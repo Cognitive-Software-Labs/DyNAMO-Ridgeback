@@ -1,0 +1,12 @@
+build/
+install/
+log/
+
+# Cloned external dependencies (managed via .repos)
+src/clearpath_simulator/
+src/clearpath_common/
+src/clearpath_config/
+src/clearpath_msgs/
+src/clearpath_nav2_demos/
+src/m-explore-ros2/
+src/slam_toolbox/

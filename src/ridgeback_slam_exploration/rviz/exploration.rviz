@@ -1,0 +1,75 @@
+Panels:
+  - Class: rviz_common/Displays
+    Name: Displays
+  - Class: rviz_common/Views
+    Name: Views
+Visualization Manager:
+  Class: ""
+  Displays:
+    - Class: rviz_default_plugins/RobotModel
+      Description Topic:
+        Value: /r100_0001/robot_description
+      Name: RobotModel
+      Enabled: true
+      TF Prefix: ""
+    - Class: rviz_default_plugins/Map
+      Name: SLAM Map
+      Enabled: true
+      Topic:
+        Value: /r100_0001/map
+      Update Topic:
+        Value: /r100_0001/map_updates
+      Color Scheme: map
+    - Class: rviz_default_plugins/LaserScan
+      Name: Lidar
+      Enabled: true
+      Topic:
+        Value: /r100_0001/sensors/lidar2d_0/scan
+      Size (m): 0.05
+      Color Transformer: FlatColor
+      Color: 255; 0; 0
+    - Class: rviz_default_plugins/Map
+      Name: Global Costmap
+      Enabled: false
+      Topic:
+        Value: /r100_0001/global_costmap/costmap
+      Color Scheme: costmap
+    - Class: rviz_default_plugins/Map
+      Name: Local Costmap
+      Enabled: false
+      Topic:
+        Value: /r100_0001/local_costmap/costmap
+      Color Scheme: costmap
+    - Class: rviz_default_plugins/Path
+      Name: Global Plan
+      Enabled: true
+      Topic:
+        Value: /r100_0001/plan
+      Color: 0; 255; 0
+    - Class: rviz_default_plugins/MarkerArray
+      Name: Frontiers
+      Enabled: true
+      Topic:
+        Value: /r100_0001/explore/frontiers
+    - Class: rviz_default_plugins/TF
+      Name: TF
+      Enabled: false
+  Global Options:
+    Background Color: 48; 48; 48
+    Fixed Frame: map
+    Frame Rate: 30
+  Tools:
+    - Class: rviz_default_plugins/MoveCamera
+    - Class: rviz_default_plugins/SetInitialPose
+      Topic:
+        Value: /r100_0001/initialpose
+    - Class: rviz_default_plugins/SetGoal
+      Topic:
+        Value: /r100_0001/goal_pose
+  Views:
+    Current:
+      Class: rviz_default_plugins/TopDownOrtho
+      Name: TopDownOrtho
+      Scale: 50
+      X: 0
+      Y: 0
