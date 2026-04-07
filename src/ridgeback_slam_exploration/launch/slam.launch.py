@@ -2,27 +2,43 @@ import os
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument
+from launch.actions import DeclareLaunchArgument, OpaqueFunction
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import LifecycleNode, Node
 
+from clearpath_config.clearpath_config import ClearpathConfig
+from clearpath_config.common.utils.yaml import read_yaml
+from nav2_common.launch import RewrittenYaml
 
-def generate_launch_description():
+
+def launch_setup(context, *args, **kwargs):
     pkg_this = get_package_share_directory('ridgeback_slam_exploration')
 
-    namespace = LaunchConfiguration('namespace')
     use_sim_time = LaunchConfiguration('use_sim_time')
+    setup_path = LaunchConfiguration('setup_path')
+
+    # Read namespace from robot.yaml
+    config = read_yaml(os.path.join(setup_path.perform(context), 'robot.yaml'))
+    clearpath_config = ClearpathConfig(config)
+    namespace = clearpath_config.system.namespace
+    scan_topic = f'/{namespace}/sensors/lidar2d_0/scan'
 
     slam_params_file = os.path.join(pkg_this, 'config', 'slam_toolbox_params.yaml')
+
+    rewritten_params = RewrittenYaml(
+        source_file=slam_params_file,
+        root_key=namespace,
+        param_rewrites={
+            'scan_topic': scan_topic,
+        },
+        convert_types=True,
+    )
 
     # Same TF remapping pattern used by Nav2 nodes
     remappings = [('/tf', 'tf'), ('/tf_static', 'tf_static'),
                   ('/map', 'map'), ('/map_metadata', 'map_metadata')]
 
-    return LaunchDescription([
-        DeclareLaunchArgument('namespace', default_value='r100_0001'),
-        DeclareLaunchArgument('use_sim_time', default_value='true'),
-
+    return [
         LifecycleNode(
             package='slam_toolbox',
             executable='async_slam_toolbox_node',
@@ -30,7 +46,7 @@ def generate_launch_description():
             namespace=namespace,
             output='screen',
             parameters=[
-                slam_params_file,
+                rewritten_params,
                 {'use_sim_time': use_sim_time, 'use_lifecycle_manager': True},
             ],
             remappings=remappings,
@@ -50,4 +66,13 @@ def generate_launch_description():
                 {'bond_respawn_max_duration': 0.0},
             ],
         ),
+    ]
+
+
+def generate_launch_description():
+    return LaunchDescription([
+        DeclareLaunchArgument('use_sim_time', default_value='true'),
+        DeclareLaunchArgument('setup_path',
+                              default_value=os.path.expanduser('~/clearpath/')),
+        OpaqueFunction(function=launch_setup),
     ])

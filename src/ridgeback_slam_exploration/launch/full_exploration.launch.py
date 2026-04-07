@@ -4,7 +4,7 @@ from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 import launch.conditions
 from launch.actions import (
-    DeclareLaunchArgument, IncludeLaunchDescription, TimerAction,
+    DeclareLaunchArgument, IncludeLaunchDescription, SetEnvironmentVariable, TimerAction,
 )
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
@@ -23,7 +23,10 @@ def generate_launch_description():
 
     rviz_config = os.path.join(pkg_this, 'rviz', 'exploration.rviz')
 
+    fastrtps_config = os.path.join(pkg_this, 'config', 'fastrtps_no_shm.xml')
+
     return LaunchDescription([
+        SetEnvironmentVariable('FASTRTPS_DEFAULT_PROFILES_FILE', fastrtps_config),
         DeclareLaunchArgument('namespace', default_value='r100_0001'),
         DeclareLaunchArgument('use_sim_time', default_value='true'),
         DeclareLaunchArgument('setup_path',
@@ -65,7 +68,7 @@ def generate_launch_description():
                         os.path.join(launch_dir, 'slam.launch.py')
                     ),
                     launch_arguments={
-                        'namespace': namespace,
+                        'setup_path': setup_path,
                         'use_sim_time': use_sim_time,
                     }.items(),
                 ),
