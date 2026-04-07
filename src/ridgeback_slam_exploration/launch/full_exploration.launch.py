@@ -37,8 +37,10 @@ def generate_launch_description():
             package='rviz2',
             executable='rviz2',
             name='rviz2',
+            namespace=namespace,
             arguments=['-d', rviz_config],
             parameters=[{'use_sim_time': use_sim_time}],
+            remappings=[('/tf', 'tf'), ('/tf_static', 'tf_static')],
             output='screen',
             condition=launch.conditions.IfCondition(rviz),
         ),
@@ -56,7 +58,7 @@ def generate_launch_description():
 
         # 2. Launch SLAM (delayed to let sim fully start and publish TF)
         TimerAction(
-            period=10.0,
+            period=20.0,
             actions=[
                 IncludeLaunchDescription(
                     PythonLaunchDescriptionSource(
@@ -72,7 +74,7 @@ def generate_launch_description():
 
         # 3. Launch Nav2 (delayed to let SLAM start publishing map)
         TimerAction(
-            period=15.0,
+            period=30.0,
             actions=[
                 IncludeLaunchDescription(
                     PythonLaunchDescriptionSource(
@@ -88,7 +90,7 @@ def generate_launch_description():
 
         # 4. Launch explore_lite (delayed to let Nav2 fully start)
         TimerAction(
-            period=25.0,
+            period=45.0,
             actions=[
                 IncludeLaunchDescription(
                     PythonLaunchDescriptionSource(

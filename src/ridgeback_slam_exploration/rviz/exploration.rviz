@@ -21,13 +21,21 @@ Visualization Manager:
         Value: /r100_0001/map_updates
       Color Scheme: map
     - Class: rviz_default_plugins/LaserScan
-      Name: Lidar
+      Name: Lidar Front
       Enabled: true
       Topic:
         Value: /r100_0001/sensors/lidar2d_0/scan
       Size (m): 0.05
       Color Transformer: FlatColor
       Color: 255; 0; 0
+    - Class: rviz_default_plugins/LaserScan
+      Name: Lidar Rear
+      Enabled: true
+      Topic:
+        Value: /r100_0001/sensors/lidar2d_1/scan
+      Size (m): 0.05
+      Color Transformer: FlatColor
+      Color: 0; 0; 255
     - Class: rviz_default_plugins/Map
       Name: Global Costmap
       Enabled: false
