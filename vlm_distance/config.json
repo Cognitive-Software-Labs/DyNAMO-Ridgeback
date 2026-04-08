@@ -1,0 +1,14 @@
+{
+  "camera": {
+    "depth_hfov_deg": 87.0,
+    "depth_vfov_deg": 58.0,
+    "pitch_deg": 0.0,
+    "height_m": 0.50476
+  },
+  "model": {
+    "default_name": "qwen-vl-max"
+  },
+  "api_key_required": {
+    "api": "sk-361f22ac85054d6db195766446883299"
+  }
+}
