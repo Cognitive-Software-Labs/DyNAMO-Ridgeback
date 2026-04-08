@@ -15,7 +15,7 @@ def generate_launch_description():
 
     setup_path = LaunchConfiguration('setup_path')
     world = LaunchConfiguration('world')
-    rviz = LaunchConfiguration('rviz')
+    clearpath_rviz = LaunchConfiguration('clearpath_rviz')
 
     return LaunchDescription([
         DeclareLaunchArgument(
@@ -29,9 +29,9 @@ def generate_launch_description():
             description='Gazebo world to load',
         ),
         DeclareLaunchArgument(
-            'rviz',
+            'clearpath_rviz',
             default_value='false',
-            description='Launch RViz',
+            description='Launch the Clearpath-provided RViz instance',
         ),
         # Add our worlds and models directories so Gazebo can find them
         AppendEnvironmentVariable(
@@ -49,7 +49,7 @@ def generate_launch_description():
             launch_arguments={
                 'setup_path': setup_path,
                 'world': world,
-                'rviz': rviz,
+                'rviz': clearpath_rviz,
                 'use_sim_time': 'true',
             }.items(),
         ),

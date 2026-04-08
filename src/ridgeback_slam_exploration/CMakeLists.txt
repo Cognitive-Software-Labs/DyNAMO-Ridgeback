@@ -31,6 +31,11 @@ install(TARGETS SpawnG1
   LIBRARY DESTINATION lib/${PROJECT_NAME}
 )
 
+install(PROGRAMS
+  scripts/camera_windows_node
+  DESTINATION lib/${PROJECT_NAME}
+)
+
 install(DIRECTORY
   launch
   config

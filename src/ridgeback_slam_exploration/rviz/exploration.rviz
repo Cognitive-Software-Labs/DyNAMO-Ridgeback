@@ -1,83 +1,222 @@
 Panels:
   - Class: rviz_common/Displays
+    Help Height: 0
     Name: Displays
+    Property Tree Widget:
+      Expanded:
+        - /Global Options1
+        - /RobotModel1
+        - /SLAM Map1
+        - /Cameras1
+      Splitter Ratio: 0.5
+    Tree Height: 720
+  - Class: rviz_common/Selection
+    Name: Selection
+  - Class: rviz_common/Tool Properties
+    Expanded:
+      - /SetInitialPose1
+      - /SetGoal1
+    Name: Tool Properties
+    Splitter Ratio: 0.58
   - Class: rviz_common/Views
+    Expanded:
+      - /Current View1
     Name: Views
+    Splitter Ratio: 0.5
 Visualization Manager:
   Class: ""
   Displays:
+    - Alpha: 0.5
+      Cell Size: 1
+      Class: rviz_default_plugins/Grid
+      Color: 160; 160; 164
+      Enabled: true
+      Line Style:
+        Line Width: 0.03
+        Value: Lines
+      Name: Grid
+      Normal Cell Count: 0
+      Offset:
+        X: 0
+        Y: 0
+        Z: 0
+      Plane: XY
+      Plane Cell Count: 20
+      Reference Frame: <Fixed Frame>
+      Value: true
     - Class: rviz_default_plugins/RobotModel
+      Description Source: Topic
       Description Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
         Value: /r100_0001/robot_description
+      Enabled: true
       Name: RobotModel
-      Enabled: true
       TF Prefix: ""
+      Value: true
     - Class: rviz_default_plugins/Map
-      Name: SLAM Map
+      Color Scheme: map
       Enabled: true
+      Name: SLAM Map
       Topic:
+        Depth: 5
+        Durability Policy: Transient Local
+        History Policy: Keep Last
+        Reliability Policy: Reliable
         Value: /r100_0001/map
       Update Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
         Value: /r100_0001/map_updates
-      Color Scheme: map
+      Value: true
     - Class: rviz_default_plugins/LaserScan
-      Name: Lidar Front
-      Enabled: true
-      Topic:
-        Value: /r100_0001/sensors/lidar2d_0/scan
-      Size (m): 0.05
-      Color Transformer: FlatColor
       Color: 255; 0; 0
-    - Class: rviz_default_plugins/LaserScan
-      Name: Lidar Rear
-      Enabled: true
-      Topic:
-        Value: /r100_0001/sensors/lidar2d_1/scan
-      Size (m): 0.05
       Color Transformer: FlatColor
+      Enabled: true
+      Name: Lidar Front
+      Size (m): 0.05
+      Style: Flat Squares
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Best Effort
+        Value: /r100_0001/sensors/lidar2d_0/scan
+      Value: true
+    - Class: rviz_default_plugins/LaserScan
       Color: 0; 0; 255
+      Color Transformer: FlatColor
+      Enabled: true
+      Name: Lidar Rear
+      Size (m): 0.05
+      Style: Flat Squares
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Best Effort
+        Value: /r100_0001/sensors/lidar2d_1/scan
+      Value: true
+    - Class: rviz_common/Group
+      Displays:
+        - Class: rviz_default_plugins/Image
+          Enabled: true
+          Max Value: 1
+          Median window: 5
+          Min Value: 0
+          Name: Camera Color
+          Normalize Range: true
+          Queue Size: 10
+          Topic:
+            Depth: 5
+            Durability Policy: Volatile
+            History Policy: Keep Last
+            Reliability Policy: Reliable
+            Value: /r100_0001/sensors/camera_0/color/image
+          Value: true
+        - Class: rviz_default_plugins/Image
+          Enabled: true
+          Max Value: 10
+          Median window: 5
+          Min Value: 0
+          Name: Camera Depth
+          Normalize Range: false
+          Queue Size: 10
+          Topic:
+            Depth: 5
+            Durability Policy: Volatile
+            History Policy: Keep Last
+            Reliability Policy: Reliable
+            Value: /r100_0001/sensors/camera_0/depth/image
+          Value: true
+      Enabled: true
+      Name: Cameras
     - Class: rviz_default_plugins/Map
+      Color Scheme: costmap
+      Enabled: false
       Name: Global Costmap
-      Enabled: false
-      Topic:
-        Value: /r100_0001/global_costmap/costmap
-      Color Scheme: costmap
+      Topic: /r100_0001/global_costmap/costmap
+      Value: true
     - Class: rviz_default_plugins/Map
-      Name: Local Costmap
-      Enabled: false
-      Topic:
-        Value: /r100_0001/local_costmap/costmap
       Color Scheme: costmap
-    - Class: rviz_default_plugins/Path
-      Name: Global Plan
-      Enabled: true
-      Topic:
-        Value: /r100_0001/plan
-      Color: 0; 255; 0
-    - Class: rviz_default_plugins/MarkerArray
-      Name: Frontiers
-      Enabled: true
-      Topic:
-        Value: /r100_0001/explore/frontiers
-    - Class: rviz_default_plugins/TF
-      Name: TF
       Enabled: false
+      Name: Local Costmap
+      Topic: /r100_0001/local_costmap/costmap
+      Value: true
+    - Class: rviz_default_plugins/Path
+      Color: 0; 255; 0
+      Enabled: true
+      Name: Global Plan
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /r100_0001/plan
+      Value: true
+    - Class: rviz_default_plugins/MarkerArray
+      Enabled: true
+      Name: Frontiers
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /r100_0001/explore/frontiers
+      Value: true
+    - Class: rviz_default_plugins/TF
+      Enabled: false
+      Frame Timeout: 15
+      Marker Scale: 1
+      Name: TF
+      Show Arrows: true
+      Show Axes: true
+      Show Names: true
+      Value: true
+  Enabled: true
   Global Options:
     Background Color: 48; 48; 48
     Fixed Frame: map
     Frame Rate: 30
+  Name: root
   Tools:
     - Class: rviz_default_plugins/MoveCamera
+    - Class: rviz_default_plugins/Select
+    - Class: rviz_default_plugins/FocusCamera
+    - Class: rviz_default_plugins/Measure
+      Line color: 128; 128; 0
     - Class: rviz_default_plugins/SetInitialPose
-      Topic:
-        Value: /r100_0001/initialpose
+      Topic: /r100_0001/initialpose
     - Class: rviz_default_plugins/SetGoal
-      Topic:
-        Value: /r100_0001/goal_pose
+      Topic: /r100_0001/goal_pose
+  Transformation:
+    Current:
+      Class: rviz_default_plugins/TF
+  Value: true
   Views:
     Current:
+      Angle: 0
       Class: rviz_default_plugins/TopDownOrtho
-      Name: TopDownOrtho
+      Name: Current View
+      Near Clip Distance: 0.01
       Scale: 50
+      Target Frame: map
+      Value: TopDownOrtho
       X: 0
       Y: 0
+Window Geometry:
+  Displays:
+    collapsed: false
+  Height: 1400
+  Hide Left Dock: false
+  Hide Right Dock: false
+  QMainWindow State: 000000ff00000000fd0000000400000000000002020000054bfc0200000008fb000000100044006900730070006c00610079007301000000000000032a0000017400fffffffb0000001200530065006c0065006300740069006f006e0100000330000000a4000000a400fffffffb0000001e0054006f006f006c002000500072006f007000650072007400690065007301000003da000000a5000000a500fffffffb0000000a005600690065007700730100000484000000c7000000c700ffffff00000001000001a80000054bfc0200000001fb0000001a00520065006e0064006500720069006e006700000000000000054b0000009800ffffff0000000300000a000000007c0100000001fb0000000a0056006900650077007302000000000000000000000000000000000000000002000000090000003efc0100000002fb0000000800540069006d0065010000000000000a0000002e00fffffffb0000001200530065006c0065006300740069006f006e010000000000000a0000000000000000000005d30000054b00000004000000040000000800000008fc00000000
+  Views:
+    collapsed: false
+  Width: 2560
+  X: 0
+  Y: 24

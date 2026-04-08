@@ -19,7 +19,8 @@ def generate_launch_description():
     use_sim_time = LaunchConfiguration('use_sim_time')
     setup_path = LaunchConfiguration('setup_path')
     world = LaunchConfiguration('world')
-    rviz = LaunchConfiguration('rviz')
+    exploration_rviz = LaunchConfiguration('exploration_rviz')
+    camera_windows = LaunchConfiguration('camera_windows')
 
     rviz_config = os.path.join(pkg_this, 'rviz', 'exploration.rviz')
 
@@ -32,8 +33,10 @@ def generate_launch_description():
         DeclareLaunchArgument('setup_path',
                               default_value=os.path.expanduser('~/clearpath/')),
         DeclareLaunchArgument('world', default_value='warehouse'),
-        DeclareLaunchArgument('rviz', default_value='true',
-                              description='Launch RViz2'),
+        DeclareLaunchArgument('exploration_rviz', default_value='true',
+                              description='Launch the exploration RViz2 config'),
+        DeclareLaunchArgument('camera_windows', default_value='true',
+                              description='Launch OpenCV camera viewer windows'),
 
         # RViz2
         Node(
@@ -45,7 +48,18 @@ def generate_launch_description():
             parameters=[{'use_sim_time': use_sim_time}],
             remappings=[('/tf', 'tf'), ('/tf_static', 'tf_static')],
             output='screen',
-            condition=launch.conditions.IfCondition(rviz),
+            condition=launch.conditions.IfCondition(exploration_rviz),
+        ),
+
+        Node(
+            package='ridgeback_slam_exploration',
+            executable='camera_windows_node',
+            name='camera_windows',
+            namespace=namespace,
+            parameters=[{'use_sim_time': use_sim_time}],
+            remappings=[('/tf', 'tf'), ('/tf_static', 'tf_static')],
+            output='screen',
+            condition=launch.conditions.IfCondition(camera_windows),
         ),
 
         # 1. Launch Gazebo simulation
@@ -56,6 +70,7 @@ def generate_launch_description():
             launch_arguments={
                 'setup_path': setup_path,
                 'world': world,
+                'clearpath_rviz': 'false',
             }.items(),
         ),
 
