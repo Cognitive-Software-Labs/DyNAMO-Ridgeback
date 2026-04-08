@@ -1,13 +1,14 @@
 diff --git a/clearpath_gz/config/gui.config b/clearpath_gz/config/gui.config
-index 4d74475..e41c508 100644
+index 4d74475..8e92f6f 100644
 --- a/clearpath_gz/config/gui.config
 +++ b/clearpath_gz/config/gui.config
-@@ -1068,71 +1068,3 @@
+@@ -1068,71 +1068,20 @@
          <property key="pluginToolBarTextColor" type="string">#111111</property>
      </gz-gui>
  </plugin>
 -<plugin filename="Teleop">
--    <gz-gui>
++<plugin filename="SpawnG1" name="Spawn G1">
+     <gz-gui>
 -        <property key="x" type="double">0</property>
 -        <property key="y" type="double">0</property>
 -        <property key="z" type="double">0</property>
@@ -15,7 +16,12 @@ index 4d74475..e41c508 100644
 -        <property key="height" type="double">968</property>
 -        <property key="opacity" type="double">1</property>
 -        <property key="enabled" type="bool">true</property>
--        <property key="visible" type="bool">true</property>
++        <property key="state" type="string">floating</property>
++        <property key="x" type="double">1700</property>
++        <property key="y" type="double">60</property>
++        <property key="width" type="double">140</property>
++        <property key="height" type="double">50</property>
+         <property key="visible" type="bool">true</property>
 -        <property key="state" type="string">docked</property>
 -        <property key="baselineOffset" type="double">0</property>
 -        <property key="clip" type="bool">false</property>
@@ -72,8 +78,52 @@ index 4d74475..e41c508 100644
 -        <property key="cardMinimumHeight" type="int">650</property>
 -        <property key="pluginToolBarColor" type="string">#bbdefb</property>
 -        <property key="pluginToolBarTextColor" type="string">#111111</property>
--    </gz-gui>
--</plugin>
++        <property key="showTitleBar" type="bool">false</property>
++        <property key="showCloseButton" type="bool">false</property>
++        <property key="showCollapseButton" type="bool">false</property>
++        <property key="resizable" type="bool">false</property>
++        <property key="standalone" type="bool">true</property>
++        <property key="cardMinimumWidth" type="int">140</property>
++        <property key="cardMinimumHeight" type="int">50</property>
+     </gz-gui>
+ </plugin>
+diff --git a/clearpath_gz/launch/gz_sim.launch.py b/clearpath_gz/launch/gz_sim.launch.py
+index 69135ab..38589ce 100644
+--- a/clearpath_gz/launch/gz_sim.launch.py
++++ b/clearpath_gz/launch/gz_sim.launch.py
+@@ -84,13 +84,24 @@ def generate_launch_description():
+     packages_paths = [os.path.join(p, 'share') for p in os.getenv('AMENT_PREFIX_PATH').split(':')]
+ 
+     # Set ignition resource path to include all sourced ros packages
++    # Also include ridgeback_slam_exploration worlds and models
++    pkg_this_exploration = get_package_share_directory('ridgeback_slam_exploration')
+     gz_sim_resource_path = SetEnvironmentVariable(
+         name='GZ_SIM_RESOURCE_PATH',
+         value=[
+             os.path.join(pkg_clearpath_gz, 'worlds') + ':',
+             os.path.join(pkg_clearpath_gz, 'meshes') + ':',
++            os.path.join(pkg_this_exploration, 'worlds') + ':',
++            os.path.join(pkg_this_exploration, 'models') + ':',
+             ':' + ':'.join(packages_paths)])
+ 
++    # Add SpawnG1 plugin path so Gazebo GUI can find it
++    gz_gui_plugin_path = SetEnvironmentVariable(
++        name='GZ_GUI_PLUGIN_PATH',
++        value=os.path.join(
++            get_package_share_directory('ridgeback_slam_exploration'),
++            '..', '..', 'lib', 'ridgeback_slam_exploration'))
++
+     # Clock bridge
+     clock_bridge = Node(
+         package='ros_gz_bridge',
+@@ -105,6 +116,7 @@ def generate_launch_description():
+     # Create launch description and add actions
+     ld = LaunchDescription(ARGUMENTS)
+     ld.add_action(gz_sim_resource_path)
++    ld.add_action(gz_gui_plugin_path)
+     ld.add_action(OpaqueFunction(function=gz_launch))
+     ld.add_action(clock_bridge)
+     return ld
 diff --git a/clearpath_gz/launch/simulation.launch.py b/clearpath_gz/launch/simulation.launch.py
 index 010f7fb..355e8b1 100644
 --- a/clearpath_gz/launch/simulation.launch.py

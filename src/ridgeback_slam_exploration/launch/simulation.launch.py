@@ -33,10 +33,14 @@ def generate_launch_description():
             default_value='false',
             description='Launch RViz',
         ),
-        # Add our worlds directory so Gazebo can find custom worlds (e.g. hospital)
+        # Add our worlds and models directories so Gazebo can find them
         AppendEnvironmentVariable(
             'GZ_SIM_RESOURCE_PATH',
             os.path.join(pkg_this, 'worlds'),
+        ),
+        AppendEnvironmentVariable(
+            'GZ_SIM_RESOURCE_PATH',
+            os.path.join(pkg_this, 'models'),
         ),
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(

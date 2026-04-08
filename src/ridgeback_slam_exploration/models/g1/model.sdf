@@ -1,0 +1,288 @@
+<?xml version="1.0"?>
+<sdf version="1.9">
+  <model name="g1">
+    <static>true</static>
+    <link name="body">
+      <visual name="pelvis_visual">
+        <pose>0.000000 0.000000 0.776864 0.000000 0.000000 0.000000</pose>
+        <geometry><mesh><uri>meshes/pelvis.STL</uri></mesh></geometry>
+        <material><ambient>0.2 0.2 0.2 1</ambient><diffuse>0.2 0.2 0.2 1</diffuse><specular>0.3 0.3 0.3 1</specular></material>
+      </visual>
+      <visual name="pelvis_contour_link_visual">
+        <pose>0.000000 0.000000 0.776864 0.000000 0.000000 0.000000</pose>
+        <geometry><mesh><uri>meshes/pelvis_contour_link.STL</uri></mesh></geometry>
+        <material><ambient>0.7 0.7 0.7 1</ambient><diffuse>0.7 0.7 0.7 1</diffuse><specular>0.9 0.9 0.9 1</specular></material>
+      </visual>
+      <visual name="left_hip_pitch_link_visual">
+        <pose>0.000000 0.064452 0.674164 0.000000 0.000000 0.000000</pose>
+        <geometry><mesh><uri>meshes/left_hip_pitch_link.STL</uri></mesh></geometry>
+        <material><ambient>0.2 0.2 0.2 1</ambient><diffuse>0.2 0.2 0.2 1</diffuse><specular>0.3 0.3 0.3 1</specular></material>
+      </visual>
+      <visual name="left_hip_roll_link_visual">
+        <pose>0.000000 0.116452 0.643699 0.000000 -0.174900 0.000000</pose>
+        <geometry><mesh><uri>meshes/left_hip_roll_link.STL</uri></mesh></geometry>
+        <material><ambient>0.7 0.7 0.7 1</ambient><diffuse>0.7 0.7 0.7 1</diffuse><specular>0.9 0.9 0.9 1</specular></material>
+      </visual>
+      <visual name="left_hip_yaw_link_visual">
+        <pose>0.046218 0.116452 0.525823 0.000000 -0.174900 0.000000</pose>
+        <geometry><mesh><uri>meshes/left_hip_yaw_link.STL</uri></mesh></geometry>
+        <material><ambient>0.7 0.7 0.7 1</ambient><diffuse>0.7 0.7 0.7 1</diffuse><specular>0.9 0.9 0.9 1</specular></material>
+      </visual>
+      <visual name="left_knee_link_visual">
+        <pose>-0.000002 0.118601 0.337568 0.000000 0.000000 0.000000</pose>
+        <geometry><mesh><uri>meshes/left_knee_link.STL</uri></mesh></geometry>
+        <material><ambient>0.7 0.7 0.7 1</ambient><diffuse>0.7 0.7 0.7 1</diffuse><specular>0.9 0.9 0.9 1</specular></material>
+      </visual>
+      <visual name="left_ankle_pitch_link_visual">
+        <pose>-0.000002 0.118506 0.037558 0.000000 0.000000 0.000000</pose>
+        <geometry><mesh><uri>meshes/left_ankle_pitch_link.STL</uri></mesh></geometry>
+        <material><ambient>0.7 0.7 0.7 1</ambient><diffuse>0.7 0.7 0.7 1</diffuse><specular>0.9 0.9 0.9 1</specular></material>
+      </visual>
+      <visual name="left_ankle_roll_link_visual">
+        <pose>-0.000002 0.118506 0.020000 0.000000 0.000000 0.000000</pose>
+        <geometry><mesh><uri>meshes/left_ankle_roll_link.STL</uri></mesh></geometry>
+        <material><ambient>0.2 0.2 0.2 1</ambient><diffuse>0.2 0.2 0.2 1</diffuse><specular>0.3 0.3 0.3 1</specular></material>
+      </visual>
+      <visual name="right_hip_pitch_link_visual">
+        <pose>0.000000 -0.064452 0.674164 0.000000 0.000000 0.000000</pose>
+        <geometry><mesh><uri>meshes/right_hip_pitch_link.STL</uri></mesh></geometry>
+        <material><ambient>0.2 0.2 0.2 1</ambient><diffuse>0.2 0.2 0.2 1</diffuse><specular>0.3 0.3 0.3 1</specular></material>
+      </visual>
+      <visual name="right_hip_roll_link_visual">
+        <pose>0.000000 -0.116452 0.643699 0.000000 -0.174900 0.000000</pose>
+        <geometry><mesh><uri>meshes/right_hip_roll_link.STL</uri></mesh></geometry>
+        <material><ambient>0.7 0.7 0.7 1</ambient><diffuse>0.7 0.7 0.7 1</diffuse><specular>0.9 0.9 0.9 1</specular></material>
+      </visual>
+      <visual name="right_hip_yaw_link_visual">
+        <pose>0.046218 -0.116452 0.525823 0.000000 -0.174900 0.000000</pose>
+        <geometry><mesh><uri>meshes/right_hip_yaw_link.STL</uri></mesh></geometry>
+        <material><ambient>0.7 0.7 0.7 1</ambient><diffuse>0.7 0.7 0.7 1</diffuse><specular>0.9 0.9 0.9 1</specular></material>
+      </visual>
+      <visual name="right_knee_link_visual">
+        <pose>-0.000002 -0.118601 0.337568 0.000000 0.000000 0.000000</pose>
+        <geometry><mesh><uri>meshes/right_knee_link.STL</uri></mesh></geometry>
+        <material><ambient>0.7 0.7 0.7 1</ambient><diffuse>0.7 0.7 0.7 1</diffuse><specular>0.9 0.9 0.9 1</specular></material>
+      </visual>
+      <visual name="right_ankle_pitch_link_visual">
+        <pose>-0.000002 -0.118506 0.037558 0.000000 0.000000 0.000000</pose>
+        <geometry><mesh><uri>meshes/right_ankle_pitch_link.STL</uri></mesh></geometry>
+        <material><ambient>0.7 0.7 0.7 1</ambient><diffuse>0.7 0.7 0.7 1</diffuse><specular>0.9 0.9 0.9 1</specular></material>
+      </visual>
+      <visual name="right_ankle_roll_link_visual">
+        <pose>-0.000002 -0.118506 0.020000 0.000000 0.000000 0.000000</pose>
+        <geometry><mesh><uri>meshes/right_ankle_roll_link.STL</uri></mesh></geometry>
+        <material><ambient>0.2 0.2 0.2 1</ambient><diffuse>0.2 0.2 0.2 1</diffuse><specular>0.3 0.3 0.3 1</specular></material>
+      </visual>
+      <visual name="waist_yaw_link_visual">
+        <pose>0.000000 0.000000 0.776864 0.000000 0.000000 0.000000</pose>
+        <geometry><mesh><uri>meshes/waist_yaw_link.STL</uri></mesh></geometry>
+        <material><ambient>0.7 0.7 0.7 1</ambient><diffuse>0.7 0.7 0.7 1</diffuse><specular>0.9 0.9 0.9 1</specular></material>
+      </visual>
+      <visual name="waist_roll_link_visual">
+        <pose>-0.003964 0.000000 0.811864 0.000000 0.000000 0.000000</pose>
+        <geometry><mesh><uri>meshes/waist_roll_link.STL</uri></mesh></geometry>
+        <material><ambient>0.7 0.7 0.7 1</ambient><diffuse>0.7 0.7 0.7 1</diffuse><specular>0.9 0.9 0.9 1</specular></material>
+      </visual>
+      <visual name="torso_link_visual">
+        <pose>-0.003964 0.000000 0.830864 0.000000 0.000000 0.000000</pose>
+        <geometry><mesh><uri>meshes/torso_link.STL</uri></mesh></geometry>
+        <material><ambient>0.7 0.7 0.7 1</ambient><diffuse>0.7 0.7 0.7 1</diffuse><specular>0.9 0.9 0.9 1</specular></material>
+      </visual>
+      <visual name="logo_link_visual">
+        <pose>0.000000 0.000000 0.776864 0.000000 0.000000 0.000000</pose>
+        <geometry><mesh><uri>meshes/logo_link.STL</uri></mesh></geometry>
+        <material><ambient>0.2 0.2 0.2 1</ambient><diffuse>0.2 0.2 0.2 1</diffuse><specular>0.3 0.3 0.3 1</specular></material>
+      </visual>
+      <visual name="head_link_visual">
+        <pose>0.000000 0.000000 0.776864 0.000000 0.000000 0.000000</pose>
+        <geometry><mesh><uri>meshes/head_link.STL</uri></mesh></geometry>
+        <material><ambient>0.2 0.2 0.2 1</ambient><diffuse>0.2 0.2 0.2 1</diffuse><specular>0.3 0.3 0.3 1</specular></material>
+      </visual>
+      <visual name="waist_support_link_visual">
+        <pose>0.000000 0.000000 0.776864 0.000000 0.000000 0.000000</pose>
+        <geometry><mesh><uri>meshes/waist_support_link.STL</uri></mesh></geometry>
+        <material><ambient>0.7 0.7 0.7 1</ambient><diffuse>0.7 0.7 0.7 1</diffuse><specular>0.9 0.9 0.9 1</specular></material>
+      </visual>
+      <visual name="left_shoulder_pitch_link_visual">
+        <pose>-0.000007 0.100220 1.068644 0.279310 0.000055 -0.000192</pose>
+        <geometry><mesh><uri>meshes/left_shoulder_pitch_link.STL</uri></mesh></geometry>
+        <material><ambient>0.7 0.7 0.7 1</ambient><diffuse>0.7 0.7 0.7 1</diffuse><specular>0.9 0.9 0.9 1</specular></material>
+      </visual>
+      <visual name="left_shoulder_roll_link_visual">
+        <pose>0.000000 0.140560 1.065825 0.000060 0.000055 -0.000192</pose>
+        <geometry><mesh><uri>meshes/left_shoulder_roll_link.STL</uri></mesh></geometry>
+        <material><ambient>0.7 0.7 0.7 1</ambient><diffuse>0.7 0.7 0.7 1</diffuse><specular>0.9 0.9 0.9 1</specular></material>
+      </visual>
+      <visual name="left_shoulder_yaw_link_visual">
+        <pose>-0.000004 0.146807 0.962625 0.000060 0.000055 -0.000192</pose>
+        <geometry><mesh><uri>meshes/left_shoulder_yaw_link.STL</uri></mesh></geometry>
+        <material><ambient>0.7 0.7 0.7 1</ambient><diffuse>0.7 0.7 0.7 1</diffuse><specular>0.9 0.9 0.9 1</specular></material>
+      </visual>
+      <visual name="left_elbow_link_visual">
+        <pose>0.015774 0.146808 0.882107 0.000060 0.000055 -0.000192</pose>
+        <geometry><mesh><uri>meshes/left_elbow_link.STL</uri></mesh></geometry>
+        <material><ambient>0.7 0.7 0.7 1</ambient><diffuse>0.7 0.7 0.7 1</diffuse><specular>0.9 0.9 0.9 1</specular></material>
+      </visual>
+      <visual name="left_wrist_roll_link_visual">
+        <pose>0.115774 0.148678 0.872101 0.000060 0.000055 -0.000192</pose>
+        <geometry><mesh><uri>meshes/left_wrist_roll_link.STL</uri></mesh></geometry>
+        <material><ambient>0.7 0.7 0.7 1</ambient><diffuse>0.7 0.7 0.7 1</diffuse><specular>0.9 0.9 0.9 1</specular></material>
+      </visual>
+      <visual name="left_wrist_pitch_link_visual">
+        <pose>0.153774 0.148671 0.872099 0.000060 0.000055 -0.000192</pose>
+        <geometry><mesh><uri>meshes/left_wrist_pitch_link.STL</uri></mesh></geometry>
+        <material><ambient>0.7 0.7 0.7 1</ambient><diffuse>0.7 0.7 0.7 1</diffuse><specular>0.9 0.9 0.9 1</specular></material>
+      </visual>
+      <visual name="left_wrist_yaw_link_visual">
+        <pose>0.199774 0.148662 0.872097 0.000060 0.000055 -0.000192</pose>
+        <geometry><mesh><uri>meshes/left_wrist_yaw_link.STL</uri></mesh></geometry>
+        <material><ambient>0.7 0.7 0.7 1</ambient><diffuse>0.7 0.7 0.7 1</diffuse><specular>0.9 0.9 0.9 1</specular></material>
+      </visual>
+      <visual name="left_rubber_hand_visual">
+        <pose>0.241275 0.151654 0.872094 0.000060 0.000055 -0.000192</pose>
+        <geometry><mesh><uri>meshes/left_rubber_hand.STL</uri></mesh></geometry>
+        <material><ambient>0.7 0.7 0.7 1</ambient><diffuse>0.7 0.7 0.7 1</diffuse><specular>0.9 0.9 0.9 1</specular></material>
+      </visual>
+      <visual name="right_shoulder_pitch_link_visual">
+        <pose>-0.000007 -0.100210 1.068644 -0.279310 0.000055 0.000192</pose>
+        <geometry><mesh><uri>meshes/right_shoulder_pitch_link.STL</uri></mesh></geometry>
+        <material><ambient>0.7 0.7 0.7 1</ambient><diffuse>0.7 0.7 0.7 1</diffuse><specular>0.9 0.9 0.9 1</specular></material>
+      </visual>
+      <visual name="right_shoulder_roll_link_visual">
+        <pose>0.000000 -0.140550 1.065825 -0.000060 0.000055 0.000192</pose>
+        <geometry><mesh><uri>meshes/right_shoulder_roll_link.STL</uri></mesh></geometry>
+        <material><ambient>0.7 0.7 0.7 1</ambient><diffuse>0.7 0.7 0.7 1</diffuse><specular>0.9 0.9 0.9 1</specular></material>
+      </visual>
+      <visual name="right_shoulder_yaw_link_visual">
+        <pose>-0.000004 -0.146797 0.962625 -0.000060 0.000055 0.000192</pose>
+        <geometry><mesh><uri>meshes/right_shoulder_yaw_link.STL</uri></mesh></geometry>
+        <material><ambient>0.7 0.7 0.7 1</ambient><diffuse>0.7 0.7 0.7 1</diffuse><specular>0.9 0.9 0.9 1</specular></material>
+      </visual>
+      <visual name="right_elbow_link_visual">
+        <pose>0.015774 -0.146798 0.882107 -0.000060 0.000055 0.000192</pose>
+        <geometry><mesh><uri>meshes/right_elbow_link.STL</uri></mesh></geometry>
+        <material><ambient>0.7 0.7 0.7 1</ambient><diffuse>0.7 0.7 0.7 1</diffuse><specular>0.9 0.9 0.9 1</specular></material>
+      </visual>
+      <visual name="right_wrist_roll_link_visual">
+        <pose>0.115774 -0.148668 0.872101 -0.000060 0.000055 0.000192</pose>
+        <geometry><mesh><uri>meshes/right_wrist_roll_link.STL</uri></mesh></geometry>
+        <material><ambient>0.7 0.7 0.7 1</ambient><diffuse>0.7 0.7 0.7 1</diffuse><specular>0.9 0.9 0.9 1</specular></material>
+      </visual>
+      <visual name="right_wrist_pitch_link_visual">
+        <pose>0.153774 -0.148661 0.872099 -0.000060 0.000055 0.000192</pose>
+        <geometry><mesh><uri>meshes/right_wrist_pitch_link.STL</uri></mesh></geometry>
+        <material><ambient>0.7 0.7 0.7 1</ambient><diffuse>0.7 0.7 0.7 1</diffuse><specular>0.9 0.9 0.9 1</specular></material>
+      </visual>
+      <visual name="right_wrist_yaw_link_visual">
+        <pose>0.199774 -0.148652 0.872097 -0.000060 0.000055 0.000192</pose>
+        <geometry><mesh><uri>meshes/right_wrist_yaw_link.STL</uri></mesh></geometry>
+        <material><ambient>0.7 0.7 0.7 1</ambient><diffuse>0.7 0.7 0.7 1</diffuse><specular>0.9 0.9 0.9 1</specular></material>
+      </visual>
+      <visual name="right_rubber_hand_visual">
+        <pose>0.241275 -0.151644 0.872094 -0.000060 0.000055 0.000192</pose>
+        <geometry><mesh><uri>meshes/right_rubber_hand.STL</uri></mesh></geometry>
+        <material><ambient>0.7 0.7 0.7 1</ambient><diffuse>0.7 0.7 0.7 1</diffuse><specular>0.9 0.9 0.9 1</specular></material>
+      </visual>
+      <collision name="pelvis_contour_link_collision">
+        <pose>0.000000 0.000000 0.776864 0.000000 0.000000 0.000000</pose>
+        <geometry><mesh><uri>meshes/pelvis_contour_link.STL</uri></mesh></geometry>
+      </collision>
+      <collision name="left_hip_pitch_link_collision">
+        <pose>0.000000 0.064452 0.674164 0.000000 0.000000 0.000000</pose>
+        <geometry><mesh><uri>meshes/left_hip_pitch_link.STL</uri></mesh></geometry>
+      </collision>
+      <collision name="left_hip_roll_link_collision">
+        <pose>0.000000 0.116452 0.643699 0.000000 -0.174900 0.000000</pose>
+        <geometry><mesh><uri>meshes/left_hip_roll_link.STL</uri></mesh></geometry>
+      </collision>
+      <collision name="left_hip_yaw_link_collision">
+        <pose>0.046218 0.116452 0.525823 0.000000 -0.174900 0.000000</pose>
+        <geometry><mesh><uri>meshes/left_hip_yaw_link.STL</uri></mesh></geometry>
+      </collision>
+      <collision name="left_knee_link_collision">
+        <pose>-0.000002 0.118601 0.337568 0.000000 0.000000 0.000000</pose>
+        <geometry><mesh><uri>meshes/left_knee_link.STL</uri></mesh></geometry>
+      </collision>
+      <collision name="left_ankle_pitch_link_collision">
+        <pose>-0.000002 0.118506 0.037558 0.000000 0.000000 0.000000</pose>
+        <geometry><mesh><uri>meshes/left_ankle_pitch_link.STL</uri></mesh></geometry>
+      </collision>
+      <collision name="right_hip_pitch_link_collision">
+        <pose>0.000000 -0.064452 0.674164 0.000000 0.000000 0.000000</pose>
+        <geometry><mesh><uri>meshes/right_hip_pitch_link.STL</uri></mesh></geometry>
+      </collision>
+      <collision name="right_hip_roll_link_collision">
+        <pose>0.000000 -0.116452 0.643699 0.000000 -0.174900 0.000000</pose>
+        <geometry><mesh><uri>meshes/right_hip_roll_link.STL</uri></mesh></geometry>
+      </collision>
+      <collision name="right_hip_yaw_link_collision">
+        <pose>0.046218 -0.116452 0.525823 0.000000 -0.174900 0.000000</pose>
+        <geometry><mesh><uri>meshes/right_hip_yaw_link.STL</uri></mesh></geometry>
+      </collision>
+      <collision name="right_knee_link_collision">
+        <pose>-0.000002 -0.118601 0.337568 0.000000 0.000000 0.000000</pose>
+        <geometry><mesh><uri>meshes/right_knee_link.STL</uri></mesh></geometry>
+      </collision>
+      <collision name="right_ankle_pitch_link_collision">
+        <pose>-0.000002 -0.118506 0.037558 0.000000 0.000000 0.000000</pose>
+        <geometry><mesh><uri>meshes/right_ankle_pitch_link.STL</uri></mesh></geometry>
+      </collision>
+      <collision name="torso_link_collision">
+        <pose>-0.003964 0.000000 0.830864 0.000000 0.000000 0.000000</pose>
+        <geometry><mesh><uri>meshes/torso_link.STL</uri></mesh></geometry>
+      </collision>
+      <collision name="logo_link_collision">
+        <pose>0.000000 0.000000 0.776864 0.000000 0.000000 0.000000</pose>
+        <geometry><mesh><uri>meshes/logo_link.STL</uri></mesh></geometry>
+      </collision>
+      <collision name="head_link_collision">
+        <pose>0.000000 0.000000 0.776864 0.000000 0.000000 0.000000</pose>
+        <geometry><mesh><uri>meshes/head_link.STL</uri></mesh></geometry>
+      </collision>
+      <collision name="waist_support_link_collision">
+        <pose>0.000000 0.000000 0.776864 0.000000 0.000000 0.000000</pose>
+        <geometry><mesh><uri>meshes/waist_support_link.STL</uri></mesh></geometry>
+      </collision>
+      <collision name="left_shoulder_yaw_link_collision">
+        <pose>-0.000004 0.146807 0.962625 0.000060 0.000055 -0.000192</pose>
+        <geometry><mesh><uri>meshes/left_shoulder_yaw_link.STL</uri></mesh></geometry>
+      </collision>
+      <collision name="left_elbow_link_collision">
+        <pose>0.015774 0.146808 0.882107 0.000060 0.000055 -0.000192</pose>
+        <geometry><mesh><uri>meshes/left_elbow_link.STL</uri></mesh></geometry>
+      </collision>
+      <collision name="left_wrist_roll_link_collision">
+        <pose>0.115774 0.148678 0.872101 0.000060 0.000055 -0.000192</pose>
+        <geometry><mesh><uri>meshes/left_wrist_roll_link.STL</uri></mesh></geometry>
+      </collision>
+      <collision name="left_wrist_pitch_link_collision">
+        <pose>0.153774 0.148671 0.872099 0.000060 0.000055 -0.000192</pose>
+        <geometry><mesh><uri>meshes/left_wrist_pitch_link.STL</uri></mesh></geometry>
+      </collision>
+      <collision name="left_wrist_yaw_link_collision">
+        <pose>0.199774 0.148662 0.872097 0.000060 0.000055 -0.000192</pose>
+        <geometry><mesh><uri>meshes/left_wrist_yaw_link.STL</uri></mesh></geometry>
+      </collision>
+      <collision name="right_shoulder_yaw_link_collision">
+        <pose>-0.000004 -0.146797 0.962625 -0.000060 0.000055 0.000192</pose>
+        <geometry><mesh><uri>meshes/right_shoulder_yaw_link.STL</uri></mesh></geometry>
+      </collision>
+      <collision name="right_elbow_link_collision">
+        <pose>0.015774 -0.146798 0.882107 -0.000060 0.000055 0.000192</pose>
+        <geometry><mesh><uri>meshes/right_elbow_link.STL</uri></mesh></geometry>
+      </collision>
+      <collision name="right_wrist_roll_link_collision">
+        <pose>0.115774 -0.148668 0.872101 -0.000060 0.000055 0.000192</pose>
+        <geometry><mesh><uri>meshes/right_wrist_roll_link.STL</uri></mesh></geometry>
+      </collision>
+      <collision name="right_wrist_pitch_link_collision">
+        <pose>0.153774 -0.148661 0.872099 -0.000060 0.000055 0.000192</pose>
+        <geometry><mesh><uri>meshes/right_wrist_pitch_link.STL</uri></mesh></geometry>
+      </collision>
+      <collision name="right_wrist_yaw_link_collision">
+        <pose>0.199774 -0.148652 0.872097 -0.000060 0.000055 0.000192</pose>
+        <geometry><mesh><uri>meshes/right_wrist_yaw_link.STL</uri></mesh></geometry>
+      </collision>
+    </link>
+  </model>
+</sdf>

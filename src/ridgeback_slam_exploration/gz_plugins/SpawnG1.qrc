@@ -1,0 +1,5 @@
+<RCC>
+  <qresource prefix="SpawnG1">
+    <file>SpawnG1.qml</file>
+  </qresource>
+</RCC>
