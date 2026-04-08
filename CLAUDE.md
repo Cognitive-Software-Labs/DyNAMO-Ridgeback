@@ -10,7 +10,7 @@ ROS 2 Jazzy project for autonomous SLAM-based frontier exploration of a Clearpat
 
 ```bash
 source /opt/ros/jazzy/setup.bash
-cd /home/davszi/dev/gazeebo
+cd /path/to/DyNAMO-Ridgeback
 
 # Clone external deps (first time only)
 vcs import < .repos
@@ -31,20 +31,26 @@ source install/setup.bash
 ## Launch Commands
 
 ```bash
-# All-in-one (sim + SLAM + Nav2 + exploration + RViz with timed delays)
+# Always clean up stale processes first
+bash cleanup.sh
+
+# Main hospital scenario
+ros2 launch ridgeback_slam_exploration full_exploration.launch.py world:=hospital
+
+# Extended SLAM / exploration test
 ros2 launch ridgeback_slam_exploration full_exploration.launch.py world:=warehouse
 
-# Without RViz
-ros2 launch ridgeback_slam_exploration full_exploration.launch.py world:=warehouse rviz:=false
+# Disable the exploration RViz instance
+ros2 launch ridgeback_slam_exploration full_exploration.launch.py world:=warehouse exploration_rviz:=false
+
+# Disable the OpenCV camera viewer windows
+ros2 launch ridgeback_slam_exploration full_exploration.launch.py world:=warehouse camera_windows:=false
 
 # Individual components (run in separate terminals)
 ros2 launch ridgeback_slam_exploration simulation.launch.py
 ros2 launch ridgeback_slam_exploration slam.launch.py
 ros2 launch ridgeback_slam_exploration nav2.launch.py
 ros2 launch ridgeback_slam_exploration explore.launch.py
-
-# IMPORTANT: Always run cleanup before launching to kill stale processes
-bash cleanup.sh
 ```
 
 ## Namespace Convention
@@ -102,8 +108,10 @@ Managed via `.repos` file (not committed to git, listed in `.gitignore`):
 
 ## Important Notes
 
+- The primary scenario is `hospital`; `warehouse` is used as a larger extended SLAM and exploration test.
 - All nodes must use `use_sim_time: true` in simulation — a single wall-clock node breaks TF.
-- The `full_exploration.launch.py` uses `TimerAction` delays (10s/15s/25s) to sequence startup. If Gazebo is slow to load, increase these.
+- The integrated `full_exploration.launch.py` also launches the custom RViz config and the `camera_windows_node` viewer by default.
+- The `full_exploration.launch.py` uses `TimerAction` delays (20s/30s/45s from startup) to sequence SLAM, Nav2, and exploration. If Gazebo is slow to load, increase these.
 - Robot config must be symlinked/copied to `~/clearpath/` for the Clearpath simulator default path.
 - **Always run `bash cleanup.sh` before launching** — Gazebo and ROS 2 processes leak across launches, causing topic conflicts, stale TF, and duplicate publishers.
-- The `diag.sh` script provides comprehensive diagnostics: `bash diag.sh [logfile]`
+- The `diag.sh` script provides comprehensive diagnostics: `bash diag.sh [logfile] [world]`

@@ -1,12 +1,14 @@
 #!/bin/bash
 # Full diagnostic for the Ridgeback SLAM exploration stack
-# Usage: bash diag.sh [logfile]
+# Usage: bash diag.sh [logfile] [world]
 
 set -o pipefail
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source /opt/ros/jazzy/setup.bash 2>/dev/null
-source /home/davszi/dev/gazeebo/install/setup.bash 2>/dev/null
+[ -f "$SCRIPT_DIR/install/setup.bash" ] && source "$SCRIPT_DIR/install/setup.bash" 2>/dev/null
 
 LOGFILE="${1:-}"
+WORLD_ARG="${2:-}"
 NS="r100_0001"
 TIMEOUT=5
 
@@ -24,7 +26,19 @@ pgrep -af "slam_toolbox|nav2|explore|controller_server|ekf_node|parameter_bridge
 # 2. Gazebo sim state (via gz transport, independent of ROS)
 section "GAZEBO SIM STATE"
 if command -v gz &>/dev/null || source /opt/ros/jazzy/setup.bash 2>/dev/null; then
-    timeout $TIMEOUT gz topic -e -t /world/warehouse/stats -n 1 2>/dev/null | head -12 || echo "  Cannot reach Gazebo transport"
+    WORLD_TOPIC=""
+    if [ -n "$WORLD_ARG" ]; then
+        WORLD_TOPIC="/world/${WORLD_ARG}/stats"
+    else
+        WORLD_TOPIC=$(timeout $TIMEOUT gz topic -l 2>/dev/null | grep '^/world/.*/stats$' | head -1)
+    fi
+
+    if [ -n "$WORLD_TOPIC" ]; then
+        echo "  Topic: $WORLD_TOPIC"
+        timeout $TIMEOUT gz topic -e -t "$WORLD_TOPIC" -n 1 2>/dev/null | head -12 || echo "  Cannot reach Gazebo transport"
+    else
+        echo "  No active /world/*/stats topic found"
+    fi
 else
     echo "  gz command not available"
 fi

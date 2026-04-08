@@ -1,8 +1,8 @@
 # Ridgeback SLAM & Frontier Exploration
 
-Autonomous frontier exploration for a [Clearpath Ridgeback](https://clearpathrobotics.com/ridgeback-indoor-robot-platform/) robot in Gazebo simulation, using ROS 2 Jazzy.
+Autonomous frontier exploration for a [Clearpath Ridgeback](https://clearpathrobotics.com/ridgeback-indoor-robot-platform/) robot in Gazebo Harmonic with ROS 2 Jazzy.
 
-The robot starts with no prior map and autonomously explores a static environment by detecting frontiers (boundaries between known and unknown space) and navigating to them.
+The integrated launch path brings up simulation, SLAM, Nav2, frontier exploration, a custom RViz layout, and camera preview windows. The main scenario in this workspace is `hospital`, while `warehouse` is used as an extended SLAM and exploration test.
 
 ## Stack
 
@@ -40,7 +40,6 @@ sudo apt install -y \
   python3-colcon-common-extensions \
   python3-rosdep \
   python3-vcstool \
-  ros-jazzy-slam-toolbox \
   ros-jazzy-navigation2 \
   ros-jazzy-nav2-bringup \
   ros-jazzy-ros-gz
@@ -56,7 +55,7 @@ source /opt/ros/jazzy/setup.bash
 ### 2. Build the workspace
 
 ```bash
-cd /path/to/gazeebo
+cd /path/to/DyNAMO-Ridgeback
 
 # Clone external dependencies
 vcs import < .repos
@@ -72,6 +71,8 @@ colcon build --symlink-install
 source install/setup.bash
 ```
 
+If you rename or move the workspace directory later, wipe `build/`, `install/`, and `log/` before rebuilding so the generated setup files do not keep stale absolute paths.
+
 ### 3. Set up robot config
 
 The Clearpath simulator expects the robot config at `~/clearpath/`:
@@ -85,47 +86,62 @@ cp clearpath/robot.yaml ~/clearpath/robot.yaml
 
 ### Full autonomous exploration (recommended)
 
+Start every run from a sourced workspace:
+
+```bash
+source /opt/ros/jazzy/setup.bash
+cd /path/to/DyNAMO-Ridgeback
+source install/setup.bash
+```
+
+### Main scenarios
+
 ```bash
 # Always clean up stale processes first
 bash cleanup.sh
 
+# Main hospital scenario
+ros2 launch ridgeback_slam_exploration full_exploration.launch.py world:=hospital
+
+# Extended SLAM / exploration test
 ros2 launch ridgeback_slam_exploration full_exploration.launch.py world:=warehouse
 ```
 
-This launches everything with timed delays (+ RViz by default):
-1. Gazebo + Ridgeback spawn
-2. slam_toolbox (after 10s)
-3. Nav2 stack (after 15s)
-4. explore_lite frontier exploration (after 25s)
+The integrated launch does all of this for you:
+1. Starts Gazebo and spawns the Ridgeback.
+2. Launches the exploration RViz config.
+3. Launches the custom OpenCV camera viewer windows.
+4. Starts `slam_toolbox` after 20 seconds.
+5. Starts Nav2 after 30 seconds.
+6. Starts `explore_lite` after 45 seconds.
 
-### Launch components individually
+By default, RViz shows the exploration view plus the camera feeds under the `Cameras` group, and the custom node opens separate color and depth windows.
 
-In separate terminals (source the workspace in each):
+### Useful launch toggles
 
 ```bash
-# Terminal 1: Simulation
-ros2 launch ridgeback_slam_exploration simulation.launch.py
+# Disable the custom RViz instance
+ros2 launch ridgeback_slam_exploration full_exploration.launch.py world:=warehouse exploration_rviz:=false
 
-# Terminal 2: SLAM
-ros2 launch ridgeback_slam_exploration slam.launch.py
-
-# Terminal 3: Navigation
-ros2 launch ridgeback_slam_exploration nav2.launch.py
-
-# Terminal 4: Exploration
-ros2 launch ridgeback_slam_exploration explore.launch.py
+# Disable the OpenCV camera preview windows
+ros2 launch ridgeback_slam_exploration full_exploration.launch.py world:=warehouse camera_windows:=false
 ```
 
-RViz launches automatically. To disable: `rviz:=false`.
+### Simulation only
 
-Displays: SLAM map, lidar scan, global plan path, frontier markers.
+```bash
+ros2 launch ridgeback_slam_exploration simulation.launch.py world:=hospital
+ros2 launch ridgeback_slam_exploration simulation.launch.py world:=warehouse
+```
+
+The per-component launch files still exist for debugging and development, but the intended workflow for normal use is the integrated `full_exploration.launch.py` entrypoint.
 
 ## Configuration
 
 ### Robot sensors (`clearpath/robot.yaml`)
 
 - **Hokuyo UST-10LX**: Mounted at front of chassis, provides 2D laser scan for SLAM and costmaps
-- **Intel RealSense D455**: Mounted on 0.2m riser bracket (~1m above ground), provides depth + RGB
+- **Intel RealSense D455**: Mounted on a riser bracket, provides depth + RGB to RViz and the custom `camera_windows_node`
 
 ### Key parameters to tune
 
@@ -206,8 +222,9 @@ If you add new nodes to this project, always:
 |---------|-------|
 | Robot doesn't move | `ros2 topic echo /r100_0001/cmd_vel` — if empty, Nav2 may not be active |
 | No map in RViz | `ros2 topic hz /r100_0001/map` — if 0, check slam_toolbox logs and scan topic |
+| Camera windows do not appear | Make sure `camera_windows:=true` and check `/r100_0001/sensors/camera_0/color/image` |
 | explore_lite not finding frontiers | Verify `track_unknown_space: true` in global costmap config |
 | TF errors | Ensure all nodes use `use_sim_time: true` |
 | Gazebo slow to start | Increase `TimerAction` delays in `full_exploration.launch.py` |
 | Stale processes from previous runs | Run `bash cleanup.sh` before each launch |
-| Diagnostics | Run `bash diag.sh /tmp/logfile.log` for comprehensive status |
+| Diagnostics | Run `bash diag.sh /tmp/logfile.log hospital` or `bash diag.sh /tmp/logfile.log warehouse` |
