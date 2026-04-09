@@ -10,10 +10,11 @@ The integrated launch path brings up simulation, SLAM, Nav2, frontier exploratio
 |-------|---------|---------|
 | Simulation | Gazebo Harmonic + clearpath_simulator | Physics, sensors, world |
 | Perception | Hokuyo UST-10LX 2D lidar | Obstacle detection + SLAM input |
-| Perception | Intel RealSense D455 (~1m height) | Depth/RGB (future use) |
+| Perception | Intel RealSense D455 (~1m height) | Depth/RGB for overlay and distance estimation |
 | SLAM | slam_toolbox (online async, from source) | Map building + localization |
 | Navigation | Nav2 (MPPI omni controller) | Path planning + obstacle avoidance |
 | Exploration | explore_lite (m-explore-ros2) | Frontier detection + goal selection |
+| Detection | g1_detection_node (OWLv2) | VLM-based humanoid robot detection + geometry/depth distance estimation |
 
 ## Prerequisites
 
@@ -110,12 +111,11 @@ ros2 launch ridgeback_slam_exploration full_exploration.launch.py world:=warehou
 The integrated launch does all of this for you:
 1. Starts Gazebo and spawns the Ridgeback.
 2. Launches the exploration RViz config.
-3. Launches the custom OpenCV camera viewer windows.
-4. Starts `slam_toolbox` after 20 seconds.
-5. Starts Nav2 after 30 seconds.
-6. Starts `explore_lite` after 45 seconds.
+3. Starts `slam_toolbox` after 20 seconds.
+4. Starts Nav2 after 30 seconds.
+5. Starts `explore_lite` after 45 seconds.
 
-By default, RViz shows the exploration view plus the camera feeds under the `Cameras` group, and the custom node opens separate color and depth windows.
+By default, RViz shows the exploration view plus the camera feeds under the `Cameras` group. When `g1_detection:=true`, `g1_detection_node` opens the combined RGB/depth detection window and can optionally add the Depth-Anything comparison pane.
 
 ### Useful launch toggles
 
@@ -123,9 +123,27 @@ By default, RViz shows the exploration view plus the camera feeds under the `Cam
 # Disable the custom RViz instance
 ros2 launch ridgeback_slam_exploration full_exploration.launch.py world:=warehouse exploration_rviz:=false
 
-# Disable the OpenCV camera preview windows
-ros2 launch ridgeback_slam_exploration full_exploration.launch.py world:=warehouse camera_windows:=false
+# Enable VLM-based humanoid robot detection
+ros2 launch ridgeback_slam_exploration full_exploration.launch.py world:=hospital g1_detection:=true
+
+# Optional: compare live sensor depth with Depth-Anything metric depth
+ros2 launch ridgeback_slam_exploration full_exploration.launch.py world:=hospital g1_detection:=true depth_anything_enabled:=true
 ```
+
+### VLM detection setup (first time only)
+
+The `g1_detection_node` uses a local OWLv2 detector and the live depth stream to produce a side-by-side detection overlay. It publishes the original geometry-based `distance` estimate plus a sensor-depth `depth_distance`, and it can optionally compare against a metric Depth-Anything branch in a 3-pane RGB / sensor depth / mono depth view. It requires a Python venv with PyTorch and Transformers:
+
+```bash
+# Create venv that can see ROS 2 packages
+python3 -m venv --system-site-packages perception_venv
+echo "/opt/ros/jazzy/lib/python3.12/site-packages" > perception_venv/lib/python3.12/site-packages/ros2.pth
+
+# Install VLM dependencies
+perception_venv/bin/python3 -m pip install torch torchvision transformers accelerate Pillow
+```
+
+The node's shebang points to `perception_venv/bin/python3` directly. The first launch will download the OWLv2 detector from Hugging Face. If you enable `depth_anything_enabled:=true`, the first run will also download the Depth-Anything V2 metric checkpoint into the local Hugging Face cache.
 
 ### Simulation only
 
@@ -141,7 +159,7 @@ The per-component launch files still exist for debugging and development, but th
 ### Robot sensors (`clearpath/robot.yaml`)
 
 - **Hokuyo UST-10LX**: Mounted at front of chassis, provides 2D laser scan for SLAM and costmaps
-- **Intel RealSense D455**: Mounted on a riser bracket, provides depth + RGB to RViz and the custom `camera_windows_node`
+- **Intel RealSense D455**: Mounted on a riser bracket, provides depth + RGB to RViz and the `g1_detection_node` overlay
 
 ### Key parameters to tune
 
@@ -222,7 +240,7 @@ If you add new nodes to this project, always:
 |---------|-------|
 | Robot doesn't move | `ros2 topic echo /r100_0001/cmd_vel` — if empty, Nav2 may not be active |
 | No map in RViz | `ros2 topic hz /r100_0001/map` — if 0, check slam_toolbox logs and scan topic |
-| Camera windows do not appear | Make sure `camera_windows:=true` and check `/r100_0001/sensors/camera_0/color/image` |
+| Detection overlay does not appear | Make sure `g1_detection:=true` and check `/r100_0001/sensors/camera_0/color/image` |
 | explore_lite not finding frontiers | Verify `track_unknown_space: true` in global costmap config |
 | TF errors | Ensure all nodes use `use_sim_time: true` |
 | Gazebo slow to start | Increase `TimerAction` delays in `full_exploration.launch.py` |

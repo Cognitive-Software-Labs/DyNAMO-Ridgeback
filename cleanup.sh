@@ -44,6 +44,8 @@ PATTERNS=(
     twist_server
     ros2-daemon
     rviz2
+    camera_windows_node
+    g1_detection_node
 )
 
 for pat in "${PATTERNS[@]}"; do

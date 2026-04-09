@@ -20,7 +20,8 @@ def generate_launch_description():
     setup_path = LaunchConfiguration('setup_path')
     world = LaunchConfiguration('world')
     exploration_rviz = LaunchConfiguration('exploration_rviz')
-    camera_windows = LaunchConfiguration('camera_windows')
+    g1_detection = LaunchConfiguration('g1_detection')
+    depth_anything_enabled = LaunchConfiguration('depth_anything_enabled')
 
     rviz_config = os.path.join(pkg_this, 'rviz', 'exploration.rviz')
 
@@ -35,8 +36,10 @@ def generate_launch_description():
         DeclareLaunchArgument('world', default_value='warehouse'),
         DeclareLaunchArgument('exploration_rviz', default_value='true',
                               description='Launch the exploration RViz2 config'),
-        DeclareLaunchArgument('camera_windows', default_value='true',
-                              description='Launch OpenCV camera viewer windows'),
+        DeclareLaunchArgument('g1_detection', default_value='false',
+                              description='Launch VLM-based G1 robot detection node'),
+        DeclareLaunchArgument('depth_anything_enabled', default_value='false',
+                              description='Enable Depth-Anything metric depth branch'),
 
         # RViz2
         Node(
@@ -53,13 +56,16 @@ def generate_launch_description():
 
         Node(
             package='ridgeback_slam_exploration',
-            executable='camera_windows_node',
-            name='camera_windows',
+            executable='g1_detection_node',
+            name='g1_detection',
             namespace=namespace,
-            parameters=[{'use_sim_time': use_sim_time}],
+            parameters=[{
+                'use_sim_time': use_sim_time,
+                'depth_anything_enabled': depth_anything_enabled,
+            }],
             remappings=[('/tf', 'tf'), ('/tf_static', 'tf_static')],
             output='screen',
-            condition=launch.conditions.IfCondition(camera_windows),
+            condition=launch.conditions.IfCondition(g1_detection),
         ),
 
         # 1. Launch Gazebo simulation

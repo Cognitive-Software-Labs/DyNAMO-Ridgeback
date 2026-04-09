@@ -1,0 +1,11 @@
+std_msgs/Header header
+bool detected
+int32 count
+float32[] bbox
+float32[] position_x
+float32[] position_z
+float32[] distance
+float32[] depth_distance
+float32[] depth_anything_distance
+int32 img_width
+int32 img_height

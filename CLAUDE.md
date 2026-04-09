@@ -43,9 +43,6 @@ ros2 launch ridgeback_slam_exploration full_exploration.launch.py world:=warehou
 # Disable the exploration RViz instance
 ros2 launch ridgeback_slam_exploration full_exploration.launch.py world:=warehouse exploration_rviz:=false
 
-# Disable the OpenCV camera viewer windows
-ros2 launch ridgeback_slam_exploration full_exploration.launch.py world:=warehouse camera_windows:=false
-
 # Individual components (run in separate terminals)
 ros2 launch ridgeback_slam_exploration simulation.launch.py
 ros2 launch ridgeback_slam_exploration slam.launch.py
@@ -110,7 +107,7 @@ Managed via `.repos` file (not committed to git, listed in `.gitignore`):
 
 - The primary scenario is `hospital`; `warehouse` is used as a larger extended SLAM and exploration test.
 - All nodes must use `use_sim_time: true` in simulation — a single wall-clock node breaks TF.
-- The integrated `full_exploration.launch.py` also launches the custom RViz config and the `camera_windows_node` viewer by default.
+- The integrated `full_exploration.launch.py` launches the custom RViz config by default, and `g1_detection_node` can be added with `g1_detection:=true` when you want the combined perception overlay.
 - The `full_exploration.launch.py` uses `TimerAction` delays (20s/30s/45s from startup) to sequence SLAM, Nav2, and exploration. If Gazebo is slow to load, increase these.
 - Robot config must be symlinked/copied to `~/clearpath/` for the Clearpath simulator default path.
 - **Always run `bash cleanup.sh` before launching** — Gazebo and ROS 2 processes leak across launches, causing topic conflicts, stale TF, and duplicate publishers.

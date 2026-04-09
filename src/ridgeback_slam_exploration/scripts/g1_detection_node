@@ -1,0 +1,803 @@
+#!/home/deivid/dev/DyNAMO-Ridgeback/perception_venv/bin/python3
+
+import json
+import math
+import os
+
+import cv2
+from message_filters import ApproximateTimeSynchronizer, Subscriber
+import numpy as np
+import rclpy
+import torch
+from ament_index_python.packages import get_package_share_directory
+from PIL import Image as PILImage
+from rclpy.executors import ExternalShutdownException
+from rclpy.node import Node
+from rclpy.qos import qos_profile_sensor_data
+from sensor_msgs.msg import Image
+from transformers import pipeline as hf_pipeline
+
+from ridgeback_slam_exploration.msg import G1Detection
+
+
+DETECTION_MODEL_DEFAULT = 'google/owlv2-base-patch16-ensemble'
+DETECTION_LABELS = ['humanoid robot']
+DETECTION_THRESHOLD = 0.55
+NMS_IOU_THRESHOLD = 0.5
+ROBOT_FRONT_OFFSET_M = 0.25
+
+DEPTH_MAX_METERS_DEFAULT = 10.0
+SYNC_QUEUE_SIZE_DEFAULT = 10
+SYNC_SLOP_SEC_DEFAULT = 0.1
+DEPTH_ANYTHING_ENABLED_DEFAULT = False
+DEPTH_ANYTHING_MODEL_ID_DEFAULT = 'depth-anything/Depth-Anything-V2-Metric-Indoor-Small-hf'
+DEPTH_FOCUS_X_MIN = 0.24
+DEPTH_FOCUS_X_MAX = 0.76
+DEPTH_FOCUS_Y_MIN = 0.18
+DEPTH_FOCUS_Y_MAX = 0.62
+
+
+def load_config(config_path: str) -> dict:
+    if not os.path.exists(config_path):
+        return {
+            'camera': {
+                'depth_hfov_deg': 87.0,
+                'depth_vfov_deg': 58.0,
+                'pitch_deg': 0.0,
+                'height_m': 0.50476,
+            }
+        }
+    with open(config_path, 'r', encoding='utf-8') as f:
+        return json.load(f)
+
+
+def compute_iou(box_a, box_b):
+    x1 = max(box_a[0], box_b[0])
+    y1 = max(box_a[1], box_b[1])
+    x2 = min(box_a[2], box_b[2])
+    y2 = min(box_a[3], box_b[3])
+    inter = max(0, x2 - x1) * max(0, y2 - y1)
+    area_a = (box_a[2] - box_a[0]) * (box_a[3] - box_a[1])
+    area_b = (box_b[2] - box_b[0]) * (box_b[3] - box_b[1])
+    union = area_a + area_b - inter
+    return inter / union if union > 0 else 0.0
+
+
+def nms(detections, iou_threshold):
+    detections.sort(key=lambda d: d['score'], reverse=True)
+    keep = []
+    for det in detections:
+        suppressed = False
+        for kept in keep:
+            if compute_iou(det['bbox_pixel'], kept['bbox_pixel']) > iou_threshold:
+                suppressed = True
+                break
+        if not suppressed:
+            keep.append(det)
+    return keep
+
+
+def parse_owl_detections(outputs: list, img_width: int, img_height: int,
+                         threshold: float) -> dict:
+    result = {
+        'detected': False,
+        'count': 0,
+        'robots': [],
+        'img_width': img_width,
+        'img_height': img_height,
+    }
+
+    for det in outputs:
+        score = det['score']
+        if score < threshold:
+            continue
+
+        box = det['box']
+        x1 = max(0, min(img_width - 1, int(box['xmin'])))
+        y1 = max(0, min(img_height - 1, int(box['ymin'])))
+        x2 = max(x1 + 1, min(img_width, int(math.ceil(box['xmax']))))
+        y2 = max(y1 + 1, min(img_height, int(math.ceil(box['ymax']))))
+
+        result['robots'].append({
+            'bbox_pixel': [x1, y1, x2, y2],
+            'center_px': [(x1 + x2) // 2, (y1 + y2) // 2],
+            'score': score,
+            'label': det['label'],
+        })
+
+    result['robots'] = nms(result['robots'], NMS_IOU_THRESHOLD)
+    result['count'] = len(result['robots'])
+    result['detected'] = result['count'] > 0
+    return result
+
+
+def add_topdown_xz_from_floor(result: dict, config: dict) -> dict:
+    if not result.get('detected'):
+        return result
+
+    cam = config['camera']
+    hfov = cam['depth_hfov_deg']
+    vfov = cam['depth_vfov_deg']
+    pitch_deg = cam['pitch_deg']
+    height_m = cam['height_m']
+
+    img_w = result['img_width']
+    img_h = result['img_height']
+
+    fx = img_w / (2.0 * math.tan(math.radians(hfov / 2.0)))
+    fy = img_h / (2.0 * math.tan(math.radians(vfov / 2.0)))
+    cx0 = img_w / 2.0
+    cy0 = img_h / 2.0
+    pitch = math.radians(pitch_deg)
+
+    for robot in result['robots']:
+        x1, y1, x2, y2 = robot['bbox_pixel']
+        cx = robot['center_px'][0]
+
+        u = cx
+        v = y2
+
+        x_cam = (u - cx0) / fx
+        y_cam = (v - cy0) / fy
+        z_cam = 1.0
+
+        x_world, y_world, z_world = rotate_camera_to_vehicle_frame(
+            x_cam,
+            y_cam,
+            z_cam,
+            pitch,
+        )
+
+        if y_world <= 0:
+            robot['x_m'] = None
+            robot['z_m'] = None
+            robot['distance_m'] = None
+            continue
+
+        t = height_m / y_world
+        x_m = x_world * t
+        z_m = z_world * t
+        x_m, z_m = apply_vehicle_front_offset(x_m, z_m)
+
+        robot['x_m'] = float(x_m)
+        robot['z_m'] = float(z_m)
+        robot['distance_m'] = float(math.sqrt(x_m ** 2 + z_m ** 2))
+
+    return result
+
+
+def rotate_camera_to_vehicle_frame(x_cam, y_cam, z_cam, pitch_rad: float):
+    cos_pitch = math.cos(pitch_rad)
+    sin_pitch = math.sin(pitch_rad)
+
+    # Positive pitch means the camera is tilted downward toward the floor.
+    x_vehicle = x_cam
+    y_vehicle = cos_pitch * y_cam + sin_pitch * z_cam
+    z_vehicle = -sin_pitch * y_cam + cos_pitch * z_cam
+    return x_vehicle, y_vehicle, z_vehicle
+
+
+def apply_vehicle_front_offset(x_m, z_m):
+    return x_m, z_m - ROBOT_FRONT_OFFSET_M
+
+
+class G1DetectionNode(Node):
+    def __init__(self) -> None:
+        super().__init__('g1_detection_node')
+
+        pkg_share = get_package_share_directory('ridgeback_slam_exploration')
+        default_config = os.path.join(pkg_share, 'config', 'vlm_config.json')
+
+        self.declare_parameter('detection_model', DETECTION_MODEL_DEFAULT)
+        self.declare_parameter('detection_threshold', DETECTION_THRESHOLD)
+        self.declare_parameter('vlm_config_path', default_config)
+        self.declare_parameter('color_topic', 'sensors/camera_0/color/image')
+        self.declare_parameter('depth_topic', 'sensors/camera_0/depth/image')
+        self.declare_parameter('depth_max_meters', DEPTH_MAX_METERS_DEFAULT)
+        self.declare_parameter('depth_anything_enabled', DEPTH_ANYTHING_ENABLED_DEFAULT)
+        default_depth_anything_device = 'cuda' if torch.cuda.is_available() else 'cpu'
+        self.declare_parameter('depth_anything_model_id', DEPTH_ANYTHING_MODEL_ID_DEFAULT)
+        self.declare_parameter('depth_anything_device', default_depth_anything_device)
+        self.declare_parameter('sync_queue_size', SYNC_QUEUE_SIZE_DEFAULT)
+        self.declare_parameter('sync_slop_sec', SYNC_SLOP_SEC_DEFAULT)
+        self.declare_parameter('window_name', 'G1 Detection')
+
+        self.detection_model = self.get_parameter('detection_model').value
+        self.detection_threshold = self.get_parameter('detection_threshold').value
+        self.vlm_config_path = self.get_parameter('vlm_config_path').value
+        self.color_topic = self.get_parameter('color_topic').value
+        self.depth_topic = self.get_parameter('depth_topic').value
+        self.depth_max_meters = float(self.get_parameter('depth_max_meters').value)
+        self.depth_anything_enabled = bool(self.get_parameter('depth_anything_enabled').value)
+        self.depth_anything_model_id = self.get_parameter('depth_anything_model_id').value
+        self.depth_anything_device = self.get_parameter('depth_anything_device').value
+        self.sync_queue_size = int(self.get_parameter('sync_queue_size').value)
+        self.sync_slop_sec = float(self.get_parameter('sync_slop_sec').value)
+        self.window_name = self.get_parameter('window_name').value
+
+        self.config = load_config(self.vlm_config_path)
+        self.latest_synced_messages = None
+
+        self.get_logger().info(f'Loading detection model: {self.detection_model}')
+        detector_device = 'cuda' if torch.cuda.is_available() else 'cpu'
+        self.get_logger().info(f'Using detection device: {detector_device}')
+        self.detector = hf_pipeline(
+            task='zero-shot-object-detection',
+            model=self.detection_model,
+            device=detector_device,
+        )
+        self.get_logger().info('Detection model loaded.')
+        self.depth_anything = None
+        if self.depth_anything_enabled:
+            self.depth_anything = self.load_depth_anything_pipeline()
+        else:
+            self.get_logger().info('Depth-Anything metric branch is disabled.')
+
+        self.color_subscriber = Subscriber(
+            self,
+            Image,
+            self.color_topic,
+            qos_profile=qos_profile_sensor_data,
+        )
+        self.depth_subscriber = Subscriber(
+            self,
+            Image,
+            self.depth_topic,
+            qos_profile=qos_profile_sensor_data,
+        )
+        self.sync = ApproximateTimeSynchronizer(
+            [self.color_subscriber, self.depth_subscriber],
+            queue_size=self.sync_queue_size,
+            slop=self.sync_slop_sec,
+        )
+        self.sync.registerCallback(self.synced_callback)
+        self.get_logger().info(f'Subscribed to color stream: {self.color_topic}')
+        self.get_logger().info(f'Subscribed to depth stream: {self.depth_topic}')
+
+        self.detection_pub = self.create_publisher(G1Detection, 'vlm/g1_detection', 10)
+
+        cv2.namedWindow(self.window_name, cv2.WINDOW_NORMAL)
+        cv2.resizeWindow(self.window_name, 1280, 720)
+        cv2.moveWindow(self.window_name, 60, 60)
+
+    def synced_callback(self, color_msg: Image, depth_msg: Image) -> None:
+        self.latest_synced_messages = (color_msg, depth_msg)
+
+    def run_detection_loop(self) -> None:
+        while rclpy.ok():
+            rclpy.spin_once(self, timeout_sec=0.1)
+            if self.latest_synced_messages is None:
+                cv2.waitKey(1)
+                continue
+
+            color_msg, depth_msg = self.latest_synced_messages
+            self.latest_synced_messages = None
+
+            try:
+                frame = self.convert_color_image(color_msg)
+            except ValueError as exc:
+                self.get_logger().warn(
+                    f'Cannot decode color image ({color_msg.encoding}): {exc}'
+                )
+                continue
+
+            depth_warning = None
+            try:
+                depth_meters = self.convert_depth_to_meters(depth_msg)
+            except ValueError as exc:
+                depth_meters = None
+                depth_warning = f'No usable depth ({depth_msg.encoding})'
+                self.get_logger().warn(
+                    f'Cannot decode depth image ({depth_msg.encoding}): {exc}'
+                )
+
+            h, w = frame.shape[:2]
+            pil_image = PILImage.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+            depth_anything_meters, depth_anything_warning = self.predict_depth_anything(
+                pil_image,
+                (h, w),
+            )
+
+            self.get_logger().info('Running detection...')
+            outputs = self.detector(
+                pil_image,
+                candidate_labels=DETECTION_LABELS,
+            )
+
+            detection = parse_owl_detections(outputs, w, h, self.detection_threshold)
+            detection = add_topdown_xz_from_floor(detection, self.config)
+            detection = self.add_depth_distances(
+                detection,
+                depth_meters,
+                depth_anything_meters,
+            )
+
+            for r in detection['robots']:
+                sensor_distance = r.get('depth_distance_m')
+                mono_distance = r.get('depth_anything_distance_m')
+                sensor_text = f'{sensor_distance:.2f}m' if sensor_distance is not None else 'N/A'
+                mono_text = f'{mono_distance:.2f}m' if mono_distance is not None else 'N/A'
+                self.get_logger().info(
+                    f'Detected: {r["label"]} (score={r["score"]:.2f}) '
+                    f'bbox={r["bbox_pixel"]} '
+                    f'GeoD={r.get("distance_m")} SensorD={sensor_text} MonoD={mono_text}'
+                )
+
+            if not detection['detected']:
+                self.get_logger().info('No detections above threshold.')
+
+            annotated = self.draw_overlay(
+                frame,
+                depth_meters,
+                depth_anything_meters,
+                detection,
+                depth_warning,
+                depth_anything_warning,
+            )
+            cv2.imshow(self.window_name, annotated)
+            cv2.waitKey(1)
+
+            self.publish_detection(detection, color_msg.header)
+
+    def load_depth_anything_pipeline(self):
+        self.get_logger().info(
+            f'Loading Depth-Anything model: {self.depth_anything_model_id} '
+            f'on {self.depth_anything_device}'
+        )
+        try:
+            pipeline = hf_pipeline(
+                task='depth-estimation',
+                model=self.depth_anything_model_id,
+                device=self.depth_anything_device,
+            )
+        except Exception as exc:
+            self.get_logger().warn(
+                f'Cannot load Depth-Anything model ({self.depth_anything_model_id}): {exc}'
+            )
+            return None
+
+        self.get_logger().info('Depth-Anything model loaded.')
+        return pipeline
+
+    def predict_depth_anything(
+        self,
+        image: PILImage.Image,
+        target_shape,
+    ) -> tuple[np.ndarray | None, str | None]:
+        if not self.depth_anything_enabled:
+            return None, 'Depth-Anything disabled'
+        if self.depth_anything is None:
+            return None, 'Depth-Anything unavailable'
+
+        try:
+            outputs = self.depth_anything(image)
+        except Exception as exc:
+            self.get_logger().warn(
+                f'Depth-Anything inference failed: {exc}. Disabling the metric branch.'
+            )
+            self.depth_anything = None
+            return None, 'Depth-Anything unavailable'
+
+        predicted_depth = outputs.get('predicted_depth')
+        if predicted_depth is None:
+            self.get_logger().warn('Depth-Anything returned no predicted_depth output.')
+            self.depth_anything = None
+            return None, 'Depth-Anything unavailable'
+
+        if isinstance(predicted_depth, torch.Tensor):
+            depth_meters = predicted_depth.detach().cpu().numpy()
+        else:
+            depth_meters = np.asarray(predicted_depth)
+
+        depth_meters = np.squeeze(depth_meters).astype(np.float32)
+        if depth_meters.ndim != 2:
+            self.get_logger().warn(
+                f'Depth-Anything returned unexpected shape {depth_meters.shape}. '
+                'Disabling the metric branch.'
+            )
+            self.depth_anything = None
+            return None, 'Depth-Anything unavailable'
+
+        target_h, target_w = target_shape
+        if depth_meters.shape != (target_h, target_w):
+            depth_meters = cv2.resize(
+                depth_meters,
+                (target_w, target_h),
+                interpolation=cv2.INTER_LINEAR,
+            )
+
+        return depth_meters, None
+
+    def add_depth_distances(
+        self,
+        detection: dict,
+        sensor_depth_meters: np.ndarray | None,
+        depth_anything_meters: np.ndarray | None,
+    ) -> dict:
+        for robot in detection['robots']:
+            robot['depth_distance_m'] = None
+            robot['depth_anything_distance_m'] = None
+            robot['depth_focus_bbox_pixel'] = self.focus_bbox(robot['bbox_pixel'])
+
+        if not detection['detected']:
+            return detection
+
+        self.add_depth_source_measurement(
+            detection,
+            sensor_depth_meters,
+            'depth_distance_m',
+        )
+        self.add_depth_source_measurement(
+            detection,
+            depth_anything_meters,
+            'depth_anything_distance_m',
+        )
+        return detection
+
+    def add_depth_source_measurement(
+        self,
+        detection: dict,
+        depth_meters: np.ndarray | None,
+        target_key: str,
+    ) -> None:
+        if depth_meters is None:
+            return
+
+        depth_h, depth_w = depth_meters.shape[:2]
+        color_w = detection['img_width']
+        color_h = detection['img_height']
+
+        for robot in detection['robots']:
+            focus_bbox = robot['depth_focus_bbox_pixel']
+            depth_focus_bbox = self.map_bbox_between_images(
+                focus_bbox,
+                color_w,
+                color_h,
+                depth_w,
+                depth_h,
+            )
+            robot[target_key] = self.compute_weighted_planar_distance(
+                depth_meters,
+                depth_focus_bbox,
+            )
+
+    def focus_bbox(self, bbox_pixel):
+        x1, y1, x2, y2 = bbox_pixel
+        width = max(x2 - x1, 1)
+        height = max(y2 - y1, 1)
+
+        # Sample the torso-heavy middle region to avoid floor contact and background edges.
+        focus_x1 = x1 + int(math.floor(width * DEPTH_FOCUS_X_MIN))
+        focus_x2 = x1 + int(math.ceil(width * DEPTH_FOCUS_X_MAX))
+        focus_y1 = y1 + int(math.floor(height * DEPTH_FOCUS_Y_MIN))
+        focus_y2 = y1 + int(math.ceil(height * DEPTH_FOCUS_Y_MAX))
+
+        focus_x1 = max(x1, min(x2 - 1, focus_x1))
+        focus_y1 = max(y1, min(y2 - 1, focus_y1))
+        focus_x2 = max(focus_x1 + 1, min(x2, focus_x2))
+        focus_y2 = max(focus_y1 + 1, min(y2, focus_y2))
+        return [focus_x1, focus_y1, focus_x2, focus_y2]
+
+    def map_bbox_between_images(self, bbox_pixel, src_width: int, src_height: int,
+                                dst_width: int, dst_height: int):
+        x1, y1, x2, y2 = bbox_pixel
+        scale_x = dst_width / max(src_width, 1)
+        scale_y = dst_height / max(src_height, 1)
+
+        mapped_x1 = int(math.floor(x1 * scale_x))
+        mapped_y1 = int(math.floor(y1 * scale_y))
+        mapped_x2 = int(math.ceil(x2 * scale_x))
+        mapped_y2 = int(math.ceil(y2 * scale_y))
+
+        mapped_x1 = max(0, min(dst_width - 1, mapped_x1))
+        mapped_y1 = max(0, min(dst_height - 1, mapped_y1))
+        mapped_x2 = max(mapped_x1 + 1, min(dst_width, mapped_x2))
+        mapped_y2 = max(mapped_y1 + 1, min(dst_height, mapped_y2))
+        return [mapped_x1, mapped_y1, mapped_x2, mapped_y2]
+
+    def compute_weighted_planar_distance(
+        self,
+        depth_meters: np.ndarray,
+        bbox_pixel,
+    ) -> float | None:
+        x1, y1, x2, y2 = bbox_pixel
+        roi = depth_meters[y1:y2, x1:x2]
+        if roi.size == 0:
+            return None
+
+        valid = np.isfinite(roi) & (roi > 0.0)
+        if self.depth_max_meters > 0.0:
+            valid &= roi <= self.depth_max_meters
+
+        if not np.any(valid):
+            return None
+
+        roi_h, roi_w = roi.shape
+        xs = np.arange(roi_w, dtype=np.float32)
+        ys = np.arange(roi_h, dtype=np.float32)
+        center_x = (roi_w - 1) / 2.0
+        center_y = (roi_h - 1) / 2.0
+        sigma_x = max(roi_w * 0.25, 1e-6)
+        sigma_y = max(roi_h * 0.25, 1e-6)
+
+        x_weights = np.exp(-0.5 * np.square((xs - center_x) / sigma_x))
+        y_weights = np.exp(-0.5 * np.square((ys - center_y) / sigma_y))
+        weights = np.outer(y_weights, x_weights).astype(np.float32)
+
+        img_h, img_w = depth_meters.shape[:2]
+        cam = self.config['camera']
+        fx = img_w / (2.0 * math.tan(math.radians(cam['depth_hfov_deg'] / 2.0)))
+        fy = img_h / (2.0 * math.tan(math.radians(cam['depth_vfov_deg'] / 2.0)))
+        cx0 = img_w / 2.0
+        cy0 = img_h / 2.0
+        pitch = math.radians(cam['pitch_deg'])
+
+        us = np.arange(x1, x2, dtype=np.float32)
+        vs = np.arange(y1, y2, dtype=np.float32)
+        grid_u, grid_v = np.meshgrid(us, vs)
+
+        z_cam = roi.astype(np.float32)
+        x_cam = ((grid_u - cx0) / fx) * z_cam
+        y_cam = ((grid_v - cy0) / fy) * z_cam
+        x_world, _, z_world = rotate_camera_to_vehicle_frame(
+            x_cam,
+            y_cam,
+            z_cam,
+            pitch,
+        )
+        x_world, z_world = apply_vehicle_front_offset(x_world, z_world)
+
+        valid &= z_world > 0.0
+        if not np.any(valid):
+            return None
+
+        planar_distance = np.sqrt(np.square(x_world) + np.square(z_world))
+        weights *= valid.astype(np.float32)
+
+        weight_sum = float(np.sum(weights))
+        if weight_sum <= 0.0:
+            return None
+
+        return float(np.sum(planar_distance * weights) / weight_sum)
+
+    def draw_overlay(self, frame: np.ndarray,
+                     sensor_depth_meters: np.ndarray | None,
+                     depth_anything_meters: np.ndarray | None,
+                     detection: dict,
+                     sensor_depth_warning: str | None,
+                     depth_anything_warning: str | None) -> np.ndarray:
+        color_panel = frame.copy()
+        sensor_depth_panel = self.make_depth_panel(frame.shape[:2], sensor_depth_meters)
+        depth_anything_panel = self.make_depth_panel(frame.shape[:2], depth_anything_meters)
+
+        self.draw_panel_title(color_panel, 'RGB Detection')
+        self.draw_panel_title(sensor_depth_panel, 'Sensor Depth')
+        self.draw_panel_title(depth_anything_panel, 'Depth-Anything')
+
+        if sensor_depth_warning:
+            cv2.putText(sensor_depth_panel, sensor_depth_warning, (20, 62),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2, cv2.LINE_AA)
+        if depth_anything_warning:
+            cv2.putText(depth_anything_panel, depth_anything_warning, (20, 62),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2, cv2.LINE_AA)
+
+        if not detection['detected']:
+            cv2.putText(color_panel, 'No G1 detected', (20, 100),
+                        cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 0, 255), 2, cv2.LINE_AA)
+            cv2.putText(sensor_depth_panel, 'No G1 detected', (20, 100),
+                        cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 0, 255), 2, cv2.LINE_AA)
+            cv2.putText(depth_anything_panel, 'No G1 detected', (20, 100),
+                        cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 0, 255), 2, cv2.LINE_AA)
+            return np.hstack((color_panel, sensor_depth_panel, depth_anything_panel))
+
+        for i, robot in enumerate(detection['robots']):
+            x1, y1, x2, y2 = robot['bbox_pixel']
+            score = robot.get('score', 0.0)
+            label_lines = [f'G1 #{i + 1} ({score:.0%})']
+            if robot.get('x_m') is not None:
+                label_lines.append(
+                    f'X:{robot["x_m"]:.2f}m Z:{robot["z_m"]:.2f}m'
+                )
+
+            geo_distance = robot.get('distance_m')
+            sensor_distance = robot.get('depth_distance_m')
+            depth_anything_distance = robot.get('depth_anything_distance_m')
+            label_lines.append(
+                f'GeoD:{geo_distance:.2f}m' if geo_distance is not None else 'GeoD:N/A'
+            )
+            label_lines.append(
+                f'SensorD:{sensor_distance:.2f}m'
+                if sensor_distance is not None else 'SensorD:N/A'
+            )
+            label_lines.append(
+                f'MonoD:{depth_anything_distance:.2f}m'
+                if depth_anything_distance is not None else 'MonoD:N/A'
+            )
+
+            for panel in (color_panel, sensor_depth_panel, depth_anything_panel):
+                cv2.rectangle(panel, (x1, y1), (x2, y2), (0, 255, 0), 2)
+                focus_bbox = robot.get('depth_focus_bbox_pixel')
+                if focus_bbox is not None:
+                    fx1, fy1, fx2, fy2 = focus_bbox
+                    cv2.rectangle(panel, (fx1, fy1), (fx2, fy2), (0, 200, 255), 2)
+                self.draw_label_block(panel, x1, y1, label_lines, (0, 255, 0))
+
+        return np.hstack((color_panel, sensor_depth_panel, depth_anything_panel))
+
+    def publish_detection(self, detection: dict, header) -> None:
+        msg = G1Detection()
+        msg.header = header
+        msg.detected = detection['detected']
+        msg.count = detection['count']
+        msg.img_width = detection['img_width']
+        msg.img_height = detection['img_height']
+
+        for robot in detection['robots']:
+            x1, y1, x2, y2 = [float(v) for v in robot['bbox_pixel']]
+            msg.bbox.extend([x1, y1, x2, y2])
+            msg.position_x.append(robot.get('x_m') or 0.0)
+            msg.position_z.append(robot.get('z_m') or 0.0)
+            msg.distance.append(robot.get('distance_m') or 0.0)
+            msg.depth_distance.append(robot.get('depth_distance_m') or 0.0)
+            msg.depth_anything_distance.append(robot.get('depth_anything_distance_m') or 0.0)
+
+        self.detection_pub.publish(msg)
+
+    # --- Image decoding helpers ---
+
+    def convert_color_image(self, msg: Image) -> np.ndarray:
+        image = self.decode_image(msg)
+        if msg.encoding == 'rgb8':
+            return cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
+        if msg.encoding == 'bgr8':
+            return image
+        if msg.encoding == 'rgba8':
+            return cv2.cvtColor(image, cv2.COLOR_RGBA2BGR)
+        if msg.encoding == 'bgra8':
+            return cv2.cvtColor(image, cv2.COLOR_BGRA2BGR)
+        if msg.encoding == 'mono8':
+            return cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
+        if msg.encoding == 'mono16':
+            return cv2.cvtColor(self.normalize_to_uint8(image), cv2.COLOR_GRAY2BGR)
+        raise ValueError('unsupported color encoding')
+
+    def convert_depth_to_meters(self, msg: Image) -> np.ndarray:
+        image = self.decode_image(msg)
+        if msg.encoding in ('16UC1', 'mono16'):
+            return image.astype(np.float32) / 1000.0
+        if msg.encoding == '32FC1':
+            return image.astype(np.float32)
+        raise ValueError('unsupported depth encoding')
+
+    def decode_image(self, msg: Image) -> np.ndarray:
+        if msg.encoding in ('rgb8', 'bgr8'):
+            return self.decode_buffer(msg, np.uint8, channels=3)
+        if msg.encoding in ('rgba8', 'bgra8'):
+            return self.decode_buffer(msg, np.uint8, channels=4)
+        if msg.encoding == 'mono8':
+            return self.decode_buffer(msg, np.uint8, channels=1)
+        if msg.encoding in ('mono16', '16UC1'):
+            return self.decode_buffer(msg, np.uint16, channels=1)
+        if msg.encoding == '32FC1':
+            return self.decode_buffer(msg, np.float32, channels=1)
+        raise ValueError('unsupported encoding')
+
+    def decode_buffer(self, msg: Image, dtype: np.dtype, channels: int) -> np.ndarray:
+        dtype = np.dtype(dtype)
+        row_elements = msg.step // dtype.itemsize
+        expected_columns = msg.width * channels
+
+        if row_elements < expected_columns:
+            raise ValueError('message step is smaller than expected image width')
+
+        buffer = np.frombuffer(msg.data, dtype=dtype).reshape(msg.height, row_elements)
+        cropped = buffer[:, :expected_columns]
+
+        if channels == 1:
+            return cropped.reshape(msg.height, msg.width)
+        return cropped.reshape(msg.height, msg.width, channels)
+
+    def normalize_to_uint8(self, image: np.ndarray) -> np.ndarray:
+        min_value = float(np.min(image))
+        max_value = float(np.max(image))
+        if math.isclose(min_value, max_value):
+            return np.zeros(image.shape, dtype=np.uint8)
+        scaled = (image.astype(np.float32) - min_value) / (max_value - min_value)
+        return np.clip(scaled * 255.0, 0.0, 255.0).astype(np.uint8)
+
+    def normalize_depth(self, image: np.ndarray) -> np.ndarray:
+        valid = np.isfinite(image) & (image > 0.0)
+        if self.depth_max_meters > 0.0:
+            valid &= image <= self.depth_max_meters
+
+        if not np.any(valid):
+            return np.zeros(image.shape, dtype=np.uint8)
+
+        clipped = image.copy()
+        clipped[~valid] = 0.0
+        max_value = self.depth_max_meters if self.depth_max_meters > 0.0 else float(np.max(clipped[valid]))
+        if max_value <= 0.0:
+            return np.zeros(image.shape, dtype=np.uint8)
+
+        normalized = np.clip(clipped / max_value, 0.0, 1.0)
+        return (normalized * 255.0).astype(np.uint8)
+
+    def make_depth_panel(self, color_shape, depth_meters: np.ndarray | None) -> np.ndarray:
+        color_h, color_w = color_shape
+        if depth_meters is None:
+            return np.zeros((color_h, color_w, 3), dtype=np.uint8)
+
+        normalized = self.normalize_depth(depth_meters)
+        panel = cv2.applyColorMap(normalized, cv2.COLORMAP_TURBO)
+        if panel.shape[:2] != (color_h, color_w):
+            panel = cv2.resize(panel, (color_w, color_h), interpolation=cv2.INTER_NEAREST)
+        return panel
+
+    def draw_panel_title(self, image: np.ndarray, title: str) -> None:
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        scale = 0.8
+        thickness = 2
+        (text_width, text_height), _ = cv2.getTextSize(title, font, scale, thickness)
+        left = 10
+        top = 10
+        right = left + text_width + 20
+        bottom = top + text_height + 18
+        cv2.rectangle(image, (left, top), (right, bottom), (0, 0, 0), -1)
+        cv2.putText(image, title, (left + 10, bottom - 10), font,
+                    scale, (255, 255, 255), thickness, cv2.LINE_AA)
+
+    def draw_label_block(self, image: np.ndarray, x: int, y: int,
+                         lines: list[str], color) -> None:
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        scale = 0.55
+        thickness = 2
+        padding = 6
+        line_gap = 6
+
+        sizes = [cv2.getTextSize(line, font, scale, thickness)[0] for line in lines]
+        block_width = max(size[0] for size in sizes) + padding * 2
+        line_height = max(size[1] for size in sizes) + line_gap
+        block_height = line_height * len(lines) + padding * 2
+
+        top_y = y - block_height - 4
+        if top_y < 4:
+            top_y = min(y + 4, image.shape[0] - block_height - 4)
+
+        left_x = max(4, min(x, image.shape[1] - block_width - 4))
+        top_y = max(4, top_y)
+
+        cv2.rectangle(
+            image,
+            (left_x, top_y),
+            (left_x + block_width, top_y + block_height),
+            (0, 0, 0),
+            -1,
+        )
+
+        text_y = top_y + padding + line_height - line_gap
+        for line in lines:
+            cv2.putText(image, line, (left_x + padding, text_y), font, scale,
+                        color, thickness, cv2.LINE_AA)
+            text_y += line_height
+
+    def destroy_node(self) -> bool:
+        cv2.destroyAllWindows()
+        return super().destroy_node()
+
+
+def main() -> None:
+    rclpy.init()
+    node = G1DetectionNode()
+
+    try:
+        node.run_detection_loop()
+    except (KeyboardInterrupt, ExternalShutdownException):
+        pass
+    finally:
+        node.destroy_node()
+        if rclpy.ok():
+            rclpy.shutdown()
+
+
+if __name__ == '__main__':
+    main()

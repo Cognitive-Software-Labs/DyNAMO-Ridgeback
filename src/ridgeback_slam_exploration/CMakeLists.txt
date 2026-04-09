@@ -2,9 +2,16 @@ cmake_minimum_required(VERSION 3.8)
 project(ridgeback_slam_exploration)
 
 find_package(ament_cmake REQUIRED)
+find_package(rosidl_default_generators REQUIRED)
+find_package(std_msgs REQUIRED)
 find_package(gz-gui8 REQUIRED)
 find_package(gz-plugin2 REQUIRED)
 find_package(gz-common5 REQUIRED)
+
+rosidl_generate_interfaces(${PROJECT_NAME}
+  "msg/G1Detection.msg"
+  DEPENDENCIES std_msgs
+)
 
 # Qt for MOC
 find_package(Qt5 REQUIRED COMPONENTS Core Quick)
@@ -32,7 +39,7 @@ install(TARGETS SpawnG1
 )
 
 install(PROGRAMS
-  scripts/camera_windows_node
+  scripts/g1_detection_node
   DESTINATION lib/${PROJECT_NAME}
 )
 
