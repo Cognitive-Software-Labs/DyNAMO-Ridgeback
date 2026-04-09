@@ -1,0 +1,1054 @@
+{
+  "directed": false,
+  "multigraph": false,
+  "graph": {
+    "hyperedges": [
+      {
+        "id": "g1_detection_pipeline",
+        "label": "G1 Humanoid Detection Pipeline",
+        "nodes": [
+          "cmakelists_g1_detection_node",
+          "cmakelists_g1detection_msg",
+          "requirements_vlm_deps",
+          "requirements_transformers",
+          "requirements_torch"
+        ],
+        "relation": "participate_in",
+        "confidence": "INFERRED",
+        "confidence_score": 0.85,
+        "source_file": "src/ridgeback_slam_exploration/CMakeLists.txt"
+      },
+      {
+        "id": "g1_test_images",
+        "label": "G1 Detection Test/Reference Images",
+        "nodes": [
+          "g1_photos_warehouse_scene",
+          "image_copy_g1_hospital_hallway",
+          "image_g1_hospital_close"
+        ],
+        "relation": "form",
+        "confidence": "INFERRED",
+        "confidence_score": 0.8,
+        "source_file": "vlm_distance/"
+      }
+    ]
+  },
+  "nodes": [
+    {
+      "label": "SpawnG1.cc",
+      "file_type": "code",
+      "source_file": "src/ridgeback_slam_exploration/gz_plugins/SpawnG1.cc",
+      "source_location": "L1",
+      "id": "spawng1",
+      "community": 3
+    },
+    {
+      "label": "SpawnG1()",
+      "file_type": "code",
+      "source_file": "src/ridgeback_slam_exploration/gz_plugins/SpawnG1.cc",
+      "source_location": "L17",
+      "id": "spawng1_spawng1",
+      "community": 3
+    },
+    {
+      "label": "LoadConfig()",
+      "file_type": "code",
+      "source_file": "src/ridgeback_slam_exploration/gz_plugins/SpawnG1.cc",
+      "source_location": "L19",
+      "id": "spawng1_loadconfig",
+      "community": 3
+    },
+    {
+      "label": "OnSpawn()",
+      "file_type": "code",
+      "source_file": "src/ridgeback_slam_exploration/gz_plugins/SpawnG1.cc",
+      "source_location": "L88",
+      "id": "spawng1_onspawn",
+      "community": 3
+    },
+    {
+      "label": "slam.launch.py",
+      "file_type": "code",
+      "source_file": "src/ridgeback_slam_exploration/launch/slam.launch.py",
+      "source_location": "L1",
+      "id": "slam_launch",
+      "community": 4
+    },
+    {
+      "label": "launch_setup()",
+      "file_type": "code",
+      "source_file": "src/ridgeback_slam_exploration/launch/slam.launch.py",
+      "source_location": "L14",
+      "id": "slam_launch_launch_setup",
+      "community": 4
+    },
+    {
+      "label": "generate_launch_description()",
+      "file_type": "code",
+      "source_file": "src/ridgeback_slam_exploration/launch/slam.launch.py",
+      "source_location": "L72",
+      "id": "slam_launch_generate_launch_description",
+      "community": 4
+    },
+    {
+      "label": "explore.launch.py",
+      "file_type": "code",
+      "source_file": "src/ridgeback_slam_exploration/launch/explore.launch.py",
+      "source_location": "L1",
+      "id": "explore_launch",
+      "community": 6
+    },
+    {
+      "label": "generate_launch_description()",
+      "file_type": "code",
+      "source_file": "src/ridgeback_slam_exploration/launch/explore.launch.py",
+      "source_location": "L10",
+      "id": "explore_launch_generate_launch_description",
+      "community": 6
+    },
+    {
+      "label": "nav2.launch.py",
+      "file_type": "code",
+      "source_file": "src/ridgeback_slam_exploration/launch/nav2.launch.py",
+      "source_location": "L1",
+      "id": "nav2_launch",
+      "community": 7
+    },
+    {
+      "label": "generate_launch_description()",
+      "file_type": "code",
+      "source_file": "src/ridgeback_slam_exploration/launch/nav2.launch.py",
+      "source_location": "L12",
+      "id": "nav2_launch_generate_launch_description",
+      "community": 7
+    },
+    {
+      "label": "simulation.launch.py",
+      "file_type": "code",
+      "source_file": "src/ridgeback_slam_exploration/launch/simulation.launch.py",
+      "source_location": "L1",
+      "id": "simulation_launch",
+      "community": 8
+    },
+    {
+      "label": "generate_launch_description()",
+      "file_type": "code",
+      "source_file": "src/ridgeback_slam_exploration/launch/simulation.launch.py",
+      "source_location": "L12",
+      "id": "simulation_launch_generate_launch_description",
+      "community": 8
+    },
+    {
+      "label": "full_exploration.launch.py",
+      "file_type": "code",
+      "source_file": "src/ridgeback_slam_exploration/launch/full_exploration.launch.py",
+      "source_location": "L1",
+      "id": "full_exploration_launch",
+      "community": 9
+    },
+    {
+      "label": "generate_launch_description()",
+      "file_type": "code",
+      "source_file": "src/ridgeback_slam_exploration/launch/full_exploration.launch.py",
+      "source_location": "L14",
+      "id": "full_exploration_launch_generate_launch_description",
+      "community": 9
+    },
+    {
+      "label": "top_down_matplot.py",
+      "file_type": "code",
+      "source_file": "vlm_distance/top_down_matplot.py",
+      "source_location": "L1",
+      "id": "top_down_matplot",
+      "community": 10
+    },
+    {
+      "label": "main.py",
+      "file_type": "code",
+      "source_file": "vlm_distance/main.py",
+      "source_location": "L1",
+      "id": "main",
+      "community": 0
+    },
+    {
+      "label": "load_config()",
+      "file_type": "code",
+      "source_file": "vlm_distance/main.py",
+      "source_location": "L35",
+      "id": "main_load_config",
+      "community": 0
+    },
+    {
+      "label": "add_topdown_xz_from_floor()",
+      "file_type": "code",
+      "source_file": "vlm_distance/main.py",
+      "source_location": "L50",
+      "id": "main_add_topdown_xz_from_floor",
+      "community": 0
+    },
+    {
+      "label": "parse_detection_result()",
+      "file_type": "code",
+      "source_file": "vlm_distance/main.py",
+      "source_location": "L110",
+      "id": "main_parse_detection_result",
+      "community": 0
+    },
+    {
+      "label": "display_results()",
+      "file_type": "code",
+      "source_file": "vlm_distance/main.py",
+      "source_location": "L172",
+      "id": "main_display_results",
+      "community": 0
+    },
+    {
+      "label": "main()",
+      "file_type": "code",
+      "source_file": "vlm_distance/main.py",
+      "source_location": "L195",
+      "id": "main_main",
+      "community": 0
+    },
+    {
+      "label": "Unitree G1 Robot Detection - Local VLM Version (No API Key Required)  What this",
+      "file_type": "rationale",
+      "source_file": "vlm_distance/main.py",
+      "source_location": "L1",
+      "id": "main_rationale_1",
+      "community": 0
+    },
+    {
+      "label": "Load camera constants from a JSON file.",
+      "file_type": "rationale",
+      "source_file": "vlm_distance/main.py",
+      "source_location": "L36",
+      "id": "main_rationale_36",
+      "community": 0
+    },
+    {
+      "label": "Estimate top-down (x, z) using camera geometry.",
+      "file_type": "rationale",
+      "source_file": "vlm_distance/main.py",
+      "source_location": "L51",
+      "id": "main_rationale_51",
+      "community": 0
+    },
+    {
+      "label": "Extract bounding boxes from the model's text output.     Llava often outputs box",
+      "file_type": "rationale",
+      "source_file": "vlm_distance/main.py",
+      "source_location": "L111",
+      "id": "main_rationale_111",
+      "community": 0
+    },
+    {
+      "label": "Visualize detections and top-down coordinates.",
+      "file_type": "rationale",
+      "source_file": "vlm_distance/main.py",
+      "source_location": "L173",
+      "id": "main_rationale_173",
+      "community": 0
+    },
+    {
+      "label": "inspect_depth.py",
+      "file_type": "code",
+      "source_file": "vlm_distance/inspect_depth.py",
+      "source_location": "L1",
+      "id": "inspect_depth",
+      "community": 2
+    },
+    {
+      "label": "redraw()",
+      "file_type": "code",
+      "source_file": "vlm_distance/inspect_depth.py",
+      "source_location": "L85",
+      "id": "inspect_depth_redraw",
+      "community": 2
+    },
+    {
+      "label": "on_mouse()",
+      "file_type": "code",
+      "source_file": "vlm_distance/inspect_depth.py",
+      "source_location": "L105",
+      "id": "inspect_depth_on_mouse",
+      "community": 2
+    },
+    {
+      "label": "inspect_depth.py \u2014 Interactive Relative Depth Inspector for Depth-Anything-V2  P",
+      "file_type": "rationale",
+      "source_file": "vlm_distance/inspect_depth.py",
+      "source_location": "L1",
+      "id": "inspect_depth_rationale_1",
+      "community": 2
+    },
+    {
+      "label": "Redraw both display frames, overlaying a marker at the last clicked point.",
+      "file_type": "rationale",
+      "source_file": "vlm_distance/inspect_depth.py",
+      "source_location": "L86",
+      "id": "inspect_depth_rationale_86",
+      "community": 2
+    },
+    {
+      "label": "Mouse callback: on left-click, record the pixel and refresh the display.",
+      "file_type": "rationale",
+      "source_file": "vlm_distance/inspect_depth.py",
+      "source_location": "L106",
+      "id": "inspect_depth_rationale_106",
+      "community": 2
+    },
+    {
+      "label": "ridgeback_slam_exploration CMake Project",
+      "file_type": "code",
+      "source_file": "src/ridgeback_slam_exploration/CMakeLists.txt",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "cmakelists_ridgeback_slam_exploration",
+      "community": 1
+    },
+    {
+      "label": "G1Detection.msg Custom Message",
+      "file_type": "code",
+      "source_file": "src/ridgeback_slam_exploration/CMakeLists.txt",
+      "source_location": "line 11-14",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "cmakelists_g1detection_msg",
+      "community": 1
+    },
+    {
+      "label": "SpawnG1 Gazebo GUI Plugin",
+      "file_type": "code",
+      "source_file": "src/ridgeback_slam_exploration/CMakeLists.txt",
+      "source_location": "line 22-36",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "cmakelists_spawng1_plugin",
+      "community": 1
+    },
+    {
+      "label": "camera_windows_node Script",
+      "file_type": "code",
+      "source_file": "src/ridgeback_slam_exploration/CMakeLists.txt",
+      "source_location": "line 42",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "cmakelists_camera_windows_node",
+      "community": 1
+    },
+    {
+      "label": "g1_detection_node Script",
+      "file_type": "code",
+      "source_file": "src/ridgeback_slam_exploration/CMakeLists.txt",
+      "source_location": "line 43",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "cmakelists_g1_detection_node",
+      "community": 1
+    },
+    {
+      "label": "VLM Distance Requirements",
+      "file_type": "code",
+      "source_file": "vlm_distance/requirements.txt",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "requirements_vlm_deps",
+      "community": 5
+    },
+    {
+      "label": "Hugging Face Transformers",
+      "file_type": "code",
+      "source_file": "vlm_distance/requirements.txt",
+      "source_location": "line 8",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "requirements_transformers",
+      "community": 5
+    },
+    {
+      "label": "PyTorch",
+      "file_type": "code",
+      "source_file": "vlm_distance/requirements.txt",
+      "source_location": "line 6",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "requirements_torch",
+      "community": 5
+    },
+    {
+      "label": "G1 Humanoid in Warehouse with Ridgeback",
+      "file_type": "image",
+      "source_file": "vlm_distance/g1_photos.jpg",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "g1_photos_warehouse_scene",
+      "community": 1
+    },
+    {
+      "label": "G1 Humanoid in Hospital Hallway (Far View)",
+      "file_type": "image",
+      "source_file": "vlm_distance/image copy.png",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "image_copy_g1_hospital_hallway",
+      "community": 1
+    },
+    {
+      "label": "G1 Humanoid in Hospital Corner (Close View)",
+      "file_type": "image",
+      "source_file": "vlm_distance/image.png",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "image_g1_hospital_close",
+      "community": 1
+    },
+    {
+      "label": "gz-gui8 (Gazebo GUI)",
+      "file_type": "code",
+      "source_file": "src/ridgeback_slam_exploration/CMakeLists.txt",
+      "source_location": "line 7",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "dep_gz_gui8",
+      "community": 1
+    },
+    {
+      "label": "rosidl_default_generators",
+      "file_type": "code",
+      "source_file": "src/ridgeback_slam_exploration/CMakeLists.txt",
+      "source_location": "line 5",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "dep_rosidl_default_generators",
+      "community": 1
+    },
+    {
+      "label": "std_msgs",
+      "file_type": "code",
+      "source_file": "src/ridgeback_slam_exploration/CMakeLists.txt",
+      "source_location": "line 6",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "dep_std_msgs",
+      "community": 1
+    }
+  ],
+  "links": [
+    {
+      "relation": "imports",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ridgeback_slam_exploration/gz_plugins/SpawnG1.cc",
+      "source_location": "L1",
+      "weight": 1.0,
+      "_src": "spawng1",
+      "_tgt": "spawng1",
+      "source": "spawng1",
+      "target": "spawng1",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ridgeback_slam_exploration/gz_plugins/SpawnG1.cc",
+      "source_location": "L17",
+      "weight": 1.0,
+      "_src": "spawng1",
+      "_tgt": "spawng1_spawng1",
+      "source": "spawng1",
+      "target": "spawng1_spawng1",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ridgeback_slam_exploration/gz_plugins/SpawnG1.cc",
+      "source_location": "L19",
+      "weight": 1.0,
+      "_src": "spawng1",
+      "_tgt": "spawng1_loadconfig",
+      "source": "spawng1",
+      "target": "spawng1_loadconfig",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ridgeback_slam_exploration/gz_plugins/SpawnG1.cc",
+      "source_location": "L88",
+      "weight": 1.0,
+      "_src": "spawng1",
+      "_tgt": "spawng1_onspawn",
+      "source": "spawng1",
+      "target": "spawng1_onspawn",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ridgeback_slam_exploration/launch/slam.launch.py",
+      "source_location": "L14",
+      "weight": 1.0,
+      "_src": "slam_launch",
+      "_tgt": "slam_launch_launch_setup",
+      "source": "slam_launch",
+      "target": "slam_launch_launch_setup",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ridgeback_slam_exploration/launch/slam.launch.py",
+      "source_location": "L72",
+      "weight": 1.0,
+      "_src": "slam_launch",
+      "_tgt": "slam_launch_generate_launch_description",
+      "source": "slam_launch",
+      "target": "slam_launch_generate_launch_description",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ridgeback_slam_exploration/launch/explore.launch.py",
+      "source_location": "L10",
+      "weight": 1.0,
+      "_src": "explore_launch",
+      "_tgt": "explore_launch_generate_launch_description",
+      "source": "explore_launch",
+      "target": "explore_launch_generate_launch_description",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ridgeback_slam_exploration/launch/nav2.launch.py",
+      "source_location": "L12",
+      "weight": 1.0,
+      "_src": "nav2_launch",
+      "_tgt": "nav2_launch_generate_launch_description",
+      "source": "nav2_launch",
+      "target": "nav2_launch_generate_launch_description",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ridgeback_slam_exploration/launch/simulation.launch.py",
+      "source_location": "L12",
+      "weight": 1.0,
+      "_src": "simulation_launch",
+      "_tgt": "simulation_launch_generate_launch_description",
+      "source": "simulation_launch",
+      "target": "simulation_launch_generate_launch_description",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ridgeback_slam_exploration/launch/full_exploration.launch.py",
+      "source_location": "L14",
+      "weight": 1.0,
+      "_src": "full_exploration_launch",
+      "_tgt": "full_exploration_launch_generate_launch_description",
+      "source": "full_exploration_launch",
+      "target": "full_exploration_launch_generate_launch_description",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "vlm_distance/main.py",
+      "source_location": "L35",
+      "weight": 1.0,
+      "_src": "main",
+      "_tgt": "main_load_config",
+      "source": "main",
+      "target": "main_load_config",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "vlm_distance/main.py",
+      "source_location": "L50",
+      "weight": 1.0,
+      "_src": "main",
+      "_tgt": "main_add_topdown_xz_from_floor",
+      "source": "main",
+      "target": "main_add_topdown_xz_from_floor",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "vlm_distance/main.py",
+      "source_location": "L110",
+      "weight": 1.0,
+      "_src": "main",
+      "_tgt": "main_parse_detection_result",
+      "source": "main",
+      "target": "main_parse_detection_result",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "vlm_distance/main.py",
+      "source_location": "L172",
+      "weight": 1.0,
+      "_src": "main",
+      "_tgt": "main_display_results",
+      "source": "main",
+      "target": "main_display_results",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "vlm_distance/main.py",
+      "source_location": "L195",
+      "weight": 1.0,
+      "_src": "main",
+      "_tgt": "main_main",
+      "source": "main",
+      "target": "main_main",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "vlm_distance/main.py",
+      "source_location": "L1",
+      "weight": 1.0,
+      "_src": "main_rationale_1",
+      "_tgt": "main",
+      "source": "main",
+      "target": "main_rationale_1",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "vlm_distance/main.py",
+      "source_location": "L245",
+      "weight": 1.0,
+      "_src": "main_main",
+      "_tgt": "main_load_config",
+      "source": "main_load_config",
+      "target": "main_main",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "vlm_distance/main.py",
+      "source_location": "L36",
+      "weight": 1.0,
+      "_src": "main_rationale_36",
+      "_tgt": "main_load_config",
+      "source": "main_load_config",
+      "target": "main_rationale_36",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "vlm_distance/main.py",
+      "source_location": "L246",
+      "weight": 1.0,
+      "_src": "main_main",
+      "_tgt": "main_add_topdown_xz_from_floor",
+      "source": "main_add_topdown_xz_from_floor",
+      "target": "main_main",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "vlm_distance/main.py",
+      "source_location": "L51",
+      "weight": 1.0,
+      "_src": "main_rationale_51",
+      "_tgt": "main_add_topdown_xz_from_floor",
+      "source": "main_add_topdown_xz_from_floor",
+      "target": "main_rationale_51",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "vlm_distance/main.py",
+      "source_location": "L244",
+      "weight": 1.0,
+      "_src": "main_main",
+      "_tgt": "main_parse_detection_result",
+      "source": "main_parse_detection_result",
+      "target": "main_main",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "vlm_distance/main.py",
+      "source_location": "L111",
+      "weight": 1.0,
+      "_src": "main_rationale_111",
+      "_tgt": "main_parse_detection_result",
+      "source": "main_parse_detection_result",
+      "target": "main_rationale_111",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "vlm_distance/main.py",
+      "source_location": "L259",
+      "weight": 1.0,
+      "_src": "main_main",
+      "_tgt": "main_display_results",
+      "source": "main_display_results",
+      "target": "main_main",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "vlm_distance/main.py",
+      "source_location": "L173",
+      "weight": 1.0,
+      "_src": "main_rationale_173",
+      "_tgt": "main_display_results",
+      "source": "main_display_results",
+      "target": "main_rationale_173",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "vlm_distance/inspect_depth.py",
+      "source_location": "L85",
+      "weight": 1.0,
+      "_src": "inspect_depth",
+      "_tgt": "inspect_depth_redraw",
+      "source": "inspect_depth",
+      "target": "inspect_depth_redraw",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "vlm_distance/inspect_depth.py",
+      "source_location": "L105",
+      "weight": 1.0,
+      "_src": "inspect_depth",
+      "_tgt": "inspect_depth_on_mouse",
+      "source": "inspect_depth",
+      "target": "inspect_depth_on_mouse",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "vlm_distance/inspect_depth.py",
+      "source_location": "L1",
+      "weight": 1.0,
+      "_src": "inspect_depth_rationale_1",
+      "_tgt": "inspect_depth",
+      "source": "inspect_depth",
+      "target": "inspect_depth_rationale_1",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "vlm_distance/inspect_depth.py",
+      "source_location": "L114",
+      "weight": 1.0,
+      "_src": "inspect_depth_on_mouse",
+      "_tgt": "inspect_depth_redraw",
+      "source": "inspect_depth_redraw",
+      "target": "inspect_depth_on_mouse",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "vlm_distance/inspect_depth.py",
+      "source_location": "L86",
+      "weight": 1.0,
+      "_src": "inspect_depth_rationale_86",
+      "_tgt": "inspect_depth_redraw",
+      "source": "inspect_depth_redraw",
+      "target": "inspect_depth_rationale_86",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "vlm_distance/inspect_depth.py",
+      "source_location": "L106",
+      "weight": 1.0,
+      "_src": "inspect_depth_rationale_106",
+      "_tgt": "inspect_depth_on_mouse",
+      "source": "inspect_depth_on_mouse",
+      "target": "inspect_depth_rationale_106",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/ridgeback_slam_exploration/CMakeLists.txt",
+      "source_location": "line 11",
+      "weight": 1.0,
+      "_src": "cmakelists_ridgeback_slam_exploration",
+      "_tgt": "cmakelists_g1detection_msg",
+      "source": "cmakelists_ridgeback_slam_exploration",
+      "target": "cmakelists_g1detection_msg"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/ridgeback_slam_exploration/CMakeLists.txt",
+      "source_location": "line 22",
+      "weight": 1.0,
+      "_src": "cmakelists_ridgeback_slam_exploration",
+      "_tgt": "cmakelists_spawng1_plugin",
+      "source": "cmakelists_ridgeback_slam_exploration",
+      "target": "cmakelists_spawng1_plugin"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/ridgeback_slam_exploration/CMakeLists.txt",
+      "source_location": "line 42",
+      "weight": 0.8,
+      "_src": "cmakelists_ridgeback_slam_exploration",
+      "_tgt": "cmakelists_camera_windows_node",
+      "source": "cmakelists_ridgeback_slam_exploration",
+      "target": "cmakelists_camera_windows_node"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/ridgeback_slam_exploration/CMakeLists.txt",
+      "source_location": "line 43",
+      "weight": 0.8,
+      "_src": "cmakelists_ridgeback_slam_exploration",
+      "_tgt": "cmakelists_g1_detection_node",
+      "source": "cmakelists_ridgeback_slam_exploration",
+      "target": "cmakelists_g1_detection_node"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/ridgeback_slam_exploration/CMakeLists.txt",
+      "source_location": "line 13",
+      "weight": 1.0,
+      "_src": "cmakelists_g1detection_msg",
+      "_tgt": "dep_std_msgs",
+      "source": "cmakelists_g1detection_msg",
+      "target": "dep_std_msgs"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/ridgeback_slam_exploration/CMakeLists.txt",
+      "source_location": "line 5",
+      "weight": 0.8,
+      "_src": "cmakelists_g1detection_msg",
+      "_tgt": "dep_rosidl_default_generators",
+      "source": "cmakelists_g1detection_msg",
+      "target": "dep_rosidl_default_generators"
+    },
+    {
+      "relation": "shares_data_with",
+      "confidence": "INFERRED",
+      "confidence_score": 0.9,
+      "source_file": "src/ridgeback_slam_exploration/CMakeLists.txt",
+      "source_location": null,
+      "weight": 1.0,
+      "_src": "cmakelists_g1_detection_node",
+      "_tgt": "cmakelists_g1detection_msg",
+      "source": "cmakelists_g1detection_msg",
+      "target": "cmakelists_g1_detection_node"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/ridgeback_slam_exploration/CMakeLists.txt",
+      "source_location": "line 29",
+      "weight": 1.0,
+      "_src": "cmakelists_spawng1_plugin",
+      "_tgt": "dep_gz_gui8",
+      "source": "cmakelists_spawng1_plugin",
+      "target": "dep_gz_gui8"
+    },
+    {
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.75,
+      "source_file": null,
+      "source_location": null,
+      "weight": 0.7,
+      "_src": "g1_photos_warehouse_scene",
+      "_tgt": "cmakelists_spawng1_plugin",
+      "source": "cmakelists_spawng1_plugin",
+      "target": "g1_photos_warehouse_scene"
+    },
+    {
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": null,
+      "source_location": null,
+      "weight": 0.9,
+      "_src": "cmakelists_g1_detection_node",
+      "_tgt": "requirements_vlm_deps",
+      "source": "cmakelists_g1_detection_node",
+      "target": "requirements_vlm_deps"
+    },
+    {
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": null,
+      "source_location": null,
+      "weight": 0.8,
+      "_src": "g1_photos_warehouse_scene",
+      "_tgt": "cmakelists_g1_detection_node",
+      "source": "cmakelists_g1_detection_node",
+      "target": "g1_photos_warehouse_scene"
+    },
+    {
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": null,
+      "source_location": null,
+      "weight": 0.8,
+      "_src": "image_copy_g1_hospital_hallway",
+      "_tgt": "cmakelists_g1_detection_node",
+      "source": "cmakelists_g1_detection_node",
+      "target": "image_copy_g1_hospital_hallway"
+    },
+    {
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": null,
+      "source_location": null,
+      "weight": 0.8,
+      "_src": "image_g1_hospital_close",
+      "_tgt": "cmakelists_g1_detection_node",
+      "source": "cmakelists_g1_detection_node",
+      "target": "image_g1_hospital_close"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "vlm_distance/requirements.txt",
+      "source_location": "line 8",
+      "weight": 1.0,
+      "_src": "requirements_vlm_deps",
+      "_tgt": "requirements_transformers",
+      "source": "requirements_vlm_deps",
+      "target": "requirements_transformers"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "vlm_distance/requirements.txt",
+      "source_location": "line 6",
+      "weight": 1.0,
+      "_src": "requirements_vlm_deps",
+      "_tgt": "requirements_torch",
+      "source": "requirements_vlm_deps",
+      "target": "requirements_torch"
+    },
+    {
+      "relation": "semantically_similar_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": null,
+      "source_location": null,
+      "weight": 0.8,
+      "_src": "image_copy_g1_hospital_hallway",
+      "_tgt": "image_g1_hospital_close",
+      "source": "image_copy_g1_hospital_hallway",
+      "target": "image_g1_hospital_close"
+    }
+  ],
+  "hyperedges": [
+    {
+      "id": "g1_detection_pipeline",
+      "label": "G1 Humanoid Detection Pipeline",
+      "nodes": [
+        "cmakelists_g1_detection_node",
+        "cmakelists_g1detection_msg",
+        "requirements_vlm_deps",
+        "requirements_transformers",
+        "requirements_torch"
+      ],
+      "relation": "participate_in",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "src/ridgeback_slam_exploration/CMakeLists.txt"
+    },
+    {
+      "id": "g1_test_images",
+      "label": "G1 Detection Test/Reference Images",
+      "nodes": [
+        "g1_photos_warehouse_scene",
+        "image_copy_g1_hospital_hallway",
+        "image_g1_hospital_close"
+      ],
+      "relation": "form",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "vlm_distance/"
+    }
+  ]
+}
