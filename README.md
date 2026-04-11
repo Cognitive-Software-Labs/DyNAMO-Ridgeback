@@ -14,7 +14,7 @@ The integrated launch path brings up simulation, SLAM, Nav2, frontier exploratio
 | SLAM | slam_toolbox (online async, from source) | Map building + localization |
 | Navigation | Nav2 (MPPI omni controller) | Path planning + obstacle avoidance |
 | Exploration | explore_lite (m-explore-ros2) | Frontier detection + goal selection |
-| Detection | g1_detection_node (OWLv2) | VLM-based humanoid robot detection + geometry/depth distance estimation |
+| Detection | g1_detection_node (OWLv2) | Zero-shot humanoid robot detection + geometry/depth distance estimation |
 
 ## Prerequisites
 
@@ -60,6 +60,9 @@ cd /path/to/DyNAMO-Ridgeback
 
 # Clone external dependencies
 vcs import < .repos
+
+# Apply clearpath_gz patch (adds custom worlds/models + SpawnG1 Gazebo GUI plugin)
+cd src/clearpath_simulator/clearpath_gz && git apply ../../../patches/clearpath_gz_customizations.patch && cd ../../..
 
 # Apply slam_toolbox patch (fixes TF namespace issue)
 cd src/slam_toolbox && git apply ../../patches/slam_toolbox_tf_namespace.patch && cd ../..
@@ -123,23 +126,66 @@ By default, RViz shows the exploration view plus the camera feeds under the `Cam
 # Disable the custom RViz instance
 ros2 launch ridgeback_slam_exploration full_exploration.launch.py world:=warehouse exploration_rviz:=false
 
-# Enable VLM-based humanoid robot detection
+# Enable OWLv2-based humanoid robot detection
 ros2 launch ridgeback_slam_exploration full_exploration.launch.py world:=hospital g1_detection:=true
 
 # Optional: compare live sensor depth with Depth-Anything metric depth
 ros2 launch ridgeback_slam_exploration full_exploration.launch.py world:=hospital g1_detection:=true depth_anything_enabled:=true
 ```
 
-### VLM detection setup (first time only)
+### Launch arguments reference
 
-The `g1_detection_node` uses a local OWLv2 detector and the live depth stream to produce a side-by-side detection overlay. It publishes the original geometry-based `distance` estimate plus a sensor-depth `depth_distance`, and it can optionally compare against a metric Depth-Anything branch in a 3-pane RGB / sensor depth / mono depth view. It requires a Python venv with PyTorch and Transformers:
+#### `full_exploration.launch.py`
+
+| Argument | Default | Meaning |
+|----------|---------|---------|
+| `namespace` | `r100_0001` | ROS namespace for RViz, Nav2, explore_lite, and optional detection node |
+| `use_sim_time` | `true` | Use Gazebo `/clock` |
+| `setup_path` | `~/clearpath/` | Directory containing `robot.yaml` and generated Clearpath files |
+| `world` | `warehouse` | Gazebo world to load (`hospital` and `warehouse` are the scenarios used in this repo) |
+| `exploration_rviz` | `true` | Launch the custom exploration RViz config |
+| `g1_detection` | `false` | Launch `g1_detection_node` |
+| `depth_anything_enabled` | `false` | Enable the Depth-Anything metric-depth comparison branch inside `g1_detection_node` |
+
+#### `simulation.launch.py`
+
+| Argument | Default | Meaning |
+|----------|---------|---------|
+| `setup_path` | `~/clearpath/` | Directory containing `robot.yaml` |
+| `world` | `warehouse` | Gazebo world to load |
+| `clearpath_rviz` | `false` | Launch the Clearpath-provided RViz instance |
+
+#### `slam.launch.py`
+
+| Argument | Default | Meaning |
+|----------|---------|---------|
+| `use_sim_time` | `true` | Use Gazebo `/clock` |
+| `setup_path` | `~/clearpath/` | Directory containing `robot.yaml`; also used to read the robot namespace |
+
+#### `nav2.launch.py`
+
+| Argument | Default | Meaning |
+|----------|---------|---------|
+| `namespace` | `r100_0001` | Namespace for the full Nav2 stack |
+| `use_sim_time` | `true` | Use Gazebo `/clock` |
+
+#### `explore.launch.py`
+
+| Argument | Default | Meaning |
+|----------|---------|---------|
+| `namespace` | `r100_0001` | Namespace for `explore_lite` |
+| `use_sim_time` | `true` | Use Gazebo `/clock` |
+
+### G1 detection setup (first time only)
+
+The `g1_detection_node` uses a local OWLv2 zero-shot detector and the live depth stream to produce a side-by-side detection overlay. It publishes the original geometry-based `distance` estimate plus a sensor-depth `depth_distance`, and it can optionally compare against a metric Depth-Anything branch in a 3-pane RGB / sensor depth / mono depth view. It requires a Python venv with PyTorch and Transformers:
 
 ```bash
 # Create venv that can see ROS 2 packages
 python3 -m venv --system-site-packages perception_venv
 echo "/opt/ros/jazzy/lib/python3.12/site-packages" > perception_venv/lib/python3.12/site-packages/ros2.pth
 
-# Install VLM dependencies
+# Install detector dependencies
 perception_venv/bin/python3 -m pip install torch torchvision transformers accelerate Pillow
 ```
 
@@ -172,7 +218,12 @@ The per-component launch files still exist for debugging and development, but th
 
 ## Why slam_toolbox is built from source
 
-This project requires a 1-line patch to slam_toolbox. Without it, SLAM completely fails in any namespaced Clearpath setup.
+This project requires two local patches:
+
+1. `patches/clearpath_gz_customizations.patch` patches `src/clearpath_simulator/clearpath_gz` to add this repo's Gazebo worlds/models to the simulator search path and to expose the custom `SpawnG1` Gazebo GUI plugin.
+2. `patches/slam_toolbox_tf_namespace.patch` patches `src/slam_toolbox` so `slam_toolbox` respects namespaced TF remappings.
+
+Without the `slam_toolbox` patch, SLAM completely fails in a namespaced Clearpath setup.
 
 ### The problem
 
