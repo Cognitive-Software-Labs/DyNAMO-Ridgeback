@@ -14,6 +14,9 @@ from launch_ros.actions import Node
 def generate_launch_description():
     pkg_this = get_package_share_directory('ridgeback_slam_exploration')
     launch_dir = os.path.join(pkg_this, 'launch')
+    workspace_root = os.path.abspath(os.path.join(pkg_this, '..', '..', '..', '..'))
+    perception_venv_path = os.path.join(workspace_root, 'perception_venv')
+    perception_venv_bin = os.path.join(perception_venv_path, 'bin')
 
     namespace = LaunchConfiguration('namespace')
     use_sim_time = LaunchConfiguration('use_sim_time')
@@ -29,6 +32,11 @@ def generate_launch_description():
 
     return LaunchDescription([
         SetEnvironmentVariable('FASTRTPS_DEFAULT_PROFILES_FILE', fastrtps_config),
+        SetEnvironmentVariable('VIRTUAL_ENV', perception_venv_path),
+        SetEnvironmentVariable(
+            'PATH',
+            os.pathsep.join([perception_venv_bin, os.environ.get('PATH', '')]),
+        ),
         DeclareLaunchArgument('namespace', default_value='r100_0001'),
         DeclareLaunchArgument('use_sim_time', default_value='true'),
         DeclareLaunchArgument('setup_path',
