@@ -2,6 +2,14 @@ build/
 install/
 log/
 
+# Clearpath generator output — regenerated from clearpath/robot.yaml on every run
+clearpath/manipulators/
+clearpath/platform/
+clearpath/sensors/
+clearpath/robot.srdf
+clearpath/robot.srdf.xacro
+clearpath/robot.urdf.xacro
+
 # Cloned external dependencies (managed via .repos)
 src/clearpath_simulator/
 src/clearpath_common/
