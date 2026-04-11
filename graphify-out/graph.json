@@ -4,32 +4,49 @@
   "graph": {
     "hyperedges": [
       {
-        "id": "g1_detection_pipeline",
-        "label": "G1 Humanoid Detection Pipeline",
+        "id": "g1_distance_benchmark_variants",
+        "label": "Three distance benchmark modalities (RGB/LiDAR/Pointcloud)",
         "nodes": [
-          "cmakelists_g1_detection_node",
-          "cmakelists_g1detection_msg",
-          "requirements_vlm_deps",
-          "requirements_transformers",
-          "requirements_torch"
+          "launch_g1_distance_benchmark",
+          "launch_g1_lidar_benchmark",
+          "launch_g1_pointcloud_benchmark",
+          "node_g1_distance_benchmark_runner",
+          "g1_distance_calibration_world"
         ],
         "relation": "participate_in",
-        "confidence": "INFERRED",
-        "confidence_score": 0.85,
-        "source_file": "src/ridgeback_slam_exploration/CMakeLists.txt"
+        "confidence": "EXTRACTED",
+        "confidence_score": 0.95,
+        "source_file": "src/ridgeback_slam_exploration/launch/g1_distance_benchmark.launch.py"
       },
       {
-        "id": "g1_test_images",
-        "label": "G1 Detection Test/Reference Images",
+        "id": "full_exploration_staged_startup",
+        "label": "Staged TimerAction startup flow (sim->SLAM->Nav2->explore)",
         "nodes": [
-          "g1_photos_warehouse_scene",
-          "image_copy_g1_hospital_hallway",
-          "image_g1_hospital_close"
+          "launch_full_exploration",
+          "simulation_launch",
+          "slam_launch",
+          "nav2_launch",
+          "explore_launch"
         ],
         "relation": "form",
+        "confidence": "EXTRACTED",
+        "confidence_score": 0.95,
+        "source_file": "src/ridgeback_slam_exploration/launch/full_exploration.launch.py"
+      },
+      {
+        "id": "owlv2_detection_pipeline",
+        "label": "OWLv2 detection decode/parse/NMS pipeline",
+        "nodes": [
+          "g1_detection_common_decode_image",
+          "g1_detection_common_convert_color",
+          "g1_detection_common_parse_owl_detections",
+          "g1_detection_common_nms",
+          "g1_detection_common_focus_bbox"
+        ],
+        "relation": "implement",
         "confidence": "INFERRED",
-        "confidence_score": 0.8,
-        "source_file": "vlm_distance/"
+        "confidence_score": 0.85,
+        "source_file": "src/ridgeback_slam_exploration/scripts/g1_detection_common.py"
       }
     ]
   },
@@ -39,264 +56,120 @@
       "file_type": "code",
       "source_file": "src/ridgeback_slam_exploration/gz_plugins/SpawnG1.cc",
       "source_location": "L1",
-      "id": "spawng1",
-      "community": 3
+      "community": 7,
+      "id": "spawng1"
     },
     {
       "label": "SpawnG1()",
       "file_type": "code",
       "source_file": "src/ridgeback_slam_exploration/gz_plugins/SpawnG1.cc",
       "source_location": "L17",
-      "id": "spawng1_spawng1",
-      "community": 3
+      "community": 7,
+      "id": "spawng1_spawng1"
     },
     {
       "label": "LoadConfig()",
       "file_type": "code",
       "source_file": "src/ridgeback_slam_exploration/gz_plugins/SpawnG1.cc",
       "source_location": "L19",
-      "id": "spawng1_loadconfig",
-      "community": 3
+      "community": 7,
+      "id": "spawng1_loadconfig"
     },
     {
       "label": "OnSpawn()",
       "file_type": "code",
       "source_file": "src/ridgeback_slam_exploration/gz_plugins/SpawnG1.cc",
       "source_location": "L88",
-      "id": "spawng1_onspawn",
-      "community": 3
+      "community": 7,
+      "id": "spawng1_onspawn"
     },
     {
       "label": "slam.launch.py",
       "file_type": "code",
       "source_file": "src/ridgeback_slam_exploration/launch/slam.launch.py",
       "source_location": "L1",
-      "id": "slam_launch",
-      "community": 4
+      "community": 1,
+      "id": "slam_launch"
     },
     {
       "label": "launch_setup()",
       "file_type": "code",
       "source_file": "src/ridgeback_slam_exploration/launch/slam.launch.py",
       "source_location": "L14",
-      "id": "slam_launch_launch_setup",
-      "community": 4
+      "community": 1,
+      "id": "slam_launch_launch_setup"
     },
     {
       "label": "generate_launch_description()",
       "file_type": "code",
       "source_file": "src/ridgeback_slam_exploration/launch/slam.launch.py",
       "source_location": "L72",
-      "id": "slam_launch_generate_launch_description",
-      "community": 4
+      "community": 1,
+      "id": "slam_launch_generate_launch_description"
     },
     {
       "label": "explore.launch.py",
       "file_type": "code",
       "source_file": "src/ridgeback_slam_exploration/launch/explore.launch.py",
       "source_location": "L1",
-      "id": "explore_launch",
-      "community": 6
+      "community": 1,
+      "id": "explore_launch"
     },
     {
       "label": "generate_launch_description()",
       "file_type": "code",
       "source_file": "src/ridgeback_slam_exploration/launch/explore.launch.py",
       "source_location": "L10",
-      "id": "explore_launch_generate_launch_description",
-      "community": 6
+      "community": 1,
+      "id": "explore_launch_generate_launch_description"
     },
     {
       "label": "nav2.launch.py",
       "file_type": "code",
       "source_file": "src/ridgeback_slam_exploration/launch/nav2.launch.py",
       "source_location": "L1",
-      "id": "nav2_launch",
-      "community": 7
+      "community": 1,
+      "id": "nav2_launch"
     },
     {
       "label": "generate_launch_description()",
       "file_type": "code",
       "source_file": "src/ridgeback_slam_exploration/launch/nav2.launch.py",
       "source_location": "L12",
-      "id": "nav2_launch_generate_launch_description",
-      "community": 7
+      "community": 1,
+      "id": "nav2_launch_generate_launch_description"
     },
     {
       "label": "simulation.launch.py",
       "file_type": "code",
       "source_file": "src/ridgeback_slam_exploration/launch/simulation.launch.py",
       "source_location": "L1",
-      "id": "simulation_launch",
-      "community": 8
+      "community": 2,
+      "id": "simulation_launch"
     },
     {
       "label": "generate_launch_description()",
       "file_type": "code",
       "source_file": "src/ridgeback_slam_exploration/launch/simulation.launch.py",
       "source_location": "L12",
-      "id": "simulation_launch_generate_launch_description",
-      "community": 8
+      "community": 2,
+      "id": "simulation_launch_generate_launch_description"
     },
     {
       "label": "full_exploration.launch.py",
       "file_type": "code",
       "source_file": "src/ridgeback_slam_exploration/launch/full_exploration.launch.py",
       "source_location": "L1",
-      "id": "full_exploration_launch",
-      "community": 9
+      "community": 10,
+      "id": "full_exploration_launch"
     },
     {
       "label": "generate_launch_description()",
       "file_type": "code",
       "source_file": "src/ridgeback_slam_exploration/launch/full_exploration.launch.py",
       "source_location": "L14",
-      "id": "full_exploration_launch_generate_launch_description",
-      "community": 9
-    },
-    {
-      "label": "top_down_matplot.py",
-      "file_type": "code",
-      "source_file": "vlm_distance/top_down_matplot.py",
-      "source_location": "L1",
-      "id": "top_down_matplot",
-      "community": 10
-    },
-    {
-      "label": "main.py",
-      "file_type": "code",
-      "source_file": "vlm_distance/main.py",
-      "source_location": "L1",
-      "id": "main",
-      "community": 0
-    },
-    {
-      "label": "load_config()",
-      "file_type": "code",
-      "source_file": "vlm_distance/main.py",
-      "source_location": "L35",
-      "id": "main_load_config",
-      "community": 0
-    },
-    {
-      "label": "add_topdown_xz_from_floor()",
-      "file_type": "code",
-      "source_file": "vlm_distance/main.py",
-      "source_location": "L50",
-      "id": "main_add_topdown_xz_from_floor",
-      "community": 0
-    },
-    {
-      "label": "parse_detection_result()",
-      "file_type": "code",
-      "source_file": "vlm_distance/main.py",
-      "source_location": "L110",
-      "id": "main_parse_detection_result",
-      "community": 0
-    },
-    {
-      "label": "display_results()",
-      "file_type": "code",
-      "source_file": "vlm_distance/main.py",
-      "source_location": "L172",
-      "id": "main_display_results",
-      "community": 0
-    },
-    {
-      "label": "main()",
-      "file_type": "code",
-      "source_file": "vlm_distance/main.py",
-      "source_location": "L195",
-      "id": "main_main",
-      "community": 0
-    },
-    {
-      "label": "Unitree G1 Robot Detection - Local VLM Version (No API Key Required)  What this",
-      "file_type": "rationale",
-      "source_file": "vlm_distance/main.py",
-      "source_location": "L1",
-      "id": "main_rationale_1",
-      "community": 0
-    },
-    {
-      "label": "Load camera constants from a JSON file.",
-      "file_type": "rationale",
-      "source_file": "vlm_distance/main.py",
-      "source_location": "L36",
-      "id": "main_rationale_36",
-      "community": 0
-    },
-    {
-      "label": "Estimate top-down (x, z) using camera geometry.",
-      "file_type": "rationale",
-      "source_file": "vlm_distance/main.py",
-      "source_location": "L51",
-      "id": "main_rationale_51",
-      "community": 0
-    },
-    {
-      "label": "Extract bounding boxes from the model's text output.     Llava often outputs box",
-      "file_type": "rationale",
-      "source_file": "vlm_distance/main.py",
-      "source_location": "L111",
-      "id": "main_rationale_111",
-      "community": 0
-    },
-    {
-      "label": "Visualize detections and top-down coordinates.",
-      "file_type": "rationale",
-      "source_file": "vlm_distance/main.py",
-      "source_location": "L173",
-      "id": "main_rationale_173",
-      "community": 0
-    },
-    {
-      "label": "inspect_depth.py",
-      "file_type": "code",
-      "source_file": "vlm_distance/inspect_depth.py",
-      "source_location": "L1",
-      "id": "inspect_depth",
-      "community": 2
-    },
-    {
-      "label": "redraw()",
-      "file_type": "code",
-      "source_file": "vlm_distance/inspect_depth.py",
-      "source_location": "L85",
-      "id": "inspect_depth_redraw",
-      "community": 2
-    },
-    {
-      "label": "on_mouse()",
-      "file_type": "code",
-      "source_file": "vlm_distance/inspect_depth.py",
-      "source_location": "L105",
-      "id": "inspect_depth_on_mouse",
-      "community": 2
-    },
-    {
-      "label": "inspect_depth.py \u2014 Interactive Relative Depth Inspector for Depth-Anything-V2  P",
-      "file_type": "rationale",
-      "source_file": "vlm_distance/inspect_depth.py",
-      "source_location": "L1",
-      "id": "inspect_depth_rationale_1",
-      "community": 2
-    },
-    {
-      "label": "Redraw both display frames, overlaying a marker at the last clicked point.",
-      "file_type": "rationale",
-      "source_file": "vlm_distance/inspect_depth.py",
-      "source_location": "L86",
-      "id": "inspect_depth_rationale_86",
-      "community": 2
-    },
-    {
-      "label": "Mouse callback: on left-click, record the pixel and refresh the display.",
-      "file_type": "rationale",
-      "source_file": "vlm_distance/inspect_depth.py",
-      "source_location": "L106",
-      "id": "inspect_depth_rationale_106",
-      "community": 2
+      "community": 10,
+      "id": "full_exploration_launch_generate_launch_description"
     },
     {
       "label": "ridgeback_slam_exploration CMake Project",
@@ -307,8 +180,8 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "id": "cmakelists_ridgeback_slam_exploration",
-      "community": 1
+      "community": 4,
+      "id": "cmakelists_ridgeback_slam_exploration"
     },
     {
       "label": "G1Detection.msg Custom Message",
@@ -319,8 +192,8 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "id": "cmakelists_g1detection_msg",
-      "community": 1
+      "community": 4,
+      "id": "cmakelists_g1detection_msg"
     },
     {
       "label": "SpawnG1 Gazebo GUI Plugin",
@@ -331,8 +204,8 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "id": "cmakelists_spawng1_plugin",
-      "community": 1
+      "community": 4,
+      "id": "cmakelists_spawng1_plugin"
     },
     {
       "label": "camera_windows_node Script",
@@ -343,8 +216,8 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "id": "cmakelists_camera_windows_node",
-      "community": 1
+      "community": 4,
+      "id": "cmakelists_camera_windows_node"
     },
     {
       "label": "g1_detection_node Script",
@@ -355,80 +228,8 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "id": "cmakelists_g1_detection_node",
-      "community": 1
-    },
-    {
-      "label": "VLM Distance Requirements",
-      "file_type": "code",
-      "source_file": "vlm_distance/requirements.txt",
-      "source_location": null,
-      "source_url": null,
-      "captured_at": null,
-      "author": null,
-      "contributor": null,
-      "id": "requirements_vlm_deps",
-      "community": 5
-    },
-    {
-      "label": "Hugging Face Transformers",
-      "file_type": "code",
-      "source_file": "vlm_distance/requirements.txt",
-      "source_location": "line 8",
-      "source_url": null,
-      "captured_at": null,
-      "author": null,
-      "contributor": null,
-      "id": "requirements_transformers",
-      "community": 5
-    },
-    {
-      "label": "PyTorch",
-      "file_type": "code",
-      "source_file": "vlm_distance/requirements.txt",
-      "source_location": "line 6",
-      "source_url": null,
-      "captured_at": null,
-      "author": null,
-      "contributor": null,
-      "id": "requirements_torch",
-      "community": 5
-    },
-    {
-      "label": "G1 Humanoid in Warehouse with Ridgeback",
-      "file_type": "image",
-      "source_file": "vlm_distance/g1_photos.jpg",
-      "source_location": null,
-      "source_url": null,
-      "captured_at": null,
-      "author": null,
-      "contributor": null,
-      "id": "g1_photos_warehouse_scene",
-      "community": 1
-    },
-    {
-      "label": "G1 Humanoid in Hospital Hallway (Far View)",
-      "file_type": "image",
-      "source_file": "vlm_distance/image copy.png",
-      "source_location": null,
-      "source_url": null,
-      "captured_at": null,
-      "author": null,
-      "contributor": null,
-      "id": "image_copy_g1_hospital_hallway",
-      "community": 1
-    },
-    {
-      "label": "G1 Humanoid in Hospital Corner (Close View)",
-      "file_type": "image",
-      "source_file": "vlm_distance/image.png",
-      "source_location": null,
-      "source_url": null,
-      "captured_at": null,
-      "author": null,
-      "contributor": null,
-      "id": "image_g1_hospital_close",
-      "community": 1
+      "community": 4,
+      "id": "cmakelists_g1_detection_node"
     },
     {
       "label": "gz-gui8 (Gazebo GUI)",
@@ -439,8 +240,8 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "id": "dep_gz_gui8",
-      "community": 1
+      "community": 4,
+      "id": "dep_gz_gui8"
     },
     {
       "label": "rosidl_default_generators",
@@ -451,8 +252,8 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "id": "dep_rosidl_default_generators",
-      "community": 1
+      "community": 4,
+      "id": "dep_rosidl_default_generators"
     },
     {
       "label": "std_msgs",
@@ -463,8 +264,780 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "id": "dep_std_msgs",
+      "community": 4,
+      "id": "dep_std_msgs"
+    },
+    {
+      "label": "g1_detection_common.py",
+      "file_type": "code",
+      "source_file": "src/ridgeback_slam_exploration/scripts/g1_detection_common.py",
+      "source_location": "L1",
+      "id": "g1_detection_common",
+      "community": 0
+    },
+    {
+      "label": "load_config()",
+      "file_type": "code",
+      "source_file": "src/ridgeback_slam_exploration/scripts/g1_detection_common.py",
+      "source_location": "L26",
+      "id": "g1_detection_common_load_config",
+      "community": 0
+    },
+    {
+      "label": "compute_iou()",
+      "file_type": "code",
+      "source_file": "src/ridgeback_slam_exploration/scripts/g1_detection_common.py",
+      "source_location": "L40",
+      "id": "g1_detection_common_compute_iou",
+      "community": 0
+    },
+    {
+      "label": "nms()",
+      "file_type": "code",
+      "source_file": "src/ridgeback_slam_exploration/scripts/g1_detection_common.py",
+      "source_location": "L52",
+      "id": "g1_detection_common_nms",
+      "community": 0
+    },
+    {
+      "label": "parse_owl_detections()",
+      "file_type": "code",
+      "source_file": "src/ridgeback_slam_exploration/scripts/g1_detection_common.py",
+      "source_location": "L65",
+      "id": "g1_detection_common_parse_owl_detections",
+      "community": 0
+    },
+    {
+      "label": "focus_bbox()",
+      "file_type": "code",
+      "source_file": "src/ridgeback_slam_exploration/scripts/g1_detection_common.py",
+      "source_location": "L99",
+      "id": "g1_detection_common_focus_bbox",
+      "community": 0
+    },
+    {
+      "label": "bgr_frame_to_pil()",
+      "file_type": "code",
+      "source_file": "src/ridgeback_slam_exploration/scripts/g1_detection_common.py",
+      "source_location": "L116",
+      "id": "g1_detection_common_bgr_frame_to_pil",
+      "community": 0
+    },
+    {
+      "label": "convert_color_image_message()",
+      "file_type": "code",
+      "source_file": "src/ridgeback_slam_exploration/scripts/g1_detection_common.py",
+      "source_location": "L120",
+      "id": "g1_detection_common_convert_color_image_message",
+      "community": 0
+    },
+    {
+      "label": "convert_depth_to_meters_message()",
+      "file_type": "code",
+      "source_file": "src/ridgeback_slam_exploration/scripts/g1_detection_common.py",
+      "source_location": "L137",
+      "id": "g1_detection_common_convert_depth_to_meters_message",
+      "community": 0
+    },
+    {
+      "label": "decode_image_message()",
+      "file_type": "code",
+      "source_file": "src/ridgeback_slam_exploration/scripts/g1_detection_common.py",
+      "source_location": "L146",
+      "id": "g1_detection_common_decode_image_message",
+      "community": 0
+    },
+    {
+      "label": "decode_buffer()",
+      "file_type": "code",
+      "source_file": "src/ridgeback_slam_exploration/scripts/g1_detection_common.py",
+      "source_location": "L160",
+      "id": "g1_detection_common_decode_buffer",
+      "community": 0
+    },
+    {
+      "label": "normalize_to_uint8()",
+      "file_type": "code",
+      "source_file": "src/ridgeback_slam_exploration/scripts/g1_detection_common.py",
+      "source_location": "L176",
+      "id": "g1_detection_common_normalize_to_uint8",
+      "community": 0
+    },
+    {
+      "label": "g1_distance_common.py",
+      "file_type": "code",
+      "source_file": "src/ridgeback_slam_exploration/scripts/g1_distance_common.py",
+      "source_location": "L1",
+      "id": "g1_distance_common",
+      "community": 6
+    },
+    {
+      "label": "apply_vehicle_front_offset()",
+      "file_type": "code",
+      "source_file": "src/ridgeback_slam_exploration/scripts/g1_distance_common.py",
+      "source_location": "L7",
+      "id": "g1_distance_common_apply_vehicle_front_offset",
+      "community": 6
+    },
+    {
+      "label": "yaw_from_quaternion()",
+      "file_type": "code",
+      "source_file": "src/ridgeback_slam_exploration/scripts/g1_distance_common.py",
+      "source_location": "L11",
+      "id": "g1_distance_common_yaw_from_quaternion",
+      "community": 6
+    },
+    {
+      "label": "world_to_vehicle_planar()",
+      "file_type": "code",
+      "source_file": "src/ridgeback_slam_exploration/scripts/g1_distance_common.py",
+      "source_location": "L17",
+      "id": "g1_distance_common_world_to_vehicle_planar",
+      "community": 6
+    },
+    {
+      "label": "planar_distance_from_vehicle_origin()",
+      "file_type": "code",
+      "source_file": "src/ridgeback_slam_exploration/scripts/g1_distance_common.py",
+      "source_location": "L23",
+      "id": "g1_distance_common_planar_distance_from_vehicle_origin",
+      "community": 6
+    },
+    {
+      "label": "g1_pointcloud_distance_benchmark.launch.py",
+      "file_type": "code",
+      "source_file": "src/ridgeback_slam_exploration/launch/g1_pointcloud_distance_benchmark.launch.py",
+      "source_location": "L1",
+      "id": "g1_pointcloud_distance_benchmark_launch",
+      "community": 11
+    },
+    {
+      "label": "generate_launch_description()",
+      "file_type": "code",
+      "source_file": "src/ridgeback_slam_exploration/launch/g1_pointcloud_distance_benchmark.launch.py",
+      "source_location": "L11",
+      "id": "g1_pointcloud_distance_benchmark_launch_generate_launch_description",
+      "community": 11
+    },
+    {
+      "label": "g1_lidar_distance_benchmark.launch.py",
+      "file_type": "code",
+      "source_file": "src/ridgeback_slam_exploration/launch/g1_lidar_distance_benchmark.launch.py",
+      "source_location": "L1",
+      "id": "g1_lidar_distance_benchmark_launch",
+      "community": 12
+    },
+    {
+      "label": "generate_launch_description()",
+      "file_type": "code",
+      "source_file": "src/ridgeback_slam_exploration/launch/g1_lidar_distance_benchmark.launch.py",
+      "source_location": "L11",
+      "id": "g1_lidar_distance_benchmark_launch_generate_launch_description",
+      "community": 12
+    },
+    {
+      "label": "g1_distance_benchmark.launch.py",
+      "file_type": "code",
+      "source_file": "src/ridgeback_slam_exploration/launch/g1_distance_benchmark.launch.py",
+      "source_location": "L1",
+      "id": "g1_distance_benchmark_launch",
+      "community": 13
+    },
+    {
+      "label": "generate_launch_description()",
+      "file_type": "code",
+      "source_file": "src/ridgeback_slam_exploration/launch/g1_distance_benchmark.launch.py",
+      "source_location": "L11",
+      "id": "g1_distance_benchmark_launch_generate_launch_description",
+      "community": 13
+    },
+    {
+      "label": "g1_detection_common utilities",
+      "file_type": "code",
+      "source_file": "src/ridgeback_slam_exploration/scripts/g1_detection_common.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "g1_detection_common_module",
+      "community": 2
+    },
+    {
+      "label": "bgr_frame_to_pil",
+      "file_type": "code",
+      "source_file": "src/ridgeback_slam_exploration/scripts/g1_detection_common.py",
+      "source_location": "L116",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "g1_detection_common_bgr_to_pil",
+      "community": 14
+    },
+    {
+      "label": "convert_color_image_message",
+      "file_type": "code",
+      "source_file": "src/ridgeback_slam_exploration/scripts/g1_detection_common.py",
+      "source_location": "L120",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "g1_detection_common_convert_color",
+      "community": 0
+    },
+    {
+      "label": "convert_depth_to_meters_message",
+      "file_type": "code",
+      "source_file": "src/ridgeback_slam_exploration/scripts/g1_detection_common.py",
+      "source_location": "L137",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "g1_detection_common_convert_depth",
+      "community": 0
+    },
+    {
+      "label": "decode_image_message",
+      "file_type": "code",
+      "source_file": "src/ridgeback_slam_exploration/scripts/g1_detection_common.py",
+      "source_location": "L146",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "g1_detection_common_decode_image",
+      "community": 0
+    },
+    {
+      "label": "normalize_to_uint8",
+      "file_type": "code",
+      "source_file": "src/ridgeback_slam_exploration/scripts/g1_detection_common.py",
+      "source_location": "L176",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "g1_detection_common_normalize_u8",
+      "community": 0
+    },
+    {
+      "label": "OWLv2 model constant (google/owlv2-base-patch16-ensemble)",
+      "file_type": "code",
+      "source_file": "src/ridgeback_slam_exploration/scripts/g1_detection_common.py",
+      "source_location": "L11",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "g1_detection_common_owl_model_default",
+      "community": 9
+    },
+    {
+      "label": "Torso focus bbox constants",
+      "file_type": "code",
+      "source_file": "src/ridgeback_slam_exploration/scripts/g1_detection_common.py",
+      "source_location": "L20-L23",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "g1_detection_common_torso_focus_constants",
+      "community": 0
+    },
+    {
+      "label": "g1_distance_common utilities",
+      "file_type": "code",
+      "source_file": "src/ridgeback_slam_exploration/scripts/g1_distance_common.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "g1_distance_common_module",
+      "community": 2
+    },
+    {
+      "label": "ROBOT_FRONT_OFFSET_M constant",
+      "file_type": "code",
+      "source_file": "src/ridgeback_slam_exploration/scripts/g1_distance_common.py",
+      "source_location": "L4",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "g1_distance_common_front_offset",
+      "community": 8
+    },
+    {
+      "label": "apply_vehicle_front_offset",
+      "file_type": "code",
+      "source_file": "src/ridgeback_slam_exploration/scripts/g1_distance_common.py",
+      "source_location": "L7",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "g1_distance_common_apply_front_offset",
+      "community": 8
+    },
+    {
+      "label": "yaw_from_quaternion",
+      "file_type": "code",
+      "source_file": "src/ridgeback_slam_exploration/scripts/g1_distance_common.py",
+      "source_location": "L11",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "g1_distance_common_yaw_from_quat",
+      "community": 15
+    },
+    {
+      "label": "world_to_vehicle_planar",
+      "file_type": "code",
+      "source_file": "src/ridgeback_slam_exploration/scripts/g1_distance_common.py",
+      "source_location": "L17",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "g1_distance_common_world_to_vehicle",
+      "community": 8
+    },
+    {
+      "label": "planar_distance_from_vehicle_origin",
+      "file_type": "code",
+      "source_file": "src/ridgeback_slam_exploration/scripts/g1_distance_common.py",
+      "source_location": "L23",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "g1_distance_common_planar_distance",
+      "community": 8
+    },
+    {
+      "label": "g1_pointcloud_distance_benchmark launch",
+      "file_type": "code",
+      "source_file": "src/ridgeback_slam_exploration/launch/g1_pointcloud_distance_benchmark.launch.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "launch_g1_pointcloud_benchmark",
+      "community": 2
+    },
+    {
+      "label": "g1_lidar_distance_benchmark launch",
+      "file_type": "code",
+      "source_file": "src/ridgeback_slam_exploration/launch/g1_lidar_distance_benchmark.launch.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "launch_g1_lidar_benchmark",
+      "community": 2
+    },
+    {
+      "label": "g1_distance_benchmark (RGB) launch",
+      "file_type": "code",
+      "source_file": "src/ridgeback_slam_exploration/launch/g1_distance_benchmark.launch.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "launch_g1_distance_benchmark",
+      "community": 2
+    },
+    {
+      "label": "full_exploration launch",
+      "file_type": "code",
+      "source_file": "src/ridgeback_slam_exploration/launch/full_exploration.launch.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "launch_full_exploration",
       "community": 1
+    },
+    {
+      "label": "g1_detection_pointcloud_node",
+      "file_type": "code",
+      "source_file": "src/ridgeback_slam_exploration/launch/g1_pointcloud_distance_benchmark.launch.py",
+      "source_location": "L57",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "node_g1_detection_pointcloud",
+      "community": 2
+    },
+    {
+      "label": "g1_detection_lidar_node",
+      "file_type": "code",
+      "source_file": "src/ridgeback_slam_exploration/launch/g1_lidar_distance_benchmark.launch.py",
+      "source_location": "L59",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "node_g1_detection_lidar",
+      "community": 2
+    },
+    {
+      "label": "g1_detection_node (RGB/OWLv2)",
+      "file_type": "code",
+      "source_file": "src/ridgeback_slam_exploration/launch/g1_distance_benchmark.launch.py",
+      "source_location": "L59",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "node_g1_detection",
+      "community": 2
+    },
+    {
+      "label": "g1_distance_benchmark_runner",
+      "file_type": "code",
+      "source_file": "src/ridgeback_slam_exploration/launch/g1_distance_benchmark.launch.py",
+      "source_location": "L73",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "node_g1_distance_benchmark_runner",
+      "community": 2
+    },
+    {
+      "label": "g1_distance_calibration world",
+      "file_type": "code",
+      "source_file": "src/ridgeback_slam_exploration/launch/g1_distance_benchmark.launch.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "g1_distance_calibration_world",
+      "community": 2
+    },
+    {
+      "label": "fastrtps_no_shm.xml",
+      "file_type": "code",
+      "source_file": "src/ridgeback_slam_exploration/launch/g1_distance_benchmark.launch.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "fastrtps_no_shm_config",
+      "community": 1
+    },
+    {
+      "label": "perception_venv (local Python venv)",
+      "file_type": "code",
+      "source_file": "src/ridgeback_slam_exploration/launch/full_exploration.launch.py",
+      "source_location": "L18",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "perception_venv",
+      "community": 1
+    },
+    {
+      "label": "G1Detection.msg interface",
+      "file_type": "code",
+      "source_file": "src/ridgeback_slam_exploration/CMakeLists.txt",
+      "source_location": "L12",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "g1_detection_msg",
+      "community": 16
+    },
+    {
+      "label": "SpawnG1 Gazebo GUI plugin",
+      "file_type": "code",
+      "source_file": "src/ridgeback_slam_exploration/CMakeLists.txt",
+      "source_location": "L22",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "spawn_g1_plugin",
+      "community": 17
+    },
+    {
+      "label": "Project README",
+      "file_type": "document",
+      "source_file": "README.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "readme",
+      "community": 5
+    },
+    {
+      "label": "CLAUDE.md project instructions",
+      "file_type": "document",
+      "source_file": "CLAUDE.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "claude_md",
+      "community": 1
+    },
+    {
+      "label": "AGENTS.md graphify rules",
+      "file_type": "document",
+      "source_file": "AGENTS.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "agents_md",
+      "community": 5
+    },
+    {
+      "label": "slam_toolbox namespace patch rationale",
+      "file_type": "document",
+      "source_file": "README.md",
+      "source_location": "L173-L226",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "readme_slam_patch_rationale",
+      "community": 5
+    },
+    {
+      "label": "Namespace gotchas guidance",
+      "file_type": "document",
+      "source_file": "README.md",
+      "source_location": "L228-L236",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "readme_namespace_gotchas",
+      "community": 5
+    },
+    {
+      "label": "VLM-based G1 detection + distance estimation",
+      "file_type": "document",
+      "source_file": "README.md",
+      "source_location": "L17",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "readme_vlm_detection_concept",
+      "community": 9
+    },
+    {
+      "label": "TimerAction staged launch sequencing",
+      "file_type": "document",
+      "source_file": "CLAUDE.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "claude_timer_sequencing_rationale",
+      "community": 1
+    },
+    {
+      "label": "OWLv2 detector (Hugging Face)",
+      "file_type": "document",
+      "source_file": "README.md",
+      "source_location": "L17",
+      "source_url": "https://huggingface.co/google/owlv2-base-patch16-ensemble",
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "owlv2_model",
+      "community": 9
+    },
+    {
+      "label": "Depth-Anything V2 metric depth",
+      "file_type": "document",
+      "source_file": "README.md",
+      "source_location": "L146",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "depth_anything_v2",
+      "community": 9
+    },
+    {
+      "label": "clearpath_simulator",
+      "file_type": "document",
+      "source_file": "README.md",
+      "source_location": "L11",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "clearpath_simulator",
+      "community": 5
+    },
+    {
+      "label": "explore_lite (m-explore-ros2)",
+      "file_type": "document",
+      "source_file": "README.md",
+      "source_location": "L16",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "explore_lite",
+      "community": 5
+    },
+    {
+      "label": "Nav2 MPPI omni controller",
+      "file_type": "document",
+      "source_file": "README.md",
+      "source_location": "L15",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "nav2_stack",
+      "community": 5
+    },
+    {
+      "label": "G1 Detection Triple-View Comparison",
+      "file_type": "image",
+      "source_file": "src/ridgeback_slam_exploration/scripts/image.png",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "image_g1_detection_triple_view",
+      "community": 3
+    },
+    {
+      "label": "RGB Detection Panel",
+      "file_type": "image",
+      "source_file": "src/ridgeback_slam_exploration/scripts/image.png",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "image_rgb_detection_panel",
+      "community": 3
+    },
+    {
+      "label": "Sensor Depth Panel",
+      "file_type": "image",
+      "source_file": "src/ridgeback_slam_exploration/scripts/image.png",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "image_sensor_depth_panel",
+      "community": 3
+    },
+    {
+      "label": "Depth-Anything Panel",
+      "file_type": "image",
+      "source_file": "src/ridgeback_slam_exploration/scripts/image.png",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "image_depth_anything_panel",
+      "community": 3
+    },
+    {
+      "label": "G1 Humanoid Detection Target",
+      "file_type": "image",
+      "source_file": "src/ridgeback_slam_exploration/scripts/image.png",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "image_g1_humanoid_target",
+      "community": 3
+    },
+    {
+      "label": "Distance Estimate Overlay (Geo/Sensor/Mono)",
+      "file_type": "image",
+      "source_file": "src/ridgeback_slam_exploration/scripts/image.png",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "image_distance_overlay",
+      "community": 3
+    },
+    {
+      "label": "Depth-Anything Monocular Depth Model",
+      "file_type": "image",
+      "source_file": "src/ridgeback_slam_exploration/scripts/image.png",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "image_depth_anything_model",
+      "community": 3
+    },
+    {
+      "label": "RealSense D455 Depth Sensor",
+      "file_type": "image",
+      "source_file": "src/ridgeback_slam_exploration/scripts/image.png",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "image_realsense_depth_sensor",
+      "community": 3
+    },
+    {
+      "label": "g1_distance_common.py",
+      "file_type": "image",
+      "source_file": "src/ridgeback_slam_exploration/scripts/image.png",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "image_g1_distance_common",
+      "community": 3
+    },
+    {
+      "label": "g1_detection_common.py",
+      "file_type": "image",
+      "source_file": "src/ridgeback_slam_exploration/scripts/image.png",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "image_g1_detection_common",
+      "community": 3
     }
   ],
   "links": [
@@ -476,9 +1049,9 @@
       "weight": 1.0,
       "_src": "spawng1",
       "_tgt": "spawng1",
+      "confidence_score": 1.0,
       "source": "spawng1",
-      "target": "spawng1",
-      "confidence_score": 1.0
+      "target": "spawng1"
     },
     {
       "relation": "contains",
@@ -488,9 +1061,9 @@
       "weight": 1.0,
       "_src": "spawng1",
       "_tgt": "spawng1_spawng1",
+      "confidence_score": 1.0,
       "source": "spawng1",
-      "target": "spawng1_spawng1",
-      "confidence_score": 1.0
+      "target": "spawng1_spawng1"
     },
     {
       "relation": "contains",
@@ -500,9 +1073,9 @@
       "weight": 1.0,
       "_src": "spawng1",
       "_tgt": "spawng1_loadconfig",
+      "confidence_score": 1.0,
       "source": "spawng1",
-      "target": "spawng1_loadconfig",
-      "confidence_score": 1.0
+      "target": "spawng1_loadconfig"
     },
     {
       "relation": "contains",
@@ -512,9 +1085,9 @@
       "weight": 1.0,
       "_src": "spawng1",
       "_tgt": "spawng1_onspawn",
+      "confidence_score": 1.0,
       "source": "spawng1",
-      "target": "spawng1_onspawn",
-      "confidence_score": 1.0
+      "target": "spawng1_onspawn"
     },
     {
       "relation": "contains",
@@ -524,9 +1097,9 @@
       "weight": 1.0,
       "_src": "slam_launch",
       "_tgt": "slam_launch_launch_setup",
+      "confidence_score": 1.0,
       "source": "slam_launch",
-      "target": "slam_launch_launch_setup",
-      "confidence_score": 1.0
+      "target": "slam_launch_launch_setup"
     },
     {
       "relation": "contains",
@@ -536,9 +1109,21 @@
       "weight": 1.0,
       "_src": "slam_launch",
       "_tgt": "slam_launch_generate_launch_description",
+      "confidence_score": 1.0,
       "source": "slam_launch",
-      "target": "slam_launch_generate_launch_description",
-      "confidence_score": 1.0
+      "target": "slam_launch_generate_launch_description"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/ridgeback_slam_exploration/launch/full_exploration.launch.py",
+      "source_location": "L92-L105",
+      "weight": 1.0,
+      "_src": "launch_full_exploration",
+      "_tgt": "slam_launch",
+      "source": "slam_launch",
+      "target": "launch_full_exploration"
     },
     {
       "relation": "contains",
@@ -548,9 +1133,21 @@
       "weight": 1.0,
       "_src": "explore_launch",
       "_tgt": "explore_launch_generate_launch_description",
+      "confidence_score": 1.0,
       "source": "explore_launch",
-      "target": "explore_launch_generate_launch_description",
-      "confidence_score": 1.0
+      "target": "explore_launch_generate_launch_description"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/ridgeback_slam_exploration/launch/full_exploration.launch.py",
+      "source_location": "L124-L137",
+      "weight": 1.0,
+      "_src": "launch_full_exploration",
+      "_tgt": "explore_launch",
+      "source": "explore_launch",
+      "target": "launch_full_exploration"
     },
     {
       "relation": "contains",
@@ -560,9 +1157,21 @@
       "weight": 1.0,
       "_src": "nav2_launch",
       "_tgt": "nav2_launch_generate_launch_description",
+      "confidence_score": 1.0,
       "source": "nav2_launch",
-      "target": "nav2_launch_generate_launch_description",
-      "confidence_score": 1.0
+      "target": "nav2_launch_generate_launch_description"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/ridgeback_slam_exploration/launch/full_exploration.launch.py",
+      "source_location": "L108-L121",
+      "weight": 1.0,
+      "_src": "launch_full_exploration",
+      "_tgt": "nav2_launch",
+      "source": "nav2_launch",
+      "target": "launch_full_exploration"
     },
     {
       "relation": "contains",
@@ -572,9 +1181,57 @@
       "weight": 1.0,
       "_src": "simulation_launch",
       "_tgt": "simulation_launch_generate_launch_description",
+      "confidence_score": 1.0,
       "source": "simulation_launch",
-      "target": "simulation_launch_generate_launch_description",
-      "confidence_score": 1.0
+      "target": "simulation_launch_generate_launch_description"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/ridgeback_slam_exploration/launch/g1_pointcloud_distance_benchmark.launch.py",
+      "source_location": "L44-L54",
+      "weight": 1.0,
+      "_src": "launch_g1_pointcloud_benchmark",
+      "_tgt": "simulation_launch",
+      "source": "simulation_launch",
+      "target": "launch_g1_pointcloud_benchmark"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/ridgeback_slam_exploration/launch/g1_lidar_distance_benchmark.launch.py",
+      "source_location": "L46-L56",
+      "weight": 1.0,
+      "_src": "launch_g1_lidar_benchmark",
+      "_tgt": "simulation_launch",
+      "source": "simulation_launch",
+      "target": "launch_g1_lidar_benchmark"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/ridgeback_slam_exploration/launch/g1_distance_benchmark.launch.py",
+      "source_location": "L47-L57",
+      "weight": 1.0,
+      "_src": "launch_g1_distance_benchmark",
+      "_tgt": "simulation_launch",
+      "source": "simulation_launch",
+      "target": "launch_g1_distance_benchmark"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/ridgeback_slam_exploration/launch/full_exploration.launch.py",
+      "source_location": "L80-L89",
+      "weight": 1.0,
+      "_src": "launch_full_exploration",
+      "_tgt": "simulation_launch",
+      "source": "simulation_launch",
+      "target": "launch_full_exploration"
     },
     {
       "relation": "contains",
@@ -584,249 +1241,9 @@
       "weight": 1.0,
       "_src": "full_exploration_launch",
       "_tgt": "full_exploration_launch_generate_launch_description",
+      "confidence_score": 1.0,
       "source": "full_exploration_launch",
-      "target": "full_exploration_launch_generate_launch_description",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "vlm_distance/main.py",
-      "source_location": "L35",
-      "weight": 1.0,
-      "_src": "main",
-      "_tgt": "main_load_config",
-      "source": "main",
-      "target": "main_load_config",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "vlm_distance/main.py",
-      "source_location": "L50",
-      "weight": 1.0,
-      "_src": "main",
-      "_tgt": "main_add_topdown_xz_from_floor",
-      "source": "main",
-      "target": "main_add_topdown_xz_from_floor",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "vlm_distance/main.py",
-      "source_location": "L110",
-      "weight": 1.0,
-      "_src": "main",
-      "_tgt": "main_parse_detection_result",
-      "source": "main",
-      "target": "main_parse_detection_result",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "vlm_distance/main.py",
-      "source_location": "L172",
-      "weight": 1.0,
-      "_src": "main",
-      "_tgt": "main_display_results",
-      "source": "main",
-      "target": "main_display_results",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "vlm_distance/main.py",
-      "source_location": "L195",
-      "weight": 1.0,
-      "_src": "main",
-      "_tgt": "main_main",
-      "source": "main",
-      "target": "main_main",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "rationale_for",
-      "confidence": "EXTRACTED",
-      "source_file": "vlm_distance/main.py",
-      "source_location": "L1",
-      "weight": 1.0,
-      "_src": "main_rationale_1",
-      "_tgt": "main",
-      "source": "main",
-      "target": "main_rationale_1",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "calls",
-      "confidence": "EXTRACTED",
-      "source_file": "vlm_distance/main.py",
-      "source_location": "L245",
-      "weight": 1.0,
-      "_src": "main_main",
-      "_tgt": "main_load_config",
-      "source": "main_load_config",
-      "target": "main_main",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "rationale_for",
-      "confidence": "EXTRACTED",
-      "source_file": "vlm_distance/main.py",
-      "source_location": "L36",
-      "weight": 1.0,
-      "_src": "main_rationale_36",
-      "_tgt": "main_load_config",
-      "source": "main_load_config",
-      "target": "main_rationale_36",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "calls",
-      "confidence": "EXTRACTED",
-      "source_file": "vlm_distance/main.py",
-      "source_location": "L246",
-      "weight": 1.0,
-      "_src": "main_main",
-      "_tgt": "main_add_topdown_xz_from_floor",
-      "source": "main_add_topdown_xz_from_floor",
-      "target": "main_main",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "rationale_for",
-      "confidence": "EXTRACTED",
-      "source_file": "vlm_distance/main.py",
-      "source_location": "L51",
-      "weight": 1.0,
-      "_src": "main_rationale_51",
-      "_tgt": "main_add_topdown_xz_from_floor",
-      "source": "main_add_topdown_xz_from_floor",
-      "target": "main_rationale_51",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "calls",
-      "confidence": "EXTRACTED",
-      "source_file": "vlm_distance/main.py",
-      "source_location": "L244",
-      "weight": 1.0,
-      "_src": "main_main",
-      "_tgt": "main_parse_detection_result",
-      "source": "main_parse_detection_result",
-      "target": "main_main",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "rationale_for",
-      "confidence": "EXTRACTED",
-      "source_file": "vlm_distance/main.py",
-      "source_location": "L111",
-      "weight": 1.0,
-      "_src": "main_rationale_111",
-      "_tgt": "main_parse_detection_result",
-      "source": "main_parse_detection_result",
-      "target": "main_rationale_111",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "calls",
-      "confidence": "EXTRACTED",
-      "source_file": "vlm_distance/main.py",
-      "source_location": "L259",
-      "weight": 1.0,
-      "_src": "main_main",
-      "_tgt": "main_display_results",
-      "source": "main_display_results",
-      "target": "main_main",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "rationale_for",
-      "confidence": "EXTRACTED",
-      "source_file": "vlm_distance/main.py",
-      "source_location": "L173",
-      "weight": 1.0,
-      "_src": "main_rationale_173",
-      "_tgt": "main_display_results",
-      "source": "main_display_results",
-      "target": "main_rationale_173",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "vlm_distance/inspect_depth.py",
-      "source_location": "L85",
-      "weight": 1.0,
-      "_src": "inspect_depth",
-      "_tgt": "inspect_depth_redraw",
-      "source": "inspect_depth",
-      "target": "inspect_depth_redraw",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "vlm_distance/inspect_depth.py",
-      "source_location": "L105",
-      "weight": 1.0,
-      "_src": "inspect_depth",
-      "_tgt": "inspect_depth_on_mouse",
-      "source": "inspect_depth",
-      "target": "inspect_depth_on_mouse",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "rationale_for",
-      "confidence": "EXTRACTED",
-      "source_file": "vlm_distance/inspect_depth.py",
-      "source_location": "L1",
-      "weight": 1.0,
-      "_src": "inspect_depth_rationale_1",
-      "_tgt": "inspect_depth",
-      "source": "inspect_depth",
-      "target": "inspect_depth_rationale_1",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "calls",
-      "confidence": "EXTRACTED",
-      "source_file": "vlm_distance/inspect_depth.py",
-      "source_location": "L114",
-      "weight": 1.0,
-      "_src": "inspect_depth_on_mouse",
-      "_tgt": "inspect_depth_redraw",
-      "source": "inspect_depth_redraw",
-      "target": "inspect_depth_on_mouse",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "rationale_for",
-      "confidence": "EXTRACTED",
-      "source_file": "vlm_distance/inspect_depth.py",
-      "source_location": "L86",
-      "weight": 1.0,
-      "_src": "inspect_depth_rationale_86",
-      "_tgt": "inspect_depth_redraw",
-      "source": "inspect_depth_redraw",
-      "target": "inspect_depth_rationale_86",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "rationale_for",
-      "confidence": "EXTRACTED",
-      "source_file": "vlm_distance/inspect_depth.py",
-      "source_location": "L106",
-      "weight": 1.0,
-      "_src": "inspect_depth_rationale_106",
-      "_tgt": "inspect_depth_on_mouse",
-      "source": "inspect_depth_on_mouse",
-      "target": "inspect_depth_rationale_106",
-      "confidence_score": 1.0
+      "target": "full_exploration_launch_generate_launch_description"
     },
     {
       "relation": "references",
@@ -925,130 +1342,1035 @@
       "target": "dep_gz_gui8"
     },
     {
-      "relation": "conceptually_related_to",
-      "confidence": "INFERRED",
-      "confidence_score": 0.75,
-      "source_file": null,
-      "source_location": null,
-      "weight": 0.7,
-      "_src": "g1_photos_warehouse_scene",
-      "_tgt": "cmakelists_spawng1_plugin",
-      "source": "cmakelists_spawng1_plugin",
-      "target": "g1_photos_warehouse_scene"
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ridgeback_slam_exploration/scripts/g1_detection_common.py",
+      "source_location": "L26",
+      "weight": 1.0,
+      "_src": "g1_detection_common",
+      "_tgt": "g1_detection_common_load_config",
+      "source": "g1_detection_common",
+      "target": "g1_detection_common_load_config",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ridgeback_slam_exploration/scripts/g1_detection_common.py",
+      "source_location": "L40",
+      "weight": 1.0,
+      "_src": "g1_detection_common",
+      "_tgt": "g1_detection_common_compute_iou",
+      "source": "g1_detection_common",
+      "target": "g1_detection_common_compute_iou",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ridgeback_slam_exploration/scripts/g1_detection_common.py",
+      "source_location": "L52",
+      "weight": 1.0,
+      "_src": "g1_detection_common",
+      "_tgt": "g1_detection_common_nms",
+      "source": "g1_detection_common",
+      "target": "g1_detection_common_nms",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ridgeback_slam_exploration/scripts/g1_detection_common.py",
+      "source_location": "L65",
+      "weight": 1.0,
+      "_src": "g1_detection_common",
+      "_tgt": "g1_detection_common_parse_owl_detections",
+      "source": "g1_detection_common",
+      "target": "g1_detection_common_parse_owl_detections",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ridgeback_slam_exploration/scripts/g1_detection_common.py",
+      "source_location": "L99",
+      "weight": 1.0,
+      "_src": "g1_detection_common",
+      "_tgt": "g1_detection_common_focus_bbox",
+      "source": "g1_detection_common",
+      "target": "g1_detection_common_focus_bbox",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ridgeback_slam_exploration/scripts/g1_detection_common.py",
+      "source_location": "L116",
+      "weight": 1.0,
+      "_src": "g1_detection_common",
+      "_tgt": "g1_detection_common_bgr_frame_to_pil",
+      "source": "g1_detection_common",
+      "target": "g1_detection_common_bgr_frame_to_pil",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ridgeback_slam_exploration/scripts/g1_detection_common.py",
+      "source_location": "L120",
+      "weight": 1.0,
+      "_src": "g1_detection_common",
+      "_tgt": "g1_detection_common_convert_color_image_message",
+      "source": "g1_detection_common",
+      "target": "g1_detection_common_convert_color_image_message",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ridgeback_slam_exploration/scripts/g1_detection_common.py",
+      "source_location": "L137",
+      "weight": 1.0,
+      "_src": "g1_detection_common",
+      "_tgt": "g1_detection_common_convert_depth_to_meters_message",
+      "source": "g1_detection_common",
+      "target": "g1_detection_common_convert_depth_to_meters_message",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ridgeback_slam_exploration/scripts/g1_detection_common.py",
+      "source_location": "L146",
+      "weight": 1.0,
+      "_src": "g1_detection_common",
+      "_tgt": "g1_detection_common_decode_image_message",
+      "source": "g1_detection_common",
+      "target": "g1_detection_common_decode_image_message",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ridgeback_slam_exploration/scripts/g1_detection_common.py",
+      "source_location": "L160",
+      "weight": 1.0,
+      "_src": "g1_detection_common",
+      "_tgt": "g1_detection_common_decode_buffer",
+      "source": "g1_detection_common",
+      "target": "g1_detection_common_decode_buffer",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ridgeback_slam_exploration/scripts/g1_detection_common.py",
+      "source_location": "L176",
+      "weight": 1.0,
+      "_src": "g1_detection_common",
+      "_tgt": "g1_detection_common_normalize_to_uint8",
+      "source": "g1_detection_common",
+      "target": "g1_detection_common_normalize_to_uint8",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ridgeback_slam_exploration/scripts/g1_detection_common.py",
+      "source_location": "L57",
+      "weight": 1.0,
+      "_src": "g1_detection_common_nms",
+      "_tgt": "g1_detection_common_compute_iou",
+      "confidence_score": 1.0,
+      "source": "g1_detection_common_compute_iou",
+      "target": "g1_detection_common_nms"
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ridgeback_slam_exploration/scripts/g1_detection_common.py",
+      "source_location": "L93",
+      "weight": 1.0,
+      "_src": "g1_detection_common_parse_owl_detections",
+      "_tgt": "g1_detection_common_nms",
+      "confidence_score": 1.0,
+      "source": "g1_detection_common_nms",
+      "target": "g1_detection_common_parse_owl_detections"
     },
     {
       "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "src/ridgeback_slam_exploration/scripts/g1_detection_common.py",
+      "source_location": null,
+      "weight": 1.0,
+      "_src": "g1_detection_common_parse_owl_detections",
+      "_tgt": "g1_detection_common_owl_model_default",
+      "source": "g1_detection_common_parse_owl_detections",
+      "target": "g1_detection_common_owl_model_default"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/ridgeback_slam_exploration/scripts/g1_detection_common.py",
+      "source_location": "L104-L107",
+      "weight": 1.0,
+      "_src": "g1_detection_common_focus_bbox",
+      "_tgt": "g1_detection_common_torso_focus_constants",
+      "source": "g1_detection_common_focus_bbox",
+      "target": "g1_detection_common_torso_focus_constants"
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ridgeback_slam_exploration/scripts/g1_detection_common.py",
+      "source_location": "L121",
+      "weight": 1.0,
+      "_src": "g1_detection_common_convert_color_image_message",
+      "_tgt": "g1_detection_common_decode_image_message",
+      "source": "g1_detection_common_convert_color_image_message",
+      "target": "g1_detection_common_decode_image_message",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ridgeback_slam_exploration/scripts/g1_detection_common.py",
+      "source_location": "L133",
+      "weight": 1.0,
+      "_src": "g1_detection_common_convert_color_image_message",
+      "_tgt": "g1_detection_common_normalize_to_uint8",
+      "source": "g1_detection_common_convert_color_image_message",
+      "target": "g1_detection_common_normalize_to_uint8",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ridgeback_slam_exploration/scripts/g1_detection_common.py",
+      "source_location": "L138",
+      "weight": 1.0,
+      "_src": "g1_detection_common_convert_depth_to_meters_message",
+      "_tgt": "g1_detection_common_decode_image_message",
+      "source": "g1_detection_common_convert_depth_to_meters_message",
+      "target": "g1_detection_common_decode_image_message",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ridgeback_slam_exploration/scripts/g1_detection_common.py",
+      "source_location": "L148",
+      "weight": 1.0,
+      "_src": "g1_detection_common_decode_image_message",
+      "_tgt": "g1_detection_common_decode_buffer",
+      "source": "g1_detection_common_decode_image_message",
+      "target": "g1_detection_common_decode_buffer",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/ridgeback_slam_exploration/scripts/g1_detection_common.py",
+      "source_location": "L148",
+      "weight": 1.0,
+      "_src": "g1_detection_common_decode_image",
+      "_tgt": "g1_detection_common_decode_buffer",
+      "source": "g1_detection_common_decode_buffer",
+      "target": "g1_detection_common_decode_image"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ridgeback_slam_exploration/scripts/g1_distance_common.py",
+      "source_location": "L7",
+      "weight": 1.0,
+      "_src": "g1_distance_common",
+      "_tgt": "g1_distance_common_apply_vehicle_front_offset",
+      "source": "g1_distance_common",
+      "target": "g1_distance_common_apply_vehicle_front_offset",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ridgeback_slam_exploration/scripts/g1_distance_common.py",
+      "source_location": "L11",
+      "weight": 1.0,
+      "_src": "g1_distance_common",
+      "_tgt": "g1_distance_common_yaw_from_quaternion",
+      "source": "g1_distance_common",
+      "target": "g1_distance_common_yaw_from_quaternion",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ridgeback_slam_exploration/scripts/g1_distance_common.py",
+      "source_location": "L17",
+      "weight": 1.0,
+      "_src": "g1_distance_common",
+      "_tgt": "g1_distance_common_world_to_vehicle_planar",
+      "source": "g1_distance_common",
+      "target": "g1_distance_common_world_to_vehicle_planar",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ridgeback_slam_exploration/scripts/g1_distance_common.py",
+      "source_location": "L23",
+      "weight": 1.0,
+      "_src": "g1_distance_common",
+      "_tgt": "g1_distance_common_planar_distance_from_vehicle_origin",
+      "source": "g1_distance_common",
+      "target": "g1_distance_common_planar_distance_from_vehicle_origin",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ridgeback_slam_exploration/scripts/g1_distance_common.py",
+      "source_location": "L29",
+      "weight": 1.0,
+      "_src": "g1_distance_common_planar_distance_from_vehicle_origin",
+      "_tgt": "g1_distance_common_apply_vehicle_front_offset",
+      "source": "g1_distance_common_apply_vehicle_front_offset",
+      "target": "g1_distance_common_planar_distance_from_vehicle_origin",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ridgeback_slam_exploration/scripts/g1_distance_common.py",
+      "source_location": "L28",
+      "weight": 1.0,
+      "_src": "g1_distance_common_planar_distance_from_vehicle_origin",
+      "_tgt": "g1_distance_common_world_to_vehicle_planar",
+      "source": "g1_distance_common_world_to_vehicle_planar",
+      "target": "g1_distance_common_planar_distance_from_vehicle_origin",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ridgeback_slam_exploration/launch/g1_pointcloud_distance_benchmark.launch.py",
+      "source_location": "L11",
+      "weight": 1.0,
+      "_src": "g1_pointcloud_distance_benchmark_launch",
+      "_tgt": "g1_pointcloud_distance_benchmark_launch_generate_launch_description",
+      "source": "g1_pointcloud_distance_benchmark_launch",
+      "target": "g1_pointcloud_distance_benchmark_launch_generate_launch_description",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ridgeback_slam_exploration/launch/g1_lidar_distance_benchmark.launch.py",
+      "source_location": "L11",
+      "weight": 1.0,
+      "_src": "g1_lidar_distance_benchmark_launch",
+      "_tgt": "g1_lidar_distance_benchmark_launch_generate_launch_description",
+      "source": "g1_lidar_distance_benchmark_launch",
+      "target": "g1_lidar_distance_benchmark_launch_generate_launch_description",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ridgeback_slam_exploration/launch/g1_distance_benchmark.launch.py",
+      "source_location": "L11",
+      "weight": 1.0,
+      "_src": "g1_distance_benchmark_launch",
+      "_tgt": "g1_distance_benchmark_launch_generate_launch_description",
+      "source": "g1_distance_benchmark_launch",
+      "target": "g1_distance_benchmark_launch_generate_launch_description",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "references",
       "confidence": "INFERRED",
       "confidence_score": 0.85,
-      "source_file": null,
+      "source_file": "src/ridgeback_slam_exploration/scripts/g1_detection_common.py",
       "source_location": null,
-      "weight": 0.9,
-      "_src": "cmakelists_g1_detection_node",
-      "_tgt": "requirements_vlm_deps",
-      "source": "cmakelists_g1_detection_node",
-      "target": "requirements_vlm_deps"
+      "weight": 1.0,
+      "_src": "node_g1_detection",
+      "_tgt": "g1_detection_common_module",
+      "source": "g1_detection_common_module",
+      "target": "node_g1_detection"
     },
     {
-      "relation": "conceptually_related_to",
+      "relation": "references",
       "confidence": "INFERRED",
-      "confidence_score": 0.8,
-      "source_file": null,
+      "confidence_score": 0.85,
+      "source_file": "src/ridgeback_slam_exploration/scripts/g1_detection_common.py",
       "source_location": null,
-      "weight": 0.8,
-      "_src": "g1_photos_warehouse_scene",
-      "_tgt": "cmakelists_g1_detection_node",
-      "source": "cmakelists_g1_detection_node",
-      "target": "g1_photos_warehouse_scene"
+      "weight": 1.0,
+      "_src": "node_g1_detection_pointcloud",
+      "_tgt": "g1_detection_common_module",
+      "source": "g1_detection_common_module",
+      "target": "node_g1_detection_pointcloud"
     },
     {
-      "relation": "conceptually_related_to",
+      "relation": "references",
       "confidence": "INFERRED",
-      "confidence_score": 0.8,
-      "source_file": null,
+      "confidence_score": 0.85,
+      "source_file": "src/ridgeback_slam_exploration/scripts/g1_detection_common.py",
       "source_location": null,
-      "weight": 0.8,
-      "_src": "image_copy_g1_hospital_hallway",
-      "_tgt": "cmakelists_g1_detection_node",
-      "source": "cmakelists_g1_detection_node",
-      "target": "image_copy_g1_hospital_hallway"
+      "weight": 1.0,
+      "_src": "node_g1_detection_lidar",
+      "_tgt": "g1_detection_common_module",
+      "source": "g1_detection_common_module",
+      "target": "node_g1_detection_lidar"
     },
     {
-      "relation": "conceptually_related_to",
+      "relation": "semantically_similar_to",
       "confidence": "INFERRED",
-      "confidence_score": 0.8,
-      "source_file": null,
+      "confidence_score": 0.7,
+      "source_file": "src/ridgeback_slam_exploration/scripts/g1_detection_common.py",
       "source_location": null,
-      "weight": 0.8,
-      "_src": "image_g1_hospital_close",
-      "_tgt": "cmakelists_g1_detection_node",
-      "source": "cmakelists_g1_detection_node",
-      "target": "image_g1_hospital_close"
+      "weight": 1.0,
+      "_src": "g1_detection_common_module",
+      "_tgt": "g1_distance_common_module",
+      "source": "g1_detection_common_module",
+      "target": "g1_distance_common_module"
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/ridgeback_slam_exploration/scripts/g1_detection_common.py",
+      "source_location": "L121",
+      "weight": 1.0,
+      "_src": "g1_detection_common_convert_color",
+      "_tgt": "g1_detection_common_decode_image",
+      "source": "g1_detection_common_convert_color",
+      "target": "g1_detection_common_decode_image"
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/ridgeback_slam_exploration/scripts/g1_detection_common.py",
+      "source_location": "L133",
+      "weight": 1.0,
+      "_src": "g1_detection_common_convert_color",
+      "_tgt": "g1_detection_common_normalize_u8",
+      "source": "g1_detection_common_convert_color",
+      "target": "g1_detection_common_normalize_u8"
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/ridgeback_slam_exploration/scripts/g1_detection_common.py",
+      "source_location": "L138",
+      "weight": 1.0,
+      "_src": "g1_detection_common_convert_depth",
+      "_tgt": "g1_detection_common_decode_image",
+      "source": "g1_detection_common_convert_depth",
+      "target": "g1_detection_common_decode_image"
     },
     {
       "relation": "references",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
-      "source_file": "vlm_distance/requirements.txt",
-      "source_location": "line 8",
+      "source_file": "src/ridgeback_slam_exploration/scripts/g1_detection_common.py",
+      "source_location": "L11",
       "weight": 1.0,
-      "_src": "requirements_vlm_deps",
-      "_tgt": "requirements_transformers",
-      "source": "requirements_vlm_deps",
-      "target": "requirements_transformers"
+      "_src": "g1_detection_common_owl_model_default",
+      "_tgt": "owlv2_model",
+      "source": "g1_detection_common_owl_model_default",
+      "target": "owlv2_model"
+    },
+    {
+      "relation": "references",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "src/ridgeback_slam_exploration/scripts/g1_distance_common.py",
+      "source_location": null,
+      "weight": 1.0,
+      "_src": "node_g1_detection_pointcloud",
+      "_tgt": "g1_distance_common_module",
+      "source": "g1_distance_common_module",
+      "target": "node_g1_detection_pointcloud"
+    },
+    {
+      "relation": "references",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "src/ridgeback_slam_exploration/scripts/g1_distance_common.py",
+      "source_location": null,
+      "weight": 1.0,
+      "_src": "node_g1_detection_lidar",
+      "_tgt": "g1_distance_common_module",
+      "source": "g1_distance_common_module",
+      "target": "node_g1_detection_lidar"
     },
     {
       "relation": "references",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
-      "source_file": "vlm_distance/requirements.txt",
-      "source_location": "line 6",
+      "source_file": "src/ridgeback_slam_exploration/scripts/g1_distance_common.py",
+      "source_location": "L8",
       "weight": 1.0,
-      "_src": "requirements_vlm_deps",
-      "_tgt": "requirements_torch",
-      "source": "requirements_vlm_deps",
-      "target": "requirements_torch"
+      "_src": "g1_distance_common_apply_front_offset",
+      "_tgt": "g1_distance_common_front_offset",
+      "source": "g1_distance_common_front_offset",
+      "target": "g1_distance_common_apply_front_offset"
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/ridgeback_slam_exploration/scripts/g1_distance_common.py",
+      "source_location": "L29",
+      "weight": 1.0,
+      "_src": "g1_distance_common_planar_distance",
+      "_tgt": "g1_distance_common_apply_front_offset",
+      "source": "g1_distance_common_apply_front_offset",
+      "target": "g1_distance_common_planar_distance"
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/ridgeback_slam_exploration/scripts/g1_distance_common.py",
+      "source_location": "L28",
+      "weight": 1.0,
+      "_src": "g1_distance_common_planar_distance",
+      "_tgt": "g1_distance_common_world_to_vehicle",
+      "source": "g1_distance_common_world_to_vehicle",
+      "target": "g1_distance_common_planar_distance"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/ridgeback_slam_exploration/launch/g1_pointcloud_distance_benchmark.launch.py",
+      "source_location": "L56",
+      "weight": 1.0,
+      "_src": "launch_g1_pointcloud_benchmark",
+      "_tgt": "node_g1_detection_pointcloud",
+      "source": "launch_g1_pointcloud_benchmark",
+      "target": "node_g1_detection_pointcloud"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/ridgeback_slam_exploration/launch/g1_pointcloud_distance_benchmark.launch.py",
+      "source_location": "L70",
+      "weight": 1.0,
+      "_src": "launch_g1_pointcloud_benchmark",
+      "_tgt": "node_g1_distance_benchmark_runner",
+      "source": "launch_g1_pointcloud_benchmark",
+      "target": "node_g1_distance_benchmark_runner"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/ridgeback_slam_exploration/launch/g1_pointcloud_distance_benchmark.launch.py",
+      "source_location": "L34",
+      "weight": 1.0,
+      "_src": "launch_g1_pointcloud_benchmark",
+      "_tgt": "g1_distance_calibration_world",
+      "source": "launch_g1_pointcloud_benchmark",
+      "target": "g1_distance_calibration_world"
+    },
+    {
+      "relation": "semantically_similar_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.9,
+      "source_file": "src/ridgeback_slam_exploration/launch/g1_pointcloud_distance_benchmark.launch.py",
+      "source_location": null,
+      "weight": 1.0,
+      "_src": "launch_g1_pointcloud_benchmark",
+      "_tgt": "launch_g1_lidar_benchmark",
+      "source": "launch_g1_pointcloud_benchmark",
+      "target": "launch_g1_lidar_benchmark"
     },
     {
       "relation": "semantically_similar_to",
       "confidence": "INFERRED",
       "confidence_score": 0.85,
-      "source_file": null,
+      "source_file": "src/ridgeback_slam_exploration/launch/g1_pointcloud_distance_benchmark.launch.py",
       "source_location": null,
-      "weight": 0.8,
-      "_src": "image_copy_g1_hospital_hallway",
-      "_tgt": "image_g1_hospital_close",
-      "source": "image_copy_g1_hospital_hallway",
-      "target": "image_g1_hospital_close"
+      "weight": 1.0,
+      "_src": "launch_g1_pointcloud_benchmark",
+      "_tgt": "launch_g1_distance_benchmark",
+      "source": "launch_g1_pointcloud_benchmark",
+      "target": "launch_g1_distance_benchmark"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/ridgeback_slam_exploration/launch/g1_lidar_distance_benchmark.launch.py",
+      "source_location": "L58",
+      "weight": 1.0,
+      "_src": "launch_g1_lidar_benchmark",
+      "_tgt": "node_g1_detection_lidar",
+      "source": "launch_g1_lidar_benchmark",
+      "target": "node_g1_detection_lidar"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/ridgeback_slam_exploration/launch/g1_lidar_distance_benchmark.launch.py",
+      "source_location": "L73",
+      "weight": 1.0,
+      "_src": "launch_g1_lidar_benchmark",
+      "_tgt": "node_g1_distance_benchmark_runner",
+      "source": "launch_g1_lidar_benchmark",
+      "target": "node_g1_distance_benchmark_runner"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/ridgeback_slam_exploration/launch/g1_lidar_distance_benchmark.launch.py",
+      "source_location": "L35",
+      "weight": 1.0,
+      "_src": "launch_g1_lidar_benchmark",
+      "_tgt": "g1_distance_calibration_world",
+      "source": "launch_g1_lidar_benchmark",
+      "target": "g1_distance_calibration_world"
+    },
+    {
+      "relation": "semantically_similar_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "src/ridgeback_slam_exploration/launch/g1_lidar_distance_benchmark.launch.py",
+      "source_location": null,
+      "weight": 1.0,
+      "_src": "launch_g1_lidar_benchmark",
+      "_tgt": "launch_g1_distance_benchmark",
+      "source": "launch_g1_lidar_benchmark",
+      "target": "launch_g1_distance_benchmark"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/ridgeback_slam_exploration/launch/g1_distance_benchmark.launch.py",
+      "source_location": "L59",
+      "weight": 1.0,
+      "_src": "launch_g1_distance_benchmark",
+      "_tgt": "node_g1_detection",
+      "source": "launch_g1_distance_benchmark",
+      "target": "node_g1_detection"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/ridgeback_slam_exploration/launch/g1_distance_benchmark.launch.py",
+      "source_location": "L73",
+      "weight": 1.0,
+      "_src": "launch_g1_distance_benchmark",
+      "_tgt": "node_g1_distance_benchmark_runner",
+      "source": "launch_g1_distance_benchmark",
+      "target": "node_g1_distance_benchmark_runner"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/ridgeback_slam_exploration/launch/g1_distance_benchmark.launch.py",
+      "source_location": "L36",
+      "weight": 1.0,
+      "_src": "launch_g1_distance_benchmark",
+      "_tgt": "g1_distance_calibration_world",
+      "source": "launch_g1_distance_benchmark",
+      "target": "g1_distance_calibration_world"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/ridgeback_slam_exploration/launch/full_exploration.launch.py",
+      "source_location": "L65",
+      "weight": 1.0,
+      "_src": "launch_full_exploration",
+      "_tgt": "node_g1_detection",
+      "source": "launch_full_exploration",
+      "target": "node_g1_detection"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/ridgeback_slam_exploration/launch/full_exploration.launch.py",
+      "source_location": "L18",
+      "weight": 1.0,
+      "_src": "launch_full_exploration",
+      "_tgt": "perception_venv",
+      "source": "launch_full_exploration",
+      "target": "perception_venv"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/ridgeback_slam_exploration/launch/full_exploration.launch.py",
+      "source_location": "L31",
+      "weight": 1.0,
+      "_src": "launch_full_exploration",
+      "_tgt": "fastrtps_no_shm_config",
+      "source": "launch_full_exploration",
+      "target": "fastrtps_no_shm_config"
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "CLAUDE.md",
+      "source_location": null,
+      "weight": 1.0,
+      "_src": "claude_timer_sequencing_rationale",
+      "_tgt": "launch_full_exploration",
+      "source": "launch_full_exploration",
+      "target": "claude_timer_sequencing_rationale"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "CLAUDE.md",
+      "source_location": null,
+      "weight": 1.0,
+      "_src": "claude_md",
+      "_tgt": "launch_full_exploration",
+      "source": "launch_full_exploration",
+      "target": "claude_md"
+    },
+    {
+      "relation": "shares_data_with",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "src/ridgeback_slam_exploration/launch/g1_pointcloud_distance_benchmark.launch.py",
+      "source_location": "L82",
+      "weight": 1.0,
+      "_src": "node_g1_detection_pointcloud",
+      "_tgt": "node_g1_distance_benchmark_runner",
+      "source": "node_g1_detection_pointcloud",
+      "target": "node_g1_distance_benchmark_runner"
+    },
+    {
+      "relation": "shares_data_with",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "src/ridgeback_slam_exploration/launch/g1_lidar_distance_benchmark.launch.py",
+      "source_location": "L85",
+      "weight": 1.0,
+      "_src": "node_g1_detection_lidar",
+      "_tgt": "node_g1_distance_benchmark_runner",
+      "source": "node_g1_detection_lidar",
+      "target": "node_g1_distance_benchmark_runner"
+    },
+    {
+      "relation": "shares_data_with",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "src/ridgeback_slam_exploration/launch/g1_distance_benchmark.launch.py",
+      "source_location": null,
+      "weight": 1.0,
+      "_src": "node_g1_detection",
+      "_tgt": "node_g1_distance_benchmark_runner",
+      "source": "node_g1_detection",
+      "target": "node_g1_distance_benchmark_runner"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "README.md",
+      "source_location": "L17",
+      "weight": 1.0,
+      "_src": "readme_vlm_detection_concept",
+      "_tgt": "node_g1_detection",
+      "source": "node_g1_detection",
+      "target": "readme_vlm_detection_concept"
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "README.md",
+      "source_location": "L173-L226",
+      "weight": 1.0,
+      "_src": "readme_slam_patch_rationale",
+      "_tgt": "readme",
+      "source": "readme",
+      "target": "readme_slam_patch_rationale"
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "README.md",
+      "source_location": "L228-L236",
+      "weight": 1.0,
+      "_src": "readme_namespace_gotchas",
+      "_tgt": "readme",
+      "source": "readme",
+      "target": "readme_namespace_gotchas"
+    },
+    {
+      "relation": "cites",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "README.md",
+      "source_location": "L11",
+      "weight": 1.0,
+      "_src": "readme",
+      "_tgt": "clearpath_simulator",
+      "source": "readme",
+      "target": "clearpath_simulator"
+    },
+    {
+      "relation": "cites",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "README.md",
+      "source_location": "L16",
+      "weight": 1.0,
+      "_src": "readme",
+      "_tgt": "explore_lite",
+      "source": "readme",
+      "target": "explore_lite"
+    },
+    {
+      "relation": "cites",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "README.md",
+      "source_location": "L15",
+      "weight": 1.0,
+      "_src": "readme",
+      "_tgt": "nav2_stack",
+      "source": "readme",
+      "target": "nav2_stack"
+    },
+    {
+      "relation": "references",
+      "confidence": "INFERRED",
+      "confidence_score": 0.5,
+      "source_file": "AGENTS.md",
+      "source_location": null,
+      "weight": 1.0,
+      "_src": "agents_md",
+      "_tgt": "readme",
+      "source": "readme",
+      "target": "agents_md"
+    },
+    {
+      "relation": "cites",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "README.md",
+      "source_location": "L17",
+      "weight": 1.0,
+      "_src": "readme_vlm_detection_concept",
+      "_tgt": "owlv2_model",
+      "source": "readme_vlm_detection_concept",
+      "target": "owlv2_model"
+    },
+    {
+      "relation": "cites",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "README.md",
+      "source_location": "L146",
+      "weight": 1.0,
+      "_src": "readme_vlm_detection_concept",
+      "_tgt": "depth_anything_v2",
+      "source": "readme_vlm_detection_concept",
+      "target": "depth_anything_v2"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/ridgeback_slam_exploration/scripts/image.png",
+      "source_location": null,
+      "weight": 1.0,
+      "_src": "image_g1_detection_triple_view",
+      "_tgt": "image_rgb_detection_panel",
+      "source": "image_g1_detection_triple_view",
+      "target": "image_rgb_detection_panel"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/ridgeback_slam_exploration/scripts/image.png",
+      "source_location": null,
+      "weight": 1.0,
+      "_src": "image_g1_detection_triple_view",
+      "_tgt": "image_sensor_depth_panel",
+      "source": "image_g1_detection_triple_view",
+      "target": "image_sensor_depth_panel"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/ridgeback_slam_exploration/scripts/image.png",
+      "source_location": null,
+      "weight": 1.0,
+      "_src": "image_g1_detection_triple_view",
+      "_tgt": "image_depth_anything_panel",
+      "source": "image_g1_detection_triple_view",
+      "target": "image_depth_anything_panel"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/ridgeback_slam_exploration/scripts/image.png",
+      "source_location": null,
+      "weight": 1.0,
+      "_src": "image_g1_detection_triple_view",
+      "_tgt": "image_g1_humanoid_target",
+      "source": "image_g1_detection_triple_view",
+      "target": "image_g1_humanoid_target"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/ridgeback_slam_exploration/scripts/image.png",
+      "source_location": null,
+      "weight": 1.0,
+      "_src": "image_rgb_detection_panel",
+      "_tgt": "image_g1_humanoid_target",
+      "source": "image_rgb_detection_panel",
+      "target": "image_g1_humanoid_target"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/ridgeback_slam_exploration/scripts/image.png",
+      "source_location": null,
+      "weight": 1.0,
+      "_src": "image_rgb_detection_panel",
+      "_tgt": "image_distance_overlay",
+      "source": "image_rgb_detection_panel",
+      "target": "image_distance_overlay"
+    },
+    {
+      "relation": "references",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "src/ridgeback_slam_exploration/scripts/image.png",
+      "source_location": null,
+      "weight": 1.0,
+      "_src": "image_sensor_depth_panel",
+      "_tgt": "image_realsense_depth_sensor",
+      "source": "image_sensor_depth_panel",
+      "target": "image_realsense_depth_sensor"
+    },
+    {
+      "relation": "semantically_similar_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.7,
+      "source_file": "src/ridgeback_slam_exploration/scripts/image.png",
+      "source_location": null,
+      "weight": 1.0,
+      "_src": "image_sensor_depth_panel",
+      "_tgt": "image_depth_anything_panel",
+      "source": "image_sensor_depth_panel",
+      "target": "image_depth_anything_panel"
+    },
+    {
+      "relation": "references",
+      "confidence": "INFERRED",
+      "confidence_score": 0.9,
+      "source_file": "src/ridgeback_slam_exploration/scripts/image.png",
+      "source_location": null,
+      "weight": 1.0,
+      "_src": "image_depth_anything_panel",
+      "_tgt": "image_depth_anything_model",
+      "source": "image_depth_anything_panel",
+      "target": "image_depth_anything_model"
+    },
+    {
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "src/ridgeback_slam_exploration/scripts/image.png",
+      "source_location": null,
+      "weight": 1.0,
+      "_src": "image_g1_humanoid_target",
+      "_tgt": "image_g1_detection_common",
+      "source": "image_g1_humanoid_target",
+      "target": "image_g1_detection_common"
+    },
+    {
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "src/ridgeback_slam_exploration/scripts/image.png",
+      "source_location": null,
+      "weight": 1.0,
+      "_src": "image_distance_overlay",
+      "_tgt": "image_g1_distance_common",
+      "source": "image_distance_overlay",
+      "target": "image_g1_distance_common"
     }
   ],
   "hyperedges": [
     {
-      "id": "g1_detection_pipeline",
-      "label": "G1 Humanoid Detection Pipeline",
+      "id": "g1_distance_benchmark_variants",
+      "label": "Three distance benchmark modalities (RGB/LiDAR/Pointcloud)",
       "nodes": [
-        "cmakelists_g1_detection_node",
-        "cmakelists_g1detection_msg",
-        "requirements_vlm_deps",
-        "requirements_transformers",
-        "requirements_torch"
+        "launch_g1_distance_benchmark",
+        "launch_g1_lidar_benchmark",
+        "launch_g1_pointcloud_benchmark",
+        "node_g1_distance_benchmark_runner",
+        "g1_distance_calibration_world"
       ],
       "relation": "participate_in",
-      "confidence": "INFERRED",
-      "confidence_score": 0.85,
-      "source_file": "src/ridgeback_slam_exploration/CMakeLists.txt"
+      "confidence": "EXTRACTED",
+      "confidence_score": 0.95,
+      "source_file": "src/ridgeback_slam_exploration/launch/g1_distance_benchmark.launch.py"
     },
     {
-      "id": "g1_test_images",
-      "label": "G1 Detection Test/Reference Images",
+      "id": "full_exploration_staged_startup",
+      "label": "Staged TimerAction startup flow (sim->SLAM->Nav2->explore)",
       "nodes": [
-        "g1_photos_warehouse_scene",
-        "image_copy_g1_hospital_hallway",
-        "image_g1_hospital_close"
+        "launch_full_exploration",
+        "simulation_launch",
+        "slam_launch",
+        "nav2_launch",
+        "explore_launch"
       ],
       "relation": "form",
+      "confidence": "EXTRACTED",
+      "confidence_score": 0.95,
+      "source_file": "src/ridgeback_slam_exploration/launch/full_exploration.launch.py"
+    },
+    {
+      "id": "owlv2_detection_pipeline",
+      "label": "OWLv2 detection decode/parse/NMS pipeline",
+      "nodes": [
+        "g1_detection_common_decode_image",
+        "g1_detection_common_convert_color",
+        "g1_detection_common_parse_owl_detections",
+        "g1_detection_common_nms",
+        "g1_detection_common_focus_bbox"
+      ],
+      "relation": "implement",
       "confidence": "INFERRED",
-      "confidence_score": 0.8,
-      "source_file": "vlm_distance/"
+      "confidence_score": 0.85,
+      "source_file": "src/ridgeback_slam_exploration/scripts/g1_detection_common.py"
     }
   ]
 }
