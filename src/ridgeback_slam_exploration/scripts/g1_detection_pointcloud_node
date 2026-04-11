@@ -1,0 +1,386 @@
+#!/usr/bin/env python3
+
+import math
+
+from message_filters import ApproximateTimeSynchronizer, Subscriber
+import numpy as np
+import rclpy
+from rclpy.duration import Duration
+from rclpy.executors import ExternalShutdownException
+from rclpy.node import Node
+from rclpy.qos import qos_profile_sensor_data
+from rclpy.time import Time
+from sensor_msgs.msg import Image, PointCloud2
+from sensor_msgs_py import point_cloud2
+import torch
+from tf2_ros import Buffer, TransformException, TransformListener
+from transformers import pipeline as hf_pipeline
+
+from g1_detection_common import (
+    DETECTION_LABELS,
+    DETECTION_MODEL_DEFAULT,
+    DETECTION_THRESHOLD,
+    SYNC_QUEUE_SIZE_DEFAULT,
+    SYNC_SLOP_SEC_DEFAULT,
+    bgr_frame_to_pil,
+    convert_color_image_message,
+    focus_bbox,
+    parse_owl_detections,
+)
+from g1_distance_common import apply_vehicle_front_offset
+from ridgeback_slam_exploration.msg import G1Detection
+
+
+POINTCLOUD_MAX_METERS = 10.0
+POINTCLOUD_FRONT_PERCENTILE = 25.0
+POINTCLOUD_INLIER_AHEAD_MARGIN_M = 0.10
+POINTCLOUD_INLIER_BEHIND_MARGIN_M = 0.35
+POINTCLOUD_MIN_VALID_POINTS = 10
+POINTCLOUD_MIN_INLIERS = 3
+TF_LOOKUP_TIMEOUT_SEC = 0.5
+
+
+class G1DetectionPointCloudNode(Node):
+    def __init__(self) -> None:
+        super().__init__('g1_detection_pointcloud_node')
+
+        default_base_frame = self.default_base_frame()
+
+        self.declare_parameter('detection_model', DETECTION_MODEL_DEFAULT)
+        self.declare_parameter('detection_threshold', DETECTION_THRESHOLD)
+        self.declare_parameter('color_topic', 'sensors/camera_0/color/image')
+        self.declare_parameter('pointcloud_topic', 'sensors/camera_0/points')
+        self.declare_parameter('base_frame', default_base_frame)
+        self.declare_parameter('sync_queue_size', SYNC_QUEUE_SIZE_DEFAULT)
+        self.declare_parameter('sync_slop_sec', SYNC_SLOP_SEC_DEFAULT)
+
+        self.detection_model = self.get_parameter('detection_model').value
+        self.detection_threshold = float(self.get_parameter('detection_threshold').value)
+        self.color_topic = self.get_parameter('color_topic').value
+        self.pointcloud_topic = self.get_parameter('pointcloud_topic').value
+        self.base_frame = self.get_parameter('base_frame').value or default_base_frame
+        self.sync_queue_size = int(self.get_parameter('sync_queue_size').value)
+        self.sync_slop_sec = float(self.get_parameter('sync_slop_sec').value)
+
+        self.latest_synced_messages = None
+        self.last_pointcloud_warning = None
+        self.last_base_frame_fallback = None
+
+        self.get_logger().info(f'Loading detection model: {self.detection_model}')
+        detector_device = 'cuda' if torch.cuda.is_available() else 'cpu'
+        self.get_logger().info(f'Using detection device: {detector_device}')
+        self.detector = hf_pipeline(
+            task='zero-shot-object-detection',
+            model=self.detection_model,
+            device=detector_device,
+        )
+        self.get_logger().info('Detection model loaded.')
+
+        self.tf_buffer = Buffer(node=self)
+        self.tf_listener = TransformListener(self.tf_buffer, self, spin_thread=False)
+
+        self.color_subscriber = Subscriber(
+            self,
+            Image,
+            self.color_topic,
+            qos_profile=qos_profile_sensor_data,
+        )
+        self.pointcloud_subscriber = Subscriber(
+            self,
+            PointCloud2,
+            self.pointcloud_topic,
+            qos_profile=qos_profile_sensor_data,
+        )
+        self.sync = ApproximateTimeSynchronizer(
+            [self.color_subscriber, self.pointcloud_subscriber],
+            queue_size=self.sync_queue_size,
+            slop=self.sync_slop_sec,
+        )
+        self.sync.registerCallback(self.synced_callback)
+        self.get_logger().info(f'Subscribed to color stream: {self.color_topic}')
+        self.get_logger().info(f'Subscribed to point cloud stream: {self.pointcloud_topic}')
+        self.get_logger().info(f'Using base frame: {self.base_frame}')
+
+        self.detection_pub = self.create_publisher(G1Detection, 'vlm/g1_detection_pointcloud', 10)
+
+    def default_base_frame(self) -> str:
+        namespace_name = self.get_namespace().strip('/')
+        if namespace_name:
+            return f'{namespace_name}/robot/base_link'
+        return 'robot/base_link'
+
+    def synced_callback(self, color_msg: Image, pointcloud_msg: PointCloud2) -> None:
+        self.latest_synced_messages = (color_msg, pointcloud_msg)
+
+    def run_detection_loop(self) -> None:
+        while rclpy.ok():
+            rclpy.spin_once(self, timeout_sec=0.1)
+            if self.latest_synced_messages is None:
+                continue
+
+            color_msg, pointcloud_msg = self.latest_synced_messages
+            self.latest_synced_messages = None
+
+            try:
+                frame = convert_color_image_message(color_msg)
+            except ValueError as exc:
+                self.get_logger().warn(
+                    f'Cannot decode color image ({color_msg.encoding}): {exc}'
+                )
+                continue
+
+            pointcloud_xyz = None
+            pointcloud_warning = None
+            try:
+                pointcloud_xyz = self.extract_organized_xyz(pointcloud_msg, frame.shape[:2])
+            except ValueError as exc:
+                pointcloud_warning = str(exc)
+                self.log_pointcloud_warning(pointcloud_warning)
+
+            pil_image = bgr_frame_to_pil(frame)
+            self.get_logger().info('Running point-cloud detection...')
+            outputs = self.detector(
+                pil_image,
+                candidate_labels=DETECTION_LABELS,
+            )
+
+            detection = parse_owl_detections(
+                outputs,
+                frame.shape[1],
+                frame.shape[0],
+                self.detection_threshold,
+            )
+            detection = self.add_pointcloud_distances(detection, pointcloud_xyz, pointcloud_msg)
+
+            for robot in detection['robots']:
+                pointcloud_distance = robot.get('pointcloud_distance_m')
+                pointcloud_text = (
+                    f'{pointcloud_distance:.2f}m'
+                    if pointcloud_distance is not None else 'N/A'
+                )
+                self.get_logger().info(
+                    f'Detected: {robot["label"]} (score={robot["score"]:.2f}) '
+                    f'bbox={robot["bbox_pixel"]} PointCloudD={pointcloud_text}'
+                )
+
+            if not detection['detected']:
+                self.get_logger().info('No detections above threshold.')
+            elif pointcloud_warning is not None:
+                self.get_logger().warn(
+                    f'Detections were published without point-cloud distance: {pointcloud_warning}'
+                )
+
+            self.publish_detection(detection, color_msg.header)
+
+    def extract_organized_xyz(self, msg: PointCloud2, image_shape) -> np.ndarray:
+        image_height, image_width = image_shape
+        if msg.height <= 1 or msg.width <= 1:
+            raise ValueError('Point cloud is not organized.')
+        if msg.height != image_height or msg.width != image_width:
+            raise ValueError(
+                'Point cloud shape does not match RGB image '
+                f'({msg.width}x{msg.height} vs {image_width}x{image_height}).'
+            )
+
+        xyz_points = point_cloud2.read_points_numpy(
+            msg,
+            field_names=['x', 'y', 'z'],
+            skip_nans=False,
+        )
+        if xyz_points.ndim != 2 or xyz_points.shape[0] != msg.width * msg.height or xyz_points.shape[1] != 3:
+            raise ValueError('Unexpected PointCloud2 layout for x/y/z fields.')
+
+        return xyz_points.reshape((msg.height, msg.width, 3)).astype(np.float32, copy=False)
+
+    def add_pointcloud_distances(
+        self,
+        detection: dict,
+        pointcloud_xyz: np.ndarray | None,
+        pointcloud_msg: PointCloud2,
+    ) -> dict:
+        for robot in detection['robots']:
+            robot['pointcloud_focus_bbox_pixel'] = focus_bbox(robot['bbox_pixel'])
+            robot['pointcloud_x_m'] = None
+            robot['pointcloud_z_m'] = None
+            robot['pointcloud_distance_m'] = None
+
+        if not detection['detected'] or pointcloud_xyz is None:
+            return detection
+
+        try:
+            rotation, translation = self.lookup_transform_components(pointcloud_msg)
+        except TransformException as exc:
+            self.log_pointcloud_warning(
+                f'Cannot transform point cloud from {pointcloud_msg.header.frame_id} '
+                f'to {self.base_frame}: {exc}'
+            )
+            return detection
+
+        for robot in detection['robots']:
+            measurement = self.compute_pointcloud_measurement(
+                pointcloud_xyz,
+                robot['pointcloud_focus_bbox_pixel'],
+                rotation,
+                translation,
+            )
+            if measurement is None:
+                continue
+
+            lateral_m, forward_m, distance_m = measurement
+            robot['pointcloud_x_m'] = lateral_m
+            robot['pointcloud_z_m'] = forward_m
+            robot['pointcloud_distance_m'] = distance_m
+
+        return detection
+
+    def lookup_transform_components(self, pointcloud_msg: PointCloud2):
+        timestamp = Time.from_msg(pointcloud_msg.header.stamp)
+        last_error = None
+
+        for target_frame in self.candidate_base_frames():
+            try:
+                transform = self.tf_buffer.lookup_transform(
+                    target_frame,
+                    pointcloud_msg.header.frame_id,
+                    timestamp,
+                    timeout=Duration(seconds=TF_LOOKUP_TIMEOUT_SEC),
+                )
+            except TransformException as exc:
+                last_error = exc
+                continue
+
+            if target_frame != self.base_frame and target_frame != self.last_base_frame_fallback:
+                self.last_base_frame_fallback = target_frame
+                self.get_logger().warn(
+                    f'Configured base frame "{self.base_frame}" is unavailable; '
+                    f'using "{target_frame}" for point-cloud transforms.'
+                )
+
+            translation = np.array([
+                transform.transform.translation.x,
+                transform.transform.translation.y,
+                transform.transform.translation.z,
+            ], dtype=np.float32)
+            rotation = self.rotation_matrix_from_quaternion(transform.transform.rotation)
+            return rotation, translation
+
+        if last_error is None:
+            raise TransformException('No candidate base frames were available.')
+        raise last_error
+
+    def candidate_base_frames(self) -> list[str]:
+        candidates = []
+        for candidate in (self.base_frame, self.base_frame.split('/')[-1]):
+            if candidate and candidate not in candidates:
+                candidates.append(candidate)
+        return candidates
+
+    def compute_pointcloud_measurement(
+        self,
+        pointcloud_xyz: np.ndarray,
+        bbox_pixel,
+        rotation: np.ndarray,
+        translation: np.ndarray,
+    ) -> tuple[float, float, float] | None:
+        x1, y1, x2, y2 = bbox_pixel
+        roi_points = pointcloud_xyz[y1:y2, x1:x2, :].reshape(-1, 3)
+        valid = np.all(np.isfinite(roi_points), axis=1)
+        if not np.any(valid):
+            return None
+
+        valid_points = roi_points[valid]
+        if valid_points.shape[0] < POINTCLOUD_MIN_VALID_POINTS:
+            return None
+
+        points_base = valid_points @ rotation.T + translation
+        lateral_m = points_base[:, 1]
+        forward_m = points_base[:, 0]
+        lateral_m, forward_m = apply_vehicle_front_offset(lateral_m, forward_m)
+
+        planar_distance = np.hypot(lateral_m, forward_m)
+        valid = np.isfinite(planar_distance) & (forward_m > 0.0)
+        valid &= planar_distance <= POINTCLOUD_MAX_METERS
+        if not np.any(valid):
+            return None
+
+        lateral_m = lateral_m[valid]
+        forward_m = forward_m[valid]
+        planar_distance = planar_distance[valid]
+
+        anchor_forward_m = float(np.percentile(forward_m, POINTCLOUD_FRONT_PERCENTILE))
+        inliers = (
+            (forward_m >= anchor_forward_m - POINTCLOUD_INLIER_AHEAD_MARGIN_M) &
+            (forward_m <= anchor_forward_m + POINTCLOUD_INLIER_BEHIND_MARGIN_M)
+        )
+        if int(np.count_nonzero(inliers)) < POINTCLOUD_MIN_INLIERS:
+            return None
+
+        lateral_inliers = lateral_m[inliers]
+        forward_inliers = forward_m[inliers]
+        distance_inliers = planar_distance[inliers]
+        nearest_index = int(np.argmin(distance_inliers))
+        return (
+            float(lateral_inliers[nearest_index]),
+            float(forward_inliers[nearest_index]),
+            float(distance_inliers[nearest_index]),
+        )
+
+    def rotation_matrix_from_quaternion(self, quaternion) -> np.ndarray:
+        x = quaternion.x
+        y = quaternion.y
+        z = quaternion.z
+        w = quaternion.w
+        return np.array([
+            [1.0 - 2.0 * (y * y + z * z), 2.0 * (x * y - z * w), 2.0 * (x * z + y * w)],
+            [2.0 * (x * y + z * w), 1.0 - 2.0 * (x * x + z * z), 2.0 * (y * z - x * w)],
+            [2.0 * (x * z - y * w), 2.0 * (y * z + x * w), 1.0 - 2.0 * (x * x + y * y)],
+        ], dtype=np.float32)
+
+    def log_pointcloud_warning(self, warning: str) -> None:
+        if warning == self.last_pointcloud_warning:
+            return
+        self.last_pointcloud_warning = warning
+        self.get_logger().warn(warning)
+
+    def publish_detection(self, detection: dict, header) -> None:
+        msg = G1Detection()
+        msg.header = header
+        msg.detected = detection['detected']
+        msg.count = detection['count']
+        msg.img_width = detection['img_width']
+        msg.img_height = detection['img_height']
+
+        for robot in detection['robots']:
+            x1, y1, x2, y2 = [float(value) for value in robot['bbox_pixel']]
+            msg.bbox.extend([x1, y1, x2, y2])
+            msg.position_x.append(0.0)
+            msg.position_z.append(0.0)
+            msg.distance.append(0.0)
+            msg.depth_distance.append(0.0)
+            msg.depth_anything_distance.append(0.0)
+            msg.pointcloud_position_x.append(robot.get('pointcloud_x_m') or 0.0)
+            msg.pointcloud_position_z.append(robot.get('pointcloud_z_m') or 0.0)
+            msg.pointcloud_distance.append(robot.get('pointcloud_distance_m') or 0.0)
+            msg.lidar_position_x.append(0.0)
+            msg.lidar_position_z.append(0.0)
+            msg.lidar_distance.append(0.0)
+
+        self.detection_pub.publish(msg)
+
+
+def main() -> None:
+    rclpy.init()
+    node = G1DetectionPointCloudNode()
+
+    try:
+        node.run_detection_loop()
+    except (KeyboardInterrupt, ExternalShutdownException):
+        pass
+    finally:
+        node.destroy_node()
+        if rclpy.ok():
+            rclpy.shutdown()
+
+
+if __name__ == '__main__':
+    main()
