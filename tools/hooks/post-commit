@@ -1,0 +1,29 @@
+#!/bin/bash
+# graphify-hook-start
+# Auto-rebuilds the knowledge graph after each commit (code files only).
+# Uses tools/rebuild_graphify — the canonical rebuild path for this repo.
+# Installed by: tools/install_hooks
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+
+CHANGED=$(git diff --name-only HEAD~1 HEAD 2>/dev/null || git diff --name-only HEAD 2>/dev/null)
+if [ -z "$CHANGED" ]; then
+    exit 0
+fi
+
+CODE_EXTS="\.py$|\.ts$|\.js$|\.go$|\.rs$|\.java$|\.cpp$|\.c$|\.rb$|\.swift$|\.kt$|\.cs$|\.scala$|\.php$|\.cc$|\.cxx$|\.hpp$|\.h$|\.kts$"
+CODE_CHANGED=$(echo "$CHANGED" | grep -E "$CODE_EXTS" || true)
+
+if [ -z "$CODE_CHANGED" ]; then
+    exit 0
+fi
+
+CODE_COUNT=$(echo "$CODE_CHANGED" | wc -l | tr -d ' ')
+echo "[graphify hook] ${CODE_COUNT} code file(s) changed - rebuilding graph..."
+
+if [ -x "$REPO_ROOT/tools/rebuild_graphify" ]; then
+    "$REPO_ROOT/tools/rebuild_graphify" || echo "[graphify hook] Rebuild failed (exit $?)"
+else
+    echo "[graphify hook] tools/rebuild_graphify not found, skipping"
+fi
+# graphify-hook-end

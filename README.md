@@ -108,7 +108,18 @@ perception_venv/bin/python3 -m pip install torch torchvision transformers accele
 
 Both public launch files automatically prepend `perception_venv/bin` to `PATH` and set `VIRTUAL_ENV` for the perception nodes. The first run will download the OWLv2 detector from Hugging Face. If you enable `depth_anything_enabled:=true`, the first run will also download the Depth-Anything V2 metric checkpoint.
 
-### 4. Set up robot config
+### 4. (Optional) Install graphify post-commit hook
+
+If you use the graphify knowledge graph, install the post-commit hook to auto-rebuild it after each commit:
+
+```bash
+pip install graphify              # or: pipx install graphify
+bash tools/install_hooks
+```
+
+The hook only triggers on code-file changes and calls `tools/rebuild_graphify`. The hook source lives in `tools/hooks/post-commit`.
+
+### 5. Set up robot config
 
 The Clearpath simulator expects the robot config at `~/clearpath/`:
 
