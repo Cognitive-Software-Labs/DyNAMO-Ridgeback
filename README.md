@@ -14,7 +14,7 @@ The integrated launch path brings up simulation, SLAM, Nav2, frontier exploratio
 | SLAM | slam_toolbox (online async, from source) | Map building + localization |
 | Navigation | Nav2 (MPPI omni controller) | Path planning + obstacle avoidance |
 | Exploration | explore_lite (m-explore-ros2) | Frontier detection + goal selection |
-| Detection | g1_detection_node (OWLv2) | Zero-shot humanoid robot detection + geometry/depth distance estimation |
+| Detection | Staged G1 perception pipeline | Raw OWLv2 detections plus camera/LiDAR measurement nodes and an optional overlay |
 
 ## Prerequisites
 
@@ -88,8 +88,6 @@ cp clearpath/robot.yaml ~/clearpath/robot.yaml
 
 ## Usage
 
-### Full autonomous exploration (recommended)
-
 Start every run from a sourced workspace:
 
 ```bash
@@ -98,114 +96,136 @@ cd /path/to/DyNAMO-Ridgeback
 source install/setup.bash
 ```
 
-### Main scenarios
+The package now exposes 2 public launch entrypoints:
+- `ridgeback_exploration.launch.py`
+- `g1_distance_benchmark.launch.py`
+
+The lower-level simulation, SLAM, Nav2, and frontier-exploration launches live under `launch/includes/` and are treated as internal building blocks.
+
+### `ridgeback_exploration.launch.py`
 
 ```bash
 # Always clean up stale processes first
 bash cleanup.sh
 
 # Main hospital scenario
-ros2 launch ridgeback_slam_exploration full_exploration.launch.py world:=hospital
+ros2 launch ridgeback_autonomy ridgeback_exploration.launch.py world:=hospital
 
 # Extended SLAM / exploration test
-ros2 launch ridgeback_slam_exploration full_exploration.launch.py world:=warehouse
+ros2 launch ridgeback_autonomy ridgeback_exploration.launch.py world:=warehouse
 ```
 
-The integrated launch does all of this for you:
+This integrated launch:
 1. Starts Gazebo and spawns the Ridgeback.
 2. Launches the exploration RViz config.
 3. Starts `slam_toolbox` after 20 seconds.
 4. Starts Nav2 after 30 seconds.
 5. Starts `explore_lite` after 45 seconds.
+6. Optionally starts the G1 perception stack:
+   `g1_detector_node`, `g1_camera_measurement_node`, and `g1_overlay_node`
 
-By default, RViz shows the exploration view plus the camera feeds under the `Cameras` group. When `g1_detection:=true`, `g1_detection_node` opens the combined RGB/depth detection window and can optionally add the Depth-Anything comparison pane.
-
-### Useful launch toggles
+Useful toggles:
 
 ```bash
 # Disable the custom RViz instance
-ros2 launch ridgeback_slam_exploration full_exploration.launch.py world:=warehouse exploration_rviz:=false
+ros2 launch ridgeback_autonomy ridgeback_exploration.launch.py world:=warehouse exploration_rviz:=false
 
-# Enable OWLv2-based humanoid robot detection
-ros2 launch ridgeback_slam_exploration full_exploration.launch.py world:=hospital g1_detection:=true
+# Enable the staged G1 perception stack
+ros2 launch ridgeback_autonomy ridgeback_exploration.launch.py world:=hospital g1_perception_enabled:=true
 
-# Optional: compare live sensor depth with Depth-Anything metric depth
-ros2 launch ridgeback_slam_exploration full_exploration.launch.py world:=hospital g1_detection:=true depth_anything_enabled:=true
+# Optional: enable the Depth-Anything branch inside the camera measurement node
+ros2 launch ridgeback_autonomy ridgeback_exploration.launch.py world:=hospital g1_perception_enabled:=true depth_anything_enabled:=true
 ```
 
-### Launch arguments reference
-
-#### `full_exploration.launch.py`
+Arguments:
 
 | Argument | Default | Meaning |
 |----------|---------|---------|
-| `namespace` | `r100_0001` | ROS namespace for RViz, Nav2, explore_lite, and optional detection node |
+| `namespace` | `r100_0001` | ROS namespace for RViz, Nav2, explore_lite, and optional perception nodes |
 | `use_sim_time` | `true` | Use Gazebo `/clock` |
 | `setup_path` | `~/clearpath/` | Directory containing `robot.yaml` and generated Clearpath files |
-| `world` | `warehouse` | Gazebo world to load (`hospital` and `warehouse` are the scenarios used in this repo) |
-| `exploration_rviz` | `true` | Launch the custom exploration RViz config |
-| `g1_detection` | `false` | Launch `g1_detection_node` |
-| `depth_anything_enabled` | `false` | Enable the Depth-Anything metric-depth comparison branch inside `g1_detection_node` |
-
-#### `simulation.launch.py`
-
-| Argument | Default | Meaning |
-|----------|---------|---------|
-| `setup_path` | `~/clearpath/` | Directory containing `robot.yaml` |
 | `world` | `warehouse` | Gazebo world to load |
-| `clearpath_rviz` | `false` | Launch the Clearpath-provided RViz instance |
+| `exploration_rviz` | `true` | Launch the custom exploration RViz config |
+| `g1_perception_enabled` | `false` | Launch the detector, camera measurement, and overlay nodes |
+| `depth_anything_enabled` | `false` | Enable Depth-Anything in the camera measurement node |
 
-#### `slam.launch.py`
+### `g1_distance_benchmark.launch.py`
+
+```bash
+# Camera-stack benchmark (RGB / sensor depth / mono depth / pointcloud)
+ros2 launch ridgeback_autonomy g1_distance_benchmark.launch.py measurement_backend:=camera
+
+# LiDAR benchmark
+ros2 launch ridgeback_autonomy g1_distance_benchmark.launch.py measurement_backend:=lidar
+
+# Camera backend scored on pointcloud instead of RGB depth
+ros2 launch ridgeback_autonomy g1_distance_benchmark.launch.py measurement_backend:=camera primary_metric:=pointcloud
+```
+
+This launch composes the simulator, `g1_detector_node`, one selected measurement node, and `g1_distance_benchmark_runner`.
+
+Arguments:
 
 | Argument | Default | Meaning |
 |----------|---------|---------|
+| `namespace` | `r100_0001` | Namespace for simulation, detector, measurement node, and benchmark runner |
 | `use_sim_time` | `true` | Use Gazebo `/clock` |
-| `setup_path` | `~/clearpath/` | Directory containing `robot.yaml`; also used to read the robot namespace |
+| `setup_path` | `~/clearpath/` | Directory containing `robot.yaml` and generated Clearpath files |
+| `world` | `g1_distance_calibration` | Gazebo world used for the benchmark run |
+| `measurement_backend` | `camera` | Measurement node to launch: `camera` or `lidar` |
+| `primary_metric` | `auto` | Metric column to score; defaults from the selected backend |
+| `repeats` | `5` | Number of positive-trial repeats per spawn pose |
+| `output_csv` | empty | Optional CSV path override; defaults from the selected backend |
+| `settle_sec` | `2.0` | Delay after spawning the target before sampling |
+| `capture_sec` | `3.0` | Sampling window length |
+| `depth_anything_enabled` | `false` | Enable the optional mono-depth branch when `measurement_backend:=camera` |
+| `color_topic` | `sensors/camera_0/color/image` | RGB topic used by the detector, camera measurement node, and benchmark snapshots |
+| `depth_topic` | `sensors/camera_0/depth/image` | Depth topic used by the camera measurement node |
+| `pointcloud_topic` | `sensors/camera_0/points` | Camera-aligned point cloud used by the camera measurement node |
+| `scan_topic` | `sensors/lidar2d_0/scan` | LaserScan topic used by the LiDAR measurement node |
+| `base_frame` | `<namespace>/robot/base_link` | Vehicle frame used for point-cloud and LiDAR projection |
+| `failed_frame_dir` | empty | Optional override for saved failed-frame directory |
+| `save_failed_frames` | `true` | Save annotated RGB frames for missed/ambiguous positive trials |
 
-#### `nav2.launch.py`
+### G1 perception setup (first time only)
 
-| Argument | Default | Meaning |
-|----------|---------|---------|
-| `namespace` | `r100_0001` | Namespace for the full Nav2 stack |
-| `use_sim_time` | `true` | Use Gazebo `/clock` |
+The G1 perception stack now follows a staged pipeline inside the installable Python package `ridgeback_autonomy/`:
+- raw detections on `detections/g1/raw`
+- camera measurements on `measurements/g1/camera`
+- lidar measurements on `measurements/g1/lidar`
+- mono-depth debug images on `debug/g1/camera/mono_depth`
 
-#### `explore.launch.py`
-
-| Argument | Default | Meaning |
-|----------|---------|---------|
-| `namespace` | `r100_0001` | Namespace for `explore_lite` |
-| `use_sim_time` | `true` | Use Gazebo `/clock` |
-
-### G1 detection setup (first time only)
-
-The `g1_detection_node` uses a local OWLv2 zero-shot detector and the live depth stream to produce a side-by-side detection overlay. It publishes the original geometry-based `distance` estimate plus a sensor-depth `depth_distance`, and it can optionally compare against a metric Depth-Anything branch in a 3-pane RGB / sensor depth / mono depth view. It requires a Python venv with PyTorch and Transformers:
+It requires a Python venv with PyTorch and Transformers:
 
 ```bash
 # Create venv that can see ROS 2 packages
 python3 -m venv --system-site-packages perception_venv
 echo "/opt/ros/jazzy/lib/python3.12/site-packages" > perception_venv/lib/python3.12/site-packages/ros2.pth
 
-# Install detector dependencies
+# Install perception dependencies
 perception_venv/bin/python3 -m pip install torch torchvision transformers accelerate Pillow
 ```
 
-The node's shebang points to `perception_venv/bin/python3` directly. The first launch will download the OWLv2 detector from Hugging Face. If you enable `depth_anything_enabled:=true`, the first run will also download the Depth-Anything V2 metric checkpoint into the local Hugging Face cache.
+Both public launch files automatically prepend `perception_venv/bin` to `PATH` and set `VIRTUAL_ENV` for the perception nodes. The first run will download the OWLv2 detector from Hugging Face. If you enable `depth_anything_enabled:=true`, the first run will also download the Depth-Anything V2 metric checkpoint.
 
-### Simulation only
+### Perception interfaces
 
-```bash
-ros2 launch ridgeback_slam_exploration simulation.launch.py world:=hospital
-ros2 launch ridgeback_slam_exploration simulation.launch.py world:=warehouse
-```
+| Node | Output topic | Key params |
+|------|--------------|------------|
+| `g1_detector_node` | `detections/g1/raw` | `color_topic`, `detection_model`, `detection_threshold` |
+| `g1_camera_measurement_node` | `measurements/g1/camera` | `camera_config_path`, `color_topic`, `depth_topic`, `pointcloud_topic`, `base_frame`, `depth_anything_enabled` |
+| `g1_lidar_measurement_node` | `measurements/g1/lidar` | `camera_config_path`, `scan_topic`, `base_frame` |
+| `g1_overlay_node` | OpenCV window only | `measurement_topic`, `color_topic`, `depth_topic`, `mono_depth_debug_topic` |
+| `g1_distance_benchmark_runner` | CSV + optional failed frames | `measurement_topic`, `primary_metric`, `color_topic`, `output_csv` |
 
-The per-component launch files still exist for debugging and development, but the intended workflow for normal use is the integrated `full_exploration.launch.py` entrypoint.
+The shared camera geometry lives in `config/camera_config.json`, and the measurement nodes use the `camera_config_path` parameter.
 
 ## Configuration
 
 ### Robot sensors (`clearpath/robot.yaml`)
 
 - **Hokuyo UST-10LX**: Mounted at front of chassis, provides 2D laser scan for SLAM and costmaps
-- **Intel RealSense D455**: Mounted on a riser bracket, provides depth + RGB to RViz and the `g1_detection_node` overlay
+- **Intel RealSense D455**: Mounted on a riser bracket, provides RGB, aligned depth, and camera-aligned point cloud to the G1 perception stack
 
 ### Key parameters to tune
 
@@ -291,9 +311,9 @@ If you add new nodes to this project, always:
 |---------|-------|
 | Robot doesn't move | `ros2 topic echo /r100_0001/cmd_vel` — if empty, Nav2 may not be active |
 | No map in RViz | `ros2 topic hz /r100_0001/map` — if 0, check slam_toolbox logs and scan topic |
-| Detection overlay does not appear | Make sure `g1_detection:=true` and check `/r100_0001/sensors/camera_0/color/image` |
+| Detection overlay does not appear | Make sure `g1_perception_enabled:=true` and check `/r100_0001/sensors/camera_0/color/image` |
 | explore_lite not finding frontiers | Verify `track_unknown_space: true` in global costmap config |
 | TF errors | Ensure all nodes use `use_sim_time: true` |
-| Gazebo slow to start | Increase `TimerAction` delays in `full_exploration.launch.py` |
+| Gazebo slow to start | Increase `TimerAction` delays in `ridgeback_exploration.launch.py` |
 | Stale processes from previous runs | Run `bash cleanup.sh` before each launch |
 | Diagnostics | Run `bash diag.sh /tmp/logfile.log hospital` or `bash diag.sh /tmp/logfile.log warehouse` |

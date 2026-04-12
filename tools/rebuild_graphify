@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+if [[ -n "${GRAPHIFY_PYTHON:-}" ]]; then
+  python_bin="${GRAPHIFY_PYTHON}"
+elif python3 - <<'PY' >/dev/null 2>&1
+import graphify
+PY
+then
+  python_bin="python3"
+elif [[ -x "${repo_root}/perception_venv/bin/python3" ]] && "${repo_root}/perception_venv/bin/python3" - <<'PY' >/dev/null 2>&1
+import graphify
+PY
+then
+  python_bin="${repo_root}/perception_venv/bin/python3"
+else
+  echo "Could not find a Python interpreter with graphify installed." >&2
+  echo "Set GRAPHIFY_PYTHON or install graphify into python3/perception_venv." >&2
+  exit 1
+fi
+
+exec "${python_bin}" "${repo_root}/tools/rebuild_graphify.py"

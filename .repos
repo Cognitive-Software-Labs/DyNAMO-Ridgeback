@@ -1,7 +1,7 @@
 repositories:
   src/clearpath_simulator:
     type: git
-    url: https://github.com/clearpathrobotics/clearpath_simulator.git
+    url: https://github.com/clearpathrobotiHcs/clearpath_simulator.git
     version: jazzy
   src/clearpath_common:
     type: git

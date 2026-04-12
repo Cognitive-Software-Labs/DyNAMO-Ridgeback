@@ -95,8 +95,8 @@ index 69135ab..38589ce 100644
      packages_paths = [os.path.join(p, 'share') for p in os.getenv('AMENT_PREFIX_PATH').split(':')]
  
      # Set ignition resource path to include all sourced ros packages
-+    # Also include ridgeback_slam_exploration worlds and models
-+    pkg_this_exploration = get_package_share_directory('ridgeback_slam_exploration')
++    # Also include ridgeback_autonomy worlds and models
++    pkg_this_exploration = get_package_share_directory('ridgeback_autonomy')
      gz_sim_resource_path = SetEnvironmentVariable(
          name='GZ_SIM_RESOURCE_PATH',
          value=[
@@ -110,8 +110,8 @@ index 69135ab..38589ce 100644
 +    gz_gui_plugin_path = SetEnvironmentVariable(
 +        name='GZ_GUI_PLUGIN_PATH',
 +        value=os.path.join(
-+            get_package_share_directory('ridgeback_slam_exploration'),
-+            '..', '..', 'lib', 'ridgeback_slam_exploration'))
++            get_package_share_directory('ridgeback_autonomy'),
++            '..', '..', 'lib', 'ridgeback_autonomy'))
 +
      # Clock bridge
      clock_bridge = Node(

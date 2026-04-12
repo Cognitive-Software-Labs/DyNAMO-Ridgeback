@@ -35,19 +35,17 @@ source install/setup.bash
 bash cleanup.sh
 
 # Main hospital scenario
-ros2 launch ridgeback_slam_exploration full_exploration.launch.py world:=hospital
+ros2 launch ridgeback_autonomy ridgeback_exploration.launch.py world:=hospital
 
 # Extended SLAM / exploration test
-ros2 launch ridgeback_slam_exploration full_exploration.launch.py world:=warehouse
+ros2 launch ridgeback_autonomy ridgeback_exploration.launch.py world:=warehouse
 
 # Disable the exploration RViz instance
-ros2 launch ridgeback_slam_exploration full_exploration.launch.py world:=warehouse exploration_rviz:=false
+ros2 launch ridgeback_autonomy ridgeback_exploration.launch.py world:=warehouse exploration_rviz:=false
 
 # Individual components (run in separate terminals)
-ros2 launch ridgeback_slam_exploration simulation.launch.py
-ros2 launch ridgeback_slam_exploration slam.launch.py
-ros2 launch ridgeback_slam_exploration nav2.launch.py
-ros2 launch ridgeback_slam_exploration explore.launch.py
+ros2 launch ridgeback_autonomy ridgeback_exploration.launch.py world:=hospital g1_perception_enabled:=true
+ros2 launch ridgeback_autonomy g1_distance_benchmark.launch.py measurement_backend:=camera
 ```
 
 ## Namespace Convention
@@ -88,9 +86,9 @@ tfL_ = std::make_unique<tf2_ros::TransformListener>(*tf_, shared_from_this());
 ## Key Config Files
 
 - `clearpath/robot.yaml` — Robot platform, sensors, namespace. Must also exist at `~/clearpath/robot.yaml` for the simulator.
-- `src/ridgeback_slam_exploration/config/nav2_params.yaml` — Nav2 stack params. Footprint matches Ridgeback dimensions.
-- `src/ridgeback_slam_exploration/config/slam_toolbox_params.yaml` — SLAM params. `scan_topic` uses absolute path `/r100_0001/sensors/lidar2d_0/scan`.
-- `src/ridgeback_slam_exploration/config/explore_lite_params.yaml` — Frontier exploration params. Uses `/**/` YAML prefix for namespace compatibility.
+- `src/ridgeback_autonomy/config/nav2_params.yaml` — Nav2 stack params. Footprint matches Ridgeback dimensions.
+- `src/ridgeback_autonomy/config/slam_toolbox_params.yaml` — SLAM params. `scan_topic` uses absolute path `/r100_0001/sensors/lidar2d_0/scan`.
+- `src/ridgeback_autonomy/config/explore_lite_params.yaml` — Frontier exploration params. Uses `/**/` YAML prefix for namespace compatibility.
 
 ## Clearpath Sensor Naming
 
@@ -107,8 +105,8 @@ Managed via `.repos` file (not committed to git, listed in `.gitignore`):
 
 - The primary scenario is `hospital`; `warehouse` is used as a larger extended SLAM and exploration test.
 - All nodes must use `use_sim_time: true` in simulation — a single wall-clock node breaks TF.
-- The integrated `full_exploration.launch.py` launches the custom RViz config by default, and `g1_detection_node` can be added with `g1_detection:=true` when you want the combined perception overlay.
-- The `full_exploration.launch.py` uses `TimerAction` delays (20s/30s/45s from startup) to sequence SLAM, Nav2, and exploration. If Gazebo is slow to load, increase these.
+- The integrated `ridgeback_exploration.launch.py` launches the custom RViz config by default, and the G1 perception stack can be added with `g1_perception_enabled:=true` when you want the combined perception overlay.
+- The `ridgeback_exploration.launch.py` uses `TimerAction` delays (20s/30s/45s from startup) to sequence SLAM, Nav2, and exploration. If Gazebo is slow to load, increase these.
 - Robot config must be symlinked/copied to `~/clearpath/` for the Clearpath simulator default path.
 - **Always run `bash cleanup.sh` before launching** — Gazebo and ROS 2 processes leak across launches, causing topic conflicts, stale TF, and duplicate publishers.
 - The `diag.sh` script provides comprehensive diagnostics: `bash diag.sh [logfile] [world]`

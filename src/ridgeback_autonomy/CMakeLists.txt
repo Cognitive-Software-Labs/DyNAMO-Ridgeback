@@ -1,0 +1,105 @@
+cmake_minimum_required(VERSION 3.8)
+project(ridgeback_autonomy)
+
+find_package(ament_cmake REQUIRED)
+find_package(ament_cmake_python REQUIRED)
+find_package(rosidl_default_generators REQUIRED)
+find_package(std_msgs REQUIRED)
+find_package(gz-gui8 REQUIRED)
+find_package(gz-plugin2 REQUIRED)
+find_package(gz-common5 REQUIRED)
+
+rosidl_generate_interfaces(${PROJECT_NAME}
+  "msg/G1Detections.msg"
+  "msg/G1Measurements.msg"
+  DEPENDENCIES std_msgs
+)
+
+# Qt for MOC
+find_package(Qt5 REQUIRED COMPONENTS Core Quick)
+set(CMAKE_AUTOMOC ON)
+cmake_policy(SET CMP0100 NEW)
+
+# SpawnG1 Gazebo GUI plugin
+qt5_add_resources(SPAWN_G1_RSC gz_plugins/SpawnG1.qrc)
+add_library(SpawnG1 SHARED
+  gz_plugins/SpawnG1.cc
+  gz_plugins/SpawnG1.hh
+  ${SPAWN_G1_RSC}
+)
+target_link_libraries(SpawnG1
+  gz-gui8::gz-gui8
+  gz-plugin2::gz-plugin2
+  gz-common5::gz-common5
+  Qt5::Core
+  Qt5::Quick
+)
+target_include_directories(SpawnG1 PRIVATE gz_plugins)
+
+install(TARGETS SpawnG1
+  LIBRARY DESTINATION lib/${PROJECT_NAME}
+)
+
+ament_get_python_install_dir(python_install_dir)
+
+install(DIRECTORY
+  ridgeback_autonomy/
+  DESTINATION ${python_install_dir}/${PROJECT_NAME}
+  PATTERN "*.pyc" EXCLUDE
+  PATTERN "__pycache__" EXCLUDE
+)
+
+install(PROGRAMS
+  ridgeback_autonomy/perception/g1_detector_node.py
+  DESTINATION lib/${PROJECT_NAME}
+  RENAME g1_detector_node
+)
+
+install(PROGRAMS
+  ridgeback_autonomy/perception/g1_camera_measurement_node.py
+  DESTINATION lib/${PROJECT_NAME}
+  RENAME g1_camera_measurement_node
+)
+
+install(PROGRAMS
+  ridgeback_autonomy/perception/g1_lidar_measurement_node.py
+  DESTINATION lib/${PROJECT_NAME}
+  RENAME g1_lidar_measurement_node
+)
+
+install(PROGRAMS
+  ridgeback_autonomy/perception/g1_overlay_node.py
+  DESTINATION lib/${PROJECT_NAME}
+  RENAME g1_overlay_node
+)
+
+install(PROGRAMS
+  ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py
+  DESTINATION lib/${PROJECT_NAME}
+  RENAME g1_distance_benchmark_runner
+)
+
+install(DIRECTORY
+  launch
+  config
+  rviz
+  worlds
+  models
+  DESTINATION share/${PROJECT_NAME}
+  PATTERN "*.pyc" EXCLUDE
+  PATTERN "__pycache__" EXCLUDE
+)
+
+if(BUILD_TESTING)
+  find_package(ament_cmake_pytest REQUIRED)
+
+  ament_add_pytest_test(test_detection test/test_detection.py)
+  ament_add_pytest_test(test_geometry test/test_geometry.py)
+  ament_add_pytest_test(test_image_utils test/test_image_utils.py)
+  ament_add_pytest_test(test_imports test/test_imports.py)
+  ament_add_pytest_test(test_launch_layout test/test_launch_layout.py)
+  ament_add_pytest_test(test_messages test/test_messages.py)
+  ament_add_pytest_test(test_benchmark_runner test/test_benchmark_runner.py)
+endif()
+
+ament_package()
