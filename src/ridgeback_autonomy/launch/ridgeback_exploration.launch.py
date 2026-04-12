@@ -27,12 +27,9 @@ def generate_launch_description():
     g1_perception_enabled = LaunchConfiguration('g1_perception_enabled')
     depth_anything_enabled = LaunchConfiguration('depth_anything_enabled')
 
-    rviz_config = os.path.join(pkg_this, 'rviz', 'exploration.rviz')
-
-    fastrtps_config = os.path.join(pkg_this, 'config', 'fastrtps_no_shm.xml')
+    rviz_config = os.path.join(pkg_this, 'sim', 'rviz', 'exploration.rviz')
 
     return LaunchDescription([
-        SetEnvironmentVariable('FASTRTPS_DEFAULT_PROFILES_FILE', fastrtps_config),
         SetEnvironmentVariable('VIRTUAL_ENV', perception_venv_path),
         SetEnvironmentVariable(
             'PATH',
@@ -45,7 +42,7 @@ def generate_launch_description():
         DeclareLaunchArgument('world', default_value='warehouse'),
         DeclareLaunchArgument('exploration_rviz', default_value='true',
                               description='Launch the exploration RViz2 config'),
-        DeclareLaunchArgument('g1_perception_enabled', default_value='false',
+        DeclareLaunchArgument('g1_perception_enabled', default_value='true',
                               description='Launch the G1 perception stack'),
         DeclareLaunchArgument('depth_anything_enabled', default_value='false',
                               description='Enable Depth-Anything in the camera measurement node'),

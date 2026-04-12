@@ -518,7 +518,7 @@
     {
       "label": "metrics.py",
       "file_type": "code",
-      "source_file": "/home/deivid/dev/DyNAMO-Ridgeback/src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/core/metrics.py",
+      "source_file": "/home/deivid/dev/DyNAMO-Ridgeback/src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/metrics.py",
       "source_location": "L1",
       "id": "metrics",
       "community": 29
@@ -1580,38 +1580,6 @@
       "community": 24
     },
     {
-      "label": "SpawnG1.cc",
-      "file_type": "code",
-      "source_file": "/home/deivid/dev/DyNAMO-Ridgeback/src/ridgeback_autonomy/gz_plugins/SpawnG1.cc",
-      "source_location": "L1",
-      "id": "spawng1",
-      "community": 15
-    },
-    {
-      "label": "SpawnG1()",
-      "file_type": "code",
-      "source_file": "/home/deivid/dev/DyNAMO-Ridgeback/src/ridgeback_autonomy/gz_plugins/SpawnG1.cc",
-      "source_location": "L17",
-      "id": "spawng1_spawng1",
-      "community": 15
-    },
-    {
-      "label": "LoadConfig()",
-      "file_type": "code",
-      "source_file": "/home/deivid/dev/DyNAMO-Ridgeback/src/ridgeback_autonomy/gz_plugins/SpawnG1.cc",
-      "source_location": "L19",
-      "id": "spawng1_loadconfig",
-      "community": 15
-    },
-    {
-      "label": "OnSpawn()",
-      "file_type": "code",
-      "source_file": "/home/deivid/dev/DyNAMO-Ridgeback/src/ridgeback_autonomy/gz_plugins/SpawnG1.cc",
-      "source_location": "L88",
-      "id": "spawng1_onspawn",
-      "community": 15
-    },
-    {
       "label": "ridgeback_exploration.launch.py",
       "file_type": "code",
       "source_file": "/home/deivid/dev/DyNAMO-Ridgeback/src/ridgeback_autonomy/launch/ridgeback_exploration.launch.py",
@@ -1722,6 +1690,38 @@
       "source_location": "L12",
       "id": "simulation_launch_generate_launch_description",
       "community": 28
+    },
+    {
+      "label": "SpawnG1.cc",
+      "file_type": "code",
+      "source_file": "/home/deivid/dev/DyNAMO-Ridgeback/src/ridgeback_autonomy/sim/gz_plugins/SpawnG1.cc",
+      "source_location": "L1",
+      "id": "spawng1",
+      "community": 15
+    },
+    {
+      "label": "SpawnG1()",
+      "file_type": "code",
+      "source_file": "/home/deivid/dev/DyNAMO-Ridgeback/src/ridgeback_autonomy/sim/gz_plugins/SpawnG1.cc",
+      "source_location": "L17",
+      "id": "spawng1_spawng1",
+      "community": 15
+    },
+    {
+      "label": "LoadConfig()",
+      "file_type": "code",
+      "source_file": "/home/deivid/dev/DyNAMO-Ridgeback/src/ridgeback_autonomy/sim/gz_plugins/SpawnG1.cc",
+      "source_location": "L19",
+      "id": "spawng1_loadconfig",
+      "community": 15
+    },
+    {
+      "label": "OnSpawn()",
+      "file_type": "code",
+      "source_file": "/home/deivid/dev/DyNAMO-Ridgeback/src/ridgeback_autonomy/sim/gz_plugins/SpawnG1.cc",
+      "source_location": "L88",
+      "id": "spawng1_onspawn",
+      "community": 15
     }
   ],
   "links": [
@@ -5242,54 +5242,6 @@
       "confidence_score": 1.0
     },
     {
-      "relation": "imports",
-      "confidence": "EXTRACTED",
-      "source_file": "/home/deivid/dev/DyNAMO-Ridgeback/src/ridgeback_autonomy/gz_plugins/SpawnG1.cc",
-      "source_location": "L1",
-      "weight": 1.0,
-      "_src": "spawng1",
-      "_tgt": "spawng1",
-      "source": "spawng1",
-      "target": "spawng1",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "/home/deivid/dev/DyNAMO-Ridgeback/src/ridgeback_autonomy/gz_plugins/SpawnG1.cc",
-      "source_location": "L17",
-      "weight": 1.0,
-      "_src": "spawng1",
-      "_tgt": "spawng1_spawng1",
-      "source": "spawng1",
-      "target": "spawng1_spawng1",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "/home/deivid/dev/DyNAMO-Ridgeback/src/ridgeback_autonomy/gz_plugins/SpawnG1.cc",
-      "source_location": "L19",
-      "weight": 1.0,
-      "_src": "spawng1",
-      "_tgt": "spawng1_loadconfig",
-      "source": "spawng1",
-      "target": "spawng1_loadconfig",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "/home/deivid/dev/DyNAMO-Ridgeback/src/ridgeback_autonomy/gz_plugins/SpawnG1.cc",
-      "source_location": "L88",
-      "weight": 1.0,
-      "_src": "spawng1",
-      "_tgt": "spawng1_onspawn",
-      "source": "spawng1",
-      "target": "spawng1_onspawn",
-      "confidence_score": 1.0
-    },
-    {
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "/home/deivid/dev/DyNAMO-Ridgeback/src/ridgeback_autonomy/launch/ridgeback_exploration.launch.py",
@@ -5383,6 +5335,54 @@
       "_tgt": "simulation_launch_generate_launch_description",
       "source": "simulation_launch",
       "target": "simulation_launch_generate_launch_description",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "confidence": "EXTRACTED",
+      "source_file": "/home/deivid/dev/DyNAMO-Ridgeback/src/ridgeback_autonomy/sim/gz_plugins/SpawnG1.cc",
+      "source_location": "L1",
+      "weight": 1.0,
+      "_src": "spawng1",
+      "_tgt": "spawng1",
+      "source": "spawng1",
+      "target": "spawng1",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "/home/deivid/dev/DyNAMO-Ridgeback/src/ridgeback_autonomy/sim/gz_plugins/SpawnG1.cc",
+      "source_location": "L17",
+      "weight": 1.0,
+      "_src": "spawng1",
+      "_tgt": "spawng1_spawng1",
+      "source": "spawng1",
+      "target": "spawng1_spawng1",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "/home/deivid/dev/DyNAMO-Ridgeback/src/ridgeback_autonomy/sim/gz_plugins/SpawnG1.cc",
+      "source_location": "L19",
+      "weight": 1.0,
+      "_src": "spawng1",
+      "_tgt": "spawng1_loadconfig",
+      "source": "spawng1",
+      "target": "spawng1_loadconfig",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "/home/deivid/dev/DyNAMO-Ridgeback/src/ridgeback_autonomy/sim/gz_plugins/SpawnG1.cc",
+      "source_location": "L88",
+      "weight": 1.0,
+      "_src": "spawng1",
+      "_tgt": "spawng1_onspawn",
+      "source": "spawng1",
+      "target": "spawng1_onspawn",
       "confidence_score": 1.0
     }
   ],

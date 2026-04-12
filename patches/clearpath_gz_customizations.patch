@@ -94,16 +94,16 @@ index 69135ab..38589ce 100644
 @@ -84,13 +84,24 @@ def generate_launch_description():
      packages_paths = [os.path.join(p, 'share') for p in os.getenv('AMENT_PREFIX_PATH').split(':')]
  
-     # Set ignition resource path to include all sourced ros packages
-+    # Also include ridgeback_autonomy worlds and models
+    # Set ignition resource path to include all sourced ros packages
++    # Also include ridgeback_autonomy simulation worlds and models
 +    pkg_this_exploration = get_package_share_directory('ridgeback_autonomy')
      gz_sim_resource_path = SetEnvironmentVariable(
          name='GZ_SIM_RESOURCE_PATH',
          value=[
              os.path.join(pkg_clearpath_gz, 'worlds') + ':',
              os.path.join(pkg_clearpath_gz, 'meshes') + ':',
-+            os.path.join(pkg_this_exploration, 'worlds') + ':',
-+            os.path.join(pkg_this_exploration, 'models') + ':',
++            os.path.join(pkg_this_exploration, 'sim', 'worlds') + ':',
++            os.path.join(pkg_this_exploration, 'sim', 'models') + ':',
              ':' + ':'.join(packages_paths)])
  
 +    # Add SpawnG1 plugin path so Gazebo GUI can find it

@@ -21,10 +21,10 @@ set(CMAKE_AUTOMOC ON)
 cmake_policy(SET CMP0100 NEW)
 
 # SpawnG1 Gazebo GUI plugin
-qt5_add_resources(SPAWN_G1_RSC gz_plugins/SpawnG1.qrc)
+qt5_add_resources(SPAWN_G1_RSC sim/gz_plugins/SpawnG1.qrc)
 add_library(SpawnG1 SHARED
-  gz_plugins/SpawnG1.cc
-  gz_plugins/SpawnG1.hh
+  sim/gz_plugins/SpawnG1.cc
+  sim/gz_plugins/SpawnG1.hh
   ${SPAWN_G1_RSC}
 )
 target_link_libraries(SpawnG1
@@ -34,7 +34,7 @@ target_link_libraries(SpawnG1
   Qt5::Core
   Qt5::Quick
 )
-target_include_directories(SpawnG1 PRIVATE gz_plugins)
+target_include_directories(SpawnG1 PRIVATE sim/gz_plugins)
 
 install(TARGETS SpawnG1
   LIBRARY DESTINATION lib/${PROJECT_NAME}
@@ -82,9 +82,7 @@ install(PROGRAMS
 install(DIRECTORY
   launch
   config
-  rviz
-  worlds
-  models
+  sim
   DESTINATION share/${PROJECT_NAME}
   PATTERN "*.pyc" EXCLUDE
   PATTERN "__pycache__" EXCLUDE

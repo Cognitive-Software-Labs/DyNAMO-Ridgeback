@@ -36,11 +36,11 @@ def generate_launch_description():
         # Add our worlds and models directories so Gazebo can find them
         AppendEnvironmentVariable(
             'GZ_SIM_RESOURCE_PATH',
-            os.path.join(pkg_this, 'worlds'),
+            os.path.join(pkg_this, 'sim', 'worlds'),
         ),
         AppendEnvironmentVariable(
             'GZ_SIM_RESOURCE_PATH',
-            os.path.join(pkg_this, 'models'),
+            os.path.join(pkg_this, 'sim', 'models'),
         ),
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(

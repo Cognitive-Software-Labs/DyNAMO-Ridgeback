@@ -19,7 +19,7 @@ from rclpy.executors import ExternalShutdownException
 from rclpy.node import Node
 from sensor_msgs.msg import Image
 
-from ridgeback_autonomy.benchmarking.core.metrics import (
+from ridgeback_autonomy.benchmarking.metrics import (
     PRIMARY_METRIC_KEYS,
     PRIMARY_METRIC_LABELS,
 )
@@ -52,7 +52,7 @@ class G1DistanceBenchmarkRunner(Node):
         super().__init__('g1_distance_benchmark_runner')
 
         pkg_share = get_package_share_directory('ridgeback_autonomy')
-        self.g1_model_sdf = os.path.join(pkg_share, 'models', 'g1', 'model.sdf')
+        self.g1_model_sdf = os.path.join(pkg_share, 'sim', 'models', 'g1', 'model.sdf')
 
         self.declare_parameter('world', 'g1_distance_calibration')
         self.declare_parameter('repeats', 5)

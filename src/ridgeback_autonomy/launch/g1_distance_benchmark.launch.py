@@ -136,7 +136,6 @@ def generate_launch_description():
     pkg_this = get_package_share_directory('ridgeback_autonomy')
     launch_dir = os.path.join(pkg_this, 'launch')
     includes_dir = os.path.join(launch_dir, 'includes')
-    fastrtps_config = os.path.join(pkg_this, 'config', 'fastrtps_no_shm.xml')
     workspace_root = os.path.abspath(os.path.join(pkg_this, '..', '..', '..', '..'))
     perception_venv_path = os.path.join(workspace_root, 'perception_venv')
     perception_venv_bin = os.path.join(perception_venv_path, 'bin')
@@ -146,7 +145,6 @@ def generate_launch_description():
     world = LaunchConfiguration('world')
 
     return LaunchDescription([
-        SetEnvironmentVariable('FASTRTPS_DEFAULT_PROFILES_FILE', fastrtps_config),
         SetEnvironmentVariable('VIRTUAL_ENV', perception_venv_path),
         SetEnvironmentVariable(
             'PATH',
