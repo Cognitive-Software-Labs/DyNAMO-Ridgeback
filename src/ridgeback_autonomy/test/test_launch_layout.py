@@ -33,3 +33,21 @@ def test_internal_launch_includes_exist_and_are_referenced() -> None:
 
     assert 'includes' in exploration_text
     assert 'includes' in benchmark_text
+
+
+def test_benchmark_default_world_is_allowed_by_clearpath_simulation() -> None:
+    repo_root = Path(__file__).resolve().parents[3]
+    benchmark_text = (
+        repo_root / 'src' / 'ridgeback_autonomy' / 'launch' / 'g1_distance_benchmark.launch.py'
+    ).read_text(encoding='utf-8')
+    clearpath_simulation_text = (
+        repo_root
+        / 'src'
+        / 'clearpath_simulator'
+        / 'clearpath_gz'
+        / 'launch'
+        / 'simulation.launch.py'
+    ).read_text(encoding='utf-8')
+
+    assert "DeclareLaunchArgument('world', default_value='g1_distance_calibration')" in benchmark_text
+    assert "'g1_distance_calibration'" in clearpath_simulation_text

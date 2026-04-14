@@ -133,6 +133,7 @@ index 010f7fb..355e8b1 100644
                            choices=[
                                'construction',
 +                              'hospital',
+                               'g1_distance_calibration',
                                'office',
                                'orchard',
                                'pipeline',
