@@ -41,6 +41,12 @@ ros2 launch ridgeback_slam_exploration full_exploration.launch.py world:=hospita
 # Use custom frontier explorer instead of explore_lite
 ros2 launch ridgeback_slam_exploration full_exploration.launch.py world:=hospital explorer:=custom
 
+# Headless (no Gazebo GUI, no camera windows) — saves CPU on slower machines
+ros2 launch ridgeback_slam_exploration full_exploration.launch.py world:=hospital explorer:=custom gz_gui:=false camera_windows:=false
+
+# Disable only the Gazebo GUI window (simulation still runs headless)
+ros2 launch ridgeback_slam_exploration full_exploration.launch.py world:=hospital gz_gui:=false
+
 # Extended SLAM / exploration test
 ros2 launch ridgeback_slam_exploration full_exploration.launch.py world:=warehouse
 
@@ -125,23 +131,24 @@ tfL_ = std::make_unique<tf2_ros::TransformListener>(*tf_, shared_from_this());
 - `navigator.py` — Frontier detection and clustering using flood-fill algorithm
 - `path_finding.py` — A* pathfinding for frontier navigation
 - `params.py` — Constants and configuration (UNKNOWN=-1, FREE=0, OBSTACLE=1)
-- `map_generator.py` — Test map generation (offline simulation only)
-- `main.py` — Standalone matplotlib simulation (offline testing only)
 
 **Algorithm Overview:**
-1. **Costmap Subscription:** Receives Nav2 global costmap, converts to awareness map
+1. **Costmap Subscription:** Receives Nav2 global costmap, vectorized conversion to awareness map
 2. **Frontier Detection:** Identifies FREE cells adjacent to UNKNOWN cells
 3. **Frontier Clustering:** Groups nearby frontier points using flood-fill (8-way connectivity)
 4. **Frontier Scoring:** Ranks clusters by `distance_weight × (1 - normalized_dist) + size_weight × normalized_size`
-5. **Goal Sending:** Sends best frontier centroid as NavigateToPose goal to Nav2
-6. **Progress Monitoring:** Times out after `progress_timeout` seconds, selects new frontier
+5. **Safety Filtering:** Rejects goals too close to obstacles (configurable `lethal_cost_threshold` and `goal_safety_margin`)
+6. **Goal Sending:** Sends best safe frontier centroid as NavigateToPose goal to Nav2
+7. **Progress Monitoring:** Times out after `progress_timeout` seconds, selects new frontier
 
 **Configuration:** `config/frontier_explorer_params.yaml`
 - `min_frontier_size: 4` — Minimum frontier cluster size
 - `distance_weight: 0.7` — Distance priority in frontier selection (higher = prefer closer)
 - `size_weight: 0.3` — Cluster size priority in frontier selection
-- `planner_frequency: 0.5 Hz` — Exploration loop rate
-- `progress_timeout: 30.0 s` — Goal timeout before selecting new frontier
+- `lethal_cost_threshold: 90` — OccupancyGrid cost (0-100) above which cells are considered obstacles
+- `goal_safety_margin: 3` — Cells around goal that must be clear of lethal obstacles
+- `planner_frequency: 2.0 Hz` — Exploration loop rate
+- `progress_timeout: 20.0 s` — Goal timeout before selecting new frontier
 
 ## Clearpath Sensor Naming
 
