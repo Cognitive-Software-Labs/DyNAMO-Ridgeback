@@ -33,7 +33,16 @@ install(TARGETS SpawnG1
 
 install(PROGRAMS
   scripts/camera_windows_node
+  frontier_explorer/frontier_explorer_node.py
   DESTINATION lib/${PROJECT_NAME}
+)
+
+install(DIRECTORY
+  frontier_explorer/
+  DESTINATION lib/python3/dist-packages/frontier_explorer
+  FILES_MATCHING PATTERN "*.py"
+  PATTERN "frontier_explorer_node.py" EXCLUDE
+  PATTERN "__pycache__" EXCLUDE
 )
 
 install(DIRECTORY

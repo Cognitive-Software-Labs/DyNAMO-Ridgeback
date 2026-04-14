@@ -8,13 +8,17 @@
       costmap_topic: global_costmap/costmap
       
       # Frontier detection parameters
-      min_frontier_size: 4              # Minimum cells in a frontier cluster (lowered to detect smaller frontiers)
-      distance_weight: 0.7              # Weight for distance in frontier scoring (0-1) - prioritize distant exploration
+      min_frontier_size: 4              # Minimum cells in a frontier cluster
+      distance_weight: 0.7              # Weight for distance in frontier scoring (0-1)
       size_weight: 0.3                  # Weight for cluster size in frontier scoring (0-1)
       
+      # Safety parameters
+      lethal_cost_threshold: 90          # OccupancyGrid cost (0-100) considered obstacle for frontier detection (99-100 = lethal)
+      goal_safety_margin: 3             # Cells around goal that must be clear of lethal obstacles (~0.18m at 0.06m resolution)
+      
       # Exploration loop timing
-      planner_frequency: 0.5            # Hz - how often to select new frontiers (increased from 0.2)
-      progress_timeout: 30.0            # Seconds - timeout for reaching current goal
+      planner_frequency: 2.0            # Hz - how often to select new frontiers
+      progress_timeout: 20.0            # Seconds - timeout for reaching current goal
       
       # Visualization
       visualize: true                   # Publish frontier visualization markers

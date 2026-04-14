@@ -175,8 +175,8 @@ global_costmap:
   global_costmap:
     ros__parameters:
       enable_stamped_cmd_vel: true
-      update_frequency: 1.0
-      publish_frequency: 1.0
+      update_frequency: 2.0
+      publish_frequency: 2.0
       global_frame: map
       robot_base_frame: base_link
       footprint: "[ [0.480, 0.3965], [0.480, -0.3965], [-0.480, -0.3965], [-0.480, 0.3965] ]"
@@ -213,8 +213,8 @@ global_costmap:
         map_subscribe_transient_local: true
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
-        cost_scaling_factor: 4.0
-        inflation_radius: 0.8
+        cost_scaling_factor: 3.0
+        inflation_radius: 1.0
 
 planner_server:
   ros__parameters:

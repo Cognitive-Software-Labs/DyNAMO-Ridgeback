@@ -1,5 +1,11 @@
 #!/usr/bin/env python3
 
+import sys
+import os
+# Add the frontier_explorer module directory to Python path
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'lib', 'python3', 'dist-packages', 'frontier_explorer'))
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
 import rclpy
 from rclpy.node import Node
 from rclpy.action import ActionClient
@@ -12,7 +18,7 @@ from geometry_msgs.msg import PoseStamped, Point
 from nav2_msgs.action import NavigateToPose
 from tf2_ros import TransformListener, Buffer
 
-from navigator import get_best_frontier, update_robot_awareness_from_costmap
+from navigator import get_best_frontier, get_frontier_clusters, update_robot_awareness_from_costmap
 from path_finding import a_star
 from params import UNKNOWN, OBSTACLE, FREE
 
@@ -30,6 +36,8 @@ class FrontierExplorerNode(Node):
         self.declare_parameter('size_weight', 0.5)
         self.declare_parameter('min_frontier_size', 6)
         self.declare_parameter('visualize', True)
+        self.declare_parameter('lethal_cost_threshold', 80)
+        self.declare_parameter('goal_safety_margin', 8)
         
         # Get parameters
         self.robot_base_frame = self.get_parameter('robot_base_frame').value
@@ -40,6 +48,8 @@ class FrontierExplorerNode(Node):
         self.size_weight = self.get_parameter('size_weight').value
         self.min_frontier_size = self.get_parameter('min_frontier_size').value
         self.visualize = self.get_parameter('visualize').value
+        self.lethal_cost_threshold = self.get_parameter('lethal_cost_threshold').value
+        self.goal_safety_margin = self.get_parameter('goal_safety_margin').value
         
         # TF2 setup
         self.tf_buffer = Buffer()
@@ -71,6 +81,7 @@ class FrontierExplorerNode(Node):
         # State variables
         self.robot_awareness_map = None
         self.current_costmap = None
+        self.costmap_costs = None
         self.robot_position = None
         self.current_goal = None
         self.goal_start_time = None
@@ -98,22 +109,29 @@ class FrontierExplorerNode(Node):
             self.get_logger().warn(f'Error updating awareness map: {e}')
     
     def update_awareness_map(self, costmap_msg: OccupancyGrid):
-        """Convert occupancy grid to robot awareness map."""
+        """Convert occupancy grid to robot awareness map (vectorized).
+        
+        Nav2 publishes costmap as OccupancyGrid with values:
+          -1 = unknown (NO_INFORMATION)
+           0 = free
+          1-98 = inflated cost (proximity to obstacles)
+          99-100 = lethal/inscribed obstacle
+        """
         height = costmap_msg.info.height
         width = costmap_msg.info.width
         data = np.array(costmap_msg.data, dtype=np.int8).reshape((height, width))
         
-        # Convert occupancy values to our map representation
-        # Occupancy grid: -1=unknown, 0=free, 100=obstacle
-        for i in range(height):
-            for j in range(width):
-                value = data[i, j]
-                if value == -1:
-                    self.robot_awareness_map[i, j] = UNKNOWN
-                elif value == 0:
-                    self.robot_awareness_map[i, j] = FREE
-                else:  # value > 0
-                    self.robot_awareness_map[i, j] = OBSTACLE
+        # Vectorized conversion — no Python loops
+        self.robot_awareness_map[:] = UNKNOWN
+        self.robot_awareness_map[data == 0] = FREE
+        # Inflated cells below threshold are navigable — mark as FREE
+        self.robot_awareness_map[(data > 0) & (data < self.lethal_cost_threshold)] = FREE
+        # High-cost and lethal cells are obstacles
+        self.robot_awareness_map[data >= self.lethal_cost_threshold] = OBSTACLE
+        # Unknown stays UNKNOWN (data == -1 is already UNKNOWN from initialization)
+        
+        # Store raw costmap costs for frontier goal validation
+        self.costmap_costs = data
     
     def get_robot_position(self) -> tuple:
         """Get robot position in map frame."""
@@ -162,6 +180,33 @@ class FrontierExplorerNode(Node):
         except Exception as e:
             self.get_logger().error(f'Error in exploration loop: {e}')
     
+    def is_goal_safe(self, grid_pos):
+        """Check if a goal position has enough clearance from obstacles.
+        
+        Checks a square region around the goal to ensure no high-cost cells
+        are within the safety margin (approximating robot footprint).
+        """
+        if self.costmap_costs is None:
+            return True
+        
+        gx, gy = grid_pos
+        margin = self.goal_safety_margin
+        h, w = self.costmap_costs.shape
+        
+        # Extract the region around the goal
+        y_min = max(0, gy - margin)
+        y_max = min(h, gy + margin + 1)
+        x_min = max(0, gx - margin)
+        x_max = min(w, gx + margin + 1)
+        
+        region = self.costmap_costs[y_min:y_max, x_min:x_max]
+        
+        # Check if any cell in the region has high cost (near obstacle)
+        # Use a lower threshold than lethal to ensure the robot's full footprint fits
+        if np.any(region >= self.lethal_cost_threshold):
+            return False
+        return True
+
     def select_new_frontier_goal(self, robot_pos):
         """Select a new frontier goal."""
         best_frontier = get_best_frontier(
@@ -176,6 +221,18 @@ class FrontierExplorerNode(Node):
             self.get_logger().info('No frontier found - exploration complete!')
             return
         
+        # Check if goal is safe (enough clearance from obstacles)
+        if not self.is_goal_safe(best_frontier):
+            self.get_logger().warn(
+                f'Frontier at ({best_frontier[0]}, {best_frontier[1]}) rejected - '
+                f'too close to obstacles. Trying alternatives...'
+            )
+            # Try to find a safe frontier by getting all clusters and checking each
+            best_frontier = self.find_safe_frontier(robot_pos)
+            if best_frontier is None:
+                self.get_logger().warn('No safe frontier found, will retry next cycle.')
+                return
+        
         # Convert grid coordinates to world coordinates
         best_frontier_world = self.grid_to_world(best_frontier)
         
@@ -187,6 +244,44 @@ class FrontierExplorerNode(Node):
         self.send_goal_to_nav2(best_frontier_world)
         self.current_goal = best_frontier
         self.goal_start_time = self.get_clock().now()
+    
+    def find_safe_frontier(self, robot_pos):
+        """Find the best safe frontier by iterating through all clusters ranked by score."""
+        clusters = get_frontier_clusters(self.robot_awareness_map)
+        if not clusters:
+            return None
+        
+        # Score all clusters (same logic as get_best_frontier)
+        scored = []
+        for cluster in clusters:
+            if len(cluster) < self.min_frontier_size:
+                continue
+            cx = np.mean([p[0] for p in cluster])
+            cy = np.mean([p[1] for p in cluster])
+            target = min(cluster, key=lambda p: (p[0]-cx)**2 + (p[1]-cy)**2)
+            dist = np.sqrt((target[0] - robot_pos[0])**2 + (target[1] - robot_pos[1])**2)
+            scored.append((cluster, target, dist, len(cluster)))
+        
+        if not scored:
+            return None
+        
+        max_dist = max(s[2] for s in scored)
+        max_size = max(s[3] for s in scored)
+        
+        # Sort by score descending
+        def compute_score(item):
+            _, _, dist, size = item
+            d_score = 1 - (dist / max_dist) if max_dist > 0 else 0
+            s_score = size / max_size if max_size > 0 else 0
+            return self.distance_weight * d_score + self.size_weight * s_score
+        
+        scored.sort(key=compute_score, reverse=True)
+        
+        for _, target, _, _ in scored:
+            if self.is_goal_safe(target):
+                return target
+        
+        return None
     
     def check_goal_progress(self):
         """Check if goal is still valid or if we're stuck."""

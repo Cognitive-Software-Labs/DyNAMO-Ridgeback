@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-ROS 2 Jazzy project for autonomous SLAM-based frontier exploration of a Clearpath Ridgeback (R100) robot in Gazebo Harmonic. The robot explores a static environment with no prior map using slam_toolbox + explore_lite + Nav2.
+ROS 2 Jazzy project for autonomous SLAM-based frontier exploration of a Clearpath Ridgeback (R100) robot in Gazebo Harmonic. The robot explores a static environment with no prior map using slam_toolbox + Nav2. Two exploration backends are available: **explore_lite** (default) and a **custom frontier explorer**.
 
 ## Build & Source
 
@@ -15,8 +15,9 @@ cd /path/to/DyNAMO-Ridgeback
 # Clone external deps (first time only)
 vcs import < .repos
 
-# Apply slam_toolbox patch (required for namespace TF fix)
+# Apply patches (required for namespace TF and custom GUI)
 cd src/slam_toolbox && git apply ../../patches/slam_toolbox_tf_namespace.patch && cd ../..
+cd src/clearpath_simulator && git apply ../../patches/clearpath_gz_customizations.patch && cd ../..
 
 # Install dependencies
 rosdep install --from-paths src --ignore-src -r -y
@@ -34,11 +35,17 @@ source install/setup.bash
 # Always clean up stale processes first
 bash cleanup.sh
 
-# Main hospital scenario
+# Main hospital scenario (uses explore_lite by default)
 ros2 launch ridgeback_slam_exploration full_exploration.launch.py world:=hospital
+
+# Use custom frontier explorer instead of explore_lite
+ros2 launch ridgeback_slam_exploration full_exploration.launch.py world:=hospital explorer:=custom
 
 # Extended SLAM / exploration test
 ros2 launch ridgeback_slam_exploration full_exploration.launch.py world:=warehouse
+
+# Warehouse with custom explorer
+ros2 launch ridgeback_slam_exploration full_exploration.launch.py world:=warehouse explorer:=custom
 
 # Disable the exploration RViz instance
 ros2 launch ridgeback_slam_exploration full_exploration.launch.py world:=warehouse exploration_rviz:=false
@@ -50,8 +57,20 @@ ros2 launch ridgeback_slam_exploration full_exploration.launch.py world:=warehou
 ros2 launch ridgeback_slam_exploration simulation.launch.py
 ros2 launch ridgeback_slam_exploration slam.launch.py
 ros2 launch ridgeback_slam_exploration nav2.launch.py
-ros2 launch ridgeback_slam_exploration explore.launch.py
+ros2 launch ridgeback_slam_exploration explore.launch.py                    # explore_lite
+ros2 launch ridgeback_slam_exploration explore.launch.py explorer:=custom   # custom frontier explorer
 ```
+
+## Explorer Selection
+
+The `explorer` launch parameter controls which frontier exploration backend is used:
+
+| Value | Backend | Description |
+|-------|---------|-------------|
+| `explore_lite` (default) | m-explore-ros2 | Mature ROS 2 frontier explorer |
+| `custom` | frontier_explorer_node.py | Custom Python frontier explorer with flood-fill clustering, A* pathfinding, and configurable scoring |
+
+Both explorers read the Nav2 global costmap and send goals via the NavigateToPose action to Nav2.
 
 ## Namespace Convention
 
@@ -68,12 +87,13 @@ All nodes remap `/tf` → `tf` and `/tf_static` → `tf_static` so TF stays with
 
 ```
 Gazebo → lidar2d_0/scan → slam_toolbox → /r100_0001/map
-                        → Nav2 costmaps → explore_lite → NavigateToPose → Nav2 → cmd_vel → Gazebo
+                        → Nav2 costmaps → [explore_lite OR custom frontier_explorer] → NavigateToPose → Nav2 → cmd_vel → Gazebo
 ```
 
 - **slam_toolbox**: Online async mode, publishes map→odom TF. Built from source with a 1-line patch (see below).
 - **Nav2**: MPPI controller with `motion_model: "Omni"` (Ridgeback is omnidirectional)
-- **explore_lite**: Reads Nav2 global costmap, sends frontier goals via NavigateToPose action
+- **explore_lite** (default): Reads Nav2 global costmap, sends frontier goals via NavigateToPose action
+- **custom frontier_explorer**: Custom Python node with flood-fill frontier clustering, A* pathfinding, configurable distance/size scoring
 - **Global costmap**: `track_unknown_space: true` and planner `allow_unknown: true` — both required for frontier exploration
 
 ## slam_toolbox Patch
@@ -93,7 +113,35 @@ tfL_ = std::make_unique<tf2_ros::TransformListener>(*tf_, shared_from_this());
 - `clearpath/robot.yaml` — Robot platform, sensors, namespace. Must also exist at `~/clearpath/robot.yaml` for the simulator.
 - `src/ridgeback_slam_exploration/config/nav2_params.yaml` — Nav2 stack params. Footprint matches Ridgeback dimensions.
 - `src/ridgeback_slam_exploration/config/slam_toolbox_params.yaml` — SLAM params. `scan_topic` uses absolute path `/r100_0001/sensors/lidar2d_0/scan`.
-- `src/ridgeback_slam_exploration/config/explore_lite_params.yaml` — Frontier exploration params. Uses `/**/` YAML prefix for namespace compatibility.
+- `src/ridgeback_slam_exploration/config/explore_lite_params.yaml` — explore_lite params. Uses `/**/` YAML prefix for namespace compatibility.
+- `src/ridgeback_slam_exploration/config/frontier_explorer_params.yaml` — Custom frontier explorer params.
+
+## Custom Frontier Explorer
+
+**Location:** `src/ridgeback_slam_exploration/frontier_explorer/`
+
+**Key Components:**
+- `frontier_explorer_node.py` — ROS 2 node that orchestrates exploration (installed as executable)
+- `navigator.py` — Frontier detection and clustering using flood-fill algorithm
+- `path_finding.py` — A* pathfinding for frontier navigation
+- `params.py` — Constants and configuration (UNKNOWN=-1, FREE=0, OBSTACLE=1)
+- `map_generator.py` — Test map generation (offline simulation only)
+- `main.py` — Standalone matplotlib simulation (offline testing only)
+
+**Algorithm Overview:**
+1. **Costmap Subscription:** Receives Nav2 global costmap, converts to awareness map
+2. **Frontier Detection:** Identifies FREE cells adjacent to UNKNOWN cells
+3. **Frontier Clustering:** Groups nearby frontier points using flood-fill (8-way connectivity)
+4. **Frontier Scoring:** Ranks clusters by `distance_weight × (1 - normalized_dist) + size_weight × normalized_size`
+5. **Goal Sending:** Sends best frontier centroid as NavigateToPose goal to Nav2
+6. **Progress Monitoring:** Times out after `progress_timeout` seconds, selects new frontier
+
+**Configuration:** `config/frontier_explorer_params.yaml`
+- `min_frontier_size: 4` — Minimum frontier cluster size
+- `distance_weight: 0.7` — Distance priority in frontier selection (higher = prefer closer)
+- `size_weight: 0.3` — Cluster size priority in frontier selection
+- `planner_frequency: 0.5 Hz` — Exploration loop rate
+- `progress_timeout: 30.0 s` — Goal timeout before selecting new frontier
 
 ## Clearpath Sensor Naming
 

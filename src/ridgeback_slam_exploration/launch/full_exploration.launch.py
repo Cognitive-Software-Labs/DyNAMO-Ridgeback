@@ -21,6 +21,8 @@ def generate_launch_description():
     world = LaunchConfiguration('world')
     exploration_rviz = LaunchConfiguration('exploration_rviz')
     camera_windows = LaunchConfiguration('camera_windows')
+    explorer = LaunchConfiguration('explorer')
+    gz_gui = LaunchConfiguration('gz_gui')
 
     rviz_config = os.path.join(pkg_this, 'rviz', 'exploration.rviz')
 
@@ -37,6 +39,11 @@ def generate_launch_description():
                               description='Launch the exploration RViz2 config'),
         DeclareLaunchArgument('camera_windows', default_value='true',
                               description='Launch OpenCV camera viewer windows'),
+        DeclareLaunchArgument('explorer', default_value='explore_lite',
+                              description='Which explorer to use: "explore_lite" or "custom"'),
+        DeclareLaunchArgument('gz_gui', default_value='true',
+                              description='Launch the Gazebo GUI window'),
+
 
         # RViz2
         Node(
@@ -71,6 +78,7 @@ def generate_launch_description():
                 'setup_path': setup_path,
                 'world': world,
                 'clearpath_rviz': 'false',
+                'gz_gui': gz_gui,
             }.items(),
         ),
 
@@ -106,7 +114,7 @@ def generate_launch_description():
             ],
         ),
 
-        # 4. Launch explore_lite (delayed to let Nav2 fully start)
+        # 4. Launch exploration (delayed to let Nav2 fully start)
         TimerAction(
             period=45.0,
             actions=[
@@ -117,6 +125,7 @@ def generate_launch_description():
                     launch_arguments={
                         'namespace': namespace,
                         'use_sim_time': use_sim_time,
+                        'explorer': explorer,
                     }.items(),
                 ),
             ],

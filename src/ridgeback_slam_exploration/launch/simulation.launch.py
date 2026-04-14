@@ -33,6 +33,11 @@ def generate_launch_description():
             default_value='false',
             description='Launch the Clearpath-provided RViz instance',
         ),
+        DeclareLaunchArgument(
+            'gz_gui',
+            default_value='true',
+            description='Launch the Gazebo GUI window',
+        ),
         # Add our worlds and models directories so Gazebo can find them
         AppendEnvironmentVariable(
             'GZ_SIM_RESOURCE_PATH',
@@ -51,6 +56,7 @@ def generate_launch_description():
                 'world': world,
                 'rviz': clearpath_rviz,
                 'use_sim_time': 'true',
+                'gz_gui': LaunchConfiguration('gz_gui'),
             }.items(),
         ),
     ])
