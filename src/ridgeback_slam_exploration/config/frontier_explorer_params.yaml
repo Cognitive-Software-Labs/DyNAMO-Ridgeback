@@ -1,0 +1,20 @@
+/**:
+  frontier_explorer_node:
+    ros__parameters:
+      # TF and map frames
+      robot_base_frame: base_link
+      
+      # Costmap topic (from Nav2)
+      costmap_topic: global_costmap/costmap
+      
+      # Frontier detection parameters
+      min_frontier_size: 4              # Minimum cells in a frontier cluster (lowered to detect smaller frontiers)
+      distance_weight: 0.7              # Weight for distance in frontier scoring (0-1) - prioritize distant exploration
+      size_weight: 0.3                  # Weight for cluster size in frontier scoring (0-1)
+      
+      # Exploration loop timing
+      planner_frequency: 0.5            # Hz - how often to select new frontiers (increased from 0.2)
+      progress_timeout: 30.0            # Seconds - timeout for reaching current goal
+      
+      # Visualization
+      visualize: true                   # Publish frontier visualization markers
