@@ -1,0 +1,30 @@
+# colcon build artifacts
+build/
+install/
+log/
+
+# python virtualenvs
+perception_venv/
+.venv/
+venv/
+
+# generated clearpath runtime config (auto-generated from clearpath/robot.yaml)
+clearpath/
+
+# vendored external ROS 2 dependencies (tracked via .repos, not our code)
+src/clearpath_common/
+src/clearpath_config/
+src/clearpath_msgs/
+src/clearpath_nav2_demos/
+src/clearpath_simulator/
+src/m-explore-ros2/
+src/slam_toolbox/
+
+# patches directory contains upstream diffs, not project code
+patches/
+
+# removed experimental folder
+vlm_distance/
+
+# graphify's own outputs (memory/ is auto-included by the tool)
+graphify-out/

@@ -15,10 +15,6 @@ repositories:
     type: git
     url: https://github.com/clearpathrobotics/clearpath_msgs.git
     version: jazzy
-  src/clearpath_nav2_demos:
-    type: git
-    url: https://github.com/clearpathrobotics/clearpath_nav2_demos.git
-    version: jazzy
   src/m-explore-ros2:
     type: git
     url: https://github.com/robo-friends/m-explore-ros2.git

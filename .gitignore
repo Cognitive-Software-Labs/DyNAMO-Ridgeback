@@ -2,6 +2,14 @@ build/
 install/
 log/
 
+# Clearpath generator output — regenerated from clearpath/robot.yaml on every run
+clearpath/manipulators/
+clearpath/platform/
+clearpath/sensors/
+clearpath/robot.srdf
+clearpath/robot.srdf.xacro
+clearpath/robot.urdf.xacro
+
 # Cloned external dependencies (managed via .repos)
 src/clearpath_simulator/
 src/clearpath_common/
@@ -10,3 +18,17 @@ src/clearpath_msgs/
 src/clearpath_nav2_demos/
 src/m-explore-ros2/
 src/slam_toolbox/
+
+# Perception virtual environments
+vlm_venv/
+perception_venv/
+
+# Python cache artifacts
+__pycache__/
+*.pyc
+
+# Graphify shareable outputs are tracked; ignore rebuild/cache internals
+graphify-out/cache/
+graphify-out/.graphify*
+graphify-out/manifest.json
+graphify-out/cost.json

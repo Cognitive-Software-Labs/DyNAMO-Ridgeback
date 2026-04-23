@@ -1,8 +1,17 @@
-# Ridgeback SLAM & Frontier Exploration
+# Ridgeback Exploration, Perception, and G1 Benchmarking
 
-Autonomous frontier exploration for a [Clearpath Ridgeback](https://clearpathrobotics.com/ridgeback-indoor-robot-platform/) robot in Gazebo Harmonic with ROS 2 Jazzy.
+Autonomous exploration, G1 perception, and distance benchmarking for a [Clearpath Ridgeback](https://clearpathrobotics.com/ridgeback-indoor-robot-platform/) robot in Gazebo Harmonic with ROS 2 Jazzy.
 
-The integrated launch path brings up simulation, SLAM, Nav2, frontier exploration, a custom RViz layout, and camera preview windows. The main scenario in this workspace is `hospital`, while `warehouse` is used as an extended SLAM and exploration test.
+This workspace supports 3 main human workflows:
+- full autonomous exploration with G1 perception (any world)
+- repeatable G1 distance benchmarking across camera and LiDAR measurements
+
+## Docs
+
+- `README.md`: installation, public launch usage, and normal human workflows
+- `ISSUES.md`: troubleshooting, resolved root causes, and operational gotchas
+- `AI_CONTEXT.md`: agent-facing repo conventions, mental model, and documentation rules
+- `AGENTS.md` / `CLAUDE.md`: thin entrypoints into the shared agent guidance
 
 ## Stack
 
@@ -10,10 +19,12 @@ The integrated launch path brings up simulation, SLAM, Nav2, frontier exploratio
 |-------|---------|---------|
 | Simulation | Gazebo Harmonic + clearpath_simulator | Physics, sensors, world |
 | Perception | Hokuyo UST-10LX 2D lidar | Obstacle detection + SLAM input |
-| Perception | Intel RealSense D455 (~1m height) | Depth/RGB (future use) |
+| Perception | Intel RealSense D455 (~1m height) | Depth/RGB for overlay and distance estimation |
 | SLAM | slam_toolbox (online async, from source) | Map building + localization |
 | Navigation | Nav2 (MPPI omni controller) | Path planning + obstacle avoidance |
 | Exploration | explore_lite (m-explore-ros2) | Frontier detection + goal selection |
+| Perception | Staged G1 perception pipeline | Raw OWLv2 detections plus camera/LiDAR measurement nodes and an optional overlay |
+| Benchmarking | G1 distance benchmark runner | Controlled evaluation of RGB, depth, mono-depth, pointcloud, and LiDAR measurements |
 
 ## Prerequisites
 
@@ -60,6 +71,9 @@ cd /path/to/DyNAMO-Ridgeback
 # Clone external dependencies
 vcs import < .repos
 
+# Apply clearpath_gz patch (adds custom worlds/models + SpawnG1 Gazebo GUI plugin)
+cd src/clearpath_simulator/clearpath_gz && git apply ../../../patches/clearpath_gz_customizations.patch && cd ../../..
+
 # Apply slam_toolbox patch (fixes TF namespace issue)
 cd src/slam_toolbox && git apply ../../patches/slam_toolbox_tf_namespace.patch && cd ../..
 
@@ -73,7 +87,39 @@ source install/setup.bash
 
 If you rename or move the workspace directory later, wipe `build/`, `install/`, and `log/` before rebuilding so the generated setup files do not keep stale absolute paths.
 
-### 3. Set up robot config
+### 3. Set up G1 perception venv (first time only)
+
+The G1 perception stack now follows a staged pipeline inside the installable Python package `ridgeback_autonomy/`:
+- raw detections on `detections/g1/raw`
+- camera measurements on `measurements/g1/camera`
+- lidar measurements on `measurements/g1/lidar`
+- mono-depth debug images on `debug/g1/camera/mono_depth`
+
+It requires a Python venv with PyTorch and Transformers:
+
+```bash
+# Create venv that can see ROS 2 packages
+python3 -m venv --system-site-packages perception_venv
+echo "/opt/ros/jazzy/lib/python3.12/site-packages" > perception_venv/lib/python3.12/site-packages/ros2.pth
+
+# Install perception dependencies
+perception_venv/bin/python3 -m pip install torch torchvision transformers accelerate Pillow
+```
+
+Both public launch files automatically prepend `perception_venv/bin` to `PATH` and set `VIRTUAL_ENV` for the perception nodes. The first run will download the OWLv2 detector from Hugging Face. If you enable `depth_anything_enabled:=true`, the first run will also download the Depth-Anything V2 metric checkpoint.
+
+### 4. (Optional) Install graphify post-commit hook
+
+If you use the graphify knowledge graph, install the post-commit hook to auto-rebuild it after each commit:
+
+```bash
+pip install graphify              # or: pipx install graphify
+bash tools/install_hooks
+```
+
+The hook only triggers on code-file changes and calls `tools/rebuild_graphify`. The hook source lives in `tools/hooks/post-commit`.
+
+### 5. Set up robot config
 
 The Clearpath simulator expects the robot config at `~/clearpath/`:
 
@@ -84,8 +130,6 @@ cp clearpath/robot.yaml ~/clearpath/robot.yaml
 
 ## Usage
 
-### Full autonomous exploration (recommended)
-
 Start every run from a sourced workspace:
 
 ```bash
@@ -94,54 +138,127 @@ cd /path/to/DyNAMO-Ridgeback
 source install/setup.bash
 ```
 
-### Main scenarios
+The package now exposes 2 public launch entrypoints:
+- `ridgeback_exploration.launch.py`
+- `g1_distance_benchmark.launch.py`
+
+The lower-level simulation, SLAM, Nav2, and frontier-exploration launches live under `launch/includes/` and are treated as internal launch building blocks rather than public entrypoints.
+
+### `ridgeback_exploration.launch.py`
+
+Launches Gazebo, SLAM, Nav2, frontier exploration, and the G1 perception stack in sequence:
+
+1. Gazebo + Ridgeback spawn
+2. Exploration RViz config
+3. `slam_toolbox` (after 20 s)
+4. Nav2 (after 30 s)
+5. `explore_lite` (after 45 s)
+6. G1 perception nodes: `g1_detector_node`, `g1_camera_measurement_node`, `g1_lidar_measurement_node`, `g1_overlay_node`
+
+The perception overlay appears in a separate OpenCV window named `G1 Perception`; it is not embedded in RViz.
+
+Available worlds:
+
+| World | Source | Notes |
+|-------|--------|-------|
+| `warehouse` | Clearpath | Default; large open floor plan |
+| `office` | Clearpath | Smaller rooms and corridors |
+| `hospital` | Custom (`sim/worlds/`) | Multi-room clinical layout |
+| `construction` | Clearpath | Outdoor construction site |
+| `orchard` | Clearpath | Outdoor orchard rows |
+| `solar_farm` | Clearpath | Outdoor solar panel array |
+| `pipeline` | Clearpath | Outdoor pipeline facility |
+
+Arguments:
+
+| Argument | Default | Meaning |
+|----------|---------|---------|
+| `world` | `warehouse` | Gazebo world to load (see table above) |
+| `namespace` | `r100_0001` | ROS namespace for all nodes |
+| `use_sim_time` | `true` | Use Gazebo `/clock` |
+| `setup_path` | `~/clearpath/` | Directory containing `robot.yaml` and generated Clearpath files |
+| `exploration_rviz` | `true` | Launch the custom exploration RViz config |
+| `g1_perception_enabled` | `true` | Launch the G1 perception stack |
+| `depth_anything_enabled` | `false` | Enable Depth-Anything in the camera measurement node |
+
+Examples:
 
 ```bash
 # Always clean up stale processes first
 bash cleanup.sh
 
-# Main hospital scenario
-ros2 launch ridgeback_slam_exploration full_exploration.launch.py world:=hospital
-
-# Extended SLAM / exploration test
-ros2 launch ridgeback_slam_exploration full_exploration.launch.py world:=warehouse
+ros2 launch ridgeback_autonomy ridgeback_exploration.launch.py world:=hospital
+ros2 launch ridgeback_autonomy ridgeback_exploration.launch.py world:=warehouse exploration_rviz:=false
+ros2 launch ridgeback_autonomy ridgeback_exploration.launch.py world:=office depth_anything_enabled:=true
+ros2 launch ridgeback_autonomy ridgeback_exploration.launch.py world:=hospital g1_perception_enabled:=false
 ```
 
-The integrated launch does all of this for you:
-1. Starts Gazebo and spawns the Ridgeback.
-2. Launches the exploration RViz config.
-3. Launches the custom OpenCV camera viewer windows.
-4. Starts `slam_toolbox` after 20 seconds.
-5. Starts Nav2 after 30 seconds.
-6. Starts `explore_lite` after 45 seconds.
+#### Quick-start script
 
-By default, RViz shows the exploration view plus the camera feeds under the `Cameras` group, and the custom node opens separate color and depth windows.
-
-### Useful launch toggles
+`start_exploration.sh` sources the workspace, runs cleanup, and launches with Depth-Anything enabled:
 
 ```bash
-# Disable the custom RViz instance
-ros2 launch ridgeback_slam_exploration full_exploration.launch.py world:=warehouse exploration_rviz:=false
-
-# Disable the OpenCV camera preview windows
-ros2 launch ridgeback_slam_exploration full_exploration.launch.py world:=warehouse camera_windows:=false
+bash start_exploration.sh              # defaults to warehouse
+bash start_exploration.sh office       # any world name as the first arg
+bash start_exploration.sh hospital
 ```
 
-### Simulation only
+### `g1_distance_benchmark.launch.py`
 
 ```bash
-ros2 launch ridgeback_slam_exploration simulation.launch.py world:=hospital
-ros2 launch ridgeback_slam_exploration simulation.launch.py world:=warehouse
+# Camera-stack benchmark (RGB / sensor depth / mono depth / pointcloud)
+ros2 launch ridgeback_autonomy g1_distance_benchmark.launch.py measurement_backend:=camera
+
+# LiDAR benchmark
+ros2 launch ridgeback_autonomy g1_distance_benchmark.launch.py measurement_backend:=lidar
+
+# Camera backend scored on pointcloud instead of RGB depth
+ros2 launch ridgeback_autonomy g1_distance_benchmark.launch.py measurement_backend:=camera primary_metric:=pointcloud
 ```
 
-The per-component launch files still exist for debugging and development, but the intended workflow for normal use is the integrated `full_exploration.launch.py` entrypoint.
+This launch composes the simulator, `g1_detector_node`, one selected measurement node, and `g1_distance_benchmark_runner`.
+
+Arguments:
+
+| Argument | Default | Meaning |
+|----------|---------|---------|
+| `namespace` | `r100_0001` | Namespace for simulation, detector, measurement node, and benchmark runner |
+| `use_sim_time` | `true` | Use Gazebo `/clock` |
+| `setup_path` | `~/clearpath/` | Directory containing `robot.yaml` and generated Clearpath files |
+| `world` | `g1_distance_calibration` | Gazebo world used for the benchmark run |
+| `measurement_backend` | `camera` | Measurement node to launch: `camera` or `lidar` |
+| `primary_metric` | `auto` | Metric column to score; defaults from the selected backend |
+| `repeats` | `5` | Number of positive-trial repeats per spawn pose |
+| `output_csv` | empty | Optional CSV path override; defaults from the selected backend |
+| `settle_sec` | `2.0` | Delay after spawning the target before sampling |
+| `capture_sec` | `3.0` | Sampling window length |
+| `depth_anything_enabled` | `false` | Enable the optional mono-depth branch when `measurement_backend:=camera` |
+| `color_topic` | `sensors/camera_0/color/image` | RGB topic used by the detector, camera measurement node, and benchmark snapshots |
+| `depth_topic` | `sensors/camera_0/depth/image` | Depth topic used by the camera measurement node |
+| `pointcloud_topic` | `sensors/camera_0/points` | Camera-aligned point cloud used by the camera measurement node |
+| `scan_topic` | `sensors/lidar2d_0/scan` | LaserScan topic used by the LiDAR measurement node |
+| `base_frame` | `<namespace>/robot/base_link` | Vehicle frame used for point-cloud and LiDAR projection |
+| `failed_frame_dir` | empty | Optional override for saved failed-frame directory |
+| `save_failed_frames` | `true` | Save annotated RGB frames for missed/ambiguous positive trials |
+
+### Perception interfaces
+
+| Node | Output topic | Key params |
+|------|--------------|------------|
+| `g1_detector_node` | `detections/g1/raw` | `color_topic`, `detection_model`, `detection_threshold` |
+| `g1_camera_measurement_node` | `measurements/g1/camera` | `camera_config_path`, `color_topic`, `depth_topic`, `pointcloud_topic`, `base_frame`, `depth_anything_enabled` |
+| `g1_lidar_measurement_node` | `measurements/g1/lidar` | `camera_config_path`, `scan_topic`, `base_frame` |
+| `g1_overlay_node` | OpenCV window only | `measurement_topic`, `color_topic`, `depth_topic`, `mono_depth_debug_topic` |
+| `g1_distance_benchmark_runner` | CSV + optional failed frames | `measurement_topic`, `primary_metric`, `color_topic`, `output_csv` |
+
+The shared camera geometry lives in `config/camera_config.json`, and the measurement nodes use the `camera_config_path` parameter.
 
 ## Configuration
 
 ### Robot sensors (`clearpath/robot.yaml`)
 
 - **Hokuyo UST-10LX**: Mounted at front of chassis, provides 2D laser scan for SLAM and costmaps
-- **Intel RealSense D455**: Mounted on a riser bracket, provides depth + RGB to RViz and the custom `camera_windows_node`
+- **Intel RealSense D455**: Mounted on a riser bracket, provides RGB, aligned depth, and camera-aligned point cloud to the G1 perception stack
 
 ### Key parameters to tune
 
@@ -152,79 +269,11 @@ The per-component launch files still exist for debugging and development, but th
 | `config/nav2_params.yaml` | `vx_max` / `vy_max` | Robot speed limits |
 | `config/slam_toolbox_params.yaml` | `resolution` | Map resolution (m/pixel) |
 
-## Why slam_toolbox is built from source
+## Patches and Issue History
 
-This project requires a 1-line patch to slam_toolbox. Without it, SLAM completely fails in any namespaced Clearpath setup.
+This project still relies on two local patches:
 
-### The problem
+1. `patches/clearpath_gz_customizations.patch` patches `src/clearpath_simulator/clearpath_gz` to add this repo's Gazebo worlds/models to the simulator search path and to expose the custom `SpawnG1` Gazebo GUI plugin.
+2. `patches/slam_toolbox_tf_namespace.patch` patches `src/slam_toolbox` so `slam_toolbox` respects namespaced TF remappings.
 
-Clearpath robots require a non-empty ROS 2 namespace (e.g. `/r100_0001/`). All topics — including TF — live under that namespace: `/r100_0001/tf`, `/r100_0001/tf_static`. The standard way to handle this in ROS 2 is to remap absolute topic names at the node level:
-
-```python
-remappings = [('/tf', 'tf'), ('/tf_static', 'tf_static')]
-```
-
-This works perfectly for Nav2, explore_lite, and every other node in the stack. But it doesn't work for slam_toolbox.
-
-### Root cause
-
-In `slam_toolbox_common.cpp` (line 123), the `TransformListener` is created with a simple constructor:
-
-```cpp
-tfL_ = std::make_unique<tf2_ros::TransformListener>(*tf_);
-```
-
-This constructor only takes a `BufferCore` reference. Internally, `tf2_ros::TransformListener` creates a **hidden internal node** and subscribes to the hardcoded absolute topics `/tf` and `/tf_static` (`transform_listener.hpp` lines 191-198). Since this internal node is separate from slam_toolbox's own node, it ignores all launch-level remappings.
-
-The result: slam_toolbox subscribes to the global `/tf` (which is empty) instead of `/r100_0001/tf` (where the robot publishes). SLAM never receives transforms, its `MessageFilter` drops every single laser scan with "queue is full" warnings, and no map is ever produced.
-
-Ironically, the `TransformBroadcaster` on the very next line already does it correctly:
-
-```cpp
-tfB_ = std::make_unique<tf2_ros::TransformBroadcaster>(shared_from_this());
-```
-
-### The fix
-
-The patch (`patches/slam_toolbox_tf_namespace.patch`) changes one line:
-
-```cpp
-// Before:
-tfL_ = std::make_unique<tf2_ros::TransformListener>(*tf_);
-// After:
-tfL_ = std::make_unique<tf2_ros::TransformListener>(*tf_, shared_from_this());
-```
-
-Passing `shared_from_this()` makes the `TransformListener` use slam_toolbox's own node interface for subscriptions. This means it respects the `/tf` -> `tf` remapping, subscribing to `/r100_0001/tf` as intended. This is the same pattern Nav2 uses for all its nodes.
-
-### What we tried before finding this
-
-1. **tf_relay node** — A Python node that forwarded messages between `/r100_0001/tf` and `/tf`. This caused infinite relay loops (messages echoed back endlessly) and even when the loops were fixed by filtering on `frame_id`, slam_toolbox's `MessageFilter` still dropped all scans.
-
-2. **Process-level remapping** — Launching slam_toolbox via `ExecuteProcess` with `-r /tf:=/r100_0001/tf`. TF worked (configure was instant), but `MessageFilter` still dropped scans after the first one.
-
-3. **Queue size increases** — Bumping `scan_queue_size` from 1 to 10. Didn't help with the fundamental subscription problem.
-
-The 1-line source patch was the only approach that actually resolved the issue. Zero `MessageFilter` drops, instant lifecycle configure, map publishing immediately.
-
-### Namespace gotchas (general)
-
-If you add new nodes to this project, always:
-
-1. Set `namespace=namespace` on the node
-2. Add `remappings=[('/tf', 'tf'), ('/tf_static', 'tf_static')]`
-3. Use `/**/node_name:` as the YAML root key in parameter files (the `/**/` glob matches any namespace prefix — without it, a namespaced node like `/r100_0001/explore_node` won't find its params under a bare `explore_node:` key)
-4. Set `use_sim_time: true` in simulation
-
-## Troubleshooting
-
-| Problem | Check |
-|---------|-------|
-| Robot doesn't move | `ros2 topic echo /r100_0001/cmd_vel` — if empty, Nav2 may not be active |
-| No map in RViz | `ros2 topic hz /r100_0001/map` — if 0, check slam_toolbox logs and scan topic |
-| Camera windows do not appear | Make sure `camera_windows:=true` and check `/r100_0001/sensors/camera_0/color/image` |
-| explore_lite not finding frontiers | Verify `track_unknown_space: true` in global costmap config |
-| TF errors | Ensure all nodes use `use_sim_time: true` |
-| Gazebo slow to start | Increase `TimerAction` delays in `full_exploration.launch.py` |
-| Stale processes from previous runs | Run `bash cleanup.sh` before each launch |
-| Diagnostics | Run `bash diag.sh /tmp/logfile.log hospital` or `bash diag.sh /tmp/logfile.log warehouse` |
+The deeper root-cause notes, previous middleware workarounds, namespace gotchas, and troubleshooting tips now live in [ISSUES.md](ISSUES.md).

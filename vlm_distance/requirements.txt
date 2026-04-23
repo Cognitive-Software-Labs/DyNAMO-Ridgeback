@@ -1,8 +1,0 @@
-accelerate
-matplotlib
-numpy
-Pillow
-torch
-torchaudio
-torchvision
-transformers
