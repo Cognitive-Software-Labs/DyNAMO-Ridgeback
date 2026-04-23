@@ -9,16 +9,18 @@
       
       # Frontier detection parameters
       min_frontier_size: 4              # Minimum cells in a frontier cluster
-      distance_weight: 0.7              # Weight for distance in frontier scoring (0-1)
-      size_weight: 0.3                  # Weight for cluster size in frontier scoring (0-1)
+      distance_weight: 0.3              # Weight for distance in frontier scoring (0-1)
+      size_weight: 0.7                  # Weight for cluster size in frontier scoring (0-1)
       
       # Safety parameters
       lethal_cost_threshold: 90          # OccupancyGrid cost (0-100) considered obstacle for frontier detection (99-100 = lethal)
-      goal_safety_margin: 3             # Cells around goal that must be clear of lethal obstacles (~0.18m at 0.06m resolution)
+      goal_safety_margin: 1             # Cells around goal that must be clear of lethal obstacles (3x3 box)
       
       # Exploration loop timing
       planner_frequency: 2.0            # Hz - how often to select new frontiers
-      progress_timeout: 20.0            # Seconds - timeout for reaching current goal
+      progress_timeout: 60.0            # Seconds - timeout for reaching current goal
+      startup_delay: 15.0               # Seconds (wall clock) to wait after node start before sending first goal
+      abort_retry_delay: 5.0            # Seconds (wall clock) to wait before retrying after a goal abort
       
       # Visualization
       visualize: true                   # Publish frontier visualization markers

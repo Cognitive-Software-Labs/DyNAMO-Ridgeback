@@ -2,9 +2,11 @@
 
 import sys
 import os
-# Add the frontier_explorer module directory to Python path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'lib', 'python3', 'dist-packages', 'frontier_explorer'))
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+# Resolve symlinks so this works from both source and install trees
+_script_dir = os.path.dirname(os.path.realpath(__file__))
+sys.path.insert(0, os.path.join(_script_dir, 'frontier_explorer'))
+
+import time as _time
 
 import rclpy
 from rclpy.node import Node
@@ -38,6 +40,8 @@ class FrontierExplorerNode(Node):
         self.declare_parameter('visualize', True)
         self.declare_parameter('lethal_cost_threshold', 80)
         self.declare_parameter('goal_safety_margin', 8)
+        self.declare_parameter('startup_delay', 15.0)
+        self.declare_parameter('abort_retry_delay', 5.0)
         
         # Get parameters
         self.robot_base_frame = self.get_parameter('robot_base_frame').value
@@ -50,6 +54,8 @@ class FrontierExplorerNode(Node):
         self.visualize = self.get_parameter('visualize').value
         self.lethal_cost_threshold = self.get_parameter('lethal_cost_threshold').value
         self.goal_safety_margin = self.get_parameter('goal_safety_margin').value
+        self._startup_delay = self.get_parameter('startup_delay').value
+        self._abort_retry_delay = self.get_parameter('abort_retry_delay').value
         
         # TF2 setup
         self.tf_buffer = Buffer()
@@ -85,6 +91,13 @@ class FrontierExplorerNode(Node):
         self.robot_position = None
         self.current_goal = None
         self.goal_start_time = None
+        self._current_goal_handle = None
+        # Startup and retry timing (wall clock so it's immune to sim-time jumps)
+        self._start_wall_time = _time.time()
+        self._retry_after_wall_time = 0.0
+        # Blacklist: list of (grid_x, grid_y) of recently-reached goals to avoid re-picking
+        self._visited_goals = []
+        self._visited_goal_radius = 20  # cells — don't re-pick within this radius
         
         self.get_logger().info(f'Frontier Explorer Node initialized')
         self.get_logger().info(f'  Robot Base Frame: {self.robot_base_frame}')
@@ -166,6 +179,15 @@ class FrontierExplorerNode(Node):
         if self.current_costmap is None or self.robot_awareness_map is None:
             return
         
+        now_wall = _time.time()
+        # Wait for TF and Nav2 to stabilize before sending the first goal
+        elapsed_since_start = now_wall - self._start_wall_time
+        if elapsed_since_start < self._startup_delay:
+            return
+        # Back off after a quick abort to avoid hammering Nav2 during TF instability
+        if now_wall < self._retry_after_wall_time:
+            return
+        
         try:
             # Get current robot position
             robot_pos = self.get_robot_position()
@@ -207,30 +229,24 @@ class FrontierExplorerNode(Node):
             return False
         return True
 
+    def _is_blacklisted(self, pos):
+        """Return True if pos is too close to a recently-visited goal."""
+        for vx, vy in self._visited_goals:
+            if np.sqrt((pos[0] - vx)**2 + (pos[1] - vy)**2) < self._visited_goal_radius:
+                return True
+        return False
+
     def select_new_frontier_goal(self, robot_pos):
         """Select a new frontier goal."""
-        best_frontier = get_best_frontier(
-            robot_pos,
-            self.robot_awareness_map,
-            distance_weight=self.distance_weight,
-            size_weight=self.size_weight,
-            min_frontier_size=self.min_frontier_size
-        )
+        best_frontier = self.find_safe_frontier(robot_pos)
         
         if best_frontier is None:
-            self.get_logger().info('No frontier found - exploration complete!')
-            return
-        
-        # Check if goal is safe (enough clearance from obstacles)
-        if not self.is_goal_safe(best_frontier):
-            self.get_logger().warn(
-                f'Frontier at ({best_frontier[0]}, {best_frontier[1]}) rejected - '
-                f'too close to obstacles. Trying alternatives...'
-            )
-            # Try to find a safe frontier by getting all clusters and checking each
-            best_frontier = self.find_safe_frontier(robot_pos)
+            if self._visited_goals:
+                self.get_logger().info('All frontiers blacklisted or blocked — clearing blacklist and retrying.')
+                self._visited_goals.clear()
+                best_frontier = self.find_safe_frontier(robot_pos)
             if best_frontier is None:
-                self.get_logger().warn('No safe frontier found, will retry next cycle.')
+                self.get_logger().info('No frontier found - exploration complete!')
                 return
         
         # Convert grid coordinates to world coordinates
@@ -246,7 +262,7 @@ class FrontierExplorerNode(Node):
         self.goal_start_time = self.get_clock().now()
     
     def find_safe_frontier(self, robot_pos):
-        """Find the best safe frontier by iterating through all clusters ranked by score."""
+        """Find the best safe, non-blacklisted frontier ranked by score."""
         clusters = get_frontier_clusters(self.robot_awareness_map)
         if not clusters:
             return None
@@ -277,6 +293,13 @@ class FrontierExplorerNode(Node):
         
         scored.sort(key=compute_score, reverse=True)
         
+        for _, target, _, _ in scored:
+            if self._is_blacklisted(target):
+                continue
+            if self.is_goal_safe(target):
+                return target
+        
+        # Fallback: return best safe goal even if blacklisted
         for _, target, _, _ in scored:
             if self.is_goal_safe(target):
                 return target
@@ -324,7 +347,39 @@ class FrontierExplorerNode(Node):
             self.get_logger().warn('NavigateToPose action server not available')
             return
         
-        self.nav_client.send_goal_async(goal_msg)
+        send_future = self.nav_client.send_goal_async(goal_msg)
+        send_future.add_done_callback(self._goal_response_callback)
+
+    def _goal_response_callback(self, future):
+        """Handle goal acceptance; attach result callback."""
+        goal_handle = future.result()
+        if not goal_handle.accepted:
+            self.get_logger().warn('Goal rejected by Nav2, will retry.')
+            self.current_goal = None
+            return
+        self._current_goal_handle = goal_handle
+        # Pass the handle through the closure so result callback can ignore stale results
+        goal_handle.get_result_async().add_done_callback(
+            lambda f, gh=goal_handle: self._goal_result_callback(f, gh)
+        )
+
+    def _goal_result_callback(self, future, goal_handle):
+        """Handle goal completion — immediately pick a new frontier."""
+        # Ignore results from superseded goals (e.g. cancelled due to timeout preemption)
+        if goal_handle is not self._current_goal_handle:
+            return
+        from action_msgs.msg import GoalStatus
+        status = future.result().status
+        if status == GoalStatus.STATUS_SUCCEEDED:
+            self.get_logger().info('Goal succeeded, selecting next frontier.')
+            # Blacklist this position so we don't immediately return to it
+            if self.current_goal is not None:
+                self._visited_goals.append(self.current_goal)
+        else:
+            self.get_logger().warn(f'Goal aborted/cancelled (status={status}), selecting new frontier.')
+            self._retry_after_wall_time = _time.time() + self._abort_retry_delay
+        self.current_goal = None
+        self._current_goal_handle = None
 
 
 def main(args=None):

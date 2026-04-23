@@ -44,7 +44,7 @@ def generate_launch_description():
 
         # Option 2: custom frontier explorer
         Node(
-            package='ridgeback_slam_exploration',
+            package='ridgeback_autonomy',
             executable='frontier_explorer_node.py',
             name='frontier_explorer_node',
             namespace=namespace,

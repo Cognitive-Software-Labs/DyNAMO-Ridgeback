@@ -32,7 +32,7 @@ controller_server:
     progress_checker:
       plugin: "nav2_controller::SimpleProgressChecker"
       required_movement_radius: 0.5
-      movement_time_allowance: 10.0
+      movement_time_allowance: 20.0
     general_goal_checker:
       stateful: true
       plugin: "nav2_controller::SimpleGoalChecker"
@@ -56,7 +56,7 @@ controller_server:
       wz_max: 1.9
       iteration_count: 1
       prune_distance: 1.7
-      transform_tolerance: 0.1
+      transform_tolerance: 0.5
       temperature: 0.3
       gamma: 0.015
       motion_model: "Omni"
@@ -258,7 +258,7 @@ behavior_server:
     global_frame: map
     local_frame: odom
     robot_base_frame: base_link
-    transform_tolerance: 0.1
+    transform_tolerance: 0.5
     simulate_ahead_time: 2.0
     max_rotational_vel: 1.0
     min_rotational_vel: 0.2

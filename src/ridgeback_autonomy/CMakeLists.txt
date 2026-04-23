@@ -79,6 +79,19 @@ install(PROGRAMS
   RENAME g1_distance_benchmark_runner
 )
 
+install(PROGRAMS
+  ridgeback_autonomy/frontier_explorer_node.py
+  DESTINATION lib/${PROJECT_NAME}
+  RENAME frontier_explorer_node.py
+)
+
+install(DIRECTORY
+  ridgeback_autonomy/frontier_explorer/
+  DESTINATION lib/${PROJECT_NAME}/frontier_explorer
+  PATTERN "*.pyc" EXCLUDE
+  PATTERN "__pycache__" EXCLUDE
+)
+
 install(DIRECTORY
   launch
   config
