@@ -131,7 +131,7 @@ def generate_launch_description():
 
         # 2. Launch SLAM (delayed to let sim fully start and publish TF)
         TimerAction(
-            period=20.0,
+            period=8.0,
             actions=[
                 IncludeLaunchDescription(
                     PythonLaunchDescriptionSource(
@@ -147,7 +147,7 @@ def generate_launch_description():
 
         # 3. Launch Nav2 (delayed to let SLAM start publishing map)
         TimerAction(
-            period=30.0,
+            period=16.0,
             actions=[
                 IncludeLaunchDescription(
                     PythonLaunchDescriptionSource(
@@ -163,7 +163,7 @@ def generate_launch_description():
 
         # 4. Launch exploration (delayed to let Nav2 fully start)
         TimerAction(
-            period=45.0,
+            period=26.0,
             actions=[
                 IncludeLaunchDescription(
                     PythonLaunchDescriptionSource(

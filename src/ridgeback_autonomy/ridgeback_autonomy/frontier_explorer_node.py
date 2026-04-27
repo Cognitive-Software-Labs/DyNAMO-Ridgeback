@@ -20,6 +20,8 @@ from geometry_msgs.msg import PoseStamped, Point
 from nav2_msgs.action import NavigateToPose
 from tf2_ros import TransformListener, Buffer
 
+from visualization_msgs.msg import Marker, MarkerArray
+from std_msgs.msg import ColorRGBA
 from navigator import get_best_frontier, get_frontier_clusters, update_robot_awareness_from_costmap
 from path_finding import a_star
 from params import UNKNOWN, OBSTACLE, FREE
@@ -39,9 +41,15 @@ class FrontierExplorerNode(Node):
         self.declare_parameter('min_frontier_size', 6)
         self.declare_parameter('visualize', True)
         self.declare_parameter('lethal_cost_threshold', 80)
-        self.declare_parameter('goal_safety_margin', 8)
+        self.declare_parameter('goal_safety_margin', 3)
+        self.declare_parameter('goal_cost_threshold', 65)
+        self.declare_parameter('goal_advance_cells', 10)
+        self.declare_parameter('near_frontier_radius', 90)
         self.declare_parameter('startup_delay', 15.0)
         self.declare_parameter('abort_retry_delay', 5.0)
+        self.declare_parameter('abort_blacklist_threshold', 3)
+        self.declare_parameter('visited_goal_radius', 25)
+        self.declare_parameter('max_effective_frontier_size', 80)
         
         # Get parameters
         self.robot_base_frame = self.get_parameter('robot_base_frame').value
@@ -54,8 +62,14 @@ class FrontierExplorerNode(Node):
         self.visualize = self.get_parameter('visualize').value
         self.lethal_cost_threshold = self.get_parameter('lethal_cost_threshold').value
         self.goal_safety_margin = self.get_parameter('goal_safety_margin').value
+        self._goal_cost_threshold = self.get_parameter('goal_cost_threshold').value
+        self._goal_advance_cells = self.get_parameter('goal_advance_cells').value
+        self._near_frontier_radius = self.get_parameter('near_frontier_radius').value
         self._startup_delay = self.get_parameter('startup_delay').value
         self._abort_retry_delay = self.get_parameter('abort_retry_delay').value
+        self._abort_blacklist_threshold = self.get_parameter('abort_blacklist_threshold').value
+        self._visited_goal_radius = self.get_parameter('visited_goal_radius').value
+        self._max_effective_frontier_size = self.get_parameter('max_effective_frontier_size').value
         
         # TF2 setup
         self.tf_buffer = Buffer()
@@ -65,6 +79,11 @@ class FrontierExplorerNode(Node):
         callback_group_1 = MutuallyExclusiveCallbackGroup()
         callback_group_2 = MutuallyExclusiveCallbackGroup()
         
+        # Publisher for frontier visualization
+        self._frontier_pub = self.create_publisher(
+            MarkerArray, 'explore/frontiers', 10,
+            callback_group=callback_group_2)
+
         # Subscriber for costmap
         self.costmap_subscription = self.create_subscription(
             OccupancyGrid,
@@ -97,7 +116,8 @@ class FrontierExplorerNode(Node):
         self._retry_after_wall_time = 0.0
         # Blacklist: list of (grid_x, grid_y) of recently-reached goals to avoid re-picking
         self._visited_goals = []
-        self._visited_goal_radius = 20  # cells — don't re-pick within this radius
+        # Per-goal abort counter: dict of grid_pos -> abort count
+        self._abort_counts = {}
         
         self.get_logger().info(f'Frontier Explorer Node initialized')
         self.get_logger().info(f'  Robot Base Frame: {self.robot_base_frame}')
@@ -222,10 +242,10 @@ class FrontierExplorerNode(Node):
         x_max = min(w, gx + margin + 1)
         
         region = self.costmap_costs[y_min:y_max, x_min:x_max]
-        
-        # Check if any cell in the region has high cost (near obstacle)
-        # Use a lower threshold than lethal to ensure the robot's full footprint fits
-        if np.any(region >= self.lethal_cost_threshold):
+
+        # Use goal_cost_threshold (lower than lethal) so goals are placed well
+        # inside the navigable corridor, not in heavily-inflated zones near walls.
+        if np.any(region >= self._goal_cost_threshold):
             return False
         return True
 
@@ -238,13 +258,17 @@ class FrontierExplorerNode(Node):
 
     def select_new_frontier_goal(self, robot_pos):
         """Select a new frontier goal."""
-        best_frontier = self.find_safe_frontier(robot_pos)
-        
+        clusters = get_frontier_clusters(self.robot_awareness_map)
+        self._publish_frontier_markers(clusters, robot_pos)
+
+        best_frontier = self.find_safe_frontier(robot_pos, clusters)
+
         if best_frontier is None:
             if self._visited_goals:
                 self.get_logger().info('All frontiers blacklisted or blocked — clearing blacklist and retrying.')
                 self._visited_goals.clear()
-                best_frontier = self.find_safe_frontier(robot_pos)
+                self._abort_counts.clear()
+                best_frontier = self.find_safe_frontier(robot_pos, clusters)
             if best_frontier is None:
                 self.get_logger().info('No frontier found - exploration complete!')
                 return
@@ -261,60 +285,153 @@ class FrontierExplorerNode(Node):
         self.current_goal = best_frontier
         self.goal_start_time = self.get_clock().now()
     
-    def find_safe_frontier(self, robot_pos):
-        """Find the best safe, non-blacklisted frontier ranked by score."""
-        clusters = get_frontier_clusters(self.robot_awareness_map)
+    def _make_goal_for_cluster(self, cluster, robot_pos):
+        """Return the goal position for a cluster.
+
+        Advances PAST the frontier boundary away from the robot so the goal
+        lands inside the unexplored room/area rather than at the free/unknown
+        edge (which is flush against a wall).
+
+        Unknown cells have OccupancyGrid cost -1, which always passes
+        is_goal_safe(), and Nav2 plans through unknown space with
+        allow_unknown=true.
+        """
+        cx = np.mean([p[0] for p in cluster])
+        cy = np.mean([p[1] for p in cluster])
+        centroid_dist = np.sqrt((cx - robot_pos[0])**2 + (cy - robot_pos[1])**2)
+
+        if centroid_dist > 0:
+            # Direction FROM robot TOWARD the frontier (into the unknown region)
+            dx = (cx - robot_pos[0]) / centroid_dist
+            dy = (cy - robot_pos[1]) / centroid_dist
+            advance = self._goal_advance_cells
+            rx = int(round(cx + dx * advance))
+            ry = int(round(cy + dy * advance))
+            h, w = self.robot_awareness_map.shape
+            rx = max(0, min(rx, w - 1))
+            ry = max(0, min(ry, h - 1))
+            # Accept FREE or UNKNOWN — not OBSTACLE
+            if self.robot_awareness_map[ry, rx] != OBSTACLE:
+                return (rx, ry), centroid_dist
+
+        # Fallback: centroid-nearest frontier cell
+        target = min(cluster, key=lambda p: (p[0] - cx)**2 + (p[1] - cy)**2)
+        return target, centroid_dist
+
+    def find_safe_frontier(self, robot_pos, clusters=None):
+        """Find the best safe, non-blacklisted frontier.
+
+        Selection strategy (tier-based, closest-first):
+          Tier 1 — frontiers within near_frontier_radius cells: sorted by
+                    closest distance first (greedy local exploration).
+          Tier 2 — everything else: sorted by blended distance+size score.
+
+        This guarantees the robot clears its local neighbourhood before
+        committing to distant corridors, regardless of corridor size.
+        """
+        if clusters is None:
+            clusters = get_frontier_clusters(self.robot_awareness_map)
         if not clusters:
             return None
-        
-        # Score all clusters (same logic as get_best_frontier)
-        scored = []
+
+        near, far = [], []
+        cap = self._max_effective_frontier_size
+
         for cluster in clusters:
             if len(cluster) < self.min_frontier_size:
                 continue
-            cx = np.mean([p[0] for p in cluster])
-            cy = np.mean([p[1] for p in cluster])
-            target = min(cluster, key=lambda p: (p[0]-cx)**2 + (p[1]-cy)**2)
-            dist = np.sqrt((target[0] - robot_pos[0])**2 + (target[1] - robot_pos[1])**2)
-            scored.append((cluster, target, dist, len(cluster)))
-        
-        if not scored:
+            target, dist = self._make_goal_for_cluster(cluster, robot_pos)
+            entry = (cluster, target, dist, len(cluster))
+            if dist <= self._near_frontier_radius:
+                near.append(entry)
+            else:
+                far.append(entry)
+
+        if not near and not far:
             return None
-        
-        max_dist = max(s[2] for s in scored)
-        max_size = max(s[3] for s in scored)
-        
-        # Sort by score descending
-        def compute_score(item):
+
+        # Tier 1: nearest first, then biggest (greedy local exploration)
+        near.sort(key=lambda x: (x[2], -x[3]))
+
+        # Tier 2: blended distance+size for far frontiers
+        def far_score(item):
             _, _, dist, size = item
-            d_score = 1 - (dist / max_dist) if max_dist > 0 else 0
-            s_score = size / max_size if max_size > 0 else 0
+            d_score = np.exp(-dist / max(self._near_frontier_radius, 1))
+            s_score = min(size, cap) / cap
             return self.distance_weight * d_score + self.size_weight * s_score
-        
-        scored.sort(key=compute_score, reverse=True)
-        
-        for _, target, _, _ in scored:
+
+        far.sort(key=far_score, reverse=True)
+
+        candidates = near + far
+
+        for _, target, _, _ in candidates:
             if self._is_blacklisted(target):
                 continue
             if self.is_goal_safe(target):
                 return target
-        
-        # Fallback: return best safe goal even if blacklisted
-        for _, target, _, _ in scored:
+
+        # Fallback: best safe goal ignoring blacklist
+        for _, target, _, _ in candidates:
             if self.is_goal_safe(target):
                 return target
-        
+
         return None
     
+    def _cancel_current_goal(self):
+        """Cancel the active Nav2 goal, if any."""
+        if self._current_goal_handle is not None:
+            self._current_goal_handle.cancel_goal_async()
+            self._current_goal_handle = None
+
+    def _publish_frontier_markers(self, clusters, robot_pos):
+        """Publish frontier cluster centroids as spheres for RViz."""
+        if not self.visualize or self.current_costmap is None:
+            return
+        msg = MarkerArray()
+        now = self.get_clock().now().to_msg()
+        frame = self.current_costmap.header.frame_id
+        for i, cluster in enumerate(clusters):
+            if len(cluster) < self.min_frontier_size:
+                continue
+            cx, cy = self.grid_to_world((
+                int(np.mean([p[0] for p in cluster])),
+                int(np.mean([p[1] for p in cluster])),
+            ))
+            m = Marker()
+            m.header.frame_id = frame
+            m.header.stamp = now
+            m.ns = 'frontiers'
+            m.id = i
+            m.type = Marker.SPHERE
+            m.action = Marker.ADD
+            m.pose.position.x = cx
+            m.pose.position.y = cy
+            m.pose.position.z = 0.3
+            m.pose.orientation.w = 1.0
+            m.scale.x = m.scale.y = m.scale.z = 0.4
+            m.color = ColorRGBA(r=0.0, g=1.0, b=0.5, a=0.9)
+            m.lifetime.sec = 2
+            msg.markers.append(m)
+        # Delete stale markers with higher IDs
+        del_m = Marker()
+        del_m.action = Marker.DELETEALL
+        del_m.ns = 'frontiers'
+        if not msg.markers:
+            msg.markers.append(del_m)
+        self._frontier_pub.publish(msg)
+
     def check_goal_progress(self):
         """Check if goal is still valid or if we're stuck."""
         elapsed = (self.get_clock().now() - self.goal_start_time).nanoseconds / 1e9
-        
+
         if elapsed > self.progress_timeout:
             self.get_logger().warn(
                 f'Goal progress timeout ({elapsed:.1f}s > {self.progress_timeout}s). '
-                'Selecting new frontier.'
+                'Cancelling and selecting new frontier.'
             )
+            self._cancel_current_goal()
+            if self.current_goal is not None:
+                self._visited_goals.append(self.current_goal)
             self.current_goal = None
     
     def grid_to_world(self, grid_pos):
@@ -372,12 +489,21 @@ class FrontierExplorerNode(Node):
         status = future.result().status
         if status == GoalStatus.STATUS_SUCCEEDED:
             self.get_logger().info('Goal succeeded, selecting next frontier.')
-            # Blacklist this position so we don't immediately return to it
             if self.current_goal is not None:
                 self._visited_goals.append(self.current_goal)
+                self._abort_counts.pop(self.current_goal, None)
         else:
             self.get_logger().warn(f'Goal aborted/cancelled (status={status}), selecting new frontier.')
             self._retry_after_wall_time = _time.time() + self._abort_retry_delay
+            # Blacklist goals that keep failing so we don't oscillate on unreachable frontiers
+            if self.current_goal is not None:
+                key = self.current_goal
+                self._abort_counts[key] = self._abort_counts.get(key, 0) + 1
+                if self._abort_counts[key] >= self._abort_blacklist_threshold:
+                    self.get_logger().warn(
+                        f'Blacklisting goal {key} after {self._abort_counts[key]} aborts.')
+                    self._visited_goals.append(key)
+                    self._abort_counts.pop(key, None)
         self.current_goal = None
         self._current_goal_handle = None
 
