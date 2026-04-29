@@ -206,17 +206,28 @@ bash start_exploration.sh hospital
 ### `g1_distance_benchmark.launch.py`
 
 ```bash
-# Camera-stack benchmark (RGB / sensor depth / mono depth / pointcloud)
-ros2 launch ridgeback_autonomy g1_distance_benchmark.launch.py measurement_backend:=camera
+# Default run: compare all available estimators
+ros2 launch ridgeback_autonomy g1_distance_benchmark.launch.py
 
-# LiDAR benchmark
-ros2 launch ridgeback_autonomy g1_distance_benchmark.launch.py measurement_backend:=lidar
+# RGB only
+ros2 launch ridgeback_autonomy g1_distance_benchmark.launch.py estimators:=rgb
 
-# Camera backend scored on pointcloud instead of RGB depth
-ros2 launch ridgeback_autonomy g1_distance_benchmark.launch.py measurement_backend:=camera primary_metric:=pointcloud
+# RGB + point cloud
+ros2 launch ridgeback_autonomy g1_distance_benchmark.launch.py estimators:=rgb,pointcloud
+
+# LiDAR only
+ros2 launch ridgeback_autonomy g1_distance_benchmark.launch.py estimators:=lidar
+
+# Mixed camera + LiDAR comparison
+ros2 launch ridgeback_autonomy g1_distance_benchmark.launch.py estimators:=rgb,lidar
 ```
 
-This launch composes the simulator, `g1_detector_node`, one selected measurement node, and `g1_distance_benchmark_runner`.
+This launch composes the simulator, `g1_detector_node`, the camera measurement node and/or the LiDAR measurement node depending on `estimators`, and `g1_distance_benchmark_runner`.
+
+Each benchmark run writes under `/tmp/g1_distance_benchmark_runs/<timestamp>/` by default:
+- one trial-level CSV per selected estimator
+- one `comparison_summary.csv`
+- one shared collage image per included trial under `images/`
 
 Arguments:
 
@@ -226,30 +237,33 @@ Arguments:
 | `use_sim_time` | `true` | Use Gazebo `/clock` |
 | `setup_path` | `~/clearpath/` | Directory containing `robot.yaml` and generated Clearpath files |
 | `world` | `g1_distance_calibration` | Gazebo world used for the benchmark run |
-| `measurement_backend` | `camera` | Measurement node to launch: `camera` or `lidar` |
-| `primary_metric` | `auto` | Metric column to score; defaults from the selected backend |
+| `estimators` | `rgb,sensor_depth,depth_anything,pointcloud,lidar` | Comma-separated estimator subset to compare in one run |
 | `repeats` | `5` | Number of positive-trial repeats per spawn pose |
-| `output_csv` | empty | Optional CSV path override; defaults from the selected backend |
+| `output_dir` | `/tmp/g1_distance_benchmark_runs` | Root directory that will receive one timestamped subfolder per run |
 | `settle_sec` | `2.0` | Delay after spawning the target before sampling |
-| `capture_sec` | `3.0` | Sampling window length |
-| `depth_anything_enabled` | `false` | Enable the optional mono-depth branch when `measurement_backend:=camera` |
+| `capture_sec` | `10.0` | Sampling window length for collecting usable detections |
 | `color_topic` | `sensors/camera_0/color/image` | RGB topic used by the detector, camera measurement node, and benchmark snapshots |
-| `depth_topic` | `sensors/camera_0/depth/image` | Depth topic used by the camera measurement node |
+| `depth_topic` | `sensors/camera_0/depth/image` | Depth topic used by the camera measurement node and benchmark collages |
 | `pointcloud_topic` | `sensors/camera_0/points` | Camera-aligned point cloud used by the camera measurement node |
 | `scan_topic` | `sensors/lidar2d_0/scan` | LaserScan topic used by the LiDAR measurement node |
 | `base_frame` | `<namespace>/robot/base_link` | Vehicle frame used for point-cloud and LiDAR projection |
-| `failed_frame_dir` | empty | Optional override for saved failed-frame directory |
-| `save_failed_frames` | `true` | Save annotated RGB frames for missed/ambiguous positive trials |
+
+Benchmark semantics:
+- only positive spawned-target trials are kept
+- only successful single-target detections are used
+- a trial is included only if every selected estimator has a usable aligned event
+- each estimator CSV stores one row per included trial, using the median estimate over that trial’s aligned usable detections
+- the shared collage image for each trial is built from one representative aligned detection event that is closest to the per-trial medians across the selected estimators
 
 ### Perception interfaces
 
 | Node | Output topic | Key params |
 |------|--------------|------------|
 | `g1_detector_node` | `detections/g1/raw` | `color_topic`, `detection_model`, `detection_threshold` |
-| `g1_camera_measurement_node` | `measurements/g1/camera` | `camera_config_path`, `color_topic`, `depth_topic`, `pointcloud_topic`, `base_frame`, `depth_anything_enabled` |
+| `g1_camera_measurement_node` | `measurements/g1/camera` | `camera_config_path`, `color_topic`, `depth_topic`, `pointcloud_topic`, `base_frame`, `enabled_estimators`, `depth_anything_enabled` |
 | `g1_lidar_measurement_node` | `measurements/g1/lidar` | `camera_config_path`, `scan_topic`, `base_frame` |
 | `g1_overlay_node` | OpenCV window only | `measurement_topic`, `color_topic`, `depth_topic`, `mono_depth_debug_topic` |
-| `g1_distance_benchmark_runner` | CSV + optional failed frames | `measurement_topic`, `primary_metric`, `color_topic`, `output_csv` |
+| `g1_distance_benchmark_runner` | per-estimator CSVs + summary CSV + trial collage images | `estimators`, `output_dir`, `camera_measurement_topic`, `lidar_measurement_topic`, `color_topic`, `depth_topic` |
 
 The shared camera geometry lives in `config/camera_config.json`, and the measurement nodes use the `camera_config_path` parameter.
 

@@ -51,3 +51,18 @@ def test_benchmark_default_world_is_allowed_by_clearpath_simulation() -> None:
 
     assert "DeclareLaunchArgument('world', default_value='g1_distance_calibration')" in benchmark_text
     assert "'g1_distance_calibration'" in clearpath_simulation_text
+
+
+def test_benchmark_launch_uses_new_multi_estimator_interface() -> None:
+    repo_root = Path(__file__).resolve().parents[3]
+    benchmark_text = (
+        repo_root / 'src' / 'ridgeback_autonomy' / 'launch' / 'g1_distance_benchmark.launch.py'
+    ).read_text(encoding='utf-8')
+
+    assert "'estimators'" in benchmark_text
+    assert "'output_dir'" in benchmark_text
+    assert 'rgb,sensor_depth,depth_anything,pointcloud,lidar' in benchmark_text
+    assert 'measurement_backend' not in benchmark_text
+    assert 'primary_metric' not in benchmark_text
+    assert "DeclareLaunchArgument('depth_anything_enabled'" not in benchmark_text
+    assert "DeclareLaunchArgument('output_csv'" not in benchmark_text

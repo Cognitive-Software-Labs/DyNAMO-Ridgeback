@@ -23,6 +23,7 @@ from ridgeback_autonomy.common.messages import (
 )
 from ridgeback_autonomy.common.tf_utils import lookup_transform_components
 from ridgeback_autonomy.msg import G1Detections, G1Measurements
+from ridgeback_autonomy.benchmarking.estimators import parse_estimators
 from ridgeback_autonomy.perception.core.depth_anything import (
     DEPTH_ANYTHING_ENABLED_DEFAULT,
     DEPTH_ANYTHING_MODEL_ID_DEFAULT,
@@ -66,6 +67,7 @@ class G1CameraMeasurementNode(Node):
         self.declare_parameter('pointcloud_topic', 'sensors/camera_0/points')
         self.declare_parameter('base_frame', default_base_frame)
         self.declare_parameter('depth_max_meters', DEPTH_MAX_METERS_DEFAULT)
+        self.declare_parameter('enabled_estimators', 'all')
         self.declare_parameter('depth_anything_enabled', DEPTH_ANYTHING_ENABLED_DEFAULT)
         self.declare_parameter('depth_anything_model_id', DEPTH_ANYTHING_MODEL_ID_DEFAULT)
         self.declare_parameter('depth_anything_device', default_depth_anything_device)
@@ -79,6 +81,7 @@ class G1CameraMeasurementNode(Node):
         self.pointcloud_topic = self.get_parameter('pointcloud_topic').value
         self.base_frame = self.get_parameter('base_frame').value or default_base_frame
         self.depth_max_meters = float(self.get_parameter('depth_max_meters').value)
+        self.enabled_estimators = parse_estimators(self.get_parameter('enabled_estimators').value)
         self.depth_anything_enabled = bool(self.get_parameter('depth_anything_enabled').value)
         self.depth_anything_model_id = self.get_parameter('depth_anything_model_id').value
         self.depth_anything_device = self.get_parameter('depth_anything_device').value
@@ -305,7 +308,12 @@ class G1CameraMeasurementNode(Node):
         mono_depth_debug = blank_depth
         mono_depth_measurements = None
 
-        if self.depth_anything_enabled and batch.detected and color_msg is not None:
+        if (
+            self.depth_anything_enabled
+            and 'depth_anything' in self.enabled_estimators
+            and batch.detected
+            and color_msg is not None
+        ):
             try:
                 frame = convert_color_image_message(color_msg)
                 self.last_color_warning = None
@@ -323,37 +331,43 @@ class G1CameraMeasurementNode(Node):
                     mono_depth_debug = mono_depth_predicted
                     mono_depth_measurements = mono_depth_predicted
 
-        add_rgb_measurements(batch, self.camera_config)
-        add_depth_measurements(
-            batch,
-            self.camera_config,
-            self.depth_max_meters,
-            depth_meters,
-            mono_depth_measurements,
-        )
+        if 'rgb' in self.enabled_estimators:
+            add_rgb_measurements(batch, self.camera_config)
 
-        pointcloud_shape_matches = (
-            pointcloud_xyz is not None
-            and pointcloud_xyz.shape[:2] == (batch.image_height, batch.image_width)
-        )
-        if pointcloud_shape_matches:
-            self.last_pointcloud_shape_warning = None
-            add_pointcloud_measurements(
+        if 'sensor_depth' in self.enabled_estimators or 'depth_anything' in self.enabled_estimators:
+            add_depth_measurements(
                 batch,
-                pointcloud_xyz,
-                pointcloud_rotation,
-                pointcloud_translation,
+                self.camera_config,
+                self.depth_max_meters,
+                depth_meters if 'sensor_depth' in self.enabled_estimators else None,
+                mono_depth_measurements if 'depth_anything' in self.enabled_estimators else None,
             )
-        elif pointcloud_xyz is not None and pointcloud_xyz.shape[:2] != (batch.image_height, batch.image_width):
-            self.log_warning_once(
-                'last_pointcloud_shape_warning',
-                'Point cloud shape does not match detection image '
-                f'({pointcloud_xyz.shape[1]}x{pointcloud_xyz.shape[0]} vs '
-                f'{batch.image_width}x{batch.image_height}).',
-            )
+
+        if 'pointcloud' not in self.enabled_estimators:
             add_pointcloud_measurements(batch, None, None, None)
         else:
-            add_pointcloud_measurements(batch, None, None, None)
+            pointcloud_shape_matches = (
+                pointcloud_xyz is not None
+                and pointcloud_xyz.shape[:2] == (batch.image_height, batch.image_width)
+            )
+            if pointcloud_shape_matches:
+                self.last_pointcloud_shape_warning = None
+                add_pointcloud_measurements(
+                    batch,
+                    pointcloud_xyz,
+                    pointcloud_rotation,
+                    pointcloud_translation,
+                )
+            elif pointcloud_xyz is not None and pointcloud_xyz.shape[:2] != (batch.image_height, batch.image_width):
+                self.log_warning_once(
+                    'last_pointcloud_shape_warning',
+                    'Point cloud shape does not match detection image '
+                    f'({pointcloud_xyz.shape[1]}x{pointcloud_xyz.shape[0]} vs '
+                    f'{batch.image_width}x{batch.image_height}).',
+                )
+                add_pointcloud_measurements(batch, None, None, None)
+            else:
+                add_pointcloud_measurements(batch, None, None, None)
 
         self.measurement_pub.publish(build_measurements_message(batch, detections_msg.header))
         self.mono_depth_pub.publish(build_float32_image_message(mono_depth_debug, detections_msg.header))
