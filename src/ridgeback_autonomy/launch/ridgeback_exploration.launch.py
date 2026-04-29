@@ -18,6 +18,7 @@ def generate_launch_description():
     workspace_root = os.path.abspath(os.path.join(pkg_this, '..', '..', '..', '..'))
     perception_venv_path = os.path.join(workspace_root, 'perception_venv')
     perception_venv_bin = os.path.join(perception_venv_path, 'bin')
+    fastrtps_profile_abs = os.path.join(workspace_root, 'fastrtps_no_shm.xml')
 
     namespace = LaunchConfiguration('namespace')
     use_sim_time = LaunchConfiguration('use_sim_time')
@@ -33,6 +34,7 @@ def generate_launch_description():
     rviz_config = os.path.join(pkg_this, 'sim', 'rviz', 'exploration.rviz')
 
     return LaunchDescription([
+        SetEnvironmentVariable('FASTRTPS_DEFAULT_PROFILES_FILE', fastrtps_profile_abs),
         SetEnvironmentVariable('VIRTUAL_ENV', perception_venv_path),
         SetEnvironmentVariable(
             'PATH',
@@ -147,7 +149,7 @@ def generate_launch_description():
 
         # 3. Launch Nav2 (delayed to let SLAM start publishing map)
         TimerAction(
-            period=30.0,
+            period=65.0,
             actions=[
                 IncludeLaunchDescription(
                     PythonLaunchDescriptionSource(
@@ -163,7 +165,7 @@ def generate_launch_description():
 
         # 4. Launch exploration (delayed to let Nav2 fully start)
         TimerAction(
-            period=45.0,
+            period=80.0,
             actions=[
                 IncludeLaunchDescription(
                     PythonLaunchDescriptionSource(
