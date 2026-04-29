@@ -26,7 +26,7 @@ Important naming note:
 
 Main entrypoint:
 
-- [src/ridgeback_autonomy/launch/g1_distance_benchmark.launch.py](/home/czika-stefania/Documents/DyNAMO/Code/DyNAMO-Ridgeback/src/ridgeback_autonomy/launch/g1_distance_benchmark.launch.py:1)
+- [src/ridgeback_autonomy/launch/g1_distance_benchmark.launch.py](src/ridgeback_autonomy/launch/g1_distance_benchmark.launch.py)
 
 Typical usage:
 
@@ -155,14 +155,14 @@ Every panel shows:
 
 ## Main Implementation Files
 
-- [src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py](/home/czika-stefania/Documents/DyNAMO/Code/DyNAMO-Ridgeback/src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py:1)
-- [src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/estimators.py](/home/czika-stefania/Documents/DyNAMO/Code/DyNAMO-Ridgeback/src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/estimators.py:1)
-- [src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/alignment.py](/home/czika-stefania/Documents/DyNAMO/Code/DyNAMO-Ridgeback/src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/alignment.py:1)
-- [src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/reduction.py](/home/czika-stefania/Documents/DyNAMO/Code/DyNAMO-Ridgeback/src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/reduction.py:1)
-- [src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/rendering.py](/home/czika-stefania/Documents/DyNAMO/Code/DyNAMO-Ridgeback/src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/rendering.py:1)
-- [src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/summary.py](/home/czika-stefania/Documents/DyNAMO/Code/DyNAMO-Ridgeback/src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/summary.py:1)
-- [src/ridgeback_autonomy/ridgeback_autonomy/perception/g1_camera_measurement_node.py](/home/czika-stefania/Documents/DyNAMO/Code/DyNAMO-Ridgeback/src/ridgeback_autonomy/ridgeback_autonomy/perception/g1_camera_measurement_node.py:1)
-- [src/ridgeback_autonomy/ridgeback_autonomy/perception/g1_lidar_measurement_node.py](/home/czika-stefania/Documents/DyNAMO/Code/DyNAMO-Ridgeback/src/ridgeback_autonomy/ridgeback_autonomy/perception/g1_lidar_measurement_node.py:1)
+- [src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py](src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py)
+- [src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/estimators.py](src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/estimators.py)
+- [src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/alignment.py](src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/alignment.py)
+- [src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/reduction.py](src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/reduction.py)
+- [src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/rendering.py](src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/rendering.py)
+- [src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/summary.py](src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/summary.py)
+- [src/ridgeback_autonomy/ridgeback_autonomy/perception/g1_camera_measurement_node.py](src/ridgeback_autonomy/ridgeback_autonomy/perception/g1_camera_measurement_node.py)
+- [src/ridgeback_autonomy/ridgeback_autonomy/perception/g1_lidar_measurement_node.py](src/ridgeback_autonomy/ridgeback_autonomy/perception/g1_lidar_measurement_node.py)
 
 ## Practical Notes
 
