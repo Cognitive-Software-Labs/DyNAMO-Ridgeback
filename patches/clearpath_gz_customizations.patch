@@ -94,7 +94,7 @@ index 69135ab..38589ce 100644
 @@ -84,13 +84,24 @@ def generate_launch_description():
      packages_paths = [os.path.join(p, 'share') for p in os.getenv('AMENT_PREFIX_PATH').split(':')]
  
-    # Set ignition resource path to include all sourced ros packages
+     # Set ignition resource path to include all sourced ros packages
 +    # Also include ridgeback_autonomy simulation worlds and models
 +    pkg_this_exploration = get_package_share_directory('ridgeback_autonomy')
      gz_sim_resource_path = SetEnvironmentVariable(
@@ -128,12 +128,12 @@ diff --git a/clearpath_gz/launch/simulation.launch.py b/clearpath_gz/launch/simu
 index 010f7fb..355e8b1 100644
 --- a/clearpath_gz/launch/simulation.launch.py
 +++ b/clearpath_gz/launch/simulation.launch.py
-@@ -29,6 +29,7 @@ ARGUMENTS = [
+@@ -29,6 +29,8 @@ ARGUMENTS = [
      DeclareLaunchArgument('world', default_value='warehouse',
                            choices=[
                                'construction',
 +                              'hospital',
-                               'g1_distance_calibration',
++                              'g1_distance_calibration',
                                'office',
                                'orchard',
                                'pipeline',
