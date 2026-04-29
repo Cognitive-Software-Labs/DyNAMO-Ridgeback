@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections import OrderedDict
+import json
 import math
 import os
 import subprocess
@@ -68,6 +69,23 @@ LIDAR_MEASUREMENT_TOPIC = 'measurements/g1/lidar'
 MONO_DEPTH_DEBUG_TOPIC = 'debug/g1/camera/mono_depth'
 DEPTH_MAX_METERS_DEFAULT = 10.0
 PREVIEW_BUFFER_LIMIT = 256
+
+
+def extract_json_payload(text: str) -> dict[str, Any]:
+    decoder = json.JSONDecoder()
+    search_from = 0
+    while True:
+        start = text.find('{', search_from)
+        if start == -1:
+            raise RuntimeError(f'Failed to parse Gazebo JSON payload: {text.strip()}')
+        try:
+            payload, _ = decoder.raw_decode(text[start:])
+        except json.JSONDecodeError:
+            search_from = start + 1
+            continue
+        if isinstance(payload, dict):
+            return payload
+        search_from = start + 1
 
 
 class G1DistanceBenchmarkRunner(Node):
@@ -648,13 +666,7 @@ class G1DistanceBenchmarkRunner(Node):
         }
 
     def extract_json_payload(self, text: str) -> dict[str, Any]:
-        start = text.find('{')
-        end = text.rfind('}')
-        if start == -1 or end == -1 or end <= start:
-            raise RuntimeError(f'Failed to parse Gazebo JSON payload: {text.strip()}')
-        import json
-
-        return json.loads(text[start:end + 1])
+        return extract_json_payload(text)
 
     def run_command(
         self,

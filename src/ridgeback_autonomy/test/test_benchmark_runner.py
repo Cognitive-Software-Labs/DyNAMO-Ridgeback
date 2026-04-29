@@ -12,6 +12,7 @@ from ridgeback_autonomy.benchmarking.alignment import (
     update_measurement_event,
 )
 from ridgeback_autonomy.benchmarking.estimators import parse_estimators
+from ridgeback_autonomy.benchmarking.g1_distance_benchmark_runner_node import extract_json_payload
 from ridgeback_autonomy.benchmarking.reduction import (
     choose_representative_event,
     compute_trial_medians,
@@ -29,6 +30,16 @@ def test_parse_estimators_uses_canonical_order_and_depth_anything_name() -> None
     assert parse_estimators('pointcloud,rgb') == ('rgb', 'pointcloud')
     with pytest.raises(ValueError, match='depth_anything'):
         parse_estimators('mono_depth')
+
+
+def test_extract_json_payload_accepts_multiple_gz_json_messages() -> None:
+    payload = extract_json_payload(
+        'noise before\n'
+        '{"pose":[{"name":"first","position":{"x":1}}]}\n'
+        '{"pose":[{"name":"second","position":{"x":2}}]}\n'
+    )
+
+    assert payload == {'pose': [{'name': 'first', 'position': {'x': 1}}]}
 
 
 def test_alignment_updates_public_depth_anything_value_from_message_field() -> None:
