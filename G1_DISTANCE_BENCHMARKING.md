@@ -84,17 +84,19 @@ This keeps the benchmark focused on distance quality once the shared detector ha
 
 Default output root:
 
-- `/tmp/g1_distance_benchmark_runs`
+- `<repo-root>/benchmark-results`
 
 Each run creates:
 
-- `/tmp/g1_distance_benchmark_runs/<timestamp>/`
+- `<repo-root>/benchmark-results/<timestamp>/`
 
 Inside that run folder:
 
 - `<estimator>.csv` for each selected estimator
 - `comparison_summary.csv`
 - `images/<trial_id>.png`
+
+Pass `output_dir:=...` to the launch file to write the timestamped run folder somewhere else.
 
 Each estimator CSV is trial-level only:
 

@@ -136,6 +136,7 @@ def generate_launch_description():
     workspace_root = os.path.abspath(os.path.join(pkg_this, '..', '..', '..', '..'))
     perception_venv_path = os.path.join(workspace_root, 'perception_venv')
     perception_venv_bin = os.path.join(perception_venv_path, 'bin')
+    benchmark_output_dir = os.path.join(workspace_root, 'benchmark-results')
 
     namespace = LaunchConfiguration('namespace')
     setup_path = LaunchConfiguration('setup_path')
@@ -159,7 +160,7 @@ def generate_launch_description():
         DeclareLaunchArgument('repeats', default_value='5'),
         DeclareLaunchArgument(
             'output_dir',
-            default_value='/tmp/g1_distance_benchmark_runs',
+            default_value=benchmark_output_dir,
         ),
         DeclareLaunchArgument('settle_sec', default_value='2.0'),
         DeclareLaunchArgument('capture_sec', default_value='10.0'),

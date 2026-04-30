@@ -45,7 +45,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/common/tf_utils.py",
       "source_location": "L1",
       "id": "src_ridgeback_autonomy_ridgeback_autonomy_common_tf_utils_py",
-      "community": 7,
+      "community": 8,
       "norm_label": "tf_utils.py"
     },
     {
@@ -54,7 +54,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/common/tf_utils.py",
       "source_location": "L11",
       "id": "common_tf_utils_candidate_base_frames",
-      "community": 7,
+      "community": 8,
       "norm_label": "candidate_base_frames()"
     },
     {
@@ -63,7 +63,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/common/tf_utils.py",
       "source_location": "L19",
       "id": "common_tf_utils_rotation_matrix_from_quaternion",
-      "community": 7,
+      "community": 8,
       "norm_label": "rotation_matrix_from_quaternion()"
     },
     {
@@ -72,7 +72,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/common/tf_utils.py",
       "source_location": "L31",
       "id": "common_tf_utils_lookup_transform_components",
-      "community": 7,
+      "community": 8,
       "norm_label": "lookup_transform_components()"
     },
     {
@@ -90,7 +90,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/common/camera_config.py",
       "source_location": "L1",
       "id": "src_ridgeback_autonomy_ridgeback_autonomy_common_camera_config_py",
-      "community": 3,
+      "community": 5,
       "norm_label": "camera_config.py"
     },
     {
@@ -99,7 +99,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/common/camera_config.py",
       "source_location": "L17",
       "id": "common_camera_config_load_camera_config",
-      "community": 3,
+      "community": 5,
       "norm_label": "load_camera_config()"
     },
     {
@@ -108,7 +108,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/common/models.py",
       "source_location": "L1",
       "id": "src_ridgeback_autonomy_ridgeback_autonomy_common_models_py",
-      "community": 5,
+      "community": 3,
       "norm_label": "models.py"
     },
     {
@@ -126,7 +126,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/common/models.py",
       "source_location": "L17",
       "id": "common_models_detection",
-      "community": 5,
+      "community": 3,
       "norm_label": "detection"
     },
     {
@@ -135,7 +135,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/common/models.py",
       "source_location": "L36",
       "id": "common_models_detectionbatch",
-      "community": 5,
+      "community": 3,
       "norm_label": "detectionbatch"
     },
     {
@@ -144,7 +144,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/common/models.py",
       "source_location": "L42",
       "id": "common_models_count",
-      "community": 5,
+      "community": 3,
       "norm_label": "count()"
     },
     {
@@ -153,7 +153,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/common/models.py",
       "source_location": "L46",
       "id": "common_models_detected",
-      "community": 5,
+      "community": 3,
       "norm_label": "detected()"
     },
     {
@@ -162,7 +162,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/common/models.py",
       "source_location": "L51",
       "id": "common_models_lidarscanpoints",
-      "community": 3,
+      "community": 2,
       "norm_label": "lidarscanpoints"
     },
     {
@@ -171,7 +171,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/common/messages.py",
       "source_location": "L1",
       "id": "src_ridgeback_autonomy_ridgeback_autonomy_common_messages_py",
-      "community": 5,
+      "community": 3,
       "norm_label": "messages.py"
     },
     {
@@ -180,7 +180,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/common/messages.py",
       "source_location": "L16",
       "id": "common_messages_optional_float",
-      "community": 5,
+      "community": 3,
       "norm_label": "optional_float()"
     },
     {
@@ -189,7 +189,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/common/messages.py",
       "source_location": "L20",
       "id": "common_messages_build_detections_message",
-      "community": 5,
+      "community": 3,
       "norm_label": "build_detections_message()"
     },
     {
@@ -198,7 +198,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/common/messages.py",
       "source_location": "L26",
       "id": "common_messages_build_measurements_message",
-      "community": 5,
+      "community": 3,
       "norm_label": "build_measurements_message()"
     },
     {
@@ -207,7 +207,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/common/messages.py",
       "source_location": "L46",
       "id": "common_messages_batch_from_detections_message",
-      "community": 5,
+      "community": 3,
       "norm_label": "batch_from_detections_message()"
     },
     {
@@ -216,7 +216,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/common/messages.py",
       "source_location": "L63",
       "id": "common_messages_batch_from_measurements_message",
-      "community": 5,
+      "community": 3,
       "norm_label": "batch_from_measurements_message()"
     },
     {
@@ -225,7 +225,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/common/messages.py",
       "source_location": "L82",
       "id": "common_messages_first_finite_positive",
-      "community": 5,
+      "community": 3,
       "norm_label": "first_finite_positive()"
     },
     {
@@ -234,7 +234,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/common/messages.py",
       "source_location": "L90",
       "id": "common_messages_decode_bbox_quads",
-      "community": 1,
+      "community": 3,
       "norm_label": "decode_bbox_quads()"
     },
     {
@@ -243,7 +243,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/common/messages.py",
       "source_location": "L103",
       "id": "common_messages_snapshot_measurements_message",
-      "community": 5,
+      "community": 3,
       "norm_label": "snapshot_measurements_message()"
     },
     {
@@ -252,7 +252,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/common/messages.py",
       "source_location": "L116",
       "id": "common_messages_build_float32_image_message",
-      "community": 4,
+      "community": 2,
       "norm_label": "build_float32_image_message()"
     },
     {
@@ -261,7 +261,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/common/messages.py",
       "source_location": "L129",
       "id": "common_messages_populate_identity_fields",
-      "community": 5,
+      "community": 3,
       "norm_label": "_populate_identity_fields()"
     },
     {
@@ -270,7 +270,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/common/messages.py",
       "source_location": "L143",
       "id": "common_messages_decode_optional_float",
-      "community": 5,
+      "community": 3,
       "norm_label": "decode_optional_float()"
     },
     {
@@ -306,7 +306,7 @@
       "source_file": "",
       "source_location": "",
       "id": "node",
-      "community": 8,
+      "community": 7,
       "norm_label": "node"
     },
     {
@@ -315,32 +315,32 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
       "source_location": "L92",
       "id": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_init",
-      "community": 8,
+      "community": 7,
       "norm_label": ".__init__()"
     },
     {
       "label": ".on_camera_measurement()",
       "file_type": "code",
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L201",
+      "source_location": "L203",
       "id": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_on_camera_measurement",
-      "community": 1,
+      "community": 0,
       "norm_label": ".on_camera_measurement()"
     },
     {
       "label": ".on_lidar_measurement()",
       "file_type": "code",
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L210",
+      "source_location": "L212",
       "id": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_on_lidar_measurement",
-      "community": 1,
+      "community": 0,
       "norm_label": ".on_lidar_measurement()"
     },
     {
       "label": ".on_color_image()",
       "file_type": "code",
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L219",
+      "source_location": "L221",
       "id": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_on_color_image",
       "community": 0,
       "norm_label": ".on_color_image()"
@@ -349,7 +349,7 @@
       "label": ".on_depth_image()",
       "file_type": "code",
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L238",
+      "source_location": "L240",
       "id": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_on_depth_image",
       "community": 0,
       "norm_label": ".on_depth_image()"
@@ -358,7 +358,7 @@
       "label": ".on_depth_anything_image()",
       "file_type": "code",
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L257",
+      "source_location": "L259",
       "id": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_on_depth_anything_image",
       "community": 0,
       "norm_label": ".on_depth_anything_image()"
@@ -367,7 +367,7 @@
       "label": ".run()",
       "file_type": "code",
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L276",
+      "source_location": "L278",
       "id": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_run",
       "community": 0,
       "norm_label": ".run()"
@@ -376,7 +376,7 @@
       "label": ".build_trials()",
       "file_type": "code",
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L308",
+      "source_location": "L310",
       "id": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_build_trials",
       "community": 0,
       "norm_label": ".build_trials()"
@@ -385,7 +385,7 @@
       "label": ".run_trial()",
       "file_type": "code",
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L321",
+      "source_location": "L323",
       "id": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_run_trial",
       "community": 0,
       "norm_label": ".run_trial()"
@@ -394,7 +394,7 @@
       "label": ".capture_measurement_window()",
       "file_type": "code",
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L392",
+      "source_location": "L394",
       "id": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_capture_measurement_window",
       "community": 0,
       "norm_label": ".capture_measurement_window()"
@@ -403,7 +403,7 @@
       "label": ".save_trial_collage()",
       "file_type": "code",
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L407",
+      "source_location": "L409",
       "id": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_save_trial_collage",
       "community": 0,
       "norm_label": ".save_trial_collage()"
@@ -412,7 +412,7 @@
       "label": ".clear_preview_buffers()",
       "file_type": "code",
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L426",
+      "source_location": "L428",
       "id": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_clear_preview_buffers",
       "community": 0,
       "norm_label": ".clear_preview_buffers()"
@@ -421,7 +421,7 @@
       "label": ".store_buffered_preview()",
       "file_type": "code",
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L431",
+      "source_location": "L433",
       "id": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_store_buffered_preview",
       "community": 0,
       "norm_label": ".store_buffered_preview()"
@@ -430,7 +430,7 @@
       "label": ".backfill_previews_from_buffers()",
       "file_type": "code",
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L442",
+      "source_location": "L444",
       "id": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_backfill_previews_from_buffers",
       "community": 0,
       "norm_label": ".backfill_previews_from_buffers()"
@@ -439,25 +439,25 @@
       "label": ".attach_buffered_previews()",
       "file_type": "code",
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L449",
+      "source_location": "L451",
       "id": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_attach_buffered_previews",
-      "community": 1,
+      "community": 0,
       "norm_label": ".attach_buffered_previews()"
     },
     {
       "label": ".apply_preview_match()",
       "file_type": "code",
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L474",
+      "source_location": "L476",
       "id": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_apply_preview_match",
-      "community": 1,
+      "community": 0,
       "norm_label": ".apply_preview_match()"
     },
     {
       "label": ".wait_for_required_streams()",
       "file_type": "code",
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L492",
+      "source_location": "L494",
       "id": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_wait_for_required_streams",
       "community": 0,
       "norm_label": ".wait_for_required_streams()"
@@ -466,7 +466,7 @@
       "label": ".wait_for_flag()",
       "file_type": "code",
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L519",
+      "source_location": "L521",
       "id": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_wait_for_flag",
       "community": 0,
       "norm_label": ".wait_for_flag()"
@@ -475,7 +475,7 @@
       "label": ".wait_for_entity_pose()",
       "file_type": "code",
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L528",
+      "source_location": "L530",
       "id": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_wait_for_entity_pose",
       "community": 0,
       "norm_label": ".wait_for_entity_pose()"
@@ -484,7 +484,7 @@
       "label": ".compute_ground_truth()",
       "file_type": "code",
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L542",
+      "source_location": "L544",
       "id": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_compute_ground_truth",
       "community": 0,
       "norm_label": ".compute_ground_truth()"
@@ -493,7 +493,7 @@
       "label": ".spawn_g1()",
       "file_type": "code",
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L571",
+      "source_location": "L573",
       "id": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_spawn_g1",
       "community": 0,
       "norm_label": ".spawn_g1()"
@@ -502,7 +502,7 @@
       "label": ".delete_g1()",
       "file_type": "code",
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L597",
+      "source_location": "L599",
       "id": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_delete_g1",
       "community": 0,
       "norm_label": ".delete_g1()"
@@ -511,7 +511,7 @@
       "label": ".get_pose_snapshot()",
       "file_type": "code",
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L628",
+      "source_location": "L630",
       "id": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_get_pose_snapshot",
       "community": 0,
       "norm_label": ".get_pose_snapshot()"
@@ -520,7 +520,7 @@
       "label": ".normalize_pose()",
       "file_type": "code",
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L650",
+      "source_location": "L652",
       "id": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_normalize_pose",
       "community": 0,
       "norm_label": ".normalize_pose()"
@@ -529,7 +529,7 @@
       "label": ".extract_json_payload()",
       "file_type": "code",
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L668",
+      "source_location": "L670",
       "id": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_extract_json_payload",
       "community": 0,
       "norm_label": ".extract_json_payload()"
@@ -538,7 +538,7 @@
       "label": ".run_command()",
       "file_type": "code",
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L671",
+      "source_location": "L673",
       "id": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_run_command",
       "community": 0,
       "norm_label": ".run_command()"
@@ -547,7 +547,7 @@
       "label": ".try_command()",
       "file_type": "code",
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L687",
+      "source_location": "L689",
       "id": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_try_command",
       "community": 0,
       "norm_label": ".try_command()"
@@ -556,7 +556,7 @@
       "label": ".resolved_topic()",
       "file_type": "code",
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L701",
+      "source_location": "L703",
       "id": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_resolved_topic",
       "community": 0,
       "norm_label": ".resolved_topic()"
@@ -565,7 +565,7 @@
       "label": ".spin_for()",
       "file_type": "code",
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L708",
+      "source_location": "L710",
       "id": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_spin_for",
       "community": 0,
       "norm_label": ".spin_for()"
@@ -574,7 +574,7 @@
       "label": ".log_warning_once()",
       "file_type": "code",
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L716",
+      "source_location": "L718",
       "id": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_log_warning_once",
       "community": 0,
       "norm_label": ".log_warning_once()"
@@ -583,7 +583,7 @@
       "label": ".log_trial()",
       "file_type": "code",
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L722",
+      "source_location": "L724",
       "id": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_log_trial",
       "community": 0,
       "norm_label": ".log_trial()"
@@ -592,7 +592,7 @@
       "label": ".log_summary()",
       "file_type": "code",
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L740",
+      "source_location": "L742",
       "id": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_log_summary",
       "community": 0,
       "norm_label": ".log_summary()"
@@ -601,7 +601,7 @@
       "label": "main()",
       "file_type": "code",
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L763",
+      "source_location": "L765",
       "id": "benchmarking_g1_distance_benchmark_runner_node_main",
       "community": 0,
       "norm_label": "main()"
@@ -612,7 +612,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/rendering.py",
       "source_location": "L1",
       "id": "src_ridgeback_autonomy_ridgeback_autonomy_benchmarking_rendering_py",
-      "community": 2,
+      "community": 1,
       "norm_label": "rendering.py"
     },
     {
@@ -621,7 +621,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/rendering.py",
       "source_location": "L17",
       "id": "benchmarking_rendering_panelcontext",
-      "community": 2,
+      "community": 1,
       "norm_label": "panelcontext"
     },
     {
@@ -630,7 +630,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/rendering.py",
       "source_location": "L28",
       "id": "benchmarking_rendering_benchmarkcollagerenderer",
-      "community": 2,
+      "community": 1,
       "norm_label": "benchmarkcollagerenderer"
     },
     {
@@ -639,7 +639,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/rendering.py",
       "source_location": "L29",
       "id": "benchmarking_rendering_benchmarkcollagerenderer_init",
-      "community": 2,
+      "community": 1,
       "norm_label": ".__init__()"
     },
     {
@@ -648,7 +648,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/rendering.py",
       "source_location": "L33",
       "id": "benchmarking_rendering_benchmarkcollagerenderer_make_color_preview",
-      "community": 2,
+      "community": 1,
       "norm_label": ".make_color_preview()"
     },
     {
@@ -657,7 +657,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/rendering.py",
       "source_location": "L36",
       "id": "benchmarking_rendering_benchmarkcollagerenderer_make_depth_preview",
-      "community": 2,
+      "community": 1,
       "norm_label": ".make_depth_preview()"
     },
     {
@@ -666,7 +666,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/rendering.py",
       "source_location": "L40",
       "id": "benchmarking_rendering_benchmarkcollagerenderer_render_trial_collage",
-      "community": 2,
+      "community": 1,
       "norm_label": ".render_trial_collage()"
     },
     {
@@ -675,7 +675,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/rendering.py",
       "source_location": "L60",
       "id": "benchmarking_rendering_benchmarkcollagerenderer_render_estimator_panel",
-      "community": 2,
+      "community": 1,
       "norm_label": ".render_estimator_panel()"
     },
     {
@@ -684,7 +684,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/rendering.py",
       "source_location": "L85",
       "id": "benchmarking_rendering_benchmarkcollagerenderer_panel_context_for_estimator",
-      "community": 2,
+      "community": 1,
       "norm_label": ".panel_context_for_estimator()"
     },
     {
@@ -693,7 +693,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/rendering.py",
       "source_location": "L159",
       "id": "benchmarking_rendering_benchmarkcollagerenderer_build_panel_context",
-      "community": 2,
+      "community": 1,
       "norm_label": ".build_panel_context()"
     },
     {
@@ -702,7 +702,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/rendering.py",
       "source_location": "L181",
       "id": "benchmarking_rendering_benchmarkcollagerenderer_make_missing_panel",
-      "community": 2,
+      "community": 1,
       "norm_label": ".make_missing_panel()"
     },
     {
@@ -711,7 +711,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/rendering.py",
       "source_location": "L208",
       "id": "benchmarking_rendering_benchmarkcollagerenderer_build_panel_lines",
-      "community": 2,
+      "community": 1,
       "norm_label": ".build_panel_lines()"
     },
     {
@@ -720,7 +720,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/rendering.py",
       "source_location": "L233",
       "id": "benchmarking_rendering_benchmarkcollagerenderer_resize_panel",
-      "community": 2,
+      "community": 1,
       "norm_label": ".resize_panel()"
     },
     {
@@ -729,7 +729,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/rendering.py",
       "source_location": "L244",
       "id": "benchmarking_rendering_benchmarkcollagerenderer_draw_bboxes",
-      "community": 2,
+      "community": 1,
       "norm_label": ".draw_bboxes()"
     },
     {
@@ -738,7 +738,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/rendering.py",
       "source_location": "L268",
       "id": "benchmarking_rendering_benchmarkcollagerenderer_draw_value_block",
-      "community": 2,
+      "community": 1,
       "norm_label": ".draw_value_block()"
     },
     {
@@ -747,7 +747,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/rendering.py",
       "source_location": "L277",
       "id": "benchmarking_rendering_benchmarkcollagerenderer_format_distance",
-      "community": 2,
+      "community": 1,
       "norm_label": ".format_distance()"
     },
     {
@@ -756,7 +756,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/rendering.py",
       "source_location": "L282",
       "id": "benchmarking_rendering_benchmarkcollagerenderer_format_delta",
-      "community": 2,
+      "community": 1,
       "norm_label": ".format_delta()"
     },
     {
@@ -765,7 +765,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/alignment.py",
       "source_location": "L1",
       "id": "src_ridgeback_autonomy_ridgeback_autonomy_benchmarking_alignment_py",
-      "community": 1,
+      "community": 4,
       "norm_label": "alignment.py"
     },
     {
@@ -774,7 +774,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/alignment.py",
       "source_location": "L18",
       "id": "benchmarking_alignment_eventpreview",
-      "community": 1,
+      "community": 4,
       "norm_label": "eventpreview"
     },
     {
@@ -783,7 +783,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/alignment.py",
       "source_location": "L37",
       "id": "benchmarking_alignment_previewmatchresult",
-      "community": 1,
+      "community": 4,
       "norm_label": "previewmatchresult"
     },
     {
@@ -792,7 +792,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/alignment.py",
       "source_location": "L46",
       "id": "benchmarking_alignment_measurementevent",
-      "community": 1,
+      "community": 4,
       "norm_label": "measurementevent"
     },
     {
@@ -810,7 +810,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/alignment.py",
       "source_location": "L62",
       "id": "benchmarking_alignment_measurement_message_key",
-      "community": 1,
+      "community": 0,
       "norm_label": "measurement_message_key()"
     },
     {
@@ -819,7 +819,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/alignment.py",
       "source_location": "L72",
       "id": "benchmarking_alignment_extract_public_estimator_values",
-      "community": 5,
+      "community": 3,
       "norm_label": "extract_public_estimator_values()"
     },
     {
@@ -828,7 +828,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/alignment.py",
       "source_location": "L79",
       "id": "benchmarking_alignment_ensure_measurement_event",
-      "community": 1,
+      "community": 0,
       "norm_label": "ensure_measurement_event()"
     },
     {
@@ -837,7 +837,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/alignment.py",
       "source_location": "L101",
       "id": "benchmarking_alignment_update_measurement_event",
-      "community": 1,
+      "community": 0,
       "norm_label": "update_measurement_event()"
     },
     {
@@ -846,7 +846,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/alignment.py",
       "source_location": "L118",
       "id": "benchmarking_alignment_has_all_selected_estimates",
-      "community": 1,
+      "community": 4,
       "norm_label": "has_all_selected_estimates()"
     },
     {
@@ -855,7 +855,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/alignment.py",
       "source_location": "L125",
       "id": "benchmarking_alignment_event_has_panel_preview",
-      "community": 1,
+      "community": 4,
       "norm_label": "event_has_panel_preview()"
     },
     {
@@ -864,7 +864,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/alignment.py",
       "source_location": "L133",
       "id": "benchmarking_alignment_event_has_all_panel_previews",
-      "community": 1,
+      "community": 4,
       "norm_label": "event_has_all_panel_previews()"
     },
     {
@@ -873,7 +873,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/alignment.py",
       "source_location": "L140",
       "id": "benchmarking_alignment_find_exact_preview_match",
-      "community": 1,
+      "community": 4,
       "norm_label": "find_exact_preview_match()"
     },
     {
@@ -882,7 +882,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/alignment.py",
       "source_location": "L164",
       "id": "benchmarking_alignment_find_nearest_preview_match",
-      "community": 1,
+      "community": 4,
       "norm_label": "find_nearest_preview_match()"
     },
     {
@@ -891,7 +891,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/alignment.py",
       "source_location": "L197",
       "id": "benchmarking_alignment_nearest_preview_metadata",
-      "community": 1,
+      "community": 4,
       "norm_label": "nearest_preview_metadata()"
     },
     {
@@ -918,7 +918,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/reduction.py",
       "source_location": "L1",
       "id": "src_ridgeback_autonomy_ridgeback_autonomy_benchmarking_reduction_py",
-      "community": 1,
+      "community": 4,
       "norm_label": "reduction.py"
     },
     {
@@ -927,7 +927,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/reduction.py",
       "source_location": "L12",
       "id": "benchmarking_reduction_usable_aligned_events",
-      "community": 1,
+      "community": 4,
       "norm_label": "usable_aligned_events()"
     },
     {
@@ -936,7 +936,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/reduction.py",
       "source_location": "L25",
       "id": "benchmarking_reduction_compute_trial_medians",
-      "community": 1,
+      "community": 4,
       "norm_label": "compute_trial_medians()"
     },
     {
@@ -945,7 +945,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/reduction.py",
       "source_location": "L39",
       "id": "benchmarking_reduction_choose_representative_event",
-      "community": 1,
+      "community": 4,
       "norm_label": "choose_representative_event()"
     },
     {
@@ -954,7 +954,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/estimators.py",
       "source_location": "L1",
       "id": "src_ridgeback_autonomy_ridgeback_autonomy_benchmarking_estimators_py",
-      "community": 8,
+      "community": 7,
       "norm_label": "estimators.py"
     },
     {
@@ -963,7 +963,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/estimators.py",
       "source_location": "L49",
       "id": "benchmarking_estimators_parse_estimators",
-      "community": 8,
+      "community": 7,
       "norm_label": "parse_estimators()"
     },
     {
@@ -972,7 +972,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/estimators.py",
       "source_location": "L77",
       "id": "benchmarking_estimators_selected_camera_estimators",
-      "community": 8,
+      "community": 7,
       "norm_label": "selected_camera_estimators()"
     },
     {
@@ -981,7 +981,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/estimators.py",
       "source_location": "L84",
       "id": "benchmarking_estimators_uses_camera_estimators",
-      "community": 8,
+      "community": 7,
       "norm_label": "uses_camera_estimators()"
     },
     {
@@ -990,7 +990,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/estimators.py",
       "source_location": "L88",
       "id": "benchmarking_estimators_uses_lidar_estimators",
-      "community": 8,
+      "community": 7,
       "norm_label": "uses_lidar_estimators()"
     },
     {
@@ -1062,7 +1062,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/g1_overlay_node.py",
       "source_location": "L31",
       "id": "perception_g1_overlay_node_g1overlaynode_init",
-      "community": 2,
+      "community": 1,
       "norm_label": ".__init__()"
     },
     {
@@ -1269,7 +1269,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/g1_lidar_measurement_node.py",
       "source_location": "L1",
       "id": "src_ridgeback_autonomy_ridgeback_autonomy_perception_g1_lidar_measurement_node_py",
-      "community": 7,
+      "community": 8,
       "norm_label": "g1_lidar_measurement_node.py"
     },
     {
@@ -1278,7 +1278,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/g1_lidar_measurement_node.py",
       "source_location": "L35",
       "id": "perception_g1_lidar_measurement_node_g1lidarmeasurementnode",
-      "community": 7,
+      "community": 8,
       "norm_label": "g1lidarmeasurementnode"
     },
     {
@@ -1287,7 +1287,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/g1_lidar_measurement_node.py",
       "source_location": "L36",
       "id": "perception_g1_lidar_measurement_node_g1lidarmeasurementnode_init",
-      "community": 7,
+      "community": 8,
       "norm_label": ".__init__()"
     },
     {
@@ -1296,7 +1296,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/g1_lidar_measurement_node.py",
       "source_location": "L95",
       "id": "perception_g1_lidar_measurement_node_g1lidarmeasurementnode_default_base_frame",
-      "community": 7,
+      "community": 8,
       "norm_label": ".default_base_frame()"
     },
     {
@@ -1305,7 +1305,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/g1_lidar_measurement_node.py",
       "source_location": "L101",
       "id": "perception_g1_lidar_measurement_node_g1lidarmeasurementnode_detections_callback",
-      "community": 7,
+      "community": 8,
       "norm_label": ".detections_callback()"
     },
     {
@@ -1314,7 +1314,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/g1_lidar_measurement_node.py",
       "source_location": "L106",
       "id": "perception_g1_lidar_measurement_node_g1lidarmeasurementnode_scan_callback",
-      "community": 7,
+      "community": 8,
       "norm_label": ".scan_callback()"
     },
     {
@@ -1323,7 +1323,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/g1_lidar_measurement_node.py",
       "source_location": "L111",
       "id": "perception_g1_lidar_measurement_node_g1lidarmeasurementnode_scan_processing_loop",
-      "community": 7,
+      "community": 8,
       "norm_label": ".scan_processing_loop()"
     },
     {
@@ -1332,7 +1332,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/g1_lidar_measurement_node.py",
       "source_location": "L139",
       "id": "perception_g1_lidar_measurement_node_g1lidarmeasurementnode_processing_loop",
-      "community": 7,
+      "community": 8,
       "norm_label": ".processing_loop()"
     },
     {
@@ -1341,7 +1341,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/g1_lidar_measurement_node.py",
       "source_location": "L159",
       "id": "perception_g1_lidar_measurement_node_g1lidarmeasurementnode_process_measurements",
-      "community": 7,
+      "community": 8,
       "norm_label": ".process_measurements()"
     },
     {
@@ -1350,7 +1350,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/g1_lidar_measurement_node.py",
       "source_location": "L164",
       "id": "perception_g1_lidar_measurement_node_g1lidarmeasurementnode_extract_scan_points",
-      "community": 7,
+      "community": 8,
       "norm_label": ".extract_scan_points()"
     },
     {
@@ -1359,7 +1359,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/g1_lidar_measurement_node.py",
       "source_location": "L175",
       "id": "perception_g1_lidar_measurement_node_g1lidarmeasurementnode_log_lidar_warning",
-      "community": 7,
+      "community": 8,
       "norm_label": ".log_lidar_warning()"
     },
     {
@@ -1368,7 +1368,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/g1_lidar_measurement_node.py",
       "source_location": "L181",
       "id": "perception_g1_lidar_measurement_node_g1lidarmeasurementnode_destroy_node",
-      "community": 7,
+      "community": 8,
       "norm_label": ".destroy_node()"
     },
     {
@@ -1377,7 +1377,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/g1_lidar_measurement_node.py",
       "source_location": "L192",
       "id": "perception_g1_lidar_measurement_node_main",
-      "community": 7,
+      "community": 8,
       "norm_label": "main()"
     },
     {
@@ -1386,7 +1386,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/g1_camera_measurement_node.py",
       "source_location": "L1",
       "id": "src_ridgeback_autonomy_ridgeback_autonomy_perception_g1_camera_measurement_node_py",
-      "community": 4,
+      "community": 5,
       "norm_label": "g1_camera_measurement_node.py"
     },
     {
@@ -1395,7 +1395,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/g1_camera_measurement_node.py",
       "source_location": "L52",
       "id": "perception_g1_camera_measurement_node_g1camerameasurementnode",
-      "community": 4,
+      "community": 5,
       "norm_label": "g1camerameasurementnode"
     },
     {
@@ -1404,7 +1404,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/g1_camera_measurement_node.py",
       "source_location": "L53",
       "id": "perception_g1_camera_measurement_node_g1camerameasurementnode_init",
-      "community": 4,
+      "community": 5,
       "norm_label": ".__init__()"
     },
     {
@@ -1413,7 +1413,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/g1_camera_measurement_node.py",
       "source_location": "L168",
       "id": "perception_g1_camera_measurement_node_g1camerameasurementnode_default_base_frame",
-      "community": 4,
+      "community": 5,
       "norm_label": ".default_base_frame()"
     },
     {
@@ -1422,7 +1422,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/g1_camera_measurement_node.py",
       "source_location": "L174",
       "id": "perception_g1_camera_measurement_node_g1camerameasurementnode_detections_callback",
-      "community": 4,
+      "community": 5,
       "norm_label": ".detections_callback()"
     },
     {
@@ -1431,7 +1431,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/g1_camera_measurement_node.py",
       "source_location": "L179",
       "id": "perception_g1_camera_measurement_node_g1camerameasurementnode_color_callback",
-      "community": 4,
+      "community": 5,
       "norm_label": ".color_callback()"
     },
     {
@@ -1440,7 +1440,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/g1_camera_measurement_node.py",
       "source_location": "L183",
       "id": "perception_g1_camera_measurement_node_g1camerameasurementnode_depth_callback",
-      "community": 4,
+      "community": 5,
       "norm_label": ".depth_callback()"
     },
     {
@@ -1449,7 +1449,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/g1_camera_measurement_node.py",
       "source_location": "L188",
       "id": "perception_g1_camera_measurement_node_g1camerameasurementnode_pointcloud_callback",
-      "community": 4,
+      "community": 5,
       "norm_label": ".pointcloud_callback()"
     },
     {
@@ -1458,7 +1458,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/g1_camera_measurement_node.py",
       "source_location": "L193",
       "id": "perception_g1_camera_measurement_node_g1camerameasurementnode_depth_processing_loop",
-      "community": 4,
+      "community": 5,
       "norm_label": ".depth_processing_loop()"
     },
     {
@@ -1467,7 +1467,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/g1_camera_measurement_node.py",
       "source_location": "L224",
       "id": "perception_g1_camera_measurement_node_g1camerameasurementnode_pointcloud_processing_loop",
-      "community": 4,
+      "community": 5,
       "norm_label": ".pointcloud_processing_loop()"
     },
     {
@@ -1476,7 +1476,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/g1_camera_measurement_node.py",
       "source_location": "L266",
       "id": "perception_g1_camera_measurement_node_g1camerameasurementnode_processing_loop",
-      "community": 4,
+      "community": 2,
       "norm_label": ".processing_loop()"
     },
     {
@@ -1485,7 +1485,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/g1_camera_measurement_node.py",
       "source_location": "L297",
       "id": "perception_g1_camera_measurement_node_g1camerameasurementnode_process_measurements",
-      "community": 4,
+      "community": 2,
       "norm_label": ".process_measurements()"
     },
     {
@@ -1494,7 +1494,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/g1_camera_measurement_node.py",
       "source_location": "L375",
       "id": "perception_g1_camera_measurement_node_g1camerameasurementnode_lookup_transform",
-      "community": 4,
+      "community": 5,
       "norm_label": ".lookup_transform()"
     },
     {
@@ -1503,7 +1503,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/g1_camera_measurement_node.py",
       "source_location": "L386",
       "id": "perception_g1_camera_measurement_node_g1camerameasurementnode_log_warning_once",
-      "community": 4,
+      "community": 5,
       "norm_label": ".log_warning_once()"
     },
     {
@@ -1512,7 +1512,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/g1_camera_measurement_node.py",
       "source_location": "L392",
       "id": "perception_g1_camera_measurement_node_g1camerameasurementnode_destroy_node",
-      "community": 4,
+      "community": 5,
       "norm_label": ".destroy_node()"
     },
     {
@@ -1521,7 +1521,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/g1_camera_measurement_node.py",
       "source_location": "L404",
       "id": "perception_g1_camera_measurement_node_main",
-      "community": 4,
+      "community": 5,
       "norm_label": "main()"
     },
     {
@@ -1530,7 +1530,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/core/rendering.py",
       "source_location": "L1",
       "id": "src_ridgeback_autonomy_ridgeback_autonomy_perception_core_rendering_py",
-      "community": 2,
+      "community": 1,
       "norm_label": "rendering.py"
     },
     {
@@ -1539,7 +1539,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/core/rendering.py",
       "source_location": "L10",
       "id": "core_rendering_rgbdoverlayrenderer",
-      "community": 2,
+      "community": 1,
       "norm_label": "rgbdoverlayrenderer"
     },
     {
@@ -1548,7 +1548,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/core/rendering.py",
       "source_location": "L11",
       "id": "core_rendering_rgbdoverlayrenderer_init",
-      "community": 2,
+      "community": 1,
       "norm_label": ".__init__()"
     },
     {
@@ -1557,7 +1557,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/core/rendering.py",
       "source_location": "L14",
       "id": "core_rendering_rgbdoverlayrenderer_render",
-      "community": 2,
+      "community": 1,
       "norm_label": ".render()"
     },
     {
@@ -1566,7 +1566,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/core/rendering.py",
       "source_location": "L84",
       "id": "core_rendering_rgbdoverlayrenderer_normalize_depth",
-      "community": 2,
+      "community": 1,
       "norm_label": ".normalize_depth()"
     },
     {
@@ -1575,7 +1575,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/core/rendering.py",
       "source_location": "L100",
       "id": "core_rendering_rgbdoverlayrenderer_make_depth_panel",
-      "community": 2,
+      "community": 1,
       "norm_label": ".make_depth_panel()"
     },
     {
@@ -1584,7 +1584,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/core/rendering.py",
       "source_location": "L111",
       "id": "core_rendering_rgbdoverlayrenderer_draw_panel_title",
-      "community": 2,
+      "community": 1,
       "norm_label": ".draw_panel_title()"
     },
     {
@@ -1593,7 +1593,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/core/rendering.py",
       "source_location": "L124",
       "id": "core_rendering_rgbdoverlayrenderer_draw_label_block",
-      "community": 2,
+      "community": 1,
       "norm_label": ".draw_label_block()"
     },
     {
@@ -1602,7 +1602,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/core/rendering.py",
       "source_location": "L179",
       "id": "core_rendering_rgbdoverlayrenderer_format_position_line",
-      "community": 2,
+      "community": 1,
       "norm_label": ".format_position_line()"
     },
     {
@@ -1611,7 +1611,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/core/rendering.py",
       "source_location": "L194",
       "id": "core_rendering_rgbdoverlayrenderer_format_distance_line",
-      "community": 2,
+      "community": 1,
       "norm_label": ".format_distance_line()"
     },
     {
@@ -1647,7 +1647,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/core/image_utils.py",
       "source_location": "L10",
       "id": "core_image_utils_bgr_frame_to_pil",
-      "community": 4,
+      "community": 6,
       "norm_label": "bgr_frame_to_pil()"
     },
     {
@@ -1710,7 +1710,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/core/detection.py",
       "source_location": "L15",
       "id": "core_detection_resolve_torch_device",
-      "community": 4,
+      "community": 5,
       "norm_label": "resolve_torch_device()"
     },
     {
@@ -1728,7 +1728,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/core/detection.py",
       "source_location": "L24",
       "id": "core_detection_owlv2detector_init",
-      "community": 4,
+      "community": 5,
       "norm_label": ".__init__()"
     },
     {
@@ -1782,7 +1782,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/core/geometry.py",
       "source_location": "L1",
       "id": "src_ridgeback_autonomy_ridgeback_autonomy_perception_core_geometry_py",
-      "community": 3,
+      "community": 2,
       "norm_label": "geometry.py"
     },
     {
@@ -1791,7 +1791,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/core/geometry.py",
       "source_location": "L36",
       "id": "core_geometry_apply_vehicle_front_offset",
-      "community": 3,
+      "community": 2,
       "norm_label": "apply_vehicle_front_offset()"
     },
     {
@@ -1809,7 +1809,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/core/geometry.py",
       "source_location": "L46",
       "id": "core_geometry_world_to_vehicle_planar",
-      "community": 3,
+      "community": 2,
       "norm_label": "world_to_vehicle_planar()"
     },
     {
@@ -1818,7 +1818,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/core/geometry.py",
       "source_location": "L52",
       "id": "core_geometry_planar_distance_from_vehicle_origin",
-      "community": 3,
+      "community": 2,
       "norm_label": "planar_distance_from_vehicle_origin()"
     },
     {
@@ -1827,7 +1827,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/core/geometry.py",
       "source_location": "L63",
       "id": "core_geometry_rotate_camera_to_vehicle_frame",
-      "community": 3,
+      "community": 2,
       "norm_label": "rotate_camera_to_vehicle_frame()"
     },
     {
@@ -1836,7 +1836,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/core/geometry.py",
       "source_location": "L73",
       "id": "core_geometry_focus_bbox",
-      "community": 3,
+      "community": 2,
       "norm_label": "focus_bbox()"
     },
     {
@@ -1845,7 +1845,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/core/geometry.py",
       "source_location": "L90",
       "id": "core_geometry_map_bbox_between_images",
-      "community": 3,
+      "community": 2,
       "norm_label": "map_bbox_between_images()"
     },
     {
@@ -1854,7 +1854,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/core/geometry.py",
       "source_location": "L113",
       "id": "core_geometry_add_rgb_measurements",
-      "community": 3,
+      "community": 2,
       "norm_label": "add_rgb_measurements()"
     },
     {
@@ -1863,7 +1863,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/core/geometry.py",
       "source_location": "L156",
       "id": "core_geometry_add_depth_measurements",
-      "community": 3,
+      "community": 2,
       "norm_label": "add_depth_measurements()"
     },
     {
@@ -1872,7 +1872,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/core/geometry.py",
       "source_location": "L188",
       "id": "core_geometry_add_depth_source_measurements",
-      "community": 3,
+      "community": 2,
       "norm_label": "add_depth_source_measurements()"
     },
     {
@@ -1881,7 +1881,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/core/geometry.py",
       "source_location": "L231",
       "id": "core_geometry_compute_weighted_planar_distance",
-      "community": 3,
+      "community": 2,
       "norm_label": "compute_weighted_planar_distance()"
     },
     {
@@ -1890,7 +1890,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/core/geometry.py",
       "source_location": "L295",
       "id": "core_geometry_extract_scan_points_base",
-      "community": 3,
+      "community": 2,
       "norm_label": "extract_scan_points_base()"
     },
     {
@@ -1899,7 +1899,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/core/geometry.py",
       "source_location": "L351",
       "id": "core_geometry_add_lidar_measurements",
-      "community": 3,
+      "community": 2,
       "norm_label": "add_lidar_measurements()"
     },
     {
@@ -1908,7 +1908,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/core/geometry.py",
       "source_location": "L382",
       "id": "core_geometry_compute_lidar_measurement",
-      "community": 3,
+      "community": 2,
       "norm_label": "compute_lidar_measurement()"
     },
     {
@@ -1917,7 +1917,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/core/geometry.py",
       "source_location": "L417",
       "id": "core_geometry_compute_camera_bearing_window",
-      "community": 3,
+      "community": 2,
       "norm_label": "compute_camera_bearing_window()"
     },
     {
@@ -1926,7 +1926,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/core/geometry.py",
       "source_location": "L442",
       "id": "core_geometry_wrap_angle",
-      "community": 3,
+      "community": 2,
       "norm_label": "wrap_angle()"
     },
     {
@@ -1935,7 +1935,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/core/geometry.py",
       "source_location": "L446",
       "id": "core_geometry_extract_organized_xyz",
-      "community": 4,
+      "community": 5,
       "norm_label": "extract_organized_xyz()"
     },
     {
@@ -1944,7 +1944,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/core/geometry.py",
       "source_location": "L467",
       "id": "core_geometry_add_pointcloud_measurements",
-      "community": 3,
+      "community": 2,
       "norm_label": "add_pointcloud_measurements()"
     },
     {
@@ -1953,7 +1953,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/core/geometry.py",
       "source_location": "L511",
       "id": "core_geometry_compute_pointcloud_measurement",
-      "community": 3,
+      "community": 2,
       "norm_label": "compute_pointcloud_measurement()"
     },
     {
@@ -1962,7 +1962,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/core/depth_anything.py",
       "source_location": "L1",
       "id": "src_ridgeback_autonomy_ridgeback_autonomy_perception_core_depth_anything_py",
-      "community": 4,
+      "community": 5,
       "norm_label": "depth_anything.py"
     },
     {
@@ -1971,7 +1971,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/core/depth_anything.py",
       "source_location": "L15",
       "id": "core_depth_anything_depthanythingestimator",
-      "community": 4,
+      "community": 5,
       "norm_label": "depthanythingestimator"
     },
     {
@@ -1980,7 +1980,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/core/depth_anything.py",
       "source_location": "L16",
       "id": "core_depth_anything_depthanythingestimator_init",
-      "community": 4,
+      "community": 5,
       "norm_label": ".__init__()"
     },
     {
@@ -1989,7 +1989,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/core/depth_anything.py",
       "source_location": "L23",
       "id": "core_depth_anything_depthanythingestimator_load",
-      "community": 4,
+      "community": 5,
       "norm_label": ".load()"
     },
     {
@@ -1998,7 +1998,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/core/depth_anything.py",
       "source_location": "L43",
       "id": "core_depth_anything_depthanythingestimator_predict",
-      "community": 4,
+      "community": 5,
       "norm_label": ".predict()"
     },
     {
@@ -2007,7 +2007,7 @@
       "source_file": "src/ridgeback_autonomy/test/test_messages.py",
       "source_location": "L1",
       "id": "src_ridgeback_autonomy_test_test_messages_py",
-      "community": 5,
+      "community": 3,
       "norm_label": "test_messages.py"
     },
     {
@@ -2016,7 +2016,7 @@
       "source_file": "src/ridgeback_autonomy/test/test_messages.py",
       "source_location": "L17",
       "id": "test_test_messages_test_build_detections_message_serializes_identity_fields",
-      "community": 5,
+      "community": 3,
       "norm_label": "test_build_detections_message_serializes_identity_fields()"
     },
     {
@@ -2025,7 +2025,7 @@
       "source_file": "src/ridgeback_autonomy/test/test_messages.py",
       "source_location": "L40",
       "id": "test_test_messages_test_batch_from_detections_message_round_trips_detection_identity",
-      "community": 5,
+      "community": 3,
       "norm_label": "test_batch_from_detections_message_round_trips_detection_identity()"
     },
     {
@@ -2034,7 +2034,7 @@
       "source_file": "src/ridgeback_autonomy/test/test_messages.py",
       "source_location": "L61",
       "id": "test_test_messages_test_build_measurements_message_serializes_parallel_arrays",
-      "community": 5,
+      "community": 3,
       "norm_label": "test_build_measurements_message_serializes_parallel_arrays()"
     },
     {
@@ -2043,7 +2043,7 @@
       "source_file": "src/ridgeback_autonomy/test/test_messages.py",
       "source_location": "L101",
       "id": "test_test_messages_test_snapshot_measurements_message_uses_first_finite_positive_values",
-      "community": 5,
+      "community": 3,
       "norm_label": "test_snapshot_measurements_message_uses_first_finite_positive_values()"
     },
     {
@@ -2079,7 +2079,7 @@
       "source_file": "src/ridgeback_autonomy/test/test_geometry.py",
       "source_location": "L1",
       "id": "src_ridgeback_autonomy_test_test_geometry_py",
-      "community": 3,
+      "community": 2,
       "norm_label": "test_geometry.py"
     },
     {
@@ -2088,7 +2088,7 @@
       "source_file": "src/ridgeback_autonomy/test/test_geometry.py",
       "source_location": "L19",
       "id": "test_test_geometry_test_focus_bbox_and_mapping",
-      "community": 3,
+      "community": 2,
       "norm_label": "test_focus_bbox_and_mapping()"
     },
     {
@@ -2106,7 +2106,7 @@
       "source_file": "src/ridgeback_autonomy/test/test_geometry.py",
       "source_location": "L46",
       "id": "test_test_geometry_test_add_depth_measurements_falls_back_to_full_bbox_when_focus_has_no_depth",
-      "community": 5,
+      "community": 3,
       "norm_label": "test_add_depth_measurements_falls_back_to_full_bbox_when_focus_has_no_depth()"
     },
     {
@@ -2115,7 +2115,7 @@
       "source_file": "src/ridgeback_autonomy/test/test_geometry.py",
       "source_location": "L76",
       "id": "test_test_geometry_test_compute_lidar_measurement_returns_vehicle_frame_distance",
-      "community": 3,
+      "community": 2,
       "norm_label": "test_compute_lidar_measurement_returns_vehicle_frame_distance()"
     },
     {
@@ -2124,7 +2124,7 @@
       "source_file": "src/ridgeback_autonomy/test/test_geometry.py",
       "source_location": "L103",
       "id": "test_test_geometry_test_compute_pointcloud_measurement_returns_nearest_inlier",
-      "community": 3,
+      "community": 2,
       "norm_label": "test_compute_pointcloud_measurement_returns_nearest_inlier()"
     },
     {
@@ -2133,7 +2133,7 @@
       "source_file": "src/ridgeback_autonomy/test/test_geometry.py",
       "source_location": "L127",
       "id": "test_test_geometry_test_compute_pointcloud_measurement_supports_direct_cloud_coordinates",
-      "community": 3,
+      "community": 2,
       "norm_label": "test_compute_pointcloud_measurement_supports_direct_cloud_coordinates()"
     },
     {
@@ -2142,7 +2142,7 @@
       "source_file": "src/ridgeback_autonomy/test/test_geometry.py",
       "source_location": "L151",
       "id": "test_test_geometry_test_add_pointcloud_measurements_falls_back_when_transform_path_rejects_points",
-      "community": 5,
+      "community": 3,
       "norm_label": "test_add_pointcloud_measurements_falls_back_when_transform_path_rejects_points()"
     },
     {
@@ -2189,6 +2189,15 @@
       "id": "test_test_launch_layout_test_benchmark_launch_uses_new_multi_estimator_interface",
       "community": 11,
       "norm_label": "test_benchmark_launch_uses_new_multi_estimator_interface()"
+    },
+    {
+      "label": "test_slam_lifecycle_configure_and_activate_are_separately_delayed()",
+      "file_type": "code",
+      "source_file": "src/ridgeback_autonomy/test/test_launch_layout.py",
+      "source_location": "L73",
+      "id": "test_test_launch_layout_test_slam_lifecycle_configure_and_activate_are_separately_delayed",
+      "community": 11,
+      "norm_label": "test_slam_lifecycle_configure_and_activate_are_separately_delayed()"
     },
     {
       "label": "test_image_utils.py",
@@ -2268,7 +2277,7 @@
       "source_file": "src/ridgeback_autonomy/test/test_benchmark_runner.py",
       "source_location": "L1",
       "id": "src_ridgeback_autonomy_test_test_benchmark_runner_py",
-      "community": 1,
+      "community": 4,
       "norm_label": "test_benchmark_runner.py"
     },
     {
@@ -2277,7 +2286,7 @@
       "source_file": "src/ridgeback_autonomy/test/test_benchmark_runner.py",
       "source_location": "L26",
       "id": "test_test_benchmark_runner_test_parse_estimators_uses_canonical_order_and_depth_anything_name",
-      "community": 8,
+      "community": 7,
       "norm_label": "test_parse_estimators_uses_canonical_order_and_depth_anything_name()"
     },
     {
@@ -2295,7 +2304,7 @@
       "source_file": "src/ridgeback_autonomy/test/test_benchmark_runner.py",
       "source_location": "L45",
       "id": "test_test_benchmark_runner_test_alignment_updates_public_depth_anything_value_from_message_field",
-      "community": 1,
+      "community": 0,
       "norm_label": "test_alignment_updates_public_depth_anything_value_from_message_field()"
     },
     {
@@ -2304,7 +2313,7 @@
       "source_file": "src/ridgeback_autonomy/test/test_benchmark_runner.py",
       "source_location": "L79",
       "id": "test_test_benchmark_runner_test_find_exact_preview_match_uses_only_exact_stamp",
-      "community": 1,
+      "community": 4,
       "norm_label": "test_find_exact_preview_match_uses_only_exact_stamp()"
     },
     {
@@ -2313,7 +2322,7 @@
       "source_file": "src/ridgeback_autonomy/test/test_benchmark_runner.py",
       "source_location": "L95",
       "id": "test_test_benchmark_runner_test_find_nearest_preview_match_prefers_smallest_delta_within_tolerance",
-      "community": 1,
+      "community": 4,
       "norm_label": "test_find_nearest_preview_match_prefers_smallest_delta_within_tolerance()"
     },
     {
@@ -2322,7 +2331,7 @@
       "source_file": "src/ridgeback_autonomy/test/test_benchmark_runner.py",
       "source_location": "L111",
       "id": "test_test_benchmark_runner_test_find_nearest_preview_match_returns_unmatched_when_outside_tolerance",
-      "community": 1,
+      "community": 4,
       "norm_label": "test_find_nearest_preview_match_returns_unmatched_when_outside_tolerance()"
     },
     {
@@ -2331,7 +2340,7 @@
       "source_file": "src/ridgeback_autonomy/test/test_benchmark_runner.py",
       "source_location": "L123",
       "id": "test_test_benchmark_runner_test_usable_aligned_events_require_the_full_selected_estimator_set",
-      "community": 1,
+      "community": 4,
       "norm_label": "test_usable_aligned_events_require_the_full_selected_estimator_set()"
     },
     {
@@ -2340,7 +2349,7 @@
       "source_file": "src/ridgeback_autonomy/test/test_benchmark_runner.py",
       "source_location": "L154",
       "id": "test_test_benchmark_runner_test_representative_event_uses_minimum_total_deviation_then_timestamp",
-      "community": 1,
+      "community": 4,
       "norm_label": "test_representative_event_uses_minimum_total_deviation_then_timestamp()"
     },
     {
@@ -2349,7 +2358,7 @@
       "source_file": "src/ridgeback_autonomy/test/test_benchmark_runner.py",
       "source_location": "L198",
       "id": "test_test_benchmark_runner_test_representative_event_prefers_preview_complete_candidate",
-      "community": 1,
+      "community": 4,
       "norm_label": "test_representative_event_prefers_preview_complete_candidate()"
     },
     {
@@ -2358,7 +2367,7 @@
       "source_file": "src/ridgeback_autonomy/test/test_benchmark_runner.py",
       "source_location": "L242",
       "id": "test_test_benchmark_runner_test_representative_event_falls_back_to_numeric_when_no_preview_complete_candidate",
-      "community": 1,
+      "community": 4,
       "norm_label": "test_representative_event_falls_back_to_numeric_when_no_preview_complete_candidate()"
     },
     {
@@ -2367,7 +2376,7 @@
       "source_file": "src/ridgeback_autonomy/test/test_benchmark_runner.py",
       "source_location": "L283",
       "id": "test_test_benchmark_runner_test_render_missing_preview_context_is_not_a_silent_black_panel",
-      "community": 1,
+      "community": 4,
       "norm_label": "test_render_missing_preview_context_is_not_a_silent_black_panel()"
     },
     {
@@ -2376,7 +2385,7 @@
       "source_file": "src/ridgeback_autonomy/test/test_benchmark_runner.py",
       "source_location": "L318",
       "id": "test_test_benchmark_runner_test_render_pointcloud_and_lidar_panels_are_labeled_as_rgb_debug_views",
-      "community": 1,
+      "community": 4,
       "norm_label": "test_render_pointcloud_and_lidar_panels_are_labeled_as_rgb_debug_views()"
     },
     {
@@ -2394,7 +2403,7 @@
       "source_file": "src/ridgeback_autonomy/launch/ridgeback_exploration.launch.py",
       "source_location": "L1",
       "id": "src_ridgeback_autonomy_launch_ridgeback_exploration_launch_py",
-      "community": 8,
+      "community": 7,
       "norm_label": "ridgeback_exploration.launch.py"
     },
     {
@@ -2403,7 +2412,7 @@
       "source_file": "src/ridgeback_autonomy/launch/ridgeback_exploration.launch.py",
       "source_location": "L14",
       "id": "launch_ridgeback_exploration_launch_generate_launch_description",
-      "community": 8,
+      "community": 7,
       "norm_label": "generate_launch_description()"
     },
     {
@@ -2412,7 +2421,7 @@
       "source_file": "src/ridgeback_autonomy/launch/g1_distance_benchmark.launch.py",
       "source_location": "L1",
       "id": "src_ridgeback_autonomy_launch_g1_distance_benchmark_launch_py",
-      "community": 8,
+      "community": 7,
       "norm_label": "g1_distance_benchmark.launch.py"
     },
     {
@@ -2421,7 +2430,7 @@
       "source_file": "src/ridgeback_autonomy/launch/g1_distance_benchmark.launch.py",
       "source_location": "L24",
       "id": "launch_g1_distance_benchmark_launch_build_benchmark_nodes",
-      "community": 8,
+      "community": 7,
       "norm_label": "build_benchmark_nodes()"
     },
     {
@@ -2430,7 +2439,7 @@
       "source_file": "src/ridgeback_autonomy/launch/g1_distance_benchmark.launch.py",
       "source_location": "L132",
       "id": "launch_g1_distance_benchmark_launch_generate_launch_description",
-      "community": 8,
+      "community": 7,
       "norm_label": "generate_launch_description()"
     },
     {
@@ -2455,7 +2464,7 @@
       "label": "generate_launch_description()",
       "file_type": "code",
       "source_file": "src/ridgeback_autonomy/launch/includes/slam.launch.py",
-      "source_location": "L70",
+      "source_location": "L80",
       "id": "includes_slam_launch_generate_launch_description",
       "community": 13,
       "norm_label": "generate_launch_description()"
@@ -2466,7 +2475,7 @@
       "source_file": "src/ridgeback_autonomy/launch/includes/explore.launch.py",
       "source_location": "L1",
       "id": "src_ridgeback_autonomy_launch_includes_explore_launch_py",
-      "community": 8,
+      "community": 7,
       "norm_label": "explore.launch.py"
     },
     {
@@ -2475,7 +2484,7 @@
       "source_file": "src/ridgeback_autonomy/launch/includes/explore.launch.py",
       "source_location": "L10",
       "id": "includes_explore_launch_generate_launch_description",
-      "community": 8,
+      "community": 7,
       "norm_label": "generate_launch_description()"
     },
     {
@@ -2484,7 +2493,7 @@
       "source_file": "src/ridgeback_autonomy/launch/includes/nav2.launch.py",
       "source_location": "L1",
       "id": "src_ridgeback_autonomy_launch_includes_nav2_launch_py",
-      "community": 8,
+      "community": 7,
       "norm_label": "nav2.launch.py"
     },
     {
@@ -2493,7 +2502,7 @@
       "source_file": "src/ridgeback_autonomy/launch/includes/nav2.launch.py",
       "source_location": "L12",
       "id": "includes_nav2_launch_generate_launch_description",
-      "community": 8,
+      "community": 7,
       "norm_label": "generate_launch_description()"
     },
     {
@@ -3528,7 +3537,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L763",
+      "source_location": "L765",
       "weight": 1.0,
       "_src": "src_ridgeback_autonomy_ridgeback_autonomy_benchmarking_g1_distance_benchmark_runner_node_py",
       "_tgt": "benchmarking_g1_distance_benchmark_runner_node_main",
@@ -3564,7 +3573,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L201",
+      "source_location": "L203",
       "weight": 1.0,
       "_src": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner",
       "_tgt": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_on_camera_measurement",
@@ -3576,7 +3585,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L210",
+      "source_location": "L212",
       "weight": 1.0,
       "_src": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner",
       "_tgt": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_on_lidar_measurement",
@@ -3588,7 +3597,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L219",
+      "source_location": "L221",
       "weight": 1.0,
       "_src": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner",
       "_tgt": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_on_color_image",
@@ -3600,7 +3609,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L238",
+      "source_location": "L240",
       "weight": 1.0,
       "_src": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner",
       "_tgt": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_on_depth_image",
@@ -3612,7 +3621,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L257",
+      "source_location": "L259",
       "weight": 1.0,
       "_src": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner",
       "_tgt": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_on_depth_anything_image",
@@ -3624,7 +3633,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L276",
+      "source_location": "L278",
       "weight": 1.0,
       "_src": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner",
       "_tgt": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_run",
@@ -3636,7 +3645,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L308",
+      "source_location": "L310",
       "weight": 1.0,
       "_src": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner",
       "_tgt": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_build_trials",
@@ -3648,7 +3657,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L321",
+      "source_location": "L323",
       "weight": 1.0,
       "_src": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner",
       "_tgt": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_run_trial",
@@ -3660,7 +3669,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L392",
+      "source_location": "L394",
       "weight": 1.0,
       "_src": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner",
       "_tgt": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_capture_measurement_window",
@@ -3672,7 +3681,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L407",
+      "source_location": "L409",
       "weight": 1.0,
       "_src": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner",
       "_tgt": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_save_trial_collage",
@@ -3684,7 +3693,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L426",
+      "source_location": "L428",
       "weight": 1.0,
       "_src": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner",
       "_tgt": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_clear_preview_buffers",
@@ -3696,7 +3705,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L431",
+      "source_location": "L433",
       "weight": 1.0,
       "_src": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner",
       "_tgt": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_store_buffered_preview",
@@ -3708,7 +3717,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L442",
+      "source_location": "L444",
       "weight": 1.0,
       "_src": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner",
       "_tgt": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_backfill_previews_from_buffers",
@@ -3720,7 +3729,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L449",
+      "source_location": "L451",
       "weight": 1.0,
       "_src": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner",
       "_tgt": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_attach_buffered_previews",
@@ -3732,7 +3741,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L474",
+      "source_location": "L476",
       "weight": 1.0,
       "_src": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner",
       "_tgt": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_apply_preview_match",
@@ -3744,7 +3753,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L492",
+      "source_location": "L494",
       "weight": 1.0,
       "_src": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner",
       "_tgt": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_wait_for_required_streams",
@@ -3756,7 +3765,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L519",
+      "source_location": "L521",
       "weight": 1.0,
       "_src": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner",
       "_tgt": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_wait_for_flag",
@@ -3768,7 +3777,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L528",
+      "source_location": "L530",
       "weight": 1.0,
       "_src": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner",
       "_tgt": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_wait_for_entity_pose",
@@ -3780,7 +3789,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L542",
+      "source_location": "L544",
       "weight": 1.0,
       "_src": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner",
       "_tgt": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_compute_ground_truth",
@@ -3792,7 +3801,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L571",
+      "source_location": "L573",
       "weight": 1.0,
       "_src": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner",
       "_tgt": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_spawn_g1",
@@ -3804,7 +3813,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L597",
+      "source_location": "L599",
       "weight": 1.0,
       "_src": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner",
       "_tgt": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_delete_g1",
@@ -3816,7 +3825,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L628",
+      "source_location": "L630",
       "weight": 1.0,
       "_src": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner",
       "_tgt": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_get_pose_snapshot",
@@ -3828,7 +3837,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L650",
+      "source_location": "L652",
       "weight": 1.0,
       "_src": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner",
       "_tgt": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_normalize_pose",
@@ -3840,7 +3849,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L668",
+      "source_location": "L670",
       "weight": 1.0,
       "_src": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner",
       "_tgt": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_extract_json_payload",
@@ -3852,7 +3861,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L671",
+      "source_location": "L673",
       "weight": 1.0,
       "_src": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner",
       "_tgt": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_run_command",
@@ -3864,7 +3873,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L687",
+      "source_location": "L689",
       "weight": 1.0,
       "_src": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner",
       "_tgt": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_try_command",
@@ -3876,7 +3885,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L701",
+      "source_location": "L703",
       "weight": 1.0,
       "_src": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner",
       "_tgt": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_resolved_topic",
@@ -3888,7 +3897,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L708",
+      "source_location": "L710",
       "weight": 1.0,
       "_src": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner",
       "_tgt": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_spin_for",
@@ -3900,7 +3909,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L716",
+      "source_location": "L718",
       "weight": 1.0,
       "_src": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner",
       "_tgt": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_log_warning_once",
@@ -3912,7 +3921,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L722",
+      "source_location": "L724",
       "weight": 1.0,
       "_src": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner",
       "_tgt": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_log_trial",
@@ -3924,7 +3933,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L740",
+      "source_location": "L742",
       "weight": 1.0,
       "_src": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner",
       "_tgt": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_log_summary",
@@ -3936,7 +3945,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L765",
+      "source_location": "L767",
       "weight": 1.0,
       "_src": "benchmarking_g1_distance_benchmark_runner_node_main",
       "_tgt": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner",
@@ -4057,7 +4066,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.8,
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L116",
+      "source_location": "L118",
       "weight": 1.0,
       "_src": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_init",
       "_tgt": "benchmarking_estimators_parse_estimators",
@@ -4069,7 +4078,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.8,
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L144",
+      "source_location": "L146",
       "weight": 1.0,
       "_src": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_init",
       "_tgt": "benchmarking_rendering_benchmarkcollagerenderer",
@@ -4081,7 +4090,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.8,
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L146",
+      "source_location": "L148",
       "weight": 1.0,
       "_src": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_init",
       "_tgt": "benchmarking_estimators_uses_camera_estimators",
@@ -4093,7 +4102,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.8,
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L147",
+      "source_location": "L149",
       "weight": 1.0,
       "_src": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_init",
       "_tgt": "benchmarking_estimators_uses_lidar_estimators",
@@ -4105,7 +4114,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.8,
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L148",
+      "source_location": "L150",
       "weight": 1.0,
       "_src": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_init",
       "_tgt": "benchmarking_estimators_selected_camera_estimators",
@@ -4116,7 +4125,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L208",
+      "source_location": "L210",
       "weight": 1.0,
       "_src": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_on_camera_measurement",
       "_tgt": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_attach_buffered_previews",
@@ -4129,7 +4138,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.8,
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L206",
+      "source_location": "L208",
       "weight": 1.0,
       "_src": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_on_camera_measurement",
       "_tgt": "benchmarking_alignment_ensure_measurement_event",
@@ -4141,7 +4150,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.8,
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L207",
+      "source_location": "L209",
       "weight": 1.0,
       "_src": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_on_camera_measurement",
       "_tgt": "benchmarking_alignment_update_measurement_event",
@@ -4151,23 +4160,23 @@
     {
       "relation": "calls",
       "confidence": "EXTRACTED",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
+      "source_location": "L219",
+      "weight": 1.0,
+      "_src": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_on_lidar_measurement",
+      "_tgt": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_attach_buffered_previews",
+      "source": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_on_lidar_measurement",
+      "target": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_attach_buffered_previews",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
       "source_location": "L217",
       "weight": 1.0,
       "_src": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_on_lidar_measurement",
-      "_tgt": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_attach_buffered_previews",
-      "source": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_on_lidar_measurement",
-      "target": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_attach_buffered_previews",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "calls",
-      "confidence": "INFERRED",
-      "confidence_score": 0.8,
-      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L215",
-      "weight": 1.0,
-      "_src": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_on_lidar_measurement",
       "_tgt": "benchmarking_alignment_ensure_measurement_event",
       "source": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_on_lidar_measurement",
       "target": "benchmarking_alignment_ensure_measurement_event"
@@ -4177,7 +4186,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.8,
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L216",
+      "source_location": "L218",
       "weight": 1.0,
       "_src": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_on_lidar_measurement",
       "_tgt": "benchmarking_alignment_update_measurement_event",
@@ -4188,7 +4197,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L227",
+      "source_location": "L229",
       "weight": 1.0,
       "_src": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_on_color_image",
       "_tgt": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_log_warning_once",
@@ -4200,7 +4209,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L229",
+      "source_location": "L231",
       "weight": 1.0,
       "_src": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_on_color_image",
       "_tgt": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_resolved_topic",
@@ -4212,7 +4221,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L235",
+      "source_location": "L237",
       "weight": 1.0,
       "_src": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_on_color_image",
       "_tgt": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_store_buffered_preview",
@@ -4224,7 +4233,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L236",
+      "source_location": "L238",
       "weight": 1.0,
       "_src": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_on_color_image",
       "_tgt": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_backfill_previews_from_buffers",
@@ -4237,7 +4246,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.8,
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L225",
+      "source_location": "L227",
       "weight": 1.0,
       "_src": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_on_color_image",
       "_tgt": "core_image_utils_convert_color_image_message",
@@ -4249,7 +4258,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.8,
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L234",
+      "source_location": "L236",
       "weight": 1.0,
       "_src": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_on_color_image",
       "_tgt": "benchmarking_alignment_stamp_to_nanoseconds",
@@ -4260,7 +4269,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L246",
+      "source_location": "L248",
       "weight": 1.0,
       "_src": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_on_depth_image",
       "_tgt": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_log_warning_once",
@@ -4272,7 +4281,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L248",
+      "source_location": "L250",
       "weight": 1.0,
       "_src": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_on_depth_image",
       "_tgt": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_resolved_topic",
@@ -4284,7 +4293,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L254",
+      "source_location": "L256",
       "weight": 1.0,
       "_src": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_on_depth_image",
       "_tgt": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_store_buffered_preview",
@@ -4296,7 +4305,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L255",
+      "source_location": "L257",
       "weight": 1.0,
       "_src": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_on_depth_image",
       "_tgt": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_backfill_previews_from_buffers",
@@ -4309,7 +4318,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.8,
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L244",
+      "source_location": "L246",
       "weight": 1.0,
       "_src": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_on_depth_image",
       "_tgt": "core_image_utils_convert_depth_to_meters_message",
@@ -4321,24 +4330,12 @@
       "confidence": "INFERRED",
       "confidence_score": 0.8,
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L253",
+      "source_location": "L255",
       "weight": 1.0,
       "_src": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_on_depth_image",
       "_tgt": "benchmarking_alignment_stamp_to_nanoseconds",
       "source": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_on_depth_image",
       "target": "benchmarking_alignment_stamp_to_nanoseconds"
-    },
-    {
-      "relation": "calls",
-      "confidence": "EXTRACTED",
-      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L265",
-      "weight": 1.0,
-      "_src": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_on_depth_anything_image",
-      "_tgt": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_log_warning_once",
-      "source": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_on_depth_anything_image",
-      "target": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_log_warning_once",
-      "confidence_score": 1.0
     },
     {
       "relation": "calls",
@@ -4347,6 +4344,18 @@
       "source_location": "L267",
       "weight": 1.0,
       "_src": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_on_depth_anything_image",
+      "_tgt": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_log_warning_once",
+      "source": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_on_depth_anything_image",
+      "target": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_log_warning_once",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
+      "source_location": "L269",
+      "weight": 1.0,
+      "_src": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_on_depth_anything_image",
       "_tgt": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_resolved_topic",
       "source": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_on_depth_anything_image",
       "target": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_resolved_topic",
@@ -4356,7 +4365,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L273",
+      "source_location": "L275",
       "weight": 1.0,
       "_src": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_on_depth_anything_image",
       "_tgt": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_store_buffered_preview",
@@ -4368,7 +4377,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L274",
+      "source_location": "L276",
       "weight": 1.0,
       "_src": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_on_depth_anything_image",
       "_tgt": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_backfill_previews_from_buffers",
@@ -4381,7 +4390,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.8,
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L263",
+      "source_location": "L265",
       "weight": 1.0,
       "_src": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_on_depth_anything_image",
       "_tgt": "core_image_utils_convert_depth_to_meters_message",
@@ -4393,7 +4402,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.8,
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L272",
+      "source_location": "L274",
       "weight": 1.0,
       "_src": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_on_depth_anything_image",
       "_tgt": "benchmarking_alignment_stamp_to_nanoseconds",
@@ -4404,7 +4413,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L282",
+      "source_location": "L284",
       "weight": 1.0,
       "_src": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_run",
       "_tgt": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_wait_for_required_streams",
@@ -4416,7 +4425,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L283",
+      "source_location": "L285",
       "weight": 1.0,
       "_src": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_run",
       "_tgt": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_wait_for_entity_pose",
@@ -4428,7 +4437,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L289",
+      "source_location": "L291",
       "weight": 1.0,
       "_src": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_run",
       "_tgt": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_build_trials",
@@ -4440,7 +4449,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L290",
+      "source_location": "L292",
       "weight": 1.0,
       "_src": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_run",
       "_tgt": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_run_trial",
@@ -4452,7 +4461,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L305",
+      "source_location": "L307",
       "weight": 1.0,
       "_src": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_run",
       "_tgt": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_log_summary",
@@ -4464,7 +4473,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L692",
+      "source_location": "L694",
       "weight": 1.0,
       "_src": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_try_command",
       "_tgt": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_run",
@@ -4476,7 +4485,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L768",
+      "source_location": "L770",
       "weight": 1.0,
       "_src": "benchmarking_g1_distance_benchmark_runner_node_main",
       "_tgt": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_run",
@@ -4489,7 +4498,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.8,
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L300",
+      "source_location": "L302",
       "weight": 1.0,
       "_src": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_run",
       "_tgt": "benchmarking_summary_write_trial_csv",
@@ -4501,7 +4510,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.8,
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L302",
+      "source_location": "L304",
       "weight": 1.0,
       "_src": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_run",
       "_tgt": "benchmarking_summary_build_summary_rows",
@@ -4513,7 +4522,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.8,
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L303",
+      "source_location": "L305",
       "weight": 1.0,
       "_src": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_run",
       "_tgt": "benchmarking_summary_write_summary_csv",
@@ -4524,7 +4533,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L330",
+      "source_location": "L332",
       "weight": 1.0,
       "_src": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_run_trial",
       "_tgt": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_spawn_g1",
@@ -4536,7 +4545,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L331",
+      "source_location": "L333",
       "weight": 1.0,
       "_src": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_run_trial",
       "_tgt": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_wait_for_entity_pose",
@@ -4548,7 +4557,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L332",
+      "source_location": "L334",
       "weight": 1.0,
       "_src": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_run_trial",
       "_tgt": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_spin_for",
@@ -4560,7 +4569,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L334",
+      "source_location": "L336",
       "weight": 1.0,
       "_src": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_run_trial",
       "_tgt": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_compute_ground_truth",
@@ -4572,7 +4581,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L335",
+      "source_location": "L337",
       "weight": 1.0,
       "_src": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_run_trial",
       "_tgt": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_capture_measurement_window",
@@ -4584,7 +4593,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L350",
+      "source_location": "L352",
       "weight": 1.0,
       "_src": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_run_trial",
       "_tgt": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_save_trial_collage",
@@ -4596,7 +4605,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L381",
+      "source_location": "L383",
       "weight": 1.0,
       "_src": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_run_trial",
       "_tgt": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_log_trial",
@@ -4608,7 +4617,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L388",
+      "source_location": "L390",
       "weight": 1.0,
       "_src": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_run_trial",
       "_tgt": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_delete_g1",
@@ -4621,7 +4630,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.8,
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L344",
+      "source_location": "L346",
       "weight": 1.0,
       "_src": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_run_trial",
       "_tgt": "benchmarking_reduction_compute_trial_medians",
@@ -4633,7 +4642,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.8,
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L345",
+      "source_location": "L347",
       "weight": 1.0,
       "_src": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_run_trial",
       "_tgt": "benchmarking_reduction_choose_representative_event",
@@ -4644,7 +4653,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L394",
+      "source_location": "L396",
       "weight": 1.0,
       "_src": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_capture_measurement_window",
       "_tgt": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_clear_preview_buffers",
@@ -4656,7 +4665,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L397",
+      "source_location": "L399",
       "weight": 1.0,
       "_src": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_capture_measurement_window",
       "_tgt": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_spin_for",
@@ -4669,7 +4678,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.8,
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L401",
+      "source_location": "L403",
       "weight": 1.0,
       "_src": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_capture_measurement_window",
       "_tgt": "benchmarking_reduction_usable_aligned_events",
@@ -4680,7 +4689,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L447",
+      "source_location": "L449",
       "weight": 1.0,
       "_src": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_backfill_previews_from_buffers",
       "_tgt": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_attach_buffered_previews",
@@ -4692,7 +4701,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L450",
+      "source_location": "L452",
       "weight": 1.0,
       "_src": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_attach_buffered_previews",
       "_tgt": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_apply_preview_match",
@@ -4705,7 +4714,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.8,
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L453",
+      "source_location": "L455",
       "weight": 1.0,
       "_src": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_attach_buffered_previews",
       "_tgt": "benchmarking_alignment_find_exact_preview_match",
@@ -4717,7 +4726,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.8,
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L460",
+      "source_location": "L462",
       "weight": 1.0,
       "_src": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_attach_buffered_previews",
       "_tgt": "benchmarking_alignment_find_nearest_preview_match",
@@ -4728,7 +4737,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L494",
+      "source_location": "L496",
       "weight": 1.0,
       "_src": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_wait_for_required_streams",
       "_tgt": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_wait_for_flag",
@@ -4740,7 +4749,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L496",
+      "source_location": "L498",
       "weight": 1.0,
       "_src": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_wait_for_required_streams",
       "_tgt": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_resolved_topic",
@@ -4752,7 +4761,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L532",
+      "source_location": "L534",
       "weight": 1.0,
       "_src": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_wait_for_entity_pose",
       "_tgt": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_get_pose_snapshot",
@@ -4764,7 +4773,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L543",
+      "source_location": "L545",
       "weight": 1.0,
       "_src": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_compute_ground_truth",
       "_tgt": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_get_pose_snapshot",
@@ -4777,7 +4786,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.8,
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L554",
+      "source_location": "L556",
       "weight": 1.0,
       "_src": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_compute_ground_truth",
       "_tgt": "core_geometry_yaw_from_quaternion",
@@ -4789,7 +4798,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.8,
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L560",
+      "source_location": "L562",
       "weight": 1.0,
       "_src": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_compute_ground_truth",
       "_tgt": "core_geometry_planar_distance_from_vehicle_origin",
@@ -4800,7 +4809,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L586",
+      "source_location": "L588",
       "weight": 1.0,
       "_src": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_spawn_g1",
       "_tgt": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_run_command",
@@ -4812,7 +4821,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L610",
+      "source_location": "L612",
       "weight": 1.0,
       "_src": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_delete_g1",
       "_tgt": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_try_command",
@@ -4824,7 +4833,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L618",
+      "source_location": "L620",
       "weight": 1.0,
       "_src": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_delete_g1",
       "_tgt": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_get_pose_snapshot",
@@ -4836,7 +4845,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L637",
+      "source_location": "L639",
       "weight": 1.0,
       "_src": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_get_pose_snapshot",
       "_tgt": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_run_command",
@@ -4848,7 +4857,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L642",
+      "source_location": "L644",
       "weight": 1.0,
       "_src": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_get_pose_snapshot",
       "_tgt": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_extract_json_payload",
@@ -4860,7 +4869,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L645",
+      "source_location": "L647",
       "weight": 1.0,
       "_src": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_get_pose_snapshot",
       "_tgt": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_normalize_pose",
@@ -4884,7 +4893,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L677",
+      "source_location": "L679",
       "weight": 1.0,
       "_src": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_run_command",
       "_tgt": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_try_command",
@@ -8675,6 +8684,18 @@
     {
       "relation": "contains",
       "confidence": "EXTRACTED",
+      "source_file": "src/ridgeback_autonomy/test/test_launch_layout.py",
+      "source_location": "L73",
+      "weight": 1.0,
+      "_src": "src_ridgeback_autonomy_test_test_launch_layout_py",
+      "_tgt": "test_test_launch_layout_test_slam_lifecycle_configure_and_activate_are_separately_delayed",
+      "source": "src_ridgeback_autonomy_test_test_launch_layout_py",
+      "target": "test_test_launch_layout_test_slam_lifecycle_configure_and_activate_are_separately_delayed",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
       "source_file": "src/ridgeback_autonomy/test/test_image_utils.py",
       "source_location": "L13",
       "weight": 1.0,
@@ -8976,7 +8997,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src/ridgeback_autonomy/launch/includes/slam.launch.py",
-      "source_location": "L70",
+      "source_location": "L80",
       "weight": 1.0,
       "_src": "src_ridgeback_autonomy_launch_includes_slam_launch_py",
       "_tgt": "includes_slam_launch_generate_launch_description",

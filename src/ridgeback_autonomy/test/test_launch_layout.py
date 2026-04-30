@@ -61,8 +61,22 @@ def test_benchmark_launch_uses_new_multi_estimator_interface() -> None:
 
     assert "'estimators'" in benchmark_text
     assert "'output_dir'" in benchmark_text
+    assert "'benchmark-results'" in benchmark_text
+    assert '/tmp/g1_distance_benchmark_runs' not in benchmark_text
     assert 'rgb,sensor_depth,depth_anything,pointcloud,lidar' in benchmark_text
     assert 'measurement_backend' not in benchmark_text
     assert 'primary_metric' not in benchmark_text
     assert "DeclareLaunchArgument('depth_anything_enabled'" not in benchmark_text
     assert "DeclareLaunchArgument('output_csv'" not in benchmark_text
+
+
+def test_slam_lifecycle_configure_and_activate_are_separately_delayed() -> None:
+    repo_root = Path(__file__).resolve().parents[3]
+    slam_text = (
+        repo_root / 'src' / 'ridgeback_autonomy' / 'launch' / 'includes' / 'slam.launch.py'
+    ).read_text(encoding='utf-8')
+
+    assert 'Transition.TRANSITION_CONFIGURE' in slam_text
+    assert 'Transition.TRANSITION_ACTIVATE' in slam_text
+    assert 'period=2.0' in slam_text
+    assert 'period=8.0' in slam_text

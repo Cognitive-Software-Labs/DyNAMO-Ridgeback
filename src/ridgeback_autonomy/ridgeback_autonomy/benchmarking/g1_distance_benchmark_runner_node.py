@@ -94,10 +94,12 @@ class G1DistanceBenchmarkRunner(Node):
 
         pkg_share = get_package_share_directory('ridgeback_autonomy')
         self.g1_model_sdf = os.path.join(pkg_share, 'sim', 'models', 'g1', 'model.sdf')
+        workspace_root = os.path.abspath(os.path.join(pkg_share, '..', '..', '..', '..'))
+        default_output_dir = os.path.join(workspace_root, 'benchmark-results')
 
         self.declare_parameter('world', 'g1_distance_calibration')
         self.declare_parameter('repeats', 5)
-        self.declare_parameter('output_dir', '/tmp/g1_distance_benchmark_runs')
+        self.declare_parameter('output_dir', default_output_dir)
         self.declare_parameter('settle_sec', 2.0)
         self.declare_parameter('capture_sec', 10.0)
         self.declare_parameter('estimators', 'rgb,sensor_depth,depth_anything,pointcloud,lidar')

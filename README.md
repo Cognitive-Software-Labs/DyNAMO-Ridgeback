@@ -224,10 +224,12 @@ ros2 launch ridgeback_autonomy g1_distance_benchmark.launch.py estimators:=rgb,l
 
 This launch composes the simulator, `g1_detector_node`, the camera measurement node and/or the LiDAR measurement node depending on `estimators`, and `g1_distance_benchmark_runner`.
 
-Each benchmark run writes under `/tmp/g1_distance_benchmark_runs/<timestamp>/` by default:
+Each benchmark run writes under `benchmark-results/<timestamp>/` by default:
 - one trial-level CSV per selected estimator
 - one `comparison_summary.csv`
 - one shared collage image per included trial under `images/`
+
+Pass `output_dir:=...` to write the timestamped run folder somewhere else.
 
 Arguments:
 
@@ -239,7 +241,7 @@ Arguments:
 | `world` | `g1_distance_calibration` | Gazebo world used for the benchmark run |
 | `estimators` | `rgb,sensor_depth,depth_anything,pointcloud,lidar` | Comma-separated estimator subset to compare in one run |
 | `repeats` | `5` | Number of positive-trial repeats per spawn pose |
-| `output_dir` | `/tmp/g1_distance_benchmark_runs` | Root directory that will receive one timestamped subfolder per run |
+| `output_dir` | `<repo-root>/benchmark-results` | Root directory that will receive one timestamped subfolder per run |
 | `settle_sec` | `2.0` | Delay after spawning the target before sampling |
 | `capture_sec` | `10.0` | Sampling window length for collecting usable detections |
 | `color_topic` | `sensors/camera_0/color/image` | RGB topic used by the detector, camera measurement node, and benchmark snapshots |
