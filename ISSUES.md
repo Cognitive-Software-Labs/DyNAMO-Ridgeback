@@ -83,6 +83,14 @@ Both runs brought up Gazebo, `/clock`, SLAM, and the G1 perception nodes success
 
 If SHM-related FastDDS errors return on another machine, the simplest fallback is to temporarily restore a UDP-only FastDDS profile and set `FASTRTPS_DEFAULT_PROFILES_FILE` again for the affected launch.
 
+## SLAM Drift in Featureless Environments (Office World)
+
+**Symptom**: After launching in the office world, the robot appears to jump/move randomly in RViz (map→odom transform drifts) while the robot remains physically stationary in Gazebo.
+
+**Root Cause**: `minimum_travel_distance: 0.0` and `minimum_travel_heading: 0.0` in `slam_toolbox_params.yaml` cause slam_toolbox to process *every* incoming scan even when the robot has not moved. In the warehouse world the shelving provides many distinctive scan features, so small mismatches stay bounded. The office world has large open areas with uniform walls; each scan-to-scan mismatch is small but uncorrected, and the accumulated drift eventually makes the map→odom TF spin the robot around in RViz.
+
+**Fix**: Set `minimum_travel_distance: 0.05` and `minimum_travel_heading: 0.05` in `slam_toolbox_params.yaml`. This gates scan processing to moments when the robot has moved ≥ 5 cm or rotated ≥ 3°, eliminating spurious updates while stationary.
+
 ## Namespace Gotchas
 
 If you add new nodes to this project, always:
