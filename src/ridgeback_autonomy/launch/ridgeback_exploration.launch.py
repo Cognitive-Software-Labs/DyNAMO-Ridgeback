@@ -26,6 +26,7 @@ def generate_launch_description():
     exploration_rviz = LaunchConfiguration('exploration_rviz')
     g1_perception_enabled = LaunchConfiguration('g1_perception_enabled')
     depth_anything_enabled = LaunchConfiguration('depth_anything_enabled')
+    mppi_visualize = LaunchConfiguration('mppi_visualize')
 
     rviz_config = os.path.join(pkg_this, 'sim', 'rviz', 'exploration.rviz')
 
@@ -39,13 +40,15 @@ def generate_launch_description():
         DeclareLaunchArgument('use_sim_time', default_value='true'),
         DeclareLaunchArgument('setup_path',
                               default_value=os.path.expanduser('~/clearpath/')),
-        DeclareLaunchArgument('world', default_value='warehouse'),
+        DeclareLaunchArgument('world', default_value='mock_hospital'),
         DeclareLaunchArgument('exploration_rviz', default_value='true',
                               description='Launch the exploration RViz2 config'),
         DeclareLaunchArgument('g1_perception_enabled', default_value='true',
                               description='Launch the G1 perception stack'),
         DeclareLaunchArgument('depth_anything_enabled', default_value='false',
                               description='Enable Depth-Anything in the camera measurement node'),
+        DeclareLaunchArgument('mppi_visualize', default_value='false',
+                              description='Publish MPPI trajectory visualization topics'),
 
         # RViz2
         Node(
@@ -146,6 +149,7 @@ def generate_launch_description():
                     launch_arguments={
                         'namespace': namespace,
                         'use_sim_time': use_sim_time,
+                        'mppi_visualize': mppi_visualize,
                     }.items(),
                 ),
             ],

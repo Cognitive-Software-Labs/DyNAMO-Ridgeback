@@ -125,14 +125,14 @@ index 69135ab..38589ce 100644
      ld.add_action(clock_bridge)
      return ld
 diff --git a/clearpath_gz/launch/simulation.launch.py b/clearpath_gz/launch/simulation.launch.py
-index 010f7fb..355e8b1 100644
+index 010f7fb..61200e0 100644
 --- a/clearpath_gz/launch/simulation.launch.py
 +++ b/clearpath_gz/launch/simulation.launch.py
 @@ -29,6 +29,8 @@ ARGUMENTS = [
      DeclareLaunchArgument('world', default_value='warehouse',
                            choices=[
                                'construction',
-+                              'hospital',
++                              'mock_hospital',
 +                              'g1_distance_calibration',
                                'office',
                                'orchard',

@@ -8,15 +8,27 @@
 set -e
 
 echo "=== Killing all ROS/Gazebo processes ==="
+CURRENT_USER="$(id -un)"
+SELF_PID="$$"
+PARENT_PID="$PPID"
+
+kill_matches() {
+    local pattern="$1"
+    pgrep -u "$CURRENT_USER" -f "$pattern" 2>/dev/null | while read -r pid; do
+        if [ "$pid" != "$SELF_PID" ] && [ "$pid" != "$PARENT_PID" ]; then
+            kill -9 "$pid" 2>/dev/null || true
+        fi
+    done
+}
 
 # Kill ros2 launch processes first (they may respawn children)
-pkill -9 -f "ros2.*launch" 2>/dev/null || true
+kill_matches "ros2.*launch"
 sleep 0.5
 
 # Kill Gazebo
-pkill -9 -f "gz sim" 2>/dev/null || true
-pkill -9 -f "ruby.*gz" 2>/dev/null || true
-pkill -9 -f "gz-sim" 2>/dev/null || true
+kill_matches "gz sim"
+kill_matches "ruby.*gz"
+kill_matches "gz-sim"
 
 # Kill all known ROS node executables
 PATTERNS=(
@@ -54,13 +66,13 @@ PATTERNS=(
 )
 
 for pat in "${PATTERNS[@]}"; do
-    pkill -9 -f "$pat" 2>/dev/null || true
+    kill_matches "$pat"
 done
 
 sleep 1
 
 # Verify nothing is left
-REMAINING=$(ps aux | grep -E "ros2|gz sim|parameter_bridge|slam_toolbox|nav2|explore|ekf_node|tf_relay|robot_state_pub|joy_linux|teleop|marker_server|image_bridge|rviz" | grep -v grep | grep -v cleanup.sh | grep -v start_exploration.sh | grep -v "bash -c" || true)
+REMAINING=$(ps -u "$CURRENT_USER" -o user=,pid=,pcpu=,pmem=,args= | grep -E "ros2|gz sim|parameter_bridge|slam_toolbox|nav2|explore|ekf_node|tf_relay|robot_state_pub|joy_linux|teleop|marker_server|image_bridge|rviz" | grep -v grep | grep -v cleanup.sh | grep -v start_exploration.sh | grep -v "bash -c" || true)
 
 if [ -n "$REMAINING" ]; then
     echo "WARNING: Some processes still running:"
@@ -76,7 +88,7 @@ rm -f /dev/shm/fastrtps_* 2>/dev/null || true
 
 echo "=== Cleanup complete ==="
 # Final check
-STILL=$(ps aux | grep -E "ros2|gz sim|parameter_bridge|slam_toolbox|nav2|explore|ekf_node|tf_relay|robot_state_pub|joy_linux|teleop|marker_server|image_bridge|rviz" | grep -v grep | grep -v cleanup.sh | grep -v start_exploration.sh | grep -v "bash -c" || true)
+STILL=$(ps -u "$CURRENT_USER" -o user=,pid=,pcpu=,pmem=,args= | grep -E "ros2|gz sim|parameter_bridge|slam_toolbox|nav2|explore|ekf_node|tf_relay|robot_state_pub|joy_linux|teleop|marker_server|image_bridge|rviz" | grep -v grep | grep -v cleanup.sh | grep -v start_exploration.sh | grep -v "bash -c" || true)
 if [ -n "$STILL" ]; then
     echo "WARNING: Could not kill:"
     echo "$STILL"

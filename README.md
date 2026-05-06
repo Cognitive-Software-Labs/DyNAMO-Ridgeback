@@ -81,7 +81,7 @@ cd src/slam_toolbox && git apply ../../patches/slam_toolbox_tf_namespace.patch &
 rosdep install --from-paths src --ignore-src -r -y
 
 # Build
-colcon build --symlink-install
+colcon build --symlink-install --base-paths src
 source install/setup.bash
 ```
 
@@ -161,9 +161,9 @@ Available worlds:
 
 | World | Source | Notes |
 |-------|--------|-------|
-| `warehouse` | Clearpath | Default; large open floor plan |
+| `mock_hospital` | Custom (`sim/worlds/`) | Default; detailed multi-room clinical layout |
+| `warehouse` | Clearpath | Large open floor plan |
 | `office` | Clearpath | Smaller rooms and corridors |
-| `hospital` | Custom (`sim/worlds/`) | Multi-room clinical layout |
 | `construction` | Clearpath | Outdoor construction site |
 | `orchard` | Clearpath | Outdoor orchard rows |
 | `solar_farm` | Clearpath | Outdoor solar panel array |
@@ -173,13 +173,14 @@ Arguments:
 
 | Argument | Default | Meaning |
 |----------|---------|---------|
-| `world` | `warehouse` | Gazebo world to load (see table above) |
+| `world` | `mock_hospital` | Gazebo world to load (see table above) |
 | `namespace` | `r100_0001` | ROS namespace for all nodes |
 | `use_sim_time` | `true` | Use Gazebo `/clock` |
 | `setup_path` | `~/clearpath/` | Directory containing `robot.yaml` and generated Clearpath files |
 | `exploration_rviz` | `true` | Launch the custom exploration RViz config |
 | `g1_perception_enabled` | `true` | Launch the G1 perception stack |
 | `depth_anything_enabled` | `false` | Enable Depth-Anything in the camera measurement node |
+| `mppi_visualize` | `false` | Publish MPPI trajectory visualization topics |
 
 Examples:
 
@@ -187,20 +188,28 @@ Examples:
 # Always clean up stale processes first
 bash cleanup.sh
 
-ros2 launch ridgeback_autonomy ridgeback_exploration.launch.py world:=hospital
+ros2 launch ridgeback_autonomy ridgeback_exploration.launch.py world:=mock_hospital
 ros2 launch ridgeback_autonomy ridgeback_exploration.launch.py world:=warehouse exploration_rviz:=false
 ros2 launch ridgeback_autonomy ridgeback_exploration.launch.py world:=office depth_anything_enabled:=true
-ros2 launch ridgeback_autonomy ridgeback_exploration.launch.py world:=hospital g1_perception_enabled:=false
+ros2 launch ridgeback_autonomy ridgeback_exploration.launch.py world:=mock_hospital g1_perception_enabled:=false
 ```
 
 #### Quick-start script
 
-`start_exploration.sh` sources the workspace, runs cleanup, and launches with Depth-Anything enabled:
+`start_exploration.sh` sources the workspace, runs cleanup, and launches exploration. Depth-Anything stays disabled unless explicitly enabled:
 
 ```bash
-bash start_exploration.sh              # defaults to warehouse
-bash start_exploration.sh office       # any world name as the first arg
-bash start_exploration.sh hospital
+bash start_exploration.sh              # defaults to mock_hospital
+bash start_exploration.sh office       # any listed world name as the first arg
+bash start_exploration.sh mock_hospital
+DEPTH_ANYTHING_ENABLED=true bash start_exploration.sh office
+```
+
+`build_and_start_expl.sh` rebuilds the workspace first, then runs the same exploration quick-start:
+
+```bash
+bash build_and_start_expl.sh
+bash build_and_start_expl.sh office
 ```
 
 ### `g1_distance_benchmark.launch.py`
@@ -261,7 +270,7 @@ Benchmark semantics:
 
 | Node | Output topic | Key params |
 |------|--------------|------------|
-| `g1_detector_node` | `detections/g1/raw` | `color_topic`, `detection_model`, `detection_threshold` |
+| `g1_detector_node` | `detections/g1/raw` | `color_topic`, `detection_model`, `detection_threshold`, `detector_fps` |
 | `g1_camera_measurement_node` | `measurements/g1/camera` | `camera_config_path`, `color_topic`, `depth_topic`, `pointcloud_topic`, `base_frame`, `enabled_estimators`, `depth_anything_enabled` |
 | `g1_lidar_measurement_node` | `measurements/g1/lidar` | `camera_config_path`, `scan_topic`, `base_frame` |
 | `g1_overlay_node` | OpenCV window only | `measurement_topic`, `color_topic`, `depth_topic`, `mono_depth_debug_topic` |
@@ -281,8 +290,9 @@ The shared camera geometry lives in `config/camera_config.json`, and the measure
 | File | Parameter | Effect |
 |------|-----------|--------|
 | `config/explore_lite_params.yaml` | `min_frontier_size` | Minimum frontier size (m) to consider — increase to skip small gaps |
-| `config/explore_lite_params.yaml` | `planner_frequency` | How often (Hz) to re-evaluate frontiers |
-| `config/nav2_params.yaml` | `vx_max` / `vy_max` | Robot speed limits |
+| `config/explore_lite_params.yaml` | `planner_frequency` | How often (Hz) to re-evaluate frontiers; lower values reduce goal preemption churn |
+| `config/nav2_params.yaml` | `vx_max` / `vy_max` / `wz_max` | Robot linear and turn-rate limits |
+| `config/nav2_params.yaml` | `max_accel` / `max_decel` | Velocity smoother acceleration and braking limits |
 | `config/slam_toolbox_params.yaml` | `resolution` | Map resolution (m/pixel) |
 
 ## Patches and Issue History

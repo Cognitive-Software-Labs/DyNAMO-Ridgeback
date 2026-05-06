@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import threading
+import time
 
 import rclpy
 from rclpy.executors import ExternalShutdownException
@@ -25,6 +26,7 @@ from ridgeback_autonomy.perception.core.image_utils import (
 
 
 RAW_DETECTIONS_TOPIC = 'detections/g1/raw'
+DETECTOR_FPS_DEFAULT = 5.0
 
 
 class G1DetectorNode(Node):
@@ -33,16 +35,20 @@ class G1DetectorNode(Node):
 
         self.declare_parameter('detection_model', DETECTION_MODEL_DEFAULT)
         self.declare_parameter('detection_threshold', DETECTION_THRESHOLD)
+        self.declare_parameter('detector_fps', DETECTOR_FPS_DEFAULT)
         self.declare_parameter('color_topic', 'sensors/camera_0/color/image')
         self.declare_parameter('detections_topic', RAW_DETECTIONS_TOPIC)
 
         self.detection_model = self.get_parameter('detection_model').value
         self.detection_threshold = float(self.get_parameter('detection_threshold').value)
+        self.detector_fps = max(0.1, float(self.get_parameter('detector_fps').value))
+        self.detector_period = 1.0 / self.detector_fps
         self.color_topic = self.get_parameter('color_topic').value
         self.detections_topic = self.get_parameter('detections_topic').value
 
         self.detector = OwlV2Detector(self.detection_model, self.get_logger())
         self.detector.load()
+        self.last_detection_time = 0.0
         self.latest_color_msg: Image | None = None
         self.processing_lock = threading.Lock()
         self.process_event = threading.Event()
@@ -64,6 +70,7 @@ class G1DetectorNode(Node):
 
         self.get_logger().info(f'Subscribed to color stream: {self.color_topic}')
         self.get_logger().info(f'Publishing raw detections on: {self.detections_topic}')
+        self.get_logger().info(f'Running detector at up to {self.detector_fps:.1f} FPS')
 
     def on_color_image(self, color_msg: Image) -> None:
         with self.processing_lock:
@@ -76,19 +83,20 @@ class G1DetectorNode(Node):
                 continue
             self.process_event.clear()
 
-            while not self.stop_event.is_set():
-                with self.processing_lock:
-                    color_msg = self.latest_color_msg
-                    self.latest_color_msg = None
+            next_allowed_time = self.last_detection_time + self.detector_period
+            wait_time = next_allowed_time - time.monotonic()
+            if wait_time > 0.0 and self.stop_event.wait(wait_time):
+                break
 
-                if color_msg is None:
-                    break
+            with self.processing_lock:
+                color_msg = self.latest_color_msg
+                self.latest_color_msg = None
 
-                self.process_color_image(color_msg)
+            if color_msg is None:
+                continue
 
-                if not self.process_event.is_set():
-                    break
-                self.process_event.clear()
+            self.process_color_image(color_msg)
+            self.last_detection_time = time.monotonic()
 
     def process_color_image(self, color_msg: Image) -> None:
         try:

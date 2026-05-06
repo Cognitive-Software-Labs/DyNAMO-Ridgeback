@@ -97,7 +97,7 @@ class G1OverlayNode(Node):
 
     def measurement_callback(self, measurements_msg: G1Measurements) -> None:
         self.latest_measurements_msg = measurements_msg
-        self.render_latest(force=True)
+        self.render_latest()
 
     def lidar_measurement_callback(self, measurements_msg: G1Measurements) -> None:
         key = self.measurement_message_key(measurements_msg)
@@ -105,24 +105,20 @@ class G1OverlayNode(Node):
         self.lidar_measurement_cache.move_to_end(key)
         while len(self.lidar_measurement_cache) > 32:
             self.lidar_measurement_cache.popitem(last=False)
-        self.render_latest()
 
     def color_callback(self, color_msg: Image) -> None:
         self.latest_color_msg = color_msg
-        self.render_latest()
 
     def depth_callback(self, depth_msg: Image) -> None:
         self.latest_depth_msg = depth_msg
-        self.render_latest()
 
     def mono_depth_callback(self, mono_depth_msg: Image) -> None:
         self.latest_mono_depth_msg = mono_depth_msg
-        self.render_latest()
 
     def render_callback(self) -> None:
         cv2.waitKey(1)
 
-    def render_latest(self, force: bool = False) -> None:
+    def render_latest(self) -> None:
         if self.latest_measurements_msg is None or self.latest_color_msg is None:
             return
 

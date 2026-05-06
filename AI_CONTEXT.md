@@ -103,7 +103,7 @@ Benchmark stack:
 - Always run `bash cleanup.sh` before launching from the repo runbooks or helper scripts
 - `start_office_perception.sh` is the fastest way to reproduce the office perception workflow; it already sources the workspace, runs cleanup, and enables `depth_anything_enabled:=true`
 - The G1 overlay is a separate OpenCV window, not an RViz panel
-- The `hospital` world is the main exploration scenario; `warehouse` is the larger exploration test; `office` is the common perception-debug world
+- The `mock_hospital` world is the main exploration scenario; `warehouse` is the larger exploration test; `office` is the common perception-debug world
 - `perception_venv/` is expected for OWLv2 and Depth-Anything dependencies; the public launches prepend its `bin/` directory to `PATH`
 - If you move or rename sim assets that are referenced by patched Clearpath files, update `patches/clearpath_gz_customizations.patch` in the same change
 
