@@ -1,0 +1,50 @@
+/**:
+  frontier_explorer_node:
+    ros__parameters:
+      # TF and map frames
+      robot_base_frame: base_link
+      
+      # Costmap topic (from Nav2)
+      costmap_topic: global_costmap/costmap
+      
+      # Frontier detection parameters
+      min_frontier_size: 4              # Minimum cells in a frontier cluster
+      distance_weight: 0.7              # Weight for distance in frontier scoring (0-1)
+      size_weight: 0.3                  # Weight for cluster size in frontier scoring (0-1)
+      
+      # Tier-based selection: frontiers within near_frontier_radius cells are always
+      # preferred over distant ones (sorted by distance, nearest first).
+      # At 0.06 m/cell: 90 cells = 5.4 m — wide enough to include room doorways
+      # at startup (~58 cells from origin at x=4, y=1.6).
+      near_frontier_radius: 120
+
+      # Goal placement: advance N cells PAST the frontier centroid (away from robot)
+      # so the goal lands inside the unexplored room.  Unknown cells have cost -1,
+      # which always passes is_goal_safe(), and Nav2 plans through them with
+      # allow_unknown=true.
+      goal_advance_cells: 10
+
+      # Distance scoring for far-tier frontiers
+      max_effective_frontier_size: 80
+
+      # Goal safety: reject goals where any cell within margin has cost >= goal_cost_threshold.
+      # 50 with margin 2 allows goals near wall corners while still rejecting lethal zones.
+      goal_cost_threshold: 50
+      goal_safety_margin: 2
+
+      # Oscillation prevention: blacklist a goal after this many consecutive aborts
+      abort_blacklist_threshold: 3
+      # Cells radius around a visited goal that counts as "already explored"
+      visited_goal_radius: 25
+
+      # Costmap threshold for obstacle detection in the awareness map
+      lethal_cost_threshold: 90
+
+      # Exploration loop timing
+      planner_frequency: 2.0
+      progress_timeout: 60.0
+      startup_delay: 5.0
+      abort_retry_delay: 5.0            # Seconds (wall clock) to wait before retrying after a goal abort
+      
+      # Visualization
+      visualize: true                   # Publish frontier visualization markers

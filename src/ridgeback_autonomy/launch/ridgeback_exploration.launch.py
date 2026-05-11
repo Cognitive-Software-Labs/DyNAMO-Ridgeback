@@ -27,6 +27,7 @@ def generate_launch_description():
     g1_perception_enabled = LaunchConfiguration('g1_perception_enabled')
     depth_anything_enabled = LaunchConfiguration('depth_anything_enabled')
     mppi_visualize = LaunchConfiguration('mppi_visualize')
+    explorer = LaunchConfiguration('explorer')
 
     rviz_config = os.path.join(pkg_this, 'sim', 'rviz', 'exploration.rviz')
 
@@ -49,6 +50,8 @@ def generate_launch_description():
                               description='Enable Depth-Anything in the camera measurement node'),
         DeclareLaunchArgument('mppi_visualize', default_value='false',
                               description='Publish MPPI trajectory visualization topics'),
+        DeclareLaunchArgument('explorer', default_value='explore_lite',
+                              description='Which explorer to use: "explore_lite" or "custom"'),
 
         # RViz2
         Node(
@@ -140,7 +143,7 @@ def generate_launch_description():
 
         # 3. Launch Nav2 (delayed to let SLAM start publishing map)
         TimerAction(
-            period=30.0,
+            period=65.0,
             actions=[
                 IncludeLaunchDescription(
                     PythonLaunchDescriptionSource(
@@ -155,9 +158,9 @@ def generate_launch_description():
             ],
         ),
 
-        # 4. Launch explore_lite (delayed to let Nav2 fully start)
+        # 4. Launch explorer (delayed to let Nav2 fully start)
         TimerAction(
-            period=45.0,
+            period=80.0,
             actions=[
                 IncludeLaunchDescription(
                     PythonLaunchDescriptionSource(
@@ -166,6 +169,7 @@ def generate_launch_description():
                     launch_arguments={
                         'namespace': namespace,
                         'use_sim_time': use_sim_time,
+                        'explorer': explorer,
                     }.items(),
                 ),
             ],

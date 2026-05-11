@@ -45,13 +45,13 @@ Rules:
 Use `README.md` for the full human runbook. In particular, point humans there for:
 - installation and workspace build steps
 - the 2 public launch entrypoints
-- `start_office_perception.sh`
+- `start_exploration.sh` and `build_and_start_expl.sh` quick-start scripts
 - G1 perception setup in `perception_venv`
 - public parameters and benchmark usage
 
 Use `ISSUES.md` when the task touches:
 - `slam_toolbox` TF namespace behavior
-- old FastDDS shared-memory workarounds
+- the FastDDS shared-memory workaround (`FASTRTPS_NO_SHM` toggle in `start_exploration.sh`)
 - stale-process cleanup, diagnostics, or recurring environment failures
 
 ## Repo Mental Model
@@ -71,7 +71,7 @@ Exploration stack:
 - Gazebo simulation
 - `slam_toolbox`
 - Nav2
-- `explore_lite`
+- frontier explorer — either `explore_lite` (default) or the in-repo `frontier_explorer_node`, dispatched in `launch/includes/explore.launch.py` based on the `explorer` arg
 - custom RViz config
 
 G1 perception stack:
@@ -101,7 +101,8 @@ Benchmark stack:
 ## Non-Obvious Conventions
 
 - Always run `bash cleanup.sh` before launching from the repo runbooks or helper scripts
-- `start_office_perception.sh` is the fastest way to reproduce the office perception workflow; it already sources the workspace, runs cleanup, and enables `depth_anything_enabled:=true`
+- `start_exploration.sh` is the canonical quick-start: sources the workspace, runs cleanup, and forwards `world` (positional 1), `EXPLORER` / explorer (positional 2 or env), `DEPTH_ANYTHING_ENABLED` (env), and `FASTRTPS_NO_SHM` (env) to the public launch
+- `build_and_start_expl.sh` rebuilds the workspace before forwarding to `start_exploration.sh`; pass-through args are positional in the same order
 - The G1 overlay is a separate OpenCV window, not an RViz panel
 - The `mock_hospital` world is the main exploration scenario; `warehouse` is the larger exploration test; `office` is the common perception-debug world
 - `perception_venv/` is expected for OWLv2 and Depth-Anything dependencies; the public launches prepend its `bin/` directory to `PATH`
@@ -112,18 +113,21 @@ Benchmark stack:
 - `clearpath/robot.yaml` must also exist at `~/clearpath/robot.yaml` for the simulator default path
 - Sensor names are auto-indexed by Clearpath, so the first camera becomes `camera_0` and the first 2D lidar becomes `lidar2d_0`
 - `slam_toolbox` is sourced from `.repos` and still needs the local TF namespace patch described in `ISSUES.md`
-- The old FastDDS no-SHM profile was removed from the public launches; keep the historical rationale in `ISSUES.md`, not in `README.md`
+- The UDP-only FastDDS profile is now a `start_exploration.sh` toggle (`FASTRTPS_NO_SHM`, default `true`); the public launches do not set FastDDS env vars themselves, so `ros2 launch` invocations honor whatever is in your shell. Keep the historical rationale and toggle docs in `ISSUES.md`, not in `README.md`
 
 ## Key Config And Entry Files
 
 - `clearpath/robot.yaml`: robot platform, namespace, and sensor declarations
 - `src/ridgeback_autonomy/launch/ridgeback_exploration.launch.py`: main public exploration launch
 - `src/ridgeback_autonomy/launch/g1_distance_benchmark.launch.py`: public benchmark launch
-- `start_office_perception.sh`: convenience launcher for office perception debugging
+- `start_exploration.sh`: canonical exploration quick-start (cleanup + launch + arg/env forwarding)
+- `build_and_start_expl.sh`: rebuild then forward to `start_exploration.sh`
 - `src/ridgeback_autonomy/config/nav2_params.yaml`: Nav2 config
 - `src/ridgeback_autonomy/config/slam_toolbox_params.yaml`: SLAM config
-- `src/ridgeback_autonomy/config/explore_lite_params.yaml`: frontier exploration config
+- `src/ridgeback_autonomy/config/explore_lite_params.yaml`: `explore_lite` frontier exploration config
+- `src/ridgeback_autonomy/config/frontier_explorer_params.yaml`: in-repo `frontier_explorer_node` config (used when `explorer:=custom`)
 - `src/ridgeback_autonomy/config/camera_config.json`: shared camera geometry
+- `fastrtps_no_shm.xml`: UDP-only FastDDS profile exported by `start_exploration.sh` when `FASTRTPS_NO_SHM=true`
 
 ## External Dependencies
 

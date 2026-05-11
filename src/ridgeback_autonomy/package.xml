@@ -25,6 +25,7 @@
   <exec_depend>nav2_common</exec_depend>
   <exec_depend>explore_lite</exec_depend>
   <exec_depend>rclpy</exec_depend>
+  <exec_depend>nav2_msgs</exec_depend>
   <exec_depend>ament_index_python</exec_depend>
   <exec_depend>message_filters</exec_depend>
   <exec_depend>sensor_msgs</exec_depend>
