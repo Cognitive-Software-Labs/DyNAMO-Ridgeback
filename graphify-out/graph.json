@@ -9,7 +9,7 @@
       "source_file": "tools/rebuild_graphify.py",
       "source_location": "L1",
       "id": "tools_rebuild_graphify_py",
-      "community": 6,
+      "community": 8,
       "norm_label": "rebuild_graphify.py"
     },
     {
@@ -18,7 +18,7 @@
       "source_file": "tools/rebuild_graphify.py",
       "source_location": "L14",
       "id": "tools_rebuild_graphify_main",
-      "community": 6,
+      "community": 8,
       "norm_label": "main()"
     },
     {
@@ -27,7 +27,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/__init__.py",
       "source_location": "L1",
       "id": "src_ridgeback_autonomy_ridgeback_autonomy_init_py",
-      "community": 14,
+      "community": 15,
       "norm_label": "__init__.py"
     },
     {
@@ -36,8 +36,341 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/__init__.py",
       "source_location": "L1",
       "id": "ridgeback_autonomy_init_rationale_1",
-      "community": 14,
+      "community": 15,
       "norm_label": "shared python package for ridgeback autonomy helpers and nodes."
+    },
+    {
+      "label": "frontier_explorer_node.py",
+      "file_type": "code",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer_node.py",
+      "source_location": "L1",
+      "id": "src_ridgeback_autonomy_ridgeback_autonomy_frontier_explorer_node_py",
+      "community": 0,
+      "norm_label": "frontier_explorer_node.py"
+    },
+    {
+      "label": "FrontierExplorerNode",
+      "file_type": "code",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer_node.py",
+      "source_location": "L30",
+      "id": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode",
+      "community": 0,
+      "norm_label": "frontierexplorernode"
+    },
+    {
+      "label": "Node",
+      "file_type": "code",
+      "source_file": "",
+      "source_location": "",
+      "id": "node",
+      "community": 10,
+      "norm_label": "node"
+    },
+    {
+      "label": ".__init__()",
+      "file_type": "code",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer_node.py",
+      "source_location": "L31",
+      "id": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_init",
+      "community": 0,
+      "norm_label": ".__init__()"
+    },
+    {
+      "label": ".costmap_callback()",
+      "file_type": "code",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer_node.py",
+      "source_location": "L127",
+      "id": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_costmap_callback",
+      "community": 0,
+      "norm_label": ".costmap_callback()"
+    },
+    {
+      "label": ".update_awareness_map()",
+      "file_type": "code",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer_node.py",
+      "source_location": "L144",
+      "id": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_update_awareness_map",
+      "community": 0,
+      "norm_label": ".update_awareness_map()"
+    },
+    {
+      "label": ".get_robot_position()",
+      "file_type": "code",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer_node.py",
+      "source_location": "L169",
+      "id": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_get_robot_position",
+      "community": 0,
+      "norm_label": ".get_robot_position()"
+    },
+    {
+      "label": ".exploration_callback()",
+      "file_type": "code",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer_node.py",
+      "source_location": "L197",
+      "id": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_exploration_callback",
+      "community": 0,
+      "norm_label": ".exploration_callback()"
+    },
+    {
+      "label": ".is_goal_safe()",
+      "file_type": "code",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer_node.py",
+      "source_location": "L225",
+      "id": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_is_goal_safe",
+      "community": 0,
+      "norm_label": ".is_goal_safe()"
+    },
+    {
+      "label": "._is_blacklisted()",
+      "file_type": "code",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer_node.py",
+      "source_location": "L252",
+      "id": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_is_blacklisted",
+      "community": 0,
+      "norm_label": "._is_blacklisted()"
+    },
+    {
+      "label": ".select_new_frontier_goal()",
+      "file_type": "code",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer_node.py",
+      "source_location": "L259",
+      "id": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_select_new_frontier_goal",
+      "community": 0,
+      "norm_label": ".select_new_frontier_goal()"
+    },
+    {
+      "label": "._make_goal_for_cluster()",
+      "file_type": "code",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer_node.py",
+      "source_location": "L288",
+      "id": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_make_goal_for_cluster",
+      "community": 0,
+      "norm_label": "._make_goal_for_cluster()"
+    },
+    {
+      "label": ".find_safe_frontier()",
+      "file_type": "code",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer_node.py",
+      "source_location": "L321",
+      "id": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_find_safe_frontier",
+      "community": 0,
+      "norm_label": ".find_safe_frontier()"
+    },
+    {
+      "label": "._cancel_current_goal()",
+      "file_type": "code",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer_node.py",
+      "source_location": "L380",
+      "id": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_cancel_current_goal",
+      "community": 0,
+      "norm_label": "._cancel_current_goal()"
+    },
+    {
+      "label": "._publish_frontier_markers()",
+      "file_type": "code",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer_node.py",
+      "source_location": "L386",
+      "id": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_publish_frontier_markers",
+      "community": 0,
+      "norm_label": "._publish_frontier_markers()"
+    },
+    {
+      "label": ".check_goal_progress()",
+      "file_type": "code",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer_node.py",
+      "source_location": "L423",
+      "id": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_check_goal_progress",
+      "community": 0,
+      "norm_label": ".check_goal_progress()"
+    },
+    {
+      "label": ".grid_to_world()",
+      "file_type": "code",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer_node.py",
+      "source_location": "L437",
+      "id": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_grid_to_world",
+      "community": 0,
+      "norm_label": ".grid_to_world()"
+    },
+    {
+      "label": ".send_goal_to_nav2()",
+      "file_type": "code",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer_node.py",
+      "source_location": "L449",
+      "id": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_send_goal_to_nav2",
+      "community": 0,
+      "norm_label": ".send_goal_to_nav2()"
+    },
+    {
+      "label": "._goal_response_callback()",
+      "file_type": "code",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer_node.py",
+      "source_location": "L470",
+      "id": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_goal_response_callback",
+      "community": 0,
+      "norm_label": "._goal_response_callback()"
+    },
+    {
+      "label": "._goal_result_callback()",
+      "file_type": "code",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer_node.py",
+      "source_location": "L483",
+      "id": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_goal_result_callback",
+      "community": 0,
+      "norm_label": "._goal_result_callback()"
+    },
+    {
+      "label": "main()",
+      "file_type": "code",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer_node.py",
+      "source_location": "L511",
+      "id": "ridgeback_autonomy_frontier_explorer_node_main",
+      "community": 0,
+      "norm_label": "main()"
+    },
+    {
+      "label": "Receive and process occupancy grid (costmap).",
+      "file_type": "rationale",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer_node.py",
+      "source_location": "L128",
+      "id": "ridgeback_autonomy_frontier_explorer_node_rationale_128",
+      "community": 0,
+      "norm_label": "receive and process occupancy grid (costmap)."
+    },
+    {
+      "label": "Convert occupancy grid to robot awareness map (vectorized).                  Nav",
+      "file_type": "rationale",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer_node.py",
+      "source_location": "L145",
+      "id": "ridgeback_autonomy_frontier_explorer_node_rationale_145",
+      "community": 0,
+      "norm_label": "convert occupancy grid to robot awareness map (vectorized).                  nav"
+    },
+    {
+      "label": "Get robot position in map frame.",
+      "file_type": "rationale",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer_node.py",
+      "source_location": "L170",
+      "id": "ridgeback_autonomy_frontier_explorer_node_rationale_170",
+      "community": 0,
+      "norm_label": "get robot position in map frame."
+    },
+    {
+      "label": "Main exploration loop.",
+      "file_type": "rationale",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer_node.py",
+      "source_location": "L198",
+      "id": "ridgeback_autonomy_frontier_explorer_node_rationale_198",
+      "community": 0,
+      "norm_label": "main exploration loop."
+    },
+    {
+      "label": "Check if a goal position has enough clearance from obstacles.                  C",
+      "file_type": "rationale",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer_node.py",
+      "source_location": "L226",
+      "id": "ridgeback_autonomy_frontier_explorer_node_rationale_226",
+      "community": 0,
+      "norm_label": "check if a goal position has enough clearance from obstacles.                  c"
+    },
+    {
+      "label": "Return True if pos is too close to a recently-visited goal.",
+      "file_type": "rationale",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer_node.py",
+      "source_location": "L253",
+      "id": "ridgeback_autonomy_frontier_explorer_node_rationale_253",
+      "community": 0,
+      "norm_label": "return true if pos is too close to a recently-visited goal."
+    },
+    {
+      "label": "Select a new frontier goal.",
+      "file_type": "rationale",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer_node.py",
+      "source_location": "L260",
+      "id": "ridgeback_autonomy_frontier_explorer_node_rationale_260",
+      "community": 0,
+      "norm_label": "select a new frontier goal."
+    },
+    {
+      "label": "Return the goal position for a cluster.          Advances PAST the frontier boun",
+      "file_type": "rationale",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer_node.py",
+      "source_location": "L289",
+      "id": "ridgeback_autonomy_frontier_explorer_node_rationale_289",
+      "community": 0,
+      "norm_label": "return the goal position for a cluster.          advances past the frontier boun"
+    },
+    {
+      "label": "Find the best safe, non-blacklisted frontier.          Selection strategy (tier-",
+      "file_type": "rationale",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer_node.py",
+      "source_location": "L322",
+      "id": "ridgeback_autonomy_frontier_explorer_node_rationale_322",
+      "community": 0,
+      "norm_label": "find the best safe, non-blacklisted frontier.          selection strategy (tier-"
+    },
+    {
+      "label": "Cancel the active Nav2 goal, if any.",
+      "file_type": "rationale",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer_node.py",
+      "source_location": "L381",
+      "id": "ridgeback_autonomy_frontier_explorer_node_rationale_381",
+      "community": 0,
+      "norm_label": "cancel the active nav2 goal, if any."
+    },
+    {
+      "label": "Publish frontier cluster centroids as spheres for RViz.",
+      "file_type": "rationale",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer_node.py",
+      "source_location": "L387",
+      "id": "ridgeback_autonomy_frontier_explorer_node_rationale_387",
+      "community": 0,
+      "norm_label": "publish frontier cluster centroids as spheres for rviz."
+    },
+    {
+      "label": "Check if goal is still valid or if we're stuck.",
+      "file_type": "rationale",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer_node.py",
+      "source_location": "L424",
+      "id": "ridgeback_autonomy_frontier_explorer_node_rationale_424",
+      "community": 0,
+      "norm_label": "check if goal is still valid or if we're stuck."
+    },
+    {
+      "label": "Convert grid coordinates to world coordinates.",
+      "file_type": "rationale",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer_node.py",
+      "source_location": "L438",
+      "id": "ridgeback_autonomy_frontier_explorer_node_rationale_438",
+      "community": 0,
+      "norm_label": "convert grid coordinates to world coordinates."
+    },
+    {
+      "label": "Send goal to Nav2 NavigateToPose action.",
+      "file_type": "rationale",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer_node.py",
+      "source_location": "L450",
+      "id": "ridgeback_autonomy_frontier_explorer_node_rationale_450",
+      "community": 0,
+      "norm_label": "send goal to nav2 navigatetopose action."
+    },
+    {
+      "label": "Handle goal acceptance; attach result callback.",
+      "file_type": "rationale",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer_node.py",
+      "source_location": "L471",
+      "id": "ridgeback_autonomy_frontier_explorer_node_rationale_471",
+      "community": 0,
+      "norm_label": "handle goal acceptance; attach result callback."
+    },
+    {
+      "label": "Handle goal completion \u2014 immediately pick a new frontier.",
+      "file_type": "rationale",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer_node.py",
+      "source_location": "L484",
+      "id": "ridgeback_autonomy_frontier_explorer_node_rationale_484",
+      "community": 0,
+      "norm_label": "handle goal completion \u2014 immediately pick a new frontier."
     },
     {
       "label": "tf_utils.py",
@@ -45,7 +378,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/common/tf_utils.py",
       "source_location": "L1",
       "id": "src_ridgeback_autonomy_ridgeback_autonomy_common_tf_utils_py",
-      "community": 7,
+      "community": 9,
       "norm_label": "tf_utils.py"
     },
     {
@@ -54,7 +387,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/common/tf_utils.py",
       "source_location": "L11",
       "id": "common_tf_utils_candidate_base_frames",
-      "community": 7,
+      "community": 9,
       "norm_label": "candidate_base_frames()"
     },
     {
@@ -63,7 +396,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/common/tf_utils.py",
       "source_location": "L19",
       "id": "common_tf_utils_rotation_matrix_from_quaternion",
-      "community": 7,
+      "community": 9,
       "norm_label": "rotation_matrix_from_quaternion()"
     },
     {
@@ -72,7 +405,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/common/tf_utils.py",
       "source_location": "L31",
       "id": "common_tf_utils_lookup_transform_components",
-      "community": 7,
+      "community": 9,
       "norm_label": "lookup_transform_components()"
     },
     {
@@ -81,7 +414,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/common/__init__.py",
       "source_location": "L1",
       "id": "src_ridgeback_autonomy_ridgeback_autonomy_common_init_py",
-      "community": 20,
+      "community": 22,
       "norm_label": "__init__.py"
     },
     {
@@ -90,7 +423,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/common/camera_config.py",
       "source_location": "L1",
       "id": "src_ridgeback_autonomy_ridgeback_autonomy_common_camera_config_py",
-      "community": 7,
+      "community": 9,
       "norm_label": "camera_config.py"
     },
     {
@@ -99,7 +432,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/common/camera_config.py",
       "source_location": "L17",
       "id": "common_camera_config_load_camera_config",
-      "community": 7,
+      "community": 9,
       "norm_label": "load_camera_config()"
     },
     {
@@ -108,7 +441,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/common/models.py",
       "source_location": "L1",
       "id": "src_ridgeback_autonomy_ridgeback_autonomy_common_models_py",
-      "community": 4,
+      "community": 7,
       "norm_label": "models.py"
     },
     {
@@ -117,7 +450,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/common/models.py",
       "source_location": "L9",
       "id": "common_models_cameraconfig",
-      "community": 4,
+      "community": 5,
       "norm_label": "cameraconfig"
     },
     {
@@ -126,7 +459,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/common/models.py",
       "source_location": "L17",
       "id": "common_models_detection",
-      "community": 4,
+      "community": 7,
       "norm_label": "detection"
     },
     {
@@ -135,7 +468,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/common/models.py",
       "source_location": "L36",
       "id": "common_models_detectionbatch",
-      "community": 4,
+      "community": 7,
       "norm_label": "detectionbatch"
     },
     {
@@ -144,7 +477,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/common/models.py",
       "source_location": "L42",
       "id": "common_models_count",
-      "community": 4,
+      "community": 7,
       "norm_label": "count()"
     },
     {
@@ -153,7 +486,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/common/models.py",
       "source_location": "L46",
       "id": "common_models_detected",
-      "community": 4,
+      "community": 7,
       "norm_label": "detected()"
     },
     {
@@ -162,7 +495,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/common/models.py",
       "source_location": "L51",
       "id": "common_models_lidarscanpoints",
-      "community": 3,
+      "community": 5,
       "norm_label": "lidarscanpoints"
     },
     {
@@ -171,7 +504,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/common/messages.py",
       "source_location": "L1",
       "id": "src_ridgeback_autonomy_ridgeback_autonomy_common_messages_py",
-      "community": 4,
+      "community": 7,
       "norm_label": "messages.py"
     },
     {
@@ -180,7 +513,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/common/messages.py",
       "source_location": "L16",
       "id": "common_messages_optional_float",
-      "community": 4,
+      "community": 7,
       "norm_label": "optional_float()"
     },
     {
@@ -189,7 +522,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/common/messages.py",
       "source_location": "L20",
       "id": "common_messages_build_detections_message",
-      "community": 4,
+      "community": 7,
       "norm_label": "build_detections_message()"
     },
     {
@@ -198,7 +531,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/common/messages.py",
       "source_location": "L26",
       "id": "common_messages_build_measurements_message",
-      "community": 4,
+      "community": 7,
       "norm_label": "build_measurements_message()"
     },
     {
@@ -207,7 +540,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/common/messages.py",
       "source_location": "L46",
       "id": "common_messages_batch_from_detections_message",
-      "community": 4,
+      "community": 7,
       "norm_label": "batch_from_detections_message()"
     },
     {
@@ -216,7 +549,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/common/messages.py",
       "source_location": "L63",
       "id": "common_messages_batch_from_measurements_message",
-      "community": 4,
+      "community": 7,
       "norm_label": "batch_from_measurements_message()"
     },
     {
@@ -225,7 +558,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/common/messages.py",
       "source_location": "L82",
       "id": "common_messages_first_finite_positive",
-      "community": 4,
+      "community": 7,
       "norm_label": "first_finite_positive()"
     },
     {
@@ -234,7 +567,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/common/messages.py",
       "source_location": "L90",
       "id": "common_messages_decode_bbox_quads",
-      "community": 1,
+      "community": 7,
       "norm_label": "decode_bbox_quads()"
     },
     {
@@ -243,7 +576,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/common/messages.py",
       "source_location": "L103",
       "id": "common_messages_snapshot_measurements_message",
-      "community": 4,
+      "community": 7,
       "norm_label": "snapshot_measurements_message()"
     },
     {
@@ -252,7 +585,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/common/messages.py",
       "source_location": "L116",
       "id": "common_messages_build_float32_image_message",
-      "community": 3,
+      "community": 6,
       "norm_label": "build_float32_image_message()"
     },
     {
@@ -261,7 +594,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/common/messages.py",
       "source_location": "L129",
       "id": "common_messages_populate_identity_fields",
-      "community": 4,
+      "community": 7,
       "norm_label": "_populate_identity_fields()"
     },
     {
@@ -270,7 +603,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/common/messages.py",
       "source_location": "L143",
       "id": "common_messages_decode_optional_float",
-      "community": 4,
+      "community": 7,
       "norm_label": "decode_optional_float()"
     },
     {
@@ -279,7 +612,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
       "source_location": "L1",
       "id": "src_ridgeback_autonomy_ridgeback_autonomy_benchmarking_g1_distance_benchmark_runner_node_py",
-      "community": 0,
+      "community": 1,
       "norm_label": "g1_distance_benchmark_runner_node.py"
     },
     {
@@ -288,7 +621,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
       "source_location": "L74",
       "id": "benchmarking_g1_distance_benchmark_runner_node_extract_json_payload",
-      "community": 0,
+      "community": 1,
       "norm_label": "extract_json_payload()"
     },
     {
@@ -297,17 +630,8 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
       "source_location": "L91",
       "id": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner",
-      "community": 0,
+      "community": 1,
       "norm_label": "g1distancebenchmarkrunner"
-    },
-    {
-      "label": "Node",
-      "file_type": "code",
-      "source_file": "",
-      "source_location": "",
-      "id": "node",
-      "community": 8,
-      "norm_label": "node"
     },
     {
       "label": ".__init__()",
@@ -315,7 +639,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
       "source_location": "L92",
       "id": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_init",
-      "community": 8,
+      "community": 10,
       "norm_label": ".__init__()"
     },
     {
@@ -324,7 +648,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
       "source_location": "L203",
       "id": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_on_camera_measurement",
-      "community": 1,
+      "community": 2,
       "norm_label": ".on_camera_measurement()"
     },
     {
@@ -333,7 +657,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
       "source_location": "L212",
       "id": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_on_lidar_measurement",
-      "community": 1,
+      "community": 2,
       "norm_label": ".on_lidar_measurement()"
     },
     {
@@ -342,7 +666,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
       "source_location": "L221",
       "id": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_on_color_image",
-      "community": 0,
+      "community": 1,
       "norm_label": ".on_color_image()"
     },
     {
@@ -351,7 +675,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
       "source_location": "L240",
       "id": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_on_depth_image",
-      "community": 0,
+      "community": 1,
       "norm_label": ".on_depth_image()"
     },
     {
@@ -360,7 +684,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
       "source_location": "L259",
       "id": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_on_depth_anything_image",
-      "community": 0,
+      "community": 1,
       "norm_label": ".on_depth_anything_image()"
     },
     {
@@ -369,7 +693,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
       "source_location": "L278",
       "id": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_run",
-      "community": 0,
+      "community": 1,
       "norm_label": ".run()"
     },
     {
@@ -378,7 +702,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
       "source_location": "L310",
       "id": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_build_trials",
-      "community": 0,
+      "community": 1,
       "norm_label": ".build_trials()"
     },
     {
@@ -387,7 +711,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
       "source_location": "L323",
       "id": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_run_trial",
-      "community": 0,
+      "community": 1,
       "norm_label": ".run_trial()"
     },
     {
@@ -396,7 +720,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
       "source_location": "L394",
       "id": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_capture_measurement_window",
-      "community": 0,
+      "community": 1,
       "norm_label": ".capture_measurement_window()"
     },
     {
@@ -405,7 +729,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
       "source_location": "L409",
       "id": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_save_trial_collage",
-      "community": 0,
+      "community": 1,
       "norm_label": ".save_trial_collage()"
     },
     {
@@ -414,7 +738,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
       "source_location": "L428",
       "id": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_clear_preview_buffers",
-      "community": 0,
+      "community": 1,
       "norm_label": ".clear_preview_buffers()"
     },
     {
@@ -423,7 +747,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
       "source_location": "L433",
       "id": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_store_buffered_preview",
-      "community": 0,
+      "community": 1,
       "norm_label": ".store_buffered_preview()"
     },
     {
@@ -432,7 +756,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
       "source_location": "L444",
       "id": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_backfill_previews_from_buffers",
-      "community": 0,
+      "community": 1,
       "norm_label": ".backfill_previews_from_buffers()"
     },
     {
@@ -441,7 +765,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
       "source_location": "L451",
       "id": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_attach_buffered_previews",
-      "community": 1,
+      "community": 2,
       "norm_label": ".attach_buffered_previews()"
     },
     {
@@ -450,7 +774,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
       "source_location": "L476",
       "id": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_apply_preview_match",
-      "community": 1,
+      "community": 2,
       "norm_label": ".apply_preview_match()"
     },
     {
@@ -459,7 +783,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
       "source_location": "L494",
       "id": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_wait_for_required_streams",
-      "community": 0,
+      "community": 1,
       "norm_label": ".wait_for_required_streams()"
     },
     {
@@ -468,7 +792,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
       "source_location": "L521",
       "id": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_wait_for_flag",
-      "community": 0,
+      "community": 1,
       "norm_label": ".wait_for_flag()"
     },
     {
@@ -477,7 +801,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
       "source_location": "L530",
       "id": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_wait_for_entity_pose",
-      "community": 0,
+      "community": 1,
       "norm_label": ".wait_for_entity_pose()"
     },
     {
@@ -486,7 +810,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
       "source_location": "L544",
       "id": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_compute_ground_truth",
-      "community": 0,
+      "community": 1,
       "norm_label": ".compute_ground_truth()"
     },
     {
@@ -495,7 +819,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
       "source_location": "L573",
       "id": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_spawn_g1",
-      "community": 0,
+      "community": 1,
       "norm_label": ".spawn_g1()"
     },
     {
@@ -504,7 +828,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
       "source_location": "L599",
       "id": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_delete_g1",
-      "community": 0,
+      "community": 1,
       "norm_label": ".delete_g1()"
     },
     {
@@ -513,7 +837,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
       "source_location": "L630",
       "id": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_get_pose_snapshot",
-      "community": 0,
+      "community": 1,
       "norm_label": ".get_pose_snapshot()"
     },
     {
@@ -522,7 +846,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
       "source_location": "L652",
       "id": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_normalize_pose",
-      "community": 0,
+      "community": 1,
       "norm_label": ".normalize_pose()"
     },
     {
@@ -531,7 +855,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
       "source_location": "L670",
       "id": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_extract_json_payload",
-      "community": 0,
+      "community": 1,
       "norm_label": ".extract_json_payload()"
     },
     {
@@ -540,7 +864,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
       "source_location": "L673",
       "id": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_run_command",
-      "community": 0,
+      "community": 1,
       "norm_label": ".run_command()"
     },
     {
@@ -549,7 +873,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
       "source_location": "L689",
       "id": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_try_command",
-      "community": 0,
+      "community": 1,
       "norm_label": ".try_command()"
     },
     {
@@ -558,7 +882,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
       "source_location": "L703",
       "id": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_resolved_topic",
-      "community": 0,
+      "community": 1,
       "norm_label": ".resolved_topic()"
     },
     {
@@ -567,7 +891,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
       "source_location": "L710",
       "id": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_spin_for",
-      "community": 0,
+      "community": 1,
       "norm_label": ".spin_for()"
     },
     {
@@ -576,7 +900,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
       "source_location": "L718",
       "id": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_log_warning_once",
-      "community": 0,
+      "community": 1,
       "norm_label": ".log_warning_once()"
     },
     {
@@ -585,7 +909,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
       "source_location": "L724",
       "id": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_log_trial",
-      "community": 0,
+      "community": 1,
       "norm_label": ".log_trial()"
     },
     {
@@ -594,7 +918,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
       "source_location": "L742",
       "id": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_log_summary",
-      "community": 0,
+      "community": 1,
       "norm_label": ".log_summary()"
     },
     {
@@ -603,7 +927,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
       "source_location": "L765",
       "id": "benchmarking_g1_distance_benchmark_runner_node_main",
-      "community": 0,
+      "community": 1,
       "norm_label": "main()"
     },
     {
@@ -612,7 +936,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/rendering.py",
       "source_location": "L1",
       "id": "src_ridgeback_autonomy_ridgeback_autonomy_benchmarking_rendering_py",
-      "community": 2,
+      "community": 3,
       "norm_label": "rendering.py"
     },
     {
@@ -621,7 +945,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/rendering.py",
       "source_location": "L17",
       "id": "benchmarking_rendering_panelcontext",
-      "community": 2,
+      "community": 3,
       "norm_label": "panelcontext"
     },
     {
@@ -630,7 +954,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/rendering.py",
       "source_location": "L28",
       "id": "benchmarking_rendering_benchmarkcollagerenderer",
-      "community": 2,
+      "community": 3,
       "norm_label": "benchmarkcollagerenderer"
     },
     {
@@ -639,7 +963,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/rendering.py",
       "source_location": "L29",
       "id": "benchmarking_rendering_benchmarkcollagerenderer_init",
-      "community": 2,
+      "community": 3,
       "norm_label": ".__init__()"
     },
     {
@@ -648,7 +972,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/rendering.py",
       "source_location": "L33",
       "id": "benchmarking_rendering_benchmarkcollagerenderer_make_color_preview",
-      "community": 2,
+      "community": 3,
       "norm_label": ".make_color_preview()"
     },
     {
@@ -657,7 +981,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/rendering.py",
       "source_location": "L36",
       "id": "benchmarking_rendering_benchmarkcollagerenderer_make_depth_preview",
-      "community": 2,
+      "community": 3,
       "norm_label": ".make_depth_preview()"
     },
     {
@@ -666,7 +990,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/rendering.py",
       "source_location": "L40",
       "id": "benchmarking_rendering_benchmarkcollagerenderer_render_trial_collage",
-      "community": 2,
+      "community": 3,
       "norm_label": ".render_trial_collage()"
     },
     {
@@ -675,7 +999,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/rendering.py",
       "source_location": "L60",
       "id": "benchmarking_rendering_benchmarkcollagerenderer_render_estimator_panel",
-      "community": 2,
+      "community": 3,
       "norm_label": ".render_estimator_panel()"
     },
     {
@@ -684,7 +1008,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/rendering.py",
       "source_location": "L85",
       "id": "benchmarking_rendering_benchmarkcollagerenderer_panel_context_for_estimator",
-      "community": 2,
+      "community": 3,
       "norm_label": ".panel_context_for_estimator()"
     },
     {
@@ -693,7 +1017,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/rendering.py",
       "source_location": "L159",
       "id": "benchmarking_rendering_benchmarkcollagerenderer_build_panel_context",
-      "community": 2,
+      "community": 3,
       "norm_label": ".build_panel_context()"
     },
     {
@@ -702,7 +1026,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/rendering.py",
       "source_location": "L181",
       "id": "benchmarking_rendering_benchmarkcollagerenderer_make_missing_panel",
-      "community": 2,
+      "community": 3,
       "norm_label": ".make_missing_panel()"
     },
     {
@@ -711,7 +1035,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/rendering.py",
       "source_location": "L208",
       "id": "benchmarking_rendering_benchmarkcollagerenderer_build_panel_lines",
-      "community": 2,
+      "community": 3,
       "norm_label": ".build_panel_lines()"
     },
     {
@@ -720,7 +1044,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/rendering.py",
       "source_location": "L233",
       "id": "benchmarking_rendering_benchmarkcollagerenderer_resize_panel",
-      "community": 2,
+      "community": 3,
       "norm_label": ".resize_panel()"
     },
     {
@@ -729,7 +1053,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/rendering.py",
       "source_location": "L244",
       "id": "benchmarking_rendering_benchmarkcollagerenderer_draw_bboxes",
-      "community": 2,
+      "community": 3,
       "norm_label": ".draw_bboxes()"
     },
     {
@@ -738,7 +1062,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/rendering.py",
       "source_location": "L268",
       "id": "benchmarking_rendering_benchmarkcollagerenderer_draw_value_block",
-      "community": 2,
+      "community": 3,
       "norm_label": ".draw_value_block()"
     },
     {
@@ -747,7 +1071,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/rendering.py",
       "source_location": "L277",
       "id": "benchmarking_rendering_benchmarkcollagerenderer_format_distance",
-      "community": 2,
+      "community": 3,
       "norm_label": ".format_distance()"
     },
     {
@@ -756,7 +1080,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/rendering.py",
       "source_location": "L282",
       "id": "benchmarking_rendering_benchmarkcollagerenderer_format_delta",
-      "community": 2,
+      "community": 3,
       "norm_label": ".format_delta()"
     },
     {
@@ -765,7 +1089,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/alignment.py",
       "source_location": "L1",
       "id": "src_ridgeback_autonomy_ridgeback_autonomy_benchmarking_alignment_py",
-      "community": 1,
+      "community": 2,
       "norm_label": "alignment.py"
     },
     {
@@ -774,7 +1098,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/alignment.py",
       "source_location": "L18",
       "id": "benchmarking_alignment_eventpreview",
-      "community": 1,
+      "community": 2,
       "norm_label": "eventpreview"
     },
     {
@@ -783,7 +1107,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/alignment.py",
       "source_location": "L37",
       "id": "benchmarking_alignment_previewmatchresult",
-      "community": 1,
+      "community": 2,
       "norm_label": "previewmatchresult"
     },
     {
@@ -792,7 +1116,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/alignment.py",
       "source_location": "L46",
       "id": "benchmarking_alignment_measurementevent",
-      "community": 1,
+      "community": 2,
       "norm_label": "measurementevent"
     },
     {
@@ -801,7 +1125,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/alignment.py",
       "source_location": "L58",
       "id": "benchmarking_alignment_stamp_to_nanoseconds",
-      "community": 0,
+      "community": 2,
       "norm_label": "stamp_to_nanoseconds()"
     },
     {
@@ -810,7 +1134,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/alignment.py",
       "source_location": "L62",
       "id": "benchmarking_alignment_measurement_message_key",
-      "community": 1,
+      "community": 2,
       "norm_label": "measurement_message_key()"
     },
     {
@@ -819,7 +1143,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/alignment.py",
       "source_location": "L72",
       "id": "benchmarking_alignment_extract_public_estimator_values",
-      "community": 4,
+      "community": 2,
       "norm_label": "extract_public_estimator_values()"
     },
     {
@@ -828,7 +1152,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/alignment.py",
       "source_location": "L79",
       "id": "benchmarking_alignment_ensure_measurement_event",
-      "community": 1,
+      "community": 2,
       "norm_label": "ensure_measurement_event()"
     },
     {
@@ -837,7 +1161,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/alignment.py",
       "source_location": "L101",
       "id": "benchmarking_alignment_update_measurement_event",
-      "community": 1,
+      "community": 2,
       "norm_label": "update_measurement_event()"
     },
     {
@@ -846,7 +1170,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/alignment.py",
       "source_location": "L118",
       "id": "benchmarking_alignment_has_all_selected_estimates",
-      "community": 1,
+      "community": 2,
       "norm_label": "has_all_selected_estimates()"
     },
     {
@@ -855,7 +1179,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/alignment.py",
       "source_location": "L125",
       "id": "benchmarking_alignment_event_has_panel_preview",
-      "community": 1,
+      "community": 2,
       "norm_label": "event_has_panel_preview()"
     },
     {
@@ -864,7 +1188,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/alignment.py",
       "source_location": "L133",
       "id": "benchmarking_alignment_event_has_all_panel_previews",
-      "community": 1,
+      "community": 2,
       "norm_label": "event_has_all_panel_previews()"
     },
     {
@@ -873,7 +1197,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/alignment.py",
       "source_location": "L140",
       "id": "benchmarking_alignment_find_exact_preview_match",
-      "community": 1,
+      "community": 2,
       "norm_label": "find_exact_preview_match()"
     },
     {
@@ -882,7 +1206,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/alignment.py",
       "source_location": "L164",
       "id": "benchmarking_alignment_find_nearest_preview_match",
-      "community": 1,
+      "community": 2,
       "norm_label": "find_nearest_preview_match()"
     },
     {
@@ -891,7 +1215,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/alignment.py",
       "source_location": "L197",
       "id": "benchmarking_alignment_nearest_preview_metadata",
-      "community": 1,
+      "community": 2,
       "norm_label": "nearest_preview_metadata()"
     },
     {
@@ -900,7 +1224,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/__init__.py",
       "source_location": "L1",
       "id": "src_ridgeback_autonomy_ridgeback_autonomy_benchmarking_init_py",
-      "community": 15,
+      "community": 16,
       "norm_label": "__init__.py"
     },
     {
@@ -909,7 +1233,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/__init__.py",
       "source_location": "L1",
       "id": "benchmarking_init_rationale_1",
-      "community": 15,
+      "community": 16,
       "norm_label": "benchmarking nodes plus helper libraries for autonomy evaluation workflows."
     },
     {
@@ -918,7 +1242,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/reduction.py",
       "source_location": "L1",
       "id": "src_ridgeback_autonomy_ridgeback_autonomy_benchmarking_reduction_py",
-      "community": 1,
+      "community": 2,
       "norm_label": "reduction.py"
     },
     {
@@ -927,7 +1251,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/reduction.py",
       "source_location": "L12",
       "id": "benchmarking_reduction_usable_aligned_events",
-      "community": 1,
+      "community": 2,
       "norm_label": "usable_aligned_events()"
     },
     {
@@ -936,7 +1260,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/reduction.py",
       "source_location": "L25",
       "id": "benchmarking_reduction_compute_trial_medians",
-      "community": 1,
+      "community": 2,
       "norm_label": "compute_trial_medians()"
     },
     {
@@ -945,7 +1269,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/reduction.py",
       "source_location": "L39",
       "id": "benchmarking_reduction_choose_representative_event",
-      "community": 1,
+      "community": 2,
       "norm_label": "choose_representative_event()"
     },
     {
@@ -954,7 +1278,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/estimators.py",
       "source_location": "L1",
       "id": "src_ridgeback_autonomy_ridgeback_autonomy_benchmarking_estimators_py",
-      "community": 8,
+      "community": 10,
       "norm_label": "estimators.py"
     },
     {
@@ -963,7 +1287,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/estimators.py",
       "source_location": "L49",
       "id": "benchmarking_estimators_parse_estimators",
-      "community": 8,
+      "community": 10,
       "norm_label": "parse_estimators()"
     },
     {
@@ -972,7 +1296,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/estimators.py",
       "source_location": "L77",
       "id": "benchmarking_estimators_selected_camera_estimators",
-      "community": 8,
+      "community": 10,
       "norm_label": "selected_camera_estimators()"
     },
     {
@@ -981,7 +1305,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/estimators.py",
       "source_location": "L84",
       "id": "benchmarking_estimators_uses_camera_estimators",
-      "community": 8,
+      "community": 10,
       "norm_label": "uses_camera_estimators()"
     },
     {
@@ -990,7 +1314,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/estimators.py",
       "source_location": "L88",
       "id": "benchmarking_estimators_uses_lidar_estimators",
-      "community": 8,
+      "community": 10,
       "norm_label": "uses_lidar_estimators()"
     },
     {
@@ -999,7 +1323,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/metrics.py",
       "source_location": "L1",
       "id": "src_ridgeback_autonomy_ridgeback_autonomy_benchmarking_metrics_py",
-      "community": 21,
+      "community": 23,
       "norm_label": "metrics.py"
     },
     {
@@ -1008,7 +1332,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/summary.py",
       "source_location": "L1",
       "id": "src_ridgeback_autonomy_ridgeback_autonomy_benchmarking_summary_py",
-      "community": 0,
+      "community": 1,
       "norm_label": "summary.py"
     },
     {
@@ -1017,7 +1341,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/summary.py",
       "source_location": "L40",
       "id": "benchmarking_summary_write_trial_csv",
-      "community": 0,
+      "community": 1,
       "norm_label": "write_trial_csv()"
     },
     {
@@ -1026,7 +1350,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/summary.py",
       "source_location": "L48",
       "id": "benchmarking_summary_build_summary_rows",
-      "community": 0,
+      "community": 1,
       "norm_label": "build_summary_rows()"
     },
     {
@@ -1035,8 +1359,170 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/summary.py",
       "source_location": "L78",
       "id": "benchmarking_summary_write_summary_csv",
-      "community": 0,
+      "community": 1,
       "norm_label": "write_summary_csv()"
+    },
+    {
+      "label": "path_finding.py",
+      "file_type": "code",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer/path_finding.py",
+      "source_location": "L1",
+      "id": "src_ridgeback_autonomy_ridgeback_autonomy_frontier_explorer_path_finding_py",
+      "community": 12,
+      "norm_label": "path_finding.py"
+    },
+    {
+      "label": "heuristic()",
+      "file_type": "code",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer/path_finding.py",
+      "source_location": "L5",
+      "id": "frontier_explorer_path_finding_heuristic",
+      "community": 12,
+      "norm_label": "heuristic()"
+    },
+    {
+      "label": "a_star()",
+      "file_type": "code",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer/path_finding.py",
+      "source_location": "L9",
+      "id": "frontier_explorer_path_finding_a_star",
+      "community": 12,
+      "norm_label": "a_star()"
+    },
+    {
+      "label": "Optimized A* Algorithm to find the shortest path avoiding obstacles.",
+      "file_type": "rationale",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer/path_finding.py",
+      "source_location": "L10",
+      "id": "frontier_explorer_path_finding_rationale_10",
+      "community": 12,
+      "norm_label": "optimized a* algorithm to find the shortest path avoiding obstacles."
+    },
+    {
+      "label": "navigator.py",
+      "file_type": "code",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer/navigator.py",
+      "source_location": "L1",
+      "id": "src_ridgeback_autonomy_ridgeback_autonomy_frontier_explorer_navigator_py",
+      "community": 0,
+      "norm_label": "navigator.py"
+    },
+    {
+      "label": "update_robot_map()",
+      "file_type": "code",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer/navigator.py",
+      "source_location": "L6",
+      "id": "frontier_explorer_navigator_update_robot_map",
+      "community": 0,
+      "norm_label": "update_robot_map()"
+    },
+    {
+      "label": "update_robot_awareness_from_costmap()",
+      "file_type": "code",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer/navigator.py",
+      "source_location": "L18",
+      "id": "frontier_explorer_navigator_update_robot_awareness_from_costmap",
+      "community": 0,
+      "norm_label": "update_robot_awareness_from_costmap()"
+    },
+    {
+      "label": "is_frontier_point()",
+      "file_type": "code",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer/navigator.py",
+      "source_location": "L25",
+      "id": "frontier_explorer_navigator_is_frontier_point",
+      "community": 0,
+      "norm_label": "is_frontier_point()"
+    },
+    {
+      "label": "get_frontier_clusters()",
+      "file_type": "code",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer/navigator.py",
+      "source_location": "L39",
+      "id": "frontier_explorer_navigator_get_frontier_clusters",
+      "community": 0,
+      "norm_label": "get_frontier_clusters()"
+    },
+    {
+      "label": "get_best_frontier()",
+      "file_type": "code",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer/navigator.py",
+      "source_location": "L68",
+      "id": "frontier_explorer_navigator_get_best_frontier",
+      "community": 0,
+      "norm_label": "get_best_frontier()"
+    },
+    {
+      "label": "Sensor Model: Discovers the area around the robot based on its VIEW_RADIUS.",
+      "file_type": "rationale",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer/navigator.py",
+      "source_location": "L7",
+      "id": "frontier_explorer_navigator_rationale_7",
+      "community": 0,
+      "norm_label": "sensor model: discovers the area around the robot based on its view_radius."
+    },
+    {
+      "label": "Update robot awareness map from costmap data.     Used for ROS 2 integration.",
+      "file_type": "rationale",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer/navigator.py",
+      "source_location": "L19",
+      "id": "frontier_explorer_navigator_rationale_19",
+      "community": 0,
+      "norm_label": "update robot awareness map from costmap data.     used for ros 2 integration."
+    },
+    {
+      "label": "Checks if a point is a valid frontier (A FREE cell next to an UNKNOWN cell).",
+      "file_type": "rationale",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer/navigator.py",
+      "source_location": "L26",
+      "id": "frontier_explorer_navigator_rationale_26",
+      "community": 0,
+      "norm_label": "checks if a point is a valid frontier (a free cell next to an unknown cell)."
+    },
+    {
+      "label": "Uses Flood Fill to group adjacent frontier points into clusters.",
+      "file_type": "rationale",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer/navigator.py",
+      "source_location": "L40",
+      "id": "frontier_explorer_navigator_rationale_40",
+      "community": 0,
+      "norm_label": "uses flood fill to group adjacent frontier points into clusters."
+    },
+    {
+      "label": "Selects frontier cluster based on both distance and size.          Args:",
+      "file_type": "rationale",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer/navigator.py",
+      "source_location": "L69",
+      "id": "frontier_explorer_navigator_rationale_69",
+      "community": 0,
+      "norm_label": "selects frontier cluster based on both distance and size.          args:"
+    },
+    {
+      "label": "__init__.py",
+      "file_type": "code",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer/__init__.py",
+      "source_location": "L1",
+      "id": "src_ridgeback_autonomy_ridgeback_autonomy_frontier_explorer_init_py",
+      "community": 17,
+      "norm_label": "__init__.py"
+    },
+    {
+      "label": "Frontier exploration module for ROS 2.",
+      "file_type": "rationale",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer/__init__.py",
+      "source_location": "L1",
+      "id": "frontier_explorer_init_rationale_1",
+      "community": 17,
+      "norm_label": "frontier exploration module for ros 2."
+    },
+    {
+      "label": "params.py",
+      "file_type": "code",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer/params.py",
+      "source_location": "L1",
+      "id": "src_ridgeback_autonomy_ridgeback_autonomy_frontier_explorer_params_py",
+      "community": 24,
+      "norm_label": "params.py"
     },
     {
       "label": "g1_overlay_node.py",
@@ -1044,7 +1530,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/g1_overlay_node.py",
       "source_location": "L1",
       "id": "src_ridgeback_autonomy_ridgeback_autonomy_perception_g1_overlay_node_py",
-      "community": 9,
+      "community": 4,
       "norm_label": "g1_overlay_node.py"
     },
     {
@@ -1053,7 +1539,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/g1_overlay_node.py",
       "source_location": "L30",
       "id": "perception_g1_overlay_node_g1overlaynode",
-      "community": 9,
+      "community": 4,
       "norm_label": "g1overlaynode"
     },
     {
@@ -1062,7 +1548,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/g1_overlay_node.py",
       "source_location": "L31",
       "id": "perception_g1_overlay_node_g1overlaynode_init",
-      "community": 9,
+      "community": 4,
       "norm_label": ".__init__()"
     },
     {
@@ -1071,7 +1557,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/g1_overlay_node.py",
       "source_location": "L98",
       "id": "perception_g1_overlay_node_g1overlaynode_measurement_callback",
-      "community": 9,
+      "community": 4,
       "norm_label": ".measurement_callback()"
     },
     {
@@ -1080,7 +1566,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/g1_overlay_node.py",
       "source_location": "L102",
       "id": "perception_g1_overlay_node_g1overlaynode_lidar_measurement_callback",
-      "community": 9,
+      "community": 4,
       "norm_label": ".lidar_measurement_callback()"
     },
     {
@@ -1089,7 +1575,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/g1_overlay_node.py",
       "source_location": "L109",
       "id": "perception_g1_overlay_node_g1overlaynode_color_callback",
-      "community": 9,
+      "community": 4,
       "norm_label": ".color_callback()"
     },
     {
@@ -1098,7 +1584,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/g1_overlay_node.py",
       "source_location": "L112",
       "id": "perception_g1_overlay_node_g1overlaynode_depth_callback",
-      "community": 9,
+      "community": 4,
       "norm_label": ".depth_callback()"
     },
     {
@@ -1107,7 +1593,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/g1_overlay_node.py",
       "source_location": "L115",
       "id": "perception_g1_overlay_node_g1overlaynode_mono_depth_callback",
-      "community": 9,
+      "community": 4,
       "norm_label": ".mono_depth_callback()"
     },
     {
@@ -1116,7 +1602,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/g1_overlay_node.py",
       "source_location": "L118",
       "id": "perception_g1_overlay_node_g1overlaynode_render_callback",
-      "community": 9,
+      "community": 4,
       "norm_label": ".render_callback()"
     },
     {
@@ -1125,7 +1611,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/g1_overlay_node.py",
       "source_location": "L121",
       "id": "perception_g1_overlay_node_g1overlaynode_render_latest",
-      "community": 9,
+      "community": 4,
       "norm_label": ".render_latest()"
     },
     {
@@ -1134,7 +1620,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/g1_overlay_node.py",
       "source_location": "L164",
       "id": "perception_g1_overlay_node_g1overlaynode_merge_lidar_measurements",
-      "community": 9,
+      "community": 4,
       "norm_label": ".merge_lidar_measurements()"
     },
     {
@@ -1143,7 +1629,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/g1_overlay_node.py",
       "source_location": "L179",
       "id": "perception_g1_overlay_node_g1overlaynode_measurement_message_key",
-      "community": 9,
+      "community": 4,
       "norm_label": ".measurement_message_key()"
     },
     {
@@ -1152,7 +1638,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/g1_overlay_node.py",
       "source_location": "L191",
       "id": "perception_g1_overlay_node_g1overlaynode_log_warning_once",
-      "community": 9,
+      "community": 4,
       "norm_label": ".log_warning_once()"
     },
     {
@@ -1161,7 +1647,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/g1_overlay_node.py",
       "source_location": "L197",
       "id": "perception_g1_overlay_node_g1overlaynode_destroy_node",
-      "community": 9,
+      "community": 4,
       "norm_label": ".destroy_node()"
     },
     {
@@ -1170,7 +1656,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/g1_overlay_node.py",
       "source_location": "L202",
       "id": "perception_g1_overlay_node_main",
-      "community": 9,
+      "community": 4,
       "norm_label": "main()"
     },
     {
@@ -1179,7 +1665,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/__init__.py",
       "source_location": "L1",
       "id": "src_ridgeback_autonomy_ridgeback_autonomy_perception_init_py",
-      "community": 16,
+      "community": 18,
       "norm_label": "__init__.py"
     },
     {
@@ -1188,7 +1674,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/__init__.py",
       "source_location": "L1",
       "id": "perception_init_rationale_1",
-      "community": 16,
+      "community": 18,
       "norm_label": "perception nodes plus helper libraries for detection, fusion, and visualization."
     },
     {
@@ -1197,7 +1683,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/g1_detector_node.py",
       "source_location": "L1",
       "id": "src_ridgeback_autonomy_ridgeback_autonomy_perception_g1_detector_node_py",
-      "community": 6,
+      "community": 8,
       "norm_label": "g1_detector_node.py"
     },
     {
@@ -1206,7 +1692,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/g1_detector_node.py",
       "source_location": "L32",
       "id": "perception_g1_detector_node_g1detectornode",
-      "community": 6,
+      "community": 8,
       "norm_label": "g1detectornode"
     },
     {
@@ -1215,7 +1701,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/g1_detector_node.py",
       "source_location": "L33",
       "id": "perception_g1_detector_node_g1detectornode_init",
-      "community": 6,
+      "community": 8,
       "norm_label": ".__init__()"
     },
     {
@@ -1224,7 +1710,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/g1_detector_node.py",
       "source_location": "L75",
       "id": "perception_g1_detector_node_g1detectornode_on_color_image",
-      "community": 6,
+      "community": 8,
       "norm_label": ".on_color_image()"
     },
     {
@@ -1233,7 +1719,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/g1_detector_node.py",
       "source_location": "L80",
       "id": "perception_g1_detector_node_g1detectornode_processing_loop",
-      "community": 6,
+      "community": 8,
       "norm_label": ".processing_loop()"
     },
     {
@@ -1242,7 +1728,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/g1_detector_node.py",
       "source_location": "L101",
       "id": "perception_g1_detector_node_g1detectornode_process_color_image",
-      "community": 6,
+      "community": 8,
       "norm_label": ".process_color_image()"
     },
     {
@@ -1251,7 +1737,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/g1_detector_node.py",
       "source_location": "L117",
       "id": "perception_g1_detector_node_g1detectornode_destroy_node",
-      "community": 6,
+      "community": 8,
       "norm_label": ".destroy_node()"
     },
     {
@@ -1260,7 +1746,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/g1_detector_node.py",
       "source_location": "L125",
       "id": "perception_g1_detector_node_main",
-      "community": 6,
+      "community": 8,
       "norm_label": "main()"
     },
     {
@@ -1269,7 +1755,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/g1_lidar_measurement_node.py",
       "source_location": "L1",
       "id": "src_ridgeback_autonomy_ridgeback_autonomy_perception_g1_lidar_measurement_node_py",
-      "community": 7,
+      "community": 9,
       "norm_label": "g1_lidar_measurement_node.py"
     },
     {
@@ -1278,7 +1764,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/g1_lidar_measurement_node.py",
       "source_location": "L35",
       "id": "perception_g1_lidar_measurement_node_g1lidarmeasurementnode",
-      "community": 7,
+      "community": 9,
       "norm_label": "g1lidarmeasurementnode"
     },
     {
@@ -1287,7 +1773,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/g1_lidar_measurement_node.py",
       "source_location": "L36",
       "id": "perception_g1_lidar_measurement_node_g1lidarmeasurementnode_init",
-      "community": 7,
+      "community": 9,
       "norm_label": ".__init__()"
     },
     {
@@ -1296,7 +1782,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/g1_lidar_measurement_node.py",
       "source_location": "L95",
       "id": "perception_g1_lidar_measurement_node_g1lidarmeasurementnode_default_base_frame",
-      "community": 7,
+      "community": 9,
       "norm_label": ".default_base_frame()"
     },
     {
@@ -1305,7 +1791,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/g1_lidar_measurement_node.py",
       "source_location": "L101",
       "id": "perception_g1_lidar_measurement_node_g1lidarmeasurementnode_detections_callback",
-      "community": 7,
+      "community": 9,
       "norm_label": ".detections_callback()"
     },
     {
@@ -1314,7 +1800,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/g1_lidar_measurement_node.py",
       "source_location": "L106",
       "id": "perception_g1_lidar_measurement_node_g1lidarmeasurementnode_scan_callback",
-      "community": 7,
+      "community": 9,
       "norm_label": ".scan_callback()"
     },
     {
@@ -1323,7 +1809,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/g1_lidar_measurement_node.py",
       "source_location": "L111",
       "id": "perception_g1_lidar_measurement_node_g1lidarmeasurementnode_scan_processing_loop",
-      "community": 7,
+      "community": 9,
       "norm_label": ".scan_processing_loop()"
     },
     {
@@ -1332,7 +1818,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/g1_lidar_measurement_node.py",
       "source_location": "L139",
       "id": "perception_g1_lidar_measurement_node_g1lidarmeasurementnode_processing_loop",
-      "community": 7,
+      "community": 9,
       "norm_label": ".processing_loop()"
     },
     {
@@ -1341,7 +1827,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/g1_lidar_measurement_node.py",
       "source_location": "L159",
       "id": "perception_g1_lidar_measurement_node_g1lidarmeasurementnode_process_measurements",
-      "community": 7,
+      "community": 9,
       "norm_label": ".process_measurements()"
     },
     {
@@ -1350,7 +1836,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/g1_lidar_measurement_node.py",
       "source_location": "L164",
       "id": "perception_g1_lidar_measurement_node_g1lidarmeasurementnode_extract_scan_points",
-      "community": 7,
+      "community": 9,
       "norm_label": ".extract_scan_points()"
     },
     {
@@ -1359,7 +1845,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/g1_lidar_measurement_node.py",
       "source_location": "L175",
       "id": "perception_g1_lidar_measurement_node_g1lidarmeasurementnode_log_lidar_warning",
-      "community": 7,
+      "community": 9,
       "norm_label": ".log_lidar_warning()"
     },
     {
@@ -1368,7 +1854,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/g1_lidar_measurement_node.py",
       "source_location": "L181",
       "id": "perception_g1_lidar_measurement_node_g1lidarmeasurementnode_destroy_node",
-      "community": 7,
+      "community": 9,
       "norm_label": ".destroy_node()"
     },
     {
@@ -1377,7 +1863,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/g1_lidar_measurement_node.py",
       "source_location": "L192",
       "id": "perception_g1_lidar_measurement_node_main",
-      "community": 7,
+      "community": 9,
       "norm_label": "main()"
     },
     {
@@ -1386,7 +1872,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/g1_camera_measurement_node.py",
       "source_location": "L1",
       "id": "src_ridgeback_autonomy_ridgeback_autonomy_perception_g1_camera_measurement_node_py",
-      "community": 5,
+      "community": 6,
       "norm_label": "g1_camera_measurement_node.py"
     },
     {
@@ -1395,7 +1881,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/g1_camera_measurement_node.py",
       "source_location": "L52",
       "id": "perception_g1_camera_measurement_node_g1camerameasurementnode",
-      "community": 5,
+      "community": 6,
       "norm_label": "g1camerameasurementnode"
     },
     {
@@ -1404,7 +1890,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/g1_camera_measurement_node.py",
       "source_location": "L53",
       "id": "perception_g1_camera_measurement_node_g1camerameasurementnode_init",
-      "community": 5,
+      "community": 6,
       "norm_label": ".__init__()"
     },
     {
@@ -1413,7 +1899,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/g1_camera_measurement_node.py",
       "source_location": "L168",
       "id": "perception_g1_camera_measurement_node_g1camerameasurementnode_default_base_frame",
-      "community": 5,
+      "community": 6,
       "norm_label": ".default_base_frame()"
     },
     {
@@ -1422,7 +1908,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/g1_camera_measurement_node.py",
       "source_location": "L174",
       "id": "perception_g1_camera_measurement_node_g1camerameasurementnode_detections_callback",
-      "community": 5,
+      "community": 6,
       "norm_label": ".detections_callback()"
     },
     {
@@ -1431,7 +1917,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/g1_camera_measurement_node.py",
       "source_location": "L179",
       "id": "perception_g1_camera_measurement_node_g1camerameasurementnode_color_callback",
-      "community": 5,
+      "community": 6,
       "norm_label": ".color_callback()"
     },
     {
@@ -1440,7 +1926,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/g1_camera_measurement_node.py",
       "source_location": "L183",
       "id": "perception_g1_camera_measurement_node_g1camerameasurementnode_depth_callback",
-      "community": 5,
+      "community": 6,
       "norm_label": ".depth_callback()"
     },
     {
@@ -1449,7 +1935,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/g1_camera_measurement_node.py",
       "source_location": "L188",
       "id": "perception_g1_camera_measurement_node_g1camerameasurementnode_pointcloud_callback",
-      "community": 5,
+      "community": 6,
       "norm_label": ".pointcloud_callback()"
     },
     {
@@ -1458,7 +1944,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/g1_camera_measurement_node.py",
       "source_location": "L193",
       "id": "perception_g1_camera_measurement_node_g1camerameasurementnode_depth_processing_loop",
-      "community": 5,
+      "community": 6,
       "norm_label": ".depth_processing_loop()"
     },
     {
@@ -1467,7 +1953,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/g1_camera_measurement_node.py",
       "source_location": "L224",
       "id": "perception_g1_camera_measurement_node_g1camerameasurementnode_pointcloud_processing_loop",
-      "community": 5,
+      "community": 6,
       "norm_label": ".pointcloud_processing_loop()"
     },
     {
@@ -1476,7 +1962,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/g1_camera_measurement_node.py",
       "source_location": "L266",
       "id": "perception_g1_camera_measurement_node_g1camerameasurementnode_processing_loop",
-      "community": 3,
+      "community": 6,
       "norm_label": ".processing_loop()"
     },
     {
@@ -1485,7 +1971,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/g1_camera_measurement_node.py",
       "source_location": "L297",
       "id": "perception_g1_camera_measurement_node_g1camerameasurementnode_process_measurements",
-      "community": 3,
+      "community": 6,
       "norm_label": ".process_measurements()"
     },
     {
@@ -1494,7 +1980,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/g1_camera_measurement_node.py",
       "source_location": "L375",
       "id": "perception_g1_camera_measurement_node_g1camerameasurementnode_lookup_transform",
-      "community": 5,
+      "community": 6,
       "norm_label": ".lookup_transform()"
     },
     {
@@ -1503,7 +1989,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/g1_camera_measurement_node.py",
       "source_location": "L386",
       "id": "perception_g1_camera_measurement_node_g1camerameasurementnode_log_warning_once",
-      "community": 5,
+      "community": 6,
       "norm_label": ".log_warning_once()"
     },
     {
@@ -1512,7 +1998,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/g1_camera_measurement_node.py",
       "source_location": "L392",
       "id": "perception_g1_camera_measurement_node_g1camerameasurementnode_destroy_node",
-      "community": 5,
+      "community": 6,
       "norm_label": ".destroy_node()"
     },
     {
@@ -1521,7 +2007,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/g1_camera_measurement_node.py",
       "source_location": "L404",
       "id": "perception_g1_camera_measurement_node_main",
-      "community": 5,
+      "community": 6,
       "norm_label": "main()"
     },
     {
@@ -1530,7 +2016,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/core/rendering.py",
       "source_location": "L1",
       "id": "src_ridgeback_autonomy_ridgeback_autonomy_perception_core_rendering_py",
-      "community": 2,
+      "community": 3,
       "norm_label": "rendering.py"
     },
     {
@@ -1539,7 +2025,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/core/rendering.py",
       "source_location": "L10",
       "id": "core_rendering_rgbdoverlayrenderer",
-      "community": 2,
+      "community": 3,
       "norm_label": "rgbdoverlayrenderer"
     },
     {
@@ -1548,7 +2034,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/core/rendering.py",
       "source_location": "L11",
       "id": "core_rendering_rgbdoverlayrenderer_init",
-      "community": 2,
+      "community": 3,
       "norm_label": ".__init__()"
     },
     {
@@ -1557,7 +2043,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/core/rendering.py",
       "source_location": "L14",
       "id": "core_rendering_rgbdoverlayrenderer_render",
-      "community": 2,
+      "community": 3,
       "norm_label": ".render()"
     },
     {
@@ -1566,7 +2052,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/core/rendering.py",
       "source_location": "L84",
       "id": "core_rendering_rgbdoverlayrenderer_normalize_depth",
-      "community": 2,
+      "community": 3,
       "norm_label": ".normalize_depth()"
     },
     {
@@ -1575,7 +2061,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/core/rendering.py",
       "source_location": "L100",
       "id": "core_rendering_rgbdoverlayrenderer_make_depth_panel",
-      "community": 2,
+      "community": 3,
       "norm_label": ".make_depth_panel()"
     },
     {
@@ -1584,7 +2070,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/core/rendering.py",
       "source_location": "L111",
       "id": "core_rendering_rgbdoverlayrenderer_draw_panel_title",
-      "community": 2,
+      "community": 3,
       "norm_label": ".draw_panel_title()"
     },
     {
@@ -1593,7 +2079,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/core/rendering.py",
       "source_location": "L124",
       "id": "core_rendering_rgbdoverlayrenderer_draw_label_block",
-      "community": 2,
+      "community": 3,
       "norm_label": ".draw_label_block()"
     },
     {
@@ -1602,7 +2088,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/core/rendering.py",
       "source_location": "L179",
       "id": "core_rendering_rgbdoverlayrenderer_format_position_line",
-      "community": 2,
+      "community": 3,
       "norm_label": ".format_position_line()"
     },
     {
@@ -1611,7 +2097,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/core/rendering.py",
       "source_location": "L194",
       "id": "core_rendering_rgbdoverlayrenderer_format_distance_line",
-      "community": 2,
+      "community": 3,
       "norm_label": ".format_distance_line()"
     },
     {
@@ -1620,7 +2106,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/core/__init__.py",
       "source_location": "L1",
       "id": "src_ridgeback_autonomy_ridgeback_autonomy_perception_core_init_py",
-      "community": 17,
+      "community": 19,
       "norm_label": "__init__.py"
     },
     {
@@ -1629,7 +2115,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/core/__init__.py",
       "source_location": "L1",
       "id": "core_init_rationale_1",
-      "community": 17,
+      "community": 19,
       "norm_label": "shared perception internals used by the perception node entrypoints."
     },
     {
@@ -1638,7 +2124,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/core/image_utils.py",
       "source_location": "L1",
       "id": "src_ridgeback_autonomy_ridgeback_autonomy_perception_core_image_utils_py",
-      "community": 10,
+      "community": 4,
       "norm_label": "image_utils.py"
     },
     {
@@ -1647,7 +2133,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/core/image_utils.py",
       "source_location": "L10",
       "id": "core_image_utils_bgr_frame_to_pil",
-      "community": 6,
+      "community": 8,
       "norm_label": "bgr_frame_to_pil()"
     },
     {
@@ -1656,7 +2142,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/core/image_utils.py",
       "source_location": "L16",
       "id": "core_image_utils_convert_color_image_message",
-      "community": 10,
+      "community": 4,
       "norm_label": "convert_color_image_message()"
     },
     {
@@ -1665,7 +2151,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/core/image_utils.py",
       "source_location": "L33",
       "id": "core_image_utils_convert_depth_to_meters_message",
-      "community": 10,
+      "community": 4,
       "norm_label": "convert_depth_to_meters_message()"
     },
     {
@@ -1674,7 +2160,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/core/image_utils.py",
       "source_location": "L42",
       "id": "core_image_utils_decode_image_message",
-      "community": 10,
+      "community": 4,
       "norm_label": "decode_image_message()"
     },
     {
@@ -1683,7 +2169,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/core/image_utils.py",
       "source_location": "L56",
       "id": "core_image_utils_decode_buffer",
-      "community": 10,
+      "community": 4,
       "norm_label": "decode_buffer()"
     },
     {
@@ -1692,7 +2178,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/core/image_utils.py",
       "source_location": "L72",
       "id": "core_image_utils_normalize_to_uint8",
-      "community": 10,
+      "community": 4,
       "norm_label": "normalize_to_uint8()"
     },
     {
@@ -1701,7 +2187,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/core/detection.py",
       "source_location": "L1",
       "id": "src_ridgeback_autonomy_ridgeback_autonomy_perception_core_detection_py",
-      "community": 6,
+      "community": 8,
       "norm_label": "detection.py"
     },
     {
@@ -1710,7 +2196,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/core/detection.py",
       "source_location": "L15",
       "id": "core_detection_resolve_torch_device",
-      "community": 5,
+      "community": 6,
       "norm_label": "resolve_torch_device()"
     },
     {
@@ -1719,7 +2205,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/core/detection.py",
       "source_location": "L23",
       "id": "core_detection_owlv2detector",
-      "community": 6,
+      "community": 8,
       "norm_label": "owlv2detector"
     },
     {
@@ -1728,7 +2214,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/core/detection.py",
       "source_location": "L24",
       "id": "core_detection_owlv2detector_init",
-      "community": 5,
+      "community": 6,
       "norm_label": ".__init__()"
     },
     {
@@ -1737,7 +2223,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/core/detection.py",
       "source_location": "L30",
       "id": "core_detection_owlv2detector_load",
-      "community": 6,
+      "community": 8,
       "norm_label": ".load()"
     },
     {
@@ -1746,7 +2232,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/core/detection.py",
       "source_location": "L41",
       "id": "core_detection_owlv2detector_detect",
-      "community": 6,
+      "community": 8,
       "norm_label": ".detect()"
     },
     {
@@ -1755,7 +2241,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/core/detection.py",
       "source_location": "L48",
       "id": "core_detection_compute_iou",
-      "community": 6,
+      "community": 8,
       "norm_label": "compute_iou()"
     },
     {
@@ -1764,7 +2250,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/core/detection.py",
       "source_location": "L60",
       "id": "core_detection_non_maximum_suppression",
-      "community": 6,
+      "community": 8,
       "norm_label": "non_maximum_suppression()"
     },
     {
@@ -1773,7 +2259,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/core/detection.py",
       "source_location": "L70",
       "id": "core_detection_parse_owl_detections",
-      "community": 6,
+      "community": 8,
       "norm_label": "parse_owl_detections()"
     },
     {
@@ -1782,7 +2268,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/core/geometry.py",
       "source_location": "L1",
       "id": "src_ridgeback_autonomy_ridgeback_autonomy_perception_core_geometry_py",
-      "community": 3,
+      "community": 5,
       "norm_label": "geometry.py"
     },
     {
@@ -1791,7 +2277,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/core/geometry.py",
       "source_location": "L36",
       "id": "core_geometry_apply_vehicle_front_offset",
-      "community": 3,
+      "community": 5,
       "norm_label": "apply_vehicle_front_offset()"
     },
     {
@@ -1800,7 +2286,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/core/geometry.py",
       "source_location": "L40",
       "id": "core_geometry_yaw_from_quaternion",
-      "community": 0,
+      "community": 5,
       "norm_label": "yaw_from_quaternion()"
     },
     {
@@ -1809,7 +2295,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/core/geometry.py",
       "source_location": "L46",
       "id": "core_geometry_world_to_vehicle_planar",
-      "community": 3,
+      "community": 5,
       "norm_label": "world_to_vehicle_planar()"
     },
     {
@@ -1818,7 +2304,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/core/geometry.py",
       "source_location": "L52",
       "id": "core_geometry_planar_distance_from_vehicle_origin",
-      "community": 3,
+      "community": 5,
       "norm_label": "planar_distance_from_vehicle_origin()"
     },
     {
@@ -1827,7 +2313,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/core/geometry.py",
       "source_location": "L63",
       "id": "core_geometry_rotate_camera_to_vehicle_frame",
-      "community": 3,
+      "community": 5,
       "norm_label": "rotate_camera_to_vehicle_frame()"
     },
     {
@@ -1836,7 +2322,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/core/geometry.py",
       "source_location": "L73",
       "id": "core_geometry_focus_bbox",
-      "community": 3,
+      "community": 5,
       "norm_label": "focus_bbox()"
     },
     {
@@ -1845,7 +2331,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/core/geometry.py",
       "source_location": "L90",
       "id": "core_geometry_map_bbox_between_images",
-      "community": 3,
+      "community": 5,
       "norm_label": "map_bbox_between_images()"
     },
     {
@@ -1854,7 +2340,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/core/geometry.py",
       "source_location": "L113",
       "id": "core_geometry_add_rgb_measurements",
-      "community": 3,
+      "community": 5,
       "norm_label": "add_rgb_measurements()"
     },
     {
@@ -1863,7 +2349,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/core/geometry.py",
       "source_location": "L156",
       "id": "core_geometry_add_depth_measurements",
-      "community": 3,
+      "community": 5,
       "norm_label": "add_depth_measurements()"
     },
     {
@@ -1872,7 +2358,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/core/geometry.py",
       "source_location": "L188",
       "id": "core_geometry_add_depth_source_measurements",
-      "community": 3,
+      "community": 5,
       "norm_label": "add_depth_source_measurements()"
     },
     {
@@ -1881,7 +2367,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/core/geometry.py",
       "source_location": "L231",
       "id": "core_geometry_compute_weighted_planar_distance",
-      "community": 3,
+      "community": 5,
       "norm_label": "compute_weighted_planar_distance()"
     },
     {
@@ -1890,7 +2376,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/core/geometry.py",
       "source_location": "L295",
       "id": "core_geometry_extract_scan_points_base",
-      "community": 3,
+      "community": 5,
       "norm_label": "extract_scan_points_base()"
     },
     {
@@ -1899,7 +2385,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/core/geometry.py",
       "source_location": "L351",
       "id": "core_geometry_add_lidar_measurements",
-      "community": 3,
+      "community": 5,
       "norm_label": "add_lidar_measurements()"
     },
     {
@@ -1908,7 +2394,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/core/geometry.py",
       "source_location": "L382",
       "id": "core_geometry_compute_lidar_measurement",
-      "community": 3,
+      "community": 5,
       "norm_label": "compute_lidar_measurement()"
     },
     {
@@ -1917,7 +2403,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/core/geometry.py",
       "source_location": "L417",
       "id": "core_geometry_compute_camera_bearing_window",
-      "community": 3,
+      "community": 5,
       "norm_label": "compute_camera_bearing_window()"
     },
     {
@@ -1926,7 +2412,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/core/geometry.py",
       "source_location": "L442",
       "id": "core_geometry_wrap_angle",
-      "community": 3,
+      "community": 5,
       "norm_label": "wrap_angle()"
     },
     {
@@ -1935,7 +2421,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/core/geometry.py",
       "source_location": "L446",
       "id": "core_geometry_extract_organized_xyz",
-      "community": 5,
+      "community": 6,
       "norm_label": "extract_organized_xyz()"
     },
     {
@@ -1944,7 +2430,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/core/geometry.py",
       "source_location": "L467",
       "id": "core_geometry_add_pointcloud_measurements",
-      "community": 3,
+      "community": 5,
       "norm_label": "add_pointcloud_measurements()"
     },
     {
@@ -1953,7 +2439,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/core/geometry.py",
       "source_location": "L511",
       "id": "core_geometry_compute_pointcloud_measurement",
-      "community": 3,
+      "community": 5,
       "norm_label": "compute_pointcloud_measurement()"
     },
     {
@@ -1962,7 +2448,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/core/depth_anything.py",
       "source_location": "L1",
       "id": "src_ridgeback_autonomy_ridgeback_autonomy_perception_core_depth_anything_py",
-      "community": 5,
+      "community": 6,
       "norm_label": "depth_anything.py"
     },
     {
@@ -1971,7 +2457,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/core/depth_anything.py",
       "source_location": "L15",
       "id": "core_depth_anything_depthanythingestimator",
-      "community": 5,
+      "community": 6,
       "norm_label": "depthanythingestimator"
     },
     {
@@ -1980,7 +2466,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/core/depth_anything.py",
       "source_location": "L16",
       "id": "core_depth_anything_depthanythingestimator_init",
-      "community": 5,
+      "community": 6,
       "norm_label": ".__init__()"
     },
     {
@@ -1989,7 +2475,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/core/depth_anything.py",
       "source_location": "L23",
       "id": "core_depth_anything_depthanythingestimator_load",
-      "community": 5,
+      "community": 6,
       "norm_label": ".load()"
     },
     {
@@ -1998,7 +2484,7 @@
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/core/depth_anything.py",
       "source_location": "L43",
       "id": "core_depth_anything_depthanythingestimator_predict",
-      "community": 5,
+      "community": 6,
       "norm_label": ".predict()"
     },
     {
@@ -2007,7 +2493,7 @@
       "source_file": "src/ridgeback_autonomy/test/test_messages.py",
       "source_location": "L1",
       "id": "src_ridgeback_autonomy_test_test_messages_py",
-      "community": 4,
+      "community": 7,
       "norm_label": "test_messages.py"
     },
     {
@@ -2016,7 +2502,7 @@
       "source_file": "src/ridgeback_autonomy/test/test_messages.py",
       "source_location": "L17",
       "id": "test_test_messages_test_build_detections_message_serializes_identity_fields",
-      "community": 4,
+      "community": 7,
       "norm_label": "test_build_detections_message_serializes_identity_fields()"
     },
     {
@@ -2025,7 +2511,7 @@
       "source_file": "src/ridgeback_autonomy/test/test_messages.py",
       "source_location": "L40",
       "id": "test_test_messages_test_batch_from_detections_message_round_trips_detection_identity",
-      "community": 4,
+      "community": 7,
       "norm_label": "test_batch_from_detections_message_round_trips_detection_identity()"
     },
     {
@@ -2034,7 +2520,7 @@
       "source_file": "src/ridgeback_autonomy/test/test_messages.py",
       "source_location": "L61",
       "id": "test_test_messages_test_build_measurements_message_serializes_parallel_arrays",
-      "community": 4,
+      "community": 7,
       "norm_label": "test_build_measurements_message_serializes_parallel_arrays()"
     },
     {
@@ -2043,7 +2529,7 @@
       "source_file": "src/ridgeback_autonomy/test/test_messages.py",
       "source_location": "L101",
       "id": "test_test_messages_test_snapshot_measurements_message_uses_first_finite_positive_values",
-      "community": 4,
+      "community": 7,
       "norm_label": "test_snapshot_measurements_message_uses_first_finite_positive_values()"
     },
     {
@@ -2052,7 +2538,7 @@
       "source_file": "src/ridgeback_autonomy/test/test_detection.py",
       "source_location": "L1",
       "id": "src_ridgeback_autonomy_test_test_detection_py",
-      "community": 6,
+      "community": 8,
       "norm_label": "test_detection.py"
     },
     {
@@ -2061,7 +2547,7 @@
       "source_file": "src/ridgeback_autonomy/test/test_detection.py",
       "source_location": "L6",
       "id": "test_test_detection_test_compute_iou_handles_overlap",
-      "community": 6,
+      "community": 8,
       "norm_label": "test_compute_iou_handles_overlap()"
     },
     {
@@ -2070,7 +2556,7 @@
       "source_file": "src/ridgeback_autonomy/test/test_detection.py",
       "source_location": "L12",
       "id": "test_test_detection_test_parse_owl_detections_applies_threshold_and_nms",
-      "community": 6,
+      "community": 8,
       "norm_label": "test_parse_owl_detections_applies_threshold_and_nms()"
     },
     {
@@ -2079,7 +2565,7 @@
       "source_file": "src/ridgeback_autonomy/test/test_geometry.py",
       "source_location": "L1",
       "id": "src_ridgeback_autonomy_test_test_geometry_py",
-      "community": 3,
+      "community": 5,
       "norm_label": "test_geometry.py"
     },
     {
@@ -2088,7 +2574,7 @@
       "source_file": "src/ridgeback_autonomy/test/test_geometry.py",
       "source_location": "L19",
       "id": "test_test_geometry_test_focus_bbox_and_mapping",
-      "community": 3,
+      "community": 5,
       "norm_label": "test_focus_bbox_and_mapping()"
     },
     {
@@ -2097,7 +2583,7 @@
       "source_file": "src/ridgeback_autonomy/test/test_geometry.py",
       "source_location": "L26",
       "id": "test_test_geometry_test_compute_weighted_planar_distance_for_center_pixel",
-      "community": 4,
+      "community": 5,
       "norm_label": "test_compute_weighted_planar_distance_for_center_pixel()"
     },
     {
@@ -2106,7 +2592,7 @@
       "source_file": "src/ridgeback_autonomy/test/test_geometry.py",
       "source_location": "L46",
       "id": "test_test_geometry_test_add_depth_measurements_falls_back_to_full_bbox_when_focus_has_no_depth",
-      "community": 4,
+      "community": 7,
       "norm_label": "test_add_depth_measurements_falls_back_to_full_bbox_when_focus_has_no_depth()"
     },
     {
@@ -2115,7 +2601,7 @@
       "source_file": "src/ridgeback_autonomy/test/test_geometry.py",
       "source_location": "L76",
       "id": "test_test_geometry_test_compute_lidar_measurement_returns_vehicle_frame_distance",
-      "community": 3,
+      "community": 5,
       "norm_label": "test_compute_lidar_measurement_returns_vehicle_frame_distance()"
     },
     {
@@ -2124,7 +2610,7 @@
       "source_file": "src/ridgeback_autonomy/test/test_geometry.py",
       "source_location": "L103",
       "id": "test_test_geometry_test_compute_pointcloud_measurement_returns_nearest_inlier",
-      "community": 3,
+      "community": 5,
       "norm_label": "test_compute_pointcloud_measurement_returns_nearest_inlier()"
     },
     {
@@ -2133,7 +2619,7 @@
       "source_file": "src/ridgeback_autonomy/test/test_geometry.py",
       "source_location": "L127",
       "id": "test_test_geometry_test_compute_pointcloud_measurement_supports_direct_cloud_coordinates",
-      "community": 3,
+      "community": 5,
       "norm_label": "test_compute_pointcloud_measurement_supports_direct_cloud_coordinates()"
     },
     {
@@ -2142,7 +2628,7 @@
       "source_file": "src/ridgeback_autonomy/test/test_geometry.py",
       "source_location": "L151",
       "id": "test_test_geometry_test_add_pointcloud_measurements_falls_back_when_transform_path_rejects_points",
-      "community": 4,
+      "community": 7,
       "norm_label": "test_add_pointcloud_measurements_falls_back_when_transform_path_rejects_points()"
     },
     {
@@ -2214,7 +2700,7 @@
       "source_file": "src/ridgeback_autonomy/test/test_image_utils.py",
       "source_location": "L1",
       "id": "src_ridgeback_autonomy_test_test_image_utils_py",
-      "community": 10,
+      "community": 4,
       "norm_label": "test_image_utils.py"
     },
     {
@@ -2223,7 +2709,7 @@
       "source_file": "src/ridgeback_autonomy/test/test_image_utils.py",
       "source_location": "L13",
       "id": "test_test_image_utils_make_image_msg",
-      "community": 10,
+      "community": 4,
       "norm_label": "make_image_msg()"
     },
     {
@@ -2232,7 +2718,7 @@
       "source_file": "src/ridgeback_autonomy/test/test_image_utils.py",
       "source_location": "L24",
       "id": "test_test_image_utils_test_convert_color_image_message_rgb8_to_bgr",
-      "community": 10,
+      "community": 4,
       "norm_label": "test_convert_color_image_message_rgb8_to_bgr()"
     },
     {
@@ -2241,7 +2727,7 @@
       "source_file": "src/ridgeback_autonomy/test/test_image_utils.py",
       "source_location": "L34",
       "id": "test_test_image_utils_test_convert_depth_to_meters_from_16uc1",
-      "community": 10,
+      "community": 4,
       "norm_label": "test_convert_depth_to_meters_from_16uc1()"
     },
     {
@@ -2250,7 +2736,7 @@
       "source_file": "src/ridgeback_autonomy/test/test_image_utils.py",
       "source_location": "L44",
       "id": "test_test_image_utils_test_convert_color_image_message_supports_padded_rows",
-      "community": 10,
+      "community": 4,
       "norm_label": "test_convert_color_image_message_supports_padded_rows()"
     },
     {
@@ -2259,7 +2745,7 @@
       "source_file": "src/ridgeback_autonomy/test/test_image_utils.py",
       "source_location": "L59",
       "id": "test_test_image_utils_test_normalize_to_uint8_flat_image_returns_zeroes",
-      "community": 10,
+      "community": 4,
       "norm_label": "test_normalize_to_uint8_flat_image_returns_zeroes()"
     },
     {
@@ -2268,7 +2754,7 @@
       "source_file": "src/ridgeback_autonomy/test/test_imports.py",
       "source_location": "L1",
       "id": "src_ridgeback_autonomy_test_test_imports_py",
-      "community": 18,
+      "community": 20,
       "norm_label": "test_imports.py"
     },
     {
@@ -2277,7 +2763,7 @@
       "source_file": "src/ridgeback_autonomy/test/test_imports.py",
       "source_location": "L6",
       "id": "test_test_imports_test_packaged_modules_import",
-      "community": 18,
+      "community": 20,
       "norm_label": "test_packaged_modules_import()"
     },
     {
@@ -2286,7 +2772,7 @@
       "source_file": "src/ridgeback_autonomy/test/test_benchmark_runner.py",
       "source_location": "L1",
       "id": "src_ridgeback_autonomy_test_test_benchmark_runner_py",
-      "community": 1,
+      "community": 2,
       "norm_label": "test_benchmark_runner.py"
     },
     {
@@ -2295,7 +2781,7 @@
       "source_file": "src/ridgeback_autonomy/test/test_benchmark_runner.py",
       "source_location": "L26",
       "id": "test_test_benchmark_runner_test_parse_estimators_uses_canonical_order_and_depth_anything_name",
-      "community": 8,
+      "community": 10,
       "norm_label": "test_parse_estimators_uses_canonical_order_and_depth_anything_name()"
     },
     {
@@ -2304,7 +2790,7 @@
       "source_file": "src/ridgeback_autonomy/test/test_benchmark_runner.py",
       "source_location": "L35",
       "id": "test_test_benchmark_runner_test_extract_json_payload_accepts_multiple_gz_json_messages",
-      "community": 0,
+      "community": 2,
       "norm_label": "test_extract_json_payload_accepts_multiple_gz_json_messages()"
     },
     {
@@ -2313,7 +2799,7 @@
       "source_file": "src/ridgeback_autonomy/test/test_benchmark_runner.py",
       "source_location": "L45",
       "id": "test_test_benchmark_runner_test_alignment_updates_public_depth_anything_value_from_message_field",
-      "community": 1,
+      "community": 2,
       "norm_label": "test_alignment_updates_public_depth_anything_value_from_message_field()"
     },
     {
@@ -2322,7 +2808,7 @@
       "source_file": "src/ridgeback_autonomy/test/test_benchmark_runner.py",
       "source_location": "L79",
       "id": "test_test_benchmark_runner_test_find_exact_preview_match_uses_only_exact_stamp",
-      "community": 1,
+      "community": 2,
       "norm_label": "test_find_exact_preview_match_uses_only_exact_stamp()"
     },
     {
@@ -2331,7 +2817,7 @@
       "source_file": "src/ridgeback_autonomy/test/test_benchmark_runner.py",
       "source_location": "L95",
       "id": "test_test_benchmark_runner_test_find_nearest_preview_match_prefers_smallest_delta_within_tolerance",
-      "community": 1,
+      "community": 2,
       "norm_label": "test_find_nearest_preview_match_prefers_smallest_delta_within_tolerance()"
     },
     {
@@ -2340,7 +2826,7 @@
       "source_file": "src/ridgeback_autonomy/test/test_benchmark_runner.py",
       "source_location": "L111",
       "id": "test_test_benchmark_runner_test_find_nearest_preview_match_returns_unmatched_when_outside_tolerance",
-      "community": 1,
+      "community": 2,
       "norm_label": "test_find_nearest_preview_match_returns_unmatched_when_outside_tolerance()"
     },
     {
@@ -2349,7 +2835,7 @@
       "source_file": "src/ridgeback_autonomy/test/test_benchmark_runner.py",
       "source_location": "L123",
       "id": "test_test_benchmark_runner_test_usable_aligned_events_require_the_full_selected_estimator_set",
-      "community": 1,
+      "community": 2,
       "norm_label": "test_usable_aligned_events_require_the_full_selected_estimator_set()"
     },
     {
@@ -2358,7 +2844,7 @@
       "source_file": "src/ridgeback_autonomy/test/test_benchmark_runner.py",
       "source_location": "L154",
       "id": "test_test_benchmark_runner_test_representative_event_uses_minimum_total_deviation_then_timestamp",
-      "community": 1,
+      "community": 2,
       "norm_label": "test_representative_event_uses_minimum_total_deviation_then_timestamp()"
     },
     {
@@ -2367,7 +2853,7 @@
       "source_file": "src/ridgeback_autonomy/test/test_benchmark_runner.py",
       "source_location": "L198",
       "id": "test_test_benchmark_runner_test_representative_event_prefers_preview_complete_candidate",
-      "community": 1,
+      "community": 2,
       "norm_label": "test_representative_event_prefers_preview_complete_candidate()"
     },
     {
@@ -2376,7 +2862,7 @@
       "source_file": "src/ridgeback_autonomy/test/test_benchmark_runner.py",
       "source_location": "L242",
       "id": "test_test_benchmark_runner_test_representative_event_falls_back_to_numeric_when_no_preview_complete_candidate",
-      "community": 1,
+      "community": 2,
       "norm_label": "test_representative_event_falls_back_to_numeric_when_no_preview_complete_candidate()"
     },
     {
@@ -2385,7 +2871,7 @@
       "source_file": "src/ridgeback_autonomy/test/test_benchmark_runner.py",
       "source_location": "L283",
       "id": "test_test_benchmark_runner_test_render_missing_preview_context_is_not_a_silent_black_panel",
-      "community": 1,
+      "community": 2,
       "norm_label": "test_render_missing_preview_context_is_not_a_silent_black_panel()"
     },
     {
@@ -2394,7 +2880,7 @@
       "source_file": "src/ridgeback_autonomy/test/test_benchmark_runner.py",
       "source_location": "L318",
       "id": "test_test_benchmark_runner_test_render_pointcloud_and_lidar_panels_are_labeled_as_rgb_debug_views",
-      "community": 1,
+      "community": 2,
       "norm_label": "test_render_pointcloud_and_lidar_panels_are_labeled_as_rgb_debug_views()"
     },
     {
@@ -2403,7 +2889,7 @@
       "source_file": "src/ridgeback_autonomy/test/test_benchmark_runner.py",
       "source_location": "L355",
       "id": "test_test_benchmark_runner_test_build_summary_rows_aggregates_trial_level_estimator_rows",
-      "community": 0,
+      "community": 1,
       "norm_label": "test_build_summary_rows_aggregates_trial_level_estimator_rows()"
     },
     {
@@ -2412,7 +2898,7 @@
       "source_file": "src/ridgeback_autonomy/launch/ridgeback_exploration.launch.py",
       "source_location": "L1",
       "id": "src_ridgeback_autonomy_launch_ridgeback_exploration_launch_py",
-      "community": 8,
+      "community": 10,
       "norm_label": "ridgeback_exploration.launch.py"
     },
     {
@@ -2421,7 +2907,7 @@
       "source_file": "src/ridgeback_autonomy/launch/ridgeback_exploration.launch.py",
       "source_location": "L14",
       "id": "launch_ridgeback_exploration_launch_generate_launch_description",
-      "community": 8,
+      "community": 10,
       "norm_label": "generate_launch_description()"
     },
     {
@@ -2430,7 +2916,7 @@
       "source_file": "src/ridgeback_autonomy/launch/g1_distance_benchmark.launch.py",
       "source_location": "L1",
       "id": "src_ridgeback_autonomy_launch_g1_distance_benchmark_launch_py",
-      "community": 8,
+      "community": 10,
       "norm_label": "g1_distance_benchmark.launch.py"
     },
     {
@@ -2439,7 +2925,7 @@
       "source_file": "src/ridgeback_autonomy/launch/g1_distance_benchmark.launch.py",
       "source_location": "L24",
       "id": "launch_g1_distance_benchmark_launch_build_benchmark_nodes",
-      "community": 8,
+      "community": 10,
       "norm_label": "build_benchmark_nodes()"
     },
     {
@@ -2448,7 +2934,7 @@
       "source_file": "src/ridgeback_autonomy/launch/g1_distance_benchmark.launch.py",
       "source_location": "L132",
       "id": "launch_g1_distance_benchmark_launch_generate_launch_description",
-      "community": 8,
+      "community": 10,
       "norm_label": "generate_launch_description()"
     },
     {
@@ -2457,7 +2943,7 @@
       "source_file": "src/ridgeback_autonomy/launch/includes/slam.launch.py",
       "source_location": "L1",
       "id": "src_ridgeback_autonomy_launch_includes_slam_launch_py",
-      "community": 13,
+      "community": 14,
       "norm_label": "slam.launch.py"
     },
     {
@@ -2466,7 +2952,7 @@
       "source_file": "src/ridgeback_autonomy/launch/includes/slam.launch.py",
       "source_location": "L15",
       "id": "includes_slam_launch_launch_setup",
-      "community": 13,
+      "community": 14,
       "norm_label": "launch_setup()"
     },
     {
@@ -2475,7 +2961,7 @@
       "source_file": "src/ridgeback_autonomy/launch/includes/slam.launch.py",
       "source_location": "L80",
       "id": "includes_slam_launch_generate_launch_description",
-      "community": 13,
+      "community": 14,
       "norm_label": "generate_launch_description()"
     },
     {
@@ -2484,16 +2970,16 @@
       "source_file": "src/ridgeback_autonomy/launch/includes/explore.launch.py",
       "source_location": "L1",
       "id": "src_ridgeback_autonomy_launch_includes_explore_launch_py",
-      "community": 8,
+      "community": 10,
       "norm_label": "explore.launch.py"
     },
     {
       "label": "generate_launch_description()",
       "file_type": "code",
       "source_file": "src/ridgeback_autonomy/launch/includes/explore.launch.py",
-      "source_location": "L10",
+      "source_location": "L11",
       "id": "includes_explore_launch_generate_launch_description",
-      "community": 8,
+      "community": 10,
       "norm_label": "generate_launch_description()"
     },
     {
@@ -2502,7 +2988,7 @@
       "source_file": "src/ridgeback_autonomy/launch/includes/nav2.launch.py",
       "source_location": "L1",
       "id": "src_ridgeback_autonomy_launch_includes_nav2_launch_py",
-      "community": 8,
+      "community": 10,
       "norm_label": "nav2.launch.py"
     },
     {
@@ -2511,7 +2997,7 @@
       "source_file": "src/ridgeback_autonomy/launch/includes/nav2.launch.py",
       "source_location": "L12",
       "id": "includes_nav2_launch_generate_launch_description",
-      "community": 8,
+      "community": 10,
       "norm_label": "generate_launch_description()"
     },
     {
@@ -2520,7 +3006,7 @@
       "source_file": "src/ridgeback_autonomy/launch/includes/simulation.launch.py",
       "source_location": "L1",
       "id": "src_ridgeback_autonomy_launch_includes_simulation_launch_py",
-      "community": 19,
+      "community": 21,
       "norm_label": "simulation.launch.py"
     },
     {
@@ -2529,7 +3015,7 @@
       "source_file": "src/ridgeback_autonomy/launch/includes/simulation.launch.py",
       "source_location": "L12",
       "id": "includes_simulation_launch_generate_launch_description",
-      "community": 19,
+      "community": 21,
       "norm_label": "generate_launch_description()"
     },
     {
@@ -2538,7 +3024,7 @@
       "source_file": "src/ridgeback_autonomy/sim/gz_plugins/SpawnG1.cc",
       "source_location": "L1",
       "id": "src_ridgeback_autonomy_sim_gz_plugins_spawng1_cc",
-      "community": 12,
+      "community": 13,
       "norm_label": "spawng1.cc"
     },
     {
@@ -2547,7 +3033,7 @@
       "source_file": "src/ridgeback_autonomy/sim/gz_plugins/SpawnG1.cc",
       "source_location": "L18",
       "id": "gz_plugins_spawng1_spawng1",
-      "community": 12,
+      "community": 13,
       "norm_label": "spawng1()"
     },
     {
@@ -2556,7 +3042,7 @@
       "source_file": "src/ridgeback_autonomy/sim/gz_plugins/SpawnG1.cc",
       "source_location": "L20",
       "id": "gz_plugins_spawng1_loadconfig",
-      "community": 12,
+      "community": 13,
       "norm_label": "loadconfig()"
     },
     {
@@ -2565,7 +3051,7 @@
       "source_file": "src/ridgeback_autonomy/sim/gz_plugins/SpawnG1.cc",
       "source_location": "L122",
       "id": "gz_plugins_spawng1_onspawn",
-      "community": 12,
+      "community": 13,
       "norm_label": "onspawn()"
     }
   ],
@@ -2604,6 +3090,750 @@
       "_tgt": "src_ridgeback_autonomy_ridgeback_autonomy_init_py",
       "source": "src_ridgeback_autonomy_ridgeback_autonomy_init_py",
       "target": "ridgeback_autonomy_init_rationale_1",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer_node.py",
+      "source_location": "L30",
+      "weight": 1.0,
+      "_src": "src_ridgeback_autonomy_ridgeback_autonomy_frontier_explorer_node_py",
+      "_tgt": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode",
+      "source": "src_ridgeback_autonomy_ridgeback_autonomy_frontier_explorer_node_py",
+      "target": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer_node.py",
+      "source_location": "L511",
+      "weight": 1.0,
+      "_src": "src_ridgeback_autonomy_ridgeback_autonomy_frontier_explorer_node_py",
+      "_tgt": "ridgeback_autonomy_frontier_explorer_node_main",
+      "source": "src_ridgeback_autonomy_ridgeback_autonomy_frontier_explorer_node_py",
+      "target": "ridgeback_autonomy_frontier_explorer_node_main",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "inherits",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer_node.py",
+      "source_location": "L30",
+      "weight": 1.0,
+      "_src": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode",
+      "_tgt": "node",
+      "source": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode",
+      "target": "node",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "method",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer_node.py",
+      "source_location": "L31",
+      "weight": 1.0,
+      "_src": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode",
+      "_tgt": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_init",
+      "source": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode",
+      "target": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_init",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "method",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer_node.py",
+      "source_location": "L127",
+      "weight": 1.0,
+      "_src": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode",
+      "_tgt": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_costmap_callback",
+      "source": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode",
+      "target": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_costmap_callback",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "method",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer_node.py",
+      "source_location": "L144",
+      "weight": 1.0,
+      "_src": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode",
+      "_tgt": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_update_awareness_map",
+      "source": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode",
+      "target": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_update_awareness_map",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "method",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer_node.py",
+      "source_location": "L169",
+      "weight": 1.0,
+      "_src": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode",
+      "_tgt": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_get_robot_position",
+      "source": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode",
+      "target": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_get_robot_position",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "method",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer_node.py",
+      "source_location": "L197",
+      "weight": 1.0,
+      "_src": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode",
+      "_tgt": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_exploration_callback",
+      "source": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode",
+      "target": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_exploration_callback",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "method",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer_node.py",
+      "source_location": "L225",
+      "weight": 1.0,
+      "_src": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode",
+      "_tgt": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_is_goal_safe",
+      "source": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode",
+      "target": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_is_goal_safe",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "method",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer_node.py",
+      "source_location": "L252",
+      "weight": 1.0,
+      "_src": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode",
+      "_tgt": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_is_blacklisted",
+      "source": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode",
+      "target": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_is_blacklisted",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "method",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer_node.py",
+      "source_location": "L259",
+      "weight": 1.0,
+      "_src": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode",
+      "_tgt": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_select_new_frontier_goal",
+      "source": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode",
+      "target": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_select_new_frontier_goal",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "method",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer_node.py",
+      "source_location": "L288",
+      "weight": 1.0,
+      "_src": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode",
+      "_tgt": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_make_goal_for_cluster",
+      "source": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode",
+      "target": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_make_goal_for_cluster",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "method",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer_node.py",
+      "source_location": "L321",
+      "weight": 1.0,
+      "_src": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode",
+      "_tgt": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_find_safe_frontier",
+      "source": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode",
+      "target": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_find_safe_frontier",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "method",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer_node.py",
+      "source_location": "L380",
+      "weight": 1.0,
+      "_src": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode",
+      "_tgt": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_cancel_current_goal",
+      "source": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode",
+      "target": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_cancel_current_goal",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "method",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer_node.py",
+      "source_location": "L386",
+      "weight": 1.0,
+      "_src": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode",
+      "_tgt": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_publish_frontier_markers",
+      "source": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode",
+      "target": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_publish_frontier_markers",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "method",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer_node.py",
+      "source_location": "L423",
+      "weight": 1.0,
+      "_src": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode",
+      "_tgt": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_check_goal_progress",
+      "source": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode",
+      "target": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_check_goal_progress",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "method",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer_node.py",
+      "source_location": "L437",
+      "weight": 1.0,
+      "_src": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode",
+      "_tgt": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_grid_to_world",
+      "source": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode",
+      "target": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_grid_to_world",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "method",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer_node.py",
+      "source_location": "L449",
+      "weight": 1.0,
+      "_src": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode",
+      "_tgt": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_send_goal_to_nav2",
+      "source": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode",
+      "target": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_send_goal_to_nav2",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "method",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer_node.py",
+      "source_location": "L470",
+      "weight": 1.0,
+      "_src": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode",
+      "_tgt": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_goal_response_callback",
+      "source": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode",
+      "target": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_goal_response_callback",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "method",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer_node.py",
+      "source_location": "L483",
+      "weight": 1.0,
+      "_src": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode",
+      "_tgt": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_goal_result_callback",
+      "source": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode",
+      "target": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_goal_result_callback",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer_node.py",
+      "source_location": "L513",
+      "weight": 1.0,
+      "_src": "ridgeback_autonomy_frontier_explorer_node_main",
+      "_tgt": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode",
+      "source": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode",
+      "target": "ridgeback_autonomy_frontier_explorer_node_main",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "inherits",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
+      "source_location": "L91",
+      "weight": 1.0,
+      "_src": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner",
+      "_tgt": "node",
+      "source": "node",
+      "target": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "inherits",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/g1_overlay_node.py",
+      "source_location": "L30",
+      "weight": 1.0,
+      "_src": "perception_g1_overlay_node_g1overlaynode",
+      "_tgt": "node",
+      "source": "node",
+      "target": "perception_g1_overlay_node_g1overlaynode",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "inherits",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/g1_detector_node.py",
+      "source_location": "L32",
+      "weight": 1.0,
+      "_src": "perception_g1_detector_node_g1detectornode",
+      "_tgt": "node",
+      "source": "node",
+      "target": "perception_g1_detector_node_g1detectornode",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "inherits",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/g1_lidar_measurement_node.py",
+      "source_location": "L35",
+      "weight": 1.0,
+      "_src": "perception_g1_lidar_measurement_node_g1lidarmeasurementnode",
+      "_tgt": "node",
+      "source": "node",
+      "target": "perception_g1_lidar_measurement_node_g1lidarmeasurementnode",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "inherits",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/g1_camera_measurement_node.py",
+      "source_location": "L52",
+      "weight": 1.0,
+      "_src": "perception_g1_camera_measurement_node_g1camerameasurementnode",
+      "_tgt": "node",
+      "source": "node",
+      "target": "perception_g1_camera_measurement_node_g1camerameasurementnode",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "src/ridgeback_autonomy/launch/ridgeback_exploration.launch.py",
+      "source_location": "L57",
+      "weight": 1.0,
+      "_src": "launch_ridgeback_exploration_launch_generate_launch_description",
+      "_tgt": "node",
+      "source": "node",
+      "target": "launch_ridgeback_exploration_launch_generate_launch_description"
+    },
+    {
+      "relation": "calls",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "src/ridgeback_autonomy/launch/g1_distance_benchmark.launch.py",
+      "source_location": "L52",
+      "weight": 1.0,
+      "_src": "launch_g1_distance_benchmark_launch_build_benchmark_nodes",
+      "_tgt": "node",
+      "source": "node",
+      "target": "launch_g1_distance_benchmark_launch_build_benchmark_nodes"
+    },
+    {
+      "relation": "calls",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "src/ridgeback_autonomy/launch/includes/explore.launch.py",
+      "source_location": "L28",
+      "weight": 1.0,
+      "_src": "includes_explore_launch_generate_launch_description",
+      "_tgt": "node",
+      "source": "node",
+      "target": "includes_explore_launch_generate_launch_description"
+    },
+    {
+      "relation": "calls",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "src/ridgeback_autonomy/launch/includes/nav2.launch.py",
+      "source_location": "L62",
+      "weight": 1.0,
+      "_src": "includes_nav2_launch_generate_launch_description",
+      "_tgt": "node",
+      "source": "node",
+      "target": "includes_nav2_launch_generate_launch_description"
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer_node.py",
+      "source_location": "L140",
+      "weight": 1.0,
+      "_src": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_costmap_callback",
+      "_tgt": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_update_awareness_map",
+      "source": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_costmap_callback",
+      "target": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_update_awareness_map",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer_node.py",
+      "source_location": "L128",
+      "weight": 1.0,
+      "_src": "ridgeback_autonomy_frontier_explorer_node_rationale_128",
+      "_tgt": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_costmap_callback",
+      "source": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_costmap_callback",
+      "target": "ridgeback_autonomy_frontier_explorer_node_rationale_128",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer_node.py",
+      "source_location": "L145",
+      "weight": 1.0,
+      "_src": "ridgeback_autonomy_frontier_explorer_node_rationale_145",
+      "_tgt": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_update_awareness_map",
+      "source": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_update_awareness_map",
+      "target": "ridgeback_autonomy_frontier_explorer_node_rationale_145",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer_node.py",
+      "source_location": "L213",
+      "weight": 1.0,
+      "_src": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_exploration_callback",
+      "_tgt": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_get_robot_position",
+      "source": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_get_robot_position",
+      "target": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_exploration_callback",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer_node.py",
+      "source_location": "L170",
+      "weight": 1.0,
+      "_src": "ridgeback_autonomy_frontier_explorer_node_rationale_170",
+      "_tgt": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_get_robot_position",
+      "source": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_get_robot_position",
+      "target": "ridgeback_autonomy_frontier_explorer_node_rationale_170",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer_node.py",
+      "source_location": "L217",
+      "weight": 1.0,
+      "_src": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_exploration_callback",
+      "_tgt": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_select_new_frontier_goal",
+      "source": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_exploration_callback",
+      "target": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_select_new_frontier_goal",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer_node.py",
+      "source_location": "L220",
+      "weight": 1.0,
+      "_src": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_exploration_callback",
+      "_tgt": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_check_goal_progress",
+      "source": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_exploration_callback",
+      "target": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_check_goal_progress",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer_node.py",
+      "source_location": "L198",
+      "weight": 1.0,
+      "_src": "ridgeback_autonomy_frontier_explorer_node_rationale_198",
+      "_tgt": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_exploration_callback",
+      "source": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_exploration_callback",
+      "target": "ridgeback_autonomy_frontier_explorer_node_rationale_198",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer_node.py",
+      "source_location": "L370",
+      "weight": 1.0,
+      "_src": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_find_safe_frontier",
+      "_tgt": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_is_goal_safe",
+      "source": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_is_goal_safe",
+      "target": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_find_safe_frontier",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer_node.py",
+      "source_location": "L226",
+      "weight": 1.0,
+      "_src": "ridgeback_autonomy_frontier_explorer_node_rationale_226",
+      "_tgt": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_is_goal_safe",
+      "source": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_is_goal_safe",
+      "target": "ridgeback_autonomy_frontier_explorer_node_rationale_226",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer_node.py",
+      "source_location": "L368",
+      "weight": 1.0,
+      "_src": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_find_safe_frontier",
+      "_tgt": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_is_blacklisted",
+      "source": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_is_blacklisted",
+      "target": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_find_safe_frontier",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer_node.py",
+      "source_location": "L253",
+      "weight": 1.0,
+      "_src": "ridgeback_autonomy_frontier_explorer_node_rationale_253",
+      "_tgt": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_is_blacklisted",
+      "source": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_is_blacklisted",
+      "target": "ridgeback_autonomy_frontier_explorer_node_rationale_253",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer_node.py",
+      "source_location": "L262",
+      "weight": 1.0,
+      "_src": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_select_new_frontier_goal",
+      "_tgt": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_publish_frontier_markers",
+      "source": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_select_new_frontier_goal",
+      "target": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_publish_frontier_markers",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer_node.py",
+      "source_location": "L264",
+      "weight": 1.0,
+      "_src": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_select_new_frontier_goal",
+      "_tgt": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_find_safe_frontier",
+      "source": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_select_new_frontier_goal",
+      "target": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_find_safe_frontier",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer_node.py",
+      "source_location": "L277",
+      "weight": 1.0,
+      "_src": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_select_new_frontier_goal",
+      "_tgt": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_grid_to_world",
+      "source": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_select_new_frontier_goal",
+      "target": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_grid_to_world",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer_node.py",
+      "source_location": "L284",
+      "weight": 1.0,
+      "_src": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_select_new_frontier_goal",
+      "_tgt": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_send_goal_to_nav2",
+      "source": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_select_new_frontier_goal",
+      "target": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_send_goal_to_nav2",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer_node.py",
+      "source_location": "L260",
+      "weight": 1.0,
+      "_src": "ridgeback_autonomy_frontier_explorer_node_rationale_260",
+      "_tgt": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_select_new_frontier_goal",
+      "source": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_select_new_frontier_goal",
+      "target": "ridgeback_autonomy_frontier_explorer_node_rationale_260",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer_node.py",
+      "source_location": "L261",
+      "weight": 1.0,
+      "_src": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_select_new_frontier_goal",
+      "_tgt": "frontier_explorer_navigator_get_frontier_clusters",
+      "source": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_select_new_frontier_goal",
+      "target": "frontier_explorer_navigator_get_frontier_clusters"
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer_node.py",
+      "source_location": "L343",
+      "weight": 1.0,
+      "_src": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_find_safe_frontier",
+      "_tgt": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_make_goal_for_cluster",
+      "source": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_make_goal_for_cluster",
+      "target": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_find_safe_frontier",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer_node.py",
+      "source_location": "L289",
+      "weight": 1.0,
+      "_src": "ridgeback_autonomy_frontier_explorer_node_rationale_289",
+      "_tgt": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_make_goal_for_cluster",
+      "source": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_make_goal_for_cluster",
+      "target": "ridgeback_autonomy_frontier_explorer_node_rationale_289",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer_node.py",
+      "source_location": "L322",
+      "weight": 1.0,
+      "_src": "ridgeback_autonomy_frontier_explorer_node_rationale_322",
+      "_tgt": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_find_safe_frontier",
+      "source": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_find_safe_frontier",
+      "target": "ridgeback_autonomy_frontier_explorer_node_rationale_322",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer_node.py",
+      "source_location": "L333",
+      "weight": 1.0,
+      "_src": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_find_safe_frontier",
+      "_tgt": "frontier_explorer_navigator_get_frontier_clusters",
+      "source": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_find_safe_frontier",
+      "target": "frontier_explorer_navigator_get_frontier_clusters"
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer_node.py",
+      "source_location": "L432",
+      "weight": 1.0,
+      "_src": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_check_goal_progress",
+      "_tgt": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_cancel_current_goal",
+      "source": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_cancel_current_goal",
+      "target": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_check_goal_progress",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer_node.py",
+      "source_location": "L381",
+      "weight": 1.0,
+      "_src": "ridgeback_autonomy_frontier_explorer_node_rationale_381",
+      "_tgt": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_cancel_current_goal",
+      "source": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_cancel_current_goal",
+      "target": "ridgeback_autonomy_frontier_explorer_node_rationale_381",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer_node.py",
+      "source_location": "L396",
+      "weight": 1.0,
+      "_src": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_publish_frontier_markers",
+      "_tgt": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_grid_to_world",
+      "source": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_publish_frontier_markers",
+      "target": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_grid_to_world",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer_node.py",
+      "source_location": "L387",
+      "weight": 1.0,
+      "_src": "ridgeback_autonomy_frontier_explorer_node_rationale_387",
+      "_tgt": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_publish_frontier_markers",
+      "source": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_publish_frontier_markers",
+      "target": "ridgeback_autonomy_frontier_explorer_node_rationale_387",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer_node.py",
+      "source_location": "L424",
+      "weight": 1.0,
+      "_src": "ridgeback_autonomy_frontier_explorer_node_rationale_424",
+      "_tgt": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_check_goal_progress",
+      "source": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_check_goal_progress",
+      "target": "ridgeback_autonomy_frontier_explorer_node_rationale_424",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer_node.py",
+      "source_location": "L438",
+      "weight": 1.0,
+      "_src": "ridgeback_autonomy_frontier_explorer_node_rationale_438",
+      "_tgt": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_grid_to_world",
+      "source": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_grid_to_world",
+      "target": "ridgeback_autonomy_frontier_explorer_node_rationale_438",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer_node.py",
+      "source_location": "L450",
+      "weight": 1.0,
+      "_src": "ridgeback_autonomy_frontier_explorer_node_rationale_450",
+      "_tgt": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_send_goal_to_nav2",
+      "source": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_send_goal_to_nav2",
+      "target": "ridgeback_autonomy_frontier_explorer_node_rationale_450",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer_node.py",
+      "source_location": "L480",
+      "weight": 1.0,
+      "_src": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_goal_response_callback",
+      "_tgt": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_goal_result_callback",
+      "source": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_goal_response_callback",
+      "target": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_goal_result_callback",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer_node.py",
+      "source_location": "L471",
+      "weight": 1.0,
+      "_src": "ridgeback_autonomy_frontier_explorer_node_rationale_471",
+      "_tgt": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_goal_response_callback",
+      "source": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_goal_response_callback",
+      "target": "ridgeback_autonomy_frontier_explorer_node_rationale_471",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer_node.py",
+      "source_location": "L484",
+      "weight": 1.0,
+      "_src": "ridgeback_autonomy_frontier_explorer_node_rationale_484",
+      "_tgt": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_goal_result_callback",
+      "source": "ridgeback_autonomy_frontier_explorer_node_frontierexplorernode_goal_result_callback",
+      "target": "ridgeback_autonomy_frontier_explorer_node_rationale_484",
       "confidence_score": 1.0
     },
     {
@@ -3555,18 +4785,6 @@
       "confidence_score": 1.0
     },
     {
-      "relation": "inherits",
-      "confidence": "EXTRACTED",
-      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
-      "source_location": "L91",
-      "weight": 1.0,
-      "_src": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner",
-      "_tgt": "node",
-      "source": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner",
-      "target": "node",
-      "confidence_score": 1.0
-    },
-    {
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py",
@@ -3973,102 +5191,6 @@
       "source": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner",
       "target": "benchmarking_rendering_benchmarkcollagerenderer",
       "confidence_score": 0.5
-    },
-    {
-      "relation": "inherits",
-      "confidence": "EXTRACTED",
-      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/g1_overlay_node.py",
-      "source_location": "L30",
-      "weight": 1.0,
-      "_src": "perception_g1_overlay_node_g1overlaynode",
-      "_tgt": "node",
-      "source": "node",
-      "target": "perception_g1_overlay_node_g1overlaynode",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "inherits",
-      "confidence": "EXTRACTED",
-      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/g1_detector_node.py",
-      "source_location": "L32",
-      "weight": 1.0,
-      "_src": "perception_g1_detector_node_g1detectornode",
-      "_tgt": "node",
-      "source": "node",
-      "target": "perception_g1_detector_node_g1detectornode",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "inherits",
-      "confidence": "EXTRACTED",
-      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/g1_lidar_measurement_node.py",
-      "source_location": "L35",
-      "weight": 1.0,
-      "_src": "perception_g1_lidar_measurement_node_g1lidarmeasurementnode",
-      "_tgt": "node",
-      "source": "node",
-      "target": "perception_g1_lidar_measurement_node_g1lidarmeasurementnode",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "inherits",
-      "confidence": "EXTRACTED",
-      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/perception/g1_camera_measurement_node.py",
-      "source_location": "L52",
-      "weight": 1.0,
-      "_src": "perception_g1_camera_measurement_node_g1camerameasurementnode",
-      "_tgt": "node",
-      "source": "node",
-      "target": "perception_g1_camera_measurement_node_g1camerameasurementnode",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "calls",
-      "confidence": "INFERRED",
-      "confidence_score": 0.8,
-      "source_file": "src/ridgeback_autonomy/launch/ridgeback_exploration.launch.py",
-      "source_location": "L54",
-      "weight": 1.0,
-      "_src": "launch_ridgeback_exploration_launch_generate_launch_description",
-      "_tgt": "node",
-      "source": "node",
-      "target": "launch_ridgeback_exploration_launch_generate_launch_description"
-    },
-    {
-      "relation": "calls",
-      "confidence": "INFERRED",
-      "confidence_score": 0.8,
-      "source_file": "src/ridgeback_autonomy/launch/g1_distance_benchmark.launch.py",
-      "source_location": "L52",
-      "weight": 1.0,
-      "_src": "launch_g1_distance_benchmark_launch_build_benchmark_nodes",
-      "_tgt": "node",
-      "source": "node",
-      "target": "launch_g1_distance_benchmark_launch_build_benchmark_nodes"
-    },
-    {
-      "relation": "calls",
-      "confidence": "INFERRED",
-      "confidence_score": 0.8,
-      "source_file": "src/ridgeback_autonomy/launch/includes/explore.launch.py",
-      "source_location": "L22",
-      "weight": 1.0,
-      "_src": "includes_explore_launch_generate_launch_description",
-      "_tgt": "node",
-      "source": "node",
-      "target": "includes_explore_launch_generate_launch_description"
-    },
-    {
-      "relation": "calls",
-      "confidence": "INFERRED",
-      "confidence_score": 0.8,
-      "source_file": "src/ridgeback_autonomy/launch/includes/nav2.launch.py",
-      "source_location": "L62",
-      "weight": 1.0,
-      "_src": "includes_nav2_launch_generate_launch_description",
-      "_tgt": "node",
-      "source": "node",
-      "target": "includes_nav2_launch_generate_launch_description"
     },
     {
       "relation": "calls",
@@ -6157,6 +7279,210 @@
       "_tgt": "benchmarking_summary_build_summary_rows",
       "source": "benchmarking_summary_build_summary_rows",
       "target": "test_test_benchmark_runner_test_build_summary_rows_aggregates_trial_level_estimator_rows"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer/path_finding.py",
+      "source_location": "L5",
+      "weight": 1.0,
+      "_src": "src_ridgeback_autonomy_ridgeback_autonomy_frontier_explorer_path_finding_py",
+      "_tgt": "frontier_explorer_path_finding_heuristic",
+      "source": "src_ridgeback_autonomy_ridgeback_autonomy_frontier_explorer_path_finding_py",
+      "target": "frontier_explorer_path_finding_heuristic",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer/path_finding.py",
+      "source_location": "L9",
+      "weight": 1.0,
+      "_src": "src_ridgeback_autonomy_ridgeback_autonomy_frontier_explorer_path_finding_py",
+      "_tgt": "frontier_explorer_path_finding_a_star",
+      "source": "src_ridgeback_autonomy_ridgeback_autonomy_frontier_explorer_path_finding_py",
+      "target": "frontier_explorer_path_finding_a_star",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer/path_finding.py",
+      "source_location": "L23",
+      "weight": 1.0,
+      "_src": "frontier_explorer_path_finding_a_star",
+      "_tgt": "frontier_explorer_path_finding_heuristic",
+      "source": "frontier_explorer_path_finding_heuristic",
+      "target": "frontier_explorer_path_finding_a_star",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer/path_finding.py",
+      "source_location": "L10",
+      "weight": 1.0,
+      "_src": "frontier_explorer_path_finding_rationale_10",
+      "_tgt": "frontier_explorer_path_finding_a_star",
+      "source": "frontier_explorer_path_finding_a_star",
+      "target": "frontier_explorer_path_finding_rationale_10",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer/navigator.py",
+      "source_location": "L6",
+      "weight": 1.0,
+      "_src": "src_ridgeback_autonomy_ridgeback_autonomy_frontier_explorer_navigator_py",
+      "_tgt": "frontier_explorer_navigator_update_robot_map",
+      "source": "src_ridgeback_autonomy_ridgeback_autonomy_frontier_explorer_navigator_py",
+      "target": "frontier_explorer_navigator_update_robot_map",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer/navigator.py",
+      "source_location": "L18",
+      "weight": 1.0,
+      "_src": "src_ridgeback_autonomy_ridgeback_autonomy_frontier_explorer_navigator_py",
+      "_tgt": "frontier_explorer_navigator_update_robot_awareness_from_costmap",
+      "source": "src_ridgeback_autonomy_ridgeback_autonomy_frontier_explorer_navigator_py",
+      "target": "frontier_explorer_navigator_update_robot_awareness_from_costmap",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer/navigator.py",
+      "source_location": "L25",
+      "weight": 1.0,
+      "_src": "src_ridgeback_autonomy_ridgeback_autonomy_frontier_explorer_navigator_py",
+      "_tgt": "frontier_explorer_navigator_is_frontier_point",
+      "source": "src_ridgeback_autonomy_ridgeback_autonomy_frontier_explorer_navigator_py",
+      "target": "frontier_explorer_navigator_is_frontier_point",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer/navigator.py",
+      "source_location": "L39",
+      "weight": 1.0,
+      "_src": "src_ridgeback_autonomy_ridgeback_autonomy_frontier_explorer_navigator_py",
+      "_tgt": "frontier_explorer_navigator_get_frontier_clusters",
+      "source": "src_ridgeback_autonomy_ridgeback_autonomy_frontier_explorer_navigator_py",
+      "target": "frontier_explorer_navigator_get_frontier_clusters",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer/navigator.py",
+      "source_location": "L68",
+      "weight": 1.0,
+      "_src": "src_ridgeback_autonomy_ridgeback_autonomy_frontier_explorer_navigator_py",
+      "_tgt": "frontier_explorer_navigator_get_best_frontier",
+      "source": "src_ridgeback_autonomy_ridgeback_autonomy_frontier_explorer_navigator_py",
+      "target": "frontier_explorer_navigator_get_best_frontier",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer/navigator.py",
+      "source_location": "L7",
+      "weight": 1.0,
+      "_src": "frontier_explorer_navigator_rationale_7",
+      "_tgt": "frontier_explorer_navigator_update_robot_map",
+      "source": "frontier_explorer_navigator_update_robot_map",
+      "target": "frontier_explorer_navigator_rationale_7",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer/navigator.py",
+      "source_location": "L19",
+      "weight": 1.0,
+      "_src": "frontier_explorer_navigator_rationale_19",
+      "_tgt": "frontier_explorer_navigator_update_robot_awareness_from_costmap",
+      "source": "frontier_explorer_navigator_update_robot_awareness_from_costmap",
+      "target": "frontier_explorer_navigator_rationale_19",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer/navigator.py",
+      "source_location": "L46",
+      "weight": 1.0,
+      "_src": "frontier_explorer_navigator_get_frontier_clusters",
+      "_tgt": "frontier_explorer_navigator_is_frontier_point",
+      "source": "frontier_explorer_navigator_is_frontier_point",
+      "target": "frontier_explorer_navigator_get_frontier_clusters",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer/navigator.py",
+      "source_location": "L26",
+      "weight": 1.0,
+      "_src": "frontier_explorer_navigator_rationale_26",
+      "_tgt": "frontier_explorer_navigator_is_frontier_point",
+      "source": "frontier_explorer_navigator_is_frontier_point",
+      "target": "frontier_explorer_navigator_rationale_26",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer/navigator.py",
+      "source_location": "L81",
+      "weight": 1.0,
+      "_src": "frontier_explorer_navigator_get_best_frontier",
+      "_tgt": "frontier_explorer_navigator_get_frontier_clusters",
+      "source": "frontier_explorer_navigator_get_frontier_clusters",
+      "target": "frontier_explorer_navigator_get_best_frontier",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer/navigator.py",
+      "source_location": "L40",
+      "weight": 1.0,
+      "_src": "frontier_explorer_navigator_rationale_40",
+      "_tgt": "frontier_explorer_navigator_get_frontier_clusters",
+      "source": "frontier_explorer_navigator_get_frontier_clusters",
+      "target": "frontier_explorer_navigator_rationale_40",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer/navigator.py",
+      "source_location": "L69",
+      "weight": 1.0,
+      "_src": "frontier_explorer_navigator_rationale_69",
+      "_tgt": "frontier_explorer_navigator_get_best_frontier",
+      "source": "frontier_explorer_navigator_get_best_frontier",
+      "target": "frontier_explorer_navigator_rationale_69",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer/__init__.py",
+      "source_location": "L1",
+      "weight": 1.0,
+      "_src": "frontier_explorer_init_rationale_1",
+      "_tgt": "src_ridgeback_autonomy_ridgeback_autonomy_frontier_explorer_init_py",
+      "source": "src_ridgeback_autonomy_ridgeback_autonomy_frontier_explorer_init_py",
+      "target": "frontier_explorer_init_rationale_1",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -8982,7 +10308,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src/ridgeback_autonomy/launch/includes/explore.launch.py",
-      "source_location": "L10",
+      "source_location": "L11",
       "weight": 1.0,
       "_src": "src_ridgeback_autonomy_launch_includes_explore_launch_py",
       "_tgt": "includes_explore_launch_generate_launch_description",
