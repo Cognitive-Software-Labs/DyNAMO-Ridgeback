@@ -345,6 +345,7 @@ def extract_scan_points_base(
         planar_distance_m=planar_distance_m,
         bearing_rad=bearing_rad,
         valid=valid,
+        points_xyz=points_base,
     )
 
 
@@ -352,6 +353,8 @@ def add_lidar_measurements(
     batch: DetectionBatch,
     scan_points: LidarScanPoints | None,
     camera_hfov_rad: float,
+    rotation: np.ndarray | None = None,
+    translation: np.ndarray | None = None,
 ) -> DetectionBatch:
     for detection in batch.detections:
         detection.lidar_lateral_m = None
@@ -367,6 +370,8 @@ def add_lidar_measurements(
             detection.bbox_xyxy,
             batch.image_width,
             camera_hfov_rad,
+            rotation,
+            translation,
         )
         if measurement is None:
             continue
@@ -384,31 +389,80 @@ def compute_lidar_measurement(
     bbox_xyxy: tuple[int, int, int, int],
     image_width: int,
     camera_hfov_rad: float,
+    rotation: np.ndarray | None = None,
+    translation: np.ndarray | None = None,
 ) -> tuple[float, float, float] | None:
     center_bearing_rad, half_window_rad = compute_camera_bearing_window(
         bbox_xyxy,
         image_width,
         camera_hfov_rad,
     )
-    bearing_delta = wrap_angle(scan_points.bearing_rad - center_bearing_rad)
-    gate = scan_points.valid & (np.abs(bearing_delta) <= half_window_rad)
-    if int(np.count_nonzero(gate)) < LIDAR_MIN_VALID_RAYS:
-        return None
 
-    gated_lateral = scan_points.lateral_m[gate]
-    gated_forward = scan_points.forward_m[gate]
-    gated_planar = scan_points.planar_distance_m[gate]
+    if (
+        rotation is not None
+        and translation is not None
+        and scan_points.points_xyz is not None
+    ):
+        # 1. Transform LiDAR base frame points into camera optical frame
+        # points_xyz is shape (N, 3), translation is (3,), rotation is (3, 3)
+        # points_cam = (points_base - translation) @ rotation
+        points_cam = (scan_points.points_xyz - translation) @ rotation
 
-    anchor_distance_m = float(np.percentile(gated_planar, LIDAR_CLOSE_PERCENTILE))
-    inliers = gated_planar <= anchor_distance_m + LIDAR_INLIER_DISTANCE_MARGIN_M
-    if not np.any(inliers):
-        return None
+        # 2. Compute horizontal bearing of points in the camera frame
+        # In camera optical frame, X is lateral (right) and Z is forward (depth)
+        bearings_cam = np.arctan2(points_cam[:, 0], points_cam[:, 2])
 
-    lateral_m = float(np.median(gated_lateral[inliers]))
-    forward_m = float(np.median(gated_forward[inliers]))
+        # 3. Apply bounding box gate to camera-relative bearing angles
+        bearing_delta = wrap_angle(bearings_cam - center_bearing_rad)
+        gate = scan_points.valid & (points_cam[:, 2] > 0.0) & (np.abs(bearing_delta) <= half_window_rad)
+        if int(np.count_nonzero(gate)) < LIDAR_MIN_VALID_RAYS:
+            return None
+
+        gated_points_base = scan_points.points_xyz[gate]
+        gated_points_cam = points_cam[gate]
+
+        # 4. Compute camera-relative planar distance for percentile filtering
+        gated_planar = np.hypot(gated_points_cam[:, 0], gated_points_cam[:, 2])
+
+        # 5. Extract close points on the target object
+        anchor_distance_m = float(np.percentile(gated_planar, LIDAR_CLOSE_PERCENTILE))
+        inliers = gated_planar <= anchor_distance_m + LIDAR_INLIER_DISTANCE_MARGIN_M
+        if not np.any(inliers):
+            return None
+
+        # 6. Compute target median position in the camera frame
+        target_cam_x = float(np.median(gated_points_cam[inliers, 0]))
+        target_cam_y = float(np.median(gated_points_cam[inliers, 1]))
+        target_cam_z = float(np.median(gated_points_cam[inliers, 2]))
+        target_cam = np.array([target_cam_x, target_cam_y, target_cam_z], dtype=np.float32)
+
+        # 7. Project target median back to base link frame
+        target_base = rotation @ target_cam + translation
+        lateral_m = float(target_base[1])
+        forward_m = float(target_base[0])
+    else:
+        # Fallback to the original base-link-only bearing gate calculation
+        bearing_delta = wrap_angle(scan_points.bearing_rad - center_bearing_rad)
+        gate = scan_points.valid & (np.abs(bearing_delta) <= half_window_rad)
+        if int(np.count_nonzero(gate)) < LIDAR_MIN_VALID_RAYS:
+            return None
+
+        gated_lateral = scan_points.lateral_m[gate]
+        gated_forward = scan_points.forward_m[gate]
+        gated_planar = scan_points.planar_distance_m[gate]
+
+        anchor_distance_m = float(np.percentile(gated_planar, LIDAR_CLOSE_PERCENTILE))
+        inliers = gated_planar <= anchor_distance_m + LIDAR_INLIER_DISTANCE_MARGIN_M
+        if not np.any(inliers):
+            return None
+
+        lateral_m = float(np.median(gated_lateral[inliers]))
+        forward_m = float(np.median(gated_forward[inliers]))
+
+    # Apply vehicle front offset and compute final distance in the base frame
     lateral_m, forward_m = apply_vehicle_front_offset(lateral_m, forward_m)
-
     distance_m = float(math.hypot(lateral_m, forward_m))
+
     if forward_m <= 0.0 or distance_m > LIDAR_MAX_METERS:
         return None
     return lateral_m, forward_m, distance_m

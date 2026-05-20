@@ -649,12 +649,15 @@ class G1DistanceBenchmarkRunner(Node):
 
     def extract_json_payload(self, text: str) -> dict[str, Any]:
         start = text.find('{')
-        end = text.rfind('}')
-        if start == -1 or end == -1 or end <= start:
+        if start == -1:
             raise RuntimeError(f'Failed to parse Gazebo JSON payload: {text.strip()}')
         import json
 
-        return json.loads(text[start:end + 1])
+        try:
+            obj, _ = json.JSONDecoder().raw_decode(text[start:])
+            return obj
+        except json.JSONDecodeError as e:
+            raise RuntimeError(f'Failed to parse Gazebo JSON payload: {text.strip()}') from e
 
     def run_command(
         self,

@@ -100,6 +100,45 @@ def test_compute_lidar_measurement_returns_vehicle_frame_distance() -> None:
     assert math.isclose(distance_m, math.hypot(lateral_m, forward_m), rel_tol=1e-6)
 
 
+def test_compute_lidar_measurement_supports_camera_frame_transformations() -> None:
+    rotation = np.array([
+        [0.0, 0.0, 1.0],
+        [-1.0, 0.0, 0.0],
+        [0.0, -1.0, 0.0],
+    ], dtype=np.float32)
+    translation = np.array([0.3, 0.0, 0.85], dtype=np.float32)
+
+    forward = np.array([2.3, 2.3, 2.3, 6.3], dtype=np.float32)
+    lateral = np.array([-0.05, 0.0, 0.05, 0.0], dtype=np.float32)
+    planar = np.hypot(forward, lateral)
+    bearing = np.arctan2(lateral, forward)
+    points_xyz = np.stack([forward, lateral, np.full_like(forward, 0.85)], axis=1)
+
+    scan_points = LidarScanPoints(
+        forward_m=forward,
+        lateral_m=lateral,
+        planar_distance_m=planar,
+        bearing_rad=bearing,
+        valid=np.array([True, True, True, True]),
+        points_xyz=points_xyz,
+    )
+
+    measurement = compute_lidar_measurement(
+        scan_points,
+        bbox_xyxy=(45, 0, 55, 20),
+        image_width=100,
+        camera_hfov_rad=math.radians(90.0),
+        rotation=rotation,
+        translation=translation,
+    )
+
+    assert measurement is not None
+    lateral_m, forward_m, distance_m = measurement
+    assert abs(lateral_m) < 1e-5
+    assert math.isclose(forward_m, 2.05, rel_tol=1e-5)
+    assert math.isclose(distance_m, 2.05, rel_tol=1e-5)
+
+
 def test_compute_pointcloud_measurement_returns_nearest_inlier() -> None:
     pointcloud_xyz = np.zeros((4, 4, 3), dtype=np.float32)
     pointcloud_xyz[:, :, 0] = 2.0
