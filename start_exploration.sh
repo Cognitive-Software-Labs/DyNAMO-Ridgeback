@@ -1,17 +1,45 @@
 #!/bin/bash
-# Clean up stale processes and launch the exploration stack with the
-# full G1 perception pipeline and Depth-Anything enabled.
+# Clean up stale processes and launch the exploration stack.
 #
 # Usage:
-#   bash start_exploration.sh                   # defaults to warehouse
-#   bash start_exploration.sh office
-#   bash start_exploration.sh hospital
+#   bash start_exploration.sh                                # mock_hospital + explore_lite
+#   bash start_exploration.sh office                         # office + explore_lite
+#   bash start_exploration.sh mock_hospital custom           # mock_hospital + custom explorer
+#   EXPLORER=custom bash start_exploration.sh office         # office + custom explorer
+#   DEPTH_ANYTHING_ENABLED=true bash start_exploration.sh    # enable Depth-Anything
+#   FASTRTPS_NO_SHM=false bash start_exploration.sh          # skip the UDP-only FastDDS profile
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-WORLD="${1:-warehouse}"
-shift 2>/dev/null || true
+WORLD="${1:-mock_hospital}"
+if [[ $# -gt 0 ]]; then
+    shift
+fi
+
+EXPLORER="${EXPLORER:-explore_lite}"
+if [[ $# -gt 0 && "$1" != *":=" ]]; then
+    EXPLORER="$1"
+    shift
+fi
+
+if [[ "$EXPLORER" != "explore_lite" && "$EXPLORER" != "custom" ]]; then
+    echo "Unknown explorer '$EXPLORER'. Expected 'explore_lite' or 'custom'." >&2
+    exit 2
+fi
+
+DEPTH_ANYTHING_ENABLED="${DEPTH_ANYTHING_ENABLED:-false}"
+
+# FastDDS shared-memory locks can get stale after Gazebo/ROS crashes and make
+# nodes disappear from discovery. The UDP-only FastDDS profile sidesteps that.
+# Default on; set FASTRTPS_NO_SHM=false to launch with the system default RMW.
+FASTRTPS_NO_SHM="${FASTRTPS_NO_SHM:-true}"
+if [[ "$FASTRTPS_NO_SHM" == "true" ]]; then
+    export RMW_IMPLEMENTATION="${RMW_IMPLEMENTATION:-rmw_fastrtps_cpp}"
+    export FASTRTPS_DEFAULT_PROFILES_FILE="${FASTRTPS_DEFAULT_PROFILES_FILE:-$SCRIPT_DIR/fastrtps_no_shm.xml}"
+    export RMW_FASTRTPS_USE_QOS_FROM_XML="${RMW_FASTRTPS_USE_QOS_FROM_XML:-1}"
+fi
+export ROS_DOMAIN_ID="${ROS_DOMAIN_ID:-42}"
 
 set +u
 source /opt/ros/jazzy/setup.bash
@@ -22,5 +50,6 @@ bash "$SCRIPT_DIR/cleanup.sh"
 
 exec ros2 launch ridgeback_autonomy ridgeback_exploration.launch.py \
     world:="$WORLD" \
-    depth_anything_enabled:=true \
+    explorer:="$EXPLORER" \
+    depth_anything_enabled:="$DEPTH_ANYTHING_ENABLED" \
     "$@"

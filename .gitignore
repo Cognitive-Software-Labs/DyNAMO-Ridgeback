@@ -1,6 +1,7 @@
 build/
 install/
 log/
+benchmark-results/
 
 # Clearpath generator output — regenerated from clearpath/robot.yaml on every run
 clearpath/manipulators/

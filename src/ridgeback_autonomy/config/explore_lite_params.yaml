@@ -4,11 +4,11 @@
     costmap_topic: global_costmap/costmap
     costmap_updates_topic: global_costmap/costmap_updates
     visualize: true
-    planner_frequency: 0.1
+    planner_frequency: 0.2
     progress_timeout: 60.0
     potential_scale: 5.0
     orientation_scale: 0.0
     gain_scale: 0.2
     transform_tolerance: 0.3
-    min_frontier_size: 0.75
+    min_frontier_size: 0.25
     return_to_init: true

@@ -59,6 +59,16 @@ def launch_setup(context, *args, **kwargs):
                     lifecycle_node_names=[f'/{namespace}/slam_toolbox'],
                     transition_ids=[
                         Transition.TRANSITION_CONFIGURE,
+                    ],
+                ),
+            ],
+        ),
+        TimerAction(
+            period=8.0,
+            actions=[
+                LifecycleTransition(
+                    lifecycle_node_names=[f'/{namespace}/slam_toolbox'],
+                    transition_ids=[
                         Transition.TRANSITION_ACTIVATE,
                     ],
                 ),

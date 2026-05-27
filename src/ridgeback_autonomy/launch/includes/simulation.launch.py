@@ -47,6 +47,10 @@ def generate_launch_description():
             'GZ_SIM_RESOURCE_PATH',
             os.path.join(pkg_this, 'sim', 'models'),
         ),
+        AppendEnvironmentVariable(
+            'GZ_GUI_PLUGIN_PATH',
+            os.path.join(os.path.abspath(os.path.join(pkg_this, '..', '..')), 'lib', 'ridgeback_autonomy'),
+        ),
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(
                 os.path.join(pkg_clearpath_gz, 'launch', 'simulation.launch.py')

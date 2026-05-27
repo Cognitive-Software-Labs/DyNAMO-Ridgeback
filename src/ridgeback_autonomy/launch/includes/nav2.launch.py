@@ -14,6 +14,7 @@ def generate_launch_description():
 
     namespace = LaunchConfiguration('namespace')
     use_sim_time = LaunchConfiguration('use_sim_time')
+    mppi_visualize = LaunchConfiguration('mppi_visualize')
 
     nav2_params_file = os.path.join(pkg_this, 'config', 'nav2_params.yaml')
 
@@ -32,7 +33,10 @@ def generate_launch_description():
         RewrittenYaml(
             source_file=nav2_params_file,
             root_key=namespace,
-            param_rewrites={'autostart': 'true'},
+            param_rewrites={
+                'autostart': 'true',
+                'controller_server.ros__parameters.FollowPath.visualize': mppi_visualize,
+            },
             convert_types=True,
         ),
         allow_substs=True,
@@ -43,6 +47,11 @@ def generate_launch_description():
     return LaunchDescription([
         DeclareLaunchArgument('namespace', default_value='r100_0001'),
         DeclareLaunchArgument('use_sim_time', default_value='true'),
+        DeclareLaunchArgument(
+            'mppi_visualize',
+            default_value='false',
+            description='Publish MPPI trajectory visualization topics',
+        ),
 
         SetEnvironmentVariable('RCUTILS_LOGGING_BUFFERED_STREAM', '1'),
 
@@ -79,7 +88,7 @@ def generate_launch_description():
                 name='behavior_server',
                 output='screen',
                 parameters=[configured_params],
-                remappings=remappings,
+                remappings=remappings + [('cmd_vel', 'cmd_vel_nav')],
             ),
             Node(
                 package='nav2_velocity_smoother',
@@ -87,8 +96,7 @@ def generate_launch_description():
                 name='velocity_smoother',
                 output='screen',
                 parameters=[configured_params],
-                remappings=remappings
-                + [('cmd_vel', 'cmd_vel_nav'), ('cmd_vel_smoothed', 'cmd_vel')],
+                remappings=remappings + [('cmd_vel', 'cmd_vel_nav')],
             ),
             Node(
                 package='nav2_collision_monitor',

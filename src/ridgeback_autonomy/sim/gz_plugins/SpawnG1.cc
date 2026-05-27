@@ -4,6 +4,7 @@
 #include <fstream>
 #include <sstream>
 #include <regex>
+#include <vector>
 
 #include <gz/gui/Application.hh>
 #include <gz/gui/GuiEvents.hh>
@@ -32,6 +33,16 @@ void SpawnG1::LoadConfig(const tinyxml2::XMLElement *_pluginElem)
       sdfPath = elem->GetText();
   }
 
+  auto tryCandidate = [&](const std::string &candidate, const std::string &dir) {
+    if (gz::common::isFile(candidate))
+    {
+      sdfPath = candidate;
+      modelDir = dir;
+      return true;
+    }
+    return false;
+  };
+
   if (sdfPath.empty() || !gz::common::isFile(sdfPath))
   {
     const char *resourcePath = std::getenv("GZ_SIM_RESOURCE_PATH");
@@ -43,13 +54,36 @@ void SpawnG1::LoadConfig(const tinyxml2::XMLElement *_pluginElem)
       while (std::getline(ss, path, ':'))
       {
         if (path.empty()) continue;
-        std::string candidate = path + "/g1/model.sdf";
-        if (gz::common::isFile(candidate))
-        {
-          sdfPath = candidate;
-          modelDir = path + "/g1/";
+        if (tryCandidate(path + "/g1/model.sdf", path + "/g1/"))
           break;
+      }
+    }
+  }
+
+  if (sdfPath.empty() || !gz::common::isFile(sdfPath))
+  {
+    const char *pluginPath = std::getenv("GZ_GUI_PLUGIN_PATH");
+    if (pluginPath)
+    {
+      std::string paths(pluginPath);
+      std::stringstream ss(paths);
+      std::string path;
+      while (std::getline(ss, path, ':'))
+      {
+        if (path.empty()) continue;
+        const std::vector<std::string> candidates = {
+          path + "/../../share/ridgeback_autonomy/sim/models/g1/model.sdf",
+          path + "/../../../share/ridgeback_autonomy/sim/models/g1/model.sdf",
+        };
+        for (const auto &candidate : candidates)
+        {
+          auto pos = candidate.rfind('/');
+          const auto dir = pos == std::string::npos ? std::string() : candidate.substr(0, pos + 1);
+          if (tryCandidate(candidate, dir))
+            break;
         }
+        if (!sdfPath.empty() && gz::common::isFile(sdfPath))
+          break;
       }
     }
   }

@@ -18,23 +18,20 @@ def generate_launch_description():
     workspace_root = os.path.abspath(os.path.join(pkg_this, '..', '..', '..', '..'))
     perception_venv_path = os.path.join(workspace_root, 'perception_venv')
     perception_venv_bin = os.path.join(perception_venv_path, 'bin')
-    fastrtps_profile_abs = os.path.join(workspace_root, 'fastrtps_no_shm.xml')
 
     namespace = LaunchConfiguration('namespace')
     use_sim_time = LaunchConfiguration('use_sim_time')
     setup_path = LaunchConfiguration('setup_path')
     world = LaunchConfiguration('world')
     exploration_rviz = LaunchConfiguration('exploration_rviz')
-    camera_windows = LaunchConfiguration('camera_windows')
-    explorer = LaunchConfiguration('explorer')
-    gz_gui = LaunchConfiguration('gz_gui')
     g1_perception_enabled = LaunchConfiguration('g1_perception_enabled')
     depth_anything_enabled = LaunchConfiguration('depth_anything_enabled')
+    mppi_visualize = LaunchConfiguration('mppi_visualize')
+    explorer = LaunchConfiguration('explorer')
 
     rviz_config = os.path.join(pkg_this, 'sim', 'rviz', 'exploration.rviz')
 
     return LaunchDescription([
-        SetEnvironmentVariable('FASTRTPS_DEFAULT_PROFILES_FILE', fastrtps_profile_abs),
         SetEnvironmentVariable('VIRTUAL_ENV', perception_venv_path),
         SetEnvironmentVariable(
             'PATH',
@@ -44,19 +41,17 @@ def generate_launch_description():
         DeclareLaunchArgument('use_sim_time', default_value='true'),
         DeclareLaunchArgument('setup_path',
                               default_value=os.path.expanduser('~/clearpath/')),
-        DeclareLaunchArgument('world', default_value='warehouse'),
+        DeclareLaunchArgument('world', default_value='mock_hospital'),
         DeclareLaunchArgument('exploration_rviz', default_value='true',
                               description='Launch the exploration RViz2 config'),
-        DeclareLaunchArgument('camera_windows', default_value='true',
-                              description='Launch OpenCV camera viewer windows'),
-        DeclareLaunchArgument('explorer', default_value='explore_lite',
-                              description='Which explorer to use: "explore_lite" or "custom"'),
-        DeclareLaunchArgument('gz_gui', default_value='true',
-                              description='Launch the Gazebo GUI window'),
         DeclareLaunchArgument('g1_perception_enabled', default_value='true',
                               description='Launch the G1 perception stack'),
         DeclareLaunchArgument('depth_anything_enabled', default_value='false',
                               description='Enable Depth-Anything in the camera measurement node'),
+        DeclareLaunchArgument('mppi_visualize', default_value='false',
+                              description='Publish MPPI trajectory visualization topics'),
+        DeclareLaunchArgument('explorer', default_value='explore_lite',
+                              description='Which explorer to use: "explore_lite" or "custom"'),
 
         # RViz2
         Node(
@@ -127,7 +122,6 @@ def generate_launch_description():
                 'setup_path': setup_path,
                 'world': world,
                 'clearpath_rviz': 'false',
-                'gz_gui': gz_gui,
             }.items(),
         ),
 
@@ -158,12 +152,13 @@ def generate_launch_description():
                     launch_arguments={
                         'namespace': namespace,
                         'use_sim_time': use_sim_time,
+                        'mppi_visualize': mppi_visualize,
                     }.items(),
                 ),
             ],
         ),
 
-        # 4. Launch exploration (delayed to let Nav2 fully start)
+        # 4. Launch explorer (delayed to let Nav2 fully start)
         TimerAction(
             period=80.0,
             actions=[

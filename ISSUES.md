@@ -13,6 +13,12 @@
 | Stale processes from previous runs | Run `bash cleanup.sh` before each launch |
 | Diagnostics | Run `bash diag.sh /tmp/logfile.log hospital` or `bash diag.sh /tmp/logfile.log warehouse` |
 
+## Platform Command Timestamp Warnings
+
+During exploration runs, Gazebo may occasionally log `platform_velocity_controller` messages like `Received message has timestamp ... older by ... than allowed timeout (0.1000)`.
+
+This is usually ROS/Gazebo timing jitter around Clearpath's generated `reference_timeout: 0.1` in `/home/deivid/clearpath/platform/config/control.yaml`. Do not change the generated Clearpath controller config as a first response. First check whether Nav2 retarget churn or collision-monitor approach flicker is causing irregular command timing, then instrument `/cmd_vel`, `/cmd_vel_smoothed`, `/platform/cmd_vel`, sim-time rate, and controller update timing if the warnings remain frequent after startup.
+
 ## Historical: slam_toolbox TF Namespace Issue
 
 This project requires `patches/slam_toolbox_tf_namespace.patch` because `slam_toolbox` otherwise fails in a namespaced Clearpath setup.
@@ -55,33 +61,40 @@ Passing `shared_from_this()` makes the listener use `slam_toolbox`'s own node in
 
 None of those resolved the underlying subscription problem. The 1-line source patch was the change that made the namespaced setup work reliably.
 
-## Historical: FastDDS Shared-Memory Workaround
+## FastDDS Shared-Memory Workaround
 
-This repo previously launched the public entrypoints with `FASTRTPS_DEFAULT_PROFILES_FILE` pointing at a UDP-only FastDDS profile that disabled shared-memory transport.
-
-### Why It Existed
-
-Earlier bring-up runs saw FastDDS SHM failures such as:
+`start_exploration.sh` exports a UDP-only FastDDS profile (`fastrtps_no_shm.xml`) by default. This sidesteps the SHM failures listed below, which historically broke discovery on this setup after Gazebo/ROS crashes:
 
 - `RTPS_TRANSPORT_SHM`
 - `open_and_lock_file`
 - `No unicast locators`
 
-That history is why:
+Related cleanup the script and tooling still do:
 
-- `cleanup.sh` still removes `/dev/shm/fastrtps_*`
-- `diag.sh` still looks for SHM-related FastDDS errors
+- `cleanup.sh` removes `/dev/shm/fastrtps_*` and `/dev/shm/sem.fastrtps_*`
+- `diag.sh` looks for SHM-related FastDDS errors
 
-### Why It Was Removed
+### Toggling It Off
 
-On April 12, 2026, the `ridgeback_exploration.launch.py` stack was A/B tested in the `office` world:
+If you want to launch with the system-default RMW (no UDP-only override), set:
 
-1. with the no-SHM FastDDS profile enabled
-2. with the profile removed from launch
+```bash
+FASTRTPS_NO_SHM=false bash start_exploration.sh office
+```
 
-Both runs brought up Gazebo, `/clock`, SLAM, and the G1 perception nodes successfully, and no SHM-specific FastDDS errors appeared in the ROS logs. Because the profile was no longer clearly buying us anything in this environment, it was removed from the public launches.
+The script then leaves `RMW_IMPLEMENTATION`, `FASTRTPS_DEFAULT_PROFILES_FILE`, and `RMW_FASTRTPS_USE_QOS_FROM_XML` untouched. The launch file (`ridgeback_exploration.launch.py`) does not set these on its own, so `ros2 launch` invocations also honor whatever is in your shell env.
 
-If SHM-related FastDDS errors return on another machine, the simplest fallback is to temporarily restore a UDP-only FastDDS profile and set `FASTRTPS_DEFAULT_PROFILES_FILE` again for the affected launch.
+### A/B History
+
+On April 12, 2026, the stack was A/B tested in the `office` world with and without the UDP-only profile. Both runs brought up Gazebo, `/clock`, SLAM, and the G1 perception nodes; no SHM-specific FastDDS errors appeared on that machine in either run. The profile was kept as the script default because it had previously fixed sim-bringup failures on a different machine and there was no observed downside to leaving it on.
+
+## SLAM Drift in Featureless Environments (Office World)
+
+**Symptom**: After launching in the office world, the robot appears to jump/move randomly in RViz (map→odom transform drifts) while the robot remains physically stationary in Gazebo.
+
+**Root Cause**: `minimum_travel_distance: 0.0` and `minimum_travel_heading: 0.0` in `slam_toolbox_params.yaml` cause slam_toolbox to process *every* incoming scan even when the robot has not moved. In the warehouse world the shelving provides many distinctive scan features, so small mismatches stay bounded. The office world has large open areas with uniform walls; each scan-to-scan mismatch is small but uncorrected, and the accumulated drift eventually makes the map→odom TF spin the robot around in RViz.
+
+**Fix**: Set `minimum_travel_distance: 0.05` and `minimum_travel_heading: 0.05` in `slam_toolbox_params.yaml`. This gates scan processing to moments when the robot has moved ≥ 5 cm or rotated ≥ 3°, eliminating spurious updates while stationary.
 
 ## SLAM Drift in Featureless Environments (Office World)
 

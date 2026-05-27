@@ -2,40 +2,58 @@
 
 from __future__ import annotations
 
-import csv
+from collections import OrderedDict
 import json
 import math
 import os
-import statistics
 import subprocess
 import time
 from typing import Any
 
 import cv2
-import numpy as np
 import rclpy
 from ament_index_python.packages import get_package_share_directory
 from rclpy.executors import ExternalShutdownException
 from rclpy.node import Node
+from rclpy.qos import qos_profile_sensor_data
 from sensor_msgs.msg import Image
 
-from ridgeback_autonomy.benchmarking.metrics import (
-    PRIMARY_METRIC_KEYS,
-    PRIMARY_METRIC_LABELS,
+from ridgeback_autonomy.benchmarking.alignment import (
+    ensure_measurement_event,
+    find_exact_preview_match,
+    find_nearest_preview_match,
+    stamp_to_nanoseconds,
+    update_measurement_event,
 )
-from ridgeback_autonomy.common.messages import (
-    first_finite_positive,
-    snapshot_measurements_message,
+from ridgeback_autonomy.benchmarking.estimators import (
+    ESTIMATOR_LABELS,
+    parse_estimators,
+    selected_camera_estimators,
+    uses_camera_estimators,
+    uses_lidar_estimators,
+)
+from ridgeback_autonomy.benchmarking.reduction import (
+    choose_representative_event,
+    compute_trial_medians,
+    usable_aligned_events,
+)
+from ridgeback_autonomy.benchmarking.rendering import BenchmarkCollageRenderer
+from ridgeback_autonomy.benchmarking.summary import (
+    build_summary_rows,
+    write_summary_csv,
+    write_trial_csv,
 )
 from ridgeback_autonomy.msg import G1Measurements
 from ridgeback_autonomy.perception.core.geometry import (
     planar_distance_from_vehicle_origin,
     yaw_from_quaternion,
 )
-from ridgeback_autonomy.perception.core.image_utils import convert_color_image_message
+from ridgeback_autonomy.perception.core.image_utils import (
+    convert_color_image_message,
+    convert_depth_to_meters_message,
+)
 
 
-NEGATIVE_CONTROL_TRIALS = 10
 FORWARD_DISTANCES_M = [1.5, 2.5, 3.5, 4.5, 5.5]
 LATERAL_OFFSETS_M = [-0.75, 0.0, 0.75]
 G1_SPAWN_HEIGHT_M = 0.0
@@ -45,6 +63,29 @@ COMMAND_RETRY_SLEEP_SEC = 0.5
 STREAM_WAIT_TIMEOUT_SEC = 300.0
 POSE_WAIT_TIMEOUT_SEC = 120.0
 DELETE_TIMEOUT_SEC = 15.0
+IMAGE_MATCH_TOLERANCE_NS = 250_000_000
+CAMERA_MEASUREMENT_TOPIC = 'measurements/g1/camera'
+LIDAR_MEASUREMENT_TOPIC = 'measurements/g1/lidar'
+MONO_DEPTH_DEBUG_TOPIC = 'debug/g1/camera/mono_depth'
+DEPTH_MAX_METERS_DEFAULT = 10.0
+PREVIEW_BUFFER_LIMIT = 256
+
+
+def extract_json_payload(text: str) -> dict[str, Any]:
+    decoder = json.JSONDecoder()
+    search_from = 0
+    while True:
+        start = text.find('{', search_from)
+        if start == -1:
+            raise RuntimeError(f'Failed to parse Gazebo JSON payload: {text.strip()}')
+        try:
+            payload, _ = decoder.raw_decode(text[start:])
+        except json.JSONDecodeError:
+            search_from = start + 1
+            continue
+        if isinstance(payload, dict):
+            return payload
+        search_from = start + 1
 
 
 class G1DistanceBenchmarkRunner(Node):
@@ -53,98 +94,129 @@ class G1DistanceBenchmarkRunner(Node):
 
         pkg_share = get_package_share_directory('ridgeback_autonomy')
         self.g1_model_sdf = os.path.join(pkg_share, 'sim', 'models', 'g1', 'model.sdf')
+        workspace_root = os.path.abspath(os.path.join(pkg_share, '..', '..', '..', '..'))
+        default_output_dir = os.path.join(workspace_root, 'benchmark-results')
 
         self.declare_parameter('world', 'g1_distance_calibration')
         self.declare_parameter('repeats', 5)
-        self.declare_parameter('output_csv', '/tmp/g1_distance_benchmark_camera.csv')
+        self.declare_parameter('output_dir', default_output_dir)
         self.declare_parameter('settle_sec', 2.0)
-        self.declare_parameter('capture_sec', 3.0)
-        self.declare_parameter('measurement_topic', 'measurements/g1/camera')
-        self.declare_parameter('primary_metric', 'rgb')
+        self.declare_parameter('capture_sec', 10.0)
+        self.declare_parameter('estimators', 'rgb,sensor_depth,depth_anything,pointcloud,lidar')
+        self.declare_parameter('camera_measurement_topic', CAMERA_MEASUREMENT_TOPIC)
+        self.declare_parameter('lidar_measurement_topic', LIDAR_MEASUREMENT_TOPIC)
         self.declare_parameter('color_topic', 'sensors/camera_0/color/image')
-        self.declare_parameter('failed_frame_dir', '')
-        self.declare_parameter('save_failed_frames', True)
+        self.declare_parameter('depth_topic', 'sensors/camera_0/depth/image')
+        self.declare_parameter('mono_depth_debug_topic', MONO_DEPTH_DEBUG_TOPIC)
+        self.declare_parameter('depth_max_meters', DEPTH_MAX_METERS_DEFAULT)
 
         self.world = str(self.get_parameter('world').value)
         self.repeats = int(self.get_parameter('repeats').value)
-        self.output_csv = str(self.get_parameter('output_csv').value)
+        self.output_dir = os.path.abspath(os.path.expanduser(str(self.get_parameter('output_dir').value)))
         self.settle_sec = float(self.get_parameter('settle_sec').value)
         self.capture_sec = float(self.get_parameter('capture_sec').value)
-        self.measurement_topic = str(self.get_parameter('measurement_topic').value)
-        self.primary_metric = str(self.get_parameter('primary_metric').value)
+        self.selected_estimators = parse_estimators(str(self.get_parameter('estimators').value))
+        self.camera_measurement_topic = str(self.get_parameter('camera_measurement_topic').value)
+        self.lidar_measurement_topic = str(self.get_parameter('lidar_measurement_topic').value)
         self.color_topic = str(self.get_parameter('color_topic').value)
-        self.failed_frame_dir = str(self.get_parameter('failed_frame_dir').value)
-        self.save_failed_frames = bool(self.get_parameter('save_failed_frames').value)
-        if self.primary_metric not in PRIMARY_METRIC_KEYS:
-            supported = ', '.join(sorted(PRIMARY_METRIC_KEYS))
-            raise ValueError(
-                f'Unsupported primary_metric "{self.primary_metric}". '
-                f'Expected one of: {supported}'
-            )
+        self.depth_topic = str(self.get_parameter('depth_topic').value)
+        self.mono_depth_debug_topic = str(self.get_parameter('mono_depth_debug_topic').value)
+        self.depth_max_meters = float(self.get_parameter('depth_max_meters').value)
 
         self.namespace_name = self.get_namespace().strip('/')
         self.robot_model_name = (
             f'{self.namespace_name}/robot' if self.namespace_name else 'robot'
         )
         self.pose_info_topic = f'/world/{self.world}/pose/info'
-        self.run_label = time.strftime('%Y%m%d_%H%M%S')
+        self.run_label = time.strftime('%Y%m%d_%H%M%S', time.localtime())
+        self.run_output_dir = os.path.join(self.output_dir, self.run_label)
+        self.images_dir = os.path.join(self.run_output_dir, 'images')
+        os.makedirs(self.images_dir, exist_ok=False)
 
-        output_dir = os.path.dirname(self.output_csv) or '.'
-        os.makedirs(output_dir, exist_ok=True)
-        self.output_csv = os.path.abspath(self.output_csv)
-        if not self.failed_frame_dir:
-            csv_root, _ = os.path.splitext(self.output_csv)
-            self.failed_frame_dir = os.path.join(
-                f'{csv_root}_frames',
-                self.run_label,
-            )
-        self.failed_frame_dir = os.path.abspath(self.failed_frame_dir)
+        self.estimator_csv_paths = {
+            estimator: os.path.join(self.run_output_dir, f'{estimator}.csv')
+            for estimator in self.selected_estimators
+        }
+        self.summary_csv_path = os.path.join(self.run_output_dir, 'comparison_summary.csv')
 
         self.command_env = os.environ.copy()
         self.command_env.setdefault('ROS_LOG_DIR', '/tmp/ros_logs')
         os.makedirs(self.command_env['ROS_LOG_DIR'], exist_ok=True)
-        if self.save_failed_frames:
-            os.makedirs(self.failed_frame_dir, exist_ok=True)
 
-        self.latest_measurement_msg = None
-        self.capture_samples: list[dict[str, Any]] = []
-        self.capture_active = False
-        self.capture_last_measurement_snapshot = None
-        self.capture_last_color_frame = None
-        self.capture_last_color_stamp_ns = None
-        self.last_color_decode_warning = None
+        self.collage_renderer = BenchmarkCollageRenderer(self.depth_max_meters)
+
+        self.needs_camera = uses_camera_estimators(self.selected_estimators)
+        self.needs_lidar = uses_lidar_estimators(self.selected_estimators)
+        self.selected_camera_estimators = set(selected_camera_estimators(self.selected_estimators))
+        self.needs_sensor_depth_preview = 'sensor_depth' in self.selected_estimators
+        self.needs_depth_anything_preview = 'depth_anything' in self.selected_estimators
+
+        self.camera_measurement_seen = False
+        self.lidar_measurement_seen = False
         self.color_stream_seen = False
+        self.depth_stream_seen = False
+        self.depth_anything_stream_seen = False
+
+        self.capture_active = False
+        self.capture_events = {}
+        self.color_preview_buffer: OrderedDict[int, Any] = OrderedDict()
+        self.sensor_depth_preview_buffer: OrderedDict[int, Any] = OrderedDict()
+        self.depth_anything_preview_buffer: OrderedDict[int, Any] = OrderedDict()
+
+        self.last_color_decode_warning = None
+        self.last_depth_decode_warning = None
+        self.last_depth_anything_decode_warning = None
 
         self.create_subscription(
             G1Measurements,
-            self.measurement_topic,
-            self.on_measurement,
+            self.camera_measurement_topic,
+            self.on_camera_measurement,
+            10,
+        )
+        self.create_subscription(
+            G1Measurements,
+            self.lidar_measurement_topic,
+            self.on_lidar_measurement,
             10,
         )
         self.create_subscription(
             Image,
             self.color_topic,
             self.on_color_image,
-            10,
+            qos_profile_sensor_data,
         )
+        if self.needs_sensor_depth_preview:
+            self.create_subscription(
+                Image,
+                self.depth_topic,
+                self.on_depth_image,
+                qos_profile_sensor_data,
+            )
+        if self.needs_depth_anything_preview:
+            self.create_subscription(
+                Image,
+                self.mono_depth_debug_topic,
+                self.on_depth_anything_image,
+                qos_profile_sensor_data,
+            )
 
-    def on_measurement(self, msg: G1Measurements) -> None:
-        self.latest_measurement_msg = msg
-        snapshot = snapshot_measurements_message(msg)
+    def on_camera_measurement(self, msg: G1Measurements) -> None:
+        self.camera_measurement_seen = True
         if not self.capture_active:
             return
 
-        self.capture_last_measurement_snapshot = snapshot
-        sample = {
-            'count': int(msg.count),
-            'detected': bool(msg.detected),
-            'rgb_distance_m': first_finite_positive(msg.rgb_distance_m),
-            'sensor_depth_distance_m': first_finite_positive(msg.sensor_depth_distance_m),
-            'mono_depth_distance_m': first_finite_positive(msg.mono_depth_distance_m),
-            'lidar_distance_m': first_finite_positive(msg.lidar_distance_m),
-            'pointcloud_distance_m': first_finite_positive(msg.pointcloud_distance_m),
-        }
-        self.capture_samples.append(sample)
+        event = ensure_measurement_event(self.capture_events, msg)
+        update_measurement_event(event, msg, self.selected_camera_estimators)
+        self.attach_buffered_previews(event)
+
+    def on_lidar_measurement(self, msg: G1Measurements) -> None:
+        self.lidar_measurement_seen = True
+        if not self.capture_active:
+            return
+
+        event = ensure_measurement_event(self.capture_events, msg)
+        update_measurement_event(event, msg, {'lidar'})
+        self.attach_buffered_previews(event)
 
     def on_color_image(self, msg: Image) -> None:
         self.color_stream_seen = True
@@ -154,305 +226,306 @@ class G1DistanceBenchmarkRunner(Node):
         try:
             frame = convert_color_image_message(msg)
         except Exception as exc:
-            warning = f'Failed to decode color frame from "{self.resolved_color_topic()}": {exc}'
-            if warning != self.last_color_decode_warning:
-                self.last_color_decode_warning = warning
-                self.get_logger().warn(warning)
+            self.log_warning_once(
+                'last_color_decode_warning',
+                f'Failed to decode color frame from "{self.resolved_topic(self.color_topic)}": {exc}',
+            )
             return
 
-        self.capture_last_color_frame = frame
-        self.capture_last_color_stamp_ns = self.stamp_to_nanoseconds(msg.header.stamp)
+        preview = self.collage_renderer.make_color_preview(frame)
+        stamp_ns = stamp_to_nanoseconds(msg.header.stamp)
+        self.store_buffered_preview(self.color_preview_buffer, stamp_ns, preview)
+        self.backfill_previews_from_buffers()
+
+    def on_depth_image(self, msg: Image) -> None:
+        self.depth_stream_seen = True
+        if not self.capture_active:
+            return
+
+        try:
+            depth_meters = convert_depth_to_meters_message(msg)
+        except Exception as exc:
+            self.log_warning_once(
+                'last_depth_decode_warning',
+                f'Failed to decode depth frame from "{self.resolved_topic(self.depth_topic)}": {exc}',
+            )
+            return
+
+        preview = self.collage_renderer.make_depth_preview(depth_meters)
+        stamp_ns = stamp_to_nanoseconds(msg.header.stamp)
+        self.store_buffered_preview(self.sensor_depth_preview_buffer, stamp_ns, preview)
+        self.backfill_previews_from_buffers()
+
+    def on_depth_anything_image(self, msg: Image) -> None:
+        self.depth_anything_stream_seen = True
+        if not self.capture_active:
+            return
+
+        try:
+            depth_meters = convert_depth_to_meters_message(msg)
+        except Exception as exc:
+            self.log_warning_once(
+                'last_depth_anything_decode_warning',
+                f'Failed to decode Depth-Anything frame from "{self.resolved_topic(self.mono_depth_debug_topic)}": {exc}',
+            )
+            return
+
+        preview = self.collage_renderer.make_depth_preview(depth_meters)
+        stamp_ns = stamp_to_nanoseconds(msg.header.stamp)
+        self.store_buffered_preview(self.depth_anything_preview_buffer, stamp_ns, preview)
+        self.backfill_previews_from_buffers()
 
     def run(self) -> None:
         self.get_logger().info(
-            f'Starting static {self.primary_metric} distance benchmark in world "{self.world}" '
-            f'for robot "{self.robot_model_name}".'
+            'Starting multi-estimator distance benchmark '
+            f'for {", ".join(ESTIMATOR_LABELS[est] for est in self.selected_estimators)} '
+            f'in world "{self.world}" for robot "{self.robot_model_name}".'
         )
-        self.wait_for_measurement_stream(STREAM_WAIT_TIMEOUT_SEC)
-        if self.save_failed_frames:
-            self.wait_for_color_stream(STREAM_WAIT_TIMEOUT_SEC)
+        self.wait_for_required_streams()
         self.wait_for_entity_pose(self.robot_model_name, POSE_WAIT_TIMEOUT_SEC)
 
-        rows = []
-        csv_columns = [
-            'trial_id',
-            'trial_kind',
-            'repeat_index',
-            'status',
-            'failure_reason',
-            'spawn_forward_m',
-            'spawn_lateral_m',
-            'spawn_world_x',
-            'spawn_world_y',
-            'spawn_yaw_rad',
-            'true_forward_m',
-            'true_lateral_m',
-            'true_distance_m',
-            'rgb_distance_m',
-            'sensor_depth_distance_m',
-            'mono_depth_distance_m',
-            'lidar_distance_m',
-            'pointcloud_distance_m',
-            'primary_metric',
-            'primary_distance_m',
-            'abs_error_m',
-            'rel_error',
-            'primary_abs_error_m',
-            'primary_rel_error',
-            'total_frames',
-            'usable_frames',
-            'ambiguous_frames',
-            'saved_frame_path',
-            'saved_frame_stamp_ns',
-            'saved_frame_type',
-        ]
+        estimator_rows = {estimator: [] for estimator in self.selected_estimators}
+        included_trials = 0
+        skipped_trials = 0
 
-        with open(self.output_csv, 'w', encoding='utf-8', newline='') as csv_file:
-            writer = csv.DictWriter(csv_file, fieldnames=csv_columns)
-            writer.writeheader()
+        for trial in self.build_trials():
+            trial_rows = self.run_trial(trial)
+            if trial_rows is None:
+                skipped_trials += 1
+                continue
 
-            for trial in self.build_trials():
-                row = self.run_trial(trial)
-                writer.writerow(row)
-                csv_file.flush()
-                rows.append(row)
+            included_trials += 1
+            for estimator, row in trial_rows.items():
+                estimator_rows[estimator].append(row)
 
-        self.print_summary(rows)
-        self.get_logger().info(f'Benchmark CSV written to {self.output_csv}')
+        for estimator in self.selected_estimators:
+            write_trial_csv(self.estimator_csv_paths[estimator], estimator_rows[estimator])
+
+        summary_rows = build_summary_rows(estimator_rows)
+        write_summary_csv(self.summary_csv_path, summary_rows)
+
+        self.log_summary(summary_rows, included_trials, skipped_trials)
+        self.get_logger().info(f'Benchmark run written to {self.run_output_dir}')
 
     def build_trials(self) -> list[dict[str, Any]]:
         trials = []
-
-        for index in range(NEGATIVE_CONTROL_TRIALS):
-            trials.append({
-                'trial_kind': 'negative_control',
-                'repeat_index': 0,
-                'trial_id': f'neg_{index + 1:02d}',
-                'spawn_forward_m': None,
-                'spawn_lateral_m': None,
-            })
-
         for repeat_index in range(self.repeats):
             for forward_m in FORWARD_DISTANCES_M:
                 for lateral_m in LATERAL_OFFSETS_M:
-                    trial_index = len(trials) + 1
                     trials.append({
-                        'trial_kind': 'positive',
                         'repeat_index': repeat_index + 1,
-                        'trial_id': f'pos_{trial_index:03d}',
+                        'trial_id': f'pos_{len(trials) + 1:03d}',
                         'spawn_forward_m': forward_m,
                         'spawn_lateral_m': lateral_m,
                     })
-
         return trials
 
-    def run_trial(self, trial: dict[str, Any]) -> dict[str, Any]:
-        trial_kind = trial['trial_kind']
+    def run_trial(self, trial: dict[str, Any]) -> dict[str, dict[str, Any]] | None:
         trial_id = trial['trial_id']
-        repeat_index = trial['repeat_index']
-
-        row = {
-            'trial_id': trial_id,
-            'trial_kind': trial_kind,
-            'repeat_index': repeat_index,
-            'status': '',
-            'failure_reason': '',
-            'spawn_forward_m': trial['spawn_forward_m'],
-            'spawn_lateral_m': trial['spawn_lateral_m'],
-            'spawn_world_x': None,
-            'spawn_world_y': None,
-            'spawn_yaw_rad': None,
-            'true_forward_m': None,
-            'true_lateral_m': None,
-            'true_distance_m': None,
-            'rgb_distance_m': None,
-            'sensor_depth_distance_m': None,
-            'mono_depth_distance_m': None,
-            'lidar_distance_m': None,
-            'pointcloud_distance_m': None,
-            'primary_metric': self.primary_metric,
-            'primary_distance_m': None,
-            'abs_error_m': None,
-            'rel_error': None,
-            'primary_abs_error_m': None,
-            'primary_rel_error': None,
-            'total_frames': 0,
-            'usable_frames': 0,
-            'ambiguous_frames': 0,
-            'saved_frame_path': '',
-            'saved_frame_stamp_ns': '',
-            'saved_frame_type': '',
-        }
-
-        if trial_kind == 'negative_control':
-            capture = self.capture_measurement_window(self.capture_sec)
-            self.fill_capture_metrics(row, capture)
-            if capture['usable_frames'] == 0 and capture['ambiguous_frames'] == 0:
-                row['status'] = 'ok'
-            else:
-                row['status'] = 'ambiguous'
-                row['failure_reason'] = 'unexpected_detection_in_negative_control'
-            self.log_trial(row)
-            return row
-
-        forward_m = float(trial['spawn_forward_m'])
-        lateral_m = float(trial['spawn_lateral_m'])
-        spawn_world_x = forward_m
-        spawn_world_y = lateral_m
-        spawn_yaw_rad = G1_FACING_ROBOT_YAW_RAD
-        row['spawn_world_x'] = spawn_world_x
-        row['spawn_world_y'] = spawn_world_y
-        row['spawn_yaw_rad'] = spawn_yaw_rad
-
         model_name = f'benchmark_g1_{self.run_label}_{trial_id}'
-        capture = None
+
+        spawn_world_x = float(trial['spawn_forward_m'])
+        spawn_world_y = float(trial['spawn_lateral_m'])
+        spawn_yaw_rad = G1_FACING_ROBOT_YAW_RAD
+
         try:
-            try:
-                self.spawn_g1(model_name, spawn_world_x, spawn_world_y, G1_SPAWN_HEIGHT_M, spawn_yaw_rad)
-                self.wait_for_entity_pose(model_name, POSE_WAIT_TIMEOUT_SEC)
-                self.spin_for(self.settle_sec)
+            self.spawn_g1(model_name, spawn_world_x, spawn_world_y, G1_SPAWN_HEIGHT_M, spawn_yaw_rad)
+            self.wait_for_entity_pose(model_name, POSE_WAIT_TIMEOUT_SEC)
+            self.spin_for(self.settle_sec)
 
-                true_pose = self.compute_ground_truth(model_name)
-                row['true_forward_m'] = true_pose['forward_m']
-                row['true_lateral_m'] = true_pose['lateral_m']
-                row['true_distance_m'] = true_pose['distance_m']
+            true_pose = self.compute_ground_truth(model_name)
+            capture = self.capture_measurement_window(self.capture_sec)
+            usable_events = capture['usable_events']
+            if not usable_events:
+                self.get_logger().info(
+                    f'{trial_id} skipped | reason=no_common_usable_events | '
+                    f'raw_events={capture["total_events"]}'
+                )
+                return None
 
-                capture = self.capture_measurement_window(self.capture_sec)
-                self.fill_capture_metrics(row, capture)
+            trial_medians = compute_trial_medians(usable_events, self.selected_estimators)
+            representative_event = choose_representative_event(
+                usable_events,
+                self.selected_estimators,
+                trial_medians,
+            )
+            image_path = self.save_trial_collage(
+                trial_id,
+                representative_event,
+                trial_medians,
+                true_pose['distance_m'],
+            )
 
-                if capture['usable_frames'] > 0:
-                    row['status'] = 'ok'
-                    row['rgb_distance_m'] = capture['rgb_distance_m']
-                    row['sensor_depth_distance_m'] = capture['sensor_depth_distance_m']
-                    row['mono_depth_distance_m'] = capture['mono_depth_distance_m']
-                    row['lidar_distance_m'] = capture['lidar_distance_m']
-                    row['pointcloud_distance_m'] = capture['pointcloud_distance_m']
-                    row['primary_distance_m'] = capture['primary_distance_m']
-                    row['abs_error_m'] = abs(row['primary_distance_m'] - row['true_distance_m'])
-                    if row['true_distance_m'] > 0.0:
-                        row['rel_error'] = row['abs_error_m'] / row['true_distance_m']
-                    row['primary_abs_error_m'] = row['abs_error_m']
-                    row['primary_rel_error'] = row['rel_error']
-                elif capture['ambiguous_frames'] > 0:
-                    row['status'] = 'ambiguous'
-                    row['failure_reason'] = 'detections_present_but_not_single_target'
-                else:
-                    row['status'] = 'missed'
-                    row['failure_reason'] = capture['miss_reason']
-            except Exception as exc:
-                row['status'] = 'ambiguous'
-                row['failure_reason'] = self.format_failure_reason(exc)
-                self.get_logger().error(f'{trial_id} failed: {exc}')
+            rows = {}
+            for estimator in self.selected_estimators:
+                estimate = trial_medians[estimator]
+                abs_error = abs(estimate - true_pose['distance_m'])
+                rel_error = abs_error / true_pose['distance_m'] if true_pose['distance_m'] > 0.0 else None
+                rows[estimator] = {
+                    'trial_id': trial_id,
+                    'repeat_index': trial['repeat_index'],
+                    'spawn_forward_m': trial['spawn_forward_m'],
+                    'spawn_lateral_m': trial['spawn_lateral_m'],
+                    'spawn_world_x': spawn_world_x,
+                    'spawn_world_y': spawn_world_y,
+                    'spawn_yaw_rad': spawn_yaw_rad,
+                    'true_forward_m': true_pose['forward_m'],
+                    'true_lateral_m': true_pose['lateral_m'],
+                    'true_distance_m': true_pose['distance_m'],
+                    'estimator': estimator,
+                    'trial_estimate_m': estimate,
+                    'abs_error_m': abs_error,
+                    'rel_error': rel_error,
+                    'usable_aligned_events': len(usable_events),
+                    'image_path': image_path,
+                }
+
+            self.log_trial(trial_id, trial_medians, true_pose['distance_m'], len(usable_events), image_path)
+            return rows
+        except Exception as exc:
+            self.get_logger().error(f'{trial_id} failed: {exc}')
+            return None
         finally:
             try:
                 self.delete_g1(model_name)
             except Exception as exc:
                 self.get_logger().warn(f'Cleanup failed for "{model_name}": {exc}')
 
-        self.maybe_save_failed_frame(row, capture)
-        self.log_trial(row)
-        return row
-
-    def fill_capture_metrics(self, row: dict[str, Any], capture: dict[str, Any]) -> None:
-        row['total_frames'] = capture['total_frames']
-        row['usable_frames'] = capture['usable_frames']
-        row['ambiguous_frames'] = capture['ambiguous_frames']
-
-    def format_failure_reason(self, exc: Exception) -> str:
-        detail = str(exc).strip().replace('\n', ' ')
-        detail = '_'.join(detail.split())
-        if not detail:
-            detail = exc.__class__.__name__
-        detail = detail[:120]
-        return f'runner_error:{detail}'
-
     def capture_measurement_window(self, duration_sec: float) -> dict[str, Any]:
-        self.capture_samples = []
-        self.capture_last_measurement_snapshot = None
-        self.capture_last_color_frame = None
-        self.capture_last_color_stamp_ns = None
+        self.capture_events = {}
+        self.clear_preview_buffers()
         self.capture_active = True
         try:
             self.spin_for(duration_sec)
         finally:
             self.capture_active = False
 
-        primary_key = PRIMARY_METRIC_KEYS[self.primary_metric]
-        usable_samples = [
-            sample for sample in self.capture_samples
-            if sample['detected'] and sample['count'] == 1 and sample[primary_key] is not None
-        ]
-        ambiguous_frames = sum(
-            1 for sample in self.capture_samples
-            if sample['detected'] and sample['count'] != 1
-        )
-        detected_frames = sum(1 for sample in self.capture_samples if sample['detected'])
-
-        result = {
-            'total_frames': len(self.capture_samples),
-            'usable_frames': len(usable_samples),
-            'ambiguous_frames': ambiguous_frames,
-            'detected_frames': detected_frames,
-            'rgb_distance_m': None,
-            'sensor_depth_distance_m': None,
-            'mono_depth_distance_m': None,
-            'lidar_distance_m': None,
-            'pointcloud_distance_m': None,
-            'primary_distance_m': None,
-            'last_measurement': self.capture_last_measurement_snapshot,
-            'last_frame': self.capture_last_color_frame,
-            'last_frame_stamp_ns': self.capture_last_color_stamp_ns,
-            'miss_reason': 'no_detection',
+        usable_events = usable_aligned_events(self.capture_events, self.selected_estimators)
+        return {
+            'total_events': len(self.capture_events),
+            'usable_events': usable_events,
         }
 
-        if not usable_samples:
-            if detected_frames > 0:
-                result['miss_reason'] = f'no_{self.primary_metric}_measurement'
-            return result
+    def save_trial_collage(
+        self,
+        trial_id: str,
+        representative_event,
+        trial_medians: dict[str, float],
+        true_distance_m: float,
+    ) -> str:
+        collage = self.collage_renderer.render_trial_collage(
+            trial_id,
+            representative_event,
+            self.selected_estimators,
+            trial_medians,
+            true_distance_m,
+        )
+        output_path = os.path.abspath(os.path.join(self.images_dir, f'{trial_id}.png'))
+        if not cv2.imwrite(output_path, collage):
+            raise RuntimeError(f'Failed to write collage image to {output_path}')
+        return output_path
 
-        result['rgb_distance_m'] = self.safe_median(
-            [sample['rgb_distance_m'] for sample in usable_samples]
-        )
-        result['sensor_depth_distance_m'] = self.safe_median(
-            [sample['sensor_depth_distance_m'] for sample in usable_samples]
-        )
-        result['mono_depth_distance_m'] = self.safe_median(
-            [sample['mono_depth_distance_m'] for sample in usable_samples]
-        )
-        result['lidar_distance_m'] = self.safe_median(
-            [sample['lidar_distance_m'] for sample in usable_samples]
-        )
-        result['pointcloud_distance_m'] = self.safe_median(
-            [sample['pointcloud_distance_m'] for sample in usable_samples]
-        )
-        result['primary_distance_m'] = result[primary_key]
-        return result
+    def clear_preview_buffers(self) -> None:
+        self.color_preview_buffer.clear()
+        self.sensor_depth_preview_buffer.clear()
+        self.depth_anything_preview_buffer.clear()
 
-    def wait_for_measurement_stream(self, timeout_sec: float) -> None:
-        self.get_logger().info(
-            f'Waiting for measurement stream on "{self.resolved_measurement_topic()}".'
+    def store_buffered_preview(
+        self,
+        preview_buffer: OrderedDict[int, Any],
+        stamp_ns: int,
+        preview,
+    ) -> None:
+        preview_buffer[stamp_ns] = preview
+        preview_buffer.move_to_end(stamp_ns)
+        while len(preview_buffer) > PREVIEW_BUFFER_LIMIT:
+            preview_buffer.popitem(last=False)
+
+    def backfill_previews_from_buffers(self) -> None:
+        if not self.capture_active:
+            return
+
+        for event in self.capture_events.values():
+            self.attach_buffered_previews(event)
+
+    def attach_buffered_previews(self, event) -> None:
+        self.apply_preview_match(
+            event,
+            'color',
+            find_exact_preview_match(self.color_preview_buffer, event.stamp_ns),
         )
-        deadline = time.monotonic() + timeout_sec
+
+        if self.needs_sensor_depth_preview:
+            self.apply_preview_match(
+                event,
+                'sensor_depth',
+                find_nearest_preview_match(
+                    self.sensor_depth_preview_buffer,
+                    event.stamp_ns,
+                    IMAGE_MATCH_TOLERANCE_NS,
+                ),
+            )
+
+        if self.needs_depth_anything_preview:
+            self.apply_preview_match(
+                event,
+                'depth_anything',
+                find_exact_preview_match(self.depth_anything_preview_buffer, event.stamp_ns),
+            )
+
+    def apply_preview_match(self, event, prefix: str, match) -> None:
+        setattr(event.preview, f'{prefix}_nearest_stamp_ns', match.nearest_stamp_ns)
+        setattr(event.preview, f'{prefix}_nearest_delta_ms', match.nearest_delta_ms)
+
+        if match.image_bgr is None or match.matched_stamp_ns is None:
+            return
+
+        preview_attribute = f'{prefix}_bgr'
+        stamp_attribute = f'{prefix}_stamp_ns'
+        delta_attribute = f'{prefix}_delta_ms'
+        current_delta_ms = getattr(event.preview, delta_attribute)
+        if current_delta_ms is not None and match.matched_delta_ms is not None and current_delta_ms <= match.matched_delta_ms:
+            return
+
+        setattr(event.preview, preview_attribute, match.image_bgr)
+        setattr(event.preview, stamp_attribute, match.matched_stamp_ns)
+        setattr(event.preview, delta_attribute, match.matched_delta_ms)
+
+    def wait_for_required_streams(self) -> None:
+        if self.needs_camera:
+            self.wait_for_flag(
+                lambda: self.camera_measurement_seen,
+                f'measurement stream on "{self.resolved_topic(self.camera_measurement_topic)}"',
+            )
+        if self.needs_lidar:
+            self.wait_for_flag(
+                lambda: self.lidar_measurement_seen,
+                f'measurement stream on "{self.resolved_topic(self.lidar_measurement_topic)}"',
+            )
+
+        self.wait_for_flag(
+            lambda: self.color_stream_seen,
+            f'color stream on "{self.resolved_topic(self.color_topic)}"',
+        )
+        if self.needs_sensor_depth_preview:
+            self.wait_for_flag(
+                lambda: self.depth_stream_seen,
+                f'depth stream on "{self.resolved_topic(self.depth_topic)}"',
+            )
+        if self.needs_depth_anything_preview:
+            self.wait_for_flag(
+                lambda: self.depth_anything_stream_seen,
+                f'Depth-Anything stream on "{self.resolved_topic(self.mono_depth_debug_topic)}"',
+            )
+
+    def wait_for_flag(self, condition, description: str) -> None:
+        self.get_logger().info(f'Waiting for {description}.')
+        deadline = time.monotonic() + STREAM_WAIT_TIMEOUT_SEC
         while rclpy.ok() and time.monotonic() < deadline:
             rclpy.spin_once(self, timeout_sec=0.2)
-            if self.latest_measurement_msg is not None:
+            if condition():
                 return
-        raise RuntimeError(
-            f'Timed out waiting for measurement messages on {self.resolved_measurement_topic()}'
-        )
-
-    def wait_for_color_stream(self, timeout_sec: float) -> None:
-        self.get_logger().info(
-            f'Waiting for color stream on "{self.resolved_color_topic()}".'
-        )
-        deadline = time.monotonic() + timeout_sec
-        while rclpy.ok() and time.monotonic() < deadline:
-            rclpy.spin_once(self, timeout_sec=0.2)
-            if self.color_stream_seen:
-                return
-        raise RuntimeError(
-            f'Timed out waiting for color messages on {self.resolved_color_topic()}'
-        )
+        raise RuntimeError(f'Timed out waiting for {description}')
 
     def wait_for_entity_pose(self, model_name: str, timeout_sec: float) -> dict[str, Any]:
         deadline = time.monotonic() + timeout_sec
@@ -595,11 +668,7 @@ class G1DistanceBenchmarkRunner(Node):
         }
 
     def extract_json_payload(self, text: str) -> dict[str, Any]:
-        start = text.find('{')
-        end = text.rfind('}')
-        if start == -1 or end == -1 or end <= start:
-            raise RuntimeError(f'Failed to parse Gazebo JSON payload: {text.strip()}')
-        return json.loads(text[start:end + 1])
+        return extract_json_payload(text)
 
     def run_command(
         self,
@@ -631,19 +700,12 @@ class G1DistanceBenchmarkRunner(Node):
             timeout=timeout_sec,
         )
 
-    def resolved_measurement_topic(self) -> str:
-        if self.measurement_topic.startswith('/'):
-            return self.measurement_topic
+    def resolved_topic(self, topic: str) -> str:
+        if topic.startswith('/'):
+            return topic
         if self.namespace_name:
-            return f'/{self.namespace_name}/{self.measurement_topic}'
-        return f'/{self.measurement_topic}'
-
-    def resolved_color_topic(self) -> str:
-        if self.color_topic.startswith('/'):
-            return self.color_topic
-        if self.namespace_name:
-            return f'/{self.namespace_name}/{self.color_topic}'
-        return f'/{self.color_topic}'
+            return f'/{self.namespace_name}/{topic}'
+        return f'/{topic}'
 
     def spin_for(self, duration_sec: float) -> None:
         deadline = time.monotonic() + duration_sec
@@ -653,224 +715,51 @@ class G1DistanceBenchmarkRunner(Node):
                 return
             rclpy.spin_once(self, timeout_sec=min(0.1, remaining))
 
-    def safe_median(self, values: list[float | None]) -> float | None:
-        filtered = [value for value in values if value is not None]
-        if not filtered:
-            return None
-        return float(statistics.median(filtered))
-
-    def maybe_save_failed_frame(self, row: dict[str, Any], capture: dict[str, Any] | None) -> None:
-        if not self.save_failed_frames:
+    def log_warning_once(self, attribute_name: str, warning: str) -> None:
+        if warning == getattr(self, attribute_name):
             return
-        if row['trial_kind'] != 'positive':
-            return
-        if row['status'] not in ('missed', 'ambiguous'):
-            return
-        if capture is None:
-            return
+        setattr(self, attribute_name, warning)
+        self.get_logger().warn(warning)
 
-        frame = capture.get('last_frame')
-        if frame is None:
-            return
-
-        os.makedirs(self.failed_frame_dir, exist_ok=True)
-        annotated = self.render_failed_frame(frame, row, capture)
-        output_path = os.path.abspath(
-            os.path.join(self.failed_frame_dir, f'{row["trial_id"]}_{row["status"]}.png')
-        )
-        if not cv2.imwrite(output_path, annotated):
-            raise RuntimeError(f'Failed to write annotated frame to {output_path}')
-
-        row['saved_frame_path'] = output_path
-        stamp_ns = capture.get('last_frame_stamp_ns')
-        row['saved_frame_stamp_ns'] = str(stamp_ns) if stamp_ns is not None else ''
-        row['saved_frame_type'] = 'annotated_rgb'
-
-    def render_failed_frame(
+    def log_trial(
         self,
-        frame: np.ndarray,
-        row: dict[str, Any],
-        capture: dict[str, Any],
-    ) -> np.ndarray:
-        panel = frame.copy()
-        status = row['status']
-        status_color = (0, 165, 255) if status == 'ambiguous' else (0, 0, 255)
-        last_measurement = capture.get('last_measurement') or {}
-        bbox_list = last_measurement.get('bboxes', [])
-
-        for index, bbox in enumerate(bbox_list):
-            x1, y1, x2, y2 = bbox
-            cv2.rectangle(panel, (x1, y1), (x2, y2), (0, 255, 0), 2)
-            cv2.putText(
-                panel,
-                f'G1 #{index + 1}',
-                (x1, max(24, y1 - 8)),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.55,
-                (0, 255, 0),
-                2,
-                cv2.LINE_AA,
-            )
-
-        status_label = status
-        if status == 'missed' and row['failure_reason'] == 'no_detection':
-            status_label = 'missed/no_detection'
-
-        lines = [
-            f'Trial: {row["trial_id"]}',
-            f'Status: {status_label}',
-            f'Primary: {row["primary_metric"]}',
-            f'True: {self.format_distance(row["true_distance_m"])}',
-            f'PrimaryD: {self.format_distance(row["primary_distance_m"])}',
-            f'RGB: {self.format_distance(row["rgb_distance_m"])}',
-            f'SensorDepth: {self.format_distance(row["sensor_depth_distance_m"])}',
-            f'MonoDepth: {self.format_distance(row["mono_depth_distance_m"])}',
-            f'LiDAR: {self.format_distance(row["lidar_distance_m"])}',
-            f'PointCloud: {self.format_distance(row["pointcloud_distance_m"])}',
-            (
-                f'LastMeas: detected={last_measurement.get("detected", False)} '
-                f'count={last_measurement.get("count", 0)}'
-            ),
-            (
-                f'Frames: total={row["total_frames"]} usable={row["usable_frames"]} '
-                f'ambiguous={row["ambiguous_frames"]}'
-            ),
-        ]
-        if row['failure_reason']:
-            lines.append(f'Reason: {row["failure_reason"]}')
-
-        self.draw_label_block(panel, lines, status_color)
-        return panel
-
-    def draw_label_block(
-        self,
-        panel: np.ndarray,
-        lines: list[str],
-        status_color: tuple[int, int, int],
+        trial_id: str,
+        trial_medians: dict[str, float],
+        true_distance_m: float,
+        usable_events: int,
+        image_path: str,
     ) -> None:
-        font = cv2.FONT_HERSHEY_SIMPLEX
-        font_scale = 0.55
-        thickness = 1
-        line_height = 24
-        padding = 12
-        widths = [
-            cv2.getTextSize(line, font, font_scale, thickness)[0][0]
-            for line in lines
-        ]
-        block_width = max(widths, default=0) + padding * 2
-        block_height = len(lines) * line_height + padding * 2
-        cv2.rectangle(panel, (8, 8), (8 + block_width, 8 + block_height), (20, 20, 20), -1)
-        cv2.rectangle(panel, (8, 8), (8 + block_width, 8 + block_height), status_color, 2)
-
-        text_y = 8 + padding + 16
-        for line in lines:
-            cv2.putText(
-                panel,
-                line,
-                (8 + padding, text_y),
-                font,
-                font_scale,
-                (255, 255, 255),
-                thickness,
-                cv2.LINE_AA,
-            )
-            text_y += line_height
-
-    def format_distance(self, value: float | None) -> str:
-        if value is None:
-            return 'N/A'
-        return f'{value:.3f}m'
-
-    def stamp_to_nanoseconds(self, stamp) -> int:
-        return int(stamp.sec) * 1_000_000_000 + int(stamp.nanosec)
-
-    def print_summary(self, rows: list[dict[str, Any]]) -> None:
-        negative_rows = [row for row in rows if row['trial_kind'] == 'negative_control']
-        positive_rows = [row for row in rows if row['trial_kind'] == 'positive']
-        ok_positive_rows = [row for row in positive_rows if row['status'] == 'ok']
-
-        negative_ok = sum(1 for row in negative_rows if row['status'] == 'ok')
-        positive_ok = len(ok_positive_rows)
-        positive_total = len(positive_rows)
-        detection_rate = positive_ok / positive_total if positive_total else 0.0
-
-        self.get_logger().info(
-            f'Negative controls: {negative_ok}/{len(negative_rows)} clean '
-            f'({len(negative_rows) - negative_ok} unexpected detections).'
-        )
-        self.get_logger().info(
-            f'Positive detection rate: {positive_ok}/{positive_total} '
-            f'({detection_rate:.1%}).'
-        )
-
-        abs_errors = [
-            row['primary_abs_error_m']
-            for row in ok_positive_rows
-            if row['primary_abs_error_m'] is not None
-        ]
-        if not abs_errors:
-            self.get_logger().warn('No successful positive trials were available for error statistics.')
-            return
-
-        mean_abs_error = statistics.fmean(abs_errors)
-        median_abs_error = statistics.median(abs_errors)
-        percentile_95_error = float(np.percentile(np.asarray(abs_errors, dtype=np.float64), 95))
-        metric_label = PRIMARY_METRIC_LABELS[self.primary_metric]
-
-        self.get_logger().info(
-            f'{metric_label} error stats: '
-            f'MAE={mean_abs_error:.3f} m, '
-            f'MedianAE={median_abs_error:.3f} m, '
-            f'P95AE={percentile_95_error:.3f} m.'
-        )
-
-        for forward_m in FORWARD_DISTANCES_M:
-            bucket_rows = [
-                row for row in ok_positive_rows
-                if row['spawn_forward_m'] == forward_m and row['primary_abs_error_m'] is not None
-            ]
-            if not bucket_rows:
-                self.get_logger().info(f'Bucket {forward_m:.1f} m: no successful trials.')
-                continue
-            bucket_errors = [row['primary_abs_error_m'] for row in bucket_rows]
-            self.get_logger().info(
-                f'Bucket {forward_m:.1f} m: '
-                f'n={len(bucket_rows)}, '
-                f'MAE={statistics.fmean(bucket_errors):.3f} m, '
-                f'MedianAE={statistics.median(bucket_errors):.3f} m.'
-            )
-
-    def log_trial(self, row: dict[str, Any]) -> None:
         parts = [
-            f'{row["trial_id"]}',
-            f'type={row["trial_kind"]}',
-            f'status={row["status"]}',
+            trial_id,
+            f'true={true_distance_m:.3f}m',
+            f'usable_events={usable_events}',
+            f'image={os.path.basename(image_path)}',
         ]
-        if row['true_distance_m'] is not None:
-            parts.append(f'true={row["true_distance_m"]:.3f}m')
-        if row['primary_distance_m'] is not None:
-            parts.append(f'{row["primary_metric"]}={row["primary_distance_m"]:.3f}m')
-
-        for metric_key in (
-            'rgb_distance_m',
-            'sensor_depth_distance_m',
-            'mono_depth_distance_m',
-            'lidar_distance_m',
-            'pointcloud_distance_m',
-        ):
-            value = row[metric_key]
-            if value is not None:
-                parts.append(f'{metric_key}={value:.3f}m')
-
-        if row['primary_abs_error_m'] is not None:
-            parts.append(f'abs_err={row["primary_abs_error_m"]:.3f}m')
-        parts.append(f'usable={row["usable_frames"]}')
-        parts.append(f'ambiguous={row["ambiguous_frames"]}')
-        if row['failure_reason']:
-            parts.append(f'reason={row["failure_reason"]}')
-        if row['saved_frame_path']:
-            parts.append(f'frame={os.path.basename(row["saved_frame_path"])}')
+        for estimator in self.selected_estimators:
+            parts.append(f'{estimator}={trial_medians[estimator]:.3f}m')
         self.get_logger().info(' | '.join(parts))
+
+    def log_summary(
+        self,
+        summary_rows: list[dict[str, Any]],
+        included_trials: int,
+        skipped_trials: int,
+    ) -> None:
+        self.get_logger().info(
+            f'Included trials: {included_trials} | skipped trials: {skipped_trials}'
+        )
+        for row in summary_rows:
+            if row['trial_count'] == 0:
+                self.get_logger().info(f'{row["estimator"]}: no comparable trials.')
+                continue
+            self.get_logger().info(
+                f'{ESTIMATOR_LABELS[row["estimator"]]} | '
+                f'n={row["trial_count"]} | '
+                f'MAE={row["mean_abs_error_m"]:.3f}m | '
+                f'MedianAE={row["median_abs_error_m"]:.3f}m | '
+                f'P95AE={row["p95_abs_error_m"]:.3f}m | '
+                f'MeanRel={row["mean_rel_error"]:.3f}'
+            )
 
 
 def main() -> int:
