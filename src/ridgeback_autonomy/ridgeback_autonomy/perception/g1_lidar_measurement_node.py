@@ -158,7 +158,31 @@ class G1LidarMeasurementNode(Node):
 
     def process_measurements(self, detections_msg: G1Detections, scan_points) -> None:
         batch = batch_from_detections_message(detections_msg)
-        add_lidar_measurements(batch, scan_points, self.camera_hfov_rad)
+        rotation = None
+        translation = None
+        if scan_points is not None:
+            try:
+                rotation, translation, self.last_base_frame_fallback = lookup_transform_components(
+                    self.tf_buffer,
+                    self.base_frame,
+                    detections_msg.header.frame_id,
+                    Time.from_msg(detections_msg.header.stamp),
+                    self.get_logger(),
+                    self.last_base_frame_fallback,
+                )
+            except TransformException as exc:
+                self.get_logger().warn(
+                    f'TF lookup from camera frame "{detections_msg.header.frame_id}" '
+                    f'to base frame "{self.base_frame}" failed: {exc}. '
+                    f'Falling back to base-frame coordinate-agnostic lidar estimation.'
+                )
+        add_lidar_measurements(
+            batch,
+            scan_points,
+            self.camera_hfov_rad,
+            rotation,
+            translation,
+        )
         self.measurement_pub.publish(build_measurements_message(batch, detections_msg.header))
 
     def extract_scan_points(self, scan_msg: LaserScan):

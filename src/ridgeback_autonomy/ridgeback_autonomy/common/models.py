@@ -54,4 +54,5 @@ class LidarScanPoints:
     planar_distance_m: np.ndarray
     bearing_rad: np.ndarray
     valid: np.ndarray
+    points_xyz: np.ndarray | None = None
 
