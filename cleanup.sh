@@ -63,6 +63,7 @@ PATTERNS=(
     g1_overlay_node
     g1_distance_benchmark_runner
     g1_detection_node
+    velocity_overlay_node
 )
 
 for pat in "${PATTERNS[@]}"; do

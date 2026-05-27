@@ -22,7 +22,7 @@
       # so the goal lands inside the unexplored room.  Unknown cells have cost -1,
       # which always passes is_goal_safe(), and Nav2 plans through them with
       # allow_unknown=true.
-      goal_advance_cells: 10
+      goal_advance_cells: 3
 
       # Distance scoring for far-tier frontiers
       max_effective_frontier_size: 80

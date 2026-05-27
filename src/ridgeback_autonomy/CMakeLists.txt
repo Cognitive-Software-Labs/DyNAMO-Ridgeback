@@ -85,6 +85,12 @@ install(PROGRAMS
   RENAME frontier_explorer_node.py
 )
 
+install(PROGRAMS
+  ridgeback_autonomy/diagnostics/velocity_overlay_node.py
+  DESTINATION lib/${PROJECT_NAME}
+  RENAME velocity_overlay_node
+)
+
 install(DIRECTORY
   ridgeback_autonomy/frontier_explorer/
   DESTINATION lib/${PROJECT_NAME}/frontier_explorer
