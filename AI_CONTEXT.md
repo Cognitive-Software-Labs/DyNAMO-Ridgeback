@@ -72,7 +72,8 @@ Exploration stack:
 - `slam_toolbox`
 - Nav2
 - frontier explorer — either `explore_lite` (default) or the in-repo `frontier_explorer_node`, dispatched in `launch/includes/explore.launch.py` based on the `explorer` arg
-- custom RViz config
+- `velocity_overlay_node` publishes a screen-anchored `rviz_2d_overlay_msgs/OverlayText` HUD on `velocity_overlay`, showing the 4-stage cmd_vel chain (`planned` from MPPI, `capped` from velocity_smoother, `controller` from collision_monitor, `actual` from `platform/odom/filtered`); the RViz config renders it via the locally vendored `rviz_2d_overlay_plugins`
+- custom RViz config also enables MPPI trajectory visualization (`/optimal_trajectory` + `/trajectories`) when `mppi_visualize:=true` is forwarded into nav2 via `FollowPath.visualize`
 
 G1 perception stack:
 - `g1_detector_node` publishes raw detections on `detections/g1/raw`
