@@ -27,7 +27,8 @@ import os
 from launch import LaunchDescription
 import launch.conditions
 from launch.actions import (
-    DeclareLaunchArgument, IncludeLaunchDescription, SetEnvironmentVariable, TimerAction,
+    DeclareLaunchArgument, ExecuteProcess, IncludeLaunchDescription, SetEnvironmentVariable,
+    TimerAction,
 )
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
@@ -101,6 +102,23 @@ def generate_launch_description():
                         'setup_path': setup_path,
                         'use_sim_time': use_sim_time,
                     }.items(),
+                ),
+            ],
+        ),
+
+        # Activate the mecanum drive controller (starts inactive by default in sim)
+        TimerAction(
+            period=15.0,
+            actions=[
+                ExecuteProcess(
+                    cmd=[
+                        'ros2', 'service', 'call',
+                        '/r100_0001/controller_manager/switch_controller',
+                        'controller_manager_msgs/srv/SwitchController',
+                        "{activate_controllers: ['platform_velocity_controller'], "
+                        "deactivate_controllers: [], strictness: 2}",
+                    ],
+                    output='screen',
                 ),
             ],
         ),
