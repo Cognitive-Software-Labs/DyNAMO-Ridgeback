@@ -96,6 +96,37 @@ On April 12, 2026, the stack was A/B tested in the `office` world with and witho
 
 **Fix**: Set `minimum_travel_distance: 0.05` and `minimum_travel_heading: 0.05` in `slam_toolbox_params.yaml`. This gates scan processing to moments when the robot has moved ≥ 5 cm or rotated ≥ 3°, eliminating spurious updates while stationary.
 
+## Camera Optical Frame TF in Simulation
+
+### Problem
+
+The lidar estimator requires a TF transform from `camera_0_color_optical_frame` to `base_link` to project scan points into camera space and gate them against the detection bounding box. Without it, the node logs an error and produces no lidar measurements.
+
+### Root Cause
+
+On real hardware, the `realsense2_camera` driver reads factory-calibrated extrinsics from the camera firmware and publishes them as TF at runtime — including the `camera_0_link` → `camera_0_color_optical_frame` chain. Because the driver owns these frames, the D435 URDF (`d435.urdf.xacro`) gates the same joints behind `use_nominal_extrinsics=false` (the default) to avoid a conflict. In simulation there is no driver — Gazebo stamps image messages with `camera_0_color_optical_frame` (via `<optical_frame_id>` in `intel_realsense.urdf.xacro`) but never publishes the corresponding TF, leaving the tree incomplete.
+
+### Fix
+
+Both launch files include a `static_transform_publisher` node behind `IfCondition(use_sim_time)` that publishes the nominal version of the transform:
+
+```
+camera_0_link → camera_0_color_optical_frame
+  xyz = 0  0.015  0          (colour lens offset from d435.urdf.xacro)
+  rpy = -π/2  0  -π/2       (standard ROS optical frame rotation)
+```
+
+This node does **not** start on a real robot (`use_sim_time:=false`), where the RealSense driver takes over.
+
+### Symptom If Missing
+
+The lidar node logs:
+```
+[ERROR] Lidar measurement skipped: TF lookup from "camera_0_color_optical_frame" to
+"r100_0001/robot/base_link" failed: ... In simulation, ensure the
+camera_0_color_optical_tf static_transform_publisher is running (requires use_sim_time:=true).
+```
+
 ## Namespace Gotchas
 
 If you add new nodes to this project, always:

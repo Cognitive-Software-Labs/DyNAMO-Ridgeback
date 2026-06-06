@@ -171,10 +171,12 @@ class G1LidarMeasurementNode(Node):
                     self.last_base_frame_fallback,
                 )
             except TransformException as exc:
-                self.get_logger().warn(
-                    f'TF lookup from camera frame "{detections_msg.header.frame_id}" '
-                    f'to base frame "{self.base_frame}" failed: {exc}. '
-                    f'Falling back to base-frame coordinate-agnostic lidar estimation.'
+                self.get_logger().error(
+                    f'Lidar measurement skipped: TF lookup from '
+                    f'"{detections_msg.header.frame_id}" to "{self.base_frame}" failed: {exc}. '
+                    f'In simulation, ensure the camera_0_color_optical_tf '
+                    f'static_transform_publisher is running (requires use_sim_time:=true). '
+                    f'On real hardware, ensure the RealSense driver is publishing camera TF.'
                 )
         add_lidar_measurements(
             batch,

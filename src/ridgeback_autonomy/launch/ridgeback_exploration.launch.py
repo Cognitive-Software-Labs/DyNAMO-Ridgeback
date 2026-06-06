@@ -102,6 +102,16 @@ def generate_launch_description():
             condition=launch.conditions.IfCondition(g1_perception_enabled),
         ),
 
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(
+                os.path.join(includes_dir, 'camera_optical_tf.launch.py')
+            ),
+            launch_arguments={
+                'namespace': namespace,
+                'use_sim_time': use_sim_time,
+            }.items(),
+        ),
+
         Node(
             package='ridgeback_autonomy',
             executable='g1_overlay_node',
