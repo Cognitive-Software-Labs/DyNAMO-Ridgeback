@@ -48,6 +48,14 @@ set -u
 
 bash "$SCRIPT_DIR/cleanup.sh"
 
+# Timestamped, non-clobbering log: one file per launch so a stalled session
+# can be reviewed after the fact instead of being overwritten by the next run.
+LOG_DIR="${LOG_DIR:-$SCRIPT_DIR/logs}"
+mkdir -p "$LOG_DIR"
+LOG_FILE="$LOG_DIR/ridgeback_$(date +%Y-%m-%d_%H-%M-%S)_${WORLD}_${EXPLORER}.log"
+echo "Logging to $LOG_FILE"
+exec > >(tee "$LOG_FILE") 2>&1
+
 exec ros2 launch ridgeback_autonomy ridgeback_exploration.launch.py \
     world:="$WORLD" \
     explorer:="$EXPLORER" \

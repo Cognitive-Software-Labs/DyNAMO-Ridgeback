@@ -4,7 +4,7 @@ from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 import launch.conditions
 from launch.actions import (
-    DeclareLaunchArgument, IncludeLaunchDescription, SetEnvironmentVariable, TimerAction,
+    DeclareLaunchArgument, ExecuteProcess, IncludeLaunchDescription, SetEnvironmentVariable, TimerAction,
 )
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
@@ -143,7 +143,7 @@ def generate_launch_description():
 
         # 3. Launch Nav2 (delayed to let SLAM start publishing map)
         TimerAction(
-            period=65.0,
+            period=80.0,
             actions=[
                 IncludeLaunchDescription(
                     PythonLaunchDescriptionSource(
@@ -158,9 +158,27 @@ def generate_launch_description():
             ],
         ),
 
+        # 3b. Re-trigger Nav2 lifecycle STARTUP to recover from the
+        # odom→base_link TF race that sometimes leaves servers inactive.
+        # If activation already succeeded the service returns false harmlessly.
+        TimerAction(
+            period=92.0,
+            actions=[
+                ExecuteProcess(
+                    cmd=[
+                        'ros2', 'service', 'call',
+                        '/r100_0001/lifecycle_manager_navigation/manage_nodes',
+                        'nav2_msgs/srv/ManageLifecycleNodes',
+                        '{command: 2}',
+                    ],
+                    output='log',
+                ),
+            ],
+        ),
+
         # 4. Launch explorer (delayed to let Nav2 fully start)
         TimerAction(
-            period=80.0,
+            period=105.0,
             actions=[
                 IncludeLaunchDescription(
                     PythonLaunchDescriptionSource(
@@ -173,5 +191,16 @@ def generate_launch_description():
                     }.items(),
                 ),
             ],
+        ),
+
+        # Velocity chain overlay marker (planned/capped/controller/actual).
+        Node(
+            package='ridgeback_autonomy',
+            executable='velocity_overlay_node',
+            name='velocity_overlay_node',
+            namespace=namespace,
+            parameters=[{'use_sim_time': use_sim_time}],
+            remappings=[('/tf', 'tf'), ('/tf_static', 'tf_static')],
+            output='screen',
         ),
     ])

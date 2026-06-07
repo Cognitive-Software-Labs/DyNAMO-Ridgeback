@@ -161,12 +161,18 @@ class G1OverlayNode(Node):
         cv2.imshow(self.window_name, annotated)
         cv2.waitKey(1)
 
+    # Camera and lidar measurements come from independent pipelines running at
+    # different rates, so they almost never share the exact same detection
+    # stamp. Allow a lidar measurement within this many seconds of the camera
+    # measurement to be paired with it.
+    LIDAR_MATCH_MAX_DT_SEC = 1.0
+
     def merge_lidar_measurements(
         self,
         batch,
         camera_msg: G1Measurements,
     ) -> None:
-        lidar_msg = self.lidar_measurement_cache.get(self.measurement_message_key(camera_msg))
+        lidar_msg = self.match_lidar_measurement(camera_msg)
         if lidar_msg is None:
             return
 
@@ -175,6 +181,39 @@ class G1OverlayNode(Node):
             detection.lidar_lateral_m = lidar_detection.lidar_lateral_m
             detection.lidar_forward_m = lidar_detection.lidar_forward_m
             detection.lidar_distance_m = lidar_detection.lidar_distance_m
+
+    def match_lidar_measurement(
+        self,
+        camera_msg: G1Measurements,
+    ) -> G1Measurements | None:
+        if not self.lidar_measurement_cache:
+            return None
+
+        # Prefer an exact key match (same detection frame) when one exists.
+        exact = self.lidar_measurement_cache.get(self.measurement_message_key(camera_msg))
+        if exact is not None:
+            return exact
+
+        # Otherwise pick the cached lidar measurement closest in time that
+        # reports the same detection count, within the tolerance window.
+        target = self.stamp_seconds(camera_msg.header.stamp)
+        best_msg = None
+        best_dt = None
+        for msg in self.lidar_measurement_cache.values():
+            if int(msg.count) != int(camera_msg.count):
+                continue
+            dt = abs(self.stamp_seconds(msg.header.stamp) - target)
+            if best_dt is None or dt < best_dt:
+                best_dt = dt
+                best_msg = msg
+
+        if best_msg is None or best_dt > self.LIDAR_MATCH_MAX_DT_SEC:
+            return None
+        return best_msg
+
+    @staticmethod
+    def stamp_seconds(stamp) -> float:
+        return float(stamp.sec) + float(stamp.nanosec) * 1e-9
 
     def measurement_message_key(
         self,

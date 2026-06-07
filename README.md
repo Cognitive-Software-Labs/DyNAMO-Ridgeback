@@ -180,7 +180,7 @@ Arguments:
 | `exploration_rviz` | `true` | Launch the custom exploration RViz config |
 | `g1_perception_enabled` | `true` | Launch the G1 perception stack |
 | `depth_anything_enabled` | `false` | Enable Depth-Anything in the camera measurement node |
-| `mppi_visualize` | `false` | Publish MPPI trajectory visualization topics |
+| `mppi_visualize` | `false` | Publish MPPI trajectory visualization topics (RViz already has `MPPI Optimal` and `MPPI Samples` displays subscribed to `/r100_0001/optimal_trajectory` and `/r100_0001/trajectories`) |
 | `explorer` | `explore_lite` | Frontier explorer to dispatch — `explore_lite` or `custom` (the in-repo `frontier_explorer_node`) |
 
 Examples:
