@@ -7,6 +7,7 @@ def test_packaged_modules_import() -> None:
     module_names = [
         'ridgeback_autonomy.common.camera_config',
         'ridgeback_autonomy.common.coverage_utils',
+        'ridgeback_autonomy.common.launch_wait',
         'ridgeback_autonomy.common.messages',
         'ridgeback_autonomy.common.models',
         'ridgeback_autonomy.common.tf_utils',

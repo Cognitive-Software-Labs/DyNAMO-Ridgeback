@@ -92,6 +92,12 @@ install(PROGRAMS
 )
 
 install(PROGRAMS
+  ridgeback_autonomy/common/launch_wait.py
+  DESTINATION lib/${PROJECT_NAME}
+  RENAME launch_wait
+)
+
+install(PROGRAMS
   ridgeback_autonomy/diagnostics/hud_node.py
   DESTINATION lib/${PROJECT_NAME}
   RENAME hud_node

@@ -60,6 +60,7 @@ Use `ISSUES.md` when the task touches:
   - `ridgeback_exploration.launch.py`
   - `g1_distance_benchmark.launch.py`
 - Lower-level launches in `src/ridgeback_autonomy/launch/includes/` are internal building blocks
+- Bringup is **event-driven**: stages are sequenced by readiness gates (`ros2 run ridgeback_autonomy launch_wait`, in `common/launch_wait.py`) chained via `OnProcessExit`, not fixed `TimerAction` delays — each stage starts when its prerequisite topic/service exists, with a `--timeout` fallback. See ISSUES.md "Event-Driven Startup". Don't reintroduce timer delays
 - The ROS package is `ridgeback_autonomy`
 - The main Python package is also `ridgeback_autonomy`
 - Simulation assets now live under `src/ridgeback_autonomy/sim/`

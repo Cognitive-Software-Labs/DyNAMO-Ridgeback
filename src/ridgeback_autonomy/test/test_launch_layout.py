@@ -100,7 +100,7 @@ def test_benchmark_launch_uses_new_multi_estimator_interface() -> None:
     assert "DeclareLaunchArgument('output_csv'" not in benchmark_text
 
 
-def test_slam_lifecycle_configure_and_activate_are_separately_delayed() -> None:
+def test_slam_lifecycle_configure_and_activate_are_event_driven() -> None:
     repo_root = Path(__file__).resolve().parents[3]
     slam_text = (
         repo_root / 'src' / 'ridgeback_autonomy' / 'launch' / 'includes' / 'slam.launch.py'
@@ -108,5 +108,9 @@ def test_slam_lifecycle_configure_and_activate_are_separately_delayed() -> None:
 
     assert 'Transition.TRANSITION_CONFIGURE' in slam_text
     assert 'Transition.TRANSITION_ACTIVATE' in slam_text
-    assert 'period=2.0' in slam_text
-    assert 'period=8.0' in slam_text
+    # Configure is gated on the lifecycle change_state service; activate fires on
+    # the configured-state transition -- no fixed timer periods.
+    assert 'OnStateTransition' in slam_text
+    assert 'change_state' in slam_text
+    assert 'period=2.0' not in slam_text
+    assert 'period=8.0' not in slam_text

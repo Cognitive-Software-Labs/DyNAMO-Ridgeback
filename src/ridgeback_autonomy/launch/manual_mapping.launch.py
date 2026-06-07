@@ -27,9 +27,10 @@ import os
 from launch import LaunchDescription
 import launch.conditions
 from launch.actions import (
-    DeclareLaunchArgument, ExecuteProcess, IncludeLaunchDescription, SetEnvironmentVariable,
-    TimerAction,
+    DeclareLaunchArgument, ExecuteProcess, IncludeLaunchDescription,
+    RegisterEventHandler, SetEnvironmentVariable,
 )
+from launch.event_handlers import OnProcessExit
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
@@ -51,6 +52,23 @@ def generate_launch_description():
     mapping_rviz = LaunchConfiguration('mapping_rviz')
 
     rviz_config = os.path.join(pkg_this, 'sim', 'rviz', 'exploration.rviz')
+
+    # Readiness gates replace fixed startup timers: SLAM starts once scan +
+    # odometry exist; the drive controller is activated once controller_manager
+    # is up (it loads platform_velocity_controller inactive at startup).
+    gate_slam = ExecuteProcess(
+        cmd=['ros2', 'run', 'ridgeback_autonomy', 'launch_wait',
+             '--topic', ['/', namespace, '/sensors/lidar2d_0/scan'],
+             '--topic', ['/', namespace, '/platform/odom/filtered'],
+             '--timeout', '45'],
+        name='gate_slam', output='screen',
+    )
+    gate_controller = ExecuteProcess(
+        cmd=['ros2', 'run', 'ridgeback_autonomy', 'launch_wait',
+             '--service', ['/', namespace, '/controller_manager/switch_controller'],
+             '--timeout', '30'],
+        name='gate_controller', output='screen',
+    )
 
     return LaunchDescription([
         SetEnvironmentVariable('FASTRTPS_DEFAULT_PROFILES_FILE', fastrtps_profile_abs),
@@ -90,10 +108,11 @@ def generate_launch_description():
             }.items(),
         ),
 
-        # 2. SLAM (delayed to let sim fully start and publish TF)
-        TimerAction(
-            period=20.0,
-            actions=[
+        # 2. SLAM — start once the sim is publishing scan + odometry.
+        gate_slam,
+        RegisterEventHandler(OnProcessExit(
+            target_action=gate_slam,
+            on_exit=[
                 IncludeLaunchDescription(
                     PythonLaunchDescriptionSource(
                         os.path.join(includes_dir, 'slam.launch.py')
@@ -104,12 +123,14 @@ def generate_launch_description():
                     }.items(),
                 ),
             ],
-        ),
+        )),
 
-        # Activate the mecanum drive controller (starts inactive by default in sim)
-        TimerAction(
-            period=15.0,
-            actions=[
+        # Activate the mecanum drive controller (starts inactive in sim) once
+        # controller_manager is up.
+        gate_controller,
+        RegisterEventHandler(OnProcessExit(
+            target_action=gate_controller,
+            on_exit=[
                 ExecuteProcess(
                     cmd=[
                         'ros2', 'service', 'call',
@@ -121,7 +142,7 @@ def generate_launch_description():
                     output='screen',
                 ),
             ],
-        ),
+        )),
 
         # 3. Interactive marker teleop (RViz drag widget) + twist_mux
         IncludeLaunchDescription(

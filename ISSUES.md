@@ -9,9 +9,49 @@
 | Detection overlay does not appear | Make sure `g1_perception_enabled:=true`, remember the overlay is a separate OpenCV window, and check `/r100_0001/sensors/camera_0/color/image` |
 | `explore_lite` not finding frontiers | Verify `track_unknown_space: true` in the global costmap config |
 | TF errors | Ensure all nodes use `use_sim_time: true` |
-| Gazebo slow to start | Increase the `TimerAction` delays in `ridgeback_exploration.launch.py` |
+| Startup hangs / a stage never comes up | Bringup is event-driven (readiness gates) — find the `gate_*` process log `[launch_wait]: waiting for …`; the `unmet:` list on timeout names the exact missing topic/service. See "Event-Driven Startup" below. Do **not** re-add `TimerAction` delays |
 | Stale processes from previous runs | Run `bash cleanup.sh` before each launch |
 | Diagnostics | Run `bash diag.sh /tmp/logfile.log hospital` or `bash diag.sh /tmp/logfile.log warehouse` |
+
+## Event-Driven Startup (Readiness Gates)
+
+Bringup is sequenced by **readiness gates**, not fixed timers. Each stage waits
+for its real precondition to exist, then the next stage starts immediately
+(`RegisterEventHandler(OnProcessExit(...))`). This cut explorer-ready from a
+fixed ~105 s to roughly real-ready (~10–15 s on a fast machine) and let us delete
+the blind 92 s Nav2 lifecycle re-startup that used to paper over an
+`odom→base_link` TF race at activation.
+
+The gate helper is `ros2 run ridgeback_autonomy launch_wait`
+(`ridgeback_autonomy/common/launch_wait.py`): it blocks until all `--topic`
+publishers / `--tf` lookups / `--service` names appear, then exits 0. The
+per-gate `--timeout` (30–60 s) is a **safety fallback** — on timeout it logs a
+warning and proceeds anyway, so a missing input slows startup but never deadlocks
+it. Topic checks use `count_publishers` (a publisher existing), so they're
+QoS-agnostic (scan is best-effort, map is transient-local).
+
+Chain in `ridgeback_exploration.launch.py`:
+
+| Gate | Waits for | Then starts |
+|------|-----------|-------------|
+| `gate_slam` | `…/sensors/lidar2d_0/scan` + `…/platform/odom/filtered` publishers | SLAM (`slam.launch.py`) |
+| `gate_slam_configure` | `…/slam_toolbox/change_state` service | SLAM `CONFIGURE`; `ACTIVATE` then fires on the configured-state event (`OnStateTransition`) |
+| `gate_nav2` | `…/map` publisher | Nav2 (`nav2.launch.py`) |
+| `gate_explorer` | `…/global_costmap/costmap` publisher | explorer (`explore.launch.py`) |
+
+`manual_mapping.launch.py` uses the same pattern (SLAM gated on scan+odom; the
+drive-controller activation gated on `…/controller_manager/switch_controller`).
+
+**Why `…/map` gates Nav2 instead of a TF check:** the robot's TF is published on
+the namespaced `/<ns>/tf`, so a plain TF listener (on `/tf`) sees nothing. A
+`…/map` publisher existing implies SLAM is active and publishing `map→odom`,
+i.e. the whole `map→odom→base_link` TF chain is alive — so Nav2 only activates
+once TF is ready, which is what removed the activation race.
+
+**If a stage stalls:** read its `gate_*` log line `[launch_wait]: waiting for …`;
+the `unmet:` entries it prints on timeout are the missing topic/service. Fix that
+input, or — if the machine is just slow and the input does eventually appear —
+raise that gate's `--timeout`. Don't reintroduce fixed `TimerAction` delays.
 
 ## Platform Command Timestamp Warnings
 
