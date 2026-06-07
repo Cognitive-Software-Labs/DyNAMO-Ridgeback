@@ -102,16 +102,25 @@ The stack follows a staged pipeline inside the installable Python package `ridge
 - lidar measurements on `measurements/g1/lidar`
 - mono-depth debug images on `debug/g1/camera/mono_depth`
 
-It requires a Python venv with PyTorch and Transformers:
+It requires a Python venv with PyTorch and Transformers. All dependencies
+(pinned, with the correct CUDA torch index) live in
+[`requirements-perception.txt`](requirements-perception.txt):
 
 ```bash
 # Create venv that can see ROS 2 packages
 python3 -m venv --system-site-packages perception_venv
 echo "/opt/ros/jazzy/lib/python3.12/site-packages" > perception_venv/lib/python3.12/site-packages/ros2.pth
 
-# Install perception dependencies
-perception_venv/bin/python3 -m pip install torch torchvision transformers accelerate Pillow
+# Install pinned perception dependencies
+perception_venv/bin/python3 -m pip install -U pip
+perception_venv/bin/python3 -m pip install -r requirements-perception.txt
 ```
+
+> **GPU note:** `requirements-perception.txt` pins the **CUDA 12.8 (`cu128`)**
+> torch build, which carries the `sm_120` kernels needed for Blackwell GPUs
+> (e.g. RTX PRO 6000). Installing plain `torch` from PyPI gives a CPU-only build
+> and silently runs Depth-Anything / OWLv2 on the CPU. For a different
+> GPU/CUDA, change the index URL + torch pins in that file.
 
 Both public launch files automatically prepend `perception_venv/bin` to `PATH` and set `VIRTUAL_ENV` for the perception nodes. When you launch with `g1_perception_enabled:=true`, the first run will download the OWLv2 detector from Hugging Face. If you also pass `depth_anything_enabled:=true`, the first run will download the Depth-Anything V2 metric checkpoint.
 
