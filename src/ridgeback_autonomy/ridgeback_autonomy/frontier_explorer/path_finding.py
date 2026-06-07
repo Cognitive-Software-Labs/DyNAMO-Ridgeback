@@ -1,6 +1,6 @@
 import heapq
 import numpy as np
-from params import OBSTACLE, GRID_SIZE
+from ridgeback_autonomy.frontier_explorer.params import OBSTACLE, GRID_SIZE
 
 def heuristic(a, b):
     # Euclidean distance

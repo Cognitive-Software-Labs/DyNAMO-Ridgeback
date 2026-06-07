@@ -1,6 +1,6 @@
 import numpy as np
 from collections import deque
-from params import UNKNOWN, FREE, VIEW_RADIUS, GRID_SIZE, OBSTACLE
+from ridgeback_autonomy.frontier_explorer.params import UNKNOWN, FREE, VIEW_RADIUS, GRID_SIZE, OBSTACLE
 
 
 def update_robot_map(pos, robot_map, true_map):

@@ -87,9 +87,16 @@ source install/setup.bash
 
 If you rename or move the workspace directory later, wipe `build/`, `install/`, and `log/` before rebuilding so the generated setup files do not keep stale absolute paths.
 
-### 3. Set up G1 perception venv (first time only)
+### 3. (Optional) Set up G1 perception venv
 
-The G1 perception stack now follows a staged pipeline inside the installable Python package `ridgeback_autonomy/`:
+The G1 perception/positioning stack (detection + camera/lidar measurement +
+overlay) is **off by default** — `ridgeback_exploration.launch.py` ships with
+`g1_perception_enabled:=false`, so a normal exploration run needs no venv and
+will not try to load any models. Enable the whole stack with
+`g1_perception_enabled:=true`, which **requires** the venv below; without it the
+detector logs a single clear error and exits cleanly.
+
+The stack follows a staged pipeline inside the installable Python package `ridgeback_autonomy/`:
 - raw detections on `detections/g1/raw`
 - camera measurements on `measurements/g1/camera`
 - lidar measurements on `measurements/g1/lidar`
@@ -106,7 +113,7 @@ echo "/opt/ros/jazzy/lib/python3.12/site-packages" > perception_venv/lib/python3
 perception_venv/bin/python3 -m pip install torch torchvision transformers accelerate Pillow
 ```
 
-Both public launch files automatically prepend `perception_venv/bin` to `PATH` and set `VIRTUAL_ENV` for the perception nodes. The first run will download the OWLv2 detector from Hugging Face. If you enable `depth_anything_enabled:=true`, the first run will also download the Depth-Anything V2 metric checkpoint.
+Both public launch files automatically prepend `perception_venv/bin` to `PATH` and set `VIRTUAL_ENV` for the perception nodes. When you launch with `g1_perception_enabled:=true`, the first run will download the OWLv2 detector from Hugging Face. If you also pass `depth_anything_enabled:=true`, the first run will download the Depth-Anything V2 metric checkpoint.
 
 ### 4. (Optional) Install graphify post-commit hook
 

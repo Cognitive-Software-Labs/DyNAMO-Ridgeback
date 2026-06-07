@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 
-def test_public_launch_surface_is_limited_to_two_entrypoints() -> None:
+def test_public_launch_surface_is_limited_to_known_entrypoints() -> None:
     launch_dir = Path(__file__).resolve().parents[1] / 'launch'
     top_level_launches = sorted(
         path.name
@@ -12,6 +12,7 @@ def test_public_launch_surface_is_limited_to_two_entrypoints() -> None:
 
     assert top_level_launches == [
         'g1_distance_benchmark.launch.py',
+        'manual_mapping.launch.py',
         'ridgeback_exploration.launch.py',
     ]
 

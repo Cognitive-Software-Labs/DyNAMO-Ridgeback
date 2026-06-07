@@ -28,6 +28,7 @@ def generate_launch_description():
     depth_anything_enabled = LaunchConfiguration('depth_anything_enabled')
     mppi_visualize = LaunchConfiguration('mppi_visualize')
     explorer = LaunchConfiguration('explorer')
+    coverage_overlay_enabled = LaunchConfiguration('coverage_overlay_enabled')
 
     rviz_config = os.path.join(pkg_this, 'sim', 'rviz', 'exploration.rviz')
 
@@ -44,14 +45,18 @@ def generate_launch_description():
         DeclareLaunchArgument('world', default_value='mock_hospital'),
         DeclareLaunchArgument('exploration_rviz', default_value='true',
                               description='Launch the exploration RViz2 config'),
-        DeclareLaunchArgument('g1_perception_enabled', default_value='true',
-                              description='Launch the G1 perception stack'),
+        DeclareLaunchArgument('g1_perception_enabled', default_value='false',
+                              description='Launch the full G1 perception/positioning stack '
+                                          '(detection + camera/lidar measurement + overlay); '
+                                          'requires perception_venv'),
         DeclareLaunchArgument('depth_anything_enabled', default_value='false',
                               description='Enable Depth-Anything in the camera measurement node'),
         DeclareLaunchArgument('mppi_visualize', default_value='false',
                               description='Publish MPPI trajectory visualization topics'),
         DeclareLaunchArgument('explorer', default_value='explore_lite',
                               description='Which explorer to use: "explore_lite" or "custom"'),
+        DeclareLaunchArgument('coverage_overlay_enabled', default_value='true',
+                              description='Publish the live exploration-coverage HUD panel'),
 
         # RViz2
         Node(
@@ -193,13 +198,43 @@ def generate_launch_description():
             ],
         ),
 
-        # Velocity chain overlay marker (planned/capped/controller/actual).
+        # Velocity chain overlay panel (planned/capped/controller/actual) -> hud/velocity.
         Node(
             package='ridgeback_autonomy',
             executable='velocity_overlay_node',
             name='velocity_overlay_node',
             namespace=namespace,
             parameters=[{'use_sim_time': use_sim_time}],
+            remappings=[('/tf', 'tf'), ('/tf_static', 'tf_static')],
+            output='screen',
+        ),
+
+        # Live exploration-coverage panel -> hud/coverage.
+        Node(
+            package='ridgeback_autonomy',
+            executable='coverage_overlay_node',
+            name='coverage_overlay_node',
+            namespace=namespace,
+            parameters=[{
+                'use_sim_time': use_sim_time,
+                'world': world,
+                'map_topic': 'map',
+            }],
+            remappings=[('/tf', 'tf'), ('/tf_static', 'tf_static')],
+            output='screen',
+            condition=launch.conditions.IfCondition(coverage_overlay_enabled),
+        ),
+
+        # General HUD aggregator: merges the panels into one screen overlay.
+        Node(
+            package='ridgeback_autonomy',
+            executable='hud_node',
+            name='hud_node',
+            namespace=namespace,
+            parameters=[{
+                'use_sim_time': use_sim_time,
+                'panels': ['hud/velocity', 'hud/coverage'],
+            }],
             remappings=[('/tf', 'tf'), ('/tf_static', 'tf_static')],
             output='screen',
         ),

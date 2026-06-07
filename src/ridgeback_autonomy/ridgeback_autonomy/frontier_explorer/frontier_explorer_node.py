@@ -1,11 +1,5 @@
 #!/usr/bin/env python3
 
-import sys
-import os
-# Resolve symlinks so this works from both source and install trees
-_script_dir = os.path.dirname(os.path.realpath(__file__))
-sys.path.insert(0, os.path.join(_script_dir, 'frontier_explorer'))
-
 import time as _time
 
 import rclpy
@@ -22,9 +16,11 @@ from tf2_ros import TransformListener, Buffer
 
 from visualization_msgs.msg import Marker, MarkerArray
 from std_msgs.msg import ColorRGBA
-from navigator import get_best_frontier, get_frontier_clusters, update_robot_awareness_from_costmap
-from path_finding import a_star
-from params import UNKNOWN, OBSTACLE, FREE
+from ridgeback_autonomy.frontier_explorer.navigator import (
+    get_best_frontier, get_frontier_clusters, update_robot_awareness_from_costmap,
+)
+from ridgeback_autonomy.frontier_explorer.path_finding import a_star
+from ridgeback_autonomy.frontier_explorer.params import UNKNOWN, OBSTACLE, FREE
 
 
 class FrontierExplorerNode(Node):

@@ -12,7 +12,7 @@ fi
 
 WORLD=$1
 WORKSPACE_ROOT="$(git rev-parse --show-toplevel)"
-GROUND_TRUTH_DIR="${WORKSPACE_ROOT}/src/ridgeback_autonomy/config/ground_truth_maps"
+GROUND_TRUTH_DIR="${WORKSPACE_ROOT}/src/ridgeback_autonomy/sim/ground_truth_maps"
 
 echo "=== Ground-Truth Map Capture Helper ==="
 echo "World: $WORLD"
