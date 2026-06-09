@@ -2,6 +2,7 @@ import os
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
+import launch.conditions
 from launch.actions import (
     DeclareLaunchArgument, IncludeLaunchDescription, OpaqueFunction, SetEnvironmentVariable,
 )
@@ -105,6 +106,39 @@ def build_benchmark_nodes(context, *args, **kwargs):
     nodes.append(
         Node(
             package='ridgeback_autonomy',
+            executable='g1_estimate_viz_node',
+            name='g1_estimate_viz',
+            namespace=namespace,
+            parameters=[{'use_sim_time': use_sim_time}],
+            remappings=[('/tf', 'tf'), ('/tf_static', 'tf_static')],
+            output='screen',
+            condition=launch.conditions.IfCondition(LaunchConfiguration('estimate_viz')),
+        )
+    )
+
+    if needs_camera:
+        nodes.append(
+            Node(
+                package='ridgeback_autonomy',
+                executable='g1_overlay_node',
+                name='g1_overlay',
+                namespace=namespace,
+                parameters=[{
+                    'use_sim_time': use_sim_time,
+                    'measurement_topic': CAMERA_MEASUREMENT_TOPIC,
+                    'lidar_measurement_topic': LIDAR_MEASUREMENT_TOPIC,
+                    'color_topic': color_topic,
+                    'depth_topic': depth_topic,
+                }],
+                remappings=[('/tf', 'tf'), ('/tf_static', 'tf_static')],
+                output='screen',
+                condition=launch.conditions.IfCondition(LaunchConfiguration('overlay')),
+            )
+        )
+
+    nodes.append(
+        Node(
+            package='ridgeback_autonomy',
             executable='g1_distance_benchmark_runner',
             name='g1_distance_benchmark_runner',
             namespace=namespace,
@@ -137,10 +171,13 @@ def generate_launch_description():
     perception_venv_path = os.path.join(workspace_root, 'perception_venv')
     perception_venv_bin = os.path.join(perception_venv_path, 'bin')
     benchmark_output_dir = os.path.join(workspace_root, 'benchmark-results')
+    rviz_config = os.path.join(pkg_this, 'sim', 'rviz', 'benchmark.rviz')
 
     namespace = LaunchConfiguration('namespace')
     setup_path = LaunchConfiguration('setup_path')
+    use_sim_time = LaunchConfiguration('use_sim_time')
     world = LaunchConfiguration('world')
+    exploration_rviz = LaunchConfiguration('exploration_rviz')
 
     return LaunchDescription([
         SetEnvironmentVariable('VIRTUAL_ENV', perception_venv_path),
@@ -150,6 +187,12 @@ def generate_launch_description():
         ),
         DeclareLaunchArgument('namespace', default_value='r100_0001'),
         DeclareLaunchArgument('use_sim_time', default_value='true'),
+        DeclareLaunchArgument('exploration_rviz', default_value='true',
+                              description='Launch the exploration RViz2 config'),
+        DeclareLaunchArgument('estimate_viz', default_value='false',
+                              description='Launch the g1_estimate_viz_node RViz marker publisher'),
+        DeclareLaunchArgument('overlay', default_value='true',
+                              description='Launch the g1_overlay_node OpenCV camera view with estimator distances'),
         DeclareLaunchArgument('setup_path',
                               default_value=os.path.expanduser('~/clearpath/')),
         DeclareLaunchArgument('world', default_value='g1_distance_calibration'),
@@ -169,6 +212,18 @@ def generate_launch_description():
         DeclareLaunchArgument('scan_topic', default_value='sensors/lidar2d_0/scan'),
         DeclareLaunchArgument('pointcloud_topic', default_value='sensors/camera_0/points'),
         DeclareLaunchArgument('base_frame', default_value=[namespace, '/robot/base_link']),
+
+        Node(
+            package='rviz2',
+            executable='rviz2',
+            name='rviz2',
+            namespace=namespace,
+            arguments=['-d', rviz_config],
+            parameters=[{'use_sim_time': use_sim_time}],
+            remappings=[('/tf', 'tf'), ('/tf_static', 'tf_static')],
+            output='screen',
+            condition=launch.conditions.IfCondition(exploration_rviz),
+        ),
 
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(

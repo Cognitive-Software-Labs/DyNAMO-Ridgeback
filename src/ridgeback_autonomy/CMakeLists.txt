@@ -80,6 +80,12 @@ install(PROGRAMS
 )
 
 install(PROGRAMS
+  ridgeback_autonomy/benchmarking/g1_estimate_viz_node.py
+  DESTINATION lib/${PROJECT_NAME}
+  RENAME g1_estimate_viz_node
+)
+
+install(PROGRAMS
   ridgeback_autonomy/frontier_explorer_node.py
   DESTINATION lib/${PROJECT_NAME}
   RENAME frontier_explorer_node.py

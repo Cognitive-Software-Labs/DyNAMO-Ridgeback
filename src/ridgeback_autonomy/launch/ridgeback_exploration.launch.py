@@ -7,7 +7,7 @@ from launch.actions import (
     DeclareLaunchArgument, ExecuteProcess, IncludeLaunchDescription, SetEnvironmentVariable, TimerAction,
 )
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import LaunchConfiguration
+from launch.substitutions import AndSubstitution, LaunchConfiguration
 from launch_ros.actions import Node
 
 
@@ -25,6 +25,7 @@ def generate_launch_description():
     world = LaunchConfiguration('world')
     exploration_rviz = LaunchConfiguration('exploration_rviz')
     g1_perception_enabled = LaunchConfiguration('g1_perception_enabled')
+    estimate_viz = LaunchConfiguration('estimate_viz')
     depth_anything_enabled = LaunchConfiguration('depth_anything_enabled')
     mppi_visualize = LaunchConfiguration('mppi_visualize')
     explorer = LaunchConfiguration('explorer')
@@ -46,6 +47,8 @@ def generate_launch_description():
                               description='Launch the exploration RViz2 config'),
         DeclareLaunchArgument('g1_perception_enabled', default_value='true',
                               description='Launch the G1 perception stack'),
+        DeclareLaunchArgument('estimate_viz', default_value='false',
+                              description='Launch the g1_estimate_viz_node RViz marker publisher'),
         DeclareLaunchArgument('depth_anything_enabled', default_value='false',
                               description='Enable Depth-Anything in the camera measurement node'),
         DeclareLaunchArgument('mppi_visualize', default_value='false',
@@ -110,6 +113,19 @@ def generate_launch_description():
                 'namespace': namespace,
                 'use_sim_time': use_sim_time,
             }.items(),
+        ),
+
+        Node(
+            package='ridgeback_autonomy',
+            executable='g1_estimate_viz_node',
+            name='g1_estimate_viz',
+            namespace=namespace,
+            parameters=[{'use_sim_time': use_sim_time}],
+            remappings=[('/tf', 'tf'), ('/tf_static', 'tf_static')],
+            output='screen',
+            condition=launch.conditions.IfCondition(
+                AndSubstitution(g1_perception_enabled, estimate_viz)
+            ),
         ),
 
         Node(

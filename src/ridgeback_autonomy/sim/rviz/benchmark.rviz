@@ -6,16 +6,12 @@ Panels:
       Expanded:
         - /Global Options1
         - /RobotModel1
-        - /SLAM Map1
-        - /Cameras1
+        - /G1 Estimates1
       Splitter Ratio: 0.5
     Tree Height: 720
   - Class: rviz_common/Selection
     Name: Selection
   - Class: rviz_common/Tool Properties
-    Expanded:
-      - /SetInitialPose1
-      - /SetGoal1
     Name: Tool Properties
     Splitter Ratio: 0.58
   - Class: rviz_common/Views
@@ -55,23 +51,6 @@ Visualization Manager:
       Enabled: true
       Name: RobotModel
       TF Prefix: ""
-      Value: true
-    - Class: rviz_default_plugins/Map
-      Color Scheme: map
-      Enabled: true
-      Name: SLAM Map
-      Topic:
-        Depth: 5
-        Durability Policy: Transient Local
-        History Policy: Keep Last
-        Reliability Policy: Reliable
-        Value: /r100_0001/map
-      Update Topic:
-        Depth: 5
-        Durability Policy: Volatile
-        History Policy: Keep Last
-        Reliability Policy: Reliable
-        Value: /r100_0001/map_updates
       Value: true
     - Class: rviz_default_plugins/LaserScan
       Color: 255; 0; 0
@@ -135,29 +114,6 @@ Visualization Manager:
           Value: true
       Enabled: true
       Name: Cameras
-    - Class: rviz_default_plugins/Map
-      Color Scheme: costmap
-      Enabled: false
-      Name: Global Costmap
-      Topic: /r100_0001/global_costmap/costmap
-      Value: true
-    - Class: rviz_default_plugins/Map
-      Color Scheme: costmap
-      Enabled: false
-      Name: Local Costmap
-      Topic: /r100_0001/local_costmap/costmap
-      Value: true
-    - Class: rviz_default_plugins/Path
-      Color: 0; 255; 0
-      Enabled: true
-      Name: Global Plan
-      Topic:
-        Depth: 5
-        Durability Policy: Volatile
-        History Policy: Keep Last
-        Reliability Policy: Reliable
-        Value: /r100_0001/plan
-      Value: true
     - Class: rviz_default_plugins/MarkerArray
       Enabled: true
       Name: G1 Estimates
@@ -168,16 +124,6 @@ Visualization Manager:
         Reliability Policy: Reliable
         Value: /r100_0001/visualization/g1/estimates
       Value: true
-    - Class: rviz_default_plugins/MarkerArray
-      Enabled: true
-      Name: Frontiers
-      Topic:
-        Depth: 5
-        Durability Policy: Volatile
-        History Policy: Keep Last
-        Reliability Policy: Reliable
-        Value: /r100_0001/explore/frontiers
-      Value: true
     - Class: rviz_default_plugins/TF
       Enabled: false
       Frame Timeout: 15
@@ -187,43 +133,10 @@ Visualization Manager:
       Show Axes: true
       Show Names: true
       Value: true
-    - Class: rviz_default_plugins/Path
-      Color: 255; 170; 0
-      Enabled: true
-      Line Style: Lines
-      Line Width: 0.03
-      Name: MPPI Optimal
-      Topic:
-        Depth: 5
-        Durability Policy: Volatile
-        History Policy: Keep Last
-        Reliability Policy: Reliable
-        Value: /r100_0001/optimal_trajectory
-      Value: true
-    - Class: rviz_default_plugins/MarkerArray
-      Enabled: true
-      Name: MPPI Samples
-      Topic:
-        Depth: 5
-        Durability Policy: Volatile
-        History Policy: Keep Last
-        Reliability Policy: Reliable
-        Value: /r100_0001/trajectories
-      Value: true
-    - Class: rviz_2d_overlay_plugins/TextOverlay
-      Enabled: true
-      Name: Velocities
-      Topic:
-        Depth: 10
-        Durability Policy: Volatile
-        History Policy: Keep Last
-        Reliability Policy: Reliable
-        Value: /r100_0001/velocity_overlay
-      Value: true
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48
-    Fixed Frame: map
+    Fixed Frame: odom
     Frame Rate: 30
   Name: root
   Tools:
@@ -232,10 +145,6 @@ Visualization Manager:
     - Class: rviz_default_plugins/FocusCamera
     - Class: rviz_default_plugins/Measure
       Line color: 128; 128; 0
-    - Class: rviz_default_plugins/SetInitialPose
-      Topic: /r100_0001/initialpose
-    - Class: rviz_default_plugins/SetGoal
-      Topic: /r100_0001/goal_pose
   Transformation:
     Current:
       Class: rviz_default_plugins/TF
@@ -247,7 +156,7 @@ Visualization Manager:
       Name: Current View
       Near Clip Distance: 0.01
       Scale: 50
-      Target Frame: map
+      Target Frame: odom
       Value: TopDownOrtho
       X: 0
       Y: 0
@@ -257,7 +166,6 @@ Window Geometry:
   Height: 1400
   Hide Left Dock: false
   Hide Right Dock: false
-  QMainWindow State: 000000ff00000000fd0000000400000000000002020000054bfc0200000008fb000000100044006900730070006c00610079007301000000000000032a0000017400fffffffb0000001200530065006c0065006300740069006f006e0100000330000000a4000000a400fffffffb0000001e0054006f006f006c002000500072006f007000650072007400690065007301000003da000000a5000000a500fffffffb0000000a005600690065007700730100000484000000c7000000c700ffffff00000001000001a80000054bfc0200000001fb0000001a00520065006e0064006500720069006e006700000000000000054b0000009800ffffff0000000300000a000000007c0100000001fb0000000a0056006900650077007302000000000000000000000000000000000000000002000000090000003efc0100000002fb0000000800540069006d0065010000000000000a0000002e00fffffffb0000001200530065006c0065006300740069006f006e010000000000000a0000000000000000000005d30000054b00000004000000040000000800000008fc00000000
   Views:
     collapsed: false
   Width: 2560
