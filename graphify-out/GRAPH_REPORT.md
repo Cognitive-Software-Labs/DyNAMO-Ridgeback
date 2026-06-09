@@ -1,7 +1,7 @@
 # Graph Report - /home/deivid/dev/DyNAMO-Ridgeback  (2026-06-09)
 
 ## Corpus Check
-- Corpus is ~47,122 words - fits in a single context window. You may not need a graph.
+- Corpus is ~47,163 words - fits in a single context window. You may not need a graph.
 
 ## Summary
 - 678 nodes · 1192 edges · 47 communities (35 shown, 12 thin omitted)
