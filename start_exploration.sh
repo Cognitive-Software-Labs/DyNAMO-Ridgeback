@@ -7,7 +7,7 @@
 #   bash start_exploration.sh mock_hospital custom           # mock_hospital + custom explorer
 #   EXPLORER=custom bash start_exploration.sh office         # office + custom explorer
 #   DEPTH_ANYTHING_ENABLED=true bash start_exploration.sh    # enable Depth-Anything
-#   FASTRTPS_NO_SHM=false bash start_exploration.sh          # skip the UDP-only FastDDS profile
+#   FASTRTPS_NO_SHM=true bash start_exploration.sh           # use the UDP-only FastDDS profile
 
 set -euo pipefail
 
@@ -32,8 +32,8 @@ DEPTH_ANYTHING_ENABLED="${DEPTH_ANYTHING_ENABLED:-false}"
 
 # FastDDS shared-memory locks can get stale after Gazebo/ROS crashes and make
 # nodes disappear from discovery. The UDP-only FastDDS profile sidesteps that.
-# Default on; set FASTRTPS_NO_SHM=false to launch with the system default RMW.
-FASTRTPS_NO_SHM="${FASTRTPS_NO_SHM:-true}"
+# Default off (shared memory on); set FASTRTPS_NO_SHM=true to use the UDP-only profile.
+FASTRTPS_NO_SHM="${FASTRTPS_NO_SHM:-false}"
 if [[ "$FASTRTPS_NO_SHM" == "true" ]]; then
     export RMW_IMPLEMENTATION="${RMW_IMPLEMENTATION:-rmw_fastrtps_cpp}"
     export FASTRTPS_DEFAULT_PROFILES_FILE="${FASTRTPS_DEFAULT_PROFILES_FILE:-$SCRIPT_DIR/fastrtps_no_shm.xml}"

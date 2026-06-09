@@ -114,19 +114,20 @@ Related cleanup the script and tooling still do:
 - `cleanup.sh` removes `/dev/shm/fastrtps_*` and `/dev/shm/sem.fastrtps_*`
 - `diag.sh` looks for SHM-related FastDDS errors
 
-### Toggling It Off
+### Toggling It On
 
-If you want to launch with the system-default RMW (no UDP-only override), set:
+The script defaults to the system RMW (shared memory on). If you hit stale
+shared-memory lock symptoms, force the UDP-only profile with:
 
 ```bash
-FASTRTPS_NO_SHM=false bash start_exploration.sh office
+FASTRTPS_NO_SHM=true bash start_exploration.sh office
 ```
 
-The script then leaves `RMW_IMPLEMENTATION`, `FASTRTPS_DEFAULT_PROFILES_FILE`, and `RMW_FASTRTPS_USE_QOS_FROM_XML` untouched. The launch file (`ridgeback_exploration.launch.py`) does not set these on its own, so `ros2 launch` invocations also honor whatever is in your shell env.
+That exports `RMW_IMPLEMENTATION`, `FASTRTPS_DEFAULT_PROFILES_FILE`, and `RMW_FASTRTPS_USE_QOS_FROM_XML`. With the default (`false`) the script leaves them untouched, and the launch file (`ridgeback_exploration.launch.py`) does not set these on its own, so `ros2 launch` invocations honor whatever is in your shell env.
 
 ### A/B History
 
-On April 12, 2026, the stack was A/B tested in the `office` world with and without the UDP-only profile. Both runs brought up Gazebo, `/clock`, SLAM, and the G1 perception nodes; no SHM-specific FastDDS errors appeared on that machine in either run. The profile was kept as the script default because it had previously fixed sim-bringup failures on a different machine and there was no observed downside to leaving it on.
+On April 12, 2026, the stack was A/B tested in the `office` world with and without the UDP-only profile. Both runs brought up Gazebo, `/clock`, SLAM, and the G1 perception nodes; no SHM-specific FastDDS errors appeared on that machine in either run. The profile had previously fixed sim-bringup failures on a different machine, but since there was no observed downside to plain shared memory it is now off by default and kept available as an opt-in toggle.
 
 ## SLAM Drift in Featureless Environments (Office World)
 

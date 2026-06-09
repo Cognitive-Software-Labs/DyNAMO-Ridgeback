@@ -74,7 +74,7 @@ def generate_launch_description():
         DeclareLaunchArgument('world', default_value='mock_hospital'),
         DeclareLaunchArgument('exploration_rviz', default_value='true',
                               description='Launch the exploration RViz2 config'),
-        DeclareLaunchArgument('g1_perception_enabled', default_value='false',
+        DeclareLaunchArgument('g1_perception_enabled', default_value='true',
                               description='Launch the full G1 perception/positioning stack '
                                           '(detection + camera/lidar measurement + overlay); '
                                           'requires perception_venv'),

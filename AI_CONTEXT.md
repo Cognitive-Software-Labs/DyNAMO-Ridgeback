@@ -78,7 +78,7 @@ Exploration stack:
 - `coverage_overlay_node` publishes the live exploration-coverage panel on `hud/coverage`: compares the SLAM map to the ground-truth map for the current `world` (reusing `common/coverage_utils.py`), reporting `complete` (discovered fraction of gt-free) and `accuracy` (coverage over explored gt-free); worlds without a ground-truth map show `n/a`. Gated by `coverage_overlay_enabled` (default true). Ground-truth maps live in the package at `sim/ground_truth_maps/` (installed to `share/`, alongside `sim/worlds/`); the node resolves them via `get_package_share_directory`. Capture/preview tooling (`capture_ground_truth.sh`, `render_previews.py`) and the README sit alongside the maps in `sim/ground_truth_maps/`
 - custom RViz config also enables MPPI trajectory visualization (`/optimal_trajectory` + `/trajectories`) when `mppi_visualize:=true` is forwarded into nav2 via `FollowPath.visualize`
 
-G1 perception stack (off by default — `g1_perception_enabled` defaults to `false`; it gates the entire detection+measurement+overlay positioning stack as one unit and requires `perception_venv`. Enabling it without the venv makes `g1_detector_node` log one clear error and exit cleanly instead of crashing):
+G1 perception stack (on by default — `g1_perception_enabled` defaults to `true`; it gates the entire detection+measurement+overlay positioning stack as one unit and requires `perception_venv`. Running it without the venv makes `g1_detector_node` log one clear error and exit cleanly instead of crashing; disable the stack with `g1_perception_enabled:=false`):
 - `g1_detector_node` publishes raw detections on `detections/g1/raw`
 - `g1_camera_measurement_node` publishes camera-based measurements on `measurements/g1/camera`
 - `g1_lidar_measurement_node` publishes LiDAR-based measurements on `measurements/g1/lidar`
@@ -117,7 +117,7 @@ Benchmark stack:
 - `clearpath/robot.yaml` must also exist at `~/clearpath/robot.yaml` for the simulator default path
 - Sensor names are auto-indexed by Clearpath, so the first camera becomes `camera_0` and the first 2D lidar becomes `lidar2d_0`
 - `slam_toolbox` is sourced from `.repos` and still needs the local TF namespace patch described in `ISSUES.md`
-- The UDP-only FastDDS profile is now a `start_exploration.sh` toggle (`FASTRTPS_NO_SHM`, default `true`); the public launches do not set FastDDS env vars themselves, so `ros2 launch` invocations honor whatever is in your shell. Keep the historical rationale and toggle docs in `ISSUES.md`, not in `README.md`
+- The UDP-only FastDDS profile is a `start_exploration.sh` toggle (`FASTRTPS_NO_SHM`, default `false` — shared memory on); the public launches do not set FastDDS env vars themselves, so `ros2 launch` invocations honor whatever is in your shell. Keep the historical rationale and toggle docs in `ISSUES.md`, not in `README.md`
 
 ## Key Config And Entry Files
 

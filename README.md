@@ -90,11 +90,11 @@ If you rename or move the workspace directory later, wipe `build/`, `install/`, 
 ### 3. (Optional) Set up G1 perception venv
 
 The G1 perception/positioning stack (detection + camera/lidar measurement +
-overlay) is **off by default** — `ridgeback_exploration.launch.py` ships with
-`g1_perception_enabled:=false`, so a normal exploration run needs no venv and
-will not try to load any models. Enable the whole stack with
+overlay) is **on by default** — `ridgeback_exploration.launch.py` ships with
 `g1_perception_enabled:=true`, which **requires** the venv below; without it the
-detector logs a single clear error and exits cleanly.
+detector logs a single clear error and exits cleanly. Disable the whole stack
+with `g1_perception_enabled:=false` for a normal exploration run that needs no
+venv and will not try to load any models.
 
 The stack follows a staged pipeline inside the installable Python package `ridgeback_autonomy/`:
 - raw detections on `detections/g1/raw`
@@ -224,10 +224,10 @@ bash start_exploration.sh office                         # office + explore_lite
 bash start_exploration.sh mock_hospital custom           # mock_hospital + custom explorer
 EXPLORER=custom bash start_exploration.sh office         # office + custom explorer
 DEPTH_ANYTHING_ENABLED=true bash start_exploration.sh office
-FASTRTPS_NO_SHM=false bash start_exploration.sh office   # skip the UDP-only FastDDS profile
+FASTRTPS_NO_SHM=true bash start_exploration.sh office    # use the UDP-only FastDDS profile
 ```
 
-By default the script forces a UDP-only FastDDS profile to dodge stale shared-memory locks — see [ISSUES.md](ISSUES.md) for the rationale and toggle.
+By default the script uses the system-default RMW (shared memory on); set `FASTRTPS_NO_SHM=true` to force a UDP-only FastDDS profile that dodges stale shared-memory locks — see [ISSUES.md](ISSUES.md) for the rationale and toggle.
 
 `build_and_start_expl.sh` rebuilds the workspace first, then runs the same exploration quick-start (extra args are forwarded to `start_exploration.sh`):
 
