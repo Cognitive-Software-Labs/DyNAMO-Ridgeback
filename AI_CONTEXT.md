@@ -60,6 +60,7 @@ Use `ISSUES.md` when the task touches:
   - `ridgeback_exploration.launch.py`
   - `g1_distance_benchmark.launch.py`
 - Lower-level launches in `src/ridgeback_autonomy/launch/includes/` are internal building blocks
+- Bringup is **event-driven**: stages are sequenced by readiness gates (`ros2 run ridgeback_autonomy launch_wait`, in `common/launch_wait.py`) chained via `OnProcessExit`, not fixed `TimerAction` delays — each stage starts when its prerequisite topic/service exists, with a `--timeout` fallback. See ISSUES.md "Event-Driven Startup". Don't reintroduce timer delays
 - The ROS package is `ridgeback_autonomy`
 - The main Python package is also `ridgeback_autonomy`
 - Simulation assets now live under `src/ridgeback_autonomy/sim/`
@@ -72,10 +73,12 @@ Exploration stack:
 - `slam_toolbox`
 - Nav2
 - frontier explorer — either `explore_lite` (default) or the in-repo `frontier_explorer_node`, dispatched in `launch/includes/explore.launch.py` based on the `explorer` arg
-- `velocity_overlay_node` publishes a screen-anchored `rviz_2d_overlay_msgs/OverlayText` HUD on `velocity_overlay`, showing the 4-stage cmd_vel chain (`planned` from MPPI, `capped` from velocity_smoother, `controller` from collision_monitor, `actual` from `platform/odom/filtered`); the RViz config renders it via the locally vendored `rviz_2d_overlay_plugins`
+- HUD is a general aggregator: producers publish `rviz_2d_overlay_msgs/OverlayText` "panels" on their own topics (`hud/velocity`, `hud/coverage`, …); `hud_node` merges them in the configured `panels` order into one `hud_overlay` (the single RViz `TextOverlay` display). Add a metric = new publisher + its topic in `panels`; no RViz change.
+- `velocity_overlay_node` publishes the velocity panel on `hud/velocity` (4-stage cmd_vel chain: `planned` from MPPI, `capped` from velocity_smoother, `controller` from collision_monitor, `actual` from `platform/odom/filtered`)
+- `coverage_overlay_node` publishes the live exploration-coverage panel on `hud/coverage`: compares the SLAM map to the ground-truth map for the current `world` (reusing `common/coverage_utils.py`), reporting `complete` (discovered fraction of gt-free) and `accuracy` (coverage over explored gt-free); worlds without a ground-truth map show `n/a`. Gated by `coverage_overlay_enabled` (default true). Ground-truth maps live in the package at `sim/ground_truth_maps/` (installed to `share/`, alongside `sim/worlds/`); the node resolves them via `get_package_share_directory`. Capture/preview tooling (`capture_ground_truth.sh`, `render_previews.py`) and the README sit alongside the maps in `sim/ground_truth_maps/`
 - custom RViz config also enables MPPI trajectory visualization (`/optimal_trajectory` + `/trajectories`) when `mppi_visualize:=true` is forwarded into nav2 via `FollowPath.visualize`
 
-G1 perception stack:
+G1 perception stack (off by default — `g1_perception_enabled` defaults to `false`; it gates the entire detection+measurement+overlay positioning stack as one unit and requires `perception_venv`. Enabling it without the venv makes `g1_detector_node` log one clear error and exit cleanly instead of crashing):
 - `g1_detector_node` publishes raw detections on `detections/g1/raw`
 - `g1_camera_measurement_node` publishes camera-based measurements on `measurements/g1/camera`
 - `g1_lidar_measurement_node` publishes LiDAR-based measurements on `measurements/g1/lidar`

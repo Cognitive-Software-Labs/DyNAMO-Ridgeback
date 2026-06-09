@@ -1,0 +1,29 @@
+# G1 perception + dev-tooling dependencies for perception_venv.
+#
+# Setup (first time only):
+#   python3 -m venv --system-site-packages perception_venv
+#   echo "/opt/ros/jazzy/lib/python3.12/site-packages" \
+#     > perception_venv/lib/python3.12/site-packages/ros2.pth
+#   perception_venv/bin/python3 -m pip install -U pip
+#   perception_venv/bin/python3 -m pip install -r requirements-perception.txt
+#
+# torch / torchvision are the CUDA 12.8 (cu128) builds. The cu128 wheels carry
+# the sm_120 kernels needed for Blackwell GPUs (e.g. RTX PRO 6000). The
+# `+cu128` local-version pins force pip to fetch them from the PyTorch index
+# below instead of the CPU-only wheels on PyPI — installing plain `torch` from
+# PyPI is what silently runs Depth-Anything / OWLv2 on CPU.
+#
+# For a different GPU / CUDA toolkit, change the index URL (e.g. cu121, cu124)
+# and the matching torch/torchvision versions.
+--extra-index-url https://download.pytorch.org/whl/cu128
+torch==2.11.0+cu128
+torchvision==0.26.0+cu128
+
+# Detection (OWLv2) + Depth-Anything model stack
+transformers==5.10.2
+accelerate==1.13.0
+Pillow>=10.0
+
+# Knowledge-graph post-commit hook — tools/rebuild_graphify does `import graphify`,
+# which is provided by the `graphifyy` distribution (note the double "y").
+graphifyy==0.8.35

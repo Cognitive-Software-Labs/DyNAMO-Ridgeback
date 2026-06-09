@@ -1,11 +1,11 @@
-# Graph Report - /home/deivid/dev/DyNAMO-Ridgeback  (2026-05-28)
+# Graph Report - /home/deivid/dev/DyNAMO-Ridgeback  (2026-06-08)
 
 ## Corpus Check
-- Corpus is ~37,138 words - fits in a single context window. You may not need a graph.
+- Corpus is ~45,854 words - fits in a single context window. You may not need a graph.
 
 ## Summary
-- 434 nodes · 806 edges · 22 communities detected
-- Extraction: 80% EXTRACTED · 20% INFERRED · 0% AMBIGUOUS · INFERRED: 160 edges (avg confidence: 0.78)
+- 662 nodes · 1162 edges · 46 communities (34 shown, 12 thin omitted)
+- Extraction: 84% EXTRACTED · 16% INFERRED · 0% AMBIGUOUS · INFERRED: 186 edges (avg confidence: 0.71)
 - Token cost: 0 input · 0 output
 
 ## Community Hubs (Navigation)
@@ -22,164 +22,154 @@
 - [[_COMMUNITY_Community 10|Community 10]]
 - [[_COMMUNITY_Community 11|Community 11]]
 - [[_COMMUNITY_Community 12|Community 12]]
+- [[_COMMUNITY_Community 13|Community 13]]
 - [[_COMMUNITY_Community 14|Community 14]]
+- [[_COMMUNITY_Community 15|Community 15]]
 - [[_COMMUNITY_Community 16|Community 16]]
+- [[_COMMUNITY_Community 17|Community 17]]
 - [[_COMMUNITY_Community 18|Community 18]]
 - [[_COMMUNITY_Community 19|Community 19]]
 - [[_COMMUNITY_Community 20|Community 20]]
 - [[_COMMUNITY_Community 21|Community 21]]
 - [[_COMMUNITY_Community 22|Community 22]]
 - [[_COMMUNITY_Community 23|Community 23]]
+- [[_COMMUNITY_Community 24|Community 24]]
+- [[_COMMUNITY_Community 26|Community 26]]
 - [[_COMMUNITY_Community 27|Community 27]]
+- [[_COMMUNITY_Community 29|Community 29]]
+- [[_COMMUNITY_Community 30|Community 30]]
+- [[_COMMUNITY_Community 31|Community 31]]
+- [[_COMMUNITY_Community 38|Community 38]]
+- [[_COMMUNITY_Community 39|Community 39]]
 
 ## God Nodes (most connected - your core abstractions)
-1. `G1DistanceBenchmarkRunner` - 36 edges
-2. `BenchmarkCollageRenderer` - 21 edges
-3. `FrontierExplorerNode` - 20 edges
-4. `onInitialize()` - 20 edges
-5. `OverlayTextDisplay()` - 20 edges
-6. `onInitialize()` - 20 edges
-7. `PieChartDisplay()` - 19 edges
-8. `G1OverlayNode` - 17 edges
-9. `G1CameraMeasurementNode` - 17 edges
-10. `RgbdOverlayRenderer` - 15 edges
+1. `OverlayTextDisplay` - 77 edges
+2. `G1DistanceBenchmarkRunner` - 36 edges
+3. `BenchmarkCollageRenderer` - 25 edges
+4. `OverlayObject` - 22 edges
+5. `DetectionBatch` - 21 edges
+6. `FrontierExplorerNode` - 20 edges
+7. `OverlayTextDisplay()` - 20 edges
+8. `onInitialize()` - 20 edges
+9. `onInitialize()` - 20 edges
+10. `PieChartDisplay()` - 19 edges
 
 ## Surprising Connections (you probably didn't know these)
-- `load_camera_config()` --calls--> `CameraConfig`  [INFERRED]
+- `CameraConfig` --uses--> `CameraConfig`  [INFERRED]
   src/ridgeback_autonomy/ridgeback_autonomy/common/camera_config.py → src/ridgeback_autonomy/ridgeback_autonomy/common/models.py
-- `OwlV2Detector` --uses--> `Detection`  [INFERRED]
-  src/ridgeback_autonomy/ridgeback_autonomy/perception/core/detection.py → src/ridgeback_autonomy/ridgeback_autonomy/common/models.py
-- `parse_owl_detections()` --calls--> `Detection`  [INFERRED]
-  src/ridgeback_autonomy/ridgeback_autonomy/perception/core/detection.py → src/ridgeback_autonomy/ridgeback_autonomy/common/models.py
-- `RgbdOverlayRenderer` --uses--> `DetectionBatch`  [INFERRED]
+- `main()` --calls--> `Path`  [INFERRED]
+  tools/rebuild_graphify.py → src/ridgeback_autonomy/ridgeback_autonomy/common/coverage_utils.py
+- `DetectionBatch` --uses--> `DetectionBatch`  [INFERRED]
   src/ridgeback_autonomy/ridgeback_autonomy/perception/core/rendering.py → src/ridgeback_autonomy/ridgeback_autonomy/common/models.py
-- `OwlV2Detector` --uses--> `DetectionBatch`  [INFERRED]
-  src/ridgeback_autonomy/ridgeback_autonomy/perception/core/detection.py → src/ridgeback_autonomy/ridgeback_autonomy/common/models.py
+- `BenchmarkCollageRenderer` --uses--> `MeasurementEvent`  [INFERRED]
+  src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/rendering.py → src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/alignment.py
+- `PanelContext` --uses--> `MeasurementEvent`  [INFERRED]
+  src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/rendering.py → src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/alignment.py
 
-## Communities
+## Import Cycles
+- None detected.
+
+## Communities (46 total, 12 thin omitted)
 
 ### Community 0 - "Community 0"
-Cohesion: 0.08
-Nodes (44): batch_from_detections_message(), batch_from_measurements_message(), build_detections_message(), build_float32_image_message(), build_measurements_message(), decode_bbox_quads(), decode_optional_float(), first_finite_positive() (+36 more)
+Cohesion: 0.03
+Nodes (77): BoolProperty, ColorProperty, EnumProperty, FloatProperty, IntProperty, Q_OBJECT, QStringList, RosTopicDisplay<rviz_2d_overlay_msgs::msg::OverlayText> (+69 more)
 
 ### Community 1 - "Community 1"
-Cohesion: 0.06
-Nodes (28): get_best_frontier(), get_frontier_clusters(), is_frontier_point(), Update robot awareness map from costmap data.     Used for ROS 2 integration., Checks if a point is a valid frontier (A FREE cell next to an UNKNOWN cell)., Uses Flood Fill to group adjacent frontier points into clusters., Selects frontier cluster based on both distance and size.          Args:, Sensor Model: Discovers the area around the robot based on its VIEW_RADIUS. (+20 more)
+Cohesion: 0.08
+Nodes (34): batch_from_detections_message(), batch_from_measurements_message(), build_detections_message(), build_float32_image_message(), build_measurements_message(), decode_bbox_quads(), decode_optional_float(), first_finite_positive() (+26 more)
 
 ### Community 2 - "Community 2"
-Cohesion: 0.12
-Nodes (7): stamp_to_nanoseconds(), G1DistanceBenchmarkRunner, main(), build_summary_rows(), write_summary_csv(), write_trial_csv(), test_build_summary_rows_aggregates_trial_level_estimator_rows()
+Cohesion: 0.06
+Nodes (29): FrontierExplorerNode, main(), Receive and process occupancy grid (costmap)., Convert occupancy grid to robot awareness map (vectorized).                  Nav, Get robot position in map frame., Main exploration loop., Check if a goal position has enough clearance from obstacles.                  C, Return True if pos is too close to a recently-visited goal. (+21 more)
 
 ### Community 3 - "Community 3"
 Cohesion: 0.12
-Nodes (27): ensure_measurement_event(), event_has_all_panel_previews(), event_has_panel_preview(), EventPreview, extract_public_estimator_values(), find_exact_preview_match(), find_nearest_preview_match(), has_all_selected_estimates() (+19 more)
+Nodes (11): stamp_to_nanoseconds(), extract_json_payload(), G1DistanceBenchmarkRunner, main(), build_summary_rows(), write_summary_csv(), write_trial_csv(), CompletedProcess (+3 more)
 
 ### Community 4 - "Community 4"
-Cohesion: 0.12
-Nodes (13): convert_color_image_message(), convert_depth_to_meters_message(), decode_buffer(), decode_image_message(), normalize_to_uint8(), G1OverlayNode, main(), stamp_seconds() (+5 more)
+Cohesion: 0.11
+Nodes (31): ensure_measurement_event(), event_has_all_panel_previews(), event_has_panel_preview(), EventPreview, extract_public_estimator_values(), find_exact_preview_match(), find_nearest_preview_match(), has_all_selected_estimates() (+23 more)
 
 ### Community 5 - "Community 5"
-Cohesion: 0.17
-Nodes (24): drawPlot(), onEnable(), onInitialize(), PieChartDisplay(), setPosition(), update(), updateAutoColorChange(), updateBGAlpha() (+16 more)
+Cohesion: 0.13
+Nodes (35): CameraConfig, LidarScanPoints, add_depth_measurements(), add_depth_source_measurements(), add_lidar_measurements(), add_pointcloud_measurements(), add_rgb_measurements(), apply_vehicle_front_offset() (+27 more)
 
 ### Community 6 - "Community 6"
-Cohesion: 0.13
-Nodes (3): BenchmarkCollageRenderer, PanelContext, RgbdOverlayRenderer
+Cohesion: 0.07
+Nodes (19): HudNode, main(), main(), VelocityOverlayNode, LoadConfig(), Node, Parameter, SetParametersResult (+11 more)
 
 ### Community 7 - "Community 7"
-Cohesion: 0.24
-Nodes (24): onDisable(), onEnable(), onInitialize(), OverlayTextDisplay(), processMessage(), reset(), updateAlignBottom(), updateBGAlpha() (+16 more)
+Cohesion: 0.09
+Nodes (22): load_camera_config(), align_grids(), compute_stats(), occupancy_msg_to_grid(), pgm_to_grid(), Coverage comparison helpers: SLAM occupancy grid vs a ground-truth map.  Both gr, Compare two normalised grids cell-by-cell. Returns a dict of statistics.      Tw, Load a PGM + companion YAML and return a normalised int8 grid + meta dict. (+14 more)
 
 ### Community 8 - "Community 8"
-Cohesion: 0.11
-Nodes (12): parse_estimators(), selected_camera_estimators(), uses_camera_estimators(), uses_lidar_estimators(), main(), VelocityOverlayNode, generate_launch_description(), generate_launch_description() (+4 more)
+Cohesion: 0.06
+Nodes (30): MaterialPtr, namespace, Overlay, PanelOverlayElement, QImage, OverlayObject, getBuffer, getName (+22 more)
 
 ### Community 9 - "Community 9"
-Cohesion: 0.12
-Nodes (6): load_camera_config(), DepthAnythingEstimator, resolve_torch_device(), extract_organized_xyz(), G1CameraMeasurementNode, main()
+Cohesion: 0.16
+Nodes (26): drawPlot(), onEnable(), onInitialize(), PieChartDisplay(), processMessage(), setPosition(), update(), updateAutoColorChange() (+18 more)
 
 ### Community 10 - "Community 10"
-Cohesion: 0.14
-Nodes (10): compute_iou(), non_maximum_suppression(), OwlV2Detector, parse_owl_detections(), bgr_frame_to_pil(), G1DetectorNode, main(), test_compute_iou_handles_overlap() (+2 more)
+Cohesion: 0.12
+Nodes (9): DepthAnythingEstimator, resolve_torch_device(), G1CameraMeasurementNode, main(), ndarray, G1Detections, Image, ndarray (+1 more)
 
 ### Community 11 - "Community 11"
-Cohesion: 0.17
-Nodes (6): candidate_base_frames(), lookup_transform_components(), rotation_matrix_from_quaternion(), extract_scan_points_base(), G1LidarMeasurementNode, main()
+Cohesion: 0.22
+Nodes (25): onDisable(), onEnable(), onInitialize(), OverlayTextDisplay(), processMessage(), reset(), updateAlignBottom(), updateBGAlpha() (+17 more)
 
 ### Community 12 - "Community 12"
-Cohesion: 0.21
-Nodes (12): getBuffer(), getName(), getQImage(), getTextureHeight(), getTextureWidth(), hide(), isTextureReady(), isVisible() (+4 more)
+Cohesion: 0.13
+Nodes (10): parse_estimators(), selected_camera_estimators(), uses_camera_estimators(), uses_lidar_estimators(), RgbdOverlayRenderer, build_benchmark_nodes(), OrderedDict, DetectionBatch (+2 more)
+
+### Community 13 - "Community 13"
+Cohesion: 0.15
+Nodes (20): OverlayObject, getBuffer(), getName(), getPixelBuffer(), getQImage(), getTextureHeight(), getTextureWidth(), hide() (+12 more)
 
 ### Community 14 - "Community 14"
+Cohesion: 0.16
+Nodes (8): candidate_base_frames(), lookup_transform_components(), rotation_matrix_from_quaternion(), G1LidarMeasurementNode, main(), ndarray, G1Detections, LaserScan
+
+### Community 15 - "Community 15"
+Cohesion: 0.29
+Nodes (4): BenchmarkCollageRenderer, PanelContext, MeasurementEvent, ndarray
+
+### Community 16 - "Community 16"
+Cohesion: 0.23
+Nodes (16): bgr_frame_to_pil(), convert_color_image_message(), convert_depth_to_meters_message(), decode_buffer(), decode_image_message(), normalize_to_uint8(), dtype, Image (+8 more)
+
+### Community 17 - "Community 17"
+Cohesion: 0.21
+Nodes (4): G1OverlayNode, main(), G1Measurements, Image
+
+### Community 18 - "Community 18"
+Cohesion: 0.33
+Nodes (5): camera, depth_hfov_deg, depth_vfov_deg, height_m, pitch_deg
+
+### Community 19 - "Community 19"
 Cohesion: 0.67
 Nodes (3): a_star(), heuristic(), Optimized A* Algorithm to find the shortest path avoiding obstacles.
 
-### Community 16 - "Community 16"
-Cohesion: 0.5
-Nodes (1): Rviz2dString
-
-### Community 18 - "Community 18"
-Cohesion: 0.67
-Nodes (2): OverlayObject, ScopedPixelBuffer
-
-### Community 19 - "Community 19"
-Cohesion: 1.0
-Nodes (1): Shared Python package for Ridgeback autonomy helpers and nodes.
-
-### Community 20 - "Community 20"
-Cohesion: 1.0
-Nodes (1): Benchmarking nodes plus helper libraries for autonomy evaluation workflows.
-
-### Community 21 - "Community 21"
-Cohesion: 1.0
-Nodes (1): Frontier exploration module for ROS 2.
-
-### Community 22 - "Community 22"
-Cohesion: 1.0
-Nodes (1): Perception nodes plus helper libraries for detection, fusion, and visualization.
-
-### Community 23 - "Community 23"
-Cohesion: 1.0
-Nodes (1): Shared perception internals used by the perception node entrypoints.
-
-### Community 27 - "Community 27"
-Cohesion: 1.0
-Nodes (1): OverlayTextDisplay
-
 ## Knowledge Gaps
-- **30 isolated node(s):** `Shared Python package for Ridgeback autonomy helpers and nodes.`, `Receive and process occupancy grid (costmap).`, `Convert occupancy grid to robot awareness map (vectorized).                  Nav`, `Get robot position in map frame.`, `Main exploration loop.` (+25 more)
+- **129 isolated node(s):** `PreToolUse`, `PreToolUse`, `build_and_start_expl.sh script`, `depth_hfov_deg`, `depth_vfov_deg` (+124 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **Thin community `Community 16`** (4 nodes): `string_to_overlay_text.cpp`, `main()`, `Rviz2dString`, `.Rviz2dString()`
-  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 18`** (3 nodes): `OverlayObject`, `ScopedPixelBuffer`, `overlay_utils.hpp`
-  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 19`** (2 nodes): `Shared Python package for Ridgeback autonomy helpers and nodes.`, `__init__.py`
-  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 20`** (2 nodes): `Benchmarking nodes plus helper libraries for autonomy evaluation workflows.`, `__init__.py`
-  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 21`** (2 nodes): `Frontier exploration module for ROS 2.`, `__init__.py`
-  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 22`** (2 nodes): `Perception nodes plus helper libraries for detection, fusion, and visualization.`, `__init__.py`
-  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 23`** (2 nodes): `Shared perception internals used by the perception node entrypoints.`, `__init__.py`
-  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 27`** (2 nodes): `OverlayTextDisplay`, `overlay_text_display.hpp`
-  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
+- **12 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `G1DistanceBenchmarkRunner` connect `Community 2` to `Community 8`, `Community 3`, `Community 6`?**
-  _High betweenness centrality (0.178) - this node is a cross-community bridge._
-- **Why does `FrontierExplorerNode` connect `Community 1` to `Community 8`?**
-  _High betweenness centrality (0.139) - this node is a cross-community bridge._
-- **Why does `G1CameraMeasurementNode` connect `Community 9` to `Community 8`, `Community 0`?**
-  _High betweenness centrality (0.079) - this node is a cross-community bridge._
-- **Are the 6 inferred relationships involving `BenchmarkCollageRenderer` (e.g. with `G1DistanceBenchmarkRunner` and `MeasurementEvent`) actually correct?**
-  _`BenchmarkCollageRenderer` has 6 INFERRED edges - model-reasoned connections that need verification._
-- **What connects `Shared Python package for Ridgeback autonomy helpers and nodes.`, `Receive and process occupancy grid (costmap).`, `Convert occupancy grid to robot awareness map (vectorized).                  Nav` to the rest of the system?**
-  _30 weakly-connected nodes found - possible documentation gaps or missing edges._
+- **Why does `G1DistanceBenchmarkRunner` connect `Community 3` to `Community 4`, `Community 12`, `Community 6`, `Community 15`?**
+  _High betweenness centrality (0.120) - this node is a cross-community bridge._
+- **Why does `FrontierExplorerNode` connect `Community 2` to `Community 6`?**
+  _High betweenness centrality (0.081) - this node is a cross-community bridge._
+- **Why does `G1CameraMeasurementNode` connect `Community 10` to `Community 6`?**
+  _High betweenness centrality (0.058) - this node is a cross-community bridge._
+- **Are the 10 inferred relationships involving `BenchmarkCollageRenderer` (e.g. with `G1DistanceBenchmarkRunner` and `.__init__()`) actually correct?**
+  _`BenchmarkCollageRenderer` has 10 INFERRED edges - model-reasoned connections that need verification._
+- **Are the 18 inferred relationships involving `DetectionBatch` (e.g. with `OwlV2Detector` and `RgbdOverlayRenderer`) actually correct?**
+  _`DetectionBatch` has 18 INFERRED edges - model-reasoned connections that need verification._
+- **What connects `PreToolUse`, `PreToolUse`, `build_and_start_expl.sh script` to the rest of the system?**
+  _161 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `Community 0` be split into smaller, more focused modules?**
-  _Cohesion score 0.08 - nodes in this community are weakly interconnected._
-- **Should `Community 1` be split into smaller, more focused modules?**
-  _Cohesion score 0.06 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.025974025974025976 - nodes in this community are weakly interconnected._
