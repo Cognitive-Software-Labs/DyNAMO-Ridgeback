@@ -1,10 +1,10 @@
-# Graph Report - /home/deivid/dev/DyNAMO-Ridgeback  (2026-06-08)
+# Graph Report - /home/deivid/dev/DyNAMO-Ridgeback  (2026-06-09)
 
 ## Corpus Check
-- Corpus is ~45,854 words - fits in a single context window. You may not need a graph.
+- Corpus is ~47,122 words - fits in a single context window. You may not need a graph.
 
 ## Summary
-- 662 nodes · 1162 edges · 46 communities (34 shown, 12 thin omitted)
+- 678 nodes · 1192 edges · 47 communities (35 shown, 12 thin omitted)
 - Extraction: 84% EXTRACTED · 16% INFERRED · 0% AMBIGUOUS · INFERRED: 186 edges (avg confidence: 0.71)
 - Token cost: 0 input · 0 output
 
@@ -34,13 +34,14 @@
 - [[_COMMUNITY_Community 22|Community 22]]
 - [[_COMMUNITY_Community 23|Community 23]]
 - [[_COMMUNITY_Community 24|Community 24]]
-- [[_COMMUNITY_Community 26|Community 26]]
+- [[_COMMUNITY_Community 25|Community 25]]
 - [[_COMMUNITY_Community 27|Community 27]]
+- [[_COMMUNITY_Community 28|Community 28]]
 - [[_COMMUNITY_Community 29|Community 29]]
 - [[_COMMUNITY_Community 30|Community 30]]
 - [[_COMMUNITY_Community 31|Community 31]]
-- [[_COMMUNITY_Community 38|Community 38]]
 - [[_COMMUNITY_Community 39|Community 39]]
+- [[_COMMUNITY_Community 40|Community 40]]
 
 ## God Nodes (most connected - your core abstractions)
 1. `OverlayTextDisplay` - 77 edges
@@ -69,19 +70,19 @@
 ## Import Cycles
 - None detected.
 
-## Communities (46 total, 12 thin omitted)
+## Communities (47 total, 12 thin omitted)
 
 ### Community 0 - "Community 0"
 Cohesion: 0.03
 Nodes (77): BoolProperty, ColorProperty, EnumProperty, FloatProperty, IntProperty, Q_OBJECT, QStringList, RosTopicDisplay<rviz_2d_overlay_msgs::msg::OverlayText> (+69 more)
 
 ### Community 1 - "Community 1"
-Cohesion: 0.08
-Nodes (34): batch_from_detections_message(), batch_from_measurements_message(), build_detections_message(), build_float32_image_message(), build_measurements_message(), decode_bbox_quads(), decode_optional_float(), first_finite_positive() (+26 more)
-
-### Community 2 - "Community 2"
 Cohesion: 0.06
 Nodes (29): FrontierExplorerNode, main(), Receive and process occupancy grid (costmap)., Convert occupancy grid to robot awareness map (vectorized).                  Nav, Get robot position in map frame., Main exploration loop., Check if a goal position has enough clearance from obstacles.                  C, Return True if pos is too close to a recently-visited goal. (+21 more)
+
+### Community 2 - "Community 2"
+Cohesion: 0.10
+Nodes (42): build_float32_image_message(), CameraConfig, Detection, DetectionBatch, LidarScanPoints, add_depth_measurements(), add_depth_source_measurements(), add_lidar_measurements() (+34 more)
 
 ### Community 3 - "Community 3"
 Cohesion: 0.12
@@ -92,20 +93,20 @@ Cohesion: 0.11
 Nodes (31): ensure_measurement_event(), event_has_all_panel_previews(), event_has_panel_preview(), EventPreview, extract_public_estimator_values(), find_exact_preview_match(), find_nearest_preview_match(), has_all_selected_estimates() (+23 more)
 
 ### Community 5 - "Community 5"
-Cohesion: 0.13
-Nodes (35): CameraConfig, LidarScanPoints, add_depth_measurements(), add_depth_source_measurements(), add_lidar_measurements(), add_pointcloud_measurements(), add_rgb_measurements(), apply_vehicle_front_offset() (+27 more)
+Cohesion: 0.10
+Nodes (26): compute_iou(), non_maximum_suppression(), OwlV2Detector, parse_owl_detections(), bgr_frame_to_pil(), convert_color_image_message(), convert_depth_to_meters_message(), decode_buffer() (+18 more)
 
 ### Community 6 - "Community 6"
-Cohesion: 0.07
-Nodes (19): HudNode, main(), main(), VelocityOverlayNode, LoadConfig(), Node, Parameter, SetParametersResult (+11 more)
-
-### Community 7 - "Community 7"
 Cohesion: 0.09
 Nodes (22): load_camera_config(), align_grids(), compute_stats(), occupancy_msg_to_grid(), pgm_to_grid(), Coverage comparison helpers: SLAM occupancy grid vs a ground-truth map.  Both gr, Compare two normalised grids cell-by-cell. Returns a dict of statistics.      Tw, Load a PGM + companion YAML and return a normalised int8 grid + meta dict. (+14 more)
 
+### Community 7 - "Community 7"
+Cohesion: 0.10
+Nodes (9): HudNode, main(), main(), VelocityOverlayNode, Node, G1OverlayNode, main(), G1Measurements (+1 more)
+
 ### Community 8 - "Community 8"
 Cohesion: 0.06
-Nodes (30): MaterialPtr, namespace, Overlay, PanelOverlayElement, QImage, OverlayObject, getBuffer, getName (+22 more)
+Nodes (29): MaterialPtr, namespace, Overlay, PanelOverlayElement, OverlayObject, getBuffer, getName, getTextureHeight (+21 more)
 
 ### Community 9 - "Community 9"
 Cohesion: 0.16
@@ -113,7 +114,7 @@ Nodes (26): drawPlot(), onEnable(), onInitialize(), PieChartDisplay(), processMe
 
 ### Community 10 - "Community 10"
 Cohesion: 0.12
-Nodes (9): DepthAnythingEstimator, resolve_torch_device(), G1CameraMeasurementNode, main(), ndarray, G1Detections, Image, ndarray (+1 more)
+Nodes (10): DepthAnythingEstimator, resolve_torch_device(), extract_organized_xyz(), G1CameraMeasurementNode, main(), ndarray, G1Detections, Image (+2 more)
 
 ### Community 11 - "Community 11"
 Cohesion: 0.22
@@ -124,30 +125,34 @@ Cohesion: 0.13
 Nodes (10): parse_estimators(), selected_camera_estimators(), uses_camera_estimators(), uses_lidar_estimators(), RgbdOverlayRenderer, build_benchmark_nodes(), OrderedDict, DetectionBatch (+2 more)
 
 ### Community 13 - "Community 13"
-Cohesion: 0.15
-Nodes (20): OverlayObject, getBuffer(), getName(), getPixelBuffer(), getQImage(), getTextureHeight(), getTextureWidth(), hide() (+12 more)
+Cohesion: 0.14
+Nodes (21): OverlayObject, QImage, getBuffer(), getName(), getPixelBuffer(), getQImage(), getTextureHeight(), getTextureWidth() (+13 more)
 
 ### Community 14 - "Community 14"
+Cohesion: 0.10
+Nodes (14): LoadConfig(), Parameter, SetParametersResult, SharedPtr, String, Rviz2dString, callback_handle_, fg_color (+6 more)
+
+### Community 15 - "Community 15"
 Cohesion: 0.16
 Nodes (8): candidate_base_frames(), lookup_transform_components(), rotation_matrix_from_quaternion(), G1LidarMeasurementNode, main(), ndarray, G1Detections, LaserScan
 
-### Community 15 - "Community 15"
+### Community 16 - "Community 16"
 Cohesion: 0.29
 Nodes (4): BenchmarkCollageRenderer, PanelContext, MeasurementEvent, ndarray
 
-### Community 16 - "Community 16"
-Cohesion: 0.23
-Nodes (16): bgr_frame_to_pil(), convert_color_image_message(), convert_depth_to_meters_message(), decode_buffer(), decode_image_message(), normalize_to_uint8(), dtype, Image (+8 more)
-
 ### Community 17 - "Community 17"
-Cohesion: 0.21
-Nodes (4): G1OverlayNode, main(), G1Measurements, Image
+Cohesion: 0.24
+Nodes (16): batch_from_detections_message(), batch_from_measurements_message(), build_detections_message(), build_measurements_message(), decode_bbox_quads(), decode_optional_float(), first_finite_positive(), optional_float() (+8 more)
 
 ### Community 18 - "Community 18"
+Cohesion: 0.22
+Nodes (8): _color_msg(), G1EstimateVizNode, _get(), main(), _ring_points(), main(), G1Measurements, Time
+
+### Community 19 - "Community 19"
 Cohesion: 0.33
 Nodes (5): camera, depth_hfov_deg, depth_vfov_deg, height_m, pitch_deg
 
-### Community 19 - "Community 19"
+### Community 20 - "Community 20"
 Cohesion: 0.67
 Nodes (3): a_star(), heuristic(), Optimized A* Algorithm to find the shortest path avoiding obstacles.
 
@@ -159,12 +164,12 @@ Nodes (3): a_star(), heuristic(), Optimized A* Algorithm to find the shortest pa
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `G1DistanceBenchmarkRunner` connect `Community 3` to `Community 4`, `Community 12`, `Community 6`, `Community 15`?**
-  _High betweenness centrality (0.120) - this node is a cross-community bridge._
-- **Why does `FrontierExplorerNode` connect `Community 2` to `Community 6`?**
+- **Why does `G1DistanceBenchmarkRunner` connect `Community 3` to `Community 16`, `Community 4`, `Community 12`, `Community 7`?**
+  _High betweenness centrality (0.123) - this node is a cross-community bridge._
+- **Why does `FrontierExplorerNode` connect `Community 1` to `Community 7`?**
   _High betweenness centrality (0.081) - this node is a cross-community bridge._
-- **Why does `G1CameraMeasurementNode` connect `Community 10` to `Community 6`?**
-  _High betweenness centrality (0.058) - this node is a cross-community bridge._
+- **Why does `G1CameraMeasurementNode` connect `Community 10` to `Community 7`?**
+  _High betweenness centrality (0.060) - this node is a cross-community bridge._
 - **Are the 10 inferred relationships involving `BenchmarkCollageRenderer` (e.g. with `G1DistanceBenchmarkRunner` and `.__init__()`) actually correct?**
   _`BenchmarkCollageRenderer` has 10 INFERRED edges - model-reasoned connections that need verification._
 - **Are the 18 inferred relationships involving `DetectionBatch` (e.g. with `OwlV2Detector` and `RgbdOverlayRenderer`) actually correct?**
