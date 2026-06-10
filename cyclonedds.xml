@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!--
+  CycloneDDS profile for single-host simulation.
+  Fixes for this box:
+  1. Multiple UP NICs (eno1/eno2): without an explicit interface Cyclone fails
+     with "failed to create domain". Pin loopback so all ROS 2 nodes (sim + nav2
+     + perception) talk over lo, isolated from the robot/lab networks.
+  2. Large stack (40+ nodes = 40+ DDS participants): Cyclone's default
+     MaxAutoParticipantIndex (~9) over UDP runs out of participant-index port
+     slots -> "Failed to find a free participant index". Raise it.
+  3. Large messages (camera images, costmaps, clouds): bump socket receive
+     buffer + max message size so bursts aren't dropped. Requires the kernel
+     ceiling raised too:
+       sudo sysctl -w net.core.rmem_max=2147483647 \
+            net.ipv4.ipfrag_high_thresh=134217728 net.ipv4.ipfrag_time=3
+     (ref: stereolabs.com/docs/ros2/dds-and-network-tuning)
+  Used via: RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+            CYCLONEDDS_URI=file://$PWD/cyclonedds.xml
+-->
+<CycloneDDS xmlns="https://cdds.io/config"
+            xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+            xsi:schemaLocation="https://cdds.io/config https://raw.githubusercontent.com/eclipse-cyclonedds/cyclonedds/master/etc/cyclonedds.xsd">
+  <Domain id="any">
+    <General>
+      <Interfaces>
+        <NetworkInterface name="lo" presence_required="false" multicast="true"/>
+      </Interfaces>
+      <AllowMulticast>true</AllowMulticast>
+      <EnableMulticastLoopback>true</EnableMulticastLoopback>
+      <MaxMessageSize>65500B</MaxMessageSize>
+    </General>
+    <Discovery>
+      <ParticipantIndex>auto</ParticipantIndex>
+      <MaxAutoParticipantIndex>200</MaxAutoParticipantIndex>
+    </Discovery>
+    <Internal>
+      <SocketReceiveBufferSize min="10MB"/>
+      <Watermarks>
+        <WhcHigh>500kB</WhcHigh>
+      </Watermarks>
+    </Internal>
+  </Domain>
+</CycloneDDS>

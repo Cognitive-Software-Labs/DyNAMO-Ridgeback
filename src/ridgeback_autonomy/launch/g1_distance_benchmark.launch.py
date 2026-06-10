@@ -179,7 +179,19 @@ def generate_launch_description():
     world = LaunchConfiguration('world')
     exploration_rviz = LaunchConfiguration('exploration_rviz')
 
+    # DDS middleware, consistent with start_exploration.sh (mismatched RMWs can't
+    # communicate). Respect an explicit override; else default to CycloneDDS.
+    rmw_impl = os.environ.get('RMW_IMPLEMENTATION', 'rmw_cyclonedds_cpp')
+    dds_env = [SetEnvironmentVariable('RMW_IMPLEMENTATION', rmw_impl)]
+    if rmw_impl == 'rmw_cyclonedds_cpp':
+        cyclonedds_uri = os.environ.get(
+            'CYCLONEDDS_URI',
+            'file://' + os.path.join(workspace_root, 'cyclonedds.xml'),
+        )
+        dds_env.append(SetEnvironmentVariable('CYCLONEDDS_URI', cyclonedds_uri))
+
     return LaunchDescription([
+        *dds_env,
         SetEnvironmentVariable('VIRTUAL_ENV', perception_venv_path),
         SetEnvironmentVariable(
             'PATH',

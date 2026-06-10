@@ -7,7 +7,10 @@
 #   bash start_exploration.sh mock_hospital custom           # mock_hospital + custom explorer
 #   EXPLORER=custom bash start_exploration.sh office         # office + custom explorer
 #   DEPTH_ANYTHING_ENABLED=true bash start_exploration.sh    # enable Depth-Anything
-#   FASTRTPS_NO_SHM=true bash start_exploration.sh           # use the UDP-only FastDDS profile
+#
+# DDS: defaults to CycloneDDS (cyclonedds.xml). Run tools/setup_dds.sh once (sudo)
+# for the large-message kernel tuning. To fall back to FastDDS:
+#   RMW_IMPLEMENTATION=rmw_fastrtps_cpp bash start_exploration.sh   # UDP-only profile
 
 set -euo pipefail
 
@@ -30,14 +33,27 @@ fi
 
 DEPTH_ANYTHING_ENABLED="${DEPTH_ANYTHING_ENABLED:-false}"
 
-# FastDDS shared-memory locks can get stale after Gazebo/ROS crashes and make
-# nodes disappear from discovery. The UDP-only FastDDS profile sidesteps that.
-# Default off (shared memory on); set FASTRTPS_NO_SHM=true to use the UDP-only profile.
-FASTRTPS_NO_SHM="${FASTRTPS_NO_SHM:-false}"
-if [[ "$FASTRTPS_NO_SHM" == "true" ]]; then
-    export RMW_IMPLEMENTATION="${RMW_IMPLEMENTATION:-rmw_fastrtps_cpp}"
-    export FASTRTPS_DEFAULT_PROFILES_FILE="${FASTRTPS_DEFAULT_PROFILES_FILE:-$SCRIPT_DIR/fastrtps_no_shm.xml}"
-    export RMW_FASTRTPS_USE_QOS_FROM_XML="${RMW_FASTRTPS_USE_QOS_FROM_XML:-1}"
+# DDS middleware. Default CycloneDDS: more robust on this multi-NIC host than
+# FastDDS, whose shared-memory locks get stale after crashes and drop nodes from
+# discovery (see ISSUES.md). Override with RMW_IMPLEMENTATION=rmw_fastrtps_cpp.
+export RMW_IMPLEMENTATION="${RMW_IMPLEMENTATION:-rmw_cyclonedds_cpp}"
+if [[ "$RMW_IMPLEMENTATION" == "rmw_cyclonedds_cpp" ]]; then
+    # Loopback interface + raised participant limit + large socket buffers.
+    export CYCLONEDDS_URI="${CYCLONEDDS_URI:-file://$SCRIPT_DIR/cyclonedds.xml}"
+    # Large-message buffers need a raised kernel ceiling; warn if not set up.
+    rmem=$(cat /proc/sys/net/core/rmem_max 2>/dev/null || echo 0)
+    if [[ "$rmem" -lt 10485760 ]]; then
+        echo "[start_exploration] WARN: net.core.rmem_max=$rmem (<10MB) -- large-message DDS (camera/costmap) may drop data." >&2
+        echo "[start_exploration]       One-time fix: bash $SCRIPT_DIR/tools/setup_dds.sh (sudo)" >&2
+    fi
+elif [[ "$RMW_IMPLEMENTATION" == "rmw_fastrtps_cpp" ]]; then
+    # FastDDS fallback. SHM is fragile here, so default to the UDP-only profile;
+    # set FASTRTPS_NO_SHM=false to use the system default (shared memory).
+    FASTRTPS_NO_SHM="${FASTRTPS_NO_SHM:-true}"
+    if [[ "$FASTRTPS_NO_SHM" == "true" ]]; then
+        export FASTRTPS_DEFAULT_PROFILES_FILE="${FASTRTPS_DEFAULT_PROFILES_FILE:-$SCRIPT_DIR/fastrtps_no_shm.xml}"
+        export RMW_FASTRTPS_USE_QOS_FROM_XML="${RMW_FASTRTPS_USE_QOS_FROM_XML:-1}"
+    fi
 fi
 export ROS_DOMAIN_ID="${ROS_DOMAIN_ID:-42}"
 
