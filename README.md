@@ -224,10 +224,10 @@ bash start_exploration.sh office                         # office + explore_lite
 bash start_exploration.sh mock_hospital custom           # mock_hospital + custom explorer
 EXPLORER=custom bash start_exploration.sh office         # office + custom explorer
 DEPTH_ANYTHING_ENABLED=true bash start_exploration.sh office
-FASTRTPS_NO_SHM=true bash start_exploration.sh office    # use the UDP-only FastDDS profile
+RMW_IMPLEMENTATION=rmw_fastrtps_cpp bash start_exploration.sh office   # fall back to FastDDS
 ```
 
-By default the script uses the system-default RMW (shared memory on); set `FASTRTPS_NO_SHM=true` to force a UDP-only FastDDS profile that dodges stale shared-memory locks — see [ISSUES.md](ISSUES.md) for the rationale and toggle.
+By default the script uses **CycloneDDS** (`cyclonedds.xml`: loopback interface, raised participant limit, large socket buffers) — more robust on this multi-NIC host than FastDDS shared memory, which gets stale locks. Run `tools/setup_dds.sh` **once** (sudo) to install the persistent large-message kernel tuning (`net.core.rmem_max` etc.); without it the script warns and big messages (camera/costmap) may drop. To fall back to FastDDS set `RMW_IMPLEMENTATION=rmw_fastrtps_cpp` (defaults to the UDP-only profile) — see [ISSUES.md](ISSUES.md) for the rationale.
 
 `build_and_start_expl.sh` rebuilds the workspace first, then runs the same exploration quick-start (extra args are forwarded to `start_exploration.sh`):
 

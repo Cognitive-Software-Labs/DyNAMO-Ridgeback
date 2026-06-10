@@ -101,9 +101,15 @@ Passing `shared_from_this()` makes the listener use `slam_toolbox`'s own node in
 
 None of those resolved the underlying subscription problem. The 1-line source patch was the change that made the namespaced setup work reliably.
 
-## FastDDS Shared-Memory Workaround
+## DDS Middleware (CycloneDDS default; FastDDS fallback)
 
-`start_exploration.sh` exports a UDP-only FastDDS profile (`fastrtps_no_shm.xml`) by default. This sidesteps the SHM failures listed below, which historically broke discovery on this setup after Gazebo/ROS crashes:
+`start_exploration.sh` now defaults to **CycloneDDS** (`RMW_IMPLEMENTATION=rmw_cyclonedds_cpp`, `CYCLONEDDS_URI=cyclonedds.xml`). It proved more robust on this multi-NIC host than FastDDS shared memory. The Cyclone config pins the **loopback** interface (multiple UP NICs otherwise cause `failed to create domain`), raises **`MaxAutoParticipantIndex`** (the 40+ node stack exhausts the default → `Failed to find a free participant index`), and requests **large socket buffers** for camera/costmap/point-cloud bursts. Those buffers need a raised kernel ceiling — run `tools/setup_dds.sh` once (sudo; installs `/etc/sysctl.d/60-ros-dds.conf` for `net.core.rmem_max` etc., persisted across reboots). ref: https://www.stereolabs.com/docs/ros2/dds-and-network-tuning
+
+To fall back to FastDDS, set `RMW_IMPLEMENTATION=rmw_fastrtps_cpp`; the script then defaults `FASTRTPS_NO_SHM=true` to use the UDP-only profile described below.
+
+### FastDDS Shared-Memory Workaround (fallback path)
+
+The UDP-only FastDDS profile (`fastrtps_no_shm.xml`) sidesteps the SHM failures listed below, which historically broke discovery on this setup after Gazebo/ROS crashes:
 
 - `RTPS_TRANSPORT_SHM`
 - `open_and_lock_file`

@@ -36,7 +36,6 @@ This project has a graphify knowledge graph at `graphify-out/`.
 
 Rules:
 - Before answering architecture or codebase questions, read `graphify-out/GRAPH_REPORT.md` for god nodes and community structure
-- If `graphify-out/wiki/index.md` exists, navigate it instead of reading raw files
 - After modifying code files, run `bash "$(git rev-parse --show-toplevel)/tools/rebuild_graphify"` to keep the repo-root graph current
 - Do not use the old `python3 -c "from graphify.watch import _rebuild_code ..."` one-liner in this repo; the helper script is the canonical rebuild path
 
@@ -51,7 +50,7 @@ Use `README.md` for the full human runbook. In particular, point humans there fo
 
 Use `ISSUES.md` when the task touches:
 - `slam_toolbox` TF namespace behavior
-- the FastDDS shared-memory workaround (`FASTRTPS_NO_SHM` toggle in `start_exploration.sh`)
+- DDS middleware selection (CycloneDDS default via `cyclonedds.xml`; FastDDS + UDP-only fallback) and the `tools/setup_dds.sh` kernel tuning in `start_exploration.sh`
 - stale-process cleanup, diagnostics, or recurring environment failures
 
 ## Repo Mental Model
@@ -117,7 +116,7 @@ Benchmark stack:
 - `clearpath/robot.yaml` must also exist at `~/clearpath/robot.yaml` for the simulator default path
 - Sensor names are auto-indexed by Clearpath, so the first camera becomes `camera_0` and the first 2D lidar becomes `lidar2d_0`
 - `slam_toolbox` is sourced from `.repos` and still needs the local TF namespace patch described in `ISSUES.md`
-- The UDP-only FastDDS profile is a `start_exploration.sh` toggle (`FASTRTPS_NO_SHM`, default `false` — shared memory on); the public launches do not set FastDDS env vars themselves, so `ros2 launch` invocations honor whatever is in your shell. Keep the historical rationale and toggle docs in `ISSUES.md`, not in `README.md`
+- DDS defaults to **CycloneDDS** in `start_exploration.sh` (`RMW_IMPLEMENTATION=rmw_cyclonedds_cpp` + `CYCLONEDDS_URI=cyclonedds.xml`): loopback-only, `MaxAutoParticipantIndex` raised (40+ node stack), large socket buffers. Needs the host kernel tuning from `tools/setup_dds.sh` (one-time sudo; persisted in `/etc/sysctl.d/60-ros-dds.conf`). Set `RMW_IMPLEMENTATION=rmw_fastrtps_cpp` to fall back to FastDDS (then `FASTRTPS_NO_SHM` defaults to `true` = UDP-only profile). The public launch files (`ridgeback_exploration`, `g1_distance_benchmark`) also `SetEnvironmentVariable` the same RMW/`CYCLONEDDS_URI` defaults (respecting an explicit override), so `ros2 launch` directly is consistent with the script — no RMW mismatch. Keep the historical SHM rationale in `ISSUES.md`, not `README.md`
 
 ## Key Config And Entry Files
 
@@ -131,7 +130,9 @@ Benchmark stack:
 - `src/ridgeback_autonomy/config/explore_lite_params.yaml`: `explore_lite` frontier exploration config
 - `src/ridgeback_autonomy/config/frontier_explorer_params.yaml`: in-repo `frontier_explorer_node` config (used when `explorer:=custom`)
 - `src/ridgeback_autonomy/config/camera_config.json`: shared camera geometry
-- `fastrtps_no_shm.xml`: UDP-only FastDDS profile exported by `start_exploration.sh` when `FASTRTPS_NO_SHM=true`
+- `cyclonedds.xml`: default DDS config (CycloneDDS) exported by `start_exploration.sh` — loopback, raised participant limit, large socket buffers
+- `fastrtps_no_shm.xml`: UDP-only FastDDS profile, used only when falling back with `RMW_IMPLEMENTATION=rmw_fastrtps_cpp`
+- `tools/setup_dds.sh`: one-time sudo host tuning (`/etc/sysctl.d/60-ros-dds.conf`) for large-message DDS buffers
 
 ## External Dependencies
 
