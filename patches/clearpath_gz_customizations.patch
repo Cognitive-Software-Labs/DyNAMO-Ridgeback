@@ -134,6 +134,7 @@ index 010f7fb..61200e0 100644
                                'construction',
 +                              'mock_hospital',
 +                              'g1_distance_calibration',
++                              'park_robot',
                                'office',
                                'orchard',
                                'pipeline',
