@@ -31,7 +31,7 @@ class VelocityOverlayNode(Node):
         self.declare_parameter('overlay_width', 320)
         self.declare_parameter('overlay_height', 140)
         self.declare_parameter('font', 'DejaVu Sans Mono')
-        self.declare_parameter('marker_topic', 'velocity_overlay')
+        self.declare_parameter('marker_topic', 'hud/velocity')
         self.declare_parameter('publish_rate_hz', 10.0)
 
         self.text_size = float(self.get_parameter('text_size').value)
@@ -116,7 +116,7 @@ class VelocityOverlayNode(Node):
         rule = '-' * (self.LABEL_W + 3 * self.VAL_W)
         rows = [data_row(k, self.latest[k])
                 for k in ('planned', 'capped', 'controller', 'actual')]
-        text = '\n'.join([header, rule, *rows])
+        text = '\n'.join(['VELOCITY', header, rule, *rows])
         # The overlay renders as HTML (QStaticText), which collapses runs of
         # normal spaces and breaks column alignment. Use non-breaking spaces so
         # the monospace padding is preserved.

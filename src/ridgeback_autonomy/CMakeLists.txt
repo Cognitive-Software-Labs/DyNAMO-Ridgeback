@@ -86,7 +86,7 @@ install(PROGRAMS
 )
 
 install(PROGRAMS
-  ridgeback_autonomy/frontier_explorer_node.py
+  ridgeback_autonomy/frontier_explorer/frontier_explorer_node.py
   DESTINATION lib/${PROJECT_NAME}
   RENAME frontier_explorer_node.py
 )
@@ -97,11 +97,22 @@ install(PROGRAMS
   RENAME velocity_overlay_node
 )
 
-install(DIRECTORY
-  ridgeback_autonomy/frontier_explorer/
-  DESTINATION lib/${PROJECT_NAME}/frontier_explorer
-  PATTERN "*.pyc" EXCLUDE
-  PATTERN "__pycache__" EXCLUDE
+install(PROGRAMS
+  ridgeback_autonomy/common/launch_wait.py
+  DESTINATION lib/${PROJECT_NAME}
+  RENAME launch_wait
+)
+
+install(PROGRAMS
+  ridgeback_autonomy/diagnostics/hud_node.py
+  DESTINATION lib/${PROJECT_NAME}
+  RENAME hud_node
+)
+
+install(PROGRAMS
+  ridgeback_autonomy/diagnostics/coverage_overlay_node.py
+  DESTINATION lib/${PROJECT_NAME}
+  RENAME coverage_overlay_node
 )
 
 install(DIRECTORY

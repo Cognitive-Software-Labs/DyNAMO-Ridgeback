@@ -4,8 +4,10 @@ from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 import launch.conditions
 from launch.actions import (
-    DeclareLaunchArgument, ExecuteProcess, IncludeLaunchDescription, SetEnvironmentVariable, TimerAction,
+    DeclareLaunchArgument, ExecuteProcess, IncludeLaunchDescription,
+    RegisterEventHandler, SetEnvironmentVariable,
 )
+from launch.event_handlers import OnProcessExit
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import AndSubstitution, LaunchConfiguration
 from launch_ros.actions import Node
@@ -29,8 +31,35 @@ def generate_launch_description():
     depth_anything_enabled = LaunchConfiguration('depth_anything_enabled')
     mppi_visualize = LaunchConfiguration('mppi_visualize')
     explorer = LaunchConfiguration('explorer')
+    coverage_overlay_enabled = LaunchConfiguration('coverage_overlay_enabled')
 
     rviz_config = os.path.join(pkg_this, 'sim', 'rviz', 'exploration.rviz')
+
+    def _launch_wait(name, *conditions, timeout):
+        return ExecuteProcess(
+            cmd=['ros2', 'run', 'ridgeback_autonomy', 'launch_wait',
+                 *conditions, '--timeout', str(timeout)],
+            name=name, output='screen',
+        )
+
+    # Readiness gates replace fixed startup timers: each blocks until its stage's
+    # prerequisites exist, then OnProcessExit fires the next stage. A
+    # `/<ns>/map` publisher implies the full map->odom->base_link TF chain is
+    # alive, so Nav2 only activates once TF is ready — no activation race, hence
+    # no blind lifecycle re-startup is needed.
+    gate_slam = _launch_wait(
+        'gate_slam',
+        '--topic', ['/', namespace, '/sensors/lidar2d_0/scan'],
+        '--topic', ['/', namespace, '/platform/odom/filtered'],
+        timeout=45,
+    )
+    gate_nav2 = _launch_wait(
+        'gate_nav2', '--topic', ['/', namespace, '/map'], timeout=60,
+    )
+    gate_explorer = _launch_wait(
+        'gate_explorer', '--topic', ['/', namespace, '/global_costmap/costmap'],
+        timeout=60,
+    )
 
     return LaunchDescription([
         SetEnvironmentVariable('VIRTUAL_ENV', perception_venv_path),
@@ -46,7 +75,9 @@ def generate_launch_description():
         DeclareLaunchArgument('exploration_rviz', default_value='true',
                               description='Launch the exploration RViz2 config'),
         DeclareLaunchArgument('g1_perception_enabled', default_value='true',
-                              description='Launch the G1 perception stack'),
+                              description='Launch the full G1 perception/positioning stack '
+                                          '(detection + camera/lidar measurement + overlay); '
+                                          'requires perception_venv'),
         DeclareLaunchArgument('estimate_viz', default_value='false',
                               description='Launch the g1_estimate_viz_node RViz marker publisher'),
         DeclareLaunchArgument('depth_anything_enabled', default_value='false',
@@ -55,6 +86,8 @@ def generate_launch_description():
                               description='Publish MPPI trajectory visualization topics'),
         DeclareLaunchArgument('explorer', default_value='explore_lite',
                               description='Which explorer to use: "explore_lite" or "custom"'),
+        DeclareLaunchArgument('coverage_overlay_enabled', default_value='true',
+                              description='Publish the live exploration-coverage HUD panel'),
 
         # RViz2
         Node(
@@ -151,10 +184,13 @@ def generate_launch_description():
             }.items(),
         ),
 
-        # 2. Launch SLAM (delayed to let sim fully start and publish TF)
-        TimerAction(
-            period=20.0,
-            actions=[
+        # Event-driven bringup. gate_slam runs now (alongside the sim) and waits
+        # for the scan + odometry to appear; each gate's exit fires the next
+        # stage and the following gate.
+        gate_slam,
+        RegisterEventHandler(OnProcessExit(
+            target_action=gate_slam,
+            on_exit=[
                 IncludeLaunchDescription(
                     PythonLaunchDescriptionSource(
                         os.path.join(includes_dir, 'slam.launch.py')
@@ -164,13 +200,12 @@ def generate_launch_description():
                         'use_sim_time': use_sim_time,
                     }.items(),
                 ),
+                gate_nav2,
             ],
-        ),
-
-        # 3. Launch Nav2 (delayed to let SLAM start publishing map)
-        TimerAction(
-            period=80.0,
-            actions=[
+        )),
+        RegisterEventHandler(OnProcessExit(
+            target_action=gate_nav2,
+            on_exit=[
                 IncludeLaunchDescription(
                     PythonLaunchDescriptionSource(
                         os.path.join(includes_dir, 'nav2.launch.py')
@@ -181,31 +216,12 @@ def generate_launch_description():
                         'mppi_visualize': mppi_visualize,
                     }.items(),
                 ),
+                gate_explorer,
             ],
-        ),
-
-        # 3b. Re-trigger Nav2 lifecycle STARTUP to recover from the
-        # odom→base_link TF race that sometimes leaves servers inactive.
-        # If activation already succeeded the service returns false harmlessly.
-        TimerAction(
-            period=92.0,
-            actions=[
-                ExecuteProcess(
-                    cmd=[
-                        'ros2', 'service', 'call',
-                        '/r100_0001/lifecycle_manager_navigation/manage_nodes',
-                        'nav2_msgs/srv/ManageLifecycleNodes',
-                        '{command: 2}',
-                    ],
-                    output='log',
-                ),
-            ],
-        ),
-
-        # 4. Launch explorer (delayed to let Nav2 fully start)
-        TimerAction(
-            period=105.0,
-            actions=[
+        )),
+        RegisterEventHandler(OnProcessExit(
+            target_action=gate_explorer,
+            on_exit=[
                 IncludeLaunchDescription(
                     PythonLaunchDescriptionSource(
                         os.path.join(includes_dir, 'explore.launch.py')
@@ -217,15 +233,45 @@ def generate_launch_description():
                     }.items(),
                 ),
             ],
-        ),
+        )),
 
-        # Velocity chain overlay marker (planned/capped/controller/actual).
+        # Velocity chain overlay panel (planned/capped/controller/actual) -> hud/velocity.
         Node(
             package='ridgeback_autonomy',
             executable='velocity_overlay_node',
             name='velocity_overlay_node',
             namespace=namespace,
             parameters=[{'use_sim_time': use_sim_time}],
+            remappings=[('/tf', 'tf'), ('/tf_static', 'tf_static')],
+            output='screen',
+        ),
+
+        # Live exploration-coverage panel -> hud/coverage.
+        Node(
+            package='ridgeback_autonomy',
+            executable='coverage_overlay_node',
+            name='coverage_overlay_node',
+            namespace=namespace,
+            parameters=[{
+                'use_sim_time': use_sim_time,
+                'world': world,
+                'map_topic': 'map',
+            }],
+            remappings=[('/tf', 'tf'), ('/tf_static', 'tf_static')],
+            output='screen',
+            condition=launch.conditions.IfCondition(coverage_overlay_enabled),
+        ),
+
+        # General HUD aggregator: merges the panels into one screen overlay.
+        Node(
+            package='ridgeback_autonomy',
+            executable='hud_node',
+            name='hud_node',
+            namespace=namespace,
+            parameters=[{
+                'use_sim_time': use_sim_time,
+                'panels': ['hud/velocity', 'hud/coverage'],
+            }],
             remappings=[('/tf', 'tf'), ('/tf_static', 'tf_static')],
             output='screen',
         ),

@@ -7,6 +7,7 @@ import time
 
 import rclpy
 from rclpy.executors import ExternalShutdownException
+from rclpy.logging import get_logger
 from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
 from sensor_msgs.msg import Image
@@ -124,7 +125,15 @@ class G1DetectorNode(Node):
 
 def main() -> None:
     rclpy.init()
-    node = G1DetectorNode()
+    try:
+        node = G1DetectorNode()
+    except RuntimeError as exc:
+        # Perception enabled without the venv (no transformers/torch). Fail
+        # cleanly with a clear message instead of dumping a traceback.
+        get_logger('g1_detector').fatal(str(exc))
+        if rclpy.ok():
+            rclpy.shutdown()
+        return
     try:
         rclpy.spin(node)
     except (KeyboardInterrupt, ExternalShutdownException):

@@ -87,26 +87,42 @@ source install/setup.bash
 
 If you rename or move the workspace directory later, wipe `build/`, `install/`, and `log/` before rebuilding so the generated setup files do not keep stale absolute paths.
 
-### 3. Set up G1 perception venv (first time only)
+### 3. (Optional) Set up G1 perception venv
 
-The G1 perception stack now follows a staged pipeline inside the installable Python package `ridgeback_autonomy/`:
+The G1 perception/positioning stack (detection + camera/lidar measurement +
+overlay) is **on by default** — `ridgeback_exploration.launch.py` ships with
+`g1_perception_enabled:=true`, which **requires** the venv below; without it the
+detector logs a single clear error and exits cleanly. Disable the whole stack
+with `g1_perception_enabled:=false` for a normal exploration run that needs no
+venv and will not try to load any models.
+
+The stack follows a staged pipeline inside the installable Python package `ridgeback_autonomy/`:
 - raw detections on `detections/g1/raw`
 - camera measurements on `measurements/g1/camera`
 - lidar measurements on `measurements/g1/lidar`
 - mono-depth debug images on `debug/g1/camera/mono_depth`
 
-It requires a Python venv with PyTorch and Transformers:
+It requires a Python venv with PyTorch and Transformers. All dependencies
+(pinned, with the correct CUDA torch index) live in
+[`requirements-perception.txt`](requirements-perception.txt):
 
 ```bash
 # Create venv that can see ROS 2 packages
 python3 -m venv --system-site-packages perception_venv
 echo "/opt/ros/jazzy/lib/python3.12/site-packages" > perception_venv/lib/python3.12/site-packages/ros2.pth
 
-# Install perception dependencies
-perception_venv/bin/python3 -m pip install torch torchvision transformers accelerate Pillow
+# Install pinned perception dependencies
+perception_venv/bin/python3 -m pip install -U pip
+perception_venv/bin/python3 -m pip install -r requirements-perception.txt
 ```
 
-Both public launch files automatically prepend `perception_venv/bin` to `PATH` and set `VIRTUAL_ENV` for the perception nodes. The first run will download the OWLv2 detector from Hugging Face. If you enable `depth_anything_enabled:=true`, the first run will also download the Depth-Anything V2 metric checkpoint.
+> **GPU note:** `requirements-perception.txt` pins the **CUDA 12.8 (`cu128`)**
+> torch build, which carries the `sm_120` kernels needed for Blackwell GPUs
+> (e.g. RTX PRO 6000). Installing plain `torch` from PyPI gives a CPU-only build
+> and silently runs Depth-Anything / OWLv2 on the CPU. For a different
+> GPU/CUDA, change the index URL + torch pins in that file.
+
+Both public launch files automatically prepend `perception_venv/bin` to `PATH` and set `VIRTUAL_ENV` for the perception nodes. When you launch with `g1_perception_enabled:=true`, the first run will download the OWLv2 detector from Hugging Face. If you also pass `depth_anything_enabled:=true`, the first run will download the Depth-Anything V2 metric checkpoint.
 
 ### 4. (Optional) Install graphify post-commit hook
 
@@ -208,10 +224,10 @@ bash start_exploration.sh office                         # office + explore_lite
 bash start_exploration.sh mock_hospital custom           # mock_hospital + custom explorer
 EXPLORER=custom bash start_exploration.sh office         # office + custom explorer
 DEPTH_ANYTHING_ENABLED=true bash start_exploration.sh office
-FASTRTPS_NO_SHM=false bash start_exploration.sh office   # skip the UDP-only FastDDS profile
+FASTRTPS_NO_SHM=true bash start_exploration.sh office    # use the UDP-only FastDDS profile
 ```
 
-By default the script forces a UDP-only FastDDS profile to dodge stale shared-memory locks — see [ISSUES.md](ISSUES.md) for the rationale and toggle.
+By default the script uses the system-default RMW (shared memory on); set `FASTRTPS_NO_SHM=true` to force a UDP-only FastDDS profile that dodges stale shared-memory locks — see [ISSUES.md](ISSUES.md) for the rationale and toggle.
 
 `build_and_start_expl.sh` rebuilds the workspace first, then runs the same exploration quick-start (extra args are forwarded to `start_exploration.sh`):
 

@@ -2,9 +2,13 @@ import os
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, OpaqueFunction, TimerAction
+from launch.actions import (
+    DeclareLaunchArgument, ExecuteProcess, OpaqueFunction, RegisterEventHandler,
+)
+from launch.event_handlers import OnProcessExit
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import LifecycleNode, LifecycleTransition
+from launch_ros.event_handlers import OnStateTransition
 from lifecycle_msgs.msg import Transition
 
 from clearpath_config.clearpath_config import ClearpathConfig
@@ -39,41 +43,47 @@ def launch_setup(context, *args, **kwargs):
     remappings = [('/tf', 'tf'), ('/tf_static', 'tf_static'),
                   ('/map', 'map'), ('/map_metadata', 'map_metadata')]
 
+    slam_node = LifecycleNode(
+        package='slam_toolbox',
+        executable='async_slam_toolbox_node',
+        name='slam_toolbox',
+        namespace=namespace,
+        output='screen',
+        parameters=[
+            rewritten_params,
+            {'use_sim_time': use_sim_time, 'use_lifecycle_manager': False},
+        ],
+        remappings=remappings,
+    )
+
+    # Event-driven lifecycle (replaces fixed 2s/8s timers): configure once the
+    # node's change_state service is up, then activate as soon as it reports
+    # 'inactive' (i.e. configured).
+    gate_configure = ExecuteProcess(
+        cmd=['ros2', 'run', 'ridgeback_autonomy', 'launch_wait',
+             '--service', f'/{namespace}/slam_toolbox/change_state',
+             '--timeout', '30'],
+        name='gate_slam_configure', output='screen',
+    )
+    configure = LifecycleTransition(
+        lifecycle_node_names=[f'/{namespace}/slam_toolbox'],
+        transition_ids=[Transition.TRANSITION_CONFIGURE],
+    )
+    activate = LifecycleTransition(
+        lifecycle_node_names=[f'/{namespace}/slam_toolbox'],
+        transition_ids=[Transition.TRANSITION_ACTIVATE],
+    )
+
     return [
-        LifecycleNode(
-            package='slam_toolbox',
-            executable='async_slam_toolbox_node',
-            name='slam_toolbox',
-            namespace=namespace,
-            output='screen',
-            parameters=[
-                rewritten_params,
-                {'use_sim_time': use_sim_time, 'use_lifecycle_manager': False},
-            ],
-            remappings=remappings,
-        ),
-        TimerAction(
-            period=2.0,
-            actions=[
-                LifecycleTransition(
-                    lifecycle_node_names=[f'/{namespace}/slam_toolbox'],
-                    transition_ids=[
-                        Transition.TRANSITION_CONFIGURE,
-                    ],
-                ),
-            ],
-        ),
-        TimerAction(
-            period=8.0,
-            actions=[
-                LifecycleTransition(
-                    lifecycle_node_names=[f'/{namespace}/slam_toolbox'],
-                    transition_ids=[
-                        Transition.TRANSITION_ACTIVATE,
-                    ],
-                ),
-            ],
-        ),
+        slam_node,
+        gate_configure,
+        RegisterEventHandler(OnProcessExit(
+            target_action=gate_configure, on_exit=[configure],
+        )),
+        RegisterEventHandler(OnStateTransition(
+            target_lifecycle_node=slam_node, goal_state='inactive',
+            entities=[activate],
+        )),
     ]
 
 
