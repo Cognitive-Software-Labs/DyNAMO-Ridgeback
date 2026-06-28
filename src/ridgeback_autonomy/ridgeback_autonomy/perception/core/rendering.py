@@ -5,6 +5,7 @@ import numpy as np
 
 from ridgeback_autonomy.common.models import DetectionBatch
 from ridgeback_autonomy.perception.core.geometry import focus_bbox
+from ridgeback_autonomy.perception.core.mask import masked_rgb, rasterize_batch
 
 
 class RgbdOverlayRenderer:
@@ -28,6 +29,11 @@ class RgbdOverlayRenderer:
         self.draw_panel_title(sensor_depth_panel, 'Sensor Depth')
         self.draw_panel_title(mono_depth_panel, 'Depth-Anything')
 
+        # Mask panel is derived from the detection boxes at render time (the mask
+        # is not published anywhere yet). Built from the clean RGB frame, not the
+        # annotated color_panel, so it shows the real masked content.
+        mask_panel = self.make_mask_panel(frame, batch)
+
         if sensor_depth_warning:
             cv2.putText(sensor_depth_panel, sensor_depth_warning, (20, 62),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2, cv2.LINE_AA)
@@ -39,7 +45,7 @@ class RgbdOverlayRenderer:
             for panel in (color_panel, sensor_depth_panel, mono_depth_panel):
                 cv2.putText(panel, 'No G1 detected', (20, 100),
                             cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 0, 255), 2, cv2.LINE_AA)
-            return np.hstack((color_panel, sensor_depth_panel, mono_depth_panel))
+            return np.hstack((color_panel, sensor_depth_panel, mono_depth_panel, mask_panel))
 
         for index, detection in enumerate(batch.detections):
             x1, y1, x2, y2 = detection.bbox_xyxy
@@ -79,7 +85,7 @@ class RgbdOverlayRenderer:
                     cv2.rectangle(panel, (fx1, fy1), (fx2, fy2), (0, 200, 255), 2)
                 self.draw_label_block(panel, x1, y1, label_lines, (0, 255, 0))
 
-        return np.hstack((color_panel, sensor_depth_panel, mono_depth_panel))
+        return np.hstack((color_panel, sensor_depth_panel, mono_depth_panel, mask_panel))
 
     def normalize_depth(self, image: np.ndarray) -> np.ndarray:
         valid = np.isfinite(image) & (image > 0.0)
@@ -106,6 +112,24 @@ class RgbdOverlayRenderer:
         panel = cv2.applyColorMap(normalized, cv2.COLORMAP_TURBO)
         if panel.shape[:2] != (color_h, color_w):
             panel = cv2.resize(panel, (color_w, color_h), interpolation=cv2.INTER_NEAREST)
+        return panel
+
+    def make_mask_panel(self, frame: np.ndarray, batch: DetectionBatch) -> np.ndarray:
+        # Masked RGB: real pixels inside the rect mask, black outside. For a
+        # rect mask this is the RGB rectangle of the box(es) on black, which
+        # makes the box's background contamination directly visible.
+        mask = rasterize_batch(batch)
+        if mask.data.shape == frame.shape[:2]:
+            panel = masked_rgb(frame, mask)
+        else:
+            # Detections came from a differently sized frame; show an empty
+            # panel rather than risk an index mismatch.
+            panel = np.zeros_like(frame)
+
+        self.draw_panel_title(panel, 'Mask')
+        if not batch.detected:
+            cv2.putText(panel, 'No G1 detected', (20, 100),
+                        cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 0, 255), 2, cv2.LINE_AA)
         return panel
 
     def draw_panel_title(self, image: np.ndarray, title: str) -> None:
