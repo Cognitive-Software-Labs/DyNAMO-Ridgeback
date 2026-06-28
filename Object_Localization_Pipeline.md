@@ -57,7 +57,7 @@ A single-plane scanner returning range vs. bearing. It is **2D**: it samples onl
 **What we actually have (NOT a 360° unit):**
 
 - Model: **Hokuyo UST** (`robot.yaml: model: hokuyo_ust`), UST-10LX class - **270° scan** (±135°), 0.25° angular resolution, ~0.06-10 m range (30 m max), single horizontal plane.
-- On the **real Ridgeback**, a **front** and a **rear** laser is optional.
+- On the **real Ridgeback**, a **front** and a **rear** laser.
 - Our **`robot.yaml` declares two** units: front (`xyz [0.3922, 0, 0]`, yaw 0) and rear (`xyz [-0.3922, 0, 0.05]`, yaw 180°). 
 - **A 360° scan is possible.** Front + rear can be merged into one ~360° ring. It stays **2D** (one height, no Y) and the rear only adds side/rear coverage. 
 
@@ -70,6 +70,20 @@ A single-plane scanner returning range vs. bearing. It is **2D**: it samples onl
 | Coverage used by perception | front 270° (`lidar2d_0`) | front 270° (`lidar2d_0`) |
 
 Sources: Hokuyo UST-10LX specification (270°, 0.25°, 0.06-10 m / 30 m max); Clearpath Ridgeback user manual (front standard / rear optional); repo `clearpath/robot.yaml`, `clearpath_sensors_description/urdf/hokuyo_ust.urdf.xacro`; perception `g1_lidar_measurement_node` (`sensors/lidar2d_0/scan`).
+
+### Design goal: one pipeline, two interchangeable backends
+
+All the sim-vs-real differences documented above are real, but they must **not** leak into the perception logic. The goal is that the detection / depth / path code is written **once** and runs unchanged in both simulation and on hardware.
+
+Simulation and the real robot are treated as two interchangeable **backends behind a single, identical interface**. The interface exposes the same methods and the same normalized data contract to everything downstream; each backend is a thin implementation of it, and the environment is selected at startup so that no code in the paths ever branches on "sim vs real."
+
+Rationale — easy maintenance:
+
+- **Maximize shared code.** One interface, two thin implementations. The paths, estimators, and benchmark consume the interface and stay environment-agnostic.
+- **Isolate divergence behind one boundary.** Every sim/real quirk (intrinsics source, where depth alignment happens, topic names, noise handling) lives in exactly one place — the backend — instead of being scattered as conditionals through the pipeline.
+- **Swappable and testable.** A backend can be replaced, or faked for tests, without touching any downstream path.
+
+The concrete mechanism (how intrinsics are obtained, where alignment is performed, what is solved by driver config vs. in code) is deliberately **deferred**. This section fixes only the principle: *very similar code and interfaces across both versions, with all environment-specific behaviour confined to one swappable backend.*
 
 ---
 
