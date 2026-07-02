@@ -115,6 +115,12 @@ install(PROGRAMS
   RENAME coverage_overlay_node
 )
 
+install(PROGRAMS
+  ridgeback_autonomy/parking/humanoid_parking_node.py
+  DESTINATION lib/${PROJECT_NAME}
+  RENAME humanoid_parking_node
+)
+
 install(DIRECTORY
   launch
   config

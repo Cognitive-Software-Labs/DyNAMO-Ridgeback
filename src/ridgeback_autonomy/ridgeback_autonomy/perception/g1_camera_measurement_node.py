@@ -166,10 +166,7 @@ class G1CameraMeasurementNode(Node):
         self.pointcloud_worker_thread.start()
 
     def default_base_frame(self) -> str:
-        namespace_name = self.get_namespace().strip('/')
-        if namespace_name:
-            return f'{namespace_name}/robot/base_link'
-        return 'robot/base_link'
+        return 'base_link'
 
     def detections_callback(self, detections_msg: G1Detections) -> None:
         with self.processing_lock:

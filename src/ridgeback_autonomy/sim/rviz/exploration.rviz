@@ -178,6 +178,16 @@ Visualization Manager:
         Reliability Policy: Reliable
         Value: /r100_0001/explore/frontiers
       Value: true
+    - Class: rviz_default_plugins/MarkerArray
+      Enabled: true
+      Name: Humanoid Parking Guide
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /r100_0001/parking/markers
+      Value: true
     - Class: rviz_default_plugins/TF
       Enabled: false
       Frame Timeout: 15

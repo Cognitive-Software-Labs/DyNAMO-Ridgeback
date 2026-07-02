@@ -17,6 +17,7 @@ def generate_launch_description():
     mppi_visualize = LaunchConfiguration('mppi_visualize')
 
     nav2_params_file = os.path.join(pkg_this, 'config', 'nav2_params.yaml')
+    nav_to_pose_bt_xml = os.path.join(pkg_this, 'config', 'navigate_to_pose_no_spin.xml')
 
     # Nodes we actually need (no docking_server, route_server, or waypoint_follower)
     lifecycle_nodes = [
@@ -36,6 +37,7 @@ def generate_launch_description():
             param_rewrites={
                 'autostart': 'true',
                 'controller_server.ros__parameters.FollowPath.visualize': mppi_visualize,
+                'bt_navigator.ros__parameters.default_nav_to_pose_bt_xml': nav_to_pose_bt_xml,
             },
             convert_types=True,
         ),

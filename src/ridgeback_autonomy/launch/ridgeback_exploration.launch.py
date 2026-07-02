@@ -9,7 +9,7 @@ from launch.actions import (
 )
 from launch.event_handlers import OnProcessExit
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import AndSubstitution, LaunchConfiguration
+from launch.substitutions import AndSubstitution, LaunchConfiguration, PythonExpression
 from launch_ros.actions import Node
 
 
@@ -32,6 +32,13 @@ def generate_launch_description():
     mppi_visualize = LaunchConfiguration('mppi_visualize')
     explorer = LaunchConfiguration('explorer')
     coverage_overlay_enabled = LaunchConfiguration('coverage_overlay_enabled')
+    parking_hand_side = LaunchConfiguration('parking_hand_side')
+    parking_distance_m = LaunchConfiguration('parking_distance_m')
+    humanoid_yaw_rad = LaunchConfiguration('humanoid_yaw_rad')
+    hand_forward_offset_m = LaunchConfiguration('hand_forward_offset_m')
+    use_static_humanoid_pose = LaunchConfiguration('use_static_humanoid_pose')
+    static_humanoid_x = LaunchConfiguration('static_humanoid_x')
+    static_humanoid_y = LaunchConfiguration('static_humanoid_y')
 
     rviz_config = os.path.join(pkg_this, 'sim', 'rviz', 'exploration.rviz')
 
@@ -88,6 +95,20 @@ def generate_launch_description():
                               description='Which explorer to use: "explore_lite" or "custom"'),
         DeclareLaunchArgument('coverage_overlay_enabled', default_value='true',
                               description='Publish the live exploration-coverage HUD panel'),
+        DeclareLaunchArgument('parking_hand_side', default_value='right',
+                              description='Humanoid hand side to park beside: "right" or "left"'),
+        DeclareLaunchArgument('parking_distance_m', default_value='0.95',
+                              description='Lateral parking distance from humanoid center'),
+        DeclareLaunchArgument('humanoid_yaw_rad', default_value='1.5708',
+                              description='Fallback humanoid yaw used when detection has no orientation'),
+        DeclareLaunchArgument('hand_forward_offset_m', default_value='0.15',
+                              description='Forward offset from humanoid center toward the hand'),
+        DeclareLaunchArgument('use_static_humanoid_pose', default_value='true',
+                              description='Use the known park_robot humanoid pose after detection'),
+        DeclareLaunchArgument('static_humanoid_x', default_value='7.2',
+                              description='Known humanoid x coordinate in park_robot'),
+        DeclareLaunchArgument('static_humanoid_y', default_value='-4.2',
+                              description='Known humanoid y coordinate in park_robot'),
 
         # RViz2
         Node(
@@ -149,6 +170,21 @@ def generate_launch_description():
         ),
 
         Node(
+            package='tf2_ros',
+            executable='static_transform_publisher',
+            name='base_link_clearpath_alias_tf',
+            namespace=namespace,
+            arguments=[
+                '--x', '0.0', '--y', '0.0', '--z', '0.0',
+                '--roll', '0.0', '--pitch', '0.0', '--yaw', '0.0',
+                '--frame-id', 'base_link',
+                '--child-frame-id', PythonExpression(["'", namespace, "/robot/base_link'"]),
+            ],
+            parameters=[{'use_sim_time': use_sim_time}],
+            remappings=[('/tf', 'tf'), ('/tf_static', 'tf_static')],
+        ),
+
+        Node(
             package='ridgeback_autonomy',
             executable='g1_estimate_viz_node',
             name='g1_estimate_viz',
@@ -170,6 +206,26 @@ def generate_launch_description():
             remappings=[('/tf', 'tf'), ('/tf_static', 'tf_static')],
             output='screen',
             condition=launch.conditions.IfCondition(g1_perception_enabled),
+        ),
+
+        Node(
+            package='ridgeback_autonomy',
+            executable='humanoid_parking_node',
+            name='humanoid_parking_node',
+            namespace=namespace,
+            parameters=[{
+                'use_sim_time': use_sim_time,
+                'world': world,
+                'hand_side': parking_hand_side,
+                'parking_distance_m': parking_distance_m,
+                'humanoid_yaw_rad': humanoid_yaw_rad,
+                'hand_forward_offset_m': hand_forward_offset_m,
+                'use_static_humanoid_pose': use_static_humanoid_pose,
+                'static_humanoid_x': static_humanoid_x,
+                'static_humanoid_y': static_humanoid_y,
+            }],
+            remappings=[('/tf', 'tf'), ('/tf_static', 'tf_static')],
+            output='screen',
         ),
 
         # 1. Launch Gazebo simulation

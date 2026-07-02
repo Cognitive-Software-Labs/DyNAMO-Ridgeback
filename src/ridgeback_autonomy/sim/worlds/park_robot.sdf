@@ -43,16 +43,16 @@
 
     <model name="floor">
       <static>true</static>
-      <pose>3 -2 0 0 0 0</pose>
+      <pose>3.8 -2.6 0 0 0 0</pose>
       <link name="link">
         <collision name="collision">
           <geometry>
-            <box><size>12.5 7.2 0.1</size></box>
+            <box><size>15.5 9.5 0.1</size></box>
           </geometry>
         </collision>
         <visual name="visual">
           <geometry>
-            <box><size>12.5 7.2 0.1</size></box>
+            <box><size>15.5 9.5 0.1</size></box>
           </geometry>
           <material>
             <ambient>0.88 0.90 0.90 1</ambient>
@@ -64,13 +64,13 @@
 
     <model name="hall_north_wall">
       <static>true</static>
-      <pose>3 1.1 1.3 0 0 0</pose>
+      <pose>3.8 1.1 1.3 0 0 0</pose>
       <link name="link">
         <collision name="collision">
-          <geometry><box><size>12.4 0.2 2.6</size></box></geometry>
+          <geometry><box><size>15.4 0.2 2.6</size></box></geometry>
         </collision>
         <visual name="visual">
-          <geometry><box><size>12.4 0.2 2.6</size></box></geometry>
+          <geometry><box><size>15.4 0.2 2.6</size></box></geometry>
           <material>
             <ambient>0.98 0.98 1.0 1</ambient>
             <diffuse>0.98 0.98 1.0 1</diffuse>
@@ -98,13 +98,13 @@
 
     <model name="hall_south_wall_after_room">
       <static>true</static>
-      <pose>7.35 -1.1 1.3 0 0 0</pose>
+      <pose>10.6 -1.1 1.3 0 0 0</pose>
       <link name="link">
         <collision name="collision">
-          <geometry><box><size>1.7 0.2 2.6</size></box></geometry>
+          <geometry><box><size>1.6 0.2 2.6</size></box></geometry>
         </collision>
         <visual name="visual">
-          <geometry><box><size>1.7 0.2 2.6</size></box></geometry>
+          <geometry><box><size>1.6 0.2 2.6</size></box></geometry>
           <material>
             <ambient>0.98 0.98 1.0 1</ambient>
             <diffuse>0.98 0.98 1.0 1</diffuse>
@@ -132,7 +132,7 @@
 
     <model name="hall_east_end">
       <static>true</static>
-      <pose>9.2 0 1.3 0 0 0</pose>
+      <pose>11.5 0 1.3 0 0 0</pose>
       <link name="link">
         <collision name="collision">
           <geometry><box><size>0.2 2.4 2.6</size></box></geometry>
@@ -149,13 +149,13 @@
 
     <model name="room_west_wall">
       <static>true</static>
-      <pose>4 -3.1 1.3 0 0 0</pose>
+      <pose>4 -3.75 1.3 0 0 0</pose>
       <link name="link">
         <collision name="collision">
-          <geometry><box><size>0.2 4.2 2.6</size></box></geometry>
+          <geometry><box><size>0.2 5.5 2.6</size></box></geometry>
         </collision>
         <visual name="visual">
-          <geometry><box><size>0.2 4.2 2.6</size></box></geometry>
+          <geometry><box><size>0.2 5.5 2.6</size></box></geometry>
           <material>
             <ambient>0.98 0.98 1.0 1</ambient>
             <diffuse>0.98 0.98 1.0 1</diffuse>
@@ -166,13 +166,13 @@
 
     <model name="room_east_wall">
       <static>true</static>
-      <pose>8.2 -3.1 1.3 0 0 0</pose>
+      <pose>9.8 -3.75 1.3 0 0 0</pose>
       <link name="link">
         <collision name="collision">
-          <geometry><box><size>0.2 4.2 2.6</size></box></geometry>
+          <geometry><box><size>0.2 5.5 2.6</size></box></geometry>
         </collision>
         <visual name="visual">
-          <geometry><box><size>0.2 4.2 2.6</size></box></geometry>
+          <geometry><box><size>0.2 5.5 2.6</size></box></geometry>
           <material>
             <ambient>0.98 0.98 1.0 1</ambient>
             <diffuse>0.98 0.98 1.0 1</diffuse>
@@ -183,13 +183,13 @@
 
     <model name="room_south_wall">
       <static>true</static>
-      <pose>6.1 -5.2 1.3 0 0 0</pose>
+      <pose>6.9 -6.5 1.3 0 0 0</pose>
       <link name="link">
         <collision name="collision">
-          <geometry><box><size>4.4 0.2 2.6</size></box></geometry>
+          <geometry><box><size>6.0 0.2 2.6</size></box></geometry>
         </collision>
         <visual name="visual">
-          <geometry><box><size>4.4 0.2 2.6</size></box></geometry>
+          <geometry><box><size>6.0 0.2 2.6</size></box></geometry>
           <material>
             <ambient>0.98 0.98 1.0 1</ambient>
             <diffuse>0.98 0.98 1.0 1</diffuse>
@@ -200,7 +200,7 @@
 
     <model name="room_back_marker">
       <static>true</static>
-      <pose>6.1 -4.4 0.15 0 0 0</pose>
+      <pose>6.9 -5.7 0.15 0 0 0</pose>
       <link name="link">
         <collision name="collision">
           <geometry><box><size>0.7 0.7 0.3</size></box></geometry>
@@ -214,6 +214,12 @@
         </visual>
       </link>
     </model>
+
+    <include>
+      <name>humanoid</name>
+      <uri>model://g1</uri>
+      <pose>7.2 -4.2 0 0 0 1.5708</pose>
+    </include>
 
   </world>
 </sdf>
