@@ -64,6 +64,8 @@ PATTERNS=(
     g1_distance_benchmark_runner
     g1_detection_node
     velocity_overlay_node
+    coverage_overlay_node
+    hud_node
     imu_filter_madgwick_node
     imu_filter_madgwick
     frontier_explorer_node
@@ -76,7 +78,7 @@ done
 sleep 1
 
 # Verify nothing is left
-REMAINING=$(ps -u "$CURRENT_USER" -o user=,pid=,pcpu=,pmem=,args= | grep -E "ros2|gz sim|parameter_bridge|slam_toolbox|nav2|explore|ekf_node|tf_relay|robot_state_pub|joy_linux|teleop|marker_server|image_bridge|rviz" | grep -v grep | grep -v cleanup.sh | grep -v start_exploration.sh | grep -v "bash -c" || true)
+REMAINING=$(ps -u "$CURRENT_USER" -o user=,pid=,pcpu=,pmem=,args= | grep -E "ros2|gz sim|parameter_bridge|slam_toolbox|nav2|explore|ekf_node|tf_relay|robot_state_pub|joy_linux|teleop|marker_server|image_bridge|rviz|overlay_node|hud_node" | grep -v grep | grep -v cleanup.sh | grep -v start_exploration.sh | grep -v "bash -c" || true)
 
 if [ -n "$REMAINING" ]; then
     echo "WARNING: Some processes still running:"
@@ -96,7 +98,7 @@ rm -f /dev/shm/sem.fastrtps_* 2>/dev/null || true
 
 echo "=== Cleanup complete ==="
 # Final check
-STILL=$(ps -u "$CURRENT_USER" -o user=,pid=,pcpu=,pmem=,args= | grep -E "ros2|gz sim|parameter_bridge|slam_toolbox|nav2|explore|ekf_node|tf_relay|robot_state_pub|joy_linux|teleop|marker_server|image_bridge|rviz" | grep -v grep | grep -v cleanup.sh | grep -v start_exploration.sh | grep -v "bash -c" || true)
+STILL=$(ps -u "$CURRENT_USER" -o user=,pid=,pcpu=,pmem=,args= | grep -E "ros2|gz sim|parameter_bridge|slam_toolbox|nav2|explore|ekf_node|tf_relay|robot_state_pub|joy_linux|teleop|marker_server|image_bridge|rviz|overlay_node|hud_node" | grep -v grep | grep -v cleanup.sh | grep -v start_exploration.sh | grep -v "bash -c" || true)
 if [ -n "$STILL" ]; then
     echo "WARNING: Could not kill:"
     echo "$STILL"
