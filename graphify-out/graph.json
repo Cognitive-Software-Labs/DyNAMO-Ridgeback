@@ -10,7 +10,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "claude_settings",
-      "community": 21,
+      "community": 23,
       "norm_label": "settings.json"
     },
     {
@@ -20,7 +20,7 @@
       "source_location": "L2",
       "_origin": "ast",
       "id": "claude_settings_hooks",
-      "community": 21,
+      "community": 23,
       "norm_label": "hooks"
     },
     {
@@ -30,7 +30,7 @@
       "source_location": "L3",
       "_origin": "ast",
       "id": "claude_settings_hooks_pretooluse",
-      "community": 21,
+      "community": 23,
       "norm_label": "pretooluse"
     },
     {
@@ -40,7 +40,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "codex_hooks",
-      "community": 23,
+      "community": 25,
       "norm_label": "hooks.json"
     },
     {
@@ -50,7 +50,7 @@
       "source_location": "L2",
       "_origin": "ast",
       "id": "codex_hooks_hooks",
-      "community": 23,
+      "community": 25,
       "norm_label": "hooks"
     },
     {
@@ -60,7 +60,7 @@
       "source_location": "L3",
       "_origin": "ast",
       "id": "codex_hooks_hooks_pretooluse",
-      "community": 23,
+      "community": 25,
       "norm_label": "pretooluse"
     },
     {
@@ -74,7 +74,7 @@
       },
       "_origin": "ast",
       "id": "build_and_start_expl",
-      "community": 28,
+      "community": 29,
       "norm_label": "build_and_start_expl.sh"
     },
     {
@@ -88,7 +88,7 @@
       },
       "_origin": "ast",
       "id": "home_deivid_dev_dynamo_ridgeback_build_and_start_expl_sh__entry",
-      "community": 28,
+      "community": 29,
       "norm_label": "build_and_start_expl.sh script"
     },
     {
@@ -102,7 +102,7 @@
       },
       "_origin": "ast",
       "id": "cleanup",
-      "community": 22,
+      "community": 24,
       "norm_label": "cleanup.sh"
     },
     {
@@ -116,7 +116,7 @@
       },
       "_origin": "ast",
       "id": "home_deivid_dev_dynamo_ridgeback_cleanup_sh__entry",
-      "community": 22,
+      "community": 24,
       "norm_label": "cleanup.sh script"
     },
     {
@@ -130,7 +130,7 @@
       },
       "_origin": "ast",
       "id": "cleanup_kill_matches",
-      "community": 22,
+      "community": 24,
       "norm_label": "kill_matches()"
     },
     {
@@ -144,7 +144,7 @@
       },
       "_origin": "ast",
       "id": "diag",
-      "community": 24,
+      "community": 26,
       "norm_label": "diag.sh"
     },
     {
@@ -158,7 +158,7 @@
       },
       "_origin": "ast",
       "id": "home_deivid_dev_dynamo_ridgeback_diag_sh__entry",
-      "community": 24,
+      "community": 26,
       "norm_label": "diag.sh script"
     },
     {
@@ -172,7 +172,7 @@
       },
       "_origin": "ast",
       "id": "diag_section",
-      "community": 24,
+      "community": 26,
       "norm_label": "section()"
     },
     {
@@ -182,7 +182,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "config_camera_config",
-      "community": 19,
+      "community": 20,
       "norm_label": "camera_config.json"
     },
     {
@@ -192,7 +192,7 @@
       "source_location": "L2",
       "_origin": "ast",
       "id": "config_camera_config_camera",
-      "community": 19,
+      "community": 20,
       "norm_label": "camera"
     },
     {
@@ -202,7 +202,7 @@
       "source_location": "L3",
       "_origin": "ast",
       "id": "config_camera_config_camera_depth_hfov_deg",
-      "community": 19,
+      "community": 20,
       "norm_label": "depth_hfov_deg"
     },
     {
@@ -212,7 +212,7 @@
       "source_location": "L4",
       "_origin": "ast",
       "id": "config_camera_config_camera_depth_vfov_deg",
-      "community": 19,
+      "community": 20,
       "norm_label": "depth_vfov_deg"
     },
     {
@@ -222,7 +222,7 @@
       "source_location": "L5",
       "_origin": "ast",
       "id": "config_camera_config_camera_pitch_deg",
-      "community": 19,
+      "community": 20,
       "norm_label": "pitch_deg"
     },
     {
@@ -232,7 +232,7 @@
       "source_location": "L6",
       "_origin": "ast",
       "id": "config_camera_config_camera_height_m",
-      "community": 19,
+      "community": 20,
       "norm_label": "height_m"
     },
     {
@@ -242,7 +242,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "launch_g1_distance_benchmark_launch",
-      "community": 12,
+      "community": 11,
       "norm_label": "g1_distance_benchmark.launch.py"
     },
     {
@@ -252,7 +252,7 @@
       "source_location": "L25",
       "_origin": "ast",
       "id": "launch_g1_distance_benchmark_launch_build_benchmark_nodes",
-      "community": 12,
+      "community": 11,
       "norm_label": "build_benchmark_nodes()"
     },
     {
@@ -262,7 +262,7 @@
       "source_location": "L166",
       "_origin": "ast",
       "id": "launch_g1_distance_benchmark_launch_generate_launch_description",
-      "community": 12,
+      "community": 11,
       "norm_label": "generate_launch_description()"
     },
     {
@@ -272,7 +272,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "includes_camera_optical_tf_launch",
-      "community": 33,
+      "community": 35,
       "norm_label": "camera_optical_tf.launch.py"
     },
     {
@@ -282,7 +282,7 @@
       "source_location": "L8",
       "_origin": "ast",
       "id": "includes_camera_optical_tf_launch_generate_launch_description",
-      "community": 33,
+      "community": 35,
       "norm_label": "generate_launch_description()"
     },
     {
@@ -292,7 +292,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "includes_explore_launch",
-      "community": 34,
+      "community": 36,
       "norm_label": "explore.launch.py"
     },
     {
@@ -302,7 +302,7 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "includes_explore_launch_generate_launch_description",
-      "community": 34,
+      "community": 36,
       "norm_label": "generate_launch_description()"
     },
     {
@@ -312,7 +312,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "includes_nav2_launch",
-      "community": 35,
+      "community": 37,
       "norm_label": "nav2.launch.py"
     },
     {
@@ -322,7 +322,7 @@
       "source_location": "L12",
       "_origin": "ast",
       "id": "includes_nav2_launch_generate_launch_description",
-      "community": 35,
+      "community": 37,
       "norm_label": "generate_launch_description()"
     },
     {
@@ -332,7 +332,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "includes_simulation_launch",
-      "community": 36,
+      "community": 38,
       "norm_label": "simulation.launch.py"
     },
     {
@@ -342,7 +342,7 @@
       "source_location": "L12",
       "_origin": "ast",
       "id": "includes_simulation_launch_generate_launch_description",
-      "community": 36,
+      "community": 38,
       "norm_label": "generate_launch_description()"
     },
     {
@@ -352,7 +352,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "includes_slam_launch",
-      "community": 26,
+      "community": 27,
       "norm_label": "slam.launch.py"
     },
     {
@@ -362,7 +362,7 @@
       "source_location": "L19",
       "_origin": "ast",
       "id": "includes_slam_launch_launch_setup",
-      "community": 26,
+      "community": 27,
       "norm_label": "launch_setup()"
     },
     {
@@ -372,7 +372,7 @@
       "source_location": "L90",
       "_origin": "ast",
       "id": "includes_slam_launch_generate_launch_description",
-      "community": 26,
+      "community": 27,
       "norm_label": "generate_launch_description()"
     },
     {
@@ -382,7 +382,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "launch_manual_mapping_launch",
-      "community": 37,
+      "community": 39,
       "norm_label": "manual_mapping.launch.py"
     },
     {
@@ -392,7 +392,7 @@
       "source_location": "L40",
       "_origin": "ast",
       "id": "launch_manual_mapping_launch_generate_launch_description",
-      "community": 37,
+      "community": 39,
       "norm_label": "generate_launch_description()"
     },
     {
@@ -402,7 +402,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "launch_ridgeback_exploration_launch",
-      "community": 38,
+      "community": 40,
       "norm_label": "ridgeback_exploration.launch.py"
     },
     {
@@ -412,7 +412,7 @@
       "source_location": "L16",
       "_origin": "ast",
       "id": "launch_ridgeback_exploration_launch_generate_launch_description",
-      "community": 38,
+      "community": 40,
       "norm_label": "generate_launch_description()"
     },
     {
@@ -422,7 +422,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "ridgeback_autonomy_init",
-      "community": 40,
+      "community": 42,
       "norm_label": "__init__.py"
     },
     {
@@ -432,7 +432,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "ridgeback_autonomy_init_rationale_1",
-      "community": 40,
+      "community": 42,
       "norm_label": "shared python package for ridgeback autonomy helpers and nodes."
     },
     {
@@ -442,7 +442,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "benchmarking_init",
-      "community": 27,
+      "community": 28,
       "norm_label": "__init__.py"
     },
     {
@@ -452,7 +452,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "benchmarking_init_rationale_1",
-      "community": 27,
+      "community": 28,
       "norm_label": "benchmarking nodes plus helper libraries for autonomy evaluation workflows."
     },
     {
@@ -642,7 +642,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "benchmarking_estimators",
-      "community": 12,
+      "community": 11,
       "norm_label": "estimators.py"
     },
     {
@@ -652,7 +652,7 @@
       "source_location": "L49",
       "_origin": "ast",
       "id": "benchmarking_estimators_parse_estimators",
-      "community": 12,
+      "community": 11,
       "norm_label": "parse_estimators()"
     },
     {
@@ -662,7 +662,7 @@
       "source_location": "L77",
       "_origin": "ast",
       "id": "benchmarking_estimators_selected_camera_estimators",
-      "community": 12,
+      "community": 11,
       "norm_label": "selected_camera_estimators()"
     },
     {
@@ -672,7 +672,7 @@
       "source_location": "L84",
       "_origin": "ast",
       "id": "benchmarking_estimators_uses_camera_estimators",
-      "community": 12,
+      "community": 11,
       "norm_label": "uses_camera_estimators()"
     },
     {
@@ -682,7 +682,7 @@
       "source_location": "L88",
       "_origin": "ast",
       "id": "benchmarking_estimators_uses_lidar_estimators",
-      "community": 12,
+      "community": 11,
       "norm_label": "uses_lidar_estimators()"
     },
     {
@@ -732,7 +732,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "node",
-      "community": 7,
+      "community": 5,
       "norm_label": "node"
     },
     {
@@ -742,7 +742,7 @@
       "source_location": "L92",
       "_origin": "ast",
       "id": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_init",
-      "community": 12,
+      "community": 11,
       "norm_label": ".__init__()"
     },
     {
@@ -892,7 +892,7 @@
       "source_location": "L433",
       "_origin": "ast",
       "id": "ordereddict",
-      "community": 12,
+      "community": 11,
       "norm_label": "ordereddict"
     },
     {
@@ -1112,7 +1112,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "benchmarking_g1_estimate_viz_node",
-      "community": 18,
+      "community": 19,
       "norm_label": "g1_estimate_viz_node.py"
     },
     {
@@ -1122,7 +1122,7 @@
       "source_location": "L43",
       "_origin": "ast",
       "id": "benchmarking_g1_estimate_viz_node_ring_points",
-      "community": 18,
+      "community": 19,
       "norm_label": "_ring_points()"
     },
     {
@@ -1132,7 +1132,7 @@
       "source_location": "L56",
       "_origin": "ast",
       "id": "benchmarking_g1_estimate_viz_node_color_msg",
-      "community": 18,
+      "community": 19,
       "norm_label": "_color_msg()"
     },
     {
@@ -1142,7 +1142,7 @@
       "source_location": "L66",
       "_origin": "ast",
       "id": "benchmarking_g1_estimate_viz_node_g1estimateviznode",
-      "community": 18,
+      "community": 19,
       "norm_label": "g1estimateviznode"
     },
     {
@@ -1152,7 +1152,7 @@
       "source_location": "L67",
       "_origin": "ast",
       "id": "benchmarking_g1_estimate_viz_node_g1estimateviznode_init",
-      "community": 18,
+      "community": 19,
       "norm_label": ".__init__()"
     },
     {
@@ -1162,7 +1162,7 @@
       "source_location": "L97",
       "_origin": "ast",
       "id": "benchmarking_g1_estimate_viz_node_g1estimateviznode_camera_cb",
-      "community": 18,
+      "community": 19,
       "norm_label": "._camera_cb()"
     },
     {
@@ -1172,7 +1172,7 @@
       "source_location": "L97",
       "_origin": "ast",
       "id": "src_ridgeback_autonomy_ridgeback_autonomy_benchmarking_g1_estimate_viz_node_py_g1measurements",
-      "community": 18,
+      "community": 19,
       "norm_label": "g1measurements"
     },
     {
@@ -1182,7 +1182,7 @@
       "source_location": "L102",
       "_origin": "ast",
       "id": "benchmarking_g1_estimate_viz_node_g1estimateviznode_lidar_cb",
-      "community": 18,
+      "community": 19,
       "norm_label": "._lidar_cb()"
     },
     {
@@ -1192,7 +1192,7 @@
       "source_location": "L107",
       "_origin": "ast",
       "id": "benchmarking_g1_estimate_viz_node_g1estimateviznode_publish",
-      "community": 18,
+      "community": 19,
       "norm_label": "._publish()"
     },
     {
@@ -1202,7 +1202,7 @@
       "source_location": "L183",
       "_origin": "ast",
       "id": "benchmarking_g1_estimate_viz_node_g1estimateviznode_add_estimator_markers",
-      "community": 18,
+      "community": 19,
       "norm_label": "._add_estimator_markers()"
     },
     {
@@ -1212,7 +1212,7 @@
       "source_location": "L246",
       "_origin": "ast",
       "id": "benchmarking_g1_estimate_viz_node_g1estimateviznode_robot_pose_in_world",
-      "community": 18,
+      "community": 19,
       "norm_label": "._robot_pose_in_world()"
     },
     {
@@ -1222,7 +1222,7 @@
       "source_location": "L246",
       "_origin": "ast",
       "id": "time",
-      "community": 18,
+      "community": 19,
       "norm_label": "time"
     },
     {
@@ -1232,7 +1232,7 @@
       "source_location": "L276",
       "_origin": "ast",
       "id": "benchmarking_g1_estimate_viz_node_get",
-      "community": 18,
+      "community": 19,
       "norm_label": "_get()"
     },
     {
@@ -1242,7 +1242,7 @@
       "source_location": "L282",
       "_origin": "ast",
       "id": "benchmarking_g1_estimate_viz_node_main",
-      "community": 18,
+      "community": 19,
       "norm_label": "main()"
     },
     {
@@ -1252,7 +1252,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "benchmarking_metrics",
-      "community": 42,
+      "community": 44,
       "norm_label": "metrics.py"
     },
     {
@@ -1342,7 +1342,7 @@
       "source_location": "L29",
       "_origin": "ast",
       "id": "benchmarking_rendering_benchmarkcollagerenderer_init",
-      "community": 12,
+      "community": 16,
       "norm_label": ".__init__()"
     },
     {
@@ -1542,7 +1542,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "common_init",
-      "community": 43,
+      "community": 45,
       "norm_label": "__init__.py"
     },
     {
@@ -1702,7 +1702,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "common_launch_wait",
-      "community": 18,
+      "community": 19,
       "norm_label": "launch_wait.py"
     },
     {
@@ -1712,7 +1712,7 @@
       "source_location": "L34",
       "_origin": "ast",
       "id": "common_launch_wait_main",
-      "community": 18,
+      "community": 19,
       "norm_label": "main()"
     },
     {
@@ -1722,7 +1722,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "common_messages",
-      "community": 17,
+      "community": 12,
       "norm_label": "messages.py"
     },
     {
@@ -1732,7 +1732,7 @@
       "source_location": "L16",
       "_origin": "ast",
       "id": "common_messages_optional_float",
-      "community": 17,
+      "community": 12,
       "norm_label": "optional_float()"
     },
     {
@@ -1742,7 +1742,7 @@
       "source_location": "L20",
       "_origin": "ast",
       "id": "common_messages_build_detections_message",
-      "community": 17,
+      "community": 12,
       "norm_label": "build_detections_message()"
     },
     {
@@ -1752,7 +1752,7 @@
       "source_location": "L20",
       "_origin": "ast",
       "id": "src_ridgeback_autonomy_ridgeback_autonomy_common_messages_py_detectionbatch",
-      "community": 17,
+      "community": 12,
       "norm_label": "detectionbatch"
     },
     {
@@ -1762,7 +1762,7 @@
       "source_location": "L20",
       "_origin": "ast",
       "id": "src_ridgeback_autonomy_ridgeback_autonomy_common_messages_py_g1detections",
-      "community": 2,
+      "community": 12,
       "norm_label": "g1detections"
     },
     {
@@ -1772,7 +1772,7 @@
       "source_location": "L26",
       "_origin": "ast",
       "id": "common_messages_build_measurements_message",
-      "community": 17,
+      "community": 12,
       "norm_label": "build_measurements_message()"
     },
     {
@@ -1782,7 +1782,7 @@
       "source_location": "L26",
       "_origin": "ast",
       "id": "src_ridgeback_autonomy_ridgeback_autonomy_common_messages_py_g1measurements",
-      "community": 17,
+      "community": 12,
       "norm_label": "g1measurements"
     },
     {
@@ -1792,7 +1792,7 @@
       "source_location": "L46",
       "_origin": "ast",
       "id": "common_messages_batch_from_detections_message",
-      "community": 17,
+      "community": 12,
       "norm_label": "batch_from_detections_message()"
     },
     {
@@ -1802,7 +1802,7 @@
       "source_location": "L63",
       "_origin": "ast",
       "id": "common_messages_batch_from_measurements_message",
-      "community": 17,
+      "community": 12,
       "norm_label": "batch_from_measurements_message()"
     },
     {
@@ -1812,7 +1812,7 @@
       "source_location": "L82",
       "_origin": "ast",
       "id": "common_messages_first_finite_positive",
-      "community": 17,
+      "community": 12,
       "norm_label": "first_finite_positive()"
     },
     {
@@ -1822,7 +1822,7 @@
       "source_location": "L90",
       "_origin": "ast",
       "id": "common_messages_decode_bbox_quads",
-      "community": 17,
+      "community": 12,
       "norm_label": "decode_bbox_quads()"
     },
     {
@@ -1832,7 +1832,7 @@
       "source_location": "L103",
       "_origin": "ast",
       "id": "common_messages_snapshot_measurements_message",
-      "community": 17,
+      "community": 12,
       "norm_label": "snapshot_measurements_message()"
     },
     {
@@ -1842,7 +1842,7 @@
       "source_location": "L103",
       "_origin": "ast",
       "id": "src_ridgeback_autonomy_ridgeback_autonomy_common_messages_py_any",
-      "community": 2,
+      "community": 12,
       "norm_label": "any"
     },
     {
@@ -1852,7 +1852,7 @@
       "source_location": "L116",
       "_origin": "ast",
       "id": "common_messages_build_float32_image_message",
-      "community": 2,
+      "community": 12,
       "norm_label": "build_float32_image_message()"
     },
     {
@@ -1862,7 +1862,7 @@
       "source_location": "L116",
       "_origin": "ast",
       "id": "src_ridgeback_autonomy_ridgeback_autonomy_common_messages_py_ndarray",
-      "community": 2,
+      "community": 12,
       "norm_label": "ndarray"
     },
     {
@@ -1872,7 +1872,7 @@
       "source_location": "L116",
       "_origin": "ast",
       "id": "src_ridgeback_autonomy_ridgeback_autonomy_common_messages_py_image",
-      "community": 2,
+      "community": 12,
       "norm_label": "image"
     },
     {
@@ -1882,7 +1882,7 @@
       "source_location": "L129",
       "_origin": "ast",
       "id": "common_messages_populate_identity_fields",
-      "community": 17,
+      "community": 12,
       "norm_label": "_populate_identity_fields()"
     },
     {
@@ -1892,7 +1892,7 @@
       "source_location": "L143",
       "_origin": "ast",
       "id": "common_messages_decode_optional_float",
-      "community": 17,
+      "community": 12,
       "norm_label": "decode_optional_float()"
     },
     {
@@ -1922,7 +1922,7 @@
       "source_location": "L17",
       "_origin": "ast",
       "id": "common_models_detection",
-      "community": 2,
+      "community": 12,
       "norm_label": "detection"
     },
     {
@@ -2022,7 +2022,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "diagnostics_init",
-      "community": 44,
+      "community": 46,
       "norm_label": "__init__.py"
     },
     {
@@ -2122,7 +2122,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "diagnostics_hud_node",
-      "community": 7,
+      "community": 5,
       "norm_label": "hud_node.py"
     },
     {
@@ -2132,7 +2132,7 @@
       "source_location": "L24",
       "_origin": "ast",
       "id": "diagnostics_hud_node_hudnode",
-      "community": 7,
+      "community": 5,
       "norm_label": "hudnode"
     },
     {
@@ -2142,7 +2142,7 @@
       "source_location": "L25",
       "_origin": "ast",
       "id": "diagnostics_hud_node_hudnode_init",
-      "community": 7,
+      "community": 5,
       "norm_label": ".__init__()"
     },
     {
@@ -2152,7 +2152,7 @@
       "source_location": "L64",
       "_origin": "ast",
       "id": "diagnostics_hud_node_hudnode_on_panel",
-      "community": 7,
+      "community": 5,
       "norm_label": "._on_panel()"
     },
     {
@@ -2162,7 +2162,7 @@
       "source_location": "L67",
       "_origin": "ast",
       "id": "diagnostics_hud_node_hudnode_tick",
-      "community": 7,
+      "community": 5,
       "norm_label": "._tick()"
     },
     {
@@ -2172,7 +2172,7 @@
       "source_location": "L101",
       "_origin": "ast",
       "id": "diagnostics_hud_node_main",
-      "community": 7,
+      "community": 5,
       "norm_label": "main()"
     },
     {
@@ -2182,7 +2182,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "diagnostics_velocity_overlay_node",
-      "community": 7,
+      "community": 5,
       "norm_label": "velocity_overlay_node.py"
     },
     {
@@ -2192,7 +2192,7 @@
       "source_location": "L24",
       "_origin": "ast",
       "id": "diagnostics_velocity_overlay_node_velocityoverlaynode",
-      "community": 7,
+      "community": 5,
       "norm_label": "velocityoverlaynode"
     },
     {
@@ -2202,7 +2202,7 @@
       "source_location": "L25",
       "_origin": "ast",
       "id": "diagnostics_velocity_overlay_node_velocityoverlaynode_init",
-      "community": 7,
+      "community": 5,
       "norm_label": ".__init__()"
     },
     {
@@ -2212,7 +2212,7 @@
       "source_location": "L72",
       "_origin": "ast",
       "id": "diagnostics_velocity_overlay_node_velocityoverlaynode_on_twist",
-      "community": 7,
+      "community": 5,
       "norm_label": "._on_twist()"
     },
     {
@@ -2222,7 +2222,7 @@
       "source_location": "L76",
       "_origin": "ast",
       "id": "diagnostics_velocity_overlay_node_velocityoverlaynode_on_odom",
-      "community": 7,
+      "community": 5,
       "norm_label": "._on_odom()"
     },
     {
@@ -2232,7 +2232,7 @@
       "source_location": "L80",
       "_origin": "ast",
       "id": "diagnostics_velocity_overlay_node_velocityoverlaynode_tick",
-      "community": 7,
+      "community": 5,
       "norm_label": "._tick()"
     },
     {
@@ -2242,7 +2242,7 @@
       "source_location": "L106",
       "_origin": "ast",
       "id": "diagnostics_velocity_overlay_node_velocityoverlaynode_format_text",
-      "community": 7,
+      "community": 5,
       "norm_label": "._format_text()"
     },
     {
@@ -2252,7 +2252,7 @@
       "source_location": "L126",
       "_origin": "ast",
       "id": "diagnostics_velocity_overlay_node_main",
-      "community": 7,
+      "community": 5,
       "norm_label": "main()"
     },
     {
@@ -2262,7 +2262,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "frontier_explorer_init",
-      "community": 30,
+      "community": 31,
       "norm_label": "__init__.py"
     },
     {
@@ -2272,7 +2272,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "frontier_explorer_init_rationale_1",
-      "community": 30,
+      "community": 31,
       "norm_label": "frontier exploration module for ros 2."
     },
     {
@@ -2762,7 +2762,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "frontier_explorer_params",
-      "community": 46,
+      "community": 48,
       "norm_label": "params.py"
     },
     {
@@ -2772,7 +2772,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "frontier_explorer_path_finding",
-      "community": 20,
+      "community": 21,
       "norm_label": "path_finding.py"
     },
     {
@@ -2782,7 +2782,7 @@
       "source_location": "L5",
       "_origin": "ast",
       "id": "frontier_explorer_path_finding_heuristic",
-      "community": 20,
+      "community": 21,
       "norm_label": "heuristic()"
     },
     {
@@ -2792,7 +2792,7 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "frontier_explorer_path_finding_a_star",
-      "community": 20,
+      "community": 21,
       "norm_label": "a_star()"
     },
     {
@@ -2802,7 +2802,7 @@
       "source_location": "L10",
       "_origin": "ast",
       "id": "frontier_explorer_path_finding_rationale_10",
-      "community": 20,
+      "community": 21,
       "norm_label": "optimized a* algorithm to find the shortest path avoiding obstacles."
     },
     {
@@ -2812,7 +2812,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "perception_init",
-      "community": 39,
+      "community": 41,
       "norm_label": "__init__.py"
     },
     {
@@ -2822,7 +2822,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "perception_init_rationale_1",
-      "community": 39,
+      "community": 41,
       "norm_label": "perception nodes plus helper libraries for detection, fusion, and visualization."
     },
     {
@@ -2832,7 +2832,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "core_init",
-      "community": 29,
+      "community": 30,
       "norm_label": "__init__.py"
     },
     {
@@ -2842,7 +2842,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "core_init_rationale_1",
-      "community": 29,
+      "community": 30,
       "norm_label": "shared perception internals used by the perception node entrypoints."
     },
     {
@@ -2852,7 +2852,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "core_depth_anything",
-      "community": 10,
+      "community": 9,
       "norm_label": "depth_anything.py"
     },
     {
@@ -2862,7 +2862,7 @@
       "source_location": "L15",
       "_origin": "ast",
       "id": "core_depth_anything_depthanythingestimator",
-      "community": 10,
+      "community": 9,
       "norm_label": "depthanythingestimator"
     },
     {
@@ -2872,7 +2872,7 @@
       "source_location": "L16",
       "_origin": "ast",
       "id": "core_depth_anything_depthanythingestimator_init",
-      "community": 10,
+      "community": 9,
       "norm_label": ".__init__()"
     },
     {
@@ -2882,7 +2882,7 @@
       "source_location": "L23",
       "_origin": "ast",
       "id": "core_depth_anything_depthanythingestimator_load",
-      "community": 10,
+      "community": 9,
       "norm_label": ".load()"
     },
     {
@@ -2892,7 +2892,7 @@
       "source_location": "L43",
       "_origin": "ast",
       "id": "core_depth_anything_depthanythingestimator_predict",
-      "community": 10,
+      "community": 9,
       "norm_label": ".predict()"
     },
     {
@@ -2902,7 +2902,7 @@
       "source_location": "L43",
       "_origin": "ast",
       "id": "src_ridgeback_autonomy_ridgeback_autonomy_perception_core_depth_anything_py_ndarray",
-      "community": 10,
+      "community": 9,
       "norm_label": "ndarray"
     },
     {
@@ -2912,7 +2912,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "core_detection",
-      "community": 5,
+      "community": 14,
       "norm_label": "detection.py"
     },
     {
@@ -2922,7 +2922,7 @@
       "source_location": "L15",
       "_origin": "ast",
       "id": "core_detection_resolve_torch_device",
-      "community": 10,
+      "community": 9,
       "norm_label": "resolve_torch_device()"
     },
     {
@@ -2932,7 +2932,7 @@
       "source_location": "L23",
       "_origin": "ast",
       "id": "core_detection_owlv2detector",
-      "community": 5,
+      "community": 14,
       "norm_label": "owlv2detector"
     },
     {
@@ -2942,7 +2942,7 @@
       "source_location": "L24",
       "_origin": "ast",
       "id": "core_detection_owlv2detector_init",
-      "community": 10,
+      "community": 9,
       "norm_label": ".__init__()"
     },
     {
@@ -2952,7 +2952,7 @@
       "source_location": "L30",
       "_origin": "ast",
       "id": "core_detection_owlv2detector_load",
-      "community": 5,
+      "community": 14,
       "norm_label": ".load()"
     },
     {
@@ -2962,7 +2962,7 @@
       "source_location": "L48",
       "_origin": "ast",
       "id": "core_detection_owlv2detector_detect",
-      "community": 5,
+      "community": 14,
       "norm_label": ".detect()"
     },
     {
@@ -2972,7 +2972,7 @@
       "source_location": "L55",
       "_origin": "ast",
       "id": "core_detection_compute_iou",
-      "community": 5,
+      "community": 14,
       "norm_label": "compute_iou()"
     },
     {
@@ -2982,7 +2982,7 @@
       "source_location": "L67",
       "_origin": "ast",
       "id": "core_detection_non_maximum_suppression",
-      "community": 5,
+      "community": 14,
       "norm_label": "non_maximum_suppression()"
     },
     {
@@ -2992,7 +2992,7 @@
       "source_location": "L67",
       "_origin": "ast",
       "id": "detection",
-      "community": 5,
+      "community": 14,
       "norm_label": "detection"
     },
     {
@@ -3002,7 +3002,7 @@
       "source_location": "L77",
       "_origin": "ast",
       "id": "core_detection_parse_owl_detections",
-      "community": 5,
+      "community": 14,
       "norm_label": "parse_owl_detections()"
     },
     {
@@ -3012,7 +3012,7 @@
       "source_location": "L77",
       "_origin": "ast",
       "id": "src_ridgeback_autonomy_ridgeback_autonomy_perception_core_detection_py_detectionbatch",
-      "community": 2,
+      "community": 14,
       "norm_label": "detectionbatch"
     },
     {
@@ -3242,7 +3242,7 @@
       "source_location": "L480",
       "_origin": "ast",
       "id": "core_geometry_extract_organized_xyz",
-      "community": 10,
+      "community": 2,
       "norm_label": "extract_organized_xyz()"
     },
     {
@@ -3282,7 +3282,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "core_image_utils",
-      "community": 5,
+      "community": 17,
       "norm_label": "image_utils.py"
     },
     {
@@ -3292,7 +3292,7 @@
       "source_location": "L10",
       "_origin": "ast",
       "id": "core_image_utils_bgr_frame_to_pil",
-      "community": 5,
+      "community": 17,
       "norm_label": "bgr_frame_to_pil()"
     },
     {
@@ -3302,7 +3302,7 @@
       "source_location": "L10",
       "_origin": "ast",
       "id": "src_ridgeback_autonomy_ridgeback_autonomy_perception_core_image_utils_py_ndarray",
-      "community": 5,
+      "community": 17,
       "norm_label": "ndarray"
     },
     {
@@ -3312,7 +3312,7 @@
       "source_location": "L16",
       "_origin": "ast",
       "id": "core_image_utils_convert_color_image_message",
-      "community": 5,
+      "community": 17,
       "norm_label": "convert_color_image_message()"
     },
     {
@@ -3322,7 +3322,7 @@
       "source_location": "L16",
       "_origin": "ast",
       "id": "src_ridgeback_autonomy_ridgeback_autonomy_perception_core_image_utils_py_image",
-      "community": 5,
+      "community": 17,
       "norm_label": "image"
     },
     {
@@ -3332,7 +3332,7 @@
       "source_location": "L33",
       "_origin": "ast",
       "id": "core_image_utils_convert_depth_to_meters_message",
-      "community": 5,
+      "community": 17,
       "norm_label": "convert_depth_to_meters_message()"
     },
     {
@@ -3342,7 +3342,7 @@
       "source_location": "L42",
       "_origin": "ast",
       "id": "core_image_utils_decode_image_message",
-      "community": 5,
+      "community": 17,
       "norm_label": "decode_image_message()"
     },
     {
@@ -3352,7 +3352,7 @@
       "source_location": "L56",
       "_origin": "ast",
       "id": "core_image_utils_decode_buffer",
-      "community": 5,
+      "community": 17,
       "norm_label": "decode_buffer()"
     },
     {
@@ -3362,7 +3362,7 @@
       "source_location": "L56",
       "_origin": "ast",
       "id": "dtype",
-      "community": 5,
+      "community": 17,
       "norm_label": "dtype"
     },
     {
@@ -3372,7 +3372,7 @@
       "source_location": "L72",
       "_origin": "ast",
       "id": "core_image_utils_normalize_to_uint8",
-      "community": 5,
+      "community": 17,
       "norm_label": "normalize_to_uint8()"
     },
     {
@@ -3382,7 +3382,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "core_rendering",
-      "community": 12,
+      "community": 11,
       "norm_label": "rendering.py"
     },
     {
@@ -3392,7 +3392,7 @@
       "source_location": "L10",
       "_origin": "ast",
       "id": "core_rendering_rgbdoverlayrenderer",
-      "community": 12,
+      "community": 11,
       "norm_label": "rgbdoverlayrenderer"
     },
     {
@@ -3402,7 +3402,7 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "core_rendering_rgbdoverlayrenderer_init",
-      "community": 12,
+      "community": 11,
       "norm_label": ".__init__()"
     },
     {
@@ -3412,7 +3412,7 @@
       "source_location": "L14",
       "_origin": "ast",
       "id": "core_rendering_rgbdoverlayrenderer_render",
-      "community": 12,
+      "community": 11,
       "norm_label": ".render()"
     },
     {
@@ -3422,7 +3422,7 @@
       "source_location": "L14",
       "_origin": "ast",
       "id": "src_ridgeback_autonomy_ridgeback_autonomy_perception_core_rendering_py_ndarray",
-      "community": 12,
+      "community": 11,
       "norm_label": "ndarray"
     },
     {
@@ -3432,7 +3432,7 @@
       "source_location": "L14",
       "_origin": "ast",
       "id": "src_ridgeback_autonomy_ridgeback_autonomy_perception_core_rendering_py_detectionbatch",
-      "community": 12,
+      "community": 11,
       "norm_label": "detectionbatch"
     },
     {
@@ -3442,7 +3442,7 @@
       "source_location": "L84",
       "_origin": "ast",
       "id": "core_rendering_rgbdoverlayrenderer_normalize_depth",
-      "community": 12,
+      "community": 11,
       "norm_label": ".normalize_depth()"
     },
     {
@@ -3452,7 +3452,7 @@
       "source_location": "L100",
       "_origin": "ast",
       "id": "core_rendering_rgbdoverlayrenderer_make_depth_panel",
-      "community": 12,
+      "community": 11,
       "norm_label": ".make_depth_panel()"
     },
     {
@@ -3462,7 +3462,7 @@
       "source_location": "L111",
       "_origin": "ast",
       "id": "core_rendering_rgbdoverlayrenderer_draw_panel_title",
-      "community": 12,
+      "community": 11,
       "norm_label": ".draw_panel_title()"
     },
     {
@@ -3472,7 +3472,7 @@
       "source_location": "L124",
       "_origin": "ast",
       "id": "core_rendering_rgbdoverlayrenderer_draw_label_block",
-      "community": 12,
+      "community": 11,
       "norm_label": ".draw_label_block()"
     },
     {
@@ -3482,7 +3482,7 @@
       "source_location": "L179",
       "_origin": "ast",
       "id": "core_rendering_rgbdoverlayrenderer_format_position_line",
-      "community": 12,
+      "community": 11,
       "norm_label": ".format_position_line()"
     },
     {
@@ -3492,7 +3492,7 @@
       "source_location": "L194",
       "_origin": "ast",
       "id": "core_rendering_rgbdoverlayrenderer_format_distance_line",
-      "community": 12,
+      "community": 11,
       "norm_label": ".format_distance_line()"
     },
     {
@@ -3502,7 +3502,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "perception_g1_camera_measurement_node",
-      "community": 10,
+      "community": 9,
       "norm_label": "g1_camera_measurement_node.py"
     },
     {
@@ -3512,7 +3512,7 @@
       "source_location": "L52",
       "_origin": "ast",
       "id": "perception_g1_camera_measurement_node_g1camerameasurementnode",
-      "community": 10,
+      "community": 9,
       "norm_label": "g1camerameasurementnode"
     },
     {
@@ -3522,7 +3522,7 @@
       "source_location": "L53",
       "_origin": "ast",
       "id": "perception_g1_camera_measurement_node_g1camerameasurementnode_init",
-      "community": 10,
+      "community": 9,
       "norm_label": ".__init__()"
     },
     {
@@ -3532,7 +3532,7 @@
       "source_location": "L168",
       "_origin": "ast",
       "id": "perception_g1_camera_measurement_node_g1camerameasurementnode_default_base_frame",
-      "community": 10,
+      "community": 9,
       "norm_label": ".default_base_frame()"
     },
     {
@@ -3542,7 +3542,7 @@
       "source_location": "L174",
       "_origin": "ast",
       "id": "perception_g1_camera_measurement_node_g1camerameasurementnode_detections_callback",
-      "community": 10,
+      "community": 9,
       "norm_label": ".detections_callback()"
     },
     {
@@ -3552,7 +3552,7 @@
       "source_location": "L174",
       "_origin": "ast",
       "id": "src_ridgeback_autonomy_ridgeback_autonomy_perception_g1_camera_measurement_node_py_g1detections",
-      "community": 10,
+      "community": 9,
       "norm_label": "g1detections"
     },
     {
@@ -3562,7 +3562,7 @@
       "source_location": "L179",
       "_origin": "ast",
       "id": "perception_g1_camera_measurement_node_g1camerameasurementnode_color_callback",
-      "community": 10,
+      "community": 9,
       "norm_label": ".color_callback()"
     },
     {
@@ -3572,7 +3572,7 @@
       "source_location": "L179",
       "_origin": "ast",
       "id": "src_ridgeback_autonomy_ridgeback_autonomy_perception_g1_camera_measurement_node_py_image",
-      "community": 10,
+      "community": 9,
       "norm_label": "image"
     },
     {
@@ -3582,7 +3582,7 @@
       "source_location": "L183",
       "_origin": "ast",
       "id": "perception_g1_camera_measurement_node_g1camerameasurementnode_depth_callback",
-      "community": 10,
+      "community": 9,
       "norm_label": ".depth_callback()"
     },
     {
@@ -3592,7 +3592,7 @@
       "source_location": "L188",
       "_origin": "ast",
       "id": "perception_g1_camera_measurement_node_g1camerameasurementnode_pointcloud_callback",
-      "community": 10,
+      "community": 9,
       "norm_label": ".pointcloud_callback()"
     },
     {
@@ -3602,7 +3602,7 @@
       "source_location": "L188",
       "_origin": "ast",
       "id": "src_ridgeback_autonomy_ridgeback_autonomy_perception_g1_camera_measurement_node_py_pointcloud2",
-      "community": 10,
+      "community": 9,
       "norm_label": "pointcloud2"
     },
     {
@@ -3612,7 +3612,7 @@
       "source_location": "L193",
       "_origin": "ast",
       "id": "perception_g1_camera_measurement_node_g1camerameasurementnode_depth_processing_loop",
-      "community": 10,
+      "community": 9,
       "norm_label": ".depth_processing_loop()"
     },
     {
@@ -3622,7 +3622,7 @@
       "source_location": "L224",
       "_origin": "ast",
       "id": "perception_g1_camera_measurement_node_g1camerameasurementnode_pointcloud_processing_loop",
-      "community": 10,
+      "community": 9,
       "norm_label": ".pointcloud_processing_loop()"
     },
     {
@@ -3632,7 +3632,7 @@
       "source_location": "L266",
       "_origin": "ast",
       "id": "perception_g1_camera_measurement_node_g1camerameasurementnode_processing_loop",
-      "community": 10,
+      "community": 9,
       "norm_label": ".processing_loop()"
     },
     {
@@ -3642,7 +3642,7 @@
       "source_location": "L297",
       "_origin": "ast",
       "id": "perception_g1_camera_measurement_node_g1camerameasurementnode_process_measurements",
-      "community": 10,
+      "community": 9,
       "norm_label": ".process_measurements()"
     },
     {
@@ -3652,7 +3652,7 @@
       "source_location": "L297",
       "_origin": "ast",
       "id": "src_ridgeback_autonomy_ridgeback_autonomy_perception_g1_camera_measurement_node_py_ndarray",
-      "community": 10,
+      "community": 9,
       "norm_label": "ndarray"
     },
     {
@@ -3662,7 +3662,7 @@
       "source_location": "L375",
       "_origin": "ast",
       "id": "perception_g1_camera_measurement_node_g1camerameasurementnode_lookup_transform",
-      "community": 10,
+      "community": 9,
       "norm_label": ".lookup_transform()"
     },
     {
@@ -3672,7 +3672,7 @@
       "source_location": "L386",
       "_origin": "ast",
       "id": "perception_g1_camera_measurement_node_g1camerameasurementnode_log_warning_once",
-      "community": 10,
+      "community": 9,
       "norm_label": ".log_warning_once()"
     },
     {
@@ -3682,7 +3682,7 @@
       "source_location": "L392",
       "_origin": "ast",
       "id": "perception_g1_camera_measurement_node_g1camerameasurementnode_destroy_node",
-      "community": 10,
+      "community": 9,
       "norm_label": ".destroy_node()"
     },
     {
@@ -3692,7 +3692,7 @@
       "source_location": "L404",
       "_origin": "ast",
       "id": "perception_g1_camera_measurement_node_main",
-      "community": 10,
+      "community": 9,
       "norm_label": "main()"
     },
     {
@@ -3702,7 +3702,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "perception_g1_detector_node",
-      "community": 5,
+      "community": 14,
       "norm_label": "g1_detector_node.py"
     },
     {
@@ -3712,7 +3712,7 @@
       "source_location": "L33",
       "_origin": "ast",
       "id": "perception_g1_detector_node_g1detectornode",
-      "community": 5,
+      "community": 14,
       "norm_label": "g1detectornode"
     },
     {
@@ -3722,7 +3722,7 @@
       "source_location": "L34",
       "_origin": "ast",
       "id": "perception_g1_detector_node_g1detectornode_init",
-      "community": 5,
+      "community": 14,
       "norm_label": ".__init__()"
     },
     {
@@ -3732,7 +3732,7 @@
       "source_location": "L76",
       "_origin": "ast",
       "id": "perception_g1_detector_node_g1detectornode_on_color_image",
-      "community": 5,
+      "community": 14,
       "norm_label": ".on_color_image()"
     },
     {
@@ -3742,7 +3742,7 @@
       "source_location": "L76",
       "_origin": "ast",
       "id": "src_ridgeback_autonomy_ridgeback_autonomy_perception_g1_detector_node_py_image",
-      "community": 5,
+      "community": 14,
       "norm_label": "image"
     },
     {
@@ -3752,7 +3752,7 @@
       "source_location": "L81",
       "_origin": "ast",
       "id": "perception_g1_detector_node_g1detectornode_processing_loop",
-      "community": 5,
+      "community": 14,
       "norm_label": ".processing_loop()"
     },
     {
@@ -3762,7 +3762,7 @@
       "source_location": "L102",
       "_origin": "ast",
       "id": "perception_g1_detector_node_g1detectornode_process_color_image",
-      "community": 5,
+      "community": 14,
       "norm_label": ".process_color_image()"
     },
     {
@@ -3772,7 +3772,7 @@
       "source_location": "L118",
       "_origin": "ast",
       "id": "perception_g1_detector_node_g1detectornode_destroy_node",
-      "community": 5,
+      "community": 14,
       "norm_label": ".destroy_node()"
     },
     {
@@ -3782,7 +3782,7 @@
       "source_location": "L126",
       "_origin": "ast",
       "id": "perception_g1_detector_node_main",
-      "community": 5,
+      "community": 14,
       "norm_label": "main()"
     },
     {
@@ -3942,7 +3942,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "perception_g1_overlay_node",
-      "community": 7,
+      "community": 18,
       "norm_label": "g1_overlay_node.py"
     },
     {
@@ -3952,7 +3952,7 @@
       "source_location": "L30",
       "_origin": "ast",
       "id": "perception_g1_overlay_node_g1overlaynode",
-      "community": 7,
+      "community": 18,
       "norm_label": "g1overlaynode"
     },
     {
@@ -3962,7 +3962,7 @@
       "source_location": "L31",
       "_origin": "ast",
       "id": "perception_g1_overlay_node_g1overlaynode_init",
-      "community": 12,
+      "community": 11,
       "norm_label": ".__init__()"
     },
     {
@@ -3972,7 +3972,7 @@
       "source_location": "L98",
       "_origin": "ast",
       "id": "perception_g1_overlay_node_g1overlaynode_measurement_callback",
-      "community": 7,
+      "community": 18,
       "norm_label": ".measurement_callback()"
     },
     {
@@ -3982,7 +3982,7 @@
       "source_location": "L98",
       "_origin": "ast",
       "id": "src_ridgeback_autonomy_ridgeback_autonomy_perception_g1_overlay_node_py_g1measurements",
-      "community": 7,
+      "community": 18,
       "norm_label": "g1measurements"
     },
     {
@@ -3992,7 +3992,7 @@
       "source_location": "L102",
       "_origin": "ast",
       "id": "perception_g1_overlay_node_g1overlaynode_lidar_measurement_callback",
-      "community": 7,
+      "community": 18,
       "norm_label": ".lidar_measurement_callback()"
     },
     {
@@ -4002,7 +4002,7 @@
       "source_location": "L109",
       "_origin": "ast",
       "id": "perception_g1_overlay_node_g1overlaynode_color_callback",
-      "community": 7,
+      "community": 18,
       "norm_label": ".color_callback()"
     },
     {
@@ -4012,7 +4012,7 @@
       "source_location": "L109",
       "_origin": "ast",
       "id": "src_ridgeback_autonomy_ridgeback_autonomy_perception_g1_overlay_node_py_image",
-      "community": 7,
+      "community": 18,
       "norm_label": "image"
     },
     {
@@ -4022,7 +4022,7 @@
       "source_location": "L112",
       "_origin": "ast",
       "id": "perception_g1_overlay_node_g1overlaynode_depth_callback",
-      "community": 7,
+      "community": 18,
       "norm_label": ".depth_callback()"
     },
     {
@@ -4032,7 +4032,7 @@
       "source_location": "L115",
       "_origin": "ast",
       "id": "perception_g1_overlay_node_g1overlaynode_mono_depth_callback",
-      "community": 7,
+      "community": 18,
       "norm_label": ".mono_depth_callback()"
     },
     {
@@ -4042,7 +4042,7 @@
       "source_location": "L118",
       "_origin": "ast",
       "id": "perception_g1_overlay_node_g1overlaynode_render_callback",
-      "community": 7,
+      "community": 18,
       "norm_label": ".render_callback()"
     },
     {
@@ -4052,7 +4052,7 @@
       "source_location": "L121",
       "_origin": "ast",
       "id": "perception_g1_overlay_node_g1overlaynode_render_latest",
-      "community": 7,
+      "community": 18,
       "norm_label": ".render_latest()"
     },
     {
@@ -4062,7 +4062,7 @@
       "source_location": "L170",
       "_origin": "ast",
       "id": "perception_g1_overlay_node_g1overlaynode_merge_lidar_measurements",
-      "community": 7,
+      "community": 18,
       "norm_label": ".merge_lidar_measurements()"
     },
     {
@@ -4072,7 +4072,7 @@
       "source_location": "L185",
       "_origin": "ast",
       "id": "perception_g1_overlay_node_g1overlaynode_match_lidar_measurement",
-      "community": 7,
+      "community": 18,
       "norm_label": ".match_lidar_measurement()"
     },
     {
@@ -4082,7 +4082,7 @@
       "source_location": "L215",
       "_origin": "ast",
       "id": "perception_g1_overlay_node_g1overlaynode_stamp_seconds",
-      "community": 7,
+      "community": 18,
       "norm_label": ".stamp_seconds()"
     },
     {
@@ -4092,7 +4092,7 @@
       "source_location": "L218",
       "_origin": "ast",
       "id": "perception_g1_overlay_node_g1overlaynode_measurement_message_key",
-      "community": 7,
+      "community": 18,
       "norm_label": ".measurement_message_key()"
     },
     {
@@ -4102,7 +4102,7 @@
       "source_location": "L230",
       "_origin": "ast",
       "id": "perception_g1_overlay_node_g1overlaynode_log_warning_once",
-      "community": 7,
+      "community": 18,
       "norm_label": ".log_warning_once()"
     },
     {
@@ -4112,7 +4112,7 @@
       "source_location": "L236",
       "_origin": "ast",
       "id": "perception_g1_overlay_node_g1overlaynode_destroy_node",
-      "community": 7,
+      "community": 18,
       "norm_label": ".destroy_node()"
     },
     {
@@ -4122,7 +4122,7 @@
       "source_location": "L241",
       "_origin": "ast",
       "id": "perception_g1_overlay_node_main",
-      "community": 7,
+      "community": 18,
       "norm_label": "main()"
     },
     {
@@ -4136,7 +4136,7 @@
       },
       "_origin": "ast",
       "id": "ground_truth_maps_capture_ground_truth",
-      "community": 31,
+      "community": 32,
       "norm_label": "capture_ground_truth.sh"
     },
     {
@@ -4150,7 +4150,7 @@
       },
       "_origin": "ast",
       "id": "home_deivid_dev_dynamo_ridgeback_src_ridgeback_autonomy_sim_ground_truth_maps_capture_ground_truth_sh__entry",
-      "community": 31,
+      "community": 32,
       "norm_label": "capture_ground_truth.sh script"
     },
     {
@@ -4160,7 +4160,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "ground_truth_maps_render_previews",
-      "community": 32,
+      "community": 33,
       "norm_label": "render_previews.py"
     },
     {
@@ -4170,7 +4170,7 @@
       "source_location": "L23",
       "_origin": "ast",
       "id": "ground_truth_maps_render_previews_main",
-      "community": 32,
+      "community": 33,
       "norm_label": "main()"
     },
     {
@@ -4180,7 +4180,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "gz_plugins_spawng1",
-      "community": 14,
+      "community": 5,
       "norm_label": "spawng1.cc"
     },
     {
@@ -4190,7 +4190,7 @@
       "source_location": "L18",
       "_origin": "ast",
       "id": "gz_plugins_spawng1_spawng1",
-      "community": 14,
+      "community": 5,
       "norm_label": "spawng1()"
     },
     {
@@ -4200,7 +4200,7 @@
       "source_location": "L20",
       "_origin": "ast",
       "id": "gz_plugins_spawng1_loadconfig",
-      "community": 14,
+      "community": 5,
       "norm_label": "loadconfig()"
     },
     {
@@ -4210,7 +4210,7 @@
       "source_location": "L20",
       "_origin": "ast",
       "id": "xmlelement",
-      "community": 14,
+      "community": 5,
       "norm_label": "xmlelement"
     },
     {
@@ -4220,7 +4220,7 @@
       "source_location": "L122",
       "_origin": "ast",
       "id": "gz_plugins_spawng1_onspawn",
-      "community": 14,
+      "community": 5,
       "norm_label": "onspawn()"
     },
     {
@@ -4240,7 +4240,7 @@
       "source_location": "L26",
       "_origin": "ast",
       "id": "test_test_benchmark_runner_test_parse_estimators_uses_canonical_order_and_depth_anything_name",
-      "community": 12,
+      "community": 11,
       "norm_label": "test_parse_estimators_uses_canonical_order_and_depth_anything_name()"
     },
     {
@@ -4370,7 +4370,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "test_test_detection",
-      "community": 5,
+      "community": 14,
       "norm_label": "test_detection.py"
     },
     {
@@ -4380,7 +4380,7 @@
       "source_location": "L6",
       "_origin": "ast",
       "id": "test_test_detection_test_compute_iou_handles_overlap",
-      "community": 5,
+      "community": 14,
       "norm_label": "test_compute_iou_handles_overlap()"
     },
     {
@@ -4390,7 +4390,7 @@
       "source_location": "L12",
       "_origin": "ast",
       "id": "test_test_detection_test_parse_owl_detections_applies_threshold_and_nms",
-      "community": 5,
+      "community": 14,
       "norm_label": "test_parse_owl_detections_applies_threshold_and_nms()"
     },
     {
@@ -4490,7 +4490,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "test_test_image_utils",
-      "community": 5,
+      "community": 17,
       "norm_label": "test_image_utils.py"
     },
     {
@@ -4500,7 +4500,7 @@
       "source_location": "L13",
       "_origin": "ast",
       "id": "test_test_image_utils_make_image_msg",
-      "community": 5,
+      "community": 17,
       "norm_label": "make_image_msg()"
     },
     {
@@ -4510,7 +4510,7 @@
       "source_location": "L13",
       "_origin": "ast",
       "id": "src_ridgeback_autonomy_test_test_image_utils_py_ndarray",
-      "community": 5,
+      "community": 17,
       "norm_label": "ndarray"
     },
     {
@@ -4520,7 +4520,7 @@
       "source_location": "L13",
       "_origin": "ast",
       "id": "src_ridgeback_autonomy_test_test_image_utils_py_image",
-      "community": 5,
+      "community": 17,
       "norm_label": "image"
     },
     {
@@ -4530,7 +4530,7 @@
       "source_location": "L24",
       "_origin": "ast",
       "id": "test_test_image_utils_test_convert_color_image_message_rgb8_to_bgr",
-      "community": 5,
+      "community": 17,
       "norm_label": "test_convert_color_image_message_rgb8_to_bgr()"
     },
     {
@@ -4540,7 +4540,7 @@
       "source_location": "L34",
       "_origin": "ast",
       "id": "test_test_image_utils_test_convert_depth_to_meters_from_16uc1",
-      "community": 5,
+      "community": 17,
       "norm_label": "test_convert_depth_to_meters_from_16uc1()"
     },
     {
@@ -4550,7 +4550,7 @@
       "source_location": "L44",
       "_origin": "ast",
       "id": "test_test_image_utils_test_convert_color_image_message_supports_padded_rows",
-      "community": 5,
+      "community": 17,
       "norm_label": "test_convert_color_image_message_supports_padded_rows()"
     },
     {
@@ -4560,7 +4560,7 @@
       "source_location": "L59",
       "_origin": "ast",
       "id": "test_test_image_utils_test_normalize_to_uint8_flat_image_returns_zeroes",
-      "community": 5,
+      "community": 17,
       "norm_label": "test_normalize_to_uint8_flat_image_returns_zeroes()"
     },
     {
@@ -4570,7 +4570,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "test_test_imports",
-      "community": 41,
+      "community": 43,
       "norm_label": "test_imports.py"
     },
     {
@@ -4580,7 +4580,7 @@
       "source_location": "L6",
       "_origin": "ast",
       "id": "test_test_imports_test_packaged_modules_import",
-      "community": 41,
+      "community": 43,
       "norm_label": "test_packaged_modules_import()"
     },
     {
@@ -4660,7 +4660,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "test_test_messages",
-      "community": 17,
+      "community": 12,
       "norm_label": "test_messages.py"
     },
     {
@@ -4670,7 +4670,7 @@
       "source_location": "L17",
       "_origin": "ast",
       "id": "test_test_messages_test_build_detections_message_serializes_identity_fields",
-      "community": 17,
+      "community": 12,
       "norm_label": "test_build_detections_message_serializes_identity_fields()"
     },
     {
@@ -4680,7 +4680,7 @@
       "source_location": "L40",
       "_origin": "ast",
       "id": "test_test_messages_test_batch_from_detections_message_round_trips_detection_identity",
-      "community": 17,
+      "community": 12,
       "norm_label": "test_batch_from_detections_message_round_trips_detection_identity()"
     },
     {
@@ -4690,7 +4690,7 @@
       "source_location": "L61",
       "_origin": "ast",
       "id": "test_test_messages_test_build_measurements_message_serializes_parallel_arrays",
-      "community": 17,
+      "community": 12,
       "norm_label": "test_build_measurements_message_serializes_parallel_arrays()"
     },
     {
@@ -4700,7 +4700,7 @@
       "source_location": "L101",
       "_origin": "ast",
       "id": "test_test_messages_test_snapshot_measurements_message_uses_first_finite_positive_values",
-      "community": 17,
+      "community": 12,
       "norm_label": "test_snapshot_measurements_message_uses_first_finite_positive_values()"
     },
     {
@@ -4710,7 +4710,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "doc_conf",
-      "community": 45,
+      "community": 47,
       "norm_label": "conf.py"
     },
     {
@@ -4720,7 +4720,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "rviz_2d_overlay_plugins_overlay_text_display",
-      "community": 8,
+      "community": 7,
       "norm_label": "overlay_text_display.hpp"
     },
     {
@@ -5500,7 +5500,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "rviz_2d_overlay_plugins_overlay_utils",
-      "community": 8,
+      "community": 7,
       "norm_label": "overlay_utils.hpp"
     },
     {
@@ -5510,7 +5510,7 @@
       "source_location": "L58",
       "_origin": "ast",
       "id": "rviz_2d_overlay_plugins_overlay_utils_overlayobject",
-      "community": 8,
+      "community": 7,
       "norm_label": "overlayobject"
     },
     {
@@ -5520,7 +5520,7 @@
       "source_location": "L60",
       "_origin": "ast",
       "id": "rviz_2d_overlay_plugins_overlay_utils_scopedpixelbuffer",
-      "community": 8,
+      "community": 7,
       "norm_label": "scopedpixelbuffer"
     },
     {
@@ -5530,7 +5530,7 @@
       "source_location": "L64",
       "_origin": "ast",
       "id": "rviz_2d_overlay_plugins_overlay_utils_scopedpixelbuffer_getpixelbuffer",
-      "community": 8,
+      "community": 7,
       "norm_label": "getpixelbuffer"
     },
     {
@@ -5540,7 +5540,7 @@
       "source_location": "L65",
       "_origin": "ast",
       "id": "rviz_2d_overlay_plugins_overlay_utils_scopedpixelbuffer_getqimage",
-      "community": 8,
+      "community": 7,
       "norm_label": "getqimage"
     },
     {
@@ -5550,7 +5550,7 @@
       "source_location": "L71",
       "_origin": "ast",
       "id": "src_rviz_2d_overlay_plugins_rviz_2d_overlay_plugins_include_rviz_2d_overlay_plugins_overlay_utils_hpp_hardwarepixelbuffersharedptr",
-      "community": 8,
+      "community": 7,
       "norm_label": "hardwarepixelbuffersharedptr"
     },
     {
@@ -5560,7 +5560,7 @@
       "source_location": "L71",
       "_origin": "ast",
       "id": "rviz_2d_overlay_plugins_overlay_utils_scopedpixelbuffer_pixel_buffer",
-      "community": 8,
+      "community": 7,
       "norm_label": "pixel_buffer_"
     },
     {
@@ -5570,7 +5570,7 @@
       "source_location": "L99",
       "_origin": "ast",
       "id": "rviz_2d_overlay_plugins_overlay_utils_overlayobject_getname",
-      "community": 8,
+      "community": 7,
       "norm_label": "getname"
     },
     {
@@ -5580,7 +5580,7 @@
       "source_location": "L100",
       "_origin": "ast",
       "id": "rviz_2d_overlay_plugins_overlay_utils_overlayobject_hide",
-      "community": 8,
+      "community": 7,
       "norm_label": "hide"
     },
     {
@@ -5590,7 +5590,7 @@
       "source_location": "L101",
       "_origin": "ast",
       "id": "rviz_2d_overlay_plugins_overlay_utils_overlayobject_show",
-      "community": 8,
+      "community": 7,
       "norm_label": "show"
     },
     {
@@ -5600,7 +5600,7 @@
       "source_location": "L102",
       "_origin": "ast",
       "id": "rviz_2d_overlay_plugins_overlay_utils_overlayobject_istextureready",
-      "community": 8,
+      "community": 7,
       "norm_label": "istextureready"
     },
     {
@@ -5610,7 +5610,7 @@
       "source_location": "L103",
       "_origin": "ast",
       "id": "rviz_2d_overlay_plugins_overlay_utils_overlayobject_updatetexturesize",
-      "community": 8,
+      "community": 7,
       "norm_label": "updatetexturesize"
     },
     {
@@ -5620,7 +5620,7 @@
       "source_location": "L104",
       "_origin": "ast",
       "id": "rviz_2d_overlay_plugins_overlay_utils_overlayobject_getbuffer",
-      "community": 8,
+      "community": 7,
       "norm_label": "getbuffer"
     },
     {
@@ -5630,7 +5630,7 @@
       "source_location": "L105",
       "_origin": "ast",
       "id": "rviz_2d_overlay_plugins_overlay_utils_overlayobject_setposition",
-      "community": 8,
+      "community": 7,
       "norm_label": "setposition"
     },
     {
@@ -5640,7 +5640,7 @@
       "source_location": "L108",
       "_origin": "ast",
       "id": "rviz_2d_overlay_plugins_overlay_utils_overlayobject_setdimensions",
-      "community": 8,
+      "community": 7,
       "norm_label": "setdimensions"
     },
     {
@@ -5650,7 +5650,7 @@
       "source_location": "L109",
       "_origin": "ast",
       "id": "rviz_2d_overlay_plugins_overlay_utils_overlayobject_isvisible",
-      "community": 8,
+      "community": 7,
       "norm_label": "isvisible"
     },
     {
@@ -5660,7 +5660,7 @@
       "source_location": "L110",
       "_origin": "ast",
       "id": "rviz_2d_overlay_plugins_overlay_utils_overlayobject_gettexturewidth",
-      "community": 8,
+      "community": 7,
       "norm_label": "gettexturewidth"
     },
     {
@@ -5670,7 +5670,7 @@
       "source_location": "L111",
       "_origin": "ast",
       "id": "rviz_2d_overlay_plugins_overlay_utils_overlayobject_gettextureheight",
-      "community": 8,
+      "community": 7,
       "norm_label": "gettextureheight"
     },
     {
@@ -5680,7 +5680,7 @@
       "source_location": "L114",
       "_origin": "ast",
       "id": "src_rviz_2d_overlay_plugins_rviz_2d_overlay_plugins_include_rviz_2d_overlay_plugins_overlay_utils_hpp_string",
-      "community": 8,
+      "community": 7,
       "norm_label": "string"
     },
     {
@@ -5690,7 +5690,7 @@
       "source_location": "L114",
       "_origin": "ast",
       "id": "rviz_2d_overlay_plugins_overlay_utils_overlayobject_name",
-      "community": 8,
+      "community": 7,
       "norm_label": "name_"
     },
     {
@@ -5700,7 +5700,7 @@
       "source_location": "L115",
       "_origin": "ast",
       "id": "overlay",
-      "community": 8,
+      "community": 7,
       "norm_label": "overlay"
     },
     {
@@ -5710,7 +5710,7 @@
       "source_location": "L115",
       "_origin": "ast",
       "id": "rviz_2d_overlay_plugins_overlay_utils_overlayobject_overlay",
-      "community": 8,
+      "community": 7,
       "norm_label": "overlay_"
     },
     {
@@ -5720,7 +5720,7 @@
       "source_location": "L116",
       "_origin": "ast",
       "id": "paneloverlayelement",
-      "community": 8,
+      "community": 7,
       "norm_label": "paneloverlayelement"
     },
     {
@@ -5730,7 +5730,7 @@
       "source_location": "L116",
       "_origin": "ast",
       "id": "rviz_2d_overlay_plugins_overlay_utils_overlayobject_panel",
-      "community": 8,
+      "community": 7,
       "norm_label": "panel_"
     },
     {
@@ -5740,7 +5740,7 @@
       "source_location": "L117",
       "_origin": "ast",
       "id": "materialptr",
-      "community": 8,
+      "community": 7,
       "norm_label": "materialptr"
     },
     {
@@ -5750,7 +5750,7 @@
       "source_location": "L117",
       "_origin": "ast",
       "id": "rviz_2d_overlay_plugins_overlay_utils_overlayobject_panel_material",
-      "community": 8,
+      "community": 7,
       "norm_label": "panel_material_"
     },
     {
@@ -5760,7 +5760,7 @@
       "source_location": "L118",
       "_origin": "ast",
       "id": "textureptr",
-      "community": 8,
+      "community": 7,
       "norm_label": "textureptr"
     },
     {
@@ -5770,7 +5770,7 @@
       "source_location": "L118",
       "_origin": "ast",
       "id": "rviz_2d_overlay_plugins_overlay_utils_overlayobject_texture",
-      "community": 8,
+      "community": 7,
       "norm_label": "texture_"
     },
     {
@@ -5780,7 +5780,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "rviz_2d_overlay_plugins_pie_chart_display",
-      "community": 8,
+      "community": 7,
       "norm_label": "pie_chart_display.h"
     },
     {
@@ -5790,7 +5790,7 @@
       "source_location": "L51",
       "_origin": "ast",
       "id": "rviz_2d_overlay_plugins_pie_chart_display_rviz_2d_overlay_plugins",
-      "community": 8,
+      "community": 7,
       "norm_label": "rviz_2d_overlay_plugins()"
     },
     {
@@ -5800,7 +5800,7 @@
       "source_location": "L51",
       "_origin": "ast",
       "id": "namespace",
-      "community": 8,
+      "community": 7,
       "norm_label": "namespace"
     },
     {
@@ -5810,7 +5810,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_overlay_text_display",
-      "community": 11,
+      "community": 10,
       "norm_label": "overlay_text_display.cpp"
     },
     {
@@ -5820,7 +5820,7 @@
       "source_location": "L55",
       "_origin": "ast",
       "id": "src_overlay_text_display_overlaytextdisplay",
-      "community": 11,
+      "community": 10,
       "norm_label": "overlaytextdisplay()"
     },
     {
@@ -5830,7 +5830,7 @@
       "source_location": "L136",
       "_origin": "ast",
       "id": "src_overlay_text_display_onenable",
-      "community": 11,
+      "community": 10,
       "norm_label": "onenable()"
     },
     {
@@ -5840,7 +5840,7 @@
       "source_location": "L143",
       "_origin": "ast",
       "id": "src_overlay_text_display_ondisable",
-      "community": 11,
+      "community": 10,
       "norm_label": "ondisable()"
     },
     {
@@ -5850,7 +5850,7 @@
       "source_location": "L151",
       "_origin": "ast",
       "id": "src_overlay_text_display_oninitialize",
-      "community": 11,
+      "community": 10,
       "norm_label": "oninitialize()"
     },
     {
@@ -5860,7 +5860,7 @@
       "source_location": "L178",
       "_origin": "ast",
       "id": "src_overlay_text_display_update",
-      "community": 11,
+      "community": 10,
       "norm_label": "update()"
     },
     {
@@ -5870,7 +5870,7 @@
       "source_location": "L256",
       "_origin": "ast",
       "id": "src_overlay_text_display_reset",
-      "community": 11,
+      "community": 10,
       "norm_label": "reset()"
     },
     {
@@ -5880,7 +5880,7 @@
       "source_location": "L264",
       "_origin": "ast",
       "id": "src_overlay_text_display_processmessage",
-      "community": 11,
+      "community": 10,
       "norm_label": "processmessage()"
     },
     {
@@ -5890,7 +5890,7 @@
       "source_location": "L264",
       "_origin": "ast",
       "id": "src_rviz_2d_overlay_plugins_rviz_2d_overlay_plugins_src_overlay_text_display_cpp_constsharedptr",
-      "community": 11,
+      "community": 10,
       "norm_label": "constsharedptr"
     },
     {
@@ -5900,7 +5900,7 @@
       "source_location": "L311",
       "_origin": "ast",
       "id": "src_overlay_text_display_updateovertakepositionproperties",
-      "community": 11,
+      "community": 10,
       "norm_label": "updateovertakepositionproperties()"
     },
     {
@@ -5910,7 +5910,7 @@
       "source_location": "L344",
       "_origin": "ast",
       "id": "src_overlay_text_display_updateovertakefgcolorproperties",
-      "community": 11,
+      "community": 10,
       "norm_label": "updateovertakefgcolorproperties()"
     },
     {
@@ -5920,7 +5920,7 @@
       "source_location": "L367",
       "_origin": "ast",
       "id": "src_overlay_text_display_updateovertakebgcolorproperties",
-      "community": 11,
+      "community": 10,
       "norm_label": "updateovertakebgcolorproperties()"
     },
     {
@@ -5930,7 +5930,7 @@
       "source_location": "L384",
       "_origin": "ast",
       "id": "src_overlay_text_display_updatealignbottom",
-      "community": 11,
+      "community": 10,
       "norm_label": "updatealignbottom()"
     },
     {
@@ -5940,7 +5940,7 @@
       "source_location": "L391",
       "_origin": "ast",
       "id": "src_overlay_text_display_updateinvertshadow",
-      "community": 11,
+      "community": 10,
       "norm_label": "updateinvertshadow()"
     },
     {
@@ -5950,7 +5950,7 @@
       "source_location": "L398",
       "_origin": "ast",
       "id": "src_overlay_text_display_updateverticaldistance",
-      "community": 11,
+      "community": 10,
       "norm_label": "updateverticaldistance()"
     },
     {
@@ -5960,7 +5960,7 @@
       "source_location": "L405",
       "_origin": "ast",
       "id": "src_overlay_text_display_updatehorizontaldistance",
-      "community": 11,
+      "community": 10,
       "norm_label": "updatehorizontaldistance()"
     },
     {
@@ -5970,7 +5970,7 @@
       "source_location": "L412",
       "_origin": "ast",
       "id": "src_overlay_text_display_updateverticalalignment",
-      "community": 11,
+      "community": 10,
       "norm_label": "updateverticalalignment()"
     },
     {
@@ -5980,7 +5980,7 @@
       "source_location": "L420",
       "_origin": "ast",
       "id": "src_overlay_text_display_updatehorizontalalignment",
-      "community": 11,
+      "community": 10,
       "norm_label": "updatehorizontalalignment()"
     },
     {
@@ -5990,7 +5990,7 @@
       "source_location": "L428",
       "_origin": "ast",
       "id": "src_overlay_text_display_updatewidth",
-      "community": 11,
+      "community": 10,
       "norm_label": "updatewidth()"
     },
     {
@@ -6000,7 +6000,7 @@
       "source_location": "L435",
       "_origin": "ast",
       "id": "src_overlay_text_display_updateheight",
-      "community": 11,
+      "community": 10,
       "norm_label": "updateheight()"
     },
     {
@@ -6010,7 +6010,7 @@
       "source_location": "L442",
       "_origin": "ast",
       "id": "src_overlay_text_display_updatetextsize",
-      "community": 11,
+      "community": 10,
       "norm_label": "updatetextsize()"
     },
     {
@@ -6020,7 +6020,7 @@
       "source_location": "L449",
       "_origin": "ast",
       "id": "src_overlay_text_display_updatebgcolor",
-      "community": 11,
+      "community": 10,
       "norm_label": "updatebgcolor()"
     },
     {
@@ -6030,7 +6030,7 @@
       "source_location": "L459",
       "_origin": "ast",
       "id": "src_overlay_text_display_updatebgalpha",
-      "community": 11,
+      "community": 10,
       "norm_label": "updatebgalpha()"
     },
     {
@@ -6040,7 +6040,7 @@
       "source_location": "L466",
       "_origin": "ast",
       "id": "src_overlay_text_display_updatefgcolor",
-      "community": 11,
+      "community": 10,
       "norm_label": "updatefgcolor()"
     },
     {
@@ -6050,7 +6050,7 @@
       "source_location": "L476",
       "_origin": "ast",
       "id": "src_overlay_text_display_updatefgalpha",
-      "community": 11,
+      "community": 10,
       "norm_label": "updatefgalpha()"
     },
     {
@@ -6060,7 +6060,7 @@
       "source_location": "L483",
       "_origin": "ast",
       "id": "src_overlay_text_display_updatefont",
-      "community": 11,
+      "community": 10,
       "norm_label": "updatefont()"
     },
     {
@@ -6070,7 +6070,7 @@
       "source_location": "L496",
       "_origin": "ast",
       "id": "src_overlay_text_display_updatelinewidth",
-      "community": 11,
+      "community": 10,
       "norm_label": "updatelinewidth()"
     },
     {
@@ -6130,7 +6130,7 @@
       "source_location": "L55",
       "_origin": "ast",
       "id": "qimage",
-      "community": 13,
+      "community": 7,
       "norm_label": "qimage"
     },
     {
@@ -6310,7 +6310,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_pie_chart_display",
-      "community": 9,
+      "community": 8,
       "norm_label": "pie_chart_display.cpp"
     },
     {
@@ -6320,7 +6320,7 @@
       "source_location": "L50",
       "_origin": "ast",
       "id": "src_pie_chart_display_piechartdisplay",
-      "community": 9,
+      "community": 8,
       "norm_label": "piechartdisplay()"
     },
     {
@@ -6330,7 +6330,7 @@
       "source_location": "L137",
       "_origin": "ast",
       "id": "src_pie_chart_display_oninitialize",
-      "community": 9,
+      "community": 8,
       "norm_label": "oninitialize()"
     },
     {
@@ -6340,7 +6340,7 @@
       "source_location": "L168",
       "_origin": "ast",
       "id": "src_pie_chart_display_update",
-      "community": 9,
+      "community": 8,
       "norm_label": "update()"
     },
     {
@@ -6350,7 +6350,7 @@
       "source_location": "L178",
       "_origin": "ast",
       "id": "src_pie_chart_display_processmessage",
-      "community": 9,
+      "community": 8,
       "norm_label": "processmessage()"
     },
     {
@@ -6360,7 +6360,7 @@
       "source_location": "L178",
       "_origin": "ast",
       "id": "src_rviz_2d_overlay_plugins_rviz_2d_overlay_plugins_src_pie_chart_display_cpp_constsharedptr",
-      "community": 9,
+      "community": 8,
       "norm_label": "constsharedptr"
     },
     {
@@ -6370,7 +6370,7 @@
       "source_location": "L192",
       "_origin": "ast",
       "id": "src_pie_chart_display_drawplot",
-      "community": 9,
+      "community": 8,
       "norm_label": "drawplot()"
     },
     {
@@ -6380,7 +6380,7 @@
       "source_location": "L291",
       "_origin": "ast",
       "id": "src_pie_chart_display_onenable",
-      "community": 9,
+      "community": 8,
       "norm_label": "onenable()"
     },
     {
@@ -6390,7 +6390,7 @@
       "source_location": "L298",
       "_origin": "ast",
       "id": "src_pie_chart_display_ondisable",
-      "community": 9,
+      "community": 8,
       "norm_label": "ondisable()"
     },
     {
@@ -6400,7 +6400,7 @@
       "source_location": "L304",
       "_origin": "ast",
       "id": "src_pie_chart_display_updatesize",
-      "community": 9,
+      "community": 8,
       "norm_label": "updatesize()"
     },
     {
@@ -6410,7 +6410,7 @@
       "source_location": "L311",
       "_origin": "ast",
       "id": "src_pie_chart_display_updatetop",
-      "community": 9,
+      "community": 8,
       "norm_label": "updatetop()"
     },
     {
@@ -6420,7 +6420,7 @@
       "source_location": "L317",
       "_origin": "ast",
       "id": "src_pie_chart_display_updateleft",
-      "community": 9,
+      "community": 8,
       "norm_label": "updateleft()"
     },
     {
@@ -6430,7 +6430,7 @@
       "source_location": "L323",
       "_origin": "ast",
       "id": "src_pie_chart_display_updatebgcolor",
-      "community": 9,
+      "community": 8,
       "norm_label": "updatebgcolor()"
     },
     {
@@ -6440,7 +6440,7 @@
       "source_location": "L330",
       "_origin": "ast",
       "id": "src_pie_chart_display_updatefgcolor",
-      "community": 9,
+      "community": 8,
       "norm_label": "updatefgcolor()"
     },
     {
@@ -6450,7 +6450,7 @@
       "source_location": "L337",
       "_origin": "ast",
       "id": "src_pie_chart_display_updatefgalpha",
-      "community": 9,
+      "community": 8,
       "norm_label": "updatefgalpha()"
     },
     {
@@ -6460,7 +6460,7 @@
       "source_location": "L344",
       "_origin": "ast",
       "id": "src_pie_chart_display_updatefgalpha2",
-      "community": 9,
+      "community": 8,
       "norm_label": "updatefgalpha2()"
     },
     {
@@ -6470,7 +6470,7 @@
       "source_location": "L352",
       "_origin": "ast",
       "id": "src_pie_chart_display_updatebgalpha",
-      "community": 9,
+      "community": 8,
       "norm_label": "updatebgalpha()"
     },
     {
@@ -6480,7 +6480,7 @@
       "source_location": "L359",
       "_origin": "ast",
       "id": "src_pie_chart_display_updateminvalue",
-      "community": 9,
+      "community": 8,
       "norm_label": "updateminvalue()"
     },
     {
@@ -6490,7 +6490,7 @@
       "source_location": "L366",
       "_origin": "ast",
       "id": "src_pie_chart_display_updatemaxvalue",
-      "community": 9,
+      "community": 8,
       "norm_label": "updatemaxvalue()"
     },
     {
@@ -6500,7 +6500,7 @@
       "source_location": "L373",
       "_origin": "ast",
       "id": "src_pie_chart_display_updatetextsize",
-      "community": 9,
+      "community": 8,
       "norm_label": "updatetextsize()"
     },
     {
@@ -6510,7 +6510,7 @@
       "source_location": "L384",
       "_origin": "ast",
       "id": "src_pie_chart_display_updateshowcaption",
-      "community": 9,
+      "community": 8,
       "norm_label": "updateshowcaption()"
     },
     {
@@ -6520,7 +6520,7 @@
       "source_location": "L391",
       "_origin": "ast",
       "id": "src_pie_chart_display_updateautocolorchange",
-      "community": 9,
+      "community": 8,
       "norm_label": "updateautocolorchange()"
     },
     {
@@ -6530,7 +6530,7 @@
       "source_location": "L410",
       "_origin": "ast",
       "id": "src_pie_chart_display_updatemaxcolor",
-      "community": 9,
+      "community": 8,
       "norm_label": "updatemaxcolor()"
     },
     {
@@ -6540,7 +6540,7 @@
       "source_location": "L417",
       "_origin": "ast",
       "id": "src_pie_chart_display_updatemedcolor",
-      "community": 9,
+      "community": 8,
       "norm_label": "updatemedcolor()"
     },
     {
@@ -6550,7 +6550,7 @@
       "source_location": "L424",
       "_origin": "ast",
       "id": "src_pie_chart_display_updatemaxcolorthreshold",
-      "community": 9,
+      "community": 8,
       "norm_label": "updatemaxcolorthreshold()"
     },
     {
@@ -6560,7 +6560,7 @@
       "source_location": "L430",
       "_origin": "ast",
       "id": "src_pie_chart_display_updatemedcolorthreshold",
-      "community": 9,
+      "community": 8,
       "norm_label": "updatemedcolorthreshold()"
     },
     {
@@ -6570,7 +6570,7 @@
       "source_location": "L436",
       "_origin": "ast",
       "id": "src_pie_chart_display_updateclockwiserotate",
-      "community": 9,
+      "community": 8,
       "norm_label": "updateclockwiserotate()"
     },
     {
@@ -6580,7 +6580,7 @@
       "source_location": "L443",
       "_origin": "ast",
       "id": "src_pie_chart_display_isinregion",
-      "community": 9,
+      "community": 8,
       "norm_label": "isinregion()"
     },
     {
@@ -6590,7 +6590,7 @@
       "source_location": "L449",
       "_origin": "ast",
       "id": "src_pie_chart_display_moveposition",
-      "community": 9,
+      "community": 8,
       "norm_label": "moveposition()"
     },
     {
@@ -6600,7 +6600,7 @@
       "source_location": "L455",
       "_origin": "ast",
       "id": "src_pie_chart_display_setposition",
-      "community": 9,
+      "community": 8,
       "norm_label": "setposition()"
     },
     {
@@ -6610,7 +6610,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_string_to_overlay_text",
-      "community": 14,
+      "community": 5,
       "norm_label": "string_to_overlay_text.cpp"
     },
     {
@@ -6620,7 +6620,7 @@
       "source_location": "L21",
       "_origin": "ast",
       "id": "src_string_to_overlay_text_rviz2dstring",
-      "community": 14,
+      "community": 5,
       "norm_label": "rviz2dstring"
     },
     {
@@ -6630,7 +6630,7 @@
       "source_location": "L23",
       "_origin": "ast",
       "id": "src_string_to_overlay_text_rviz2dstring_parameterscallback",
-      "community": 14,
+      "community": 5,
       "norm_label": ".parameterscallback()"
     },
     {
@@ -6640,7 +6640,7 @@
       "source_location": "L23",
       "_origin": "ast",
       "id": "setparametersresult",
-      "community": 14,
+      "community": 5,
       "norm_label": "setparametersresult"
     },
     {
@@ -6650,7 +6650,7 @@
       "source_location": "L23",
       "_origin": "ast",
       "id": "vector",
-      "community": 14,
+      "community": 5,
       "norm_label": "vector"
     },
     {
@@ -6660,7 +6660,7 @@
       "source_location": "L23",
       "_origin": "ast",
       "id": "parameter",
-      "community": 14,
+      "community": 5,
       "norm_label": "parameter"
     },
     {
@@ -6670,7 +6670,7 @@
       "source_location": "L46",
       "_origin": "ast",
       "id": "src_string_to_overlay_text_rviz2dstring_rviz2dstring",
-      "community": 14,
+      "community": 5,
       "norm_label": ".rviz2dstring()"
     },
     {
@@ -6680,7 +6680,7 @@
       "source_location": "L67",
       "_origin": "ast",
       "id": "src_string_to_overlay_text_rviz2dstring_strcallback",
-      "community": 14,
+      "community": 5,
       "norm_label": ".strcallback()"
     },
     {
@@ -6690,7 +6690,7 @@
       "source_location": "L67",
       "_origin": "ast",
       "id": "src_rviz_2d_overlay_plugins_rviz_2d_overlay_plugins_src_string_to_overlay_text_cpp_string",
-      "community": 14,
+      "community": 5,
       "norm_label": "string"
     },
     {
@@ -6700,7 +6700,7 @@
       "source_location": "L121",
       "_origin": "ast",
       "id": "src_rviz_2d_overlay_plugins_rviz_2d_overlay_plugins_src_string_to_overlay_text_cpp_sharedptr",
-      "community": 14,
+      "community": 5,
       "norm_label": "sharedptr"
     },
     {
@@ -6710,7 +6710,7 @@
       "source_location": "L121",
       "_origin": "ast",
       "id": "src_string_to_overlay_text_rviz2dstring_sub_st",
-      "community": 14,
+      "community": 5,
       "norm_label": "sub_st_"
     },
     {
@@ -6720,7 +6720,7 @@
       "source_location": "L122",
       "_origin": "ast",
       "id": "src_string_to_overlay_text_rviz2dstring_string_topic",
-      "community": 14,
+      "community": 5,
       "norm_label": "string_topic"
     },
     {
@@ -6730,7 +6730,7 @@
       "source_location": "L122",
       "_origin": "ast",
       "id": "src_string_to_overlay_text_rviz2dstring_overlay_text_topic",
-      "community": 14,
+      "community": 5,
       "norm_label": "overlay_text_topic"
     },
     {
@@ -6740,7 +6740,7 @@
       "source_location": "L122",
       "_origin": "ast",
       "id": "src_string_to_overlay_text_rviz2dstring_fg_color",
-      "community": 14,
+      "community": 5,
       "norm_label": "fg_color"
     },
     {
@@ -6750,7 +6750,7 @@
       "source_location": "L123",
       "_origin": "ast",
       "id": "src_string_to_overlay_text_rviz2dstring_pub_ov",
-      "community": 14,
+      "community": 5,
       "norm_label": "pub_ov_"
     },
     {
@@ -6760,7 +6760,7 @@
       "source_location": "L124",
       "_origin": "ast",
       "id": "src_string_to_overlay_text_rviz2dstring_callback_handle",
-      "community": 14,
+      "community": 5,
       "norm_label": "callback_handle_"
     },
     {
@@ -6770,7 +6770,7 @@
       "source_location": "L127",
       "_origin": "ast",
       "id": "src_string_to_overlay_text_main",
-      "community": 14,
+      "community": 5,
       "norm_label": "main()"
     },
     {
@@ -6784,7 +6784,7 @@
       },
       "_origin": "ast",
       "id": "start_exploration",
-      "community": 25,
+      "community": 22,
       "norm_label": "start_exploration.sh"
     },
     {
@@ -6798,21 +6798,35 @@
       },
       "_origin": "ast",
       "id": "home_deivid_dev_dynamo_ridgeback_start_exploration_sh__entry",
-      "community": 25,
+      "community": 22,
       "norm_label": "start_exploration.sh script"
+    },
+    {
+      "label": "RMW_IMPLEMENTATION",
+      "file_type": "code",
+      "source_file": "start_exploration.sh",
+      "source_location": "L39",
+      "metadata": {
+        "language": "bash",
+        "kind": "code"
+      },
+      "_origin": "ast",
+      "id": "start_exploration_rmw_implementation",
+      "community": 22,
+      "norm_label": "rmw_implementation"
     },
     {
       "label": "ROS_DOMAIN_ID",
       "file_type": "code",
       "source_file": "start_exploration.sh",
-      "source_location": "L42",
+      "source_location": "L58",
       "metadata": {
         "language": "bash",
         "kind": "code"
       },
       "_origin": "ast",
       "id": "start_exploration_ros_domain_id",
-      "community": 25,
+      "community": 22,
       "norm_label": "ros_domain_id"
     },
     {
@@ -6834,6 +6848,34 @@
       "id": "tools_rebuild_graphify_main",
       "community": 6,
       "norm_label": "main()"
+    },
+    {
+      "label": "setup_dds.sh",
+      "file_type": "code",
+      "source_file": "tools/setup_dds.sh",
+      "source_location": "L1",
+      "metadata": {
+        "language": "bash",
+        "kind": "file"
+      },
+      "_origin": "ast",
+      "id": "tools_setup_dds",
+      "community": 34,
+      "norm_label": "setup_dds.sh"
+    },
+    {
+      "label": "setup_dds.sh script",
+      "file_type": "code",
+      "source_file": "tools/setup_dds.sh",
+      "source_location": "L1",
+      "metadata": {
+        "language": "bash",
+        "kind": "bash_entrypoint"
+      },
+      "_origin": "ast",
+      "id": "home_deivid_dev_dynamo_ridgeback_tools_setup_dds_sh__entry",
+      "community": 34,
+      "norm_label": "setup_dds.sh script"
     }
   ],
   "links": [
@@ -19428,7 +19470,17 @@
       "relation": "defines",
       "confidence": "EXTRACTED",
       "source_file": "start_exploration.sh",
-      "source_location": "L42",
+      "source_location": "L39",
+      "weight": 1.0,
+      "source": "start_exploration",
+      "target": "start_exploration_rmw_implementation",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "defines",
+      "confidence": "EXTRACTED",
+      "source_file": "start_exploration.sh",
+      "source_location": "L58",
       "weight": 1.0,
       "source": "start_exploration",
       "target": "start_exploration_ros_domain_id",
@@ -19443,8 +19495,18 @@
       "source": "tools_rebuild_graphify",
       "target": "tools_rebuild_graphify_main",
       "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "tools/setup_dds.sh",
+      "source_location": "L1",
+      "weight": 1.0,
+      "source": "tools_setup_dds",
+      "target": "home_deivid_dev_dynamo_ridgeback_tools_setup_dds_sh__entry",
+      "confidence_score": 1.0
     }
   ],
   "hyperedges": [],
-  "built_at_commit": "1836049be87da39ff7a5ac601d1e70915e3dc290"
+  "built_at_commit": "653a5bc774d74cf90e4de5909253251bd8b4722f"
 }
