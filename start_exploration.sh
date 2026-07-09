@@ -21,7 +21,7 @@ if [[ $# -gt 0 ]]; then
 fi
 
 EXPLORER="${EXPLORER:-explore_lite}"
-if [[ $# -gt 0 && "$1" != *":=" ]]; then
+if [[ $# -gt 0 && "$1" != *":="* ]]; then
     EXPLORER="$1"
     shift
 fi
