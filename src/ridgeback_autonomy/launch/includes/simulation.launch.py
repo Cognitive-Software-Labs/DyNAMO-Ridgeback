@@ -38,6 +38,12 @@ def generate_launch_description():
             default_value='true',
             description='Launch the Gazebo GUI window',
         ),
+        DeclareLaunchArgument(
+            'headless_rendering',
+            default_value='false',
+            description='Render server sensors via EGL without an X display '
+                        '(GPU rendering for non-seat/SSH sessions; see ISSUES.md)',
+        ),
         # Add our worlds and models directories so Gazebo can find them
         AppendEnvironmentVariable(
             'GZ_SIM_RESOURCE_PATH',
@@ -61,6 +67,7 @@ def generate_launch_description():
                 'rviz': clearpath_rviz,
                 'use_sim_time': 'true',
                 'gz_gui': LaunchConfiguration('gz_gui'),
+                'headless_rendering': LaunchConfiguration('headless_rendering'),
             }.items(),
         ),
     ])

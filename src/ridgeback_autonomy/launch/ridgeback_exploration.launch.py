@@ -102,6 +102,9 @@ def generate_launch_description():
                               description='Which explorer to use: "explore_lite" or "custom"'),
         DeclareLaunchArgument('coverage_overlay_enabled', default_value='true',
                               description='Publish the live exploration-coverage HUD panel'),
+        DeclareLaunchArgument('headless_rendering', default_value='false',
+                              description='Render Gazebo server sensors via EGL without an X '
+                                          'display (GPU rendering for SSH sessions; ISSUES.md)'),
 
         # RViz2
         Node(
@@ -195,6 +198,7 @@ def generate_launch_description():
                 'setup_path': setup_path,
                 'world': world,
                 'clearpath_rviz': 'false',
+                'headless_rendering': LaunchConfiguration('headless_rendering'),
             }.items(),
         ),
 
