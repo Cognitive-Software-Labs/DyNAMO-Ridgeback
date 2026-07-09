@@ -104,7 +104,7 @@ Benchmark stack:
 ## Non-Obvious Conventions
 
 - Always run `bash cleanup.sh` before launching from the repo runbooks or helper scripts
-- `start_exploration.sh` is the canonical quick-start: sources the workspace, runs cleanup, and forwards `world` (positional 1), `EXPLORER` / explorer (positional 2 or env), `DEPTH_ANYTHING_ENABLED` (env), and `FASTRTPS_NO_SHM` (env) to the public launch
+- `start_exploration.sh` is the canonical quick-start: sources the workspace, runs cleanup, and forwards `world` (positional 1), `EXPLORER` / explorer (positional 2 or env), `DEPTH_ANYTHING_ENABLED` (env), and the DDS selection (`RMW_IMPLEMENTATION`, default CycloneDDS; `FASTRTPS_NO_SHM` applies only on the FastDDS fallback) to the public launch
 - `build_and_start_expl.sh` rebuilds the workspace before forwarding to `start_exploration.sh`; pass-through args are positional in the same order
 - The G1 overlay is a separate OpenCV window, not an RViz panel
 - The `mock_hospital` world is the main exploration scenario; `warehouse` is the larger exploration test; `office` is the common perception-debug world

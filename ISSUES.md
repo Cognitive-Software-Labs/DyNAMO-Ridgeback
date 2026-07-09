@@ -120,20 +120,90 @@ Related cleanup the script and tooling still do:
 - `cleanup.sh` removes `/dev/shm/fastrtps_*` and `/dev/shm/sem.fastrtps_*`
 - `diag.sh` looks for SHM-related FastDDS errors
 
-### Toggling It On
+### Using the FastDDS fallback
 
-The script defaults to the system RMW (shared memory on). If you hit stale
-shared-memory lock symptoms, force the UDP-only profile with:
+CycloneDDS is the default. To switch back to FastDDS, set `RMW_IMPLEMENTATION`:
 
 ```bash
-FASTRTPS_NO_SHM=true bash start_exploration.sh office
+RMW_IMPLEMENTATION=rmw_fastrtps_cpp bash start_exploration.sh office
 ```
 
-That exports `RMW_IMPLEMENTATION`, `FASTRTPS_DEFAULT_PROFILES_FILE`, and `RMW_FASTRTPS_USE_QOS_FROM_XML`. With the default (`false`) the script leaves them untouched, and the launch file (`ridgeback_exploration.launch.py`) does not set these on its own, so `ros2 launch` invocations honor whatever is in your shell env.
+On that path the script defaults `FASTRTPS_NO_SHM=true`, exporting `FASTRTPS_DEFAULT_PROFILES_FILE` (the UDP-only profile) and `RMW_FASTRTPS_USE_QOS_FROM_XML`. Set `FASTRTPS_NO_SHM=false` alongside it to run FastDDS with the system default (shared memory) instead. The public launches (`ridgeback_exploration`, `g1_distance_benchmark`) set the same RMW default but respect an explicit override, so `ros2 launch` matches the script.
 
 ### A/B History
 
-On April 12, 2026, the stack was A/B tested in the `office` world with and without the UDP-only profile. Both runs brought up Gazebo, `/clock`, SLAM, and the G1 perception nodes; no SHM-specific FastDDS errors appeared on that machine in either run. The profile had previously fixed sim-bringup failures on a different machine, but since there was no observed downside to plain shared memory it is now off by default and kept available as an opt-in toggle.
+On April 12, 2026, the stack was A/B tested in the `office` world with and without the UDP-only FastDDS profile; neither run showed SHM-specific errors on that machine. The UDP-only profile had previously fixed sim-bringup failures on a different machine. The project later moved its default off FastDDS entirely to **CycloneDDS** (more robust on this multi-NIC host); the FastDDS UDP-only profile remains the opt-in fallback.
+
+## Simulation RTF Collapse: GPU Rendering Lost to Seat ACL
+
+**Symptom**: Gazebo real-time factor drops from ~0.9 to 0.02–0.08. Exploration
+crawls, `platform_velocity_controller` floods `Received message has timestamp …
+older by …` errors (commands get dropped as stale), Nav2 recovery churn.
+Launch log shows `libEGL warning: failed to open /dev/dri/renderD128:
+Permission denied` and `nvidia-smi` shows 0% GPU while a `gz sim server`
+thread pins one CPU core — all sensor rendering (GPU lidars, RGBD camera)
+falls back to Mesa llvmpipe software rendering.
+
+**Root Cause**: `/dev/dri/*` is `root:render`/`root:video` with an ACL that
+systemd-logind grants only to the *active desktop seat* user (check with
+`getfacl /dev/dri/renderD128`). On this shared box the seat can belong to a
+display manager or another user, so shell/SSH sessions of other users get no
+GPU device access. Runs are fast only while your user holds the seat ACL.
+Verified 2026-07-09: historical logs show RTF ≈ 0.91 (June runs, seat owned)
+vs 0.04 same stack, same config (seat lost).
+
+**Fixes**:
+- Immediate (per boot): `sudo setfacl -m u:$USER:rw /dev/dri/renderD128 /dev/dri/card*`
+- Durable: `sudo usermod -aG render,video $USER`, then re-login.
+- **Even with `/dev/dri` access**, Mesa cannot drive the NVIDIA card for GLX
+  direct rendering (`libEGL warning: pci id … 10de:…, driver (null)`), so the
+  default X11/GLX sensor-rendering path stays on llvmpipe. The working
+  GPU path for SSH/non-seat sessions is NVIDIA EGL headless
+  (`/dev/nvidia*` is world-accessible, no `/dev/dri` needed):
+
+  ```bash
+  export __EGL_VENDOR_LIBRARY_FILENAMES=/usr/share/glvnd/egl_vendor.d/10_nvidia.json
+  bash start_exploration.sh mock_hospital headless_rendering:=true
+  ```
+
+  `headless_rendering:=true` (new launch arg, plumbed through the patched
+  `clearpath_gz` launches as `gz sim --headless-rendering`) makes the server
+  render sensors via EGL instead of GLX/X11. Verified 2026-07-09: RTF
+  0.04 → ~1.0 with this combination. The Gazebo GUI window still opens and
+  renders on llvmpipe; that part is cosmetic.
+
+**Triage order when the sim is slow** (see also the shared-box note): check
+`getfacl /dev/dri/renderD128` and `grep libEGL <launch log>` first, then
+co-tenant CPU load (`uptime`, `ps -eo pcpu,user,comm --sort=-pcpu | head`).
+
+## Phantom Coverage "Collapse" — Stale HUD Nodes Surviving cleanup.sh
+
+**Symptom**: The HUD `complete` metric appears to collapse instantly (e.g.
+~80% → ~39%) and then "flap" between two values every second, while `accuracy`
+stays ~97%. Recorded coverage curves look like a mid-run SLAM catastrophe.
+
+**Root cause (found 2026-07-10)**: not SLAM at all. `cleanup.sh`'s kill list
+was missing `coverage_overlay_node` and `hud_node`, so every launch leaked one
+of each. After N runs, N coverage nodes (some configured for *other worlds'*
+ground-truth maps) all subscribe to the **same** `/r100_0001/map` (topic names
+are identical across runs) and all publish onto the **same** `hud/coverage`
+topic. Subscribers see interleaved values from every generation: nodes with
+the current world's GT agree (true value), stale nodes configured for a
+different world score the map against the wrong GT (bogus value) → 1 Hz
+flapping. Verified with `ros2 topic info -v /r100_0001/map` (15 subscriptions
+named `coverage_overlay_node`) and 14 `hud/coverage` messages per tick.
+
+**Fix**: `coverage_overlay_node` and `hud_node` added to `cleanup.sh` PATTERNS
+and to its verification greps.
+
+**Diagnosis recipe when a HUD metric looks impossible**: check for multiple
+publishers first — `ros2 topic info -v /r100_0001/hud/coverage` (or the
+metric's topic). More than one publisher/subscription with the same node name
+= stale processes from previous launches; extend `cleanup.sh` accordingly.
+
+**Benchmarking note**: coverage CSVs recorded before this fix (2026-07-09/10
+warehouse A/B runs) contain interleaved multi-node values; the *upper
+envelope* of `complete` is the live node's true value.
 
 ## SLAM Drift in Featureless Environments (Office World)
 

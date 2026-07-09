@@ -2,7 +2,7 @@
 
 Autonomous exploration, G1 perception, and distance benchmarking for a [Clearpath Ridgeback](https://clearpathrobotics.com/ridgeback-indoor-robot-platform/) robot in Gazebo Harmonic with ROS 2 Jazzy.
 
-This workspace supports 3 main human workflows:
+This workspace supports 2 main human workflows:
 - full autonomous exploration with G1 perception (any world)
 - repeatable G1 distance benchmarking across camera and LiDAR measurements
 
@@ -166,10 +166,12 @@ Launches Gazebo, SLAM, Nav2, frontier exploration, and the G1 perception stack i
 
 1. Gazebo + Ridgeback spawn
 2. Exploration RViz config
-3. `slam_toolbox` (after 20 s)
-4. Nav2 (after 65 s)
-5. The selected explorer — `explore_lite` (default) or the in-repo `frontier_explorer_node` (after 80 s)
+3. `slam_toolbox` (once the scan + filtered-odom topics publish)
+4. Nav2 (once `/map` publishes)
+5. The selected explorer — `explore_lite` (default) or the in-repo `frontier_explorer_node` (once the global costmap publishes)
 6. G1 perception nodes: `g1_detector_node`, `g1_camera_measurement_node`, `g1_lidar_measurement_node`, `g1_overlay_node`
+
+Bringup is **event-driven** (readiness gates), not fixed timers — each stage starts when its prerequisite exists, with a `--timeout` fallback. See [ISSUES.md](ISSUES.md) "Event-Driven Startup".
 
 The perception overlay appears in a separate OpenCV window named `G1 Perception`; it is not embedded in RViz.
 
@@ -198,6 +200,7 @@ Arguments:
 | `depth_anything_enabled` | `false` | Enable Depth-Anything in the camera measurement node |
 | `mppi_visualize` | `false` | Publish MPPI trajectory visualization topics (RViz already has `MPPI Optimal` and `MPPI Samples` displays subscribed to `/r100_0001/optimal_trajectory` and `/r100_0001/trajectories`) |
 | `explorer` | `explore_lite` | Frontier explorer to dispatch — `explore_lite` or `custom` (the in-repo `frontier_explorer_node`) |
+| `headless_rendering` | `false` | Render Gazebo server sensors via EGL without an X display — GPU-accelerated sensor rendering for SSH/non-seat sessions (see [ISSUES.md](ISSUES.md) "Simulation RTF Collapse") |
 
 Examples:
 
