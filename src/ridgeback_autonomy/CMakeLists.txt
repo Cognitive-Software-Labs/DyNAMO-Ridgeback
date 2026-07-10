@@ -134,6 +134,7 @@ if(BUILD_TESTING)
   ament_add_pytest_test(test_launch_layout test/test_launch_layout.py)
   ament_add_pytest_test(test_messages test/test_messages.py)
   ament_add_pytest_test(test_benchmark_runner test/test_benchmark_runner.py)
+  ament_add_pytest_test(test_sdf2usd_parse test/test_sdf2usd_parse.py)
 endif()
 
 ament_package()
