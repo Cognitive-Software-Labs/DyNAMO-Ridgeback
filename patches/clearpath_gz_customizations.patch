@@ -88,7 +88,7 @@ index 4d74475..8e92f6f 100644
      </gz-gui>
  </plugin>
 diff --git a/clearpath_gz/launch/gz_sim.launch.py b/clearpath_gz/launch/gz_sim.launch.py
-index 69135ab..c1bcd23 100644
+index 69135ab..0f743a9 100644
 --- a/clearpath_gz/launch/gz_sim.launch.py
 +++ b/clearpath_gz/launch/gz_sim.launch.py
 @@ -35,6 +35,10 @@ ARGUMENTS = [
@@ -102,19 +102,21 @@ index 69135ab..c1bcd23 100644
  ]
  
  
-@@ -58,6 +62,11 @@ def gz_launch(context, *args, **kwargs):
+@@ -58,6 +62,13 @@ def gz_launch(context, *args, **kwargs):
      if (auto_start == 'true'):
          auto_start_option = ' -r'
  
 +    headless_option = ''
 +    headless = LaunchConfiguration('headless_rendering').perform(context)
 +    if (headless == 'true'):
-+        headless_option = ' --headless-rendering'
++        # -s: server only. Without it gz still spawns the GUI client, which
++        # busy-loops without a display and burns CPU cores on SSH sessions.
++        headless_option = ' --headless-rendering -s'
 +
      # Gazebo Simulator
      gz_sim = IncludeLaunchDescription(
          PythonLaunchDescriptionSource([gz_sim_launch]),
-@@ -65,6 +74,7 @@ def gz_launch(context, *args, **kwargs):
+@@ -65,6 +76,7 @@ def gz_launch(context, *args, **kwargs):
              ('gz_args', [LaunchConfiguration('world'),
                           '.sdf',
                           auto_start_option,
@@ -122,7 +124,7 @@ index 69135ab..c1bcd23 100644
                           ' -v 4',
                           ' --gui-config ',
                           gui_config])
-@@ -84,13 +94,24 @@ def generate_launch_description():
+@@ -84,13 +96,24 @@ def generate_launch_description():
      packages_paths = [os.path.join(p, 'share') for p in os.getenv('AMENT_PREFIX_PATH').split(':')]
  
      # Set ignition resource path to include all sourced ros packages
@@ -147,7 +149,7 @@ index 69135ab..c1bcd23 100644
      # Clock bridge
      clock_bridge = Node(
          package='ros_gz_bridge',
-@@ -105,6 +126,7 @@ def generate_launch_description():
+@@ -105,6 +128,7 @@ def generate_launch_description():
      # Create launch description and add actions
      ld = LaunchDescription(ARGUMENTS)
      ld.add_action(gz_sim_resource_path)
