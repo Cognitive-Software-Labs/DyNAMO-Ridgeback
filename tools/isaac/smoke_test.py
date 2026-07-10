@@ -66,9 +66,11 @@ if not failures:
         app.update()
     timeline.stop()
 
-app.close()
-
+# Verdict before app.close(): Kit teardown can swallow buffered stdout.
 if failures:
-    print("SMOKE TEST FAILED:", *failures, sep="\n  - ")
+    print("SMOKE TEST FAILED:", *failures, sep="\n  - ", flush=True)
+    app.close()
     sys.exit(1)
-print("SMOKE TEST OK: headless boot, ros2 bridge, /clock published for ~5 s")
+print("SMOKE TEST OK: headless boot, ros2 bridge, /clock published for ~5 s",
+      flush=True)
+app.close()
