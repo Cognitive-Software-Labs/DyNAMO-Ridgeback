@@ -1,0 +1,91 @@
+### /r100_0001/sensors/lidar2d_0/scan
+average rate: 37.545
+	min: 0.011s max: 0.040s std dev: 0.00691s window: 39
+average rate: 37.407
+	min: 0.008s max: 0.040s std dev: 0.00682s window: 77
+average rate: 36.838
+	min: 0.006s max: 0.040s std dev: 0.00673s window: 100
+average rate: 36.735
+	min: 0.006s max: 0.040s std dev: 0.00672s window: 100
+average rate: 37.192
+	min: 0.006s max: 0.040s std dev: 0.00664s window: 100
+average rate: 36.936
+	min: 0.009s max: 0.042s std dev: 0.00643s window: 100
+average rate: 36.810
+	min: 0.011s max: 0.042s std dev: 0.00603s window: 100
+average rate: 37.157
+	min: 0.007s max: 0.042s std dev: 0.00609s window: 100
+average rate: 37.257
+	min: 0.007s max: 0.042s std dev: 0.00560s window: 100
+average rate: 37.147
+	min: 0.012s max: 0.040s std dev: 0.00529s window: 100
+
+### /r100_0001/sensors/camera_0/color/image
+average rate: 27.687
+	min: 0.025s max: 0.049s std dev: 0.00678s window: 29
+average rate: 27.720
+	min: 0.025s max: 0.052s std dev: 0.00662s window: 57
+average rate: 27.891
+	min: 0.025s max: 0.052s std dev: 0.00597s window: 86
+average rate: 27.857
+	min: 0.025s max: 0.052s std dev: 0.00595s window: 100
+average rate: 28.034
+	min: 0.025s max: 0.050s std dev: 0.00584s window: 100
+average rate: 28.146
+	min: 0.025s max: 0.049s std dev: 0.00567s window: 100
+average rate: 28.258
+	min: 0.025s max: 0.049s std dev: 0.00522s window: 100
+average rate: 28.122
+	min: 0.024s max: 0.049s std dev: 0.00543s window: 100
+average rate: 28.148
+	min: 0.024s max: 0.049s std dev: 0.00554s window: 100
+average rate: 28.055
+	min: 0.024s max: 0.049s std dev: 0.00586s window: 100
+
+### /r100_0001/platform/odom/filtered
+average rate: 45.793
+	min: 0.018s max: 0.032s std dev: 0.00336s window: 47
+average rate: 46.358
+	min: 0.018s max: 0.032s std dev: 0.00289s window: 94
+average rate: 46.767
+	min: 0.018s max: 0.032s std dev: 0.00252s window: 100
+average rate: 46.757
+	min: 0.018s max: 0.032s std dev: 0.00259s window: 100
+average rate: 46.735
+	min: 0.017s max: 0.031s std dev: 0.00284s window: 100
+average rate: 46.634
+	min: 0.016s max: 0.031s std dev: 0.00302s window: 100
+average rate: 46.451
+	min: 0.016s max: 0.035s std dev: 0.00305s window: 100
+average rate: 46.326
+	min: 0.018s max: 0.035s std dev: 0.00286s window: 100
+average rate: 46.083
+	min: 0.018s max: 0.035s std dev: 0.00310s window: 100
+average rate: 45.898
+	min: 0.018s max: 0.033s std dev: 0.00315s window: 100
+
+### /clock
+average rate: 442.628
+	min: 0.000s max: 0.014s std dev: 0.00186s window: 100
+average rate: 423.305
+	min: 0.000s max: 0.012s std dev: 0.00182s window: 100
+average rate: 440.437
+	min: 0.000s max: 0.010s std dev: 0.00158s window: 100
+average rate: 449.589
+	min: 0.000s max: 0.011s std dev: 0.00137s window: 100
+average rate: 469.049
+	min: 0.000s max: 0.010s std dev: 0.00108s window: 100
+average rate: 471.157
+	min: 0.000s max: 0.012s std dev: 0.00121s window: 100
+average rate: 442.797
+	min: 0.000s max: 0.012s std dev: 0.00158s window: 100
+average rate: 463.162
+	min: 0.000s max: 0.011s std dev: 0.00123s window: 100
+average rate: 456.419
+	min: 0.000s max: 0.015s std dev: 0.00160s window: 100
+average rate: 477.914
+	min: 0.000s max: 0.010s std dev: 0.00124s window: 100
+average rate: 434.314
+	min: 0.000s max: 0.015s std dev: 0.00190s window: 100
+failed to shutdown: rcl_shutdown already called on the given context, at ./src/rcl/init.c:333
+
