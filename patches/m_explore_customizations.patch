@@ -1,0 +1,117 @@
+diff --git a/explore/include/explore/explore.h b/explore/include/explore/explore.h
+index 7741ce0..c6852f1 100644
+--- a/explore/include/explore/explore.h
++++ b/explore/include/explore/explore.h
+@@ -128,6 +128,11 @@ private:
+   void resumeCallback(const std_msgs::msg::Bool::SharedPtr msg);
+ 
+   std::vector<geometry_msgs::msg::Point> frontier_blacklist_;
++  // consecutive genuine-abort tallies per frontier; a frontier is only
++  // blacklisted after abort_blacklist_threshold_ failures so a transient
++  // nav2 hiccup (TF gap, controller overload) cannot permanently kill it
++  std::vector<std::pair<geometry_msgs::msg::Point, int>> failure_counts_;
++  int countFailure(const geometry_msgs::msg::Point& goal);
+   geometry_msgs::msg::Point prev_goal_;
+   double prev_distance_;
+   rclcpp::Time last_progress_;
+@@ -140,6 +145,7 @@ private:
+   double planner_frequency_;
+   double potential_scale_, orientation_scale_, gain_scale_;
+   double progress_timeout_;
++  int abort_blacklist_threshold_;
+   bool visualize_;
+   bool return_to_init_;
+   std::string robot_base_frame_;
+diff --git a/explore/src/explore.cpp b/explore/src/explore.cpp
+index 6a1125c..1d3317e 100644
+--- a/explore/src/explore.cpp
++++ b/explore/src/explore.cpp
+@@ -38,6 +38,7 @@
+ 
+ #include <explore/explore.h>
+ 
++#include <limits>
+ #include <thread>
+ 
+ inline static bool same_point(const geometry_msgs::msg::Point& one,
+@@ -69,6 +70,7 @@ Explore::Explore()
+   this->declare_parameter<float>("orientation_scale", 0.0);
+   this->declare_parameter<float>("gain_scale", 1.0);
+   this->declare_parameter<float>("min_frontier_size", 0.5);
++  this->declare_parameter<int>("abort_blacklist_threshold", 3);
+   this->declare_parameter<bool>("return_to_init", false);
+ 
+   this->get_parameter("planner_frequency", planner_frequency_);
+@@ -78,6 +80,7 @@ Explore::Explore()
+   this->get_parameter("orientation_scale", orientation_scale_);
+   this->get_parameter("gain_scale", gain_scale_);
+   this->get_parameter("min_frontier_size", min_frontier_size);
++  this->get_parameter("abort_blacklist_threshold", abort_blacklist_threshold_);
+   this->get_parameter("return_to_init", return_to_init_);
+   this->get_parameter("robot_base_frame", robot_base_frame_);
+ 
+@@ -344,6 +347,22 @@ void Explore::returnToInitialPose()
+       };
+   move_base_client_->async_send_goal(goal, send_goal_options);
+ }
++int Explore::countFailure(const geometry_msgs::msg::Point& goal)
++{
++  // match with the same cell tolerance as goalOnBlacklist so a slightly
++  // drifted centroid of the same frontier accumulates onto one tally
++  constexpr static size_t tolerace = 5;
++  double tol =
++      tolerace * costmap_client_.getCostmap()->getResolution();
++  for (auto& [point, count] : failure_counts_) {
++    if (fabs(goal.x - point.x) < tol && fabs(goal.y - point.y) < tol) {
++      return ++count;
++    }
++  }
++  failure_counts_.emplace_back(goal, 1);
++  return 1;
++}
++
+ bool Explore::goalOnBlacklist(const geometry_msgs::msg::Point& goal)
+ {
+   constexpr static size_t tolerace = 5;
+@@ -370,10 +389,37 @@ void Explore::reachedGoal(const NavigationGoalHandle::WrappedResult& result,
+       break;
+     case rclcpp_action::ResultCode::ABORTED:
+       RCLCPP_DEBUG(logger_, "Goal was aborted");
+-      frontier_blacklist_.push_back(frontier_goal);
+-      RCLCPP_DEBUG(logger_, "Adding current goal to black list");
+-      // If it was aborted probably because we've found another frontier goal,
+-      // so just return and don't make plan again
++      // nav2's SimpleActionServer reports preempted goals as ABORTED. A
++      // preempted goal is not unreachable — blacklisting it here slowly
++      // consumes the map until every remaining frontier is blacklisted and
++      // exploration stops early. Only count a failure when the aborted goal
++      // is still the one being pursued (a genuine navigation failure), and
++      // only blacklist after repeated failures: a single abort is often a
++      // transient (TF gap or controller overload on a loaded host), and one
++      // such burst must not permanently consume the frontier list.
++      if (same_point(prev_goal_, frontier_goal)) {
++        int failures = countFailure(frontier_goal);
++        if (failures >= abort_blacklist_threshold_) {
++          frontier_blacklist_.push_back(frontier_goal);
++          RCLCPP_WARN(logger_,
++                      "Blacklisting unreachable frontier (%.2f, %.2f) after "
++                      "%d failed attempts",
++                      frontier_goal.x, frontier_goal.y, failures);
++          // frontier is now excluded — pick a different goal right away
++          makePlan();
++        } else {
++          RCLCPP_WARN(logger_,
++                      "Frontier (%.2f, %.2f) navigation failed (attempt "
++                      "%d/%d)",
++                      frontier_goal.x, frontier_goal.y, failures,
++                      abort_blacklist_threshold_);
++          // forget the aborted goal so the next planner tick re-sends it
++          // (same_goal would otherwise suppress the send and idle the
++          // robot); waiting for the tick doubles as retry backoff, so a
++          // seconds-long TF/controller outage can't burn every attempt
++          prev_goal_.x = std::numeric_limits<double>::max();
++        }
++      }
+       return;
+     case rclcpp_action::ResultCode::CANCELED:
+       RCLCPP_DEBUG(logger_, "Goal was canceled");
