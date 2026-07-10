@@ -111,6 +111,16 @@ Benchmark stack:
 - `perception_venv/` is expected for OWLv2 and Depth-Anything dependencies; the public launches prepend its `bin/` directory to `PATH`
 - If you move or rename sim assets that are referenced by patched Clearpath files, update `patches/clearpath_gz_customizations.patch` in the same change
 
+## Project Subagents
+
+Committed under `.claude/agents/` (Claude Code picks them up automatically):
+
+- `sim-runner` — launches/monitors/stops instrumented benchmark runs (full recipe incl. probe attach, `tools/benchmark/`)
+- `log-triage` — read-only launch-log diagnosis against the ISSUES.md failure signatures
+- `box-health` — read-only shared-box triage (GPU seat ACL, co-tenant load, stale processes)
+
+Keep their recipes in sync when the underlying scripts (`cleanup.sh`, `start_exploration.sh`, `tools/benchmark/`) or ISSUES.md sections change.
+
 ## Key Repo Facts Agents Should Remember
 
 - `clearpath/robot.yaml` must also exist at `~/clearpath/robot.yaml` for the simulator default path
