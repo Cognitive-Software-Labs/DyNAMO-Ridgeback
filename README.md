@@ -77,6 +77,9 @@ cd src/clearpath_simulator/clearpath_gz && git apply ../../../patches/clearpath_
 # Apply slam_toolbox patch (fixes TF namespace issue)
 cd src/slam_toolbox && git apply ../../patches/slam_toolbox_tf_namespace.patch && cd ../..
 
+# Apply m-explore patch (robust frontier blacklisting — see ISSUES.md "Exploration Quits Early")
+cd src/m-explore-ros2 && git apply ../../patches/m_explore_customizations.patch && cd ../..
+
 # Install any remaining deps
 rosdep install --from-paths src --ignore-src -r -y
 
@@ -319,6 +322,7 @@ The shared camera geometry lives in `config/camera_config.json`, and the measure
 |------|-----------|--------|
 | `config/explore_lite_params.yaml` | `min_frontier_size` | Minimum frontier size (m) to consider — increase to skip small gaps |
 | `config/explore_lite_params.yaml` | `planner_frequency` | How often (Hz) to re-evaluate frontiers; lower values reduce goal preemption churn |
+| `config/explore_lite_params.yaml` | `abort_blacklist_threshold` | Genuine navigation failures before a frontier is blacklisted (patched explore_lite; guards against transient TF/controller outages) |
 | `config/frontier_explorer_params.yaml` | `min_frontier_size` / `near_frontier_radius` / `goal_advance_cells` | Custom-explorer frontier clustering, near-tier preference, and goal placement past the centroid |
 | `config/frontier_explorer_params.yaml` | `distance_weight` / `size_weight` | Scoring trade-off between how close vs. how large a far-tier frontier is |
 | `config/frontier_explorer_params.yaml` | `goal_cost_threshold` / `goal_safety_margin` / `lethal_cost_threshold` | Goal-safety filtering against the costmap |
@@ -328,9 +332,10 @@ The shared camera geometry lives in `config/camera_config.json`, and the measure
 
 ## Patches and Issue History
 
-This project still relies on two local patches:
+This project still relies on three local patches:
 
 1. `patches/clearpath_gz_customizations.patch` patches `src/clearpath_simulator/clearpath_gz` to add this repo's Gazebo worlds/models to the simulator search path and to expose the custom `SpawnG1` Gazebo GUI plugin.
 2. `patches/slam_toolbox_tf_namespace.patch` patches `src/slam_toolbox` so `slam_toolbox` respects namespaced TF remappings.
+3. `patches/m_explore_customizations.patch` patches `src/m-explore-ros2` so `explore_lite` no longer blacklists frontiers on preempted goals and retries genuine navigation failures (`abort_blacklist_threshold`) before giving up on a frontier — without it, exploration quits with roughly half the map unexplored.
 
 The deeper root-cause notes, previous middleware workarounds, namespace gotchas, and troubleshooting tips now live in [ISSUES.md](ISSUES.md).

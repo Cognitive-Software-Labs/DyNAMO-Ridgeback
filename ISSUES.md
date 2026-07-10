@@ -205,6 +205,54 @@ metric's topic). More than one publisher/subscription with the same node name
 warehouse A/B runs) contain interleaved multi-node values; the *upper
 envelope* of `complete` is the live node's true value.
 
+## Exploration Quits Early — explore_lite Frontier Blacklist Exhaustion
+
+**Symptom**: `explore_lite` logs "All frontiers traversed/tried out, stopping."
+minutes into a run with roughly half the map unexplored (warehouse: quits at
+280–450 s with ~45–48% coverage). Quit time varies wildly between
+identical-config runs.
+
+**Root causes (found 2026-07-10, instrumented warehouse runs C–G)** — three
+stacked failure modes, each ending in the same blacklist-exhaustion quit:
+
+1. **Preempted goals blacklisted as failures.** explore_lite re-targets the
+   best frontier every planner tick; nav2 reports each preempted goal as
+   `ABORTED`, and upstream explore_lite blacklists every aborted goal. Under
+   normal goal churn (~85 preemptions per warehouse run) the blacklist slowly
+   consumes the frontier list. Fixed in
+   `patches/m_explore_customizations.patch`: only count an abort when the
+   goal is still the one being pursued (genuine navigation failure).
+2. **Wall-flush frontier centroids unplannable at tolerance 0.75.** Frontier
+   centroids often sit inside the inscribed-lethal band of the 0.75 m
+   inflation; NavFn finds no endpoint within its 0.75 m tolerance, the goal
+   aborts, the frontier gets blacklisted. Fixed in `nav2_params.yaml`:
+   `GridBased.tolerance: 1.5` (goals succeeded went 0 → 11 in the first
+   validation run).
+3. **Transient TF/controller outages cascade.** Under co-tenant CPU load
+   (see the shared-box note below), the controller loop drops from 20 Hz to
+   2–8 Hz and `map→odom` lags by up to ~1.5 s; every active goal aborts with
+   "Unable to transform goal pose into costmap frame" within 1–2 s of being
+   sent. One such burst blacklisted 8 frontiers in 18 s and ended run F. Fixed
+   in the same m-explore patch: a frontier is only blacklisted after
+   `abort_blacklist_threshold` (default 3) genuine failures, and retries wait
+   for the next planner tick, so a seconds-long outage can't burn every
+   attempt.
+
+**Validation (warehouse, fixed HUD)**: baseline quit 448 s / 45.2% coverage;
+with all three fixes the run survived 720 s under ~6× worse TF-error
+conditions (box load 40+/32 from co-tenant training). Coverage stayed ~47%
+in that run because the controller couldn't complete goals at 5–8 Hz — a
+load ceiling, not explorer logic; re-benchmark coverage on a quiet box.
+
+**Diagnosis recipe for early exploration quits**: count
+`grep -c "Received goal preemption request"` vs
+`grep -c "Blacklisting unreachable"` in the launch log. Preemptions >> real
+failures + a growing blacklist = failure mode 1. Repeated
+`Failed to create plan with tolerance` at the same coordinates = mode 2.
+`Exception in transformPose … extrapolation into the future` bursts +
+`Control loop missed its desired rate` = mode 3 (check co-tenant load
+first: `uptime`).
+
 ## SLAM Drift in Featureless Environments (Office World)
 
 **Symptom**: After launching in the office world, the robot appears to jump/move randomly in RViz (map→odom transform drifts) while the robot remains physically stationary in Gazebo.
