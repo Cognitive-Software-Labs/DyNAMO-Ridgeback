@@ -1,0 +1,25 @@
+#usda 1.0
+(
+    """Ground-origin wrapper for the vendored Unitree G1 (29-DoF, Dex1) USD.
+
+    The Unitree asset's origin is the pelvis with feet at z=-0.792; worlds
+    and the distance benchmark place G1 by its ground contact point (gz
+    model convention), so this wrapper lifts the reference accordingly.
+    Fixed-base articulation: spawned instances stand rigidly at their pose.
+
+    Source: unitreerobotics/unitree_sim_isaaclab_usds (Hugging Face),
+    assets/robots/g1-29dof-dex1-base-fix-usd/. Apache-2.0, (c) Unitree
+    Robotics — see NOTICE.md alongside this file.
+    """
+    defaultPrim = "g1"
+    metersPerUnit = 1
+    upAxis = "Z"
+)
+
+def Xform "g1" (
+    prepend references = @./g1_29dof_with_dex1_base_fix1.usd@
+)
+{
+    double3 xformOp:translate = (0, 0, 0.792)
+    uniform token[] xformOpOrder = ["xformOp:translate"]
+}
