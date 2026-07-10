@@ -246,7 +246,12 @@ planner_server:
     planner_plugins: ["GridBased"]
     GridBased:
       plugin: "nav2_navfn_planner::NavfnPlanner"
-      tolerance: 0.75
+      # Frontier centroids often sit flush against walls, inside the inscribed-
+      # lethal band of the 0.75 m inflation. With tolerance below that band's
+      # width NavFn finds no valid endpoint, the goal aborts, and explore_lite
+      # blacklists the frontier — runs quit with half the map unexplored.
+      # 1.5 lets the planner stop at the nearest reachable cell instead.
+      tolerance: 1.5
       use_astar: false
       allow_unknown: true
 
