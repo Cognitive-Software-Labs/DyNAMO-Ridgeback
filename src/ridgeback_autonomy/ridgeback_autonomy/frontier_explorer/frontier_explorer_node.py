@@ -16,10 +16,9 @@ from tf2_ros import TransformListener, Buffer
 
 from visualization_msgs.msg import Marker, MarkerArray
 from std_msgs.msg import ColorRGBA
-from ridgeback_autonomy.frontier_explorer.navigator import (
-    get_best_frontier, get_frontier_clusters, update_robot_awareness_from_costmap,
-)
-from ridgeback_autonomy.frontier_explorer.path_finding import a_star
+from rclpy.qos import QoSProfile, QoSDurabilityPolicy
+from explore_lite_msgs.msg import ExploreStatus
+from ridgeback_autonomy.frontier_explorer.navigator import get_frontier_clusters
 from ridgeback_autonomy.frontier_explorer.params import UNKNOWN, OBSTACLE, FREE
 
 
@@ -80,6 +79,15 @@ class FrontierExplorerNode(Node):
             MarkerArray, 'explore/frontiers', 10,
             callback_group=callback_group_2)
 
+        # Exploration status — same topic/QoS contract as explore_lite so
+        # benchmark tooling can detect completion regardless of explorer
+        status_qos = QoSProfile(depth=10)
+        status_qos.durability = QoSDurabilityPolicy.TRANSIENT_LOCAL
+        self._status_pub = self.create_publisher(
+            ExploreStatus, 'explore/status', status_qos,
+            callback_group=callback_group_2)
+        self._publish_status(ExploreStatus.EXPLORATION_STARTED)
+
         # Subscriber for costmap
         self.costmap_subscription = self.create_subscription(
             OccupancyGrid,
@@ -112,8 +120,12 @@ class FrontierExplorerNode(Node):
         self._retry_after_wall_time = 0.0
         # Blacklist: list of (grid_x, grid_y) of recently-reached goals to avoid re-picking
         self._visited_goals = []
-        # Per-goal abort counter: dict of grid_pos -> abort count
-        self._abort_counts = {}
+        # Per-goal failure tallies: list of [(grid_x, grid_y), count]. Radius-
+        # matched, not dict-keyed — the re-picked goal for the same frontier
+        # drifts a few cells between attempts and must accumulate onto one tally.
+        self._abort_counts = []
+        # Best distance_remaining seen for the active goal (progress tracking)
+        self._goal_best_distance = None
         
         self.get_logger().info(f'Frontier Explorer Node initialized')
         self.get_logger().info(f'  Robot Base Frame: {self.robot_base_frame}')
@@ -123,42 +135,39 @@ class FrontierExplorerNode(Node):
     def costmap_callback(self, msg: OccupancyGrid):
         """Receive and process occupancy grid (costmap)."""
         self.current_costmap = msg
-        
-        # Initialize or reinitialize robot awareness map if size changed
-        map_height = msg.info.height
-        map_width = msg.info.width
-        if self.robot_awareness_map is None or self.robot_awareness_map.shape != (map_height, map_width):
-            self.robot_awareness_map = np.full((map_height, map_width), UNKNOWN, dtype=np.int8)
-            self.get_logger().info(f'Initialized robot awareness map: {map_width}x{map_height}')
-        
-        # Convert costmap to robot awareness map
         try:
             self.update_awareness_map(msg)
         except Exception as e:
             self.get_logger().warn(f'Error updating awareness map: {e}')
-    
+
     def update_awareness_map(self, costmap_msg: OccupancyGrid):
         """Convert occupancy grid to robot awareness map (vectorized).
-        
+
         Nav2 publishes costmap as OccupancyGrid with values:
           -1 = unknown (NO_INFORMATION)
            0 = free
           1-98 = inflated cost (proximity to obstacles)
           99-100 = lethal/inscribed obstacle
+
+        Builds into a fresh array and swaps the reference at the end: the
+        exploration timer reads robot_awareness_map from another executor
+        thread, and mutating the shared array in place would let it observe
+        a half-written (all-UNKNOWN) map.
         """
         height = costmap_msg.info.height
         width = costmap_msg.info.width
         data = np.array(costmap_msg.data, dtype=np.int8).reshape((height, width))
-        
-        # Vectorized conversion — no Python loops
-        self.robot_awareness_map[:] = UNKNOWN
-        self.robot_awareness_map[data == 0] = FREE
+
+        awareness = np.full((height, width), UNKNOWN, dtype=np.int8)
+        awareness[data == 0] = FREE
         # Inflated cells below threshold are navigable — mark as FREE
-        self.robot_awareness_map[(data > 0) & (data < self.lethal_cost_threshold)] = FREE
+        awareness[(data > 0) & (data < self.lethal_cost_threshold)] = FREE
         # High-cost and lethal cells are obstacles
-        self.robot_awareness_map[data >= self.lethal_cost_threshold] = OBSTACLE
-        # Unknown stays UNKNOWN (data == -1 is already UNKNOWN from initialization)
-        
+        awareness[data >= self.lethal_cost_threshold] = OBSTACLE
+        # Unknown stays UNKNOWN (data == -1)
+
+        # Reference swaps are atomic in CPython — readers see old or new, never mixed
+        self.robot_awareness_map = awareness
         # Store raw costmap costs for frontier goal validation
         self.costmap_costs = data
     
@@ -252,6 +261,50 @@ class FrontierExplorerNode(Node):
                 return True
         return False
 
+    def _publish_status(self, status):
+        msg = ExploreStatus()
+        msg.status = status
+        self._status_pub.publish(msg)
+
+    # Radius for merging failure tallies of the same drifting frontier goal
+    _ABORT_MATCH_RADIUS = 5
+
+    def _count_goal_failure(self, goal):
+        """Tally a navigation failure for goal, merging nearby entries.
+
+        Returns the accumulated count. Radius-matched because the re-picked
+        goal for the same frontier drifts a few cells between attempts; exact
+        keys would never accumulate to the blacklist threshold.
+        """
+        for entry in self._abort_counts:
+            (ex, ey), count = entry
+            if np.sqrt((goal[0] - ex)**2 + (goal[1] - ey)**2) < self._ABORT_MATCH_RADIUS:
+                entry[1] = count + 1
+                return entry[1]
+        self._abort_counts.append([goal, 1])
+        return 1
+
+    def _clear_goal_failures(self, goal):
+        """Drop failure tallies near goal (called on success or blacklist)."""
+        self._abort_counts = [
+            e for e in self._abort_counts
+            if np.sqrt((goal[0] - e[0][0])**2 + (goal[1] - e[0][1])**2)
+            >= self._ABORT_MATCH_RADIUS
+        ]
+
+    def _register_goal_failure(self, goal, reason):
+        """Count a failure; blacklist the goal once it keeps failing."""
+        failures = self._count_goal_failure(goal)
+        if failures >= self._abort_blacklist_threshold:
+            self.get_logger().warn(
+                f'Blacklisting goal {goal} after {failures} failures ({reason}).')
+            self._visited_goals.append(goal)
+            self._clear_goal_failures(goal)
+        else:
+            self.get_logger().warn(
+                f'Goal {goal} failed ({reason}), attempt '
+                f'{failures}/{self._abort_blacklist_threshold}.')
+
     def select_new_frontier_goal(self, robot_pos):
         """Select a new frontier goal."""
         clusters = get_frontier_clusters(self.robot_awareness_map)
@@ -267,19 +320,27 @@ class FrontierExplorerNode(Node):
                 best_frontier = self.find_safe_frontier(robot_pos, clusters)
             if best_frontier is None:
                 self.get_logger().info('No frontier found - exploration complete!')
+                # Signal completion for benchmark tooling; keep the timer
+                # alive — new frontiers may still appear as the map grows
+                self._publish_status(ExploreStatus.EXPLORATION_COMPLETE)
                 return
-        
+
         # Convert grid coordinates to world coordinates
         best_frontier_world = self.grid_to_world(best_frontier)
-        
+
         self.get_logger().info(
             f'Selected frontier goal at grid ({best_frontier[0]}, {best_frontier[1]}) '
             f'world ({best_frontier_world[0]:.2f}, {best_frontier_world[1]:.2f})'
         )
-        
-        self.send_goal_to_nav2(best_frontier_world)
+
+        if not self.send_goal_to_nav2(best_frontier_world):
+            # Nothing was sent — leaving current_goal unset lets the next
+            # tick retry instead of idling until the progress timeout
+            # blacklists a goal nav2 never saw
+            return
         self.current_goal = best_frontier
         self.goal_start_time = self.get_clock().now()
+        self._goal_best_distance = None
     
     def _make_goal_for_cluster(self, cluster, robot_pos):
         """Return the goal position for a cluster.
@@ -376,8 +437,19 @@ class FrontierExplorerNode(Node):
     def _cancel_current_goal(self):
         """Cancel the active Nav2 goal, if any."""
         if self._current_goal_handle is not None:
-            self._current_goal_handle.cancel_goal_async()
+            cancel_future = self._current_goal_handle.cancel_goal_async()
+            cancel_future.add_done_callback(self._cancel_done_callback)
             self._current_goal_handle = None
+
+    def _cancel_done_callback(self, future):
+        try:
+            response = future.result()
+        except Exception as e:
+            self.get_logger().warn(f'Goal cancel request failed: {e}')
+            return
+        if not response.goals_canceling:
+            self.get_logger().warn(
+                'Nav2 rejected the cancel request; previous goal may still be active.')
 
     def _publish_frontier_markers(self, clusters, robot_pos):
         """Publish frontier cluster centroids as spheres for RViz."""
@@ -417,18 +489,36 @@ class FrontierExplorerNode(Node):
         self._frontier_pub.publish(msg)
 
     def check_goal_progress(self):
-        """Check if goal is still valid or if we're stuck."""
+        """Cancel the goal if the robot has made no progress toward it.
+
+        Stall-based: goal_start_time is reset every time nav2 feedback shows
+        distance_remaining improving, so a long traverse that keeps moving is
+        never cancelled — only a robot that is genuinely stuck.
+        """
         elapsed = (self.get_clock().now() - self.goal_start_time).nanoseconds / 1e9
 
         if elapsed > self.progress_timeout:
             self.get_logger().warn(
-                f'Goal progress timeout ({elapsed:.1f}s > {self.progress_timeout}s). '
-                'Cancelling and selecting new frontier.'
+                f'No progress toward goal for {elapsed:.1f}s '
+                f'(> {self.progress_timeout}s). Cancelling and selecting new frontier.'
             )
             self._cancel_current_goal()
             if self.current_goal is not None:
-                self._visited_goals.append(self.current_goal)
+                # A stall is a failure, not a visit — blacklist only after
+                # repeated failures so one bad approach angle or transient
+                # congestion doesn't wipe the frontier's neighbourhood
+                self._register_goal_failure(self.current_goal, 'progress stall')
             self.current_goal = None
+
+    def _feedback_callback(self, feedback_msg):
+        """Reset the stall timer whenever distance to goal improves."""
+        distance = feedback_msg.feedback.distance_remaining
+        if distance <= 0.0:
+            return
+        if self._goal_best_distance is None or \
+                distance < self._goal_best_distance - 0.1:
+            self._goal_best_distance = distance
+            self.goal_start_time = self.get_clock().now()
     
     def grid_to_world(self, grid_pos):
         """Convert grid coordinates to world coordinates."""
@@ -443,25 +533,27 @@ class FrontierExplorerNode(Node):
         return (world_x, world_y)
     
     def send_goal_to_nav2(self, target_position):
-        """Send goal to Nav2 NavigateToPose action."""
+        """Send goal to Nav2 NavigateToPose action. Returns True if sent."""
         goal_msg = NavigateToPose.Goal()
         goal_msg.pose = PoseStamped()
         goal_msg.pose.header.frame_id = self.current_costmap.header.frame_id
         goal_msg.pose.header.stamp = self.get_clock().now().to_msg()
-        
+
         goal_msg.pose.pose.position.x = target_position[0]
         goal_msg.pose.pose.position.y = target_position[1]
         goal_msg.pose.pose.position.z = 0.0
-        
+
         # Set orientation to face the goal
         goal_msg.pose.pose.orientation.w = 1.0
-        
+
         if not self.nav_client.wait_for_server(timeout_sec=1.0):
             self.get_logger().warn('NavigateToPose action server not available')
-            return
-        
-        send_future = self.nav_client.send_goal_async(goal_msg)
+            return False
+
+        send_future = self.nav_client.send_goal_async(
+            goal_msg, feedback_callback=self._feedback_callback)
         send_future.add_done_callback(self._goal_response_callback)
+        return True
 
     def _goal_response_callback(self, future):
         """Handle goal acceptance; attach result callback."""
@@ -487,19 +579,13 @@ class FrontierExplorerNode(Node):
             self.get_logger().info('Goal succeeded, selecting next frontier.')
             if self.current_goal is not None:
                 self._visited_goals.append(self.current_goal)
-                self._abort_counts.pop(self.current_goal, None)
+                self._clear_goal_failures(self.current_goal)
         else:
             self.get_logger().warn(f'Goal aborted/cancelled (status={status}), selecting new frontier.')
             self._retry_after_wall_time = _time.time() + self._abort_retry_delay
             # Blacklist goals that keep failing so we don't oscillate on unreachable frontiers
             if self.current_goal is not None:
-                key = self.current_goal
-                self._abort_counts[key] = self._abort_counts.get(key, 0) + 1
-                if self._abort_counts[key] >= self._abort_blacklist_threshold:
-                    self.get_logger().warn(
-                        f'Blacklisting goal {key} after {self._abort_counts[key]} aborts.')
-                    self._visited_goals.append(key)
-                    self._abort_counts.pop(key, None)
+                self._register_goal_failure(self.current_goal, f'status={status}')
         self.current_goal = None
         self._current_goal_handle = None
 

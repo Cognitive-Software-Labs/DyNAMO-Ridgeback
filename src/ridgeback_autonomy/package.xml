@@ -24,6 +24,7 @@
   <exec_depend>nav2_bringup</exec_depend>
   <exec_depend>nav2_common</exec_depend>
   <exec_depend>explore_lite</exec_depend>
+  <exec_depend>explore_lite_msgs</exec_depend>
   <exec_depend>rclpy</exec_depend>
   <exec_depend>nav2_msgs</exec_depend>
   <exec_depend>ament_index_python</exec_depend>
