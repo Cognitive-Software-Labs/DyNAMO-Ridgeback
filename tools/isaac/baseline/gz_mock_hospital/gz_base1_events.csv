@@ -1,0 +1,462 @@
+t,kind,detail
+0.06,explore_status,exploration_started
+18.58,goal_succeeded,3e1f2cc9
+18.81,frontiers,avail=16 black=0
+18.83,goal_accepted,d6b18524
+77.68,goal_succeeded,d6b18524
+77.80,frontiers,avail=14 black=0
+77.80,goal_accepted,4337bbcd
+136.65,goal_succeeded,4337bbcd
+136.81,frontiers,avail=15 black=0
+136.82,goal_accepted,f0c2cf96
+271.97,goal_succeeded,f0c2cf96
+272.36,frontiers,avail=21 black=0
+272.36,goal_accepted,5db6075a
+309.11,goal_succeeded,5db6075a
+309.37,frontiers,avail=18 black=0
+309.37,goal_accepted,b9799c32
+430.93,goal_canceled,b9799c32
+431.39,frontiers,avail=18 black=0
+431.39,goal_accepted,27598bdf
+579.85,goal_aborted,27598bdf
+584.89,frontiers,avail=14 black=0
+584.90,goal_accepted,a3ac1e51
+597.95,goal_aborted,a3ac1e51
+603.40,frontiers,avail=14 black=0
+603.40,goal_accepted,a0611294
+606.48,goal_aborted,a0611294
+611.90,frontiers,avail=14 black=0
+611.90,goal_accepted,fa958a2c
+618.09,goal_aborted,fa958a2c
+623.41,frontiers,avail=14 black=0
+623.41,goal_accepted,977aa68f
+626.23,goal_aborted,977aa68f
+631.40,frontiers,avail=14 black=0
+631.40,goal_accepted,7912426a
+657.12,goal_aborted,7912426a
+662.40,frontiers,avail=14 black=0
+662.40,goal_accepted,dffb690e
+670.36,goal_aborted,dffb690e
+675.40,frontiers,avail=14 black=0
+675.40,goal_accepted,e766e70d
+678.30,goal_aborted,e766e70d
+683.40,frontiers,avail=13 black=0
+683.40,goal_accepted,b3b1d742
+689.40,goal_aborted,b3b1d742
+694.60,frontiers,avail=17 black=0
+694.61,goal_accepted,3c2f1839
+722.86,goal_aborted,3c2f1839
+728.12,frontiers,avail=17 black=0
+728.12,goal_accepted,b4a771d0
+732.11,goal_aborted,b4a771d0
+737.61,frontiers,avail=17 black=0
+737.61,goal_accepted,57875146
+748.49,goal_aborted,57875146
+753.61,frontiers,avail=17 black=0
+753.61,goal_accepted,457a9e29
+758.41,goal_aborted,457a9e29
+763.61,frontiers,avail=17 black=0
+763.61,goal_accepted,cf9e225c
+790.15,goal_aborted,cf9e225c
+795.61,frontiers,avail=17 black=0
+795.62,goal_accepted,badb2b96
+809.78,goal_aborted,badb2b96
+815.13,frontiers,avail=17 black=0
+815.15,goal_accepted,b94c57cf
+842.80,goal_aborted,b94c57cf
+848.15,frontiers,avail=13 black=0
+848.15,goal_accepted,8f58649c
+850.92,goal_aborted,8f58649c
+856.15,frontiers,avail=13 black=0
+856.16,goal_accepted,686a0d8d
+865.08,goal_aborted,686a0d8d
+870.15,frontiers,avail=13 black=0
+870.16,goal_accepted,80f09f4b
+910.06,goal_aborted,80f09f4b
+915.17,frontiers,avail=11 black=0
+915.17,goal_accepted,048de77d
+946.78,goal_aborted,048de77d
+952.20,frontiers,avail=10 black=0
+952.20,goal_accepted,cb793c34
+1020.90,goal_aborted,cb793c34
+1025.92,frontiers,avail=10 black=0
+1025.92,goal_accepted,ea5bfb85
+1049.37,goal_aborted,ea5bfb85
+1054.42,frontiers,avail=10 black=0
+1054.42,goal_accepted,6871560d
+1071.52,goal_aborted,6871560d
+1076.92,frontiers,avail=10 black=0
+1076.93,goal_accepted,305e2624
+1079.02,goal_aborted,305e2624
+1084.42,frontiers,avail=10 black=0
+1084.43,goal_accepted,064ba147
+1085.49,goal_aborted,064ba147
+1090.92,frontiers,avail=10 black=0
+1090.93,goal_accepted,aedeb1bb
+1094.00,goal_aborted,aedeb1bb
+1099.42,frontiers,avail=10 black=0
+1099.42,goal_accepted,ec13bc6a
+1101.52,goal_aborted,ec13bc6a
+1106.93,frontiers,avail=10 black=0
+1106.93,goal_accepted,38bb1764
+1109.91,goal_aborted,38bb1764
+1114.92,frontiers,avail=10 black=0
+1114.93,goal_accepted,f952596f
+1115.53,goal_aborted,f952596f
+1120.93,frontiers,avail=10 black=0
+1120.93,goal_accepted,e8762544
+1123.99,goal_aborted,e8762544
+1129.43,frontiers,avail=10 black=0
+1129.43,goal_accepted,241967f0
+1132.50,goal_aborted,241967f0
+1137.94,frontiers,avail=10 black=0
+1137.94,goal_accepted,ad94425e
+1141.02,goal_aborted,ad94425e
+1146.44,frontiers,avail=10 black=0
+1146.44,goal_accepted,1087875b
+1149.47,goal_aborted,1087875b
+1154.94,frontiers,avail=10 black=0
+1154.94,goal_accepted,a5c7e857
+1157.97,goal_aborted,a5c7e857
+1163.44,frontiers,avail=10 black=0
+1163.44,goal_accepted,9947aeb2
+1166.44,goal_aborted,9947aeb2
+1171.94,frontiers,avail=10 black=0
+1171.94,goal_accepted,c284b4d5
+1174.93,goal_aborted,c284b4d5
+1179.94,frontiers,avail=10 black=0
+1179.94,goal_accepted,bc83de51
+1180.54,goal_aborted,bc83de51
+1185.94,frontiers,avail=10 black=0
+1185.95,goal_accepted,c7137a4b
+1192.02,goal_aborted,c7137a4b
+1197.45,frontiers,avail=10 black=0
+1197.45,goal_accepted,8c6e9089
+1201.58,goal_aborted,8c6e9089
+1206.94,frontiers,avail=10 black=0
+1206.95,goal_accepted,1c5f70c6
+1215.12,goal_aborted,1c5f70c6
+1220.45,frontiers,avail=10 black=0
+1220.45,goal_accepted,4e01cb7a
+1226.60,goal_aborted,4e01cb7a
+1231.96,frontiers,avail=10 black=0
+1231.97,goal_accepted,7a04ae12
+1248.95,goal_aborted,7a04ae12
+1253.96,frontiers,avail=10 black=0
+1253.97,goal_accepted,a89ecb83
+1254.51,goal_aborted,a89ecb83
+1259.96,frontiers,avail=10 black=0
+1259.97,goal_accepted,58457059
+1264.67,goal_aborted,58457059
+1269.96,frontiers,avail=10 black=0
+1269.97,goal_accepted,cca8adf3
+1305.54,goal_aborted,cca8adf3
+1310.96,frontiers,avail=10 black=0
+1310.97,goal_accepted,db42bbcf
+1335.37,goal_aborted,db42bbcf
+1340.46,frontiers,avail=11 black=0
+1340.47,goal_accepted,b3a10e4e
+1370.16,goal_aborted,b3a10e4e
+1375.46,frontiers,avail=7 black=0
+1375.47,goal_accepted,29c26678
+1398.74,goal_aborted,29c26678
+1403.96,frontiers,avail=6 black=0
+1403.97,goal_accepted,5ecd3c19
+1408.66,goal_aborted,5ecd3c19
+1413.96,frontiers,avail=6 black=0
+1413.97,goal_accepted,9c6298bb
+1417.00,goal_aborted,9c6298bb
+1422.46,frontiers,avail=6 black=0
+1422.46,goal_accepted,de99e9f1
+1453.26,goal_aborted,de99e9f1
+1458.46,frontiers,avail=5 black=0
+1458.47,goal_accepted,c2d9d4cf
+1492.38,goal_aborted,c2d9d4cf
+1497.46,frontiers,avail=5 black=0
+1497.47,goal_accepted,c4ca492c
+1528.24,goal_aborted,c4ca492c
+1533.46,frontiers,avail=5 black=0
+1533.47,goal_accepted,f774f6ec
+1587.04,goal_aborted,f774f6ec
+1592.46,frontiers,avail=5 black=0
+1592.47,goal_accepted,7704123f
+1593.02,goal_aborted,7704123f
+1598.46,frontiers,avail=5 black=0
+1598.47,goal_accepted,00f94aa0
+1603.31,goal_aborted,00f94aa0
+1608.46,frontiers,avail=5 black=0
+1608.46,goal_accepted,e6d71b27
+1642.16,goal_aborted,e6d71b27
+1647.46,frontiers,avail=5 black=0
+1647.46,goal_accepted,35992751
+1660.36,goal_aborted,35992751
+1665.46,frontiers,avail=5 black=0
+1665.46,goal_accepted,26237c16
+1682.96,goal_aborted,26237c16
+1687.96,frontiers,avail=5 black=0
+1687.97,goal_accepted,8d6991e2
+1748.78,goal_canceled,8d6991e2
+1748.96,frontiers,avail=5 black=0
+1748.96,goal_accepted,841e25dc
+1755.82,goal_aborted,841e25dc
+1760.96,frontiers,avail=5 black=0
+1760.96,goal_accepted,a53468d5
+1763.72,goal_aborted,a53468d5
+1768.96,frontiers,avail=5 black=0
+1768.96,goal_accepted,47ed0d8a
+1772.64,goal_aborted,47ed0d8a
+1777.96,frontiers,avail=5 black=0
+1777.96,goal_accepted,d2f3d6da
+1787.10,goal_aborted,d2f3d6da
+1792.46,frontiers,avail=5 black=0
+1792.47,goal_accepted,e523bf2f
+1798.35,goal_aborted,e523bf2f
+1803.46,frontiers,avail=5 black=0
+1803.46,goal_accepted,f36f9ded
+1805.12,goal_aborted,f36f9ded
+1810.46,frontiers,avail=5 black=0
+1810.47,goal_accepted,2b4fea48
+1812.46,goal_aborted,2b4fea48
+1817.46,frontiers,avail=5 black=0
+1817.47,goal_accepted,ee016deb
+1818.07,goal_aborted,ee016deb
+1823.46,frontiers,avail=5 black=0
+1823.46,goal_accepted,08fb0955
+1826.56,goal_aborted,08fb0955
+1831.96,frontiers,avail=5 black=0
+1831.97,goal_accepted,e6f7df70
+1837.00,goal_aborted,e6f7df70
+1842.46,frontiers,avail=5 black=0
+1842.47,goal_accepted,ceb2dd4b
+1852.35,goal_aborted,ceb2dd4b
+1857.66,frontiers,avail=5 black=0
+1857.67,goal_accepted,307d3156
+1858.22,goal_aborted,307d3156
+1863.66,frontiers,avail=5 black=0
+1863.67,goal_accepted,85560c7b
+1869.39,goal_aborted,85560c7b
+1874.66,frontiers,avail=5 black=0
+1874.66,goal_accepted,238fb3fd
+1875.21,goal_aborted,238fb3fd
+1880.66,frontiers,avail=5 black=0
+1880.66,goal_accepted,22ecdd17
+1884.32,goal_aborted,22ecdd17
+1889.67,frontiers,avail=5 black=0
+1889.67,goal_accepted,20a7ae3a
+1890.22,goal_aborted,20a7ae3a
+1895.67,frontiers,avail=5 black=0
+1895.67,goal_accepted,df574cf7
+1900.33,goal_aborted,df574cf7
+1905.67,frontiers,avail=5 black=0
+1905.67,goal_accepted,4c4ae5dc
+1906.22,goal_aborted,4c4ae5dc
+1911.67,frontiers,avail=5 black=0
+1911.67,goal_accepted,f9ad64cb
+1916.46,goal_aborted,f9ad64cb
+1921.67,frontiers,avail=5 black=0
+1921.67,goal_accepted,0dc48e3b
+1922.22,goal_aborted,0dc48e3b
+1927.67,frontiers,avail=5 black=0
+1927.67,goal_accepted,877dc726
+1928.22,goal_aborted,877dc726
+1933.67,frontiers,avail=5 black=0
+1933.67,goal_accepted,129b3ed9
+1938.35,goal_aborted,129b3ed9
+1943.67,frontiers,avail=5 black=0
+1943.67,goal_accepted,b96bd90c
+1944.22,goal_aborted,b96bd90c
+1949.67,frontiers,avail=5 black=0
+1949.67,goal_accepted,5b12ce67
+1950.22,goal_aborted,5b12ce67
+1955.67,frontiers,avail=5 black=0
+1955.67,goal_accepted,b1999384
+1960.43,goal_aborted,b1999384
+1965.67,frontiers,avail=5 black=0
+1965.67,goal_accepted,2a899569
+1966.22,goal_aborted,2a899569
+1971.67,frontiers,avail=5 black=0
+1971.67,goal_accepted,c457ee46
+1972.22,goal_aborted,c457ee46
+1977.67,frontiers,avail=5 black=0
+1977.67,goal_accepted,4251df1c
+1981.39,goal_aborted,4251df1c
+1986.67,frontiers,avail=5 black=0
+1986.67,goal_accepted,cb26aa98
+1987.22,goal_aborted,cb26aa98
+1992.67,frontiers,avail=5 black=0
+1992.67,goal_accepted,0d1ab59d
+1993.22,goal_aborted,0d1ab59d
+1998.67,frontiers,avail=5 black=0
+1998.67,goal_accepted,81e9f7b7
+1999.23,goal_aborted,81e9f7b7
+2004.67,frontiers,avail=5 black=0
+2004.68,goal_accepted,8449e119
+2008.36,goal_aborted,8449e119
+2013.67,frontiers,avail=5 black=0
+2013.68,goal_accepted,42fc42d2
+2014.23,goal_aborted,42fc42d2
+2019.67,frontiers,avail=5 black=0
+2019.68,goal_accepted,633d31fc
+2020.23,goal_aborted,633d31fc
+2025.67,frontiers,avail=5 black=0
+2025.68,goal_accepted,c6788f65
+2026.23,goal_aborted,c6788f65
+2031.67,frontiers,avail=5 black=0
+2031.68,goal_accepted,7cfb811d
+2034.28,goal_aborted,7cfb811d
+2039.67,frontiers,avail=5 black=0
+2039.68,goal_accepted,4db3437f
+2040.23,goal_aborted,4db3437f
+2045.67,frontiers,avail=5 black=0
+2045.67,goal_accepted,488e1ffb
+2046.23,goal_aborted,488e1ffb
+2051.67,frontiers,avail=5 black=0
+2051.67,goal_accepted,5c66a210
+2054.33,goal_aborted,5c66a210
+2059.67,frontiers,avail=5 black=0
+2059.68,goal_accepted,c9e3699f
+2060.28,goal_aborted,c9e3699f
+2065.67,frontiers,avail=5 black=0
+2065.67,goal_accepted,e76b8242
+2066.23,goal_aborted,e76b8242
+2071.67,frontiers,avail=5 black=0
+2071.67,goal_accepted,506014e4
+2072.23,goal_aborted,506014e4
+2077.67,frontiers,avail=5 black=0
+2077.68,goal_accepted,5e5b7303
+2078.23,goal_aborted,5e5b7303
+2083.67,frontiers,avail=5 black=0
+2083.68,goal_accepted,fc590daf
+2084.23,goal_aborted,fc590daf
+2089.67,frontiers,avail=5 black=0
+2089.68,goal_accepted,d833ff15
+2090.23,goal_aborted,d833ff15
+2095.67,frontiers,avail=5 black=0
+2095.67,goal_accepted,919c551d
+2099.48,goal_aborted,919c551d
+2104.67,frontiers,avail=5 black=0
+2104.68,goal_accepted,3f38f3ea
+2105.43,goal_aborted,3f38f3ea
+2110.67,frontiers,avail=5 black=0
+2110.67,goal_accepted,bc2589d1
+2111.42,goal_aborted,bc2589d1
+2116.67,frontiers,avail=5 black=0
+2116.67,goal_accepted,f72642d0
+2117.43,goal_aborted,f72642d0
+2122.67,frontiers,avail=5 black=0
+2122.67,goal_accepted,8f51fdf5
+2123.37,goal_aborted,8f51fdf5
+2128.67,frontiers,avail=5 black=0
+2128.68,goal_accepted,5dd87767
+2129.38,goal_aborted,5dd87767
+2134.67,frontiers,avail=5 black=0
+2134.68,goal_accepted,f741cdc4
+2135.43,goal_aborted,f741cdc4
+2140.67,frontiers,avail=5 black=0
+2140.68,goal_accepted,5695dcf7
+2141.42,goal_aborted,5695dcf7
+2146.68,frontiers,avail=5 black=0
+2146.68,goal_accepted,da894a47
+2147.43,goal_aborted,da894a47
+2152.68,frontiers,avail=5 black=0
+2152.68,goal_accepted,e06e77bc
+2153.48,goal_aborted,e06e77bc
+2158.68,frontiers,avail=5 black=0
+2158.68,goal_accepted,bc21f605
+2159.53,goal_aborted,bc21f605
+2164.68,frontiers,avail=5 black=0
+2164.68,goal_accepted,8b6e55e8
+2165.58,goal_aborted,8b6e55e8
+2170.68,frontiers,avail=5 black=0
+2170.68,goal_accepted,dca83b34
+2171.58,goal_aborted,dca83b34
+2176.68,frontiers,avail=5 black=0
+2176.68,goal_accepted,72e623d5
+2177.23,goal_aborted,72e623d5
+2182.68,frontiers,avail=5 black=0
+2182.68,goal_accepted,5ed62527
+2183.69,goal_aborted,5ed62527
+2189.18,frontiers,avail=5 black=0
+2189.18,goal_accepted,b1be6dc8
+2189.78,goal_aborted,b1be6dc8
+2195.18,frontiers,avail=5 black=0
+2195.18,goal_accepted,7f85cd8d
+2195.83,goal_aborted,7f85cd8d
+2201.18,frontiers,avail=5 black=0
+2201.18,goal_accepted,b4b6f38a
+2201.93,goal_aborted,b4b6f38a
+2207.18,frontiers,avail=5 black=0
+2207.18,goal_accepted,5068b68a
+2207.98,goal_aborted,5068b68a
+2213.18,frontiers,avail=5 black=0
+2213.18,goal_accepted,1cd70c74
+2214.13,goal_aborted,1cd70c74
+2219.18,frontiers,avail=5 black=0
+2219.18,goal_accepted,2e79b56f
+2222.90,goal_aborted,2e79b56f
+2228.18,frontiers,avail=5 black=0
+2228.18,goal_accepted,d694b7de
+2229.03,goal_aborted,d694b7de
+2234.18,frontiers,avail=5 black=0
+2234.18,goal_accepted,6bc8de37
+2238.18,goal_aborted,6bc8de37
+2243.68,frontiers,avail=5 black=0
+2243.68,goal_accepted,d233b84c
+2247.48,goal_aborted,d233b84c
+2252.68,frontiers,avail=5 black=0
+2252.68,goal_accepted,e0def111
+2253.58,goal_aborted,e0def111
+2258.68,frontiers,avail=5 black=0
+2258.68,goal_accepted,09c784c1
+2263.51,goal_aborted,09c784c1
+2268.68,frontiers,avail=5 black=0
+2268.68,goal_accepted,97a36803
+2269.58,goal_aborted,97a36803
+2274.68,frontiers,avail=5 black=0
+2274.68,goal_accepted,960bdb83
+2279.47,goal_aborted,960bdb83
+2284.68,frontiers,avail=5 black=0
+2284.69,goal_accepted,95aa9a65
+2285.59,goal_aborted,95aa9a65
+2290.69,frontiers,avail=5 black=0
+2290.69,goal_accepted,5311e0f1
+2294.76,goal_aborted,5311e0f1
+2300.19,frontiers,avail=5 black=0
+2300.19,goal_accepted,75b2a082
+2302.89,goal_aborted,75b2a082
+2308.18,frontiers,avail=5 black=0
+2308.19,goal_accepted,7dbeb376
+2309.24,goal_aborted,7dbeb376
+2314.68,frontiers,avail=5 black=0
+2314.69,goal_accepted,6428cb29
+2315.24,goal_aborted,6428cb29
+2320.68,frontiers,avail=5 black=0
+2320.69,goal_accepted,dac0a0e0
+2321.24,goal_aborted,dac0a0e0
+2326.68,frontiers,avail=5 black=0
+2326.69,goal_accepted,9291ac1e
+2327.64,goal_aborted,9291ac1e
+2332.68,frontiers,avail=5 black=0
+2332.69,goal_accepted,c31ade2d
+2336.36,goal_aborted,c31ade2d
+2341.69,frontiers,avail=5 black=0
+2341.69,goal_accepted,01cb7809
+2342.59,goal_aborted,01cb7809
+2347.68,frontiers,avail=5 black=0
+2347.69,goal_accepted,315779bf
+2352.56,goal_aborted,315779bf
+2357.69,frontiers,avail=5 black=0
+2357.69,goal_accepted,1193dbbe
+2362.57,goal_aborted,1193dbbe
+2367.69,frontiers,avail=5 black=0
+2367.69,goal_accepted,552d2b5a
+2372.55,goal_aborted,552d2b5a
+2377.69,frontiers,avail=5 black=0
+2377.69,goal_accepted,4f6353ee
+2381.34,goal_aborted,4f6353ee
+2386.69,frontiers,avail=5 black=0
+2386.69,goal_accepted,fa785009
+2387.54,goal_aborted,fa785009
+2392.69,frontiers,avail=5 black=0
+2392.69,goal_accepted,0f37bde9
+2395.61,goal_aborted,0f37bde9

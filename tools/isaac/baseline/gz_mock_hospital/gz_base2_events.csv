@@ -1,0 +1,4326 @@
+t,kind,detail
+0.07,explore_status,exploration_started
+55.94,goal_succeeded,2cd3afd0
+55.94,goal_succeeded,a5ab8e8c
+56.09,frontiers,avail=16 black=0
+56.09,goal_accepted,e74ec9e5
+112.85,goal_succeeded,e74ec9e5
+113.09,frontiers,avail=26 black=0
+113.09,goal_accepted,f41be5bc
+179.24,goal_succeeded,f41be5bc
+179.59,frontiers,avail=23 black=0
+179.59,goal_accepted,b9321249
+258.05,goal_succeeded,b9321249
+258.09,frontiers,avail=16 black=0
+258.09,goal_accepted,e1fe7be3
+490.15,goal_canceled,e1fe7be3
+490.61,frontiers,avail=8 black=0
+490.61,goal_accepted,3f1bdeb2
+507.67,goal_aborted,3f1bdeb2
+513.11,frontiers,avail=8 black=0
+513.11,goal_accepted,ba55f47a
+514.16,goal_aborted,ba55f47a
+519.61,frontiers,avail=8 black=0
+519.61,goal_accepted,f2841ff4
+527.75,goal_aborted,f2841ff4
+533.11,frontiers,avail=8 black=0
+533.11,goal_accepted,92bea711
+554.59,goal_aborted,92bea711
+559.61,frontiers,avail=10 black=0
+559.61,goal_accepted,623434e0
+572.85,goal_aborted,623434e0
+578.11,frontiers,avail=10 black=0
+578.11,goal_accepted,4f8095ce
+586.15,goal_aborted,4f8095ce
+591.61,frontiers,avail=10 black=0
+591.61,goal_accepted,286cc36f
+613.86,goal_aborted,286cc36f
+619.11,frontiers,avail=10 black=0
+619.11,goal_accepted,83bb0f33
+622.21,goal_aborted,83bb0f33
+627.61,frontiers,avail=10 black=0
+627.61,goal_accepted,4cf35591
+732.97,goal_succeeded,4cf35591
+733.11,frontiers,avail=6 black=0
+733.11,goal_accepted,57e34688
+742.20,goal_aborted,57e34688
+747.61,frontiers,avail=6 black=0
+747.61,goal_accepted,0fa6e6aa
+773.88,goal_aborted,0fa6e6aa
+779.12,frontiers,avail=6 black=0
+779.12,goal_accepted,9680b988
+818.82,goal_aborted,9680b988
+824.12,frontiers,avail=6 black=0
+824.12,goal_accepted,f8814f6a
+833.10,goal_aborted,f8814f6a
+838.12,frontiers,avail=6 black=0
+838.12,goal_accepted,7147b409
+867.67,goal_aborted,7147b409
+873.12,frontiers,avail=6 black=0
+873.13,goal_accepted,3608c658
+908.65,goal_aborted,3608c658
+914.12,frontiers,avail=6 black=0
+914.13,goal_accepted,9e0f2c09
+1003.15,goal_aborted,9e0f2c09
+1008.62,frontiers,avail=5 black=0
+1008.63,goal_accepted,0a2e9241
+1098.77,goal_aborted,0a2e9241
+1104.13,frontiers,avail=5 black=0
+1104.13,goal_accepted,500ad9e9
+1125.36,goal_aborted,500ad9e9
+1130.63,frontiers,avail=5 black=0
+1130.63,goal_accepted,58b635f6
+1148.06,goal_aborted,58b635f6
+1153.13,frontiers,avail=5 black=0
+1153.13,goal_accepted,43a6efa6
+1162.30,goal_aborted,43a6efa6
+1167.63,frontiers,avail=5 black=0
+1167.63,goal_accepted,9b66341a
+1174.84,goal_aborted,9b66341a
+1180.13,frontiers,avail=5 black=0
+1180.13,goal_accepted,b4ac3dc6
+1222.13,goal_aborted,b4ac3dc6
+1227.63,frontiers,avail=5 black=0
+1227.63,goal_accepted,fc778a54
+1229.59,goal_aborted,fc778a54
+1234.64,frontiers,avail=5 black=0
+1234.64,goal_accepted,04f93401
+1238.45,goal_aborted,04f93401
+1243.64,frontiers,avail=4 black=0
+1243.64,goal_accepted,ae6b57c1
+1293.85,goal_aborted,ae6b57c1
+1299.14,frontiers,avail=3 black=0
+1299.14,goal_accepted,a5b68117
+1316.17,goal_aborted,a5b68117
+1321.64,frontiers,avail=3 black=0
+1321.64,goal_accepted,533d920b
+1337.79,goal_aborted,533d920b
+1343.14,frontiers,avail=2 black=0
+1343.14,explore_status,exploration_complete
+1343.64,frontiers,avail=2 black=0
+1343.64,explore_status,exploration_complete
+1344.14,frontiers,avail=2 black=0
+1344.14,explore_status,exploration_complete
+1344.64,frontiers,avail=2 black=0
+1344.64,explore_status,exploration_complete
+1345.14,frontiers,avail=2 black=0
+1345.14,explore_status,exploration_complete
+1345.64,frontiers,avail=2 black=0
+1345.64,explore_status,exploration_complete
+1346.14,frontiers,avail=2 black=0
+1346.14,explore_status,exploration_complete
+1346.64,frontiers,avail=2 black=0
+1346.64,explore_status,exploration_complete
+1347.14,frontiers,avail=2 black=0
+1347.14,explore_status,exploration_complete
+1347.64,frontiers,avail=2 black=0
+1347.64,explore_status,exploration_complete
+1348.14,frontiers,avail=2 black=0
+1348.14,explore_status,exploration_complete
+1348.64,frontiers,avail=2 black=0
+1348.64,explore_status,exploration_complete
+1349.14,frontiers,avail=2 black=0
+1349.14,explore_status,exploration_complete
+1349.64,frontiers,avail=2 black=0
+1349.64,explore_status,exploration_complete
+1350.14,frontiers,avail=2 black=0
+1350.14,explore_status,exploration_complete
+1350.64,frontiers,avail=2 black=0
+1350.64,explore_status,exploration_complete
+1351.14,frontiers,avail=2 black=0
+1351.14,explore_status,exploration_complete
+1351.64,frontiers,avail=2 black=0
+1351.64,explore_status,exploration_complete
+1352.14,frontiers,avail=2 black=0
+1352.14,explore_status,exploration_complete
+1352.64,frontiers,avail=2 black=0
+1352.64,explore_status,exploration_complete
+1353.14,frontiers,avail=2 black=0
+1353.14,explore_status,exploration_complete
+1353.64,frontiers,avail=2 black=0
+1353.64,explore_status,exploration_complete
+1354.14,frontiers,avail=2 black=0
+1354.14,explore_status,exploration_complete
+1354.64,frontiers,avail=2 black=0
+1354.64,explore_status,exploration_complete
+1355.14,frontiers,avail=2 black=0
+1355.14,explore_status,exploration_complete
+1355.64,frontiers,avail=2 black=0
+1355.64,explore_status,exploration_complete
+1356.14,frontiers,avail=2 black=0
+1356.14,explore_status,exploration_complete
+1356.64,frontiers,avail=2 black=0
+1356.64,explore_status,exploration_complete
+1357.14,frontiers,avail=2 black=0
+1357.14,explore_status,exploration_complete
+1357.64,frontiers,avail=2 black=0
+1357.64,explore_status,exploration_complete
+1358.14,frontiers,avail=2 black=0
+1358.14,explore_status,exploration_complete
+1358.64,frontiers,avail=2 black=0
+1358.64,explore_status,exploration_complete
+1359.14,frontiers,avail=2 black=0
+1359.14,explore_status,exploration_complete
+1359.64,frontiers,avail=2 black=0
+1359.64,explore_status,exploration_complete
+1360.14,frontiers,avail=2 black=0
+1360.14,explore_status,exploration_complete
+1360.64,frontiers,avail=2 black=0
+1360.64,explore_status,exploration_complete
+1361.14,frontiers,avail=2 black=0
+1361.14,explore_status,exploration_complete
+1361.64,frontiers,avail=2 black=0
+1361.64,explore_status,exploration_complete
+1362.14,frontiers,avail=2 black=0
+1362.14,explore_status,exploration_complete
+1362.64,frontiers,avail=2 black=0
+1362.64,explore_status,exploration_complete
+1363.14,frontiers,avail=2 black=0
+1363.14,explore_status,exploration_complete
+1363.64,frontiers,avail=2 black=0
+1363.64,explore_status,exploration_complete
+1364.14,frontiers,avail=2 black=0
+1364.14,explore_status,exploration_complete
+1364.64,frontiers,avail=2 black=0
+1364.64,explore_status,exploration_complete
+1365.14,frontiers,avail=2 black=0
+1365.14,explore_status,exploration_complete
+1365.64,frontiers,avail=2 black=0
+1365.64,explore_status,exploration_complete
+1366.14,frontiers,avail=2 black=0
+1366.14,explore_status,exploration_complete
+1366.64,frontiers,avail=2 black=0
+1366.64,explore_status,exploration_complete
+1367.14,frontiers,avail=2 black=0
+1367.14,explore_status,exploration_complete
+1367.64,frontiers,avail=2 black=0
+1367.64,explore_status,exploration_complete
+1368.14,frontiers,avail=2 black=0
+1368.14,explore_status,exploration_complete
+1368.64,frontiers,avail=2 black=0
+1368.64,explore_status,exploration_complete
+1369.14,frontiers,avail=2 black=0
+1369.14,explore_status,exploration_complete
+1369.64,frontiers,avail=2 black=0
+1369.64,explore_status,exploration_complete
+1370.14,frontiers,avail=2 black=0
+1370.14,explore_status,exploration_complete
+1370.64,frontiers,avail=2 black=0
+1370.64,explore_status,exploration_complete
+1371.14,frontiers,avail=2 black=0
+1371.14,explore_status,exploration_complete
+1371.64,frontiers,avail=2 black=0
+1371.64,explore_status,exploration_complete
+1372.14,frontiers,avail=2 black=0
+1372.14,explore_status,exploration_complete
+1372.64,frontiers,avail=2 black=0
+1372.64,explore_status,exploration_complete
+1373.14,frontiers,avail=2 black=0
+1373.14,explore_status,exploration_complete
+1373.64,frontiers,avail=2 black=0
+1373.64,explore_status,exploration_complete
+1374.14,frontiers,avail=2 black=0
+1374.14,explore_status,exploration_complete
+1374.64,frontiers,avail=2 black=0
+1374.64,explore_status,exploration_complete
+1375.14,frontiers,avail=2 black=0
+1375.14,explore_status,exploration_complete
+1375.64,frontiers,avail=2 black=0
+1375.64,explore_status,exploration_complete
+1376.14,frontiers,avail=2 black=0
+1376.14,explore_status,exploration_complete
+1376.64,frontiers,avail=2 black=0
+1376.64,explore_status,exploration_complete
+1377.14,frontiers,avail=2 black=0
+1377.14,explore_status,exploration_complete
+1377.64,frontiers,avail=2 black=0
+1377.64,explore_status,exploration_complete
+1378.14,frontiers,avail=2 black=0
+1378.14,explore_status,exploration_complete
+1378.64,frontiers,avail=2 black=0
+1378.64,explore_status,exploration_complete
+1379.14,frontiers,avail=2 black=0
+1379.14,explore_status,exploration_complete
+1379.64,frontiers,avail=2 black=0
+1379.64,explore_status,exploration_complete
+1380.14,frontiers,avail=2 black=0
+1380.14,explore_status,exploration_complete
+1380.64,frontiers,avail=2 black=0
+1380.64,explore_status,exploration_complete
+1381.14,frontiers,avail=2 black=0
+1381.14,explore_status,exploration_complete
+1381.64,frontiers,avail=2 black=0
+1381.64,explore_status,exploration_complete
+1382.14,frontiers,avail=2 black=0
+1382.14,explore_status,exploration_complete
+1382.64,frontiers,avail=2 black=0
+1382.64,explore_status,exploration_complete
+1383.14,frontiers,avail=2 black=0
+1383.14,explore_status,exploration_complete
+1383.64,frontiers,avail=2 black=0
+1383.64,explore_status,exploration_complete
+1384.14,frontiers,avail=2 black=0
+1384.14,explore_status,exploration_complete
+1384.64,frontiers,avail=2 black=0
+1384.64,explore_status,exploration_complete
+1385.14,frontiers,avail=2 black=0
+1385.14,explore_status,exploration_complete
+1385.64,frontiers,avail=2 black=0
+1385.64,explore_status,exploration_complete
+1386.14,frontiers,avail=2 black=0
+1386.14,explore_status,exploration_complete
+1386.64,frontiers,avail=2 black=0
+1386.64,explore_status,exploration_complete
+1387.14,frontiers,avail=2 black=0
+1387.14,explore_status,exploration_complete
+1387.64,frontiers,avail=2 black=0
+1387.64,explore_status,exploration_complete
+1388.14,frontiers,avail=2 black=0
+1388.14,explore_status,exploration_complete
+1388.64,frontiers,avail=2 black=0
+1388.64,explore_status,exploration_complete
+1389.14,frontiers,avail=2 black=0
+1389.14,explore_status,exploration_complete
+1389.64,frontiers,avail=2 black=0
+1389.64,explore_status,exploration_complete
+1390.14,frontiers,avail=2 black=0
+1390.14,explore_status,exploration_complete
+1390.64,frontiers,avail=2 black=0
+1390.64,explore_status,exploration_complete
+1391.14,frontiers,avail=2 black=0
+1391.14,explore_status,exploration_complete
+1391.64,frontiers,avail=2 black=0
+1391.64,explore_status,exploration_complete
+1392.14,frontiers,avail=2 black=0
+1392.14,explore_status,exploration_complete
+1392.64,frontiers,avail=2 black=0
+1392.64,explore_status,exploration_complete
+1393.14,frontiers,avail=2 black=0
+1393.14,explore_status,exploration_complete
+1393.64,frontiers,avail=2 black=0
+1393.64,explore_status,exploration_complete
+1394.14,frontiers,avail=2 black=0
+1394.14,explore_status,exploration_complete
+1394.64,frontiers,avail=2 black=0
+1394.64,explore_status,exploration_complete
+1395.14,frontiers,avail=2 black=0
+1395.14,explore_status,exploration_complete
+1395.64,frontiers,avail=2 black=0
+1395.64,explore_status,exploration_complete
+1396.14,frontiers,avail=2 black=0
+1396.14,explore_status,exploration_complete
+1396.64,frontiers,avail=2 black=0
+1396.64,explore_status,exploration_complete
+1397.14,frontiers,avail=2 black=0
+1397.14,explore_status,exploration_complete
+1397.64,frontiers,avail=2 black=0
+1397.64,explore_status,exploration_complete
+1398.14,frontiers,avail=2 black=0
+1398.14,explore_status,exploration_complete
+1398.64,frontiers,avail=2 black=0
+1398.64,explore_status,exploration_complete
+1399.14,frontiers,avail=2 black=0
+1399.14,explore_status,exploration_complete
+1399.64,frontiers,avail=2 black=0
+1399.64,explore_status,exploration_complete
+1400.14,frontiers,avail=2 black=0
+1400.14,explore_status,exploration_complete
+1400.64,frontiers,avail=2 black=0
+1400.64,explore_status,exploration_complete
+1401.14,frontiers,avail=2 black=0
+1401.14,explore_status,exploration_complete
+1401.64,frontiers,avail=2 black=0
+1401.64,explore_status,exploration_complete
+1402.14,frontiers,avail=2 black=0
+1402.14,explore_status,exploration_complete
+1402.64,frontiers,avail=2 black=0
+1402.64,explore_status,exploration_complete
+1403.14,frontiers,avail=2 black=0
+1403.14,explore_status,exploration_complete
+1403.64,frontiers,avail=2 black=0
+1403.64,explore_status,exploration_complete
+1404.14,frontiers,avail=2 black=0
+1404.14,explore_status,exploration_complete
+1404.64,frontiers,avail=2 black=0
+1404.64,explore_status,exploration_complete
+1405.14,frontiers,avail=2 black=0
+1405.14,explore_status,exploration_complete
+1405.64,frontiers,avail=2 black=0
+1405.64,explore_status,exploration_complete
+1406.14,frontiers,avail=2 black=0
+1406.14,explore_status,exploration_complete
+1406.64,frontiers,avail=2 black=0
+1406.64,explore_status,exploration_complete
+1407.14,frontiers,avail=2 black=0
+1407.14,explore_status,exploration_complete
+1407.64,frontiers,avail=2 black=0
+1407.64,explore_status,exploration_complete
+1408.14,frontiers,avail=2 black=0
+1408.14,explore_status,exploration_complete
+1408.64,frontiers,avail=2 black=0
+1408.64,explore_status,exploration_complete
+1409.14,frontiers,avail=2 black=0
+1409.14,explore_status,exploration_complete
+1409.64,frontiers,avail=2 black=0
+1409.64,explore_status,exploration_complete
+1410.14,frontiers,avail=2 black=0
+1410.14,explore_status,exploration_complete
+1410.64,frontiers,avail=2 black=0
+1410.64,explore_status,exploration_complete
+1411.14,frontiers,avail=2 black=0
+1411.14,explore_status,exploration_complete
+1411.64,frontiers,avail=2 black=0
+1411.64,explore_status,exploration_complete
+1412.14,frontiers,avail=2 black=0
+1412.14,explore_status,exploration_complete
+1412.64,frontiers,avail=2 black=0
+1412.64,explore_status,exploration_complete
+1413.14,frontiers,avail=2 black=0
+1413.14,explore_status,exploration_complete
+1413.64,frontiers,avail=2 black=0
+1413.64,explore_status,exploration_complete
+1414.14,frontiers,avail=2 black=0
+1414.14,explore_status,exploration_complete
+1414.64,frontiers,avail=2 black=0
+1414.64,explore_status,exploration_complete
+1415.14,frontiers,avail=2 black=0
+1415.14,explore_status,exploration_complete
+1415.64,frontiers,avail=2 black=0
+1415.64,explore_status,exploration_complete
+1416.14,frontiers,avail=2 black=0
+1416.14,explore_status,exploration_complete
+1416.64,frontiers,avail=2 black=0
+1416.64,explore_status,exploration_complete
+1417.14,frontiers,avail=2 black=0
+1417.14,explore_status,exploration_complete
+1417.64,frontiers,avail=2 black=0
+1417.64,explore_status,exploration_complete
+1418.14,frontiers,avail=2 black=0
+1418.14,explore_status,exploration_complete
+1418.64,frontiers,avail=2 black=0
+1418.64,explore_status,exploration_complete
+1419.14,frontiers,avail=2 black=0
+1419.14,explore_status,exploration_complete
+1419.64,frontiers,avail=2 black=0
+1419.64,explore_status,exploration_complete
+1420.14,frontiers,avail=2 black=0
+1420.14,explore_status,exploration_complete
+1420.64,frontiers,avail=2 black=0
+1420.64,explore_status,exploration_complete
+1421.14,frontiers,avail=2 black=0
+1421.14,explore_status,exploration_complete
+1421.64,frontiers,avail=2 black=0
+1421.64,explore_status,exploration_complete
+1422.14,frontiers,avail=2 black=0
+1422.14,explore_status,exploration_complete
+1422.64,frontiers,avail=2 black=0
+1422.64,explore_status,exploration_complete
+1423.14,frontiers,avail=2 black=0
+1423.14,explore_status,exploration_complete
+1423.64,frontiers,avail=2 black=0
+1423.64,explore_status,exploration_complete
+1424.14,frontiers,avail=2 black=0
+1424.14,explore_status,exploration_complete
+1424.64,frontiers,avail=2 black=0
+1424.64,explore_status,exploration_complete
+1425.14,frontiers,avail=2 black=0
+1425.14,explore_status,exploration_complete
+1425.64,frontiers,avail=2 black=0
+1425.64,explore_status,exploration_complete
+1426.14,frontiers,avail=2 black=0
+1426.14,explore_status,exploration_complete
+1426.64,frontiers,avail=2 black=0
+1426.64,explore_status,exploration_complete
+1427.14,frontiers,avail=2 black=0
+1427.14,explore_status,exploration_complete
+1427.64,frontiers,avail=2 black=0
+1427.64,explore_status,exploration_complete
+1428.14,frontiers,avail=2 black=0
+1428.14,explore_status,exploration_complete
+1428.64,frontiers,avail=2 black=0
+1428.64,explore_status,exploration_complete
+1429.14,frontiers,avail=2 black=0
+1429.14,explore_status,exploration_complete
+1429.64,frontiers,avail=2 black=0
+1429.64,explore_status,exploration_complete
+1430.14,frontiers,avail=2 black=0
+1430.14,explore_status,exploration_complete
+1430.64,frontiers,avail=2 black=0
+1430.64,explore_status,exploration_complete
+1431.14,frontiers,avail=2 black=0
+1431.14,explore_status,exploration_complete
+1431.64,frontiers,avail=2 black=0
+1431.64,explore_status,exploration_complete
+1432.14,frontiers,avail=2 black=0
+1432.14,explore_status,exploration_complete
+1432.64,frontiers,avail=2 black=0
+1432.64,explore_status,exploration_complete
+1433.14,frontiers,avail=2 black=0
+1433.14,explore_status,exploration_complete
+1433.64,frontiers,avail=2 black=0
+1433.64,explore_status,exploration_complete
+1434.14,frontiers,avail=2 black=0
+1434.14,explore_status,exploration_complete
+1434.64,frontiers,avail=2 black=0
+1434.64,explore_status,exploration_complete
+1435.14,frontiers,avail=2 black=0
+1435.14,explore_status,exploration_complete
+1435.64,frontiers,avail=2 black=0
+1435.64,explore_status,exploration_complete
+1436.14,frontiers,avail=2 black=0
+1436.14,explore_status,exploration_complete
+1436.64,frontiers,avail=2 black=0
+1436.64,explore_status,exploration_complete
+1437.14,frontiers,avail=2 black=0
+1437.14,explore_status,exploration_complete
+1437.64,frontiers,avail=2 black=0
+1437.64,explore_status,exploration_complete
+1438.14,frontiers,avail=2 black=0
+1438.14,explore_status,exploration_complete
+1438.64,frontiers,avail=2 black=0
+1438.64,explore_status,exploration_complete
+1439.14,frontiers,avail=2 black=0
+1439.14,explore_status,exploration_complete
+1439.64,frontiers,avail=2 black=0
+1439.64,explore_status,exploration_complete
+1440.14,frontiers,avail=2 black=0
+1440.14,explore_status,exploration_complete
+1440.64,frontiers,avail=2 black=0
+1440.64,explore_status,exploration_complete
+1441.14,frontiers,avail=2 black=0
+1441.14,explore_status,exploration_complete
+1441.64,frontiers,avail=2 black=0
+1441.64,explore_status,exploration_complete
+1442.14,frontiers,avail=2 black=0
+1442.14,explore_status,exploration_complete
+1442.64,frontiers,avail=2 black=0
+1442.64,explore_status,exploration_complete
+1443.14,frontiers,avail=2 black=0
+1443.14,explore_status,exploration_complete
+1443.64,frontiers,avail=2 black=0
+1443.64,explore_status,exploration_complete
+1444.14,frontiers,avail=2 black=0
+1444.14,explore_status,exploration_complete
+1444.64,frontiers,avail=2 black=0
+1444.64,explore_status,exploration_complete
+1445.14,frontiers,avail=2 black=0
+1445.14,explore_status,exploration_complete
+1445.64,frontiers,avail=2 black=0
+1445.64,explore_status,exploration_complete
+1446.14,frontiers,avail=2 black=0
+1446.14,explore_status,exploration_complete
+1446.64,frontiers,avail=2 black=0
+1446.64,explore_status,exploration_complete
+1447.14,frontiers,avail=2 black=0
+1447.14,explore_status,exploration_complete
+1447.64,frontiers,avail=2 black=0
+1447.64,explore_status,exploration_complete
+1448.14,frontiers,avail=2 black=0
+1448.14,explore_status,exploration_complete
+1448.64,frontiers,avail=2 black=0
+1448.64,explore_status,exploration_complete
+1449.14,frontiers,avail=2 black=0
+1449.14,explore_status,exploration_complete
+1449.64,frontiers,avail=2 black=0
+1449.64,explore_status,exploration_complete
+1450.14,frontiers,avail=2 black=0
+1450.14,explore_status,exploration_complete
+1450.64,frontiers,avail=2 black=0
+1450.64,explore_status,exploration_complete
+1451.14,frontiers,avail=2 black=0
+1451.14,explore_status,exploration_complete
+1451.64,frontiers,avail=2 black=0
+1451.64,explore_status,exploration_complete
+1452.14,frontiers,avail=2 black=0
+1452.14,explore_status,exploration_complete
+1452.64,frontiers,avail=2 black=0
+1452.64,explore_status,exploration_complete
+1453.14,frontiers,avail=2 black=0
+1453.14,explore_status,exploration_complete
+1453.64,frontiers,avail=2 black=0
+1453.64,explore_status,exploration_complete
+1454.14,frontiers,avail=2 black=0
+1454.14,explore_status,exploration_complete
+1454.64,frontiers,avail=2 black=0
+1454.64,explore_status,exploration_complete
+1455.14,frontiers,avail=2 black=0
+1455.14,explore_status,exploration_complete
+1455.64,frontiers,avail=2 black=0
+1455.64,explore_status,exploration_complete
+1456.14,frontiers,avail=2 black=0
+1456.14,explore_status,exploration_complete
+1456.64,frontiers,avail=2 black=0
+1456.64,explore_status,exploration_complete
+1457.14,frontiers,avail=2 black=0
+1457.14,explore_status,exploration_complete
+1457.64,frontiers,avail=2 black=0
+1457.64,explore_status,exploration_complete
+1458.14,frontiers,avail=2 black=0
+1458.14,explore_status,exploration_complete
+1458.64,frontiers,avail=2 black=0
+1458.64,explore_status,exploration_complete
+1459.14,frontiers,avail=2 black=0
+1459.14,explore_status,exploration_complete
+1459.64,frontiers,avail=2 black=0
+1459.64,explore_status,exploration_complete
+1460.14,frontiers,avail=2 black=0
+1460.14,explore_status,exploration_complete
+1460.64,frontiers,avail=2 black=0
+1460.64,explore_status,exploration_complete
+1461.14,frontiers,avail=2 black=0
+1461.14,explore_status,exploration_complete
+1461.64,frontiers,avail=2 black=0
+1461.64,explore_status,exploration_complete
+1462.14,frontiers,avail=2 black=0
+1462.14,explore_status,exploration_complete
+1462.64,frontiers,avail=2 black=0
+1462.64,explore_status,exploration_complete
+1463.14,frontiers,avail=2 black=0
+1463.14,explore_status,exploration_complete
+1463.64,frontiers,avail=2 black=0
+1463.64,explore_status,exploration_complete
+1464.14,frontiers,avail=2 black=0
+1464.14,explore_status,exploration_complete
+1464.64,frontiers,avail=2 black=0
+1464.64,explore_status,exploration_complete
+1465.14,frontiers,avail=2 black=0
+1465.14,explore_status,exploration_complete
+1465.64,frontiers,avail=2 black=0
+1465.64,explore_status,exploration_complete
+1466.14,frontiers,avail=2 black=0
+1466.14,explore_status,exploration_complete
+1466.64,frontiers,avail=2 black=0
+1466.64,explore_status,exploration_complete
+1467.14,frontiers,avail=2 black=0
+1467.14,explore_status,exploration_complete
+1467.64,frontiers,avail=2 black=0
+1467.64,explore_status,exploration_complete
+1468.14,frontiers,avail=2 black=0
+1468.14,explore_status,exploration_complete
+1468.64,frontiers,avail=2 black=0
+1468.64,explore_status,exploration_complete
+1469.14,frontiers,avail=2 black=0
+1469.14,explore_status,exploration_complete
+1469.64,frontiers,avail=2 black=0
+1469.65,explore_status,exploration_complete
+1470.14,frontiers,avail=2 black=0
+1470.14,explore_status,exploration_complete
+1470.64,frontiers,avail=2 black=0
+1470.64,explore_status,exploration_complete
+1471.14,frontiers,avail=2 black=0
+1471.14,explore_status,exploration_complete
+1471.64,frontiers,avail=2 black=0
+1471.64,explore_status,exploration_complete
+1472.14,frontiers,avail=2 black=0
+1472.14,explore_status,exploration_complete
+1472.64,frontiers,avail=2 black=0
+1472.64,explore_status,exploration_complete
+1473.14,frontiers,avail=2 black=0
+1473.14,explore_status,exploration_complete
+1473.64,frontiers,avail=2 black=0
+1473.64,explore_status,exploration_complete
+1474.14,frontiers,avail=2 black=0
+1474.14,explore_status,exploration_complete
+1474.64,frontiers,avail=2 black=0
+1474.64,explore_status,exploration_complete
+1475.14,frontiers,avail=2 black=0
+1475.14,explore_status,exploration_complete
+1475.64,frontiers,avail=2 black=0
+1475.64,explore_status,exploration_complete
+1476.14,frontiers,avail=2 black=0
+1476.14,explore_status,exploration_complete
+1476.64,frontiers,avail=2 black=0
+1476.64,explore_status,exploration_complete
+1477.14,frontiers,avail=2 black=0
+1477.14,explore_status,exploration_complete
+1477.64,frontiers,avail=2 black=0
+1477.64,explore_status,exploration_complete
+1478.14,frontiers,avail=2 black=0
+1478.14,explore_status,exploration_complete
+1478.64,frontiers,avail=2 black=0
+1478.64,explore_status,exploration_complete
+1479.14,frontiers,avail=2 black=0
+1479.14,explore_status,exploration_complete
+1479.64,frontiers,avail=2 black=0
+1479.64,explore_status,exploration_complete
+1480.14,frontiers,avail=2 black=0
+1480.14,explore_status,exploration_complete
+1480.64,frontiers,avail=2 black=0
+1480.64,explore_status,exploration_complete
+1481.14,frontiers,avail=2 black=0
+1481.14,explore_status,exploration_complete
+1481.64,frontiers,avail=2 black=0
+1481.64,explore_status,exploration_complete
+1482.14,frontiers,avail=2 black=0
+1482.14,explore_status,exploration_complete
+1482.64,frontiers,avail=2 black=0
+1482.64,explore_status,exploration_complete
+1483.14,frontiers,avail=2 black=0
+1483.14,explore_status,exploration_complete
+1483.64,frontiers,avail=2 black=0
+1483.64,explore_status,exploration_complete
+1484.14,frontiers,avail=2 black=0
+1484.14,explore_status,exploration_complete
+1484.64,frontiers,avail=2 black=0
+1484.64,explore_status,exploration_complete
+1485.14,frontiers,avail=2 black=0
+1485.14,explore_status,exploration_complete
+1485.64,frontiers,avail=2 black=0
+1485.64,explore_status,exploration_complete
+1486.14,frontiers,avail=2 black=0
+1486.14,explore_status,exploration_complete
+1486.64,frontiers,avail=2 black=0
+1486.64,explore_status,exploration_complete
+1487.14,frontiers,avail=2 black=0
+1487.14,explore_status,exploration_complete
+1487.64,frontiers,avail=2 black=0
+1487.64,explore_status,exploration_complete
+1488.14,frontiers,avail=2 black=0
+1488.14,explore_status,exploration_complete
+1488.64,frontiers,avail=2 black=0
+1488.64,explore_status,exploration_complete
+1489.14,frontiers,avail=2 black=0
+1489.14,explore_status,exploration_complete
+1489.64,frontiers,avail=2 black=0
+1489.64,explore_status,exploration_complete
+1490.14,frontiers,avail=2 black=0
+1490.14,explore_status,exploration_complete
+1490.64,frontiers,avail=2 black=0
+1490.64,explore_status,exploration_complete
+1491.14,frontiers,avail=2 black=0
+1491.14,explore_status,exploration_complete
+1491.64,frontiers,avail=2 black=0
+1491.64,explore_status,exploration_complete
+1492.14,frontiers,avail=2 black=0
+1492.14,explore_status,exploration_complete
+1492.64,frontiers,avail=2 black=0
+1492.64,explore_status,exploration_complete
+1493.14,frontiers,avail=2 black=0
+1493.14,explore_status,exploration_complete
+1493.64,frontiers,avail=2 black=0
+1493.64,explore_status,exploration_complete
+1494.14,frontiers,avail=2 black=0
+1494.14,explore_status,exploration_complete
+1494.64,frontiers,avail=2 black=0
+1494.64,explore_status,exploration_complete
+1495.14,frontiers,avail=2 black=0
+1495.14,explore_status,exploration_complete
+1495.64,frontiers,avail=2 black=0
+1495.64,explore_status,exploration_complete
+1496.14,frontiers,avail=2 black=0
+1496.14,explore_status,exploration_complete
+1496.64,frontiers,avail=2 black=0
+1496.64,explore_status,exploration_complete
+1497.14,frontiers,avail=2 black=0
+1497.14,explore_status,exploration_complete
+1497.64,frontiers,avail=2 black=0
+1497.64,explore_status,exploration_complete
+1498.14,frontiers,avail=2 black=0
+1498.14,explore_status,exploration_complete
+1498.64,frontiers,avail=2 black=0
+1498.64,explore_status,exploration_complete
+1499.14,frontiers,avail=2 black=0
+1499.14,explore_status,exploration_complete
+1499.64,frontiers,avail=2 black=0
+1499.64,explore_status,exploration_complete
+1500.14,frontiers,avail=2 black=0
+1500.14,explore_status,exploration_complete
+1500.64,frontiers,avail=2 black=0
+1500.64,explore_status,exploration_complete
+1501.14,frontiers,avail=2 black=0
+1501.14,explore_status,exploration_complete
+1501.64,frontiers,avail=2 black=0
+1501.64,explore_status,exploration_complete
+1502.14,frontiers,avail=2 black=0
+1502.14,explore_status,exploration_complete
+1502.64,frontiers,avail=2 black=0
+1502.64,explore_status,exploration_complete
+1503.14,frontiers,avail=2 black=0
+1503.14,explore_status,exploration_complete
+1503.64,frontiers,avail=2 black=0
+1503.64,explore_status,exploration_complete
+1504.14,frontiers,avail=2 black=0
+1504.14,explore_status,exploration_complete
+1504.64,frontiers,avail=2 black=0
+1504.64,explore_status,exploration_complete
+1505.14,frontiers,avail=2 black=0
+1505.14,explore_status,exploration_complete
+1505.64,frontiers,avail=2 black=0
+1505.64,explore_status,exploration_complete
+1506.14,frontiers,avail=2 black=0
+1506.14,explore_status,exploration_complete
+1506.64,frontiers,avail=2 black=0
+1506.64,explore_status,exploration_complete
+1507.14,frontiers,avail=2 black=0
+1507.14,explore_status,exploration_complete
+1507.64,frontiers,avail=2 black=0
+1507.64,explore_status,exploration_complete
+1508.14,frontiers,avail=2 black=0
+1508.14,explore_status,exploration_complete
+1508.64,frontiers,avail=2 black=0
+1508.64,explore_status,exploration_complete
+1509.14,frontiers,avail=2 black=0
+1509.14,explore_status,exploration_complete
+1509.64,frontiers,avail=2 black=0
+1509.64,explore_status,exploration_complete
+1510.14,frontiers,avail=2 black=0
+1510.14,explore_status,exploration_complete
+1510.64,frontiers,avail=2 black=0
+1510.64,explore_status,exploration_complete
+1511.14,frontiers,avail=2 black=0
+1511.14,explore_status,exploration_complete
+1511.64,frontiers,avail=2 black=0
+1511.64,explore_status,exploration_complete
+1512.14,frontiers,avail=2 black=0
+1512.14,explore_status,exploration_complete
+1512.64,frontiers,avail=2 black=0
+1512.64,explore_status,exploration_complete
+1513.14,frontiers,avail=2 black=0
+1513.14,explore_status,exploration_complete
+1513.64,frontiers,avail=2 black=0
+1513.64,explore_status,exploration_complete
+1514.14,frontiers,avail=2 black=0
+1514.14,explore_status,exploration_complete
+1514.64,frontiers,avail=2 black=0
+1514.64,explore_status,exploration_complete
+1515.14,frontiers,avail=2 black=0
+1515.14,explore_status,exploration_complete
+1515.64,frontiers,avail=2 black=0
+1515.64,explore_status,exploration_complete
+1516.14,frontiers,avail=2 black=0
+1516.14,explore_status,exploration_complete
+1516.64,frontiers,avail=2 black=0
+1516.64,explore_status,exploration_complete
+1517.14,frontiers,avail=2 black=0
+1517.14,explore_status,exploration_complete
+1517.64,frontiers,avail=2 black=0
+1517.64,explore_status,exploration_complete
+1518.14,frontiers,avail=2 black=0
+1518.14,explore_status,exploration_complete
+1518.64,frontiers,avail=2 black=0
+1518.64,explore_status,exploration_complete
+1519.14,frontiers,avail=2 black=0
+1519.14,explore_status,exploration_complete
+1519.64,frontiers,avail=2 black=0
+1519.64,explore_status,exploration_complete
+1520.14,frontiers,avail=2 black=0
+1520.14,explore_status,exploration_complete
+1520.64,frontiers,avail=2 black=0
+1520.64,explore_status,exploration_complete
+1521.14,frontiers,avail=2 black=0
+1521.14,explore_status,exploration_complete
+1521.64,frontiers,avail=2 black=0
+1521.64,explore_status,exploration_complete
+1522.14,frontiers,avail=2 black=0
+1522.14,explore_status,exploration_complete
+1522.64,frontiers,avail=2 black=0
+1522.64,explore_status,exploration_complete
+1523.14,frontiers,avail=2 black=0
+1523.14,explore_status,exploration_complete
+1523.64,frontiers,avail=2 black=0
+1523.64,explore_status,exploration_complete
+1524.14,frontiers,avail=2 black=0
+1524.14,explore_status,exploration_complete
+1524.64,frontiers,avail=2 black=0
+1524.64,explore_status,exploration_complete
+1525.14,frontiers,avail=2 black=0
+1525.14,explore_status,exploration_complete
+1525.64,frontiers,avail=2 black=0
+1525.64,explore_status,exploration_complete
+1526.14,frontiers,avail=2 black=0
+1526.14,explore_status,exploration_complete
+1526.64,frontiers,avail=2 black=0
+1526.64,explore_status,exploration_complete
+1527.14,frontiers,avail=2 black=0
+1527.14,explore_status,exploration_complete
+1527.64,frontiers,avail=2 black=0
+1527.64,explore_status,exploration_complete
+1528.14,frontiers,avail=2 black=0
+1528.14,explore_status,exploration_complete
+1528.64,frontiers,avail=2 black=0
+1528.64,explore_status,exploration_complete
+1529.14,frontiers,avail=2 black=0
+1529.14,explore_status,exploration_complete
+1529.64,frontiers,avail=2 black=0
+1529.64,explore_status,exploration_complete
+1530.14,frontiers,avail=2 black=0
+1530.14,explore_status,exploration_complete
+1530.64,frontiers,avail=2 black=0
+1530.64,explore_status,exploration_complete
+1531.14,frontiers,avail=2 black=0
+1531.14,explore_status,exploration_complete
+1531.64,frontiers,avail=2 black=0
+1531.64,explore_status,exploration_complete
+1532.14,frontiers,avail=2 black=0
+1532.14,explore_status,exploration_complete
+1532.64,frontiers,avail=2 black=0
+1532.64,explore_status,exploration_complete
+1533.14,frontiers,avail=2 black=0
+1533.14,explore_status,exploration_complete
+1533.64,frontiers,avail=2 black=0
+1533.64,explore_status,exploration_complete
+1534.14,frontiers,avail=2 black=0
+1534.14,explore_status,exploration_complete
+1534.64,frontiers,avail=2 black=0
+1534.64,explore_status,exploration_complete
+1535.14,frontiers,avail=2 black=0
+1535.14,explore_status,exploration_complete
+1535.64,frontiers,avail=2 black=0
+1535.64,explore_status,exploration_complete
+1536.14,frontiers,avail=2 black=0
+1536.14,explore_status,exploration_complete
+1536.64,frontiers,avail=2 black=0
+1536.64,explore_status,exploration_complete
+1537.14,frontiers,avail=2 black=0
+1537.14,explore_status,exploration_complete
+1537.64,frontiers,avail=2 black=0
+1537.64,explore_status,exploration_complete
+1538.14,frontiers,avail=2 black=0
+1538.14,explore_status,exploration_complete
+1538.64,frontiers,avail=2 black=0
+1538.64,explore_status,exploration_complete
+1539.14,frontiers,avail=2 black=0
+1539.14,explore_status,exploration_complete
+1539.64,frontiers,avail=2 black=0
+1539.64,explore_status,exploration_complete
+1540.14,frontiers,avail=2 black=0
+1540.14,explore_status,exploration_complete
+1540.64,frontiers,avail=2 black=0
+1540.64,explore_status,exploration_complete
+1541.14,frontiers,avail=2 black=0
+1541.14,explore_status,exploration_complete
+1541.64,frontiers,avail=2 black=0
+1541.64,explore_status,exploration_complete
+1542.14,frontiers,avail=2 black=0
+1542.14,explore_status,exploration_complete
+1542.64,frontiers,avail=2 black=0
+1542.64,explore_status,exploration_complete
+1543.14,frontiers,avail=2 black=0
+1543.14,explore_status,exploration_complete
+1543.64,frontiers,avail=2 black=0
+1543.64,explore_status,exploration_complete
+1544.14,frontiers,avail=2 black=0
+1544.14,explore_status,exploration_complete
+1544.64,frontiers,avail=2 black=0
+1544.64,explore_status,exploration_complete
+1545.14,frontiers,avail=2 black=0
+1545.14,explore_status,exploration_complete
+1545.64,frontiers,avail=2 black=0
+1545.64,explore_status,exploration_complete
+1546.14,frontiers,avail=2 black=0
+1546.14,explore_status,exploration_complete
+1546.64,frontiers,avail=2 black=0
+1546.64,explore_status,exploration_complete
+1547.14,frontiers,avail=2 black=0
+1547.14,explore_status,exploration_complete
+1547.64,frontiers,avail=2 black=0
+1547.64,explore_status,exploration_complete
+1548.14,frontiers,avail=2 black=0
+1548.14,explore_status,exploration_complete
+1548.64,frontiers,avail=2 black=0
+1548.64,explore_status,exploration_complete
+1549.14,frontiers,avail=2 black=0
+1549.14,explore_status,exploration_complete
+1549.64,frontiers,avail=2 black=0
+1549.64,explore_status,exploration_complete
+1550.14,frontiers,avail=2 black=0
+1550.14,explore_status,exploration_complete
+1550.64,frontiers,avail=2 black=0
+1550.64,explore_status,exploration_complete
+1551.14,frontiers,avail=2 black=0
+1551.14,explore_status,exploration_complete
+1551.64,frontiers,avail=2 black=0
+1551.64,explore_status,exploration_complete
+1552.14,frontiers,avail=2 black=0
+1552.14,explore_status,exploration_complete
+1552.64,frontiers,avail=2 black=0
+1552.64,explore_status,exploration_complete
+1553.14,frontiers,avail=2 black=0
+1553.14,explore_status,exploration_complete
+1553.64,frontiers,avail=2 black=0
+1553.64,explore_status,exploration_complete
+1554.14,frontiers,avail=2 black=0
+1554.14,explore_status,exploration_complete
+1554.64,frontiers,avail=2 black=0
+1554.64,explore_status,exploration_complete
+1555.14,frontiers,avail=2 black=0
+1555.14,explore_status,exploration_complete
+1555.64,frontiers,avail=2 black=0
+1555.64,explore_status,exploration_complete
+1556.14,frontiers,avail=2 black=0
+1556.14,explore_status,exploration_complete
+1556.64,frontiers,avail=2 black=0
+1556.64,explore_status,exploration_complete
+1557.14,frontiers,avail=2 black=0
+1557.14,explore_status,exploration_complete
+1557.64,frontiers,avail=2 black=0
+1557.64,explore_status,exploration_complete
+1558.14,frontiers,avail=2 black=0
+1558.14,explore_status,exploration_complete
+1558.64,frontiers,avail=2 black=0
+1558.64,explore_status,exploration_complete
+1559.14,frontiers,avail=2 black=0
+1559.14,explore_status,exploration_complete
+1559.64,frontiers,avail=2 black=0
+1559.64,explore_status,exploration_complete
+1560.14,frontiers,avail=2 black=0
+1560.14,explore_status,exploration_complete
+1560.64,frontiers,avail=2 black=0
+1560.64,explore_status,exploration_complete
+1561.14,frontiers,avail=2 black=0
+1561.14,explore_status,exploration_complete
+1561.64,frontiers,avail=2 black=0
+1561.64,explore_status,exploration_complete
+1562.14,frontiers,avail=2 black=0
+1562.14,explore_status,exploration_complete
+1562.64,frontiers,avail=2 black=0
+1562.64,explore_status,exploration_complete
+1563.14,frontiers,avail=2 black=0
+1563.14,explore_status,exploration_complete
+1563.64,frontiers,avail=2 black=0
+1563.64,explore_status,exploration_complete
+1564.14,frontiers,avail=2 black=0
+1564.14,explore_status,exploration_complete
+1564.64,frontiers,avail=2 black=0
+1564.64,explore_status,exploration_complete
+1565.14,frontiers,avail=2 black=0
+1565.14,explore_status,exploration_complete
+1565.64,frontiers,avail=2 black=0
+1565.64,explore_status,exploration_complete
+1566.14,frontiers,avail=2 black=0
+1566.14,explore_status,exploration_complete
+1566.64,frontiers,avail=2 black=0
+1566.64,explore_status,exploration_complete
+1567.14,frontiers,avail=2 black=0
+1567.14,explore_status,exploration_complete
+1567.64,frontiers,avail=2 black=0
+1567.64,explore_status,exploration_complete
+1568.14,frontiers,avail=2 black=0
+1568.14,explore_status,exploration_complete
+1568.64,frontiers,avail=2 black=0
+1568.64,explore_status,exploration_complete
+1569.14,frontiers,avail=2 black=0
+1569.14,explore_status,exploration_complete
+1569.64,frontiers,avail=2 black=0
+1569.64,explore_status,exploration_complete
+1570.14,frontiers,avail=2 black=0
+1570.14,explore_status,exploration_complete
+1570.64,frontiers,avail=2 black=0
+1570.64,explore_status,exploration_complete
+1571.14,frontiers,avail=2 black=0
+1571.14,explore_status,exploration_complete
+1571.64,frontiers,avail=2 black=0
+1571.64,explore_status,exploration_complete
+1572.14,frontiers,avail=2 black=0
+1572.14,explore_status,exploration_complete
+1572.64,frontiers,avail=2 black=0
+1572.64,explore_status,exploration_complete
+1573.14,frontiers,avail=2 black=0
+1573.14,explore_status,exploration_complete
+1573.64,frontiers,avail=2 black=0
+1573.64,explore_status,exploration_complete
+1574.14,frontiers,avail=2 black=0
+1574.14,explore_status,exploration_complete
+1574.64,frontiers,avail=2 black=0
+1574.64,explore_status,exploration_complete
+1575.14,frontiers,avail=2 black=0
+1575.14,explore_status,exploration_complete
+1575.64,frontiers,avail=2 black=0
+1575.64,explore_status,exploration_complete
+1576.14,frontiers,avail=2 black=0
+1576.14,explore_status,exploration_complete
+1576.64,frontiers,avail=2 black=0
+1576.64,explore_status,exploration_complete
+1577.14,frontiers,avail=2 black=0
+1577.14,explore_status,exploration_complete
+1577.64,frontiers,avail=2 black=0
+1577.64,explore_status,exploration_complete
+1578.14,frontiers,avail=2 black=0
+1578.14,explore_status,exploration_complete
+1578.64,frontiers,avail=2 black=0
+1578.64,explore_status,exploration_complete
+1579.14,frontiers,avail=2 black=0
+1579.14,explore_status,exploration_complete
+1579.64,frontiers,avail=2 black=0
+1579.64,explore_status,exploration_complete
+1580.14,frontiers,avail=2 black=0
+1580.14,explore_status,exploration_complete
+1580.64,frontiers,avail=2 black=0
+1580.64,explore_status,exploration_complete
+1581.14,frontiers,avail=2 black=0
+1581.14,explore_status,exploration_complete
+1581.64,frontiers,avail=2 black=0
+1581.64,explore_status,exploration_complete
+1582.14,frontiers,avail=2 black=0
+1582.14,explore_status,exploration_complete
+1582.64,frontiers,avail=2 black=0
+1582.64,explore_status,exploration_complete
+1583.14,frontiers,avail=2 black=0
+1583.14,explore_status,exploration_complete
+1583.64,frontiers,avail=2 black=0
+1583.64,explore_status,exploration_complete
+1584.14,frontiers,avail=2 black=0
+1584.14,explore_status,exploration_complete
+1584.64,frontiers,avail=2 black=0
+1584.64,explore_status,exploration_complete
+1585.14,frontiers,avail=2 black=0
+1585.14,explore_status,exploration_complete
+1585.64,frontiers,avail=2 black=0
+1585.64,explore_status,exploration_complete
+1586.14,frontiers,avail=2 black=0
+1586.14,explore_status,exploration_complete
+1586.64,frontiers,avail=2 black=0
+1586.64,explore_status,exploration_complete
+1587.14,frontiers,avail=2 black=0
+1587.14,explore_status,exploration_complete
+1587.64,frontiers,avail=2 black=0
+1587.64,explore_status,exploration_complete
+1588.14,frontiers,avail=2 black=0
+1588.14,explore_status,exploration_complete
+1588.64,frontiers,avail=2 black=0
+1588.64,explore_status,exploration_complete
+1589.14,frontiers,avail=2 black=0
+1589.14,explore_status,exploration_complete
+1589.64,frontiers,avail=2 black=0
+1589.64,explore_status,exploration_complete
+1590.14,frontiers,avail=2 black=0
+1590.14,explore_status,exploration_complete
+1590.64,frontiers,avail=2 black=0
+1590.64,explore_status,exploration_complete
+1591.14,frontiers,avail=2 black=0
+1591.14,explore_status,exploration_complete
+1591.64,frontiers,avail=2 black=0
+1591.64,explore_status,exploration_complete
+1592.14,frontiers,avail=2 black=0
+1592.14,explore_status,exploration_complete
+1592.64,frontiers,avail=2 black=0
+1592.64,explore_status,exploration_complete
+1593.14,frontiers,avail=2 black=0
+1593.14,explore_status,exploration_complete
+1593.64,frontiers,avail=2 black=0
+1593.64,explore_status,exploration_complete
+1594.14,frontiers,avail=2 black=0
+1594.14,explore_status,exploration_complete
+1594.64,frontiers,avail=2 black=0
+1594.64,explore_status,exploration_complete
+1595.14,frontiers,avail=2 black=0
+1595.14,explore_status,exploration_complete
+1595.64,frontiers,avail=2 black=0
+1595.64,explore_status,exploration_complete
+1596.14,frontiers,avail=2 black=0
+1596.14,explore_status,exploration_complete
+1596.64,frontiers,avail=2 black=0
+1596.64,explore_status,exploration_complete
+1597.14,frontiers,avail=2 black=0
+1597.14,explore_status,exploration_complete
+1597.64,frontiers,avail=2 black=0
+1597.64,explore_status,exploration_complete
+1598.14,frontiers,avail=2 black=0
+1598.14,explore_status,exploration_complete
+1598.64,frontiers,avail=2 black=0
+1598.64,explore_status,exploration_complete
+1599.14,frontiers,avail=2 black=0
+1599.14,explore_status,exploration_complete
+1599.64,frontiers,avail=2 black=0
+1599.64,explore_status,exploration_complete
+1600.14,frontiers,avail=2 black=0
+1600.14,explore_status,exploration_complete
+1600.64,frontiers,avail=2 black=0
+1600.64,explore_status,exploration_complete
+1601.14,frontiers,avail=2 black=0
+1601.14,explore_status,exploration_complete
+1601.64,frontiers,avail=2 black=0
+1601.64,explore_status,exploration_complete
+1602.14,frontiers,avail=2 black=0
+1602.14,explore_status,exploration_complete
+1602.64,frontiers,avail=2 black=0
+1602.64,explore_status,exploration_complete
+1603.14,frontiers,avail=2 black=0
+1603.14,explore_status,exploration_complete
+1603.64,frontiers,avail=2 black=0
+1603.64,explore_status,exploration_complete
+1604.14,frontiers,avail=2 black=0
+1604.14,explore_status,exploration_complete
+1604.64,frontiers,avail=2 black=0
+1604.64,explore_status,exploration_complete
+1605.14,frontiers,avail=2 black=0
+1605.14,explore_status,exploration_complete
+1605.64,frontiers,avail=2 black=0
+1605.64,explore_status,exploration_complete
+1606.14,frontiers,avail=2 black=0
+1606.14,explore_status,exploration_complete
+1606.64,frontiers,avail=2 black=0
+1606.64,explore_status,exploration_complete
+1607.14,frontiers,avail=2 black=0
+1607.14,explore_status,exploration_complete
+1607.64,frontiers,avail=2 black=0
+1607.64,explore_status,exploration_complete
+1608.14,frontiers,avail=2 black=0
+1608.14,explore_status,exploration_complete
+1608.64,frontiers,avail=2 black=0
+1608.64,explore_status,exploration_complete
+1609.14,frontiers,avail=2 black=0
+1609.14,explore_status,exploration_complete
+1609.64,frontiers,avail=2 black=0
+1609.64,explore_status,exploration_complete
+1610.14,frontiers,avail=2 black=0
+1610.14,explore_status,exploration_complete
+1610.64,frontiers,avail=2 black=0
+1610.64,explore_status,exploration_complete
+1611.14,frontiers,avail=2 black=0
+1611.14,explore_status,exploration_complete
+1611.64,frontiers,avail=2 black=0
+1611.64,explore_status,exploration_complete
+1612.14,frontiers,avail=2 black=0
+1612.14,explore_status,exploration_complete
+1612.64,frontiers,avail=2 black=0
+1612.64,explore_status,exploration_complete
+1613.14,frontiers,avail=2 black=0
+1613.14,explore_status,exploration_complete
+1613.64,frontiers,avail=2 black=0
+1613.64,explore_status,exploration_complete
+1614.14,frontiers,avail=2 black=0
+1614.14,explore_status,exploration_complete
+1614.64,frontiers,avail=2 black=0
+1614.64,explore_status,exploration_complete
+1615.14,frontiers,avail=2 black=0
+1615.14,explore_status,exploration_complete
+1615.64,frontiers,avail=2 black=0
+1615.64,explore_status,exploration_complete
+1616.14,frontiers,avail=2 black=0
+1616.14,explore_status,exploration_complete
+1616.64,frontiers,avail=2 black=0
+1616.64,explore_status,exploration_complete
+1617.14,frontiers,avail=2 black=0
+1617.14,explore_status,exploration_complete
+1617.64,frontiers,avail=2 black=0
+1617.64,explore_status,exploration_complete
+1618.14,frontiers,avail=2 black=0
+1618.14,explore_status,exploration_complete
+1618.64,frontiers,avail=2 black=0
+1618.64,explore_status,exploration_complete
+1619.14,frontiers,avail=2 black=0
+1619.14,explore_status,exploration_complete
+1619.64,frontiers,avail=2 black=0
+1619.64,explore_status,exploration_complete
+1620.14,frontiers,avail=2 black=0
+1620.14,explore_status,exploration_complete
+1620.64,frontiers,avail=2 black=0
+1620.64,explore_status,exploration_complete
+1621.14,frontiers,avail=2 black=0
+1621.14,explore_status,exploration_complete
+1621.64,frontiers,avail=2 black=0
+1621.64,explore_status,exploration_complete
+1622.14,frontiers,avail=2 black=0
+1622.14,explore_status,exploration_complete
+1622.64,frontiers,avail=2 black=0
+1622.64,explore_status,exploration_complete
+1623.14,frontiers,avail=2 black=0
+1623.14,explore_status,exploration_complete
+1623.64,frontiers,avail=2 black=0
+1623.64,explore_status,exploration_complete
+1624.14,frontiers,avail=2 black=0
+1624.14,explore_status,exploration_complete
+1624.64,frontiers,avail=2 black=0
+1624.64,explore_status,exploration_complete
+1625.14,frontiers,avail=2 black=0
+1625.14,explore_status,exploration_complete
+1625.64,frontiers,avail=2 black=0
+1625.64,explore_status,exploration_complete
+1626.14,frontiers,avail=2 black=0
+1626.14,explore_status,exploration_complete
+1626.64,frontiers,avail=2 black=0
+1626.64,explore_status,exploration_complete
+1627.14,frontiers,avail=2 black=0
+1627.14,explore_status,exploration_complete
+1627.64,frontiers,avail=2 black=0
+1627.64,explore_status,exploration_complete
+1628.14,frontiers,avail=2 black=0
+1628.14,explore_status,exploration_complete
+1628.64,frontiers,avail=2 black=0
+1628.64,explore_status,exploration_complete
+1629.14,frontiers,avail=2 black=0
+1629.14,explore_status,exploration_complete
+1629.64,frontiers,avail=2 black=0
+1629.64,explore_status,exploration_complete
+1630.14,frontiers,avail=2 black=0
+1630.14,explore_status,exploration_complete
+1630.64,frontiers,avail=2 black=0
+1630.64,explore_status,exploration_complete
+1631.14,frontiers,avail=2 black=0
+1631.14,explore_status,exploration_complete
+1631.64,frontiers,avail=2 black=0
+1631.64,explore_status,exploration_complete
+1632.14,frontiers,avail=2 black=0
+1632.14,explore_status,exploration_complete
+1632.64,frontiers,avail=2 black=0
+1632.64,explore_status,exploration_complete
+1633.14,frontiers,avail=2 black=0
+1633.14,explore_status,exploration_complete
+1633.64,frontiers,avail=2 black=0
+1633.64,explore_status,exploration_complete
+1634.14,frontiers,avail=2 black=0
+1634.14,explore_status,exploration_complete
+1634.64,frontiers,avail=2 black=0
+1634.64,explore_status,exploration_complete
+1635.14,frontiers,avail=2 black=0
+1635.14,explore_status,exploration_complete
+1635.64,frontiers,avail=2 black=0
+1635.64,explore_status,exploration_complete
+1636.14,frontiers,avail=2 black=0
+1636.14,explore_status,exploration_complete
+1636.64,frontiers,avail=2 black=0
+1636.64,explore_status,exploration_complete
+1637.14,frontiers,avail=2 black=0
+1637.14,explore_status,exploration_complete
+1637.64,frontiers,avail=2 black=0
+1637.64,explore_status,exploration_complete
+1638.14,frontiers,avail=2 black=0
+1638.14,explore_status,exploration_complete
+1638.64,frontiers,avail=2 black=0
+1638.64,explore_status,exploration_complete
+1639.14,frontiers,avail=2 black=0
+1639.14,explore_status,exploration_complete
+1639.64,frontiers,avail=2 black=0
+1639.64,explore_status,exploration_complete
+1640.14,frontiers,avail=2 black=0
+1640.14,explore_status,exploration_complete
+1640.64,frontiers,avail=2 black=0
+1640.64,explore_status,exploration_complete
+1641.14,frontiers,avail=2 black=0
+1641.14,explore_status,exploration_complete
+1641.64,frontiers,avail=2 black=0
+1641.64,explore_status,exploration_complete
+1642.14,frontiers,avail=2 black=0
+1642.14,explore_status,exploration_complete
+1642.64,frontiers,avail=2 black=0
+1642.64,explore_status,exploration_complete
+1643.14,frontiers,avail=2 black=0
+1643.14,explore_status,exploration_complete
+1643.64,frontiers,avail=2 black=0
+1643.64,explore_status,exploration_complete
+1644.14,frontiers,avail=2 black=0
+1644.14,explore_status,exploration_complete
+1644.64,frontiers,avail=2 black=0
+1644.64,explore_status,exploration_complete
+1645.14,frontiers,avail=2 black=0
+1645.14,explore_status,exploration_complete
+1645.64,frontiers,avail=2 black=0
+1645.64,explore_status,exploration_complete
+1646.14,frontiers,avail=2 black=0
+1646.14,explore_status,exploration_complete
+1646.64,frontiers,avail=2 black=0
+1646.64,explore_status,exploration_complete
+1647.14,frontiers,avail=2 black=0
+1647.14,explore_status,exploration_complete
+1647.64,frontiers,avail=2 black=0
+1647.64,explore_status,exploration_complete
+1648.14,frontiers,avail=2 black=0
+1648.14,explore_status,exploration_complete
+1648.64,frontiers,avail=2 black=0
+1648.64,explore_status,exploration_complete
+1649.14,frontiers,avail=2 black=0
+1649.14,explore_status,exploration_complete
+1649.64,frontiers,avail=2 black=0
+1649.64,explore_status,exploration_complete
+1650.14,frontiers,avail=2 black=0
+1650.14,explore_status,exploration_complete
+1650.64,frontiers,avail=2 black=0
+1650.64,explore_status,exploration_complete
+1651.14,frontiers,avail=2 black=0
+1651.14,explore_status,exploration_complete
+1651.64,frontiers,avail=2 black=0
+1651.64,explore_status,exploration_complete
+1652.14,frontiers,avail=2 black=0
+1652.14,explore_status,exploration_complete
+1652.64,frontiers,avail=2 black=0
+1652.64,explore_status,exploration_complete
+1653.14,frontiers,avail=2 black=0
+1653.14,explore_status,exploration_complete
+1653.64,frontiers,avail=2 black=0
+1653.64,explore_status,exploration_complete
+1654.14,frontiers,avail=2 black=0
+1654.14,explore_status,exploration_complete
+1654.64,frontiers,avail=2 black=0
+1654.64,explore_status,exploration_complete
+1655.14,frontiers,avail=2 black=0
+1655.14,explore_status,exploration_complete
+1655.64,frontiers,avail=2 black=0
+1655.64,explore_status,exploration_complete
+1656.14,frontiers,avail=2 black=0
+1656.14,explore_status,exploration_complete
+1656.64,frontiers,avail=2 black=0
+1656.64,explore_status,exploration_complete
+1657.14,frontiers,avail=2 black=0
+1657.14,explore_status,exploration_complete
+1657.64,frontiers,avail=2 black=0
+1657.64,explore_status,exploration_complete
+1658.14,frontiers,avail=2 black=0
+1658.14,explore_status,exploration_complete
+1658.64,frontiers,avail=2 black=0
+1658.64,explore_status,exploration_complete
+1659.14,frontiers,avail=2 black=0
+1659.14,explore_status,exploration_complete
+1659.64,frontiers,avail=2 black=0
+1659.64,explore_status,exploration_complete
+1660.14,frontiers,avail=2 black=0
+1660.14,explore_status,exploration_complete
+1660.64,frontiers,avail=2 black=0
+1660.64,explore_status,exploration_complete
+1661.14,frontiers,avail=2 black=0
+1661.14,explore_status,exploration_complete
+1661.64,frontiers,avail=2 black=0
+1661.64,explore_status,exploration_complete
+1662.14,frontiers,avail=2 black=0
+1662.14,explore_status,exploration_complete
+1662.64,frontiers,avail=2 black=0
+1662.64,explore_status,exploration_complete
+1663.14,frontiers,avail=2 black=0
+1663.14,explore_status,exploration_complete
+1663.64,frontiers,avail=2 black=0
+1663.64,explore_status,exploration_complete
+1664.14,frontiers,avail=2 black=0
+1664.14,explore_status,exploration_complete
+1664.64,frontiers,avail=2 black=0
+1664.64,explore_status,exploration_complete
+1665.14,frontiers,avail=2 black=0
+1665.14,explore_status,exploration_complete
+1665.64,frontiers,avail=2 black=0
+1665.64,explore_status,exploration_complete
+1666.14,frontiers,avail=2 black=0
+1666.14,explore_status,exploration_complete
+1666.64,frontiers,avail=2 black=0
+1666.64,explore_status,exploration_complete
+1667.14,frontiers,avail=2 black=0
+1667.14,explore_status,exploration_complete
+1667.64,frontiers,avail=2 black=0
+1667.64,explore_status,exploration_complete
+1668.14,frontiers,avail=2 black=0
+1668.14,explore_status,exploration_complete
+1668.64,frontiers,avail=2 black=0
+1668.64,explore_status,exploration_complete
+1669.14,frontiers,avail=2 black=0
+1669.14,explore_status,exploration_complete
+1669.64,frontiers,avail=2 black=0
+1669.64,explore_status,exploration_complete
+1670.14,frontiers,avail=2 black=0
+1670.14,explore_status,exploration_complete
+1670.64,frontiers,avail=2 black=0
+1670.64,explore_status,exploration_complete
+1671.14,frontiers,avail=2 black=0
+1671.14,explore_status,exploration_complete
+1671.64,frontiers,avail=2 black=0
+1671.64,explore_status,exploration_complete
+1672.14,frontiers,avail=2 black=0
+1672.14,explore_status,exploration_complete
+1672.64,frontiers,avail=2 black=0
+1672.64,explore_status,exploration_complete
+1673.14,frontiers,avail=2 black=0
+1673.14,explore_status,exploration_complete
+1673.64,frontiers,avail=2 black=0
+1673.64,explore_status,exploration_complete
+1674.14,frontiers,avail=2 black=0
+1674.14,explore_status,exploration_complete
+1674.64,frontiers,avail=2 black=0
+1674.64,explore_status,exploration_complete
+1675.14,frontiers,avail=2 black=0
+1675.14,explore_status,exploration_complete
+1675.64,frontiers,avail=2 black=0
+1675.64,explore_status,exploration_complete
+1676.14,frontiers,avail=2 black=0
+1676.14,explore_status,exploration_complete
+1676.64,frontiers,avail=2 black=0
+1676.64,explore_status,exploration_complete
+1677.14,frontiers,avail=2 black=0
+1677.14,explore_status,exploration_complete
+1677.64,frontiers,avail=2 black=0
+1677.64,explore_status,exploration_complete
+1678.14,frontiers,avail=2 black=0
+1678.14,explore_status,exploration_complete
+1678.64,frontiers,avail=2 black=0
+1678.64,explore_status,exploration_complete
+1679.14,frontiers,avail=2 black=0
+1679.14,explore_status,exploration_complete
+1679.64,frontiers,avail=2 black=0
+1679.64,explore_status,exploration_complete
+1680.14,frontiers,avail=2 black=0
+1680.14,explore_status,exploration_complete
+1680.64,frontiers,avail=2 black=0
+1680.64,explore_status,exploration_complete
+1681.14,frontiers,avail=2 black=0
+1681.14,explore_status,exploration_complete
+1681.64,frontiers,avail=2 black=0
+1681.64,explore_status,exploration_complete
+1682.14,frontiers,avail=2 black=0
+1682.14,explore_status,exploration_complete
+1682.64,frontiers,avail=2 black=0
+1682.64,explore_status,exploration_complete
+1683.14,frontiers,avail=2 black=0
+1683.14,explore_status,exploration_complete
+1683.64,frontiers,avail=2 black=0
+1683.64,explore_status,exploration_complete
+1684.14,frontiers,avail=2 black=0
+1684.14,explore_status,exploration_complete
+1684.64,frontiers,avail=2 black=0
+1684.64,explore_status,exploration_complete
+1685.14,frontiers,avail=2 black=0
+1685.14,explore_status,exploration_complete
+1685.64,frontiers,avail=2 black=0
+1685.64,explore_status,exploration_complete
+1686.14,frontiers,avail=2 black=0
+1686.14,explore_status,exploration_complete
+1686.64,frontiers,avail=2 black=0
+1686.64,explore_status,exploration_complete
+1687.14,frontiers,avail=2 black=0
+1687.14,explore_status,exploration_complete
+1687.64,frontiers,avail=2 black=0
+1687.64,explore_status,exploration_complete
+1688.14,frontiers,avail=2 black=0
+1688.14,explore_status,exploration_complete
+1688.64,frontiers,avail=2 black=0
+1688.64,explore_status,exploration_complete
+1689.14,frontiers,avail=2 black=0
+1689.14,explore_status,exploration_complete
+1689.64,frontiers,avail=2 black=0
+1689.64,explore_status,exploration_complete
+1690.14,frontiers,avail=2 black=0
+1690.14,explore_status,exploration_complete
+1690.64,frontiers,avail=2 black=0
+1690.64,explore_status,exploration_complete
+1691.14,frontiers,avail=2 black=0
+1691.14,explore_status,exploration_complete
+1691.64,frontiers,avail=2 black=0
+1691.64,explore_status,exploration_complete
+1692.14,frontiers,avail=2 black=0
+1692.14,explore_status,exploration_complete
+1692.64,frontiers,avail=2 black=0
+1692.64,explore_status,exploration_complete
+1693.14,frontiers,avail=2 black=0
+1693.14,explore_status,exploration_complete
+1693.64,frontiers,avail=2 black=0
+1693.64,explore_status,exploration_complete
+1694.14,frontiers,avail=2 black=0
+1694.14,explore_status,exploration_complete
+1694.64,frontiers,avail=2 black=0
+1694.64,explore_status,exploration_complete
+1695.14,frontiers,avail=2 black=0
+1695.14,explore_status,exploration_complete
+1695.64,frontiers,avail=2 black=0
+1695.64,explore_status,exploration_complete
+1696.14,frontiers,avail=2 black=0
+1696.14,explore_status,exploration_complete
+1696.64,frontiers,avail=2 black=0
+1696.64,explore_status,exploration_complete
+1697.14,frontiers,avail=2 black=0
+1697.14,explore_status,exploration_complete
+1697.64,frontiers,avail=2 black=0
+1697.64,explore_status,exploration_complete
+1698.14,frontiers,avail=2 black=0
+1698.14,explore_status,exploration_complete
+1698.64,frontiers,avail=2 black=0
+1698.64,explore_status,exploration_complete
+1699.14,frontiers,avail=2 black=0
+1699.14,explore_status,exploration_complete
+1699.64,frontiers,avail=2 black=0
+1699.64,explore_status,exploration_complete
+1700.14,frontiers,avail=2 black=0
+1700.14,explore_status,exploration_complete
+1700.64,frontiers,avail=2 black=0
+1700.64,explore_status,exploration_complete
+1701.14,frontiers,avail=2 black=0
+1701.14,explore_status,exploration_complete
+1701.64,frontiers,avail=2 black=0
+1701.64,explore_status,exploration_complete
+1702.14,frontiers,avail=2 black=0
+1702.14,explore_status,exploration_complete
+1702.64,frontiers,avail=2 black=0
+1702.64,explore_status,exploration_complete
+1703.14,frontiers,avail=2 black=0
+1703.14,explore_status,exploration_complete
+1703.64,frontiers,avail=2 black=0
+1703.64,explore_status,exploration_complete
+1704.14,frontiers,avail=2 black=0
+1704.14,explore_status,exploration_complete
+1704.64,frontiers,avail=2 black=0
+1704.64,explore_status,exploration_complete
+1705.14,frontiers,avail=2 black=0
+1705.14,explore_status,exploration_complete
+1705.64,frontiers,avail=2 black=0
+1705.64,explore_status,exploration_complete
+1706.14,frontiers,avail=2 black=0
+1706.14,explore_status,exploration_complete
+1706.64,frontiers,avail=2 black=0
+1706.64,explore_status,exploration_complete
+1707.14,frontiers,avail=2 black=0
+1707.14,explore_status,exploration_complete
+1707.64,frontiers,avail=2 black=0
+1707.64,explore_status,exploration_complete
+1708.14,frontiers,avail=2 black=0
+1708.14,explore_status,exploration_complete
+1708.64,frontiers,avail=2 black=0
+1708.64,explore_status,exploration_complete
+1709.14,frontiers,avail=2 black=0
+1709.14,explore_status,exploration_complete
+1709.64,frontiers,avail=2 black=0
+1709.64,explore_status,exploration_complete
+1710.14,frontiers,avail=2 black=0
+1710.14,explore_status,exploration_complete
+1710.64,frontiers,avail=2 black=0
+1710.64,explore_status,exploration_complete
+1711.14,frontiers,avail=2 black=0
+1711.14,explore_status,exploration_complete
+1711.64,frontiers,avail=2 black=0
+1711.64,explore_status,exploration_complete
+1712.14,frontiers,avail=2 black=0
+1712.14,explore_status,exploration_complete
+1712.64,frontiers,avail=2 black=0
+1712.64,explore_status,exploration_complete
+1713.14,frontiers,avail=2 black=0
+1713.14,explore_status,exploration_complete
+1713.64,frontiers,avail=2 black=0
+1713.64,explore_status,exploration_complete
+1714.14,frontiers,avail=2 black=0
+1714.14,explore_status,exploration_complete
+1714.64,frontiers,avail=2 black=0
+1714.64,explore_status,exploration_complete
+1715.14,frontiers,avail=2 black=0
+1715.14,explore_status,exploration_complete
+1715.64,frontiers,avail=2 black=0
+1715.64,explore_status,exploration_complete
+1716.14,frontiers,avail=2 black=0
+1716.14,explore_status,exploration_complete
+1716.64,frontiers,avail=2 black=0
+1716.64,explore_status,exploration_complete
+1717.14,frontiers,avail=2 black=0
+1717.14,explore_status,exploration_complete
+1717.64,frontiers,avail=2 black=0
+1717.64,explore_status,exploration_complete
+1718.14,frontiers,avail=2 black=0
+1718.14,explore_status,exploration_complete
+1718.64,frontiers,avail=2 black=0
+1718.64,explore_status,exploration_complete
+1719.14,frontiers,avail=2 black=0
+1719.14,explore_status,exploration_complete
+1719.64,frontiers,avail=2 black=0
+1719.64,explore_status,exploration_complete
+1720.14,frontiers,avail=2 black=0
+1720.14,explore_status,exploration_complete
+1720.64,frontiers,avail=2 black=0
+1720.64,explore_status,exploration_complete
+1721.14,frontiers,avail=2 black=0
+1721.14,explore_status,exploration_complete
+1721.64,frontiers,avail=2 black=0
+1721.64,explore_status,exploration_complete
+1722.14,frontiers,avail=2 black=0
+1722.14,explore_status,exploration_complete
+1722.64,frontiers,avail=2 black=0
+1722.64,explore_status,exploration_complete
+1723.14,frontiers,avail=2 black=0
+1723.14,explore_status,exploration_complete
+1723.64,frontiers,avail=2 black=0
+1723.64,explore_status,exploration_complete
+1724.14,frontiers,avail=2 black=0
+1724.14,explore_status,exploration_complete
+1724.64,frontiers,avail=2 black=0
+1724.64,explore_status,exploration_complete
+1725.14,frontiers,avail=2 black=0
+1725.14,explore_status,exploration_complete
+1725.64,frontiers,avail=2 black=0
+1725.64,explore_status,exploration_complete
+1726.14,frontiers,avail=2 black=0
+1726.14,explore_status,exploration_complete
+1726.64,frontiers,avail=2 black=0
+1726.64,explore_status,exploration_complete
+1727.14,frontiers,avail=2 black=0
+1727.14,explore_status,exploration_complete
+1727.64,frontiers,avail=2 black=0
+1727.64,explore_status,exploration_complete
+1728.14,frontiers,avail=2 black=0
+1728.14,explore_status,exploration_complete
+1728.64,frontiers,avail=2 black=0
+1728.64,explore_status,exploration_complete
+1729.14,frontiers,avail=2 black=0
+1729.14,explore_status,exploration_complete
+1729.64,frontiers,avail=2 black=0
+1729.64,explore_status,exploration_complete
+1730.14,frontiers,avail=2 black=0
+1730.14,explore_status,exploration_complete
+1730.64,frontiers,avail=2 black=0
+1730.64,explore_status,exploration_complete
+1731.14,frontiers,avail=2 black=0
+1731.14,explore_status,exploration_complete
+1731.64,frontiers,avail=2 black=0
+1731.64,explore_status,exploration_complete
+1732.14,frontiers,avail=2 black=0
+1732.14,explore_status,exploration_complete
+1732.64,frontiers,avail=2 black=0
+1732.64,explore_status,exploration_complete
+1733.14,frontiers,avail=2 black=0
+1733.14,explore_status,exploration_complete
+1733.64,frontiers,avail=2 black=0
+1733.64,explore_status,exploration_complete
+1734.14,frontiers,avail=2 black=0
+1734.14,explore_status,exploration_complete
+1734.64,frontiers,avail=2 black=0
+1734.64,explore_status,exploration_complete
+1735.14,frontiers,avail=2 black=0
+1735.14,explore_status,exploration_complete
+1735.64,frontiers,avail=2 black=0
+1735.64,explore_status,exploration_complete
+1736.14,frontiers,avail=2 black=0
+1736.14,explore_status,exploration_complete
+1736.64,frontiers,avail=2 black=0
+1736.64,explore_status,exploration_complete
+1737.14,frontiers,avail=2 black=0
+1737.14,explore_status,exploration_complete
+1737.64,frontiers,avail=2 black=0
+1737.64,explore_status,exploration_complete
+1738.14,frontiers,avail=2 black=0
+1738.14,explore_status,exploration_complete
+1738.64,frontiers,avail=2 black=0
+1738.64,explore_status,exploration_complete
+1739.14,frontiers,avail=2 black=0
+1739.14,explore_status,exploration_complete
+1739.64,frontiers,avail=2 black=0
+1739.64,explore_status,exploration_complete
+1740.14,frontiers,avail=2 black=0
+1740.14,explore_status,exploration_complete
+1740.64,frontiers,avail=2 black=0
+1740.64,explore_status,exploration_complete
+1741.14,frontiers,avail=2 black=0
+1741.14,explore_status,exploration_complete
+1741.64,frontiers,avail=2 black=0
+1741.64,explore_status,exploration_complete
+1742.14,frontiers,avail=2 black=0
+1742.14,explore_status,exploration_complete
+1742.64,frontiers,avail=2 black=0
+1742.64,explore_status,exploration_complete
+1743.14,frontiers,avail=2 black=0
+1743.14,explore_status,exploration_complete
+1743.64,frontiers,avail=2 black=0
+1743.64,explore_status,exploration_complete
+1744.14,frontiers,avail=2 black=0
+1744.14,explore_status,exploration_complete
+1744.64,frontiers,avail=2 black=0
+1744.64,explore_status,exploration_complete
+1745.14,frontiers,avail=2 black=0
+1745.14,explore_status,exploration_complete
+1745.64,frontiers,avail=2 black=0
+1745.64,explore_status,exploration_complete
+1746.14,frontiers,avail=2 black=0
+1746.14,explore_status,exploration_complete
+1746.64,frontiers,avail=2 black=0
+1746.64,explore_status,exploration_complete
+1747.14,frontiers,avail=2 black=0
+1747.14,explore_status,exploration_complete
+1747.64,frontiers,avail=2 black=0
+1747.64,explore_status,exploration_complete
+1748.14,frontiers,avail=2 black=0
+1748.14,explore_status,exploration_complete
+1748.64,frontiers,avail=2 black=0
+1748.64,explore_status,exploration_complete
+1749.14,frontiers,avail=2 black=0
+1749.14,explore_status,exploration_complete
+1749.64,frontiers,avail=2 black=0
+1749.64,explore_status,exploration_complete
+1750.14,frontiers,avail=2 black=0
+1750.14,explore_status,exploration_complete
+1750.64,frontiers,avail=2 black=0
+1750.64,explore_status,exploration_complete
+1751.14,frontiers,avail=2 black=0
+1751.14,explore_status,exploration_complete
+1751.64,frontiers,avail=2 black=0
+1751.64,explore_status,exploration_complete
+1752.14,frontiers,avail=2 black=0
+1752.14,explore_status,exploration_complete
+1752.64,frontiers,avail=2 black=0
+1752.64,explore_status,exploration_complete
+1753.14,frontiers,avail=2 black=0
+1753.14,explore_status,exploration_complete
+1753.64,frontiers,avail=2 black=0
+1753.64,explore_status,exploration_complete
+1754.14,frontiers,avail=2 black=0
+1754.14,explore_status,exploration_complete
+1754.64,frontiers,avail=2 black=0
+1754.64,explore_status,exploration_complete
+1755.14,frontiers,avail=2 black=0
+1755.14,explore_status,exploration_complete
+1755.64,frontiers,avail=2 black=0
+1755.64,explore_status,exploration_complete
+1756.14,frontiers,avail=2 black=0
+1756.14,explore_status,exploration_complete
+1756.64,frontiers,avail=2 black=0
+1756.64,explore_status,exploration_complete
+1757.14,frontiers,avail=2 black=0
+1757.14,explore_status,exploration_complete
+1757.64,frontiers,avail=2 black=0
+1757.64,explore_status,exploration_complete
+1758.14,frontiers,avail=2 black=0
+1758.14,explore_status,exploration_complete
+1758.64,frontiers,avail=2 black=0
+1758.64,explore_status,exploration_complete
+1759.14,frontiers,avail=2 black=0
+1759.14,explore_status,exploration_complete
+1759.64,frontiers,avail=2 black=0
+1759.64,explore_status,exploration_complete
+1760.14,frontiers,avail=2 black=0
+1760.14,explore_status,exploration_complete
+1760.64,frontiers,avail=2 black=0
+1760.64,explore_status,exploration_complete
+1761.14,frontiers,avail=2 black=0
+1761.14,explore_status,exploration_complete
+1761.64,frontiers,avail=2 black=0
+1761.64,explore_status,exploration_complete
+1762.14,frontiers,avail=2 black=0
+1762.14,explore_status,exploration_complete
+1762.64,frontiers,avail=2 black=0
+1762.64,explore_status,exploration_complete
+1763.14,frontiers,avail=2 black=0
+1763.14,explore_status,exploration_complete
+1763.64,frontiers,avail=2 black=0
+1763.64,explore_status,exploration_complete
+1764.14,frontiers,avail=2 black=0
+1764.14,explore_status,exploration_complete
+1764.64,frontiers,avail=2 black=0
+1764.64,explore_status,exploration_complete
+1765.14,frontiers,avail=2 black=0
+1765.14,explore_status,exploration_complete
+1765.64,frontiers,avail=2 black=0
+1765.64,explore_status,exploration_complete
+1766.14,frontiers,avail=2 black=0
+1766.14,explore_status,exploration_complete
+1766.64,frontiers,avail=2 black=0
+1766.64,explore_status,exploration_complete
+1767.14,frontiers,avail=2 black=0
+1767.14,explore_status,exploration_complete
+1767.64,frontiers,avail=2 black=0
+1767.64,explore_status,exploration_complete
+1768.14,frontiers,avail=2 black=0
+1768.14,explore_status,exploration_complete
+1768.64,frontiers,avail=2 black=0
+1768.64,explore_status,exploration_complete
+1769.14,frontiers,avail=2 black=0
+1769.14,explore_status,exploration_complete
+1769.64,frontiers,avail=2 black=0
+1769.64,explore_status,exploration_complete
+1770.14,frontiers,avail=2 black=0
+1770.14,explore_status,exploration_complete
+1770.64,frontiers,avail=2 black=0
+1770.64,explore_status,exploration_complete
+1771.14,frontiers,avail=2 black=0
+1771.14,explore_status,exploration_complete
+1771.64,frontiers,avail=2 black=0
+1771.64,explore_status,exploration_complete
+1772.14,frontiers,avail=2 black=0
+1772.14,explore_status,exploration_complete
+1772.64,frontiers,avail=2 black=0
+1772.64,explore_status,exploration_complete
+1773.14,frontiers,avail=2 black=0
+1773.14,explore_status,exploration_complete
+1773.64,frontiers,avail=2 black=0
+1773.64,explore_status,exploration_complete
+1774.14,frontiers,avail=2 black=0
+1774.14,explore_status,exploration_complete
+1774.64,frontiers,avail=2 black=0
+1774.64,explore_status,exploration_complete
+1775.14,frontiers,avail=2 black=0
+1775.14,explore_status,exploration_complete
+1775.64,frontiers,avail=2 black=0
+1775.64,explore_status,exploration_complete
+1776.14,frontiers,avail=2 black=0
+1776.14,explore_status,exploration_complete
+1776.64,frontiers,avail=2 black=0
+1776.64,explore_status,exploration_complete
+1777.14,frontiers,avail=2 black=0
+1777.14,explore_status,exploration_complete
+1777.64,frontiers,avail=2 black=0
+1777.64,explore_status,exploration_complete
+1778.14,frontiers,avail=2 black=0
+1778.14,explore_status,exploration_complete
+1778.64,frontiers,avail=2 black=0
+1778.64,explore_status,exploration_complete
+1779.14,frontiers,avail=2 black=0
+1779.14,explore_status,exploration_complete
+1779.64,frontiers,avail=2 black=0
+1779.64,explore_status,exploration_complete
+1780.14,frontiers,avail=2 black=0
+1780.14,explore_status,exploration_complete
+1780.64,frontiers,avail=2 black=0
+1780.64,explore_status,exploration_complete
+1781.14,frontiers,avail=2 black=0
+1781.14,explore_status,exploration_complete
+1781.64,frontiers,avail=2 black=0
+1781.64,explore_status,exploration_complete
+1782.14,frontiers,avail=2 black=0
+1782.14,explore_status,exploration_complete
+1782.64,frontiers,avail=2 black=0
+1782.64,explore_status,exploration_complete
+1783.14,frontiers,avail=2 black=0
+1783.14,explore_status,exploration_complete
+1783.64,frontiers,avail=2 black=0
+1783.64,explore_status,exploration_complete
+1784.14,frontiers,avail=2 black=0
+1784.14,explore_status,exploration_complete
+1784.64,frontiers,avail=2 black=0
+1784.64,explore_status,exploration_complete
+1785.14,frontiers,avail=2 black=0
+1785.14,explore_status,exploration_complete
+1785.64,frontiers,avail=2 black=0
+1785.64,explore_status,exploration_complete
+1786.14,frontiers,avail=2 black=0
+1786.14,explore_status,exploration_complete
+1786.64,frontiers,avail=2 black=0
+1786.64,explore_status,exploration_complete
+1787.14,frontiers,avail=2 black=0
+1787.14,explore_status,exploration_complete
+1787.64,frontiers,avail=2 black=0
+1787.64,explore_status,exploration_complete
+1788.14,frontiers,avail=2 black=0
+1788.14,explore_status,exploration_complete
+1788.64,frontiers,avail=2 black=0
+1788.64,explore_status,exploration_complete
+1789.14,frontiers,avail=2 black=0
+1789.14,explore_status,exploration_complete
+1789.64,frontiers,avail=2 black=0
+1789.64,explore_status,exploration_complete
+1790.14,frontiers,avail=2 black=0
+1790.14,explore_status,exploration_complete
+1790.64,frontiers,avail=2 black=0
+1790.64,explore_status,exploration_complete
+1791.14,frontiers,avail=2 black=0
+1791.14,explore_status,exploration_complete
+1791.64,frontiers,avail=2 black=0
+1791.64,explore_status,exploration_complete
+1792.14,frontiers,avail=2 black=0
+1792.14,explore_status,exploration_complete
+1792.64,frontiers,avail=2 black=0
+1792.64,explore_status,exploration_complete
+1793.14,frontiers,avail=2 black=0
+1793.14,explore_status,exploration_complete
+1793.64,frontiers,avail=2 black=0
+1793.64,explore_status,exploration_complete
+1794.14,frontiers,avail=2 black=0
+1794.14,explore_status,exploration_complete
+1794.64,frontiers,avail=2 black=0
+1794.64,explore_status,exploration_complete
+1795.14,frontiers,avail=2 black=0
+1795.14,explore_status,exploration_complete
+1795.64,frontiers,avail=2 black=0
+1795.64,explore_status,exploration_complete
+1796.14,frontiers,avail=2 black=0
+1796.14,explore_status,exploration_complete
+1796.64,frontiers,avail=2 black=0
+1796.64,explore_status,exploration_complete
+1797.14,frontiers,avail=2 black=0
+1797.14,explore_status,exploration_complete
+1797.64,frontiers,avail=2 black=0
+1797.64,explore_status,exploration_complete
+1798.14,frontiers,avail=2 black=0
+1798.14,explore_status,exploration_complete
+1798.64,frontiers,avail=2 black=0
+1798.64,explore_status,exploration_complete
+1799.14,frontiers,avail=2 black=0
+1799.14,explore_status,exploration_complete
+1799.64,frontiers,avail=2 black=0
+1799.64,explore_status,exploration_complete
+1800.14,frontiers,avail=2 black=0
+1800.14,explore_status,exploration_complete
+1800.64,frontiers,avail=2 black=0
+1800.64,explore_status,exploration_complete
+1801.14,frontiers,avail=2 black=0
+1801.14,explore_status,exploration_complete
+1801.64,frontiers,avail=2 black=0
+1801.64,explore_status,exploration_complete
+1802.14,frontiers,avail=2 black=0
+1802.14,explore_status,exploration_complete
+1802.64,frontiers,avail=2 black=0
+1802.64,explore_status,exploration_complete
+1803.14,frontiers,avail=2 black=0
+1803.14,explore_status,exploration_complete
+1803.64,frontiers,avail=2 black=0
+1803.64,explore_status,exploration_complete
+1804.14,frontiers,avail=2 black=0
+1804.14,explore_status,exploration_complete
+1804.64,frontiers,avail=2 black=0
+1804.64,explore_status,exploration_complete
+1805.14,frontiers,avail=2 black=0
+1805.14,explore_status,exploration_complete
+1805.64,frontiers,avail=2 black=0
+1805.64,explore_status,exploration_complete
+1806.14,frontiers,avail=2 black=0
+1806.14,explore_status,exploration_complete
+1806.64,frontiers,avail=2 black=0
+1806.64,explore_status,exploration_complete
+1807.14,frontiers,avail=2 black=0
+1807.14,explore_status,exploration_complete
+1807.64,frontiers,avail=2 black=0
+1807.64,explore_status,exploration_complete
+1808.14,frontiers,avail=2 black=0
+1808.14,explore_status,exploration_complete
+1808.64,frontiers,avail=2 black=0
+1808.64,explore_status,exploration_complete
+1809.14,frontiers,avail=2 black=0
+1809.14,explore_status,exploration_complete
+1809.64,frontiers,avail=2 black=0
+1809.64,explore_status,exploration_complete
+1810.14,frontiers,avail=2 black=0
+1810.14,explore_status,exploration_complete
+1810.64,frontiers,avail=2 black=0
+1810.64,explore_status,exploration_complete
+1811.14,frontiers,avail=2 black=0
+1811.14,explore_status,exploration_complete
+1811.64,frontiers,avail=2 black=0
+1811.64,explore_status,exploration_complete
+1812.14,frontiers,avail=2 black=0
+1812.14,explore_status,exploration_complete
+1812.64,frontiers,avail=2 black=0
+1812.64,explore_status,exploration_complete
+1813.14,frontiers,avail=2 black=0
+1813.14,explore_status,exploration_complete
+1813.64,frontiers,avail=2 black=0
+1813.64,explore_status,exploration_complete
+1814.14,frontiers,avail=2 black=0
+1814.14,explore_status,exploration_complete
+1814.64,frontiers,avail=2 black=0
+1814.64,explore_status,exploration_complete
+1815.14,frontiers,avail=2 black=0
+1815.14,explore_status,exploration_complete
+1815.64,frontiers,avail=2 black=0
+1815.64,explore_status,exploration_complete
+1816.14,frontiers,avail=2 black=0
+1816.14,explore_status,exploration_complete
+1816.64,frontiers,avail=2 black=0
+1816.64,explore_status,exploration_complete
+1817.14,frontiers,avail=2 black=0
+1817.14,explore_status,exploration_complete
+1817.64,frontiers,avail=2 black=0
+1817.64,explore_status,exploration_complete
+1818.14,frontiers,avail=2 black=0
+1818.14,explore_status,exploration_complete
+1818.64,frontiers,avail=2 black=0
+1818.64,explore_status,exploration_complete
+1819.14,frontiers,avail=2 black=0
+1819.14,explore_status,exploration_complete
+1819.64,frontiers,avail=2 black=0
+1819.64,explore_status,exploration_complete
+1820.14,frontiers,avail=2 black=0
+1820.14,explore_status,exploration_complete
+1820.64,frontiers,avail=2 black=0
+1820.64,explore_status,exploration_complete
+1821.14,frontiers,avail=2 black=0
+1821.14,explore_status,exploration_complete
+1821.64,frontiers,avail=2 black=0
+1821.64,explore_status,exploration_complete
+1822.14,frontiers,avail=2 black=0
+1822.14,explore_status,exploration_complete
+1822.64,frontiers,avail=2 black=0
+1822.64,explore_status,exploration_complete
+1823.14,frontiers,avail=2 black=0
+1823.14,explore_status,exploration_complete
+1823.64,frontiers,avail=2 black=0
+1823.64,explore_status,exploration_complete
+1824.14,frontiers,avail=2 black=0
+1824.14,explore_status,exploration_complete
+1824.64,frontiers,avail=2 black=0
+1824.64,explore_status,exploration_complete
+1825.14,frontiers,avail=2 black=0
+1825.14,explore_status,exploration_complete
+1825.64,frontiers,avail=2 black=0
+1825.64,explore_status,exploration_complete
+1826.14,frontiers,avail=2 black=0
+1826.14,explore_status,exploration_complete
+1826.64,frontiers,avail=2 black=0
+1826.64,explore_status,exploration_complete
+1827.14,frontiers,avail=2 black=0
+1827.14,explore_status,exploration_complete
+1827.64,frontiers,avail=2 black=0
+1827.64,explore_status,exploration_complete
+1828.14,frontiers,avail=2 black=0
+1828.14,explore_status,exploration_complete
+1828.64,frontiers,avail=2 black=0
+1828.64,explore_status,exploration_complete
+1829.14,frontiers,avail=2 black=0
+1829.14,explore_status,exploration_complete
+1829.64,frontiers,avail=2 black=0
+1829.64,explore_status,exploration_complete
+1830.14,frontiers,avail=2 black=0
+1830.14,explore_status,exploration_complete
+1830.64,frontiers,avail=2 black=0
+1830.64,explore_status,exploration_complete
+1831.14,frontiers,avail=2 black=0
+1831.14,explore_status,exploration_complete
+1831.64,frontiers,avail=2 black=0
+1831.64,explore_status,exploration_complete
+1832.14,frontiers,avail=2 black=0
+1832.14,explore_status,exploration_complete
+1832.64,frontiers,avail=2 black=0
+1832.64,explore_status,exploration_complete
+1833.14,frontiers,avail=2 black=0
+1833.14,explore_status,exploration_complete
+1833.64,frontiers,avail=2 black=0
+1833.64,explore_status,exploration_complete
+1834.14,frontiers,avail=2 black=0
+1834.14,explore_status,exploration_complete
+1834.64,frontiers,avail=2 black=0
+1834.64,explore_status,exploration_complete
+1835.14,frontiers,avail=2 black=0
+1835.14,explore_status,exploration_complete
+1835.64,frontiers,avail=2 black=0
+1835.64,explore_status,exploration_complete
+1836.14,frontiers,avail=2 black=0
+1836.14,explore_status,exploration_complete
+1836.64,frontiers,avail=2 black=0
+1836.64,explore_status,exploration_complete
+1837.14,frontiers,avail=2 black=0
+1837.14,explore_status,exploration_complete
+1837.64,frontiers,avail=2 black=0
+1837.64,explore_status,exploration_complete
+1838.14,frontiers,avail=2 black=0
+1838.14,explore_status,exploration_complete
+1838.64,frontiers,avail=2 black=0
+1838.64,explore_status,exploration_complete
+1839.14,frontiers,avail=2 black=0
+1839.14,explore_status,exploration_complete
+1839.64,frontiers,avail=2 black=0
+1839.64,explore_status,exploration_complete
+1840.14,frontiers,avail=2 black=0
+1840.14,explore_status,exploration_complete
+1840.64,frontiers,avail=2 black=0
+1840.64,explore_status,exploration_complete
+1841.14,frontiers,avail=2 black=0
+1841.14,explore_status,exploration_complete
+1841.64,frontiers,avail=2 black=0
+1841.64,explore_status,exploration_complete
+1842.14,frontiers,avail=2 black=0
+1842.14,explore_status,exploration_complete
+1842.64,frontiers,avail=2 black=0
+1842.64,explore_status,exploration_complete
+1843.14,frontiers,avail=2 black=0
+1843.14,explore_status,exploration_complete
+1843.64,frontiers,avail=2 black=0
+1843.64,explore_status,exploration_complete
+1844.14,frontiers,avail=2 black=0
+1844.14,explore_status,exploration_complete
+1844.64,frontiers,avail=2 black=0
+1844.64,explore_status,exploration_complete
+1845.14,frontiers,avail=2 black=0
+1845.14,explore_status,exploration_complete
+1845.64,frontiers,avail=2 black=0
+1845.64,explore_status,exploration_complete
+1846.14,frontiers,avail=2 black=0
+1846.14,explore_status,exploration_complete
+1846.64,frontiers,avail=2 black=0
+1846.64,explore_status,exploration_complete
+1847.14,frontiers,avail=2 black=0
+1847.14,explore_status,exploration_complete
+1847.64,frontiers,avail=2 black=0
+1847.64,explore_status,exploration_complete
+1848.14,frontiers,avail=2 black=0
+1848.14,explore_status,exploration_complete
+1848.64,frontiers,avail=2 black=0
+1848.64,explore_status,exploration_complete
+1849.14,frontiers,avail=2 black=0
+1849.14,explore_status,exploration_complete
+1849.64,frontiers,avail=2 black=0
+1849.64,explore_status,exploration_complete
+1850.14,frontiers,avail=2 black=0
+1850.14,explore_status,exploration_complete
+1850.64,frontiers,avail=2 black=0
+1850.64,explore_status,exploration_complete
+1851.14,frontiers,avail=2 black=0
+1851.14,explore_status,exploration_complete
+1851.64,frontiers,avail=2 black=0
+1851.64,explore_status,exploration_complete
+1852.14,frontiers,avail=2 black=0
+1852.14,explore_status,exploration_complete
+1852.64,frontiers,avail=2 black=0
+1852.64,explore_status,exploration_complete
+1853.14,frontiers,avail=2 black=0
+1853.14,explore_status,exploration_complete
+1853.64,frontiers,avail=2 black=0
+1853.64,explore_status,exploration_complete
+1854.14,frontiers,avail=2 black=0
+1854.14,explore_status,exploration_complete
+1854.64,frontiers,avail=2 black=0
+1854.64,explore_status,exploration_complete
+1855.14,frontiers,avail=2 black=0
+1855.14,explore_status,exploration_complete
+1855.64,frontiers,avail=2 black=0
+1855.64,explore_status,exploration_complete
+1856.14,frontiers,avail=2 black=0
+1856.14,explore_status,exploration_complete
+1856.64,frontiers,avail=2 black=0
+1856.64,explore_status,exploration_complete
+1857.14,frontiers,avail=2 black=0
+1857.14,explore_status,exploration_complete
+1857.64,frontiers,avail=2 black=0
+1857.64,explore_status,exploration_complete
+1858.14,frontiers,avail=2 black=0
+1858.14,explore_status,exploration_complete
+1858.64,frontiers,avail=2 black=0
+1858.64,explore_status,exploration_complete
+1859.14,frontiers,avail=2 black=0
+1859.14,explore_status,exploration_complete
+1859.64,frontiers,avail=2 black=0
+1859.64,explore_status,exploration_complete
+1860.14,frontiers,avail=2 black=0
+1860.14,explore_status,exploration_complete
+1860.64,frontiers,avail=2 black=0
+1860.64,explore_status,exploration_complete
+1861.14,frontiers,avail=2 black=0
+1861.14,explore_status,exploration_complete
+1861.64,frontiers,avail=2 black=0
+1861.64,explore_status,exploration_complete
+1862.14,frontiers,avail=2 black=0
+1862.14,explore_status,exploration_complete
+1862.64,frontiers,avail=2 black=0
+1862.64,explore_status,exploration_complete
+1863.14,frontiers,avail=2 black=0
+1863.14,explore_status,exploration_complete
+1863.64,frontiers,avail=2 black=0
+1863.64,explore_status,exploration_complete
+1864.14,frontiers,avail=2 black=0
+1864.14,explore_status,exploration_complete
+1864.64,frontiers,avail=2 black=0
+1864.64,explore_status,exploration_complete
+1865.14,frontiers,avail=2 black=0
+1865.14,explore_status,exploration_complete
+1865.64,frontiers,avail=2 black=0
+1865.64,explore_status,exploration_complete
+1866.14,frontiers,avail=2 black=0
+1866.14,explore_status,exploration_complete
+1866.64,frontiers,avail=2 black=0
+1866.64,explore_status,exploration_complete
+1867.14,frontiers,avail=2 black=0
+1867.14,explore_status,exploration_complete
+1867.64,frontiers,avail=2 black=0
+1867.64,explore_status,exploration_complete
+1868.14,frontiers,avail=2 black=0
+1868.14,explore_status,exploration_complete
+1868.64,frontiers,avail=2 black=0
+1868.64,explore_status,exploration_complete
+1869.14,frontiers,avail=2 black=0
+1869.14,explore_status,exploration_complete
+1869.64,frontiers,avail=2 black=0
+1869.64,explore_status,exploration_complete
+1870.14,frontiers,avail=2 black=0
+1870.14,explore_status,exploration_complete
+1870.64,frontiers,avail=2 black=0
+1870.64,explore_status,exploration_complete
+1871.14,frontiers,avail=2 black=0
+1871.14,explore_status,exploration_complete
+1871.64,frontiers,avail=2 black=0
+1871.64,explore_status,exploration_complete
+1872.14,frontiers,avail=2 black=0
+1872.14,explore_status,exploration_complete
+1872.64,frontiers,avail=2 black=0
+1872.64,explore_status,exploration_complete
+1873.14,frontiers,avail=2 black=0
+1873.14,explore_status,exploration_complete
+1873.64,frontiers,avail=2 black=0
+1873.64,explore_status,exploration_complete
+1874.14,frontiers,avail=2 black=0
+1874.14,explore_status,exploration_complete
+1874.64,frontiers,avail=2 black=0
+1874.64,explore_status,exploration_complete
+1875.14,frontiers,avail=2 black=0
+1875.14,explore_status,exploration_complete
+1875.64,frontiers,avail=2 black=0
+1875.64,explore_status,exploration_complete
+1876.14,frontiers,avail=2 black=0
+1876.14,explore_status,exploration_complete
+1876.64,frontiers,avail=2 black=0
+1876.64,explore_status,exploration_complete
+1877.14,frontiers,avail=2 black=0
+1877.14,explore_status,exploration_complete
+1877.64,frontiers,avail=2 black=0
+1877.64,explore_status,exploration_complete
+1878.14,frontiers,avail=2 black=0
+1878.14,explore_status,exploration_complete
+1878.64,frontiers,avail=2 black=0
+1878.64,explore_status,exploration_complete
+1879.14,frontiers,avail=2 black=0
+1879.14,explore_status,exploration_complete
+1879.64,frontiers,avail=2 black=0
+1879.64,explore_status,exploration_complete
+1880.14,frontiers,avail=2 black=0
+1880.14,explore_status,exploration_complete
+1880.64,frontiers,avail=2 black=0
+1880.64,explore_status,exploration_complete
+1881.14,frontiers,avail=2 black=0
+1881.14,explore_status,exploration_complete
+1881.64,frontiers,avail=2 black=0
+1881.64,explore_status,exploration_complete
+1882.14,frontiers,avail=2 black=0
+1882.14,explore_status,exploration_complete
+1882.64,frontiers,avail=2 black=0
+1882.64,explore_status,exploration_complete
+1883.14,frontiers,avail=2 black=0
+1883.14,explore_status,exploration_complete
+1883.64,frontiers,avail=2 black=0
+1883.64,explore_status,exploration_complete
+1884.14,frontiers,avail=2 black=0
+1884.14,explore_status,exploration_complete
+1884.64,frontiers,avail=2 black=0
+1884.64,explore_status,exploration_complete
+1885.14,frontiers,avail=2 black=0
+1885.14,explore_status,exploration_complete
+1885.64,frontiers,avail=2 black=0
+1885.64,explore_status,exploration_complete
+1886.14,frontiers,avail=2 black=0
+1886.14,explore_status,exploration_complete
+1886.64,frontiers,avail=2 black=0
+1886.64,explore_status,exploration_complete
+1887.14,frontiers,avail=2 black=0
+1887.14,explore_status,exploration_complete
+1887.64,frontiers,avail=2 black=0
+1887.64,explore_status,exploration_complete
+1888.14,frontiers,avail=2 black=0
+1888.14,explore_status,exploration_complete
+1888.64,frontiers,avail=2 black=0
+1888.64,explore_status,exploration_complete
+1889.14,frontiers,avail=2 black=0
+1889.14,explore_status,exploration_complete
+1889.64,frontiers,avail=2 black=0
+1889.64,explore_status,exploration_complete
+1890.14,frontiers,avail=2 black=0
+1890.14,explore_status,exploration_complete
+1890.64,frontiers,avail=2 black=0
+1890.64,explore_status,exploration_complete
+1891.14,frontiers,avail=2 black=0
+1891.14,explore_status,exploration_complete
+1891.64,frontiers,avail=2 black=0
+1891.64,explore_status,exploration_complete
+1892.14,frontiers,avail=2 black=0
+1892.14,explore_status,exploration_complete
+1892.64,frontiers,avail=2 black=0
+1892.64,explore_status,exploration_complete
+1893.14,frontiers,avail=2 black=0
+1893.14,explore_status,exploration_complete
+1893.64,frontiers,avail=2 black=0
+1893.64,explore_status,exploration_complete
+1894.14,frontiers,avail=2 black=0
+1894.14,explore_status,exploration_complete
+1894.64,frontiers,avail=2 black=0
+1894.64,explore_status,exploration_complete
+1895.14,frontiers,avail=2 black=0
+1895.14,explore_status,exploration_complete
+1895.64,frontiers,avail=2 black=0
+1895.64,explore_status,exploration_complete
+1896.14,frontiers,avail=2 black=0
+1896.14,explore_status,exploration_complete
+1896.64,frontiers,avail=2 black=0
+1896.64,explore_status,exploration_complete
+1897.14,frontiers,avail=2 black=0
+1897.14,explore_status,exploration_complete
+1897.64,frontiers,avail=2 black=0
+1897.64,explore_status,exploration_complete
+1898.14,frontiers,avail=2 black=0
+1898.14,explore_status,exploration_complete
+1898.64,frontiers,avail=2 black=0
+1898.64,explore_status,exploration_complete
+1899.14,frontiers,avail=2 black=0
+1899.14,explore_status,exploration_complete
+1899.64,frontiers,avail=2 black=0
+1899.64,explore_status,exploration_complete
+1900.14,frontiers,avail=2 black=0
+1900.14,explore_status,exploration_complete
+1900.64,frontiers,avail=2 black=0
+1900.64,explore_status,exploration_complete
+1901.14,frontiers,avail=2 black=0
+1901.14,explore_status,exploration_complete
+1901.64,frontiers,avail=2 black=0
+1901.64,explore_status,exploration_complete
+1902.14,frontiers,avail=2 black=0
+1902.14,explore_status,exploration_complete
+1902.64,frontiers,avail=2 black=0
+1902.64,explore_status,exploration_complete
+1903.14,frontiers,avail=2 black=0
+1903.14,explore_status,exploration_complete
+1903.64,frontiers,avail=2 black=0
+1903.64,explore_status,exploration_complete
+1904.14,frontiers,avail=2 black=0
+1904.14,explore_status,exploration_complete
+1904.64,frontiers,avail=2 black=0
+1904.64,explore_status,exploration_complete
+1905.14,frontiers,avail=2 black=0
+1905.14,explore_status,exploration_complete
+1905.64,frontiers,avail=2 black=0
+1905.64,explore_status,exploration_complete
+1906.14,frontiers,avail=2 black=0
+1906.14,explore_status,exploration_complete
+1906.64,frontiers,avail=2 black=0
+1906.64,explore_status,exploration_complete
+1907.14,frontiers,avail=2 black=0
+1907.14,explore_status,exploration_complete
+1907.64,frontiers,avail=2 black=0
+1907.64,explore_status,exploration_complete
+1908.14,frontiers,avail=2 black=0
+1908.14,explore_status,exploration_complete
+1908.64,frontiers,avail=2 black=0
+1908.64,explore_status,exploration_complete
+1909.14,frontiers,avail=2 black=0
+1909.14,explore_status,exploration_complete
+1909.64,frontiers,avail=2 black=0
+1909.64,explore_status,exploration_complete
+1910.14,frontiers,avail=2 black=0
+1910.14,explore_status,exploration_complete
+1910.64,frontiers,avail=2 black=0
+1910.64,explore_status,exploration_complete
+1911.14,frontiers,avail=2 black=0
+1911.14,explore_status,exploration_complete
+1911.64,frontiers,avail=2 black=0
+1911.64,explore_status,exploration_complete
+1912.14,frontiers,avail=2 black=0
+1912.14,explore_status,exploration_complete
+1912.64,frontiers,avail=2 black=0
+1912.64,explore_status,exploration_complete
+1913.14,frontiers,avail=2 black=0
+1913.14,explore_status,exploration_complete
+1913.64,frontiers,avail=2 black=0
+1913.64,explore_status,exploration_complete
+1914.14,frontiers,avail=2 black=0
+1914.14,explore_status,exploration_complete
+1914.64,frontiers,avail=2 black=0
+1914.64,explore_status,exploration_complete
+1915.14,frontiers,avail=2 black=0
+1915.14,explore_status,exploration_complete
+1915.64,frontiers,avail=2 black=0
+1915.64,explore_status,exploration_complete
+1916.14,frontiers,avail=2 black=0
+1916.14,explore_status,exploration_complete
+1916.64,frontiers,avail=2 black=0
+1916.64,explore_status,exploration_complete
+1917.14,frontiers,avail=2 black=0
+1917.14,explore_status,exploration_complete
+1917.64,frontiers,avail=2 black=0
+1917.64,explore_status,exploration_complete
+1918.14,frontiers,avail=2 black=0
+1918.14,explore_status,exploration_complete
+1918.64,frontiers,avail=2 black=0
+1918.64,explore_status,exploration_complete
+1919.14,frontiers,avail=2 black=0
+1919.14,explore_status,exploration_complete
+1919.64,frontiers,avail=2 black=0
+1919.64,explore_status,exploration_complete
+1920.14,frontiers,avail=2 black=0
+1920.14,explore_status,exploration_complete
+1920.64,frontiers,avail=2 black=0
+1920.64,explore_status,exploration_complete
+1921.14,frontiers,avail=2 black=0
+1921.14,explore_status,exploration_complete
+1921.64,frontiers,avail=2 black=0
+1921.64,explore_status,exploration_complete
+1922.14,frontiers,avail=2 black=0
+1922.14,explore_status,exploration_complete
+1922.64,frontiers,avail=2 black=0
+1922.64,explore_status,exploration_complete
+1923.14,frontiers,avail=2 black=0
+1923.14,explore_status,exploration_complete
+1923.64,frontiers,avail=2 black=0
+1923.64,explore_status,exploration_complete
+1924.14,frontiers,avail=2 black=0
+1924.14,explore_status,exploration_complete
+1924.64,frontiers,avail=2 black=0
+1924.64,explore_status,exploration_complete
+1925.14,frontiers,avail=2 black=0
+1925.14,explore_status,exploration_complete
+1925.64,frontiers,avail=2 black=0
+1925.64,explore_status,exploration_complete
+1926.14,frontiers,avail=2 black=0
+1926.14,explore_status,exploration_complete
+1926.64,frontiers,avail=2 black=0
+1926.64,explore_status,exploration_complete
+1927.14,frontiers,avail=2 black=0
+1927.14,explore_status,exploration_complete
+1927.64,frontiers,avail=2 black=0
+1927.64,explore_status,exploration_complete
+1928.14,frontiers,avail=2 black=0
+1928.14,explore_status,exploration_complete
+1928.64,frontiers,avail=2 black=0
+1928.64,explore_status,exploration_complete
+1929.14,frontiers,avail=2 black=0
+1929.14,explore_status,exploration_complete
+1929.64,frontiers,avail=2 black=0
+1929.64,explore_status,exploration_complete
+1930.14,frontiers,avail=2 black=0
+1930.14,explore_status,exploration_complete
+1930.64,frontiers,avail=2 black=0
+1930.64,explore_status,exploration_complete
+1931.14,frontiers,avail=2 black=0
+1931.14,explore_status,exploration_complete
+1931.64,frontiers,avail=2 black=0
+1931.64,explore_status,exploration_complete
+1932.14,frontiers,avail=2 black=0
+1932.14,explore_status,exploration_complete
+1932.64,frontiers,avail=2 black=0
+1932.64,explore_status,exploration_complete
+1933.14,frontiers,avail=2 black=0
+1933.14,explore_status,exploration_complete
+1933.64,frontiers,avail=2 black=0
+1933.64,explore_status,exploration_complete
+1934.14,frontiers,avail=2 black=0
+1934.14,explore_status,exploration_complete
+1934.64,frontiers,avail=2 black=0
+1934.64,explore_status,exploration_complete
+1935.14,frontiers,avail=2 black=0
+1935.14,explore_status,exploration_complete
+1935.64,frontiers,avail=2 black=0
+1935.64,explore_status,exploration_complete
+1936.14,frontiers,avail=2 black=0
+1936.14,explore_status,exploration_complete
+1936.64,frontiers,avail=2 black=0
+1936.64,explore_status,exploration_complete
+1937.14,frontiers,avail=2 black=0
+1937.14,explore_status,exploration_complete
+1937.64,frontiers,avail=2 black=0
+1937.64,explore_status,exploration_complete
+1938.14,frontiers,avail=2 black=0
+1938.14,explore_status,exploration_complete
+1938.64,frontiers,avail=2 black=0
+1938.64,explore_status,exploration_complete
+1939.14,frontiers,avail=2 black=0
+1939.14,explore_status,exploration_complete
+1939.64,frontiers,avail=2 black=0
+1939.64,explore_status,exploration_complete
+1940.14,frontiers,avail=2 black=0
+1940.14,explore_status,exploration_complete
+1940.64,frontiers,avail=2 black=0
+1940.64,explore_status,exploration_complete
+1941.14,frontiers,avail=2 black=0
+1941.14,explore_status,exploration_complete
+1941.64,frontiers,avail=2 black=0
+1941.64,explore_status,exploration_complete
+1942.14,frontiers,avail=2 black=0
+1942.14,explore_status,exploration_complete
+1942.64,frontiers,avail=2 black=0
+1942.64,explore_status,exploration_complete
+1943.14,frontiers,avail=2 black=0
+1943.14,explore_status,exploration_complete
+1943.64,frontiers,avail=2 black=0
+1943.64,explore_status,exploration_complete
+1944.14,frontiers,avail=2 black=0
+1944.14,explore_status,exploration_complete
+1944.64,frontiers,avail=2 black=0
+1944.64,explore_status,exploration_complete
+1945.14,frontiers,avail=2 black=0
+1945.14,explore_status,exploration_complete
+1945.64,frontiers,avail=2 black=0
+1945.64,explore_status,exploration_complete
+1946.14,frontiers,avail=2 black=0
+1946.14,explore_status,exploration_complete
+1946.64,frontiers,avail=2 black=0
+1946.64,explore_status,exploration_complete
+1947.14,frontiers,avail=2 black=0
+1947.14,explore_status,exploration_complete
+1947.64,frontiers,avail=2 black=0
+1947.64,explore_status,exploration_complete
+1948.14,frontiers,avail=2 black=0
+1948.14,explore_status,exploration_complete
+1948.64,frontiers,avail=2 black=0
+1948.64,explore_status,exploration_complete
+1949.14,frontiers,avail=2 black=0
+1949.14,explore_status,exploration_complete
+1949.64,frontiers,avail=2 black=0
+1949.64,explore_status,exploration_complete
+1950.14,frontiers,avail=2 black=0
+1950.14,explore_status,exploration_complete
+1950.64,frontiers,avail=2 black=0
+1950.64,explore_status,exploration_complete
+1951.14,frontiers,avail=2 black=0
+1951.14,explore_status,exploration_complete
+1951.64,frontiers,avail=2 black=0
+1951.64,explore_status,exploration_complete
+1952.14,frontiers,avail=2 black=0
+1952.14,explore_status,exploration_complete
+1952.64,frontiers,avail=2 black=0
+1952.64,explore_status,exploration_complete
+1953.14,frontiers,avail=2 black=0
+1953.14,explore_status,exploration_complete
+1953.64,frontiers,avail=2 black=0
+1953.64,explore_status,exploration_complete
+1954.14,frontiers,avail=2 black=0
+1954.14,explore_status,exploration_complete
+1954.64,frontiers,avail=2 black=0
+1954.64,explore_status,exploration_complete
+1955.14,frontiers,avail=2 black=0
+1955.14,explore_status,exploration_complete
+1955.64,frontiers,avail=2 black=0
+1955.64,explore_status,exploration_complete
+1956.14,frontiers,avail=2 black=0
+1956.14,explore_status,exploration_complete
+1956.64,frontiers,avail=2 black=0
+1956.64,explore_status,exploration_complete
+1957.14,frontiers,avail=2 black=0
+1957.14,explore_status,exploration_complete
+1957.64,frontiers,avail=2 black=0
+1957.64,explore_status,exploration_complete
+1958.14,frontiers,avail=2 black=0
+1958.14,explore_status,exploration_complete
+1958.64,frontiers,avail=2 black=0
+1958.64,explore_status,exploration_complete
+1959.14,frontiers,avail=2 black=0
+1959.14,explore_status,exploration_complete
+1959.64,frontiers,avail=2 black=0
+1959.64,explore_status,exploration_complete
+1960.14,frontiers,avail=2 black=0
+1960.14,explore_status,exploration_complete
+1960.64,frontiers,avail=2 black=0
+1960.64,explore_status,exploration_complete
+1961.14,frontiers,avail=2 black=0
+1961.14,explore_status,exploration_complete
+1961.64,frontiers,avail=2 black=0
+1961.64,explore_status,exploration_complete
+1962.14,frontiers,avail=2 black=0
+1962.14,explore_status,exploration_complete
+1962.64,frontiers,avail=2 black=0
+1962.64,explore_status,exploration_complete
+1963.14,frontiers,avail=2 black=0
+1963.14,explore_status,exploration_complete
+1963.64,frontiers,avail=2 black=0
+1963.64,explore_status,exploration_complete
+1964.14,frontiers,avail=2 black=0
+1964.14,explore_status,exploration_complete
+1964.64,frontiers,avail=2 black=0
+1964.64,explore_status,exploration_complete
+1965.14,frontiers,avail=2 black=0
+1965.14,explore_status,exploration_complete
+1965.64,frontiers,avail=2 black=0
+1965.64,explore_status,exploration_complete
+1966.14,frontiers,avail=2 black=0
+1966.14,explore_status,exploration_complete
+1966.64,frontiers,avail=2 black=0
+1966.64,explore_status,exploration_complete
+1967.14,frontiers,avail=2 black=0
+1967.14,explore_status,exploration_complete
+1967.64,frontiers,avail=2 black=0
+1967.64,explore_status,exploration_complete
+1968.14,frontiers,avail=2 black=0
+1968.14,explore_status,exploration_complete
+1968.64,frontiers,avail=2 black=0
+1968.64,explore_status,exploration_complete
+1969.14,frontiers,avail=2 black=0
+1969.14,explore_status,exploration_complete
+1969.64,frontiers,avail=2 black=0
+1969.64,explore_status,exploration_complete
+1970.14,frontiers,avail=2 black=0
+1970.14,explore_status,exploration_complete
+1970.64,frontiers,avail=2 black=0
+1970.64,explore_status,exploration_complete
+1971.14,frontiers,avail=2 black=0
+1971.14,explore_status,exploration_complete
+1971.64,frontiers,avail=2 black=0
+1971.64,explore_status,exploration_complete
+1972.14,frontiers,avail=2 black=0
+1972.14,explore_status,exploration_complete
+1972.64,frontiers,avail=2 black=0
+1972.64,explore_status,exploration_complete
+1973.14,frontiers,avail=2 black=0
+1973.14,explore_status,exploration_complete
+1973.64,frontiers,avail=2 black=0
+1973.64,explore_status,exploration_complete
+1974.14,frontiers,avail=2 black=0
+1974.14,explore_status,exploration_complete
+1974.64,frontiers,avail=2 black=0
+1974.64,explore_status,exploration_complete
+1975.14,frontiers,avail=2 black=0
+1975.14,explore_status,exploration_complete
+1975.64,frontiers,avail=2 black=0
+1975.64,explore_status,exploration_complete
+1976.14,frontiers,avail=2 black=0
+1976.14,explore_status,exploration_complete
+1976.64,frontiers,avail=2 black=0
+1976.64,explore_status,exploration_complete
+1977.14,frontiers,avail=2 black=0
+1977.14,explore_status,exploration_complete
+1977.64,frontiers,avail=2 black=0
+1977.64,explore_status,exploration_complete
+1978.14,frontiers,avail=2 black=0
+1978.14,explore_status,exploration_complete
+1978.64,frontiers,avail=2 black=0
+1978.64,explore_status,exploration_complete
+1979.14,frontiers,avail=2 black=0
+1979.14,explore_status,exploration_complete
+1979.64,frontiers,avail=2 black=0
+1979.64,explore_status,exploration_complete
+1980.14,frontiers,avail=2 black=0
+1980.14,explore_status,exploration_complete
+1980.64,frontiers,avail=2 black=0
+1980.64,explore_status,exploration_complete
+1981.14,frontiers,avail=2 black=0
+1981.14,explore_status,exploration_complete
+1981.64,frontiers,avail=2 black=0
+1981.64,explore_status,exploration_complete
+1982.14,frontiers,avail=2 black=0
+1982.14,explore_status,exploration_complete
+1982.64,frontiers,avail=2 black=0
+1982.64,explore_status,exploration_complete
+1983.14,frontiers,avail=2 black=0
+1983.14,explore_status,exploration_complete
+1983.64,frontiers,avail=2 black=0
+1983.64,explore_status,exploration_complete
+1984.14,frontiers,avail=2 black=0
+1984.14,explore_status,exploration_complete
+1984.64,frontiers,avail=2 black=0
+1984.64,explore_status,exploration_complete
+1985.14,frontiers,avail=2 black=0
+1985.14,explore_status,exploration_complete
+1985.64,frontiers,avail=2 black=0
+1985.64,explore_status,exploration_complete
+1986.14,frontiers,avail=2 black=0
+1986.14,explore_status,exploration_complete
+1986.64,frontiers,avail=2 black=0
+1986.64,explore_status,exploration_complete
+1987.14,frontiers,avail=2 black=0
+1987.14,explore_status,exploration_complete
+1987.64,frontiers,avail=2 black=0
+1987.64,explore_status,exploration_complete
+1988.14,frontiers,avail=2 black=0
+1988.14,explore_status,exploration_complete
+1988.64,frontiers,avail=2 black=0
+1988.64,explore_status,exploration_complete
+1989.14,frontiers,avail=2 black=0
+1989.14,explore_status,exploration_complete
+1989.64,frontiers,avail=2 black=0
+1989.64,explore_status,exploration_complete
+1990.14,frontiers,avail=2 black=0
+1990.14,explore_status,exploration_complete
+1990.64,frontiers,avail=2 black=0
+1990.64,explore_status,exploration_complete
+1991.14,frontiers,avail=2 black=0
+1991.14,explore_status,exploration_complete
+1991.64,frontiers,avail=2 black=0
+1991.64,explore_status,exploration_complete
+1992.14,frontiers,avail=2 black=0
+1992.14,explore_status,exploration_complete
+1992.64,frontiers,avail=2 black=0
+1992.64,explore_status,exploration_complete
+1993.14,frontiers,avail=2 black=0
+1993.14,explore_status,exploration_complete
+1993.64,frontiers,avail=2 black=0
+1993.64,explore_status,exploration_complete
+1994.14,frontiers,avail=2 black=0
+1994.14,explore_status,exploration_complete
+1994.64,frontiers,avail=2 black=0
+1994.64,explore_status,exploration_complete
+1995.14,frontiers,avail=2 black=0
+1995.14,explore_status,exploration_complete
+1995.64,frontiers,avail=2 black=0
+1995.64,explore_status,exploration_complete
+1996.14,frontiers,avail=2 black=0
+1996.14,explore_status,exploration_complete
+1996.64,frontiers,avail=2 black=0
+1996.64,explore_status,exploration_complete
+1997.14,frontiers,avail=2 black=0
+1997.14,explore_status,exploration_complete
+1997.64,frontiers,avail=2 black=0
+1997.64,explore_status,exploration_complete
+1998.14,frontiers,avail=2 black=0
+1998.14,explore_status,exploration_complete
+1998.64,frontiers,avail=2 black=0
+1998.64,explore_status,exploration_complete
+1999.14,frontiers,avail=2 black=0
+1999.14,explore_status,exploration_complete
+1999.64,frontiers,avail=2 black=0
+1999.64,explore_status,exploration_complete
+2000.14,frontiers,avail=2 black=0
+2000.14,explore_status,exploration_complete
+2000.64,frontiers,avail=2 black=0
+2000.64,explore_status,exploration_complete
+2001.14,frontiers,avail=2 black=0
+2001.14,explore_status,exploration_complete
+2001.64,frontiers,avail=2 black=0
+2001.64,explore_status,exploration_complete
+2002.14,frontiers,avail=2 black=0
+2002.14,explore_status,exploration_complete
+2002.64,frontiers,avail=2 black=0
+2002.64,explore_status,exploration_complete
+2003.14,frontiers,avail=2 black=0
+2003.14,explore_status,exploration_complete
+2003.64,frontiers,avail=2 black=0
+2003.64,explore_status,exploration_complete
+2004.14,frontiers,avail=2 black=0
+2004.14,explore_status,exploration_complete
+2004.64,frontiers,avail=2 black=0
+2004.64,explore_status,exploration_complete
+2005.14,frontiers,avail=2 black=0
+2005.14,explore_status,exploration_complete
+2005.64,frontiers,avail=2 black=0
+2005.64,explore_status,exploration_complete
+2006.14,frontiers,avail=2 black=0
+2006.14,explore_status,exploration_complete
+2006.64,frontiers,avail=2 black=0
+2006.64,explore_status,exploration_complete
+2007.14,frontiers,avail=2 black=0
+2007.14,explore_status,exploration_complete
+2007.64,frontiers,avail=2 black=0
+2007.64,explore_status,exploration_complete
+2008.14,frontiers,avail=2 black=0
+2008.14,explore_status,exploration_complete
+2008.64,frontiers,avail=2 black=0
+2008.64,explore_status,exploration_complete
+2009.14,frontiers,avail=2 black=0
+2009.14,explore_status,exploration_complete
+2009.64,frontiers,avail=2 black=0
+2009.64,explore_status,exploration_complete
+2010.14,frontiers,avail=2 black=0
+2010.14,explore_status,exploration_complete
+2010.64,frontiers,avail=2 black=0
+2010.64,explore_status,exploration_complete
+2011.14,frontiers,avail=2 black=0
+2011.14,explore_status,exploration_complete
+2011.64,frontiers,avail=2 black=0
+2011.64,explore_status,exploration_complete
+2012.14,frontiers,avail=2 black=0
+2012.14,explore_status,exploration_complete
+2012.64,frontiers,avail=2 black=0
+2012.64,explore_status,exploration_complete
+2013.14,frontiers,avail=2 black=0
+2013.14,explore_status,exploration_complete
+2013.64,frontiers,avail=2 black=0
+2013.64,explore_status,exploration_complete
+2014.14,frontiers,avail=2 black=0
+2014.14,explore_status,exploration_complete
+2014.64,frontiers,avail=2 black=0
+2014.64,explore_status,exploration_complete
+2015.14,frontiers,avail=2 black=0
+2015.14,explore_status,exploration_complete
+2015.64,frontiers,avail=2 black=0
+2015.64,explore_status,exploration_complete
+2016.14,frontiers,avail=2 black=0
+2016.14,explore_status,exploration_complete
+2016.64,frontiers,avail=2 black=0
+2016.64,explore_status,exploration_complete
+2017.14,frontiers,avail=2 black=0
+2017.14,explore_status,exploration_complete
+2017.64,frontiers,avail=2 black=0
+2017.64,explore_status,exploration_complete
+2018.14,frontiers,avail=2 black=0
+2018.14,explore_status,exploration_complete
+2018.64,frontiers,avail=2 black=0
+2018.64,explore_status,exploration_complete
+2019.14,frontiers,avail=2 black=0
+2019.14,explore_status,exploration_complete
+2019.64,frontiers,avail=2 black=0
+2019.64,explore_status,exploration_complete
+2020.14,frontiers,avail=2 black=0
+2020.14,explore_status,exploration_complete
+2020.64,frontiers,avail=2 black=0
+2020.64,explore_status,exploration_complete
+2021.14,frontiers,avail=2 black=0
+2021.14,explore_status,exploration_complete
+2021.64,frontiers,avail=2 black=0
+2021.64,explore_status,exploration_complete
+2022.14,frontiers,avail=2 black=0
+2022.14,explore_status,exploration_complete
+2022.64,frontiers,avail=2 black=0
+2022.64,explore_status,exploration_complete
+2023.14,frontiers,avail=2 black=0
+2023.14,explore_status,exploration_complete
+2023.64,frontiers,avail=2 black=0
+2023.64,explore_status,exploration_complete
+2024.14,frontiers,avail=2 black=0
+2024.14,explore_status,exploration_complete
+2024.64,frontiers,avail=2 black=0
+2024.64,explore_status,exploration_complete
+2025.14,frontiers,avail=2 black=0
+2025.14,explore_status,exploration_complete
+2025.64,frontiers,avail=2 black=0
+2025.64,explore_status,exploration_complete
+2026.14,frontiers,avail=2 black=0
+2026.14,explore_status,exploration_complete
+2026.64,frontiers,avail=2 black=0
+2026.64,explore_status,exploration_complete
+2027.14,frontiers,avail=2 black=0
+2027.14,explore_status,exploration_complete
+2027.64,frontiers,avail=2 black=0
+2027.64,explore_status,exploration_complete
+2028.14,frontiers,avail=2 black=0
+2028.14,explore_status,exploration_complete
+2028.64,frontiers,avail=2 black=0
+2028.64,explore_status,exploration_complete
+2029.14,frontiers,avail=2 black=0
+2029.14,explore_status,exploration_complete
+2029.64,frontiers,avail=2 black=0
+2029.64,explore_status,exploration_complete
+2030.14,frontiers,avail=2 black=0
+2030.14,explore_status,exploration_complete
+2030.64,frontiers,avail=2 black=0
+2030.64,explore_status,exploration_complete
+2031.14,frontiers,avail=2 black=0
+2031.14,explore_status,exploration_complete
+2031.64,frontiers,avail=2 black=0
+2031.64,explore_status,exploration_complete
+2032.14,frontiers,avail=2 black=0
+2032.14,explore_status,exploration_complete
+2032.64,frontiers,avail=2 black=0
+2032.64,explore_status,exploration_complete
+2033.14,frontiers,avail=2 black=0
+2033.14,explore_status,exploration_complete
+2033.64,frontiers,avail=2 black=0
+2033.64,explore_status,exploration_complete
+2034.14,frontiers,avail=2 black=0
+2034.14,explore_status,exploration_complete
+2034.64,frontiers,avail=2 black=0
+2034.64,explore_status,exploration_complete
+2035.14,frontiers,avail=2 black=0
+2035.14,explore_status,exploration_complete
+2035.64,frontiers,avail=2 black=0
+2035.64,explore_status,exploration_complete
+2036.14,frontiers,avail=2 black=0
+2036.14,explore_status,exploration_complete
+2036.64,frontiers,avail=2 black=0
+2036.64,explore_status,exploration_complete
+2037.14,frontiers,avail=2 black=0
+2037.14,explore_status,exploration_complete
+2037.64,frontiers,avail=2 black=0
+2037.64,explore_status,exploration_complete
+2038.14,frontiers,avail=2 black=0
+2038.14,explore_status,exploration_complete
+2038.64,frontiers,avail=2 black=0
+2038.64,explore_status,exploration_complete
+2039.14,frontiers,avail=2 black=0
+2039.14,explore_status,exploration_complete
+2039.64,frontiers,avail=2 black=0
+2039.64,explore_status,exploration_complete
+2040.14,frontiers,avail=2 black=0
+2040.14,explore_status,exploration_complete
+2040.64,frontiers,avail=2 black=0
+2040.64,explore_status,exploration_complete
+2041.14,frontiers,avail=2 black=0
+2041.14,explore_status,exploration_complete
+2041.64,frontiers,avail=2 black=0
+2041.64,explore_status,exploration_complete
+2042.14,frontiers,avail=2 black=0
+2042.14,explore_status,exploration_complete
+2042.64,frontiers,avail=2 black=0
+2042.64,explore_status,exploration_complete
+2043.14,frontiers,avail=2 black=0
+2043.14,explore_status,exploration_complete
+2043.64,frontiers,avail=2 black=0
+2043.64,explore_status,exploration_complete
+2044.14,frontiers,avail=2 black=0
+2044.14,explore_status,exploration_complete
+2044.64,frontiers,avail=2 black=0
+2044.64,explore_status,exploration_complete
+2045.14,frontiers,avail=2 black=0
+2045.14,explore_status,exploration_complete
+2045.64,frontiers,avail=2 black=0
+2045.64,explore_status,exploration_complete
+2046.14,frontiers,avail=2 black=0
+2046.14,explore_status,exploration_complete
+2046.64,frontiers,avail=2 black=0
+2046.64,explore_status,exploration_complete
+2047.14,frontiers,avail=2 black=0
+2047.14,explore_status,exploration_complete
+2047.64,frontiers,avail=2 black=0
+2047.64,explore_status,exploration_complete
+2048.14,frontiers,avail=2 black=0
+2048.14,explore_status,exploration_complete
+2048.64,frontiers,avail=2 black=0
+2048.64,explore_status,exploration_complete
+2049.14,frontiers,avail=2 black=0
+2049.14,explore_status,exploration_complete
+2049.64,frontiers,avail=2 black=0
+2049.64,explore_status,exploration_complete
+2050.14,frontiers,avail=2 black=0
+2050.14,explore_status,exploration_complete
+2050.64,frontiers,avail=2 black=0
+2050.64,explore_status,exploration_complete
+2051.14,frontiers,avail=2 black=0
+2051.14,explore_status,exploration_complete
+2051.64,frontiers,avail=2 black=0
+2051.64,explore_status,exploration_complete
+2052.14,frontiers,avail=2 black=0
+2052.14,explore_status,exploration_complete
+2052.64,frontiers,avail=2 black=0
+2052.64,explore_status,exploration_complete
+2053.14,frontiers,avail=2 black=0
+2053.14,explore_status,exploration_complete
+2053.64,frontiers,avail=2 black=0
+2053.64,explore_status,exploration_complete
+2054.14,frontiers,avail=2 black=0
+2054.14,explore_status,exploration_complete
+2054.64,frontiers,avail=2 black=0
+2054.64,explore_status,exploration_complete
+2055.14,frontiers,avail=2 black=0
+2055.14,explore_status,exploration_complete
+2055.64,frontiers,avail=2 black=0
+2055.64,explore_status,exploration_complete
+2056.14,frontiers,avail=2 black=0
+2056.14,explore_status,exploration_complete
+2056.64,frontiers,avail=2 black=0
+2056.64,explore_status,exploration_complete
+2057.14,frontiers,avail=2 black=0
+2057.14,explore_status,exploration_complete
+2057.64,frontiers,avail=2 black=0
+2057.64,explore_status,exploration_complete
+2058.14,frontiers,avail=2 black=0
+2058.14,explore_status,exploration_complete
+2058.64,frontiers,avail=2 black=0
+2058.64,explore_status,exploration_complete
+2059.14,frontiers,avail=2 black=0
+2059.14,explore_status,exploration_complete
+2059.64,frontiers,avail=2 black=0
+2059.64,explore_status,exploration_complete
+2060.14,frontiers,avail=2 black=0
+2060.14,explore_status,exploration_complete
+2060.64,frontiers,avail=2 black=0
+2060.64,explore_status,exploration_complete
+2061.14,frontiers,avail=2 black=0
+2061.14,explore_status,exploration_complete
+2061.64,frontiers,avail=2 black=0
+2061.64,explore_status,exploration_complete
+2062.14,frontiers,avail=2 black=0
+2062.14,explore_status,exploration_complete
+2062.64,frontiers,avail=2 black=0
+2062.64,explore_status,exploration_complete
+2063.14,frontiers,avail=2 black=0
+2063.14,explore_status,exploration_complete
+2063.64,frontiers,avail=2 black=0
+2063.64,explore_status,exploration_complete
+2064.14,frontiers,avail=2 black=0
+2064.14,explore_status,exploration_complete
+2064.64,frontiers,avail=2 black=0
+2064.64,explore_status,exploration_complete
+2065.14,frontiers,avail=2 black=0
+2065.14,explore_status,exploration_complete
+2065.64,frontiers,avail=2 black=0
+2065.64,explore_status,exploration_complete
+2066.14,frontiers,avail=2 black=0
+2066.14,explore_status,exploration_complete
+2066.64,frontiers,avail=2 black=0
+2066.64,explore_status,exploration_complete
+2067.14,frontiers,avail=2 black=0
+2067.14,explore_status,exploration_complete
+2067.64,frontiers,avail=2 black=0
+2067.64,explore_status,exploration_complete
+2068.14,frontiers,avail=2 black=0
+2068.14,explore_status,exploration_complete
+2068.64,frontiers,avail=2 black=0
+2068.64,explore_status,exploration_complete
+2069.14,frontiers,avail=2 black=0
+2069.14,explore_status,exploration_complete
+2069.64,frontiers,avail=2 black=0
+2069.64,explore_status,exploration_complete
+2070.14,frontiers,avail=2 black=0
+2070.14,explore_status,exploration_complete
+2070.64,frontiers,avail=2 black=0
+2070.64,explore_status,exploration_complete
+2071.14,frontiers,avail=2 black=0
+2071.14,explore_status,exploration_complete
+2071.64,frontiers,avail=2 black=0
+2071.64,explore_status,exploration_complete
+2072.14,frontiers,avail=2 black=0
+2072.14,explore_status,exploration_complete
+2072.64,frontiers,avail=2 black=0
+2072.64,explore_status,exploration_complete
+2073.14,frontiers,avail=2 black=0
+2073.14,explore_status,exploration_complete
+2073.64,frontiers,avail=2 black=0
+2073.64,explore_status,exploration_complete
+2074.14,frontiers,avail=2 black=0
+2074.14,explore_status,exploration_complete
+2074.64,frontiers,avail=2 black=0
+2074.64,explore_status,exploration_complete
+2075.14,frontiers,avail=2 black=0
+2075.14,explore_status,exploration_complete
+2075.64,frontiers,avail=2 black=0
+2075.64,explore_status,exploration_complete
+2076.14,frontiers,avail=2 black=0
+2076.14,explore_status,exploration_complete
+2076.64,frontiers,avail=2 black=0
+2076.64,explore_status,exploration_complete
+2077.14,frontiers,avail=2 black=0
+2077.14,explore_status,exploration_complete
+2077.64,frontiers,avail=2 black=0
+2077.64,explore_status,exploration_complete
+2078.14,frontiers,avail=2 black=0
+2078.14,explore_status,exploration_complete
+2078.64,frontiers,avail=2 black=0
+2078.64,explore_status,exploration_complete
+2079.14,frontiers,avail=2 black=0
+2079.14,explore_status,exploration_complete
+2079.64,frontiers,avail=2 black=0
+2079.64,explore_status,exploration_complete
+2080.14,frontiers,avail=2 black=0
+2080.14,explore_status,exploration_complete
+2080.64,frontiers,avail=2 black=0
+2080.64,explore_status,exploration_complete
+2081.14,frontiers,avail=2 black=0
+2081.14,explore_status,exploration_complete
+2081.64,frontiers,avail=2 black=0
+2081.64,explore_status,exploration_complete
+2082.14,frontiers,avail=2 black=0
+2082.14,explore_status,exploration_complete
+2082.64,frontiers,avail=2 black=0
+2082.64,explore_status,exploration_complete
+2083.14,frontiers,avail=2 black=0
+2083.14,explore_status,exploration_complete
+2083.64,frontiers,avail=2 black=0
+2083.64,explore_status,exploration_complete
+2084.14,frontiers,avail=2 black=0
+2084.14,explore_status,exploration_complete
+2084.64,frontiers,avail=2 black=0
+2084.64,explore_status,exploration_complete
+2085.14,frontiers,avail=2 black=0
+2085.14,explore_status,exploration_complete
+2085.64,frontiers,avail=2 black=0
+2085.64,explore_status,exploration_complete
+2086.14,frontiers,avail=2 black=0
+2086.14,explore_status,exploration_complete
+2086.64,frontiers,avail=2 black=0
+2086.64,explore_status,exploration_complete
+2087.14,frontiers,avail=2 black=0
+2087.14,explore_status,exploration_complete
+2087.64,frontiers,avail=2 black=0
+2087.64,explore_status,exploration_complete
+2088.14,frontiers,avail=2 black=0
+2088.14,explore_status,exploration_complete
+2088.64,frontiers,avail=2 black=0
+2088.64,explore_status,exploration_complete
+2089.14,frontiers,avail=2 black=0
+2089.14,explore_status,exploration_complete
+2089.64,frontiers,avail=2 black=0
+2089.64,explore_status,exploration_complete
+2090.14,frontiers,avail=2 black=0
+2090.14,explore_status,exploration_complete
+2090.64,frontiers,avail=2 black=0
+2090.64,explore_status,exploration_complete
+2091.14,frontiers,avail=2 black=0
+2091.14,explore_status,exploration_complete
+2091.64,frontiers,avail=2 black=0
+2091.64,explore_status,exploration_complete
+2092.14,frontiers,avail=2 black=0
+2092.14,explore_status,exploration_complete
+2092.64,frontiers,avail=2 black=0
+2092.64,explore_status,exploration_complete
+2093.14,frontiers,avail=2 black=0
+2093.14,explore_status,exploration_complete
+2093.64,frontiers,avail=2 black=0
+2093.64,explore_status,exploration_complete
+2094.14,frontiers,avail=2 black=0
+2094.14,explore_status,exploration_complete
+2094.64,frontiers,avail=2 black=0
+2094.64,explore_status,exploration_complete
+2095.14,frontiers,avail=2 black=0
+2095.14,explore_status,exploration_complete
+2095.64,frontiers,avail=2 black=0
+2095.64,explore_status,exploration_complete
+2096.14,frontiers,avail=2 black=0
+2096.14,explore_status,exploration_complete
+2096.64,frontiers,avail=2 black=0
+2096.64,explore_status,exploration_complete
+2097.14,frontiers,avail=2 black=0
+2097.14,explore_status,exploration_complete
+2097.64,frontiers,avail=2 black=0
+2097.64,explore_status,exploration_complete
+2098.14,frontiers,avail=2 black=0
+2098.14,explore_status,exploration_complete
+2098.64,frontiers,avail=2 black=0
+2098.64,explore_status,exploration_complete
+2099.14,frontiers,avail=2 black=0
+2099.14,explore_status,exploration_complete
+2099.64,frontiers,avail=2 black=0
+2099.64,explore_status,exploration_complete
+2100.14,frontiers,avail=2 black=0
+2100.14,explore_status,exploration_complete
+2100.64,frontiers,avail=2 black=0
+2100.64,explore_status,exploration_complete
+2101.14,frontiers,avail=2 black=0
+2101.14,explore_status,exploration_complete
+2101.64,frontiers,avail=2 black=0
+2101.64,explore_status,exploration_complete
+2102.14,frontiers,avail=2 black=0
+2102.14,explore_status,exploration_complete
+2102.64,frontiers,avail=2 black=0
+2102.64,explore_status,exploration_complete
+2103.14,frontiers,avail=2 black=0
+2103.14,explore_status,exploration_complete
+2103.64,frontiers,avail=2 black=0
+2103.64,explore_status,exploration_complete
+2104.14,frontiers,avail=2 black=0
+2104.14,explore_status,exploration_complete
+2104.64,frontiers,avail=2 black=0
+2104.64,explore_status,exploration_complete
+2105.14,frontiers,avail=2 black=0
+2105.14,explore_status,exploration_complete
+2105.64,frontiers,avail=2 black=0
+2105.64,explore_status,exploration_complete
+2106.14,frontiers,avail=2 black=0
+2106.14,explore_status,exploration_complete
+2106.64,frontiers,avail=2 black=0
+2106.64,explore_status,exploration_complete
+2107.14,frontiers,avail=2 black=0
+2107.14,explore_status,exploration_complete
+2107.64,frontiers,avail=2 black=0
+2107.64,explore_status,exploration_complete
+2108.14,frontiers,avail=2 black=0
+2108.14,explore_status,exploration_complete
+2108.64,frontiers,avail=2 black=0
+2108.64,explore_status,exploration_complete
+2109.14,frontiers,avail=2 black=0
+2109.14,explore_status,exploration_complete
+2109.64,frontiers,avail=2 black=0
+2109.64,explore_status,exploration_complete
+2110.14,frontiers,avail=2 black=0
+2110.14,explore_status,exploration_complete
+2110.64,frontiers,avail=2 black=0
+2110.64,explore_status,exploration_complete
+2111.14,frontiers,avail=2 black=0
+2111.14,explore_status,exploration_complete
+2111.64,frontiers,avail=2 black=0
+2111.64,explore_status,exploration_complete
+2112.14,frontiers,avail=2 black=0
+2112.14,explore_status,exploration_complete
+2112.64,frontiers,avail=2 black=0
+2112.64,explore_status,exploration_complete
+2113.14,frontiers,avail=2 black=0
+2113.14,explore_status,exploration_complete
+2113.64,frontiers,avail=2 black=0
+2113.64,explore_status,exploration_complete
+2114.14,frontiers,avail=2 black=0
+2114.14,explore_status,exploration_complete
+2114.64,frontiers,avail=2 black=0
+2114.64,explore_status,exploration_complete
+2115.14,frontiers,avail=2 black=0
+2115.14,explore_status,exploration_complete
+2115.64,frontiers,avail=2 black=0
+2115.64,explore_status,exploration_complete
+2116.14,frontiers,avail=2 black=0
+2116.14,explore_status,exploration_complete
+2116.64,frontiers,avail=2 black=0
+2116.64,explore_status,exploration_complete
+2117.14,frontiers,avail=2 black=0
+2117.14,explore_status,exploration_complete
+2117.64,frontiers,avail=2 black=0
+2117.64,explore_status,exploration_complete
+2118.14,frontiers,avail=2 black=0
+2118.14,explore_status,exploration_complete
+2118.64,frontiers,avail=2 black=0
+2118.64,explore_status,exploration_complete
+2119.14,frontiers,avail=2 black=0
+2119.14,explore_status,exploration_complete
+2119.64,frontiers,avail=2 black=0
+2119.64,explore_status,exploration_complete
+2120.14,frontiers,avail=2 black=0
+2120.14,explore_status,exploration_complete
+2120.64,frontiers,avail=2 black=0
+2120.64,explore_status,exploration_complete
+2121.14,frontiers,avail=2 black=0
+2121.14,explore_status,exploration_complete
+2121.64,frontiers,avail=2 black=0
+2121.64,explore_status,exploration_complete
+2122.14,frontiers,avail=2 black=0
+2122.14,explore_status,exploration_complete
+2122.64,frontiers,avail=2 black=0
+2122.64,explore_status,exploration_complete
+2123.14,frontiers,avail=2 black=0
+2123.14,explore_status,exploration_complete
+2123.64,frontiers,avail=2 black=0
+2123.64,explore_status,exploration_complete
+2124.14,frontiers,avail=2 black=0
+2124.14,explore_status,exploration_complete
+2124.64,frontiers,avail=2 black=0
+2124.64,explore_status,exploration_complete
+2125.14,frontiers,avail=2 black=0
+2125.14,explore_status,exploration_complete
+2125.64,frontiers,avail=2 black=0
+2125.64,explore_status,exploration_complete
+2126.14,frontiers,avail=2 black=0
+2126.14,explore_status,exploration_complete
+2126.64,frontiers,avail=2 black=0
+2126.64,explore_status,exploration_complete
+2127.14,frontiers,avail=2 black=0
+2127.14,explore_status,exploration_complete
+2127.64,frontiers,avail=2 black=0
+2127.64,explore_status,exploration_complete
+2128.14,frontiers,avail=2 black=0
+2128.14,explore_status,exploration_complete
+2128.64,frontiers,avail=2 black=0
+2128.64,explore_status,exploration_complete
+2129.14,frontiers,avail=2 black=0
+2129.14,explore_status,exploration_complete
+2129.64,frontiers,avail=2 black=0
+2129.64,explore_status,exploration_complete
+2130.14,frontiers,avail=2 black=0
+2130.14,explore_status,exploration_complete
+2130.64,frontiers,avail=2 black=0
+2130.64,explore_status,exploration_complete
+2131.14,frontiers,avail=2 black=0
+2131.14,explore_status,exploration_complete
+2131.64,frontiers,avail=2 black=0
+2131.64,explore_status,exploration_complete
+2132.14,frontiers,avail=2 black=0
+2132.14,explore_status,exploration_complete
+2132.64,frontiers,avail=2 black=0
+2132.64,explore_status,exploration_complete
+2133.14,frontiers,avail=2 black=0
+2133.14,explore_status,exploration_complete
+2133.64,frontiers,avail=2 black=0
+2133.64,explore_status,exploration_complete
+2134.14,frontiers,avail=2 black=0
+2134.14,explore_status,exploration_complete
+2134.64,frontiers,avail=2 black=0
+2134.64,explore_status,exploration_complete
+2135.14,frontiers,avail=2 black=0
+2135.14,explore_status,exploration_complete
+2135.64,frontiers,avail=2 black=0
+2135.64,explore_status,exploration_complete
+2136.14,frontiers,avail=2 black=0
+2136.14,explore_status,exploration_complete
+2136.64,frontiers,avail=2 black=0
+2136.64,explore_status,exploration_complete
+2137.14,frontiers,avail=2 black=0
+2137.14,explore_status,exploration_complete
+2137.64,frontiers,avail=2 black=0
+2137.64,explore_status,exploration_complete
+2138.14,frontiers,avail=2 black=0
+2138.14,explore_status,exploration_complete
+2138.64,frontiers,avail=2 black=0
+2138.64,explore_status,exploration_complete
+2139.14,frontiers,avail=2 black=0
+2139.14,explore_status,exploration_complete
+2139.64,frontiers,avail=2 black=0
+2139.64,explore_status,exploration_complete
+2140.14,frontiers,avail=2 black=0
+2140.14,explore_status,exploration_complete
+2140.64,frontiers,avail=2 black=0
+2140.64,explore_status,exploration_complete
+2141.14,frontiers,avail=2 black=0
+2141.14,explore_status,exploration_complete
+2141.64,frontiers,avail=2 black=0
+2141.64,explore_status,exploration_complete
+2142.14,frontiers,avail=2 black=0
+2142.14,explore_status,exploration_complete
+2142.64,frontiers,avail=2 black=0
+2142.64,explore_status,exploration_complete
+2143.14,frontiers,avail=2 black=0
+2143.14,explore_status,exploration_complete
+2143.64,frontiers,avail=2 black=0
+2143.64,explore_status,exploration_complete
+2144.14,frontiers,avail=2 black=0
+2144.14,explore_status,exploration_complete
+2144.64,frontiers,avail=2 black=0
+2144.64,explore_status,exploration_complete
+2145.14,frontiers,avail=2 black=0
+2145.14,explore_status,exploration_complete
+2145.64,frontiers,avail=2 black=0
+2145.64,explore_status,exploration_complete
+2146.14,frontiers,avail=2 black=0
+2146.14,explore_status,exploration_complete
+2146.64,frontiers,avail=2 black=0
+2146.64,explore_status,exploration_complete
+2147.14,frontiers,avail=2 black=0
+2147.14,explore_status,exploration_complete
+2147.64,frontiers,avail=2 black=0
+2147.64,explore_status,exploration_complete
+2148.14,frontiers,avail=2 black=0
+2148.14,explore_status,exploration_complete
+2148.64,frontiers,avail=2 black=0
+2148.64,explore_status,exploration_complete
+2149.14,frontiers,avail=2 black=0
+2149.14,explore_status,exploration_complete
+2149.64,frontiers,avail=2 black=0
+2149.64,explore_status,exploration_complete
+2150.14,frontiers,avail=2 black=0
+2150.14,explore_status,exploration_complete
+2150.64,frontiers,avail=2 black=0
+2150.64,explore_status,exploration_complete
+2151.14,frontiers,avail=2 black=0
+2151.14,explore_status,exploration_complete
+2151.64,frontiers,avail=2 black=0
+2151.64,explore_status,exploration_complete
+2152.14,frontiers,avail=2 black=0
+2152.14,explore_status,exploration_complete
+2152.64,frontiers,avail=2 black=0
+2152.64,explore_status,exploration_complete
+2153.14,frontiers,avail=2 black=0
+2153.14,explore_status,exploration_complete
+2153.64,frontiers,avail=2 black=0
+2153.64,explore_status,exploration_complete
+2154.14,frontiers,avail=2 black=0
+2154.14,explore_status,exploration_complete
+2154.64,frontiers,avail=2 black=0
+2154.64,explore_status,exploration_complete
+2155.14,frontiers,avail=2 black=0
+2155.14,explore_status,exploration_complete
+2155.64,frontiers,avail=2 black=0
+2155.64,explore_status,exploration_complete
+2156.14,frontiers,avail=2 black=0
+2156.14,explore_status,exploration_complete
+2156.64,frontiers,avail=2 black=0
+2156.64,explore_status,exploration_complete
+2157.14,frontiers,avail=2 black=0
+2157.14,explore_status,exploration_complete
+2157.64,frontiers,avail=2 black=0
+2157.64,explore_status,exploration_complete
+2158.14,frontiers,avail=2 black=0
+2158.14,explore_status,exploration_complete
+2158.64,frontiers,avail=2 black=0
+2158.64,explore_status,exploration_complete
+2159.14,frontiers,avail=2 black=0
+2159.14,explore_status,exploration_complete
+2159.64,frontiers,avail=2 black=0
+2159.64,explore_status,exploration_complete
+2160.14,frontiers,avail=2 black=0
+2160.14,explore_status,exploration_complete
+2160.64,frontiers,avail=2 black=0
+2160.64,explore_status,exploration_complete
+2161.14,frontiers,avail=2 black=0
+2161.14,explore_status,exploration_complete
+2161.64,frontiers,avail=2 black=0
+2161.64,explore_status,exploration_complete
+2162.14,frontiers,avail=2 black=0
+2162.14,explore_status,exploration_complete
+2162.64,frontiers,avail=2 black=0
+2162.64,explore_status,exploration_complete
+2163.14,frontiers,avail=2 black=0
+2163.14,explore_status,exploration_complete
+2163.64,frontiers,avail=2 black=0
+2163.64,explore_status,exploration_complete
+2164.14,frontiers,avail=2 black=0
+2164.14,explore_status,exploration_complete
+2164.64,frontiers,avail=2 black=0
+2164.64,explore_status,exploration_complete
+2165.14,frontiers,avail=2 black=0
+2165.14,explore_status,exploration_complete
+2165.64,frontiers,avail=2 black=0
+2165.64,explore_status,exploration_complete
+2166.14,frontiers,avail=2 black=0
+2166.14,explore_status,exploration_complete
+2166.64,frontiers,avail=2 black=0
+2166.64,explore_status,exploration_complete
+2167.14,frontiers,avail=2 black=0
+2167.14,explore_status,exploration_complete
+2167.64,frontiers,avail=2 black=0
+2167.64,explore_status,exploration_complete
+2168.14,frontiers,avail=2 black=0
+2168.14,explore_status,exploration_complete
+2168.64,frontiers,avail=2 black=0
+2168.64,explore_status,exploration_complete
+2169.14,frontiers,avail=2 black=0
+2169.14,explore_status,exploration_complete
+2169.64,frontiers,avail=2 black=0
+2169.64,explore_status,exploration_complete
+2170.14,frontiers,avail=2 black=0
+2170.14,explore_status,exploration_complete
+2170.64,frontiers,avail=2 black=0
+2170.64,explore_status,exploration_complete
+2171.14,frontiers,avail=2 black=0
+2171.14,explore_status,exploration_complete
+2171.64,frontiers,avail=2 black=0
+2171.64,explore_status,exploration_complete
+2172.14,frontiers,avail=2 black=0
+2172.14,explore_status,exploration_complete
+2172.64,frontiers,avail=2 black=0
+2172.64,explore_status,exploration_complete
+2173.14,frontiers,avail=2 black=0
+2173.14,explore_status,exploration_complete
+2173.64,frontiers,avail=2 black=0
+2173.64,explore_status,exploration_complete
+2174.14,frontiers,avail=2 black=0
+2174.14,explore_status,exploration_complete
+2174.64,frontiers,avail=2 black=0
+2174.64,explore_status,exploration_complete
+2175.14,frontiers,avail=2 black=0
+2175.14,explore_status,exploration_complete
+2175.64,frontiers,avail=2 black=0
+2175.64,explore_status,exploration_complete
+2176.14,frontiers,avail=2 black=0
+2176.14,explore_status,exploration_complete
+2176.64,frontiers,avail=2 black=0
+2176.64,explore_status,exploration_complete
+2177.14,frontiers,avail=2 black=0
+2177.14,explore_status,exploration_complete
+2177.64,frontiers,avail=2 black=0
+2177.64,explore_status,exploration_complete
+2178.14,frontiers,avail=2 black=0
+2178.14,explore_status,exploration_complete
+2178.64,frontiers,avail=2 black=0
+2178.64,explore_status,exploration_complete
+2179.14,frontiers,avail=2 black=0
+2179.14,explore_status,exploration_complete
+2179.64,frontiers,avail=2 black=0
+2179.64,explore_status,exploration_complete
+2180.14,frontiers,avail=2 black=0
+2180.14,explore_status,exploration_complete
+2180.64,frontiers,avail=2 black=0
+2180.64,explore_status,exploration_complete
+2181.14,frontiers,avail=2 black=0
+2181.14,explore_status,exploration_complete
+2181.64,frontiers,avail=2 black=0
+2181.64,explore_status,exploration_complete
+2182.14,frontiers,avail=2 black=0
+2182.14,explore_status,exploration_complete
+2182.64,frontiers,avail=2 black=0
+2182.64,explore_status,exploration_complete
+2183.14,frontiers,avail=2 black=0
+2183.14,explore_status,exploration_complete
+2183.64,frontiers,avail=2 black=0
+2183.64,explore_status,exploration_complete
+2184.14,frontiers,avail=2 black=0
+2184.14,explore_status,exploration_complete
+2184.64,frontiers,avail=2 black=0
+2184.64,explore_status,exploration_complete
+2185.14,frontiers,avail=2 black=0
+2185.14,explore_status,exploration_complete
+2185.64,frontiers,avail=2 black=0
+2185.64,explore_status,exploration_complete
+2186.14,frontiers,avail=2 black=0
+2186.14,explore_status,exploration_complete
+2186.64,frontiers,avail=2 black=0
+2186.64,explore_status,exploration_complete
+2187.14,frontiers,avail=2 black=0
+2187.14,explore_status,exploration_complete
+2187.64,frontiers,avail=2 black=0
+2187.64,explore_status,exploration_complete
+2188.14,frontiers,avail=2 black=0
+2188.14,explore_status,exploration_complete
+2188.64,frontiers,avail=2 black=0
+2188.64,explore_status,exploration_complete
+2189.14,frontiers,avail=2 black=0
+2189.14,explore_status,exploration_complete
+2189.64,frontiers,avail=2 black=0
+2189.64,explore_status,exploration_complete
+2190.14,frontiers,avail=2 black=0
+2190.14,explore_status,exploration_complete
+2190.64,frontiers,avail=2 black=0
+2190.64,explore_status,exploration_complete
+2191.14,frontiers,avail=2 black=0
+2191.14,explore_status,exploration_complete
+2191.64,frontiers,avail=2 black=0
+2191.64,explore_status,exploration_complete
+2192.14,frontiers,avail=2 black=0
+2192.14,explore_status,exploration_complete
+2192.64,frontiers,avail=2 black=0
+2192.64,explore_status,exploration_complete
+2193.14,frontiers,avail=2 black=0
+2193.14,explore_status,exploration_complete
+2193.64,frontiers,avail=2 black=0
+2193.64,explore_status,exploration_complete
+2194.14,frontiers,avail=2 black=0
+2194.14,explore_status,exploration_complete
+2194.64,frontiers,avail=2 black=0
+2194.64,explore_status,exploration_complete
+2195.14,frontiers,avail=2 black=0
+2195.14,explore_status,exploration_complete
+2195.64,frontiers,avail=2 black=0
+2195.64,explore_status,exploration_complete
+2196.14,frontiers,avail=2 black=0
+2196.14,explore_status,exploration_complete
+2196.64,frontiers,avail=2 black=0
+2196.64,explore_status,exploration_complete
+2197.14,frontiers,avail=2 black=0
+2197.14,explore_status,exploration_complete
+2197.64,frontiers,avail=2 black=0
+2197.64,explore_status,exploration_complete
+2198.14,frontiers,avail=2 black=0
+2198.14,explore_status,exploration_complete
+2198.64,frontiers,avail=2 black=0
+2198.64,explore_status,exploration_complete
+2199.14,frontiers,avail=2 black=0
+2199.14,explore_status,exploration_complete
+2199.64,frontiers,avail=2 black=0
+2199.64,explore_status,exploration_complete
+2200.14,frontiers,avail=2 black=0
+2200.14,explore_status,exploration_complete
+2200.64,frontiers,avail=2 black=0
+2200.64,explore_status,exploration_complete
+2201.14,frontiers,avail=2 black=0
+2201.14,explore_status,exploration_complete
+2201.64,frontiers,avail=2 black=0
+2201.64,explore_status,exploration_complete
+2202.14,frontiers,avail=2 black=0
+2202.14,explore_status,exploration_complete
+2202.64,frontiers,avail=2 black=0
+2202.64,explore_status,exploration_complete
+2203.14,frontiers,avail=2 black=0
+2203.14,explore_status,exploration_complete
+2203.64,frontiers,avail=2 black=0
+2203.64,explore_status,exploration_complete
+2204.14,frontiers,avail=2 black=0
+2204.14,explore_status,exploration_complete
+2204.64,frontiers,avail=2 black=0
+2204.64,explore_status,exploration_complete
+2205.14,frontiers,avail=2 black=0
+2205.14,explore_status,exploration_complete
+2205.64,frontiers,avail=2 black=0
+2205.64,explore_status,exploration_complete
+2206.14,frontiers,avail=2 black=0
+2206.14,explore_status,exploration_complete
+2206.64,frontiers,avail=2 black=0
+2206.64,explore_status,exploration_complete
+2207.14,frontiers,avail=2 black=0
+2207.14,explore_status,exploration_complete
+2207.64,frontiers,avail=2 black=0
+2207.64,explore_status,exploration_complete
+2208.14,frontiers,avail=2 black=0
+2208.14,explore_status,exploration_complete
+2208.64,frontiers,avail=2 black=0
+2208.64,explore_status,exploration_complete
+2209.14,frontiers,avail=2 black=0
+2209.14,explore_status,exploration_complete
+2209.64,frontiers,avail=2 black=0
+2209.64,explore_status,exploration_complete
+2210.14,frontiers,avail=2 black=0
+2210.14,explore_status,exploration_complete
+2210.64,frontiers,avail=2 black=0
+2210.64,explore_status,exploration_complete
+2211.14,frontiers,avail=2 black=0
+2211.14,explore_status,exploration_complete
+2211.64,frontiers,avail=2 black=0
+2211.64,explore_status,exploration_complete
+2212.14,frontiers,avail=2 black=0
+2212.14,explore_status,exploration_complete
+2212.64,frontiers,avail=2 black=0
+2212.64,explore_status,exploration_complete
+2213.14,frontiers,avail=2 black=0
+2213.14,explore_status,exploration_complete
+2213.64,frontiers,avail=2 black=0
+2213.64,explore_status,exploration_complete
+2214.14,frontiers,avail=2 black=0
+2214.14,explore_status,exploration_complete
+2214.64,frontiers,avail=2 black=0
+2214.64,explore_status,exploration_complete
+2215.14,frontiers,avail=2 black=0
+2215.14,explore_status,exploration_complete
+2215.64,frontiers,avail=2 black=0
+2215.64,explore_status,exploration_complete
+2216.14,frontiers,avail=2 black=0
+2216.14,explore_status,exploration_complete
+2216.64,frontiers,avail=2 black=0
+2216.64,explore_status,exploration_complete
+2217.14,frontiers,avail=2 black=0
+2217.14,explore_status,exploration_complete
+2217.64,frontiers,avail=2 black=0
+2217.64,explore_status,exploration_complete
+2218.14,frontiers,avail=2 black=0
+2218.14,explore_status,exploration_complete
+2218.64,frontiers,avail=2 black=0
+2218.64,explore_status,exploration_complete
+2219.14,frontiers,avail=2 black=0
+2219.14,explore_status,exploration_complete
+2219.64,frontiers,avail=2 black=0
+2219.64,explore_status,exploration_complete
+2220.14,frontiers,avail=2 black=0
+2220.14,explore_status,exploration_complete
+2220.64,frontiers,avail=2 black=0
+2220.64,explore_status,exploration_complete
+2221.14,frontiers,avail=2 black=0
+2221.14,explore_status,exploration_complete
+2221.64,frontiers,avail=2 black=0
+2221.64,explore_status,exploration_complete
+2222.14,frontiers,avail=2 black=0
+2222.14,explore_status,exploration_complete
+2222.64,frontiers,avail=2 black=0
+2222.64,explore_status,exploration_complete
+2223.14,frontiers,avail=2 black=0
+2223.14,explore_status,exploration_complete
+2223.64,frontiers,avail=2 black=0
+2223.64,explore_status,exploration_complete
+2224.14,frontiers,avail=2 black=0
+2224.14,explore_status,exploration_complete
+2224.64,frontiers,avail=2 black=0
+2224.64,explore_status,exploration_complete
+2225.14,frontiers,avail=2 black=0
+2225.14,explore_status,exploration_complete
+2225.64,frontiers,avail=2 black=0
+2225.64,explore_status,exploration_complete
+2226.14,frontiers,avail=2 black=0
+2226.14,explore_status,exploration_complete
+2226.64,frontiers,avail=2 black=0
+2226.64,explore_status,exploration_complete
+2227.14,frontiers,avail=2 black=0
+2227.14,explore_status,exploration_complete
+2227.64,frontiers,avail=2 black=0
+2227.64,explore_status,exploration_complete
+2228.14,frontiers,avail=2 black=0
+2228.14,explore_status,exploration_complete
+2228.64,frontiers,avail=2 black=0
+2228.64,explore_status,exploration_complete
+2229.14,frontiers,avail=2 black=0
+2229.14,explore_status,exploration_complete
+2229.64,frontiers,avail=2 black=0
+2229.64,explore_status,exploration_complete
+2230.14,frontiers,avail=2 black=0
+2230.14,explore_status,exploration_complete
+2230.64,frontiers,avail=2 black=0
+2230.64,explore_status,exploration_complete
+2231.14,frontiers,avail=2 black=0
+2231.14,explore_status,exploration_complete
+2231.64,frontiers,avail=2 black=0
+2231.64,explore_status,exploration_complete
+2232.14,frontiers,avail=2 black=0
+2232.14,explore_status,exploration_complete
+2232.64,frontiers,avail=2 black=0
+2232.64,explore_status,exploration_complete
+2233.14,frontiers,avail=2 black=0
+2233.14,explore_status,exploration_complete
+2233.64,frontiers,avail=2 black=0
+2233.64,explore_status,exploration_complete
+2234.14,frontiers,avail=2 black=0
+2234.14,explore_status,exploration_complete
+2234.64,frontiers,avail=2 black=0
+2234.64,explore_status,exploration_complete
+2235.14,frontiers,avail=2 black=0
+2235.14,explore_status,exploration_complete
+2235.64,frontiers,avail=2 black=0
+2235.64,explore_status,exploration_complete
+2236.14,frontiers,avail=2 black=0
+2236.14,explore_status,exploration_complete
+2236.64,frontiers,avail=2 black=0
+2236.64,explore_status,exploration_complete
+2237.14,frontiers,avail=2 black=0
+2237.14,explore_status,exploration_complete
+2237.64,frontiers,avail=2 black=0
+2237.64,explore_status,exploration_complete
+2238.14,frontiers,avail=2 black=0
+2238.14,explore_status,exploration_complete
+2238.64,frontiers,avail=2 black=0
+2238.64,explore_status,exploration_complete
+2239.14,frontiers,avail=2 black=0
+2239.14,explore_status,exploration_complete
+2239.64,frontiers,avail=2 black=0
+2239.64,explore_status,exploration_complete
+2240.14,frontiers,avail=2 black=0
+2240.14,explore_status,exploration_complete
+2240.64,frontiers,avail=2 black=0
+2240.64,explore_status,exploration_complete
+2241.14,frontiers,avail=2 black=0
+2241.14,explore_status,exploration_complete
+2241.64,frontiers,avail=2 black=0
+2241.64,explore_status,exploration_complete
+2242.14,frontiers,avail=2 black=0
+2242.14,explore_status,exploration_complete
+2242.64,frontiers,avail=2 black=0
+2242.64,explore_status,exploration_complete
+2243.14,frontiers,avail=2 black=0
+2243.14,explore_status,exploration_complete
+2243.64,frontiers,avail=2 black=0
+2243.64,explore_status,exploration_complete
+2244.14,frontiers,avail=2 black=0
+2244.14,explore_status,exploration_complete
+2244.64,frontiers,avail=2 black=0
+2244.64,explore_status,exploration_complete
+2245.14,frontiers,avail=2 black=0
+2245.14,explore_status,exploration_complete
+2245.64,frontiers,avail=2 black=0
+2245.64,explore_status,exploration_complete
+2246.14,frontiers,avail=2 black=0
+2246.14,explore_status,exploration_complete
+2246.64,frontiers,avail=2 black=0
+2246.64,explore_status,exploration_complete
+2247.14,frontiers,avail=2 black=0
+2247.14,explore_status,exploration_complete
+2247.64,frontiers,avail=2 black=0
+2247.64,explore_status,exploration_complete
+2248.14,frontiers,avail=2 black=0
+2248.14,explore_status,exploration_complete
+2248.64,frontiers,avail=2 black=0
+2248.64,explore_status,exploration_complete
+2249.14,frontiers,avail=2 black=0
+2249.14,explore_status,exploration_complete
+2249.64,frontiers,avail=2 black=0
+2249.64,explore_status,exploration_complete
+2250.14,frontiers,avail=2 black=0
+2250.14,explore_status,exploration_complete
+2250.64,frontiers,avail=2 black=0
+2250.64,explore_status,exploration_complete
+2251.14,frontiers,avail=2 black=0
+2251.14,explore_status,exploration_complete
+2251.64,frontiers,avail=2 black=0
+2251.64,explore_status,exploration_complete
+2252.14,frontiers,avail=2 black=0
+2252.14,explore_status,exploration_complete
+2252.64,frontiers,avail=2 black=0
+2252.64,explore_status,exploration_complete
+2253.14,frontiers,avail=2 black=0
+2253.14,explore_status,exploration_complete
+2253.64,frontiers,avail=2 black=0
+2253.64,explore_status,exploration_complete
+2254.14,frontiers,avail=2 black=0
+2254.14,explore_status,exploration_complete
+2254.64,frontiers,avail=2 black=0
+2254.64,explore_status,exploration_complete
+2255.14,frontiers,avail=2 black=0
+2255.14,explore_status,exploration_complete
+2255.64,frontiers,avail=2 black=0
+2255.64,explore_status,exploration_complete
+2256.14,frontiers,avail=2 black=0
+2256.14,explore_status,exploration_complete
+2256.64,frontiers,avail=2 black=0
+2256.64,explore_status,exploration_complete
+2257.14,frontiers,avail=2 black=0
+2257.14,explore_status,exploration_complete
+2257.64,frontiers,avail=2 black=0
+2257.64,explore_status,exploration_complete
+2258.14,frontiers,avail=2 black=0
+2258.14,explore_status,exploration_complete
+2258.64,frontiers,avail=2 black=0
+2258.64,explore_status,exploration_complete
+2259.14,frontiers,avail=2 black=0
+2259.14,explore_status,exploration_complete
+2259.64,frontiers,avail=2 black=0
+2259.64,explore_status,exploration_complete
+2260.14,frontiers,avail=2 black=0
+2260.14,explore_status,exploration_complete
+2260.64,frontiers,avail=2 black=0
+2260.64,explore_status,exploration_complete
+2261.14,frontiers,avail=2 black=0
+2261.14,explore_status,exploration_complete
+2261.64,frontiers,avail=2 black=0
+2261.64,explore_status,exploration_complete
+2262.14,frontiers,avail=2 black=0
+2262.14,explore_status,exploration_complete
+2262.64,frontiers,avail=2 black=0
+2262.64,explore_status,exploration_complete
+2263.14,frontiers,avail=2 black=0
+2263.14,explore_status,exploration_complete
+2263.64,frontiers,avail=2 black=0
+2263.64,explore_status,exploration_complete
+2264.14,frontiers,avail=2 black=0
+2264.14,explore_status,exploration_complete
+2264.64,frontiers,avail=2 black=0
+2264.64,explore_status,exploration_complete
+2265.14,frontiers,avail=2 black=0
+2265.14,explore_status,exploration_complete
+2265.64,frontiers,avail=2 black=0
+2265.64,explore_status,exploration_complete
+2266.14,frontiers,avail=2 black=0
+2266.14,explore_status,exploration_complete
+2266.64,frontiers,avail=2 black=0
+2266.64,explore_status,exploration_complete
+2267.14,frontiers,avail=2 black=0
+2267.14,explore_status,exploration_complete
+2267.64,frontiers,avail=2 black=0
+2267.64,explore_status,exploration_complete
+2268.14,frontiers,avail=2 black=0
+2268.14,explore_status,exploration_complete
+2268.64,frontiers,avail=2 black=0
+2268.64,explore_status,exploration_complete
+2269.14,frontiers,avail=2 black=0
+2269.14,explore_status,exploration_complete
+2269.64,frontiers,avail=2 black=0
+2269.64,explore_status,exploration_complete
+2270.14,frontiers,avail=2 black=0
+2270.14,explore_status,exploration_complete
+2270.64,frontiers,avail=2 black=0
+2270.64,explore_status,exploration_complete
+2271.14,frontiers,avail=2 black=0
+2271.14,explore_status,exploration_complete
+2271.64,frontiers,avail=2 black=0
+2271.64,explore_status,exploration_complete
+2272.14,frontiers,avail=2 black=0
+2272.14,explore_status,exploration_complete
+2272.64,frontiers,avail=2 black=0
+2272.64,explore_status,exploration_complete
+2273.14,frontiers,avail=2 black=0
+2273.14,explore_status,exploration_complete
+2273.64,frontiers,avail=2 black=0
+2273.64,explore_status,exploration_complete
+2274.14,frontiers,avail=2 black=0
+2274.14,explore_status,exploration_complete
+2274.64,frontiers,avail=2 black=0
+2274.64,explore_status,exploration_complete
+2275.14,frontiers,avail=2 black=0
+2275.14,explore_status,exploration_complete
+2275.64,frontiers,avail=2 black=0
+2275.64,explore_status,exploration_complete
+2276.14,frontiers,avail=2 black=0
+2276.14,explore_status,exploration_complete
+2276.64,frontiers,avail=2 black=0
+2276.64,explore_status,exploration_complete
+2277.14,frontiers,avail=2 black=0
+2277.14,explore_status,exploration_complete
+2277.64,frontiers,avail=2 black=0
+2277.64,explore_status,exploration_complete
+2278.14,frontiers,avail=2 black=0
+2278.14,explore_status,exploration_complete
+2278.64,frontiers,avail=2 black=0
+2278.64,explore_status,exploration_complete
+2279.14,frontiers,avail=2 black=0
+2279.14,explore_status,exploration_complete
+2279.64,frontiers,avail=2 black=0
+2279.64,explore_status,exploration_complete
+2280.14,frontiers,avail=2 black=0
+2280.14,explore_status,exploration_complete
+2280.64,frontiers,avail=2 black=0
+2280.64,explore_status,exploration_complete
+2281.14,frontiers,avail=2 black=0
+2281.14,explore_status,exploration_complete
+2281.64,frontiers,avail=2 black=0
+2281.64,explore_status,exploration_complete
+2282.14,frontiers,avail=2 black=0
+2282.14,explore_status,exploration_complete
+2282.64,frontiers,avail=2 black=0
+2282.64,explore_status,exploration_complete
+2283.14,frontiers,avail=2 black=0
+2283.14,explore_status,exploration_complete
+2283.64,frontiers,avail=2 black=0
+2283.64,explore_status,exploration_complete
+2284.14,frontiers,avail=2 black=0
+2284.14,explore_status,exploration_complete
+2284.64,frontiers,avail=2 black=0
+2284.64,explore_status,exploration_complete
+2285.14,frontiers,avail=2 black=0
+2285.14,explore_status,exploration_complete
+2285.64,frontiers,avail=2 black=0
+2285.64,explore_status,exploration_complete
+2286.14,frontiers,avail=2 black=0
+2286.14,explore_status,exploration_complete
+2286.64,frontiers,avail=2 black=0
+2286.64,explore_status,exploration_complete
+2287.14,frontiers,avail=2 black=0
+2287.14,explore_status,exploration_complete
+2287.64,frontiers,avail=2 black=0
+2287.64,explore_status,exploration_complete
+2288.14,frontiers,avail=2 black=0
+2288.14,explore_status,exploration_complete
+2288.64,frontiers,avail=2 black=0
+2288.64,explore_status,exploration_complete
+2289.14,frontiers,avail=2 black=0
+2289.14,explore_status,exploration_complete
+2289.64,frontiers,avail=2 black=0
+2289.64,explore_status,exploration_complete
+2290.14,frontiers,avail=2 black=0
+2290.14,explore_status,exploration_complete
+2290.64,frontiers,avail=2 black=0
+2290.64,explore_status,exploration_complete
+2291.14,frontiers,avail=2 black=0
+2291.14,explore_status,exploration_complete
+2291.64,frontiers,avail=2 black=0
+2291.64,explore_status,exploration_complete
+2292.14,frontiers,avail=2 black=0
+2292.14,explore_status,exploration_complete
+2292.64,frontiers,avail=2 black=0
+2292.64,explore_status,exploration_complete
+2293.14,frontiers,avail=2 black=0
+2293.14,explore_status,exploration_complete
+2293.64,frontiers,avail=2 black=0
+2293.64,explore_status,exploration_complete
+2294.14,frontiers,avail=2 black=0
+2294.14,explore_status,exploration_complete
+2294.64,frontiers,avail=2 black=0
+2294.64,explore_status,exploration_complete
+2295.14,frontiers,avail=2 black=0
+2295.14,explore_status,exploration_complete
+2295.64,frontiers,avail=2 black=0
+2295.64,explore_status,exploration_complete
+2296.14,frontiers,avail=2 black=0
+2296.14,explore_status,exploration_complete
+2296.64,frontiers,avail=2 black=0
+2296.64,explore_status,exploration_complete
+2297.14,frontiers,avail=2 black=0
+2297.14,explore_status,exploration_complete
+2297.64,frontiers,avail=2 black=0
+2297.64,explore_status,exploration_complete
+2298.14,frontiers,avail=2 black=0
+2298.14,explore_status,exploration_complete
+2298.64,frontiers,avail=2 black=0
+2298.64,explore_status,exploration_complete
+2299.14,frontiers,avail=2 black=0
+2299.14,explore_status,exploration_complete
+2299.64,frontiers,avail=2 black=0
+2299.64,explore_status,exploration_complete
+2300.14,frontiers,avail=2 black=0
+2300.14,explore_status,exploration_complete
+2300.64,frontiers,avail=2 black=0
+2300.64,explore_status,exploration_complete
+2301.14,frontiers,avail=2 black=0
+2301.14,explore_status,exploration_complete
+2301.64,frontiers,avail=2 black=0
+2301.64,explore_status,exploration_complete
+2302.14,frontiers,avail=2 black=0
+2302.14,explore_status,exploration_complete
+2302.64,frontiers,avail=2 black=0
+2302.64,explore_status,exploration_complete
+2303.14,frontiers,avail=2 black=0
+2303.14,explore_status,exploration_complete
+2303.64,frontiers,avail=2 black=0
+2303.64,explore_status,exploration_complete
+2304.14,frontiers,avail=2 black=0
+2304.14,explore_status,exploration_complete
+2304.64,frontiers,avail=2 black=0
+2304.64,explore_status,exploration_complete
+2305.14,frontiers,avail=2 black=0
+2305.14,explore_status,exploration_complete
+2305.64,frontiers,avail=2 black=0
+2305.64,explore_status,exploration_complete
+2306.14,frontiers,avail=2 black=0
+2306.14,explore_status,exploration_complete
+2306.64,frontiers,avail=2 black=0
+2306.64,explore_status,exploration_complete
+2307.14,frontiers,avail=2 black=0
+2307.14,explore_status,exploration_complete
+2307.64,frontiers,avail=2 black=0
+2307.64,explore_status,exploration_complete
+2308.14,frontiers,avail=2 black=0
+2308.14,explore_status,exploration_complete
+2308.64,frontiers,avail=2 black=0
+2308.64,explore_status,exploration_complete
+2309.14,frontiers,avail=2 black=0
+2309.14,explore_status,exploration_complete
+2309.64,frontiers,avail=2 black=0
+2309.64,explore_status,exploration_complete
+2310.14,frontiers,avail=2 black=0
+2310.14,explore_status,exploration_complete
+2310.64,frontiers,avail=2 black=0
+2310.64,explore_status,exploration_complete
+2311.14,frontiers,avail=2 black=0
+2311.14,explore_status,exploration_complete
+2311.64,frontiers,avail=2 black=0
+2311.64,explore_status,exploration_complete
+2312.14,frontiers,avail=2 black=0
+2312.14,explore_status,exploration_complete
+2312.64,frontiers,avail=2 black=0
+2312.64,explore_status,exploration_complete
+2313.14,frontiers,avail=2 black=0
+2313.14,explore_status,exploration_complete
+2313.64,frontiers,avail=2 black=0
+2313.64,explore_status,exploration_complete
+2314.14,frontiers,avail=2 black=0
+2314.14,explore_status,exploration_complete
+2314.64,frontiers,avail=2 black=0
+2314.64,explore_status,exploration_complete
+2315.14,frontiers,avail=2 black=0
+2315.14,explore_status,exploration_complete
+2315.64,frontiers,avail=2 black=0
+2315.64,explore_status,exploration_complete
+2316.14,frontiers,avail=2 black=0
+2316.14,explore_status,exploration_complete
+2316.64,frontiers,avail=2 black=0
+2316.64,explore_status,exploration_complete
+2317.14,frontiers,avail=2 black=0
+2317.14,explore_status,exploration_complete
+2317.64,frontiers,avail=2 black=0
+2317.64,explore_status,exploration_complete
+2318.14,frontiers,avail=2 black=0
+2318.14,explore_status,exploration_complete
+2318.64,frontiers,avail=2 black=0
+2318.64,explore_status,exploration_complete
+2319.14,frontiers,avail=2 black=0
+2319.14,explore_status,exploration_complete
+2319.64,frontiers,avail=2 black=0
+2319.64,explore_status,exploration_complete
+2320.14,frontiers,avail=2 black=0
+2320.14,explore_status,exploration_complete
+2320.64,frontiers,avail=2 black=0
+2320.64,explore_status,exploration_complete
+2321.14,frontiers,avail=2 black=0
+2321.14,explore_status,exploration_complete
+2321.64,frontiers,avail=2 black=0
+2321.64,explore_status,exploration_complete
+2322.14,frontiers,avail=2 black=0
+2322.14,explore_status,exploration_complete
+2322.64,frontiers,avail=2 black=0
+2322.64,explore_status,exploration_complete
+2323.14,frontiers,avail=2 black=0
+2323.14,explore_status,exploration_complete
+2323.64,frontiers,avail=2 black=0
+2323.64,explore_status,exploration_complete
+2324.14,frontiers,avail=2 black=0
+2324.14,explore_status,exploration_complete
+2324.64,frontiers,avail=2 black=0
+2324.64,explore_status,exploration_complete
+2325.14,frontiers,avail=2 black=0
+2325.14,explore_status,exploration_complete
+2325.64,frontiers,avail=2 black=0
+2325.64,explore_status,exploration_complete
+2326.14,frontiers,avail=2 black=0
+2326.14,explore_status,exploration_complete
+2326.64,frontiers,avail=2 black=0
+2326.64,explore_status,exploration_complete
+2327.14,frontiers,avail=2 black=0
+2327.14,explore_status,exploration_complete
+2327.64,frontiers,avail=2 black=0
+2327.64,explore_status,exploration_complete
+2328.14,frontiers,avail=2 black=0
+2328.14,explore_status,exploration_complete
+2328.64,frontiers,avail=2 black=0
+2328.64,explore_status,exploration_complete
+2329.14,frontiers,avail=2 black=0
+2329.14,explore_status,exploration_complete
+2329.64,frontiers,avail=2 black=0
+2329.64,explore_status,exploration_complete
+2330.14,frontiers,avail=2 black=0
+2330.14,explore_status,exploration_complete
+2330.64,frontiers,avail=2 black=0
+2330.64,explore_status,exploration_complete
+2331.14,frontiers,avail=2 black=0
+2331.14,explore_status,exploration_complete
+2331.64,frontiers,avail=2 black=0
+2331.64,explore_status,exploration_complete
+2332.14,frontiers,avail=2 black=0
+2332.14,explore_status,exploration_complete
+2332.64,frontiers,avail=2 black=0
+2332.64,explore_status,exploration_complete
+2333.14,frontiers,avail=2 black=0
+2333.14,explore_status,exploration_complete
+2333.64,frontiers,avail=2 black=0
+2333.64,explore_status,exploration_complete
+2334.14,frontiers,avail=2 black=0
+2334.14,explore_status,exploration_complete
+2334.64,frontiers,avail=2 black=0
+2334.64,explore_status,exploration_complete
+2335.14,frontiers,avail=2 black=0
+2335.14,explore_status,exploration_complete
+2335.64,frontiers,avail=2 black=0
+2335.64,explore_status,exploration_complete
+2336.14,frontiers,avail=2 black=0
+2336.14,explore_status,exploration_complete
+2336.64,frontiers,avail=2 black=0
+2336.64,explore_status,exploration_complete
+2337.14,frontiers,avail=2 black=0
+2337.14,explore_status,exploration_complete
+2337.64,frontiers,avail=2 black=0
+2337.64,explore_status,exploration_complete
+2338.14,frontiers,avail=2 black=0
+2338.14,explore_status,exploration_complete
+2338.64,frontiers,avail=2 black=0
+2338.64,explore_status,exploration_complete
+2339.14,frontiers,avail=2 black=0
+2339.14,explore_status,exploration_complete
+2339.64,frontiers,avail=2 black=0
+2339.64,explore_status,exploration_complete
+2340.14,frontiers,avail=2 black=0
+2340.14,explore_status,exploration_complete
+2340.64,frontiers,avail=2 black=0
+2340.64,explore_status,exploration_complete
+2341.14,frontiers,avail=2 black=0
+2341.14,explore_status,exploration_complete
+2341.64,frontiers,avail=2 black=0
+2341.64,explore_status,exploration_complete
+2342.14,frontiers,avail=2 black=0
+2342.14,explore_status,exploration_complete
+2342.64,frontiers,avail=2 black=0
+2342.64,explore_status,exploration_complete
+2343.14,frontiers,avail=2 black=0
+2343.14,explore_status,exploration_complete
+2343.64,frontiers,avail=2 black=0
+2343.64,explore_status,exploration_complete
+2344.14,frontiers,avail=2 black=0
+2344.14,explore_status,exploration_complete
+2344.64,frontiers,avail=2 black=0
+2344.64,explore_status,exploration_complete
+2345.14,frontiers,avail=2 black=0
+2345.14,explore_status,exploration_complete
+2345.64,frontiers,avail=2 black=0
+2345.64,explore_status,exploration_complete
+2346.14,frontiers,avail=2 black=0
+2346.14,explore_status,exploration_complete
+2346.64,frontiers,avail=2 black=0
+2346.64,explore_status,exploration_complete
+2347.14,frontiers,avail=2 black=0
+2347.14,explore_status,exploration_complete
+2347.64,frontiers,avail=2 black=0
+2347.64,explore_status,exploration_complete
+2348.14,frontiers,avail=2 black=0
+2348.14,explore_status,exploration_complete
+2348.64,frontiers,avail=2 black=0
+2348.64,explore_status,exploration_complete
+2349.14,frontiers,avail=2 black=0
+2349.14,explore_status,exploration_complete
+2349.64,frontiers,avail=2 black=0
+2349.64,explore_status,exploration_complete
+2350.14,frontiers,avail=2 black=0
+2350.14,explore_status,exploration_complete
+2350.64,frontiers,avail=2 black=0
+2350.64,explore_status,exploration_complete
+2351.14,frontiers,avail=2 black=0
+2351.14,explore_status,exploration_complete
+2351.64,frontiers,avail=2 black=0
+2351.64,explore_status,exploration_complete
+2352.14,frontiers,avail=2 black=0
+2352.14,explore_status,exploration_complete
+2352.64,frontiers,avail=2 black=0
+2352.64,explore_status,exploration_complete
+2353.14,frontiers,avail=2 black=0
+2353.14,explore_status,exploration_complete
+2353.64,frontiers,avail=2 black=0
+2353.64,explore_status,exploration_complete
+2354.14,frontiers,avail=2 black=0
+2354.14,explore_status,exploration_complete
+2354.64,frontiers,avail=2 black=0
+2354.64,explore_status,exploration_complete
+2355.14,frontiers,avail=2 black=0
+2355.14,explore_status,exploration_complete
+2355.64,frontiers,avail=2 black=0
+2355.64,explore_status,exploration_complete
+2356.14,frontiers,avail=2 black=0
+2356.14,explore_status,exploration_complete
+2356.64,frontiers,avail=2 black=0
+2356.64,explore_status,exploration_complete
+2357.14,frontiers,avail=2 black=0
+2357.14,explore_status,exploration_complete
+2357.64,frontiers,avail=2 black=0
+2357.64,explore_status,exploration_complete
+2358.14,frontiers,avail=2 black=0
+2358.14,explore_status,exploration_complete
+2358.64,frontiers,avail=2 black=0
+2358.64,explore_status,exploration_complete
+2359.14,frontiers,avail=2 black=0
+2359.14,explore_status,exploration_complete
+2359.64,frontiers,avail=2 black=0
+2359.64,explore_status,exploration_complete
+2360.14,frontiers,avail=2 black=0
+2360.14,explore_status,exploration_complete
+2360.64,frontiers,avail=2 black=0
+2360.64,explore_status,exploration_complete
+2361.14,frontiers,avail=2 black=0
+2361.14,explore_status,exploration_complete
+2361.64,frontiers,avail=2 black=0
+2361.64,explore_status,exploration_complete
+2362.14,frontiers,avail=2 black=0
+2362.14,explore_status,exploration_complete
+2362.64,frontiers,avail=2 black=0
+2362.64,explore_status,exploration_complete
+2363.14,frontiers,avail=2 black=0
+2363.14,explore_status,exploration_complete
+2363.64,frontiers,avail=2 black=0
+2363.64,explore_status,exploration_complete
+2364.14,frontiers,avail=2 black=0
+2364.14,explore_status,exploration_complete
+2364.64,frontiers,avail=2 black=0
+2364.64,explore_status,exploration_complete
+2365.14,frontiers,avail=2 black=0
+2365.14,explore_status,exploration_complete
+2365.64,frontiers,avail=2 black=0
+2365.64,explore_status,exploration_complete
+2366.14,frontiers,avail=2 black=0
+2366.14,explore_status,exploration_complete
+2366.64,frontiers,avail=2 black=0
+2366.64,explore_status,exploration_complete
+2367.14,frontiers,avail=2 black=0
+2367.14,explore_status,exploration_complete
+2367.64,frontiers,avail=2 black=0
+2367.64,explore_status,exploration_complete
+2368.14,frontiers,avail=2 black=0
+2368.14,explore_status,exploration_complete
+2368.64,frontiers,avail=2 black=0
+2368.64,explore_status,exploration_complete
+2369.14,frontiers,avail=2 black=0
+2369.14,explore_status,exploration_complete
+2369.64,frontiers,avail=2 black=0
+2369.64,explore_status,exploration_complete
+2370.14,frontiers,avail=2 black=0
+2370.14,explore_status,exploration_complete
+2370.64,frontiers,avail=2 black=0
+2370.64,explore_status,exploration_complete
+2371.14,frontiers,avail=2 black=0
+2371.14,explore_status,exploration_complete
+2371.64,frontiers,avail=2 black=0
+2371.64,explore_status,exploration_complete
+2372.14,frontiers,avail=2 black=0
+2372.14,explore_status,exploration_complete
+2372.64,frontiers,avail=2 black=0
+2372.64,explore_status,exploration_complete
+2373.14,frontiers,avail=2 black=0
+2373.14,explore_status,exploration_complete
+2373.64,frontiers,avail=2 black=0
+2373.64,explore_status,exploration_complete
+2374.14,frontiers,avail=2 black=0
+2374.14,explore_status,exploration_complete
+2374.64,frontiers,avail=2 black=0
+2374.64,explore_status,exploration_complete
+2375.14,frontiers,avail=2 black=0
+2375.14,explore_status,exploration_complete
+2375.64,frontiers,avail=2 black=0
+2375.64,explore_status,exploration_complete
+2376.14,frontiers,avail=2 black=0
+2376.14,explore_status,exploration_complete
+2376.64,frontiers,avail=2 black=0
+2376.64,explore_status,exploration_complete
+2377.14,frontiers,avail=2 black=0
+2377.14,explore_status,exploration_complete
+2377.64,frontiers,avail=2 black=0
+2377.64,explore_status,exploration_complete
+2378.14,frontiers,avail=2 black=0
+2378.14,explore_status,exploration_complete
+2378.64,frontiers,avail=2 black=0
+2378.64,explore_status,exploration_complete
+2379.14,frontiers,avail=2 black=0
+2379.14,explore_status,exploration_complete
+2379.64,frontiers,avail=2 black=0
+2379.64,explore_status,exploration_complete
+2380.14,frontiers,avail=2 black=0
+2380.14,explore_status,exploration_complete
+2380.64,frontiers,avail=2 black=0
+2380.64,explore_status,exploration_complete
+2381.14,frontiers,avail=2 black=0
+2381.14,explore_status,exploration_complete
+2381.64,frontiers,avail=2 black=0
+2381.64,explore_status,exploration_complete
+2382.14,frontiers,avail=2 black=0
+2382.14,explore_status,exploration_complete
+2382.64,frontiers,avail=2 black=0
+2382.64,explore_status,exploration_complete
+2383.14,frontiers,avail=2 black=0
+2383.14,explore_status,exploration_complete
+2383.64,frontiers,avail=2 black=0
+2383.64,explore_status,exploration_complete
+2384.14,frontiers,avail=2 black=0
+2384.14,explore_status,exploration_complete
+2384.64,frontiers,avail=2 black=0
+2384.64,explore_status,exploration_complete
+2385.14,frontiers,avail=2 black=0
+2385.14,explore_status,exploration_complete
+2385.64,frontiers,avail=2 black=0
+2385.64,explore_status,exploration_complete
+2386.14,frontiers,avail=2 black=0
+2386.14,explore_status,exploration_complete
+2386.64,frontiers,avail=2 black=0
+2386.64,explore_status,exploration_complete
+2387.14,frontiers,avail=2 black=0
+2387.14,explore_status,exploration_complete
+2387.64,frontiers,avail=2 black=0
+2387.64,explore_status,exploration_complete
+2388.14,frontiers,avail=2 black=0
+2388.14,explore_status,exploration_complete
+2388.64,frontiers,avail=2 black=0
+2388.64,explore_status,exploration_complete
+2389.14,frontiers,avail=2 black=0
+2389.14,explore_status,exploration_complete
+2389.64,frontiers,avail=2 black=0
+2389.64,explore_status,exploration_complete
+2390.14,frontiers,avail=2 black=0
+2390.14,explore_status,exploration_complete
+2390.64,frontiers,avail=2 black=0
+2390.64,explore_status,exploration_complete
+2391.14,frontiers,avail=2 black=0
+2391.14,explore_status,exploration_complete
+2391.64,frontiers,avail=2 black=0
+2391.64,explore_status,exploration_complete
+2392.14,frontiers,avail=2 black=0
+2392.14,explore_status,exploration_complete
+2392.64,frontiers,avail=2 black=0
+2392.64,explore_status,exploration_complete
+2393.14,frontiers,avail=2 black=0
+2393.14,explore_status,exploration_complete
+2393.64,frontiers,avail=2 black=0
+2393.64,explore_status,exploration_complete
+2394.14,frontiers,avail=2 black=0
+2394.14,explore_status,exploration_complete
+2394.64,frontiers,avail=2 black=0
+2394.64,explore_status,exploration_complete
+2395.14,frontiers,avail=2 black=0
+2395.14,explore_status,exploration_complete
+2395.64,frontiers,avail=2 black=0
+2395.64,explore_status,exploration_complete
+2396.14,frontiers,avail=2 black=0
+2396.14,explore_status,exploration_complete
+2396.64,frontiers,avail=2 black=0
+2396.64,explore_status,exploration_complete
+2397.14,frontiers,avail=2 black=0
+2397.14,explore_status,exploration_complete
+2397.64,frontiers,avail=2 black=0
+2397.64,explore_status,exploration_complete
+2398.14,frontiers,avail=2 black=0
+2398.14,explore_status,exploration_complete
+2398.64,frontiers,avail=2 black=0
+2398.64,explore_status,exploration_complete
+2399.14,frontiers,avail=2 black=0
+2399.14,explore_status,exploration_complete
+2399.64,frontiers,avail=2 black=0
+2399.64,explore_status,exploration_complete
+2400.14,frontiers,avail=2 black=0

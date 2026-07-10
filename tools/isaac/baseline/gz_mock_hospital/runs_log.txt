@@ -1,0 +1,6 @@
+ 19:14:32 up 8 days, 22:58, 58 users,  load average: 12.26, 10.99, 9.15
+gz_base1: coverage_peak 93.3% (salvaged after session crash; run reached 2400s cap, no exploration_complete event, 5 goals succeeded)
+ 19:16:09 up 8 days, 22:59, 58 users,  load average: 5.01, 8.72, 8.52
+gz_base2: coverage_peak 92.9% (explorer quit t=1343s 'No frontier found - exploration complete', probe ran to 2400s cap; 6 goals succeeded, 26 aborted (1 preempt/25 genuine), 1 canceled; frontiers at end avail=2 black=0; load at end 6.18)
+ 19:59:29 up 8 days, 23:42, 60 users,  load average: 5.03, 8.04, 9.36
+gz_base3: coverage_peak 93.8% (explorer quit t=896s 'No frontier found - exploration complete', probe ran to 2400s cap; 5 goals succeeded, 18 aborted (1 preempt/17 genuine), 0 canceled; frontiers at end avail=0 black=0; load at end 27.85 co-tenant spike after completion)

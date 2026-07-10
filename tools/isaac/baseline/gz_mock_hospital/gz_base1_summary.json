@@ -1,0 +1,15 @@
+{
+  "quit_at_s": null,
+  "coverage_peak_pct": 93.3,
+  "goals_total": 154,
+  "succeeded": 5,
+  "aborted": 147,
+  "canceled": 2,
+  "aborts_preempted": 59,
+  "aborts_genuine": 88,
+  "frontiers_at_end": {
+    "avail": 5,
+    "blacklisted": 0
+  },
+  "frontier_peak_black": 0
+}
