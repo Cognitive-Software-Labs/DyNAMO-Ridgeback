@@ -30,7 +30,6 @@ def generate_launch_description():
     estimate_viz = LaunchConfiguration('estimate_viz')
     depth_anything_enabled = LaunchConfiguration('depth_anything_enabled')
     mppi_visualize = LaunchConfiguration('mppi_visualize')
-    explorer = LaunchConfiguration('explorer')
     coverage_overlay_enabled = LaunchConfiguration('coverage_overlay_enabled')
 
     rviz_config = os.path.join(pkg_this, 'sim', 'rviz', 'exploration.rviz')
@@ -98,8 +97,6 @@ def generate_launch_description():
                               description='Enable Depth-Anything in the camera measurement node'),
         DeclareLaunchArgument('mppi_visualize', default_value='false',
                               description='Publish MPPI trajectory visualization topics'),
-        DeclareLaunchArgument('explorer', default_value='explore_lite',
-                              description='Which explorer to use: "explore_lite" or "custom"'),
         DeclareLaunchArgument('coverage_overlay_enabled', default_value='true',
                               description='Publish the live exploration-coverage HUD panel'),
         DeclareLaunchArgument('headless_rendering', default_value='false',
@@ -247,7 +244,6 @@ def generate_launch_description():
                     launch_arguments={
                         'namespace': namespace,
                         'use_sim_time': use_sim_time,
-                        'explorer': explorer,
                     }.items(),
                 ),
             ],

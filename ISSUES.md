@@ -7,7 +7,7 @@
 | Robot doesn't move | `ros2 topic echo /r100_0001/cmd_vel` - if empty, Nav2 may not be active |
 | No map in RViz | `ros2 topic hz /r100_0001/map` - if 0, check `slam_toolbox` logs and the scan topic |
 | Detection overlay does not appear | Make sure `g1_perception_enabled:=true`, remember the overlay is a separate OpenCV window, and check `/r100_0001/sensors/camera_0/color/image` |
-| `explore_lite` not finding frontiers | Verify `track_unknown_space: true` in the global costmap config |
+| Explorer not finding frontiers | Verify `track_unknown_space: true` in the global costmap config |
 | TF errors | Ensure all nodes use `use_sim_time: true` |
 | Startup hangs / a stage never comes up | Bringup is event-driven (readiness gates) — find the `gate_*` process log `[launch_wait]: waiting for …`; the `unmet:` list on timeout names the exact missing topic/service. See "Event-Driven Startup" below. Do **not** re-add `TimerAction` delays |
 | Stale processes from previous runs | Run `bash cleanup.sh` before each launch |
@@ -71,7 +71,7 @@ Clearpath robots require a non-empty ROS 2 namespace such as `/r100_0001/`. All 
 remappings = [('/tf', 'tf'), ('/tf_static', 'tf_static')]
 ```
 
-That works for Nav2, `explore_lite`, and the other nodes in this stack, but not for the stock `slam_toolbox` build.
+That works for Nav2, the frontier explorer, and the other nodes in this stack, but not for the stock `slam_toolbox` build.
 
 ### Root Cause
 
@@ -205,53 +205,73 @@ metric's topic). More than one publisher/subscription with the same node name
 warehouse A/B runs) contain interleaved multi-node values; the *upper
 envelope* of `complete` is the live node's true value.
 
-## Exploration Quits Early — explore_lite Frontier Blacklist Exhaustion
+## Exploration Quits Early — Frontier Blacklist Exhaustion (Historical: led to explore_lite removal)
 
-**Symptom**: `explore_lite` logs "All frontiers traversed/tried out, stopping."
-minutes into a run with roughly half the map unexplored (warehouse: quits at
-280–450 s with ~45–48% coverage). Quit time varies wildly between
-identical-config runs.
+> **Status**: explore_lite (m-explore-ros2) was **removed from the stack on
+> 2026-07-10** after these findings and a head-to-head benchmark against the
+> in-repo `frontier_explorer_node`. The failure modes below are kept because
+> they generalize to any frontier explorer driving nav2, and modes 2–3
+> still apply to the current explorer.
+
+**Symptom**: `explore_lite` logged "All frontiers traversed/tried out,
+stopping." minutes into a run with roughly half the map unexplored
+(warehouse: quits at 280–450 s with ~45–48% coverage). Quit time varied
+wildly between identical-config runs.
 
 **Root causes (found 2026-07-10, instrumented warehouse runs C–G)** — three
 stacked failure modes, each ending in the same blacklist-exhaustion quit:
 
-1. **Preempted goals blacklisted as failures.** explore_lite re-targets the
-   best frontier every planner tick; nav2 reports each preempted goal as
-   `ABORTED`, and upstream explore_lite blacklists every aborted goal. Under
-   normal goal churn (~85 preemptions per warehouse run) the blacklist slowly
-   consumes the frontier list. Fixed in
-   `patches/m_explore_customizations.patch`: only count an abort when the
-   goal is still the one being pursued (genuine navigation failure).
+1. **Preempted goals blacklisted as failures** (explore_lite-specific).
+   explore_lite re-targets the best frontier every planner tick; nav2 reports
+   each preempted goal as `ABORTED`, and upstream explore_lite blacklists
+   every aborted goal. Under normal goal churn (~85 preemptions per warehouse
+   run) the blacklist slowly consumed the frontier list. Was fixed in a local
+   m-explore patch (removed with the dependency; recoverable from git history
+   at `patches/m_explore_customizations.patch`, commit cd42c31f).
 2. **Wall-flush frontier centroids unplannable at tolerance 0.75.** Frontier
    centroids often sit inside the inscribed-lethal band of the 0.75 m
    inflation; NavFn finds no endpoint within its 0.75 m tolerance, the goal
    aborts, the frontier gets blacklisted. Fixed in `nav2_params.yaml`:
    `GridBased.tolerance: 1.5` (goals succeeded went 0 → 11 in the first
-   validation run).
+   validation run). **Still relevant** — applies to any explorer.
 3. **Transient TF/controller outages cascade.** Under co-tenant CPU load
-   (see the shared-box note below), the controller loop drops from 20 Hz to
+   (see the shared-box notes), the controller loop drops from 20 Hz to
    2–8 Hz and `map→odom` lags by up to ~1.5 s; every active goal aborts with
    "Unable to transform goal pose into costmap frame" within 1–2 s of being
-   sent. One such burst blacklisted 8 frontiers in 18 s and ended run F. Fixed
-   in the same m-explore patch: a frontier is only blacklisted after
-   `abort_blacklist_threshold` (default 3) genuine failures, and retries wait
-   for the next planner tick, so a seconds-long outage can't burn every
-   attempt.
+   sent. One such burst blacklisted 8 frontiers in 18 s and ended a run.
+   **Still relevant** — the current explorer defends with radius-matched
+   failure tallies (`abort_blacklist_threshold`, default 3) and a stall-based
+   `progress_timeout` (cancels only when nav2 feedback shows no
+   `distance_remaining` improvement).
 
-**Validation (warehouse, fixed HUD)**: baseline quit 448 s / 45.2% coverage;
-with all three fixes the run survived 720 s under ~6× worse TF-error
-conditions (box load 40+/32 from co-tenant training). Coverage stayed ~47%
-in that run because the controller couldn't complete goals at 5–8 Hz — a
-load ceiling, not explorer logic; re-benchmark coverage on a quiet box.
+**Head-to-head benchmark that decided the removal (2026-07-10, quiet box,
+warehouse, both explorers fully fixed)**:
 
-**Diagnosis recipe for early exploration quits**: count
-`grep -c "Received goal preemption request"` vs
-`grep -c "Blacklisting unreachable"` in the launch log. Preemptions >> real
-failures + a growing blacklist = failure mode 1. Repeated
+| | explore_lite (patched) | frontier_explorer_node |
+|---|---|---|
+| Coverage peak | 66.9% (terminal quit at 1337 s) | 73.9% at 1643 s, still climbing |
+| Time to 50% / 60% | 380 s / 624 s | 273 s / 562 s |
+| Goal profile | 183 goals, 1 completed (churn by design) | 62 goals, 8 completed (commits to goals) |
+| Blacklist end state | 10 blacklisted → terminal quit | clears blacklist and retries; broke a 5-min plateau at 63.9% |
+
+The in-repo explorer won on coverage ceiling, time-to-coverage, and
+persistence (its clear-blacklist-and-retry loop cracked a pocket explore_lite
+permanently gave up on), so explore_lite, its params file, its patch, and the
+`explorer:=` launch dispatch were removed. `explore/status` is now a
+`std_msgs/String` (`exploration_started` / `exploration_complete`).
+
+**Coverage ceiling note**: every warehouse run — both explorers — stalled
+against the same two zones (east ~(12, −8), northwest ~(−8, 11)), capping
+coverage at ~67–74%. Whether those pockets are genuinely sealed (door/wall
+geometry, inflation-blocked gaps) or mis-scored by the ground-truth map is an
+open investigation, independent of explorer logic.
+
+**Diagnosis recipe for early exploration quits / stalls**: repeated
 `Failed to create plan with tolerance` at the same coordinates = mode 2.
 `Exception in transformPose … extrapolation into the future` bursts +
-`Control loop missed its desired rate` = mode 3 (check co-tenant load
-first: `uptime`).
+`Control loop missed its desired rate` = mode 3 (check co-tenant load first:
+`uptime`). `Blacklisting goal … after N failures` in the explorer log tells
+you which frontiers are genuinely unreachable.
 
 ## SLAM Drift in Featureless Environments (Office World)
 

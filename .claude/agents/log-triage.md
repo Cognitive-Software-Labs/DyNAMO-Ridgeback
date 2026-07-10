@@ -16,12 +16,11 @@ recipes — do not rely on this prompt alone: "Exploration Quits Early",
 
 ## Signature checklist (count each, then classify)
 
-1. Explorer early quit:
-   - `grep -c "Received goal preemption request"` vs
-     `grep -c "Blacklisting unreachable"` and `navigation failed (attempt`
-   - preemptions >> genuine failures + blacklist growth → preempt-blacklist
-     bug class (fixed in patches/m_explore_customizations.patch — check the
-     patch is applied if this reappears)
+1. Explorer stalls / gives up on areas:
+   - `grep -c "Blacklisting goal"` and `Goal .* failed .* attempt` lines name
+     frontiers the explorer found genuinely unreachable
+   - (historical: explore_lite's preempt-blacklist quit bug — removed with
+     explore_lite on 2026-07-10; see ISSUES.md "Exploration Quits Early")
 2. `Failed to create plan with tolerance` repeated at the same coordinates →
    wall-flush frontier centroid inside the inscribed-lethal inflation band
    (NavFn `tolerance` in nav2_params.yaml).

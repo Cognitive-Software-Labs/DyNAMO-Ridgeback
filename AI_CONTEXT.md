@@ -71,7 +71,7 @@ Exploration stack:
 - Gazebo simulation
 - `slam_toolbox`
 - Nav2
-- frontier explorer — either `explore_lite` (default) or the in-repo `frontier_explorer_node`, dispatched in `launch/includes/explore.launch.py` based on the `explorer` arg
+- frontier explorer — the in-repo `frontier_explorer_node`, launched by `launch/includes/explore.launch.py` (explore_lite was removed 2026-07-10 after a head-to-head benchmark; findings in ISSUES.md "Exploration Quits Early")
 - HUD is a general aggregator: producers publish `rviz_2d_overlay_msgs/OverlayText` "panels" on their own topics (`hud/velocity`, `hud/coverage`, …); `hud_node` merges them in the configured `panels` order into one `hud_overlay` (the single RViz `TextOverlay` display). Add a metric = new publisher + its topic in `panels`; no RViz change.
 - `velocity_overlay_node` publishes the velocity panel on `hud/velocity` (4-stage cmd_vel chain: `planned` from MPPI, `capped` from velocity_smoother, `controller` from collision_monitor, `actual` from `platform/odom/filtered`)
 - `coverage_overlay_node` publishes the live exploration-coverage panel on `hud/coverage`: compares the SLAM map to the ground-truth map for the current `world` (reusing `common/coverage_utils.py`), reporting `complete` (discovered fraction of gt-free) and `accuracy` (coverage over explored gt-free); worlds without a ground-truth map show `n/a`. Gated by `coverage_overlay_enabled` (default true). Ground-truth maps live in the package at `sim/ground_truth_maps/` (installed to `share/`, alongside `sim/worlds/`); the node resolves them via `get_package_share_directory`. Capture/preview tooling (`capture_ground_truth.sh`, `render_previews.py`) and the README sit alongside the maps in `sim/ground_truth_maps/`
@@ -104,7 +104,7 @@ Benchmark stack:
 ## Non-Obvious Conventions
 
 - Always run `bash cleanup.sh` before launching from the repo runbooks or helper scripts
-- `start_exploration.sh` is the canonical quick-start: sources the workspace, runs cleanup, and forwards `world` (positional 1), `EXPLORER` / explorer (positional 2 or env), `DEPTH_ANYTHING_ENABLED` (env), and the DDS selection (`RMW_IMPLEMENTATION`, default CycloneDDS; `FASTRTPS_NO_SHM` applies only on the FastDDS fallback) to the public launch
+- `start_exploration.sh` is the canonical quick-start: sources the workspace, runs cleanup, and forwards `world` (positional 1), `DEPTH_ANYTHING_ENABLED` (env), and the DDS selection (`RMW_IMPLEMENTATION`, default CycloneDDS; `FASTRTPS_NO_SHM` applies only on the FastDDS fallback) to the public launch
 - `build_and_start_expl.sh` rebuilds the workspace before forwarding to `start_exploration.sh`; pass-through args are positional in the same order
 - The G1 overlay is a separate OpenCV window, not an RViz panel
 - The `mock_hospital` world is the main exploration scenario; `warehouse` is the larger exploration test; `office` is the common perception-debug world
@@ -137,8 +137,7 @@ Keep their recipes in sync when the underlying scripts (`cleanup.sh`, `start_exp
 - `build_and_start_expl.sh`: rebuild then forward to `start_exploration.sh`
 - `src/ridgeback_autonomy/config/nav2_params.yaml`: Nav2 config
 - `src/ridgeback_autonomy/config/slam_toolbox_params.yaml`: SLAM config
-- `src/ridgeback_autonomy/config/explore_lite_params.yaml`: `explore_lite` frontier exploration config
-- `src/ridgeback_autonomy/config/frontier_explorer_params.yaml`: in-repo `frontier_explorer_node` config (used when `explorer:=custom`)
+- `src/ridgeback_autonomy/config/frontier_explorer_params.yaml`: `frontier_explorer_node` config
 - `src/ridgeback_autonomy/config/camera_config.json`: shared camera geometry
 - `cyclonedds.xml`: default DDS config (CycloneDDS) exported by `start_exploration.sh` — loopback, raised participant limit, large socket buffers
 - `fastrtps_no_shm.xml`: UDP-only FastDDS profile, used only when falling back with `RMW_IMPLEMENTATION=rmw_fastrtps_cpp`
@@ -151,7 +150,6 @@ Managed through `.repos`:
 - `clearpath_common`
 - `clearpath_config`
 - `clearpath_msgs`
-- `m-explore-ros2`
 - `slam_toolbox`
 
 If you remove, rename, or add repo dependencies, check:

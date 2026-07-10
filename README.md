@@ -22,7 +22,7 @@ This workspace supports 2 main human workflows:
 | Perception | Intel RealSense D455 (~1m height) | Depth/RGB for overlay and distance estimation |
 | SLAM | slam_toolbox (online async, from source) | Map building + localization |
 | Navigation | Nav2 (MPPI omni controller) | Path planning + obstacle avoidance |
-| Exploration | explore_lite (m-explore-ros2) or in-repo `frontier_explorer_node` | Frontier detection + goal selection (selectable via `explorer:=`) |
+| Exploration | in-repo `frontier_explorer_node` | Frontier detection + goal selection |
 | Perception | Staged G1 perception pipeline | Raw OWLv2 detections plus camera/LiDAR measurement nodes and an optional overlay |
 | Benchmarking | G1 distance benchmark runner | Controlled evaluation of RGB, depth, mono-depth, pointcloud, and LiDAR measurements |
 
@@ -76,9 +76,6 @@ cd src/clearpath_simulator/clearpath_gz && git apply ../../../patches/clearpath_
 
 # Apply slam_toolbox patch (fixes TF namespace issue)
 cd src/slam_toolbox && git apply ../../patches/slam_toolbox_tf_namespace.patch && cd ../..
-
-# Apply m-explore patch (robust frontier blacklisting — see ISSUES.md "Exploration Quits Early")
-cd src/m-explore-ros2 && git apply ../../patches/m_explore_customizations.patch && cd ../..
 
 # Install any remaining deps
 rosdep install --from-paths src --ignore-src -r -y
@@ -171,7 +168,7 @@ Launches Gazebo, SLAM, Nav2, frontier exploration, and the G1 perception stack i
 2. Exploration RViz config
 3. `slam_toolbox` (once the scan + filtered-odom topics publish)
 4. Nav2 (once `/map` publishes)
-5. The selected explorer — `explore_lite` (default) or the in-repo `frontier_explorer_node` (once the global costmap publishes)
+5. The in-repo `frontier_explorer_node` explorer (once the global costmap publishes)
 6. G1 perception nodes: `g1_detector_node`, `g1_camera_measurement_node`, `g1_lidar_measurement_node`, `g1_overlay_node`
 
 Bringup is **event-driven** (readiness gates), not fixed timers — each stage starts when its prerequisite exists, with a `--timeout` fallback. See [ISSUES.md](ISSUES.md) "Event-Driven Startup".
@@ -202,7 +199,6 @@ Arguments:
 | `g1_perception_enabled` | `true` | Launch the G1 perception stack |
 | `depth_anything_enabled` | `false` | Enable Depth-Anything in the camera measurement node |
 | `mppi_visualize` | `false` | Publish MPPI trajectory visualization topics (RViz already has `MPPI Optimal` and `MPPI Samples` displays subscribed to `/r100_0001/optimal_trajectory` and `/r100_0001/trajectories`) |
-| `explorer` | `explore_lite` | Frontier explorer to dispatch — `explore_lite` or `custom` (the in-repo `frontier_explorer_node`) |
 | `headless_rendering` | `false` | Render Gazebo server sensors via EGL without an X display — GPU-accelerated sensor rendering for SSH/non-seat sessions (see [ISSUES.md](ISSUES.md) "Simulation RTF Collapse") |
 
 Examples:
@@ -218,15 +214,15 @@ ros2 launch ridgeback_autonomy ridgeback_exploration.launch.py world:=mock_hospi
 ros2 launch ridgeback_autonomy ridgeback_exploration.launch.py world:=office explorer:=custom
 ```
 
-The `custom` explorer is the in-repo `frontier_explorer_node` (sources under `src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer/`). It and `explore_lite` both consume the Nav2 global costmap and send goals via `NavigateToPose`; pick whichever you want to evaluate.
+The explorer is the in-repo `frontier_explorer_node` (sources under `src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer/`). It consumes the Nav2 global costmap and sends goals via `NavigateToPose`. It replaced `explore_lite` after a head-to-head benchmark — see ISSUES.md "Exploration Quits Early" for the findings.
 
 #### Quick-start script
 
-`start_exploration.sh` sources the workspace, runs cleanup, and launches exploration. Depth-Anything stays disabled unless explicitly enabled. The script accepts the world as the first positional arg and the explorer (`explore_lite` or `custom`) as the second; `EXPLORER` works as an env-var alternative:
+`start_exploration.sh` sources the workspace, runs cleanup, and launches exploration. Depth-Anything stays disabled unless explicitly enabled. The script accepts the world as the first positional arg:
 
 ```bash
-bash start_exploration.sh                                # mock_hospital + explore_lite
-bash start_exploration.sh office                         # office + explore_lite
+bash start_exploration.sh                                # mock_hospital
+bash start_exploration.sh office                         # office world
 bash start_exploration.sh mock_hospital custom           # mock_hospital + custom explorer
 EXPLORER=custom bash start_exploration.sh office         # office + custom explorer
 DEPTH_ANYTHING_ENABLED=true bash start_exploration.sh office
@@ -320,10 +316,8 @@ The shared camera geometry lives in `config/camera_config.json`, and the measure
 
 | File | Parameter | Effect |
 |------|-----------|--------|
-| `config/explore_lite_params.yaml` | `min_frontier_size` | Minimum frontier size (m) to consider — increase to skip small gaps |
-| `config/explore_lite_params.yaml` | `planner_frequency` | How often (Hz) to re-evaluate frontiers; lower values reduce goal preemption churn |
-| `config/explore_lite_params.yaml` | `abort_blacklist_threshold` | Genuine navigation failures before a frontier is blacklisted (patched explore_lite; guards against transient TF/controller outages) |
-| `config/frontier_explorer_params.yaml` | `min_frontier_size` / `near_frontier_radius` / `goal_advance_cells` | Custom-explorer frontier clustering, near-tier preference, and goal placement past the centroid |
+| `config/frontier_explorer_params.yaml` | `min_frontier_size` / `near_frontier_radius` / `goal_advance_cells` | Frontier clustering, near-tier preference, and goal placement past the centroid |
+| `config/frontier_explorer_params.yaml` | `progress_timeout` / `abort_blacklist_threshold` | Stall timeout (cancels only when no progress) and failures required before a frontier is blacklisted |
 | `config/frontier_explorer_params.yaml` | `distance_weight` / `size_weight` | Scoring trade-off between how close vs. how large a far-tier frontier is |
 | `config/frontier_explorer_params.yaml` | `goal_cost_threshold` / `goal_safety_margin` / `lethal_cost_threshold` | Goal-safety filtering against the costmap |
 | `config/nav2_params.yaml` | `vx_max` / `vy_max` / `wz_max` | Robot linear and turn-rate limits |
@@ -332,10 +326,9 @@ The shared camera geometry lives in `config/camera_config.json`, and the measure
 
 ## Patches and Issue History
 
-This project still relies on three local patches:
+This project still relies on two local patches:
 
 1. `patches/clearpath_gz_customizations.patch` patches `src/clearpath_simulator/clearpath_gz` to add this repo's Gazebo worlds/models to the simulator search path and to expose the custom `SpawnG1` Gazebo GUI plugin.
 2. `patches/slam_toolbox_tf_namespace.patch` patches `src/slam_toolbox` so `slam_toolbox` respects namespaced TF remappings.
-3. `patches/m_explore_customizations.patch` patches `src/m-explore-ros2` so `explore_lite` no longer blacklists frontiers on preempted goals and retries genuine navigation failures (`abort_blacklist_threshold`) before giving up on a frontier — without it, exploration quits with roughly half the map unexplored.
 
 The deeper root-cause notes, previous middleware workarounds, namespace gotchas, and troubleshooting tips now live in [ISSUES.md](ISSUES.md).

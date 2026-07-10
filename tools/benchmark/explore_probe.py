@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Instrument explore_lite quit behavior.
+"""Instrument frontier-explorer runs.
 
 Tracks:
 - navigate_to_pose action status transitions per goal ID (accept/succeed/abort/cancel)
 - abort classification: PREEMPTED (another goal accepted within +/-1.5s) vs GENUINE
-- explore/frontiers markers: available (blue) vs blacklisted (red) counts
-- explore/status: exploration_complete event = quit
+- explore/frontiers markers (cluster count)
+- explore/status (std_msgs/String): "exploration_complete" = quit
 - hud/coverage complete%
 
 Writes events CSV + summary JSON. Exits on exploration_complete + 10s, or --max-wall.
@@ -23,7 +23,7 @@ from rclpy.qos import QoSDurabilityPolicy, QoSProfile, QoSReliabilityPolicy
 from action_msgs.msg import GoalStatusArray
 from visualization_msgs.msg import MarkerArray
 from rviz_2d_overlay_msgs.msg import OverlayText
-from explore_lite_msgs.msg import ExploreStatus
+from std_msgs.msg import String
 
 NS = '/r100_0001'
 PCT = re.compile(r'complete\s+([0-9.]+)%')
@@ -55,7 +55,7 @@ class Probe(Node):
                         reliability=QoSReliabilityPolicy.RELIABLE,
                         durability=QoSDurabilityPolicy.TRANSIENT_LOCAL)
         self.create_subscription(
-            ExploreStatus, NS + '/explore/status', self.on_explore_status, tl)
+            String, NS + '/explore/status', self.on_explore_status, tl)
         self.create_subscription(
             OverlayText, NS + '/hud/coverage', self.on_cov, 10)
 
@@ -93,19 +93,15 @@ class Probe(Node):
                 a['kind'] = 'preempted' if near else 'genuine'
 
     def on_frontiers(self, msg):
-        avail = black = 0
-        for m in msg.markers:
-            if m.action == 0 and m.type == 8:  # ADD, POINTS
-                if m.color.r > 0.5:
-                    black += 1
-                else:
-                    avail += 1
+        # frontier_explorer publishes one SPHERE marker per cluster
+        avail = sum(1 for m in msg.markers if m.action == 0 and m.type == 2)
+        black = 0
         self.frontier_log.append((self.now(), avail, black))
         self.ev('frontiers', f'avail={avail} black={black}')
 
     def on_explore_status(self, msg):
-        self.ev('explore_status', msg.status)
-        if msg.status == ExploreStatus.EXPLORATION_COMPLETE:
+        self.ev('explore_status', msg.data)
+        if msg.data == 'exploration_complete':
             self.complete_at = self.now()
 
     def on_cov(self, msg):

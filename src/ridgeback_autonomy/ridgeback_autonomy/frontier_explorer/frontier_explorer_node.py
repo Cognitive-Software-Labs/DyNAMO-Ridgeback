@@ -17,7 +17,7 @@ from tf2_ros import TransformListener, Buffer
 from visualization_msgs.msg import Marker, MarkerArray
 from std_msgs.msg import ColorRGBA
 from rclpy.qos import QoSProfile, QoSDurabilityPolicy
-from explore_lite_msgs.msg import ExploreStatus
+from std_msgs.msg import String
 from ridgeback_autonomy.frontier_explorer.navigator import get_frontier_clusters
 from ridgeback_autonomy.frontier_explorer.params import UNKNOWN, OBSTACLE, FREE
 
@@ -79,14 +79,15 @@ class FrontierExplorerNode(Node):
             MarkerArray, 'explore/frontiers', 10,
             callback_group=callback_group_2)
 
-        # Exploration status — same topic/QoS contract as explore_lite so
-        # benchmark tooling can detect completion regardless of explorer
+        # Exploration status for benchmark tooling / monitors. Plain string
+        # values ("exploration_started" / "exploration_complete") on a
+        # transient-local topic so late subscribers see the latest state.
         status_qos = QoSProfile(depth=10)
         status_qos.durability = QoSDurabilityPolicy.TRANSIENT_LOCAL
         self._status_pub = self.create_publisher(
-            ExploreStatus, 'explore/status', status_qos,
+            String, 'explore/status', status_qos,
             callback_group=callback_group_2)
-        self._publish_status(ExploreStatus.EXPLORATION_STARTED)
+        self._publish_status('exploration_started')
 
         # Subscriber for costmap
         self.costmap_subscription = self.create_subscription(
@@ -262,8 +263,8 @@ class FrontierExplorerNode(Node):
         return False
 
     def _publish_status(self, status):
-        msg = ExploreStatus()
-        msg.status = status
+        msg = String()
+        msg.data = status
         self._status_pub.publish(msg)
 
     # Radius for merging failure tallies of the same drifting frontier goal
@@ -322,7 +323,7 @@ class FrontierExplorerNode(Node):
                 self.get_logger().info('No frontier found - exploration complete!')
                 # Signal completion for benchmark tooling; keep the timer
                 # alive — new frontiers may still appear as the map grows
-                self._publish_status(ExploreStatus.EXPLORATION_COMPLETE)
+                self._publish_status('exploration_complete')
                 return
 
         # Convert grid coordinates to world coordinates

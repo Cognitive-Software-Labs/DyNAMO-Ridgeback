@@ -17,7 +17,7 @@ cp tools/benchmark/robot_no_camera.yaml /tmp/bench-clearpath/robot.yaml
 
 # 3. Launch (NVIDIA EGL headless; headless_rendering also implies gz -s server-only)
 export __EGL_VENDOR_LIBRARY_FILENAMES=/usr/share/glvnd/egl_vendor.d/10_nvidia.json
-setsid nohup bash start_exploration.sh warehouse explore_lite \
+setsid nohup bash start_exploration.sh warehouse \
     g1_perception_enabled:=false exploration_rviz:=false \
     headless_rendering:=true setup_path:=/tmp/bench-clearpath/ \
     >/dev/null 2>&1 &
@@ -38,16 +38,15 @@ aborted, preempt-vs-genuine abort split, frontier blacklist counts, coverage
 peak, quit time) into the working directory.
 
 Caveats:
-- the preempt-vs-genuine classification uses a ±1.5 s accept window; with the
-  patched explore_lite (retries re-send within that window) trust the explore
-  log's `attempt N/M` lines over the probe's split
-- frontier avail/black counts only work with explore_lite's marker scheme;
-  for `explorer:=custom` use goal stats + `explore/status`
+- the preempt-vs-genuine abort classification uses a ±1.5 s accept window;
+  cross-check against the explorer log's failure/blacklist lines
+- `explore/status` is a `std_msgs/String` (`exploration_started` /
+  `exploration_complete`); the probe exits ~10 s after completion
 
 ## Reading results
 
 Record `uptime` load with every run — sim health tracks total box load
 (see ISSUES.md and `~/workstation.md`; co-tenant training/build storms cap
 coverage regardless of nav config). Launch logs land in
-`logs/ridgeback_<timestamp>_<world>_<explorer>.log`; triage recipes live in
+`logs/ridgeback_<timestamp>_<world>.log`; triage recipes live in
 ISSUES.md ("Exploration Quits Early", "Phantom Coverage", "RTF Collapse").

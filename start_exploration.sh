@@ -2,10 +2,9 @@
 # Clean up stale processes and launch the exploration stack.
 #
 # Usage:
-#   bash start_exploration.sh                                # mock_hospital + explore_lite
-#   bash start_exploration.sh office                         # office + explore_lite
-#   bash start_exploration.sh mock_hospital custom           # mock_hospital + custom explorer
-#   EXPLORER=custom bash start_exploration.sh office         # office + custom explorer
+#   bash start_exploration.sh                                # mock_hospital
+#   bash start_exploration.sh office                         # office world
+#   bash start_exploration.sh warehouse key:=value ...       # extra launch args
 #   DEPTH_ANYTHING_ENABLED=true bash start_exploration.sh    # enable Depth-Anything
 #
 # DDS: defaults to CycloneDDS (cyclonedds.xml). Run tools/setup_dds.sh once (sudo)
@@ -20,15 +19,16 @@ if [[ $# -gt 0 ]]; then
     shift
 fi
 
-EXPLORER="${EXPLORER:-explore_lite}"
+# Historical: a second positional used to select explore_lite vs custom.
+# explore_lite was removed (see ISSUES.md "Exploration Quits Early") — the
+# in-repo frontier_explorer_node is the only explorer. Swallow a stray
+# "custom" positional so old invocations keep working.
 if [[ $# -gt 0 && "$1" != *":="* ]]; then
-    EXPLORER="$1"
+    if [[ "$1" != "custom" ]]; then
+        echo "Unknown explorer '$1'. explore_lite was removed; the custom frontier explorer is the only option." >&2
+        exit 2
+    fi
     shift
-fi
-
-if [[ "$EXPLORER" != "explore_lite" && "$EXPLORER" != "custom" ]]; then
-    echo "Unknown explorer '$EXPLORER'. Expected 'explore_lite' or 'custom'." >&2
-    exit 2
 fi
 
 DEPTH_ANYTHING_ENABLED="${DEPTH_ANYTHING_ENABLED:-false}"
@@ -68,12 +68,11 @@ bash "$SCRIPT_DIR/cleanup.sh"
 # can be reviewed after the fact instead of being overwritten by the next run.
 LOG_DIR="${LOG_DIR:-$SCRIPT_DIR/logs}"
 mkdir -p "$LOG_DIR"
-LOG_FILE="$LOG_DIR/ridgeback_$(date +%Y-%m-%d_%H-%M-%S)_${WORLD}_${EXPLORER}.log"
+LOG_FILE="$LOG_DIR/ridgeback_$(date +%Y-%m-%d_%H-%M-%S)_${WORLD}.log"
 echo "Logging to $LOG_FILE"
 exec > >(tee "$LOG_FILE") 2>&1
 
 exec ros2 launch ridgeback_autonomy ridgeback_exploration.launch.py \
     world:="$WORLD" \
-    explorer:="$EXPLORER" \
     depth_anything_enabled:="$DEPTH_ANYTHING_ENABLED" \
     "$@"

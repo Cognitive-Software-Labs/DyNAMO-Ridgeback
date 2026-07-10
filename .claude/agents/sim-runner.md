@@ -10,22 +10,23 @@ recipe exactly — every step exists because skipping it burned a session once.
 ## Launch sequence
 
 1. `bash cleanup.sh` — always, even if you believe the box is clean.
-2. Verify clean with self-match-proof patterns: `pgrep -f "[e]xplore_node"`,
-   `pgrep -f "[g]z sim"` (bracket trick prevents matching your own shell).
+2. Verify clean with self-match-proof patterns:
+   `pgrep -f "[f]rontier_explorer_node"`, `pgrep -f "[g]z sim"`
+   (bracket trick prevents matching your own shell).
 3. Stage the profile OUTSIDE the repo (the clearpath generator writes
    artifacts into the setup_path dir):
    `mkdir -p /tmp/bench-clearpath && cp tools/benchmark/robot_no_camera.yaml /tmp/bench-clearpath/robot.yaml`
 4. Launch detached so it survives session restarts:
    ```
    export __EGL_VENDOR_LIBRARY_FILENAMES=/usr/share/glvnd/egl_vendor.d/10_nvidia.json
-   setsid nohup bash start_exploration.sh <world> <explorer> \
+   setsid nohup bash start_exploration.sh <world> \
        g1_perception_enabled:=false exploration_rviz:=false \
        headless_rendering:=true setup_path:=/tmp/bench-clearpath/ \
        >/dev/null 2>&1 &
    ```
-   `<explorer>` is `explore_lite` or `custom`. Default world: warehouse.
-5. Wait for `pgrep -f "[e]xplore_node"` (or `[f]rontier_explorer_node` for
-   custom), up to ~150 s.
+   Default world: warehouse. The explorer is always the in-repo
+   `frontier_explorer_node` (explore_lite was removed 2026-07-10).
+5. Wait for `pgrep -f "[f]rontier_explorer_node"`, up to ~150 s.
 6. Attach the probe, detached, from the repo root:
    ```
    source install/setup.bash
@@ -51,9 +52,10 @@ recipe exactly — every step exists because skipping it burned a session once.
 
 - Progress: tail `<tag>_probe.log` (checkpoint line every 15 s: coverage,
   goals ok/abort, frontier counts) and the launch log
-  `logs/ridgeback_<timestamp>_<world>_<explorer>.log`.
-- Explorer quit signatures: "All frontiers traversed" / "Exploration stopped"
-  (explore_lite), "exploration complete" (custom).
+  `logs/ridgeback_<timestamp>_<world>.log`.
+- Explorer quit signature: "exploration complete" in the launch log /
+  `exploration_complete` on `explore/status` (the explorer keeps its timer
+  alive afterwards and resumes if new frontiers appear).
 - Stop: `pkill -f "[e]xplore_probe"` then `bash cleanup.sh`.
 
 ## Report back (raw data, no prose padding)
