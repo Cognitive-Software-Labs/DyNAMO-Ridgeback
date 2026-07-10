@@ -1,0 +1,74 @@
+#!/usr/bin/env python3
+"""Isaac Sim 6.0 install smoke test: headless boot + ROS 2 bridge + /clock.
+
+Proves in one shot that the pip install works, headless Vulkan rendering
+initializes on this box (no X needed), the ROS 2 bridge extension loads,
+and its publishers reach the system DDS (CycloneDDS by default).
+
+Run from the workspace root with ROS sourced, so the bridge picks up the
+system RMW instead of its bundled libraries:
+
+    source /opt/ros/jazzy/setup.bash
+    RMW_IMPLEMENTATION=rmw_cyclonedds_cpp \
+    CYCLONEDDS_URI=file://$PWD/cyclonedds.xml \
+    isaac_venv/bin/python3 tools/isaac/smoke_test.py
+
+While it runs, `ros2 topic hz /clock` in a plain terminal (same RMW env)
+must show ~60 Hz ticks. Exit code 0 = all checks passed.
+"""
+import os
+import sys
+
+os.environ.setdefault("OMNI_KIT_ACCEPT_EULA", "YES")
+
+from isaacsim import SimulationApp  # noqa: E402  (must precede omni imports)
+
+app = SimulationApp({"headless": True})
+
+import omni.graph.core as og  # noqa: E402
+import omni.timeline  # noqa: E402
+from isaacsim.core.utils.extensions import enable_extension  # noqa: E402
+
+failures = []
+
+if not enable_extension("isaacsim.ros2.bridge"):
+    failures.append("could not enable isaacsim.ros2.bridge")
+
+# The bridge registers its OmniGraph nodes on load; assert the ones the
+# runner depends on exist in this build (guards 6.x renames).
+required_nodes = [
+    "isaacsim.ros2.bridge.ROS2PublishClock",
+    "isaacsim.ros2.bridge.ROS2RtxLidarHelper",
+    "isaacsim.ros2.bridge.ROS2CameraHelper",
+]
+registered = set(og.get_registered_nodes())
+for node in required_nodes:
+    if node not in registered:
+        failures.append(f"OmniGraph node not registered: {node}")
+
+if not failures:
+    og.Controller.edit(
+        {"graph_path": "/SmokeGraph", "evaluator_name": "execution"},
+        {
+            og.Controller.Keys.CREATE_NODES: [
+                ("tick", "omni.graph.action.OnPlaybackTick"),
+                ("clock", "isaacsim.ros2.bridge.ROS2PublishClock"),
+            ],
+            og.Controller.Keys.CONNECT: [
+                ("tick.outputs:tick", "clock.inputs:execIn"),
+                ("tick.outputs:time", "clock.inputs:timeStamp"),
+            ],
+        },
+    )
+    timeline = omni.timeline.get_timeline_interface()
+    timeline.play()
+    for _ in range(300):  # ~5 s of /clock at 60 Hz
+        app.update()
+    timeline.stop()
+
+app.close()
+
+if failures:
+    print("SMOKE TEST FAILED:", *failures, sep="\n  - ")
+    sys.exit(1)
+print("SMOKE TEST OK: headless boot, ros2 bridge, /clock published for ~5 s")

@@ -24,6 +24,9 @@ src/slam_toolbox/
 vlm_venv/
 perception_venv/
 
+# Isaac Sim virtual environment (tools/install_isaac_venv.sh)
+isaac_venv/
+
 # Python cache artifacts
 __pycache__/
 *.pyc

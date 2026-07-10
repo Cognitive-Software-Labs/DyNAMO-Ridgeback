@@ -1,0 +1,13 @@
+# Isaac Sim 6.0 simulator dependencies for isaac_venv (see README "Isaac Sim venv").
+#
+# Pinned to the 6.0.1 GA patch release; the port's runner code
+# (src/ridgeback_autonomy/sim/isaac/) is written against these APIs and
+# 6.x minor bumps have historically renamed extensions. Bump deliberately,
+# re-running tools/isaac/smoke_test.py afterwards.
+#
+# [all,extscache] pre-caches the extension registry (~30-50 GB download)
+# so headless launches need no registry access at runtime — required for
+# benchmark runs on a box where first-launch downloads would trip the
+# bringup readiness gates.
+--extra-index-url https://pypi.nvidia.com
+isaacsim[all,extscache]==6.0.1
