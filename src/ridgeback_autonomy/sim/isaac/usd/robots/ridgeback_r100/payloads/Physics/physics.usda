@@ -1,0 +1,517 @@
+#usda 1.0
+(
+    customLayerData = {
+        string creator = "URDF USD Converter v0.1.3"
+    }
+    defaultPrim = "tn__r1000001_bC"
+    doc = """Generated from Composed Stage of root layer /tmp/tmp9pvamk94/r100-0001.usdc
+
+
+Generated from Composed Stage of root layer /tmp/urdf_import_ridgeback_r100_qxkgsb7w/usdex_ridgeback_r100/r100-0001.usdc
+
+
+Generated from Composed Stage of root layer /tmp/urdf_import_ridgeback_r100_qxkgsb7w/temp_ridgeback_r100/ridgeback_r100.usd
+
+
+Generated from Composed Stage of root layer /home/deivid/dev/DyNAMO-Ridgeback/.claude/worktrees/jolly-borg-f48cab/src/ridgeback_autonomy/sim/isaac/usd/robots/ridgeback_r100.usd/ridgeback_r100/payloads/base.usd
+"""
+    kilogramsPerUnit = 1
+    metersPerUnit = 1
+    upAxis = "Z"
+)
+
+over "tn__r1000001_bC"
+{
+    over "Geometry"
+    {
+        over "base_link"
+        {
+            over "chassis_link" (
+                prepend apiSchemas = ["PhysicsRigidBodyAPI", "PhysicsArticulationRootAPI", "NewtonArticulationRootAPI", "PhysicsMassAPI"]
+            )
+            {
+                bool newton:selfCollisionEnabled = 0
+                point3f physics:centerOfMass = (0.012, 0.002, 0.067)
+                float3 physics:diagonalInertia = (4.474006, 4.6096272, 7.1686664)
+                float physics:mass = 165.304
+                quatf physics:principalAxes = (-0.7029205, 0.011314742, 0.022740483, -0.7108148)
+
+                over "right_side_cover_link" (
+                    prepend apiSchemas = ["PhysicsRigidBodyAPI"]
+                )
+                {
+                }
+
+                over "left_side_cover_link" (
+                    prepend apiSchemas = ["PhysicsRigidBodyAPI"]
+                )
+                {
+                }
+
+                over "front_cover_link" (
+                    prepend apiSchemas = ["PhysicsRigidBodyAPI"]
+                )
+                {
+                }
+
+                over "rear_cover_link" (
+                    prepend apiSchemas = ["PhysicsRigidBodyAPI"]
+                )
+                {
+                }
+
+                over "front_lights_link" (
+                    prepend apiSchemas = ["PhysicsRigidBodyAPI"]
+                )
+                {
+                }
+
+                over "rear_lights_link" (
+                    prepend apiSchemas = ["PhysicsRigidBodyAPI"]
+                )
+                {
+                }
+
+                over "axle_link" (
+                    prepend apiSchemas = ["PhysicsRigidBodyAPI"]
+                )
+                {
+                    over "front_rocker_link" (
+                        prepend apiSchemas = ["PhysicsRigidBodyAPI", "PhysicsMassAPI"]
+                    )
+                    {
+                        point3f physics:centerOfMass = (0, 0, 0)
+                        float3 physics:diagonalInertia = (0.0288, 0.41281673, 0.43258324)
+                        float physics:mass = 10.267
+                        quatf physics:principalAxes = (-0.70628357, 0.034094125, 0.034069747, -0.7062863)
+
+                        over "front_left_wheel_link" (
+                            prepend apiSchemas = ["PhysicsRigidBodyAPI", "PhysicsMassAPI"]
+                        )
+                        {
+                            point3f physics:centerOfMass = (0, 0, 0)
+                            float3 physics:diagonalInertia = (0.0049007144, 0.0049007144, 0.0072010127)
+                            float physics:mass = 2.5
+                            quatf physics:principalAxes = (0.70710677, 0.70710677, 0, 0)
+
+                            over "cylinder" (
+                                prepend apiSchemas = ["NewtonCollisionAPI"]
+                            )
+                            {
+                            }
+                        }
+
+                        over "front_right_wheel_link" (
+                            prepend apiSchemas = ["PhysicsRigidBodyAPI", "PhysicsMassAPI"]
+                        )
+                        {
+                            point3f physics:centerOfMass = (0, 0, 0)
+                            float3 physics:diagonalInertia = (0.0049007144, 0.0049007144, 0.0072010127)
+                            float physics:mass = 2.5
+                            quatf physics:principalAxes = (0.70710677, 0.70710677, 0, 0)
+
+                            over "cylinder" (
+                                prepend apiSchemas = ["NewtonCollisionAPI"]
+                            )
+                            {
+                            }
+                        }
+                    }
+
+                    over "rear_rocker_link" (
+                        prepend apiSchemas = ["PhysicsRigidBodyAPI", "PhysicsMassAPI"]
+                    )
+                    {
+                        point3f physics:centerOfMass = (0, 0, 0)
+                        float3 physics:diagonalInertia = (0.0288, 0.41281673, 0.43258324)
+                        float physics:mass = 10.267
+                        quatf physics:principalAxes = (-0.70628357, 0.034094125, 0.034069747, -0.7062863)
+
+                        over "rear_left_wheel_link" (
+                            prepend apiSchemas = ["PhysicsRigidBodyAPI", "PhysicsMassAPI"]
+                        )
+                        {
+                            point3f physics:centerOfMass = (0, 0, 0)
+                            float3 physics:diagonalInertia = (0.0049007144, 0.0049007144, 0.0072010127)
+                            float physics:mass = 2.5
+                            quatf physics:principalAxes = (0.70710677, 0.70710677, 0, 0)
+
+                            over "cylinder" (
+                                prepend apiSchemas = ["NewtonCollisionAPI"]
+                            )
+                            {
+                            }
+                        }
+
+                        over "rear_right_wheel_link" (
+                            prepend apiSchemas = ["PhysicsRigidBodyAPI", "PhysicsMassAPI"]
+                        )
+                        {
+                            point3f physics:centerOfMass = (0, 0, 0)
+                            float3 physics:diagonalInertia = (0.0049007144, 0.0049007144, 0.0072010127)
+                            float physics:mass = 2.5
+                            quatf physics:principalAxes = (0.70710677, 0.70710677, 0, 0)
+
+                            over "cylinder" (
+                                prepend apiSchemas = ["NewtonCollisionAPI"]
+                            )
+                            {
+                            }
+                        }
+                    }
+                }
+
+                over "riser_link" (
+                    prepend apiSchemas = ["PhysicsRigidBodyAPI"]
+                )
+                {
+                    over "top_link" (
+                        prepend apiSchemas = ["PhysicsRigidBodyAPI"]
+                    )
+                    {
+                    }
+
+                    over "default_mount"
+                    {
+                        over "lidar2d_0_link" (
+                            prepend apiSchemas = ["PhysicsRigidBodyAPI"]
+                        )
+                        {
+                            over "lidar2d_0_laser" (
+                                prepend apiSchemas = ["PhysicsRigidBodyAPI", "PhysicsMassAPI"]
+                            )
+                            {
+                                point3f physics:centerOfMass = (0, 0, 0)
+                                float3 physics:diagonalInertia = (0.0019643242, 0.0030715654, 0.0031284904)
+                                float physics:mass = 1.1
+                                quatf physics:principalAxes = (0.5, 0.5, 0.5, 0.5)
+                            }
+                        }
+
+                        over "lidar2d_1_link" (
+                            prepend apiSchemas = ["PhysicsRigidBodyAPI"]
+                        )
+                        {
+                            over "lidar2d_1_laser" (
+                                prepend apiSchemas = ["PhysicsRigidBodyAPI", "PhysicsMassAPI"]
+                            )
+                            {
+                                point3f physics:centerOfMass = (0, 0, 0)
+                                float3 physics:diagonalInertia = (0.0019643242, 0.0030715654, 0.0031284904)
+                                float physics:mass = 1.1
+                                quatf physics:principalAxes = (0.5, 0.5, 0.5, 0.5)
+                            }
+                        }
+
+                        over "camera_0_bottom_screw_frame"
+                        {
+                            over "camera_0_link" (
+                                prepend apiSchemas = ["PhysicsRigidBodyAPI", "PhysicsMassAPI"]
+                            )
+                            {
+                                point3f physics:centerOfMass = (0, 0, 0)
+                                float3 physics:diagonalInertia = (0.00049894, 0.003879257, 0.003881243)
+                                float physics:mass = 0.072
+                                quatf physics:principalAxes = (-0.5, 0.5, 0.5, 0.5)
+
+                                over "box" (
+                                    prepend apiSchemas = ["NewtonCollisionAPI"]
+                                )
+                                {
+                                }
+                            }
+                        }
+                    }
+
+                    over "box_1" (
+                        prepend apiSchemas = ["NewtonCollisionAPI"]
+                    )
+                    {
+                    }
+                }
+
+                over "imu_0_link" (
+                    prepend apiSchemas = ["PhysicsRigidBodyAPI", "PhysicsMassAPI"]
+                )
+                {
+                    point3f physics:centerOfMass = (0, 0, 0)
+                    float3 physics:diagonalInertia = (1e-9, 1e-9, 1e-9)
+                    float physics:mass = 0.001
+                    quatf physics:principalAxes = (1, 0, 0, 0)
+                }
+            }
+        }
+    }
+
+    over "Physics"
+    {
+        def PhysicsRevoluteJoint "front_left_wheel_joint" (
+            prepend apiSchemas = ["PhysicsDriveAPI:angular", "PhysicsJointStateAPI:angular"]
+        )
+        {
+            uniform token physics:axis = "Y"
+            custom rel physics:body0
+            prepend rel physics:body0 = </tn__r1000001_bC/Geometry/base_link/chassis_link/axle_link/front_rocker_link>
+            custom rel physics:body1
+            prepend rel physics:body1 = </tn__r1000001_bC/Geometry/base_link/chassis_link/axle_link/front_rocker_link/front_left_wheel_link>
+            point3f physics:localPos0 = (0, 0.2755, 0)
+            point3f physics:localPos1 = (0, 0, 0)
+            quatf physics:localRot0 = (1, 0, 0, 0)
+            quatf physics:localRot1 = (1, 0, 0, 0)
+        }
+
+        def PhysicsRevoluteJoint "front_right_wheel_joint" (
+            prepend apiSchemas = ["PhysicsDriveAPI:angular", "PhysicsJointStateAPI:angular"]
+        )
+        {
+            uniform token physics:axis = "Y"
+            custom rel physics:body0
+            prepend rel physics:body0 = </tn__r1000001_bC/Geometry/base_link/chassis_link/axle_link/front_rocker_link>
+            custom rel physics:body1
+            prepend rel physics:body1 = </tn__r1000001_bC/Geometry/base_link/chassis_link/axle_link/front_rocker_link/front_right_wheel_link>
+            point3f physics:localPos0 = (0, -0.2755, 0)
+            point3f physics:localPos1 = (0, 0, 0)
+            quatf physics:localRot0 = (1, 0, 0, 0)
+            quatf physics:localRot1 = (1, 0, 0, 0)
+        }
+
+        def PhysicsRevoluteJoint "rear_left_wheel_joint" (
+            prepend apiSchemas = ["PhysicsDriveAPI:angular", "PhysicsJointStateAPI:angular"]
+        )
+        {
+            uniform token physics:axis = "Y"
+            custom rel physics:body0
+            prepend rel physics:body0 = </tn__r1000001_bC/Geometry/base_link/chassis_link/axle_link/rear_rocker_link>
+            custom rel physics:body1
+            prepend rel physics:body1 = </tn__r1000001_bC/Geometry/base_link/chassis_link/axle_link/rear_rocker_link/rear_left_wheel_link>
+            point3f physics:localPos0 = (0, 0.2755, 0)
+            point3f physics:localPos1 = (0, 0, 0)
+            quatf physics:localRot0 = (1, 0, 0, 0)
+            quatf physics:localRot1 = (1, 0, 0, 0)
+        }
+
+        def PhysicsRevoluteJoint "rear_right_wheel_joint" (
+            prepend apiSchemas = ["PhysicsDriveAPI:angular", "PhysicsJointStateAPI:angular"]
+        )
+        {
+            uniform token physics:axis = "Y"
+            custom rel physics:body0
+            prepend rel physics:body0 = </tn__r1000001_bC/Geometry/base_link/chassis_link/axle_link/rear_rocker_link>
+            custom rel physics:body1
+            prepend rel physics:body1 = </tn__r1000001_bC/Geometry/base_link/chassis_link/axle_link/rear_rocker_link/rear_right_wheel_link>
+            point3f physics:localPos0 = (0, -0.2755, 0)
+            point3f physics:localPos1 = (0, 0, 0)
+            quatf physics:localRot0 = (1, 0, 0, 0)
+            quatf physics:localRot1 = (1, 0, 0, 0)
+        }
+
+        def PhysicsFixedJoint "right_side_cover_link_joint"
+        {
+            custom rel physics:body0
+            prepend rel physics:body0 = </tn__r1000001_bC/Geometry/base_link/chassis_link>
+            custom rel physics:body1
+            prepend rel physics:body1 = </tn__r1000001_bC/Geometry/base_link/chassis_link/right_side_cover_link>
+            point3f physics:localPos0 = (0, 0, 0)
+            point3f physics:localPos1 = (0, 0, 0)
+            quatf physics:localRot0 = (1, 0, 0, 0)
+            quatf physics:localRot1 = (1, 0, 0, 0)
+        }
+
+        def PhysicsFixedJoint "left_side_cover_link_joint"
+        {
+            custom rel physics:body0
+            prepend rel physics:body0 = </tn__r1000001_bC/Geometry/base_link/chassis_link>
+            custom rel physics:body1
+            prepend rel physics:body1 = </tn__r1000001_bC/Geometry/base_link/chassis_link/left_side_cover_link>
+            point3f physics:localPos0 = (0, 0, 0)
+            point3f physics:localPos1 = (0, 0, 0)
+            quatf physics:localRot0 = (1, 0, 0, 0)
+            quatf physics:localRot1 = (1, 0, 0, 0)
+        }
+
+        def PhysicsFixedJoint "front_cover_link_joint"
+        {
+            custom rel physics:body0
+            prepend rel physics:body0 = </tn__r1000001_bC/Geometry/base_link/chassis_link>
+            custom rel physics:body1
+            prepend rel physics:body1 = </tn__r1000001_bC/Geometry/base_link/chassis_link/front_cover_link>
+            point3f physics:localPos0 = (0, 0, 0)
+            point3f physics:localPos1 = (0, 0, 0)
+            quatf physics:localRot0 = (1, 0, 0, 0)
+            quatf physics:localRot1 = (1, 0, 0, 0)
+        }
+
+        def PhysicsFixedJoint "rear_cover_link_joint"
+        {
+            custom rel physics:body0
+            prepend rel physics:body0 = </tn__r1000001_bC/Geometry/base_link/chassis_link>
+            custom rel physics:body1
+            prepend rel physics:body1 = </tn__r1000001_bC/Geometry/base_link/chassis_link/rear_cover_link>
+            point3f physics:localPos0 = (0, 0, 0)
+            point3f physics:localPos1 = (0, 0, 0)
+            quatf physics:localRot0 = (1, 0, 0, 0)
+            quatf physics:localRot1 = (1, 0, 0, 0)
+        }
+
+        def PhysicsFixedJoint "front_lights_link_joint"
+        {
+            custom rel physics:body0
+            prepend rel physics:body0 = </tn__r1000001_bC/Geometry/base_link/chassis_link>
+            custom rel physics:body1
+            prepend rel physics:body1 = </tn__r1000001_bC/Geometry/base_link/chassis_link/front_lights_link>
+            point3f physics:localPos0 = (0, 0, 0)
+            point3f physics:localPos1 = (0, 0, 0)
+            quatf physics:localRot0 = (1, 0, 0, 0)
+            quatf physics:localRot1 = (1, 0, 0, 0)
+        }
+
+        def PhysicsFixedJoint "rear_lights_link_joint"
+        {
+            custom rel physics:body0
+            prepend rel physics:body0 = </tn__r1000001_bC/Geometry/base_link/chassis_link>
+            custom rel physics:body1
+            prepend rel physics:body1 = </tn__r1000001_bC/Geometry/base_link/chassis_link/rear_lights_link>
+            point3f physics:localPos0 = (0, 0, 0)
+            point3f physics:localPos1 = (0, 0, 0)
+            quatf physics:localRot0 = (1, 0, 0, 0)
+            quatf physics:localRot1 = (1, 0, 0, 0)
+        }
+
+        def PhysicsFixedJoint "axle_joint"
+        {
+            custom rel physics:body0
+            prepend rel physics:body0 = </tn__r1000001_bC/Geometry/base_link/chassis_link>
+            custom rel physics:body1
+            prepend rel physics:body1 = </tn__r1000001_bC/Geometry/base_link/chassis_link/axle_link>
+            point3f physics:localPos0 = (0, 0, 0.05)
+            point3f physics:localPos1 = (0, 0, 0)
+            quatf physics:localRot0 = (1, 0, 0, 0)
+            quatf physics:localRot1 = (1, 0, 0, 0)
+        }
+
+        def PhysicsFixedJoint "riser_link_joint"
+        {
+            custom rel physics:body0
+            prepend rel physics:body0 = </tn__r1000001_bC/Geometry/base_link/chassis_link>
+            custom rel physics:body1
+            prepend rel physics:body1 = </tn__r1000001_bC/Geometry/base_link/chassis_link/riser_link>
+            point3f physics:localPos0 = (0, 0, 0.22)
+            point3f physics:localPos1 = (0, 0, 0)
+            quatf physics:localRot0 = (1, 0, 0, 0)
+            quatf physics:localRot1 = (1, 0, 0, 0)
+        }
+
+        def PhysicsFixedJoint "top_link_joint"
+        {
+            custom rel physics:body0
+            prepend rel physics:body0 = </tn__r1000001_bC/Geometry/base_link/chassis_link/riser_link>
+            custom rel physics:body1
+            prepend rel physics:body1 = </tn__r1000001_bC/Geometry/base_link/chassis_link/riser_link/top_link>
+            point3f physics:localPos0 = (0, 0, -0.205)
+            point3f physics:localPos1 = (0, 0, 0)
+            quatf physics:localRot0 = (1, 0, 0, 0)
+            quatf physics:localRot1 = (1, 0, 0, 0)
+        }
+
+        def PhysicsFixedJoint "front_rocker"
+        {
+            custom rel physics:body0
+            prepend rel physics:body0 = </tn__r1000001_bC/Geometry/base_link/chassis_link/axle_link>
+            custom rel physics:body1
+            prepend rel physics:body1 = </tn__r1000001_bC/Geometry/base_link/chassis_link/axle_link/front_rocker_link>
+            point3f physics:localPos0 = (0.319, 0, 0)
+            point3f physics:localPos1 = (0, 0, 0)
+            quatf physics:localRot0 = (1, 0, 0, 0)
+            quatf physics:localRot1 = (1, 0, 0, 0)
+            custom float urdf:limit:effort = 0
+            custom float urdf:limit:velocity = 0
+        }
+
+        def PhysicsFixedJoint "rear_rocker"
+        {
+            custom rel physics:body0
+            prepend rel physics:body0 = </tn__r1000001_bC/Geometry/base_link/chassis_link/axle_link>
+            custom rel physics:body1
+            prepend rel physics:body1 = </tn__r1000001_bC/Geometry/base_link/chassis_link/axle_link/rear_rocker_link>
+            point3f physics:localPos0 = (-0.319, 0, 0)
+            point3f physics:localPos1 = (0, 0, 0)
+            quatf physics:localRot0 = (1, 0, 0, 0)
+            quatf physics:localRot1 = (1, 0, 0, 0)
+            custom float urdf:limit:effort = 0
+            custom float urdf:limit:velocity = 0
+        }
+
+        def PhysicsFixedJoint "imu_0_joint"
+        {
+            custom rel physics:body0
+            prepend rel physics:body0 = </tn__r1000001_bC/Geometry/base_link/chassis_link>
+            custom rel physics:body1
+            prepend rel physics:body1 = </tn__r1000001_bC/Geometry/base_link/chassis_link/imu_0_link>
+            point3f physics:localPos0 = (0.2085, -0.2902, 0.1681)
+            point3f physics:localPos1 = (0, 0, 0)
+            quatf physics:localRot0 = (1, 0, 0, 0)
+            quatf physics:localRot1 = (1, 0, 0, 0)
+        }
+
+        def PhysicsFixedJoint "lidar2d_0_joint"
+        {
+            custom rel physics:body0
+            prepend rel physics:body0 = </tn__r1000001_bC/Geometry/base_link/chassis_link/riser_link/default_mount>
+            custom rel physics:body1
+            prepend rel physics:body1 = </tn__r1000001_bC/Geometry/base_link/chassis_link/riser_link/default_mount/lidar2d_0_link>
+            point3f physics:localPos0 = (0.3922, 0, 0)
+            point3f physics:localPos1 = (0, 0, 0)
+            quatf physics:localRot0 = (1, 0, 0, 0)
+            quatf physics:localRot1 = (1, 0, 0, 0)
+        }
+
+        def PhysicsFixedJoint "lidar2d_0_laser_joint"
+        {
+            custom rel physics:body0
+            prepend rel physics:body0 = </tn__r1000001_bC/Geometry/base_link/chassis_link/riser_link/default_mount/lidar2d_0_link>
+            custom rel physics:body1
+            prepend rel physics:body1 = </tn__r1000001_bC/Geometry/base_link/chassis_link/riser_link/default_mount/lidar2d_0_link/lidar2d_0_laser>
+            point3f physics:localPos0 = (0, 0, 0.0474)
+            point3f physics:localPos1 = (0, 0, 0)
+            quatf physics:localRot0 = (1, 0, 0, 0)
+            quatf physics:localRot1 = (1, 0, 0, 0)
+        }
+
+        def PhysicsFixedJoint "lidar2d_1_joint"
+        {
+            custom rel physics:body0
+            prepend rel physics:body0 = </tn__r1000001_bC/Geometry/base_link/chassis_link/riser_link/default_mount>
+            custom rel physics:body1
+            prepend rel physics:body1 = </tn__r1000001_bC/Geometry/base_link/chassis_link/riser_link/default_mount/lidar2d_1_link>
+            point3f physics:localPos0 = (-0.3922, 0, 0.05)
+            point3f physics:localPos1 = (0, 0, 0)
+            quatf physics:localRot0 = (0.0000013267949, 0, 0, 1)
+            quatf physics:localRot1 = (1, 0, 0, 0)
+        }
+
+        def PhysicsFixedJoint "lidar2d_1_laser_joint"
+        {
+            custom rel physics:body0
+            prepend rel physics:body0 = </tn__r1000001_bC/Geometry/base_link/chassis_link/riser_link/default_mount/lidar2d_1_link>
+            custom rel physics:body1
+            prepend rel physics:body1 = </tn__r1000001_bC/Geometry/base_link/chassis_link/riser_link/default_mount/lidar2d_1_link/lidar2d_1_laser>
+            point3f physics:localPos0 = (0, 0, 0.0474)
+            point3f physics:localPos1 = (0, 0, 0)
+            quatf physics:localRot0 = (1, 0, 0, 0)
+            quatf physics:localRot1 = (1, 0, 0, 0)
+        }
+
+        def PhysicsFixedJoint "camera_0_link_joint"
+        {
+            custom rel physics:body0
+            prepend rel physics:body0 = </tn__r1000001_bC/Geometry/base_link/chassis_link/riser_link/default_mount/camera_0_bottom_screw_frame>
+            custom rel physics:body1
+            prepend rel physics:body1 = </tn__r1000001_bC/Geometry/base_link/chassis_link/riser_link/default_mount/camera_0_bottom_screw_frame/camera_0_link>
+            point3f physics:localPos0 = (0.0106, 0.0175, 0.0125)
+            point3f physics:localPos1 = (0, 0, 0)
+            quatf physics:localRot0 = (1, 0, 0, 0)
+            quatf physics:localRot1 = (1, 0, 0, 0)
+        }
+    }
+}
+

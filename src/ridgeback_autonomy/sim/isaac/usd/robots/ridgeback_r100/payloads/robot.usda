@@ -1,0 +1,356 @@
+#usda 1.0
+(
+    customLayerData = {
+        string creator = "URDF USD Converter v0.1.3"
+    }
+    defaultPrim = "tn__r1000001_bC"
+    doc = """Generated from Composed Stage of root layer /tmp/tmp9pvamk94/r100-0001.usdc
+
+
+Generated from Composed Stage of root layer /tmp/urdf_import_ridgeback_r100_qxkgsb7w/usdex_ridgeback_r100/r100-0001.usdc
+
+
+Generated from Composed Stage of root layer /tmp/urdf_import_ridgeback_r100_qxkgsb7w/temp_ridgeback_r100/ridgeback_r100.usd
+"""
+    kilogramsPerUnit = 1
+    metersPerUnit = 1
+    upAxis = "Z"
+)
+
+over "tn__r1000001_bC" (
+    prepend apiSchemas = ["IsaacRobotAPI"]
+)
+{
+    prepend rel isaac:physics:robotJoints = [
+        </tn__r1000001_bC/Physics/right_side_cover_link_joint>,
+        </tn__r1000001_bC/Physics/left_side_cover_link_joint>,
+        </tn__r1000001_bC/Physics/front_cover_link_joint>,
+        </tn__r1000001_bC/Physics/rear_cover_link_joint>,
+        </tn__r1000001_bC/Physics/front_lights_link_joint>,
+        </tn__r1000001_bC/Physics/rear_lights_link_joint>,
+        </tn__r1000001_bC/Physics/axle_joint>,
+        </tn__r1000001_bC/Physics/riser_link_joint>,
+        </tn__r1000001_bC/Physics/imu_0_joint>,
+        </tn__r1000001_bC/Physics/front_rocker>,
+        </tn__r1000001_bC/Physics/rear_rocker>,
+        </tn__r1000001_bC/Physics/front_left_wheel_joint>,
+        </tn__r1000001_bC/Physics/front_right_wheel_joint>,
+        </tn__r1000001_bC/Physics/rear_left_wheel_joint>,
+        </tn__r1000001_bC/Physics/rear_right_wheel_joint>,
+        </tn__r1000001_bC/Physics/top_link_joint>,
+    ]
+    prepend rel isaac:physics:robotLinks = [
+        </tn__r1000001_bC/Geometry/base_link/chassis_link>,
+        </tn__r1000001_bC/Geometry/base_link/chassis_link/right_side_cover_link>,
+        </tn__r1000001_bC/Geometry/base_link/chassis_link/left_side_cover_link>,
+        </tn__r1000001_bC/Geometry/base_link/chassis_link/front_cover_link>,
+        </tn__r1000001_bC/Geometry/base_link/chassis_link/rear_cover_link>,
+        </tn__r1000001_bC/Geometry/base_link/chassis_link/front_lights_link>,
+        </tn__r1000001_bC/Geometry/base_link/chassis_link/rear_lights_link>,
+        </tn__r1000001_bC/Geometry/base_link/chassis_link/axle_link>,
+        </tn__r1000001_bC/Geometry/base_link/chassis_link/axle_link/front_rocker_link>,
+        </tn__r1000001_bC/Geometry/base_link/chassis_link/axle_link/front_rocker_link/front_left_wheel_link>,
+        </tn__r1000001_bC/Geometry/base_link/chassis_link/axle_link/front_rocker_link/front_right_wheel_link>,
+        </tn__r1000001_bC/Geometry/base_link/chassis_link/axle_link/rear_rocker_link>,
+        </tn__r1000001_bC/Geometry/base_link/chassis_link/axle_link/rear_rocker_link/rear_left_wheel_link>,
+        </tn__r1000001_bC/Geometry/base_link/chassis_link/axle_link/rear_rocker_link/rear_right_wheel_link>,
+        </tn__r1000001_bC/Geometry/base_link/chassis_link/riser_link>,
+        </tn__r1000001_bC/Geometry/base_link/chassis_link/riser_link/top_link>,
+        </tn__r1000001_bC/Geometry/base_link/chassis_link/imu_0_link>,
+    ]
+    token isaac:robotType = "Default"
+
+    over "Geometry"
+    {
+        over "base_link"
+        {
+            over "chassis_link" (
+                prepend apiSchemas = ["IsaacLinkAPI"]
+            )
+            {
+                over "body" (
+                    prepend apiSchemas = ["IsaacSiteAPI"]
+                )
+                {
+                }
+
+                over "right_side_cover_link" (
+                    prepend apiSchemas = ["IsaacLinkAPI"]
+                )
+                {
+                    over "tn__sidecover_pD" (
+                        prepend apiSchemas = ["IsaacSiteAPI"]
+                    )
+                    {
+                    }
+                }
+
+                over "left_side_cover_link" (
+                    prepend apiSchemas = ["IsaacLinkAPI"]
+                )
+                {
+                    over "tn__sidecover_pD" (
+                        prepend apiSchemas = ["IsaacSiteAPI"]
+                    )
+                    {
+                    }
+                }
+
+                over "front_cover_link" (
+                    prepend apiSchemas = ["IsaacLinkAPI"]
+                )
+                {
+                    over "tn__endcover_aC" (
+                        prepend apiSchemas = ["IsaacSiteAPI"]
+                    )
+                    {
+                    }
+                }
+
+                over "rear_cover_link" (
+                    prepend apiSchemas = ["IsaacLinkAPI"]
+                )
+                {
+                    over "tn__endcover_aC" (
+                        prepend apiSchemas = ["IsaacSiteAPI"]
+                    )
+                    {
+                    }
+                }
+
+                over "front_lights_link" (
+                    prepend apiSchemas = ["IsaacLinkAPI"]
+                )
+                {
+                    over "lights" (
+                        prepend apiSchemas = ["IsaacSiteAPI"]
+                    )
+                    {
+                    }
+                }
+
+                over "rear_lights_link" (
+                    prepend apiSchemas = ["IsaacLinkAPI"]
+                )
+                {
+                    over "lights" (
+                        prepend apiSchemas = ["IsaacSiteAPI"]
+                    )
+                    {
+                    }
+                }
+
+                over "axle_link" (
+                    prepend apiSchemas = ["IsaacLinkAPI"]
+                )
+                {
+                    over "axle" (
+                        prepend apiSchemas = ["IsaacSiteAPI"]
+                    )
+                    {
+                    }
+
+                    over "front_rocker_link" (
+                        prepend apiSchemas = ["IsaacLinkAPI"]
+                    )
+                    {
+                        over "rocker" (
+                            prepend apiSchemas = ["IsaacSiteAPI"]
+                        )
+                        {
+                        }
+
+                        over "front_left_wheel_link" (
+                            prepend apiSchemas = ["IsaacLinkAPI"]
+                        )
+                        {
+                            over "mecanum" (
+                                prepend apiSchemas = ["IsaacSiteAPI"]
+                            )
+                            {
+                            }
+                        }
+
+                        over "front_right_wheel_link" (
+                            prepend apiSchemas = ["IsaacLinkAPI"]
+                        )
+                        {
+                            over "mecanum" (
+                                prepend apiSchemas = ["IsaacSiteAPI"]
+                            )
+                            {
+                            }
+                        }
+                    }
+
+                    over "rear_rocker_link" (
+                        prepend apiSchemas = ["IsaacLinkAPI"]
+                    )
+                    {
+                        over "rocker" (
+                            prepend apiSchemas = ["IsaacSiteAPI"]
+                        )
+                        {
+                        }
+
+                        over "rear_left_wheel_link" (
+                            prepend apiSchemas = ["IsaacLinkAPI"]
+                        )
+                        {
+                            over "mecanum" (
+                                prepend apiSchemas = ["IsaacSiteAPI"]
+                            )
+                            {
+                            }
+                        }
+
+                        over "rear_right_wheel_link" (
+                            prepend apiSchemas = ["IsaacLinkAPI"]
+                        )
+                        {
+                            over "mecanum" (
+                                prepend apiSchemas = ["IsaacSiteAPI"]
+                            )
+                            {
+                            }
+                        }
+                    }
+                }
+
+                over "riser_link" (
+                    prepend apiSchemas = ["IsaacLinkAPI"]
+                )
+                {
+                    over "top_link" (
+                        prepend apiSchemas = ["IsaacLinkAPI"]
+                    )
+                    {
+                        over "top" (
+                            prepend apiSchemas = ["IsaacSiteAPI"]
+                        )
+                        {
+                        }
+
+                        over "top_1" (
+                            prepend apiSchemas = ["IsaacSiteAPI"]
+                        )
+                        {
+                        }
+                    }
+                }
+
+                over "tn__bodycollision_jJ" (
+                    prepend apiSchemas = ["IsaacSiteAPI"]
+                )
+                {
+                }
+
+                over "imu_0_link" (
+                    prepend apiSchemas = ["IsaacLinkAPI"]
+                )
+                {
+                }
+            }
+        }
+    }
+
+    over "Physics"
+    {
+        over "right_side_cover_link_joint" (
+            prepend apiSchemas = ["IsaacJointAPI"]
+        )
+        {
+        }
+
+        over "left_side_cover_link_joint" (
+            prepend apiSchemas = ["IsaacJointAPI"]
+        )
+        {
+        }
+
+        over "front_cover_link_joint" (
+            prepend apiSchemas = ["IsaacJointAPI"]
+        )
+        {
+        }
+
+        over "rear_cover_link_joint" (
+            prepend apiSchemas = ["IsaacJointAPI"]
+        )
+        {
+        }
+
+        over "front_lights_link_joint" (
+            prepend apiSchemas = ["IsaacJointAPI"]
+        )
+        {
+        }
+
+        over "rear_lights_link_joint" (
+            prepend apiSchemas = ["IsaacJointAPI"]
+        )
+        {
+        }
+
+        over "axle_joint" (
+            prepend apiSchemas = ["IsaacJointAPI"]
+        )
+        {
+        }
+
+        over "riser_link_joint" (
+            prepend apiSchemas = ["IsaacJointAPI"]
+        )
+        {
+        }
+
+        over "top_link_joint" (
+            prepend apiSchemas = ["IsaacJointAPI"]
+        )
+        {
+        }
+
+        over "front_rocker" (
+            prepend apiSchemas = ["IsaacJointAPI"]
+        )
+        {
+        }
+
+        over "front_left_wheel_joint" (
+            prepend apiSchemas = ["IsaacJointAPI"]
+        )
+        {
+        }
+
+        over "front_right_wheel_joint" (
+            prepend apiSchemas = ["IsaacJointAPI"]
+        )
+        {
+        }
+
+        over "rear_rocker" (
+            prepend apiSchemas = ["IsaacJointAPI"]
+        )
+        {
+        }
+
+        over "rear_left_wheel_joint" (
+            prepend apiSchemas = ["IsaacJointAPI"]
+        )
+        {
+        }
+
+        over "rear_right_wheel_joint" (
+            prepend apiSchemas = ["IsaacJointAPI"]
+        )
+        {
+        }
+
+        over "imu_0_joint" (
+            prepend apiSchemas = ["IsaacJointAPI"]
+        )
+        {
+        }
+    }
+}
+

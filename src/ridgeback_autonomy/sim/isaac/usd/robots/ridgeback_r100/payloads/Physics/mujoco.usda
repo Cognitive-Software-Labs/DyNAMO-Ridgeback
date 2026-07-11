@@ -1,0 +1,371 @@
+#usda 1.0
+(
+    customLayerData = {
+        string creator = "URDF USD Converter v0.1.3"
+    }
+    defaultPrim = "tn__r1000001_bC"
+    doc = """Generated from Composed Stage of root layer /tmp/tmp9pvamk94/r100-0001.usdc
+
+
+Generated from Composed Stage of root layer /tmp/urdf_import_ridgeback_r100_qxkgsb7w/usdex_ridgeback_r100/r100-0001.usdc
+
+
+Generated from Composed Stage of root layer /tmp/urdf_import_ridgeback_r100_qxkgsb7w/temp_ridgeback_r100/ridgeback_r100.usd
+
+
+Generated from Composed Stage of root layer /home/deivid/dev/DyNAMO-Ridgeback/.claude/worktrees/jolly-borg-f48cab/src/ridgeback_autonomy/sim/isaac/usd/robots/ridgeback_r100.usd/ridgeback_r100/payloads/base.usd
+"""
+    kilogramsPerUnit = 1
+    metersPerUnit = 1
+    subLayers = [
+        @./physics.usda@
+    ]
+    upAxis = "Z"
+)
+
+over "tn__r1000001_bC"
+{
+    over "Physics"
+    {
+        def MjcActuator "front_left_wheel_joint_actuator"
+        {
+            uniform double mjc:forceRange:max = inf
+            uniform double mjc:forceRange:min = -inf
+            custom rel mjc:target
+            prepend rel mjc:target = </tn__r1000001_bC/Physics/front_left_wheel_joint>
+        }
+
+        def MjcActuator "front_right_wheel_joint_actuator"
+        {
+            uniform double mjc:forceRange:max = inf
+            uniform double mjc:forceRange:min = -inf
+            custom rel mjc:target
+            prepend rel mjc:target = </tn__r1000001_bC/Physics/front_right_wheel_joint>
+        }
+
+        def MjcActuator "rear_left_wheel_joint_actuator"
+        {
+            uniform double mjc:forceRange:max = inf
+            uniform double mjc:forceRange:min = -inf
+            custom rel mjc:target
+            prepend rel mjc:target = </tn__r1000001_bC/Physics/rear_left_wheel_joint>
+        }
+
+        def MjcActuator "rear_right_wheel_joint_actuator"
+        {
+            uniform double mjc:forceRange:max = inf
+            uniform double mjc:forceRange:min = -inf
+            custom rel mjc:target
+            prepend rel mjc:target = </tn__r1000001_bC/Physics/rear_right_wheel_joint>
+        }
+
+        over "right_side_cover_link_joint"
+        {
+        }
+
+        over "left_side_cover_link_joint"
+        {
+        }
+
+        over "front_cover_link_joint"
+        {
+        }
+
+        over "rear_cover_link_joint"
+        {
+        }
+
+        over "front_lights_link_joint"
+        {
+        }
+
+        over "rear_lights_link_joint"
+        {
+        }
+
+        over "axle_joint"
+        {
+        }
+
+        over "riser_link_joint"
+        {
+        }
+
+        over "top_link_joint"
+        {
+        }
+
+        over "front_rocker"
+        {
+        }
+
+        over "front_left_wheel_joint" (
+            delete apiSchemas = ["PhysicsDriveAPI:angular", "PhysicsJointStateAPI:angular"]
+        )
+        {
+        }
+
+        over "front_right_wheel_joint" (
+            delete apiSchemas = ["PhysicsDriveAPI:angular", "PhysicsJointStateAPI:angular"]
+        )
+        {
+        }
+
+        over "rear_rocker"
+        {
+        }
+
+        over "rear_left_wheel_joint" (
+            delete apiSchemas = ["PhysicsDriveAPI:angular", "PhysicsJointStateAPI:angular"]
+        )
+        {
+        }
+
+        over "rear_right_wheel_joint" (
+            delete apiSchemas = ["PhysicsDriveAPI:angular", "PhysicsJointStateAPI:angular"]
+        )
+        {
+        }
+
+        over "imu_0_joint"
+        {
+        }
+
+        over "lidar2d_0_joint"
+        {
+        }
+
+        over "lidar2d_0_laser_joint"
+        {
+        }
+
+        over "lidar2d_1_joint"
+        {
+        }
+
+        over "lidar2d_1_laser_joint"
+        {
+        }
+
+        over "camera_0_link_joint"
+        {
+        }
+    }
+
+    over "Geometry"
+    {
+        over "base_link"
+        {
+            over "chassis_link"
+            {
+                over "body"
+                {
+                }
+
+                over "right_side_cover_link"
+                {
+                    over "tn__sidecover_pD"
+                    {
+                    }
+                }
+
+                over "left_side_cover_link"
+                {
+                    over "tn__sidecover_pD"
+                    {
+                    }
+                }
+
+                over "front_cover_link"
+                {
+                    over "tn__endcover_aC"
+                    {
+                    }
+                }
+
+                over "rear_cover_link"
+                {
+                    over "tn__endcover_aC"
+                    {
+                    }
+                }
+
+                over "front_lights_link"
+                {
+                    over "lights"
+                    {
+                    }
+                }
+
+                over "rear_lights_link"
+                {
+                    over "lights"
+                    {
+                    }
+                }
+
+                over "axle_link"
+                {
+                    over "axle"
+                    {
+                    }
+
+                    over "front_rocker_link"
+                    {
+                        over "rocker"
+                        {
+                        }
+
+                        over "front_left_wheel_link"
+                        {
+                            over "mecanum"
+                            {
+                            }
+
+                            over "cylinder"
+                            {
+                            }
+                        }
+
+                        over "front_right_wheel_link"
+                        {
+                            over "mecanum"
+                            {
+                            }
+
+                            over "cylinder"
+                            {
+                            }
+                        }
+                    }
+
+                    over "rear_rocker_link"
+                    {
+                        over "rocker"
+                        {
+                        }
+
+                        over "rear_left_wheel_link"
+                        {
+                            over "mecanum"
+                            {
+                            }
+
+                            over "cylinder"
+                            {
+                            }
+                        }
+
+                        over "rear_right_wheel_link"
+                        {
+                            over "mecanum"
+                            {
+                            }
+
+                            over "cylinder"
+                            {
+                            }
+                        }
+                    }
+                }
+
+                over "riser_link"
+                {
+                    over "top_link"
+                    {
+                        over "top"
+                        {
+                        }
+
+                        over "top_1"
+                        {
+                        }
+                    }
+
+                    over "box"
+                    {
+                    }
+
+                    over "default_mount"
+                    {
+                        over "lidar2d_0_link"
+                        {
+                            over "hokuyo_ust"
+                            {
+                            }
+
+                            over "lidar2d_0_laser"
+                            {
+                            }
+                        }
+
+                        over "lidar2d_1_link"
+                        {
+                            over "hokuyo_ust"
+                            {
+                            }
+
+                            over "lidar2d_1_laser"
+                            {
+                            }
+                        }
+
+                        over "camera_0_bottom_screw_frame"
+                        {
+                            over "camera_0_link"
+                            {
+                                over "d435"
+                                {
+                                }
+
+                                over "box"
+                                {
+                                }
+                            }
+                        }
+                    }
+
+                    over "box_1"
+                    {
+                    }
+                }
+
+                over "tn__bodycollision_jJ"
+                {
+                }
+
+                over "imu_0_link"
+                {
+                }
+            }
+        }
+    }
+
+    over "Materials"
+    {
+        over "clearpath_black"
+        {
+        }
+
+        over "clearpath_yellow"
+        {
+        }
+
+        over "clearpath_white"
+        {
+        }
+
+        over "clearpath_red"
+        {
+        }
+
+        over "clearpath_light_grey"
+        {
+        }
+
+        over "clearpath_dark_grey"
+        {
+        }
+    }
+}
+
