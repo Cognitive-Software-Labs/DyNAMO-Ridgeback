@@ -46,11 +46,13 @@ def parse_args():
                     help="override the committed robot package entry USD")
     ap.add_argument("--spawn", default="0,0,0",
                     help="robot spawn x,y,yaw in the world frame")
-    ap.add_argument("--spawn-z", type=float, default=0.06,
-                    help="base height: floor top + clearance. The rig is "
-                         "kinematic — wheels are meant to hover ~1 cm, "
-                         "ground contact would only fight the joints "
-                         "(mock_hospital floor top is z=0.05)")
+    ap.add_argument("--spawn-z", type=float, default=0.076,
+                    help="base_link height. Wheels carry no colliders (the "
+                         "z-less rig would fight any floor contact), so this "
+                         "is visual + sensor-height truth: wheel bottoms sit "
+                         "at spawn_z + axle 0.05 - radius 0.0759; default "
+                         "puts them on mock_hospital's floor top (z=0.05) "
+                         "with 1 mm slack")
     return ap.parse_args()
 
 
@@ -104,7 +106,7 @@ def run(app, args) -> int:
     robot_prim_path = "/ridgeback"
     robot_prim = stage.DefinePrim(robot_prim_path, "Xform")
     robot_prim.GetReferences().AddReference(robot_usd)
-    # lift the whole articulation so the wheels clear the world's floor —
+    # place the base at its ride height (wheels are collider-free visuals) —
     # AND anchor the rig's world fixed-joint at the same height: its
     # unauthored localPos0 defaults to the world origin, which would yank
     # the chain back to z=0 and grind the wheels into the floor.
@@ -154,6 +156,12 @@ def run(app, args) -> int:
     rig = RidgebackRig(art_root_path, odom_noise=args.odom_noise)
 
     timeline = omni.timeline.get_timeline_interface()
+    # Converted worlds author no timeCodes, so Kit's play range is
+    # zero-length and looping pins get_current_time() at ~0 forever —
+    # /clock never advances and the cmd_vel timeout can never fire.
+    # Force an effectively infinite, non-looping range.
+    timeline.set_end_time(1.0e9)
+    timeline.set_looping(False)
     timeline.play()
     # the experimental Articulation attaches to the tensor backend on a
     # physics-ready event — pump frames until it reports initialized

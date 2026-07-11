@@ -218,16 +218,26 @@ def add_planar_rig(usd_path: Path) -> None:
         # it, resurrecting the root we removed.
         ROOT_TOKENS = {"PhysicsArticulationRootAPI", "NewtonArticulationRootAPI"}
 
-        def _strip(prim_spec):
+        def _strip(prim_spec, path):
             schemas = prim_spec.GetInfo("apiSchemas") if prim_spec.HasInfo("apiSchemas") else None
-            if schemas and ROOT_TOKENS & set(schemas.GetAddedOrExplicitItems()):
-                items = [s for s in schemas.GetAddedOrExplicitItems()
-                         if s not in ROOT_TOKENS]
+            if not schemas:
+                return
+            drop = set(ROOT_TOKENS)
+            # Wheels are purely visual in the kinematic rig: the planar
+            # chain has no z dof, so a wheel collider that ever meets a
+            # floor cannot depenetrate vertically and PhysX resolves the
+            # overlap sideways — the robot skates away (the P3 "spawn
+            # fling", ~3.5e5 contact impulses at rest). Strip their
+            # colliders so no world's floor height can start that fight.
+            if "_wheel_link/cylinder" in path.pathString:
+                drop.add("PhysicsCollisionAPI")
+            items = schemas.GetAddedOrExplicitItems()
+            if drop & set(items):
                 lo = Sdf.TokenListOp()
-                lo.explicitItems = items
+                lo.explicitItems = [s for s in items if s not in drop]
                 prim_spec.SetInfo("apiSchemas", lo)
 
-        layer.Traverse("/", lambda path: _strip(layer.GetPrimAtPath(path))
+        layer.Traverse("/", lambda path: _strip(layer.GetPrimAtPath(path), path)
                        if path.IsPrimPath() and layer.GetPrimAtPath(path) else None)
         layer.Save()
     for prim in Usd.PrimRange(default_prim):
@@ -273,6 +283,14 @@ def add_planar_rig(usd_path: Path) -> None:
         stage, rig_scope.GetPath().AppendChild("world_fix"))
     world_fix.CreateBody1Rel().SetTargets([anchor.GetPath()])
     UsdPhysics.ArticulationRootAPI.Apply(world_fix.GetPrim())
+    # Default TGS velocity-iteration count under-converges the coupled
+    # px/py/rz velocity-drive solve: mixed translate+rotate commands
+    # tracked at only ~60-70% (single axes exact). 32/16 makes combined
+    # commands track exactly (probed on 6.0.1).
+    from pxr import PhysxSchema
+    art_api = PhysxSchema.PhysxArticulationAPI.Apply(world_fix.GetPrim())
+    art_api.CreateSolverPositionIterationCountAttr(32)
+    art_api.CreateSolverVelocityIterationCountAttr(16)
 
     joint("px", "prismatic", "X", anchor, dummy_x)
     joint("py", "prismatic", "Y", dummy_x, dummy_y)
@@ -287,6 +305,13 @@ def add_planar_rig(usd_path: Path) -> None:
     rest = world.ExtractTranslation()
     rz.CreateLocalPos0Attr(Gf.Vec3f(rest))
     rz.CreateLocalPos1Attr(Gf.Vec3f(0.0))
+
+    # The 6.0.1 importer silently drops mesh <collision> elements (the
+    # chassis body-collision.stl becomes an empty Xform, purpose=guide,
+    # no collider) — without it the robot has no body collision at all
+    # (only the riser/camera boxes came through). Author an AABB box
+    # collider from the same STL the URDF references.
+    _author_chassis_collider(stage, base_link)
 
     # Wheels must spin freely (visual only) — strip importer-added drives.
     freed = 0
@@ -308,6 +333,59 @@ def add_planar_rig(usd_path: Path) -> None:
           flush=True)
 
 
+def _stl_aabb(path: Path):
+    """Min/max corners of an STL (binary or ASCII), model units."""
+    import re
+    import struct
+
+    data = path.read_bytes()
+    if len(data) >= 84:
+        (n_tris,) = struct.unpack_from("<I", data, 80)
+        if 84 + 50 * n_tris == len(data):          # well-formed binary STL
+            lo = [float("inf")] * 3
+            hi = [float("-inf")] * 3
+            for i in range(n_tris):
+                base = 84 + 50 * i + 12            # skip the normal
+                for v in range(3):
+                    x, y, z = struct.unpack_from("<3f", data, base + 12 * v)
+                    for k, val in enumerate((x, y, z)):
+                        lo[k] = min(lo[k], val)
+                        hi[k] = max(hi[k], val)
+            return lo, hi
+    floats = re.findall(
+        rb"vertex\s+([-\d.eE+]+)\s+([-\d.eE+]+)\s+([-\d.eE+]+)", data)
+    if not floats:
+        raise RuntimeError(f"cannot parse STL {path}")
+    verts = [tuple(float(c) for c in f) for f in floats]
+    return ([min(v[k] for v in verts) for k in range(3)],
+            [max(v[k] for v in verts) for k in range(3)])
+
+
+def _author_chassis_collider(stage, chassis_prim) -> None:
+    from ament_index_python.packages import get_package_share_directory
+    from pxr import Gf, UsdGeom, UsdPhysics
+
+    stl = Path(get_package_share_directory(
+        "clearpath_platform_description")) / "meshes/r100/body-collision.stl"
+    lo, hi = _stl_aabb(stl)
+    size = [hi[k] - lo[k] for k in range(3)]
+    center = [(hi[k] + lo[k]) / 2.0 for k in range(3)]
+    if not (0.3 < size[0] < 2.0 and 0.3 < size[1] < 2.0):
+        print(f"WARNING: chassis collider AABB looks off: size={size}",
+              flush=True)
+
+    cube = UsdGeom.Cube.Define(
+        stage, chassis_prim.GetPath().AppendChild("chassis_collision"))
+    cube.CreateSizeAttr(1.0)
+    cube.CreatePurposeAttr(UsdGeom.Tokens.guide)
+    UsdGeom.XformCommonAPI(cube).SetTranslate(Gf.Vec3d(*center))
+    UsdGeom.XformCommonAPI(cube).SetScale(Gf.Vec3f(*size))
+    UsdPhysics.CollisionAPI.Apply(cube.GetPrim())
+    print(f"chassis collider: AABB of {stl.name} size="
+          f"({size[0]:.3f}, {size[1]:.3f}, {size[2]:.3f}) center="
+          f"({center[0]:.3f}, {center[1]:.3f}, {center[2]:.3f})", flush=True)
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--skip-generate", action="store_true",
@@ -322,6 +400,7 @@ def main():
         with flat.open("w") as f:
             subprocess.run(["xacro", str(SETUP_PATH / "robot.urdf.xacro")],
                            check=True, stdout=f)
+        _sanitize_urdf(flat)         # importer chokes on raw output either way
     else:
         flat = generate_flat_urdf(workdir)
 

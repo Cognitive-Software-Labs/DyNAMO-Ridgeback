@@ -112,10 +112,21 @@ class RidgebackRig:
 
     def set_planar_pose(self, x: float, y: float, yaw: float):
         import numpy as np
-        pos = self._art.get_dof_positions().numpy()
-        for idx, v in zip(self._joint_indices, (x, y, yaw)):
-            pos[0][idx] = v
-        self._art.set_dof_positions(pos)
+        # 6.0.1 quirk: the experimental setters silently no-op when handed
+        # the full dof array without dof_indices — always use the subset
+        # form (probed; the full-array form left positions unchanged).
+        self._art.set_dof_positions(
+            np.array([[x, y, yaw]], dtype=np.float32),
+            dof_indices=self._joint_indices)
+        # kill any settle motion too: dof velocities, drive targets, and
+        # the accel-limiter state all reset to rest
+        zeros = np.zeros((1, 3), dtype=np.float32)
+        self._art.set_dof_velocities(zeros, dof_indices=self._joint_indices)
+        self._applied = [0.0, 0.0, 0.0]
+        self._art.set_dof_velocity_targets(
+            zeros, dof_indices=self._joint_indices)
+        self._cmd = (0.0, 0.0, 0.0)
+        self._cmd_stamp = -math.inf
         self._last_joint_pos = None          # re-seed odom at the new pose
 
     def ground_truth(self):

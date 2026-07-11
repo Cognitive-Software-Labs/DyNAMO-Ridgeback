@@ -1,6 +1,6 @@
 # Port plan: Gazebo Harmonic → NVIDIA Isaac Sim 6.0
 
-Status: **approved, pre-implementation** (P0 pending). Kept current per phase; mark phases done as they land.
+Status: **in progress — P0–P3 done, P4 next.** Kept current per phase; mark phases done as they land.
 Branch: `feat/isaac-sim-6-port` (cut from `dev`). Base includes `4f8b72d8` (explore_lite removed — single in-repo `frontier_explorer_node`).
 
 ## Context
@@ -72,27 +72,28 @@ Decisions:
 
 Bootstrap: cut `feat/isaac-sim-6-port` from `dev`; workspace already built in the main checkout (`vcs import` only if clones missing; rosdep adds `robot_localization`). `bash tools/rebuild_graphify` after every code phase.
 
-### P0 — Contract freeze + gz reference capture [S]
+### P0 — Contract freeze + gz reference capture [S] ✅
 - This file committed; `tools/isaac/capture_contract.sh` → committed `tools/isaac/baseline/contract/` (topic list/types/QoS, camera_info, view_frames, hz for all contract topics).
 - 3× gz probe runs (`explore_probe.py gz_base{1..3}`) on `bash start_exploration.sh mock_hospital` → `tools/isaac/baseline/gz_mock_hospital/` (reference only — sensors diverge by design).
 - ✓ Baseline dirs complete; probe JSONs show expected coverage (mock_hospital ≈93% reference from `4f8b72d8` validation).
 
-### P1 — isaac_venv + installer + headless smoke + MCP dev tooling [M]
+### P1 — isaac_venv + installer + headless smoke + MCP dev tooling [M] ✅
 - `requirements-isaac.txt` (pinned 6.0.1), `tools/install_isaac_venv.sh` (system-site-packages venv + ros2.pth like perception_venv; EULA env; `--warmup` shader-cache bake; nvidia-smi driver/VRAM preflight), `tools/isaac/smoke_test.py` (headless + bridge + clock publish, 5 s). `.gitignore` += `isaac_venv/`. README install subsection.
 - **Isaac Sim MCP setup**: clone `kit-usd-agents`, `./build-docker.sh` in `source/mcp/isaacsim_mcp`, run on `:9904`, add http entry to project `.mcp.json`. Needs NVIDIA API key (build.nvidia.com) — if unavailable, skip; fall back to 5.1-era names + `og.get_registered_nodes()`. Used through P2–P7 to resolve exact 6.0 APIs before writing code. Evaluate Isaac Sim Skills during P3–P4 as a live-verification aid.
 - ✓ Smoke test exits 0 while a plain-terminal `ros2 topic hz /clock` (CycloneDDS) ticks. MCP: one successful extension-search query (if key available).
 
-### P2 — Assets: worlds + G1 [L]
+### P2 — Assets: worlds + G1 [L] ✅
 - `tools/isaac/sdf2usd.py`: xml parse layer (unit-testable, no pxr) + pxr emit layer (Cube/Sphere, colliders exactly where SDF `<collision>`, UsdPreviewSurface, lights, PhysicsScene, `model://g1` → USD reference). `.usda` text output. `--check` re-opens USD, asserts per-model AABB/pose vs SDF.
 - Convert `mock_hospital`, `g1_distance_calibration` → `src/ridgeback_autonomy/sim/isaac/usd/worlds/`.
 - G1: vendor USD from `unitree_sim_isaaclab` (git-lfs; license check + attribution) → `sim/isaac/usd/models/g1/`; fallback `tools/isaac/convert_g1_model.py` (STL→USD).
 - Pytest `test_sdf2usd_parse.py` (98 boxes/2 spheres/1 include, exact named-wall poses) in CMake BUILD_TESTING.
 - ✓ `--check` passes both worlds; `colcon test` green; headless screenshot eyeball.
 
-### P3 — Robot: URDF import + rig + raw odom/IMU/TF/clock [L]
+### P3 — Robot: URDF import + rig + raw odom/IMU/TF/clock [L] ✅
 - `tools/isaac/import_ridgeback_urdf.py`: `clearpath_generator_common generate_description` (repo-local setup_path) → xacro → URDF → URDF importer (`merge_fixed_joints=False`, no drives) → append planar rig → committed `sim/isaac/usd/robots/ridgeback_r100.usda`. Regen only when robot.yaml changes.
 - `isaac_runner.py`, `worlds.py`, `robot_rig.py` (+ odom noise model), `ros_io.py`.
 - ✓ Manual: runner headless in mock_hospital; TwistStamped teleop → raw odom ≈50 Hz arcs, /clock ticks, stop ≤0.5 s, strafe proves holonomic; `--odom-noise 0` vs default shows drift in odom while `ground_truth/pose` stays exact.
+- **DONE** — motion verified two ways: `tools/isaac/diag_rig.py --battery` 10/10 (stillness at spawn, zero wheel contacts, sim-time advance, set_planar_pose teleport, fwd/strafe/spin/combined tracking exact, stop drift 0.00 cm, cmd-timeout stop) + live-runner ROS checks (/clock advances at RTF≈1, odom arcs under teleop, strafe-at-yaw holonomic, stop twist ~0, noisy odom vs exact GT split). Deviation: raw odom publishes at the render rate (~35 Hz under co-tenant load), not 50 Hz — publish-per-physics-step decoupling is a P4 option if the EKF wants it.
 
 ### P4 — Sensors + EKF + launch include: full contract [L]
 - `sensors.py`, `ust10lx_2d.json`, D455 rig + `camera_config.json` update (real D455 intrinsics), IMU publisher.
