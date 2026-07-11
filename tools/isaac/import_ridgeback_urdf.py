@@ -184,20 +184,55 @@ def add_planar_rig(usd_path: Path) -> None:
     default_prim = stage.GetDefaultPrim()
     root_path = default_prim.GetPath()
 
+    # Anchor the rig to the robot's root RIGID BODY. base_link itself is a
+    # massless URDF dummy that the importer leaves as a plain Xform — a
+    # joint targeting it gets dropped by PhysX (and the whole chain after
+    # it, which is how we end up with dofs == ['py']). chassis_link is the
+    # first real body.
     base_link = None
     for prim in Usd.PrimRange(default_prim):
-        if prim.GetName() == "base_link":
+        if prim.HasAPI(UsdPhysics.RigidBodyAPI) and prim.GetName() in (
+                "base_link", "chassis_link"):
             base_link = prim
             break
     if base_link is None:
-        raise RuntimeError(f"no base_link prim under {root_path}")
+        raise RuntimeError(f"no base_link/chassis_link rigid body under {root_path}")
+    print(f"rig anchor body: {base_link.GetPath()}", flush=True)
 
-    # The articulation root must sit above the full kinematic chain so the
-    # virtual joints belong to the same articulation as the robot links.
+    # Strip the importer's articulation root; a floating-base articulation
+    # excludes world-anchored joints (they'd become maximal-coordinate
+    # joints, not dofs). The rig instead forms a FIXED-BASE articulation:
+    # PhysX convention puts ArticulationRootAPI on the world-attached
+    # joint (px below), which pulls px/py/rz into the articulation as
+    # dofs alongside the wheels.
+    # RemoveAPI on the composed stage cannot always defeat an apiSchemas
+    # entry authored inside a payload layer — edit every sublayer where
+    # the schema is actually authored.
+    from pxr import Sdf
+    for layer in stage.GetUsedLayers():
+        if layer.anonymous:
+            continue
+
+        # NewtonArticulationRootAPI matters too: at stage attach Isaac's
+        # multi-backend layer materializes a PhysX articulation root from
+        # it, resurrecting the root we removed.
+        ROOT_TOKENS = {"PhysicsArticulationRootAPI", "NewtonArticulationRootAPI"}
+
+        def _strip(prim_spec):
+            schemas = prim_spec.GetInfo("apiSchemas") if prim_spec.HasInfo("apiSchemas") else None
+            if schemas and ROOT_TOKENS & set(schemas.GetAddedOrExplicitItems()):
+                items = [s for s in schemas.GetAddedOrExplicitItems()
+                         if s not in ROOT_TOKENS]
+                lo = Sdf.TokenListOp()
+                lo.explicitItems = items
+                prim_spec.SetInfo("apiSchemas", lo)
+
+        layer.Traverse("/", lambda path: _strip(layer.GetPrimAtPath(path))
+                       if path.IsPrimPath() and layer.GetPrimAtPath(path) else None)
+        layer.Save()
     for prim in Usd.PrimRange(default_prim):
         if prim.HasAPI(UsdPhysics.ArticulationRootAPI):
             prim.RemoveAPI(UsdPhysics.ArticulationRootAPI)
-    UsdPhysics.ArticulationRootAPI.Apply(default_prim)
 
     rig_scope = UsdGeom.Scope.Define(stage, root_path.AppendChild("drive_rig"))
 
@@ -208,6 +243,7 @@ def add_planar_rig(usd_path: Path) -> None:
         mass.CreateMassAttr(DUMMY_MASS)
         return x.GetPrim()
 
+    anchor = dummy_body("anchor")
     dummy_x = dummy_body("carrier_x")
     dummy_y = dummy_body("carrier_y")
 
@@ -230,9 +266,27 @@ def add_planar_rig(usd_path: Path) -> None:
         drive.CreateTargetVelocityAttr(0.0)
         return j
 
-    joint("px", "prismatic", "X", None, dummy_x)
+    # PhysX consumes the root-API joint as the FIXED attachment (not a
+    # dof) — give it a dedicated world->anchor fixed joint so px/py/rz
+    # all remain real dofs.
+    world_fix = UsdPhysics.FixedJoint.Define(
+        stage, rig_scope.GetPath().AppendChild("world_fix"))
+    world_fix.CreateBody1Rel().SetTargets([anchor.GetPath()])
+    UsdPhysics.ArticulationRootAPI.Apply(world_fix.GetPrim())
+
+    joint("px", "prismatic", "X", anchor, dummy_x)
     joint("py", "prismatic", "Y", dummy_x, dummy_y)
-    joint("rz", "revolute", "Z", dummy_y, base_link)
+    rz = joint("rz", "revolute", "Z", dummy_y, base_link)
+
+    # Joint frames: carriers sit at the world origin; the anchor body rests
+    # at its imported pose. Author localPos0 on rz so the joint is satisfied
+    # at rest instead of PhysX snapping the chassis to the origin.
+    from pxr import Gf, UsdGeom as _UsdGeom
+    xf = _UsdGeom.Xformable(base_link)
+    world = xf.ComputeLocalToWorldTransform(Usd.TimeCode.Default())
+    rest = world.ExtractTranslation()
+    rz.CreateLocalPos0Attr(Gf.Vec3f(rest))
+    rz.CreateLocalPos1Attr(Gf.Vec3f(0.0))
 
     # Wheels must spin freely (visual only) — strip importer-added drives.
     freed = 0

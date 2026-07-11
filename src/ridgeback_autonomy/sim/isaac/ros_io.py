@@ -1,0 +1,164 @@
+"""In-process ROS 2 I/O for the Isaac runner (rclpy side).
+
+Owns everything that is NOT a GPU sensor path: /clock, cmd_vel
+subscriptions (TwistStamped per the Nav2 contract, plus a tolerant plain
+Twist), odometry + odom->base_link TF, and the exact ground-truth pose.
+GPU sensors (RTX lidar, camera) publish through OmniGraph bridge helpers
+instead (sensors.py, P4).
+
+Runs on the system rclpy/CycloneDDS that the sourced workspace provides
+(the bridge loads system ROS when it is sourced before launch). The node
+lives in the robot namespace and remaps /tf -> tf like every node in
+this stack.
+
+TF ownership note: until the EKF include (P4) takes over odom->base_link,
+this node publishes it from the (noise-degraded) odometry — matching how
+the platform behaves, where TF follows wheel odometry, not ground truth.
+"""
+from __future__ import annotations
+
+import math
+
+
+def _quat_from_yaw(yaw: float):
+    return (0.0, 0.0, math.sin(yaw / 2.0), math.cos(yaw / 2.0))
+
+
+class RosIO:
+    def __init__(self, namespace: str, base_frame: str = "base_link",
+                 odom_frame: str = "odom"):
+        import rclpy
+        from geometry_msgs.msg import PoseStamped, Twist, TwistStamped
+        from nav_msgs.msg import Odometry
+        from rosgraph_msgs.msg import Clock
+        from tf2_ros import TransformBroadcaster, StaticTransformBroadcaster
+
+        rclpy.init()
+        self._rclpy = rclpy
+        self.node = rclpy.create_node(
+            "isaac_sim_runner", namespace=namespace,
+            # tf remap convention used across this stack
+            cli_args=["--ros-args", "-r", "/tf:=tf", "-r", "/tf_static:=tf_static"],
+            automatically_declare_parameters_from_overrides=True,
+        )
+        self._base_frame = base_frame
+        self._odom_frame = odom_frame
+
+        self._cmd = (0.0, 0.0, 0.0)
+        self._cmd_stamp_wall = None   # set by runner via sim-time now()
+
+        # /clock is global (un-namespaced) by contract
+        self._clock_pub = self.node.create_publisher(Clock, "/clock", 10)
+        self._odom_pub = self.node.create_publisher(
+            Odometry, "platform/odom/filtered", 10)
+        self._gt_pub = self.node.create_publisher(
+            PoseStamped, "ground_truth/pose", 10)
+        self._tf = TransformBroadcaster(self.node)
+        self._static_tf = StaticTransformBroadcaster(self.node)
+
+        self._new_cmd = None
+        self.node.create_subscription(
+            TwistStamped, "cmd_vel", self._on_twist_stamped, 10)
+        # tolerant plain-Twist fallback on the same topic (logs once)
+        self._warned_plain = False
+        self.node.create_subscription(Twist, "cmd_vel", self._on_twist, 10)
+
+        self._msgs = dict(Odometry=Odometry, PoseStamped=PoseStamped,
+                          Clock=Clock)
+        self._publish_base_link_shim()
+
+    # ---- subscriptions -----------------------------------------------------
+
+    def _on_twist_stamped(self, msg):
+        t = msg.twist
+        self._new_cmd = (t.linear.x, t.linear.y, t.angular.z)
+
+    def _on_twist(self, msg):
+        if not self._warned_plain:
+            self.node.get_logger().warn(
+                "plain Twist on cmd_vel — contract is TwistStamped; accepting")
+            self._warned_plain = True
+        self._new_cmd = (msg.linear.x, msg.linear.y, msg.angular.z)
+
+    def take_cmd(self):
+        """Return and clear the newest cmd (vx, vy, wz), or None."""
+        cmd, self._new_cmd = self._new_cmd, None
+        return cmd
+
+    # ---- publications ------------------------------------------------------
+
+    def _stamp(self, sim_time: float):
+        from builtin_interfaces.msg import Time
+        t = Time()
+        t.sec = int(sim_time)
+        t.nanosec = int((sim_time - int(sim_time)) * 1e9)
+        return t
+
+    def publish_clock(self, sim_time: float):
+        msg = self._msgs["Clock"]()
+        msg.clock = self._stamp(sim_time)
+        self._clock_pub.publish(msg)
+
+    def publish_odom(self, sim_time: float, odom_state, body_twist):
+        stamp = self._stamp(sim_time)
+
+        msg = self._msgs["Odometry"]()
+        msg.header.stamp = stamp
+        msg.header.frame_id = self._odom_frame
+        msg.child_frame_id = self._base_frame
+        msg.pose.pose.position.x = odom_state.x
+        msg.pose.pose.position.y = odom_state.y
+        qx, qy, qz, qw = _quat_from_yaw(odom_state.yaw)
+        msg.pose.pose.orientation.x = qx
+        msg.pose.pose.orientation.y = qy
+        msg.pose.pose.orientation.z = qz
+        msg.pose.pose.orientation.w = qw
+        msg.twist.twist.linear.x = body_twist[0]
+        msg.twist.twist.linear.y = body_twist[1]
+        msg.twist.twist.angular.z = body_twist[2]
+        self._odom_pub.publish(msg)
+
+        from geometry_msgs.msg import TransformStamped
+        tf = TransformStamped()
+        tf.header.stamp = stamp
+        tf.header.frame_id = self._odom_frame
+        tf.child_frame_id = self._base_frame
+        tf.transform.translation.x = odom_state.x
+        tf.transform.translation.y = odom_state.y
+        tf.transform.rotation.x = qx
+        tf.transform.rotation.y = qy
+        tf.transform.rotation.z = qz
+        tf.transform.rotation.w = qw
+        self._tf.sendTransform(tf)
+
+    def publish_ground_truth(self, sim_time: float, x, y, yaw):
+        msg = self._msgs["PoseStamped"]()
+        msg.header.stamp = self._stamp(sim_time)
+        msg.header.frame_id = "world"
+        msg.pose.position.x = x
+        msg.pose.position.y = y
+        qx, qy, qz, qw = _quat_from_yaw(yaw)
+        msg.pose.orientation.x = qx
+        msg.pose.orientation.y = qy
+        msg.pose.orientation.z = qz
+        msg.pose.orientation.w = qw
+        self._gt_pub.publish(msg)
+
+    def _publish_base_link_shim(self):
+        """Identity base_link -> <ns>/robot/base_link (perception default)."""
+        from geometry_msgs.msg import TransformStamped
+        ns = self.node.get_namespace().strip("/")
+        tf = TransformStamped()
+        tf.header.frame_id = self._base_frame
+        tf.child_frame_id = f"{ns}/robot/base_link"
+        tf.transform.rotation.w = 1.0
+        self._static_tf.sendTransform(tf)
+
+    # ---- loop glue -----------------------------------------------------------
+
+    def spin_once(self):
+        self._rclpy.spin_once(self.node, timeout_sec=0.0)
+
+    def shutdown(self):
+        self.node.destroy_node()
+        self._rclpy.shutdown()

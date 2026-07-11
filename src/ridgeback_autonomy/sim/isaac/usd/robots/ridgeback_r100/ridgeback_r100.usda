@@ -4,13 +4,13 @@
         string creator = "URDF USD Converter v0.1.3"
     }
     defaultPrim = "tn__r1000001_bC"
-    doc = """Generated from Composed Stage of root layer /tmp/tmp9pvamk94/r100-0001.usdc
+    doc = """Generated from Composed Stage of root layer /tmp/tmpv0rc2ys9/r100-0001.usdc
 
 
-Generated from Composed Stage of root layer /tmp/urdf_import_ridgeback_r100_qxkgsb7w/usdex_ridgeback_r100/r100-0001.usdc
+Generated from Composed Stage of root layer /tmp/urdf_import_ridgeback_r100_nyezd1rh/usdex_ridgeback_r100/r100-0001.usdc
 
 
-Generated from Composed Stage of root layer /tmp/urdf_import_ridgeback_r100_qxkgsb7w/temp_ridgeback_r100/ridgeback_r100.usd
+Generated from Composed Stage of root layer /tmp/urdf_import_ridgeback_r100_nyezd1rh/temp_ridgeback_r100/ridgeback_r100.usd
 
 
 Generated from Composed Stage of root layer /home/deivid/dev/DyNAMO-Ridgeback/.claude/worktrees/jolly-borg-f48cab/src/ridgeback_autonomy/sim/isaac/usd/robots/ridgeback_r100.usd/ridgeback_r100/payloads/base.usd
@@ -21,7 +21,6 @@ Generated from Composed Stage of root layer /home/deivid/dev/DyNAMO-Ridgeback/.c
 )
 
 def Xform "tn__r1000001_bC" (
-    prepend apiSchemas = ["PhysicsArticulationRootAPI"]
     prepend references = @./payloads/base.usda@
     variants = {
         string Physics = "physx"
@@ -29,20 +28,15 @@ def Xform "tn__r1000001_bC" (
     append variantSets = "Physics"
 )
 {
-    over "Geometry"
-    {
-        over "base_link"
-        {
-            over "chassis_link" (
-                delete apiSchemas = ["PhysicsArticulationRootAPI"]
-            )
-            {
-            }
-        }
-    }
-
     def Scope "drive_rig"
     {
+        def Xform "anchor" (
+            prepend apiSchemas = ["PhysicsRigidBodyAPI", "PhysicsMassAPI"]
+        )
+        {
+            float physics:mass = 1
+        }
+
         def Xform "carrier_x" (
             prepend apiSchemas = ["PhysicsRigidBodyAPI", "PhysicsMassAPI"]
         )
@@ -57,6 +51,13 @@ def Xform "tn__r1000001_bC" (
             float physics:mass = 1
         }
 
+        def PhysicsFixedJoint "world_fix" (
+            prepend apiSchemas = ["PhysicsArticulationRootAPI"]
+        )
+        {
+            rel physics:body1 = </tn__r1000001_bC/drive_rig/anchor>
+        }
+
         def PhysicsPrismaticJoint "px" (
             prepend apiSchemas = ["PhysicsDriveAPI:linear"]
         )
@@ -66,6 +67,7 @@ def Xform "tn__r1000001_bC" (
             float drive:linear:physics:targetVelocity = 0
             uniform token drive:linear:physics:type = "force"
             uniform token physics:axis = "X"
+            rel physics:body0 = </tn__r1000001_bC/drive_rig/anchor>
             rel physics:body1 = </tn__r1000001_bC/drive_rig/carrier_x>
         }
 
@@ -92,7 +94,9 @@ def Xform "tn__r1000001_bC" (
             uniform token drive:angular:physics:type = "force"
             uniform token physics:axis = "Z"
             rel physics:body0 = </tn__r1000001_bC/drive_rig/carrier_y>
-            rel physics:body1 = </tn__r1000001_bC/Geometry/base_link>
+            rel physics:body1 = </tn__r1000001_bC/Geometry/base_link/chassis_link>
+            point3f physics:localPos0 = (0, 0, 0)
+            point3f physics:localPos1 = (0, 0, 0)
         }
     }
 

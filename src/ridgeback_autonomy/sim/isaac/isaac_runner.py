@@ -1,0 +1,216 @@
+#!/usr/bin/env python3
+"""Isaac Sim 6.0 runner for the Ridgeback exploration stack.
+
+Standalone SimulationApp process replacing the gz server: loads a world
+USD (worlds.py resolution), references the committed Ridgeback package,
+drives it kinematic-holonomically from cmd_vel (robot_rig.py), and
+publishes /clock, odometry+TF, and ground-truth pose (ros_io.py). GPU
+sensors attach in sensors.py (P4).
+
+Run under isaac_venv with the workspace sourced (bridge then uses system
+rclpy/CycloneDDS):
+
+    source install/setup.bash
+    OMNI_KIT_ACCEPT_EULA=YES isaac_venv/bin/python3 \
+        src/ridgeback_autonomy/sim/isaac/isaac_runner.py \
+        --world mock_hospital --headless true
+
+Timing: physics at --physics-hz (default 120). --rtf 1.0 keeps sim time
+at wall speed (interactive default); --rtf 0 runs unthrottled for
+benchmarks — legal because the whole stack runs on sim time.
+"""
+import argparse
+import math
+import signal
+import sys
+import time
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+
+def parse_args():
+    ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    ap.add_argument("--world", default="mock_hospital")
+    ap.add_argument("--namespace", default="r100_0001")
+    ap.add_argument("--headless", default="true",
+                    choices=["true", "false"])
+    ap.add_argument("--livestream", default="false", choices=["true", "false"],
+                    help="WebRTC livestream (implies headless render window)")
+    ap.add_argument("--physics-hz", type=float, default=120.0)
+    ap.add_argument("--rtf", type=float, default=1.0,
+                    help="real-time-factor throttle; 0 = unthrottled")
+    ap.add_argument("--odom-noise", type=float, default=1.0,
+                    help="odometry drift scale; 0 = perfect odom")
+    ap.add_argument("--robot-usd", default=None,
+                    help="override the committed robot package entry USD")
+    ap.add_argument("--spawn", default="0,0,0",
+                    help="robot spawn x,y,yaw in the world frame")
+    ap.add_argument("--spawn-z", type=float, default=0.06,
+                    help="base height: floor top + clearance. The rig is "
+                         "kinematic — wheels are meant to hover ~1 cm, "
+                         "ground contact would only fight the joints "
+                         "(mock_hospital floor top is z=0.05)")
+    return ap.parse_args()
+
+
+def main():
+    args = parse_args()
+    headless = args.headless == "true"
+
+    from isaacsim import SimulationApp
+    app_cfg = {"headless": headless}
+    app = SimulationApp(app_cfg)
+
+    exit_code = 1
+    try:
+        exit_code = run(app, args)
+    except Exception:
+        import traceback
+        traceback.print_exc()
+        print("RUNNER FAILED", flush=True)
+    app.close()
+    sys.exit(exit_code)
+
+
+def run(app, args) -> int:
+    import omni.timeline
+    import omni.usd
+    from isaacsim.core.utils.extensions import enable_extension
+    from pxr import Gf, Usd, UsdGeom, UsdPhysics
+
+    from robot_rig import RidgebackRig
+    from ros_io import RosIO
+    from worlds import resolve_world
+
+    world_path = resolve_world(args.world)
+    print(f"loading world: {world_path}", flush=True)
+    ctx = omni.usd.get_context()
+    ctx.open_stage(world_path)
+    stage = ctx.get_stage()
+
+    # ORDER MATTERS (6.0.1): the ros2 bridge crashes in omni.graph.core
+    # if a stage is opened after the extension is enabled — enable it only
+    # once the world stage is in place.
+    enable_extension("isaacsim.ros2.bridge")
+    if args.livestream == "true":
+        enable_extension("omni.kit.livestream.webrtc")
+
+    # --- robot ------------------------------------------------------------
+    robot_usd = args.robot_usd or str(
+        Path(__file__).resolve().parent / "usd/robots/ridgeback_r100/ridgeback_r100.usda")
+    x0, y0, yaw0 = (float(v) for v in args.spawn.split(","))
+
+    robot_prim_path = "/ridgeback"
+    robot_prim = stage.DefinePrim(robot_prim_path, "Xform")
+    robot_prim.GetReferences().AddReference(robot_usd)
+    # lift the whole articulation so the wheels clear the world's floor —
+    # AND anchor the rig's world fixed-joint at the same height: its
+    # unauthored localPos0 defaults to the world origin, which would yank
+    # the chain back to z=0 and grind the wheels into the floor.
+    UsdGeom.XformCommonAPI(robot_prim).SetTranslate(
+        Gf.Vec3d(0.0, 0.0, args.spawn_z))
+    wf = stage.GetPrimAtPath(f"{robot_prim_path}/drive_rig/world_fix")
+    if not wf:
+        raise RuntimeError("drive_rig/world_fix joint missing from robot USD")
+    UsdPhysics.FixedJoint(wf).CreateLocalPos0Attr(
+        Gf.Vec3f(0.0, 0.0, args.spawn_z))
+    # spawn pose goes into the rig's joint offsets after initialize();
+    # the reference itself stays at the world origin so px/py/rz remain
+    # the single source of planar pose truth.
+
+    # the articulation root lives inside the referenced package (name is
+    # sanitized from the URDF robot name) — find it instead of hardcoding
+    from pxr import UsdPhysics
+    roots = [p.GetPath().pathString for p in Usd.PrimRange(robot_prim)
+             if p.HasAPI(UsdPhysics.ArticulationRootAPI)]
+    if not roots:
+        raise RuntimeError(f"no ArticulationRootAPI under {robot_prim_path}")
+    # the rig's world-anchored joint is the intended (fixed-base) root
+    rig_roots = [r for r in roots if "/drive_rig/" in r]
+    art_root_path = rig_roots[0] if rig_roots else roots[0]
+    if len(roots) > 1:
+        print(f"WARNING: multiple articulation roots {roots}, using "
+              f"{art_root_path}", flush=True)
+    print(f"articulation root: {art_root_path}", flush=True)
+
+    # --- physics / timing ---------------------------------------------------
+    # No SimulationContext: the deprecated isaacsim.core.api variant
+    # segfaults in _init_stage->render on 6.0.1 headless. Timeline +
+    # app.update() (smoke-test-proven) drive stepping; physics rate is set
+    # on the world's PhysicsScene prim.
+    from pxr import PhysxSchema
+    scene_prim = None
+    for prim in stage.Traverse():
+        if prim.GetTypeName() == "PhysicsScene":
+            scene_prim = prim
+            break
+    if scene_prim is None:
+        raise RuntimeError("world has no PhysicsScene prim")
+    physx_scene = PhysxSchema.PhysxSceneAPI.Apply(scene_prim)
+    physx_scene.CreateTimeStepsPerSecondAttr(float(args.physics_hz))
+
+    ros = RosIO(args.namespace)
+    rig = RidgebackRig(art_root_path, odom_noise=args.odom_noise)
+
+    timeline = omni.timeline.get_timeline_interface()
+    timeline.play()
+    # the experimental Articulation attaches to the tensor backend on a
+    # physics-ready event — pump frames until it reports initialized
+    for _ in range(240):
+        app.update()
+        if rig.ready():
+            break
+    else:
+        raise RuntimeError("articulation tensor backend never initialized")
+    rig.initialize()
+    # Always reset: physics settling during backend attach can translate
+    # the chain (constraint snap); this puts the rig dofs exactly at the
+    # requested spawn pose with zero velocity.
+    rig.set_planar_pose(x0, y0, yaw0)
+
+    print("RUNNER READY", flush=True)
+
+    stop = {"flag": False}
+    signal.signal(signal.SIGINT, lambda *_: stop.update(flag=True))
+    signal.signal(signal.SIGTERM, lambda *_: stop.update(flag=True))
+
+    frames = 0
+    wall_start = time.monotonic()
+    last_sim_time = timeline.get_current_time()
+    while app.is_running() and not stop["flag"]:
+        sim_time = timeline.get_current_time()
+        frame_dt = max(sim_time - last_sim_time, 0.0)
+        last_sim_time = sim_time
+
+        cmd = ros.take_cmd()
+        if cmd is not None:
+            rig.set_cmd(*cmd, now=sim_time)
+        rig.step(frame_dt if frame_dt > 0 else 1.0 / 60.0, now=sim_time)
+
+        app.update()          # one render frame + its physics substeps
+        frames += 1
+
+        sim_time = timeline.get_current_time()
+        ros.publish_clock(sim_time)
+        odom_state, body_twist = rig.update_odom()
+        ros.publish_odom(sim_time, odom_state, body_twist)
+        ros.publish_ground_truth(sim_time, *rig.ground_truth())
+        ros.spin_once()
+
+        if args.rtf > 0:
+            target_wall = wall_start + sim_time / args.rtf
+            lag = target_wall - time.monotonic()
+            if lag > 0:
+                time.sleep(lag)
+
+    sim_elapsed = timeline.get_current_time()
+    achieved = sim_elapsed / max(time.monotonic() - wall_start, 1e-9)
+    print(f"RUNNER EXIT after {frames} frames, sim {sim_elapsed:.1f}s, "
+          f"achieved RTF {achieved:.2f}", flush=True)
+    ros.shutdown()
+    return 0
+
+
+if __name__ == "__main__":
+    main()
