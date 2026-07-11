@@ -156,6 +156,7 @@ def import_urdf_to_usd(urdf_path: Path) -> None:
 
         add_planar_rig(Path(out))
         add_sensor_prims(Path(out))
+        attach_visual_meshes(app, Path(out), urdf_path)
 
         # flatten <staging .usd dir>/ridgeback_r100/... -> robots/ridgeback_r100/
         import shutil
@@ -332,6 +333,156 @@ def add_planar_rig(usd_path: Path) -> None:
     stage.GetRootLayer().Save()
     print(f"planar drive rig appended ({freed} wheel drives freed) -> {usd_path}",
           flush=True)
+
+
+def attach_visual_meshes(app, usd_path: Path, urdf_path: Path) -> None:
+    """The 6.0.1 importer silently drops ALL visual mesh geometry (it
+    parses the DAEs — its material pass harvests them — then writes empty
+    Xforms named after the mesh file stems; zero Mesh prims, no mesh
+    files, for this URDF). Convert every URDF visual mesh with Kit's
+    asset converter into payloads/meshes/ and reference each under its
+    matching (correctly-transformed, material-bound) empty Xform.
+    """
+    import xml.etree.ElementTree as ET
+
+    from isaacsim.core.utils.extensions import enable_extension
+    enable_extension("omni.kit.asset_converter")
+    import omni.kit.asset_converter as asset_converter
+    from ament_index_python.packages import get_package_share_directory
+    from pxr import Usd, UsdGeom
+
+    def resolve(uri: str) -> Path:
+        if uri.startswith("package://"):
+            pkg, _, rel = uri.removeprefix("package://").partition("/")
+            return Path(get_package_share_directory(pkg)) / rel
+        if uri.startswith("file://"):
+            return Path(uri.removeprefix("file://"))
+        if uri.startswith("file:"):
+            return Path(uri.removeprefix("file:"))
+        return Path(uri)
+
+    # link name -> [(mesh abs path, scale-or-None)]
+    visuals: dict[str, list] = {}
+    root = ET.parse(urdf_path).getroot()
+    for link in root.iter("link"):
+        for visual in link.findall("visual"):
+            mesh = visual.find("geometry/mesh")
+            if mesh is None:
+                continue
+            scale = mesh.get("scale")
+            visuals.setdefault(link.get("name"), []).append(
+                (resolve(mesh.get("filename")), scale))
+
+    mesh_dir = usd_path.parent / "payloads/meshes"
+    mesh_dir.mkdir(parents=True, exist_ok=True)
+    converted: dict[Path, Path] = {}
+
+    def convert(src: Path) -> Path:
+        if src in converted:
+            return converted[src]
+        dst = mesh_dir / (src.stem + ".usd")
+        print(f"  converting {src.name} ...", flush=True)
+        ctx = asset_converter.AssetConverterContext()
+        # meshes only — DAE "scenes" (d435.dae) carry cameras/lights at
+        # multi-meter offsets that would balloon the robot's bounds
+        ctx.ignore_camera = True
+        ctx.ignore_light = True
+        ctx.ignore_animations = True
+        task = asset_converter.get_instance().create_converter_task(
+            str(src), str(dst), None, ctx)
+        # the converter is asyncio-driven: polling is_finished() without
+        # awaiting never schedules it (hung a full regen). Drive the
+        # canonical coroutine, with a hard per-mesh timeout.
+        import asyncio
+        loop = asyncio.get_event_loop()
+        try:
+            ok = loop.run_until_complete(
+                asyncio.wait_for(task.wait_until_finished(), timeout=120))
+        except asyncio.TimeoutError:
+            raise RuntimeError(f"asset convert timed out for {src}")
+        if not ok or not dst.exists():
+            raise RuntimeError(f"asset convert failed for {src}: "
+                               f"{task.get_error_message()}")
+        # The converter normalizes into its own centimeter stage: sources
+        # with explicit units (DAE <unit meter="X">) get their vertices
+        # scaled by X/0.01 (d435.dae in meters came out x100); unitless
+        # STLs pass through untouched. Compensate on the slot, and keep
+        # the file metadata honest for standalone viewing.
+        from pxr import Usd, UsdGeom
+        mstage = Usd.Stage.Open(str(dst))
+        written_mpu = UsdGeom.GetStageMetersPerUnit(mstage)
+        slot_scale = 1.0
+        if src.suffix.lower() == ".dae":
+            import re as _re
+            m = _re.search(rb'<unit[^>]*meter="([0-9.eE+-]+)"',
+                           src.read_bytes()[:4096])
+            src_unit = float(m.group(1)) if m else 1.0
+            slot_scale = written_mpu / src_unit
+        UsdGeom.SetStageMetersPerUnit(mstage, 1.0)
+        mstage.GetRootLayer().Save()
+        converted[src] = (dst, slot_scale)
+        return converted[src]
+
+    stage = Usd.Stage.Open(str(usd_path))
+    by_name = {}
+    for prim in Usd.PrimRange(stage.GetDefaultPrim()):
+        by_name.setdefault(prim.GetName(), []).append(prim)
+
+    attached = 0
+    for link_name, meshes in visuals.items():
+        link_prims = [p for p in by_name.get(link_name, [])
+                      if "/Geometry/" in p.GetPath().pathString]
+        if not link_prims:
+            print(f"  WARNING: no Geometry prim for link {link_name}",
+                  flush=True)
+            continue
+        link_prim = link_prims[0]
+        for src, scale in meshes:
+            from pxr import Tf
+            safe = Tf.MakeValidIdentifier(src.stem)
+            # importer names the empty visual Xform after the stem (its
+            # own sanitizer may differ from ours — try both); fall back
+            # to creating one at identity
+            slot = link_prim.GetChild(src.stem) or link_prim.GetChild(safe)
+            if not slot:
+                slot = stage.DefinePrim(
+                    link_prim.GetPath().AppendChild(safe), "Xform")
+            dst, unit_scale = convert(src)
+            # reference on a CHILD prim, never on the slot: direct arcs
+            # beat ancestral ones, so a reference on the slot itself lets
+            # the mesh file's identity xform ops override the importer's
+            # visual-origin ops that live in the payload layer (the axle
+            # rendered unrotated this way — same masking class as the G1
+            # include bug)
+            geom = stage.DefinePrim(slot.GetPath().AppendChild("geom"),
+                                    "Xform")
+            geom.GetReferences().AddReference(
+                f"./payloads/meshes/{dst.name}")
+            sx = sy = sz = unit_scale
+            if scale:
+                usx, usy, usz = (float(v) for v in scale.split())
+                sx, sy, sz = sx * usx, sy * usy, sz * usz
+            if (sx, sy, sz) != (1.0, 1.0, 1.0):
+                from pxr import Gf, UsdGeom as _ug
+                attr = geom.GetAttribute("xformOp:scale")
+                if attr:      # referenced /World already carries the op
+                    attr.Set(Gf.Vec3f(sx, sy, sz))
+                else:
+                    _ug.Xformable(geom).AddScaleOp().Set(
+                        Gf.Vec3f(sx, sy, sz))
+            attached += 1
+
+    stage.GetRootLayer().Save()
+    # verify the geometry actually composes through the references
+    check = Usd.Stage.Open(str(usd_path))
+    n_mesh = sum(1 for p in Usd.PrimRange(
+        check.GetDefaultPrim(), Usd.TraverseInstanceProxies())
+        if p.IsA(UsdGeom.Mesh))
+    print(f"visual meshes attached: {attached} slots, "
+          f"{len(converted)} files converted, {n_mesh} Mesh prims compose",
+          flush=True)
+    if n_mesh == 0:
+        raise RuntimeError("mesh attach produced no composed Mesh prims")
 
 
 def add_sensor_prims(usd_path: Path) -> None:

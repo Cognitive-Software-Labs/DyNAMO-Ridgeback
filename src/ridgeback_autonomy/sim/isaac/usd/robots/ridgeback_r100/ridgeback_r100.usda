@@ -4,13 +4,13 @@
         string creator = "URDF USD Converter v0.1.3"
     }
     defaultPrim = "tn__r1000001_bC"
-    doc = """Generated from Composed Stage of root layer /tmp/tmpyi8gvy5i/r100-0001.usdc
+    doc = """Generated from Composed Stage of root layer /tmp/tmpq3z8vj71/r100-0001.usdc
 
 
-Generated from Composed Stage of root layer /tmp/urdf_import_ridgeback_r100_v2564li6/usdex_ridgeback_r100/r100-0001.usdc
+Generated from Composed Stage of root layer /tmp/urdf_import_ridgeback_r100_08j9comu/usdex_ridgeback_r100/r100-0001.usdc
 
 
-Generated from Composed Stage of root layer /tmp/urdf_import_ridgeback_r100_v2564li6/temp_ridgeback_r100/ridgeback_r100.usd
+Generated from Composed Stage of root layer /tmp/urdf_import_ridgeback_r100_08j9comu/temp_ridgeback_r100/ridgeback_r100.usd
 
 
 Generated from Composed Stage of root layer /home/deivid/dev/DyNAMO-Ridgeback/.claude/worktrees/jolly-borg-f48cab/src/ridgeback_autonomy/sim/isaac/usd/robots/ridgeback_r100.usd/ridgeback_r100/payloads/base.usd
@@ -161,6 +161,15 @@ def Xform "tn__r1000001_bC" (
                                     float omni:sensor:tickRate = 40
                                 }
                             }
+
+                            over "hokuyo_ust"
+                            {
+                                def Xform "geom" (
+                                    prepend references = @./payloads/meshes/hokuyo_ust.usd@
+                                )
+                                {
+                                }
+                            }
                         }
 
                         over "lidar2d_1_link"
@@ -201,6 +210,15 @@ def Xform "tn__r1000001_bC" (
                                     float omni:sensor:tickRate = 40
                                 }
                             }
+
+                            over "hokuyo_ust"
+                            {
+                                def Xform "geom" (
+                                    prepend references = @./payloads/meshes/hokuyo_ust.usd@
+                                )
+                                {
+                                }
+                            }
                         }
 
                         over "camera_0_bottom_screw_frame"
@@ -216,6 +234,193 @@ def Xform "tn__r1000001_bC" (
                                     quatf xformOp:orient = (0.5, 0.5, -0.5, -0.5)
                                     double3 xformOp:translate = (0, 0.015, 0)
                                     uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient"]
+                                }
+
+                                over "d435"
+                                {
+                                    def Xform "geom" (
+                                        prepend references = @./payloads/meshes/d435.usd@
+                                    )
+                                    {
+                                        float3 xformOp:scale = (0.01, 0.01, 0.01)
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    over "top_link"
+                    {
+                        over "top"
+                        {
+                            def Xform "geom" (
+                                prepend references = @./payloads/meshes/top.usd@
+                            )
+                            {
+                            }
+                        }
+                    }
+                }
+
+                over "body"
+                {
+                    def Xform "geom" (
+                        prepend references = @./payloads/meshes/body.usd@
+                    )
+                    {
+                    }
+                }
+
+                over "left_side_cover_link"
+                {
+                    def Xform "side_cover"
+                    {
+                        def Xform "geom" (
+                            prepend references = @./payloads/meshes/side-cover.usd@
+                        )
+                        {
+                        }
+                    }
+                }
+
+                over "right_side_cover_link"
+                {
+                    def Xform "side_cover"
+                    {
+                        def Xform "geom" (
+                            prepend references = @./payloads/meshes/side-cover.usd@
+                        )
+                        {
+                        }
+                    }
+                }
+
+                over "front_cover_link"
+                {
+                    def Xform "end_cover"
+                    {
+                        def Xform "geom" (
+                            prepend references = @./payloads/meshes/end-cover.usd@
+                        )
+                        {
+                        }
+                    }
+                }
+
+                over "rear_cover_link"
+                {
+                    def Xform "end_cover"
+                    {
+                        def Xform "geom" (
+                            prepend references = @./payloads/meshes/end-cover.usd@
+                        )
+                        {
+                        }
+                    }
+                }
+
+                over "front_lights_link"
+                {
+                    over "lights"
+                    {
+                        def Xform "geom" (
+                            prepend references = @./payloads/meshes/lights.usd@
+                        )
+                        {
+                        }
+                    }
+                }
+
+                over "rear_lights_link"
+                {
+                    over "lights"
+                    {
+                        def Xform "geom" (
+                            prepend references = @./payloads/meshes/lights.usd@
+                        )
+                        {
+                        }
+                    }
+                }
+
+                over "axle_link"
+                {
+                    over "axle"
+                    {
+                        def Xform "geom" (
+                            prepend references = @./payloads/meshes/axle.usd@
+                        )
+                        {
+                        }
+                    }
+
+                    over "front_rocker_link"
+                    {
+                        over "rocker"
+                        {
+                            def Xform "geom" (
+                                prepend references = @./payloads/meshes/rocker.usd@
+                            )
+                            {
+                            }
+                        }
+
+                        over "front_left_wheel_link"
+                        {
+                            over "mecanum"
+                            {
+                                def Xform "geom" (
+                                    prepend references = @./payloads/meshes/mecanum.usd@
+                                )
+                                {
+                                }
+                            }
+                        }
+
+                        over "front_right_wheel_link"
+                        {
+                            over "mecanum"
+                            {
+                                def Xform "geom" (
+                                    prepend references = @./payloads/meshes/mecanum.usd@
+                                )
+                                {
+                                }
+                            }
+                        }
+                    }
+
+                    over "rear_rocker_link"
+                    {
+                        over "rocker"
+                        {
+                            def Xform "geom" (
+                                prepend references = @./payloads/meshes/rocker.usd@
+                            )
+                            {
+                            }
+                        }
+
+                        over "rear_left_wheel_link"
+                        {
+                            over "mecanum"
+                            {
+                                def Xform "geom" (
+                                    prepend references = @./payloads/meshes/mecanum.usd@
+                                )
+                                {
+                                }
+                            }
+                        }
+
+                        over "rear_right_wheel_link"
+                        {
+                            over "mecanum"
+                            {
+                                def Xform "geom" (
+                                    prepend references = @./payloads/meshes/mecanum.usd@
+                                )
+                                {
                                 }
                             }
                         }
