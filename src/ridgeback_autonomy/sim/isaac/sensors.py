@@ -1,34 +1,25 @@
-"""GPU sensor rigs for the Isaac runner (P4).
+"""Runtime ROS wiring for the robot package's GPU sensor prims (P4).
 
-Everything here publishes through OmniGraph bridge helper nodes (the GPU
-path); plain-rclpy I/O lives in ros_io.py. Attached after the robot is
-referenced and the ros2 bridge extension is enabled, before play.
+The sensor PRIMS live in the committed robot USD — the import script
+(tools/isaac/import_ridgeback_urdf.py) bakes 2x UST-10LX OmniLidar prims
+onto the lidar2d_{0,1}_laser frames and a D455-intrinsics camera at the
+color optical pose, from the committed specs (ust10lx_2d.json and
+config/camera_config.json). This module only binds render products and
+ROS2 bridge helper publishers to those prims at runtime; plain-rclpy I/O
+lives in ros_io.py.
 
-Lidars: two Hokuyo UST-10LX on the lidar2d_{0,1}_laser frames. Isaac 6.0
-replaced JSON lidar profiles with OmniLidar prims carrying
-OmniSensorGenericLidarCoreAPI attributes — ust10lx_2d.json (committed
-spec) is read here and authored onto the prims.
-
-Publish topics follow the frozen contract: sensors/lidar2d_{i}/scan in
-the robot namespace, frame lidar2d_{i}_laser, default (RELIABLE/VOLATILE/
+Publish topics follow the frozen contract, default (RELIABLE/VOLATILE/
 KEEP_LAST 10) QoS from the bridge nodes.
+
+Known quirk (tracked for P5): the bridge's laser_scan writer stamps with
+sim time at publish while the RTX pipeline delivers data a few frames
+late — fast rotation smears SLAM input. Fix is a custom writer with
+frame-correlated IsaacReadSimulationTime.
 """
 from __future__ import annotations
 
-import json
-import math
-from pathlib import Path
-
-LIDAR_SPEC_PATH = Path(__file__).resolve().parent / "ust10lx_2d.json"
-# single source of camera intrinsics (also consumed by perception)
-CAMERA_CONFIG_PATH = (Path(__file__).resolve().parents[2]
-                      / "config/camera_config.json")
-
-# USD cameras look down -Z with +Y up in image; this quaternion (w,x,y,z)
-# orients that to the ROS optical convention (+Z forward, +Y down) when
-# the parent link is x-forward/z-up — i.e. the optical frame the static
-# camera_optical_tf publishes, rotated pi about X.
-_OPTICAL_QUAT_WXYZ = (0.5, 0.5, -0.5, -0.5)
+REGEN_HINT = ("robot USD predates baked sensor prims — regenerate with "
+              "tools/isaac/import_ridgeback_urdf.py")
 
 
 def _find_prim_by_name(stage, root_path: str, name: str):
@@ -38,38 +29,22 @@ def _find_prim_by_name(stage, root_path: str, name: str):
     for prim in Usd.PrimRange(root):
         if prim.GetName() == name:
             return prim
-    raise RuntimeError(f"prim named {name} not found under {root_path}")
+    raise RuntimeError(f"prim named {name} not found under {root_path}: "
+                       + REGEN_HINT)
 
 
-def _author_spec(prim, attributes: dict) -> None:
-    """Author OmniSensor attributes; values are already USD-typed enough
-    (int/float/str/bool/lists) that Usd type coercion handles them."""
-    from pxr import Vt
+def _render_product(prim_path: str, resolution):
+    import omni.replicator.core as rep
 
-    for name, value in attributes.items():
-        attr = prim.GetAttribute(name)
-        if not attr:
-            raise RuntimeError(f"{prim.GetPath()}: no attribute {name} "
-                               f"(schema not applied?)")
-        if isinstance(value, list):
-            if all(isinstance(v, int) for v in value):
-                value = Vt.UIntArray(value) if min(value) >= 0 \
-                    else Vt.IntArray(value)
-            else:
-                value = Vt.FloatArray([float(v) for v in value])
-        attr.Set(value)
+    rp = rep.create.render_product(str(prim_path), resolution)
+    return rp.path if hasattr(rp, "path") else str(rp)
 
 
 def attach_lidars(stage, robot_root: str = "/ridgeback",
                   namespace: str = "r100_0001") -> list:
-    """Create both UST-10LX rigs + bridge laser_scan publishers.
-
-    Returns the created OmniLidar prim paths (for tests/diagnostics).
-    """
+    """Bind render products + bridge laser_scan publishers to the two
+    baked UST-10LX prims. Returns their prim paths."""
     import omni.graph.core as og
-    import omni.replicator.core as rep
-
-    spec = json.loads(LIDAR_SPEC_PATH.read_text())["attributes"]
 
     created = []
     nodes = [("tick", "omni.graph.action.OnPlaybackTick")]
@@ -77,17 +52,12 @@ def attach_lidars(stage, robot_root: str = "/ridgeback",
     values = []
     for i in (0, 1):
         laser = _find_prim_by_name(stage, robot_root, f"lidar2d_{i}_laser")
-        lidar_path = laser.GetPath().AppendChild("rtx_lidar")
-        lidar = stage.DefinePrim(lidar_path, "OmniLidar")
-        if not lidar.ApplyAPI("OmniSensorGenericLidarCoreAPI"):
-            raise RuntimeError(f"cannot apply lidar core API at {lidar_path}")
-        _author_spec(lidar, spec)
-        created.append(str(lidar_path))
-
-        # render product drives the RTX sensor pipeline; resolution is a
-        # placeholder for non-camera sensors
-        rp = rep.create.render_product(str(lidar_path), [32, 32])
-        rp_path = rp.path if hasattr(rp, "path") else str(rp)
+        lidar = laser.GetChild("rtx_lidar")
+        if not lidar:
+            raise RuntimeError(f"{laser.GetPath()}: no rtx_lidar child — "
+                               + REGEN_HINT)
+        created.append(str(lidar.GetPath()))
+        rp_path = _render_product(lidar.GetPath(), [32, 32])
 
         node = f"lidar{i}"
         nodes.append((node, "isaacsim.ros2.bridge.ROS2RtxLidarHelper"))
@@ -115,48 +85,36 @@ def attach_lidars(stage, robot_root: str = "/ridgeback",
 
 def attach_camera(stage, robot_root: str = "/ridgeback",
                   namespace: str = "r100_0001") -> str:
-    """D455-native camera: one USD camera at the color optical pose
-    renders color+depth+points at true D455 720p intrinsics (depth
-    aligned to color, matching the gz-era single-camera setup and the
-    real driver's align mode). Intrinsics come from camera_config.json.
-    """
+    """Bind one render product + color/depth/points/camera_info publishers
+    to the baked D455 camera prim (depth aligned to color, like the gz
+    setup and the real driver's align mode)."""
     import omni.graph.core as og
-    import omni.replicator.core as rep
-    from pxr import Gf, UsdGeom
-
-    cam_cfg = json.loads(CAMERA_CONFIG_PATH.read_text())["camera"]
-    width, height = int(cam_cfg["width"]), int(cam_cfg["height"])
-    fx, fy = float(cam_cfg["fx"]), float(cam_cfg["fy"])
+    from pxr import UsdGeom
 
     link = _find_prim_by_name(stage, robot_root, "camera_0_link")
-    cam_path = link.GetPath().AppendChild("d455_color")
-    cam = UsdGeom.Camera.Define(stage, cam_path)
-    # optical pose: same translate the camera_optical_tf static publishes
-    xf = UsdGeom.Xformable(cam.GetPrim())
-    xf.AddTranslateOp().Set(Gf.Vec3d(0.0, 0.015, 0.0))
-    w, x, y, z = _OPTICAL_QUAT_WXYZ
-    xf.AddOrientOp().Set(Gf.Quatf(w, x, y, z))
-    # pinhole intrinsics: fx = width * focalLength / horizontalAperture
-    focal = 24.0
-    cam.CreateFocalLengthAttr(focal)
-    cam.CreateHorizontalApertureAttr(width * focal / fx)
-    cam.CreateVerticalApertureAttr(height * focal / fy)
-    cam.CreateClippingRangeAttr(Gf.Vec2f(0.1, 100.0))
-
-    rp = rep.create.render_product(str(cam_path), [width, height])
-    rp_path = rp.path if hasattr(rp, "path") else str(rp)
+    cam = link.GetChild("d455_color")
+    if not cam:
+        raise RuntimeError(f"{link.GetPath()}: no d455_color child — "
+                           + REGEN_HINT)
+    # resolution back-derived from the baked intrinsics: fx = w*f/hAp
+    c = UsdGeom.Camera(cam)
+    focal = c.GetFocalLengthAttr().Get()
+    hap = c.GetHorizontalApertureAttr().Get()
+    vap = c.GetVerticalApertureAttr().Get()
+    fx = 1280 * focal / hap            # sanity print only
+    width, height = 1280, int(round(1280 * vap / hap))
+    rp_path = _render_product(cam.GetPath(), [width, height])
 
     frame = "camera_0_color_optical_frame"
     base = "sensors/camera_0"
     nodes = [("cam_tick", "omni.graph.action.OnPlaybackTick")]
     connects = []
     values = []
-    helpers = [
+    for node, kind, topic in [
         ("cam_rgb", "rgb", f"{base}/color/image"),
         ("cam_depth", "depth", f"{base}/depth/image"),
         ("cam_points", "depth_pcl", f"{base}/points"),
-    ]
-    for node, kind, topic in helpers:
+    ]:
         nodes.append((node, "isaacsim.ros2.bridge.ROS2CameraHelper"))
         connects.append(("cam_tick.outputs:tick", f"{node}.inputs:execIn"))
         values += [
@@ -189,7 +147,6 @@ def attach_camera(stage, robot_root: str = "/ridgeback",
             og.Controller.Keys.SET_VALUES: values,
         },
     )
-    hfov = math.degrees(2 * math.atan(width / (2 * fx)))
-    print(f"camera attached: {cam_path} {width}x{height} fx={fx} "
-          f"(hfov {hfov:.1f} deg)", flush=True)
-    return str(cam_path)
+    print(f"camera attached: {cam.GetPath()} {width}x{height} "
+          f"fx={fx:.0f}", flush=True)
+    return str(cam.GetPath())

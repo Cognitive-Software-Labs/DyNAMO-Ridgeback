@@ -155,6 +155,7 @@ def import_urdf_to_usd(urdf_path: Path) -> None:
         print(f"imported -> {out}", flush=True)
 
         add_planar_rig(Path(out))
+        add_sensor_prims(Path(out))
 
         # flatten <staging .usd dir>/ridgeback_r100/... -> robots/ridgeback_r100/
         import shutil
@@ -331,6 +332,76 @@ def add_planar_rig(usd_path: Path) -> None:
     stage.GetRootLayer().Save()
     print(f"planar drive rig appended ({freed} wheel drives freed) -> {usd_path}",
           flush=True)
+
+
+def add_sensor_prims(usd_path: Path) -> None:
+    """Author the GPU sensor prims INTO the robot package so the committed
+    USD is the complete digital twin (open it in the Isaac GUI and the
+    sensors are there). Specs stay in their committed sources —
+    sim/isaac/ust10lx_2d.json and config/camera_config.json — and are
+    baked here at regen time; sensors.py only binds render products and
+    ROS publishers to these prims at runtime.
+    """
+    import json
+    import math
+
+    from isaacsim.core.utils.extensions import enable_extension
+    # registers OmniLidar + OmniSensorGenericLidarCoreAPI
+    enable_extension("omni.usd.schema.omni_sensors")
+    from pxr import Gf, Usd, UsdGeom, Vt
+
+    sim_dir = REPO / "src/ridgeback_autonomy/sim/isaac"
+    lidar_spec = json.loads((sim_dir / "ust10lx_2d.json").read_text())["attributes"]
+    cam_cfg = json.loads(
+        (REPO / "src/ridgeback_autonomy/config/camera_config.json")
+        .read_text())["camera"]
+
+    stage = Usd.Stage.Open(str(usd_path))
+
+    def find(name):
+        for prim in Usd.PrimRange(stage.GetDefaultPrim()):
+            if prim.GetName() == name:
+                return prim
+        raise RuntimeError(f"prim {name} missing from imported robot")
+
+    for i in (0, 1):
+        laser = find(f"lidar2d_{i}_laser")
+        lidar = stage.DefinePrim(
+            laser.GetPath().AppendChild("rtx_lidar"), "OmniLidar")
+        if not lidar.ApplyAPI("OmniSensorGenericLidarCoreAPI"):
+            raise RuntimeError("OmniSensorGenericLidarCoreAPI not registered")
+        for name, value in lidar_spec.items():
+            attr = lidar.GetAttribute(name)
+            if not attr:
+                raise RuntimeError(f"{lidar.GetPath()}: no attribute {name}")
+            if isinstance(value, list):
+                if all(isinstance(v, int) for v in value):
+                    value = Vt.UIntArray(value) if min(value) >= 0 \
+                        else Vt.IntArray(value)
+                else:
+                    value = Vt.FloatArray([float(v) for v in value])
+            attr.Set(value)
+
+    link = find("camera_0_link")
+    cam = UsdGeom.Camera.Define(
+        stage, link.GetPath().AppendChild("d455_color"))
+    xf = UsdGeom.Xformable(cam.GetPrim())
+    # color optical pose (matches the camera_optical_tf static publish);
+    # quaternion turns USD's -Z-forward/+Y-up into the ROS optical frame
+    xf.AddTranslateOp().Set(Gf.Vec3d(0.0, 0.015, 0.0))
+    xf.AddOrientOp().Set(Gf.Quatf(0.5, 0.5, -0.5, -0.5))
+    width, height = int(cam_cfg["width"]), int(cam_cfg["height"])
+    fx, fy = float(cam_cfg["fx"]), float(cam_cfg["fy"])
+    focal = 24.0
+    cam.CreateFocalLengthAttr(focal)
+    cam.CreateHorizontalApertureAttr(width * focal / fx)
+    cam.CreateVerticalApertureAttr(height * focal / fy)
+    cam.CreateClippingRangeAttr(Gf.Vec2f(0.1, 100.0))
+
+    stage.GetRootLayer().Save()
+    hfov = math.degrees(2 * math.atan(width / (2 * fx)))
+    print(f"sensor prims baked: 2x UST-10LX + D455 camera "
+          f"({width}x{height}, hfov {hfov:.1f} deg) -> {usd_path}", flush=True)
 
 
 def _stl_aabb(path: Path):
