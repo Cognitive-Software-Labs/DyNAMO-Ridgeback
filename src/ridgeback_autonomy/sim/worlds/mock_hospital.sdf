@@ -282,7 +282,7 @@
     <include>
       <name>default_g1_far_right_room</name>
       <uri>model://g1</uri>
-      <pose>13.2 4.65 0 0 0 3.14159</pose>
+      <pose>13.2 4.65 0.05 0 0 3.14159</pose>
     </include>
 
     <!-- Target sphere in forward room -->

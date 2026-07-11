@@ -66,7 +66,8 @@ def test_g1_include(hospital):
     inc = hospital.includes[0]
     assert inc.uri == "model://g1"
     assert inc.name == "default_g1_far_right_room"
-    assert inc.pose == (13.2, 4.65, 0.0, 0.0, 0.0, 3.14159)
+    # z = floor top (0.05): G1 stands ON the slab, not sunk to its ankles
+    assert inc.pose == (13.2, 4.65, 0.05, 0.0, 0.0, 3.14159)
 
 
 def test_lights(hospital):

@@ -253,6 +253,35 @@ def _sanitize(name):
     return out if not out[:1].isdigit() else "_" + out
 
 
+def _freeze_include_dynamics(prim) -> None:
+    """Included models are set dressing: kill their dynamics, keep their
+    colliders (static obstacles the robot cannot drive through) and their
+    visuals (RTX lidar and cameras raytrace render geometry). The vendored
+    G1 is a live 51-body articulation with 29 unactuated dofs — at play it
+    would flop under gravity and jitter against the floor otherwise."""
+    # PhysxSchema python module only exists inside Kit — author the physx
+    # attribute + apiSchemas entry by hand so this stays runnable under
+    # plain-pxr isaac_venv (same constraint as the rest of this file).
+    from pxr import Sdf, Usd, UsdPhysics
+
+    frozen = 0
+    for p in Usd.PrimRange(prim):
+        if p.HasAPI(UsdPhysics.ArticulationRootAPI):
+            schemas = p.GetMetadata("apiSchemas") or Sdf.TokenListOp()
+            items = list(schemas.GetAddedOrExplicitItems())
+            if "PhysxArticulationAPI" not in items:
+                schemas.appendedItems = list(schemas.appendedItems) + [
+                    "PhysxArticulationAPI"]
+                p.SetMetadata("apiSchemas", schemas)
+            p.CreateAttribute("physxArticulation:articulationEnabled",
+                              Sdf.ValueTypeNames.Bool).Set(False)
+        if p.HasAPI(UsdPhysics.RigidBodyAPI):
+            UsdPhysics.RigidBodyAPI(p).CreateRigidBodyEnabledAttr(False)
+            frozen += 1
+    print(f"  include {prim.GetName()}: dynamics frozen on {frozen} bodies",
+          flush=True)
+
+
 def emit_usd(world: World, out_path: Path, model_refs: dict[str, str]):
     from pxr import Gf, Sdf, Usd, UsdGeom, UsdLux, UsdPhysics, UsdShade
 
@@ -336,7 +365,14 @@ def emit_usd(world: World, out_path: Path, model_refs: dict[str, str]):
                 f"include {inc.uri!r}: pass --model-ref {model_name}=<usd path>")
         ix = UsdGeom.Xform.Define(stage, root_path.AppendChild(_sanitize(inc.name)))
         set_pose(ix, inc.pose)
-        ix.GetPrim().GetReferences().AddReference(model_refs[model_name])
+        # Reference on a CHILD prim, never on the posed prim itself: a
+        # reference merges the target prim into the referencing prim, so
+        # our xformOp:translate would mask the target's own ops (the G1
+        # wrapper's 0.792 pelvis lift silently vanished this way and the
+        # figure stood waist-deep in the floor).
+        inner = stage.DefinePrim(ix.GetPath().AppendChild("model"), "Xform")
+        inner.GetReferences().AddReference(model_refs[model_name])
+        _freeze_include_dynamics(inner)
 
     for light in world.lights:
         lpath = root_path.AppendChild(_sanitize(light.name))
@@ -403,6 +439,22 @@ def check_usd(world: World, usd_path: Path, tol=1e-5) -> list[str]:
                 errors.append(
                     f"{model.name} AABB {side}: sdf={tuple(round(v, 6) for v in want)} "
                     f"usd={tuple(round(v, 6) for v in got)}")
+
+    # Includes: the referenced model's ground-contact convention says its
+    # feet sit at local z=0, so the composed subtree's lowest point must
+    # land at the include's pose z (this is what regresses if a reference
+    # ever masks the wrapper's own xform ops again).
+    for inc in world.includes:
+        prim = root.GetChild(_sanitize(inc.name))
+        if not prim:
+            errors.append(f"missing include prim: {inc.name}")
+            continue
+        box = cache.ComputeWorldBound(prim).ComputeAlignedRange()
+        feet_z = box.GetMin()[2]
+        if abs(feet_z - inc.pose[2]) > 0.02:
+            errors.append(
+                f"{inc.name}: subtree bottom z={feet_z:.4f}, expected "
+                f"pose z={inc.pose[2]:.4f} (wrapper xform masked?)")
 
     got_children = {c.GetName() for c in root.GetChildren()}
     missing = expected_children - got_children

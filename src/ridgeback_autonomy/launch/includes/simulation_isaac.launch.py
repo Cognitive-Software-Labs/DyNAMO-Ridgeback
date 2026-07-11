@@ -103,7 +103,8 @@ def generate_launch_description():
              '--headless', headless,
              '--livestream', livestream,
              '--rtf', rtf,
-             '--odom-noise', odom_noise],
+             '--odom-noise', odom_noise,
+             '--animate-g1', LaunchConfiguration('animate_g1')],
         name='isaac_runner',
         output='screen',
         additional_env={'OMNI_KIT_ACCEPT_EULA': 'YES'},
@@ -127,6 +128,9 @@ def generate_launch_description():
                               description='real-time factor; 0 = unthrottled'),
         DeclareLaunchArgument('odom_noise', default_value='1.0',
                               description='odometry drift scale; 0 = perfect'),
+        DeclareLaunchArgument('animate_g1', default_value='false',
+                              description='demo idle for world-authored G1 '
+                                          'figures; keep off for benchmarks'),
         generate_description,
         RegisterEventHandler(OnProcessExit(
             target_action=generate_description,

@@ -1780,13 +1780,276 @@ def Xform "mock_hospital"
         }
     }
 
-    def Xform "default_g1_far_right_room" (
-        prepend references = @../models/g1/g1.usda@
-    )
+    def Xform "default_g1_far_right_room"
     {
         quatf xformOp:orient = (0.0000013267949, 0, 0, 1)
-        double3 xformOp:translate = (13.2, 4.65, 0)
+        double3 xformOp:translate = (13.2, 4.65, 0.05)
         uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient"]
+
+        def Xform "model" (
+            prepend references = @../models/g1/g1.usda@
+        )
+        {
+            over "pelvis"
+            {
+                bool physics:rigidBodyEnabled = 0
+            }
+
+            over "imu_in_pelvis"
+            {
+                bool physics:rigidBodyEnabled = 0
+            }
+
+            over "left_hip_pitch_link"
+            {
+                bool physics:rigidBodyEnabled = 0
+            }
+
+            over "left_hip_roll_link"
+            {
+                bool physics:rigidBodyEnabled = 0
+            }
+
+            over "left_hip_yaw_link"
+            {
+                bool physics:rigidBodyEnabled = 0
+            }
+
+            over "left_knee_link"
+            {
+                bool physics:rigidBodyEnabled = 0
+            }
+
+            over "left_ankle_pitch_link"
+            {
+                bool physics:rigidBodyEnabled = 0
+            }
+
+            over "left_ankle_roll_link"
+            {
+                bool physics:rigidBodyEnabled = 0
+            }
+
+            over "pelvis_contour_link"
+            {
+                bool physics:rigidBodyEnabled = 0
+            }
+
+            over "right_hip_pitch_link"
+            {
+                bool physics:rigidBodyEnabled = 0
+            }
+
+            over "right_hip_roll_link"
+            {
+                bool physics:rigidBodyEnabled = 0
+            }
+
+            over "right_hip_yaw_link"
+            {
+                bool physics:rigidBodyEnabled = 0
+            }
+
+            over "right_knee_link"
+            {
+                bool physics:rigidBodyEnabled = 0
+            }
+
+            over "right_ankle_pitch_link"
+            {
+                bool physics:rigidBodyEnabled = 0
+            }
+
+            over "right_ankle_roll_link"
+            {
+                bool physics:rigidBodyEnabled = 0
+            }
+
+            over "waist_yaw_link"
+            {
+                bool physics:rigidBodyEnabled = 0
+            }
+
+            over "waist_roll_link"
+            {
+                bool physics:rigidBodyEnabled = 0
+            }
+
+            over "torso_link"
+            {
+                bool physics:rigidBodyEnabled = 0
+            }
+
+            over "d435_link"
+            {
+                bool physics:rigidBodyEnabled = 0
+            }
+
+            over "head_link"
+            {
+                bool physics:rigidBodyEnabled = 0
+            }
+
+            over "imu_in_torso"
+            {
+                bool physics:rigidBodyEnabled = 0
+            }
+
+            over "left_shoulder_pitch_link"
+            {
+                bool physics:rigidBodyEnabled = 0
+            }
+
+            over "left_shoulder_roll_link"
+            {
+                bool physics:rigidBodyEnabled = 0
+            }
+
+            over "left_shoulder_yaw_link"
+            {
+                bool physics:rigidBodyEnabled = 0
+            }
+
+            over "left_elbow_link"
+            {
+                bool physics:rigidBodyEnabled = 0
+            }
+
+            over "left_wrist_roll_link"
+            {
+                bool physics:rigidBodyEnabled = 0
+            }
+
+            over "left_wrist_pitch_link"
+            {
+                bool physics:rigidBodyEnabled = 0
+            }
+
+            over "left_wrist_yaw_link"
+            {
+                bool physics:rigidBodyEnabled = 0
+            }
+
+            over "left_hand_base_link"
+            {
+                bool physics:rigidBodyEnabled = 0
+            }
+
+            over "left_hand_Link1_1"
+            {
+                bool physics:rigidBodyEnabled = 0
+            }
+
+            over "left_hand_Link1_2"
+            {
+                bool physics:rigidBodyEnabled = 0
+            }
+
+            over "left_hand_Link1_3"
+            {
+                bool physics:rigidBodyEnabled = 0
+            }
+
+            over "left_hand_Link2_1"
+            {
+                bool physics:rigidBodyEnabled = 0
+            }
+
+            over "left_hand_Link2_2"
+            {
+                bool physics:rigidBodyEnabled = 0
+            }
+
+            over "left_hand_Link2_3"
+            {
+                bool physics:rigidBodyEnabled = 0
+            }
+
+            over "logo_link"
+            {
+                bool physics:rigidBodyEnabled = 0
+            }
+
+            over "mid360_link"
+            {
+                bool physics:rigidBodyEnabled = 0
+            }
+
+            over "right_shoulder_pitch_link"
+            {
+                bool physics:rigidBodyEnabled = 0
+            }
+
+            over "right_shoulder_roll_link"
+            {
+                bool physics:rigidBodyEnabled = 0
+            }
+
+            over "right_shoulder_yaw_link"
+            {
+                bool physics:rigidBodyEnabled = 0
+            }
+
+            over "right_elbow_link"
+            {
+                bool physics:rigidBodyEnabled = 0
+            }
+
+            over "right_wrist_roll_link"
+            {
+                bool physics:rigidBodyEnabled = 0
+            }
+
+            over "right_wrist_pitch_link"
+            {
+                bool physics:rigidBodyEnabled = 0
+            }
+
+            over "right_wrist_yaw_link"
+            {
+                bool physics:rigidBodyEnabled = 0
+            }
+
+            over "right_hand_base_link"
+            {
+                bool physics:rigidBodyEnabled = 0
+            }
+
+            over "right_hand_Link1_1"
+            {
+                bool physics:rigidBodyEnabled = 0
+            }
+
+            over "right_hand_Link1_2"
+            {
+                bool physics:rigidBodyEnabled = 0
+            }
+
+            over "right_hand_Link1_3"
+            {
+                bool physics:rigidBodyEnabled = 0
+            }
+
+            over "right_hand_Link2_1"
+            {
+                bool physics:rigidBodyEnabled = 0
+            }
+
+            over "right_hand_Link2_2"
+            {
+                bool physics:rigidBodyEnabled = 0
+            }
+
+            over "right_hand_Link2_3"
+            {
+                bool physics:rigidBodyEnabled = 0
+            }
+
+            over "root_joint"
+            {
+                custom bool physxArticulation:articulationEnabled = 0
+            }
+        }
     }
 
     def DistantLight "sun"

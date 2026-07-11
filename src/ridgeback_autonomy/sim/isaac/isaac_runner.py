@@ -48,6 +48,12 @@ def parse_args():
                     help="publish odom->base_link TF from the runner. Off by "
                          "default: the EKF include owns that TF, like the "
                          "real platform. Enable for standalone runs")
+    ap.add_argument("--animate-g1", default="false", choices=["true", "false"],
+                    help="give world-authored G1 figures a gentle kinematic "
+                         "idle (sway + drift). Demo sugar only — keep off "
+                         "for benchmarks; the calibration targets must not "
+                         "move (real pedestrian animation is a planned "
+                         "post-port addon)")
     ap.add_argument("--spawn", default="0,0,0",
                     help="robot spawn x,y,yaw in the world frame")
     ap.add_argument("--spawn-z", type=float, default=0.076,
@@ -194,6 +200,24 @@ def run(app, args) -> int:
     # requested spawn pose with zero velocity.
     rig.set_planar_pose(x0, y0, yaw0)
 
+    # optional demo idle for world-authored G1 figures (children of the
+    # world's default prim whose name mentions g1 — the robot lives at
+    # /ridgeback, outside that subtree)
+    g1_anim = []
+    if args.animate_g1 == "true":
+        for prim in stage.GetDefaultPrim().GetChildren():
+            if "g1" not in prim.GetName().lower():
+                continue
+            tr = prim.GetAttribute("xformOp:translate")
+            orq = prim.GetAttribute("xformOp:orient")
+            if not (tr and orq and tr.HasAuthoredValue()):
+                continue
+            t0 = tr.Get()
+            q0 = orq.Get()
+            yaw0 = 2.0 * math.atan2(q0.GetImaginary()[2], q0.GetReal())
+            g1_anim.append((tr, orq, t0, yaw0))
+        print(f"animating {len(g1_anim)} g1 figure(s)", flush=True)
+
     print("RUNNER READY", flush=True)
 
     stop = {"flag": False}
@@ -217,6 +241,15 @@ def run(app, args) -> int:
         if cmd is not None:
             rig.set_cmd(*cmd, now=sim_time)
         rig.step(frame_dt if frame_dt > 0 else 1.0 / 60.0, now=sim_time)
+
+        # kinematic idle: slow figure-of-motion drift + heading sway
+        for tr, orq, t0, yaw0 in g1_anim:
+            from pxr import Gf
+            dx = 0.35 * math.sin(0.35 * sim_time)
+            dy = 0.20 * math.sin(0.22 * sim_time + 0.7)
+            yaw = yaw0 + 0.45 * math.sin(0.35 * sim_time + 1.2)
+            tr.Set(Gf.Vec3d(t0[0] + dx, t0[1] + dy, t0[2]))
+            orq.Set(Gf.Quatf(math.cos(yaw / 2), 0.0, 0.0, math.sin(yaw / 2)))
 
         app.update()          # one render frame + its physics substeps
         frames += 1
