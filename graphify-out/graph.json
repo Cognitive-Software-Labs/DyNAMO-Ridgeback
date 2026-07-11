@@ -10,7 +10,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "claude_settings",
-      "community": 30,
+      "community": 32,
       "norm_label": "settings.json"
     },
     {
@@ -20,7 +20,7 @@
       "source_location": "L2",
       "_origin": "ast",
       "id": "claude_settings_hooks",
-      "community": 30,
+      "community": 32,
       "norm_label": "hooks"
     },
     {
@@ -30,7 +30,7 @@
       "source_location": "L3",
       "_origin": "ast",
       "id": "claude_settings_hooks_pretooluse",
-      "community": 30,
+      "community": 32,
       "norm_label": "pretooluse"
     },
     {
@@ -40,7 +40,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "claude_settings_local",
-      "community": 31,
+      "community": 33,
       "norm_label": "settings.local.json"
     },
     {
@@ -50,7 +50,7 @@
       "source_location": "L2",
       "_origin": "ast",
       "id": "claude_settings_local_permissions",
-      "community": 31,
+      "community": 33,
       "norm_label": "permissions"
     },
     {
@@ -60,7 +60,7 @@
       "source_location": "L3",
       "_origin": "ast",
       "id": "claude_settings_local_permissions_allow",
-      "community": 31,
+      "community": 33,
       "norm_label": "allow"
     },
     {
@@ -70,7 +70,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "codex_hooks",
-      "community": 33,
+      "community": 35,
       "norm_label": "hooks.json"
     },
     {
@@ -80,7 +80,7 @@
       "source_location": "L2",
       "_origin": "ast",
       "id": "codex_hooks_hooks",
-      "community": 33,
+      "community": 35,
       "norm_label": "hooks"
     },
     {
@@ -90,7 +90,7 @@
       "source_location": "L3",
       "_origin": "ast",
       "id": "codex_hooks_hooks_pretooluse",
-      "community": 33,
+      "community": 35,
       "norm_label": "pretooluse"
     },
     {
@@ -103,7 +103,7 @@
       },
       "_origin": "ast",
       "id": "mcp",
-      "community": 51,
+      "community": 53,
       "norm_label": ".mcp.json"
     },
     {
@@ -116,7 +116,7 @@
       },
       "_origin": "ast",
       "id": "mcp_mcp_server_isaac_sim_mcp",
-      "community": 51,
+      "community": 53,
       "norm_label": "isaac-sim-mcp"
     },
     {
@@ -130,7 +130,7 @@
       },
       "_origin": "ast",
       "id": "build_and_start_expl",
-      "community": 37,
+      "community": 39,
       "norm_label": "build_and_start_expl.sh"
     },
     {
@@ -144,7 +144,7 @@
       },
       "_origin": "ast",
       "id": "home_deivid_dev_dynamo_ridgeback_claude_worktrees_jolly_borg_f48cab_build_and_start_expl_sh__entry",
-      "community": 37,
+      "community": 39,
       "norm_label": "build_and_start_expl.sh script"
     },
     {
@@ -158,7 +158,7 @@
       },
       "_origin": "ast",
       "id": "cleanup",
-      "community": 32,
+      "community": 34,
       "norm_label": "cleanup.sh"
     },
     {
@@ -172,7 +172,7 @@
       },
       "_origin": "ast",
       "id": "home_deivid_dev_dynamo_ridgeback_claude_worktrees_jolly_borg_f48cab_cleanup_sh__entry",
-      "community": 32,
+      "community": 34,
       "norm_label": "cleanup.sh script"
     },
     {
@@ -186,7 +186,7 @@
       },
       "_origin": "ast",
       "id": "cleanup_kill_matches",
-      "community": 32,
+      "community": 34,
       "norm_label": "kill_matches()"
     },
     {
@@ -200,7 +200,7 @@
       },
       "_origin": "ast",
       "id": "diag",
-      "community": 34,
+      "community": 36,
       "norm_label": "diag.sh"
     },
     {
@@ -214,7 +214,7 @@
       },
       "_origin": "ast",
       "id": "home_deivid_dev_dynamo_ridgeback_claude_worktrees_jolly_borg_f48cab_diag_sh__entry",
-      "community": 34,
+      "community": 36,
       "norm_label": "diag.sh script"
     },
     {
@@ -228,7 +228,7 @@
       },
       "_origin": "ast",
       "id": "diag_section",
-      "community": 34,
+      "community": 36,
       "norm_label": "section()"
     },
     {
@@ -238,7 +238,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "config_camera_config",
-      "community": 26,
+      "community": 28,
       "norm_label": "camera_config.json"
     },
     {
@@ -248,7 +248,7 @@
       "source_location": "L2",
       "_origin": "ast",
       "id": "config_camera_config_camera",
-      "community": 26,
+      "community": 28,
       "norm_label": "camera"
     },
     {
@@ -258,7 +258,7 @@
       "source_location": "L3",
       "_origin": "ast",
       "id": "config_camera_config_camera_depth_hfov_deg",
-      "community": 26,
+      "community": 28,
       "norm_label": "depth_hfov_deg"
     },
     {
@@ -268,7 +268,7 @@
       "source_location": "L4",
       "_origin": "ast",
       "id": "config_camera_config_camera_depth_vfov_deg",
-      "community": 26,
+      "community": 28,
       "norm_label": "depth_vfov_deg"
     },
     {
@@ -278,7 +278,7 @@
       "source_location": "L5",
       "_origin": "ast",
       "id": "config_camera_config_camera_pitch_deg",
-      "community": 26,
+      "community": 28,
       "norm_label": "pitch_deg"
     },
     {
@@ -288,7 +288,7 @@
       "source_location": "L6",
       "_origin": "ast",
       "id": "config_camera_config_camera_height_m",
-      "community": 26,
+      "community": 28,
       "norm_label": "height_m"
     },
     {
@@ -298,7 +298,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "launch_g1_distance_benchmark_launch",
-      "community": 8,
+      "community": 7,
       "norm_label": "g1_distance_benchmark.launch.py"
     },
     {
@@ -308,7 +308,7 @@
       "source_location": "L25",
       "_origin": "ast",
       "id": "launch_g1_distance_benchmark_launch_build_benchmark_nodes",
-      "community": 8,
+      "community": 7,
       "norm_label": "build_benchmark_nodes()"
     },
     {
@@ -318,7 +318,7 @@
       "source_location": "L166",
       "_origin": "ast",
       "id": "launch_g1_distance_benchmark_launch_generate_launch_description",
-      "community": 8,
+      "community": 7,
       "norm_label": "generate_launch_description()"
     },
     {
@@ -328,7 +328,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "includes_camera_optical_tf_launch",
-      "community": 45,
+      "community": 47,
       "norm_label": "camera_optical_tf.launch.py"
     },
     {
@@ -338,7 +338,7 @@
       "source_location": "L8",
       "_origin": "ast",
       "id": "includes_camera_optical_tf_launch_generate_launch_description",
-      "community": 45,
+      "community": 47,
       "norm_label": "generate_launch_description()"
     },
     {
@@ -348,7 +348,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "includes_explore_launch",
-      "community": 46,
+      "community": 48,
       "norm_label": "explore.launch.py"
     },
     {
@@ -358,7 +358,7 @@
       "source_location": "L10",
       "_origin": "ast",
       "id": "includes_explore_launch_generate_launch_description",
-      "community": 46,
+      "community": 48,
       "norm_label": "generate_launch_description()"
     },
     {
@@ -368,7 +368,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "includes_nav2_launch",
-      "community": 47,
+      "community": 49,
       "norm_label": "nav2.launch.py"
     },
     {
@@ -378,7 +378,7 @@
       "source_location": "L12",
       "_origin": "ast",
       "id": "includes_nav2_launch_generate_launch_description",
-      "community": 47,
+      "community": 49,
       "norm_label": "generate_launch_description()"
     },
     {
@@ -388,7 +388,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "includes_simulation_launch",
-      "community": 48,
+      "community": 50,
       "norm_label": "simulation.launch.py"
     },
     {
@@ -398,7 +398,7 @@
       "source_location": "L12",
       "_origin": "ast",
       "id": "includes_simulation_launch_generate_launch_description",
-      "community": 48,
+      "community": 50,
       "norm_label": "generate_launch_description()"
     },
     {
@@ -408,7 +408,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "includes_slam_launch",
-      "community": 35,
+      "community": 37,
       "norm_label": "slam.launch.py"
     },
     {
@@ -418,7 +418,7 @@
       "source_location": "L19",
       "_origin": "ast",
       "id": "includes_slam_launch_launch_setup",
-      "community": 35,
+      "community": 37,
       "norm_label": "launch_setup()"
     },
     {
@@ -428,7 +428,7 @@
       "source_location": "L90",
       "_origin": "ast",
       "id": "includes_slam_launch_generate_launch_description",
-      "community": 35,
+      "community": 37,
       "norm_label": "generate_launch_description()"
     },
     {
@@ -438,7 +438,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "launch_manual_mapping_launch",
-      "community": 49,
+      "community": 51,
       "norm_label": "manual_mapping.launch.py"
     },
     {
@@ -448,7 +448,7 @@
       "source_location": "L40",
       "_origin": "ast",
       "id": "launch_manual_mapping_launch_generate_launch_description",
-      "community": 49,
+      "community": 51,
       "norm_label": "generate_launch_description()"
     },
     {
@@ -458,7 +458,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "launch_ridgeback_exploration_launch",
-      "community": 50,
+      "community": 52,
       "norm_label": "ridgeback_exploration.launch.py"
     },
     {
@@ -468,7 +468,7 @@
       "source_location": "L16",
       "_origin": "ast",
       "id": "launch_ridgeback_exploration_launch_generate_launch_description",
-      "community": 50,
+      "community": 52,
       "norm_label": "generate_launch_description()"
     },
     {
@@ -478,7 +478,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "ridgeback_autonomy_init",
-      "community": 53,
+      "community": 55,
       "norm_label": "__init__.py"
     },
     {
@@ -488,7 +488,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "ridgeback_autonomy_init_rationale_1",
-      "community": 53,
+      "community": 55,
       "norm_label": "shared python package for ridgeback autonomy helpers and nodes."
     },
     {
@@ -498,7 +498,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "benchmarking_init",
-      "community": 36,
+      "community": 38,
       "norm_label": "__init__.py"
     },
     {
@@ -508,7 +508,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "benchmarking_init_rationale_1",
-      "community": 36,
+      "community": 38,
       "norm_label": "benchmarking nodes plus helper libraries for autonomy evaluation workflows."
     },
     {
@@ -518,7 +518,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "benchmarking_alignment",
-      "community": 3,
+      "community": 5,
       "norm_label": "alignment.py"
     },
     {
@@ -528,7 +528,7 @@
       "source_location": "L18",
       "_origin": "ast",
       "id": "benchmarking_alignment_eventpreview",
-      "community": 3,
+      "community": 5,
       "norm_label": "eventpreview"
     },
     {
@@ -538,7 +538,7 @@
       "source_location": "L37",
       "_origin": "ast",
       "id": "benchmarking_alignment_previewmatchresult",
-      "community": 3,
+      "community": 5,
       "norm_label": "previewmatchresult"
     },
     {
@@ -548,7 +548,7 @@
       "source_location": "L46",
       "_origin": "ast",
       "id": "benchmarking_alignment_measurementevent",
-      "community": 3,
+      "community": 5,
       "norm_label": "measurementevent"
     },
     {
@@ -558,7 +558,7 @@
       "source_location": "L58",
       "_origin": "ast",
       "id": "benchmarking_alignment_stamp_to_nanoseconds",
-      "community": 3,
+      "community": 4,
       "norm_label": "stamp_to_nanoseconds()"
     },
     {
@@ -568,7 +568,7 @@
       "source_location": "L62",
       "_origin": "ast",
       "id": "benchmarking_alignment_measurement_message_key",
-      "community": 3,
+      "community": 5,
       "norm_label": "measurement_message_key()"
     },
     {
@@ -578,7 +578,7 @@
       "source_location": "L62",
       "_origin": "ast",
       "id": "src_ridgeback_autonomy_ridgeback_autonomy_benchmarking_alignment_py_g1measurements",
-      "community": 3,
+      "community": 5,
       "norm_label": "g1measurements"
     },
     {
@@ -588,7 +588,7 @@
       "source_location": "L62",
       "_origin": "ast",
       "id": "measurementeventkey",
-      "community": 3,
+      "community": 5,
       "norm_label": "measurementeventkey"
     },
     {
@@ -598,7 +598,7 @@
       "source_location": "L72",
       "_origin": "ast",
       "id": "benchmarking_alignment_extract_public_estimator_values",
-      "community": 3,
+      "community": 5,
       "norm_label": "extract_public_estimator_values()"
     },
     {
@@ -608,7 +608,7 @@
       "source_location": "L79",
       "_origin": "ast",
       "id": "benchmarking_alignment_ensure_measurement_event",
-      "community": 3,
+      "community": 5,
       "norm_label": "ensure_measurement_event()"
     },
     {
@@ -618,7 +618,7 @@
       "source_location": "L101",
       "_origin": "ast",
       "id": "benchmarking_alignment_update_measurement_event",
-      "community": 3,
+      "community": 5,
       "norm_label": "update_measurement_event()"
     },
     {
@@ -628,7 +628,7 @@
       "source_location": "L118",
       "_origin": "ast",
       "id": "benchmarking_alignment_has_all_selected_estimates",
-      "community": 3,
+      "community": 5,
       "norm_label": "has_all_selected_estimates()"
     },
     {
@@ -638,7 +638,7 @@
       "source_location": "L125",
       "_origin": "ast",
       "id": "benchmarking_alignment_event_has_panel_preview",
-      "community": 3,
+      "community": 5,
       "norm_label": "event_has_panel_preview()"
     },
     {
@@ -648,7 +648,7 @@
       "source_location": "L133",
       "_origin": "ast",
       "id": "benchmarking_alignment_event_has_all_panel_previews",
-      "community": 3,
+      "community": 5,
       "norm_label": "event_has_all_panel_previews()"
     },
     {
@@ -658,7 +658,7 @@
       "source_location": "L140",
       "_origin": "ast",
       "id": "benchmarking_alignment_find_exact_preview_match",
-      "community": 3,
+      "community": 5,
       "norm_label": "find_exact_preview_match()"
     },
     {
@@ -668,7 +668,7 @@
       "source_location": "L140",
       "_origin": "ast",
       "id": "src_ridgeback_autonomy_ridgeback_autonomy_benchmarking_alignment_py_ndarray",
-      "community": 3,
+      "community": 5,
       "norm_label": "ndarray"
     },
     {
@@ -678,7 +678,7 @@
       "source_location": "L164",
       "_origin": "ast",
       "id": "benchmarking_alignment_find_nearest_preview_match",
-      "community": 3,
+      "community": 5,
       "norm_label": "find_nearest_preview_match()"
     },
     {
@@ -688,7 +688,7 @@
       "source_location": "L197",
       "_origin": "ast",
       "id": "benchmarking_alignment_nearest_preview_metadata",
-      "community": 3,
+      "community": 5,
       "norm_label": "nearest_preview_metadata()"
     },
     {
@@ -698,7 +698,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "benchmarking_estimators",
-      "community": 8,
+      "community": 7,
       "norm_label": "estimators.py"
     },
     {
@@ -708,7 +708,7 @@
       "source_location": "L49",
       "_origin": "ast",
       "id": "benchmarking_estimators_parse_estimators",
-      "community": 8,
+      "community": 7,
       "norm_label": "parse_estimators()"
     },
     {
@@ -718,7 +718,7 @@
       "source_location": "L77",
       "_origin": "ast",
       "id": "benchmarking_estimators_selected_camera_estimators",
-      "community": 8,
+      "community": 7,
       "norm_label": "selected_camera_estimators()"
     },
     {
@@ -728,7 +728,7 @@
       "source_location": "L84",
       "_origin": "ast",
       "id": "benchmarking_estimators_uses_camera_estimators",
-      "community": 8,
+      "community": 7,
       "norm_label": "uses_camera_estimators()"
     },
     {
@@ -738,7 +738,7 @@
       "source_location": "L88",
       "_origin": "ast",
       "id": "benchmarking_estimators_uses_lidar_estimators",
-      "community": 8,
+      "community": 7,
       "norm_label": "uses_lidar_estimators()"
     },
     {
@@ -788,7 +788,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "node",
-      "community": 11,
+      "community": 9,
       "norm_label": "node"
     },
     {
@@ -798,7 +798,7 @@
       "source_location": "L92",
       "_origin": "ast",
       "id": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_init",
-      "community": 8,
+      "community": 7,
       "norm_label": ".__init__()"
     },
     {
@@ -808,7 +808,7 @@
       "source_location": "L203",
       "_origin": "ast",
       "id": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_on_camera_measurement",
-      "community": 3,
+      "community": 5,
       "norm_label": ".on_camera_measurement()"
     },
     {
@@ -818,7 +818,7 @@
       "source_location": "L203",
       "_origin": "ast",
       "id": "src_ridgeback_autonomy_ridgeback_autonomy_benchmarking_g1_distance_benchmark_runner_node_py_g1measurements",
-      "community": 3,
+      "community": 5,
       "norm_label": "g1measurements"
     },
     {
@@ -828,7 +828,7 @@
       "source_location": "L212",
       "_origin": "ast",
       "id": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_on_lidar_measurement",
-      "community": 3,
+      "community": 5,
       "norm_label": ".on_lidar_measurement()"
     },
     {
@@ -948,7 +948,7 @@
       "source_location": "L433",
       "_origin": "ast",
       "id": "ordereddict",
-      "community": 8,
+      "community": 7,
       "norm_label": "ordereddict"
     },
     {
@@ -968,7 +968,7 @@
       "source_location": "L451",
       "_origin": "ast",
       "id": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_attach_buffered_previews",
-      "community": 3,
+      "community": 5,
       "norm_label": ".attach_buffered_previews()"
     },
     {
@@ -978,7 +978,7 @@
       "source_location": "L476",
       "_origin": "ast",
       "id": "benchmarking_g1_distance_benchmark_runner_node_g1distancebenchmarkrunner_apply_preview_match",
-      "community": 3,
+      "community": 5,
       "norm_label": ".apply_preview_match()"
     },
     {
@@ -1168,7 +1168,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "benchmarking_g1_estimate_viz_node",
-      "community": 19,
+      "community": 20,
       "norm_label": "g1_estimate_viz_node.py"
     },
     {
@@ -1178,7 +1178,7 @@
       "source_location": "L43",
       "_origin": "ast",
       "id": "benchmarking_g1_estimate_viz_node_ring_points",
-      "community": 19,
+      "community": 20,
       "norm_label": "_ring_points()"
     },
     {
@@ -1188,7 +1188,7 @@
       "source_location": "L56",
       "_origin": "ast",
       "id": "benchmarking_g1_estimate_viz_node_color_msg",
-      "community": 19,
+      "community": 20,
       "norm_label": "_color_msg()"
     },
     {
@@ -1198,7 +1198,7 @@
       "source_location": "L66",
       "_origin": "ast",
       "id": "benchmarking_g1_estimate_viz_node_g1estimateviznode",
-      "community": 19,
+      "community": 20,
       "norm_label": "g1estimateviznode"
     },
     {
@@ -1208,7 +1208,7 @@
       "source_location": "L67",
       "_origin": "ast",
       "id": "benchmarking_g1_estimate_viz_node_g1estimateviznode_init",
-      "community": 19,
+      "community": 20,
       "norm_label": ".__init__()"
     },
     {
@@ -1218,7 +1218,7 @@
       "source_location": "L97",
       "_origin": "ast",
       "id": "benchmarking_g1_estimate_viz_node_g1estimateviznode_camera_cb",
-      "community": 19,
+      "community": 20,
       "norm_label": "._camera_cb()"
     },
     {
@@ -1228,7 +1228,7 @@
       "source_location": "L97",
       "_origin": "ast",
       "id": "src_ridgeback_autonomy_ridgeback_autonomy_benchmarking_g1_estimate_viz_node_py_g1measurements",
-      "community": 19,
+      "community": 20,
       "norm_label": "g1measurements"
     },
     {
@@ -1238,7 +1238,7 @@
       "source_location": "L102",
       "_origin": "ast",
       "id": "benchmarking_g1_estimate_viz_node_g1estimateviznode_lidar_cb",
-      "community": 19,
+      "community": 20,
       "norm_label": "._lidar_cb()"
     },
     {
@@ -1248,7 +1248,7 @@
       "source_location": "L107",
       "_origin": "ast",
       "id": "benchmarking_g1_estimate_viz_node_g1estimateviznode_publish",
-      "community": 19,
+      "community": 20,
       "norm_label": "._publish()"
     },
     {
@@ -1258,7 +1258,7 @@
       "source_location": "L183",
       "_origin": "ast",
       "id": "benchmarking_g1_estimate_viz_node_g1estimateviznode_add_estimator_markers",
-      "community": 19,
+      "community": 20,
       "norm_label": "._add_estimator_markers()"
     },
     {
@@ -1268,7 +1268,7 @@
       "source_location": "L246",
       "_origin": "ast",
       "id": "benchmarking_g1_estimate_viz_node_g1estimateviznode_robot_pose_in_world",
-      "community": 19,
+      "community": 20,
       "norm_label": "._robot_pose_in_world()"
     },
     {
@@ -1278,7 +1278,7 @@
       "source_location": "L246",
       "_origin": "ast",
       "id": "time",
-      "community": 19,
+      "community": 20,
       "norm_label": "time"
     },
     {
@@ -1288,7 +1288,7 @@
       "source_location": "L276",
       "_origin": "ast",
       "id": "benchmarking_g1_estimate_viz_node_get",
-      "community": 19,
+      "community": 20,
       "norm_label": "_get()"
     },
     {
@@ -1298,7 +1298,7 @@
       "source_location": "L282",
       "_origin": "ast",
       "id": "benchmarking_g1_estimate_viz_node_main",
-      "community": 19,
+      "community": 20,
       "norm_label": "main()"
     },
     {
@@ -1308,7 +1308,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "benchmarking_metrics",
-      "community": 55,
+      "community": 57,
       "norm_label": "metrics.py"
     },
     {
@@ -1318,7 +1318,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "benchmarking_reduction",
-      "community": 3,
+      "community": 5,
       "norm_label": "reduction.py"
     },
     {
@@ -1328,7 +1328,7 @@
       "source_location": "L12",
       "_origin": "ast",
       "id": "benchmarking_reduction_usable_aligned_events",
-      "community": 3,
+      "community": 5,
       "norm_label": "usable_aligned_events()"
     },
     {
@@ -1338,7 +1338,7 @@
       "source_location": "L12",
       "_origin": "ast",
       "id": "src_ridgeback_autonomy_ridgeback_autonomy_benchmarking_reduction_py_measurementevent",
-      "community": 3,
+      "community": 5,
       "norm_label": "measurementevent"
     },
     {
@@ -1348,7 +1348,7 @@
       "source_location": "L25",
       "_origin": "ast",
       "id": "benchmarking_reduction_compute_trial_medians",
-      "community": 3,
+      "community": 5,
       "norm_label": "compute_trial_medians()"
     },
     {
@@ -1358,7 +1358,7 @@
       "source_location": "L39",
       "_origin": "ast",
       "id": "benchmarking_reduction_choose_representative_event",
-      "community": 3,
+      "community": 5,
       "norm_label": "choose_representative_event()"
     },
     {
@@ -1368,7 +1368,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "benchmarking_rendering",
-      "community": 8,
+      "community": 7,
       "norm_label": "rendering.py"
     },
     {
@@ -1378,7 +1378,7 @@
       "source_location": "L17",
       "_origin": "ast",
       "id": "benchmarking_rendering_panelcontext",
-      "community": 8,
+      "community": 7,
       "norm_label": "panelcontext"
     },
     {
@@ -1388,7 +1388,7 @@
       "source_location": "L28",
       "_origin": "ast",
       "id": "benchmarking_rendering_benchmarkcollagerenderer",
-      "community": 8,
+      "community": 7,
       "norm_label": "benchmarkcollagerenderer"
     },
     {
@@ -1398,7 +1398,7 @@
       "source_location": "L29",
       "_origin": "ast",
       "id": "benchmarking_rendering_benchmarkcollagerenderer_init",
-      "community": 20,
+      "community": 21,
       "norm_label": ".__init__()"
     },
     {
@@ -1408,7 +1408,7 @@
       "source_location": "L33",
       "_origin": "ast",
       "id": "benchmarking_rendering_benchmarkcollagerenderer_make_color_preview",
-      "community": 8,
+      "community": 7,
       "norm_label": ".make_color_preview()"
     },
     {
@@ -1418,7 +1418,7 @@
       "source_location": "L33",
       "_origin": "ast",
       "id": "src_ridgeback_autonomy_ridgeback_autonomy_benchmarking_rendering_py_ndarray",
-      "community": 8,
+      "community": 7,
       "norm_label": "ndarray"
     },
     {
@@ -1428,7 +1428,7 @@
       "source_location": "L36",
       "_origin": "ast",
       "id": "benchmarking_rendering_benchmarkcollagerenderer_make_depth_preview",
-      "community": 8,
+      "community": 7,
       "norm_label": ".make_depth_preview()"
     },
     {
@@ -1438,7 +1438,7 @@
       "source_location": "L40",
       "_origin": "ast",
       "id": "benchmarking_rendering_benchmarkcollagerenderer_render_trial_collage",
-      "community": 8,
+      "community": 7,
       "norm_label": ".render_trial_collage()"
     },
     {
@@ -1448,7 +1448,7 @@
       "source_location": "L40",
       "_origin": "ast",
       "id": "src_ridgeback_autonomy_ridgeback_autonomy_benchmarking_rendering_py_measurementevent",
-      "community": 8,
+      "community": 7,
       "norm_label": "measurementevent"
     },
     {
@@ -1458,7 +1458,7 @@
       "source_location": "L60",
       "_origin": "ast",
       "id": "benchmarking_rendering_benchmarkcollagerenderer_render_estimator_panel",
-      "community": 8,
+      "community": 7,
       "norm_label": ".render_estimator_panel()"
     },
     {
@@ -1468,7 +1468,7 @@
       "source_location": "L85",
       "_origin": "ast",
       "id": "benchmarking_rendering_benchmarkcollagerenderer_panel_context_for_estimator",
-      "community": 8,
+      "community": 7,
       "norm_label": ".panel_context_for_estimator()"
     },
     {
@@ -1478,7 +1478,7 @@
       "source_location": "L159",
       "_origin": "ast",
       "id": "benchmarking_rendering_benchmarkcollagerenderer_build_panel_context",
-      "community": 8,
+      "community": 7,
       "norm_label": ".build_panel_context()"
     },
     {
@@ -1488,7 +1488,7 @@
       "source_location": "L181",
       "_origin": "ast",
       "id": "benchmarking_rendering_benchmarkcollagerenderer_make_missing_panel",
-      "community": 8,
+      "community": 7,
       "norm_label": ".make_missing_panel()"
     },
     {
@@ -1498,7 +1498,7 @@
       "source_location": "L208",
       "_origin": "ast",
       "id": "benchmarking_rendering_benchmarkcollagerenderer_build_panel_lines",
-      "community": 8,
+      "community": 7,
       "norm_label": ".build_panel_lines()"
     },
     {
@@ -1508,7 +1508,7 @@
       "source_location": "L233",
       "_origin": "ast",
       "id": "benchmarking_rendering_benchmarkcollagerenderer_resize_panel",
-      "community": 8,
+      "community": 7,
       "norm_label": ".resize_panel()"
     },
     {
@@ -1518,7 +1518,7 @@
       "source_location": "L244",
       "_origin": "ast",
       "id": "benchmarking_rendering_benchmarkcollagerenderer_draw_bboxes",
-      "community": 8,
+      "community": 7,
       "norm_label": ".draw_bboxes()"
     },
     {
@@ -1528,7 +1528,7 @@
       "source_location": "L268",
       "_origin": "ast",
       "id": "benchmarking_rendering_benchmarkcollagerenderer_draw_value_block",
-      "community": 8,
+      "community": 7,
       "norm_label": ".draw_value_block()"
     },
     {
@@ -1538,7 +1538,7 @@
       "source_location": "L277",
       "_origin": "ast",
       "id": "benchmarking_rendering_benchmarkcollagerenderer_format_distance",
-      "community": 8,
+      "community": 7,
       "norm_label": ".format_distance()"
     },
     {
@@ -1548,7 +1548,7 @@
       "source_location": "L282",
       "_origin": "ast",
       "id": "benchmarking_rendering_benchmarkcollagerenderer_format_delta",
-      "community": 8,
+      "community": 7,
       "norm_label": ".format_delta()"
     },
     {
@@ -1598,7 +1598,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "common_init",
-      "community": 56,
+      "community": 58,
       "norm_label": "__init__.py"
     },
     {
@@ -1608,7 +1608,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "common_camera_config",
-      "community": 13,
+      "community": 12,
       "norm_label": "camera_config.py"
     },
     {
@@ -1618,7 +1618,7 @@
       "source_location": "L17",
       "_origin": "ast",
       "id": "common_camera_config_load_camera_config",
-      "community": 13,
+      "community": 12,
       "norm_label": "load_camera_config()"
     },
     {
@@ -1628,7 +1628,7 @@
       "source_location": "L17",
       "_origin": "ast",
       "id": "src_ridgeback_autonomy_ridgeback_autonomy_common_camera_config_py_cameraconfig",
-      "community": 13,
+      "community": 12,
       "norm_label": "cameraconfig"
     },
     {
@@ -1638,7 +1638,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "common_coverage_utils",
-      "community": 17,
+      "community": 16,
       "norm_label": "coverage_utils.py"
     },
     {
@@ -1648,7 +1648,7 @@
       "source_location": "L34",
       "_origin": "ast",
       "id": "common_coverage_utils_pgm_to_grid",
-      "community": 17,
+      "community": 16,
       "norm_label": "pgm_to_grid()"
     },
     {
@@ -1658,7 +1658,7 @@
       "source_location": "L34",
       "_origin": "ast",
       "id": "src_ridgeback_autonomy_ridgeback_autonomy_common_coverage_utils_py_path",
-      "community": 17,
+      "community": 16,
       "norm_label": "path"
     },
     {
@@ -1668,7 +1668,7 @@
       "source_location": "L58",
       "_origin": "ast",
       "id": "common_coverage_utils_occupancy_msg_to_grid",
-      "community": 17,
+      "community": 16,
       "norm_label": "occupancy_msg_to_grid()"
     },
     {
@@ -1678,7 +1678,7 @@
       "source_location": "L87",
       "_origin": "ast",
       "id": "common_coverage_utils_world_extent",
-      "community": 17,
+      "community": 16,
       "norm_label": "world_extent()"
     },
     {
@@ -1688,7 +1688,7 @@
       "source_location": "L94",
       "_origin": "ast",
       "id": "common_coverage_utils_align_grids",
-      "community": 17,
+      "community": 16,
       "norm_label": "align_grids()"
     },
     {
@@ -1698,7 +1698,7 @@
       "source_location": "L141",
       "_origin": "ast",
       "id": "common_coverage_utils_compute_stats",
-      "community": 17,
+      "community": 16,
       "norm_label": "compute_stats()"
     },
     {
@@ -1708,7 +1708,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "common_coverage_utils_rationale_1",
-      "community": 17,
+      "community": 16,
       "norm_label": "coverage comparison helpers: slam occupancy grid vs a ground-truth map.  both gr"
     },
     {
@@ -1718,7 +1718,7 @@
       "source_location": "L35",
       "_origin": "ast",
       "id": "common_coverage_utils_rationale_35",
-      "community": 17,
+      "community": 16,
       "norm_label": "load a pgm + companion yaml and return a normalised int8 grid + meta dict."
     },
     {
@@ -1728,7 +1728,7 @@
       "source_location": "L59",
       "_origin": "ast",
       "id": "common_coverage_utils_rationale_59",
-      "community": 17,
+      "community": 16,
       "norm_label": "convert a nav_msgs/occupancygrid to a normalised int8 grid + meta dict.      occ"
     },
     {
@@ -1738,7 +1738,7 @@
       "source_location": "L95",
       "_origin": "ast",
       "id": "common_coverage_utils_rationale_95",
-      "community": 17,
+      "community": 16,
       "norm_label": "crop both grids to their overlapping world region at the ground-truth     resolu"
     },
     {
@@ -1748,7 +1748,7 @@
       "source_location": "L142",
       "_origin": "ast",
       "id": "common_coverage_utils_rationale_142",
-      "community": 17,
+      "community": 16,
       "norm_label": "compare two normalised grids cell-by-cell. returns a dict of statistics.      tw"
     },
     {
@@ -1758,7 +1758,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "common_launch_wait",
-      "community": 19,
+      "community": 20,
       "norm_label": "launch_wait.py"
     },
     {
@@ -1768,7 +1768,7 @@
       "source_location": "L34",
       "_origin": "ast",
       "id": "common_launch_wait_main",
-      "community": 19,
+      "community": 20,
       "norm_label": "main()"
     },
     {
@@ -1958,7 +1958,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "common_models",
-      "community": 5,
+      "community": 3,
       "norm_label": "models.py"
     },
     {
@@ -1968,7 +1968,7 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "common_models_cameraconfig",
-      "community": 5,
+      "community": 3,
       "norm_label": "cameraconfig"
     },
     {
@@ -1988,7 +1988,7 @@
       "source_location": "L36",
       "_origin": "ast",
       "id": "common_models_detectionbatch",
-      "community": 5,
+      "community": 3,
       "norm_label": "detectionbatch"
     },
     {
@@ -1998,7 +1998,7 @@
       "source_location": "L42",
       "_origin": "ast",
       "id": "common_models_detectionbatch_count",
-      "community": 5,
+      "community": 3,
       "norm_label": ".count()"
     },
     {
@@ -2008,7 +2008,7 @@
       "source_location": "L46",
       "_origin": "ast",
       "id": "common_models_detectionbatch_detected",
-      "community": 5,
+      "community": 3,
       "norm_label": ".detected()"
     },
     {
@@ -2018,7 +2018,7 @@
       "source_location": "L51",
       "_origin": "ast",
       "id": "common_models_lidarscanpoints",
-      "community": 5,
+      "community": 3,
       "norm_label": "lidarscanpoints"
     },
     {
@@ -2028,7 +2028,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "common_tf_utils",
-      "community": 13,
+      "community": 12,
       "norm_label": "tf_utils.py"
     },
     {
@@ -2038,7 +2038,7 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "common_tf_utils_candidate_base_frames",
-      "community": 13,
+      "community": 12,
       "norm_label": "candidate_base_frames()"
     },
     {
@@ -2048,7 +2048,7 @@
       "source_location": "L19",
       "_origin": "ast",
       "id": "common_tf_utils_rotation_matrix_from_quaternion",
-      "community": 13,
+      "community": 12,
       "norm_label": "rotation_matrix_from_quaternion()"
     },
     {
@@ -2058,7 +2058,7 @@
       "source_location": "L19",
       "_origin": "ast",
       "id": "src_ridgeback_autonomy_ridgeback_autonomy_common_tf_utils_py_ndarray",
-      "community": 13,
+      "community": 12,
       "norm_label": "ndarray"
     },
     {
@@ -2068,7 +2068,7 @@
       "source_location": "L31",
       "_origin": "ast",
       "id": "common_tf_utils_lookup_transform_components",
-      "community": 13,
+      "community": 12,
       "norm_label": "lookup_transform_components()"
     },
     {
@@ -2078,7 +2078,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "diagnostics_init",
-      "community": 57,
+      "community": 59,
       "norm_label": "__init__.py"
     },
     {
@@ -2088,7 +2088,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "diagnostics_coverage_overlay_node",
-      "community": 17,
+      "community": 16,
       "norm_label": "coverage_overlay_node.py"
     },
     {
@@ -2098,7 +2098,7 @@
       "source_location": "L40",
       "_origin": "ast",
       "id": "diagnostics_coverage_overlay_node_coverageoverlaynode",
-      "community": 17,
+      "community": 16,
       "norm_label": "coverageoverlaynode"
     },
     {
@@ -2108,7 +2108,7 @@
       "source_location": "L41",
       "_origin": "ast",
       "id": "diagnostics_coverage_overlay_node_coverageoverlaynode_init",
-      "community": 17,
+      "community": 16,
       "norm_label": ".__init__()"
     },
     {
@@ -2118,7 +2118,7 @@
       "source_location": "L93",
       "_origin": "ast",
       "id": "diagnostics_coverage_overlay_node_coverageoverlaynode_on_map",
-      "community": 17,
+      "community": 16,
       "norm_label": "._on_map()"
     },
     {
@@ -2128,7 +2128,7 @@
       "source_location": "L96",
       "_origin": "ast",
       "id": "diagnostics_coverage_overlay_node_coverageoverlaynode_tick",
-      "community": 17,
+      "community": 16,
       "norm_label": "._tick()"
     },
     {
@@ -2138,7 +2138,7 @@
       "source_location": "L102",
       "_origin": "ast",
       "id": "diagnostics_coverage_overlay_node_coverageoverlaynode_panel_text",
-      "community": 17,
+      "community": 16,
       "norm_label": "._panel_text()"
     },
     {
@@ -2148,7 +2148,7 @@
       "source_location": "L131",
       "_origin": "ast",
       "id": "diagnostics_coverage_overlay_node_coverageoverlaynode_k",
-      "community": 17,
+      "community": 16,
       "norm_label": "._k()"
     },
     {
@@ -2158,7 +2158,7 @@
       "source_location": "L135",
       "_origin": "ast",
       "id": "diagnostics_coverage_overlay_node_coverageoverlaynode_pad",
-      "community": 17,
+      "community": 16,
       "norm_label": "._pad()"
     },
     {
@@ -2168,7 +2168,7 @@
       "source_location": "L139",
       "_origin": "ast",
       "id": "diagnostics_coverage_overlay_node_main",
-      "community": 17,
+      "community": 16,
       "norm_label": "main()"
     },
     {
@@ -2178,7 +2178,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "diagnostics_hud_node",
-      "community": 11,
+      "community": 9,
       "norm_label": "hud_node.py"
     },
     {
@@ -2188,7 +2188,7 @@
       "source_location": "L24",
       "_origin": "ast",
       "id": "diagnostics_hud_node_hudnode",
-      "community": 11,
+      "community": 9,
       "norm_label": "hudnode"
     },
     {
@@ -2198,7 +2198,7 @@
       "source_location": "L25",
       "_origin": "ast",
       "id": "diagnostics_hud_node_hudnode_init",
-      "community": 11,
+      "community": 9,
       "norm_label": ".__init__()"
     },
     {
@@ -2208,7 +2208,7 @@
       "source_location": "L64",
       "_origin": "ast",
       "id": "diagnostics_hud_node_hudnode_on_panel",
-      "community": 11,
+      "community": 9,
       "norm_label": "._on_panel()"
     },
     {
@@ -2218,7 +2218,7 @@
       "source_location": "L67",
       "_origin": "ast",
       "id": "diagnostics_hud_node_hudnode_tick",
-      "community": 11,
+      "community": 9,
       "norm_label": "._tick()"
     },
     {
@@ -2228,7 +2228,7 @@
       "source_location": "L101",
       "_origin": "ast",
       "id": "diagnostics_hud_node_main",
-      "community": 11,
+      "community": 9,
       "norm_label": "main()"
     },
     {
@@ -2238,7 +2238,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "diagnostics_velocity_overlay_node",
-      "community": 11,
+      "community": 9,
       "norm_label": "velocity_overlay_node.py"
     },
     {
@@ -2248,7 +2248,7 @@
       "source_location": "L24",
       "_origin": "ast",
       "id": "diagnostics_velocity_overlay_node_velocityoverlaynode",
-      "community": 11,
+      "community": 9,
       "norm_label": "velocityoverlaynode"
     },
     {
@@ -2258,7 +2258,7 @@
       "source_location": "L25",
       "_origin": "ast",
       "id": "diagnostics_velocity_overlay_node_velocityoverlaynode_init",
-      "community": 11,
+      "community": 9,
       "norm_label": ".__init__()"
     },
     {
@@ -2268,7 +2268,7 @@
       "source_location": "L72",
       "_origin": "ast",
       "id": "diagnostics_velocity_overlay_node_velocityoverlaynode_on_twist",
-      "community": 11,
+      "community": 9,
       "norm_label": "._on_twist()"
     },
     {
@@ -2278,7 +2278,7 @@
       "source_location": "L76",
       "_origin": "ast",
       "id": "diagnostics_velocity_overlay_node_velocityoverlaynode_on_odom",
-      "community": 11,
+      "community": 9,
       "norm_label": "._on_odom()"
     },
     {
@@ -2288,7 +2288,7 @@
       "source_location": "L80",
       "_origin": "ast",
       "id": "diagnostics_velocity_overlay_node_velocityoverlaynode_tick",
-      "community": 11,
+      "community": 9,
       "norm_label": "._tick()"
     },
     {
@@ -2298,7 +2298,7 @@
       "source_location": "L106",
       "_origin": "ast",
       "id": "diagnostics_velocity_overlay_node_velocityoverlaynode_format_text",
-      "community": 11,
+      "community": 9,
       "norm_label": "._format_text()"
     },
     {
@@ -2308,7 +2308,7 @@
       "source_location": "L126",
       "_origin": "ast",
       "id": "diagnostics_velocity_overlay_node_main",
-      "community": 11,
+      "community": 9,
       "norm_label": "main()"
     },
     {
@@ -2318,7 +2318,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "frontier_explorer_init",
-      "community": 39,
+      "community": 41,
       "norm_label": "__init__.py"
     },
     {
@@ -2328,7 +2328,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "frontier_explorer_init_rationale_1",
-      "community": 39,
+      "community": 41,
       "norm_label": "frontier exploration module for ros 2."
     },
     {
@@ -2808,7 +2808,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "frontier_explorer_navigator",
-      "community": 18,
+      "community": 17,
       "norm_label": "navigator.py"
     },
     {
@@ -2818,7 +2818,7 @@
       "source_location": "L6",
       "_origin": "ast",
       "id": "frontier_explorer_navigator_frontier_mask",
-      "community": 18,
+      "community": 17,
       "norm_label": "frontier_mask()"
     },
     {
@@ -2828,7 +2828,7 @@
       "source_location": "L25",
       "_origin": "ast",
       "id": "frontier_explorer_navigator_is_frontier_point",
-      "community": 18,
+      "community": 17,
       "norm_label": "is_frontier_point()"
     },
     {
@@ -2838,7 +2838,7 @@
       "source_location": "L40",
       "_origin": "ast",
       "id": "frontier_explorer_navigator_get_frontier_clusters",
-      "community": 18,
+      "community": 17,
       "norm_label": "get_frontier_clusters()"
     },
     {
@@ -2848,7 +2848,7 @@
       "source_location": "L7",
       "_origin": "ast",
       "id": "frontier_explorer_navigator_rationale_7",
-      "community": 18,
+      "community": 17,
       "norm_label": "boolean mask of frontier cells: free cells 4-adjacent to an unknown cell.      v"
     },
     {
@@ -2858,7 +2858,7 @@
       "source_location": "L26",
       "_origin": "ast",
       "id": "frontier_explorer_navigator_rationale_26",
-      "community": 18,
+      "community": 17,
       "norm_label": "checks if a point is a valid frontier (a free cell next to an unknown cell)."
     },
     {
@@ -2868,7 +2868,7 @@
       "source_location": "L41",
       "_origin": "ast",
       "id": "frontier_explorer_navigator_rationale_41",
-      "community": 18,
+      "community": 17,
       "norm_label": "group adjacent frontier points into clusters (8-connectivity flood fill).      r"
     },
     {
@@ -2878,7 +2878,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "frontier_explorer_params",
-      "community": 59,
+      "community": 61,
       "norm_label": "params.py"
     },
     {
@@ -2888,7 +2888,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "perception_init",
-      "community": 52,
+      "community": 54,
       "norm_label": "__init__.py"
     },
     {
@@ -2898,7 +2898,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "perception_init_rationale_1",
-      "community": 52,
+      "community": 54,
       "norm_label": "perception nodes plus helper libraries for detection, fusion, and visualization."
     },
     {
@@ -2908,7 +2908,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "core_init",
-      "community": 38,
+      "community": 40,
       "norm_label": "__init__.py"
     },
     {
@@ -2918,7 +2918,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "core_init_rationale_1",
-      "community": 38,
+      "community": 40,
       "norm_label": "shared perception internals used by the perception node entrypoints."
     },
     {
@@ -2928,7 +2928,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "core_depth_anything",
-      "community": 10,
+      "community": 11,
       "norm_label": "depth_anything.py"
     },
     {
@@ -2938,7 +2938,7 @@
       "source_location": "L15",
       "_origin": "ast",
       "id": "core_depth_anything_depthanythingestimator",
-      "community": 10,
+      "community": 11,
       "norm_label": "depthanythingestimator"
     },
     {
@@ -2948,7 +2948,7 @@
       "source_location": "L16",
       "_origin": "ast",
       "id": "core_depth_anything_depthanythingestimator_init",
-      "community": 10,
+      "community": 11,
       "norm_label": ".__init__()"
     },
     {
@@ -2958,7 +2958,7 @@
       "source_location": "L23",
       "_origin": "ast",
       "id": "core_depth_anything_depthanythingestimator_load",
-      "community": 10,
+      "community": 11,
       "norm_label": ".load()"
     },
     {
@@ -2968,7 +2968,7 @@
       "source_location": "L43",
       "_origin": "ast",
       "id": "core_depth_anything_depthanythingestimator_predict",
-      "community": 10,
+      "community": 11,
       "norm_label": ".predict()"
     },
     {
@@ -2978,7 +2978,7 @@
       "source_location": "L43",
       "_origin": "ast",
       "id": "src_ridgeback_autonomy_ridgeback_autonomy_perception_core_depth_anything_py_ndarray",
-      "community": 10,
+      "community": 11,
       "norm_label": "ndarray"
     },
     {
@@ -2998,7 +2998,7 @@
       "source_location": "L15",
       "_origin": "ast",
       "id": "core_detection_resolve_torch_device",
-      "community": 10,
+      "community": 11,
       "norm_label": "resolve_torch_device()"
     },
     {
@@ -3018,7 +3018,7 @@
       "source_location": "L24",
       "_origin": "ast",
       "id": "core_detection_owlv2detector_init",
-      "community": 10,
+      "community": 11,
       "norm_label": ".__init__()"
     },
     {
@@ -3098,7 +3098,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "core_geometry",
-      "community": 5,
+      "community": 3,
       "norm_label": "geometry.py"
     },
     {
@@ -3108,7 +3108,7 @@
       "source_location": "L36",
       "_origin": "ast",
       "id": "core_geometry_apply_vehicle_front_offset",
-      "community": 5,
+      "community": 3,
       "norm_label": "apply_vehicle_front_offset()"
     },
     {
@@ -3128,7 +3128,7 @@
       "source_location": "L46",
       "_origin": "ast",
       "id": "core_geometry_world_to_vehicle_planar",
-      "community": 5,
+      "community": 3,
       "norm_label": "world_to_vehicle_planar()"
     },
     {
@@ -3138,7 +3138,7 @@
       "source_location": "L52",
       "_origin": "ast",
       "id": "core_geometry_planar_distance_from_vehicle_origin",
-      "community": 5,
+      "community": 3,
       "norm_label": "planar_distance_from_vehicle_origin()"
     },
     {
@@ -3148,7 +3148,7 @@
       "source_location": "L63",
       "_origin": "ast",
       "id": "core_geometry_rotate_camera_to_vehicle_frame",
-      "community": 5,
+      "community": 3,
       "norm_label": "rotate_camera_to_vehicle_frame()"
     },
     {
@@ -3158,7 +3158,7 @@
       "source_location": "L73",
       "_origin": "ast",
       "id": "core_geometry_focus_bbox",
-      "community": 5,
+      "community": 3,
       "norm_label": "focus_bbox()"
     },
     {
@@ -3168,7 +3168,7 @@
       "source_location": "L90",
       "_origin": "ast",
       "id": "core_geometry_map_bbox_between_images",
-      "community": 5,
+      "community": 3,
       "norm_label": "map_bbox_between_images()"
     },
     {
@@ -3178,7 +3178,7 @@
       "source_location": "L113",
       "_origin": "ast",
       "id": "core_geometry_add_rgb_measurements",
-      "community": 5,
+      "community": 3,
       "norm_label": "add_rgb_measurements()"
     },
     {
@@ -3188,7 +3188,7 @@
       "source_location": "L113",
       "_origin": "ast",
       "id": "src_ridgeback_autonomy_ridgeback_autonomy_perception_core_geometry_py_detectionbatch",
-      "community": 5,
+      "community": 3,
       "norm_label": "detectionbatch"
     },
     {
@@ -3198,7 +3198,7 @@
       "source_location": "L113",
       "_origin": "ast",
       "id": "src_ridgeback_autonomy_ridgeback_autonomy_perception_core_geometry_py_cameraconfig",
-      "community": 5,
+      "community": 3,
       "norm_label": "cameraconfig"
     },
     {
@@ -3208,7 +3208,7 @@
       "source_location": "L156",
       "_origin": "ast",
       "id": "core_geometry_add_depth_measurements",
-      "community": 5,
+      "community": 3,
       "norm_label": "add_depth_measurements()"
     },
     {
@@ -3218,7 +3218,7 @@
       "source_location": "L156",
       "_origin": "ast",
       "id": "src_ridgeback_autonomy_ridgeback_autonomy_perception_core_geometry_py_ndarray",
-      "community": 5,
+      "community": 3,
       "norm_label": "ndarray"
     },
     {
@@ -3228,7 +3228,7 @@
       "source_location": "L188",
       "_origin": "ast",
       "id": "core_geometry_add_depth_source_measurements",
-      "community": 5,
+      "community": 3,
       "norm_label": "add_depth_source_measurements()"
     },
     {
@@ -3238,7 +3238,7 @@
       "source_location": "L231",
       "_origin": "ast",
       "id": "core_geometry_compute_weighted_planar_distance",
-      "community": 5,
+      "community": 3,
       "norm_label": "compute_weighted_planar_distance()"
     },
     {
@@ -3248,7 +3248,7 @@
       "source_location": "L295",
       "_origin": "ast",
       "id": "core_geometry_extract_scan_points_base",
-      "community": 5,
+      "community": 3,
       "norm_label": "extract_scan_points_base()"
     },
     {
@@ -3258,7 +3258,7 @@
       "source_location": "L295",
       "_origin": "ast",
       "id": "src_ridgeback_autonomy_ridgeback_autonomy_perception_core_geometry_py_laserscan",
-      "community": 5,
+      "community": 3,
       "norm_label": "laserscan"
     },
     {
@@ -3268,7 +3268,7 @@
       "source_location": "L295",
       "_origin": "ast",
       "id": "lidarscanpoints",
-      "community": 5,
+      "community": 3,
       "norm_label": "lidarscanpoints"
     },
     {
@@ -3278,7 +3278,7 @@
       "source_location": "L352",
       "_origin": "ast",
       "id": "core_geometry_add_lidar_measurements",
-      "community": 5,
+      "community": 3,
       "norm_label": "add_lidar_measurements()"
     },
     {
@@ -3288,7 +3288,7 @@
       "source_location": "L387",
       "_origin": "ast",
       "id": "core_geometry_compute_lidar_measurement",
-      "community": 5,
+      "community": 3,
       "norm_label": "compute_lidar_measurement()"
     },
     {
@@ -3298,7 +3298,7 @@
       "source_location": "L451",
       "_origin": "ast",
       "id": "core_geometry_compute_camera_bearing_window",
-      "community": 5,
+      "community": 3,
       "norm_label": "compute_camera_bearing_window()"
     },
     {
@@ -3308,7 +3308,7 @@
       "source_location": "L476",
       "_origin": "ast",
       "id": "core_geometry_wrap_angle",
-      "community": 5,
+      "community": 3,
       "norm_label": "wrap_angle()"
     },
     {
@@ -3318,7 +3318,7 @@
       "source_location": "L480",
       "_origin": "ast",
       "id": "core_geometry_extract_organized_xyz",
-      "community": 5,
+      "community": 3,
       "norm_label": "extract_organized_xyz()"
     },
     {
@@ -3328,7 +3328,7 @@
       "source_location": "L480",
       "_origin": "ast",
       "id": "src_ridgeback_autonomy_ridgeback_autonomy_perception_core_geometry_py_pointcloud2",
-      "community": 5,
+      "community": 3,
       "norm_label": "pointcloud2"
     },
     {
@@ -3338,7 +3338,7 @@
       "source_location": "L501",
       "_origin": "ast",
       "id": "core_geometry_add_pointcloud_measurements",
-      "community": 5,
+      "community": 3,
       "norm_label": "add_pointcloud_measurements()"
     },
     {
@@ -3348,7 +3348,7 @@
       "source_location": "L545",
       "_origin": "ast",
       "id": "core_geometry_compute_pointcloud_measurement",
-      "community": 5,
+      "community": 3,
       "norm_label": "compute_pointcloud_measurement()"
     },
     {
@@ -3358,7 +3358,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "core_image_utils",
-      "community": 6,
+      "community": 18,
       "norm_label": "image_utils.py"
     },
     {
@@ -3368,7 +3368,7 @@
       "source_location": "L10",
       "_origin": "ast",
       "id": "core_image_utils_bgr_frame_to_pil",
-      "community": 6,
+      "community": 18,
       "norm_label": "bgr_frame_to_pil()"
     },
     {
@@ -3378,7 +3378,7 @@
       "source_location": "L10",
       "_origin": "ast",
       "id": "src_ridgeback_autonomy_ridgeback_autonomy_perception_core_image_utils_py_ndarray",
-      "community": 6,
+      "community": 18,
       "norm_label": "ndarray"
     },
     {
@@ -3388,7 +3388,7 @@
       "source_location": "L16",
       "_origin": "ast",
       "id": "core_image_utils_convert_color_image_message",
-      "community": 6,
+      "community": 18,
       "norm_label": "convert_color_image_message()"
     },
     {
@@ -3398,7 +3398,7 @@
       "source_location": "L16",
       "_origin": "ast",
       "id": "src_ridgeback_autonomy_ridgeback_autonomy_perception_core_image_utils_py_image",
-      "community": 6,
+      "community": 18,
       "norm_label": "image"
     },
     {
@@ -3408,7 +3408,7 @@
       "source_location": "L33",
       "_origin": "ast",
       "id": "core_image_utils_convert_depth_to_meters_message",
-      "community": 6,
+      "community": 18,
       "norm_label": "convert_depth_to_meters_message()"
     },
     {
@@ -3418,7 +3418,7 @@
       "source_location": "L42",
       "_origin": "ast",
       "id": "core_image_utils_decode_image_message",
-      "community": 6,
+      "community": 18,
       "norm_label": "decode_image_message()"
     },
     {
@@ -3428,7 +3428,7 @@
       "source_location": "L56",
       "_origin": "ast",
       "id": "core_image_utils_decode_buffer",
-      "community": 6,
+      "community": 18,
       "norm_label": "decode_buffer()"
     },
     {
@@ -3438,7 +3438,7 @@
       "source_location": "L56",
       "_origin": "ast",
       "id": "dtype",
-      "community": 6,
+      "community": 18,
       "norm_label": "dtype"
     },
     {
@@ -3448,7 +3448,7 @@
       "source_location": "L72",
       "_origin": "ast",
       "id": "core_image_utils_normalize_to_uint8",
-      "community": 6,
+      "community": 18,
       "norm_label": "normalize_to_uint8()"
     },
     {
@@ -3458,7 +3458,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "core_rendering",
-      "community": 20,
+      "community": 21,
       "norm_label": "rendering.py"
     },
     {
@@ -3468,7 +3468,7 @@
       "source_location": "L10",
       "_origin": "ast",
       "id": "core_rendering_rgbdoverlayrenderer",
-      "community": 20,
+      "community": 21,
       "norm_label": "rgbdoverlayrenderer"
     },
     {
@@ -3478,7 +3478,7 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "core_rendering_rgbdoverlayrenderer_init",
-      "community": 20,
+      "community": 21,
       "norm_label": ".__init__()"
     },
     {
@@ -3488,7 +3488,7 @@
       "source_location": "L14",
       "_origin": "ast",
       "id": "core_rendering_rgbdoverlayrenderer_render",
-      "community": 20,
+      "community": 21,
       "norm_label": ".render()"
     },
     {
@@ -3498,7 +3498,7 @@
       "source_location": "L14",
       "_origin": "ast",
       "id": "src_ridgeback_autonomy_ridgeback_autonomy_perception_core_rendering_py_ndarray",
-      "community": 20,
+      "community": 21,
       "norm_label": "ndarray"
     },
     {
@@ -3508,7 +3508,7 @@
       "source_location": "L14",
       "_origin": "ast",
       "id": "src_ridgeback_autonomy_ridgeback_autonomy_perception_core_rendering_py_detectionbatch",
-      "community": 20,
+      "community": 21,
       "norm_label": "detectionbatch"
     },
     {
@@ -3518,7 +3518,7 @@
       "source_location": "L84",
       "_origin": "ast",
       "id": "core_rendering_rgbdoverlayrenderer_normalize_depth",
-      "community": 20,
+      "community": 21,
       "norm_label": ".normalize_depth()"
     },
     {
@@ -3528,7 +3528,7 @@
       "source_location": "L100",
       "_origin": "ast",
       "id": "core_rendering_rgbdoverlayrenderer_make_depth_panel",
-      "community": 20,
+      "community": 21,
       "norm_label": ".make_depth_panel()"
     },
     {
@@ -3538,7 +3538,7 @@
       "source_location": "L111",
       "_origin": "ast",
       "id": "core_rendering_rgbdoverlayrenderer_draw_panel_title",
-      "community": 20,
+      "community": 21,
       "norm_label": ".draw_panel_title()"
     },
     {
@@ -3548,7 +3548,7 @@
       "source_location": "L124",
       "_origin": "ast",
       "id": "core_rendering_rgbdoverlayrenderer_draw_label_block",
-      "community": 20,
+      "community": 21,
       "norm_label": ".draw_label_block()"
     },
     {
@@ -3558,7 +3558,7 @@
       "source_location": "L179",
       "_origin": "ast",
       "id": "core_rendering_rgbdoverlayrenderer_format_position_line",
-      "community": 20,
+      "community": 21,
       "norm_label": ".format_position_line()"
     },
     {
@@ -3568,7 +3568,7 @@
       "source_location": "L194",
       "_origin": "ast",
       "id": "core_rendering_rgbdoverlayrenderer_format_distance_line",
-      "community": 20,
+      "community": 21,
       "norm_label": ".format_distance_line()"
     },
     {
@@ -3578,7 +3578,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "perception_g1_camera_measurement_node",
-      "community": 10,
+      "community": 11,
       "norm_label": "g1_camera_measurement_node.py"
     },
     {
@@ -3588,7 +3588,7 @@
       "source_location": "L52",
       "_origin": "ast",
       "id": "perception_g1_camera_measurement_node_g1camerameasurementnode",
-      "community": 10,
+      "community": 11,
       "norm_label": "g1camerameasurementnode"
     },
     {
@@ -3598,7 +3598,7 @@
       "source_location": "L53",
       "_origin": "ast",
       "id": "perception_g1_camera_measurement_node_g1camerameasurementnode_init",
-      "community": 10,
+      "community": 11,
       "norm_label": ".__init__()"
     },
     {
@@ -3608,7 +3608,7 @@
       "source_location": "L168",
       "_origin": "ast",
       "id": "perception_g1_camera_measurement_node_g1camerameasurementnode_default_base_frame",
-      "community": 10,
+      "community": 11,
       "norm_label": ".default_base_frame()"
     },
     {
@@ -3618,7 +3618,7 @@
       "source_location": "L174",
       "_origin": "ast",
       "id": "perception_g1_camera_measurement_node_g1camerameasurementnode_detections_callback",
-      "community": 10,
+      "community": 11,
       "norm_label": ".detections_callback()"
     },
     {
@@ -3628,7 +3628,7 @@
       "source_location": "L174",
       "_origin": "ast",
       "id": "src_ridgeback_autonomy_ridgeback_autonomy_perception_g1_camera_measurement_node_py_g1detections",
-      "community": 10,
+      "community": 11,
       "norm_label": "g1detections"
     },
     {
@@ -3638,7 +3638,7 @@
       "source_location": "L179",
       "_origin": "ast",
       "id": "perception_g1_camera_measurement_node_g1camerameasurementnode_color_callback",
-      "community": 10,
+      "community": 11,
       "norm_label": ".color_callback()"
     },
     {
@@ -3648,7 +3648,7 @@
       "source_location": "L179",
       "_origin": "ast",
       "id": "src_ridgeback_autonomy_ridgeback_autonomy_perception_g1_camera_measurement_node_py_image",
-      "community": 10,
+      "community": 11,
       "norm_label": "image"
     },
     {
@@ -3658,7 +3658,7 @@
       "source_location": "L183",
       "_origin": "ast",
       "id": "perception_g1_camera_measurement_node_g1camerameasurementnode_depth_callback",
-      "community": 10,
+      "community": 11,
       "norm_label": ".depth_callback()"
     },
     {
@@ -3668,7 +3668,7 @@
       "source_location": "L188",
       "_origin": "ast",
       "id": "perception_g1_camera_measurement_node_g1camerameasurementnode_pointcloud_callback",
-      "community": 10,
+      "community": 11,
       "norm_label": ".pointcloud_callback()"
     },
     {
@@ -3678,7 +3678,7 @@
       "source_location": "L188",
       "_origin": "ast",
       "id": "src_ridgeback_autonomy_ridgeback_autonomy_perception_g1_camera_measurement_node_py_pointcloud2",
-      "community": 10,
+      "community": 11,
       "norm_label": "pointcloud2"
     },
     {
@@ -3688,7 +3688,7 @@
       "source_location": "L193",
       "_origin": "ast",
       "id": "perception_g1_camera_measurement_node_g1camerameasurementnode_depth_processing_loop",
-      "community": 10,
+      "community": 11,
       "norm_label": ".depth_processing_loop()"
     },
     {
@@ -3698,7 +3698,7 @@
       "source_location": "L224",
       "_origin": "ast",
       "id": "perception_g1_camera_measurement_node_g1camerameasurementnode_pointcloud_processing_loop",
-      "community": 10,
+      "community": 11,
       "norm_label": ".pointcloud_processing_loop()"
     },
     {
@@ -3708,7 +3708,7 @@
       "source_location": "L266",
       "_origin": "ast",
       "id": "perception_g1_camera_measurement_node_g1camerameasurementnode_processing_loop",
-      "community": 10,
+      "community": 11,
       "norm_label": ".processing_loop()"
     },
     {
@@ -3718,7 +3718,7 @@
       "source_location": "L297",
       "_origin": "ast",
       "id": "perception_g1_camera_measurement_node_g1camerameasurementnode_process_measurements",
-      "community": 10,
+      "community": 3,
       "norm_label": ".process_measurements()"
     },
     {
@@ -3728,7 +3728,7 @@
       "source_location": "L297",
       "_origin": "ast",
       "id": "src_ridgeback_autonomy_ridgeback_autonomy_perception_g1_camera_measurement_node_py_ndarray",
-      "community": 10,
+      "community": 3,
       "norm_label": "ndarray"
     },
     {
@@ -3738,7 +3738,7 @@
       "source_location": "L375",
       "_origin": "ast",
       "id": "perception_g1_camera_measurement_node_g1camerameasurementnode_lookup_transform",
-      "community": 10,
+      "community": 11,
       "norm_label": ".lookup_transform()"
     },
     {
@@ -3748,7 +3748,7 @@
       "source_location": "L386",
       "_origin": "ast",
       "id": "perception_g1_camera_measurement_node_g1camerameasurementnode_log_warning_once",
-      "community": 10,
+      "community": 11,
       "norm_label": ".log_warning_once()"
     },
     {
@@ -3758,7 +3758,7 @@
       "source_location": "L392",
       "_origin": "ast",
       "id": "perception_g1_camera_measurement_node_g1camerameasurementnode_destroy_node",
-      "community": 10,
+      "community": 11,
       "norm_label": ".destroy_node()"
     },
     {
@@ -3768,7 +3768,7 @@
       "source_location": "L404",
       "_origin": "ast",
       "id": "perception_g1_camera_measurement_node_main",
-      "community": 10,
+      "community": 11,
       "norm_label": "main()"
     },
     {
@@ -3868,7 +3868,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "perception_g1_lidar_measurement_node",
-      "community": 13,
+      "community": 12,
       "norm_label": "g1_lidar_measurement_node.py"
     },
     {
@@ -3878,7 +3878,7 @@
       "source_location": "L35",
       "_origin": "ast",
       "id": "perception_g1_lidar_measurement_node_g1lidarmeasurementnode",
-      "community": 13,
+      "community": 12,
       "norm_label": "g1lidarmeasurementnode"
     },
     {
@@ -3888,7 +3888,7 @@
       "source_location": "L36",
       "_origin": "ast",
       "id": "perception_g1_lidar_measurement_node_g1lidarmeasurementnode_init",
-      "community": 13,
+      "community": 12,
       "norm_label": ".__init__()"
     },
     {
@@ -3898,7 +3898,7 @@
       "source_location": "L95",
       "_origin": "ast",
       "id": "perception_g1_lidar_measurement_node_g1lidarmeasurementnode_default_base_frame",
-      "community": 13,
+      "community": 12,
       "norm_label": ".default_base_frame()"
     },
     {
@@ -3908,7 +3908,7 @@
       "source_location": "L101",
       "_origin": "ast",
       "id": "perception_g1_lidar_measurement_node_g1lidarmeasurementnode_detections_callback",
-      "community": 13,
+      "community": 12,
       "norm_label": ".detections_callback()"
     },
     {
@@ -3918,7 +3918,7 @@
       "source_location": "L101",
       "_origin": "ast",
       "id": "src_ridgeback_autonomy_ridgeback_autonomy_perception_g1_lidar_measurement_node_py_g1detections",
-      "community": 13,
+      "community": 12,
       "norm_label": "g1detections"
     },
     {
@@ -3928,7 +3928,7 @@
       "source_location": "L106",
       "_origin": "ast",
       "id": "perception_g1_lidar_measurement_node_g1lidarmeasurementnode_scan_callback",
-      "community": 13,
+      "community": 12,
       "norm_label": ".scan_callback()"
     },
     {
@@ -3938,7 +3938,7 @@
       "source_location": "L106",
       "_origin": "ast",
       "id": "src_ridgeback_autonomy_ridgeback_autonomy_perception_g1_lidar_measurement_node_py_laserscan",
-      "community": 13,
+      "community": 12,
       "norm_label": "laserscan"
     },
     {
@@ -3948,7 +3948,7 @@
       "source_location": "L111",
       "_origin": "ast",
       "id": "perception_g1_lidar_measurement_node_g1lidarmeasurementnode_scan_processing_loop",
-      "community": 13,
+      "community": 12,
       "norm_label": ".scan_processing_loop()"
     },
     {
@@ -3958,7 +3958,7 @@
       "source_location": "L139",
       "_origin": "ast",
       "id": "perception_g1_lidar_measurement_node_g1lidarmeasurementnode_processing_loop",
-      "community": 13,
+      "community": 12,
       "norm_label": ".processing_loop()"
     },
     {
@@ -3968,7 +3968,7 @@
       "source_location": "L159",
       "_origin": "ast",
       "id": "perception_g1_lidar_measurement_node_g1lidarmeasurementnode_process_measurements",
-      "community": 13,
+      "community": 12,
       "norm_label": ".process_measurements()"
     },
     {
@@ -3978,7 +3978,7 @@
       "source_location": "L190",
       "_origin": "ast",
       "id": "perception_g1_lidar_measurement_node_g1lidarmeasurementnode_extract_scan_points",
-      "community": 13,
+      "community": 12,
       "norm_label": ".extract_scan_points()"
     },
     {
@@ -3988,7 +3988,7 @@
       "source_location": "L201",
       "_origin": "ast",
       "id": "perception_g1_lidar_measurement_node_g1lidarmeasurementnode_log_lidar_warning",
-      "community": 13,
+      "community": 12,
       "norm_label": ".log_lidar_warning()"
     },
     {
@@ -3998,7 +3998,7 @@
       "source_location": "L207",
       "_origin": "ast",
       "id": "perception_g1_lidar_measurement_node_g1lidarmeasurementnode_destroy_node",
-      "community": 13,
+      "community": 12,
       "norm_label": ".destroy_node()"
     },
     {
@@ -4008,7 +4008,7 @@
       "source_location": "L218",
       "_origin": "ast",
       "id": "perception_g1_lidar_measurement_node_main",
-      "community": 13,
+      "community": 12,
       "norm_label": "main()"
     },
     {
@@ -4018,7 +4018,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "perception_g1_overlay_node",
-      "community": 6,
+      "community": 19,
       "norm_label": "g1_overlay_node.py"
     },
     {
@@ -4028,7 +4028,7 @@
       "source_location": "L30",
       "_origin": "ast",
       "id": "perception_g1_overlay_node_g1overlaynode",
-      "community": 6,
+      "community": 19,
       "norm_label": "g1overlaynode"
     },
     {
@@ -4038,7 +4038,7 @@
       "source_location": "L31",
       "_origin": "ast",
       "id": "perception_g1_overlay_node_g1overlaynode_init",
-      "community": 8,
+      "community": 7,
       "norm_label": ".__init__()"
     },
     {
@@ -4048,7 +4048,7 @@
       "source_location": "L98",
       "_origin": "ast",
       "id": "perception_g1_overlay_node_g1overlaynode_measurement_callback",
-      "community": 6,
+      "community": 19,
       "norm_label": ".measurement_callback()"
     },
     {
@@ -4058,7 +4058,7 @@
       "source_location": "L98",
       "_origin": "ast",
       "id": "src_ridgeback_autonomy_ridgeback_autonomy_perception_g1_overlay_node_py_g1measurements",
-      "community": 6,
+      "community": 19,
       "norm_label": "g1measurements"
     },
     {
@@ -4068,7 +4068,7 @@
       "source_location": "L102",
       "_origin": "ast",
       "id": "perception_g1_overlay_node_g1overlaynode_lidar_measurement_callback",
-      "community": 6,
+      "community": 19,
       "norm_label": ".lidar_measurement_callback()"
     },
     {
@@ -4078,7 +4078,7 @@
       "source_location": "L109",
       "_origin": "ast",
       "id": "perception_g1_overlay_node_g1overlaynode_color_callback",
-      "community": 6,
+      "community": 19,
       "norm_label": ".color_callback()"
     },
     {
@@ -4088,7 +4088,7 @@
       "source_location": "L109",
       "_origin": "ast",
       "id": "src_ridgeback_autonomy_ridgeback_autonomy_perception_g1_overlay_node_py_image",
-      "community": 6,
+      "community": 19,
       "norm_label": "image"
     },
     {
@@ -4098,7 +4098,7 @@
       "source_location": "L112",
       "_origin": "ast",
       "id": "perception_g1_overlay_node_g1overlaynode_depth_callback",
-      "community": 6,
+      "community": 19,
       "norm_label": ".depth_callback()"
     },
     {
@@ -4108,7 +4108,7 @@
       "source_location": "L115",
       "_origin": "ast",
       "id": "perception_g1_overlay_node_g1overlaynode_mono_depth_callback",
-      "community": 6,
+      "community": 19,
       "norm_label": ".mono_depth_callback()"
     },
     {
@@ -4118,7 +4118,7 @@
       "source_location": "L118",
       "_origin": "ast",
       "id": "perception_g1_overlay_node_g1overlaynode_render_callback",
-      "community": 6,
+      "community": 19,
       "norm_label": ".render_callback()"
     },
     {
@@ -4128,7 +4128,7 @@
       "source_location": "L121",
       "_origin": "ast",
       "id": "perception_g1_overlay_node_g1overlaynode_render_latest",
-      "community": 6,
+      "community": 19,
       "norm_label": ".render_latest()"
     },
     {
@@ -4138,7 +4138,7 @@
       "source_location": "L170",
       "_origin": "ast",
       "id": "perception_g1_overlay_node_g1overlaynode_merge_lidar_measurements",
-      "community": 6,
+      "community": 19,
       "norm_label": ".merge_lidar_measurements()"
     },
     {
@@ -4148,7 +4148,7 @@
       "source_location": "L185",
       "_origin": "ast",
       "id": "perception_g1_overlay_node_g1overlaynode_match_lidar_measurement",
-      "community": 6,
+      "community": 19,
       "norm_label": ".match_lidar_measurement()"
     },
     {
@@ -4158,7 +4158,7 @@
       "source_location": "L215",
       "_origin": "ast",
       "id": "perception_g1_overlay_node_g1overlaynode_stamp_seconds",
-      "community": 6,
+      "community": 19,
       "norm_label": ".stamp_seconds()"
     },
     {
@@ -4168,7 +4168,7 @@
       "source_location": "L218",
       "_origin": "ast",
       "id": "perception_g1_overlay_node_g1overlaynode_measurement_message_key",
-      "community": 6,
+      "community": 19,
       "norm_label": ".measurement_message_key()"
     },
     {
@@ -4178,7 +4178,7 @@
       "source_location": "L230",
       "_origin": "ast",
       "id": "perception_g1_overlay_node_g1overlaynode_log_warning_once",
-      "community": 6,
+      "community": 19,
       "norm_label": ".log_warning_once()"
     },
     {
@@ -4188,7 +4188,7 @@
       "source_location": "L236",
       "_origin": "ast",
       "id": "perception_g1_overlay_node_g1overlaynode_destroy_node",
-      "community": 6,
+      "community": 19,
       "norm_label": ".destroy_node()"
     },
     {
@@ -4198,7 +4198,7 @@
       "source_location": "L241",
       "_origin": "ast",
       "id": "perception_g1_overlay_node_main",
-      "community": 6,
+      "community": 19,
       "norm_label": "main()"
     },
     {
@@ -4212,7 +4212,7 @@
       },
       "_origin": "ast",
       "id": "ground_truth_maps_capture_ground_truth",
-      "community": 40,
+      "community": 42,
       "norm_label": "capture_ground_truth.sh"
     },
     {
@@ -4226,7 +4226,7 @@
       },
       "_origin": "ast",
       "id": "home_deivid_dev_dynamo_ridgeback_claude_worktrees_jolly_borg_f48cab_src_ridgeback_autonomy_sim_ground_truth_maps_capture_ground_truth_sh__entry",
-      "community": 40,
+      "community": 42,
       "norm_label": "capture_ground_truth.sh script"
     },
     {
@@ -4236,7 +4236,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "ground_truth_maps_render_previews",
-      "community": 41,
+      "community": 43,
       "norm_label": "render_previews.py"
     },
     {
@@ -4246,7 +4246,7 @@
       "source_location": "L23",
       "_origin": "ast",
       "id": "ground_truth_maps_render_previews_main",
-      "community": 41,
+      "community": 43,
       "norm_label": "main()"
     },
     {
@@ -4256,7 +4256,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "gz_plugins_spawng1",
-      "community": 14,
+      "community": 13,
       "norm_label": "spawng1.cc"
     },
     {
@@ -4266,7 +4266,7 @@
       "source_location": "L18",
       "_origin": "ast",
       "id": "gz_plugins_spawng1_spawng1",
-      "community": 14,
+      "community": 13,
       "norm_label": "spawng1()"
     },
     {
@@ -4276,7 +4276,7 @@
       "source_location": "L20",
       "_origin": "ast",
       "id": "gz_plugins_spawng1_loadconfig",
-      "community": 14,
+      "community": 13,
       "norm_label": "loadconfig()"
     },
     {
@@ -4286,7 +4286,7 @@
       "source_location": "L20",
       "_origin": "ast",
       "id": "xmlelement",
-      "community": 14,
+      "community": 13,
       "norm_label": "xmlelement"
     },
     {
@@ -4296,7 +4296,7 @@
       "source_location": "L122",
       "_origin": "ast",
       "id": "gz_plugins_spawng1_onspawn",
-      "community": 14,
+      "community": 13,
       "norm_label": "onspawn()"
     },
     {
@@ -4306,7 +4306,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "isaac_worlds",
-      "community": 27,
+      "community": 29,
       "norm_label": "worlds.py"
     },
     {
@@ -4316,7 +4316,7 @@
       "source_location": "L27",
       "_origin": "ast",
       "id": "isaac_worlds_candidate_dirs",
-      "community": 27,
+      "community": 29,
       "norm_label": "_candidate_dirs()"
     },
     {
@@ -4326,7 +4326,7 @@
       "source_location": "L27",
       "_origin": "ast",
       "id": "src_ridgeback_autonomy_sim_isaac_worlds_py_path",
-      "community": 27,
+      "community": 29,
       "norm_label": "path"
     },
     {
@@ -4336,7 +4336,7 @@
       "source_location": "L40",
       "_origin": "ast",
       "id": "isaac_worlds_resolve_world",
-      "community": 27,
+      "community": 29,
       "norm_label": "resolve_world()"
     },
     {
@@ -4346,7 +4346,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "isaac_worlds_rationale_1",
-      "community": 27,
+      "community": 29,
       "norm_label": "world-name resolution for the isaac sim runner.  keeps the gz-era operator contr"
     },
     {
@@ -4356,7 +4356,7 @@
       "source_location": "L41",
       "_origin": "ast",
       "id": "isaac_worlds_rationale_41",
-      "community": 27,
+      "community": 29,
       "norm_label": "return a loadable stage path/url for a world name or explicit path."
     },
     {
@@ -4366,7 +4366,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "test_test_benchmark_runner",
-      "community": 3,
+      "community": 5,
       "norm_label": "test_benchmark_runner.py"
     },
     {
@@ -4376,7 +4376,7 @@
       "source_location": "L26",
       "_origin": "ast",
       "id": "test_test_benchmark_runner_test_parse_estimators_uses_canonical_order_and_depth_anything_name",
-      "community": 8,
+      "community": 7,
       "norm_label": "test_parse_estimators_uses_canonical_order_and_depth_anything_name()"
     },
     {
@@ -4386,7 +4386,7 @@
       "source_location": "L35",
       "_origin": "ast",
       "id": "test_test_benchmark_runner_test_extract_json_payload_accepts_multiple_gz_json_messages",
-      "community": 3,
+      "community": 5,
       "norm_label": "test_extract_json_payload_accepts_multiple_gz_json_messages()"
     },
     {
@@ -4396,7 +4396,7 @@
       "source_location": "L45",
       "_origin": "ast",
       "id": "test_test_benchmark_runner_test_alignment_updates_public_depth_anything_value_from_message_field",
-      "community": 3,
+      "community": 5,
       "norm_label": "test_alignment_updates_public_depth_anything_value_from_message_field()"
     },
     {
@@ -4406,7 +4406,7 @@
       "source_location": "L79",
       "_origin": "ast",
       "id": "test_test_benchmark_runner_test_find_exact_preview_match_uses_only_exact_stamp",
-      "community": 3,
+      "community": 5,
       "norm_label": "test_find_exact_preview_match_uses_only_exact_stamp()"
     },
     {
@@ -4416,7 +4416,7 @@
       "source_location": "L95",
       "_origin": "ast",
       "id": "test_test_benchmark_runner_test_find_nearest_preview_match_prefers_smallest_delta_within_tolerance",
-      "community": 3,
+      "community": 5,
       "norm_label": "test_find_nearest_preview_match_prefers_smallest_delta_within_tolerance()"
     },
     {
@@ -4426,7 +4426,7 @@
       "source_location": "L111",
       "_origin": "ast",
       "id": "test_test_benchmark_runner_test_find_nearest_preview_match_returns_unmatched_when_outside_tolerance",
-      "community": 3,
+      "community": 5,
       "norm_label": "test_find_nearest_preview_match_returns_unmatched_when_outside_tolerance()"
     },
     {
@@ -4436,7 +4436,7 @@
       "source_location": "L123",
       "_origin": "ast",
       "id": "test_test_benchmark_runner_test_usable_aligned_events_require_the_full_selected_estimator_set",
-      "community": 3,
+      "community": 5,
       "norm_label": "test_usable_aligned_events_require_the_full_selected_estimator_set()"
     },
     {
@@ -4446,7 +4446,7 @@
       "source_location": "L154",
       "_origin": "ast",
       "id": "test_test_benchmark_runner_test_representative_event_uses_minimum_total_deviation_then_timestamp",
-      "community": 3,
+      "community": 5,
       "norm_label": "test_representative_event_uses_minimum_total_deviation_then_timestamp()"
     },
     {
@@ -4456,7 +4456,7 @@
       "source_location": "L198",
       "_origin": "ast",
       "id": "test_test_benchmark_runner_test_representative_event_prefers_preview_complete_candidate",
-      "community": 3,
+      "community": 5,
       "norm_label": "test_representative_event_prefers_preview_complete_candidate()"
     },
     {
@@ -4466,7 +4466,7 @@
       "source_location": "L242",
       "_origin": "ast",
       "id": "test_test_benchmark_runner_test_representative_event_falls_back_to_numeric_when_no_preview_complete_candidate",
-      "community": 3,
+      "community": 5,
       "norm_label": "test_representative_event_falls_back_to_numeric_when_no_preview_complete_candidate()"
     },
     {
@@ -4476,7 +4476,7 @@
       "source_location": "L283",
       "_origin": "ast",
       "id": "test_test_benchmark_runner_test_render_missing_preview_context_is_not_a_silent_black_panel",
-      "community": 3,
+      "community": 5,
       "norm_label": "test_render_missing_preview_context_is_not_a_silent_black_panel()"
     },
     {
@@ -4486,7 +4486,7 @@
       "source_location": "L318",
       "_origin": "ast",
       "id": "test_test_benchmark_runner_test_render_pointcloud_and_lidar_panels_are_labeled_as_rgb_debug_views",
-      "community": 3,
+      "community": 5,
       "norm_label": "test_render_pointcloud_and_lidar_panels_are_labeled_as_rgb_debug_views()"
     },
     {
@@ -4536,7 +4536,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "test_test_frontier_explorer",
-      "community": 18,
+      "community": 17,
       "norm_label": "test_frontier_explorer.py"
     },
     {
@@ -4546,7 +4546,7 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "test_test_frontier_explorer_grid",
-      "community": 18,
+      "community": 17,
       "norm_label": "_grid()"
     },
     {
@@ -4556,7 +4556,7 @@
       "source_location": "L17",
       "_origin": "ast",
       "id": "test_test_frontier_explorer_reference_clusters",
-      "community": 18,
+      "community": 17,
       "norm_label": "_reference_clusters()"
     },
     {
@@ -4566,7 +4566,7 @@
       "source_location": "L44",
       "_origin": "ast",
       "id": "test_test_frontier_explorer_as_cluster_sets",
-      "community": 18,
+      "community": 17,
       "norm_label": "_as_cluster_sets()"
     },
     {
@@ -4576,7 +4576,7 @@
       "source_location": "L48",
       "_origin": "ast",
       "id": "test_test_frontier_explorer_test_frontier_mask_free_next_to_unknown",
-      "community": 18,
+      "community": 17,
       "norm_label": "test_frontier_mask_free_next_to_unknown()"
     },
     {
@@ -4586,7 +4586,7 @@
       "source_location": "L66",
       "_origin": "ast",
       "id": "test_test_frontier_explorer_test_frontier_mask_interior_free_not_frontier",
-      "community": 18,
+      "community": 17,
       "norm_label": "test_frontier_mask_interior_free_not_frontier()"
     },
     {
@@ -4596,7 +4596,7 @@
       "source_location": "L79",
       "_origin": "ast",
       "id": "test_test_frontier_explorer_test_no_frontiers_returns_empty",
-      "community": 18,
+      "community": 17,
       "norm_label": "test_no_frontiers_returns_empty()"
     },
     {
@@ -4606,7 +4606,7 @@
       "source_location": "L85",
       "_origin": "ast",
       "id": "test_test_frontier_explorer_test_two_separated_clusters",
-      "community": 18,
+      "community": 17,
       "norm_label": "test_two_separated_clusters()"
     },
     {
@@ -4616,7 +4616,7 @@
       "source_location": "L100",
       "_origin": "ast",
       "id": "test_test_frontier_explorer_test_diagonal_cells_join_one_cluster",
-      "community": 18,
+      "community": 17,
       "norm_label": "test_diagonal_cells_join_one_cluster()"
     },
     {
@@ -4626,7 +4626,7 @@
       "source_location": "L114",
       "_origin": "ast",
       "id": "test_test_frontier_explorer_test_matches_reference_implementation_on_random_grids",
-      "community": 18,
+      "community": 17,
       "norm_label": "test_matches_reference_implementation_on_random_grids()"
     },
     {
@@ -4636,7 +4636,7 @@
       "source_location": "L125",
       "_origin": "ast",
       "id": "test_test_frontier_explorer_test_cluster_grows_onto_edge_from_interior_seed",
-      "community": 18,
+      "community": 17,
       "norm_label": "test_cluster_grows_onto_edge_from_interior_seed()"
     },
     {
@@ -4646,7 +4646,7 @@
       "source_location": "L12",
       "_origin": "ast",
       "id": "test_test_frontier_explorer_rationale_12",
-      "community": 18,
+      "community": 17,
       "norm_label": "build an int8 grid from single-char rows: '.'=free '?'=unknown '#'=obstacle."
     },
     {
@@ -4656,7 +4656,7 @@
       "source_location": "L18",
       "_origin": "ast",
       "id": "test_test_frontier_explorer_rationale_18",
-      "community": 18,
+      "community": 17,
       "norm_label": "original per-cell flood-fill implementation, kept as the oracle."
     },
     {
@@ -4666,7 +4666,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "test_test_geometry",
-      "community": 5,
+      "community": 3,
       "norm_label": "test_geometry.py"
     },
     {
@@ -4676,7 +4676,7 @@
       "source_location": "L19",
       "_origin": "ast",
       "id": "test_test_geometry_test_focus_bbox_and_mapping",
-      "community": 5,
+      "community": 3,
       "norm_label": "test_focus_bbox_and_mapping()"
     },
     {
@@ -4686,7 +4686,7 @@
       "source_location": "L26",
       "_origin": "ast",
       "id": "test_test_geometry_test_compute_weighted_planar_distance_for_center_pixel",
-      "community": 5,
+      "community": 3,
       "norm_label": "test_compute_weighted_planar_distance_for_center_pixel()"
     },
     {
@@ -4696,7 +4696,7 @@
       "source_location": "L46",
       "_origin": "ast",
       "id": "test_test_geometry_test_add_depth_measurements_falls_back_to_full_bbox_when_focus_has_no_depth",
-      "community": 5,
+      "community": 3,
       "norm_label": "test_add_depth_measurements_falls_back_to_full_bbox_when_focus_has_no_depth()"
     },
     {
@@ -4706,7 +4706,7 @@
       "source_location": "L76",
       "_origin": "ast",
       "id": "test_test_geometry_test_compute_lidar_measurement_returns_vehicle_frame_distance",
-      "community": 5,
+      "community": 3,
       "norm_label": "test_compute_lidar_measurement_returns_vehicle_frame_distance()"
     },
     {
@@ -4716,7 +4716,7 @@
       "source_location": "L103",
       "_origin": "ast",
       "id": "test_test_geometry_test_compute_lidar_measurement_supports_camera_frame_transformations",
-      "community": 5,
+      "community": 3,
       "norm_label": "test_compute_lidar_measurement_supports_camera_frame_transformations()"
     },
     {
@@ -4726,7 +4726,7 @@
       "source_location": "L142",
       "_origin": "ast",
       "id": "test_test_geometry_test_compute_pointcloud_measurement_returns_nearest_inlier",
-      "community": 5,
+      "community": 3,
       "norm_label": "test_compute_pointcloud_measurement_returns_nearest_inlier()"
     },
     {
@@ -4736,7 +4736,7 @@
       "source_location": "L166",
       "_origin": "ast",
       "id": "test_test_geometry_test_compute_pointcloud_measurement_supports_direct_cloud_coordinates",
-      "community": 5,
+      "community": 3,
       "norm_label": "test_compute_pointcloud_measurement_supports_direct_cloud_coordinates()"
     },
     {
@@ -4746,7 +4746,7 @@
       "source_location": "L190",
       "_origin": "ast",
       "id": "test_test_geometry_test_add_pointcloud_measurements_falls_back_when_transform_path_rejects_points",
-      "community": 5,
+      "community": 3,
       "norm_label": "test_add_pointcloud_measurements_falls_back_when_transform_path_rejects_points()"
     },
     {
@@ -4756,7 +4756,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "test_test_image_utils",
-      "community": 6,
+      "community": 18,
       "norm_label": "test_image_utils.py"
     },
     {
@@ -4766,7 +4766,7 @@
       "source_location": "L13",
       "_origin": "ast",
       "id": "test_test_image_utils_make_image_msg",
-      "community": 6,
+      "community": 18,
       "norm_label": "make_image_msg()"
     },
     {
@@ -4776,7 +4776,7 @@
       "source_location": "L13",
       "_origin": "ast",
       "id": "src_ridgeback_autonomy_test_test_image_utils_py_ndarray",
-      "community": 6,
+      "community": 18,
       "norm_label": "ndarray"
     },
     {
@@ -4786,7 +4786,7 @@
       "source_location": "L13",
       "_origin": "ast",
       "id": "src_ridgeback_autonomy_test_test_image_utils_py_image",
-      "community": 6,
+      "community": 18,
       "norm_label": "image"
     },
     {
@@ -4796,7 +4796,7 @@
       "source_location": "L24",
       "_origin": "ast",
       "id": "test_test_image_utils_test_convert_color_image_message_rgb8_to_bgr",
-      "community": 6,
+      "community": 18,
       "norm_label": "test_convert_color_image_message_rgb8_to_bgr()"
     },
     {
@@ -4806,7 +4806,7 @@
       "source_location": "L34",
       "_origin": "ast",
       "id": "test_test_image_utils_test_convert_depth_to_meters_from_16uc1",
-      "community": 6,
+      "community": 18,
       "norm_label": "test_convert_depth_to_meters_from_16uc1()"
     },
     {
@@ -4816,7 +4816,7 @@
       "source_location": "L44",
       "_origin": "ast",
       "id": "test_test_image_utils_test_convert_color_image_message_supports_padded_rows",
-      "community": 6,
+      "community": 18,
       "norm_label": "test_convert_color_image_message_supports_padded_rows()"
     },
     {
@@ -4826,7 +4826,7 @@
       "source_location": "L59",
       "_origin": "ast",
       "id": "test_test_image_utils_test_normalize_to_uint8_flat_image_returns_zeroes",
-      "community": 6,
+      "community": 18,
       "norm_label": "test_normalize_to_uint8_flat_image_returns_zeroes()"
     },
     {
@@ -4836,7 +4836,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "test_test_imports",
-      "community": 54,
+      "community": 56,
       "norm_label": "test_imports.py"
     },
     {
@@ -4846,7 +4846,7 @@
       "source_location": "L6",
       "_origin": "ast",
       "id": "test_test_imports_test_packaged_modules_import",
-      "community": 54,
+      "community": 56,
       "norm_label": "test_packaged_modules_import()"
     },
     {
@@ -4856,7 +4856,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "test_test_launch_layout",
-      "community": 25,
+      "community": 27,
       "norm_label": "test_launch_layout.py"
     },
     {
@@ -4866,7 +4866,7 @@
       "source_location": "L6",
       "_origin": "ast",
       "id": "test_test_launch_layout_test_public_launch_surface_is_limited_to_known_entrypoints",
-      "community": 25,
+      "community": 27,
       "norm_label": "test_public_launch_surface_is_limited_to_known_entrypoints()"
     },
     {
@@ -4876,7 +4876,7 @@
       "source_location": "L20",
       "_origin": "ast",
       "id": "test_test_launch_layout_test_internal_launch_includes_exist_and_are_referenced",
-      "community": 25,
+      "community": 27,
       "norm_label": "test_internal_launch_includes_exist_and_are_referenced()"
     },
     {
@@ -4886,7 +4886,7 @@
       "source_location": "L39",
       "_origin": "ast",
       "id": "test_test_launch_layout_test_benchmark_default_world_is_allowed_by_clearpath_simulation",
-      "community": 25,
+      "community": 27,
       "norm_label": "test_benchmark_default_world_is_allowed_by_clearpath_simulation()"
     },
     {
@@ -4896,7 +4896,7 @@
       "source_location": "L57",
       "_origin": "ast",
       "id": "test_test_launch_layout_test_exploration_uses_unique_mock_hospital_world",
-      "community": 25,
+      "community": 27,
       "norm_label": "test_exploration_uses_unique_mock_hospital_world()"
     },
     {
@@ -4906,7 +4906,7 @@
       "source_location": "L86",
       "_origin": "ast",
       "id": "test_test_launch_layout_test_benchmark_launch_uses_new_multi_estimator_interface",
-      "community": 25,
+      "community": 27,
       "norm_label": "test_benchmark_launch_uses_new_multi_estimator_interface()"
     },
     {
@@ -4916,7 +4916,7 @@
       "source_location": "L103",
       "_origin": "ast",
       "id": "test_test_launch_layout_test_slam_lifecycle_configure_and_activate_are_event_driven",
-      "community": 25,
+      "community": 27,
       "norm_label": "test_slam_lifecycle_configure_and_activate_are_event_driven()"
     },
     {
@@ -4976,7 +4976,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "test_test_sdf2usd_parse",
-      "community": 24,
+      "community": 26,
       "norm_label": "test_sdf2usd_parse.py"
     },
     {
@@ -4986,7 +4986,7 @@
       "source_location": "L25",
       "_origin": "ast",
       "id": "test_test_sdf2usd_parse_hospital",
-      "community": 24,
+      "community": 26,
       "norm_label": "hospital()"
     },
     {
@@ -4996,7 +4996,7 @@
       "source_location": "L29",
       "_origin": "ast",
       "id": "test_test_sdf2usd_parse_test_world_inventory",
-      "community": 24,
+      "community": 26,
       "norm_label": "test_world_inventory()"
     },
     {
@@ -5006,7 +5006,7 @@
       "source_location": "L42",
       "_origin": "ast",
       "id": "test_test_sdf2usd_parse_test_named_wall_exact",
-      "community": 24,
+      "community": 26,
       "norm_label": "test_named_wall_exact()"
     },
     {
@@ -5016,7 +5016,7 @@
       "source_location": "L51",
       "_origin": "ast",
       "id": "test_test_sdf2usd_parse_test_per_geom_pose_and_yawed_model",
-      "community": 24,
+      "community": 26,
       "norm_label": "test_per_geom_pose_and_yawed_model()"
     },
     {
@@ -5026,7 +5026,7 @@
       "source_location": "L59",
       "_origin": "ast",
       "id": "test_test_sdf2usd_parse_test_transparent_material",
-      "community": 24,
+      "community": 26,
       "norm_label": "test_transparent_material()"
     },
     {
@@ -5036,7 +5036,7 @@
       "source_location": "L65",
       "_origin": "ast",
       "id": "test_test_sdf2usd_parse_test_g1_include",
-      "community": 24,
+      "community": 26,
       "norm_label": "test_g1_include()"
     },
     {
@@ -5046,7 +5046,7 @@
       "source_location": "L72",
       "_origin": "ast",
       "id": "test_test_sdf2usd_parse_test_lights",
-      "community": 24,
+      "community": 26,
       "norm_label": "test_lights()"
     },
     {
@@ -5056,7 +5056,7 @@
       "source_location": "L81",
       "_origin": "ast",
       "id": "test_test_sdf2usd_parse_test_rpy_to_quat_yaw_only",
-      "community": 24,
+      "community": 26,
       "norm_label": "test_rpy_to_quat_yaw_only()"
     },
     {
@@ -5066,7 +5066,7 @@
       "source_location": "L88",
       "_origin": "ast",
       "id": "test_test_sdf2usd_parse_test_world_aabb_of_axis_aligned_wall",
-      "community": 24,
+      "community": 26,
       "norm_label": "test_world_aabb_of_axis_aligned_wall()"
     },
     {
@@ -5076,7 +5076,7 @@
       "source_location": "L95",
       "_origin": "ast",
       "id": "test_test_sdf2usd_parse_test_world_aabb_respects_yaw",
-      "community": 24,
+      "community": 26,
       "norm_label": "test_world_aabb_respects_yaw()"
     },
     {
@@ -5086,7 +5086,7 @@
       "source_location": "L108",
       "_origin": "ast",
       "id": "test_test_sdf2usd_parse_test_calibration_world_parses",
-      "community": 24,
+      "community": 26,
       "norm_label": "test_calibration_world_parses()"
     },
     {
@@ -5096,7 +5096,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "test_test_sdf2usd_parse_rationale_1",
-      "community": 24,
+      "community": 26,
       "norm_label": "parse-layer tests for tools/isaac/sdf2usd.py (no pxr required).  the emit/check"
     },
     {
@@ -5106,7 +5106,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "doc_conf",
-      "community": 58,
+      "community": 60,
       "norm_label": "conf.py"
     },
     {
@@ -5116,7 +5116,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "rviz_2d_overlay_plugins_overlay_text_display",
-      "community": 7,
+      "community": 6,
       "norm_label": "overlay_text_display.hpp"
     },
     {
@@ -5896,7 +5896,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "rviz_2d_overlay_plugins_overlay_utils",
-      "community": 7,
+      "community": 6,
       "norm_label": "overlay_utils.hpp"
     },
     {
@@ -5906,7 +5906,7 @@
       "source_location": "L58",
       "_origin": "ast",
       "id": "rviz_2d_overlay_plugins_overlay_utils_overlayobject",
-      "community": 7,
+      "community": 6,
       "norm_label": "overlayobject"
     },
     {
@@ -5916,7 +5916,7 @@
       "source_location": "L60",
       "_origin": "ast",
       "id": "rviz_2d_overlay_plugins_overlay_utils_scopedpixelbuffer",
-      "community": 7,
+      "community": 6,
       "norm_label": "scopedpixelbuffer"
     },
     {
@@ -5926,7 +5926,7 @@
       "source_location": "L64",
       "_origin": "ast",
       "id": "rviz_2d_overlay_plugins_overlay_utils_scopedpixelbuffer_getpixelbuffer",
-      "community": 7,
+      "community": 6,
       "norm_label": "getpixelbuffer"
     },
     {
@@ -5936,7 +5936,7 @@
       "source_location": "L65",
       "_origin": "ast",
       "id": "rviz_2d_overlay_plugins_overlay_utils_scopedpixelbuffer_getqimage",
-      "community": 7,
+      "community": 6,
       "norm_label": "getqimage"
     },
     {
@@ -5946,7 +5946,7 @@
       "source_location": "L71",
       "_origin": "ast",
       "id": "src_rviz_2d_overlay_plugins_rviz_2d_overlay_plugins_include_rviz_2d_overlay_plugins_overlay_utils_hpp_hardwarepixelbuffersharedptr",
-      "community": 7,
+      "community": 6,
       "norm_label": "hardwarepixelbuffersharedptr"
     },
     {
@@ -5956,7 +5956,7 @@
       "source_location": "L71",
       "_origin": "ast",
       "id": "rviz_2d_overlay_plugins_overlay_utils_scopedpixelbuffer_pixel_buffer",
-      "community": 7,
+      "community": 6,
       "norm_label": "pixel_buffer_"
     },
     {
@@ -5966,7 +5966,7 @@
       "source_location": "L99",
       "_origin": "ast",
       "id": "rviz_2d_overlay_plugins_overlay_utils_overlayobject_getname",
-      "community": 7,
+      "community": 6,
       "norm_label": "getname"
     },
     {
@@ -5976,7 +5976,7 @@
       "source_location": "L100",
       "_origin": "ast",
       "id": "rviz_2d_overlay_plugins_overlay_utils_overlayobject_hide",
-      "community": 7,
+      "community": 6,
       "norm_label": "hide"
     },
     {
@@ -5986,7 +5986,7 @@
       "source_location": "L101",
       "_origin": "ast",
       "id": "rviz_2d_overlay_plugins_overlay_utils_overlayobject_show",
-      "community": 7,
+      "community": 6,
       "norm_label": "show"
     },
     {
@@ -5996,7 +5996,7 @@
       "source_location": "L102",
       "_origin": "ast",
       "id": "rviz_2d_overlay_plugins_overlay_utils_overlayobject_istextureready",
-      "community": 7,
+      "community": 6,
       "norm_label": "istextureready"
     },
     {
@@ -6006,7 +6006,7 @@
       "source_location": "L103",
       "_origin": "ast",
       "id": "rviz_2d_overlay_plugins_overlay_utils_overlayobject_updatetexturesize",
-      "community": 7,
+      "community": 6,
       "norm_label": "updatetexturesize"
     },
     {
@@ -6016,7 +6016,7 @@
       "source_location": "L104",
       "_origin": "ast",
       "id": "rviz_2d_overlay_plugins_overlay_utils_overlayobject_getbuffer",
-      "community": 7,
+      "community": 6,
       "norm_label": "getbuffer"
     },
     {
@@ -6026,7 +6026,7 @@
       "source_location": "L105",
       "_origin": "ast",
       "id": "rviz_2d_overlay_plugins_overlay_utils_overlayobject_setposition",
-      "community": 7,
+      "community": 6,
       "norm_label": "setposition"
     },
     {
@@ -6036,7 +6036,7 @@
       "source_location": "L108",
       "_origin": "ast",
       "id": "rviz_2d_overlay_plugins_overlay_utils_overlayobject_setdimensions",
-      "community": 7,
+      "community": 6,
       "norm_label": "setdimensions"
     },
     {
@@ -6046,7 +6046,7 @@
       "source_location": "L109",
       "_origin": "ast",
       "id": "rviz_2d_overlay_plugins_overlay_utils_overlayobject_isvisible",
-      "community": 7,
+      "community": 6,
       "norm_label": "isvisible"
     },
     {
@@ -6056,7 +6056,7 @@
       "source_location": "L110",
       "_origin": "ast",
       "id": "rviz_2d_overlay_plugins_overlay_utils_overlayobject_gettexturewidth",
-      "community": 7,
+      "community": 6,
       "norm_label": "gettexturewidth"
     },
     {
@@ -6066,7 +6066,7 @@
       "source_location": "L111",
       "_origin": "ast",
       "id": "rviz_2d_overlay_plugins_overlay_utils_overlayobject_gettextureheight",
-      "community": 7,
+      "community": 6,
       "norm_label": "gettextureheight"
     },
     {
@@ -6076,7 +6076,7 @@
       "source_location": "L114",
       "_origin": "ast",
       "id": "src_rviz_2d_overlay_plugins_rviz_2d_overlay_plugins_include_rviz_2d_overlay_plugins_overlay_utils_hpp_string",
-      "community": 7,
+      "community": 6,
       "norm_label": "string"
     },
     {
@@ -6086,7 +6086,7 @@
       "source_location": "L114",
       "_origin": "ast",
       "id": "rviz_2d_overlay_plugins_overlay_utils_overlayobject_name",
-      "community": 7,
+      "community": 6,
       "norm_label": "name_"
     },
     {
@@ -6096,7 +6096,7 @@
       "source_location": "L115",
       "_origin": "ast",
       "id": "overlay",
-      "community": 7,
+      "community": 6,
       "norm_label": "overlay"
     },
     {
@@ -6106,7 +6106,7 @@
       "source_location": "L115",
       "_origin": "ast",
       "id": "rviz_2d_overlay_plugins_overlay_utils_overlayobject_overlay",
-      "community": 7,
+      "community": 6,
       "norm_label": "overlay_"
     },
     {
@@ -6116,7 +6116,7 @@
       "source_location": "L116",
       "_origin": "ast",
       "id": "paneloverlayelement",
-      "community": 7,
+      "community": 6,
       "norm_label": "paneloverlayelement"
     },
     {
@@ -6126,7 +6126,7 @@
       "source_location": "L116",
       "_origin": "ast",
       "id": "rviz_2d_overlay_plugins_overlay_utils_overlayobject_panel",
-      "community": 7,
+      "community": 6,
       "norm_label": "panel_"
     },
     {
@@ -6136,7 +6136,7 @@
       "source_location": "L117",
       "_origin": "ast",
       "id": "materialptr",
-      "community": 7,
+      "community": 6,
       "norm_label": "materialptr"
     },
     {
@@ -6146,7 +6146,7 @@
       "source_location": "L117",
       "_origin": "ast",
       "id": "rviz_2d_overlay_plugins_overlay_utils_overlayobject_panel_material",
-      "community": 7,
+      "community": 6,
       "norm_label": "panel_material_"
     },
     {
@@ -6156,7 +6156,7 @@
       "source_location": "L118",
       "_origin": "ast",
       "id": "textureptr",
-      "community": 7,
+      "community": 6,
       "norm_label": "textureptr"
     },
     {
@@ -6166,7 +6166,7 @@
       "source_location": "L118",
       "_origin": "ast",
       "id": "rviz_2d_overlay_plugins_overlay_utils_overlayobject_texture",
-      "community": 7,
+      "community": 6,
       "norm_label": "texture_"
     },
     {
@@ -6176,7 +6176,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "rviz_2d_overlay_plugins_pie_chart_display",
-      "community": 7,
+      "community": 6,
       "norm_label": "pie_chart_display.h"
     },
     {
@@ -6186,7 +6186,7 @@
       "source_location": "L51",
       "_origin": "ast",
       "id": "rviz_2d_overlay_plugins_pie_chart_display_rviz_2d_overlay_plugins",
-      "community": 7,
+      "community": 6,
       "norm_label": "rviz_2d_overlay_plugins()"
     },
     {
@@ -6196,7 +6196,7 @@
       "source_location": "L51",
       "_origin": "ast",
       "id": "namespace",
-      "community": 7,
+      "community": 6,
       "norm_label": "namespace"
     },
     {
@@ -6206,7 +6206,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_overlay_text_display",
-      "community": 12,
+      "community": 10,
       "norm_label": "overlay_text_display.cpp"
     },
     {
@@ -6216,7 +6216,7 @@
       "source_location": "L55",
       "_origin": "ast",
       "id": "src_overlay_text_display_overlaytextdisplay",
-      "community": 12,
+      "community": 10,
       "norm_label": "overlaytextdisplay()"
     },
     {
@@ -6226,7 +6226,7 @@
       "source_location": "L136",
       "_origin": "ast",
       "id": "src_overlay_text_display_onenable",
-      "community": 12,
+      "community": 10,
       "norm_label": "onenable()"
     },
     {
@@ -6236,7 +6236,7 @@
       "source_location": "L143",
       "_origin": "ast",
       "id": "src_overlay_text_display_ondisable",
-      "community": 12,
+      "community": 10,
       "norm_label": "ondisable()"
     },
     {
@@ -6246,7 +6246,7 @@
       "source_location": "L151",
       "_origin": "ast",
       "id": "src_overlay_text_display_oninitialize",
-      "community": 12,
+      "community": 10,
       "norm_label": "oninitialize()"
     },
     {
@@ -6256,7 +6256,7 @@
       "source_location": "L178",
       "_origin": "ast",
       "id": "src_overlay_text_display_update",
-      "community": 12,
+      "community": 10,
       "norm_label": "update()"
     },
     {
@@ -6266,7 +6266,7 @@
       "source_location": "L256",
       "_origin": "ast",
       "id": "src_overlay_text_display_reset",
-      "community": 12,
+      "community": 10,
       "norm_label": "reset()"
     },
     {
@@ -6276,7 +6276,7 @@
       "source_location": "L264",
       "_origin": "ast",
       "id": "src_overlay_text_display_processmessage",
-      "community": 12,
+      "community": 10,
       "norm_label": "processmessage()"
     },
     {
@@ -6286,7 +6286,7 @@
       "source_location": "L264",
       "_origin": "ast",
       "id": "src_rviz_2d_overlay_plugins_rviz_2d_overlay_plugins_src_overlay_text_display_cpp_constsharedptr",
-      "community": 12,
+      "community": 10,
       "norm_label": "constsharedptr"
     },
     {
@@ -6296,7 +6296,7 @@
       "source_location": "L311",
       "_origin": "ast",
       "id": "src_overlay_text_display_updateovertakepositionproperties",
-      "community": 12,
+      "community": 10,
       "norm_label": "updateovertakepositionproperties()"
     },
     {
@@ -6306,7 +6306,7 @@
       "source_location": "L344",
       "_origin": "ast",
       "id": "src_overlay_text_display_updateovertakefgcolorproperties",
-      "community": 12,
+      "community": 10,
       "norm_label": "updateovertakefgcolorproperties()"
     },
     {
@@ -6316,7 +6316,7 @@
       "source_location": "L367",
       "_origin": "ast",
       "id": "src_overlay_text_display_updateovertakebgcolorproperties",
-      "community": 12,
+      "community": 10,
       "norm_label": "updateovertakebgcolorproperties()"
     },
     {
@@ -6326,7 +6326,7 @@
       "source_location": "L384",
       "_origin": "ast",
       "id": "src_overlay_text_display_updatealignbottom",
-      "community": 12,
+      "community": 10,
       "norm_label": "updatealignbottom()"
     },
     {
@@ -6336,7 +6336,7 @@
       "source_location": "L391",
       "_origin": "ast",
       "id": "src_overlay_text_display_updateinvertshadow",
-      "community": 12,
+      "community": 10,
       "norm_label": "updateinvertshadow()"
     },
     {
@@ -6346,7 +6346,7 @@
       "source_location": "L398",
       "_origin": "ast",
       "id": "src_overlay_text_display_updateverticaldistance",
-      "community": 12,
+      "community": 10,
       "norm_label": "updateverticaldistance()"
     },
     {
@@ -6356,7 +6356,7 @@
       "source_location": "L405",
       "_origin": "ast",
       "id": "src_overlay_text_display_updatehorizontaldistance",
-      "community": 12,
+      "community": 10,
       "norm_label": "updatehorizontaldistance()"
     },
     {
@@ -6366,7 +6366,7 @@
       "source_location": "L412",
       "_origin": "ast",
       "id": "src_overlay_text_display_updateverticalalignment",
-      "community": 12,
+      "community": 10,
       "norm_label": "updateverticalalignment()"
     },
     {
@@ -6376,7 +6376,7 @@
       "source_location": "L420",
       "_origin": "ast",
       "id": "src_overlay_text_display_updatehorizontalalignment",
-      "community": 12,
+      "community": 10,
       "norm_label": "updatehorizontalalignment()"
     },
     {
@@ -6386,7 +6386,7 @@
       "source_location": "L428",
       "_origin": "ast",
       "id": "src_overlay_text_display_updatewidth",
-      "community": 12,
+      "community": 10,
       "norm_label": "updatewidth()"
     },
     {
@@ -6396,7 +6396,7 @@
       "source_location": "L435",
       "_origin": "ast",
       "id": "src_overlay_text_display_updateheight",
-      "community": 12,
+      "community": 10,
       "norm_label": "updateheight()"
     },
     {
@@ -6406,7 +6406,7 @@
       "source_location": "L442",
       "_origin": "ast",
       "id": "src_overlay_text_display_updatetextsize",
-      "community": 12,
+      "community": 10,
       "norm_label": "updatetextsize()"
     },
     {
@@ -6416,7 +6416,7 @@
       "source_location": "L449",
       "_origin": "ast",
       "id": "src_overlay_text_display_updatebgcolor",
-      "community": 12,
+      "community": 10,
       "norm_label": "updatebgcolor()"
     },
     {
@@ -6426,7 +6426,7 @@
       "source_location": "L459",
       "_origin": "ast",
       "id": "src_overlay_text_display_updatebgalpha",
-      "community": 12,
+      "community": 10,
       "norm_label": "updatebgalpha()"
     },
     {
@@ -6436,7 +6436,7 @@
       "source_location": "L466",
       "_origin": "ast",
       "id": "src_overlay_text_display_updatefgcolor",
-      "community": 12,
+      "community": 10,
       "norm_label": "updatefgcolor()"
     },
     {
@@ -6446,7 +6446,7 @@
       "source_location": "L476",
       "_origin": "ast",
       "id": "src_overlay_text_display_updatefgalpha",
-      "community": 12,
+      "community": 10,
       "norm_label": "updatefgalpha()"
     },
     {
@@ -6456,7 +6456,7 @@
       "source_location": "L483",
       "_origin": "ast",
       "id": "src_overlay_text_display_updatefont",
-      "community": 12,
+      "community": 10,
       "norm_label": "updatefont()"
     },
     {
@@ -6466,7 +6466,7 @@
       "source_location": "L496",
       "_origin": "ast",
       "id": "src_overlay_text_display_updatelinewidth",
-      "community": 12,
+      "community": 10,
       "norm_label": "updatelinewidth()"
     },
     {
@@ -6476,7 +6476,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_overlay_utils",
-      "community": 16,
+      "community": 15,
       "norm_label": "overlay_utils.cpp"
     },
     {
@@ -6486,7 +6486,7 @@
       "source_location": "L42",
       "_origin": "ast",
       "id": "src_overlay_utils_scopedpixelbuffer",
-      "community": 16,
+      "community": 15,
       "norm_label": "scopedpixelbuffer()"
     },
     {
@@ -6496,7 +6496,7 @@
       "source_location": "L42",
       "_origin": "ast",
       "id": "src_rviz_2d_overlay_plugins_rviz_2d_overlay_plugins_src_overlay_utils_cpp_hardwarepixelbuffersharedptr",
-      "community": 16,
+      "community": 15,
       "norm_label": "hardwarepixelbuffersharedptr"
     },
     {
@@ -6506,7 +6506,7 @@
       "source_location": "L51",
       "_origin": "ast",
       "id": "src_overlay_utils_getpixelbuffer",
-      "community": 16,
+      "community": 15,
       "norm_label": "getpixelbuffer()"
     },
     {
@@ -6516,7 +6516,7 @@
       "source_location": "L55",
       "_origin": "ast",
       "id": "src_overlay_utils_getqimage",
-      "community": 16,
+      "community": 15,
       "norm_label": "getqimage()"
     },
     {
@@ -6526,7 +6526,7 @@
       "source_location": "L55",
       "_origin": "ast",
       "id": "qimage",
-      "community": 7,
+      "community": 6,
       "norm_label": "qimage"
     },
     {
@@ -6536,7 +6536,7 @@
       "source_location": "L62",
       "_origin": "ast",
       "id": "src_rviz_2d_overlay_plugins_rviz_2d_overlay_plugins_src_overlay_utils_cpp_qcolor",
-      "community": 16,
+      "community": 15,
       "norm_label": "qcolor"
     },
     {
@@ -6546,7 +6546,7 @@
       "source_location": "L72",
       "_origin": "ast",
       "id": "overlayobject",
-      "community": 16,
+      "community": 15,
       "norm_label": "overlayobject"
     },
     {
@@ -6556,7 +6556,7 @@
       "source_location": "L80",
       "_origin": "ast",
       "id": "src_overlay_utils_overlayobject",
-      "community": 16,
+      "community": 15,
       "norm_label": "overlayobject()"
     },
     {
@@ -6566,7 +6566,7 @@
       "source_location": "L80",
       "_origin": "ast",
       "id": "src_rviz_2d_overlay_plugins_rviz_2d_overlay_plugins_src_overlay_utils_cpp_string",
-      "community": 16,
+      "community": 15,
       "norm_label": "string"
     },
     {
@@ -6576,7 +6576,7 @@
       "source_location": "L105",
       "_origin": "ast",
       "id": "src_overlay_utils_getname",
-      "community": 16,
+      "community": 15,
       "norm_label": "getname()"
     },
     {
@@ -6586,7 +6586,7 @@
       "source_location": "L109",
       "_origin": "ast",
       "id": "src_overlay_utils_hide",
-      "community": 16,
+      "community": 15,
       "norm_label": "hide()"
     },
     {
@@ -6596,7 +6596,7 @@
       "source_location": "L115",
       "_origin": "ast",
       "id": "src_overlay_utils_show",
-      "community": 16,
+      "community": 15,
       "norm_label": "show()"
     },
     {
@@ -6606,7 +6606,7 @@
       "source_location": "L121",
       "_origin": "ast",
       "id": "src_overlay_utils_istextureready",
-      "community": 16,
+      "community": 15,
       "norm_label": "istextureready()"
     },
     {
@@ -6616,7 +6616,7 @@
       "source_location": "L125",
       "_origin": "ast",
       "id": "src_overlay_utils_updatetexturesize",
-      "community": 16,
+      "community": 15,
       "norm_label": "updatetexturesize()"
     },
     {
@@ -6626,7 +6626,7 @@
       "source_location": "L158",
       "_origin": "ast",
       "id": "src_overlay_utils_getbuffer",
-      "community": 16,
+      "community": 15,
       "norm_label": "getbuffer()"
     },
     {
@@ -6636,7 +6636,7 @@
       "source_location": "L166",
       "_origin": "ast",
       "id": "src_overlay_utils_setposition",
-      "community": 16,
+      "community": 15,
       "norm_label": "setposition()"
     },
     {
@@ -6646,7 +6646,7 @@
       "source_location": "L166",
       "_origin": "ast",
       "id": "src_rviz_2d_overlay_plugins_rviz_2d_overlay_plugins_src_overlay_utils_cpp_horizontalalignment",
-      "community": 16,
+      "community": 15,
       "norm_label": "horizontalalignment"
     },
     {
@@ -6656,7 +6656,7 @@
       "source_location": "L166",
       "_origin": "ast",
       "id": "src_rviz_2d_overlay_plugins_rviz_2d_overlay_plugins_src_overlay_utils_cpp_verticalalignment",
-      "community": 16,
+      "community": 15,
       "norm_label": "verticalalignment"
     },
     {
@@ -6666,7 +6666,7 @@
       "source_location": "L207",
       "_origin": "ast",
       "id": "src_overlay_utils_setdimensions",
-      "community": 16,
+      "community": 15,
       "norm_label": "setdimensions()"
     },
     {
@@ -6676,7 +6676,7 @@
       "source_location": "L211",
       "_origin": "ast",
       "id": "src_overlay_utils_isvisible",
-      "community": 16,
+      "community": 15,
       "norm_label": "isvisible()"
     },
     {
@@ -6686,7 +6686,7 @@
       "source_location": "L215",
       "_origin": "ast",
       "id": "src_overlay_utils_gettexturewidth",
-      "community": 16,
+      "community": 15,
       "norm_label": "gettexturewidth()"
     },
     {
@@ -6696,7 +6696,7 @@
       "source_location": "L223",
       "_origin": "ast",
       "id": "src_overlay_utils_gettextureheight",
-      "community": 16,
+      "community": 15,
       "norm_label": "gettextureheight()"
     },
     {
@@ -6706,7 +6706,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_pie_chart_display",
-      "community": 9,
+      "community": 8,
       "norm_label": "pie_chart_display.cpp"
     },
     {
@@ -6716,7 +6716,7 @@
       "source_location": "L50",
       "_origin": "ast",
       "id": "src_pie_chart_display_piechartdisplay",
-      "community": 9,
+      "community": 8,
       "norm_label": "piechartdisplay()"
     },
     {
@@ -6726,7 +6726,7 @@
       "source_location": "L137",
       "_origin": "ast",
       "id": "src_pie_chart_display_oninitialize",
-      "community": 9,
+      "community": 8,
       "norm_label": "oninitialize()"
     },
     {
@@ -6736,7 +6736,7 @@
       "source_location": "L168",
       "_origin": "ast",
       "id": "src_pie_chart_display_update",
-      "community": 9,
+      "community": 8,
       "norm_label": "update()"
     },
     {
@@ -6746,7 +6746,7 @@
       "source_location": "L178",
       "_origin": "ast",
       "id": "src_pie_chart_display_processmessage",
-      "community": 9,
+      "community": 8,
       "norm_label": "processmessage()"
     },
     {
@@ -6756,7 +6756,7 @@
       "source_location": "L178",
       "_origin": "ast",
       "id": "src_rviz_2d_overlay_plugins_rviz_2d_overlay_plugins_src_pie_chart_display_cpp_constsharedptr",
-      "community": 9,
+      "community": 8,
       "norm_label": "constsharedptr"
     },
     {
@@ -6766,7 +6766,7 @@
       "source_location": "L192",
       "_origin": "ast",
       "id": "src_pie_chart_display_drawplot",
-      "community": 9,
+      "community": 8,
       "norm_label": "drawplot()"
     },
     {
@@ -6776,7 +6776,7 @@
       "source_location": "L291",
       "_origin": "ast",
       "id": "src_pie_chart_display_onenable",
-      "community": 9,
+      "community": 8,
       "norm_label": "onenable()"
     },
     {
@@ -6786,7 +6786,7 @@
       "source_location": "L298",
       "_origin": "ast",
       "id": "src_pie_chart_display_ondisable",
-      "community": 9,
+      "community": 8,
       "norm_label": "ondisable()"
     },
     {
@@ -6796,7 +6796,7 @@
       "source_location": "L304",
       "_origin": "ast",
       "id": "src_pie_chart_display_updatesize",
-      "community": 9,
+      "community": 8,
       "norm_label": "updatesize()"
     },
     {
@@ -6806,7 +6806,7 @@
       "source_location": "L311",
       "_origin": "ast",
       "id": "src_pie_chart_display_updatetop",
-      "community": 9,
+      "community": 8,
       "norm_label": "updatetop()"
     },
     {
@@ -6816,7 +6816,7 @@
       "source_location": "L317",
       "_origin": "ast",
       "id": "src_pie_chart_display_updateleft",
-      "community": 9,
+      "community": 8,
       "norm_label": "updateleft()"
     },
     {
@@ -6826,7 +6826,7 @@
       "source_location": "L323",
       "_origin": "ast",
       "id": "src_pie_chart_display_updatebgcolor",
-      "community": 9,
+      "community": 8,
       "norm_label": "updatebgcolor()"
     },
     {
@@ -6836,7 +6836,7 @@
       "source_location": "L330",
       "_origin": "ast",
       "id": "src_pie_chart_display_updatefgcolor",
-      "community": 9,
+      "community": 8,
       "norm_label": "updatefgcolor()"
     },
     {
@@ -6846,7 +6846,7 @@
       "source_location": "L337",
       "_origin": "ast",
       "id": "src_pie_chart_display_updatefgalpha",
-      "community": 9,
+      "community": 8,
       "norm_label": "updatefgalpha()"
     },
     {
@@ -6856,7 +6856,7 @@
       "source_location": "L344",
       "_origin": "ast",
       "id": "src_pie_chart_display_updatefgalpha2",
-      "community": 9,
+      "community": 8,
       "norm_label": "updatefgalpha2()"
     },
     {
@@ -6866,7 +6866,7 @@
       "source_location": "L352",
       "_origin": "ast",
       "id": "src_pie_chart_display_updatebgalpha",
-      "community": 9,
+      "community": 8,
       "norm_label": "updatebgalpha()"
     },
     {
@@ -6876,7 +6876,7 @@
       "source_location": "L359",
       "_origin": "ast",
       "id": "src_pie_chart_display_updateminvalue",
-      "community": 9,
+      "community": 8,
       "norm_label": "updateminvalue()"
     },
     {
@@ -6886,7 +6886,7 @@
       "source_location": "L366",
       "_origin": "ast",
       "id": "src_pie_chart_display_updatemaxvalue",
-      "community": 9,
+      "community": 8,
       "norm_label": "updatemaxvalue()"
     },
     {
@@ -6896,7 +6896,7 @@
       "source_location": "L373",
       "_origin": "ast",
       "id": "src_pie_chart_display_updatetextsize",
-      "community": 9,
+      "community": 8,
       "norm_label": "updatetextsize()"
     },
     {
@@ -6906,7 +6906,7 @@
       "source_location": "L384",
       "_origin": "ast",
       "id": "src_pie_chart_display_updateshowcaption",
-      "community": 9,
+      "community": 8,
       "norm_label": "updateshowcaption()"
     },
     {
@@ -6916,7 +6916,7 @@
       "source_location": "L391",
       "_origin": "ast",
       "id": "src_pie_chart_display_updateautocolorchange",
-      "community": 9,
+      "community": 8,
       "norm_label": "updateautocolorchange()"
     },
     {
@@ -6926,7 +6926,7 @@
       "source_location": "L410",
       "_origin": "ast",
       "id": "src_pie_chart_display_updatemaxcolor",
-      "community": 9,
+      "community": 8,
       "norm_label": "updatemaxcolor()"
     },
     {
@@ -6936,7 +6936,7 @@
       "source_location": "L417",
       "_origin": "ast",
       "id": "src_pie_chart_display_updatemedcolor",
-      "community": 9,
+      "community": 8,
       "norm_label": "updatemedcolor()"
     },
     {
@@ -6946,7 +6946,7 @@
       "source_location": "L424",
       "_origin": "ast",
       "id": "src_pie_chart_display_updatemaxcolorthreshold",
-      "community": 9,
+      "community": 8,
       "norm_label": "updatemaxcolorthreshold()"
     },
     {
@@ -6956,7 +6956,7 @@
       "source_location": "L430",
       "_origin": "ast",
       "id": "src_pie_chart_display_updatemedcolorthreshold",
-      "community": 9,
+      "community": 8,
       "norm_label": "updatemedcolorthreshold()"
     },
     {
@@ -6966,7 +6966,7 @@
       "source_location": "L436",
       "_origin": "ast",
       "id": "src_pie_chart_display_updateclockwiserotate",
-      "community": 9,
+      "community": 8,
       "norm_label": "updateclockwiserotate()"
     },
     {
@@ -6976,7 +6976,7 @@
       "source_location": "L443",
       "_origin": "ast",
       "id": "src_pie_chart_display_isinregion",
-      "community": 9,
+      "community": 8,
       "norm_label": "isinregion()"
     },
     {
@@ -6986,7 +6986,7 @@
       "source_location": "L449",
       "_origin": "ast",
       "id": "src_pie_chart_display_moveposition",
-      "community": 9,
+      "community": 8,
       "norm_label": "moveposition()"
     },
     {
@@ -6996,7 +6996,7 @@
       "source_location": "L455",
       "_origin": "ast",
       "id": "src_pie_chart_display_setposition",
-      "community": 9,
+      "community": 8,
       "norm_label": "setposition()"
     },
     {
@@ -7006,7 +7006,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_string_to_overlay_text",
-      "community": 14,
+      "community": 13,
       "norm_label": "string_to_overlay_text.cpp"
     },
     {
@@ -7016,7 +7016,7 @@
       "source_location": "L21",
       "_origin": "ast",
       "id": "src_string_to_overlay_text_rviz2dstring",
-      "community": 14,
+      "community": 13,
       "norm_label": "rviz2dstring"
     },
     {
@@ -7026,7 +7026,7 @@
       "source_location": "L23",
       "_origin": "ast",
       "id": "src_string_to_overlay_text_rviz2dstring_parameterscallback",
-      "community": 14,
+      "community": 13,
       "norm_label": ".parameterscallback()"
     },
     {
@@ -7036,7 +7036,7 @@
       "source_location": "L23",
       "_origin": "ast",
       "id": "setparametersresult",
-      "community": 14,
+      "community": 13,
       "norm_label": "setparametersresult"
     },
     {
@@ -7046,7 +7046,7 @@
       "source_location": "L23",
       "_origin": "ast",
       "id": "vector",
-      "community": 14,
+      "community": 13,
       "norm_label": "vector"
     },
     {
@@ -7056,7 +7056,7 @@
       "source_location": "L23",
       "_origin": "ast",
       "id": "parameter",
-      "community": 14,
+      "community": 13,
       "norm_label": "parameter"
     },
     {
@@ -7066,7 +7066,7 @@
       "source_location": "L46",
       "_origin": "ast",
       "id": "src_string_to_overlay_text_rviz2dstring_rviz2dstring",
-      "community": 14,
+      "community": 13,
       "norm_label": ".rviz2dstring()"
     },
     {
@@ -7076,7 +7076,7 @@
       "source_location": "L67",
       "_origin": "ast",
       "id": "src_string_to_overlay_text_rviz2dstring_strcallback",
-      "community": 14,
+      "community": 13,
       "norm_label": ".strcallback()"
     },
     {
@@ -7086,7 +7086,7 @@
       "source_location": "L67",
       "_origin": "ast",
       "id": "src_rviz_2d_overlay_plugins_rviz_2d_overlay_plugins_src_string_to_overlay_text_cpp_string",
-      "community": 14,
+      "community": 13,
       "norm_label": "string"
     },
     {
@@ -7096,7 +7096,7 @@
       "source_location": "L121",
       "_origin": "ast",
       "id": "src_rviz_2d_overlay_plugins_rviz_2d_overlay_plugins_src_string_to_overlay_text_cpp_sharedptr",
-      "community": 14,
+      "community": 13,
       "norm_label": "sharedptr"
     },
     {
@@ -7106,7 +7106,7 @@
       "source_location": "L121",
       "_origin": "ast",
       "id": "src_string_to_overlay_text_rviz2dstring_sub_st",
-      "community": 14,
+      "community": 13,
       "norm_label": "sub_st_"
     },
     {
@@ -7116,7 +7116,7 @@
       "source_location": "L122",
       "_origin": "ast",
       "id": "src_string_to_overlay_text_rviz2dstring_string_topic",
-      "community": 14,
+      "community": 13,
       "norm_label": "string_topic"
     },
     {
@@ -7126,7 +7126,7 @@
       "source_location": "L122",
       "_origin": "ast",
       "id": "src_string_to_overlay_text_rviz2dstring_overlay_text_topic",
-      "community": 14,
+      "community": 13,
       "norm_label": "overlay_text_topic"
     },
     {
@@ -7136,7 +7136,7 @@
       "source_location": "L122",
       "_origin": "ast",
       "id": "src_string_to_overlay_text_rviz2dstring_fg_color",
-      "community": 14,
+      "community": 13,
       "norm_label": "fg_color"
     },
     {
@@ -7146,7 +7146,7 @@
       "source_location": "L123",
       "_origin": "ast",
       "id": "src_string_to_overlay_text_rviz2dstring_pub_ov",
-      "community": 14,
+      "community": 13,
       "norm_label": "pub_ov_"
     },
     {
@@ -7156,7 +7156,7 @@
       "source_location": "L124",
       "_origin": "ast",
       "id": "src_string_to_overlay_text_rviz2dstring_callback_handle",
-      "community": 14,
+      "community": 13,
       "norm_label": "callback_handle_"
     },
     {
@@ -7166,7 +7166,7 @@
       "source_location": "L127",
       "_origin": "ast",
       "id": "src_string_to_overlay_text_main",
-      "community": 14,
+      "community": 13,
       "norm_label": "main()"
     },
     {
@@ -7180,7 +7180,7 @@
       },
       "_origin": "ast",
       "id": "start_exploration",
-      "community": 28,
+      "community": 30,
       "norm_label": "start_exploration.sh"
     },
     {
@@ -7194,7 +7194,7 @@
       },
       "_origin": "ast",
       "id": "home_deivid_dev_dynamo_ridgeback_claude_worktrees_jolly_borg_f48cab_start_exploration_sh__entry",
-      "community": 28,
+      "community": 30,
       "norm_label": "start_exploration.sh script"
     },
     {
@@ -7208,7 +7208,7 @@
       },
       "_origin": "ast",
       "id": "start_exploration_rmw_implementation",
-      "community": 28,
+      "community": 30,
       "norm_label": "rmw_implementation"
     },
     {
@@ -7222,7 +7222,7 @@
       },
       "_origin": "ast",
       "id": "start_exploration_ros_domain_id",
-      "community": 28,
+      "community": 30,
       "norm_label": "ros_domain_id"
     },
     {
@@ -7232,7 +7232,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "benchmark_explore_probe",
-      "community": 11,
+      "community": 9,
       "norm_label": "explore_probe.py"
     },
     {
@@ -7242,7 +7242,7 @@
       "source_location": "L35",
       "_origin": "ast",
       "id": "benchmark_explore_probe_probe",
-      "community": 11,
+      "community": 9,
       "norm_label": "probe"
     },
     {
@@ -7252,7 +7252,7 @@
       "source_location": "L36",
       "_origin": "ast",
       "id": "benchmark_explore_probe_probe_init",
-      "community": 8,
+      "community": 7,
       "norm_label": ".__init__()"
     },
     {
@@ -7262,7 +7262,7 @@
       "source_location": "L62",
       "_origin": "ast",
       "id": "benchmark_explore_probe_probe_now",
-      "community": 11,
+      "community": 9,
       "norm_label": ".now()"
     },
     {
@@ -7272,7 +7272,7 @@
       "source_location": "L65",
       "_origin": "ast",
       "id": "benchmark_explore_probe_probe_ev",
-      "community": 11,
+      "community": 9,
       "norm_label": ".ev()"
     },
     {
@@ -7282,7 +7282,7 @@
       "source_location": "L69",
       "_origin": "ast",
       "id": "benchmark_explore_probe_probe_on_status",
-      "community": 11,
+      "community": 9,
       "norm_label": ".on_status()"
     },
     {
@@ -7292,7 +7292,7 @@
       "source_location": "L85",
       "_origin": "ast",
       "id": "benchmark_explore_probe_probe_classify_aborts",
-      "community": 11,
+      "community": 9,
       "norm_label": ".classify_aborts()"
     },
     {
@@ -7302,7 +7302,7 @@
       "source_location": "L95",
       "_origin": "ast",
       "id": "benchmark_explore_probe_probe_on_frontiers",
-      "community": 11,
+      "community": 9,
       "norm_label": ".on_frontiers()"
     },
     {
@@ -7312,7 +7312,7 @@
       "source_location": "L102",
       "_origin": "ast",
       "id": "benchmark_explore_probe_probe_on_explore_status",
-      "community": 11,
+      "community": 9,
       "norm_label": ".on_explore_status()"
     },
     {
@@ -7322,7 +7322,7 @@
       "source_location": "L107",
       "_origin": "ast",
       "id": "benchmark_explore_probe_probe_on_cov",
-      "community": 11,
+      "community": 9,
       "norm_label": ".on_cov()"
     },
     {
@@ -7332,7 +7332,7 @@
       "source_location": "L114",
       "_origin": "ast",
       "id": "benchmark_explore_probe_probe_summary",
-      "community": 11,
+      "community": 9,
       "norm_label": ".summary()"
     },
     {
@@ -7342,7 +7342,7 @@
       "source_location": "L135",
       "_origin": "ast",
       "id": "benchmark_explore_probe_main",
-      "community": 11,
+      "community": 9,
       "norm_label": "main()"
     },
     {
@@ -7352,7 +7352,7 @@
       "source_location": "L86",
       "_origin": "ast",
       "id": "benchmark_explore_probe_rationale_86",
-      "community": 11,
+      "community": 9,
       "norm_label": "preemption: another goal accepted within preempt_window of abort."
     },
     {
@@ -7366,7 +7366,7 @@
       },
       "_origin": "ast",
       "id": "tools_install_isaac_venv",
-      "community": 42,
+      "community": 44,
       "norm_label": "install_isaac_venv.sh"
     },
     {
@@ -7380,7 +7380,7 @@
       },
       "_origin": "ast",
       "id": "home_deivid_dev_dynamo_ridgeback_claude_worktrees_jolly_borg_f48cab_tools_install_isaac_venv_sh__entry",
-      "community": 42,
+      "community": 44,
       "norm_label": "install_isaac_venv.sh script"
     },
     {
@@ -7390,7 +7390,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "gz_mock_hospital_gz_base1_summary",
-      "community": 21,
+      "community": 22,
       "norm_label": "gz_base1_summary.json"
     },
     {
@@ -7400,7 +7400,7 @@
       "source_location": "L2",
       "_origin": "ast",
       "id": "gz_mock_hospital_gz_base1_summary_quit_at_s",
-      "community": 21,
+      "community": 22,
       "norm_label": "quit_at_s"
     },
     {
@@ -7410,7 +7410,7 @@
       "source_location": "L3",
       "_origin": "ast",
       "id": "gz_mock_hospital_gz_base1_summary_coverage_peak_pct",
-      "community": 21,
+      "community": 22,
       "norm_label": "coverage_peak_pct"
     },
     {
@@ -7420,7 +7420,7 @@
       "source_location": "L4",
       "_origin": "ast",
       "id": "gz_mock_hospital_gz_base1_summary_goals_total",
-      "community": 21,
+      "community": 22,
       "norm_label": "goals_total"
     },
     {
@@ -7430,7 +7430,7 @@
       "source_location": "L5",
       "_origin": "ast",
       "id": "gz_mock_hospital_gz_base1_summary_succeeded",
-      "community": 21,
+      "community": 22,
       "norm_label": "succeeded"
     },
     {
@@ -7440,7 +7440,7 @@
       "source_location": "L6",
       "_origin": "ast",
       "id": "gz_mock_hospital_gz_base1_summary_aborted",
-      "community": 21,
+      "community": 22,
       "norm_label": "aborted"
     },
     {
@@ -7450,7 +7450,7 @@
       "source_location": "L7",
       "_origin": "ast",
       "id": "gz_mock_hospital_gz_base1_summary_canceled",
-      "community": 21,
+      "community": 22,
       "norm_label": "canceled"
     },
     {
@@ -7460,7 +7460,7 @@
       "source_location": "L8",
       "_origin": "ast",
       "id": "gz_mock_hospital_gz_base1_summary_aborts_preempted",
-      "community": 21,
+      "community": 22,
       "norm_label": "aborts_preempted"
     },
     {
@@ -7470,7 +7470,7 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "gz_mock_hospital_gz_base1_summary_aborts_genuine",
-      "community": 21,
+      "community": 22,
       "norm_label": "aborts_genuine"
     },
     {
@@ -7480,7 +7480,7 @@
       "source_location": "L10",
       "_origin": "ast",
       "id": "gz_mock_hospital_gz_base1_summary_frontiers_at_end",
-      "community": 21,
+      "community": 22,
       "norm_label": "frontiers_at_end"
     },
     {
@@ -7490,7 +7490,7 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "gz_mock_hospital_gz_base1_summary_frontiers_at_end_avail",
-      "community": 21,
+      "community": 22,
       "norm_label": "avail"
     },
     {
@@ -7500,7 +7500,7 @@
       "source_location": "L12",
       "_origin": "ast",
       "id": "gz_mock_hospital_gz_base1_summary_frontiers_at_end_blacklisted",
-      "community": 21,
+      "community": 22,
       "norm_label": "blacklisted"
     },
     {
@@ -7510,7 +7510,7 @@
       "source_location": "L14",
       "_origin": "ast",
       "id": "gz_mock_hospital_gz_base1_summary_frontier_peak_black",
-      "community": 21,
+      "community": 22,
       "norm_label": "frontier_peak_black"
     },
     {
@@ -7520,7 +7520,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "gz_mock_hospital_gz_base2_summary",
-      "community": 22,
+      "community": 23,
       "norm_label": "gz_base2_summary.json"
     },
     {
@@ -7530,7 +7530,7 @@
       "source_location": "L2",
       "_origin": "ast",
       "id": "gz_mock_hospital_gz_base2_summary_quit_at_s",
-      "community": 22,
+      "community": 23,
       "norm_label": "quit_at_s"
     },
     {
@@ -7540,7 +7540,7 @@
       "source_location": "L3",
       "_origin": "ast",
       "id": "gz_mock_hospital_gz_base2_summary_coverage_peak_pct",
-      "community": 22,
+      "community": 23,
       "norm_label": "coverage_peak_pct"
     },
     {
@@ -7550,7 +7550,7 @@
       "source_location": "L4",
       "_origin": "ast",
       "id": "gz_mock_hospital_gz_base2_summary_goals_total",
-      "community": 22,
+      "community": 23,
       "norm_label": "goals_total"
     },
     {
@@ -7560,7 +7560,7 @@
       "source_location": "L5",
       "_origin": "ast",
       "id": "gz_mock_hospital_gz_base2_summary_succeeded",
-      "community": 22,
+      "community": 23,
       "norm_label": "succeeded"
     },
     {
@@ -7570,7 +7570,7 @@
       "source_location": "L6",
       "_origin": "ast",
       "id": "gz_mock_hospital_gz_base2_summary_aborted",
-      "community": 22,
+      "community": 23,
       "norm_label": "aborted"
     },
     {
@@ -7580,7 +7580,7 @@
       "source_location": "L7",
       "_origin": "ast",
       "id": "gz_mock_hospital_gz_base2_summary_canceled",
-      "community": 22,
+      "community": 23,
       "norm_label": "canceled"
     },
     {
@@ -7590,7 +7590,7 @@
       "source_location": "L8",
       "_origin": "ast",
       "id": "gz_mock_hospital_gz_base2_summary_aborts_preempted",
-      "community": 22,
+      "community": 23,
       "norm_label": "aborts_preempted"
     },
     {
@@ -7600,7 +7600,7 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "gz_mock_hospital_gz_base2_summary_aborts_genuine",
-      "community": 22,
+      "community": 23,
       "norm_label": "aborts_genuine"
     },
     {
@@ -7610,7 +7610,7 @@
       "source_location": "L10",
       "_origin": "ast",
       "id": "gz_mock_hospital_gz_base2_summary_frontiers_at_end",
-      "community": 22,
+      "community": 23,
       "norm_label": "frontiers_at_end"
     },
     {
@@ -7620,7 +7620,7 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "gz_mock_hospital_gz_base2_summary_frontiers_at_end_avail",
-      "community": 22,
+      "community": 23,
       "norm_label": "avail"
     },
     {
@@ -7630,7 +7630,7 @@
       "source_location": "L12",
       "_origin": "ast",
       "id": "gz_mock_hospital_gz_base2_summary_frontiers_at_end_blacklisted",
-      "community": 22,
+      "community": 23,
       "norm_label": "blacklisted"
     },
     {
@@ -7640,7 +7640,7 @@
       "source_location": "L14",
       "_origin": "ast",
       "id": "gz_mock_hospital_gz_base2_summary_frontier_peak_black",
-      "community": 22,
+      "community": 23,
       "norm_label": "frontier_peak_black"
     },
     {
@@ -7650,7 +7650,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "gz_mock_hospital_gz_base3_summary",
-      "community": 23,
+      "community": 24,
       "norm_label": "gz_base3_summary.json"
     },
     {
@@ -7660,7 +7660,7 @@
       "source_location": "L2",
       "_origin": "ast",
       "id": "gz_mock_hospital_gz_base3_summary_quit_at_s",
-      "community": 23,
+      "community": 24,
       "norm_label": "quit_at_s"
     },
     {
@@ -7670,7 +7670,7 @@
       "source_location": "L3",
       "_origin": "ast",
       "id": "gz_mock_hospital_gz_base3_summary_coverage_peak_pct",
-      "community": 23,
+      "community": 24,
       "norm_label": "coverage_peak_pct"
     },
     {
@@ -7680,7 +7680,7 @@
       "source_location": "L4",
       "_origin": "ast",
       "id": "gz_mock_hospital_gz_base3_summary_goals_total",
-      "community": 23,
+      "community": 24,
       "norm_label": "goals_total"
     },
     {
@@ -7690,7 +7690,7 @@
       "source_location": "L5",
       "_origin": "ast",
       "id": "gz_mock_hospital_gz_base3_summary_succeeded",
-      "community": 23,
+      "community": 24,
       "norm_label": "succeeded"
     },
     {
@@ -7700,7 +7700,7 @@
       "source_location": "L6",
       "_origin": "ast",
       "id": "gz_mock_hospital_gz_base3_summary_aborted",
-      "community": 23,
+      "community": 24,
       "norm_label": "aborted"
     },
     {
@@ -7710,7 +7710,7 @@
       "source_location": "L7",
       "_origin": "ast",
       "id": "gz_mock_hospital_gz_base3_summary_canceled",
-      "community": 23,
+      "community": 24,
       "norm_label": "canceled"
     },
     {
@@ -7720,7 +7720,7 @@
       "source_location": "L8",
       "_origin": "ast",
       "id": "gz_mock_hospital_gz_base3_summary_aborts_preempted",
-      "community": 23,
+      "community": 24,
       "norm_label": "aborts_preempted"
     },
     {
@@ -7730,7 +7730,7 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "gz_mock_hospital_gz_base3_summary_aborts_genuine",
-      "community": 23,
+      "community": 24,
       "norm_label": "aborts_genuine"
     },
     {
@@ -7740,7 +7740,7 @@
       "source_location": "L10",
       "_origin": "ast",
       "id": "gz_mock_hospital_gz_base3_summary_frontiers_at_end",
-      "community": 23,
+      "community": 24,
       "norm_label": "frontiers_at_end"
     },
     {
@@ -7750,7 +7750,7 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "gz_mock_hospital_gz_base3_summary_frontiers_at_end_avail",
-      "community": 23,
+      "community": 24,
       "norm_label": "avail"
     },
     {
@@ -7760,7 +7760,7 @@
       "source_location": "L12",
       "_origin": "ast",
       "id": "gz_mock_hospital_gz_base3_summary_frontiers_at_end_blacklisted",
-      "community": 23,
+      "community": 24,
       "norm_label": "blacklisted"
     },
     {
@@ -7770,7 +7770,7 @@
       "source_location": "L14",
       "_origin": "ast",
       "id": "gz_mock_hospital_gz_base3_summary_frontier_peak_black",
-      "community": 23,
+      "community": 24,
       "norm_label": "frontier_peak_black"
     },
     {
@@ -7784,7 +7784,7 @@
       },
       "_origin": "ast",
       "id": "isaac_capture_contract",
-      "community": 43,
+      "community": 45,
       "norm_label": "capture_contract.sh"
     },
     {
@@ -7798,8 +7798,138 @@
       },
       "_origin": "ast",
       "id": "home_deivid_dev_dynamo_ridgeback_claude_worktrees_jolly_borg_f48cab_tools_isaac_capture_contract_sh__entry",
-      "community": 43,
+      "community": 45,
       "norm_label": "capture_contract.sh script"
+    },
+    {
+      "label": "import_ridgeback_urdf.py",
+      "file_type": "code",
+      "source_file": "tools/isaac/import_ridgeback_urdf.py",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "isaac_import_ridgeback_urdf",
+      "community": 25,
+      "norm_label": "import_ridgeback_urdf.py"
+    },
+    {
+      "label": "sh()",
+      "file_type": "code",
+      "source_file": "tools/isaac/import_ridgeback_urdf.py",
+      "source_location": "L52",
+      "_origin": "ast",
+      "id": "isaac_import_ridgeback_urdf_sh",
+      "community": 25,
+      "norm_label": "sh()"
+    },
+    {
+      "label": "generate_flat_urdf()",
+      "file_type": "code",
+      "source_file": "tools/isaac/import_ridgeback_urdf.py",
+      "source_location": "L57",
+      "_origin": "ast",
+      "id": "isaac_import_ridgeback_urdf_generate_flat_urdf",
+      "community": 25,
+      "norm_label": "generate_flat_urdf()"
+    },
+    {
+      "label": "Path",
+      "file_type": "code",
+      "source_file": "tools/isaac/import_ridgeback_urdf.py",
+      "source_location": "L57",
+      "_origin": "ast",
+      "id": "tools_isaac_import_ridgeback_urdf_py_path",
+      "community": 25,
+      "norm_label": "path"
+    },
+    {
+      "label": "_sanitize_urdf()",
+      "file_type": "code",
+      "source_file": "tools/isaac/import_ridgeback_urdf.py",
+      "source_location": "L68",
+      "_origin": "ast",
+      "id": "isaac_import_ridgeback_urdf_sanitize_urdf",
+      "community": 25,
+      "norm_label": "_sanitize_urdf()"
+    },
+    {
+      "label": "clearpath_package_paths()",
+      "file_type": "code",
+      "source_file": "tools/isaac/import_ridgeback_urdf.py",
+      "source_location": "L102",
+      "_origin": "ast",
+      "id": "isaac_import_ridgeback_urdf_clearpath_package_paths",
+      "community": 25,
+      "norm_label": "clearpath_package_paths()"
+    },
+    {
+      "label": "import_urdf_to_usd()",
+      "file_type": "code",
+      "source_file": "tools/isaac/import_ridgeback_urdf.py",
+      "source_location": "L116",
+      "_origin": "ast",
+      "id": "isaac_import_ridgeback_urdf_import_urdf_to_usd",
+      "community": 25,
+      "norm_label": "import_urdf_to_usd()"
+    },
+    {
+      "label": "add_planar_rig()",
+      "file_type": "code",
+      "source_file": "tools/isaac/import_ridgeback_urdf.py",
+      "source_location": "L179",
+      "_origin": "ast",
+      "id": "isaac_import_ridgeback_urdf_add_planar_rig",
+      "community": 25,
+      "norm_label": "add_planar_rig()"
+    },
+    {
+      "label": "main()",
+      "file_type": "code",
+      "source_file": "tools/isaac/import_ridgeback_urdf.py",
+      "source_location": "L257",
+      "_origin": "ast",
+      "id": "isaac_import_ridgeback_urdf_main",
+      "community": 25,
+      "norm_label": "main()"
+    },
+    {
+      "label": "Make the Clearpath URDF digestible for the 6.0 importer.      - Give every mater",
+      "file_type": "rationale",
+      "source_file": "tools/isaac/import_ridgeback_urdf.py",
+      "source_location": "L69",
+      "_origin": "ast",
+      "id": "isaac_import_ridgeback_urdf_rationale_69",
+      "community": 25,
+      "norm_label": "make the clearpath urdf digestible for the 6.0 importer.      - give every mater"
+    },
+    {
+      "label": "package:// roots the URDF references, for the importer's resolver.",
+      "file_type": "rationale",
+      "source_file": "tools/isaac/import_ridgeback_urdf.py",
+      "source_location": "L103",
+      "_origin": "ast",
+      "id": "isaac_import_ridgeback_urdf_rationale_103",
+      "community": 25,
+      "norm_label": "package:// roots the urdf references, for the importer's resolver."
+    },
+    {
+      "label": "Append world -> px -> py -> rz -> base_link velocity-drive chain.",
+      "file_type": "rationale",
+      "source_file": "tools/isaac/import_ridgeback_urdf.py",
+      "source_location": "L180",
+      "_origin": "ast",
+      "id": "isaac_import_ridgeback_urdf_rationale_180",
+      "community": 25,
+      "norm_label": "append world -> px -> py -> rz -> base_link velocity-drive chain."
+    },
+    {
+      "label": "# NOTE: app.close() fast-shuts the process \u2014 nothing after it runs.",
+      "file_type": "rationale",
+      "source_file": "tools/isaac/import_ridgeback_urdf.py",
+      "source_location": "L117",
+      "_origin": "ast",
+      "id": "isaac_import_ridgeback_urdf_rationale_117",
+      "community": 25,
+      "norm_label": "# note: app.close() fast-shuts the process \u2014 nothing after it runs."
     },
     {
       "label": "mcp_query.sh",
@@ -7812,7 +7942,7 @@
       },
       "_origin": "ast",
       "id": "isaac_mcp_query",
-      "community": 29,
+      "community": 31,
       "norm_label": "mcp_query.sh"
     },
     {
@@ -7826,7 +7956,7 @@
       },
       "_origin": "ast",
       "id": "home_deivid_dev_dynamo_ridgeback_claude_worktrees_jolly_borg_f48cab_tools_isaac_mcp_query_sh__entry",
-      "community": 29,
+      "community": 31,
       "norm_label": "mcp_query.sh script"
     },
     {
@@ -7840,7 +7970,7 @@
       },
       "_origin": "ast",
       "id": "isaac_mcp_query_post",
-      "community": 29,
+      "community": 31,
       "norm_label": "_post()"
     },
     {
@@ -7854,7 +7984,7 @@
       },
       "_origin": "ast",
       "id": "isaac_mcp_query_data",
-      "community": 29,
+      "community": 31,
       "norm_label": "_data()"
     },
     {
@@ -7864,7 +7994,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "isaac_sdf2usd",
-      "community": 15,
+      "community": 14,
       "norm_label": "sdf2usd.py"
     },
     {
@@ -7874,7 +8004,7 @@
       "source_location": "L37",
       "_origin": "ast",
       "id": "isaac_sdf2usd_material",
-      "community": 15,
+      "community": 14,
       "norm_label": "material"
     },
     {
@@ -7884,7 +8014,7 @@
       "source_location": "L44",
       "_origin": "ast",
       "id": "isaac_sdf2usd_geom",
-      "community": 15,
+      "community": 14,
       "norm_label": "geom"
     },
     {
@@ -7894,7 +8024,7 @@
       "source_location": "L55",
       "_origin": "ast",
       "id": "isaac_sdf2usd_model",
-      "community": 15,
+      "community": 14,
       "norm_label": "model"
     },
     {
@@ -7904,7 +8034,7 @@
       "source_location": "L63",
       "_origin": "ast",
       "id": "isaac_sdf2usd_include",
-      "community": 15,
+      "community": 14,
       "norm_label": "include"
     },
     {
@@ -7914,7 +8044,7 @@
       "source_location": "L70",
       "_origin": "ast",
       "id": "isaac_sdf2usd_light",
-      "community": 15,
+      "community": 14,
       "norm_label": "light"
     },
     {
@@ -7924,7 +8054,7 @@
       "source_location": "L80",
       "_origin": "ast",
       "id": "isaac_sdf2usd_world",
-      "community": 15,
+      "community": 14,
       "norm_label": "world"
     },
     {
@@ -7934,7 +8064,7 @@
       "source_location": "L89",
       "_origin": "ast",
       "id": "isaac_sdf2usd_floats",
-      "community": 15,
+      "community": 14,
       "norm_label": "_floats()"
     },
     {
@@ -7944,7 +8074,7 @@
       "source_location": "L98",
       "_origin": "ast",
       "id": "isaac_sdf2usd_pose",
-      "community": 15,
+      "community": 14,
       "norm_label": "_pose()"
     },
     {
@@ -7954,7 +8084,7 @@
       "source_location": "L140",
       "_origin": "ast",
       "id": "isaac_sdf2usd_parse_world",
-      "community": 15,
+      "community": 14,
       "norm_label": "parse_world()"
     },
     {
@@ -7964,7 +8094,7 @@
       "source_location": "L193",
       "_origin": "ast",
       "id": "isaac_sdf2usd_rpy_to_quat",
-      "community": 15,
+      "community": 14,
       "norm_label": "rpy_to_quat()"
     },
     {
@@ -7974,7 +8104,7 @@
       "source_location": "L206",
       "_origin": "ast",
       "id": "isaac_sdf2usd_rot_mat",
-      "community": 15,
+      "community": 14,
       "norm_label": "_rot_mat()"
     },
     {
@@ -7984,7 +8114,7 @@
       "source_location": "L215",
       "_origin": "ast",
       "id": "isaac_sdf2usd_apply",
-      "community": 15,
+      "community": 14,
       "norm_label": "_apply()"
     },
     {
@@ -7994,7 +8124,7 @@
       "source_location": "L222",
       "_origin": "ast",
       "id": "isaac_sdf2usd_model_world_aabb",
-      "community": 15,
+      "community": 14,
       "norm_label": "model_world_aabb()"
     },
     {
@@ -8004,7 +8134,7 @@
       "source_location": "L251",
       "_origin": "ast",
       "id": "isaac_sdf2usd_sanitize",
-      "community": 15,
+      "community": 14,
       "norm_label": "_sanitize()"
     },
     {
@@ -8014,7 +8144,7 @@
       "source_location": "L256",
       "_origin": "ast",
       "id": "isaac_sdf2usd_emit_usd",
-      "community": 15,
+      "community": 14,
       "norm_label": "emit_usd()"
     },
     {
@@ -8024,7 +8154,7 @@
       "source_location": "L256",
       "_origin": "ast",
       "id": "tools_isaac_sdf2usd_py_path",
-      "community": 15,
+      "community": 14,
       "norm_label": "path"
     },
     {
@@ -8034,7 +8164,7 @@
       "source_location": "L376",
       "_origin": "ast",
       "id": "isaac_sdf2usd_check_usd",
-      "community": 15,
+      "community": 14,
       "norm_label": "check_usd()"
     },
     {
@@ -8044,7 +8174,7 @@
       "source_location": "L416",
       "_origin": "ast",
       "id": "isaac_sdf2usd_main",
-      "community": 15,
+      "community": 14,
       "norm_label": "main()"
     },
     {
@@ -8054,7 +8184,7 @@
       "source_location": "L45",
       "_origin": "ast",
       "id": "isaac_sdf2usd_rationale_45",
-      "community": 15,
+      "community": 14,
       "norm_label": "one <visual> or <collision> entry."
     },
     {
@@ -8064,7 +8194,7 @@
       "source_location": "L194",
       "_origin": "ast",
       "id": "isaac_sdf2usd_rationale_194",
-      "community": 15,
+      "community": 14,
       "norm_label": "sdf rpy -> quaternion (w, x, y, z); r = rz(yaw) ry(pitch) rx(roll)."
     },
     {
@@ -8074,7 +8204,7 @@
       "source_location": "L223",
       "_origin": "ast",
       "id": "isaac_sdf2usd_rationale_223",
-      "community": 15,
+      "community": 14,
       "norm_label": "world-space aabb over the model's geoms (corners of each geom's obb)."
     },
     {
@@ -8084,7 +8214,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "isaac_smoke_test",
-      "community": 60,
+      "community": 62,
       "norm_label": "smoke_test.py"
     },
     {
@@ -8118,7 +8248,7 @@
       },
       "_origin": "ast",
       "id": "tools_setup_dds",
-      "community": 44,
+      "community": 46,
       "norm_label": "setup_dds.sh"
     },
     {
@@ -8132,7 +8262,7 @@
       },
       "_origin": "ast",
       "id": "home_deivid_dev_dynamo_ridgeback_claude_worktrees_jolly_borg_f48cab_tools_setup_dds_sh__entry",
-      "community": 44,
+      "community": 46,
       "norm_label": "setup_dds.sh script"
     }
   ],
@@ -21927,6 +22057,226 @@
     {
       "relation": "contains",
       "confidence": "EXTRACTED",
+      "source_file": "tools/isaac/import_ridgeback_urdf.py",
+      "source_location": "L179",
+      "weight": 1.0,
+      "source": "isaac_import_ridgeback_urdf",
+      "target": "isaac_import_ridgeback_urdf_add_planar_rig",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "tools/isaac/import_ridgeback_urdf.py",
+      "source_location": "L102",
+      "weight": 1.0,
+      "source": "isaac_import_ridgeback_urdf",
+      "target": "isaac_import_ridgeback_urdf_clearpath_package_paths",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "tools/isaac/import_ridgeback_urdf.py",
+      "source_location": "L57",
+      "weight": 1.0,
+      "source": "isaac_import_ridgeback_urdf",
+      "target": "isaac_import_ridgeback_urdf_generate_flat_urdf",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "tools/isaac/import_ridgeback_urdf.py",
+      "source_location": "L116",
+      "weight": 1.0,
+      "source": "isaac_import_ridgeback_urdf",
+      "target": "isaac_import_ridgeback_urdf_import_urdf_to_usd",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "tools/isaac/import_ridgeback_urdf.py",
+      "source_location": "L257",
+      "weight": 1.0,
+      "source": "isaac_import_ridgeback_urdf",
+      "target": "isaac_import_ridgeback_urdf_main",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "tools/isaac/import_ridgeback_urdf.py",
+      "source_location": "L68",
+      "weight": 1.0,
+      "source": "isaac_import_ridgeback_urdf",
+      "target": "isaac_import_ridgeback_urdf_sanitize_urdf",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "tools/isaac/import_ridgeback_urdf.py",
+      "source_location": "L52",
+      "weight": 1.0,
+      "source": "isaac_import_ridgeback_urdf",
+      "target": "isaac_import_ridgeback_urdf_sh",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "tools/isaac/import_ridgeback_urdf.py",
+      "source_location": "L117",
+      "weight": 1.0,
+      "source": "isaac_import_ridgeback_urdf_rationale_117",
+      "target": "isaac_import_ridgeback_urdf",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "tools/isaac/import_ridgeback_urdf.py",
+      "source_location": "L58",
+      "weight": 1.0,
+      "source": "isaac_import_ridgeback_urdf_generate_flat_urdf",
+      "target": "isaac_import_ridgeback_urdf_sh",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "tools/isaac/import_ridgeback_urdf.py",
+      "source_location": "L64",
+      "weight": 1.0,
+      "source": "isaac_import_ridgeback_urdf_generate_flat_urdf",
+      "target": "isaac_import_ridgeback_urdf_sanitize_urdf",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "references",
+      "context": "return_type",
+      "confidence": "EXTRACTED",
+      "source_file": "tools/isaac/import_ridgeback_urdf.py",
+      "source_location": "L57",
+      "weight": 1.0,
+      "source": "isaac_import_ridgeback_urdf_generate_flat_urdf",
+      "target": "tools_isaac_import_ridgeback_urdf_py_path",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "tools/isaac/import_ridgeback_urdf.py",
+      "source_location": "L272",
+      "weight": 1.0,
+      "source": "isaac_import_ridgeback_urdf_main",
+      "target": "isaac_import_ridgeback_urdf_generate_flat_urdf",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "references",
+      "context": "parameter_type",
+      "confidence": "EXTRACTED",
+      "source_file": "tools/isaac/import_ridgeback_urdf.py",
+      "source_location": "L179",
+      "weight": 1.0,
+      "source": "isaac_import_ridgeback_urdf_add_planar_rig",
+      "target": "tools_isaac_import_ridgeback_urdf_py_path",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "references",
+      "context": "parameter_type",
+      "confidence": "EXTRACTED",
+      "source_file": "tools/isaac/import_ridgeback_urdf.py",
+      "source_location": "L116",
+      "weight": 1.0,
+      "source": "isaac_import_ridgeback_urdf_import_urdf_to_usd",
+      "target": "tools_isaac_import_ridgeback_urdf_py_path",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "references",
+      "context": "parameter_type",
+      "confidence": "EXTRACTED",
+      "source_file": "tools/isaac/import_ridgeback_urdf.py",
+      "source_location": "L68",
+      "weight": 1.0,
+      "source": "isaac_import_ridgeback_urdf_sanitize_urdf",
+      "target": "tools_isaac_import_ridgeback_urdf_py_path",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "tools/isaac/import_ridgeback_urdf.py",
+      "source_location": "L69",
+      "weight": 1.0,
+      "source": "isaac_import_ridgeback_urdf_rationale_69",
+      "target": "isaac_import_ridgeback_urdf_sanitize_urdf",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "tools/isaac/import_ridgeback_urdf.py",
+      "source_location": "L152",
+      "weight": 1.0,
+      "source": "isaac_import_ridgeback_urdf_import_urdf_to_usd",
+      "target": "isaac_import_ridgeback_urdf_clearpath_package_paths",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "tools/isaac/import_ridgeback_urdf.py",
+      "source_location": "L103",
+      "weight": 1.0,
+      "source": "isaac_import_ridgeback_urdf_rationale_103",
+      "target": "isaac_import_ridgeback_urdf_clearpath_package_paths",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "tools/isaac/import_ridgeback_urdf.py",
+      "source_location": "L157",
+      "weight": 1.0,
+      "source": "isaac_import_ridgeback_urdf_import_urdf_to_usd",
+      "target": "isaac_import_ridgeback_urdf_add_planar_rig",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "tools/isaac/import_ridgeback_urdf.py",
+      "source_location": "L274",
+      "weight": 1.0,
+      "source": "isaac_import_ridgeback_urdf_main",
+      "target": "isaac_import_ridgeback_urdf_import_urdf_to_usd",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "tools/isaac/import_ridgeback_urdf.py",
+      "source_location": "L180",
+      "weight": 1.0,
+      "source": "isaac_import_ridgeback_urdf_rationale_180",
+      "target": "isaac_import_ridgeback_urdf_add_planar_rig",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
       "source_file": "tools/isaac/mcp_query.sh",
       "source_location": "L1",
       "weight": 1.0,
@@ -22451,5 +22801,5 @@
     }
   ],
   "hyperedges": [],
-  "built_at_commit": "801104acf0db49234a869013f987e366de7d9720"
+  "built_at_commit": "9d022d0e0ea0b009199bf163ef2c69fefa78debf"
 }
