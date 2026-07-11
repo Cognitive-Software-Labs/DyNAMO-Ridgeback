@@ -320,3 +320,27 @@ If you add new nodes to this project, always:
 2. Add `remappings=[('/tf', 'tf'), ('/tf_static', 'tf_static')]`
 3. Use `/**/node_name:` as the YAML root key in parameter files so namespaced nodes still match their params
 4. Set `use_sim_time: true` in simulation
+
+## Isaac Runner Freeze in Windowed Mode (headless:=false)
+
+**Symptom**: `isaac_runner.py` with `--headless false` boots, prints
+`RUNNER READY`, then the whole loop stalls — `/clock` stops, scans stop,
+the process parks in `futex_wait`. Headless mode is unaffected. The full
+`isaacsim` GUI app runs fine on the same display, which makes the runner
+look broken by comparison.
+
+**Root cause**: the runner drives Kit manually (`app.update()` in its own
+while-loop with an RTF sleep-throttle). In windowed mode Kit's present
+loop is vsync-locked; on this box's software-X VNC display (`:0` is Xvnc,
+llvmpipe GL, present happens via a copy path) the vsync-locked present
+blocks inside `app.update()`, deadlocking against the runner's throttle.
+The full `isaacsim` app is immune because Kit owns its main loop there.
+
+**Fix (in code since P4)**: when launching windowed, the runner passes
+`--/app/vsync=false` and `--/app/runLoops/present/rateLimitEnabled=false`
+to decouple presentation from stepping (`isaac_runner.py`, SimulationApp
+`extra_args`). Expect a lower RTF than headless while a viewport is up.
+
+**If it recurs**: check which X display you are on (`:0` = Xvnc remote,
+`:1`/`:2` = physical lightdm seats) and confirm the window actually
+opened on yours; then fall back to headless + RViz, which always works.

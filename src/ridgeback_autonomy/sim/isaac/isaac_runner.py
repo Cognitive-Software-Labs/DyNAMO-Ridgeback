@@ -66,6 +66,15 @@ def main():
 
     from isaacsim import SimulationApp
     app_cfg = {"headless": headless}
+    if not headless:
+        # Windowed on a software-X display (e.g. VNC): a vsync-locked
+        # present loop can stall this manually-driven update loop (the
+        # full isaacsim app runs Kit's own main loop and is immune).
+        # Decouple presentation from our stepping.
+        app_cfg["extra_args"] = [
+            "--/app/vsync=false",
+            "--/app/runLoops/present/rateLimitEnabled=false",
+        ]
     app = SimulationApp(app_cfg)
 
     exit_code = 1
