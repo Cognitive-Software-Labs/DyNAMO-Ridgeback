@@ -15,21 +15,13 @@ The robot carries a single **Intel RealSense D435**, forward-facing, mounted at 
 **Data products we use:**
 
 1. **RGB color image** - input to detection / segmentation. Real D435: up to 1920x1080; our config requests 1280x720 @ 30 fps. Sim: rendered color frame.
-2. **Depth image** (made 1:1 with RGB) - input to Path A and Path B.
-3. **Organized point cloud** - input to Path B (the mask indexes points by pixel).
-4. **Camera IMU - NONE.** The D435 SKU has no IMU; only the D435i does.
+2. **Depth image** (made 1:1 with RGB) - input to Path A and Path B. Path B deprojects it into an organized point cloud in code (`depth_based_B.md`; provenance decision in `pointcloud_provenance_test.md` §7) - the cloud is a derived, in-code representation, not a sensor product.
+3. **Camera IMU - NONE.** The D435 SKU has no IMU; only the D435i does.
 
 **How depth is produced - this is where sim and real diverge:**
 
 - **Real D435:** active infrared **stereo**. Two IR imagers (left/right) plus a Class-1 IR laser projector that casts a texture pattern; the on-board D4 ASIC rectifies the pair and matches horizontal disparity into a per-pixel depth map. Raw depth is expressed in the **left IR imager frame, NOT the RGB frame**, so it must be **aligned** (reprojected) onto the color pixel grid before use. Depth FoV (HD 16:9) is **86° H x 57° V** (datasheet); usable range ~0.2 m to >10 m.
 - **Sim (Gazebo `rgbd_camera`):** no IR, no projector, no stereo matching. Gazebo renders the scene and reads the GPU **depth (Z) buffer** directly - the exact geometric distance to the first surface along each pixel ray, clipped to `near 0.3 / far 100`. Because color and depth come from the **same render pass and pose**, sim depth is **already co-registered with RGB** - no alignment step exists or is needed. The sim camera renders at `horizontal_fov = 1.25 rad = 71.6°`, NOT the real 86-87°.
-
-The point cloud is a **3D point cloud limited to the camera field of view** (a wedge / cone in front of the lens, not 360°).
-
-**Point cloud availability - also diverges sim vs real:**
-
-- **Real D435:** the cloud is an optional product of the `realsense2_camera` driver. It is published **only when `pointcloud.enable:=true`**, and is **unordered unless `pointcloud.ordered_pc:=true`**. Both default to **false** (verified in driver source `ros2-master`: `pointcloud_filter.h` ctor `bool is_enabled=false`; `base_realsense_node.cpp` constructs the filter without overriding it; `named_filter.cpp` registers `<name>.enable` from that default). Our `robot.yaml` sets **neither** - so on the real robot **no point cloud is published** and Path B has no input.
-- **Sim:** the Gazebo `rgbd_camera` sensor emits an organized point cloud, bridged to ROS by `ros_gz_bridge`, **regardless** of the `intel_realsense` parameters in `robot.yaml` (the real driver does not run in sim). So `sensors/camera_0/points` is always available in sim.
 
 **Sim vs real summary (camera-based):**
 
@@ -39,16 +31,15 @@ The point cloud is a **3D point cloud limited to the camera field of view** (a w
 | Depth source | rendered GPU Z-buffer (ground truth) | active IR stereo on D4 ASIC |
 | Depth alignment to RGB | none - co-registered by construction | required (depth in left-IR frame) |
 | Depth FoV | 71.6° H (rendered) | 86° H x 57° V (config uses 87x58) |
-| Organized point cloud | always published (gz + bridge) | only if `pointcloud.enable` + `ordered_pc` set - **currently missing -> none** |
 | Camera IMU | none (D435) | none (D435) |
 
 **Open config gaps on the real robot** (invisible in sim, so the sim benchmark hides them):
 
-- `pointcloud.enable: true` **and** `pointcloud.ordered_pc: true` are missing from `robot.yaml` -> no organized cloud on hardware -> Path B has no input.
+- `align_depth.enable: true` is missing from `robot.yaml` -> no `aligned_depth_to_color` topic on hardware -> Paths A and B have no depth input there (`depth_based_path.md` §2.1).
 - Stream profile keys are stale: `robot.yaml` uses `rgb_camera.profile` / `depth_module.profile`; current Clearpath / realsense-ros use `rgb_camera.color_profile` / `depth_module.depth_profile` -> the requested 1280x720 may be silently ignored. Verify against the installed driver version.
 - `config/camera_config.json` intrinsics (87° x 58°) match the real D435, **not** the sim render (71.6°) - so estimators assume the wrong FoV in sim.
 
-Sources: Intel RealSense D400 Series Datasheet (doc 337029-005, §2.3 / §3.6 / Table 4-5 / §4.5 / §4.9.1); Gazebo `gz-sensors` RgbdCameraSensor docs; Clearpath RealSense D435 + Cameras config docs; realsense-ros source (`ros2-master`: `pointcloud_filter.h`, `base_realsense_node.cpp`, `named_filter.cpp`); repo `clearpath/robot.yaml`, `intel_realsense.urdf.xacro`, `config/camera_config.json`, `r100.urdf.xacro`.
+Sources: Intel RealSense D400 Series Datasheet (doc 337029-005, §2.3 / §3.6 / Table 4-5 / §4.5 / §4.9.1); Gazebo `gz-sensors` RgbdCameraSensor docs; Clearpath RealSense D435 + Cameras config docs; repo `clearpath/robot.yaml`, `intel_realsense.urdf.xacro`, `config/camera_config.json`, `r100.urdf.xacro`.
 
 ### 2D LiDAR (Hokuyo UST, planar 270°)
 
