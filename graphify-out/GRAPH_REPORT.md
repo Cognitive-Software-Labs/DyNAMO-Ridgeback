@@ -1,11 +1,11 @@
 # Graph Report - /home/deivid/dev/DyNAMO-Ridgeback/.claude/worktrees/jolly-borg-f48cab  (2026-07-11)
 
 ## Corpus Check
-- 140 files · ~70,051 words
+- 143 files · ~71,915 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 920 nodes · 1511 edges · 64 communities (46 shown, 18 thin omitted)
+- 933 nodes · 1529 edges · 64 communities (46 shown, 18 thin omitted)
 - Extraction: 87% EXTRACTED · 13% INFERRED · 0% AMBIGUOUS · INFERRED: 195 edges (avg confidence: 0.71)
 - Token cost: 0 input · 0 output
 
@@ -72,12 +72,12 @@
 10. `onInitialize()` - 20 edges
 
 ## Surprising Connections (you probably didn't know these)
+- `test_parse_estimators_uses_canonical_order_and_depth_anything_name()` --calls--> `parse_estimators()`  [INFERRED]
+  src/ridgeback_autonomy/test/test_benchmark_runner.py → src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/estimators.py
 - `CameraConfig` --uses--> `CameraConfig`  [INFERRED]
   src/ridgeback_autonomy/ridgeback_autonomy/common/camera_config.py → src/ridgeback_autonomy/ridgeback_autonomy/common/models.py
 - `DetectionBatch` --uses--> `DetectionBatch`  [INFERRED]
   src/ridgeback_autonomy/ridgeback_autonomy/perception/core/rendering.py → src/ridgeback_autonomy/ridgeback_autonomy/common/models.py
-- `ndarray` --uses--> `DepthAnythingEstimator`  [INFERRED]
-  src/ridgeback_autonomy/ridgeback_autonomy/perception/g1_camera_measurement_node.py → src/ridgeback_autonomy/ridgeback_autonomy/perception/core/depth_anything.py
 - `run()` --calls--> `RidgebackRig`  [INFERRED]
   tools/isaac/diag_rig.py → src/ridgeback_autonomy/sim/isaac/robot_rig.py
 - `run()` --calls--> `resolve_world()`  [INFERRED]
@@ -93,60 +93,60 @@ Cohesion: 0.03
 Nodes (77): BoolProperty, ColorProperty, EnumProperty, FloatProperty, IntProperty, Q_OBJECT, QStringList, RosTopicDisplay<rviz_2d_overlay_msgs::msg::OverlayText> (+69 more)
 
 ### Community 1 - "Community 1"
-Cohesion: 0.08
-Nodes (34): batch_from_detections_message(), batch_from_measurements_message(), build_detections_message(), build_float32_image_message(), build_measurements_message(), decode_bbox_quads(), decode_optional_float(), first_finite_positive() (+26 more)
+Cohesion: 0.09
+Nodes (18): ensure_measurement_event(), measurement_message_key(), stamp_to_nanoseconds(), update_measurement_event(), extract_json_payload(), G1DistanceBenchmarkRunner, main(), build_summary_rows() (+10 more)
 
 ### Community 2 - "Community 2"
+Cohesion: 0.08
+Nodes (35): extract_public_estimator_values(), batch_from_detections_message(), batch_from_measurements_message(), build_detections_message(), build_float32_image_message(), build_measurements_message(), decode_bbox_quads(), decode_optional_float() (+27 more)
+
+### Community 3 - "Community 3"
+Cohesion: 0.10
+Nodes (29): event_has_all_panel_previews(), event_has_panel_preview(), EventPreview, find_exact_preview_match(), find_nearest_preview_match(), has_all_selected_estimates(), MeasurementEvent, nearest_preview_metadata() (+21 more)
+
+### Community 4 - "Community 4"
 Cohesion: 0.06
 Nodes (23): FrontierExplorerNode, main(), Receive and process occupancy grid (costmap)., Convert occupancy grid to robot awareness map (vectorized).          Nav2 publis, Get robot position in map frame., Main exploration loop., Check if a goal position has enough clearance from obstacles.                  C, Return True if pos is too close to a recently-visited goal. (+15 more)
 
-### Community 3 - "Community 3"
+### Community 5 - "Community 5"
+Cohesion: 0.08
+Nodes (25): DepthAnythingEstimator, resolve_torch_device(), bgr_frame_to_pil(), convert_color_image_message(), convert_depth_to_meters_message(), decode_buffer(), decode_image_message(), normalize_to_uint8() (+17 more)
+
+### Community 6 - "Community 6"
 Cohesion: 0.06
 Nodes (30): _body_vel(), main(), Step n render frames, refreshing cmd every frame like teleop would., run(), run_battery(), _step_frames(), main(), parse_args() (+22 more)
 
-### Community 4 - "Community 4"
-Cohesion: 0.08
-Nodes (16): main(), Probe, Preemption: another goal accepted within PREEMPT_WINDOW of abort., _color_msg(), G1EstimateVizNode, _get(), main(), _ring_points() (+8 more)
-
-### Community 5 - "Community 5"
-Cohesion: 0.12
-Nodes (36): CameraConfig, DetectionBatch, LidarScanPoints, add_depth_measurements(), add_depth_source_measurements(), add_lidar_measurements(), add_pointcloud_measurements(), add_rgb_measurements() (+28 more)
-
-### Community 6 - "Community 6"
-Cohesion: 0.12
-Nodes (12): stamp_to_nanoseconds(), extract_json_payload(), G1DistanceBenchmarkRunner, main(), build_summary_rows(), write_summary_csv(), write_trial_csv(), CompletedProcess (+4 more)
-
 ### Community 7 - "Community 7"
-Cohesion: 0.11
-Nodes (31): ensure_measurement_event(), event_has_all_panel_previews(), event_has_panel_preview(), EventPreview, extract_public_estimator_values(), find_exact_preview_match(), find_nearest_preview_match(), has_all_selected_estimates() (+23 more)
+Cohesion: 0.13
+Nodes (35): CameraConfig, DetectionBatch, LidarScanPoints, add_depth_measurements(), add_depth_source_measurements(), add_lidar_measurements(), add_pointcloud_measurements(), add_rgb_measurements() (+27 more)
 
 ### Community 8 - "Community 8"
-Cohesion: 0.11
-Nodes (20): bgr_frame_to_pil(), convert_color_image_message(), convert_depth_to_meters_message(), decode_buffer(), decode_image_message(), normalize_to_uint8(), dtype, G1OverlayNode (+12 more)
-
-### Community 9 - "Community 9"
 Cohesion: 0.06
 Nodes (30): MaterialPtr, namespace, Overlay, PanelOverlayElement, QImage, OverlayObject, getBuffer, getName (+22 more)
 
-### Community 10 - "Community 10"
-Cohesion: 0.14
-Nodes (11): parse_estimators(), selected_camera_estimators(), uses_camera_estimators(), uses_lidar_estimators(), BenchmarkCollageRenderer, PanelContext, build_benchmark_nodes(), OrderedDict (+3 more)
-
-### Community 11 - "Community 11"
+### Community 9 - "Community 9"
 Cohesion: 0.06
 Nodes (30): attributes, omni:sensor:Core:accumulateOutputs, omni:sensor:Core:azimuthErrorStd, omni:sensor:Core:elementsCoordsType, omni:sensor:Core:elevationErrorStd, omni:sensor:Core:emitterState:s001:azimuthDeg, omni:sensor:Core:emitterState:s001:channelId, omni:sensor:Core:emitterState:s001:elevationDeg (+22 more)
 
-### Community 12 - "Community 12"
+### Community 10 - "Community 10"
 Cohesion: 0.16
 Nodes (26): drawPlot(), onEnable(), onInitialize(), PieChartDisplay(), processMessage(), setPosition(), update(), updateAutoColorChange() (+18 more)
+
+### Community 11 - "Community 11"
+Cohesion: 0.11
+Nodes (13): _color_msg(), G1EstimateVizNode, _get(), main(), _ring_points(), main(), Demo, main() (+5 more)
+
+### Community 12 - "Community 12"
+Cohesion: 0.12
+Nodes (8): main(), Probe, Preemption: another goal accepted within PREEMPT_WINDOW of abort., HudNode, main(), main(), VelocityOverlayNode, Node
 
 ### Community 13 - "Community 13"
 Cohesion: 0.22
 Nodes (25): onDisable(), onEnable(), onInitialize(), OverlayTextDisplay(), processMessage(), reset(), updateAlignBottom(), updateBGAlpha() (+17 more)
 
 ### Community 14 - "Community 14"
-Cohesion: 0.12
-Nodes (8): DepthAnythingEstimator, resolve_torch_device(), G1CameraMeasurementNode, main(), ndarray, G1Detections, Image, PointCloud2
+Cohesion: 0.13
+Nodes (9): parse_estimators(), selected_camera_estimators(), uses_camera_estimators(), uses_lidar_estimators(), RgbdOverlayRenderer, build_benchmark_nodes(), OrderedDict, DetectionBatch (+1 more)
 
 ### Community 15 - "Community 15"
 Cohesion: 0.13
@@ -177,16 +177,16 @@ Cohesion: 0.15
 Nodes (6): _quat_from_yaw(), In-process ROS 2 I/O for the Isaac runner (rclpy side).  Owns everything that is, Raw IMU (no orientation estimate, like a real driver's         data_raw): body-f, Identity base_link -> <ns>/robot/base_link (perception default)., Return and clear the newest cmd (vx, vy, wz), or None., RosIO
 
 ### Community 22 - "Community 22"
+Cohesion: 0.21
+Nodes (4): G1OverlayNode, main(), G1Measurements, Image
+
+### Community 23 - "Community 23"
 Cohesion: 0.24
 Nodes (15): add_planar_rig(), _author_chassis_collider(), clearpath_package_paths(), generate_flat_urdf(), import_urdf_to_usd(), main(), package:// roots the URDF references, for the importer's resolver., # NOTE: app.close() fast-shuts the process — nothing after it runs. (+7 more)
 
-### Community 23 - "Community 23"
+### Community 24 - "Community 24"
 Cohesion: 0.14
 Nodes (13): camera, comment, cx, cy, depth_hfov_deg, depth_vfov_deg, fps, fx (+5 more)
-
-### Community 24 - "Community 24"
-Cohesion: 0.28
-Nodes (3): RgbdOverlayRenderer, DetectionBatch, ndarray
 
 ### Community 25 - "Community 25"
 Cohesion: 0.15
@@ -216,12 +216,12 @@ Nodes (3): mcp_query.sh script, _data(), _post()
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `G1DistanceBenchmarkRunner` connect `Community 6` to `Community 10`, `Community 4`, `Community 7`?**
-  _High betweenness centrality (0.099) - this node is a cross-community bridge._
-- **Why does `FrontierExplorerNode` connect `Community 2` to `Community 4`?**
-  _High betweenness centrality (0.076) - this node is a cross-community bridge._
-- **Why does `Time` connect `Community 4` to `Community 1`, `Community 2`, `Community 3`, `Community 6`, `Community 21`?**
-  _High betweenness centrality (0.073) - this node is a cross-community bridge._
+- **Why does `G1DistanceBenchmarkRunner` connect `Community 1` to `Community 3`, `Community 12`, `Community 14`?**
+  _High betweenness centrality (0.101) - this node is a cross-community bridge._
+- **Why does `Time` connect `Community 11` to `Community 1`, `Community 2`, `Community 4`, `Community 6`, `Community 12`, `Community 21`?**
+  _High betweenness centrality (0.087) - this node is a cross-community bridge._
+- **Why does `FrontierExplorerNode` connect `Community 4` to `Community 12`?**
+  _High betweenness centrality (0.077) - this node is a cross-community bridge._
 - **Are the 10 inferred relationships involving `BenchmarkCollageRenderer` (e.g. with `G1DistanceBenchmarkRunner` and `.__init__()`) actually correct?**
   _`BenchmarkCollageRenderer` has 10 INFERRED edges - model-reasoned connections that need verification._
 - **What connects `PreToolUse`, `allow`, `PreToolUse` to the rest of the system?**
@@ -229,4 +229,4 @@ _Questions this graph is uniquely positioned to answer:_
 - **Should `Community 0` be split into smaller, more focused modules?**
   _Cohesion score 0.025974025974025976 - nodes in this community are weakly interconnected._
 - **Should `Community 1` be split into smaller, more focused modules?**
-  _Cohesion score 0.07955596669750231 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.09411764705882353 - nodes in this community are weakly interconnected._
