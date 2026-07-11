@@ -30,6 +30,10 @@ kill_matches "gz sim"
 kill_matches "ruby.*gz"
 kill_matches "gz-sim"
 
+# Kill Isaac Sim (user-scoped: shared box, leave co-tenants alone)
+kill_matches "isaac_runner.py"
+kill_matches "omni.kit"
+
 # Kill all known ROS node executables
 PATTERNS=(
     parameter_bridge
@@ -69,6 +73,7 @@ PATTERNS=(
     imu_filter_madgwick_node
     imu_filter_madgwick
     frontier_explorer_node
+    isaac_runner
 )
 
 for pat in "${PATTERNS[@]}"; do

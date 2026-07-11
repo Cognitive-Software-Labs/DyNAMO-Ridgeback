@@ -22,9 +22,11 @@ def test_internal_launch_includes_exist_and_are_referenced() -> None:
     includes_dir = launch_dir / 'includes'
 
     expected_includes = [
+        'camera_optical_tf.launch.py',
         'explore.launch.py',
         'nav2.launch.py',
         'simulation.launch.py',
+        'simulation_isaac.launch.py',
         'slam.launch.py',
     ]
     assert sorted(path.name for path in includes_dir.glob('*.launch.py')) == expected_includes

@@ -11,9 +11,10 @@ Runs on the system rclpy/CycloneDDS that the sourced workspace provides
 lives in the robot namespace and remaps /tf -> tf like every node in
 this stack.
 
-TF ownership note: until the EKF include (P4) takes over odom->base_link,
-this node publishes it from the (noise-degraded) odometry — matching how
-the platform behaves, where TF follows wheel odometry, not ground truth.
+TF ownership note: odom->base_link belongs to the EKF include (matching
+the real platform, where robot_localization owns it). The runner can
+publish it directly with odom_tf=True for standalone/debug runs without
+the EKF.
 """
 from __future__ import annotations
 
@@ -26,11 +27,13 @@ def _quat_from_yaw(yaw: float):
 
 class RosIO:
     def __init__(self, namespace: str, base_frame: str = "base_link",
-                 odom_frame: str = "odom"):
+                 odom_frame: str = "odom", odom_tf: bool = False,
+                 imu_frame: str = "imu_0_link"):
         import rclpy
         from geometry_msgs.msg import PoseStamped, Twist, TwistStamped
         from nav_msgs.msg import Odometry
         from rosgraph_msgs.msg import Clock
+        from sensor_msgs.msg import Imu
         from tf2_ros import TransformBroadcaster, StaticTransformBroadcaster
 
         rclpy.init()
@@ -43,14 +46,20 @@ class RosIO:
         )
         self._base_frame = base_frame
         self._odom_frame = odom_frame
+        self._imu_frame = imu_frame
+        self._odom_tf = odom_tf
 
         self._cmd = (0.0, 0.0, 0.0)
         self._cmd_stamp_wall = None   # set by runner via sim-time now()
 
         # /clock is global (un-namespaced) by contract
         self._clock_pub = self.node.create_publisher(Clock, "/clock", 10)
+        # raw wheel odometry — the EKF include turns this into
+        # platform/odom/filtered (+ TF), same shape as the real platform
         self._odom_pub = self.node.create_publisher(
-            Odometry, "platform/odom/filtered", 10)
+            Odometry, "platform/odom", 10)
+        self._imu_pub = self.node.create_publisher(
+            Imu, "sensors/imu_0/data_raw", 10)
         self._gt_pub = self.node.create_publisher(
             PoseStamped, "ground_truth/pose", 10)
         self._tf = TransformBroadcaster(self.node)
@@ -116,20 +125,43 @@ class RosIO:
         msg.twist.twist.linear.x = body_twist[0]
         msg.twist.twist.linear.y = body_twist[1]
         msg.twist.twist.angular.z = body_twist[2]
+        # non-zero diagonal covariances so the EKF weights it sanely
+        for i, v in ((0, 1e-3), (7, 1e-3), (35, 1e-3)):
+            msg.pose.covariance[i] = v
+            msg.twist.covariance[i] = v
         self._odom_pub.publish(msg)
 
-        from geometry_msgs.msg import TransformStamped
-        tf = TransformStamped()
-        tf.header.stamp = stamp
-        tf.header.frame_id = self._odom_frame
-        tf.child_frame_id = self._base_frame
-        tf.transform.translation.x = odom_state.x
-        tf.transform.translation.y = odom_state.y
-        tf.transform.rotation.x = qx
-        tf.transform.rotation.y = qy
-        tf.transform.rotation.z = qz
-        tf.transform.rotation.w = qw
-        self._tf.sendTransform(tf)
+        if self._odom_tf:
+            from geometry_msgs.msg import TransformStamped
+            tf = TransformStamped()
+            tf.header.stamp = stamp
+            tf.header.frame_id = self._odom_frame
+            tf.child_frame_id = self._base_frame
+            tf.transform.translation.x = odom_state.x
+            tf.transform.translation.y = odom_state.y
+            tf.transform.rotation.x = qx
+            tf.transform.rotation.y = qy
+            tf.transform.rotation.z = qz
+            tf.transform.rotation.w = qw
+            self._tf.sendTransform(tf)
+
+    def publish_imu(self, sim_time: float, wz: float, ax: float, ay: float):
+        """Raw IMU (no orientation estimate, like a real driver's
+        data_raw): body-frame gyro z and planar accel + gravity."""
+        from sensor_msgs.msg import Imu
+        msg = Imu()
+        msg.header.stamp = self._stamp(sim_time)
+        msg.header.frame_id = self._imu_frame
+        msg.orientation_covariance[0] = -1.0     # no orientation
+        msg.angular_velocity.z = wz
+        msg.angular_velocity_covariance[8] = 1e-4
+        msg.linear_acceleration.x = ax
+        msg.linear_acceleration.y = ay
+        msg.linear_acceleration.z = 9.81
+        msg.linear_acceleration_covariance[0] = 1e-2
+        msg.linear_acceleration_covariance[4] = 1e-2
+        msg.linear_acceleration_covariance[8] = 1e-2
+        self._imu_pub.publish(msg)
 
     def publish_ground_truth(self, sim_time: float, x, y, yaw):
         msg = self._msgs["PoseStamped"]()

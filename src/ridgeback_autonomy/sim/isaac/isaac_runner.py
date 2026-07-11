@@ -44,6 +44,10 @@ def parse_args():
                     help="odometry drift scale; 0 = perfect odom")
     ap.add_argument("--robot-usd", default=None,
                     help="override the committed robot package entry USD")
+    ap.add_argument("--odom-tf", default="false", choices=["true", "false"],
+                    help="publish odom->base_link TF from the runner. Off by "
+                         "default: the EKF include owns that TF, like the "
+                         "real platform. Enable for standalone runs")
     ap.add_argument("--spawn", default="0,0,0",
                     help="robot spawn x,y,yaw in the world frame")
     ap.add_argument("--spawn-z", type=float, default=0.076,
@@ -152,7 +156,11 @@ def run(app, args) -> int:
     physx_scene = PhysxSchema.PhysxSceneAPI.Apply(scene_prim)
     physx_scene.CreateTimeStepsPerSecondAttr(float(args.physics_hz))
 
-    ros = RosIO(args.namespace)
+    from sensors import attach_camera, attach_lidars
+    attach_lidars(stage, robot_prim_path, args.namespace)
+    attach_camera(stage, robot_prim_path, args.namespace)
+
+    ros = RosIO(args.namespace, odom_tf=args.odom_tf == "true")
     rig = RidgebackRig(art_root_path, odom_noise=args.odom_noise)
 
     timeline = omni.timeline.get_timeline_interface()
@@ -186,6 +194,11 @@ def run(app, args) -> int:
     frames = 0
     wall_start = time.monotonic()
     last_sim_time = timeline.get_current_time()
+    last_body_twist = (0.0, 0.0, 0.0)
+    import random as _random
+    imu_rng = _random.Random(1)
+    imu_sigma_gyro = 0.005 * args.odom_noise      # rad/s
+    imu_sigma_accel = 0.05 * args.odom_noise      # m/s^2
     while app.is_running() and not stop["flag"]:
         sim_time = timeline.get_current_time()
         frame_dt = max(sim_time - last_sim_time, 0.0)
@@ -203,6 +216,16 @@ def run(app, args) -> int:
         ros.publish_clock(sim_time)
         odom_state, body_twist = rig.update_odom()
         ros.publish_odom(sim_time, odom_state, body_twist)
+        dt = frame_dt if frame_dt > 0 else 1.0 / 60.0
+        ros.publish_imu(
+            sim_time,
+            body_twist[2] + imu_rng.gauss(0.0, imu_sigma_gyro),
+            (body_twist[0] - last_body_twist[0]) / dt
+            + imu_rng.gauss(0.0, imu_sigma_accel),
+            (body_twist[1] - last_body_twist[1]) / dt
+            + imu_rng.gauss(0.0, imu_sigma_accel),
+        )
+        last_body_twist = body_twist
         ros.publish_ground_truth(sim_time, *rig.ground_truth())
         ros.spin_once()
 

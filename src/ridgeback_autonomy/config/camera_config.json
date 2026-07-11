@@ -1,7 +1,23 @@
 {
   "camera": {
-    "depth_hfov_deg": 87.0,
-    "depth_vfov_deg": 58.0,
+    "comment": [
+      "Single source of camera intrinsics (Isaac D455-native, P4).",
+      "sensors.py renders color+depth from ONE camera at these intrinsics",
+      "(depth aligned to color, like the gz setup and like the real driver",
+      "with align enabled); fx/fy 631 @1280x720 is the typical D455 RGB",
+      "calibration. depth_*fov_deg are the RENDERED truth (2*atan(w/2/fx)),",
+      "fixing the gz-era latent mismatch where config said 87x58 while the",
+      "sim rendered 71.6x53.7 at 640x480."
+    ],
+    "width": 1280,
+    "height": 720,
+    "fps": 30.0,
+    "fx": 631.0,
+    "fy": 631.0,
+    "cx": 640.0,
+    "cy": 360.0,
+    "depth_hfov_deg": 90.78,
+    "depth_vfov_deg": 59.35,
     "pitch_deg": 0.0,
     "height_m": 0.85
   }

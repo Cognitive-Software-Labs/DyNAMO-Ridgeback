@@ -1,0 +1,38 @@
+# robot_localization EKF for the Isaac sim include (P4).
+# Derived from clearpath_control config/generic/localization.yaml (the
+# r100 has no platform-specific one): fuse planar pose+velocity from the
+# runner's noise-injected raw wheel odometry, plus yaw rate from the
+# madgwick-filtered IMU. Owns the odom->base_link TF, like the real
+# platform. Frames are namespace-relative (the stack remaps tf).
+# /**: wildcard — the node runs namespaced (/r100_0001/ekf_node) and a
+# bare node-name key would silently not apply.
+/**:
+  ros__parameters:
+    use_sim_time: true
+    frequency: 50.0
+    two_d_mode: true
+    publish_tf: true
+    print_diagnostics: false
+
+    odom_frame: odom
+    base_link_frame: base_link
+    world_frame: odom
+
+    odom0: platform/odom
+    odom0_config: [true, true, false,
+                   false, false, true,
+                   true, true, false,
+                   false, false, true,
+                   false, false, false]
+    odom0_differential: false
+    odom0_queue_size: 10
+
+    imu0: sensors/imu_0/data
+    imu0_config: [false, false, false,
+                  false, false, false,
+                  false, false, false,
+                  false, false, true,
+                  true, false, false]
+    imu0_differential: false
+    imu0_remove_gravitational_acceleration: true
+    imu0_queue_size: 10

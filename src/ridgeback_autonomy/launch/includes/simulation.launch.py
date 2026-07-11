@@ -4,8 +4,11 @@ from launch import LaunchDescription
 from launch.actions import (
     AppendEnvironmentVariable, DeclareLaunchArgument, IncludeLaunchDescription,
 )
+from launch.conditions import IfCondition, UnlessCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import LaunchConfiguration
+from launch.substitutions import (
+    EqualsSubstitution, LaunchConfiguration,
+)
 from ament_index_python.packages import get_package_share_directory
 
 
@@ -16,8 +19,17 @@ def generate_launch_description():
     setup_path = LaunchConfiguration('setup_path')
     world = LaunchConfiguration('world')
     clearpath_rviz = LaunchConfiguration('clearpath_rviz')
+    sim = LaunchConfiguration('sim')
 
     return LaunchDescription([
+        # transient dispatch during the Isaac port: gz stays the default
+        # until P8 removes it
+        DeclareLaunchArgument(
+            'sim',
+            default_value='gz',
+            choices=['gz', 'isaac'],
+            description='Simulation backend',
+        ),
         DeclareLaunchArgument(
             'setup_path',
             default_value=os.path.expanduser('~/clearpath/'),
@@ -61,6 +73,8 @@ def generate_launch_description():
             PythonLaunchDescriptionSource(
                 os.path.join(pkg_clearpath_gz, 'launch', 'simulation.launch.py')
             ),
+            condition=UnlessCondition(
+                EqualsSubstitution(sim, 'isaac')),
             launch_arguments={
                 'setup_path': setup_path,
                 'world': world,
@@ -68,6 +82,19 @@ def generate_launch_description():
                 'use_sim_time': 'true',
                 'gz_gui': LaunchConfiguration('gz_gui'),
                 'headless_rendering': LaunchConfiguration('headless_rendering'),
+            }.items(),
+        ),
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(
+                os.path.join(pkg_this, 'launch', 'includes',
+                             'simulation_isaac.launch.py')
+            ),
+            condition=IfCondition(EqualsSubstitution(sim, 'isaac')),
+            launch_arguments={
+                'setup_path': setup_path,
+                'world': world,
+                # headless_rendering arg maps to Isaac headless; the
+                # gz_gui concept has no Isaac equivalent (P8 retires it)
             }.items(),
         ),
     ])

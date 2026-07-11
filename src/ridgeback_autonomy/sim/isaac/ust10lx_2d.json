@@ -1,0 +1,42 @@
+{
+  "comment": [
+    "Hokuyo UST-10LX profile for the Isaac 6.0 RTX lidar (OmniLidar prim +",
+    "OmniSensorGenericLidarCoreAPI). 6.0 deprecated JSON profile files, so",
+    "sensors.py reads THIS file and authors the attributes on the prim —",
+    "this stays the committed single source of the sensor spec.",
+    "Datasheet: 270 deg FOV, 0.25 deg step (1081 points/scan), 40 Hz,",
+    "0.06-10 m, +/-40 mm accuracy, 905 nm. Rotary single emitter:",
+    "1440 steps/rev x 40 Hz = 57600 firings/s, valid window -135..+135 deg.",
+    "Note: real min range is 0.06 m (plan text said 0.05 - datasheet wins)."
+  ],
+  "attributes": {
+    "omni:sensor:tickRate": 40.0,
+    "omni:sensor:Core:scanType": "ROTARY",
+    "omni:sensor:Core:rotationDirection": "CCW",
+    "omni:sensor:Core:scanRateBaseHz": 40,
+    "omni:sensor:Core:patternFiringRateHz": 57600,
+    "omni:sensor:Core:numberOfEmitters": 1,
+    "omni:sensor:Core:numberOfChannels": 1,
+    "omni:sensor:Core:maxReturns": 1,
+    "omni:sensor:Core:validStartAzimuthDeg": -135.0,
+    "omni:sensor:Core:validEndAzimuthDeg": 135.0,
+    "omni:sensor:Core:startAzimuthOffsetDeg": 0.0,
+    "omni:sensor:Core:nearRangeM": 0.06,
+    "omni:sensor:Core:farRangeM": 10.0,
+    "omni:sensor:Core:rangeAccuracyM": 0.04,
+    "omni:sensor:Core:rangeResolutionM": 0.001,
+    "omni:sensor:Core:azimuthErrorStd": 0.01,
+    "omni:sensor:Core:elevationErrorStd": 0.0,
+    "omni:sensor:Core:waveLengthNm": 905.0,
+    "omni:sensor:Core:rayType": "IDEALIZED",
+    "omni:sensor:Core:intensityProcessing": "NORMALIZATION",
+    "omni:sensor:Core:elementsCoordsType": "SPHERICAL",
+    "omni:sensor:Core:outputFrameOfReference": "SENSOR",
+    "omni:sensor:Core:skipDroppingInvalidPoints": true,
+    "omni:sensor:Core:accumulateOutputs": true,
+    "omni:sensor:Core:emitterState:s001:azimuthDeg": [0.0],
+    "omni:sensor:Core:emitterState:s001:elevationDeg": [0.0],
+    "omni:sensor:Core:emitterState:s001:fireTimeNs": [0],
+    "omni:sensor:Core:emitterState:s001:channelId": [1]
+  }
+}

@@ -1,6 +1,6 @@
 # Port plan: Gazebo Harmonic → NVIDIA Isaac Sim 6.0
 
-Status: **in progress — P0–P3 done, P4 next.** Kept current per phase; mark phases done as they land.
+Status: **in progress — P0–P4 done, P5 next.** Kept current per phase; mark phases done as they land.
 Branch: `feat/isaac-sim-6-port` (cut from `dev`). Base includes `4f8b72d8` (explore_lite removed — single in-repo `frontier_explorer_node`).
 
 ## Context
@@ -95,13 +95,14 @@ Bootstrap: cut `feat/isaac-sim-6-port` from `dev`; workspace already built in th
 - ✓ Manual: runner headless in mock_hospital; TwistStamped teleop → raw odom ≈50 Hz arcs, /clock ticks, stop ≤0.5 s, strafe proves holonomic; `--odom-noise 0` vs default shows drift in odom while `ground_truth/pose` stays exact.
 - **DONE** — motion verified two ways: `tools/isaac/diag_rig.py --battery` 10/10 (stillness at spawn, zero wheel contacts, sim-time advance, set_planar_pose teleport, fwd/strafe/spin/combined tracking exact, stop drift 0.00 cm, cmd-timeout stop) + live-runner ROS checks (/clock advances at RTF≈1, odom arcs under teleop, strafe-at-yaw holonomic, stop twist ~0, noisy odom vs exact GT split). Deviation: raw odom publishes at the render rate (~35 Hz under co-tenant load), not 50 Hz — publish-per-physics-step decoupling is a P4 option if the EKF wants it.
 
-### P4 — Sensors + EKF + launch include: full contract [L]
+### P4 — Sensors + EKF + launch include: full contract [L] ✅
 - `sensors.py`, `ust10lx_2d.json`, D455 rig + `camera_config.json` update (real D455 intrinsics), IMU publisher.
 - `launch/includes/simulation_isaac.launch.py`: event chain generate_description → OnProcessExit → robot_state_publisher + `robot_localization` ekf_node (→ `platform/odom/filtered` + TF) + runner ExecuteProcess. Same arg surface as the gz include.
 - `includes/simulation.launch.py`: transient `sim:=gz|isaac` dispatch (default gz until P8).
 - `cleanup.sh` += isaac kill patterns (user-scoped `isaac_runner.py`, `omni.kit`); extend `test_launch_layout.py`.
 - Config deltas land here: slam `max_laser_range` 10, costmap range review (documented in commit).
 - ✓ Isaac include alone: all contract topics live, types/QoS match baseline, camera_info = D455 1280×720 (intentional divergence, matches new camera_config.json), EKF publishes filtered odom + TF, view_frames complete, standalone slam_toolbox maps.
+- **DONE** — include-alone acceptance: 14/14 contract topics live, QoS RELIABLE/VOLATILE matches baseline, camera_info 1280×720 fx=631 frame=color-optical, EKF filtered odom within ~1 mm of GT while raw drifts (IMU+odom fusion), TF tree 22 edges incl. odom→base_link from EKF, slam_toolbox maps standalone (1758 occ / 17k free cells after one arc). Deviations, all documented in code: 6.0 replaced lidar JSON profiles with OmniLidar prims (`ust10lx_2d.json` is now our spec file that sensors.py authors onto the prim; needs `omni:sensor:tickRate` 40 + `accumulateOutputs`); LaserScan is a 360° frame with the rear 90° sector inf (valid-azimuth ROI honored; effective FOV 270°, same message shape gz produced); scan ~20 Hz and odom ~30 Hz — render-frame-locked under co-tenant load (gz baseline 37/46; slam fine, revisit at P5 RTF gate); camera = plain USD camera with true D455 720p intrinsics at the d435 mount pose instead of referencing the cloud `rsd455.usd` asset (self-contained repo beats a boot-time network fetch; mesh is cosmetic); UST-10LX min range 0.06 m per datasheet (plan said 0.05).
 
 ### P5 — E2E exploration + sign-off [M] (transient A/B window opens)
 - `ridgeback_exploration.launch.py`: forward `sim`; `sim_ready_timeout` (45 gz / 300 isaac) on the first gate. HUD: localization-error panel (GT pose vs SLAM). Probe optionally logs GT-drift.
