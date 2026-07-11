@@ -12,6 +12,7 @@ This workspace supports 2 main human workflows:
 - `ISSUES.md`: troubleshooting, resolved root causes, and operational gotchas
 - `AI_CONTEXT.md`: agent-facing repo conventions, mental model, and documentation rules
 - `AGENTS.md` / `CLAUDE.md`: thin entrypoints into the shared agent guidance
+- `docs/demos/`: self-contained demo snapshots (e.g. `isaac-first-drive/` — the Isaac port's first SLAM drive, with regeneration steps)
 
 ## Stack
 
