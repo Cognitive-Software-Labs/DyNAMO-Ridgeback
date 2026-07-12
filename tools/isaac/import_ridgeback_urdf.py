@@ -515,23 +515,35 @@ def add_sensor_prims(usd_path: Path) -> None:
                 return prim
         raise RuntimeError(f"prim {name} missing from imported robot")
 
+    # Two prims per lidar: the generic rotary model only fires a 180-deg
+    # drum transit per tick from startAzimuthOffsetDeg (the valid-window
+    # subset of it), regardless of tickRate or emitter patterns —
+    # measured against the analytic world grid, not documented. Offset 0
+    # covers azimuths [-135, 0], offset -135 covers [0, +135];
+    # ros_io.LidarScanAssembler merges both clouds into the 270-deg scan.
     for i in (0, 1):
         laser = find(f"lidar2d_{i}_laser")
-        lidar = stage.DefinePrim(
-            laser.GetPath().AppendChild("rtx_lidar"), "OmniLidar")
-        if not lidar.ApplyAPI("OmniSensorGenericLidarCoreAPI"):
-            raise RuntimeError("OmniSensorGenericLidarCoreAPI not registered")
-        for name, value in lidar_spec.items():
-            attr = lidar.GetAttribute(name)
-            if not attr:
-                raise RuntimeError(f"{lidar.GetPath()}: no attribute {name}")
-            if isinstance(value, list):
-                if all(isinstance(v, int) for v in value):
-                    value = Vt.UIntArray(value) if min(value) >= 0 \
-                        else Vt.IntArray(value)
-                else:
-                    value = Vt.FloatArray([float(v) for v in value])
-            attr.Set(value)
+        for prim_name, az_offset in (("rtx_lidar", 0.0),
+                                     ("rtx_lidar_l", -135.0)):
+            lidar = stage.DefinePrim(
+                laser.GetPath().AppendChild(prim_name), "OmniLidar")
+            if not lidar.ApplyAPI("OmniSensorGenericLidarCoreAPI"):
+                raise RuntimeError(
+                    "OmniSensorGenericLidarCoreAPI not registered")
+            for name, value in lidar_spec.items():
+                attr = lidar.GetAttribute(name)
+                if not attr:
+                    raise RuntimeError(
+                        f"{lidar.GetPath()}: no attribute {name}")
+                if isinstance(value, list):
+                    if all(isinstance(v, int) for v in value):
+                        value = Vt.UIntArray(value) if min(value) >= 0 \
+                            else Vt.IntArray(value)
+                    else:
+                        value = Vt.FloatArray([float(v) for v in value])
+                attr.Set(value)
+            lidar.GetAttribute(
+                "omni:sensor:Core:startAzimuthOffsetDeg").Set(az_offset)
 
     link = find("camera_0_link")
     cam = UsdGeom.Camera.Define(

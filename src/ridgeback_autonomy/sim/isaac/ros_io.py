@@ -47,9 +47,14 @@ class LidarScanAssembler:
     RANGE_MIN = 0.06
     RANGE_MAX = 10.0
     SCAN_PERIOD = 1.0 / 40.0
-    STALE_SWEEPS = 1.5
+    # 3 sweeps (75 ms): each half-arc refreshes from its own prim at
+    # render cadence; tighter expiry flaps whole halves to inf when a
+    # render frame runs long under co-tenant load
+    STALE_SWEEPS = 3.0
 
     def __init__(self, node, index: int):
+        from functools import partial
+
         from rclpy.qos import QoSProfile
         from sensor_msgs.msg import LaserScan, PointCloud2
 
@@ -57,30 +62,40 @@ class LidarScanAssembler:
         self._frame = f"lidar2d_{index}_laser"
         self._ranges = np.full(self.N_BINS, np.inf, dtype=np.float32)
         self._updated = np.full(self.N_BINS, -1.0, dtype=np.float64)
+        self._half_stamp = [None, None]
         self._pub = node.create_publisher(
             LaserScan, f"sensors/lidar2d_{index}/scan", QoSProfile(depth=10))
+        # two half-arc clouds per lidar (sensors.py: the rotary model only
+        # fires 180 deg of drum transit per tick; two prims cover the arc)
         node.create_subscription(
             PointCloud2, f"sensors/lidar2d_{index}/points",
-            self._on_cloud, 10)
+            partial(self._on_cloud, 0), 10)
+        node.create_subscription(
+            PointCloud2, f"sensors/lidar2d_{index}/points_l",
+            partial(self._on_cloud, 1), 10)
 
-    def _on_cloud(self, msg):
+    def _on_cloud(self, half, msg):
         from sensor_msgs_py import point_cloud2 as pc2
 
+        t = msg.header.stamp.sec + msg.header.stamp.nanosec * 1e-9
+        self._half_stamp[half] = t
         pts = pc2.read_points(msg, field_names=("x", "y"), skip_nans=True)
         x = pts["x"].astype(np.float64)
         y = pts["y"].astype(np.float64)
         r = np.hypot(x, y)
         ok = r > self.RANGE_MIN * 0.5   # zero-range = invalid slot padding
-        if not ok.any():
+        if ok.any():
+            r = r[ok]
+            bins = np.round((np.arctan2(y[ok], x[ok]) - self.ANGLE_MIN)
+                            / self.ANGLE_INC).astype(int)
+            good = (bins >= 0) & (bins < self.N_BINS)
+            self._ranges[bins[good]] = r[good]
+            self._updated[bins[good]] = t
+        # both prims capture per the same tick and stamp identically —
+        # publish once per completed pair so a scan never mixes two
+        # capture instants (a half-stale seam smears SLAM under rotation)
+        if self._half_stamp[0] != self._half_stamp[1]:
             return
-        r = r[ok]
-        bins = np.round((np.arctan2(y[ok], x[ok]) - self.ANGLE_MIN)
-                        / self.ANGLE_INC).astype(int)
-        good = (bins >= 0) & (bins < self.N_BINS)
-        bins, r = bins[good], r[good]
-        t = msg.header.stamp.sec + msg.header.stamp.nanosec * 1e-9
-        self._ranges[bins] = r
-        self._updated[bins] = t
 
         out = self._ranges.copy()
         out[self._updated < t - self.STALE_SWEEPS * self.SCAN_PERIOD] = np.inf
@@ -267,7 +282,12 @@ class RosIO:
     # ---- loop glue -----------------------------------------------------------
 
     def spin_once(self):
-        self._rclpy.spin_once(self.node, timeout_sec=0.0)
+        # drain the ready queue, not a single callback: four half-arc
+        # cloud streams (~28 Hz each) plus cmd/clock would otherwise
+        # backlog behind a one-callback-per-render-frame budget and the
+        # scan assembler's stamp pairing compares stale halves
+        for _ in range(32):
+            self._rclpy.spin_once(self.node, timeout_sec=0.0)
 
     def shutdown(self):
         self.node.destroy_node()

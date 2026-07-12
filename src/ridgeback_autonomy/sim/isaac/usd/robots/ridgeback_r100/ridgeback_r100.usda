@@ -160,6 +160,40 @@ def Xform "tn__r1000001_bC" (
                                     float omni:sensor:Core:waveLengthNm = 905
                                     float omni:sensor:tickRate = 40
                                 }
+
+                                def OmniLidar "rtx_lidar_l" (
+                                    prepend apiSchemas = ["OmniSensorGenericLidarCoreAPI"]
+                                )
+                                {
+                                    bool omni:sensor:Core:accumulateOutputs = 1
+                                    float omni:sensor:Core:azimuthErrorStd = 0.01
+                                    token omni:sensor:Core:elementsCoordsType = "SPHERICAL"
+                                    float omni:sensor:Core:elevationErrorStd = 0
+                                    float[] omni:sensor:Core:emitterState:s001:azimuthDeg = [0]
+                                    uint[] omni:sensor:Core:emitterState:s001:channelId = [1]
+                                    float[] omni:sensor:Core:emitterState:s001:elevationDeg = [0]
+                                    uint[] omni:sensor:Core:emitterState:s001:fireTimeNs = [0]
+                                    float omni:sensor:Core:farRangeM = 10
+                                    token omni:sensor:Core:intensityProcessing = "NORMALIZATION"
+                                    uint omni:sensor:Core:maxReturns = 1
+                                    float omni:sensor:Core:nearRangeM = 0.06
+                                    uint omni:sensor:Core:numberOfChannels = 1
+                                    uint omni:sensor:Core:numberOfEmitters = 1
+                                    token omni:sensor:Core:outputFrameOfReference = "SENSOR"
+                                    uint omni:sensor:Core:patternFiringRateHz = 57600
+                                    float omni:sensor:Core:rangeAccuracyM = 0.04
+                                    float omni:sensor:Core:rangeResolutionM = 0.001
+                                    token omni:sensor:Core:rayType = "IDEALIZED"
+                                    token omni:sensor:Core:rotationDirection = "CCW"
+                                    uint omni:sensor:Core:scanRateBaseHz = 40
+                                    token omni:sensor:Core:scanType = "ROTARY"
+                                    bool omni:sensor:Core:skipDroppingInvalidPoints = 1
+                                    float omni:sensor:Core:startAzimuthOffsetDeg = -135
+                                    float omni:sensor:Core:validEndAzimuthDeg = 135
+                                    float omni:sensor:Core:validStartAzimuthDeg = -135
+                                    float omni:sensor:Core:waveLengthNm = 905
+                                    float omni:sensor:tickRate = 40
+                                }
                             }
 
                             over "hokuyo_ust"
@@ -204,6 +238,40 @@ def Xform "tn__r1000001_bC" (
                                     token omni:sensor:Core:scanType = "ROTARY"
                                     bool omni:sensor:Core:skipDroppingInvalidPoints = 1
                                     float omni:sensor:Core:startAzimuthOffsetDeg = 0
+                                    float omni:sensor:Core:validEndAzimuthDeg = 135
+                                    float omni:sensor:Core:validStartAzimuthDeg = -135
+                                    float omni:sensor:Core:waveLengthNm = 905
+                                    float omni:sensor:tickRate = 40
+                                }
+
+                                def OmniLidar "rtx_lidar_l" (
+                                    prepend apiSchemas = ["OmniSensorGenericLidarCoreAPI"]
+                                )
+                                {
+                                    bool omni:sensor:Core:accumulateOutputs = 1
+                                    float omni:sensor:Core:azimuthErrorStd = 0.01
+                                    token omni:sensor:Core:elementsCoordsType = "SPHERICAL"
+                                    float omni:sensor:Core:elevationErrorStd = 0
+                                    float[] omni:sensor:Core:emitterState:s001:azimuthDeg = [0]
+                                    uint[] omni:sensor:Core:emitterState:s001:channelId = [1]
+                                    float[] omni:sensor:Core:emitterState:s001:elevationDeg = [0]
+                                    uint[] omni:sensor:Core:emitterState:s001:fireTimeNs = [0]
+                                    float omni:sensor:Core:farRangeM = 10
+                                    token omni:sensor:Core:intensityProcessing = "NORMALIZATION"
+                                    uint omni:sensor:Core:maxReturns = 1
+                                    float omni:sensor:Core:nearRangeM = 0.06
+                                    uint omni:sensor:Core:numberOfChannels = 1
+                                    uint omni:sensor:Core:numberOfEmitters = 1
+                                    token omni:sensor:Core:outputFrameOfReference = "SENSOR"
+                                    uint omni:sensor:Core:patternFiringRateHz = 57600
+                                    float omni:sensor:Core:rangeAccuracyM = 0.04
+                                    float omni:sensor:Core:rangeResolutionM = 0.001
+                                    token omni:sensor:Core:rayType = "IDEALIZED"
+                                    token omni:sensor:Core:rotationDirection = "CCW"
+                                    uint omni:sensor:Core:scanRateBaseHz = 40
+                                    token omni:sensor:Core:scanType = "ROTARY"
+                                    bool omni:sensor:Core:skipDroppingInvalidPoints = 1
+                                    float omni:sensor:Core:startAzimuthOffsetDeg = -135
                                     float omni:sensor:Core:validEndAzimuthDeg = 135
                                     float omni:sensor:Core:validStartAzimuthDeg = -135
                                     float omni:sensor:Core:waveLengthNm = 905

@@ -52,13 +52,6 @@ def attach_lidars(stage, robot_root: str = "/ridgeback",
     values = []
     for i in (0, 1):
         laser = _find_prim_by_name(stage, robot_root, f"lidar2d_{i}_laser")
-        lidar = laser.GetChild("rtx_lidar")
-        if not lidar:
-            raise RuntimeError(f"{laser.GetPath()}: no rtx_lidar child — "
-                               + REGEN_HINT)
-        created.append(str(lidar.GetPath()))
-        rp_path = _render_product(lidar.GetPath(), [32, 32])
-
         # point_cloud, NOT laser_scan: the 6.0.1 laser_scan writer hardcodes
         # a 360-deg FOV for ROTARY sensors (_read_laser_scan_metadata in
         # OgnROS2RtxLidarHelper.py), so our 270-deg ROI arc gets stretched
@@ -66,17 +59,31 @@ def attach_lidars(stage, robot_root: str = "/ridgeback",
         # cooks on any rotation. The Cartesian returns are sensor-frame
         # correct (verified against the analytic world grid, ~2.6 cm), so
         # ros_io.py bins them into the contract LaserScan instead.
-        node = f"lidar{i}_pc"
-        nodes.append((node, "isaacsim.ros2.bridge.ROS2RtxLidarHelper"))
-        connects.append(("tick.outputs:tick", f"{node}.inputs:execIn"))
-        values += [
-            (f"{node}.inputs:renderProductPath", rp_path),
-            (f"{node}.inputs:type", "point_cloud"),
-            (f"{node}.inputs:topicName", f"sensors/lidar2d_{i}/points"),
-            (f"{node}.inputs:frameId", f"lidar2d_{i}_laser"),
-            (f"{node}.inputs:nodeNamespace", f"/{namespace}"),
-            (f"{node}.inputs:queueSize", 10),
-        ]
+        #
+        # TWO prims per lidar: the generic rotary model only fires a
+        # 180-deg drum transit per tick from startAzimuthOffsetDeg (valid
+        # subset thereof), regardless of tickRate/emitter tricks —
+        # measured, not documented. rtx_lidar (offset 0) covers
+        # [-135, 0]; rtx_lidar_l (offset -135) covers [0, +135].
+        for prim_name, suffix in (("rtx_lidar", ""), ("rtx_lidar_l", "_l")):
+            lidar = laser.GetChild(prim_name)
+            if not lidar:
+                raise RuntimeError(f"{laser.GetPath()}: no {prim_name} "
+                                   f"child — " + REGEN_HINT)
+            created.append(str(lidar.GetPath()))
+            rp_path = _render_product(lidar.GetPath(), [32, 32])
+            node = f"lidar{i}_pc{suffix}"
+            nodes.append((node, "isaacsim.ros2.bridge.ROS2RtxLidarHelper"))
+            connects.append(("tick.outputs:tick", f"{node}.inputs:execIn"))
+            values += [
+                (f"{node}.inputs:renderProductPath", rp_path),
+                (f"{node}.inputs:type", "point_cloud"),
+                (f"{node}.inputs:topicName",
+                 f"sensors/lidar2d_{i}/points{suffix}"),
+                (f"{node}.inputs:frameId", f"lidar2d_{i}_laser"),
+                (f"{node}.inputs:nodeNamespace", f"/{namespace}"),
+                (f"{node}.inputs:queueSize", 10),
+            ]
 
     og.Controller.edit(
         {"graph_path": "/ros_lidar_graph", "evaluator_name": "execution"},
