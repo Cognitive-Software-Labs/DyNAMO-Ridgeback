@@ -115,6 +115,12 @@ install(PROGRAMS
   RENAME coverage_overlay_node
 )
 
+install(PROGRAMS
+  ridgeback_autonomy/diagnostics/localization_overlay_node.py
+  DESTINATION lib/${PROJECT_NAME}
+  RENAME localization_overlay_node
+)
+
 install(DIRECTORY
   launch
   config

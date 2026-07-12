@@ -9,7 +9,9 @@ from launch.actions import (
 )
 from launch.event_handlers import OnProcessExit
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import AndSubstitution, LaunchConfiguration
+from launch.substitutions import (
+    AndSubstitution, EqualsSubstitution, LaunchConfiguration, PythonExpression,
+)
 from launch_ros.actions import Node
 
 
@@ -31,13 +33,22 @@ def generate_launch_description():
     depth_anything_enabled = LaunchConfiguration('depth_anything_enabled')
     mppi_visualize = LaunchConfiguration('mppi_visualize')
     coverage_overlay_enabled = LaunchConfiguration('coverage_overlay_enabled')
+    sim = LaunchConfiguration('sim')
+    sim_ready_timeout = LaunchConfiguration('sim_ready_timeout')
+    rtf = LaunchConfiguration('rtf')
+    headless = LaunchConfiguration('headless')
+    livestream = LaunchConfiguration('livestream')
 
     rviz_config = os.path.join(pkg_this, 'sim', 'rviz', 'exploration.rviz')
 
     def _launch_wait(name, *conditions, timeout):
+        # timeout may be an int (fixed gate) or a launch substitution (the
+        # sim-dependent readiness window); pass substitutions through verbatim.
+        timeout_arg = (str(timeout) if isinstance(timeout, (int, float))
+                       else timeout)
         return ExecuteProcess(
             cmd=['ros2', 'run', 'ridgeback_autonomy', 'launch_wait',
-                 *conditions, '--timeout', str(timeout)],
+                 *conditions, '--timeout', timeout_arg],
             name=name, output='screen',
         )
 
@@ -50,7 +61,7 @@ def generate_launch_description():
         'gate_slam',
         '--topic', ['/', namespace, '/sensors/lidar2d_0/scan'],
         '--topic', ['/', namespace, '/platform/odom/filtered'],
-        timeout=45,
+        timeout=sim_ready_timeout,
     )
     gate_nav2 = _launch_wait(
         'gate_nav2', '--topic', ['/', namespace, '/map'], timeout=60,
@@ -85,6 +96,24 @@ def generate_launch_description():
         DeclareLaunchArgument('setup_path',
                               default_value=os.path.expanduser('~/clearpath/')),
         DeclareLaunchArgument('world', default_value='mock_hospital'),
+        DeclareLaunchArgument(
+            'sim', default_value='gz', choices=['gz', 'isaac'],
+            description='Simulation backend, forwarded down the include chain'),
+        DeclareLaunchArgument(
+            'sim_ready_timeout',
+            default_value=PythonExpression(
+                ["'300' if '", sim, "' == 'isaac' else '45'"]),
+            description='Seconds the first readiness gate waits for the sim to '
+                        'publish scan+odom (Isaac cold-boots slower than gz)'),
+        DeclareLaunchArgument(
+            'rtf', default_value='1.0',
+            description='Isaac real-time factor; 0 = unthrottled (gz ignores)'),
+        DeclareLaunchArgument(
+            'headless', default_value='true',
+            description='Isaac: run without the sim GUI window (gz ignores)'),
+        DeclareLaunchArgument(
+            'livestream', default_value='false',
+            description='Isaac: WebRTC livestream (gz ignores)'),
         DeclareLaunchArgument('exploration_rviz', default_value='true',
                               description='Launch the exploration RViz2 config'),
         DeclareLaunchArgument('g1_perception_enabled', default_value='true',
@@ -192,10 +221,14 @@ def generate_launch_description():
                         os.path.join(includes_dir, 'simulation.launch.py')
                     ),
             launch_arguments={
+                'sim': sim,
                 'setup_path': setup_path,
                 'world': world,
                 'clearpath_rviz': 'false',
                 'headless_rendering': LaunchConfiguration('headless_rendering'),
+                'rtf': rtf,
+                'headless': headless,
+                'livestream': livestream,
             }.items(),
         ),
 
@@ -276,6 +309,22 @@ def generate_launch_description():
             condition=launch.conditions.IfCondition(coverage_overlay_enabled),
         ),
 
+        # Localization-error panel (GT pose vs SLAM map->base_link) ->
+        # hud/localization. Isaac-only: only the Isaac runner publishes
+        # ground_truth/pose, so gz launches without it (the panel stays empty
+        # and the HUD aggregator drops it).
+        Node(
+            package='ridgeback_autonomy',
+            executable='localization_overlay_node',
+            name='localization_overlay_node',
+            namespace=namespace,
+            parameters=[{'use_sim_time': use_sim_time}],
+            remappings=[('/tf', 'tf'), ('/tf_static', 'tf_static')],
+            output='screen',
+            condition=launch.conditions.IfCondition(
+                EqualsSubstitution(sim, 'isaac')),
+        ),
+
         # General HUD aggregator: merges the panels into one screen overlay.
         Node(
             package='ridgeback_autonomy',
@@ -284,7 +333,7 @@ def generate_launch_description():
             namespace=namespace,
             parameters=[{
                 'use_sim_time': use_sim_time,
-                'panels': ['hud/velocity', 'hud/coverage'],
+                'panels': ['hud/velocity', 'hud/coverage', 'hud/localization'],
             }],
             remappings=[('/tf', 'tf'), ('/tf_static', 'tf_static')],
             output='screen',

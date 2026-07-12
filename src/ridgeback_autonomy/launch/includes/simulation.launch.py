@@ -56,6 +56,23 @@ def generate_launch_description():
             description='Render server sensors via EGL without an X display '
                         '(GPU rendering for non-seat/SSH sessions; see ISSUES.md)',
         ),
+        DeclareLaunchArgument(
+            'rtf',
+            default_value='1.0',
+            description='Isaac real-time factor; 0 = unthrottled '
+                        '(ignored under gz)',
+        ),
+        DeclareLaunchArgument(
+            'headless',
+            default_value='true',
+            description='Isaac: run without the sim GUI window '
+                        '(ignored under gz)',
+        ),
+        DeclareLaunchArgument(
+            'livestream',
+            default_value='false',
+            description='Isaac: WebRTC livestream (ignored under gz)',
+        ),
         # Add our worlds and models directories so Gazebo can find them
         AppendEnvironmentVariable(
             'GZ_SIM_RESOURCE_PATH',
@@ -93,8 +110,10 @@ def generate_launch_description():
             launch_arguments={
                 'setup_path': setup_path,
                 'world': world,
-                # headless_rendering arg maps to Isaac headless; the
-                # gz_gui concept has no Isaac equivalent (P8 retires it)
+                'rtf': LaunchConfiguration('rtf'),
+                'headless': LaunchConfiguration('headless'),
+                'livestream': LaunchConfiguration('livestream'),
+                # the gz_gui concept has no Isaac equivalent (P8 retires it)
             }.items(),
         ),
     ])

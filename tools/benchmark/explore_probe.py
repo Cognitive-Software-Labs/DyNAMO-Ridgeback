@@ -21,12 +21,17 @@ from rclpy.node import Node
 from rclpy.qos import QoSDurabilityPolicy, QoSProfile, QoSReliabilityPolicy
 
 from action_msgs.msg import GoalStatusArray
+from rosgraph_msgs.msg import Clock
 from visualization_msgs.msg import MarkerArray
 from rviz_2d_overlay_msgs.msg import OverlayText
 from std_msgs.msg import String
 
 NS = '/r100_0001'
+# HUD panels pad columns with non-breaking spaces; \s matches U+00A0 in Unicode
+# mode, so these patterns work against the rendered OverlayText verbatim.
 PCT = re.compile(r'complete\s+([0-9.]+)%')
+ACC = re.compile(r'accuracy\s+([0-9.]+)%')
+LOC = re.compile(r'trans\s+err\s+([0-9.]+)')
 STATUS_NAMES = {0: 'UNKNOWN', 1: 'ACCEPTED', 2: 'EXECUTING', 3: 'CANCELING',
                 4: 'SUCCEEDED', 5: 'CANCELED', 6: 'ABORTED'}
 PREEMPT_WINDOW = 1.5  # s: new goal accepted within this of an abort => preemption
@@ -42,7 +47,11 @@ class Probe(Node):
         self.frontier_log = []       # (t, avail, blacklisted)
         self.coverage = 0.0
         self.cov_log = []
+        self.accuracy = None         # coverage accuracy% (hud/coverage)
         self.complete_at = None
+        self.sim_first = None        # (wall_s, sim_s) at first /clock
+        self.sim_last = None         # (wall_s, sim_s) at latest /clock
+        self.loc_errs = []           # (wall_s, trans_err_m) from hud/localization
         self.events = open(f'{tag}_events.csv', 'w')
         self.events.write('t,kind,detail\n')
 
@@ -58,6 +67,13 @@ class Probe(Node):
             String, NS + '/explore/status', self.on_explore_status, tl)
         self.create_subscription(
             OverlayText, NS + '/hud/coverage', self.on_cov, 10)
+        # Achieved RTF (sim-time span / wall span); /clock is global, not
+        # namespaced. Captured live so it survives an unclean runner teardown.
+        self.create_subscription(Clock, '/clock', self.on_clock, 10)
+        # GT-drift, isaac-only: gz publishes no hud/localization so this never
+        # fires and the localization fields stay null (see localization_overlay).
+        self.create_subscription(
+            OverlayText, NS + '/hud/localization', self.on_loc, 10)
 
     def now(self):
         return time.time() - self.t0
@@ -110,6 +126,20 @@ class Probe(Node):
             v = float(m.group(1))
             self.coverage = max(self.coverage, v)
             self.cov_log.append((self.now(), v))
+        a = ACC.search(msg.text)
+        if a:
+            self.accuracy = float(a.group(1))
+
+    def on_clock(self, msg):
+        t = msg.clock.sec + msg.clock.nanosec * 1e-9
+        if self.sim_first is None:
+            self.sim_first = (self.now(), t)
+        self.sim_last = (self.now(), t)
+
+    def on_loc(self, msg):
+        m = LOC.search(msg.text)
+        if m:
+            self.loc_errs.append((self.now(), float(m.group(1))))
 
     def summary(self):
         self.classify_aborts()
@@ -117,9 +147,22 @@ class Probe(Node):
         pre = sum(1 for a in self.aborts if a['kind'] == 'preempted')
         gen = len(self.aborts) - pre
         last_f = self.frontier_log[-1] if self.frontier_log else (0, -1, -1)
+        rtf = None
+        if self.sim_first and self.sim_last:
+            dwall = self.sim_last[0] - self.sim_first[0]
+            dsim = self.sim_last[1] - self.sim_first[1]
+            if dwall > 1.0:
+                rtf = round(dsim / dwall, 3)
+        loc = [e for _, e in self.loc_errs]
         return {
             'quit_at_s': self.complete_at,
             'coverage_peak_pct': self.coverage,
+            'coverage_accuracy_pct': self.accuracy,
+            'achieved_rtf': rtf,
+            'localization_err_mean_m':
+                round(sum(loc) / len(loc), 3) if loc else None,
+            'localization_err_max_m': round(max(loc), 3) if loc else None,
+            'localization_err_last_m': round(loc[-1], 3) if loc else None,
             'goals_total': len(self.goals),
             'succeeded': term.count('SUCCEEDED'),
             'aborted': term.count('ABORTED'),
