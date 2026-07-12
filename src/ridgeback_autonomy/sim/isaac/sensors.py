@@ -11,10 +11,10 @@ lives in ros_io.py.
 Publish topics follow the frozen contract, default (RELIABLE/VOLATILE/
 KEEP_LAST 10) QoS from the bridge nodes.
 
-Known quirk (tracked for P5): the bridge's laser_scan writer stamps with
-sim time at publish while the RTX pipeline delivers data a few frames
-late — fast rotation smears SLAM input. Fix is a custom writer with
-frame-correlated IsaacReadSimulationTime.
+Lidar publishes point_cloud (Cartesian returns), NOT laser_scan: the
+6.0.1 laser_scan writer hardcodes a 360-deg FOV for ROTARY sensors and
+mislabels our 270-deg ROI arc (details at the helper node below).
+ros_io.LidarScanAssembler bins the clouds into the contract LaserScan.
 """
 from __future__ import annotations
 
@@ -59,13 +59,20 @@ def attach_lidars(stage, robot_root: str = "/ridgeback",
         created.append(str(lidar.GetPath()))
         rp_path = _render_product(lidar.GetPath(), [32, 32])
 
-        node = f"lidar{i}"
+        # point_cloud, NOT laser_scan: the 6.0.1 laser_scan writer hardcodes
+        # a 360-deg FOV for ROTARY sensors (_read_laser_scan_metadata in
+        # OgnROS2RtxLidarHelper.py), so our 270-deg ROI arc gets stretched
+        # across 360 deg of bin labels — scans over-rotate by 4/3 and SLAM
+        # cooks on any rotation. The Cartesian returns are sensor-frame
+        # correct (verified against the analytic world grid, ~2.6 cm), so
+        # ros_io.py bins them into the contract LaserScan instead.
+        node = f"lidar{i}_pc"
         nodes.append((node, "isaacsim.ros2.bridge.ROS2RtxLidarHelper"))
         connects.append(("tick.outputs:tick", f"{node}.inputs:execIn"))
         values += [
             (f"{node}.inputs:renderProductPath", rp_path),
-            (f"{node}.inputs:type", "laser_scan"),
-            (f"{node}.inputs:topicName", f"sensors/lidar2d_{i}/scan"),
+            (f"{node}.inputs:type", "point_cloud"),
+            (f"{node}.inputs:topicName", f"sensors/lidar2d_{i}/points"),
             (f"{node}.inputs:frameId", f"lidar2d_{i}_laser"),
             (f"{node}.inputs:nodeNamespace", f"/{namespace}"),
             (f"{node}.inputs:queueSize", 10),

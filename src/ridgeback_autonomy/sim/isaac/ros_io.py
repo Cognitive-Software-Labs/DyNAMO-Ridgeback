@@ -20,9 +20,82 @@ from __future__ import annotations
 
 import math
 
+import numpy as np
+
 
 def _quat_from_yaw(yaw: float):
     return (0.0, 0.0, math.sin(yaw / 2.0), math.cos(yaw / 2.0))
+
+
+class LidarScanAssembler:
+    """Bin the bridge's RTX lidar PointCloud2 into the contract LaserScan.
+
+    The 6.0.1 bridge laser_scan writer mislabels ROTARY sensors with an
+    azimuth ROI (hardcoded 360-deg FOV — see sensors.py), but its
+    point_cloud output is sensor-frame correct. Each cloud message carries
+    the returns of the render frame's accumulated sweep segment, so bins
+    are updated newest-wins and expire after STALE_SWEEPS sweep periods
+    (a real spinning lidar refreshes each azimuth once per sweep; expiry
+    turns never-refreshed bins into inf instead of freezing old hits).
+
+    UST-10LX geometry: 1081 bins, -135..+135 deg, 0.25 deg step, 40 Hz.
+    """
+
+    N_BINS = 1081
+    ANGLE_MIN = -3.0 * math.pi / 4.0
+    ANGLE_INC = math.radians(0.25)
+    RANGE_MIN = 0.06
+    RANGE_MAX = 10.0
+    SCAN_PERIOD = 1.0 / 40.0
+    STALE_SWEEPS = 1.5
+
+    def __init__(self, node, index: int):
+        from rclpy.qos import QoSProfile
+        from sensor_msgs.msg import LaserScan, PointCloud2
+
+        self._LaserScan = LaserScan
+        self._frame = f"lidar2d_{index}_laser"
+        self._ranges = np.full(self.N_BINS, np.inf, dtype=np.float32)
+        self._updated = np.full(self.N_BINS, -1.0, dtype=np.float64)
+        self._pub = node.create_publisher(
+            LaserScan, f"sensors/lidar2d_{index}/scan", QoSProfile(depth=10))
+        node.create_subscription(
+            PointCloud2, f"sensors/lidar2d_{index}/points",
+            self._on_cloud, 10)
+
+    def _on_cloud(self, msg):
+        from sensor_msgs_py import point_cloud2 as pc2
+
+        pts = pc2.read_points(msg, field_names=("x", "y"), skip_nans=True)
+        x = pts["x"].astype(np.float64)
+        y = pts["y"].astype(np.float64)
+        r = np.hypot(x, y)
+        ok = r > self.RANGE_MIN * 0.5   # zero-range = invalid slot padding
+        if not ok.any():
+            return
+        r = r[ok]
+        bins = np.round((np.arctan2(y[ok], x[ok]) - self.ANGLE_MIN)
+                        / self.ANGLE_INC).astype(int)
+        good = (bins >= 0) & (bins < self.N_BINS)
+        bins, r = bins[good], r[good]
+        t = msg.header.stamp.sec + msg.header.stamp.nanosec * 1e-9
+        self._ranges[bins] = r
+        self._updated[bins] = t
+
+        out = self._ranges.copy()
+        out[self._updated < t - self.STALE_SWEEPS * self.SCAN_PERIOD] = np.inf
+        scan = self._LaserScan()
+        scan.header.stamp = msg.header.stamp
+        scan.header.frame_id = self._frame
+        scan.angle_min = self.ANGLE_MIN
+        scan.angle_max = self.ANGLE_MIN + self.ANGLE_INC * (self.N_BINS - 1)
+        scan.angle_increment = self.ANGLE_INC
+        scan.scan_time = self.SCAN_PERIOD
+        scan.time_increment = 0.0
+        scan.range_min = self.RANGE_MIN
+        scan.range_max = self.RANGE_MAX
+        scan.ranges = out.tolist()
+        self._pub.publish(scan)
 
 
 class RosIO:
@@ -74,6 +147,11 @@ class RosIO:
 
         self._msgs = dict(Odometry=Odometry, PoseStamped=PoseStamped,
                           Clock=Clock)
+        # contract LaserScan assembled from the bridge's point clouds
+        # (see LidarScanAssembler for why the bridge's own laser_scan
+        # output cannot be used)
+        self._scan_assemblers = [LidarScanAssembler(self.node, i)
+                                 for i in (0, 1)]
         self._publish_base_link_shim()
 
     # ---- subscriptions -----------------------------------------------------

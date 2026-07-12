@@ -34,11 +34,22 @@ slam_toolbox:
     # General Parameters
     use_scan_matching: true
     use_scan_barycenter: true
+    # Every-scan ingestion (0.0/0.0 + minimum_time_interval 0.2) measured
+    # BEST on the closed-loop probe (tools/isaac/slam_quality_probe.py):
+    # node density keeps the graph rigid and re-localizes at rest (loop
+    # error 0.010 m, map IoU 0.74). Travel gating measured strictly worse
+    # against the fixed sensor: 0.2 m/10 deg thins the map (IoU 0.37) and
+    # lets the at-rest estimate go stale (loop error 0.31 m); 0.1 m/5 deg
+    # left chains weak enough that one bad loop closure snapped the graph
+    # 7.4 m mid-run.
     minimum_travel_distance: 0.0
     minimum_travel_heading: 0.0
     scan_buffer_size: 10
     scan_buffer_maximum_scan_distance: 10.0
-    link_match_minimum_response_fine: 0.1
+    # Stock default 0.8 (gz-era 0.1 accepted noise links). Measured on
+    # identical seeded runs vs 0.1: map IoU 0.70 -> 0.74, wall precision
+    # 0.74 -> 0.78, loop error 0.012 -> 0.010 m — small but consistent.
+    link_match_minimum_response_fine: 0.8
     link_scan_maximum_distance: 1.5
     loop_search_maximum_distance: 3.0
     do_loop_closing: true
