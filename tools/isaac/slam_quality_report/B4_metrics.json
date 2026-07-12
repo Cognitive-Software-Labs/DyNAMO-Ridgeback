@@ -1,0 +1,58 @@
+{
+  "tag": "B4",
+  "waypoints": [
+    [
+      9.0,
+      0.0
+    ],
+    [
+      11.8,
+      0.0
+    ],
+    [
+      11.8,
+      3.3
+    ],
+    [
+      9.0,
+      3.4
+    ],
+    [
+      11.8,
+      3.3
+    ],
+    [
+      11.8,
+      0.0
+    ],
+    [
+      2.0,
+      0.0
+    ],
+    [
+      0.0,
+      0.0
+    ]
+  ],
+  "wz_max": 0.4,
+  "vx_max": 0.35,
+  "aborted": false,
+  "abort_reason": "",
+  "drive_duration_s": 145.5,
+  "n_pose_samples": 1309,
+  "pose_rmse_m": 0.4981,
+  "pose_max_m": 1.1998,
+  "loop_error_mean_m": 0.01,
+  "loop_error_max_m": 0.0387,
+  "map_iou": 0.7368,
+  "wall_precision": 0.7815,
+  "wall_recall": 0.9724,
+  "slam_occupied_cells": 9047,
+  "gt_occupied_cells_observed": 5473,
+  "observed_cells": 94658,
+  "closure_log_available": true,
+  "closures_accepted": 0,
+  "closures_rejected": 0,
+  "tf_correction_events": 217,
+  "tf_max_jump_m": 1.2245
+}

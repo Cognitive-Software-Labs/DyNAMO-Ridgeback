@@ -344,3 +344,33 @@ to decouple presentation from stepping (`isaac_runner.py`, SimulationApp
 **If it recurs**: check which X display you are on (`:0` = Xvnc remote,
 `:1`/`:2` = physical lightdm seats) and confirm the window actually
 opened on yours; then fall back to headless + RViz, which always works.
+
+## Isaac RTX Lidar: Rotation-Smeared SLAM Maps + Half-Blind FOV (6.0.1)
+
+Symptoms: straight driving maps crisp, any rotation smears/destroys the
+slam map; separately, the published scan covered only the robot's right
+side (azimuths -135..0 deg).
+
+Two distinct Isaac 6.0.1 sensor-pipeline bugs, both measured and fixed on
+`feat/isaac-sim-6-port` (commits 66493670, e1862498):
+
+1. The bridge's laser_scan writer hardcodes a 360-deg FOV for ROTARY
+   lidars (ignores validStart/EndAzimuthDeg) — the UST-10LX's 270-deg arc
+   gets stretched across 360 deg of bin labels, so scan content rotates
+   4/3x the robot yaw. Fix: publish `point_cloud` from the bridge and bin
+   it into the contract LaserScan in `ros_io.LidarScanAssembler`.
+2. The generic rotary model fires only a 180-deg drum transit per tick
+   from `startAzimuthOffsetDeg`, so one prim can never cover 270 deg
+   (rotating the prim rotates the window AND the frame — it repositions
+   the blindness, never widens it). Fix: two OmniLidar prims per laser
+   frame (offset 0 = right half, offset -135 = left half); the assembler
+   merges both clouds and publishes once per matched stamp pair.
+
+Also: the runner's rclpy spin processed one callback per render frame —
+four ~28 Hz cloud streams backlogged it and the scan collapsed to ~3 Hz;
+`ros_io.spin_once` now drains the ready queue each frame.
+
+Full dossier with measurements, run matrix, overlay images, and the
+regression tooling: `tools/isaac/SLAM_QUALITY_REPORT.md`. Sensor
+regression check: `tools/isaac/scan_geometry_check.py` (assert per-sector
+coverage, not just geometric fit — the FOV bug hid behind passing fits).
