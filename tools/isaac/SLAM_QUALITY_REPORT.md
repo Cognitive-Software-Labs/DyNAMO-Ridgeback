@@ -42,15 +42,19 @@ into bin labels spanning 360°:
 - scan content rotated **4/3× the robot yaw** (spin cross-correlation test),
   with the label window sliding with heading;
 - self-consistent under straight driving → crisp maps;
-- poison under any rotation → the observed smear/starburst
-  ([`A_overlay.png`](slam_quality_report/A_overlay.png) — baseline probe run,
-  slam estimate collapsed near the origin while the robot drove the loop).
+- poison under any rotation → the observed smear/starburst (baseline
+  probe run below: slam estimate collapsed near the origin while the
+  robot drove the loop; GT walls blue, GT trajectory green, slam red).
+
+![Run A: baseline on the broken sensor — starburst map, estimate stuck near origin](slam_quality_report/A_overlay.png)
 
 **Exoneration matrix** (broken sensor): baseline (A), travel-gated params
-(B), zero odometry noise (C) all failed identically — RMSE 7–8 m, IoU ~0.1
-([`B_overlay.png`](slam_quality_report/B_overlay.png),
-[`C_overlay.png`](slam_quality_report/C_overlay.png)). Neither the slam
-params nor odom noise was the cause.
+(B), zero odometry noise (C) all failed identically — RMSE 7–8 m, IoU ~0.1.
+Neither the slam params nor odom noise was the cause.
+
+![Run B: travel-gated slam params on the broken sensor — still destroyed](slam_quality_report/B_overlay.png)
+
+![Run C: zero odometry noise on the broken sensor — still destroyed](slam_quality_report/C_overlay.png)
 
 **Fix (`66493670`)**: the bridge publishes the lidar's `point_cloud` output
 (Cartesian returns, verified sensor-frame correct to ~2.6 cm against the
@@ -61,9 +65,11 @@ was tried and rejected — a 1081-emitter pattern returns nothing.
 ## Bug 2 — rotary model fires only a 180° drum transit per tick
 
 Caught by the user eyeballing rviz: *the robot never saw anything on its
-left*. The published scan covered azimuths [−135°, 0°] only —
-[`fov_proof.png`](slam_quality_report/fov_proof.png) shows the configured
-270° arc (green) vs the measured rays (red): 522 right, 0 left.
+left*. The published scan covered azimuths [−135°, 0°] only — the drawing
+below shows the configured 270° arc (green) vs the measured rays (red):
+522 right, 0 left.
+
+![FOV proof: configured 270° arc (green) vs measured returns (red) — left half empty](slam_quality_report/fov_proof.png)
 
 Measured mechanism (offset experiments, all on fresh single-sim boots):
 
@@ -90,8 +96,11 @@ half). Both fire on the same tick and stamp identically;
 `LidarScanAssembler` merges both clouds and publishes **once per completed
 stamp pair**, so a scan never mixes two capture instants (mixed-freshness
 halves measurably warped the map: IoU 0.48 vs 0.54, loop error 0.33 m vs
-0.07 m — [`B5_overlay.png`](slam_quality_report/B5_overlay.png) vs
-[`B6_overlay.png`](slam_quality_report/B6_overlay.png)).
+0.07 m):
+
+![Run B5: full FOV but seamed scans — whole map slightly offset from GT](slam_quality_report/B5_overlay.png)
+
+![Run B6: pair-consistent scans — ship state](slam_quality_report/B6_overlay.png)
 
 ## Bug 3 — runner processed one ROS callback per render frame
 
@@ -110,13 +119,17 @@ Same seeded closed-loop drive, fixed sensor, one variable at a time:
 |---|---|---|---|---|---|
 | A2 | gz-era (0.0/0.0 travel, link 0.1) | 0.52 | 0.012 | 0.70 | jerky graph (204 corrections, 1.2 m max jump) |
 | B2 | 0.2 m/10° gating, link 0.8 | 0.25 | 0.31 | 0.37 | map thins, at-rest estimate goes stale |
-| B3 | 0.1 m/5° gating, link 0.8 | 3.10 | 6.59 | 0.24 | one bad closure snapped the graph 7.4 m ([`B3_overlay.png`](slam_quality_report/B3_overlay.png)) |
-| B4 | 0.0/0.0, link 0.8 | 0.50 | 0.010 | 0.74 | best of the half-blind era ([`B4_overlay.png`](slam_quality_report/B4_overlay.png)) |
+| B3 | 0.1 m/5° gating, link 0.8 | 3.10 | 6.59 | 0.24 | one bad closure snapped the graph 7.4 m (below) |
+| B4 | 0.0/0.0, link 0.8 | 0.50 | 0.010 | 0.74 | best of the half-blind era (below) |
 
 Conclusions: **every-scan ingestion wins** (node density keeps the graph
 rigid and re-localizes at rest); travel gating is strictly worse here;
 `link_match_minimum_response_fine: 0.8` (stock) gives small consistent
 gains. Shipped config = gz-era gating + link 0.8 only.
+
+![Run B3: right half tracked cleanly, then one bad loop closure folded the graph 7.4 m](slam_quality_report/B3_overlay.png)
+
+![Run B4: best half-blind-era map — note the west-end trajectory excursion](slam_quality_report/B4_overlay.png)
 
 Note B4's IoU (0.74) exceeding B6's (0.54) is an artifact: the half-blind
 sensor observed a much smaller region, concentrated where geometry was
@@ -133,9 +146,24 @@ crisp. B6 is the honest sensor.
 | wall recall | 0.82 | 0.87 |
 | max map→odom jump | 0.25 m | — |
 
-Full-loop overlay: [`WINDOWED3_overlay.png`](slam_quality_report/WINDOWED3_overlay.png).
-Analytic GT grid: [`gt_hospital.png`](slam_quality_report/gt_hospital.png).
-All runs' metrics JSONs sit beside the images.
+Final windowed full-loop overlay (map black, GT walls blue, GT trajectory
+green, slam estimate red, waypoints orange):
+
+![WINDOWED3: final full-loop run on the fixed sensor — RMSE 0.195 m](slam_quality_report/WINDOWED3_overlay.png)
+
+The analytic ground-truth grid the metrics score against (rasterized from
+the SDF at the lidar plane z=0.418; orange = G1 ignore mask):
+
+![Analytic GT occupancy grid from mock_hospital.sdf](slam_quality_report/gt_hospital.png)
+
+A live-scan world-frame debug plot from the bug-1 era (points landing on
+walls that should be occluded — the angular warp made wrong geometry look
+locally plausible):
+
+![Scan debug plot during bug 1: warped angular mapping](slam_quality_report/scan_debug.png)
+
+All runs' metrics JSONs sit beside the images in
+[`slam_quality_report/`](slam_quality_report/).
 
 Known residuals (accepted, documented):
 - transient pose error ~0.2 m during long corridor legs — longitudinal
