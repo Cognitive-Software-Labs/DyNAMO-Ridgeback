@@ -74,6 +74,12 @@ install(PROGRAMS
 )
 
 install(PROGRAMS
+  ridgeback_autonomy/perception/aligned_depth_node.py
+  DESTINATION lib/${PROJECT_NAME}
+  RENAME aligned_depth_node
+)
+
+install(PROGRAMS
   ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py
   DESTINATION lib/${PROJECT_NAME}
   RENAME g1_distance_benchmark_runner
@@ -127,6 +133,7 @@ install(DIRECTORY
 if(BUILD_TESTING)
   find_package(ament_cmake_pytest REQUIRED)
 
+  ament_add_pytest_test(test_aligned_depth_node test/test_aligned_depth_node.py)
   ament_add_pytest_test(test_detection test/test_detection.py)
   ament_add_pytest_test(test_geometry test/test_geometry.py)
   ament_add_pytest_test(test_image_utils test/test_image_utils.py)

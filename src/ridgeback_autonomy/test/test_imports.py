@@ -22,6 +22,7 @@ def test_packaged_modules_import() -> None:
         'ridgeback_autonomy.benchmarking.reduction',
         'ridgeback_autonomy.benchmarking.rendering',
         'ridgeback_autonomy.benchmarking.summary',
+        'ridgeback_autonomy.perception.aligned_depth_node',
         'ridgeback_autonomy.perception.g1_detector_node',
         'ridgeback_autonomy.perception.g1_camera_measurement_node',
         'ridgeback_autonomy.perception.g1_lidar_measurement_node',
