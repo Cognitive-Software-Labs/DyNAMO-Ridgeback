@@ -124,6 +124,12 @@ A rectangular mask is:
 - bound to the color frame's grid (resolution, intrinsics, timestamp),
 - and carrying a known background contamination that the tag advertises.
 
+The boolean array is an **in-process representation, not a wire format**: the
+whole perception stack (mask component + Paths A/B/C) runs on one machine, so
+consumers receive the mask by in-process handoff, never over the network. If a
+mask is ever published as a topic, that topic is debug/visualization only and
+uses an encoded form — see the wire-cost note in Section 5.3.
+
 ---
 
 ## 4. Tight mask (deferred)
@@ -192,12 +198,27 @@ There is an important distinction in **where the displayed mask comes from**:
   would *recompute* the rectangular mask from the detection box(es) at draw
   time (union of boxes, rasterized). This is cheap and needs no new topic or
   node, but it means the overlay is displaying a *locally reconstructed* mask,
-  not the actual artifact any path consumes.
+  not the actual artifact any path consumes. Note the union is **display-only**:
+  localization always uses one mask per detection (Section 6.1) and never
+  consumes the union — merging masks would destroy per-object coordinates.
 - **Target (display the real artifact):** once the mask component publishes a
   real mask (the `H×W` boolean array plus its `tight | rect` tag), the panel
   should consume that instead. Then the view shows exactly what downstream
   receives, and it renders `tight` and `rect` masks identically with no
   panel-side changes.
+
+**Wire cost of the target.** A naive published mask (1 byte per pixel) is
+`1280 × 720 ≈ 0.9 MB` — at 30 fps that is ~28 MB/s for a single mask, times the
+detection count. The convention that keeps this harmless:
+
+- **Consumers never take the mask off the wire.** The whole perception stack
+  runs on one machine (robot PC or workstation — never split across both), so
+  Paths A/B/C receive the boolean array by in-process handoff at zero wire
+  cost.
+- **The published topic is debug/visualization only**, and goes out encoded:
+  `mono8` Image with compressed transport (PNG). Binary masks compress to a few
+  kB — two to three orders of magnitude under the naive figure — at negligible
+  CPU cost.
 
 ### 5.4 Cost
 
@@ -217,6 +238,37 @@ interface carries a *list* of masks, not a single mask.
 - `count = 0` — nothing detected, no masks.
 - `count = 1` — one mask (the common single-target case, e.g. the benchmark).
 - `count = N` — N independent masks carried together.
+
+### 6.1 The hierarchy: one object → one detection → one mask
+
+The relationship is strictly **1:1:1** per frame:
+
+```
+frame
+ └─ count detections        (post-NMS: one box per visible object)
+     └─ 1 mask each          (rasterized from that one detection's box)
+         └─ 1 result each    (one coordinate per mask, per path)
+```
+
+Two G1s in view means `count = 2`, two masks, two coordinates. There is **no**
+"N detections per object" layer: the raw detector head does propose many
+candidate boxes per object, but confidence thresholding and non-maximum
+suppression collapse them *inside the detector front-end*, before anything is
+published. Everything downstream of the detector — the messages, the masks,
+the paths — sees only post-NMS detections.
+
+Consequences worth pinning:
+
+- A mask is "the pixel set of one detection's box," **not** "all pixels
+  belonging to one object across several detections." No consolidation step
+  exists or is needed.
+- If NMS ever under-suppresses (two surviving boxes on the same G1), the
+  pipeline honestly reports two objects with two coordinates. De-duplicating
+  that is an association problem for the fusion stage, not for the mask
+  component or the paths.
+- The hierarchy is **per frame** — nothing persists across frames. The same G1
+  in consecutive frames yields a fresh detection, mask, and coordinate each
+  time; temporal association (tracking) is a separate, later concern.
 
 Two properties follow, and both matter downstream:
 
@@ -250,5 +302,3 @@ by detection index `i` to recover each object's mask region and its result.
   from the box at render time (quick, throwaway) and consuming a real published
   mask (matches the interface, reusable by other consumers such as the benchmark
   collage). See Section 5.3.
-</content>
-</invoke>

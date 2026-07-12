@@ -1,8 +1,8 @@
-# Object Localization Pipeline ? Handover
+# Object Localization Pipeline — Handover
 
-**Purpose:** Given a RealSense camera (and optionally a 2D 360° LiDAR), detect objects of a target class in the RGB image and report each object's coordinates **relative to the camera frame**. The system is designed as a set of swappable components so that every combination of detector, depth source, and downstream path can be benchmarked for accuracy vs. compute.
+**Purpose:** Given a RealSense camera (and optionally a planar 2D LiDAR), detect objects of a target class in the RGB image and report each object's coordinates **relative to the camera frame**. The system is designed as a set of swappable components so that every combination of detector, depth source, and downstream path can be benchmarked for accuracy vs. compute.
 
-**Output contract:** Every path terminates at a single representation ? `(X, Y, Z)` in the camera frame (the LiDAR path yields `(X, Z)` only; see Path C). This shared output makes the paths directly comparable and fusible.
+**Output contract:** Every path terminates at a single representation — `(X, Y, Z)` in the camera frame (the LiDAR path yields `(X, Z)` only; see Path C). This shared output makes the paths directly comparable and fusible.
 
 ---
 
@@ -88,7 +88,7 @@ flowchart TD
         SEG["Instance Segmentation<br/>(emits mask · model = impl detail)"] --> MASK_S["Binary Mask<br/>(tight)"]
     end
     subgraph DETCOMP["Detection Component"]
-        DET["Object Detection<br/>(open-vocab · e.g. OWLv2 · impl detail)"] --> RAST["Rasterize box ?<br/>rectangular mask"]
+        DET["Object Detection<br/>(open-vocab · e.g. OWLv2 · impl detail)"] --> RAST["Rasterize box →<br/>rectangular mask"]
         RAST --> MASK_B["Binary Mask<br/>(rectangle)"]
     end
     RGB --> SEG
@@ -99,7 +99,7 @@ flowchart TD
 
     RGB --> DA["Depth Anything<br/>(monocular)"]
     STEREO["RealSense Stereo Depth"] --> RAW["Raw Depth Frame<br/>(left IR reference)"]
-    RAW --> ALIGN["Align Depth ? RGB"]
+    RAW --> ALIGN["Align Depth → RGB"]
     RGB -.calibration.-> ALIGN
     ALIGN --> ALIGNED["Aligned Depth<br/>(1:1 with RGB)"]
     DA --> SCALE["Metric Scaling"]
@@ -110,9 +110,8 @@ flowchart TD
     EXTRACT -->|tight| A_T["Direct robust median"]
     EXTRACT -->|rect| A_R["Foreground isolation<br/>(nearest depth mode)"]
     A_R --> A_R2["Median of foreground"]
-    A_T --> A_COORD["Deproject (u,v,Z)<br/>centroid pixel + agg. depth<br/>? camera frame"]
+    A_T --> A_COORD["Deproject (u,v,Z)<br/>foreground centroid + agg. depth<br/>→ camera frame"]
     A_R2 --> A_COORD
-    IFACE -.centroid pixel.-> A_COORD
 
     ALIGNED -->|"Path B · 3D"| DEPROJ["Deproject to 3D"]
     DEPROJ --> CLOUD["Organized Point Cloud<br/>(camera optical frame)"]
@@ -122,18 +121,18 @@ flowchart TD
     SELECT -->|rect| B_R1["RANSAC plane removal"]
     B_R1 --> B_R2["Euclidean clustering"]
     B_R2 --> B_R3["Cluster selection<br/>(nearest / central / largest)"]
-    B_T --> B_COORD["Centroid (X,Y,Z)<br/>? camera frame"]
+    B_T --> B_COORD["Centroid (X,Y,Z)<br/>→ camera frame"]
     B_R3 --> B_COORD
 
-    LIDAR["2D LiDAR Scan<br/>(360°, single plane)"] --> L_XY["Polar ? Cartesian"]
+    LIDAR["2D LiDAR Scan<br/>(270°, single plane)"] --> L_XY["Polar → Cartesian"]
     L_XY --> L_TF["Transform to Camera Frame<br/>(extrinsics)"]
     L_TF --> L_PROJ["Project into Image Plane<br/>(intrinsics)"]
-    L_PROJ --> L_SEL["Keep points in mask<br/>(? FoV, shared)"]
+    L_PROJ --> L_SEL["Keep points in mask<br/>(∩ FoV, shared)"]
     IFACE --> L_SEL
     L_SEL -->|tight| C_T["Median range over arc"]
-    L_SEL -->|rect| C_R["Segment arc ?<br/>nearest contiguous run"]
+    L_SEL -->|rect| C_R["Segment arc →<br/>nearest contiguous run"]
     C_R --> C_R2["Median of run"]
-    C_T --> C_COORD["Range + bearing ? (X,Z)<br/>camera frame (Y unobserved)"]
+    C_T --> C_COORD["Range + bearing → (X,Z)<br/>camera frame (Y unobserved)"]
     C_R2 --> C_COORD
 
     A_COORD --> FINAL["Object Coordinates<br/>relative to Camera Frame<br/>(X, Y, Z) · Path C: X,Z only"]
@@ -147,12 +146,12 @@ flowchart TD
 
 Two detector components run off the RGB frame. They are kept structurally separate (different models, different compute profiles, independently versioned and benchmarked) but are unified behind a **common data contract**.
 
-- **Segmentation component** ? emits a pixel-precise (*tight*) binary mask.
-- **Detection component** ? emits a bounding box, then **rasterizes the box into a rectangular binary mask**. The detector model is an implementation detail (an open-vocabulary detector such as OWLv2 is the current intent; nothing downstream depends on the choice).
+- **Segmentation component** — emits a pixel-precise (*tight*) binary mask.
+- **Detection component** — emits a bounding box, then **rasterizes the box into a rectangular binary mask**. The detector model is an implementation detail (an open-vocabulary detector such as OWLv2 is the current intent; nothing downstream depends on the choice).
 
 Both emit into the **Mask Interface**: an `H×W` binary mask plus a **precision tag** (`tight` | `rect`). Everything downstream reads only this interface and never branches on which model produced the mask. Adding a third front-end later (e.g. a promptable segmenter like SAM) means another component emitting into the same node, with zero downstream changes.
 
-> **Design note:** the rasterize step is a deliberate, lossy adapter ? it discards shape to conform to the interface. The rectangular mask is *not* a real segmentation; it carries a known background contamination. Mark this clearly at the code boundary so it is never mistaken for a tight mask.
+> **Design note:** the rasterize step is a deliberate, lossy adapter — it discards shape to conform to the interface. The rectangular mask is *not* a real segmentation; it carries a known background contamination. Mark this clearly at the code boundary so it is never mistaken for a tight mask.
 
 ---
 
@@ -160,8 +159,8 @@ Both emit into the **Mask Interface**: an `H×W` binary mask plus a **precision 
 
 Two interchangeable sources produce an **aligned depth frame** that is 1:1 with the RGB pixels:
 
-- **RealSense stereo depth** ? the raw depth lives in the left-IR frame, so it must pass through an **alignment** step (using the calibrated intrinsics + extrinsics) to reproject it onto the RGB pixel grid. After alignment, depth pixel `(u, v)` corresponds to color pixel `(u, v)`.
-- **Depth Anything (monocular)** ? estimated directly from the RGB frame, so it is *already* pixel-aligned (no alignment step). However it outputs **affine-invariant / relative** depth, so it needs a **metric scaling** step to become meters. If RealSense depth is available, it is the natural ground-truth reference for that scaling.
+- **RealSense stereo depth** — the raw depth lives in the left-IR frame, so it must pass through an **alignment** step (using the calibrated intrinsics + extrinsics) to reproject it onto the RGB pixel grid. After alignment, depth pixel `(u, v)` corresponds to color pixel `(u, v)`.
+- **Depth Anything (monocular)** — estimated directly from the RGB frame, so it is *already* pixel-aligned (no alignment step). However it outputs **affine-invariant / relative** depth, so it needs a **metric scaling** step to become meters. If RealSense depth is available, it is the natural ground-truth reference for that scaling.
 
 Both converge to the same `Aligned Depth` node that feeds Paths A and B.
 
@@ -175,30 +174,32 @@ Both converge to the same `Aligned Depth` node that feeds Paths A and B.
 
 All three paths consume the same mask interface and resolve to camera-frame coordinates. They differ in what 3D information they recover and in cost.
 
-### Path A ? 2D depth-image route (cheapest)
-Extract depth values at the masked pixels, aggregate to a single distance, then deproject the representative pixel (mask centroid) + aggregated depth through the intrinsics to a 3D point.
+### Path A — 2D depth-image route (cheapest)
+Extract depth values at the masked pixels, aggregate to a single distance, then deproject the representative pixel (centroid of the foreground pixels — `depth_based_A.md` §2.4) + aggregated depth through the intrinsics to a 3D point.
 
 - **tight branch:** direct robust median of the masked depths.
-- **rect branch:** the masked depths are multimodal (object + background), so a plain median can land on background. Isolate the foreground first (histogram ? nearest dominant depth mode, or center-weight the box), *then* median.
+- **rect branch:** the masked depths are multimodal (object + background), so a plain median can land on background. Isolate the foreground first (histogram → nearest dominant depth mode, or center-weight the box), *then* median.
 - **Output:** `(X, Y, Z)` from a single representative pixel.
 
-> Path A's coordinate is only as good as that one representative pixel. If the centroid lands on a depth discontinuity (object edge vs. far background) the depth can be wrong even when the aggregate range was fine. Use the centroid of *valid* depth within the mask rather than the raw geometric centroid.
+> Path A's coordinate is only as good as that one representative pixel. If the centroid lands on a depth discontinuity (object edge vs. far background) the depth can be wrong even when the aggregate range was fine. The representative pixel must be the centroid of the *foreground* pixels — the isolation output on the `rect` branch, all valid masked pixels on the `tight` branch — never the raw geometric box center (`depth_based_A.md` §2.4). Both the aggregate and the centroid read the same foreground set, so they agree by construction.
 
-### Path B ? 3D point cloud route (richest, heaviest)
+### Path B — 3D point cloud route (richest, heaviest)
 Deproject the aligned depth into an **organized** point cloud (points keep pixel ordering, so the 2D mask indexes them directly), select the instance's points, clean up, and take the centroid.
 
-- **tight branch:** outlier removal ? centroid.
-- **rect branch:** the box drags in the ground plane and neighbors, so: **RANSAC plane removal** ? **Euclidean clustering** ? **cluster selection** (nearest / most central / largest-after-plane). The tight mask never has to choose a cluster; the rectangular mask does.
+- **tight branch:** outlier removal → centroid.
+- **rect branch:** the box drags in the ground plane and neighbors, so: **RANSAC plane removal** → **Euclidean clustering** → **cluster selection** (nearest / most central / largest-after-plane). The tight mask never has to choose a cluster; the rectangular mask does.
 - **Output:** centroid `(X, Y, Z)` plus, if wanted, oriented bounding box and physical dimensions.
 
-### Path C ? 2D 360° LiDAR route (accurate, planar only)
-Independent sensor stream; rejoins the pipeline only at the mask. Convert the scan to Cartesian, transform into the camera frame via **extrinsic calibration**, project into the image plane with the intrinsics, then keep only the points falling inside the mask ? camera FoV.
+### Path C — 2D 270° LiDAR route (accurate, planar only)
+Independent sensor stream; rejoins the pipeline only at the mask. Convert the scan to Cartesian, transform into the camera frame via **extrinsic calibration**, project into the image plane with the intrinsics, then keep only the points falling inside the mask ∩ camera FoV.
 
-- **tight branch:** median range over the resulting arc.
-- **rect branch:** the wider box widens the bearing window and admits neighbors, so **segment the 1D range profile and pick the nearest contiguous run**, then median that run.
+- **tight branch:** segment the 1D range profile, **merge the runs lying within a small range band of the nearest run**, and median the merged set — same recovery as the rect branch, only over a narrower bearing window. A plain median over the arc is unsafe even with a tight mask: parallax lets background points into the arc (see the callout below).
+- **rect branch:** the wider box widens the bearing window and admits neighbors, so segment the 1D range profile, merge the runs within the range band of the nearest, and median the merged set.
 - **Output:** `(X, Z)` in the camera frame. **Y (height) is unobservable** from a single-plane LiDAR.
 
-> Path C only returns points where the scan plane physically intersects the object at the LiDAR's height. A valid mask can yield zero LiDAR points if the plane passes above/below the object ? the system needs a fallback to Path A/B in that case.
+> Path C only returns points where the scan plane physically intersects the object at the LiDAR's height. A valid mask can yield zero LiDAR points if the plane passes above/below the object → the system needs a fallback to Path A/B in that case.
+>
+> **Parallax contamination — why even the tight branch segments:** the mask is defined from the camera's viewpoint, but the LiDAR samples from a different position. Background points the camera cannot see — occluded behind the object, or visible through gaps in it (between the G1's legs at scan height) — still project inside the mask and enter the arc carrying background ranges. Mask membership only certifies that the *camera's* ray hits the object; it says nothing about a LiDAR point further along that ray. The zero-point fallback does not catch this (points exist, they are just wrong); segmenting the range profile and keeping only the near runs drops them. **Convention (pinned):** runs lying within a small range band of the nearest run are merged before the median. On a legged object the nearest run alone would be one leg (range = leg face, offset from body center); merging the band averages both legs.
 
 ---
 
@@ -208,15 +209,15 @@ The common interface unifies the **selection** mechanic (indexing depth / points
 
 | Path | tight branch | rect branch (extra work) |
 |------|--------------|--------------------------|
-| A (2D depth) | robust median | foreground isolation (depth-mode/center) ? median |
-| B (point cloud) | outlier removal | RANSAC plane removal ? clustering ? cluster selection |
-| C (LiDAR) | median range | arc segmentation ? nearest run ? median |
+| A (2D depth) | robust median | foreground isolation (depth-mode/center) → median |
+| B (point cloud) | outlier removal | RANSAC plane removal → clustering → cluster selection |
+| C (LiDAR) | arc segmentation → merge near-band runs → median (narrow window) | arc segmentation → merge near-band runs → median (wide window admits neighbors) |
 
-Selection stays shared; the fork sits exactly where behavior genuinely diverges. The practical consequence: choosing the cheap box detector also switches you onto the heavier recovery branch downstream ? most punishing in Path B (plane + clustering), nearly free in Path A.
+Selection stays shared; the fork sits exactly where behavior genuinely diverges. Path C is the exception: parallax contaminates even the tight mask (see the Path C callout), so its branches run the same recovery and differ only in bearing-window width. The practical consequence: choosing the cheap box detector also switches you onto the heavier recovery branch downstream — most punishing in Path B (plane + clustering), nearly free in Path A.
 
 ---
 
-## 7. Coordinate frame convention ? **TO PIN DOWN**
+## 7. Coordinate frame convention — **TO PIN DOWN**
 
 All paths agree to emit into one camera frame, but the exact convention must be fixed before integration. Proposed default (RealSense / OpenCV optical convention, to be confirmed):
 
@@ -232,13 +233,13 @@ Path C must be expressed in this same frame after the extrinsic transform, with 
 
 The design intent is to evaluate every combination on two axes: **accuracy** (vs. ground-truth coordinates) and **latency / compute**.
 
-- **Detectors (2):** segmentation (tight) · detection?rect
+- **Detectors (2):** segmentation (tight) · detection→rect
 - **Depth sources (2):** RealSense stereo · Depth Anything (Paths A/B); LiDAR is its own source for Path C
 - **Paths (3):** A (2D depth) · B (point cloud) · C (LiDAR)
 
 Working hypotheses to validate:
 
-- **Box + Path B** may approach mask + Path B in accuracy because the 3D clustering recovers what the mask would have given for free ? but it spends the detector savings back on plane removal + clustering, so the "box is cheaper" intuition can partly invert here.
+- **Box + Path B** may approach mask + Path B in accuracy because the 3D clustering recovers what the mask would have given for free — but it spends the detector savings back on plane removal + clustering, so the "box is cheaper" intuition can partly invert here.
 - **Box + Path A** is where the box stays genuinely cheap end-to-end.
 - **Path C** is the most accurate within its plane but only 2D; best as a high-accuracy range cross-check or fallback, not a standalone 3D source.
 
@@ -252,21 +253,21 @@ Because every path emits in the same frame and at least `(X, Z)`, the outputs ar
 
 ## 10. Open items / TODO
 
-1. **Pin the camera-frame convention** (Section 7) ? axes, handedness, units ? against SDK + robot TF.
-2. **Calibration procedures:** RealSense intrinsics/extrinsics are factory-calibrated; the **camera?LiDAR extrinsic** must be calibrated and documented. Define the procedure and store the transform.
-3. **Time synchronization** between camera and LiDAR ? without matched timestamps, a moving platform/object smears the LiDAR projection against the mask.
-4. **Fallback logic** for Path C empty returns (scan plane misses object) ? route to A/B.
-5. **Metric-scaling strategy** for Depth Anything ? metric-trained variant vs. calibrate against stereo.
-6. **Build the benchmark scaffold** ? enumerate the matrix rows, columns for accuracy + latency, drop in measured numbers.
+1. **Pin the camera-frame convention** (Section 7) — axes, handedness, units — against SDK + robot TF.
+2. **Calibration procedures:** RealSense intrinsics/extrinsics are factory-calibrated; the **camera–LiDAR extrinsic** must be calibrated and documented. Define the procedure and store the transform.
+3. **Time synchronization** between camera and LiDAR — without matched timestamps, a moving platform/object smears the LiDAR projection against the mask.
+4. **Fallback logic** for Path C empty returns (scan plane misses object) → route to A/B.
+5. **Metric-scaling strategy** for Depth Anything — metric-trained variant vs. calibrate against stereo.
+6. **Build the benchmark scaffold** — enumerate the matrix rows, columns for accuracy + latency, drop in measured numbers.
 7. **Define the component interface signatures** in code (the mask-interface contract, the per-path recovery dispatch) so the separation is enforced, not just diagrammed.
 
 ---
 
 ## Glossary
 
-- **Tight mask** ? pixel-precise segmentation mask.
-- **Rect mask** ? rasterized bounding box (rectangular, contains background).
-- **Organized point cloud** ? cloud whose points retain image row/column ordering, so a 2D mask indexes it directly.
-- **Affine-invariant depth** ? relative depth defined up to an unknown scale and offset (monocular estimators); needs metric scaling.
-- **Extrinsics** ? rigid transform (rotation + translation) between two sensors' frames.
-- **Intrinsics** ? a sensor's internal projection parameters (focal lengths, principal point, distortion).
+- **Tight mask** — pixel-precise segmentation mask.
+- **Rect mask** — rasterized bounding box (rectangular, contains background).
+- **Organized point cloud** — cloud whose points retain image row/column ordering, so a 2D mask indexes it directly.
+- **Affine-invariant depth** — relative depth defined up to an unknown scale and offset (monocular estimators); needs metric scaling.
+- **Extrinsics** — rigid transform (rotation + translation) between two sensors' frames.
+- **Intrinsics** — a sensor's internal projection parameters (focal lengths, principal point, distortion).
