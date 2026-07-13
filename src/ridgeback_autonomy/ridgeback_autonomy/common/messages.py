@@ -39,6 +39,12 @@ def build_measurements_message(batch: DetectionBatch, header) -> G1Measurements:
         msg.lidar_lateral_m.append(optional_float(detection.lidar_lateral_m))
         msg.lidar_forward_m.append(optional_float(detection.lidar_forward_m))
         msg.lidar_distance_m.append(optional_float(detection.lidar_distance_m))
+        msg.path_a_lateral_m.append(optional_float(detection.path_a_lateral_m))
+        msg.path_a_forward_m.append(optional_float(detection.path_a_forward_m))
+        msg.path_a_distance_m.append(optional_float(detection.path_a_distance_m))
+        msg.path_b_lateral_m.append(optional_float(detection.path_b_lateral_m))
+        msg.path_b_forward_m.append(optional_float(detection.path_b_forward_m))
+        msg.path_b_distance_m.append(optional_float(detection.path_b_distance_m))
 
     return msg
 
@@ -75,6 +81,12 @@ def batch_from_measurements_message(msg: G1Measurements) -> DetectionBatch:
         detection.lidar_lateral_m = decode_optional_float(msg.lidar_lateral_m, index)
         detection.lidar_forward_m = decode_optional_float(msg.lidar_forward_m, index)
         detection.lidar_distance_m = decode_optional_float(msg.lidar_distance_m, index)
+        detection.path_a_lateral_m = decode_optional_float(msg.path_a_lateral_m, index)
+        detection.path_a_forward_m = decode_optional_float(msg.path_a_forward_m, index)
+        detection.path_a_distance_m = decode_optional_float(msg.path_a_distance_m, index)
+        detection.path_b_lateral_m = decode_optional_float(msg.path_b_lateral_m, index)
+        detection.path_b_forward_m = decode_optional_float(msg.path_b_forward_m, index)
+        detection.path_b_distance_m = decode_optional_float(msg.path_b_distance_m, index)
 
     return batch
 
@@ -110,6 +122,8 @@ def snapshot_measurements_message(msg: G1Measurements) -> dict[str, Any]:
         'mono_depth_distance_m': first_finite_positive(msg.mono_depth_distance_m),
         'lidar_distance_m': first_finite_positive(msg.lidar_distance_m),
         'pointcloud_distance_m': first_finite_positive(msg.pointcloud_distance_m),
+        'path_a_distance_m': first_finite_positive(msg.path_a_distance_m),
+        'path_b_distance_m': first_finite_positive(msg.path_b_distance_m),
     }
 
 

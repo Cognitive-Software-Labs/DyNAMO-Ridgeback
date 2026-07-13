@@ -25,9 +25,11 @@ from ridgeback_autonomy.msg import G1Measurements
 
 def test_parse_estimators_uses_canonical_order_and_depth_anything_name() -> None:
     assert parse_estimators('') == (
-        'rgb', 'sensor_depth', 'depth_anything', 'pointcloud', 'lidar'
+        'rgb', 'sensor_depth', 'depth_anything', 'pointcloud', 'lidar',
+        'path_a', 'path_b',
     )
     assert parse_estimators('pointcloud,rgb') == ('rgb', 'pointcloud')
+    assert parse_estimators('path_b,rgb,path_a') == ('rgb', 'path_a', 'path_b')
     with pytest.raises(ValueError, match='depth_anything'):
         parse_estimators('mono_depth')
 
@@ -74,6 +76,39 @@ def test_alignment_updates_public_depth_anything_value_from_message_field() -> N
     assert event.estimates['depth_anything'] == pytest.approx(3.8, rel=1e-6)
     assert event.estimates['pointcloud'] is None
     assert event.estimates['lidar'] == pytest.approx(3.9, rel=1e-6)
+
+
+def test_mask_source_message_merges_into_the_same_aligned_event() -> None:
+    def make_message() -> G1Measurements:
+        msg = G1Measurements()
+        msg.header.frame_id = 'camera'
+        msg.header.stamp.sec = 12
+        msg.header.stamp.nanosec = 34
+        msg.detected = True
+        msg.count = 1
+        msg.image_width = 640
+        msg.image_height = 480
+        msg.bbox_xyxy = [1.0, 2.0, 30.0, 40.0]
+        return msg
+
+    camera_msg = make_message()
+    camera_msg.rgb_distance_m = [4.5]
+    mask_msg = make_message()
+    mask_msg.path_a_distance_m = [4.1]
+    mask_msg.path_b_distance_m = [4.2]
+
+    events = {}
+    camera_event = ensure_measurement_event(events, camera_msg)
+    update_measurement_event(camera_event, camera_msg, {'rgb'})
+    mask_event = ensure_measurement_event(events, mask_msg)
+    update_measurement_event(mask_event, mask_msg, {'path_a', 'path_b'})
+
+    # Identical alignment key -> one merged event holding all three estimates.
+    assert len(events) == 1
+    assert mask_event is camera_event
+    assert camera_event.estimates['rgb'] == pytest.approx(4.5, rel=1e-6)
+    assert camera_event.estimates['path_a'] == pytest.approx(4.1, rel=1e-6)
+    assert camera_event.estimates['path_b'] == pytest.approx(4.2, rel=1e-6)
 
 
 def test_find_exact_preview_match_uses_only_exact_stamp() -> None:

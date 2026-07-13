@@ -7,6 +7,8 @@ PUBLIC_ESTIMATOR_ORDER = (
     'depth_anything',
     'pointcloud',
     'lidar',
+    'path_a',
+    'path_b',
 )
 
 IMAGE_BACKED_ESTIMATORS = frozenset({
@@ -18,6 +20,8 @@ IMAGE_BACKED_ESTIMATORS = frozenset({
 RGB_DEBUG_VIEW_ESTIMATORS = frozenset({
     'pointcloud',
     'lidar',
+    'path_a',
+    'path_b',
 })
 
 CAMERA_ESTIMATORS = frozenset({
@@ -29,12 +33,18 @@ CAMERA_ESTIMATORS = frozenset({
 
 LIDAR_ESTIMATORS = frozenset({'lidar'})
 
+# The mask-based localization rows (g1_mask_measurement_node): masks + the
+# aligned depth frame, independent of the legacy camera estimator stack.
+MASK_ESTIMATORS = frozenset({'path_a', 'path_b'})
+
 ESTIMATOR_FIELD_KEYS = {
     'rgb': 'rgb_distance_m',
     'sensor_depth': 'sensor_depth_distance_m',
     'depth_anything': 'mono_depth_distance_m',
     'pointcloud': 'pointcloud_distance_m',
     'lidar': 'lidar_distance_m',
+    'path_a': 'path_a_distance_m',
+    'path_b': 'path_b_distance_m',
 }
 
 ESTIMATOR_LABELS = {
@@ -43,6 +53,8 @@ ESTIMATOR_LABELS = {
     'depth_anything': 'Depth-Anything',
     'pointcloud': 'Point Cloud',
     'lidar': 'LiDAR',
+    'path_a': 'Path A (2D depth)',
+    'path_b': 'Path B (3D points)',
 }
 
 
@@ -81,9 +93,20 @@ def selected_camera_estimators(selected_estimators: tuple[str, ...]) -> tuple[st
     )
 
 
+def selected_mask_estimators(selected_estimators: tuple[str, ...]) -> tuple[str, ...]:
+    return tuple(
+        estimator for estimator in PUBLIC_ESTIMATOR_ORDER
+        if estimator in MASK_ESTIMATORS and estimator in selected_estimators
+    )
+
+
 def uses_camera_estimators(selected_estimators: tuple[str, ...]) -> bool:
     return any(estimator in CAMERA_ESTIMATORS for estimator in selected_estimators)
 
 
 def uses_lidar_estimators(selected_estimators: tuple[str, ...]) -> bool:
     return any(estimator in LIDAR_ESTIMATORS for estimator in selected_estimators)
+
+
+def uses_mask_estimators(selected_estimators: tuple[str, ...]) -> bool:
+    return any(estimator in MASK_ESTIMATORS for estimator in selected_estimators)

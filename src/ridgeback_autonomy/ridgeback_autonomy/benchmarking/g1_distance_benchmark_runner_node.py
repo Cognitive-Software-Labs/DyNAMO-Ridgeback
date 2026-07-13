@@ -29,8 +29,10 @@ from ridgeback_autonomy.benchmarking.estimators import (
     ESTIMATOR_LABELS,
     parse_estimators,
     selected_camera_estimators,
+    selected_mask_estimators,
     uses_camera_estimators,
     uses_lidar_estimators,
+    uses_mask_estimators,
 )
 from ridgeback_autonomy.benchmarking.reduction import (
     choose_representative_event,
@@ -66,6 +68,7 @@ DELETE_TIMEOUT_SEC = 15.0
 IMAGE_MATCH_TOLERANCE_NS = 250_000_000
 CAMERA_MEASUREMENT_TOPIC = 'measurements/g1/camera'
 LIDAR_MEASUREMENT_TOPIC = 'measurements/g1/lidar'
+MASK_MEASUREMENT_TOPIC = 'measurements/g1/mask'
 MONO_DEPTH_DEBUG_TOPIC = 'debug/g1/camera/mono_depth'
 DEPTH_MAX_METERS_DEFAULT = 10.0
 PREVIEW_BUFFER_LIMIT = 256
@@ -105,6 +108,7 @@ class G1DistanceBenchmarkRunner(Node):
         self.declare_parameter('estimators', 'rgb,sensor_depth,depth_anything,pointcloud,lidar')
         self.declare_parameter('camera_measurement_topic', CAMERA_MEASUREMENT_TOPIC)
         self.declare_parameter('lidar_measurement_topic', LIDAR_MEASUREMENT_TOPIC)
+        self.declare_parameter('mask_measurement_topic', MASK_MEASUREMENT_TOPIC)
         self.declare_parameter('color_topic', 'sensors/camera_0/color/image')
         self.declare_parameter('depth_topic', 'sensors/camera_0/depth/image')
         self.declare_parameter('mono_depth_debug_topic', MONO_DEPTH_DEBUG_TOPIC)
@@ -118,6 +122,7 @@ class G1DistanceBenchmarkRunner(Node):
         self.selected_estimators = parse_estimators(str(self.get_parameter('estimators').value))
         self.camera_measurement_topic = str(self.get_parameter('camera_measurement_topic').value)
         self.lidar_measurement_topic = str(self.get_parameter('lidar_measurement_topic').value)
+        self.mask_measurement_topic = str(self.get_parameter('mask_measurement_topic').value)
         self.color_topic = str(self.get_parameter('color_topic').value)
         self.depth_topic = str(self.get_parameter('depth_topic').value)
         self.mono_depth_debug_topic = str(self.get_parameter('mono_depth_debug_topic').value)
@@ -147,12 +152,15 @@ class G1DistanceBenchmarkRunner(Node):
 
         self.needs_camera = uses_camera_estimators(self.selected_estimators)
         self.needs_lidar = uses_lidar_estimators(self.selected_estimators)
+        self.needs_mask = uses_mask_estimators(self.selected_estimators)
         self.selected_camera_estimators = set(selected_camera_estimators(self.selected_estimators))
+        self.selected_mask_estimators = set(selected_mask_estimators(self.selected_estimators))
         self.needs_sensor_depth_preview = 'sensor_depth' in self.selected_estimators
         self.needs_depth_anything_preview = 'depth_anything' in self.selected_estimators
 
         self.camera_measurement_seen = False
         self.lidar_measurement_seen = False
+        self.mask_measurement_seen = False
         self.color_stream_seen = False
         self.depth_stream_seen = False
         self.depth_anything_stream_seen = False
@@ -177,6 +185,12 @@ class G1DistanceBenchmarkRunner(Node):
             G1Measurements,
             self.lidar_measurement_topic,
             self.on_lidar_measurement,
+            10,
+        )
+        self.create_subscription(
+            G1Measurements,
+            self.mask_measurement_topic,
+            self.on_mask_measurement,
             10,
         )
         self.create_subscription(
@@ -216,6 +230,15 @@ class G1DistanceBenchmarkRunner(Node):
 
         event = ensure_measurement_event(self.capture_events, msg)
         update_measurement_event(event, msg, {'lidar'})
+        self.attach_buffered_previews(event)
+
+    def on_mask_measurement(self, msg: G1Measurements) -> None:
+        self.mask_measurement_seen = True
+        if not self.capture_active:
+            return
+
+        event = ensure_measurement_event(self.capture_events, msg)
+        update_measurement_event(event, msg, self.selected_mask_estimators)
         self.attach_buffered_previews(event)
 
     def on_color_image(self, msg: Image) -> None:
@@ -501,6 +524,11 @@ class G1DistanceBenchmarkRunner(Node):
             self.wait_for_flag(
                 lambda: self.lidar_measurement_seen,
                 f'measurement stream on "{self.resolved_topic(self.lidar_measurement_topic)}"',
+            )
+        if self.needs_mask:
+            self.wait_for_flag(
+                lambda: self.mask_measurement_seen,
+                f'measurement stream on "{self.resolved_topic(self.mask_measurement_topic)}"',
             )
 
         self.wait_for_flag(

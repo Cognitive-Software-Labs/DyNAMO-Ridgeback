@@ -15,5 +15,11 @@ float32[] pointcloud_distance_m
 float32[] lidar_lateral_m
 float32[] lidar_forward_m
 float32[] lidar_distance_m
+float32[] path_a_lateral_m
+float32[] path_a_forward_m
+float32[] path_a_distance_m
+float32[] path_b_lateral_m
+float32[] path_b_forward_m
+float32[] path_b_distance_m
 int32 image_width
 int32 image_height

@@ -254,9 +254,16 @@ ros2 launch ridgeback_autonomy g1_distance_benchmark.launch.py estimators:=lidar
 
 # Mixed camera + LiDAR comparison
 ros2 launch ridgeback_autonomy g1_distance_benchmark.launch.py estimators:=rgb,lidar
+
+# Mask-based localization paths (opt-in), stereo aligned depth
+ros2 launch ridgeback_autonomy g1_distance_benchmark.launch.py estimators:=sensor_depth,path_a,path_b
+
+# Same rows on monocular (Depth-Anything) aligned depth — compare depth
+# sources by running the benchmark twice, once per depth_source
+ros2 launch ridgeback_autonomy g1_distance_benchmark.launch.py estimators:=path_a,path_b depth_source:=depth_anything
 ```
 
-This launch composes the simulator, `g1_detector_node`, the camera measurement node and/or the LiDAR measurement node depending on `estimators`, and `g1_distance_benchmark_runner`.
+This launch composes the simulator, `g1_detector_node`, the camera measurement node and/or the LiDAR measurement node depending on `estimators`, and `g1_distance_benchmark_runner`. Selecting `path_a`/`path_b` additionally launches `aligned_depth_node` (the aligned-depth producer, switched by `depth_source`) and `g1_mask_measurement_node` (rasterizes detection boxes into rect masks and runs the Path A/B localizers from `object_localization_documentation/`).
 
 Each benchmark run writes under `benchmark-results/<timestamp>/` by default:
 - one trial-level CSV per selected estimator
@@ -273,7 +280,9 @@ Arguments:
 | `use_sim_time` | `true` | Use Gazebo `/clock` |
 | `setup_path` | `~/clearpath/` | Directory containing `robot.yaml` and generated Clearpath files |
 | `world` | `g1_distance_calibration` | Gazebo world used for the benchmark run |
-| `estimators` | `rgb,sensor_depth,depth_anything,pointcloud,lidar` | Comma-separated estimator subset to compare in one run |
+| `estimators` | `rgb,sensor_depth,depth_anything,pointcloud,lidar` | Comma-separated estimator subset to compare in one run; `path_a` and `path_b` (mask-based localization) are opt-in |
+| `depth_source` | `stereo` | Aligned-depth producer for the `path_a`/`path_b` rows: `stereo` or `depth_anything`; comparing sources = two runs |
+| `camera_info_topic` | `sensors/camera_0/color/camera_info` | Color-camera intrinsics used by the aligned-depth producer and the mask measurement node |
 | `repeats` | `5` | Number of positive-trial repeats per spawn pose |
 | `output_dir` | `<repo-root>/benchmark-results` | Root directory that will receive one timestamped subfolder per run |
 | `settle_sec` | `2.0` | Delay after spawning the target before sampling |
@@ -298,6 +307,8 @@ Benchmark semantics:
 | `g1_detector_node` | `detections/g1/raw` | `color_topic`, `detection_model`, `detection_threshold`, `detector_fps` |
 | `g1_camera_measurement_node` | `measurements/g1/camera` | `camera_config_path`, `color_topic`, `depth_topic`, `pointcloud_topic`, `base_frame`, `enabled_estimators`, `depth_anything_enabled` |
 | `g1_lidar_measurement_node` | `measurements/g1/lidar` | `camera_config_path`, `scan_topic`, `base_frame` |
+| `aligned_depth_node` | `perception/aligned_depth/image` + `.../camera_info` | `depth_source`, `depth_topic`, `color_topic`, `camera_info_topic` |
+| `g1_mask_measurement_node` | `measurements/g1/mask` | `aligned_depth_topic`, `aligned_camera_info_topic`, `pitch_deg`, `front_offset_m`, `isolation_2d`, `isolation_3d` |
 | `g1_overlay_node` | OpenCV window only | `measurement_topic`, `color_topic`, `depth_topic`, `mono_depth_debug_topic` |
 | `g1_distance_benchmark_runner` | per-estimator CSVs + summary CSV + trial collage images | `estimators`, `output_dir`, `camera_measurement_topic`, `lidar_measurement_topic`, `color_topic`, `depth_topic` |
 

@@ -171,6 +171,8 @@ consumers (Path A, Path B, mask overlay) never branch on the source.
   camera instead of the FoV constants in `camera_config.json` (§2.3).
 - **Metric-scale validation** — quantify Depth-Anything's global scale error
   against stereo on identical frames before trusting its Path B rows.
-- **Topic-level contract** — pin the topic names/remappings under which both
-  producers publish (or are consumed as) the aligned depth frame, so the
-  source swap is pure config with no code branch.
+- ~~**Topic-level contract**~~ — resolved 2026-07-12: both producers publish
+  `perception/aligned_depth/image` + `perception/aligned_depth/camera_info`
+  (`aligned_depth_node`, switched by its `depth_source` param); consumers
+  (`g1_mask_measurement_node`) subscribe those topics and never branch on the
+  source.

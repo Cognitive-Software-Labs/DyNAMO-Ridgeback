@@ -15,11 +15,15 @@ from ridgeback_autonomy.benchmarking.estimators import (
     selected_camera_estimators,
     uses_camera_estimators,
     uses_lidar_estimators,
+    uses_mask_estimators,
 )
 
 
 CAMERA_MEASUREMENT_TOPIC = 'measurements/g1/camera'
 LIDAR_MEASUREMENT_TOPIC = 'measurements/g1/lidar'
+MASK_MEASUREMENT_TOPIC = 'measurements/g1/mask'
+ALIGNED_DEPTH_TOPIC = 'perception/aligned_depth/image'
+ALIGNED_CAMERA_INFO_TOPIC = 'perception/aligned_depth/camera_info'
 
 
 def build_benchmark_nodes(context, *args, **kwargs):
@@ -42,6 +46,7 @@ def build_benchmark_nodes(context, *args, **kwargs):
     selected_camera = selected_camera_estimators(selected_estimators)
     needs_camera = uses_camera_estimators(selected_estimators)
     needs_lidar = uses_lidar_estimators(selected_estimators)
+    needs_mask = uses_mask_estimators(selected_estimators)
 
     detector_parameters = {
         'use_sim_time': use_sim_time,
@@ -103,6 +108,44 @@ def build_benchmark_nodes(context, *args, **kwargs):
             )
         )
 
+    if needs_mask:
+        nodes.append(
+            Node(
+                package='ridgeback_autonomy',
+                executable='aligned_depth_node',
+                name='aligned_depth',
+                namespace=namespace,
+                parameters=[{
+                    'use_sim_time': use_sim_time,
+                    'depth_source': LaunchConfiguration('depth_source'),
+                    'depth_topic': depth_topic,
+                    'color_topic': color_topic,
+                    'camera_info_topic': LaunchConfiguration('camera_info_topic'),
+                    'aligned_depth_topic': ALIGNED_DEPTH_TOPIC,
+                    'aligned_camera_info_topic': ALIGNED_CAMERA_INFO_TOPIC,
+                }],
+                remappings=[('/tf', 'tf'), ('/tf_static', 'tf_static')],
+                output='screen',
+            )
+        )
+        nodes.append(
+            Node(
+                package='ridgeback_autonomy',
+                executable='g1_mask_measurement_node',
+                name='g1_mask_measurement',
+                namespace=namespace,
+                parameters=[{
+                    'use_sim_time': use_sim_time,
+                    'detections_topic': 'detections/g1/raw',
+                    'measurement_topic': MASK_MEASUREMENT_TOPIC,
+                    'aligned_depth_topic': ALIGNED_DEPTH_TOPIC,
+                    'aligned_camera_info_topic': ALIGNED_CAMERA_INFO_TOPIC,
+                }],
+                remappings=[('/tf', 'tf'), ('/tf_static', 'tf_static')],
+                output='screen',
+            )
+        )
+
     nodes.append(
         Node(
             package='ridgeback_autonomy',
@@ -152,6 +195,7 @@ def build_benchmark_nodes(context, *args, **kwargs):
                 'estimators': ','.join(selected_estimators),
                 'camera_measurement_topic': CAMERA_MEASUREMENT_TOPIC,
                 'lidar_measurement_topic': LIDAR_MEASUREMENT_TOPIC,
+                'mask_measurement_topic': MASK_MEASUREMENT_TOPIC,
                 'color_topic': color_topic,
                 'depth_topic': depth_topic,
             }],
@@ -209,6 +253,14 @@ def generate_launch_description():
         DeclareLaunchArgument('capture_sec', default_value='10.0'),
         DeclareLaunchArgument('color_topic', default_value='sensors/camera_0/color/image'),
         DeclareLaunchArgument('depth_topic', default_value='sensors/camera_0/depth/image'),
+        DeclareLaunchArgument('camera_info_topic',
+                              default_value='sensors/camera_0/color/camera_info'),
+        DeclareLaunchArgument(
+            'depth_source',
+            default_value='stereo',
+            description='Aligned-depth producer for the path_a/path_b rows: '
+                        '"stereo" or "depth_anything". Comparing sources = two runs.',
+        ),
         DeclareLaunchArgument('scan_topic', default_value='sensors/lidar2d_0/scan'),
         DeclareLaunchArgument('pointcloud_topic', default_value='sensors/camera_0/points'),
         DeclareLaunchArgument('base_frame', default_value=[namespace, '/robot/base_link']),

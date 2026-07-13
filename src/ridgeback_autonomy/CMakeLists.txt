@@ -80,6 +80,12 @@ install(PROGRAMS
 )
 
 install(PROGRAMS
+  ridgeback_autonomy/perception/g1_mask_measurement_node.py
+  DESTINATION lib/${PROJECT_NAME}
+  RENAME g1_mask_measurement_node
+)
+
+install(PROGRAMS
   ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py
   DESTINATION lib/${PROJECT_NAME}
   RENAME g1_distance_benchmark_runner
@@ -142,6 +148,7 @@ if(BUILD_TESTING)
   ament_add_pytest_test(test_isolation_2d test/test_isolation_2d.py)
   ament_add_pytest_test(test_isolation_3d test/test_isolation_3d.py)
   ament_add_pytest_test(test_mask test/test_mask.py)
+  ament_add_pytest_test(test_mask_measurement_node test/test_mask_measurement_node.py)
   ament_add_pytest_test(test_launch_layout test/test_launch_layout.py)
   ament_add_pytest_test(test_messages test/test_messages.py)
   ament_add_pytest_test(test_path_a test/test_path_a.py)
