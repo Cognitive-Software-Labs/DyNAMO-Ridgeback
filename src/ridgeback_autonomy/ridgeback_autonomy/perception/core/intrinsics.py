@@ -69,6 +69,35 @@ def deproject_pixel(
     return x, y, float(z_m)
 
 
+def project_points(
+    points: np.ndarray,
+    intrinsics: CameraIntrinsics,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Forward pinhole projection of camera-optical-frame points (Path C §2.3).
+
+    ``points`` is an ``(N, 3)`` array in the camera optical frame. Returns
+    ``(uv, valid)``: an ``(N, 2)`` float pixel-coordinate array and an
+    ``(N,)`` boolean marking the points that are in front of the camera
+    (``Z > 0``) and whose nearest pixel lies inside the grid — the
+    "∩ camera FoV" clip. ``uv`` rows where ``valid`` is False are undefined.
+    """
+
+    points = np.asarray(points, dtype=np.float64)
+    x, y, z = points[:, 0], points[:, 1], points[:, 2]
+    with np.errstate(divide='ignore', invalid='ignore'):
+        u = intrinsics.fx * x / z + intrinsics.cx
+        v = intrinsics.fy * y / z + intrinsics.cy
+    # rint comparisons are False for NaN, so Z = 0 rows drop out here too.
+    u_px = np.rint(u)
+    v_px = np.rint(v)
+    valid = (
+        (z > 0.0)
+        & (u_px >= 0.0) & (u_px < intrinsics.width)
+        & (v_px >= 0.0) & (v_px < intrinsics.height)
+    )
+    return np.stack((u, v), axis=-1), valid
+
+
 def deproject_masked(
     depth_m: np.ndarray,
     rows: np.ndarray,

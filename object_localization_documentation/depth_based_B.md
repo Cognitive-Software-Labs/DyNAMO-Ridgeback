@@ -24,7 +24,8 @@ the 3D foreground-isolation methods are catalogued in
 **Output**
 
 - One coordinate `(X, Y, Z)` in the **camera optical frame**, per mask (frame
-  convention pinned in `Object_Localization_Pipeline.md` Section 7). Unlike
+  convention proposed in `Object_Localization_Pipeline.md` Section 7;
+  confirmation against SDK/TF still open). Unlike
   Path A, Path B also has the full foreground point set available as a
   by-product (extent, orientation, footprint) if a later consumer wants it.
 

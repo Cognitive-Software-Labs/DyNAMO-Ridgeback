@@ -25,8 +25,8 @@ is `depth_based_B.md`.
 **Output**
 
 - One coordinate `(X, Y, Z)` in the **camera optical frame**, per mask. (The
-  exact frame convention is pinned in `Object_Localization_Pipeline.md`
-  Section 7.)
+  exact frame convention is proposed in `Object_Localization_Pipeline.md`
+  Section 7; confirmation against SDK/TF still open.)
 
 Path A is the cheapest path because it never builds a 3D structure — it collapses
 the masked depths to a single number and deprojects exactly one pixel.

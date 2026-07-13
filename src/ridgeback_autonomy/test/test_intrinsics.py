@@ -9,6 +9,7 @@ from ridgeback_autonomy.perception.core.intrinsics import (
     deproject_masked,
     deproject_pixel,
     intrinsics_from_camera_info,
+    project_points,
 )
 
 
@@ -66,3 +67,38 @@ def test_deproject_masked_empty_selection() -> None:
     points = deproject_masked(depth, rows, cols, INTRINSICS)
 
     assert points.shape == (0, 3)
+
+
+def test_project_points_round_trips_deproject_pixel() -> None:
+    pixels = [(40.0, 30.0, 3.0), (10.5, 50.25, 1.5), (79.0, 0.0, 6.0)]
+    points = np.array([deproject_pixel(u, v, z, INTRINSICS) for u, v, z in pixels])
+
+    uv, valid = project_points(points, INTRINSICS)
+
+    assert valid.all()
+    assert np.allclose(uv, [(u, v) for u, v, _ in pixels])
+
+
+def test_project_points_invalidates_behind_and_out_of_bounds() -> None:
+    points = np.array([
+        (0.0, 0.0, 2.0),    # principal point, valid
+        (0.0, 0.0, -2.0),   # behind the camera
+        (0.0, 0.0, 0.0),    # on the camera plane (division blows up)
+        (10.0, 0.0, 2.0),   # projects far right of the grid
+        (0.0, -10.0, 2.0),  # projects far above the grid
+    ])
+
+    uv, valid = project_points(points, INTRINSICS)
+
+    assert valid.tolist() == [True, False, False, False, False]
+    assert np.allclose(uv[0], (INTRINSICS.cx, INTRINSICS.cy))
+
+
+def test_project_points_rint_boundary() -> None:
+    # u = 79.4 rounds inside the 80-wide grid; u = 79.6 rounds to 80, outside.
+    inside = deproject_pixel(79.4, 30.0, 2.0, INTRINSICS)
+    outside = deproject_pixel(79.6, 30.0, 2.0, INTRINSICS)
+
+    _, valid = project_points(np.array([inside, outside]), INTRINSICS)
+
+    assert valid.tolist() == [True, False]

@@ -129,11 +129,8 @@ flowchart TD
     L_TF --> L_PROJ["Project into Image Plane<br/>(intrinsics)"]
     L_PROJ --> L_SEL["Keep points in mask<br/>(∩ FoV, shared)"]
     IFACE --> L_SEL
-    L_SEL -->|tight| C_T["Median range over arc"]
-    L_SEL -->|rect| C_R["Segment arc →<br/>nearest contiguous run"]
-    C_R --> C_R2["Median of run"]
-    C_T --> C_COORD["Range + bearing → (X,Z)<br/>camera frame (Y unobserved)"]
-    C_R2 --> C_COORD
+    L_SEL -->|"tight & rect (no fork)"| C_SEG["Segment range profile →<br/>merge near-band runs"]
+    C_SEG --> C_COORD["Median of merged set → (X,Z)<br/>camera frame (Y unobserved)"]
 
     A_COORD --> FINAL["Object Coordinates<br/>relative to Camera Frame<br/>(X, Y, Z) · Path C: X,Z only"]
     B_COORD --> FINAL
@@ -199,7 +196,7 @@ Independent sensor stream; rejoins the pipeline only at the mask. Convert the sc
 
 > Path C only returns points where the scan plane physically intersects the object at the LiDAR's height. A valid mask can yield zero LiDAR points if the plane passes above/below the object → the system needs a fallback to Path A/B in that case.
 >
-> **Parallax contamination — why even the tight branch segments:** the mask is defined from the camera's viewpoint, but the LiDAR samples from a different position. Background points the camera cannot see — occluded behind the object, or visible through gaps in it (between the G1's legs at scan height) — still project inside the mask and enter the arc carrying background ranges. Mask membership only certifies that the *camera's* ray hits the object; it says nothing about a LiDAR point further along that ray. The zero-point fallback does not catch this (points exist, they are just wrong); segmenting the range profile and keeping only the near runs drops them. **Convention (pinned):** runs lying within a small range band of the nearest run are merged before the median. On a legged object the nearest run alone would be one leg (range = leg face, offset from body center); merging the band averages both legs.
+> **Parallax contamination — why even the tight branch segments:** the mask is defined from the camera's viewpoint, but the LiDAR samples from a different position. A `rect` mask admits background the camera can see through gaps in the object (between the G1's legs at scan height). A `tight` mask rejects those (gap pixels are False) but still admits background the camera *cannot* see: an occluded point projects inside the silhouette by definition of occlusion — the sensors' vertical offset means a beam through the leg gap that hits the wall behind lands on *torso* pixels from the camera's higher viewpoint (full geometry in `lidar_based_path.md` §2.5). Mask membership only certifies that the *camera's* ray hits the object; it says nothing about a LiDAR point further along that ray. The zero-point fallback does not catch this (points exist, they are just wrong); segmenting the range profile and keeping only the near runs drops them. **Convention (pinned):** runs lying within a small range band of the nearest run are merged before the median. On a legged object the nearest run alone would be one leg (range = leg face, offset from body center); merging the band averages both legs.
 
 ---
 
