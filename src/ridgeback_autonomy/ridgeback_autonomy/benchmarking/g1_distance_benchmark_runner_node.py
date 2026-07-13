@@ -27,6 +27,7 @@ from ridgeback_autonomy.benchmarking.alignment import (
 )
 from ridgeback_autonomy.benchmarking.estimators import (
     ESTIMATOR_LABELS,
+    benchmark_output_name,
     parse_estimators,
     selected_camera_estimators,
     selected_mask_estimators,
@@ -54,6 +55,8 @@ from ridgeback_autonomy.perception.core.image_utils import (
     convert_color_image_message,
     convert_depth_to_meters_message,
 )
+from ridgeback_autonomy.perception.core.isolation_2d import ISOLATION_2D_DEFAULT
+from ridgeback_autonomy.perception.core.isolation_3d import ISOLATION_3D_DEFAULT
 
 
 FORWARD_DISTANCES_M = [1.5, 2.5, 3.5, 4.5, 5.5]
@@ -69,6 +72,7 @@ IMAGE_MATCH_TOLERANCE_NS = 250_000_000
 CAMERA_MEASUREMENT_TOPIC = 'measurements/g1/camera'
 LIDAR_MEASUREMENT_TOPIC = 'measurements/g1/lidar'
 MASK_MEASUREMENT_TOPIC = 'measurements/g1/mask'
+DEPTH_SOURCE_DEFAULT = 'stereo'
 MONO_DEPTH_DEBUG_TOPIC = 'debug/g1/camera/mono_depth'
 DEPTH_MAX_METERS_DEFAULT = 10.0
 PREVIEW_BUFFER_LIMIT = 256
@@ -109,6 +113,12 @@ class G1DistanceBenchmarkRunner(Node):
         self.declare_parameter('camera_measurement_topic', CAMERA_MEASUREMENT_TOPIC)
         self.declare_parameter('lidar_measurement_topic', LIDAR_MEASUREMENT_TOPIC)
         self.declare_parameter('mask_measurement_topic', MASK_MEASUREMENT_TOPIC)
+        # The three config axes of the mask rows, stamped into their output
+        # names so path_a/path_b runs are self-describing (must match the
+        # values passed to the aligned depth + mask nodes for the same run).
+        self.declare_parameter('depth_source', DEPTH_SOURCE_DEFAULT)
+        self.declare_parameter('isolation_2d', ISOLATION_2D_DEFAULT)
+        self.declare_parameter('isolation_3d', ISOLATION_3D_DEFAULT)
         self.declare_parameter('color_topic', 'sensors/camera_0/color/image')
         self.declare_parameter('depth_topic', 'sensors/camera_0/depth/image')
         self.declare_parameter('mono_depth_debug_topic', MONO_DEPTH_DEBUG_TOPIC)
@@ -123,6 +133,9 @@ class G1DistanceBenchmarkRunner(Node):
         self.camera_measurement_topic = str(self.get_parameter('camera_measurement_topic').value)
         self.lidar_measurement_topic = str(self.get_parameter('lidar_measurement_topic').value)
         self.mask_measurement_topic = str(self.get_parameter('mask_measurement_topic').value)
+        self.depth_source = str(self.get_parameter('depth_source').value)
+        self.isolation_2d = str(self.get_parameter('isolation_2d').value)
+        self.isolation_3d = str(self.get_parameter('isolation_3d').value)
         self.color_topic = str(self.get_parameter('color_topic').value)
         self.depth_topic = str(self.get_parameter('depth_topic').value)
         self.mono_depth_debug_topic = str(self.get_parameter('mono_depth_debug_topic').value)
@@ -138,8 +151,16 @@ class G1DistanceBenchmarkRunner(Node):
         self.images_dir = os.path.join(self.run_output_dir, 'images')
         os.makedirs(self.images_dir, exist_ok=False)
 
+        # Self-describing output names: mask rows fold in source + isolation
+        # recipe (benchmark_output_name); everything else keeps its plain key.
+        self.estimator_output_names = {
+            estimator: benchmark_output_name(
+                estimator, self.depth_source, self.isolation_2d, self.isolation_3d)
+            for estimator in self.selected_estimators
+        }
         self.estimator_csv_paths = {
-            estimator: os.path.join(self.run_output_dir, f'{estimator}.csv')
+            estimator: os.path.join(
+                self.run_output_dir, f'{self.estimator_output_names[estimator]}.csv')
             for estimator in self.selected_estimators
         }
         self.summary_csv_path = os.path.join(self.run_output_dir, 'comparison_summary.csv')
@@ -325,6 +346,9 @@ class G1DistanceBenchmarkRunner(Node):
             write_trial_csv(self.estimator_csv_paths[estimator], estimator_rows[estimator])
 
         summary_rows = build_summary_rows(estimator_rows)
+        for row in summary_rows:
+            row['estimator'] = self.estimator_output_names.get(
+                row['estimator'], row['estimator'])
         write_summary_csv(self.summary_csv_path, summary_rows)
 
         self.log_summary(summary_rows, included_trials, skipped_trials)
@@ -395,7 +419,7 @@ class G1DistanceBenchmarkRunner(Node):
                     'true_forward_m': true_pose['forward_m'],
                     'true_lateral_m': true_pose['lateral_m'],
                     'true_distance_m': true_pose['distance_m'],
-                    'estimator': estimator,
+                    'estimator': self.estimator_output_names[estimator],
                     'trial_estimate_m': estimate,
                     'abs_error_m': abs_error,
                     'rel_error': rel_error,
@@ -780,8 +804,11 @@ class G1DistanceBenchmarkRunner(Node):
             if row['trial_count'] == 0:
                 self.get_logger().info(f'{row["estimator"]}: no comparable trials.')
                 continue
+            # row['estimator'] is the output name here (mask rows are already
+            # renamed to their self-describing form); fall back to it when it
+            # is not one of the fixed ESTIMATOR_LABELS keys.
             self.get_logger().info(
-                f'{ESTIMATOR_LABELS[row["estimator"]]} | '
+                f'{ESTIMATOR_LABELS.get(row["estimator"], row["estimator"])} | '
                 f'n={row["trial_count"]} | '
                 f'MAE={row["mean_abs_error_m"]:.3f}m | '
                 f'MedianAE={row["median_abs_error_m"]:.3f}m | '

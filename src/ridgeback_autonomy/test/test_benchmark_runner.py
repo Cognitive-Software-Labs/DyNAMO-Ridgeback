@@ -11,7 +11,10 @@ from ridgeback_autonomy.benchmarking.alignment import (
     find_nearest_preview_match,
     update_measurement_event,
 )
-from ridgeback_autonomy.benchmarking.estimators import parse_estimators
+from ridgeback_autonomy.benchmarking.estimators import (
+    benchmark_output_name,
+    parse_estimators,
+)
 from ridgeback_autonomy.benchmarking.g1_distance_benchmark_runner_node import extract_json_payload
 from ridgeback_autonomy.benchmarking.reduction import (
     choose_representative_event,
@@ -32,6 +35,22 @@ def test_parse_estimators_uses_canonical_order_and_depth_anything_name() -> None
     assert parse_estimators('path_b,rgb,path_a') == ('rgb', 'path_a', 'path_b')
     with pytest.raises(ValueError, match='depth_anything'):
         parse_estimators('mono_depth')
+
+
+def test_benchmark_output_name_folds_source_and_isolation_into_mask_rows() -> None:
+    assert benchmark_output_name(
+        'path_a', 'stereo', 'nearest_mode_histogram', 'height_crop_range_band'
+    ) == 'stereo_aggregate_depth_nearest_mode_histogram'
+    assert benchmark_output_name(
+        'path_b', 'depth_anything', 'otsu', 'range_band'
+    ) == 'depth_anything_deproject_centroid_range_band'
+
+
+def test_benchmark_output_name_leaves_non_mask_estimators_plain() -> None:
+    for estimator in ('rgb', 'sensor_depth', 'depth_anything', 'pointcloud', 'lidar'):
+        assert benchmark_output_name(
+            estimator, 'stereo', 'nearest_mode_histogram', 'height_crop_range_band'
+        ) == estimator
 
 
 def test_extract_json_payload_accepts_multiple_gz_json_messages() -> None:

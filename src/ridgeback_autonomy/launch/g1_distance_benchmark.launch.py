@@ -140,6 +140,8 @@ def build_benchmark_nodes(context, *args, **kwargs):
                     'measurement_topic': MASK_MEASUREMENT_TOPIC,
                     'aligned_depth_topic': ALIGNED_DEPTH_TOPIC,
                     'aligned_camera_info_topic': ALIGNED_CAMERA_INFO_TOPIC,
+                    'isolation_2d': LaunchConfiguration('isolation_2d'),
+                    'isolation_3d': LaunchConfiguration('isolation_3d'),
                 }],
                 remappings=[('/tf', 'tf'), ('/tf_static', 'tf_static')],
                 output='screen',
@@ -198,6 +200,9 @@ def build_benchmark_nodes(context, *args, **kwargs):
                 'mask_measurement_topic': MASK_MEASUREMENT_TOPIC,
                 'color_topic': color_topic,
                 'depth_topic': depth_topic,
+                'depth_source': LaunchConfiguration('depth_source'),
+                'isolation_2d': LaunchConfiguration('isolation_2d'),
+                'isolation_3d': LaunchConfiguration('isolation_3d'),
             }],
             remappings=[('/tf', 'tf'), ('/tf_static', 'tf_static')],
             output='screen',
@@ -260,6 +265,18 @@ def generate_launch_description():
             default_value='stereo',
             description='Aligned-depth producer for the path_a/path_b rows: '
                         '"stereo" or "depth_anything". Comparing sources = two runs.',
+        ),
+        DeclareLaunchArgument(
+            'isolation_2d',
+            default_value='nearest_mode_histogram',
+            description='Path A (path_a) rect-branch foreground recipe: '
+                        '"nearest_mode_histogram" or "otsu".',
+        ),
+        DeclareLaunchArgument(
+            'isolation_3d',
+            default_value='height_crop_range_band',
+            description='Path B (path_b) rect-branch foreground recipe: '
+                        '"height_crop_range_band", "height_crop", or "range_band".',
         ),
         DeclareLaunchArgument('scan_topic', default_value='sensors/lidar2d_0/scan'),
         DeclareLaunchArgument('pointcloud_topic', default_value='sensors/camera_0/points'),

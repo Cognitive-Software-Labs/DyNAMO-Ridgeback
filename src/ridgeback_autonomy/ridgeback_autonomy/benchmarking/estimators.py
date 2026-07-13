@@ -37,6 +37,13 @@ LIDAR_ESTIMATORS = frozenset({'lidar'})
 # aligned depth frame, independent of the legacy camera estimator stack.
 MASK_ESTIMATORS = frozenset({'path_a', 'path_b'})
 
+# What each mask row's reduction actually produces, for self-describing output
+# names: Path A medians the masked depth, Path B centroids the 3D points.
+MASK_ESTIMATOR_DESCRIPTORS = {
+    'path_a': 'aggregate_depth',
+    'path_b': 'deproject_centroid',
+}
+
 ESTIMATOR_FIELD_KEYS = {
     'rgb': 'rgb_distance_m',
     'sensor_depth': 'sensor_depth_distance_m',
@@ -110,3 +117,25 @@ def uses_lidar_estimators(selected_estimators: tuple[str, ...]) -> bool:
 
 def uses_mask_estimators(selected_estimators: tuple[str, ...]) -> bool:
     return any(estimator in MASK_ESTIMATORS for estimator in selected_estimators)
+
+
+def benchmark_output_name(
+    estimator: str,
+    depth_source: str,
+    isolation_2d: str,
+    isolation_3d: str,
+) -> str:
+    """The self-describing name a mask row carries in the benchmark output.
+
+    Mask rows are identified by three config axes -- the aligned-depth source,
+    the path (which reduction it runs), and the foreground-isolation recipe --
+    so ``path_a``/``path_b`` alone collide across runs that vary any of them.
+    The output name folds all three in, e.g.
+    ``stereo_aggregate_depth_nearest_mode_histogram``. Non-mask estimators keep
+    their plain name (they are neither source- nor isolation-swappable).
+    """
+
+    if estimator not in MASK_ESTIMATORS:
+        return estimator
+    isolation = isolation_2d if estimator == 'path_a' else isolation_3d
+    return f'{depth_source}_{MASK_ESTIMATOR_DESCRIPTORS[estimator]}_{isolation}'

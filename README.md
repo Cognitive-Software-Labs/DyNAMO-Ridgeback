@@ -265,6 +265,8 @@ ros2 launch ridgeback_autonomy g1_distance_benchmark.launch.py estimators:=path_
 
 This launch composes the simulator, `g1_detector_node`, the camera measurement node and/or the LiDAR measurement node depending on `estimators`, and `g1_distance_benchmark_runner`. Selecting `path_a`/`path_b` additionally launches `aligned_depth_node` (the aligned-depth producer, switched by `depth_source`) and `g1_mask_measurement_node` (rasterizes detection boxes into rect masks and runs the Path A/B localizers from `object_localization_documentation/`).
 
+The mask rows are identified by three config axes — the aligned-depth source (`depth_source`), the path, and the foreground-isolation recipe (`isolation_2d` for `path_a`, `isolation_3d` for `path_b`) — so their CSV files fold all three into a self-describing name instead of a bare `path_a`/`path_b`. The run above (defaults) writes `stereo_aggregate_depth_nearest_mode_histogram.csv` and `stereo_deproject_centroid_height_crop_range_band.csv`; the `depth_source:=depth_anything` run writes the `depth_anything_*` variants. Non-mask estimators keep their plain names.
+
 Each benchmark run writes under `benchmark-results/<timestamp>/` by default:
 - one trial-level CSV per selected estimator
 - one `comparison_summary.csv`
@@ -282,6 +284,8 @@ Arguments:
 | `world` | `g1_distance_calibration` | Gazebo world used for the benchmark run |
 | `estimators` | `rgb,sensor_depth,depth_anything,pointcloud,lidar` | Comma-separated estimator subset to compare in one run; `path_a` and `path_b` (mask-based localization) are opt-in |
 | `depth_source` | `stereo` | Aligned-depth producer for the `path_a`/`path_b` rows: `stereo` or `depth_anything`; comparing sources = two runs |
+| `isolation_2d` | `nearest_mode_histogram` | Path A rect-branch foreground recipe: `nearest_mode_histogram` or `otsu` |
+| `isolation_3d` | `height_crop_range_band` | Path B rect-branch foreground recipe: `height_crop_range_band`, `height_crop`, or `range_band` |
 | `camera_info_topic` | `sensors/camera_0/color/camera_info` | Color-camera intrinsics used by the aligned-depth producer and the mask measurement node |
 | `repeats` | `5` | Number of positive-trial repeats per spawn pose |
 | `output_dir` | `<repo-root>/benchmark-results` | Root directory that will receive one timestamped subfolder per run |
