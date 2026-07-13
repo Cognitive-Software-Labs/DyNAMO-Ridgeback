@@ -12,6 +12,7 @@ import numpy as np
 from nav_msgs.msg import OccupancyGrid
 from geometry_msgs.msg import PoseStamped, Point
 from nav2_msgs.action import NavigateToPose
+from nav2_msgs.srv import ClearEntireCostmap
 from tf2_ros import TransformListener, Buffer
 
 from visualization_msgs.msg import Marker, MarkerArray
@@ -100,6 +101,14 @@ class FrontierExplorerNode(Node):
         
         # Action client for Nav2 NavigateToPose
         self.nav_client = ActionClient(self, NavigateToPose, 'navigate_to_pose')
+        # Costmap-clear services, called on a progress stall: the local costmap
+        # is sensor-only (no static layer), so clearing drops a phantom wall the
+        # rotated SLAM pose smeared into it and lets the controller re-plan from
+        # fresh scans instead of staying wedged against it.
+        self._clear_global = self.create_client(
+            ClearEntireCostmap, 'global_costmap/clear_entirely_global_costmap')
+        self._clear_local = self.create_client(
+            ClearEntireCostmap, 'local_costmap/clear_entirely_local_costmap')
         
         # Timer for exploration loop
         self.exploration_timer = self.create_timer(
@@ -452,6 +461,12 @@ class FrontierExplorerNode(Node):
             self.get_logger().warn(
                 'Nav2 rejected the cancel request; previous goal may still be active.')
 
+    def _clear_costmaps(self):
+        """Best-effort clear of both costmaps (fire-and-forget) on a stall."""
+        for cli in (self._clear_global, self._clear_local):
+            if cli.service_is_ready():
+                cli.call_async(ClearEntireCostmap.Request())
+
     def _publish_frontier_markers(self, clusters, robot_pos):
         """Publish frontier cluster centroids as spheres for RViz."""
         if not self.visualize or self.current_costmap is None:
@@ -504,6 +519,7 @@ class FrontierExplorerNode(Node):
                 f'(> {self.progress_timeout}s). Cancelling and selecting new frontier.'
             )
             self._cancel_current_goal()
+            self._clear_costmaps()
             if self.current_goal is not None:
                 # A stall is a failure, not a visit — blacklist only after
                 # repeated failures so one bad approach angle or transient

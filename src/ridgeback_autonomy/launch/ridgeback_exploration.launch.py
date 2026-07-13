@@ -38,6 +38,7 @@ def generate_launch_description():
     rtf = LaunchConfiguration('rtf')
     headless = LaunchConfiguration('headless')
     livestream = LaunchConfiguration('livestream')
+    odom_noise = LaunchConfiguration('odom_noise')
 
     rviz_config = os.path.join(pkg_this, 'sim', 'rviz', 'exploration.rviz')
 
@@ -114,6 +115,9 @@ def generate_launch_description():
         DeclareLaunchArgument(
             'livestream', default_value='false',
             description='Isaac: WebRTC livestream (gz ignores)'),
+        DeclareLaunchArgument(
+            'odom_noise', default_value='1.0',
+            description='Isaac: odometry drift scale; 0 = perfect (gz ignores)'),
         DeclareLaunchArgument('exploration_rviz', default_value='true',
                               description='Launch the exploration RViz2 config'),
         DeclareLaunchArgument('g1_perception_enabled', default_value='true',
@@ -229,6 +233,7 @@ def generate_launch_description():
                 'rtf': rtf,
                 'headless': headless,
                 'livestream': livestream,
+                'odom_noise': odom_noise,
             }.items(),
         ),
 

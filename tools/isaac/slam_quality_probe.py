@@ -71,6 +71,14 @@ LOOP_WINDOW_S = 10.0
 JUMP_TRANS_M = 0.03      # map->odom deltas above these count as corrections
 JUMP_YAW_RAD = 0.015
 
+# Rotation-stress repro (--repro): drive into the feature-poor NE room and spin
+# in place, where scan-match rotational ambiguity + rotation smear bite. The
+# spot is clearance-checked against the SDF like WAYPOINTS.
+REPRO_WAYPOINTS = [
+    (9.0, 0.0), (11.8, 0.0), (11.8, 3.3), (12.5, 4.0), (12.5, 5.0),
+]
+SPIN_REVS = 3            # full in-place turns at the NE-room spot
+
 
 def yaw_of(q):
     return math.atan2(2.0 * (q.w * q.z + q.x * q.y),
@@ -88,6 +96,7 @@ class Probe:
         self.gt_path = []
         self.slam_path = []              # (t, x, y, yaw) from map->base_link
         self.odom_corr = []              # (t, x, y, yaw) map->odom
+        self.yaw_samples = []            # (t, phi_ekf, theta_mo, total) radians
         self.map_msg = None
         self.tf_buffer = tf2_ros.Buffer(cache_time=rclpy.duration.Duration(
             seconds=30.0))
@@ -141,6 +150,40 @@ class Probe:
         if corr is not None:
             if not self.odom_corr or corr[1:] != self.odom_corr[-1][1:]:
                 self.odom_corr.append((self.now_s(),) + corr[1:])
+        # Yaw decomposition — isolates EKF/odom heading drift from the SLAM
+        # correction (both feed the total map->base_link error the HUD shows):
+        #   phi_ekf  = yaw(odom->base) - yaw(GT)  pure odom/EKF heading drift
+        #   theta_mo = yaw(map->odom)             SLAM's rotational correction
+        #   total    = yaw(map->base) - yaw(GT)   == theta_mo + phi_ekf
+        ob = self.lookup("odom", "base_link")
+        if est is not None and ob is not None and self.gt is not None:
+            gt_yaw = self.gt[3]
+            self.yaw_samples.append((
+                self.now_s(),
+                ang_norm(ob[3] - gt_yaw),
+                corr[3] if corr is not None else 0.0,
+                ang_norm(est[3] - gt_yaw)))
+
+    def spin_in_place(self, revs, timeout_s=None):
+        """Rotate in place through |revs| full turns at WZ_MAX (sign = dir),
+        sampling the yaw decomposition — the rotation-stress repro."""
+        if self.gt is None:
+            return
+        target = abs(revs) * 2.0 * math.pi
+        wz = WZ_MAX if revs >= 0 else -WZ_MAX
+        accum, last_yaw = 0.0, self.gt[3]
+        t0 = last_sample = self.now_s()
+        to = timeout_s or (target / max(WZ_MAX, 1e-3)) * 2.0 + 10.0
+        while accum < target and self.now_s() - t0 < to:
+            rclpy.spin_once(self.node, timeout_sec=0.02)
+            if self.gt is not None:
+                accum += abs(ang_norm(self.gt[3] - last_yaw))
+                last_yaw = self.gt[3]
+            self.send(0.0, wz)
+            if self.now_s() - last_sample >= 0.1:
+                last_sample = self.now_s()
+                self.sample_slam()
+        self.send(0.0, 0.0)
 
     def send(self, vx, wz):
         msg = TwistStamped()
@@ -349,18 +392,27 @@ def render_overlay(map_msg, gt_grid, gt_ignore, gt_origin, gt_res,
 # -- main ---------------------------------------------------------------------
 
 def main():
+    global WZ_MAX
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--tag", required=True)
     ap.add_argument("--gt-grid", required=True, type=Path)
     ap.add_argument("--out", required=True, type=Path)
     ap.add_argument("--slam-log", type=Path, default=None)
     ap.add_argument("--namespace", default="r100_0001")
+    ap.add_argument("--wz-max", type=float, default=WZ_MAX,
+                    help="rotation-rate cap rad/s (default 0.4; raise to ~1.5 "
+                         "to reproduce the fast-turn yaw drift)")
+    ap.add_argument("--repro", action="store_true",
+                    help="rotation-stress isolation drive: into the feature-poor "
+                         "NE room + spin in place, instead of the loop-closure run")
     args = ap.parse_args()
     args.out.mkdir(parents=True, exist_ok=True)
+    WZ_MAX = args.wz_max
 
+    waypoints = REPRO_WAYPOINTS if args.repro else WAYPOINTS
     gt_grid, gt_ignore, gt_origin, gt_res = load_grid(args.gt_grid)
     problems = check_waypoints(gt_grid, gt_origin, gt_res,
-                               [(0.0, 0.0)] + WAYPOINTS, clearance=0.8)
+                               [(0.0, 0.0)] + waypoints, clearance=0.8)
     if problems:
         print("WAYPOINT CHECK FAILED:", *problems, sep="\n  ")
         return 2
@@ -383,13 +435,14 @@ def main():
         print("PROBE ABORT: stack never became ready", flush=True)
         return 3
 
-    metrics = {"tag": args.tag, "waypoints": WAYPOINTS,
+    metrics = {"tag": args.tag, "waypoints": waypoints,
+               "mode": "repro" if args.repro else "loop",
                "wz_max": WZ_MAX, "vx_max": VX_MAX,
                "aborted": False, "abort_reason": ""}
     drive_t0 = probe.now_s()
     probe.gt_path.clear()
 
-    for i, (wx, wy) in enumerate(WAYPOINTS):
+    for i, (wx, wy) in enumerate(waypoints):
         ok, why = probe.drive_to(wx, wy)
         print(f"waypoint {i} ({wx},{wy}): {'ok' if ok else why} "
               f"sim_t={probe.now_s() - drive_t0:.1f}s", flush=True)
@@ -398,7 +451,9 @@ def main():
             metrics["abort_reason"] = f"waypoint {i}: {why}"
             break
     if not metrics["aborted"]:
-        if not probe.rotate_to(FINAL_YAW):
+        if args.repro:
+            probe.spin_in_place(SPIN_REVS)
+        elif not probe.rotate_to(FINAL_YAW):
             metrics["aborted"] = True
             metrics["abort_reason"] = "final align timeout"
     probe.send(0.0, 0.0)
@@ -419,6 +474,27 @@ def main():
         if tail_errs.size else None
     metrics["loop_error_max_m"] = round(float(tail_errs.max()), 4) \
         if tail_errs.size else None
+
+    # Yaw decomposition — the isolation readout. total == theta_mo + phi_ekf:
+    #   phi_ekf big + theta_mo ~0  -> EKF/odom heading drift dominates
+    #   phi_ekf ~0 + theta_mo big  -> SLAM scan-match spuriously rotates the map
+    if probe.yaw_samples:
+        ys = np.array(probe.yaw_samples)      # cols: t, phi_ekf, theta_mo, total
+
+        def _yd(col):
+            a = np.degrees(np.abs(ys[:, col]))
+            return {"rms": round(float(np.sqrt(np.mean(a ** 2))), 2),
+                    "max": round(float(a.max()), 2)}
+
+        worst = int(np.argmax(np.abs(ys[:, 3])))
+        metrics["yaw_n_samples"] = int(ys.shape[0])
+        metrics["yaw_total_deg"] = _yd(3)        # panel error (theta_mo + phi_ekf)
+        metrics["yaw_ekf_phi_deg"] = _yd(1)      # odom/EKF heading drift
+        metrics["yaw_slam_mo_deg"] = _yd(2)      # SLAM map->odom correction
+        metrics["yaw_worst_sample_deg"] = {
+            "total": round(float(np.degrees(ys[worst, 3])), 2),
+            "phi_ekf": round(float(np.degrees(ys[worst, 1])), 2),
+            "theta_mo": round(float(np.degrees(ys[worst, 2])), 2)}
 
     if probe.map_msg is not None:
         metrics.update(map_metrics(probe.map_msg, gt_grid, gt_ignore,

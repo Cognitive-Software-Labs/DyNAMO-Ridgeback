@@ -73,6 +73,12 @@ def generate_launch_description():
             default_value='false',
             description='Isaac: WebRTC livestream (ignored under gz)',
         ),
+        DeclareLaunchArgument(
+            'odom_noise',
+            default_value='1.0',
+            description='Isaac: odometry drift scale; 0 = perfect odom '
+                        '(ignored under gz)',
+        ),
         # Add our worlds and models directories so Gazebo can find them
         AppendEnvironmentVariable(
             'GZ_SIM_RESOURCE_PATH',
@@ -113,6 +119,7 @@ def generate_launch_description():
                 'rtf': LaunchConfiguration('rtf'),
                 'headless': LaunchConfiguration('headless'),
                 'livestream': LaunchConfiguration('livestream'),
+                'odom_noise': LaunchConfiguration('odom_noise'),
                 # the gz_gui concept has no Isaac equivalent (P8 retires it)
             }.items(),
         ),
