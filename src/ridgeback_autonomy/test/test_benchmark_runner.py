@@ -29,27 +29,29 @@ from ridgeback_autonomy.msg import G1Measurements
 def test_parse_estimators_uses_canonical_order_and_depth_anything_name() -> None:
     assert parse_estimators('') == (
         'rgb', 'sensor_depth', 'depth_anything', 'pointcloud', 'lidar',
-        'path_a', 'path_b',
+        'projective_ranging', 'euclidean_reconstruction',
     )
     assert parse_estimators('pointcloud,rgb') == ('rgb', 'pointcloud')
-    assert parse_estimators('path_b,rgb,path_a') == ('rgb', 'path_a', 'path_b')
+    assert parse_estimators('euclidean_reconstruction,rgb,projective_ranging') == (
+        'rgb', 'projective_ranging', 'euclidean_reconstruction',
+    )
     with pytest.raises(ValueError, match='depth_anything'):
         parse_estimators('mono_depth')
 
 
-def test_benchmark_output_name_folds_source_and_isolation_into_mask_rows() -> None:
+def test_benchmark_output_name_folds_path_source_gate_and_isolation() -> None:
     assert benchmark_output_name(
-        'path_a', 'stereo', 'nearest_mode_histogram', 'height_crop_range_band'
-    ) == 'stereo_aggregate_depth_nearest_mode_histogram'
+        'projective_ranging', 'stereoscopic', 'nearest_mode_histogram', 'height_crop_range_band'
+    ) == 'projective_ranging_stereoscopic_box_nearest_mode_histogram'
     assert benchmark_output_name(
-        'path_b', 'depth_anything', 'otsu', 'range_band'
-    ) == 'depth_anything_deproject_centroid_range_band'
+        'euclidean_reconstruction', 'monocular', 'otsu', 'range_band'
+    ) == 'euclidean_reconstruction_monocular_box_range_band'
 
 
 def test_benchmark_output_name_leaves_non_mask_estimators_plain() -> None:
     for estimator in ('rgb', 'sensor_depth', 'depth_anything', 'pointcloud', 'lidar'):
         assert benchmark_output_name(
-            estimator, 'stereo', 'nearest_mode_histogram', 'height_crop_range_band'
+            estimator, 'stereoscopic', 'nearest_mode_histogram', 'height_crop_range_band'
         ) == estimator
 
 
@@ -113,21 +115,21 @@ def test_mask_source_message_merges_into_the_same_aligned_event() -> None:
     camera_msg = make_message()
     camera_msg.rgb_distance_m = [4.5]
     mask_msg = make_message()
-    mask_msg.path_a_distance_m = [4.1]
-    mask_msg.path_b_distance_m = [4.2]
+    mask_msg.projective_ranging_distance_m = [4.1]
+    mask_msg.euclidean_reconstruction_distance_m = [4.2]
 
     events = {}
     camera_event = ensure_measurement_event(events, camera_msg)
     update_measurement_event(camera_event, camera_msg, {'rgb'})
     mask_event = ensure_measurement_event(events, mask_msg)
-    update_measurement_event(mask_event, mask_msg, {'path_a', 'path_b'})
+    update_measurement_event(mask_event, mask_msg, {'projective_ranging', 'euclidean_reconstruction'})
 
     # Identical alignment key -> one merged event holding all three estimates.
     assert len(events) == 1
     assert mask_event is camera_event
     assert camera_event.estimates['rgb'] == pytest.approx(4.5, rel=1e-6)
-    assert camera_event.estimates['path_a'] == pytest.approx(4.1, rel=1e-6)
-    assert camera_event.estimates['path_b'] == pytest.approx(4.2, rel=1e-6)
+    assert camera_event.estimates['projective_ranging'] == pytest.approx(4.1, rel=1e-6)
+    assert camera_event.estimates['euclidean_reconstruction'] == pytest.approx(4.2, rel=1e-6)
 
 
 def test_find_exact_preview_match_uses_only_exact_stamp() -> None:

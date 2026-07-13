@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
-"""Mask-based measurement node: the Path A/B benchmark rows.
+"""Mask-based measurement node: the projective ranging / euclidean reconstruction benchmark rows.
 
 Consumes detections plus the aligned depth frame (``aligned_depth_node``),
 rasterizes each detection box into a ``rect`` mask, and runs both
-localization paths (``perception/core/path_a.py`` / ``path_b.py``) per mask.
+localization paths (``perception/core/projective_ranging.py`` / ``euclidean_reconstruction.py``) per mask.
 Results are converted from the camera optical frame to the vehicle-frame
 planar-distance convention every benchmark row shares (ground truth
 included), and published as ``G1Measurements`` with the identity fields of
 the source detections message -- so the benchmark runner can merge them into
 the same aligned event as the camera and lidar measurements.
 
-The depth source (stereo vs Depth-Anything) is whatever ``aligned_depth_node``
+The depth source (stereoscopic vs monocular) is whatever ``aligned_depth_node``
 was configured to produce; this node never branches on it. Deliberately
 independent of the legacy estimator stack (``geometry.py`` /
 ``g1_camera_measurement_node``): constants are mirrored by value, never
@@ -49,8 +49,8 @@ from ridgeback_autonomy.perception.core.isolation_3d import (
     ISOLATION_3D_RECIPES,
 )
 from ridgeback_autonomy.perception.core.mask import rasterize_detection
-from ridgeback_autonomy.perception.core.path_a import localize_path_a
-from ridgeback_autonomy.perception.core.path_b import localize_path_b
+from ridgeback_autonomy.perception.core.projective_ranging import localize_projective_ranging
+from ridgeback_autonomy.perception.core.euclidean_reconstruction import localize_euclidean_reconstruction
 
 
 RAW_DETECTIONS_TOPIC = 'detections/g1/raw'
@@ -226,23 +226,23 @@ class G1MaskMeasurementNode(Node):
         for detection in batch.detections:
             mask = rasterize_detection(detection, batch.image_height, batch.image_width)
 
-            result_a = localize_path_a(
+            result_a = localize_projective_ranging(
                 depth_m, mask, intrinsics, isolation=self.isolation_2d)
             if result_a is not None:
                 (
-                    detection.path_a_lateral_m,
-                    detection.path_a_forward_m,
-                    detection.path_a_distance_m,
+                    detection.projective_ranging_lateral_m,
+                    detection.projective_ranging_forward_m,
+                    detection.projective_ranging_distance_m,
                 ) = optical_to_vehicle_planar(
                     result_a.xyz_optical, self.pitch_rad, self.front_offset_m)
 
-            result_b = localize_path_b(
+            result_b = localize_euclidean_reconstruction(
                 depth_m, mask, intrinsics, isolation=self.isolation_3d)
             if result_b is not None:
                 (
-                    detection.path_b_lateral_m,
-                    detection.path_b_forward_m,
-                    detection.path_b_distance_m,
+                    detection.euclidean_reconstruction_lateral_m,
+                    detection.euclidean_reconstruction_forward_m,
+                    detection.euclidean_reconstruction_distance_m,
                 ) = optical_to_vehicle_planar(
                     result_b.xyz_optical, self.pitch_rad, self.front_offset_m)
 

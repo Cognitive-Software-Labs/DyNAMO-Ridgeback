@@ -1,4 +1,4 @@
-# Path C — Project-Then-Segment (2D LiDAR Route)
+# Polar profiling — Project-Then-Segment (2D LiDAR Route)
 
 **Scope:** the LiDAR localization path, end to end — the only path that does not
 consume the aligned depth frame. It takes a mask plus a planar 2D LiDAR scan,
@@ -10,7 +10,7 @@ stereo/monocular producer split), this one document covers both the
 acquisition contract and the path itself — the roles that
 `depth_based_path.md` and `depth_based_A.md`/`depth_based_B.md` split between
 them for the depth routes. The mask contract is `mask_component.md`; the
-architecture-level view of Path C is `Object_Localization_Pipeline.md` §5.
+architecture-level view of polar profiling is `Object_Localization_Pipeline.md` §5.
 
 ---
 
@@ -20,7 +20,7 @@ architecture-level view of Path C is `Object_Localization_Pipeline.md` §5.
 
 - A **mask** from the mask interface: an `H×W` boolean array on the RGB color
   grid, plus its precision tag (`tight` | `rect`). See `mask_component.md`.
-  Same interface as Paths A and B — Path C rejoins the pipeline only here.
+  Same interface as projective ranging and euclidean reconstruction — polar profiling rejoins the pipeline only here.
 - A **LaserScan** from the front Hokuyo UST (`sensors/lidar2d_0/scan`): 270°
   (±135°), 0.25° angular resolution, single horizontal plane at the LiDAR's
   mounting height. Range vs. bearing only — no height information.
@@ -45,7 +45,7 @@ architecture-level view of Path C is `Object_Localization_Pipeline.md` §5.
   by-product, but it is the *plane's* height, not the object center's — do not
   substitute it.
 
-Path C is the accuracy specialist: within its plane the UST is typically more
+Polar profiling is the accuracy specialist: within its plane the UST is typically more
 accurate and longer-range than RealSense stereo, but it recovers no height and
 only returns anything at all when the scan plane physically intersects the
 object.
@@ -93,7 +93,7 @@ remains downstream. Two properties worth pinning:
 - The transform comes from **TF at the matching timestamp**. On a moving
   platform an unsynchronized lookup smears the projected points against the
   mask — time synchronization is a pipeline-level open item
-  (`Object_Localization_Pipeline.md` §10.3), and Path C is its most sensitive
+  (`Object_Localization_Pipeline.md` §10.3), and polar profiling is its most sensitive
   consumer because the mask test (step 4) is pixel-exact.
 - After the transform the scan is no longer at `z = 0`: in the optical frame
   (X right, Y down, Z forward) the plane sits at a Y determined by the
@@ -119,19 +119,19 @@ mask test, not just a column/bearing gate.
 ### 2.4 Select
 
 The mask indexes the projected points exactly as it indexes depth pixels in
-Path A — the same one-line selection mechanic, in sparse form:
+projective ranging — the same one-line selection mechanic, in sparse form:
 
 ```python
 keep = mask.data[v_px, u_px]         # per-point membership test
 ```
 
-This is the whole payoff of the mask interface for Path C: `tight` and `rect`
+This is the whole payoff of the mask interface for polar profiling: `tight` and `rect`
 masks select scan points with the *same* line, and the front-end choice never
 leaks into this path. The grid precondition applies unchanged: the mask and
 the projection must share resolution and intrinsics, or the indices refer to
 different rays.
 
-One geometric subtlety unique to Path C: with a `tight` mask, the scan plane
+One geometric subtlety unique to polar profiling: with a `tight` mask, the scan plane
 may cross the object at a height where the silhouette is narrow (between the
 G1's legs) — a perfectly valid mask can then select very few or zero points
 even though the object is visible. This is the structural fallback case (§4),
@@ -139,8 +139,9 @@ not an error.
 
 ### 2.5 Recover — segmentation, not a fork
 
-The selected points form a 1D **range profile** over bearing. Unlike Paths A
-and B, *both* mask tags run the same recovery, because mask membership is not
+The selected points form a 1D **range profile** over bearing. Unlike
+projective ranging and euclidean reconstruction, *both* mask tags run the same
+recovery, because mask membership is not
 sufficient here even when the mask is pixel-precise:
 
 > **Parallax contamination.** The mask is defined from the camera's viewpoint;
@@ -149,7 +150,7 @@ sufficient here even when the mask is pixel-precise:
 > enter the profile carrying background ranges. Mask membership certifies that
 > the *camera's* ray hits the object; it says nothing about a LiDAR point
 > further along that ray. So a plain median over the arc is unsafe even on the
-> `tight` branch. (`Object_Localization_Pipeline.md` §5, Path C callout.)
+> `tight` branch. (`Object_Localization_Pipeline.md` §5, polar profiling callout.)
 >
 > A pixel-precise segmenter does *not* close this hole. It excludes background
 > the camera can see (e.g. wall visible between the G1's legs — those pixels
@@ -193,11 +194,11 @@ The only tag-dependent behavior is implicit: the `rect` mask admits a wider
 bearing window, so more neighbor runs enter the profile and the segmentation
 has more to reject; the `tight` mask narrows the window but changes nothing
 about the algorithm. This is the same "fork sits where behavior genuinely
-diverges" rule as Paths A/B (`Object_Localization_Pipeline.md` §6) — here the
+diverges" rule as projective ranging and euclidean reconstruction (`Object_Localization_Pipeline.md` §6) — here the
 behaviors do not diverge, so there is no fork.
 
-The merged near-band set is Path C's **foreground set**, and it is the single
-source for the output — the same single-source rule as Path A §2.3 and Path B
+The merged near-band set is polar profiling's **foreground set**, and it is the single
+source for the output — the same single-source rule as projective ranging §2.3 and euclidean reconstruction
 §2.4: the coordinate and any distance statistic read the same set, so they
 agree by construction.
 
@@ -205,7 +206,7 @@ agree by construction.
 
 ## 3. Batch / per-mask granularity
 
-Path C runs **per mask** over shared per-scan work, with the same 1:1:1
+Polar profiling runs **per mask** over shared per-scan work, with the same 1:1:1
 hierarchy as the depth paths (`mask_component.md` §6.1): one object → one
 detection → one mask → one coordinate; masks never compared or merged.
 
@@ -215,21 +216,21 @@ detection → one mask → one coordinate; masks never compared or merged.
 | mask select, segment, merge, median | once per mask |
 
 The per-scan work is tiny by depth-path standards — a 270° / 0.25° scan is
-~1080 points against Path B's `H×W` pixels — so Path C is computationally the
+~1080 points against euclidean reconstruction's `H×W` pixels — so polar profiling is computationally the
 cheapest path end to end, on top of being sensor-accurate in its plane.
 
 ---
 
 ## 4. Failure modes and the fallback contract
 
-Path C has a structural failure mode the depth paths do not: **the scan plane
+Polar profiling has a structural failure mode the depth paths do not: **the scan plane
 can miss the object entirely** (plane passes above/below it, or crosses a gap
 in it). The path must distinguish and report:
 
 - **No points selected / too few rays** (`< min_valid_rays`): the plane missed
   the object, the object is outside the LiDAR FoV overlap, or the scan was
-  invalid → return `None`, mirroring `localize_path_a` / `localize_path_b`'s
-  sparse fallback. The consumer routes to Path A/B
+  invalid → return `None`, mirroring `localize_projective_ranging` / `localize_euclidean_reconstruction`'s
+  sparse fallback. The consumer routes to projective ranging / euclidean reconstruction
   (`Object_Localization_Pipeline.md` §10.4).
 - **Points selected but all far**: parallax-only content (camera sees the
   object, every LiDAR ray inside the mask flew past it). The zero-point check
@@ -246,19 +247,19 @@ pipeline it is the signal to fall back — never a zero or a stale value.
 
 ---
 
-## 5. Where Path C wins (and what it lacks)
+## 5. Where polar profiling wins (and what it lacks)
 
 - **In-plane accuracy.** The UST's range accuracy and 0.25° angular resolution
   beat stereo depth at range; no alignment resampling, no occlusion holes, no
   monocular scale softness.
 - **Independence.** A genuinely separate sensor and error model — the reason
-  it is the natural cross-check on Path B's depth in the fusion stage
+  it is the natural cross-check on euclidean reconstruction's depth in the fusion stage
   (`Object_Localization_Pipeline.md` §9).
 - **Cheapest compute.** ~1k points per scan; segmentation is a 1D pass.
 - **No Y.** Planar only; never a standalone 3D source.
 - **Conditional availability.** Only fires when the scan plane intersects the
-  object — availability depends on object height and range, unlike A/B which
-  fire whenever the mask has valid depth.
+  object — availability depends on object height and range, unlike projective
+  ranging / euclidean reconstruction which fire whenever the mask has valid depth.
 - **Extrinsic + sync sensitivity.** A camera–LiDAR miscalibration or timestamp
   skew translates directly into wrong mask membership; the depth paths have no
   analogous inter-sensor coupling (their alignment is factory-calibrated or by
@@ -272,7 +273,7 @@ The existing lidar estimator (`compute_lidar_measurement` in `geometry.py`,
 fed by `g1_lidar_measurement_node`) is a proto-Path-C with the same
 generalization gaps its depth siblings had:
 
-| Aspect | Current estimator | Path C target |
+| Aspect | Current estimator | polar profiling target |
 |--------|-------------------|---------------|
 | Selection | bbox → bearing window (`compute_camera_bearing_window`, margin + floor padding); horizontal gate only | project points to `(u, v)`, index the actual mask (2D membership, forked on nothing) |
 | Intrinsics | fx synthesized from `camera_config.json` HFoV | `camera_info` of the color grid (`depth_based_path.md` §2.3) |
@@ -281,32 +282,32 @@ generalization gaps its depth siblings had:
 | Scan preprocessing | `extract_scan_points_base` (validity, base-frame Cartesian) | same responsibilities, retargeted at the camera optical frame |
 
 The percentile-anchor inlier band is the incumbent recovery, exactly as the
-range band was for Path B — it survives as a benchmark baseline, not as the
+range band was for euclidean reconstruction — it survives as a benchmark baseline, not as the
 target design. Note the current estimator already transforms points into the
 camera frame internally (steps 1–2 of `compute_lidar_measurement`) and then
-transforms the answer *back* to the base frame; Path C simply stops at the
+transforms the answer *back* to the base frame; polar profiling simply stops at the
 camera frame.
 
 ---
 
 ## 7. Implementation plan
 
-Mirrors the Path A/B pattern: a pure core module, constants mirrored by value
+Mirrors the projective ranging / euclidean reconstruction pattern: a pure core module, constants mirrored by value
 from the legacy stack (never imported — the stacks stay independent, as with
-`path_a.py`/`path_b.py`), the node as a thin shell, the estimator as an
+`projective_ranging.py`/`euclidean_reconstruction.py`), the node as a thin shell, the estimator as an
 opt-in benchmark row.
 
-**`perception/core/path_c.py`** — the pure path, no ROS:
+**`perception/core/polar_profiling.py`** — the pure path, no ROS:
 
 ```python
 @dataclass(frozen=True)
-class PathCResult:
+class PolarProfilingResult:
     xz_optical: np.ndarray        # (2,) X right, Z forward, meters; Y unobserved
     distance_m: float             # median planar range of the merged near-band set
     foreground_points: np.ndarray # (M, 2) the merged (X, Z) set, by-product
     ray_count: int                # rays that survived the mask ∩ FoV select
 
-def localize_path_c(
+def localize_polar_profiling(
     points_optical: np.ndarray,   # (N, 3) scan in the camera optical frame
     valid: np.ndarray,            # (N,) scan-validity from preprocessing
     mask: Mask,
@@ -316,7 +317,7 @@ def localize_path_c(
     range_band_m: float = ...,        # near-band merge width
     max_bearing_gap_beams: int = ..., # run-split beam-gap threshold
     min_valid_rays: int = ...,
-) -> PathCResult | None: ...
+) -> PolarProfilingResult | None: ...
 ```
 
 Internal structure mirrors the sibling modules: SELECT (project + mask index,
@@ -330,7 +331,7 @@ percentile band being the obvious first alternative row).
 **`perception/core/intrinsics.py`** — add the forward projection
 (`project_points(points, intrinsics) -> (uv, valid)`: an `(N, 2)` pixel
 array plus an in-front-and-in-bounds selector), the inverse of the existing
-`deproject_*` helpers; Path C is its first consumer.
+`deproject_*` helpers; polar profiling is its first consumer.
 
 **Scan preprocessing** — a `scan_points_optical(...)` helper (validity clean +
 polar→Cartesian + extrinsic transform, §2.1–2.2): the retargeted equivalent of
@@ -340,19 +341,19 @@ shared across masks per §3.
 **Node wiring** — the mask-based measurement flow needs the scan + TF, which
 `g1_mask_measurement_node` does not have, and the mask, which
 `g1_lidar_measurement_node` does not have. Options: extend the lidar node to
-consume the mask topic and publish a `path_c` measurement alongside its legacy
+consume the mask topic and publish a `polar_profiling` measurement alongside its legacy
 one, or give the mask node a scan subscription. **Deferred** — same category
 as the other benchmark-wiring decisions; decide when wiring the benchmark row,
 not before.
 
-**Benchmark row** — `path_c` estimator key, opt-in via `estimators:=`,
-matching the `path_a`/`path_b` rows added in fbed928. Distance convention:
+**Benchmark row** — `polar_profiling` estimator key, opt-in via `estimators:=`,
+matching the `projective_ranging`/`euclidean_reconstruction` rows added in fbed928. Distance convention:
 `distance_m` = median planar range of the merged set. Comparable in trend to
 the legacy `lidar` row's scalar, but not identical by construction: the
 legacy row is *base-frame* planar distance with the vehicle front offset
 applied, while `distance_m` is *camera-frame* planar range — the same
 reference-frame mismatch already suspected behind the ~0.07 m bias in the
-`path_a`/`path_b` rows. Account for the offset when reading the matrix.
+`projective_ranging`/`euclidean_reconstruction` rows. Account for the offset when reading the matrix.
 
 **Tests** — synthetic-scan unit tests in the `test_benchmark_runner.py` /
 core-module style: a two-legs profile (band merge averages the legs), a
@@ -368,21 +369,21 @@ stack's, untouched by this work.
 - **Camera–LiDAR extrinsic calibration** on real hardware — define the
   procedure, store the transform (`Object_Localization_Pipeline.md` §10.2).
   Sim is exact via URDF; the sim benchmark will not exercise this error.
-- **Time synchronization** — matched scan/mask timestamps; Path C is the most
+- **Time synchronization** — matched scan/mask timestamps; polar profiling is the most
   sensitive consumer (§2.2), and the current node pairs latest-scan with
   latest-detections without stamp matching.
 - **Segmentation parameters** — pin `range_band_m`, `range_jump_m`,
   `max_bearing_gap_beams`, `min_valid_rays` against the two-legs and
   wall-behind cases; document the values next to the mirrored constants.
-- **Parallax-only guard placement** — cross-check against Path A's depth
+- **Parallax-only guard placement** — cross-check against projective ranging's depth
   inside the path vs. in the fusion stage (§4, second failure mode).
-- **Fallback routing** — where the `None` → Path A/B escalation lives
-  (consumer logic, not the path itself); shared with Path B's sparse-mask
+- **Fallback routing** — where the `None` → projective ranging / euclidean reconstruction escalation lives
+  (consumer logic, not the path itself); shared with euclidean reconstruction's sparse-mask
   fallback item.
 - **Y convention** — pinned here as NaN in the output; confirm the message
   fields represent it losslessly when the wiring is decided.
 - **Front + rear merge (360°)** — out of scope; perception uses the front 270°
   (`lidar2d_0`) only. Revisit only if rear coverage ever matters for
   localization.
-- **Coordinate frame** — same confirmation as Paths A/B
+- **Coordinate frame** — same confirmation as projective ranging and euclidean reconstruction
   (`Object_Localization_Pipeline.md` §7) before integration.

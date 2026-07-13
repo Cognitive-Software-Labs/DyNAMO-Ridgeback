@@ -125,7 +125,7 @@ A rectangular mask is:
 - and carrying a known background contamination that the tag advertises.
 
 The boolean array is an **in-process representation, not a wire format**: the
-whole perception stack (mask component + Paths A/B/C) runs on one machine, so
+whole perception stack (mask component + projective ranging, euclidean reconstruction, and polar profiling) runs on one machine, so
 consumers receive the mask by in-process handoff, never over the network. If a
 mask is ever published as a topic, that topic is debug/visualization only and
 uses an encoded form — see the wire-cost note in Section 5.3.
@@ -213,7 +213,7 @@ detection count. The convention that keeps this harmless:
 
 - **Consumers never take the mask off the wire.** The whole perception stack
   runs on one machine (robot PC or workstation — never split across both), so
-  Paths A/B/C receive the boolean array by in-process handoff at zero wire
+  projective ranging, euclidean reconstruction, and polar profiling receive the boolean array by in-process handoff at zero wire
   cost.
 - **The published topic is debug/visualization only**, and goes out encoded:
   `mono8` Image with compressed transport (PNG). Binary masks compress to a few

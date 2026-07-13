@@ -83,12 +83,12 @@ def test_build_measurements_message_serializes_parallel_arrays() -> None:
                 lidar_lateral_m=-0.2,
                 lidar_forward_m=3.0,
                 lidar_distance_m=3.006,
-                path_a_lateral_m=-0.1,
-                path_a_forward_m=3.1,
-                path_a_distance_m=3.102,
-                path_b_lateral_m=-0.15,
-                path_b_forward_m=3.05,
-                path_b_distance_m=3.054,
+                projective_ranging_lateral_m=-0.1,
+                projective_ranging_forward_m=3.1,
+                projective_ranging_distance_m=3.102,
+                euclidean_reconstruction_lateral_m=-0.15,
+                euclidean_reconstruction_forward_m=3.05,
+                euclidean_reconstruction_distance_m=3.054,
             ),
         ],
     )
@@ -102,10 +102,10 @@ def test_build_measurements_message_serializes_parallel_arrays() -> None:
     assert math.isnan(msg.mono_depth_distance_m[0])
     assert math.isclose(msg.pointcloud_distance_m[0], 1.8, rel_tol=1e-6)
     assert math.isclose(msg.lidar_distance_m[1], 3.006, rel_tol=1e-6)
-    assert math.isnan(msg.path_a_distance_m[0])
-    assert math.isclose(msg.path_a_distance_m[1], 3.102, rel_tol=1e-6)
-    assert math.isnan(msg.path_b_distance_m[0])
-    assert math.isclose(msg.path_b_distance_m[1], 3.054, rel_tol=1e-6)
+    assert math.isnan(msg.projective_ranging_distance_m[0])
+    assert math.isclose(msg.projective_ranging_distance_m[1], 3.102, rel_tol=1e-6)
+    assert math.isnan(msg.euclidean_reconstruction_distance_m[0])
+    assert math.isclose(msg.euclidean_reconstruction_distance_m[1], 3.054, rel_tol=1e-6)
 
 
 def test_snapshot_measurements_message_uses_first_finite_positive_values() -> None:
@@ -122,8 +122,8 @@ def test_snapshot_measurements_message_uses_first_finite_positive_values() -> No
                 mono_depth_distance_m=None,
                 lidar_distance_m=2.1,
                 pointcloud_distance_m=None,
-                path_a_distance_m=2.3,
-                path_b_distance_m=None,
+                projective_ranging_distance_m=2.3,
+                euclidean_reconstruction_distance_m=None,
             ),
         ],
     )
@@ -139,5 +139,5 @@ def test_snapshot_measurements_message_uses_first_finite_positive_values() -> No
     assert snapshot['mono_depth_distance_m'] is None
     assert snapshot['lidar_distance_m'] == pytest.approx(2.1, rel=1e-6)
     assert snapshot['pointcloud_distance_m'] is None
-    assert snapshot['path_a_distance_m'] == pytest.approx(2.3, rel=1e-6)
-    assert snapshot['path_b_distance_m'] is None
+    assert snapshot['projective_ranging_distance_m'] == pytest.approx(2.3, rel=1e-6)
+    assert snapshot['euclidean_reconstruction_distance_m'] is None

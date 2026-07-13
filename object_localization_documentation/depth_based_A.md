@@ -1,12 +1,12 @@
-# Path A — Aggregate-Then-Deproject (2D Depth-Image Route)
+# Projective ranging — Aggregate-Then-Deproject (2D Depth-Image Route)
 
 **Scope:** the cheapest of the three localization paths. It takes a mask plus an
 aligned depth frame, reads the depth at the masked pixels, reduces them to a
 single distance, and deprojects one representative pixel into a 3D point. This
-document describes Path A end to end. The mask object it consumes is defined in
+document describes projective ranging end to end. The mask object it consumes is defined in
 `mask_component.md`; how the aligned depth frame is produced (stereo alignment
 or monocular estimation) is defined in `depth_based_path.md`. This doc assumes
-both contracts and does not re-describe them. Path B, the point-domain sibling,
+both contracts and does not re-describe them. Euclidean reconstruction, the point-domain sibling,
 is `depth_based_B.md`.
 
 ---
@@ -19,7 +19,7 @@ is `depth_based_B.md`.
   grid, plus its precision tag (`tight` | `rect`). See `mask_component.md`.
 - An **aligned depth frame**: a depth image that is 1:1 with the RGB pixels, so
   that depth pixel `(u, v)` is the same ray as color pixel `(u, v)`. Producing
-  this is a separate component (`depth_based_path.md`); Path A assumes it is
+  this is a separate component (`depth_based_path.md`); projective ranging assumes it is
   already aligned.
 
 **Output**
@@ -28,7 +28,7 @@ is `depth_based_B.md`.
   exact frame convention is proposed in `Object_Localization_Pipeline.md`
   Section 7; confirmation against SDK/TF still open.)
 
-Path A is the cheapest path because it never builds a 3D structure — it collapses
+Projective ranging is the cheapest path because it never builds a 3D structure — it collapses
 the masked depths to a single number and deprojects exactly one pixel.
 
 ---
@@ -122,8 +122,8 @@ the representative pixel. Because both read the *same* set, they agree by
 construction.
 
 The practical consequence of the fork: choosing the cheap box detector also puts
-Path A on the heavier `rect` branch — but here the extra work is small (a
-histogram or a weighting), which is exactly why Path A is the path where "the box
+projective ranging on the heavier `rect` branch — but here the extra work is small (a
+histogram or a weighting), which is exactly why projective ranging is the path where "the box
 stays cheap."
 
 ### 2.4 Deproject
@@ -142,7 +142,7 @@ The result is `(X, Y, Z)` in the camera optical frame.
 **The representative pixel must be the centroid of the *foreground* pixels, not
 the raw geometric box center.** On the `rect` branch those are the foreground
 pixels the isolation strategy returned (§2.3); on the `tight` branch they are all
-valid masked pixels. Path A's entire answer rides on this one pixel. If it lands
+valid masked pixels. Projective ranging's entire answer rides on this one pixel. If it lands
 on a depth discontinuity (object edge against far background) its `Z` is wrong
 even when the aggregated range was correct. Taking the centroid of the foreground
 pixels keeps the pixel on the object.
@@ -151,7 +151,7 @@ pixels keeps the pixel on the object.
 
 ## 3. Depth-source agnostic
 
-Path A does not care *how* the aligned depth frame was produced. The same four
+Projective ranging does not care *how* the aligned depth frame was produced. The same four
 steps run unchanged on RealSense stereo depth (after alignment) and on
 Depth-Anything monocular depth (after metric scaling). Both producers and the
 contract they converge to are specified in `depth_based_path.md`; the depth
@@ -162,10 +162,10 @@ path.
 
 ## 4. Batch / per-mask granularity
 
-Path A runs **per mask**, looped within a frame, over a shared depth frame. The
+Projective ranging runs **per mask**, looped within a frame, over a shared depth frame. The
 hierarchy is strictly 1:1:1 (`mask_component.md` §6.1): one visible object →
 one post-NMS detection → one mask → one `(X, Y, Z)`. Two G1s in view means two
-masks and two independent Path A runs — masks are never compared, merged, or
+masks and two independent projective ranging runs — masks are never compared, merged, or
 ranked against each other; object *i*'s coordinate is computed as if the other
 masks did not exist. Crucially, the heavy per-frame work is done once and the
 per-mask work is cheap:
@@ -188,29 +188,29 @@ already define.
 
 ---
 
-## 5. Two aggregation philosophies (where Path A sits)
+## 5. Two aggregation philosophies (where projective ranging sits)
 
 It is worth being explicit about *order of operations*, because it separates
-Path A from Path B:
+projective ranging from euclidean reconstruction:
 
-- **Aggregate-then-deproject (Path A):** collapse the masked depths to one
+- **Aggregate-then-deproject (projective ranging):** collapse the masked depths to one
   number, then deproject one representative pixel. Cheap, yields a single point,
   but fragile on the choice of that pixel.
-- **Deproject-then-aggregate (Path B, `depth_based_B.md`):** deproject *all*
+- **Deproject-then-aggregate (euclidean reconstruction, `depth_based_B.md`):** deproject *all*
   masked pixels into 3D points first, then reduce the point set (e.g.
   centroid). Heavier, more robust, recovers full geometry.
 
-Path A is deliberately the first. When the single-pixel fragility matters, that
-is the signal to spend the extra cost and move to Path B.
+Projective ranging is deliberately the first. When the single-pixel fragility matters, that
+is the signal to spend the extra cost and move to euclidean reconstruction.
 
 ---
 
 ## 6. Relationship to the current stack
 
-The repository today has a depth estimator that is close to Path A but not
+The repository today has a depth estimator that is close to projective ranging but not
 identical, and the differences define the work:
 
-| Aspect | Current estimator | Path A target |
+| Aspect | Current estimator | projective ranging target |
 |--------|-------------------|---------------|
 | Region | inner "focus" crop of the box + Gaussian center weighting | the actual mask, forked on tag |
 | `rect` foreground | crop + weight (assumes the object is centered) | pluggable isolation strategy (`foreground_isolation_2d.md`) |
@@ -219,7 +219,7 @@ identical, and the differences define the work:
 
 In other words the current estimator is permanently on a `rect`-style branch,
 approximates foreground recovery with a fixed crop, and emits a range rather than
-a point. Path A generalizes it: replace the crop with the mask, add the tag fork,
+a point. Projective ranging generalizes it: replace the crop with the mask, add the tag fork,
 and emit a camera-frame coordinate without the vehicle-frame transform (which
 belongs to a later consumer/fusion stage, once the frame convention is fixed).
 
@@ -229,7 +229,7 @@ belongs to a later consumer/fusion stage, once the frame convention is fixed).
 
 - ~~**Representative-pixel rule**~~ — resolved 2026-07-12: the representative
   pixel is the mean row/column of the foreground pixel set
-  (`perception/core/path_a.py`); a sparse mask falls under the invalid-depth
+  (`perception/core/projective_ranging.py`); a sparse mask falls under the invalid-depth
   fallback below.
 - **`rect` foreground recipe** — the `rect` branch is a pluggable strategy
   (input: depth frame + mask; output: the foreground pixel set). Choose among
@@ -238,5 +238,5 @@ belongs to a later consumer/fusion stage, once the frame convention is fixed).
 - **Coordinate frame** — confirm the camera-frame axes/handedness against the SDK
   and TF tree (`Object_Localization_Pipeline.md` Section 7) before integration.
 - ~~**Invalid-depth fallback**~~ — resolved 2026-07-12: skip —
-  `localize_path_a` returns `None` when fewer than `min_valid_pixels` valid
+  `localize_projective_ranging` returns `None` when fewer than `min_valid_pixels` valid
   (or foreground) pixels remain.

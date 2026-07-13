@@ -63,8 +63,8 @@ def test_measurements_from_detections_batch_preserve_alignment_key() -> None:
     # What the mask node does: rebuild the batch from the detections message,
     # fill path fields, publish measurements with the same header.
     rebuilt = batch_from_detections_message(detections_msg)
-    rebuilt.detections[0].path_a_distance_m = 2.5
-    rebuilt.detections[0].path_b_distance_m = 2.6
+    rebuilt.detections[0].projective_ranging_distance_m = 2.5
+    rebuilt.detections[0].euclidean_reconstruction_distance_m = 2.6
     measurements_msg = build_measurements_message(rebuilt, detections_msg.header)
 
     assert measurement_message_key(measurements_msg) == (
@@ -80,10 +80,10 @@ def test_missing_path_results_encode_as_nan_and_decode_as_none() -> None:
                 bbox_xyxy=(1, 2, 30, 40),
                 label='humanoid robot',
                 score=0.9,
-                path_a_lateral_m=0.1,
-                path_a_forward_m=2.0,
-                path_a_distance_m=2.002,
-                # path_b left unset: the sparse-mask skip case.
+                projective_ranging_lateral_m=0.1,
+                projective_ranging_forward_m=2.0,
+                projective_ranging_distance_m=2.002,
+                # euclidean_reconstruction left unset: the sparse-mask skip case.
             ),
         ],
     )
@@ -91,7 +91,7 @@ def test_missing_path_results_encode_as_nan_and_decode_as_none() -> None:
     msg = build_measurements_message(batch, Header())
     decoded = batch_from_measurements_message(msg)
 
-    assert msg.path_a_distance_m[0] == pytest.approx(2.002, rel=1e-6)
-    assert math.isnan(msg.path_b_distance_m[0])
-    assert decoded.detections[0].path_a_distance_m == pytest.approx(2.002, rel=1e-6)
-    assert decoded.detections[0].path_b_distance_m is None
+    assert msg.projective_ranging_distance_m[0] == pytest.approx(2.002, rel=1e-6)
+    assert math.isnan(msg.euclidean_reconstruction_distance_m[0])
+    assert decoded.detections[0].projective_ranging_distance_m == pytest.approx(2.002, rel=1e-6)
+    assert decoded.detections[0].euclidean_reconstruction_distance_m is None

@@ -1,7 +1,7 @@
-# Path B — Foreground Isolation Methods (3D Point-Domain Route)
+# Euclidean reconstruction — Foreground Isolation Methods (3D Point-Domain Route)
 
 **Context.** Companion to `foreground_isolation_2d.md`, which covers the 2D
-depth-image route (Path A). In Path B the mask has already selected a point set
+depth-image route (projective ranging). In euclidean reconstruction the mask has already selected a point set
 out of the organized cloud — but with a *rect* mask that set is the whole box
 frustum: the G1 **plus** the floor strip under it **plus** whatever background
 falls inside the box. Foreground isolation must then separate them **in the
@@ -16,7 +16,7 @@ subset, so they agree by construction. Every method below is one implementation
 of this contract, swappable behind it for the benchmark.
 
 **Relationship to the 2D methods.** The 2D catalogue does not become obsolete
-in Path B:
+in euclidean reconstruction:
 
 - **Value-based 2D methods transfer verbatim** (nearest-mode histogram, Otsu,
   GMM, mean-shift): depth value *is* the Z coordinate, so running them before

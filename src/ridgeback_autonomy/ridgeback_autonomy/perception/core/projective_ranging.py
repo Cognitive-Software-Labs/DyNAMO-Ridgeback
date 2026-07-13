@@ -1,4 +1,4 @@
-"""Path A -- aggregate-then-deproject (``depth_based_A.md``).
+"""Projective ranging -- aggregate-then-deproject (``depth_based_A.md``).
 
 The cheapest localization path: select the masked depths, clean them,
 collapse them to one distance, and deproject exactly one representative
@@ -38,8 +38,8 @@ MIN_VALID_PIXELS_DEFAULT = 10  # mirrors POINTCLOUD_MIN_VALID_POINTS by value
 
 
 @dataclass(frozen=True)
-class PathAResult:
-    """One Path A localization: a point in the camera optical frame plus provenance."""
+class ProjectiveRangingResult:
+    """One projective ranging localization: a point in the camera optical frame plus provenance."""
 
     xyz_optical: np.ndarray  # (3,) X right, Y down, Z forward, meters
     depth_m: float  # the aggregated (median) foreground depth
@@ -47,7 +47,7 @@ class PathAResult:
     foreground_pixel_count: int
 
 
-def localize_path_a(
+def localize_projective_ranging(
     depth_m: np.ndarray,
     mask: Mask,
     intrinsics: CameraIntrinsics,
@@ -55,7 +55,7 @@ def localize_path_a(
     isolation: Callable[..., np.ndarray] | None = None,
     depth_max: float = DEPTH_MAX_METERS_DEFAULT,
     min_valid_pixels: int = MIN_VALID_PIXELS_DEFAULT,
-) -> PathAResult | None:
+) -> ProjectiveRangingResult | None:
     """Localize one mask against one aligned depth frame.
 
     ``isolation`` is the ``rect``-branch foreground recipe (an
@@ -93,7 +93,7 @@ def localize_path_a(
     u = float(cols.mean())
     v = float(rows.mean())
     x, y, z = deproject_pixel(u, v, aggregated_depth_m, intrinsics)
-    return PathAResult(
+    return ProjectiveRangingResult(
         xyz_optical=np.array((x, y, z), dtype=np.float64),
         depth_m=aggregated_depth_m,
         representative_uv=(u, v),

@@ -1,4 +1,4 @@
-"""2D foreground isolation recipes for Path A's ``rect`` branch.
+"""2D foreground isolation recipes for projective ranging's ``rect`` branch.
 
 Contract (``depth_based_A.md`` Section 2.3): input the aligned depth frame and
 a mask, both ``H x W`` on the color grid; output the **foreground pixels** as
@@ -123,7 +123,7 @@ def otsu_foreground(
 
 
 # The config swap point: recipes keyed by name, all satisfying the contract
-# above. ``ISOLATION_2D_DEFAULT`` is what Path A uses when none is chosen.
+# above. ``ISOLATION_2D_DEFAULT`` is what projective ranging uses when none is chosen.
 ISOLATION_2D_RECIPES: dict[str, Callable[..., np.ndarray]] = {
     'nearest_mode_histogram': nearest_mode_histogram,
     'otsu': otsu_foreground,

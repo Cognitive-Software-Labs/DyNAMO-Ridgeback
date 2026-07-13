@@ -2,7 +2,7 @@
 
 Every consumer of an aligned depth frame filters invalid pixels the same way
 before doing anything else (``depth_based_A.md`` Section 2.2, applied verbatim
-by Path B): ``0`` means no depth return, ``NaN``/``inf`` are undefined, and
+by euclidean reconstruction): ``0`` means no depth return, ``NaN``/``inf`` are undefined, and
 values past a sane maximum are far-field noise.
 
 ``DEPTH_MAX_METERS_DEFAULT`` mirrors the legacy stack's

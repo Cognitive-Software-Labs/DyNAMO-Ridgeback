@@ -58,7 +58,7 @@ def deproject_pixel(
     z_m: float,
     intrinsics: CameraIntrinsics,
 ) -> tuple[float, float, float]:
-    """Inverse pinhole projection of one pixel (Path A Section 2.4).
+    """Inverse pinhole projection of one pixel (projective ranging Section 2.4).
 
     ``(u, v)`` is a pixel coordinate on the grid, ``z_m`` its depth in meters;
     returns ``(X, Y, Z)`` in the camera optical frame.
@@ -73,7 +73,7 @@ def project_points(
     points: np.ndarray,
     intrinsics: CameraIntrinsics,
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Forward pinhole projection of camera-optical-frame points (Path C §2.3).
+    """Forward pinhole projection of camera-optical-frame points (polar profiling §2.3).
 
     ``points`` is an ``(N, 3)`` array in the camera optical frame. Returns
     ``(uv, valid)``: an ``(N, 2)`` float pixel-coordinate array and an
@@ -108,7 +108,7 @@ def deproject_masked(
 
     ``rows`` / ``cols`` are the pixel indices to deproject (typically
     ``np.nonzero`` of a cleaned mask). Restricting the multiply to the masked
-    pixels is the production form of Path B's deproject step
+    pixels is the production form of euclidean reconstruction's deproject step
     (``depth_based_B.md`` Section 2.1). Returns an ``(N, 3)`` float array in
     the camera optical frame.
     """

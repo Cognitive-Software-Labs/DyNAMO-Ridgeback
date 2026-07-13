@@ -1,4 +1,4 @@
-"""Path B -- deproject-then-aggregate (``depth_based_B.md``).
+"""Euclidean reconstruction -- deproject-then-aggregate (``depth_based_B.md``).
 
 The point-domain localization path: deproject the valid masked pixels of the
 aligned depth frame into camera-optical-frame points, isolate the foreground
@@ -46,15 +46,15 @@ MIN_VALID_POINTS_DEFAULT = 10  # mirrors POINTCLOUD_MIN_VALID_POINTS by value
 
 
 @dataclass(frozen=True)
-class PathBResult:
-    """One Path B localization plus the foreground set it was reduced from."""
+class EuclideanReconstructionResult:
+    """One euclidean reconstruction localization plus the foreground set it was reduced from."""
 
     xyz_optical: np.ndarray  # (3,) centroid, camera optical frame, meters
     distance_m: float  # median camera-frame range of the foreground points
     foreground_points: np.ndarray  # (M, 3) by-product (extent, orientation, ...)
 
 
-def localize_path_b(
+def localize_euclidean_reconstruction(
     depth_m: np.ndarray,
     mask: Mask,
     intrinsics: CameraIntrinsics,
@@ -62,7 +62,7 @@ def localize_path_b(
     isolation: Callable[[np.ndarray], np.ndarray] | None = None,
     depth_max: float = DEPTH_MAX_METERS_DEFAULT,
     min_valid_points: int = MIN_VALID_POINTS_DEFAULT,
-) -> PathBResult | None:
+) -> EuclideanReconstructionResult | None:
     """Localize one mask against one aligned depth frame in the point domain.
 
     ``isolation`` is the ``rect``-branch keep-selector (an
@@ -95,7 +95,7 @@ def localize_path_b(
     # 4. REDUCE: centroid for the coordinate, median range for the distance.
     centroid = foreground.mean(axis=0)
     distance_m = float(np.median(point_ranges(foreground)))
-    return PathBResult(
+    return EuclideanReconstructionResult(
         xyz_optical=centroid,
         distance_m=distance_m,
         foreground_points=foreground,

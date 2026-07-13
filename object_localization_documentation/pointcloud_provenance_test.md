@@ -1,6 +1,6 @@
 # Point-Cloud Provenance Test: Published vs. Deprojected
 
-**Question:** Path B consumes an organized point cloud. That cloud can come from
+**Question:** euclidean reconstruction consumes an organized point cloud. That cloud can come from
 two places — the **published** cloud (sim: gz `rgbd_camera` plugin; real:
 realsense-ros pointcloud filter) or a **deprojected** cloud our own code builds
 from the aligned depth frame. Is there any difference in *accuracy* or
@@ -21,7 +21,7 @@ python3 ~/tmp/cloud_provenance_test.py --ros-args \
 One run per G1 position; each writes `~/tmp/cloud_provenance_<label>.csv` and
 prints column medians at exit. `pidstat` / `ros2 topic bw` / `delay` remain
 manual, per §2. **Results collected 2026-07-11 — see §6. Decision taken — see
-§7: Path B uses the deprojected cloud only.** Script and CSVs kept in `~/tmp/`
+§7: Euclidean reconstruction uses the deprojected cloud only.** Script and CSVs kept in `~/tmp/`
 for re-runs; delete once the decision is implemented.
 
 ---
@@ -87,7 +87,7 @@ Three metric classes:
      - real: camera driver CPU with `pointcloud.enable` true vs. false, and
        separately `align_depth` true vs. false. Fair accounting: the published
        variant pays the pointcloud filter, the deprojected variant pays the
-       align filter — and alignment is needed anyway for Path A and the mask
+       align filter — and alignment is needed anyway for projective ranging and the mask
        work, so for the deprojected variant it is effectively a sunk cost.
    - **Wire.** Serialized message size per frame (`len(msg.data)`) for
      `points` vs. `depth/image`, `ros2 topic bw` on both as a rate
@@ -232,7 +232,7 @@ Implementation notes:
 | deproject_ms ≪ frame period (expect 1–2 ms at 640×480) | no processing argument for the published variant |
 | deproject_ms comparable to parse_ms | deprojection is not even a cost increase — drop the published variant from the benchmark matrix entirely |
 | systematic cloud diff | intrinsics bug (FoV/center convention) — fix the deprojection, re-run; also flags the `camera_config.json` 87° vs. sim 71.6° mismatch as a live defect |
-| est_dep clearly worse despite matching clouds | reduction is sensitive to something other than geometry (ordering, invalid-pixel handling) — investigate before trusting Path B plans |
+| est_dep clearly worse despite matching clouds | reduction is sensitive to something other than geometry (ordering, invalid-pixel handling) — investigate before trusting euclidean reconstruction plans |
 
 Whatever the outcome, the real-robot question stays open: on hardware the two
 variants read genuinely different depth (raw vs. aligned), so the sim result
@@ -304,7 +304,7 @@ remains open per §2 scope.
 
 ## 7. Decision (2026-07-11)
 
-**Path B uses the deprojected cloud only.** The published cloud is not a
+**Euclidean reconstruction uses the deprojected cloud only.** The published cloud is not a
 pipeline input anywhere — it keeps exactly one role: optional RViz/debug
 visualization.
 
@@ -320,7 +320,7 @@ Consequences applied to the other docs:
 - `depth_based_B.md` — deprojected is the sole input; the published-variant
   caveats collapse into a historical note pointing here.
 - `Object_Localization_Pipeline.md` — the organized point cloud is no longer
-  listed as a pipeline input; "Path B has no input on hardware" is void (Path B
+  listed as a pipeline input; "euclidean reconstruction has no input on hardware" is void (euclidean reconstruction
   needs only the aligned depth frame there).
 - The `pointcloud.enable` / `ordered_pc` config gap on the real robot is
   **downgraded from blocker to irrelevant-for-the-paths** (matters only if
@@ -331,5 +331,5 @@ Consequences applied to the other docs:
   compare; hardware validation effort moves to the aligned-depth topic itself
   (grid check, hole rate, `align_depth` passthrough).
 - The existing `pointcloud` estimator keeps consuming the published topic until
-  Path B replaces it; its benchmark row is now understood as "deprojected-
+  euclidean reconstruction replaces it; its benchmark row is now understood as "deprojected-
   equivalent geometry + percentile-anchor reduction" per §6.

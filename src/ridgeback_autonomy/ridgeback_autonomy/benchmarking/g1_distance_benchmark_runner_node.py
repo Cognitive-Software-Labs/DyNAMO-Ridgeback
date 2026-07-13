@@ -72,7 +72,7 @@ IMAGE_MATCH_TOLERANCE_NS = 250_000_000
 CAMERA_MEASUREMENT_TOPIC = 'measurements/g1/camera'
 LIDAR_MEASUREMENT_TOPIC = 'measurements/g1/lidar'
 MASK_MEASUREMENT_TOPIC = 'measurements/g1/mask'
-DEPTH_SOURCE_DEFAULT = 'stereo'
+DEPTH_SOURCE_DEFAULT = 'stereoscopic'
 MONO_DEPTH_DEBUG_TOPIC = 'debug/g1/camera/mono_depth'
 DEPTH_MAX_METERS_DEFAULT = 10.0
 PREVIEW_BUFFER_LIMIT = 256
@@ -113,9 +113,10 @@ class G1DistanceBenchmarkRunner(Node):
         self.declare_parameter('camera_measurement_topic', CAMERA_MEASUREMENT_TOPIC)
         self.declare_parameter('lidar_measurement_topic', LIDAR_MEASUREMENT_TOPIC)
         self.declare_parameter('mask_measurement_topic', MASK_MEASUREMENT_TOPIC)
-        # The three config axes of the mask rows, stamped into their output
-        # names so path_a/path_b runs are self-describing (must match the
-        # values passed to the aligned depth + mask nodes for the same run).
+        # The config axes of the mask rows, stamped into their output names so
+        # projective_ranging / euclidean_reconstruction runs are
+        # self-describing (must match the values passed to the aligned depth +
+        # mask nodes for the same run).
         self.declare_parameter('depth_source', DEPTH_SOURCE_DEFAULT)
         self.declare_parameter('isolation_2d', ISOLATION_2D_DEFAULT)
         self.declare_parameter('isolation_3d', ISOLATION_3D_DEFAULT)

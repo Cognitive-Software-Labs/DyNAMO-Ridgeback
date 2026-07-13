@@ -1,11 +1,11 @@
-# Path A — Foreground Isolation Methods (2D Depth-Image Route)
+# Projective ranging — Foreground Isolation Methods (2D Depth-Image Route)
 
-**Context.** In Path A of the pipeline, an aligned depth frame (1:1 with RGB) and a binary mask arrive through the mask interface. When the mask is *tight* (instance segmentation), a robust median over the masked depth pixels is sufficient. When the mask is a *rectangle* (rasterized detection box), the ROI contains both the foreground subject (the static G1) and background pixels, so a **foreground isolation** step must separate them **purely in the 2D depth image** — no back-projection into a point cloud (that is Path B's job).
+**Context.** In projective ranging of the pipeline, an aligned depth frame (1:1 with RGB) and a binary mask arrive through the mask interface. When the mask is *tight* (instance segmentation), a robust median over the masked depth pixels is sufficient. When the mask is a *rectangle* (rasterized detection box), the ROI contains both the foreground subject (the static G1) and background pixels, so a **foreground isolation** step must separate them **purely in the 2D depth image** — no back-projection into a point cloud (that is euclidean reconstruction's job).
 
 The problem reduces to separating the depth distribution inside the rectangle: the G1 forms a near mode, the background forms one or more farther modes, plus invalid/zero-depth pixels. The methods below span the design space from trivial histogram tricks to learned foundation models, so they can be benchmarked against each other on:
 
 1. **Mask quality** (IoU against hand-labeled ground truth)
-2. **Distance error** (error in the final median depth — the metric that actually matters for Path A)
+2. **Distance error** (error in the final median depth — the metric that actually matters for projective ranging)
 3. **Runtime per frame** (this runs live on the Ridgeback)
 
 They differ along two axes worth keeping in mind when analyzing results:
@@ -206,4 +206,4 @@ A. Kirillov, E. Mintun, N. Ravi, H. Mao, C. Rolland, L. Gustafson, T. Xiao, S. W
 1. **Ground truth:** hand-label tight masks on a sample of frames (varying distance, viewpoint, clutter).
 2. **Metrics per method:** mask IoU, absolute error of the median foreground depth vs. ground-truth median, runtime per ROI.
 3. **Ablations:** each of Methods 1–5 with and without CRF refinement (Method 7); GrabCut in its three input variants; SAM as the appearance-only control.
-4. **Report:** since the downstream output is one distance number, expect and highlight cases where an "ugly" mask still yields a near-perfect median depth — for Path A, that finding is as valuable as a pretty mask.
+4. **Report:** since the downstream output is one distance number, expect and highlight cases where an "ugly" mask still yields a near-perfect median depth — for projective ranging, that finding is as valuable as a pretty mask.

@@ -262,20 +262,21 @@ def generate_launch_description():
                               default_value='sensors/camera_0/color/camera_info'),
         DeclareLaunchArgument(
             'depth_source',
-            default_value='stereo',
-            description='Aligned-depth producer for the path_a/path_b rows: '
-                        '"stereo" or "depth_anything". Comparing sources = two runs.',
+            default_value='stereoscopic',
+            description='Aligned-depth producer for the projective_ranging / '
+                        'euclidean_reconstruction rows: "stereoscopic" or '
+                        '"monocular". Comparing sources = two runs.',
         ),
         DeclareLaunchArgument(
             'isolation_2d',
             default_value='nearest_mode_histogram',
-            description='Path A (path_a) rect-branch foreground recipe: '
+            description='Projective-ranging rect-branch foreground recipe: '
                         '"nearest_mode_histogram" or "otsu".',
         ),
         DeclareLaunchArgument(
             'isolation_3d',
             default_value='height_crop_range_band',
-            description='Path B (path_b) rect-branch foreground recipe: '
+            description='Euclidean-reconstruction rect-branch foreground recipe: '
                         '"height_crop_range_band", "height_crop", or "range_band".',
         ),
         DeclareLaunchArgument('scan_topic', default_value='sensors/lidar2d_0/scan'),

@@ -1,7 +1,7 @@
 # The Aligned Depth Frame — Depth Acquisition
 
 **Scope:** how the depth that the localization paths consume is produced. Both
-Path A (`depth_based_A.md`) and Path B (`depth_based_B.md`) consume one and the
+projective ranging (`depth_based_A.md`) and euclidean reconstruction (`depth_based_B.md`) consume one and the
 same artifact — the **aligned depth frame** — and neither cares how it was
 made. This document defines that contract and the two producers that satisfy
 it: the physical depth camera (`camera → aligned depth`) and monocular
@@ -12,7 +12,7 @@ estimation (`RGB frame → aligned depth`).
    D435 depth ──▶│ stereo source:            │
    (sensor)      │ capture → align to color  │──┐
                  └───────────────────────────┘  │   ┌─────────────────────┐
-                                                ├──▶│ ALIGNED DEPTH FRAME │──▶ Path A / Path B
+                                                ├──▶│ ALIGNED DEPTH FRAME │──▶ projective ranging / euclidean reconstruction
                  ┌───────────────────────────┐  │   │  (one contract)     │
    RGB frame  ──▶│ monocular source:         │──┘   └─────────────────────┘
    (color)       │ Depth-Anything → metric   │
@@ -100,7 +100,7 @@ contract. Divergences to keep in mind (details in
 
 ### 2.3 Intrinsics caveat
 
-Deprojection (Path A §2.4, Path B §2.1) needs the intrinsics *of the grid the
+Deprojection (projective ranging §2.4, euclidean reconstruction §2.1) needs the intrinsics *of the grid the
 frame lives on* — after alignment that is the **color** camera's intrinsics.
 The repo currently derives intrinsics from `config/camera_config.json` FoV
 values (87°/58° — the real depth FoV), which is wrong for the sim render
@@ -132,8 +132,8 @@ predicts a dense metric depth map.
   accordingly (current sim run: `sensor_depth` MAE 0.586 m vs.
   `depth_anything` MAE 0.931 m).
 - **No published cloud.** The monocular source produces only a depth image.
-  Path B reaches it exclusively through in-code deprojection — the reason the
-  deprojected provenance is Path B's canonical input
+  euclidean reconstruction reaches it exclusively through in-code deprojection — the reason the
+  deprojected provenance is euclidean reconstruction's canonical input
   (`pointcloud_provenance_test.md`).
 
 ---
@@ -146,7 +146,7 @@ Two producers, one contract, and every consumer is source-blind:
 stereo producer     = capture -> (real: align) -> float meters -> frame
 monocular producer  = RGB -> Depth-Anything -> metric scale    -> frame
 
-consumers (Path A, Path B, mask overlay) never branch on the source.
+consumers (projective ranging, euclidean reconstruction, mask overlay) never branch on the source.
 ```
 
 - Selecting the source is a **config choice**, mirroring the other swap points
@@ -170,7 +170,7 @@ consumers (Path A, Path B, mask overlay) never branch on the source.
 - **Intrinsics source** — switch deprojection to `camera_info` of the color
   camera instead of the FoV constants in `camera_config.json` (§2.3).
 - **Metric-scale validation** — quantify Depth-Anything's global scale error
-  against stereo on identical frames before trusting its Path B rows.
+  against stereo on identical frames before trusting its euclidean reconstruction rows.
 - ~~**Topic-level contract**~~ — resolved 2026-07-12: both producers publish
   `perception/aligned_depth/image` + `perception/aligned_depth/camera_info`
   (`aligned_depth_node`, switched by its `depth_source` param); consumers

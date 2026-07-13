@@ -1,4 +1,4 @@
-"""Path C -- project-then-segment (``lidar_based_path.md``).
+"""Polar profiling -- project-then-segment (``lidar_based_path.md``).
 
 The LiDAR localization path: transform the planar scan into the camera
 optical frame, project the points onto the color grid, keep the points the
@@ -16,7 +16,7 @@ Runs per mask over shared per-scan work (``scan_points_optical``); the caller
 loops masks (1:1:1 hierarchy, ``mask_component.md`` Section 6.1). A mask that
 selects too few rays -- the scan plane missed the object, or it sits outside
 the FoV overlap -- is skipped by returning ``None``: the structural fallback
-to Path A/B, never an error.
+to projective ranging / euclidean reconstruction, never an error.
 
 Constants mirror the legacy ``geometry.py`` incumbent by value; the new stack
 deliberately never imports from the legacy stack.
@@ -46,8 +46,8 @@ MAX_BEARING_GAP_BEAMS_DEFAULT = 2  # run split: more than this many missing beam
 
 
 @dataclass(frozen=True)
-class PathCResult:
-    """One Path C localization: a planar point in the camera optical frame."""
+class PolarProfilingResult:
+    """One polar profiling localization: a planar point in the camera optical frame."""
 
     xz_optical: np.ndarray  # (2,) X right, Z forward, meters; Y unobserved
     distance_m: float  # median planar range of the merged near-band set
@@ -155,7 +155,7 @@ def merge_near_band(
     return np.concatenate(kept)
 
 
-def localize_path_c(
+def localize_polar_profiling(
     points_optical: np.ndarray,
     valid: np.ndarray,
     mask: Mask,
@@ -165,7 +165,7 @@ def localize_path_c(
     range_band_m: float = RANGE_BAND_M_DEFAULT,
     max_bearing_gap_beams: int = MAX_BEARING_GAP_BEAMS_DEFAULT,
     min_valid_rays: int = MIN_VALID_RAYS_DEFAULT,
-) -> PathCResult | None:
+) -> PolarProfilingResult | None:
     """Localize one mask against one scan already in the camera optical frame.
 
     ``points_optical`` / ``valid`` come from ``scan_points_optical`` (beam
@@ -177,7 +177,7 @@ def localize_path_c(
     points_optical = np.asarray(points_optical, dtype=np.float64)
 
     # 3. PROJECT + 4. SELECT: the mask indexes the projected points exactly
-    # as it indexes depth pixels in Path A, in sparse per-point form.
+    # as it indexes depth pixels in projective ranging, in sparse per-point form.
     uv, in_view = project_points(points_optical, intrinsics)
     selectable = np.asarray(valid, dtype=bool) & in_view
     beam_indices = np.flatnonzero(selectable)
@@ -208,7 +208,7 @@ def localize_path_c(
     foreground = selected[merged][:, (0, 2)]
     xz_optical = np.median(foreground, axis=0)
     distance_m = float(np.median(planar_range_m[merged]))
-    return PathCResult(
+    return PolarProfilingResult(
         xz_optical=xz_optical,
         distance_m=distance_m,
         foreground_points=foreground,

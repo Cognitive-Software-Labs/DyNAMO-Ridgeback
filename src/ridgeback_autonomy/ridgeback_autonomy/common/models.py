@@ -30,12 +30,12 @@ class Detection:
     pointcloud_lateral_m: float | None = None
     pointcloud_forward_m: float | None = None
     pointcloud_distance_m: float | None = None
-    path_a_lateral_m: float | None = None
-    path_a_forward_m: float | None = None
-    path_a_distance_m: float | None = None
-    path_b_lateral_m: float | None = None
-    path_b_forward_m: float | None = None
-    path_b_distance_m: float | None = None
+    projective_ranging_lateral_m: float | None = None
+    projective_ranging_forward_m: float | None = None
+    projective_ranging_distance_m: float | None = None
+    euclidean_reconstruction_lateral_m: float | None = None
+    euclidean_reconstruction_forward_m: float | None = None
+    euclidean_reconstruction_distance_m: float | None = None
 
 
 @dataclass

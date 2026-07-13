@@ -5,7 +5,7 @@ import numpy as np
 from ridgeback_autonomy.perception.core.intrinsics import CameraIntrinsics
 from ridgeback_autonomy.perception.core.isolation_3d import RangeBand
 from ridgeback_autonomy.perception.core.mask import MaskPrecision, mask_from_array, rasterize_bbox
-from ridgeback_autonomy.perception.core.path_b import localize_path_b
+from ridgeback_autonomy.perception.core.euclidean_reconstruction import localize_euclidean_reconstruction
 
 
 HEIGHT, WIDTH = 60, 80
@@ -35,7 +35,7 @@ def object_mask_data() -> np.ndarray:
 def test_rect_mask_default_chain_recovers_object_centroid() -> None:
     mask = rasterize_bbox(RECT_BBOX, HEIGHT, WIDTH)
 
-    result = localize_path_b(build_depth(), mask, INTRINSICS)
+    result = localize_euclidean_reconstruction(build_depth(), mask, INTRINSICS)
 
     assert result is not None
     assert np.allclose(result.xyz_optical, OBJECT_CENTROID_XYZ)
@@ -48,7 +48,7 @@ def test_rect_mask_default_chain_recovers_object_centroid() -> None:
 def test_rect_accepts_explicit_isolation_recipe() -> None:
     mask = rasterize_bbox(RECT_BBOX, HEIGHT, WIDTH)
 
-    result = localize_path_b(build_depth(), mask, INTRINSICS, isolation=RangeBand())
+    result = localize_euclidean_reconstruction(build_depth(), mask, INTRINSICS, isolation=RangeBand())
 
     assert result is not None
     assert np.allclose(result.xyz_optical, OBJECT_CENTROID_XYZ)
@@ -63,7 +63,7 @@ def test_tight_mask_mad_pass_drops_edge_bleed() -> None:
         depth[row, col] = 6.0
     mask = mask_from_array(object_mask_data(), MaskPrecision.TIGHT)
 
-    result = localize_path_b(depth, mask, INTRINSICS)
+    result = localize_euclidean_reconstruction(depth, mask, INTRINSICS)
 
     assert result is not None
     # The bleed points (range ~6 m) are gone; some legitimate far-corner
@@ -78,10 +78,10 @@ def test_all_invalid_depth_returns_none() -> None:
     depth = np.zeros((HEIGHT, WIDTH), dtype=np.float32)
     mask = rasterize_bbox(RECT_BBOX, HEIGHT, WIDTH)
 
-    assert localize_path_b(depth, mask, INTRINSICS) is None
+    assert localize_euclidean_reconstruction(depth, mask, INTRINSICS) is None
 
 
 def test_sparse_mask_returns_none() -> None:
     mask = rasterize_bbox((10, 10, 13, 13), HEIGHT, WIDTH)
 
-    assert localize_path_b(build_depth(), mask, INTRINSICS) is None
+    assert localize_euclidean_reconstruction(build_depth(), mask, INTRINSICS) is None

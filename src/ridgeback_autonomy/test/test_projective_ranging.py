@@ -5,7 +5,7 @@ import numpy as np
 from ridgeback_autonomy.perception.core.intrinsics import CameraIntrinsics
 from ridgeback_autonomy.perception.core.isolation_2d import otsu_foreground
 from ridgeback_autonomy.perception.core.mask import MaskPrecision, mask_from_array, rasterize_bbox
-from ridgeback_autonomy.perception.core.path_a import localize_path_a
+from ridgeback_autonomy.perception.core.projective_ranging import localize_projective_ranging
 
 
 HEIGHT, WIDTH = 60, 80
@@ -38,7 +38,7 @@ def object_mask_data() -> np.ndarray:
 def test_rect_mask_recovers_object_coordinate() -> None:
     mask = rasterize_bbox(RECT_BBOX, HEIGHT, WIDTH)
 
-    result = localize_path_a(build_depth(), mask, INTRINSICS)
+    result = localize_projective_ranging(build_depth(), mask, INTRINSICS)
 
     assert result is not None
     assert result.depth_m == OBJECT_DEPTH_M
@@ -49,7 +49,7 @@ def test_rect_mask_recovers_object_coordinate() -> None:
 def test_rect_representative_pixel_is_foreground_centroid_not_box_center() -> None:
     mask = rasterize_bbox(RECT_BBOX, HEIGHT, WIDTH)
 
-    result = localize_path_a(build_depth(), mask, INTRINSICS)
+    result = localize_projective_ranging(build_depth(), mask, INTRINSICS)
 
     assert result is not None
     assert np.allclose(result.representative_uv, OBJECT_CENTROID_UV)
@@ -66,7 +66,7 @@ def test_rect_survives_invalid_pixels_in_the_box() -> None:
     depth[17, 27] = 15.0  # out of range
     mask = rasterize_bbox(RECT_BBOX, HEIGHT, WIDTH)
 
-    result = localize_path_a(depth, mask, INTRINSICS)
+    result = localize_projective_ranging(depth, mask, INTRINSICS)
 
     assert result is not None
     assert result.depth_m == OBJECT_DEPTH_M
@@ -77,7 +77,7 @@ def test_rect_survives_invalid_pixels_in_the_box() -> None:
 def test_rect_accepts_explicit_isolation_recipe() -> None:
     mask = rasterize_bbox(RECT_BBOX, HEIGHT, WIDTH)
 
-    result = localize_path_a(build_depth(), mask, INTRINSICS, isolation=otsu_foreground)
+    result = localize_projective_ranging(build_depth(), mask, INTRINSICS, isolation=otsu_foreground)
 
     assert result is not None
     assert result.depth_m == OBJECT_DEPTH_M
@@ -87,7 +87,7 @@ def test_rect_accepts_explicit_isolation_recipe() -> None:
 def test_tight_mask_takes_the_median_directly() -> None:
     mask = mask_from_array(object_mask_data(), MaskPrecision.TIGHT)
 
-    result = localize_path_a(build_depth(), mask, INTRINSICS)
+    result = localize_projective_ranging(build_depth(), mask, INTRINSICS)
 
     assert result is not None
     assert result.depth_m == OBJECT_DEPTH_M
@@ -100,11 +100,11 @@ def test_all_invalid_depth_returns_none() -> None:
     depth = np.zeros((HEIGHT, WIDTH), dtype=np.float32)
     mask = rasterize_bbox(RECT_BBOX, HEIGHT, WIDTH)
 
-    assert localize_path_a(depth, mask, INTRINSICS) is None
+    assert localize_projective_ranging(depth, mask, INTRINSICS) is None
 
 
 def test_sparse_mask_returns_none() -> None:
     # A 3x3 box holds fewer valid pixels than min_valid_pixels.
     mask = rasterize_bbox((10, 10, 13, 13), HEIGHT, WIDTH)
 
-    assert localize_path_a(build_depth(), mask, INTRINSICS) is None
+    assert localize_projective_ranging(build_depth(), mask, INTRINSICS) is None

@@ -7,8 +7,8 @@ import numpy as np
 
 from ridgeback_autonomy.perception.core.intrinsics import CameraIntrinsics
 from ridgeback_autonomy.perception.core.mask import MaskPrecision, mask_from_array, rasterize_bbox
-from ridgeback_autonomy.perception.core.path_c import (
-    localize_path_c,
+from ridgeback_autonomy.perception.core.polar_profiling import (
+    localize_polar_profiling,
     merge_near_band,
     scan_points_optical,
     segment_range_profile,
@@ -64,7 +64,7 @@ def test_two_legs_merge_drops_parallax_wall() -> None:
     points = two_legs_profile()
     mask = rasterize_bbox(MASK_BBOX, HEIGHT, WIDTH)
 
-    result = localize_path_c(points, np.ones(points.shape[0], dtype=bool), mask, INTRINSICS)
+    result = localize_polar_profiling(points, np.ones(points.shape[0], dtype=bool), mask, INTRINSICS)
 
     assert result is not None
     # Both legs merged: X medians to the body center, Z to the leg depth.
@@ -86,7 +86,7 @@ def test_unequal_legs_median_stays_on_object() -> None:
     points = profile_points(bearings_deg, z_m)
     mask = rasterize_bbox(MASK_BBOX, HEIGHT, WIDTH)
 
-    result = localize_path_c(points, np.ones(points.shape[0], dtype=bool), mask, INTRINSICS)
+    result = localize_polar_profiling(points, np.ones(points.shape[0], dtype=bool), mask, INTRINSICS)
 
     assert result is not None
     assert result.xz_optical[1] == LEG_Z_M
@@ -98,15 +98,15 @@ def test_unequal_legs_median_stays_on_object() -> None:
 
 
 def test_tight_tag_runs_identical_recovery() -> None:
-    # Same selector, tight tag: no fork exists in Path C, so the result is
+    # Same selector, tight tag: no fork exists in polar profiling, so the result is
     # bit-identical to the rect run (lidar_based_path.md Section 2.5).
     points = two_legs_profile()
     valid = np.ones(points.shape[0], dtype=bool)
     rect = rasterize_bbox(MASK_BBOX, HEIGHT, WIDTH)
     tight = mask_from_array(rect.data.copy(), MaskPrecision.TIGHT)
 
-    rect_result = localize_path_c(points, valid, rect, INTRINSICS)
-    tight_result = localize_path_c(points, valid, tight, INTRINSICS)
+    rect_result = localize_polar_profiling(points, valid, rect, INTRINSICS)
+    tight_result = localize_polar_profiling(points, valid, tight, INTRINSICS)
 
     assert rect_result is not None and tight_result is not None
     assert np.array_equal(rect_result.xz_optical, tight_result.xz_optical)
@@ -121,7 +121,7 @@ def test_wall_behind_single_object_rejected() -> None:
     points = profile_points(bearings_deg, z_m)
     mask = rasterize_bbox(MASK_BBOX, HEIGHT, WIDTH)
 
-    result = localize_path_c(points, np.ones(points.shape[0], dtype=bool), mask, INTRINSICS)
+    result = localize_polar_profiling(points, np.ones(points.shape[0], dtype=bool), mask, INTRINSICS)
 
     assert result is not None
     assert np.allclose(result.xz_optical, (0.0, LEG_Z_M), atol=1e-6)
@@ -133,7 +133,7 @@ def test_plane_miss_returns_none() -> None:
     points = two_legs_profile()
     empty_mask = mask_from_array(np.zeros((HEIGHT, WIDTH), dtype=bool), MaskPrecision.TIGHT)
 
-    assert localize_path_c(
+    assert localize_polar_profiling(
         points, np.ones(points.shape[0], dtype=bool), empty_mask, INTRINSICS,
     ) is None
 
@@ -142,7 +142,7 @@ def test_all_invalid_beams_return_none() -> None:
     points = two_legs_profile()
     mask = rasterize_bbox(MASK_BBOX, HEIGHT, WIDTH)
 
-    assert localize_path_c(
+    assert localize_polar_profiling(
         points, np.zeros(points.shape[0], dtype=bool), mask, INTRINSICS,
     ) is None
 
@@ -152,7 +152,7 @@ def test_sparse_rays_return_none() -> None:
     points = profile_points(np.array([0.0]), np.array([LEG_Z_M]))
     mask = rasterize_bbox(MASK_BBOX, HEIGHT, WIDTH)
 
-    assert localize_path_c(points, np.ones(1, dtype=bool), mask, INTRINSICS) is None
+    assert localize_polar_profiling(points, np.ones(1, dtype=bool), mask, INTRINSICS) is None
 
 
 def test_segment_range_profile_splits_on_jump_and_gap() -> None:

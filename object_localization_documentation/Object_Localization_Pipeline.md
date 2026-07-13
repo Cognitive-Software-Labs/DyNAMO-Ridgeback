@@ -2,7 +2,7 @@
 
 **Purpose:** Given a RealSense camera (and optionally a planar 2D LiDAR), detect objects of a target class in the RGB image and report each object's coordinates **relative to the camera frame**. The system is designed as a set of swappable components so that every combination of detector, depth source, and downstream path can be benchmarked for accuracy vs. compute.
 
-**Output contract:** Every path terminates at a single representation — `(X, Y, Z)` in the camera frame (the LiDAR path yields `(X, Z)` only; see Path C). This shared output makes the paths directly comparable and fusible.
+**Output contract:** Every path terminates at a single representation — `(X, Y, Z)` in the camera frame (the LiDAR path yields `(X, Z)` only; see polar profiling). This shared output makes the paths directly comparable and fusible.
 
 ---
 
@@ -15,7 +15,7 @@ The robot carries a single **Intel RealSense D435**, forward-facing, mounted at 
 **Data products we use:**
 
 1. **RGB color image** - input to detection / segmentation. Real D435: up to 1920x1080; our config requests 1280x720 @ 30 fps. Sim: rendered color frame.
-2. **Depth image** (made 1:1 with RGB) - input to Path A and Path B. Path B deprojects it into an organized point cloud in code (`depth_based_B.md`; provenance decision in `pointcloud_provenance_test.md` §7) - the cloud is a derived, in-code representation, not a sensor product.
+2. **Depth image** (made 1:1 with RGB) - input to projective ranging and euclidean reconstruction. Euclidean reconstruction deprojects it into an organized point cloud in code (`depth_based_B.md`; provenance decision in `pointcloud_provenance_test.md` §7) - the cloud is a derived, in-code representation, not a sensor product.
 3. **Camera IMU - NONE.** The D435 SKU has no IMU; only the D435i does.
 
 **How depth is produced - this is where sim and real diverge:**
@@ -35,7 +35,7 @@ The robot carries a single **Intel RealSense D435**, forward-facing, mounted at 
 
 **Open config gaps on the real robot** (invisible in sim, so the sim benchmark hides them):
 
-- `align_depth.enable: true` is missing from `robot.yaml` -> no `aligned_depth_to_color` topic on hardware -> Paths A and B have no depth input there (`depth_based_path.md` §2.1).
+- `align_depth.enable: true` is missing from `robot.yaml` -> no `aligned_depth_to_color` topic on hardware -> projective ranging and euclidean reconstruction have no depth input there (`depth_based_path.md` §2.1).
 - Stream profile keys are stale: `robot.yaml` uses `rgb_camera.profile` / `depth_module.profile`; current Clearpath / realsense-ros use `rgb_camera.color_profile` / `depth_module.depth_profile` -> the requested 1280x720 may be silently ignored. Verify against the installed driver version.
 - `config/camera_config.json` intrinsics (87° x 58°) match the real D435, **not** the sim render (71.6°) - so estimators assume the wrong FoV in sim.
 
@@ -105,7 +105,7 @@ flowchart TD
     DA --> SCALE["Metric Scaling"]
     SCALE --> ALIGNED
 
-    ALIGNED -->|"Path A · 2D"| EXTRACT["Extract depth<br/>in mask (shared)"]
+    ALIGNED -->|"projective ranging · 2D"| EXTRACT["Extract depth<br/>in mask (shared)"]
     IFACE --> EXTRACT
     EXTRACT -->|tight| A_T["Direct robust median"]
     EXTRACT -->|rect| A_R["Foreground isolation<br/>(nearest depth mode)"]
@@ -113,7 +113,7 @@ flowchart TD
     A_T --> A_COORD["Deproject (u,v,Z)<br/>foreground centroid + agg. depth<br/>→ camera frame"]
     A_R2 --> A_COORD
 
-    ALIGNED -->|"Path B · 3D"| DEPROJ["Deproject to 3D"]
+    ALIGNED -->|"euclidean reconstruction · 3D"| DEPROJ["Deproject to 3D"]
     DEPROJ --> CLOUD["Organized Point Cloud<br/>(camera optical frame)"]
     IFACE --> SELECT["Select points<br/>by mask (shared)"]
     CLOUD --> SELECT
@@ -132,7 +132,7 @@ flowchart TD
     L_SEL -->|"tight & rect (no fork)"| C_SEG["Segment range profile →<br/>merge near-band runs"]
     C_SEG --> C_COORD["Median of merged set → (X,Z)<br/>camera frame (Y unobserved)"]
 
-    A_COORD --> FINAL["Object Coordinates<br/>relative to Camera Frame<br/>(X, Y, Z) · Path C: X,Z only"]
+    A_COORD --> FINAL["Object Coordinates<br/>relative to Camera Frame<br/>(X, Y, Z) · polar profiling: X,Z only"]
     B_COORD --> FINAL
     C_COORD --> FINAL
 ```
@@ -159,11 +159,11 @@ Two interchangeable sources produce an **aligned depth frame** that is 1:1 with 
 - **RealSense stereo depth** — the raw depth lives in the left-IR frame, so it must pass through an **alignment** step (using the calibrated intrinsics + extrinsics) to reproject it onto the RGB pixel grid. After alignment, depth pixel `(u, v)` corresponds to color pixel `(u, v)`.
 - **Depth Anything (monocular)** — estimated directly from the RGB frame, so it is *already* pixel-aligned (no alignment step). However it outputs **affine-invariant / relative** depth, so it needs a **metric scaling** step to become meters. If RealSense depth is available, it is the natural ground-truth reference for that scaling.
 
-Both converge to the same `Aligned Depth` node that feeds Paths A and B.
+Both converge to the same `Aligned Depth` node that feeds projective ranging and euclidean reconstruction.
 
 > **Gotcha (alignment):** reprojection resamples the data and produces gaps at occlusion edges, because the baseline offset means some pixels are visible to one sensor but hidden from the other.
 
-> **Gotcha (monocular):** Depth Anything tends to bend flat surfaces and warp absolute geometry. It produces a much messier point cloud than stereo, which matters for Path B's clustering and box fitting.
+> **Gotcha (monocular):** Depth Anything tends to bend flat surfaces and warp absolute geometry. It produces a much messier point cloud than stereo, which matters for euclidean reconstruction's clustering and box fitting.
 
 ---
 
@@ -171,30 +171,30 @@ Both converge to the same `Aligned Depth` node that feeds Paths A and B.
 
 All three paths consume the same mask interface and resolve to camera-frame coordinates. They differ in what 3D information they recover and in cost.
 
-### Path A — 2D depth-image route (cheapest)
+### Projective ranging — 2D depth-image route (cheapest)
 Extract depth values at the masked pixels, aggregate to a single distance, then deproject the representative pixel (centroid of the foreground pixels — `depth_based_A.md` §2.4) + aggregated depth through the intrinsics to a 3D point.
 
 - **tight branch:** direct robust median of the masked depths.
 - **rect branch:** the masked depths are multimodal (object + background), so a plain median can land on background. Isolate the foreground first (histogram → nearest dominant depth mode, or center-weight the box), *then* median.
 - **Output:** `(X, Y, Z)` from a single representative pixel.
 
-> Path A's coordinate is only as good as that one representative pixel. If the centroid lands on a depth discontinuity (object edge vs. far background) the depth can be wrong even when the aggregate range was fine. The representative pixel must be the centroid of the *foreground* pixels — the isolation output on the `rect` branch, all valid masked pixels on the `tight` branch — never the raw geometric box center (`depth_based_A.md` §2.4). Both the aggregate and the centroid read the same foreground set, so they agree by construction.
+> Projective ranging's coordinate is only as good as that one representative pixel. If the centroid lands on a depth discontinuity (object edge vs. far background) the depth can be wrong even when the aggregate range was fine. The representative pixel must be the centroid of the *foreground* pixels — the isolation output on the `rect` branch, all valid masked pixels on the `tight` branch — never the raw geometric box center (`depth_based_A.md` §2.4). Both the aggregate and the centroid read the same foreground set, so they agree by construction.
 
-### Path B — 3D point cloud route (richest, heaviest)
+### Euclidean reconstruction — 3D point cloud route (richest, heaviest)
 Deproject the aligned depth into an **organized** point cloud (points keep pixel ordering, so the 2D mask indexes them directly), select the instance's points, clean up, and take the centroid.
 
 - **tight branch:** outlier removal → centroid.
 - **rect branch:** the box drags in the ground plane and neighbors, so: **RANSAC plane removal** → **Euclidean clustering** → **cluster selection** (nearest / most central / largest-after-plane). The tight mask never has to choose a cluster; the rectangular mask does.
 - **Output:** centroid `(X, Y, Z)` plus, if wanted, oriented bounding box and physical dimensions.
 
-### Path C — 2D 270° LiDAR route (accurate, planar only)
+### Polar profiling — 2D 270° LiDAR route (accurate, planar only)
 Independent sensor stream; rejoins the pipeline only at the mask. Convert the scan to Cartesian, transform into the camera frame via **extrinsic calibration**, project into the image plane with the intrinsics, then keep only the points falling inside the mask ∩ camera FoV.
 
 - **tight branch:** segment the 1D range profile, **merge the runs lying within a small range band of the nearest run**, and median the merged set — same recovery as the rect branch, only over a narrower bearing window. A plain median over the arc is unsafe even with a tight mask: parallax lets background points into the arc (see the callout below).
 - **rect branch:** the wider box widens the bearing window and admits neighbors, so segment the 1D range profile, merge the runs within the range band of the nearest, and median the merged set.
 - **Output:** `(X, Z)` in the camera frame. **Y (height) is unobservable** from a single-plane LiDAR.
 
-> Path C only returns points where the scan plane physically intersects the object at the LiDAR's height. A valid mask can yield zero LiDAR points if the plane passes above/below the object → the system needs a fallback to Path A/B in that case.
+> Polar profiling only returns points where the scan plane physically intersects the object at the LiDAR's height. A valid mask can yield zero LiDAR points if the plane passes above/below the object → the system needs a fallback to projective ranging / euclidean reconstruction in that case.
 >
 > **Parallax contamination — why even the tight branch segments:** the mask is defined from the camera's viewpoint, but the LiDAR samples from a different position. A `rect` mask admits background the camera can see through gaps in the object (between the G1's legs at scan height). A `tight` mask rejects those (gap pixels are False) but still admits background the camera *cannot* see: an occluded point projects inside the silhouette by definition of occlusion — the sensors' vertical offset means a beam through the leg gap that hits the wall behind lands on *torso* pixels from the camera's higher viewpoint (full geometry in `lidar_based_path.md` §2.5). Mask membership only certifies that the *camera's* ray hits the object; it says nothing about a LiDAR point further along that ray. The zero-point fallback does not catch this (points exist, they are just wrong); segmenting the range profile and keeping only the near runs drops them. **Convention (pinned):** runs lying within a small range band of the nearest run are merged before the median. On a legged object the nearest run alone would be one leg (range = leg face, offset from body center); merging the band averages both legs.
 
@@ -206,11 +206,11 @@ The common interface unifies the **selection** mechanic (indexing depth / points
 
 | Path | tight branch | rect branch (extra work) |
 |------|--------------|--------------------------|
-| A (2D depth) | robust median | foreground isolation (depth-mode/center) → median |
-| B (point cloud) | outlier removal | RANSAC plane removal → clustering → cluster selection |
-| C (LiDAR) | arc segmentation → merge near-band runs → median (narrow window) | arc segmentation → merge near-band runs → median (wide window admits neighbors) |
+| projective ranging (2D depth) | robust median | foreground isolation (depth-mode/center) → median |
+| euclidean reconstruction (point cloud) | outlier removal | RANSAC plane removal → clustering → cluster selection |
+| polar profiling (LiDAR) | arc segmentation → merge near-band runs → median (narrow window) | arc segmentation → merge near-band runs → median (wide window admits neighbors) |
 
-Selection stays shared; the fork sits exactly where behavior genuinely diverges. Path C is the exception: parallax contaminates even the tight mask (see the Path C callout), so its branches run the same recovery and differ only in bearing-window width. The practical consequence: choosing the cheap box detector also switches you onto the heavier recovery branch downstream — most punishing in Path B (plane + clustering), nearly free in Path A.
+Selection stays shared; the fork sits exactly where behavior genuinely diverges. Polar profiling is the exception: parallax contaminates even the tight mask (see the polar profiling callout), so its branches run the same recovery and differ only in bearing-window width. The practical consequence: choosing the cheap box detector also switches you onto the heavier recovery branch downstream — most punishing in euclidean reconstruction (plane + clustering), nearly free in projective ranging.
 
 ---
 
@@ -222,7 +222,7 @@ All paths agree to emit into one camera frame, but the exact convention must be 
 - **Axes:** X right, Y down, Z forward (into the scene), right-handed.
 - **Units:** meters.
 
-Path C must be expressed in this same frame after the extrinsic transform, with Y left undefined/NaN. **Action:** confirm handedness and axis directions against the actual SDK output and the robot's TF tree.
+Polar profiling must be expressed in this same frame after the extrinsic transform, with Y left undefined/NaN. **Action:** confirm handedness and axis directions against the actual SDK output and the robot's TF tree.
 
 ---
 
@@ -231,20 +231,20 @@ Path C must be expressed in this same frame after the extrinsic transform, with 
 The design intent is to evaluate every combination on two axes: **accuracy** (vs. ground-truth coordinates) and **latency / compute**.
 
 - **Detectors (2):** segmentation (tight) · detection→rect
-- **Depth sources (2):** RealSense stereo · Depth Anything (Paths A/B); LiDAR is its own source for Path C
-- **Paths (3):** A (2D depth) · B (point cloud) · C (LiDAR)
+- **Depth sources (2):** RealSense stereo · Depth Anything (projective ranging and euclidean reconstruction); LiDAR is its own source for polar profiling
+- **Paths (3):** projective ranging (2D depth) · euclidean reconstruction (point cloud) · polar profiling (LiDAR)
 
 Working hypotheses to validate:
 
-- **Box + Path B** may approach mask + Path B in accuracy because the 3D clustering recovers what the mask would have given for free — but it spends the detector savings back on plane removal + clustering, so the "box is cheaper" intuition can partly invert here.
-- **Box + Path A** is where the box stays genuinely cheap end-to-end.
-- **Path C** is the most accurate within its plane but only 2D; best as a high-accuracy range cross-check or fallback, not a standalone 3D source.
+- **Box + euclidean reconstruction** may approach mask + euclidean reconstruction in accuracy because the 3D clustering recovers what the mask would have given for free — but it spends the detector savings back on plane removal + clustering, so the "box is cheaper" intuition can partly invert here.
+- **Box + projective ranging** is where the box stays genuinely cheap end-to-end.
+- **Polar profiling** is the most accurate within its plane but only 2D; best as a high-accuracy range cross-check or fallback, not a standalone 3D source.
 
 ---
 
 ## 9. Fusion opportunity
 
-Because every path emits in the same frame and at least `(X, Z)`, the outputs are mutually checkable and fusible: weight by per-path confidence, prefer Path B's full geometry when available, fall back to A or C otherwise, and use Path C's accurate range to cross-validate B's depth. No further frame juggling is required once Section 7 is fixed.
+Because every path emits in the same frame and at least `(X, Z)`, the outputs are mutually checkable and fusible: weight by per-path confidence, prefer euclidean reconstruction's full geometry when available, fall back to projective ranging or polar profiling otherwise, and use polar profiling's accurate range to cross-validate euclidean reconstruction's depth. No further frame juggling is required once Section 7 is fixed.
 
 ---
 
@@ -253,7 +253,7 @@ Because every path emits in the same frame and at least `(X, Z)`, the outputs ar
 1. **Pin the camera-frame convention** (Section 7) — axes, handedness, units — against SDK + robot TF.
 2. **Calibration procedures:** RealSense intrinsics/extrinsics are factory-calibrated; the **camera–LiDAR extrinsic** must be calibrated and documented. Define the procedure and store the transform.
 3. **Time synchronization** between camera and LiDAR — without matched timestamps, a moving platform/object smears the LiDAR projection against the mask.
-4. **Fallback logic** for Path C empty returns (scan plane misses object) → route to A/B.
+4. **Fallback logic** for polar profiling empty returns (scan plane misses object) → route to projective ranging / euclidean reconstruction.
 5. **Metric-scaling strategy** for Depth Anything — metric-trained variant vs. calibrate against stereo.
 6. **Build the benchmark scaffold** — enumerate the matrix rows, columns for accuracy + latency, drop in measured numbers.
 7. **Define the component interface signatures** in code (the mask-interface contract, the per-path recovery dispatch) so the separation is enforced, not just diagrammed.

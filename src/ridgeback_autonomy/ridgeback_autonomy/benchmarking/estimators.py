@@ -7,8 +7,8 @@ PUBLIC_ESTIMATOR_ORDER = (
     'depth_anything',
     'pointcloud',
     'lidar',
-    'path_a',
-    'path_b',
+    'projective_ranging',
+    'euclidean_reconstruction',
 )
 
 IMAGE_BACKED_ESTIMATORS = frozenset({
@@ -20,8 +20,8 @@ IMAGE_BACKED_ESTIMATORS = frozenset({
 RGB_DEBUG_VIEW_ESTIMATORS = frozenset({
     'pointcloud',
     'lidar',
-    'path_a',
-    'path_b',
+    'projective_ranging',
+    'euclidean_reconstruction',
 })
 
 CAMERA_ESTIMATORS = frozenset({
@@ -34,15 +34,15 @@ CAMERA_ESTIMATORS = frozenset({
 LIDAR_ESTIMATORS = frozenset({'lidar'})
 
 # The mask-based localization rows (g1_mask_measurement_node): masks + the
-# aligned depth frame, independent of the legacy camera estimator stack.
-MASK_ESTIMATORS = frozenset({'path_a', 'path_b'})
+# aligned depth frame, independent of the legacy camera estimator stack. The
+# estimator key is already the self-describing path name (projective ranging /
+# euclidean reconstruction), so no separate descriptor is needed.
+MASK_ESTIMATORS = frozenset({'projective_ranging', 'euclidean_reconstruction'})
 
-# What each mask row's reduction actually produces, for self-describing output
-# names: Path A medians the masked depth, Path B centroids the 3D points.
-MASK_ESTIMATOR_DESCRIPTORS = {
-    'path_a': 'aggregate_depth',
-    'path_b': 'deproject_centroid',
-}
+# The mask front-end (gate) axis of the self-describing output name. Only the
+# rasterized box (rect) gate exists today; the silhouette (tight segmentation)
+# front-end is a future producer that will add a second value here.
+MASK_GATE = 'box'
 
 ESTIMATOR_FIELD_KEYS = {
     'rgb': 'rgb_distance_m',
@@ -50,8 +50,8 @@ ESTIMATOR_FIELD_KEYS = {
     'depth_anything': 'mono_depth_distance_m',
     'pointcloud': 'pointcloud_distance_m',
     'lidar': 'lidar_distance_m',
-    'path_a': 'path_a_distance_m',
-    'path_b': 'path_b_distance_m',
+    'projective_ranging': 'projective_ranging_distance_m',
+    'euclidean_reconstruction': 'euclidean_reconstruction_distance_m',
 }
 
 ESTIMATOR_LABELS = {
@@ -60,8 +60,8 @@ ESTIMATOR_LABELS = {
     'depth_anything': 'Depth-Anything',
     'pointcloud': 'Point Cloud',
     'lidar': 'LiDAR',
-    'path_a': 'Path A (2D depth)',
-    'path_b': 'Path B (3D points)',
+    'projective_ranging': 'Projective Ranging',
+    'euclidean_reconstruction': 'Euclidean Reconstruction',
 }
 
 
@@ -127,15 +127,17 @@ def benchmark_output_name(
 ) -> str:
     """The self-describing name a mask row carries in the benchmark output.
 
-    Mask rows are identified by three config axes -- the aligned-depth source,
-    the path (which reduction it runs), and the foreground-isolation recipe --
-    so ``path_a``/``path_b`` alone collide across runs that vary any of them.
-    The output name folds all three in, e.g.
-    ``stereo_aggregate_depth_nearest_mode_histogram``. Non-mask estimators keep
-    their plain name (they are neither source- nor isolation-swappable).
+    A mask row varies along four axes -- the path (the estimator key is already
+    the path name: projective ranging / euclidean reconstruction), the
+    aligned-depth source (stereoscopic / monocular), the mask gate (box today),
+    and the foreground-isolation recipe -- so the path name alone collides
+    across runs that vary any of the others. The output name folds them in as
+    ``<path>_<source>_<gate>_<isolation>``, e.g.
+    ``projective_ranging_stereoscopic_box_nearest_mode_histogram``. Non-mask
+    estimators keep their plain name (none of these axes apply to them).
     """
 
     if estimator not in MASK_ESTIMATORS:
         return estimator
-    isolation = isolation_2d if estimator == 'path_a' else isolation_3d
-    return f'{depth_source}_{MASK_ESTIMATOR_DESCRIPTORS[estimator]}_{isolation}'
+    isolation = isolation_2d if estimator == 'projective_ranging' else isolation_3d
+    return f'{estimator}_{depth_source}_{MASK_GATE}_{isolation}'

@@ -1,12 +1,12 @@
-# Path B — Deproject-Then-Aggregate (3D Point-Domain Route)
+# Euclidean reconstruction — Deproject-Then-Aggregate (3D Point-Domain Route)
 
 **Scope:** the point-domain localization path. It deprojects the aligned depth
 frame into 3D points, selects the points under the mask, isolates the
 foreground in the point domain, and reduces the surviving points to one
-coordinate. This document describes Path B end to end. The mask contract is
+coordinate. This document describes euclidean reconstruction end to end. The mask contract is
 `mask_component.md`; the aligned depth frame contract is `depth_based_path.md`;
 the 3D foreground-isolation methods are catalogued in
-`foreground_isolation_3d.md`; Path A, the cheaper image-domain sibling, is
+`foreground_isolation_3d.md`; projective ranging, the cheaper image-domain sibling, is
 `depth_based_A.md`.
 
 ---
@@ -18,7 +18,7 @@ the 3D foreground-isolation methods are catalogued in
 - A **mask** from the mask interface: an `H×W` boolean array on the RGB color
   grid, plus its precision tag (`tight` | `rect`). See `mask_component.md`.
 - An **aligned depth frame** (canonical input): 1:1 with the RGB pixels, from
-  either depth source (`depth_based_path.md`). Path B builds its own point
+  either depth source (`depth_based_path.md`). Euclidean reconstruction builds its own point
   cloud from it — see the provenance note below.
 
 **Output**
@@ -26,18 +26,18 @@ the 3D foreground-isolation methods are catalogued in
 - One coordinate `(X, Y, Z)` in the **camera optical frame**, per mask (frame
   convention proposed in `Object_Localization_Pipeline.md` Section 7;
   confirmation against SDK/TF still open). Unlike
-  Path A, Path B also has the full foreground point set available as a
+  projective ranging, euclidean reconstruction also has the full foreground point set available as a
   by-product (extent, orientation, footprint) if a later consumer wants it.
 
 ### Cloud provenance: deprojected only (decided)
 
-Path B **deprojects the aligned depth frame itself** — that keeps the cloud on
+Euclidean reconstruction **deprojects the aligned depth frame itself** — that keeps the cloud on
 the color grid (where the mask lives), works for both depth sources
 (Depth-Anything publishes no cloud), and costs one vectorized inverse pinhole
 per frame.
 
 A **published** organized cloud (sim: gz `rgbd_camera` plugin; real: the
-driver's pointcloud filter) also exists, but it is **not a Path B input** —
+driver's pointcloud filter) also exists, but it is **not a euclidean reconstruction input** —
 this was tested and decided 2026-07-11 (`pointcloud_provenance_test.md` §6–7):
 accuracy bit-identical, masked deprojection ~10× cheaper than parsing the
 cloud, wire cost 6× against the published cloud, and on real hardware the
@@ -56,7 +56,7 @@ published topic's only remaining role is optional RViz/debug visualization.
 ```
 
 Steps 1, 2 and 4 are identical for both mask types. Step 3 is the only place
-the `tight` / `rect` tag changes behavior — the same fork position as Path A.
+the `tight` / `rect` tag changes behavior — the same fork position as projective ranging.
 
 ### 2.1 Deproject
 
@@ -91,7 +91,7 @@ never reach the reduction.
 ### 2.2 Select
 
 The mask indexes the organized cloud exactly as it indexes the depth frame in
-Path A:
+projective ranging:
 
 ```python
 points_masked = points[mask]   # (N, 3) — the box frustum's points
@@ -122,7 +122,7 @@ frustum — everything inside it survives, so the foreground must be isolated in
 the point domain. The methods — from the extrinsic height crop and the
 range-band incumbent up to min-cut and learned segmentation — are catalogued
 with pros, cons, and citations in `foreground_isolation_3d.md`. The contract
-is the same shape as Path A's:
+is the same shape as projective ranging's:
 
 - **Input:** the masked point set (organized where possible, so pixel indices
   remain available).
@@ -135,7 +135,7 @@ clustering) makes a complete isolator.
 **Placement alternative.** Isolation can instead run in 2D *before*
 deprojection: apply a `foreground_isolation_2d.md` recipe to the depth frame +
 mask, then deproject only the returned foreground pixels. That placement
-shares one isolation implementation with Path A and deprojects fewer pixels;
+shares one isolation implementation with projective ranging and deprojects fewer pixels;
 the 3D placement exploits geometry the 2D methods cannot express (the floor is
 a plane in 3D but a mode-less ramp in the depth histogram). The two placements
 are a swap point of the benchmark matrix, and they compose — 2D coarse, 3D
@@ -155,14 +155,14 @@ Collapse the foreground point set to the outputs:
   algorithm-controlled.
 
 Because the centroid and the range read the **same** foreground set, they
-agree by construction — the same single-source rule as Path A §2.3.
+agree by construction — the same single-source rule as projective ranging §2.3.
 
 ---
 
 ## 3. Batch / per-mask granularity
 
-Path B runs **per mask** over shared per-frame work, with the same 1:1:1
-hierarchy as Path A (`mask_component.md` §6.1): one object → one post-NMS
+Euclidean reconstruction runs **per mask** over shared per-frame work, with the same 1:1:1
+hierarchy as projective ranging (`mask_component.md` §6.1): one object → one post-NMS
 detection → one mask → one coordinate, masks never compared or merged. The
 cost split:
 
@@ -174,19 +174,19 @@ cost split:
 
 With masked-only deprojection the per-mask cost scales with the box area, not
 the frame area. Results are packed into the same parallel, index-aligned
-arrays as Path A's (`mask_component.md` Section 6); results are never merged
+arrays as projective ranging's (`mask_component.md` Section 6); results are never merged
 across masks.
 
 ---
 
-## 4. Where Path B beats Path A (and what it costs)
+## 4. Where euclidean reconstruction beats projective ranging (and what it costs)
 
-- **Single-pixel fragility gone.** Path A's answer rides on one representative
-  pixel; Path B's centroid averages the whole foreground set, so one bad pixel
+- **Single-pixel fragility gone.** projective ranging's answer rides on one representative
+  pixel; euclidean reconstruction's centroid averages the whole foreground set, so one bad pixel
   cannot poison the coordinate.
 - **Geometry-aware isolation.** The floor has no separable mode in the depth
-  histogram (Path A's `rect` weakness) but is a literal plane in 3D — plane
-  removal and clustering are tools only Path B can use.
+  histogram (projective ranging's `rect` weakness) but is a literal plane in 3D — plane
+  removal and clustering are tools only euclidean reconstruction can use.
 - **Full-geometry by-products.** Extent, orientation, and footprint come free
   from the foreground set.
 - **Cost:** deprojection of the masked pixels (sub-millisecond with the ray
@@ -194,7 +194,7 @@ across masks.
   `foreground_isolation_3d.md`). The heavier isolation methods, not the
   deprojection, dominate.
 
-Path A stays the default cheap path; Path B is the escalation when Path A's
+Projective ranging stays the default cheap path; euclidean reconstruction is the escalation when projective ranging's
 fragility or the `rect` contamination dominates the error budget.
 
 ---
@@ -204,7 +204,7 @@ fragility or the `rect` contamination dominates the error budget.
 The existing `pointcloud` estimator (`compute_pointcloud_measurement` in
 `geometry.py`) is a proto-Path-B with three differences:
 
-| Aspect | Current estimator | Path B target |
+| Aspect | Current estimator | euclidean reconstruction target |
 |--------|-------------------|---------------|
 | Cloud provenance | subscribes the published cloud topic | deprojects the aligned depth (published cloud dropped — `pointcloud_provenance_test.md` §7) |
 | Region | focus crop of the bbox | the actual mask, forked on tag |
@@ -212,8 +212,8 @@ The existing `pointcloud` estimator (`compute_pointcloud_measurement` in
 | Output | nearest-inlier scalar range, vehicle frame, front offset applied | `(X, Y, Z)` centroid in the camera frame |
 
 It is also stereo-only and sim-only in practice (no cloud is published on
-hardware today; see `pointcloud_provenance_test.md` §1). Path B generalizes it
-the same way Path A generalizes the depth estimator: mask instead of crop, tag
+hardware today; see `pointcloud_provenance_test.md` §1). Euclidean reconstruction generalizes it
+the same way projective ranging generalizes the depth estimator: mask instead of crop, tag
 fork, pluggable isolation, camera-frame coordinate output.
 
 ---
@@ -222,7 +222,7 @@ fork, pluggable isolation, camera-frame coordinate output.
 
 - ~~**Reduction convention**~~ — resolved 2026-07-12: coordinate = centroid of
   the foreground points; distance = median camera-frame (Euclidean) range
-  (`perception/core/path_b.py`). Applied identically across isolation recipes.
+  (`perception/core/euclidean_reconstruction.py`). Applied identically across isolation recipes.
 - **Isolation recipe** — choose and parameterize the `rect`-branch chain from
   `foreground_isolation_3d.md` (floor-remover + background-separator), then
   benchmark against the range-band incumbent.
@@ -231,6 +231,6 @@ fork, pluggable isolation, camera-frame coordinate output.
 - ~~**Provenance decision**~~ — resolved 2026-07-11: deprojected only; the
   published cloud is demoted to RViz/debug (`pointcloud_provenance_test.md` §7).
 - **Sparse-mask fallback** — behavior when too few valid points survive
-  isolation (skip, or defer to Path A / Path C).
-- **Coordinate frame** — same confirmation as Path A
+  isolation (skip, or defer to projective ranging / polar profiling).
+- **Coordinate frame** — same confirmation as projective ranging
   (`Object_Localization_Pipeline.md` Section 7).

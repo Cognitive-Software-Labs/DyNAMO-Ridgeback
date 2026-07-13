@@ -6,10 +6,10 @@ on the color camera's pixel grid, stamped with the frame it is aligned to,
 with 0/NaN/inf meaning "no depth here". Two interchangeable producers satisfy
 the contract behind a single config switch (`depth_source`):
 
-- ``stereo``: passes the camera depth stream through (sim: the co-registered
-  gz render; real: the driver's ``aligned_depth_to_color`` topic — point
-  ``depth_topic`` at it), converting to float meters.
-- ``depth_anything``: predicts metric depth from the RGB stream with
+- ``stereoscopic``: passes the camera depth stream through (sim: the
+  co-registered gz render; real: the driver's ``aligned_depth_to_color``
+  topic — point ``depth_topic`` at it), converting to float meters.
+- ``monocular``: predicts metric depth from the RGB stream with
   Depth-Anything V2, aligned by construction.
 
 Consumers subscribe to the output topics and never branch on the source.
@@ -32,8 +32,8 @@ from sensor_msgs.msg import CameraInfo, Image
 
 ALIGNED_DEPTH_TOPIC = 'perception/aligned_depth/image'
 ALIGNED_CAMERA_INFO_TOPIC = 'perception/aligned_depth/camera_info'
-DEPTH_SOURCE_STEREO = 'stereo'
-DEPTH_SOURCE_DEPTH_ANYTHING = 'depth_anything'
+DEPTH_SOURCE_STEREOSCOPIC = 'stereoscopic'
+DEPTH_SOURCE_MONOCULAR = 'monocular'
 DEPTH_ANYTHING_MODEL_ID_DEFAULT = 'depth-anything/Depth-Anything-V2-Metric-Indoor-Small-hf'
 
 
@@ -188,7 +188,7 @@ class AlignedDepthNode(Node):
     def __init__(self) -> None:
         super().__init__('aligned_depth_node')
 
-        self.declare_parameter('depth_source', DEPTH_SOURCE_STEREO)
+        self.declare_parameter('depth_source', DEPTH_SOURCE_STEREOSCOPIC)
         self.declare_parameter('depth_topic', 'sensors/camera_0/depth/image')
         self.declare_parameter('color_topic', 'sensors/camera_0/color/image')
         self.declare_parameter('camera_info_topic', 'sensors/camera_0/color/camera_info')
@@ -198,9 +198,9 @@ class AlignedDepthNode(Node):
         self.declare_parameter('depth_anything_device', '')
 
         depth_source = str(self.get_parameter('depth_source').value).strip().lower()
-        if depth_source == DEPTH_SOURCE_STEREO:
+        if depth_source == DEPTH_SOURCE_STEREOSCOPIC:
             self.source = StereoDepthSource(self.get_logger())
-        elif depth_source == DEPTH_SOURCE_DEPTH_ANYTHING:
+        elif depth_source == DEPTH_SOURCE_MONOCULAR:
             self.source = MonocularDepthSource(
                 str(self.get_parameter('depth_anything_model_id').value),
                 str(self.get_parameter('depth_anything_device').value),
@@ -209,7 +209,7 @@ class AlignedDepthNode(Node):
         else:
             raise ValueError(
                 f'Unknown depth_source "{depth_source}"; expected '
-                f'"{DEPTH_SOURCE_STEREO}" or "{DEPTH_SOURCE_DEPTH_ANYTHING}".'
+                f'"{DEPTH_SOURCE_STEREOSCOPIC}" or "{DEPTH_SOURCE_MONOCULAR}".'
             )
 
         self.latest_input_msg: Image | None = None

@@ -1,4 +1,4 @@
-"""3D foreground isolation for Path B's ``rect`` branch (plus tight cleanup).
+"""3D foreground isolation for euclidean reconstruction's ``rect`` branch (plus tight cleanup).
 
 Contract (``foreground_isolation_3d.md``): input the masked point set as an
 ``(N, 3)`` float array in the camera optical frame (X right, Y down, Z
@@ -123,7 +123,7 @@ def mad_outlier_removal(points: np.ndarray, k: float = MAD_K_DEFAULT) -> np.ndar
 
 
 # The config swap point: isolators keyed by name, all satisfying the contract
-# above. ``ISOLATION_3D_DEFAULT`` is what Path B uses when none is chosen.
+# above. ``ISOLATION_3D_DEFAULT`` is what euclidean reconstruction uses when none is chosen.
 ISOLATION_3D_RECIPES: dict[str, object] = {
     'height_crop': HeightCrop(),
     'range_band': RangeBand(),
