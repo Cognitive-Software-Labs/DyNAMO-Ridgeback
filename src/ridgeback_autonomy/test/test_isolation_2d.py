@@ -79,6 +79,22 @@ def test_unimodal_roi_keeps_all_valid_masked_pixels(recipe) -> None:
     assert np.array_equal(foreground, mask)
 
 
+def test_nearest_mode_dispersed_histogram_falls_back_to_global_mode() -> None:
+    # Regression: a depth ramp spread over many bins (floor inside the box,
+    # object far away) can leave NO bin above the significance floor; the
+    # recipe must fall back to the most-populated bin instead of crashing.
+    depth = np.zeros((HEIGHT, WIDTH), dtype=np.float32)
+    # 60 rows sweep 1.0 -> 6.9 m: every 0.05 m bin holds ~1/118 of the pixels.
+    depth[:] = np.linspace(1.0, 6.9, HEIGHT, dtype=np.float32)[:, np.newaxis]
+    mask = np.ones((HEIGHT, WIDTH), dtype=bool)
+
+    foreground = nearest_mode_histogram(depth, mask)
+
+    assert foreground.shape == mask.shape
+    assert foreground.any()
+    assert not np.any(foreground & ~valid_depth(depth))
+
+
 @pytest.mark.parametrize('recipe', [nearest_mode_histogram, otsu_foreground])
 def test_all_invalid_roi_yields_empty_foreground(recipe) -> None:
     depth = np.zeros((HEIGHT, WIDTH), dtype=np.float32)

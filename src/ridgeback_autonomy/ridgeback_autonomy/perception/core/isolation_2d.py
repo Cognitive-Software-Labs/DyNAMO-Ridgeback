@@ -66,7 +66,13 @@ def nearest_mode_histogram(
         values, bins=num_bins, range=(low, low + num_bins * bin_width_m))
 
     significant = np.flatnonzero(hist >= max(1.0, min_bin_fraction * values.size))
-    nearest = int(significant[0])
+    if significant.size > 0:
+        nearest = int(significant[0])
+    else:
+        # Dispersed distribution: no bin clears the significance floor (the
+        # object's depth spread plus the floor ramp can dilute every bin at
+        # range). Fall back to the global mode so the recipe stays total.
+        nearest = int(np.argmax(hist))
     peak_m = 0.5 * (edges[nearest] + edges[nearest + 1])
 
     foreground = np.zeros_like(valid)
