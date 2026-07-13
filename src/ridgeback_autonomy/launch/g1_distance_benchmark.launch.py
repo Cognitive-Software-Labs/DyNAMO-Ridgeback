@@ -140,6 +140,7 @@ def build_benchmark_nodes(context, *args, **kwargs):
                     'measurement_topic': MASK_MEASUREMENT_TOPIC,
                     'aligned_depth_topic': ALIGNED_DEPTH_TOPIC,
                     'aligned_camera_info_topic': ALIGNED_CAMERA_INFO_TOPIC,
+                    'scan_topic': scan_topic,
                     'isolation_2d': LaunchConfiguration('isolation_2d'),
                     'isolation_3d': LaunchConfiguration('isolation_3d'),
                 }],

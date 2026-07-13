@@ -29,7 +29,7 @@ from ridgeback_autonomy.msg import G1Measurements
 def test_parse_estimators_uses_canonical_order_and_depth_anything_name() -> None:
     assert parse_estimators('') == (
         'rgb', 'sensor_depth', 'depth_anything', 'pointcloud', 'lidar',
-        'projective_ranging', 'euclidean_reconstruction',
+        'projective_ranging', 'euclidean_reconstruction', 'polar_profiling',
     )
     assert parse_estimators('pointcloud,rgb') == ('rgb', 'pointcloud')
     assert parse_estimators('euclidean_reconstruction,rgb,projective_ranging') == (
@@ -46,6 +46,14 @@ def test_benchmark_output_name_folds_path_source_gate_and_isolation() -> None:
     assert benchmark_output_name(
         'euclidean_reconstruction', 'monocular', 'otsu', 'range_band'
     ) == 'euclidean_reconstruction_monocular_box_range_band'
+
+
+def test_benchmark_output_name_polar_profiling_folds_gate_only() -> None:
+    # Polar profiling is mask-based but LiDAR-sourced: only the gate applies,
+    # not the depth source or an isolation recipe.
+    assert benchmark_output_name(
+        'polar_profiling', 'stereoscopic', 'nearest_mode_histogram', 'range_band'
+    ) == 'polar_profiling_box'
 
 
 def test_benchmark_output_name_leaves_non_mask_estimators_plain() -> None:

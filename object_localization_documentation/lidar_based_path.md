@@ -338,29 +338,39 @@ polar→Cartesian + extrinsic transform, §2.1–2.2): the retargeted equivalent
 `extract_scan_points_base`, living in the new stack. Per-scan work, cached and
 shared across masks per §3.
 
-**Node wiring** — the mask-based measurement flow needs the scan + TF, which
-`g1_mask_measurement_node` does not have, and the mask, which
-`g1_lidar_measurement_node` does not have. Options: extend the lidar node to
-consume the mask topic and publish a `polar_profiling` measurement alongside its legacy
-one, or give the mask node a scan subscription. **Deferred** — same category
-as the other benchmark-wiring decisions; decide when wiring the benchmark row,
-not before.
+**Node wiring** (done) — polar profiling runs inside `g1_mask_measurement_node`
+alongside the two depth paths, keeping all new-stack rows in one node on the
+camera-optical frame with `camera_info` intrinsics. The node gained a
+`LaserScan` subscription (`scan_topic`) and a TF listener; per frame it looks
+up the scan→optical extrinsic at the detection stamp and calls
+`scan_points_optical` once (shared across masks), then `localize_polar_profiling`
+per mask. The result's `(X, Z)` is converted to the shared vehicle-frame planar
+convention with `Y = 0` (exact at the benchmark's zero camera pitch). Polar
+runs independently of the depth frame — a missing scan or unavailable TF simply
+leaves its fields NaN. The alternative (extending the legacy lidar node) was
+rejected: it works in the vehicle frame with `camera_config` FoV intrinsics,
+not the color-grid `camera_info` the new stack uses.
 
-**Benchmark row** — `polar_profiling` estimator key, opt-in via `estimators:=`,
-matching the `projective_ranging`/`euclidean_reconstruction` rows added in fbed928. Distance convention:
-`distance_m` = median planar range of the merged set. Comparable in trend to
-the legacy `lidar` row's scalar, but not identical by construction: the
-legacy row is *base-frame* planar distance with the vehicle front offset
-applied, while `distance_m` is *camera-frame* planar range — the same
-reference-frame mismatch already suspected behind the ~0.07 m bias in the
-`projective_ranging`/`euclidean_reconstruction` rows. Account for the offset when reading the matrix.
+**Benchmark row** (done) — `polar_profiling` estimator key, opt-in via
+`estimators:=`, published on `measurements/g1/mask`. It is in `MASK_ESTIMATORS`
+(so it launches the mask node) but not `DEPTH_PATH_ESTIMATORS`, so its
+self-describing output name folds only the gate: `polar_profiling_box` (no
+depth source, no isolation recipe). Distance convention: `distance_m` = median
+planar range of the merged set. Comparable in trend to the legacy `lidar`
+row's scalar, but not identical by construction: the legacy row is *base-frame*
+planar distance with the vehicle front offset applied, while `distance_m` is
+*camera-frame* planar range — the same reference-frame mismatch behind the
+~0.07 m bias in the depth-path rows. First sim run (2026-07-13, 14 trials):
+`polar_profiling_box` MAE 0.093 m vs legacy `lidar` 0.064 m — LiDAR-accurate,
+the gap attributable to untuned segmentation params (§8) and the frame
+difference.
 
-**Tests** — synthetic-scan unit tests in the `test_benchmark_runner.py` /
-core-module style: a two-legs profile (band merge averages the legs), a
-parallax profile (far points inside the mask are dropped), a plane-miss
-profile (returns `None`), a wall-behind profile (background run rejected).
-Note the pre-existing `test_geometry.py` lidar failure (696e101) is the legacy
-stack's, untouched by this work.
+**Tests** — synthetic-scan unit tests in `test_polar_profiling.py`: a two-legs
+profile (band merge averages the legs), a parallax profile (far points inside
+the mask are dropped), a plane-miss profile (returns `None`), a wall-behind
+profile (background run rejected). The registry/output-name wiring is covered
+in `test_benchmark_runner.py`. Note the pre-existing `test_geometry.py` lidar
+failure (696e101) is the legacy stack's, untouched by this work.
 
 ---
 
@@ -380,8 +390,11 @@ stack's, untouched by this work.
 - **Fallback routing** — where the `None` → projective ranging / euclidean reconstruction escalation lives
   (consumer logic, not the path itself); shared with euclidean reconstruction's sparse-mask
   fallback item.
-- **Y convention** — pinned here as NaN in the output; confirm the message
-  fields represent it losslessly when the wiring is decided.
+- ~~**Y convention**~~ — resolved 2026-07-13: the benchmark output is the
+  shared vehicle-frame `lateral / forward / distance` triple (no separate Y
+  field), and the optical→vehicle conversion folds `Y = 0`, which is exact at
+  the benchmark's zero camera pitch. A non-zero pitch would need the true Y,
+  which polar cannot observe — revisit only if the camera is ever pitched.
 - **Front + rear merge (360°)** — out of scope; perception uses the front 270°
   (`lidar2d_0`) only. Revisit only if rear coverage ever matters for
   localization.

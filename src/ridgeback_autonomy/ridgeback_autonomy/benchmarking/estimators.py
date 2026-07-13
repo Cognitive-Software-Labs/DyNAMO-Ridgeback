@@ -9,6 +9,7 @@ PUBLIC_ESTIMATOR_ORDER = (
     'lidar',
     'projective_ranging',
     'euclidean_reconstruction',
+    'polar_profiling',
 )
 
 IMAGE_BACKED_ESTIMATORS = frozenset({
@@ -22,6 +23,7 @@ RGB_DEBUG_VIEW_ESTIMATORS = frozenset({
     'lidar',
     'projective_ranging',
     'euclidean_reconstruction',
+    'polar_profiling',
 })
 
 CAMERA_ESTIMATORS = frozenset({
@@ -33,11 +35,19 @@ CAMERA_ESTIMATORS = frozenset({
 
 LIDAR_ESTIMATORS = frozenset({'lidar'})
 
-# The mask-based localization rows (g1_mask_measurement_node): masks + the
-# aligned depth frame, independent of the legacy camera estimator stack. The
-# estimator key is already the self-describing path name (projective ranging /
-# euclidean reconstruction), so no separate descriptor is needed.
-MASK_ESTIMATORS = frozenset({'projective_ranging', 'euclidean_reconstruction'})
+# The mask-based localization rows (g1_mask_measurement_node), all sharing the
+# mask front-end and the camera-optical frame, independent of the legacy camera
+# estimator stack. The estimator key is already the self-describing path name.
+MASK_ESTIMATORS = frozenset({
+    'projective_ranging',
+    'euclidean_reconstruction',
+    'polar_profiling',
+})
+
+# The subset whose accuracy folds the aligned-depth source and a foreground
+# isolation recipe into the output name. Polar profiling is mask-based too but
+# LiDAR-sourced -- no depth source, no isolation recipe -- so it is excluded.
+DEPTH_PATH_ESTIMATORS = frozenset({'projective_ranging', 'euclidean_reconstruction'})
 
 # The mask front-end (gate) axis of the self-describing output name. Only the
 # rasterized box (rect) gate exists today; the silhouette (tight segmentation)
@@ -52,6 +62,7 @@ ESTIMATOR_FIELD_KEYS = {
     'lidar': 'lidar_distance_m',
     'projective_ranging': 'projective_ranging_distance_m',
     'euclidean_reconstruction': 'euclidean_reconstruction_distance_m',
+    'polar_profiling': 'polar_profiling_distance_m',
 }
 
 ESTIMATOR_LABELS = {
@@ -62,6 +73,7 @@ ESTIMATOR_LABELS = {
     'lidar': 'LiDAR',
     'projective_ranging': 'Projective Ranging',
     'euclidean_reconstruction': 'Euclidean Reconstruction',
+    'polar_profiling': 'Polar Profiling',
 }
 
 
@@ -127,17 +139,22 @@ def benchmark_output_name(
 ) -> str:
     """The self-describing name a mask row carries in the benchmark output.
 
-    A mask row varies along four axes -- the path (the estimator key is already
-    the path name: projective ranging / euclidean reconstruction), the
+    A depth-path row varies along four axes -- the path (the estimator key is
+    already the path name: projective ranging / euclidean reconstruction), the
     aligned-depth source (stereoscopic / monocular), the mask gate (box today),
     and the foreground-isolation recipe -- so the path name alone collides
     across runs that vary any of the others. The output name folds them in as
     ``<path>_<source>_<gate>_<isolation>``, e.g.
-    ``projective_ranging_stereoscopic_box_nearest_mode_histogram``. Non-mask
-    estimators keep their plain name (none of these axes apply to them).
+    ``projective_ranging_stereoscopic_box_nearest_mode_histogram``.
+
+    Polar profiling is mask-based but LiDAR-sourced, so only the gate axis
+    applies: ``polar_profiling_box``. Non-mask estimators keep their plain name
+    (none of these axes apply to them).
     """
 
-    if estimator not in MASK_ESTIMATORS:
-        return estimator
-    isolation = isolation_2d if estimator == 'projective_ranging' else isolation_3d
-    return f'{estimator}_{depth_source}_{MASK_GATE}_{isolation}'
+    if estimator in DEPTH_PATH_ESTIMATORS:
+        isolation = isolation_2d if estimator == 'projective_ranging' else isolation_3d
+        return f'{estimator}_{depth_source}_{MASK_GATE}_{isolation}'
+    if estimator == 'polar_profiling':
+        return f'{estimator}_{MASK_GATE}'
+    return estimator

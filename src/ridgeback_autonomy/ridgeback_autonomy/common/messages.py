@@ -45,6 +45,9 @@ def build_measurements_message(batch: DetectionBatch, header) -> G1Measurements:
         msg.euclidean_reconstruction_lateral_m.append(optional_float(detection.euclidean_reconstruction_lateral_m))
         msg.euclidean_reconstruction_forward_m.append(optional_float(detection.euclidean_reconstruction_forward_m))
         msg.euclidean_reconstruction_distance_m.append(optional_float(detection.euclidean_reconstruction_distance_m))
+        msg.polar_profiling_lateral_m.append(optional_float(detection.polar_profiling_lateral_m))
+        msg.polar_profiling_forward_m.append(optional_float(detection.polar_profiling_forward_m))
+        msg.polar_profiling_distance_m.append(optional_float(detection.polar_profiling_distance_m))
 
     return msg
 
@@ -87,6 +90,9 @@ def batch_from_measurements_message(msg: G1Measurements) -> DetectionBatch:
         detection.euclidean_reconstruction_lateral_m = decode_optional_float(msg.euclidean_reconstruction_lateral_m, index)
         detection.euclidean_reconstruction_forward_m = decode_optional_float(msg.euclidean_reconstruction_forward_m, index)
         detection.euclidean_reconstruction_distance_m = decode_optional_float(msg.euclidean_reconstruction_distance_m, index)
+        detection.polar_profiling_lateral_m = decode_optional_float(msg.polar_profiling_lateral_m, index)
+        detection.polar_profiling_forward_m = decode_optional_float(msg.polar_profiling_forward_m, index)
+        detection.polar_profiling_distance_m = decode_optional_float(msg.polar_profiling_distance_m, index)
 
     return batch
 
@@ -124,6 +130,7 @@ def snapshot_measurements_message(msg: G1Measurements) -> dict[str, Any]:
         'pointcloud_distance_m': first_finite_positive(msg.pointcloud_distance_m),
         'projective_ranging_distance_m': first_finite_positive(msg.projective_ranging_distance_m),
         'euclidean_reconstruction_distance_m': first_finite_positive(msg.euclidean_reconstruction_distance_m),
+        'polar_profiling_distance_m': first_finite_positive(msg.polar_profiling_distance_m),
     }
 
 

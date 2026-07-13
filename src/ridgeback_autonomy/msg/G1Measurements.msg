@@ -21,5 +21,8 @@ float32[] projective_ranging_distance_m
 float32[] euclidean_reconstruction_lateral_m
 float32[] euclidean_reconstruction_forward_m
 float32[] euclidean_reconstruction_distance_m
+float32[] polar_profiling_lateral_m
+float32[] polar_profiling_forward_m
+float32[] polar_profiling_distance_m
 int32 image_width
 int32 image_height

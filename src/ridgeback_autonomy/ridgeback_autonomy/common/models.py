@@ -36,6 +36,9 @@ class Detection:
     euclidean_reconstruction_lateral_m: float | None = None
     euclidean_reconstruction_forward_m: float | None = None
     euclidean_reconstruction_distance_m: float | None = None
+    polar_profiling_lateral_m: float | None = None
+    polar_profiling_forward_m: float | None = None
+    polar_profiling_distance_m: float | None = None
 
 
 @dataclass
