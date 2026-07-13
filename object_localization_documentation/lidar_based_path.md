@@ -354,16 +354,17 @@ not the color-grid `camera_info` the new stack uses.
 **Benchmark row** (done) — `polar_profiling` estimator key, opt-in via
 `estimators:=`, published on `measurements/g1/mask`. It is in `MASK_ESTIMATORS`
 (so it launches the mask node) but not `DEPTH_PATH_ESTIMATORS`, so its
-self-describing output name folds only the gate: `polar_profiling_box` (no
-depth source, no isolation recipe). Distance convention: `distance_m` = median
-planar range of the merged set. Comparable in trend to the legacy `lidar`
-row's scalar, but not identical by construction: the legacy row is *base-frame*
-planar distance with the vehicle front offset applied, while `distance_m` is
-*camera-frame* planar range — the same reference-frame mismatch behind the
-~0.07 m bias in the depth-path rows. First sim run (2026-07-13, 14 trials):
-`polar_profiling_box` MAE 0.093 m vs legacy `lidar` 0.064 m — LiDAR-accurate,
-the gap attributable to untuned segmentation params (§8) and the frame
-difference.
+self-describing names fold only the gate: the CSV file is
+`box_gated_polar_profiling.csv` and the summary/log prose is "box-gated polar
+profiling" (no depth source, no isolation recipe). Distance convention:
+`distance_m` = median planar range of the merged set. Comparable in trend to
+the legacy `lidar` row's scalar, but not identical by construction: the legacy
+row is *base-frame* planar distance with the vehicle front offset applied,
+while `distance_m` is *camera-frame* planar range — the same reference-frame
+mismatch behind the ~0.07 m bias in the depth-path rows. First sim run
+(2026-07-13, 14 trials): box-gated polar profiling MAE 0.093 m vs legacy
+`lidar` 0.064 m — LiDAR-accurate, the gap attributable to untuned segmentation
+params (§8) and the frame difference.
 
 **Tests** — synthetic-scan unit tests in `test_polar_profiling.py`: a two-legs
 profile (band merge averages the legs), a parallax profile (far points inside

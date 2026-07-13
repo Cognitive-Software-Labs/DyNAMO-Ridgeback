@@ -12,6 +12,7 @@ from ridgeback_autonomy.benchmarking.alignment import (
     update_measurement_event,
 )
 from ridgeback_autonomy.benchmarking.estimators import (
+    benchmark_display_name,
     benchmark_output_name,
     parse_estimators,
 )
@@ -39,13 +40,14 @@ def test_parse_estimators_uses_canonical_order_and_depth_anything_name() -> None
         parse_estimators('mono_depth')
 
 
-def test_benchmark_output_name_folds_path_source_gate_and_isolation() -> None:
+def test_benchmark_output_name_is_prose_order_snake_case() -> None:
+    # Filesystem-safe: prose order (gate, source, path) + isolation, snake_case.
     assert benchmark_output_name(
         'projective_ranging', 'stereoscopic', 'nearest_mode_histogram', 'height_crop_range_band'
-    ) == 'projective_ranging_stereoscopic_box_nearest_mode_histogram'
+    ) == 'box_gated_stereoscopic_projective_ranging_nearest_mode_histogram'
     assert benchmark_output_name(
         'euclidean_reconstruction', 'monocular', 'otsu', 'range_band'
-    ) == 'euclidean_reconstruction_monocular_box_range_band'
+    ) == 'box_gated_monocular_euclidean_reconstruction_range_band'
 
 
 def test_benchmark_output_name_polar_profiling_folds_gate_only() -> None:
@@ -53,7 +55,7 @@ def test_benchmark_output_name_polar_profiling_folds_gate_only() -> None:
     # not the depth source or an isolation recipe.
     assert benchmark_output_name(
         'polar_profiling', 'stereoscopic', 'nearest_mode_histogram', 'range_band'
-    ) == 'polar_profiling_box'
+    ) == 'box_gated_polar_profiling'
 
 
 def test_benchmark_output_name_leaves_non_mask_estimators_plain() -> None:
@@ -61,6 +63,18 @@ def test_benchmark_output_name_leaves_non_mask_estimators_plain() -> None:
         assert benchmark_output_name(
             estimator, 'stereoscopic', 'nearest_mode_histogram', 'height_crop_range_band'
         ) == estimator
+
+
+def test_benchmark_display_name_is_spaced_prose_without_isolation() -> None:
+    assert benchmark_display_name(
+        'projective_ranging', 'stereoscopic'
+    ) == 'box-gated stereoscopic projective ranging'
+    assert benchmark_display_name(
+        'euclidean_reconstruction', 'monocular'
+    ) == 'box-gated monocular euclidean reconstruction'
+    # Polar profiling drops the source; non-mask rows use their fixed label.
+    assert benchmark_display_name('polar_profiling', 'stereoscopic') == 'box-gated polar profiling'
+    assert benchmark_display_name('lidar', 'stereoscopic') == 'LiDAR'
 
 
 def test_extract_json_payload_accepts_multiple_gz_json_messages() -> None:

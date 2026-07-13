@@ -26,7 +26,7 @@ from ridgeback_autonomy.benchmarking.alignment import (
     update_measurement_event,
 )
 from ridgeback_autonomy.benchmarking.estimators import (
-    ESTIMATOR_LABELS,
+    benchmark_display_name,
     benchmark_output_name,
     parse_estimators,
     selected_camera_estimators,
@@ -152,11 +152,16 @@ class G1DistanceBenchmarkRunner(Node):
         self.images_dir = os.path.join(self.run_output_dir, 'images')
         os.makedirs(self.images_dir, exist_ok=False)
 
-        # Self-describing output names: mask rows fold in source + isolation
-        # recipe (benchmark_output_name); everything else keeps its plain key.
+        # Self-describing names: the underscore ``output`` form (gate, source,
+        # path, isolation) names the CSV file; the spaced ``display`` prose
+        # (gate, source, path) goes in logs and the summary column.
         self.estimator_output_names = {
             estimator: benchmark_output_name(
                 estimator, self.depth_source, self.isolation_2d, self.isolation_3d)
+            for estimator in self.selected_estimators
+        }
+        self.estimator_display_names = {
+            estimator: benchmark_display_name(estimator, self.depth_source)
             for estimator in self.selected_estimators
         }
         self.estimator_csv_paths = {
@@ -323,7 +328,7 @@ class G1DistanceBenchmarkRunner(Node):
     def run(self) -> None:
         self.get_logger().info(
             'Starting multi-estimator distance benchmark '
-            f'for {", ".join(ESTIMATOR_LABELS[est] for est in self.selected_estimators)} '
+            f'for {", ".join(self.estimator_display_names[est] for est in self.selected_estimators)} '
             f'in world "{self.world}" for robot "{self.robot_model_name}".'
         )
         self.wait_for_required_streams()
@@ -348,7 +353,7 @@ class G1DistanceBenchmarkRunner(Node):
 
         summary_rows = build_summary_rows(estimator_rows)
         for row in summary_rows:
-            row['estimator'] = self.estimator_output_names.get(
+            row['estimator'] = self.estimator_display_names.get(
                 row['estimator'], row['estimator'])
         write_summary_csv(self.summary_csv_path, summary_rows)
 
@@ -420,7 +425,7 @@ class G1DistanceBenchmarkRunner(Node):
                     'true_forward_m': true_pose['forward_m'],
                     'true_lateral_m': true_pose['lateral_m'],
                     'true_distance_m': true_pose['distance_m'],
-                    'estimator': self.estimator_output_names[estimator],
+                    'estimator': self.estimator_display_names[estimator],
                     'trial_estimate_m': estimate,
                     'abs_error_m': abs_error,
                     'rel_error': rel_error,
@@ -805,11 +810,9 @@ class G1DistanceBenchmarkRunner(Node):
             if row['trial_count'] == 0:
                 self.get_logger().info(f'{row["estimator"]}: no comparable trials.')
                 continue
-            # row['estimator'] is the output name here (mask rows are already
-            # renamed to their self-describing form); fall back to it when it
-            # is not one of the fixed ESTIMATOR_LABELS keys.
+            # row['estimator'] is already the display prose (set above).
             self.get_logger().info(
-                f'{ESTIMATOR_LABELS.get(row["estimator"], row["estimator"])} | '
+                f'{row["estimator"]} | '
                 f'n={row["trial_count"]} | '
                 f'MAE={row["mean_abs_error_m"]:.3f}m | '
                 f'MedianAE={row["median_abs_error_m"]:.3f}m | '

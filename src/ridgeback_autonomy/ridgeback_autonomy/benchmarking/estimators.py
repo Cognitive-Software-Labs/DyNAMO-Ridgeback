@@ -137,24 +137,40 @@ def benchmark_output_name(
     isolation_2d: str,
     isolation_3d: str,
 ) -> str:
-    """The self-describing name a mask row carries in the benchmark output.
+    """Filesystem-safe self-describing name for a row's output CSV.
 
-    A depth-path row varies along four axes -- the path (the estimator key is
-    already the path name: projective ranging / euclidean reconstruction), the
-    aligned-depth source (stereoscopic / monocular), the mask gate (box today),
-    and the foreground-isolation recipe -- so the path name alone collides
-    across runs that vary any of the others. The output name folds them in as
-    ``<path>_<source>_<gate>_<isolation>``, e.g.
-    ``projective_ranging_stereoscopic_box_nearest_mode_histogram``.
+    The snake_case form of the doc prose, in prose order (gate, source, path)
+    plus the foreground-isolation recipe -- the four axes a depth-path row
+    varies along, so the path name alone collides across runs that vary any of
+    the others: ``box_gated_stereoscopic_projective_ranging_nearest_mode_histogram``.
 
-    Polar profiling is mask-based but LiDAR-sourced, so only the gate axis
-    applies: ``polar_profiling_box``. Non-mask estimators keep their plain name
-    (none of these axes apply to them).
+    Polar profiling is mask-based but LiDAR-sourced, so only the gate applies:
+    ``box_gated_polar_profiling``. Non-mask estimators keep their plain key
+    (none of these axes apply to them). The spaced, isolation-free prose used
+    in logs and the summary column is ``benchmark_display_name``.
     """
 
     if estimator in DEPTH_PATH_ESTIMATORS:
         isolation = isolation_2d if estimator == 'projective_ranging' else isolation_3d
-        return f'{estimator}_{depth_source}_{MASK_GATE}_{isolation}'
+        return f'{MASK_GATE}_gated_{depth_source}_{estimator}_{isolation}'
     if estimator == 'polar_profiling':
-        return f'{estimator}_{MASK_GATE}'
+        return f'{MASK_GATE}_gated_{estimator}'
     return estimator
+
+
+def benchmark_display_name(estimator: str, depth_source: str) -> str:
+    """Human-readable prose name for logs and the summary ``estimator`` column.
+
+    The doc prose form (gate, source, path), spaced and lower-case, without the
+    isolation recipe (constant within a run): ``box-gated stereoscopic
+    projective ranging``. Polar profiling drops the source
+    (``box-gated polar profiling``); non-mask rows use their fixed label
+    (``RGB``, ``LiDAR``, ...).
+    """
+
+    path_words = estimator.replace('_', ' ')
+    if estimator in DEPTH_PATH_ESTIMATORS:
+        return f'{MASK_GATE}-gated {depth_source} {path_words}'
+    if estimator == 'polar_profiling':
+        return f'{MASK_GATE}-gated {path_words}'
+    return ESTIMATOR_LABELS[estimator]
