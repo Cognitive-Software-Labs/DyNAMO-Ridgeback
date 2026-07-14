@@ -24,6 +24,20 @@ STOCK_WORLDS = {
 }
 
 
+def get_assets_root() -> str | None:
+    """The configured NVIDIA asset root (S3/Nucleus), or None if unavailable.
+
+    Stock worlds (STOCK_WORLDS) stream from here. Only importable inside a
+    live Kit/SimulationApp process — returns None on a bare interpreter, so
+    repo-local worlds keep resolving without it.
+    """
+    try:
+        from isaacsim.storage.native import get_assets_root_path
+        return get_assets_root_path()
+    except Exception:
+        return None
+
+
 def _candidate_dirs() -> list[Path]:
     dirs = []
     here = Path(__file__).resolve().parent

@@ -129,9 +129,13 @@ def run(app, args) -> int:
 
     from robot_rig import RidgebackRig
     from ros_io import RosIO
-    from worlds import resolve_world
+    from worlds import get_assets_root, resolve_world
 
-    world_path = resolve_world(args.world)
+    # Stock envs (warehouse/office/hospital) resolve to <assets_root>/Isaac/...
+    # and stream from S3/Nucleus; repo-local worlds ignore it. Only reachable
+    # now that we are inside the SimulationApp process.
+    assets_root = get_assets_root()
+    world_path = resolve_world(args.world, assets_root)
     print(f"loading world: {world_path}", flush=True)
     ctx = omni.usd.get_context()
     ctx.open_stage(world_path)
@@ -151,7 +155,13 @@ def run(app, args) -> int:
 
     robot_prim_path = "/ridgeback"
     robot_prim = stage.DefinePrim(robot_prim_path, "Xform")
-    robot_prim.GetReferences().AddReference(robot_usd)
+    # When the world's root layer is remote (a stock env streaming from S3),
+    # a bare local path in AddReference gets URL-joined against that remote
+    # anchor and 404s (the /ridgeback subtree never composes). Force an
+    # absolute file:// URI so the asset resolver keeps our robot local
+    # regardless of where the world layer lives. (P7)
+    robot_ref = robot_usd if "://" in robot_usd else Path(robot_usd).as_uri()
+    robot_prim.GetReferences().AddReference(robot_ref)
     # place the base at its ride height (wheels are collider-free visuals) —
     # AND anchor the rig's world fixed-joint at the same height: its
     # unauthored localPos0 defaults to the world origin, which would yank
@@ -194,7 +204,10 @@ def run(app, args) -> int:
             scene_prim = prim
             break
     if scene_prim is None:
-        raise RuntimeError("world has no PhysicsScene prim")
+        # Stock Isaac envs may ship without an authored PhysicsScene; the rig
+        # needs one to carry TimeStepsPerSecond. Author a default. (P7)
+        scene_prim = UsdPhysics.Scene.Define(stage, "/physicsScene").GetPrim()
+        print("world has no PhysicsScene — created /physicsScene", flush=True)
     physx_scene = PhysxSchema.PhysxSceneAPI.Apply(scene_prim)
     physx_scene.CreateTimeStepsPerSecondAttr(float(args.physics_hz))
 
@@ -296,6 +309,14 @@ def run(app, args) -> int:
             measured = max(sim_time - last_sim_time, 0.0)
             frame_dt = min(measured, 2.0 * sim_dt) if measured > 0.0 else sim_dt
         last_sim_time = sim_time
+
+        if ros.take_reset():
+            # in-session benchmark reset (P7): return the robot to spawn and
+            # re-zero odom so probe --repeat N can start a fresh run without
+            # relaunching the sim. GT/odom re-seed inside set_planar_pose.
+            rig.set_planar_pose(x0, y0, yaw0)
+            last_body_twist = (0.0, 0.0, 0.0)
+            print(f"sim reset: robot -> spawn ({x0},{y0},{yaw0})", flush=True)
 
         cmd = ros.take_cmd()
         if cmd is not None:

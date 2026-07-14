@@ -9,7 +9,16 @@ Tracks:
 - hud/coverage complete%
 
 Writes events CSV + summary JSON. Exits on exploration_complete + 10s, or --max-wall.
+
+--repeat N (P7): run N exploration cycles back-to-back WITHOUT relaunching the
+sim. Between runs it resets in-session state — runner `sim/reset` (robot back
+to spawn + odom re-zero), slam_toolbox `reset` (clears the pose graph/map), and
+both nav2 costmap clears — then waits --settle for fresh frontiers so the
+explorer's timer re-arms and republishes exploration_started. Emits one
+<tag>_run<i>_summary.json per run plus a combined <tag>_summary.json (which is
+the single run's summary verbatim when N==1, unchanged for ab_compare.py).
 """
+import argparse
 import json
 import re
 import sys
@@ -38,10 +47,60 @@ PREEMPT_WINDOW = 1.5  # s: new goal accepted within this of an abort => preempti
 
 
 class Probe(Node):
-    def __init__(self, tag):
+    def __init__(self, tag, namespace=NS):
         super().__init__('explore_probe')
         self.tag = tag
+        self.ns = namespace
         self.t0 = time.time()
+        self._init_state()
+        self.events = open(f'{tag}_events.csv', 'w')
+        self.events.write('t,kind,detail\n')
+
+        self.create_subscription(
+            GoalStatusArray, namespace + '/navigate_to_pose/_action/status',
+            self.on_status, 10)
+        self.create_subscription(
+            MarkerArray, namespace + '/explore/frontiers', self.on_frontiers, 10)
+        tl = QoSProfile(depth=10,
+                        reliability=QoSReliabilityPolicy.RELIABLE,
+                        durability=QoSDurabilityPolicy.TRANSIENT_LOCAL)
+        self.create_subscription(
+            String, namespace + '/explore/status', self.on_explore_status, tl)
+        self.create_subscription(
+            OverlayText, namespace + '/hud/coverage', self.on_cov, 10)
+        # Achieved RTF (sim-time span / wall span); /clock is global, not
+        # namespaced. Captured live so it survives an unclean runner teardown.
+        self.create_subscription(Clock, '/clock', self.on_clock, 10)
+        # GT-drift, isaac-only: gz publishes no hud/localization so this never
+        # fires and the localization fields stay null (see localization_overlay).
+        self.create_subscription(
+            OverlayText, namespace + '/hud/localization', self.on_loc, 10)
+
+        # --- reset service clients (P7 --repeat), created lazily-typed ------
+        from std_srvs.srv import Trigger
+        from nav2_msgs.srv import ClearEntireCostmap
+        self._reset_clients = {
+            'runner': self.create_client(Trigger, namespace + '/sim/reset'),
+            'global_costmap': self.create_client(
+                ClearEntireCostmap,
+                namespace + '/global_costmap/clear_entirely_global_costmap'),
+            'local_costmap': self.create_client(
+                ClearEntireCostmap,
+                namespace + '/local_costmap/clear_entirely_local_costmap'),
+        }
+        self._Trigger = Trigger
+        self._ClearEntireCostmap = ClearEntireCostmap
+        try:                                   # slam reset is optional/tolerant
+            from slam_toolbox.srv import Reset
+            self._Reset = Reset
+            self._reset_clients['slam'] = self.create_client(
+                Reset, namespace + '/slam_toolbox/reset')
+        except Exception:
+            self._Reset = None
+
+    # ---- per-run state ------------------------------------------------------
+
+    def _init_state(self):
         self.goals = OrderedDict()   # id -> {'accepted': t, 'terminal': (t, name)}
         self.aborts = []             # {'t','goal','kind'}
         self.frontier_log = []       # (t, avail, blacklisted)
@@ -52,28 +111,11 @@ class Probe(Node):
         self.sim_first = None        # (wall_s, sim_s) at first /clock
         self.sim_last = None         # (wall_s, sim_s) at latest /clock
         self.loc_errs = []           # (wall_s, trans_err_m) from hud/localization
-        self.events = open(f'{tag}_events.csv', 'w')
-        self.events.write('t,kind,detail\n')
 
-        self.create_subscription(
-            GoalStatusArray, NS + '/navigate_to_pose/_action/status',
-            self.on_status, 10)
-        self.create_subscription(
-            MarkerArray, NS + '/explore/frontiers', self.on_frontiers, 10)
-        tl = QoSProfile(depth=10,
-                        reliability=QoSReliabilityPolicy.RELIABLE,
-                        durability=QoSDurabilityPolicy.TRANSIENT_LOCAL)
-        self.create_subscription(
-            String, NS + '/explore/status', self.on_explore_status, tl)
-        self.create_subscription(
-            OverlayText, NS + '/hud/coverage', self.on_cov, 10)
-        # Achieved RTF (sim-time span / wall span); /clock is global, not
-        # namespaced. Captured live so it survives an unclean runner teardown.
-        self.create_subscription(Clock, '/clock', self.on_clock, 10)
-        # GT-drift, isaac-only: gz publishes no hud/localization so this never
-        # fires and the localization fields stay null (see localization_overlay).
-        self.create_subscription(
-            OverlayText, NS + '/hud/localization', self.on_loc, 10)
+    def reset_state(self):
+        """Clear per-run accumulators and re-base the clock for the next run."""
+        self._init_state()
+        self.t0 = time.time()
 
     def now(self):
         return time.time() - self.t0
@@ -174,30 +216,107 @@ class Probe(Node):
                                        default=0),
         }
 
+    # ---- in-session reset (P7 --repeat) ------------------------------------
 
-def main():
-    tag = sys.argv[1] if len(sys.argv) > 1 else 'probe'
-    max_wall = float(sys.argv[2]) if len(sys.argv) > 2 else 1200.0
-    rclpy.init()
-    p = Probe(tag)
+    def _call(self, name, req, timeout=15.0):
+        cli = self._reset_clients.get(name)
+        if cli is None:
+            return f'{name}:absent'
+        if not cli.wait_for_service(timeout_sec=5.0):
+            return f'{name}:no-service'
+        fut = cli.call_async(req)
+        rclpy.spin_until_future_complete(self, fut, timeout_sec=timeout)
+        return f'{name}:ok' if fut.done() else f'{name}:timeout'
+
+    def reset_run(self):
+        """Return the robot to spawn + clear SLAM/costmaps for a fresh run."""
+        results = []
+        results.append(self._call('runner', self._Trigger.Request()))
+        if self._Reset is not None:
+            rq = self._Reset.Request()
+            rq.pause_new_measurements = False
+            results.append(self._call('slam', rq))
+        for cm in ('global_costmap', 'local_costmap'):
+            results.append(self._call(cm, self._ClearEntireCostmap.Request()))
+        self.ev('reset', ' '.join(results))
+        return results
+
+
+def _run_once(p, run_idx, max_wall, min_run):
+    """Observe one exploration cycle; returns when it completes (+10 s settle,
+    honored only after min_run seconds) or max_wall elapses."""
+    p.ev('run_start', str(run_idx))
     end = time.time() + max_wall
     last_print = 0.0
     while time.time() < end:
         rclpy.spin_once(p, timeout_sec=0.5)
-        if p.complete_at is not None and p.now() > p.complete_at + 10.0:
+        if (p.complete_at is not None and p.complete_at > min_run
+                and p.now() > p.complete_at + 10.0):
             break
         if p.now() - last_print > 15.0:
             last_print = p.now()
             s = p.summary()
-            print(f'[{p.now():7.1f}s] cov={p.coverage:.1f}% goals={s["goals_total"]} '
-                  f'ok={s["succeeded"]} abort={s["aborted"]} '
+            print(f'[run {run_idx}] [{p.now():7.1f}s] cov={p.coverage:.1f}% '
+                  f'goals={s["goals_total"]} ok={s["succeeded"]} '
+                  f'abort={s["aborted"]} '
                   f'(pre={s["aborts_preempted"]}/gen={s["aborts_genuine"]}) '
-                  f'frontiers avail={s["frontiers_at_end"]["avail"]} '
-                  f'black={s["frontiers_at_end"]["blacklisted"]}', flush=True)
-    s = p.summary()
-    with open(f'{tag}_summary.json', 'w') as f:
-        json.dump(s, f, indent=2)
-    print(json.dumps(s, indent=2))
+                  f'frontiers avail={s["frontiers_at_end"]["avail"]}', flush=True)
+    return p.summary()
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    ap.add_argument('tag', nargs='?', default='probe')
+    ap.add_argument('max_wall', nargs='?', type=float, default=1200.0,
+                    help='per-run wall-clock cap (s)')
+    ap.add_argument('--repeat', type=int, default=1,
+                    help='number of exploration cycles (reset between)')
+    ap.add_argument('--settle', type=float, default=15.0,
+                    help='seconds to wait after a reset for fresh frontiers')
+    ap.add_argument('--min-run', type=float, default=20.0,
+                    help='ignore exploration_complete before this many s '
+                         '(guards against a stale latched complete post-reset)')
+    ap.add_argument('--namespace', default=NS)
+    ap.add_argument('--no-reset', action='store_true',
+                    help='do not call reset services between runs')
+    args = ap.parse_args()
+
+    rclpy.init()
+    p = Probe(args.tag, namespace=args.namespace)
+    summaries = []
+    for run_idx in range(1, args.repeat + 1):
+        s = _run_once(p, run_idx, args.max_wall, args.min_run)
+        summaries.append(s)
+        with open(f'{args.tag}_run{run_idx}_summary.json', 'w') as f:
+            json.dump(s, f, indent=2)
+        print(f'=== run {run_idx}/{args.repeat} done: '
+              f'cov={s["coverage_peak_pct"]:.1f}% quit_at={s["quit_at_s"]} '
+              f'rtf={s["achieved_rtf"]} ===', flush=True)
+        if run_idx < args.repeat:
+            if not args.no_reset:
+                print(f'resetting for run {run_idx + 1}...', flush=True)
+                print('  ' + ' '.join(p.reset_run()), flush=True)
+            settle_end = time.time() + args.settle
+            while time.time() < settle_end:
+                rclpy.spin_once(p, timeout_sec=0.2)
+            p.reset_state()
+
+    if args.repeat == 1:
+        combined = summaries[0]            # unchanged schema for ab_compare.py
+    else:
+        peaks = [s['coverage_peak_pct'] for s in summaries]
+        completes = [s for s in summaries if s['quit_at_s'] is not None]
+        combined = {
+            'repeat': args.repeat,
+            'runs': summaries,
+            'coverage_peak_pct_mean': round(sum(peaks) / len(peaks), 1),
+            'coverage_peak_pct_min': min(peaks),
+            'coverage_peak_pct_max': max(peaks),
+            'completed_runs': len(completes),
+        }
+    with open(f'{args.tag}_summary.json', 'w') as f:
+        json.dump(combined, f, indent=2)
+    print(json.dumps(combined, indent=2))
     p.events.close()
 
 

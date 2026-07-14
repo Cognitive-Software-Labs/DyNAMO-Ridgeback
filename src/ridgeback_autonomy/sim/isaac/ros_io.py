@@ -122,6 +122,7 @@ class RosIO:
         from nav_msgs.msg import Odometry
         from rosgraph_msgs.msg import Clock
         from sensor_msgs.msg import Imu
+        from std_srvs.srv import Trigger
         from tf2_ros import TransformBroadcaster, StaticTransformBroadcaster
 
         rclpy.init()
@@ -160,6 +161,14 @@ class RosIO:
         self._warned_plain = False
         self.node.create_subscription(Twist, "cmd_vel", self._on_twist, 10)
 
+        # in-session benchmark reset (P7): teleport the robot back to spawn +
+        # re-zero odom without relaunching the sim, for probe --repeat N. The
+        # callback only raises a flag; the actual rig teleport happens on the
+        # main loop (physics/articulation ops are not thread-safe from the
+        # executor callback thread).
+        self._reset_request = False
+        self.node.create_service(Trigger, "sim/reset", self._on_reset)
+
         self._msgs = dict(Odometry=Odometry, PoseStamped=PoseStamped,
                           Clock=Clock)
         # contract LaserScan assembled from the bridge's point clouds
@@ -186,6 +195,18 @@ class RosIO:
         """Return and clear the newest cmd (vx, vy, wz), or None."""
         cmd, self._new_cmd = self._new_cmd, None
         return cmd
+
+    def _on_reset(self, request, response):
+        self._reset_request = True
+        response.success = True
+        response.message = "reset queued"
+        return response
+
+    def take_reset(self) -> bool:
+        """True once if a reset was requested since the last call (consumed
+        by the main loop, which does the actual teleport)."""
+        r, self._reset_request = self._reset_request, False
+        return r
 
     # ---- publications ------------------------------------------------------
 
