@@ -44,8 +44,9 @@ def parse_args():
                          "timing, realistic noise — deployment fidelity + "
                          "real-time-deadline testing. deterministic: fixed "
                          "sim-dt per frame (omni.kit.loop manual mode), "
-                         "unthrottled, contention-immune byte-identical sensor "
-                         "data — reproducible A/B benchmarks.")
+                         "contention-immune byte-identical sensor data — "
+                         "reproducible A/B benchmarks (rtf:=0 to run flat out, "
+                         "rtf:=1 headless:=false to watch).")
     ap.add_argument("--sensor-hz", type=float, default=40.0,
                     help="lidar sweep rate; in deterministic mode this is the "
                          "fixed sim-dt (1/sensor_hz) advanced per frame, so "
@@ -53,8 +54,9 @@ def parse_args():
                          "un-deskewed sweep). Keep physics_hz an integer "
                          "multiple.")
     ap.add_argument("--rtf", type=float, default=1.0,
-                    help="real-time-factor throttle; 0 = unthrottled "
-                         "(ignored in deterministic mode)")
+                    help="real-time-factor throttle; 0 = unthrottled. Honored "
+                         "in both modes (rtf:=0 for fast deterministic A/B, "
+                         "rtf:=1 to watch a run at real-time).")
     ap.add_argument("--odom-noise", type=float, default=None,
                     help="odometry drift scale; 0 = perfect odom. Default by "
                          "mode: 0 (deterministic), 1.0 (realtime).")
@@ -215,16 +217,19 @@ def run(app, args) -> int:
         # headless in 6.0.1, so we drive it directly. This decouples every
         # sim-time-stamped payload from box load: a scan's inherent skew
         # becomes wz*sim_dt (the real 40Hz sweep) instead of wz*render_dt.
-        # Verified byte-fixed dt by tools/isaac/smoke_test.py. Scoped to this
-        # mode because name='' targets ALL run loops incl. the GUI 'present'
-        # loop, so realtime/windowed keeps the default wall-coupled loop.
+        # Verified byte-fixed dt by tools/isaac/smoke_test.py. name='main'
+        # fixes ONLY the sim loop — 'rendering_0' and the GUI 'present' loop
+        # stay wall-tracked (verified: get_manual_mode False), so a throttled
+        # deterministic run (rtf:=1 headless:=false) is watchable windowed.
+        # Kept deterministic-only so realtime stays render-coupled by design.
         from omni.kit.loop import _loop as omni_loop
         _loop = omni_loop.acquire_loop_interface()
         _loop.set_manual_step_size(sim_dt)
-        _loop.set_manual_mode(True)
+        _loop.set_manual_mode(True, name="main")
         timeline.set_time_codes_per_second(float(args.sensor_hz))
+        _thr = "unthrottled" if args.rtf == 0 else f"throttled rtf={args.rtf}"
         print(f"deterministic mode: fixed sim-dt {sim_dt * 1e3:.2f} ms "
-              f"({args.sensor_hz} Hz), unthrottled", flush=True)
+              f"({args.sensor_hz} Hz), {_thr}", flush=True)
     # Converted worlds author no timeCodes, so Kit's play range is
     # zero-length and looping pins get_current_time() at ~0 forever —
     # /clock never advances and the cmd_vel timeout can never fire.
@@ -326,7 +331,7 @@ def run(app, args) -> int:
         ros.publish_ground_truth(sim_time, *rig.ground_truth())
         ros.spin_once()
 
-        if args.sim_mode == "realtime" and args.rtf > 0:
+        if args.rtf > 0:
             target_wall = wall_start + sim_time / args.rtf
             lag = target_wall - time.monotonic()
             if lag > 0:

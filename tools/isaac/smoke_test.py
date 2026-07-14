@@ -76,7 +76,7 @@ try:
     _mm_loop = omni_loop.acquire_loop_interface()
     _mm_dt = 1.0 / 40.0
     _mm_loop.set_manual_step_size(_mm_dt)
-    _mm_loop.set_manual_mode(True)
+    _mm_loop.set_manual_mode(True, name="main")   # matches the runner
     _mm_tl = omni.timeline.get_timeline_interface()
     _mm_tl.set_end_time(1.0e9)
     _mm_tl.set_looping(False)
