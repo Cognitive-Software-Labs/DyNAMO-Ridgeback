@@ -4583,7 +4583,7 @@
       "label": "main()",
       "file_type": "code",
       "source_file": "src/ridgeback_autonomy/sim/isaac/isaac_runner.py",
-      "source_location": "L72",
+      "source_location": "L88",
       "_origin": "ast",
       "id": "isaac_isaac_runner_main",
       "community": 4,
@@ -4593,7 +4593,7 @@
       "label": "run()",
       "file_type": "code",
       "source_file": "src/ridgeback_autonomy/sim/isaac/isaac_runner.py",
-      "source_location": "L100",
+      "source_location": "L122",
       "_origin": "ast",
       "id": "isaac_isaac_runner_run",
       "community": 4,
@@ -22343,7 +22343,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src/ridgeback_autonomy/sim/isaac/isaac_runner.py",
-      "source_location": "L72",
+      "source_location": "L88",
       "weight": 1.0,
       "source": "isaac_isaac_runner",
       "target": "isaac_isaac_runner_main",
@@ -22363,7 +22363,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src/ridgeback_autonomy/sim/isaac/isaac_runner.py",
-      "source_location": "L100",
+      "source_location": "L122",
       "weight": 1.0,
       "source": "isaac_isaac_runner",
       "target": "isaac_isaac_runner_run",
@@ -22374,7 +22374,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "src/ridgeback_autonomy/sim/isaac/isaac_runner.py",
-      "source_location": "L73",
+      "source_location": "L89",
       "weight": 1.0,
       "source": "isaac_isaac_runner_main",
       "target": "isaac_isaac_runner_parse_args",
@@ -22385,7 +22385,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "src/ridgeback_autonomy/sim/isaac/isaac_runner.py",
-      "source_location": "L91",
+      "source_location": "L113",
       "weight": 1.0,
       "source": "isaac_isaac_runner_main",
       "target": "isaac_isaac_runner_run",
@@ -22397,7 +22397,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.8,
       "source_file": "src/ridgeback_autonomy/sim/isaac/isaac_runner.py",
-      "source_location": "L185",
+      "source_location": "L207",
       "weight": 1.0,
       "source": "isaac_isaac_runner_run",
       "target": "isaac_robot_rig_ridgebackrig"
@@ -22408,7 +22408,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.8,
       "source_file": "src/ridgeback_autonomy/sim/isaac/isaac_runner.py",
-      "source_location": "L184",
+      "source_location": "L206",
       "weight": 1.0,
       "source": "isaac_isaac_runner_run",
       "target": "isaac_ros_io_rosio"
@@ -22419,7 +22419,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.8,
       "source_file": "src/ridgeback_autonomy/sim/isaac/isaac_runner.py",
-      "source_location": "L180",
+      "source_location": "L202",
       "weight": 1.0,
       "source": "isaac_isaac_runner_run",
       "target": "isaac_sensors_attach_camera"
@@ -22430,7 +22430,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.8,
       "source_file": "src/ridgeback_autonomy/sim/isaac/isaac_runner.py",
-      "source_location": "L178",
+      "source_location": "L200",
       "weight": 1.0,
       "source": "isaac_isaac_runner_run",
       "target": "isaac_sensors_attach_lidars"
@@ -22441,7 +22441,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.8,
       "source_file": "src/ridgeback_autonomy/sim/isaac/isaac_runner.py",
-      "source_location": "L110",
+      "source_location": "L132",
       "weight": 1.0,
       "source": "isaac_isaac_runner_run",
       "target": "isaac_worlds_resolve_world"
@@ -33269,5 +33269,5 @@
     }
   ],
   "hyperedges": [],
-  "built_at_commit": "b9c46c77b09cdcd10d6ca5737b1bf3619a58152a"
+  "built_at_commit": "ae03b570df170cf37ac7595340b331ff540c3a62"
 }
