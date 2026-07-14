@@ -143,7 +143,7 @@
         "kind": "bash_entrypoint"
       },
       "_origin": "ast",
-      "id": "home_deivid_dev_dynamo_ridgeback_claude_worktrees_jolly_borg_f48cab_build_and_start_expl_sh__entry",
+      "id": "home_deivid_dev_dynamo_ridgeback_build_and_start_expl_sh__entry",
       "community": 58,
       "norm_label": "build_and_start_expl.sh script"
     },
@@ -171,7 +171,7 @@
         "kind": "bash_entrypoint"
       },
       "_origin": "ast",
-      "id": "home_deivid_dev_dynamo_ridgeback_claude_worktrees_jolly_borg_f48cab_cleanup_sh__entry",
+      "id": "home_deivid_dev_dynamo_ridgeback_cleanup_sh__entry",
       "community": 52,
       "norm_label": "cleanup.sh script"
     },
@@ -213,7 +213,7 @@
         "kind": "bash_entrypoint"
       },
       "_origin": "ast",
-      "id": "home_deivid_dev_dynamo_ridgeback_claude_worktrees_jolly_borg_f48cab_diag_sh__entry",
+      "id": "home_deivid_dev_dynamo_ridgeback_diag_sh__entry",
       "community": 54,
       "norm_label": "diag.sh script"
     },
@@ -4485,7 +4485,7 @@
         "kind": "bash_entrypoint"
       },
       "_origin": "ast",
-      "id": "home_deivid_dev_dynamo_ridgeback_claude_worktrees_jolly_borg_f48cab_src_ridgeback_autonomy_sim_ground_truth_maps_capture_ground_truth_sh__entry",
+      "id": "home_deivid_dev_dynamo_ridgeback_src_ridgeback_autonomy_sim_ground_truth_maps_capture_ground_truth_sh__entry",
       "community": 61,
       "norm_label": "capture_ground_truth.sh script"
     },
@@ -4583,7 +4583,7 @@
       "label": "main()",
       "file_type": "code",
       "source_file": "src/ridgeback_autonomy/sim/isaac/isaac_runner.py",
-      "source_location": "L69",
+      "source_location": "L72",
       "_origin": "ast",
       "id": "isaac_isaac_runner_main",
       "community": 4,
@@ -4593,7 +4593,7 @@
       "label": "run()",
       "file_type": "code",
       "source_file": "src/ridgeback_autonomy/sim/isaac/isaac_runner.py",
-      "source_location": "L97",
+      "source_location": "L100",
       "_origin": "ast",
       "id": "isaac_isaac_runner_run",
       "community": 4,
@@ -8303,7 +8303,7 @@
         "kind": "bash_entrypoint"
       },
       "_origin": "ast",
-      "id": "home_deivid_dev_dynamo_ridgeback_claude_worktrees_jolly_borg_f48cab_start_exploration_sh__entry",
+      "id": "home_deivid_dev_dynamo_ridgeback_start_exploration_sh__entry",
       "community": 48,
       "norm_label": "start_exploration.sh script"
     },
@@ -8509,7 +8509,7 @@
         "kind": "bash_entrypoint"
       },
       "_origin": "ast",
-      "id": "home_deivid_dev_dynamo_ridgeback_claude_worktrees_jolly_borg_f48cab_tools_install_isaac_venv_sh__entry",
+      "id": "home_deivid_dev_dynamo_ridgeback_tools_install_isaac_venv_sh__entry",
       "community": 63,
       "norm_label": "install_isaac_venv.sh script"
     },
@@ -9087,7 +9087,7 @@
         "kind": "bash_entrypoint"
       },
       "_origin": "ast",
-      "id": "home_deivid_dev_dynamo_ridgeback_claude_worktrees_jolly_borg_f48cab_tools_isaac_capture_contract_sh__entry",
+      "id": "home_deivid_dev_dynamo_ridgeback_tools_isaac_capture_contract_sh__entry",
       "community": 64,
       "norm_label": "capture_contract.sh script"
     },
@@ -9685,7 +9685,7 @@
         "kind": "bash_entrypoint"
       },
       "_origin": "ast",
-      "id": "home_deivid_dev_dynamo_ridgeback_claude_worktrees_jolly_borg_f48cab_tools_isaac_mcp_query_sh__entry",
+      "id": "home_deivid_dev_dynamo_ridgeback_tools_isaac_mcp_query_sh__entry",
       "community": 49,
       "norm_label": "mcp_query.sh script"
     },
@@ -12971,7 +12971,7 @@
         "kind": "bash_entrypoint"
       },
       "_origin": "ast",
-      "id": "home_deivid_dev_dynamo_ridgeback_claude_worktrees_jolly_borg_f48cab_tools_setup_dds_sh__entry",
+      "id": "home_deivid_dev_dynamo_ridgeback_tools_setup_dds_sh__entry",
       "community": 65,
       "norm_label": "setup_dds.sh script"
     }
@@ -13054,7 +13054,7 @@
       "source_location": "L1",
       "weight": 1.0,
       "source": "build_and_start_expl",
-      "target": "home_deivid_dev_dynamo_ridgeback_claude_worktrees_jolly_borg_f48cab_build_and_start_expl_sh__entry",
+      "target": "home_deivid_dev_dynamo_ridgeback_build_and_start_expl_sh__entry",
       "confidence_score": 1.0
     },
     {
@@ -13074,7 +13074,7 @@
       "source_location": "L1",
       "weight": 1.0,
       "source": "cleanup",
-      "target": "home_deivid_dev_dynamo_ridgeback_claude_worktrees_jolly_borg_f48cab_cleanup_sh__entry",
+      "target": "home_deivid_dev_dynamo_ridgeback_cleanup_sh__entry",
       "confidence_score": 1.0
     },
     {
@@ -13084,7 +13084,7 @@
       "source_location": "L25",
       "weight": 1.0,
       "context": "call",
-      "source": "home_deivid_dev_dynamo_ridgeback_claude_worktrees_jolly_borg_f48cab_cleanup_sh__entry",
+      "source": "home_deivid_dev_dynamo_ridgeback_cleanup_sh__entry",
       "target": "cleanup_kill_matches",
       "confidence_score": 1.0
     },
@@ -13105,7 +13105,7 @@
       "source_location": "L1",
       "weight": 1.0,
       "source": "diag",
-      "target": "home_deivid_dev_dynamo_ridgeback_claude_worktrees_jolly_borg_f48cab_diag_sh__entry",
+      "target": "home_deivid_dev_dynamo_ridgeback_diag_sh__entry",
       "confidence_score": 1.0
     },
     {
@@ -13115,7 +13115,7 @@
       "source_location": "L18",
       "weight": 1.0,
       "context": "call",
-      "source": "home_deivid_dev_dynamo_ridgeback_claude_worktrees_jolly_borg_f48cab_diag_sh__entry",
+      "source": "home_deivid_dev_dynamo_ridgeback_diag_sh__entry",
       "target": "diag_section",
       "confidence_score": 1.0
     },
@@ -22274,7 +22274,7 @@
       "source_location": "L1",
       "weight": 1.0,
       "source": "ground_truth_maps_capture_ground_truth",
-      "target": "home_deivid_dev_dynamo_ridgeback_claude_worktrees_jolly_borg_f48cab_src_ridgeback_autonomy_sim_ground_truth_maps_capture_ground_truth_sh__entry",
+      "target": "home_deivid_dev_dynamo_ridgeback_src_ridgeback_autonomy_sim_ground_truth_maps_capture_ground_truth_sh__entry",
       "confidence_score": 1.0
     },
     {
@@ -22343,7 +22343,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src/ridgeback_autonomy/sim/isaac/isaac_runner.py",
-      "source_location": "L69",
+      "source_location": "L72",
       "weight": 1.0,
       "source": "isaac_isaac_runner",
       "target": "isaac_isaac_runner_main",
@@ -22363,7 +22363,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src/ridgeback_autonomy/sim/isaac/isaac_runner.py",
-      "source_location": "L97",
+      "source_location": "L100",
       "weight": 1.0,
       "source": "isaac_isaac_runner",
       "target": "isaac_isaac_runner_run",
@@ -22374,7 +22374,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "src/ridgeback_autonomy/sim/isaac/isaac_runner.py",
-      "source_location": "L70",
+      "source_location": "L73",
       "weight": 1.0,
       "source": "isaac_isaac_runner_main",
       "target": "isaac_isaac_runner_parse_args",
@@ -22385,7 +22385,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "src/ridgeback_autonomy/sim/isaac/isaac_runner.py",
-      "source_location": "L88",
+      "source_location": "L91",
       "weight": 1.0,
       "source": "isaac_isaac_runner_main",
       "target": "isaac_isaac_runner_run",
@@ -22397,7 +22397,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.8,
       "source_file": "src/ridgeback_autonomy/sim/isaac/isaac_runner.py",
-      "source_location": "L179",
+      "source_location": "L185",
       "weight": 1.0,
       "source": "isaac_isaac_runner_run",
       "target": "isaac_robot_rig_ridgebackrig"
@@ -22408,7 +22408,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.8,
       "source_file": "src/ridgeback_autonomy/sim/isaac/isaac_runner.py",
-      "source_location": "L178",
+      "source_location": "L184",
       "weight": 1.0,
       "source": "isaac_isaac_runner_run",
       "target": "isaac_ros_io_rosio"
@@ -22419,7 +22419,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.8,
       "source_file": "src/ridgeback_autonomy/sim/isaac/isaac_runner.py",
-      "source_location": "L176",
+      "source_location": "L180",
       "weight": 1.0,
       "source": "isaac_isaac_runner_run",
       "target": "isaac_sensors_attach_camera"
@@ -22430,7 +22430,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.8,
       "source_file": "src/ridgeback_autonomy/sim/isaac/isaac_runner.py",
-      "source_location": "L175",
+      "source_location": "L178",
       "weight": 1.0,
       "source": "isaac_isaac_runner_run",
       "target": "isaac_sensors_attach_lidars"
@@ -22441,7 +22441,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.8,
       "source_file": "src/ridgeback_autonomy/sim/isaac/isaac_runner.py",
-      "source_location": "L107",
+      "source_location": "L110",
       "weight": 1.0,
       "source": "isaac_isaac_runner_run",
       "target": "isaac_worlds_resolve_world"
@@ -27621,7 +27621,7 @@
       "source_location": "L1",
       "weight": 1.0,
       "source": "start_exploration",
-      "target": "home_deivid_dev_dynamo_ridgeback_claude_worktrees_jolly_borg_f48cab_start_exploration_sh__entry",
+      "target": "home_deivid_dev_dynamo_ridgeback_start_exploration_sh__entry",
       "confidence_score": 1.0
     },
     {
@@ -27945,7 +27945,7 @@
       "source_location": "L1",
       "weight": 1.0,
       "source": "tools_install_isaac_venv",
-      "target": "home_deivid_dev_dynamo_ridgeback_claude_worktrees_jolly_borg_f48cab_tools_install_isaac_venv_sh__entry",
+      "target": "home_deivid_dev_dynamo_ridgeback_tools_install_isaac_venv_sh__entry",
       "confidence_score": 1.0
     },
     {
@@ -28575,7 +28575,7 @@
       "source_location": "L1",
       "weight": 1.0,
       "source": "isaac_capture_contract",
-      "target": "home_deivid_dev_dynamo_ridgeback_claude_worktrees_jolly_borg_f48cab_tools_isaac_capture_contract_sh__entry",
+      "target": "home_deivid_dev_dynamo_ridgeback_tools_isaac_capture_contract_sh__entry",
       "confidence_score": 1.0
     },
     {
@@ -29503,7 +29503,7 @@
       "source_location": "L1",
       "weight": 1.0,
       "source": "isaac_mcp_query",
-      "target": "home_deivid_dev_dynamo_ridgeback_claude_worktrees_jolly_borg_f48cab_tools_isaac_mcp_query_sh__entry",
+      "target": "home_deivid_dev_dynamo_ridgeback_tools_isaac_mcp_query_sh__entry",
       "confidence_score": 1.0
     },
     {
@@ -29533,7 +29533,7 @@
       "source_location": "L39",
       "weight": 1.0,
       "context": "call",
-      "source": "home_deivid_dev_dynamo_ridgeback_claude_worktrees_jolly_borg_f48cab_tools_isaac_mcp_query_sh__entry",
+      "source": "home_deivid_dev_dynamo_ridgeback_tools_isaac_mcp_query_sh__entry",
       "target": "isaac_mcp_query_data",
       "confidence_score": 1.0
     },
@@ -29544,7 +29544,7 @@
       "source_location": "L29",
       "weight": 1.0,
       "context": "call",
-      "source": "home_deivid_dev_dynamo_ridgeback_claude_worktrees_jolly_borg_f48cab_tools_isaac_mcp_query_sh__entry",
+      "source": "home_deivid_dev_dynamo_ridgeback_tools_isaac_mcp_query_sh__entry",
       "target": "isaac_mcp_query_post",
       "confidence_score": 1.0
     },
@@ -33264,10 +33264,10 @@
       "source_location": "L1",
       "weight": 1.0,
       "source": "tools_setup_dds",
-      "target": "home_deivid_dev_dynamo_ridgeback_claude_worktrees_jolly_borg_f48cab_tools_setup_dds_sh__entry",
+      "target": "home_deivid_dev_dynamo_ridgeback_tools_setup_dds_sh__entry",
       "confidence_score": 1.0
     }
   ],
   "hyperedges": [],
-  "built_at_commit": "858ee67810cda6e402c2546a6d9d832e297729ba"
+  "built_at_commit": "b9c46c77b09cdcd10d6ca5737b1bf3619a58152a"
 }

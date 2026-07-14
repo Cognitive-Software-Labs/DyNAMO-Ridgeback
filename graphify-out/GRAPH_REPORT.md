@@ -1,7 +1,7 @@
-# Graph Report - /home/deivid/dev/DyNAMO-Ridgeback/.claude/worktrees/jolly-borg-f48cab  (2026-07-13)
+# Graph Report - /home/deivid/dev/DyNAMO-Ridgeback  (2026-07-14)
 
 ## Corpus Check
-- 175 files · ~93,017 words
+- 175 files · ~93,232 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
