@@ -85,6 +85,18 @@ def generate_launch_description():
             description='Isaac: attach D455 camera; false = lidar-only '
                         '(saves GPU/RTF; ignored under gz)',
         ),
+        DeclareLaunchArgument(
+            'sim_mode',
+            default_value='realtime',
+            description='Isaac: realtime | deterministic timing mode '
+                        '(ignored under gz)',
+        ),
+        DeclareLaunchArgument(
+            'sensor_hz',
+            default_value='40.0',
+            description='Isaac: lidar rate / deterministic fixed dt '
+                        '(ignored under gz)',
+        ),
         # Add our worlds and models directories so Gazebo can find them
         AppendEnvironmentVariable(
             'GZ_SIM_RESOURCE_PATH',
@@ -127,6 +139,8 @@ def generate_launch_description():
                 'livestream': LaunchConfiguration('livestream'),
                 'odom_noise': LaunchConfiguration('odom_noise'),
                 'camera': LaunchConfiguration('camera'),
+                'sim_mode': LaunchConfiguration('sim_mode'),
+                'sensor_hz': LaunchConfiguration('sensor_hz'),
                 # the gz_gui concept has no Isaac equivalent (P8 retires it)
             }.items(),
         ),

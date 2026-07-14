@@ -38,6 +38,8 @@ def generate_launch_description():
     rtf = LaunchConfiguration('rtf')
     odom_noise = LaunchConfiguration('odom_noise')
     camera = LaunchConfiguration('camera')
+    sim_mode = LaunchConfiguration('sim_mode')
+    sensor_hz = LaunchConfiguration('sensor_hz')
 
     isaac_python = os.environ.get(
         'ISAAC_PYTHON', os.path.join(os.getcwd(), 'isaac_venv/bin/python3'))
@@ -106,6 +108,8 @@ def generate_launch_description():
              '--rtf', rtf,
              '--odom-noise', odom_noise,
              '--camera', camera,
+             '--sim-mode', sim_mode,
+             '--sensor-hz', sensor_hz,
              '--animate-g1', LaunchConfiguration('animate_g1')],
         name='isaac_runner',
         output='screen',
@@ -133,6 +137,11 @@ def generate_launch_description():
         DeclareLaunchArgument('camera', default_value='true',
                               description='attach D455 camera; false = '
                                           'lidar-only (saves GPU/RTF)'),
+        DeclareLaunchArgument('sim_mode', default_value='realtime',
+                              description='realtime | deterministic '
+                                          '(fixed-step contention-immune A/B)'),
+        DeclareLaunchArgument('sensor_hz', default_value='40.0',
+                              description='lidar rate = deterministic fixed dt'),
         DeclareLaunchArgument('animate_g1', default_value='false',
                               description='demo idle for world-authored G1 '
                                           'figures; keep off for benchmarks'),

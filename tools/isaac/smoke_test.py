@@ -66,11 +66,45 @@ if not failures:
         app.update()
     timeline.stop()
 
+# Fixed-step gate: the deterministic sim mode (isaac_runner --sim-mode
+# deterministic) relies on omni.kit.loop manual mode advancing app.update()
+# by an EXACT sim-dt headless — it lives below the isaacsim.core.api
+# SimulationContext that segfaults headless in 6.0.1. Prove it holds so
+# contention-immune A/B benchmarks are trustworthy on this box.
+try:
+    from omni.kit.loop import _loop as omni_loop
+    _mm_loop = omni_loop.acquire_loop_interface()
+    _mm_dt = 1.0 / 40.0
+    _mm_loop.set_manual_step_size(_mm_dt)
+    _mm_loop.set_manual_mode(True)
+    _mm_tl = omni.timeline.get_timeline_interface()
+    _mm_tl.set_end_time(1.0e9)
+    _mm_tl.set_looping(False)
+    _mm_tl.set_time_codes_per_second(40.0)
+    _mm_tl.play()
+    for _ in range(20):          # warmup / physics init
+        app.update()
+    _mm_t0 = _mm_tl.get_current_time()
+    for _ in range(40):
+        app.update()
+    _mm_adv = _mm_tl.get_current_time() - _mm_t0
+    _mm_tl.stop()
+    _mm_loop.set_manual_mode(False)
+    if abs(_mm_adv - 40 * _mm_dt) > 1e-6:
+        failures.append(
+            f"manual-mode fixed-step broken: 40 frames advanced {_mm_adv:.6f}s, "
+            f"expected {40 * _mm_dt:.6f}s (deterministic mode would drift)")
+    else:
+        print(f"fixed-step gate OK: 40 frames advanced exactly {_mm_adv:.4f}s",
+              flush=True)
+except Exception as e:
+    failures.append(f"omni.kit.loop manual mode unavailable: {e!r}")
+
 # Verdict before app.close(): Kit teardown can swallow buffered stdout.
 if failures:
     print("SMOKE TEST FAILED:", *failures, sep="\n  - ", flush=True)
     app.close()
     sys.exit(1)
-print("SMOKE TEST OK: headless boot, ros2 bridge, /clock published for ~5 s",
+print("SMOKE TEST OK: headless boot, ros2 bridge, /clock ~5 s, fixed-step gate",
       flush=True)
 app.close()

@@ -40,6 +40,8 @@ def generate_launch_description():
     livestream = LaunchConfiguration('livestream')
     odom_noise = LaunchConfiguration('odom_noise')
     camera = LaunchConfiguration('camera')
+    sim_mode = LaunchConfiguration('sim_mode')
+    sensor_hz = LaunchConfiguration('sensor_hz')
 
     rviz_config = os.path.join(pkg_this, 'sim', 'rviz', 'exploration.rviz')
 
@@ -123,6 +125,12 @@ def generate_launch_description():
             'camera', default_value='true',
             description='Isaac: attach D455 camera; false = lidar-only '
                         '(saves GPU/RTF; gz ignores)'),
+        DeclareLaunchArgument(
+            'sim_mode', default_value='realtime',
+            description='Isaac: realtime | deterministic timing (gz ignores)'),
+        DeclareLaunchArgument(
+            'sensor_hz', default_value='40.0',
+            description='Isaac: lidar rate / deterministic fixed dt (gz ignores)'),
         DeclareLaunchArgument('exploration_rviz', default_value='true',
                               description='Launch the exploration RViz2 config'),
         DeclareLaunchArgument('g1_perception_enabled', default_value='true',
@@ -240,6 +248,8 @@ def generate_launch_description():
                 'livestream': livestream,
                 'odom_noise': odom_noise,
                 'camera': camera,
+                'sim_mode': sim_mode,
+                'sensor_hz': sensor_hz,
             }.items(),
         ),
 

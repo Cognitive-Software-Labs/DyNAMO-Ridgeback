@@ -38,10 +38,26 @@ def parse_args():
     ap.add_argument("--livestream", default="false", choices=["true", "false"],
                     help="WebRTC livestream (implies headless render window)")
     ap.add_argument("--physics-hz", type=float, default=120.0)
+    ap.add_argument("--sim-mode", default="realtime",
+                    choices=["realtime", "deterministic"],
+                    help="realtime: wall-throttled (--rtf), render-coupled "
+                         "timing, realistic noise — deployment fidelity + "
+                         "real-time-deadline testing. deterministic: fixed "
+                         "sim-dt per frame (omni.kit.loop manual mode), "
+                         "unthrottled, contention-immune byte-identical sensor "
+                         "data — reproducible A/B benchmarks.")
+    ap.add_argument("--sensor-hz", type=float, default=40.0,
+                    help="lidar sweep rate; in deterministic mode this is the "
+                         "fixed sim-dt (1/sensor_hz) advanced per frame, so "
+                         "scan skew = wz/sensor_hz (matches the real 40Hz "
+                         "un-deskewed sweep). Keep physics_hz an integer "
+                         "multiple.")
     ap.add_argument("--rtf", type=float, default=1.0,
-                    help="real-time-factor throttle; 0 = unthrottled")
-    ap.add_argument("--odom-noise", type=float, default=1.0,
-                    help="odometry drift scale; 0 = perfect odom")
+                    help="real-time-factor throttle; 0 = unthrottled "
+                         "(ignored in deterministic mode)")
+    ap.add_argument("--odom-noise", type=float, default=None,
+                    help="odometry drift scale; 0 = perfect odom. Default by "
+                         "mode: 0 (deterministic), 1.0 (realtime).")
     ap.add_argument("--camera", default="true", choices=["true", "false"],
                     help="attach D455 camera render + publishers; false = "
                          "lidar-only (saves GPU/RTF for SLAM/nav benchmarks)")
@@ -71,6 +87,12 @@ def parse_args():
 
 def main():
     args = parse_args()
+    if args.odom_noise is None:
+        args.odom_noise = 0.0 if args.sim_mode == "deterministic" else 1.0
+    if args.sim_mode == "deterministic" and args.physics_hz % args.sensor_hz != 0:
+        print(f"WARN: --physics-hz {args.physics_hz} is not an integer multiple "
+              f"of --sensor-hz {args.sensor_hz}; physics substeps per frame "
+              f"become non-integer and determinism is weakened.", flush=True)
     headless = args.headless == "true"
 
     from isaacsim import SimulationApp
@@ -185,6 +207,24 @@ def run(app, args) -> int:
     rig = RidgebackRig(art_root_path, odom_noise=args.odom_noise)
 
     timeline = omni.timeline.get_timeline_interface()
+    sim_dt = 1.0 / args.sensor_hz
+    if args.sim_mode == "deterministic":
+        # Fixed-step: make app.update() advance sim-time by exactly sim_dt
+        # regardless of render/wall duration. The omni.kit.loop manual runner
+        # lives BELOW the isaacsim.core.api SimulationContext that segfaults
+        # headless in 6.0.1, so we drive it directly. This decouples every
+        # sim-time-stamped payload from box load: a scan's inherent skew
+        # becomes wz*sim_dt (the real 40Hz sweep) instead of wz*render_dt.
+        # Verified byte-fixed dt by tools/isaac/smoke_test.py. Scoped to this
+        # mode because name='' targets ALL run loops incl. the GUI 'present'
+        # loop, so realtime/windowed keeps the default wall-coupled loop.
+        from omni.kit.loop import _loop as omni_loop
+        _loop = omni_loop.acquire_loop_interface()
+        _loop.set_manual_step_size(sim_dt)
+        _loop.set_manual_mode(True)
+        timeline.set_time_codes_per_second(float(args.sensor_hz))
+        print(f"deterministic mode: fixed sim-dt {sim_dt * 1e3:.2f} ms "
+              f"({args.sensor_hz} Hz), unthrottled", flush=True)
     # Converted worlds author no timeCodes, so Kit's play range is
     # zero-length and looping pins get_current_time() at ~0 forever —
     # /clock never advances and the cmd_vel timeout can never fire.
@@ -240,13 +280,22 @@ def run(app, args) -> int:
     imu_sigma_accel = 0.05 * args.odom_noise      # m/s^2
     while app.is_running() and not stop["flag"]:
         sim_time = timeline.get_current_time()
-        frame_dt = max(sim_time - last_sim_time, 0.0)
+        if args.sim_mode == "deterministic":
+            # manual mode advanced the timeline by exactly sim_dt last frame
+            frame_dt = sim_dt
+        else:
+            # realtime: bound a stalled frame's dt so a long render can't
+            # inject a huge rig velocity step / IMU dt. (Does NOT bound the
+            # lidar skew — the RTX render already baked it; realtime skew is
+            # only well-behaved while the box sustains rtf~1.)
+            measured = max(sim_time - last_sim_time, 0.0)
+            frame_dt = min(measured, 2.0 * sim_dt) if measured > 0.0 else sim_dt
         last_sim_time = sim_time
 
         cmd = ros.take_cmd()
         if cmd is not None:
             rig.set_cmd(*cmd, now=sim_time)
-        rig.step(frame_dt if frame_dt > 0 else 1.0 / 60.0, now=sim_time)
+        rig.step(frame_dt, now=sim_time)
 
         # kinematic idle: slow figure-of-motion drift + heading sway
         for tr, orq, t0, yaw0 in g1_anim:
@@ -264,7 +313,7 @@ def run(app, args) -> int:
         ros.publish_clock(sim_time)
         odom_state, body_twist = rig.update_odom()
         ros.publish_odom(sim_time, odom_state, body_twist)
-        dt = frame_dt if frame_dt > 0 else 1.0 / 60.0
+        dt = frame_dt
         ros.publish_imu(
             sim_time,
             body_twist[2] + imu_rng.gauss(0.0, imu_sigma_gyro),
@@ -277,7 +326,7 @@ def run(app, args) -> int:
         ros.publish_ground_truth(sim_time, *rig.ground_truth())
         ros.spin_once()
 
-        if args.rtf > 0:
+        if args.sim_mode == "realtime" and args.rtf > 0:
             target_wall = wall_start + sim_time / args.rtf
             lag = target_wall - time.monotonic()
             if lag > 0:
