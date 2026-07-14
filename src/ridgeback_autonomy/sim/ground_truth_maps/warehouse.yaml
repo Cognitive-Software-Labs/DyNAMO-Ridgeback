@@ -1,7 +1,7 @@
 image: warehouse.pgm
 mode: trinary
-resolution: 0.050
-origin: [-15.833, -25.528, 0]
+resolution: 0.0500
+origin: [-11.4300, -13.2001, 0]
 negate: 0
 occupied_thresh: 0.65
 free_thresh: 0.196

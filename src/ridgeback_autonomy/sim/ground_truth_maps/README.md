@@ -1,7 +1,17 @@
 # Ground-Truth Maps
 
-Hand-authored ground-truth occupancy maps define the "true reachable area" used
-as the coverage reference for exploration sweeps.
+Ground-truth occupancy maps define the "true reachable area" used as the
+coverage reference for exploration sweeps.
+
+**Canonical maps are now generated analytically from the simulation geometry**,
+not driven-captured. For the Isaac stock worlds (`warehouse`, `office`,
+`hospital`) `tools/isaac/generate_gt_map.py` slices the world USD at the 2D
+lidar plane; for SDF-sourced worlds `tools/isaac/gt_occupancy.py` rasterizes
+the declared boxes/spheres. Both are exact and regeneratable — no capture
+drive. The old gz-captured `.pgm`/`.yaml` (for the retired Gazebo warehouse and
+office, which are *different geometry* from the Isaac stock envs) are archived
+under `historical/`; the manual capture workflow (Part 1) is kept for reference
+only.
 
 - **This folder** is the package maps dir
   (`src/ridgeback_autonomy/sim/ground_truth_maps/`, beside `sim/worlds/`). It is
@@ -20,14 +30,22 @@ as the coverage reference for exploration sweeps.
 
 ## Maps
 
-| World | Resolution | Origin |
-|-------|------------|--------|
-| mock_hospital | 0.05 m/px | [-6.338, -9.283, 0] |
-| warehouse | 0.05 m/px | [-15.833, -25.528, 0] |
-| office | 0.05 m/px | [-13.785, -10.543, 0] |
+Canonical maps (analytic, from the Isaac stock world USDs):
 
-Standard ROS occupancy-grid format: `occupied_thresh: 0.65`, `free_thresh: 0.196`,
-`negate: 0`, `mode: trinary`.
+| World | Size | Resolution | Origin | Source |
+|-------|------|------------|--------|--------|
+| warehouse | 440×680 px (22×34 m) | 0.05 m/px | [-11.430, -13.200, 0] | `generate_gt_map.py` |
+| office | 760×2040 px (38×102 m) | 0.05 m/px | [-27.075, -37.673, 0] | `generate_gt_map.py` |
+| hospital | 1560×880 px (78×44 m) | 0.05 m/px | [-49.440, -5.450, 0] | `generate_gt_map.py` |
+
+Each ships a `.npz` alongside the `.pgm`/`.yaml`/`.png` (grid + unknown mask +
+origin/resolution) for `tools/isaac/coverage_ceiling.py`. Standard ROS
+occupancy-grid format: `occupied_thresh: 0.65`, `free_thresh: 0.196`,
+`negate: 0`, `mode: trinary`. Rooms behind doors closed at the lidar plane read
+as unknown — correct, since those doors block the robot in-sim identically.
+
+`historical/` holds the superseded gz-captured `warehouse`/`office` maps (a
+different, retired world geometry).
 
 ### Previews
 
@@ -50,7 +68,36 @@ now lives in the package at
 
 ---
 
-## Part 1 — Generating ground-truth maps (manual teleop)
+## Regenerating maps (analytic — canonical)
+
+No sim drive, no SLAM — the world geometry is the source of truth.
+
+**Isaac stock worlds** (`warehouse`, `office`, `hospital`) — slice the world USD
+at the lidar plane (needs `isaac_venv` + the NVIDIA asset root; streams the
+stock USD from S3):
+
+```bash
+OMNI_KIT_ACCEPT_EULA=YES isaac_venv/bin/python3 \
+  tools/isaac/generate_gt_map.py <world> \
+  --out src/ridgeback_autonomy/sim/ground_truth_maps
+```
+
+It flood-fills free space from the dominant building cluster (auto-cropping the
+far skybox/backdrop geometry stock envs ship) and writes `<world>.{pgm,yaml,png,npz}`.
+Pass `--origin x,y` if a world's building is not where the auto-seed lands.
+
+**SDF-sourced worlds** — `tools/isaac/gt_occupancy.py <world>.sdf` rasterizes the
+declared boxes/spheres analytically (used for the converted worlds).
+
+Rebuild after regenerating so the maps install to `share/`:
+`colcon build --packages-select ridgeback_autonomy`.
+
+---
+
+## Part 1 — Generating ground-truth maps (manual teleop) — HISTORICAL
+
+> Superseded by the analytic generators above. Kept for reference; the driven
+> capture is no longer the canonical path.
 
 Maps are made by manually teleoperating the Ridgeback through every reachable
 area with SLAM running, then saving the occupancy grid.

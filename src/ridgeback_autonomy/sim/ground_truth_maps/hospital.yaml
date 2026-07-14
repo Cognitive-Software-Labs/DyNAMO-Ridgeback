@@ -1,7 +1,7 @@
-image: office.pgm
+image: hospital.pgm
 mode: trinary
 resolution: 0.0500
-origin: [-27.0750, -37.6733, 0]
+origin: [-49.4400, -5.4500, 0]
 negate: 0
 occupied_thresh: 0.65
 free_thresh: 0.196
