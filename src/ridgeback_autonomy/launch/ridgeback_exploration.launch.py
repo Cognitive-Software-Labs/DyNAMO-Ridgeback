@@ -39,6 +39,7 @@ def generate_launch_description():
     headless = LaunchConfiguration('headless')
     livestream = LaunchConfiguration('livestream')
     odom_noise = LaunchConfiguration('odom_noise')
+    camera = LaunchConfiguration('camera')
 
     rviz_config = os.path.join(pkg_this, 'sim', 'rviz', 'exploration.rviz')
 
@@ -118,6 +119,10 @@ def generate_launch_description():
         DeclareLaunchArgument(
             'odom_noise', default_value='1.0',
             description='Isaac: odometry drift scale; 0 = perfect (gz ignores)'),
+        DeclareLaunchArgument(
+            'camera', default_value='true',
+            description='Isaac: attach D455 camera; false = lidar-only '
+                        '(saves GPU/RTF; gz ignores)'),
         DeclareLaunchArgument('exploration_rviz', default_value='true',
                               description='Launch the exploration RViz2 config'),
         DeclareLaunchArgument('g1_perception_enabled', default_value='true',
@@ -234,6 +239,7 @@ def generate_launch_description():
                 'headless': headless,
                 'livestream': livestream,
                 'odom_noise': odom_noise,
+                'camera': camera,
             }.items(),
         ),
 

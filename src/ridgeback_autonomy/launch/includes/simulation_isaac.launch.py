@@ -37,6 +37,7 @@ def generate_launch_description():
     livestream = LaunchConfiguration('livestream')
     rtf = LaunchConfiguration('rtf')
     odom_noise = LaunchConfiguration('odom_noise')
+    camera = LaunchConfiguration('camera')
 
     isaac_python = os.environ.get(
         'ISAAC_PYTHON', os.path.join(os.getcwd(), 'isaac_venv/bin/python3'))
@@ -104,6 +105,7 @@ def generate_launch_description():
              '--livestream', livestream,
              '--rtf', rtf,
              '--odom-noise', odom_noise,
+             '--camera', camera,
              '--animate-g1', LaunchConfiguration('animate_g1')],
         name='isaac_runner',
         output='screen',
@@ -128,6 +130,9 @@ def generate_launch_description():
                               description='real-time factor; 0 = unthrottled'),
         DeclareLaunchArgument('odom_noise', default_value='1.0',
                               description='odometry drift scale; 0 = perfect'),
+        DeclareLaunchArgument('camera', default_value='true',
+                              description='attach D455 camera; false = '
+                                          'lidar-only (saves GPU/RTF)'),
         DeclareLaunchArgument('animate_g1', default_value='false',
                               description='demo idle for world-authored G1 '
                                           'figures; keep off for benchmarks'),

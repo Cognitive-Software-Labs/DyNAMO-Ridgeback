@@ -42,6 +42,9 @@ def parse_args():
                     help="real-time-factor throttle; 0 = unthrottled")
     ap.add_argument("--odom-noise", type=float, default=1.0,
                     help="odometry drift scale; 0 = perfect odom")
+    ap.add_argument("--camera", default="true", choices=["true", "false"],
+                    help="attach D455 camera render + publishers; false = "
+                         "lidar-only (saves GPU/RTF for SLAM/nav benchmarks)")
     ap.add_argument("--robot-usd", default=None,
                     help="override the committed robot package entry USD")
     ap.add_argument("--odom-tf", default="false", choices=["true", "false"],
@@ -173,7 +176,10 @@ def run(app, args) -> int:
 
     from sensors import attach_camera, attach_lidars
     attach_lidars(stage, robot_prim_path, args.namespace)
-    attach_camera(stage, robot_prim_path, args.namespace)
+    if args.camera == "true":
+        attach_camera(stage, robot_prim_path, args.namespace)
+    else:
+        print("camera disabled (--camera false): lidar-only run", flush=True)
 
     ros = RosIO(args.namespace, odom_tf=args.odom_tf == "true")
     rig = RidgebackRig(art_root_path, odom_noise=args.odom_noise)

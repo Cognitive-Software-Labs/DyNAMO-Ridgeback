@@ -79,6 +79,12 @@ def generate_launch_description():
             description='Isaac: odometry drift scale; 0 = perfect odom '
                         '(ignored under gz)',
         ),
+        DeclareLaunchArgument(
+            'camera',
+            default_value='true',
+            description='Isaac: attach D455 camera; false = lidar-only '
+                        '(saves GPU/RTF; ignored under gz)',
+        ),
         # Add our worlds and models directories so Gazebo can find them
         AppendEnvironmentVariable(
             'GZ_SIM_RESOURCE_PATH',
@@ -120,6 +126,7 @@ def generate_launch_description():
                 'headless': LaunchConfiguration('headless'),
                 'livestream': LaunchConfiguration('livestream'),
                 'odom_noise': LaunchConfiguration('odom_noise'),
+                'camera': LaunchConfiguration('camera'),
                 # the gz_gui concept has no Isaac equivalent (P8 retires it)
             }.items(),
         ),
