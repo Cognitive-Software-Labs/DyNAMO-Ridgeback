@@ -208,3 +208,33 @@ python3 tools/isaac/slam_quality_probe.py --tag X --gt-grid /tmp/gt.npz \
   assume.
 - One kit boot crashed spontaneously (breakpad, ~15th boot of the day);
   relaunch succeeded — treat single boot crashes as flaky before digging.
+
+## Noise + hygiene follow-up (2026-07-13)
+
+Revisiting the P5 blocker: is odom noise the coverage cap, and does the prior
+"~40% plateau" hold? No on both.
+
+- **The ~40% plateau does not reproduce.** Every clean `mock_hospital` run
+  landed 51–83%. Prime suspect for the historical stall = the old aggressive
+  explorer timeouts (30 s / blacklist-2, since reverted to 60 s/3), not SLAM.
+- **odom_noise is a partial lever.** Clean paired A/B (camera-off, domain-43
+  isolated): noise=0 → 61.9% / 16 aborts; noise=1.0 → 51.3% / 35 aborts.
+- **Yaw decomposition (`--repro --wz-max 1.5`, noise off):** total yaw rms
+  2.11° / max 7.94°; `theta_mo` (scan-match) rms 1.47° / max 4.0° dominates
+  `phi_ekf` (EKF) rms 0.71° / max 4.3°. Residual is scan-match rotation on FULL
+  healthy scans (min 916/1081 bins, 0 flaps) — H1 geometry, not the assembler.
+- **Sensor pipeline exonerated (H2/H3):** `flap_events=0` across ~110k scans
+  over all runs; drift climbed on steady RTF and recurred after contention
+  cleared. New read-only tool `scan_pipeline_probe.py` (finite-bin / flap /
+  stamp-pair telemetry vs RTF) carries this signal.
+- **Benchmark hygiene (was wrong; now enforced):** `isaac_runner` rendered the
+  D455 unconditionally → RTF 0.33–0.45. Added `--camera false` (commit
+  b9c46c77) → RTF 0.55–0.65. Also `g1_perception_enabled:=false` and an
+  isolated `ROS_DOMAIN_ID` — co-tenant `stefi`'s domain-42 `/r100_0001` stack
+  publishes the same `hud/coverage` topic the probe reads. Canonical benchmark
+  invocation: `camera:=false g1_perception_enabled:=false
+  ROS_DOMAIN_ID=<isolated> setup_path:=/tmp/bench-clearpath/`.
+- **Caveat:** coverage variance is large (62–83% noise-off; loc-err 0.9–9.4 m);
+  stochastic scan-match excursions + intermittent co-tenant GPU bursts dominate.
+  Firm numbers need multi-seed on a single-tenant box. Raw artifacts live in the
+  session scratchpad (`clean_n0/clean_n1`, `REPRO_noiseoff`, `noiseoff_hosp_A`).
