@@ -35,8 +35,15 @@ Canonical maps (analytic, from the Isaac stock world USDs):
 | World | Size | Resolution | Origin | Source |
 |-------|------|------------|--------|--------|
 | warehouse | 440×680 px (22×34 m) | 0.05 m/px | [-11.430, -13.200, 0] | `generate_gt_map.py` |
+| warehouse_full | 680×1160 px (34×58 m) | 0.05 m/px | [-27.430, -24.400, 0] | `generate_gt_map.py --origin=-10,5` |
 | office | 760×2040 px (38×102 m) | 0.05 m/px | [-27.075, -37.673, 0] | `generate_gt_map.py` |
 | hospital | 1560×880 px (78×44 m) | 0.05 m/px | [-49.440, -5.450, 0] | `generate_gt_map.py` |
+
+`warehouse_full` (the shelved variant — 7 racking rows, a real exploration
+workout vs the near-empty `warehouse`) needs an explicit `--origin` on open
+floor: its geometry is so dense that the auto-seed centroid lands *on* a shelf
+and the free-space flood never fills (`free=277`). `--origin=-10,5` seeds the
+staging area (note the `=`; argparse eats a bare `-10,5` as a flag).
 
 Each ships a `.npz` alongside the `.pgm`/`.yaml`/`.png` (grid + unknown mask +
 origin/resolution) for `tools/isaac/coverage_ceiling.py`. Standard ROS
