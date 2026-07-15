@@ -36,13 +36,42 @@ from ridgeback_autonomy.perception.core.intrinsics import (
 from ridgeback_autonomy.perception.core.mask import Mask
 
 
-LIDAR_RANGE_MIN_M_DEFAULT = 0.05  # mirrors LIDAR_MIN_RANGE_METERS by value
-LIDAR_RANGE_MAX_M_DEFAULT = 10.0  # mirrors LIDAR_MAX_METERS by value
-MIN_VALID_RAYS_DEFAULT = 2  # mirrors LIDAR_MIN_VALID_RAYS by value
+# Scan-validity clips (not accuracy knobs): drop physically impossible returns
+# before anything else. Values mirror the legacy geometry.py lidar estimator.
+LIDAR_RANGE_MIN_M_DEFAULT = 0.05  # drop sub-5cm self-hits (mirrors LIDAR_MIN_RANGE_METERS)
+LIDAR_RANGE_MAX_M_DEFAULT = 10.0  # drop far-field noise (mirrors LIDAR_MAX_METERS)
 
-RANGE_JUMP_M_DEFAULT = 0.30  # run split: discontinuity larger than the G1 body depth
-RANGE_BAND_M_DEFAULT = 0.35  # near-band merge width; mirrors NEAREST_MODE_BAND_M by value
-MAX_BEARING_GAP_BEAMS_DEFAULT = 2  # run split: more than this many missing beams
+# Foreground-isolation parameters -- the LiDAR analogue of the isolation_2d /
+# isolation_3d recipes (``lidar_based_path.md`` Section 2.5). They decide which
+# of the masked beams are the object vs. background, so these are the knobs to
+# tune for accuracy. Each notes what it does and which way it fails.
+
+# Run split: start a new run where consecutive beams jump in range by more than
+# this. Sits between the object's own front-to-back depth (~0.2 m for the G1)
+# and the object-to-background gap (metres). Too small shatters the object into
+# slivers -> keeps only the nearest sliver -> reads too near; too large glues
+# the background onto the object.
+RANGE_JUMP_M_DEFAULT = 0.30
+
+# Near-band merge width: after taking the nearest run, also keep runs whose
+# median range is within this of it. Set to the object's depth so both legs and
+# torso merge but the wall behind does not. Too small keeps one leg (lateral
+# offset, leg-face range); too large admits parallax / neighbour background.
+# (Value mirrors NEAREST_MODE_BAND_M, the Path A near-band width, by value.)
+RANGE_BAND_M_DEFAULT = 0.35
+
+# Run split on a bearing gap: start a new run where more than this many
+# consecutive beams are missing (invalid, or projecting outside the mask), so
+# two objects sharing a range across an empty gap are not glued together. Minor
+# knob.
+MAX_BEARING_GAP_BEAMS_DEFAULT = 2
+
+# Sparse floor: return ``None`` (no estimate -> that trial is simply dropped
+# from this path's benchmark row, no fallback) when fewer than this many beams
+# survive the mask select or the near-band merge. A handful of beams gives a
+# noisy median; raising it trades availability (fewer usable trials) for a
+# tighter estimate. (mirrors LIDAR_MIN_VALID_RAYS by value.)
+MIN_VALID_RAYS_DEFAULT = 2
 
 
 @dataclass(frozen=True)

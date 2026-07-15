@@ -383,9 +383,30 @@ failure (696e101) is the legacy stack's, untouched by this work.
 - **Time synchronization** — matched scan/mask timestamps; polar profiling is the most
   sensitive consumer (§2.2), and the current node pairs latest-scan with
   latest-detections without stamp matching.
-- **Segmentation parameters** — pin `range_band_m`, `range_jump_m`,
-  `max_bearing_gap_beams`, `min_valid_rays` against the two-legs and
-  wall-behind cases; document the values next to the mirrored constants.
+- **Segmentation parameters (tuning, deferred)** — `range_band_m`,
+  `range_jump_m`, `max_bearing_gap_beams`, `min_valid_rays` are the LiDAR
+  foreground-isolation knobs (the analogue of the `isolation_2d` /
+  `isolation_3d` recipes); they are the source of the current gap to the legacy
+  `lidar` row (0.093 vs 0.064 m) — see §7. Plan when picked up:
+  1. **Tune on the benchmark, not exploration** — tuning needs ground truth
+     (known spawn distance → MAE), which only the benchmark has; exploration
+     has no labelled target to measure error against.
+  2. **Harden the benchmark scenario first** — the `g1_distance_calibration`
+     world is a sterile empty room, so it barely stresses these
+     background-rejection knobs (risk: over-fit, e.g. a huge `range_band_m`
+     still scores well with no clutter to admit). Add a neighbour G1 / clutter /
+     a closer back wall (keeping ground truth) so the isolation actually bites.
+  3. **Wire the four as launch params first** — they are currently hardcoded
+     defaults (the mask node calls `localize_polar_profiling` without passing
+     them); expose them like `isolation_2d` / `isolation_3d` so a run can sweep
+     them, then sweep and pin the values next to the mirrored constants.
+  4. **Validate in exploration** — qualitative only (overlay under real clutter
+     and motion); not for optimization.
+  Note the systematic part of the gap is a convention offset, not a knob: the
+  median of near runs sits on the leg *front face* while ground truth is body
+  *center* (~0.1 m deeper). If sweeping does not close it, add a forward-depth
+  compensation in the reduce step (the legacy row's `+0.20 m behind-anchor`
+  margin is the precedent).
 - **Parallax-only guard placement** — cross-check against projective ranging's depth
   inside the path vs. in the fusion stage (§4, second failure mode).
 - **Fallback routing** — where the `None` → projective ranging / euclidean reconstruction escalation lives
