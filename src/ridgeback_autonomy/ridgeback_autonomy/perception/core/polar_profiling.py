@@ -7,16 +7,17 @@ runs within a range band of the nearest, and reduce the merged set to one
 planar coordinate ``(X, Z)``. Y (height) is unobservable from a single-plane
 LiDAR and is not emitted.
 
-Unlike Paths A and B there is no ``tight | rect`` fork: parallax lets
-occluded background points project inside even a pixel-precise mask
-(``lidar_based_path.md`` Section 2.5), so both tags run the same recovery --
-the tag only changes how wide the admitted window effectively is.
+Unlike projective ranging and euclidean reconstruction there is no
+``tight | rect`` fork: parallax lets occluded background points project inside
+even a pixel-precise mask (``lidar_based_path.md`` Section 2.5), so both tags
+run the same recovery -- the tag only changes how wide the admitted window
+effectively is.
 
 Runs per mask over shared per-scan work (``scan_points_optical``); the caller
 loops masks (1:1:1 hierarchy, ``mask_component.md`` Section 6.1). A mask that
 selects too few rays -- the scan plane missed the object, or it sits outside
-the FoV overlap -- is skipped by returning ``None``: the structural fallback
-to projective ranging / euclidean reconstruction, never an error.
+the FoV overlap -- is skipped by returning ``None``: no estimate for that
+mask, never an error.
 
 Constants mirror the legacy ``geometry.py`` incumbent by value; the new stack
 deliberately never imports from the legacy stack.
@@ -54,16 +55,19 @@ LIDAR_RANGE_MAX_M_DEFAULT = 10.0  # drop far-field noise (mirrors LIDAR_MAX_METE
 RANGE_JUMP_M_DEFAULT = 0.30
 
 # Near-band merge width: after taking the nearest run, also keep runs whose
-# median range is within this of it. Set to the object's depth so both legs and
-# torso merge but the wall behind does not. Too small keeps one leg (lateral
-# offset, leg-face range); too large admits parallax / neighbour background.
-# (Value mirrors NEAREST_MODE_BAND_M, the Path A near-band width, by value.)
+# median range is within this of it. Wants to span the object's own
+# front-to-back depth (~0.2 m for the G1) so both legs and torso merge but the
+# wall behind does not. Too small keeps one leg (lateral offset, leg-face
+# range); too large admits parallax / neighbour background. The value is an
+# untuned starting point mirroring NEAREST_MODE_BAND_M_DEFAULT (the projective
+# ranging near-band width), not a fit to the object depth -- tuning tracked in
+# lidar_based_path.md Section 8.
 RANGE_BAND_M_DEFAULT = 0.35
 
-# Run split on a bearing gap: start a new run where more than this many
-# consecutive beams are missing (invalid, or projecting outside the mask), so
-# two objects sharing a range across an empty gap are not glued together. Minor
-# knob.
+# Run split on a bearing gap: start a new run where the beam index gaps by
+# more than this many increments -- i.e. once that many or more consecutive
+# beams are missing (invalid, or projecting outside the mask) -- so two objects
+# sharing a range across an empty gap are not glued together. Minor knob.
 MAX_BEARING_GAP_BEAMS_DEFAULT = 2
 
 # Sparse floor: return ``None`` (no estimate -> that trial is simply dropped
@@ -200,7 +204,7 @@ def localize_polar_profiling(
     ``points_optical`` / ``valid`` come from ``scan_points_optical`` (beam
     order = bearing order). Returns ``None`` when fewer than
     ``min_valid_rays`` rays survive the mask ∩ FoV select or the near-band
-    merge -- the fallback-to-Path-A/B signal.
+    merge -- no estimate for this mask.
     """
 
     points_optical = np.asarray(points_optical, dtype=np.float64)

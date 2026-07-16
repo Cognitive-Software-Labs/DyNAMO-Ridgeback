@@ -40,10 +40,11 @@ architecture-level view of polar profiling is `Object_Localization_Pipeline.md` 
 - One planar coordinate `(X, Z)` in the **camera optical frame**, per mask
   (frame convention proposed in `Object_Localization_Pipeline.md` §7;
   confirmation against SDK/TF still open).
-  **Y (height) is unobservable** from a single-plane LiDAR and is emitted as
-  NaN. The scan-plane's own Y in the camera frame is available as a
-  by-product, but it is the *plane's* height, not the object center's — do not
-  substitute it.
+  **Y (height) is unobservable** from a single-plane LiDAR: the result
+  carries no Y at all, and the benchmark's optical→vehicle conversion folds
+  `Y = 0`, which is exact at the benchmark's zero camera pitch (§8, resolved).
+  The scan-plane's own Y in the camera frame is available as a by-product, but
+  it is the *plane's* height, not the object center's — do not substitute it.
 
 Polar profiling is the accuracy specialist: within its plane the UST is typically more
 accurate and longer-range than RealSense stereo, but it recovers no height and
@@ -63,7 +64,9 @@ object.
               -> (X, Z)                                   # same both tags
 ```
 
-Steps 1–3 are per-scan work shared by all masks; steps 4–5 run per mask. The
+Steps 1–2 are per-scan work shared by all masks; steps 3–5 run per mask (the
+projection is per-point arithmetic over ~1k points, so re-running it per mask
+costs nothing). The
 `tight` / `rect` tag does **not** fork the recovery here — both branches run
 the same segmentation (see §2.5 for why); the tag only changes how wide the
 admitted bearing window effectively is.
@@ -212,8 +215,8 @@ detection → one mask → one coordinate; masks never compared or merged.
 
 | Work | Frequency |
 |------|-----------|
-| convert + transform + project the scan | once per scan (shared by all masks) |
-| mask select, segment, merge, median | once per mask |
+| convert + transform the scan | once per scan (shared by all masks) |
+| project, mask select, segment, merge, median | once per mask |
 
 The per-scan work is tiny by depth-path standards — a 270° / 0.25° scan is
 ~1080 points against euclidean reconstruction's `H×W` pixels — so polar profiling is computationally the
@@ -235,8 +238,9 @@ in it). The path must distinguish and report:
 - **Points selected but all far**: parallax-only content (camera sees the
   object, every LiDAR ray inside the mask flew past it). The zero-point check
   does *not* catch this — points exist, they are just wrong. Heuristic guard:
-  if the nearest run's range wildly disagrees with a cheap prior (e.g. Path
-  A's depth median, when available), flag low confidence rather than emit.
+  if the nearest run's range wildly disagrees with a cheap prior (e.g.
+  projective ranging's depth median, when available), flag low confidence
+  rather than emit.
   Whether this cross-check belongs in the path or in the fusion stage is an
   open item (§8).
 - **TF unavailable**: no extrinsics, no path — return `None` and warn, as the
@@ -270,7 +274,7 @@ pipeline it is the signal to fall back — never a zero or a stale value.
 ## 6. Relationship to the current stack
 
 The existing lidar estimator (`compute_lidar_measurement` in `geometry.py`,
-fed by `g1_lidar_measurement_node`) is a proto-Path-C with the same
+fed by `g1_lidar_measurement_node`) is a proto-polar-profiling with the same
 generalization gaps its depth siblings had:
 
 | Aspect | Current estimator | polar profiling target |
@@ -356,15 +360,20 @@ not the color-grid `camera_info` the new stack uses.
 (so it launches the mask node) but not `DEPTH_PATH_ESTIMATORS`, so its
 self-describing names fold only the gate: the CSV file is
 `box_gated_polar_profiling.csv` and the summary/log prose is "box-gated polar
-profiling" (no depth source, no isolation recipe). Distance convention:
-`distance_m` = median planar range of the merged set. Comparable in trend to
-the legacy `lidar` row's scalar, but not identical by construction: the legacy
-row is *base-frame* planar distance with the vehicle front offset applied,
-while `distance_m` is *camera-frame* planar range — the same reference-frame
-mismatch behind the ~0.07 m bias in the depth-path rows. First sim run
-(2026-07-13, 14 trials): box-gated polar profiling MAE 0.093 m vs legacy
-`lidar` 0.064 m — LiDAR-accurate, the gap attributable to untuned segmentation
-params (§8) and the frame difference.
+profiling" (no depth source, no isolation recipe). Distance convention: the
+published scalar is the vehicle-frame planar distance of the median `(X, Z)`
+coordinate — the node runs it through the same `optical_to_vehicle_planar`
+conversion as the depth-path rows (pitch fold with `Y = 0`, front offset
+subtracted), so all mask rows, the legacy rows, and the ground truth share
+one convention. The core result's `distance_m` (median planar range of the
+merged set, camera frame) is a by-product and is not published. The
+conversion models only the camera pitch and the front offset, not the
+camera's mounting translation, so the polar row inherits whatever systematic
+bias that leaves in the depth-path rows (~0.07 m, uninvestigated). First sim
+run (2026-07-13, 14 trials): box-gated polar profiling MAE 0.093 m vs legacy
+`lidar` 0.064 m — LiDAR-accurate, the gap attributable to untuned
+segmentation params (§8) and the leg-front-face vs body-center convention
+offset (§8).
 
 **Tests** — synthetic-scan unit tests in `test_polar_profiling.py`: a two-legs
 profile (band merge averages the legs), a parallax profile (far points inside
