@@ -1,4 +1,4 @@
-# Object Localization Pipeline — Handover
+# Object Localization Pipeline
 
 **Purpose:** Given a RealSense camera (and optionally a planar 2D LiDAR), detect objects of a target class in the RGB image and report each object's coordinates **relative to the camera frame**. The system is designed as a set of swappable components so that every combination of detector, depth source, and downstream path can be benchmarked for accuracy vs. compute.
 
@@ -15,7 +15,7 @@ The robot carries a single **Intel RealSense D435**, forward-facing, mounted at 
 **Data products we use:**
 
 1. **RGB color image** - input to detection / segmentation. Real D435: up to 1920x1080; our config requests 1280x720 @ 30 fps. Sim: rendered color frame.
-2. **Depth image** (made 1:1 with RGB) - input to projective ranging and euclidean reconstruction. Euclidean reconstruction deprojects it into an organized point cloud in code (`depth_based_B.md`; provenance decision in `pointcloud_provenance_test.md` §7) - the cloud is a derived, in-code representation, not a sensor product.
+2. **Depth image** (made 1:1 with RGB) - input to projective ranging and euclidean reconstruction. Euclidean reconstruction deprojects its masked pixels into camera-frame points in code (`depth_based_B.md`; provenance decision in `pointcloud_provenance_test.md` §7) - the points are a derived, in-code representation, not a sensor product.
 3. **Camera IMU - NONE.** The D435 SKU has no IMU; only the D435i does.
 
 **How depth is produced - this is where sim and real diverge:**
@@ -97,44 +97,56 @@ flowchart TD
     MASK_S -->|"tag: tight"| IFACE["Mask Interface<br/>(H×W binary + precision tag)"]
     MASK_B -->|"tag: rect"| IFACE
 
-    RGB --> DA["Depth Anything<br/>(monocular)"]
-    STEREO["RealSense Stereo Depth"] --> RAW["Raw Depth Frame<br/>(left IR reference)"]
-    RAW --> ALIGN["Align Depth → RGB"]
-    RGB -.calibration.-> ALIGN
-    ALIGN --> ALIGNED["Aligned Depth<br/>(1:1 with RGB)"]
-    DA --> SCALE["Metric Scaling"]
-    SCALE --> ALIGNED
+    subgraph DEPTHSRC["Depth Sources"]
+        STEREO["RealSense Stereo Depth"] --> RAW["Raw Depth Frame<br/>(left IR reference)"]
+        RAW --> ALIGN["Align Depth → RGB<br/>(driver-side; sim co-registered)"]
+        CAL["Calibrated intrinsics<br/>+ extrinsics"] -.-> ALIGN
+        ALIGN --> ALIGNED["Aligned Depth<br/>(1:1 with RGB)"]
+        DA["Depth Anything<br/>(metric monocular)"] --> ALIGNED
+    end
+    RGB --> DA
 
-    ALIGNED -->|"projective ranging · 2D"| EXTRACT["Extract depth<br/>in mask (shared)"]
-    IFACE --> EXTRACT
-    EXTRACT -->|tight| A_T["Direct robust median"]
-    EXTRACT -->|rect| A_R["Foreground isolation<br/>(nearest depth mode)"]
-    A_R --> A_R2["Median of foreground"]
-    A_T --> A_COORD["Deproject (u,v,Z)<br/>foreground centroid + agg. depth<br/>→ camera frame"]
-    A_R2 --> A_COORD
+    subgraph PATH_A["Projective ranging"]
+        EXTRACT["Extract depth<br/>in mask (shared)"] -->|tight| A_T["Direct robust median"]
+        EXTRACT -->|rect| A_R["Foreground isolation<br/>(2D recipe)"]
+        A_R --> A_R2["Median of foreground"]
+        A_T --> A_COORD["Deproject (u,v,Z)<br/>foreground centroid + agg. depth<br/>→ camera frame"]
+        A_R2 --> A_COORD
+    end
 
-    ALIGNED -->|"euclidean reconstruction · 3D"| DEPROJ["Deproject to 3D"]
-    DEPROJ --> CLOUD["Organized Point Cloud<br/>(camera optical frame)"]
-    IFACE --> SELECT["Select points<br/>by mask (shared)"]
-    CLOUD --> SELECT
-    SELECT -->|tight| B_T["Outlier removal"]
-    SELECT -->|rect| B_R1["RANSAC plane removal"]
-    B_R1 --> B_R2["Euclidean clustering"]
-    B_R2 --> B_R3["Cluster selection<br/>(nearest / central / largest)"]
-    B_T --> B_COORD["Centroid (X,Y,Z)<br/>→ camera frame"]
-    B_R3 --> B_COORD
+    subgraph PATH_B["Euclidean reconstruction"]
+        SELECT["Select valid masked<br/>pixels (shared)"] --> DEPROJ["Deproject selection<br/>to 3D points"]
+        DEPROJ -->|tight| B_T["Outlier removal"]
+        DEPROJ -->|rect| B_R1["Foreground isolation<br/>(3D recipe: floor removal<br/>+ background separation)"]
+        B_T --> B_COORD["Centroid (X,Y,Z)<br/>→ camera frame"]
+        B_R1 --> B_COORD
+    end
 
-    LIDAR["2D LiDAR Scan<br/>(270°, single plane)"] --> L_XY["Polar → Cartesian"]
-    L_XY --> L_TF["Transform to Camera Frame<br/>(extrinsics)"]
-    L_TF --> L_PROJ["Project into Image Plane<br/>(intrinsics)"]
-    L_PROJ --> L_SEL["Keep points in mask<br/>(∩ FoV, shared)"]
+    %% declared before the subgraph so the edge routes left of the LiDAR chain
     IFACE --> L_SEL
-    L_SEL -->|"tight & rect (no fork)"| C_SEG["Segment range profile →<br/>merge near-band runs"]
-    C_SEG --> C_COORD["Median of merged set → (X,Z)<br/>camera frame (Y unobserved)"]
+
+    subgraph PATH_C["Polar profiling"]
+        LIDAR["2D LiDAR Scan<br/>(270°, single plane)"] --> L_XY["Polar → Cartesian"]
+        L_XY --> L_TF["Transform to Camera Frame<br/>(extrinsics)"]
+        L_TF --> L_PROJ["Project into Image Plane<br/>(intrinsics)"]
+        L_PROJ --> L_SEL["Keep points in mask<br/>(∩ FoV, shared)"]
+        L_SEL -->|"tight & rect (no fork)"| C_SEG["Segment range profile →<br/>merge near-band runs"]
+        C_SEG --> C_COORD["Median of merged set → (X,Z)<br/>camera frame (Y unobserved)"]
+    end
+
+    ALIGNED --> EXTRACT
+    IFACE --> EXTRACT
+    ALIGNED --> SELECT
+    IFACE --> SELECT
 
     A_COORD --> FINAL["Object Coordinates<br/>relative to Camera Frame<br/>(X, Y, Z) · polar profiling: X,Z only"]
     B_COORD --> FINAL
     C_COORD --> FINAL
+
+    %% invisible links: push euclidean reconstruction one rank down,
+    %% keep the LiDAR column on the right side of the layout
+    EXTRACT ~~~ SELECT
+    MASK_B ~~~ LIDAR
 ```
 
 ---
@@ -144,7 +156,7 @@ flowchart TD
 Two detector components run off the RGB frame. They are kept structurally separate (different models, different compute profiles, independently versioned and benchmarked) but are unified behind a **common data contract**.
 
 - **Segmentation component** — emits a pixel-precise (*tight*) binary mask.
-- **Detection component** — emits a bounding box, then **rasterizes the box into a rectangular binary mask**. The detector model is an implementation detail (an open-vocabulary detector such as OWLv2 is the current intent; nothing downstream depends on the choice).
+- **Detection component** — emits a bounding box, then **rasterizes the box into a rectangular binary mask**. The detector model is an implementation detail (an open-vocabulary detector such as OWLv2 is the current implementation; nothing downstream depends on the choice). In code the rasterization currently executes in the consuming measurement node (`rasterize_detection` in `perception/core/mask.py`) — it belongs to this component's contract regardless of where it runs.
 
 Both emit into the **Mask Interface**: an `H×W` binary mask plus a **precision tag** (`tight` | `rect`). Everything downstream reads only this interface and never branches on which model produced the mask. Adding a third front-end later (e.g. a promptable segmenter like SAM) means another component emitting into the same node, with zero downstream changes.
 
@@ -154,12 +166,12 @@ Both emit into the **Mask Interface**: an `H×W` binary mask plus a **precision 
 
 ## 4. Depth sources
 
-Two interchangeable sources produce an **aligned depth frame** that is 1:1 with the RGB pixels:
+Two interchangeable sources produce an **aligned depth frame** that is 1:1 with the RGB pixels. Both sit behind one producer node (`aligned_depth_node`, switch `depth_source: stereoscopic | monocular`); consumers subscribe to its output and never branch on the source.
 
-- **RealSense stereo depth** — the raw depth lives in the left-IR frame, so it must pass through an **alignment** step (using the calibrated intrinsics + extrinsics) to reproject it onto the RGB pixel grid. After alignment, depth pixel `(u, v)` corresponds to color pixel `(u, v)`.
-- **Depth Anything (monocular)** — estimated directly from the RGB frame, so it is *already* pixel-aligned (no alignment step). However it outputs **affine-invariant / relative** depth, so it needs a **metric scaling** step to become meters. If RealSense depth is available, it is the natural ground-truth reference for that scaling.
+- **RealSense stereo depth (`stereoscopic`)** — the raw depth lives in the left-IR frame, so it must be **aligned** (reprojected with the calibrated intrinsics + extrinsics) onto the RGB pixel grid. After alignment, depth pixel `(u, v)` corresponds to color pixel `(u, v)`. The alignment is not pipeline code: on hardware the driver performs it (`aligned_depth_to_color`); in sim color and depth are co-registered by construction (Section 1). The producer passes the stream through, converting to float meters only.
+- **Depth Anything (`monocular`)** — predicted directly from the RGB frame, so it is *already* pixel-aligned. The implementation uses the **metric-trained variant** (`Depth-Anything-V2-Metric-Indoor`), which emits meters directly — no scaling step against stereo; the prediction is only resized to the color grid. (The base Depth Anything models output affine-invariant depth; choosing the metric variant is what removed the scaling stage from the architecture.)
 
-Both converge to the same `Aligned Depth` node that feeds projective ranging and euclidean reconstruction.
+Both converge to the same `Aligned Depth` contract (float32 meters on the color grid; 0/NaN/inf = no depth) that feeds projective ranging and euclidean reconstruction. The producer republishes the color camera's live `camera_info` alongside each frame, so the paths deproject with the grid's true intrinsics instead of static FoV constants.
 
 > **Gotcha (alignment):** reprojection resamples the data and produces gaps at occlusion edges, because the baseline offset means some pixels are visible to one sensor but hidden from the other.
 
@@ -175,17 +187,17 @@ All three paths consume the same mask interface and resolve to camera-frame coor
 Extract depth values at the masked pixels, aggregate to a single distance, then deproject the representative pixel (centroid of the foreground pixels — `depth_based_A.md` §2.4) + aggregated depth through the intrinsics to a 3D point.
 
 - **tight branch:** direct robust median of the masked depths.
-- **rect branch:** the masked depths are multimodal (object + background), so a plain median can land on background. Isolate the foreground first (histogram → nearest dominant depth mode, or center-weight the box), *then* median.
+- **rect branch:** the masked depths are multimodal (object + background), so a plain median can land on background. Isolate the foreground first with a pluggable 2D recipe (`isolation_2d.py`; implemented: nearest-mode histogram — the default — and Otsu; catalogue in `foreground_isolation_2d.md`), *then* median.
 - **Output:** `(X, Y, Z)` from a single representative pixel.
 
 > Projective ranging's coordinate is only as good as that one representative pixel. If the centroid lands on a depth discontinuity (object edge vs. far background) the depth can be wrong even when the aggregate range was fine. The representative pixel must be the centroid of the *foreground* pixels — the isolation output on the `rect` branch, all valid masked pixels on the `tight` branch — never the raw geometric box center (`depth_based_A.md` §2.4). Both the aggregate and the centroid read the same foreground set, so they agree by construction.
 
-### Euclidean reconstruction — 3D point cloud route (richest, heaviest)
-Deproject the aligned depth into an **organized** point cloud (points keep pixel ordering, so the 2D mask indexes them directly), select the instance's points, clean up, and take the centroid.
+### Euclidean reconstruction — 3D point-domain route (richest)
+Select the valid masked pixels, deproject only those into camera-optical-frame points (select and deproject commute, so no full organized cloud is ever materialized — the published cloud topic is never consumed, per `pointcloud_provenance_test.md`), isolate the foreground in the point domain, and take the centroid.
 
-- **tight branch:** outlier removal → centroid.
-- **rect branch:** the box drags in the ground plane and neighbors, so: **RANSAC plane removal** → **Euclidean clustering** → **cluster selection** (nearest / most central / largest-after-plane). The tight mask never has to choose a cluster; the rectangular mask does.
-- **Output:** centroid `(X, Y, Z)` plus, if wanted, oriented bounding box and physical dimensions.
+- **tight branch:** statistical outlier removal (median ± k·MAD on camera-frame range) → centroid.
+- **rect branch:** the box drags in the floor and background, so a pluggable 3D isolation recipe runs (`isolation_3d.py`; catalogue in `foreground_isolation_3d.md`). Implemented default: **height crop** (extrinsic ground-plane crop — the floor is removed by known calibration, not estimation) → **range band** (percentile anchor + asymmetric inlier window tied to the object's body depth). Heavier catalogue entries (RANSAC plane removal, Euclidean clustering, min-cut) remain swap-ins, deliberately not implemented — see the catalogue for why RANSAC's dominant-plane premise is weak inside a detector box.
+- **Output:** centroid `(X, Y, Z)`; the distance is the median camera-frame range of the same foreground set, so coordinate and distance agree by construction. The foreground points are returned as a by-product (extent, oriented box later if wanted).
 
 ### Polar profiling — 2D 270° LiDAR route (accurate, planar only)
 Independent sensor stream; rejoins the pipeline only at the mask. Convert the scan to Cartesian, transform into the camera frame via **extrinsic calibration**, project into the image plane with the intrinsics, then keep only the points falling inside the mask ∩ camera FoV.
@@ -206,11 +218,11 @@ The common interface unifies the **selection** mechanic (indexing depth / points
 
 | Path | tight branch | rect branch (extra work) |
 |------|--------------|--------------------------|
-| projective ranging (2D depth) | robust median | foreground isolation (depth-mode/center) → median |
-| euclidean reconstruction (point cloud) | outlier removal | RANSAC plane removal → clustering → cluster selection |
+| projective ranging (2D depth) | robust median | 2D isolation recipe (default: nearest-mode histogram) → median |
+| euclidean reconstruction (point cloud) | MAD outlier removal | 3D isolation recipe (default: height crop → range band) |
 | polar profiling (LiDAR) | arc segmentation → merge near-band runs → median (narrow window) | arc segmentation → merge near-band runs → median (wide window admits neighbors) |
 
-Selection stays shared; the fork sits exactly where behavior genuinely diverges. Polar profiling is the exception: parallax contaminates even the tight mask (see the polar profiling callout), so its branches run the same recovery and differ only in bearing-window width. The practical consequence: choosing the cheap box detector also switches you onto the heavier recovery branch downstream — most punishing in euclidean reconstruction (plane + clustering), nearly free in projective ranging.
+Selection stays shared; the fork sits exactly where behavior genuinely diverges. Polar profiling is the exception: parallax contaminates even the tight mask (see the polar profiling callout), so its branches run the same recovery and differ only in bearing-window width. The rect recoveries are pluggable recipes (`ISOLATION_2D_RECIPES` / `ISOLATION_3D_RECIPES`, selected per launch via the `isolation_2d` / `isolation_3d` parameters of `g1_mask_measurement_node`). The implemented defaults are all cheap NumPy, so the box detector's extra recovery is currently near-free on every path; only the heavier catalogued recipes (clustering, min-cut) would reintroduce a real cost asymmetry.
 
 ---
 
@@ -236,7 +248,7 @@ The design intent is to evaluate every combination on two axes: **accuracy** (vs
 
 Working hypotheses to validate:
 
-- **Box + euclidean reconstruction** may approach mask + euclidean reconstruction in accuracy because the 3D clustering recovers what the mask would have given for free — but it spends the detector savings back on plane removal + clustering, so the "box is cheaper" intuition can partly invert here.
+- **Box + euclidean reconstruction** may approach mask + euclidean reconstruction in accuracy because the 3D isolation recovers what the mask would have given for free. With the implemented height-crop → range-band chain that recovery is nearly free, so the comparison is purely about accuracy; only the heavier catalogued recipes would spend the detector savings back.
 - **Box + projective ranging** is where the box stays genuinely cheap end-to-end.
 - **Polar profiling** is the most accurate within its plane but only 2D; best as a high-accuracy range cross-check or fallback, not a standalone 3D source.
 
@@ -254,7 +266,7 @@ Because every path emits in the same frame and at least `(X, Z)`, the outputs ar
 2. **Calibration procedures:** RealSense intrinsics/extrinsics are factory-calibrated; the **camera–LiDAR extrinsic** must be calibrated and documented. Define the procedure and store the transform.
 3. **Time synchronization** between camera and LiDAR — without matched timestamps, a moving platform/object smears the LiDAR projection against the mask.
 4. **Fallback logic** for polar profiling empty returns (scan plane misses object) → route to projective ranging / euclidean reconstruction.
-5. **Metric-scaling strategy** for Depth Anything — metric-trained variant vs. calibrate against stereo.
+5. **Metric-scaling strategy** for Depth Anything — **decided:** the metric-trained variant (`Depth-Anything-V2-Metric-Indoor`) is implemented in `aligned_depth_node`; no calibration against stereo. Revisit only if the metric variant's absolute scale proves off in the benchmark.
 6. **Build the benchmark scaffold** — enumerate the matrix rows, columns for accuracy + latency, drop in measured numbers.
 7. **Define the component interface signatures** in code (the mask-interface contract, the per-path recovery dispatch) so the separation is enforced, not just diagrammed.
 
