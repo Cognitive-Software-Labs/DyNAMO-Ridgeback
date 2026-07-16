@@ -13,9 +13,11 @@ from ridgeback_autonomy.common.messages import (
     build_measurements_message,
 )
 from ridgeback_autonomy.common.models import Detection, DetectionBatch
+from ridgeback_autonomy.perception.core.intrinsics import CameraIntrinsics
 from ridgeback_autonomy.perception.g1_mask_measurement_node import (
     CAMERA_PITCH_DEG_DEFAULT,
     ROBOT_FRONT_OFFSET_M_DEFAULT,
+    grid_mismatch_warning,
     optical_to_vehicle_planar,
 )
 
@@ -44,6 +46,28 @@ def test_vehicle_adapter_pitch_folds_optical_y_into_forward() -> None:
 def test_defaults_mirror_legacy_constants_by_value() -> None:
     assert ROBOT_FRONT_OFFSET_M_DEFAULT == 0.25
     assert CAMERA_PITCH_DEG_DEFAULT == 0.0
+
+
+def test_grid_mismatch_warning_none_when_grids_match() -> None:
+    intrinsics = CameraIntrinsics(
+        fx=443.5, fy=443.5, cx=319.5, cy=239.5, width=640, height=480)
+    batch = DetectionBatch(image_width=640, image_height=480, detections=[])
+
+    assert grid_mismatch_warning(intrinsics, batch) is None
+
+
+def test_grid_mismatch_warning_names_both_grids() -> None:
+    # The Isaac Sim grid against the Gazebo detection grid: the realistic
+    # mismatch a mis-wired camera_info topic would produce.
+    intrinsics = CameraIntrinsics(
+        fx=443.5, fy=443.5, cx=639.5, cy=359.5, width=1280, height=720)
+    batch = DetectionBatch(image_width=640, image_height=480, detections=[])
+
+    warning = grid_mismatch_warning(intrinsics, batch)
+
+    assert warning is not None
+    assert '(720, 1280)' in warning
+    assert '(480, 640)' in warning
 
 
 def test_measurements_from_detections_batch_preserve_alignment_key() -> None:

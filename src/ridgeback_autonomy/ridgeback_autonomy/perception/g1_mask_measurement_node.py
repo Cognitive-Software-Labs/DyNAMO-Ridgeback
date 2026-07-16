@@ -94,6 +94,25 @@ def optical_to_vehicle_planar(
     return lateral_m, forward_m, distance_m
 
 
+def grid_mismatch_warning(intrinsics, batch) -> str | None:
+    """Warning when the ``camera_info`` grid differs from the detection grid.
+
+    The masks are rasterized on the detection grid, while the depth indexing
+    and the scan projection are bounded by the ``camera_info`` grid. When the
+    two differ the masks cannot index either, so the caller skips every path
+    for the frame (fields stay NaN) and warns. Returns ``None`` when the
+    grids match.
+    """
+
+    if (intrinsics.height, intrinsics.width) == (batch.image_height, batch.image_width):
+        return None
+    return (
+        f'camera_info grid ({intrinsics.height}, {intrinsics.width}) does not '
+        f'match the detection grid ({batch.image_height}, {batch.image_width}); '
+        'masks cannot index the projection. Check the aligned camera_info topic.'
+    )
+
+
 class G1MaskMeasurementNode(Node):
     def __init__(self) -> None:
         super().__init__('g1_mask_measurement_node')
@@ -228,16 +247,22 @@ class G1MaskMeasurementNode(Node):
         intrinsics) is not available yet its fields stay NaN, which downstream
         reads as "no estimate" (same convention as the other measurement
         nodes). The depth paths and polar profiling are independent: either can
-        fill while the other's input is missing.
+        fill while the other's input is missing. A ``camera_info`` grid that
+        does not match the detection grid skips every path for the frame --
+        the masks cannot index the projection.
         """
 
         batch = batch_from_detections_message(detections_msg)
 
         if batch.detected and camera_info is not None:
             intrinsics = intrinsics_from_camera_info(camera_info)
-            depth_m = self.decode_depth_for_batch(depth_msg, batch)
-            scan_points = self.scan_points_for_batch(detections_msg, scan_msg)
-            self.fill_path_measurements(batch, intrinsics, depth_m, scan_points)
+            warning = grid_mismatch_warning(intrinsics, batch)
+            if warning is not None:
+                self.log_skip_warning(warning)
+            else:
+                depth_m = self.decode_depth_for_batch(depth_msg, batch)
+                scan_points = self.scan_points_for_batch(detections_msg, scan_msg)
+                self.fill_path_measurements(batch, intrinsics, depth_m, scan_points)
         elif batch.detected:
             self.log_skip_warning(
                 'No camera_info received yet; publishing measurements without '
