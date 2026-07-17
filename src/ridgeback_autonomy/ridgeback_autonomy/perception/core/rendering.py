@@ -5,7 +5,12 @@ import numpy as np
 
 from ridgeback_autonomy.common.models import DetectionBatch
 from ridgeback_autonomy.perception.core.geometry import focus_bbox
-from ridgeback_autonomy.perception.core.mask import masked_rgb, rasterize_batch
+from ridgeback_autonomy.perception.core.mask import (
+    MaskPrecision,
+    mask_from_array,
+    masked_rgb,
+    rasterize_batch,
+)
 
 
 class RgbdOverlayRenderer:
@@ -20,6 +25,7 @@ class RgbdOverlayRenderer:
         batch: DetectionBatch,
         sensor_depth_warning: str | None,
         mono_depth_warning: str | None,
+        published_mask: np.ndarray | None = None,
     ) -> np.ndarray:
         color_panel = frame.copy()
         sensor_depth_panel = self.make_depth_panel(frame.shape[:2], sensor_depth_meters)
@@ -29,10 +35,14 @@ class RgbdOverlayRenderer:
         self.draw_panel_title(sensor_depth_panel, 'Sensor Depth')
         self.draw_panel_title(mono_depth_panel, 'Depth-Anything')
 
-        # Mask panel is derived from the detection boxes at render time (the mask
-        # is not published anywhere yet). Built from the clean RGB frame, not the
-        # annotated color_panel, so it shows the real masked content.
-        mask_panel = self.make_mask_panel(frame, batch)
+        # Two mask panels, one per front-end: the rect union derived from the
+        # detection boxes at render time, and the published silhouette
+        # artifact (the tight mask downstream actually consumed). Both built
+        # from the clean RGB frame, not the annotated color_panel, so they
+        # show the real masked content. They form a second row below the
+        # camera panels.
+        box_mask_panel = self.make_box_mask_panel(frame, batch)
+        silhouette_panel = self.make_silhouette_mask_panel(frame, published_mask)
 
         if sensor_depth_warning:
             cv2.putText(sensor_depth_panel, sensor_depth_warning, (20, 62),
@@ -45,7 +55,9 @@ class RgbdOverlayRenderer:
             for panel in (color_panel, sensor_depth_panel, mono_depth_panel):
                 cv2.putText(panel, 'No G1 detected', (20, 100),
                             cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 0, 255), 2, cv2.LINE_AA)
-            return np.hstack((color_panel, sensor_depth_panel, mono_depth_panel, mask_panel))
+            return self.stack_panel_grid(
+                (color_panel, sensor_depth_panel, mono_depth_panel),
+                (box_mask_panel, silhouette_panel))
 
         for index, detection in enumerate(batch.detections):
             x1, y1, x2, y2 = detection.bbox_xyxy
@@ -85,7 +97,21 @@ class RgbdOverlayRenderer:
                     cv2.rectangle(panel, (fx1, fy1), (fx2, fy2), (0, 200, 255), 2)
                 self.draw_label_block(panel, x1, y1, label_lines, (0, 255, 0))
 
-        return np.hstack((color_panel, sensor_depth_panel, mono_depth_panel, mask_panel))
+        return self.stack_panel_grid(
+            (color_panel, sensor_depth_panel, mono_depth_panel),
+            (box_mask_panel, silhouette_panel))
+
+    def stack_panel_grid(self, top_panels, bottom_panels) -> np.ndarray:
+        """Stack the camera row over the mask row, black-padding the short row."""
+
+        top_row = np.hstack(top_panels)
+        bottom_row = np.hstack(bottom_panels)
+        if bottom_row.shape[1] < top_row.shape[1]:
+            filler = np.zeros(
+                (bottom_row.shape[0], top_row.shape[1] - bottom_row.shape[1], 3),
+                dtype=bottom_row.dtype)
+            bottom_row = np.hstack((bottom_row, filler))
+        return np.vstack((top_row, bottom_row))
 
     def normalize_depth(self, image: np.ndarray) -> np.ndarray:
         valid = np.isfinite(image) & (image > 0.0)
@@ -114,10 +140,10 @@ class RgbdOverlayRenderer:
             panel = cv2.resize(panel, (color_w, color_h), interpolation=cv2.INTER_NEAREST)
         return panel
 
-    def make_mask_panel(self, frame: np.ndarray, batch: DetectionBatch) -> np.ndarray:
-        # Masked RGB: real pixels inside the rect mask, black outside. For a
-        # rect mask this is the RGB rectangle of the box(es) on black, which
-        # makes the box's background contamination directly visible.
+    def make_box_mask_panel(self, frame: np.ndarray, batch: DetectionBatch) -> np.ndarray:
+        # Masked RGB of the rect union derived from the detection boxes at
+        # render time: the RGB rectangle of the box(es) on black, which makes
+        # the box's background contamination directly visible.
         mask = rasterize_batch(batch)
         if mask.data.shape == frame.shape[:2]:
             panel = masked_rgb(frame, mask)
@@ -126,10 +152,31 @@ class RgbdOverlayRenderer:
             # panel rather than risk an index mismatch.
             panel = np.zeros_like(frame)
 
-        self.draw_panel_title(panel, 'Mask')
+        self.draw_panel_title(panel, 'Box Mask')
         if not batch.detected:
             cv2.putText(panel, 'No G1 detected', (20, 100),
                         cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 0, 255), 2, cv2.LINE_AA)
+        return panel
+
+    def make_silhouette_mask_panel(
+        self,
+        frame: np.ndarray,
+        published_mask: np.ndarray | None,
+    ) -> np.ndarray:
+        # Masked RGB of the published silhouette artifact (`debug/g1/mask`) --
+        # exactly the tight mask downstream consumed for this stamp. Only the
+        # silhouette gate publishes it; without an artifact (box-gate run, or
+        # the mask for this stamp never arrived) the panel says so instead of
+        # faking one.
+        if published_mask is not None and published_mask.shape == frame.shape[:2]:
+            mask = mask_from_array(published_mask.astype(bool), MaskPrecision.TIGHT)
+            panel = masked_rgb(frame, mask)
+        else:
+            panel = np.zeros_like(frame)
+            cv2.putText(panel, 'No silhouette mask', (20, 100),
+                        cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 0, 255), 2, cv2.LINE_AA)
+
+        self.draw_panel_title(panel, 'Silhouette Mask')
         return panel
 
     def draw_panel_title(self, image: np.ndarray, title: str) -> None:

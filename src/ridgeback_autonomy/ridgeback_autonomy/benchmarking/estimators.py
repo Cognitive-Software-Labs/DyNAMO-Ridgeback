@@ -49,10 +49,14 @@ MASK_ESTIMATORS = frozenset({
 # LiDAR-sourced -- no depth source, no isolation recipe -- so it is excluded.
 DEPTH_PATH_ESTIMATORS = frozenset({'projective_ranging', 'euclidean_reconstruction'})
 
-# The mask front-end (gate) axis of the self-describing output name. Only the
-# rasterized box (rect) gate exists today; the silhouette (tight segmentation)
-# front-end is a future producer that will add a second value here.
-MASK_GATE = 'box'
+# The mask front-end (gate) axis: the rasterized box (rect) gate and the
+# silhouette (tight segmentation) gate. A run picks one via the ``mask_gate``
+# parameter; the value folds into every mask-row output name. Tokens mirror
+# ``g1_mask_measurement_node.MASK_GATES`` by value (cross-checked in tests).
+MASK_GATE_BOX = 'box'
+MASK_GATE_SILHOUETTE = 'silhouette'
+MASK_GATES = (MASK_GATE_BOX, MASK_GATE_SILHOUETTE)
+MASK_GATE_DEFAULT = MASK_GATE_BOX
 
 ESTIMATOR_FIELD_KEYS = {
     'rgb': 'rgb_distance_m',
@@ -75,6 +79,18 @@ ESTIMATOR_LABELS = {
     'euclidean_reconstruction': 'Euclidean Reconstruction',
     'polar_profiling': 'Polar Profiling',
 }
+
+
+def parse_mask_gate(raw_mask_gate: str | None) -> str:
+    """Validate the run-level ``mask_gate`` parameter (``box`` | ``silhouette``)."""
+
+    gate = (raw_mask_gate or '').strip()
+    if not gate:
+        return MASK_GATE_DEFAULT
+    if gate not in MASK_GATES:
+        supported = ', '.join(MASK_GATES)
+        raise ValueError(f'Unsupported mask_gate "{gate}". Expected one of: {supported}')
+    return gate
 
 
 def parse_estimators(raw_estimators: str | None) -> tuple[str, ...]:
@@ -136,6 +152,7 @@ def benchmark_output_name(
     depth_source: str,
     isolation_2d: str,
     isolation_3d: str,
+    mask_gate: str = MASK_GATE_DEFAULT,
 ) -> str:
     """Filesystem-safe self-describing name for a row's output CSV.
 
@@ -144,6 +161,11 @@ def benchmark_output_name(
     varies along, so the path name alone collides across runs that vary any of
     the others: ``box_gated_stereoscopic_projective_ranging_nearest_mode_histogram``.
 
+    Silhouette rows drop the isolation token
+    (``silhouette_gated_stereoscopic_projective_ranging``): the tight branches
+    never run an isolation recipe, and naming code that did not execute would
+    mislabel the row.
+
     Polar profiling is mask-based but LiDAR-sourced, so only the gate applies:
     ``box_gated_polar_profiling``. Non-mask estimators keep their plain key
     (none of these axes apply to them). The spaced, isolation-free prose used
@@ -151,14 +173,20 @@ def benchmark_output_name(
     """
 
     if estimator in DEPTH_PATH_ESTIMATORS:
+        if mask_gate == MASK_GATE_SILHOUETTE:
+            return f'{mask_gate}_gated_{depth_source}_{estimator}'
         isolation = isolation_2d if estimator == 'projective_ranging' else isolation_3d
-        return f'{MASK_GATE}_gated_{depth_source}_{estimator}_{isolation}'
+        return f'{mask_gate}_gated_{depth_source}_{estimator}_{isolation}'
     if estimator == 'polar_profiling':
-        return f'{MASK_GATE}_gated_{estimator}'
+        return f'{mask_gate}_gated_{estimator}'
     return estimator
 
 
-def benchmark_display_name(estimator: str, depth_source: str) -> str:
+def benchmark_display_name(
+    estimator: str,
+    depth_source: str,
+    mask_gate: str = MASK_GATE_DEFAULT,
+) -> str:
     """Human-readable prose name for logs and the summary ``estimator`` column.
 
     The doc prose form (gate, source, path), spaced and lower-case, without the
@@ -170,7 +198,7 @@ def benchmark_display_name(estimator: str, depth_source: str) -> str:
 
     path_words = estimator.replace('_', ' ')
     if estimator in DEPTH_PATH_ESTIMATORS:
-        return f'{MASK_GATE}-gated {depth_source} {path_words}'
+        return f'{mask_gate}-gated {depth_source} {path_words}'
     if estimator == 'polar_profiling':
-        return f'{MASK_GATE}-gated {path_words}'
+        return f'{mask_gate}-gated {path_words}'
     return ESTIMATOR_LABELS[estimator]

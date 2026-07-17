@@ -88,7 +88,7 @@ flowchart TD
         SEG["Instance Segmentation<br/>(emits mask · model = impl detail)"] --> MASK_S["Binary Mask<br/>(tight)"]
     end
     subgraph DETCOMP["Detection Component"]
-        DET["Object Detection<br/>(open-vocab · e.g. OWLv2 · impl detail)"] --> RAST["Rasterize box →<br/>rectangular mask"]
+        DET["Object Detection<br/>(open-vocab · model = impl detail)"] --> RAST["Rasterize box →<br/>rectangular mask"]
         RAST --> MASK_B["Binary Mask<br/>(rectangle)"]
     end
     RGB --> SEG
@@ -155,10 +155,10 @@ flowchart TD
 
 Two detector components run off the RGB frame. They are kept structurally separate (different models, different compute profiles, independently versioned and benchmarked) but are unified behind a **common data contract**.
 
-- **Segmentation component** — emits a pixel-precise (*tight*) binary mask.
-- **Detection component** — emits a bounding box, then **rasterizes the box into a rectangular binary mask**. The detector model is an implementation detail (an open-vocabulary detector such as OWLv2 is the current implementation; nothing downstream depends on the choice). In code the rasterization currently executes in the consuming measurement node (`rasterize_detection` in `perception/core/mask.py`) — it belongs to this component's contract regardless of where it runs.
+- **Segmentation component** — emits a pixel-precise (*tight*) binary mask. Implemented as a **box-promptable segmenter prompted with the detection component's boxes** (SlimSAM by default; `perception/core/segmentation.py`, documented in `segmentation_component.md` — evaluated alternatives in §7 there: Florence-2 spike failed, SAM 3 spike passed with adoption undecided), which keeps the detector's open-vocabulary property: one box prompt → one mask. Like rasterization, it executes in the consuming measurement node (the mask never crosses the wire); a run selects it with `mask_gate:=silhouette`.
+- **Detection component** — emits a bounding box, then **rasterizes the box into a rectangular binary mask** (the default, `mask_gate:=box`). The detector model is an implementation detail (an open-vocabulary detector such as OWLv2 is the current implementation; nothing downstream depends on the choice). In code the rasterization currently executes in the consuming measurement node (`rasterize_detection` in `perception/core/mask.py`) — it belongs to this component's contract regardless of where it runs.
 
-Both emit into the **Mask Interface**: an `H×W` binary mask plus a **precision tag** (`tight` | `rect`). Everything downstream reads only this interface and never branches on which model produced the mask. Adding a third front-end later (e.g. a promptable segmenter like SAM) means another component emitting into the same node, with zero downstream changes.
+Both emit into the **Mask Interface**: an `H×W` binary mask plus a **precision tag** (`tight` | `rect`). Everything downstream reads only this interface and never branches on which model produced the mask. Adding a third front-end later means another component emitting into the same interface, with zero downstream changes.
 
 > **Design note:** the rasterize step is a deliberate, lossy adapter — it discards shape to conform to the interface. The rectangular mask is *not* a real segmentation; it carries a known background contamination. Mark this clearly at the code boundary so it is never mistaken for a tight mask.
 

@@ -26,9 +26,11 @@ from ridgeback_autonomy.benchmarking.alignment import (
     update_measurement_event,
 )
 from ridgeback_autonomy.benchmarking.estimators import (
+    MASK_GATE_DEFAULT,
     benchmark_display_name,
     benchmark_output_name,
     parse_estimators,
+    parse_mask_gate,
     selected_camera_estimators,
     selected_mask_estimators,
     uses_camera_estimators,
@@ -120,6 +122,7 @@ class G1DistanceBenchmarkRunner(Node):
         self.declare_parameter('depth_source', DEPTH_SOURCE_DEFAULT)
         self.declare_parameter('isolation_2d', ISOLATION_2D_DEFAULT)
         self.declare_parameter('isolation_3d', ISOLATION_3D_DEFAULT)
+        self.declare_parameter('mask_gate', MASK_GATE_DEFAULT)
         self.declare_parameter('color_topic', 'sensors/camera_0/color/image')
         self.declare_parameter('depth_topic', 'sensors/camera_0/depth/image')
         self.declare_parameter('mono_depth_debug_topic', MONO_DEPTH_DEBUG_TOPIC)
@@ -137,6 +140,7 @@ class G1DistanceBenchmarkRunner(Node):
         self.depth_source = str(self.get_parameter('depth_source').value)
         self.isolation_2d = str(self.get_parameter('isolation_2d').value)
         self.isolation_3d = str(self.get_parameter('isolation_3d').value)
+        self.mask_gate = parse_mask_gate(str(self.get_parameter('mask_gate').value))
         self.color_topic = str(self.get_parameter('color_topic').value)
         self.depth_topic = str(self.get_parameter('depth_topic').value)
         self.mono_depth_debug_topic = str(self.get_parameter('mono_depth_debug_topic').value)
@@ -157,11 +161,12 @@ class G1DistanceBenchmarkRunner(Node):
         # (gate, source, path) goes in logs and the summary column.
         self.estimator_output_names = {
             estimator: benchmark_output_name(
-                estimator, self.depth_source, self.isolation_2d, self.isolation_3d)
+                estimator, self.depth_source, self.isolation_2d, self.isolation_3d,
+                self.mask_gate)
             for estimator in self.selected_estimators
         }
         self.estimator_display_names = {
-            estimator: benchmark_display_name(estimator, self.depth_source)
+            estimator: benchmark_display_name(estimator, self.depth_source, self.mask_gate)
             for estimator in self.selected_estimators
         }
         self.estimator_csv_paths = {

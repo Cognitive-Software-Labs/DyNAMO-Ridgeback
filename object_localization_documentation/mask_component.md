@@ -36,10 +36,10 @@ written once and works for either. They differ only in how faithfully the `True`
 region follows the object's true silhouette, which is recorded by the
 **precision tag** (`tight` | `rect`).
 
-The tight mask is described only briefly here (Section 4); it is a future
-front-end. The remainder of this document describes the **rectangular mask**
-thoroughly, because it is the mask produced from the detector that already
-exists in the stack (OWLv2).
+The tight mask is described only briefly here (Section 4); its producer has
+its own document, `segmentation_component.md`. The remainder of this document
+describes the **rectangular mask** thoroughly, because it is the default mask
+produced from the detector (OWLv2).
 
 ---
 
@@ -132,14 +132,16 @@ uses an encoded form — see the wire-cost note in Section 5.3.
 
 ---
 
-## 4. Tight mask (deferred)
+## 4. Tight mask
 
-The tight mask is the second front-end and is **not** detailed here. In short,
-it will come from an instance-segmentation model and produce a pixel-precise
-`True` region (an arbitrary blob, not a rectangle), tagged `tight`, with
-negligible background contamination. It emits into the identical mask interface,
-so adding it requires no change to anything that consumes a mask. A full
-description belongs in its own document when that front-end is built.
+The tight mask is the second front-end and is **not** detailed here — see
+`segmentation_component.md`. In short: a box-promptable segmentation model
+(SlimSAM by default), prompted with the detector's boxes, produces a
+pixel-precise `True` region (an arbitrary blob, not a rectangle), tagged
+`tight`, with negligible background contamination. It emits into the identical
+mask interface via `mask_from_array(blob, MaskPrecision.TIGHT)`, so nothing
+that consumes a mask changed when it was added. The front-end is selected per
+run by the `mask_gate` parameter (`box` | `silhouette`).
 
 ---
 
@@ -158,18 +160,21 @@ color-image-sized panels:
 [ RGB Detection | Sensor Depth | Depth-Anything ]
 ```
 
-The mask view is added as one more panel appended to the right of this row:
+The mask views form a **second row below** the camera panels — one panel per
+front-end, so both mask types are visible at once and directly comparable:
 
 ```
-[ RGB Detection | Sensor Depth | Depth-Anything | Mask ]
+[ RGB Detection | Sensor Depth | Depth-Anything ]
+[ Box Mask      | Silhouette Mask |             ]
 ```
 
-All panels share the color image resolution, so the mask panel is the same
-`1280 × 720` size as the others.
+All panels share the color image resolution, so the mask panels are the same
+`1280 × 720` size as the others (the shorter mask row is black-padded to the
+grid width).
 
 ### 5.2 Panel style: masked RGB
 
-The mask panel renders as **masked RGB**: pixels **inside** the mask show the
+Both mask panels render as **masked RGB**: pixels **inside** the mask show the
 real RGB content; everything **outside** the mask is black.
 
 ```
@@ -177,35 +182,39 @@ panel = zeros (all black)
 panel[mask] = rgb[mask]      # copy RGB only where mask is True
 ```
 
-For a rectangular mask this is exactly the RGB rectangle of the detection box
+For the rectangular mask this is exactly the RGB rectangle of the detection box
 sitting on a black background. The chosen style is deliberate: showing the real
 RGB pixels inside the region (rather than a flat white blob) makes the
 contamination directly visible — floor, wall, and neighbouring objects caught
 inside the box appear right next to the target. The panel therefore doubles as a
 visual measure of "how much background is this box dragging in."
 
-When the tight front-end exists, the **same** panel renders its silhouette for
-free: black outside, RGB inside the true object outline. Side by side, the two
-mask types make the precision difference immediately obvious — a clean cut-out
-(`tight`) versus a rectangle full of background (`rect`).
+The silhouette panel renders the same style off the tight mask: black outside,
+RGB inside the true object outline. Side by side, the two panels make the
+precision difference immediately obvious — a clean cut-out (`tight`) versus a
+rectangle full of background (`rect`).
 
-### 5.3 Data source (current vs. target)
+### 5.3 Data source (per panel)
 
-There is an important distinction in **where the displayed mask comes from**:
+The two panels have different sources, because only one of the two masks is
+reconstructible at the consumer:
 
-- **Current (derive at render time):** the binary mask is not yet produced or
-  published anywhere in the pipeline — only the bounding box is. So the panel
-  would *recompute* the rectangular mask from the detection box(es) at draw
-  time (union of boxes, rasterized). This is cheap and needs no new topic or
-  node, but it means the overlay is displaying a *locally reconstructed* mask,
-  not the actual artifact any path consumes. Note the union is **display-only**:
-  localization always uses one mask per detection (Section 6.1) and never
-  consumes the union — merging masks would destroy per-object coordinates.
-- **Target (display the real artifact):** once the mask component publishes a
-  real mask (the `H×W` boolean array plus its `tight | rect` tag), the panel
-  should consume that instead. Then the view shows exactly what downstream
-  receives, and it renders `tight` and `rect` masks identically with no
-  panel-side changes.
+- **Box Mask panel (derive at render time):** the rect mask is fully
+  determined by the detection boxes already on the wire, so the panel
+  *recomputes* it at draw time (union of boxes, rasterized). Always shown.
+  Note the union is **display-only**: localization always uses one mask per
+  detection (Section 6.1) and never consumes the union — merging masks would
+  destroy per-object coordinates.
+- **Silhouette Mask panel (display the real artifact):** a tight mask is *not*
+  reconstructible downstream, so the mask node publishes the union of the
+  frame's consumed masks as a debug-only `mono8` Image on `debug/g1/mask`
+  (`segmentation_component.md` §6) — silhouette gate only. The panel never
+  shows substitute content: it renders the artifact whose stamp matches the
+  rendered frame exactly (what downstream received), holding the most recent
+  artifact when the current frame's mask has not landed yet (it lags the
+  measurements by the segmentation latency). Only a run that has produced no
+  artifact at all (box gate, startup) shows the "No silhouette mask"
+  placeholder.
 
 **Wire cost of the target.** A naive published mask (1 byte per pixel) is
 `1280 × 720 ≈ 0.9 MB` — at 30 fps that is ~28 MB/s for a single mask, times the
@@ -222,10 +231,10 @@ detection count. The convention that keeps this harmless:
 
 ### 5.4 Cost
 
-Negligible: one boolean fill plus one masked copy per rendered frame. No model
-inference, and — if derived at render time — no new topic or node. The only
-practical caveat is window width: a fourth panel makes the row `4 × 1280 =
-5120 px` wide, which the overlay window scales down to fit the screen.
+Negligible: one boolean fill plus one masked copy per panel per rendered
+frame. No model inference in the panels themselves. The grid is `3 × 1280 =
+3840 px` wide by two rows tall, which the overlay window scales down to fit
+the screen.
 
 ---
 
@@ -293,12 +302,15 @@ by detection index `i` to recover each object's mask region and its result.
 
 ## 7. Open items
 
-- **Tight-mask front-end** — choose and document the segmentation model and its
-  output handling.
 - **Interface signature** — pin the in-code contract for the mask object (the
   `H×W` boolean array plus the `tight | rect` tag) so the separation between
   front-ends and consumers is enforced, not just described.
-- **Visualization data source** — decide between deriving the displayed mask
-  from the box at render time (quick, throwaway) and consuming a real published
-  mask (matches the interface, reusable by other consumers such as the benchmark
-  collage). See Section 5.3.
+
+Resolved:
+
+- **Tight-mask front-end** — implemented and documented in
+  `segmentation_component.md` (box-prompted SlimSAM behind the `mask_gate`
+  parameter).
+- **Visualization data source** — per panel, see Section 5.3: the Box Mask
+  panel derives the rect union at render time; the Silhouette Mask panel
+  consumes the published `debug/g1/mask` artifact.

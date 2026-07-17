@@ -143,6 +143,8 @@ def build_benchmark_nodes(context, *args, **kwargs):
                     'scan_topic': scan_topic,
                     'isolation_2d': LaunchConfiguration('isolation_2d'),
                     'isolation_3d': LaunchConfiguration('isolation_3d'),
+                    'mask_gate': LaunchConfiguration('mask_gate'),
+                    'color_topic': color_topic,
                 }],
                 remappings=[('/tf', 'tf'), ('/tf_static', 'tf_static')],
                 output='screen',
@@ -204,6 +206,7 @@ def build_benchmark_nodes(context, *args, **kwargs):
                 'depth_source': LaunchConfiguration('depth_source'),
                 'isolation_2d': LaunchConfiguration('isolation_2d'),
                 'isolation_3d': LaunchConfiguration('isolation_3d'),
+                'mask_gate': LaunchConfiguration('mask_gate'),
             }],
             remappings=[('/tf', 'tf'), ('/tf_static', 'tf_static')],
             output='screen',
@@ -279,6 +282,14 @@ def generate_launch_description():
             default_value='height_crop_range_band',
             description='Euclidean-reconstruction rect-branch foreground recipe: '
                         '"height_crop_range_band", "height_crop", or "range_band".',
+        ),
+        DeclareLaunchArgument(
+            'mask_gate',
+            default_value='box',
+            description='Mask front-end for the mask-based rows: "box" '
+                        '(rasterized detection box, no model) or "silhouette" '
+                        '(segmentation model prompted with the boxes; needs '
+                        'perception_venv). Comparing gates = two runs.',
         ),
         DeclareLaunchArgument('scan_topic', default_value='sensors/lidar2d_0/scan'),
         DeclareLaunchArgument('pointcloud_topic', default_value='sensors/camera_0/points'),

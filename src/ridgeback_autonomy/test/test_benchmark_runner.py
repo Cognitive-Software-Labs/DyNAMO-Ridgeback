@@ -12,9 +12,12 @@ from ridgeback_autonomy.benchmarking.alignment import (
     update_measurement_event,
 )
 from ridgeback_autonomy.benchmarking.estimators import (
+    MASK_GATE_DEFAULT,
+    MASK_GATES,
     benchmark_display_name,
     benchmark_output_name,
     parse_estimators,
+    parse_mask_gate,
 )
 from ridgeback_autonomy.benchmarking.g1_distance_benchmark_runner_node import extract_json_payload
 from ridgeback_autonomy.benchmarking.reduction import (
@@ -75,6 +78,50 @@ def test_benchmark_display_name_is_spaced_prose_without_isolation() -> None:
     # Polar profiling drops the source; non-mask rows use their fixed label.
     assert benchmark_display_name('polar_profiling', 'stereoscopic') == 'box-gated polar profiling'
     assert benchmark_display_name('lidar', 'stereoscopic') == 'LiDAR'
+
+
+def test_parse_mask_gate_validates_and_defaults() -> None:
+    assert parse_mask_gate('box') == 'box'
+    assert parse_mask_gate(' silhouette ') == 'silhouette'
+    assert parse_mask_gate('') == MASK_GATE_DEFAULT
+    assert parse_mask_gate(None) == MASK_GATE_DEFAULT
+    with pytest.raises(ValueError, match='box, silhouette'):
+        parse_mask_gate('tight')
+
+
+def test_silhouette_output_name_drops_the_isolation_token() -> None:
+    # The tight branches never run an isolation recipe; folding one into the
+    # name would describe code that did not execute.
+    assert benchmark_output_name(
+        'projective_ranging', 'stereoscopic', 'nearest_mode_histogram',
+        'height_crop_range_band', 'silhouette'
+    ) == 'silhouette_gated_stereoscopic_projective_ranging'
+    assert benchmark_output_name(
+        'euclidean_reconstruction', 'stereoscopic', 'nearest_mode_histogram',
+        'height_crop_range_band', 'silhouette'
+    ) == 'silhouette_gated_stereoscopic_euclidean_reconstruction'
+    assert benchmark_output_name(
+        'polar_profiling', 'stereoscopic', 'nearest_mode_histogram',
+        'height_crop_range_band', 'silhouette'
+    ) == 'silhouette_gated_polar_profiling'
+
+
+def test_silhouette_display_name_folds_the_gate() -> None:
+    assert benchmark_display_name(
+        'projective_ranging', 'stereoscopic', 'silhouette'
+    ) == 'silhouette-gated stereoscopic projective ranging'
+    assert benchmark_display_name(
+        'polar_profiling', 'stereoscopic', 'silhouette'
+    ) == 'silhouette-gated polar profiling'
+    assert benchmark_display_name('rgb', 'stereoscopic', 'silhouette') == 'RGB'
+
+
+def test_mask_gate_tokens_mirror_the_node_by_value() -> None:
+    from ridgeback_autonomy.perception.g1_mask_measurement_node import (
+        MASK_GATES as NODE_MASK_GATES,
+    )
+
+    assert MASK_GATES == NODE_MASK_GATES
 
 
 def test_extract_json_payload_accepts_multiple_gz_json_messages() -> None:

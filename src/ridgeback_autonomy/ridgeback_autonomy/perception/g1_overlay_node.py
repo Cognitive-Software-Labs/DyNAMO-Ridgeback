@@ -16,6 +16,7 @@ from ridgeback_autonomy.msg import G1Measurements
 from ridgeback_autonomy.perception.core.image_utils import (
     convert_color_image_message,
     convert_depth_to_meters_message,
+    decode_image_message,
 )
 from ridgeback_autonomy.perception.core.rendering import RgbdOverlayRenderer
 
@@ -23,6 +24,7 @@ from ridgeback_autonomy.perception.core.rendering import RgbdOverlayRenderer
 CAMERA_MEASUREMENTS_TOPIC = 'measurements/g1/camera'
 LIDAR_MEASUREMENTS_TOPIC = 'measurements/g1/lidar'
 MONO_DEPTH_DEBUG_TOPIC = 'debug/g1/camera/mono_depth'
+MASK_DEBUG_TOPIC = 'debug/g1/mask'
 DEPTH_MAX_METERS_DEFAULT = 10.0
 RENDER_FPS_DEFAULT = 15.0
 
@@ -36,6 +38,7 @@ class G1OverlayNode(Node):
         self.declare_parameter('color_topic', 'sensors/camera_0/color/image')
         self.declare_parameter('depth_topic', 'sensors/camera_0/depth/image')
         self.declare_parameter('mono_depth_debug_topic', MONO_DEPTH_DEBUG_TOPIC)
+        self.declare_parameter('mask_debug_topic', MASK_DEBUG_TOPIC)
         self.declare_parameter('depth_max_meters', DEPTH_MAX_METERS_DEFAULT)
         self.declare_parameter('render_fps', RENDER_FPS_DEFAULT)
         self.declare_parameter('window_name', 'G1 Perception')
@@ -55,9 +58,12 @@ class G1OverlayNode(Node):
         self.latest_color_msg: Image | None = None
         self.latest_depth_msg: Image | None = None
         self.latest_mono_depth_msg: Image | None = None
+        self.mask_debug_cache: OrderedDict[tuple[int, int], Image] = OrderedDict()
+        self.last_matched_silhouette = None
         self.last_color_warning: str | None = None
         self.last_depth_warning: str | None = None
         self.last_mono_depth_warning: str | None = None
+        self.last_mask_debug_warning: str | None = None
 
         self.measurement_subscription = self.create_subscription(
             G1Measurements,
@@ -89,6 +95,12 @@ class G1OverlayNode(Node):
             self.mono_depth_callback,
             qos_profile=qos_profile_sensor_data,
         )
+        self.mask_debug_subscription = self.create_subscription(
+            Image,
+            str(self.get_parameter('mask_debug_topic').value),
+            self.mask_debug_callback,
+            qos_profile=qos_profile_sensor_data,
+        )
         self.render_timer = self.create_timer(1.0 / self.render_fps, self.render_callback)
 
         cv2.namedWindow(self.window_name, cv2.WINDOW_NORMAL)
@@ -114,6 +126,22 @@ class G1OverlayNode(Node):
 
     def mono_depth_callback(self, mono_depth_msg: Image) -> None:
         self.latest_mono_depth_msg = mono_depth_msg
+
+    def mask_debug_callback(self, mask_msg: Image) -> None:
+        key = (mask_msg.header.stamp.sec, mask_msg.header.stamp.nanosec)
+        self.mask_debug_cache[key] = mask_msg
+        self.mask_debug_cache.move_to_end(key)
+        while len(self.mask_debug_cache) > 32:
+            self.mask_debug_cache.popitem(last=False)
+        # The silhouette artifact lags its measurements message by the
+        # segmentation latency, so the frame usually renders (rect fallback)
+        # before the mask lands. Re-render as soon as the matching mask
+        # arrives, otherwise the panel permanently shows the fallback.
+        measurements_msg = self.latest_measurements_msg
+        if measurements_msg is not None and key == (
+                measurements_msg.header.stamp.sec,
+                measurements_msg.header.stamp.nanosec):
+            self.render_latest()
 
     def render_callback(self) -> None:
         cv2.waitKey(1)
@@ -157,9 +185,37 @@ class G1OverlayNode(Node):
             batch,
             None,
             None,
+            published_mask=self.match_mask_debug(self.latest_measurements_msg),
         )
         cv2.imshow(self.window_name, annotated)
         cv2.waitKey(1)
+
+    def match_mask_debug(self, measurements_msg: G1Measurements):
+        """The silhouette artifact for the rendered stamp, else the newest one.
+
+        The artifact for a stamp lags its measurements message by the
+        segmentation latency, so the exact match is often one frame behind at
+        render time. The silhouette panel never shows substitute content:
+        without an exact match it holds the most recent artifact, and only a
+        run that has produced no artifact at all (box gate, startup) renders
+        the panel's placeholder (``None``).
+        """
+
+        mask_msg = self.mask_debug_cache.get(
+            (measurements_msg.header.stamp.sec, measurements_msg.header.stamp.nanosec))
+        if mask_msg is None:
+            return self.last_matched_silhouette
+        try:
+            mask = decode_image_message(mask_msg)
+            self.last_mask_debug_warning = None
+        except ValueError as exc:
+            self.log_warning_once(
+                'last_mask_debug_warning',
+                f'Cannot decode mask debug image ({mask_msg.encoding}): {exc}',
+            )
+            return self.last_matched_silhouette
+        self.last_matched_silhouette = mask > 0
+        return self.last_matched_silhouette
 
     # Camera and lidar measurements come from independent pipelines running at
     # different rates, so they almost never share the exact same detection
