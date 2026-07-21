@@ -79,20 +79,37 @@ def test_unimodal_roi_keeps_all_valid_masked_pixels(recipe) -> None:
     assert np.array_equal(foreground, mask)
 
 
-def test_nearest_mode_dispersed_histogram_falls_back_to_global_mode() -> None:
-    # Regression: a depth ramp spread over many bins (floor inside the box,
-    # object far away) can leave NO bin above the significance floor; the
-    # recipe must fall back to the most-populated bin instead of crashing.
-    depth = np.zeros((HEIGHT, WIDTH), dtype=np.float32)
-    # 60 rows sweep 1.0 -> 6.9 m: every 0.05 m bin holds ~1/118 of the pixels.
-    depth[:] = np.linspace(1.0, 6.9, HEIGHT, dtype=np.float32)[:, np.newaxis]
+def test_nearest_mode_dispersed_histogram_picks_nearest_not_global_mode() -> None:
+    # Regression (audit C5): when the histogram is so dispersed that NO bin
+    # clears the significance floor, the recipe must fall back to the NEAREST
+    # non-empty bin, not the global argmax. Here a thin near cluster (~2 m,
+    # fewer pixels) sits in front of a larger dispersed far wall (~5 m): the
+    # global mode is a far-wall bin, but the subject is the near cluster.
+    near_rows = 10
+    depth = np.empty((HEIGHT, WIDTH), dtype=np.float32)
+    # Near: 1 row per 0.05 m bin (~80 px/bin). Far: 2 rows per bin (~160 px/bin)
+    # -> the far wall is the taller (global) mode, yet neither clears the 5%
+    # floor (240 px), so the dispersed fallback is what runs.
+    depth[:near_rows] = np.linspace(2.0, 2.5, near_rows, dtype=np.float32)[:, np.newaxis]
+    depth[near_rows:] = np.linspace(
+        5.0, 6.25, HEIGHT - near_rows, dtype=np.float32)[:, np.newaxis]
     mask = np.ones((HEIGHT, WIDTH), dtype=bool)
+
+    # Precondition: the far wall really is the more populated (global) mode, so
+    # this test would fail under the old argmax fallback.
+    values = depth[mask]
+    hist, _ = np.histogram(
+        values, bins=int(np.ceil((values.max() - values.min()) / 0.05)))
+    assert hist.max() < 0.05 * values.size  # no bin clears the floor -> fallback
 
     foreground = nearest_mode_histogram(depth, mask)
 
     assert foreground.shape == mask.shape
     assert foreground.any()
     assert not np.any(foreground & ~valid_depth(depth))
+    # The near cluster is isolated; the far wall is never selected.
+    assert depth[foreground].max() < 3.0
+    assert not np.any(foreground & (depth > 3.0))
 
 
 @pytest.mark.parametrize('recipe', [nearest_mode_histogram, otsu_foreground])

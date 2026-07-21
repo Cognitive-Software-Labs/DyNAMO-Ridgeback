@@ -18,43 +18,88 @@ from ridgeback_autonomy.common.models import Detection, DetectionBatch
 from ridgeback_autonomy.perception.core.intrinsics import CameraIntrinsics
 from ridgeback_autonomy.perception.core.mask import MaskPrecision, mask_from_array
 from ridgeback_autonomy.perception.g1_mask_measurement_node import (
-    CAMERA_PITCH_DEG_DEFAULT,
+    BASE_FRAME_DEFAULT,
     MASK_GATE_BOX,
     MASK_GATE_SILHOUETTE,
+    MAX_BOX_FRAME_FRACTION,
     ROBOT_FRONT_OFFSET_M_DEFAULT,
-    ColorFrameBuffer,
+    StampedMessageBuffer,
+    box_within_frame_fraction,
     encode_mask_debug_image,
     fill_path_measurements,
     grid_mismatch_warning,
-    optical_to_vehicle_planar,
+    optical_to_base_planar,
     resolve_mask_gate,
 )
 
 
-def test_vehicle_adapter_zero_pitch_forward_is_z_minus_offset() -> None:
-    lateral, forward, distance = optical_to_vehicle_planar(
-        (0.5, -0.2, 3.0), pitch_rad=0.0, front_offset_m=0.25)
+# The optical -> base rotation of a level (zero-pitch, zero-roll) camera:
+# base X (forward) = optical Z, base Y (left) = -optical X, base Z (up) =
+# -optical Y. What TF publishes for the benchmark camera.
+LEVEL_OPTICAL_TO_BASE = np.array([
+    [0.0, 0.0, 1.0],
+    [-1.0, 0.0, 0.0],
+    [0.0, -1.0, 0.0],
+])
+ZERO_TRANSLATION = np.zeros(3)
 
-    assert lateral == pytest.approx(0.5)
+
+def test_base_adapter_level_camera_forward_is_z_minus_offset() -> None:
+    lateral, forward, distance = optical_to_base_planar(
+        (0.5, -0.2, 3.0), LEVEL_OPTICAL_TO_BASE, ZERO_TRANSLATION,
+        front_offset_m=0.25)
+
+    # Optical X right = base -Y: lateral is left-positive (REP-103), matching
+    # the ground truth and the lidar/pointcloud rows.
+    assert lateral == pytest.approx(-0.5)
     assert forward == pytest.approx(2.75)
     assert distance == pytest.approx(math.hypot(0.5, 2.75))
 
 
-def test_vehicle_adapter_pitch_folds_optical_y_into_forward() -> None:
-    pitch_rad = math.radians(10.0)
-    # A point straight ahead of a downward-pitched camera: optical Y (down)
-    # contributes against forward, optical Z contributes with cos(pitch).
-    lateral, forward, _ = optical_to_vehicle_planar(
-        (0.0, 0.3, 2.0), pitch_rad=pitch_rad, front_offset_m=0.0)
+def test_base_adapter_applies_camera_mounting_translation() -> None:
+    # Camera mounted forward/left/up of the base origin: the translation must
+    # enter the planar coordinate -- this is the C1 fix under test.
+    translation = np.array([0.311, 0.018, 1.158])
+    lateral, forward, _ = optical_to_base_planar(
+        (0.0, 0.0, 3.0), LEVEL_OPTICAL_TO_BASE, translation,
+        front_offset_m=0.25)
 
-    assert lateral == 0.0
-    assert forward == pytest.approx(
-        -math.sin(pitch_rad) * 0.3 + math.cos(pitch_rad) * 2.0)
+    assert forward == pytest.approx(3.0 + 0.311 - 0.25)
+    assert lateral == pytest.approx(0.018)
 
 
 def test_defaults_mirror_legacy_constants_by_value() -> None:
+    # The node's front-offset default mirrors the legacy geometry constant by
+    # value (the two stacks never import each other). The pure core-module
+    # mirrors are covered in test_mirrored_constants; this one needs the
+    # ROS-importing node module, so it lives here (audit C10).
+    from ridgeback_autonomy.perception.core import geometry
+
+    assert ROBOT_FRONT_OFFSET_M_DEFAULT == geometry.ROBOT_FRONT_OFFSET_M
     assert ROBOT_FRONT_OFFSET_M_DEFAULT == 0.25
-    assert CAMERA_PITCH_DEG_DEFAULT == 0.0
+    assert BASE_FRAME_DEFAULT == 'base_link'
+
+
+def test_box_within_frame_fraction_accepts_normal_box() -> None:
+    # A person-sized box on a 640x480 frame: well under the gate.
+    assert box_within_frame_fraction((260, 120, 380, 400), 480, 640) is True
+
+
+def test_box_within_frame_fraction_rejects_near_full_frame_box() -> None:
+    # The OWLv2 failure mode: a box spanning almost the whole frame (audit C6).
+    assert box_within_frame_fraction((2, 2, 638, 478), 480, 640) is False
+
+
+def test_box_within_frame_fraction_boundary_at_max_fraction() -> None:
+    # Exactly MAX_BOX_FRAME_FRACTION of the area is still accepted (<=).
+    width, height = 640, 480
+    box_w = int(round(width * MAX_BOX_FRAME_FRACTION))
+    assert box_within_frame_fraction((0, 0, box_w, height), height, width) is True
+    assert box_within_frame_fraction((0, 0, box_w + 2, height), height, width) is False
+
+
+def test_box_within_frame_fraction_degenerate_frame_is_rejected() -> None:
+    assert box_within_frame_fraction((0, 0, 10, 10), 0, 0) is False
 
 
 def test_grid_mismatch_warning_none_when_grids_match() -> None:
@@ -154,8 +199,8 @@ def stamp(sec: int, nanosec: int):
     return header.stamp
 
 
-def test_color_frame_buffer_exact_stamp_hit() -> None:
-    buffer = ColorFrameBuffer(depth=3)
+def test_stamped_buffer_exact_stamp_hit() -> None:
+    buffer = StampedMessageBuffer(depth=3)
     target = color_image(10, 500)
     buffer.store(color_image(10, 400))
     buffer.store(target)
@@ -164,16 +209,16 @@ def test_color_frame_buffer_exact_stamp_hit() -> None:
     assert buffer.lookup(stamp(10, 500)) is target
 
 
-def test_color_frame_buffer_miss_returns_none() -> None:
-    buffer = ColorFrameBuffer(depth=3)
+def test_stamped_buffer_miss_returns_none() -> None:
+    buffer = StampedMessageBuffer(depth=3)
     buffer.store(color_image(10, 400))
 
     # Nearby but not exact: the lookup is exact-stamp, no tolerance.
     assert buffer.lookup(stamp(10, 401)) is None
 
 
-def test_color_frame_buffer_evicts_oldest_beyond_depth() -> None:
-    buffer = ColorFrameBuffer(depth=2)
+def test_stamped_buffer_evicts_oldest_beyond_depth() -> None:
+    buffer = StampedMessageBuffer(depth=2)
     buffer.store(color_image(1, 0))
     buffer.store(color_image(2, 0))
     buffer.store(color_image(3, 0))
@@ -181,6 +226,26 @@ def test_color_frame_buffer_evicts_oldest_beyond_depth() -> None:
     assert len(buffer) == 2
     assert buffer.lookup(stamp(1, 0)) is None  # aged out
     assert buffer.lookup(stamp(3, 0)) is not None
+
+
+def test_stamped_buffer_nearest_picks_closest_within_tolerance() -> None:
+    # The scan match: free-running stamps, pick the nearest inside the window.
+    buffer = StampedMessageBuffer(depth=5)
+    buffer.store(color_image(10, 0))            # 40 ms before target
+    closest = color_image(10, 30_000_000)       # 10 ms before target
+    buffer.store(closest)
+    buffer.store(color_image(10, 90_000_000))   # 50 ms after target
+
+    hit = buffer.lookup_nearest(stamp(10, 40_000_000), tolerance_s=0.05)
+
+    assert hit is closest
+
+
+def test_stamped_buffer_nearest_miss_outside_tolerance_returns_none() -> None:
+    buffer = StampedMessageBuffer(depth=5)
+    buffer.store(color_image(10, 0))            # 100 ms away
+
+    assert buffer.lookup_nearest(stamp(10, 100_000_000), tolerance_s=0.05) is None
 
 
 # --- fill_path_measurements with tight masks: the silhouette-gate consumption
@@ -230,7 +295,8 @@ def test_fill_with_tight_masks_runs_paths_without_isolation_recipes() -> None:
         FILL_INTRINSICS,
         build_fill_depth(),
         None,  # no scan: polar profiling simply skipped
-        pitch_rad=0.0,
+        camera_rotation=LEVEL_OPTICAL_TO_BASE,
+        camera_translation=ZERO_TRANSLATION,
         front_offset_m=0.25,
         isolation_2d=forbidden_isolation,
         isolation_3d=forbidden_isolation,
@@ -255,7 +321,8 @@ def test_fill_skips_none_mask_entries_fields_stay_unset() -> None:
         FILL_INTRINSICS,
         build_fill_depth(),
         None,
-        pitch_rad=0.0,
+        camera_rotation=LEVEL_OPTICAL_TO_BASE,
+        camera_translation=ZERO_TRANSLATION,
         front_offset_m=0.25,
         isolation_2d=forbidden_isolation,
         isolation_3d=forbidden_isolation,

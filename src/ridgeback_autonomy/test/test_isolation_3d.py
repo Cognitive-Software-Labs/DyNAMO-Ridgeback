@@ -22,10 +22,10 @@ def object_points() -> np.ndarray:
 
 
 def floor_points() -> np.ndarray:
-    """Floor strip: camera height 0.85 m, pitch 0 => the floor is Y = +0.85."""
+    """Floor strip: camera height 1.053 m, pitch 0 => the floor is Y = +1.053."""
 
     x, z = np.meshgrid(np.linspace(-0.5, 0.5, 5), np.linspace(1.0, 3.5, 10))
-    y = np.full_like(x, 0.85)
+    y = np.full_like(x, 1.053)
     return np.stack((x.ravel(), y.ravel(), z.ravel()), axis=-1)
 
 

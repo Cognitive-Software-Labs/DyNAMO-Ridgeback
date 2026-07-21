@@ -21,7 +21,7 @@ from dataclasses import dataclass
 import numpy as np
 
 
-CAMERA_HEIGHT_M_DEFAULT = 0.85  # mirrors config/camera_config.json height_m
+CAMERA_HEIGHT_M_DEFAULT = 1.053  # measured 2026-07-20 (TF base_link -> camera); 1.183 after the robot.yaml re-sync. Mask-stack only: the legacy config/camera_config.json height_m stays 0.85 and is deliberately not touched by this change.
 CAMERA_PITCH_DEG_DEFAULT = 0.0  # mirrors config/camera_config.json pitch_deg
 FLOOR_MARGIN_M_DEFAULT = 0.05
 

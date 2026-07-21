@@ -9,8 +9,10 @@ paths per mask: the two depth paths
 against the aligned depth frame, and polar profiling
 (``perception/core/polar_profiling.py``) against the scan projected into the
 camera optical frame via TF. Each path's result is converted from the camera
-optical frame to the vehicle-frame planar-distance convention every benchmark
-row shares (ground truth included), and published as ``G1Measurements`` with
+optical frame to the base-frame planar-distance convention every benchmark
+row shares (ground truth included) through the optical -> base extrinsics
+from TF -- the camera's mounting pose, translation included, is modeled
+exactly -- and published as ``G1Measurements`` with
 the identity fields of the source detections message -- so the benchmark
 runner can merge them into the same aligned event as the camera and lidar
 measurements.
@@ -93,7 +95,7 @@ COLOR_TOPIC_DEFAULT = 'sensors/camera_0/color/image'
 MASK_DEBUG_TOPIC = 'debug/g1/mask'
 
 ROBOT_FRONT_OFFSET_M_DEFAULT = 0.25  # mirrors geometry.ROBOT_FRONT_OFFSET_M
-CAMERA_PITCH_DEG_DEFAULT = 0.0  # mirrors config/camera_config.json pitch_deg
+BASE_FRAME_DEFAULT = 'base_link'
 
 MASK_GATE_BOX = 'box'
 MASK_GATE_SILHOUETTE = 'silhouette'
@@ -104,23 +106,47 @@ MASK_GATES = (MASK_GATE_BOX, MASK_GATE_SILHOUETTE)
 # is genuinely stalled.
 COLOR_BUFFER_DEPTH_DEFAULT = 15
 
+# A detector box covering more than this fraction of the frame is almost always
+# a failure (OWLv2 occasionally boxes the whole scene at close range); masking
+# with it isolates the background wall and poisons every path. Detections that
+# fail this gate are skipped (fields stay NaN, trial drops) rather than measured
+# against the room -- audit C6, the 2026-07-17 pos_003/024/032 outlier trials.
+MAX_BOX_FRAME_FRACTION = 0.60
 
-def optical_to_vehicle_planar(
+# Aligned-depth frames and scans are matched to the detection stamp, not paired
+# latest-wins, so the mask and the depth/scan it reads come from the same
+# instant (audit C3). Depth inherits the color frame's stamp (exact match); the
+# scan free-runs at ~40 Hz, so it is matched to the nearest buffered stamp
+# within SCAN_MATCH_TOLERANCE_S. Buffer depths span the detector latency
+# (~200 ms) plus jitter.
+DEPTH_MATCH_BUFFER_DEPTH = 15
+SCAN_MATCH_BUFFER_DEPTH = 20
+SCAN_MATCH_TOLERANCE_S_DEFAULT = 0.05
+
+
+def optical_to_base_planar(
     xyz_optical,
-    pitch_rad: float,
+    rotation: np.ndarray,
+    translation: np.ndarray,
     front_offset_m: float,
 ) -> tuple[float, float, float]:
-    """Camera-optical point -> ``(lateral_m, forward_m, distance_m)``.
+    """Camera-optical point -> ``(lateral_m, forward_m, distance_m)`` in the base frame.
 
-    The vehicle-frame planar convention every benchmark row (and the ground
-    truth) uses: optical X right is vehicle lateral; optical Y/Z fold into
-    vehicle forward through the camera pitch; the robot front offset is
-    subtracted from forward before the planar distance.
+    ``rotation`` / ``translation`` are the camera-optical -> base extrinsics
+    from TF, so the camera's mounting pose (translation included) is modeled
+    exactly instead of assuming the optical center sits at the base origin.
+    Lateral is base +Y (left-positive, REP-103), matching the ground truth and
+    the legacy lidar/pointcloud rows; the robot front offset is subtracted
+    from base forward (+X) before the planar distance.
     """
 
-    x, y, z = (float(value) for value in xyz_optical)
-    lateral_m = x
-    forward_m = -math.sin(pitch_rad) * y + math.cos(pitch_rad) * z - front_offset_m
+    point_base = (
+        np.asarray(rotation, dtype=np.float64)
+        @ np.asarray(xyz_optical, dtype=np.float64)
+        + np.asarray(translation, dtype=np.float64)
+    )
+    lateral_m = float(point_base[1])
+    forward_m = float(point_base[0]) - front_offset_m
     distance_m = math.hypot(lateral_m, forward_m)
     return lateral_m, forward_m, distance_m
 
@@ -135,35 +161,76 @@ def resolve_mask_gate(value) -> str:
     return gate
 
 
+def box_within_frame_fraction(
+    bbox_xyxy,
+    image_height: int,
+    image_width: int,
+    max_fraction: float = MAX_BOX_FRAME_FRACTION,
+) -> bool:
+    """True if the detector box covers at most ``max_fraction`` of the frame.
+
+    A near-full-frame box (see ``MAX_BOX_FRAME_FRACTION``) fails the gate; the
+    caller then skips that detection instead of masking the whole scene. Pure so
+    it can be unit-tested without a node (mirrors ``grid_mismatch_warning``).
+    """
+
+    frame_area = float(image_height) * float(image_width)
+    if frame_area <= 0.0:
+        return False
+    x1, y1, x2, y2 = bbox_xyxy
+    box_area = float(max(0, x2 - x1)) * float(max(0, y2 - y1))
+    return box_area <= max_fraction * frame_area
+
+
 def stamp_key(stamp) -> tuple[int, int]:
     return int(stamp.sec), int(stamp.nanosec)
 
 
-class ColorFrameBuffer:
-    """Stamp-keyed rolling buffer of recent color frames (silhouette gate).
+class StampedMessageBuffer:
+    """Stamp-keyed rolling buffer of recent messages, matched by header stamp.
 
-    The detections message inherits its color frame's header, so the stamp is
-    an exact match key -- no tolerance window. A lookup miss means the frame
-    aged out (or never arrived); the caller skips the frame's paths rather
-    than downgrading to a rect mask, which would mislabel the benchmark row.
+    Used for the silhouette color frame, the aligned depth frame, and the scan.
+    Color and depth inherit the exact color stamp, so they match with
+    ``lookup`` (no tolerance); the scan free-runs, so it matches with
+    ``lookup_nearest`` within a tolerance window. A miss means the message aged
+    out (or never arrived); the caller skips that source's paths rather than
+    pairing whatever arrived most recently, which would smear distance under
+    motion (audit C3) or mislabel the silhouette benchmark row.
     """
 
     def __init__(self, depth: int) -> None:
         self.depth = int(depth)
-        self._frames: OrderedDict[tuple[int, int], Image] = OrderedDict()
+        self._msgs: OrderedDict[tuple[int, int], object] = OrderedDict()
 
     def __len__(self) -> int:
-        return len(self._frames)
+        return len(self._msgs)
 
-    def store(self, msg: Image) -> None:
+    def store(self, msg) -> None:
         key = stamp_key(msg.header.stamp)
-        self._frames[key] = msg
-        self._frames.move_to_end(key)
-        while len(self._frames) > self.depth:
-            self._frames.popitem(last=False)
+        self._msgs[key] = msg
+        self._msgs.move_to_end(key)
+        while len(self._msgs) > self.depth:
+            self._msgs.popitem(last=False)
 
-    def lookup(self, stamp) -> Image | None:
-        return self._frames.get(stamp_key(stamp))
+    def lookup(self, stamp):
+        """Exact stamp match, or ``None``."""
+
+        return self._msgs.get(stamp_key(stamp))
+
+    def lookup_nearest(self, stamp, tolerance_s: float):
+        """Buffered message closest to ``stamp`` within ``tolerance_s``, or ``None``."""
+
+        sec, nanosec = stamp_key(stamp)
+        target_ns = sec * 1_000_000_000 + nanosec
+        tol_ns = int(tolerance_s * 1_000_000_000)
+        best = None
+        best_delta = None
+        for (key_sec, key_nanosec), msg in self._msgs.items():
+            delta = abs(key_sec * 1_000_000_000 + key_nanosec - target_ns)
+            if delta <= tol_ns and (best_delta is None or delta < best_delta):
+                best_delta = delta
+                best = msg
+        return best
 
 
 def fill_path_measurements(
@@ -173,17 +240,20 @@ def fill_path_measurements(
     depth_m,
     scan_points,
     *,
-    pitch_rad: float,
+    camera_rotation: np.ndarray,
+    camera_translation: np.ndarray,
     front_offset_m: float,
     isolation_2d,
     isolation_3d,
 ) -> None:
     """Run every available path for each (detection, mask) pair, in place.
 
-    ``masks`` is index-aligned with ``batch.detections``; a ``None`` mask
-    (empty segmentation) skips that detection entirely -- its fields stay NaN
-    and the trial drops, per the no-fallback convention. The ``tight | rect``
-    fork lives inside the paths themselves; this function is gate-agnostic.
+    ``camera_rotation`` / ``camera_translation`` are the camera-optical ->
+    base extrinsics (TF at the detection stamp). ``masks`` is index-aligned
+    with ``batch.detections``; a ``None`` mask (empty segmentation) skips that
+    detection entirely -- its fields stay NaN and the trial drops, per the
+    no-fallback convention. The ``tight | rect`` fork lives inside the paths
+    themselves; this function is gate-agnostic.
     """
 
     for detection, mask in zip(batch.detections, masks):
@@ -198,8 +268,9 @@ def fill_path_measurements(
                     detection.projective_ranging_lateral_m,
                     detection.projective_ranging_forward_m,
                     detection.projective_ranging_distance_m,
-                ) = optical_to_vehicle_planar(
-                    result_a.xyz_optical, pitch_rad, front_offset_m)
+                ) = optical_to_base_planar(
+                    result_a.xyz_optical, camera_rotation, camera_translation,
+                    front_offset_m)
 
             result_b = localize_euclidean_reconstruction(
                 depth_m, mask, intrinsics, isolation=isolation_3d)
@@ -208,24 +279,27 @@ def fill_path_measurements(
                     detection.euclidean_reconstruction_lateral_m,
                     detection.euclidean_reconstruction_forward_m,
                     detection.euclidean_reconstruction_distance_m,
-                ) = optical_to_vehicle_planar(
-                    result_b.xyz_optical, pitch_rad, front_offset_m)
+                ) = optical_to_base_planar(
+                    result_b.xyz_optical, camera_rotation, camera_translation,
+                    front_offset_m)
 
         if scan_points is not None:
             points_optical, valid = scan_points
             result_c = localize_polar_profiling(
                 points_optical, valid, mask, intrinsics)
             if result_c is not None:
-                # Polar profiling recovers only (X, Z); Y is unobservable.
-                # The vehicle-frame forward folds Y through the camera pitch,
-                # which is 0 for this benchmark, so Y = 0 is exact here.
+                # Polar profiling recovers only (X, Z); Y is unobservable and
+                # substituted with 0. Optical Y folds into base forward only
+                # through the camera pitch, which is 0 for this benchmark, so
+                # the substitution is exact here.
                 x_optical, z_optical = (float(value) for value in result_c.xz_optical)
                 (
                     detection.polar_profiling_lateral_m,
                     detection.polar_profiling_forward_m,
                     detection.polar_profiling_distance_m,
-                ) = optical_to_vehicle_planar(
-                    (x_optical, 0.0, z_optical), pitch_rad, front_offset_m)
+                ) = optical_to_base_planar(
+                    (x_optical, 0.0, z_optical), camera_rotation,
+                    camera_translation, front_offset_m)
 
 
 def encode_mask_debug_image(masks, image_height: int, image_width: int, header) -> Image:
@@ -279,7 +353,8 @@ class G1MaskMeasurementNode(Node):
         self.declare_parameter('aligned_depth_topic', ALIGNED_DEPTH_TOPIC)
         self.declare_parameter('aligned_camera_info_topic', ALIGNED_CAMERA_INFO_TOPIC)
         self.declare_parameter('scan_topic', 'sensors/lidar2d_0/scan')
-        self.declare_parameter('pitch_deg', CAMERA_PITCH_DEG_DEFAULT)
+        self.declare_parameter('scan_match_tolerance_s', SCAN_MATCH_TOLERANCE_S_DEFAULT)
+        self.declare_parameter('base_frame', BASE_FRAME_DEFAULT)
         self.declare_parameter('front_offset_m', ROBOT_FRONT_OFFSET_M_DEFAULT)
         self.declare_parameter('isolation_2d', ISOLATION_2D_DEFAULT)
         self.declare_parameter('isolation_3d', ISOLATION_3D_DEFAULT)
@@ -289,7 +364,9 @@ class G1MaskMeasurementNode(Node):
         self.declare_parameter('segmentation_model', SEGMENTATION_MODEL_DEFAULT)
         self.declare_parameter('mask_debug_topic', MASK_DEBUG_TOPIC)
 
-        self.pitch_rad = math.radians(float(self.get_parameter('pitch_deg').value))
+        self.base_frame = str(self.get_parameter('base_frame').value)
+        self.scan_match_tolerance_s = float(
+            self.get_parameter('scan_match_tolerance_s').value)
         self.front_offset_m = float(self.get_parameter('front_offset_m').value)
         self.isolation_2d = self.resolve_recipe(
             'isolation_2d', ISOLATION_2D_RECIPES)
@@ -300,11 +377,12 @@ class G1MaskMeasurementNode(Node):
         # The silhouette gate needs the exact color frame the detections were
         # made on, and the segmentation model. The box gate subscribes to
         # nothing extra and loads nothing -- rasterization is model-free.
-        self.color_buffer: ColorFrameBuffer | None = None
+        self.color_buffer: StampedMessageBuffer | None = None
         self.segmenter: SamBoxSegmenter | None = None
         self.last_segmentation_log_monotonic = 0.0
+        self.last_oversized_log_monotonic = 0.0
         if self.mask_gate == MASK_GATE_SILHOUETTE:
-            self.color_buffer = ColorFrameBuffer(
+            self.color_buffer = StampedMessageBuffer(
                 int(self.get_parameter('color_buffer_depth').value))
             self.segmenter = SamBoxSegmenter(
                 str(self.get_parameter('segmentation_model').value),
@@ -315,15 +393,21 @@ class G1MaskMeasurementNode(Node):
             # the worker.
             self.segmenter.load()
 
-        # Polar profiling projects the scan into the camera optical frame, so it
-        # needs the scan -> optical extrinsic from TF at each detection stamp.
+        # TF serves two extrinsics per frame: scan -> optical (polar profiling
+        # projects the scan into the camera frame) and optical -> base (every
+        # path's result is converted to the base-frame planar convention with
+        # the camera's true mounting pose, translation included).
         self.tf_buffer = Buffer(node=self)
         self.tf_listener = TransformListener(self.tf_buffer, self, spin_thread=False)
         self.last_scan_tf_fallback: str | None = None
+        self.last_base_tf_fallback: str | None = None
 
         self.latest_detections_msg: G1Detections | None = None
-        self.latest_depth_msg: Image | None = None
-        self.latest_scan_msg: LaserScan | None = None
+        # Depth and scan are matched to the detection stamp (audit C3), not
+        # paired latest-wins, so they are buffered rather than kept as a single
+        # slot. Depth = exact stamp; scan = nearest within scan_match_tolerance_s.
+        self.depth_buffer = StampedMessageBuffer(DEPTH_MATCH_BUFFER_DEPTH)
+        self.scan_buffer = StampedMessageBuffer(SCAN_MATCH_BUFFER_DEPTH)
         self.latest_camera_info: CameraInfo | None = None
         self.processing_lock = threading.Lock()
         self.process_event = threading.Event()
@@ -399,11 +483,11 @@ class G1MaskMeasurementNode(Node):
 
     def depth_callback(self, depth_msg: Image) -> None:
         with self.processing_lock:
-            self.latest_depth_msg = depth_msg
+            self.depth_buffer.store(depth_msg)
 
     def scan_callback(self, scan_msg: LaserScan) -> None:
         with self.processing_lock:
-            self.latest_scan_msg = scan_msg
+            self.scan_buffer.store(scan_msg)
 
     def camera_info_callback(self, camera_info: CameraInfo) -> None:
         self.latest_camera_info = camera_info
@@ -421,9 +505,17 @@ class G1MaskMeasurementNode(Node):
             while not self.stop_event.is_set():
                 with self.processing_lock:
                     detections_msg = self.latest_detections_msg
-                    depth_msg = self.latest_depth_msg
-                    scan_msg = self.latest_scan_msg
                     self.latest_detections_msg = None
+                    depth_msg = None
+                    scan_msg = None
+                    if detections_msg is not None:
+                        # Match the mask's own instant: depth inherits the color
+                        # stamp (exact), the free-running scan the nearest within
+                        # tolerance. A miss -> None -> that source's paths skip.
+                        stamp = detections_msg.header.stamp
+                        depth_msg = self.depth_buffer.lookup(stamp)
+                        scan_msg = self.scan_buffer.lookup_nearest(
+                            stamp, self.scan_match_tolerance_s)
 
                 if detections_msg is None:
                     break
@@ -471,19 +563,23 @@ class G1MaskMeasurementNode(Node):
                         self.mask_debug_pub.publish(encode_mask_debug_image(
                             masks, batch.image_height, batch.image_width,
                             detections_msg.header))
-                    depth_m = self.decode_depth_for_batch(depth_msg, batch)
-                    scan_points = self.scan_points_for_batch(detections_msg, scan_msg)
-                    fill_path_measurements(
-                        batch,
-                        masks,
-                        intrinsics,
-                        depth_m,
-                        scan_points,
-                        pitch_rad=self.pitch_rad,
-                        front_offset_m=self.front_offset_m,
-                        isolation_2d=self.isolation_2d,
-                        isolation_3d=self.isolation_3d,
-                    )
+                    camera_extrinsic = self.camera_extrinsic_for_batch(detections_msg)
+                    if camera_extrinsic is not None:
+                        camera_rotation, camera_translation = camera_extrinsic
+                        depth_m = self.decode_depth_for_batch(depth_msg, batch)
+                        scan_points = self.scan_points_for_batch(detections_msg, scan_msg)
+                        fill_path_measurements(
+                            batch,
+                            masks,
+                            intrinsics,
+                            depth_m,
+                            scan_points,
+                            camera_rotation=camera_rotation,
+                            camera_translation=camera_translation,
+                            front_offset_m=self.front_offset_m,
+                            isolation_2d=self.isolation_2d,
+                            isolation_3d=self.isolation_3d,
+                        )
         elif batch.detected:
             self.log_skip_warning(
                 'No camera_info received yet; publishing measurements without '
@@ -501,13 +597,24 @@ class G1MaskMeasurementNode(Node):
         -- one forward per frame, one decode per box. A missing color frame
         returns ``None`` (skip the frame's paths, never downgrade to rect --
         the run *is* the gate axis); an empty segmentation yields a ``None``
-        entry for that detection only.
+        entry for that detection only. Detections whose box covers more than
+        ``MAX_BOX_FRAME_FRACTION`` of the frame are gated to a ``None`` entry
+        before masking (audit C6), so a runaway detector box is never rasterized
+        or segmented into the background wall.
         """
+
+        accepted = [
+            box_within_frame_fraction(
+                detection.bbox_xyxy, batch.image_height, batch.image_width)
+            for detection in batch.detections
+        ]
+        self.log_oversized_skip(accepted.count(False))
 
         if self.mask_gate == MASK_GATE_BOX:
             return [
                 rasterize_detection(detection, batch.image_height, batch.image_width)
-                for detection in batch.detections
+                if keep else None
+                for detection, keep in zip(batch.detections, accepted)
             ]
 
         with self.processing_lock:
@@ -520,19 +627,33 @@ class G1MaskMeasurementNode(Node):
             )
             return None
 
-        # The segmenter wants RGB; the shared decoder returns BGR.
+        # The segmenter wants RGB; the shared decoder returns BGR. Only accepted
+        # boxes are prompted; oversized ones map straight to ``None``.
         rgb = np.ascontiguousarray(
             convert_color_image_message(color_msg)[:, :, ::-1])
-        started = time.perf_counter()
-        blobs = self.segmenter.segment_boxes(
-            rgb, [detection.bbox_xyxy for detection in batch.detections])
-        elapsed_ms = (time.perf_counter() - started) * 1000.0
-        self.log_segmentation_latency(elapsed_ms, len(blobs))
-        return [
-            None if blob is None
-            else mask_from_array(blob, MaskPrecision.TIGHT)
-            for blob in blobs
+        prompt_boxes = [
+            detection.bbox_xyxy
+            for detection, keep in zip(batch.detections, accepted)
+            if keep
         ]
+        blobs: list = []
+        if prompt_boxes:
+            started = time.perf_counter()
+            blobs = self.segmenter.segment_boxes(rgb, prompt_boxes)
+            elapsed_ms = (time.perf_counter() - started) * 1000.0
+            self.log_segmentation_latency(elapsed_ms, len(blobs))
+
+        # Re-align the segmenter's per-prompt blobs back to full detection order.
+        blob_iter = iter(blobs)
+        masks: list = []
+        for keep in accepted:
+            if not keep:
+                masks.append(None)
+                continue
+            blob = next(blob_iter)
+            masks.append(
+                None if blob is None else mask_from_array(blob, MaskPrecision.TIGHT))
+        return masks
 
     def log_segmentation_latency(self, elapsed_ms: float, mask_count: int) -> None:
         now = time.monotonic()
@@ -541,6 +662,20 @@ class G1MaskMeasurementNode(Node):
         self.last_segmentation_log_monotonic = now
         self.get_logger().info(
             f'Silhouette segmentation: {elapsed_ms:.1f} ms for {mask_count} mask(s).')
+
+    def log_oversized_skip(self, count: int) -> None:
+        """Warn (throttled) that oversized detector boxes were gated out (C6)."""
+
+        if count <= 0:
+            return
+        now = time.monotonic()
+        if now - self.last_oversized_log_monotonic < 5.0:
+            return
+        self.last_oversized_log_monotonic = now
+        self.get_logger().warn(
+            f'Skipping {count} detection(s) whose box exceeds '
+            f'{int(MAX_BOX_FRAME_FRACTION * 100)}% of the frame (likely a '
+            'detector failure); their path estimates stay unset.')
 
     def decode_depth_for_batch(self, depth_msg: Image | None, batch):
         """Aligned depth in meters on the batch grid, or ``None`` if unusable."""
@@ -560,6 +695,31 @@ class G1MaskMeasurementNode(Node):
             )
             return None
         return depth_m
+
+    def camera_extrinsic_for_batch(self, detections_msg: G1Detections):
+        """Camera-optical -> base ``(rotation, translation)`` from TF, or ``None``.
+
+        Looked up at the detection stamp for the frame the detections (and
+        masks) live in. Without it the paths cannot be expressed in the base
+        planar convention, so the caller skips every path for the frame --
+        fields stay NaN, never a camera-at-origin approximation.
+        """
+
+        try:
+            rotation, translation, self.last_base_tf_fallback = lookup_transform_components(
+                self.tf_buffer,
+                self.base_frame,
+                detections_msg.header.frame_id,
+                Time.from_msg(detections_msg.header.stamp),
+                self.get_logger(),
+                self.last_base_tf_fallback,
+            )
+        except TransformException as exc:
+            self.log_skip_warning(
+                f'Camera -> base extrinsic unavailable (TF): {exc}; '
+                'skipping path estimates for this frame.')
+            return None
+        return rotation, translation
 
     def scan_points_for_batch(self, detections_msg: G1Detections, scan_msg: LaserScan | None):
         """Scan in the camera optical frame ``(points, valid)``, or ``None``.

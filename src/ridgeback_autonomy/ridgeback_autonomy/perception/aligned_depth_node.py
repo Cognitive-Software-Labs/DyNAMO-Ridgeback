@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import importlib
 import threading
+import time
 
 import numpy as np
 import rclpy
@@ -29,24 +30,37 @@ from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
 from sensor_msgs.msg import CameraInfo, Image
 
+from ridgeback_autonomy.perception.core.image_utils import (
+    convert_depth_to_meters_message,
+)
+
 
 ALIGNED_DEPTH_TOPIC = 'perception/aligned_depth/image'
 ALIGNED_CAMERA_INFO_TOPIC = 'perception/aligned_depth/camera_info'
 DEPTH_SOURCE_STEREOSCOPIC = 'stereoscopic'
 DEPTH_SOURCE_MONOCULAR = 'monocular'
 DEPTH_ANYTHING_MODEL_ID_DEFAULT = 'depth-anything/Depth-Anything-V2-Metric-Indoor-Small-hf'
+# After a load/inference failure the monocular source waits this long before
+# re-attempting, instead of disabling itself for the rest of the run. A single
+# transient hiccup (e.g. a CUDA OOM) then self-heals rather than silently
+# starving every ``monocular`` benchmark row (audit C4).
+MONOCULAR_RETRY_COOLDOWN_S_DEFAULT = 30.0
 
 
 def decode_depth_to_meters(msg: Image) -> np.ndarray:
     """Decode a depth Image message into float32 meters, invalid pixels kept
-    as 0/NaN/inf per the aligned-depth-frame contract."""
-    if msg.encoding in ('16UC1', 'mono16'):
-        raw = np.frombuffer(msg.data, dtype=np.uint16)
-        return raw.reshape(msg.height, msg.width).astype(np.float32) / 1000.0
-    if msg.encoding == '32FC1':
-        raw = np.frombuffer(msg.data, dtype=np.float32)
-        return raw.reshape(msg.height, msg.width).astype(np.float32, copy=True)
-    raise ValueError(f'unsupported depth encoding "{msg.encoding}"')
+    as 0/NaN/inf per the aligned-depth-frame contract.
+
+    Delegates to the shared decoder, which honours ``msg.step`` (row padding).
+    A real camera driver may emit row-aligned buffers (``step > width *
+    itemsize``); the previous hand-rolled ``reshape(height, width)`` rejected
+    every such frame (audit C12). This stays the contract's single entry point,
+    so both importers (this node and ``g1_mask_measurement_node``) get the fix.
+    """
+
+    if msg.encoding not in ('16UC1', 'mono16', '32FC1'):
+        raise ValueError(f'unsupported depth encoding "{msg.encoding}"')
+    return convert_depth_to_meters_message(msg)
 
 
 def decode_color_to_rgb(msg: Image) -> np.ndarray:
@@ -106,12 +120,25 @@ class MonocularDepthSource:
 
     input_kind = 'color'
 
-    def __init__(self, model_id: str, device: str, logger) -> None:
+    def __init__(
+        self,
+        model_id: str,
+        device: str,
+        logger,
+        *,
+        now_fn=time.monotonic,
+        cooldown_s: float = MONOCULAR_RETRY_COOLDOWN_S_DEFAULT,
+    ) -> None:
         self.model_id = model_id
         self.device = device or self.resolve_device()
         self.logger = logger
         self._pipeline = None
-        self._failed = False
+        # Retry-with-cooldown instead of a permanent fail latch (audit C4):
+        # ``_retry_after`` is the earliest time (``now_fn`` seconds) a new load
+        # is allowed. 0 lets the first load run immediately.
+        self._now_fn = now_fn
+        self._cooldown_s = float(cooldown_s)
+        self._retry_after = 0.0
 
     @staticmethod
     def resolve_device() -> str:
@@ -123,22 +150,35 @@ class MonocularDepthSource:
             pass
         return 'cpu'
 
+    def _build_pipeline(self):
+        """Construct the Depth-Anything pipeline (seam for tests)."""
+
+        transformers = importlib.import_module('transformers')
+        return transformers.pipeline(
+            task='depth-estimation',
+            model=self.model_id,
+            device=self.device,
+        )
+
+    def _schedule_retry(self, reason: str) -> None:
+        """Drop the pipeline and arm the cooldown, warning on each occurrence."""
+
+        self._pipeline = None
+        self._retry_after = self._now_fn() + self._cooldown_s
+        self.logger.warn(
+            f'Depth-Anything unavailable ({reason}); retrying after '
+            f'{self._cooldown_s:.0f} s cooldown.')
+
     def load(self) -> bool:
         if self._pipeline is not None:
             return True
-        if self._failed:
+        if self._now_fn() < self._retry_after:
             return False
         self.logger.info(f'Loading Depth-Anything model {self.model_id} on {self.device}')
         try:
-            transformers = importlib.import_module('transformers')
-            self._pipeline = transformers.pipeline(
-                task='depth-estimation',
-                model=self.model_id,
-                device=self.device,
-            )
+            self._pipeline = self._build_pipeline()
         except Exception as exc:
-            self.logger.error(f'Cannot load Depth-Anything model ({self.model_id}): {exc}')
-            self._failed = True
+            self._schedule_retry(f'load failed: {exc}')
             return False
         self.logger.info('Depth-Anything model loaded.')
         return True
@@ -156,9 +196,7 @@ class MonocularDepthSource:
         try:
             outputs = self._pipeline(pil.fromarray(np.ascontiguousarray(rgb)))
         except Exception as exc:
-            self.logger.error(f'Depth-Anything inference failed: {exc}')
-            self._failed = True
-            self._pipeline = None
+            self._schedule_retry(f'inference failed: {exc}')
             return None
 
         predicted = outputs.get('predicted_depth')
@@ -205,6 +243,8 @@ class AlignedDepthNode(Node):
                 str(self.get_parameter('depth_anything_model_id').value),
                 str(self.get_parameter('depth_anything_device').value),
                 self.get_logger(),
+                # Node clock so the cooldown respects use_sim_time.
+                now_fn=lambda: self.get_clock().now().nanoseconds / 1e9,
             )
         else:
             raise ValueError(

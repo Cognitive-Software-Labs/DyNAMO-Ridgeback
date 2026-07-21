@@ -230,7 +230,10 @@ fork, pluggable isolation, camera-frame coordinate output.
   swap point (`foreground_isolation_3d.md`, evaluation protocol step 4).
 - ~~**Provenance decision**~~ — resolved 2026-07-11: deprojected only; the
   published cloud is demoted to RViz/debug (`pointcloud_provenance_test.md` §7).
-- **Sparse-mask fallback** — behavior when too few valid points survive
-  isolation (skip, or defer to projective ranging / polar profiling).
+- ~~**Sparse-mask fallback**~~ — resolved 2026-07-21: skip —
+  `localize_euclidean_reconstruction` returns `None` when too few valid points
+  survive isolation, so the benchmark drops the row (never substituted). Any
+  defer-to-projective-ranging / polar-profiling routing is a production-pipeline
+  consumer concern, not the estimator's.
 - **Coordinate frame** — same confirmation as projective ranging
   (`Object_Localization_Pipeline.md` Section 7).

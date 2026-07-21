@@ -84,8 +84,9 @@ this step — it is a pure, deterministic geometric fill.
 The mask is defined in exactly one coordinate system: the **RGB color image
 pixel grid**. Concretely, that grid is fixed by three things:
 
-- **Resolution** — the color image size (currently `1280 × 720`). The mask is
-  allocated at this size, so `mask.shape == (H, W)` of the color frame.
+- **Resolution** — the color grid of the active backend (sim today: `640 × 480`;
+  real/Isaac target: `1280 × 720`). The mask is allocated at this size, so
+  `mask.shape == (H, W)` of the color frame.
 - **Intrinsics** — the color camera's projection parameters. They are not used
   to build the mask, but they define what each pixel index *means* as a ray into
   the scene, which matters the moment the mask is used as a selector.
@@ -168,9 +169,9 @@ front-end, so both mask types are visible at once and directly comparable:
 [ Box Mask      | Silhouette Mask |             ]
 ```
 
-All panels share the color image resolution, so the mask panels are the same
-`1280 × 720` size as the others (the shorter mask row is black-padded to the
-grid width).
+All panels share the active backend's color-image resolution (sim today:
+`640 × 480`; real/Isaac target: `1280 × 720`), so the mask panels are the same
+size as the others (the shorter mask row is black-padded to the grid width).
 
 ### 5.2 Panel style: masked RGB
 
@@ -216,9 +217,11 @@ reconstructible at the consumer:
   artifact at all (box gate, startup) shows the "No silhouette mask"
   placeholder.
 
-**Wire cost of the target.** A naive published mask (1 byte per pixel) is
-`1280 × 720 ≈ 0.9 MB` — at 30 fps that is ~28 MB/s for a single mask, times the
-detection count. The convention that keeps this harmless:
+**Wire cost of the target.** A naive published mask (1 byte per pixel) scales
+with the active backend's color grid — at the real/Isaac `1280 × 720` target it
+is `≈ 0.9 MB` (at 30 fps ~28 MB/s for a single mask, times the detection count);
+the sim `640 × 480` grid is ~2.7× smaller (`≈ 0.3 MB`). The convention that
+keeps either harmless:
 
 - **Consumers never take the mask off the wire.** The whole perception stack
   runs on one machine (robot PC or workstation — never split across both), so
@@ -232,9 +235,10 @@ detection count. The convention that keeps this harmless:
 ### 5.4 Cost
 
 Negligible: one boolean fill plus one masked copy per panel per rendered
-frame. No model inference in the panels themselves. The grid is `3 × 1280 =
-3840 px` wide by two rows tall, which the overlay window scales down to fit
-the screen.
+frame. No model inference in the panels themselves. The grid is three color
+frames wide (`3 × 640 = 1920 px` in sim; `3 × 1280 = 3840 px` at the
+real/Isaac target) by two rows tall, which the overlay window scales down to
+fit the screen.
 
 ---
 
@@ -302,12 +306,13 @@ by detection index `i` to recover each object's mask region and its result.
 
 ## 7. Open items
 
-- **Interface signature** — pin the in-code contract for the mask object (the
-  `H×W` boolean array plus the `tight | rect` tag) so the separation between
-  front-ends and consumers is enforced, not just described.
-
 Resolved:
 
+- ~~**Interface signature** — pin the in-code contract for the mask object (the
+  `H×W` boolean array plus the `tight | rect` tag) so the separation between
+  front-ends and consumers is enforced, not just described.~~ — resolved
+  2026-07-21: `Mask.__post_init__` (`perception/core/mask.py`) enforces the
+  2D-boolean array, and the precision tag is a real `MaskPrecision(str, Enum)`.
 - **Tight-mask front-end** — implemented and documented in
   `segmentation_component.md` (box-prompted SlimSAM behind the `mask_gate`
   parameter).

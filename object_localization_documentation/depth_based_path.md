@@ -102,10 +102,12 @@ contract. Divergences to keep in mind (details in
 
 Deprojection (projective ranging §2.4, euclidean reconstruction §2.1) needs the intrinsics *of the grid the
 frame lives on* — after alignment that is the **color** camera's intrinsics.
-The repo currently derives intrinsics from `config/camera_config.json` FoV
-values (87°/58° — the real depth FoV), which is wrong for the sim render
-(71.6°) and wrong-in-principle for aligned real depth (color FoV). The robust
-fix is subscribing `camera_info` of the grid's camera; the provenance test
+The **legacy estimators** still derive intrinsics from
+`config/camera_config.json` FoV values (87°/58° — the real depth FoV), which is
+wrong for the sim render (71.6°) and wrong-in-principle for aligned real depth
+(color FoV). The mask stack no longer has this problem: `aligned_depth_node`
+already subscribes and republishes `camera_info` of the grid's camera and the
+mask node deprojects with it (resolved 2026-07-21). The provenance test
 self-calibrates as a cross-check (`pointcloud_provenance_test.md` §3).
 
 ---
@@ -167,8 +169,12 @@ consumers (projective ranging, euclidean reconstruction, mask overlay) never bra
 - **`align_depth` on hardware** — add the parameter to `robot.yaml`, verify it
   survives the Clearpath generation layer, and confirm the
   `aligned_depth_to_color` topic grid matches the color image.
-- **Intrinsics source** — switch deprojection to `camera_info` of the color
-  camera instead of the FoV constants in `camera_config.json` (§2.3).
+- ~~**Intrinsics source** — switch deprojection to `camera_info` of the color
+  camera instead of the FoV constants in `camera_config.json` (§2.3).~~ —
+  resolved 2026-07-21: for the mask stack, `aligned_depth_node` republishes the
+  color camera's `camera_info` alongside each frame and the mask node deprojects
+  with it; only the legacy estimators still fall back to the
+  `camera_config.json` FoV constants.
 - **Metric-scale validation** — quantify Depth-Anything's global scale error
   against stereo on identical frames before trusting its euclidean reconstruction rows.
 - ~~**Topic-level contract**~~ — resolved 2026-07-12: both producers publish

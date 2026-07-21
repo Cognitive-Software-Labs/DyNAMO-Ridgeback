@@ -6,10 +6,22 @@ from sensor_msgs.msg import Image
 from std_msgs.msg import Header
 
 from ridgeback_autonomy.perception.aligned_depth_node import (
+    MonocularDepthSource,
     decode_color_to_rgb,
     decode_depth_to_meters,
     encode_depth_message,
 )
+
+
+class _NullLogger:
+    def info(self, *args, **kwargs) -> None:
+        pass
+
+    def warn(self, *args, **kwargs) -> None:
+        pass
+
+    def error(self, *args, **kwargs) -> None:
+        pass
 
 
 def make_image(encoding: str, array: np.ndarray) -> Image:
@@ -17,6 +29,8 @@ def make_image(encoding: str, array: np.ndarray) -> Image:
     msg.encoding = encoding
     msg.height = array.shape[0]
     msg.width = array.shape[1]
+    # Packed rows: byte stride of the contiguous array (the decoder honours it).
+    msg.step = int(np.ascontiguousarray(array).strides[0])
     msg.data = array.tobytes()
     return msg
 
@@ -34,6 +48,28 @@ def test_decode_depth_mono16_uses_the_millimeter_path() -> None:
     raw = np.array([[500]], dtype=np.uint16)
 
     assert np.allclose(decode_depth_to_meters(make_image('mono16', raw)), [[0.5]])
+
+
+def test_decode_depth_16uc1_honours_row_padding() -> None:
+    # A real driver may emit row-aligned buffers (step > width*itemsize); the
+    # decoder must strip the padding, not choke on it (audit C12).
+    rows = [[1000, 2500], [500, 0]]
+    itemsize = np.dtype(np.uint16).itemsize
+    width, pad_elements = 2, 2
+    buf = bytearray()
+    for row in rows:
+        buf += np.array(row + [9999] * pad_elements, dtype=np.uint16).tobytes()
+
+    msg = Image()
+    msg.encoding = '16UC1'
+    msg.height, msg.width = 2, width
+    msg.step = (width + pad_elements) * itemsize
+    msg.data = bytes(buf)
+
+    depth = decode_depth_to_meters(msg)
+
+    assert depth.shape == (2, 2)
+    assert np.allclose(depth, [[1.0, 2.5], [0.5, 0.0]])
 
 
 def test_decode_depth_32fc1_passthrough_keeps_invalids() -> None:
@@ -74,6 +110,40 @@ def test_decode_color_rejects_unknown_encoding() -> None:
 
     with pytest.raises(ValueError, match='unsupported color encoding'):
         decode_color_to_rgb(make_image('yuv422', raw))
+
+
+def test_monocular_source_retries_after_cooldown(monkeypatch) -> None:
+    # C4: a transient load/inference failure must NOT permanently disable the
+    # source. It arms a cooldown, skips while it is active, then re-attempts
+    # once the cooldown elapses -- here the retry succeeds.
+    clock = {'t': 100.0}
+    source = MonocularDepthSource(
+        'model', 'cpu', _NullLogger(),
+        now_fn=lambda: clock['t'], cooldown_s=30.0)
+
+    attempts = {'n': 0}
+
+    def build():
+        attempts['n'] += 1
+        if attempts['n'] == 1:
+            raise RuntimeError('transient CUDA OOM')
+        return object()  # a "loaded pipeline"
+
+    monkeypatch.setattr(source, '_build_pipeline', build)
+
+    assert source.load() is False        # first attempt fails -> cooldown armed
+    assert attempts['n'] == 1
+
+    clock['t'] = 120.0                    # still inside the 30 s cooldown
+    assert source.load() is False
+    assert attempts['n'] == 1             # no re-attempt while cooling down
+
+    clock['t'] = 131.0                    # cooldown elapsed
+    assert source.load() is True          # re-attempts and succeeds
+    assert attempts['n'] == 2
+
+    assert source.load() is True          # stays loaded, no further attempts
+    assert attempts['n'] == 2
 
 
 def test_encode_depth_message_round_trip() -> None:

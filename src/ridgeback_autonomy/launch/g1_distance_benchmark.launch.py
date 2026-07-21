@@ -141,6 +141,7 @@ def build_benchmark_nodes(context, *args, **kwargs):
                     'aligned_depth_topic': ALIGNED_DEPTH_TOPIC,
                     'aligned_camera_info_topic': ALIGNED_CAMERA_INFO_TOPIC,
                     'scan_topic': scan_topic,
+                    'base_frame': base_frame,
                     'isolation_2d': LaunchConfiguration('isolation_2d'),
                     'isolation_3d': LaunchConfiguration('isolation_3d'),
                     'mask_gate': LaunchConfiguration('mask_gate'),
