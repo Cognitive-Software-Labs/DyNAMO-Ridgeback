@@ -11,6 +11,8 @@ from ridgeback_autonomy.benchmarking.estimators import PUBLIC_ESTIMATOR_ORDER
 TRIAL_CSV_COLUMNS = [
     'trial_id',
     'repeat_index',
+    'scene_id',
+    'instance_index',
     'spawn_forward_m',
     'spawn_lateral_m',
     'spawn_world_x',

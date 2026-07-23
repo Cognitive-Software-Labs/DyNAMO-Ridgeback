@@ -158,6 +158,7 @@ if(BUILD_TESTING)
   ament_add_pytest_test(test_euclidean_reconstruction test/test_euclidean_reconstruction.py)
   ament_add_pytest_test(test_polar_profiling test/test_polar_profiling.py)
   ament_add_pytest_test(test_benchmark_runner test/test_benchmark_runner.py)
+  ament_add_pytest_test(test_scenarios test/test_scenarios.py)
 endif()
 
 ament_package()

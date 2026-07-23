@@ -1,0 +1,27 @@
+# Example scenes exercising the new benchmark axes (opt-in via
+# scenario:=<share>/config/benchmark_scenarios_examples.yaml).
+#
+# World-frame planar poses: x = forward, y = lateral (+left). z pinned to floor.
+# Object occluders spawn from model://<model> (see sim/models/).
+defaults:
+  robot_yaw_rad: 3.141592653589793
+
+scenes:
+  # Single robot straight ahead -- trivial multi-instance-path sanity scene.
+  - id: single_forward_2p5
+    robots: [{ x: 2.5, y: 0.0 }]
+
+  # Two robots on the same camera bearing (both y=0) at different ranges: the
+  # near one occludes the far one. Far robot is expected to be MISSED when fully
+  # hidden; no true position is needed to produce or separate the estimates.
+  - id: inter_robot_occlusion_near_far
+    robots:
+      - { x: 2.0, y: 0.0 }   # near
+      - { x: 4.0, y: 0.0 }   # far (occluded by the near robot)
+
+  # A hospital bed between the sensor and the robot -- object occlusion.
+  # Requires sim/models/hospital_bed (Stage 3).
+  - id: bed_occluder_single
+    robots: [{ x: 3.5, y: 0.0 }]
+    objects:
+      - { model: hospital_bed, x: 2.2, y: 0.0, yaw: 0.0 }
