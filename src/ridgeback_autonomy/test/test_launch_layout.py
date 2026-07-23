@@ -99,10 +99,11 @@ def test_benchmark_launch_uses_new_multi_estimator_interface() -> None:
     assert 'primary_metric' not in benchmark_text
     assert "DeclareLaunchArgument('depth_anything_enabled'" not in benchmark_text
     assert "DeclareLaunchArgument('output_csv'" not in benchmark_text
-    # The mask-gate axis: declared once, forwarded to both the mask node and
-    # the runner (the run's output names must match the node's gate).
+    # The mask-gate axis: declared once, forwarded to the mask node, the runner
+    # (output names must match the node's gate), and the overlay (its mask panel
+    # follows the gate).
     assert "'mask_gate'," in benchmark_text
-    assert benchmark_text.count("'mask_gate': LaunchConfiguration('mask_gate')") == 2
+    assert benchmark_text.count("'mask_gate': LaunchConfiguration('mask_gate')") == 3
 
 
 def test_slam_lifecycle_configure_and_activate_are_event_driven() -> None:
