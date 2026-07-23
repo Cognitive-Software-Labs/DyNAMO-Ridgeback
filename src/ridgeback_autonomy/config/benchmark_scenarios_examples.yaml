@@ -19,9 +19,16 @@ scenes:
       - { x: 2.0, y: 0.0 }   # near
       - { x: 4.0, y: 0.0 }   # far (occluded by the near robot)
 
-  # A hospital bed between the sensor and the robot -- object occlusion.
-  # Requires sim/models/hospital_bed (Stage 3).
+  # A hospital bed between the sensor and the robot -- low, partial object
+  # occlusion (the bed only blocks the robot's lower body).
   - id: bed_occluder_single
     robots: [{ x: 3.5, y: 0.0 }]
     objects:
       - { model: hospital_bed, x: 2.2, y: 0.0, yaw: 0.0 }
+
+  # A privacy curtain across the line of sight -- tall, near-full object
+  # occlusion (the thin panel spans in Y, blocking most of the robot).
+  - id: curtain_occluder_single
+    robots: [{ x: 3.5, y: 0.0 }]
+    objects:
+      - { model: privacy_curtain, x: 2.2, y: 0.0, yaw: 0.0 }
