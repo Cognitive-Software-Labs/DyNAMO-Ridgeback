@@ -498,3 +498,15 @@ def test_build_summary_rows_aggregates_trial_level_estimator_rows() -> None:
 
     assert lidar_row['trial_count'] == 1
     assert lidar_row['p95_abs_error_m'] == pytest.approx(0.1, rel=1e-6)
+
+
+def test_build_summary_rows_carries_missed_and_extra_counts() -> None:
+    summary_rows = build_summary_rows(
+        {'lidar': [{'abs_error_m': 0.1, 'rel_error': 0.05}]},
+        missed_instance_count=3,
+        extra_detection_count=1,
+    )
+
+    lidar_row = next(row for row in summary_rows if row['estimator'] == 'lidar')
+    assert lidar_row['missed_instance_count'] == 3
+    assert lidar_row['extra_detection_count'] == 1

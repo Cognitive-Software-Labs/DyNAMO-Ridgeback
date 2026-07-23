@@ -69,6 +69,19 @@ ESTIMATOR_FIELD_KEYS = {
     'polar_profiling': 'polar_profiling_distance_m',
 }
 
+# Detection-model (forward, lateral) attribute names for the estimators that
+# emit a planar position -- used as the sensor-side locator for the scoring
+# assignment. sensor_depth / depth_anything report only a distance, so they are
+# absent here and fall back to the 1-D distance locator.
+ESTIMATOR_POSITION_ATTRS = {
+    'rgb': ('rgb_forward_m', 'rgb_lateral_m'),
+    'pointcloud': ('pointcloud_forward_m', 'pointcloud_lateral_m'),
+    'lidar': ('lidar_forward_m', 'lidar_lateral_m'),
+    'projective_ranging': ('projective_ranging_forward_m', 'projective_ranging_lateral_m'),
+    'euclidean_reconstruction': ('euclidean_reconstruction_forward_m', 'euclidean_reconstruction_lateral_m'),
+    'polar_profiling': ('polar_profiling_forward_m', 'polar_profiling_lateral_m'),
+}
+
 ESTIMATOR_LABELS = {
     'rgb': 'RGB',
     'sensor_depth': 'Sensor Depth',

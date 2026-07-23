@@ -5,10 +5,18 @@ from typing import Any, Mapping
 
 import numpy as np
 
-from ridgeback_autonomy.common.messages import decode_bbox_quads, first_finite_positive
+from ridgeback_autonomy.common.messages import (
+    batch_from_measurements_message,
+    decode_bbox_quads,
+    first_finite_positive,
+)
+from ridgeback_autonomy.common.models import Detection
 from ridgeback_autonomy.msg import G1Measurements
 
-from ridgeback_autonomy.benchmarking.estimators import ESTIMATOR_FIELD_KEYS
+from ridgeback_autonomy.benchmarking.estimators import (
+    ESTIMATOR_FIELD_KEYS,
+    ESTIMATOR_POSITION_ATTRS,
+)
 
 
 MeasurementEventKey = tuple[Any, ...]
@@ -51,7 +59,14 @@ class MeasurementEvent:
     bboxes: tuple[tuple[int, int, int, int], ...]
     image_width: int
     image_height: int
+    # Scalar per-frame estimates (first finite detection): the single-instance
+    # view used by the collage and the single-robot scoring path.
     estimates: dict[str, float | None] = field(default_factory=dict)
+    # Per-detection measurements, merged across the camera / lidar / mask
+    # messages that share this frame's alignment key. Index-aligned with
+    # ``bboxes``; the multi-instance scoring path reads these + associates them
+    # to ground truth. Empty until the first measurement message is merged.
+    detections: list[Detection] = field(default_factory=list)
     preview: EventPreview = field(default_factory=EventPreview)
 
 
@@ -113,6 +128,44 @@ def update_measurement_event(
     for estimator, value in extract_public_estimator_values(msg).items():
         if estimator in allowed_estimators:
             event.estimates[estimator] = value
+
+    merge_measurement_detections(event, msg, allowed_estimators)
+
+
+def merge_measurement_detections(
+    event: MeasurementEvent,
+    msg: G1Measurements,
+    allowed_estimators: set[str],
+) -> None:
+    """Merge this message's per-detection values into the event's detection table.
+
+    Camera / lidar / mask messages of one frame share the alignment key (same
+    count + bbox tuple), so their detections are index-aligned. Each message only
+    carries its own node's estimators; we copy exactly the ``allowed_estimators``
+    so a later message never erases an earlier one's fields.
+    """
+
+    batch = batch_from_measurements_message(msg)
+    if len(event.detections) != len(batch.detections):
+        # First message for this frame (or the count changed): seed the table
+        # with identity-only detections, then merge this message's estimators.
+        event.detections = [
+            Detection(bbox_xyxy=det.bbox_xyxy, label=det.label, score=det.score)
+            for det in batch.detections
+        ]
+    for target, source in zip(event.detections, batch.detections):
+        for estimator in allowed_estimators:
+            _copy_estimator_fields(target, source, estimator)
+
+
+def _copy_estimator_fields(target: Detection, source: Detection, estimator: str) -> None:
+    distance_attr = ESTIMATOR_FIELD_KEYS[estimator]
+    setattr(target, distance_attr, getattr(source, distance_attr))
+    position = ESTIMATOR_POSITION_ATTRS.get(estimator)
+    if position is not None:
+        forward_attr, lateral_attr = position
+        setattr(target, forward_attr, getattr(source, forward_attr))
+        setattr(target, lateral_attr, getattr(source, lateral_attr))
 
 
 def has_all_selected_estimates(

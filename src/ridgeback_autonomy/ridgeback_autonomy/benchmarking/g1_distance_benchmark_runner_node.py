@@ -44,6 +44,7 @@ from ridgeback_autonomy.benchmarking.reduction import (
 )
 from ridgeback_autonomy.benchmarking.rendering import BenchmarkCollageRenderer
 from ridgeback_autonomy.benchmarking.scenarios import Scene, load_scenarios
+from ridgeback_autonomy.benchmarking.scoring import score_scene
 from ridgeback_autonomy.benchmarking.summary import (
     build_summary_rows,
     write_summary_csv,
@@ -368,21 +369,26 @@ class G1DistanceBenchmarkRunner(Node):
         estimator_rows = {estimator: [] for estimator in self.selected_estimators}
         included_trials = 0
         skipped_trials = 0
+        total_missed_instances = 0
+        total_extra_detections = 0
 
         for trial in self.build_trials():
-            trial_rows = self.run_trial(trial)
-            if trial_rows is None:
+            result = self.run_trial(trial)
+            if result is None:
                 skipped_trials += 1
                 continue
 
             included_trials += 1
-            for estimator, row in trial_rows.items():
-                estimator_rows[estimator].append(row)
+            for estimator, instance_rows in result['rows'].items():
+                estimator_rows[estimator].extend(instance_rows)
+            total_missed_instances += result['missed_count']
+            total_extra_detections += result['extra_count']
 
         for estimator in self.selected_estimators:
             write_trial_csv(self.estimator_csv_paths[estimator], estimator_rows[estimator])
 
-        summary_rows = build_summary_rows(estimator_rows)
+        summary_rows = build_summary_rows(
+            estimator_rows, total_missed_instances, total_extra_detections)
         for row in summary_rows:
             row['estimator'] = self.estimator_display_names.get(
                 row['estimator'], row['estimator'])
@@ -427,52 +433,67 @@ class G1DistanceBenchmarkRunner(Node):
                 )
                 return None
 
-            trial_medians = compute_trial_medians(usable_events, self.selected_estimators)
+            # Frame-level scalar medians drive the representative-frame choice
+            # and the collage (always finite for the selected estimators). The
+            # per-instance medians below drive the scored rows.
+            scalar_medians = compute_trial_medians(usable_events, self.selected_estimators)
+            if len(gt_instances) == 1:
+                # Single robot: the per-instance medians ARE the scalar medians,
+                # so a one-robot scene reproduces the historical grid benchmark.
+                instance_medians = {gt_instances[0].index: scalar_medians}
+                missed_gt: tuple[int, ...] = ()
+                extra_count = 0
+            else:
+                instance_medians, missed_gt, extra_count = score_scene(
+                    usable_events, gt_instances, self.selected_estimators)
+
             representative_event = choose_representative_event(
                 usable_events,
                 self.selected_estimators,
-                trial_medians,
+                scalar_medians,
             )
-            # Stage 1: single-instance scoring. Multi-robot frames are still
-            # rejected by the count==1 gate (per-instance scoring lands in the
-            # next stage), so for a single-robot scene this is the target and
-            # reproduces the historical benchmark exactly.
-            gt = gt_instances[0]
             image_path = self.save_trial_collage(
                 trial_id,
                 representative_event,
-                trial_medians,
-                gt.distance_m,
+                scalar_medians,
+                gt_instances[0].distance_m,
             )
 
-            rows = {}
-            for estimator in self.selected_estimators:
-                estimate = trial_medians[estimator]
-                abs_error = abs(estimate - gt.distance_m)
-                rel_error = abs_error / gt.distance_m if gt.distance_m > 0.0 else None
-                rows[estimator] = {
-                    'trial_id': trial_id,
-                    'repeat_index': trial['repeat_index'],
-                    'scene_id': scene.id,
-                    'instance_index': gt.index,
-                    'spawn_forward_m': gt.world_x,
-                    'spawn_lateral_m': gt.world_y,
-                    'spawn_world_x': gt.world_x,
-                    'spawn_world_y': gt.world_y,
-                    'spawn_yaw_rad': scene.robots[gt.index].yaw,
-                    'true_forward_m': gt.forward_m,
-                    'true_lateral_m': gt.lateral_m,
-                    'true_distance_m': gt.distance_m,
-                    'estimator': self.estimator_display_names[estimator],
-                    'trial_estimate_m': estimate,
-                    'abs_error_m': abs_error,
-                    'rel_error': rel_error,
-                    'usable_aligned_events': len(usable_events),
-                    'image_path': image_path,
-                }
+            rows: dict[str, list[dict[str, Any]]] = {
+                estimator: [] for estimator in self.selected_estimators}
+            for gt in gt_instances:
+                medians = instance_medians.get(gt.index, {})
+                for estimator in self.selected_estimators:
+                    estimate = medians.get(estimator)
+                    if estimate is None:
+                        continue  # this instance had no finite value for this estimator
+                    abs_error = abs(estimate - gt.distance_m)
+                    rel_error = abs_error / gt.distance_m if gt.distance_m > 0.0 else None
+                    rows[estimator].append({
+                        'trial_id': trial_id,
+                        'repeat_index': trial['repeat_index'],
+                        'scene_id': scene.id,
+                        'instance_index': gt.index,
+                        'spawn_forward_m': gt.world_x,
+                        'spawn_lateral_m': gt.world_y,
+                        'spawn_world_x': gt.world_x,
+                        'spawn_world_y': gt.world_y,
+                        'spawn_yaw_rad': scene.robots[gt.index].yaw,
+                        'true_forward_m': gt.forward_m,
+                        'true_lateral_m': gt.lateral_m,
+                        'true_distance_m': gt.distance_m,
+                        'estimator': self.estimator_display_names[estimator],
+                        'trial_estimate_m': estimate,
+                        'abs_error_m': abs_error,
+                        'rel_error': rel_error,
+                        'usable_aligned_events': len(usable_events),
+                        'image_path': image_path,
+                    })
 
-            self.log_trial(trial_id, trial_medians, gt.distance_m, len(usable_events), image_path)
-            return rows
+            self.log_trial(
+                trial_id, scalar_medians, gt_instances[0].distance_m,
+                len(usable_events), image_path, len(missed_gt), extra_count)
+            return {'rows': rows, 'missed_count': len(missed_gt), 'extra_count': extra_count}
         except Exception as exc:
             self.get_logger().error(f'{trial_id} failed: {exc}')
             return None
@@ -888,6 +909,8 @@ class G1DistanceBenchmarkRunner(Node):
         true_distance_m: float,
         usable_events: int,
         image_path: str,
+        missed_instances: int = 0,
+        extra_detections: int = 0,
     ) -> None:
         parts = [
             trial_id,
@@ -895,8 +918,13 @@ class G1DistanceBenchmarkRunner(Node):
             f'usable_events={usable_events}',
             f'image={os.path.basename(image_path)}',
         ]
+        if missed_instances or extra_detections:
+            parts.append(f'missed={missed_instances}')
+            parts.append(f'extra={extra_detections}')
         for estimator in self.selected_estimators:
-            parts.append(f'{estimator}={trial_medians[estimator]:.3f}m')
+            value = trial_medians.get(estimator)
+            parts.append(
+                f'{estimator}={value:.3f}m' if value is not None else f'{estimator}=NA')
         self.get_logger().info(' | '.join(parts))
 
     def log_summary(

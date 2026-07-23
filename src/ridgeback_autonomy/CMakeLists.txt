@@ -160,6 +160,7 @@ if(BUILD_TESTING)
   ament_add_pytest_test(test_benchmark_runner test/test_benchmark_runner.py)
   ament_add_pytest_test(test_scenarios test/test_scenarios.py)
   ament_add_pytest_test(test_association test/test_association.py)
+  ament_add_pytest_test(test_scoring test/test_scoring.py)
 endif()
 
 ament_package()
