@@ -69,8 +69,11 @@ from ridgeback_autonomy.perception.core.isolation_2d import (
     ISOLATION_2D_RECIPES,
 )
 from ridgeback_autonomy.perception.core.isolation_3d import (
+    BASE_ABOVE_FLOOR_M_DEFAULT,
     ISOLATION_3D_DEFAULT,
     ISOLATION_3D_RECIPES,
+    build_isolation_3d,
+    camera_floor_geometry,
 )
 from ridgeback_autonomy.perception.core.mask import (
     MaskPrecision,
@@ -359,6 +362,9 @@ class G1MaskMeasurementNode(Node):
         self.declare_parameter('front_offset_m', ROBOT_FRONT_OFFSET_M_DEFAULT)
         self.declare_parameter('isolation_2d', ISOLATION_2D_DEFAULT)
         self.declare_parameter('isolation_3d', ISOLATION_3D_DEFAULT)
+        # Height of the base origin above the floor, added to the TF
+        # camera-above-base height to place the euclidean floor crop per frame.
+        self.declare_parameter('base_above_floor_m', BASE_ABOVE_FLOOR_M_DEFAULT)
         self.declare_parameter('mask_gate', MASK_GATE_BOX)
         self.declare_parameter('color_topic', COLOR_TOPIC_DEFAULT)
         self.declare_parameter('color_buffer_depth', COLOR_BUFFER_DEPTH_DEFAULT)
@@ -376,8 +382,12 @@ class G1MaskMeasurementNode(Node):
         self.front_offset_m = float(self.get_parameter('front_offset_m').value)
         self.isolation_2d = self.resolve_recipe(
             'isolation_2d', ISOLATION_2D_RECIPES)
-        self.isolation_3d = self.resolve_recipe(
+        # The 3D recipe is rebuilt per frame with the TF-derived floor pose, so
+        # store the validated name (not a pre-built callable) and the offset.
+        self.isolation_3d_name = self.resolve_recipe_name(
             'isolation_3d', ISOLATION_3D_RECIPES)
+        self.base_above_floor_m = float(
+            self.get_parameter('base_above_floor_m').value)
         self.mask_gate = resolve_mask_gate(self.get_parameter('mask_gate').value)
 
         # The silhouette gate needs the exact color frame the detections were
@@ -478,12 +488,15 @@ class G1MaskMeasurementNode(Node):
         self.worker_thread.start()
 
     def resolve_recipe(self, parameter_name: str, registry: dict):
+        return registry[self.resolve_recipe_name(parameter_name, registry)]
+
+    def resolve_recipe_name(self, parameter_name: str, registry: dict) -> str:
         key = str(self.get_parameter(parameter_name).value).strip()
         if key not in registry:
             supported = ', '.join(sorted(registry))
             raise ValueError(
                 f'Unknown {parameter_name} recipe "{key}". Expected one of: {supported}')
-        return registry[key]
+        return key
 
     def detections_callback(self, detections_msg: G1Detections) -> None:
         with self.processing_lock:
@@ -575,6 +588,14 @@ class G1MaskMeasurementNode(Node):
                     camera_extrinsic = self.camera_extrinsic_for_batch(detections_msg)
                     if camera_extrinsic is not None:
                         camera_rotation, camera_translation = camera_extrinsic
+                        # The euclidean floor crop tracks the live mount: derive
+                        # its height/pitch from the same extrinsic and build the
+                        # recipe for this frame.
+                        camera_height_m, camera_pitch_deg = camera_floor_geometry(
+                            camera_rotation, camera_translation,
+                            self.base_above_floor_m)
+                        isolation_3d = build_isolation_3d(
+                            self.isolation_3d_name, camera_height_m, camera_pitch_deg)
                         depth_m = self.decode_depth_for_batch(depth_msg, batch)
                         scan_points = self.scan_points_for_batch(detections_msg, scan_msg)
                         fill_path_measurements(
@@ -587,7 +608,7 @@ class G1MaskMeasurementNode(Node):
                             camera_translation=camera_translation,
                             front_offset_m=self.front_offset_m,
                             isolation_2d=self.isolation_2d,
-                            isolation_3d=self.isolation_3d,
+                            isolation_3d=isolation_3d,
                         )
         elif batch.detected:
             self.log_skip_warning(

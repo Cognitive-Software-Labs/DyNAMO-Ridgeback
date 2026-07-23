@@ -32,6 +32,7 @@ from sensor_msgs.msg import CameraInfo, Image
 
 from ridgeback_autonomy.perception.core.image_utils import (
     convert_depth_to_meters_message,
+    decode_image_message,
 )
 
 
@@ -64,15 +65,26 @@ def decode_depth_to_meters(msg: Image) -> np.ndarray:
 
 
 def decode_color_to_rgb(msg: Image) -> np.ndarray:
-    """Decode a color Image message into an RGB uint8 array."""
-    if msg.encoding in ('rgb8', 'bgr8'):
-        raw = np.frombuffer(msg.data, dtype=np.uint8).reshape(msg.height, msg.width, 3)
-        return raw if msg.encoding == 'rgb8' else raw[:, :, ::-1]
-    if msg.encoding in ('rgba8', 'bgra8'):
-        raw = np.frombuffer(msg.data, dtype=np.uint8).reshape(msg.height, msg.width, 4)
-        rgb = raw[:, :, :3]
-        return rgb if msg.encoding == 'rgba8' else rgb[:, :, ::-1]
-    raise ValueError(f'unsupported color encoding "{msg.encoding}"')
+    """Decode a color Image message into an RGB uint8 array.
+
+    Delegates the row decode to the shared step-aware decoder (honours
+    ``msg.step``) -- the same fix as the depth path: 
+    a real driver may pad rows (``step > width * channels``),
+    which the old hand-rolled ``reshape`` rejected, throwing every frame. The
+    explicit whitelist stays here to preserve the exact error message and the
+    mono rejection. ``produce`` re-contiguous-izes, so returning views is fine.
+    """
+
+    if msg.encoding not in ('rgb8', 'bgr8', 'rgba8', 'bgra8'):
+        raise ValueError(f'unsupported color encoding "{msg.encoding}"')
+    image = decode_image_message(msg)
+    if msg.encoding == 'rgb8':
+        return image
+    if msg.encoding == 'bgr8':
+        return image[:, :, ::-1]
+    if msg.encoding == 'rgba8':
+        return image[:, :, :3]
+    return image[:, :, :3][:, :, ::-1]  # bgra8
 
 
 def encode_depth_message(depth_m: np.ndarray, header) -> Image:
@@ -84,6 +96,31 @@ def encode_depth_message(depth_m: np.ndarray, header) -> Image:
     msg.step = msg.width * 4
     msg.data = np.ascontiguousarray(depth_m, dtype=np.float32).tobytes()
     return msg
+
+
+def camera_info_matches_depth(depth_shape: tuple[int, int], camera_info) -> bool:
+    """True when the produced depth grid matches the color ``camera_info`` grid.
+
+    The aligned-depth contract puts depth on the color grid; if a misconfigured
+    real camera ships a mismatched pair, republishing the intrinsics anyway
+    would mislabel the frame and break deprojection confusingly downstream. 
+    Checked at the source so the failure is loud and local.
+    """
+
+    return depth_shape == (int(camera_info.height), int(camera_info.width))
+
+
+def throttle_remainder(last_monotonic: float, now: float, max_fps: float) -> float:
+    """Seconds to wait before the next frame to honour ``max_fps``.
+
+    ``max_fps <= 0`` means no cap (returns 0.0). Otherwise the minimum period
+    is ``1 / max_fps`` since the previous step; a non-positive remainder (the
+    period already elapsed) also returns 0.0.
+    """
+
+    if max_fps <= 0.0:
+        return 0.0
+    return max(0.0, (last_monotonic + 1.0 / max_fps) - now)
 
 
 class StereoDepthSource:
@@ -223,7 +260,7 @@ class MonocularDepthSource:
 
 
 class AlignedDepthNode(Node):
-    def __init__(self) -> None:
+    def __init__(self, source=None) -> None:
         super().__init__('aligned_depth_node')
 
         self.declare_parameter('depth_source', DEPTH_SOURCE_STEREOSCOPIC)
@@ -234,29 +271,26 @@ class AlignedDepthNode(Node):
         self.declare_parameter('aligned_camera_info_topic', ALIGNED_CAMERA_INFO_TOPIC)
         self.declare_parameter('depth_anything_model_id', DEPTH_ANYTHING_MODEL_ID_DEFAULT)
         self.declare_parameter('depth_anything_device', '')
+        # Cap producer cadence (default 0 = unlimited = current behavior).
+        # Set on a real robot sharing one GPU with the detector + segmenter so
+        # monocular inference can't starve them; benchmark leaves it 0.
+        self.declare_parameter('max_fps', 0.0)
 
         depth_source = str(self.get_parameter('depth_source').value).strip().lower()
-        if depth_source == DEPTH_SOURCE_STEREOSCOPIC:
-            self.source = StereoDepthSource(self.get_logger())
-        elif depth_source == DEPTH_SOURCE_MONOCULAR:
-            self.source = MonocularDepthSource(
-                str(self.get_parameter('depth_anything_model_id').value),
-                str(self.get_parameter('depth_anything_device').value),
-                self.get_logger(),
-                # Node clock so the cooldown respects use_sim_time.
-                now_fn=lambda: self.get_clock().now().nanoseconds / 1e9,
-            )
-        else:
-            raise ValueError(
-                f'Unknown depth_source "{depth_source}"; expected '
-                f'"{DEPTH_SOURCE_STEREOSCOPIC}" or "{DEPTH_SOURCE_MONOCULAR}".'
-            )
+        # Seam: tests inject a stub source (with an ``input_kind`` and a
+        # scripted ``produce``) so the node stands up without a real model,
+        # mirroring G1DetectorNode(detector=...).
+        self.source = source or self._build_source(depth_source)
+        self.max_fps = float(self.get_parameter('max_fps').value)
 
         self.latest_input_msg: Image | None = None
         self.latest_camera_info: CameraInfo | None = None
         self.input_lock = threading.Lock()
         self.input_event = threading.Event()
         self.stop_event = threading.Event()
+        self.last_step_monotonic = 0.0
+        self.last_error_log_monotonic = 0.0
+        self.last_grid_warn_monotonic = 0.0
 
         input_topic = str(
             self.get_parameter('depth_topic').value
@@ -282,6 +316,25 @@ class AlignedDepthNode(Node):
         self.get_logger().info(
             f'Aligned depth producer up: source={depth_source} input="{input_topic}"')
 
+    def _build_source(self, depth_source: str):
+        """Dispatch the configured producer (production path; the test seam
+        bypasses this by injecting a source)."""
+
+        if depth_source == DEPTH_SOURCE_STEREOSCOPIC:
+            return StereoDepthSource(self.get_logger())
+        if depth_source == DEPTH_SOURCE_MONOCULAR:
+            return MonocularDepthSource(
+                str(self.get_parameter('depth_anything_model_id').value),
+                str(self.get_parameter('depth_anything_device').value),
+                self.get_logger(),
+                # Node clock so the cooldown respects use_sim_time.
+                now_fn=lambda: self.get_clock().now().nanoseconds / 1e9,
+            )
+        raise ValueError(
+            f'Unknown depth_source "{depth_source}"; expected '
+            f'"{DEPTH_SOURCE_STEREOSCOPIC}" or "{DEPTH_SOURCE_MONOCULAR}".'
+        )
+
     def input_callback(self, msg: Image) -> None:
         with self.input_lock:
             self.latest_input_msg = msg
@@ -302,28 +355,81 @@ class AlignedDepthNode(Node):
             if msg is None:
                 continue
 
+            # optional cadence cap before the (expensive) produce step.
+            if self.max_fps > 0.0:
+                remainder = throttle_remainder(
+                    self.last_step_monotonic, time.monotonic(), self.max_fps)
+                if remainder > 0.0 and self.stop_event.wait(remainder):
+                    break
+
+            self.run_producer_step(msg)
+            # Advance outside the guard so a frame that always fails cannot
+            # hot-loop the worker.
+            self.last_step_monotonic = time.monotonic()
+
+    def run_producer_step(self, msg: Image) -> None:
+        """Produce, publish, and republish intrinsics for one input frame.
+
+        Guarded against any producer/encode/publish error: this is the
+        third daemon worker (with the detector and mask nodes) and the only one
+        that lacked the guard, so an unexpected failure silently killed it while
+        the node still looked alive. ``KeyboardInterrupt``/``SystemExit`` are
+        not ``Exception`` subclasses, so shutdown is unaffected.
+        """
+
+        try:
             frame = self.source.produce(msg)
             if frame is None:
-                continue
+                return
             depth_m, header = frame
-
             self.depth_pub.publish(encode_depth_message(depth_m, header))
-            camera_info = self.latest_camera_info
-            if camera_info is not None:
-                # Republish the color camera's intrinsics stamped with the
-                # frame, so consumers deproject with the grid's true
-                # intrinsics instead of static FoV constants.
-                info = CameraInfo()
-                info.header.stamp = header.stamp
-                info.header.frame_id = camera_info.header.frame_id
-                info.height = camera_info.height
-                info.width = camera_info.width
-                info.distortion_model = camera_info.distortion_model
-                info.d = camera_info.d
-                info.k = camera_info.k
-                info.r = camera_info.r
-                info.p = camera_info.p
-                self.camera_info_pub.publish(info)
+            self.publish_aligned_camera_info(depth_m.shape, header)
+        except Exception as exc:  # noqa: BLE001 - worker must survive any frame
+            self.log_producer_error(exc)
+
+    def publish_aligned_camera_info(self, depth_shape, header) -> None:
+        """Republish the color intrinsics stamped with the frame, so consumers
+        deproject with the grid's true intrinsics instead of static FoV
+        constants -- but only when the depth grid matches."""
+
+        camera_info = self.latest_camera_info
+        if camera_info is None:
+            return
+        if not camera_info_matches_depth(depth_shape, camera_info):
+            self.log_grid_mismatch(depth_shape, camera_info)
+            return
+        info = CameraInfo()
+        info.header.stamp = header.stamp
+        info.header.frame_id = camera_info.header.frame_id
+        info.height = camera_info.height
+        info.width = camera_info.width
+        info.distortion_model = camera_info.distortion_model
+        info.d = camera_info.d
+        info.k = camera_info.k
+        info.r = camera_info.r
+        info.p = camera_info.p
+        self.camera_info_pub.publish(info)
+
+    def log_producer_error(self, exc: Exception) -> None:
+        """Warn (throttled) that a producer frame failed."""
+
+        now = time.monotonic()
+        if now - self.last_error_log_monotonic < 5.0:
+            return
+        self.last_error_log_monotonic = now
+        self.get_logger().warn(f'Depth producer frame failed, skipping: {exc}')
+
+    def log_grid_mismatch(self, depth_shape, camera_info) -> None:
+        """Warn (throttled) that depth and camera_info grids disagree."""
+
+        now = time.monotonic()
+        if now - self.last_grid_warn_monotonic < 5.0:
+            return
+        self.last_grid_warn_monotonic = now
+        self.get_logger().warn(
+            f'Depth grid {depth_shape[0]}x{depth_shape[1]} does not match '
+            f'camera_info grid {camera_info.height}x{camera_info.width}; '
+            'skipping intrinsics republish (consumers degrade to no-intrinsics).')
 
     def destroy_node(self) -> bool:
         self.stop_event.set()

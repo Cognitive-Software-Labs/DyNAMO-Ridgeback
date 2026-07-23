@@ -83,7 +83,6 @@ class PolarProfilingResult:
     """One polar profiling localization: a planar point in the camera optical frame."""
 
     xz_optical: np.ndarray  # (2,) X right, Z forward, meters; Y unobserved
-    distance_m: float  # median planar range of the merged near-band set
     foreground_points: np.ndarray  # (M, 2) the merged (X, Z) set, by-product
     ray_count: int  # rays that survived the mask ∩ FoV select
 
@@ -236,14 +235,13 @@ def localize_polar_profiling(
     if merged.size < min_valid_rays:
         return None
 
-    # The merged set is the foreground set -- single source for coordinate
-    # and distance, so they agree by construction (doc Section 2.5).
+    # The merged set is the foreground. The coordinate is its per-axis median
+    # (X, Z); the published distance is derived from that coordinate downstream
+    # (planar projection), so coordinate and distance rest on the same point.
     foreground = selected[merged][:, (0, 2)]
     xz_optical = np.median(foreground, axis=0)
-    distance_m = float(np.median(planar_range_m[merged]))
     return PolarProfilingResult(
         xz_optical=xz_optical,
-        distance_m=distance_m,
         foreground_points=foreground,
         ray_count=int(beam_indices.size),
     )

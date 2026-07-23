@@ -147,6 +147,16 @@ on a depth discontinuity (object edge against far background) its `Z` is wrong
 even when the aggregated range was correct. Taking the centroid of the foreground
 pixels keeps the pixel on the object.
 
+For a **non-convex silhouette** (the `tight` branch on a legged robot) the
+centroid can itself fall in a concavity — the gap between the legs — landing on
+background rather than the object. That is safe here regardless: the deproject
+takes `Z` from the **aggregated (median) foreground depth**, never from the
+centroid pixel's own depth, so the range is decoupled from wherever the centroid
+lands. `(u, v)` only fixes the `(X, Y)` bearing, which is a body-center estimate;
+a centroid sitting in the leg gap still points at the body center. The mitigation
+is intrinsic to aggregating depth separately from choosing the representative
+pixel, so it needs no extra guard.
+
 ---
 
 ## 3. Depth-source agnostic

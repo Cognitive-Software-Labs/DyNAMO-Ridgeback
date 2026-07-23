@@ -21,9 +21,13 @@ from dataclasses import dataclass
 import numpy as np
 
 
-CAMERA_HEIGHT_M_DEFAULT = 1.053  # measured 2026-07-20 (TF base_link -> camera); 1.183 after the robot.yaml re-sync. Mask-stack only: the legacy config/camera_config.json height_m stays 0.85 and is deliberately not touched by this change.
-CAMERA_PITCH_DEG_DEFAULT = 0.0  # mirrors config/camera_config.json pitch_deg
+CAMERA_HEIGHT_M_DEFAULT = 1.053  # static/test default only; at runtime the height comes from TF via camera_floor_geometry. Mask-stack only: the legacy config/camera_config.json height_m stays 0.85 and is deliberately not touched here.
+CAMERA_PITCH_DEG_DEFAULT = 0.0  # static/test default; runtime pitch is read from the TF rotation
 FLOOR_MARGIN_M_DEFAULT = 0.05
+# base_link origin above the floor: stable chassis geometry, and the floor is
+# not a TF frame, so this stays a measured constant rather than a lookup. Added
+# to the TF camera-above-base height to get camera-above-floor.
+BASE_ABOVE_FLOOR_M_DEFAULT = 0.026
 
 RANGE_BAND_PERCENTILE_DEFAULT = 25.0  # mirrors POINTCLOUD_FRONT_PERCENTILE
 RANGE_BAND_AHEAD_M_DEFAULT = 0.10  # mirrors POINTCLOUD_INLIER_AHEAD_MARGIN_M
@@ -124,9 +128,57 @@ def mad_outlier_removal(points: np.ndarray, k: float = MAD_K_DEFAULT) -> np.ndar
 
 # The config swap point: isolators keyed by name, all satisfying the contract
 # above. ``ISOLATION_3D_DEFAULT`` is what euclidean reconstruction uses when none is chosen.
+# These carry the static default pose; the node builds a pose-parameterized
+# recipe per frame via ``build_isolation_3d`` (below). The registry stays for
+# name validation, listing, and pure unit tests.
 ISOLATION_3D_RECIPES: dict[str, object] = {
     'height_crop': HeightCrop(),
     'range_band': RangeBand(),
     'height_crop_range_band': Chain((HeightCrop(), RangeBand())),
 }
 ISOLATION_3D_DEFAULT = 'height_crop_range_band'
+
+
+def camera_floor_geometry(
+    rotation: np.ndarray,
+    translation: np.ndarray,
+    base_above_floor_m: float,
+) -> tuple[float, float]:
+    """Camera height above the floor and pitch, from the optical->base transform.
+
+    ``rotation`` / ``translation`` are the camera-optical -> base extrinsics
+    (from TF). Height above the floor is the camera's height above the base
+    origin (``translation[2]``) plus the fixed chassis offset of that origin
+    above the floor (``base_above_floor_m``). Pitch comes from the rotation:
+    gravity-down expressed in the optical frame is the negated base-up row of
+    the transform, and ``HeightCrop`` models that direction as
+    ``[0, cos p, sin p]``, so ``p`` is the angle of its (Y, Z) components -- 0
+    for a level mount.
+    """
+
+    rotation = np.asarray(rotation, dtype=np.float64)
+    translation = np.asarray(translation, dtype=np.float64)
+    camera_height_m = float(translation[2]) + float(base_above_floor_m)
+    down_optical = -rotation[2, :]
+    pitch_deg = math.degrees(math.atan2(float(down_optical[2]), float(down_optical[1])))
+    return camera_height_m, pitch_deg
+
+
+def build_isolation_3d(name: str, camera_height_m: float, pitch_deg: float):
+    """Build the named recipe with its floor crop set to a specific camera pose.
+
+    Mirrors ``ISOLATION_3D_RECIPES`` but constructs any ``HeightCrop`` step at
+    the given height and pitch (typically from ``camera_floor_geometry``) rather
+    than the static defaults. ``RangeBand`` takes no pose -- it works on
+    rotation-invariant camera-frame ranges -- so it is unchanged.
+    """
+
+    height_crop = HeightCrop(camera_height_m=camera_height_m, pitch_deg=pitch_deg)
+    if name == 'height_crop':
+        return height_crop
+    if name == 'range_band':
+        return RangeBand()
+    if name == 'height_crop_range_band':
+        return Chain((height_crop, RangeBand()))
+    supported = ', '.join(sorted(ISOLATION_3D_RECIPES))
+    raise ValueError(f'Unknown isolation_3d recipe "{name}". Expected one of: {supported}')
