@@ -27,6 +27,7 @@ from ridgeback_autonomy.benchmarking.reduction import (
 )
 from ridgeback_autonomy.benchmarking.rendering import BenchmarkCollageRenderer
 from ridgeback_autonomy.benchmarking.summary import build_summary_rows
+from ridgeback_autonomy.common.models import Detection
 from ridgeback_autonomy.msg import G1Measurements
 
 
@@ -510,3 +511,49 @@ def test_build_summary_rows_carries_missed_and_extra_counts() -> None:
     lidar_row = next(row for row in summary_rows if row['estimator'] == 'lidar')
     assert lidar_row['missed_instance_count'] == 3
     assert lidar_row['extra_detection_count'] == 1
+
+
+def _event_with_detection(detection: Detection) -> MeasurementEvent:
+    return MeasurementEvent(
+        key=('x',),
+        stamp_ns=1,
+        detected=True,
+        count=1,
+        bboxes=((0, 0, 10, 10),),
+        image_width=64,
+        image_height=48,
+        detections=[detection],
+        preview=EventPreview(),
+    )
+
+
+def test_box_label_shows_instance_estimate_and_true() -> None:
+    renderer = BenchmarkCollageRenderer(depth_max_meters=10.0)
+    event = _event_with_detection(
+        Detection(bbox_xyxy=(0, 0, 10, 10), label='r', score=0.9, lidar_distance_m=2.13))
+
+    label, color = renderer.box_label_and_color(
+        event, 0, 'lidar', [{'instance_index': 1, 'true_distance_m': 2.25}])
+
+    assert label == '#1 e2.13/t2.25'
+    assert color == (0, 255, 0)
+
+
+def test_box_label_marks_unmatched_detection_as_extra() -> None:
+    renderer = BenchmarkCollageRenderer(depth_max_meters=10.0)
+    event = _event_with_detection(Detection(bbox_xyxy=(0, 0, 10, 10), label='r', score=0.9))
+
+    label, color = renderer.box_label_and_color(event, 0, 'lidar', [None])
+
+    assert label == 'extra'
+    assert color == (0, 165, 255)
+
+
+def test_box_label_defaults_to_historical_label_without_annotations() -> None:
+    renderer = BenchmarkCollageRenderer(depth_max_meters=10.0)
+    event = _event_with_detection(Detection(bbox_xyxy=(0, 0, 10, 10), label='r', score=0.9))
+
+    label, color = renderer.box_label_and_color(event, 0, None, None)
+
+    assert label == 'G1 #1'
+    assert color == (0, 255, 0)

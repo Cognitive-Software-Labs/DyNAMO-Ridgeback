@@ -42,9 +42,10 @@ from ridgeback_autonomy.benchmarking.reduction import (
     compute_trial_medians,
     usable_aligned_events,
 )
+from ridgeback_autonomy.benchmarking.association import GtPoint, assign_to_ground_truth
 from ridgeback_autonomy.benchmarking.rendering import BenchmarkCollageRenderer
 from ridgeback_autonomy.benchmarking.scenarios import Scene, load_scenarios
-from ridgeback_autonomy.benchmarking.scoring import score_scene
+from ridgeback_autonomy.benchmarking.scoring import build_instance_estimate, score_scene
 from ridgeback_autonomy.benchmarking.summary import (
     build_summary_rows,
     write_summary_csv,
@@ -452,11 +453,14 @@ class G1DistanceBenchmarkRunner(Node):
                 self.selected_estimators,
                 scalar_medians,
             )
+            box_annotations = self.build_box_annotations(representative_event, gt_instances)
             image_path = self.save_trial_collage(
                 trial_id,
                 representative_event,
                 scalar_medians,
                 gt_instances[0].distance_m,
+                box_annotations,
+                len(missed_gt),
             )
 
             rows: dict[str, list[dict[str, Any]]] = {
@@ -519,12 +523,45 @@ class G1DistanceBenchmarkRunner(Node):
             'usable_events': usable_events,
         }
 
+    def build_box_annotations(
+        self,
+        representative_event,
+        gt_instances: list[GtInstance],
+    ) -> list[dict | None]:
+        """Map each box in the representative frame to its ground-truth instance.
+
+        Sensor-only association on the one displayed frame, purely for the
+        collage labels (``#i e<est>/t<true>``). Unmatched boxes stay ``None`` and
+        render as ``extra``.
+        """
+
+        instances = [
+            build_instance_estimate(detection, index, self.selected_estimators)
+            for index, detection in enumerate(representative_event.detections)
+        ]
+        gt_points = [
+            GtPoint(index=gt.index, forward_m=gt.forward_m, lateral_m=gt.lateral_m,
+                    distance_m=gt.distance_m)
+            for gt in gt_instances
+        ]
+        assignment = assign_to_ground_truth(instances, gt_points)
+        true_by_gt = {gt.index: gt.distance_m for gt in gt_instances}
+        annotations: list[dict | None] = [None] * len(representative_event.detections)
+        for gt_index, det_index in assignment.matches:
+            annotations[det_index] = {
+                'instance_index': gt_index,
+                'true_distance_m': true_by_gt[gt_index],
+            }
+        return annotations
+
     def save_trial_collage(
         self,
         trial_id: str,
         representative_event,
         trial_medians: dict[str, float],
         true_distance_m: float,
+        box_annotations: list[dict | None] | None = None,
+        missed_count: int = 0,
     ) -> str:
         collage = self.collage_renderer.render_trial_collage(
             trial_id,
@@ -532,6 +569,8 @@ class G1DistanceBenchmarkRunner(Node):
             self.selected_estimators,
             trial_medians,
             true_distance_m,
+            box_annotations,
+            missed_count,
         )
         output_path = os.path.abspath(os.path.join(self.images_dir, f'{trial_id}.png'))
         if not cv2.imwrite(output_path, collage):
