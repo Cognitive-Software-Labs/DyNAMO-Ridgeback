@@ -141,6 +141,7 @@ if(BUILD_TESTING)
 
   ament_add_pytest_test(test_aligned_depth_node test/test_aligned_depth_node.py)
   ament_add_pytest_test(test_detection test/test_detection.py)
+  ament_add_pytest_test(test_detector_node test/test_detector_node.py)
   ament_add_pytest_test(test_geometry test/test_geometry.py)
   ament_add_pytest_test(test_image_utils test/test_image_utils.py)
   ament_add_pytest_test(test_imports test/test_imports.py)

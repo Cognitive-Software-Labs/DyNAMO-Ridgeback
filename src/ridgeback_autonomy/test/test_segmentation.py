@@ -83,6 +83,28 @@ def test_select_best_masks_empty_winner_is_none() -> None:
     assert select_best_masks(masks, scores) == [None]
 
 
+def test_select_best_masks_drops_below_floor() -> None:
+    # Non-empty winning mask, but its score is under the floor -> dropped.
+    masks = np.zeros((1, 2, 4, 4), dtype=bool)
+    masks[0, 0, 1, 1] = True
+    scores = np.array([[0.3, 0.1]])
+
+    assert select_best_masks(masks, scores, min_predicted_iou=0.5) == [None]
+    # The default (permissive) floor keeps the same mask.
+    kept = select_best_masks(masks, scores)
+    assert kept[0] is not None and kept[0][1, 1]
+
+
+def test_select_best_masks_floor_keeps_high_confidence() -> None:
+    masks = np.zeros((1, 2, 4, 4), dtype=bool)
+    masks[0, 0, 2, 2] = True
+    scores = np.array([[0.9, 0.1]])
+
+    kept = select_best_masks(masks, scores, min_predicted_iou=0.5)
+
+    assert kept[0] is not None and kept[0][2, 2]
+
+
 def test_select_best_masks_rejects_bad_shapes() -> None:
     with pytest.raises(ValueError, match=r'\(N, K, H, W\)'):
         select_best_masks(np.zeros((2, 4, 4), dtype=bool), np.zeros((2, 1)))
@@ -173,6 +195,28 @@ def test_segment_boxes_empty_segmentation_is_none() -> None:
     out = segmenter.segment_boxes(np.zeros((6, 8, 3), dtype=np.uint8), [(1, 1, 3, 3)])
 
     assert out == [None]
+
+
+def test_segment_boxes_applies_min_predicted_iou() -> None:
+    # A confident-but-low winning score is gated out end-to-end via the node's
+    # floor (the pos_003 wall-silhouette case).
+    masks = np.zeros((1, 1, 6, 8), dtype=bool)
+    masks[0, 0, 2, 2] = True
+    segmenter, _ = build_segmenter(masks, np.array([[0.4]]))
+
+    out = segmenter.segment_boxes(
+        np.zeros((6, 8, 3), dtype=np.uint8), [(1, 1, 3, 3)], min_predicted_iou=0.7)
+
+    assert out == [None]
+
+
+def test_segment_boxes_raises_when_not_loaded() -> None:
+    # S-4: a non-empty box list on an unloaded segmenter is a wiring bug -- fail
+    # loud, not with a cryptic None(**inputs) TypeError.
+    segmenter = SamBoxSegmenter('fake/model', PrintLogger())
+
+    with pytest.raises(RuntimeError, match='not loaded'):
+        segmenter.segment_boxes(np.zeros((6, 8, 3), dtype=np.uint8), [(1, 1, 3, 3)])
 
 
 def test_segment_boxes_no_boxes_short_circuits_without_model() -> None:

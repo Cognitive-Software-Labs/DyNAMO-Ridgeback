@@ -37,6 +37,17 @@ SEGMENTATION_MODEL_DEFAULT = 'Zigeng/SlimSAM-uniform-50'
 # inside it, so the mask does not inherit the padding.
 PROMPT_PADDING_REL_DEFAULT = 0.05
 
+# Floor on SAM's predicted-IoU: masks scoring below it are dropped (-> None ->
+# that detection skips, no-fallback). CAVEAT: predicted-IoU rates mask *boundary*
+# quality, NOT whether the mask is the robot -- a cleanly-segmented wall can
+# score high. So this drops low-quality/uncertain masks (which correlate with
+# bad prompt boxes) but will NOT catch a crisp wrong-object mask; full
+# correctness would need a depth-consistency or class check (out of scope).
+# Spike range for good G1 masks was 0.94-0.99 (segmentation_component.md); the
+# audit suggested ~0.7 (S-C6). A conservative 0.5 default leaves headroom for
+# real D435 imagery scoring below sim -- a tunable knob, not a magic truth.
+SEGMENTATION_MIN_PREDICTED_IOU_DEFAULT = 0.5
+
 
 def pad_prompt_box(
     bbox_xyxy: tuple[float, float, float, float],
@@ -78,14 +89,20 @@ def binarize_mask(mask: np.ndarray) -> np.ndarray:
 def select_best_masks(
     masks: np.ndarray,
     iou_scores: np.ndarray,
+    min_predicted_iou: float = 0.0,
 ) -> list[np.ndarray | None]:
     """Resolve multimask output to one mask per box: highest predicted IoU.
 
     ``masks`` is ``(N, K, H, W)`` (N boxes, K mask options each; bool or
     float), ``iou_scores`` is ``(N, K)``. Returns N entries, each an
-    ``(H, W)`` boolean array, or ``None`` where the winning option is empty --
-    the caller's signal to skip that detection (no-fallback convention: a
-    failed segmentation drops the trial, it is never patched over).
+    ``(H, W)`` boolean array, or ``None`` where the winning option is empty
+    **or scores below** ``min_predicted_iou`` -- the caller's signal to skip
+    that detection (no-fallback convention: a failed segmentation drops the
+    trial, it is never patched over). The floor lives here because this is
+    where the score exists (S-9); the default 0.0 keeps the library call
+    permissive, the node supplies the production floor. See
+    ``SEGMENTATION_MIN_PREDICTED_IOU_DEFAULT`` for the quality-vs-correctness
+    caveat.
     """
 
     masks = np.asarray(masks)
@@ -100,8 +117,10 @@ def select_best_masks(
     selected: list[np.ndarray | None] = []
     for box_index in range(masks.shape[0]):
         best = int(np.argmax(iou_scores[box_index]))
+        score = float(iou_scores[box_index, best])
         mask = binarize_mask(masks[box_index, best])
-        selected.append(mask if mask.any() else None)
+        keep = mask.any() and score >= min_predicted_iou
+        selected.append(mask if keep else None)
     return selected
 
 
@@ -155,19 +174,28 @@ class SamBoxSegmenter:
         rgb: np.ndarray,
         boxes_xyxy: list[tuple[float, float, float, float]],
         pad_rel: float = PROMPT_PADDING_REL_DEFAULT,
+        min_predicted_iou: float = 0.0,
     ) -> list[np.ndarray | None]:
         """Segment one silhouette per box on one RGB frame.
 
         ``rgb`` is the ``(H, W, 3)`` uint8 color image the boxes live on.
         Returns one entry per box, index-aligned: an ``(H, W)`` boolean blob
-        on the same grid, or ``None`` for an empty segmentation. One model
-        forward for the whole frame (encoder once, decoder per box).
+        on the same grid, or ``None`` for an empty or low-confidence
+        segmentation (below ``min_predicted_iou``). One model forward for the
+        whole frame (encoder once, decoder per box).
+
+        Precondition: ``load()`` has been called (the node eager-loads in
+        ``__init__``). An empty box list short-circuits before any model use.
         """
 
         if not boxes_xyxy:
             return []
+        # S-4: the model is loaded eagerly by the node; a live None here is a
+        # wiring bug, so fail loud rather than the cryptic ``None(**inputs)``.
+        # (The detector's detect() carries the identical dead lazy-load, D-6 --
+        # out of scope here.)
         if self._model is None:
-            self.load()
+            raise RuntimeError('segmenter not loaded; call load() first')
 
         height, width = rgb.shape[:2]
         prompts = [
@@ -186,7 +214,8 @@ class SamBoxSegmenter:
         masks = self._post_process(inputs, outputs)
         iou_scores = _to_numpy(outputs.iou_scores)
         # Per-image batch of one: (N boxes, K options, H, W) and (N, K).
-        return select_best_masks(masks, iou_scores.reshape(masks.shape[:2]))
+        return select_best_masks(
+            masks, iou_scores.reshape(masks.shape[:2]), min_predicted_iou)
 
     def _post_process(self, inputs, outputs) -> np.ndarray:
         """Upscale predicted masks back to the original grid, as (N, K, H, W)."""

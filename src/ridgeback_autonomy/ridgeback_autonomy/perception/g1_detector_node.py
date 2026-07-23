@@ -31,7 +31,7 @@ DETECTOR_FPS_DEFAULT = 5.0
 
 
 class G1DetectorNode(Node):
-    def __init__(self) -> None:
+    def __init__(self, detector=None) -> None:
         super().__init__('g1_detector_node')
 
         self.declare_parameter('detection_model', DETECTION_MODEL_DEFAULT)
@@ -47,9 +47,12 @@ class G1DetectorNode(Node):
         self.color_topic = self.get_parameter('color_topic').value
         self.detections_topic = self.get_parameter('detections_topic').value
 
-        self.detector = OwlV2Detector(self.detection_model, self.get_logger())
+        # Seam: tests inject a stub detector (whose load() is a no-op) so the
+        # node stands up without pulling in OWLv2/torch.
+        self.detector = detector or OwlV2Detector(self.detection_model, self.get_logger())
         self.detector.load()
         self.last_detection_time = 0.0
+        self.last_error_log_monotonic = 0.0
         self.latest_color_msg: Image | None = None
         self.processing_lock = threading.Lock()
         self.process_event = threading.Event()
@@ -96,8 +99,31 @@ class G1DetectorNode(Node):
             if color_msg is None:
                 continue
 
-            self.process_color_image(color_msg)
+            self.run_detection_step(color_msg)
+            # Advance the clock outside the guarded step so a frame that always
+            # raises still respects the detector period and cannot hot-loop.
             self.last_detection_time = time.monotonic()
+
+    def run_detection_step(self, color_msg: Image) -> None:
+        """Process one frame, surviving any inference/publish failure (D-1).
+
+        Only image-decode errors were caught before, so one transient CUDA OOM
+        (or any publish error) killed the worker thread while the node still
+        looked alive -- every downstream consumer then silently starved.
+        """
+        try:
+            self.process_color_image(color_msg)
+        except Exception as exc:  # noqa: BLE001 - worker must survive any frame
+            self.log_detection_error(exc)
+
+    def log_detection_error(self, exc: Exception) -> None:
+        """Warn (throttled) that a detection frame failed (D-1)."""
+
+        now = time.monotonic()
+        if now - self.last_error_log_monotonic < 5.0:
+            return
+        self.last_error_log_monotonic = now
+        self.get_logger().warn(f'Detection frame failed, skipping: {exc}')
 
     def process_color_image(self, color_msg: Image) -> None:
         try:
@@ -106,7 +132,8 @@ class G1DetectorNode(Node):
             self.get_logger().warn(f'Cannot decode color image ({color_msg.encoding}): {exc}')
             return
 
-        outputs = self.detector.detect(bgr_frame_to_pil(frame))
+        outputs = self.detector.detect(
+            bgr_frame_to_pil(frame), threshold=self.detection_threshold)
         batch = parse_owl_detections(
             outputs,
             frame.shape[1],

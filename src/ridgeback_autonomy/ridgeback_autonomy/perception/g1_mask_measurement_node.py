@@ -84,6 +84,7 @@ from ridgeback_autonomy.perception.core.polar_profiling import (
     scan_points_optical,
 )
 from ridgeback_autonomy.perception.core.segmentation import (
+    SEGMENTATION_MIN_PREDICTED_IOU_DEFAULT,
     SEGMENTATION_MODEL_DEFAULT,
     SamBoxSegmenter,
 )
@@ -362,6 +363,11 @@ class G1MaskMeasurementNode(Node):
         self.declare_parameter('color_topic', COLOR_TOPIC_DEFAULT)
         self.declare_parameter('color_buffer_depth', COLOR_BUFFER_DEPTH_DEFAULT)
         self.declare_parameter('segmentation_model', SEGMENTATION_MODEL_DEFAULT)
+        # Silhouette confidence floor (S-1). Settable via --ros-args only for
+        # now, same status as segmentation_model -- fold into C11's launch-arg
+        # work later.
+        self.declare_parameter(
+            'segmentation_min_iou', SEGMENTATION_MIN_PREDICTED_IOU_DEFAULT)
         self.declare_parameter('mask_debug_topic', MASK_DEBUG_TOPIC)
 
         self.base_frame = str(self.get_parameter('base_frame').value)
@@ -381,9 +387,12 @@ class G1MaskMeasurementNode(Node):
         self.segmenter: SamBoxSegmenter | None = None
         self.last_segmentation_log_monotonic = 0.0
         self.last_oversized_log_monotonic = 0.0
+        self.segmentation_min_iou = 0.0
         if self.mask_gate == MASK_GATE_SILHOUETTE:
             self.color_buffer = StampedMessageBuffer(
                 int(self.get_parameter('color_buffer_depth').value))
+            self.segmentation_min_iou = float(
+                self.get_parameter('segmentation_min_iou').value)
             self.segmenter = SamBoxSegmenter(
                 str(self.get_parameter('segmentation_model').value),
                 self.get_logger(),
@@ -639,7 +648,8 @@ class G1MaskMeasurementNode(Node):
         blobs: list = []
         if prompt_boxes:
             started = time.perf_counter()
-            blobs = self.segmenter.segment_boxes(rgb, prompt_boxes)
+            blobs = self.segmenter.segment_boxes(
+                rgb, prompt_boxes, min_predicted_iou=self.segmentation_min_iou)
             elapsed_ms = (time.perf_counter() - started) * 1000.0
             self.log_segmentation_latency(elapsed_ms, len(blobs))
 

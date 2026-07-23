@@ -2,22 +2,24 @@
 
 Every detector front-end emits into a single representation -- an ``H x W``
 boolean mask plus a precision tag -- so downstream paths never branch on which
-model produced the region. This module covers the ``rect`` mask: the rasterized
-bounding box of an object detector (currently OWLv2). The ``tight`` mask (instance
-segmentation) is a future front-end that emits into the identical interface.
+model produced the region. Two front-ends exist today, both emitting this same
+``Mask``: ``rect`` -- the rasterized bounding box of an open-vocabulary detector
+(``rasterize_*``) -- and ``tight`` -- a pixel-precise segmentation blob wrapped by
+``mask_from_array`` (the SlimSAM silhouette in ``core/segmentation.py``).
 
 See ``object_localization_documentation/mask_component.md``. This component is
-deliberately standalone: it has no ROS or OpenCV dependency and is not consumed
-by the coordinate paths (depth-image, point-cloud, LiDAR) yet.
+deliberately standalone -- no ROS or OpenCV dependency -- but its output *is*
+consumed by all three coordinate paths (depth-image, point-cloud, LiDAR), which
+fork on the precision tag: ``localize_projective_ranging``,
+``localize_euclidean_reconstruction`` and ``localize_polar_profiling`` each take a
+``Mask`` and read ``.precision`` / ``.data``.
 
-Extending to the tight front-end (future): instance segmentation yields a
-pixel-precise boolean blob rather than a box. Wrap it with
-``mask_from_array(blob, MaskPrecision.TIGHT)`` -- the same ``Mask`` type. Box
-rasterization (``rasterize_*``) is inherently rectangular and stays the detection
-front-end's producer; segmentation uses ``mask_from_array`` instead. Because
-``Mask``, ``masked_rgb``, the overlay panel, and every downstream consumer are
-precision-agnostic, adding the tight front-end means adding one producer and
-changes nothing that already exists.
+Adding a third front-end (hypothetical) needs one producer and nothing else: a
+producer that yields a pixel-precise boolean blob wraps it with
+``mask_from_array(blob, <precision>)`` -- the same ``Mask`` type; one that
+produces boxes rasterizes via ``rasterize_*``. Because ``Mask``, ``masked_rgb``,
+the overlay panel, and every downstream consumer are precision-agnostic, the new
+front-end changes nothing that already exists.
 """
 
 from __future__ import annotations
@@ -50,18 +52,34 @@ class Mask:
     Resolution is implicit in ``data.shape``; the mask is bound to the color
     frame's grid (resolution, intrinsics, timestamp) by convention, but only the
     array and the tag are stored here.
+
+    None vs empty (the two ways "no pixels" arises, distinct by convention): a
+    ``None`` entry in a masks list means *no mask for this detection* -- skip it
+    (the no-fallback convention: a failed/rejected segmentation drops the trial,
+    never patched over). A constructed ``Mask`` is always a real selector but may
+    legitimately be all-``False`` (empty batch, degenerate box); the paths drop
+    that naturally via their ``min_valid_pixels`` guard. ``is_empty`` tests the
+    all-``False`` case.
+
+    Immutable: ``frozen=True`` locks the fields and ``__post_init__`` marks
+    ``data`` read-only, so a shared mask cannot be mutated out from under a
+    consumer.
     """
 
     data: np.ndarray
     precision: MaskPrecision
 
     def __post_init__(self) -> None:
-        # Pin the contract for every producer (rect today, tight later): the
-        # selector is always a 2D boolean array. Caught here, not downstream.
         if self.data.ndim != 2:
             raise ValueError(f'mask data must be 2D (H, W); got shape {self.data.shape}')
         if self.data.dtype != np.bool_:
             raise ValueError(f'mask data must be boolean; got dtype {self.data.dtype}')
+        # Make ``frozen=True`` real for the pixels too (M-2). No consumer writes
+        # into a mask after construction (producers fill a local array first),
+        # so this only forbids writes nobody performs. Setting a numpy array
+        # read-only is always permitted -- even for a view of a reused tensor
+        # buffer -- since only the reverse (read-only -> writable) is restricted.
+        self.data.flags.writeable = False
 
     @property
     def height(self) -> int:
@@ -71,16 +89,22 @@ class Mask:
     def width(self) -> int:
         return int(self.data.shape[1])
 
+    @property
+    def is_empty(self) -> bool:
+        """True when the mask selects no pixels (all-``False``)."""
+
+        return not bool(self.data.any())
+
 
 def mask_from_array(data: np.ndarray, precision: MaskPrecision) -> Mask:
     """Wrap a pre-computed ``H x W`` boolean region into the mask interface.
 
-    The integration hook for any front-end that produces a mask directly instead
-    of by rasterizing a box -- in particular the future tight (instance
-    segmentation) front-end: ``mask_from_array(blob, MaskPrecision.TIGHT)``.
-    Binarize before calling; the contract (enforced by ``Mask``) requires a 2D
-    boolean array. Prefer this over constructing ``Mask`` directly so all
-    producers share one entry point.
+    The semantic hook for a front-end that produces a mask array *directly* --
+    the tight (instance segmentation) front-end: ``mask_from_array(blob,
+    MaskPrecision.TIGHT)``. Binarize before calling; the contract (enforced by
+    ``Mask``) requires a 2D boolean array. The rect producers legitimately
+    create-and-tag via ``rasterize_*`` instead; the real shared chokepoint that
+    validates every mask is ``Mask.__post_init__``, not this function.
     """
 
     return Mask(data=data, precision=precision)

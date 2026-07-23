@@ -155,6 +155,28 @@ def test_masked_rgb_works_on_non_rect_tight_mask() -> None:
     assert not out[~mask.data].any()
 
 
+def test_mask_data_is_read_only() -> None:
+    # M-2: frozen must cover the pixels, not just the fields. Both construction
+    # paths go through __post_init__, so both lock the array.
+    direct = Mask(data=np.ones((4, 4), dtype=bool), precision=MaskPrecision.RECT)
+    wrapped = mask_from_array(np.eye(4, dtype=bool), MaskPrecision.TIGHT)
+
+    assert direct.data.flags.writeable is False
+    assert wrapped.data.flags.writeable is False
+    with pytest.raises(ValueError):
+        direct.data[0, 0] = False
+
+
+def test_mask_is_empty() -> None:
+    # M-5: a constructed all-False mask is a real (empty) selector, distinct
+    # from a None list entry (which means "no mask, skip").
+    empty = Mask(data=np.zeros((4, 4), dtype=bool), precision=MaskPrecision.RECT)
+    filled = rasterize_bbox((1, 1, 3, 3), 4, 4)
+
+    assert empty.is_empty is True
+    assert filled.is_empty is False
+
+
 def test_mask_contract_rejects_non_2d_and_non_bool() -> None:
     with pytest.raises(ValueError):
         Mask(data=np.zeros((4, 4, 3), dtype=bool), precision=MaskPrecision.RECT)
