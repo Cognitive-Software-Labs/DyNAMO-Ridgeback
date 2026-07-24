@@ -282,14 +282,24 @@ Consequences worth pinning:
 - The hierarchy is **per frame** — nothing persists across frames. The same G1
   in consecutive frames yields a fresh detection, mask, and coordinate each
   time; temporal association (tracking) is a separate, later concern.
+- **Oversized-box exception to the 1:1 mapping.** A detection whose box covers
+  more than `MAX_BOX_FRAME_FRACTION` (0.60) of the frame — a likely detector
+  failure that would otherwise mask the whole scene — is gated to a `None` mask
+  *before* rasterization or segmentation, so it produces no mask and no result.
+  The mapping is therefore "one *accepted* detection → one mask"; an oversized
+  detection is skipped rather than turned into a full-frame mask.
 
 Two properties follow, and both matter downstream:
 
 - **Masks are independent and never merged.** Each mask selects one object's
   pixels and yields one result for *that* object. Two different objects always
   get two separate coordinates; there is no "distance for the whole batch."
-  Masks may even partially overlap (the detector's non-maximum suppression
-  allows boxes up to 0.5 IoU), and each is still selected on its own.
+  Masks may even partially overlap: the detector's non-maximum suppression is
+  per-label — it suppresses a candidate only against a same-label kept box that
+  either overlaps it above `IoU > 0.5` or nearly contains it
+  (`intersection_over_smaller > 0.95`, the near-total-containment case).
+  Cross-label overlaps are kept, and each surviving mask is still selected on
+  its own.
 - **The source frame is shared; only selection is per-mask.** The RGB frame —
   and anything derived from it once per frame (e.g. an aligned depth frame) — is
   produced a single time and then indexed once per mask. The expensive

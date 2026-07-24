@@ -6,6 +6,10 @@ realsense-ros pointcloud filter) or a **deprojected** cloud our own code builds
 from the aligned depth frame. Is there any difference in *accuracy* or
 *processing cost*? If not, should the published variant be kept at all?
 
+> Resolved by §7: euclidean reconstruction deprojects masked depth pixels in
+> code and never consumes a published cloud, so this question no longer gates
+> the path — the material below is retained as the supporting evidence.
+
 **Status:** script implemented at `~/tmp/cloud_provenance_test.py` (outside the
 repo, never committed — delete after §6 is filled). Run with the sim + detector
 up and the workspace sourced:

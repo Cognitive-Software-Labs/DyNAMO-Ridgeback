@@ -38,10 +38,10 @@ architecture-level view of polar profiling is `Object_Localization_Pipeline.md` 
 **Output**
 
 - One planar coordinate `(X, Z)` in the **camera optical frame**, per mask
-  (frame convention proposed in `Object_Localization_Pipeline.md` §7;
-  confirmation against SDK/TF still open).
+  (camera optical frame; the downstream `base_link` planar conversion is fixed —
+  `Object_Localization_Pipeline.md` §7).
   **Y (height) is unobservable** from a single-plane LiDAR: the result
-  carries no Y at all, and the benchmark's optical→vehicle conversion folds
+  carries no Y at all, and the benchmark's optical→base conversion folds
   `Y = 0`, which is exact at the benchmark's zero camera pitch (§8, resolved).
   The scan-plane's own Y in the camera frame is available as a by-product, but
   it is the *plane's* height, not the object center's — do not substitute it.
@@ -182,7 +182,9 @@ The recovery, identical for both tags:
    alone would be one leg — range = that leg's face, laterally offset from the
    body center; merging the band averages both legs in range *and* bearing.
 3. **Median** the merged set: per-axis median of the merged points' `(X, Z)`
-   for the coordinate, median planar range for the distance.
+   — the coordinate the core returns. (No separate distance statistic is
+   emitted here; the published distance is derived from this coordinate
+   downstream, §7.)
 
    **Median over mean (pinned):** the mean would center better between the
    legs (per-axis median can snap toward the better-sampled leg when beam
@@ -202,8 +204,10 @@ behaviors do not diverge, so there is no fork.
 
 The merged near-band set is polar profiling's **foreground set**, and it is the single
 source for the output — the same single-source rule as projective ranging §2.3 and euclidean reconstruction
-§2.4: the coordinate and any distance statistic read the same set, so they
-agree by construction.
+§2.4. The core emits only the coordinate: the per-axis median `(X, Z)` of
+that set. There is no separate core distance statistic — the published
+distance is derived downstream from the same coordinate (base-planar
+projection, §7), so coordinate and distance rest on the same point.
 
 ---
 
@@ -307,7 +311,6 @@ opt-in benchmark row.
 @dataclass(frozen=True)
 class PolarProfilingResult:
     xz_optical: np.ndarray        # (2,) X right, Z forward, meters; Y unobserved
-    distance_m: float             # median planar range of the merged near-band set
     foreground_points: np.ndarray # (M, 2) the merged (X, Z) set, by-product
     ray_count: int                # rays that survived the mask ∩ FoV select
 
@@ -332,10 +335,12 @@ analogue of the isolation recipes — and like them it can grow alternatives
 behind the same contract if the benchmark motivates any (the incumbent
 percentile band being the obvious first alternative row).
 
-**`perception/core/intrinsics.py`** — add the forward projection
+**`perception/core/intrinsics.py`** — ~~add the forward projection
 (`project_points(points, intrinsics) -> (uv, valid)`: an `(N, 2)` pixel
 array plus an in-front-and-in-bounds selector), the inverse of the existing
-`deproject_*` helpers; polar profiling is its first consumer.
+`deproject_*` helpers; polar profiling is its first consumer.~~ — done
+2026-07-23: `project_points` is implemented in `intrinsics.py` and consumed
+by `polar_profiling.py`.
 
 **Scan preprocessing** — a `scan_points_optical(...)` helper (validity clean +
 polar→Cartesian + extrinsic transform, §2.1–2.2): the retargeted equivalent of
@@ -348,8 +353,9 @@ camera-optical frame with `camera_info` intrinsics. The node gained a
 `LaserScan` subscription (`scan_topic`) and a TF listener; per frame it looks
 up the scan→optical extrinsic at the detection stamp and calls
 `scan_points_optical` once (shared across masks), then `localize_polar_profiling`
-per mask. The result's `(X, Z)` is converted to the shared vehicle-frame planar
-convention with `Y = 0` (exact at the benchmark's zero camera pitch). Polar
+per mask. The result's `(X, Z)` is converted to the shared base_link planar
+convention via the full TF transform with `Y = 0` (exact at the benchmark's
+zero camera pitch). Polar
 runs independently of the depth frame — a missing scan or unavailable TF simply
 leaves its fields NaN. The alternative (extending the legacy lidar node) was
 rejected: it works in the vehicle frame with `camera_config` FoV intrinsics,
@@ -361,19 +367,23 @@ not the color-grid `camera_info` the new stack uses.
 self-describing names fold only the gate: the CSV file is
 `box_gated_polar_profiling.csv` and the summary/log prose is "box-gated polar
 profiling" (no depth source, no isolation recipe). Distance convention: the
-published scalar is the vehicle-frame planar distance of the median `(X, Z)`
-coordinate — the node runs it through the same `optical_to_vehicle_planar`
-conversion as the depth-path rows (pitch fold with `Y = 0`, front offset
-subtracted), so all mask rows, the legacy rows, and the ground truth share
-one convention. The core result's `distance_m` (median planar range of the
-merged set, camera frame) is a by-product and is not published. The
-conversion models only the camera pitch and the front offset, not the
-camera's mounting translation, so the polar row inherits whatever systematic
-bias that leaves in the depth-path rows (~0.07 m, uninvestigated). First sim
-run (2026-07-13, 14 trials): box-gated polar profiling MAE 0.093 m vs legacy
-`lidar` 0.064 m — LiDAR-accurate, the gap attributable to untuned
-segmentation params (§8) and the leg-front-face vs body-center convention
-offset (§8).
+published scalar is the base_link planar distance of the median `(X, Z)`
+coordinate — the node runs it through the same `optical_to_base_planar`
+conversion as the depth-path rows (full TF transform with `Y = 0`, front
+offset subtracted), so all mask rows, the legacy rows, and the ground truth
+share one convention. The core result carries no `distance_m` field; the
+distance is derived here from the median coordinate, not from a separate
+core statistic. The conversion applies the camera's full mounting pose
+(rotation *and* translation) from TF, so the optical center is not assumed to
+sit at the base origin. Any residual systematic bias the polar row inherits
+from the depth-path rows is the G1's surface-vs-body-center offset (the
+median lands on the near surface, ground truth is the model origin), not a
+missing camera translation. First sim run (2026-07-13, 14 trials): box-gated
+polar profiling MAE 0.093 m vs legacy `lidar` 0.064 m — LiDAR-accurate, the
+gap attributable to untuned segmentation params (§8) and the leg-front-face
+vs body-center convention offset (§8). Later standing runs have landed in the
+~0.086–0.094 m range against legacy `lidar` ~0.064 m; treat 0.093 m as one
+early data point and read the current figure from `benchmark-results/`.
 
 **Tests** — synthetic-scan unit tests in `test_polar_profiling.py`: a two-legs
 profile (band merge averages the legs), a parallax profile (far points inside
@@ -389,9 +399,13 @@ failure (696e101) is the legacy stack's, untouched by this work.
 - **Camera–LiDAR extrinsic calibration** on real hardware — define the
   procedure, store the transform (`Object_Localization_Pipeline.md` §10.2).
   Sim is exact via URDF; the sim benchmark will not exercise this error.
-- **Time synchronization** — matched scan/mask timestamps; polar profiling is the most
-  sensitive consumer (§2.2), and the current node pairs latest-scan with
-  latest-detections without stamp matching.
+- ~~**Time synchronization**~~ — resolved 2026-07-23: the mask node matches the
+  scan to the detection (mask) stamp via `StampedMessageBuffer.lookup_nearest`
+  within `scan_match_tolerance_s` (and looks up the scan→optical TF at that same
+  stamp), instead of pairing latest-scan with latest-detections. The static
+  benchmark is unaffected; the win is correctness under motion — polar profiling
+  being the most sensitive consumer (§2.2). Accurate sensor clocks on real
+  hardware remain a driver concern the software matching relies on.
 - **Segmentation parameters (tuning, deferred)** — `range_band_m`,
   `range_jump_m`, `max_bearing_gap_beams`, `min_valid_rays` are the LiDAR
   foreground-isolation knobs (the analogue of the `isolation_2d` /
@@ -422,12 +436,14 @@ failure (696e101) is the legacy stack's, untouched by this work.
   (consumer logic, not the path itself); shared with euclidean reconstruction's sparse-mask
   fallback item.
 - ~~**Y convention**~~ — resolved 2026-07-13: the benchmark output is the
-  shared vehicle-frame `lateral / forward / distance` triple (no separate Y
-  field), and the optical→vehicle conversion folds `Y = 0`, which is exact at
-  the benchmark's zero camera pitch. A non-zero pitch would need the true Y,
+  shared base_link `lateral / forward / distance` triple (no separate Y
+  field), and the optical→base conversion (full TF transform) folds `Y = 0`,
+  which is exact at the benchmark's zero camera pitch. A non-zero pitch would
+  need the true Y,
   which polar cannot observe — revisit only if the camera is ever pitched.
 - **Front + rear merge (360°)** — out of scope; perception uses the front 270°
   (`lidar2d_0`) only. Revisit only if rear coverage ever matters for
   localization.
-- **Coordinate frame** — same confirmation as projective ranging and euclidean reconstruction
-  (`Object_Localization_Pipeline.md` §7) before integration.
+- ~~**Coordinate frame**~~ — resolved 2026-07-23: the camera-optical → `base_link`
+  planar convention is fixed (`Object_Localization_Pipeline.md` §7), same as
+  projective ranging and euclidean reconstruction.

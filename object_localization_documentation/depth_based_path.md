@@ -116,8 +116,10 @@ self-calibrates as a cross-check (`pointcloud_provenance_test.md` §3).
 
 The monocular source needs no depth sensor at all: the RGB frame goes through
 **Depth-Anything V2** (Metric Indoor Small checkpoint, via HuggingFace
-`transformers`; already integrated in `g1_camera_measurement_node`), which
-predicts a dense metric depth map.
+`transformers`), which predicts a dense metric depth map. This document's
+producer is `aligned_depth_node.MonocularDepthSource` (selected by the node's
+`depth_source` param); the legacy `g1_camera_measurement_node` runs the same
+network for its own estimators.
 
 - **Aligned by construction.** The network's input *is* the color image, so
   its output is per-color-pixel — the grid property costs nothing. Resized to
@@ -131,8 +133,9 @@ predicts a dense metric depth map.
   (no invalid pixels, no occlusion holes) but can be globally off in scale and
   soft at depth discontinuities. The clean step passes almost everything; the
   burden shifts to the aggregate/isolate stage, and the benchmark rows differ
-  accordingly (current sim run: `sensor_depth` MAE 0.586 m vs.
-  `depth_anything` MAE 0.931 m).
+  accordingly (sim run of 2026-07-13: `sensor_depth` MAE 0.586 m vs.
+  `depth_anything` MAE 0.931 m; see `benchmark-results/` for the run summaries —
+  these figures may be superseded by a later run).
 - **No published cloud.** The monocular source produces only a depth image.
   euclidean reconstruction reaches it exclusively through in-code deprojection — the reason the
   deprojected provenance is euclidean reconstruction's canonical input
@@ -175,8 +178,21 @@ consumers (projective ranging, euclidean reconstruction, mask overlay) never bra
   color camera's `camera_info` alongside each frame and the mask node deprojects
   with it; only the legacy estimators still fall back to the
   `camera_config.json` FoV constants.
-- **Metric-scale validation** — quantify Depth-Anything's global scale error
-  against stereo on identical frames before trusting its euclidean reconstruction rows.
+- ~~**Metric-scale validation**~~ — resolved 2026-07-24: measured Depth-Anything's
+  scale directly as a pixel-wise `mono / stereo` depth ratio on identical sim
+  frames (isolating the scale term from surface warping and noise). On the **G1
+  region** — the pixels euclidean reconstruction actually consumes — the ratio is
+  ≈**1.0** (overall median 1.02) but **range-dependent**: it over-reads ~10–15% at
+  2–3 m (ratio 1.10–1.15) and converges to metric (~1.0) by 4–6 m. On the **whole
+  frame** (dominated by floor and walls) it reads ~13% short (median 0.87), a
+  separate warping of large flat surfaces. So Depth-Anything is *approximately
+  metric on the object* with mild close-range warping — **not** a constant global
+  bias correctable by a single factor. Consequence: euclidean's absolute-metric
+  isolation (`HeightCrop` floor plane, `RangeBand` ±0.10/0.35 m windows) is
+  genuinely soft at close range on the monocular source; treat monocular euclidean
+  rows as range-warped, not scale-shiftable. (Consistent with the end-to-end
+  monocular MAE ~0.19–0.22 m vs. stereo ~0.07 m — the excess is warping, not a
+  fixable offset.)
 - ~~**Topic-level contract**~~ — resolved 2026-07-12: both producers publish
   `perception/aligned_depth/image` + `perception/aligned_depth/camera_info`
   (`aligned_depth_node`, switched by its `depth_source` param); consumers

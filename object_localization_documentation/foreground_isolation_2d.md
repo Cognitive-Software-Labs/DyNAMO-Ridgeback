@@ -13,6 +13,14 @@ They differ along two axes worth keeping in mind when analyzing results:
 - **Value-based** (2, 3, 4) vs. **connectivity-based** (5) vs. **joint/global** (6, 7, 8)
 - **Depth-only** vs. **RGB-only** vs. **RGB-D** input
 
+**Implemented so far** (`perception/core/isolation_2d.py`): Method 1
+`nearest_mode_histogram` (the default recipe) and Method 2 `otsu`. The
+nearest-mode recipe applies a 5% significance floor — a bin must hold at least
+5% of the valid masked pixels to count as the near peak — with a
+dispersed-distribution fallback to the nearest non-empty bin (not the global
+mode, which at range would lock onto the background wall). The rest of the
+catalogue below remains for benchmarking against these two.
+
 ---
 
 ## 1. Nearest-Mode Histogram Selection (Baseline)

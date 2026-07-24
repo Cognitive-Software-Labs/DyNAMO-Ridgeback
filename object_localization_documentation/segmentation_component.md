@@ -88,7 +88,13 @@ the SAM 3 spike passed its gates and the adoption question is open (§7.2).
   frame-encode plus N light decodes.
 - **Multimask output → highest predicted IoU.** SAM returns several mask
   options per prompt with predicted-IoU scores; the highest-scoring option is
-  binarized to the `H×W` boolean blob on the color grid.
+  binarized to the `H×W` boolean blob on the color grid. That argmax option is
+  then held to a **predicted-IoU floor**: if its score is below the floor it is
+  dropped to `None` (→ that detection skips, no-fallback — §3), rather than
+  passing a low-confidence mask downstream. The floor is a node parameter,
+  `segmentation_min_iou` (default 0.5). Predicted IoU rates mask *boundary*
+  quality, not whether the mask is the robot, so the floor drops
+  low-quality/uncertain masks but cannot catch a crisp wrong-object mask.
 
 ## 3. Output semantics
 
@@ -97,10 +103,12 @@ the SAM 3 spike passed its gates and the adoption question is open (§7.2).
   `mask_from_array(blob, MaskPrecision.TIGHT)` — the module returns plain
   arrays and knows nothing about producers or consumers, mirroring
   `rasterize_*` on the rect side.
-- **Empty segmentation → `None` → trial drops.** An empty winning mask yields
-  `None` for that detection; the node leaves the detection's path fields NaN.
-  No fallback to a rect mask — silently rasterizing would mislabel the
-  benchmark row (the run *is* the gate axis).
+- **Empty or below-floor segmentation → `None` → trial drops.** A winning mask
+  that is empty **or** whose predicted IoU falls below the floor
+  (`segmentation_min_iou`, default 0.5 — §2) yields `None` for that detection;
+  the node leaves the detection's path fields NaN. No fallback to a rect mask —
+  silently rasterizing would mislabel the benchmark row (the run *is* the gate
+  axis).
 
 ## 4. Execution host: inside `g1_mask_measurement_node`
 
