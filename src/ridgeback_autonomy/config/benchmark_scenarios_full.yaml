@@ -103,4 +103,23 @@ scenes:
     objects: [{ model: hospital_bed, x: 2.0, y: -0.30, yaw: 0.0 }]      # narrow bed (long axis at camera)
   - id: objocc_05
     robots: [{ x: 3.8, y: 0.0, yaw: 3.00 }]
-    objects: [{ model: privacy_curtain, x: 2.3, y: 0.0, yaw: 0.4 }]     # curtain slightly angled
+    objects: [{ model: privacy_curtain, x: 2.3, y: 0.0, yaw: 0.4 }]
+
+  # ---- F. Object PARTIALLY occluding (robot stays >= half visible) ----
+  # Vertical partial: a low bed in front leaves the upper body visible.
+  # Lateral partial: the occluder is offset so it clips only part of the width.
+  - id: objpartial_01
+    robots: [{ x: 3.5, y: 0.0 }]
+    objects: [{ model: hospital_bed, x: 2.2, y: 0.0 }]        # low bed centered -> lower body only, head+torso visible
+  - id: objpartial_02
+    robots: [{ x: 3.5, y: 0.0 }]
+    objects: [{ model: hospital_bed, x: 2.3, y: -0.45 }]      # offset left -> ~left half occluded
+  - id: objpartial_03
+    robots: [{ x: 3.5, y: 0.0 }]
+    objects: [{ model: hospital_bed, x: 2.3, y: 0.55 }]       # offset right -> mostly visible
+  - id: objpartial_04
+    robots: [{ x: 3.0, y: 0.0 }]
+    objects: [{ model: privacy_curtain, x: 2.0, y: -0.7 }]    # tall curtain offset -> left side (incl upper) blocked
+  - id: objpartial_05
+    robots: [{ x: 4.0, y: 0.0 }]
+    objects: [{ model: hospital_bed, x: 2.6, y: 0.6, yaw: 1.5708 }]  # broadside bed offset -> partial from the right     # curtain slightly angled

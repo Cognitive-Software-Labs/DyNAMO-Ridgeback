@@ -134,8 +134,8 @@ def test_shipped_examples_scenario_parses() -> None:
 def test_shipped_full_scenario_covers_every_case_five_times() -> None:
     scenes = load_scenarios(os.path.join(CONFIG_DIR, 'benchmark_scenarios_full.yaml'))
 
-    assert len(scenes) == 25
-    for prefix in ('single', 'multi', 'interocc', 'objclear', 'objocc'):
+    assert len(scenes) == 30
+    for prefix in ('single', 'multi', 'interocc', 'objclear', 'objocc', 'objpartial'):
         assert sum(1 for scene in scenes if scene.id.startswith(prefix)) == 5
     # Object cases use the two authored occluder models.
     models = {obj.model for scene in scenes for obj in scene.objects}
