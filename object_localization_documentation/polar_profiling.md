@@ -8,9 +8,9 @@ image plane, keeps the points falling inside the mask, segments the surviving
 one planar coordinate. Because LiDAR is a single self-contained source (no
 stereo/monocular producer split), this one document covers both the
 acquisition contract and the path itself — the roles that
-`depth_based_path.md` and `depth_based_A.md`/`depth_based_B.md` split between
+`aligned_depth.md` and `projective_ranging.md`/`euclidean_reconstruction.md` split between
 them for the depth routes. The mask contract is `mask_component.md`; the
-architecture-level view of polar profiling is `Object_Localization_Pipeline.md` §5.
+architecture-level view of polar profiling is `object_localization_pipeline.md` §5.
 
 ---
 
@@ -27,19 +27,19 @@ architecture-level view of polar profiling is `Object_Localization_Pipeline.md` 
 - The **LiDAR→camera extrinsics**: the rigid transform from the scan frame to
   the camera optical frame, looked up from TF at the scan/detection timestamp.
   Factory-calibrated nowhere — on real hardware this transform must be
-  calibrated (`Object_Localization_Pipeline.md` §10.2); in sim it comes from
+  calibrated (`object_localization_pipeline.md` §10.2); in sim it comes from
   the URDF and is exact.
 - The **color-camera intrinsics** (`camera_info` of the grid the mask lives
   on) — needed to project the scan points into the image plane so the mask can
   select them. Same intrinsics caveat as the depth paths
-  (`depth_based_path.md` §2.3): use the grid's `camera_info`, not the FoV
+  (`aligned_depth.md` §2.3): use the grid's `camera_info`, not the FoV
   constants in `camera_config.json`.
 
 **Output**
 
 - One planar coordinate `(X, Z)` in the **camera optical frame**, per mask
   (camera optical frame; the downstream `base_link` planar conversion is fixed —
-  `Object_Localization_Pipeline.md` §7).
+  `object_localization_pipeline.md` §7).
   **Y (height) is unobservable** from a single-plane LiDAR: the result
   carries no Y at all, and the benchmark's optical→base conversion folds
   `Y = 0`, which is exact at the benchmark's zero camera pitch (§8, resolved).
@@ -82,7 +82,7 @@ y = ranges * np.sin(angles)          # z = 0: single plane
 ```
 
 Invalid returns must be dropped first — the LiDAR analogue of the depth clean
-step (`depth_based_A.md` §2.2): non-finite ranges, ranges below `range_min`
+step (`projective_ranging.md` §2.2): non-finite ranges, ranges below `range_min`
 (mixed-pixel and self-hit artifacts), ranges beyond `range_max` / a sane
 maximum. They must never survive into the range profile, where a stray 0.06 m
 self-hit would masquerade as the nearest run.
@@ -96,7 +96,7 @@ remains downstream. Two properties worth pinning:
 - The transform comes from **TF at the matching timestamp**. On a moving
   platform an unsynchronized lookup smears the projected points against the
   mask — time synchronization is a pipeline-level open item
-  (`Object_Localization_Pipeline.md` §10.3), and polar profiling is its most sensitive
+  (`object_localization_pipeline.md` §10.3), and polar profiling is its most sensitive
   consumer because the mask test (step 4) is pixel-exact.
 - After the transform the scan is no longer at `z = 0`: in the optical frame
   (X right, Y down, Z forward) the plane sits at a Y determined by the
@@ -153,7 +153,7 @@ sufficient here even when the mask is pixel-precise:
 > enter the profile carrying background ranges. Mask membership certifies that
 > the *camera's* ray hits the object; it says nothing about a LiDAR point
 > further along that ray. So a plain median over the arc is unsafe even on the
-> `tight` branch. (`Object_Localization_Pipeline.md` §5, polar profiling callout.)
+> `tight` branch. (`object_localization_pipeline.md` §5, polar profiling callout.)
 >
 > A pixel-precise segmenter does *not* close this hole. It excludes background
 > the camera can see (e.g. wall visible between the G1's legs — those pixels
@@ -178,7 +178,7 @@ The recovery, identical for both tags:
    returned invalid.
 2. **Merge the near band**: take the nearest run, then merge every run whose
    range lies within a small band of it. **Convention (pinned,
-   `Object_Localization_Pipeline.md` §5):** on a legged object the nearest run
+   `object_localization_pipeline.md` §5):** on a legged object the nearest run
    alone would be one leg — range = that leg's face, laterally offset from the
    body center; merging the band averages both legs in range *and* bearing.
 3. **Median** the merged set: per-axis median of the merged points' `(X, Z)`
@@ -199,7 +199,7 @@ The only tag-dependent behavior is implicit: the `rect` mask admits a wider
 bearing window, so more neighbor runs enter the profile and the segmentation
 has more to reject; the `tight` mask narrows the window but changes nothing
 about the algorithm. This is the same "fork sits where behavior genuinely
-diverges" rule as projective ranging and euclidean reconstruction (`Object_Localization_Pipeline.md` §6) — here the
+diverges" rule as projective ranging and euclidean reconstruction (`object_localization_pipeline.md` §6) — here the
 behaviors do not diverge, so there is no fork.
 
 The merged near-band set is polar profiling's **foreground set**, and it is the single
@@ -238,7 +238,7 @@ in it). The path must distinguish and report:
   the object, the object is outside the LiDAR FoV overlap, or the scan was
   invalid → return `None`, mirroring `localize_projective_ranging` / `localize_euclidean_reconstruction`'s
   sparse fallback. The consumer routes to projective ranging / euclidean reconstruction
-  (`Object_Localization_Pipeline.md` §10.4).
+  (`object_localization_pipeline.md` §10.4).
 - **Points selected but all far**: parallax-only content (camera sees the
   object, every LiDAR ray inside the mask flew past it). The zero-point check
   does *not* catch this — points exist, they are just wrong. Heuristic guard:
@@ -262,7 +262,7 @@ pipeline it is the signal to fall back — never a zero or a stale value.
   monocular scale softness.
 - **Independence.** A genuinely separate sensor and error model — the reason
   it is the natural cross-check on euclidean reconstruction's depth in the fusion stage
-  (`Object_Localization_Pipeline.md` §9).
+  (`object_localization_pipeline.md` §9).
 - **Cheapest compute.** ~1k points per scan; segmentation is a 1D pass.
 - **No Y.** Planar only; never a standalone 3D source.
 - **Conditional availability.** Only fires when the scan plane intersects the
@@ -284,7 +284,7 @@ generalization gaps its depth siblings had:
 | Aspect | Current estimator | polar profiling target |
 |--------|-------------------|---------------|
 | Selection | bbox → bearing window (`compute_camera_bearing_window`, margin + floor padding); horizontal gate only | project points to `(u, v)`, index the actual mask (2D membership, forked on nothing) |
-| Intrinsics | fx synthesized from `camera_config.json` HFoV | `camera_info` of the color grid (`depth_based_path.md` §2.3) |
+| Intrinsics | fx synthesized from `camera_config.json` HFoV | `camera_info` of the color grid (`aligned_depth.md` §2.3) |
 | Contamination recovery | percentile anchor (30th) + fixed inlier margin (0.20 m) over planar range | segment runs over bearing → merge near-band runs → median (pinned convention, handles the two-legs case explicitly) |
 | Output | vehicle-frame `lateral / forward / distance`, front offset applied | `(X, Z)` in the camera optical frame, Y = NaN; vehicle-frame transform belongs to a later consumer |
 | Scan preprocessing | `extract_scan_points_base` (validity, base-frame Cartesian) | same responsibilities, retargeted at the camera optical frame |
@@ -397,7 +397,7 @@ failure (696e101) is the legacy stack's, untouched by this work.
 ## 8. Open items
 
 - **Camera–LiDAR extrinsic calibration** on real hardware — define the
-  procedure, store the transform (`Object_Localization_Pipeline.md` §10.2).
+  procedure, store the transform (`object_localization_pipeline.md` §10.2).
   Sim is exact via URDF; the sim benchmark will not exercise this error.
 - ~~**Time synchronization**~~ — resolved 2026-07-23: the mask node matches the
   scan to the detection (mask) stamp via `StampedMessageBuffer.lookup_nearest`
@@ -445,5 +445,5 @@ failure (696e101) is the legacy stack's, untouched by this work.
   (`lidar2d_0`) only. Revisit only if rear coverage ever matters for
   localization.
 - ~~**Coordinate frame**~~ — resolved 2026-07-23: the camera-optical → `base_link`
-  planar convention is fixed (`Object_Localization_Pipeline.md` §7), same as
+  planar convention is fixed (`object_localization_pipeline.md` §7), same as
   projective ranging and euclidean reconstruction.

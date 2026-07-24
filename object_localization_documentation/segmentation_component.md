@@ -8,8 +8,7 @@ documented in `mask_component.md`.
 
 **Code:** `perception/core/segmentation.py` (`SamBoxSegmenter`), wired into
 `g1_mask_measurement_node` behind the `mask_gate` parameter
-(`box` | `silhouette`). The implementation plan this executed is
-`segmentation_component_plan.md`.
+(`box` | `silhouette`).
 
 **History note (2026-07-17):** Florence-2 was evaluated as a candidate
 replacement main path (single model for detection + segmentation, motivated by
@@ -44,7 +43,7 @@ across the full 1.5–5.5 m benchmark grid against `facebook/sam-vit-base` and
 The selection criterion was **silhouette fidelity on the G1's legs**: the leg
 gap must come out `False` — that gap is precisely what the tight mask buys
 polar profiling (a rect mask admits through-the-gap background rays,
-`Object_Localization_Pipeline.md` §5). All three candidates passed the leg-gap
+`object_localization_pipeline.md` §5). All three candidates passed the leg-gap
 check visually; SlimSAM won on stable quality at the lowest footprint. Latency
 is well inside the 5 FPS detector cadence. The model stays a public parameter
 (`segmentation_model`) because the real robot's compute budget is undecided;
@@ -53,7 +52,7 @@ checkpoint's `model_type`).
 
 The specific detector-plus-segmenter stack (OWLv2 + SlimSAM) is an
 **implementation detail of this component, not an architectural fixture** —
-`Object_Localization_Pipeline.md` §2 shows only the abstract segmentation
+`object_localization_pipeline.md` §2 shows only the abstract segmentation
 front-end, and nothing downstream of the mask interface depends on the choice.
 It is a **swappable, benchmarkable axis**: multiple segmentation implementations
 are planned to be compared on the same three metrics used above —

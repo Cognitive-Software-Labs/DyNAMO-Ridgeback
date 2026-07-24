@@ -4,10 +4,10 @@
 frame into 3D points, selects the points under the mask, isolates the
 foreground in the point domain, and reduces the surviving points to one
 coordinate. This document describes euclidean reconstruction end to end. The mask contract is
-`mask_component.md`; the aligned depth frame contract is `depth_based_path.md`;
+`mask_component.md`; the aligned depth frame contract is `aligned_depth.md`;
 the 3D foreground-isolation methods are catalogued in
 `foreground_isolation_3d.md`; projective ranging, the cheaper image-domain sibling, is
-`depth_based_A.md`.
+`projective_ranging.md`.
 
 ---
 
@@ -18,14 +18,14 @@ the 3D foreground-isolation methods are catalogued in
 - A **mask** from the mask interface: an `H×W` boolean array on the RGB color
   grid, plus its precision tag (`tight` | `rect`). See `mask_component.md`.
 - An **aligned depth frame** (canonical input): 1:1 with the RGB pixels, from
-  either depth source (`depth_based_path.md`). Euclidean reconstruction builds its own point
+  either depth source (`aligned_depth.md`). Euclidean reconstruction builds its own point
   cloud from it — see the provenance note below.
 
 **Output**
 
 - One coordinate `(X, Y, Z)` in the **camera optical frame**, per mask (the
   downstream `base_link` planar conversion is fixed —
-  `Object_Localization_Pipeline.md` Section 7). Unlike
+  `object_localization_pipeline.md` Section 7). Unlike
   projective ranging, euclidean reconstruction also has the full foreground point set available as a
   by-product (extent, orientation, footprint) if a later consumer wants it.
 
@@ -84,7 +84,7 @@ Two implementation notes:
   The full-frame form exists for debugging and RViz export.
 
 Invalid depth pixels (0 / NaN / inf — see the cleaning rules in
-`depth_based_A.md` §2.2, which apply verbatim) must be dropped either before
+`projective_ranging.md` §2.2, which apply verbatim) must be dropped either before
 deprojection or carried as invalid points and dropped in step 3; they must
 never reach the reduction.
 
@@ -247,7 +247,7 @@ camera-frame coordinate output.
   defer-to-projective-ranging / polar-profiling routing is a production-pipeline
   consumer concern, not the estimator's.
 - ~~**Coordinate frame**~~ — resolved 2026-07-24, same basis as projective ranging
-  (`depth_based_A.md` §7, deferring to `Object_Localization_Pipeline.md` Section 7):
+  (`projective_ranging.md` §7, deferring to `object_localization_pipeline.md` Section 7):
   euclidean reconstruction and projective ranging share `deproject_*` +
   `optical_to_base_planar`, so the frame confirmation is identical for both. Two
   parts: (1) the downstream camera-optical → `base_link` conversion is fixed (full

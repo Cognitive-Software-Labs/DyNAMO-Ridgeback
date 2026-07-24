@@ -1,4 +1,4 @@
-"""Euclidean reconstruction -- deproject-then-aggregate (``depth_based_B.md``).
+"""Euclidean reconstruction -- deproject-then-aggregate (``euclidean_reconstruction.md``).
 
 The point-domain localization path: deproject the valid masked pixels of the
 aligned depth frame into camera-optical-frame points, isolate the foreground

@@ -1,4 +1,4 @@
-"""Projective ranging -- aggregate-then-deproject (``depth_based_A.md``).
+"""Projective ranging -- aggregate-then-deproject (``projective_ranging.md``).
 
 The cheapest localization path: select the masked depths, clean them,
 collapse them to one distance, and deproject exactly one representative

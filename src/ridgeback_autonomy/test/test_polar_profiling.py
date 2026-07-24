@@ -98,7 +98,7 @@ def test_unequal_legs_median_stays_on_object() -> None:
 
 def test_tight_tag_runs_identical_recovery() -> None:
     # Same selector, tight tag: no fork exists in polar profiling, so the result is
-    # bit-identical to the rect run (lidar_based_path.md Section 2.5).
+    # bit-identical to the rect run (polar_profiling.md Section 2.5).
     points = two_legs_profile()
     valid = np.ones(points.shape[0], dtype=bool)
     rect = rasterize_bbox(MASK_BBOX, HEIGHT, WIDTH)

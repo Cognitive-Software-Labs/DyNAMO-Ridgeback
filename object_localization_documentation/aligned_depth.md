@@ -1,7 +1,7 @@
 # The Aligned Depth Frame — Depth Acquisition
 
 **Scope:** how the depth that the localization paths consume is produced. Both
-projective ranging (`depth_based_A.md`) and euclidean reconstruction (`depth_based_B.md`) consume one and the
+projective ranging (`projective_ranging.md`) and euclidean reconstruction (`euclidean_reconstruction.md`) consume one and the
 same artifact — the **aligned depth frame** — and neither cares how it was
 made. This document defines that contract and the two producers that satisfy
 it: the physical depth camera (`camera → aligned depth`) and monocular
@@ -34,7 +34,7 @@ An **aligned depth frame** is a depth image that satisfies:
   publishes `16UC1` millimeters; conversion to float meters is part of the
   producer, not the consumer.)
 - **Invalid pixels:** `0`, `NaN`, or `inf` mean "no depth here"; consumers
-  filter them (`depth_based_A.md` §2.2) and producers must not encode invalid
+  filter them (`projective_ranging.md` §2.2) and producers must not encode invalid
   as any other value.
 - **Timing:** stamped with the color frame it is aligned to, so mask and depth
   can be matched frame-to-frame.
@@ -42,7 +42,7 @@ An **aligned depth frame** is a depth image that satisfies:
 Everything downstream — select, clean/isolate, aggregate, deproject — is
 identical regardless of which producer made the frame. The depth source is a
 **strategy**: a config choice behind this one contract, and an axis of the
-benchmark matrix (`Object_Localization_Pipeline.md` §8).
+benchmark matrix (`object_localization_pipeline.md` §8).
 
 ---
 
@@ -87,7 +87,7 @@ This convenience is also a trap: code that works on raw sim depth will break
 on raw real depth. The backend abstraction must route *real* through the align
 filter and *sim* straight through, while consumers see one topic-level
 contract. Divergences to keep in mind (details in
-`Object_Localization_Pipeline.md` §2):
+`object_localization_pipeline.md` §2):
 
 | | Sim | Real |
 |---|---|---|

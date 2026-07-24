@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Aligned depth frame producer (object_localization_documentation/depth_based_path.md).
+"""Aligned depth frame producer (object_localization_documentation/aligned_depth.md).
 
 Publishes the "aligned depth frame" contract: a float32 depth image in meters
 on the color camera's pixel grid, stamped with the frame it is aligned to,
