@@ -2,14 +2,16 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
-from sensor_msgs.msg import Image
+from sensor_msgs.msg import CameraInfo, Image
 from std_msgs.msg import Header
 
 from ridgeback_autonomy.perception.aligned_depth_node import (
     MonocularDepthSource,
+    camera_info_matches_depth,
     decode_color_to_rgb,
     decode_depth_to_meters,
     encode_depth_message,
+    throttle_remainder,
 )
 
 
@@ -158,3 +160,117 @@ def test_encode_depth_message_round_trip() -> None:
     assert msg.step == depth.shape[1] * 4
     assert msg.header.frame_id == 'camera_0_color_optical'
     np.testing.assert_array_equal(decode_depth_to_meters(msg), depth)
+
+
+def test_decode_color_honours_row_padding() -> None:
+    # A real driver may pad rows (step > width*channels); the decoder must strip
+    # the padding, not choke on it (DP-7, the color twin of C12).
+    height, width, channels, pad_bytes = 2, 2, 3, 4
+    pixels = np.arange(height * width * channels, dtype=np.uint8).reshape(
+        height, width, channels)
+    buf = bytearray()
+    for row in pixels:
+        buf += row.tobytes() + bytes(pad_bytes)
+
+    def padded(encoding: str) -> Image:
+        msg = Image()
+        msg.encoding = encoding
+        msg.height, msg.width = height, width
+        msg.step = width * channels + pad_bytes
+        msg.data = bytes(buf)
+        return msg
+
+    np.testing.assert_array_equal(decode_color_to_rgb(padded('rgb8')), pixels)
+    np.testing.assert_array_equal(
+        decode_color_to_rgb(padded('bgr8')), pixels[:, :, ::-1])
+
+
+def test_camera_info_matches_depth_true_on_equal_grid() -> None:
+    info = CameraInfo()
+    info.height, info.width = 480, 640
+
+    assert camera_info_matches_depth((480, 640), info) is True
+
+
+def test_camera_info_matches_depth_false_on_mismatch() -> None:
+    info = CameraInfo()
+    info.height, info.width = 480, 640
+
+    assert camera_info_matches_depth((481, 640), info) is False
+    assert camera_info_matches_depth((480, 641), info) is False
+
+
+def test_throttle_remainder_uncapped_is_zero() -> None:
+    assert throttle_remainder(100.0, 100.05, 0.0) == 0.0
+
+
+def test_throttle_remainder_waits_out_the_period() -> None:
+    # 10 fps -> 0.1 s period; 0.05 s elapsed -> 0.05 s remaining.
+    assert throttle_remainder(100.0, 100.05, 10.0) == pytest.approx(0.05)
+
+
+def test_throttle_remainder_zero_once_period_elapsed() -> None:
+    assert throttle_remainder(100.0, 100.2, 10.0) == 0.0
+
+
+class _StubSource:
+    """Injected in place of a real depth producer: scripted produce(), no model."""
+
+    input_kind = 'depth'
+
+    def __init__(self) -> None:
+        self.produce_calls = 0
+        self.raise_next = False
+        self.frame = None
+
+    def produce(self, msg):
+        self.produce_calls += 1
+        if self.raise_next:
+            raise RuntimeError('simulated producer failure')
+        return self.frame
+
+
+@pytest.fixture
+def ros_context():
+    rclpy = pytest.importorskip('rclpy')
+    rclpy.init()
+    try:
+        yield
+    finally:
+        rclpy.shutdown()
+
+
+def _make_node(source):
+    from ridgeback_autonomy.perception.aligned_depth_node import AlignedDepthNode
+
+    return AlignedDepthNode(source=source)
+
+
+def _input_image() -> Image:
+    msg = Image()
+    msg.encoding = '32FC1'
+    msg.height = msg.width = 4
+    return msg
+
+
+def test_producer_worker_survives_exception(ros_context) -> None:
+    # DP-9: an unexpected produce/publish error must not propagate out of the
+    # guarded step or leave the worker unable to handle the next good frame.
+    source = _StubSource()
+    node = _make_node(source)
+    published: list = []
+    node.depth_pub.publish = lambda m: published.append(m)
+    try:
+        source.raise_next = True
+        node.run_producer_step(_input_image())  # no exception escapes
+
+        source.raise_next = False
+        header = Header()
+        header.frame_id = 'camera_0_color_optical'
+        source.frame = (np.zeros((4, 4), dtype=np.float32), header)
+        node.run_producer_step(_input_image())
+
+        assert source.produce_calls == 2
+        assert len(published) == 1
+    finally:
+        node.destroy_node()

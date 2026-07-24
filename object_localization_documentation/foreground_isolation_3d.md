@@ -40,10 +40,15 @@ The two axes worth keeping in mind when analyzing results:
 
 ## 1. Extrinsic Ground-Plane Crop (Height Filter)
 
-**Idea.** The camera's pose above the floor is *known* (height 0.85 m, pitch in
-`camera_config.json`, TF for the rest). Transform the masked points into a
-gravity-aligned frame and drop everything below `z < ε`. The floor is removed
-by prior knowledge, not estimation.
+**Idea.** The camera's pose above the floor is *known*. Transform the masked
+points into a gravity-aligned frame and drop everything below `z < ε`. The
+floor is removed by prior knowledge, not estimation. In the shipped `HeightCrop`
+(`perception/core/isolation_3d.py`) the camera height and pitch are read from
+live TF at runtime via `camera_floor_geometry` (the camera-above-base
+translation plus a fixed chassis offset, and the pitch from the rotation); the
+`CAMERA_HEIGHT_M_DEFAULT = 1.053` constant is only the static/test default. The
+legacy `camera_config.json` height of 0.85 m is deliberately left untouched and
+unused by the mask stack.
 
 **Pros**
 - Essentially free: one rigid transform (already needed anyway) plus one
@@ -70,16 +75,20 @@ R. B. Rusu, S. Cousins, *"3D is here: Point Cloud Library (PCL),"* IEEE ICRA,
 
 ## 2. Range-Band Selection (Percentile Anchor + Inlier Window)
 
-**Idea.** Sort the masked points by forward distance, anchor at a low
-percentile ("the near surface"), keep points within a fixed window around the
-anchor, discard the rest. **This is the method the repository already runs**:
-the existing `pointcloud` estimator uses a 25th-percentile forward anchor with
-a −0.10 m / +0.35 m inlier window (`compute_pointcloud_measurement` in
-`geometry.py`). It is the point-domain twin of the 2D nearest-mode histogram.
+**Idea.** Sort the masked points by distance, anchor at a low percentile ("the
+near surface"), keep points within a fixed window around the anchor, discard the
+rest. The shipped `RangeBand` (`perception/core/isolation_3d.py`) anchors on the
+**Euclidean camera-frame range** of each point (`np.linalg.norm`), keeping a
+25th-percentile anchor with a −0.10 m / +0.35 m inlier window. The legacy
+`pointcloud` estimator (`compute_pointcloud_measurement` in `geometry.py`)
+anchors on *forward* distance instead; the two are identical at zero lateral
+offset and diverge only as the object moves off the optical axis. It is the
+point-domain twin of the 2D nearest-mode histogram.
 
 **Pros**
-- Already implemented and benchmarked (MAE 0.156 m in the 70-trial sim run) —
-  the incumbent every other method must beat.
+- Already implemented and benchmarked (MAE 0.156 m in the 70-trial sim run of
+  2026-07-13; see `benchmark-results/`, figure possibly superseded by a later
+  run) — the incumbent every other method must beat.
 - A handful of NumPy lines; negligible runtime.
 - The percentile anchor is robust to a moderate fraction of nearer-than-object
   noise, which a plain minimum is not.

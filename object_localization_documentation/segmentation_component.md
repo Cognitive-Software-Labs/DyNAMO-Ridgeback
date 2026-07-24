@@ -8,8 +8,7 @@ documented in `mask_component.md`.
 
 **Code:** `perception/core/segmentation.py` (`SamBoxSegmenter`), wired into
 `g1_mask_measurement_node` behind the `mask_gate` parameter
-(`box` | `silhouette`). The implementation plan this executed is
-`segmentation_component_plan.md`.
+(`box` | `silhouette`).
 
 **History note (2026-07-17):** Florence-2 was evaluated as a candidate
 replacement main path (single model for detection + segmentation, motivated by
@@ -44,7 +43,7 @@ across the full 1.5–5.5 m benchmark grid against `facebook/sam-vit-base` and
 The selection criterion was **silhouette fidelity on the G1's legs**: the leg
 gap must come out `False` — that gap is precisely what the tight mask buys
 polar profiling (a rect mask admits through-the-gap background rays,
-`Object_Localization_Pipeline.md` §5). All three candidates passed the leg-gap
+`object_localization_pipeline.md` §5). All three candidates passed the leg-gap
 check visually; SlimSAM won on stable quality at the lowest footprint. Latency
 is well inside the 5 FPS detector cadence. The model stays a public parameter
 (`segmentation_model`) because the real robot's compute budget is undecided;
@@ -53,7 +52,7 @@ checkpoint's `model_type`).
 
 The specific detector-plus-segmenter stack (OWLv2 + SlimSAM) is an
 **implementation detail of this component, not an architectural fixture** —
-`Object_Localization_Pipeline.md` §2 shows only the abstract segmentation
+`object_localization_pipeline.md` §2 shows only the abstract segmentation
 front-end, and nothing downstream of the mask interface depends on the choice.
 It is a **swappable, benchmarkable axis**: multiple segmentation implementations
 are planned to be compared on the same three metrics used above —
@@ -88,7 +87,13 @@ the SAM 3 spike passed its gates and the adoption question is open (§7.2).
   frame-encode plus N light decodes.
 - **Multimask output → highest predicted IoU.** SAM returns several mask
   options per prompt with predicted-IoU scores; the highest-scoring option is
-  binarized to the `H×W` boolean blob on the color grid.
+  binarized to the `H×W` boolean blob on the color grid. That argmax option is
+  then held to a **predicted-IoU floor**: if its score is below the floor it is
+  dropped to `None` (→ that detection skips, no-fallback — §3), rather than
+  passing a low-confidence mask downstream. The floor is a node parameter,
+  `segmentation_min_iou` (default 0.5). Predicted IoU rates mask *boundary*
+  quality, not whether the mask is the robot, so the floor drops
+  low-quality/uncertain masks but cannot catch a crisp wrong-object mask.
 
 ## 3. Output semantics
 
@@ -97,10 +102,12 @@ the SAM 3 spike passed its gates and the adoption question is open (§7.2).
   `mask_from_array(blob, MaskPrecision.TIGHT)` — the module returns plain
   arrays and knows nothing about producers or consumers, mirroring
   `rasterize_*` on the rect side.
-- **Empty segmentation → `None` → trial drops.** An empty winning mask yields
-  `None` for that detection; the node leaves the detection's path fields NaN.
-  No fallback to a rect mask — silently rasterizing would mislabel the
-  benchmark row (the run *is* the gate axis).
+- **Empty or below-floor segmentation → `None` → trial drops.** A winning mask
+  that is empty **or** whose predicted IoU falls below the floor
+  (`segmentation_min_iou`, default 0.5 — §2) yields `None` for that detection;
+  the node leaves the detection's path fields NaN. No fallback to a rect mask —
+  silently rasterizing would mislabel the benchmark row (the run *is* the gate
+  axis).
 
 ## 4. Execution host: inside `g1_mask_measurement_node`
 

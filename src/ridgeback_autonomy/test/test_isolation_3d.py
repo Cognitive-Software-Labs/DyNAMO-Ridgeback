@@ -1,16 +1,48 @@
 from __future__ import annotations
 
+import math
+
 import numpy as np
+import pytest
 
 from ridgeback_autonomy.perception.core.isolation_3d import (
+    BASE_ABOVE_FLOOR_M_DEFAULT,
+    CAMERA_HEIGHT_M_DEFAULT,
     ISOLATION_3D_DEFAULT,
     ISOLATION_3D_RECIPES,
     Chain,
     HeightCrop,
     RangeBand,
+    build_isolation_3d,
+    camera_floor_geometry,
     mad_outlier_removal,
     point_ranges,
 )
+
+
+LEVEL_OPTICAL_TO_BASE = np.array([
+    [0.0, 0.0, 1.0],
+    [-1.0, 0.0, 0.0],
+    [0.0, -1.0, 0.0],
+])
+
+
+def _pitched_optical_to_base(pitch_deg: float) -> np.ndarray:
+    """A level optical->base rotation tilted about the optical X axis.
+
+    Built so ``camera_floor_geometry`` recovers ``pitch_deg`` back out of it.
+    """
+
+    beta = math.radians(-pitch_deg)
+    # Cross-product matrix of the optical X axis expressed in base = (0, -1, 0).
+    axis_k = np.array([
+        [0.0, 0.0, -1.0],
+        [0.0, 0.0, 0.0],
+        [1.0, 0.0, 0.0],
+    ])
+    rot_about_optical_x = (
+        np.eye(3) + math.sin(beta) * axis_k + (1.0 - math.cos(beta)) * (axis_k @ axis_k))
+    return rot_about_optical_x @ LEVEL_OPTICAL_TO_BASE
 
 
 def object_points() -> np.ndarray:
@@ -112,3 +144,55 @@ def test_registry_default_is_the_full_chain() -> None:
     assert isinstance(default, Chain)
     assert isinstance(default.steps[0], HeightCrop)
     assert isinstance(default.steps[1], RangeBand)
+
+
+def test_camera_floor_geometry_level_mount() -> None:
+    # Camera 1.027 m above the base origin; the base origin sits the chassis
+    # offset above the floor, so the camera is 1.053 m above the floor.
+    height, pitch = camera_floor_geometry(
+        LEVEL_OPTICAL_TO_BASE, np.array([0.011, 0.018, 1.027]),
+        BASE_ABOVE_FLOOR_M_DEFAULT)
+
+    assert height == pytest.approx(1.053)
+    assert pitch == pytest.approx(0.0, abs=1e-9)
+
+
+def test_camera_floor_geometry_recovers_pitch() -> None:
+    _, pitch = camera_floor_geometry(
+        _pitched_optical_to_base(12.0), np.array([0.0, 0.0, 1.0]), 0.0)
+
+    assert pitch == pytest.approx(12.0)
+
+
+def test_build_isolation_3d_parameterizes_heightcrop() -> None:
+    chain = build_isolation_3d('height_crop_range_band', camera_height_m=1.2, pitch_deg=3.0)
+
+    assert isinstance(chain, Chain)
+    height_crop, range_band = chain.steps
+    assert isinstance(height_crop, HeightCrop)
+    assert height_crop.camera_height_m == 1.2
+    assert height_crop.pitch_deg == 3.0
+    assert isinstance(range_band, RangeBand)
+
+    lone = build_isolation_3d('height_crop', camera_height_m=1.2, pitch_deg=3.0)
+    assert isinstance(lone, HeightCrop)
+    assert lone.camera_height_m == 1.2
+
+
+def test_build_isolation_3d_rejects_unknown_name() -> None:
+    with pytest.raises(ValueError, match='Unknown isolation_3d recipe'):
+        build_isolation_3d('nope', camera_height_m=1.0, pitch_deg=0.0)
+
+
+def test_tf_derived_crop_matches_static_at_measured_pose() -> None:
+    # At the current level pose the TF-derived height reproduces the static
+    # default, so the crop keeps exactly the same points -- no behavior change.
+    translation = np.array(
+        [0.011, 0.018, CAMERA_HEIGHT_M_DEFAULT - BASE_ABOVE_FLOOR_M_DEFAULT])
+    height, pitch = camera_floor_geometry(
+        LEVEL_OPTICAL_TO_BASE, translation, BASE_ABOVE_FLOOR_M_DEFAULT)
+    derived = build_isolation_3d('height_crop_range_band', height, pitch)
+    static = ISOLATION_3D_RECIPES[ISOLATION_3D_DEFAULT]
+
+    points = np.concatenate((object_points(), floor_points(), wall_points()))
+    np.testing.assert_array_equal(derived(points), static(points))

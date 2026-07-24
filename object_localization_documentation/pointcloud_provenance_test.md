@@ -6,6 +6,10 @@ realsense-ros pointcloud filter) or a **deprojected** cloud our own code builds
 from the aligned depth frame. Is there any difference in *accuracy* or
 *processing cost*? If not, should the published variant be kept at all?
 
+> Resolved by §7: euclidean reconstruction deprojects masked depth pixels in
+> code and never consumes a published cloud, so this question no longer gates
+> the path — the material below is retained as the supporting evidence.
+
 **Status:** script implemented at `~/tmp/cloud_provenance_test.py` (outside the
 repo, never committed — delete after §6 is filled). Run with the sim + detector
 up and the workspace sourced:
@@ -116,7 +120,7 @@ cannot answer the real-robot grid question (published real cloud lives on the
 depth grid; the mask lives on the color grid). The real-hardware comparison is
 a separate session with its own prerequisites (`pointcloud.enable`,
 `ordered_pc` passthrough, grid verification) — see
-`Object_Localization_Pipeline.md`.
+`object_localization_pipeline.md`.
 
 ---
 
@@ -317,15 +321,15 @@ real-hardware published cloud lives on the wrong grid for mask indexing.
 
 Consequences applied to the other docs:
 
-- `depth_based_B.md` — deprojected is the sole input; the published-variant
+- `euclidean_reconstruction.md` — deprojected is the sole input; the published-variant
   caveats collapse into a historical note pointing here.
-- `Object_Localization_Pipeline.md` — the organized point cloud is no longer
+- `object_localization_pipeline.md` — the organized point cloud is no longer
   listed as a pipeline input; "euclidean reconstruction has no input on hardware" is void (euclidean reconstruction
   needs only the aligned depth frame there).
 - The `pointcloud.enable` / `ordered_pc` config gap on the real robot is
   **downgraded from blocker to irrelevant-for-the-paths** (matters only if
   someone wants the RViz debug cloud). The config gap that *does* matter on
-  hardware is `align_depth.enable` (`depth_based_path.md` §2.1).
+  hardware is `align_depth.enable` (`aligned_depth.md` §2.1).
 - The planned real-hardware published-vs-deprojected comparison is **cancelled**
   — with no production role for the published cloud there is nothing left to
   compare; hardware validation effort moves to the aligned-depth topic itself

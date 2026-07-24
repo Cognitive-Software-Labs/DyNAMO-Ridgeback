@@ -69,7 +69,6 @@ def test_two_legs_merge_drops_parallax_wall() -> None:
     assert result is not None
     # Both legs merged: X medians to the body center, Z to the leg depth.
     assert np.allclose(result.xz_optical, (0.0, LEG_Z_M), atol=1e-6)
-    assert LEG_Z_M <= result.distance_m <= LEG_Z_M + 0.01
     # Exactly the 9-beam legs survive (both sides); every wall beam is gone.
     assert result.foreground_points.shape == (18, 2)
     assert result.ray_count > 18  # wall beams did enter the mask select
@@ -99,7 +98,7 @@ def test_unequal_legs_median_stays_on_object() -> None:
 
 def test_tight_tag_runs_identical_recovery() -> None:
     # Same selector, tight tag: no fork exists in polar profiling, so the result is
-    # bit-identical to the rect run (lidar_based_path.md Section 2.5).
+    # bit-identical to the rect run (polar_profiling.md Section 2.5).
     points = two_legs_profile()
     valid = np.ones(points.shape[0], dtype=bool)
     rect = rasterize_bbox(MASK_BBOX, HEIGHT, WIDTH)
@@ -110,7 +109,6 @@ def test_tight_tag_runs_identical_recovery() -> None:
 
     assert rect_result is not None and tight_result is not None
     assert np.array_equal(rect_result.xz_optical, tight_result.xz_optical)
-    assert rect_result.distance_m == tight_result.distance_m
     assert rect_result.ray_count == tight_result.ray_count
 
 

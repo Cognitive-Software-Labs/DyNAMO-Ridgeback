@@ -1,4 +1,4 @@
-"""Euclidean reconstruction -- deproject-then-aggregate (``depth_based_B.md``).
+"""Euclidean reconstruction -- deproject-then-aggregate (``euclidean_reconstruction.md``).
 
 The point-domain localization path: deproject the valid masked pixels of the
 aligned depth frame into camera-optical-frame points, isolate the foreground
@@ -11,11 +11,12 @@ behavior: ``tight`` takes a statistical outlier pass (median +/- k*MAD on
 range); ``rect`` runs a pluggable 3D recipe (``isolation_3d.py``, default:
 height crop then range band).
 
-Reduction convention: coordinate = centroid of the foreground points;
-distance = median camera-frame range. Both read the same foreground set, so
-they agree by construction. Runs per mask (1:1:1 hierarchy,
-``mask_component.md`` Section 6.1); a mask with too few valid points is
-skipped by returning ``None``.
+The reduced coordinate is the centroid of the foreground points; the
+published distance is derived from that coordinate downstream (planar
+projection into the base frame), so coordinate and distance stay
+self-consistent by resting on the same point. Runs per mask (1:1:1
+hierarchy, ``mask_component.md`` Section 6.1); a mask with too few valid
+points is skipped by returning ``None``.
 """
 
 from __future__ import annotations
@@ -37,7 +38,6 @@ from ridgeback_autonomy.perception.core.isolation_3d import (
     ISOLATION_3D_DEFAULT,
     ISOLATION_3D_RECIPES,
     mad_outlier_removal,
-    point_ranges,
 )
 from ridgeback_autonomy.perception.core.mask import Mask, MaskPrecision
 
@@ -50,7 +50,6 @@ class EuclideanReconstructionResult:
     """One euclidean reconstruction localization plus the foreground set it was reduced from."""
 
     xyz_optical: np.ndarray  # (3,) centroid, camera optical frame, meters
-    distance_m: float  # median camera-frame range of the foreground points
     foreground_points: np.ndarray  # (M, 3) by-product (extent, orientation, ...)
 
 
@@ -92,11 +91,10 @@ def localize_euclidean_reconstruction(
     if foreground.shape[0] < min_valid_points:
         return None
 
-    # 4. REDUCE: centroid for the coordinate, median range for the distance.
+    # 4. REDUCE: the coordinate is the foreground centroid. A robust median
+    # range is recoverable from foreground_points if a consumer ever needs one.
     centroid = foreground.mean(axis=0)
-    distance_m = float(np.median(point_ranges(foreground)))
     return EuclideanReconstructionResult(
         xyz_optical=centroid,
-        distance_m=distance_m,
         foreground_points=foreground,
     )

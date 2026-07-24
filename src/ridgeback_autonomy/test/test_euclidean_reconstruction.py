@@ -39,8 +39,6 @@ def test_rect_mask_default_chain_recovers_object_centroid() -> None:
 
     assert result is not None
     assert np.allclose(result.xyz_optical, OBJECT_CENTROID_XYZ)
-    # Median camera-frame range of a plate at Z = 2 m is barely above 2 m.
-    assert 2.0 <= result.distance_m <= 2.03
     # By-product: exactly the object's points survive the chain.
     assert result.foreground_points.shape == (400, 3)
 
@@ -71,7 +69,6 @@ def test_tight_mask_mad_pass_drops_edge_bleed() -> None:
     assert result.foreground_points[:, 2].max() < 3.0
     assert 300 <= result.foreground_points.shape[0] <= 395
     assert np.allclose(result.xyz_optical, OBJECT_CENTROID_XYZ, atol=0.02)
-    assert abs(result.distance_m - OBJECT_DEPTH_M) < 0.03
 
 
 def test_all_invalid_depth_returns_none() -> None:

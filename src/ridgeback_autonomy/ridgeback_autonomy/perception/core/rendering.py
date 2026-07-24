@@ -1,8 +1,18 @@
 from __future__ import annotations
 
+import math
+from dataclasses import dataclass
+
 import cv2
 import numpy as np
 
+from ridgeback_autonomy.benchmarking.estimators import (
+    DEPTH_PATH_ESTIMATORS,
+    ESTIMATOR_FIELD_KEYS,
+    ESTIMATOR_LABELS,
+    MASK_GATE_SILHOUETTE,
+    PUBLIC_ESTIMATOR_ORDER,
+)
 from ridgeback_autonomy.common.models import DetectionBatch
 from ridgeback_autonomy.perception.core.geometry import focus_bbox
 from ridgeback_autonomy.perception.core.mask import (
@@ -11,107 +21,285 @@ from ridgeback_autonomy.perception.core.mask import (
     masked_rgb,
     rasterize_batch,
 )
+from ridgeback_autonomy.perception.core.polar_profiling import (
+    merge_near_band,
+    segment_range_profile,
+)
+
+
+# Panel kinds. A run renders only the ones its selected estimators need, so the
+# view matches the config instead of a fixed grid.
+PANEL_RGB = 'rgb'
+PANEL_SENSOR_DEPTH = 'sensor_depth'
+PANEL_MONO_DEPTH = 'depth_anything'
+PANEL_ALIGNED_DEPTH = 'aligned_depth'
+PANEL_BOX_MASK = 'box_mask'
+PANEL_SILHOUETTE = 'silhouette'
+PANEL_LIDAR = 'lidar'
+
+# Estimators that report a full planar position (lateral/forward/distance); the
+# rest report distance only. Field names are ``{estimator}_lateral_m`` etc.,
+# except the distance-only pair whose keys live in ``ESTIMATOR_FIELD_KEYS``.
+POSITION_ESTIMATORS = frozenset({
+    'rgb',
+    'pointcloud',
+    'lidar',
+    'projective_ranging',
+    'euclidean_reconstruction',
+    'polar_profiling',
+})
+
+
+@dataclass(frozen=True)
+class PanelSpec:
+    kind: str
+    title: str
+
+
+def select_panels(estimators, depth_source: str, mask_gate: str) -> list[PanelSpec]:
+    """The panels a run needs, in display order, driven by its estimator set.
+
+    RGB is always the anchor. Each further panel appears only when an estimator
+    that consumes its data is selected: the aligned-depth panel and the mask
+    (box or silhouette) panel are tied to the depth mask paths, and the LiDAR /
+    polar panel to polar profiling. The mask gate picks box vs silhouette.
+    """
+
+    selected = set(estimators)
+    panels: list[PanelSpec] = [PanelSpec(PANEL_RGB, 'RGB Detection')]
+
+    if 'sensor_depth' in selected:
+        panels.append(PanelSpec(PANEL_SENSOR_DEPTH, 'Sensor Depth'))
+    if 'depth_anything' in selected:
+        panels.append(PanelSpec(PANEL_MONO_DEPTH, 'Depth-Anything'))
+    if selected & DEPTH_PATH_ESTIMATORS:
+        panels.append(PanelSpec(PANEL_ALIGNED_DEPTH, f'Aligned Depth ({depth_source})'))
+        if mask_gate == MASK_GATE_SILHOUETTE:
+            panels.append(PanelSpec(PANEL_SILHOUETTE, 'Silhouette Mask'))
+        else:
+            panels.append(PanelSpec(PANEL_BOX_MASK, 'Box Mask'))
+    if 'polar_profiling' in selected:
+        # Name the panel after the selected lidar-family estimator; only when
+        # the legacy lidar row is also selected does it carry both names.
+        title = 'LiDAR / Polar' if 'lidar' in selected else ESTIMATOR_LABELS['polar_profiling']
+        panels.append(PanelSpec(PANEL_LIDAR, title))
+
+    return panels
+
+
+def pack_panels(panels: list[np.ndarray], max_cols: int = 3) -> np.ndarray:
+    """Tile equal-size panels into a tidy grid, black-padding the last row.
+
+    ``ceil(N / cols)`` rows by ``cols = min(max_cols, N)`` columns, so 1..N
+    panels pack without a standing empty cell except the last row's remainder.
+    """
+
+    if not panels:
+        raise ValueError('pack_panels needs at least one panel')
+
+    count = len(panels)
+    cols = min(max_cols, count)
+    rows = math.ceil(count / cols)
+    blank = np.zeros_like(panels[0])
+    cells = list(panels) + [blank] * (rows * cols - count)
+    row_images = [np.hstack(cells[row * cols:(row + 1) * cols]) for row in range(rows)]
+    return np.vstack(row_images)
+
+
+def active_label_lines(detection, estimators) -> list[str]:
+    """One label line per selected estimator, in ``PUBLIC_ESTIMATOR_ORDER``.
+
+    Position-capable estimators render lateral/forward/distance; the rest render
+    distance only. A missing field reads as ``NA`` (no estimate for this frame).
+    """
+
+    selected = set(estimators)
+    lines: list[str] = []
+    for estimator in PUBLIC_ESTIMATOR_ORDER:
+        if estimator not in selected:
+            continue
+        label = ESTIMATOR_LABELS[estimator]
+        if estimator in POSITION_ESTIMATORS:
+            lines.append(format_position_line(
+                label,
+                getattr(detection, f'{estimator}_lateral_m', None),
+                getattr(detection, f'{estimator}_forward_m', None),
+                getattr(detection, f'{estimator}_distance_m', None),
+            ))
+        else:
+            lines.append(format_distance_line(
+                label, getattr(detection, ESTIMATOR_FIELD_KEYS[estimator], None)))
+    return lines
+
+
+def format_position_line(
+    prefix: str,
+    lateral_m: float | None,
+    forward_m: float | None,
+    distance_m: float | None,
+) -> str:
+    if lateral_m is None or forward_m is None or distance_m is None:
+        return f'{prefix} d=NA'
+    return f'{prefix} x={lateral_m:+.2f} z={forward_m:+.2f} d={distance_m:.2f}m'
+
+
+def format_distance_line(prefix: str, distance_m: float | None) -> str:
+    if distance_m is None:
+        return f'{prefix} d=NA'
+    return f'{prefix} d={distance_m:.2f}m'
 
 
 class RgbdOverlayRenderer:
-    def __init__(self, depth_max_meters: float) -> None:
+    """Assembles the per-frame overlay grid for the configured estimator set."""
+
+    def __init__(
+        self,
+        depth_max_meters: float,
+        estimators=PUBLIC_ESTIMATOR_ORDER,
+        depth_source: str = 'stereoscopic',
+        mask_gate: str = 'box',
+    ) -> None:
         self.depth_max_meters = depth_max_meters
+        self.estimators = tuple(estimators)
+        self.depth_source = depth_source
+        self.mask_gate = mask_gate
+        self.panels = select_panels(self.estimators, depth_source, mask_gate)
 
     def render(
         self,
         frame: np.ndarray,
-        sensor_depth_meters: np.ndarray | None,
-        mono_depth_meters: np.ndarray | None,
         batch: DetectionBatch,
-        sensor_depth_warning: str | None,
-        mono_depth_warning: str | None,
+        *,
+        sensor_depth_meters: np.ndarray | None = None,
+        mono_depth_meters: np.ndarray | None = None,
+        aligned_depth_meters: np.ndarray | None = None,
         published_mask: np.ndarray | None = None,
+        scan_uv: np.ndarray | None = None,
+        scan_in_view: np.ndarray | None = None,
+        scan_points_optical: np.ndarray | None = None,
     ) -> np.ndarray:
-        color_panel = frame.copy()
-        sensor_depth_panel = self.make_depth_panel(frame.shape[:2], sensor_depth_meters)
-        mono_depth_panel = self.make_depth_panel(frame.shape[:2], mono_depth_meters)
+        images = [
+            self.build_panel(
+                spec, frame, batch,
+                sensor_depth_meters=sensor_depth_meters,
+                mono_depth_meters=mono_depth_meters,
+                aligned_depth_meters=aligned_depth_meters,
+                published_mask=published_mask,
+                scan_uv=scan_uv,
+                scan_in_view=scan_in_view,
+                scan_points_optical=scan_points_optical,
+            )
+            for spec in self.panels
+        ]
+        return pack_panels(images)
 
-        self.draw_panel_title(color_panel, 'RGB Detection')
-        self.draw_panel_title(sensor_depth_panel, 'Sensor Depth')
-        self.draw_panel_title(mono_depth_panel, 'Depth-Anything')
+    def build_panel(
+        self,
+        spec: PanelSpec,
+        frame: np.ndarray,
+        batch: DetectionBatch,
+        *,
+        sensor_depth_meters,
+        mono_depth_meters,
+        aligned_depth_meters,
+        published_mask,
+        scan_uv,
+        scan_in_view,
+        scan_points_optical,
+    ) -> np.ndarray:
+        if spec.kind == PANEL_RGB:
+            panel = frame.copy()
+            self.annotate_detections(panel, batch, draw_labels=True)
+        elif spec.kind == PANEL_SENSOR_DEPTH:
+            panel = self.make_depth_panel(frame.shape[:2], sensor_depth_meters)
+            self.annotate_detections(panel, batch, draw_labels=False)
+        elif spec.kind == PANEL_MONO_DEPTH:
+            panel = self.make_depth_panel(frame.shape[:2], mono_depth_meters)
+            self.annotate_detections(panel, batch, draw_labels=False)
+        elif spec.kind == PANEL_ALIGNED_DEPTH:
+            panel = self.make_depth_panel(frame.shape[:2], aligned_depth_meters)
+            self.annotate_detections(panel, batch, draw_labels=False)
+        elif spec.kind == PANEL_BOX_MASK:
+            panel = self.make_box_mask_panel(frame, batch)
+        elif spec.kind == PANEL_SILHOUETTE:
+            panel = self.make_silhouette_mask_panel(frame, published_mask)
+        elif spec.kind == PANEL_LIDAR:
+            panel = self.make_lidar_panel(
+                frame, batch, published_mask, scan_uv, scan_in_view, scan_points_optical)
+        else:
+            panel = np.zeros_like(frame)
 
-        # Two mask panels, one per front-end: the rect union derived from the
-        # detection boxes at render time, and the published silhouette
-        # artifact (the tight mask downstream actually consumed). Both built
-        # from the clean RGB frame, not the annotated color_panel, so they
-        # show the real masked content. They form a second row below the
-        # camera panels.
-        box_mask_panel = self.make_box_mask_panel(frame, batch)
-        silhouette_panel = self.make_silhouette_mask_panel(frame, published_mask)
+        self.draw_panel_title(panel, spec.title)
+        if not batch.detected and spec.kind in (
+                PANEL_RGB, PANEL_SENSOR_DEPTH, PANEL_MONO_DEPTH, PANEL_ALIGNED_DEPTH):
+            cv2.putText(panel, 'No G1 detected', (20, 100),
+                        cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 0, 255), 2, cv2.LINE_AA)
+        return panel
 
-        if sensor_depth_warning:
-            cv2.putText(sensor_depth_panel, sensor_depth_warning, (20, 62),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2, cv2.LINE_AA)
-        if mono_depth_warning:
-            cv2.putText(mono_depth_panel, mono_depth_warning, (20, 62),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2, cv2.LINE_AA)
-
+    def annotate_detections(
+        self,
+        panel: np.ndarray,
+        batch: DetectionBatch,
+        *,
+        draw_labels: bool,
+    ) -> None:
         if not batch.detected:
-            for panel in (color_panel, sensor_depth_panel, mono_depth_panel):
-                cv2.putText(panel, 'No G1 detected', (20, 100),
-                            cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 0, 255), 2, cv2.LINE_AA)
-            return self.stack_panel_grid(
-                (color_panel, sensor_depth_panel, mono_depth_panel),
-                (box_mask_panel, silhouette_panel))
-
+            return
         for index, detection in enumerate(batch.detections):
             x1, y1, x2, y2 = detection.bbox_xyxy
-            label_lines = [f'G1 #{index + 1} ({detection.score:.0%})']
-            label_lines.append(
-                self.format_position_line(
-                    'RGB',
-                    detection.rgb_lateral_m,
-                    detection.rgb_forward_m,
-                    detection.rgb_distance_m,
-                )
-            )
-            label_lines.append(self.format_distance_line('Depth', detection.sensor_depth_distance_m))
-            label_lines.append(self.format_distance_line('Mono', detection.mono_depth_distance_m))
-            label_lines.append(
-                self.format_position_line(
-                    'Cloud',
-                    detection.pointcloud_lateral_m,
-                    detection.pointcloud_forward_m,
-                    detection.pointcloud_distance_m,
-                )
-            )
-            label_lines.append(
-                self.format_position_line(
-                    'LiDAR',
-                    detection.lidar_lateral_m,
-                    detection.lidar_forward_m,
-                    detection.lidar_distance_m,
-                )
-            )
+            cv2.rectangle(panel, (x1, y1), (x2, y2), (0, 255, 0), 2)
+            focus = detection.focus_bbox_xyxy or focus_bbox(detection.bbox_xyxy)
+            if focus is not None:
+                fx1, fy1, fx2, fy2 = focus
+                cv2.rectangle(panel, (fx1, fy1), (fx2, fy2), (0, 200, 255), 2)
+            if draw_labels:
+                lines = [f'G1 #{index + 1} ({detection.score:.0%})']
+                lines.extend(active_label_lines(detection, self.estimators))
+                self.draw_label_block(panel, x1, y1, lines, (0, 255, 0))
 
-            for panel in (color_panel, sensor_depth_panel, mono_depth_panel):
-                cv2.rectangle(panel, (x1, y1), (x2, y2), (0, 255, 0), 2)
-                focus = detection.focus_bbox_xyxy or focus_bbox(detection.bbox_xyxy)
-                if focus is not None:
-                    fx1, fy1, fx2, fy2 = focus
-                    cv2.rectangle(panel, (fx1, fy1), (fx2, fy2), (0, 200, 255), 2)
-                self.draw_label_block(panel, x1, y1, label_lines, (0, 255, 0))
+    def make_lidar_panel(
+        self,
+        frame: np.ndarray,
+        batch: DetectionBatch,
+        published_mask: np.ndarray | None,
+        scan_uv: np.ndarray | None,
+        scan_in_view: np.ndarray | None,
+        scan_points_optical: np.ndarray | None,
+    ) -> np.ndarray:
+        panel = frame.copy()
+        self.annotate_detections(panel, batch, draw_labels=False)
+        highlight = None
+        if scan_uv is not None and scan_points_optical is not None:
+            select_mask = self.lidar_select_mask(frame.shape[:2], batch, published_mask)
+            highlight = polar_highlight_beams(
+                scan_uv, scan_in_view, scan_points_optical, select_mask)
+        draw_scan_points(panel, scan_uv, scan_in_view, highlight)
+        return panel
 
-        return self.stack_panel_grid(
-            (color_panel, sensor_depth_panel, mono_depth_panel),
-            (box_mask_panel, silhouette_panel))
+    def lidar_select_mask(
+        self,
+        color_shape,
+        batch: DetectionBatch,
+        published_mask: np.ndarray | None,
+    ) -> np.ndarray | None:
+        """The boolean selector polar profiling would use: the silhouette union
+        when it is available, else the rasterized detection boxes."""
+
+        if (self.mask_gate == MASK_GATE_SILHOUETTE
+                and published_mask is not None
+                and published_mask.shape == tuple(color_shape)):
+            return published_mask.astype(bool)
+        if not batch.detected:
+            return None
+        mask = rasterize_batch(batch)
+        if mask.data.shape == tuple(color_shape):
+            return mask.data
+        return None
 
     def stack_panel_grid(self, top_panels, bottom_panels) -> np.ndarray:
-        """Stack the camera row over the mask row, black-padding the short row."""
+        """Retained for callers still passing explicit rows: pack them together."""
 
-        top_row = np.hstack(top_panels)
-        bottom_row = np.hstack(bottom_panels)
-        if bottom_row.shape[1] < top_row.shape[1]:
-            filler = np.zeros(
-                (bottom_row.shape[0], top_row.shape[1] - bottom_row.shape[1], 3),
-                dtype=bottom_row.dtype)
-            bottom_row = np.hstack((bottom_row, filler))
-        return np.vstack((top_row, bottom_row))
+        return pack_panels(list(top_panels) + list(bottom_panels), max_cols=len(top_panels))
 
     def normalize_depth(self, image: np.ndarray) -> np.ndarray:
         valid = np.isfinite(image) & (image > 0.0)
@@ -141,18 +329,12 @@ class RgbdOverlayRenderer:
         return panel
 
     def make_box_mask_panel(self, frame: np.ndarray, batch: DetectionBatch) -> np.ndarray:
-        # Masked RGB of the rect union derived from the detection boxes at
-        # render time: the RGB rectangle of the box(es) on black, which makes
-        # the box's background contamination directly visible.
         mask = rasterize_batch(batch)
         if mask.data.shape == frame.shape[:2]:
             panel = masked_rgb(frame, mask)
         else:
-            # Detections came from a differently sized frame; show an empty
-            # panel rather than risk an index mismatch.
             panel = np.zeros_like(frame)
 
-        self.draw_panel_title(panel, 'Box Mask')
         if not batch.detected:
             cv2.putText(panel, 'No G1 detected', (20, 100),
                         cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 0, 255), 2, cv2.LINE_AA)
@@ -163,11 +345,6 @@ class RgbdOverlayRenderer:
         frame: np.ndarray,
         published_mask: np.ndarray | None,
     ) -> np.ndarray:
-        # Masked RGB of the published silhouette artifact (`debug/g1/mask`) --
-        # exactly the tight mask downstream consumed for this stamp. Only the
-        # silhouette gate publishes it; without an artifact (box-gate run, or
-        # the mask for this stamp never arrived) the panel says so instead of
-        # faking one.
         if published_mask is not None and published_mask.shape == frame.shape[:2]:
             mask = mask_from_array(published_mask.astype(bool), MaskPrecision.TIGHT)
             panel = masked_rgb(frame, mask)
@@ -175,8 +352,6 @@ class RgbdOverlayRenderer:
             panel = np.zeros_like(frame)
             cv2.putText(panel, 'No silhouette mask', (20, 100),
                         cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 0, 255), 2, cv2.LINE_AA)
-
-        self.draw_panel_title(panel, 'Silhouette Mask')
         return panel
 
     def draw_panel_title(self, image: np.ndarray, title: str) -> None:
@@ -225,44 +400,80 @@ class RgbdOverlayRenderer:
         for line_index, line in enumerate(lines):
             text_color = color if line_index == 0 else (245, 245, 245)
             origin = (left_x + padding_x, text_y)
-            cv2.putText(
-                image,
-                line,
-                origin,
-                font,
-                scale,
-                (0, 0, 0),
-                thickness + 3,
-                cv2.LINE_AA,
-            )
-            cv2.putText(
-                image,
-                line,
-                origin,
-                font,
-                scale,
-                text_color,
-                thickness,
-                cv2.LINE_AA,
-            )
+            cv2.putText(image, line, origin, font, scale, (0, 0, 0), thickness + 3, cv2.LINE_AA)
+            cv2.putText(image, line, origin, font, scale, text_color, thickness, cv2.LINE_AA)
             text_y += line_height
 
-    def format_position_line(
-        self,
-        prefix: str,
-        lateral_m: float | None,
-        forward_m: float | None,
-        distance_m: float | None,
-    ) -> str:
-        if lateral_m is None or forward_m is None or distance_m is None:
-            return f'{prefix:<5} d=NA'
-        return (
-            f'{prefix:<5} x={lateral_m:+.2f} '
-            f'z={forward_m:+.2f} '
-            f'd={distance_m:.2f}m'
-        )
 
-    def format_distance_line(self, prefix: str, distance_m: float | None) -> str:
-        if distance_m is None:
-            return f'{prefix:<5} d=NA'
-        return f'{prefix:<5} d={distance_m:.2f}m'
+def polar_highlight_beams(
+    scan_uv: np.ndarray,
+    scan_in_view: np.ndarray,
+    scan_points_optical: np.ndarray,
+    select_mask: np.ndarray | None,
+) -> np.ndarray:
+    """Per-beam boolean of the beams polar profiling actually reduces.
+
+    Not merely "inside the mask": the mask select also admits the far
+    background (the scan's field of view sees past the object, and by
+    perspective those far beams land near the horizon -- torso/arm height in the
+    image). Those beams are dropped by the range segmentation, so the highlight
+    applies the same nearest-range-band merge the estimator uses and marks only
+    the survivors. Assumes one near object across the mask union (the common
+    single-robot case); multiple objects at different ranges would keep only the
+    nearest band.
+    """
+
+    scan_uv = np.asarray(scan_uv, dtype=np.float64)
+    highlight = np.zeros(scan_uv.shape[0], dtype=bool)
+    if select_mask is None:
+        return highlight
+
+    beams = np.flatnonzero(np.asarray(scan_in_view, dtype=bool))
+    if beams.size == 0:
+        return highlight
+    height, width = select_mask.shape[:2]
+    u_px = np.rint(scan_uv[beams, 0]).astype(np.intp)
+    v_px = np.rint(scan_uv[beams, 1]).astype(np.intp)
+    inside_frame = (u_px >= 0) & (u_px < width) & (v_px >= 0) & (v_px < height)
+    beams = beams[inside_frame]
+    if beams.size == 0:
+        return highlight
+    in_mask = select_mask[v_px[inside_frame], u_px[inside_frame]]
+    mask_beams = beams[in_mask]
+    if mask_beams.size == 0:
+        return highlight
+
+    points = np.asarray(scan_points_optical, dtype=np.float64)[mask_beams]
+    planar_range_m = np.hypot(points[:, 0], points[:, 2])
+    runs = segment_range_profile(mask_beams, planar_range_m)
+    merged = merge_near_band(runs, planar_range_m)
+    highlight[mask_beams[merged]] = True
+    return highlight
+
+
+def draw_scan_points(
+    panel: np.ndarray,
+    scan_uv: np.ndarray | None,
+    scan_in_view: np.ndarray | None,
+    highlight: np.ndarray | None,
+) -> None:
+    """Draw the projected LiDAR points: faint gray for every in-view beam,
+    highlighted yellow for the near-band beams polar profiling reduces."""
+
+    if scan_uv is None or scan_in_view is None:
+        return
+    scan_uv = np.asarray(scan_uv, dtype=np.float64)
+    in_view = np.asarray(scan_in_view, dtype=bool)
+    highlight = (
+        np.asarray(highlight, dtype=bool) if highlight is not None
+        else np.zeros(scan_uv.shape[0], dtype=bool))
+    height, width = panel.shape[:2]
+    for index in np.flatnonzero(in_view):
+        u_px = int(round(float(scan_uv[index, 0])))
+        v_px = int(round(float(scan_uv[index, 1])))
+        if not (0 <= u_px < width and 0 <= v_px < height):
+            continue
+        selected = bool(highlight[index])
+        color = (0, 255, 255) if selected else (120, 120, 120)
+        radius = 3 if selected else 1
+        cv2.circle(panel, (u_px, v_px), radius, color, -1, cv2.LINE_AA)

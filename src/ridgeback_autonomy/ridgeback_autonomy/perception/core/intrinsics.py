@@ -1,12 +1,12 @@
 """Camera intrinsics and inverse pinhole deprojection for the localization paths.
 
 Deprojection needs the intrinsics *of the grid the frame lives on*
-(``depth_based_path.md`` Section 2.3): for an aligned depth frame that is the
+(``aligned_depth.md`` Section 2.3): for an aligned depth frame that is the
 color camera. ``intrinsics_from_camera_info`` reads them from that camera's
 ``CameraInfo`` -- no FoV constants.
 
 Frame convention: all coordinates are in the **camera optical frame** --
-X right, Y down, Z forward, meters (``Object_Localization_Pipeline.md``
+X right, Y down, Z forward, meters (``object_localization_pipeline.md``
 Section 7). The TF cross-check of axes/handedness stays an open item of the
 integration PR.
 
@@ -109,7 +109,7 @@ def deproject_masked(
     ``rows`` / ``cols`` are the pixel indices to deproject (typically
     ``np.nonzero`` of a cleaned mask). Restricting the multiply to the masked
     pixels is the production form of euclidean reconstruction's deproject step
-    (``depth_based_B.md`` Section 2.1). Returns an ``(N, 3)`` float array in
+    (``euclidean_reconstruction.md`` Section 2.1). Returns an ``(N, 3)`` float array in
     the camera optical frame.
     """
 

@@ -5,9 +5,9 @@ aligned depth frame, reads the depth at the masked pixels, reduces them to a
 single distance, and deprojects one representative pixel into a 3D point. This
 document describes projective ranging end to end. The mask object it consumes is defined in
 `mask_component.md`; how the aligned depth frame is produced (stereo alignment
-or monocular estimation) is defined in `depth_based_path.md`. This doc assumes
+or monocular estimation) is defined in `aligned_depth.md`. This doc assumes
 both contracts and does not re-describe them. Euclidean reconstruction, the point-domain sibling,
-is `depth_based_B.md`.
+is `euclidean_reconstruction.md`.
 
 ---
 
@@ -19,14 +19,14 @@ is `depth_based_B.md`.
   grid, plus its precision tag (`tight` | `rect`). See `mask_component.md`.
 - An **aligned depth frame**: a depth image that is 1:1 with the RGB pixels, so
   that depth pixel `(u, v)` is the same ray as color pixel `(u, v)`. Producing
-  this is a separate component (`depth_based_path.md`); projective ranging assumes it is
+  this is a separate component (`aligned_depth.md`); projective ranging assumes it is
   already aligned.
 
 **Output**
 
 - One coordinate `(X, Y, Z)` in the **camera optical frame**, per mask. (The
-  exact frame convention is proposed in `Object_Localization_Pipeline.md`
-  Section 7; confirmation against SDK/TF still open.)
+  downstream `base_link` planar conversion is fixed —
+  `object_localization_pipeline.md` Section 7.)
 
 Projective ranging is the cheapest path because it never builds a 3D structure — it collapses
 the masked depths to a single number and deprojects exactly one pixel.
@@ -147,6 +147,16 @@ on a depth discontinuity (object edge against far background) its `Z` is wrong
 even when the aggregated range was correct. Taking the centroid of the foreground
 pixels keeps the pixel on the object.
 
+For a **non-convex silhouette** (the `tight` branch on a legged robot) the
+centroid can itself fall in a concavity — the gap between the legs — landing on
+background rather than the object. That is safe here regardless: the deproject
+takes `Z` from the **aggregated (median) foreground depth**, never from the
+centroid pixel's own depth, so the range is decoupled from wherever the centroid
+lands. `(u, v)` only fixes the `(X, Y)` bearing, which is a body-center estimate;
+a centroid sitting in the leg gap still points at the body center. The mitigation
+is intrinsic to aggregating depth separately from choosing the representative
+pixel, so it needs no extra guard.
+
 ---
 
 ## 3. Depth-source agnostic
@@ -154,7 +164,7 @@ pixels keeps the pixel on the object.
 Projective ranging does not care *how* the aligned depth frame was produced. The same four
 steps run unchanged on RealSense stereo depth (after alignment) and on
 Depth-Anything monocular depth (after metric scaling). Both producers and the
-contract they converge to are specified in `depth_based_path.md`; the depth
+contract they converge to are specified in `aligned_depth.md`; the depth
 source is a swappable input and both are benchmarked through the identical
 path.
 
@@ -196,7 +206,7 @@ projective ranging from euclidean reconstruction:
 - **Aggregate-then-deproject (projective ranging):** collapse the masked depths to one
   number, then deproject one representative pixel. Cheap, yields a single point,
   but fragile on the choice of that pixel.
-- **Deproject-then-aggregate (euclidean reconstruction, `depth_based_B.md`):** deproject *all*
+- **Deproject-then-aggregate (euclidean reconstruction, `euclidean_reconstruction.md`):** deproject *all*
   masked pixels into 3D points first, then reduce the point set (e.g.
   centroid). Heavier, more robust, recovers full geometry.
 
@@ -207,21 +217,22 @@ is the signal to spend the extra cost and move to euclidean reconstruction.
 
 ## 6. Relationship to the current stack
 
-The repository today has a depth estimator that is close to projective ranging but not
-identical, and the differences define the work:
+Projective ranging is shipped as `perception/core/projective_ranging.py`
+(`localize_projective_ranging`). The **legacy** depth estimator is close but not
+identical, and the differences are exactly what the shipped path resolves:
 
-| Aspect | Current estimator | projective ranging target |
+| Aspect | Legacy estimator | projective ranging (shipped) |
 |--------|-------------------|---------------|
 | Region | inner "focus" crop of the box + Gaussian center weighting | the actual mask, forked on tag |
 | `rect` foreground | crop + weight (assumes the object is centered) | pluggable isolation strategy (`foreground_isolation_2d.md`) |
 | Order | deprojects every ROI pixel, averages the *distances* | aggregate depth, deproject one pixel |
 | Output | a scalar range, in the **vehicle** frame, with a front offset applied | `(X, Y, Z)` in the **camera** frame |
 
-In other words the current estimator is permanently on a `rect`-style branch,
+In other words the legacy estimator is permanently on a `rect`-style branch,
 approximates foreground recovery with a fixed crop, and emits a range rather than
-a point. Projective ranging generalizes it: replace the crop with the mask, add the tag fork,
-and emit a camera-frame coordinate without the vehicle-frame transform (which
-belongs to a later consumer/fusion stage, once the frame convention is fixed).
+a point. Projective ranging generalizes it: it replaces the crop with the mask, adds the tag fork,
+and emits a camera-frame coordinate, leaving the base-frame transform to a later
+consumer/fusion stage.
 
 ---
 
@@ -232,11 +243,24 @@ belongs to a later consumer/fusion stage, once the frame convention is fixed).
   (`perception/core/projective_ranging.py`); a sparse mask falls under the invalid-depth
   fallback below.
 - **`rect` foreground recipe** — the `rect` branch is a pluggable strategy
-  (input: depth frame + mask; output: the foreground pixel set). Choose among
-  the candidates in `foreground_isolation_2d.md` and document the thresholds,
-  then benchmark them behind the fixed contract.
-- **Coordinate frame** — confirm the camera-frame axes/handedness against the SDK
-  and TF tree (`Object_Localization_Pipeline.md` Section 7) before integration.
+  (input: depth frame + mask; output: the foreground pixel set).
+  ~~Choose among the candidates in `foreground_isolation_2d.md` and document the
+  thresholds~~ — resolved 2026-07-23: `nearest_mode_histogram` (default) and
+  `otsu` are implemented and wired in `perception/core/isolation_2d.py` with
+  their thresholds as module constants. Benchmarking the recipes against each
+  other behind the fixed contract stays open.
+- ~~**Coordinate frame**~~ — resolved 2026-07-23/24 in two parts. **(1) Downstream
+  base conversion:** the camera-optical → `base_link` planar convention is fixed and
+  applied via the full live-TF extrinsic (rotation *and* translation) at the
+  detection stamp — lateral = base +Y, left-positive (REP-103)
+  (`object_localization_pipeline.md` Section 7; the camera-family lateral-sign split
+  is documented there). **(2) Raw optical axis/handedness** (X right, Y down, Z
+  forward, assumed by `deproject_pixel`): empirically confirmed in sim — the mask
+  paths hit MAE ~0.057 m with correct left-positive lateral signs against ground
+  truth, and a flipped axis or handedness would give grossly wrong estimates, not
+  ~5 cm errors. Outstanding only as a belt-and-suspenders **RealSense-SDK/TF axis
+  cross-check on real hardware** (tracked at `perception/core/intrinsics.py`) — not
+  a suspected bug.
 - ~~**Invalid-depth fallback**~~ — resolved 2026-07-12: skip —
   `localize_projective_ranging` returns `None` when fewer than `min_valid_pixels` valid
   (or foreground) pixels remain.

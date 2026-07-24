@@ -165,25 +165,31 @@ def build_benchmark_nodes(context, *args, **kwargs):
         )
     )
 
-    if needs_camera:
-        nodes.append(
-            Node(
-                package='ridgeback_autonomy',
-                executable='g1_overlay_node',
-                name='g1_overlay',
-                namespace=namespace,
-                parameters=[{
-                    'use_sim_time': use_sim_time,
-                    'measurement_topic': CAMERA_MEASUREMENT_TOPIC,
-                    'lidar_measurement_topic': LIDAR_MEASUREMENT_TOPIC,
-                    'color_topic': color_topic,
-                    'depth_topic': depth_topic,
-                }],
-                remappings=[('/tf', 'tf'), ('/tf_static', 'tf_static')],
-                output='screen',
-                condition=launch.conditions.IfCondition(LaunchConfiguration('overlay')),
-            )
+    # The overlay follows the run: its panels and labels are built from the
+    # selected estimators, so it is useful for mask- and lidar-only runs too,
+    # not just camera runs. Gated only on the ``overlay`` flag.
+    nodes.append(
+        Node(
+            package='ridgeback_autonomy',
+            executable='g1_overlay_node',
+            name='g1_overlay',
+            namespace=namespace,
+            parameters=[{
+                'use_sim_time': use_sim_time,
+                'measurement_topic': CAMERA_MEASUREMENT_TOPIC,
+                'lidar_measurement_topic': LIDAR_MEASUREMENT_TOPIC,
+                'mask_measurement_topic': MASK_MEASUREMENT_TOPIC,
+                'color_topic': color_topic,
+                'depth_topic': depth_topic,
+                'estimators': ','.join(selected_estimators),
+                'depth_source': LaunchConfiguration('depth_source'),
+                'mask_gate': LaunchConfiguration('mask_gate'),
+            }],
+            remappings=[('/tf', 'tf'), ('/tf_static', 'tf_static')],
+            output='screen',
+            condition=launch.conditions.IfCondition(LaunchConfiguration('overlay')),
         )
+    )
 
     nodes.append(
         Node(

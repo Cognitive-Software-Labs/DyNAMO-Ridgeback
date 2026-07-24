@@ -15,7 +15,7 @@ The robot carries a single **Intel RealSense D435**, forward-facing, mounted at 
 **Data products we use:**
 
 1. **RGB color image** - input to detection / segmentation. Real D435: up to 1920x1080; our config requests 1280x720 @ 30 fps. Sim: rendered color frame.
-2. **Depth image** (made 1:1 with RGB) - input to projective ranging and euclidean reconstruction. Euclidean reconstruction deprojects its masked pixels into camera-frame points in code (`depth_based_B.md`; provenance decision in `pointcloud_provenance_test.md` §7) - the points are a derived, in-code representation, not a sensor product.
+2. **Depth image** (made 1:1 with RGB) - input to projective ranging and euclidean reconstruction. Euclidean reconstruction deprojects its masked pixels into camera-frame points in code (`euclidean_reconstruction.md`; provenance decision in `pointcloud_provenance_test.md` §7) - the points are a derived, in-code representation, not a sensor product.
 3. **Camera IMU - NONE.** The D435 SKU has no IMU; only the D435i does.
 
 **How depth is produced - this is where sim and real diverge:**
@@ -35,7 +35,7 @@ The robot carries a single **Intel RealSense D435**, forward-facing, mounted at 
 
 **Open config gaps on the real robot** (invisible in sim, so the sim benchmark hides them):
 
-- `align_depth.enable: true` is missing from `robot.yaml` -> no `aligned_depth_to_color` topic on hardware -> projective ranging and euclidean reconstruction have no depth input there (`depth_based_path.md` §2.1).
+- `align_depth.enable: true` is missing from `robot.yaml` -> no `aligned_depth_to_color` topic on hardware -> projective ranging and euclidean reconstruction have no depth input there (`aligned_depth.md` §2.1).
 - Stream profile keys are stale: `robot.yaml` uses `rgb_camera.profile` / `depth_module.profile`; current Clearpath / realsense-ros use `rgb_camera.color_profile` / `depth_module.depth_profile` -> the requested 1280x720 may be silently ignored. Verify against the installed driver version.
 - `config/camera_config.json` intrinsics (87° x 58°) match the real D435, **not** the sim render (71.6°) - so estimators assume the wrong FoV in sim.
 
@@ -184,13 +184,13 @@ Both converge to the same `Aligned Depth` contract (float32 meters on the color 
 All three paths consume the same mask interface and resolve to camera-frame coordinates. They differ in what 3D information they recover and in cost.
 
 ### Projective ranging — 2D depth-image route (cheapest)
-Extract depth values at the masked pixels, aggregate to a single distance, then deproject the representative pixel (centroid of the foreground pixels — `depth_based_A.md` §2.4) + aggregated depth through the intrinsics to a 3D point.
+Extract depth values at the masked pixels, aggregate to a single distance, then deproject the representative pixel (centroid of the foreground pixels — `projective_ranging.md` §2.4) + aggregated depth through the intrinsics to a 3D point.
 
 - **tight branch:** direct robust median of the masked depths.
 - **rect branch:** the masked depths are multimodal (object + background), so a plain median can land on background. Isolate the foreground first with a pluggable 2D recipe (`isolation_2d.py`; implemented: nearest-mode histogram — the default — and Otsu; catalogue in `foreground_isolation_2d.md`), *then* median.
 - **Output:** `(X, Y, Z)` from a single representative pixel.
 
-> Projective ranging's coordinate is only as good as that one representative pixel. If the centroid lands on a depth discontinuity (object edge vs. far background) the depth can be wrong even when the aggregate range was fine. The representative pixel must be the centroid of the *foreground* pixels — the isolation output on the `rect` branch, all valid masked pixels on the `tight` branch — never the raw geometric box center (`depth_based_A.md` §2.4). Both the aggregate and the centroid read the same foreground set, so they agree by construction.
+> Projective ranging's coordinate is only as good as that one representative pixel. If the centroid lands on a depth discontinuity (object edge vs. far background) the depth can be wrong even when the aggregate range was fine. The representative pixel must be the centroid of the *foreground* pixels — the isolation output on the `rect` branch, all valid masked pixels on the `tight` branch — never the raw geometric box center (`projective_ranging.md` §2.4). Both the aggregate and the centroid read the same foreground set, so they agree by construction.
 
 ### Euclidean reconstruction — 3D point-domain route (richest)
 Select the valid masked pixels, deproject only those into camera-optical-frame points (select and deproject commute, so no full organized cloud is ever materialized — the published cloud topic is never consumed, per `pointcloud_provenance_test.md`), isolate the foreground in the point domain, and take the centroid.
@@ -206,9 +206,9 @@ Independent sensor stream; rejoins the pipeline only at the mask. Convert the sc
 - **rect branch:** the wider box widens the bearing window and admits neighbors, so segment the 1D range profile, merge the runs within the range band of the nearest, and median the merged set.
 - **Output:** `(X, Z)` in the camera frame. **Y (height) is unobservable** from a single-plane LiDAR.
 
-> Polar profiling only returns points where the scan plane physically intersects the object at the LiDAR's height. A valid mask can yield zero LiDAR points if the plane passes above/below the object → the path returns `None`, which is first-class (`lidar_based_path.md` §4). In the **benchmark** a miss simply drops that row — it is never substituted with another path's answer. Any fallback routing to projective ranging / euclidean reconstruction is a **production-pipeline consumer concern only** (unresolved, deferred — §10.4), never something the benchmark does.
+> Polar profiling only returns points where the scan plane physically intersects the object at the LiDAR's height. A valid mask can yield zero LiDAR points if the plane passes above/below the object → the path returns `None`, which is first-class (`polar_profiling.md` §4). In the **benchmark** a miss simply drops that row — it is never substituted with another path's answer. Any fallback routing to projective ranging / euclidean reconstruction is a **production-pipeline consumer concern only** (unresolved, deferred — §10.4), never something the benchmark does.
 >
-> **Parallax contamination — why even the tight branch segments:** the mask is defined from the camera's viewpoint, but the LiDAR samples from a different position. A `rect` mask admits background the camera can see through gaps in the object (between the G1's legs at scan height). A `tight` mask rejects those (gap pixels are False) but still admits background the camera *cannot* see: an occluded point projects inside the silhouette by definition of occlusion — the sensors' vertical offset means a beam through the leg gap that hits the wall behind lands on *torso* pixels from the camera's higher viewpoint (full geometry in `lidar_based_path.md` §2.5). Mask membership only certifies that the *camera's* ray hits the object; it says nothing about a LiDAR point further along that ray. The zero-point fallback does not catch this (points exist, they are just wrong); segmenting the range profile and keeping only the near runs drops them. **Convention (pinned):** runs lying within a small range band of the nearest run are merged before the median. On a legged object the nearest run alone would be one leg (range = leg face, offset from body center); merging the band averages both legs.
+> **Parallax contamination — why even the tight branch segments:** the mask is defined from the camera's viewpoint, but the LiDAR samples from a different position. A `rect` mask admits background the camera can see through gaps in the object (between the G1's legs at scan height). A `tight` mask rejects those (gap pixels are False) but still admits background the camera *cannot* see: an occluded point projects inside the silhouette by definition of occlusion — the sensors' vertical offset means a beam through the leg gap that hits the wall behind lands on *torso* pixels from the camera's higher viewpoint (full geometry in `polar_profiling.md` §2.5). Mask membership only certifies that the *camera's* ray hits the object; it says nothing about a LiDAR point further along that ray. The zero-point fallback does not catch this (points exist, they are just wrong); segmenting the range profile and keeping only the near runs drops them. **Convention (pinned):** runs lying within a small range band of the nearest run are merged before the median. On a legged object the nearest run alone would be one leg (range = leg face, offset from body center); merging the band averages both legs.
 
 ---
 
@@ -226,15 +226,16 @@ Selection stays shared; the fork sits exactly where behavior genuinely diverges.
 
 ---
 
-## 7. Coordinate frame convention — **TO PIN DOWN**
+## 7. Coordinate frame convention
 
-All paths agree to emit into one camera frame, but the exact convention must be fixed before integration. Proposed default (RealSense / OpenCV optical convention, to be confirmed):
+The mask stack does not stop at a camera-frame coordinate: each path's camera-optical point is transformed to a `base_link` **planar** measurement via the live TF extrinsic at the detection stamp — `optical_to_base_planar(xyz_optical, rotation, translation, front_offset_m)`. The rotation *and* translation are the camera-optical → base extrinsics from TF, so the full mounting pose (not just pitch) is applied. The output is `(lateral_m, forward_m, distance_m)` where lateral is base **+Y, left-positive (REP-103)** and forward is base +X minus the 0.25 m robot front offset. Polar profiling runs the same transform with the optical Y component set to 0 (height is unobservable from a single plane; at zero camera pitch the substitution is exact).
 
-- **Origin:** camera optical center.
-- **Axes:** X right, Y down, Z forward (into the scene), right-handed.
-- **Units:** meters.
+The convention is **split** by estimator family, and this is deliberate:
 
-Polar profiling must be expressed in this same frame after the extrinsic transform, with Y left undefined/NaN. **Action:** confirm handedness and axis directions against the actual SDK output and the robot's TF tree.
+- The **mask-based paths** and the legacy `lidar` / `pointcloud` estimators are **left-positive** (base +Y, REP-103).
+- The **legacy camera family** — `rgb` and the legacy depth estimator, which go through `rotate_camera_to_vehicle_frame` — keep lateral = camera-optical +X, i.e. **right-positive**.
+
+A benchmark comparing a mask path against a legacy camera row must account for the flipped lateral sign.
 
 ---
 
@@ -262,10 +263,10 @@ Because every path emits in the same frame and at least `(X, Z)`, the outputs ar
 
 ## 10. Open items / TODO
 
-1. **Pin the camera-frame convention** (Section 7) — axes, handedness, units — against SDK + robot TF.
+1. ~~**Pin the camera-frame convention** (Section 7) — axes, handedness, units — against SDK + robot TF.~~ — resolved 2026-07-23 for the mask stack: paths emit `base_link` planar measurements via the live TF extrinsic (`optical_to_base_planar`), lateral left-positive (REP-103) — Section 7. The legacy camera family (`rgb` / legacy depth) still emits right-positive, so the split is documented rather than unified.
 2. **Calibration procedures:** RealSense intrinsics/extrinsics are factory-calibrated; the **camera–LiDAR extrinsic** must be calibrated and documented. Define the procedure and store the transform.
-3. **Time synchronization** between camera and LiDAR — without matched timestamps, a moving platform/object smears the LiDAR projection against the mask.
-4. **Fallback routing** for polar profiling empty returns (scan plane misses object). `None` is first-class (`lidar_based_path.md` §4): in the **benchmark** the row is dropped, never substituted. Where the `None` → projective ranging / euclidean reconstruction escalation lives is a **production-pipeline consumer concern only** (unresolved, deferred), never inside the benchmark.
+3. ~~**Time synchronization** between camera and LiDAR — without matched timestamps, a moving platform/object smears the LiDAR projection against the mask.~~ — resolved 2026-07-23 in the mask node: depth and scan are matched to the detection (mask) stamp via `StampedMessageBuffer` (depth exact-stamp; scan nearest within `scan_match_tolerance_s`), not latest-wins (`polar_profiling.md` §8, `aligned_depth.md` §1). Accurate sensor clocks/timestamping on real hardware remain a driver concern the software matching relies on.
+4. **Fallback routing** for polar profiling empty returns (scan plane misses object). `None` is first-class (`polar_profiling.md` §4): in the **benchmark** the row is dropped, never substituted. Where the `None` → projective ranging / euclidean reconstruction escalation lives is a **production-pipeline consumer concern only** (unresolved, deferred), never inside the benchmark.
 5. **Metric-scaling strategy** for Depth Anything — **decided:** the metric-trained variant (`Depth-Anything-V2-Metric-Indoor`) is implemented in `aligned_depth_node`; no calibration against stereo. Revisit only if the metric variant's absolute scale proves off in the benchmark.
 6. ~~**Build the benchmark scaffold** — enumerate the matrix rows, columns for accuracy + latency, drop in measured numbers.~~ — **Resolved 2026-07-21:** the benchmark scaffold exists and runs (`g1_distance_benchmark.launch.py` drives the matrix; measured numbers are already landing).
 7. ~~**Define the component interface signatures** in code (the mask-interface contract, the per-path recovery dispatch) so the separation is enforced, not just diagrammed.~~ — **Resolved 2026-07-21:** the in-code contracts exist — the mask interface is `Mask` / `MaskPrecision` in `perception/core/mask.py`, and the per-path recovery dispatches on the precision tag.

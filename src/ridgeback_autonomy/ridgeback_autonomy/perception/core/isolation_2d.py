@@ -1,6 +1,6 @@
 """2D foreground isolation recipes for projective ranging's ``rect`` branch.
 
-Contract (``depth_based_A.md`` Section 2.3): input the aligned depth frame and
+Contract (``projective_ranging.md`` Section 2.3): input the aligned depth frame and
 a mask, both ``H x W`` on the color grid; output the **foreground pixels** as
 an ``H x W`` boolean array -- always a subset of the valid masked pixels. An
 empty (all-``False``) result is allowed and means the recipe found no

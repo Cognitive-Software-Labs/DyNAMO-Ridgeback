@@ -84,6 +84,24 @@ def test_rect_accepts_explicit_isolation_recipe() -> None:
     assert np.allclose(result.representative_uv, OBJECT_CENTROID_UV)
 
 
+def test_rect_branch_respects_custom_depth_max() -> None:
+    # The depth cutoff must reach the isolation recipe, not only a caller-side
+    # pre-clean: an object entirely past a tightened depth_max drops out.
+    depth = np.zeros((HEIGHT, WIDTH), dtype=np.float32)  # invalid background
+    depth[OBJECT_SLICE] = 6.0                            # object plate at 6 m
+    mask = rasterize_bbox(RECT_BBOX, HEIGHT, WIDTH)
+
+    kept = localize_projective_ranging(depth, mask, INTRINSICS)
+    assert kept is not None
+    assert kept.depth_m == 6.0
+    assert kept.foreground_pixel_count == 400
+
+    # Tighten the cutoff below the object: the recipe now cleans it away and the
+    # mask is left with too few pixels, so the call returns None.
+    capped = localize_projective_ranging(depth, mask, INTRINSICS, depth_max=4.0)
+    assert capped is None
+
+
 def test_tight_mask_takes_the_median_directly() -> None:
     mask = mask_from_array(object_mask_data(), MaskPrecision.TIGHT)
 

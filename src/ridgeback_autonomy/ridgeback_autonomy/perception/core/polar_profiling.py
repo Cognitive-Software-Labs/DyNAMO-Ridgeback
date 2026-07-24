@@ -1,4 +1,4 @@
-"""Polar profiling -- project-then-segment (``lidar_based_path.md``).
+"""Polar profiling -- project-then-segment (``polar_profiling.md``).
 
 The LiDAR localization path: transform the planar scan into the camera
 optical frame, project the points onto the color grid, keep the points the
@@ -9,7 +9,7 @@ LiDAR and is not emitted.
 
 Unlike projective ranging and euclidean reconstruction there is no
 ``tight | rect`` fork: parallax lets occluded background points project inside
-even a pixel-precise mask (``lidar_based_path.md`` Section 2.5), so both tags
+even a pixel-precise mask (``polar_profiling.md`` Section 2.5), so both tags
 run the same recovery -- the tag only changes how wide the admitted window
 effectively is.
 
@@ -43,7 +43,7 @@ LIDAR_RANGE_MIN_M_DEFAULT = 0.05  # drop sub-5cm self-hits (mirrors LIDAR_MIN_RA
 LIDAR_RANGE_MAX_M_DEFAULT = 10.0  # drop far-field noise (mirrors LIDAR_MAX_METERS)
 
 # Foreground-isolation parameters -- the LiDAR analogue of the isolation_2d /
-# isolation_3d recipes (``lidar_based_path.md`` Section 2.5). They decide which
+# isolation_3d recipes (``polar_profiling.md`` Section 2.5). They decide which
 # of the masked beams are the object vs. background, so these are the knobs to
 # tune for accuracy. Each notes what it does and which way it fails.
 
@@ -61,7 +61,7 @@ RANGE_JUMP_M_DEFAULT = 0.30
 # range); too large admits parallax / neighbour background. The value is an
 # untuned starting point mirroring NEAREST_MODE_BAND_M_DEFAULT (the projective
 # ranging near-band width), not a fit to the object depth -- tuning tracked in
-# lidar_based_path.md Section 8.
+# polar_profiling.md Section 8.
 RANGE_BAND_M_DEFAULT = 0.35
 
 # Run split on a bearing gap: start a new run where the beam index gaps by
@@ -83,7 +83,6 @@ class PolarProfilingResult:
     """One polar profiling localization: a planar point in the camera optical frame."""
 
     xz_optical: np.ndarray  # (2,) X right, Z forward, meters; Y unobserved
-    distance_m: float  # median planar range of the merged near-band set
     foreground_points: np.ndarray  # (M, 2) the merged (X, Z) set, by-product
     ray_count: int  # rays that survived the mask ∩ FoV select
 
@@ -173,7 +172,7 @@ def merge_near_band(
 ) -> np.ndarray:
     """Merge the runs within a range band of the nearest run (step 2).
 
-    Convention (pinned, ``Object_Localization_Pipeline.md`` Section 5): on a
+    Convention (pinned, ``object_localization_pipeline.md`` Section 5): on a
     legged object the nearest run alone would be one leg; merging every run
     whose median range lies within ``range_band_m`` of the nearest run's
     median averages both legs in range and bearing. Returns the merged
@@ -236,14 +235,13 @@ def localize_polar_profiling(
     if merged.size < min_valid_rays:
         return None
 
-    # The merged set is the foreground set -- single source for coordinate
-    # and distance, so they agree by construction (doc Section 2.5).
+    # The merged set is the foreground. The coordinate is its per-axis median
+    # (X, Z); the published distance is derived from that coordinate downstream
+    # (planar projection), so coordinate and distance rest on the same point.
     foreground = selected[merged][:, (0, 2)]
     xz_optical = np.median(foreground, axis=0)
-    distance_m = float(np.median(planar_range_m[merged]))
     return PolarProfilingResult(
         xz_optical=xz_optical,
-        distance_m=distance_m,
         foreground_points=foreground,
         ray_count=int(beam_indices.size),
     )
