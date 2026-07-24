@@ -129,3 +129,14 @@ def test_shipped_examples_scenario_parses() -> None:
     assert 'inter_robot_occlusion_near_far' in by_id
     assert len(by_id['inter_robot_occlusion_near_far'].robots) == 2
     assert by_id['bed_occluder_single'].objects[0].model == 'hospital_bed'
+
+
+def test_shipped_full_scenario_covers_every_case_five_times() -> None:
+    scenes = load_scenarios(os.path.join(CONFIG_DIR, 'benchmark_scenarios_full.yaml'))
+
+    assert len(scenes) == 25
+    for prefix in ('single', 'multi', 'interocc', 'objclear', 'objocc'):
+        assert sum(1 for scene in scenes if scene.id.startswith(prefix)) == 5
+    # Object cases use the two authored occluder models.
+    models = {obj.model for scene in scenes for obj in scene.objects}
+    assert models == {'hospital_bed', 'privacy_curtain'}
