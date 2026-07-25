@@ -39,6 +39,9 @@ class Detection:
     polar_profiling_lateral_m: float | None = None
     polar_profiling_forward_m: float | None = None
     polar_profiling_distance_m: float | None = None
+    projective_ranging_status: int | None = None
+    euclidean_reconstruction_status: int | None = None
+    polar_profiling_status: int | None = None
 
 
 @dataclass

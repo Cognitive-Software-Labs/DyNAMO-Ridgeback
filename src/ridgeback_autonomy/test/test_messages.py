@@ -7,10 +7,14 @@ from std_msgs.msg import Header
 
 from ridgeback_autonomy.common.messages import (
     batch_from_detections_message,
+    batch_from_measurements_message,
     build_detections_message,
     build_measurements_message,
+    decode_optional_status,
+    optional_status,
     snapshot_measurements_message,
 )
+from ridgeback_autonomy.common.miss_reason import MissReason
 from ridgeback_autonomy.common.models import Detection, DetectionBatch
 
 
@@ -141,3 +145,46 @@ def test_snapshot_measurements_message_uses_first_finite_positive_values() -> No
     assert snapshot['pointcloud_distance_m'] is None
     assert snapshot['projective_ranging_distance_m'] == pytest.approx(2.3, rel=1e-6)
     assert snapshot['euclidean_reconstruction_distance_m'] is None
+
+
+def test_optional_status_encode_decode() -> None:
+    assert optional_status(None) == int(MissReason.UNSET)
+    assert optional_status(int(MissReason.SCAN_INVALID)) == int(MissReason.SCAN_INVALID)
+    assert decode_optional_status([int(MissReason.OK)], 0) == int(MissReason.OK)
+    assert decode_optional_status([int(MissReason.UNSET)], 0) is None  # sentinel -> None
+    assert decode_optional_status([], 0) is None  # absent -> None
+
+
+def test_measurements_message_round_trips_estimator_statuses() -> None:
+    batch = DetectionBatch(
+        image_width=640,
+        image_height=480,
+        detections=[
+            Detection(
+                bbox_xyxy=(1, 2, 30, 40), label='humanoid robot', score=0.9,
+                projective_ranging_status=int(MissReason.OK),
+                euclidean_reconstruction_status=int(MissReason.ISOLATION_EMPTY),
+                polar_profiling_status=int(MissReason.SCAN_INVALID),
+            ),
+        ],
+    )
+
+    msg = build_measurements_message(batch, Header())
+    assert list(msg.projective_ranging_status) == [int(MissReason.OK)]
+
+    decoded = batch_from_measurements_message(msg).detections[0]
+    assert decoded.projective_ranging_status == int(MissReason.OK)
+    assert decoded.euclidean_reconstruction_status == int(MissReason.ISOLATION_EMPTY)
+    assert decoded.polar_profiling_status == int(MissReason.SCAN_INVALID)
+
+
+def test_unset_status_decodes_to_none() -> None:
+    batch = DetectionBatch(
+        image_width=640,
+        image_height=480,
+        detections=[Detection(bbox_xyxy=(1, 2, 30, 40), label='humanoid robot', score=0.9)],
+    )
+
+    decoded = batch_from_measurements_message(build_measurements_message(batch, Header()))
+
+    assert decoded.detections[0].projective_ranging_status is None

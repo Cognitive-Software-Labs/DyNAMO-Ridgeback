@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import csv
+import json
 import statistics
 
 import numpy as np
 
 from ridgeback_autonomy.benchmarking.estimators import PUBLIC_ESTIMATOR_ORDER
+from ridgeback_autonomy.common.miss_reason import MissReason, reason_name
 
 
 TRIAL_CSV_COLUMNS = [
@@ -34,7 +36,24 @@ SUMMARY_CSV_COLUMNS = [
     'median_abs_error_m',
     'p95_abs_error_m',
     'mean_rel_error',
+    'reason_histogram',
 ]
+
+COVERAGE_CSV_COLUMNS = [
+    'estimator',
+    'events',
+    'ok',
+    'coverage',
+    'reason_histogram',
+]
+
+
+def format_reason_histogram(code_counts: dict[int, int] | None) -> str:
+    """JSON of ``reason name -> count``, ordered by code, for a CSV cell."""
+
+    code_counts = code_counts or {}
+    return json.dumps(
+        {reason_name(code): count for code, count in sorted(code_counts.items())})
 
 
 def write_trial_csv(path: str, rows: list[dict]) -> None:
@@ -45,7 +64,11 @@ def write_trial_csv(path: str, rows: list[dict]) -> None:
             writer.writerow(row)
 
 
-def build_summary_rows(estimator_rows: dict[str, list[dict]]) -> list[dict]:
+def build_summary_rows(
+    estimator_rows: dict[str, list[dict]],
+    status_histograms: dict[str, dict[int, int]] | None = None,
+) -> list[dict]:
+    status_histograms = status_histograms or {}
     summary_rows: list[dict] = []
     for estimator in PUBLIC_ESTIMATOR_ORDER:
         rows = estimator_rows.get(estimator)
@@ -71,13 +94,42 @@ def build_summary_rows(estimator_rows: dict[str, list[dict]]) -> list[dict]:
             'median_abs_error_m': median_abs_error,
             'p95_abs_error_m': p95_abs_error,
             'mean_rel_error': mean_rel_error,
+            'reason_histogram': format_reason_histogram(status_histograms.get(estimator)),
         })
     return summary_rows
+
+
+def build_coverage_rows(status_histograms: dict[str, dict[int, int]]) -> list[dict]:
+    """One row per estimator over all captured events: OK count and coverage."""
+
+    coverage_rows: list[dict] = []
+    for estimator in PUBLIC_ESTIMATOR_ORDER:
+        code_counts = status_histograms.get(estimator)
+        if code_counts is None:
+            continue
+        events = sum(code_counts.values())
+        ok = code_counts.get(int(MissReason.OK), 0)
+        coverage_rows.append({
+            'estimator': estimator,
+            'events': events,
+            'ok': ok,
+            'coverage': (ok / events) if events else 0.0,
+            'reason_histogram': format_reason_histogram(code_counts),
+        })
+    return coverage_rows
 
 
 def write_summary_csv(path: str, rows: list[dict]) -> None:
     with open(path, 'w', encoding='utf-8', newline='') as csv_file:
         writer = csv.DictWriter(csv_file, fieldnames=SUMMARY_CSV_COLUMNS)
+        writer.writeheader()
+        for row in rows:
+            writer.writerow(row)
+
+
+def write_coverage_csv(path: str, rows: list[dict]) -> None:
+    with open(path, 'w', encoding='utf-8', newline='') as csv_file:
+        writer = csv.DictWriter(csv_file, fieldnames=COVERAGE_CSV_COLUMNS)
         writer.writeheader()
         for row in rows:
             writer.writerow(row)

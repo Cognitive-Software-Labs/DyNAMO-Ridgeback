@@ -6,9 +6,13 @@ from typing import Any, Mapping
 import numpy as np
 
 from ridgeback_autonomy.common.messages import decode_bbox_quads, first_finite_positive
+from ridgeback_autonomy.common.miss_reason import MissReason
 from ridgeback_autonomy.msg import G1Measurements
 
-from ridgeback_autonomy.benchmarking.estimators import ESTIMATOR_FIELD_KEYS
+from ridgeback_autonomy.benchmarking.estimators import (
+    ESTIMATOR_FIELD_KEYS,
+    ESTIMATOR_STATUS_FIELD_KEYS,
+)
 
 
 MeasurementEventKey = tuple[Any, ...]
@@ -52,6 +56,7 @@ class MeasurementEvent:
     image_width: int
     image_height: int
     estimates: dict[str, float | None] = field(default_factory=dict)
+    estimate_statuses: dict[str, int] = field(default_factory=dict)
     preview: EventPreview = field(default_factory=EventPreview)
 
 
@@ -74,6 +79,26 @@ def extract_public_estimator_values(msg: G1Measurements) -> dict[str, float | No
         estimator: first_finite_positive(getattr(msg, field_key))
         for estimator, field_key in ESTIMATOR_FIELD_KEYS.items()
     }
+
+
+def extract_estimator_statuses(msg: G1Measurements) -> dict[str, int]:
+    """Per-estimator status code for the first detection (count == 1 frames).
+
+    Mask estimators carry an explicit ``*_status`` array from the node; the
+    legacy estimators have none, so a coarse ``OK``/``UNSET`` is inferred from
+    whether they published a finite distance.
+    """
+
+    statuses: dict[str, int] = {}
+    for estimator, field_key in ESTIMATOR_FIELD_KEYS.items():
+        status_key = ESTIMATOR_STATUS_FIELD_KEYS.get(estimator)
+        if status_key is not None:
+            values = getattr(msg, status_key)
+            statuses[estimator] = int(values[0]) if len(values) > 0 else int(MissReason.UNSET)
+        else:
+            value = first_finite_positive(getattr(msg, field_key))
+            statuses[estimator] = int(MissReason.OK if value is not None else MissReason.UNSET)
+    return statuses
 
 
 def ensure_measurement_event(
@@ -113,6 +138,10 @@ def update_measurement_event(
     for estimator, value in extract_public_estimator_values(msg).items():
         if estimator in allowed_estimators:
             event.estimates[estimator] = value
+
+    for estimator, status in extract_estimator_statuses(msg).items():
+        if estimator in allowed_estimators:
+            event.estimate_statuses[estimator] = status
 
 
 def has_all_selected_estimates(

@@ -355,3 +355,63 @@ def test_encode_mask_debug_image_unions_masks_and_skips_none() -> None:
     decoded = np.frombuffer(bytes(msg.data), dtype=np.uint8).reshape(4, 6)
     assert decoded[1, 2] == 255 and decoded[3, 5] == 255
     assert int(np.count_nonzero(decoded)) == 2
+
+
+def _status_fixture():
+    from ridgeback_autonomy.common.models import Detection, DetectionBatch
+    from ridgeback_autonomy.perception.core.intrinsics import CameraIntrinsics
+    from ridgeback_autonomy.perception.core.mask import rasterize_bbox
+
+    intrinsics = CameraIntrinsics(fx=100.0, fy=100.0, cx=40.0, cy=30.0, width=80, height=60)
+    depth = np.full((60, 80), 4.0, dtype=np.float32)
+    depth[20:40, 30:50] = 2.0
+    batch = DetectionBatch(
+        image_width=80, image_height=60,
+        detections=[Detection(bbox_xyxy=(25, 15, 55, 45), label='r', score=0.9)])
+    masks = [rasterize_bbox((25, 15, 55, 45), 60, 80)]
+    return intrinsics, depth, batch, masks
+
+
+def test_fill_path_measurements_stamps_ok_and_scan_reason() -> None:
+    from ridgeback_autonomy.common.miss_reason import MissReason
+    from ridgeback_autonomy.perception.g1_mask_measurement_node import fill_path_measurements
+
+    intrinsics, depth, batch, masks = _status_fixture()
+    fill_path_measurements(
+        batch, masks, intrinsics, depth, None,
+        camera_rotation=np.eye(3), camera_translation=np.zeros(3), front_offset_m=0.0,
+        isolation_2d=None, isolation_3d=None, scan_reason=MissReason.NO_SCAN)
+
+    det = batch.detections[0]
+    assert det.projective_ranging_status == int(MissReason.OK)
+    assert det.euclidean_reconstruction_status == int(MissReason.OK)
+    assert det.polar_profiling_status == int(MissReason.NO_SCAN)
+
+
+def test_fill_path_measurements_no_depth_stamps_no_depth_frame() -> None:
+    from ridgeback_autonomy.common.miss_reason import MissReason
+    from ridgeback_autonomy.perception.g1_mask_measurement_node import fill_path_measurements
+
+    intrinsics, _depth, batch, masks = _status_fixture()
+    fill_path_measurements(
+        batch, masks, intrinsics, None, None,
+        camera_rotation=np.eye(3), camera_translation=np.zeros(3), front_offset_m=0.0,
+        isolation_2d=None, isolation_3d=None, scan_reason=MissReason.TF_MISS_SCAN)
+
+    det = batch.detections[0]
+    assert det.projective_ranging_status == int(MissReason.NO_DEPTH_FRAME)
+    assert det.euclidean_reconstruction_status == int(MissReason.NO_DEPTH_FRAME)
+    assert det.polar_profiling_status == int(MissReason.TF_MISS_SCAN)
+
+
+def test_fill_path_measurements_skips_none_mask() -> None:
+    from ridgeback_autonomy.perception.g1_mask_measurement_node import fill_path_measurements
+
+    intrinsics, depth, batch, _masks = _status_fixture()
+    fill_path_measurements(
+        batch, [None], intrinsics, depth, None,
+        camera_rotation=np.eye(3), camera_translation=np.zeros(3), front_offset_m=0.0,
+        isolation_2d=None, isolation_3d=None)
+
+    # A None mask is already status-stamped by masks_for_batch; fill leaves it.
+    assert batch.detections[0].projective_ranging_status is None

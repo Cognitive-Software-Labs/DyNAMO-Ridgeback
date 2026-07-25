@@ -39,12 +39,17 @@ from ridgeback_autonomy.benchmarking.estimators import (
 )
 from ridgeback_autonomy.benchmarking.reduction import (
     choose_representative_event,
+    compute_status_histogram,
     compute_trial_medians,
+    format_status_tally,
+    merge_status_histograms,
     usable_aligned_events,
 )
 from ridgeback_autonomy.benchmarking.rendering import BenchmarkCollageRenderer
 from ridgeback_autonomy.benchmarking.summary import (
+    build_coverage_rows,
     build_summary_rows,
+    write_coverage_csv,
     write_summary_csv,
     write_trial_csv,
 )
@@ -175,6 +180,10 @@ class G1DistanceBenchmarkRunner(Node):
             for estimator in self.selected_estimators
         }
         self.summary_csv_path = os.path.join(self.run_output_dir, 'comparison_summary.csv')
+        self.coverage_csv_path = os.path.join(self.run_output_dir, 'coverage.csv')
+        # Per-estimator status-code tallies over every captured event across the
+        # whole run (misses included, unlike the usable-aligned rows).
+        self.status_aggregate: dict[str, dict[int, int]] = {}
 
         self.command_env = os.environ.copy()
         self.command_env.setdefault('ROS_LOG_DIR', '/tmp/ros_logs')
@@ -356,11 +365,17 @@ class G1DistanceBenchmarkRunner(Node):
         for estimator in self.selected_estimators:
             write_trial_csv(self.estimator_csv_paths[estimator], estimator_rows[estimator])
 
-        summary_rows = build_summary_rows(estimator_rows)
+        summary_rows = build_summary_rows(estimator_rows, self.status_aggregate)
         for row in summary_rows:
             row['estimator'] = self.estimator_display_names.get(
                 row['estimator'], row['estimator'])
         write_summary_csv(self.summary_csv_path, summary_rows)
+
+        coverage_rows = build_coverage_rows(self.status_aggregate)
+        for row in coverage_rows:
+            row['estimator'] = self.estimator_display_names.get(
+                row['estimator'], row['estimator'])
+        write_coverage_csv(self.coverage_csv_path, coverage_rows)
 
         self.log_summary(summary_rows, included_trials, skipped_trials)
         self.get_logger().info(f'Benchmark run written to {self.run_output_dir}')
@@ -393,11 +408,13 @@ class G1DistanceBenchmarkRunner(Node):
 
             true_pose = self.compute_ground_truth(model_name)
             capture = self.capture_measurement_window(self.capture_sec)
+            merge_status_histograms(self.status_aggregate, capture['status_histogram'])
             usable_events = capture['usable_events']
             if not usable_events:
                 self.get_logger().info(
-                    f'{trial_id} skipped | reason=no_common_usable_events | '
-                    f'raw_events={capture["total_events"]}'
+                    f'{trial_id} skipped | no_common_usable_events | '
+                    f'raw_events={capture["total_events"]} | '
+                    f'{format_status_tally(capture["status_histogram"], self.selected_estimators)}'
                 )
                 return None
 
@@ -462,6 +479,8 @@ class G1DistanceBenchmarkRunner(Node):
         return {
             'total_events': len(self.capture_events),
             'usable_events': usable_events,
+            'status_histogram': compute_status_histogram(
+                self.capture_events, self.selected_estimators),
         }
 
     def save_trial_collage(

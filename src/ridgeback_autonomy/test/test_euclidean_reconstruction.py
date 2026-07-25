@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import numpy as np
 
+from ridgeback_autonomy.common.miss_reason import MissReason
 from ridgeback_autonomy.perception.core.intrinsics import CameraIntrinsics
 from ridgeback_autonomy.perception.core.isolation_3d import RangeBand
 from ridgeback_autonomy.perception.core.mask import MaskPrecision, mask_from_array, rasterize_bbox
@@ -35,9 +36,10 @@ def object_mask_data() -> np.ndarray:
 def test_rect_mask_default_chain_recovers_object_centroid() -> None:
     mask = rasterize_bbox(RECT_BBOX, HEIGHT, WIDTH)
 
-    result = localize_euclidean_reconstruction(build_depth(), mask, INTRINSICS)
+    result, reason = localize_euclidean_reconstruction(build_depth(), mask, INTRINSICS)
 
     assert result is not None
+    assert reason is MissReason.OK
     assert np.allclose(result.xyz_optical, OBJECT_CENTROID_XYZ)
     # By-product: exactly the object's points survive the chain.
     assert result.foreground_points.shape == (400, 3)
@@ -46,7 +48,7 @@ def test_rect_mask_default_chain_recovers_object_centroid() -> None:
 def test_rect_accepts_explicit_isolation_recipe() -> None:
     mask = rasterize_bbox(RECT_BBOX, HEIGHT, WIDTH)
 
-    result = localize_euclidean_reconstruction(build_depth(), mask, INTRINSICS, isolation=RangeBand())
+    result, _ = localize_euclidean_reconstruction(build_depth(), mask, INTRINSICS, isolation=RangeBand())
 
     assert result is not None
     assert np.allclose(result.xyz_optical, OBJECT_CENTROID_XYZ)
@@ -61,7 +63,7 @@ def test_tight_mask_mad_pass_drops_edge_bleed() -> None:
         depth[row, col] = 6.0
     mask = mask_from_array(object_mask_data(), MaskPrecision.TIGHT)
 
-    result = localize_euclidean_reconstruction(depth, mask, INTRINSICS)
+    result, _ = localize_euclidean_reconstruction(depth, mask, INTRINSICS)
 
     assert result is not None
     # The bleed points (range ~6 m) are gone; some legitimate far-corner
@@ -71,14 +73,34 @@ def test_tight_mask_mad_pass_drops_edge_bleed() -> None:
     assert np.allclose(result.xyz_optical, OBJECT_CENTROID_XYZ, atol=0.02)
 
 
-def test_all_invalid_depth_returns_none() -> None:
+def test_all_invalid_depth_returns_too_few_valid_points() -> None:
     depth = np.zeros((HEIGHT, WIDTH), dtype=np.float32)
     mask = rasterize_bbox(RECT_BBOX, HEIGHT, WIDTH)
 
-    assert localize_euclidean_reconstruction(depth, mask, INTRINSICS) is None
+    result, reason = localize_euclidean_reconstruction(depth, mask, INTRINSICS)
+
+    assert result is None
+    assert reason is MissReason.TOO_FEW_VALID_POINTS
 
 
-def test_sparse_mask_returns_none() -> None:
+def test_sparse_mask_returns_too_few_valid_points() -> None:
     mask = rasterize_bbox((10, 10, 13, 13), HEIGHT, WIDTH)
 
-    assert localize_euclidean_reconstruction(build_depth(), mask, INTRINSICS) is None
+    result, reason = localize_euclidean_reconstruction(build_depth(), mask, INTRINSICS)
+
+    assert result is None
+    assert reason is MissReason.TOO_FEW_VALID_POINTS
+
+
+def test_isolation_dropping_all_points_returns_isolation_empty() -> None:
+    # Enough valid points enter, but the isolation recipe keeps none.
+    mask = rasterize_bbox(RECT_BBOX, HEIGHT, WIDTH)
+
+    def drop_all(points: np.ndarray) -> np.ndarray:
+        return np.zeros(points.shape[0], dtype=bool)
+
+    result, reason = localize_euclidean_reconstruction(
+        build_depth(), mask, INTRINSICS, isolation=drop_all)
+
+    assert result is None
+    assert reason is MissReason.ISOLATION_EMPTY

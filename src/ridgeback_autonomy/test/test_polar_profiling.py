@@ -5,6 +5,7 @@ from types import SimpleNamespace
 
 import numpy as np
 
+from ridgeback_autonomy.common.miss_reason import MissReason
 from ridgeback_autonomy.perception.core.intrinsics import CameraIntrinsics
 from ridgeback_autonomy.perception.core.mask import MaskPrecision, mask_from_array, rasterize_bbox
 from ridgeback_autonomy.perception.core.polar_profiling import (
@@ -64,9 +65,11 @@ def test_two_legs_merge_drops_parallax_wall() -> None:
     points = two_legs_profile()
     mask = rasterize_bbox(MASK_BBOX, HEIGHT, WIDTH)
 
-    result = localize_polar_profiling(points, np.ones(points.shape[0], dtype=bool), mask, INTRINSICS)
+    result, reason = localize_polar_profiling(
+        points, np.ones(points.shape[0], dtype=bool), mask, INTRINSICS)
 
     assert result is not None
+    assert reason is MissReason.OK
     # Both legs merged: X medians to the body center, Z to the leg depth.
     assert np.allclose(result.xz_optical, (0.0, LEG_Z_M), atol=1e-6)
     # Exactly the 9-beam legs survive (both sides); every wall beam is gone.
@@ -85,7 +88,8 @@ def test_unequal_legs_median_stays_on_object() -> None:
     points = profile_points(bearings_deg, z_m)
     mask = rasterize_bbox(MASK_BBOX, HEIGHT, WIDTH)
 
-    result = localize_polar_profiling(points, np.ones(points.shape[0], dtype=bool), mask, INTRINSICS)
+    result, _ = localize_polar_profiling(
+        points, np.ones(points.shape[0], dtype=bool), mask, INTRINSICS)
 
     assert result is not None
     assert result.xz_optical[1] == LEG_Z_M
@@ -104,8 +108,8 @@ def test_tight_tag_runs_identical_recovery() -> None:
     rect = rasterize_bbox(MASK_BBOX, HEIGHT, WIDTH)
     tight = mask_from_array(rect.data.copy(), MaskPrecision.TIGHT)
 
-    rect_result = localize_polar_profiling(points, valid, rect, INTRINSICS)
-    tight_result = localize_polar_profiling(points, valid, tight, INTRINSICS)
+    rect_result, _ = localize_polar_profiling(points, valid, rect, INTRINSICS)
+    tight_result, _ = localize_polar_profiling(points, valid, tight, INTRINSICS)
 
     assert rect_result is not None and tight_result is not None
     assert np.array_equal(rect_result.xz_optical, tight_result.xz_optical)
@@ -119,38 +123,58 @@ def test_wall_behind_single_object_rejected() -> None:
     points = profile_points(bearings_deg, z_m)
     mask = rasterize_bbox(MASK_BBOX, HEIGHT, WIDTH)
 
-    result = localize_polar_profiling(points, np.ones(points.shape[0], dtype=bool), mask, INTRINSICS)
+    result, _ = localize_polar_profiling(
+        points, np.ones(points.shape[0], dtype=bool), mask, INTRINSICS)
 
     assert result is not None
     assert np.allclose(result.xz_optical, (0.0, LEG_Z_M), atol=1e-6)
     assert result.foreground_points.shape[0] == 13
 
 
-def test_plane_miss_returns_none() -> None:
-    # Scan plane misses the object: no beam projects inside the mask.
+def test_no_beam_in_mask_returns_too_few_rays_selected() -> None:
+    # Beams are in view, but none fall inside the (empty) mask.
     points = two_legs_profile()
     empty_mask = mask_from_array(np.zeros((HEIGHT, WIDTH), dtype=bool), MaskPrecision.TIGHT)
 
-    assert localize_polar_profiling(
-        points, np.ones(points.shape[0], dtype=bool), empty_mask, INTRINSICS,
-    ) is None
+    result, reason = localize_polar_profiling(
+        points, np.ones(points.shape[0], dtype=bool), empty_mask, INTRINSICS)
+
+    assert result is None
+    assert reason is MissReason.TOO_FEW_RAYS_SELECTED
 
 
-def test_all_invalid_beams_return_none() -> None:
+def test_all_invalid_beams_return_no_beams_in_view() -> None:
     points = two_legs_profile()
     mask = rasterize_bbox(MASK_BBOX, HEIGHT, WIDTH)
 
-    assert localize_polar_profiling(
-        points, np.zeros(points.shape[0], dtype=bool), mask, INTRINSICS,
-    ) is None
+    result, reason = localize_polar_profiling(
+        points, np.zeros(points.shape[0], dtype=bool), mask, INTRINSICS)
+
+    assert result is None
+    assert reason is MissReason.NO_BEAMS_IN_VIEW
 
 
-def test_sparse_rays_return_none() -> None:
+def test_sparse_rays_return_too_few_rays_selected() -> None:
     # A single beam in the mask is below min_valid_rays.
     points = profile_points(np.array([0.0]), np.array([LEG_Z_M]))
     mask = rasterize_bbox(MASK_BBOX, HEIGHT, WIDTH)
 
-    assert localize_polar_profiling(points, np.ones(1, dtype=bool), mask, INTRINSICS) is None
+    result, reason = localize_polar_profiling(points, np.ones(1, dtype=bool), mask, INTRINSICS)
+
+    assert result is None
+    assert reason is MissReason.TOO_FEW_RAYS_SELECTED
+
+
+def test_merge_leaves_too_few_returns_too_few_rays_merged() -> None:
+    # Two in-mask beams at far-apart ranges: the near-band merge keeps only the
+    # nearest, dropping below min_valid_rays after the merge (a distinct reason).
+    points = profile_points(np.array([-1.0, 1.0]), np.array([LEG_Z_M, WALL_Z_M]))
+    mask = rasterize_bbox(MASK_BBOX, HEIGHT, WIDTH)
+
+    result, reason = localize_polar_profiling(points, np.ones(2, dtype=bool), mask, INTRINSICS)
+
+    assert result is None
+    assert reason is MissReason.TOO_FEW_RAYS_MERGED
 
 
 def test_segment_range_profile_splits_on_jump_and_gap() -> None:

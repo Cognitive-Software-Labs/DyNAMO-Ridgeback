@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import numpy as np
 
+from ridgeback_autonomy.common.miss_reason import MissReason
 from ridgeback_autonomy.perception.core.intrinsics import CameraIntrinsics
 from ridgeback_autonomy.perception.core.isolation_2d import otsu_foreground
 from ridgeback_autonomy.perception.core.mask import MaskPrecision, mask_from_array, rasterize_bbox
@@ -38,9 +39,10 @@ def object_mask_data() -> np.ndarray:
 def test_rect_mask_recovers_object_coordinate() -> None:
     mask = rasterize_bbox(RECT_BBOX, HEIGHT, WIDTH)
 
-    result = localize_projective_ranging(build_depth(), mask, INTRINSICS)
+    result, reason = localize_projective_ranging(build_depth(), mask, INTRINSICS)
 
     assert result is not None
+    assert reason is MissReason.OK
     assert result.depth_m == OBJECT_DEPTH_M
     assert np.allclose(result.xyz_optical, OBJECT_XYZ)
     assert result.foreground_pixel_count == 400
@@ -49,7 +51,7 @@ def test_rect_mask_recovers_object_coordinate() -> None:
 def test_rect_representative_pixel_is_foreground_centroid_not_box_center() -> None:
     mask = rasterize_bbox(RECT_BBOX, HEIGHT, WIDTH)
 
-    result = localize_projective_ranging(build_depth(), mask, INTRINSICS)
+    result, _ = localize_projective_ranging(build_depth(), mask, INTRINSICS)
 
     assert result is not None
     assert np.allclose(result.representative_uv, OBJECT_CENTROID_UV)
@@ -66,7 +68,7 @@ def test_rect_survives_invalid_pixels_in_the_box() -> None:
     depth[17, 27] = 15.0  # out of range
     mask = rasterize_bbox(RECT_BBOX, HEIGHT, WIDTH)
 
-    result = localize_projective_ranging(depth, mask, INTRINSICS)
+    result, _ = localize_projective_ranging(depth, mask, INTRINSICS)
 
     assert result is not None
     assert result.depth_m == OBJECT_DEPTH_M
@@ -77,7 +79,7 @@ def test_rect_survives_invalid_pixels_in_the_box() -> None:
 def test_rect_accepts_explicit_isolation_recipe() -> None:
     mask = rasterize_bbox(RECT_BBOX, HEIGHT, WIDTH)
 
-    result = localize_projective_ranging(build_depth(), mask, INTRINSICS, isolation=otsu_foreground)
+    result, _ = localize_projective_ranging(build_depth(), mask, INTRINSICS, isolation=otsu_foreground)
 
     assert result is not None
     assert result.depth_m == OBJECT_DEPTH_M
@@ -91,38 +93,59 @@ def test_rect_branch_respects_custom_depth_max() -> None:
     depth[OBJECT_SLICE] = 6.0                            # object plate at 6 m
     mask = rasterize_bbox(RECT_BBOX, HEIGHT, WIDTH)
 
-    kept = localize_projective_ranging(depth, mask, INTRINSICS)
+    kept, reason = localize_projective_ranging(depth, mask, INTRINSICS)
     assert kept is not None
+    assert reason is MissReason.OK
     assert kept.depth_m == 6.0
     assert kept.foreground_pixel_count == 400
 
     # Tighten the cutoff below the object: the recipe now cleans it away and the
     # mask is left with too few pixels, so the call returns None.
-    capped = localize_projective_ranging(depth, mask, INTRINSICS, depth_max=4.0)
+    capped, capped_reason = localize_projective_ranging(depth, mask, INTRINSICS, depth_max=4.0)
     assert capped is None
+    assert capped_reason is MissReason.ISOLATION_EMPTY
 
 
 def test_tight_mask_takes_the_median_directly() -> None:
     mask = mask_from_array(object_mask_data(), MaskPrecision.TIGHT)
 
-    result = localize_projective_ranging(build_depth(), mask, INTRINSICS)
+    result, reason = localize_projective_ranging(build_depth(), mask, INTRINSICS)
 
     assert result is not None
+    assert reason is MissReason.OK
     assert result.depth_m == OBJECT_DEPTH_M
     assert np.allclose(result.representative_uv, OBJECT_CENTROID_UV)
     assert np.allclose(result.xyz_optical, OBJECT_XYZ)
     assert result.foreground_pixel_count == 400
 
 
-def test_all_invalid_depth_returns_none() -> None:
+def test_all_invalid_depth_returns_isolation_empty() -> None:
     depth = np.zeros((HEIGHT, WIDTH), dtype=np.float32)
     mask = rasterize_bbox(RECT_BBOX, HEIGHT, WIDTH)
 
-    assert localize_projective_ranging(depth, mask, INTRINSICS) is None
+    result, reason = localize_projective_ranging(depth, mask, INTRINSICS)
+
+    assert result is None
+    assert reason is MissReason.ISOLATION_EMPTY
 
 
-def test_sparse_mask_returns_none() -> None:
-    # A 3x3 box holds fewer valid pixels than min_valid_pixels.
+def test_sparse_rect_mask_returns_isolation_empty() -> None:
+    # A 3x3 rect box holds fewer valid pixels than min_valid_pixels.
     mask = rasterize_bbox((10, 10, 13, 13), HEIGHT, WIDTH)
 
-    assert localize_projective_ranging(build_depth(), mask, INTRINSICS) is None
+    result, reason = localize_projective_ranging(build_depth(), mask, INTRINSICS)
+
+    assert result is None
+    assert reason is MissReason.ISOLATION_EMPTY
+
+
+def test_sparse_tight_mask_returns_too_few_valid_pixels() -> None:
+    # The tight branch skips isolation, so its shortfall is a distinct reason.
+    data = np.zeros((HEIGHT, WIDTH), dtype=bool)
+    data[10:13, 10:13] = True  # 9 pixels < min_valid_pixels
+    mask = mask_from_array(data, MaskPrecision.TIGHT)
+
+    result, reason = localize_projective_ranging(build_depth(), mask, INTRINSICS)
+
+    assert result is None
+    assert reason is MissReason.TOO_FEW_VALID_PIXELS

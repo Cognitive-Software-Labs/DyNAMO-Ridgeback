@@ -30,6 +30,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
+from ridgeback_autonomy.common.miss_reason import MissReason
 from ridgeback_autonomy.perception.core.intrinsics import (
     CameraIntrinsics,
     project_points,
@@ -197,13 +198,13 @@ def localize_polar_profiling(
     range_band_m: float = RANGE_BAND_M_DEFAULT,
     max_bearing_gap_beams: int = MAX_BEARING_GAP_BEAMS_DEFAULT,
     min_valid_rays: int = MIN_VALID_RAYS_DEFAULT,
-) -> PolarProfilingResult | None:
+) -> tuple[PolarProfilingResult | None, MissReason]:
     """Localize one mask against one scan already in the camera optical frame.
 
     ``points_optical`` / ``valid`` come from ``scan_points_optical`` (beam
-    order = bearing order). Returns ``None`` when fewer than
-    ``min_valid_rays`` rays survive the mask ∩ FoV select or the near-band
-    merge -- no estimate for this mask.
+    order = bearing order). Returns ``(result, MissReason.OK)`` on success, or
+    ``(None, <reason>)`` when fewer than ``min_valid_rays`` rays survive the
+    mask ∩ FoV select or the near-band merge -- no estimate for this mask.
     """
 
     points_optical = np.asarray(points_optical, dtype=np.float64)
@@ -214,12 +215,12 @@ def localize_polar_profiling(
     selectable = np.asarray(valid, dtype=bool) & in_view
     beam_indices = np.flatnonzero(selectable)
     if beam_indices.size == 0:
-        return None
+        return None, MissReason.NO_BEAMS_IN_VIEW
     u_px = np.rint(uv[beam_indices, 0]).astype(np.intp)
     v_px = np.rint(uv[beam_indices, 1]).astype(np.intp)
     beam_indices = beam_indices[mask.data[v_px, u_px]]
     if beam_indices.size < min_valid_rays:
-        return None
+        return None, MissReason.TOO_FEW_RAYS_SELECTED
 
     # 5. RECOVER -- same for both mask tags (parallax survives even a tight
     # mask): segment the range profile, merge the near band, median-reduce.
@@ -233,7 +234,7 @@ def localize_polar_profiling(
     )
     merged = merge_near_band(runs, planar_range_m, range_band_m=range_band_m)
     if merged.size < min_valid_rays:
-        return None
+        return None, MissReason.TOO_FEW_RAYS_MERGED
 
     # The merged set is the foreground. The coordinate is its per-axis median
     # (X, Z); the published distance is derived from that coordinate downstream
@@ -244,4 +245,4 @@ def localize_polar_profiling(
         xz_optical=xz_optical,
         foreground_points=foreground,
         ray_count=int(beam_indices.size),
-    )
+    ), MissReason.OK

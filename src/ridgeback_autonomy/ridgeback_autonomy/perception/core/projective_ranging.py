@@ -19,6 +19,7 @@ from typing import Callable
 
 import numpy as np
 
+from ridgeback_autonomy.common.miss_reason import MissReason
 from ridgeback_autonomy.perception.core.depth_common import (
     DEPTH_MAX_METERS_DEFAULT,
     valid_depth,
@@ -55,14 +56,14 @@ def localize_projective_ranging(
     isolation: Callable[..., np.ndarray] | None = None,
     depth_max: float = DEPTH_MAX_METERS_DEFAULT,
     min_valid_pixels: int = MIN_VALID_PIXELS_DEFAULT,
-) -> ProjectiveRangingResult | None:
+) -> tuple[ProjectiveRangingResult | None, MissReason]:
     """Localize one mask against one aligned depth frame.
 
     ``isolation`` is the ``rect``-branch foreground recipe (an
     ``ISOLATION_2D_RECIPES`` entry; default recipe when ``None``); the
-    ``tight`` branch never calls it. Returns ``None`` when fewer than
-    ``min_valid_pixels`` valid (or, on the ``rect`` branch, foreground)
-    pixels remain.
+    ``tight`` branch never calls it. Returns ``(result, MissReason.OK)`` on
+    success, or ``(None, <reason>)`` when fewer than ``min_valid_pixels`` valid
+    (or, on the ``rect`` branch, foreground) pixels remain.
     """
 
     depth_m = np.asarray(depth_m)
@@ -75,7 +76,7 @@ def localize_projective_ranging(
         # A tight silhouette already is the object: keep its valid depths.
         foreground = mask.data & valid_depth(depth_m, depth_max)
         if int(np.count_nonzero(foreground)) < min_valid_pixels:
-            return None
+            return None, MissReason.TOO_FEW_VALID_PIXELS
     else:
         if isolation is None:
             isolation = ISOLATION_2D_RECIPES[ISOLATION_2D_DEFAULT]
@@ -85,7 +86,7 @@ def localize_projective_ranging(
         # isolation step.
         foreground = isolation(depth_m, mask.data, depth_max=depth_max)
         if int(np.count_nonzero(foreground)) < min_valid_pixels:
-            return None
+            return None, MissReason.ISOLATION_EMPTY
 
     rows, cols = np.nonzero(foreground)
     aggregated_depth_m = float(np.median(depth_m[rows, cols]))
@@ -105,4 +106,4 @@ def localize_projective_ranging(
         depth_m=aggregated_depth_m,
         representative_uv=(u, v),
         foreground_pixel_count=int(rows.size),
-    )
+    ), MissReason.OK

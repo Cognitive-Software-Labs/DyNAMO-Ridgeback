@@ -26,6 +26,7 @@ from typing import Callable
 
 import numpy as np
 
+from ridgeback_autonomy.common.miss_reason import MissReason
 from ridgeback_autonomy.perception.core.depth_common import (
     DEPTH_MAX_METERS_DEFAULT,
     valid_depth,
@@ -61,13 +62,14 @@ def localize_euclidean_reconstruction(
     isolation: Callable[[np.ndarray], np.ndarray] | None = None,
     depth_max: float = DEPTH_MAX_METERS_DEFAULT,
     min_valid_points: int = MIN_VALID_POINTS_DEFAULT,
-) -> EuclideanReconstructionResult | None:
+) -> tuple[EuclideanReconstructionResult | None, MissReason]:
     """Localize one mask against one aligned depth frame in the point domain.
 
     ``isolation`` is the ``rect``-branch keep-selector (an
     ``ISOLATION_3D_RECIPES`` entry; default recipe when ``None``); the
-    ``tight`` branch uses MAD outlier removal instead. Returns ``None`` when
-    fewer than ``min_valid_points`` points enter or survive isolation.
+    ``tight`` branch uses MAD outlier removal instead. Returns
+    ``(result, MissReason.OK)`` on success, or ``(None, <reason>)`` when fewer
+    than ``min_valid_points`` points enter or survive isolation.
     """
 
     depth_m = np.asarray(depth_m)
@@ -76,7 +78,7 @@ def localize_euclidean_reconstruction(
     valid = mask.data & valid_depth(depth_m, depth_max)
     rows, cols = np.nonzero(valid)
     if rows.size < min_valid_points:
-        return None
+        return None, MissReason.TOO_FEW_VALID_POINTS
     points = deproject_masked(depth_m, rows, cols, intrinsics)
 
     # 3. ISOLATE -- the mask-tag fork.
@@ -89,7 +91,7 @@ def localize_euclidean_reconstruction(
 
     foreground = points[keep]
     if foreground.shape[0] < min_valid_points:
-        return None
+        return None, MissReason.ISOLATION_EMPTY
 
     # 4. REDUCE: the coordinate is the foreground centroid. A robust median
     # range is recoverable from foreground_points if a consumer ever needs one.
@@ -97,4 +99,4 @@ def localize_euclidean_reconstruction(
     return EuclideanReconstructionResult(
         xyz_optical=centroid,
         foreground_points=foreground,
-    )
+    ), MissReason.OK

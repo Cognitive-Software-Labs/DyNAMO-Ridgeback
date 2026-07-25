@@ -55,6 +55,7 @@ from ridgeback_autonomy.common.messages import (
     batch_from_detections_message,
     build_measurements_message,
 )
+from ridgeback_autonomy.common.miss_reason import MissReason
 from ridgeback_autonomy.common.tf_utils import lookup_transform_components
 from ridgeback_autonomy.msg import G1Detections, G1Measurements
 from ridgeback_autonomy.perception.aligned_depth_node import (
@@ -237,6 +238,14 @@ class StampedMessageBuffer:
         return best
 
 
+def set_mask_estimator_status(detection, reason: MissReason) -> None:
+    """Stamp one miss reason on all three mask-estimator status fields."""
+
+    detection.projective_ranging_status = int(reason)
+    detection.euclidean_reconstruction_status = int(reason)
+    detection.polar_profiling_status = int(reason)
+
+
 def fill_path_measurements(
     batch,
     masks,
@@ -249,24 +258,32 @@ def fill_path_measurements(
     front_offset_m: float,
     isolation_2d,
     isolation_3d,
+    scan_reason: MissReason = MissReason.NO_SCAN,
 ) -> None:
     """Run every available path for each (detection, mask) pair, in place.
 
     ``camera_rotation`` / ``camera_translation`` are the camera-optical ->
     base extrinsics (TF at the detection stamp). ``masks`` is index-aligned
-    with ``batch.detections``; a ``None`` mask (empty segmentation) skips that
-    detection entirely -- its fields stay NaN and the trial drops, per the
-    no-fallback convention. The ``tight | rect`` fork lives inside the paths
-    themselves; this function is gate-agnostic.
+    with ``batch.detections``; a ``None`` mask (already status-stamped by
+    ``masks_for_batch``) skips that detection entirely -- its fields stay NaN
+    and the trial drops, per the no-fallback convention. Each estimator's
+    ``*_status`` records why it missed (or ``OK``); ``scan_reason`` is the
+    reason polar carries when the scan itself never resolved. The
+    ``tight | rect`` fork lives inside the paths themselves; this function is
+    gate-agnostic.
     """
 
     for detection, mask in zip(batch.detections, masks):
         if mask is None:
             continue
 
-        if depth_m is not None:
-            result_a = localize_projective_ranging(
+        if depth_m is None:
+            detection.projective_ranging_status = int(MissReason.NO_DEPTH_FRAME)
+            detection.euclidean_reconstruction_status = int(MissReason.NO_DEPTH_FRAME)
+        else:
+            result_a, reason_a = localize_projective_ranging(
                 depth_m, mask, intrinsics, isolation=isolation_2d)
+            detection.projective_ranging_status = int(reason_a)
             if result_a is not None:
                 (
                     detection.projective_ranging_lateral_m,
@@ -276,8 +293,9 @@ def fill_path_measurements(
                     result_a.xyz_optical, camera_rotation, camera_translation,
                     front_offset_m)
 
-            result_b = localize_euclidean_reconstruction(
+            result_b, reason_b = localize_euclidean_reconstruction(
                 depth_m, mask, intrinsics, isolation=isolation_3d)
+            detection.euclidean_reconstruction_status = int(reason_b)
             if result_b is not None:
                 (
                     detection.euclidean_reconstruction_lateral_m,
@@ -287,10 +305,13 @@ def fill_path_measurements(
                     result_b.xyz_optical, camera_rotation, camera_translation,
                     front_offset_m)
 
-        if scan_points is not None:
+        if scan_points is None:
+            detection.polar_profiling_status = int(scan_reason)
+        else:
             points_optical, valid = scan_points
-            result_c = localize_polar_profiling(
+            result_c, reason_c = localize_polar_profiling(
                 points_optical, valid, mask, intrinsics)
+            detection.polar_profiling_status = int(reason_c)
             if result_c is not None:
                 # Polar profiling recovers only (X, Z); Y is unobservable and
                 # substituted with 0. Optical Y folds into base forward only
@@ -578,15 +599,23 @@ class G1MaskMeasurementNode(Node):
             warning = grid_mismatch_warning(intrinsics, batch)
             if warning is not None:
                 self.log_skip_warning(warning)
+                self.stamp_frame_reason(batch, MissReason.GRID_MISMATCH)
             else:
-                masks = self.masks_for_batch(detections_msg, batch)
-                if masks is not None:
-                    if self.mask_debug_pub is not None:
-                        self.mask_debug_pub.publish(encode_mask_debug_image(
-                            masks, batch.image_height, batch.image_width,
-                            detections_msg.header))
-                    camera_extrinsic = self.camera_extrinsic_for_batch(detections_msg)
-                    if camera_extrinsic is not None:
+                # Extrinsic before masks: a TF miss skips (and never overwrites)
+                # the per-detection mask statuses, and spares the segmenter a
+                # forward pass on a frame no path could use.
+                camera_extrinsic = self.camera_extrinsic_for_batch(detections_msg)
+                if camera_extrinsic is None:
+                    self.stamp_frame_reason(batch, MissReason.TF_MISS_EXTRINSIC)
+                else:
+                    masks = self.masks_for_batch(detections_msg, batch)
+                    if masks is None:
+                        self.stamp_frame_reason(batch, MissReason.NO_COLOR_FRAME)
+                    else:
+                        if self.mask_debug_pub is not None:
+                            self.mask_debug_pub.publish(encode_mask_debug_image(
+                                masks, batch.image_height, batch.image_width,
+                                detections_msg.header))
                         camera_rotation, camera_translation = camera_extrinsic
                         # The euclidean floor crop tracks the live mount: derive
                         # its height/pitch from the same extrinsic and build the
@@ -597,7 +626,8 @@ class G1MaskMeasurementNode(Node):
                         isolation_3d = build_isolation_3d(
                             self.isolation_3d_name, camera_height_m, camera_pitch_deg)
                         depth_m = self.decode_depth_for_batch(depth_msg, batch)
-                        scan_points = self.scan_points_for_batch(detections_msg, scan_msg)
+                        scan_points, scan_reason = self.scan_points_for_batch(
+                            detections_msg, scan_msg)
                         fill_path_measurements(
                             batch,
                             masks,
@@ -609,15 +639,25 @@ class G1MaskMeasurementNode(Node):
                             front_offset_m=self.front_offset_m,
                             isolation_2d=self.isolation_2d,
                             isolation_3d=isolation_3d,
+                            scan_reason=scan_reason,
                         )
         elif batch.detected:
             self.log_skip_warning(
                 'No camera_info received yet; publishing measurements without '
                 'path estimates.'
             )
+            self.stamp_frame_reason(batch, MissReason.NO_CAMERA_INFO)
 
         self.measurement_pub.publish(
             build_measurements_message(batch, detections_msg.header))
+
+    def stamp_frame_reason(self, batch, reason: MissReason) -> None:
+        """Stamp a frame-level miss reason on all three mask estimators of every
+        detection, so a frame that short-circuits before path work still reports
+        why rather than a bare ``UNSET``."""
+
+        for detection in batch.detections:
+            set_mask_estimator_status(detection, reason)
 
     def masks_for_batch(self, detections_msg: G1Detections, batch) -> list | None:
         """One mask per detection for the configured gate, or ``None``.
@@ -641,11 +681,15 @@ class G1MaskMeasurementNode(Node):
         self.log_oversized_skip(accepted.count(False))
 
         if self.mask_gate == MASK_GATE_BOX:
-            return [
-                rasterize_detection(detection, batch.image_height, batch.image_width)
-                if keep else None
-                for detection, keep in zip(batch.detections, accepted)
-            ]
+            box_masks: list = []
+            for detection, keep in zip(batch.detections, accepted):
+                if keep:
+                    box_masks.append(rasterize_detection(
+                        detection, batch.image_height, batch.image_width))
+                else:
+                    set_mask_estimator_status(detection, MissReason.MASK_OVERSIZED_BOX)
+                    box_masks.append(None)
+            return box_masks
 
         with self.processing_lock:
             color_msg = self.color_buffer.lookup(detections_msg.header.stamp)
@@ -677,13 +721,17 @@ class G1MaskMeasurementNode(Node):
         # Re-align the segmenter's per-prompt blobs back to full detection order.
         blob_iter = iter(blobs)
         masks: list = []
-        for keep in accepted:
+        for detection, keep in zip(batch.detections, accepted):
             if not keep:
+                set_mask_estimator_status(detection, MissReason.MASK_OVERSIZED_BOX)
                 masks.append(None)
                 continue
             blob = next(blob_iter)
-            masks.append(
-                None if blob is None else mask_from_array(blob, MaskPrecision.TIGHT))
+            if blob is None:
+                set_mask_estimator_status(detection, MissReason.MASK_EMPTY_SEGMENTATION)
+                masks.append(None)
+            else:
+                masks.append(mask_from_array(blob, MaskPrecision.TIGHT))
         return masks
 
     def log_segmentation_latency(self, elapsed_ms: float, mask_count: int) -> None:
@@ -762,7 +810,7 @@ class G1MaskMeasurementNode(Node):
         """
 
         if scan_msg is None:
-            return None
+            return None, MissReason.NO_SCAN
         try:
             rotation, translation, self.last_scan_tf_fallback = lookup_transform_components(
                 self.tf_buffer,
@@ -774,12 +822,12 @@ class G1MaskMeasurementNode(Node):
             )
         except TransformException as exc:
             self.log_skip_warning(f'Polar profiling scan skipped (TF): {exc}')
-            return None
+            return None, MissReason.TF_MISS_SCAN
         try:
-            return scan_points_optical(scan_msg, rotation, translation)
+            return scan_points_optical(scan_msg, rotation, translation), MissReason.OK
         except ValueError as exc:
             self.log_skip_warning(f'Polar profiling scan skipped: {exc}')
-            return None
+            return None, MissReason.SCAN_INVALID
 
     def log_skip_warning(self, warning: str) -> None:
         if warning == self.last_skip_warning:

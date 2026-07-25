@@ -6,6 +6,7 @@ from typing import Any
 import numpy as np
 from sensor_msgs.msg import Image
 
+from ridgeback_autonomy.common.miss_reason import MissReason
 from ridgeback_autonomy.common.models import Detection, DetectionBatch
 from ridgeback_autonomy.msg import G1Detections, G1Measurements
 
@@ -15,6 +16,21 @@ MISSING_FLOAT = float('nan')
 
 def optional_float(value: float | None) -> float:
     return float(value) if value is not None else MISSING_FLOAT
+
+
+def optional_status(value: int | None) -> int:
+    """Encode a miss-reason code as ``uint8``; ``None`` -> ``UNSET`` sentinel."""
+
+    return int(value) if value is not None else int(MissReason.UNSET)
+
+
+def decode_optional_status(values, index: int) -> int | None:
+    """Decode a ``uint8`` status back to a code, ``UNSET``/absent -> ``None``."""
+
+    if index >= len(values):
+        return None
+    value = int(values[index])
+    return None if value == int(MissReason.UNSET) else value
 
 
 def build_detections_message(batch: DetectionBatch, header) -> G1Detections:
@@ -48,6 +64,9 @@ def build_measurements_message(batch: DetectionBatch, header) -> G1Measurements:
         msg.polar_profiling_lateral_m.append(optional_float(detection.polar_profiling_lateral_m))
         msg.polar_profiling_forward_m.append(optional_float(detection.polar_profiling_forward_m))
         msg.polar_profiling_distance_m.append(optional_float(detection.polar_profiling_distance_m))
+        msg.projective_ranging_status.append(optional_status(detection.projective_ranging_status))
+        msg.euclidean_reconstruction_status.append(optional_status(detection.euclidean_reconstruction_status))
+        msg.polar_profiling_status.append(optional_status(detection.polar_profiling_status))
 
     return msg
 
@@ -93,6 +112,10 @@ def batch_from_measurements_message(msg: G1Measurements) -> DetectionBatch:
         detection.polar_profiling_lateral_m = decode_optional_float(msg.polar_profiling_lateral_m, index)
         detection.polar_profiling_forward_m = decode_optional_float(msg.polar_profiling_forward_m, index)
         detection.polar_profiling_distance_m = decode_optional_float(msg.polar_profiling_distance_m, index)
+        detection.projective_ranging_status = decode_optional_status(msg.projective_ranging_status, index)
+        detection.euclidean_reconstruction_status = decode_optional_status(
+            msg.euclidean_reconstruction_status, index)
+        detection.polar_profiling_status = decode_optional_status(msg.polar_profiling_status, index)
 
     return batch
 

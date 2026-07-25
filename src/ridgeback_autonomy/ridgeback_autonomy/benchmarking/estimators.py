@@ -69,6 +69,15 @@ ESTIMATOR_FIELD_KEYS = {
     'polar_profiling': 'polar_profiling_distance_m',
 }
 
+# Per-detection miss-reason arrays on G1Measurements, for the mask estimators
+# that write a status. The legacy estimators have no status field; the benchmark
+# infers a coarse OK/UNSET for them from finiteness.
+ESTIMATOR_STATUS_FIELD_KEYS = {
+    'projective_ranging': 'projective_ranging_status',
+    'euclidean_reconstruction': 'euclidean_reconstruction_status',
+    'polar_profiling': 'polar_profiling_status',
+}
+
 ESTIMATOR_LABELS = {
     'rgb': 'RGB',
     'sensor_depth': 'Sensor Depth',

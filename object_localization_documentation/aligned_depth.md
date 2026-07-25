@@ -198,3 +198,9 @@ consumers (projective ranging, euclidean reconstruction, mask overlay) never bra
   (`aligned_depth_node`, switched by its `depth_source` param); consumers
   (`g1_mask_measurement_node`) subscribe those topics and never branch on the
   source.
+- **Stamp-matching coverage in sim** — open (2026-07-24): the exact-stamp match
+  between detections and aligned depth (the §1 "Timing" invariant) misses on
+  ~80% of frames in sim, so the depth paths report `NO_DEPTH_FRAME`. Root cause
+  is CPU-starvation of the `aligned_depth_node` process (producer ~1 Hz vs
+  ~2.7 Hz published), not a code hotspot. Diagnosis, profiling, and fix options
+  in `aligned_depth_coverage.md`; no fix chosen yet.
