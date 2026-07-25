@@ -44,7 +44,7 @@ DEPTH_ANYTHING_MODEL_ID_DEFAULT = 'depth-anything/Depth-Anything-V2-Metric-Indoo
 # After a load/inference failure the monocular source waits this long before
 # re-attempting, instead of disabling itself for the rest of the run. A single
 # transient hiccup (e.g. a CUDA OOM) then self-heals rather than silently
-# starving every ``monocular`` benchmark row (audit C4).
+# starving every ``monocular`` benchmark row.
 MONOCULAR_RETRY_COOLDOWN_S_DEFAULT = 30.0
 
 
@@ -55,7 +55,7 @@ def decode_depth_to_meters(msg: Image) -> np.ndarray:
     Delegates to the shared decoder, which honours ``msg.step`` (row padding).
     A real camera driver may emit row-aligned buffers (``step > width *
     itemsize``); the previous hand-rolled ``reshape(height, width)`` rejected
-    every such frame (audit C12). This stays the contract's single entry point,
+    every such frame. This stays the contract's single entry point,
     so both importers (this node and ``g1_mask_measurement_node``) get the fix.
     """
 
@@ -170,7 +170,7 @@ class MonocularDepthSource:
         self.device = device or self.resolve_device()
         self.logger = logger
         self._pipeline = None
-        # Retry-with-cooldown instead of a permanent fail latch (audit C4):
+        # Retry-with-cooldown instead of a permanent fail latch:
         # ``_retry_after`` is the earliest time (``now_fn`` seconds) a new load
         # is allowed. 0 lets the first load run immediately.
         self._now_fn = now_fn

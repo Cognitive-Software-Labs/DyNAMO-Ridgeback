@@ -73,8 +73,8 @@ def nearest_mode_histogram(
         # object's depth spread plus the floor ramp can dilute every bin at
         # range). Fall back to the NEAREST non-empty bin, not the global mode:
         # at range the biggest coherent bin is the background wall, so
-        # ``argmax`` would confidently isolate the wall instead of the subject
-        # (audit C5). ``values.size > 0`` guarantees at least one non-empty bin.
+        # ``argmax`` would confidently isolate the wall instead of the subject.
+        # ``values.size > 0`` guarantees at least one non-empty bin.
         nearest = int(np.flatnonzero(hist >= 1)[0])
     peak_m = 0.5 * (edges[nearest] + edges[nearest + 1])
 

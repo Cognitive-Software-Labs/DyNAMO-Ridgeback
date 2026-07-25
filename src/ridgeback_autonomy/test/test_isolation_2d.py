@@ -80,7 +80,7 @@ def test_unimodal_roi_keeps_all_valid_masked_pixels(recipe) -> None:
 
 
 def test_nearest_mode_dispersed_histogram_picks_nearest_not_global_mode() -> None:
-    # Regression (audit C5): when the histogram is so dispersed that NO bin
+    # Regression: when the histogram is so dispersed that NO bin
     # clears the significance floor, the recipe must fall back to the NEAREST
     # non-empty bin, not the global argmax. Here a thin near cluster (~2 m,
     # fewer pixels) sits in front of a larger dispersed far wall (~5 m): the

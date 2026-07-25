@@ -211,7 +211,7 @@ def test_segment_boxes_applies_min_predicted_iou() -> None:
 
 
 def test_segment_boxes_raises_when_not_loaded() -> None:
-    # S-4: a non-empty box list on an unloaded segmenter is a wiring bug -- fail
+    # A non-empty box list on an unloaded segmenter is a wiring bug -- fail
     # loud, not with a cryptic None(**inputs) TypeError.
     segmenter = SamBoxSegmenter('fake/model', PrintLogger())
 

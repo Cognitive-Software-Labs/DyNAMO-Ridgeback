@@ -9,7 +9,7 @@ class _StubDetector:
     """Injected in place of OwlV2Detector: no torch, scripted detect().
 
     ``load()`` is a no-op so the node stands up without OWLv2; ``detect`` raises
-    on demand to exercise the D-1 worker guard.
+    on demand to exercise the worker guard.
     """
 
     def __init__(self) -> None:

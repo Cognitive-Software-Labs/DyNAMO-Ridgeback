@@ -29,7 +29,7 @@ def test_intersection_over_smaller_full_containment() -> None:
 
 
 def test_nms_containment_drops_giant_box_around_higher_score_box() -> None:
-    # The C6/D-2 outlier: a near-full-frame box (low IoU with everything) that
+    # The outlier case: a near-full-frame box (low IoU with everything) that
     # contains a tighter, higher-scoring box must be suppressed by it.
     giant = Detection(bbox_xyxy=(0, 0, 100, 100), label='humanoid robot', score=0.60)
     tight = Detection(bbox_xyxy=(10, 10, 30, 30), label='humanoid robot', score=0.90)
@@ -40,16 +40,16 @@ def test_nms_containment_drops_giant_box_around_higher_score_box() -> None:
 
 
 def test_nms_keeps_lone_giant_box() -> None:
-    # D-2 limitation, encoded: with no competing box to outscore it, the giant
+    # Limitation, encoded: with no competing box to outscore it, the giant
     # box survives -- the detector adds no size gate (lone-giant defense is the
-    # mask node's C6 MAX_BOX_FRAME_FRACTION gate, not here).
+    # mask node's MAX_BOX_FRAME_FRACTION gate, not here).
     giant = Detection(bbox_xyxy=(0, 0, 100, 100), label='humanoid robot', score=0.60)
 
     assert non_maximum_suppression([giant], NMS_IOU_THRESHOLD) == [giant]
 
 
 def test_nms_keeps_overlapping_boxes_of_different_labels() -> None:
-    # D-8: suppression is per-label. Two identical boxes with different labels
+    # Suppression is per-label. Two identical boxes with different labels
     # (IoU 1.0) are not duplicates -- both are kept.
     robot = Detection(bbox_xyxy=(0, 0, 100, 100), label='humanoid robot', score=0.90)
     person = Detection(bbox_xyxy=(0, 0, 100, 100), label='person', score=0.80)

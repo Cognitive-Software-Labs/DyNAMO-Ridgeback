@@ -114,12 +114,12 @@ COLOR_BUFFER_DEPTH_DEFAULT = 15
 # a failure (OWLv2 occasionally boxes the whole scene at close range); masking
 # with it isolates the background wall and poisons every path. Detections that
 # fail this gate are skipped (fields stay NaN, trial drops) rather than measured
-# against the room -- audit C6, the 2026-07-17 pos_003/024/032 outlier trials.
+# against the room -- the observed close-range outlier trials.
 MAX_BOX_FRAME_FRACTION = 0.60
 
 # Aligned-depth frames and scans are matched to the detection stamp, not paired
 # latest-wins, so the mask and the depth/scan it reads come from the same
-# instant (audit C3). Depth inherits the color frame's stamp (exact match); the
+# instant. Depth inherits the color frame's stamp (exact match); the
 # scan free-runs at ~40 Hz, so it is matched to the nearest buffered stamp
 # within SCAN_MATCH_TOLERANCE_S. Buffer depths span the detector latency
 # (~200 ms) plus jitter.
@@ -199,7 +199,7 @@ class StampedMessageBuffer:
     ``lookup_nearest`` within a tolerance window. A miss means the message aged
     out (or never arrived); the caller skips that source's paths rather than
     pairing whatever arrived most recently, which would smear distance under
-    motion (audit C3) or mislabel the silhouette benchmark row.
+    motion or mislabel the silhouette benchmark row.
     """
 
     def __init__(self, depth: int) -> None:
@@ -369,8 +369,8 @@ class G1MaskMeasurementNode(Node):
         self.declare_parameter('color_topic', COLOR_TOPIC_DEFAULT)
         self.declare_parameter('color_buffer_depth', COLOR_BUFFER_DEPTH_DEFAULT)
         self.declare_parameter('segmentation_model', SEGMENTATION_MODEL_DEFAULT)
-        # Silhouette confidence floor (S-1). Settable via --ros-args only for
-        # now, same status as segmentation_model -- fold into C11's launch-arg
+        # Silhouette confidence floor. Settable via --ros-args only for
+        # now, same status as segmentation_model -- fold into the launch-arg
         # work later.
         self.declare_parameter(
             'segmentation_min_iou', SEGMENTATION_MIN_PREDICTED_IOU_DEFAULT)
@@ -422,7 +422,7 @@ class G1MaskMeasurementNode(Node):
         self.last_base_tf_fallback: str | None = None
 
         self.latest_detections_msg: G1Detections | None = None
-        # Depth and scan are matched to the detection stamp (audit C3), not
+        # Depth and scan are matched to the detection stamp, not
         # paired latest-wins, so they are buffered rather than kept as a single
         # slot. Depth = exact stamp; scan = nearest within scan_match_tolerance_s.
         self.depth_buffer = StampedMessageBuffer(DEPTH_MATCH_BUFFER_DEPTH)
@@ -629,7 +629,7 @@ class G1MaskMeasurementNode(Node):
         the run *is* the gate axis); an empty segmentation yields a ``None``
         entry for that detection only. Detections whose box covers more than
         ``MAX_BOX_FRAME_FRACTION`` of the frame are gated to a ``None`` entry
-        before masking (audit C6), so a runaway detector box is never rasterized
+        before masking, so a runaway detector box is never rasterized
         or segmented into the background wall.
         """
 
@@ -695,7 +695,7 @@ class G1MaskMeasurementNode(Node):
             f'Silhouette segmentation: {elapsed_ms:.1f} ms for {mask_count} mask(s).')
 
     def log_oversized_skip(self, count: int) -> None:
-        """Warn (throttled) that oversized detector boxes were gated out (C6)."""
+        """Warn (throttled) that oversized detector boxes were gated out."""
 
         if count <= 0:
             return

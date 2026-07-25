@@ -105,7 +105,7 @@ class G1DetectorNode(Node):
             self.last_detection_time = time.monotonic()
 
     def run_detection_step(self, color_msg: Image) -> None:
-        """Process one frame, surviving any inference/publish failure (D-1).
+        """Process one frame, surviving any inference/publish failure.
 
         Only image-decode errors were caught before, so one transient CUDA OOM
         (or any publish error) killed the worker thread while the node still
@@ -117,7 +117,7 @@ class G1DetectorNode(Node):
             self.log_detection_error(exc)
 
     def log_detection_error(self, exc: Exception) -> None:
-        """Warn (throttled) that a detection frame failed (D-1)."""
+        """Warn (throttled) that a detection frame failed."""
 
         now = time.monotonic()
         if now - self.last_error_log_monotonic < 5.0:

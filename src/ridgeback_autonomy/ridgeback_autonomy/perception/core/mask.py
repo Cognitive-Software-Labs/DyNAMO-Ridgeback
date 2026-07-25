@@ -74,7 +74,7 @@ class Mask:
             raise ValueError(f'mask data must be 2D (H, W); got shape {self.data.shape}')
         if self.data.dtype != np.bool_:
             raise ValueError(f'mask data must be boolean; got dtype {self.data.dtype}')
-        # Make ``frozen=True`` real for the pixels too (M-2). No consumer writes
+        # Make ``frozen=True`` real for the pixels too. No consumer writes
         # into a mask after construction (producers fill a local array first),
         # so this only forbids writes nobody performs. Setting a numpy array
         # read-only is always permitted -- even for a view of a reused tensor

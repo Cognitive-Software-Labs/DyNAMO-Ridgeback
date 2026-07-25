@@ -58,7 +58,7 @@ def test_base_adapter_level_camera_forward_is_z_minus_offset() -> None:
 
 def test_base_adapter_applies_camera_mounting_translation() -> None:
     # Camera mounted forward/left/up of the base origin: the translation must
-    # enter the planar coordinate -- this is the C1 fix under test.
+    # enter the planar coordinate -- this is the fix under test.
     translation = np.array([0.311, 0.018, 1.158])
     lateral, forward, _ = optical_to_base_planar(
         (0.0, 0.0, 3.0), LEVEL_OPTICAL_TO_BASE, translation,
@@ -72,7 +72,7 @@ def test_defaults_mirror_legacy_constants_by_value() -> None:
     # The node's front-offset default mirrors the legacy geometry constant by
     # value (the two stacks never import each other). The pure core-module
     # mirrors are covered in test_mirrored_constants; this one needs the
-    # ROS-importing node module, so it lives here (audit C10).
+    # ROS-importing node module, so it lives here.
     from ridgeback_autonomy.perception.core import geometry
 
     assert ROBOT_FRONT_OFFSET_M_DEFAULT == geometry.ROBOT_FRONT_OFFSET_M
@@ -86,7 +86,7 @@ def test_box_within_frame_fraction_accepts_normal_box() -> None:
 
 
 def test_box_within_frame_fraction_rejects_near_full_frame_box() -> None:
-    # The OWLv2 failure mode: a box spanning almost the whole frame (audit C6).
+    # The OWLv2 failure mode: a box spanning almost the whole frame.
     assert box_within_frame_fraction((2, 2, 638, 478), 480, 640) is False
 
 

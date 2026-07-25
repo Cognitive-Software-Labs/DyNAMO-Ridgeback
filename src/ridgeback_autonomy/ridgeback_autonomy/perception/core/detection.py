@@ -12,7 +12,7 @@ DETECTION_THRESHOLD = 0.55
 NMS_IOU_THRESHOLD = 0.5
 # A candidate almost entirely inside a kept box (high intersection-over-smaller)
 # is suppressed even when its IoU is low -- the near-full-frame box overlapping a
-# tight box is the C6 outlier source. Conservative: near-total containment only.
+# tight box is the outlier source. Conservative: near-total containment only.
 # Near-total containment only: a full giant-box-over-real-box still scores 1.0
 # and is suppressed, while a partly-occluded neighbour (~0.85-0.95 inside a
 # nearer box) survives, preserving multi-instance recall in crowded scenes.
@@ -104,9 +104,9 @@ def non_maximum_suppression(detections: list[Detection], iou_threshold: float) -
     ordered = sorted(detections, key=lambda detection: detection.score, reverse=True)
     keep: list[Detection] = []
     for detection in ordered:
-        # Suppress only against a same-label kept box (D-8: cross-label overlap is
+        # Suppress only against a same-label kept box (cross-label overlap is
         # not a duplicate) that either overlaps enough (IoU) or nearly contains
-        # this one (intersection-over-smaller -- the giant-box case, D-2).
+        # this one (intersection-over-smaller -- the giant-box case).
         suppressed = any(
             detection.label == kept.label
             and (

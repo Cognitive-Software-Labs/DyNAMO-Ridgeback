@@ -43,9 +43,9 @@ PROMPT_PADDING_REL_DEFAULT = 0.05
 # score high. So this drops low-quality/uncertain masks (which correlate with
 # bad prompt boxes) but will NOT catch a crisp wrong-object mask; full
 # correctness would need a depth-consistency or class check (out of scope).
-# Spike range for good G1 masks was 0.94-0.99 (segmentation_component.md); the
-# audit suggested ~0.7 (S-C6). A conservative 0.5 default leaves headroom for
-# real D435 imagery scoring below sim -- a tunable knob, not a magic truth.
+# Spike range for good G1 masks was 0.94-0.99 (segmentation_component.md). A
+# conservative 0.5 default leaves headroom for real D435 imagery scoring below
+# sim -- a tunable knob, not a magic truth.
 SEGMENTATION_MIN_PREDICTED_IOU_DEFAULT = 0.5
 
 
@@ -99,7 +99,7 @@ def select_best_masks(
     **or scores below** ``min_predicted_iou`` -- the caller's signal to skip
     that detection (no-fallback convention: a failed segmentation drops the
     trial, it is never patched over). The floor lives here because this is
-    where the score exists (S-9); the default 0.0 keeps the library call
+    where the score exists; the default 0.0 keeps the library call
     permissive, the node supplies the production floor. See
     ``SEGMENTATION_MIN_PREDICTED_IOU_DEFAULT`` for the quality-vs-correctness
     caveat.
@@ -190,10 +190,10 @@ class SamBoxSegmenter:
 
         if not boxes_xyxy:
             return []
-        # S-4: the model is loaded eagerly by the node; a live None here is a
+        # The model is loaded eagerly by the node; a live None here is a
         # wiring bug, so fail loud rather than the cryptic ``None(**inputs)``.
-        # (The detector's detect() carries the identical dead lazy-load, D-6 --
-        # out of scope here.)
+        # (The detector's detect() carries the identical dead lazy-load, out of
+        # scope here.)
         if self._model is None:
             raise RuntimeError('segmenter not loaded; call load() first')
 

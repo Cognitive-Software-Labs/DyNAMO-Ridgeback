@@ -1,4 +1,4 @@
-"""Cross-check the by-value 'mirrored constant' pairs (audit C10).
+"""Cross-check the by-value 'mirrored constant' pairs.
 
 The mask stack (``perception/core``) deliberately never imports the legacy
 estimator stack (``geometry.py``); shared tuning values are duplicated by value

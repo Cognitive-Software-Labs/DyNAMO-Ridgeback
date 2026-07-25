@@ -54,7 +54,7 @@ def test_decode_depth_mono16_uses_the_millimeter_path() -> None:
 
 def test_decode_depth_16uc1_honours_row_padding() -> None:
     # A real driver may emit row-aligned buffers (step > width*itemsize); the
-    # decoder must strip the padding, not choke on it (audit C12).
+    # decoder must strip the padding, not choke on it.
     rows = [[1000, 2500], [500, 0]]
     itemsize = np.dtype(np.uint16).itemsize
     width, pad_elements = 2, 2
@@ -115,7 +115,7 @@ def test_decode_color_rejects_unknown_encoding() -> None:
 
 
 def test_monocular_source_retries_after_cooldown(monkeypatch) -> None:
-    # C4: a transient load/inference failure must NOT permanently disable the
+    # A transient load/inference failure must NOT permanently disable the
     # source. It arms a cooldown, skips while it is active, then re-attempts
     # once the cooldown elapses -- here the retry succeeds.
     clock = {'t': 100.0}
@@ -164,7 +164,7 @@ def test_encode_depth_message_round_trip() -> None:
 
 def test_decode_color_honours_row_padding() -> None:
     # A real driver may pad rows (step > width*channels); the decoder must strip
-    # the padding, not choke on it (DP-7, the color twin of C12).
+    # the padding, not choke on it (the color twin of the depth-padding case).
     height, width, channels, pad_bytes = 2, 2, 3, 4
     pixels = np.arange(height * width * channels, dtype=np.uint8).reshape(
         height, width, channels)
@@ -254,7 +254,7 @@ def _input_image() -> Image:
 
 
 def test_producer_worker_survives_exception(ros_context) -> None:
-    # DP-9: an unexpected produce/publish error must not propagate out of the
+    # An unexpected produce/publish error must not propagate out of the
     # guarded step or leave the worker unable to handle the next good frame.
     source = _StubSource()
     node = _make_node(source)
