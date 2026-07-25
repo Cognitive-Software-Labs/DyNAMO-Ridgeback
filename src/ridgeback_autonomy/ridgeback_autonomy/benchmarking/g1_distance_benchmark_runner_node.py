@@ -13,6 +13,7 @@ from typing import Any
 import cv2
 import rclpy
 from ament_index_python.packages import get_package_share_directory
+from geometry_msgs.msg import PointStamped
 from rclpy.executors import ExternalShutdownException
 from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
@@ -26,6 +27,7 @@ from ridgeback_autonomy.benchmarking.alignment import (
     update_measurement_event,
 )
 from ridgeback_autonomy.benchmarking.estimators import (
+    GROUND_TRUTH_TOPIC,
     MASK_GATE_DEFAULT,
     benchmark_display_name,
     benchmark_output_name,
@@ -64,6 +66,21 @@ from ridgeback_autonomy.perception.core.image_utils import (
 )
 from ridgeback_autonomy.perception.core.isolation_2d import ISOLATION_2D_DEFAULT
 from ridgeback_autonomy.perception.core.isolation_3d import ISOLATION_3D_DEFAULT
+
+
+def ground_truth_point_message(true_pose: dict[str, float]) -> PointStamped:
+    """Pack a trial's ground truth as x=lateral, y=forward, z=distance.
+
+    The overlay's ``current_truth`` unpacks the same convention; the values are
+    the base-frame planar measurement every benchmark row shares, not a 3D
+    point in any TF frame.
+    """
+
+    msg = PointStamped()
+    msg.point.x = float(true_pose['lateral_m'])
+    msg.point.y = float(true_pose['forward_m'])
+    msg.point.z = float(true_pose['distance_m'])
+    return msg
 
 
 FORWARD_DISTANCES_M = [1.5, 2.5, 3.5, 4.5, 5.5]
@@ -255,6 +272,14 @@ class G1DistanceBenchmarkRunner(Node):
                 qos_profile_sensor_data,
             )
 
+        # Ground truth for the overlay's reference line, republished at ~1 Hz
+        # while a capture window is active so the overlay's age gate drops the
+        # line between trials.
+        self.ground_truth_pub = self.create_publisher(
+            PointStamped, GROUND_TRUTH_TOPIC, 10)
+        self.active_truth: dict[str, float] | None = None
+        self.last_truth_publish_monotonic = 0.0
+
     def on_camera_measurement(self, msg: G1Measurements) -> None:
         self.camera_measurement_seen = True
         if not self.capture_active:
@@ -407,6 +432,7 @@ class G1DistanceBenchmarkRunner(Node):
             self.spin_for(self.settle_sec)
 
             true_pose = self.compute_ground_truth(model_name)
+            self.active_truth = true_pose
             capture = self.capture_measurement_window(self.capture_sec)
             merge_status_histograms(self.status_aggregate, capture['status_histogram'])
             usable_events = capture['usable_events']
@@ -474,6 +500,7 @@ class G1DistanceBenchmarkRunner(Node):
             self.spin_for(duration_sec)
         finally:
             self.capture_active = False
+            self.active_truth = None
 
         usable_events = usable_aligned_events(self.capture_events, self.selected_estimators)
         return {
@@ -795,7 +822,21 @@ class G1DistanceBenchmarkRunner(Node):
             remaining = deadline - time.monotonic()
             if remaining <= 0.0:
                 return
+            self.publish_active_truth()
             rclpy.spin_once(self, timeout_sec=min(0.1, remaining))
+
+    def publish_active_truth(self) -> None:
+        """Republish the trial ground truth at ~1 Hz during capture."""
+
+        if not self.capture_active or self.active_truth is None:
+            return
+        now = time.monotonic()
+        if now - self.last_truth_publish_monotonic < 1.0:
+            return
+        self.last_truth_publish_monotonic = now
+        msg = ground_truth_point_message(self.active_truth)
+        msg.header.stamp = self.get_clock().now().to_msg()
+        self.ground_truth_pub.publish(msg)
 
     def log_warning_once(self, attribute_name: str, warning: str) -> None:
         if warning == getattr(self, attribute_name):

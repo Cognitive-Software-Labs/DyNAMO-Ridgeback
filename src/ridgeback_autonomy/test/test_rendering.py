@@ -17,6 +17,7 @@ from ridgeback_autonomy.perception.core.rendering import (
     pack_panels,
     polar_highlight_beams,
     select_panels,
+    truth_label_line,
 )
 
 
@@ -126,6 +127,11 @@ def test_active_label_lines_follows_public_order() -> None:
 
     assert lines[0].startswith('RGB')
     assert lines[1].startswith('Polar Profiling')
+
+
+def test_truth_label_line_matches_position_line_format() -> None:
+    assert truth_label_line((0.0, 2.5, 2.5)) == 'Truth x=+0.00 z=+2.50 d=2.50m'
+    assert truth_label_line((-0.75, 3.5, 3.58)) == 'Truth x=-0.75 z=+3.50 d=3.58m'
 
 
 def test_polar_highlight_beams_keeps_near_band_only() -> None:

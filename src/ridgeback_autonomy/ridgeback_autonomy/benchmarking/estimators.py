@@ -78,6 +78,12 @@ ESTIMATOR_STATUS_FIELD_KEYS = {
     'polar_profiling': 'polar_profiling_status',
 }
 
+# Ground truth the benchmark runner republishes during a trial's capture
+# window and the overlay renders as a reference label line. Benchmark-only:
+# nothing publishes this topic in the exploration stack, so the overlay line
+# never appears there.
+GROUND_TRUTH_TOPIC = 'benchmark/g1/ground_truth'
+
 ESTIMATOR_LABELS = {
     'rgb': 'RGB',
     'sensor_depth': 'Sensor Depth',

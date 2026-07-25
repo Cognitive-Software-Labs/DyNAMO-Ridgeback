@@ -149,6 +149,18 @@ def format_distance_line(prefix: str, distance_m: float | None) -> str:
     return f'{prefix} d={distance_m:.2f}m'
 
 
+# Ground-truth reference line: rendered gold so it reads as the benchmark's
+# reference, never as one of the estimates.
+TRUTH_LABEL_COLOR = (0, 215, 255)
+
+
+def truth_label_line(truth) -> str:
+    """Label line for a ``(lateral_m, forward_m, distance_m)`` ground truth."""
+
+    lateral_m, forward_m, distance_m = truth
+    return format_position_line('Truth', lateral_m, forward_m, distance_m)
+
+
 class RgbdOverlayRenderer:
     """Assembles the per-frame overlay grid for the configured estimator set."""
 
@@ -177,6 +189,7 @@ class RgbdOverlayRenderer:
         scan_uv: np.ndarray | None = None,
         scan_in_view: np.ndarray | None = None,
         scan_points_optical: np.ndarray | None = None,
+        truth: tuple[float, float, float] | None = None,
     ) -> np.ndarray:
         images = [
             self.build_panel(
@@ -188,6 +201,7 @@ class RgbdOverlayRenderer:
                 scan_uv=scan_uv,
                 scan_in_view=scan_in_view,
                 scan_points_optical=scan_points_optical,
+                truth=truth,
             )
             for spec in self.panels
         ]
@@ -206,10 +220,11 @@ class RgbdOverlayRenderer:
         scan_uv,
         scan_in_view,
         scan_points_optical,
+        truth=None,
     ) -> np.ndarray:
         if spec.kind == PANEL_RGB:
             panel = frame.copy()
-            self.annotate_detections(panel, batch, draw_labels=True)
+            self.annotate_detections(panel, batch, draw_labels=True, truth=truth)
         elif spec.kind == PANEL_SENSOR_DEPTH:
             panel = self.make_depth_panel(frame.shape[:2], sensor_depth_meters)
             self.annotate_detections(panel, batch, draw_labels=False)
@@ -242,6 +257,7 @@ class RgbdOverlayRenderer:
         batch: DetectionBatch,
         *,
         draw_labels: bool,
+        truth: tuple[float, float, float] | None = None,
     ) -> None:
         if not batch.detected:
             return
@@ -255,7 +271,12 @@ class RgbdOverlayRenderer:
             if draw_labels:
                 lines = [f'G1 #{index + 1} ({detection.score:.0%})']
                 lines.extend(active_label_lines(detection, self.estimators))
-                self.draw_label_block(panel, x1, y1, lines, (0, 255, 0))
+                line_colors = None
+                if truth is not None:
+                    line_colors = {len(lines): TRUTH_LABEL_COLOR}
+                    lines.append(truth_label_line(truth))
+                self.draw_label_block(
+                    panel, x1, y1, lines, (0, 255, 0), line_colors=line_colors)
 
     def make_lidar_panel(
         self,
@@ -368,7 +389,8 @@ class RgbdOverlayRenderer:
                     scale, (255, 255, 255), thickness, cv2.LINE_AA)
 
     def draw_label_block(self, image: np.ndarray, x: int, y: int,
-                         lines: list[str], color) -> None:
+                         lines: list[str], color,
+                         line_colors: dict[int, tuple] | None = None) -> None:
         font = cv2.FONT_HERSHEY_DUPLEX
         scale = 0.68
         thickness = 2
@@ -398,7 +420,8 @@ class RgbdOverlayRenderer:
 
         text_y = top_y + padding_y + line_height - line_gap
         for line_index, line in enumerate(lines):
-            text_color = color if line_index == 0 else (245, 245, 245)
+            text_color = (line_colors or {}).get(
+                line_index, color if line_index == 0 else (245, 245, 245))
             origin = (left_x + padding_x, text_y)
             cv2.putText(image, line, origin, font, scale, (0, 0, 0), thickness + 3, cv2.LINE_AA)
             cv2.putText(image, line, origin, font, scale, text_color, thickness, cv2.LINE_AA)

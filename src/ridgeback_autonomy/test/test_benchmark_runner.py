@@ -19,7 +19,10 @@ from ridgeback_autonomy.benchmarking.estimators import (
     parse_estimators,
     parse_mask_gate,
 )
-from ridgeback_autonomy.benchmarking.g1_distance_benchmark_runner_node import extract_json_payload
+from ridgeback_autonomy.benchmarking.g1_distance_benchmark_runner_node import (
+    extract_json_payload,
+    ground_truth_point_message,
+)
 from ridgeback_autonomy.benchmarking.reduction import (
     choose_representative_event,
     compute_trial_medians,
@@ -498,3 +501,12 @@ def test_build_summary_rows_aggregates_trial_level_estimator_rows() -> None:
 
     assert lidar_row['trial_count'] == 1
     assert lidar_row['p95_abs_error_m'] == pytest.approx(0.1, rel=1e-6)
+
+
+def test_ground_truth_point_message_packs_planar_truth() -> None:
+    msg = ground_truth_point_message(
+        {'lateral_m': -0.75, 'forward_m': 3.5, 'distance_m': 3.58})
+
+    assert msg.point.x == pytest.approx(-0.75)
+    assert msg.point.y == pytest.approx(3.5)
+    assert msg.point.z == pytest.approx(3.58)

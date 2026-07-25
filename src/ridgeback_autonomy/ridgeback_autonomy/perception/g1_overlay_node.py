@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from collections import OrderedDict
 
 import cv2
@@ -10,11 +11,13 @@ from rclpy.executors import ExternalShutdownException
 from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
 from rclpy.time import Time
+from geometry_msgs.msg import PointStamped
 from sensor_msgs.msg import CameraInfo, Image, LaserScan
 from tf2_ros import Buffer, TransformException, TransformListener
 
 from ridgeback_autonomy.benchmarking.estimators import (
     DEPTH_PATH_ESTIMATORS,
+    GROUND_TRUTH_TOPIC,
     parse_estimators,
     parse_mask_gate,
     uses_mask_estimators,
@@ -45,6 +48,11 @@ COLOR_CAMERA_INFO_TOPIC = 'sensors/camera_0/color/camera_info'
 SCAN_TOPIC = 'sensors/lidar2d_0/scan'
 DEPTH_MAX_METERS_DEFAULT = 10.0
 RENDER_FPS_DEFAULT = 15.0
+
+# The benchmark runner republishes the trial ground truth at ~1 Hz during a
+# capture window. The age gate drops the reference line shortly after capture
+# ends, so a stale truth never sits next to a teleported target between trials.
+TRUTH_MAX_AGE_S = 3.0
 
 # The estimator fields each measurement pipeline populates. render_latest builds
 # the batch from whichever pipeline drove the frame, then merges the others in
@@ -77,6 +85,7 @@ class G1OverlayNode(Node):
         self.declare_parameter('aligned_depth_topic', ALIGNED_DEPTH_TOPIC)
         self.declare_parameter('color_camera_info_topic', COLOR_CAMERA_INFO_TOPIC)
         self.declare_parameter('scan_topic', SCAN_TOPIC)
+        self.declare_parameter('ground_truth_topic', GROUND_TRUTH_TOPIC)
         self.declare_parameter('depth_max_meters', DEPTH_MAX_METERS_DEFAULT)
         self.declare_parameter('render_fps', RENDER_FPS_DEFAULT)
         self.declare_parameter('window_name', 'G1 Perception')
@@ -108,6 +117,8 @@ class G1OverlayNode(Node):
         self.latest_aligned_depth_msg: Image | None = None
         self.latest_color_info: CameraInfo | None = None
         self.latest_scan_msg: LaserScan | None = None
+        self.latest_truth_msg: PointStamped | None = None
+        self.latest_truth_monotonic = 0.0
         self.camera_cache: OrderedDict[tuple, G1Measurements] = OrderedDict()
         self.lidar_cache: OrderedDict[tuple, G1Measurements] = OrderedDict()
         self.mask_cache: OrderedDict[tuple, G1Measurements] = OrderedDict()
@@ -136,6 +147,11 @@ class G1OverlayNode(Node):
             self.mask_measurement_callback, 10)
         self.create_subscription(
             Image, self.color_topic, self.color_callback, qos_profile=qos_profile_sensor_data)
+        # Silent outside the benchmark (nothing publishes it), so this needs no
+        # exploration-vs-benchmark gate.
+        self.create_subscription(
+            PointStamped, self.get_parameter('ground_truth_topic').value,
+            self.ground_truth_callback, 10)
 
         if 'sensor_depth' in self.estimators:
             self.create_subscription(
@@ -209,6 +225,25 @@ class G1OverlayNode(Node):
     def scan_callback(self, scan_msg: LaserScan) -> None:
         self.latest_scan_msg = scan_msg
 
+    def ground_truth_callback(self, msg: PointStamped) -> None:
+        self.latest_truth_msg = msg
+        self.latest_truth_monotonic = time.monotonic()
+
+    def current_truth(self) -> tuple[float, float, float] | None:
+        """The benchmark ground truth while it is being republished, else None.
+
+        Packed as x=lateral, y=forward, z=distance (the runner's
+        ``ground_truth_point_message``). Age-gated so the reference line
+        disappears between trials instead of lying next to a teleported target.
+        """
+
+        if self.latest_truth_msg is None:
+            return None
+        if time.monotonic() - self.latest_truth_monotonic > TRUTH_MAX_AGE_S:
+            return None
+        point = self.latest_truth_msg.point
+        return (point.x, point.y, point.z)
+
     def mask_debug_callback(self, mask_msg: Image) -> None:
         key = (mask_msg.header.stamp.sec, mask_msg.header.stamp.nanosec)
         self.mask_debug_cache[key] = mask_msg
@@ -262,6 +297,7 @@ class G1OverlayNode(Node):
             scan_uv=scan_uv,
             scan_in_view=scan_in_view,
             scan_points_optical=scan_points_optical,
+            truth=self.current_truth(),
         )
         cv2.imshow(self.window_name, annotated)
         cv2.waitKey(1)
