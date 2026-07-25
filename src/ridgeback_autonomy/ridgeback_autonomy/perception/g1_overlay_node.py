@@ -120,6 +120,7 @@ class G1OverlayNode(Node):
         self.last_aligned_depth_warning: str | None = None
         self.last_mask_debug_warning: str | None = None
         self.last_scan_tf_warning: str | None = None
+        self.last_scan_decode_warning: str | None = None
 
         self.tf_buffer = Buffer(node=self)
         self.tf_listener = TransformListener(self.tf_buffer, self, spin_thread=False)
@@ -319,7 +320,9 @@ class G1OverlayNode(Node):
         try:
             points_optical, valid = scan_points_optical(
                 self.latest_scan_msg, rotation, translation)
-        except ValueError:
+        except ValueError as exc:
+            self.log_warning_once(
+                'last_scan_decode_warning', f'Polar overlay scan skipped: {exc}')
             return None, None, None
         intrinsics = intrinsics_from_camera_info(self.latest_color_info)
         uv, in_view = project_points(points_optical, intrinsics)
