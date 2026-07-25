@@ -13,6 +13,8 @@ from ridgeback_autonomy.common.miss_reason import MissReason, reason_name
 TRIAL_CSV_COLUMNS = [
     'trial_id',
     'repeat_index',
+    'scene_id',
+    'instance_index',
     'spawn_forward_m',
     'spawn_lateral_m',
     'spawn_world_x',
@@ -36,6 +38,8 @@ SUMMARY_CSV_COLUMNS = [
     'median_abs_error_m',
     'p95_abs_error_m',
     'mean_rel_error',
+    'missed_instance_count',
+    'extra_detection_count',
     'reason_histogram',
 ]
 
@@ -66,8 +70,12 @@ def write_trial_csv(path: str, rows: list[dict]) -> None:
 
 def build_summary_rows(
     estimator_rows: dict[str, list[dict]],
+    missed_instance_count: int = 0,
+    extra_detection_count: int = 0,
     status_histograms: dict[str, dict[int, int]] | None = None,
 ) -> list[dict]:
+    # missed/extra are scene-level (estimator-agnostic) totals across the run;
+    # each estimator's summary row carries the same values for convenience.
     status_histograms = status_histograms or {}
     summary_rows: list[dict] = []
     for estimator in PUBLIC_ESTIMATOR_ORDER:
@@ -94,6 +102,8 @@ def build_summary_rows(
             'median_abs_error_m': median_abs_error,
             'p95_abs_error_m': p95_abs_error,
             'mean_rel_error': mean_rel_error,
+            'missed_instance_count': missed_instance_count,
+            'extra_detection_count': extra_detection_count,
             'reason_histogram': format_reason_histogram(status_histograms.get(estimator)),
         })
     return summary_rows

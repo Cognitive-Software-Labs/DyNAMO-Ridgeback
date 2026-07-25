@@ -1,0 +1,32 @@
+<?xml version="1.0"?>
+<sdf version="1.9">
+  <model name="iv_pole">
+    <static>true</static>
+    <link name="link">
+      <collision name="collision_0">
+        <pose>0 0 0.925 0 0 0</pose>
+        <geometry><cylinder><radius>0.025</radius><length>1.75</length></cylinder></geometry>
+      </collision>
+      <visual name="visual_0">
+        <pose>0 0 0.925 0 0 0</pose>
+        <geometry><cylinder><radius>0.025</radius><length>1.75</length></cylinder></geometry>
+        <material>
+          <ambient>0.55 0.57 0.60 1</ambient>
+          <diffuse>0.55 0.57 0.60 1</diffuse>
+        </material>
+      </visual>
+      <collision name="collision_1">
+        <pose>0 0 0.025 0 0 0</pose>
+        <geometry><cylinder><radius>0.225</radius><length>0.05</length></cylinder></geometry>
+      </collision>
+      <visual name="visual_1">
+        <pose>0 0 0.025 0 0 0</pose>
+        <geometry><cylinder><radius>0.225</radius><length>0.05</length></cylinder></geometry>
+        <material>
+          <ambient>0.55 0.57 0.60 1</ambient>
+          <diffuse>0.55 0.57 0.60 1</diffuse>
+        </material>
+      </visual>
+    </link>
+  </model>
+</sdf>

@@ -7,6 +7,7 @@ import numpy as np
 
 from ridgeback_autonomy.benchmarking.alignment import MeasurementEvent
 from ridgeback_autonomy.benchmarking.estimators import (
+    ESTIMATOR_FIELD_KEYS,
     ESTIMATOR_LABELS,
     RGB_DEBUG_VIEW_ESTIMATORS,
 )
@@ -44,6 +45,8 @@ class BenchmarkCollageRenderer:
         selected_estimators: tuple[str, ...],
         trial_medians: dict[str, float],
         true_distance_m: float,
+        box_annotations: list[dict] | None = None,
+        missed_count: int = 0,
     ) -> np.ndarray:
         panels = [
             self.render_estimator_panel(
@@ -52,6 +55,8 @@ class BenchmarkCollageRenderer:
                 representative_event,
                 trial_medians[estimator],
                 true_distance_m,
+                box_annotations,
+                missed_count,
             )
             for estimator in selected_estimators
         ]
@@ -64,11 +69,15 @@ class BenchmarkCollageRenderer:
         event: MeasurementEvent,
         trial_median_m: float,
         true_distance_m: float,
+        box_annotations: list[dict] | None = None,
+        missed_count: int = 0,
     ) -> np.ndarray:
         context = self.panel_context_for_estimator(estimator, event)
         panel = context.panel.copy()
         self.overlay.draw_panel_title(panel, ESTIMATOR_LABELS[estimator])
-        self.draw_bboxes(panel, event)
+        self.draw_bboxes(panel, event, estimator, box_annotations)
+        if missed_count:
+            self.draw_missed_note(panel, missed_count)
 
         frame_value = event.estimates.get(estimator)
         lines = self.build_panel_lines(
@@ -241,7 +250,13 @@ class BenchmarkCollageRenderer:
             interpolation=cv2.INTER_AREA,
         )
 
-    def draw_bboxes(self, panel: np.ndarray, event: MeasurementEvent) -> None:
+    def draw_bboxes(
+        self,
+        panel: np.ndarray,
+        event: MeasurementEvent,
+        estimator: str | None = None,
+        box_annotations: list[dict] | None = None,
+    ) -> None:
         if not event.bboxes:
             return
 
@@ -253,17 +268,46 @@ class BenchmarkCollageRenderer:
             sy1 = int(round(y1 * scale_y))
             sx2 = int(round(x2 * scale_x))
             sy2 = int(round(y2 * scale_y))
-            cv2.rectangle(panel, (sx1, sy1), (sx2, sy2), (0, 255, 0), 2)
+            label, color = self.box_label_and_color(event, index, estimator, box_annotations)
+            cv2.rectangle(panel, (sx1, sy1), (sx2, sy2), color, 2)
             cv2.putText(
                 panel,
-                f'G1 #{index + 1}',
+                label,
                 (sx1, max(26, sy1 - 8)),
                 cv2.FONT_HERSHEY_SIMPLEX,
                 0.55,
-                (0, 255, 0),
+                color,
                 2,
                 cv2.LINE_AA,
             )
+
+    def box_label_and_color(
+        self,
+        event: MeasurementEvent,
+        index: int,
+        estimator: str | None,
+        box_annotations: list[dict] | None,
+    ) -> tuple[str, tuple[int, int, int]]:
+        # Without per-instance annotations (single-robot / tests) keep the
+        # historical green "G1 #i" label so those collages stay identical.
+        if box_annotations is None or estimator is None:
+            return f'G1 #{index + 1}', (0, 255, 0)
+        annotation = box_annotations[index] if index < len(box_annotations) else None
+        if annotation is None:
+            # Detection matched no ground truth: an extra / false positive.
+            return 'extra', (0, 165, 255)
+        value = None
+        if index < len(event.detections):
+            value = getattr(event.detections[index], ESTIMATOR_FIELD_KEYS[estimator], None)
+        value_str = f'{value:.2f}' if value is not None else 'NA'
+        label = f"#{annotation['instance_index']} e{value_str}/t{annotation['true_distance_m']:.2f}"
+        return label, (0, 255, 0)
+
+    def draw_missed_note(self, panel: np.ndarray, missed_count: int) -> None:
+        text = f'missed: {missed_count}'
+        (text_width, _), _ = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)
+        origin = (max(10, panel.shape[1] - text_width - 12), 30)
+        cv2.putText(panel, text, origin, cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2, cv2.LINE_AA)
 
     def draw_value_block(self, panel: np.ndarray, lines: list[str]) -> None:
         self.overlay.draw_label_block(

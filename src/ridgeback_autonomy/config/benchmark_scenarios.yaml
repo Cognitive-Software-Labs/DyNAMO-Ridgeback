@@ -1,0 +1,44 @@
+# Default G1 distance benchmark scenario spec.
+#
+# This is the legacy 5-forward x 3-lateral single-robot grid, re-expressed as
+# scenes so a no-argument run reproduces the historical benchmark (and acts as
+# the regression guard for the scenario-spec redesign). Multi-robot, occlusion,
+# and object-occluder scenes live in benchmark_scenarios_examples.yaml.
+#
+# World-frame planar poses: x = forward (in front of the sensor robot at origin),
+# y = lateral (+left, REP-103). z is pinned to the floor by the runner. yaw is
+# about world +Z in radians; robots default to facing back toward the sensor.
+defaults:
+  robot_yaw_rad: 3.141592653589793
+
+scenes:
+  - id: fwd1p5_latn0p75
+    robots: [{ x: 1.5, y: -0.75 }]
+  - id: fwd1p5_lat0p0
+    robots: [{ x: 1.5, y: 0.0 }]
+  - id: fwd1p5_lat0p75
+    robots: [{ x: 1.5, y: 0.75 }]
+  - id: fwd2p5_latn0p75
+    robots: [{ x: 2.5, y: -0.75 }]
+  - id: fwd2p5_lat0p0
+    robots: [{ x: 2.5, y: 0.0 }]
+  - id: fwd2p5_lat0p75
+    robots: [{ x: 2.5, y: 0.75 }]
+  - id: fwd3p5_latn0p75
+    robots: [{ x: 3.5, y: -0.75 }]
+  - id: fwd3p5_lat0p0
+    robots: [{ x: 3.5, y: 0.0 }]
+  - id: fwd3p5_lat0p75
+    robots: [{ x: 3.5, y: 0.75 }]
+  - id: fwd4p5_latn0p75
+    robots: [{ x: 4.5, y: -0.75 }]
+  - id: fwd4p5_lat0p0
+    robots: [{ x: 4.5, y: 0.0 }]
+  - id: fwd4p5_lat0p75
+    robots: [{ x: 4.5, y: 0.75 }]
+  - id: fwd5p5_latn0p75
+    robots: [{ x: 5.5, y: -0.75 }]
+  - id: fwd5p5_lat0p0
+    robots: [{ x: 5.5, y: 0.0 }]
+  - id: fwd5p5_lat0p75
+    robots: [{ x: 5.5, y: 0.75 }]

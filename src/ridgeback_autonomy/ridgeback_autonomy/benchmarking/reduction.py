@@ -15,10 +15,13 @@ def usable_aligned_events(
     events: dict,
     selected_estimators: tuple[str, ...],
 ) -> list[MeasurementEvent]:
+    # No count==1 gate: multi-robot frames are kept and scored per instance via
+    # the association path. An event is usable if it detected something and at
+    # least one detection carries every selected estimator (has_all_selected).
     return sorted(
         (
             event for event in events.values()
-            if event.detected and event.count == 1 and has_all_selected_estimates(event, selected_estimators)
+            if event.detected and has_all_selected_estimates(event, selected_estimators)
         ),
         key=lambda event: event.stamp_ns,
     )

@@ -1,0 +1,22 @@
+<?xml version="1.0"?>
+<sdf version="1.9">
+  <model name="privacy_curtain">
+    <static>true</static>
+    <!-- Thin panel 0.06 x 1.7 x 1.6 lifted 0.8 so the model origin sits on the
+         floor. Near-opaque so it occludes both RGB and depth. -->
+    <link name="link">
+      <collision name="collision">
+        <pose>0 0 0.8 0 0 0</pose>
+        <geometry><box><size>0.06 1.7 1.6</size></box></geometry>
+      </collision>
+      <visual name="visual">
+        <pose>0 0 0.8 0 0 0</pose>
+        <geometry><box><size>0.06 1.7 1.6</size></box></geometry>
+        <material>
+          <ambient>0.62 0.82 0.88 0.95</ambient>
+          <diffuse>0.62 0.82 0.88 0.95</diffuse>
+        </material>
+      </visual>
+    </link>
+  </model>
+</sdf>

@@ -200,6 +200,7 @@ def build_benchmark_nodes(context, *args, **kwargs):
             parameters=[{
                 'use_sim_time': use_sim_time,
                 'world': world,
+                'scenario': LaunchConfiguration('scenario'),
                 'repeats': repeats,
                 'output_dir': output_dir,
                 'settle_sec': settle_sec,
@@ -260,6 +261,13 @@ def generate_launch_description():
             'estimators',
             default_value='rgb,sensor_depth,depth_anything,pointcloud,lidar',
         ),
+        DeclareLaunchArgument(
+            'scenario',
+            default_value='',
+            description='Path to a benchmark scenario YAML (robots + object '
+                        'occluders per scene). Empty uses the packaged '
+                        'config/benchmark_scenarios.yaml (the legacy 15-pose '
+                        'single-robot grid).'),
         DeclareLaunchArgument('repeats', default_value='5'),
         DeclareLaunchArgument(
             'output_dir',

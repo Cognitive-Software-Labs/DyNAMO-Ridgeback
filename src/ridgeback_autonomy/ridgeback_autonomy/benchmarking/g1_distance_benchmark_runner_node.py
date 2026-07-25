@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 from collections import OrderedDict
+from dataclasses import dataclass
 import json
-import math
 import os
 import subprocess
 import time
@@ -47,7 +47,10 @@ from ridgeback_autonomy.benchmarking.reduction import (
     merge_status_histograms,
     usable_aligned_events,
 )
+from ridgeback_autonomy.benchmarking.association import GtPoint, assign_to_ground_truth
 from ridgeback_autonomy.benchmarking.rendering import BenchmarkCollageRenderer
+from ridgeback_autonomy.benchmarking.scenarios import Scene, load_scenarios
+from ridgeback_autonomy.benchmarking.scoring import build_instance_estimate, score_scene
 from ridgeback_autonomy.benchmarking.summary import (
     build_coverage_rows,
     build_summary_rows,
@@ -83,10 +86,9 @@ def ground_truth_point_message(true_pose: dict[str, float]) -> PointStamped:
     return msg
 
 
-FORWARD_DISTANCES_M = [1.5, 2.5, 3.5, 4.5, 5.5]
-LATERAL_OFFSETS_M = [-0.75, 0.0, 0.75]
+# Robots and objects spawn with their model origin on the floor plane; each
+# model bakes in its own vertical offset so origin-at-z=0 sits it on the ground.
 G1_SPAWN_HEIGHT_M = 0.0
-G1_FACING_ROBOT_YAW_RAD = math.pi
 COMMAND_TIMEOUT_SEC = 10.0
 COMMAND_RETRY_SLEEP_SEC = 0.5
 STREAM_WAIT_TIMEOUT_SEC = 300.0
@@ -119,16 +121,36 @@ def extract_json_payload(text: str) -> dict[str, Any]:
         search_from = start + 1
 
 
+@dataclass
+class GtInstance:
+    """Ground truth for one spawned robot in a scene (from the sim's true pose).
+
+    The sim's true pose is used only here (and for the scoring assignment); it
+    never feeds the estimators, which are sensor-only.
+    """
+
+    index: int
+    model_name: str
+    world_x: float
+    world_y: float
+    forward_m: float
+    lateral_m: float
+    distance_m: float
+
+
 class G1DistanceBenchmarkRunner(Node):
     def __init__(self) -> None:
         super().__init__('g1_distance_benchmark_runner')
 
         pkg_share = get_package_share_directory('ridgeback_autonomy')
         self.g1_model_sdf = os.path.join(pkg_share, 'sim', 'models', 'g1', 'model.sdf')
+        self.models_dir = os.path.join(pkg_share, 'sim', 'models')
+        default_scenario = os.path.join(pkg_share, 'config', 'benchmark_scenarios.yaml')
         workspace_root = os.path.abspath(os.path.join(pkg_share, '..', '..', '..', '..'))
         default_output_dir = os.path.join(workspace_root, 'benchmark-results')
 
         self.declare_parameter('world', 'g1_distance_calibration')
+        self.declare_parameter('scenario', '')
         self.declare_parameter('repeats', 5)
         self.declare_parameter('output_dir', default_output_dir)
         self.declare_parameter('settle_sec', 2.0)
@@ -151,6 +173,12 @@ class G1DistanceBenchmarkRunner(Node):
         self.declare_parameter('depth_max_meters', DEPTH_MAX_METERS_DEFAULT)
 
         self.world = str(self.get_parameter('world').value)
+        scenario_param = str(self.get_parameter('scenario').value).strip()
+        self.scenario_path = (
+            os.path.abspath(os.path.expanduser(scenario_param))
+            if scenario_param else default_scenario
+        )
+        self.scenes = load_scenarios(self.scenario_path)
         self.repeats = int(self.get_parameter('repeats').value)
         self.output_dir = os.path.abspath(os.path.expanduser(str(self.get_parameter('output_dir').value)))
         self.settle_sec = float(self.get_parameter('settle_sec').value)
@@ -376,21 +404,27 @@ class G1DistanceBenchmarkRunner(Node):
         estimator_rows = {estimator: [] for estimator in self.selected_estimators}
         included_trials = 0
         skipped_trials = 0
+        total_missed_instances = 0
+        total_extra_detections = 0
 
         for trial in self.build_trials():
-            trial_rows = self.run_trial(trial)
-            if trial_rows is None:
+            result = self.run_trial(trial)
+            if result is None:
                 skipped_trials += 1
                 continue
 
             included_trials += 1
-            for estimator, row in trial_rows.items():
-                estimator_rows[estimator].append(row)
+            for estimator, instance_rows in result['rows'].items():
+                estimator_rows[estimator].extend(instance_rows)
+            total_missed_instances += result['missed_count']
+            total_extra_detections += result['extra_count']
 
         for estimator in self.selected_estimators:
             write_trial_csv(self.estimator_csv_paths[estimator], estimator_rows[estimator])
 
-        summary_rows = build_summary_rows(estimator_rows, self.status_aggregate)
+        summary_rows = build_summary_rows(
+            estimator_rows, total_missed_instances, total_extra_detections,
+            self.status_aggregate)
         for row in summary_rows:
             row['estimator'] = self.estimator_display_names.get(
                 row['estimator'], row['estimator'])
@@ -406,33 +440,40 @@ class G1DistanceBenchmarkRunner(Node):
         self.get_logger().info(f'Benchmark run written to {self.run_output_dir}')
 
     def build_trials(self) -> list[dict[str, Any]]:
-        trials = []
-        for repeat_index in range(self.repeats):
-            for forward_m in FORWARD_DISTANCES_M:
-                for lateral_m in LATERAL_OFFSETS_M:
-                    trials.append({
-                        'repeat_index': repeat_index + 1,
-                        'trial_id': f'pos_{len(trials) + 1:03d}',
-                        'spawn_forward_m': forward_m,
-                        'spawn_lateral_m': lateral_m,
-                    })
+        trials: list[dict[str, Any]] = []
+        for scene in self.scenes:
+            effective_repeats = scene.repeats_override or self.repeats
+            for repeat_index in range(effective_repeats):
+                trial_id = (
+                    scene.id if effective_repeats == 1
+                    else f'{scene.id}_rep{repeat_index + 1}'
+                )
+                trials.append({
+                    'trial_id': trial_id,
+                    'repeat_index': repeat_index + 1,
+                    'scene': scene,
+                })
         return trials
 
     def run_trial(self, trial: dict[str, Any]) -> dict[str, dict[str, Any]] | None:
         trial_id = trial['trial_id']
-        model_name = f'benchmark_g1_{self.run_label}_{trial_id}'
+        scene: Scene = trial['scene']
+        entity_prefix = f'bench_{self.run_label}_{trial_id}'
 
-        spawn_world_x = float(trial['spawn_forward_m'])
-        spawn_world_y = float(trial['spawn_lateral_m'])
-        spawn_yaw_rad = G1_FACING_ROBOT_YAW_RAD
-
+        spawned_names: list[str] = []
         try:
-            self.spawn_g1(model_name, spawn_world_x, spawn_world_y, G1_SPAWN_HEIGHT_M, spawn_yaw_rad)
-            self.wait_for_entity_pose(model_name, POSE_WAIT_TIMEOUT_SEC)
+            robot_models = self.spawn_scene(scene, entity_prefix, spawned_names)
             self.spin_for(self.settle_sec)
 
-            true_pose = self.compute_ground_truth(model_name)
-            self.active_truth = true_pose
+            gt_instances = self.compute_scene_ground_truth(robot_models)
+            # Overlay truth line is a single reference: republish the nearest
+            # instance's planar truth (multi-robot scenes pick the closest).
+            nearest = min(gt_instances, key=lambda gt: gt.distance_m)
+            self.active_truth = {
+                'lateral_m': nearest.lateral_m,
+                'forward_m': nearest.forward_m,
+                'distance_m': nearest.distance_m,
+            }
             capture = self.capture_measurement_window(self.capture_sec)
             merge_status_histograms(self.status_aggregate, capture['status_histogram'])
             usable_events = capture['usable_events']
@@ -444,53 +485,79 @@ class G1DistanceBenchmarkRunner(Node):
                 )
                 return None
 
-            trial_medians = compute_trial_medians(usable_events, self.selected_estimators)
+            # Frame-level scalar medians drive the representative-frame choice
+            # and the collage (always finite for the selected estimators). The
+            # per-instance medians below drive the scored rows.
+            scalar_medians = compute_trial_medians(usable_events, self.selected_estimators)
+            if len(gt_instances) == 1:
+                # Single robot: the per-instance medians ARE the scalar medians,
+                # so a one-robot scene reproduces the historical grid benchmark.
+                instance_medians = {gt_instances[0].index: scalar_medians}
+                missed_gt: tuple[int, ...] = ()
+                extra_count = 0
+            else:
+                instance_medians, missed_gt, extra_count = score_scene(
+                    usable_events, gt_instances, self.selected_estimators)
+
             representative_event = choose_representative_event(
                 usable_events,
                 self.selected_estimators,
-                trial_medians,
+                scalar_medians,
             )
+            box_annotations = self.build_box_annotations(representative_event, gt_instances)
             image_path = self.save_trial_collage(
                 trial_id,
                 representative_event,
-                trial_medians,
-                true_pose['distance_m'],
+                scalar_medians,
+                gt_instances[0].distance_m,
+                box_annotations,
+                len(missed_gt),
             )
 
-            rows = {}
-            for estimator in self.selected_estimators:
-                estimate = trial_medians[estimator]
-                abs_error = abs(estimate - true_pose['distance_m'])
-                rel_error = abs_error / true_pose['distance_m'] if true_pose['distance_m'] > 0.0 else None
-                rows[estimator] = {
-                    'trial_id': trial_id,
-                    'repeat_index': trial['repeat_index'],
-                    'spawn_forward_m': trial['spawn_forward_m'],
-                    'spawn_lateral_m': trial['spawn_lateral_m'],
-                    'spawn_world_x': spawn_world_x,
-                    'spawn_world_y': spawn_world_y,
-                    'spawn_yaw_rad': spawn_yaw_rad,
-                    'true_forward_m': true_pose['forward_m'],
-                    'true_lateral_m': true_pose['lateral_m'],
-                    'true_distance_m': true_pose['distance_m'],
-                    'estimator': self.estimator_display_names[estimator],
-                    'trial_estimate_m': estimate,
-                    'abs_error_m': abs_error,
-                    'rel_error': rel_error,
-                    'usable_aligned_events': len(usable_events),
-                    'image_path': image_path,
-                }
+            rows: dict[str, list[dict[str, Any]]] = {
+                estimator: [] for estimator in self.selected_estimators}
+            for gt in gt_instances:
+                medians = instance_medians.get(gt.index, {})
+                for estimator in self.selected_estimators:
+                    estimate = medians.get(estimator)
+                    if estimate is None:
+                        continue  # this instance had no finite value for this estimator
+                    abs_error = abs(estimate - gt.distance_m)
+                    rel_error = abs_error / gt.distance_m if gt.distance_m > 0.0 else None
+                    rows[estimator].append({
+                        'trial_id': trial_id,
+                        'repeat_index': trial['repeat_index'],
+                        'scene_id': scene.id,
+                        'instance_index': gt.index,
+                        'spawn_forward_m': gt.world_x,
+                        'spawn_lateral_m': gt.world_y,
+                        'spawn_world_x': gt.world_x,
+                        'spawn_world_y': gt.world_y,
+                        'spawn_yaw_rad': scene.robots[gt.index].yaw,
+                        'true_forward_m': gt.forward_m,
+                        'true_lateral_m': gt.lateral_m,
+                        'true_distance_m': gt.distance_m,
+                        'estimator': self.estimator_display_names[estimator],
+                        'trial_estimate_m': estimate,
+                        'abs_error_m': abs_error,
+                        'rel_error': rel_error,
+                        'usable_aligned_events': len(usable_events),
+                        'image_path': image_path,
+                    })
 
-            self.log_trial(trial_id, trial_medians, true_pose['distance_m'], len(usable_events), image_path)
-            return rows
+            self.log_trial(
+                trial_id, scalar_medians, gt_instances[0].distance_m,
+                len(usable_events), image_path, len(missed_gt), extra_count)
+            return {'rows': rows, 'missed_count': len(missed_gt), 'extra_count': extra_count}
         except Exception as exc:
             self.get_logger().error(f'{trial_id} failed: {exc}')
             return None
         finally:
-            try:
-                self.delete_g1(model_name)
-            except Exception as exc:
-                self.get_logger().warn(f'Cleanup failed for "{model_name}": {exc}')
+            for model_name in spawned_names:
+                try:
+                    self.despawn_model(model_name)
+                except Exception as exc:
+                    self.get_logger().warn(f'Cleanup failed for "{model_name}": {exc}')
 
     def capture_measurement_window(self, duration_sec: float) -> dict[str, Any]:
         self.capture_events = {}
@@ -510,12 +577,45 @@ class G1DistanceBenchmarkRunner(Node):
                 self.capture_events, self.selected_estimators),
         }
 
+    def build_box_annotations(
+        self,
+        representative_event,
+        gt_instances: list[GtInstance],
+    ) -> list[dict | None]:
+        """Map each box in the representative frame to its ground-truth instance.
+
+        Sensor-only association on the one displayed frame, purely for the
+        collage labels (``#i e<est>/t<true>``). Unmatched boxes stay ``None`` and
+        render as ``extra``.
+        """
+
+        instances = [
+            build_instance_estimate(detection, index, self.selected_estimators)
+            for index, detection in enumerate(representative_event.detections)
+        ]
+        gt_points = [
+            GtPoint(index=gt.index, forward_m=gt.forward_m, lateral_m=gt.lateral_m,
+                    distance_m=gt.distance_m)
+            for gt in gt_instances
+        ]
+        assignment = assign_to_ground_truth(instances, gt_points)
+        true_by_gt = {gt.index: gt.distance_m for gt in gt_instances}
+        annotations: list[dict | None] = [None] * len(representative_event.detections)
+        for gt_index, det_index in assignment.matches:
+            annotations[det_index] = {
+                'instance_index': gt_index,
+                'true_distance_m': true_by_gt[gt_index],
+            }
+        return annotations
+
     def save_trial_collage(
         self,
         trial_id: str,
         representative_event,
         trial_medians: dict[str, float],
         true_distance_m: float,
+        box_annotations: list[dict | None] | None = None,
+        missed_count: int = 0,
     ) -> str:
         collage = self.collage_renderer.render_trial_collage(
             trial_id,
@@ -523,6 +623,8 @@ class G1DistanceBenchmarkRunner(Node):
             self.selected_estimators,
             trial_medians,
             true_distance_m,
+            box_annotations,
+            missed_count,
         )
         output_path = os.path.abspath(os.path.join(self.images_dir, f'{trial_id}.png'))
         if not cv2.imwrite(output_path, collage):
@@ -650,40 +752,103 @@ class G1DistanceBenchmarkRunner(Node):
             time.sleep(COMMAND_RETRY_SLEEP_SEC)
         raise RuntimeError(f'Timed out waiting for Gazebo pose of "{model_name}"')
 
-    def compute_ground_truth(self, model_name: str) -> dict[str, float]:
+    def compute_scene_ground_truth(
+        self,
+        robot_models: list[tuple[int, str, Any]],
+    ) -> list[GtInstance]:
+        """Ground truth per spawned robot, from one pose snapshot.
+
+        Truth is used here only to produce reference distances (and later the
+        scoring assignment); it never reaches the estimators.
+        """
+
         snapshot = self.get_pose_snapshot()
         robot_pose = snapshot.get(self.robot_model_name)
-        target_pose = snapshot.get(model_name)
-
         if robot_pose is None:
-            raise RuntimeError(f'Robot pose "{self.robot_model_name}" not present on {self.pose_info_topic}')
-        if target_pose is None:
-            raise RuntimeError(f'Target pose "{model_name}" not present on {self.pose_info_topic}')
-
-        dx_world = target_pose['position']['x'] - robot_pose['position']['x']
-        dy_world = target_pose['position']['y'] - robot_pose['position']['y']
+            raise RuntimeError(
+                f'Robot pose "{self.robot_model_name}" not present on {self.pose_info_topic}')
         robot_yaw = yaw_from_quaternion(
             robot_pose['orientation']['x'],
             robot_pose['orientation']['y'],
             robot_pose['orientation']['z'],
             robot_pose['orientation']['w'],
         )
-        forward_m, lateral_m, distance_m = planar_distance_from_vehicle_origin(
-            dx_world,
-            dy_world,
-            robot_yaw,
-        )
-        return {
-            'forward_m': forward_m,
-            'lateral_m': lateral_m,
-            'distance_m': distance_m,
-        }
 
-    def spawn_g1(self, model_name: str, x_m: float, y_m: float, z_m: float, yaw_rad: float) -> None:
+        instances: list[GtInstance] = []
+        for index, model_name, _robot in robot_models:
+            target_pose = snapshot.get(model_name)
+            if target_pose is None:
+                raise RuntimeError(
+                    f'Target pose "{model_name}" not present on {self.pose_info_topic}')
+            dx_world = target_pose['position']['x'] - robot_pose['position']['x']
+            dy_world = target_pose['position']['y'] - robot_pose['position']['y']
+            forward_m, lateral_m, distance_m = planar_distance_from_vehicle_origin(
+                dx_world,
+                dy_world,
+                robot_yaw,
+            )
+            instances.append(GtInstance(
+                index=index,
+                model_name=model_name,
+                world_x=target_pose['position']['x'],
+                world_y=target_pose['position']['y'],
+                forward_m=forward_m,
+                lateral_m=lateral_m,
+                distance_m=distance_m,
+            ))
+        return instances
+
+    def object_model_sdf(self, model: str) -> str:
+        path = os.path.join(self.models_dir, model, 'model.sdf')
+        if not os.path.isfile(path):
+            raise RuntimeError(f'Object model "{model}" has no model.sdf at {path}')
+        return path
+
+    def spawn_scene(
+        self,
+        scene: Scene,
+        entity_prefix: str,
+        spawned_names: list[str],
+    ) -> list[tuple[int, str, Any]]:
+        """Spawn every robot + object in a scene; record names for teardown.
+
+        Names are appended to ``spawned_names`` before the pose wait so a spawn
+        that never settles is still despawned by the caller's ``finally``.
+        Returns ``(index, model_name, RobotSpec)`` per robot for ground truth.
+        """
+
+        robot_models: list[tuple[int, str, Any]] = []
+        for index, robot in enumerate(scene.robots):
+            model_name = f'{entity_prefix}_g1_{index}'
+            spawned_names.append(model_name)
+            self.spawn_model(
+                self.g1_model_sdf, model_name, robot.x, robot.y, G1_SPAWN_HEIGHT_M, robot.yaw)
+            self.wait_for_entity_pose(model_name, POSE_WAIT_TIMEOUT_SEC)
+            robot_models.append((index, model_name, robot))
+
+        for index, obj in enumerate(scene.objects):
+            model_name = f'{entity_prefix}_obj_{index}'
+            spawned_names.append(model_name)
+            self.spawn_model(
+                self.object_model_sdf(obj.model), model_name, obj.x, obj.y,
+                G1_SPAWN_HEIGHT_M, obj.yaw)
+            self.wait_for_entity_pose(model_name, POSE_WAIT_TIMEOUT_SEC)
+
+        return robot_models
+
+    def spawn_model(
+        self,
+        model_ref: str,
+        model_name: str,
+        x_m: float,
+        y_m: float,
+        z_m: float,
+        yaw_rad: float,
+    ) -> None:
         command = [
             '/opt/ros/jazzy/lib/ros_gz_sim/create',
             '-world', self.world,
-            '-file', self.g1_model_sdf,
+            '-file', model_ref,
             '-name', model_name,
             '-x', f'{x_m:.6f}',
             '-y', f'{y_m:.6f}',
@@ -705,7 +870,7 @@ class G1DistanceBenchmarkRunner(Node):
                 time.sleep(COMMAND_RETRY_SLEEP_SEC)
         raise RuntimeError(f'Failed to spawn "{model_name}": {last_error}')
 
-    def delete_g1(self, model_name: str) -> None:
+    def despawn_model(self, model_name: str) -> None:
         deadline = time.monotonic() + DELETE_TIMEOUT_SEC
         command = [
             'gz',
@@ -851,6 +1016,8 @@ class G1DistanceBenchmarkRunner(Node):
         true_distance_m: float,
         usable_events: int,
         image_path: str,
+        missed_instances: int = 0,
+        extra_detections: int = 0,
     ) -> None:
         parts = [
             trial_id,
@@ -858,8 +1025,13 @@ class G1DistanceBenchmarkRunner(Node):
             f'usable_events={usable_events}',
             f'image={os.path.basename(image_path)}',
         ]
+        if missed_instances or extra_detections:
+            parts.append(f'missed={missed_instances}')
+            parts.append(f'extra={extra_detections}')
         for estimator in self.selected_estimators:
-            parts.append(f'{estimator}={trial_medians[estimator]:.3f}m')
+            value = trial_medians.get(estimator)
+            parts.append(
+                f'{estimator}={value:.3f}m' if value is not None else f'{estimator}=NA')
         self.get_logger().info(' | '.join(parts))
 
     def log_summary(

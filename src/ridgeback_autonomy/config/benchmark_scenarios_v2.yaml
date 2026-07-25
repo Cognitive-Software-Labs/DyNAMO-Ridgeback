@@ -1,0 +1,405 @@
+# v2 benchmark set: randomized poses under family constraints, pixel-certified
+# (id-buffer raster through sim intrinsics fx=443.53, 640x480, camera at
+# (0.25, 0, 0.85)). Sampler seed 20260725, generated 2026-07-26 by a one-shot
+# scratchpad script; this YAML is the durable artifact. Comments carry the
+# certified visible fractions measured at generation time.
+#
+# Design: repeats:=1 at the runner; 3 probe scenes carry repeats_override 8
+# to measure the within-pose noise floor (single_facing_01, objpartial_01,
+# far_mid_01). Yaw and occluder shape are stratified factors; occlusion and
+# FOV families are certified into named bands.
+#
+# World-frame planar: x = forward, y = lateral (+left). yaw about +Z (rad).
+defaults:
+  robot_yaw_rad: 3.141592653589793
+
+scenes:
+  # yaw stratum facing
+  - id: single_facing_01
+    robots: [{ x: 5.02, y: -1.11, yaw: 2.78 }]
+    repeats_override: 8
+
+  # yaw stratum facing
+  - id: single_facing_02
+    robots: [{ x: 4.27, y: -0.14, yaw: 3.46 }]
+
+  # yaw stratum side
+  - id: single_side_01
+    robots: [{ x: 2.42, y: -0.81, yaw: 5.0 }]
+
+  # yaw stratum side
+  - id: single_side_02
+    robots: [{ x: 4.94, y: -1.41, yaw: 4.54 }]
+
+  # yaw stratum back
+  - id: single_back_01
+    robots: [{ x: 1.94, y: 0.32, yaw: 0.07 }]
+
+  # yaw stratum back
+  - id: single_back_02
+    robots: [{ x: 4.83, y: 1.42, yaw: 0.11 }]
+
+  # yaw stratum free
+  - id: single_free_01
+    robots: [{ x: 3.71, y: 1.18, yaw: 5.95 }]
+
+  # yaw stratum free
+  - id: single_free_02
+    robots: [{ x: 5.17, y: 1.91, yaw: 2.67 }]
+
+  # 2 robots all visible: 1.00, 1.00
+  - id: multi_01
+    robots:
+      - { x: 1.82, y: 0.2, yaw: 3.28 }
+      - { x: 3.67, y: -1.18, yaw: 6.05 }
+
+  # 3 robots all visible: 1.00, 1.00, 0.98
+  - id: multi_02
+    robots:
+      - { x: 3.45, y: -1.05, yaw: 3.44 }
+      - { x: 2.44, y: 0.87, yaw: 2.77 }
+      - { x: 4.36, y: 0.88, yaw: 3.16 }
+
+  # 2 robots all visible: 0.98, 1.00
+  - id: multi_03
+    robots:
+      - { x: 4.11, y: 0.1, yaw: 3.08 }
+      - { x: 2.42, y: -0.33, yaw: 3.38 }
+
+  # 3 robots all visible: 1.00, 1.00, 1.00
+  - id: multi_04
+    robots:
+      - { x: 4.23, y: -0.1, yaw: 2.92 }
+      - { x: 3.48, y: 0.76, yaw: 2.96 }
+      - { x: 5.41, y: 2.46, yaw: 3.2 }
+
+  # shoulder gap 0.14 m, mask-merge risk
+  - id: twin_shoulder_01
+    robots:
+      - { x: 4.01, y: -0.35, yaw: 2.82 }
+      - { x: 4.01, y: 0.29, yaw: 3.17 }
+
+  # shoulder gap 0.11 m, mask-merge risk
+  - id: twin_shoulder_02
+    robots:
+      - { x: 3.13, y: -0.76, yaw: 3.28 }
+      - { x: 3.13, y: -0.15, yaw: 3.1 }
+
+  # bearing-adjacent, range-separated
+  - id: twin_swap_01
+    robots:
+      - { x: 2.35, y: 0.24, yaw: 3.25 }
+      - { x: 4.01, y: -0.13, yaw: 3.62 }
+
+  # bearing-adjacent, range-separated
+  - id: twin_swap_02
+    robots:
+      - { x: 2.66, y: 0.75, yaw: 2.87 }
+      - { x: 4.45, y: 0.21, yaw: 3.48 }
+
+  # far robot vis 0.15 (band 0.15-0.45)
+  - id: interocc_moderate_01
+    robots:
+      - { x: 3.07, y: -0.75, yaw: 3.18 }
+      - { x: 4.69, y: -0.97, yaw: 2.86 }
+
+  # far robot vis 0.23 (band 0.15-0.45)
+  - id: interocc_moderate_02
+    robots:
+      - { x: 1.87, y: 0.11, yaw: 2.76 }
+      - { x: 3.91, y: 0.69, yaw: 2.99 }
+
+  # far robot vis 0.09 (band 0.03-0.15)
+  - id: interocc_sliver_01
+    robots:
+      - { x: 3.21, y: -0.66, yaw: 2.72 }
+      - { x: 4.76, y: -1.14, yaw: 3.61 }
+
+  # far robot vis 0.10 (band 0.03-0.15)
+  - id: interocc_sliver_02
+    robots:
+      - { x: 3.04, y: -0.94, yaw: 2.7 }
+      - { x: 4.09, y: -1.18, yaw: 3.49 }
+
+  # far robot vis 0.00 (band 0.0-0.03)
+  - id: interocc_neartotal_01
+    robots:
+      - { x: 3.02, y: -0.12, yaw: 3.0 }
+      - { x: 5.1, y: -0.31, yaw: 3.43 }
+
+  # far robot vis 0.00 (band 0.0-0.03)
+  - id: interocc_neartotal_02
+    robots:
+      - { x: 2.49, y: 0.11, yaw: 3.56 }
+      - { x: 3.9, y: 0.28, yaw: 2.82 }
+
+  # hospital_bed_high behind robot on bearing; vis 1.00
+  - id: interfere_behind_01
+    robots: [{ x: 2.45, y: 0.21, yaw: 3.64 }]
+    objects:
+      - { model: hospital_bed_high, x: 4.12, y: 0.47, yaw: 1.93 }
+
+  # cabinet behind robot on bearing; vis 1.00
+  - id: interfere_behind_02
+    robots: [{ x: 3.21, y: -0.42, yaw: 3.51 }]
+    objects:
+      - { model: cabinet, x: 4.69, y: -0.61, yaw: 3.02 }
+
+  # table at same range, lateral gap; vis 1.00
+  - id: interfere_beside_01
+    robots: [{ x: 3.65, y: -0.99, yaw: 3.39 }]
+    objects:
+      - { model: table, x: 3.57, y: 0.14, yaw: 0.11 }
+
+  # cabinet at same range, lateral gap; vis 1.00
+  - id: interfere_beside_02
+    robots: [{ x: 3.81, y: 0.18, yaw: 2.9 }]
+    objects:
+      - { model: cabinet, x: 3.79, y: -1.0, yaw: 1.75 }
+
+  # hospital_bed far behind, same bearing; vis 1.00
+  - id: interfere_bearing_01
+    robots: [{ x: 2.42, y: 0.34, yaw: 2.98 }]
+    objects:
+      - { model: hospital_bed, x: 5.31, y: 0.79, yaw: 0.8 }
+
+  # hospital_bed_high far behind, same bearing; vis 1.00
+  - id: interfere_bearing_02
+    robots: [{ x: 2.68, y: -0.96, yaw: 3.47 }]
+    objects:
+      - { model: hospital_bed_high, x: 5.41, y: -2.04, yaw: 1.53 }
+
+  # CONTROL/FP sweep: table_low clean separation; vis 1.00
+  - id: interfere_control_01
+    robots: [{ x: 4.3, y: -0.87, yaw: 3.46 }]
+    objects:
+      - { model: table_low, x: 3.26, y: 1.34, yaw: 2.35 }
+
+  # CONTROL/FP sweep: iv_pole clean separation; vis 1.00
+  - id: interfere_control_02
+    robots: [{ x: 3.84, y: -1.44, yaw: 3.41 }]
+    objects:
+      - { model: iv_pole, x: 2.34, y: 1.42, yaw: 0.14 }
+
+  # CONTROL/FP sweep: cabinet_tall clean separation; vis 1.00
+  - id: interfere_control_03
+    robots: [{ x: 2.83, y: -0.9, yaw: 3.5 }]
+    objects:
+      - { model: cabinet_tall, x: 3.41, y: 1.78, yaw: 1.32 }
+
+  # privacy_curtain heavy occlusion; vis 0.16 (band 0.02-0.20)
+  - id: objocc_heavy_01
+    robots: [{ x: 3.34, y: 0.95, yaw: 3.13 }]
+    objects:
+      - { model: privacy_curtain, x: 2.17, y: 0.04, yaw: 2.67 }
+
+  # cabinet heavy occlusion; vis 0.05 (band 0.02-0.20)
+  - id: objocc_heavy_02
+    robots: [{ x: 4.02, y: -1.49, yaw: 3.33 }]
+    objects:
+      - { model: cabinet, x: 2.76, y: -0.84, yaw: 1.08 }
+
+  # cabinet_tall heavy occlusion; vis 0.06 (band 0.02-0.20)
+  - id: objocc_heavy_03
+    robots: [{ x: 4.17, y: 0.92, yaw: 3.24 }]
+    objects:
+      - { model: cabinet_tall, x: 2.23, y: 0.76, yaw: 2.05 }
+
+  # privacy_curtain heavy occlusion; vis 0.14 (band 0.02-0.20)
+  - id: objocc_heavy_04
+    robots: [{ x: 4.12, y: -0.48, yaw: 3.17 }]
+    objects:
+      - { model: privacy_curtain, x: 2.27, y: 0.4, yaw: 0.44 }
+
+  # hospital_bed partial; vis 0.65 (band 0.35-0.65)
+  - id: objpartial_01
+    robots: [{ x: 4.41, y: 0.31, yaw: 3.62 }]
+    objects:
+      - { model: hospital_bed, x: 3.3, y: -0.12, yaw: 0.61 }
+    repeats_override: 8
+
+  # hospital_bed_high partial; vis 0.50 (band 0.35-0.65)
+  - id: objpartial_02
+    robots: [{ x: 3.69, y: 1.61, yaw: 3.21 }]
+    objects:
+      - { model: hospital_bed_high, x: 2.37, y: 0.44, yaw: 0.06 }
+
+  # privacy_curtain partial; vis 0.51 (band 0.35-0.65)
+  - id: objpartial_03
+    robots: [{ x: 3.11, y: -0.34, yaw: 3.35 }]
+    objects:
+      - { model: privacy_curtain, x: 2.22, y: -1.08, yaw: 0.16 }
+
+  # table partial; vis 0.60 (band 0.35-0.65)
+  - id: objpartial_04
+    robots: [{ x: 3.72, y: -0.92, yaw: 3.1 }]
+    objects:
+      - { model: table, x: 2.17, y: -0.56, yaw: 0.09 }
+
+  # hospital_bed_high partial; vis 0.49 (band 0.35-0.65)
+  - id: objpartial_05
+    robots: [{ x: 3.32, y: 1.34, yaw: 3.15 }]
+    objects:
+      - { model: hospital_bed_high, x: 2.48, y: -0.03, yaw: 2.19 }
+
+  # table partial; vis 0.64 (band 0.35-0.65)
+  - id: objpartial_06
+    robots: [{ x: 4.12, y: -1.27, yaw: 3.32 }]
+    objects:
+      - { model: table, x: 2.96, y: -0.89, yaw: 2.38 }
+
+  # near limit, centered: feet clipped by VFOV
+  - id: near_clip_01
+    robots: [{ x: 1.34, y: -0.03, yaw: 3.45 }]
+
+  # near limit + lateral + rotated
+  - id: near_clip_02
+    robots: [{ x: 1.36, y: -0.67, yaw: 0.65 }]
+
+  # near limit + lateral + rotated
+  - id: near_clip_03
+    robots: [{ x: 1.09, y: 0.03, yaw: 3.28 }]
+
+  # small target, depth noise region
+  - id: far_mid_01
+    robots: [{ x: 8.06, y: -1.56, yaw: 3.22 }]
+    repeats_override: 8
+
+  # small target, depth noise region
+  - id: far_mid_02
+    robots: [{ x: 7.64, y: -0.43, yaw: 2.64 }]
+
+  # just inside the 10 m depth clamp
+  - id: far_clamp_01
+    robots: [{ x: 9.18, y: -2.79, yaw: 3.6 }]
+
+  # just inside the 10 m depth clamp
+  - id: far_clamp_02
+    robots: [{ x: 9.32, y: 0.44, yaw: 3.18 }]
+
+  # BEYOND the depth clamp: depth paths must miss
+  - id: far_beyond_01
+    robots: [{ x: 10.73, y: 0.64, yaw: 3.41 }]
+
+  # center ratio 0.89; in-frame 1.00
+  - id: edge_mostly_in_01
+    robots: [{ x: 4.39, y: -2.67, yaw: 2.74 }]
+
+  # center ratio 0.88; in-frame 1.00
+  - id: edge_mostly_in_02
+    robots: [{ x: 3.98, y: 2.38, yaw: 2.8 }]
+
+  # center ratio 1.04; in-frame 0.26
+  - id: edge_half_out_01
+    robots: [{ x: 4.3, y: 3.03, yaw: 3.48 }]
+
+  # center ratio 1.03; in-frame 0.27
+  - id: edge_half_out_02
+    robots: [{ x: 4.37, y: -3.08, yaw: 2.79 }]
+
+  # center ratio 1.18; in-frame 0.01
+  - id: edge_sliver_01
+    robots: [{ x: 2.67, y: 2.05, yaw: 3.44 }]
+
+  # edge-on curtain bisects mask (verified); vis 0.30
+  - id: trap_split_curtain
+    robots: [{ x: 3.86, y: 0.17, yaw: 3.04 }]
+    objects:
+      - { model: privacy_curtain, x: 2.35, y: 0.11, yaw: 1.57 }
+
+  # IV pole bisects mask (verified); vis 0.70
+  - id: trap_split_pole
+    robots: [{ x: 3.86, y: -0.48, yaw: 3.07 }]
+    objects:
+      - { model: iv_pole, x: 2.25, y: -0.24, yaw: 0.0 }
+
+  # bed blocks scan plane fully; camera vis 0.84
+  - id: trap_lidar_bed
+    robots: [{ x: 4.19, y: -1.39, yaw: 3.21 }]
+    objects:
+      - { model: hospital_bed, x: 1.47, y: -0.43, yaw: 0.0 }
+
+  # table on same bearing: scan passes between legs; camera vis 0.67
+  - id: trap_lidar_table
+    robots: [{ x: 4.27, y: 0.8, yaw: 3.08 }]
+    objects:
+      - { model: table, x: 1.83, y: 0.31, yaw: 0.0 }
+
+  # hospital_bed hides legs, bbox bottom lifted; vis 0.66
+  - id: trap_rgb_01
+    robots: [{ x: 3.85, y: 0.98, yaw: 3.46 }]
+    objects:
+      - { model: hospital_bed, x: 2.62, y: 0.64, yaw: 0.0 }
+
+  # hospital_bed hides legs, bbox bottom lifted; vis 0.66
+  - id: trap_rgb_02
+    robots: [{ x: 3.7, y: 0.94, yaw: 3.37 }]
+    objects:
+      - { model: hospital_bed, x: 2.49, y: 0.61, yaw: 0.0 }
+
+  # hospital_bed_high contact, gap 0.22 m; vis 0.45
+  - id: trap_contact_01
+    robots: [{ x: 3.58, y: -0.69, yaw: 2.97 }]
+    objects:
+      - { model: hospital_bed_high, x: 2.61, y: -0.69, yaw: 1.57 }
+
+  # table contact, gap 0.19 m; vis 0.89
+  - id: trap_contact_02
+    robots: [{ x: 3.36, y: -0.93, yaw: 3.33 }]
+    objects:
+      - { model: table, x: 2.57, y: -0.93, yaw: 1.57 }
+
+  # table in front + cabinet behind: depth band attacked both sides; vis 0.62
+  - id: trap_layered_01
+    robots: [{ x: 3.71, y: -1.27, yaw: 2.76 }]
+    objects:
+      - { model: table, x: 2.43, y: -0.85, yaw: 0.0 }
+      - { model: cabinet, x: 5.44, y: -1.72, yaw: 2.04 }
+
+  # table in front + cabinet behind: depth band attacked both sides; vis 0.63
+  - id: trap_layered_02
+    robots: [{ x: 3.88, y: 0.43, yaw: 3.02 }]
+    objects:
+      - { model: table, x: 2.49, y: 0.52, yaw: 0.0 }
+      - { model: cabinet, x: 5.22, y: 0.67, yaw: 2.35 }
+
+  # R0 vis 0.47, R1 vis 0.75, R2 vis 0.52 | table+hospital_bed_high
+  - id: chaos_01
+    robots:
+      - { x: 4.17, y: -1.34, yaw: 1.18 }
+      - { x: 3.7, y: 1.17, yaw: 4.27 }
+      - { x: 4.53, y: -0.09, yaw: 3.2 }
+    objects:
+      - { model: table, x: 2.0, y: 1.16, yaw: 0.91 }
+      - { model: hospital_bed_high, x: 2.04, y: -0.97, yaw: 1.21 }
+
+  # R0 vis 0.85, R1 vis 0.84, R2 vis 0.57 | table+cabinet_tall
+  - id: chaos_02
+    robots:
+      - { x: 3.71, y: -1.24, yaw: 0.36 }
+      - { x: 2.93, y: 0.39, yaw: 4.57 }
+      - { x: 4.32, y: -1.05, yaw: 3.54 }
+    objects:
+      - { model: table, x: 2.59, y: -0.35, yaw: 1.97 }
+      - { model: cabinet_tall, x: 3.0, y: 1.98, yaw: 1.01 }
+
+  # R0 vis 0.68, R1 vis 0.33, R2 vis 0.54 | table+cabinet_tall
+  - id: chaos_03
+    robots:
+      - { x: 2.22, y: -0.18, yaw: 3.57 }
+      - { x: 2.95, y: -0.02, yaw: 2.88 }
+      - { x: 4.7, y: 0.37, yaw: 3.48 }
+    objects:
+      - { model: table, x: 1.67, y: 2.07, yaw: 2.64 }
+      - { model: cabinet_tall, x: 1.88, y: -0.65, yaw: 2.26 }
+
+  # R0 vis 0.79, R1 vis 0.35, R2 vis 0.84 | table+table_low+iv_pole
+  - id: chaos_04
+    robots:
+      - { x: 3.33, y: 0.01, yaw: 3.13 }
+      - { x: 4.85, y: -0.24, yaw: 1.08 }
+      - { x: 3.88, y: 0.6, yaw: 3.59 }
+    objects:
+      - { model: table, x: 2.51, y: -1.92, yaw: 0.32 }
+      - { model: table_low, x: 2.6, y: 0.25, yaw: 1.8 }
+      - { model: iv_pole, x: 1.86, y: 0.62, yaw: 0.11 }
