@@ -27,6 +27,44 @@ def usable_aligned_events(
     )
 
 
+def usable_events_by_estimator(
+    events: dict,
+    selected_estimators: tuple[str, ...],
+) -> dict[str, list[MeasurementEvent]]:
+    """Per-estimator usable events: detected frames where THIS estimator has a
+    finite value on some detection.
+
+    Each estimator is scored on its own event set, so a scene that blinds one
+    estimator by design (occluder on the scan plane, target beyond the depth
+    clamp) yields a per-estimator miss with a reason instead of discarding the
+    whole trial for everyone.
+    """
+
+    by_estimator: dict[str, list[MeasurementEvent]] = {
+        estimator: [] for estimator in selected_estimators}
+    for event in sorted(events.values(), key=lambda event: event.stamp_ns):
+        if not event.detected:
+            continue
+        for estimator in selected_estimators:
+            # estimates[e] is the first finite value across the message's
+            # detections, so "present" == "some detection carries it".
+            if event.estimates.get(estimator) is not None:
+                by_estimator[estimator].append(event)
+    return by_estimator
+
+
+def union_usable_events(
+    usable_by_estimator: dict[str, list[MeasurementEvent]],
+) -> list[MeasurementEvent]:
+    """All events usable for at least one estimator, stamp-ordered."""
+
+    seen: dict[int, MeasurementEvent] = {}
+    for events in usable_by_estimator.values():
+        for event in events:
+            seen[id(event)] = event
+    return sorted(seen.values(), key=lambda event: event.stamp_ns)
+
+
 def compute_status_histogram(
     events: dict,
     selected_estimators: tuple[str, ...],
@@ -84,16 +122,19 @@ def format_status_tally(
 
 
 def compute_trial_medians(
-    usable_events: list[MeasurementEvent],
-    selected_estimators: tuple[str, ...],
+    usable_by_estimator: dict[str, list[MeasurementEvent]],
 ) -> dict[str, float]:
+    """Median per estimator over ITS OWN usable events.
+
+    Partial by design: an estimator with no usable events has no key, and its
+    absence is scored as a per-estimator miss (reason in the status histogram).
+    """
+
     return {
-        estimator: float(statistics.median([
-            event.estimates[estimator]
-            for event in usable_events
-            if event.estimates.get(estimator) is not None
-        ]))
-        for estimator in selected_estimators
+        estimator: float(statistics.median(
+            [event.estimates[estimator] for event in events]))
+        for estimator, events in usable_by_estimator.items()
+        if events
     }
 
 
@@ -102,14 +143,25 @@ def choose_representative_event(
     selected_estimators: tuple[str, ...],
     trial_medians: dict[str, float],
 ) -> MeasurementEvent:
-    return min(
-        usable_events,
-        key=lambda event: (
-            0 if event_has_all_panel_previews(event, selected_estimators) else 1,
-            sum(
-                abs(event.estimates[estimator] - trial_medians[estimator])
-                for estimator in selected_estimators
-            ),
+    """Pick the collage frame from the union of usable events.
+
+    Prefer frames with panel previews, then frames covering the most
+    estimators, then closeness to the trial medians over the estimators the
+    frame actually carries.
+    """
+
+    def rank(event: MeasurementEvent):
+        present = tuple(
+            estimator for estimator in selected_estimators
+            if estimator in trial_medians and event.estimates.get(estimator) is not None
+        )
+        preview_scope = present or selected_estimators
+        return (
+            0 if event_has_all_panel_previews(event, preview_scope) else 1,
+            -len(present),
+            sum(abs(event.estimates[estimator] - trial_medians[estimator])
+                for estimator in present),
             event.stamp_ns,
-        ),
-    )
+        )
+
+    return min(usable_events, key=rank)

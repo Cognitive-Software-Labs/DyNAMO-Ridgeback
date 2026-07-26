@@ -40,7 +40,6 @@ SUMMARY_CSV_COLUMNS = [
     'mean_rel_error',
     'missed_instance_count',
     'extra_detection_count',
-    'reason_histogram',
 ]
 
 COVERAGE_CSV_COLUMNS = [
@@ -70,13 +69,14 @@ def write_trial_csv(path: str, rows: list[dict]) -> None:
 
 def build_summary_rows(
     estimator_rows: dict[str, list[dict]],
-    missed_instance_count: int = 0,
+    missed_instance_counts: dict[str, int] | None = None,
     extra_detection_count: int = 0,
-    status_histograms: dict[str, dict[int, int]] | None = None,
 ) -> list[dict]:
-    # missed/extra are scene-level (estimator-agnostic) totals across the run;
-    # each estimator's summary row carries the same values for convenience.
-    status_histograms = status_histograms or {}
+    # missed counts are per estimator: detector-level misses (instance never
+    # matched by any detection) plus estimator-level misses (matched but this
+    # estimator produced no value). extra stays scene-level (detector concept).
+    # Reason histograms live in coverage.csv only (single source of truth).
+    missed_instance_counts = missed_instance_counts or {}
     summary_rows: list[dict] = []
     for estimator in PUBLIC_ESTIMATOR_ORDER:
         rows = estimator_rows.get(estimator)
@@ -102,9 +102,8 @@ def build_summary_rows(
             'median_abs_error_m': median_abs_error,
             'p95_abs_error_m': p95_abs_error,
             'mean_rel_error': mean_rel_error,
-            'missed_instance_count': missed_instance_count,
+            'missed_instance_count': missed_instance_counts.get(estimator, 0),
             'extra_detection_count': extra_detection_count,
-            'reason_histogram': format_reason_histogram(status_histograms.get(estimator)),
         })
     return summary_rows
 

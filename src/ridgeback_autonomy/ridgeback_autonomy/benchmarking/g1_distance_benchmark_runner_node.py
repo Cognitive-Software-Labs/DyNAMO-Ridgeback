@@ -45,8 +45,10 @@ from ridgeback_autonomy.benchmarking.reduction import (
     compute_trial_medians,
     format_status_tally,
     merge_status_histograms,
-    usable_aligned_events,
+    union_usable_events,
+    usable_events_by_estimator,
 )
+from ridgeback_autonomy.common.miss_reason import MissReason, reason_name
 from ridgeback_autonomy.benchmarking.association import GtPoint, assign_to_ground_truth
 from ridgeback_autonomy.benchmarking.rendering import BenchmarkCollageRenderer
 from ridgeback_autonomy.benchmarking.scenarios import Scene, load_scenarios
@@ -404,7 +406,7 @@ class G1DistanceBenchmarkRunner(Node):
         estimator_rows = {estimator: [] for estimator in self.selected_estimators}
         included_trials = 0
         skipped_trials = 0
-        total_missed_instances = 0
+        missed_by_estimator = {estimator: 0 for estimator in self.selected_estimators}
         total_extra_detections = 0
 
         for trial in self.build_trials():
@@ -416,15 +418,15 @@ class G1DistanceBenchmarkRunner(Node):
             included_trials += 1
             for estimator, instance_rows in result['rows'].items():
                 estimator_rows[estimator].extend(instance_rows)
-            total_missed_instances += result['missed_count']
+            for estimator, missed in result['missed_by_estimator'].items():
+                missed_by_estimator[estimator] += missed
             total_extra_detections += result['extra_count']
 
         for estimator in self.selected_estimators:
             write_trial_csv(self.estimator_csv_paths[estimator], estimator_rows[estimator])
 
         summary_rows = build_summary_rows(
-            estimator_rows, total_missed_instances, total_extra_detections,
-            self.status_aggregate)
+            estimator_rows, missed_by_estimator, total_extra_detections)
         for row in summary_rows:
             row['estimator'] = self.estimator_display_names.get(
                 row['estimator'], row['estimator'])
@@ -476,27 +478,45 @@ class G1DistanceBenchmarkRunner(Node):
             }
             capture = self.capture_measurement_window(self.capture_sec)
             merge_status_histograms(self.status_aggregate, capture['status_histogram'])
+            usable_by_estimator = capture['usable_by_estimator']
             usable_events = capture['usable_events']
             if not usable_events:
+                # Union empty: the detector never yielded a usable frame for ANY
+                # estimator. The trial ran and found nothing, so every GT
+                # instance counts as missed by every estimator — a skip
+                # (return None) is reserved for infrastructure failures.
                 self.get_logger().info(
-                    f'{trial_id} skipped | no_common_usable_events | '
+                    f'{trial_id} all_instances_missed | no_usable_detections | '
                     f'raw_events={capture["total_events"]} | '
                     f'{format_status_tally(capture["status_histogram"], self.selected_estimators)}'
                 )
-                return None
+                return {
+                    'rows': {estimator: [] for estimator in self.selected_estimators},
+                    'missed_count': len(gt_instances),
+                    'missed_by_estimator': {
+                        estimator: len(gt_instances)
+                        for estimator in self.selected_estimators
+                    },
+                    'extra_count': 0,
+                }
 
             # Frame-level scalar medians drive the representative-frame choice
-            # and the collage (always finite for the selected estimators). The
+            # and the collage. Partial by design: an estimator with no usable
+            # events has no key and is scored as a per-estimator miss. The
             # per-instance medians below drive the scored rows.
-            scalar_medians = compute_trial_medians(usable_events, self.selected_estimators)
+            scalar_medians = compute_trial_medians(usable_by_estimator)
             if len(gt_instances) == 1:
                 # Single robot: the per-instance medians ARE the scalar medians,
                 # so a one-robot scene reproduces the historical grid benchmark.
-                instance_medians = {gt_instances[0].index: scalar_medians}
+                instance_medians = {gt_instances[0].index: dict(scalar_medians)}
                 missed_gt: tuple[int, ...] = ()
                 extra_count = 0
+                estimator_missed = {
+                    estimator: (0 if estimator in scalar_medians else 1)
+                    for estimator in self.selected_estimators
+                }
             else:
-                instance_medians, missed_gt, extra_count = score_scene(
+                instance_medians, missed_gt, extra_count, estimator_missed = score_scene(
                     usable_events, gt_instances, self.selected_estimators)
 
             representative_event = choose_representative_event(
@@ -512,6 +532,7 @@ class G1DistanceBenchmarkRunner(Node):
                 gt_instances[0].distance_m,
                 box_annotations,
                 len(missed_gt),
+                self.dominant_miss_reasons(capture['status_histogram'], scalar_medians),
             )
 
             rows: dict[str, list[dict[str, Any]]] = {
@@ -521,7 +542,7 @@ class G1DistanceBenchmarkRunner(Node):
                 for estimator in self.selected_estimators:
                     estimate = medians.get(estimator)
                     if estimate is None:
-                        continue  # this instance had no finite value for this estimator
+                        continue  # per-estimator miss: counted, reason in coverage.csv
                     abs_error = abs(estimate - gt.distance_m)
                     rel_error = abs_error / gt.distance_m if gt.distance_m > 0.0 else None
                     rows[estimator].append({
@@ -541,14 +562,25 @@ class G1DistanceBenchmarkRunner(Node):
                         'trial_estimate_m': estimate,
                         'abs_error_m': abs_error,
                         'rel_error': rel_error,
-                        'usable_aligned_events': len(usable_events),
+                        'usable_aligned_events': len(usable_by_estimator.get(estimator, [])),
                         'image_path': image_path,
                     })
 
+            # Per-estimator missed total for this trial: detector-level misses
+            # (nobody had a chance at the instance) plus estimator-level ones.
+            missed_by_estimator = {
+                estimator: len(missed_gt) + estimator_missed.get(estimator, 0)
+                for estimator in self.selected_estimators
+            }
             self.log_trial(
                 trial_id, scalar_medians, gt_instances[0].distance_m,
                 len(usable_events), image_path, len(missed_gt), extra_count)
-            return {'rows': rows, 'missed_count': len(missed_gt), 'extra_count': extra_count}
+            return {
+                'rows': rows,
+                'missed_count': len(missed_gt),
+                'missed_by_estimator': missed_by_estimator,
+                'extra_count': extra_count,
+            }
         except Exception as exc:
             self.get_logger().error(f'{trial_id} failed: {exc}')
             return None
@@ -569,10 +601,12 @@ class G1DistanceBenchmarkRunner(Node):
             self.capture_active = False
             self.active_truth = None
 
-        usable_events = usable_aligned_events(self.capture_events, self.selected_estimators)
+        usable_by_estimator = usable_events_by_estimator(
+            self.capture_events, self.selected_estimators)
         return {
             'total_events': len(self.capture_events),
-            'usable_events': usable_events,
+            'usable_by_estimator': usable_by_estimator,
+            'usable_events': union_usable_events(usable_by_estimator),
             'status_histogram': compute_status_histogram(
                 self.capture_events, self.selected_estimators),
         }
@@ -608,6 +642,31 @@ class G1DistanceBenchmarkRunner(Node):
             }
         return annotations
 
+    def dominant_miss_reasons(
+        self,
+        status_histogram: dict[str, dict[int, int]],
+        trial_medians: dict[str, float],
+    ) -> dict[str, str]:
+        """For estimators with no median this trial: the most frequent non-OK
+        reason from the capture window, for the collage panel."""
+
+        reasons: dict[str, str] = {}
+        for estimator in self.selected_estimators:
+            if estimator in trial_medians:
+                continue
+            code_counts = status_histogram.get(estimator, {})
+            misses = {code: count for code, count in code_counts.items()
+                      if code != int(MissReason.OK)}
+            # A specific reason beats UNSET (UNSET = the frame never reached
+            # this estimator's node — usually the majority, never the story).
+            specific = {code: count for code, count in misses.items()
+                        if code != int(MissReason.UNSET)}
+            if specific:
+                reasons[estimator] = reason_name(max(specific, key=specific.get))
+            elif misses:
+                reasons[estimator] = reason_name(int(MissReason.UNSET))
+        return reasons
+
     def save_trial_collage(
         self,
         trial_id: str,
@@ -616,6 +675,7 @@ class G1DistanceBenchmarkRunner(Node):
         true_distance_m: float,
         box_annotations: list[dict | None] | None = None,
         missed_count: int = 0,
+        miss_reasons: dict[str, str] | None = None,
     ) -> str:
         collage = self.collage_renderer.render_trial_collage(
             trial_id,
@@ -625,6 +685,7 @@ class G1DistanceBenchmarkRunner(Node):
             true_distance_m,
             box_annotations,
             missed_count,
+            miss_reasons,
         )
         output_path = os.path.abspath(os.path.join(self.images_dir, f'{trial_id}.png'))
         if not cv2.imwrite(output_path, collage):

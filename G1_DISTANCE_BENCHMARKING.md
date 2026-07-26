@@ -69,8 +69,14 @@ The benchmark now follows these rules:
   - `header.stamp.nanosec`
   - `count`
   - `bbox_xyxy`
-- a trial is included only if every selected estimator has at least one usable aligned event
-- each selected estimator gets one final per-trial value, computed as the median over that trial’s aligned usable detections
+- each estimator is scored on its OWN usable events; an estimator with zero
+  usable events in an otherwise-live trial is a per-estimator miss, with its
+  reason in `coverage.csv`
+- a trial whose capture window yields NO detections at all still counts: every
+  ground-truth instance is recorded as missed by every estimator
+  (`all_instances_missed` in the log). A skipped trial means infrastructure
+  failure only (spawn error, stream timeout)
+- each selected estimator gets one final per-trial value, computed as the median over that trial’s aligned usable detections for that estimator
 
 What is intentionally *not* scored:
 
@@ -142,10 +148,13 @@ The collage:
 
 Representative-frame selection:
 
-- compute the per-trial median for each selected estimator
-- score each aligned usable event by the sum of `abs(event_value - trial_median)` across the selected estimators
-- choose the minimum-score event
-- break ties by earliest timestamp
+- compute the per-trial median for each selected estimator (partial when an
+  estimator produced nothing)
+- rank candidates from the union of usable events: panel previews first, then
+  most estimators present, then the sum of `abs(event_value - trial_median)`
+  over the estimators the frame actually carries
+- break ties by earliest timestamp; panels for estimators without a median
+  show the dominant miss reason instead of a value
 
 Every panel shows:
 

@@ -53,6 +53,20 @@ Value: the v2 families are banded occlusion experiments
 at visibility 0.03 but TOO_FEW_RAYS at 0.15" — the per-band failure-mode
 breakdown the set was designed to expose.
 
+### Resolved: per-estimator usable events (2026-07-26)
+
+The all-estimator common-event gate is gone: each estimator scores on its own
+usable events (`usable_events_by_estimator`), and
+`missed_instance_count` in the summary is now genuinely per estimator
+(detector-level misses + estimator-level misses, reasons in `coverage.csv`).
+Collage panels for a blinded estimator show the dominant miss reason.
+Zero-detection trials (e.g. a full occluder) score as all-instances-missed
+for every estimator instead of vanishing as skips — skips now mean
+infrastructure failure only. First
+run after this change is a NEW baseline — medians rest on per-estimator
+event sets (supersets of the old intersection), so numbers are not comparable
+to earlier runs.
+
 ### Other open items
 
 - **Sim depth-coverage gap (known, diagnosed):** in sim expect
@@ -73,6 +87,54 @@ breakdown the set was designed to expose.
 - Probe scenes (`single_facing_01`, `objpartial_01`, `far_mid_01`) carry
   `repeats_override: 8`; run with `repeats:=1` so probes measure the noise
   floor and everything else spends budget on pose diversity.
+
+## Output reference
+
+### What an "event" is
+
+One event = one aligned measurement **frame**: a unique key of (frame_id,
+stamp, detection count, bbox set). The camera, lidar, and mask nodes'
+messages for the same frame merge into a single event. Events accumulate
+along the **time** axis, not the robot axis:
+
+- Per trial (one spawn + settle + capture window) the pipeline produces
+  roughly 20–40 events at the sim's effective detector rate.
+- A multi-robot scene does NOT multiply events: one frame is one event
+  carrying up to N detections; the association step splits those detections
+  across ground-truth instances for scoring.
+- `raw_events` in a skip log line counts every captured event, including
+  frames with zero detections.
+
+### `comparison_summary.csv` (one row per estimator)
+
+| Column | Meaning |
+|---|---|
+| `estimator` | Display name of the estimator row. |
+| `trial_count` | Scored (instance, trial) rows for THIS estimator. Per-estimator since the usable-events change: an estimator blinded in a scene simply has fewer rows. |
+| `mean_abs_error_m` | Mean of `abs(estimate − true)` over this estimator's scored rows. |
+| `median_abs_error_m` | Median of the same. |
+| `p95_abs_error_m` | 95th percentile of the same — the tail the mean hides. |
+| `mean_rel_error` | Mean of `abs_error / true_distance`. |
+| `missed_instance_count` | Per-estimator: detector-level misses (instance never matched by any detection) + estimator-level misses (instance matched, but this estimator produced no value in any frame — reason in `coverage.csv`). |
+| `extra_detection_count` | Scene-level (same value in every row): peak count of detections in a frame that matched no ground-truth instance. A detector concept, not per-estimator. |
+
+Reason histograms live in `coverage.csv` only (single source of truth).
+
+### `coverage.csv` (one row per estimator)
+
+| Column | Meaning |
+|---|---|
+| `estimator` | Display name. |
+| `events` | Denominator: captured events with exactly ONE detection (`count == 1`), summed over every trial's capture window — including trials later skipped. Same value for all rows. No-detection frames and multi-robot frames are excluded (a frame-level status can't describe two robots; per-instance attribution is the open follow-up above). |
+| `ok` | Events where this estimator delivered a value (`MissReason.OK`). |
+| `coverage` | `ok / events` — how often the estimator answers at all, independent of accuracy. |
+| `reason_histogram` | JSON `reason → count` naming why the non-OK events failed. Codes glossary: `object_localization_pipeline.md` → Glossary → "Miss-reason codes". |
+
+Reading the two together: `coverage.csv` answers "how often does this
+estimator produce anything"; `comparison_summary.csv` answers "how good is
+it when it does, and how many instances did it miss". The per-trial CSVs'
+`usable_aligned_events` column is the per-trial, per-estimator slice of the
+same coverage idea — the frames that actually fed that trial's median.
 
 ## Running the v2 benchmark from zero
 

@@ -63,10 +63,14 @@ def build_instance_estimate(detection, index: int, selected_estimators) -> Insta
 def score_scene(usable_events, gt_instances, selected_estimators):
     """Median per (GT instance, estimator) across frames + missed/extra counts.
 
-    Returns ``(instance_medians, missed_gt, extra_count)`` where
-    ``instance_medians[gt_index][estimator]`` is a float or ``None``,
-    ``missed_gt`` is the tuple of GT indices never matched, and ``extra_count``
-    is the peak number of unmatched detections in any single frame.
+    Returns ``(instance_medians, missed_gt, extra_count, estimator_missed)``:
+    ``instance_medians[gt_index][estimator]`` is a float or ``None``;
+    ``missed_gt`` is the tuple of GT indices never matched by ANY detection
+    (a detector-level miss, estimator-agnostic); ``extra_count`` is the peak
+    number of unmatched detections in any single frame; and
+    ``estimator_missed[estimator]`` counts instances that WERE matched but for
+    which this estimator produced no value in any frame (an estimator-level
+    miss — the status histogram names the reason).
     """
 
     gt_points = [
@@ -102,4 +106,11 @@ def score_scene(usable_events, gt_instances, selected_estimators):
     }
     missed_gt = tuple(sorted(gt.index for gt in gt_instances if not matched_any[gt.index]))
     extra_count = max(extra_per_frame) if extra_per_frame else 0
-    return instance_medians, missed_gt, extra_count
+    estimator_missed = {estimator: 0 for estimator in selected_estimators}
+    for gt_index, per_estimator in instance_medians.items():
+        if not matched_any[gt_index]:
+            continue
+        for estimator, median in per_estimator.items():
+            if median is None:
+                estimator_missed[estimator] += 1
+    return instance_medians, missed_gt, extra_count, estimator_missed

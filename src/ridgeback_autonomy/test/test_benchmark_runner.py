@@ -27,6 +27,8 @@ from ridgeback_autonomy.benchmarking.reduction import (
     choose_representative_event,
     compute_trial_medians,
     usable_aligned_events,
+    union_usable_events,
+    usable_events_by_estimator,
 )
 from ridgeback_autonomy.benchmarking.rendering import BenchmarkCollageRenderer
 from ridgeback_autonomy.benchmarking.summary import build_summary_rows
@@ -317,7 +319,8 @@ def test_representative_event_uses_minimum_total_deviation_then_timestamp() -> N
         ),
     ]
 
-    medians = compute_trial_medians(usable, ('rgb', 'lidar'))
+    medians = compute_trial_medians(usable_events_by_estimator(
+        {event.key: event for event in usable}, ('rgb', 'lidar')))
     representative = choose_representative_event(usable, ('rgb', 'lidar'), medians)
 
     assert medians == {'rgb': 2.2, 'lidar': 2.0}
@@ -362,7 +365,8 @@ def test_representative_event_prefers_preview_complete_candidate() -> None:
         ),
     ]
 
-    medians = compute_trial_medians(usable, ('rgb', 'sensor_depth'))
+    medians = compute_trial_medians(usable_events_by_estimator(
+        {event.key: event for event in usable}, ('rgb', 'sensor_depth')))
     representative = choose_representative_event(usable, ('rgb', 'sensor_depth'), medians)
 
     assert representative.key == ('complete',)
@@ -403,7 +407,8 @@ def test_representative_event_falls_back_to_numeric_when_no_preview_complete_can
         ),
     ]
 
-    medians = compute_trial_medians(usable, ('rgb', 'sensor_depth'))
+    medians = compute_trial_medians(usable_events_by_estimator(
+        {event.key: event for event in usable}, ('rgb', 'sensor_depth')))
     representative = choose_representative_event(usable, ('rgb', 'sensor_depth'), medians)
 
     assert representative.key == ('best_numeric',)
@@ -516,7 +521,7 @@ def test_ground_truth_point_message_packs_planar_truth() -> None:
 def test_build_summary_rows_carries_missed_and_extra_counts() -> None:
     summary_rows = build_summary_rows(
         {'lidar': [{'abs_error_m': 0.1, 'rel_error': 0.05}]},
-        missed_instance_count=3,
+        missed_instance_counts={'lidar': 3},
         extra_detection_count=1,
     )
 
@@ -569,3 +574,59 @@ def test_box_label_defaults_to_historical_label_without_annotations() -> None:
 
     assert label == 'G1 #1'
     assert color == (0, 255, 0)
+
+
+def _estimates_event(key, stamp_ns, estimates):
+    return MeasurementEvent(
+        key=(key,),
+        stamp_ns=stamp_ns,
+        detected=True,
+        count=1,
+        bboxes=((1, 2, 3, 4),),
+        image_width=640,
+        image_height=480,
+        estimates=estimates,
+        preview=EventPreview(),
+    )
+
+
+def test_usable_events_by_estimator_scores_each_on_its_own_events() -> None:
+    # polar blind on every frame (occluder on the scan plane): rgb still usable.
+    events = {
+        ('a',): _estimates_event('a', 100, {'rgb': 2.0, 'polar_profiling': None}),
+        ('b',): _estimates_event('b', 200, {'rgb': 2.2}),
+    }
+
+    by_estimator = usable_events_by_estimator(events, ('rgb', 'polar_profiling'))
+
+    assert [event.stamp_ns for event in by_estimator['rgb']] == [100, 200]
+    assert by_estimator['polar_profiling'] == []
+    # The union keeps the trial alive even though one estimator is at zero.
+    assert [event.stamp_ns for event in union_usable_events(by_estimator)] == [100, 200]
+
+
+def test_compute_trial_medians_is_partial_for_blind_estimators() -> None:
+    events = {
+        ('a',): _estimates_event('a', 100, {'rgb': 2.0}),
+        ('b',): _estimates_event('b', 200, {'rgb': 2.4}),
+    }
+    by_estimator = usable_events_by_estimator(events, ('rgb', 'polar_profiling'))
+
+    medians = compute_trial_medians(by_estimator)
+
+    assert medians == {'rgb': pytest.approx(2.2)}
+    assert 'polar_profiling' not in medians
+
+
+def test_representative_event_chosen_from_union_without_common_event() -> None:
+    # No event carries both estimators; the union still yields a collage frame,
+    # preferring the one covering more estimators.
+    both = _estimates_event('both', 300, {'rgb': 2.0, 'lidar': 2.0})
+    rgb_only = _estimates_event('rgb', 100, {'rgb': 2.0})
+    by_estimator = {'rgb': [rgb_only, both], 'lidar': [both]}
+    union = union_usable_events(by_estimator)
+    medians = compute_trial_medians(by_estimator)
+
+    chosen = choose_representative_event(union, ('rgb', 'lidar'), medians)
+
+    assert chosen.key == ('both',)

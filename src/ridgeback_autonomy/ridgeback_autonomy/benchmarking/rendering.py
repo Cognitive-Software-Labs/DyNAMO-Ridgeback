@@ -47,16 +47,21 @@ class BenchmarkCollageRenderer:
         true_distance_m: float,
         box_annotations: list[dict] | None = None,
         missed_count: int = 0,
+        miss_reasons: dict[str, str] | None = None,
     ) -> np.ndarray:
+        # trial_medians is partial: an estimator with no usable events has no
+        # key, and its panel shows the dominant miss reason instead of a value.
+        miss_reasons = miss_reasons or {}
         panels = [
             self.render_estimator_panel(
                 estimator,
                 trial_id,
                 representative_event,
-                trial_medians[estimator],
+                trial_medians.get(estimator),
                 true_distance_m,
                 box_annotations,
                 missed_count,
+                miss_reasons.get(estimator),
             )
             for estimator in selected_estimators
         ]
@@ -67,10 +72,11 @@ class BenchmarkCollageRenderer:
         estimator: str,
         trial_id: str,
         event: MeasurementEvent,
-        trial_median_m: float,
+        trial_median_m: float | None,
         true_distance_m: float,
         box_annotations: list[dict] | None = None,
         missed_count: int = 0,
+        miss_reason: str | None = None,
     ) -> np.ndarray:
         context = self.panel_context_for_estimator(estimator, event)
         panel = context.panel.copy()
@@ -88,6 +94,8 @@ class BenchmarkCollageRenderer:
             true_distance_m,
             event.stamp_ns,
         )
+        if trial_median_m is None and miss_reason:
+            lines.append(f'Reason: {miss_reason}')
         self.draw_value_block(panel, lines)
         return panel
 
@@ -219,7 +227,7 @@ class BenchmarkCollageRenderer:
         context: PanelContext,
         trial_id: str,
         frame_value: float | None,
-        trial_median_m: float,
+        trial_median_m: float | None,
         true_distance_m: float,
         event_stamp_ns: int,
     ) -> list[str]:

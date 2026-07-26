@@ -28,7 +28,7 @@ def test_single_robot_median_over_frames() -> None:
         _event([_lidar_detection(2.0, 0.0, 2.1)]),
     ]
 
-    medians, missed, extra = score_scene(events, gts, ('lidar',))
+    medians, missed, extra, est_missed = score_scene(events, gts, ('lidar',))
 
     assert medians[0]['lidar'] == pytest.approx(2.0)
     assert missed == ()
@@ -45,7 +45,7 @@ def test_two_robots_scored_independently() -> None:
         _event([_lidar_detection(2.0, 0.0, 1.98), _lidar_detection(3.0, 1.5, 3.40)]),
     ]
 
-    medians, missed, extra = score_scene(events, gts, ('lidar',))
+    medians, missed, extra, est_missed = score_scene(events, gts, ('lidar',))
 
     assert medians[0]['lidar'] == pytest.approx(2.0)
     assert medians[1]['lidar'] == pytest.approx(3.35)
@@ -60,7 +60,7 @@ def test_occluded_far_robot_missed_not_scored() -> None:
     ]
     events = [_event([_lidar_detection(2.0, 0.0, 2.0)]) for _ in range(3)]
 
-    medians, missed, extra = score_scene(events, gts, ('lidar',))
+    medians, missed, extra, est_missed = score_scene(events, gts, ('lidar',))
 
     assert medians[0]['lidar'] == pytest.approx(2.0)
     assert medians[1]['lidar'] is None
@@ -75,7 +75,7 @@ def test_distance_only_locator_used_when_no_planar_estimator() -> None:
     near = Detection(bbox_xyxy=(0, 0, 10, 10), label='r', score=0.9, sensor_depth_distance_m=2.05)
     events = [_event([near])]
 
-    medians, missed, extra = score_scene(events, gts, ('sensor_depth',))
+    medians, missed, extra, est_missed = score_scene(events, gts, ('sensor_depth',))
 
     assert medians[0]['sensor_depth'] == pytest.approx(2.05)
     assert medians[1]['sensor_depth'] is None
@@ -90,3 +90,20 @@ def test_build_instance_estimate_prefers_planar_locator() -> None:
     assert estimate.forward_m == pytest.approx(2.5)
     assert estimate.lateral_m == pytest.approx(-0.3)
     assert estimate.distance_m == pytest.approx(2.52)
+
+
+def test_estimator_missed_counts_matched_instance_without_values() -> None:
+    gts = [GtPoint(index=0, forward_m=2.0, lateral_m=0.0, distance_m=2.0)]
+    detection = Detection(
+        bbox_xyxy=(0, 0, 10, 10), label='r', score=0.9,
+        lidar_distance_m=2.05, lidar_forward_m=2.05, lidar_lateral_m=0.0)
+    events = [_event([detection])]
+
+    medians, missed, extra, est_missed = score_scene(
+        events, gts, ('lidar', 'sensor_depth'))
+
+    # Matched via lidar, but sensor_depth never produced a value for it.
+    assert missed == ()
+    assert medians[0]['lidar'] == pytest.approx(2.05)
+    assert medians[0]['sensor_depth'] is None
+    assert est_missed == {'lidar': 0, 'sensor_depth': 1}
