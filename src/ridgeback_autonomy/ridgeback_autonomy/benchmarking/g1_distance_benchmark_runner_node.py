@@ -944,7 +944,11 @@ class G1DistanceBenchmarkRunner(Node):
         ]
 
         while time.monotonic() < deadline:
-            result = self.try_command(command, timeout_sec=COMMAND_TIMEOUT_SEC)
+            try:
+                result = self.try_command(command, timeout_sec=COMMAND_TIMEOUT_SEC)
+            except RuntimeError:
+                time.sleep(COMMAND_RETRY_SLEEP_SEC)
+                continue
             if result.returncode == 0:
                 break
             time.sleep(COMMAND_RETRY_SLEEP_SEC)
@@ -1026,14 +1030,22 @@ class G1DistanceBenchmarkRunner(Node):
         command: list[str],
         timeout_sec: float,
     ) -> subprocess.CompletedProcess[str]:
-        return subprocess.run(
-            command,
-            check=False,
-            capture_output=True,
-            text=True,
-            env=self.command_env,
-            timeout=timeout_sec,
-        )
+        # A timeout surfaces as RuntimeError like any other command failure, so
+        # callers with retry loops (spawn_model) actually retry it instead of
+        # failing the trial on the first slow gz service response.
+        try:
+            return subprocess.run(
+                command,
+                check=False,
+                capture_output=True,
+                text=True,
+                env=self.command_env,
+                timeout=timeout_sec,
+            )
+        except subprocess.TimeoutExpired as exc:
+            raise RuntimeError(
+                f'Command timed out after {timeout_sec:.1f}s: {" ".join(command)}'
+            ) from exc
 
     def resolved_topic(self, topic: str) -> str:
         if topic.startswith('/'):
