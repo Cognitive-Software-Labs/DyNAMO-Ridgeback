@@ -281,3 +281,48 @@ Because every path emits in the same frame and at least `(X, Z)`, the outputs ar
 - **Affine-invariant depth** — relative depth defined up to an unknown scale and offset (monocular estimators); needs metric scaling.
 - **Extrinsics** — rigid transform (rotation + translation) between two sensors' frames.
 - **Intrinsics** — a sensor's internal projection parameters (focal lengths, principal point, distortion).
+
+### Miss-reason codes (`coverage.csv` / `reason_histogram`)
+
+Authoritative source: `common/miss_reason.py` (`MissReason` enum). Every
+mask-estimator value carries one of these per detection; the benchmark tallies
+them over all captured events. Grouped by where in the pipeline the frame died:
+
+**Frame-level** — the whole frame was unusable before any per-detection work:
+
+- `NO_CAMERA_INFO` — camera intrinsics never arrived for this frame.
+- `GRID_MISMATCH` — camera_info grid does not match the image grid.
+- `NO_COLOR_FRAME` — silhouette gate: the exact color frame for the detection
+  stamp never arrived (aged out of the buffer or dropped).
+- `TF_MISS_EXTRINSIC` — camera-optical → base transform unavailable.
+
+**Mask-level** — this detection's mask was rejected before any path ran:
+
+- `MASK_OVERSIZED_BOX` — detector box too large to trust (gate threshold).
+- `MASK_EMPTY_SEGMENTATION` — segmenter returned an empty mask.
+
+**Input-missing** — the source stream a path needs was not matched:
+
+- `NO_DEPTH_FRAME` — projective + euclidean: no aligned-depth frame with the
+  detection's exact stamp (in sim, see `aligned_depth_coverage.md` — the
+  dominant sim miss).
+- `NO_SCAN` / `TF_MISS_SCAN` / `SCAN_INVALID` — polar: scan missing within
+  tolerance / scan→optical TF unavailable / scan undecodable.
+
+**Path-internal** — inputs present, the path itself gave up:
+
+- `TOO_FEW_VALID_PIXELS` — projective: too few valid masked depth pixels.
+- `TOO_FEW_VALID_POINTS` — euclidean: too few valid deprojected points.
+- `ISOLATION_EMPTY` — foreground isolation left too few pixels/points.
+- `NO_BEAMS_IN_VIEW` — polar: no scan beam projects into the image.
+- `TOO_FEW_RAYS_SELECTED` — polar: too few beams fall inside the mask (the
+  expected signature when an occluder blocks the scan plane).
+- `TOO_FEW_RAYS_MERGED` — polar: near-band merge left too few beams.
+
+**Bookkeeping:**
+
+- `OK` — the path produced an estimate.
+- `UNSET` — no status at all: that estimator's producer node published nothing
+  for this event's frame key (node behind the camera rate, or a legacy
+  estimator on an event its node skipped). Not a path failure — the frame
+  simply never reached the estimator.
