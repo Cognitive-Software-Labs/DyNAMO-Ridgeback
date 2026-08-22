@@ -49,22 +49,34 @@ def world_to_vehicle_planar(dx_world: float, dy_world: float, yaw_rad: float):
     return forward_m, lateral_m
 
 
-def planar_distance_from_vehicle_origin(
+def planar_measurement_from_vehicle_front(
     dx_world: float,
     dy_world: float,
     yaw_rad: float,
 ) -> tuple[float, float, float]:
+    """World-frame offset -> ``(forward_m, lateral_m, distance_m)`` off the robot front.
+
+    All three components share one reference point -- the base origin plus
+    ``ROBOT_FRONT_OFFSET_M`` -- which is what every estimator publishes against,
+    so ground truth and estimates are directly comparable component by component
+    (the benchmark association matches them in the planar plane, not just on
+    distance). Lateral is offset-invariant: the front offset is purely forward.
+    """
+
     forward_m, lateral_m = world_to_vehicle_planar(dx_world, dy_world, yaw_rad)
-    _, forward_with_offset_m = apply_vehicle_front_offset(0.0, forward_m)
-    distance_m = math.hypot(lateral_m, forward_with_offset_m)
-    return forward_m, lateral_m, distance_m
+    lateral_m, forward_m = apply_vehicle_front_offset(lateral_m, forward_m)
+    return forward_m, lateral_m, math.hypot(lateral_m, forward_m)
 
 
 def rotate_camera_to_vehicle_frame(x_cam, y_cam, z_cam, pitch_rad: float):
     cos_pitch = math.cos(pitch_rad)
     sin_pitch = math.sin(pitch_rad)
 
-    lateral_vehicle = x_cam
+    # Camera-optical +X points image-right; vehicle lateral is base +Y, which is
+    # left-positive (REP-103). Negating keeps this family on the same convention
+    # as the lidar, pointcloud, and mask paths -- and as the ground truth the
+    # benchmark associates against.
+    lateral_vehicle = -x_cam
     vertical_vehicle = cos_pitch * y_cam + sin_pitch * z_cam
     forward_vehicle = -sin_pitch * y_cam + cos_pitch * z_cam
     return lateral_vehicle, vertical_vehicle, forward_vehicle

@@ -230,12 +230,11 @@ Selection stays shared; the fork sits exactly where behavior genuinely diverges.
 
 The mask stack does not stop at a camera-frame coordinate: each path's camera-optical point is transformed to a `base_link` **planar** measurement via the live TF extrinsic at the detection stamp — `optical_to_base_planar(xyz_optical, rotation, translation, front_offset_m)`. The rotation *and* translation are the camera-optical → base extrinsics from TF, so the full mounting pose (not just pitch) is applied. The output is `(lateral_m, forward_m, distance_m)` where lateral is base **+Y, left-positive (REP-103)** and forward is base +X minus the 0.25 m robot front offset. Polar profiling runs the same transform with the optical Y component set to 0 (height is unobservable from a single plane; at zero camera pitch the substitution is exact).
 
-The convention is **split** by estimator family, and this is deliberate:
+The convention is **uniform** across every estimator that reports a lateral: **left-positive** (base +Y, REP-103). That covers the mask-based paths, `lidar`, `pointcloud`, `rgb`, and the benchmark ground truth. `sensor_depth` and `depth_anything` report a scalar distance only and carry no lateral.
 
-- The **mask-based paths** and the legacy `lidar` / `pointcloud` estimators are **left-positive** (base +Y, REP-103).
-- The **legacy camera family** — `rgb` and the legacy depth estimator, which go through `rotate_camera_to_vehicle_frame` — keep lateral = camera-optical +X, i.e. **right-positive**.
+`rotate_camera_to_vehicle_frame` (the `rgb` path) negates camera-optical +X to reach base +Y — optical X is image-right, so the sign has to flip. This used to be left un-negated, making `rgb` the one right-positive producer; it was corrected because the benchmark associates detections to ground truth in the planar plane, so a mirrored lateral pushed pair costs past the assignment gate whenever `rgb` served as the locator.
 
-A benchmark comparing a mask path against a legacy camera row must account for the flipped lateral sign.
+The **forward** component is likewise uniform: base +X minus the 0.25 m robot front offset, for estimates *and* ground truth. Any planar comparison can therefore be done component-wise without a conversion step.
 
 ---
 

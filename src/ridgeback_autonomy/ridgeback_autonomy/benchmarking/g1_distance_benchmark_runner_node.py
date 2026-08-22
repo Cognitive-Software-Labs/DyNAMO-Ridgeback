@@ -62,7 +62,7 @@ from ridgeback_autonomy.benchmarking.summary import (
 )
 from ridgeback_autonomy.msg import G1Measurements
 from ridgeback_autonomy.perception.core.geometry import (
-    planar_distance_from_vehicle_origin,
+    planar_measurement_from_vehicle_front,
     yaw_from_quaternion,
 )
 from ridgeback_autonomy.perception.core.image_utils import (
@@ -550,8 +550,6 @@ class G1DistanceBenchmarkRunner(Node):
                         'repeat_index': trial['repeat_index'],
                         'scene_id': scene.id,
                         'instance_index': gt.index,
-                        'spawn_forward_m': gt.world_x,
-                        'spawn_lateral_m': gt.world_y,
                         'spawn_world_x': gt.world_x,
                         'spawn_world_y': gt.world_y,
                         'spawn_yaw_rad': scene.robots[gt.index].yaw,
@@ -843,7 +841,7 @@ class G1DistanceBenchmarkRunner(Node):
                     f'Target pose "{model_name}" not present on {self.pose_info_topic}')
             dx_world = target_pose['position']['x'] - robot_pose['position']['x']
             dy_world = target_pose['position']['y'] - robot_pose['position']['y']
-            forward_m, lateral_m, distance_m = planar_distance_from_vehicle_origin(
+            forward_m, lateral_m, distance_m = planar_measurement_from_vehicle_front(
                 dx_world,
                 dy_world,
                 robot_yaw,

@@ -6,14 +6,74 @@ import numpy as np
 
 from ridgeback_autonomy.common.models import CameraConfig, Detection, DetectionBatch, LidarScanPoints
 from ridgeback_autonomy.perception.core.geometry import (
+    ROBOT_FRONT_OFFSET_M,
     add_depth_measurements,
     add_pointcloud_measurements,
+    add_rgb_measurements,
     compute_lidar_measurement,
     compute_pointcloud_measurement,
     compute_weighted_planar_distance,
     focus_bbox,
     map_bbox_between_images,
+    planar_measurement_from_vehicle_front,
+    rotate_camera_to_vehicle_frame,
 )
+
+
+def test_ground_truth_components_share_the_front_reference() -> None:
+    """Forward, lateral, and distance must agree; each is measured off the front.
+
+    A mixed tuple (origin-relative forward next to a front-relative distance)
+    reads as a target that is farther ahead than it is away, and inflates every
+    benchmark association cost by the offset.
+    """
+
+    forward_m, lateral_m, distance_m = planar_measurement_from_vehicle_front(
+        5.02, -1.11, 0.0)
+
+    assert math.isclose(forward_m, 5.02 - ROBOT_FRONT_OFFSET_M, rel_tol=1e-9)
+    assert math.isclose(lateral_m, -1.11, rel_tol=1e-9)
+    assert math.isclose(distance_m, math.hypot(forward_m, lateral_m), rel_tol=1e-12)
+    assert distance_m >= abs(forward_m)
+
+
+def test_camera_lateral_is_left_positive() -> None:
+    """The rgb path must agree in sign with lidar, pointcloud, mask, and truth.
+
+    Camera-optical +X is image-right, so a target left of centre has a negative
+    optical X and must come back as a positive (left) vehicle lateral.
+    """
+
+    lateral_left, _, _ = rotate_camera_to_vehicle_frame(-0.4, 0.0, 1.0, 0.0)
+    lateral_right, _, _ = rotate_camera_to_vehicle_frame(0.4, 0.0, 1.0, 0.0)
+
+    assert lateral_left > 0.0
+    assert lateral_right < 0.0
+
+
+def test_rgb_measurement_lateral_matches_ground_truth_sign() -> None:
+    """End-to-end sign check: a target left of centre reports the same sign as truth."""
+
+    camera_config = CameraConfig(
+        depth_hfov_deg=90.0,
+        depth_vfov_deg=90.0,
+        pitch_deg=0.0,
+        height_m=0.85,
+    )
+    # Bounding box left of the image centre (image is 100 wide, centre 50).
+    batch = DetectionBatch(
+        image_width=100,
+        image_height=100,
+        detections=[Detection(bbox_xyxy=(10, 40, 30, 80), label='humanoid robot', score=0.9)],
+    )
+
+    add_rgb_measurements(batch, camera_config)
+    rgb_lateral_m = batch.detections[0].rgb_lateral_m
+
+    assert rgb_lateral_m is not None
+    # Truth for a target off to the left is +Y in the base frame (REP-103).
+    _, truth_lateral_m, _ = planar_measurement_from_vehicle_front(3.0, 1.0, 0.0)
+    assert math.copysign(1.0, rgb_lateral_m) == math.copysign(1.0, truth_lateral_m)
 
 
 def test_focus_bbox_and_mapping() -> None:
