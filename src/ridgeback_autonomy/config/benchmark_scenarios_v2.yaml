@@ -9,6 +9,18 @@
 # far_mid_01). Yaw and occluder shape are stratified factors; occlusion and
 # FOV families are certified into named bands.
 #
+# EXTENDED 2026-08-23 with 18 in-box clutter scenes at the end of the file:
+# interfere_infront_*, interfere_behind_03..05, interfere_samerange_*,
+# interfere_pair_*, interfere_multi_*, interfere_control_04. They are certified
+# against LiDAR geometry rather than the pixel raster above -- see the banner
+# where the block starts. Their object-free baselines are single_facing_03 and
+# single_back_03, added in the same change: the existing object-free poses
+# (single_* plus every robot in the objectless multi_*) already sit within
+# 0.11-0.46 m of each clutter pose, so only those two filled a real gap.
+# Aggregates from this file are NO LONGER comparable to runs recorded before
+# that date: the scene set is a superset, so trial_count and every mean move.
+# The A/B rule still holds going forward (same YAML, different estimators:=).
+#
 # World-frame planar: x = forward, y = lateral (+left). yaw about +Z (rad).
 defaults:
   robot_yaw_rad: 3.141592653589793
@@ -22,6 +34,11 @@ scenes:
   # yaw stratum facing
   - id: single_facing_02
     robots: [{ x: 4.27, y: -0.14, yaw: 3.46 }]
+
+  # yaw stratum facing, 2.90 m: object-free baseline for the in-box
+  # clutter block below, whose scenes cluster at 2.7-3.4 m facing
+  - id: single_facing_03
+    robots: [{ x: 2.90, y: 0.00, yaw: 3.14 }]
 
   # yaw stratum side
   - id: single_side_01
@@ -38,6 +55,11 @@ scenes:
   # yaw stratum back
   - id: single_back_02
     robots: [{ x: 4.83, y: 1.42, yaw: 0.11 }]
+
+  # yaw stratum back, 2.74 m: fills the gap between single_back_01
+  # (1.97 m) and single_back_02 (5.03 m); baseline for interfere_infront_03
+  - id: single_back_03
+    robots: [{ x: 2.70, y: -0.45, yaw: 0.10 }]
 
   # yaw stratum free
   - id: single_free_01
@@ -403,3 +425,160 @@ scenes:
       - { model: table, x: 2.51, y: -1.92, yaw: 0.32 }
       - { model: table_low, x: 2.6, y: 0.25, yaw: 1.8 }
       - { model: iv_pole, x: 1.86, y: 0.62, yaw: 0.11 }
+
+  # ---------------------------------------------------------------------------
+  # In-box clutter (added 2026-08-23). The interfere_* scenes above place an
+  # object CLEAR of the detection box, checking that a distant object is
+  # ignored. These place one inside it, where the mask admits its beams and the
+  # range segmentation is what has to reject them -- the other half of the axis.
+  #
+  # Certified from the live URDF (~/clearpath, camera mount 0.0/0.72) and the
+  # world SDF: camera base_link + (0.011, 0.018, 1.028) fx 443.53 640x480;
+  # LiDAR base_link + (0.392, 0, 0.342), 270 deg at 0.25 deg per beam, so the
+  # scan plane cuts the G1 mid-thigh. IV pole = 0.025 m shaft, z 0.05..1.80;
+  # its 0.225 m base disc sits below the scan plane and the LiDAR never sees it.
+  #
+  # Each pole satisfies: both shins keep at least 60% of their angular width
+  # (so the legs always return), it projects inside the detection box, its
+  # shaft clears the robot and the other poles, and no pole stands in another's
+  # shadow. Camera and LiDAR are only 0.38 m apart on one centre line, so "in
+  # the box" and "in the leg shadow" are nearly the same cone: a pole fits
+  # either BETWEEN the legs (25-35 px inside the box edge) or on a FLANK just
+  # outside one shin (5-7 px inside the edge, the geometric maximum). Two poles
+  # per robot is the ceiling; a third would have to share a bearing and would
+  # sit in another pole's shadow.
+  #
+  # Baseline for subtracting the pole's effect: the object-free poses already
+  # in this file. All but one of these scenes is facing at 2.7-3.4 m, within
+  # 0.11-0.46 m of an existing object-free pose (single_facing_03, or a robot
+  # in one of the objectless multi_*), and the clean offset drifts smoothly
+  # with range (-0.051 m at 2.67, -0.057 m at 3.89). The lone back-stratum
+  # scene pairs with single_back_03. Note the offset IS yaw-dependent (about
+  # -0.05 m facing vs -0.13 m side-on), so compare within a stratum. Measured
+  # within-pose spread over 5 repeats was 0.000 m, which is why none of these
+  # carry repeats_override.
+  #
+  # Expected against RANGE_BAND_M_DEFAULT = 0.35: infront = pole owns the
+  # nearest run and the estimate reads short; behind = pole discarded;
+  # samerange = pole merges and pulls the estimate; control = no effect at all.
+  # ---------------------------------------------------------------------------
+
+  # pole between the legs at 1.31 m (-0.59 m vs the legs, ~9 beams), nearest shin 100% visible, +37 px inside the box -> steals the near band
+  - id: interfere_infront_01
+    robots: [{ x: 2.30, y: 0.10, yaw: 3.05 }]
+    objects:
+      - { model: iv_pole, x: 1.70, y: 0.07 }
+
+  # control twin of interfere_infront_01: identical robot pose, no poles
+  - id: interfere_infront_02
+    robots: [{ x: 2.90, y: -0.25, yaw: 3.28 }]
+    objects:
+      - { model: iv_pole, x: 2.30, y: -0.19 }
+
+  # control twin of interfere_infront_02: identical robot pose, no poles
+  - id: interfere_infront_03
+    robots: [{ x: 2.70, y: -0.45, yaw: 0.10 }]
+    objects:
+      - { model: iv_pole, x: 2.11, y: -0.34 }
+
+  # control twin of interfere_infront_03: identical robot pose, no poles
+  - id: interfere_infront_04
+    robots: [{ x: 2.95, y: 0.40, yaw: 3.00 }]
+    objects:
+      - { model: iv_pole, x: 2.33, y: 0.44 }
+
+  # control twin of interfere_infront_04: identical robot pose, no poles
+  - id: interfere_behind_03
+    robots: [{ x: 2.80, y: 0.05, yaw: 3.14 }]
+    objects:
+      - { model: iv_pole, x: 3.50, y: 0.06 }
+
+  # control twin of interfere_behind_03: identical robot pose, no poles
+  - id: interfere_behind_04
+    robots: [{ x: 3.30, y: -0.40, yaw: 3.35 }]
+    objects:
+      - { model: iv_pole, x: 3.99, y: -0.50 }
+
+  # control twin of interfere_behind_04: identical robot pose, no poles
+  - id: interfere_behind_05
+    robots: [{ x: 3.40, y: 0.30, yaw: 2.98 }]
+    objects:
+      - { model: iv_pole, x: 4.10, y: 0.37 }
+
+  # control twin of interfere_behind_05: identical robot pose, no poles
+  - id: interfere_samerange_01
+    robots: [{ x: 2.70, y: 0.15, yaw: 3.22 }]
+    objects:
+      - { model: iv_pole, x: 2.37, y: 0.13 }
+
+  # control twin of interfere_samerange_01: identical robot pose, no poles
+  - id: interfere_samerange_02
+    robots: [{ x: 3.10, y: -0.20, yaw: 3.28 }]
+    objects:
+      - { model: iv_pole, x: 2.77, y: -0.18 }
+
+  # control twin of interfere_samerange_02: identical robot pose, no poles
+  - id: interfere_samerange_03
+    robots: [{ x: 2.90, y: 0.35, yaw: 3.05 }]
+    objects:
+      - { model: iv_pole, x: 2.55, y: 0.45 }
+
+  # control twin of interfere_samerange_03: identical robot pose, no poles
+  - id: interfere_pair_01
+    robots: [{ x: 3.00, y: 0.00, yaw: 3.14 }]
+    objects:
+      - { model: iv_pole, x: 3.70, y: 0.00 }
+      - { model: iv_pole, x: 2.40, y: 0.14 }
+
+  # control twin of interfere_pair_01: identical robot pose, no poles
+  - id: interfere_pair_02
+    robots: [{ x: 2.80, y: 0.25, yaw: 3.25 }]
+    objects:
+      - { model: iv_pole, x: 2.20, y: 0.19 }
+      - { model: iv_pole, x: 3.14, y: 0.08 }
+
+  # control twin of interfere_pair_02: identical robot pose, no poles
+  - id: interfere_pair_03
+    robots: [{ x: 2.90, y: 0.00, yaw: 3.14 }]
+    objects:
+      - { model: iv_pole, x: 2.30, y: 0.14 }
+      - { model: iv_pole, x: 3.22, y: -0.21 }
+
+  # control twin of interfere_pair_03: identical robot pose, no poles
+  - id: interfere_pair_04
+    robots: [{ x: 2.85, y: -0.25, yaw: 3.30 }]
+    objects:
+      - { model: iv_pole, x: 2.52, y: -0.22 }
+      - { model: iv_pole, x: 2.04, y: -0.29 }
+
+  # control twin of interfere_pair_04: identical robot pose, no poles
+  - id: interfere_pair_05
+    robots: [{ x: 2.95, y: 0.20, yaw: 3.18 }]
+    objects:
+      - { model: iv_pole, x: 3.65, y: 0.25 }
+      - { model: iv_pole, x: 2.60, y: 0.33 }
+
+  # control twin of interfere_pair_05: identical robot pose, no poles
+  - id: interfere_multi_01
+    robots:
+      - { x: 2.70, y: 0.80, yaw: 3.30 }
+      - { x: 4.40, y: -1.00, yaw: 2.95 }
+    objects:
+      - { model: iv_pole, x: 2.13, y: 0.60 }
+
+  # control twin of interfere_multi_01: identical robot pose, no poles
+  - id: interfere_multi_02
+    robots:
+      - { x: 2.80, y: 0.85, yaw: 3.28 }
+      - { x: 4.50, y: -1.05, yaw: 2.92 }
+    objects:
+      - { model: iv_pole, x: 2.23, y: 0.65 }
+      - { model: iv_pole, x: 3.53, y: 0.86 }
+
+  # control twin of interfere_multi_02: identical robot pose, no poles
+  - id: interfere_control_04
+    robots: [{ x: 2.80, y: 0.10, yaw: 3.15 }]
+    objects:
+      - { model: iv_pole, x: 2.14, y: 0.46 }
+
+  # control twin of interfere_control_04: identical robot pose, no poles
