@@ -294,7 +294,7 @@ class RgbdOverlayRenderer:
             select_mask = self.lidar_select_mask(frame.shape[:2], batch, published_mask)
             highlight = polar_highlight_beams(
                 scan_uv, scan_in_view, scan_points_optical, select_mask)
-        draw_scan_points(panel, scan_uv, scan_in_view, highlight)
+        draw_scan_points(panel, scan_uv, highlight)
         return panel
 
     def lidar_select_mask(
@@ -477,26 +477,25 @@ def polar_highlight_beams(
 def draw_scan_points(
     panel: np.ndarray,
     scan_uv: np.ndarray | None,
-    scan_in_view: np.ndarray | None,
     highlight: np.ndarray | None,
 ) -> None:
-    """Draw the projected LiDAR points: faint gray for every in-view beam,
-    highlighted yellow for the near-band beams polar profiling reduces."""
+    """Draw the beams polar profiling reduces to its estimate, and only those.
 
-    if scan_uv is None or scan_in_view is None:
+    The other in-view beams are deliberately not drawn: the panel answers
+    "which rays produced this distance", so the background returns the range
+    segmentation discards would read as part of the measurement. An empty
+    highlight (no mask, or no run survived) therefore draws nothing -- the
+    honest picture of a frame that produced no polar estimate.
+    """
+
+    if scan_uv is None or highlight is None:
         return
     scan_uv = np.asarray(scan_uv, dtype=np.float64)
-    in_view = np.asarray(scan_in_view, dtype=bool)
-    highlight = (
-        np.asarray(highlight, dtype=bool) if highlight is not None
-        else np.zeros(scan_uv.shape[0], dtype=bool))
+    highlight = np.asarray(highlight, dtype=bool)
     height, width = panel.shape[:2]
-    for index in np.flatnonzero(in_view):
+    for index in np.flatnonzero(highlight):
         u_px = int(round(float(scan_uv[index, 0])))
         v_px = int(round(float(scan_uv[index, 1])))
         if not (0 <= u_px < width and 0 <= v_px < height):
             continue
-        selected = bool(highlight[index])
-        color = (0, 255, 255) if selected else (120, 120, 120)
-        radius = 3 if selected else 1
-        cv2.circle(panel, (u_px, v_px), radius, color, -1, cv2.LINE_AA)
+        cv2.circle(panel, (u_px, v_px), 3, (0, 255, 255), -1, cv2.LINE_AA)

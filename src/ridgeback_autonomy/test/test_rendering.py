@@ -14,6 +14,7 @@ from ridgeback_autonomy.perception.core.rendering import (
     PANEL_SENSOR_DEPTH,
     PANEL_SILHOUETTE,
     active_label_lines,
+    draw_scan_points,
     pack_panels,
     polar_highlight_beams,
     select_panels,
@@ -164,3 +165,25 @@ def test_polar_highlight_beams_none_mask_is_empty() -> None:
         np.full((5, 2), 3.0), np.ones(5, dtype=bool), np.ones((5, 3)), None)
 
     assert not highlight.any()
+
+
+def test_draw_scan_points_draws_only_the_highlighted_beams() -> None:
+    panel = np.zeros((40, 40, 3), dtype=np.uint8)
+    uv = np.array([[10.0, 10.0], [30.0, 30.0]])
+    highlight = np.array([True, False])
+
+    draw_scan_points(panel, uv, highlight)
+
+    assert panel[10, 10].tolist() == [0, 255, 255]
+    # The dropped beam leaves no trace: a 3 px marker at (30, 30) would tint
+    # every pixel within a couple of pixels of it.
+    assert not panel[27:34, 27:34].any()
+
+
+def test_draw_scan_points_empty_highlight_draws_nothing() -> None:
+    panel = np.zeros((40, 40, 3), dtype=np.uint8)
+
+    draw_scan_points(panel, np.full((5, 2), 20.0), np.zeros(5, dtype=bool))
+    draw_scan_points(panel, np.full((5, 2), 20.0), None)
+
+    assert not panel.any()
