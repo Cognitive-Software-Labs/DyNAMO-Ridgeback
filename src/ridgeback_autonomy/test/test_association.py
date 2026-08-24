@@ -41,14 +41,33 @@ def test_inter_robot_occlusion_far_robot_missed() -> None:
 
 
 def test_estimate_beyond_gate_is_extra_and_gt_missed() -> None:
-    gts = [GtPoint(index=0, forward_m=5.0, lateral_m=0.0, distance_m=5.0)]
+    # Two GTs, so the gate is live: an estimate 3 m from the nearer robot could
+    # be mis-scored against either one, and is rejected instead.
+    gts = [
+        GtPoint(index=0, forward_m=5.0, lateral_m=0.0, distance_m=5.0),
+        GtPoint(index=1, forward_m=8.0, lateral_m=0.0, distance_m=8.0),
+    ]
     instances = [InstanceEstimate(index=0, forward_m=2.0, lateral_m=0.0, distance_m=2.0)]
 
     result = assign_to_ground_truth(instances, gts)
 
     assert result.matches == ()
-    assert result.missed_gt == (0,)
+    assert result.missed_gt == (0, 1)
     assert result.extra_detections == (0,)
+
+
+def test_single_gt_is_ungated_so_a_far_estimate_still_matches() -> None:
+    # The gate disambiguates between robots; with only one there is nothing to
+    # confuse, so the estimate is assigned and its error graded in full rather
+    # than dropped out of the MAE.
+    gts = [GtPoint(index=0, forward_m=5.0, lateral_m=0.0, distance_m=5.0)]
+    instances = [InstanceEstimate(index=0, forward_m=2.0, lateral_m=0.0, distance_m=2.0)]
+
+    result = assign_to_ground_truth(instances, gts)
+
+    assert result.matches == ((0, 0),)
+    assert result.missed_gt == ()
+    assert result.extra_detections == ()
 
 
 def test_distance_only_locator_matches_on_distance() -> None:

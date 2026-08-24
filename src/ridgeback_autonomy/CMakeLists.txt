@@ -164,6 +164,7 @@ if(BUILD_TESTING)
   ament_add_pytest_test(test_scenarios test/test_scenarios.py)
   ament_add_pytest_test(test_association test/test_association.py)
   ament_add_pytest_test(test_scoring test/test_scoring.py)
+  ament_add_pytest_test(test_report test/test_report.py)
 endif()
 
 ament_package()

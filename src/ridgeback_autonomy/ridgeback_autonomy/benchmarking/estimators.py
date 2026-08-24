@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import os
+import re
+
 
 PUBLIC_ESTIMATOR_ORDER = (
     'rgb',
@@ -208,6 +211,46 @@ def benchmark_output_name(
     if estimator == 'polar_profiling':
         return f'{mask_gate}_gated_{estimator}'
     return estimator
+
+
+def scenario_slug(scenario_path: str) -> str:
+    """Short filesystem-safe name for a scenario file, for the run folder.
+
+    ``benchmark_scenarios_full.yaml`` -> ``full``; anything else keeps its
+    stem. The shared prefix carries no information once it is inside a
+    ``benchmark-results`` folder, and dropping it keeps the name short enough
+    to read at a glance.
+    """
+
+    stem = os.path.splitext(os.path.basename(scenario_path or ''))[0]
+    if stem.startswith('benchmark_scenarios_'):
+        stem = stem[len('benchmark_scenarios_'):]
+    stem = re.sub(r'[^a-z0-9_-]+', '_', stem.lower()).strip('_')
+    return stem or 'scenario'
+
+
+def benchmark_run_folder_name(
+    run_label: str,
+    scenario_path: str,
+    mask_gate: str,
+    depth_source: str,
+    selected_estimators: tuple[str, ...],
+) -> str:
+    """Run folder name: timestamp first, then the axes that change the results.
+
+    The timestamp leads so the directory keeps sorting chronologically -- the
+    usual question is "what did I run last". After it come only axes that
+    actually applied: the mask gate is omitted when no mask estimator ran, and
+    the depth source when no depth-path estimator ran, so a lidar-only run is
+    not labelled with a segmentation gate it never used.
+    """
+
+    parts = [run_label, scenario_slug(scenario_path)]
+    if uses_mask_estimators(selected_estimators):
+        parts.append(mask_gate)
+    if any(estimator in DEPTH_PATH_ESTIMATORS for estimator in selected_estimators):
+        parts.append(depth_source)
+    return '_'.join(part for part in parts if part)
 
 
 def benchmark_display_name(

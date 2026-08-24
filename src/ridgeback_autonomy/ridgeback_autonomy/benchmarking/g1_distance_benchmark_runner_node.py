@@ -31,6 +31,7 @@ from ridgeback_autonomy.benchmarking.estimators import (
     MASK_GATE_DEFAULT,
     benchmark_display_name,
     benchmark_output_name,
+    benchmark_run_folder_name,
     parse_estimators,
     parse_mask_gate,
     selected_camera_estimators,
@@ -43,21 +44,28 @@ from ridgeback_autonomy.benchmarking.reduction import (
     choose_representative_event,
     compute_status_histogram,
     compute_trial_medians,
+    dominant_miss_reason,
     format_status_tally,
     merge_status_histograms,
     union_usable_events,
     usable_events_by_estimator,
 )
-from ridgeback_autonomy.common.miss_reason import MissReason, reason_name
 from ridgeback_autonomy.benchmarking.association import GtPoint, assign_to_ground_truth
 from ridgeback_autonomy.benchmarking.rendering import BenchmarkCollageRenderer
+from ridgeback_autonomy.benchmarking.report import render_run_report
 from ridgeback_autonomy.benchmarking.scenarios import Scene, load_scenarios
-from ridgeback_autonomy.benchmarking.scoring import build_instance_estimate, score_scene
+from ridgeback_autonomy.benchmarking.scoring import (
+    MISS_OUTCOMES,
+    OUTCOME_DETECTOR_MISS,
+    OUTCOME_NO_VALUE,
+    SceneScore,
+    build_display_instance_estimate,
+    score_scene,
+)
 from ridgeback_autonomy.benchmarking.summary import (
-    build_coverage_rows,
+    build_run_document,
     build_summary_rows,
-    write_coverage_csv,
-    write_summary_csv,
+    write_run_json,
     write_trial_csv,
 )
 from ridgeback_autonomy.msg import G1Measurements
@@ -104,6 +112,11 @@ DEPTH_SOURCE_DEFAULT = 'stereoscopic'
 MONO_DEPTH_DEBUG_TOPIC = 'debug/g1/camera/mono_depth'
 DEPTH_MAX_METERS_DEFAULT = 10.0
 PREVIEW_BUFFER_LIMIT = 256
+GIT_TIMEOUT_SEC = 5.0
+# Declared by rclpy itself, not by the launch file, so it is not part of a
+# run's configuration. ``use_sim_time`` is deliberately NOT excluded: the
+# launch sets it and it changes how stamps are interpreted.
+RCLPY_INTERNAL_PARAMETERS = frozenset({'start_type_description_service'})
 
 
 def extract_json_payload(text: str) -> dict[str, Any]:
@@ -121,6 +134,51 @@ def extract_json_payload(text: str) -> dict[str, Any]:
         if isinstance(payload, dict):
             return payload
         search_from = start + 1
+
+
+def git_provenance(repo_dir: str) -> dict[str, str]:
+    """Commit, branch and dirty flag for the tree that produced a run.
+
+    Best-effort: a missing git, a detached checkout or a non-repo directory
+    yields ``unknown`` rather than failing a benchmark over bookkeeping. The
+    dirty flag matters more than the hash -- a run from a modified tree is not
+    reproducible from the commit alone, and silently recording just the hash
+    would imply that it is.
+    """
+
+    def capture(args: list[str]) -> str | None:
+        try:
+            result = subprocess.run(
+                ['git', '-C', repo_dir] + args,
+                check=False, capture_output=True, text=True, timeout=GIT_TIMEOUT_SEC)
+        except (OSError, subprocess.SubprocessError):
+            return None
+        return result.stdout.strip() if result.returncode == 0 else None
+
+    status = capture(['status', '--porcelain'])
+    return {
+        'commit': capture(['rev-parse', '--short', 'HEAD']),
+        'branch': capture(['rev-parse', '--abbrev-ref', 'HEAD']),
+        'dirty_count': (
+            None if status is None
+            else len([line for line in status.splitlines() if line.strip()])
+        ),
+    }
+
+
+def format_commit(provenance: dict[str, Any]) -> str:
+    """One line naming the code that produced a run, dirt included."""
+
+    commit = provenance.get('commit')
+    if commit is None:
+        return 'unknown'
+    dirty_count = provenance.get('dirty_count')
+    if dirty_count is None:
+        return f'{commit} (dirty state unknown)'
+    if dirty_count:
+        return (f'{commit} + {dirty_count} uncommitted file(s) — NOT reproducible '
+                f'from this commit alone')
+    return f'{commit} (clean)'
 
 
 @dataclass
@@ -147,9 +205,12 @@ class G1DistanceBenchmarkRunner(Node):
         pkg_share = get_package_share_directory('ridgeback_autonomy')
         self.g1_model_sdf = os.path.join(pkg_share, 'sim', 'models', 'g1', 'model.sdf')
         self.models_dir = os.path.join(pkg_share, 'sim', 'models')
-        default_scenario = os.path.join(pkg_share, 'config', 'benchmark_scenarios.yaml')
-        workspace_root = os.path.abspath(os.path.join(pkg_share, '..', '..', '..', '..'))
-        default_output_dir = os.path.join(workspace_root, 'benchmark-results')
+        default_scenario = os.path.join(pkg_share, 'config', 'benchmark_scenarios_full.yaml')
+        # Kept on the node: the git provenance recorded with each run is read
+        # from this directory, not just the default output path.
+        self.workspace_root = os.path.abspath(
+            os.path.join(pkg_share, '..', '..', '..', '..'))
+        default_output_dir = os.path.join(self.workspace_root, 'benchmark-results')
 
         self.declare_parameter('world', 'g1_distance_calibration')
         self.declare_parameter('scenario', '')
@@ -203,8 +264,13 @@ class G1DistanceBenchmarkRunner(Node):
             f'{self.namespace_name}/robot' if self.namespace_name else 'robot'
         )
         self.pose_info_topic = f'/world/{self.world}/pose/info'
-        self.run_label = time.strftime('%Y%m%d_%H%M%S', time.localtime())
-        self.run_output_dir = os.path.join(self.output_dir, self.run_label)
+        self.run_started_at = time.localtime()
+        self.run_label = time.strftime('%Y%m%d_%H%M%S', self.run_started_at)
+        # The folder carries the axes that change the results, so a results
+        # directory reads without opening anything.
+        self.run_output_dir = os.path.join(self.output_dir, benchmark_run_folder_name(
+            self.run_label, self.scenario_path, self.mask_gate, self.depth_source,
+            self.selected_estimators))
         self.images_dir = os.path.join(self.run_output_dir, 'images')
         os.makedirs(self.images_dir, exist_ok=False)
 
@@ -226,10 +292,11 @@ class G1DistanceBenchmarkRunner(Node):
                 self.run_output_dir, f'{self.estimator_output_names[estimator]}.csv')
             for estimator in self.selected_estimators
         }
-        self.summary_csv_path = os.path.join(self.run_output_dir, 'comparison_summary.csv')
-        self.coverage_csv_path = os.path.join(self.run_output_dir, 'coverage.csv')
-        # Per-estimator status-code tallies over every captured event across the
-        # whole run (misses included, unlike the usable-aligned rows).
+        self.run_json_path = os.path.join(self.run_output_dir, 'run.json')
+        self.report_path = os.path.join(self.run_output_dir, 'summary.md')
+        # Per-estimator status-code tallies over every captured box across the
+        # whole run (misses included, unlike the usable-aligned rows). Feeds the
+        # summary's observation columns.
         self.status_aggregate: dict[str, dict[int, int]] = {}
 
         self.command_env = os.environ.copy()
@@ -394,7 +461,42 @@ class G1DistanceBenchmarkRunner(Node):
         self.store_buffered_preview(self.depth_anything_preview_buffer, stamp_ns, preview)
         self.backfill_previews_from_buffers()
 
+    def log_code_provenance(self) -> None:
+        """Say which code is about to produce these results, before it does.
+
+        A dirty tree gets a banner rather than a line: a benchmark takes many
+        minutes, and finding out afterwards that the results cannot be traced
+        to a commit means running it again. A clean tree still reports its
+        commit -- silence there would be indistinguishable from the check
+        having failed to run.
+        """
+
+        provenance = git_provenance(self.workspace_root)
+        commit = provenance['commit']
+        branch = provenance['branch'] or 'unknown'
+        dirty_count = provenance['dirty_count']
+
+        if commit is None:
+            self.get_logger().warn(
+                'Code provenance unavailable (not a git checkout, or git is missing): '
+                'this run cannot be traced back to a commit.')
+            return
+
+        if dirty_count:
+            rule = '=' * 78
+            self.get_logger().warn(
+                f'\n{rule}\n'
+                f'  UNCOMMITTED CHANGES: {dirty_count} file(s) differ from {commit} '
+                f'({branch}).\n'
+                f'  These results will NOT be reproducible from that commit alone.\n'
+                f'  Commit before benchmarking if this run matters.\n'
+                f'{rule}')
+            return
+
+        self.get_logger().info(f'Code provenance: {commit} on {branch} (clean tree).')
+
     def run(self) -> None:
+        self.log_code_provenance()
         self.get_logger().info(
             'Starting multi-estimator distance benchmark '
             f'for {", ".join(self.estimator_display_names[est] for est in self.selected_estimators)} '
@@ -403,10 +505,19 @@ class G1DistanceBenchmarkRunner(Node):
         self.wait_for_required_streams()
         self.wait_for_entity_pose(self.robot_model_name, POSE_WAIT_TIMEOUT_SEC)
 
+        self.run_trials()
+
+    def run_trials(self) -> None:
         estimator_rows = {estimator: [] for estimator in self.selected_estimators}
         included_trials = 0
         skipped_trials = 0
-        missed_by_estimator = {estimator: 0 for estimator in self.selected_estimators}
+        # Per-estimator tally of the four outcomes, so the summary can report
+        # WHY an instance went unscored instead of pooling every failure mode.
+        # Also the only miss counter: the summary derives its total from these.
+        outcome_counts = {
+            estimator: {outcome: 0 for outcome in MISS_OUTCOMES}
+            for estimator in self.selected_estimators
+        }
         total_extra_detections = 0
 
         for trial in self.build_trials():
@@ -418,28 +529,103 @@ class G1DistanceBenchmarkRunner(Node):
             included_trials += 1
             for estimator, instance_rows in result['rows'].items():
                 estimator_rows[estimator].extend(instance_rows)
-            for estimator, missed in result['missed_by_estimator'].items():
-                missed_by_estimator[estimator] += missed
+            for estimator, counts in result['outcome_counts'].items():
+                for outcome in MISS_OUTCOMES:
+                    outcome_counts[estimator][outcome] += counts.get(outcome, 0)
             total_extra_detections += result['extra_count']
 
         for estimator in self.selected_estimators:
             write_trial_csv(self.estimator_csv_paths[estimator], estimator_rows[estimator])
 
         summary_rows = build_summary_rows(
-            estimator_rows, missed_by_estimator, total_extra_detections)
-        for row in summary_rows:
-            row['estimator'] = self.estimator_display_names.get(
-                row['estimator'], row['estimator'])
-        write_summary_csv(self.summary_csv_path, summary_rows)
-
-        coverage_rows = build_coverage_rows(self.status_aggregate)
-        for row in coverage_rows:
-            row['estimator'] = self.estimator_display_names.get(
-                row['estimator'], row['estimator'])
-        write_coverage_csv(self.coverage_csv_path, coverage_rows)
+            estimator_rows, total_extra_detections, outcome_counts, self.status_aggregate)
+        self.write_run_outputs(
+            summary_rows, estimator_rows, included_trials, skipped_trials)
 
         self.log_summary(summary_rows, included_trials, skipped_trials)
         self.get_logger().info(f'Benchmark run written to {self.run_output_dir}')
+
+    def declared_parameters(self) -> dict[str, str]:
+        """Every ROS parameter this node declared, as text.
+
+        Read off the node rather than hand-listed, so the recorded
+        configuration cannot drift as parameters are added. These are the
+        launch arguments that reach the runner; launch-only toggles that do not
+        affect measurement (rviz, overlay) never become parameters here.
+        """
+
+        return {
+            name: str(parameter.value)
+            for name, parameter in sorted(self.get_parameters_by_prefix('').items())
+            if name not in RCLPY_INTERNAL_PARAMETERS
+        }
+
+    def write_run_outputs(
+        self,
+        summary_rows: list[dict[str, Any]],
+        estimator_rows: dict[str, list[dict[str, Any]]],
+        included_trials: int,
+        skipped_trials: int,
+    ) -> None:
+        """Both run-level views of the same numbers.
+
+        ``summary.md`` is the readable one (see ``report.py``); ``run.json`` is
+        the machine-readable one, carrying full precision plus the provenance
+        and parameters that would otherwise exist only as prose.
+        """
+
+        provenance = git_provenance(self.workspace_root)
+        parameters = self.declared_parameters()
+        scenes = len({
+            row['scene_id'] for rows in estimator_rows.values() for row in rows})
+        instances = len({
+            (row['trial_id'], row['instance_index'])
+            for rows in estimator_rows.values() for row in rows
+        })
+
+        metadata = {
+            'Started': time.strftime('%Y-%m-%d %H:%M:%S', self.run_started_at),
+            'Commit': format_commit(provenance),
+            'Branch': provenance['branch'] or 'unknown',
+            'Scenario': self.scenario_path,
+        }
+        markdown = render_run_report(
+            run_label=self.run_label,
+            scenario_path=self.scenario_path,
+            summary_rows=summary_rows,
+            estimator_rows=estimator_rows,
+            status_histograms=self.status_aggregate,
+            display_names=self.estimator_display_names,
+            included_trials=included_trials,
+            skipped_trials=skipped_trials,
+            scenes=scenes,
+            instances=instances,
+            metadata=metadata,
+            parameters=parameters,
+        )
+        with open(self.report_path, 'w', encoding='utf-8') as report_file:
+            report_file.write(markdown)
+
+        # Raw fields, not the report's prose: ``uncommitted_files`` is a number
+        # so "runs from a clean tree" is a filter, not a string match.
+        write_run_json(self.run_json_path, build_run_document(
+            summary_rows,
+            run_metadata={
+                'label': self.run_label,
+                'started': time.strftime('%Y-%m-%d %H:%M:%S', self.run_started_at),
+                'commit': provenance['commit'],
+                'branch': provenance['branch'],
+                'uncommitted_files': provenance['dirty_count'],
+                'scenario': self.scenario_path,
+                'scenes': scenes,
+                'instances': instances,
+                'trials_included': included_trials,
+                'trials_skipped': skipped_trials,
+            },
+            parameters=parameters,
+            display_names=self.estimator_display_names,
+            status_histograms=self.status_aggregate,
+        ))
 
     def build_trials(self) -> list[dict[str, Any]]:
         trials: list[dict[str, Any]] = []
@@ -484,40 +670,31 @@ class G1DistanceBenchmarkRunner(Node):
                 # Union empty: the detector never yielded a usable frame for ANY
                 # estimator. The trial ran and found nothing, so every GT
                 # instance counts as missed by every estimator — a skip
-                # (return None) is reserved for infrastructure failures.
+                # (return None) is reserved for infrastructure failures. There
+                # is no frame to render, so the rows carry no collage path.
                 self.get_logger().info(
                     f'{trial_id} all_instances_missed | no_usable_detections | '
                     f'raw_events={capture["total_events"]} | '
                     f'{format_status_tally(capture["status_histogram"], self.selected_estimators)}'
                 )
-                return {
-                    'rows': {estimator: [] for estimator in self.selected_estimators},
-                    'missed_count': len(gt_instances),
-                    'missed_by_estimator': {
-                        estimator: len(gt_instances)
-                        for estimator in self.selected_estimators
-                    },
-                    'extra_count': 0,
-                }
+                scene_score = score_scene(
+                    usable_by_estimator, gt_instances, self.selected_estimators,
+                    detector_fired=capture['any_detected'])
+                return self.build_trial_result(
+                    trial, scene, gt_instances, scene_score, usable_by_estimator, '',
+                    capture['status_histogram'], capture['total_events'])
 
             # Frame-level scalar medians drive the representative-frame choice
-            # and the collage. Partial by design: an estimator with no usable
-            # events has no key and is scored as a per-estimator miss. The
-            # per-instance medians below drive the scored rows.
+            # and the collage only. Partial by design: an estimator with no
+            # usable events simply has no key here. The scored rows come from
+            # the per-instance medians below.
             scalar_medians = compute_trial_medians(usable_by_estimator)
-            if len(gt_instances) == 1:
-                # Single robot: the per-instance medians ARE the scalar medians,
-                # so a one-robot scene reproduces the historical grid benchmark.
-                instance_medians = {gt_instances[0].index: dict(scalar_medians)}
-                missed_gt: tuple[int, ...] = ()
-                extra_count = 0
-                estimator_missed = {
-                    estimator: (0 if estimator in scalar_medians else 1)
-                    for estimator in self.selected_estimators
-                }
-            else:
-                instance_medians, missed_gt, extra_count, estimator_missed = score_scene(
-                    usable_events, gt_instances, self.selected_estimators)
+            # One scoring path for every scene size: each estimator associates
+            # its own estimates to the ground-truth robots, so one estimator's
+            # gross error can no longer erase the instance for the rest.
+            scene_score = score_scene(
+                usable_by_estimator, gt_instances, self.selected_estimators,
+                detector_fired=capture['any_detected'])
 
             representative_event = choose_representative_event(
                 usable_events,
@@ -531,54 +708,17 @@ class G1DistanceBenchmarkRunner(Node):
                 scalar_medians,
                 gt_instances[0].distance_m,
                 box_annotations,
-                len(missed_gt),
+                len(scene_score.detector_missed),
                 self.dominant_miss_reasons(capture['status_histogram'], scalar_medians),
             )
 
-            rows: dict[str, list[dict[str, Any]]] = {
-                estimator: [] for estimator in self.selected_estimators}
-            for gt in gt_instances:
-                medians = instance_medians.get(gt.index, {})
-                for estimator in self.selected_estimators:
-                    estimate = medians.get(estimator)
-                    if estimate is None:
-                        continue  # per-estimator miss: counted, reason in coverage.csv
-                    abs_error = abs(estimate - gt.distance_m)
-                    rel_error = abs_error / gt.distance_m if gt.distance_m > 0.0 else None
-                    rows[estimator].append({
-                        'trial_id': trial_id,
-                        'repeat_index': trial['repeat_index'],
-                        'scene_id': scene.id,
-                        'instance_index': gt.index,
-                        'spawn_world_x': gt.world_x,
-                        'spawn_world_y': gt.world_y,
-                        'spawn_yaw_rad': scene.robots[gt.index].yaw,
-                        'true_forward_m': gt.forward_m,
-                        'true_lateral_m': gt.lateral_m,
-                        'true_distance_m': gt.distance_m,
-                        'estimator': self.estimator_display_names[estimator],
-                        'trial_estimate_m': estimate,
-                        'abs_error_m': abs_error,
-                        'rel_error': rel_error,
-                        'usable_aligned_events': len(usable_by_estimator.get(estimator, [])),
-                        'image_path': image_path,
-                    })
-
-            # Per-estimator missed total for this trial: detector-level misses
-            # (nobody had a chance at the instance) plus estimator-level ones.
-            missed_by_estimator = {
-                estimator: len(missed_gt) + estimator_missed.get(estimator, 0)
-                for estimator in self.selected_estimators
-            }
             self.log_trial(
                 trial_id, scalar_medians, gt_instances[0].distance_m,
-                len(usable_events), image_path, len(missed_gt), extra_count)
-            return {
-                'rows': rows,
-                'missed_count': len(missed_gt),
-                'missed_by_estimator': missed_by_estimator,
-                'extra_count': extra_count,
-            }
+                len(usable_events), image_path,
+                len(scene_score.detector_missed), scene_score.extra_count)
+            return self.build_trial_result(
+                trial, scene, gt_instances, scene_score, usable_by_estimator, image_path,
+                capture['status_histogram'], capture['total_events'])
         except Exception as exc:
             self.get_logger().error(f'{trial_id} failed: {exc}')
             return None
@@ -603,10 +743,87 @@ class G1DistanceBenchmarkRunner(Node):
             self.capture_events, self.selected_estimators)
         return {
             'total_events': len(self.capture_events),
+            # Whether the detector produced ANY detection this window, which
+            # separates "nothing was there to measure" from "the estimators
+            # could not measure what was there".
+            'any_detected': any(
+                event.detected for event in self.capture_events.values()),
             'usable_by_estimator': usable_by_estimator,
             'usable_events': union_usable_events(usable_by_estimator),
             'status_histogram': compute_status_histogram(
                 self.capture_events, self.selected_estimators),
+        }
+
+    def build_trial_result(
+        self,
+        trial: dict[str, Any],
+        scene: Scene,
+        gt_instances: list[GtInstance],
+        scene_score: SceneScore,
+        usable_by_estimator: dict[str, list],
+        image_path: str,
+        status_histogram: dict[str, dict[int, int]],
+        frames_captured: int,
+    ) -> dict[str, Any]:
+        """One row per (instance, estimator), scored or not.
+
+        A miss keeps its row with null estimate/error columns, its ``outcome``
+        naming which of the four it was, and -- for ``no_value`` -- the dominant
+        ``miss_reason`` behind it. The failure stays attached to the scene that
+        caused it instead of collapsing into a run-level count.
+        """
+
+        rows: dict[str, list[dict[str, Any]]] = {
+            estimator: [] for estimator in self.selected_estimators}
+        for gt in gt_instances:
+            medians = scene_score.medians.get(gt.index, {})
+            outcomes = scene_score.outcomes.get(gt.index, {})
+            for estimator in self.selected_estimators:
+                estimate = medians.get(estimator)
+                if estimate is not None:
+                    abs_error = abs(estimate - gt.distance_m)
+                    rel_error = abs_error / gt.distance_m if gt.distance_m > 0.0 else None
+                else:
+                    abs_error = None
+                    rel_error = None
+                outcome = outcomes.get(estimator, OUTCOME_DETECTOR_MISS)
+                # A MissReason only exists for no_value (the estimator's own
+                # node reported why). gate_miss and detector_miss are already
+                # fully described by the outcome itself.
+                miss_reason = (
+                    dominant_miss_reason(status_histogram.get(estimator))
+                    if outcome == OUTCOME_NO_VALUE else None
+                )
+                rows[estimator].append({
+                    'trial_id': trial['trial_id'],
+                    'repeat_index': trial['repeat_index'],
+                    'scene_id': scene.id,
+                    'instance_index': gt.index,
+                    'spawn_world_x': gt.world_x,
+                    'spawn_world_y': gt.world_y,
+                    'spawn_yaw_rad': scene.robots[gt.index].yaw,
+                    'true_forward_m': gt.forward_m,
+                    'true_lateral_m': gt.lateral_m,
+                    'true_distance_m': gt.distance_m,
+                    'estimator': self.estimator_display_names[estimator],
+                    'outcome': outcome,
+                    'miss_reason': miss_reason,
+                    'trial_estimate_m': estimate,
+                    'abs_error_m': abs_error,
+                    'rel_error': rel_error,
+                    'usable_aligned_events': len(usable_by_estimator.get(estimator, [])),
+                    'frames_captured': frames_captured,
+                    'image_path': image_path,
+                })
+
+        return {
+            'rows': rows,
+            'missed_count': len(scene_score.detector_missed),
+            'outcome_counts': {
+                estimator: scene_score.outcome_counts(estimator)
+                for estimator in self.selected_estimators
+            },
+            'extra_count': scene_score.extra_count,
         }
 
     def build_box_annotations(
@@ -622,7 +839,7 @@ class G1DistanceBenchmarkRunner(Node):
         """
 
         instances = [
-            build_instance_estimate(detection, index, self.selected_estimators)
+            build_display_instance_estimate(detection, index, self.selected_estimators)
             for index, detection in enumerate(representative_event.detections)
         ]
         gt_points = [
@@ -652,17 +869,9 @@ class G1DistanceBenchmarkRunner(Node):
         for estimator in self.selected_estimators:
             if estimator in trial_medians:
                 continue
-            code_counts = status_histogram.get(estimator, {})
-            misses = {code: count for code, count in code_counts.items()
-                      if code != int(MissReason.OK)}
-            # A specific reason beats UNSET (UNSET = the frame never reached
-            # this estimator's node — usually the majority, never the story).
-            specific = {code: count for code, count in misses.items()
-                        if code != int(MissReason.UNSET)}
-            if specific:
-                reasons[estimator] = reason_name(max(specific, key=specific.get))
-            elif misses:
-                reasons[estimator] = reason_name(int(MissReason.UNSET))
+            reason = dominant_miss_reason(status_histogram.get(estimator))
+            if reason is not None:
+                reasons[estimator] = reason
         return reasons
 
     def save_trial_collage(

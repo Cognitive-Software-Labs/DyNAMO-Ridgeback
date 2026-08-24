@@ -114,6 +114,23 @@ def extract_estimator_statuses(msg: G1Measurements) -> dict[str, int]:
     return statuses
 
 
+def detection_status(detection: Detection, estimator: str) -> int:
+    """One estimator's status code on ONE detection.
+
+    The per-detection counterpart of ``extract_estimator_statuses``, which only
+    ever reads index 0. Mask estimators carry an explicit ``*_status`` decoded
+    per detection; the legacy estimators publish none, so the same coarse
+    ``OK``/``UNSET`` is inferred from whether THIS detection got a distance.
+    """
+
+    status_key = ESTIMATOR_STATUS_FIELD_KEYS.get(estimator)
+    if status_key is not None:
+        code = getattr(detection, status_key)
+        return int(code) if code is not None else int(MissReason.UNSET)
+    value = getattr(detection, ESTIMATOR_FIELD_KEYS[estimator])
+    return int(MissReason.OK if value is not None else MissReason.UNSET)
+
+
 def ensure_measurement_event(
     events: dict[MeasurementEventKey, MeasurementEvent],
     msg: G1Measurements,
@@ -193,6 +210,12 @@ def _copy_estimator_fields(target: Detection, source: Detection, estimator: str)
         forward_attr, lateral_attr = position
         setattr(target, forward_attr, getattr(source, forward_attr))
         setattr(target, lateral_attr, getattr(source, lateral_attr))
+    # The mask estimators' status rides along with their values: the reason
+    # tallies read it off this table, so dropping it here reports a working
+    # estimator as UNSET on every box.
+    status_attr = ESTIMATOR_STATUS_FIELD_KEYS.get(estimator)
+    if status_attr is not None:
+        setattr(target, status_attr, getattr(source, status_attr))
 
 
 def has_all_selected_estimates(

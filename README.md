@@ -271,9 +271,12 @@ This launch composes the simulator, `g1_detector_node`, the camera measurement n
 
 The mask rows are identified by their config axes — the mask gate (`mask_gate`), the aligned-depth source (`depth_source`), the path, and on the box gate the foreground-isolation recipe (`isolation_2d` for projective ranging, `isolation_3d` for euclidean reconstruction) — so their CSV files fold the axes into a self-describing name. The stereoscopic box-gate run above writes `box_gated_stereoscopic_projective_ranging_nearest_mode_histogram.csv` and `box_gated_stereoscopic_euclidean_reconstruction_height_crop_range_band.csv`; silhouette rows drop the isolation token (the tight branches never run a recipe), e.g. `silhouette_gated_stereoscopic_projective_ranging.csv`; polar profiling folds the gate only (`box_gated_polar_profiling.csv`). Non-mask estimators keep their plain names.
 
-Each benchmark run writes under `benchmark-results/<timestamp>/` by default:
+Each benchmark run writes under
+`benchmark-results/<timestamp>_<scenario>[_<gate>][_<depth_source>]/` by default
+(e.g. `20260822_202851_v2_silhouette_stereoscopic`):
+- `summary.md` — the readable report; start here
 - one trial-level CSV per selected estimator
-- one `comparison_summary.csv`
+- one `run.json` — the run-level numbers for machines, plus provenance
 - one shared collage image per included trial under `images/`
 
 Pass `output_dir:=...` to write the timestamped run folder somewhere else.
@@ -318,7 +321,7 @@ Benchmark semantics:
 | `g1_lidar_measurement_node` | `measurements/g1/lidar` | `camera_config_path`, `scan_topic`, `base_frame` |
 | `aligned_depth_node` | `perception/aligned_depth/image` + `.../camera_info` | `depth_source`, `depth_topic`, `color_topic`, `camera_info_topic` |
 | `g1_mask_measurement_node` | `measurements/g1/mask` (+ `debug/g1/mask` on the silhouette gate) | `aligned_depth_topic`, `aligned_camera_info_topic`, `scan_topic`, `pitch_deg`, `front_offset_m`, `isolation_2d`, `isolation_3d`, `mask_gate`, `segmentation_model`, `color_topic` |
-| `g1_overlay_node` | OpenCV window only | `measurement_topic`, `color_topic`, `depth_topic`, `mono_depth_debug_topic` |
+| `g1_overlay_node` | `debug/g1/overlay` (+ an OpenCV window when `show_window`) | `measurement_topic`, `color_topic`, `depth_topic`, `mono_depth_debug_topic`, `show_window`, `max_cols`, `rgb_panel_labels` |
 | `g1_distance_benchmark_runner` | per-estimator CSVs + summary CSV + trial collage images | `estimators`, `output_dir`, `camera_measurement_topic`, `lidar_measurement_topic`, `color_topic`, `depth_topic` |
 
 The shared camera geometry lives in `config/camera_config.json`, and the measurement nodes use the `camera_config_path` parameter.

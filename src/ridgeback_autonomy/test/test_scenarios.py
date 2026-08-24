@@ -110,18 +110,6 @@ def test_empty_scenes_rejected() -> None:
         parse_scenarios({'scenes': []})
 
 
-def test_shipped_grid_scenario_reproduces_15_single_robot_scenes() -> None:
-    scenes = load_scenarios(os.path.join(CONFIG_DIR, 'benchmark_scenarios.yaml'))
-
-    assert len(scenes) == 15
-    assert all(len(scene.robots) == 1 and not scene.objects for scene in scenes)
-    # The 5x3 forward/lateral grid is covered exactly once.
-    poses = {(scene.robots[0].x, scene.robots[0].y) for scene in scenes}
-    assert poses == {
-        (f, l) for f in (1.5, 2.5, 3.5, 4.5, 5.5) for l in (-0.75, 0.0, 0.75)
-    }
-
-
 def test_shipped_examples_scenario_parses() -> None:
     scenes = load_scenarios(os.path.join(CONFIG_DIR, 'benchmark_scenarios_examples.yaml'))
 
@@ -131,12 +119,18 @@ def test_shipped_examples_scenario_parses() -> None:
     assert by_id['bed_occluder_single'].objects[0].model == 'hospital_bed'
 
 
-def test_shipped_full_scenario_covers_every_case_five_times() -> None:
+def test_shipped_full_scenario_is_the_certified_randomized_set() -> None:
+    # ``full`` is now the certified randomized set and the packaged default:
+    # the hand-written 15-pose grid and the older 30-scene file were dropped in
+    # its favour, so this is the only shipped set besides the examples.
     scenes = load_scenarios(os.path.join(CONFIG_DIR, 'benchmark_scenarios_full.yaml'))
 
-    assert len(scenes) == 30
-    for prefix in ('single', 'multi', 'interocc', 'objclear', 'objocc', 'objpartial'):
-        assert sum(1 for scene in scenes if scene.id.startswith(prefix)) == 5
-    # Object cases use the two authored occluder models.
-    models = {obj.model for scene in scenes for obj in scene.objects}
-    assert models == {'hospital_bed', 'privacy_curtain'}
+    assert len(scenes) == 88
+    # Multi-robot scenes are what the per-estimator association path exists for.
+    assert sum(1 for scene in scenes if len(scene.robots) > 1) == 20
+    # Every family the set was designed to exercise is present.
+    for prefix in ('single', 'multi', 'interocc', 'objocc', 'objpartial', 'interfere'):
+        assert any(scene.id.startswith(prefix) for scene in scenes), prefix
+    # Probe scenes repeat, to measure the within-pose noise floor.
+    assert {scene.id for scene in scenes if scene.repeats_override} == {
+        'single_facing_01', 'objpartial_01', 'far_mid_01'}

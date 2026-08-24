@@ -71,7 +71,8 @@ The benchmark now follows these rules:
   - `bbox_xyxy`
 - each estimator is scored on its OWN usable events; an estimator with zero
   usable events in an otherwise-live trial is a per-estimator miss, with its
-  reason in `coverage.csv`
+  reason in the trial CSV's `miss_reason` column (run-level tallies in
+  `run.json` → `reason_histogram`)
 - a trial whose capture window yields NO detections at all still counts: every
   ground-truth instance is recorded as missed by every estimator
   (`all_instances_missed` in the log). A skipped trial means infrastructure
@@ -94,13 +95,22 @@ Default output root:
 
 Each run creates:
 
-- `<repo-root>/benchmark-results/<timestamp>/`
+- `<repo-root>/benchmark-results/<timestamp>_<scenario>[_<gate>][_<depth_source>]/`
+
+  e.g. `20260822_202851_v2_silhouette_stereoscopic`. The timestamp leads so the
+  directory sorts chronologically; the gate and depth source appear only when a
+  mask (respectively depth-path) estimator actually ran.
 
 Inside that run folder:
 
+- `summary.md` — the readable report: accuracy, reliability, why boxes went
+  unmeasured, and a per-scene table with one column per estimator. Start here.
 - `<estimator>.csv` for each selected estimator
-- `comparison_summary.csv`
+- `run.json` — the same run-level numbers for machines, plus provenance
 - `images/<trial_id>.png`
+
+`run.json` and the trial CSVs are the machine-readable sources (diffing runs,
+feeding analysis); `summary.md` renders the same numbers for reading.
 
 Pass `output_dir:=...` to the launch file to write the timestamped run folder somewhere else.
 
@@ -121,13 +131,22 @@ Each row contains:
 - usable aligned detection count
 - shared collage image path
 
-`comparison_summary.csv` contains one row per selected estimator with aggregate stats across the trial-level rows:
+`run.json` holds the run-level numbers: a `run` object (label, start time,
+commit, branch, `uncommitted_files`, scenario, scene/instance/trial counts), a
+`parameters` object with every parameter the runner was launched with, and one
+entry per estimator carrying the accuracy aggregates, a nested `missed`
+breakdown, a nested `observations` group, and `reason_histogram` as a real
+mapping. Field-by-field meanings:
+[benchmark_v2_followups.md](object_localization_documentation/benchmark_v2_followups.md)
+→ Output reference.
 
-- `trial_count`
-- `mean_abs_error_m`
-- `median_abs_error_m`
-- `p95_abs_error_m`
-- `mean_rel_error`
+It replaced `comparison_summary.csv`, which duplicated most of `summary.md`
+while being a poor machine format for this shape — JSON embedded in a cell, and
+instance-level accuracy sharing one flat row with box-level counts.
+
+`summary.md` renders the same numbers for reading, plus the provenance header —
+start time, commit (flagged when the tree was dirty, since the hash alone will
+not reproduce it), branch, and the full parameter table.
 
 ## Trial Images
 

@@ -80,7 +80,9 @@ scalar collapse, single ground-truth pose). So no perception code changed.
 
 ## 4. Scenario files (`config/`)
 
-- **`benchmark_scenarios.yaml`** — **default** (no-arg run). The legacy 5×3 grid
+- **`benchmark_scenarios_full.yaml`** — **default** (no-arg run). The certified
+  randomized 88-scene set. (Superseded the legacy 5×3 grid, which was the
+  original default and was deleted 2026-08-24.) The legacy grid
   as 15 single-robot scenes → reproduces the old benchmark (regression guard).
 - **`benchmark_scenarios_examples.yaml`** — small showcase (single, inter-robot
   occlusion, bed occluder, curtain occluder).

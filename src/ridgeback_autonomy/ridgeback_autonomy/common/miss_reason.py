@@ -44,6 +44,20 @@ class MissReason(IntEnum):
     UNSET = 255
 
 
+def observation_totals(code_counts: dict[int, int] | None) -> tuple[int, int]:
+    """``(observations, observations_ok)`` for one estimator's status tally.
+
+    One definition shared by the CSV summary and the markdown report, so the
+    two can never disagree about how many boxes an estimator was asked about.
+    Lives here rather than beside the histogram builder because it is pure
+    arithmetic over these codes -- the reporting modules stay free of the ROS
+    message imports that the reduction pipeline needs.
+    """
+
+    code_counts = code_counts or {}
+    return sum(code_counts.values()), code_counts.get(int(MissReason.OK), 0)
+
+
 def reason_name(code: int | None) -> str:
     """Human-readable name for a status code, tolerant of ``None``/unknown."""
 

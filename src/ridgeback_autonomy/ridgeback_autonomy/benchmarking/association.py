@@ -20,7 +20,8 @@ import math
 
 # If the nearest GT is farther than this from an instance's estimate, the pair
 # is rejected (EXTRA) rather than forced -- stops a wildly-wrong estimate from
-# mis-scoring against an unrelated robot.
+# mis-scoring against an unrelated robot. Only applied when the scene HAS an
+# unrelated robot: see ``assign_to_ground_truth``.
 ASSIGN_MAX_GATE_M = 1.5
 
 
@@ -76,16 +77,25 @@ def assign_to_ground_truth(
 ) -> Assignment:
     """Greedy nearest-estimate assignment of instances to ground-truth robots.
 
-    All (instance, gt) pairs within ``max_gate_m`` are ranked by cost ascending
-    and assigned first-come, each instance/GT used at most once. Deterministic:
-    ties break by (gt_index, detection_index).
+    All (instance, gt) pairs within the gate are ranked by cost ascending and
+    assigned first-come, each instance/GT used at most once. Deterministic: ties
+    break by (gt_index, detection_index).
+
+    The gate is an ASSOCIATION device, not an outlier filter. It exists to stop a
+    wildly-wrong estimate from being scored against an unrelated robot, so it
+    only applies when the scene contains an unrelated robot to confuse it with.
+    With a single GT the estimate is assigned however far off it is, and its
+    error is graded in full -- gating there would quietly drop the worst trials
+    out of the MAE instead of reporting them.
     """
+
+    gate_m = max_gate_m if len(gts) > 1 else math.inf
 
     candidates: list[tuple[float, int, int]] = []
     for gt in gts:
         for instance in instances:
             cost = _pair_cost(instance, gt)
-            if cost is None or cost > max_gate_m:
+            if cost is None or cost > gate_m:
                 continue
             candidates.append((cost, gt.index, instance.index))
     candidates.sort(key=lambda item: (item[0], item[1], item[2]))

@@ -22,6 +22,10 @@ from ridgeback_autonomy.benchmarking.estimators import (
 CAMERA_MEASUREMENT_TOPIC = 'measurements/g1/camera'
 LIDAR_MEASUREMENT_TOPIC = 'measurements/g1/lidar'
 MASK_MEASUREMENT_TOPIC = 'measurements/g1/mask'
+
+# Overlay columns for the RViz strip. Above any possible panel count, and
+# pack_panels clamps to that count, so the effect is simply "one row".
+OVERLAY_SINGLE_ROW = 99
 ALIGNED_DEPTH_TOPIC = 'perception/aligned_depth/image'
 ALIGNED_CAMERA_INFO_TOPIC = 'perception/aligned_depth/camera_info'
 
@@ -184,10 +188,47 @@ def build_benchmark_nodes(context, *args, **kwargs):
                 'estimators': ','.join(selected_estimators),
                 'depth_source': LaunchConfiguration('depth_source'),
                 'mask_gate': LaunchConfiguration('mask_gate'),
+                'show_window': LaunchConfiguration('overlay_window'),
+                # Every panel on one row, so the composite fills the wide RViz
+                # panel instead of letterboxing to a third of its width.
+                # pack_panels clamps to the panel count, so this just means "one row".
+                'max_cols': OVERLAY_SINGLE_ROW,
+                # The HUD prints the distances as text RViz draws at full size,
+                # so the label block would only cover the robot it annotates.
+                'rgb_panel_labels': False,
             }],
             remappings=[('/tf', 'tf'), ('/tf_static', 'tf_static')],
             output='screen',
             condition=launch.conditions.IfCondition(LaunchConfiguration('overlay')),
+        )
+    )
+
+    # Renders the distance readout the estimate viz node publishes. Benchmark
+    # RViz has no HUD otherwise; the exploration config has carried one all along.
+    nodes.append(
+        Node(
+            package='ridgeback_autonomy',
+            executable='hud_node',
+            name='hud_node',
+            namespace=namespace,
+            parameters=[{
+                'use_sim_time': use_sim_time,
+                'panels': ['hud/g1_distances'],
+                'text_size': 16.0,
+                # The widest row is "Euclidean Reconstruction" (24) + distance +
+                # signed error = 40 monospace columns, ~510 px at this size.
+                # Too narrow and the overlay wraps the long labels onto a second
+                # line and clips the error column mid-number.
+                'overlay_width': 640,
+                # Top-right, clear of the perception overlay docked below the
+                # 3D view and of the robot, which sits left of centre.
+                'horizontal_alignment': 'right',
+                'vertical_alignment': 'top',
+                # The distances panel colours each row to match its ring.
+                'rich_text': True,
+            }],
+            output='screen',
+            condition=launch.conditions.IfCondition(LaunchConfiguration('estimate_viz')),
         )
     )
 
@@ -250,10 +291,16 @@ def generate_launch_description():
         DeclareLaunchArgument('use_sim_time', default_value='true'),
         DeclareLaunchArgument('exploration_rviz', default_value='true',
                               description='Launch the exploration RViz2 config'),
-        DeclareLaunchArgument('estimate_viz', default_value='false',
-                              description='Launch the g1_estimate_viz_node RViz marker publisher'),
+        DeclareLaunchArgument('estimate_viz', default_value='true',
+                              description='Publish the per-estimator position rings and the '
+                                          'HUD distance readout, and run the HUD aggregator '
+                                          'that renders it'),
         DeclareLaunchArgument('overlay', default_value='true',
-                              description='Launch the g1_overlay_node OpenCV camera view with estimator distances'),
+                              description='Launch the g1_overlay_node camera view with estimator distances'),
+        DeclareLaunchArgument('overlay_window', default_value='false',
+                              description='Also open the overlay in its own OpenCV window. Off '
+                                          'here because the overlay is published for the RViz '
+                                          'panel, and a floating window would cover it'),
         DeclareLaunchArgument('setup_path',
                               default_value=os.path.expanduser('~/clearpath/')),
         DeclareLaunchArgument('world', default_value='g1_distance_calibration'),
@@ -266,8 +313,8 @@ def generate_launch_description():
             default_value='',
             description='Path to a benchmark scenario YAML (robots + object '
                         'occluders per scene). Empty uses the packaged '
-                        'config/benchmark_scenarios.yaml (the legacy 15-pose '
-                        'single-robot grid).'),
+                        'config/benchmark_scenarios_full.yaml (88 scenes: '
+                        'single, multi-robot, occlusion and clutter families).'),
         DeclareLaunchArgument('repeats', default_value='5'),
         DeclareLaunchArgument(
             'output_dir',

@@ -281,7 +281,7 @@ Because every path emits in the same frame and at least `(X, Z)`, the outputs ar
 - **Extrinsics** — rigid transform (rotation + translation) between two sensors' frames.
 - **Intrinsics** — a sensor's internal projection parameters (focal lengths, principal point, distortion).
 
-### Miss-reason codes (`coverage.csv` / `reason_histogram`)
+### Miss-reason codes (`run.json` → `reason_histogram`, trial CSV → `miss_reason`)
 
 Authoritative source: `common/miss_reason.py` (`MissReason` enum). Every
 mask-estimator value carries one of these per detection; the benchmark tallies

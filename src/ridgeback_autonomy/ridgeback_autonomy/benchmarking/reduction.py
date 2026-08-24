@@ -5,6 +5,7 @@ from collections import Counter
 
 from ridgeback_autonomy.benchmarking.alignment import (
     MeasurementEvent,
+    detection_status,
     event_has_all_panel_previews,
     has_all_selected_estimates,
 )
@@ -69,22 +70,48 @@ def compute_status_histogram(
     events: dict,
     selected_estimators: tuple[str, ...],
 ) -> dict[str, dict[int, int]]:
-    """Per-estimator count of status codes over **all** captured events.
+    """Per-estimator count of status codes over every captured BOX.
 
-    Runs over every ``count == 1`` event (not just the usable-aligned ones),
-    so misses are visible: an estimator that never produced a value still shows
-    its reason tally. Codes are ``MissReason`` values; a missing/absent status
-    is counted as ``UNSET``.
+    The unit is one detection (box-observation), not one frame, so a scene with
+    two robots contributes both boxes per frame. Counting frames instead meant
+    multi-robot scenes were either invisible (every frame held 2 boxes, so none
+    qualified) or sampled only on the frames where the detector had already
+    lost one -- exactly the failures, and nothing else.
+
+    Single-robot scenes are unaffected: one box per frame makes detections and
+    frames the same number. Codes are ``MissReason`` values; an absent status
+    counts as ``UNSET``.
     """
 
     histogram: dict[str, Counter] = {estimator: Counter() for estimator in selected_estimators}
     for event in events.values():
-        if int(event.count) != 1:
-            continue
-        for estimator in selected_estimators:
-            code = event.estimate_statuses.get(estimator)
-            histogram[estimator][int(code if code is not None else MissReason.UNSET)] += 1
+        for detection in event.detections:
+            for estimator in selected_estimators:
+                histogram[estimator][detection_status(detection, estimator)] += 1
     return {estimator: dict(counter) for estimator, counter in histogram.items()}
+
+
+def dominant_miss_reason(code_counts: dict[int, int] | None) -> str | None:
+    """The reason that best explains why an estimator produced nothing.
+
+    A specific reason beats ``UNSET``: ``UNSET`` means the frame never reached
+    this estimator's node, which is usually the majority of the tally and never
+    the story. Returns ``None`` when nothing failed (all ``OK`` / empty).
+    """
+
+    misses = {
+        code: count for code, count in (code_counts or {}).items()
+        if code != int(MissReason.OK)
+    }
+    if not misses:
+        return None
+    specific = {
+        code: count for code, count in misses.items()
+        if code != int(MissReason.UNSET)
+    }
+    if specific:
+        return reason_name(max(specific, key=specific.get))
+    return reason_name(int(MissReason.UNSET))
 
 
 def merge_status_histograms(
