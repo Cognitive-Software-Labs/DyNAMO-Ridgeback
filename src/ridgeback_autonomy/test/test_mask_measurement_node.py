@@ -8,6 +8,7 @@ from sensor_msgs.msg import Image
 from std_msgs.msg import Header
 
 from ridgeback_autonomy.benchmarking.alignment import measurement_message_key
+from ridgeback_autonomy.common.markers import PolarBeamRecord
 from ridgeback_autonomy.common.messages import (
     batch_from_detections_message,
     batch_from_measurements_message,
@@ -28,6 +29,7 @@ from ridgeback_autonomy.perception.g1_mask_measurement_node import (
     encode_mask_debug_image,
     fill_path_measurements,
     grid_mismatch_warning,
+    nearest_beam_record,
     optical_to_base_planar,
     resolve_mask_gate,
 )
@@ -379,6 +381,48 @@ def test_fill_records_beams_even_when_polar_produces_no_estimate() -> None:
     assert len(records) == 1
     assert records[0].merged.size == 0
     assert records[0].selected.size > 0
+
+
+def beam_record(detection_index: int) -> PolarBeamRecord:
+    return PolarBeamRecord(
+        detection_index=detection_index,
+        selected=np.array([1, 2]),
+        merged=np.array([1]),
+        in_bbox=np.array([1, 2]),
+    )
+
+
+def test_the_drawn_record_is_the_nearest_detections() -> None:
+    batch = build_fill_batch(count=2)
+    batch.detections[0].polar_profiling_distance_m = 4.0
+    batch.detections[1].polar_profiling_distance_m = 2.0
+
+    record = nearest_beam_record(batch, [beam_record(0), beam_record(1)])
+
+    assert record.detection_index == 1
+
+
+def test_records_are_matched_by_detection_index_not_position() -> None:
+    # Detection 0's segmentation came back empty, so it recorded no beams and the
+    # list is one short. Indexing it positionally would draw the far robot.
+    batch = build_fill_batch(count=3)
+    batch.detections[1].polar_profiling_distance_m = 5.0
+    batch.detections[2].polar_profiling_distance_m = 3.0
+
+    record = nearest_beam_record(batch, [beam_record(1), beam_record(2)])
+
+    assert record.detection_index == 2
+
+
+def test_a_batch_with_no_estimates_still_draws_its_beams() -> None:
+    # Every path declined, so nothing is rankable -- but a frame with beams and
+    # no estimate is exactly the failure the ray layers exist to show.
+    batch = build_fill_batch(count=2)
+
+    record = nearest_beam_record(batch, [beam_record(0), beam_record(1)])
+
+    assert record.detection_index == 0
+    assert nearest_beam_record(batch, []) is None
 
 
 def test_fill_skips_none_mask_entries_fields_stay_unset() -> None:

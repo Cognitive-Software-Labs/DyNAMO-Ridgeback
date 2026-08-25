@@ -130,7 +130,7 @@ def test_dropped_layer_is_selected_minus_merged() -> None:
         in_bbox=np.array([1, 2, 3, 4, 5]),
     )
 
-    markers = build_polar_ray_markers(scan, [record], STAMP, LIFETIME)
+    markers = build_polar_ray_markers(scan, record, STAMP, LIFETIME)
     by_namespace = {marker.ns: marker for marker in markers}
 
     assert set(by_namespace) == {NS_USED, NS_DROPPED, NS_WEDGE}
@@ -138,20 +138,22 @@ def test_dropped_layer_is_selected_minus_merged() -> None:
     assert len(by_namespace[NS_DROPPED].points) == 3 * 2    # beams 1, 4, 5
 
 
-def test_ids_are_per_detection_so_layers_do_not_collide() -> None:
-    # Two robots in frame: each detection owns an id within every namespace, so a
-    # frame overwrites the previous one instead of accumulating markers.
+def test_ids_are_fixed_so_a_change_of_instance_leaves_no_orphans() -> None:
+    # Two robots in frame, drawn on consecutive frames as the nearer one changes.
+    # Both frames have to land on the same ids, or the robot that stopped being
+    # nearest keeps its rays on screen until the marker lifetime runs out.
     scan = make_scan([2.0] * 12)
-    records = [
-        PolarBeamRecord(0, np.array([1, 2, 3]), np.array([2]), np.array([1, 2, 3])),
-        PolarBeamRecord(1, np.array([7, 8, 9]), np.array([8]), np.array([7, 8, 9])),
+    first = PolarBeamRecord(0, np.array([1, 2, 3]), np.array([2]), np.array([1, 2, 3]))
+    second = PolarBeamRecord(1, np.array([7, 8, 9]), np.array([8]), np.array([7, 8, 9]))
+
+    keys = [
+        {(marker.ns, marker.id) for marker in build_polar_ray_markers(
+            scan, record, STAMP, LIFETIME)}
+        for record in (first, second)
     ]
 
-    markers = build_polar_ray_markers(scan, records, STAMP, LIFETIME)
-    keys = [(marker.ns, marker.id) for marker in markers]
-
-    assert len(keys) == len(set(keys)) == 6
-    assert {marker.id for marker in markers} == {0, 1}
+    assert keys[0] == keys[1]
+    assert {(NS_USED, 0), (NS_DROPPED, 0), (NS_WEDGE, 0)} == keys[0]
 
 
 def test_fully_merged_selection_draws_no_dropped_layer() -> None:
@@ -160,7 +162,7 @@ def test_fully_merged_selection_draws_no_dropped_layer() -> None:
     scan = make_scan([2.0] * 6)
     record = PolarBeamRecord(0, np.array([1, 2, 3]), np.array([1, 2, 3]), np.array([1, 2, 3]))
 
-    namespaces = {marker.ns for marker in build_polar_ray_markers(scan, [record], STAMP, LIFETIME)}
+    namespaces = {marker.ns for marker in build_polar_ray_markers(scan, record, STAMP, LIFETIME)}
 
     assert NS_DROPPED not in namespaces
     assert NS_USED in namespaces

@@ -53,6 +53,10 @@ from sensor_msgs.msg import CameraInfo, Image, LaserScan
 from tf2_ros import Buffer, TransformException, TransformListener
 from visualization_msgs.msg import MarkerArray
 
+from ridgeback_autonomy.benchmarking.estimators import (
+    ESTIMATOR_FIELD_KEYS,
+    nearest_instance_index,
+)
 from ridgeback_autonomy.common.markers import PolarBeamRecord, build_polar_ray_markers
 from ridgeback_autonomy.common.messages import (
     batch_from_detections_message,
@@ -358,6 +362,33 @@ def fill_path_measurements(
                     in_bbox=beams_in_bbox(
                         points_optical, valid, detection.bbox_xyxy, intrinsics),
                 ))
+
+
+def nearest_beam_record(batch, beam_records):
+    """The record for the detection the ray layers speak for, or ``None``.
+
+    Ranked by the same rule the estimate rings use, so both surfaces land on the
+    same robot. This node only fills its own three estimators, so the canonical
+    order falls through to them here -- two near-equal robots can still split the
+    ray and ring layers for a frame, which is the cost of not coupling the nodes.
+
+    Matched on ``detection_index`` rather than list position: detections whose
+    segmentation came back empty never record beams, so the two diverge. A batch
+    that ranks to nothing still draws its first record -- a frame with beams and
+    no estimate is exactly the failure worth seeing.
+    """
+
+    if not beam_records:
+        return None
+
+    def read_distance(estimator: str, index: int) -> float | None:
+        return getattr(batch.detections[index], ESTIMATOR_FIELD_KEYS[estimator], None)
+
+    nearest = nearest_instance_index(batch.count, read_distance)
+    for record in beam_records:
+        if record.detection_index == nearest:
+            return record
+    return beam_records[0]
 
 
 def encode_mask_debug_image(masks, image_height: int, image_width: int, header) -> Image:
@@ -690,7 +721,8 @@ class G1MaskMeasurementNode(Node):
                             scan_reason=scan_reason,
                             beam_records=beam_records,
                         )
-                        self.publish_ray_markers(beam_records, scan_msg)
+                        self.publish_ray_markers(
+                            nearest_beam_record(batch, beam_records), scan_msg)
         elif batch.detected:
             self.log_skip_warning(
                 'No camera_info received yet; publishing measurements without '
@@ -701,19 +733,19 @@ class G1MaskMeasurementNode(Node):
         self.measurement_pub.publish(
             build_measurements_message(batch, detections_msg.header))
 
-    def publish_ray_markers(self, beam_records, scan_msg) -> None:
-        """Draw this frame's polar beams, if there was a scan to draw them from.
+    def publish_ray_markers(self, beam_record, scan_msg) -> None:
+        """Draw the nearest detection's polar beams, given a scan to draw from.
 
         Stamped from the scan rather than the detection so the markers carry the
         stamp of the data they depict; the two are matched to within
         ``scan_match_tolerance_s`` and RViz interpolates the transform.
         """
 
-        if scan_msg is None or not beam_records:
+        if scan_msg is None or beam_record is None:
             return
         markers = build_polar_ray_markers(
             scan_msg,
-            beam_records,
+            beam_record,
             scan_msg.header.stamp,
             Duration(seconds=self.ray_marker_lifetime_sec).to_msg(),
         )

@@ -722,11 +722,21 @@ def test_build_summary_rows_aggregates_trial_level_estimator_rows() -> None:
 
 def test_ground_truth_point_message_packs_planar_truth() -> None:
     msg = ground_truth_point_message(
-        {'lateral_m': -0.75, 'forward_m': 3.5, 'distance_m': 3.58})
+        {'lateral_m': -0.75, 'forward_m': 3.5, 'distance_m': 3.58}, 'bed_occluder_single')
 
     assert msg.point.x == pytest.approx(-0.75)
     assert msg.point.y == pytest.approx(3.5)
     assert msg.point.z == pytest.approx(3.58)
+
+
+def test_ground_truth_point_message_names_its_trial() -> None:
+    # The trial id rides in header.frame_id (not a TF frame -- neither is the
+    # point) so a displayed truth can be checked against the scene on screen.
+    # Without it, a truth left over from an earlier trial is unfalsifiable.
+    msg = ground_truth_point_message(
+        {'lateral_m': 0.0, 'forward_m': 3.25, 'distance_m': 3.25}, 'bed_occluder_single')
+
+    assert msg.header.frame_id == 'bed_occluder_single'
 
 
 def test_run_document_is_machine_readable_with_full_precision(tmp_path) -> None:

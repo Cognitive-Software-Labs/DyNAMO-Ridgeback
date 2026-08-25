@@ -87,15 +87,18 @@ from ridgeback_autonomy.perception.core.isolation_2d import ISOLATION_2D_DEFAULT
 from ridgeback_autonomy.perception.core.isolation_3d import ISOLATION_3D_DEFAULT
 
 
-def ground_truth_point_message(true_pose: dict[str, float]) -> PointStamped:
+def ground_truth_point_message(true_pose: dict[str, float], trial_id: str) -> PointStamped:
     """Pack a trial's ground truth as x=lateral, y=forward, z=distance.
 
-    The overlay's ``current_truth`` unpacks the same convention; the values are
+    ``estimators.truth_reading`` unpacks the same convention; the values are
     the base-frame planar measurement every benchmark row shares, not a 3D
-    point in any TF frame.
+    point in any TF frame. ``header.frame_id`` carries the trial id for that
+    same reason -- it is not a TF frame either, and a truth number that names
+    its own trial can be checked against the scene the display is showing.
     """
 
     msg = PointStamped()
+    msg.header.frame_id = trial_id
     msg.point.x = float(true_pose['lateral_m'])
     msg.point.y = float(true_pose['forward_m'])
     msg.point.z = float(true_pose['distance_m'])
@@ -111,6 +114,10 @@ STREAM_WAIT_TIMEOUT_SEC = 300.0
 POSE_WAIT_TIMEOUT_SEC = 120.0
 DELETE_TIMEOUT_SEC = 15.0
 IMAGE_MATCH_TOLERANCE_NS = 250_000_000
+# Republish period for the trial truth, well inside the consumers'
+# ``TRUTH_MAX_AGE_S`` so the line survives a dropped message and is never much
+# older than the scene it describes.
+TRUTH_PUBLISH_PERIOD_SEC = 0.2
 CAMERA_MEASUREMENT_TOPIC = 'measurements/g1/camera'
 LIDAR_MEASUREMENT_TOPIC = 'measurements/g1/lidar'
 MASK_MEASUREMENT_TOPIC = 'measurements/g1/mask'
@@ -396,12 +403,14 @@ class G1DistanceBenchmarkRunner(Node):
                 qos_profile_sensor_data,
             )
 
-        # Ground truth for the overlay's reference line, republished at ~1 Hz
-        # while a capture window is active so the overlay's age gate drops the
-        # line between trials.
+        # Ground truth for the display surfaces' reference line, republished
+        # while a capture window is active so their age gates drop the line
+        # between trials. Depth 1: only the newest value is ever wanted, and a
+        # deeper queue lets a slow consumer read a previous trial's truth.
         self.ground_truth_pub = self.create_publisher(
-            PointStamped, GROUND_TRUTH_TOPIC, 10)
+            PointStamped, GROUND_TRUTH_TOPIC, 1)
         self.active_truth: dict[str, float] | None = None
+        self.active_trial_id = ''
         self.last_truth_publish_monotonic = 0.0
 
     def on_camera_measurement(self, msg: G1Measurements) -> None:
@@ -722,6 +731,7 @@ class G1DistanceBenchmarkRunner(Node):
                 'forward_m': nearest.forward_m,
                 'distance_m': nearest.distance_m,
             }
+            self.active_trial_id = trial_id
             capture = self.capture_measurement_window(self.capture_sec)
             merge_status_histograms(self.status_aggregate, capture['status_histogram'])
             usable_by_estimator = capture['usable_by_estimator']
@@ -798,6 +808,7 @@ class G1DistanceBenchmarkRunner(Node):
         finally:
             self.capture_active = False
             self.active_truth = None
+            self.active_trial_id = ''
 
         usable_by_estimator = usable_events_by_estimator(
             self.capture_events, self.selected_estimators)
@@ -1331,15 +1342,21 @@ class G1DistanceBenchmarkRunner(Node):
             rclpy.spin_once(self, timeout_sec=min(0.1, remaining))
 
     def publish_active_truth(self) -> None:
-        """Republish the trial ground truth at ~1 Hz during capture."""
+        """Republish the trial ground truth during capture.
+
+        Faster than the consumers' age gate by a wide margin: at one message
+        per gate period a single drop leaves the line unserviced for a third of
+        its lifetime, and the number on screen is up to a whole period stale
+        before it is even sent.
+        """
 
         if not self.capture_active or self.active_truth is None:
             return
         now = time.monotonic()
-        if now - self.last_truth_publish_monotonic < 1.0:
+        if now - self.last_truth_publish_monotonic < TRUTH_PUBLISH_PERIOD_SEC:
             return
         self.last_truth_publish_monotonic = now
-        msg = ground_truth_point_message(self.active_truth)
+        msg = ground_truth_point_message(self.active_truth, self.active_trial_id)
         msg.header.stamp = self.get_clock().now().to_msg()
         self.ground_truth_pub.publish(msg)
 

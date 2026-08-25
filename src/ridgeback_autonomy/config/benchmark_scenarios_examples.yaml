@@ -19,6 +19,23 @@ scenes:
       - { x: 2.0, y: 0.0 }   # near
       - { x: 4.0, y: 0.0 }   # far (occluded by the near robot)
 
+  # Three robots, all visible, at plainly different ranges -- the scene for
+  # checking that the rings, the HUD and the polar ray layers all speak for the
+  # nearest instance. Bearings are ~33 deg and ~20 deg apart so none occludes
+  # another, and range climbs left to right across the image (+y is left, so the
+  # near robot sits on the right), which makes the expected pick readable off a
+  # single screenshot. Range gaps of ~1.4 m leave no near-tie, the one case where
+  # the mask node and the estimate viz node can rank differently.
+  #
+  # Ranges below are off the robot FRONT (base origin + ROBOT_FRONT_OFFSET_M),
+  # which is what every estimator and the ground truth publish against -- the
+  # poses themselves are base-origin world coordinates like every other scene.
+  - id: multi_visible_near_mid_far
+    robots:
+      - { x: 1.90, y: -1.00 }   # near, ~1.93 m -- the one every surface should draw
+      - { x: 3.60, y: 0.10 }    # mid,  ~3.35 m
+      - { x: 5.00, y: 1.90 }    # far,  ~5.12 m
+
   # A hospital bed between the sensor and the robot -- low, partial object
   # occlusion (the bed only blocks the robot's lower body).
   - id: bed_occluder_single

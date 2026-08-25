@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import time
 from collections import OrderedDict
 
 import cv2
@@ -20,6 +19,7 @@ from ridgeback_autonomy.benchmarking.estimators import (
     GROUND_TRUTH_TOPIC,
     parse_estimators,
     parse_mask_gate,
+    truth_reading,
     uses_mask_estimators,
 )
 from ridgeback_autonomy.common.messages import (
@@ -55,11 +55,6 @@ COLOR_CAMERA_INFO_TOPIC = 'sensors/camera_0/color/camera_info'
 SCAN_TOPIC = 'sensors/lidar2d_0/scan'
 DEPTH_MAX_METERS_DEFAULT = 10.0
 RENDER_FPS_DEFAULT = 15.0
-
-# The benchmark runner republishes the trial ground truth at ~1 Hz during a
-# capture window. The age gate drops the reference line shortly after capture
-# ends, so a stale truth never sits next to a teleported target between trials.
-TRUTH_MAX_AGE_S = 3.0
 
 # The estimator fields each measurement pipeline populates. render_latest builds
 # the batch from whichever pipeline drove the frame, then merges the others in
@@ -142,7 +137,6 @@ class G1OverlayNode(Node):
         self.latest_color_info: CameraInfo | None = None
         self.latest_scan_msg: LaserScan | None = None
         self.latest_truth_msg: PointStamped | None = None
-        self.latest_truth_monotonic = 0.0
         self.camera_cache: OrderedDict[tuple, G1Measurements] = OrderedDict()
         self.lidar_cache: OrderedDict[tuple, G1Measurements] = OrderedDict()
         self.mask_cache: OrderedDict[tuple, G1Measurements] = OrderedDict()
@@ -173,9 +167,11 @@ class G1OverlayNode(Node):
             Image, self.color_topic, self.color_callback, qos_profile=qos_profile_sensor_data)
         # Silent outside the benchmark (nothing publishes it), so this needs no
         # exploration-vs-benchmark gate.
+        # Depth 1: latest value wins, and a deeper queue would only let this
+        # node read a previous trial's truth behind a backlog.
         self.create_subscription(
             PointStamped, self.get_parameter('ground_truth_topic').value,
-            self.ground_truth_callback, 10)
+            self.ground_truth_callback, 1)
 
         if 'sensor_depth' in self.estimators:
             self.create_subscription(
@@ -259,22 +255,20 @@ class G1OverlayNode(Node):
 
     def ground_truth_callback(self, msg: PointStamped) -> None:
         self.latest_truth_msg = msg
-        self.latest_truth_monotonic = time.monotonic()
 
     def current_truth(self) -> tuple[float, float, float] | None:
         """The benchmark ground truth while it is being republished, else None.
 
-        Packed as x=lateral, y=forward, z=distance (the runner's
-        ``ground_truth_point_message``). Age-gated so the reference line
-        disappears between trials instead of lying next to a teleported target.
+        Age-gated on the message stamp by ``truth_reading``, so the reference
+        line disappears between trials instead of lying next to a teleported
+        target -- and so a message that waited in the queue counts as the old
+        data it is rather than as a fresh arrival.
         """
 
-        if self.latest_truth_msg is None:
+        reading = truth_reading(self.latest_truth_msg, self.get_clock().now().nanoseconds)
+        if reading is None:
             return None
-        if time.monotonic() - self.latest_truth_monotonic > TRUTH_MAX_AGE_S:
-            return None
-        point = self.latest_truth_msg.point
-        return (point.x, point.y, point.z)
+        return (reading.lateral_m, reading.forward_m, reading.distance_m)
 
     def mask_debug_callback(self, mask_msg: Image) -> None:
         key = (mask_msg.header.stamp.sec, mask_msg.header.stamp.nanosec)

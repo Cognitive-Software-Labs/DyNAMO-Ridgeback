@@ -12,6 +12,7 @@ from ridgeback_autonomy.benchmarking.scenarios import (
     load_scenarios,
     parse_scenarios,
 )
+from ridgeback_autonomy.perception.core.geometry import planar_measurement_from_vehicle_front
 
 
 CONFIG_DIR = os.path.join(os.path.dirname(__file__), '..', 'config')
@@ -117,6 +118,17 @@ def test_shipped_examples_scenario_parses() -> None:
     assert 'inter_robot_occlusion_near_far' in by_id
     assert len(by_id['inter_robot_occlusion_near_far'].robots) == 2
     assert by_id['bed_occluder_single'].objects[0].model == 'hospital_bed'
+    # The nearest-instance visualization scene is only readable if the ranges
+    # stay well apart: a near-tie is exactly where the ray and ring layers are
+    # allowed to disagree, which would make the scene prove nothing. Measured the
+    # way the estimators report, off the robot front, with the sensor at the
+    # world origin facing +x.
+    ranges = sorted(
+        planar_measurement_from_vehicle_front(robot.x, robot.y, 0.0)[2]
+        for robot in by_id['multi_visible_near_mid_far'].robots
+    )
+    assert len(ranges) == 3
+    assert min(b - a for a, b in zip(ranges, ranges[1:])) > 1.0
 
 
 def test_shipped_full_scenario_is_the_certified_randomized_set() -> None:

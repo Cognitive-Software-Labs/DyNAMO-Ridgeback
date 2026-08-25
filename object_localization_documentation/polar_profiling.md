@@ -266,6 +266,17 @@ near-band merge and is therefore what the estimate medians over.
 are built in the scan's own frame, where a beam is
 `angle_min + i*angle_increment` at `ranges[i]`, so no extrinsics are re-applied.
 
+Beams are recorded for every detection but **only the nearest one is drawn** —
+eight estimate rings and three ray layers per robot are unreadable the moment a
+scene holds two. `nearest_beam_record` ranks the batch with the shared
+`nearest_instance_index` and matches the chosen index against
+`PolarBeamRecord.detection_index`, never against the list position: a detection
+whose segmentation came back empty records no beams, so the two disagree. Each
+namespace then holds a single fixed marker id, which is what lets the drawn
+instance change between frames without stranding the previous one's rays for a
+full `ray_marker_lifetime_sec`. A batch nothing could rank still draws its first
+record — beams with no estimate is precisely the failure worth seeing.
+
 The beams are recorded **even when the path returns `None`**: on a miss,
 `selected_beams` is recomputed via `select_beams` and nothing is marked as used.
 That is deliberate — the failure modes above are exactly what a viewer needs to
@@ -286,6 +297,15 @@ calls `localize_polar_profiling` with no kwargs, so the two agree today. The
 moment the §8 tuning campaign passes non-default knobs, the OpenCV panel and the
 RViz rays will disagree. Routing the panel through the same indices is a
 separate change.
+
+**Known divergence.** This node ranks the nearest instance from its own three
+estimators, because nothing else has filled the batch by the time the rays are
+published, while `g1_estimate_viz_node` ranks the merged measurement topics and
+so starts at `rgb`. Two robots at near-equal range can therefore put the rays on
+one and the estimate rings on the other for a frame. Both sides walk
+`PUBLIC_ESTIMATOR_ORDER` and break ties on the lower index, which bounds the
+disagreement to near-ties; removing it would mean publishing the chosen index
+and accepting a frame of coupling between the nodes.
 
 ---
 

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
+import math
 import os
 import re
 
@@ -87,6 +89,13 @@ ESTIMATOR_STATUS_FIELD_KEYS = {
 # never appears there.
 GROUND_TRUTH_TOPIC = 'benchmark/g1/ground_truth'
 
+# How long a truth message stays displayable. The runner publishes only while a
+# capture window is open, so the gate is what makes the line disappear between
+# trials instead of sitting next to a target that has already been teleported
+# away. Defined here rather than in each consumer: the viz node and the overlay
+# have to expire on the same schedule or they disagree about the same message.
+TRUTH_MAX_AGE_S = 3.0
+
 # Detection-model (forward, lateral) attribute names for the estimators that
 # emit a planar position -- used as the sensor-side locator for the scoring
 # assignment. sensor_depth / depth_anything report only a distance, so they are
@@ -110,6 +119,112 @@ ESTIMATOR_LABELS = {
     'euclidean_reconstruction': 'Euclidean Reconstruction',
     'polar_profiling': 'Polar Profiling',
 }
+
+
+@dataclass(frozen=True)
+class TruthReading:
+    """One trial's ground truth as the display surfaces consume it.
+
+    ``trial_id`` names the trial the numbers belong to, so a reading can be
+    checked against the scene on screen instead of being taken on trust.
+    """
+
+    lateral_m: float
+    forward_m: float
+    distance_m: float
+    trial_id: str
+
+
+def truth_reading(msg, now_nanoseconds: int, max_age_s: float = TRUTH_MAX_AGE_S):
+    """Unpack a truth message, or ``None`` once it is too old to display.
+
+    Age is measured on the message STAMP, never on when it arrived. A message
+    delayed behind a full subscription queue is stale data however recently it
+    was handed to the callback, and a receipt-time gate cannot tell those two
+    apart -- it reports the delay as freshness and pins the previous trial's
+    truth under the current trial's scene.
+
+    Packed by the runner as x=lateral, y=forward, z=distance: the base-frame
+    planar measurement every benchmark row shares, not a 3D point in any TF
+    frame. The trial id rides in ``header.frame_id`` for the same reason.
+    """
+
+    if msg is None:
+        return None
+    stamp = msg.header.stamp
+    stamp_nanoseconds = int(stamp.sec) * 1_000_000_000 + int(stamp.nanosec)
+    if now_nanoseconds - stamp_nanoseconds > max_age_s * 1_000_000_000:
+        return None
+    return TruthReading(
+        lateral_m=float(msg.point.x),
+        forward_m=float(msg.point.y),
+        distance_m=float(msg.point.z),
+        trial_id=str(msg.header.frame_id),
+    )
+
+
+def display_distance(read_distance, index: int) -> float | None:
+    """The one distance that speaks for a detection, in canonical order.
+
+    ``read_distance(estimator, index)`` is supplied by the caller, so the same
+    rule serves the ``G1Measurements`` array shape and the ``Detection``
+    dataclass shape. First usable estimator wins rather than the smallest one:
+    producers see different estimator sets, and a rule that ranks by whichever
+    number happens to be lowest would let two nodes disagree about the same
+    scene far more often than one pinned to a fixed order does.
+    """
+
+    for estimator in PUBLIC_ESTIMATOR_ORDER:
+        value = read_distance(estimator, index)
+        if value is not None:
+            return value
+    return None
+
+
+def display_bearing(read_position, index: int) -> float | None:
+    """Bearing of a detection in the base frame, in canonical order.
+
+    ``read_position(estimator, index)`` returns that estimator's
+    ``(forward_m, lateral_m)`` or ``None``. Ordered exactly like
+    ``display_distance`` -- first usable answer wins -- so the direction a
+    surface draws and the distance it prints are picked by one rule rather than
+    two that can disagree about which estimator speaks for a detection.
+
+    Exists for the depth-only rows (``sensor_depth``, ``depth_anything``), which
+    publish a planar distance and no position at all. A borrowed bearing is a
+    visualization convenience, never an input to scoring: the benchmark's
+    locator stays ``ESTIMATOR_POSITION_ATTRS``, where those two are absent on
+    purpose.
+    """
+
+    for estimator in PUBLIC_ESTIMATOR_ORDER:
+        position = read_position(estimator, index)
+        if position is None:
+            continue
+        forward_m, lateral_m = position
+        if forward_m is None or lateral_m is None:
+            continue
+        if forward_m == 0.0 and lateral_m == 0.0:
+            continue
+        return math.atan2(lateral_m, forward_m)
+    return None
+
+
+def nearest_instance_index(count: int, read_distance) -> int | None:
+    """Index of the closest detection, or ``None`` when nothing is rankable.
+
+    The single source for "which instance do the visualizations speak for".
+    Ordering by ``(distance, index)`` breaks a tie on the lower index, so two
+    equidistant robots always resolve the same way instead of following
+    whichever the detector happened to list first.
+    """
+
+    ranked = [
+        (distance, index)
+        for index in range(count)
+        if (distance := display_distance(read_distance, index)) is not None
+    ]
+    return min(ranked)[1] if ranked else None
 
 
 def parse_mask_gate(raw_mask_gate: str | None) -> str:

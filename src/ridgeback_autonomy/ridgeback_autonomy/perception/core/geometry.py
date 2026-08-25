@@ -37,6 +37,20 @@ def apply_vehicle_front_offset(lateral_m, forward_m):
     return lateral_m, forward_m - ROBOT_FRONT_OFFSET_M
 
 
+def remove_vehicle_front_offset(lateral_m, forward_m):
+    """Inverse of ``apply_vehicle_front_offset``: front-referenced -> base origin.
+
+    Needed by anything that has to put a published measurement back on a map,
+    since every estimator reports against the robot front rather than the base
+    origin TF gives. It lives beside the forward conversion so the two cannot
+    drift: a one-sided change to the offset would otherwise leave the round trip
+    silently lossy, and the error is a constant shift that looks like a
+    calibration problem.
+    """
+
+    return lateral_m, forward_m + ROBOT_FRONT_OFFSET_M
+
+
 def yaw_from_quaternion(x: float, y: float, z: float, w: float) -> float:
     siny_cosp = 2.0 * (w * z + x * y)
     cosy_cosp = 1.0 - 2.0 * (y * y + z * z)

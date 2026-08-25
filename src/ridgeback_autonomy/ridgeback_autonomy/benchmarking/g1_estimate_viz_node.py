@@ -16,7 +16,6 @@ from __future__ import annotations
 import html
 import math
 import threading
-import time
 
 import rclpy
 from geometry_msgs.msg import Point, PointStamped
@@ -33,8 +32,12 @@ from ridgeback_autonomy.benchmarking.estimators import (
     ESTIMATOR_POSITION_ATTRS,
     GROUND_TRUTH_TOPIC,
     PUBLIC_ESTIMATOR_ORDER,
+    display_bearing,
+    nearest_instance_index,
+    truth_reading,
 )
 from ridgeback_autonomy.msg import G1Measurements
+from ridgeback_autonomy.perception.core.geometry import remove_vehicle_front_offset
 
 
 # Seconds before a marker auto-expires if no new detection arrives.
@@ -46,39 +49,52 @@ RING_RADIUS_M = 0.15
 RING_POINTS = 32
 DOT_RADIUS_M = 0.04
 
+# Ring line width. The thin one marks a ring whose *direction* is not its own
+# estimator's answer: the depth-only rows publish a distance and no position, so
+# their bearing is borrowed (see ``_add_estimator_markers``). Their radius is
+# still their own number -- only the direction is second-hand, and the weight
+# difference is what keeps that distinction readable on the floor plan.
+RING_LINE_WIDTH_M = 0.06
+BORROWED_BEARING_LINE_WIDTH_M = 0.03
+
 # Z height above ground plane so markers sit on top of the costmap.
 MARKER_Z_M = 0.05
-
-# Matches the overlay's gate: the truth line disappears between trials rather
-# than sitting next to a target that has already been teleported away.
-TRUTH_MAX_AGE_S = 3.0
 
 CAMERA_MEASUREMENTS_TOPIC = 'measurements/g1/camera'
 LIDAR_MEASUREMENTS_TOPIC = 'measurements/g1/lidar'
 MASK_MEASUREMENTS_TOPIC = 'measurements/g1/mask'
 HUD_DISTANCES_TOPIC = 'hud/g1_distances'
 
-# (r, g, b, a) per estimator. The first five keep the colours they have always
-# had; the mask paths take hues that stay apart from them and from each other,
-# since in a clean scene all eight rings land within centimetres.
+# (r, g, b, a) per estimator, split by colour temperature: the five legacy rows
+# are warm (rose through chartreuse), the three mask rows cold (cyan through
+# violet). Nothing on the HUD or in RViz names the two families, so the
+# temperature is the only thing that groups them -- which is why no hue crosses
+# over, however much room that would buy inside a family. Within a family the
+# hues are still spread as far as five (or three) allow, since in a clean scene
+# all eight rings land within centimetres of each other.
 ESTIMATOR_COLOURS = {
     'rgb':                      (1.0, 0.0, 0.0, 1.0),
-    'sensor_depth':             (1.0, 0.5, 0.0, 1.0),
-    'depth_anything':           (0.6, 0.0, 1.0, 1.0),
-    'pointcloud':               (0.0, 0.4, 1.0, 1.0),
-    'lidar':                    (0.0, 0.9, 0.0, 1.0),
-    'projective_ranging':       (0.0, 0.9, 0.9, 1.0),
-    'euclidean_reconstruction': (1.0, 0.9, 0.1, 1.0),
-    'polar_profiling':          (1.0, 0.2, 0.7, 1.0),
+    'sensor_depth':             (1.0, 0.45, 0.0, 1.0),
+    'depth_anything':           (1.0, 0.1, 0.55, 1.0),
+    'pointcloud':               (1.0, 0.85, 0.0, 1.0),
+    'lidar':                    (0.85, 1.0, 0.15, 1.0),
+    'projective_ranging':       (0.0, 0.85, 0.85, 1.0),
+    'euclidean_reconstruction': (0.2, 0.55, 1.0, 1.0),
+    'polar_profiling':          (0.7, 0.4, 1.0, 1.0),
 }
 
-# Stable marker-id base per estimator so DELETEALL is not needed — we just overwrite.
+# Stable marker-id base per estimator so DELETEALL is not needed — we just
+# overwrite. Only the nearest instance is drawn, so an estimator needs a fixed
+# pair of ids (ring, dot) rather than a pair per detection: an id that moved
+# with the detection index would strand the previous instance's ring on screen
+# for a full lifetime whenever the nearest one changes.
 _ESTIMATOR_ID_BASE = {name: i * 100 for i, name in enumerate(PUBLIC_ESTIMATOR_ORDER)}
 
 
 # The HUD draws on a half-opaque black panel, where a ring colour's own
-# luminance decides whether its line is readable. Red (0.21) and the purple of
-# depth_anything (0.20) sit well under this; green and yellow are far above it.
+# luminance decides whether its line is readable. Red (0.21) and the rose of
+# depth_anything (0.32) sit under this; every cold row clears it unlifted (0.51
+# at the darkest), so the lift never touches the mask family.
 HUD_MIN_LUMINANCE = 0.40
 HUD_HEADER_COLOUR = (1.0, 1.0, 1.0)
 
@@ -102,6 +118,21 @@ def hud_text_colour(estimator: str) -> tuple[float, float, float]:
         return red, green, blue
     blend = (HUD_MIN_LUMINANCE - luminance) / (1.0 - luminance)
     return tuple(channel + (1.0 - channel) * blend for channel in (red, green, blue))
+
+
+def hud_truth_header(truth) -> str:
+    """The HUD's first line, naming the trial its truth belongs to.
+
+    The trial id is what makes a mismatch legible. A bare number cannot be
+    checked against the scene on screen: a truth left over from an earlier
+    trial reads as the estimators disagreeing with the target rather than as
+    the wrong target, which is exactly how it went unnoticed.
+    """
+
+    if truth is None:
+        return 'G1 DISTANCES'
+    header = f'G1 DISTANCES   truth {truth.distance_m:.3f} m'
+    return f'{header}  [{truth.trial_id}]' if truth.trial_id else header
 
 
 def _hud_line(body: str, colour: tuple[float, float, float]) -> str:
@@ -157,6 +188,81 @@ def estimator_reading(msg, estimator: str, index: int) -> tuple[float | None, fl
     return forward, lateral, distance
 
 
+def merged_distance_reader(fresh: list):
+    """``(estimator, index) -> distance`` across every producer in one frame.
+
+    Each topic fills only the estimators its node computes, so a reading has to
+    be looked up in all of them. The indices line up because all three producers
+    number their detections from the same detector batch.
+    """
+
+    def read_distance(estimator: str, index: int) -> float | None:
+        for msg in fresh:
+            if not msg.detected or index >= msg.count:
+                continue
+            _, _, distance = estimator_reading(msg, estimator, index)
+            if distance is not None:
+                return distance
+        return None
+
+    return read_distance
+
+
+def merged_position_reader(fresh: list):
+    """``(estimator, index) -> (forward, lateral) | None`` across every producer.
+
+    The positional counterpart to ``merged_distance_reader``, feeding
+    ``display_bearing`` so the depth-only rows can be pointed somewhere. Same
+    reason for scanning every message: an estimator's fields are filled by
+    exactly one producer and are empty in the other two.
+    """
+
+    def read_position(estimator: str, index: int):
+        for msg in fresh:
+            if not msg.detected or index >= msg.count:
+                continue
+            forward, lateral, _ = estimator_reading(msg, estimator, index)
+            if forward is not None and lateral is not None:
+                return forward, lateral
+        return None
+
+    return read_position
+
+
+def world_marker_point(
+    forward_m: float,
+    lateral_m: float,
+    origin_x: float,
+    origin_y: float,
+    yaw_rad: float,
+) -> tuple[float, float]:
+    """A base-frame ``(forward, lateral)`` placed in the world.
+
+    ``origin_x`` / ``origin_y`` / ``yaw_rad`` are the base pose TF reports, so
+    the measurement passed in must already be referenced to the base origin --
+    callers undo the front offset first. Module-level and pure so the placement
+    can be asserted against a known world point without standing up a node,
+    which is what let the offset bug survive.
+    """
+
+    world_x = origin_x + math.cos(yaw_rad) * forward_m - math.sin(yaw_rad) * lateral_m
+    world_y = origin_y + math.sin(yaw_rad) * forward_m + math.cos(yaw_rad) * lateral_m
+    return world_x, world_y
+
+
+def nearest_detection_index(fresh: list) -> int:
+    """The detection every surface in this node speaks for.
+
+    Falls back to 0 when no estimator placed anything: the frame then renders as
+    an all-miss HUD with no rings, which is what it did before there was a
+    nearest-instance rule at all.
+    """
+
+    count = max((msg.count for msg in fresh if msg.detected), default=0)
+    nearest = nearest_instance_index(count, merged_distance_reader(fresh))
+    return 0 if nearest is None else nearest
+
+
 class G1EstimateVizNode(Node):
     def __init__(self) -> None:
         super().__init__('g1_estimate_viz_node')
@@ -184,7 +290,6 @@ class G1EstimateVizNode(Node):
             'camera': None, 'lidar': None, 'mask': None,
         }
         self._latest_truth: PointStamped | None = None
-        self._latest_truth_monotonic = 0.0
 
         for key, topic in (
             ('camera', CAMERA_MEASUREMENTS_TOPIC),
@@ -195,9 +300,13 @@ class G1EstimateVizNode(Node):
                 G1Measurements, topic,
                 lambda msg, key=key: self._measurement_cb(key, msg), 10)
 
+        # Depth 1: the truth line is a latest-value-wins signal, so a deeper
+        # queue only buys lag. This node's callbacks share one executor thread
+        # with three measurement topics that build markers and hit TF, and a
+        # backlog here pins a previous trial's truth under the current scene.
         self.create_subscription(
             PointStamped, str(self.get_parameter('ground_truth_topic').value),
-            self._truth_cb, 10)
+            self._truth_cb, 1)
 
         self._pub = self.create_publisher(MarkerArray, 'visualization/g1/estimates', 10)
         # The HUD aggregator owns the container style; this node contributes one
@@ -213,19 +322,18 @@ class G1EstimateVizNode(Node):
     def _truth_cb(self, msg: PointStamped) -> None:
         with self._lock:
             self._latest_truth = msg
-            self._latest_truth_monotonic = time.monotonic()
 
-    def _current_truth(self) -> float | None:
-        """Benchmark truth distance while it is live, else ``None``.
+    def _current_truth(self):
+        """The live benchmark truth as a ``TruthReading``, else ``None``.
 
-        Packed by the runner as x=lateral, y=forward, z=distance.
+        Expiry is judged on the message stamp against this node's clock, so a
+        message that waited in the queue is old data rather than fresh -- see
+        ``truth_reading``.
         """
 
         with self._lock:
-            msg, seen_at = self._latest_truth, self._latest_truth_monotonic
-        if msg is None or time.monotonic() - seen_at > TRUTH_MAX_AGE_S:
-            return None
-        return float(msg.point.z)
+            msg = self._latest_truth
+        return truth_reading(msg, self.get_clock().now().nanoseconds)
 
     def _fresh_messages(self) -> list[G1Measurements]:
         """Cached messages still within the marker lifetime, oldest cache dropped."""
@@ -249,7 +357,10 @@ class G1EstimateVizNode(Node):
         if not fresh:
             return
 
-        self._publish_hud(fresh)
+        # Rings, HUD and the mask node's rays all show a single instance, so the
+        # index is resolved once per frame and shared by both surfaces here.
+        nearest = nearest_detection_index(fresh)
+        self._publish_hud(fresh, nearest)
 
         # Use Time(0) to get the latest available TF — avoids sim-time buffer
         # mismatches since the robot is stationary during benchmarks.
@@ -259,19 +370,23 @@ class G1EstimateVizNode(Node):
         if robot_x is None:
             return
 
+        # Resolved once per frame rather than per estimator: every depth-only
+        # ring on this detection must point the same way, or two rows that
+        # measured the same robot would appear to disagree about where it is.
+        bearing = display_bearing(merged_position_reader(fresh), nearest)
+
         markers = []
         marker_time = self.get_clock().now().to_msg()
         for msg in fresh:
-            if not msg.detected:
+            if not msg.detected or nearest >= msg.count:
                 continue
-            for index in range(msg.count):
-                for estimator in PUBLIC_ESTIMATOR_ORDER:
-                    forward, lateral, distance = estimator_reading(msg, estimator, index)
-                    self._add_estimator_markers(
-                        markers, estimator, index, forward, lateral,
-                        robot_x, robot_y, robot_yaw, marker_time, actual_frame,
-                        distance_m=distance,
-                    )
+            for estimator in PUBLIC_ESTIMATOR_ORDER:
+                forward, lateral, distance = estimator_reading(msg, estimator, nearest)
+                self._add_estimator_markers(
+                    markers, estimator, forward, lateral,
+                    robot_x, robot_y, robot_yaw, marker_time, actual_frame,
+                    distance_m=distance, bearing_rad=bearing,
+                )
 
         if not markers:
             return
@@ -280,7 +395,7 @@ class G1EstimateVizNode(Node):
         ma.markers = markers
         self._pub.publish(ma)
 
-    def _publish_hud(self, fresh: list[G1Measurements]) -> None:
+    def _publish_hud(self, fresh: list[G1Measurements], nearest: int) -> None:
         """One HUD section: every estimator's distance against the truth.
 
         Rendered by RViz as text, so it stays legible at any window size — unlike
@@ -293,17 +408,16 @@ class G1EstimateVizNode(Node):
         """
 
         truth = self._current_truth()
-        header = 'G1 DISTANCES' + (f'   truth {truth:.3f} m' if truth is not None else '')
-        lines = [_hud_line(header, HUD_HEADER_COLOUR)]
+        lines = [_hud_line(hud_truth_header(truth), HUD_HEADER_COLOUR)]
 
         readings: dict[str, float] = {}
         for msg in fresh:
-            if not msg.detected or msg.count < 1:
+            if not msg.detected or nearest >= msg.count:
                 continue
             for estimator in PUBLIC_ESTIMATOR_ORDER:
-                # First detection only: the HUD is a scalar readout, and the
-                # rings already carry the per-instance picture.
-                _, _, distance = estimator_reading(msg, estimator, 0)
+                # The HUD is a scalar readout, so it quotes the same nearest
+                # instance the rings are drawn on rather than a second one.
+                _, _, distance = estimator_reading(msg, estimator, nearest)
                 if distance is not None:
                     readings[estimator] = distance
 
@@ -313,7 +427,7 @@ class G1EstimateVizNode(Node):
             if distance is None:
                 body = f'{label:<24}      --    miss'
             else:
-                error = '' if truth is None else f'  {distance - truth:+.3f}'
+                error = '' if truth is None else f'  {distance - truth.distance_m:+.3f}'
                 body = f'{label:<24} {distance:7.3f}{error}'
             lines.append(_hud_line(body, hud_text_colour(estimator)))
 
@@ -325,7 +439,6 @@ class G1EstimateVizNode(Node):
         self,
         markers: list,
         estimator: str,
-        detection_index: int,
         forward_m: float | None,
         lateral_m: float | None,
         robot_x: float,
@@ -334,21 +447,37 @@ class G1EstimateVizNode(Node):
         stamp,
         frame_id: str,
         distance_m: float | None = None,
+        bearing_rad: float | None = None,
     ) -> None:
-        # For depth-only estimators (sensor_depth, depth_anything) we only have a scalar
-        # distance along the camera boresight — treat lateral as 0.
+        # The depth-only rows (sensor_depth, depth_anything) publish a planar
+        # distance and no position, so a direction has to come from somewhere.
+        # Borrowing the bearing another row measured on this same detection puts
+        # the ring on the right robot; the old fallback of pointing it down the
+        # boresight was wrong by the whole lateral component, which for an
+        # off-axis target is metres. The radius stays the row's own number, so
+        # the ring still disagrees with its neighbours exactly as much as the
+        # HUD says it does. No bearing at all (nothing else placed this
+        # detection) keeps the boresight guess rather than dropping the ring.
+        borrowed_bearing = ESTIMATOR_POSITION_ATTRS.get(estimator) is None
         if forward_m is None and distance_m is not None:
-            forward_m = distance_m
-            lateral_m = 0.0
+            if bearing_rad is None:
+                forward_m, lateral_m = distance_m, 0.0
+            else:
+                forward_m = distance_m * math.cos(bearing_rad)
+                lateral_m = distance_m * math.sin(bearing_rad)
         if forward_m is None or lateral_m is None:
             return
 
-        # Rotate base-frame (forward, lateral) into world frame.
-        wx = robot_x + math.cos(robot_yaw) * forward_m - math.sin(robot_yaw) * lateral_m
-        wy = robot_y + math.sin(robot_yaw) * forward_m + math.cos(robot_yaw) * lateral_m
+        # Every estimator reports off the robot FRONT, but TF hands back the base
+        # origin, so the offset goes back on before the measurement is rotated
+        # out. Without it the ring lands a fixed 0.25 m nearer the robot than the
+        # distance it is drawing -- small enough to read as sensor error rather
+        # than as a fault in the plotting.
+        lateral_m, forward_m = remove_vehicle_front_offset(lateral_m, forward_m)
+        wx, wy = world_marker_point(forward_m, lateral_m, robot_x, robot_y, robot_yaw)
 
         colour = ESTIMATOR_COLOURS[estimator]
-        id_base = _ESTIMATOR_ID_BASE[estimator] + detection_index * 2
+        id_base = _ESTIMATOR_ID_BASE[estimator]
         lifetime = rclpy.duration.Duration(seconds=self.marker_lifetime).to_msg()
 
         # Ring marker (LINE_STRIP circle).
@@ -359,7 +488,9 @@ class G1EstimateVizNode(Node):
         ring.id = id_base
         ring.type = Marker.LINE_STRIP
         ring.action = Marker.ADD
-        ring.scale.x = 0.06   # line width
+        ring.scale.x = (
+            BORROWED_BEARING_LINE_WIDTH_M if borrowed_bearing else RING_LINE_WIDTH_M
+        )
         ring.color = _color_msg(*colour)
         ring.lifetime = lifetime
         ring.points = _ring_points(wx, wy, MARKER_Z_M, RING_RADIUS_M, RING_POINTS)

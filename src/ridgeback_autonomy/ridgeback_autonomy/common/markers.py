@@ -44,6 +44,9 @@ COLOR_WEDGE = (0.20, 0.75, 0.60, 0.18)
 RAY_WIDTH_USED_M = 0.02
 RAY_WIDTH_DROPPED_M = 0.008
 
+# One detection is drawn per frame, so each namespace holds a single marker.
+_MARKER_ID = 0
+
 # Arc resolution of the wedge fan. The spans here are a few degrees, so this is
 # far more than enough for the edge to read as straight-sided.
 WEDGE_SEGMENTS = 24
@@ -56,6 +59,10 @@ class PolarBeamRecord:
     ``selected`` and ``merged`` come straight from ``PolarProfilingResult``.
     ``in_bbox`` is a superset of ``selected`` under a silhouette gate and equal to
     it under a box gate -- the difference is what the silhouette removed.
+
+    ``detection_index`` says which detection in the batch these beams belong to,
+    so the caller can pick the record for the instance being drawn. It is not a
+    marker id: only one record is drawn per frame.
     """
 
     detection_index: int
@@ -188,33 +195,31 @@ def build_wedge_marker(
 
 def build_polar_ray_markers(
     scan,
-    records,
+    record,
     stamp,
     lifetime,
 ) -> list[Marker]:
-    """Every marker for one frame, across all detections.
+    """Every marker for one frame, for the one detection being drawn.
 
-    Marker ids are the detection index and the namespaces keep the three layers
-    from colliding, so a detection's markers overwrite its own from the previous
-    frame instead of accumulating. Markers carry a lifetime rather than being
-    explicitly deleted, so they expire when detections stop -- matching how the
-    estimate rings already behave.
+    The three namespaces keep the layers from colliding and each holds a single
+    fixed id, so a frame overwrites the previous one instead of accumulating.
+    Keying the id off the detection index instead would strand the old
+    instance's rays on screen for a full lifetime every time the drawn detection
+    changes. Markers carry a lifetime rather than being explicitly deleted, so
+    they expire when detections stop -- matching how the estimate rings behave.
     """
 
-    markers: list[Marker] = []
-    for record in records:
-        dropped = np.setdiff1d(
-            np.asarray(record.selected, dtype=np.intp),
-            np.asarray(record.merged, dtype=np.intp),
-        )
-        candidates = (
-            build_wedge_marker(scan, record.in_bbox, record.detection_index, stamp, lifetime),
-            build_ray_marker(
-                scan, dropped, NS_DROPPED, record.detection_index,
-                COLOR_DROPPED, RAY_WIDTH_DROPPED_M, stamp, lifetime),
-            build_ray_marker(
-                scan, record.merged, NS_USED, record.detection_index,
-                COLOR_USED, RAY_WIDTH_USED_M, stamp, lifetime),
-        )
-        markers.extend(marker for marker in candidates if marker is not None)
-    return markers
+    dropped = np.setdiff1d(
+        np.asarray(record.selected, dtype=np.intp),
+        np.asarray(record.merged, dtype=np.intp),
+    )
+    candidates = (
+        build_wedge_marker(scan, record.in_bbox, _MARKER_ID, stamp, lifetime),
+        build_ray_marker(
+            scan, dropped, NS_DROPPED, _MARKER_ID,
+            COLOR_DROPPED, RAY_WIDTH_DROPPED_M, stamp, lifetime),
+        build_ray_marker(
+            scan, record.merged, NS_USED, _MARKER_ID,
+            COLOR_USED, RAY_WIDTH_USED_M, stamp, lifetime),
+    )
+    return [marker for marker in candidates if marker is not None]
