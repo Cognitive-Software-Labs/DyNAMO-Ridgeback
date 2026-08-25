@@ -1,17 +1,39 @@
 #!/usr/bin/env python3
 
+"""Where each estimator thinks the G1 is, as RViz rings, plus a HUD readout.
+
+Two renderings of the same measurements. The rings put every estimator's answer
+on the floor plan at once, so disagreement is spatial and immediate; the HUD
+panel prints the same numbers against the benchmark's ground truth, because a
+ring 60 mm off and a ring 2 m off look alike once they are small.
+
+The estimator set is driven from ``benchmarking/estimators.py`` rather than
+listed here, so a new estimator appears in both renderings by registering there.
+"""
+
 from __future__ import annotations
 
+import html
 import math
 import threading
+import time
 
 import rclpy
+from geometry_msgs.msg import Point, PointStamped
 from rclpy.executors import ExternalShutdownException
 from rclpy.node import Node
-from rclpy.time import Time
+from rviz_2d_overlay_msgs.msg import OverlayText
+from std_msgs.msg import ColorRGBA
 from tf2_ros import Buffer, TransformException, TransformListener
 from visualization_msgs.msg import Marker, MarkerArray
 
+from ridgeback_autonomy.benchmarking.estimators import (
+    ESTIMATOR_FIELD_KEYS,
+    ESTIMATOR_LABELS,
+    ESTIMATOR_POSITION_ATTRS,
+    GROUND_TRUTH_TOPIC,
+    PUBLIC_ESTIMATOR_ORDER,
+)
 from ridgeback_autonomy.msg import G1Measurements
 
 
@@ -27,24 +49,79 @@ DOT_RADIUS_M = 0.04
 # Z height above ground plane so markers sit on top of the costmap.
 MARKER_Z_M = 0.05
 
-# (r, g, b, a) colours per estimator.
+# Matches the overlay's gate: the truth line disappears between trials rather
+# than sitting next to a target that has already been teleported away.
+TRUTH_MAX_AGE_S = 3.0
+
+CAMERA_MEASUREMENTS_TOPIC = 'measurements/g1/camera'
+LIDAR_MEASUREMENTS_TOPIC = 'measurements/g1/lidar'
+MASK_MEASUREMENTS_TOPIC = 'measurements/g1/mask'
+HUD_DISTANCES_TOPIC = 'hud/g1_distances'
+
+# (r, g, b, a) per estimator. The first five keep the colours they have always
+# had; the mask paths take hues that stay apart from them and from each other,
+# since in a clean scene all eight rings land within centimetres.
 ESTIMATOR_COLOURS = {
-    'rgb':          (1.0, 0.0, 0.0, 1.0),
-    'sensor_depth': (1.0, 0.5, 0.0, 1.0),
-    'depth_anything': (0.6, 0.0, 1.0, 1.0),
-    'pointcloud':   (0.0, 0.4, 1.0, 1.0),
-    'lidar':        (0.0, 0.9, 0.0, 1.0),
+    'rgb':                      (1.0, 0.0, 0.0, 1.0),
+    'sensor_depth':             (1.0, 0.5, 0.0, 1.0),
+    'depth_anything':           (0.6, 0.0, 1.0, 1.0),
+    'pointcloud':               (0.0, 0.4, 1.0, 1.0),
+    'lidar':                    (0.0, 0.9, 0.0, 1.0),
+    'projective_ranging':       (0.0, 0.9, 0.9, 1.0),
+    'euclidean_reconstruction': (1.0, 0.9, 0.1, 1.0),
+    'polar_profiling':          (1.0, 0.2, 0.7, 1.0),
 }
 
 # Stable marker-id base per estimator so DELETEALL is not needed — we just overwrite.
-_ESTIMATOR_ID_BASE = {name: i * 100 for i, name in enumerate(ESTIMATOR_COLOURS)}
+_ESTIMATOR_ID_BASE = {name: i * 100 for i, name in enumerate(PUBLIC_ESTIMATOR_ORDER)}
+
+
+# The HUD draws on a half-opaque black panel, where a ring colour's own
+# luminance decides whether its line is readable. Red (0.21) and the purple of
+# depth_anything (0.20) sit well under this; green and yellow are far above it.
+HUD_MIN_LUMINANCE = 0.40
+HUD_HEADER_COLOUR = (1.0, 1.0, 1.0)
+
+# Rec. 709 luma weights -- the eye's actual sensitivity, so a colour is judged
+# by how bright it looks rather than by its largest channel.
+_LUMA_WEIGHTS = (0.2126, 0.7152, 0.0722)
+
+
+def hud_text_colour(estimator: str) -> tuple[float, float, float]:
+    """A ring's colour, lightened only as far as legibility needs.
+
+    Blending toward white raises luminance while holding the hue, so a dark ring
+    colour stays recognisable as the same estimator instead of being swapped for
+    a brighter unrelated one. Luminance is linear in the channels, so the exact
+    blend that reaches the floor is closed-form -- no iterating.
+    """
+
+    red, green, blue = ESTIMATOR_COLOURS[estimator][:3]
+    luminance = sum(w * c for w, c in zip(_LUMA_WEIGHTS, (red, green, blue)))
+    if luminance >= HUD_MIN_LUMINANCE:
+        return red, green, blue
+    blend = (HUD_MIN_LUMINANCE - luminance) / (1.0 - luminance)
+    return tuple(channel + (1.0 - channel) * blend for channel in (red, green, blue))
+
+
+def _hud_line(body: str, colour: tuple[float, float, float]) -> str:
+    """One coloured HUD row.
+
+    Escape before padding, never after: turning spaces into ``&nbsp;`` first
+    would leave the escaper rewriting its own ampersands into ``&amp;nbsp;``.
+    The padding is needed at all because rich text collapses runs of spaces,
+    which is what keeps the columns lined up.
+    """
+
+    red, green, blue = (int(round(channel * 255)) for channel in colour)
+    escaped = html.escape(body, quote=False).replace(' ', '&nbsp;')
+    return f'<span style="color: rgb({red}, {green}, {blue})">{escaped}</span>'
 
 
 def _ring_points(cx: float, cy: float, z: float, r: float, n: int) -> list:
     pts = []
     for i in range(n + 1):
         angle = 2.0 * math.pi * i / n
-        from geometry_msgs.msg import Point
         p = Point()
         p.x = cx + r * math.cos(angle)
         p.y = cy + r * math.sin(angle)
@@ -54,13 +131,30 @@ def _ring_points(cx: float, cy: float, z: float, r: float, n: int) -> list:
 
 
 def _color_msg(r: float, g: float, b: float, a: float):
-    from std_msgs.msg import ColorRGBA
     c = ColorRGBA()
     c.r = r
     c.g = g
     c.b = b
     c.a = a
     return c
+
+
+def estimator_reading(msg, estimator: str, index: int) -> tuple[float | None, float | None, float | None]:
+    """``(forward, lateral, distance)`` for one estimator on one detection.
+
+    Every measurement topic carries the same message type, so an estimator that
+    this producer does not compute simply has an empty or NaN slot. Reading them
+    all and dropping the blanks avoids hard-coding which node owns which field.
+    """
+
+    position_attrs = ESTIMATOR_POSITION_ATTRS.get(estimator)
+    forward = lateral = None
+    if position_attrs is not None:
+        forward_attr, lateral_attr = position_attrs
+        forward = _get(getattr(msg, forward_attr, None), index)
+        lateral = _get(getattr(msg, lateral_attr, None), index)
+    distance = _get(getattr(msg, ESTIMATOR_FIELD_KEYS[estimator], None), index)
+    return forward, lateral, distance
 
 
 class G1EstimateVizNode(Node):
@@ -75,6 +169,8 @@ class G1EstimateVizNode(Node):
         self.declare_parameter('base_frame', default_base_frame)
         self.declare_parameter('world_frame', 'map')
         self.declare_parameter('marker_lifetime_sec', MARKER_LIFETIME_SEC)
+        self.declare_parameter('ground_truth_topic', GROUND_TRUTH_TOPIC)
+        self.declare_parameter('hud_distances_topic', HUD_DISTANCES_TOPIC)
 
         self.base_frame = self.get_parameter('base_frame').value or default_base_frame
         self.world_frame = self.get_parameter('world_frame').value
@@ -84,47 +180,76 @@ class G1EstimateVizNode(Node):
         self.tf_listener = TransformListener(self.tf_buffer, self, spin_thread=False)
 
         self._lock = threading.Lock()
-        self._latest_camera: G1Measurements | None = None
-        self._latest_lidar: G1Measurements | None = None
+        self._latest: dict[str, G1Measurements | None] = {
+            'camera': None, 'lidar': None, 'mask': None,
+        }
+        self._latest_truth: PointStamped | None = None
+        self._latest_truth_monotonic = 0.0
 
-        self.create_subscription(G1Measurements, 'measurements/g1/camera',
-                                 self._camera_cb, 10)
-        self.create_subscription(G1Measurements, 'measurements/g1/lidar',
-                                 self._lidar_cb, 10)
+        for key, topic in (
+            ('camera', CAMERA_MEASUREMENTS_TOPIC),
+            ('lidar', LIDAR_MEASUREMENTS_TOPIC),
+            ('mask', MASK_MEASUREMENTS_TOPIC),
+        ):
+            self.create_subscription(
+                G1Measurements, topic,
+                lambda msg, key=key: self._measurement_cb(key, msg), 10)
+
+        self.create_subscription(
+            PointStamped, str(self.get_parameter('ground_truth_topic').value),
+            self._truth_cb, 10)
 
         self._pub = self.create_publisher(MarkerArray, 'visualization/g1/estimates', 10)
+        # The HUD aggregator owns the container style; this node contributes one
+        # labelled section and nothing else.
+        self._hud_pub = self.create_publisher(
+            OverlayText, str(self.get_parameter('hud_distances_topic').value), 10)
 
-    def _camera_cb(self, msg: G1Measurements) -> None:
+    def _measurement_cb(self, key: str, msg: G1Measurements) -> None:
         with self._lock:
-            self._latest_camera = msg
+            self._latest[key] = msg
         self._publish()
 
-    def _lidar_cb(self, msg: G1Measurements) -> None:
+    def _truth_cb(self, msg: PointStamped) -> None:
         with self._lock:
-            self._latest_lidar = msg
-        self._publish()
+            self._latest_truth = msg
+            self._latest_truth_monotonic = time.monotonic()
 
-    def _publish(self) -> None:
+    def _current_truth(self) -> float | None:
+        """Benchmark truth distance while it is live, else ``None``.
+
+        Packed by the runner as x=lateral, y=forward, z=distance.
+        """
+
         with self._lock:
-            camera_msg = self._latest_camera
-            lidar_msg = self._latest_lidar
+            msg, seen_at = self._latest_truth, self._latest_truth_monotonic
+        if msg is None or time.monotonic() - seen_at > TRUTH_MAX_AGE_S:
+            return None
+        return float(msg.point.z)
 
-        if camera_msg is None and lidar_msg is None:
-            return
+    def _fresh_messages(self) -> list[G1Measurements]:
+        """Cached messages still within the marker lifetime, oldest cache dropped."""
 
-        # Drop stale cached messages so rings disappear when the G1 is gone.
         now = self.get_clock().now()
         stale_threshold = rclpy.duration.Duration(seconds=self.marker_lifetime)
-        if camera_msg is not None:
-            age = now - rclpy.time.Time.from_msg(camera_msg.header.stamp)
-            if age > stale_threshold:
-                camera_msg = None
-        if lidar_msg is not None:
-            age = now - rclpy.time.Time.from_msg(lidar_msg.header.stamp)
-            if age > stale_threshold:
-                lidar_msg = None
-        if camera_msg is None and lidar_msg is None:
+        with self._lock:
+            cached = dict(self._latest)
+
+        fresh = []
+        for msg in cached.values():
+            if msg is None:
+                continue
+            if now - rclpy.time.Time.from_msg(msg.header.stamp) > stale_threshold:
+                continue
+            fresh.append(msg)
+        return fresh
+
+    def _publish(self) -> None:
+        fresh = self._fresh_messages()
+        if not fresh:
             return
+
+        self._publish_hud(fresh)
 
         # Use Time(0) to get the latest available TF — avoids sim-time buffer
         # mismatches since the robot is stationary during benchmarks.
@@ -135,43 +260,18 @@ class G1EstimateVizNode(Node):
             return
 
         markers = []
-        marker_time = now.to_msg()
-
-        if camera_msg is not None and camera_msg.detected:
-            for i in range(camera_msg.count):
-                self._add_estimator_markers(
-                    markers, 'rgb', i,
-                    _get(camera_msg.rgb_forward_m, i),
-                    _get(camera_msg.rgb_lateral_m, i),
-                    robot_x, robot_y, robot_yaw, marker_time, actual_frame,
-                )
-                self._add_estimator_markers(
-                    markers, 'sensor_depth', i,
-                    None, None,
-                    robot_x, robot_y, robot_yaw, marker_time, actual_frame,
-                    distance_m=_get(camera_msg.sensor_depth_distance_m, i),
-                )
-                self._add_estimator_markers(
-                    markers, 'depth_anything', i,
-                    None, None,
-                    robot_x, robot_y, robot_yaw, marker_time, actual_frame,
-                    distance_m=_get(camera_msg.mono_depth_distance_m, i),
-                )
-                self._add_estimator_markers(
-                    markers, 'pointcloud', i,
-                    _get(camera_msg.pointcloud_forward_m, i),
-                    _get(camera_msg.pointcloud_lateral_m, i),
-                    robot_x, robot_y, robot_yaw, marker_time, actual_frame,
-                )
-
-        if lidar_msg is not None and lidar_msg.detected:
-            for i in range(lidar_msg.count):
-                self._add_estimator_markers(
-                    markers, 'lidar', i,
-                    _get(lidar_msg.lidar_forward_m, i),
-                    _get(lidar_msg.lidar_lateral_m, i),
-                    robot_x, robot_y, robot_yaw, marker_time, actual_frame,
-                )
+        marker_time = self.get_clock().now().to_msg()
+        for msg in fresh:
+            if not msg.detected:
+                continue
+            for index in range(msg.count):
+                for estimator in PUBLIC_ESTIMATOR_ORDER:
+                    forward, lateral, distance = estimator_reading(msg, estimator, index)
+                    self._add_estimator_markers(
+                        markers, estimator, index, forward, lateral,
+                        robot_x, robot_y, robot_yaw, marker_time, actual_frame,
+                        distance_m=distance,
+                    )
 
         if not markers:
             return
@@ -179,6 +279,47 @@ class G1EstimateVizNode(Node):
         ma = MarkerArray()
         ma.markers = markers
         self._pub.publish(ma)
+
+    def _publish_hud(self, fresh: list[G1Measurements]) -> None:
+        """One HUD section: every estimator's distance against the truth.
+
+        Rendered by RViz as text, so it stays legible at any window size — unlike
+        numbers burned into the perception overlay bitmap, which shrink with it.
+
+        Each line is coloured from ``ESTIMATOR_COLOURS``, the same table that
+        colours that estimator's ring, so a reading and its ring cannot drift
+        apart. That markup makes the overlay rich text, hence ``&nbsp;`` padding
+        and ``<br/>`` breaks -- see ``hud_node``'s ``rich_text``.
+        """
+
+        truth = self._current_truth()
+        header = 'G1 DISTANCES' + (f'   truth {truth:.3f} m' if truth is not None else '')
+        lines = [_hud_line(header, HUD_HEADER_COLOUR)]
+
+        readings: dict[str, float] = {}
+        for msg in fresh:
+            if not msg.detected or msg.count < 1:
+                continue
+            for estimator in PUBLIC_ESTIMATOR_ORDER:
+                # First detection only: the HUD is a scalar readout, and the
+                # rings already carry the per-instance picture.
+                _, _, distance = estimator_reading(msg, estimator, 0)
+                if distance is not None:
+                    readings[estimator] = distance
+
+        for estimator in PUBLIC_ESTIMATOR_ORDER:
+            label = ESTIMATOR_LABELS[estimator]
+            distance = readings.get(estimator)
+            if distance is None:
+                body = f'{label:<24}      --    miss'
+            else:
+                error = '' if truth is None else f'  {distance - truth:+.3f}'
+                body = f'{label:<24} {distance:7.3f}{error}'
+            lines.append(_hud_line(body, hud_text_colour(estimator)))
+
+        text = OverlayText()
+        text.text = '<br/>'.join(lines)
+        self._hud_pub.publish(text)
 
     def _add_estimator_markers(
         self,
@@ -274,7 +415,7 @@ class G1EstimateVizNode(Node):
 
 
 def _get(arr, i: int) -> float | None:
-    if arr and i < len(arr) and arr[i] == arr[i]:  # NaN check
+    if arr is not None and len(arr) > i and arr[i] == arr[i]:  # NaN check
         return float(arr[i])
     return None
 

@@ -9,10 +9,12 @@ from ridgeback_autonomy.common.miss_reason import MissReason
 from ridgeback_autonomy.perception.core.intrinsics import CameraIntrinsics
 from ridgeback_autonomy.perception.core.mask import MaskPrecision, mask_from_array, rasterize_bbox
 from ridgeback_autonomy.perception.core.polar_profiling import (
+    beams_in_bbox,
     localize_polar_profiling,
     merge_near_band,
     scan_points_optical,
     segment_range_profile,
+    select_beams,
 )
 
 
@@ -75,6 +77,68 @@ def test_two_legs_merge_drops_parallax_wall() -> None:
     # Exactly the 9-beam legs survive (both sides); every wall beam is gone.
     assert result.foreground_points.shape == (18, 2)
     assert result.ray_count > 18  # wall beams did enter the mask select
+
+
+def test_reported_beams_index_the_original_scan() -> None:
+    # The beam sets are what a visualization draws, so they have to index the
+    # scan the caller passed in -- not the selected subset the merge works on.
+    # Indexing the input array by merged_beams must reproduce the foreground.
+    points = two_legs_profile()
+    mask = rasterize_bbox(MASK_BBOX, HEIGHT, WIDTH)
+
+    result, _ = localize_polar_profiling(
+        points, np.ones(points.shape[0], dtype=bool), mask, INTRINSICS)
+
+    assert result is not None
+    assert np.array_equal(points[result.merged_beams][:, (0, 2)], result.foreground_points)
+    assert set(result.merged_beams.tolist()) <= set(result.selected_beams.tolist())
+    assert result.selected_beams.size == result.ray_count
+
+    # The gap between the two sets is exactly the parallax wall the segmentation
+    # discarded -- the beams a "dropped" overlay exists to show.
+    dropped = np.setdiff1d(result.selected_beams, result.merged_beams)
+    assert dropped.size > 0
+    assert np.allclose(points[dropped][:, 2], WALL_Z_M)
+    assert np.allclose(points[result.merged_beams][:, 2], LEG_Z_M)
+
+
+def test_bbox_beams_equal_mask_beams_under_a_box_gate() -> None:
+    # Under a box gate the mask IS the rasterized box, so the wedge's beam set
+    # and the estimator's selection must coincide -- if they ever diverge here,
+    # the two are being derived by different rules.
+    points = two_legs_profile()
+    valid = np.ones(points.shape[0], dtype=bool)
+    mask = rasterize_bbox(MASK_BBOX, HEIGHT, WIDTH)
+
+    selected = select_beams(points, valid, mask, INTRINSICS)
+    in_bbox = beams_in_bbox(points, valid, MASK_BBOX, INTRINSICS)
+
+    assert np.array_equal(selected, in_bbox)
+
+
+def test_bbox_beams_are_a_superset_of_a_tighter_silhouette() -> None:
+    # A silhouette that drops the middle columns keeps the box beams unchanged;
+    # the difference is exactly what the segmentation removed.
+    points = two_legs_profile()
+    valid = np.ones(points.shape[0], dtype=bool)
+    silhouette_data = rasterize_bbox(MASK_BBOX, HEIGHT, WIDTH).data.copy()
+    silhouette_data[:, 38:43] = False
+    silhouette = mask_from_array(silhouette_data, MaskPrecision.TIGHT)
+
+    selected = select_beams(points, valid, silhouette, INTRINSICS)
+    in_bbox = beams_in_bbox(points, valid, MASK_BBOX, INTRINSICS)
+
+    assert set(selected.tolist()) < set(in_bbox.tolist())
+
+
+def test_box_above_the_scan_row_contains_no_beams() -> None:
+    # The vertical test is load-bearing: a target occluded at scan height still
+    # has a detection box, but no ray in it. No beams means no wedge downstream.
+    points = two_legs_profile()
+    valid = np.ones(points.shape[0], dtype=bool)
+    above_scan_row = (30, 0, 51, 10)
+
+    assert beams_in_bbox(points, valid, above_scan_row, INTRINSICS).size == 0
 
 
 def test_unequal_legs_median_stays_on_object() -> None:

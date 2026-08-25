@@ -87,6 +87,21 @@ def test_pack_panels_shapes() -> None:
     assert pack_panels([_panel()] * 5).shape == (8, 18, 3)
 
 
+def test_pack_panels_single_row_fills_width_for_a_wide_target() -> None:
+    # Six panels default to 3x2 (aspect ~2:1), which letterboxes badly in a wide
+    # short strip; one row is ~8:1 and fills it. Same panels, same pixels.
+    tall = pack_panels([_panel()] * 6)
+    wide = pack_panels([_panel()] * 6, max_cols=6)
+
+    assert tall.shape == (8, 18, 3)
+    assert wide.shape == (4, 36, 3)
+    assert wide.shape[1] / wide.shape[0] > tall.shape[1] / tall.shape[0]
+
+
+def test_pack_panels_single_column_is_allowed() -> None:
+    assert pack_panels([_panel()] * 3, max_cols=1).shape == (12, 6, 3)
+
+
 def test_pack_panels_last_row_padding_is_black() -> None:
     white = np.full((4, 6, 3), 255, dtype=np.uint8)
     grid = pack_panels([white] * 4)  # 2x3: cells 4 and 5 are blank

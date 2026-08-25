@@ -43,6 +43,7 @@ from collections import OrderedDict
 
 import numpy as np
 import rclpy
+from rclpy.duration import Duration
 from rclpy.executors import ExternalShutdownException
 from rclpy.logging import get_logger
 from rclpy.node import Node
@@ -50,7 +51,9 @@ from rclpy.qos import qos_profile_sensor_data
 from rclpy.time import Time
 from sensor_msgs.msg import CameraInfo, Image, LaserScan
 from tf2_ros import Buffer, TransformException, TransformListener
+from visualization_msgs.msg import MarkerArray
 
+from ridgeback_autonomy.common.markers import PolarBeamRecord, build_polar_ray_markers
 from ridgeback_autonomy.common.messages import (
     batch_from_detections_message,
     build_measurements_message,
@@ -84,8 +87,10 @@ from ridgeback_autonomy.perception.core.mask import (
 from ridgeback_autonomy.perception.core.projective_ranging import localize_projective_ranging
 from ridgeback_autonomy.perception.core.euclidean_reconstruction import localize_euclidean_reconstruction
 from ridgeback_autonomy.perception.core.polar_profiling import (
+    beams_in_bbox,
     localize_polar_profiling,
     scan_points_optical,
+    select_beams,
 )
 from ridgeback_autonomy.perception.core.segmentation import (
     SEGMENTATION_MIN_PREDICTED_IOU_DEFAULT,
@@ -98,6 +103,11 @@ RAW_DETECTIONS_TOPIC = 'detections/g1/raw'
 MASK_MEASUREMENTS_TOPIC = 'measurements/g1/mask'
 COLOR_TOPIC_DEFAULT = 'sensors/camera_0/color/image'
 MASK_DEBUG_TOPIC = 'debug/g1/mask'
+RAY_MARKER_TOPIC = 'visualization/g1/polar_rays'
+
+# Markers expire rather than being explicitly deleted, so they vanish on their
+# own when detections stop. Mirrors the estimate rings' lifetime.
+RAY_MARKER_LIFETIME_SEC = 1.5
 
 ROBOT_FRONT_OFFSET_M_DEFAULT = 0.25  # mirrors geometry.ROBOT_FRONT_OFFSET_M
 BASE_FRAME_DEFAULT = 'base_link'
@@ -259,6 +269,7 @@ def fill_path_measurements(
     isolation_2d,
     isolation_3d,
     scan_reason: MissReason = MissReason.NO_SCAN,
+    beam_records: list | None = None,
 ) -> None:
     """Run every available path for each (detection, mask) pair, in place.
 
@@ -271,9 +282,14 @@ def fill_path_measurements(
     reason polar carries when the scan itself never resolved. The
     ``tight | rect`` fork lives inside the paths themselves; this function is
     gate-agnostic.
+
+    ``beam_records`` is an optional out-list collecting one ``PolarBeamRecord``
+    per detection that had a scan, for visualization. Passing nothing keeps the
+    previous behaviour exactly; the beams are a by-product of work already done,
+    never a reason to run a path.
     """
 
-    for detection, mask in zip(batch.detections, masks):
+    for index, (detection, mask) in enumerate(zip(batch.detections, masks)):
         if mask is None:
             continue
 
@@ -325,6 +341,23 @@ def fill_path_measurements(
                 ) = optical_to_base_planar(
                     (x_optical, 0.0, z_optical), camera_rotation,
                     camera_translation, front_offset_m)
+
+            if beam_records is not None:
+                # A miss is the case worth seeing, so record the beams either
+                # way: on success the estimator's own two sets, on failure the
+                # selection it rejected, with nothing marked as used.
+                if result_c is not None:
+                    selected, merged = result_c.selected_beams, result_c.merged_beams
+                else:
+                    selected = select_beams(points_optical, valid, mask, intrinsics)
+                    merged = np.empty(0, dtype=np.intp)
+                beam_records.append(PolarBeamRecord(
+                    detection_index=index,
+                    selected=selected,
+                    merged=merged,
+                    in_bbox=beams_in_bbox(
+                        points_optical, valid, detection.bbox_xyxy, intrinsics),
+                ))
 
 
 def encode_mask_debug_image(masks, image_height: int, image_width: int, header) -> Image:
@@ -379,6 +412,8 @@ class G1MaskMeasurementNode(Node):
         self.declare_parameter('aligned_camera_info_topic', ALIGNED_CAMERA_INFO_TOPIC)
         self.declare_parameter('scan_topic', 'sensors/lidar2d_0/scan')
         self.declare_parameter('scan_match_tolerance_s', SCAN_MATCH_TOLERANCE_S_DEFAULT)
+        self.declare_parameter('ray_marker_topic', RAY_MARKER_TOPIC)
+        self.declare_parameter('ray_marker_lifetime_sec', RAY_MARKER_LIFETIME_SEC)
         self.declare_parameter('base_frame', BASE_FRAME_DEFAULT)
         self.declare_parameter('front_offset_m', ROBOT_FRONT_OFFSET_M_DEFAULT)
         self.declare_parameter('isolation_2d', ISOLATION_2D_DEFAULT)
@@ -400,6 +435,8 @@ class G1MaskMeasurementNode(Node):
         self.base_frame = str(self.get_parameter('base_frame').value)
         self.scan_match_tolerance_s = float(
             self.get_parameter('scan_match_tolerance_s').value)
+        self.ray_marker_lifetime_sec = float(
+            self.get_parameter('ray_marker_lifetime_sec').value)
         self.front_offset_m = float(self.get_parameter('front_offset_m').value)
         self.isolation_2d = self.resolve_recipe(
             'isolation_2d', ISOLATION_2D_RECIPES)
@@ -504,6 +541,16 @@ class G1MaskMeasurementNode(Node):
                 str(self.get_parameter('mask_debug_topic').value),
                 qos_profile_sensor_data,
             )
+
+        # Which beams polar profiling reduced, and the box they were drawn from,
+        # as RViz markers. Published unconditionally: the three layers are
+        # separate marker namespaces, so RViz's own per-namespace checkboxes do
+        # the enabling and disabling without a round trip through this node.
+        self.ray_marker_pub = self.create_publisher(
+            MarkerArray,
+            str(self.get_parameter('ray_marker_topic').value),
+            10,
+        )
 
         self.worker_thread = threading.Thread(target=self.processing_loop, daemon=True)
         self.worker_thread.start()
@@ -628,6 +675,7 @@ class G1MaskMeasurementNode(Node):
                         depth_m = self.decode_depth_for_batch(depth_msg, batch)
                         scan_points, scan_reason = self.scan_points_for_batch(
                             detections_msg, scan_msg)
+                        beam_records: list[PolarBeamRecord] = []
                         fill_path_measurements(
                             batch,
                             masks,
@@ -640,7 +688,9 @@ class G1MaskMeasurementNode(Node):
                             isolation_2d=self.isolation_2d,
                             isolation_3d=isolation_3d,
                             scan_reason=scan_reason,
+                            beam_records=beam_records,
                         )
+                        self.publish_ray_markers(beam_records, scan_msg)
         elif batch.detected:
             self.log_skip_warning(
                 'No camera_info received yet; publishing measurements without '
@@ -650,6 +700,25 @@ class G1MaskMeasurementNode(Node):
 
         self.measurement_pub.publish(
             build_measurements_message(batch, detections_msg.header))
+
+    def publish_ray_markers(self, beam_records, scan_msg) -> None:
+        """Draw this frame's polar beams, if there was a scan to draw them from.
+
+        Stamped from the scan rather than the detection so the markers carry the
+        stamp of the data they depict; the two are matched to within
+        ``scan_match_tolerance_s`` and RViz interpolates the transform.
+        """
+
+        if scan_msg is None or not beam_records:
+            return
+        markers = build_polar_ray_markers(
+            scan_msg,
+            beam_records,
+            scan_msg.header.stamp,
+            Duration(seconds=self.ray_marker_lifetime_sec).to_msg(),
+        )
+        if markers:
+            self.ray_marker_pub.publish(MarkerArray(markers=markers))
 
     def stamp_frame_reason(self, batch, reason: MissReason) -> None:
         """Stamp a frame-level miss reason on all three mask estimators of every

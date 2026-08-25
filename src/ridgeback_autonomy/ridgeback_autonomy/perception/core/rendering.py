@@ -37,6 +37,10 @@ PANEL_BOX_MASK = 'box_mask'
 PANEL_SILHOUETTE = 'silhouette'
 PANEL_LIDAR = 'lidar'
 
+# Panels per row when packing the grid. Three suits a roughly square window;
+# a wide, short target (the RViz strip) wants them all on one row instead.
+PANEL_MAX_COLS_DEFAULT = 3
+
 # Estimators that report a full planar position (lateral/forward/distance); the
 # rest report distance only. Field names are ``{estimator}_lateral_m`` etc.,
 # except the distance-only pair whose keys live in ``ESTIMATOR_FIELD_KEYS``.
@@ -87,7 +91,7 @@ def select_panels(estimators, depth_source: str, mask_gate: str) -> list[PanelSp
     return panels
 
 
-def pack_panels(panels: list[np.ndarray], max_cols: int = 3) -> np.ndarray:
+def pack_panels(panels: list[np.ndarray], max_cols: int = PANEL_MAX_COLS_DEFAULT) -> np.ndarray:
     """Tile equal-size panels into a tidy grid, black-padding the last row.
 
     ``ceil(N / cols)`` rows by ``cols = min(max_cols, N)`` columns, so 1..N
@@ -170,11 +174,15 @@ class RgbdOverlayRenderer:
         estimators=PUBLIC_ESTIMATOR_ORDER,
         depth_source: str = 'stereoscopic',
         mask_gate: str = 'box',
+        max_cols: int = PANEL_MAX_COLS_DEFAULT,
+        rgb_panel_labels: bool = True,
     ) -> None:
         self.depth_max_meters = depth_max_meters
         self.estimators = tuple(estimators)
         self.depth_source = depth_source
         self.mask_gate = mask_gate
+        self.max_cols = max_cols
+        self.rgb_panel_labels = rgb_panel_labels
         self.panels = select_panels(self.estimators, depth_source, mask_gate)
 
     def render(
@@ -205,7 +213,7 @@ class RgbdOverlayRenderer:
             )
             for spec in self.panels
         ]
-        return pack_panels(images)
+        return pack_panels(images, max_cols=self.max_cols)
 
     def build_panel(
         self,
@@ -224,7 +232,8 @@ class RgbdOverlayRenderer:
     ) -> np.ndarray:
         if spec.kind == PANEL_RGB:
             panel = frame.copy()
-            self.annotate_detections(panel, batch, draw_labels=True, truth=truth)
+            self.annotate_detections(
+                panel, batch, draw_labels=self.rgb_panel_labels, truth=truth)
         elif spec.kind == PANEL_SENSOR_DEPTH:
             panel = self.make_depth_panel(frame.shape[:2], sensor_depth_meters)
             self.annotate_detections(panel, batch, draw_labels=False)

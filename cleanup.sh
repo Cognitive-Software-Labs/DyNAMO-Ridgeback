@@ -21,6 +21,18 @@ kill_matches() {
     done
 }
 
+# Stop a benchmark screen recorder FIRST, and gently. ffmpeg writes the mp4
+# index when it exits, so the kill -9 below would leave an unplayable file.
+if pgrep -u "$CURRENT_USER" -f "ffmpeg.*x11grab" >/dev/null 2>&1; then
+    echo "Stopping screen recorder..."
+    pkill -INT -u "$CURRENT_USER" -f "ffmpeg.*x11grab" 2>/dev/null || true
+    for _ in 1 2 3 4 5 6 7 8 9 10; do
+        pgrep -u "$CURRENT_USER" -f "ffmpeg.*x11grab" >/dev/null 2>&1 || break
+        sleep 0.5
+    done
+    kill_matches "ffmpeg.*x11grab"
+fi
+
 # Kill ros2 launch processes first (they may respawn children)
 kill_matches "ros2.*launch"
 sleep 0.5
@@ -61,9 +73,14 @@ PATTERNS=(
     g1_camera_measurement_node
     g1_lidar_measurement_node
     g1_overlay_node
+    g1_mask_measurement_node
+    g1_estimate_viz_node
+    aligned_depth_node
     g1_distance_benchmark_runner
     g1_detection_node
     velocity_overlay_node
+    coverage_overlay_node
+    hud_node
     imu_filter_madgwick_node
     imu_filter_madgwick
     frontier_explorer_node
@@ -72,6 +89,12 @@ PATTERNS=(
 for pat in "${PATTERNS[@]}"; do
     kill_matches "$pat"
 done
+
+# Catch-all for this package's nodes. The named list above has repeatedly gone
+# stale as nodes were added, leaving orphans alive for hours after a launch was
+# killed -- and duplicates then fight over the measurement topics on the next
+# run. Every node here is installed under lib/ridgeback_autonomy, so match that.
+kill_matches "lib/ridgeback_autonomy/"
 
 sleep 1
 

@@ -82,13 +82,22 @@ G1 perception stack (on by default — `g1_perception_enabled` defaults to `true
 - `g1_detector_node` publishes raw detections on `detections/g1/raw`
 - `g1_camera_measurement_node` publishes camera-based measurements on `measurements/g1/camera`
 - `g1_lidar_measurement_node` publishes LiDAR-based measurements on `measurements/g1/lidar`
-- `g1_overlay_node` renders the separate OpenCV perception window
+- `g1_mask_measurement_node` publishes the three mask-based rows on `measurements/g1/mask`, and the beams polar profiling reduced on `visualization/g1/polar_rays` (`MarkerArray`)
+- `g1_overlay_node` renders the perception panels. It **publishes the composite on `debug/g1/overlay`** (`bgr8`) so RViz can hold it as an Image display, and separately opens the OpenCV window when `show_window` is true (default). `max_cols` sets panels per row; `rgb_panel_labels` toggles the per-detection label block
+
+Visualization conventions:
+- Enable/disable of the G1 visualizations is done with **RViz Displays checkboxes only** — no `add_on_set_parameters_callback` anywhere in this repo, and none was added. A `MarkerArray` display renders one checkbox per marker namespace, which is why `polar_rays` splits into `polar/used`, `polar/dropped` and `polar/wedge`
+- Marker builders live in `common/markers.py` and emit markers in the **scan's own frame**, so beam geometry is `angle_min + i*angle_increment` with no extrinsics; TF places them
+- `g1_estimate_viz_node` drives its rings and its HUD panel from `benchmarking/estimators.py`, so registering an estimator there is enough to make it appear in both. HUD rows are coloured from the same `ESTIMATOR_COLOURS` table as the rings, lightened only as far as `HUD_MIN_LUMINANCE` needs
+- `hud_node` has `horizontal_alignment` / `vertical_alignment` (default `left`/`top`, benchmark uses `right`/`top`) and `rich_text`. **`rich_text` changes the text contract**: the overlay renders via `QStaticText`, which switches to rich text as soon as any HTML tag appears — there `\n` stops breaking lines and runs of spaces collapse, so panels must use `<br/>` and `&nbsp;`. Exploration's panels are plain and keep the default
+- **Dock placement is only expressible as a `QMainWindow State` hex blob** in the `.rviz` file. `rviz_common`'s `addPane()` hardcodes `Qt::LeftDockWidgetArea` and the config format has no per-display area key, so a wide panel with no blob lands in the narrow left dock. `benchmark.rviz` carries one (generated via `QMainWindow::saveState()`, dock objectNames = the pane names = the keys in that same block); `restoreState` fails silently on a name mismatch, so any change to it needs a screenshot, not a build
 
 Benchmark stack:
 - simulator
 - `g1_detector_node`
 - one measurement node chosen by `measurement_backend`
-- `g1_distance_benchmark_runner`
+- `g1_estimate_viz_node` + `hud_node` (the rings and the distance readout, `estimate_viz:=true` by default)
+- `g1_distance_benchmark_runner` — also screen-records the RViz window to `video/run.mp4` via `benchmarking/recording.py` (best-effort; never fails a run)
 
 ## Namespace And Topic Conventions
 

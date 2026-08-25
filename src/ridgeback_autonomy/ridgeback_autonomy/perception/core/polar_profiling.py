@@ -86,6 +86,12 @@ class PolarProfilingResult:
     xz_optical: np.ndarray  # (2,) X right, Z forward, meters; Y unobserved
     foreground_points: np.ndarray  # (M, 2) the merged (X, Z) set, by-product
     ray_count: int  # rays that survived the mask ∩ FoV select
+    # Beam indices into the ORIGINAL scan array, so a consumer can map an estimate
+    # back to the rays it came from without re-deriving the selection. Reporting
+    # both sides is the point: the gap between them is what the range segmentation
+    # threw away, which is how an occluder latch becomes visible.
+    selected_beams: np.ndarray  # (N,) the mask ∩ FoV select
+    merged_beams: np.ndarray  # (M,) the near-band survivors -- what the estimate reduces
 
 
 def scan_points_optical(
@@ -188,6 +194,74 @@ def merge_near_band(
     return np.concatenate(kept)
 
 
+def project_in_view(
+    points_optical: np.ndarray,
+    valid: np.ndarray,
+    intrinsics: CameraIntrinsics,
+) -> tuple[np.ndarray, np.ndarray]:
+    """``(beam_indices, uv)`` for beams that are valid and land on the image.
+
+    The PROJECT step, shared by the estimator and by everything that reports on
+    it, so a depiction of the selection cannot drift from the selection itself.
+    """
+
+    uv, in_view = project_points(points_optical, intrinsics)
+    selectable = np.asarray(valid, dtype=bool) & in_view
+    return np.flatnonzero(selectable), uv
+
+
+def select_beams(
+    points_optical: np.ndarray,
+    valid: np.ndarray,
+    mask: Mask,
+    intrinsics: CameraIntrinsics,
+) -> np.ndarray:
+    """Beam indices inside both the camera FoV and ``mask`` -- the SELECT step.
+
+    Split out so a caller can recover the selection when localization returns no
+    estimate: a miss still has beams worth showing, and re-deriving them
+    elsewhere is how a visualization drifts from the estimator it depicts.
+    """
+
+    beam_indices, uv = project_in_view(points_optical, valid, intrinsics)
+    if beam_indices.size == 0:
+        return beam_indices
+    u_px = np.rint(uv[beam_indices, 0]).astype(np.intp)
+    v_px = np.rint(uv[beam_indices, 1]).astype(np.intp)
+    return beam_indices[mask.data[v_px, u_px]]
+
+
+def beams_in_bbox(
+    points_optical: np.ndarray,
+    valid: np.ndarray,
+    bbox_xyxy,
+    intrinsics: CameraIntrinsics,
+) -> np.ndarray:
+    """Beam indices projecting inside the detection BOX, whatever the mask is.
+
+    Under a box gate this equals ``select_beams``; under a silhouette gate it is
+    a superset, and the difference is what the segmentation removed. The vertical
+    test matters as much as the horizontal one: a box that does not span the scan
+    plane's image row contains no beams at all, which is the correct reading of a
+    target fully occluded at scan height.
+
+    Deliberately mirrors ``mask._fill_box``: round to a pixel as ``select_beams``
+    does, then test the HALF-OPEN ``[x1, x2) x [y1, y2)`` against truncated
+    bounds. Testing the raw float against the raw box instead disagrees by a beam
+    at each edge, which would make the wedge and the rays contradict each other
+    on a box gate, where they are the same set by definition.
+    """
+
+    beam_indices, uv = project_in_view(points_optical, valid, intrinsics)
+    if beam_indices.size == 0:
+        return beam_indices
+    x1, y1, x2, y2 = (int(value) for value in bbox_xyxy)
+    u_px = np.rint(uv[beam_indices, 0]).astype(np.intp)
+    v_px = np.rint(uv[beam_indices, 1]).astype(np.intp)
+    inside = (u_px >= x1) & (u_px < x2) & (v_px >= y1) & (v_px < y2)
+    return beam_indices[inside]
+
+
 def localize_polar_profiling(
     points_optical: np.ndarray,
     valid: np.ndarray,
@@ -211,9 +285,9 @@ def localize_polar_profiling(
 
     # 3. PROJECT + 4. SELECT: the mask indexes the projected points exactly
     # as it indexes depth pixels in projective ranging, in sparse per-point form.
-    uv, in_view = project_points(points_optical, intrinsics)
-    selectable = np.asarray(valid, dtype=bool) & in_view
-    beam_indices = np.flatnonzero(selectable)
+    # The two stages stay separate because they carry different miss reasons:
+    # nothing on the image at all, versus nothing of it under the mask.
+    beam_indices, uv = project_in_view(points_optical, valid, intrinsics)
     if beam_indices.size == 0:
         return None, MissReason.NO_BEAMS_IN_VIEW
     u_px = np.rint(uv[beam_indices, 0]).astype(np.intp)
@@ -245,4 +319,7 @@ def localize_polar_profiling(
         xz_optical=xz_optical,
         foreground_points=foreground,
         ray_count=int(beam_indices.size),
+        selected_beams=beam_indices,
+        # ``merged`` indexes into the selected set, not the scan, so map it back.
+        merged_beams=beam_indices[merged],
     ), MissReason.OK

@@ -22,7 +22,10 @@ from ridgeback_autonomy.benchmarking.estimators import (
     parse_mask_gate,
     uses_mask_estimators,
 )
-from ridgeback_autonomy.common.messages import batch_from_measurements_message
+from ridgeback_autonomy.common.messages import (
+    batch_from_measurements_message,
+    build_bgr8_image_message,
+)
 from ridgeback_autonomy.common.tf_utils import lookup_transform_components
 from ridgeback_autonomy.msg import G1Measurements
 from ridgeback_autonomy.perception.core.image_utils import (
@@ -35,7 +38,10 @@ from ridgeback_autonomy.perception.core.intrinsics import (
     project_points,
 )
 from ridgeback_autonomy.perception.core.polar_profiling import scan_points_optical
-from ridgeback_autonomy.perception.core.rendering import RgbdOverlayRenderer
+from ridgeback_autonomy.perception.core.rendering import (
+    PANEL_MAX_COLS_DEFAULT,
+    RgbdOverlayRenderer,
+)
 
 
 CAMERA_MEASUREMENTS_TOPIC = 'measurements/g1/camera'
@@ -43,6 +49,7 @@ LIDAR_MEASUREMENTS_TOPIC = 'measurements/g1/lidar'
 MASK_MEASUREMENTS_TOPIC = 'measurements/g1/mask'
 MONO_DEPTH_DEBUG_TOPIC = 'debug/g1/camera/mono_depth'
 MASK_DEBUG_TOPIC = 'debug/g1/mask'
+OVERLAY_IMAGE_TOPIC = 'debug/g1/overlay'
 ALIGNED_DEPTH_TOPIC = 'perception/aligned_depth/image'
 COLOR_CAMERA_INFO_TOPIC = 'sensors/camera_0/color/camera_info'
 SCAN_TOPIC = 'sensors/lidar2d_0/scan'
@@ -94,11 +101,26 @@ class G1OverlayNode(Node):
         self.declare_parameter('estimators', 'all')
         self.declare_parameter('depth_source', 'stereoscopic')
         self.declare_parameter('mask_gate', 'box')
+        self.declare_parameter('overlay_image_topic', OVERLAY_IMAGE_TOPIC)
+        # The standalone OpenCV window. Kept on by default so existing workflows
+        # are unchanged; benchmark runs turn it off, because the composite is
+        # published for RViz there and a floating window would sit over it.
+        self.declare_parameter('show_window', True)
+        # Panels per row. A tall 3-wide grid suits the standalone window; the
+        # RViz strip is far wider than it is tall, where a single row fills it
+        # instead of letterboxing to a third of the width.
+        self.declare_parameter('max_cols', PANEL_MAX_COLS_DEFAULT)
+        # The per-detection label block on the RGB panel. Off for benchmark runs,
+        # where the HUD carries the numbers as text RViz draws at full size and
+        # the block otherwise covers the robot it annotates.
+        self.declare_parameter('rgb_panel_labels', True)
 
         self.color_topic = self.get_parameter('color_topic').value
         self.depth_max_meters = float(self.get_parameter('depth_max_meters').value)
         self.render_fps = max(1.0, float(self.get_parameter('render_fps').value))
         self.window_name = self.get_parameter('window_name').value
+        self.show_window = bool(self.get_parameter('show_window').value)
+        self.rgb_panel_labels = bool(self.get_parameter('rgb_panel_labels').value)
 
         self.estimators = parse_estimators(str(self.get_parameter('estimators').value))
         self.depth_source = str(self.get_parameter('depth_source').value).strip() or 'stereoscopic'
@@ -108,7 +130,9 @@ class G1OverlayNode(Node):
         self.wants_polar = 'polar_profiling' in self.estimators
 
         self.renderer = RgbdOverlayRenderer(
-            self.depth_max_meters, self.estimators, self.depth_source, self.mask_gate)
+            self.depth_max_meters, self.estimators, self.depth_source, self.mask_gate,
+            max_cols=max(1, int(self.get_parameter('max_cols').value)),
+            rgb_panel_labels=self.rgb_panel_labels)
 
         self.latest_measurements_msg: G1Measurements | None = None
         self.latest_color_msg: Image | None = None
@@ -179,9 +203,17 @@ class G1OverlayNode(Node):
 
         self.render_timer = self.create_timer(1.0 / self.render_fps, self.render_callback)
 
-        cv2.namedWindow(self.window_name, cv2.WINDOW_NORMAL)
-        cv2.resizeWindow(self.window_name, 1280, 720)
-        cv2.moveWindow(self.window_name, 60, 60)
+        # The composite as a topic, so RViz can hold it alongside the 3D view and
+        # one window contains the whole picture. Published whatever the window
+        # setting, since the two are independent sinks for the same frame.
+        self.overlay_pub = self.create_publisher(
+            Image, str(self.get_parameter('overlay_image_topic').value),
+            qos_profile_sensor_data)
+
+        if self.show_window:
+            cv2.namedWindow(self.window_name, cv2.WINDOW_NORMAL)
+            cv2.resizeWindow(self.window_name, 1280, 720)
+            cv2.moveWindow(self.window_name, 60, 60)
 
     # -- measurement inputs --
 
@@ -259,7 +291,9 @@ class G1OverlayNode(Node):
             self.render_latest()
 
     def render_callback(self) -> None:
-        cv2.waitKey(1)
+        # Pumps the highgui event loop; pointless with no window to pump.
+        if self.show_window:
+            cv2.waitKey(1)
 
     # -- rendering --
 
@@ -299,8 +333,11 @@ class G1OverlayNode(Node):
             scan_points_optical=scan_points_optical,
             truth=self.current_truth(),
         )
-        cv2.imshow(self.window_name, annotated)
-        cv2.waitKey(1)
+        self.overlay_pub.publish(
+            build_bgr8_image_message(annotated, self.latest_color_msg.header))
+        if self.show_window:
+            cv2.imshow(self.window_name, annotated)
+            cv2.waitKey(1)
 
     def decode_depth(self, depth_msg: Image | None, warning_attr: str, label: str):
         if depth_msg is None:

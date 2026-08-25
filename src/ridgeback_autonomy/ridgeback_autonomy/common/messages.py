@@ -170,6 +170,26 @@ def build_float32_image_message(image: np.ndarray, header) -> Image:
     return msg
 
 
+def build_bgr8_image_message(image: np.ndarray, header) -> Image:
+    """Wrap an OpenCV BGR frame as an ``Image`` for RViz to display.
+
+    Sibling of ``build_float32_image_message``. ``bgr8`` is the encoding the
+    frame is already in, so this is a header plus a buffer copy with no colour
+    conversion -- it sits on a per-frame render path.
+    """
+
+    image = np.ascontiguousarray(image, dtype=np.uint8)
+    msg = Image()
+    msg.header = header
+    msg.height = int(image.shape[0])
+    msg.width = int(image.shape[1])
+    msg.encoding = 'bgr8'
+    msg.is_bigendian = False
+    msg.step = int(image.shape[1] * 3)
+    msg.data = image.tobytes()
+    return msg
+
+
 def _populate_identity_fields(message, batch: DetectionBatch, header) -> None:
     message.header = header
     message.detected = batch.detected

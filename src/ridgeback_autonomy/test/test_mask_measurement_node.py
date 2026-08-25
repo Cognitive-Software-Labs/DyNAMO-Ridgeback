@@ -311,6 +311,76 @@ def test_fill_with_tight_masks_runs_paths_without_isolation_recipes() -> None:
     assert detection.polar_profiling_distance_m is None
 
 
+def build_fill_scan(near_ratios, near_z: float = 2.0, wall_z: float = 5.0, count: int = 41):
+    """Scan points across the box and past it; ``near_ratios`` marks the object.
+
+    u = 100*(X/Z) + 40, so a ratio of X/Z maps to a column directly and the box
+    (columns 30..50) spans ratios -0.10..0.10. Y = 0 puts every beam on row 30,
+    inside the box's rows, so the vertical test never masks the horizontal one.
+    """
+
+    ratios = np.linspace(-0.2, 0.2, count)
+    z = np.where(near_ratios(ratios), near_z, wall_z)
+    points = np.stack((ratios * z, np.zeros(count), z), axis=1)
+    return points, np.ones(count, dtype=bool)
+
+
+def test_fill_records_the_beams_polar_reduced() -> None:
+    batch = build_fill_batch()
+    masks = [mask_from_array(tight_blob(), MaskPrecision.TIGHT)]
+    scan_points = build_fill_scan(lambda ratios: np.abs(ratios) <= 0.05)
+    records: list = []
+
+    fill_path_measurements(
+        batch, masks, FILL_INTRINSICS, build_fill_depth(), scan_points,
+        camera_rotation=LEVEL_OPTICAL_TO_BASE,
+        camera_translation=ZERO_TRANSLATION,
+        front_offset_m=0.25,
+        isolation_2d=forbidden_isolation,
+        isolation_3d=forbidden_isolation,
+        beam_records=records,
+    )
+
+    assert len(records) == 1
+    record = records[0]
+    assert record.detection_index == 0
+    # The near plate merged; the wall beams that shared the box did not.
+    points = scan_points[0]
+    assert np.allclose(points[record.merged][:, 2], 2.0)
+    dropped = np.setdiff1d(record.selected, record.merged)
+    assert dropped.size > 0
+    assert np.allclose(points[dropped][:, 2], 5.0)
+    # Tight mask equals the box here, so the wedge spans the same beams.
+    assert np.array_equal(record.in_bbox, record.selected)
+
+
+def test_fill_records_beams_even_when_polar_produces_no_estimate() -> None:
+    # A lone near return with the rest of the box on a far wall: the near-band
+    # merge keeps one beam, below the floor, so polar declines. The beams are
+    # still what a viewer needs -- that is how "declined" is told apart from
+    # "latched onto the near thing".
+    batch = build_fill_batch()
+    masks = [mask_from_array(tight_blob(), MaskPrecision.TIGHT)]
+    scan_points = build_fill_scan(
+        lambda ratios: np.isclose(ratios, 0.0, atol=1e-9), near_z=1.0)
+    records: list = []
+
+    fill_path_measurements(
+        batch, masks, FILL_INTRINSICS, build_fill_depth(), scan_points,
+        camera_rotation=LEVEL_OPTICAL_TO_BASE,
+        camera_translation=ZERO_TRANSLATION,
+        front_offset_m=0.25,
+        isolation_2d=forbidden_isolation,
+        isolation_3d=forbidden_isolation,
+        beam_records=records,
+    )
+
+    assert batch.detections[0].polar_profiling_distance_m is None
+    assert len(records) == 1
+    assert records[0].merged.size == 0
+    assert records[0].selected.size > 0
+
+
 def test_fill_skips_none_mask_entries_fields_stay_unset() -> None:
     batch = build_fill_batch(count=2)
     masks = [None, mask_from_array(tight_blob(), MaskPrecision.TIGHT)]

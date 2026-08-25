@@ -87,6 +87,51 @@ What is intentionally *not* scored:
 
 This keeps the benchmark focused on distance quality once the shared detector has produced a usable target lock.
 
+## Watching a run in RViz
+
+The benchmark launches RViz with `sim/rviz/benchmark.rviz`. Four displays carry
+the run, and each is switched on and off from the Displays panel while the run is
+going — that is the only toggle mechanism; there are no parameters for it.
+
+| Display | Shows |
+|---|---|
+| `G1 Estimates` | one coloured ring per estimator, at where it thinks the G1 is |
+| `G1 Polar Rays` | the LiDAR beams behind the polar profiling estimate |
+| `HUD` | top-right: every estimator's distance against the trial's ground truth |
+| `Perception overlay` | docked under the 3D view: the camera-side panels |
+
+The HUD colours each row to match that estimator's ring, from the one table in
+`g1_estimate_viz_node`, so a reading and its ring cannot drift apart. Dark ring
+colours (red, and Depth-Anything's purple) are lightened just enough to stay
+readable on the HUD's dark panel, keeping the hue so the ring is still
+recognisable.
+
+The layout — overlay docked full-width beneath the 3D view, roughly 30% of the
+height — is held by the `QMainWindow State` blob in `sim/rviz/benchmark.rviz`.
+RViz hardcodes the left dock for every panel it creates and the config format has
+no per-display dock-area key, so **that blob is the only thing placing it**. If it
+is ever dropped, the overlay silently reverts to a narrow left-dock strip a few
+tens of pixels tall.
+
+`G1 Polar Rays` expands into three namespaces, each with its own checkbox:
+
+- `polar/used` — the beams the estimate medians over, in amber
+- `polar/dropped` — beams the mask selected but the range segmentation discarded,
+  dim and **off by default**. Turn it on when diagnosing: without it, a frame
+  where the estimator threw the robot away looks the same as one where nothing
+  was there
+- `polar/wedge` — the bearing span of the beams inside the detection box. Under
+  `mask_gate:=box` this matches the rays exactly; under `silhouette` it is wider,
+  and the gap is what the segmentation removed
+
+A box that does not span the scan plane's image row contains no beams, so it
+draws no wedge. That is the correct picture for a target fully occluded at scan
+height, not a bug — the `objocc_*` scenes hit it routinely.
+
+The rings cover all eight estimators. The three mask-based ones are the reason
+the palette runs to cyan, yellow and magenta: in a clean scene every ring lands
+within centimetres of the others.
+
 ## Output Layout
 
 Default output root:
@@ -108,9 +153,29 @@ Inside that run folder:
 - `<estimator>.csv` for each selected estimator
 - `run.json` — the same run-level numbers for machines, plus provenance
 - `images/<trial_id>.png`
+- `video/run.mp4` — the RViz window for the whole run
 
 `run.json` and the trial CSVs are the machine-readable sources (diffing runs,
 feeding analysis); `summary.md` renders the same numbers for reading.
+
+## Run video
+
+Every run records the RViz window to `video/run.mp4` (H.264, 10 fps). The
+collages freeze one representative frame per trial; the video keeps the motion
+around it, which is where a mask collapsing or an estimator latching onto an
+occluder actually shows.
+
+Recording is best-effort and never costs a trial: a missing `ffmpeg`, a missing
+`xdotool`, or an RViz window that never appears logs a warning and the run
+continues. Turn it off with `record_video:=false`; `record_fps`, `record_max_sec`
+and `record_window_class` are also parameters.
+
+It captures the RViz window by id, so it is unaffected by what else is on screen
+— but that relies on a compositing X server. Without compositing, an occluded
+window records whatever is drawn over it.
+
+Because the perception overlay is published into RViz (see below), that one
+window holds the whole picture.
 
 Pass `output_dir:=...` to the launch file to write the timestamped run folder somewhere else.
 

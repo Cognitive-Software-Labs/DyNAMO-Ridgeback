@@ -253,6 +253,40 @@ in it). The path must distinguish and report:
 `None` is a first-class output: in the benchmark it is a skipped row, in the
 pipeline it is the signal to fall back — never a zero or a stale value.
 
+### 4.1 Seeing which beams were used (implemented)
+
+`localize_polar_profiling` returns `selected_beams` and `merged_beams` alongside
+the estimate — indices into the **original scan array**, not the selected subset.
+`selected_beams` is the mask ∩ FoV select; `merged_beams` is what survived the
+near-band merge and is therefore what the estimate medians over.
+
+`g1_mask_measurement_node` turns them into RViz markers on
+`visualization/g1/polar_rays`, in three namespaces (`polar/used`,
+`polar/dropped`, `polar/wedge`) so each toggles independently in RViz. Markers
+are built in the scan's own frame, where a beam is
+`angle_min + i*angle_increment` at `ranges[i]`, so no extrinsics are re-applied.
+
+The beams are recorded **even when the path returns `None`**: on a miss,
+`selected_beams` is recomputed via `select_beams` and nothing is marked as used.
+That is deliberate — the failure modes above are exactly what a viewer needs to
+tell apart, and a frame where the estimator discarded the robot must not look
+like a frame where nothing was there.
+
+`beams_in_bbox` drives the wedge. It mirrors `mask._fill_box` exactly: round the
+projection to a pixel as `select_beams` does, then test the half-open
+`[x1, x2) × [y1, y2)`. Testing the raw float against the raw box instead
+disagrees by one beam at each edge, which would make the wedge and the rays
+contradict each other under a box gate, where they are the same set by
+definition.
+
+**Known divergence.** `perception/core/rendering.py:polar_highlight_beams` still
+re-runs `segment_range_profile` + `merge_near_band` at *library defaults* to
+drive the 2D overlay panel, rather than reading the published indices. The node
+calls `localize_polar_profiling` with no kwargs, so the two agree today. The
+moment the §8 tuning campaign passes non-default knobs, the OpenCV panel and the
+RViz rays will disagree. Routing the panel through the same indices is a
+separate change.
+
 ---
 
 ## 5. Where polar profiling wins (and what it lacks)

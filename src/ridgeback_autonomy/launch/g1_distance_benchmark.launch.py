@@ -216,10 +216,11 @@ def build_benchmark_nodes(context, *args, **kwargs):
                 'panels': ['hud/g1_distances'],
                 'text_size': 16.0,
                 # The widest row is "Euclidean Reconstruction" (24) + distance +
-                # signed error = 40 monospace columns, ~510 px at this size.
-                # Too narrow and the overlay wraps the long labels onto a second
-                # line and clips the error column mid-number.
-                'overlay_width': 640,
+                # signed error = 40 monospace columns, measured at 503 px for
+                # this font size. Too narrow and the overlay wraps the long
+                # labels onto a second line and clips the error column
+                # mid-number; much wider and the panel is mostly empty.
+                'overlay_width': 540,
                 # Top-right, clear of the perception overlay docked below the
                 # 3D view and of the robot, which sits left of centre.
                 'horizontal_alignment': 'right',

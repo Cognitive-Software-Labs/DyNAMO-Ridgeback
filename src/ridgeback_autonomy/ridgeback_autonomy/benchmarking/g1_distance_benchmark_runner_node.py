@@ -52,6 +52,12 @@ from ridgeback_autonomy.benchmarking.reduction import (
 )
 from ridgeback_autonomy.benchmarking.association import GtPoint, assign_to_ground_truth
 from ridgeback_autonomy.benchmarking.rendering import BenchmarkCollageRenderer
+from ridgeback_autonomy.benchmarking.recording import (
+    DEFAULT_FPS,
+    DEFAULT_MAX_SECONDS,
+    ScreenRecorder,
+    find_window_id,
+)
 from ridgeback_autonomy.benchmarking.report import render_run_report
 from ridgeback_autonomy.benchmarking.scenarios import Scene, load_scenarios
 from ridgeback_autonomy.benchmarking.scoring import (
@@ -111,6 +117,12 @@ MASK_MEASUREMENT_TOPIC = 'measurements/g1/mask'
 DEPTH_SOURCE_DEFAULT = 'stereoscopic'
 MONO_DEPTH_DEBUG_TOPIC = 'debug/g1/camera/mono_depth'
 DEPTH_MAX_METERS_DEFAULT = 10.0
+
+# WM_CLASS of the window to record. RViz holds the whole picture once the
+# perception overlay is published into it, so one window is the whole run.
+RECORD_WINDOW_CLASS_DEFAULT = 'rviz'
+# RViz starts alongside this node, so allow it a moment to map its window.
+RECORD_WINDOW_WAIT_SEC = 20.0
 PREVIEW_BUFFER_LIMIT = 256
 GIT_TIMEOUT_SEC = 5.0
 # Declared by rclpy itself, not by the launch file, so it is not part of a
@@ -235,6 +247,13 @@ class G1DistanceBenchmarkRunner(Node):
         self.declare_parameter('mono_depth_debug_topic', MONO_DEPTH_DEBUG_TOPIC)
         self.declare_parameter('depth_max_meters', DEPTH_MAX_METERS_DEFAULT)
 
+        # Screen recording of the RViz window for the length of the run. The
+        # collages freeze one frame per trial; this keeps the motion around it.
+        self.declare_parameter('record_video', True)
+        self.declare_parameter('record_fps', DEFAULT_FPS)
+        self.declare_parameter('record_max_sec', DEFAULT_MAX_SECONDS)
+        self.declare_parameter('record_window_class', RECORD_WINDOW_CLASS_DEFAULT)
+
         self.world = str(self.get_parameter('world').value)
         scenario_param = str(self.get_parameter('scenario').value).strip()
         self.scenario_path = (
@@ -258,6 +277,13 @@ class G1DistanceBenchmarkRunner(Node):
         self.depth_topic = str(self.get_parameter('depth_topic').value)
         self.mono_depth_debug_topic = str(self.get_parameter('mono_depth_debug_topic').value)
         self.depth_max_meters = float(self.get_parameter('depth_max_meters').value)
+        self.record_video = bool(self.get_parameter('record_video').value)
+        self.record_window_class = str(self.get_parameter('record_window_class').value)
+        self.recorder = ScreenRecorder(
+            fps=int(self.get_parameter('record_fps').value),
+            max_seconds=int(self.get_parameter('record_max_sec').value),
+            log=self.get_logger().warning,
+        )
 
         self.namespace_name = self.get_namespace().strip('/')
         self.robot_model_name = (
@@ -294,6 +320,7 @@ class G1DistanceBenchmarkRunner(Node):
         }
         self.run_json_path = os.path.join(self.run_output_dir, 'run.json')
         self.report_path = os.path.join(self.run_output_dir, 'summary.md')
+        self.video_path = os.path.join(self.run_output_dir, 'video', 'run.mp4')
         # Per-estimator status-code tallies over every captured box across the
         # whole run (misses included, unlike the usable-aligned rows). Feeds the
         # summary's observation columns.
@@ -505,7 +532,14 @@ class G1DistanceBenchmarkRunner(Node):
         self.wait_for_required_streams()
         self.wait_for_entity_pose(self.robot_model_name, POSE_WAIT_TIMEOUT_SEC)
 
-        self.run_trials()
+        # Started once the streams are up, so RViz is certain to exist by now,
+        # and stopped in the finally below so an exception or a Ctrl-C still
+        # leaves a playable file covering everything up to the interruption.
+        self.start_recording()
+        try:
+            self.run_trials()
+        finally:
+            self.stop_recording()
 
     def run_trials(self) -> None:
         estimator_rows = {estimator: [] for estimator in self.selected_estimators}
@@ -544,6 +578,28 @@ class G1DistanceBenchmarkRunner(Node):
 
         self.log_summary(summary_rows, included_trials, skipped_trials)
         self.get_logger().info(f'Benchmark run written to {self.run_output_dir}')
+
+    def start_recording(self) -> None:
+        """Begin recording the RViz window, if recording is on and it is there.
+
+        Never raises and never blocks the run: a benchmark costs 40 minutes, and
+        a screen recorder is not a reason to lose one.
+        """
+
+        if not self.record_video:
+            return
+        window_id = find_window_id(
+            self.record_window_class,
+            timeout_s=RECORD_WINDOW_WAIT_SEC,
+            log=self.get_logger().warning,
+        )
+        if window_id is None:
+            return
+        self.recorder.start(window_id, self.video_path)
+
+    def stop_recording(self) -> None:
+        if self.recorder.active:
+            self.recorder.stop()
 
     def declared_parameters(self) -> dict[str, str]:
         """Every ROS parameter this node declared, as text.
@@ -589,6 +645,10 @@ class G1DistanceBenchmarkRunner(Node):
             'Branch': provenance['branch'] or 'unknown',
             'Scenario': self.scenario_path,
         }
+        # Named while the recorder is still running (it is stopped after the
+        # report is written), so this is the path, not a claim the file is ready.
+        if self.recorder.active:
+            metadata['Video'] = os.path.relpath(self.video_path, self.run_output_dir)
         markdown = render_run_report(
             run_label=self.run_label,
             scenario_path=self.scenario_path,
