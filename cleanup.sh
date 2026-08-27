@@ -75,7 +75,6 @@ PATTERNS=(
     g1_overlay_node
     g1_mask_measurement_node
     g1_estimate_viz_node
-    aligned_depth_node
     g1_distance_benchmark_runner
     g1_detection_node
     velocity_overlay_node

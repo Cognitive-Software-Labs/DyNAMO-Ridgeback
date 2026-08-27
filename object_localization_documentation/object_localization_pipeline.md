@@ -166,12 +166,14 @@ Both emit into the **Mask Interface**: an `H×W` binary mask plus a **precision 
 
 ## 4. Depth sources
 
-Two interchangeable sources produce an **aligned depth frame** that is 1:1 with the RGB pixels. Both sit behind one producer node (`aligned_depth_node`, switch `depth_source: stereoscopic | monocular`); consumers subscribe to its output and never branch on the source.
+Two interchangeable sources produce an **aligned depth frame** that is 1:1 with the RGB pixels. Both live in `perception/core/depth_sources.py` behind one switch (`depth_source: stereoscopic | monocular`) and are pulled by `g1_mask_measurement_node` at the detection stamp — there is no depth producer process and no depth topic between them and the paths that consume them (`aligned_depth_coverage.md` §6). The node buffers the source's *input* stream raw and converts only the frame the detections were made on; the localization paths never branch on which source ran.
 
-- **RealSense stereo depth (`stereoscopic`)** — the raw depth lives in the left-IR frame, so it must be **aligned** (reprojected with the calibrated intrinsics + extrinsics) onto the RGB pixel grid. After alignment, depth pixel `(u, v)` corresponds to color pixel `(u, v)`. The alignment is not pipeline code: on hardware the driver performs it (`aligned_depth_to_color`); in sim color and depth are co-registered by construction (Section 1). The producer passes the stream through, converting to float meters only.
+- **RealSense stereo depth (`stereoscopic`)** — the raw depth lives in the left-IR frame, so it must be **aligned** (reprojected with the calibrated intrinsics + extrinsics) onto the RGB pixel grid. After alignment, depth pixel `(u, v)` corresponds to color pixel `(u, v)`. The alignment is not pipeline code: on hardware the driver performs it (`aligned_depth_to_color`); in sim color and depth are co-registered by construction (Section 1). The source converts the matched frame to float meters, nothing more — on hardware its `depth_topic` must therefore point at `aligned_depth_to_color`.
 - **Depth Anything (`monocular`)** — predicted directly from the RGB frame, so it is *already* pixel-aligned. The implementation uses the **metric-trained variant** (`Depth-Anything-V2-Metric-Indoor`), which emits meters directly — no scaling step against stereo; the prediction is only resized to the color grid. (The base Depth Anything models output affine-invariant depth; choosing the metric variant is what removed the scaling stage from the architecture.)
 
-Both converge to the same `Aligned Depth` contract (float32 meters on the color grid; 0/NaN/inf = no depth) that feeds projective ranging and euclidean reconstruction. The producer republishes the color camera's live `camera_info` alongside each frame, so the paths deproject with the grid's true intrinsics instead of static FoV constants.
+Both converge to the same `Aligned Depth` contract (float32 meters on the color grid; 0/NaN/inf = no depth) that feeds projective ranging and euclidean reconstruction. The mask node subscribes to the color camera's live `camera_info`, so the paths deproject with the grid's true intrinsics instead of static FoV constants.
+
+A depth source is built only when a run actually selects a depth path (`enabled_estimators`, Section 5). Polar profiling reads the scan, not a depth frame, so a polar-only run constructs no source, subscribes to no depth input, and under `monocular` loads no model.
 
 > **Gotcha (alignment):** reprojection resamples the data and produces gaps at occlusion edges, because the baseline offset means some pixels are visible to one sensor but hidden from the other.
 
@@ -182,6 +184,8 @@ Both converge to the same `Aligned Depth` contract (float32 meters on the color 
 ## 5. Downstream paths
 
 All three paths consume the same mask interface and resolve to camera-frame coordinates. They differ in what 3D information they recover and in cost.
+
+They are also independently selectable. A run picks its subset with `enabled_estimators` (the benchmark launch splits its own `estimators` list per stack, so one list selects across the mask and legacy nodes alike). A path outside the subset is never executed: its fields stay NaN, its status stays `UNSET` — the honest record, since the node did not miss, it never looked — and it gets no benchmark row at all, exactly like an unselected legacy estimator. The inputs only that path needs go unsubscribed with it.
 
 ### Projective ranging — 2D depth-image route (cheapest)
 Extract depth values at the masked pixels, aggregate to a single distance, then deproject the representative pixel (centroid of the foreground pixels — `projective_ranging.md` §2.4) + aggregated depth through the intrinsics to a 3D point.
@@ -266,7 +270,7 @@ Because every path emits in the same frame and at least `(X, Z)`, the outputs ar
 2. **Calibration procedures:** RealSense intrinsics/extrinsics are factory-calibrated; the **camera–LiDAR extrinsic** must be calibrated and documented. Define the procedure and store the transform.
 3. ~~**Time synchronization** between camera and LiDAR — without matched timestamps, a moving platform/object smears the LiDAR projection against the mask.~~ — resolved 2026-07-23 in the mask node: depth and scan are matched to the detection (mask) stamp via `StampedMessageBuffer` (depth exact-stamp; scan nearest within `scan_match_tolerance_s`), not latest-wins (`polar_profiling.md` §8, `aligned_depth.md` §1). Accurate sensor clocks/timestamping on real hardware remain a driver concern the software matching relies on.
 4. **Fallback routing** for polar profiling empty returns (scan plane misses object). `None` is first-class (`polar_profiling.md` §4): in the **benchmark** the row is dropped, never substituted. Where the `None` → projective ranging / euclidean reconstruction escalation lives is a **production-pipeline consumer concern only** (unresolved, deferred), never inside the benchmark.
-5. **Metric-scaling strategy** for Depth Anything — **decided:** the metric-trained variant (`Depth-Anything-V2-Metric-Indoor`) is implemented in `aligned_depth_node`; no calibration against stereo. Revisit only if the metric variant's absolute scale proves off in the benchmark.
+5. **Metric-scaling strategy** for Depth Anything — **decided:** the metric-trained variant (`Depth-Anything-V2-Metric-Indoor`) is implemented in `depth_sources.MonocularDepthSource`; no calibration against stereo. Revisit only if the metric variant's absolute scale proves off in the benchmark.
 6. ~~**Build the benchmark scaffold** — enumerate the matrix rows, columns for accuracy + latency, drop in measured numbers.~~ — **Resolved 2026-07-21:** the benchmark scaffold exists and runs (`g1_distance_benchmark.launch.py` drives the matrix; measured numbers are already landing).
 7. ~~**Define the component interface signatures** in code (the mask-interface contract, the per-path recovery dispatch) so the separation is enforced, not just diagrammed.~~ — **Resolved 2026-07-21:** the in-code contracts exist — the mask interface is `Mask` / `MaskPrecision` in `perception/core/mask.py`, and the per-path recovery dispatches on the precision tag.
 
@@ -302,9 +306,11 @@ them over all captured events. Grouped by where in the pipeline the frame died:
 
 **Input-missing** — the source stream a path needs was not matched:
 
-- `NO_DEPTH_FRAME` — projective + euclidean: no aligned-depth frame with the
-  detection's exact stamp (in sim, see `aligned_depth_coverage.md` — the
-  dominant sim miss).
+- `NO_DEPTH_FRAME` — projective + euclidean: no usable aligned-depth frame at
+  the detection's exact stamp — nothing buffered at that stamp, an unsupported
+  encoding, a monocular model that is unavailable, or a grid the masks cannot
+  index. Was the dominant sim miss until depth acquisition moved into the mask
+  node (`aligned_depth_coverage.md` §6).
 - `NO_SCAN` / `TF_MISS_SCAN` / `SCAN_INVALID` — polar: scan missing within
   tolerance / scan→optical TF unavailable / scan undecodable.
 

@@ -3,9 +3,12 @@
 **Scope:** how the depth that the localization paths consume is produced. Both
 projective ranging (`projective_ranging.md`) and euclidean reconstruction (`euclidean_reconstruction.md`) consume one and the
 same artifact — the **aligned depth frame** — and neither cares how it was
-made. This document defines that contract and the two producers that satisfy
+made. This document defines that contract and the two sources that satisfy
 it: the physical depth camera (`camera → aligned depth`) and monocular
-estimation (`RGB frame → aligned depth`).
+estimation (`RGB frame → aligned depth`). Both live in
+`perception/core/depth_sources.py` and are pulled by
+`g1_mask_measurement_node` at the detection stamp — there is no depth
+producer process (`aligned_depth_coverage.md` §6).
 
 ```
                  ┌───────────────────────────┐
@@ -32,15 +35,19 @@ An **aligned depth frame** is a depth image that satisfies:
   from it) with the mask directly.
 - **Units:** metric depth in meters, float. (The RealSense driver natively
   publishes `16UC1` millimeters; conversion to float meters is part of the
-  producer, not the consumer.)
+  source, not the localization path.)
 - **Invalid pixels:** `0`, `NaN`, or `inf` mean "no depth here"; consumers
-  filter them (`projective_ranging.md` §2.2) and producers must not encode invalid
+  filter them (`projective_ranging.md` §2.2) and sources must not encode invalid
   as any other value.
 - **Timing:** stamped with the color frame it is aligned to, so mask and depth
-  can be matched frame-to-frame.
+  can be matched frame-to-frame. The frame is *made* at that stamp: the mask
+  node buffers the source's input stream raw and converts only the frame the
+  detections were made on, so "the depth at stamp `T`" is a lookup into a
+  buffer this process filled, not an intersection with another process's
+  thinning (`aligned_depth_coverage.md`).
 
 Everything downstream — select, clean/isolate, aggregate, deproject — is
-identical regardless of which producer made the frame. The depth source is a
+identical regardless of which source made the frame. The depth source is a
 **strategy**: a config choice behind this one contract, and an axis of the
 benchmark matrix (`object_localization_pipeline.md` §8).
 
@@ -60,7 +67,9 @@ mismatch, not a small error.
 **Alignment** fixes this: reproject each depth pixel into 3D, transform by the
 depth→color extrinsics, and re-render onto the color grid. The RealSense
 driver does this on demand (`align_depth.enable: true` → the
-`aligned_depth_to_color` image topic). Consequences to design around:
+`aligned_depth_to_color` image topic). The stereo source's `depth_topic` must
+point at *that* topic on hardware: the source converts units, it does not
+align. Consequences to design around:
 
 - **Occlusion holes.** Alignment is a reprojection from a different viewpoint;
   surfaces visible to the depth sensor but hidden from the color camera leave
@@ -84,9 +93,10 @@ topic already satisfies the contract with no align step and no occlusion
 holes. Published as `32FC1` meters on `sensors/camera_0/depth/image`.
 
 This convenience is also a trap: code that works on raw sim depth will break
-on raw real depth. The backend abstraction must route *real* through the align
-filter and *sim* straight through, while consumers see one topic-level
-contract. Divergences to keep in mind (details in
+on raw real depth. Routing *real* through the driver's align filter and *sim*
+straight through is a launch-wiring choice (`depth_topic`), not a code branch —
+`decode_depth_to_meters` accepts `16UC1`/`mono16`/`32FC1`, so both grids reach
+the same contract unchanged. Divergences to keep in mind (details in
 `object_localization_pipeline.md` §2):
 
 | | Sim | Real |
@@ -105,10 +115,12 @@ frame lives on* — after alignment that is the **color** camera's intrinsics.
 The **legacy estimators** still derive intrinsics from
 `config/camera_config.json` FoV values (87°/58° — the real depth FoV), which is
 wrong for the sim render (71.6°) and wrong-in-principle for aligned real depth
-(color FoV). The mask stack no longer has this problem: `aligned_depth_node`
-already subscribes and republishes `camera_info` of the grid's camera and the
-mask node deprojects with it (resolved 2026-07-21). The provenance test
-self-calibrates as a cross-check (`pointcloud_provenance_test.md` §3).
+(color FoV). The mask stack no longer has this problem: the mask node
+subscribes to the **color** camera's `camera_info` directly and deprojects with
+it (resolved 2026-07-21; the republish hop went away with the producer node on
+2026-08-26). `grid_mismatch_warning` skips the frame's paths if that grid and
+the detection grid ever disagree. The provenance test self-calibrates as a
+cross-check (`pointcloud_provenance_test.md` §3).
 
 ---
 
@@ -117,9 +129,10 @@ self-calibrates as a cross-check (`pointcloud_provenance_test.md` §3).
 The monocular source needs no depth sensor at all: the RGB frame goes through
 **Depth-Anything V2** (Metric Indoor Small checkpoint, via HuggingFace
 `transformers`), which predicts a dense metric depth map. This document's
-producer is `aligned_depth_node.MonocularDepthSource` (selected by the node's
-`depth_source` param); the legacy `g1_camera_measurement_node` runs the same
-network for its own estimators.
+source is `depth_sources.MonocularDepthSource` (selected by the mask node's
+`depth_source` param, and run on the color frame at the detection stamp — once
+per detection batch, not once per camera frame); the legacy
+`g1_camera_measurement_node` runs the same network for its own estimators.
 
 - **Aligned by construction.** The network's input *is* the color image, so
   its output is per-color-pixel — the grid property costs nothing. Resized to
@@ -145,14 +158,19 @@ network for its own estimators.
 
 ## 4. The strategy pattern
 
-Two producers, one contract, and every consumer is source-blind:
+Two sources, one contract, and every localization path is source-blind:
 
 ```
-stereo producer     = capture -> (real: align) -> float meters -> frame
-monocular producer  = RGB -> Depth-Anything -> metric scale    -> frame
+stereo source     = capture -> (real: align) -> float meters -> frame
+monocular source  = RGB -> Depth-Anything -> metric scale    -> frame
 
-consumers (projective ranging, euclidean reconstruction, mask overlay) never branch on the source.
+projective ranging, euclidean reconstruction and the mask overlay never branch
+on the source; they receive a frame that already satisfies §1.
 ```
+
+The mask node does branch, but on **acquisition**, never on depth semantics:
+each source declares an `input_kind` (`depth` | `color`), which decides only
+which stream the node buffers raw and hands back at the detection stamp.
 
 - Selecting the source is a **config choice**, mirroring the other swap points
   (backend sim/real, mask front-end detect/segment, isolation recipe).
@@ -174,10 +192,9 @@ consumers (projective ranging, euclidean reconstruction, mask overlay) never bra
   `aligned_depth_to_color` topic grid matches the color image.
 - ~~**Intrinsics source** — switch deprojection to `camera_info` of the color
   camera instead of the FoV constants in `camera_config.json` (§2.3).~~ —
-  resolved 2026-07-21: for the mask stack, `aligned_depth_node` republishes the
-  color camera's `camera_info` alongside each frame and the mask node deprojects
-  with it; only the legacy estimators still fall back to the
-  `camera_config.json` FoV constants.
+  resolved 2026-07-21: the mask node subscribes to the color camera's
+  `camera_info` and deprojects with it; only the legacy estimators still fall
+  back to the `camera_config.json` FoV constants.
 - ~~**Metric-scale validation**~~ — resolved 2026-07-24: measured Depth-Anything's
   scale directly as a pixel-wise `mono / stereo` depth ratio on identical sim
   frames (isolating the scale term from surface warping and noise). On the **G1
@@ -193,14 +210,18 @@ consumers (projective ranging, euclidean reconstruction, mask overlay) never bra
   rows as range-warped, not scale-shiftable. (Consistent with the end-to-end
   monocular MAE ~0.19–0.22 m vs. stereo ~0.07 m — the excess is warping, not a
   fixable offset.)
-- ~~**Topic-level contract**~~ — resolved 2026-07-12: both producers publish
-  `perception/aligned_depth/image` + `perception/aligned_depth/camera_info`
-  (`aligned_depth_node`, switched by its `depth_source` param); consumers
-  (`g1_mask_measurement_node`) subscribe those topics and never branch on the
-  source.
-- **Stamp-matching coverage in sim** — open (2026-07-24): the exact-stamp match
-  between detections and aligned depth (the §1 "Timing" invariant) misses on
-  ~80% of frames in sim, so the depth paths report `NO_DEPTH_FRAME`. Root cause
-  is CPU-starvation of the `aligned_depth_node` process (producer ~1 Hz vs
-  ~2.7 Hz published), not a code hotspot. Diagnosis, profiling, and fix options
-  in `aligned_depth_coverage.md`; no fix chosen yet.
+- ~~**Topic-level contract**~~ — superseded 2026-08-26. It was resolved
+  2026-07-12 as a pair of topics (`perception/aligned_depth/image` +
+  `.../camera_info`) published by `aligned_depth_node`; that transport is gone.
+  The contract is now a **call** at the detection stamp
+  (`depth_sources.produce`), and the frame is republished only as the debug
+  artifact `debug/g1/mask/aligned_depth` for the overlay panel. The artifact
+  itself (§1) is unchanged.
+- ~~**Stamp-matching coverage in sim**~~ — resolved 2026-08-26. The exact-stamp
+  match between detections and aligned depth (the §1 "Timing" invariant) missed
+  on ~80–90% of frames in sim because a separate producer process thinned the
+  depth stream independently of the detector, under CPU starvation. Depth
+  acquisition moved into `g1_mask_measurement_node`, which now buffers the
+  source's input raw and converts at the detection stamp; the second thinning
+  stage no longer exists. Diagnosis, profiling and the decision are in
+  `aligned_depth_coverage.md`.

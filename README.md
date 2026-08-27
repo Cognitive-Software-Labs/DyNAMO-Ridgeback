@@ -265,9 +265,13 @@ ros2 launch ridgeback_autonomy g1_distance_benchmark.launch.py estimators:=proje
 # Silhouette mask front-end (segmentation model) instead of the rasterized
 # box — compare gates by running the benchmark twice, once per mask_gate
 ros2 launch ridgeback_autonomy g1_distance_benchmark.launch.py estimators:=projective_ranging,euclidean_reconstruction,polar_profiling mask_gate:=silhouette
+
+# One mask row on its own — polar profiling needs no depth at all, so this run
+# builds no depth source and subscribes to no depth stream
+ros2 launch ridgeback_autonomy g1_distance_benchmark.launch.py estimators:=polar_profiling
 ```
 
-This launch composes the simulator, `g1_detector_node`, the camera measurement node and/or the LiDAR measurement node depending on `estimators`, and `g1_distance_benchmark_runner`. Selecting `projective_ranging`/`euclidean_reconstruction` additionally launches `aligned_depth_node` (the aligned-depth producer, switched by `depth_source`) and `g1_mask_measurement_node`; `polar_profiling` needs only the mask node. The mask node builds one mask per detection (`mask_gate:=box` rasterizes the detection box; `mask_gate:=silhouette` prompts a segmentation model with the boxes, needs `perception_venv`) and runs the localization paths from `object_localization_documentation/`.
+This launch composes the simulator, `g1_detector_node`, the camera measurement node and/or the LiDAR measurement node depending on `estimators`, and `g1_distance_benchmark_runner`. Every row is individually selectable, mask rows included: `estimators` is split per stack and each measurement node is passed only the rows it owns, so a path that was not selected is never run — its fields stay NaN, it gets no CSV, and the inputs only it needs are never subscribed to. Selecting any mask row launches `g1_mask_measurement_node`, which for `projective_ranging`/`euclidean_reconstruction` obtains the aligned depth frame itself, at the detection stamp, through the source `depth_source` selects; `polar_profiling` needs no depth at all, so a polar-only run builds no depth source (and under `depth_source:=monocular`, loads no model). The mask node builds one mask per detection (`mask_gate:=box` rasterizes the detection box; `mask_gate:=silhouette` prompts a segmentation model with the boxes, needs `perception_venv`) and runs the localization paths from `object_localization_documentation/`.
 
 The mask rows are identified by their config axes — the mask gate (`mask_gate`), the aligned-depth source (`depth_source`), the path, and on the box gate the foreground-isolation recipe (`isolation_2d` for projective ranging, `isolation_3d` for euclidean reconstruction) — so their CSV files fold the axes into a self-describing name. The stereoscopic box-gate run above writes `box_gated_stereoscopic_projective_ranging_nearest_mode_histogram.csv` and `box_gated_stereoscopic_euclidean_reconstruction_height_crop_range_band.csv`; silhouette rows drop the isolation token (the tight branches never run a recipe), e.g. `silhouette_gated_stereoscopic_projective_ranging.csv`; polar profiling folds the gate only (`box_gated_polar_profiling.csv`). Non-mask estimators keep their plain names.
 
@@ -289,7 +293,7 @@ Arguments:
 | `use_sim_time` | `true` | Use Gazebo `/clock` |
 | `setup_path` | `~/clearpath/` | Directory containing `robot.yaml` and generated Clearpath files |
 | `world` | `g1_distance_calibration` | Gazebo world used for the benchmark run |
-| `estimators` | `rgb,sensor_depth,depth_anything,pointcloud,lidar` | Comma-separated estimator subset to compare in one run; `projective_ranging`, `euclidean_reconstruction`, and `polar_profiling` (mask-based localization) are opt-in |
+| `estimators` | `rgb,sensor_depth,depth_anything,pointcloud,lidar` | Comma-separated estimator subset to compare in one run; `projective_ranging`, `euclidean_reconstruction`, and `polar_profiling` (mask-based localization) are opt-in. Any subset works, mask rows individually — `estimators:=polar_profiling` runs that row alone |
 | `depth_source` | `stereoscopic` | Aligned-depth producer for the `projective_ranging`/`euclidean_reconstruction` rows: `stereoscopic` or `monocular`; comparing sources = two runs |
 | `mask_gate` | `box` | Mask front-end for the mask-based rows: `box` (rasterized detection box, no model) or `silhouette` (segmentation model prompted with the boxes; needs `perception_venv`); comparing gates = two runs |
 | `isolation_2d` | `nearest_mode_histogram` | Projective-ranging box-gate foreground recipe: `nearest_mode_histogram` or `otsu` |
@@ -319,10 +323,9 @@ Benchmark semantics:
 | `g1_detector_node` | `detections/g1/raw` | `color_topic`, `detection_model`, `detection_threshold`, `detector_fps` |
 | `g1_camera_measurement_node` | `measurements/g1/camera` | `camera_config_path`, `color_topic`, `depth_topic`, `pointcloud_topic`, `base_frame`, `enabled_estimators`, `depth_anything_enabled` |
 | `g1_lidar_measurement_node` | `measurements/g1/lidar` | `camera_config_path`, `scan_topic`, `base_frame` |
-| `aligned_depth_node` | `perception/aligned_depth/image` + `.../camera_info` | `depth_source`, `depth_topic`, `color_topic`, `camera_info_topic` |
-| `g1_mask_measurement_node` | `measurements/g1/mask` (+ `debug/g1/mask` on the silhouette gate, + `visualization/g1/polar_rays`) | `aligned_depth_topic`, `aligned_camera_info_topic`, `scan_topic`, `pitch_deg`, `front_offset_m`, `isolation_2d`, `isolation_3d`, `mask_gate`, `segmentation_model`, `color_topic`, `ray_marker_topic` |
+| `g1_mask_measurement_node` | `measurements/g1/mask` (+ `debug/g1/mask` on the silhouette gate, + `debug/g1/mask/aligned_depth` when a depth path is enabled, + `visualization/g1/polar_rays` when polar profiling is) | `enabled_estimators`, `depth_source`, `depth_topic`, `camera_info_topic`, `scan_topic`, `pitch_deg`, `front_offset_m`, `isolation_2d`, `isolation_3d`, `mask_gate`, `segmentation_model`, `color_topic`, `ray_marker_topic` |
 | `g1_overlay_node` | `debug/g1/overlay` (+ an OpenCV window when `show_window`) | `measurement_topic`, `color_topic`, `depth_topic`, `mono_depth_debug_topic`, `show_window`, `max_cols`, `rgb_panel_labels` |
-| `g1_estimate_viz_node` | `visualization/g1/estimates` + `hud/g1_distances` | `base_frame`, `world_frame`, `marker_lifetime_sec`, `ground_truth_topic` |
+| `g1_estimate_viz_node` | `visualization/g1/estimates` + `hud/g1_distances` | `base_frame`, `world_frame`, `marker_lifetime_sec`, `ground_truth_topic`, `estimators` (gates both the HUD rows and the rings; defaults to `all`) |
 | `g1_distance_benchmark_runner` | per-estimator CSVs + summary CSV + trial collage images + `video/run.mp4` | `estimators`, `output_dir`, `camera_measurement_topic`, `lidar_measurement_topic`, `color_topic`, `depth_topic`, `record_video`, `record_fps` |
 
 The shared camera geometry lives in `config/camera_config.json`, and the measurement nodes use the `camera_config_path` parameter.

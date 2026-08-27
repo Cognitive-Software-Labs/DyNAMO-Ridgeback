@@ -50,7 +50,11 @@ MASK_MEASUREMENTS_TOPIC = 'measurements/g1/mask'
 MONO_DEPTH_DEBUG_TOPIC = 'debug/g1/camera/mono_depth'
 MASK_DEBUG_TOPIC = 'debug/g1/mask'
 OVERLAY_IMAGE_TOPIC = 'debug/g1/overlay'
-ALIGNED_DEPTH_TOPIC = 'perception/aligned_depth/image'
+# The mask node's debug republish of the depth frame its paths read. It only
+# converts depth on frames that carry a detection, so this panel updates on
+# detection frames and holds its last one in between, rather than tracking the
+# camera stream.
+ALIGNED_DEPTH_TOPIC = 'debug/g1/mask/aligned_depth'
 COLOR_CAMERA_INFO_TOPIC = 'sensors/camera_0/color/camera_info'
 SCAN_TOPIC = 'sensors/lidar2d_0/scan'
 DEPTH_MAX_METERS_DEFAULT = 10.0

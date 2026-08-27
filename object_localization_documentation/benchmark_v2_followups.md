@@ -67,14 +67,15 @@ to earlier runs.
 
 ### Other open items
 
-- **Sim depth-coverage gap (known, diagnosed):** in sim expect
-  `projective_ranging` / `euclidean_reconstruction` at only ~20 % coverage
-  with `NO_DEPTH_FRAME` dominating the summary `reason_histogram`, while `polar_profiling`
-  sits near 100 %. This is the CPU-starved `aligned_depth_node` sim artifact
-  — NOT a v2 regression and largely absent on real hardware. Diagnosis +
-  fix options: [aligned_depth_coverage.md](aligned_depth_coverage.md);
-  troubleshooting entry in `ISSUES.md`. Fewer usable events per trial also
-  means depth-path trial medians rest on a thinner sample in sim.
+- ~~**Sim depth-coverage gap (known, diagnosed):**~~ fixed 2026-08-26. In sim
+  `projective_ranging` / `euclidean_reconstruction` used to sit at ~9–20 %
+  coverage with `NO_DEPTH_FRAME` dominating the summary `reason_histogram`,
+  while `polar_profiling` sat near 100 %. It was never a v2 regression: a
+  CPU-starved depth producer process thinned the depth stream independently of
+  the detector, so the exact-stamp match rarely landed. Depth acquisition now
+  happens inside the mask node at the detection stamp and the producer is gone
+  ([aligned_depth_coverage.md](aligned_depth_coverage.md) §6). Runs predating
+  that change still show the thin depth-path sample.
 - Launch default `estimators` still excludes the mask stack — pass the full
   list explicitly (below) or bump the default.
 - `mask_gate` defaults to `box`; silhouette (SlimSAM) is the primary path —

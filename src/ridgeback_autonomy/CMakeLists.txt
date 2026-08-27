@@ -74,12 +74,6 @@ install(PROGRAMS
 )
 
 install(PROGRAMS
-  ridgeback_autonomy/perception/aligned_depth_node.py
-  DESTINATION lib/${PROJECT_NAME}
-  RENAME aligned_depth_node
-)
-
-install(PROGRAMS
   ridgeback_autonomy/perception/g1_mask_measurement_node.py
   DESTINATION lib/${PROJECT_NAME}
   RENAME g1_mask_measurement_node
@@ -139,7 +133,7 @@ install(DIRECTORY
 if(BUILD_TESTING)
   find_package(ament_cmake_pytest REQUIRED)
 
-  ament_add_pytest_test(test_aligned_depth_node test/test_aligned_depth_node.py)
+  ament_add_pytest_test(test_depth_sources test/test_depth_sources.py)
   ament_add_pytest_test(test_detection test/test_detection.py)
   ament_add_pytest_test(test_detector_node test/test_detector_node.py)
   ament_add_pytest_test(test_geometry test/test_geometry.py)

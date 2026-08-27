@@ -13,6 +13,7 @@ from launch_ros.actions import Node
 from ridgeback_autonomy.benchmarking.estimators import (
     parse_estimators,
     selected_camera_estimators,
+    selected_mask_estimators,
     uses_camera_estimators,
     uses_lidar_estimators,
     uses_mask_estimators,
@@ -26,8 +27,9 @@ MASK_MEASUREMENT_TOPIC = 'measurements/g1/mask'
 # Overlay columns for the RViz strip. Above any possible panel count, and
 # pack_panels clamps to that count, so the effect is simply "one row".
 OVERLAY_SINGLE_ROW = 99
-ALIGNED_DEPTH_TOPIC = 'perception/aligned_depth/image'
-ALIGNED_CAMERA_INFO_TOPIC = 'perception/aligned_depth/camera_info'
+# The mask node converts depth itself, at the detection stamp, and republishes
+# the result for the overlay panel. Debug-only: nothing measures off this topic.
+MASK_ALIGNED_DEPTH_DEBUG_TOPIC = 'debug/g1/mask/aligned_depth'
 
 
 def build_benchmark_nodes(context, *args, **kwargs):
@@ -48,6 +50,7 @@ def build_benchmark_nodes(context, *args, **kwargs):
         LaunchConfiguration('estimators').perform(context).strip()
     )
     selected_camera = selected_camera_estimators(selected_estimators)
+    selected_mask = selected_mask_estimators(selected_estimators)
     needs_camera = uses_camera_estimators(selected_estimators)
     needs_lidar = uses_lidar_estimators(selected_estimators)
     needs_mask = uses_mask_estimators(selected_estimators)
@@ -116,25 +119,6 @@ def build_benchmark_nodes(context, *args, **kwargs):
         nodes.append(
             Node(
                 package='ridgeback_autonomy',
-                executable='aligned_depth_node',
-                name='aligned_depth',
-                namespace=namespace,
-                parameters=[{
-                    'use_sim_time': use_sim_time,
-                    'depth_source': LaunchConfiguration('depth_source'),
-                    'depth_topic': depth_topic,
-                    'color_topic': color_topic,
-                    'camera_info_topic': LaunchConfiguration('camera_info_topic'),
-                    'aligned_depth_topic': ALIGNED_DEPTH_TOPIC,
-                    'aligned_camera_info_topic': ALIGNED_CAMERA_INFO_TOPIC,
-                }],
-                remappings=[('/tf', 'tf'), ('/tf_static', 'tf_static')],
-                output='screen',
-            )
-        )
-        nodes.append(
-            Node(
-                package='ridgeback_autonomy',
                 executable='g1_mask_measurement_node',
                 name='g1_mask_measurement',
                 namespace=namespace,
@@ -142,14 +126,21 @@ def build_benchmark_nodes(context, *args, **kwargs):
                     'use_sim_time': use_sim_time,
                     'detections_topic': 'detections/g1/raw',
                     'measurement_topic': MASK_MEASUREMENT_TOPIC,
-                    'aligned_depth_topic': ALIGNED_DEPTH_TOPIC,
-                    'aligned_camera_info_topic': ALIGNED_CAMERA_INFO_TOPIC,
+                    'enabled_estimators': ','.join(selected_mask),
+                    'depth_source': LaunchConfiguration('depth_source'),
+                    # On a real D435 this must be the driver's
+                    # aligned_depth_to_color stream: the stereo source converts
+                    # units, it does not align.
+                    'depth_topic': depth_topic,
+                    'camera_info_topic': LaunchConfiguration('camera_info_topic'),
+                    'aligned_depth_debug_topic': MASK_ALIGNED_DEPTH_DEBUG_TOPIC,
                     'scan_topic': scan_topic,
                     'base_frame': base_frame,
                     'isolation_2d': LaunchConfiguration('isolation_2d'),
                     'isolation_3d': LaunchConfiguration('isolation_3d'),
                     'mask_gate': LaunchConfiguration('mask_gate'),
                     'color_topic': color_topic,
+                    'depth_match_debug': LaunchConfiguration('depth_match_debug'),
                 }],
                 remappings=[('/tf', 'tf'), ('/tf_static', 'tf_static')],
                 output='screen',
@@ -162,7 +153,14 @@ def build_benchmark_nodes(context, *args, **kwargs):
             executable='g1_estimate_viz_node',
             name='g1_estimate_viz',
             namespace=namespace,
-            parameters=[{'use_sim_time': use_sim_time}],
+            parameters=[{
+                'use_sim_time': use_sim_time,
+                # The HUD lists the run's own estimators, not the registry:
+                # rows for paths this run never launched can only ever read
+                # "-- miss", which is the same thing the panel prints for an
+                # estimator that ran and found nothing.
+                'estimators': ','.join(selected_estimators),
+            }],
             remappings=[('/tf', 'tf'), ('/tf_static', 'tf_static')],
             output='screen',
             condition=launch.conditions.IfCondition(LaunchConfiguration('estimate_viz')),
@@ -185,6 +183,7 @@ def build_benchmark_nodes(context, *args, **kwargs):
                 'mask_measurement_topic': MASK_MEASUREMENT_TOPIC,
                 'color_topic': color_topic,
                 'depth_topic': depth_topic,
+                'aligned_depth_topic': MASK_ALIGNED_DEPTH_DEBUG_TOPIC,
                 'estimators': ','.join(selected_estimators),
                 'depth_source': LaunchConfiguration('depth_source'),
                 'mask_gate': LaunchConfiguration('mask_gate'),
@@ -216,11 +215,13 @@ def build_benchmark_nodes(context, *args, **kwargs):
                 'panels': ['hud/g1_distances'],
                 'text_size': 16.0,
                 # The widest row is "Euclidean Reconstruction" (24) + distance +
-                # signed error = 40 monospace columns, measured at 503 px for
-                # this font size. Too narrow and the overlay wraps the long
-                # labels onto a second line and clips the error column
-                # mid-number; much wider and the panel is mostly empty.
-                'overlay_width': 540,
+                # signed error + the age column an aged row carries = 47
+                # monospace columns, at the 12.6 px/column measured for this
+                # font size. Too narrow and the overlay wraps the long labels
+                # onto a second line and clips the age off the end -- which
+                # would silently undo the fresh/aged distinction on exactly the
+                # rows that need it; much wider and the panel is mostly empty.
+                'overlay_width': 600,
                 # Top-right, clear of the perception overlay docked below the
                 # 3D view and of the robot, which sits left of centre.
                 'horizontal_alignment': 'right',
@@ -330,9 +331,11 @@ def generate_launch_description():
         DeclareLaunchArgument(
             'depth_source',
             default_value='stereoscopic',
-            description='Aligned-depth producer for the projective_ranging / '
-                        'euclidean_reconstruction rows: "stereoscopic" or '
-                        '"monocular". Comparing sources = two runs.',
+            description='How the mask node obtains the aligned depth frame for '
+                        'the projective_ranging / euclidean_reconstruction '
+                        'rows: "stereoscopic" (convert the depth stream) or '
+                        '"monocular" (Depth-Anything on the color stream; '
+                        'needs perception_venv). Comparing sources = two runs.',
         ),
         DeclareLaunchArgument(
             'isolation_2d',
@@ -354,6 +357,10 @@ def generate_launch_description():
                         '(segmentation model prompted with the boxes; needs '
                         'perception_venv). Comparing gates = two runs.',
         ),
+        DeclareLaunchArgument(
+            'depth_match_debug', default_value='false',
+            description='Log depth-input lookup hit/miss accounting from the mask '
+                        'node, to separate reception loss from stamp mismatch.'),
         DeclareLaunchArgument('scan_topic', default_value='sensors/lidar2d_0/scan'),
         DeclareLaunchArgument('pointcloud_topic', default_value='sensors/camera_0/points'),
         DeclareLaunchArgument('base_frame', default_value=[namespace, '/robot/base_link']),

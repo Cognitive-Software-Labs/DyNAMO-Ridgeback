@@ -34,15 +34,38 @@ from ridgeback_autonomy.benchmarking.estimators import (
     PUBLIC_ESTIMATOR_ORDER,
     display_bearing,
     nearest_instance_index,
+    parse_estimators,
     truth_reading,
 )
 from ridgeback_autonomy.msg import G1Measurements
 from ridgeback_autonomy.perception.core.geometry import remove_vehicle_front_offset
 
 
-# Seconds before a marker auto-expires if no new detection arrives.
-# Set to 1.5x the detector's max publish interval (detector runs at ≤5 Hz → 0.2s per frame).
+# How long silence is tolerated, in the two places that have to agree on it: a
+# marker carries this as its RViz ``lifetime``, so a ring vanishes this long
+# after the message that drew it, and the same budget decides whether a cached
+# message still counts as a running producer. Set by how long a ring may linger
+# before it reads as a live claim about a robot that is no longer being
+# measured -- not by the detector's rate, which the comment here used to derive
+# it from with a formula that yielded 0.3 s and never matched the value.
 MARKER_LIFETIME_SEC = 1.5
+
+# How old an observation may be and still describe the scene on screen. A
+# separate question from the budget above, and the reason the mask rows used to
+# blink: a mask measurement is stamped with the DETECTION instant and only
+# reaches this node after inference, segmentation and a depth lookup, so it
+# arrives already a second or more old. That is the pipeline's latency, not
+# staleness, and judging it against the silence budget threw away readings from
+# an estimator that was working. Same order as ``TRUTH_MAX_AGE_S`` because it
+# answers the same question -- could this still be the trial on screen.
+MAX_OBSERVATION_AGE_S = 3.0
+
+# How often the HUD section is rebuilt. It needs a clock of its own rather than
+# riding the measurement callbacks, which cannot fire when the thing to be shown
+# is that nothing is arriving: expiring rows, expiring the truth line and
+# ticking the age column all have to happen with no traffic at all. Matches
+# ``hud_node``'s own sampler rate, above which the extra renders are discarded.
+HUD_PUBLISH_RATE_HZ = 5.0
 
 # Ring radius and center dot size in metres.
 RING_RADIUS_M = 0.15
@@ -87,7 +110,10 @@ ESTIMATOR_COLOURS = {
 # overwrite. Only the nearest instance is drawn, so an estimator needs a fixed
 # pair of ids (ring, dot) rather than a pair per detection: an id that moved
 # with the detection index would strand the previous instance's ring on screen
-# for a full lifetime whenever the nearest one changes.
+# for a full lifetime whenever the nearest one changes. It enumerates the whole
+# registry for the same reason and not the run's selected set — ids that shifted
+# with the selection would let a leftover marker collide with a different
+# estimator's ring.
 _ESTIMATOR_ID_BASE = {name: i * 100 for i, name in enumerate(PUBLIC_ESTIMATOR_ORDER)}
 
 
@@ -98,26 +124,67 @@ _ESTIMATOR_ID_BASE = {name: i * 100 for i, name in enumerate(PUBLIC_ESTIMATOR_OR
 HUD_MIN_LUMINANCE = 0.40
 HUD_HEADER_COLOUR = (1.0, 1.0, 1.0)
 
+# The one luminance every aged row is driven to, up or down. A dim multiplier
+# would not do: red and depth_anything's rose sit exactly AT the floor above
+# after their lift, so scaling them down and clamping to the floor would hand
+# them straight back their fresh appearance. Driving every aged row to a single
+# figure also keeps the fresh/aged step the same size between two adjacent rows
+# of different hue, which is what makes it readable as a state rather than as
+# one row happening to be darker.
+#
+# It sits below the documented legibility floor deliberately -- an aged row must
+# read as secondary -- so this value is settled on screen, not from the number.
+HUD_AGED_LUMINANCE = 0.28
+
 # Rec. 709 luma weights -- the eye's actual sensitivity, so a colour is judged
 # by how bright it looks rather than by its largest channel.
 _LUMA_WEIGHTS = (0.2126, 0.7152, 0.0722)
 
 
-def hud_text_colour(estimator: str) -> tuple[float, float, float]:
-    """A ring's colour, lightened only as far as legibility needs.
+def _luminance(colour: tuple[float, float, float]) -> float:
+    return sum(weight * channel for weight, channel in zip(_LUMA_WEIGHTS, colour))
 
-    Blending toward white raises luminance while holding the hue, so a dark ring
-    colour stays recognisable as the same estimator instead of being swapped for
-    a brighter unrelated one. Luminance is linear in the channels, so the exact
-    blend that reaches the floor is closed-form -- no iterating.
+
+def colour_at_luminance(
+    colour: tuple[float, float, float], target: float
+) -> tuple[float, float, float]:
+    """``colour`` moved to ``target`` luminance, as close to its hue as it can be.
+
+    Two rungs, because the two directions have different best answers. Going up,
+    there is nowhere to go but toward white, and luminance is linear in the
+    channels so the exact blend that lands on the target is closed-form -- hue
+    survives, saturation necessarily does not. Going down, scaling all three
+    channels by one factor holds their ratios exactly, so hue *and* saturation
+    come through untouched.
+
+    Hue fidelity is what ties a row to its estimator, and it matters more the
+    dimmer the row: an aged row has no ring on the floor plan to be matched
+    against, so its colour is the only thing left identifying it.
     """
 
-    red, green, blue = ESTIMATOR_COLOURS[estimator][:3]
-    luminance = sum(w * c for w, c in zip(_LUMA_WEIGHTS, (red, green, blue)))
-    if luminance >= HUD_MIN_LUMINANCE:
-        return red, green, blue
-    blend = (HUD_MIN_LUMINANCE - luminance) / (1.0 - luminance)
-    return tuple(channel + (1.0 - channel) * blend for channel in (red, green, blue))
+    luminance = _luminance(colour)
+    if luminance == target:
+        return colour
+    if luminance > target:
+        scale = target / luminance
+        return tuple(channel * scale for channel in colour)
+    blend = (target - luminance) / (1.0 - luminance)
+    return tuple(channel + (1.0 - channel) * blend for channel in colour)
+
+
+def hud_text_colour(estimator: str, aged: bool = False) -> tuple[float, float, float]:
+    """A ring's colour as HUD text, at the luminance that row's state calls for.
+
+    A fresh row is lightened only as far as legibility needs and otherwise left
+    exactly alone, so the text and the ring it belongs to do not drift apart for
+    no reason. An aged row is driven to ``HUD_AGED_LUMINANCE`` whichever side it
+    started on -- see that constant for why it is a target rather than a dimming.
+    """
+
+    colour = ESTIMATOR_COLOURS[estimator][:3]
+    if aged:
+        return colour_at_luminance(colour, HUD_AGED_LUMINANCE)
+    return colour_at_luminance(colour, max(_luminance(colour), HUD_MIN_LUMINANCE))
 
 
 def hud_truth_header(truth) -> str:
@@ -188,16 +255,18 @@ def estimator_reading(msg, estimator: str, index: int) -> tuple[float | None, fl
     return forward, lateral, distance
 
 
-def merged_distance_reader(fresh: list):
+def merged_distance_reader(batch: list):
     """``(estimator, index) -> distance`` across every producer in one frame.
 
     Each topic fills only the estimators its node computes, so a reading has to
     be looked up in all of them. The indices line up because all three producers
-    number their detections from the same detector batch.
+    number their detections from the same detector batch -- which is a premise,
+    not a guarantee, and the reason ``partition_measurements`` hands this only
+    the messages that share a stamp.
     """
 
     def read_distance(estimator: str, index: int) -> float | None:
-        for msg in fresh:
+        for msg in batch:
             if not msg.detected or index >= msg.count:
                 continue
             _, _, distance = estimator_reading(msg, estimator, index)
@@ -208,7 +277,7 @@ def merged_distance_reader(fresh: list):
     return read_distance
 
 
-def merged_position_reader(fresh: list):
+def merged_position_reader(batch: list):
     """``(estimator, index) -> (forward, lateral) | None`` across every producer.
 
     The positional counterpart to ``merged_distance_reader``, feeding
@@ -218,7 +287,7 @@ def merged_position_reader(fresh: list):
     """
 
     def read_position(estimator: str, index: int):
-        for msg in fresh:
+        for msg in batch:
             if not msg.detected or index >= msg.count:
                 continue
             forward, lateral, _ = estimator_reading(msg, estimator, index)
@@ -250,7 +319,7 @@ def world_marker_point(
     return world_x, world_y
 
 
-def nearest_detection_index(fresh: list) -> int:
+def nearest_detection_index(batch: list) -> int:
     """The detection every surface in this node speaks for.
 
     Falls back to 0 when no estimator placed anything: the frame then renders as
@@ -258,9 +327,172 @@ def nearest_detection_index(fresh: list) -> int:
     nearest-instance rule at all.
     """
 
-    count = max((msg.count for msg in fresh if msg.detected), default=0)
-    nearest = nearest_instance_index(count, merged_distance_reader(fresh))
+    count = max((msg.count for msg in batch if msg.detected), default=0)
+    nearest = nearest_instance_index(count, merged_distance_reader(batch))
     return 0 if nearest is None else nearest
+
+
+def stamp_nanoseconds(stamp) -> int:
+    return int(stamp.sec) * 1_000_000_000 + int(stamp.nanosec)
+
+
+def partition_measurements(
+    cached,
+    now_nanoseconds: int,
+    liveness_budget_s: float,
+    max_observation_age_s: float,
+) -> tuple[list, list]:
+    """Cached messages split into ``(same_batch, aged)``, the rest discarded.
+
+    Two gates, because liveness and validity are different questions and the
+    single stamp gate this replaces was answering neither for the mask rows:
+
+    * **liveness**, on the RECEIPT time -- has this producer gone quiet? A mask
+      reading genuinely *is* a second or more old by the time it arrives, and
+      charging its own pipeline latency against a silence budget is what made
+      the mask rows blink at the detector's rate. Receipt time is the right
+      clock here precisely because these rows are not trial-keyed; the truth
+      line is, which is why ``truth_reading`` keeps its stamp-only rule -- no
+      receipt gate can tell trial N-1's truth from trial N's.
+    * **validity**, on the STAMP -- can this observation still describe the
+      scene? This is what retains the cross-trial protection.
+
+    Survivors then split on whether they carry the newest stamp present.
+    ``merged_distance_reader`` and everything downstream of it assume the
+    indices in one message name the same detections as the indices in another,
+    which holds only within a detector batch: an older mask message's index 0
+    may be a different robot. So the batch drives the rings and the ranking, and
+    the aged remainder -- returned as ``(message, age_seconds)`` -- is only ever
+    allowed to print numbers.
+    """
+
+    live = []
+    for entry in cached:
+        if entry is None:
+            continue
+        msg, receipt_nanoseconds = entry
+        if now_nanoseconds - receipt_nanoseconds > liveness_budget_s * 1_000_000_000:
+            continue
+        stamp = stamp_nanoseconds(msg.header.stamp)
+        if now_nanoseconds - stamp > max_observation_age_s * 1_000_000_000:
+            continue
+        live.append((msg, stamp))
+
+    if not live:
+        return [], []
+
+    newest = max(stamp for _, stamp in live)
+    same_batch = [msg for msg, stamp in live if stamp == newest]
+    aged = [
+        (msg, (now_nanoseconds - stamp) / 1_000_000_000)
+        for msg, stamp in live if stamp != newest
+    ]
+    return same_batch, aged
+
+
+def _reading_body(label: str, distance_m: float, truth) -> str:
+    error = '' if truth is None else f'  {distance_m - truth.distance_m:+.3f}'
+    return f'{label:<24} {distance_m:7.3f}{error}'
+
+
+def hud_rows(
+    same_batch: list,
+    aged: list,
+    nearest: int,
+    truth,
+    estimators: tuple[str, ...] = PUBLIC_ESTIMATOR_ORDER,
+) -> list[str]:
+    """One coloured row per estimator this run selected, in three states.
+
+    A fresh reading renders as it always has. An aged one renders its value and
+    its error alongside an age column, dimmed to ``HUD_AGED_LUMINANCE`` -- the
+    number is real and the panel says how old it is, rather than the row being
+    dropped and repainted as ``-- miss`` by whichever producer answered in the
+    meantime. Only a row nothing reported is a miss, which is what that word was
+    supposed to mean -- and which is why ``estimators`` is the run's set rather
+    than the registry: a row for a path the run never launched can only ever
+    print that same word, about an estimator that was never asked.
+
+    Defaults to every registered estimator, so a caller with no run
+    configuration to hand (the exploration entrypoint, and the tests) keeps the
+    full panel. ``parse_estimators`` returns its subset already in
+    ``PUBLIC_ESTIMATOR_ORDER`` sequence, so the row order is the canonical one
+    however the launch argument happened to name them.
+
+    An aged message is ranked against itself rather than against ``nearest``:
+    it comes from a different detector batch, so the batch's index would be a
+    guess about which robot it names, and the message's own three estimators
+    rank exactly the instance its producer was speaking for.
+    """
+
+    fresh_readings: dict[str, float] = {}
+    for msg in same_batch:
+        if not msg.detected or nearest >= msg.count:
+            continue
+        for estimator in estimators:
+            # The HUD is a scalar readout, so it quotes the same nearest
+            # instance the rings are drawn on rather than a second one.
+            _, _, distance = estimator_reading(msg, estimator, nearest)
+            if distance is not None:
+                fresh_readings[estimator] = distance
+
+    aged_readings: dict[str, tuple[float, float]] = {}
+    for msg, age_s in aged:
+        index = nearest_detection_index([msg])
+        if not msg.detected or index >= msg.count:
+            continue
+        for estimator in estimators:
+            if estimator in fresh_readings:
+                continue
+            _, _, distance = estimator_reading(msg, estimator, index)
+            if distance is not None:
+                aged_readings[estimator] = (distance, age_s)
+
+    rows = []
+    for estimator in estimators:
+        label = ESTIMATOR_LABELS[estimator]
+        if estimator in fresh_readings:
+            body = _reading_body(label, fresh_readings[estimator], truth)
+            colour = hud_text_colour(estimator)
+        elif estimator in aged_readings:
+            distance, age_s = aged_readings[estimator]
+            body = f'{_reading_body(label, distance, truth)}   {age_s:.1f}s'
+            colour = hud_text_colour(estimator, aged=True)
+        else:
+            body = f'{label:<24}      --    miss'
+            colour = hud_text_colour(estimator)
+        rows.append(_hud_line(body, colour))
+    return rows
+
+
+def hud_section_text(
+    same_batch: list,
+    aged: list,
+    nearest: int,
+    truth,
+    estimators: tuple[str, ...] = PUBLIC_ESTIMATOR_ORDER,
+) -> str:
+    """The whole HUD section, or ``''`` when there is nothing to say.
+
+    Rendered by RViz as text, so it stays legible at any window size -- unlike
+    numbers burned into the perception overlay bitmap, which shrink with it.
+
+    Each line is coloured from ``ESTIMATOR_COLOURS``, the same table that colours
+    that estimator's ring, so a reading and its ring cannot drift apart. That
+    markup makes the overlay rich text, hence ``&nbsp;`` padding and ``<br/>``
+    breaks -- see ``hud_node``'s ``rich_text``.
+
+    The empty string is load-bearing: ``hud_node`` drops falsy panels, so it
+    collapses the section instead of holding the last text it was ever sent. A
+    panel of numbers left standing under a floor plan whose rings have all
+    correctly expired reads as a broken ring layer rather than a dead detector.
+    """
+
+    if not same_batch and not aged:
+        return ''
+    lines = [_hud_line(hud_truth_header(truth), HUD_HEADER_COLOUR)]
+    lines.extend(hud_rows(same_batch, aged, nearest, truth, estimators))
+    return '<br/>'.join(lines)
 
 
 class G1EstimateVizNode(Node):
@@ -275,18 +507,31 @@ class G1EstimateVizNode(Node):
         self.declare_parameter('base_frame', default_base_frame)
         self.declare_parameter('world_frame', 'map')
         self.declare_parameter('marker_lifetime_sec', MARKER_LIFETIME_SEC)
+        self.declare_parameter('max_observation_age_sec', MAX_OBSERVATION_AGE_S)
+        self.declare_parameter('hud_publish_rate_hz', HUD_PUBLISH_RATE_HZ)
         self.declare_parameter('ground_truth_topic', GROUND_TRUTH_TOPIC)
         self.declare_parameter('hud_distances_topic', HUD_DISTANCES_TOPIC)
+        # Which estimators this run selected, comma-separated, as the launch
+        # file resolved it. "all" (the default) is every registered row, which
+        # is what the exploration entrypoint gets -- it has no such argument.
+        self.declare_parameter('estimators', 'all')
 
         self.base_frame = self.get_parameter('base_frame').value or default_base_frame
         self.world_frame = self.get_parameter('world_frame').value
         self.marker_lifetime = self.get_parameter('marker_lifetime_sec').value
+        self.max_observation_age = float(
+            self.get_parameter('max_observation_age_sec').value)
+        self.estimators = parse_estimators(str(self.get_parameter('estimators').value))
 
         self.tf_buffer = Buffer(node=self)
         self.tf_listener = TransformListener(self.tf_buffer, self, spin_thread=False)
 
         self._lock = threading.Lock()
-        self._latest: dict[str, G1Measurements | None] = {
+        # Each slot holds ``(message, receipt_nanoseconds)``: the stamp answers
+        # "how old is this observation", the receipt answers "is this producer
+        # still running", and for the mask topic those two are a second or more
+        # apart. See ``partition_measurements``.
+        self._latest: dict[str, tuple[G1Measurements, int] | None] = {
             'camera': None, 'lidar': None, 'mask': None,
         }
         self._latest_truth: PointStamped | None = None
@@ -314,10 +559,22 @@ class G1EstimateVizNode(Node):
         self._hud_pub = self.create_publisher(
             OverlayText, str(self.get_parameter('hud_distances_topic').value), 10)
 
+        # The HUD renders on a clock, the markers stay event-driven. Markers
+        # carry a ``lifetime``, so republishing unchanged data against a fresh
+        # stamp would renew that lifetime forever and no ring could ever expire;
+        # the HUD has the opposite problem and cannot expire anything without a
+        # tick of its own. ``create_timer`` runs on the node clock, so under
+        # ``use_sim_time`` a paused sim freezes the panel and the ages together
+        # rather than ticking ages forward against a world that is not moving.
+        hud_rate = float(self.get_parameter('hud_publish_rate_hz').value)
+        self.create_timer(
+            1.0 / (hud_rate if hud_rate > 0.0 else HUD_PUBLISH_RATE_HZ),
+            self._render_hud)
+
     def _measurement_cb(self, key: str, msg: G1Measurements) -> None:
         with self._lock:
-            self._latest[key] = msg
-        self._publish()
+            self._latest[key] = (msg, self.get_clock().now().nanoseconds)
+        self._publish_markers()
 
     def _truth_cb(self, msg: PointStamped) -> None:
         with self._lock:
@@ -335,32 +592,38 @@ class G1EstimateVizNode(Node):
             msg = self._latest_truth
         return truth_reading(msg, self.get_clock().now().nanoseconds)
 
-    def _fresh_messages(self) -> list[G1Measurements]:
-        """Cached messages still within the marker lifetime, oldest cache dropped."""
+    def _partitioned_messages(self) -> tuple[list, list]:
+        """The cache split into the current batch and the aged remainder."""
 
-        now = self.get_clock().now()
-        stale_threshold = rclpy.duration.Duration(seconds=self.marker_lifetime)
+        now_nanoseconds = self.get_clock().now().nanoseconds
         with self._lock:
-            cached = dict(self._latest)
+            cached = list(self._latest.values())
+        return partition_measurements(
+            cached, now_nanoseconds, self.marker_lifetime, self.max_observation_age)
 
-        fresh = []
-        for msg in cached.values():
-            if msg is None:
-                continue
-            if now - rclpy.time.Time.from_msg(msg.header.stamp) > stale_threshold:
-                continue
-            fresh.append(msg)
-        return fresh
+    def _publish_markers(self) -> None:
+        """Rings and dots for the current detector batch.
 
-    def _publish(self) -> None:
-        fresh = self._fresh_messages()
-        if not fresh:
+        Aged messages are excluded on purpose. A stale number is a claim about
+        the past that the HUD can label as such; a stale ring is a claim about
+        where a robot is *now*, with nothing on the floor plan able to say
+        otherwise, so it is simply not drawn.
+
+        Only the run's estimators are drawn, the same set the panel lists, so
+        the two surfaces agree by construction rather than by both happening to
+        enumerate the registry. Producers are normally already filtered -- the
+        mask node resolves its own ``enabled_estimators`` -- but a field filled
+        for an estimator this run did not select would otherwise still get a
+        ring with no row beside it to name it.
+        """
+
+        same_batch, _ = self._partitioned_messages()
+        if not same_batch:
             return
 
         # Rings, HUD and the mask node's rays all show a single instance, so the
         # index is resolved once per frame and shared by both surfaces here.
-        nearest = nearest_detection_index(fresh)
-        self._publish_hud(fresh, nearest)
+        nearest = nearest_detection_index(same_batch)
 
         # Use Time(0) to get the latest available TF — avoids sim-time buffer
         # mismatches since the robot is stationary during benchmarks.
@@ -373,14 +636,14 @@ class G1EstimateVizNode(Node):
         # Resolved once per frame rather than per estimator: every depth-only
         # ring on this detection must point the same way, or two rows that
         # measured the same robot would appear to disagree about where it is.
-        bearing = display_bearing(merged_position_reader(fresh), nearest)
+        bearing = display_bearing(merged_position_reader(same_batch), nearest)
 
         markers = []
         marker_time = self.get_clock().now().to_msg()
-        for msg in fresh:
+        for msg in same_batch:
             if not msg.detected or nearest >= msg.count:
                 continue
-            for estimator in PUBLIC_ESTIMATOR_ORDER:
+            for estimator in self.estimators:
                 forward, lateral, distance = estimator_reading(msg, estimator, nearest)
                 self._add_estimator_markers(
                     markers, estimator, forward, lateral,
@@ -395,44 +658,26 @@ class G1EstimateVizNode(Node):
         ma.markers = markers
         self._pub.publish(ma)
 
-    def _publish_hud(self, fresh: list[G1Measurements], nearest: int) -> None:
-        """One HUD section: every estimator's distance against the truth.
+    def _render_hud(self) -> None:
+        """Publish the HUD section, unconditionally, on every tick.
 
-        Rendered by RViz as text, so it stays legible at any window size — unlike
-        numbers burned into the perception overlay bitmap, which shrink with it.
+        Unconditionally is the point. Returning early on an empty cache is what
+        left the panel latched: ``hud_node`` only ever overwrites its cached
+        text, so a section that stops publishing keeps showing its last numbers
+        for as long as RViz is open. Publishing ``''`` collapses it instead.
 
-        Each line is coloured from ``ESTIMATOR_COLOURS``, the same table that
-        colours that estimator's ring, so a reading and its ring cannot drift
-        apart. That markup makes the overlay rich text, hence ``&nbsp;`` padding
-        and ``<br/>`` breaks -- see ``hud_node``'s ``rich_text``.
+        It is also the only thing that re-evaluates the truth gate. ``truth_reading``
+        expires on ``TRUTH_MAX_AGE_S`` so the line disappears between trials, but
+        reachable only from a measurement callback it was a gate with nothing to
+        pull it -- when detections stopped it never fired again, and the previous
+        trial's truth sat under a target that had already been teleported away.
         """
 
-        truth = self._current_truth()
-        lines = [_hud_line(hud_truth_header(truth), HUD_HEADER_COLOUR)]
-
-        readings: dict[str, float] = {}
-        for msg in fresh:
-            if not msg.detected or nearest >= msg.count:
-                continue
-            for estimator in PUBLIC_ESTIMATOR_ORDER:
-                # The HUD is a scalar readout, so it quotes the same nearest
-                # instance the rings are drawn on rather than a second one.
-                _, _, distance = estimator_reading(msg, estimator, nearest)
-                if distance is not None:
-                    readings[estimator] = distance
-
-        for estimator in PUBLIC_ESTIMATOR_ORDER:
-            label = ESTIMATOR_LABELS[estimator]
-            distance = readings.get(estimator)
-            if distance is None:
-                body = f'{label:<24}      --    miss'
-            else:
-                error = '' if truth is None else f'  {distance - truth.distance_m:+.3f}'
-                body = f'{label:<24} {distance:7.3f}{error}'
-            lines.append(_hud_line(body, hud_text_colour(estimator)))
-
+        same_batch, aged = self._partitioned_messages()
+        nearest = nearest_detection_index(same_batch) if same_batch else 0
         text = OverlayText()
-        text.text = '<br/>'.join(lines)
+        text.text = hud_section_text(
+            same_batch, aged, nearest, self._current_truth(), self.estimators)
         self._hud_pub.publish(text)
 
     def _add_estimator_markers(

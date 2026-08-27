@@ -31,6 +31,7 @@ from ridgeback_autonomy.perception.g1_mask_measurement_node import (
     grid_mismatch_warning,
     nearest_beam_record,
     optical_to_base_planar,
+    resolve_enabled_estimators,
     resolve_mask_gate,
 )
 
@@ -529,3 +530,379 @@ def test_fill_path_measurements_skips_none_mask() -> None:
 
     # A None mask is already status-stamped by masks_for_batch; fill leaves it.
     assert batch.detections[0].projective_ranging_status is None
+
+
+def test_fill_with_no_depth_still_lets_polar_fill_the_same_frame() -> None:
+    # The depth paths and polar profiling are independent: a source that
+    # produced nothing at this stamp costs the two depth rows, not the scan row.
+    from ridgeback_autonomy.common.miss_reason import MissReason
+
+    batch = build_fill_batch()
+    masks = [mask_from_array(tight_blob(), MaskPrecision.TIGHT)]
+
+    fill_path_measurements(
+        batch, masks, FILL_INTRINSICS, None,
+        build_fill_scan(lambda ratios: np.abs(ratios) <= 0.05),
+        camera_rotation=LEVEL_OPTICAL_TO_BASE,
+        camera_translation=ZERO_TRANSLATION,
+        front_offset_m=0.25,
+        isolation_2d=forbidden_isolation,
+        isolation_3d=forbidden_isolation,
+    )
+
+    detection = batch.detections[0]
+    assert detection.projective_ranging_status == int(MissReason.NO_DEPTH_FRAME)
+    assert detection.euclidean_reconstruction_status == int(MissReason.NO_DEPTH_FRAME)
+    assert detection.polar_profiling_status == int(MissReason.OK)
+    assert detection.polar_profiling_forward_m == pytest.approx(2.0 - 0.25, abs=0.01)
+
+
+# --- Estimator subset: a path outside ``enabled`` is never run, so it has no
+# value AND no status -- the run simply has no such row, exactly as an
+# unselected legacy estimator has none. ---
+
+
+def test_fill_runs_only_the_enabled_paths_leaving_the_rest_unset() -> None:
+    from ridgeback_autonomy.common.miss_reason import MissReason
+
+    batch = build_fill_batch()
+    masks = [mask_from_array(tight_blob(), MaskPrecision.TIGHT)]
+
+    # Depth AND scan both available: only the selection keeps the depth rows out.
+    fill_path_measurements(
+        batch, masks, FILL_INTRINSICS, build_fill_depth(),
+        build_fill_scan(lambda ratios: np.abs(ratios) <= 0.05),
+        camera_rotation=LEVEL_OPTICAL_TO_BASE,
+        camera_translation=ZERO_TRANSLATION,
+        front_offset_m=0.25,
+        isolation_2d=forbidden_isolation,
+        isolation_3d=forbidden_isolation,
+        enabled=frozenset({'polar_profiling'}),
+    )
+
+    detection = batch.detections[0]
+    assert detection.polar_profiling_status == int(MissReason.OK)
+    assert detection.polar_profiling_forward_m == pytest.approx(2.0 - 0.25, abs=0.01)
+    # Not "missed for want of depth" -- never asked.
+    assert detection.projective_ranging_status is None
+    assert detection.euclidean_reconstruction_status is None
+    assert detection.projective_ranging_distance_m is None
+    assert detection.euclidean_reconstruction_distance_m is None
+
+
+def test_fill_splits_the_two_depth_paths_independently() -> None:
+    from ridgeback_autonomy.common.miss_reason import MissReason
+
+    batch = build_fill_batch()
+    masks = [mask_from_array(tight_blob(), MaskPrecision.TIGHT)]
+
+    fill_path_measurements(
+        batch, masks, FILL_INTRINSICS, build_fill_depth(), None,
+        camera_rotation=LEVEL_OPTICAL_TO_BASE,
+        camera_translation=ZERO_TRANSLATION,
+        front_offset_m=0.25,
+        isolation_2d=forbidden_isolation,
+        isolation_3d=forbidden_isolation,
+        enabled=frozenset({'projective_ranging'}),
+    )
+
+    detection = batch.detections[0]
+    assert detection.projective_ranging_status == int(MissReason.OK)
+    assert detection.euclidean_reconstruction_status is None
+    # The scan row is not stamped with its scan_reason either.
+    assert detection.polar_profiling_status is None
+
+
+def test_fill_without_depth_leaves_a_disabled_depth_row_unset_not_missing() -> None:
+    # The NO_DEPTH_FRAME stamp follows the selection too: a row that was not
+    # asked for must not be reported as a depth miss, or the benchmark's
+    # miss-reason tally would blame a source the run never used.
+    from ridgeback_autonomy.common.miss_reason import MissReason
+
+    batch = build_fill_batch()
+    masks = [mask_from_array(tight_blob(), MaskPrecision.TIGHT)]
+
+    fill_path_measurements(
+        batch, masks, FILL_INTRINSICS, None, None,
+        camera_rotation=LEVEL_OPTICAL_TO_BASE,
+        camera_translation=ZERO_TRANSLATION,
+        front_offset_m=0.25,
+        isolation_2d=forbidden_isolation,
+        isolation_3d=forbidden_isolation,
+        enabled=frozenset({'euclidean_reconstruction'}),
+    )
+
+    detection = batch.detections[0]
+    assert detection.euclidean_reconstruction_status == int(MissReason.NO_DEPTH_FRAME)
+    assert detection.projective_ranging_status is None
+
+
+def test_fill_records_no_beams_when_polar_is_not_enabled() -> None:
+    batch = build_fill_batch()
+    masks = [mask_from_array(tight_blob(), MaskPrecision.TIGHT)]
+    records: list = []
+
+    fill_path_measurements(
+        batch, masks, FILL_INTRINSICS, build_fill_depth(),
+        build_fill_scan(lambda ratios: np.abs(ratios) <= 0.05),
+        camera_rotation=LEVEL_OPTICAL_TO_BASE,
+        camera_translation=ZERO_TRANSLATION,
+        front_offset_m=0.25,
+        isolation_2d=forbidden_isolation,
+        isolation_3d=forbidden_isolation,
+        beam_records=records,
+        enabled=frozenset({'projective_ranging', 'euclidean_reconstruction'}),
+    )
+
+    assert records == []
+
+
+def test_resolve_enabled_estimators_keeps_only_the_mask_rows() -> None:
+    # One comma-separated list selects across both stacks; this node keeps the
+    # keys it owns and ignores the legacy ones.
+    assert resolve_enabled_estimators('all') == frozenset({
+        'projective_ranging', 'euclidean_reconstruction', 'polar_profiling'})
+    assert resolve_enabled_estimators('rgb,lidar,polar_profiling') == frozenset(
+        {'polar_profiling'})
+
+
+def test_resolve_enabled_estimators_rejects_a_selection_with_no_mask_row() -> None:
+    # Not a quiet no-op: the node would publish empty measurements forever.
+    with pytest.raises(ValueError, match='no mask estimator'):
+        resolve_enabled_estimators('rgb,lidar')
+
+
+def test_resolve_enabled_estimators_rejects_an_unknown_key() -> None:
+    with pytest.raises(ValueError, match='Unsupported estimator'):
+        resolve_enabled_estimators('polar_profiling,not_an_estimator')
+
+
+# --- Depth acquisition in the node: the source is pulled at the detection
+# stamp, on a stream this process buffered itself. ---
+
+
+class _StubDepthSource:
+    """Injected in place of a real depth source: scripted produce(), no model."""
+
+    def __init__(self, input_kind: str = 'depth') -> None:
+        self.input_kind = input_kind
+        self.produce_calls: list = []
+        self.frame = None
+
+    def produce(self, msg):
+        self.produce_calls.append(msg)
+        return self.frame
+
+
+@pytest.fixture
+def ros_context():
+    rclpy = pytest.importorskip('rclpy')
+    rclpy.init()
+    try:
+        yield
+    finally:
+        rclpy.shutdown()
+
+
+def _mask_node(source, **parameters):
+    from rclpy.parameter import Parameter
+    from ridgeback_autonomy.perception.g1_mask_measurement_node import (
+        G1MaskMeasurementNode,
+    )
+
+    return G1MaskMeasurementNode(
+        depth_source=source,
+        parameter_overrides=[
+            Parameter(name, value=value) for name, value in parameters.items()
+        ],
+    )
+
+
+def depth_image(sec: int, nanosec: int) -> Image:
+    msg = Image()
+    msg.header.stamp.sec = sec
+    msg.header.stamp.nanosec = nanosec
+    msg.encoding = '32FC1'
+    msg.height, msg.width = FILL_HEIGHT, FILL_WIDTH
+    return msg
+
+
+def test_depth_input_is_the_depth_stream_matched_on_the_exact_stamp(ros_context) -> None:
+    node = _mask_node(_StubDepthSource('depth'))
+    try:
+        assert node.depth_input_buffer is node.depth_buffer
+
+        buffered = depth_image(7, 42)
+        node.depth_callback(buffered)
+
+        assert node.depth_input_buffer.lookup(stamp(7, 42)) is buffered
+        # One tick off is a miss -- the rule is exact-stamp, no tolerance -- and
+        # a miss is what lands as NO_DEPTH_FRAME.
+        assert node.depth_input_buffer.lookup(stamp(7, 43)) is None
+    finally:
+        node.destroy_node()
+
+
+def test_monocular_source_reads_the_color_frame_and_no_depth_stream(ros_context) -> None:
+    node = _mask_node(_StubDepthSource('color'))
+    try:
+        # A color-input source subscribes to no depth stream at all.
+        assert node.depth_buffer is None
+        assert node.depth_input_buffer is node.color_buffer
+        # The box gate loads no segmenter, so the color buffer exists purely for
+        # the depth source here.
+        assert node.segmenter is None
+
+        buffered = color_image(7, 42)
+        node.color_callback(buffered)
+
+        assert node.depth_input_buffer.lookup(stamp(7, 42)) is buffered
+    finally:
+        node.destroy_node()
+
+
+def test_depth_for_batch_converts_the_matched_frame_once(ros_context) -> None:
+    source = _StubDepthSource('depth')
+    node = _mask_node(source)
+    try:
+        batch = build_fill_batch()
+        depth_m = build_fill_depth()
+        source.frame = (depth_m, Header())
+        matched = depth_image(7, 42)
+
+        assert node.depth_for_batch(matched, batch) is depth_m
+        # Nothing buffered at the stamp: the source is never asked, and the
+        # caller reads the None as NO_DEPTH_FRAME.
+        assert node.depth_for_batch(None, batch) is None
+        assert source.produce_calls == [matched]
+    finally:
+        node.destroy_node()
+
+
+def test_depth_for_batch_none_when_the_source_declines_the_frame(ros_context) -> None:
+    # A model that is unavailable or mid-cooldown, or an unsupported encoding:
+    # the source returns None, which means "no usable depth at this stamp".
+    source = _StubDepthSource('depth')
+    node = _mask_node(source)
+    try:
+        source.frame = None
+
+        assert node.depth_for_batch(depth_image(7, 42), build_fill_batch()) is None
+    finally:
+        node.destroy_node()
+
+
+def test_depth_for_batch_rejects_a_grid_the_masks_cannot_index(ros_context) -> None:
+    source = _StubDepthSource('depth')
+    node = _mask_node(source)
+    try:
+        source.frame = (np.zeros((FILL_HEIGHT + 1, FILL_WIDTH), dtype=np.float32),
+                        Header())
+
+        assert node.depth_for_batch(depth_image(7, 42), build_fill_batch()) is None
+    finally:
+        node.destroy_node()
+
+
+def test_aligned_depth_debug_carries_the_detection_stamp(ros_context) -> None:
+    node = _mask_node(_StubDepthSource('depth'))
+    published: list = []
+    node.aligned_depth_debug_pub.publish = lambda msg: published.append(msg)
+    node.aligned_depth_debug_pub.get_subscription_count = lambda: 1
+    try:
+        header = Header()
+        header.frame_id = 'camera_0_color_optical'
+        header.stamp.sec, header.stamp.nanosec = 7, 42
+
+        node.publish_aligned_depth_debug(build_fill_depth(), header)
+
+        assert len(published) == 1
+        assert published[0].encoding == '32FC1'
+        assert published[0].header.frame_id == 'camera_0_color_optical'
+        assert (published[0].header.stamp.sec,
+                published[0].header.stamp.nanosec) == (7, 42)
+    finally:
+        node.destroy_node()
+
+
+def test_aligned_depth_debug_skips_the_encode_with_no_subscriber(ros_context) -> None:
+    node = _mask_node(_StubDepthSource('depth'))
+    published: list = []
+    node.aligned_depth_debug_pub.publish = lambda msg: published.append(msg)
+    node.aligned_depth_debug_pub.get_subscription_count = lambda: 0
+    try:
+        node.publish_aligned_depth_debug(build_fill_depth(), Header())
+        # Nothing produced either: a frame with no depth has nothing to show.
+        node.aligned_depth_debug_pub.get_subscription_count = lambda: 1
+        node.publish_aligned_depth_debug(None, Header())
+
+        assert published == []
+    finally:
+        node.destroy_node()
+
+
+# --- The subset drives what the node subscribes to and builds: a run pays for
+# the inputs its selected paths read, and nothing else. ---
+
+
+def subscribed_topics(node) -> set[str]:
+    return {subscription.topic_name for subscription in node.subscriptions}
+
+
+def test_polar_only_run_builds_no_depth_machinery(ros_context) -> None:
+    # Injecting a source and selecting no depth path: the selection wins. This
+    # is the case that matters under depth_source:=monocular, where building
+    # the source is what loads Depth-Anything.
+    node = _mask_node(_StubDepthSource('depth'), enabled_estimators='polar_profiling')
+    try:
+        assert node.needs_depth is False
+        assert node.depth_source is None
+        assert node.depth_buffer is None
+        assert node.depth_input_buffer is None
+        assert node.aligned_depth_debug_pub is None
+        assert not any(
+            topic.endswith('depth/image') for topic in subscribed_topics(node))
+        # The scan side is fully wired.
+        assert node.scan_buffer is not None
+        assert node.ray_marker_pub is not None
+    finally:
+        node.destroy_node()
+
+
+def test_depth_only_run_builds_no_scan_machinery(ros_context) -> None:
+    node = _mask_node(
+        _StubDepthSource('depth'),
+        enabled_estimators='projective_ranging,euclidean_reconstruction')
+    try:
+        assert node.needs_scan is False
+        assert node.scan_buffer is None
+        assert node.ray_marker_pub is None
+        assert not any(
+            topic.endswith('scan') for topic in subscribed_topics(node))
+        assert node.depth_input_buffer is node.depth_buffer
+        assert node.aligned_depth_debug_pub is not None
+    finally:
+        node.destroy_node()
+
+
+def test_polar_only_run_subscribes_to_no_color_stream_for_depth(ros_context) -> None:
+    # A color-input (monocular) source with no depth path selected: the color
+    # buffer exists only for readers that want it, and neither the absent depth
+    # source nor the box gate does. Without this the worker would hand a color
+    # frame to a depth source that does not exist.
+    node = _mask_node(_StubDepthSource('color'), enabled_estimators='polar_profiling')
+    try:
+        assert node.color_buffer is None
+        assert node.depth_input_buffer is None
+    finally:
+        node.destroy_node()
+
+
+def test_default_run_fills_all_three_rows(ros_context) -> None:
+    node = _mask_node(_StubDepthSource('depth'))
+    try:
+        assert node.enabled_estimators == frozenset({
+            'projective_ranging', 'euclidean_reconstruction', 'polar_profiling'})
+        assert node.needs_depth and node.needs_scan
+    finally:
+        node.destroy_node()

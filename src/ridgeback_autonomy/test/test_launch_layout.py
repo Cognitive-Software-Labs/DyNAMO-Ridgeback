@@ -104,6 +104,10 @@ def test_benchmark_launch_uses_new_multi_estimator_interface() -> None:
     # follows the gate).
     assert "'mask_gate'," in benchmark_text
     assert benchmark_text.count("'mask_gate': LaunchConfiguration('mask_gate')") == 3
+    # One estimators list, split per stack: each measurement node is handed only
+    # the rows it owns, so a mask row can be selected as freely as a legacy one.
+    assert "'enabled_estimators': ','.join(selected_camera)" in benchmark_text
+    assert "'enabled_estimators': ','.join(selected_mask)" in benchmark_text
 
 
 def test_slam_lifecycle_configure_and_activate_are_event_driven() -> None:

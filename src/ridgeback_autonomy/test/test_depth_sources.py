@@ -2,16 +2,16 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
-from sensor_msgs.msg import CameraInfo, Image
+from sensor_msgs.msg import Image
 from std_msgs.msg import Header
 
-from ridgeback_autonomy.perception.aligned_depth_node import (
+from ridgeback_autonomy.perception.core.depth_sources import (
     MonocularDepthSource,
-    camera_info_matches_depth,
+    StereoDepthSource,
+    build_depth_source,
     decode_color_to_rgb,
     decode_depth_to_meters,
     encode_depth_message,
-    throttle_remainder,
 )
 
 
@@ -185,92 +185,37 @@ def test_decode_color_honours_row_padding() -> None:
         decode_color_to_rgb(padded('bgr8')), pixels[:, :, ::-1])
 
 
-def test_camera_info_matches_depth_true_on_equal_grid() -> None:
-    info = CameraInfo()
-    info.height, info.width = 480, 640
+def test_build_depth_source_dispatches_both_names() -> None:
+    stereo = build_depth_source('stereoscopic', _NullLogger())
+    monocular = build_depth_source(
+        'Monocular', _NullLogger(), model_id='model', device='cpu')
 
-    assert camera_info_matches_depth((480, 640), info) is True
-
-
-def test_camera_info_matches_depth_false_on_mismatch() -> None:
-    info = CameraInfo()
-    info.height, info.width = 480, 640
-
-    assert camera_info_matches_depth((481, 640), info) is False
-    assert camera_info_matches_depth((480, 641), info) is False
+    assert isinstance(stereo, StereoDepthSource)
+    assert stereo.input_kind == 'depth'
+    # Case and surrounding whitespace are normalized, so a launch argument
+    # typed loosely still resolves.
+    assert isinstance(monocular, MonocularDepthSource)
+    assert monocular.input_kind == 'color'
 
 
-def test_throttle_remainder_uncapped_is_zero() -> None:
-    assert throttle_remainder(100.0, 100.05, 0.0) == 0.0
+def test_build_depth_source_rejects_unknown_name() -> None:
+    with pytest.raises(ValueError, match='Unknown depth_source'):
+        build_depth_source('lidar', _NullLogger())
 
 
-def test_throttle_remainder_waits_out_the_period() -> None:
-    # 10 fps -> 0.1 s period; 0.05 s elapsed -> 0.05 s remaining.
-    assert throttle_remainder(100.0, 100.05, 10.0) == pytest.approx(0.05)
+def test_stereo_source_produces_meters_and_keeps_the_input_header() -> None:
+    raw = np.array([[1000, 2500]], dtype=np.uint16)
+    msg = make_image('16UC1', raw)
+    msg.header.frame_id = 'camera_0_color_optical'
+
+    depth_m, header = StereoDepthSource(_NullLogger()).produce(msg)
+
+    assert np.allclose(depth_m, [[1.0, 2.5]])
+    assert header.frame_id == 'camera_0_color_optical'
 
 
-def test_throttle_remainder_zero_once_period_elapsed() -> None:
-    assert throttle_remainder(100.0, 100.2, 10.0) == 0.0
+def test_stereo_source_returns_none_on_unsupported_encoding() -> None:
+    # The mask node reads this ``None`` as "no usable depth at this stamp".
+    msg = make_image('8UC1', np.zeros((2, 2), dtype=np.uint16))
 
-
-class _StubSource:
-    """Injected in place of a real depth producer: scripted produce(), no model."""
-
-    input_kind = 'depth'
-
-    def __init__(self) -> None:
-        self.produce_calls = 0
-        self.raise_next = False
-        self.frame = None
-
-    def produce(self, msg):
-        self.produce_calls += 1
-        if self.raise_next:
-            raise RuntimeError('simulated producer failure')
-        return self.frame
-
-
-@pytest.fixture
-def ros_context():
-    rclpy = pytest.importorskip('rclpy')
-    rclpy.init()
-    try:
-        yield
-    finally:
-        rclpy.shutdown()
-
-
-def _make_node(source):
-    from ridgeback_autonomy.perception.aligned_depth_node import AlignedDepthNode
-
-    return AlignedDepthNode(source=source)
-
-
-def _input_image() -> Image:
-    msg = Image()
-    msg.encoding = '32FC1'
-    msg.height = msg.width = 4
-    return msg
-
-
-def test_producer_worker_survives_exception(ros_context) -> None:
-    # An unexpected produce/publish error must not propagate out of the
-    # guarded step or leave the worker unable to handle the next good frame.
-    source = _StubSource()
-    node = _make_node(source)
-    published: list = []
-    node.depth_pub.publish = lambda m: published.append(m)
-    try:
-        source.raise_next = True
-        node.run_producer_step(_input_image())  # no exception escapes
-
-        source.raise_next = False
-        header = Header()
-        header.frame_id = 'camera_0_color_optical'
-        source.frame = (np.zeros((4, 4), dtype=np.float32), header)
-        node.run_producer_step(_input_image())
-
-        assert source.produce_calls == 2
-        assert len(published) == 1
-    finally:
-        node.destroy_node()
+    assert StereoDepthSource(_NullLogger()).produce(msg) is None

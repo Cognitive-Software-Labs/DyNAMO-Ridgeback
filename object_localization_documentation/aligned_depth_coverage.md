@@ -11,6 +11,12 @@ The symptom surfaced through the benchmark's per-estimator miss-reason
 attribution (`object_localization_pipeline.md`): a box-gate run tallies the
 depth rows almost entirely as `NO_DEPTH_FRAME`.
 
+> **Resolved 2026-08-26 by option 1 (§6).** Depth acquisition now happens
+> inside `g1_mask_measurement_node`, at the detection stamp; there is no
+> depth producer process and no depth topic. Sections 1–5 describe the
+> topology that caused the loss and are kept as the diagnosis that motivated
+> the fix. §6 records the decision.
+
 ---
 
 ## 1. The symptom
@@ -70,25 +76,31 @@ The contract itself is sound. The problem is that in sim the set of stamps that
 The RealSense is a single `rgbd_camera` sensor
 (`intel_realsense.urdf.xacro`), so color and depth are rendered together and
 **share a stamp** — at the source, a depth frame with the detection's exact
-stamp always exists. The loss happens because **two independent workers each
-sub-sample the stream with latest-wins frame-drop**, and they keep *different*
-frames:
+stamp always exists. The loss happened because **two independent processes each
+sub-sampled the stream**, and they kept *different* frames:
 
 ```
    rgbd_camera (color+depth, shared stamps, ~30 Hz nominal)
         │
-        ├──▶ detector          latest-wins, capped detector_fps=5  ──▶ detections at stamps {D}
+        ├──▶ detector          latest-wins slot + detector_fps=5 cap  ──▶ detections at stamps {D}
         │        (g1_detector_node.py: grab latest color, set None)
         │
-        └──▶ aligned_depth_node latest-wins, uncapped              ──▶ aligned depth at stamps {A}
-                 (aligned_depth_node.py: grab latest depth, set None)
+        └──▶ aligned_depth_node                                       ──▶ aligned depth at stamps {A}
+                 thinned mostly at the rmw/executor layer (§4), not by
+                 its latest-wins slot, which is rarely contended
 
    mask node needs  T ∈ {D} ∩ {A}   (exact)   ──▶  coverage = |{D} ∩ {A}| / |{D}|
 ```
 
 `{D}` and `{A}` are two independent thinnings of the same stamp grid. Their
 exact-stamp overlap is small, so most detections land on a stamp for which
-`aligned_depth_node` happened to drop the depth frame → `NO_DEPTH_FRAME`.
+`aligned_depth_node` never received the depth frame → `NO_DEPTH_FRAME`.
+
+The deeper point is that the two thinnings cannot be reconciled: `T` is decided
+downstream, in a process `aligned_depth_node` never talks to. A producer
+optimizing for **freshness** (keep the newest frame, drop the backlog) cannot
+serve a consumer that needs **specificity** (the one frame the detector used,
+already ~200 ms old by the time detections arrive).
 
 ### Measured rates (same run, `ros2 topic hz`)
 
@@ -142,8 +154,8 @@ On a real robot this failure mode is mostly a sim artifact:
 - A RealSense publishes hardware-synchronized color + `aligned_depth_to_color`
   at a true 30 fps with **shared stamps**, on dedicated compute that is not
   contending with a renderer and a physics engine.
-- Alignment happens in the driver, so `aligned_depth_node`'s stereo source is
-  again a trivial unit-convert-and-restamp.
+- Alignment happens in the driver, so the stereo source is again a trivial
+  unit-convert-and-restamp.
 
 With the producer keeping up, `{A}` ≈ the full stamp grid, `{D} ⊆ {A}`, and
 exact-stamp coverage approaches 100 %. **Exact-stamp matching is the correct
@@ -155,33 +167,65 @@ this sim-contention finding.)
 
 ---
 
-## 6. Options considered (no decision made)
+## 6. Options considered — option 1 chosen (2026-08-26)
 
-Recorded for a later call; **nothing is implemented**.
-
-1. **Fold the stereo/driver-aligned decode into the consumer.** Because the
-   decode is ~2 ms, the mask node could buffer the *raw* (or driver-aligned)
-   depth by stamp and decode on-demand at the exact detection stamp, inside the
-   worker it already runs per detection. That removes the second independent
-   sub-sampling stage entirely, so the depth for whatever frame the detector
-   chose is essentially always present. Monocular stays a producer (real NN
-   bottleneck). Faithful on real hardware. Cost: a real refactor touching the
-   mask depth path, the `depth_source` branch, launch wiring, and tests.
+1. **Fold depth acquisition into the consumer.** ← **chosen and implemented.**
+   Because the decode is ~2 ms, the mask node buffers the *raw* (or
+   driver-aligned) depth by stamp and converts on demand at the exact detection
+   stamp, inside the worker it already runs per detection. That removes the
+   second independent sub-sampling stage entirely, so the depth for whatever
+   frame the detector chose is essentially always present.
 2. **Raise the `aligned_depth_node` process priority** (`nice`/`chrt` in the
    launch) so its executor drains the subscription under contention. Small and
    sim-only; partial, and does not address the two-sub-sampler divergence.
 3. **Accept and document as a sim artifact** (this file). Zero code; justified
    by §5.
 
-Profiling (§4) is what justifies option 1 — a separate always-on process buys
-nothing for the stereo path but the sub-sampling penalty — but the trade
-against refactor cost is left open.
+Profiling (§4) is what justified option 1: a separate always-on process buys
+nothing for the stereo path but the sub-sampling penalty. Two pieces of
+in-repo evidence said it was safe — the mask node already does exact-stamp
+lookup on the *color* topic for the silhouette gate, in the same process on
+the same saturated host, missing 1 frame in 135; and the legacy
+`depth_anything` estimator already computes depth inside its consumer, with a
+full NN forward pass, and scores 130/135.
+
+### What was built
+
+- `perception/core/depth_sources.py` holds both sources unchanged
+  (`StereoDepthSource`, `MonocularDepthSource`) plus a `build_depth_source`
+  factory. Monocular moved in with stereo rather than staying a producer: the
+  same specificity argument applies to it, and running the NN once per
+  detection batch (5 Hz) is not obviously worse than once per camera frame.
+- `g1_mask_measurement_node` subscribes to the source's *input* stream
+  (`input_kind`), buffers it raw in the `StampedMessageBuffer` it already
+  owned, and converts only the frame at the detection stamp. Monocular reads
+  the same color buffer the silhouette gate uses — one buffer, two readers,
+  one stamp.
+- `aligned_depth_node` is deleted, with the `max_fps` cadence cap (a
+  demand-driven path has no cadence) and the producer-side
+  `camera_info_matches_depth` check (the consumer's `grid_mismatch_warning`
+  covers it). The aligned-depth **artifact** contract is unchanged; only its
+  transport is, from a topic to a call at stamp `T`. It is still published on
+  `debug/g1/mask/aligned_depth` for the overlay panel, encoded only when
+  something is subscribed.
+
+### Measured effect
+
+| | before (`20260825_203145`, silhouette / stereoscopic) | after |
+|---|---|---|
+| projective ranging | 12 / 135 (8.9 %), `NO_DEPTH_FRAME` ×85 | not yet re-run |
+| euclidean reconstruction | 12 / 135 (8.9 %), `NO_DEPTH_FRAME` ×85 | not yet re-run |
+| polar profiling | unaffected (never depended on depth) | — |
+
+Expected after: roughly 97/135 for the two depth rows. The residual `UNSET`
+×37 in that run is a **different** defect — the mask node's own latest-wins
+detections slot drops backlog — and should be unchanged by this work.
 
 ---
 
 ## 7. Cross-references
 
-- `aligned_depth.md` — the aligned-depth contract and its two producers; §1
+- `aligned_depth.md` — the aligned-depth contract and its two sources; §1
   "Timing" bullet is the invariant this document stresses.
 - `projective_ranging.md`, `euclidean_reconstruction.md` — the two consumers
   that report `NO_DEPTH_FRAME` together.
