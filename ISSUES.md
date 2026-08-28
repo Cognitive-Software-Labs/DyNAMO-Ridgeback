@@ -11,7 +11,22 @@
 | TF errors | Ensure all nodes use `use_sim_time: true` |
 | Startup hangs / a stage never comes up | Bringup is event-driven (readiness gates) — find the `gate_*` process log `[launch_wait]: waiting for …`; the `unmet:` list on timeout names the exact missing topic/service. See "Event-Driven Startup" below. Do **not** re-add `TimerAction` delays |
 | Stale processes from previous runs | Run `bash cleanup.sh` before each launch |
+| Gazebo/RViz vanished during a benchmark sweep | Do not run `cleanup.sh` between sweep configurations; it kills the persistent environment. Run it once before starting the supervisor |
 | Diagnostics | Run `bash diag.sh /tmp/logfile.log hospital` or `bash diag.sh /tmp/logfile.log warehouse` |
+
+## Benchmark Sweep Cleanup Trap
+
+`cleanup.sh` is intentionally aggressive: it kills `gz sim`, `ruby.*gz`,
+`gz-sim`, `rviz2`, ROS launch processes, and every package node it can find.
+That is correct before a normal launch, but wrong between configurations in a
+benchmark sweep. The point of `g1_benchmark_sweep` is that Gazebo, RViz, the
+Ridgeback, camera TF, detector, and clock survive for the whole comparison.
+
+Run cleanup once before starting the supervisor. During the sweep, let the
+supervisor stop only the per-config process group. It also checks Gazebo's pose
+topic before each config and removes leftover `bench_*` models from a crashed
+runner. If the supervisor itself is interrupted, rerun the same command to
+resume completed `run.json` outputs; do not manually clean between its configs.
 
 ## Event-Driven Startup (Readiness Gates)
 

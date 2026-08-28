@@ -1,0 +1,79 @@
+# Baseline sweep: every estimator once, at its defaults.
+#
+# One config per estimator path, run back to back against a single Gazebo and
+# RViz bringup -- same world, same Ridgeback spawn, same clock for all eight.
+# That shared bringup is the point: cross-config differences here are the
+# estimators, not eight separate sim boots.
+#
+# Each estimator gets its own config rather than sharing one, so every path is
+# measured under the load of running alone. The mask paths in particular
+# compete for the capture window, and a path's numbers under contention are a
+# different measurement from its numbers in isolation.
+#
+# Cost at repeats:=1 -- 109 trials per config (85 scenes x 1, plus 3 probe
+# scenes at repeats_override 8), ~15.4 s per trial, so ~28 min per config and
+# ~3.8 h for the sweep including per-config node startup.
+#
+# The mask configs pin the settings they depend on instead of inheriting them
+# from the launch file, so this file records what was run without a reader
+# having to know what the launch defaults were on the day. Values here are the
+# current defaults: box gate, stereoscopic depth, nearest_mode_histogram (2D),
+# height_crop_nearest_mode_band (3D), and no mask working-depth gate.
+#
+# Knobs are only written on configs where they are live. depth_source and
+# mask_depth_max_meters reach projective ranging and euclidean reconstruction;
+# mask_gate reaches all three mask paths; isolation_2d is projective ranging's
+# alone and isolation_3d is euclidean reconstruction's alone. Polar profiling
+# is mask-based but LiDAR-sourced, so it takes the gate and nothing else. None
+# of them reach the legacy camera or LiDAR paths.
+
+sweep:
+  name: baseline
+  description: >
+    Every estimator once at its defaults, one config each, box mask gate and
+    default isolation recipes on the mask paths.
+
+defaults:
+  scenario: ''        # packaged config/benchmark_scenarios_full.yaml, 88 scenes
+  repeats: 1
+
+configs:
+  # Legacy camera paths. Three read the color/depth streams directly, one reads
+  # the point cloud; all four live in g1_camera_measurement_node, and only one
+  # is enabled per config.
+  - name: legacy_rgb
+    estimators: rgb
+
+  - name: legacy_sensor_depth
+    estimators: sensor_depth
+
+  # The only legacy path with a torch model in it, which is why it is worth
+  # having alone rather than alongside the other three.
+  - name: legacy_depth_anything
+    estimators: depth_anything
+
+  - name: legacy_pointcloud
+    estimators: pointcloud
+
+  # Legacy LiDAR path: g1_lidar_measurement_node, no camera node at all.
+  - name: legacy_lidar
+    estimators: lidar
+
+  # Mask paths. Each brings up g1_mask_measurement_node alone.
+  - name: mask_projective_ranging
+    estimators: projective_ranging
+    mask_gate: box
+    depth_source: stereoscopic
+    isolation_2d: nearest_mode_histogram
+
+  - name: mask_euclidean_reconstruction
+    estimators: euclidean_reconstruction
+    mask_gate: box
+    depth_source: stereoscopic
+    isolation_3d: height_crop_nearest_mode_band
+
+  # LiDAR-sourced: no depth stream, so no depth source, no isolation recipe and
+  # no depth gate. The mask gate is the only axis it has.
+  - name: mask_polar_profiling
+    estimators: polar_profiling
+    mask_gate: box

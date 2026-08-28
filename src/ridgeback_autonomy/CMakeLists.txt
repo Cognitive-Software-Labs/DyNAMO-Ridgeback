@@ -92,6 +92,12 @@ install(PROGRAMS
 )
 
 install(PROGRAMS
+  ridgeback_autonomy/benchmarking/g1_benchmark_sweep.py
+  DESTINATION lib/${PROJECT_NAME}
+  RENAME g1_benchmark_sweep
+)
+
+install(PROGRAMS
   ridgeback_autonomy/frontier_explorer/frontier_explorer_node.py
   DESTINATION lib/${PROJECT_NAME}
   RENAME frontier_explorer_node.py
@@ -162,6 +168,8 @@ if(BUILD_TESTING)
   ament_add_pytest_test(test_report test/test_report.py)
   ament_add_pytest_test(test_estimate_viz test/test_estimate_viz.py)
   ament_add_pytest_test(test_recording test/test_recording.py)
+  ament_add_pytest_test(test_sweep test/test_sweep.py)
+  ament_add_pytest_test(test_sweep_report test/test_sweep_report.py)
   ament_add_pytest_test(test_hud_node test/test_hud_node.py)
 endif()
 

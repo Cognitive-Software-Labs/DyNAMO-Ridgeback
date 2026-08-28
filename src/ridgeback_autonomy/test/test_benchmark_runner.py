@@ -303,6 +303,37 @@ def test_runner_node_constructs_and_its_provenance_methods_run(tmp_path) -> None
         rclpy.shutdown()
 
 
+def test_runner_uses_explicit_run_dir_name_verbatim(tmp_path) -> None:
+    import rclpy
+
+    from ridgeback_autonomy.benchmarking.g1_distance_benchmark_runner_node import (
+        G1DistanceBenchmarkRunner,
+    )
+
+    scenario = tmp_path / 'scenes.yaml'
+    scenario.write_text('scenes:\n  - id: s1\n    robots: [{ x: 2.0, y: 0.0 }]\n')
+    output_dir = tmp_path / 'out'
+
+    rclpy.init(args=[
+        '--ros-args',
+        '-p', f'scenario:={scenario}',
+        '-p', f'output_dir:={output_dir}',
+        '-p', 'run_dir_name:=legacy_lidar',
+        '-p', 'estimators:=lidar',
+    ])
+    node = None
+    try:
+        node = G1DistanceBenchmarkRunner()
+
+        assert node.run_output_dir == str(output_dir / 'legacy_lidar')
+        assert node.declared_parameters()['run_dir_name'] == 'legacy_lidar'
+        assert os.path.isdir(node.images_dir)
+    finally:
+        if node is not None:
+            node.destroy_node()
+        rclpy.shutdown()
+
+
 def test_format_commit_makes_a_dirty_tree_impossible_to_miss() -> None:
     from ridgeback_autonomy.benchmarking.g1_distance_benchmark_runner_node import (
         format_commit,

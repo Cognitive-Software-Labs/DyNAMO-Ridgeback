@@ -154,9 +154,15 @@ cd /path/to/DyNAMO-Ridgeback
 source install/setup.bash
 ```
 
-The package now exposes 2 public launch entrypoints:
+The package has 5 top-level launch files. The first two are the normal human
+entrypoints; the benchmark environment/config pair are also public because the
+sweep supervisor invokes them as separate processes:
+
 - `ridgeback_exploration.launch.py`
 - `g1_distance_benchmark.launch.py`
+- `g1_benchmark_env.launch.py`
+- `g1_benchmark_config.launch.py`
+- `manual_mapping.launch.py`
 
 The lower-level simulation, SLAM, Nav2, and frontier-exploration launches live under `launch/includes/` and are treated as internal launch building blocks rather than public entrypoints.
 
@@ -240,7 +246,7 @@ bash build_and_start_expl.sh office custom
 ### `g1_distance_benchmark.launch.py`
 
 ```bash
-# Default run: compare all available estimators
+# Default run: compare the five legacy camera/LiDAR estimators
 ros2 launch ridgeback_autonomy g1_distance_benchmark.launch.py
 
 # RGB only
@@ -271,7 +277,7 @@ ros2 launch ridgeback_autonomy g1_distance_benchmark.launch.py estimators:=proje
 ros2 launch ridgeback_autonomy g1_distance_benchmark.launch.py estimators:=polar_profiling
 ```
 
-This launch composes the simulator, `g1_detector_node`, the camera measurement node and/or the LiDAR measurement node depending on `estimators`, and `g1_distance_benchmark_runner`. Every row is individually selectable, mask rows included: `estimators` is split per stack and each measurement node is passed only the rows it owns, so a path that was not selected is never run — its fields stay NaN, it gets no CSV, and the inputs only it needs are never subscribed to. Selecting any mask row launches `g1_mask_measurement_node`, which for `projective_ranging`/`euclidean_reconstruction` obtains the aligned depth frame itself, at the detection stamp, through the source `depth_source` selects; `polar_profiling` needs no depth at all, so a polar-only run builds no depth source (and under `depth_source:=monocular`, loads no model). The mask node builds one mask per detection (`mask_gate:=box` rasterizes the detection box; `mask_gate:=silhouette` prompts a segmentation model with the boxes, needs `perception_venv`) and runs the localization paths from `object_localization_documentation/`.
+This compatibility launch composes two layers. `g1_benchmark_env.launch.py` owns the simulator, camera TF, RViz, and `g1_detector_node`; `g1_benchmark_config.launch.py` waits for the color and warm-detector topics, then starts the selected measurement nodes, visualizations, HUD, overlay, and `g1_distance_benchmark_runner`. Every row is individually selectable, mask rows included: `estimators` is split per stack and each measurement node is passed only the rows it owns, so a path that was not selected is never run — its fields stay NaN, it gets no CSV, and the inputs only it needs are never subscribed to. Selecting any mask row launches `g1_mask_measurement_node`, which for `projective_ranging`/`euclidean_reconstruction` obtains the aligned depth frame itself, at the detection stamp, through the source `depth_source` selects; `polar_profiling` needs no depth at all, so a polar-only run builds no depth source (and under `depth_source:=monocular`, loads no model). The mask node builds one mask per detection (`mask_gate:=box` rasterizes the detection box; `mask_gate:=silhouette` prompts a segmentation model with the boxes, needs `perception_venv`) and runs the localization paths from `object_localization_documentation/`.
 
 The mask rows are identified by their config axes — the mask gate (`mask_gate`), the aligned-depth source (`depth_source`), the path, and on the box gate the foreground-isolation recipe (`isolation_2d` for projective ranging, `isolation_3d` for euclidean reconstruction) — so their CSV files fold the axes into a self-describing name. The stereoscopic box-gate run above writes `box_gated_stereoscopic_projective_ranging_nearest_mode_histogram.csv` and `box_gated_stereoscopic_euclidean_reconstruction_height_crop_nearest_mode_band.csv`; silhouette rows drop the isolation token (the tight branches never run a recipe), e.g. `silhouette_gated_stereoscopic_projective_ranging.csv`; polar profiling folds the gate only (`box_gated_polar_profiling.csv`). Non-mask estimators keep their plain names.
 
@@ -282,6 +288,7 @@ Each benchmark run writes under
 - one trial-level CSV per selected estimator
 - one `run.json` — the run-level numbers for machines, plus provenance
 - one shared collage image per included trial under `images/`
+- one best-effort RViz recording at `video/run.mp4`
 
 Pass `output_dir:=...` to write the timestamped run folder somewhere else.
 
@@ -303,6 +310,8 @@ Arguments:
 | `camera_info_topic` | `sensors/camera_0/color/camera_info` | Color-camera intrinsics used by the aligned-depth producer and the mask measurement node |
 | `repeats` | `5` | Number of positive-trial repeats per spawn pose |
 | `output_dir` | `<repo-root>/benchmark-results` | Root directory that will receive one timestamped subfolder per run |
+| `run_dir_name` | empty | Optional exact run-folder name under `output_dir`; sweeps use the configuration name. Empty preserves the timestamped single-run naming |
+| `shutdown_on_complete` | `false` | Shut down the config launch service when the runner exits. The sweep sets this to `true`; the compatibility launch leaves the completed stack open for inspection |
 | `settle_sec` | `2.0` | Delay after spawning the target before sampling |
 | `capture_sec` | `10.0` | Sampling window length for collecting usable detections |
 | `color_topic` | `sensors/camera_0/color/image` | RGB topic used by the detector, camera measurement node, and benchmark snapshots |
@@ -317,6 +326,89 @@ Benchmark semantics:
 - a trial is included only if every selected estimator has a usable aligned event
 - each estimator CSV stores one row per included trial, using the median estimate over that trial’s aligned usable detections
 - the shared collage image for each trial is built from one representative aligned detection event that is closest to the per-trial medians across the selected estimators
+
+### Benchmark sweeps
+
+Use the sweep supervisor when comparing configurations. It starts Gazebo,
+RViz, the Ridgeback, camera TF, and the detector once, then restarts only the
+measurement/configuration layer for each entry. The detector therefore loads
+OWLv2 once per sweep; silhouette configurations still load their segmentation
+model inside their per-config mask node.
+
+```bash
+# Start from a clean machine once, before the persistent environment starts.
+bash cleanup.sh
+
+SWEEP="$(ros2 pkg prefix ridgeback_autonomy)/share/ridgeback_autonomy/config/benchmark_sweep_baseline.yaml"
+
+# Validate all configs and print the trial/time estimate without launching.
+ros2 run ridgeback_autonomy g1_benchmark_sweep "$SWEEP" --dry-run
+
+# Run all 8 baseline configurations against one simulator boot.
+ros2 run ridgeback_autonomy g1_benchmark_sweep "$SWEEP"
+
+# Run a named subset.
+ros2 run ridgeback_autonomy g1_benchmark_sweep "$SWEEP" \
+  --only legacy_lidar,legacy_rgb,mask_polar_profiling
+
+# Rebuild the cross-config report for a partial or completed sweep.
+ros2 run ridgeback_autonomy g1_benchmark_sweep \
+  --report-only benchmark-results/20260828_141530_baseline
+```
+
+Do **not** run `cleanup.sh` between configurations: it kills Gazebo and RViz,
+which are deliberately persistent. The supervisor owns each config process
+group, removes any orphan `bench_*` entities after an unclean exit, and shuts
+the environment down at the end. If a sweep is interrupted, rerun the same
+command: the latest incomplete sweep with the same YAML and `--only` selection
+is resumed, valid `run.json` configurations are skipped, and partial config
+folders are preserved with an `.incomplete_<timestamp>` suffix before retry.
+
+The YAML format is a metadata block, sweep-wide defaults, and named configs:
+
+```yaml
+sweep:
+  name: baseline
+  description: Every estimator once at its defaults.
+
+defaults:
+  scenario: ''       # packaged benchmark_scenarios_full.yaml
+  repeats: 1
+
+configs:
+  - name: legacy_lidar
+    estimators: lidar
+  - name: mask_projective_ranging
+    estimators: projective_ranging
+    mask_gate: box
+    depth_source: stereoscopic
+    isolation_2d: nearest_mode_histogram
+```
+
+Config values override `defaults`. Validation happens before Gazebo starts:
+unknown arguments, duplicate/unsafe names, bad estimators, missing scenario
+files, environment keys on individual configs, and estimator-inapplicable
+knobs are rejected. `world`, `setup_path`, `namespace`, `use_sim_time`, and
+`color_topic` may be set only in `defaults` because the environment cannot
+change mid-sweep.
+
+Outputs use one timestamped sweep folder with a resumable manifest and a
+comparison report:
+
+```text
+benchmark-results/20260828_141530_baseline/
+  sweep.json
+  summary.md
+  legacy_rgb/
+    run.json  summary.md  rgb.csv  images/  video/run.mp4
+  legacy_sensor_depth/
+    ...
+```
+
+`summary.md` contains one row per `(config, estimator)`, sorted by MAE. It also
+records each configuration's wall time and a pre-run real-time-factor sample;
+RTF is diagnostic only, but helps distinguish configuration effects from
+observation-coverage drift as a long-lived simulator slows down.
 
 ### Perception interfaces
 

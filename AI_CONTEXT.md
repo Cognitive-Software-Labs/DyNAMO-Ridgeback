@@ -44,7 +44,7 @@ Rules:
 
 Use `README.md` for the full human runbook. In particular, point humans there for:
 - installation and workspace build steps
-- the 2 public launch entrypoints
+- the public launch/workflow entrypoints
 - `start_exploration.sh` and `build_and_start_expl.sh` quick-start scripts
 - G1 perception setup in `perception_venv`
 - public parameters and benchmark usage
@@ -56,9 +56,14 @@ Use `ISSUES.md` when the task touches:
 
 ## Repo Mental Model
 
-- This repo centers on 2 public launch entrypoints:
+- This repo centers on 2 normal human launch workflows:
   - `ridgeback_exploration.launch.py`
   - `g1_distance_benchmark.launch.py`
+- Benchmarking also exposes `g1_benchmark_env.launch.py` and
+  `g1_benchmark_config.launch.py` as public process-level layers because
+  `g1_benchmark_sweep` invokes them separately. The compatibility
+  `g1_distance_benchmark.launch.py` includes both and inherits their arguments.
+- `manual_mapping.launch.py` is the fifth top-level public launch file.
 - Lower-level launches in `src/ridgeback_autonomy/launch/includes/` are internal building blocks
 - Bringup is **event-driven**: stages are sequenced by readiness gates (`ros2 run ridgeback_autonomy launch_wait`, in `common/launch_wait.py`) chained via `OnProcessExit`, not fixed `TimerAction` delays — each stage starts when its prerequisite topic/service exists, with a `--timeout` fallback. See ISSUES.md "Event-Driven Startup". Don't reintroduce timer delays
 - The ROS package is `ridgeback_autonomy`
@@ -102,11 +107,24 @@ Visualization conventions:
 - **Dock placement is only expressible as a `QMainWindow State` hex blob** in the `.rviz` file. `rviz_common`'s `addPane()` hardcodes `Qt::LeftDockWidgetArea` and the config format has no per-display area key, so a wide panel with no blob lands in the narrow left dock. `benchmark.rviz` carries one (generated via `QMainWindow::saveState()`, dock objectNames = the pane names = the keys in that same block); `restoreState` fails silently on a name mismatch, so any change to it needs a screenshot, not a build
 
 Benchmark stack:
-- simulator
-- `g1_detector_node`
-- one measurement node chosen by `measurement_backend`
-- `g1_estimate_viz_node` + `hud_node` (the rings and the distance readout, `estimate_viz:=true` by default)
-- `g1_distance_benchmark_runner` — also screen-records the RViz window to `video/run.mp4` via `benchmarking/recording.py` (best-effort; never fails a run)
+- Persistent environment layer (`g1_benchmark_env.launch.py`): simulator,
+  Ridgeback spawn, camera optical TF, benchmark RViz, and `g1_detector_node`.
+  The detector publishes only after OWLv2 has loaded, so its publisher is the
+  warm-model readiness signal.
+- Per-config layer (`g1_benchmark_config.launch.py`): the selected camera,
+  LiDAR, and/or mask measurement nodes; `g1_estimate_viz_node`; `hud_node`;
+  overlay; and `g1_distance_benchmark_runner`. It gates startup on both the
+  color and raw-detections publishers through `launch_wait`.
+- The runner screen-records persistent RViz to `video/run.mp4` through
+  `benchmarking/recording.py` (best-effort; never fails a run).
+- `g1_distance_benchmark.launch.py` is the backwards-compatible single-run
+  wrapper. `shutdown_on_complete` defaults false, so the completed single-run
+  stack stays open for inspection.
+- `g1_benchmark_sweep` validates a sweep YAML, starts one environment launch,
+  runs one config launch process at a time with `shutdown_on_complete:=true`,
+  resumes valid config outputs by `run.json`, records RTF, and writes
+  sweep-level `sweep.json` + `summary.md`. Never add runtime parameter mutation
+  to avoid the per-config process restart; node existence is estimator-driven.
 
 ## Namespace And Topic Conventions
 
@@ -122,7 +140,7 @@ Benchmark stack:
 
 ## Non-Obvious Conventions
 
-- Always run `bash cleanup.sh` before launching from the repo runbooks or helper scripts
+- Always run `bash cleanup.sh` before launching from the repo runbooks or helper scripts. For a benchmark sweep, run it once before the supervisor; never run it between configs because the simulator and RViz are intentionally persistent
 - `start_exploration.sh` is the canonical quick-start: sources the workspace, runs cleanup, and forwards `world` (positional 1), `EXPLORER` / explorer (positional 2 or env), `DEPTH_ANYTHING_ENABLED` (env), and `FASTRTPS_NO_SHM` (env) to the public launch
 - `build_and_start_expl.sh` rebuilds the workspace before forwarding to `start_exploration.sh`; pass-through args are positional in the same order
 - The G1 overlay is a separate OpenCV window, not an RViz panel
@@ -142,6 +160,10 @@ Benchmark stack:
 - `clearpath/robot.yaml`: robot platform, namespace, and sensor declarations
 - `src/ridgeback_autonomy/launch/ridgeback_exploration.launch.py`: main public exploration launch
 - `src/ridgeback_autonomy/launch/g1_distance_benchmark.launch.py`: public benchmark launch
+- `src/ridgeback_autonomy/launch/g1_benchmark_env.launch.py`: persistent benchmark simulator/RViz/detector layer
+- `src/ridgeback_autonomy/launch/g1_benchmark_config.launch.py`: restartable per-config benchmark layer
+- `src/ridgeback_autonomy/config/benchmark_sweep_baseline.yaml`: shipped 8-config baseline sweep
+- `src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_benchmark_sweep.py`: sweep supervisor executable
 - `start_exploration.sh`: canonical exploration quick-start (cleanup + launch + arg/env forwarding)
 - `build_and_start_expl.sh`: rebuild then forward to `start_exploration.sh`
 - `src/ridgeback_autonomy/config/nav2_params.yaml`: Nav2 config

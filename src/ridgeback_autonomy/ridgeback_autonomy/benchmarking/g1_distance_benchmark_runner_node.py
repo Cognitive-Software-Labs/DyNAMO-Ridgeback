@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from collections import OrderedDict
 from dataclasses import dataclass
-import json
 import os
 import subprocess
 import time
@@ -57,6 +56,13 @@ from ridgeback_autonomy.benchmarking.recording import (
     DEFAULT_MAX_SECONDS,
     ScreenRecorder,
     find_window_id,
+)
+from ridgeback_autonomy.benchmarking.process_utils import (
+    extract_json_payload,
+    format_commit,
+    git_provenance,
+    run_command,
+    try_command,
 )
 from ridgeback_autonomy.benchmarking.report import render_run_report
 from ridgeback_autonomy.benchmarking.scenarios import Scene, load_scenarios
@@ -134,73 +140,10 @@ RECORD_WINDOW_CLASS_DEFAULT = 'rviz'
 # RViz starts alongside this node, so allow it a moment to map its window.
 RECORD_WINDOW_WAIT_SEC = 20.0
 PREVIEW_BUFFER_LIMIT = 256
-GIT_TIMEOUT_SEC = 5.0
 # Declared by rclpy itself, not by the launch file, so it is not part of a
 # run's configuration. ``use_sim_time`` is deliberately NOT excluded: the
 # launch sets it and it changes how stamps are interpreted.
 RCLPY_INTERNAL_PARAMETERS = frozenset({'start_type_description_service'})
-
-
-def extract_json_payload(text: str) -> dict[str, Any]:
-    decoder = json.JSONDecoder()
-    search_from = 0
-    while True:
-        start = text.find('{', search_from)
-        if start == -1:
-            raise RuntimeError(f'Failed to parse Gazebo JSON payload: {text.strip()}')
-        try:
-            payload, _ = decoder.raw_decode(text[start:])
-        except json.JSONDecodeError:
-            search_from = start + 1
-            continue
-        if isinstance(payload, dict):
-            return payload
-        search_from = start + 1
-
-
-def git_provenance(repo_dir: str) -> dict[str, str]:
-    """Commit, branch and dirty flag for the tree that produced a run.
-
-    Best-effort: a missing git, a detached checkout or a non-repo directory
-    yields ``unknown`` rather than failing a benchmark over bookkeeping. The
-    dirty flag matters more than the hash -- a run from a modified tree is not
-    reproducible from the commit alone, and silently recording just the hash
-    would imply that it is.
-    """
-
-    def capture(args: list[str]) -> str | None:
-        try:
-            result = subprocess.run(
-                ['git', '-C', repo_dir] + args,
-                check=False, capture_output=True, text=True, timeout=GIT_TIMEOUT_SEC)
-        except (OSError, subprocess.SubprocessError):
-            return None
-        return result.stdout.strip() if result.returncode == 0 else None
-
-    status = capture(['status', '--porcelain'])
-    return {
-        'commit': capture(['rev-parse', '--short', 'HEAD']),
-        'branch': capture(['rev-parse', '--abbrev-ref', 'HEAD']),
-        'dirty_count': (
-            None if status is None
-            else len([line for line in status.splitlines() if line.strip()])
-        ),
-    }
-
-
-def format_commit(provenance: dict[str, Any]) -> str:
-    """One line naming the code that produced a run, dirt included."""
-
-    commit = provenance.get('commit')
-    if commit is None:
-        return 'unknown'
-    dirty_count = provenance.get('dirty_count')
-    if dirty_count is None:
-        return f'{commit} (dirty state unknown)'
-    if dirty_count:
-        return (f'{commit} + {dirty_count} uncommitted file(s) — NOT reproducible '
-                f'from this commit alone')
-    return f'{commit} (clean)'
 
 
 @dataclass
@@ -238,6 +181,7 @@ class G1DistanceBenchmarkRunner(Node):
         self.declare_parameter('scenario', '')
         self.declare_parameter('repeats', 5)
         self.declare_parameter('output_dir', default_output_dir)
+        self.declare_parameter('run_dir_name', '')
         self.declare_parameter('settle_sec', 2.0)
         self.declare_parameter('capture_sec', 10.0)
         self.declare_parameter('estimators', 'rgb,sensor_depth,depth_anything,pointcloud,lidar')
@@ -277,6 +221,7 @@ class G1DistanceBenchmarkRunner(Node):
         self.scenes = load_scenarios(self.scenario_path)
         self.repeats = int(self.get_parameter('repeats').value)
         self.output_dir = os.path.abspath(os.path.expanduser(str(self.get_parameter('output_dir').value)))
+        self.run_dir_name = str(self.get_parameter('run_dir_name').value).strip()
         self.settle_sec = float(self.get_parameter('settle_sec').value)
         self.capture_sec = float(self.get_parameter('capture_sec').value)
         self.selected_estimators = parse_estimators(str(self.get_parameter('estimators').value))
@@ -308,9 +253,14 @@ class G1DistanceBenchmarkRunner(Node):
         self.run_label = time.strftime('%Y%m%d_%H%M%S', self.run_started_at)
         # The folder carries the axes that change the results, so a results
         # directory reads without opening anything.
-        self.run_output_dir = os.path.join(self.output_dir, benchmark_run_folder_name(
-            self.run_label, self.scenario_path, self.mask_gate, self.depth_source,
-            self.selected_estimators))
+        run_folder = self.run_dir_name or benchmark_run_folder_name(
+            self.run_label,
+            self.scenario_path,
+            self.mask_gate,
+            self.depth_source,
+            self.selected_estimators,
+        )
+        self.run_output_dir = os.path.join(self.output_dir, run_folder)
         self.images_dir = os.path.join(self.run_output_dir, 'images')
         os.makedirs(self.images_dir, exist_ok=False)
 
@@ -1300,37 +1250,23 @@ class G1DistanceBenchmarkRunner(Node):
         timeout_sec: float,
         description: str,
     ) -> subprocess.CompletedProcess[str]:
-        result = self.try_command(command, timeout_sec=timeout_sec)
-        if result.returncode != 0:
-            stderr = result.stderr.strip()
-            stdout = result.stdout.strip()
-            raise RuntimeError(
-                f'Failed to {description}: exit={result.returncode} '
-                f'stdout="{stdout}" stderr="{stderr}"'
-            )
-        return result
+        return run_command(
+            command,
+            timeout_sec=timeout_sec,
+            description=description,
+            env=self.command_env,
+        )
 
     def try_command(
         self,
         command: list[str],
         timeout_sec: float,
     ) -> subprocess.CompletedProcess[str]:
-        # A timeout surfaces as RuntimeError like any other command failure, so
-        # callers with retry loops (spawn_model) actually retry it instead of
-        # failing the trial on the first slow gz service response.
-        try:
-            return subprocess.run(
-                command,
-                check=False,
-                capture_output=True,
-                text=True,
-                env=self.command_env,
-                timeout=timeout_sec,
-            )
-        except subprocess.TimeoutExpired as exc:
-            raise RuntimeError(
-                f'Command timed out after {timeout_sec:.1f}s: {" ".join(command)}'
-            ) from exc
+        return try_command(
+            command,
+            timeout_sec=timeout_sec,
+            env=self.command_env,
+        )
 
     def resolved_topic(self, topic: str) -> str:
         if topic.startswith('/'):
