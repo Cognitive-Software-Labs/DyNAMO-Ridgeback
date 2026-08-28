@@ -17,6 +17,26 @@ producer process and no depth topic in between. Each source declares which
 stream it reads through ``input_kind``; nothing downstream branches on depth
 semantics.
 
+Each source also declares ``usable_max_m``: the farthest reading it can
+produce that still means something. This is a property of the sensor or the
+network, not of the scene, and it is deliberately separate from the working
+depth gate the node applies (``depth_max_meters``). The two answer different
+questions -- "can this value be believed" versus "how much of the scene do we
+want to admit" -- and conflating them is what made a single 10 m constant do
+background suppression as a side effect. The node takes the tighter of the
+two.
+
+Only the monocular source declares a finite one, and it derives it rather than
+naming it: the metric head saturates at a known fraction of the checkpoint's
+``max_depth``, so the ceiling is a fact about the loaded weights. Stereo
+declares none. There is no honest number to put there -- Intel's D400
+datasheet gives the D435 as "0.2 m to over 3 m (varies with lighting
+conditions)" while the simulated camera is an exact render out to its 100 m
+far clip -- and a made-up ceiling is not a safety net. Out-of-range readings
+are already excluded by the frame contract above, which both sources satisfy:
+a value past what the source can resolve arrives as 0/NaN/inf, not as a
+confident number.
+
 This module is deliberately independent of the distance-estimator stack
 (geometry.py / g1_camera_measurement_node); it shares no code with it.
 """
@@ -24,6 +44,7 @@ This module is deliberately independent of the distance-estimator stack
 from __future__ import annotations
 
 import importlib
+import math
 import time
 
 import numpy as np
@@ -43,6 +64,16 @@ DEPTH_ANYTHING_MODEL_ID_DEFAULT = 'depth-anything/Depth-Anything-V2-Metric-Indoo
 # transient hiccup (e.g. a CUDA OOM) then self-heals rather than silently
 # starving every ``monocular`` benchmark row.
 MONOCULAR_RETRY_COOLDOWN_S_DEFAULT = 30.0
+
+# Depth-Anything's metric head is ``sigmoid(x) * config.max_depth``, so the top
+# of that range is where the sigmoid saturates rather than where the scene is:
+# predictions crowd toward the ceiling instead of resolving against it. Keep
+# the fraction of the range where the head still discriminates and treat the
+# rest as no-return.
+MONOCULAR_USABLE_RANGE_FRACTION = 0.9
+# Used only when the loaded config does not expose ``max_depth``; matches the
+# Metric Indoor checkpoint this module defaults to.
+MONOCULAR_MAX_DEPTH_FALLBACK_M = 20.0
 
 
 def decode_depth_to_meters(msg: Image) -> np.ndarray:
@@ -108,8 +139,17 @@ class StereoDepthSource:
 
     input_kind = 'depth'
 
-    def __init__(self, logger) -> None:
+    def __init__(
+        self,
+        logger,
+        *,
+        usable_max_m: float = math.inf,
+    ) -> None:
         self.logger = logger
+        # Unbounded by default: see the module docstring on why this source
+        # names no ceiling. An operator who knows their sensor can still pass
+        # one, and the node's own gate is the other way to bound the scene.
+        self.usable_max_m = float(usable_max_m)
 
     def produce(self, msg: Image) -> tuple[np.ndarray, object] | None:
         try:
@@ -149,6 +189,9 @@ class MonocularDepthSource:
         self._now_fn = now_fn
         self._cooldown_s = float(cooldown_s)
         self._retry_after = 0.0
+        # Refined from the checkpoint's own config on load; this standing value
+        # only covers the window before the first successful load.
+        self.usable_max_m = MONOCULAR_MAX_DEPTH_FALLBACK_M * MONOCULAR_USABLE_RANGE_FRACTION
 
     @staticmethod
     def resolve_device() -> str:
@@ -179,6 +222,37 @@ class MonocularDepthSource:
             f'Depth-Anything unavailable ({reason}); retrying after '
             f'{self._cooldown_s:.0f} s cooldown.')
 
+    def _resolve_usable_max(self) -> float:
+        """The checkpoint's usable ceiling, and the guard that it is metric at all.
+
+        Depth-Anything ships in two flavours behind identical plumbing: the
+        ``relative`` checkpoints emit affine-invariant *inverse* depth (bigger
+        means nearer, no units) while the ``metric`` ones emit meters. The
+        pipeline hands both back as ``predicted_depth`` and ``produce`` reads
+        that as meters, so a relative checkpoint would not error -- it would
+        quietly publish unitless disparity as a distance, and enough of it
+        would pass the depth gate to look plausible. ``model_id`` is a free
+        parameter, so refuse here rather than let that reach the estimators.
+
+        Raises ``ValueError`` when the configured checkpoint is not metric.
+        """
+
+        config = getattr(getattr(self._pipeline, 'model', None), 'config', None)
+        estimation_type = getattr(config, 'depth_estimation_type', None)
+        if estimation_type is not None and str(estimation_type) != 'metric':
+            raise ValueError(
+                f'model "{self.model_id}" is a "{estimation_type}" depth checkpoint, '
+                'which predicts unitless inverse depth rather than meters; the '
+                'aligned depth frame contract needs a metric checkpoint '
+                f'(e.g. "{DEPTH_ANYTHING_MODEL_ID_DEFAULT}")')
+        max_depth = getattr(config, 'max_depth', None)
+        if not max_depth:
+            self.logger.warn(
+                f'Checkpoint "{self.model_id}" exposes no max_depth; assuming '
+                f'{MONOCULAR_MAX_DEPTH_FALLBACK_M:.0f} m.')
+            max_depth = MONOCULAR_MAX_DEPTH_FALLBACK_M
+        return float(max_depth) * MONOCULAR_USABLE_RANGE_FRACTION
+
     def load(self) -> bool:
         if self._pipeline is not None:
             return True
@@ -190,7 +264,18 @@ class MonocularDepthSource:
         except Exception as exc:
             self._schedule_retry(f'load failed: {exc}')
             return False
-        self.logger.info('Depth-Anything model loaded.')
+        try:
+            self.usable_max_m = self._resolve_usable_max()
+        except ValueError as exc:
+            # A misconfigured checkpoint is not transient, but it goes through
+            # the same cooldown as any other failure rather than getting its
+            # own permanent latch: the model is cached locally by now, so the
+            # retry is cheap, and the operator gets the reason repeated instead
+            # of once at startup where it scrolls away.
+            self._schedule_retry(str(exc))
+            return False
+        self.logger.info(
+            f'Depth-Anything model loaded; usable to {self.usable_max_m:.1f} m.')
         return True
 
     def produce(self, msg: Image) -> tuple[np.ndarray, object] | None:

@@ -232,11 +232,15 @@ camera-frame coordinate output.
   centroid (base-planar projection). Applied identically across isolation
   recipes.
 - **Isolation recipe** — the `rect`-branch chain is a pluggable strategy.
-  ~~Choose and parameterize it~~ — resolved 2026-07-24: the default is
-  `Chain(HeightCrop, RangeBand)` (`ISOLATION_3D_DEFAULT` = `height_crop_range_band`
-  in `perception/core/isolation_3d.py`) — a floor-remover then a
-  background-separator, wired and running. Benchmarking the recipes against the
-  range-band incumbent stays open.
+  ~~Choose and parameterize it~~ — resolved 2026-07-24, changed 2026-08-28: the
+  default is `Chain(HeightCrop, NearestModeBand)` (`ISOLATION_3D_DEFAULT` =
+  `height_crop_nearest_mode_band` in `perception/core/isolation_3d.py`) — a
+  floor-remover then a background-separator, wired and running. It replaced the
+  percentile-anchored `RangeBand` chain, whose anchor is only correct while the
+  object is the nearest quarter of the point set and which was held inside that
+  regime by the depth gate rather than by anything in the recipe
+  (`foreground_isolation_3d.md` §2). Benchmarking the recipes against each
+  other stays open — the swap is unmeasured on real scenes.
 - **Isolation placement** — 2D-before-deprojection vs. 3D-after: benchmark the
   swap point (`foreground_isolation_3d.md`, evaluation protocol step 4).
 - ~~**Provenance decision**~~ — resolved 2026-07-11: deprojected only; the

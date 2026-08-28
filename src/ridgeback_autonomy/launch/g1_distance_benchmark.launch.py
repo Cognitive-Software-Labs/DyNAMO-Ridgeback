@@ -18,6 +18,11 @@ from ridgeback_autonomy.benchmarking.estimators import (
     uses_lidar_estimators,
     uses_mask_estimators,
 )
+from ridgeback_autonomy.perception.core.depth_common import (
+    DEPTH_GATE_DISABLED,
+    DEPTH_MAX_METERS_DEFAULT,
+)
+from ridgeback_autonomy.perception.core.isolation_3d import ISOLATION_3D_DEFAULT
 
 
 CAMERA_MEASUREMENT_TOPIC = 'measurements/g1/camera'
@@ -90,6 +95,7 @@ def build_benchmark_nodes(context, *args, **kwargs):
                     'base_frame': base_frame,
                     'enabled_estimators': ','.join(selected_camera),
                     'depth_anything_enabled': 'depth_anything' in selected_estimators,
+                    'depth_max_meters': LaunchConfiguration('depth_max_meters'),
                 }],
                 remappings=[('/tf', 'tf'), ('/tf_static', 'tf_static')],
                 output='screen',
@@ -140,6 +146,7 @@ def build_benchmark_nodes(context, *args, **kwargs):
                     'isolation_3d': LaunchConfiguration('isolation_3d'),
                     'mask_gate': LaunchConfiguration('mask_gate'),
                     'color_topic': color_topic,
+                    'depth_max_meters': LaunchConfiguration('mask_depth_max_meters'),
                     'depth_match_debug': LaunchConfiguration('depth_match_debug'),
                 }],
                 remappings=[('/tf', 'tf'), ('/tf_static', 'tf_static')],
@@ -258,6 +265,12 @@ def build_benchmark_nodes(context, *args, **kwargs):
                 'isolation_2d': LaunchConfiguration('isolation_2d'),
                 'isolation_3d': LaunchConfiguration('isolation_3d'),
                 'mask_gate': LaunchConfiguration('mask_gate'),
+                'depth_max_meters': LaunchConfiguration('depth_max_meters'),
+                # Recorded, not applied: the runner reads depth_max_meters for
+                # the collage. This is here so run.json carries the gate the
+                # mask rows actually ran under, which is the axis a gate
+                # comparison varies.
+                'mask_depth_max_meters': LaunchConfiguration('mask_depth_max_meters'),
             }],
             remappings=[('/tf', 'tf'), ('/tf_static', 'tf_static')],
             output='screen',
@@ -345,9 +358,40 @@ def generate_launch_description():
         ),
         DeclareLaunchArgument(
             'isolation_3d',
-            default_value='height_crop_range_band',
+            default_value=ISOLATION_3D_DEFAULT,
             description='Euclidean-reconstruction rect-branch foreground recipe: '
-                        '"height_crop_range_band", "height_crop", or "range_band".',
+                        '"height_crop_nearest_mode_band", "height_crop_range_band", '
+                        '"height_crop", "range_band", or "nearest_mode_band". The '
+                        'two chains differ only in how the background separator '
+                        'anchors -- nearest mode vs. percentile. The mode anchor '
+                        'is the default because it does not slide as background '
+                        'grows; the percentile one is kept selectable because it '
+                        'is what the legacy pointcloud estimator does, so a run '
+                        'can measure the difference.',
+        ),
+        DeclareLaunchArgument(
+            'depth_max_meters',
+            default_value=str(DEPTH_MAX_METERS_DEFAULT),
+            description='Working depth gate for the legacy camera rows, and the '
+                        'range the depth collage normalizes its colours over. '
+                        'Finite because neither has a source ceiling behind it: '
+                        'the legacy rows would be left unbounded, and the '
+                        'colorizer would render a uniform frame. The mask rows '
+                        'have their own gate -- see mask_depth_max_meters.',
+        ),
+        DeclareLaunchArgument(
+            'mask_depth_max_meters',
+            default_value=str(DEPTH_GATE_DISABLED),
+            description='Working depth gate for the mask rows. Not a validity '
+                        'rule: how far a reading can be believed is the depth '
+                        'source\'s own ceiling (monocular derives it from the '
+                        'checkpoint, stereo declares none), and the tighter of '
+                        'the two applies. 0 means no gate, which is the default '
+                        '-- set a positive value only to deliberately admit less '
+                        'scene. The percentile-anchored isolation_3d recipes are '
+                        'sensitive to how much background gets through, so one of '
+                        'those alongside a wide gate is the combination that '
+                        'reads the wall instead of the robot.',
         ),
         DeclareLaunchArgument(
             'mask_gate',

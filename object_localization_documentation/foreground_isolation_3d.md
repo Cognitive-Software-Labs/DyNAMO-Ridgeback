@@ -86,9 +86,13 @@ offset and diverge only as the object moves off the optical axis. It is the
 point-domain twin of the 2D nearest-mode histogram.
 
 **Pros**
-- Already implemented and benchmarked (MAE 0.156 m in the 70-trial sim run of
-  2026-07-13; see `benchmark-results/`, figure possibly superseded by a later
-  run) — the incumbent every other method must beat.
+- Benchmarked (MAE 0.156 m in the 70-trial sim run of 2026-07-13; see
+  `benchmark-results/`, figure possibly superseded by a later run). It was the
+  default until 2026-08-28 and is the baseline a change to this stage is
+  measured against, but it is no longer what ships — see §2b.
+- Still what the legacy `pointcloud` estimator does, unchanged, which is the
+  other reason it stays in the registry: selecting it is how a run reproduces
+  that row's isolation behaviour on the mask path.
 - A handful of NumPy lines; negligible runtime.
 - The percentile anchor is robust to a moderate fraction of nearer-than-object
   noise, which a plain minimum is not.
@@ -100,10 +104,68 @@ point-domain twin of the 2D nearest-mode histogram.
   for any other object.
 - No spatial coherence: floor points that happen to lie in the range band
   survive (the window's asymmetry is precisely a hand-tuned patch for this).
+- **The anchor is a proportion statistic, so it is coupled to the depth
+  gate.** "The 25% mark" moves whenever the background's *share* of the point
+  set changes, and that share is a property of the scene's depth extent rather
+  than of the object. A rect mask in a small room collects little background;
+  the same mask down a corridor collects a lot. Once the subject stops being
+  the nearest quarter of the set, the anchor lands on the wall and the window
+  follows it — the estimator reports the background, confidently, with no miss
+  reason. What held this in check until 2026-08-28 was the 10 m cutoff in
+  `depth_common.valid_depth`, which bounded how much background could enter at
+  all — a cutoff that was load-bearing for reasons unrelated to depth validity
+  and that nobody had chosen for that job. This is why the anchor was replaced
+  as the default rather than the gate simply being widened: relaxing the gate
+  first is the regression. `NearestModeBand` (§2b) is the decoupled
+  replacement, and with it the mask gate now defaults to no gate at all.
 
 **Paper access.** Folk method; no canonical publication. The percentile-anchor
 formulation is this repository's own (`geometry.py`); document as
 "range-band / percentile anchor" in the comparison.
+
+---
+
+## 2b. Nearest-Mode Band (Mode Anchor + Inlier Window)
+
+**Idea.** `RangeBand` with the anchor swapped and the window untouched:
+histogram the ranges at 0.05 m and anchor on the nearest bin holding at least
+5% of the points — the subject's near surface — instead of on a low percentile
+of them. Shipped as `NearestModeBand` (`perception/core/isolation_3d.py`); the
+anchor itself is `depth_common.nearest_significant_mode`, shared outright with
+the 2D nearest-mode histogram so the pixel domain and the point domain place
+the near surface identically.
+
+**Pros**
+- **Invariant to how much background is in the set.** Far points can only add
+  far bins; they cannot move the nearest significant bin. This is the property
+  §2 lacks, and it is what decouples isolation from the depth cutoff — the
+  prerequisite for raising or removing that cutoff.
+- Keeps §2's asymmetric −0.10 / +0.35 m window, so the two differ in exactly
+  one respect and are directly comparable in the benchmark.
+- Same cost class as §2: one histogram, a handful of NumPy lines.
+
+**Cons**
+- Inherits §2's other failures unchanged: clutter *in front of* the G1 still
+  captures the anchor, the window width is still a G1-specific magic number,
+  and there is still no spatial coherence.
+- Adds two parameters of its own (bin width, significance fraction). The
+  significance floor is a fraction of the set size, so a subject that is a very
+  small share of a very large point set can fail to clear it; the fallback is
+  the nearest non-empty bin, which errs in the safe direction but is
+  noise-sensitive.
+- **Not yet benchmarked on real scenes**, despite being the default since
+  2026-08-28. The invariance is established by unit test
+  (`test_nearest_mode_band_anchor_is_invariant_to_background_size`) and §2's
+  corresponding failure by
+  `test_range_band_anchor_slides_off_the_object_in_a_corridor`, but neither is
+  evidence about MAE on the scenario set. It is the default because the
+  alternative was keeping an anchor whose correctness depended on a depth gate
+  that no longer exists — not because it has been measured to be better. The
+  A/B that settles that is still outstanding; run it as a regression check,
+  selecting §2 explicitly for the baseline arm.
+
+**Paper access.** Same folk lineage as §2; the mode-anchor variant is the
+point-domain port of this repository's own 2D nearest-mode histogram.
 
 ---
 
@@ -332,7 +394,8 @@ Learning on Point Sets in a Metric Space,"* NeurIPS 2017.
 | # | Method | Cue | Handles touching FG/BG | Speed | Tuning burden | Extra input | Key risk |
 |---|--------|-----|------------------------|-------|---------------|-------------|----------|
 | 1 | Extrinsic height crop | Known extrinsics | floor only | ★★★★★ | ε | TF/calib | Calibration drift; non-floor BG passes |
-| 2 | Range band (percentile) | Distance distribution | No | ★★★★★ | Window width | — | Clutter in front; **incumbent** |
+| 2 | Range band (percentile) | Distance distribution | No | ★★★★★ | Window width | — | Clutter in front; anchor slides with background share; **prior default, still the legacy `pointcloud` behaviour** |
+| 2b | Nearest-mode band | Distance distribution | No | ★★★★★ | Window width, bin width | — | Clutter in front; unbenchmarked; **default** |
 | 3 | RANSAC plane removal | Fitted plane | floor/wall | ★★★★☆ | Inlier band | — | Locks onto the G1's flat patches |
 | 4 | Normal filter | Per-point normals | floor only | ★★★☆☆ | Radius, angle | normals | Noisy normals at range |
 | 5 | Euclidean cluster / DBSCAN | Air-gap connectivity | **No** (fuses) | ★★★★☆ | Tolerance vs. density | — | Fragment at range, fuse at floor |

@@ -82,6 +82,11 @@ from ridgeback_autonomy.common.messages import (
 from ridgeback_autonomy.common.miss_reason import MissReason
 from ridgeback_autonomy.common.tf_utils import lookup_transform_components
 from ridgeback_autonomy.msg import G1Detections, G1Measurements
+from ridgeback_autonomy.perception.core.depth_common import (
+    DEPTH_GATE_DISABLED,
+    MASK_DEPTH_GATE_DEFAULT,
+    resolve_depth_gate,
+)
 from ridgeback_autonomy.perception.core.depth_sources import (
     DEPTH_ANYTHING_MODEL_ID_DEFAULT,
     DEPTH_SOURCE_STEREOSCOPIC,
@@ -400,6 +405,7 @@ def fill_path_measurements(
     front_offset_m: float,
     isolation_2d,
     isolation_3d,
+    depth_max: float = MASK_DEPTH_GATE_DEFAULT,
     scan_reason: MissReason = MissReason.NO_SCAN,
     beam_records: list | None = None,
     enabled=MASK_ESTIMATORS,
@@ -420,6 +426,11 @@ def fill_path_measurements(
     run and not stamped, so its fields stay NaN and its status stays ``UNSET``
     -- the run simply has no such row, exactly as an unselected legacy
     estimator has none.
+
+    ``depth_max`` is the working depth gate the two depth paths clean against
+    (polar never sees it -- it reads the scan, which has its own clip). It is
+    not a validity rule: how far a reading can be believed is the depth
+    source's ``usable_max_m``, and the caller passes the tighter of the two.
 
     ``beam_records`` is an optional out-list collecting one ``PolarBeamRecord``
     per detection that had a scan, for visualization. Passing nothing keeps the
@@ -443,7 +454,8 @@ def fill_path_measurements(
         else:
             if wants_projective:
                 result_a, reason_a = localize_projective_ranging(
-                    depth_m, mask, intrinsics, isolation=isolation_2d)
+                    depth_m, mask, intrinsics, isolation=isolation_2d,
+                    depth_max=depth_max)
                 detection.projective_ranging_status = int(reason_a)
                 if result_a is not None:
                     (
@@ -456,7 +468,8 @@ def fill_path_measurements(
 
             if wants_euclidean:
                 result_b, reason_b = localize_euclidean_reconstruction(
-                    depth_m, mask, intrinsics, isolation=isolation_3d)
+                    depth_m, mask, intrinsics, isolation=isolation_3d,
+                    depth_max=depth_max)
                 detection.euclidean_reconstruction_status = int(reason_b)
                 if result_b is not None:
                     (
@@ -598,6 +611,23 @@ class G1MaskMeasurementNode(Node):
         # ``aligned_depth_to_color`` stream: the source converts units, it does
         # not align. Unused when depth_source is monocular.
         self.declare_parameter('depth_topic', DEPTH_TOPIC_DEFAULT)
+        # The working depth gate for the two depth paths. Same parameter name
+        # as the legacy g1_camera_measurement_node but no longer the same
+        # default: that node's rows have no source ceiling behind them, so
+        # theirs has to stay finite while this one does not.
+        #
+        # This gate is about how much of the scene to admit, not about whether
+        # a reading is believable; that ceiling is the depth source's
+        # ``usable_max_m`` and the two are combined in effective_depth_max().
+        # Unbounded by default. It used to sit at 10 m, where it doubled as the
+        # background suppressor keeping euclidean's percentile anchor inside
+        # the regime that anchor is correct in -- load-bearing behaviour from a
+        # constant nobody picked for that job, and the reason an object past
+        # the gate came back as TOO_FEW_VALID_PIXELS, blaming the mask for a
+        # range decision. The isolation default is mode-anchored now
+        # (``foreground_isolation_3d.md`` Section 2b), so nothing depends on
+        # the gate being tight.
+        self.declare_parameter('depth_max_meters', DEPTH_GATE_DISABLED)
         self.declare_parameter('camera_info_topic', CAMERA_INFO_TOPIC_DEFAULT)
         self.declare_parameter('depth_anything_model_id', DEPTH_ANYTHING_MODEL_ID_DEFAULT)
         self.declare_parameter('depth_anything_device', '')
@@ -674,6 +704,8 @@ class G1MaskMeasurementNode(Node):
                 # Node clock so the monocular cooldown respects use_sim_time.
                 now_fn=lambda: self.get_clock().now().nanoseconds / 1e9,
             )
+        self.depth_max_gate_m = resolve_depth_gate(
+            self.get_parameter('depth_max_meters').value)
 
         # Two readers want the exact color frame the detections were made on:
         # the silhouette gate prompts the segmenter with it, and the monocular
@@ -842,6 +874,19 @@ class G1MaskMeasurementNode(Node):
             summary = self.depth_match_diagnostics.summary()
         self.get_logger().info(summary)
 
+    def effective_depth_max(self) -> float:
+        """The depth cutoff to clean against: the tighter of gate and source ceiling.
+
+        Resolved per batch rather than once at startup because the monocular
+        source only learns its ceiling from the checkpoint config once the
+        model finishes loading, which is lazy and retried after a failure. A
+        source that declares no ceiling (the test stubs) contributes none and
+        leaves the gate alone.
+        """
+
+        usable_max_m = getattr(self.depth_source, 'usable_max_m', float('inf'))
+        return min(self.depth_max_gate_m, float(usable_max_m))
+
     def resolve_recipe(self, parameter_name: str, registry: dict):
         return registry[self.resolve_recipe_name(parameter_name, registry)]
 
@@ -990,6 +1035,7 @@ class G1MaskMeasurementNode(Node):
                             front_offset_m=self.front_offset_m,
                             isolation_2d=self.isolation_2d,
                             isolation_3d=isolation_3d,
+                            depth_max=self.effective_depth_max(),
                             scan_reason=scan_reason,
                             beam_records=beam_records,
                             enabled=self.enabled_estimators,

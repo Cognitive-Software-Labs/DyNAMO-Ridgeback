@@ -20,6 +20,12 @@ from dataclasses import dataclass
 
 import numpy as np
 
+from ridgeback_autonomy.perception.core.depth_common import (
+    NEAREST_MODE_BIN_WIDTH_M_DEFAULT,
+    NEAREST_MODE_MIN_BIN_FRACTION_DEFAULT,
+    nearest_significant_mode,
+)
+
 
 CAMERA_HEIGHT_M_DEFAULT = 1.053  # static/test default only; at runtime the height comes from TF via camera_floor_geometry. Mask-stack only: the legacy config/camera_config.json height_m stays 0.85 and is deliberately not touched here.
 CAMERA_PITCH_DEG_DEFAULT = 0.0  # static/test default; runtime pitch is read from the TF rotation
@@ -91,6 +97,47 @@ class RangeBand:
 
 
 @dataclass(frozen=True)
+class NearestModeBand:
+    """Catalogue #2b: nearest-mode anchor + inlier window -- a background-separator.
+
+    ``RangeBand`` with its anchor swapped: the same asymmetric window, placed
+    at the nearest significant mode of the ranges instead of at a low
+    percentile of them. The point-domain twin of the 2D nearest-mode
+    histogram, and it shares that recipe's anchor function outright.
+
+    The percentile anchor is a *proportion* statistic -- "how far in does the
+    25% mark fall" -- so it moves whenever the background's share of the point
+    set changes. That share is a property of the scene's depth extent, not of
+    the object: a rect mask in a corridor collects far wall points that a rect
+    mask in a small room does not, and past the point where the subject stops
+    being the nearest quarter of the set, the anchor lands on the wall and the
+    window follows it. Anchoring on the nearest coherent surface removes the
+    dependence, because far samples can only add far bins.
+
+    That makes this the recipe to reach for when the depth gate is widened:
+    ``RangeBand``'s tolerance for background is bounded by how much background
+    the gate lets through, so the two are coupled and this one is not.
+    """
+
+    ahead_m: float = RANGE_BAND_AHEAD_M_DEFAULT
+    behind_m: float = RANGE_BAND_BEHIND_M_DEFAULT
+    bin_width_m: float = NEAREST_MODE_BIN_WIDTH_M_DEFAULT
+    min_bin_fraction: float = NEAREST_MODE_MIN_BIN_FRACTION_DEFAULT
+
+    def __call__(self, points: np.ndarray) -> np.ndarray:
+        points = np.asarray(points, dtype=np.float64)
+        if points.shape[0] == 0:
+            return np.zeros(0, dtype=bool)
+        ranges = point_ranges(points)
+        anchor_m = nearest_significant_mode(
+            ranges,
+            bin_width_m=self.bin_width_m,
+            min_bin_fraction=self.min_bin_fraction,
+        )
+        return (ranges >= anchor_m - self.ahead_m) & (ranges <= anchor_m + self.behind_m)
+
+
+@dataclass(frozen=True)
 class Chain:
     """Compose isolators: each step sees only the survivors of the previous one."""
 
@@ -134,9 +181,20 @@ def mad_outlier_removal(points: np.ndarray, k: float = MAD_K_DEFAULT) -> np.ndar
 ISOLATION_3D_RECIPES: dict[str, object] = {
     'height_crop': HeightCrop(),
     'range_band': RangeBand(),
+    'nearest_mode_band': NearestModeBand(),
     'height_crop_range_band': Chain((HeightCrop(), RangeBand())),
+    'height_crop_nearest_mode_band': Chain((HeightCrop(), NearestModeBand())),
 }
-ISOLATION_3D_DEFAULT = 'height_crop_range_band'
+# The mode-anchored chain is the default. The percentile chain it replaces is
+# correct only while the object is the nearest quarter of the point set, and
+# what kept it inside that regime was the depth gate bounding how much
+# background could enter -- not anything about the recipe. With no ceiling on
+# the stereo source and none on the gate, that protection is gone, so the
+# anchor has to be one that does not move as background grows.
+# ``RangeBand`` stays in the registry: it is what the legacy pointcloud
+# estimator does, and the benchmark needs to be able to select it to measure
+# the difference.
+ISOLATION_3D_DEFAULT = 'height_crop_nearest_mode_band'
 
 
 def camera_floor_geometry(
@@ -169,8 +227,8 @@ def build_isolation_3d(name: str, camera_height_m: float, pitch_deg: float):
 
     Mirrors ``ISOLATION_3D_RECIPES`` but constructs any ``HeightCrop`` step at
     the given height and pitch (typically from ``camera_floor_geometry``) rather
-    than the static defaults. ``RangeBand`` takes no pose -- it works on
-    rotation-invariant camera-frame ranges -- so it is unchanged.
+    than the static defaults. The background-separators take no pose -- they
+    work on rotation-invariant camera-frame ranges -- so they are unchanged.
     """
 
     height_crop = HeightCrop(camera_height_m=camera_height_m, pitch_deg=pitch_deg)
@@ -178,7 +236,11 @@ def build_isolation_3d(name: str, camera_height_m: float, pitch_deg: float):
         return height_crop
     if name == 'range_band':
         return RangeBand()
+    if name == 'nearest_mode_band':
+        return NearestModeBand()
     if name == 'height_crop_range_band':
         return Chain((height_crop, RangeBand()))
+    if name == 'height_crop_nearest_mode_band':
+        return Chain((height_crop, NearestModeBand()))
     supported = ', '.join(sorted(ISOLATION_3D_RECIPES))
     raise ValueError(f'Unknown isolation_3d recipe "{name}". Expected one of: {supported}')

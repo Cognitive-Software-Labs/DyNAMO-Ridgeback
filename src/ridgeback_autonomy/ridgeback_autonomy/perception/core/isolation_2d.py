@@ -20,13 +20,14 @@ import numpy as np
 
 from ridgeback_autonomy.perception.core.depth_common import (
     DEPTH_MAX_METERS_DEFAULT,
+    NEAREST_MODE_BIN_WIDTH_M_DEFAULT,
+    NEAREST_MODE_MIN_BIN_FRACTION_DEFAULT,
+    nearest_significant_mode,
     valid_depth,
 )
 
 
-NEAREST_MODE_BIN_WIDTH_M_DEFAULT = 0.05
 NEAREST_MODE_BAND_M_DEFAULT = 0.35
-NEAREST_MODE_MIN_BIN_FRACTION_DEFAULT = 0.05
 
 OTSU_BIN_WIDTH_M_DEFAULT = 0.05
 
@@ -52,31 +53,17 @@ def nearest_mode_histogram(
     Histogram the valid masked depths, take the nearest bin holding at least
     ``min_bin_fraction`` of them as the object's near surface, and keep the
     pixels within ``band_m`` of that peak. Assumes the subject is the nearest
-    coherent surface in the box.
+    coherent surface in the box. The anchor itself is
+    ``depth_common.nearest_significant_mode``, shared with the point-domain
+    twin so both domains place the near surface identically.
     """
 
     valid, values = _valid_masked(depth_m, mask, depth_max)
     if values.size == 0:
         return np.zeros_like(valid)
 
-    low = float(values.min())
-    high = float(values.max())
-    num_bins = max(1, int(np.ceil((high - low) / bin_width_m)))
-    hist, edges = np.histogram(
-        values, bins=num_bins, range=(low, low + num_bins * bin_width_m))
-
-    significant = np.flatnonzero(hist >= max(1.0, min_bin_fraction * values.size))
-    if significant.size > 0:
-        nearest = int(significant[0])
-    else:
-        # Dispersed distribution: no bin clears the significance floor (the
-        # object's depth spread plus the floor ramp can dilute every bin at
-        # range). Fall back to the NEAREST non-empty bin, not the global mode:
-        # at range the biggest coherent bin is the background wall, so
-        # ``argmax`` would confidently isolate the wall instead of the subject.
-        # ``values.size > 0`` guarantees at least one non-empty bin.
-        nearest = int(np.flatnonzero(hist >= 1)[0])
-    peak_m = 0.5 * (edges[nearest] + edges[nearest + 1])
+    peak_m = nearest_significant_mode(
+        values, bin_width_m=bin_width_m, min_bin_fraction=min_bin_fraction)
 
     foreground = np.zeros_like(valid)
     foreground[valid] = np.abs(values - peak_m) <= band_m

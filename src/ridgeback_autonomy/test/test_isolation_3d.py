@@ -12,6 +12,7 @@ from ridgeback_autonomy.perception.core.isolation_3d import (
     ISOLATION_3D_RECIPES,
     Chain,
     HeightCrop,
+    NearestModeBand,
     RangeBand,
     build_isolation_3d,
     camera_floor_geometry,
@@ -69,6 +70,21 @@ def wall_points() -> np.ndarray:
     return np.stack((x.ravel(), y.ravel(), z.ravel()), axis=-1)
 
 
+def corridor_points(near_m: float = 4.0, far_m: float = 22.0, planes: int = 24) -> np.ndarray:
+    """Background receding well past the object, as a corridor's walls do.
+
+    Deliberately far larger than ``object_points()``: the whole question is
+    what an anchor does once the subject stops being a large share of the set.
+    """
+
+    x, y = np.meshgrid(np.linspace(-0.5, 0.5, 5), np.linspace(-0.5, 0.5, 10))
+    slabs = [
+        np.stack((x.ravel(), y.ravel(), np.full(x.size, z)), axis=-1)
+        for z in np.linspace(near_m, far_m, planes)
+    ]
+    return np.concatenate(slabs)
+
+
 def test_height_crop_removes_floor_keeps_object_and_wall() -> None:
     points = np.concatenate((object_points(), floor_points(), wall_points()))
     n_object, n_floor = len(object_points()), len(floor_points())
@@ -90,6 +106,42 @@ def test_range_band_removes_wall_keeps_object() -> None:
 
     assert keep[:n_object].all()
     assert not keep[n_object:].any()
+
+
+def test_nearest_mode_band_removes_wall_keeps_object() -> None:
+    points = np.concatenate((object_points(), wall_points()))
+    n_object = len(object_points())
+
+    keep = NearestModeBand()(points)
+
+    assert keep[:n_object].all()
+    assert not keep[n_object:].any()
+
+
+def test_nearest_mode_band_anchor_is_invariant_to_background_size() -> None:
+    # The property the percentile anchor lacks: growing the background must not
+    # move the anchor, because the subject's near surface has not moved.
+    objects = object_points()
+    small = np.concatenate((objects, corridor_points(planes=2)))
+    large = np.concatenate((objects, corridor_points(planes=24)))
+
+    for points in (small, large):
+        keep = NearestModeBand()(points)
+        assert keep[:len(objects)].all()
+        assert not keep[len(objects):].any()
+
+
+def test_range_band_anchor_slides_off_the_object_in_a_corridor() -> None:
+    # Characterizes the incumbent's coupling to the depth gate rather than
+    # asserting it is correct: once the subject is under the 25th percentile of
+    # the set, the percentile anchor leaves it and the window follows.
+    objects = object_points()
+    points = np.concatenate((objects, corridor_points(planes=24)))
+
+    keep = RangeBand()(points)
+
+    assert not keep[:len(objects)].any(), 'expected the incumbent to lose the object here'
+    assert keep[len(objects):].any()
 
 
 def test_chain_leaves_exactly_the_object() -> None:
@@ -127,7 +179,13 @@ def test_mad_outlier_removal_zero_spread_keeps_all() -> None:
 def test_isolators_accept_empty_input() -> None:
     empty = np.zeros((0, 3), dtype=np.float64)
 
-    for isolator in (HeightCrop(), RangeBand(), Chain((HeightCrop(), RangeBand()))):
+    for isolator in (
+        HeightCrop(),
+        RangeBand(),
+        NearestModeBand(),
+        Chain((HeightCrop(), RangeBand())),
+        Chain((HeightCrop(), NearestModeBand())),
+    ):
         assert isolator(empty).shape == (0,)
     assert mad_outlier_removal(empty).shape == (0,)
 
@@ -138,12 +196,15 @@ def test_point_ranges_is_euclidean_norm() -> None:
     assert np.allclose(point_ranges(points), [5.0, 2.0])
 
 
-def test_registry_default_is_the_full_chain() -> None:
+def test_registry_default_is_the_mode_anchored_full_chain() -> None:
+    # The anchor, not just the chain: a percentile anchor is only correct while
+    # the object is the nearest quarter of the point set, and nothing bounds
+    # the background any more now that the gate defaults to no gate.
     default = ISOLATION_3D_RECIPES[ISOLATION_3D_DEFAULT]
 
     assert isinstance(default, Chain)
     assert isinstance(default.steps[0], HeightCrop)
-    assert isinstance(default.steps[1], RangeBand)
+    assert isinstance(default.steps[1], NearestModeBand)
 
 
 def test_camera_floor_geometry_level_mount() -> None:
@@ -177,6 +238,26 @@ def test_build_isolation_3d_parameterizes_heightcrop() -> None:
     lone = build_isolation_3d('height_crop', camera_height_m=1.2, pitch_deg=3.0)
     assert isinstance(lone, HeightCrop)
     assert lone.camera_height_m == 1.2
+
+
+def test_build_isolation_3d_covers_every_registered_recipe() -> None:
+    # The registry and the builder are two lists of the same names; a recipe
+    # added to one and not the other only fails at runtime, on the node, when
+    # someone finally passes that name as a parameter.
+    for name in ISOLATION_3D_RECIPES:
+        built = build_isolation_3d(name, camera_height_m=1.2, pitch_deg=3.0)
+        assert type(built) is type(ISOLATION_3D_RECIPES[name])
+
+
+def test_build_isolation_3d_parameterizes_heightcrop_in_the_mode_chain() -> None:
+    chain = build_isolation_3d(
+        'height_crop_nearest_mode_band', camera_height_m=1.2, pitch_deg=3.0)
+
+    height_crop, band = chain.steps
+    assert isinstance(height_crop, HeightCrop)
+    assert height_crop.camera_height_m == 1.2
+    assert height_crop.pitch_deg == 3.0
+    assert isinstance(band, NearestModeBand)
 
 
 def test_build_isolation_3d_rejects_unknown_name() -> None:

@@ -39,6 +39,25 @@ An **aligned depth frame** is a depth image that satisfies:
 - **Invalid pixels:** `0`, `NaN`, or `inf` mean "no depth here"; consumers
   filter them (`projective_ranging.md` §2.2) and sources must not encode invalid
   as any other value.
+- **Usable ceiling:** every source declares `usable_max_m` — the farthest
+  reading it can produce that still means something. This is a property of the
+  sensor or the network (see §3), *not* of the scene, and it is deliberately
+  distinct from the working depth gate the node applies (`depth_max_meters`).
+  The two answer different questions — "can this value be believed" versus "how
+  much of the scene do we want to admit" — and the node cleans against the
+  tighter of them. They were one 10 m constant until 2026-08-27; the cost of
+  that conflation is written up in `foreground_isolation_3d.md` §2.
+
+  Only monocular declares a finite ceiling, and it *derives* it rather than
+  naming it. Stereo declares none, as of 2026-08-28. There is no honest number
+  to put there: Intel's D400 datasheet (337029-017) gives the D435 as "0.2 m to
+  over 3 m (varies with lighting conditions)", while the simulated camera is an
+  exact render out to a 100 m far clip
+  (`clearpath_sensors_description/urdf/intel_realsense.urdf.xacro`, no noise
+  model). The 10 m that used to sit there matched neither and was inherited
+  from `POINTCLOUD_MAX_METERS`. Out-of-range readings are already excluded by
+  the invalid-pixel rule above, which both sources satisfy — a value past what
+  a source can resolve arrives as `0`/`NaN`/`inf`, not as a confident number.
 - **Timing:** stamped with the color frame it is aligned to, so mask and depth
   can be matched frame-to-frame. The frame is *made* at that stamp: the mask
   node buffers the source's input stream raw and converts only the frame the
@@ -141,6 +160,25 @@ per detection batch, not once per camera frame); the legacy
 - **Metric scaling.** The checkpoint predicts metric depth for indoor scenes;
   any residual global scale/bias correction (e.g. against a known reference)
   is part of this producer, not the consumers.
+- **Metric is a property of the checkpoint, not of Depth-Anything.** The
+  architecture ships in two flavours behind identical plumbing, selected by
+  `config.depth_estimation_type`. `relative` checkpoints end in `ReLU` and emit
+  affine-invariant **inverse** depth (larger means nearer, no units);
+  `metric` ones end in `Sigmoid` scaled by `config.max_depth` and emit meters.
+  The HuggingFace pipeline returns both as `predicted_depth`, and `produce`
+  reads that as meters — so pointing `depth_anything_model_id` at a relative
+  checkpoint would not raise: it would publish unitless disparity as a
+  distance, and enough of it would clear the depth gate to look plausible.
+  `MonocularDepthSource._resolve_usable_max` therefore reads the config on load
+  and **refuses** a non-metric checkpoint rather than let it reach the
+  estimators.
+- **The ceiling comes from that same config.** `usable_max_m` is
+  `config.max_depth × 0.9`. The head cannot emit beyond `max_depth` at all
+  (20 m for Metric Indoor, 80 m for Metric Outdoor), and the top of that range
+  is where the sigmoid saturates rather than where the scene is — predictions
+  crowd toward the ceiling instead of resolving against it — so the last tenth
+  is treated as no-return. Nothing here is hardcoded to the Indoor figure;
+  swapping checkpoints moves the ceiling with them.
 - **Error character is inverted vs. stereo.** Stereo depth has *holes and
   speckle* but locally accurate values; monocular depth is *dense and smooth*
   (no invalid pixels, no occlusion holes) but can be globally off in scale and
@@ -163,6 +201,11 @@ Two sources, one contract, and every localization path is source-blind:
 ```
 stereo source     = capture -> (real: align) -> float meters -> frame
 monocular source  = RGB -> Depth-Anything -> metric scale    -> frame
+
+each also declares usable_max_m; the node cleans against
+min(usable_max_m, depth_max_meters). Both default to unbounded except
+monocular's derived ceiling, so by default a mask reading is bounded
+only by what its own source can resolve.
 
 projective ranging, euclidean reconstruction and the mask overlay never branch
 on the source; they receive a frame that already satisfies §1.
@@ -190,6 +233,18 @@ which stream the node buffers raw and hands back at the detection stamp.
 - **`align_depth` on hardware** — add the parameter to `robot.yaml`, verify it
   survives the Clearpath generation layer, and confirm the
   `aligned_depth_to_color` topic grid matches the color image.
+- ~~**Widen the depth gate**~~ — done 2026-08-28. The mask rows' gate
+  (`mask_depth_max_meters`) defaults to `0`, meaning no gate, so the only
+  ceiling on a mask measurement is whatever its source declares: monocular's
+  derived 18 m, and nothing at all for stereo. Landed together with the
+  isolation default moving to `height_crop_nearest_mode_band`, which was the
+  ordering constraint — widening first would have been the regression. The
+  legacy camera rows keep a finite `depth_max_meters` of 10 m: they have no
+  source ceiling behind them and still carry the percentile anchor.
+  **Unmeasured.** No benchmark has run with these defaults; the A/B is now a
+  regression check rather than a gate, and the benchmark cannot see the change
+  it is checking for, since its scenes top out at 5.8 m in a world whose far
+  wall is at 12 m. Exploration (`mock_hospital`, ~22 m) is where it bites.
 - ~~**Intrinsics source** — switch deprojection to `camera_info` of the color
   camera instead of the FoV constants in `camera_config.json` (§2.3).~~ —
   resolved 2026-07-21: the mask node subscribes to the color camera's

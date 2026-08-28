@@ -123,7 +123,10 @@ LIDAR_MEASUREMENT_TOPIC = 'measurements/g1/lidar'
 MASK_MEASUREMENT_TOPIC = 'measurements/g1/mask'
 DEPTH_SOURCE_DEFAULT = 'stereoscopic'
 MONO_DEPTH_DEBUG_TOPIC = 'debug/g1/camera/mono_depth'
+# The range the depth collage normalizes its colours over. Finite even though
+# the mask rows now run ungated: infinity would render every panel uniform.
 DEPTH_MAX_METERS_DEFAULT = 10.0
+DEPTH_GATE_DISABLED = 0.0
 
 # WM_CLASS of the window to record. RViz holds the whole picture once the
 # perception overlay is published into it, so one window is the whole run.
@@ -253,6 +256,10 @@ class G1DistanceBenchmarkRunner(Node):
         self.declare_parameter('depth_topic', 'sensors/camera_0/depth/image')
         self.declare_parameter('mono_depth_debug_topic', MONO_DEPTH_DEBUG_TOPIC)
         self.declare_parameter('depth_max_meters', DEPTH_MAX_METERS_DEFAULT)
+        # Declared so declared_parameters() records the gate the mask rows ran
+        # under. The runner itself never applies it -- it reads
+        # depth_max_meters, above, to normalize the depth collage.
+        self.declare_parameter('mask_depth_max_meters', DEPTH_GATE_DISABLED)
 
         # Screen recording of the RViz window for the length of the run. The
         # collages freeze one frame per trial; this keeps the motion around it.

@@ -684,10 +684,12 @@ def test_resolve_enabled_estimators_rejects_an_unknown_key() -> None:
 class _StubDepthSource:
     """Injected in place of a real depth source: scripted produce(), no model."""
 
-    def __init__(self, input_kind: str = 'depth') -> None:
+    def __init__(self, input_kind: str = 'depth', usable_max_m: float | None = None) -> None:
         self.input_kind = input_kind
         self.produce_calls: list = []
         self.frame = None
+        if usable_max_m is not None:
+            self.usable_max_m = usable_max_m
 
     def produce(self, msg):
         self.produce_calls.append(msg)
@@ -906,3 +908,54 @@ def test_default_run_fills_all_three_rows(ros_context) -> None:
         assert node.needs_depth and node.needs_scan
     finally:
         node.destroy_node()
+
+
+def test_depth_gate_defaults_to_no_gate(ros_context) -> None:
+    # A mask row is bounded only by what its source says it can resolve. The
+    # gate used to default to 10 m, where it was quietly doing background
+    # suppression for the percentile anchor rather than any validity job.
+    node = _mask_node(_StubDepthSource('depth'))
+    try:
+        assert node.effective_depth_max() == math.inf
+    finally:
+        node.destroy_node()
+
+
+def test_non_positive_gate_means_no_gate_rather_than_reject_everything(
+        ros_context) -> None:
+    # 0 is how an operator writes "no gate" (bare ``inf`` does not survive YAML
+    # as a double). Passed into min() unconverted it would read as the tightest
+    # gate possible and cull every pixel.
+    node = _mask_node(_StubDepthSource('depth', usable_max_m=18.0),
+                      depth_max_meters=0.0)
+    try:
+        assert node.effective_depth_max() == 18.0
+    finally:
+        node.destroy_node()
+
+
+def test_depth_gate_parameter_reaches_the_mask_rows(ros_context) -> None:
+    node = _mask_node(_StubDepthSource('depth'), depth_max_meters=4.0)
+    try:
+        assert node.effective_depth_max() == 4.0
+    finally:
+        node.destroy_node()
+
+
+def test_source_ceiling_tightens_the_gate_but_never_widens_it(ros_context) -> None:
+    # The two limits answer different questions and are combined by min(): the
+    # gate says how much scene to admit, the source says how far it can be
+    # believed. Neither may override the other upward.
+    tight_source = _mask_node(_StubDepthSource('depth', usable_max_m=3.0),
+                              depth_max_meters=10.0)
+    try:
+        assert tight_source.effective_depth_max() == 3.0
+    finally:
+        tight_source.destroy_node()
+
+    generous_source = _mask_node(_StubDepthSource('depth', usable_max_m=18.0),
+                                 depth_max_meters=10.0)
+    try:
+        assert generous_source.effective_depth_max() == 10.0
+    finally:
+        generous_source.destroy_node()

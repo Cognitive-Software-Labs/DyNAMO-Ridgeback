@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+import math
+
 import numpy as np
 import pytest
 from sensor_msgs.msg import Image
 from std_msgs.msg import Header
 
 from ridgeback_autonomy.perception.core.depth_sources import (
+    MONOCULAR_MAX_DEPTH_FALLBACK_M,
+    MONOCULAR_USABLE_RANGE_FRACTION,
     MonocularDepthSource,
     StereoDepthSource,
     build_depth_source,
@@ -146,6 +150,69 @@ def test_monocular_source_retries_after_cooldown(monkeypatch) -> None:
 
     assert source.load() is True          # stays loaded, no further attempts
     assert attempts['n'] == 2
+
+
+class _FakeConfig:
+    def __init__(self, depth_estimation_type=None, max_depth=None) -> None:
+        if depth_estimation_type is not None:
+            self.depth_estimation_type = depth_estimation_type
+        if max_depth is not None:
+            self.max_depth = max_depth
+
+
+class _FakePipeline:
+    def __init__(self, config) -> None:
+        self.model = type('_FakeModel', (), {'config': config})()
+
+
+def _loaded_source(config, monkeypatch) -> MonocularDepthSource:
+    source = MonocularDepthSource('model', 'cpu', _NullLogger())
+    monkeypatch.setattr(source, '_build_pipeline', lambda: _FakePipeline(config))
+    return source
+
+
+def test_monocular_usable_max_derives_from_checkpoint_max_depth(monkeypatch) -> None:
+    # The metric head is sigmoid * max_depth, so the ceiling is a property of
+    # the checkpoint rather than a constant this repo picks.
+    source = _loaded_source(_FakeConfig('metric', 20), monkeypatch)
+
+    assert source.load() is True
+    assert source.usable_max_m == pytest.approx(20 * MONOCULAR_USABLE_RANGE_FRACTION)
+
+
+def test_monocular_usable_max_tracks_a_different_checkpoint(monkeypatch) -> None:
+    # The Outdoor checkpoint ships max_depth=80; nothing should be hardcoded to
+    # the Indoor figure.
+    source = _loaded_source(_FakeConfig('metric', 80), monkeypatch)
+
+    assert source.load() is True
+    assert source.usable_max_m == pytest.approx(80 * MONOCULAR_USABLE_RANGE_FRACTION)
+
+
+def test_monocular_refuses_a_relative_checkpoint(monkeypatch) -> None:
+    # A relative checkpoint predicts unitless inverse depth. Nothing downstream
+    # would error on it -- it would publish disparity as meters -- so the
+    # source has to refuse rather than let it through.
+    source = _loaded_source(_FakeConfig('relative', 1), monkeypatch)
+
+    assert source.load() is False
+    assert source._pipeline is None
+
+
+def test_monocular_falls_back_when_config_exposes_no_max_depth(monkeypatch) -> None:
+    source = _loaded_source(_FakeConfig('metric'), monkeypatch)
+
+    assert source.load() is True
+    assert source.usable_max_m == pytest.approx(
+        MONOCULAR_MAX_DEPTH_FALLBACK_M * MONOCULAR_USABLE_RANGE_FRACTION)
+
+
+def test_stereo_source_declares_no_ceiling_but_accepts_one() -> None:
+    # Unbounded by default: no defensible number exists for this source, and
+    # out-of-range readings already arrive as 0/NaN/inf under the frame
+    # contract. An operator who knows their sensor can still name one.
+    assert StereoDepthSource(_NullLogger()).usable_max_m == math.inf
+    assert StereoDepthSource(_NullLogger(), usable_max_m=6.0).usable_max_m == 6.0
 
 
 def test_encode_depth_message_round_trip() -> None:
