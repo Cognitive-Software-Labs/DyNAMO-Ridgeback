@@ -2,6 +2,9 @@ from __future__ import annotations
 
 import pytest
 
+from ridgeback_autonomy.benchmarking.g1_benchmark_sweep import (
+    _launch_argument_tokens,
+)
 from ridgeback_autonomy.benchmarking.sweep import parse_sweep
 
 
@@ -22,6 +25,17 @@ def _document(tmp_path):
         'defaults': {'scenario': str(_scenario(tmp_path)), 'repeats': 1},
         'configs': [{'name': 'lidar', 'estimators': 'lidar'}],
     }
+
+
+def test_launch_argument_tokens_omit_empty_launch_defaults() -> None:
+    assert _launch_argument_tokens({
+        'estimators': 'rgb',
+        'scenario': '',
+        'repeats': '1',
+    }) == [
+        'estimators:=rgb',
+        'repeats:=1',
+    ]
 
 
 def test_sweep_rejects_unknown_config_key(tmp_path) -> None:

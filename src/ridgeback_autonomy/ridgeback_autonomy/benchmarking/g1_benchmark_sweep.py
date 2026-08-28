@@ -141,7 +141,11 @@ def _resolved_arguments(
 
 
 def _launch_argument_tokens(arguments: dict[str, str]) -> list[str]:
-    return [f'{key}:={value}' for key, value in arguments.items()]
+    return [
+        f'{key}:={value}'
+        for key, value in arguments.items()
+        if value != ''
+    ]
 
 
 def _environment_command(spec: SweepSpec) -> list[str]:
