@@ -176,7 +176,23 @@ def build_benchmark_nodes(context, *args, **kwargs):
                 'use_sim_time': use_sim_time,
                 'panels': ['hud/g1_distances'],
                 'text_size': 16.0,
-                'overlay_width': 600,
+                # The widest row is "Euclidean Reconstruction" (24 columns) +
+                # distance + signed error + the age column an aged row carries
+                # = 47 columns. The overlay clips rather than wraps, and the
+                # age column is last, so a box that is too narrow silently
+                # deletes the fresh/aged distinction on exactly the rows that
+                # need it -- the failure looks like the estimator never
+                # reported, not like a layout fault.
+                #
+                # ``text_size`` is in POINTS, so columns-to-pixels depends on
+                # the display's scaling: measured at 12.6 px/column on one
+                # monitor and 14.4 px/column on another. 720 covers the wider
+                # of the two (47 x 14.4 = 677, plus insets); on the narrower
+                # one it costs some empty space, which is the cheap direction
+                # to be wrong in. The truth header is longer still (the trial
+                # id runs to ~63 columns) and is knowingly left to clip -- it
+                # is prose, not a column anyone reads off.
+                'overlay_width': 720,
                 'horizontal_alignment': 'right',
                 'vertical_alignment': 'top',
                 'rich_text': True,
