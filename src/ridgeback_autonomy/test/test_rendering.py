@@ -9,9 +9,7 @@ from ridgeback_autonomy.perception.core.rendering import (
     PANEL_ALIGNED_DEPTH,
     PANEL_BOX_MASK,
     PANEL_LIDAR,
-    PANEL_MONO_DEPTH,
     PANEL_RGB,
-    PANEL_SENSOR_DEPTH,
     PANEL_SILHOUETTE,
     active_label_lines,
     draw_scan_points,
@@ -34,17 +32,11 @@ def test_select_panels_polar_only_is_rgb_plus_lidar() -> None:
     assert lidar.title == 'Polar Profiling'
 
 
-def test_select_panels_lidar_and_polar_title_combines() -> None:
-    panels = select_panels(('lidar', 'polar_profiling'), 'stereoscopic', 'box')
-    lidar = next(panel for panel in panels if panel.kind == PANEL_LIDAR)
+def test_select_panels_pointcloud_only_is_the_colour_frame_alone() -> None:
+    # The pointcloud row measures off the cloud, which has no panel of its own.
+    panels = select_panels(('pointcloud',), 'stereoscopic', 'box')
 
-    assert lidar.title == 'LiDAR / Polar'
-
-
-def test_select_panels_sensor_depth_only() -> None:
-    panels = select_panels(('sensor_depth',), 'stereoscopic', 'box')
-
-    assert kinds(panels) == [PANEL_RGB, PANEL_SENSOR_DEPTH]
+    assert kinds(panels) == [PANEL_RGB]
 
 
 def test_select_panels_silhouette_proj_polar() -> None:
@@ -64,14 +56,14 @@ def test_select_panels_box_gate_uses_box_mask_not_silhouette() -> None:
     assert PANEL_SILHOUETTE not in kinds(panels)
 
 
-def test_select_panels_full_set_orders_depth_panels() -> None:
+def test_select_panels_full_set_orders_the_mask_panels() -> None:
     panels = select_panels(
-        ('sensor_depth', 'depth_anything', 'projective_ranging', 'polar_profiling'),
+        ('pointcloud', 'projective_ranging', 'euclidean_reconstruction',
+         'polar_profiling'),
         'stereoscopic', 'box')
 
     assert kinds(panels) == [
-        PANEL_RGB, PANEL_SENSOR_DEPTH, PANEL_MONO_DEPTH,
-        PANEL_ALIGNED_DEPTH, PANEL_BOX_MASK, PANEL_LIDAR]
+        PANEL_RGB, PANEL_ALIGNED_DEPTH, PANEL_BOX_MASK, PANEL_LIDAR]
 
 
 def _panel() -> np.ndarray:
@@ -118,30 +110,33 @@ def test_pack_panels_empty_raises() -> None:
 
 def test_active_label_lines_only_selected_estimators() -> None:
     detection = types.SimpleNamespace(
-        sensor_depth_distance_m=2.5,
+        pointcloud_lateral_m=0.2,
+        pointcloud_forward_m=2.4,
+        pointcloud_distance_m=2.408,
         projective_ranging_lateral_m=-0.1,
         projective_ranging_forward_m=2.0,
         projective_ranging_distance_m=2.003,
     )
 
-    lines = active_label_lines(detection, ('sensor_depth', 'projective_ranging'))
+    lines = active_label_lines(detection, ('pointcloud', 'projective_ranging'))
 
     assert len(lines) == 2
-    assert lines[0].startswith('Sensor Depth') and 'd=2.50m' in lines[0]
+    assert lines[0].startswith('Point Cloud') and 'd=2.41m' in lines[0]
     assert lines[1].startswith('Projective Ranging')
     assert 'x=-0.10' in lines[1] and 'z=+2.00' in lines[1] and 'd=2.00m' in lines[1]
 
 
 def test_active_label_lines_missing_field_reads_na() -> None:
-    lines = active_label_lines(types.SimpleNamespace(), ('lidar',))
+    lines = active_label_lines(types.SimpleNamespace(), ('polar_profiling',))
 
-    assert lines == ['LiDAR d=NA']
+    assert lines == ['Polar Profiling d=NA']
 
 
 def test_active_label_lines_follows_public_order() -> None:
-    lines = active_label_lines(types.SimpleNamespace(), ('polar_profiling', 'rgb'))
+    lines = active_label_lines(
+        types.SimpleNamespace(), ('polar_profiling', 'pointcloud'))
 
-    assert lines[0].startswith('RGB')
+    assert lines[0].startswith('Point Cloud')
     assert lines[1].startswith('Polar Profiling')
 
 

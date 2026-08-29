@@ -19,8 +19,8 @@ selects too few rays -- the scan plane missed the object, or it sits outside
 the FoV overlap -- is skipped by returning ``None``: no estimate for that
 mask, never an error.
 
-Constants mirror the legacy ``geometry.py`` incumbent by value; the new stack
-deliberately never imports from the legacy stack.
+This module owns the LiDAR scan-validity clips outright -- there is no longer a
+second estimator holding a copy of them.
 """
 
 from __future__ import annotations
@@ -39,9 +39,9 @@ from ridgeback_autonomy.perception.core.mask import Mask
 
 
 # Scan-validity clips (not accuracy knobs): drop physically impossible returns
-# before anything else. Values mirror the legacy geometry.py lidar estimator.
-LIDAR_RANGE_MIN_M_DEFAULT = 0.05  # drop sub-5cm self-hits (mirrors LIDAR_MIN_RANGE_METERS)
-LIDAR_RANGE_MAX_M_DEFAULT = 10.0  # drop far-field noise (mirrors LIDAR_MAX_METERS)
+# before anything else. This module is their only owner.
+LIDAR_RANGE_MIN_M_DEFAULT = 0.05  # drop sub-5cm self-hits
+LIDAR_RANGE_MAX_M_DEFAULT = 10.0  # drop far-field noise
 
 # Foreground-isolation parameters -- the LiDAR analogue of the isolation_2d /
 # isolation_3d recipes (``polar_profiling.md`` Section 2.5). They decide which
@@ -75,7 +75,7 @@ MAX_BEARING_GAP_BEAMS_DEFAULT = 2
 # from this path's benchmark row, no fallback) when fewer than this many beams
 # survive the mask select or the near-band merge. A handful of beams gives a
 # noisy median; raising it trades availability (fewer usable trials) for a
-# tighter estimate. (mirrors LIDAR_MIN_VALID_RAYS by value.)
+# tighter estimate.
 MIN_VALID_RAYS_DEFAULT = 2
 
 

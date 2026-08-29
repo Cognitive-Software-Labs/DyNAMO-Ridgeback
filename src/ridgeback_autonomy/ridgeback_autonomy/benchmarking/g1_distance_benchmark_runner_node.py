@@ -21,7 +21,6 @@ from sensor_msgs.msg import Image
 from ridgeback_autonomy.benchmarking.alignment import (
     ensure_measurement_event,
     find_exact_preview_match,
-    find_nearest_preview_match,
     stamp_to_nanoseconds,
     update_measurement_event,
 )
@@ -33,11 +32,10 @@ from ridgeback_autonomy.benchmarking.estimators import (
     benchmark_run_folder_name,
     parse_estimators,
     parse_mask_gate,
-    selected_camera_estimators,
     selected_mask_estimators,
-    uses_camera_estimators,
-    uses_lidar_estimators,
+    selected_pointcloud_estimators,
     uses_mask_estimators,
+    uses_pointcloud_estimators,
 )
 from ridgeback_autonomy.benchmarking.reduction import (
     choose_representative_event,
@@ -81,13 +79,10 @@ from ridgeback_autonomy.benchmarking.summary import (
     write_trial_csv,
 )
 from ridgeback_autonomy.msg import G1Measurements
-from ridgeback_autonomy.perception.core.geometry import (
+from ridgeback_autonomy.perception.core.image_utils import convert_color_image_message
+from ridgeback_autonomy.perception.core.vehicle_frame import (
     planar_measurement_from_vehicle_front,
     yaw_from_quaternion,
-)
-from ridgeback_autonomy.perception.core.image_utils import (
-    convert_color_image_message,
-    convert_depth_to_meters_message,
 )
 from ridgeback_autonomy.perception.core.isolation_2d import ISOLATION_2D_DEFAULT
 from ridgeback_autonomy.perception.core.isolation_3d import ISOLATION_3D_DEFAULT
@@ -119,19 +114,13 @@ COMMAND_RETRY_SLEEP_SEC = 0.5
 STREAM_WAIT_TIMEOUT_SEC = 300.0
 POSE_WAIT_TIMEOUT_SEC = 120.0
 DELETE_TIMEOUT_SEC = 15.0
-IMAGE_MATCH_TOLERANCE_NS = 250_000_000
 # Republish period for the trial truth, well inside the consumers'
 # ``TRUTH_MAX_AGE_S`` so the line survives a dropped message and is never much
 # older than the scene it describes.
 TRUTH_PUBLISH_PERIOD_SEC = 0.2
-CAMERA_MEASUREMENT_TOPIC = 'measurements/g1/camera'
-LIDAR_MEASUREMENT_TOPIC = 'measurements/g1/lidar'
+POINTCLOUD_MEASUREMENT_TOPIC = 'measurements/g1/pointcloud'
 MASK_MEASUREMENT_TOPIC = 'measurements/g1/mask'
 DEPTH_SOURCE_DEFAULT = 'stereoscopic'
-MONO_DEPTH_DEBUG_TOPIC = 'debug/g1/camera/mono_depth'
-# The range the depth collage normalizes its colours over. Finite even though
-# the mask rows now run ungated: infinity would render every panel uniform.
-DEPTH_MAX_METERS_DEFAULT = 10.0
 DEPTH_GATE_DISABLED = 0.0
 
 # WM_CLASS of the window to record. RViz holds the whole picture once the
@@ -184,9 +173,8 @@ class G1DistanceBenchmarkRunner(Node):
         self.declare_parameter('run_dir_name', '')
         self.declare_parameter('settle_sec', 2.0)
         self.declare_parameter('capture_sec', 10.0)
-        self.declare_parameter('estimators', 'rgb,sensor_depth,depth_anything,pointcloud,lidar')
-        self.declare_parameter('camera_measurement_topic', CAMERA_MEASUREMENT_TOPIC)
-        self.declare_parameter('lidar_measurement_topic', LIDAR_MEASUREMENT_TOPIC)
+        self.declare_parameter('estimators', 'all')
+        self.declare_parameter('pointcloud_measurement_topic', POINTCLOUD_MEASUREMENT_TOPIC)
         self.declare_parameter('mask_measurement_topic', MASK_MEASUREMENT_TOPIC)
         # The config axes of the mask rows, stamped into their output names so
         # projective_ranging / euclidean_reconstruction runs are
@@ -197,12 +185,8 @@ class G1DistanceBenchmarkRunner(Node):
         self.declare_parameter('isolation_3d', ISOLATION_3D_DEFAULT)
         self.declare_parameter('mask_gate', MASK_GATE_DEFAULT)
         self.declare_parameter('color_topic', 'sensors/camera_0/color/image')
-        self.declare_parameter('depth_topic', 'sensors/camera_0/depth/image')
-        self.declare_parameter('mono_depth_debug_topic', MONO_DEPTH_DEBUG_TOPIC)
-        self.declare_parameter('depth_max_meters', DEPTH_MAX_METERS_DEFAULT)
         # Declared so declared_parameters() records the gate the mask rows ran
-        # under. The runner itself never applies it -- it reads
-        # depth_max_meters, above, to normalize the depth collage.
+        # under. The runner itself never applies it.
         self.declare_parameter('mask_depth_max_meters', DEPTH_GATE_DISABLED)
 
         # Screen recording of the RViz window for the length of the run. The
@@ -225,17 +209,14 @@ class G1DistanceBenchmarkRunner(Node):
         self.settle_sec = float(self.get_parameter('settle_sec').value)
         self.capture_sec = float(self.get_parameter('capture_sec').value)
         self.selected_estimators = parse_estimators(str(self.get_parameter('estimators').value))
-        self.camera_measurement_topic = str(self.get_parameter('camera_measurement_topic').value)
-        self.lidar_measurement_topic = str(self.get_parameter('lidar_measurement_topic').value)
+        self.pointcloud_measurement_topic = str(
+            self.get_parameter('pointcloud_measurement_topic').value)
         self.mask_measurement_topic = str(self.get_parameter('mask_measurement_topic').value)
         self.depth_source = str(self.get_parameter('depth_source').value)
         self.isolation_2d = str(self.get_parameter('isolation_2d').value)
         self.isolation_3d = str(self.get_parameter('isolation_3d').value)
         self.mask_gate = parse_mask_gate(str(self.get_parameter('mask_gate').value))
         self.color_topic = str(self.get_parameter('color_topic').value)
-        self.depth_topic = str(self.get_parameter('depth_topic').value)
-        self.mono_depth_debug_topic = str(self.get_parameter('mono_depth_debug_topic').value)
-        self.depth_max_meters = float(self.get_parameter('depth_max_meters').value)
         self.record_video = bool(self.get_parameter('record_video').value)
         self.record_window_class = str(self.get_parameter('record_window_class').value)
         self.recorder = ScreenRecorder(
@@ -294,43 +275,28 @@ class G1DistanceBenchmarkRunner(Node):
         self.command_env.setdefault('ROS_LOG_DIR', '/tmp/ros_logs')
         os.makedirs(self.command_env['ROS_LOG_DIR'], exist_ok=True)
 
-        self.collage_renderer = BenchmarkCollageRenderer(self.depth_max_meters)
+        self.collage_renderer = BenchmarkCollageRenderer()
 
-        self.needs_camera = uses_camera_estimators(self.selected_estimators)
-        self.needs_lidar = uses_lidar_estimators(self.selected_estimators)
+        self.needs_pointcloud = uses_pointcloud_estimators(self.selected_estimators)
         self.needs_mask = uses_mask_estimators(self.selected_estimators)
-        self.selected_camera_estimators = set(selected_camera_estimators(self.selected_estimators))
+        self.selected_pointcloud_estimators = set(
+            selected_pointcloud_estimators(self.selected_estimators))
         self.selected_mask_estimators = set(selected_mask_estimators(self.selected_estimators))
-        self.needs_sensor_depth_preview = 'sensor_depth' in self.selected_estimators
-        self.needs_depth_anything_preview = 'depth_anything' in self.selected_estimators
 
-        self.camera_measurement_seen = False
-        self.lidar_measurement_seen = False
+        self.pointcloud_measurement_seen = False
         self.mask_measurement_seen = False
         self.color_stream_seen = False
-        self.depth_stream_seen = False
-        self.depth_anything_stream_seen = False
 
         self.capture_active = False
         self.capture_events = {}
         self.color_preview_buffer: OrderedDict[int, Any] = OrderedDict()
-        self.sensor_depth_preview_buffer: OrderedDict[int, Any] = OrderedDict()
-        self.depth_anything_preview_buffer: OrderedDict[int, Any] = OrderedDict()
 
         self.last_color_decode_warning = None
-        self.last_depth_decode_warning = None
-        self.last_depth_anything_decode_warning = None
 
         self.create_subscription(
             G1Measurements,
-            self.camera_measurement_topic,
-            self.on_camera_measurement,
-            10,
-        )
-        self.create_subscription(
-            G1Measurements,
-            self.lidar_measurement_topic,
-            self.on_lidar_measurement,
+            self.pointcloud_measurement_topic,
+            self.on_pointcloud_measurement,
             10,
         )
         self.create_subscription(
@@ -345,20 +311,6 @@ class G1DistanceBenchmarkRunner(Node):
             self.on_color_image,
             qos_profile_sensor_data,
         )
-        if self.needs_sensor_depth_preview:
-            self.create_subscription(
-                Image,
-                self.depth_topic,
-                self.on_depth_image,
-                qos_profile_sensor_data,
-            )
-        if self.needs_depth_anything_preview:
-            self.create_subscription(
-                Image,
-                self.mono_depth_debug_topic,
-                self.on_depth_anything_image,
-                qos_profile_sensor_data,
-            )
 
         # Ground truth for the display surfaces' reference line, republished
         # while a capture window is active so their age gates drop the line
@@ -370,22 +322,13 @@ class G1DistanceBenchmarkRunner(Node):
         self.active_trial_id = ''
         self.last_truth_publish_monotonic = 0.0
 
-    def on_camera_measurement(self, msg: G1Measurements) -> None:
-        self.camera_measurement_seen = True
+    def on_pointcloud_measurement(self, msg: G1Measurements) -> None:
+        self.pointcloud_measurement_seen = True
         if not self.capture_active:
             return
 
         event = ensure_measurement_event(self.capture_events, msg)
-        update_measurement_event(event, msg, self.selected_camera_estimators)
-        self.attach_buffered_previews(event)
-
-    def on_lidar_measurement(self, msg: G1Measurements) -> None:
-        self.lidar_measurement_seen = True
-        if not self.capture_active:
-            return
-
-        event = ensure_measurement_event(self.capture_events, msg)
-        update_measurement_event(event, msg, {'lidar'})
+        update_measurement_event(event, msg, self.selected_pointcloud_estimators)
         self.attach_buffered_previews(event)
 
     def on_mask_measurement(self, msg: G1Measurements) -> None:
@@ -414,44 +357,6 @@ class G1DistanceBenchmarkRunner(Node):
         preview = self.collage_renderer.make_color_preview(frame)
         stamp_ns = stamp_to_nanoseconds(msg.header.stamp)
         self.store_buffered_preview(self.color_preview_buffer, stamp_ns, preview)
-        self.backfill_previews_from_buffers()
-
-    def on_depth_image(self, msg: Image) -> None:
-        self.depth_stream_seen = True
-        if not self.capture_active:
-            return
-
-        try:
-            depth_meters = convert_depth_to_meters_message(msg)
-        except Exception as exc:
-            self.log_warning_once(
-                'last_depth_decode_warning',
-                f'Failed to decode depth frame from "{self.resolved_topic(self.depth_topic)}": {exc}',
-            )
-            return
-
-        preview = self.collage_renderer.make_depth_preview(depth_meters)
-        stamp_ns = stamp_to_nanoseconds(msg.header.stamp)
-        self.store_buffered_preview(self.sensor_depth_preview_buffer, stamp_ns, preview)
-        self.backfill_previews_from_buffers()
-
-    def on_depth_anything_image(self, msg: Image) -> None:
-        self.depth_anything_stream_seen = True
-        if not self.capture_active:
-            return
-
-        try:
-            depth_meters = convert_depth_to_meters_message(msg)
-        except Exception as exc:
-            self.log_warning_once(
-                'last_depth_anything_decode_warning',
-                f'Failed to decode Depth-Anything frame from "{self.resolved_topic(self.mono_depth_debug_topic)}": {exc}',
-            )
-            return
-
-        preview = self.collage_renderer.make_depth_preview(depth_meters)
-        stamp_ns = stamp_to_nanoseconds(msg.header.stamp)
-        self.store_buffered_preview(self.depth_anything_preview_buffer, stamp_ns, preview)
         self.backfill_previews_from_buffers()
 
     def log_code_provenance(self) -> None:
@@ -929,8 +834,6 @@ class G1DistanceBenchmarkRunner(Node):
 
     def clear_preview_buffers(self) -> None:
         self.color_preview_buffer.clear()
-        self.sensor_depth_preview_buffer.clear()
-        self.depth_anything_preview_buffer.clear()
 
     def store_buffered_preview(
         self,
@@ -957,24 +860,6 @@ class G1DistanceBenchmarkRunner(Node):
             find_exact_preview_match(self.color_preview_buffer, event.stamp_ns),
         )
 
-        if self.needs_sensor_depth_preview:
-            self.apply_preview_match(
-                event,
-                'sensor_depth',
-                find_nearest_preview_match(
-                    self.sensor_depth_preview_buffer,
-                    event.stamp_ns,
-                    IMAGE_MATCH_TOLERANCE_NS,
-                ),
-            )
-
-        if self.needs_depth_anything_preview:
-            self.apply_preview_match(
-                event,
-                'depth_anything',
-                find_exact_preview_match(self.depth_anything_preview_buffer, event.stamp_ns),
-            )
-
     def apply_preview_match(self, event, prefix: str, match) -> None:
         setattr(event.preview, f'{prefix}_nearest_stamp_ns', match.nearest_stamp_ns)
         setattr(event.preview, f'{prefix}_nearest_delta_ms', match.nearest_delta_ms)
@@ -994,15 +879,10 @@ class G1DistanceBenchmarkRunner(Node):
         setattr(event.preview, delta_attribute, match.matched_delta_ms)
 
     def wait_for_required_streams(self) -> None:
-        if self.needs_camera:
+        if self.needs_pointcloud:
             self.wait_for_flag(
-                lambda: self.camera_measurement_seen,
-                f'measurement stream on "{self.resolved_topic(self.camera_measurement_topic)}"',
-            )
-        if self.needs_lidar:
-            self.wait_for_flag(
-                lambda: self.lidar_measurement_seen,
-                f'measurement stream on "{self.resolved_topic(self.lidar_measurement_topic)}"',
+                lambda: self.pointcloud_measurement_seen,
+                f'measurement stream on "{self.resolved_topic(self.pointcloud_measurement_topic)}"',
             )
         if self.needs_mask:
             self.wait_for_flag(
@@ -1014,16 +894,6 @@ class G1DistanceBenchmarkRunner(Node):
             lambda: self.color_stream_seen,
             f'color stream on "{self.resolved_topic(self.color_topic)}"',
         )
-        if self.needs_sensor_depth_preview:
-            self.wait_for_flag(
-                lambda: self.depth_stream_seen,
-                f'depth stream on "{self.resolved_topic(self.depth_topic)}"',
-            )
-        if self.needs_depth_anything_preview:
-            self.wait_for_flag(
-                lambda: self.depth_anything_stream_seen,
-                f'Depth-Anything stream on "{self.resolved_topic(self.mono_depth_debug_topic)}"',
-            )
 
     def wait_for_flag(self, condition, description: str) -> None:
         self.get_logger().info(f'Waiting for {description}.')

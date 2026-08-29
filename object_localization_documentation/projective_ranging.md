@@ -228,7 +228,7 @@ identical, and the differences are exactly what the shipped path resolves:
 | Order | deprojects every ROI pixel, averages the *distances* | aggregate depth, deproject one pixel |
 | Output | a scalar range, in the **vehicle** frame, with a front offset applied | `(X, Y, Z)` in the **camera** frame |
 
-In other words the legacy estimator is permanently on a `rect`-style branch,
+In other words that legacy estimator (since deleted) was permanently on a `rect`-style branch,
 approximates foreground recovery with a fixed crop, and emits a range rather than
 a point. Projective ranging generalizes it: it replaces the crop with the mask, adds the tag fork,
 and emits a camera-frame coordinate, leaving the base-frame transform to a later

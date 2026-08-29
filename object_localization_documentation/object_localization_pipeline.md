@@ -60,7 +60,7 @@ A single-plane scanner returning range vs. bearing. It is **2D**: it samples onl
 | Units present | both front + rear (from `robot.yaml`) | front always; rear only if the optional unit is fitted |
 | Coverage used by perception | front 270° (`lidar2d_0`) | front 270° (`lidar2d_0`) |
 
-Sources: Hokuyo UST-10LX specification (270°, 0.25°, 0.06-10 m / 30 m max); Clearpath Ridgeback user manual (front standard / rear optional); repo `clearpath/robot.yaml`, `clearpath_sensors_description/urdf/hokuyo_ust.urdf.xacro`; perception `g1_lidar_measurement_node` (`sensors/lidar2d_0/scan`).
+Sources: Hokuyo UST-10LX specification (270°, 0.25°, 0.06-10 m / 30 m max); Clearpath Ridgeback user manual (front standard / rear optional); repo `clearpath/robot.yaml`, `clearpath_sensors_description/urdf/hokuyo_ust.urdf.xacro`; perception `g1_mask_measurement_node`'s polar profiling path (`sensors/lidar2d_0/scan`).
 
 ### Design goal: one pipeline, two interchangeable backends
 
@@ -185,7 +185,7 @@ A depth source is built only when a run actually selects a depth path (`enabled_
 
 All three paths consume the same mask interface and resolve to camera-frame coordinates. They differ in what 3D information they recover and in cost.
 
-They are also independently selectable. A run picks its subset with `enabled_estimators` (the benchmark launch splits its own `estimators` list per stack, so one list selects across the mask and legacy nodes alike). A path outside the subset is never executed: its fields stay NaN, its status stays `UNSET` — the honest record, since the node did not miss, it never looked — and it gets no benchmark row at all, exactly like an unselected legacy estimator. The inputs only that path needs go unsubscribed with it.
+They are also independently selectable. A run picks its subset with `enabled_estimators` (the benchmark launch splits its own `estimators` list per stack, so one list selects across the mask node and the point cloud node alike). A path outside the subset is never executed: its fields stay NaN, its status stays `UNSET` — the honest record, since the node did not miss, it never looked — and it gets no benchmark row at all, exactly like an unselected `pointcloud` row. The inputs only that path needs go unsubscribed with it.
 
 ### Projective ranging — 2D depth-image route (cheapest)
 Extract depth values at the masked pixels, aggregate to a single distance, then deproject the representative pixel (centroid of the foreground pixels — `projective_ranging.md` §2.4) + aggregated depth through the intrinsics to a 3D point.
@@ -234,9 +234,9 @@ Selection stays shared; the fork sits exactly where behavior genuinely diverges.
 
 The mask stack does not stop at a camera-frame coordinate: each path's camera-optical point is transformed to a `base_link` **planar** measurement via the live TF extrinsic at the detection stamp — `optical_to_base_planar(xyz_optical, rotation, translation, front_offset_m)`. The rotation *and* translation are the camera-optical → base extrinsics from TF, so the full mounting pose (not just pitch) is applied. The output is `(lateral_m, forward_m, distance_m)` where lateral is base **+Y, left-positive (REP-103)** and forward is base +X minus the 0.25 m robot front offset. Polar profiling runs the same transform with the optical Y component set to 0 (height is unobservable from a single plane; at zero camera pitch the substitution is exact).
 
-The convention is **uniform** across every estimator that reports a lateral: **left-positive** (base +Y, REP-103). That covers the mask-based paths, `lidar`, `pointcloud`, `rgb`, and the benchmark ground truth. `sensor_depth` and `depth_anything` report a scalar distance only and carry no lateral.
+The convention is **uniform** across every estimator: **left-positive** (base +Y, REP-103). That covers the mask-based paths, `pointcloud`, and the benchmark ground truth — every registered row reports a full planar position, which is the invariant `ESTIMATOR_POSITION_ATTRS` carries and `test_estimate_viz` asserts.
 
-`rotate_camera_to_vehicle_frame` (the `rgb` path) negates camera-optical +X to reach base +Y — optical X is image-right, so the sign has to flip. This used to be left un-negated, making `rgb` the one right-positive producer; it was corrected because the benchmark associates detections to ground truth in the planar plane, so a mirrored lateral pushed pair costs past the assignment gate whenever `rgb` served as the locator.
+(Historical: the deleted `rgb` path reached base +Y by negating camera-optical +X in `rotate_camera_to_vehicle_frame`, since optical X is image-right. It was briefly left un-negated, making `rgb` the one right-positive producer, which pushed pair costs past the benchmark's assignment gate whenever `rgb` served as the locator. That family is gone; the sign convention it had to be corrected into is the one above.)
 
 The **forward** component is likewise uniform: base +X minus the 0.25 m robot front offset, for estimates *and* ground truth. Any planar comparison can therefore be done component-wise without a conversion step.
 
@@ -266,7 +266,7 @@ Because every path emits in the same frame and at least `(X, Z)`, the outputs ar
 
 ## 10. Open items / TODO
 
-1. ~~**Pin the camera-frame convention** (Section 7) — axes, handedness, units — against SDK + robot TF.~~ — resolved 2026-07-23 for the mask stack: paths emit `base_link` planar measurements via the live TF extrinsic (`optical_to_base_planar`), lateral left-positive (REP-103) — Section 7. The legacy camera family (`rgb` / legacy depth) still emits right-positive, so the split is documented rather than unified.
+1. ~~**Pin the camera-frame convention** (Section 7) — axes, handedness, units — against SDK + robot TF.~~ — resolved 2026-07-23 for the mask stack: paths emit `base_link` planar measurements via the live TF extrinsic (`optical_to_base_planar`), lateral left-positive (REP-103) — Section 7. The camera family that still emitted right-positive has since been deleted, so the convention is now unified rather than split.
 2. **Calibration procedures:** RealSense intrinsics/extrinsics are factory-calibrated; the **camera–LiDAR extrinsic** must be calibrated and documented. Define the procedure and store the transform.
 3. ~~**Time synchronization** between camera and LiDAR — without matched timestamps, a moving platform/object smears the LiDAR projection against the mask.~~ — resolved 2026-07-23 in the mask node: depth and scan are matched to the detection (mask) stamp via `StampedMessageBuffer` (depth exact-stamp; scan nearest within `scan_match_tolerance_s`), not latest-wins (`polar_profiling.md` §8, `aligned_depth.md` §1). Accurate sensor clocks/timestamping on real hardware remain a driver concern the software matching relies on.
 4. **Fallback routing** for polar profiling empty returns (scan plane misses object). `None` is first-class (`polar_profiling.md` §4): in the **benchmark** the row is dropped, never substituted. Where the `None` → projective ranging / euclidean reconstruction escalation lives is a **production-pipeline consumer concern only** (unresolved, deferred), never inside the benchmark.

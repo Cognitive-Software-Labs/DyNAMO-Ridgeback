@@ -9,8 +9,7 @@ Isolators are callables satisfying that contract. ``Chain`` composes them --
 per the docs, one floor-remover (``HeightCrop``) plus one
 background-separator (``RangeBand``) makes a complete isolator, and that chain
 is the default recipe. Geometry constants mirror ``config/camera_config.json``
-and the legacy ``geometry.py`` incumbent by value; the new stack deliberately
-never imports from the legacy stack.
+by value; this stack deliberately never imports them.
 """
 
 from __future__ import annotations
@@ -27,7 +26,7 @@ from ridgeback_autonomy.perception.core.depth_common import (
 )
 
 
-CAMERA_HEIGHT_M_DEFAULT = 1.053  # static/test default only; at runtime the height comes from TF via camera_floor_geometry. Mask-stack only: the legacy config/camera_config.json height_m stays 0.85 and is deliberately not touched here.
+CAMERA_HEIGHT_M_DEFAULT = 1.053  # static/test default only; at runtime the height comes from TF via camera_floor_geometry. Mask-stack only: config/camera_config.json's height_m stays 0.85 and is deliberately not touched here.
 CAMERA_PITCH_DEG_DEFAULT = 0.0  # static/test default; runtime pitch is read from the TF rotation
 FLOOR_MARGIN_M_DEFAULT = 0.05
 # base_link origin above the floor: stable chassis geometry, and the floor is

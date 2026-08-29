@@ -19,11 +19,10 @@ from launch_ros.actions import Node
 
 from ridgeback_autonomy.benchmarking.estimators import (
     parse_estimators,
-    selected_camera_estimators,
     selected_mask_estimators,
-    uses_camera_estimators,
-    uses_lidar_estimators,
+    selected_pointcloud_estimators,
     uses_mask_estimators,
+    uses_pointcloud_estimators,
 )
 from ridgeback_autonomy.benchmarking.launch_common import (
     CONFIG_LAUNCH_ARGUMENT_NAMES,
@@ -31,15 +30,11 @@ from ridgeback_autonomy.benchmarking.launch_common import (
     perception_venv_actions,
     workspace_root_from_package_share,
 )
-from ridgeback_autonomy.perception.core.depth_common import (
-    DEPTH_GATE_DISABLED,
-    DEPTH_MAX_METERS_DEFAULT,
-)
+from ridgeback_autonomy.perception.core.depth_common import DEPTH_GATE_DISABLED
 from ridgeback_autonomy.perception.core.isolation_3d import ISOLATION_3D_DEFAULT
 
 
-CAMERA_MEASUREMENT_TOPIC = 'measurements/g1/camera'
-LIDAR_MEASUREMENT_TOPIC = 'measurements/g1/lidar'
+POINTCLOUD_MEASUREMENT_TOPIC = 'measurements/g1/pointcloud'
 MASK_MEASUREMENT_TOPIC = 'measurements/g1/mask'
 
 # Overlay columns for the RViz strip. Above any possible panel count, and
@@ -68,51 +63,28 @@ def build_benchmark_nodes(context, *args, **kwargs):
     selected_estimators = parse_estimators(
         LaunchConfiguration('estimators').perform(context).strip()
     )
-    selected_camera = selected_camera_estimators(selected_estimators)
+    selected_pointcloud = selected_pointcloud_estimators(selected_estimators)
     selected_mask = selected_mask_estimators(selected_estimators)
-    needs_camera = uses_camera_estimators(selected_estimators)
-    needs_lidar = uses_lidar_estimators(selected_estimators)
+    needs_pointcloud = uses_pointcloud_estimators(selected_estimators)
     needs_mask = uses_mask_estimators(selected_estimators)
 
     nodes = []
 
-    if needs_camera:
+    if needs_pointcloud:
         nodes.append(
             Node(
                 package='ridgeback_autonomy',
-                executable='g1_camera_measurement_node',
-                name='g1_camera_measurement',
+                executable='g1_pointcloud_measurement_node',
+                name='g1_pointcloud_measurement',
                 namespace=namespace,
                 parameters=[{
                     'use_sim_time': use_sim_time,
                     'detections_topic': RAW_DETECTIONS_TOPIC,
-                    'measurement_topic': CAMERA_MEASUREMENT_TOPIC,
+                    'measurement_topic': POINTCLOUD_MEASUREMENT_TOPIC,
                     'color_topic': color_topic,
-                    'depth_topic': depth_topic,
                     'pointcloud_topic': pointcloud_topic,
                     'base_frame': base_frame,
-                    'enabled_estimators': ','.join(selected_camera),
-                    'depth_anything_enabled': 'depth_anything' in selected_estimators,
-                    'depth_max_meters': LaunchConfiguration('depth_max_meters'),
-                }],
-                remappings=[('/tf', 'tf'), ('/tf_static', 'tf_static')],
-                output='screen',
-            )
-        )
-
-    if needs_lidar:
-        nodes.append(
-            Node(
-                package='ridgeback_autonomy',
-                executable='g1_lidar_measurement_node',
-                name='g1_lidar_measurement',
-                namespace=namespace,
-                parameters=[{
-                    'use_sim_time': use_sim_time,
-                    'detections_topic': RAW_DETECTIONS_TOPIC,
-                    'measurement_topic': LIDAR_MEASUREMENT_TOPIC,
-                    'scan_topic': scan_topic,
-                    'base_frame': base_frame,
+                    'enabled_estimators': ','.join(selected_pointcloud),
                 }],
                 remappings=[('/tf', 'tf'), ('/tf_static', 'tf_static')],
                 output='screen',
@@ -177,11 +149,9 @@ def build_benchmark_nodes(context, *args, **kwargs):
             namespace=namespace,
             parameters=[{
                 'use_sim_time': use_sim_time,
-                'measurement_topic': CAMERA_MEASUREMENT_TOPIC,
-                'lidar_measurement_topic': LIDAR_MEASUREMENT_TOPIC,
+                'measurement_topic': POINTCLOUD_MEASUREMENT_TOPIC,
                 'mask_measurement_topic': MASK_MEASUREMENT_TOPIC,
                 'color_topic': color_topic,
-                'depth_topic': depth_topic,
                 'aligned_depth_topic': MASK_ALIGNED_DEPTH_DEBUG_TOPIC,
                 'estimators': ','.join(selected_estimators),
                 'depth_source': LaunchConfiguration('depth_source'),
@@ -231,16 +201,13 @@ def build_benchmark_nodes(context, *args, **kwargs):
             'settle_sec': settle_sec,
             'capture_sec': capture_sec,
             'estimators': ','.join(selected_estimators),
-            'camera_measurement_topic': CAMERA_MEASUREMENT_TOPIC,
-            'lidar_measurement_topic': LIDAR_MEASUREMENT_TOPIC,
+            'pointcloud_measurement_topic': POINTCLOUD_MEASUREMENT_TOPIC,
             'mask_measurement_topic': MASK_MEASUREMENT_TOPIC,
             'color_topic': color_topic,
-            'depth_topic': depth_topic,
             'depth_source': LaunchConfiguration('depth_source'),
             'isolation_2d': LaunchConfiguration('isolation_2d'),
             'isolation_3d': LaunchConfiguration('isolation_3d'),
             'mask_gate': LaunchConfiguration('mask_gate'),
-            'depth_max_meters': LaunchConfiguration('depth_max_meters'),
             # Recorded, not applied: this records the mask row's actual gate.
             'mask_depth_max_meters': LaunchConfiguration('mask_depth_max_meters'),
         }],
@@ -320,10 +287,7 @@ def generate_launch_description():
             default_value='false',
             description='Also open the overlay in its own OpenCV window',
         ),
-        DeclareLaunchArgument(
-            'estimators',
-            default_value='rgb,sensor_depth,depth_anything,pointcloud,lidar',
-        ),
+        DeclareLaunchArgument('estimators', default_value='all'),
         DeclareLaunchArgument(
             'scenario',
             default_value='',
@@ -353,11 +317,6 @@ def generate_launch_description():
             'isolation_3d',
             default_value=ISOLATION_3D_DEFAULT,
             description='Euclidean-reconstruction box-gate foreground recipe',
-        ),
-        DeclareLaunchArgument(
-            'depth_max_meters',
-            default_value=str(DEPTH_MAX_METERS_DEFAULT),
-            description='Legacy camera depth gate and collage color range',
         ),
         DeclareLaunchArgument(
             'mask_depth_max_meters',

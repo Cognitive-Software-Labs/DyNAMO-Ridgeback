@@ -15,7 +15,8 @@ right. Instead each estimator carries its own outcome per instance:
                     of this instance (only reachable in multi-robot scenes,
                     where the gate runs). A gross localization error.
 ``no_value``        produced no value on any frame; the reason is in the status
-                    histogram (coverage.csv).
+                    histogram (``run.json``'s ``reason_histogram``, and the
+                    "Why boxes went unmeasured" section of ``summary.md``).
 ``detector_miss``   no estimator matched this instance in any frame -- occluded
                     or never detected, so nobody had a chance at it.
 
@@ -87,10 +88,11 @@ class SceneScore:
 def build_instance_estimate(detection, index: int, estimator: str) -> InstanceEstimate:
     """One detection's locator AS SEEN BY ``estimator``.
 
-    Planar when that estimator publishes a position, else its own scalar
-    distance (the 1-D fallback used by sensor_depth / depth_anything). Never
-    borrows another estimator's position: the association has to reflect what
-    THIS estimator believes, or its errors would be hidden behind a better one.
+    Planar when that estimator placed this detection, else its own scalar
+    distance -- the 1-D fallback, which today is reached only when a
+    position-capable row produced nothing on this box. Never borrows another
+    estimator's position: the association has to reflect what THIS estimator
+    believes, or its errors would be hidden behind a better one.
     """
 
     forward = lateral = None

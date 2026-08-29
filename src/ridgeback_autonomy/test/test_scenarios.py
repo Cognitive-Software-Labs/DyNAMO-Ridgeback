@@ -12,7 +12,9 @@ from ridgeback_autonomy.benchmarking.scenarios import (
     load_scenarios,
     parse_scenarios,
 )
-from ridgeback_autonomy.perception.core.geometry import planar_measurement_from_vehicle_front
+from ridgeback_autonomy.perception.core.vehicle_frame import (
+    planar_measurement_from_vehicle_front,
+)
 
 
 CONFIG_DIR = os.path.join(os.path.dirname(__file__), '..', 'config')

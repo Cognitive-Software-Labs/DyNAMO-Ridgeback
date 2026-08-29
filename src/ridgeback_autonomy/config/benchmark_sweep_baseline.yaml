@@ -1,9 +1,9 @@
 # Baseline sweep: every estimator once, at its defaults.
 #
 # One config per estimator path, run back to back against a single Gazebo and
-# RViz bringup -- same world, same Ridgeback spawn, same clock for all eight.
+# RViz bringup -- same world, same Ridgeback spawn, same clock for all four.
 # That shared bringup is the point: cross-config differences here are the
-# estimators, not eight separate sim boots.
+# estimators, not four separate sim boots.
 #
 # Each estimator gets its own config rather than sharing one, so every path is
 # measured under the load of running alone. The mask paths in particular
@@ -12,7 +12,7 @@
 #
 # Cost at repeats:=1 -- 109 trials per config (85 scenes x 1, plus 3 probe
 # scenes at repeats_override 8), ~15.4 s per trial, so ~28 min per config and
-# ~3.8 h for the sweep including per-config node startup.
+# ~1.9 h for the sweep including per-config node startup.
 #
 # The mask configs pin the settings they depend on instead of inheriting them
 # from the launch file, so this file records what was run without a reader
@@ -25,7 +25,7 @@
 # mask_gate reaches all three mask paths; isolation_2d is projective ranging's
 # alone and isolation_3d is euclidean reconstruction's alone. Polar profiling
 # is mask-based but LiDAR-sourced, so it takes the gate and nothing else. None
-# of them reach the legacy camera or LiDAR paths.
+# of them reach the point cloud path.
 
 sweep:
   name: baseline
@@ -38,26 +38,10 @@ defaults:
   repeats: 1
 
 configs:
-  # Legacy camera paths. Three read the color/depth streams directly, one reads
-  # the point cloud; all four live in g1_camera_measurement_node, and only one
-  # is enabled per config.
-  - name: legacy_rgb
-    estimators: rgb
-
-  - name: legacy_sensor_depth
-    estimators: sensor_depth
-
-  # The only legacy path with a torch model in it, which is why it is worth
-  # having alone rather than alongside the other three.
-  - name: legacy_depth_anything
-    estimators: depth_anything
-
-  - name: legacy_pointcloud
+  # The organized-PointCloud2 path: g1_pointcloud_measurement_node, no mask node
+  # at all. None of the mask knobs below apply to it.
+  - name: pointcloud
     estimators: pointcloud
-
-  # Legacy LiDAR path: g1_lidar_measurement_node, no camera node at all.
-  - name: legacy_lidar
-    estimators: lidar
 
   # Mask paths. Each brings up g1_mask_measurement_node alone.
   - name: mask_projective_ranging

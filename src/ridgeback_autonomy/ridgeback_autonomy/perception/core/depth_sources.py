@@ -37,8 +37,8 @@ are already excluded by the frame contract above, which both sources satisfy:
 a value past what the source can resolve arrives as 0/NaN/inf, not as a
 confident number.
 
-This module is deliberately independent of the distance-estimator stack
-(geometry.py / g1_camera_measurement_node); it shares no code with it.
+This module is deliberately independent of the pointcloud estimator
+(pointcloud_ranging.py); it shares no code with it.
 """
 
 from __future__ import annotations

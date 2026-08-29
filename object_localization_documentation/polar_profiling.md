@@ -301,7 +301,7 @@ separate change.
 **Known divergence.** This node ranks the nearest instance from its own three
 estimators, because nothing else has filled the batch by the time the rays are
 published, while `g1_estimate_viz_node` ranks the merged measurement topics and
-so starts at `rgb`. Two robots at near-equal range can therefore put the rays on
+so starts at `pointcloud`. Two robots at near-equal range can therefore put the rays on
 one and the estimate rings on the other for a frame. Both sides walk
 `PUBLIC_ESTIMATOR_ORDER` and break ties on the lower index, which bounds the
 disagreement to near-ties; removing it would mean publishing the chosen index
@@ -329,13 +329,18 @@ and accepting a frame of coupling between the nodes.
 
 ---
 
-## 6. Relationship to the current stack
+## 6. Relationship to the incumbent lidar estimator
 
-The existing lidar estimator (`compute_lidar_measurement` in `geometry.py`,
-fed by `g1_lidar_measurement_node`) is a proto-polar-profiling with the same
-generalization gaps its depth siblings had:
+> **Historical.** The estimator this section compares against
+> (`compute_lidar_measurement` in `geometry.py`, fed by
+> `g1_lidar_measurement_node`) was **deleted** along with the rest of the legacy
+> stack; polar profiling is now the only LiDAR-sourced row. The comparison is
+> kept because it records why each design choice was made.
 
-| Aspect | Current estimator | polar profiling target |
+That estimator was a proto-polar-profiling with the same generalization gaps
+its depth siblings had:
+
+| Aspect | Deleted estimator | polar profiling target |
 |--------|-------------------|---------------|
 | Selection | bbox → bearing window (`compute_camera_bearing_window`, margin + floor padding); horizontal gate only | project points to `(u, v)`, index the actual mask (2D membership, forked on nothing) |
 | Intrinsics | fx synthesized from `camera_config.json` HFoV | `camera_info` of the color grid (`aligned_depth.md` §2.3) |
@@ -354,10 +359,10 @@ camera frame.
 
 ## 7. Implementation plan
 
-Mirrors the projective ranging / euclidean reconstruction pattern: a pure core module, constants mirrored by value
-from the legacy stack (never imported — the stacks stay independent, as with
-`projective_ranging.py`/`euclidean_reconstruction.py`), the node as a thin shell, the estimator as an
-opt-in benchmark row.
+Mirrors the projective ranging / euclidean reconstruction pattern: a pure core
+module, the node as a thin shell, the estimator as an opt-in benchmark row. The
+scan-validity clips started as by-value copies of the legacy estimator's; with
+that estimator deleted, `polar_profiling.py` is their sole owner.
 
 **`perception/core/polar_profiling.py`** — the pure path, no ROS:
 
@@ -412,8 +417,9 @@ convention via the full TF transform with `Y = 0` (exact at the benchmark's
 zero camera pitch). Polar
 runs independently of the depth frame — a missing scan or unavailable TF simply
 leaves its fields NaN. The alternative (extending the legacy lidar node) was
-rejected: it works in the vehicle frame with `camera_config` FoV intrinsics,
-not the color-grid `camera_info` the new stack uses.
+rejected: it worked in the vehicle frame with `camera_config` FoV intrinsics,
+not the color-grid `camera_info` this stack uses. That node has since been
+deleted outright.
 
 **Benchmark row** (done) — `polar_profiling` estimator key, opt-in via
 `estimators:=`, published on `measurements/g1/mask`. It is in `MASK_ESTIMATORS`
@@ -425,7 +431,7 @@ published scalar is the base_link planar distance of the median `(X, Z)`
 coordinate — the node runs it through the same `optical_to_base_planar`
 conversion as the depth-path rows (full TF transform with `Y = 0`, front
 offset subtracted), so all mask rows, the legacy rows, and the ground truth
-share one convention. The core result carries no `distance_m` field; the
+share one convention (the legacy rows named here have since been deleted). The core result carries no `distance_m` field; the
 distance is derived here from the median coordinate, not from a separate
 core statistic. The conversion applies the camera's full mounting pose
 (rotation *and* translation) from TF, so the optical center is not assumed to
@@ -443,8 +449,8 @@ early data point and read the current figure from `benchmark-results/`.
 profile (band merge averages the legs), a parallax profile (far points inside
 the mask are dropped), a plane-miss profile (returns `None`), a wall-behind
 profile (background run rejected). The registry/output-name wiring is covered
-in `test_benchmark_runner.py`. Note the pre-existing `test_geometry.py` lidar
-failure (696e101) is the legacy stack's, untouched by this work.
+in `test_benchmark_runner.py`. (The `test_geometry.py` lidar failure noted here
+at 696e101 went away with the file: the legacy stack and its tests are gone.)
 
 ---
 
@@ -463,8 +469,11 @@ failure (696e101) is the legacy stack's, untouched by this work.
 - **Segmentation parameters (tuning, deferred)** — `range_band_m`,
   `range_jump_m`, `max_bearing_gap_beams`, `min_valid_rays` are the LiDAR
   foreground-isolation knobs (the analogue of the `isolation_2d` /
-  `isolation_3d` recipes); they are the source of the current gap to the legacy
-  `lidar` row (0.093 vs 0.064 m) — see §7. Plan when picked up:
+  `isolation_3d` recipes); they are the source of the measured gap to the
+  `lidar` row (0.093 vs 0.064 m) — see §7. **That baseline is no longer
+  runnable:** `lidar` was deleted with the rest of the legacy stack, so 0.064 m
+  is a recorded figure rather than something a rerun can reproduce. Tune
+  against ground truth directly. Plan when picked up:
   1. **Tune on the benchmark, not exploration** — tuning needs ground truth
      (known spawn distance → MAE), which only the benchmark has; exploration
      has no labelled target to measure error against.

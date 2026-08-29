@@ -1,48 +1,25 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-import math
 import os
 import re
 
 
 PUBLIC_ESTIMATOR_ORDER = (
-    'rgb',
-    'sensor_depth',
-    'depth_anything',
     'pointcloud',
-    'lidar',
     'projective_ranging',
     'euclidean_reconstruction',
     'polar_profiling',
 )
 
-IMAGE_BACKED_ESTIMATORS = frozenset({
-    'rgb',
-    'sensor_depth',
-    'depth_anything',
-})
-
-RGB_DEBUG_VIEW_ESTIMATORS = frozenset({
-    'pointcloud',
-    'lidar',
-    'projective_ranging',
-    'euclidean_reconstruction',
-    'polar_profiling',
-})
-
-CAMERA_ESTIMATORS = frozenset({
-    'rgb',
-    'sensor_depth',
-    'depth_anything',
-    'pointcloud',
-})
-
-LIDAR_ESTIMATORS = frozenset({'lidar'})
+# The organized-``PointCloud2`` row (g1_pointcloud_measurement_node), the one
+# path that reads the cloud directly rather than deprojecting depth itself --
+# which is what the mask stack's deprojection was validated against.
+POINTCLOUD_ESTIMATORS = frozenset({'pointcloud'})
 
 # The mask-based localization rows (g1_mask_measurement_node), all sharing the
-# mask front-end and the camera-optical frame, independent of the legacy camera
-# estimator stack. The estimator key is already the self-describing path name.
+# mask front-end and the camera-optical frame, independent of the pointcloud
+# row. The estimator key is already the self-describing path name.
 MASK_ESTIMATORS = frozenset({
     'projective_ranging',
     'euclidean_reconstruction',
@@ -64,19 +41,15 @@ MASK_GATES = (MASK_GATE_BOX, MASK_GATE_SILHOUETTE)
 MASK_GATE_DEFAULT = MASK_GATE_BOX
 
 ESTIMATOR_FIELD_KEYS = {
-    'rgb': 'rgb_distance_m',
-    'sensor_depth': 'sensor_depth_distance_m',
-    'depth_anything': 'mono_depth_distance_m',
     'pointcloud': 'pointcloud_distance_m',
-    'lidar': 'lidar_distance_m',
     'projective_ranging': 'projective_ranging_distance_m',
     'euclidean_reconstruction': 'euclidean_reconstruction_distance_m',
     'polar_profiling': 'polar_profiling_distance_m',
 }
 
 # Per-detection miss-reason arrays on G1Measurements, for the mask estimators
-# that write a status. The legacy estimators have no status field; the benchmark
-# infers a coarse OK/UNSET for them from finiteness.
+# that write a status. The pointcloud row has no status field; the benchmark
+# infers a coarse OK/UNSET for it from finiteness.
 ESTIMATOR_STATUS_FIELD_KEYS = {
     'projective_ranging': 'projective_ranging_status',
     'euclidean_reconstruction': 'euclidean_reconstruction_status',
@@ -98,23 +71,19 @@ TRUTH_MAX_AGE_S = 3.0
 
 # Detection-model (forward, lateral) attribute names for the estimators that
 # emit a planar position -- used as the sensor-side locator for the scoring
-# assignment. sensor_depth / depth_anything report only a distance, so they are
-# absent here and fall back to the 1-D distance locator.
+# assignment. Every registered estimator places its detection, and the display
+# surfaces rely on that: a distance-only row would have no direction of its own
+# and would draw its ring down the boresight, wrong by the whole lateral
+# component. ``test_estimate_viz`` asserts this covers PUBLIC_ESTIMATOR_ORDER.
 ESTIMATOR_POSITION_ATTRS = {
-    'rgb': ('rgb_forward_m', 'rgb_lateral_m'),
     'pointcloud': ('pointcloud_forward_m', 'pointcloud_lateral_m'),
-    'lidar': ('lidar_forward_m', 'lidar_lateral_m'),
     'projective_ranging': ('projective_ranging_forward_m', 'projective_ranging_lateral_m'),
     'euclidean_reconstruction': ('euclidean_reconstruction_forward_m', 'euclidean_reconstruction_lateral_m'),
     'polar_profiling': ('polar_profiling_forward_m', 'polar_profiling_lateral_m'),
 }
 
 ESTIMATOR_LABELS = {
-    'rgb': 'RGB',
-    'sensor_depth': 'Sensor Depth',
-    'depth_anything': 'Depth-Anything',
     'pointcloud': 'Point Cloud',
-    'lidar': 'LiDAR',
     'projective_ranging': 'Projective Ranging',
     'euclidean_reconstruction': 'Euclidean Reconstruction',
     'polar_profiling': 'Polar Profiling',
@@ -181,35 +150,6 @@ def display_distance(read_distance, index: int) -> float | None:
     return None
 
 
-def display_bearing(read_position, index: int) -> float | None:
-    """Bearing of a detection in the base frame, in canonical order.
-
-    ``read_position(estimator, index)`` returns that estimator's
-    ``(forward_m, lateral_m)`` or ``None``. Ordered exactly like
-    ``display_distance`` -- first usable answer wins -- so the direction a
-    surface draws and the distance it prints are picked by one rule rather than
-    two that can disagree about which estimator speaks for a detection.
-
-    Exists for the depth-only rows (``sensor_depth``, ``depth_anything``), which
-    publish a planar distance and no position at all. A borrowed bearing is a
-    visualization convenience, never an input to scoring: the benchmark's
-    locator stays ``ESTIMATOR_POSITION_ATTRS``, where those two are absent on
-    purpose.
-    """
-
-    for estimator in PUBLIC_ESTIMATOR_ORDER:
-        position = read_position(estimator, index)
-        if position is None:
-            continue
-        forward_m, lateral_m = position
-        if forward_m is None or lateral_m is None:
-            continue
-        if forward_m == 0.0 and lateral_m == 0.0:
-            continue
-        return math.atan2(lateral_m, forward_m)
-    return None
-
-
 def nearest_instance_index(count: int, read_distance) -> int | None:
     """Index of the closest detection, or ``None`` when nothing is rankable.
 
@@ -249,8 +189,6 @@ def parse_estimators(raw_estimators: str | None) -> tuple[str, ...]:
         estimator = token.strip()
         if not estimator:
             continue
-        if estimator == 'mono_depth':
-            raise ValueError('Use "depth_anything" instead of "mono_depth" in benchmark configuration.')
         if estimator not in ESTIMATOR_FIELD_KEYS:
             supported = ', '.join(PUBLIC_ESTIMATOR_ORDER)
             raise ValueError(
@@ -267,10 +205,10 @@ def parse_estimators(raw_estimators: str | None) -> tuple[str, ...]:
     )
 
 
-def selected_camera_estimators(selected_estimators: tuple[str, ...]) -> tuple[str, ...]:
+def selected_pointcloud_estimators(selected_estimators: tuple[str, ...]) -> tuple[str, ...]:
     return tuple(
         estimator for estimator in PUBLIC_ESTIMATOR_ORDER
-        if estimator in CAMERA_ESTIMATORS and estimator in selected_estimators
+        if estimator in POINTCLOUD_ESTIMATORS and estimator in selected_estimators
     )
 
 
@@ -281,12 +219,8 @@ def selected_mask_estimators(selected_estimators: tuple[str, ...]) -> tuple[str,
     )
 
 
-def uses_camera_estimators(selected_estimators: tuple[str, ...]) -> bool:
-    return any(estimator in CAMERA_ESTIMATORS for estimator in selected_estimators)
-
-
-def uses_lidar_estimators(selected_estimators: tuple[str, ...]) -> bool:
-    return any(estimator in LIDAR_ESTIMATORS for estimator in selected_estimators)
+def uses_pointcloud_estimators(selected_estimators: tuple[str, ...]) -> bool:
+    return any(estimator in POINTCLOUD_ESTIMATORS for estimator in selected_estimators)
 
 
 def uses_mask_estimators(selected_estimators: tuple[str, ...]) -> bool:
@@ -356,8 +290,8 @@ def benchmark_run_folder_name(
     The timestamp leads so the directory keeps sorting chronologically -- the
     usual question is "what did I run last". After it come only axes that
     actually applied: the mask gate is omitted when no mask estimator ran, and
-    the depth source when no depth-path estimator ran, so a lidar-only run is
-    not labelled with a segmentation gate it never used.
+    the depth source when no depth-path estimator ran, so a pointcloud-only run
+    is not labelled with a segmentation gate it never used.
     """
 
     parts = [run_label, scenario_slug(scenario_path)]
@@ -379,7 +313,7 @@ def benchmark_display_name(
     isolation recipe (constant within a run): ``box-gated stereoscopic
     projective ranging``. Polar profiling drops the source
     (``box-gated polar profiling``); non-mask rows use their fixed label
-    (``RGB``, ``LiDAR``, ...).
+    (``Point Cloud``).
     """
 
     path_words = estimator.replace('_', ' ')

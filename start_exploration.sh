@@ -6,7 +6,6 @@
 #   bash start_exploration.sh office                         # office + explore_lite
 #   bash start_exploration.sh mock_hospital custom           # mock_hospital + custom explorer
 #   EXPLORER=custom bash start_exploration.sh office         # office + custom explorer
-#   DEPTH_ANYTHING_ENABLED=true bash start_exploration.sh    # enable Depth-Anything
 #   FASTRTPS_NO_SHM=true bash start_exploration.sh           # use the UDP-only FastDDS profile
 
 set -euo pipefail
@@ -27,8 +26,6 @@ if [[ "$EXPLORER" != "explore_lite" && "$EXPLORER" != "custom" ]]; then
     echo "Unknown explorer '$EXPLORER'. Expected 'explore_lite' or 'custom'." >&2
     exit 2
 fi
-
-DEPTH_ANYTHING_ENABLED="${DEPTH_ANYTHING_ENABLED:-false}"
 
 # FastDDS shared-memory locks can get stale after Gazebo/ROS crashes and make
 # nodes disappear from discovery. The UDP-only FastDDS profile sidesteps that.
@@ -59,5 +56,4 @@ exec > >(tee "$LOG_FILE") 2>&1
 exec ros2 launch ridgeback_autonomy ridgeback_exploration.launch.py \
     world:="$WORLD" \
     explorer:="$EXPLORER" \
-    depth_anything_enabled:="$DEPTH_ANYTHING_ENABLED" \
     "$@"

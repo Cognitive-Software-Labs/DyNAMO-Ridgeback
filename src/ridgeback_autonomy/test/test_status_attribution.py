@@ -70,17 +70,18 @@ def test_missing_status_counts_as_unset() -> None:
     assert histogram['projective_ranging'] == {int(MissReason.UNSET): 1}
 
 
-def test_legacy_estimator_status_is_inferred_per_detection() -> None:
-    # Legacy estimators publish no status array, so OK/UNSET is inferred from
+def test_statusless_estimator_status_is_inferred_per_detection() -> None:
+    # The pointcloud row publishes no status array, so OK/UNSET is inferred from
     # whether THAT box got a distance -- not from the frame's first box.
     event = _event([
-        _detection(rgb_distance_m=2.5),
-        _detection(rgb_distance_m=None),
+        _detection(pointcloud_distance_m=2.5),
+        _detection(pointcloud_distance_m=None),
     ])
 
-    histogram = compute_status_histogram({'a': event}, ('rgb',))
+    histogram = compute_status_histogram({'a': event}, ('pointcloud',))
 
-    assert histogram['rgb'] == {int(MissReason.OK): 1, int(MissReason.UNSET): 1}
+    assert histogram['pointcloud'] == {
+        int(MissReason.OK): 1, int(MissReason.UNSET): 1}
 
 
 def test_merging_a_mask_message_keeps_its_per_detection_status() -> None:
@@ -148,22 +149,33 @@ def test_format_status_tally_names_the_culprit() -> None:
     assert tally == 'projective 20/20, polar 0/20 (SCAN_INVALID)'
 
 
-def test_extract_estimator_statuses_mask_explicit_and_legacy_inferred() -> None:
-    batch = DetectionBatch(
+def test_extract_estimator_statuses_mask_explicit_and_pointcloud_inferred() -> None:
+    present = DetectionBatch(
         image_width=640,
         image_height=480,
         detections=[Detection(
             bbox_xyxy=(1, 2, 30, 40), label='humanoid robot', score=0.9,
             projective_ranging_status=int(MissReason.OK),
             polar_profiling_status=int(MissReason.NO_SCAN),
-            rgb_distance_m=2.5,            # legacy present -> inferred OK
-            sensor_depth_distance_m=None,  # legacy absent -> inferred UNSET
+            pointcloud_distance_m=2.5,  # no status array -> inferred OK
         )],
     )
 
-    statuses = extract_estimator_statuses(build_measurements_message(batch, Header()))
+    statuses = extract_estimator_statuses(build_measurements_message(present, Header()))
 
     assert statuses['projective_ranging'] == int(MissReason.OK)
     assert statuses['polar_profiling'] == int(MissReason.NO_SCAN)
-    assert statuses['rgb'] == int(MissReason.OK)
-    assert statuses['sensor_depth'] == int(MissReason.UNSET)
+    assert statuses['pointcloud'] == int(MissReason.OK)
+
+    absent = DetectionBatch(
+        image_width=640,
+        image_height=480,
+        detections=[Detection(
+            bbox_xyxy=(1, 2, 30, 40), label='humanoid robot', score=0.9,
+            pointcloud_distance_m=None,  # no status array -> inferred UNSET
+        )],
+    )
+
+    assert extract_estimator_statuses(
+        build_measurements_message(absent, Header())
+    )['pointcloud'] == int(MissReason.UNSET)

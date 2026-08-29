@@ -8,13 +8,12 @@ import numpy as np
 
 from ridgeback_autonomy.benchmarking.estimators import (
     DEPTH_PATH_ESTIMATORS,
-    ESTIMATOR_FIELD_KEYS,
     ESTIMATOR_LABELS,
     MASK_GATE_SILHOUETTE,
     PUBLIC_ESTIMATOR_ORDER,
 )
 from ridgeback_autonomy.common.models import DetectionBatch
-from ridgeback_autonomy.perception.core.geometry import focus_bbox
+from ridgeback_autonomy.perception.core.pointcloud_ranging import focus_bbox
 from ridgeback_autonomy.perception.core.mask import (
     MaskPrecision,
     mask_from_array,
@@ -30,8 +29,6 @@ from ridgeback_autonomy.perception.core.polar_profiling import (
 # Panel kinds. A run renders only the ones its selected estimators need, so the
 # view matches the config instead of a fixed grid.
 PANEL_RGB = 'rgb'
-PANEL_SENSOR_DEPTH = 'sensor_depth'
-PANEL_MONO_DEPTH = 'depth_anything'
 PANEL_ALIGNED_DEPTH = 'aligned_depth'
 PANEL_BOX_MASK = 'box_mask'
 PANEL_SILHOUETTE = 'silhouette'
@@ -40,18 +37,6 @@ PANEL_LIDAR = 'lidar'
 # Panels per row when packing the grid. Three suits a roughly square window;
 # a wide, short target (the RViz strip) wants them all on one row instead.
 PANEL_MAX_COLS_DEFAULT = 3
-
-# Estimators that report a full planar position (lateral/forward/distance); the
-# rest report distance only. Field names are ``{estimator}_lateral_m`` etc.,
-# except the distance-only pair whose keys live in ``ESTIMATOR_FIELD_KEYS``.
-POSITION_ESTIMATORS = frozenset({
-    'rgb',
-    'pointcloud',
-    'lidar',
-    'projective_ranging',
-    'euclidean_reconstruction',
-    'polar_profiling',
-})
 
 
 @dataclass(frozen=True)
@@ -72,10 +57,6 @@ def select_panels(estimators, depth_source: str, mask_gate: str) -> list[PanelSp
     selected = set(estimators)
     panels: list[PanelSpec] = [PanelSpec(PANEL_RGB, 'RGB Detection')]
 
-    if 'sensor_depth' in selected:
-        panels.append(PanelSpec(PANEL_SENSOR_DEPTH, 'Sensor Depth'))
-    if 'depth_anything' in selected:
-        panels.append(PanelSpec(PANEL_MONO_DEPTH, 'Depth-Anything'))
     if selected & DEPTH_PATH_ESTIMATORS:
         panels.append(PanelSpec(PANEL_ALIGNED_DEPTH, f'Aligned Depth ({depth_source})'))
         if mask_gate == MASK_GATE_SILHOUETTE:
@@ -83,10 +64,7 @@ def select_panels(estimators, depth_source: str, mask_gate: str) -> list[PanelSp
         else:
             panels.append(PanelSpec(PANEL_BOX_MASK, 'Box Mask'))
     if 'polar_profiling' in selected:
-        # Name the panel after the selected lidar-family estimator; only when
-        # the legacy lidar row is also selected does it carry both names.
-        title = 'LiDAR / Polar' if 'lidar' in selected else ESTIMATOR_LABELS['polar_profiling']
-        panels.append(PanelSpec(PANEL_LIDAR, title))
+        panels.append(PanelSpec(PANEL_LIDAR, ESTIMATOR_LABELS['polar_profiling']))
 
     return panels
 
@@ -113,27 +91,22 @@ def pack_panels(panels: list[np.ndarray], max_cols: int = PANEL_MAX_COLS_DEFAULT
 def active_label_lines(detection, estimators) -> list[str]:
     """One label line per selected estimator, in ``PUBLIC_ESTIMATOR_ORDER``.
 
-    Position-capable estimators render lateral/forward/distance; the rest render
-    distance only. A missing field reads as ``NA`` (no estimate for this frame).
+    Every registered estimator reports lateral/forward/distance -- the invariant
+    ``ESTIMATOR_POSITION_ATTRS`` carries -- so every line is a position line. A
+    missing field reads as ``NA`` (no estimate for this frame).
     """
 
     selected = set(estimators)
-    lines: list[str] = []
-    for estimator in PUBLIC_ESTIMATOR_ORDER:
-        if estimator not in selected:
-            continue
-        label = ESTIMATOR_LABELS[estimator]
-        if estimator in POSITION_ESTIMATORS:
-            lines.append(format_position_line(
-                label,
-                getattr(detection, f'{estimator}_lateral_m', None),
-                getattr(detection, f'{estimator}_forward_m', None),
-                getattr(detection, f'{estimator}_distance_m', None),
-            ))
-        else:
-            lines.append(format_distance_line(
-                label, getattr(detection, ESTIMATOR_FIELD_KEYS[estimator], None)))
-    return lines
+    return [
+        format_position_line(
+            ESTIMATOR_LABELS[estimator],
+            getattr(detection, f'{estimator}_lateral_m', None),
+            getattr(detection, f'{estimator}_forward_m', None),
+            getattr(detection, f'{estimator}_distance_m', None),
+        )
+        for estimator in PUBLIC_ESTIMATOR_ORDER
+        if estimator in selected
+    ]
 
 
 def format_position_line(
@@ -145,12 +118,6 @@ def format_position_line(
     if lateral_m is None or forward_m is None or distance_m is None:
         return f'{prefix} d=NA'
     return f'{prefix} x={lateral_m:+.2f} z={forward_m:+.2f} d={distance_m:.2f}m'
-
-
-def format_distance_line(prefix: str, distance_m: float | None) -> str:
-    if distance_m is None:
-        return f'{prefix} d=NA'
-    return f'{prefix} d={distance_m:.2f}m'
 
 
 # Ground-truth reference line: rendered gold so it reads as the benchmark's
@@ -190,8 +157,6 @@ class RgbdOverlayRenderer:
         frame: np.ndarray,
         batch: DetectionBatch,
         *,
-        sensor_depth_meters: np.ndarray | None = None,
-        mono_depth_meters: np.ndarray | None = None,
         aligned_depth_meters: np.ndarray | None = None,
         published_mask: np.ndarray | None = None,
         scan_uv: np.ndarray | None = None,
@@ -202,8 +167,6 @@ class RgbdOverlayRenderer:
         images = [
             self.build_panel(
                 spec, frame, batch,
-                sensor_depth_meters=sensor_depth_meters,
-                mono_depth_meters=mono_depth_meters,
                 aligned_depth_meters=aligned_depth_meters,
                 published_mask=published_mask,
                 scan_uv=scan_uv,
@@ -221,8 +184,6 @@ class RgbdOverlayRenderer:
         frame: np.ndarray,
         batch: DetectionBatch,
         *,
-        sensor_depth_meters,
-        mono_depth_meters,
         aligned_depth_meters,
         published_mask,
         scan_uv,
@@ -234,12 +195,6 @@ class RgbdOverlayRenderer:
             panel = frame.copy()
             self.annotate_detections(
                 panel, batch, draw_labels=self.rgb_panel_labels, truth=truth)
-        elif spec.kind == PANEL_SENSOR_DEPTH:
-            panel = self.make_depth_panel(frame.shape[:2], sensor_depth_meters)
-            self.annotate_detections(panel, batch, draw_labels=False)
-        elif spec.kind == PANEL_MONO_DEPTH:
-            panel = self.make_depth_panel(frame.shape[:2], mono_depth_meters)
-            self.annotate_detections(panel, batch, draw_labels=False)
         elif spec.kind == PANEL_ALIGNED_DEPTH:
             panel = self.make_depth_panel(frame.shape[:2], aligned_depth_meters)
             self.annotate_detections(panel, batch, draw_labels=False)
@@ -254,8 +209,7 @@ class RgbdOverlayRenderer:
             panel = np.zeros_like(frame)
 
         self.draw_panel_title(panel, spec.title)
-        if not batch.detected and spec.kind in (
-                PANEL_RGB, PANEL_SENSOR_DEPTH, PANEL_MONO_DEPTH, PANEL_ALIGNED_DEPTH):
+        if not batch.detected and spec.kind in (PANEL_RGB, PANEL_ALIGNED_DEPTH):
             cv2.putText(panel, 'No G1 detected', (20, 100),
                         cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 0, 255), 2, cv2.LINE_AA)
         return panel

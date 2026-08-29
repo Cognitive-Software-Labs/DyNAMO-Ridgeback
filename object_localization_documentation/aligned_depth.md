@@ -131,10 +131,10 @@ the same contract unchanged. Divergences to keep in mind (details in
 
 Deprojection (projective ranging §2.4, euclidean reconstruction §2.1) needs the intrinsics *of the grid the
 frame lives on* — after alignment that is the **color** camera's intrinsics.
-The **legacy estimators** still derive intrinsics from
-`config/camera_config.json` FoV values (87°/58° — the real depth FoV), which is
+The **deleted legacy estimators** derived intrinsics from
+`config/camera_config.json` FoV values (87°/58° — the real depth FoV), which was
 wrong for the sim render (71.6°) and wrong-in-principle for aligned real depth
-(color FoV). The mask stack no longer has this problem: the mask node
+(color FoV). No surviving path does this: the mask node
 subscribes to the **color** camera's `camera_info` directly and deprojects with
 it (resolved 2026-07-21; the republish hop went away with the producer node on
 2026-08-26). `grid_mismatch_warning` skips the frame's paths if that grid and
@@ -150,8 +150,8 @@ The monocular source needs no depth sensor at all: the RGB frame goes through
 `transformers`), which predicts a dense metric depth map. This document's
 source is `depth_sources.MonocularDepthSource` (selected by the mask node's
 `depth_source` param, and run on the color frame at the detection stamp — once
-per detection batch, not once per camera frame); the legacy
-`g1_camera_measurement_node` runs the same network for its own estimators.
+per detection batch, not once per camera frame). It is the only consumer of the
+network now; the legacy camera node that also ran it has been deleted.
 
 - **Aligned by construction.** The network's input *is* the color image, so
   its output is per-color-pixel — the grid property costs nothing. Resized to
@@ -220,11 +220,11 @@ which stream the node buffers raw and hands back at the detection stamp.
 - The benchmark treats the source as a matrix axis: every downstream
   combination (path × mask tag × isolation recipe) runs once per source, so
   stereo-vs-monocular is compared under identical downstream code.
-- The current estimators already do this implicitly:
-  `add_depth_source_measurements` in `geometry.py` runs the *same* function
-  over the sensor depth image and the Depth-Anything map (`sensor_depth` and
-  `depth_anything` rows). The contract here formalizes what that function
-  already assumes.
+- The deleted legacy stack already did this implicitly:
+  `add_depth_source_measurements` in `geometry.py` ran the *same* function over
+  the sensor depth image and the Depth-Anything map (the `sensor_depth` and
+  `depth_anything` rows). This contract formalized what that function assumed;
+  it now stands on its own, both of those rows having been removed.
 
 ---
 
@@ -239,8 +239,8 @@ which stream the node buffers raw and hands back at the detection stamp.
   derived 18 m, and nothing at all for stereo. Landed together with the
   isolation default moving to `height_crop_nearest_mode_band`, which was the
   ordering constraint — widening first would have been the regression. The
-  legacy camera rows keep a finite `depth_max_meters` of 10 m: they have no
-  source ceiling behind them and still carry the percentile anchor.
+  legacy camera rows kept a finite `depth_max_meters` of 10 m, having no source
+  ceiling behind them; those rows and that parameter are both gone.
   **Unmeasured.** No benchmark has run with these defaults; the A/B is now a
   regression check rather than a gate, and the benchmark cannot see the change
   it is checking for, since its scenes top out at 5.8 m in a world whose far
@@ -248,8 +248,9 @@ which stream the node buffers raw and hands back at the detection stamp.
 - ~~**Intrinsics source** — switch deprojection to `camera_info` of the color
   camera instead of the FoV constants in `camera_config.json` (§2.3).~~ —
   resolved 2026-07-21: the mask node subscribes to the color camera's
-  `camera_info` and deprojects with it; only the legacy estimators still fall
-  back to the `camera_config.json` FoV constants.
+  `camera_info` and deprojects with it. The legacy estimators that fell back to
+  the `camera_config.json` FoV constants have since been deleted, so nothing
+  reads those constants any more.
 - ~~**Metric-scale validation**~~ — resolved 2026-07-24: measured Depth-Anything's
   scale directly as a pixel-wise `mono / stereo` depth ratio on identical sim
   frames (isolating the scale term from surface warping and noise). On the **G1

@@ -70,8 +70,7 @@ PATTERNS=(
     rviz2
     camera_windows_node
     g1_detector_node
-    g1_camera_measurement_node
-    g1_lidar_measurement_node
+    g1_pointcloud_measurement_node
     g1_overlay_node
     g1_mask_measurement_node
     g1_estimate_viz_node

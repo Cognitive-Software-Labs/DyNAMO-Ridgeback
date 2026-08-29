@@ -215,8 +215,9 @@ three differences the shipped path resolves:
 | Isolation | range band (25th-percentile anchor, −0.10/+0.35 m window) | pluggable strategy (`foreground_isolation_3d.md`; range band = incumbent) |
 | Output | nearest-inlier scalar range, vehicle frame, front offset applied | `(X, Y, Z)` centroid in the camera frame |
 
-The legacy estimator is also stereo-only and sim-only in practice (no cloud is
-published on hardware today; see `pointcloud_provenance_test.md` §1). Euclidean
+The `pointcloud` estimator compared against here is also stereo-only and
+sim-only in practice (no cloud is published on hardware today; see
+`pointcloud_provenance_test.md` §1). It is the one legacy row that survives. Euclidean
 reconstruction generalizes it the same way projective ranging generalizes the
 depth estimator: mask instead of crop, tag fork, pluggable isolation,
 camera-frame coordinate output.

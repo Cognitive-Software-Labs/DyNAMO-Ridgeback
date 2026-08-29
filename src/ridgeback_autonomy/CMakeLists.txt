@@ -56,15 +56,9 @@ install(PROGRAMS
 )
 
 install(PROGRAMS
-  ridgeback_autonomy/perception/g1_camera_measurement_node.py
+  ridgeback_autonomy/perception/g1_pointcloud_measurement_node.py
   DESTINATION lib/${PROJECT_NAME}
-  RENAME g1_camera_measurement_node
-)
-
-install(PROGRAMS
-  ridgeback_autonomy/perception/g1_lidar_measurement_node.py
-  DESTINATION lib/${PROJECT_NAME}
-  RENAME g1_lidar_measurement_node
+  RENAME g1_pointcloud_measurement_node
 )
 
 install(PROGRAMS
@@ -142,7 +136,6 @@ if(BUILD_TESTING)
   ament_add_pytest_test(test_depth_sources test/test_depth_sources.py)
   ament_add_pytest_test(test_detection test/test_detection.py)
   ament_add_pytest_test(test_detector_node test/test_detector_node.py)
-  ament_add_pytest_test(test_geometry test/test_geometry.py)
   ament_add_pytest_test(test_image_utils test/test_image_utils.py)
   ament_add_pytest_test(test_imports test/test_imports.py)
   ament_add_pytest_test(test_intrinsics test/test_intrinsics.py)
@@ -161,6 +154,8 @@ if(BUILD_TESTING)
   ament_add_pytest_test(test_status_attribution test/test_status_attribution.py)
   ament_add_pytest_test(test_euclidean_reconstruction test/test_euclidean_reconstruction.py)
   ament_add_pytest_test(test_polar_profiling test/test_polar_profiling.py)
+  ament_add_pytest_test(test_pointcloud_ranging test/test_pointcloud_ranging.py)
+  ament_add_pytest_test(test_vehicle_frame test/test_vehicle_frame.py)
   ament_add_pytest_test(test_benchmark_runner test/test_benchmark_runner.py)
   ament_add_pytest_test(test_scenarios test/test_scenarios.py)
   ament_add_pytest_test(test_association test/test_association.py)

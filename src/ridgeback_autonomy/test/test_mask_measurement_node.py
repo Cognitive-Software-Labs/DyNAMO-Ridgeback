@@ -71,14 +71,14 @@ def test_base_adapter_applies_camera_mounting_translation() -> None:
     assert lateral == pytest.approx(0.018)
 
 
-def test_defaults_mirror_legacy_constants_by_value() -> None:
-    # The node's front-offset default mirrors the legacy geometry constant by
-    # value (the two stacks never import each other). The pure core-module
-    # mirrors are covered in test_mirrored_constants; this one needs the
-    # ROS-importing node module, so it lives here.
-    from ridgeback_autonomy.perception.core import geometry
+def test_defaults_mirror_shared_constants_by_value() -> None:
+    # The node's front-offset default mirrors the shared frame constant by value
+    # (the mask stack imports nothing from the estimator modules). The pure
+    # core-module mirrors are covered in test_mirrored_constants; this one needs
+    # the ROS-importing node module, so it lives here.
+    from ridgeback_autonomy.perception.core import vehicle_frame
 
-    assert ROBOT_FRONT_OFFSET_M_DEFAULT == geometry.ROBOT_FRONT_OFFSET_M
+    assert ROBOT_FRONT_OFFSET_M_DEFAULT == vehicle_frame.ROBOT_FRONT_OFFSET_M
     assert ROBOT_FRONT_OFFSET_M_DEFAULT == 0.25
     assert BASE_FRAME_DEFAULT == 'base_link'
 
@@ -659,17 +659,17 @@ def test_fill_records_no_beams_when_polar_is_not_enabled() -> None:
 
 def test_resolve_enabled_estimators_keeps_only_the_mask_rows() -> None:
     # One comma-separated list selects across both stacks; this node keeps the
-    # keys it owns and ignores the legacy ones.
+    # keys it owns and ignores the pointcloud one.
     assert resolve_enabled_estimators('all') == frozenset({
         'projective_ranging', 'euclidean_reconstruction', 'polar_profiling'})
-    assert resolve_enabled_estimators('rgb,lidar,polar_profiling') == frozenset(
+    assert resolve_enabled_estimators('pointcloud,polar_profiling') == frozenset(
         {'polar_profiling'})
 
 
 def test_resolve_enabled_estimators_rejects_a_selection_with_no_mask_row() -> None:
     # Not a quiet no-op: the node would publish empty measurements forever.
     with pytest.raises(ValueError, match='no mask estimator'):
-        resolve_enabled_estimators('rgb,lidar')
+        resolve_enabled_estimators('pointcloud')
 
 
 def test_resolve_enabled_estimators_rejects_an_unknown_key() -> None:

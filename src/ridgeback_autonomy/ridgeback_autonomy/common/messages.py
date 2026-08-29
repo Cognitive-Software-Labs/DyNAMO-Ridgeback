@@ -44,17 +44,9 @@ def build_measurements_message(batch: DetectionBatch, header) -> G1Measurements:
     _populate_identity_fields(msg, batch, header)
 
     for detection in batch.detections:
-        msg.rgb_lateral_m.append(optional_float(detection.rgb_lateral_m))
-        msg.rgb_forward_m.append(optional_float(detection.rgb_forward_m))
-        msg.rgb_distance_m.append(optional_float(detection.rgb_distance_m))
-        msg.sensor_depth_distance_m.append(optional_float(detection.sensor_depth_distance_m))
-        msg.mono_depth_distance_m.append(optional_float(detection.mono_depth_distance_m))
         msg.pointcloud_lateral_m.append(optional_float(detection.pointcloud_lateral_m))
         msg.pointcloud_forward_m.append(optional_float(detection.pointcloud_forward_m))
         msg.pointcloud_distance_m.append(optional_float(detection.pointcloud_distance_m))
-        msg.lidar_lateral_m.append(optional_float(detection.lidar_lateral_m))
-        msg.lidar_forward_m.append(optional_float(detection.lidar_forward_m))
-        msg.lidar_distance_m.append(optional_float(detection.lidar_distance_m))
         msg.projective_ranging_lateral_m.append(optional_float(detection.projective_ranging_lateral_m))
         msg.projective_ranging_forward_m.append(optional_float(detection.projective_ranging_forward_m))
         msg.projective_ranging_distance_m.append(optional_float(detection.projective_ranging_distance_m))
@@ -92,17 +84,9 @@ def batch_from_measurements_message(msg: G1Measurements) -> DetectionBatch:
     batch = batch_from_detections_message(msg)
 
     for index, detection in enumerate(batch.detections):
-        detection.rgb_lateral_m = decode_optional_float(msg.rgb_lateral_m, index)
-        detection.rgb_forward_m = decode_optional_float(msg.rgb_forward_m, index)
-        detection.rgb_distance_m = decode_optional_float(msg.rgb_distance_m, index)
-        detection.sensor_depth_distance_m = decode_optional_float(msg.sensor_depth_distance_m, index)
-        detection.mono_depth_distance_m = decode_optional_float(msg.mono_depth_distance_m, index)
         detection.pointcloud_lateral_m = decode_optional_float(msg.pointcloud_lateral_m, index)
         detection.pointcloud_forward_m = decode_optional_float(msg.pointcloud_forward_m, index)
         detection.pointcloud_distance_m = decode_optional_float(msg.pointcloud_distance_m, index)
-        detection.lidar_lateral_m = decode_optional_float(msg.lidar_lateral_m, index)
-        detection.lidar_forward_m = decode_optional_float(msg.lidar_forward_m, index)
-        detection.lidar_distance_m = decode_optional_float(msg.lidar_distance_m, index)
         detection.projective_ranging_lateral_m = decode_optional_float(msg.projective_ranging_lateral_m, index)
         detection.projective_ranging_forward_m = decode_optional_float(msg.projective_ranging_forward_m, index)
         detection.projective_ranging_distance_m = decode_optional_float(msg.projective_ranging_distance_m, index)
@@ -146,10 +130,6 @@ def snapshot_measurements_message(msg: G1Measurements) -> dict[str, Any]:
         'detected': bool(msg.detected),
         'count': int(msg.count),
         'bboxes': [list(bbox) for bbox in decode_bbox_quads(msg.bbox_xyxy)],
-        'rgb_distance_m': first_finite_positive(msg.rgb_distance_m),
-        'sensor_depth_distance_m': first_finite_positive(msg.sensor_depth_distance_m),
-        'mono_depth_distance_m': first_finite_positive(msg.mono_depth_distance_m),
-        'lidar_distance_m': first_finite_positive(msg.lidar_distance_m),
         'pointcloud_distance_m': first_finite_positive(msg.pointcloud_distance_m),
         'projective_ranging_distance_m': first_finite_positive(msg.projective_ranging_distance_m),
         'euclidean_reconstruction_distance_m': first_finite_positive(msg.euclidean_reconstruction_distance_m),

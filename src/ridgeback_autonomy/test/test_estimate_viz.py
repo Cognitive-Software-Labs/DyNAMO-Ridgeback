@@ -11,16 +11,15 @@ from geometry_msgs.msg import PointStamped
 
 from ridgeback_autonomy.benchmarking.estimators import (
     ESTIMATOR_LABELS,
+    ESTIMATOR_POSITION_ATTRS,
     MASK_ESTIMATORS,
     PUBLIC_ESTIMATOR_ORDER,
     TRUTH_MAX_AGE_S,
-    display_bearing,
     nearest_instance_index,
     parse_estimators,
     truth_reading,
 )
 from ridgeback_autonomy.benchmarking.g1_estimate_viz_node import (
-    BORROWED_BEARING_LINE_WIDTH_M,
     ESTIMATOR_COLOURS,
     G1EstimateVizNode,
     HUD_AGED_LUMINANCE,
@@ -36,13 +35,12 @@ from ridgeback_autonomy.benchmarking.g1_estimate_viz_node import (
     hud_section_text,
     hud_text_colour,
     hud_truth_header,
-    merged_position_reader,
     nearest_detection_index,
     partition_measurements,
     world_marker_point,
 )
 from ridgeback_autonomy.msg import G1Measurements
-from ridgeback_autonomy.perception.core.geometry import (
+from ridgeback_autonomy.perception.core.vehicle_frame import (
     ROBOT_FRONT_OFFSET_M,
     planar_measurement_from_vehicle_front,
 )
@@ -55,15 +53,21 @@ def test_every_registered_estimator_has_a_colour() -> None:
     assert set(ESTIMATOR_COLOURS) == set(PUBLIC_ESTIMATOR_ORDER)
 
 
-def test_mask_and_legacy_families_are_split_by_colour_temperature() -> None:
+def test_every_estimator_reports_a_planar_position() -> None:
+    # Licenses the removal of the borrowed-bearing path: a distance-only
+    # estimator would silently draw its ring on the boresight.
+    assert set(ESTIMATOR_POSITION_ATTRS) == set(PUBLIC_ESTIMATOR_ORDER)
+
+
+def test_mask_and_pointcloud_families_are_split_by_colour_temperature() -> None:
     # Nothing on screen labels the two families, so the warm/cold split is the
-    # whole of the distinction: a legacy row that drifted cold would silently
+    # whole of the distinction: a non-mask row that drifted cold would silently
     # read as a mask path. Red over blue is warm, blue over red cold.
     for estimator, (red, _, blue, _) in ESTIMATOR_COLOURS.items():
         if estimator in MASK_ESTIMATORS:
             assert blue > red, f'{estimator} is a mask path but reads warm'
         else:
-            assert red > blue, f'{estimator} is a legacy path but reads cold'
+            assert red > blue, f'{estimator} is not a mask path but reads cold'
 
 
 def test_marker_id_bases_are_distinct() -> None:
@@ -97,16 +101,16 @@ def test_absent_estimator_slots_read_as_none() -> None:
     msg.detected = True
     msg.count = 1
 
-    assert estimator_reading(msg, 'lidar', 0) == (None, None, None)
+    assert estimator_reading(msg, 'pointcloud', 0) == (None, None, None)
 
 
 def test_nan_slots_read_as_none() -> None:
     msg = G1Measurements()
     msg.detected = True
     msg.count = 1
-    msg.rgb_distance_m = [float('nan')]
+    msg.pointcloud_distance_m = [float('nan')]
 
-    assert estimator_reading(msg, 'rgb', 0)[2] is None
+    assert estimator_reading(msg, 'pointcloud', 0)[2] is None
 
 
 def reader_from(table):
@@ -116,24 +120,27 @@ def reader_from(table):
 
 
 def test_nearest_instance_index_picks_the_closest_detection() -> None:
-    table = {0: {'rgb': 4.2}, 1: {'rgb': 2.1}}
+    table = {0: {'pointcloud': 4.2}, 1: {'pointcloud': 2.1}}
 
     assert nearest_instance_index(2, reader_from(table)) == 1
 
 
 def test_canonical_order_decides_which_estimator_speaks_for_a_detection() -> None:
     # Detection 1 holds the smallest number in the frame, but only on an
-    # estimator that never gets consulted: rgb answers for both detections, so
-    # detection 0 is the nearer one. Ranking by the minimum across estimators
-    # instead would flip this, and would flip it differently in a node that does
-    # not compute rgb.
-    table = {0: {'rgb': 1.0, 'lidar': 5.0}, 1: {'rgb': 2.0, 'lidar': 0.5}}
+    # estimator that never gets consulted: pointcloud answers for both
+    # detections, so detection 0 is the nearer one. Ranking by the minimum
+    # across estimators instead would flip this, and would flip it differently
+    # in a node that does not compute pointcloud.
+    table = {
+        0: {'pointcloud': 1.0, 'polar_profiling': 5.0},
+        1: {'pointcloud': 2.0, 'polar_profiling': 0.5},
+    }
 
     assert nearest_instance_index(2, reader_from(table)) == 0
 
 
 def test_equal_distances_tie_break_to_the_lower_index() -> None:
-    table = {0: {'rgb': 3.0}, 1: {'rgb': 3.0}}
+    table = {0: {'pointcloud': 3.0}, 1: {'pointcloud': 3.0}}
 
     assert nearest_instance_index(2, reader_from(table)) == 0
 
@@ -154,12 +161,12 @@ def measurements(count: int, *, stamp_ns: int = 0, **fields) -> G1Measurements:
 
 
 def test_nearest_detection_index_ranks_across_every_producer() -> None:
-    # The camera node fills rgb, the mask node fills polar profiling, and the
-    # indices are the same detections in both. Detection 1 is the closer robot.
-    camera = measurements(2, rgb_distance_m=[4.0, 2.0])
+    # The pointcloud node fills pointcloud, the mask node fills polar profiling,
+    # and the indices are the same detections in both. Detection 1 is closer.
+    pointcloud = measurements(2, pointcloud_distance_m=[4.0, 2.0])
     mask = measurements(2, polar_profiling_distance_m=[4.1, 2.2])
 
-    assert nearest_detection_index([camera, mask]) == 1
+    assert nearest_detection_index([pointcloud, mask]) == 1
 
 
 def test_nearest_detection_index_falls_back_to_the_first_detection() -> None:
@@ -174,37 +181,36 @@ def luminance(colour) -> float:
 
 def test_every_hud_colour_clears_the_legibility_floor() -> None:
     # The HUD sits on a half-opaque black panel, so a dark ring colour is
-    # unreadable as text. Red and depth_anything's rose are the ones that fail
-    # without the lift.
+    # unreadable as text. Every registered colour clears the floor unlifted
+    # today; the lift is the guard for one added later.
     for estimator in ESTIMATOR_COLOURS:
         assert luminance(hud_text_colour(estimator)) >= HUD_MIN_LUMINANCE - 1e-9
 
 
 def test_bright_colours_are_left_exactly_alone() -> None:
-    # lidar's chartreuse is already well above the floor; lifting it would drift
-    # the text away from the ring for no reason.
-    assert hud_text_colour('lidar') == ESTIMATOR_COLOURS['lidar'][:3]
+    # The pointcloud amber is already well above the floor; lifting it would
+    # drift the text away from the ring for no reason.
+    assert hud_text_colour('pointcloud') == ESTIMATOR_COLOURS['pointcloud'][:3]
 
 
 def test_lift_preserves_hue_ordering_so_rings_stay_identifiable() -> None:
-    # Blending toward white must not reorder the channels -- rose that came out
-    # red-dominant with blue second has to stay that way, or it no longer reads
-    # as the same estimator as its ring.
-    red, green, blue = hud_text_colour('depth_anything')
-    original_r, original_g, original_b = ESTIMATOR_COLOURS['depth_anything'][:3]
+    # Blending toward white must not reorder the channels, or a lifted colour no
+    # longer reads as the same estimator as its ring. Asserted on a synthetic
+    # dark colour, since no registered one is currently below the floor.
+    dark = (0.4, 0.0, 0.2)
+    red, green, blue = colour_at_luminance(dark, HUD_MIN_LUMINANCE)
 
     assert red > blue > green
-    assert (original_r > original_b > original_g)
 
 
 # --- aged rows --------------------------------------------------------------
 
 
 def test_every_aged_colour_lands_on_the_aged_luminance() -> None:
-    # One target for all eight, not a dim multiplier: red and depth_anything's
-    # rose sit AT the legibility floor after their lift, so a multiply-then-clamp
-    # would hand them back their fresh appearance and the state would be
-    # invisible on exactly the two rows that most need it.
+    # One target for every row, not a dim multiplier: a colour sitting AT the
+    # legibility floor after its lift would be handed back its fresh appearance
+    # by a multiply-then-clamp, and the state would be invisible on exactly the
+    # rows that most need it.
     for estimator in ESTIMATOR_COLOURS:
         assert luminance(hud_text_colour(estimator, aged=True)) == pytest.approx(
             HUD_AGED_LUMINANCE, abs=1e-9)
@@ -219,9 +225,9 @@ def test_aged_is_strictly_dimmer_than_fresh_for_every_estimator() -> None:
 def test_dimming_preserves_hue_ordering_so_an_aged_row_keeps_its_estimator() -> None:
     # The mirror of the lift test, and it matters more here: an aged row draws no
     # ring, so its colour is the only thing left tying it to an estimator.
-    red, green, blue = hud_text_colour('depth_anything', aged=True)
+    red, green, blue = hud_text_colour('polar_profiling', aged=True)
 
-    assert red > blue > green
+    assert blue > red > green
 
 
 def test_dimming_preserves_saturation_not_just_hue() -> None:
@@ -236,17 +242,18 @@ def test_dimming_preserves_saturation_not_just_hue() -> None:
 
 
 def test_colour_at_luminance_lifts_a_colour_that_starts_below_the_target() -> None:
-    # red's 0.2126 is under the aged target too, so it is the one aged row that
-    # gets brighter rather than darker -- the reason this is a target and not a
-    # dimming.
-    lifted = colour_at_luminance(ESTIMATOR_COLOURS['rgb'][:3], HUD_AGED_LUMINANCE)
+    # A colour under the aged target gets BRIGHTER rather than darker -- the
+    # reason this is a target and not a dimming. No registered colour is that
+    # dark today, so the case is asserted on a synthetic one.
+    dark = (0.2, 0.0, 0.1)
+    lifted = colour_at_luminance(dark, HUD_AGED_LUMINANCE)
 
     assert luminance(lifted) == pytest.approx(HUD_AGED_LUMINANCE, abs=1e-9)
-    assert luminance(lifted) > luminance(ESTIMATOR_COLOURS['rgb'][:3])
+    assert luminance(lifted) > luminance(dark)
 
 
 def test_colour_at_luminance_leaves_a_colour_already_on_target_untouched() -> None:
-    colour = ESTIMATOR_COLOURS['lidar'][:3]
+    colour = ESTIMATOR_COLOURS['pointcloud'][:3]
 
     assert colour_at_luminance(colour, luminance(colour)) == colour
 
@@ -274,21 +281,6 @@ def test_hud_line_emits_an_rgb_span() -> None:
     assert line.endswith('</span>')
 
 
-def test_depth_only_estimators_have_distance_but_no_position() -> None:
-    # sensor_depth and depth_anything report a planar distance and nothing else;
-    # they intentionally have no entry in the position registry, which is why
-    # their rings have to borrow a bearing to be drawn at all.
-    msg = G1Measurements()
-    msg.detected = True
-    msg.count = 1
-    msg.sensor_depth_distance_m = [2.5]
-
-    forward, lateral, distance = estimator_reading(msg, 'sensor_depth', 0)
-
-    assert (forward, lateral) == (None, None)
-    assert distance == 2.5
-
-
 # --- ring placement ---------------------------------------------------------
 #
 # These assert where a ring actually lands in the world. Nothing did before, and
@@ -304,8 +296,6 @@ def _place(
     robot_x: float = 0.0,
     robot_y: float = 0.0,
     robot_yaw: float = 0.0,
-    distance_m: float | None = None,
-    bearing_rad: float | None = None,
 ) -> list:
     """Markers from the real node method, with no ROS context to stand up.
 
@@ -326,8 +316,6 @@ def _place(
         robot_yaw,
         TimeMsg(),
         'map',
-        distance_m=distance_m,
-        bearing_rad=bearing_rad,
     )
     return markers
 
@@ -357,7 +345,8 @@ def test_ring_lands_on_the_world_point_the_measurement_came_from() -> None:
 
     forward_m, lateral_m, _ = planar_measurement_from_vehicle_front(
         target_x - robot_x, target_y - robot_y, robot_yaw)
-    markers = _place('lidar', forward_m, lateral_m, robot_x, robot_y, robot_yaw)
+    markers = _place(
+        'polar_profiling', forward_m, lateral_m, robot_x, robot_y, robot_yaw)
 
     assert _dot_xy(markers) == pytest.approx((target_x, target_y), abs=1e-9)
 
@@ -365,7 +354,7 @@ def test_ring_lands_on_the_world_point_the_measurement_came_from() -> None:
 def test_ring_is_referenced_to_the_robot_front_not_the_base_origin() -> None:
     # A robot facing +X: a 3.00 m reading is 3.25 m from the base origin, since
     # the producer already subtracted the front offset from it.
-    markers = _place('rgb', 3.0, 0.0)
+    markers = _place('pointcloud', 3.0, 0.0)
 
     assert _dot_xy(markers) == pytest.approx((3.0 + ROBOT_FRONT_OFFSET_M, 0.0), abs=1e-9)
 
@@ -374,47 +363,21 @@ def test_the_front_offset_turns_with_the_robot() -> None:
     # Same reading with the robot facing +Y. The offset has to rotate with the
     # base, so it lands on the y axis -- adding it in the world frame would
     # leave the dot off-axis and still pass the yaw=0 case above.
-    markers = _place('rgb', 3.0, 0.0, robot_yaw=math.pi / 2.0)
+    markers = _place('pointcloud', 3.0, 0.0, robot_yaw=math.pi / 2.0)
 
     assert _dot_xy(markers) == pytest.approx((0.0, 3.0 + ROBOT_FRONT_OFFSET_M), abs=1e-9)
 
 
-def test_depth_only_ring_takes_the_bearing_another_row_measured() -> None:
-    # An off-axis target: 2.0 m away on a bearing of -30 degrees. The depth row
-    # owns the radius, the borrowed bearing owns the direction.
-    bearing = math.radians(-30.0)
-    markers = _place(
-        'sensor_depth', None, None, distance_m=2.0, bearing_rad=bearing)
-
-    dot_x, dot_y = _dot_xy(markers)
-    from_front = math.hypot(dot_x - ROBOT_FRONT_OFFSET_M, dot_y)
-    assert from_front == pytest.approx(2.0, abs=1e-9)
-    assert math.atan2(dot_y, dot_x - ROBOT_FRONT_OFFSET_M) == pytest.approx(
-        bearing, abs=1e-9)
-    # The old behaviour put this on the boresight, a full metre out.
-    assert dot_y == pytest.approx(-1.0, abs=1e-9)
+def test_a_row_that_placed_nothing_draws_nothing() -> None:
+    assert _place('pointcloud', None, None) == []
 
 
-def test_depth_only_ring_keeps_the_boresight_when_no_one_placed_the_detection() -> None:
-    # Nothing else measured a position, so there is no bearing to borrow. A ring
-    # on the boresight is still worth more than no ring: the radius is right.
-    markers = _place('sensor_depth', None, None, distance_m=2.0)
+def test_every_ring_is_drawn_at_the_one_line_width() -> None:
+    # There is no second width any more: the thin ring marked a borrowed
+    # bearing, and every registered estimator now measures its own.
+    ring, _ = _place('polar_profiling', 2.0, 0.1)
 
-    assert _dot_xy(markers) == pytest.approx((2.0 + ROBOT_FRONT_OFFSET_M, 0.0), abs=1e-9)
-
-
-def test_a_row_with_neither_a_position_nor_a_distance_draws_nothing() -> None:
-    assert _place('lidar', None, None) == []
-
-
-def test_borrowed_bearing_rings_are_drawn_thinner() -> None:
-    # The width is the only cue that a ring's direction is not its own answer.
-    borrowed, _ = _place('sensor_depth', None, None, distance_m=2.0, bearing_rad=0.1)
-    measured, _ = _place('lidar', 2.0, 0.1)
-
-    assert borrowed.scale.x == BORROWED_BEARING_LINE_WIDTH_M
-    assert measured.scale.x == RING_LINE_WIDTH_M
-    assert BORROWED_BEARING_LINE_WIDTH_M < RING_LINE_WIDTH_M
+    assert ring.scale.x == RING_LINE_WIDTH_M
 
 
 def test_world_marker_point_is_a_plain_rotation_about_the_given_origin() -> None:
@@ -424,65 +387,6 @@ def test_world_marker_point_is_a_plain_rotation_about_the_given_origin() -> None
         (0.0, 1.0), abs=1e-9)
     assert world_marker_point(0.0, 1.0, 0.0, 0.0, 0.0) == pytest.approx(
         (0.0, 1.0), abs=1e-9)
-
-
-# --- borrowed bearings ------------------------------------------------------
-
-
-def test_display_bearing_follows_the_canonical_estimator_order() -> None:
-    # rgb precedes lidar in PUBLIC_ESTIMATOR_ORDER, so its bearing is the one
-    # borrowed -- the same first-usable rule display_distance applies, so the
-    # direction drawn and the distance printed cannot come from different rows.
-    positions = {'rgb': (3.0, 3.0), 'lidar': (3.0, -3.0)}
-
-    bearing = display_bearing(lambda estimator, index: positions.get(estimator), 0)
-
-    assert bearing == pytest.approx(math.radians(45.0), abs=1e-9)
-
-
-def test_display_bearing_skips_rows_that_placed_nothing() -> None:
-    positions = {'lidar': (0.0, -2.0)}
-
-    bearing = display_bearing(lambda estimator, index: positions.get(estimator), 0)
-
-    assert bearing == pytest.approx(math.radians(-90.0), abs=1e-9)
-
-
-def test_display_bearing_is_none_when_no_row_placed_the_detection() -> None:
-    assert display_bearing(lambda estimator, index: None, 0) is None
-
-
-def test_display_bearing_rejects_a_degenerate_origin_reading() -> None:
-    # atan2(0, 0) is 0.0, an answer indistinguishable from a real dead-ahead
-    # bearing; a row that placed the target on the robot itself has not measured
-    # a direction, so the next row gets the chance.
-    positions = {'rgb': (0.0, 0.0), 'lidar': (0.0, 2.0)}
-
-    bearing = display_bearing(lambda estimator, index: positions.get(estimator), 0)
-
-    assert bearing == pytest.approx(math.radians(90.0), abs=1e-9)
-
-
-def test_merged_position_reader_finds_a_position_in_any_producer() -> None:
-    # Each producer fills only its own rows, so a bearing has to be looked for
-    # across all of them -- the same reason merged_distance_reader exists.
-    camera = G1Measurements()
-    camera.detected = True
-    camera.count = 1
-    camera.rgb_forward_m = [4.0]
-    camera.rgb_lateral_m = [1.0]
-
-    mask = G1Measurements()
-    mask.detected = True
-    mask.count = 1
-    mask.polar_profiling_forward_m = [4.1]
-    mask.polar_profiling_lateral_m = [1.1]
-
-    read_position = merged_position_reader([camera, mask])
-
-    assert read_position('rgb', 0) == pytest.approx((4.0, 1.0), abs=1e-6)
-    assert read_position('polar_profiling', 0) == pytest.approx((4.1, 1.1), abs=1e-6)
-    assert read_position('lidar', 0) is None
 
 
 def _truth_message(distance_m: float, trial_id: str, stamp_ns: int) -> PointStamped:
@@ -566,7 +470,8 @@ def hud_text_from(
 
 
 def test_hud_scores_every_row_against_the_truth_it_displays() -> None:
-    fresh = [measurements(1, rgb_distance_m=[3.885], lidar_distance_m=[1.050])]
+    fresh = [measurements(
+        1, pointcloud_distance_m=[3.885], polar_profiling_distance_m=[1.050])]
     truth = truth_reading(_truth_message(3.25, 'bed_occluder_single', 0), 0)
 
     text = hud_text_from(fresh, 0, truth)
@@ -580,7 +485,7 @@ def test_hud_scores_every_row_against_the_truth_it_displays() -> None:
 def test_hud_drops_the_error_column_when_the_truth_has_expired() -> None:
     # No truth means no reference, and a distance printed beside a stale error
     # is worse than one printed beside none.
-    fresh = [measurements(1, rgb_distance_m=[3.885])]
+    fresh = [measurements(1, pointcloud_distance_m=[3.885])]
 
     text = hud_text_from(fresh, 0, None)
 
@@ -594,7 +499,7 @@ def test_hud_drops_the_error_column_when_the_truth_has_expired() -> None:
 # The mask rows used to blink: their message is stamped with the DETECTION
 # instant, so inference, segmentation and the depth lookup are all charged
 # against it, and a single stamp gate against the marker lifetime threw the
-# reading away while camera and lidar -- same stamp, no pipeline behind it --
+# reading away while the pointcloud row -- same stamp, no pipeline behind it --
 # repainted the row as "-- miss" at detector rate.
 
 
@@ -623,7 +528,7 @@ def test_a_message_received_long_ago_is_dropped_however_recent_its_stamp() -> No
     # Liveness is the receipt question: this producer has said nothing for two
     # lifetimes, so its last word is not evidence that it is still running.
     now = 100 * SECOND_NS
-    quiet = measurements(1, stamp_ns=now, rgb_distance_m=[2.4])
+    quiet = measurements(1, stamp_ns=now, pointcloud_distance_m=[2.4])
 
     same_batch, aged = partition_measurements(
         [cached(quiet, now - 3 * SECOND_NS)],
@@ -649,16 +554,17 @@ def test_a_message_past_the_observation_age_is_dropped_however_recent_its_receip
 
 def test_only_the_newest_stamp_counts_as_the_current_batch() -> None:
     now = 100 * SECOND_NS
-    camera = measurements(1, stamp_ns=now, rgb_distance_m=[2.4])
-    lidar = measurements(1, stamp_ns=now, lidar_distance_m=[2.5])
+    pointcloud = measurements(1, stamp_ns=now, pointcloud_distance_m=[2.4])
+    projective = measurements(
+        1, stamp_ns=now, projective_ranging_distance_m=[2.5])
     lagging_mask = measurements(1, stamp_ns=now - int(1.2 * SECOND_NS),
                                 polar_profiling_distance_m=[2.6])
 
     same_batch, aged = partition_measurements(
-        [cached(camera, now), cached(lidar, now), cached(lagging_mask, now)],
+        [cached(pointcloud, now), cached(projective, now), cached(lagging_mask, now)],
         now, MARKER_LIFETIME_SEC, MAX_OBSERVATION_AGE_S)
 
-    assert same_batch == [camera, lidar]
+    assert same_batch == [pointcloud, projective]
     assert [msg for msg, _ in aged] == [lagging_mask]
     assert aged[0][1] == pytest.approx(1.2, abs=1e-9)
 
@@ -679,21 +585,21 @@ def test_a_lone_lagging_producer_is_its_own_current_batch() -> None:
 
 def test_an_empty_cache_partitions_to_nothing() -> None:
     assert partition_measurements(
-        [None, None, None], 0, MARKER_LIFETIME_SEC, MAX_OBSERVATION_AGE_S) == ([], [])
+        [None, None], 0, MARKER_LIFETIME_SEC, MAX_OBSERVATION_AGE_S) == ([], [])
 
 
 def test_an_aged_reading_renders_with_an_age_column_instead_of_a_miss() -> None:
     # The whole point: the mask row keeps its number and says how old it is,
-    # rather than being repainted as "-- miss" by the camera row's stamp.
-    camera = measurements(1, rgb_distance_m=[3.885])
+    # rather than being repainted as "-- miss" by the pointcloud row's stamp.
+    pointcloud = measurements(1, pointcloud_distance_m=[3.885])
     mask = measurements(1, polar_profiling_distance_m=[2.431])
 
-    text = hud_text_from([camera], 0, None, aged=[(mask, 1.2)])
+    text = hud_text_from([pointcloud], 0, None, aged=[(mask, 1.2)])
 
     assert '2.431' in text
     assert '1.2s' in text
     assert 'Polar&nbsp;Profiling' in text
-    # The camera row is current and carries no age column.
+    # The pointcloud row is current and carries no age column.
     assert '3.885' in text
 
 
@@ -702,7 +608,7 @@ def test_an_aged_row_is_coloured_at_the_aged_luminance() -> None:
     dimmed = hud_text_colour('polar_profiling', aged=True)
     expected = ', '.join(str(int(round(channel * 255))) for channel in dimmed)
 
-    text = hud_text_from([measurements(1, rgb_distance_m=[3.885])], 0, None,
+    text = hud_text_from([measurements(1, pointcloud_distance_m=[3.885])], 0, None,
                          aged=[(mask, 1.2)])
 
     assert f'rgb({expected})' in text
@@ -725,10 +631,10 @@ def test_an_aged_message_is_ranked_against_itself_not_the_current_batch() -> Non
     # Two robots, and the batches disagree about which is nearer. The aged
     # message's own ranking picks its index 1 (2.0 m); borrowing the current
     # batch's nearest would print 5.0 m against the wrong robot.
-    camera = measurements(2, rgb_distance_m=[1.0, 6.0])
+    pointcloud = measurements(2, pointcloud_distance_m=[1.0, 6.0])
     mask = measurements(2, polar_profiling_distance_m=[5.0, 2.0])
 
-    text = hud_text_from([camera], 0, None, aged=[(mask, 1.2)])
+    text = hud_text_from([pointcloud], 0, None, aged=[(mask, 1.2)])
 
     assert '2.000' in text
     assert '5.000' not in text
@@ -737,9 +643,10 @@ def test_an_aged_message_is_ranked_against_itself_not_the_current_batch() -> Non
 def test_a_nan_reading_still_renders_a_miss_distinct_from_an_aged_one() -> None:
     # "miss" has to mean the estimator ran and returned nothing, or the word is
     # a lie about the estimator every time the HUD is merely out of date.
-    missed = hud_text_from([measurements(1, rgb_distance_m=[float('nan')])], 0, None)
+    missed = hud_text_from(
+        [measurements(1, pointcloud_distance_m=[float('nan')])], 0, None)
     aged = hud_text_from(
-        [measurements(1, lidar_distance_m=[2.0])], 0, None,
+        [measurements(1, pointcloud_distance_m=[2.0])], 0, None,
         aged=[(measurements(1, polar_profiling_distance_m=[2.431]), 1.2)])
 
     assert 'miss' in missed
@@ -753,14 +660,15 @@ def test_aged_messages_never_reach_the_ranking_the_rings_are_drawn_from() -> Non
     # same robot. _publish_markers ranks and draws from same_batch alone, so the
     # aged mask message here must not pull the nearest index onto its own robot.
     now = 100 * SECOND_NS
-    # The camera placed only detection 0 this batch; the aged mask message has
-    # its own detection 1 much nearer.
-    camera = measurements(2, stamp_ns=now, rgb_distance_m=[1.0, float('nan')])
+    # The pointcloud row placed only detection 0 this batch; the aged mask
+    # message has its own detection 1 much nearer.
+    pointcloud = measurements(
+        2, stamp_ns=now, pointcloud_distance_m=[1.0, float('nan')])
     mask = measurements(2, stamp_ns=now - int(1.2 * SECOND_NS),
                         polar_profiling_distance_m=[9.0, 0.5])
 
     same_batch, aged = partition_measurements(
-        [cached(camera, now), cached(mask, now)],
+        [cached(pointcloud, now), cached(mask, now)],
         now, MARKER_LIFETIME_SEC, MAX_OBSERVATION_AGE_S)
 
     assert [msg for msg, _ in aged] == [mask]
@@ -780,7 +688,8 @@ def test_the_hud_renders_nothing_at_all_when_nothing_is_cached() -> None:
 def test_the_hud_still_renders_when_the_truth_has_gone_but_readings_have_not() -> None:
     # The timer re-evaluates the truth gate with no measurement traffic needed;
     # the rows outlive the truth line rather than disappearing with it.
-    text = hud_section_text([measurements(1, rgb_distance_m=[3.885])], [], 0, None)
+    text = hud_section_text(
+        [measurements(1, pointcloud_distance_m=[3.885])], [], 0, None)
 
     assert text.count('<br/>') == len(PUBLIC_ESTIMATOR_ORDER)
     assert 'G1&nbsp;DISTANCES' in text
@@ -791,8 +700,8 @@ def test_the_hud_still_renders_when_the_truth_has_gone_but_readings_have_not() -
 #
 # A row for a path the run never launched can only ever print "-- miss", which
 # is the same thing the panel prints for an estimator that ran and found
-# nothing. The benchmark's own default selects the five legacy rows, so the
-# unfiltered panel carried three permanently dead mask rows.
+# nothing -- so the two are indistinguishable unless the panel is filtered to
+# the set the run actually launched.
 
 
 def hud_labels(text: str) -> list[str]:
@@ -802,7 +711,7 @@ def hud_labels(text: str) -> list[str]:
     (``_reading_body``, and the miss branch beside it), so the label is that
     slice once the span markup is stripped and the ``&nbsp;`` padding is turned
     back into ordinary spaces. Splitting on whitespace instead would cut
-    two-word labels like ``Sensor Depth`` in half.
+    two-word labels like ``Point Cloud`` in half.
     """
 
     rows = text.split('<br/>')[1:]  # drop the truth header
@@ -815,23 +724,26 @@ def hud_labels(text: str) -> list[str]:
 
 
 def test_only_the_selected_estimators_get_a_row() -> None:
-    same_batch = [measurements(1, lidar_distance_m=[2.430])]
+    same_batch = [measurements(1, pointcloud_distance_m=[2.430])]
 
-    text = hud_text_from(same_batch, 0, None, estimators=('lidar', 'polar_profiling'))
+    text = hud_text_from(
+        same_batch, 0, None, estimators=('pointcloud', 'polar_profiling'))
 
-    assert hud_labels(text) == ['LiDAR', 'Polar Profiling']
+    assert hud_labels(text) == ['Point Cloud', 'Polar Profiling']
 
 
 def test_rows_keep_canonical_order_however_the_argument_named_them() -> None:
-    # parse_estimators sorts into PUBLIC_ESTIMATOR_ORDER, so "polar,lidar" and
-    # "lidar,polar" have to render identically -- the HUD's order is the
-    # registry's, not the launch line's.
-    selected = parse_estimators('polar_profiling,rgb,lidar')
-    same_batch = [measurements(1, rgb_distance_m=[3.885], lidar_distance_m=[2.430])]
+    # parse_estimators sorts into PUBLIC_ESTIMATOR_ORDER, so "polar,pointcloud"
+    # and "pointcloud,polar" have to render identically -- the HUD's order is
+    # the registry's, not the launch line's.
+    selected = parse_estimators('polar_profiling,pointcloud,projective_ranging')
+    same_batch = [measurements(
+        1, pointcloud_distance_m=[3.885], projective_ranging_distance_m=[2.430])]
 
     text = hud_text_from(same_batch, 0, None, estimators=selected)
 
-    assert hud_labels(text) == ['RGB', 'LiDAR', 'Polar Profiling']
+    assert hud_labels(text) == [
+        'Point Cloud', 'Projective Ranging', 'Polar Profiling']
 
 
 def test_an_unselected_estimator_that_is_publishing_still_gets_no_row() -> None:
@@ -853,20 +765,22 @@ def test_an_unselected_estimator_that_is_publishing_still_gets_no_row() -> None:
 def test_a_selected_estimator_that_reported_nothing_still_reads_as_a_miss() -> None:
     # Filtering must not swallow the selected-but-silent case: that row is the
     # one place "-- miss" is now the honest word.
-    same_batch = [measurements(1, lidar_distance_m=[2.430])]
+    same_batch = [measurements(1, pointcloud_distance_m=[2.430])]
 
-    text = hud_text_from(same_batch, 0, None, estimators=('lidar', 'polar_profiling'))
+    text = hud_text_from(
+        same_batch, 0, None, estimators=('pointcloud', 'polar_profiling'))
 
-    assert hud_labels(text) == ['LiDAR', 'Polar Profiling']
+    assert hud_labels(text) == ['Point Cloud', 'Polar Profiling']
     assert 'miss' in text
 
 
 def test_an_aged_row_keeps_its_age_column_when_the_set_is_restricted() -> None:
-    same_batch = [measurements(1, lidar_distance_m=[2.430])]
+    same_batch = [measurements(1, pointcloud_distance_m=[2.430])]
     aged = [(measurements(1, polar_profiling_distance_m=[2.455]), 1.2)]
 
     text = hud_text_from(
-        same_batch, 0, None, aged=aged, estimators=('lidar', 'polar_profiling'))
+        same_batch, 0, None, aged=aged,
+        estimators=('pointcloud', 'polar_profiling'))
 
     assert '2.455' in text
     assert '1.2s' in text
@@ -875,7 +789,7 @@ def test_an_aged_row_keeps_its_age_column_when_the_set_is_restricted() -> None:
 def test_omitting_the_set_renders_every_registered_estimator() -> None:
     # The exploration entrypoint declares no estimators argument at all, so the
     # parameter default has to leave that panel exactly as it was.
-    text = hud_text_from([measurements(1, rgb_distance_m=[3.885])], 0, None)
+    text = hud_text_from([measurements(1, pointcloud_distance_m=[3.885])], 0, None)
 
     assert hud_labels(text) == [ESTIMATOR_LABELS[e] for e in PUBLIC_ESTIMATOR_ORDER]
 
@@ -884,7 +798,8 @@ def test_the_parameter_default_resolves_to_every_registered_estimator() -> None:
     # 'all' is the declared default on the node, and the launch file hands over
     # a comma-joined list; both have to come back in canonical order.
     assert parse_estimators('all') == PUBLIC_ESTIMATOR_ORDER
-    assert parse_estimators(','.join(('lidar', 'rgb'))) == ('rgb', 'lidar')
+    assert parse_estimators(','.join(('polar_profiling', 'pointcloud'))) == (
+        'pointcloud', 'polar_profiling')
 
 
 # --- the same set decides the rings -----------------------------------------
@@ -902,8 +817,8 @@ def _published_markers(
     """Markers from the real ``_publish_markers``, with no ROS context.
 
     Unbound against a stub, the same discipline ``_place`` uses: the TF lookup
-    and the message cache are the only things replaced, so the selection, the
-    ranking and the bearing borrow are all the shipped ones.
+    and the message cache are the only things replaced, so the selection and the
+    ranking are the shipped ones.
     """
 
     published: list = []
@@ -930,13 +845,15 @@ def _marker_estimators(markers: list) -> set[str]:
 def test_only_the_selected_estimators_get_a_ring() -> None:
     same_batch = [measurements(
         1,
-        rgb_forward_m=[3.8], rgb_lateral_m=[0.4], rgb_distance_m=[3.821],
-        lidar_forward_m=[2.4], lidar_lateral_m=[0.3], lidar_distance_m=[2.419],
+        pointcloud_forward_m=[3.8], pointcloud_lateral_m=[0.4],
+        pointcloud_distance_m=[3.821],
+        polar_profiling_forward_m=[2.4], polar_profiling_lateral_m=[0.3],
+        polar_profiling_distance_m=[2.419],
     )]
 
-    markers = _published_markers(same_batch, estimators=('lidar',))
+    markers = _published_markers(same_batch, estimators=('polar_profiling',))
 
-    assert _marker_estimators(markers) == {'lidar'}
+    assert _marker_estimators(markers) == {'polar_profiling'}
 
 
 def test_an_unselected_estimator_that_is_publishing_draws_nothing() -> None:
@@ -961,35 +878,28 @@ def test_omitting_the_set_draws_every_estimator_that_reported() -> None:
     # The exploration entrypoint again: nothing selected, nothing filtered.
     same_batch = [measurements(
         1,
-        rgb_forward_m=[3.8], rgb_lateral_m=[0.4], rgb_distance_m=[3.821],
-        lidar_forward_m=[2.4], lidar_lateral_m=[0.3], lidar_distance_m=[2.419],
-        sensor_depth_distance_m=[2.401],
+        pointcloud_forward_m=[3.8], pointcloud_lateral_m=[0.4],
+        pointcloud_distance_m=[3.821],
+        polar_profiling_forward_m=[2.4], polar_profiling_lateral_m=[0.3],
+        polar_profiling_distance_m=[2.419],
     )]
 
     markers = _published_markers(same_batch)
 
-    assert _marker_estimators(markers) == {'rgb', 'lidar', 'sensor_depth'}
+    assert _marker_estimators(markers) == {'pointcloud', 'polar_profiling'}
 
 
-def test_a_selected_depth_row_still_borrows_a_bearing_from_an_unselected_one() -> None:
-    # display_bearing reads every estimator that placed the detection, not just
-    # the selected ones. Filtering it too would drop a depth-only ring back onto
-    # the boresight -- wrong by the whole lateral component, and silently.
-    # Both rows agree on the range, so any gap between the two dots below is the
-    # bearing alone rather than the two ring radii differing.
-    planar_m = math.hypot(2.4, 1.2)
+def test_a_row_with_only_a_distance_draws_no_ring() -> None:
+    # No borrowed bearing any more: a row that published a distance but no
+    # position has no direction of its own, and a ring on the boresight would be
+    # wrong by the whole lateral component with nothing marking it as a guess.
     same_batch = [measurements(
         1,
-        lidar_forward_m=[2.4], lidar_lateral_m=[1.2], lidar_distance_m=[planar_m],
-        sensor_depth_distance_m=[planar_m],
+        pointcloud_forward_m=[2.4], pointcloud_lateral_m=[1.2],
+        pointcloud_distance_m=[math.hypot(2.4, 1.2)],
+        polar_profiling_distance_m=[math.hypot(2.4, 1.2)],
     )]
 
-    markers = _published_markers(same_batch, estimators=('sensor_depth',))
+    markers = _published_markers(same_batch)
 
-    assert _marker_estimators(markers) == {'sensor_depth'}
-    borrowed = _dot_xy(markers)
-    # Same distance down the same borrowed bearing, so the depth ring lands on
-    # the lidar dot rather than straight ahead of the robot.
-    assert borrowed == pytest.approx(
-        _dot_xy(_place('lidar', 2.4, 1.2)), abs=1e-6)
-    assert borrowed[1] != pytest.approx(0.0, abs=1e-3)
+    assert _marker_estimators(markers) == {'pointcloud'}

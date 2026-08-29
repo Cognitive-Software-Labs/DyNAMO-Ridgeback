@@ -186,8 +186,8 @@ nothing for the stereo path but the sub-sampling penalty. Two pieces of
 in-repo evidence said it was safe — the mask node already does exact-stamp
 lookup on the *color* topic for the silhouette gate, in the same process on
 the same saturated host, missing 1 frame in 135; and the legacy
-`depth_anything` estimator already computes depth inside its consumer, with a
-full NN forward pass, and scores 130/135.
+`depth_anything` estimator (since deleted) already computed depth inside its
+consumer, with a full NN forward pass, and scored 130/135.
 
 ### What was built
 

@@ -99,7 +99,7 @@ def test_benchmark_launch_uses_new_multi_estimator_interface() -> None:
     assert "'output_dir'" in benchmark_text
     assert "'benchmark-results'" in benchmark_text
     assert '/tmp/g1_distance_benchmark_runs' not in benchmark_text
-    assert 'rgb,sensor_depth,depth_anything,pointcloud,lidar' in benchmark_text
+    assert "DeclareLaunchArgument('estimators', default_value='all')" in benchmark_text
     assert 'measurement_backend' not in benchmark_text
     assert 'primary_metric' not in benchmark_text
     assert "DeclareLaunchArgument('depth_anything_enabled'" not in benchmark_text
@@ -110,8 +110,9 @@ def test_benchmark_launch_uses_new_multi_estimator_interface() -> None:
     assert "'mask_gate'," in benchmark_text
     assert benchmark_text.count("'mask_gate': LaunchConfiguration('mask_gate')") == 3
     # One estimators list, split per stack: each measurement node is handed only
-    # the rows it owns, so a mask row can be selected as freely as a legacy one.
-    assert "'enabled_estimators': ','.join(selected_camera)" in benchmark_text
+    # the rows it owns, so a mask row can be selected as freely as the
+    # pointcloud one.
+    assert "'enabled_estimators': ','.join(selected_pointcloud)" in benchmark_text
     assert "'enabled_estimators': ','.join(selected_mask)" in benchmark_text
 
 

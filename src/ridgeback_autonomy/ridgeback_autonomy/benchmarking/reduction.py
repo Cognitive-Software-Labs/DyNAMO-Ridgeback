@@ -6,7 +6,7 @@ from collections import Counter
 from ridgeback_autonomy.benchmarking.alignment import (
     MeasurementEvent,
     detection_status,
-    event_has_all_panel_previews,
+    event_has_panel_preview,
     has_all_selected_estimates,
 )
 from ridgeback_autonomy.common.miss_reason import MissReason, reason_name
@@ -172,7 +172,7 @@ def choose_representative_event(
 ) -> MeasurementEvent:
     """Pick the collage frame from the union of usable events.
 
-    Prefer frames with panel previews, then frames covering the most
+    Prefer frames with a panel preview, then frames covering the most
     estimators, then closeness to the trial medians over the estimators the
     frame actually carries.
     """
@@ -182,9 +182,8 @@ def choose_representative_event(
             estimator for estimator in selected_estimators
             if estimator in trial_medians and event.estimates.get(estimator) is not None
         )
-        preview_scope = present or selected_estimators
         return (
-            0 if event_has_all_panel_previews(event, preview_scope) else 1,
+            0 if event_has_panel_preview(event) else 1,
             -len(present),
             sum(abs(event.estimates[estimator] - trial_medians[estimator])
                 for estimator in present),

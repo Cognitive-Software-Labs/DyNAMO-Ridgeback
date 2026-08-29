@@ -32,13 +32,12 @@ from ridgeback_autonomy.benchmarking.estimators import (
     ESTIMATOR_POSITION_ATTRS,
     GROUND_TRUTH_TOPIC,
     PUBLIC_ESTIMATOR_ORDER,
-    display_bearing,
     nearest_instance_index,
     parse_estimators,
     truth_reading,
 )
 from ridgeback_autonomy.msg import G1Measurements
-from ridgeback_autonomy.perception.core.geometry import remove_vehicle_front_offset
+from ridgeback_autonomy.perception.core.vehicle_frame import remove_vehicle_front_offset
 
 
 # How long silence is tolerated, in the two places that have to agree on it: a
@@ -72,35 +71,24 @@ RING_RADIUS_M = 0.15
 RING_POINTS = 32
 DOT_RADIUS_M = 0.04
 
-# Ring line width. The thin one marks a ring whose *direction* is not its own
-# estimator's answer: the depth-only rows publish a distance and no position, so
-# their bearing is borrowed (see ``_add_estimator_markers``). Their radius is
-# still their own number -- only the direction is second-hand, and the weight
-# difference is what keeps that distinction readable on the floor plan.
 RING_LINE_WIDTH_M = 0.06
-BORROWED_BEARING_LINE_WIDTH_M = 0.03
 
 # Z height above ground plane so markers sit on top of the costmap.
 MARKER_Z_M = 0.05
 
-CAMERA_MEASUREMENTS_TOPIC = 'measurements/g1/camera'
-LIDAR_MEASUREMENTS_TOPIC = 'measurements/g1/lidar'
+POINTCLOUD_MEASUREMENTS_TOPIC = 'measurements/g1/pointcloud'
 MASK_MEASUREMENTS_TOPIC = 'measurements/g1/mask'
 HUD_DISTANCES_TOPIC = 'hud/g1_distances'
 
-# (r, g, b, a) per estimator, split by colour temperature: the five legacy rows
-# are warm (rose through chartreuse), the three mask rows cold (cyan through
-# violet). Nothing on the HUD or in RViz names the two families, so the
-# temperature is the only thing that groups them -- which is why no hue crosses
-# over, however much room that would buy inside a family. Within a family the
-# hues are still spread as far as five (or three) allow, since in a clean scene
-# all eight rings land within centimetres of each other.
+# (r, g, b, a) per estimator, split by colour temperature: the pointcloud row is
+# warm, the three mask rows cold (cyan through violet). Nothing on the HUD or in
+# RViz names the two families, so the temperature is the only thing that groups
+# them -- which is why no hue crosses over, however much room that would buy
+# inside a family. Within the mask family the hues are still spread as far as
+# three allow, since in a clean scene all four rings land within centimetres of
+# each other.
 ESTIMATOR_COLOURS = {
-    'rgb':                      (1.0, 0.0, 0.0, 1.0),
-    'sensor_depth':             (1.0, 0.45, 0.0, 1.0),
-    'depth_anything':           (1.0, 0.1, 0.55, 1.0),
     'pointcloud':               (1.0, 0.85, 0.0, 1.0),
-    'lidar':                    (0.85, 1.0, 0.15, 1.0),
     'projective_ranging':       (0.0, 0.85, 0.85, 1.0),
     'euclidean_reconstruction': (0.2, 0.55, 1.0, 1.0),
     'polar_profiling':          (0.7, 0.4, 1.0, 1.0),
@@ -118,19 +106,19 @@ _ESTIMATOR_ID_BASE = {name: i * 100 for i, name in enumerate(PUBLIC_ESTIMATOR_OR
 
 
 # The HUD draws on a half-opaque black panel, where a ring colour's own
-# luminance decides whether its line is readable. Red (0.21) and the rose of
-# depth_anything (0.32) sit under this; every cold row clears it unlifted (0.51
-# at the darkest), so the lift never touches the mask family.
+# luminance decides whether its line is readable. Every currently registered
+# colour clears this unlifted (0.51 at the darkest), so the lift is a floor for
+# a colour added later rather than something any row hits today.
 HUD_MIN_LUMINANCE = 0.40
 HUD_HEADER_COLOUR = (1.0, 1.0, 1.0)
 
 # The one luminance every aged row is driven to, up or down. A dim multiplier
-# would not do: red and depth_anything's rose sit exactly AT the floor above
-# after their lift, so scaling them down and clamping to the floor would hand
-# them straight back their fresh appearance. Driving every aged row to a single
-# figure also keeps the fresh/aged step the same size between two adjacent rows
-# of different hue, which is what makes it readable as a state rather than as
-# one row happening to be darker.
+# would not do: a colour sitting at the legibility floor above would be scaled
+# down, clamped back to that floor, and handed straight back its fresh
+# appearance. Driving every aged row to a single figure also keeps the
+# fresh/aged step the same size between two adjacent rows of different hue,
+# which is what makes it readable as a state rather than as one row happening
+# to be darker.
 #
 # It sits below the documented legibility floor deliberately -- an aged row must
 # read as secondary -- so this value is settled on screen, not from the number.
@@ -259,7 +247,7 @@ def merged_distance_reader(batch: list):
     """``(estimator, index) -> distance`` across every producer in one frame.
 
     Each topic fills only the estimators its node computes, so a reading has to
-    be looked up in all of them. The indices line up because all three producers
+    be looked up in all of them. The indices line up because both producers
     number their detections from the same detector batch -- which is a premise,
     not a guarantee, and the reason ``partition_measurements`` hands this only
     the messages that share a stamp.
@@ -275,27 +263,6 @@ def merged_distance_reader(batch: list):
         return None
 
     return read_distance
-
-
-def merged_position_reader(batch: list):
-    """``(estimator, index) -> (forward, lateral) | None`` across every producer.
-
-    The positional counterpart to ``merged_distance_reader``, feeding
-    ``display_bearing`` so the depth-only rows can be pointed somewhere. Same
-    reason for scanning every message: an estimator's fields are filled by
-    exactly one producer and are empty in the other two.
-    """
-
-    def read_position(estimator: str, index: int):
-        for msg in batch:
-            if not msg.detected or index >= msg.count:
-                continue
-            forward, lateral, _ = estimator_reading(msg, estimator, index)
-            if forward is not None and lateral is not None:
-                return forward, lateral
-        return None
-
-    return read_position
 
 
 def world_marker_point(
@@ -532,13 +499,12 @@ class G1EstimateVizNode(Node):
         # still running", and for the mask topic those two are a second or more
         # apart. See ``partition_measurements``.
         self._latest: dict[str, tuple[G1Measurements, int] | None] = {
-            'camera': None, 'lidar': None, 'mask': None,
+            'pointcloud': None, 'mask': None,
         }
         self._latest_truth: PointStamped | None = None
 
         for key, topic in (
-            ('camera', CAMERA_MEASUREMENTS_TOPIC),
-            ('lidar', LIDAR_MEASUREMENTS_TOPIC),
+            ('pointcloud', POINTCLOUD_MEASUREMENTS_TOPIC),
             ('mask', MASK_MEASUREMENTS_TOPIC),
         ):
             self.create_subscription(
@@ -547,7 +513,7 @@ class G1EstimateVizNode(Node):
 
         # Depth 1: the truth line is a latest-value-wins signal, so a deeper
         # queue only buys lag. This node's callbacks share one executor thread
-        # with three measurement topics that build markers and hit TF, and a
+        # with the measurement topics that build markers and hit TF, and a
         # backlog here pins a previous trial's truth under the current scene.
         self.create_subscription(
             PointStamped, str(self.get_parameter('ground_truth_topic').value),
@@ -633,22 +599,16 @@ class G1EstimateVizNode(Node):
         if robot_x is None:
             return
 
-        # Resolved once per frame rather than per estimator: every depth-only
-        # ring on this detection must point the same way, or two rows that
-        # measured the same robot would appear to disagree about where it is.
-        bearing = display_bearing(merged_position_reader(same_batch), nearest)
-
         markers = []
         marker_time = self.get_clock().now().to_msg()
         for msg in same_batch:
             if not msg.detected or nearest >= msg.count:
                 continue
             for estimator in self.estimators:
-                forward, lateral, distance = estimator_reading(msg, estimator, nearest)
+                forward, lateral, _ = estimator_reading(msg, estimator, nearest)
                 self._add_estimator_markers(
                     markers, estimator, forward, lateral,
                     robot_x, robot_y, robot_yaw, marker_time, actual_frame,
-                    distance_m=distance, bearing_rad=bearing,
                 )
 
         if not markers:
@@ -691,25 +651,10 @@ class G1EstimateVizNode(Node):
         robot_yaw: float,
         stamp,
         frame_id: str,
-        distance_m: float | None = None,
-        bearing_rad: float | None = None,
     ) -> None:
-        # The depth-only rows (sensor_depth, depth_anything) publish a planar
-        # distance and no position, so a direction has to come from somewhere.
-        # Borrowing the bearing another row measured on this same detection puts
-        # the ring on the right robot; the old fallback of pointing it down the
-        # boresight was wrong by the whole lateral component, which for an
-        # off-axis target is metres. The radius stays the row's own number, so
-        # the ring still disagrees with its neighbours exactly as much as the
-        # HUD says it does. No bearing at all (nothing else placed this
-        # detection) keeps the boresight guess rather than dropping the ring.
-        borrowed_bearing = ESTIMATOR_POSITION_ATTRS.get(estimator) is None
-        if forward_m is None and distance_m is not None:
-            if bearing_rad is None:
-                forward_m, lateral_m = distance_m, 0.0
-            else:
-                forward_m = distance_m * math.cos(bearing_rad)
-                lateral_m = distance_m * math.sin(bearing_rad)
+        # Every registered estimator places its own detection
+        # (``ESTIMATOR_POSITION_ATTRS`` covers ``PUBLIC_ESTIMATOR_ORDER``), so a
+        # row with no position here simply had nothing to report this frame.
         if forward_m is None or lateral_m is None:
             return
 
@@ -733,9 +678,7 @@ class G1EstimateVizNode(Node):
         ring.id = id_base
         ring.type = Marker.LINE_STRIP
         ring.action = Marker.ADD
-        ring.scale.x = (
-            BORROWED_BEARING_LINE_WIDTH_M if borrowed_bearing else RING_LINE_WIDTH_M
-        )
+        ring.scale.x = RING_LINE_WIDTH_M
         ring.color = _color_msg(*colour)
         ring.lifetime = lifetime
         ring.points = _ring_points(wx, wy, MARKER_Z_M, RING_RADIUS_M, RING_POINTS)

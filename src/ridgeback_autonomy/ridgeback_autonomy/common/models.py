@@ -2,8 +2,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-import numpy as np
-
 
 @dataclass(frozen=True)
 class CameraConfig:
@@ -19,14 +17,6 @@ class Detection:
     label: str
     score: float
     focus_bbox_xyxy: tuple[int, int, int, int] | None = None
-    rgb_lateral_m: float | None = None
-    rgb_forward_m: float | None = None
-    rgb_distance_m: float | None = None
-    sensor_depth_distance_m: float | None = None
-    mono_depth_distance_m: float | None = None
-    lidar_lateral_m: float | None = None
-    lidar_forward_m: float | None = None
-    lidar_distance_m: float | None = None
     pointcloud_lateral_m: float | None = None
     pointcloud_forward_m: float | None = None
     pointcloud_distance_m: float | None = None
@@ -57,14 +47,4 @@ class DetectionBatch:
     @property
     def detected(self) -> bool:
         return bool(self.detections)
-
-
-@dataclass(frozen=True)
-class LidarScanPoints:
-    forward_m: np.ndarray
-    lateral_m: np.ndarray
-    planar_distance_m: np.ndarray
-    bearing_rad: np.ndarray
-    valid: np.ndarray
-    points_xyz: np.ndarray | None = None
 

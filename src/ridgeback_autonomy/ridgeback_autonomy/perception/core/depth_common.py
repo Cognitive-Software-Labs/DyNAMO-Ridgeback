@@ -18,11 +18,10 @@ Two depth ceilings live here, and they are not interchangeable:
   it can resolve. A finite value here is an operator choice about how much
   scene to admit, never a validity rule.
 - ``DEPTH_MAX_METERS_DEFAULT`` -- 10 m, for the callers that still need a
-  finite number: the legacy camera estimators, whose rows have no source
-  ceiling behind them, and the depth colorizers, which normalize by it and
-  would render a uniform frame given infinity. It mirrors the legacy stack's
-  ``POINTCLOUD_MAX_METERS`` by value; the new stack deliberately never imports
-  from ``geometry.py``.
+  finite number: the depth colorizers, which normalize by it and would render a
+  uniform frame given infinity, and the isolation catalogues' static defaults.
+  It mirrors ``pointcloud_ranging.POINTCLOUD_MAX_METERS`` by value; the mask
+  stack deliberately never imports from the pointcloud path.
 """
 
 from __future__ import annotations
@@ -39,8 +38,7 @@ MASK_DEPTH_GATE_DEFAULT = math.inf
 # What an operator writes to mean "no gate". Not spelled ``inf``: the value
 # arrives through a launch substitution, and YAML reads bare ``inf`` as the
 # string "inf", which fails the double parameter's type check. Non-positive
-# already means "unlimited" for this same parameter name in ``geometry.py``
-# and ``rendering.py``.
+# already means "unlimited" for this same parameter name in ``rendering.py``.
 DEPTH_GATE_DISABLED = 0.0
 
 NEAREST_MODE_BIN_WIDTH_M_DEFAULT = 0.05

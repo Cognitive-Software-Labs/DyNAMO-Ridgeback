@@ -41,7 +41,6 @@ CONFIG_LAUNCH_ARGUMENT_NAMES = frozenset({
     'depth_source',
     'isolation_2d',
     'isolation_3d',
-    'depth_max_meters',
     'mask_depth_max_meters',
     'mask_gate',
     'depth_match_debug',

@@ -14,12 +14,12 @@ row shares (ground truth included) through the optical -> base extrinsics
 from TF -- the camera's mounting pose, translation included, is modeled
 exactly -- and published as ``G1Measurements`` with
 the identity fields of the source detections message -- so the benchmark
-runner can merge them into the same aligned event as the camera and lidar
+runner can merge them into the same aligned event as the pointcloud
 measurements.
 
 Which of the three rows a run fills is the ``enabled_estimators`` parameter,
-the same name and ``all`` default the legacy ``g1_camera_measurement_node``
-carries, so one comma-separated list selects across both stacks. A path that
+the same name and ``all`` default ``g1_pointcloud_measurement_node`` carries,
+so one comma-separated list selects across both stacks. A path that
 was not selected is never run: its fields stay NaN, its status stays ``UNSET``,
 and the inputs only it needs are never subscribed to -- a polar-only run builds
 no depth source at all (so ``depth_source:=monocular`` loads no model), and a
@@ -41,9 +41,9 @@ lookup into a buffer this process filled rather than an intersection with some
 other process's thinning. Nothing downstream branches on which source ran.
 Polar profiling needs no depth frame -- only the scan, the mask, and the
 color-grid intrinsics -- so it runs independently of depth availability.
-Deliberately independent of the legacy estimator stack (``geometry.py`` /
-``g1_camera_measurement_node``): constants are mirrored by value, never
-imported.
+Deliberately independent of the pointcloud estimator
+(``perception/core/pointcloud_ranging.py``): constants are mirrored by value,
+never imported.
 """
 
 from __future__ import annotations
@@ -139,7 +139,7 @@ RAY_MARKER_TOPIC = 'visualization/g1/polar_rays'
 # own when detections stop. Mirrors the estimate rings' lifetime.
 RAY_MARKER_LIFETIME_SEC = 1.5
 
-ROBOT_FRONT_OFFSET_M_DEFAULT = 0.25  # mirrors geometry.ROBOT_FRONT_OFFSET_M
+ROBOT_FRONT_OFFSET_M_DEFAULT = 0.25  # mirrors vehicle_frame.ROBOT_FRONT_OFFSET_M
 BASE_FRAME_DEFAULT = 'base_link'
 
 MASK_GATE_BOX = 'box'
@@ -601,7 +601,7 @@ class G1MaskMeasurementNode(Node):
         self.declare_parameter('detections_topic', RAW_DETECTIONS_TOPIC)
         self.declare_parameter('measurement_topic', MASK_MEASUREMENTS_TOPIC)
         # Which of the three mask rows this run fills, same parameter name and
-        # "all" default as the legacy g1_camera_measurement_node. Non-mask keys
+        # "all" default as g1_pointcloud_measurement_node. Non-mask keys
         # in the value are ignored (a run selects across both stacks with one
         # list); the paths not selected are never run, so their fields stay NaN
         # and their statuses stay UNSET.
@@ -611,10 +611,9 @@ class G1MaskMeasurementNode(Node):
         # ``aligned_depth_to_color`` stream: the source converts units, it does
         # not align. Unused when depth_source is monocular.
         self.declare_parameter('depth_topic', DEPTH_TOPIC_DEFAULT)
-        # The working depth gate for the two depth paths. Same parameter name
-        # as the legacy g1_camera_measurement_node but no longer the same
-        # default: that node's rows have no source ceiling behind them, so
-        # theirs has to stay finite while this one does not.
+        # The working depth gate for the two depth paths. Unbounded by
+        # default, because the only ceiling a mask measurement needs is
+        # whatever its depth source declares it can resolve.
         #
         # This gate is about how much of the scene to admit, not about whether
         # a reading is believable; that ceiling is the depth source's

@@ -28,7 +28,6 @@ def generate_launch_description():
     exploration_rviz = LaunchConfiguration('exploration_rviz')
     g1_perception_enabled = LaunchConfiguration('g1_perception_enabled')
     estimate_viz = LaunchConfiguration('estimate_viz')
-    depth_anything_enabled = LaunchConfiguration('depth_anything_enabled')
     mppi_visualize = LaunchConfiguration('mppi_visualize')
     explorer = LaunchConfiguration('explorer')
     coverage_overlay_enabled = LaunchConfiguration('coverage_overlay_enabled')
@@ -76,12 +75,10 @@ def generate_launch_description():
                               description='Launch the exploration RViz2 config'),
         DeclareLaunchArgument('g1_perception_enabled', default_value='true',
                               description='Launch the full G1 perception/positioning stack '
-                                          '(detection + camera/lidar measurement + overlay); '
+                                          '(detection + pointcloud measurement + overlay); '
                                           'requires perception_venv'),
         DeclareLaunchArgument('estimate_viz', default_value='false',
                               description='Launch the g1_estimate_viz_node RViz marker publisher'),
-        DeclareLaunchArgument('depth_anything_enabled', default_value='false',
-                              description='Enable Depth-Anything in the camera measurement node'),
         DeclareLaunchArgument('mppi_visualize', default_value='false',
                               description='Publish MPPI trajectory visualization topics'),
         DeclareLaunchArgument('explorer', default_value='explore_lite',
@@ -115,22 +112,8 @@ def generate_launch_description():
 
         Node(
             package='ridgeback_autonomy',
-            executable='g1_camera_measurement_node',
-            name='g1_camera_measurement',
-            namespace=namespace,
-            parameters=[{
-                'use_sim_time': use_sim_time,
-                'depth_anything_enabled': depth_anything_enabled,
-            }],
-            remappings=[('/tf', 'tf'), ('/tf_static', 'tf_static')],
-            output='screen',
-            condition=launch.conditions.IfCondition(g1_perception_enabled),
-        ),
-
-        Node(
-            package='ridgeback_autonomy',
-            executable='g1_lidar_measurement_node',
-            name='g1_lidar_measurement',
+            executable='g1_pointcloud_measurement_node',
+            name='g1_pointcloud_measurement',
             namespace=namespace,
             parameters=[{'use_sim_time': use_sim_time}],
             remappings=[('/tf', 'tf'), ('/tf_static', 'tf_static')],
@@ -148,12 +131,22 @@ def generate_launch_description():
             }.items(),
         ),
 
+        # Pinned to the one row exploration actually launches a producer for.
+        # The node's own default is "all", and the three mask rows have no
+        # producer here (no g1_mask_measurement_node in this stack), so the
+        # default would print three permanent "-- miss" rows -- the same word a
+        # row that ran and found nothing prints, making the two
+        # indistinguishable. A ring never appears without a row to name it, and
+        # a row is only shown for a path the run actually launched.
         Node(
             package='ridgeback_autonomy',
             executable='g1_estimate_viz_node',
             name='g1_estimate_viz',
             namespace=namespace,
-            parameters=[{'use_sim_time': use_sim_time}],
+            parameters=[{
+                'use_sim_time': use_sim_time,
+                'estimators': 'pointcloud',
+            }],
             remappings=[('/tf', 'tf'), ('/tf_static', 'tf_static')],
             output='screen',
             condition=launch.conditions.IfCondition(
@@ -161,12 +154,19 @@ def generate_launch_description():
             ),
         ),
 
+        # Same set as the viz node above, for the same reason: the overlay picks
+        # its panels from the estimator set, and the mask panels have no
+        # producer in this stack, so "all" would grid three permanently black
+        # panels beside the one real frame.
         Node(
             package='ridgeback_autonomy',
             executable='g1_overlay_node',
             name='g1_overlay',
             namespace=namespace,
-            parameters=[{'use_sim_time': use_sim_time}],
+            parameters=[{
+                'use_sim_time': use_sim_time,
+                'estimators': 'pointcloud',
+            }],
             remappings=[('/tf', 'tf'), ('/tf_static', 'tf_static')],
             output='screen',
             condition=launch.conditions.IfCondition(g1_perception_enabled),

@@ -44,10 +44,8 @@ from ridgeback_autonomy.perception.core.rendering import (
 )
 
 
-CAMERA_MEASUREMENTS_TOPIC = 'measurements/g1/camera'
-LIDAR_MEASUREMENTS_TOPIC = 'measurements/g1/lidar'
+POINTCLOUD_MEASUREMENTS_TOPIC = 'measurements/g1/pointcloud'
 MASK_MEASUREMENTS_TOPIC = 'measurements/g1/mask'
-MONO_DEPTH_DEBUG_TOPIC = 'debug/g1/camera/mono_depth'
 MASK_DEBUG_TOPIC = 'debug/g1/mask'
 OVERLAY_IMAGE_TOPIC = 'debug/g1/overlay'
 # The mask node's debug republish of the depth frame its paths read. It only
@@ -61,14 +59,11 @@ DEPTH_MAX_METERS_DEFAULT = 10.0
 RENDER_FPS_DEFAULT = 15.0
 
 # The estimator fields each measurement pipeline populates. render_latest builds
-# the batch from whichever pipeline drove the frame, then merges the others in
+# the batch from whichever pipeline drove the frame, then merges the other in
 # by stamp so the label block can show every selected estimator's line.
-CAMERA_FIELDS = (
-    'rgb_lateral_m', 'rgb_forward_m', 'rgb_distance_m',
-    'sensor_depth_distance_m', 'mono_depth_distance_m',
+POINTCLOUD_FIELDS = (
     'pointcloud_lateral_m', 'pointcloud_forward_m', 'pointcloud_distance_m',
 )
-LIDAR_FIELDS = ('lidar_lateral_m', 'lidar_forward_m', 'lidar_distance_m')
 MASK_FIELDS = (
     'projective_ranging_lateral_m', 'projective_ranging_forward_m', 'projective_ranging_distance_m',
     'euclidean_reconstruction_lateral_m', 'euclidean_reconstruction_forward_m',
@@ -81,12 +76,9 @@ class G1OverlayNode(Node):
     def __init__(self) -> None:
         super().__init__('g1_overlay_node')
 
-        self.declare_parameter('measurement_topic', CAMERA_MEASUREMENTS_TOPIC)
-        self.declare_parameter('lidar_measurement_topic', LIDAR_MEASUREMENTS_TOPIC)
+        self.declare_parameter('measurement_topic', POINTCLOUD_MEASUREMENTS_TOPIC)
         self.declare_parameter('mask_measurement_topic', MASK_MEASUREMENTS_TOPIC)
         self.declare_parameter('color_topic', 'sensors/camera_0/color/image')
-        self.declare_parameter('depth_topic', 'sensors/camera_0/depth/image')
-        self.declare_parameter('mono_depth_debug_topic', MONO_DEPTH_DEBUG_TOPIC)
         self.declare_parameter('mask_debug_topic', MASK_DEBUG_TOPIC)
         self.declare_parameter('aligned_depth_topic', ALIGNED_DEPTH_TOPIC)
         self.declare_parameter('color_camera_info_topic', COLOR_CAMERA_INFO_TOPIC)
@@ -135,21 +127,16 @@ class G1OverlayNode(Node):
 
         self.latest_measurements_msg: G1Measurements | None = None
         self.latest_color_msg: Image | None = None
-        self.latest_depth_msg: Image | None = None
-        self.latest_mono_depth_msg: Image | None = None
         self.latest_aligned_depth_msg: Image | None = None
         self.latest_color_info: CameraInfo | None = None
         self.latest_scan_msg: LaserScan | None = None
         self.latest_truth_msg: PointStamped | None = None
-        self.camera_cache: OrderedDict[tuple, G1Measurements] = OrderedDict()
-        self.lidar_cache: OrderedDict[tuple, G1Measurements] = OrderedDict()
+        self.pointcloud_cache: OrderedDict[tuple, G1Measurements] = OrderedDict()
         self.mask_cache: OrderedDict[tuple, G1Measurements] = OrderedDict()
         self.mask_debug_cache: OrderedDict[tuple[int, int], Image] = OrderedDict()
         self.last_matched_silhouette = None
         self.last_scan_tf_fallback: str | None = None
         self.last_color_warning: str | None = None
-        self.last_depth_warning: str | None = None
-        self.last_mono_depth_warning: str | None = None
         self.last_aligned_depth_warning: str | None = None
         self.last_mask_debug_warning: str | None = None
         self.last_scan_tf_warning: str | None = None
@@ -161,9 +148,6 @@ class G1OverlayNode(Node):
         self.create_subscription(
             G1Measurements, self.get_parameter('measurement_topic').value,
             self.measurement_callback, 10)
-        self.create_subscription(
-            G1Measurements, self.get_parameter('lidar_measurement_topic').value,
-            self.lidar_measurement_callback, 10)
         self.create_subscription(
             G1Measurements, self.get_parameter('mask_measurement_topic').value,
             self.mask_measurement_callback, 10)
@@ -177,14 +161,6 @@ class G1OverlayNode(Node):
             PointStamped, self.get_parameter('ground_truth_topic').value,
             self.ground_truth_callback, 1)
 
-        if 'sensor_depth' in self.estimators:
-            self.create_subscription(
-                Image, self.get_parameter('depth_topic').value,
-                self.depth_callback, qos_profile=qos_profile_sensor_data)
-        if 'depth_anything' in self.estimators:
-            self.create_subscription(
-                Image, self.get_parameter('mono_depth_debug_topic').value,
-                self.mono_depth_callback, qos_profile=qos_profile_sensor_data)
         if self.wants_aligned:
             self.create_subscription(
                 Image, self.get_parameter('aligned_depth_topic').value,
@@ -218,7 +194,7 @@ class G1OverlayNode(Node):
     # -- measurement inputs --
 
     def measurement_callback(self, msg: G1Measurements) -> None:
-        self.cache_measurement(self.camera_cache, msg)
+        self.cache_measurement(self.pointcloud_cache, msg)
         self.latest_measurements_msg = msg
         self.render_latest()
 
@@ -226,9 +202,6 @@ class G1OverlayNode(Node):
         self.cache_measurement(self.mask_cache, msg)
         self.latest_measurements_msg = msg
         self.render_latest()
-
-    def lidar_measurement_callback(self, msg: G1Measurements) -> None:
-        self.cache_measurement(self.lidar_cache, msg)
 
     def cache_measurement(self, cache: OrderedDict, msg: G1Measurements) -> None:
         key = self.measurement_message_key(msg)
@@ -241,12 +214,6 @@ class G1OverlayNode(Node):
 
     def color_callback(self, color_msg: Image) -> None:
         self.latest_color_msg = color_msg
-
-    def depth_callback(self, depth_msg: Image) -> None:
-        self.latest_depth_msg = depth_msg
-
-    def mono_depth_callback(self, mono_depth_msg: Image) -> None:
-        self.latest_mono_depth_msg = mono_depth_msg
 
     def aligned_depth_callback(self, aligned_depth_msg: Image) -> None:
         self.latest_aligned_depth_msg = aligned_depth_msg
@@ -308,10 +275,6 @@ class G1OverlayNode(Node):
                 f'Cannot decode color image ({self.latest_color_msg.encoding}): {exc}')
             return
 
-        sensor_depth_meters = self.decode_depth(
-            self.latest_depth_msg, 'last_depth_warning', 'depth')
-        mono_depth_meters = self.decode_depth(
-            self.latest_mono_depth_msg, 'last_mono_depth_warning', 'mono-depth debug')
         aligned_depth_meters = self.decode_depth(
             self.latest_aligned_depth_msg, 'last_aligned_depth_warning', 'aligned depth')
 
@@ -322,8 +285,6 @@ class G1OverlayNode(Node):
         annotated = self.renderer.render(
             frame,
             batch,
-            sensor_depth_meters=sensor_depth_meters,
-            mono_depth_meters=mono_depth_meters,
             aligned_depth_meters=aligned_depth_meters,
             published_mask=self.match_mask_debug(self.latest_measurements_msg),
             scan_uv=scan_uv,
@@ -356,8 +317,7 @@ class G1OverlayNode(Node):
 
         primary = self.latest_measurements_msg
         for cache, fields in (
-                (self.camera_cache, CAMERA_FIELDS),
-                (self.lidar_cache, LIDAR_FIELDS),
+                (self.pointcloud_cache, POINTCLOUD_FIELDS),
                 (self.mask_cache, MASK_FIELDS)):
             other = self.match_measurement(cache, primary)
             if other is not None and other is not primary:
@@ -417,7 +377,7 @@ class G1OverlayNode(Node):
         self.last_matched_silhouette = mask > 0
         return self.last_matched_silhouette
 
-    # Camera, lidar, and mask measurements run at different rates and rarely
+    # The pointcloud and mask measurements run at different rates and rarely
     # share an exact detection stamp, so pair within this window on equal count.
     MATCH_MAX_DT_SEC = 1.0
 

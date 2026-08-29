@@ -10,17 +10,13 @@ The benchmark keeps the same OWLv2 RGB detection front-end and compares differen
 
 The public benchmark interface uses these estimator names:
 
-- `rgb`
-- `sensor_depth`
-- `depth_anything`
 - `pointcloud`
-- `lidar`
+- `projective_ranging`
+- `euclidean_reconstruction`
+- `polar_profiling`
 
-Important naming note:
-
-- the public benchmark API uses `depth_anything`
-- the internal ROS message field is still `mono_depth_distance_m`
-- the internal debug topic is still `debug/g1/camera/mono_depth`
+`pointcloud` reads the organized `PointCloud2` directly; the other three are the
+mask-based localization paths documented under `object_localization_documentation/`.
 
 ## Launch Interface
 
@@ -37,10 +33,10 @@ bash cleanup.sh
 ros2 launch ridgeback_autonomy g1_distance_benchmark.launch.py
 
 # Single-estimator run
-ros2 launch ridgeback_autonomy g1_distance_benchmark.launch.py estimators:=rgb
+ros2 launch ridgeback_autonomy g1_distance_benchmark.launch.py estimators:=pointcloud
 
 # Mixed comparison
-ros2 launch ridgeback_autonomy g1_distance_benchmark.launch.py estimators:=rgb,pointcloud,lidar
+ros2 launch ridgeback_autonomy g1_distance_benchmark.launch.py estimators:=pointcloud,polar_profiling
 ```
 
 Key public arguments:
@@ -63,7 +59,7 @@ The benchmark now follows these rules:
 - only positive spawned-target trials are generated
 - the target stays in front of the robot for a fixed capture window, `10.0` seconds by default
 - only successful single-target detections are used
-- camera and LiDAR measurements are aligned on the same detection-event key:
+- point-cloud and mask measurements are aligned on the same detection-event key:
   - `header.frame_id`
   - `header.stamp.sec`
   - `header.stamp.nanosec`
@@ -98,7 +94,7 @@ going — that is the only toggle mechanism; there are no parameters for it.
 | `G1 Estimates` | one coloured ring per estimator, at where it thinks the G1 is |
 | `G1 Polar Rays` | the LiDAR beams behind the polar profiling estimate |
 | `HUD` | top-right: every estimator's distance against the trial's ground truth |
-| `Perception overlay` | docked under the 3D view: the camera-side panels |
+| `Perception overlay` | docked under the 3D view: the color and mask panels |
 
 The HUD colours each row to match that estimator's ring, from the one table in
 `g1_estimate_viz_node`, so a reading and its ring cannot drift apart. Dark ring
@@ -128,9 +124,9 @@ A box that does not span the scan plane's image row contains no beams, so it
 draws no wedge. That is the correct picture for a target fully occluded at scan
 height, not a bug — the `objocc_*` scenes hit it routinely.
 
-The rings cover all eight estimators. The three mask-based ones are the reason
-the palette runs to cyan, yellow and magenta: in a clean scene every ring lands
-within centimetres of the others.
+The rings cover all four estimators. The three mask-based ones are the reason
+the palette runs to cyan, blue and violet, against the point cloud's amber: in a
+clean scene every ring lands within centimetres of the others.
 
 ## Output Layout
 
@@ -223,20 +219,22 @@ The collage:
 
 - uses one shared representative aligned detection event for the whole trial
 - renders panels left-to-right in canonical order:
-  - `rgb`
-  - `sensor_depth`
-  - `depth_anything`
   - `pointcloud`
-  - `lidar`
+  - `projective_ranging`
+  - `euclidean_reconstruction`
+  - `polar_profiling`
 - includes only the estimators selected for that run
+- draws every panel on the same color frame: no estimator has imagery of its
+  own, so the panels differ in their annotations, not their source
 
 Representative-frame selection:
 
 - compute the per-trial median for each selected estimator (partial when an
   estimator produced nothing)
-- rank candidates from the union of usable events: panel previews first, then
-  most estimators present, then the sum of `abs(event_value - trial_median)`
-  over the estimators the frame actually carries
+- rank candidates from the union of usable events: frames with a color preview
+  first, then most estimators present, then the sum of
+  `abs(event_value - trial_median)` over the estimators the frame actually
+  carries
 - break ties by earliest timestamp; panels for estimators without a median
   show the dominant miss reason instead of a value
 
@@ -256,12 +254,11 @@ Every panel shows:
 - [src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/reduction.py](src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/reduction.py)
 - [src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/rendering.py](src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/rendering.py)
 - [src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/summary.py](src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/summary.py)
-- [src/ridgeback_autonomy/ridgeback_autonomy/perception/g1_camera_measurement_node.py](src/ridgeback_autonomy/ridgeback_autonomy/perception/g1_camera_measurement_node.py)
-- [src/ridgeback_autonomy/ridgeback_autonomy/perception/g1_lidar_measurement_node.py](src/ridgeback_autonomy/ridgeback_autonomy/perception/g1_lidar_measurement_node.py)
+- [src/ridgeback_autonomy/ridgeback_autonomy/perception/g1_pointcloud_measurement_node.py](src/ridgeback_autonomy/ridgeback_autonomy/perception/g1_pointcloud_measurement_node.py)
+- [src/ridgeback_autonomy/ridgeback_autonomy/perception/g1_mask_measurement_node.py](src/ridgeback_autonomy/ridgeback_autonomy/perception/g1_mask_measurement_node.py)
 
 ## Practical Notes
 
-- `rgb`, `sensor_depth`, `depth_anything`, and `pointcloud` all come from the camera measurement node
-- `lidar` stays in its own node
+- `pointcloud` comes from `g1_pointcloud_measurement_node`; the three mask rows come from `g1_mask_measurement_node`
 - when the benchmark launch receives a subset in `estimators`, only the required measurement nodes are launched
-- when the camera node is launched for benchmarking, it is told which camera estimators to compute so unselected camera branches stay off
+- each node is told which of its own rows to compute, so an unselected branch never runs

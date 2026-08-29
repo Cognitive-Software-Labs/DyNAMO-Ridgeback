@@ -16,8 +16,9 @@ visual reference is
 Statuses are now counted **per detected box**, not per frame:
 
 - Every mask-estimator value on the wire carries a `MissReason` status per
-  detection (`*_status` arrays on `G1Measurements`); legacy estimators get a
-  coarse OK/UNSET inferred from finiteness, per detection.
+  detection (`*_status` arrays on `G1Measurements`); the `pointcloud` row, which
+  publishes no status, gets a coarse OK/UNSET inferred from finiteness, per
+  detection.
 - `compute_status_histogram` iterates `event.detections` via
   `alignment.detection_status`, so a 2-robot frame contributes both boxes.
 

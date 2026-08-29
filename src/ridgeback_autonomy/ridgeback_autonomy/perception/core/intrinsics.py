@@ -10,8 +10,8 @@ X right, Y down, Z forward, meters (``object_localization_pipeline.md``
 Section 7). The RealSense-SDK/TF axis/handedness cross-check on real hardware
 stays an open item (``projective_ranging.md`` Section 7).
 
-This module is deliberately independent of the legacy estimator stack
-(``geometry.py`` / ``g1_camera_measurement_node``); it shares no code with it.
+This module is deliberately independent of the pointcloud estimator
+(``pointcloud_ranging.py``); it shares no code with it.
 """
 
 from __future__ import annotations

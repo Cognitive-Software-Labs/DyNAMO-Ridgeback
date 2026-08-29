@@ -71,7 +71,7 @@ def test_single_gt_is_ungated_so_a_far_estimate_still_matches() -> None:
 
 
 def test_distance_only_locator_matches_on_distance() -> None:
-    # sensor_depth-style instance: no planar position, only a distance.
+    # An instance the estimator could not place: only a distance, no position.
     gts = [
         GtPoint(index=0, forward_m=2.0, lateral_m=0.0, distance_m=2.0),
         GtPoint(index=1, forward_m=4.0, lateral_m=0.0, distance_m=4.0),

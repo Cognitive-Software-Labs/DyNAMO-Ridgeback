@@ -4,17 +4,9 @@ int32 count
 float32[] bbox_xyxy
 string[] labels
 float32[] scores
-float32[] rgb_lateral_m
-float32[] rgb_forward_m
-float32[] rgb_distance_m
-float32[] sensor_depth_distance_m
-float32[] mono_depth_distance_m
 float32[] pointcloud_lateral_m
 float32[] pointcloud_forward_m
 float32[] pointcloud_distance_m
-float32[] lidar_lateral_m
-float32[] lidar_forward_m
-float32[] lidar_distance_m
 float32[] projective_ranging_lateral_m
 float32[] projective_ranging_forward_m
 float32[] projective_ranging_distance_m

@@ -9,9 +9,13 @@ from ridgeback_autonomy.benchmarking.alignment import MeasurementEvent
 from ridgeback_autonomy.benchmarking.estimators import (
     ESTIMATOR_FIELD_KEYS,
     ESTIMATOR_LABELS,
-    RGB_DEBUG_VIEW_ESTIMATORS,
 )
 from ridgeback_autonomy.perception.core.rendering import RgbdOverlayRenderer
+
+
+# Every panel is the colour frame with that estimator's boxes and numbers drawn
+# on it -- none of the surviving estimators has imagery of its own to show.
+COLOR_SOURCE_LABEL = 'RGB Debug View'
 
 
 @dataclass
@@ -27,16 +31,15 @@ class PanelContext:
 
 
 class BenchmarkCollageRenderer:
-    def __init__(self, depth_max_meters: float, panel_max_width: int = 320) -> None:
-        self.overlay = RgbdOverlayRenderer(depth_max_meters)
+    def __init__(self, panel_max_width: int = 320) -> None:
+        # Borrowed for its title and label-block drawing only: the collage no
+        # longer renders any depth imagery, so the renderer's depth range is
+        # never consulted.
+        self.overlay = RgbdOverlayRenderer(depth_max_meters=0.0)
         self.panel_max_width = panel_max_width
 
     def make_color_preview(self, frame_bgr: np.ndarray) -> np.ndarray:
         return self.resize_panel(frame_bgr)
-
-    def make_depth_preview(self, depth_meters: np.ndarray) -> np.ndarray:
-        panel = self.overlay.make_depth_panel(depth_meters.shape[:2], depth_meters)
-        return self.resize_panel(panel)
 
     def render_trial_collage(
         self,
@@ -78,7 +81,7 @@ class BenchmarkCollageRenderer:
         missed_count: int = 0,
         miss_reason: str | None = None,
     ) -> np.ndarray:
-        context = self.panel_context_for_estimator(estimator, event)
+        context = self.panel_context_for_event(event)
         panel = context.panel.copy()
         self.overlay.draw_panel_title(panel, ESTIMATOR_LABELS[estimator])
         self.draw_bboxes(panel, event, estimator, box_annotations)
@@ -99,63 +102,18 @@ class BenchmarkCollageRenderer:
         self.draw_value_block(panel, lines)
         return panel
 
-    def panel_context_for_estimator(
-        self,
-        estimator: str,
-        event: MeasurementEvent,
-    ) -> PanelContext:
-        if estimator == 'sensor_depth' and event.preview.sensor_depth_bgr is not None:
-            return self.build_panel_context(
-                panel=event.preview.sensor_depth_bgr,
-                source_label='Sensor Depth',
-                expected_source_label='Sensor Depth',
-                preview_available=True,
-                matched_stamp_ns=event.preview.sensor_depth_stamp_ns,
-                match_delta_ms=event.preview.sensor_depth_delta_ms,
-                nearest_stamp_ns=event.preview.sensor_depth_nearest_stamp_ns,
-                nearest_delta_ms=event.preview.sensor_depth_nearest_delta_ms,
-            )
-        if estimator == 'sensor_depth':
-            return self.build_panel_context(
-                panel=self.make_missing_panel(event),
-                source_label='Sensor Depth',
-                expected_source_label='Sensor Depth',
-                preview_available=False,
-                matched_stamp_ns=None,
-                match_delta_ms=None,
-                nearest_stamp_ns=event.preview.sensor_depth_nearest_stamp_ns,
-                nearest_delta_ms=event.preview.sensor_depth_nearest_delta_ms,
-            )
+    def panel_context_for_event(self, event: MeasurementEvent) -> PanelContext:
+        """The colour frame every estimator's panel is drawn on, or a placeholder.
 
-        if estimator == 'depth_anything' and event.preview.depth_anything_bgr is not None:
-            return self.build_panel_context(
-                panel=event.preview.depth_anything_bgr,
-                source_label='Depth-Anything',
-                expected_source_label='Depth-Anything',
-                preview_available=True,
-                matched_stamp_ns=event.preview.depth_anything_stamp_ns,
-                match_delta_ms=event.preview.depth_anything_delta_ms,
-                nearest_stamp_ns=event.preview.depth_anything_nearest_stamp_ns,
-                nearest_delta_ms=event.preview.depth_anything_nearest_delta_ms,
-            )
-        if estimator == 'depth_anything':
-            return self.build_panel_context(
-                panel=self.make_missing_panel(event),
-                source_label='Depth-Anything',
-                expected_source_label='Depth-Anything',
-                preview_available=False,
-                matched_stamp_ns=None,
-                match_delta_ms=None,
-                nearest_stamp_ns=event.preview.depth_anything_nearest_stamp_ns,
-                nearest_delta_ms=event.preview.depth_anything_nearest_delta_ms,
-            )
+        One context for the whole collage: no estimator renders its own imagery
+        any more, so the panels differ in their annotations, not their source.
+        """
 
-        color_source_label = 'RGB Debug View' if estimator in RGB_DEBUG_VIEW_ESTIMATORS else 'RGB'
         if event.preview.color_bgr is not None:
             return self.build_panel_context(
                 panel=event.preview.color_bgr,
-                source_label=color_source_label,
-                expected_source_label=color_source_label,
+                source_label=COLOR_SOURCE_LABEL,
+                expected_source_label=COLOR_SOURCE_LABEL,
                 preview_available=True,
                 matched_stamp_ns=event.preview.color_stamp_ns,
                 match_delta_ms=event.preview.color_delta_ms,
@@ -164,8 +122,8 @@ class BenchmarkCollageRenderer:
             )
         return self.build_panel_context(
             panel=self.make_missing_panel(event),
-            source_label=color_source_label,
-            expected_source_label=color_source_label,
+            source_label=COLOR_SOURCE_LABEL,
+            expected_source_label=COLOR_SOURCE_LABEL,
             preview_available=False,
             matched_stamp_ns=None,
             match_delta_ms=None,

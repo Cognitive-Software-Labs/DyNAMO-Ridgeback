@@ -56,28 +56,28 @@ def _manifest():
 
 
 def test_sweep_rollup_handles_multi_estimator_and_missing_run(tmp_path) -> None:
-    _write_run(tmp_path / 'single', [_estimator('lidar', 0.25)])
+    _write_run(tmp_path / 'single', [_estimator('polar_profiling', 0.25)])
     _write_run(tmp_path / 'multi', [
-        _estimator('rgb', 0.40),
-        _estimator('sensor_depth', 0.10),
+        _estimator('pointcloud', 0.40),
+        _estimator('projective_ranging', 0.10),
     ])
 
     rows, notes = collect_comparison_rows(_manifest(), str(tmp_path))
 
     assert [(row['config'], row['estimator']) for row in rows] == [
-        ('multi', 'Sensor Depth'),
-        ('single', 'Lidar'),
-        ('multi', 'Rgb'),
+        ('multi', 'Projective Ranging'),
+        ('single', 'Polar Profiling'),
+        ('multi', 'Pointcloud'),
     ]
     assert any('failed' in note and 'runner exited' in note for note in notes)
     assert rows[0]['rtf'] == 0.75
 
 
 def test_sweep_report_is_regenerable_from_manifest_and_runs(tmp_path) -> None:
-    _write_run(tmp_path / 'single', [_estimator('lidar', 0.25)])
+    _write_run(tmp_path / 'single', [_estimator('polar_profiling', 0.25)])
     _write_run(tmp_path / 'multi', [
-        _estimator('rgb', 0.40),
-        _estimator('sensor_depth', 0.10),
+        _estimator('pointcloud', 0.40),
+        _estimator('projective_ranging', 0.10),
     ])
     manifest = _manifest()
     (tmp_path / 'sweep.json').write_text(json.dumps(manifest), encoding='utf-8')
@@ -88,13 +88,14 @@ def test_sweep_report_is_regenerable_from_manifest_and_runs(tmp_path) -> None:
     assert report_path == str(tmp_path / 'summary.md')
     assert '# Benchmark sweep synthetic' in report
     assert 'Cross-config comparison' in report
-    assert report.index('Sensor Depth') < report.index('Lidar') < report.index('Rgb')
+    assert report.index('Projective Ranging') < report.index(
+        'Polar Profiling') < report.index('Pointcloud')
     assert 'runner exited' in report
     assert '0.750' in report
 
 
 def test_render_sweep_report_marks_skipped_completed_config(tmp_path) -> None:
-    _write_run(tmp_path / 'single', [_estimator('lidar', 0.25)])
+    _write_run(tmp_path / 'single', [_estimator('polar_profiling', 0.25)])
     manifest = _manifest()
     manifest['configs'] = [
         {'name': 'single', 'status': 'skipped', 'output_path': 'single'},
@@ -103,4 +104,4 @@ def test_render_sweep_report_marks_skipped_completed_config(tmp_path) -> None:
     report = render_sweep_report(manifest, str(tmp_path))
 
     assert 'existing run.json reused' in report
-    assert 'Lidar' in report
+    assert 'Polar Profiling' in report

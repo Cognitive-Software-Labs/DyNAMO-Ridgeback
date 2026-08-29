@@ -9,7 +9,6 @@ import re
 import yaml
 
 from ridgeback_autonomy.benchmarking.estimators import (
-    CAMERA_ESTIMATORS,
     DEPTH_PATH_ESTIMATORS,
     MASK_ESTIMATORS,
     parse_estimators,
@@ -34,10 +33,6 @@ SWEEP_DEFAULT_ARGUMENT_NAMES = CONFIG_LAUNCH_ARGUMENT_NAMES | frozenset({'setup_
 KNOB_ESTIMATORS = {
     'depth_source': DEPTH_PATH_ESTIMATORS,
     'mask_depth_max_meters': DEPTH_PATH_ESTIMATORS,
-    # depth_max_meters now gates the legacy camera stack. The mask stack's gate
-    # is mask_depth_max_meters; keeping those distinct prevents a sweep from
-    # silently varying only the collage colour range on mask-only configs.
-    'depth_max_meters': CAMERA_ESTIMATORS,
     'mask_gate': MASK_ESTIMATORS,
     'isolation_2d': frozenset({'projective_ranging'}),
     'isolation_3d': frozenset({'euclidean_reconstruction'}),

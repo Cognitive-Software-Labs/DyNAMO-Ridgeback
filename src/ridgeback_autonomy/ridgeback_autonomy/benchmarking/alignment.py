@@ -26,21 +26,17 @@ MeasurementEventKey = tuple[Any, ...]
 
 @dataclass
 class EventPreview:
+    """The colour frame a trial's collage panels are drawn on.
+
+    One image for the whole event: every estimator's panel is the same colour
+    frame annotated differently, so there is nothing per-estimator to buffer.
+    """
+
     color_bgr: np.ndarray | None = None
     color_stamp_ns: int | None = None
     color_delta_ms: float | None = None
     color_nearest_stamp_ns: int | None = None
     color_nearest_delta_ms: float | None = None
-    sensor_depth_bgr: np.ndarray | None = None
-    sensor_depth_stamp_ns: int | None = None
-    sensor_depth_delta_ms: float | None = None
-    sensor_depth_nearest_stamp_ns: int | None = None
-    sensor_depth_nearest_delta_ms: float | None = None
-    depth_anything_bgr: np.ndarray | None = None
-    depth_anything_stamp_ns: int | None = None
-    depth_anything_delta_ms: float | None = None
-    depth_anything_nearest_stamp_ns: int | None = None
-    depth_anything_nearest_delta_ms: float | None = None
 
 
 @dataclass(frozen=True)
@@ -65,7 +61,7 @@ class MeasurementEvent:
     # view used by the collage and the single-robot scoring path.
     estimates: dict[str, float | None] = field(default_factory=dict)
     estimate_statuses: dict[str, int] = field(default_factory=dict)
-    # Per-detection measurements, merged across the camera / lidar / mask
+    # Per-detection measurements, merged across the pointcloud / mask
     # messages that share this frame's alignment key. Index-aligned with
     # ``bboxes``; the multi-instance scoring path reads these + associates them
     # to ground truth. Empty until the first measurement message is merged.
@@ -98,8 +94,8 @@ def extract_estimator_statuses(msg: G1Measurements) -> dict[str, int]:
     """Per-estimator status code for the first detection (count == 1 frames).
 
     Mask estimators carry an explicit ``*_status`` array from the node; the
-    legacy estimators have none, so a coarse ``OK``/``UNSET`` is inferred from
-    whether they published a finite distance.
+    pointcloud row has none, so a coarse ``OK``/``UNSET`` is inferred from
+    whether it published a finite distance.
     """
 
     statuses: dict[str, int] = {}
@@ -119,7 +115,7 @@ def detection_status(detection: Detection, estimator: str) -> int:
 
     The per-detection counterpart of ``extract_estimator_statuses``, which only
     ever reads index 0. Mask estimators carry an explicit ``*_status`` decoded
-    per detection; the legacy estimators publish none, so the same coarse
+    per detection; the pointcloud row publishes none, so the same coarse
     ``OK``/``UNSET`` is inferred from whether THIS detection got a distance.
     """
 
@@ -183,7 +179,7 @@ def merge_measurement_detections(
 ) -> None:
     """Merge this message's per-detection values into the event's detection table.
 
-    Camera / lidar / mask messages of one frame share the alignment key (same
+    The pointcloud and mask messages of one frame share the alignment key (same
     count + bbox tuple), so their detections are index-aligned. Each message only
     carries its own node's estimators; we copy exactly the ``allowed_estimators``
     so a later message never erases an earlier one's fields.
@@ -225,19 +221,14 @@ def has_all_selected_estimates(
     return all(event.estimates.get(estimator) is not None for estimator in selected_estimators)
 
 
-def event_has_panel_preview(event: MeasurementEvent, estimator: str) -> bool:
-    if estimator == 'sensor_depth':
-        return event.preview.sensor_depth_bgr is not None
-    if estimator == 'depth_anything':
-        return event.preview.depth_anything_bgr is not None
+def event_has_panel_preview(event: MeasurementEvent) -> bool:
+    """Whether this event's collage panels can be drawn at all.
+
+    One question for the whole event rather than one per estimator: every panel
+    is the same colour frame, so either all of them render or none do.
+    """
+
     return event.preview.color_bgr is not None
-
-
-def event_has_all_panel_previews(
-    event: MeasurementEvent,
-    selected_estimators: tuple[str, ...],
-) -> bool:
-    return all(event_has_panel_preview(event, estimator) for estimator in selected_estimators)
 
 
 def find_exact_preview_match(
@@ -259,39 +250,6 @@ def find_exact_preview_match(
         image_bgr=preview,
         matched_stamp_ns=event_stamp_ns,
         matched_delta_ms=0.0,
-        nearest_stamp_ns=nearest_stamp_ns,
-        nearest_delta_ms=nearest_delta_ms,
-    )
-
-
-def find_nearest_preview_match(
-    preview_buffer: Mapping[int, np.ndarray],
-    event_stamp_ns: int,
-    tolerance_ns: int,
-) -> PreviewMatchResult:
-    nearest_stamp_ns, nearest_delta_ms = nearest_preview_metadata(preview_buffer, event_stamp_ns)
-    if nearest_stamp_ns is None or nearest_delta_ms is None:
-        return PreviewMatchResult(
-            image_bgr=None,
-            matched_stamp_ns=None,
-            matched_delta_ms=None,
-            nearest_stamp_ns=None,
-            nearest_delta_ms=None,
-        )
-
-    if nearest_delta_ms > (tolerance_ns / 1_000_000.0):
-        return PreviewMatchResult(
-            image_bgr=None,
-            matched_stamp_ns=None,
-            matched_delta_ms=None,
-            nearest_stamp_ns=nearest_stamp_ns,
-            nearest_delta_ms=nearest_delta_ms,
-        )
-
-    return PreviewMatchResult(
-        image_bgr=preview_buffer[nearest_stamp_ns],
-        matched_stamp_ns=nearest_stamp_ns,
-        matched_delta_ms=nearest_delta_ms,
         nearest_stamp_ns=nearest_stamp_ns,
         nearest_delta_ms=nearest_delta_ms,
     )
