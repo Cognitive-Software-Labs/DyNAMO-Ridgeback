@@ -710,9 +710,24 @@ class G1EstimateVizNode(Node):
         for world_frame in (self.world_frame, 'odom'):
             for base_frame in base_frames:
                 try:
+                    # Zero timeout, and it has to stay zero. The TF listener is
+                    # constructed with ``spin_thread=False``, so it shares this
+                    # node's single-threaded executor: the /tf callback that
+                    # would satisfy a wait is queued BEHIND the callback doing
+                    # the waiting, and can never run until it returns. A
+                    # non-zero timeout therefore cannot succeed -- it only burns
+                    # the whole budget, every time, and this runs on every
+                    # measurement callback. At 0.2 s against a ``world_frame``
+                    # the run does not have (the benchmark has no "map"; it
+                    # falls through to "odom") that cost two stalls per message
+                    # and starved the node to a sixth of its rate, which the HUD
+                    # showed as permanent "-- miss" rows: the measurement slots
+                    # aged out of the liveness gate while the executor blocked.
+                    # ``stamp`` is Time() -- latest available -- so the buffer
+                    # either holds the transform now or does not.
                     tf = self.tf_buffer.lookup_transform(
                         world_frame, base_frame, stamp,
-                        timeout=rclpy.duration.Duration(seconds=0.2),
+                        timeout=rclpy.duration.Duration(seconds=0.0),
                     )
                     tx = tf.transform.translation.x
                     ty = tf.transform.translation.y
