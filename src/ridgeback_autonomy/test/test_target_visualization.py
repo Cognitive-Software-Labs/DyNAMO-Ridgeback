@@ -3,7 +3,7 @@ from __future__ import annotations
 import html
 import math
 import re
-from types import MethodType, SimpleNamespace
+from types import SimpleNamespace
 
 import pytest
 from builtin_interfaces.msg import Time as TimeMsg
@@ -18,33 +18,41 @@ from ridgeback_autonomy.perception.target_localization.estimator_registry import
     nearest_instance_index,
     parse_estimators,
 )
-from ridgeback_autonomy.perception.target_localization.visualization_node import (
-    ESTIMATOR_COLOURS,
-    TargetVisualizationNode,
+from ridgeback_autonomy.perception.target_localization.hud_rendering import (
     HUD_AGED_LUMINANCE,
     HUD_LAYOUTS,
     HUD_LAYOUT_ROWS,
     HUD_MIN_LUMINANCE,
     HUD_WIDE_CELL_COLUMNS,
-    MARKER_LIFETIME_SEC,
-    MAX_OBSERVATION_AGE_S,
-    RING_LINE_WIDTH_M,
-    _ESTIMATOR_ID_BASE,
-    _hud_line,
-    _LUMA_WEIGHTS,
-    batch_messages,
-    collect_readings,
     colour_at_luminance,
-    estimator_reading,
+    hud_line as _hud_line,
     hud_section_text,
     hud_text_colour,
     hud_truth_header,
     hud_wide_section_text,
     hud_wide_text,
-    nearest_detection_index,
     parse_hud_layout,
-    partition_measurements,
+)
+from ridgeback_autonomy.perception.target_localization.marker_rendering import (
+    append_estimator_markers,
     world_marker_point,
+)
+from ridgeback_autonomy.perception.target_localization.visualization_node import (
+    MARKER_LIFETIME_SEC,
+    MAX_OBSERVATION_AGE_S,
+    TargetVisualizationNode,
+)
+from ridgeback_autonomy.perception.target_localization.visualization_readings import (
+    batch_messages,
+    collect_readings,
+    estimator_reading,
+    nearest_detection_index,
+    partition_measurements,
+)
+from ridgeback_autonomy.perception.target_localization.visualization_style import (
+    ESTIMATOR_COLOURS,
+    ESTIMATOR_MARKER_ID_BASES,
+    RING_LINE_WIDTH_M,
 )
 from ridgeback_autonomy.msg import TargetMeasurements
 from visualization_msgs.msg import Marker
@@ -80,7 +88,7 @@ def test_mask_and_pointcloud_families_are_split_by_colour_temperature() -> None:
 
 
 def test_marker_id_bases_are_distinct() -> None:
-    bases = [_ESTIMATOR_ID_BASE[name] for name in PUBLIC_ESTIMATOR_ORDER]
+    bases = [ESTIMATOR_MARKER_ID_BASES[name] for name in PUBLIC_ESTIMATOR_ORDER]
 
     assert len(set(bases)) == len(bases)
     # An estimator owns a ring at its base and a dot at base + 1, so two bases
@@ -185,7 +193,11 @@ def test_nearest_detection_index_falls_back_to_the_first_detection() -> None:
 
 
 def luminance(colour) -> float:
-    return sum(w * c for w, c in zip(_LUMA_WEIGHTS, colour))
+    from ridgeback_autonomy.perception.target_localization.hud_rendering import (
+        LUMA_WEIGHTS,
+    )
+
+    return sum(w * c for w, c in zip(LUMA_WEIGHTS, colour))
 
 
 def test_every_hud_colour_clears_the_legibility_floor() -> None:
@@ -306,16 +318,10 @@ def _place(
     robot_y: float = 0.0,
     robot_yaw: float = 0.0,
 ) -> list:
-    """Markers from the real node method, with no ROS context to stand up.
-
-    ``_add_estimator_markers`` only reaches ``self`` for the marker lifetime, so
-    an unbound call against a stub exercises the shipped placement path rather
-    than a copy of the arithmetic that could drift from it.
-    """
+    """Markers from the shipped construction helper, with no node to stand up."""
 
     markers: list = []
-    TargetVisualizationNode._add_estimator_markers(
-        SimpleNamespace(marker_lifetime=1.5),
+    append_estimator_markers(
         markers,
         estimator,
         forward_m,
@@ -325,6 +331,7 @@ def _place(
         robot_yaw,
         TimeMsg(),
         'map',
+        1.5,
     )
     return markers
 
@@ -1046,11 +1053,6 @@ def _published_markers(
             now=lambda: SimpleNamespace(to_msg=TimeMsg)),
         _pub=SimpleNamespace(publish=lambda ma: published.extend(ma.markers)),
     )
-    stub._add_estimator_markers = MethodType(
-        TargetVisualizationNode._add_estimator_markers, stub)
-    stub._add_delete_markers = MethodType(
-        TargetVisualizationNode._add_delete_markers, stub)
-
     # The same snapshot the node's tick builds, so the markers under test come
     # from the shipped path rather than from a second reading of the messages.
     entries = dated(same_batch)

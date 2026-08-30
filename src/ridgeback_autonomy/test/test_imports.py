@@ -52,6 +52,8 @@ def test_packaged_modules_import() -> None:
         'ridgeback_autonomy.perception.target_localization.core.vehicle_frame',
         'ridgeback_autonomy.perception.target_localization.core.rendering',
         'ridgeback_autonomy.perception.target_localization.contracts',
+        'ridgeback_autonomy.perception.target_localization.hud_rendering',
+        'ridgeback_autonomy.perception.target_localization.marker_rendering',
         'ridgeback_autonomy.perception.target_localization.measurement_pipeline',
         'ridgeback_autonomy.perception.target_localization.synchronization',
         'ridgeback_autonomy.benchmarking.metrics',
@@ -61,6 +63,8 @@ def test_packaged_modules_import() -> None:
         'ridgeback_autonomy.perception.target_localization.detector_node',
         'ridgeback_autonomy.perception.target_localization.estimator_registry',
         'ridgeback_autonomy.perception.target_localization.visualization_node',
+        'ridgeback_autonomy.perception.target_localization.visualization_readings',
+        'ridgeback_autonomy.perception.target_localization.visualization_style',
         'ridgeback_autonomy.perception.target_localization.launch',
         'ridgeback_autonomy.perception.target_localization.ground_truth',
         'ridgeback_autonomy.perception.target_localization.mask_measurement_node',
@@ -105,6 +109,37 @@ def test_package_dependencies_flow_one_way() -> None:
 
     assert not violations, (
         'dependencies must flow common <- perception <- benchmarking: '
+        f'{violations}'
+    )
+
+
+def test_reusable_target_helpers_do_not_depend_on_node_orchestration() -> None:
+    """Keep pure/reusable target layers below their ROS orchestration modules."""
+
+    target_root = PACKAGE_ROOT / 'perception' / 'target_localization'
+    helper_names = (
+        'synchronization.py',
+        'measurement_pipeline.py',
+        'visualization_readings.py',
+        'visualization_style.py',
+        'hud_rendering.py',
+        'marker_rendering.py',
+    )
+    node_modules = (
+        'ridgeback_autonomy.perception.target_localization.mask_measurement_node',
+        'ridgeback_autonomy.perception.target_localization.visualization_node',
+    )
+    violations = []
+    for helper_name in helper_names:
+        path = target_root / helper_name
+        for node_module in node_modules:
+            violations.extend(
+                f'{helper_name}:{line} imports {node_module}'
+                for line in _imports_from(path, node_module)
+            )
+
+    assert not violations, (
+        'reusable target helpers must not import node orchestration: '
         f'{violations}'
     )
 
