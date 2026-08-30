@@ -19,14 +19,19 @@ from ridgeback_autonomy.common.models import Detection, DetectionBatch
 from ridgeback_autonomy.common.miss_reason import MissReason
 from ridgeback_autonomy.perception.target_localization.core.intrinsics import CameraIntrinsics
 from ridgeback_autonomy.perception.target_localization.core.mask import MaskPrecision, mask_from_array
-from ridgeback_autonomy.perception.target_localization import mask_measurement_node
+from ridgeback_autonomy.perception.target_localization import (
+    mask_measurement_node,
+    measurement_pipeline,
+)
 from ridgeback_autonomy.perception.target_localization.mask_measurement_node import (
     BASE_FRAME_DEFAULT,
+    TargetMaskMeasurementNode,
+)
+from ridgeback_autonomy.perception.target_localization.measurement_pipeline import (
     MASK_GATE_BOX,
     MASK_GATE_SILHOUETTE,
     MAX_BOX_FRAME_FRACTION,
     ROBOT_FRONT_OFFSET_M_DEFAULT,
-    StampedMessageBuffer,
     box_within_frame_fraction,
     encode_mask_debug_image,
     fill_path_measurements,
@@ -35,6 +40,9 @@ from ridgeback_autonomy.perception.target_localization.mask_measurement_node imp
     optical_to_base_planar,
     resolve_enabled_estimators,
     resolve_mask_gate,
+)
+from ridgeback_autonomy.perception.target_localization.synchronization import (
+    StampedMessageBuffer,
 )
 
 target_mask_measurement_node = mask_measurement_node
@@ -348,11 +356,11 @@ def test_fill_computes_valid_depth_once_and_shares_each_masked_result(
         return None, MissReason.ISOLATION_EMPTY
 
     monkeypatch.setattr(
-        target_mask_measurement_node, 'valid_depth', compute_valid_once, raising=False)
+        measurement_pipeline, 'valid_depth', compute_valid_once)
     monkeypatch.setattr(
-        target_mask_measurement_node, 'localize_projective_ranging', projective_stub)
+        measurement_pipeline, 'localize_projective_ranging', projective_stub)
     monkeypatch.setattr(
-        target_mask_measurement_node, 'localize_euclidean_reconstruction', euclidean_stub)
+        measurement_pipeline, 'localize_euclidean_reconstruction', euclidean_stub)
 
     fill_path_measurements(
         batch, masks, FILL_INTRINSICS, depth_m, None,
@@ -457,14 +465,14 @@ def test_fill_projects_one_scan_once_for_multiple_polar_masks(
         mask_from_array(tight_blob(), MaskPrecision.TIGHT),
     ]
     calls = []
-    original_project = target_mask_measurement_node.project_scan_to_image
+    original_project = measurement_pipeline.project_scan_to_image
 
     def record_project(points_optical, valid, intrinsics):
         calls.append((points_optical, valid, intrinsics))
         return original_project(points_optical, valid, intrinsics)
 
     monkeypatch.setattr(
-        target_mask_measurement_node, 'project_scan_to_image', record_project)
+        measurement_pipeline, 'project_scan_to_image', record_project)
     records = [] if with_records else None
 
     fill_path_measurements(
@@ -491,14 +499,14 @@ def test_failed_polar_rviz_path_still_projects_once(monkeypatch) -> None:
         mask_from_array(tight_blob(), MaskPrecision.TIGHT),
     ]
     calls = []
-    original_project = target_mask_measurement_node.project_scan_to_image
+    original_project = measurement_pipeline.project_scan_to_image
 
     def record_project(points_optical, valid, intrinsics):
         calls.append((points_optical, valid, intrinsics))
         return original_project(points_optical, valid, intrinsics)
 
     monkeypatch.setattr(
-        target_mask_measurement_node, 'project_scan_to_image', record_project)
+        measurement_pipeline, 'project_scan_to_image', record_project)
     records = []
 
     fill_path_measurements(
@@ -537,7 +545,7 @@ def test_fill_avoids_projection_when_polar_cannot_use_a_mask(
 ) -> None:
     batch = build_fill_batch(count=len(masks))
     monkeypatch.setattr(
-        target_mask_measurement_node,
+        measurement_pipeline,
         'project_scan_to_image',
         lambda *args: pytest.fail('projection must be skipped'),
     )
@@ -658,7 +666,7 @@ def _status_fixture():
 
 def test_fill_path_measurements_stamps_ok_and_scan_reason() -> None:
     from ridgeback_autonomy.common.miss_reason import MissReason
-    from ridgeback_autonomy.perception.target_localization.mask_measurement_node import fill_path_measurements
+    from ridgeback_autonomy.perception.target_localization.measurement_pipeline import fill_path_measurements
 
     intrinsics, depth, batch, masks = _status_fixture()
     fill_path_measurements(
@@ -674,7 +682,7 @@ def test_fill_path_measurements_stamps_ok_and_scan_reason() -> None:
 
 def test_fill_path_measurements_no_depth_stamps_no_depth_frame() -> None:
     from ridgeback_autonomy.common.miss_reason import MissReason
-    from ridgeback_autonomy.perception.target_localization.mask_measurement_node import fill_path_measurements
+    from ridgeback_autonomy.perception.target_localization.measurement_pipeline import fill_path_measurements
 
     intrinsics, _depth, batch, masks = _status_fixture()
     fill_path_measurements(
@@ -689,7 +697,7 @@ def test_fill_path_measurements_no_depth_stamps_no_depth_frame() -> None:
 
 
 def test_fill_path_measurements_skips_none_mask() -> None:
-    from ridgeback_autonomy.perception.target_localization.mask_measurement_node import fill_path_measurements
+    from ridgeback_autonomy.perception.target_localization.measurement_pipeline import fill_path_measurements
 
     intrinsics, depth, batch, _masks = _status_fixture()
     fill_path_measurements(

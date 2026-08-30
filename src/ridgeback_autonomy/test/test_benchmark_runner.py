@@ -132,12 +132,12 @@ def test_silhouette_display_name_folds_the_gate() -> None:
     assert benchmark_display_name('pointcloud', 'stereoscopic', 'silhouette') == 'Point Cloud'
 
 
-def test_mask_gate_tokens_mirror_the_node_by_value() -> None:
-    from ridgeback_autonomy.perception.target_localization.mask_measurement_node import (
-        MASK_GATES as NODE_MASK_GATES,
+def test_mask_gate_tokens_mirror_the_measurement_pipeline_by_value() -> None:
+    from ridgeback_autonomy.perception.target_localization.measurement_pipeline import (
+        MASK_GATES as PIPELINE_MASK_GATES,
     )
 
-    assert MASK_GATES == NODE_MASK_GATES
+    assert MASK_GATES == PIPELINE_MASK_GATES
 
 
 def test_trial_rows_use_exactly_the_declared_csv_columns(tmp_path) -> None:

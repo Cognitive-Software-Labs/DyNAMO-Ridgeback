@@ -48,12 +48,9 @@ never imported.
 
 from __future__ import annotations
 
-import math
 import threading
 import time
 import traceback
-from collections import OrderedDict
-from dataclasses import dataclass
 
 import numpy as np
 import rclpy
@@ -69,11 +66,6 @@ from visualization_msgs.msg import MarkerArray
 
 from ridgeback_autonomy.perception.target_localization.estimator_registry import (
     DEPTH_PATH_ESTIMATORS,
-    ESTIMATOR_FIELD_KEYS,
-    MASK_ESTIMATORS,
-    nearest_instance_index,
-    parse_estimators,
-    selected_mask_estimators,
 )
 from ridgeback_autonomy.common.markers import PolarBeamRecord, build_polar_ray_markers
 from ridgeback_autonomy.common.messages import (
@@ -85,9 +77,7 @@ from ridgeback_autonomy.common.tf_utils import lookup_transform_components
 from ridgeback_autonomy.msg import TargetDetections, TargetMeasurements
 from ridgeback_autonomy.perception.target_localization.core.depth_common import (
     DEPTH_GATE_DISABLED,
-    MASK_DEPTH_GATE_DEFAULT,
     resolve_depth_gate,
-    valid_depth,
 )
 from ridgeback_autonomy.perception.target_localization.core.depth_sources import (
     DEPTH_ANYTHING_MODEL_ID_DEFAULT,
@@ -113,13 +103,8 @@ from ridgeback_autonomy.perception.target_localization.core.mask import (
     mask_from_array,
     rasterize_detection,
 )
-from ridgeback_autonomy.perception.target_localization.core.projective_ranging import localize_projective_ranging
-from ridgeback_autonomy.perception.target_localization.core.euclidean_reconstruction import localize_euclidean_reconstruction
 from ridgeback_autonomy.perception.target_localization.core.polar_profiling import (
-    localize_projected_polar_profiling,
-    project_scan_to_image,
     scan_points_optical,
-    select_bbox_beams,
 )
 from ridgeback_autonomy.perception.target_localization.core.segmentation import (
     SEGMENTATION_MIN_PREDICTED_IOU_DEFAULT,
@@ -133,484 +118,38 @@ from ridgeback_autonomy.perception.target_localization.contracts import (
     POLAR_RAYS_TOPIC,
     RAW_DETECTIONS_TOPIC,
 )
+from ridgeback_autonomy.perception.target_localization.measurement_pipeline import (
+    MASK_GATE_BOX,
+    MASK_GATE_SILHOUETTE,
+    MAX_BOX_FRAME_FRACTION,
+    ROBOT_FRONT_OFFSET_M_DEFAULT,
+    box_within_frame_fraction,
+    encode_mask_debug_image,
+    fill_path_measurements,
+    grid_mismatch_warning,
+    nearest_beam_record,
+    optical_to_base_planar,
+    resolve_enabled_estimators,
+    resolve_mask_gate,
+    set_mask_estimator_status,
+)
+from ridgeback_autonomy.perception.target_localization.synchronization import (
+    COLOR_BUFFER_DEPTH_DEFAULT,
+    DEPTH_MATCH_BUFFER_DEPTH,
+    SCAN_MATCH_BUFFER_DEPTH,
+    SCAN_MATCH_TOLERANCE_S_DEFAULT,
+    DepthMatchDiagnostics,
+    PreparedColorFrame,
+    StampedMessageBuffer,
+    stamp_key,
+)
 
 
 COLOR_TOPIC_DEFAULT = 'sensors/camera_0/color/image'
 DEPTH_TOPIC_DEFAULT = 'sensors/camera_0/depth/image'
 CAMERA_INFO_TOPIC_DEFAULT = 'sensors/camera_0/color/camera_info'
-
-# Markers expire rather than being explicitly deleted, so they vanish on their
-# own when detections stop. Mirrors the estimate rings' lifetime.
 RAY_MARKER_LIFETIME_SEC = 1.5
-
-ROBOT_FRONT_OFFSET_M_DEFAULT = 0.25  # mirrors vehicle_frame.ROBOT_FRONT_OFFSET_M
 BASE_FRAME_DEFAULT = 'base_link'
-
-MASK_GATE_BOX = 'box'
-MASK_GATE_SILHOUETTE = 'silhouette'
-MASK_GATES = (MASK_GATE_BOX, MASK_GATE_SILHOUETTE)
-
-# ~0.5 s of color frames at 30 fps -- comfortably above the detector latency
-# (~200 ms at 5 FPS), so the exact-stamp lookup only misses when the pipeline
-# is genuinely stalled.
-COLOR_BUFFER_DEPTH_DEFAULT = 15
-
-# A detector box covering more than this fraction of the frame is almost always
-# a failure (OWLv2 occasionally boxes the whole scene at close range); masking
-# with it isolates the background wall and poisons every path. Detections that
-# fail this gate are skipped (fields stay NaN, trial drops) rather than measured
-# against the room -- the observed close-range outlier trials.
-MAX_BOX_FRAME_FRACTION = 0.60
-
-# The depth source's input frames and the scans are matched to the detection
-# stamp, not paired latest-wins, so the mask and the depth/scan it reads come
-# from the same instant. The depth input shares the color frame's stamp (exact
-# match); the scan free-runs at ~40 Hz, so it is matched to the nearest buffered
-# stamp within SCAN_MATCH_TOLERANCE_S. Buffer depths span the detector latency
-# (~200 ms) plus jitter.
-DEPTH_MATCH_BUFFER_DEPTH = 15
-SCAN_MATCH_BUFFER_DEPTH = 20
-SCAN_MATCH_TOLERANCE_S_DEFAULT = 0.05
-
-
-def optical_to_base_planar(
-    xyz_optical,
-    rotation: np.ndarray,
-    translation: np.ndarray,
-    front_offset_m: float,
-) -> tuple[float, float, float]:
-    """Camera-optical point -> ``(lateral_m, forward_m, distance_m)`` in the base frame.
-
-    ``rotation`` / ``translation`` are the camera-optical -> base extrinsics
-    from TF, so the camera's mounting pose (translation included) is modeled
-    exactly instead of assuming the optical center sits at the base origin.
-    Lateral is base +Y (left-positive, REP-103), matching the ground truth and
-    the legacy lidar/pointcloud rows; the robot front offset is subtracted
-    from base forward (+X) before the planar distance.
-    """
-
-    point_base = (
-        np.asarray(rotation, dtype=np.float64)
-        @ np.asarray(xyz_optical, dtype=np.float64)
-        + np.asarray(translation, dtype=np.float64)
-    )
-    lateral_m = float(point_base[1])
-    forward_m = float(point_base[0]) - front_offset_m
-    distance_m = math.hypot(lateral_m, forward_m)
-    return lateral_m, forward_m, distance_m
-
-
-def resolve_mask_gate(value) -> str:
-    """Validate the ``mask_gate`` parameter value (``box`` | ``silhouette``)."""
-
-    gate = str(value).strip()
-    if gate not in MASK_GATES:
-        supported = ', '.join(MASK_GATES)
-        raise ValueError(f'Unknown mask_gate "{gate}". Expected one of: {supported}')
-    return gate
-
-
-def resolve_enabled_estimators(value) -> frozenset:
-    """The ``enabled_estimators`` parameter as this node's mask-row subset.
-
-    Shares ``parse_estimators`` with the legacy stack, so one comma-separated
-    list can select across both and each node keeps the keys it owns. A value
-    naming only non-mask estimators leaves nothing for this node to fill, which
-    is a launch mistake rather than a quiet no-op -- the node would publish
-    empty measurements forever -- so it raises.
-    """
-
-    enabled = frozenset(selected_mask_estimators(parse_estimators(value)))
-    if not enabled:
-        supported = ', '.join(sorted(MASK_ESTIMATORS))
-        raise ValueError(
-            f'enabled_estimators "{value}" selects no mask estimator; this node '
-            f'fills only: {supported}.')
-    return enabled
-
-
-def box_within_frame_fraction(
-    bbox_xyxy,
-    image_height: int,
-    image_width: int,
-    max_fraction: float = MAX_BOX_FRAME_FRACTION,
-) -> bool:
-    """True if the detector box covers at most ``max_fraction`` of the frame.
-
-    A near-full-frame box (see ``MAX_BOX_FRAME_FRACTION``) fails the gate; the
-    caller then skips that detection instead of masking the whole scene. Pure so
-    it can be unit-tested without a node (mirrors ``grid_mismatch_warning``).
-    """
-
-    frame_area = float(image_height) * float(image_width)
-    if frame_area <= 0.0:
-        return False
-    x1, y1, x2, y2 = bbox_xyxy
-    box_area = float(max(0, x2 - x1)) * float(max(0, y2 - y1))
-    return box_area <= max_fraction * frame_area
-
-
-def stamp_key(stamp) -> tuple[int, int]:
-    return int(stamp.sec), int(stamp.nanosec)
-
-
-@dataclass(frozen=True)
-class PreparedColorFrame:
-    """The exact color message and RGB array prepared for one batch only."""
-
-    message: Image
-    rgb: np.ndarray
-
-
-class StampedMessageBuffer:
-    """Stamp-keyed rolling buffer of recent messages, matched by header stamp.
-
-    Used for the color frame (the silhouette gate's prompt image and the
-    monocular depth source's input), the raw depth stream, and the scan.
-    Color and depth share the exact color stamp, so they match with
-    ``lookup`` (no tolerance); the scan free-runs, so it matches with
-    ``lookup_nearest`` within a tolerance window. A miss means the message aged
-    out (or never arrived); the caller skips that source's paths rather than
-    pairing whatever arrived most recently, which would smear distance under
-    motion or mislabel the silhouette benchmark row.
-    """
-
-    def __init__(self, depth: int) -> None:
-        self.depth = int(depth)
-        self._msgs: OrderedDict[tuple[int, int], object] = OrderedDict()
-
-    def __len__(self) -> int:
-        return len(self._msgs)
-
-    def store(self, msg) -> None:
-        key = stamp_key(msg.header.stamp)
-        self._msgs[key] = msg
-        self._msgs.move_to_end(key)
-        while len(self._msgs) > self.depth:
-            self._msgs.popitem(last=False)
-
-    def lookup(self, stamp):
-        """Exact stamp match, or ``None``."""
-
-        return self._msgs.get(stamp_key(stamp))
-
-    def lookup_nearest(self, stamp, tolerance_s: float):
-        """Buffered message closest to ``stamp`` within ``tolerance_s``, or ``None``."""
-
-        sec, nanosec = stamp_key(stamp)
-        target_ns = sec * 1_000_000_000 + nanosec
-        tol_ns = int(tolerance_s * 1_000_000_000)
-        best = None
-        best_delta = None
-        for (key_sec, key_nanosec), msg in self._msgs.items():
-            delta = abs(key_sec * 1_000_000_000 + key_nanosec - target_ns)
-            if delta <= tol_ns and (best_delta is None or delta < best_delta):
-                best_delta = delta
-                best = msg
-        return best
-
-    def stamps_ns(self) -> list[int]:
-        """Buffered stamps as nanoseconds, oldest first. Diagnostics only."""
-
-        return [sec * 1_000_000_000 + nanosec for sec, nanosec in self._msgs]
-
-
-class DepthMatchDiagnostics:
-    """Counts why the depth input lookup hits or misses, for one run.
-
-    Answers three competing explanations for a ``NO_DEPTH_FRAME`` with one
-    log line, without changing any matching behaviour:
-
-    - **reception loss** -- ``depth`` received well below ``color``. The frame
-      was published but this process never got it.
-    - **stamp mismatch** -- both streams received at the same rate, the target
-      stamp sits inside the buffered span, and the nearest buffered stamp is a
-      near-constant offset away. The streams are not stamped alike.
-    - **lag** -- the target is *newer* than everything buffered, so the depth
-      frame simply had not arrived yet when the detection was processed.
-    """
-
-    def __init__(self) -> None:
-        self.color_rx = 0
-        self.depth_rx = 0
-        self.hits = 0
-        self.misses = 0
-        self.miss_target_newer = 0
-        self.miss_target_older = 0
-        self.miss_target_inside = 0
-        self.miss_nearest_delta_ms: list[float] = []
-        self.empty_buffer_misses = 0
-
-    def record_lookup(self, hit: bool, target_ns: int, buffered_ns: list[int]) -> None:
-        if hit:
-            self.hits += 1
-            return
-        self.misses += 1
-        if not buffered_ns:
-            self.empty_buffer_misses += 1
-            return
-        if target_ns > max(buffered_ns):
-            self.miss_target_newer += 1
-        elif target_ns < min(buffered_ns):
-            self.miss_target_older += 1
-        else:
-            self.miss_target_inside += 1
-        nearest = min(abs(stamp - target_ns) for stamp in buffered_ns)
-        self.miss_nearest_delta_ms.append(nearest / 1e6)
-
-    def summary(self) -> str:
-        lookups = self.hits + self.misses
-        ratio = (self.depth_rx / self.color_rx) if self.color_rx else float('nan')
-        hit_rate = (self.hits / lookups) if lookups else float('nan')
-        lines = [
-            f'depth-match: rx color={self.color_rx} depth={self.depth_rx} '
-            f'(depth/color={ratio:.2f}) | lookups={lookups} hit={self.hits} '
-            f'miss={self.misses} (hit_rate={hit_rate:.2f})',
-        ]
-        if self.misses:
-            deltas = sorted(self.miss_nearest_delta_ms)
-            if deltas:
-                median = deltas[len(deltas) // 2]
-                spread = (
-                    f'min={deltas[0]:.1f} med={median:.1f} max={deltas[-1]:.1f}')
-            else:
-                spread = 'n/a'
-            lines.append(
-                f'  miss placement: target_newer={self.miss_target_newer} '
-                f'target_inside={self.miss_target_inside} '
-                f'target_older={self.miss_target_older} '
-                f'empty_buffer={self.empty_buffer_misses}')
-            lines.append(f'  nearest buffered stamp delta (ms): {spread}')
-        return '\n'.join(lines)
-
-
-def set_mask_estimator_status(
-    detection,
-    reason: MissReason,
-    enabled=MASK_ESTIMATORS,
-) -> None:
-    """Stamp one miss reason on the enabled mask-estimator status fields.
-
-    ``enabled`` is the run's mask-estimator subset; a path that was never asked
-    to run keeps its ``UNSET`` status, because that is what happened -- the node
-    did not miss, it never looked. Same shape as the legacy rows, which carry no
-    status field at all and infer ``UNSET`` from a NaN distance.
-    """
-
-    if 'projective_ranging' in enabled:
-        detection.projective_ranging_status = int(reason)
-    if 'euclidean_reconstruction' in enabled:
-        detection.euclidean_reconstruction_status = int(reason)
-    if 'polar_profiling' in enabled:
-        detection.polar_profiling_status = int(reason)
-
-
-def fill_path_measurements(
-    batch,
-    masks,
-    intrinsics,
-    depth_m,
-    scan_points,
-    *,
-    camera_rotation: np.ndarray,
-    camera_translation: np.ndarray,
-    front_offset_m: float,
-    isolation_2d,
-    isolation_3d,
-    depth_max: float = MASK_DEPTH_GATE_DEFAULT,
-    scan_reason: MissReason = MissReason.NO_SCAN,
-    beam_records: list | None = None,
-    enabled=MASK_ESTIMATORS,
-) -> None:
-    """Run every enabled path for each (detection, mask) pair, in place.
-
-    ``camera_rotation`` / ``camera_translation`` are the camera-optical ->
-    base extrinsics (TF at the detection stamp). ``masks`` is index-aligned
-    with ``batch.detections``; a ``None`` mask (already status-stamped by
-    ``masks_for_batch``) skips that detection entirely -- its fields stay NaN
-    and the trial drops, per the no-fallback convention. Each estimator's
-    ``*_status`` records why it missed (or ``OK``); ``scan_reason`` is the
-    reason polar carries when the scan itself never resolved. The
-    ``tight | rect`` fork lives inside the paths themselves; this function is
-    gate-agnostic.
-
-    ``enabled`` is the run's mask-estimator subset. A path outside it is not
-    run and not stamped, so its fields stay NaN and its status stays ``UNSET``
-    -- the run simply has no such row, exactly as an unselected legacy
-    estimator has none.
-
-    ``depth_max`` is the working depth gate the two depth paths clean against
-    (polar never sees it -- it reads the scan, which has its own clip). It is
-    not a validity rule: how far a reading can be believed is the depth
-    source's ``usable_max_m``, and the caller passes the tighter of the two.
-
-    ``beam_records`` is an optional out-list collecting one ``PolarBeamRecord``
-    per detection that had a scan, for visualization. Passing nothing keeps the
-    previous behaviour exactly; the beams are a by-product of work already done,
-    never a reason to run a path.
-    """
-
-    wants_projective = 'projective_ranging' in enabled
-    wants_euclidean = 'euclidean_reconstruction' in enabled
-    wants_polar = 'polar_profiling' in enabled
-    frame_valid_depth = None
-    scan_projection = None
-
-    for index, (detection, mask) in enumerate(zip(batch.detections, masks)):
-        if mask is None:
-            continue
-
-        if depth_m is None:
-            if wants_projective:
-                detection.projective_ranging_status = int(MissReason.NO_DEPTH_FRAME)
-            if wants_euclidean:
-                detection.euclidean_reconstruction_status = int(MissReason.NO_DEPTH_FRAME)
-        else:
-            valid_masked = None
-            if wants_projective or wants_euclidean:
-                if frame_valid_depth is None:
-                    frame_valid_depth = valid_depth(depth_m, depth_max)
-                valid_masked = mask.data & frame_valid_depth
-
-            if wants_projective:
-                result_a, reason_a = localize_projective_ranging(
-                    depth_m, mask, intrinsics, isolation=isolation_2d,
-                    depth_max=depth_max, valid_masked=valid_masked)
-                detection.projective_ranging_status = int(reason_a)
-                if result_a is not None:
-                    (
-                        detection.projective_ranging_lateral_m,
-                        detection.projective_ranging_forward_m,
-                        detection.projective_ranging_distance_m,
-                    ) = optical_to_base_planar(
-                        result_a.xyz_optical, camera_rotation, camera_translation,
-                        front_offset_m)
-
-            if wants_euclidean:
-                result_b, reason_b = localize_euclidean_reconstruction(
-                    depth_m, mask, intrinsics, isolation=isolation_3d,
-                    depth_max=depth_max, valid_masked=valid_masked)
-                detection.euclidean_reconstruction_status = int(reason_b)
-                if result_b is not None:
-                    (
-                        detection.euclidean_reconstruction_lateral_m,
-                        detection.euclidean_reconstruction_forward_m,
-                        detection.euclidean_reconstruction_distance_m,
-                    ) = optical_to_base_planar(
-                        result_b.xyz_optical, camera_rotation, camera_translation,
-                        front_offset_m)
-
-        if not wants_polar:
-            continue
-
-        if scan_points is None:
-            detection.polar_profiling_status = int(scan_reason)
-        else:
-            points_optical, valid = scan_points
-            if scan_projection is None:
-                scan_projection = project_scan_to_image(
-                    points_optical, valid, intrinsics)
-            attempt = localize_projected_polar_profiling(scan_projection, mask)
-            result_c = attempt.result
-            detection.polar_profiling_status = int(attempt.reason)
-            if result_c is not None:
-                # Polar profiling recovers only (X, Z); Y is unobservable and
-                # substituted with 0. Optical Y folds into base forward only
-                # through the camera pitch, which is 0 for this benchmark, so
-                # the substitution is exact here.
-                x_optical, z_optical = (float(value) for value in result_c.xz_optical)
-                (
-                    detection.polar_profiling_lateral_m,
-                    detection.polar_profiling_forward_m,
-                    detection.polar_profiling_distance_m,
-                ) = optical_to_base_planar(
-                    (x_optical, 0.0, z_optical), camera_rotation,
-                    camera_translation, front_offset_m)
-
-            if beam_records is not None:
-                # A miss is the case worth seeing, so record the beams either
-                # way: on success the estimator's own two sets, on failure the
-                # selection it rejected, with nothing marked as used.
-                if result_c is not None:
-                    selected, merged = result_c.selected_beams, result_c.merged_beams
-                else:
-                    selected = attempt.selected_beams
-                    merged = np.empty(0, dtype=np.intp)
-                beam_records.append(PolarBeamRecord(
-                    detection_index=index,
-                    selected=selected,
-                    merged=merged,
-                    in_bbox=select_bbox_beams(scan_projection, detection.bbox_xyxy),
-                ))
-
-
-def nearest_beam_record(batch, beam_records):
-    """The record for the detection the ray layers speak for, or ``None``.
-
-    Ranked by the same rule the estimate rings use, so both surfaces land on the
-    same robot. This node only fills its own three estimators, so the canonical
-    order falls through to them here -- two near-equal robots can still split the
-    ray and ring layers for a frame, which is the cost of not coupling the nodes.
-
-    Matched on ``detection_index`` rather than list position: detections whose
-    segmentation came back empty never record beams, so the two diverge. A batch
-    that ranks to nothing still draws its first record -- a frame with beams and
-    no estimate is exactly the failure worth seeing.
-    """
-
-    if not beam_records:
-        return None
-
-    def read_distance(estimator: str, index: int) -> float | None:
-        return getattr(batch.detections[index], ESTIMATOR_FIELD_KEYS[estimator], None)
-
-    nearest = nearest_instance_index(batch.count, read_distance)
-    for record in beam_records:
-        if record.detection_index == nearest:
-            return record
-    return beam_records[0]
-
-
-def encode_mask_debug_image(masks, image_height: int, image_width: int, header) -> Image:
-    """Union of the frame's masks as a ``mono8`` Image (255 = object).
-
-    The debug artifact for the overlay panel: the pixels downstream actually
-    consumed this frame. ``None`` entries (empty segmentations) contribute
-    nothing.
-    """
-
-    union = np.zeros((image_height, image_width), dtype=np.uint8)
-    for mask in masks:
-        if mask is not None:
-            union[mask.data] = 255
-    msg = Image()
-    msg.header = header
-    msg.height = image_height
-    msg.width = image_width
-    msg.encoding = 'mono8'
-    msg.is_bigendian = 0
-    msg.step = image_width
-    msg.data = union.tobytes()
-    return msg
-
-
-def grid_mismatch_warning(intrinsics, batch) -> str | None:
-    """Warning when the ``camera_info`` grid differs from the detection grid.
-
-    The masks are rasterized on the detection grid, while the depth indexing
-    and the scan projection are bounded by the ``camera_info`` grid. When the
-    two differ the masks cannot index either, so the caller skips every path
-    for the frame (fields stay NaN) and warns. Returns ``None`` when the
-    grids match.
-    """
-
-    if (intrinsics.height, intrinsics.width) == (batch.image_height, batch.image_width):
-        return None
-    return (
-        f'camera_info grid ({intrinsics.height}, {intrinsics.width}) does not '
-        f'match the detection grid ({batch.image_height}, {batch.image_width}); '
-        'masks cannot index the projection. Check the camera_info_topic parameter.'
-    )
 
 
 class TargetMaskMeasurementNode(Node):

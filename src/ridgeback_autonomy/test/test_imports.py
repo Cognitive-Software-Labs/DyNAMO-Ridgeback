@@ -52,6 +52,8 @@ def test_packaged_modules_import() -> None:
         'ridgeback_autonomy.perception.target_localization.core.vehicle_frame',
         'ridgeback_autonomy.perception.target_localization.core.rendering',
         'ridgeback_autonomy.perception.target_localization.contracts',
+        'ridgeback_autonomy.perception.target_localization.measurement_pipeline',
+        'ridgeback_autonomy.perception.target_localization.synchronization',
         'ridgeback_autonomy.benchmarking.metrics',
         'ridgeback_autonomy.benchmarking.reduction',
         'ridgeback_autonomy.benchmarking.rendering',
