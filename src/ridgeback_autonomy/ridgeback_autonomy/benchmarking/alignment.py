@@ -14,7 +14,7 @@ from ridgeback_autonomy.common.miss_reason import MissReason
 from ridgeback_autonomy.common.models import Detection
 from ridgeback_autonomy.msg import G1Measurements
 
-from ridgeback_autonomy.benchmarking.estimators import (
+from ridgeback_autonomy.perception.estimators import (
     ESTIMATOR_FIELD_KEYS,
     ESTIMATOR_POSITION_ATTRS,
     ESTIMATOR_STATUS_FIELD_KEYS,

@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
+from functools import lru_cache
 
 import numpy as np
 
@@ -78,6 +79,12 @@ MAX_BEARING_GAP_BEAMS_DEFAULT = 2
 # tighter estimate.
 MIN_VALID_RAYS_DEFAULT = 2
 
+# A driver normally publishes one fixed scan geometry. Keep a few immutable
+# direction tables so a runtime profile change is handled without rebuilding
+# trigonometry on every detection batch or allowing stale profiles to grow the
+# process indefinitely.
+_SCAN_GEOMETRY_CACHE_SIZE = 4
+
 
 @dataclass(frozen=True)
 class PolarProfilingResult:
@@ -92,6 +99,51 @@ class PolarProfilingResult:
     # threw away, which is how an occluder latch becomes visible.
     selected_beams: np.ndarray  # (N,) the mask ∩ FoV select
     merged_beams: np.ndarray  # (M,) the near-band survivors -- what the estimate reduces
+
+
+@dataclass(frozen=True)
+class ScanImageProjection:
+    """One scan's camera-image mapping, prepared for one detection batch.
+
+    ``uv`` preserves the full original-beam projection contract, including
+    invalid and out-of-view rows. The remaining three arrays are the compact,
+    valid in-view subset used repeatedly by every per-mask selection.
+    """
+
+    points_optical: np.ndarray  # (N, 3), indexed by original scan beam
+    uv: np.ndarray  # (N, 2), float projection of every original beam
+    beam_indices: np.ndarray  # (K,), valid and in-view original beam indices
+    u_px: np.ndarray  # (K,), rounded compact image columns
+    v_px: np.ndarray  # (K,), rounded compact image rows
+
+
+@dataclass(frozen=True)
+class PolarProfilingAttempt:
+    """One localization attempt, retaining its selection even on a miss."""
+
+    result: PolarProfilingResult | None
+    reason: MissReason
+    selected_beams: np.ndarray
+
+
+@lru_cache(maxsize=_SCAN_GEOMETRY_CACHE_SIZE)
+def _scan_unit_directions(
+    beam_count: int,
+    angle_min: float,
+    angle_increment: float,
+) -> np.ndarray:
+    """Return immutable scan-frame unit directions for one beam geometry."""
+
+    angles = angle_min + (
+        np.arange(beam_count, dtype=np.float64) * angle_increment
+    )
+    directions = np.stack((
+        np.cos(angles),
+        np.sin(angles),
+        np.zeros(beam_count, dtype=np.float64),
+    ), axis=1)
+    directions.flags.writeable = False
+    return directions
 
 
 def scan_points_optical(
@@ -130,14 +182,12 @@ def scan_points_optical(
         range_cap = range_max_m
     valid &= (safe_ranges >= range_floor) & (safe_ranges <= min(range_cap, range_max_m))
 
-    angles = float(scan.angle_min) + (
-        np.arange(ranges.size, dtype=np.float64) * float(scan.angle_increment)
+    unit_directions = _scan_unit_directions(
+        int(ranges.size),
+        float(scan.angle_min),
+        float(scan.angle_increment),
     )
-    points_scan = np.stack((
-        safe_ranges * np.cos(angles),
-        safe_ranges * np.sin(angles),
-        np.zeros_like(safe_ranges),
-    ), axis=1)
+    points_scan = safe_ranges[:, np.newaxis] * unit_directions
     points_optical = points_scan @ np.asarray(rotation, dtype=np.float64).T
     points_optical += np.asarray(translation, dtype=np.float64)
     return points_optical, valid
@@ -194,20 +244,63 @@ def merge_near_band(
     return np.concatenate(kept)
 
 
+def project_scan_to_image(
+    points_optical: np.ndarray,
+    valid: np.ndarray,
+    intrinsics: CameraIntrinsics,
+) -> ScanImageProjection:
+    """Project one scan once and retain its full and compact image mappings.
+
+    This is batch-local work: the scan, its TF transform, and its timestamp can
+    all change on the next batch. ``project_points`` is deliberately called
+    exactly once here; per-mask helpers index this prepared mapping only.
+    """
+
+    uv, in_view = project_points(points_optical, intrinsics)
+    selectable = np.asarray(valid, dtype=bool) & in_view
+    beam_indices = np.flatnonzero(selectable)
+    return ScanImageProjection(
+        points_optical=points_optical,
+        uv=uv,
+        beam_indices=beam_indices,
+        u_px=np.rint(uv[beam_indices, 0]).astype(np.intp),
+        v_px=np.rint(uv[beam_indices, 1]).astype(np.intp),
+    )
+
+
 def project_in_view(
     points_optical: np.ndarray,
     valid: np.ndarray,
     intrinsics: CameraIntrinsics,
 ) -> tuple[np.ndarray, np.ndarray]:
-    """``(beam_indices, uv)`` for beams that are valid and land on the image.
+    """Compatibility wrapper returning the historical ``(beam_indices, uv)``."""
 
-    The PROJECT step, shared by the estimator and by everything that reports on
-    it, so a depiction of the selection cannot drift from the selection itself.
-    """
+    projection = project_scan_to_image(points_optical, valid, intrinsics)
+    return projection.beam_indices, projection.uv
 
-    uv, in_view = project_points(points_optical, intrinsics)
-    selectable = np.asarray(valid, dtype=bool) & in_view
-    return np.flatnonzero(selectable), uv
+
+def select_mask_beams(projection: ScanImageProjection, mask: Mask) -> np.ndarray:
+    """Original scan beam indices selected by one mask from a prepared mapping."""
+
+    if projection.beam_indices.size == 0:
+        return projection.beam_indices
+    return projection.beam_indices[mask.data[projection.v_px, projection.u_px]]
+
+
+def select_bbox_beams(
+    projection: ScanImageProjection,
+    bbox_xyxy,
+) -> np.ndarray:
+    """Original scan beam indices inside one half-open, pixel-rounded box."""
+
+    if projection.beam_indices.size == 0:
+        return projection.beam_indices
+    x1, y1, x2, y2 = (int(value) for value in bbox_xyxy)
+    inside = (
+        (projection.u_px >= x1) & (projection.u_px < x2)
+        & (projection.v_px >= y1) & (projection.v_px < y2)
+    )
+    return projection.beam_indices[inside]
 
 
 def select_beams(
@@ -223,12 +316,8 @@ def select_beams(
     elsewhere is how a visualization drifts from the estimator it depicts.
     """
 
-    beam_indices, uv = project_in_view(points_optical, valid, intrinsics)
-    if beam_indices.size == 0:
-        return beam_indices
-    u_px = np.rint(uv[beam_indices, 0]).astype(np.intp)
-    v_px = np.rint(uv[beam_indices, 1]).astype(np.intp)
-    return beam_indices[mask.data[v_px, u_px]]
+    return select_mask_beams(
+        project_scan_to_image(points_optical, valid, intrinsics), mask)
 
 
 def beams_in_bbox(
@@ -252,14 +341,71 @@ def beams_in_bbox(
     on a box gate, where they are the same set by definition.
     """
 
-    beam_indices, uv = project_in_view(points_optical, valid, intrinsics)
-    if beam_indices.size == 0:
-        return beam_indices
-    x1, y1, x2, y2 = (int(value) for value in bbox_xyxy)
-    u_px = np.rint(uv[beam_indices, 0]).astype(np.intp)
-    v_px = np.rint(uv[beam_indices, 1]).astype(np.intp)
-    inside = (u_px >= x1) & (u_px < x2) & (v_px >= y1) & (v_px < y2)
-    return beam_indices[inside]
+    return select_bbox_beams(
+        project_scan_to_image(points_optical, valid, intrinsics), bbox_xyxy)
+
+
+def localize_projected_polar_profiling(
+    projection: ScanImageProjection,
+    mask: Mask,
+    *,
+    range_jump_m: float = RANGE_JUMP_M_DEFAULT,
+    range_band_m: float = RANGE_BAND_M_DEFAULT,
+    max_bearing_gap_beams: int = MAX_BEARING_GAP_BEAMS_DEFAULT,
+    min_valid_rays: int = MIN_VALID_RAYS_DEFAULT,
+) -> PolarProfilingAttempt:
+    """Localize one mask from an already-prepared scan image projection.
+
+    The attempt exposes its selected original beam indices even on failure, so
+    subscribed visualization reuses estimator intermediates rather than doing
+    another projection or mask selection.
+    """
+
+    # 3. PROJECT + 4. SELECT: the mask indexes the projected points exactly
+    # as it indexes depth pixels in projective ranging, in sparse per-point form.
+    # The two stages stay separate because they carry different miss reasons:
+    # nothing on the image at all, versus nothing of it under the mask.
+    if projection.beam_indices.size == 0:
+        return PolarProfilingAttempt(
+            None, MissReason.NO_BEAMS_IN_VIEW,
+            np.empty(0, dtype=np.intp))
+    beam_indices = select_mask_beams(projection, mask)
+    if beam_indices.size < min_valid_rays:
+        return PolarProfilingAttempt(
+            None, MissReason.TOO_FEW_RAYS_SELECTED, beam_indices)
+
+    # 5. RECOVER -- same for both mask tags (parallax survives even a tight
+    # mask): segment the range profile, merge the near band, median-reduce.
+    selected = np.asarray(projection.points_optical, dtype=np.float64)[beam_indices]
+    planar_range_m = np.hypot(selected[:, 0], selected[:, 2])
+    runs = segment_range_profile(
+        beam_indices,
+        planar_range_m,
+        range_jump_m=range_jump_m,
+        max_bearing_gap_beams=max_bearing_gap_beams,
+    )
+    merged = merge_near_band(runs, planar_range_m, range_band_m=range_band_m)
+    if merged.size < min_valid_rays:
+        return PolarProfilingAttempt(
+            None, MissReason.TOO_FEW_RAYS_MERGED, beam_indices)
+
+    # The merged set is the foreground. The coordinate is its per-axis median
+    # (X, Z); the published distance is derived from that coordinate downstream
+    # (planar projection), so coordinate and distance rest on the same point.
+    foreground = selected[merged][:, (0, 2)]
+    xz_optical = np.median(foreground, axis=0)
+    return PolarProfilingAttempt(
+        PolarProfilingResult(
+            xz_optical=xz_optical,
+            foreground_points=foreground,
+            ray_count=int(beam_indices.size),
+            selected_beams=beam_indices,
+            # ``merged`` indexes into the selected set, not the scan, so map it back.
+            merged_beams=beam_indices[merged],
+        ),
+        MissReason.OK,
+        beam_indices,
+    )
 
 
 def localize_polar_profiling(
@@ -273,53 +419,14 @@ def localize_polar_profiling(
     max_bearing_gap_beams: int = MAX_BEARING_GAP_BEAMS_DEFAULT,
     min_valid_rays: int = MIN_VALID_RAYS_DEFAULT,
 ) -> tuple[PolarProfilingResult | None, MissReason]:
-    """Localize one mask against one scan already in the camera optical frame.
+    """Compatibility wrapper for one-off localization callers."""
 
-    ``points_optical`` / ``valid`` come from ``scan_points_optical`` (beam
-    order = bearing order). Returns ``(result, MissReason.OK)`` on success, or
-    ``(None, <reason>)`` when fewer than ``min_valid_rays`` rays survive the
-    mask ∩ FoV select or the near-band merge -- no estimate for this mask.
-    """
-
-    points_optical = np.asarray(points_optical, dtype=np.float64)
-
-    # 3. PROJECT + 4. SELECT: the mask indexes the projected points exactly
-    # as it indexes depth pixels in projective ranging, in sparse per-point form.
-    # The two stages stay separate because they carry different miss reasons:
-    # nothing on the image at all, versus nothing of it under the mask.
-    beam_indices, uv = project_in_view(points_optical, valid, intrinsics)
-    if beam_indices.size == 0:
-        return None, MissReason.NO_BEAMS_IN_VIEW
-    u_px = np.rint(uv[beam_indices, 0]).astype(np.intp)
-    v_px = np.rint(uv[beam_indices, 1]).astype(np.intp)
-    beam_indices = beam_indices[mask.data[v_px, u_px]]
-    if beam_indices.size < min_valid_rays:
-        return None, MissReason.TOO_FEW_RAYS_SELECTED
-
-    # 5. RECOVER -- same for both mask tags (parallax survives even a tight
-    # mask): segment the range profile, merge the near band, median-reduce.
-    selected = points_optical[beam_indices]
-    planar_range_m = np.hypot(selected[:, 0], selected[:, 2])
-    runs = segment_range_profile(
-        beam_indices,
-        planar_range_m,
+    attempt = localize_projected_polar_profiling(
+        project_scan_to_image(points_optical, valid, intrinsics),
+        mask,
         range_jump_m=range_jump_m,
+        range_band_m=range_band_m,
         max_bearing_gap_beams=max_bearing_gap_beams,
+        min_valid_rays=min_valid_rays,
     )
-    merged = merge_near_band(runs, planar_range_m, range_band_m=range_band_m)
-    if merged.size < min_valid_rays:
-        return None, MissReason.TOO_FEW_RAYS_MERGED
-
-    # The merged set is the foreground. The coordinate is its per-axis median
-    # (X, Z); the published distance is derived from that coordinate downstream
-    # (planar projection), so coordinate and distance rest on the same point.
-    foreground = selected[merged][:, (0, 2)]
-    xz_optical = np.median(foreground, axis=0)
-    return PolarProfilingResult(
-        xz_optical=xz_optical,
-        foreground_points=foreground,
-        ray_count=int(beam_indices.size),
-        selected_beams=beam_indices,
-        # ``merged`` indexes into the selected set, not the scan, so map it back.
-        merged_beams=beam_indices[merged],
-    ), MissReason.OK
+    return attempt.result, attempt.reason

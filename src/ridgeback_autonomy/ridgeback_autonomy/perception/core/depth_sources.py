@@ -52,6 +52,7 @@ from sensor_msgs.msg import Image
 
 from ridgeback_autonomy.perception.core.image_utils import (
     convert_depth_to_meters_message,
+    decode_color_to_rgb,
     decode_image_message,
 )
 
@@ -91,29 +92,6 @@ def decode_depth_to_meters(msg: Image) -> np.ndarray:
     if msg.encoding not in ('16UC1', 'mono16', '32FC1'):
         raise ValueError(f'unsupported depth encoding "{msg.encoding}"')
     return convert_depth_to_meters_message(msg)
-
-
-def decode_color_to_rgb(msg: Image) -> np.ndarray:
-    """Decode a color Image message into an RGB uint8 array.
-
-    Delegates the row decode to the shared step-aware decoder (honours
-    ``msg.step``) -- the same fix as the depth path:
-    a real driver may pad rows (``step > width * channels``),
-    which the old hand-rolled ``reshape`` rejected, throwing every frame. The
-    explicit whitelist stays here to preserve the exact error message and the
-    mono rejection. ``produce`` re-contiguous-izes, so returning views is fine.
-    """
-
-    if msg.encoding not in ('rgb8', 'bgr8', 'rgba8', 'bgra8'):
-        raise ValueError(f'unsupported color encoding "{msg.encoding}"')
-    image = decode_image_message(msg)
-    if msg.encoding == 'rgb8':
-        return image
-    if msg.encoding == 'bgr8':
-        return image[:, :, ::-1]
-    if msg.encoding == 'rgba8':
-        return image[:, :, :3]
-    return image[:, :, :3][:, :, ::-1]  # bgra8
 
 
 def encode_depth_message(depth_m: np.ndarray, header) -> Image:
@@ -183,6 +161,12 @@ class MonocularDepthSource:
         self.device = device or self.resolve_device()
         self.logger = logger
         self._pipeline = None
+        # Heavy optional dependencies stay lazy: Pillow is resolved with the
+        # model load, while OpenCV is not needed unless a prediction must be
+        # resized. Once resolved, neither goes back through importlib on every
+        # frame.
+        self._pil_image = None
+        self._cv2 = None
         # Retry-with-cooldown instead of a permanent fail latch:
         # ``_retry_after`` is the earliest time (``now_fn`` seconds) a new load
         # is allowed. 0 lets the first load run immediately.
@@ -211,6 +195,28 @@ class MonocularDepthSource:
             task='depth-estimation',
             model=self.model_id,
             device=self.device,
+        )
+
+    def _load_pillow(self) -> None:
+        """Resolve Pillow once as part of the retryable model-load lifecycle."""
+
+        if self._pil_image is None:
+            self._pil_image = importlib.import_module('PIL.Image')
+
+    def _resize_depth(
+        self,
+        depth_m: np.ndarray,
+        width: int,
+        height: int,
+    ) -> np.ndarray:
+        """Resize with a lazily resolved, per-source OpenCV reference."""
+
+        if self._cv2 is None:
+            self._cv2 = importlib.import_module('cv2')
+        return self._cv2.resize(
+            depth_m,
+            (width, height),
+            interpolation=self._cv2.INTER_LINEAR,
         )
 
     def _schedule_retry(self, reason: str) -> None:
@@ -260,6 +266,7 @@ class MonocularDepthSource:
             return False
         self.logger.info(f'Loading Depth-Anything model {self.model_id} on {self.device}')
         try:
+            self._load_pillow()
             self._pipeline = self._build_pipeline()
         except Exception as exc:
             self._schedule_retry(f'load failed: {exc}')
@@ -278,18 +285,32 @@ class MonocularDepthSource:
             f'Depth-Anything model loaded; usable to {self.usable_max_m:.1f} m.')
         return True
 
-    def produce(self, msg: Image) -> tuple[np.ndarray, object] | None:
+    def produce_from_rgb(
+        self,
+        rgb: np.ndarray,
+        header,
+    ) -> tuple[np.ndarray, object] | None:
+        """Produce depth from one prepared RGB frame.
+
+        ``rgb`` is normally the batch-local array that SlimSAM also consumed.
+        Valid input is kept by identity, so this entry point does not introduce
+        another RGB copy between the two inference backends.
+        """
+
+        if not isinstance(rgb, np.ndarray) or rgb.dtype != np.uint8:
+            self.logger.warn('Monocular source skipped an RGB frame that is not uint8.')
+            return None
+        if rgb.ndim != 3 or rgb.shape[2] != 3:
+            self.logger.warn(
+                f'Monocular source skipped an RGB frame with unexpected shape {rgb.shape}.')
+            return None
+        if not rgb.flags.c_contiguous:
+            rgb = np.ascontiguousarray(rgb)
         if not self.load():
             return None
-        try:
-            rgb = decode_color_to_rgb(msg)
-        except ValueError as exc:
-            self.logger.warn(f'Monocular source skipped a frame: {exc}')
-            return None
 
-        pil = importlib.import_module('PIL.Image')
         try:
-            outputs = self._pipeline(pil.fromarray(np.ascontiguousarray(rgb)))
+            outputs = self._pipeline(self._pil_image.fromarray(rgb))
         except Exception as exc:
             self._schedule_retry(f'inference failed: {exc}')
             return None
@@ -307,14 +328,19 @@ class MonocularDepthSource:
             self.logger.warn(f'Depth-Anything returned unexpected shape {depth_m.shape}.')
             return None
 
-        if depth_m.shape != (msg.height, msg.width):
-            cv2 = importlib.import_module('cv2')
-            depth_m = cv2.resize(
-                depth_m,
-                (msg.width, msg.height),
-                interpolation=cv2.INTER_LINEAR,
-            )
-        return depth_m, msg.header
+        if depth_m.shape != rgb.shape[:2]:
+            depth_m = self._resize_depth(depth_m, rgb.shape[1], rgb.shape[0])
+        return depth_m, header
+
+    def produce(self, msg: Image) -> tuple[np.ndarray, object] | None:
+        """Decode a color message and delegate to :meth:`produce_from_rgb`."""
+
+        try:
+            rgb = np.ascontiguousarray(decode_color_to_rgb(msg))
+        except ValueError as exc:
+            self.logger.warn(f'Monocular source skipped a frame: {exc}')
+            return None
+        return self.produce_from_rgb(rgb, msg.header)
 
 
 def build_depth_source(

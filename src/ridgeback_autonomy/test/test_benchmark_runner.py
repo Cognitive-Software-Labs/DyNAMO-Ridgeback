@@ -12,13 +12,15 @@ from ridgeback_autonomy.benchmarking.alignment import (
     find_exact_preview_match,
     update_measurement_event,
 )
-from ridgeback_autonomy.benchmarking.estimators import (
+from ridgeback_autonomy.perception.estimators import (
     MASK_GATE_DEFAULT,
     MASK_GATES,
-    benchmark_display_name,
-    benchmark_output_name,
     parse_estimators,
     parse_mask_gate,
+)
+from ridgeback_autonomy.benchmarking.naming import (
+    benchmark_display_name,
+    benchmark_output_name,
 )
 from ridgeback_autonomy.benchmarking.g1_distance_benchmark_runner_node import (
     extract_json_payload,
@@ -243,7 +245,7 @@ def test_no_value_miss_row_carries_its_reason(tmp_path) -> None:
 
 
 def test_run_folder_name_leads_with_the_timestamp_then_applied_axes() -> None:
-    from ridgeback_autonomy.benchmarking.estimators import (
+    from ridgeback_autonomy.benchmarking.naming import (
         benchmark_run_folder_name,
         scenario_slug,
     )

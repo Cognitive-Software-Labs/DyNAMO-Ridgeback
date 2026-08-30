@@ -4,7 +4,7 @@ import math
 
 import numpy as np
 import pytest
-from sensor_msgs.msg import Image
+from sensor_msgs.msg import Image, LaserScan
 from std_msgs.msg import Header
 
 from ridgeback_autonomy.benchmarking.alignment import measurement_message_key
@@ -16,8 +16,10 @@ from ridgeback_autonomy.common.messages import (
     build_measurements_message,
 )
 from ridgeback_autonomy.common.models import Detection, DetectionBatch
+from ridgeback_autonomy.common.miss_reason import MissReason
 from ridgeback_autonomy.perception.core.intrinsics import CameraIntrinsics
 from ridgeback_autonomy.perception.core.mask import MaskPrecision, mask_from_array
+from ridgeback_autonomy.perception import g1_mask_measurement_node
 from ridgeback_autonomy.perception.g1_mask_measurement_node import (
     BASE_FRAME_DEFAULT,
     MASK_GATE_BOX,
@@ -114,16 +116,16 @@ def test_grid_mismatch_warning_none_when_grids_match() -> None:
 
 
 def test_grid_mismatch_warning_names_both_grids() -> None:
-    # The Isaac Sim grid against the Gazebo detection grid: the realistic
-    # mismatch a mis-wired camera_info topic would produce.
+    # A higher-resolution intrinsics grid against the detection grid: the
+    # realistic mismatch a mis-wired camera_info topic would produce.
     intrinsics = CameraIntrinsics(
-        fx=443.5, fy=443.5, cx=639.5, cy=359.5, width=1280, height=720)
+        fx=554.0, fy=554.0, cx=399.5, cy=299.5, width=800, height=600)
     batch = DetectionBatch(image_width=640, image_height=480, detections=[])
 
     warning = grid_mismatch_warning(intrinsics, batch)
 
     assert warning is not None
-    assert '(720, 1280)' in warning
+    assert '(600, 800)' in warning
     assert '(480, 640)' in warning
 
 
@@ -314,6 +316,65 @@ def test_fill_with_tight_masks_runs_paths_without_isolation_recipes() -> None:
     assert detection.polar_profiling_distance_m is None
 
 
+def test_fill_computes_valid_depth_once_and_shares_each_masked_result(
+    monkeypatch,
+) -> None:
+    batch = build_fill_batch(count=2)
+    masks = [
+        mask_from_array(tight_blob(), MaskPrecision.TIGHT),
+        mask_from_array(tight_blob(), MaskPrecision.TIGHT),
+    ]
+    depth_m = build_fill_depth()
+    validity_calls = []
+    projective_valid = []
+    euclidean_valid = []
+
+    def compute_valid_once(depth_arg, depth_max):
+        validity_calls.append((depth_arg, depth_max))
+        return np.isfinite(depth_arg) & (depth_arg > 0.0) & (depth_arg <= depth_max)
+
+    def projective_stub(
+        depth_arg, mask_arg, intrinsics_arg, *, valid_masked, **kwargs,
+    ):
+        projective_valid.append(valid_masked)
+        return None, MissReason.ISOLATION_EMPTY
+
+    def euclidean_stub(
+        depth_arg, mask_arg, intrinsics_arg, *, valid_masked, **kwargs,
+    ):
+        euclidean_valid.append(valid_masked)
+        return None, MissReason.ISOLATION_EMPTY
+
+    monkeypatch.setattr(
+        g1_mask_measurement_node, 'valid_depth', compute_valid_once, raising=False)
+    monkeypatch.setattr(
+        g1_mask_measurement_node, 'localize_projective_ranging', projective_stub)
+    monkeypatch.setattr(
+        g1_mask_measurement_node, 'localize_euclidean_reconstruction', euclidean_stub)
+
+    fill_path_measurements(
+        batch, masks, FILL_INTRINSICS, depth_m, None,
+        camera_rotation=LEVEL_OPTICAL_TO_BASE,
+        camera_translation=ZERO_TRANSLATION,
+        front_offset_m=0.25,
+        isolation_2d=forbidden_isolation,
+        isolation_3d=forbidden_isolation,
+        depth_max=3.0,
+        enabled=frozenset({'projective_ranging', 'euclidean_reconstruction'}),
+    )
+
+    assert len(validity_calls) == 1
+    assert validity_calls[0][0] is depth_m
+    assert validity_calls[0][1] == 3.0
+    assert len(projective_valid) == len(euclidean_valid) == 2
+    for index, mask in enumerate(masks):
+        assert projective_valid[index] is euclidean_valid[index]
+        assert np.array_equal(
+            projective_valid[index],
+            mask.data & (depth_m <= 3.0),
+        )
+
+
 def build_fill_scan(near_ratios, near_z: float = 2.0, wall_z: float = 5.0, count: int = 41):
     """Scan points across the box and past it; ``near_ratios`` marks the object.
 
@@ -382,6 +443,112 @@ def test_fill_records_beams_even_when_polar_produces_no_estimate() -> None:
     assert len(records) == 1
     assert records[0].merged.size == 0
     assert records[0].selected.size > 0
+
+
+@pytest.mark.parametrize('with_records', [False, True])
+def test_fill_projects_one_scan_once_for_multiple_polar_masks(
+    monkeypatch, with_records,
+) -> None:
+    batch = build_fill_batch(count=2)
+    masks = [
+        mask_from_array(tight_blob(), MaskPrecision.TIGHT),
+        mask_from_array(tight_blob(), MaskPrecision.TIGHT),
+    ]
+    calls = []
+    original_project = g1_mask_measurement_node.project_scan_to_image
+
+    def record_project(points_optical, valid, intrinsics):
+        calls.append((points_optical, valid, intrinsics))
+        return original_project(points_optical, valid, intrinsics)
+
+    monkeypatch.setattr(
+        g1_mask_measurement_node, 'project_scan_to_image', record_project)
+    records = [] if with_records else None
+
+    fill_path_measurements(
+        batch, masks, FILL_INTRINSICS,
+        None, build_fill_scan(lambda ratios: np.abs(ratios) <= 0.05),
+        camera_rotation=LEVEL_OPTICAL_TO_BASE,
+        camera_translation=ZERO_TRANSLATION,
+        front_offset_m=0.25,
+        isolation_2d=forbidden_isolation,
+        isolation_3d=forbidden_isolation,
+        beam_records=records,
+        enabled=frozenset({'polar_profiling'}),
+    )
+
+    assert len(calls) == 1
+    if with_records:
+        assert len(records) == 2
+
+
+def test_failed_polar_rviz_path_still_projects_once(monkeypatch) -> None:
+    batch = build_fill_batch(count=2)
+    masks = [
+        mask_from_array(tight_blob(), MaskPrecision.TIGHT),
+        mask_from_array(tight_blob(), MaskPrecision.TIGHT),
+    ]
+    calls = []
+    original_project = g1_mask_measurement_node.project_scan_to_image
+
+    def record_project(points_optical, valid, intrinsics):
+        calls.append((points_optical, valid, intrinsics))
+        return original_project(points_optical, valid, intrinsics)
+
+    monkeypatch.setattr(
+        g1_mask_measurement_node, 'project_scan_to_image', record_project)
+    records = []
+
+    fill_path_measurements(
+        batch, masks, FILL_INTRINSICS,
+        None, build_fill_scan(
+            lambda ratios: np.isclose(ratios, 0.0, atol=1e-9), near_z=1.0),
+        camera_rotation=LEVEL_OPTICAL_TO_BASE,
+        camera_translation=ZERO_TRANSLATION,
+        front_offset_m=0.25,
+        isolation_2d=forbidden_isolation,
+        isolation_3d=forbidden_isolation,
+        beam_records=records,
+        enabled=frozenset({'polar_profiling'}),
+    )
+
+    assert len(calls) == 1
+    assert len(records) == 2
+    assert all(record.merged.size == 0 and record.selected.size > 0 for record in records)
+
+
+@pytest.mark.parametrize(
+    ('masks', 'scan_points', 'enabled'),
+    [
+        ([None, None], build_fill_scan(lambda ratios: np.abs(ratios) <= 0.05),
+         frozenset({'polar_profiling'})),
+        ([mask_from_array(tight_blob(), MaskPrecision.TIGHT)],
+         build_fill_scan(lambda ratios: np.abs(ratios) <= 0.05),
+         frozenset({'projective_ranging'})),
+        ([mask_from_array(tight_blob(), MaskPrecision.TIGHT)], None,
+         frozenset({'polar_profiling'})),
+    ],
+    ids=('all-masks-none', 'polar-disabled', 'scan-unavailable'),
+)
+def test_fill_avoids_projection_when_polar_cannot_use_a_mask(
+    monkeypatch, masks, scan_points, enabled,
+) -> None:
+    batch = build_fill_batch(count=len(masks))
+    monkeypatch.setattr(
+        g1_mask_measurement_node,
+        'project_scan_to_image',
+        lambda *args: pytest.fail('projection must be skipped'),
+    )
+
+    fill_path_measurements(
+        batch, masks, FILL_INTRINSICS, None, scan_points,
+        camera_rotation=LEVEL_OPTICAL_TO_BASE,
+        camera_translation=ZERO_TRANSLATION,
+        front_offset_m=0.25,
+        isolation_2d=forbidden_isolation,
+        isolation_3d=forbidden_isolation,
+        enabled=enabled,
+    )
 
 
 def beam_record(detection_index: int) -> PolarBeamRecord:
@@ -696,6 +863,39 @@ class _StubDepthSource:
         return self.frame
 
 
+class _RgbDepthSource(_StubDepthSource):
+    """Color-input source seam that records the shared prepared array."""
+
+    def __init__(self) -> None:
+        super().__init__('color')
+        self.rgb_calls: list = []
+
+    def produce_from_rgb(self, rgb, header):
+        self.rgb_calls.append((rgb, header))
+        return self.frame
+
+
+class _RecordingSegmenter:
+    def __init__(self) -> None:
+        self.rgb_calls: list = []
+
+    def segment_boxes(self, rgb, boxes, *, min_predicted_iou):
+        self.rgb_calls.append((rgb, boxes, min_predicted_iou))
+        return [tight_blob() for _ in boxes]
+
+
+class _DebugPublisher:
+    def __init__(self, subscription_count: int) -> None:
+        self.subscription_count = subscription_count
+        self.published = []
+
+    def get_subscription_count(self) -> int:
+        return self.subscription_count
+
+    def publish(self, msg) -> None:
+        self.published.append(msg)
+
+
 @pytest.fixture
 def ros_context():
     rclpy = pytest.importorskip('rclpy')
@@ -720,6 +920,37 @@ def _mask_node(source, **parameters):
     )
 
 
+def test_ray_debug_records_skipped_with_no_subscriber(ros_context) -> None:
+    node = _mask_node(
+        _StubDepthSource('depth'), enabled_estimators='polar_profiling')
+    try:
+        node.ray_marker_pub.get_subscription_count = lambda: 0
+
+        assert node.ray_marker_records() is None
+
+        node.ray_marker_pub.get_subscription_count = lambda: 1
+        assert node.ray_marker_records() == []
+    finally:
+        node.destroy_node()
+
+
+def test_ray_marker_publish_rechecks_subscriber_before_build(
+    ros_context, monkeypatch,
+) -> None:
+    node = _mask_node(
+        _StubDepthSource('depth'), enabled_estimators='polar_profiling')
+    node.ray_marker_pub.get_subscription_count = lambda: 0
+    monkeypatch.setattr(
+        g1_mask_measurement_node,
+        'build_polar_ray_markers',
+        lambda *args: pytest.fail('ray markers should not be built'),
+    )
+    try:
+        node.publish_ray_markers(beam_record(0), LaserScan())
+    finally:
+        node.destroy_node()
+
+
 def depth_image(sec: int, nanosec: int) -> Image:
     msg = Image()
     msg.header.stamp.sec = sec
@@ -727,6 +958,177 @@ def depth_image(sec: int, nanosec: int) -> Image:
     msg.encoding = '32FC1'
     msg.height, msg.width = FILL_HEIGHT, FILL_WIDTH
     return msg
+
+
+def rgb_image(sec: int, nanosec: int) -> Image:
+    msg = color_image(sec, nanosec)
+    pixels = np.arange(FILL_HEIGHT * FILL_WIDTH * 3, dtype=np.uint8).reshape(
+        FILL_HEIGHT, FILL_WIDTH, 3)
+    msg.encoding = 'rgb8'
+    msg.height, msg.width = FILL_HEIGHT, FILL_WIDTH
+    msg.step = FILL_WIDTH * 3
+    msg.data = pixels.tobytes()
+    return msg
+
+
+def fill_detections_message(sec: int, nanosec: int):
+    header = Header()
+    header.stamp.sec = sec
+    header.stamp.nanosec = nanosec
+    return build_detections_message(build_fill_batch(), header)
+
+
+def configure_silhouette_node(node) -> _RecordingSegmenter:
+    """Use the box-gate test fixture without loading a real SlimSAM model."""
+
+    node.mask_gate = MASK_GATE_SILHOUETTE
+    node.segmentation_min_iou = 0.0
+    segmenter = _RecordingSegmenter()
+    node.segmenter = segmenter
+    return segmenter
+
+
+def test_silhouette_monocular_reuses_early_color_hint_and_one_rgb_array(
+    ros_context, monkeypatch,
+) -> None:
+    source = _RgbDepthSource()
+    source.frame = (build_fill_depth(), Header())
+    node = _mask_node(source)
+    segmenter = configure_silhouette_node(node)
+    detections_msg = fill_detections_message(7, 42)
+    batch = build_fill_batch()
+    early = rgb_image(7, 42)
+    decode_calls = []
+    original_decode = g1_mask_measurement_node.decode_color_to_rgb
+
+    def record_decode(message):
+        decode_calls.append(message)
+        return original_decode(message)
+
+    monkeypatch.setattr(g1_mask_measurement_node, 'decode_color_to_rgb', record_decode)
+    node.color_buffer.lookup = lambda _stamp: pytest.fail(
+        'an exact early hint must avoid a second color-buffer lookup')
+    try:
+        masks, prepared = node.masks_for_batch(
+            detections_msg, batch, color_hint=early)
+        depth_m = node.depth_for_batch(early, batch, prepared_color=prepared)
+
+        assert len(masks) == 1
+        assert prepared.message is early
+        assert prepared.rgb.flags.c_contiguous
+        assert decode_calls == [early]
+        assert segmenter.rgb_calls[0][0] is prepared.rgb
+        assert source.rgb_calls == [(prepared.rgb, early.header)]
+        assert source.rgb_calls[0][0] is segmenter.rgb_calls[0][0]
+        assert source.produce_calls == []
+        assert depth_m is source.frame[0]
+        assert all(value is not prepared for value in vars(node).values())
+    finally:
+        node.destroy_node()
+
+
+def test_silhouette_late_exact_color_hit_drives_monocular_depth(
+    ros_context,
+) -> None:
+    source = _RgbDepthSource()
+    source.frame = (build_fill_depth(), Header())
+    node = _mask_node(source)
+    segmenter = configure_silhouette_node(node)
+    detections_msg = fill_detections_message(7, 42)
+    batch = build_fill_batch()
+    late = rgb_image(7, 42)
+    mismatched_hint = rgb_image(7, 41)
+    node.color_callback(late)
+    lookup_calls = []
+    lookup = node.color_buffer.lookup
+    node.color_buffer.lookup = lambda requested: (
+        lookup_calls.append(requested) or lookup(requested))
+    try:
+        masks, prepared = node.masks_for_batch(
+            detections_msg, batch, color_hint=mismatched_hint)
+        depth_m = node.depth_for_batch(None, batch, prepared_color=prepared)
+
+        assert len(lookup_calls) == 1
+        assert prepared.message is late
+        assert segmenter.rgb_calls[0][0] is prepared.rgb
+        assert source.rgb_calls == [(prepared.rgb, late.header)]
+        assert depth_m is source.frame[0]
+        assert source.produce_calls == []
+    finally:
+        node.destroy_node()
+
+
+def test_silhouette_rejects_mismatched_hint_when_no_late_frame_exists(ros_context) -> None:
+    node = _mask_node(_RgbDepthSource())
+    configure_silhouette_node(node)
+    detections_msg = fill_detections_message(7, 42)
+    try:
+        masks, prepared = node.masks_for_batch(
+            detections_msg, build_fill_batch(), color_hint=rgb_image(7, 41))
+
+        assert masks is None
+        assert prepared is None
+    finally:
+        node.destroy_node()
+
+
+def test_box_monocular_keeps_depth_side_conversion_only(ros_context, monkeypatch) -> None:
+    source = _RgbDepthSource()
+    source.frame = (build_fill_depth(), Header())
+    node = _mask_node(source)
+    detections_msg = fill_detections_message(7, 42)
+    batch = build_fill_batch()
+    early = rgb_image(7, 42)
+    monkeypatch.setattr(
+        g1_mask_measurement_node,
+        'decode_color_to_rgb',
+        lambda _message: pytest.fail('box masks must not decode color'),
+    )
+    try:
+        masks, prepared = node.masks_for_batch(
+            detections_msg, batch, color_hint=early)
+        depth_m = node.depth_for_batch(early, batch, prepared_color=prepared)
+
+        assert len(masks) == 1
+        assert prepared is None
+        assert source.produce_calls == [early]
+        assert source.rgb_calls == []
+        assert depth_m is source.frame[0]
+    finally:
+        node.destroy_node()
+
+
+def test_silhouette_stereo_never_uses_monocular_rgb_entry_point(ros_context) -> None:
+    class StereoSource(_StubDepthSource):
+        def __init__(self) -> None:
+            super().__init__('depth')
+            self.rgb_calls = []
+
+        def produce_from_rgb(self, rgb, header):
+            self.rgb_calls.append((rgb, header))
+            pytest.fail('stereo must not use produce_from_rgb')
+
+    source = StereoSource()
+    source.frame = (build_fill_depth(), Header())
+    node = _mask_node(source)
+    configure_silhouette_node(node)
+    # This fixture was constructed as a box+stereo node, so add the silhouette
+    # color buffer the real silhouette configuration creates at initialization.
+    node.color_buffer = StampedMessageBuffer(2)
+    detections_msg = fill_detections_message(7, 42)
+    batch = build_fill_batch()
+    color = rgb_image(7, 42)
+    node.color_callback(color)
+    try:
+        masks, prepared = node.masks_for_batch(detections_msg, batch)
+        depth_m = node.depth_for_batch(depth_image(7, 42), batch, prepared_color=prepared)
+
+        assert len(masks) == 1
+        assert source.produce_calls[0].encoding == '32FC1'
+        assert source.rgb_calls == []
+        assert depth_m is source.frame[0]
+    finally:
+        node.destroy_node()
 
 
 def test_depth_input_is_the_depth_stream_matched_on_the_exact_stamp(ros_context) -> None:
@@ -839,6 +1241,67 @@ def test_aligned_depth_debug_skips_the_encode_with_no_subscriber(ros_context) ->
         node.publish_aligned_depth_debug(None, Header())
 
         assert published == []
+    finally:
+        node.destroy_node()
+
+
+def test_mask_debug_skips_the_encode_without_a_publisher(
+    ros_context, monkeypatch,
+) -> None:
+    node = _mask_node(_StubDepthSource('depth'))
+    monkeypatch.setattr(
+        g1_mask_measurement_node,
+        'encode_mask_debug_image',
+        lambda *args: pytest.fail('mask debug should not be encoded'),
+    )
+    try:
+        assert node.mask_debug_pub is None
+        node.publish_mask_debug([], FILL_HEIGHT, FILL_WIDTH, Header())
+    finally:
+        node.destroy_node()
+
+
+def test_mask_debug_skips_the_encode_with_no_subscriber(
+    ros_context, monkeypatch,
+) -> None:
+    node = _mask_node(_StubDepthSource('depth'))
+    node.mask_debug_pub = _DebugPublisher(subscription_count=0)
+    monkeypatch.setattr(
+        g1_mask_measurement_node,
+        'encode_mask_debug_image',
+        lambda *args: pytest.fail('mask debug should not be encoded'),
+    )
+    try:
+        node.publish_mask_debug([], FILL_HEIGHT, FILL_WIDTH, Header())
+        assert node.mask_debug_pub.published == []
+    finally:
+        node.destroy_node()
+
+
+def test_mask_debug_encodes_and_publishes_once_with_a_subscriber(
+    ros_context, monkeypatch,
+) -> None:
+    node = _mask_node(_StubDepthSource('depth'))
+    node.mask_debug_pub = _DebugPublisher(subscription_count=1)
+    masks = [object()]
+    header = Header()
+    encoded = object()
+    encode_calls = []
+
+    def encode_mask_debug(masks_arg, height_arg, width_arg, header_arg):
+        encode_calls.append((masks_arg, height_arg, width_arg, header_arg))
+        return encoded
+
+    monkeypatch.setattr(
+        g1_mask_measurement_node,
+        'encode_mask_debug_image',
+        encode_mask_debug,
+    )
+    try:
+        node.publish_mask_debug(masks, FILL_HEIGHT, FILL_WIDTH, header)
+
+        assert encode_calls == [(masks, FILL_HEIGHT, FILL_WIDTH, header)]
+        assert node.mask_debug_pub.published == [encoded]
     finally:
         node.destroy_node()
 

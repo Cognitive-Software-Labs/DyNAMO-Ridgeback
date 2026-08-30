@@ -24,18 +24,20 @@ from ridgeback_autonomy.benchmarking.alignment import (
     stamp_to_nanoseconds,
     update_measurement_event,
 )
-from ridgeback_autonomy.benchmarking.estimators import (
-    GROUND_TRUTH_TOPIC,
+from ridgeback_autonomy.perception.estimators import (
     MASK_GATE_DEFAULT,
-    benchmark_display_name,
-    benchmark_output_name,
-    benchmark_run_folder_name,
     parse_estimators,
     parse_mask_gate,
     selected_mask_estimators,
     selected_pointcloud_estimators,
     uses_mask_estimators,
     uses_pointcloud_estimators,
+)
+from ridgeback_autonomy.perception.ground_truth import GROUND_TRUTH_TOPIC
+from ridgeback_autonomy.benchmarking.naming import (
+    benchmark_display_name,
+    benchmark_output_name,
+    benchmark_run_folder_name,
 )
 from ridgeback_autonomy.benchmarking.reduction import (
     choose_representative_event,
@@ -91,7 +93,7 @@ from ridgeback_autonomy.perception.core.isolation_3d import ISOLATION_3D_DEFAULT
 def ground_truth_point_message(true_pose: dict[str, float], trial_id: str) -> PointStamped:
     """Pack a trial's ground truth as x=lateral, y=forward, z=distance.
 
-    ``estimators.truth_reading`` unpacks the same convention; the values are
+    ``ground_truth.truth_reading`` unpacks the same convention; the values are
     the base-frame planar measurement every benchmark row shares, not a 3D
     point in any TF frame. ``header.frame_id`` carries the trial id for that
     same reason -- it is not a TF frame either, and a truth number that names

@@ -41,6 +41,6 @@ sensors:
           device_type: d435
           serial_no: "0"
           enable_color: true
-          rgb_camera.profile: 1280,720,30
           enable_depth: true
-          depth_module.profile: 1280,720,30
+          align_depth.enable: true
+          enable_sync: true

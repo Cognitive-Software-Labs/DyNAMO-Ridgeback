@@ -32,11 +32,25 @@ NEAREST_MODE_BAND_M_DEFAULT = 0.35
 OTSU_BIN_WIDTH_M_DEFAULT = 0.05
 
 
-def _valid_masked(depth_m: np.ndarray, mask: np.ndarray, depth_max: float):
+def _valid_masked(
+    depth_m: np.ndarray,
+    mask: np.ndarray,
+    depth_max: float,
+    valid_masked: np.ndarray | None = None,
+):
     """Shared select+clean prologue: the valid masked pixels and their depths."""
 
-    valid = np.asarray(mask, dtype=bool) & valid_depth(depth_m, depth_max)
-    return valid, np.asarray(depth_m)[valid]
+    depth_m = np.asarray(depth_m)
+    if valid_masked is None:
+        valid = np.asarray(mask, dtype=bool) & valid_depth(depth_m, depth_max)
+    else:
+        valid = np.asarray(valid_masked)
+        if valid.dtype != np.bool_ or valid.shape != depth_m.shape:
+            raise ValueError(
+                'valid_masked must be a boolean array matching depth_m; '
+                f'got dtype={valid.dtype}, shape={valid.shape}, '
+                f'depth_shape={depth_m.shape}')
+    return valid, depth_m[valid]
 
 
 def nearest_mode_histogram(
@@ -47,6 +61,7 @@ def nearest_mode_histogram(
     band_m: float = NEAREST_MODE_BAND_M_DEFAULT,
     min_bin_fraction: float = NEAREST_MODE_MIN_BIN_FRACTION_DEFAULT,
     depth_max: float = DEPTH_MAX_METERS_DEFAULT,
+    valid_masked: np.ndarray | None = None,
 ) -> np.ndarray:
     """Catalogue #1 (baseline): nearest significant depth mode, fixed band.
 
@@ -58,7 +73,7 @@ def nearest_mode_histogram(
     twin so both domains place the near surface identically.
     """
 
-    valid, values = _valid_masked(depth_m, mask, depth_max)
+    valid, values = _valid_masked(depth_m, mask, depth_max, valid_masked)
     if values.size == 0:
         return np.zeros_like(valid)
 
@@ -76,6 +91,7 @@ def otsu_foreground(
     *,
     bin_width_m: float = OTSU_BIN_WIDTH_M_DEFAULT,
     depth_max: float = DEPTH_MAX_METERS_DEFAULT,
+    valid_masked: np.ndarray | None = None,
 ) -> np.ndarray:
     """Catalogue #2: Otsu threshold on the masked depth histogram, keep the near side.
 
@@ -85,7 +101,7 @@ def otsu_foreground(
     depths fit one bin keeps every valid masked pixel.
     """
 
-    valid, values = _valid_masked(depth_m, mask, depth_max)
+    valid, values = _valid_masked(depth_m, mask, depth_max, valid_masked)
     if values.size == 0:
         return np.zeros_like(valid)
 

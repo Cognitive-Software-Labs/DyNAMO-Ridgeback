@@ -97,9 +97,9 @@ Three metric classes:
      `points` vs. `depth/image`, `ros2 topic bw` on both as a rate
      cross-check, and `ros2 topic delay` (header stamp → arrival) to catch
      serialization/transport latency. Expected: PointCloud2 at 32 B/point
-     (padded XYZRGB) → 640×480 ≈ 9.8 MB/frame ≈ 300 MB/s at 30 fps (real
-     1280×720 ≈ 29 MB/frame ≈ 885 MB/s), vs. depth image 1.2 MB (sim 32FC1)
-     / 1.8 MB (real 16UC1) per frame — an 8–16× gap.
+     (padded XYZRGB) → 640×480 ≈ 9.8 MB/frame ≈ 300 MB/s at 30 fps, vs. a
+     640×480 depth image at ≈1.2 MB (32FC1) or ≈0.6 MB (16UC1) per frame —
+     an 8–16× gap. Any higher-resolution profile scales both by pixel count.
    - **Consumer compute.** Per-frame wall time via `time.perf_counter`,
      reduction time excluded (identical for both variants). Three timings:
      1. parse `PointCloud2` → numpy (published variant),

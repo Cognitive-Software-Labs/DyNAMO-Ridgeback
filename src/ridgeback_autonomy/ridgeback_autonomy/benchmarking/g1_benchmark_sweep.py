@@ -15,7 +15,7 @@ from typing import Any
 
 from ament_index_python.packages import get_package_share_directory
 
-from ridgeback_autonomy.benchmarking.launch_common import (
+from ridgeback_autonomy.perception.g1_launch import (
     SHARED_BENCHMARK_ARGUMENT_DEFAULTS,
     workspace_root_from_package_share,
 )

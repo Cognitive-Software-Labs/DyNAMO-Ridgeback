@@ -56,6 +56,7 @@ def localize_projective_ranging(
     isolation: Callable[..., np.ndarray] | None = None,
     depth_max: float = DEPTH_MAX_METERS_DEFAULT,
     min_valid_pixels: int = MIN_VALID_PIXELS_DEFAULT,
+    valid_masked: np.ndarray | None = None,
 ) -> tuple[ProjectiveRangingResult | None, MissReason]:
     """Localize one mask against one aligned depth frame.
 
@@ -63,10 +64,20 @@ def localize_projective_ranging(
     ``ISOLATION_2D_RECIPES`` entry; default recipe when ``None``); the
     ``tight`` branch never calls it. Returns ``(result, MissReason.OK)`` on
     success, or ``(None, <reason>)`` when fewer than ``min_valid_pixels`` valid
-    (or, on the ``rect`` branch, foreground) pixels remain.
+    (or, on the ``rect`` branch, foreground) pixels remain. ``valid_masked`` may
+    carry the caller's already-cleaned ``mask & valid_depth`` array; omitting it
+    preserves the standalone behavior and computes validity here.
     """
 
     depth_m = np.asarray(depth_m)
+    has_precomputed_valid = valid_masked is not None
+    if has_precomputed_valid:
+        valid_masked = np.asarray(valid_masked)
+        if valid_masked.dtype != np.bool_ or valid_masked.shape != depth_m.shape:
+            raise ValueError(
+                'valid_masked must be a boolean array matching depth_m; '
+                f'got dtype={valid_masked.dtype}, shape={valid_masked.shape}, '
+                f'depth_shape={depth_m.shape}')
 
     # SELECT + CLEAN + AGGREGATE. The mask tag forks how the foreground is
     # isolated; either way the depth cutoff is applied exactly once per call,
@@ -74,17 +85,26 @@ def localize_projective_ranging(
     # the representative pixel.
     if mask.precision is MaskPrecision.TIGHT:
         # A tight silhouette already is the object: keep its valid depths.
-        foreground = mask.data & valid_depth(depth_m, depth_max)
+        if valid_masked is None:
+            valid_masked = mask.data & valid_depth(depth_m, depth_max)
+        foreground = valid_masked
         if int(np.count_nonzero(foreground)) < min_valid_pixels:
             return None, MissReason.TOO_FEW_VALID_PIXELS
     else:
         if isolation is None:
             isolation = ISOLATION_2D_RECIPES[ISOLATION_2D_DEFAULT]
-        # Hand the recipe the raw mask and the cutoff: it selects and cleans
-        # from the frame itself, so validity is computed once (inside the
-        # recipe, not also here) and a caller-tightened depth_max reaches the
-        # isolation step.
-        foreground = isolation(depth_m, mask.data, depth_max=depth_max)
+        # Standalone callers retain the recipe's original select+clean path.
+        # The batch caller passes the already-cleaned mask, which the built-in
+        # recipes consume without rescanning the full depth frame.
+        if has_precomputed_valid:
+            foreground = isolation(
+                depth_m,
+                mask.data,
+                depth_max=depth_max,
+                valid_masked=valid_masked,
+            )
+        else:
+            foreground = isolation(depth_m, mask.data, depth_max=depth_max)
         if int(np.count_nonzero(foreground)) < min_valid_pixels:
             return None, MissReason.ISOLATION_EMPTY
 

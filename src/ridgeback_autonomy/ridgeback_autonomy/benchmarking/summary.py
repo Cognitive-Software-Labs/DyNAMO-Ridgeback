@@ -6,7 +6,7 @@ import statistics
 
 import numpy as np
 
-from ridgeback_autonomy.benchmarking.estimators import PUBLIC_ESTIMATOR_ORDER
+from ridgeback_autonomy.perception.estimators import PUBLIC_ESTIMATOR_ORDER
 from ridgeback_autonomy.benchmarking.scoring import (
     OUTCOME_DETECTOR_MISS,
     OUTCOME_GATE_MISS,

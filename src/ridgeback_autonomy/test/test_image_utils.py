@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import numpy as np
+import pytest
 from sensor_msgs.msg import Image
 
 from ridgeback_autonomy.perception.core.image_utils import (
     convert_color_image_message,
     convert_depth_to_meters_message,
+    decode_color_to_rgb,
     normalize_to_uint8,
 )
 
@@ -54,6 +56,38 @@ def test_convert_color_image_message_supports_padded_rows() -> None:
     converted = convert_color_image_message(msg)
 
     assert converted.tolist() == [[[3, 2, 1], [6, 5, 4]]]
+
+
+@pytest.mark.parametrize(
+    ('encoding', 'pixels', 'expected'),
+    [
+        ('rgb8', np.arange(12, dtype=np.uint8).reshape(2, 2, 3),
+         lambda value: value),
+        ('bgr8', np.arange(12, dtype=np.uint8).reshape(2, 2, 3),
+         lambda value: value[:, :, ::-1]),
+        ('rgba8', np.arange(16, dtype=np.uint8).reshape(2, 2, 4),
+         lambda value: value[:, :, :3]),
+        ('bgra8', np.arange(16, dtype=np.uint8).reshape(2, 2, 4),
+         lambda value: value[:, :, 2::-1]),
+    ],
+)
+def test_decode_color_to_rgb_canonical_decoder_handles_encodings_and_padding(
+    encoding, pixels, expected,
+) -> None:
+    pad_bytes = 5
+    rows = bytearray()
+    for row in pixels:
+        rows.extend(row.tobytes())
+        rows.extend(bytes(pad_bytes))
+    msg = Image()
+    msg.height, msg.width = pixels.shape[:2]
+    msg.encoding = encoding
+    msg.step = pixels.shape[1] * pixels.shape[2] + pad_bytes
+    msg.data = bytes(rows)
+
+    decoded = decode_color_to_rgb(msg)
+
+    np.testing.assert_array_equal(decoded, expected(pixels))
 
 
 def test_normalize_to_uint8_flat_image_returns_zeroes() -> None:

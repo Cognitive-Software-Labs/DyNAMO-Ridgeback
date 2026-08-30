@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from ridgeback_autonomy.benchmarking.estimators import (
+from ridgeback_autonomy.perception.estimators import (
     ESTIMATOR_FIELD_KEYS,
     ESTIMATOR_LABELS,
 )

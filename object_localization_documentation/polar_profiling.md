@@ -64,9 +64,10 @@ object.
               -> (X, Z)                                   # same both tags
 ```
 
-Steps 1–2 are per-scan work shared by all masks; steps 3–5 run per mask (the
-projection is per-point arithmetic over ~1k points, so re-running it per mask
-costs nothing). The
+Steps 1–3 are batch-local work shared by all masks; steps 4–5 run per mask. The
+projection keeps the full `(u, v)` result by original beam index plus compact
+rounded in-view pixel coordinates, so every mask indexes one mapping rather
+than re-projecting the scan. The
 `tight` / `rect` tag does **not** fork the recovery here — both branches run
 the same segmentation (see §2.5 for why); the tag only changes how wide the
 admitted bearing window effectively is.
@@ -219,12 +220,16 @@ detection → one mask → one coordinate; masks never compared or merged.
 
 | Work | Frequency |
 |------|-----------|
-| convert + transform the scan | once per scan (shared by all masks) |
-| project, mask select, segment, merge, median | once per mask |
+| convert + transform the scan; project to image pixels | zero or once per batch, shared by all usable masks |
+| mask select, segment, merge, median | once per mask |
 
-The per-scan work is tiny by depth-path standards — a 270° / 0.25° scan is
-~1080 points against euclidean reconstruction's `H×W` pixels — so polar profiling is computationally the
-cheapest path end to end, on top of being sensor-accurate in its plane.
+Projection is lazy: a batch with no scan, polar profiling disabled, or only
+absent masks does no projection at all. It is never cached across batches,
+because the scan, its matching TF transform, and its timestamp can change. The
+per-scan work is tiny by depth-path standards — a 270° / 0.25° scan is ~1080
+points against euclidean reconstruction's `H×W` pixels — so polar profiling is
+computationally the cheapest path end to end, on top of being sensor-accurate
+in its plane.
 
 ---
 
@@ -266,9 +271,11 @@ near-band merge and is therefore what the estimate medians over.
 are built in the scan's own frame, where a beam is
 `angle_min + i*angle_increment` at `ranges[i]`, so no extrinsics are re-applied.
 
-Beams are recorded for every detection but **only the nearest one is drawn** —
-eight estimate rings and three ray layers per robot are unreadable the moment a
-scene holds two. `nearest_beam_record` ranks the batch with the shared
+While the marker topic has a subscriber, beams are recorded for every detection
+but **only the nearest one is drawn** — eight estimate rings and three ray layers
+per robot are unreadable the moment a scene holds two. With no subscriber the
+estimator still runs, but debug records, wedge selection, and marker construction
+are skipped. `nearest_beam_record` ranks the batch with the shared
 `nearest_instance_index` and matches the chosen index against
 `PolarBeamRecord.detection_index`, never against the list position: a detection
 whose segmentation came back empty records no beams, so the two disagree. Each
@@ -277,7 +284,8 @@ instance change between frames without stranding the previous one's rays for a
 full `ray_marker_lifetime_sec`. A batch nothing could rank still draws its first
 record — beams with no estimate is precisely the failure worth seeing.
 
-The beams are recorded **even when the path returns `None`**: on a miss,
+When subscribed, the beams are recorded **even when the path returns `None`**:
+on a miss,
 `selected_beams` is recomputed via `select_beams` and nothing is marked as used.
 That is deliberate — the failure modes above are exactly what a viewer needs to
 tell apart, and a frame where the estimator discarded the robot must not look
@@ -294,7 +302,7 @@ definition.
 re-runs `segment_range_profile` + `merge_near_band` at *library defaults* to
 drive the 2D overlay panel, rather than reading the published indices. The node
 calls `localize_polar_profiling` with no kwargs, so the two agree today. The
-moment the §8 tuning campaign passes non-default knobs, the OpenCV panel and the
+moment the §8 tuning campaign passes non-default knobs, the 2D overlay panel and the
 RViz rays will disagree. Routing the panel through the same indices is a
 separate change.
 

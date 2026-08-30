@@ -9,41 +9,50 @@ import pytest
 from builtin_interfaces.msg import Time as TimeMsg
 from geometry_msgs.msg import PointStamped
 
-from ridgeback_autonomy.benchmarking.estimators import (
+from ridgeback_autonomy.perception.estimators import (
     ESTIMATOR_LABELS,
     ESTIMATOR_POSITION_ATTRS,
+    ESTIMATOR_SHORT_LABELS,
     MASK_ESTIMATORS,
     PUBLIC_ESTIMATOR_ORDER,
-    TRUTH_MAX_AGE_S,
     nearest_instance_index,
     parse_estimators,
-    truth_reading,
 )
-from ridgeback_autonomy.benchmarking.g1_estimate_viz_node import (
+from ridgeback_autonomy.perception.g1_estimate_viz_node import (
     ESTIMATOR_COLOURS,
     G1EstimateVizNode,
     HUD_AGED_LUMINANCE,
+    HUD_LAYOUTS,
+    HUD_LAYOUT_ROWS,
     HUD_MIN_LUMINANCE,
+    HUD_WIDE_CELL_COLUMNS,
     MARKER_LIFETIME_SEC,
     MAX_OBSERVATION_AGE_S,
     RING_LINE_WIDTH_M,
     _ESTIMATOR_ID_BASE,
     _hud_line,
     _LUMA_WEIGHTS,
+    batch_messages,
+    collect_readings,
     colour_at_luminance,
     estimator_reading,
     hud_section_text,
     hud_text_colour,
     hud_truth_header,
+    hud_wide_section_text,
+    hud_wide_text,
     nearest_detection_index,
+    parse_hud_layout,
     partition_measurements,
     world_marker_point,
 )
 from ridgeback_autonomy.msg import G1Measurements
+from visualization_msgs.msg import Marker
 from ridgeback_autonomy.perception.core.vehicle_frame import (
     ROBOT_FRONT_OFFSET_M,
     planar_measurement_from_vehicle_front,
 )
+from ridgeback_autonomy.perception.ground_truth import TRUTH_MAX_AGE_S, truth_reading
 
 
 def test_every_registered_estimator_has_a_colour() -> None:
@@ -449,6 +458,20 @@ def test_hud_truth_header_omits_empty_brackets_for_an_unnamed_trial() -> None:
     assert hud_truth_header(reading) == 'G1 DISTANCES   truth 2.250 m'
 
 
+FRESH_AGE_S = 0.1
+
+
+def dated(same_batch: list, age_s: float = FRESH_AGE_S) -> list:
+    """Plain messages as the ``(message, age_seconds)`` entries the HUD takes.
+
+    ``partition_measurements`` returns an age for every live message, not only
+    the ones that fell out of the current batch: a same-batch reading's age is
+    the pipeline latency behind that row, which the wide layout prints.
+    """
+
+    return [(msg, age_s) for msg in same_batch]
+
+
 def hud_text_from(
     same_batch: list,
     nearest: int,
@@ -461,12 +484,27 @@ def hud_text_from(
     ``hud_section_text`` is module-level and pure, so the error column -- which
     subtracts a field off the reading rather than the reading itself -- is
     assertable directly. Omitting ``estimators`` exercises the default, which is
-    what the exploration entrypoint gets.
+    what a caller with no run configuration to hand gets.
     """
 
     if estimators is None:
-        return hud_section_text(same_batch, aged or [], nearest, truth)
-    return hud_section_text(same_batch, aged or [], nearest, truth, estimators)
+        return hud_section_text(dated(same_batch), aged or [], nearest, truth)
+    return hud_section_text(dated(same_batch), aged or [], nearest, truth, estimators)
+
+
+def hud_wide_text_from(
+    same_batch: list,
+    nearest: int = 0,
+    aged: list | None = None,
+    estimators: tuple[str, ...] | None = None,
+    fresh_age_s: float = FRESH_AGE_S,
+) -> str:
+    """The wide renderer, same discipline. No truth argument: it has no truth row."""
+
+    entries = dated(same_batch, fresh_age_s)
+    if estimators is None:
+        return hud_wide_section_text(entries, aged or [], nearest)
+    return hud_wide_section_text(entries, aged or [], nearest, estimators)
 
 
 def test_hud_scores_every_row_against_the_truth_it_displays() -> None:
@@ -520,7 +558,9 @@ def test_a_message_older_than_the_lifetime_but_received_now_still_renders() -> N
     same_batch, aged = partition_measurements(
         [cached(lagging, now)], now, MARKER_LIFETIME_SEC, MAX_OBSERVATION_AGE_S)
 
-    assert same_batch == [lagging]
+    assert batch_messages(same_batch) == [lagging]
+    # Two seconds of pipeline latency, reported as such rather than discarded.
+    assert same_batch[0][1] == pytest.approx(2.0, abs=1e-9)
     assert aged == []
 
 
@@ -564,8 +604,8 @@ def test_only_the_newest_stamp_counts_as_the_current_batch() -> None:
         [cached(pointcloud, now), cached(projective, now), cached(lagging_mask, now)],
         now, MARKER_LIFETIME_SEC, MAX_OBSERVATION_AGE_S)
 
-    assert same_batch == [pointcloud, projective]
-    assert [msg for msg, _ in aged] == [lagging_mask]
+    assert batch_messages(same_batch) == [pointcloud, projective]
+    assert batch_messages(aged) == [lagging_mask]
     assert aged[0][1] == pytest.approx(1.2, abs=1e-9)
 
 
@@ -579,7 +619,7 @@ def test_a_lone_lagging_producer_is_its_own_current_batch() -> None:
     same_batch, aged = partition_measurements(
         [cached(mask, now)], now, MARKER_LIFETIME_SEC, MAX_OBSERVATION_AGE_S)
 
-    assert same_batch == [mask]
+    assert batch_messages(same_batch) == [mask]
     assert aged == []
 
 
@@ -654,11 +694,11 @@ def test_a_nan_reading_still_renders_a_miss_distinct_from_an_aged_one() -> None:
     assert 'miss' in aged and '2.431' in aged and '1.2s' in aged
 
 
-def test_aged_messages_never_reach_the_ranking_the_rings_are_drawn_from() -> None:
-    # A stale position is a false claim about where a robot is now, in a way a
-    # stale number is not -- and an older batch's index 0 may not even be the
-    # same robot. _publish_markers ranks and draws from same_batch alone, so the
-    # aged mask message here must not pull the nearest index onto its own robot.
+def test_an_aged_message_never_joins_the_batch_ranking() -> None:
+    # An aged message does get a ring now, but never off the BATCH's index: it
+    # comes from an earlier detector batch, so its index 0 may be a different
+    # robot. It is ranked against itself instead, which is what keeps the two
+    # sets of indices from being silently mixed.
     now = 100 * SECOND_NS
     # The pointcloud row placed only detection 0 this batch; the aged mask
     # message has its own detection 1 much nearer.
@@ -671,11 +711,14 @@ def test_aged_messages_never_reach_the_ranking_the_rings_are_drawn_from() -> Non
         [cached(pointcloud, now), cached(mask, now)],
         now, MARKER_LIFETIME_SEC, MAX_OBSERVATION_AGE_S)
 
-    assert [msg for msg, _ in aged] == [mask]
-    assert nearest_detection_index(same_batch) == 0
-    # Folding the aged message back in flips every ring onto a robot no current
-    # message measured -- which is what the split exists to prevent.
-    assert nearest_detection_index(same_batch + [msg for msg, _ in aged]) == 1
+    assert batch_messages(aged) == [mask]
+    assert nearest_detection_index(batch_messages(same_batch)) == 0
+    # Folding the aged message into the batch ranking would move the pointcloud
+    # ring onto a robot no current message measured -- which is what the split
+    # exists to prevent. The aged message's own ranking picks that robot for its
+    # own ring, and only for its own.
+    assert nearest_detection_index(batch_messages(same_batch + aged)) == 1
+    assert nearest_detection_index(batch_messages(aged)) == 1
 
 
 def test_the_hud_renders_nothing_at_all_when_nothing_is_cached() -> None:
@@ -689,7 +732,7 @@ def test_the_hud_still_renders_when_the_truth_has_gone_but_readings_have_not() -
     # The timer re-evaluates the truth gate with no measurement traffic needed;
     # the rows outlive the truth line rather than disappearing with it.
     text = hud_section_text(
-        [measurements(1, pointcloud_distance_m=[3.885])], [], 0, None)
+        dated([measurements(1, pointcloud_distance_m=[3.885])]), [], 0, None)
 
     assert text.count('<br/>') == len(PUBLIC_ESTIMATOR_ORDER)
     assert 'G1&nbsp;DISTANCES' in text
@@ -802,6 +845,165 @@ def test_the_parameter_default_resolves_to_every_registered_estimator() -> None:
         'pointcloud', 'polar_profiling')
 
 
+# --- the wide layout --------------------------------------------------------
+#
+# Exploration's shape: estimator names across the top, distances under them,
+# ages under those. No truth source there, so no truth line and no error column
+# -- and, unlike the row layout, an age on every column rather than only on the
+# ones that fell out of the current batch.
+
+
+def wide_cells(text: str) -> list[list[str]]:
+    """Each line's cells with their padding intact, markup stripped.
+
+    One ``<span>`` per cell is what lets a column keep its own ring colour, so
+    the spans are also the cell boundaries -- splitting on whitespace would
+    merge a blank age cell into its neighbour and hide exactly the case the
+    ``--`` column exists to show.
+    """
+
+    return [
+        [
+            html.unescape(re.sub(r'<[^>]+>', '', cell)).replace('\xa0', ' ')
+            for cell in re.findall(r'<span[^>]*>.*?</span>', line)
+        ]
+        for line in text.split('<br/>')
+    ]
+
+
+def wide_row(text: str, index: int) -> list[str]:
+    return [cell.strip() for cell in wide_cells(text)[index]]
+
+
+def wide_colours(text: str) -> list[list[str]]:
+    return [re.findall(r'rgb\([^)]*\)', line) for line in text.split('<br/>')]
+
+
+def test_every_registered_estimator_has_a_column_header() -> None:
+    # A missing short label is a KeyError mid-render, and the wide layout is the
+    # exploration HUD's only shape -- the panel would simply never appear.
+    assert set(ESTIMATOR_SHORT_LABELS) == set(PUBLIC_ESTIMATOR_ORDER)
+    for estimator in PUBLIC_ESTIMATOR_ORDER:
+        assert len(ESTIMATOR_SHORT_LABELS[estimator]) <= HUD_WIDE_CELL_COLUMNS
+
+
+def test_the_wide_layout_is_names_then_distances_then_ages() -> None:
+    same_batch = [measurements(
+        1,
+        pointcloud_distance_m=[3.310],
+        projective_ranging_distance_m=[3.262],
+        euclidean_reconstruction_distance_m=[3.255],
+        polar_profiling_distance_m=[3.180],
+    )]
+
+    text = hud_wide_text_from(same_batch, fresh_age_s=0.14)
+
+    assert text.count('<br/>') == 2
+    assert wide_row(text, 0) == [
+        ESTIMATOR_SHORT_LABELS[e] for e in PUBLIC_ESTIMATOR_ORDER]
+    assert wide_row(text, 1) == ['3.310', '3.262', '3.255', '3.180']
+    assert wide_row(text, 2) == ['0.1s', '0.1s', '0.1s', '0.1s']
+
+
+def test_a_fresh_column_carries_an_age_too() -> None:
+    # The row layout prints an age only for an aged reading. Here every column
+    # has one, because a column with a blank age is how a miss is shown -- a
+    # fresh reading left blank would be indistinguishable from one.
+    text = hud_wide_text_from(
+        [measurements(1, pointcloud_distance_m=[3.310])],
+        estimators=('pointcloud',), fresh_age_s=1.24)
+
+    assert wide_row(text, 2) == ['1.2s']
+
+
+def test_an_aged_column_prints_its_own_age_and_dims_whole() -> None:
+    # The header dims with the number: the column is what is stale, and a bright
+    # header over a dimmed reading reads as the layout, not as the state.
+    fresh = [measurements(1, pointcloud_distance_m=[3.310])]
+    aged = [(measurements(1, polar_profiling_distance_m=[3.180]), 1.2)]
+    dim = hud_text_colour('polar_profiling', aged=True)
+    expected = 'rgb(' + ', '.join(
+        str(int(round(channel * 255))) for channel in dim) + ')'
+
+    text = hud_wide_text_from(
+        fresh, aged=aged, estimators=('pointcloud', 'polar_profiling'))
+
+    assert wide_row(text, 1) == ['3.310', '3.180']
+    assert wide_row(text, 2) == ['0.1s', '1.2s']
+    # Header, distance and age of that one column, all at the aged luminance.
+    assert [line[1] for line in wide_colours(text)] == [expected] * 3
+
+
+def test_a_column_nothing_reported_prints_a_dash_over_a_blank_age() -> None:
+    text = hud_wide_text_from(
+        [measurements(1, pointcloud_distance_m=[3.310])],
+        estimators=('pointcloud', 'polar_profiling'))
+
+    assert wide_row(text, 1) == ['3.310', '--']
+    assert wide_row(text, 2) == ['0.1s', '']
+
+
+def test_a_missing_column_keeps_its_fresh_colour_not_the_aged_one() -> None:
+    # A miss is not a stale reading: nothing about it is out of date, and
+    # dimming it would spend the one signal the layout has for staleness.
+    text = hud_wide_text_from(
+        [measurements(1, pointcloud_distance_m=[3.310])],
+        estimators=('polar_profiling',))
+
+    fresh = hud_text_colour('polar_profiling')
+    expected = 'rgb(' + ', '.join(
+        str(int(round(channel * 255))) for channel in fresh) + ')'
+    assert wide_colours(text)[0] == [expected]
+
+
+def test_wide_columns_are_one_fixed_width_so_the_panel_cannot_ragged() -> None:
+    # Rich text collapses runs of spaces, so the columns line up only because
+    # every cell is padded to the same width with &nbsp;. A cell wider than the
+    # rest also pushes the last column past overlay_width, where it is clipped
+    # rather than wrapped -- which looks like that estimator never reporting.
+    text = hud_wide_text_from(
+        [measurements(1, pointcloud_distance_m=[12.345])],
+        fresh_age_s=12.3)
+
+    for line in wide_cells(text):
+        assert [len(cell) for cell in line] == (
+            [HUD_WIDE_CELL_COLUMNS] * len(PUBLIC_ESTIMATOR_ORDER))
+
+
+def test_the_wide_layout_renders_nothing_at_all_when_nothing_is_cached() -> None:
+    # Same load-bearing contract as the row layout: hud_node drops falsy panels,
+    # and a latched panel of numbers under expired rings reads as a broken ring
+    # layer rather than as a dead detector.
+    assert hud_wide_section_text([], [], 0) == ''
+
+
+def test_wide_columns_follow_the_selected_set_in_canonical_order() -> None:
+    selected = parse_estimators('polar_profiling,pointcloud')
+    same_batch = [measurements(
+        1, pointcloud_distance_m=[3.310], projective_ranging_distance_m=[3.262])]
+
+    text = hud_wide_text_from(same_batch, estimators=selected)
+
+    assert wide_row(text, 0) == ['Cloud', 'Polar']
+    assert '3.262' not in text
+
+
+def test_the_hud_layout_parameter_default_is_the_row_layout() -> None:
+    # The benchmark passes nothing and must keep the layout with the truth and
+    # error columns; only exploration asks for the other one.
+    assert parse_hud_layout(HUD_LAYOUT_ROWS) == HUD_LAYOUT_ROWS
+    assert parse_hud_layout('') == HUD_LAYOUT_ROWS
+    assert parse_hud_layout(None) == HUD_LAYOUT_ROWS
+    assert set(HUD_LAYOUTS) == {'rows', 'wide'}
+
+
+def test_an_unknown_hud_layout_is_rejected_rather_than_defaulted() -> None:
+    # Falling back would ship the row layout into a panel sized for columns,
+    # which looks like a clipping fault rather than a misspelled parameter.
+    with pytest.raises(ValueError):
+        parse_hud_layout('columns')
+
+
 # --- the same set decides the rings -----------------------------------------
 #
 # The panel and the floor plan are one claim in two renderings, so a ring with
@@ -813,33 +1015,75 @@ def _published_markers(
     same_batch: list,
     estimators: tuple[str, ...] | None = None,
     robot_yaw: float = 0.0,
+    aged: list | None = None,
+    pose_at=None,
 ) -> list:
     """Markers from the real ``_publish_markers``, with no ROS context.
 
     Unbound against a stub, the same discipline ``_place`` uses: the TF lookup
     and the message cache are the only things replaced, so the selection and the
     ranking are the shipped ones.
+
+    ``pose_at`` receives the ``rclpy.time.Time`` the node asked TF for, so a test
+    can return a different pose per stamp -- which is the whole point of placing
+    an aged reading against the pose it was taken from. It defaults to one fixed
+    pose regardless of stamp.
     """
 
     published: list = []
+    selected = PUBLIC_ESTIMATOR_ORDER if estimators is None else estimators
+
+    def lookup(stamp):
+        if pose_at is None:
+            return (0.0, 0.0, robot_yaw, 'map')
+        return pose_at(stamp)
+
     stub = SimpleNamespace(
         marker_lifetime=1.5,
-        estimators=PUBLIC_ESTIMATOR_ORDER if estimators is None else estimators,
-        _partitioned_messages=lambda: (same_batch, []),
-        _robot_pose_in_world=lambda _time: (0.0, 0.0, robot_yaw, 'map'),
+        estimators=selected,
+        _robot_pose_in_world=lookup,
         get_clock=lambda: SimpleNamespace(
             now=lambda: SimpleNamespace(to_msg=TimeMsg)),
         _pub=SimpleNamespace(publish=lambda ma: published.extend(ma.markers)),
     )
     stub._add_estimator_markers = MethodType(
         G1EstimateVizNode._add_estimator_markers, stub)
+    stub._add_delete_markers = MethodType(
+        G1EstimateVizNode._add_delete_markers, stub)
 
-    G1EstimateVizNode._publish_markers(stub)
+    # The same snapshot the node's tick builds, so the markers under test come
+    # from the shipped path rather than from a second reading of the messages.
+    entries = dated(same_batch)
+    aged_entries = aged or []
+    nearest = (
+        nearest_detection_index(batch_messages(entries)) if entries else 0
+    )
+    readings = collect_readings(entries, aged_entries, nearest, selected)
+
+    G1EstimateVizNode._publish_markers(stub, readings)
     return published
 
 
+def _added(markers: list) -> list:
+    """Only the markers that draw something, dropping the deletes.
+
+    Every estimator with no reading now gets an explicit DELETE so its ring
+    cannot outlive its HUD column, so the raw list always names the full
+    selected set.
+    """
+
+    return [marker for marker in markers if marker.action == Marker.ADD]
+
+
 def _marker_estimators(markers: list) -> set[str]:
-    return {marker.ns.removeprefix('g1_estimates/') for marker in markers}
+    return {marker.ns.removeprefix('g1_estimates/') for marker in _added(markers)}
+
+
+def _deleted_estimators(markers: list) -> set[str]:
+    return {
+        marker.ns.removeprefix('g1_estimates/')
+        for marker in markers if marker.action == Marker.DELETE
+    }
 
 
 def test_only_the_selected_estimators_get_a_ring() -> None:
@@ -887,6 +1131,159 @@ def test_omitting_the_set_draws_every_estimator_that_reported() -> None:
     markers = _published_markers(same_batch)
 
     assert _marker_estimators(markers) == {'pointcloud', 'polar_profiling'}
+
+
+# --- aged messages draw rings, placed at their own stamp --------------------
+#
+# Excluding aged messages did not cost the mask rows an occasional ring, it cost
+# them EVERY ring: a mask measurement carries the detection instant and only
+# arrives after inference, segmentation and the depth lookup, so it is never the
+# newest stamp while the pointcloud row is also running. Measured in
+# exploration: 19 of 19 detected mask messages landed in the aged remainder.
+
+
+def _mask_reading(stamp_ns: int, forward: float, lateral: float):
+    return measurements(
+        1, stamp_ns=stamp_ns,
+        polar_profiling_forward_m=[forward],
+        polar_profiling_lateral_m=[lateral],
+        polar_profiling_distance_m=[math.hypot(forward, lateral)],
+    )
+
+
+def test_an_aged_message_still_draws_its_ring() -> None:
+    # The regression this whole path exists for. The pointcloud row is current
+    # and the mask row is a batch behind, which is the steady state in
+    # exploration -- not an edge case.
+    pointcloud = measurements(
+        1, stamp_ns=2 * SECOND_NS,
+        pointcloud_forward_m=[3.8], pointcloud_lateral_m=[0.4],
+        pointcloud_distance_m=[3.821])
+    mask = _mask_reading(1 * SECOND_NS, 2.4, 0.3)
+
+    markers = _published_markers([pointcloud], aged=[(mask, 1.2)])
+
+    assert _marker_estimators(markers) == {'pointcloud', 'polar_profiling'}
+
+
+def test_an_aged_ring_is_placed_at_the_pose_its_measurement_came_from() -> None:
+    # The robot drove 2 m along +X between the detection and the message
+    # arriving. Placing the reading against the pose NOW would put the ring 2 m
+    # past the target; against the pose at its own stamp it lands on the target.
+    def pose_at(stamp):
+        return (0.0, 0.0, 0.0, 'map') if stamp.nanoseconds == SECOND_NS \
+            else (2.0, 0.0, 0.0, 'map')
+
+    mask = _mask_reading(1 * SECOND_NS, 3.0, 0.0)
+
+    markers = _published_markers(
+        [], aged=[(mask, 1.2)], estimators=('polar_profiling',), pose_at=pose_at)
+
+    # 3.0 m off the robot front, from an origin at x=0, not x=2.
+    assert _dot_xy(markers) == pytest.approx((3.0 + ROBOT_FRONT_OFFSET_M, 0.0), abs=1e-9)
+
+
+def test_the_aged_ring_turns_with_the_pose_it_was_taken_from() -> None:
+    # Rotation is what makes the latest-pose shortcut worst: the robot has since
+    # turned 90 degrees, so borrowing the current yaw would swing a 3 m reading
+    # onto the wrong axis entirely.
+    def pose_at(stamp):
+        return (0.0, 0.0, 0.0, 'map') if stamp.nanoseconds == SECOND_NS \
+            else (0.0, 0.0, math.pi / 2.0, 'map')
+
+    mask = _mask_reading(1 * SECOND_NS, 3.0, 0.0)
+
+    markers = _published_markers(
+        [], aged=[(mask, 1.2)], estimators=('polar_profiling',), pose_at=pose_at)
+
+    assert _dot_xy(markers) == pytest.approx((3.0 + ROBOT_FRONT_OFFSET_M, 0.0), abs=1e-9)
+
+
+def test_a_message_whose_pose_lookup_fails_is_skipped_not_the_whole_frame() -> None:
+    # An aged stamp can fall off the back of the TF buffer. That must cost that
+    # one message's ring, not every ring in the frame -- the old code returned
+    # early on a failed lookup because there was only ever one to do.
+    pointcloud = measurements(
+        1, stamp_ns=2 * SECOND_NS,
+        pointcloud_forward_m=[3.8], pointcloud_lateral_m=[0.4],
+        pointcloud_distance_m=[3.821])
+    mask = _mask_reading(1 * SECOND_NS, 2.4, 0.3)
+
+    def pose_at(stamp):
+        if stamp.nanoseconds == SECOND_NS:
+            return (None, None, None, None)
+        return (0.0, 0.0, 0.0, 'map')
+
+    markers = _published_markers([pointcloud], aged=[(mask, 1.2)], pose_at=pose_at)
+
+    assert _marker_estimators(markers) == {'pointcloud'}
+
+
+def test_an_aged_message_is_ranked_against_itself_for_rings_too() -> None:
+    # Same rule the HUD applies: the aged message comes from a different
+    # detector batch, so the batch's nearest index would name a different robot.
+    pointcloud = measurements(
+        2, stamp_ns=2 * SECOND_NS,
+        pointcloud_forward_m=[1.0, float('nan')],
+        pointcloud_lateral_m=[0.0, float('nan')],
+        pointcloud_distance_m=[1.0, float('nan')])
+    mask = measurements(
+        2, stamp_ns=1 * SECOND_NS,
+        polar_profiling_forward_m=[9.0, 2.0],
+        polar_profiling_lateral_m=[0.0, 0.0],
+        polar_profiling_distance_m=[9.0, 2.0])
+
+    markers = _published_markers(
+        [pointcloud], aged=[(mask, 1.2)], estimators=('polar_profiling',))
+
+    # Its own index 1 (2.0 m), not the batch's index 0 (9.0 m).
+    assert _dot_xy(markers) == pytest.approx((2.0 + ROBOT_FRONT_OFFSET_M, 0.0), abs=1e-9)
+
+
+def test_an_estimator_with_no_reading_has_its_ring_deleted() -> None:
+    # lifetime alone could not keep the two surfaces in step: it starts at the
+    # last publish, so a ring outlived its own column by up to a full lifetime
+    # after a producer went quiet. The delete retires it on the same tick the
+    # column turns to "--".
+    pointcloud = measurements(
+        1, pointcloud_forward_m=[3.8], pointcloud_lateral_m=[0.4],
+        pointcloud_distance_m=[3.821])
+
+    markers = _published_markers([pointcloud])
+
+    assert _marker_estimators(markers) == {'pointcloud'}
+    assert _deleted_estimators(markers) == {
+        'projective_ranging', 'euclidean_reconstruction', 'polar_profiling'}
+
+
+def test_a_path_ring_and_its_column_always_agree() -> None:
+    # The invariant the shared snapshot exists for: whatever the panel prints a
+    # number for has a ring, and whatever has a ring is printed. Here all three
+    # states are live at once -- pointcloud fresh, polar aged, the other two
+    # silent -- which is exactly the exploration steady state.
+    pointcloud = measurements(
+        1, stamp_ns=2 * SECOND_NS,
+        pointcloud_forward_m=[3.8], pointcloud_lateral_m=[0.4],
+        pointcloud_distance_m=[3.821])
+    mask = _mask_reading(1 * SECOND_NS, 2.4, 0.3)
+
+    entries, aged_entries = dated([pointcloud]), [(mask, 1.2)]
+    readings = collect_readings(entries, aged_entries, 0, PUBLIC_ESTIMATOR_ORDER)
+
+    markers = _published_markers([pointcloud], aged=aged_entries)
+    text = hud_wide_text(readings, PUBLIC_ESTIMATOR_ORDER)
+
+    ringed = _marker_estimators(markers)
+    printed = {
+        estimator
+        for estimator, cell in zip(PUBLIC_ESTIMATOR_ORDER, wide_row(text, 1))
+        if cell != '--'
+    }
+
+    assert ringed == printed == {'pointcloud', 'polar_profiling'}
+    # And the silent two are retired from both surfaces, not merely absent.
+    assert _deleted_estimators(markers) == {
+        'projective_ranging', 'euclidean_reconstruction'}
 
 
 def test_a_row_with_only_a_distance_draws_no_ring() -> None:

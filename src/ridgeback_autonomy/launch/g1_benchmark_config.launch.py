@@ -17,32 +17,32 @@ from launch.events import Shutdown
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
-from ridgeback_autonomy.benchmarking.estimators import (
+from ridgeback_autonomy.perception.estimators import (
     parse_estimators,
     selected_mask_estimators,
     selected_pointcloud_estimators,
     uses_mask_estimators,
     uses_pointcloud_estimators,
 )
-from ridgeback_autonomy.benchmarking.launch_common import (
+from ridgeback_autonomy.perception.g1_launch import (
     CONFIG_LAUNCH_ARGUMENT_NAMES,
+    MASK_MEASUREMENT_TOPIC,
+    POINTCLOUD_MEASUREMENT_TOPIC,
     RAW_DETECTIONS_TOPIC,
+    SIMULATION_CAMERA_INPUTS,
+    distance_hud_node,
+    estimate_viz_node,
+    mask_measurement_node,
+    overlay_node,
     perception_venv_actions,
+    pointcloud_measurement_node,
+    resolved_camera_inputs,
     workspace_root_from_package_share,
 )
 from ridgeback_autonomy.perception.core.depth_common import DEPTH_GATE_DISABLED
 from ridgeback_autonomy.perception.core.isolation_3d import ISOLATION_3D_DEFAULT
 
 
-POINTCLOUD_MEASUREMENT_TOPIC = 'measurements/g1/pointcloud'
-MASK_MEASUREMENT_TOPIC = 'measurements/g1/mask'
-
-# Overlay columns for the RViz strip. Above any possible panel count, and
-# pack_panels clamps to that count, so the effect is simply "one row".
-OVERLAY_SINGLE_ROW = 99
-# The mask node converts depth itself, at the detection stamp, and republishes
-# the result for the overlay panel. Debug-only: nothing measures off this topic.
-MASK_ALIGNED_DEPTH_DEBUG_TOPIC = 'debug/g1/mask/aligned_depth'
 ENV_READY_TIMEOUT_SEC = 300.0
 
 
@@ -54,11 +54,11 @@ def build_benchmark_nodes(context, *args, **kwargs):
     output_dir = LaunchConfiguration('output_dir')
     settle_sec = LaunchConfiguration('settle_sec')
     capture_sec = LaunchConfiguration('capture_sec')
-    color_topic = LaunchConfiguration('color_topic')
-    depth_topic = LaunchConfiguration('depth_topic')
     scan_topic = LaunchConfiguration('scan_topic')
-    pointcloud_topic = LaunchConfiguration('pointcloud_topic')
     base_frame = LaunchConfiguration('base_frame')
+    camera_inputs = resolved_camera_inputs(
+        context, 'color_topic', 'camera_info_topic',
+        'depth_topic', 'pointcloud_topic')
 
     selected_estimators = parse_estimators(
         LaunchConfiguration('estimators').perform(context).strip()
@@ -71,136 +71,66 @@ def build_benchmark_nodes(context, *args, **kwargs):
     nodes = []
 
     if needs_pointcloud:
-        nodes.append(
-            Node(
-                package='ridgeback_autonomy',
-                executable='g1_pointcloud_measurement_node',
-                name='g1_pointcloud_measurement',
-                namespace=namespace,
-                parameters=[{
-                    'use_sim_time': use_sim_time,
-                    'detections_topic': RAW_DETECTIONS_TOPIC,
-                    'measurement_topic': POINTCLOUD_MEASUREMENT_TOPIC,
-                    'color_topic': color_topic,
-                    'pointcloud_topic': pointcloud_topic,
-                    'base_frame': base_frame,
-                    'enabled_estimators': ','.join(selected_pointcloud),
-                }],
-                remappings=[('/tf', 'tf'), ('/tf_static', 'tf_static')],
-                output='screen',
-            )
-        )
+        nodes.append(pointcloud_measurement_node(
+            namespace=namespace,
+            use_sim_time=use_sim_time,
+            enabled_estimators=','.join(selected_pointcloud),
+            base_frame=base_frame,
+            color_topic=camera_inputs.color_image_topic,
+            pointcloud_topic=camera_inputs.organized_points_topic,
+        ))
 
     if needs_mask:
-        nodes.append(
-            Node(
-                package='ridgeback_autonomy',
-                executable='g1_mask_measurement_node',
-                name='g1_mask_measurement',
-                namespace=namespace,
-                parameters=[{
-                    'use_sim_time': use_sim_time,
-                    'detections_topic': RAW_DETECTIONS_TOPIC,
-                    'measurement_topic': MASK_MEASUREMENT_TOPIC,
-                    'enabled_estimators': ','.join(selected_mask),
-                    'depth_source': LaunchConfiguration('depth_source'),
-                    # On a real D435 this must be the driver's
-                    # aligned_depth_to_color stream: the stereo source converts
-                    # units, it does not align.
-                    'depth_topic': depth_topic,
-                    'camera_info_topic': LaunchConfiguration('camera_info_topic'),
-                    'aligned_depth_debug_topic': MASK_ALIGNED_DEPTH_DEBUG_TOPIC,
-                    'scan_topic': scan_topic,
-                    'base_frame': base_frame,
-                    'isolation_2d': LaunchConfiguration('isolation_2d'),
-                    'isolation_3d': LaunchConfiguration('isolation_3d'),
-                    'mask_gate': LaunchConfiguration('mask_gate'),
-                    'color_topic': color_topic,
-                    'depth_max_meters': LaunchConfiguration('mask_depth_max_meters'),
-                    'depth_match_debug': LaunchConfiguration('depth_match_debug'),
-                }],
-                remappings=[('/tf', 'tf'), ('/tf_static', 'tf_static')],
-                output='screen',
-            )
-        )
-
-    nodes.append(
-        Node(
-            package='ridgeback_autonomy',
-            executable='g1_estimate_viz_node',
-            name='g1_estimate_viz',
+        nodes.append(mask_measurement_node(
             namespace=namespace,
-            parameters=[{
-                'use_sim_time': use_sim_time,
-                # The HUD lists only the rows this run actually launched.
-                'estimators': ','.join(selected_estimators),
-            }],
-            remappings=[('/tf', 'tf'), ('/tf_static', 'tf_static')],
-            output='screen',
-            condition=launch.conditions.IfCondition(LaunchConfiguration('estimate_viz')),
-        )
-    )
+            use_sim_time=use_sim_time,
+            enabled_estimators=','.join(selected_mask),
+            base_frame=base_frame,
+            depth_source=LaunchConfiguration('depth_source'),
+            depth_topic=camera_inputs.aligned_depth_topic,
+            camera_info_topic=camera_inputs.color_camera_info_topic,
+            scan_topic=scan_topic,
+            isolation_2d=LaunchConfiguration('isolation_2d'),
+            isolation_3d=LaunchConfiguration('isolation_3d'),
+            mask_gate=LaunchConfiguration('mask_gate'),
+            color_topic=camera_inputs.color_image_topic,
+            depth_max_meters=LaunchConfiguration('mask_depth_max_meters'),
+            depth_match_debug=LaunchConfiguration('depth_match_debug'),
+        ))
 
-    nodes.append(
-        Node(
-            package='ridgeback_autonomy',
-            executable='g1_overlay_node',
-            name='g1_overlay',
-            namespace=namespace,
-            parameters=[{
-                'use_sim_time': use_sim_time,
-                'measurement_topic': POINTCLOUD_MEASUREMENT_TOPIC,
-                'mask_measurement_topic': MASK_MEASUREMENT_TOPIC,
-                'color_topic': color_topic,
-                'aligned_depth_topic': MASK_ALIGNED_DEPTH_DEBUG_TOPIC,
-                'estimators': ','.join(selected_estimators),
-                'depth_source': LaunchConfiguration('depth_source'),
-                'mask_gate': LaunchConfiguration('mask_gate'),
-                'show_window': LaunchConfiguration('overlay_window'),
-                'max_cols': OVERLAY_SINGLE_ROW,
-                'rgb_panel_labels': False,
-            }],
-            remappings=[('/tf', 'tf'), ('/tf_static', 'tf_static')],
-            output='screen',
-            condition=launch.conditions.IfCondition(LaunchConfiguration('overlay')),
-        )
-    )
+    # The HUD lists only the rows this run actually launched.
+    nodes.append(estimate_viz_node(
+        namespace=namespace,
+        use_sim_time=use_sim_time,
+        estimators=','.join(selected_estimators),
+        condition=launch.conditions.IfCondition(LaunchConfiguration('estimate_viz')),
+    ))
 
-    nodes.append(
-        Node(
-            package='ridgeback_autonomy',
-            executable='hud_node',
-            name='hud_node',
-            namespace=namespace,
-            parameters=[{
-                'use_sim_time': use_sim_time,
-                'panels': ['hud/g1_distances'],
-                'text_size': 16.0,
-                # The widest row is "Euclidean Reconstruction" (24 columns) +
-                # distance + signed error + the age column an aged row carries
-                # = 47 columns. The overlay clips rather than wraps, and the
-                # age column is last, so a box that is too narrow silently
-                # deletes the fresh/aged distinction on exactly the rows that
-                # need it -- the failure looks like the estimator never
-                # reported, not like a layout fault.
-                #
-                # ``text_size`` is in POINTS, so columns-to-pixels depends on
-                # the display's scaling: measured at 12.6 px/column on one
-                # monitor and 14.4 px/column on another. 720 covers the wider
-                # of the two (47 x 14.4 = 677, plus insets); on the narrower
-                # one it costs some empty space, which is the cheap direction
-                # to be wrong in. The truth header is longer still (the trial
-                # id runs to ~63 columns) and is knowingly left to clip -- it
-                # is prose, not a column anyone reads off.
-                'overlay_width': 720,
-                'horizontal_alignment': 'right',
-                'vertical_alignment': 'top',
-                'rich_text': True,
-            }],
-            output='screen',
-            condition=launch.conditions.IfCondition(LaunchConfiguration('estimate_viz')),
-        )
-    )
+    # The benchmark drops the per-detection label block: the runner's collage
+    # carries the numbers, so the panels are there to be looked at, not read.
+    nodes.append(overlay_node(
+        namespace=namespace,
+        use_sim_time=use_sim_time,
+        estimators=','.join(selected_estimators),
+        color_topic=camera_inputs.color_image_topic,
+        depth_source=LaunchConfiguration('depth_source'),
+        mask_gate=LaunchConfiguration('mask_gate'),
+        rgb_panel_labels=False,
+        condition=launch.conditions.IfCondition(LaunchConfiguration('overlay')),
+    ))
+
+    # The rows layout's widest line is "Euclidean Reconstruction" (24 columns)
+    # + distance + signed error + the age column an aged row carries = 47
+    # columns; 47 x 14.4 px = 677 plus insets. The truth header is longer still
+    # (the trial id runs to ~63 columns) and is knowingly left to clip -- it is
+    # prose, not a column anyone reads off.
+    nodes.append(distance_hud_node(
+        namespace=namespace,
+        use_sim_time=use_sim_time,
+        name='hud_node',
+        overlay_width=720,
+        condition=launch.conditions.IfCondition(LaunchConfiguration('estimate_viz')),
+    ))
 
     runner = Node(
         package='ridgeback_autonomy',
@@ -219,7 +149,7 @@ def build_benchmark_nodes(context, *args, **kwargs):
             'estimators': ','.join(selected_estimators),
             'pointcloud_measurement_topic': POINTCLOUD_MEASUREMENT_TOPIC,
             'mask_measurement_topic': MASK_MEASUREMENT_TOPIC,
-            'color_topic': color_topic,
+            'color_topic': camera_inputs.color_image_topic,
             'depth_source': LaunchConfiguration('depth_source'),
             'isolation_2d': LaunchConfiguration('isolation_2d'),
             'isolation_3d': LaunchConfiguration('isolation_3d'),
@@ -255,12 +185,14 @@ def build_readiness_gate(context, *args, **kwargs):
     """Start the config stack only after the persistent layer is genuinely ready."""
 
     namespace = LaunchConfiguration('namespace').perform(context)
-    color_topic = LaunchConfiguration('color_topic').perform(context)
+    camera_inputs = resolved_camera_inputs(
+        context, 'color_topic', 'camera_info_topic',
+        'depth_topic', 'pointcloud_topic')
     gate = ExecuteProcess(
         cmd=[
             'ros2', 'run', 'ridgeback_autonomy', 'launch_wait',
             '--topic', _resolved_topic(namespace, RAW_DETECTIONS_TOPIC),
-            '--topic', _resolved_topic(namespace, color_topic),
+            '--topic', _resolved_topic(namespace, camera_inputs.color_image_topic),
             '--timeout', str(ENV_READY_TIMEOUT_SEC),
         ],
         name='gate_benchmark_environment_ready',
@@ -287,7 +219,8 @@ def generate_launch_description():
         DeclareLaunchArgument('namespace', default_value='r100_0001'),
         DeclareLaunchArgument('use_sim_time', default_value='true'),
         DeclareLaunchArgument('world', default_value='g1_distance_calibration'),
-        DeclareLaunchArgument('color_topic', default_value='sensors/camera_0/color/image'),
+        DeclareLaunchArgument(
+            'color_topic', default_value=SIMULATION_CAMERA_INPUTS.color_image_topic),
         DeclareLaunchArgument(
             'estimate_viz',
             default_value='true',
@@ -297,11 +230,6 @@ def generate_launch_description():
             'overlay',
             default_value='true',
             description='Launch the camera overlay with estimator distances',
-        ),
-        DeclareLaunchArgument(
-            'overlay_window',
-            default_value='false',
-            description='Also open the overlay in its own OpenCV window',
         ),
         DeclareLaunchArgument('estimators', default_value='all'),
         DeclareLaunchArgument(
@@ -314,10 +242,11 @@ def generate_launch_description():
         DeclareLaunchArgument('run_dir_name', default_value=''),
         DeclareLaunchArgument('settle_sec', default_value='2.0'),
         DeclareLaunchArgument('capture_sec', default_value='10.0'),
-        DeclareLaunchArgument('depth_topic', default_value='sensors/camera_0/depth/image'),
+        DeclareLaunchArgument(
+            'depth_topic', default_value=SIMULATION_CAMERA_INPUTS.aligned_depth_topic),
         DeclareLaunchArgument(
             'camera_info_topic',
-            default_value='sensors/camera_0/color/camera_info',
+            default_value=SIMULATION_CAMERA_INPUTS.color_camera_info_topic,
         ),
         DeclareLaunchArgument(
             'depth_source',
@@ -350,7 +279,10 @@ def generate_launch_description():
             description='Log mask depth-input lookup accounting',
         ),
         DeclareLaunchArgument('scan_topic', default_value='sensors/lidar2d_0/scan'),
-        DeclareLaunchArgument('pointcloud_topic', default_value='sensors/camera_0/points'),
+        DeclareLaunchArgument(
+            'pointcloud_topic',
+            default_value=SIMULATION_CAMERA_INPUTS.organized_points_topic or '',
+        ),
         # namespace must be declared before this substitution-backed default.
         DeclareLaunchArgument('base_frame', default_value=[namespace, '/robot/base_link']),
         DeclareLaunchArgument(

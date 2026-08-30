@@ -53,6 +53,7 @@ import threading
 import time
 import traceback
 from collections import OrderedDict
+from dataclasses import dataclass
 
 import numpy as np
 import rclpy
@@ -66,7 +67,7 @@ from sensor_msgs.msg import CameraInfo, Image, LaserScan
 from tf2_ros import Buffer, TransformException, TransformListener
 from visualization_msgs.msg import MarkerArray
 
-from ridgeback_autonomy.benchmarking.estimators import (
+from ridgeback_autonomy.perception.estimators import (
     DEPTH_PATH_ESTIMATORS,
     ESTIMATOR_FIELD_KEYS,
     MASK_ESTIMATORS,
@@ -86,6 +87,7 @@ from ridgeback_autonomy.perception.core.depth_common import (
     DEPTH_GATE_DISABLED,
     MASK_DEPTH_GATE_DEFAULT,
     resolve_depth_gate,
+    valid_depth,
 )
 from ridgeback_autonomy.perception.core.depth_sources import (
     DEPTH_ANYTHING_MODEL_ID_DEFAULT,
@@ -93,7 +95,7 @@ from ridgeback_autonomy.perception.core.depth_sources import (
     build_depth_source,
     encode_depth_message,
 )
-from ridgeback_autonomy.perception.core.image_utils import convert_color_image_message
+from ridgeback_autonomy.perception.core.image_utils import decode_color_to_rgb
 from ridgeback_autonomy.perception.core.intrinsics import intrinsics_from_camera_info
 from ridgeback_autonomy.perception.core.isolation_2d import (
     ISOLATION_2D_DEFAULT,
@@ -114,10 +116,10 @@ from ridgeback_autonomy.perception.core.mask import (
 from ridgeback_autonomy.perception.core.projective_ranging import localize_projective_ranging
 from ridgeback_autonomy.perception.core.euclidean_reconstruction import localize_euclidean_reconstruction
 from ridgeback_autonomy.perception.core.polar_profiling import (
-    beams_in_bbox,
-    localize_polar_profiling,
+    localize_projected_polar_profiling,
+    project_scan_to_image,
     scan_points_optical,
-    select_beams,
+    select_bbox_beams,
 )
 from ridgeback_autonomy.perception.core.segmentation import (
     SEGMENTATION_MIN_PREDICTED_IOU_DEFAULT,
@@ -248,6 +250,14 @@ def box_within_frame_fraction(
 
 def stamp_key(stamp) -> tuple[int, int]:
     return int(stamp.sec), int(stamp.nanosec)
+
+
+@dataclass(frozen=True)
+class PreparedColorFrame:
+    """The exact color message and RGB array prepared for one batch only."""
+
+    message: Image
+    rgb: np.ndarray
 
 
 class StampedMessageBuffer:
@@ -441,6 +451,8 @@ def fill_path_measurements(
     wants_projective = 'projective_ranging' in enabled
     wants_euclidean = 'euclidean_reconstruction' in enabled
     wants_polar = 'polar_profiling' in enabled
+    frame_valid_depth = None
+    scan_projection = None
 
     for index, (detection, mask) in enumerate(zip(batch.detections, masks)):
         if mask is None:
@@ -452,10 +464,16 @@ def fill_path_measurements(
             if wants_euclidean:
                 detection.euclidean_reconstruction_status = int(MissReason.NO_DEPTH_FRAME)
         else:
+            valid_masked = None
+            if wants_projective or wants_euclidean:
+                if frame_valid_depth is None:
+                    frame_valid_depth = valid_depth(depth_m, depth_max)
+                valid_masked = mask.data & frame_valid_depth
+
             if wants_projective:
                 result_a, reason_a = localize_projective_ranging(
                     depth_m, mask, intrinsics, isolation=isolation_2d,
-                    depth_max=depth_max)
+                    depth_max=depth_max, valid_masked=valid_masked)
                 detection.projective_ranging_status = int(reason_a)
                 if result_a is not None:
                     (
@@ -469,7 +487,7 @@ def fill_path_measurements(
             if wants_euclidean:
                 result_b, reason_b = localize_euclidean_reconstruction(
                     depth_m, mask, intrinsics, isolation=isolation_3d,
-                    depth_max=depth_max)
+                    depth_max=depth_max, valid_masked=valid_masked)
                 detection.euclidean_reconstruction_status = int(reason_b)
                 if result_b is not None:
                     (
@@ -487,9 +505,12 @@ def fill_path_measurements(
             detection.polar_profiling_status = int(scan_reason)
         else:
             points_optical, valid = scan_points
-            result_c, reason_c = localize_polar_profiling(
-                points_optical, valid, mask, intrinsics)
-            detection.polar_profiling_status = int(reason_c)
+            if scan_projection is None:
+                scan_projection = project_scan_to_image(
+                    points_optical, valid, intrinsics)
+            attempt = localize_projected_polar_profiling(scan_projection, mask)
+            result_c = attempt.result
+            detection.polar_profiling_status = int(attempt.reason)
             if result_c is not None:
                 # Polar profiling recovers only (X, Z); Y is unobservable and
                 # substituted with 0. Optical Y folds into base forward only
@@ -511,14 +532,13 @@ def fill_path_measurements(
                 if result_c is not None:
                     selected, merged = result_c.selected_beams, result_c.merged_beams
                 else:
-                    selected = select_beams(points_optical, valid, mask, intrinsics)
+                    selected = attempt.selected_beams
                     merged = np.empty(0, dtype=np.intp)
                 beam_records.append(PolarBeamRecord(
                     detection_index=index,
                     selected=selected,
                     merged=merged,
-                    in_bbox=beams_in_bbox(
-                        points_optical, valid, detection.bbox_xyxy, intrinsics),
+                    in_bbox=select_bbox_beams(scan_projection, detection.bbox_xyxy),
                 ))
 
 
@@ -1000,14 +1020,21 @@ class G1MaskMeasurementNode(Node):
                 if camera_extrinsic is None:
                     self.stamp_frame_reason(batch, MissReason.TF_MISS_EXTRINSIC)
                 else:
-                    masks = self.masks_for_batch(detections_msg, batch)
+                    color_hint = None
+                    if (self.depth_source is not None
+                            and self.depth_source.input_kind == 'color'):
+                        color_hint = depth_input_msg
+                    masks, prepared_color = self.masks_for_batch(
+                        detections_msg, batch, color_hint=color_hint)
                     if masks is None:
                         self.stamp_frame_reason(batch, MissReason.NO_COLOR_FRAME)
                     else:
-                        if self.mask_debug_pub is not None:
-                            self.mask_debug_pub.publish(encode_mask_debug_image(
-                                masks, batch.image_height, batch.image_width,
-                                detections_msg.header))
+                        self.publish_mask_debug(
+                            masks,
+                            batch.image_height,
+                            batch.image_width,
+                            detections_msg.header,
+                        )
                         camera_rotation, camera_translation = camera_extrinsic
                         # The euclidean floor crop tracks the live mount: derive
                         # its height/pitch from the same extrinsic and build the
@@ -1017,12 +1044,13 @@ class G1MaskMeasurementNode(Node):
                             self.base_above_floor_m)
                         isolation_3d = build_isolation_3d(
                             self.isolation_3d_name, camera_height_m, camera_pitch_deg)
-                        depth_m = self.depth_for_batch(depth_input_msg, batch)
+                        depth_m = self.depth_for_batch(
+                            depth_input_msg, batch, prepared_color=prepared_color)
                         self.publish_aligned_depth_debug(
                             depth_m, detections_msg.header)
                         scan_points, scan_reason = self.scan_points_for_batch(
                             detections_msg, scan_msg)
-                        beam_records: list[PolarBeamRecord] = []
+                        beam_records = self.ray_marker_records()
                         fill_path_measurements(
                             batch,
                             masks,
@@ -1039,8 +1067,9 @@ class G1MaskMeasurementNode(Node):
                             beam_records=beam_records,
                             enabled=self.enabled_estimators,
                         )
-                        self.publish_ray_markers(
-                            nearest_beam_record(batch, beam_records), scan_msg)
+                        if beam_records is not None:
+                            self.publish_ray_markers(
+                                nearest_beam_record(batch, beam_records), scan_msg)
         elif batch.detected:
             self.log_skip_warning(
                 'No camera_info received yet; publishing measurements without '
@@ -1051,6 +1080,15 @@ class G1MaskMeasurementNode(Node):
         self.measurement_pub.publish(
             build_measurements_message(batch, detections_msg.header))
 
+    def ray_marker_records(self) -> list[PolarBeamRecord] | None:
+        """Allocate debug records only while the ray topic has a subscriber."""
+
+        if self.ray_marker_pub is None:
+            return None
+        if self.ray_marker_pub.get_subscription_count() <= 0:
+            return None
+        return []
+
     def publish_ray_markers(self, beam_record, scan_msg) -> None:
         """Draw the nearest detection's polar beams, given a scan to draw from.
 
@@ -1060,6 +1098,8 @@ class G1MaskMeasurementNode(Node):
         """
 
         if self.ray_marker_pub is None or scan_msg is None or beam_record is None:
+            return
+        if self.ray_marker_pub.get_subscription_count() <= 0:
             return
         markers = build_polar_ray_markers(
             scan_msg,
@@ -1078,18 +1118,26 @@ class G1MaskMeasurementNode(Node):
         for detection in batch.detections:
             set_mask_estimator_status(detection, reason, self.enabled_estimators)
 
-    def masks_for_batch(self, detections_msg: G1Detections, batch) -> list | None:
-        """One mask per detection for the configured gate, or ``None``.
+    def masks_for_batch(
+        self,
+        detections_msg: G1Detections,
+        batch,
+        *,
+        color_hint: Image | None = None,
+    ) -> tuple[list | None, PreparedColorFrame | None]:
+        """One mask per detection plus an optional prepared RGB frame.
 
         ``box``: rasterize each detection box (never fails). ``silhouette``:
         prompt the segmenter with all boxes on the stamp-matched color frame
-        -- one forward per frame, one decode per box. A missing color frame
+        -- one forward and one RGB preparation per frame. A missing color frame
         returns ``None`` (skip the frame's paths, never downgrade to rect --
         the run *is* the gate axis); an empty segmentation yields a ``None``
         entry for that detection only. Detections whose box covers more than
         ``MAX_BOX_FRAME_FRACTION`` of the frame are gated to a ``None`` entry
         before masking, so a runaway detector box is never rasterized
-        or segmented into the background wall.
+        or segmented into the background wall. A matching ``color_hint`` is
+        reused without taking the color-buffer lock; otherwise this method
+        retains the late exact-stamp buffer lookup.
         """
 
         accepted = [
@@ -1110,22 +1158,30 @@ class G1MaskMeasurementNode(Node):
                         detection, MissReason.MASK_OVERSIZED_BOX,
                         self.enabled_estimators)
                     box_masks.append(None)
-            return box_masks
+            return box_masks, None
 
-        with self.processing_lock:
-            color_msg = self.color_buffer.lookup(detections_msg.header.stamp)
+        color_msg = None
+        if (color_hint is not None
+                and stamp_key(color_hint.header.stamp)
+                == stamp_key(detections_msg.header.stamp)):
+            color_msg = color_hint
+        else:
+            with self.processing_lock:
+                color_msg = self.color_buffer.lookup(detections_msg.header.stamp)
         if color_msg is None:
             self.log_skip_warning(
                 'Silhouette gate: no color frame buffered for the detection '
                 'stamp (aged out or not arrived); skipping paths for this '
                 'frame. Check the color_topic parameter and buffer depth.'
             )
-            return None
+            return None, None
 
-        # The segmenter wants RGB; the shared decoder returns BGR. Only accepted
-        # boxes are prompted; oversized ones map straight to ``None``.
-        rgb = np.ascontiguousarray(
-            convert_color_image_message(color_msg)[:, :, ::-1])
+        # Both inference backends consume this one contiguous RGB object. Only
+        # accepted boxes are prompted; oversized ones map straight to ``None``.
+        prepared_color = PreparedColorFrame(
+            message=color_msg,
+            rgb=np.ascontiguousarray(decode_color_to_rgb(color_msg)),
+        )
         prompt_boxes = [
             detection.bbox_xyxy
             for detection, keep in zip(batch.detections, accepted)
@@ -1135,7 +1191,8 @@ class G1MaskMeasurementNode(Node):
         if prompt_boxes:
             started = time.perf_counter()
             blobs = self.segmenter.segment_boxes(
-                rgb, prompt_boxes, min_predicted_iou=self.segmentation_min_iou)
+                prepared_color.rgb, prompt_boxes,
+                min_predicted_iou=self.segmentation_min_iou)
             elapsed_ms = (time.perf_counter() - started) * 1000.0
             self.log_segmentation_latency(elapsed_ms, len(blobs))
 
@@ -1156,7 +1213,7 @@ class G1MaskMeasurementNode(Node):
                 masks.append(None)
             else:
                 masks.append(mask_from_array(blob, MaskPrecision.TIGHT))
-        return masks
+        return masks, prepared_color
 
     def log_segmentation_latency(self, elapsed_ms: float, mask_count: int) -> None:
         now = time.monotonic()
@@ -1180,14 +1237,21 @@ class G1MaskMeasurementNode(Node):
             f'{int(MAX_BOX_FRAME_FRACTION * 100)}% of the frame (likely a '
             'detector failure); their path estimates stay unset.')
 
-    def depth_for_batch(self, depth_input_msg: Image | None, batch):
+    def depth_for_batch(
+        self,
+        depth_input_msg: Image | None,
+        batch,
+        *,
+        prepared_color: PreparedColorFrame | None = None,
+    ):
         """Aligned depth in meters on the batch grid, or ``None`` if unusable.
 
         ``depth_input_msg`` is the depth source's own input at the detection
         stamp -- a raw camera depth frame for the stereo source, the color
         frame for the monocular one -- so the conversion (a unit decode, or a
         network forward pass) happens here, once, for the frame the detections
-        were made on.
+        were made on. With silhouette + monocular, ``prepared_color`` carries
+        that same exact RGB array from segmentation into the depth source.
 
         Every "no usable depth at this stamp" outcome funnels through ``None``,
         which the caller stamps as ``NO_DEPTH_FRAME``: nothing buffered at the
@@ -1195,10 +1259,19 @@ class G1MaskMeasurementNode(Node):
         or mid-cooldown, or a grid the masks cannot index.
         """
 
-        if depth_input_msg is None:
+        if depth_input_msg is None and prepared_color is None:
             return None
         try:
-            frame = self.depth_source.produce(depth_input_msg)
+            produce_from_rgb = getattr(self.depth_source, 'produce_from_rgb', None)
+            if (prepared_color is not None
+                    and self.depth_source.input_kind == 'color'
+                    and callable(produce_from_rgb)):
+                frame = produce_from_rgb(
+                    prepared_color.rgb, prepared_color.message.header)
+            elif depth_input_msg is not None:
+                frame = self.depth_source.produce(depth_input_msg)
+            else:
+                return None
         except ValueError as exc:
             self.log_skip_warning(f'Aligned depth frame skipped: {exc}')
             return None
@@ -1213,6 +1286,22 @@ class G1MaskMeasurementNode(Node):
             )
             return None
         return depth_m
+
+    def publish_mask_debug(
+        self,
+        masks,
+        image_height: int,
+        image_width: int,
+        header,
+    ) -> None:
+        """Publish the consumed mask union only when something subscribes."""
+
+        if self.mask_debug_pub is None:
+            return
+        if self.mask_debug_pub.get_subscription_count() <= 0:
+            return
+        self.mask_debug_pub.publish(
+            encode_mask_debug_image(masks, image_height, image_width, header))
 
     def publish_aligned_depth_debug(self, depth_m, header) -> None:
         """Republish the aligned depth frame the paths just read.

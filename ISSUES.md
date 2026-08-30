@@ -6,7 +6,9 @@
 |---------|-------|
 | Robot doesn't move | `ros2 topic echo /r100_0001/cmd_vel` - if empty, Nav2 may not be active |
 | No map in RViz | `ros2 topic hz /r100_0001/map` - if 0, check `slam_toolbox` logs and the scan topic |
-| Detection overlay does not appear | Make sure `g1_perception_enabled:=true`, remember the overlay is a separate OpenCV window, and check `/r100_0001/sensors/camera_0/color/image` |
+| Detection overlay does not appear | Make sure `g1_perception_enabled:=true`, enable the `Perception overlay` Image display in RViz, and check `/r100_0001/debug/g1/overlay` plus `/r100_0001/sensors/camera_0/color/image` |
+| Perception overlay is a sliver in the narrow left dock | Expected until `exploration.rviz`'s `QMainWindow State` blob is regenerated — `addPane()` hardcodes the left dock area. Drag the pane to the bottom dock, stretch it full width, File → Save Config. If the *whole* layout reverted to defaults instead, `restoreState` rejected the blob and restored nothing |
+| Fewer than four rings, or a missing HUD column | `ros2 node list` should show `g1_pointcloud_measurement`, `g1_mask_measurement`, `g1_estimate_viz` and `hud_g1_node`; then `ros2 topic hz /r100_0001/measurements/g1/mask`. A column reading `--` means that estimator ran and reported nothing; a column missing entirely means `estimators` did not select it |
 | `explore_lite` not finding frontiers | Verify `track_unknown_space: true` in the global costmap config |
 | TF errors | Ensure all nodes use `use_sim_time: true` |
 | Startup hangs / a stage never comes up | Bringup is event-driven (readiness gates) — find the `gate_*` process log `[launch_wait]: waiting for …`; the `unmet:` list on timeout names the exact missing topic/service. See "Event-Driven Startup" below. Do **not** re-add `TimerAction` delays |
@@ -191,3 +193,20 @@ If you add new nodes to this project, always:
 2. Add `remappings=[('/tf', 'tf'), ('/tf_static', 'tf_static')]`
 3. Use `/**/node_name:` as the YAML root key in parameter files so namespaced nodes still match their params
 4. Set `use_sim_time: true` in simulation
+
+### `g1_mask_measurement_node`'s `base_frame` default is not namespace-aware
+
+Every launch caller must pass `base_frame` explicitly to the mask node. Its own
+default is the bare string `base_link`
+(`g1_mask_measurement_node.BASE_FRAME_DEFAULT`), while the pointcloud and viz
+nodes derive `<namespace>/robot/base_link` from `get_namespace()` at
+construction. Under a namespace the bare default therefore names a frame nothing
+publishes, and polar profiling's scan→base lookup fails.
+
+It fails **silently**, which is the trap: the row simply reports nothing, which
+on the HUD is indistinguishable from an estimator that ran and found nothing.
+The benchmark has always passed the frame, so the bad default was never
+exercised there. `launch_common.mask_measurement_node()` now makes `base_frame` a
+required keyword argument rather than an optional one, so a new caller cannot
+inherit it by omission. Fixing the node's own default would be the better repair;
+this only closes the launch-layer path to it.

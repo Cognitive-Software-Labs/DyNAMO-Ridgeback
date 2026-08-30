@@ -30,6 +30,27 @@ def convert_color_image_message(msg: Image) -> np.ndarray:
     raise ValueError('unsupported color encoding')
 
 
+def decode_color_to_rgb(msg: Image) -> np.ndarray:
+    """Decode a color Image message into an RGB uint8 array.
+
+    The explicit whitelist preserves the depth-source error behaviour while
+    ``decode_image_message`` handles a driver's optional row padding. The
+    returned view may not be contiguous; callers prepare contiguity at their
+    batch boundary.
+    """
+
+    if msg.encoding not in ('rgb8', 'bgr8', 'rgba8', 'bgra8'):
+        raise ValueError(f'unsupported color encoding "{msg.encoding}"')
+    image = decode_image_message(msg)
+    if msg.encoding == 'rgb8':
+        return image
+    if msg.encoding == 'bgr8':
+        return image[:, :, ::-1]
+    if msg.encoding == 'rgba8':
+        return image[:, :, :3]
+    return image[:, :, :3][:, :, ::-1]  # bgra8
+
+
 def convert_depth_to_meters_message(msg: Image) -> np.ndarray:
     image = decode_image_message(msg)
     if msg.encoding in ('16UC1', 'mono16'):
@@ -76,4 +97,3 @@ def normalize_to_uint8(image: np.ndarray) -> np.ndarray:
         return np.zeros(image.shape, dtype=np.uint8)
     scaled = (image.astype(np.float32) - min_value) / (max_value - min_value)
     return np.clip(scaled * 255.0, 0.0, 255.0).astype(np.uint8)
-

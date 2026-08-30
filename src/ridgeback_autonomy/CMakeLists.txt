@@ -80,7 +80,7 @@ install(PROGRAMS
 )
 
 install(PROGRAMS
-  ridgeback_autonomy/benchmarking/g1_estimate_viz_node.py
+  ridgeback_autonomy/perception/g1_estimate_viz_node.py
   DESTINATION lib/${PROJECT_NAME}
   RENAME g1_estimate_viz_node
 )

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from collections import OrderedDict
 
-import cv2
 import rclpy
 from rclpy.executors import ExternalShutdownException
 from rclpy.node import Node
@@ -14,12 +13,10 @@ from geometry_msgs.msg import PointStamped
 from sensor_msgs.msg import CameraInfo, Image, LaserScan
 from tf2_ros import Buffer, TransformException, TransformListener
 
-from ridgeback_autonomy.benchmarking.estimators import (
+from ridgeback_autonomy.perception.estimators import (
     DEPTH_PATH_ESTIMATORS,
-    GROUND_TRUTH_TOPIC,
     parse_estimators,
     parse_mask_gate,
-    truth_reading,
     uses_mask_estimators,
 )
 from ridgeback_autonomy.common.messages import (
@@ -42,6 +39,7 @@ from ridgeback_autonomy.perception.core.rendering import (
     PANEL_MAX_COLS_DEFAULT,
     RgbdOverlayRenderer,
 )
+from ridgeback_autonomy.perception.ground_truth import GROUND_TRUTH_TOPIC, truth_reading
 
 
 POINTCLOUD_MEASUREMENTS_TOPIC = 'measurements/g1/pointcloud'
@@ -56,7 +54,6 @@ ALIGNED_DEPTH_TOPIC = 'debug/g1/mask/aligned_depth'
 COLOR_CAMERA_INFO_TOPIC = 'sensors/camera_0/color/camera_info'
 SCAN_TOPIC = 'sensors/lidar2d_0/scan'
 DEPTH_MAX_METERS_DEFAULT = 10.0
-RENDER_FPS_DEFAULT = 15.0
 
 # The estimator fields each measurement pipeline populates. render_latest builds
 # the batch from whichever pipeline drove the frame, then merges the other in
@@ -85,21 +82,14 @@ class G1OverlayNode(Node):
         self.declare_parameter('scan_topic', SCAN_TOPIC)
         self.declare_parameter('ground_truth_topic', GROUND_TRUTH_TOPIC)
         self.declare_parameter('depth_max_meters', DEPTH_MAX_METERS_DEFAULT)
-        self.declare_parameter('render_fps', RENDER_FPS_DEFAULT)
-        self.declare_parameter('window_name', 'G1 Perception')
         # The run config: which estimators, the aligned-depth source, and the
         # mask gate. These drive which panels are built and which labels drawn.
         self.declare_parameter('estimators', 'all')
         self.declare_parameter('depth_source', 'stereoscopic')
         self.declare_parameter('mask_gate', 'box')
         self.declare_parameter('overlay_image_topic', OVERLAY_IMAGE_TOPIC)
-        # The standalone OpenCV window. Kept on by default so existing workflows
-        # are unchanged; benchmark runs turn it off, because the composite is
-        # published for RViz there and a floating window would sit over it.
-        self.declare_parameter('show_window', True)
-        # Panels per row. A tall 3-wide grid suits the standalone window; the
-        # RViz strip is far wider than it is tall, where a single row fills it
-        # instead of letterboxing to a third of the width.
+        # The RViz strip is far wider than it is tall, where a single row fills
+        # it instead of letterboxing to a third of the width.
         self.declare_parameter('max_cols', PANEL_MAX_COLS_DEFAULT)
         # The per-detection label block on the RGB panel. Off for benchmark runs,
         # where the HUD carries the numbers as text RViz draws at full size and
@@ -108,9 +98,6 @@ class G1OverlayNode(Node):
 
         self.color_topic = self.get_parameter('color_topic').value
         self.depth_max_meters = float(self.get_parameter('depth_max_meters').value)
-        self.render_fps = max(1.0, float(self.get_parameter('render_fps').value))
-        self.window_name = self.get_parameter('window_name').value
-        self.show_window = bool(self.get_parameter('show_window').value)
         self.rgb_panel_labels = bool(self.get_parameter('rgb_panel_labels').value)
 
         self.estimators = parse_estimators(str(self.get_parameter('estimators').value))
@@ -177,19 +164,10 @@ class G1OverlayNode(Node):
                 LaserScan, self.get_parameter('scan_topic').value,
                 self.scan_callback, qos_profile=qos_profile_sensor_data)
 
-        self.render_timer = self.create_timer(1.0 / self.render_fps, self.render_callback)
-
-        # The composite as a topic, so RViz can hold it alongside the 3D view and
-        # one window contains the whole picture. Published whatever the window
-        # setting, since the two are independent sinks for the same frame.
+        # The composite is a topic so RViz can hold it alongside the 3D view.
         self.overlay_pub = self.create_publisher(
             Image, str(self.get_parameter('overlay_image_topic').value),
             qos_profile_sensor_data)
-
-        if self.show_window:
-            cv2.namedWindow(self.window_name, cv2.WINDOW_NORMAL)
-            cv2.resizeWindow(self.window_name, 1280, 720)
-            cv2.moveWindow(self.window_name, 60, 60)
 
     # -- measurement inputs --
 
@@ -255,11 +233,6 @@ class G1OverlayNode(Node):
                 measurements_msg.header.stamp.sec, measurements_msg.header.stamp.nanosec):
             self.render_latest()
 
-    def render_callback(self) -> None:
-        # Pumps the highgui event loop; pointless with no window to pump.
-        if self.show_window:
-            cv2.waitKey(1)
-
     # -- rendering --
 
     def render_latest(self) -> None:
@@ -294,9 +267,6 @@ class G1OverlayNode(Node):
         )
         self.overlay_pub.publish(
             build_bgr8_image_message(annotated, self.latest_color_msg.header))
-        if self.show_window:
-            cv2.imshow(self.window_name, annotated)
-            cv2.waitKey(1)
 
     def decode_depth(self, depth_msg: Image | None, warning_attr: str, label: str):
         if depth_msg is None:
@@ -419,11 +389,6 @@ class G1OverlayNode(Node):
             return
         setattr(self, attribute_name, warning)
         self.get_logger().warn(warning)
-
-    def destroy_node(self) -> bool:
-        cv2.destroyAllWindows()
-        return super().destroy_node()
-
 
 def main() -> None:
     rclpy.init()

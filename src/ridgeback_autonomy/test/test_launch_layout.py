@@ -3,7 +3,24 @@ from __future__ import annotations
 from pathlib import Path
 import re
 
-from ridgeback_autonomy.benchmarking.launch_common import CONFIG_LAUNCH_ARGUMENT_NAMES
+import yaml
+
+from ridgeback_autonomy.perception.estimators import PUBLIC_ESTIMATOR_ORDER
+from ridgeback_autonomy.perception.g1_launch import CONFIG_LAUNCH_ARGUMENT_NAMES
+
+
+def _package_root() -> Path:
+    return Path(__file__).resolve().parents[1]
+
+
+def _exploration_text() -> str:
+    return (
+        _package_root() / 'launch' / 'ridgeback_exploration.launch.py'
+    ).read_text(encoding='utf-8')
+
+
+def _exploration_rviz_path() -> Path:
+    return _package_root() / 'sim' / 'rviz' / 'exploration.rviz'
 
 
 def test_public_launch_surface_is_limited_to_known_entrypoints() -> None:
@@ -104,16 +121,115 @@ def test_benchmark_launch_uses_new_multi_estimator_interface() -> None:
     assert 'primary_metric' not in benchmark_text
     assert "DeclareLaunchArgument('depth_anything_enabled'" not in benchmark_text
     assert "DeclareLaunchArgument('output_csv'" not in benchmark_text
+    assert 'overlay_window' not in benchmark_text
+    assert 'show_window' not in benchmark_text
     # The mask-gate axis: declared once, forwarded to the mask node, the runner
     # (output names must match the node's gate), and the overlay (its mask panel
     # follows the gate).
     assert "'mask_gate'," in benchmark_text
-    assert benchmark_text.count("'mask_gate': LaunchConfiguration('mask_gate')") == 3
+    assert benchmark_text.count("LaunchConfiguration('mask_gate')") == 3
     # One estimators list, split per stack: each measurement node is handed only
     # the rows it owns, so a mask row can be selected as freely as the
     # pointcloud one.
-    assert "'enabled_estimators': ','.join(selected_pointcloud)" in benchmark_text
-    assert "'enabled_estimators': ','.join(selected_mask)" in benchmark_text
+    assert "enabled_estimators=','.join(selected_pointcloud)" in benchmark_text
+    assert "enabled_estimators=','.join(selected_mask)" in benchmark_text
+
+
+def test_exploration_runs_the_same_four_estimator_rows_as_the_benchmark() -> None:
+    exploration_text = _exploration_text()
+
+    # Nothing pinned to one row any more: exploration selects the same way the
+    # benchmark does, and the shared factories are what stop the two stacks
+    # measuring off different topics.
+    assert "'estimators': 'pointcloud'" not in exploration_text
+    assert "DeclareLaunchArgument('estimators', default_value='all'" in exploration_text
+    assert 'pointcloud_measurement_node(' in exploration_text
+    assert 'mask_measurement_node(' in exploration_text
+    assert 'parse_estimators' in exploration_text
+
+    # Rings and the distance HUD are on by default, or the four-way comparison
+    # this stack now produces has nothing drawing it.
+    assert "DeclareLaunchArgument('estimate_viz', default_value='true'" in exploration_text
+
+    # The mask node's own base_frame default is the bare string 'base_link',
+    # which resolves to nothing under a namespace and fails polar profiling's
+    # scan->base lookup silently. Every caller has to pass it.
+    assert "base_frame = [namespace, '/robot/base_link']" in exploration_text
+
+
+def test_exploration_gives_the_distance_hud_its_own_aggregator() -> None:
+    # hud_node renders through QStaticText: one rich-text panel switches the
+    # whole overlay to rich text, and the velocity/coverage panels align their
+    # columns with runs of spaces, which rich text collapses.
+    exploration_text = _exploration_text()
+
+    assert "name='hud_g1_node'" in exploration_text
+    assert 'marker_topic=HUD_G1_MARKER_TOPIC' in exploration_text
+    # The rich-text panel and the alignment come from the shared factory, so the
+    # benchmark's aggregator and this one cannot drift apart on that contract.
+    assert 'distance_hud_node(' in exploration_text
+    # The original aggregator keeps its plain panels and its own topic, and is
+    # still written out here because nothing else runs one like it.
+    assert "'panels': ['hud/velocity', 'hud/coverage']" in exploration_text
+    assert exploration_text.count("executable='hud_node'") == 1
+
+
+def test_exploration_rviz_configures_one_checkbox_per_registered_estimator() -> None:
+    # A MarkerArray display renders one checkbox per marker namespace, and the
+    # ring and its centre dot share one, so unticking a row drops both. Writing
+    # the names into the config pins them: rename an estimator and this block
+    # would silently keep a checkbox for a namespace nothing publishes while the
+    # new row arrived unconfigured.
+    config = yaml.safe_load(_exploration_rviz_path().read_text(encoding='utf-8'))
+    displays = config['Visualization Manager']['Displays']
+    estimates = next(d for d in displays if d['Name'] == 'G1 Estimates')
+
+    assert set(estimates['Namespaces']) == {
+        f'g1_estimates/{estimator}' for estimator in PUBLIC_ESTIMATOR_ORDER
+    }
+    assert all(estimates['Namespaces'].values())
+
+
+def test_exploration_rviz_shows_the_overlay_and_the_distance_hud() -> None:
+    config = yaml.safe_load(_exploration_rviz_path().read_text(encoding='utf-8'))
+    displays = config['Visualization Manager']['Displays']
+    by_name = {display['Name']: display for display in displays}
+
+    # The overlay display has existed here all along with Enabled: false, so the
+    # camera panels have never been visible in exploration.
+    assert by_name['Perception overlay']['Enabled'] is True
+    # A pane, so it needs a Window Geometry entry; the TextOverlays are drawn on
+    # the 3D view and do not.
+    assert config['Window Geometry']['Perception overlay'] == {'collapsed': False}
+
+    assert by_name['G1 HUD']['Topic']['Value'] == '/r100_0001/hud_g1_overlay'
+    assert by_name['HUD']['Topic']['Value'] == '/r100_0001/hud_overlay'
+
+
+def test_camera_overlay_is_rviz_only() -> None:
+    repo_root = Path(__file__).resolve().parents[3]
+    overlay_text = (
+        repo_root
+        / 'src'
+        / 'ridgeback_autonomy'
+        / 'ridgeback_autonomy'
+        / 'perception'
+        / 'g1_overlay_node.py'
+    ).read_text(encoding='utf-8')
+
+    assert 'build_bgr8_image_message' in overlay_text
+    assert 'self.overlay_pub.publish' in overlay_text
+    for removed_symbol in (
+        'show_window',
+        'window_name',
+        'render_fps',
+        'render_callback',
+        'cv2.namedWindow',
+        'cv2.imshow',
+        'cv2.waitKey',
+        'cv2.destroyAllWindows',
+    ):
+        assert removed_symbol not in overlay_text
 
 
 def test_benchmark_layers_declare_identical_shared_arguments() -> None:
@@ -125,11 +241,20 @@ def test_benchmark_layers_declare_identical_shared_arguments() -> None:
         "DeclareLaunchArgument('namespace', default_value='r100_0001')",
         "DeclareLaunchArgument('use_sim_time', default_value='true')",
         "DeclareLaunchArgument('world', default_value='g1_distance_calibration')",
-        "DeclareLaunchArgument('color_topic', default_value='sensors/camera_0/color/image')",
     ]
     for declaration in shared_declarations:
         assert env_text.count(declaration) == 1
         assert config_text.count(declaration) == 1
+
+    # Both process layers source the persistent detector and restartable
+    # measurement stack from the same pure mapping rather than duplicating a
+    # simulation topic literal -- and that mapping is now resolved once in
+    # launch_common, so no launch file calls resolve_camera_inputs itself.
+    for text in (env_text, config_text, _exploration_text()):
+        assert 'SIMULATION_CAMERA_INPUTS' in text
+        assert 'resolve_camera_inputs(SIMULATION_BACKEND)' not in text
+    assert 'default_value=SIMULATION_CAMERA_INPUTS.color_image_topic' in env_text
+    assert 'default_value=SIMULATION_CAMERA_INPUTS.color_image_topic' in config_text
 
     declared_config_names = frozenset(re.findall(
         r"DeclareLaunchArgument\(\s*'([^']+)'",

@@ -4,17 +4,24 @@ import math
 from types import SimpleNamespace
 
 import numpy as np
+import pytest
 
 from ridgeback_autonomy.common.miss_reason import MissReason
 from ridgeback_autonomy.perception.core.intrinsics import CameraIntrinsics
 from ridgeback_autonomy.perception.core.mask import MaskPrecision, mask_from_array, rasterize_bbox
+from ridgeback_autonomy.perception.core import polar_profiling
 from ridgeback_autonomy.perception.core.polar_profiling import (
     beams_in_bbox,
+    localize_projected_polar_profiling,
     localize_polar_profiling,
     merge_near_band,
+    project_in_view,
+    project_scan_to_image,
     scan_points_optical,
     segment_range_profile,
+    select_bbox_beams,
     select_beams,
+    select_mask_beams,
 )
 
 
@@ -129,6 +136,76 @@ def test_bbox_beams_are_a_superset_of_a_tighter_silhouette() -> None:
     in_bbox = beams_in_bbox(points, valid, MASK_BBOX, INTRINSICS)
 
     assert set(selected.tolist()) < set(in_bbox.tolist())
+
+
+def test_scan_image_projection_preserves_full_uv_and_compact_original_indices() -> None:
+    points = np.vstack((
+        two_legs_profile(),
+        # These rows must remain in the full UV array even though neither is
+        # selectable: one is beyond the image edge, the other behind camera.
+        np.array([[10.0, SCAN_PLANE_Y_M, 1.0], [0.0, SCAN_PLANE_Y_M, -1.0]]),
+    ))
+    valid = np.ones(points.shape[0], dtype=bool)
+    valid[0] = False
+
+    projection = project_scan_to_image(points, valid, INTRINSICS)
+    legacy_indices, legacy_uv = project_in_view(points, valid, INTRINSICS)
+
+    assert projection.uv.shape == (points.shape[0], 2)
+    assert np.array_equal(projection.uv, legacy_uv, equal_nan=True)
+    assert np.array_equal(projection.beam_indices, legacy_indices)
+    assert np.array_equal(
+        projection.u_px, np.rint(projection.uv[legacy_indices, 0]).astype(np.intp))
+    assert np.array_equal(
+        projection.v_px, np.rint(projection.uv[legacy_indices, 1]).astype(np.intp))
+    assert {0, points.shape[0] - 2, points.shape[0] - 1}.isdisjoint(
+        projection.beam_indices.tolist())
+
+
+def test_distinct_masks_select_independently_from_one_projection() -> None:
+    points = two_legs_profile()
+    projection = project_scan_to_image(
+        points, np.ones(points.shape[0], dtype=bool), INTRINSICS)
+    left = mask_from_array(
+        rasterize_bbox((30, 33, 40, 49), HEIGHT, WIDTH).data, MaskPrecision.TIGHT)
+    right = mask_from_array(
+        rasterize_bbox((40, 33, 51, 49), HEIGHT, WIDTH).data, MaskPrecision.TIGHT)
+
+    left_beams = select_mask_beams(projection, left)
+    right_beams = select_mask_beams(projection, right)
+
+    assert left_beams.size > 0 and right_beams.size > 0
+    assert not np.array_equal(left_beams, right_beams)
+    assert set(left_beams.tolist()).isdisjoint(right_beams.tolist())
+    assert np.array_equal(select_bbox_beams(projection, MASK_BBOX),
+                          beams_in_bbox(points, np.ones(points.shape[0], dtype=bool),
+                                        MASK_BBOX, INTRINSICS))
+
+
+def test_projected_localization_matches_legacy_and_retains_failed_selection() -> None:
+    points = two_legs_profile()
+    valid = np.ones(points.shape[0], dtype=bool)
+    mask = rasterize_bbox(MASK_BBOX, HEIGHT, WIDTH)
+    projection = project_scan_to_image(points, valid, INTRINSICS)
+
+    attempt = localize_projected_polar_profiling(projection, mask)
+    legacy_result, legacy_reason = localize_polar_profiling(points, valid, mask, INTRINSICS)
+
+    assert attempt.reason is legacy_reason is MissReason.OK
+    assert np.array_equal(attempt.result.xz_optical, legacy_result.xz_optical)
+    assert np.array_equal(attempt.result.selected_beams, legacy_result.selected_beams)
+    assert np.array_equal(attempt.result.merged_beams, legacy_result.merged_beams)
+
+    sparse_points = profile_points(
+        np.array([-1.0, 1.0]), np.array([LEG_Z_M, WALL_Z_M]))
+    sparse_projection = project_scan_to_image(
+        sparse_points, np.ones(2, dtype=bool), INTRINSICS)
+    failed = localize_projected_polar_profiling(
+        sparse_projection, rasterize_bbox(MASK_BBOX, HEIGHT, WIDTH))
+
+    assert failed.result is None
+    assert failed.reason is MissReason.TOO_FEW_RAYS_MERGED
+    assert failed.selected_beams.tolist() == [0, 1]
 
 
 def test_box_above_the_scan_row_contains_no_beams() -> None:
@@ -286,6 +363,100 @@ def test_scan_points_optical_transform_and_validity() -> None:
         3.0 * math.cos(0.4) + 0.09,
     )
     assert np.allclose(points[4], expected)
+
+
+def test_scan_points_optical_reuses_immutable_unit_directions() -> None:
+    polar_profiling._scan_unit_directions.cache_clear()
+    scan = SimpleNamespace(
+        ranges=[1.0, 2.0, 3.0],
+        angle_min=-0.1,
+        angle_increment=0.1,
+        range_min=0.02,
+        range_max=15.0,
+    )
+
+    scan_points_optical(scan, np.eye(3), np.zeros(3))
+    scan.ranges = [3.0, 2.0, 1.0]
+    scan_points_optical(scan, np.eye(3), np.zeros(3))
+
+    cache_info = polar_profiling._scan_unit_directions.cache_info()
+    assert cache_info.hits == 1
+    assert cache_info.misses == 1
+    assert cache_info.maxsize == polar_profiling._SCAN_GEOMETRY_CACHE_SIZE
+
+    directions = polar_profiling._scan_unit_directions(3, -0.1, 0.1)
+    assert directions.dtype == np.float64
+    assert not directions.flags.writeable
+    with pytest.raises(ValueError):
+        directions[0, 0] = 0.0
+
+
+def test_scan_points_optical_cache_keys_every_geometry_field() -> None:
+    polar_profiling._scan_unit_directions.cache_clear()
+
+    geometries = (
+        (3, -0.1, 0.1),
+        (4, -0.1, 0.1),
+        (3, -0.2, 0.1),
+        (3, -0.1, 0.2),
+    )
+    directions = [
+        polar_profiling._scan_unit_directions(*geometry)
+        for geometry in geometries
+    ]
+
+    assert len({id(value) for value in directions}) == len(geometries)
+    assert directions[0].shape != directions[1].shape
+    assert not np.array_equal(directions[0], directions[2])
+    assert not np.array_equal(directions[0], directions[3])
+    assert polar_profiling._scan_unit_directions.cache_info().currsize == len(geometries)
+
+
+def test_scan_points_optical_current_ranges_and_transform_are_not_cached() -> None:
+    polar_profiling._scan_unit_directions.cache_clear()
+    scan = SimpleNamespace(
+        ranges=[1.0, 2.0, 3.0],
+        angle_min=-0.2,
+        angle_increment=0.2,
+        range_min=0.02,
+        range_max=15.0,
+    )
+    first_rotation = np.eye(3)
+    first_translation = np.zeros(3)
+
+    first_points, first_valid = scan_points_optical(
+        scan, first_rotation, first_translation,
+    )
+    first_angles = scan.angle_min + np.arange(3, dtype=np.float64) * scan.angle_increment
+    first_expected = np.stack((
+        np.asarray(scan.ranges) * np.cos(first_angles),
+        np.asarray(scan.ranges) * np.sin(first_angles),
+        np.zeros(3),
+    ), axis=1)
+
+    scan.ranges = [3.0, 2.0, 1.0]
+    second_rotation = np.array([
+        [0.0, -1.0, 0.0],
+        [1.0, 0.0, 0.0],
+        [0.0, 0.0, 1.0],
+    ])
+    second_translation = np.array([0.5, -0.25, 1.0])
+    second_points, second_valid = scan_points_optical(
+        scan, second_rotation, second_translation,
+    )
+    second_scan_points = np.stack((
+        np.asarray(scan.ranges) * np.cos(first_angles),
+        np.asarray(scan.ranges) * np.sin(first_angles),
+        np.zeros(3),
+    ), axis=1)
+    second_expected = second_scan_points @ second_rotation.T + second_translation
+
+    assert np.array_equal(first_valid, np.ones(3, dtype=bool))
+    assert np.array_equal(second_valid, np.ones(3, dtype=bool))
+    assert np.allclose(first_points, first_expected)
+    assert np.allclose(second_points, second_expected)
+    assert not np.array_equal(first_points, second_points)
+    assert polar_profiling._scan_unit_directions.cache_info().hits == 1
 
 
 def test_scan_points_optical_empty_scan_raises() -> None:

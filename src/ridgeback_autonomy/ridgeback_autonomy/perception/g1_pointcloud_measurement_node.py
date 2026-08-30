@@ -19,7 +19,7 @@ from ridgeback_autonomy.common.messages import (
 )
 from ridgeback_autonomy.common.tf_utils import lookup_transform_components
 from ridgeback_autonomy.msg import G1Detections, G1Measurements
-from ridgeback_autonomy.benchmarking.estimators import parse_estimators
+from ridgeback_autonomy.perception.estimators import parse_estimators
 from ridgeback_autonomy.perception.core.pointcloud_ranging import (
     add_pointcloud_measurements,
     extract_organized_xyz,

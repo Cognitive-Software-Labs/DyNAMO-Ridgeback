@@ -6,7 +6,7 @@ from dataclasses import dataclass
 import cv2
 import numpy as np
 
-from ridgeback_autonomy.benchmarking.estimators import (
+from ridgeback_autonomy.perception.estimators import (
     DEPTH_PATH_ESTIMATORS,
     ESTIMATOR_LABELS,
     MASK_GATE_SILHOUETTE,

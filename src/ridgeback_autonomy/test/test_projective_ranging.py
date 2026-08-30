@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import numpy as np
+import pytest
 
 from ridgeback_autonomy.common.miss_reason import MissReason
 from ridgeback_autonomy.perception.core.intrinsics import CameraIntrinsics
 from ridgeback_autonomy.perception.core.isolation_2d import otsu_foreground
 from ridgeback_autonomy.perception.core.mask import MaskPrecision, mask_from_array, rasterize_bbox
+from ridgeback_autonomy.perception.core import projective_ranging
 from ridgeback_autonomy.perception.core.projective_ranging import localize_projective_ranging
 
 
@@ -84,6 +86,38 @@ def test_rect_accepts_explicit_isolation_recipe() -> None:
     assert result is not None
     assert result.depth_m == OBJECT_DEPTH_M
     assert np.allclose(result.representative_uv, OBJECT_CENTROID_UV)
+
+
+def test_rect_uses_precomputed_valid_mask_without_recleaning(
+    monkeypatch,
+) -> None:
+    depth = build_depth()
+    mask = rasterize_bbox(RECT_BBOX, HEIGHT, WIDTH)
+    valid_masked = mask.data & np.isfinite(depth) & (depth > 0.0)
+    received = []
+
+    def isolation(depth_arg, mask_arg, *, depth_max, valid_masked):
+        received.append(valid_masked)
+        return valid_masked
+
+    monkeypatch.setattr(
+        projective_ranging,
+        'valid_depth',
+        lambda *args: pytest.fail('precomputed validity should be reused'),
+    )
+
+    result, reason = localize_projective_ranging(
+        depth,
+        mask,
+        INTRINSICS,
+        isolation=isolation,
+        valid_masked=valid_masked,
+    )
+
+    assert result is not None
+    assert reason is MissReason.OK
+    assert len(received) == 1
+    assert received[0] is valid_masked
 
 
 def test_rect_branch_respects_custom_depth_max() -> None:

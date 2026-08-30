@@ -17,6 +17,9 @@ from ridgeback_autonomy.perception.core.depth_sources import (
     decode_depth_to_meters,
     encode_depth_message,
 )
+from ridgeback_autonomy.perception.core.image_utils import (
+    decode_color_to_rgb as canonical_decode_color_to_rgb,
+)
 
 
 class _NullLogger:
@@ -28,6 +31,14 @@ class _NullLogger:
 
     def error(self, *args, **kwargs) -> None:
         pass
+
+
+class _RecordingLogger(_NullLogger):
+    def __init__(self) -> None:
+        self.warnings = []
+
+    def warn(self, message, *args, **kwargs) -> None:
+        self.warnings.append(str(message))
 
 
 def make_image(encoding: str, array: np.ndarray) -> Image:
@@ -118,6 +129,10 @@ def test_decode_color_rejects_unknown_encoding() -> None:
         decode_color_to_rgb(make_image('yuv422', raw))
 
 
+def test_depth_sources_reexports_the_canonical_color_decoder() -> None:
+    assert decode_color_to_rgb is canonical_decode_color_to_rgb
+
+
 def test_monocular_source_retries_after_cooldown(monkeypatch) -> None:
     # A transient load/inference failure must NOT permanently disable the
     # source. It arms a cooldown, skips while it is active, then re-attempts
@@ -165,10 +180,183 @@ class _FakePipeline:
         self.model = type('_FakeModel', (), {'config': config})()
 
 
+class _ProducingPipeline(_FakePipeline):
+    def __init__(self, predicted_depth: np.ndarray) -> None:
+        super().__init__(_FakeConfig('metric', 20))
+        self.predicted_depth = predicted_depth
+        self.inputs = []
+
+    def __call__(self, image):
+        self.inputs.append(image)
+        return {'predicted_depth': self.predicted_depth}
+
+
+class _FakePilImage:
+    @staticmethod
+    def fromarray(image: np.ndarray) -> np.ndarray:
+        return image
+
+
+class _FakeCv2:
+    INTER_LINEAR = object()
+
+    def __init__(self, resized: np.ndarray) -> None:
+        self.resized = resized
+        self.calls = []
+
+    def resize(self, depth: np.ndarray, size, *, interpolation) -> np.ndarray:
+        self.calls.append((depth.copy(), size, interpolation))
+        return self.resized.copy()
+
+
 def _loaded_source(config, monkeypatch) -> MonocularDepthSource:
     source = MonocularDepthSource('model', 'cpu', _NullLogger())
     monkeypatch.setattr(source, '_build_pipeline', lambda: _FakePipeline(config))
     return source
+
+
+def test_monocular_caches_pillow_and_opencv_across_frames(monkeypatch) -> None:
+    predicted = np.array(
+        [[1.0, 1.1, 1.2], [1.3, 1.4, 1.5]], dtype=np.float32)
+    expected = np.array([[1.0, 1.1], [1.2, 1.3]], dtype=np.float32)
+    pipeline = _ProducingPipeline(predicted)
+    cv2 = _FakeCv2(expected)
+    imports = []
+
+    def import_module(name: str):
+        imports.append(name)
+        if name == 'PIL.Image':
+            return _FakePilImage
+        if name == 'cv2':
+            return cv2
+        raise AssertionError(f'unexpected import: {name}')
+
+    monkeypatch.setattr(
+        'ridgeback_autonomy.perception.core.depth_sources.importlib.import_module',
+        import_module)
+    source = MonocularDepthSource('model', 'cpu', _NullLogger())
+    monkeypatch.setattr(source, '_build_pipeline', lambda: pipeline)
+    msg = make_image('rgb8', np.arange(12, dtype=np.uint8).reshape(2, 2, 3))
+
+    first_depth, first_header = source.produce(msg)
+    second_depth, second_header = source.produce(msg)
+
+    assert imports == ['PIL.Image', 'cv2']
+    assert len(pipeline.inputs) == 2
+    assert len(cv2.calls) == 2
+    assert cv2.calls[0][1:] == ((2, 2), cv2.INTER_LINEAR)
+    np.testing.assert_array_equal(first_depth, expected)
+    np.testing.assert_array_equal(second_depth, expected)
+    assert first_header is msg.header
+    assert second_header is msg.header
+
+
+def test_monocular_does_not_require_opencv_without_resizing(monkeypatch) -> None:
+    predicted = np.array([[0.5, 1.0], [1.5, 2.0]], dtype=np.float32)
+    pipeline = _ProducingPipeline(predicted)
+    imports = []
+
+    def import_module(name: str):
+        imports.append(name)
+        if name == 'PIL.Image':
+            return _FakePilImage
+        if name == 'cv2':
+            raise ModuleNotFoundError('OpenCV is not installed')
+        raise AssertionError(f'unexpected import: {name}')
+
+    monkeypatch.setattr(
+        'ridgeback_autonomy.perception.core.depth_sources.importlib.import_module',
+        import_module)
+    source = MonocularDepthSource('model', 'cpu', _NullLogger())
+    monkeypatch.setattr(source, '_build_pipeline', lambda: pipeline)
+    msg = make_image('rgb8', np.zeros((2, 2, 3), dtype=np.uint8))
+
+    depth_m, header = source.produce(msg)
+
+    assert imports == ['PIL.Image']
+    np.testing.assert_array_equal(depth_m, predicted)
+    assert header is msg.header
+
+
+def test_monocular_produce_decodes_then_delegates_to_prepared_rgb(monkeypatch) -> None:
+    source = MonocularDepthSource('model', 'cpu', _NullLogger())
+    msg = make_image(
+        'bgr8', np.arange(12, dtype=np.uint8).reshape(2, 2, 3))
+    seen = {}
+
+    def produce_from_rgb(rgb, header):
+        seen['rgb'] = rgb
+        seen['header'] = header
+        return 'depth', header
+
+    monkeypatch.setattr(source, 'produce_from_rgb', produce_from_rgb)
+
+    assert source.produce(msg) == ('depth', msg.header)
+    np.testing.assert_array_equal(
+        seen['rgb'], np.arange(12, dtype=np.uint8).reshape(2, 2, 3)[:, :, ::-1])
+    assert seen['rgb'].flags.c_contiguous
+    assert seen['header'] is msg.header
+
+
+def test_monocular_produce_from_rgb_does_not_decode_a_ros_message(monkeypatch) -> None:
+    rgb = np.arange(12, dtype=np.uint8).reshape(2, 2, 3)
+    pipeline = _ProducingPipeline(np.ones((2, 2), dtype=np.float32))
+    source = MonocularDepthSource('model', 'cpu', _NullLogger())
+    monkeypatch.setattr(source, '_build_pipeline', lambda: pipeline)
+    monkeypatch.setattr(
+        'ridgeback_autonomy.perception.core.depth_sources.decode_color_to_rgb',
+        lambda _msg: pytest.fail('produce_from_rgb must not decode a ROS message'),
+    )
+    monkeypatch.setattr(
+        'ridgeback_autonomy.perception.core.depth_sources.importlib.import_module',
+        lambda name: _FakePilImage if name == 'PIL.Image' else pytest.fail(name),
+    )
+    header = Header()
+
+    depth_m, returned_header = source.produce_from_rgb(rgb, header)
+
+    np.testing.assert_array_equal(depth_m, np.ones((2, 2), dtype=np.float32))
+    assert returned_header is header
+    assert pipeline.inputs == [rgb]
+    assert pipeline.inputs[0] is rgb
+
+
+def test_monocular_retries_a_failed_pillow_import_after_cooldown(monkeypatch) -> None:
+    clock = {'t': 100.0}
+    logger = _RecordingLogger()
+    predicted = np.full((2, 2), 2.0, dtype=np.float32)
+    pipeline = _ProducingPipeline(predicted)
+    import_attempts = {'n': 0}
+
+    def import_module(name: str):
+        assert name == 'PIL.Image'
+        import_attempts['n'] += 1
+        if import_attempts['n'] == 1:
+            raise ModuleNotFoundError('Pillow is temporarily unavailable')
+        return _FakePilImage
+
+    monkeypatch.setattr(
+        'ridgeback_autonomy.perception.core.depth_sources.importlib.import_module',
+        import_module)
+    source = MonocularDepthSource(
+        'model', 'cpu', logger,
+        now_fn=lambda: clock['t'], cooldown_s=30.0)
+    monkeypatch.setattr(source, '_build_pipeline', lambda: pipeline)
+    msg = make_image('rgb8', np.zeros((2, 2, 3), dtype=np.uint8))
+
+    assert source.produce(msg) is None
+    assert import_attempts['n'] == 1
+    assert 'Pillow is temporarily unavailable' in logger.warnings[-1]
+
+    clock['t'] = 120.0
+    assert source.produce(msg) is None
+    assert import_attempts['n'] == 1
+
+    clock['t'] = 131.0
+    depth_m, header = source.produce(msg)
+    np.testing.assert_array_equal(depth_m, predicted)
+    assert header is msg.header
+    assert import_attempts['n'] == 2
 
 
 def test_monocular_usable_max_derives_from_checkpoint_max_depth(monkeypatch) -> None:

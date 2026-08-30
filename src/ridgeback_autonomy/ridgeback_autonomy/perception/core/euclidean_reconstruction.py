@@ -62,6 +62,7 @@ def localize_euclidean_reconstruction(
     isolation: Callable[[np.ndarray], np.ndarray] | None = None,
     depth_max: float = DEPTH_MAX_METERS_DEFAULT,
     min_valid_points: int = MIN_VALID_POINTS_DEFAULT,
+    valid_masked: np.ndarray | None = None,
 ) -> tuple[EuclideanReconstructionResult | None, MissReason]:
     """Localize one mask against one aligned depth frame in the point domain.
 
@@ -69,13 +70,23 @@ def localize_euclidean_reconstruction(
     ``ISOLATION_3D_RECIPES`` entry; default recipe when ``None``); the
     ``tight`` branch uses MAD outlier removal instead. Returns
     ``(result, MissReason.OK)`` on success, or ``(None, <reason>)`` when fewer
-    than ``min_valid_points`` points enter or survive isolation.
+    than ``min_valid_points`` points enter or survive isolation. ``valid_masked``
+    may carry the caller's already-cleaned ``mask & valid_depth`` array;
+    omitting it preserves the standalone behavior and computes validity here.
     """
 
     depth_m = np.asarray(depth_m)
 
     # 1./2. DEPROJECT + SELECT commute: deproject the valid masked pixels only.
-    valid = mask.data & valid_depth(depth_m, depth_max)
+    if valid_masked is None:
+        valid = mask.data & valid_depth(depth_m, depth_max)
+    else:
+        valid = np.asarray(valid_masked)
+        if valid.dtype != np.bool_ or valid.shape != depth_m.shape:
+            raise ValueError(
+                'valid_masked must be a boolean array matching depth_m; '
+                f'got dtype={valid.dtype}, shape={valid.shape}, '
+                f'depth_shape={depth_m.shape}')
     rows, cols = np.nonzero(valid)
     if rows.size < min_valid_points:
         return None, MissReason.TOO_FEW_VALID_POINTS

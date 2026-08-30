@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import numpy as np
+import pytest
 
 from ridgeback_autonomy.common.miss_reason import MissReason
+from ridgeback_autonomy.perception.core import euclidean_reconstruction
 from ridgeback_autonomy.perception.core.intrinsics import CameraIntrinsics
 from ridgeback_autonomy.perception.core.isolation_3d import RangeBand
 from ridgeback_autonomy.perception.core.mask import MaskPrecision, mask_from_array, rasterize_bbox
@@ -53,6 +55,27 @@ def test_rect_accepts_explicit_isolation_recipe() -> None:
     assert result is not None
     assert np.allclose(result.xyz_optical, OBJECT_CENTROID_XYZ)
     assert result.foreground_points.shape == (400, 3)
+
+
+def test_precomputed_valid_mask_avoids_recleaning(monkeypatch) -> None:
+    depth = build_depth()
+    mask = rasterize_bbox(RECT_BBOX, HEIGHT, WIDTH)
+    valid_masked = mask.data & np.isfinite(depth) & (depth > 0.0)
+    monkeypatch.setattr(
+        euclidean_reconstruction,
+        'valid_depth',
+        lambda *args: pytest.fail('precomputed validity should be reused'),
+    )
+
+    result, reason = localize_euclidean_reconstruction(
+        depth,
+        mask,
+        INTRINSICS,
+        valid_masked=valid_masked,
+    )
+
+    assert result is not None
+    assert reason is MissReason.OK
 
 
 def test_tight_mask_mad_pass_drops_edge_bleed() -> None:

@@ -5,15 +5,36 @@ import os
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 import launch.conditions
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, OpaqueFunction
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
-from ridgeback_autonomy.benchmarking.launch_common import (
+from ridgeback_autonomy.perception.g1_launch import (
     RAW_DETECTIONS_TOPIC,
+    SIMULATION_CAMERA_INPUTS,
     perception_venv_actions,
+    resolved_camera_inputs,
 )
+
+
+def build_detector(context, *args, **kwargs):
+    """Resolve the compatibility color override before starting the detector."""
+
+    inputs = resolved_camera_inputs(context, 'color_topic')
+    return [Node(
+        package='ridgeback_autonomy',
+        executable='g1_detector_node',
+        name='g1_detector',
+        namespace=LaunchConfiguration('namespace'),
+        parameters=[{
+            'use_sim_time': LaunchConfiguration('use_sim_time'),
+            'color_topic': inputs.color_image_topic,
+            'detections_topic': RAW_DETECTIONS_TOPIC,
+        }],
+        remappings=[('/tf', 'tf'), ('/tf_static', 'tf_static')],
+        output='screen',
+    )]
 
 
 def generate_launch_description():
@@ -36,7 +57,8 @@ def generate_launch_description():
         DeclareLaunchArgument('namespace', default_value='r100_0001'),
         DeclareLaunchArgument('use_sim_time', default_value='true'),
         DeclareLaunchArgument('world', default_value='g1_distance_calibration'),
-        DeclareLaunchArgument('color_topic', default_value='sensors/camera_0/color/image'),
+        DeclareLaunchArgument(
+            'color_topic', default_value=SIMULATION_CAMERA_INPUTS.color_image_topic),
         DeclareLaunchArgument(
             'setup_path',
             default_value=os.path.expanduser('~/clearpath/'),
@@ -81,17 +103,5 @@ def generate_launch_description():
             }.items(),
         ),
 
-        Node(
-            package='ridgeback_autonomy',
-            executable='g1_detector_node',
-            name='g1_detector',
-            namespace=namespace,
-            parameters=[{
-                'use_sim_time': use_sim_time,
-                'color_topic': color_topic,
-                'detections_topic': RAW_DETECTIONS_TOPIC,
-            }],
-            remappings=[('/tf', 'tf'), ('/tf_static', 'tf_static')],
-            output='screen',
-        ),
+        OpaqueFunction(function=build_detector),
     ])

@@ -6,7 +6,7 @@ import cv2
 import numpy as np
 
 from ridgeback_autonomy.benchmarking.alignment import MeasurementEvent
-from ridgeback_autonomy.benchmarking.estimators import (
+from ridgeback_autonomy.perception.estimators import (
     ESTIMATOR_FIELD_KEYS,
     ESTIMATOR_LABELS,
 )

@@ -84,8 +84,8 @@ this step — it is a pure, deterministic geometric fill.
 The mask is defined in exactly one coordinate system: the **RGB color image
 pixel grid**. Concretely, that grid is fixed by three things:
 
-- **Resolution** — the color grid of the active backend (sim today: `640 × 480`;
-  real/Isaac target: `1280 × 720`). The mask is allocated at this size, so
+- **Resolution** — the color grid of the active backend (the current Clearpath
+  default is `640 × 480`). The mask is allocated at this size, so
   `mask.shape == (H, W)` of the color frame.
 - **Intrinsics** — the color camera's projection parameters. They are not used
   to build the mask, but they define what each pixel index *means* as a ray into
@@ -169,9 +169,9 @@ front-end, so both mask types are visible at once and directly comparable:
 [ Box Mask      | Silhouette Mask |             ]
 ```
 
-All panels share the active backend's color-image resolution (sim today:
-`640 × 480`; real/Isaac target: `1280 × 720`), so the mask panels are the same
-size as the others (the shorter mask row is black-padded to the grid width).
+All panels share the active backend's color-image resolution, so the mask
+panels are the same size as the others (the shorter mask row is black-padded
+to the grid width).
 
 ### 5.2 Panel style: masked RGB
 
@@ -218,10 +218,9 @@ reconstructible at the consumer:
   placeholder.
 
 **Wire cost of the target.** A naive published mask (1 byte per pixel) scales
-with the active backend's color grid — at the real/Isaac `1280 × 720` target it
-is `≈ 0.9 MB` (at 30 fps ~28 MB/s for a single mask, times the detection count);
-the sim `640 × 480` grid is ~2.7× smaller (`≈ 0.3 MB`). The convention that
-keeps either harmless:
+with the active backend's color grid. At the current `640 × 480` default it is
+`≈ 0.3 MB` per mask; any future higher-resolution profile scales directly with
+pixel count. The convention that keeps it harmless:
 
 - **Consumers never take the mask off the wire.** The whole perception stack
   runs on one machine (robot PC or workstation — never split across both), so
@@ -236,9 +235,8 @@ keeps either harmless:
 
 Negligible: one boolean fill plus one masked copy per panel per rendered
 frame. No model inference in the panels themselves. The grid is three color
-frames wide (`3 × 640 = 1920 px` in sim; `3 × 1280 = 3840 px` at the
-real/Isaac target) by two rows tall, which the overlay window scales down to
-fit the screen.
+frames wide by two rows tall, and the composite is published for the RViz
+Image display.
 
 ---
 

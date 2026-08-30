@@ -14,7 +14,7 @@ The robot carries a single **Intel RealSense D435**, forward-facing, mounted at 
 
 **Data products we use:**
 
-1. **RGB color image** - input to detection / segmentation. Real D435: up to 1920x1080; our config requests 1280x720 @ 30 fps. Sim: rendered color frame.
+1. **RGB color image** - input to detection / segmentation. The repo leaves the stream profile unspecified, so the checked-out Clearpath configuration supplies its 640x480 @ 30 fps default to both backends. Sim: rendered color frame; real D435: hardware stream selected by the driver.
 2. **Depth image** (made 1:1 with RGB) - input to projective ranging and euclidean reconstruction. Euclidean reconstruction deprojects its masked pixels into camera-frame points in code (`euclidean_reconstruction.md`; provenance decision in `pointcloud_provenance_test.md` §7) - the points are a derived, in-code representation, not a sensor product.
 3. **Camera IMU - NONE.** The D435 SKU has no IMU; only the D435i does.
 
@@ -27,16 +27,15 @@ The robot carries a single **Intel RealSense D435**, forward-facing, mounted at 
 
 | Data product | Simulation | Real robot |
 |---|---|---|
-| RGB color | rendered frame | D435 RGB sensor (config 1280x720 @ 30) |
+| RGB color | rendered frame (Clearpath default 640x480 @ 30) | D435 RGB sensor (Clearpath default 640x480 @ 30; verify on hardware) |
 | Depth source | rendered GPU Z-buffer (ground truth) | active IR stereo on D4 ASIC |
 | Depth alignment to RGB | none - co-registered by construction | required (depth in left-IR frame) |
 | Depth FoV | 71.6° H (rendered) | 86° H x 57° V (config uses 87x58) |
 | Camera IMU | none (D435) | none (D435) |
 
-**Open config gaps on the real robot** (invisible in sim, so the sim benchmark hides them):
+**Hardware verification items** (invisible in sim, so the sim benchmark cannot prove them):
 
-- `align_depth.enable: true` is missing from `robot.yaml` -> no `aligned_depth_to_color` topic on hardware -> projective ranging and euclidean reconstruction have no depth input there (`aligned_depth.md` §2.1).
-- Stream profile keys are stale: `robot.yaml` uses `rgb_camera.profile` / `depth_module.profile`; current Clearpath / realsense-ros use `rgb_camera.color_profile` / `depth_module.depth_profile` -> the requested 1280x720 may be silently ignored. Verify against the installed driver version.
+- `robot.yaml` now sets `align_depth.enable: true` and `enable_sync: true`, and the Clearpath parser preserves both. Confirm on the robot that `sensors/camera_0/aligned_depth_to_color/image_raw` exists, has the color image dimensions, and retains the driver timestamps; hardware support remains unverified until then (`aligned_depth.md` §2.1).
 - `config/camera_config.json` intrinsics (87° x 58°) match the real D435, **not** the sim render (71.6°) - so estimators assume the wrong FoV in sim.
 
 Sources: Intel RealSense D400 Series Datasheet (doc 337029-005, §2.3 / §3.6 / Table 4-5 / §4.5 / §4.9.1); Gazebo `gz-sensors` RgbdCameraSensor docs; Clearpath RealSense D435 + Cameras config docs; repo `clearpath/robot.yaml`, `intel_realsense.urdf.xacro`, `config/camera_config.json`, `r100.urdf.xacro`.
@@ -168,7 +167,7 @@ Both emit into the **Mask Interface**: an `H×W` binary mask plus a **precision 
 
 Two interchangeable sources produce an **aligned depth frame** that is 1:1 with the RGB pixels. Both live in `perception/core/depth_sources.py` behind one switch (`depth_source: stereoscopic | monocular`) and are pulled by `g1_mask_measurement_node` at the detection stamp — there is no depth producer process and no depth topic between them and the paths that consume them (`aligned_depth_coverage.md` §6). The node buffers the source's *input* stream raw and converts only the frame the detections were made on; the localization paths never branch on which source ran.
 
-- **RealSense stereo depth (`stereoscopic`)** — the raw depth lives in the left-IR frame, so it must be **aligned** (reprojected with the calibrated intrinsics + extrinsics) onto the RGB pixel grid. After alignment, depth pixel `(u, v)` corresponds to color pixel `(u, v)`. The alignment is not pipeline code: on hardware the driver performs it (`aligned_depth_to_color`); in sim color and depth are co-registered by construction (Section 1). The source converts the matched frame to float meters, nothing more — on hardware its `depth_topic` must therefore point at `aligned_depth_to_color`.
+- **RealSense stereo depth (`stereoscopic`)** — the raw depth lives in the left-IR frame, so it must be **aligned** (reprojected with the calibrated intrinsics + extrinsics) onto the RGB pixel grid. After alignment, depth pixel `(u, v)` corresponds to color pixel `(u, v)`. The alignment is not pipeline code: on hardware the driver performs it (`aligned_depth_to_color`); in sim color and depth are co-registered by construction (Section 1). The source converts the matched frame to float meters, nothing more — the RealSense camera contract therefore selects `sensors/camera_0/aligned_depth_to_color/image_raw`, pending robot verification.
 - **Depth Anything (`monocular`)** — predicted directly from the RGB frame, so it is *already* pixel-aligned. The implementation uses the **metric-trained variant** (`Depth-Anything-V2-Metric-Indoor`), which emits meters directly — no scaling step against stereo; the prediction is only resized to the color grid. (The base Depth Anything models output affine-invariant depth; choosing the metric variant is what removed the scaling stage from the architecture.)
 
 Both converge to the same `Aligned Depth` contract (float32 meters on the color grid; 0/NaN/inf = no depth) that feeds projective ranging and euclidean reconstruction. The mask node subscribes to the color camera's live `camera_info`, so the paths deproject with the grid's true intrinsics instead of static FoV constants.
@@ -186,6 +185,13 @@ A depth source is built only when a run actually selects a depth path (`enabled_
 All three paths consume the same mask interface and resolve to camera-frame coordinates. They differ in what 3D information they recover and in cost.
 
 They are also independently selectable. A run picks its subset with `enabled_estimators` (the benchmark launch splits its own `estimators` list per stack, so one list selects across the mask node and the point cloud node alike). A path outside the subset is never executed: its fields stay NaN, its status stays `UNSET` — the honest record, since the node did not miss, it never looked — and it gets no benchmark row at all, exactly like an unselected `pointcloud` row. The inputs only that path needs go unsubscribed with it.
+
+The two depth-image paths share their cleaning prologue. The node evaluates the
+frame-level finite/positive/range gate once, intersects that result with each
+detection mask once, and hands the same valid-masked array to projective ranging
+and euclidean reconstruction. Their algorithms diverge only after this common
+selection; standalone calls may omit the precomputed array and retain the same
+self-contained behavior.
 
 ### Projective ranging — 2D depth-image route (cheapest)
 Extract depth values at the masked pixels, aggregate to a single distance, then deproject the representative pixel (centroid of the foreground pixels — `projective_ranging.md` §2.4) + aggregated depth through the intrinsics to a 3D point.

@@ -128,7 +128,7 @@ Both public launch files automatically prepend `perception_venv/bin` to `PATH` a
 If you use the graphify knowledge graph, install the post-commit hook to auto-rebuild it after each commit:
 
 ```bash
-pip install graphify              # or: pipx install graphify
+perception_venv/bin/python3 -m pip install graphifyy==0.8.35
 bash tools/install_hooks
 ```
 
@@ -174,9 +174,11 @@ Launches Gazebo, SLAM, Nav2, frontier exploration, and the G1 perception stack i
 3. `slam_toolbox` (after 20 s)
 4. Nav2 (after 65 s)
 5. The selected explorer — `explore_lite` (default) or the in-repo `frontier_explorer_node` (after 80 s)
-6. G1 perception nodes: `g1_detector_node`, `g1_pointcloud_measurement_node`, `g1_overlay_node`
+6. G1 perception nodes: `g1_detector_node`, the measurement nodes for the selected `estimators` (`g1_pointcloud_measurement_node` and/or `g1_mask_measurement_node`), `g1_estimate_viz_node`, `g1_overlay_node`, and a second `hud_node` for the distance panel
 
-The perception overlay appears in a separate OpenCV window named `G1 Perception`; it is not embedded in RViz.
+All four distance estimator rows run by default, the same set the benchmark compares — one RViz ring per row, each with its own bearing, plus a wide distance HUD top-right (`hud_g1_overlay`) listing the four side by side with the age of each reading. There is no ground truth in exploration, so that panel carries no truth line and no error column. Per-row visibility is an RViz Displays checkbox under `G1 Estimates`, one per estimator.
+
+The perception overlay is published on `debug/g1/overlay` and shown by the configured RViz Image display.
 
 Available worlds:
 
@@ -198,8 +200,16 @@ Arguments:
 | `namespace` | `r100_0001` | ROS namespace for all nodes |
 | `use_sim_time` | `true` | Use Gazebo `/clock` |
 | `setup_path` | `~/clearpath/` | Directory containing `robot.yaml` and generated Clearpath files |
+| `color_topic` | `sensors/camera_0/color/image` | Compatibility override for the shared camera contract's color image |
+| `camera_info_topic` | `sensors/camera_0/color/camera_info` | Compatibility override for color-grid camera intrinsics |
+| `depth_topic` | `sensors/camera_0/depth/image` | Compatibility override for aligned depth; a RealSense launch must set its driver-aligned topic |
+| `pointcloud_topic` | `sensors/camera_0/points` | Compatibility override for organized points; pass an empty value only when no pointcloud estimator is selected |
 | `exploration_rviz` | `true` | Launch the custom exploration RViz config |
 | `g1_perception_enabled` | `true` | Launch the G1 perception stack |
+| `estimators` | `all` | Distance estimator rows to run — `all`, or a comma-separated subset of `pointcloud`, `projective_ranging`, `euclidean_reconstruction`, `polar_profiling`. Selects the measurement nodes, the rings and the HUD columns from one list |
+| `estimate_viz` | `true` | Publish the estimator rings and the wide distance HUD |
+| `depth_source` | `stereoscopic` | Aligned depth source for the mask rows — `stereoscopic` or `monocular` (Depth-Anything V2; downloads a checkpoint on first use) |
+| `mask_gate` | `box` | Mask front-end — `box` (no segmentation model) or `silhouette` (SlimSAM) |
 | `mppi_visualize` | `false` | Publish MPPI trajectory visualization topics (RViz already has `MPPI Optimal` and `MPPI Samples` displays subscribed to `/r100_0001/optimal_trajectory` and `/r100_0001/trajectories`) |
 | `explorer` | `explore_lite` | Frontier explorer to dispatch — `explore_lite` or `custom` (the in-repo `frontier_explorer_node`) |
 
@@ -213,6 +223,9 @@ ros2 launch ridgeback_autonomy ridgeback_exploration.launch.py world:=mock_hospi
 ros2 launch ridgeback_autonomy ridgeback_exploration.launch.py world:=warehouse exploration_rviz:=false
 ros2 launch ridgeback_autonomy ridgeback_exploration.launch.py world:=mock_hospital g1_perception_enabled:=false
 ros2 launch ridgeback_autonomy ridgeback_exploration.launch.py world:=office explorer:=custom
+
+# One ring instead of four: the pre-mask-row exploration stack
+ros2 launch ridgeback_autonomy ridgeback_exploration.launch.py estimators:=pointcloud
 ```
 
 The `custom` explorer is the in-repo `frontier_explorer_node` (sources under `src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer/`). It and `explore_lite` both consume the Nav2 global costmap and send goals via `NavigateToPose`; pick whichever you want to evaluate.
@@ -297,16 +310,16 @@ Arguments:
 | `isolation_2d` | `nearest_mode_histogram` | Projective-ranging box-gate foreground recipe: `nearest_mode_histogram` or `otsu` |
 | `isolation_3d` | `height_crop_nearest_mode_band` | Euclidean-reconstruction box-gate foreground recipe: `height_crop_nearest_mode_band`, `height_crop_range_band`, `height_crop`, `nearest_mode_band`, or `range_band`. The two chains differ only in how the background separator anchors — nearest mode vs. percentile; the percentile one slides as background grows and is what the `pointcloud` row does |
 | `mask_depth_max_meters` | `0.0` | Working depth gate for the mask rows; `0` means no gate, leaving each row bounded only by what its depth source declares it can resolve |
-| `camera_info_topic` | `sensors/camera_0/color/camera_info` | Color-camera intrinsics used by the aligned-depth producer and the mask measurement node |
+| `camera_info_topic` | `sensors/camera_0/color/camera_info` | Compatibility override for the shared camera contract's color-grid intrinsics |
 | `repeats` | `5` | Number of positive-trial repeats per spawn pose |
 | `output_dir` | `<repo-root>/benchmark-results` | Root directory that will receive one timestamped subfolder per run |
 | `run_dir_name` | empty | Optional exact run-folder name under `output_dir`; sweeps use the configuration name. Empty preserves the timestamped single-run naming |
 | `shutdown_on_complete` | `false` | Shut down the config launch service when the runner exits. The sweep sets this to `true`; the compatibility launch leaves the completed stack open for inspection |
 | `settle_sec` | `2.0` | Delay after spawning the target before sampling |
 | `capture_sec` | `10.0` | Sampling window length for collecting usable detections |
-| `color_topic` | `sensors/camera_0/color/image` | RGB topic used by the detector, the mask measurement node, and benchmark snapshots |
-| `depth_topic` | `sensors/camera_0/depth/image` | Depth topic the mask node's stereoscopic source reads |
-| `pointcloud_topic` | `sensors/camera_0/points` | Camera-aligned point cloud used by the point-cloud measurement node |
+| `color_topic` | `sensors/camera_0/color/image` | Compatibility override for the shared camera contract's color image; feeds detector, measurements, overlay, runner, and readiness gate |
+| `depth_topic` | `sensors/camera_0/depth/image` | Simulation's color-aligned depth. A hardware RealSense launch must override this to `sensors/camera_0/aligned_depth_to_color/image_raw` |
+| `pointcloud_topic` | `sensors/camera_0/points` | Simulation's organized point cloud. It is optional on RealSense; omit the pointcloud estimator or override this only after confirming driver output |
 | `scan_topic` | `sensors/lidar2d_0/scan` | LaserScan topic used by polar profiling |
 | `base_frame` | `<namespace>/robot/base_link` | Vehicle frame used for point-cloud and scan projection |
 
@@ -406,9 +419,9 @@ observation-coverage drift as a long-lived simulator slows down.
 |------|--------------|------------|
 | `g1_detector_node` | `detections/g1/raw` | `color_topic`, `detection_model`, `detection_threshold`, `detector_fps` |
 | `g1_pointcloud_measurement_node` | `measurements/g1/pointcloud` | `color_topic`, `pointcloud_topic`, `base_frame`, `enabled_estimators` |
-| `g1_mask_measurement_node` | `measurements/g1/mask` (+ `debug/g1/mask` on the silhouette gate, + `debug/g1/mask/aligned_depth` when a depth path is enabled, + `visualization/g1/polar_rays` when polar profiling is) | `enabled_estimators`, `depth_source`, `depth_topic`, `camera_info_topic`, `scan_topic`, `pitch_deg`, `front_offset_m`, `isolation_2d`, `isolation_3d`, `mask_gate`, `segmentation_model`, `color_topic`, `ray_marker_topic` |
-| `g1_overlay_node` | `debug/g1/overlay` (+ an OpenCV window when `show_window`) | `measurement_topic`, `mask_measurement_topic`, `color_topic`, `aligned_depth_topic`, `estimators`, `show_window`, `max_cols`, `rgb_panel_labels` |
-| `g1_estimate_viz_node` | `visualization/g1/estimates` + `hud/g1_distances` | `base_frame`, `world_frame`, `marker_lifetime_sec`, `ground_truth_topic`, `estimators` (gates both the HUD rows and the rings; defaults to `all`) |
+| `g1_mask_measurement_node` | `measurements/g1/mask` (+ `debug/g1/mask` on the silhouette gate, + `debug/g1/mask/aligned_depth` when a depth path is enabled, + `visualization/g1/polar_rays` when polar profiling is) | `enabled_estimators`, `depth_source`, `depth_topic`, `camera_info_topic`, `scan_topic`, `base_frame` (**must be passed** — its own default is the bare `base_link`, unlike the other nodes', which are namespace-derived), `pitch_deg`, `front_offset_m`, `isolation_2d`, `isolation_3d`, `mask_gate`, `segmentation_model`, `color_topic`, `ray_marker_topic` |
+| `g1_overlay_node` | `debug/g1/overlay` | `measurement_topic`, `mask_measurement_topic`, `color_topic`, `aligned_depth_topic`, `estimators`, `max_cols`, `rgb_panel_labels` |
+| `g1_estimate_viz_node` | `visualization/g1/estimates` + `hud/g1_distances` | `base_frame`, `world_frame`, `marker_lifetime_sec`, `ground_truth_topic`, `estimators` (gates both the HUD rows and the rings; defaults to `all`), `hud_layout` (`rows` — the benchmark's, with truth and error columns — or `wide`, exploration's estimator columns with an age under each) |
 | `g1_distance_benchmark_runner` | per-estimator CSVs + summary CSV + trial collage images + `video/run.mp4` | `estimators`, `output_dir`, `pointcloud_measurement_topic`, `mask_measurement_topic`, `color_topic`, `record_video`, `record_fps` |
 
 The shared camera geometry lives in `config/camera_config.json`; the mask stack mirrors the values it needs rather than loading that file.

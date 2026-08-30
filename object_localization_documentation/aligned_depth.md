@@ -99,9 +99,12 @@ align. Consequences to design around:
 - **Cost.** The align filter runs in the driver. It is the price of admission
   for every mask-based consumer, so for cost accounting it is a *sunk* cost —
   see `pointcloud_provenance_test.md` §2.
-- **Config gap.** `align_depth.enable` is not set in `clearpath/robot.yaml`
-  today; enabling it (and verifying the key passes through the Clearpath
-  generation layer) is a prerequisite for running either path on hardware.
+- **Configured but unverified hardware path.** `clearpath/robot.yaml` now sets
+  `align_depth.enable: true` and `enable_sync: true`; the repository's
+  Clearpath parser test confirms both values survive into generated RealSense
+  parameters. The robot still needs validation that the driver publishes
+  `sensors/camera_0/aligned_depth_to_color/image_raw` on the color grid with
+  sensor-owned, synchronized headers.
 
 ### 2.2 Simulation (gz `rgbd_camera`)
 
@@ -152,6 +155,13 @@ source is `depth_sources.MonocularDepthSource` (selected by the mask node's
 `depth_source` param, and run on the color frame at the detection stamp — once
 per detection batch, not once per camera frame). It is the only consumer of the
 network now; the legacy camera node that also ran it has been deleted.
+
+When the silhouette gate and monocular source are both selected, SlimSAM and
+Depth-Anything share one batch-local, contiguous RGB preparation. The mask
+node first reuses the source's early exact-stamp color lookup when it exists;
+when it misses, the silhouette gate keeps its later exact-stamp lookup and a
+hit there can still drive both models. This changes no topics, subscriptions,
+or QoS settings, and never falls back to a nearest color frame.
 
 - **Aligned by construction.** The network's input *is* the color image, so
   its output is per-color-pixel — the grid property costs nothing. Resized to
@@ -230,9 +240,11 @@ which stream the node buffers raw and hands back at the detection stamp.
 
 ## 5. Open items
 
-- **`align_depth` on hardware** — add the parameter to `robot.yaml`, verify it
-  survives the Clearpath generation layer, and confirm the
-  `aligned_depth_to_color` topic grid matches the color image.
+- **`align_depth` on hardware** — configuration and parser preservation are
+  complete (`align_depth.enable: true`, `enable_sync: true`). Still confirm on
+  the robot: effective stream profiles, aligned-depth topic name and
+  dimensions, matching color/depth header timing, optical-frame TF to base,
+  and organized-pointcloud availability/layout before selecting its estimator.
 - ~~**Widen the depth gate**~~ — done 2026-08-28. The mask rows' gate
   (`mask_depth_max_meters`) defaults to `0`, meaning no gate, so the only
   ceiling on a mask measurement is whatever its source declares: monocular's
