@@ -1,6 +1,6 @@
 """Cross-check the by-value 'mirrored constant' pairs.
 
-The mask stack (``perception/core``) deliberately never imports the pointcloud
+The mask stack (``target_localization/core``) deliberately never imports the pointcloud
 estimator (``pointcloud_ranging.py``); shared tuning values are duplicated by
 value instead, which keeps the two decoupled. The cost is that editing one side
 can silently diverge from the other. This test turns such a divergence into a
@@ -12,7 +12,7 @@ copy is gone, so ``polar_profiling`` is their sole owner.
 
 from __future__ import annotations
 
-from ridgeback_autonomy.perception.core import (
+from ridgeback_autonomy.perception.target_localization.core import (
     depth_common,
     euclidean_reconstruction,
     isolation_2d,

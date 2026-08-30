@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 import numpy as np
 
-from ridgeback_autonomy.perception.core.intrinsics import (
+from ridgeback_autonomy.perception.target_localization.core.intrinsics import (
     CameraIntrinsics,
     deproject_masked,
     deproject_pixel,

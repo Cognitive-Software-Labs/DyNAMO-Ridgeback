@@ -27,20 +27,20 @@ from typing import Callable
 import numpy as np
 
 from ridgeback_autonomy.common.miss_reason import MissReason
-from ridgeback_autonomy.perception.core.depth_common import (
+from ridgeback_autonomy.perception.target_localization.core.depth_common import (
     DEPTH_MAX_METERS_DEFAULT,
     valid_depth,
 )
-from ridgeback_autonomy.perception.core.intrinsics import (
+from ridgeback_autonomy.perception.target_localization.core.intrinsics import (
     CameraIntrinsics,
     deproject_masked,
 )
-from ridgeback_autonomy.perception.core.isolation_3d import (
+from ridgeback_autonomy.perception.target_localization.core.isolation_3d import (
     ISOLATION_3D_DEFAULT,
     ISOLATION_3D_RECIPES,
     mad_outlier_removal,
 )
-from ridgeback_autonomy.perception.core.mask import Mask, MaskPrecision
+from ridgeback_autonomy.perception.target_localization.core.mask import Mask, MaskPrecision
 
 
 MIN_VALID_POINTS_DEFAULT = 10  # mirrors POINTCLOUD_MIN_VALID_POINTS by value

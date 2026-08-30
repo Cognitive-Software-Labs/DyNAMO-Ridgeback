@@ -11,7 +11,7 @@ the contract behind a single config switch (`depth_source`):
 - ``monocular``: predicts metric depth from the RGB stream with
   Depth-Anything V2, aligned by construction.
 
-The sources are pulled by ``g1_mask_measurement_node``, once per detection
+The sources are pulled by ``target_mask_measurement_node``, once per detection
 batch, on the input frame buffered at the detection stamp -- there is no
 producer process and no depth topic in between. Each source declares which
 stream it reads through ``input_kind``; nothing downstream branches on depth
@@ -50,7 +50,7 @@ import time
 import numpy as np
 from sensor_msgs.msg import Image
 
-from ridgeback_autonomy.perception.core.image_utils import (
+from ridgeback_autonomy.perception.target_localization.core.image_utils import (
     convert_depth_to_meters_message,
     decode_color_to_rgb,
     decode_image_message,

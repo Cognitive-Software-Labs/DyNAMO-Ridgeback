@@ -24,7 +24,7 @@ from ridgeback_autonomy.benchmarking.alignment import (
     stamp_to_nanoseconds,
     update_measurement_event,
 )
-from ridgeback_autonomy.perception.estimators import (
+from ridgeback_autonomy.perception.target_localization.estimator_registry import (
     MASK_GATE_DEFAULT,
     parse_estimators,
     parse_mask_gate,
@@ -33,7 +33,11 @@ from ridgeback_autonomy.perception.estimators import (
     uses_mask_estimators,
     uses_pointcloud_estimators,
 )
-from ridgeback_autonomy.perception.ground_truth import GROUND_TRUTH_TOPIC
+from ridgeback_autonomy.perception.target_localization.contracts import (
+    GROUND_TRUTH_TOPIC,
+    MASK_MEASUREMENTS_TOPIC,
+    POINTCLOUD_MEASUREMENTS_TOPIC,
+)
 from ridgeback_autonomy.benchmarking.naming import (
     benchmark_display_name,
     benchmark_output_name,
@@ -80,14 +84,14 @@ from ridgeback_autonomy.benchmarking.summary import (
     write_run_json,
     write_trial_csv,
 )
-from ridgeback_autonomy.msg import G1Measurements
-from ridgeback_autonomy.perception.core.image_utils import convert_color_image_message
-from ridgeback_autonomy.perception.core.vehicle_frame import (
+from ridgeback_autonomy.msg import TargetMeasurements
+from ridgeback_autonomy.perception.target_localization.core.image_utils import convert_color_image_message
+from ridgeback_autonomy.perception.target_localization.core.vehicle_frame import (
     planar_measurement_from_vehicle_front,
     yaw_from_quaternion,
 )
-from ridgeback_autonomy.perception.core.isolation_2d import ISOLATION_2D_DEFAULT
-from ridgeback_autonomy.perception.core.isolation_3d import ISOLATION_3D_DEFAULT
+from ridgeback_autonomy.perception.target_localization.core.isolation_2d import ISOLATION_2D_DEFAULT
+from ridgeback_autonomy.perception.target_localization.core.isolation_3d import ISOLATION_3D_DEFAULT
 
 
 def ground_truth_point_message(true_pose: dict[str, float], trial_id: str) -> PointStamped:
@@ -110,7 +114,7 @@ def ground_truth_point_message(true_pose: dict[str, float], trial_id: str) -> Po
 
 # Robots and objects spawn with their model origin on the floor plane; each
 # model bakes in its own vertical offset so origin-at-z=0 sits it on the ground.
-G1_SPAWN_HEIGHT_M = 0.0
+TARGET_SPAWN_HEIGHT_M = 0.0
 COMMAND_TIMEOUT_SEC = 10.0
 COMMAND_RETRY_SLEEP_SEC = 0.5
 STREAM_WAIT_TIMEOUT_SEC = 300.0
@@ -120,8 +124,6 @@ DELETE_TIMEOUT_SEC = 15.0
 # ``TRUTH_MAX_AGE_S`` so the line survives a dropped message and is never much
 # older than the scene it describes.
 TRUTH_PUBLISH_PERIOD_SEC = 0.2
-POINTCLOUD_MEASUREMENT_TOPIC = 'measurements/g1/pointcloud'
-MASK_MEASUREMENT_TOPIC = 'measurements/g1/mask'
 DEPTH_SOURCE_DEFAULT = 'stereoscopic'
 DEPTH_GATE_DISABLED = 0.0
 
@@ -154,12 +156,14 @@ class GtInstance:
     distance_m: float
 
 
-class G1DistanceBenchmarkRunner(Node):
+class TargetDistanceBenchmarkRunner(Node):
     def __init__(self) -> None:
-        super().__init__('g1_distance_benchmark_runner')
+        super().__init__('target_distance_benchmark_runner')
 
         pkg_share = get_package_share_directory('ridgeback_autonomy')
-        self.g1_model_sdf = os.path.join(pkg_share, 'sim', 'models', 'g1', 'model.sdf')
+        # The runner is target-generic; the shipped scenario currently selects
+        # the Unitree G1 asset as its concrete simulated target.
+        self.target_model_sdf = os.path.join(pkg_share, 'sim', 'models', 'g1', 'model.sdf')
         self.models_dir = os.path.join(pkg_share, 'sim', 'models')
         default_scenario = os.path.join(pkg_share, 'config', 'benchmark_scenarios_full.yaml')
         # Kept on the node: the git provenance recorded with each run is read
@@ -168,7 +172,7 @@ class G1DistanceBenchmarkRunner(Node):
             os.path.join(pkg_share, '..', '..', '..', '..'))
         default_output_dir = os.path.join(self.workspace_root, 'benchmark-results')
 
-        self.declare_parameter('world', 'g1_distance_calibration')
+        self.declare_parameter('world', 'target_distance_calibration')
         self.declare_parameter('scenario', '')
         self.declare_parameter('repeats', 5)
         self.declare_parameter('output_dir', default_output_dir)
@@ -176,8 +180,8 @@ class G1DistanceBenchmarkRunner(Node):
         self.declare_parameter('settle_sec', 2.0)
         self.declare_parameter('capture_sec', 10.0)
         self.declare_parameter('estimators', 'all')
-        self.declare_parameter('pointcloud_measurement_topic', POINTCLOUD_MEASUREMENT_TOPIC)
-        self.declare_parameter('mask_measurement_topic', MASK_MEASUREMENT_TOPIC)
+        self.declare_parameter('pointcloud_measurement_topic', POINTCLOUD_MEASUREMENTS_TOPIC)
+        self.declare_parameter('mask_measurement_topic', MASK_MEASUREMENTS_TOPIC)
         # The config axes of the mask rows, stamped into their output names so
         # projective_ranging / euclidean_reconstruction runs are
         # self-describing (must match the values passed to the aligned depth +
@@ -296,13 +300,13 @@ class G1DistanceBenchmarkRunner(Node):
         self.last_color_decode_warning = None
 
         self.create_subscription(
-            G1Measurements,
+            TargetMeasurements,
             self.pointcloud_measurement_topic,
             self.on_pointcloud_measurement,
             10,
         )
         self.create_subscription(
-            G1Measurements,
+            TargetMeasurements,
             self.mask_measurement_topic,
             self.on_mask_measurement,
             10,
@@ -324,7 +328,7 @@ class G1DistanceBenchmarkRunner(Node):
         self.active_trial_id = ''
         self.last_truth_publish_monotonic = 0.0
 
-    def on_pointcloud_measurement(self, msg: G1Measurements) -> None:
+    def on_pointcloud_measurement(self, msg: TargetMeasurements) -> None:
         self.pointcloud_measurement_seen = True
         if not self.capture_active:
             return
@@ -333,7 +337,7 @@ class G1DistanceBenchmarkRunner(Node):
         update_measurement_event(event, msg, self.selected_pointcloud_estimators)
         self.attach_buffered_previews(event)
 
-    def on_mask_measurement(self, msg: G1Measurements) -> None:
+    def on_mask_measurement(self, msg: TargetMeasurements) -> None:
         self.mask_measurement_seen = True
         if not self.capture_active:
             return
@@ -987,10 +991,11 @@ class G1DistanceBenchmarkRunner(Node):
 
         robot_models: list[tuple[int, str, Any]] = []
         for index, robot in enumerate(scene.robots):
-            model_name = f'{entity_prefix}_g1_{index}'
+            model_name = f'{entity_prefix}_target_{index}'
             spawned_names.append(model_name)
             self.spawn_model(
-                self.g1_model_sdf, model_name, robot.x, robot.y, G1_SPAWN_HEIGHT_M, robot.yaw)
+                self.target_model_sdf, model_name, robot.x, robot.y,
+                TARGET_SPAWN_HEIGHT_M, robot.yaw)
             self.wait_for_entity_pose(model_name, POSE_WAIT_TIMEOUT_SEC)
             robot_models.append((index, model_name, robot))
 
@@ -999,7 +1004,7 @@ class G1DistanceBenchmarkRunner(Node):
             spawned_names.append(model_name)
             self.spawn_model(
                 self.object_model_sdf(obj.model), model_name, obj.x, obj.y,
-                G1_SPAWN_HEIGHT_M, obj.yaw)
+                TARGET_SPAWN_HEIGHT_M, obj.yaw)
             self.wait_for_entity_pose(model_name, POSE_WAIT_TIMEOUT_SEC)
 
         return robot_models
@@ -1232,7 +1237,7 @@ class G1DistanceBenchmarkRunner(Node):
 
 def main() -> int:
     rclpy.init()
-    node = G1DistanceBenchmarkRunner()
+    node = TargetDistanceBenchmarkRunner()
 
     try:
         node.run()

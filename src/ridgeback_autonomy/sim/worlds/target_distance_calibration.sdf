@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <sdf version="1.9">
-  <world name="g1_distance_calibration">
+  <world name="target_distance_calibration">
 
     <plugin
       filename="gz-sim-physics-system"

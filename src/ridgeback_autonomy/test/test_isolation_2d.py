@@ -3,8 +3,8 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from ridgeback_autonomy.perception.core.depth_common import valid_depth
-from ridgeback_autonomy.perception.core.isolation_2d import (
+from ridgeback_autonomy.perception.target_localization.core.depth_common import valid_depth
+from ridgeback_autonomy.perception.target_localization.core.isolation_2d import (
     ISOLATION_2D_DEFAULT,
     ISOLATION_2D_RECIPES,
     nearest_mode_histogram,

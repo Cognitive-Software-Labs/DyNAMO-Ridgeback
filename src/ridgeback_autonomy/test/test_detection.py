@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from ridgeback_autonomy.common.models import Detection
-from ridgeback_autonomy.perception.core.detection import (
+from ridgeback_autonomy.perception.target_localization.core.detection import (
     DETECTION_LABELS,
     DETECTION_THRESHOLD,
     NMS_IOU_THRESHOLD,

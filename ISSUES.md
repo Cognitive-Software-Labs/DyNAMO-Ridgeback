@@ -6,9 +6,9 @@
 |---------|-------|
 | Robot doesn't move | `ros2 topic echo /r100_0001/cmd_vel` - if empty, Nav2 may not be active |
 | No map in RViz | `ros2 topic hz /r100_0001/map` - if 0, check `slam_toolbox` logs and the scan topic |
-| Detection overlay does not appear | Make sure `g1_perception_enabled:=true`, enable the `Perception overlay` Image display in RViz, and check `/r100_0001/debug/g1/overlay` plus `/r100_0001/sensors/camera_0/color/image` |
+| Detection overlay does not appear | Make sure `target_localization_enabled:=true`, enable the `Perception overlay` Image display in RViz, and check `/r100_0001/debug/target/overlay` plus `/r100_0001/sensors/camera_0/color/image` |
 | Perception overlay is a sliver in the narrow left dock | Expected until `exploration.rviz`'s `QMainWindow State` blob is regenerated — `addPane()` hardcodes the left dock area. Drag the pane to the bottom dock, stretch it full width, File → Save Config. If the *whole* layout reverted to defaults instead, `restoreState` rejected the blob and restored nothing |
-| Fewer than four rings, or a missing HUD column | `ros2 node list` should show `g1_pointcloud_measurement`, `g1_mask_measurement`, `g1_estimate_viz` and `hud_g1_node`; then `ros2 topic hz /r100_0001/measurements/g1/mask`. A column reading `--` means that estimator ran and reported nothing; a column missing entirely means `estimators` did not select it |
+| Fewer than four rings, or a missing HUD column | `ros2 node list` should show `target_pointcloud_measurement`, `target_mask_measurement`, `target_visualization` and `hud_target_node`; then `ros2 topic hz /r100_0001/measurements/target/mask`. A column reading `--` means that estimator ran and reported nothing; a column missing entirely means `estimators` did not select it |
 | `explore_lite` not finding frontiers | Verify `track_unknown_space: true` in the global costmap config |
 | TF errors | Ensure all nodes use `use_sim_time: true` |
 | Startup hangs / a stage never comes up | Bringup is event-driven (readiness gates) — find the `gate_*` process log `[launch_wait]: waiting for …`; the `unmet:` list on timeout names the exact missing topic/service. See "Event-Driven Startup" below. Do **not** re-add `TimerAction` delays |
@@ -21,7 +21,7 @@
 `cleanup.sh` is intentionally aggressive: it kills `gz sim`, `ruby.*gz`,
 `gz-sim`, `rviz2`, ROS launch processes, and every package node it can find.
 That is correct before a normal launch, but wrong between configurations in a
-benchmark sweep. The point of `g1_benchmark_sweep` is that Gazebo, RViz, the
+benchmark sweep. The point of `target_benchmark_sweep` is that Gazebo, RViz, the
 Ridgeback, camera TF, detector, and clock survive for the whole comparison.
 
 Run cleanup once before starting the supervisor. During the sweep, let the
@@ -144,7 +144,7 @@ That exports `RMW_IMPLEMENTATION`, `FASTRTPS_DEFAULT_PROFILES_FILE`, and `RMW_FA
 
 ### A/B History
 
-On April 12, 2026, the stack was A/B tested in the `office` world with and without the UDP-only profile. Both runs brought up Gazebo, `/clock`, SLAM, and the G1 perception nodes; no SHM-specific FastDDS errors appeared on that machine in either run. The profile had previously fixed sim-bringup failures on a different machine, but since there was no observed downside to plain shared memory it is now off by default and kept available as an opt-in toggle.
+On April 12, 2026, the stack was A/B tested in the `office` world with and without the UDP-only profile. Both runs brought up Gazebo, `/clock`, SLAM, and the target-localization nodes; no SHM-specific FastDDS errors appeared on that machine in either run. The profile had previously fixed sim-bringup failures on a different machine, but since there was no observed downside to plain shared memory it is now off by default and kept available as an opt-in toggle.
 
 ## SLAM Drift in Featureless Environments (Office World)
 
@@ -194,11 +194,11 @@ If you add new nodes to this project, always:
 3. Use `/**/node_name:` as the YAML root key in parameter files so namespaced nodes still match their params
 4. Set `use_sim_time: true` in simulation
 
-### `g1_mask_measurement_node`'s `base_frame` default is not namespace-aware
+### `target_mask_measurement_node`'s `base_frame` default is not namespace-aware
 
 Every launch caller must pass `base_frame` explicitly to the mask node. Its own
 default is the bare string `base_link`
-(`g1_mask_measurement_node.BASE_FRAME_DEFAULT`), while the pointcloud and viz
+(`target_mask_measurement_node.BASE_FRAME_DEFAULT`), while the pointcloud and viz
 nodes derive `<namespace>/robot/base_link` from `get_namespace()` at
 construction. Under a namespace the bare default therefore names a frame nothing
 publishes, and polar profiling's scan→base lookup fails.

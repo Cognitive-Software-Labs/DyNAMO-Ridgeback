@@ -208,7 +208,7 @@ reconstructible at the consumer:
   destroy per-object coordinates.
 - **Silhouette Mask panel (display the real artifact):** a tight mask is *not*
   reconstructible downstream, so the mask node publishes the union of the
-  frame's consumed masks as a debug-only `mono8` Image on `debug/g1/mask`
+  frame's consumed masks as a debug-only `mono8` Image on `debug/target/mask`
   (`segmentation_component.md` §6) — silhouette gate only. The panel never
   shows substitute content: it renders the artifact whose stamp matches the
   rendered frame exactly (what downstream received), holding the most recent
@@ -319,11 +319,11 @@ Resolved:
 - ~~**Interface signature** — pin the in-code contract for the mask object (the
   `H×W` boolean array plus the `tight | rect` tag) so the separation between
   front-ends and consumers is enforced, not just described.~~ — resolved
-  2026-07-21: `Mask.__post_init__` (`perception/core/mask.py`) enforces the
+  2026-07-21: `Mask.__post_init__` (`perception/target_localization/core/mask.py`) enforces the
   2D-boolean array, and the precision tag is a real `MaskPrecision(str, Enum)`.
 - **Tight-mask front-end** — implemented and documented in
   `segmentation_component.md` (box-prompted SlimSAM behind the `mask_gate`
   parameter).
 - **Visualization data source** — per panel, see Section 5.3: the Box Mask
   panel derives the rect union at render time; the Silhouette Mask panel
-  consumes the published `debug/g1/mask` artifact.
+  consumes the published `debug/target/mask` artifact.

@@ -43,7 +43,7 @@ The two axes worth keeping in mind when analyzing results:
 **Idea.** The camera's pose above the floor is *known*. Transform the masked
 points into a gravity-aligned frame and drop everything below `z < ε`. The
 floor is removed by prior knowledge, not estimation. In the shipped `HeightCrop`
-(`perception/core/isolation_3d.py`) the camera height and pitch are read from
+(`perception/target_localization/core/isolation_3d.py`) the camera height and pitch are read from
 live TF at runtime via `camera_floor_geometry` (the camera-above-base
 translation plus a fixed chassis offset, and the pitch from the rotation); the
 `CAMERA_HEIGHT_M_DEFAULT = 1.053` constant is only the static/test default. The
@@ -77,7 +77,7 @@ R. B. Rusu, S. Cousins, *"3D is here: Point Cloud Library (PCL),"* IEEE ICRA,
 
 **Idea.** Sort the masked points by distance, anchor at a low percentile ("the
 near surface"), keep points within a fixed window around the anchor, discard the
-rest. The shipped `RangeBand` (`perception/core/isolation_3d.py`) anchors on the
+rest. The shipped `RangeBand` (`perception/target_localization/core/isolation_3d.py`) anchors on the
 **Euclidean camera-frame range** of each point (`np.linalg.norm`), keeping a
 25th-percentile anchor with a −0.10 m / +0.35 m inlier window. The legacy
 `pointcloud` estimator (`compute_pointcloud_measurement` in `geometry.py`)
@@ -130,7 +130,7 @@ formulation is this repository's own (`geometry.py`); document as
 **Idea.** `RangeBand` with the anchor swapped and the window untouched:
 histogram the ranges at 0.05 m and anchor on the nearest bin holding at least
 5% of the points — the subject's near surface — instead of on a low percentile
-of them. Shipped as `NearestModeBand` (`perception/core/isolation_3d.py`); the
+of them. Shipped as `NearestModeBand` (`perception/target_localization/core/isolation_3d.py`); the
 anchor itself is `depth_common.nearest_significant_mode`, shared outright with
 the 2D nearest-mode histogram so the pixel domain and the point domain place
 the near surface identically.

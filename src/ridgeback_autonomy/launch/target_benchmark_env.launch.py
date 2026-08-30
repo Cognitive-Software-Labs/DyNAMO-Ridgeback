@@ -1,4 +1,4 @@
-"""Persistent simulator, visualization, transforms, and detector for G1 benchmarks."""
+"""Persistent simulator, visualization, transforms, and target detector."""
 
 import os
 
@@ -10,7 +10,7 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
-from ridgeback_autonomy.perception.g1_launch import (
+from ridgeback_autonomy.perception.target_localization.launch import (
     RAW_DETECTIONS_TOPIC,
     SIMULATION_CAMERA_INPUTS,
     perception_venv_actions,
@@ -24,8 +24,8 @@ def build_detector(context, *args, **kwargs):
     inputs = resolved_camera_inputs(context, 'color_topic')
     return [Node(
         package='ridgeback_autonomy',
-        executable='g1_detector_node',
-        name='g1_detector',
+        executable='target_detector_node',
+        name='target_detector',
         namespace=LaunchConfiguration('namespace'),
         parameters=[{
             'use_sim_time': LaunchConfiguration('use_sim_time'),
@@ -52,11 +52,11 @@ def generate_launch_description():
 
     return LaunchDescription([
         *perception_venv_actions(pkg_this),
-        # Shared with g1_benchmark_config.launch.py. Keep these defaults
+        # Shared with target_benchmark_config.launch.py. Keep these defaults
         # byte-identical: the first declaration inherited by a wrapper wins.
         DeclareLaunchArgument('namespace', default_value='r100_0001'),
         DeclareLaunchArgument('use_sim_time', default_value='true'),
-        DeclareLaunchArgument('world', default_value='g1_distance_calibration'),
+        DeclareLaunchArgument('world', default_value='target_distance_calibration'),
         DeclareLaunchArgument(
             'color_topic', default_value=SIMULATION_CAMERA_INPUTS.color_image_topic),
         DeclareLaunchArgument(

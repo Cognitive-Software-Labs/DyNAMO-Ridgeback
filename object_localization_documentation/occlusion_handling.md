@@ -179,14 +179,14 @@ is judged against — and possibly a re-scoping of the phases below.
 - `MissReason.OCCLUDED` in `common/miss_reason.py` (a free code). Mapping, scoped to the new recipes
   and the tight guard: pre-isolation input healthy but no robot-plausible cluster → `OCCLUDED`
   (instead of the generic empty-isolation reason).
-- `DepthClusterSelect` in `perception/core/isolation_3d.py`: floor removal (the `HeightCrop` formula,
+- `DepthClusterSelect` in `perception/target_localization/core/isolation_3d.py`: floor removal (the `HeightCrop` formula,
   TF-parameterized like the existing per-frame builder) → range-gap clustering → the §3 plausibility
   gates → nearest-plausible keep-mask. Params (`cluster_gap_m` ~0.30, `min_robot_height_m` ~0.8,
   `min_body_depth_m` ~0.08) as fields with module defaults.
-- The 2-D twin in `perception/core/isolation_2d.py` using per-pixel metric height (§3); the recipe
+- The 2-D twin in `perception/target_localization/core/isolation_2d.py` using per-pixel metric height (§3); the recipe
   needs intrinsics + camera height, so its signature is extended (existing recipes' signatures stay
   unchanged).
-- Polar width-gate in `perception/core/polar_profiling.py`, behind an opt-in parameter (default =
+- Polar width-gate in `perception/target_localization/core/polar_profiling.py`, behind an opt-in parameter (default =
   current behaviour).
 - Tight-branch plausibility guard in the euclidean (and projective) path.
 
@@ -229,8 +229,8 @@ planned-status note in the header. Add pointers from `foreground_isolation_2d.md
 
 ### Reuse (nothing re-invented)
 
-- `camera_floor_geometry` + the `HeightCrop` height formula (`perception/core/isolation_3d.py`); the
-  per-frame TF-parameterized isolation builder already threaded through `g1_mask_measurement_node`.
+- `camera_floor_geometry` + the `HeightCrop` height formula (`perception/target_localization/core/isolation_3d.py`); the
+  per-frame TF-parameterized isolation builder already threaded through `target_mask_measurement_node`.
 - `point_ranges`; the range-gap split pattern of `polar_profiling.segment_range_profile`.
 - The miss-reason pipeline end to end: `common/miss_reason.py`, the paths' `(result, reason)` returns,
   the per-estimator status fields, and the benchmark's histogram/coverage aggregation — the benchmark

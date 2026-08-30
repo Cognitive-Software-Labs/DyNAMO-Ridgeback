@@ -13,7 +13,7 @@ import math
 import yaml
 
 
-# G1 faces back toward the sensor robot at the world origin. Same value as the
+# The target faces back toward the sensor robot at the world origin. Same value as the
 # runner's historical ``G1_FACING_ROBOT_YAW_RAD`` (mirrored, not imported, so the
 # spec stays ROS-free).
 DEFAULT_ROBOT_YAW_RAD = math.pi
@@ -23,7 +23,7 @@ DEFAULT_OBJECT_YAW_RAD = 0.0
 
 @dataclass(frozen=True)
 class RobotSpec:
-    """One G1 instance, world-frame planar pose (z pinned to floor by the runner)."""
+    """One target instance, world-frame planar pose (z pinned to floor by the runner)."""
 
     x: float
     y: float

@@ -12,7 +12,7 @@ from ridgeback_autonomy.benchmarking.alignment import (
     find_exact_preview_match,
     update_measurement_event,
 )
-from ridgeback_autonomy.perception.estimators import (
+from ridgeback_autonomy.perception.target_localization.estimator_registry import (
     MASK_GATE_DEFAULT,
     MASK_GATES,
     parse_estimators,
@@ -22,7 +22,7 @@ from ridgeback_autonomy.benchmarking.naming import (
     benchmark_display_name,
     benchmark_output_name,
 )
-from ridgeback_autonomy.benchmarking.g1_distance_benchmark_runner_node import (
+from ridgeback_autonomy.benchmarking.target_distance_benchmark_runner_node import (
     extract_json_payload,
     ground_truth_point_message,
 )
@@ -36,7 +36,7 @@ from ridgeback_autonomy.benchmarking.reduction import (
 from ridgeback_autonomy.benchmarking.rendering import BenchmarkCollageRenderer
 from ridgeback_autonomy.benchmarking.summary import build_summary_rows
 from ridgeback_autonomy.common.models import Detection
-from ridgeback_autonomy.msg import G1Measurements
+from ridgeback_autonomy.msg import TargetMeasurements
 
 
 def test_parse_estimators_uses_canonical_order() -> None:
@@ -133,7 +133,7 @@ def test_silhouette_display_name_folds_the_gate() -> None:
 
 
 def test_mask_gate_tokens_mirror_the_node_by_value() -> None:
-    from ridgeback_autonomy.perception.g1_mask_measurement_node import (
+    from ridgeback_autonomy.perception.target_localization.mask_measurement_node import (
         MASK_GATES as NODE_MASK_GATES,
     )
 
@@ -147,8 +147,8 @@ def test_trial_rows_use_exactly_the_declared_csv_columns(tmp_path) -> None:
     # after the whole grid has been spawned.
     from types import SimpleNamespace
 
-    from ridgeback_autonomy.benchmarking.g1_distance_benchmark_runner_node import (
-        G1DistanceBenchmarkRunner,
+    from ridgeback_autonomy.benchmarking.target_distance_benchmark_runner_node import (
+        TargetDistanceBenchmarkRunner,
         GtInstance,
     )
     from ridgeback_autonomy.benchmarking.scenarios import RobotSpec, Scene
@@ -176,7 +176,7 @@ def test_trial_rows_use_exactly_the_declared_csv_columns(tmp_path) -> None:
         extra_count=0,
     )
 
-    result = G1DistanceBenchmarkRunner.build_trial_result(
+    result = TargetDistanceBenchmarkRunner.build_trial_result(
         runner,
         {'trial_id': 'scene_a_rep1', 'repeat_index': 1},
         scene, [gt], score, {'pointcloud': []}, '/tmp/x.png',
@@ -201,8 +201,8 @@ def test_no_value_miss_row_carries_its_reason(tmp_path) -> None:
     # that caused it, instead of only existing in a run-level histogram.
     from types import SimpleNamespace
 
-    from ridgeback_autonomy.benchmarking.g1_distance_benchmark_runner_node import (
-        G1DistanceBenchmarkRunner,
+    from ridgeback_autonomy.benchmarking.target_distance_benchmark_runner_node import (
+        TargetDistanceBenchmarkRunner,
         GtInstance,
     )
     from ridgeback_autonomy.benchmarking.scenarios import RobotSpec, Scene
@@ -230,7 +230,7 @@ def test_no_value_miss_row_carries_its_reason(tmp_path) -> None:
     histogram = {'polar_profiling': {
         int(MissReason.UNSET): 12, int(MissReason.SCAN_INVALID): 8}}
 
-    result = G1DistanceBenchmarkRunner.build_trial_result(
+    result = TargetDistanceBenchmarkRunner.build_trial_result(
         runner,
         {'trial_id': 'scan_blocked_rep1', 'repeat_index': 1},
         scene, [gt], score, {'polar_profiling': []}, '', histogram, 20,
@@ -279,8 +279,8 @@ def test_runner_node_constructs_and_its_provenance_methods_run(tmp_path) -> None
     # catch a method reaching for one that __init__ never set.
     import rclpy
 
-    from ridgeback_autonomy.benchmarking.g1_distance_benchmark_runner_node import (
-        G1DistanceBenchmarkRunner,
+    from ridgeback_autonomy.benchmarking.target_distance_benchmark_runner_node import (
+        TargetDistanceBenchmarkRunner,
     )
 
     scenario = tmp_path / 'scenes.yaml'
@@ -295,7 +295,7 @@ def test_runner_node_constructs_and_its_provenance_methods_run(tmp_path) -> None
     ])
     node = None
     try:
-        node = G1DistanceBenchmarkRunner()
+        node = TargetDistanceBenchmarkRunner()
         node.log_code_provenance()
         parameters = node.declared_parameters()
 
@@ -314,8 +314,8 @@ def test_runner_node_constructs_and_its_provenance_methods_run(tmp_path) -> None
 def test_runner_uses_explicit_run_dir_name_verbatim(tmp_path) -> None:
     import rclpy
 
-    from ridgeback_autonomy.benchmarking.g1_distance_benchmark_runner_node import (
-        G1DistanceBenchmarkRunner,
+    from ridgeback_autonomy.benchmarking.target_distance_benchmark_runner_node import (
+        TargetDistanceBenchmarkRunner,
     )
 
     scenario = tmp_path / 'scenes.yaml'
@@ -331,7 +331,7 @@ def test_runner_uses_explicit_run_dir_name_verbatim(tmp_path) -> None:
     ])
     node = None
     try:
-        node = G1DistanceBenchmarkRunner()
+        node = TargetDistanceBenchmarkRunner()
 
         assert node.run_output_dir == str(output_dir / 'pinned_name')
         assert node.declared_parameters()['run_dir_name'] == 'pinned_name'
@@ -343,7 +343,7 @@ def test_runner_uses_explicit_run_dir_name_verbatim(tmp_path) -> None:
 
 
 def test_format_commit_makes_a_dirty_tree_impossible_to_miss() -> None:
-    from ridgeback_autonomy.benchmarking.g1_distance_benchmark_runner_node import (
+    from ridgeback_autonomy.benchmarking.target_distance_benchmark_runner_node import (
         format_commit,
     )
 
@@ -361,7 +361,7 @@ def test_format_commit_makes_a_dirty_tree_impossible_to_miss() -> None:
 
 
 def test_git_provenance_survives_a_non_repository() -> None:
-    from ridgeback_autonomy.benchmarking.g1_distance_benchmark_runner_node import (
+    from ridgeback_autonomy.benchmarking.target_distance_benchmark_runner_node import (
         git_provenance,
     )
 
@@ -373,7 +373,7 @@ def test_git_provenance_survives_a_non_repository() -> None:
 
 
 def format_commit_is_unknown(provenance) -> bool:
-    from ridgeback_autonomy.benchmarking.g1_distance_benchmark_runner_node import (
+    from ridgeback_autonomy.benchmarking.target_distance_benchmark_runner_node import (
         format_commit,
     )
 
@@ -391,7 +391,7 @@ def test_extract_json_payload_accepts_multiple_gz_json_messages() -> None:
 
 
 def test_alignment_updates_public_estimator_values_from_message_fields() -> None:
-    msg = G1Measurements()
+    msg = TargetMeasurements()
     msg.header.frame_id = 'camera'
     msg.header.stamp.sec = 12
     msg.header.stamp.nanosec = 34
@@ -421,8 +421,8 @@ def test_alignment_updates_public_estimator_values_from_message_fields() -> None
 
 
 def test_mask_source_message_merges_into_the_same_aligned_event() -> None:
-    def make_message() -> G1Measurements:
-        msg = G1Measurements()
+    def make_message() -> TargetMeasurements:
+        msg = TargetMeasurements()
         msg.header.frame_id = 'camera'
         msg.header.stamp.sec = 12
         msg.header.stamp.nanosec = 34
@@ -870,7 +870,7 @@ def test_box_label_defaults_to_historical_label_without_annotations() -> None:
 
     label, color = renderer.box_label_and_color(event, 0, None, None)
 
-    assert label == 'G1 #1'
+    assert label == 'Target #1'
     assert color == (0, 255, 0)
 
 

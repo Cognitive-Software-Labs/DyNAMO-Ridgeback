@@ -38,12 +38,12 @@ defaults:
   repeats: 1
 
 configs:
-  # The organized-PointCloud2 path: g1_pointcloud_measurement_node, no mask node
+  # The organized-PointCloud2 path: target_pointcloud_measurement_node, no mask node
   # at all. None of the mask knobs below apply to it.
   - name: pointcloud
     estimators: pointcloud
 
-  # Mask paths. Each brings up g1_mask_measurement_node alone.
+  # Mask paths. Each brings up target_mask_measurement_node alone.
   - name: mask_projective_ranging
     estimators: projective_ranging
     mask_gate: box

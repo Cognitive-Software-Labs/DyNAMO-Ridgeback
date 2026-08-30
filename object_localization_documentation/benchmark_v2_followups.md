@@ -16,7 +16,7 @@ visual reference is
 Statuses are now counted **per detected box**, not per frame:
 
 - Every mask-estimator value on the wire carries a `MissReason` status per
-  detection (`*_status` arrays on `G1Measurements`); the `pointcloud` row, which
+  detection (`*_status` arrays on `TargetMeasurements`); the `pointcloud` row, which
   publishes no status, gets a coarse OK/UNSET inferred from finiteness, per
   detection.
 - `compute_status_histogram` iterates `event.detections` via
@@ -175,7 +175,7 @@ colcon build --packages-select ridgeback_autonomy --symlink-install
 source install/setup.bash
 
 # 3. Full run: all 8 estimators, v2 scene set, silhouette mask gate
-ros2 launch ridgeback_autonomy g1_distance_benchmark.launch.py \
+ros2 launch ridgeback_autonomy target_distance_benchmark.launch.py \
   repeats:=1 \
   estimators:=rgb,sensor_depth,depth_anything,pointcloud,lidar,projective_ranging,euclidean_reconstruction,polar_profiling \
   mask_gate:=silhouette

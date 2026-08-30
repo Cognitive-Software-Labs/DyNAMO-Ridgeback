@@ -1,7 +1,7 @@
 """Launch-layer constants and node specs shared by the public entrypoints.
 
 Both `ridgeback_exploration.launch.py` and the benchmark layers build the same
-G1 stack, so the node specs live here rather than in either of them: the topic
+target-localization stack, so the node specs live here rather than in either: the topic
 names below are the contract the measurement nodes publish and the display
 nodes subscribe against, and two copies of that contract are free to drift into
 measuring off different topics.
@@ -19,15 +19,13 @@ from ridgeback_autonomy.common.camera_inputs import (
     SIMULATION_BACKEND,
     resolve_camera_inputs,
 )
-
-
-RAW_DETECTIONS_TOPIC = 'detections/g1/raw'
-POINTCLOUD_MEASUREMENT_TOPIC = 'measurements/g1/pointcloud'
-MASK_MEASUREMENT_TOPIC = 'measurements/g1/mask'
-
-# The mask node converts depth itself, at the detection stamp, and republishes
-# the result for the overlay panel. Debug-only: nothing measures off this topic.
-MASK_ALIGNED_DEPTH_DEBUG_TOPIC = 'debug/g1/mask/aligned_depth'
+from ridgeback_autonomy.perception.target_localization.contracts import (
+    ALIGNED_DEPTH_DEBUG_TOPIC,
+    HUD_DISTANCES_PANEL_TOPIC,
+    MASK_MEASUREMENTS_TOPIC,
+    POINTCLOUD_MEASUREMENTS_TOPIC,
+    RAW_DETECTIONS_TOPIC,
+)
 
 # Overlay columns for the RViz strip. Above any possible panel count, and
 # pack_panels clamps to that count, so the effect is simply "one row". Both
@@ -36,10 +34,6 @@ MASK_ALIGNED_DEPTH_DEBUG_TOPIC = 'debug/g1/mask/aligned_depth'
 # height each panel gets.
 OVERLAY_SINGLE_ROW = 99
 
-# The panel the viz node publishes and a hud_node aggregator merges. Both
-# entrypoints run a dedicated aggregator for it, because it is rich text and
-# rich text collapses the space-padded columns the plain panels align with.
-HUD_DISTANCES_PANEL_TOPIC = 'hud/g1_distances'
 HUD_DISTANCES_TEXT_SIZE = 16.0
 
 # Every simulation launch resolves the camera topic set from the same backend,
@@ -49,7 +43,7 @@ SIMULATION_CAMERA_INPUTS = resolve_camera_inputs(SIMULATION_BACKEND)
 SHARED_BENCHMARK_ARGUMENT_DEFAULTS = {
     'namespace': 'r100_0001',
     'use_sim_time': 'true',
-    'world': 'g1_distance_calibration',
+    'world': 'target_distance_calibration',
     'color_topic': 'sensors/camera_0/color/image',
 }
 
@@ -147,14 +141,14 @@ def pointcloud_measurement_node(
 
     return Node(
         package='ridgeback_autonomy',
-        executable='g1_pointcloud_measurement_node',
-        name='g1_pointcloud_measurement',
+        executable='target_pointcloud_measurement_node',
+        name='target_pointcloud_measurement',
         namespace=namespace,
         parameters=_measurement_parameters(
             {
                 'use_sim_time': use_sim_time,
                 'detections_topic': RAW_DETECTIONS_TOPIC,
-                'measurement_topic': POINTCLOUD_MEASUREMENT_TOPIC,
+                'measurement_topic': POINTCLOUD_MEASUREMENTS_TOPIC,
                 'base_frame': base_frame,
                 'enabled_estimators': enabled_estimators,
             },
@@ -198,15 +192,15 @@ def mask_measurement_node(
 
     return Node(
         package='ridgeback_autonomy',
-        executable='g1_mask_measurement_node',
-        name='g1_mask_measurement',
+        executable='target_mask_measurement_node',
+        name='target_mask_measurement',
         namespace=namespace,
         parameters=_measurement_parameters(
             {
                 'use_sim_time': use_sim_time,
                 'detections_topic': RAW_DETECTIONS_TOPIC,
-                'measurement_topic': MASK_MEASUREMENT_TOPIC,
-                'aligned_depth_debug_topic': MASK_ALIGNED_DEPTH_DEBUG_TOPIC,
+                'measurement_topic': MASK_MEASUREMENTS_TOPIC,
+                'aligned_depth_debug_topic': ALIGNED_DEPTH_DEBUG_TOPIC,
                 'base_frame': base_frame,
                 'enabled_estimators': enabled_estimators,
             },
@@ -266,8 +260,8 @@ def estimate_viz_node(
 
     return Node(
         package='ridgeback_autonomy',
-        executable='g1_estimate_viz_node',
-        name='g1_estimate_viz',
+        executable='target_visualization_node',
+        name='target_visualization',
         namespace=namespace,
         parameters=_measurement_parameters(
             {'use_sim_time': use_sim_time, 'estimators': estimators},
@@ -301,16 +295,16 @@ def overlay_node(
 
     return Node(
         package='ridgeback_autonomy',
-        executable='g1_overlay_node',
-        name='g1_overlay',
+        executable='target_overlay_node',
+        name='target_overlay',
         namespace=namespace,
         parameters=_measurement_parameters(
             {
                 'use_sim_time': use_sim_time,
                 'estimators': estimators,
-                'measurement_topic': POINTCLOUD_MEASUREMENT_TOPIC,
-                'mask_measurement_topic': MASK_MEASUREMENT_TOPIC,
-                'aligned_depth_topic': MASK_ALIGNED_DEPTH_DEBUG_TOPIC,
+                'measurement_topic': POINTCLOUD_MEASUREMENTS_TOPIC,
+                'mask_measurement_topic': MASK_MEASUREMENTS_TOPIC,
+                'aligned_depth_topic': ALIGNED_DEPTH_DEBUG_TOPIC,
                 'color_topic': color_topic,
                 'max_cols': OVERLAY_SINGLE_ROW,
             },

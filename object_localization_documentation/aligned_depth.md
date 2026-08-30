@@ -6,8 +6,8 @@ same artifact — the **aligned depth frame** — and neither cares how it was
 made. This document defines that contract and the two sources that satisfy
 it: the physical depth camera (`camera → aligned depth`) and monocular
 estimation (`RGB frame → aligned depth`). Both live in
-`perception/core/depth_sources.py` and are pulled by
-`g1_mask_measurement_node` at the detection stamp — there is no depth
+`perception/target_localization/core/depth_sources.py` and are pulled by
+`target_mask_measurement_node` at the detection stamp — there is no depth
 producer process (`aligned_depth_coverage.md` §6).
 
 ```
@@ -283,13 +283,13 @@ which stream the node buffers raw and hands back at the detection stamp.
   `.../camera_info`) published by `aligned_depth_node`; that transport is gone.
   The contract is now a **call** at the detection stamp
   (`depth_sources.produce`), and the frame is republished only as the debug
-  artifact `debug/g1/mask/aligned_depth` for the overlay panel. The artifact
+  artifact `debug/target/mask/aligned_depth` for the overlay panel. The artifact
   itself (§1) is unchanged.
 - ~~**Stamp-matching coverage in sim**~~ — resolved 2026-08-26. The exact-stamp
   match between detections and aligned depth (the §1 "Timing" invariant) missed
   on ~80–90% of frames in sim because a separate producer process thinned the
   depth stream independently of the detector, under CPU starvation. Depth
-  acquisition moved into `g1_mask_measurement_node`, which now buffers the
+  acquisition moved into `target_mask_measurement_node`, which now buffers the
   source's input raw and converts at the detection stamp; the second thinning
   stage no longer exists. Diagnosis, profiling and the decision are in
   `aligned_depth_coverage.md`.

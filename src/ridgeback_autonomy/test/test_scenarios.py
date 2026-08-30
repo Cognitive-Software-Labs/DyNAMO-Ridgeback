@@ -12,7 +12,7 @@ from ridgeback_autonomy.benchmarking.scenarios import (
     load_scenarios,
     parse_scenarios,
 )
-from ridgeback_autonomy.perception.core.vehicle_frame import (
+from ridgeback_autonomy.perception.target_localization.core.vehicle_frame import (
     planar_measurement_from_vehicle_front,
 )
 

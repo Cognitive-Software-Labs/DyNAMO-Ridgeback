@@ -17,10 +17,10 @@ from ridgeback_autonomy.common.messages import (
 )
 from ridgeback_autonomy.common.models import Detection, DetectionBatch
 from ridgeback_autonomy.common.miss_reason import MissReason
-from ridgeback_autonomy.perception.core.intrinsics import CameraIntrinsics
-from ridgeback_autonomy.perception.core.mask import MaskPrecision, mask_from_array
-from ridgeback_autonomy.perception import g1_mask_measurement_node
-from ridgeback_autonomy.perception.g1_mask_measurement_node import (
+from ridgeback_autonomy.perception.target_localization.core.intrinsics import CameraIntrinsics
+from ridgeback_autonomy.perception.target_localization.core.mask import MaskPrecision, mask_from_array
+from ridgeback_autonomy.perception.target_localization import mask_measurement_node
+from ridgeback_autonomy.perception.target_localization.mask_measurement_node import (
     BASE_FRAME_DEFAULT,
     MASK_GATE_BOX,
     MASK_GATE_SILHOUETTE,
@@ -36,6 +36,8 @@ from ridgeback_autonomy.perception.g1_mask_measurement_node import (
     resolve_enabled_estimators,
     resolve_mask_gate,
 )
+
+target_mask_measurement_node = mask_measurement_node
 
 
 # The optical -> base rotation of a level (zero-pitch, zero-roll) camera:
@@ -78,7 +80,7 @@ def test_defaults_mirror_shared_constants_by_value() -> None:
     # (the mask stack imports nothing from the estimator modules). The pure
     # core-module mirrors are covered in test_mirrored_constants; this one needs
     # the ROS-importing node module, so it lives here.
-    from ridgeback_autonomy.perception.core import vehicle_frame
+    from ridgeback_autonomy.perception.target_localization.core import vehicle_frame
 
     assert ROBOT_FRONT_OFFSET_M_DEFAULT == vehicle_frame.ROBOT_FRONT_OFFSET_M
     assert ROBOT_FRONT_OFFSET_M_DEFAULT == 0.25
@@ -346,11 +348,11 @@ def test_fill_computes_valid_depth_once_and_shares_each_masked_result(
         return None, MissReason.ISOLATION_EMPTY
 
     monkeypatch.setattr(
-        g1_mask_measurement_node, 'valid_depth', compute_valid_once, raising=False)
+        target_mask_measurement_node, 'valid_depth', compute_valid_once, raising=False)
     monkeypatch.setattr(
-        g1_mask_measurement_node, 'localize_projective_ranging', projective_stub)
+        target_mask_measurement_node, 'localize_projective_ranging', projective_stub)
     monkeypatch.setattr(
-        g1_mask_measurement_node, 'localize_euclidean_reconstruction', euclidean_stub)
+        target_mask_measurement_node, 'localize_euclidean_reconstruction', euclidean_stub)
 
     fill_path_measurements(
         batch, masks, FILL_INTRINSICS, depth_m, None,
@@ -455,14 +457,14 @@ def test_fill_projects_one_scan_once_for_multiple_polar_masks(
         mask_from_array(tight_blob(), MaskPrecision.TIGHT),
     ]
     calls = []
-    original_project = g1_mask_measurement_node.project_scan_to_image
+    original_project = target_mask_measurement_node.project_scan_to_image
 
     def record_project(points_optical, valid, intrinsics):
         calls.append((points_optical, valid, intrinsics))
         return original_project(points_optical, valid, intrinsics)
 
     monkeypatch.setattr(
-        g1_mask_measurement_node, 'project_scan_to_image', record_project)
+        target_mask_measurement_node, 'project_scan_to_image', record_project)
     records = [] if with_records else None
 
     fill_path_measurements(
@@ -489,14 +491,14 @@ def test_failed_polar_rviz_path_still_projects_once(monkeypatch) -> None:
         mask_from_array(tight_blob(), MaskPrecision.TIGHT),
     ]
     calls = []
-    original_project = g1_mask_measurement_node.project_scan_to_image
+    original_project = target_mask_measurement_node.project_scan_to_image
 
     def record_project(points_optical, valid, intrinsics):
         calls.append((points_optical, valid, intrinsics))
         return original_project(points_optical, valid, intrinsics)
 
     monkeypatch.setattr(
-        g1_mask_measurement_node, 'project_scan_to_image', record_project)
+        target_mask_measurement_node, 'project_scan_to_image', record_project)
     records = []
 
     fill_path_measurements(
@@ -535,7 +537,7 @@ def test_fill_avoids_projection_when_polar_cannot_use_a_mask(
 ) -> None:
     batch = build_fill_batch(count=len(masks))
     monkeypatch.setattr(
-        g1_mask_measurement_node,
+        target_mask_measurement_node,
         'project_scan_to_image',
         lambda *args: pytest.fail('projection must be skipped'),
     )
@@ -641,8 +643,8 @@ def test_encode_mask_debug_image_unions_masks_and_skips_none() -> None:
 
 def _status_fixture():
     from ridgeback_autonomy.common.models import Detection, DetectionBatch
-    from ridgeback_autonomy.perception.core.intrinsics import CameraIntrinsics
-    from ridgeback_autonomy.perception.core.mask import rasterize_bbox
+    from ridgeback_autonomy.perception.target_localization.core.intrinsics import CameraIntrinsics
+    from ridgeback_autonomy.perception.target_localization.core.mask import rasterize_bbox
 
     intrinsics = CameraIntrinsics(fx=100.0, fy=100.0, cx=40.0, cy=30.0, width=80, height=60)
     depth = np.full((60, 80), 4.0, dtype=np.float32)
@@ -656,7 +658,7 @@ def _status_fixture():
 
 def test_fill_path_measurements_stamps_ok_and_scan_reason() -> None:
     from ridgeback_autonomy.common.miss_reason import MissReason
-    from ridgeback_autonomy.perception.g1_mask_measurement_node import fill_path_measurements
+    from ridgeback_autonomy.perception.target_localization.mask_measurement_node import fill_path_measurements
 
     intrinsics, depth, batch, masks = _status_fixture()
     fill_path_measurements(
@@ -672,7 +674,7 @@ def test_fill_path_measurements_stamps_ok_and_scan_reason() -> None:
 
 def test_fill_path_measurements_no_depth_stamps_no_depth_frame() -> None:
     from ridgeback_autonomy.common.miss_reason import MissReason
-    from ridgeback_autonomy.perception.g1_mask_measurement_node import fill_path_measurements
+    from ridgeback_autonomy.perception.target_localization.mask_measurement_node import fill_path_measurements
 
     intrinsics, _depth, batch, masks = _status_fixture()
     fill_path_measurements(
@@ -687,7 +689,7 @@ def test_fill_path_measurements_no_depth_stamps_no_depth_frame() -> None:
 
 
 def test_fill_path_measurements_skips_none_mask() -> None:
-    from ridgeback_autonomy.perception.g1_mask_measurement_node import fill_path_measurements
+    from ridgeback_autonomy.perception.target_localization.mask_measurement_node import fill_path_measurements
 
     intrinsics, depth, batch, _masks = _status_fixture()
     fill_path_measurements(
@@ -908,11 +910,11 @@ def ros_context():
 
 def _mask_node(source, **parameters):
     from rclpy.parameter import Parameter
-    from ridgeback_autonomy.perception.g1_mask_measurement_node import (
-        G1MaskMeasurementNode,
+    from ridgeback_autonomy.perception.target_localization.mask_measurement_node import (
+        TargetMaskMeasurementNode,
     )
 
-    return G1MaskMeasurementNode(
+    return TargetMaskMeasurementNode(
         depth_source=source,
         parameter_overrides=[
             Parameter(name, value=value) for name, value in parameters.items()
@@ -941,7 +943,7 @@ def test_ray_marker_publish_rechecks_subscriber_before_build(
         _StubDepthSource('depth'), enabled_estimators='polar_profiling')
     node.ray_marker_pub.get_subscription_count = lambda: 0
     monkeypatch.setattr(
-        g1_mask_measurement_node,
+        target_mask_measurement_node,
         'build_polar_ray_markers',
         lambda *args: pytest.fail('ray markers should not be built'),
     )
@@ -999,13 +1001,13 @@ def test_silhouette_monocular_reuses_early_color_hint_and_one_rgb_array(
     batch = build_fill_batch()
     early = rgb_image(7, 42)
     decode_calls = []
-    original_decode = g1_mask_measurement_node.decode_color_to_rgb
+    original_decode = target_mask_measurement_node.decode_color_to_rgb
 
     def record_decode(message):
         decode_calls.append(message)
         return original_decode(message)
 
-    monkeypatch.setattr(g1_mask_measurement_node, 'decode_color_to_rgb', record_decode)
+    monkeypatch.setattr(target_mask_measurement_node, 'decode_color_to_rgb', record_decode)
     node.color_buffer.lookup = lambda _stamp: pytest.fail(
         'an exact early hint must avoid a second color-buffer lookup')
     try:
@@ -1080,7 +1082,7 @@ def test_box_monocular_keeps_depth_side_conversion_only(ros_context, monkeypatch
     batch = build_fill_batch()
     early = rgb_image(7, 42)
     monkeypatch.setattr(
-        g1_mask_measurement_node,
+        target_mask_measurement_node,
         'decode_color_to_rgb',
         lambda _message: pytest.fail('box masks must not decode color'),
     )
@@ -1250,7 +1252,7 @@ def test_mask_debug_skips_the_encode_without_a_publisher(
 ) -> None:
     node = _mask_node(_StubDepthSource('depth'))
     monkeypatch.setattr(
-        g1_mask_measurement_node,
+        target_mask_measurement_node,
         'encode_mask_debug_image',
         lambda *args: pytest.fail('mask debug should not be encoded'),
     )
@@ -1267,7 +1269,7 @@ def test_mask_debug_skips_the_encode_with_no_subscriber(
     node = _mask_node(_StubDepthSource('depth'))
     node.mask_debug_pub = _DebugPublisher(subscription_count=0)
     monkeypatch.setattr(
-        g1_mask_measurement_node,
+        target_mask_measurement_node,
         'encode_mask_debug_image',
         lambda *args: pytest.fail('mask debug should not be encoded'),
     )
@@ -1293,7 +1295,7 @@ def test_mask_debug_encodes_and_publishes_once_with_a_subscriber(
         return encoded
 
     monkeypatch.setattr(
-        g1_mask_measurement_node,
+        target_mask_measurement_node,
         'encode_mask_debug_image',
         encode_mask_debug,
     )

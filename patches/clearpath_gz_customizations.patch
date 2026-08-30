@@ -133,7 +133,7 @@ index 010f7fb..61200e0 100644
                            choices=[
                                'construction',
 +                              'mock_hospital',
-+                              'g1_distance_calibration',
++                              'target_distance_calibration',
                                'office',
                                'orchard',
                                'pipeline',

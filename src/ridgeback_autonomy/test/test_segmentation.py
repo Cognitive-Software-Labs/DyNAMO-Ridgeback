@@ -3,7 +3,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from ridgeback_autonomy.perception.core.segmentation import (
+from ridgeback_autonomy.perception.target_localization.core.segmentation import (
     PROMPT_PADDING_REL_DEFAULT,
     SEGMENTATION_MODEL_DEFAULT,
     SamBoxSegmenter,

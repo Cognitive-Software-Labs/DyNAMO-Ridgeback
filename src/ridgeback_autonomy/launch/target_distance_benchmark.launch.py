@@ -24,12 +24,12 @@ def generate_launch_description():
         ),
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(
-                os.path.join(launch_dir, 'g1_benchmark_env.launch.py')
+                os.path.join(launch_dir, 'target_benchmark_env.launch.py')
             ),
         ),
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(
-                os.path.join(launch_dir, 'g1_benchmark_config.launch.py')
+                os.path.join(launch_dir, 'target_benchmark_config.launch.py')
             ),
             launch_arguments={
                 'shutdown_on_complete': shutdown_on_complete,

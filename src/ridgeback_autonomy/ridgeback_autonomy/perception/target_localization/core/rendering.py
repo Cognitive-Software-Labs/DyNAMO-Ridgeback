@@ -6,21 +6,21 @@ from dataclasses import dataclass
 import cv2
 import numpy as np
 
-from ridgeback_autonomy.perception.estimators import (
+from ridgeback_autonomy.perception.target_localization.estimator_registry import (
     DEPTH_PATH_ESTIMATORS,
     ESTIMATOR_LABELS,
     MASK_GATE_SILHOUETTE,
     PUBLIC_ESTIMATOR_ORDER,
 )
 from ridgeback_autonomy.common.models import DetectionBatch
-from ridgeback_autonomy.perception.core.pointcloud_ranging import focus_bbox
-from ridgeback_autonomy.perception.core.mask import (
+from ridgeback_autonomy.perception.target_localization.core.pointcloud_ranging import focus_bbox
+from ridgeback_autonomy.perception.target_localization.core.mask import (
     MaskPrecision,
     mask_from_array,
     masked_rgb,
     rasterize_batch,
 )
-from ridgeback_autonomy.perception.core.polar_profiling import (
+from ridgeback_autonomy.perception.target_localization.core.polar_profiling import (
     merge_near_band,
     segment_range_profile,
 )
@@ -210,7 +210,7 @@ class RgbdOverlayRenderer:
 
         self.draw_panel_title(panel, spec.title)
         if not batch.detected and spec.kind in (PANEL_RGB, PANEL_ALIGNED_DEPTH):
-            cv2.putText(panel, 'No G1 detected', (20, 100),
+            cv2.putText(panel, 'No target detected', (20, 100),
                         cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 0, 255), 2, cv2.LINE_AA)
         return panel
 
@@ -232,7 +232,7 @@ class RgbdOverlayRenderer:
                 fx1, fy1, fx2, fy2 = focus
                 cv2.rectangle(panel, (fx1, fy1), (fx2, fy2), (0, 200, 255), 2)
             if draw_labels:
-                lines = [f'G1 #{index + 1} ({detection.score:.0%})']
+                lines = [f'Target #{index + 1} ({detection.score:.0%})']
                 lines.extend(active_label_lines(detection, self.estimators))
                 line_colors = None
                 if truth is not None:
@@ -320,7 +320,7 @@ class RgbdOverlayRenderer:
             panel = np.zeros_like(frame)
 
         if not batch.detected:
-            cv2.putText(panel, 'No G1 detected', (20, 100),
+            cv2.putText(panel, 'No target detected', (20, 100),
                         cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 0, 255), 2, cv2.LINE_AA)
         return panel
 

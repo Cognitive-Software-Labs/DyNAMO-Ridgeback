@@ -12,9 +12,9 @@ from ridgeback_autonomy.common.messages import (
 )
 from ridgeback_autonomy.common.miss_reason import MissReason
 from ridgeback_autonomy.common.models import Detection
-from ridgeback_autonomy.msg import G1Measurements
+from ridgeback_autonomy.msg import TargetMeasurements
 
-from ridgeback_autonomy.perception.estimators import (
+from ridgeback_autonomy.perception.target_localization.estimator_registry import (
     ESTIMATOR_FIELD_KEYS,
     ESTIMATOR_POSITION_ATTRS,
     ESTIMATOR_STATUS_FIELD_KEYS,
@@ -73,7 +73,7 @@ def stamp_to_nanoseconds(stamp) -> int:
     return int(stamp.sec) * 1_000_000_000 + int(stamp.nanosec)
 
 
-def measurement_message_key(msg: G1Measurements) -> MeasurementEventKey:
+def measurement_message_key(msg: TargetMeasurements) -> MeasurementEventKey:
     return (
         msg.header.frame_id,
         int(msg.header.stamp.sec),
@@ -83,14 +83,14 @@ def measurement_message_key(msg: G1Measurements) -> MeasurementEventKey:
     )
 
 
-def extract_public_estimator_values(msg: G1Measurements) -> dict[str, float | None]:
+def extract_public_estimator_values(msg: TargetMeasurements) -> dict[str, float | None]:
     return {
         estimator: first_finite_positive(getattr(msg, field_key))
         for estimator, field_key in ESTIMATOR_FIELD_KEYS.items()
     }
 
 
-def extract_estimator_statuses(msg: G1Measurements) -> dict[str, int]:
+def extract_estimator_statuses(msg: TargetMeasurements) -> dict[str, int]:
     """Per-estimator status code for the first detection (count == 1 frames).
 
     Mask estimators carry an explicit ``*_status`` array from the node; the
@@ -129,7 +129,7 @@ def detection_status(detection: Detection, estimator: str) -> int:
 
 def ensure_measurement_event(
     events: dict[MeasurementEventKey, MeasurementEvent],
-    msg: G1Measurements,
+    msg: TargetMeasurements,
 ) -> MeasurementEvent:
     key = measurement_message_key(msg)
     event = events.get(key)
@@ -151,7 +151,7 @@ def ensure_measurement_event(
 
 def update_measurement_event(
     event: MeasurementEvent,
-    msg: G1Measurements,
+    msg: TargetMeasurements,
     allowed_estimators: set[str],
 ) -> None:
     event.detected = bool(msg.detected)
@@ -174,7 +174,7 @@ def update_measurement_event(
 
 def merge_measurement_detections(
     event: MeasurementEvent,
-    msg: G1Measurements,
+    msg: TargetMeasurements,
     allowed_estimators: set[str],
 ) -> None:
     """Merge this message's per-detection values into the event's detection table.

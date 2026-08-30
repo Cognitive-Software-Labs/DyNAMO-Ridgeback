@@ -114,7 +114,7 @@ What the selection returns depends on the mask precision:
 
 **`tight` branch.** The points are nearly all object; a statistical outlier
 removal pass is enough before reducing. The shipped rule
-(`mad_outlier_removal` in `perception/core/isolation_3d.py`) keeps the points
+(`mad_outlier_removal` in `perception/target_localization/core/isolation_3d.py`) keeps the points
 whose camera-frame range is within median ± 3·MAD of the range distribution —
 the stragglers being edge bleed onto the background.
 
@@ -203,7 +203,7 @@ fragility or the `rect` contamination dominates the error budget.
 ## 5. Relationship to the current stack
 
 Euclidean reconstruction is shipped as
-`perception/core/euclidean_reconstruction.py`
+`perception/target_localization/core/euclidean_reconstruction.py`
 (`localize_euclidean_reconstruction`). The **legacy** `pointcloud` estimator
 (`compute_pointcloud_measurement` in `geometry.py`) is a proto-Path-B with
 three differences the shipped path resolves:
@@ -228,14 +228,14 @@ camera-frame coordinate output.
 
 - ~~**Reduction convention**~~ — resolved 2026-07-23: the reduce step emits
   only the centroid of the foreground points
-  (`perception/core/euclidean_reconstruction.py`); there is no separate
+  (`perception/target_localization/core/euclidean_reconstruction.py`); there is no separate
   distance statistic, and the published distance is derived downstream from that
   centroid (base-planar projection). Applied identically across isolation
   recipes.
 - **Isolation recipe** — the `rect`-branch chain is a pluggable strategy.
   ~~Choose and parameterize it~~ — resolved 2026-07-24, changed 2026-08-28: the
   default is `Chain(HeightCrop, NearestModeBand)` (`ISOLATION_3D_DEFAULT` =
-  `height_crop_nearest_mode_band` in `perception/core/isolation_3d.py`) — a
+  `height_crop_nearest_mode_band` in `perception/target_localization/core/isolation_3d.py`) — a
   floor-remover then a background-separator, wired and running. It replaced the
   percentile-anchored `RangeBand` chain, whose anchor is only correct while the
   object is the nearest quarter of the point set and which was held inside that

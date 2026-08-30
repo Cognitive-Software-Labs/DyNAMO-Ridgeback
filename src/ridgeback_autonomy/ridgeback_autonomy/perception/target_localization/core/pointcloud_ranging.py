@@ -15,7 +15,7 @@ from sensor_msgs.msg import PointCloud2
 from sensor_msgs_py import point_cloud2
 
 from ridgeback_autonomy.common.models import DetectionBatch
-from ridgeback_autonomy.perception.core.vehicle_frame import apply_vehicle_front_offset
+from ridgeback_autonomy.perception.target_localization.core.vehicle_frame import apply_vehicle_front_offset
 
 
 # The ROI crop inside a detection box: a centre patch, biased upward, so the

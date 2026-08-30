@@ -4,11 +4,11 @@ import numpy as np
 import pytest
 
 from ridgeback_autonomy.common.miss_reason import MissReason
-from ridgeback_autonomy.perception.core.intrinsics import CameraIntrinsics
-from ridgeback_autonomy.perception.core.isolation_2d import otsu_foreground
-from ridgeback_autonomy.perception.core.mask import MaskPrecision, mask_from_array, rasterize_bbox
-from ridgeback_autonomy.perception.core import projective_ranging
-from ridgeback_autonomy.perception.core.projective_ranging import localize_projective_ranging
+from ridgeback_autonomy.perception.target_localization.core.intrinsics import CameraIntrinsics
+from ridgeback_autonomy.perception.target_localization.core.isolation_2d import otsu_foreground
+from ridgeback_autonomy.perception.target_localization.core.mask import MaskPrecision, mask_from_array, rasterize_bbox
+from ridgeback_autonomy.perception.target_localization.core import projective_ranging
+from ridgeback_autonomy.perception.target_localization.core.projective_ranging import localize_projective_ranging
 
 
 HEIGHT, WIDTH = 60, 80

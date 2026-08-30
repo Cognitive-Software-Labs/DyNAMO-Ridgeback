@@ -1,6 +1,6 @@
 """Why a mask estimator produced (or failed to produce) a value on a frame.
 
-A single source imported by both the writer (``g1_mask_measurement_node``) and
+A single source imported by both the writer (``target_mask_measurement_node``) and
 the reader (the benchmark), so the codes never drift between the two. Stored on
 the wire as ``uint8`` per detection, parallel to the ``*_distance_m`` arrays.
 ``OK`` means a value was produced; ``UNSET`` means the node never wrote a status

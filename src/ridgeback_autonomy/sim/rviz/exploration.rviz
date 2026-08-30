@@ -7,7 +7,7 @@ Panels:
         - /Global Options1
         - /RobotModel1
         - /SLAM Map1
-        - /G1 Estimates1
+        - /Target Estimates1
       Splitter Ratio: 0.5
     Tree Height: 720
   - Class: rviz_common/Selection
@@ -126,7 +126,7 @@ Visualization Manager:
       Value: true
     - Class: rviz_default_plugins/MarkerArray
       Enabled: true
-      Name: G1 Estimates
+      Name: Target Estimates
       # One checkbox per marker namespace, and ring and dot share theirs, so
       # unticking a row drops both. Listed rather than discovered so the four
       # are configurable before anything has published -- test_launch_layout
@@ -134,20 +134,20 @@ Visualization Manager:
       # estimator would otherwise leave a checkbox for a namespace nothing
       # publishes and the new row would arrive unconfigured.
       Namespaces:
-        g1_estimates/pointcloud: true
-        g1_estimates/projective_ranging: true
-        g1_estimates/euclidean_reconstruction: true
-        g1_estimates/polar_profiling: true
+        target_estimates/pointcloud: true
+        target_estimates/projective_ranging: true
+        target_estimates/euclidean_reconstruction: true
+        target_estimates/polar_profiling: true
       Topic:
         Depth: 5
         Durability Policy: Volatile
         History Policy: Keep Last
         Reliability Policy: Reliable
-        Value: /r100_0001/visualization/g1/estimates
+        Value: /r100_0001/visualization/target/estimates
       Value: true
     - Class: rviz_default_plugins/MarkerArray
       Enabled: true
-      Name: G1 Polar Rays
+      Name: Target Polar Rays
       Namespaces:
         polar/used: true
         polar/wedge: true
@@ -157,7 +157,7 @@ Visualization Manager:
         Durability Policy: Volatile
         History Policy: Keep Last
         Reliability Policy: Reliable
-        Value: /r100_0001/visualization/g1/polar_rays
+        Value: /r100_0001/visualization/target/polar_rays
       Value: true
     - Class: rviz_default_plugins/Image
       Enabled: true
@@ -172,7 +172,7 @@ Visualization Manager:
         Durability Policy: Volatile
         History Policy: Keep Last
         Reliability Policy: Best Effort
-        Value: /r100_0001/debug/g1/overlay
+        Value: /r100_0001/debug/target/overlay
       Value: true
     - Class: rviz_default_plugins/MarkerArray
       Enabled: true
@@ -226,19 +226,19 @@ Visualization Manager:
         Reliability Policy: Reliable
         Value: /r100_0001/hud_overlay
       Value: true
-    # A second overlay, from hud_g1_node: the distance panel is rich text and
+    # A second overlay, from hud_target_node: the distance panel is rich text and
     # the velocity/coverage panels align their columns with runs of spaces,
     # which rich text collapses, so the two cannot share an aggregator. Needs no
     # Window Geometry entry -- a TextOverlay is drawn on the 3D view, not docked.
     - Class: rviz_2d_overlay_plugins/TextOverlay
       Enabled: true
-      Name: G1 HUD
+      Name: Target HUD
       Topic:
         Depth: 10
         Durability Policy: Volatile
         History Policy: Keep Last
         Reliability Policy: Reliable
-        Value: /r100_0001/hud_g1_overlay
+        Value: /r100_0001/hud_target_overlay
       Value: true
   Enabled: true
   Global Options:

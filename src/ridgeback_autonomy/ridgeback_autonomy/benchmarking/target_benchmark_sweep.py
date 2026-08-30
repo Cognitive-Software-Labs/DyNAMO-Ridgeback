@@ -15,7 +15,7 @@ from typing import Any
 
 from ament_index_python.packages import get_package_share_directory
 
-from ridgeback_autonomy.perception.g1_launch import (
+from ridgeback_autonomy.perception.target_localization.launch import (
     SHARED_BENCHMARK_ARGUMENT_DEFAULTS,
     workspace_root_from_package_share,
 )
@@ -153,14 +153,14 @@ def _environment_command(spec: SweepSpec) -> list[str]:
     if 'setup_path' in spec.defaults:
         arguments['setup_path'] = spec.defaults['setup_path']
     return [
-        'ros2', 'launch', 'ridgeback_autonomy', 'g1_benchmark_env.launch.py',
+        'ros2', 'launch', 'ridgeback_autonomy', 'target_benchmark_env.launch.py',
         *_launch_argument_tokens(arguments),
     ]
 
 
 def _config_command(arguments: dict[str, str]) -> list[str]:
     return [
-        'ros2', 'launch', 'ridgeback_autonomy', 'g1_benchmark_config.launch.py',
+        'ros2', 'launch', 'ridgeback_autonomy', 'target_benchmark_config.launch.py',
         *_launch_argument_tokens(arguments),
     ]
 
@@ -697,12 +697,12 @@ def main(argv: list[str] | None = None) -> int:
         try:
             report_path = write_sweep_report(args.report_only)
         except (OSError, ValueError, json.JSONDecodeError) as exc:
-            print(f'g1_benchmark_sweep: {exc}', file=sys.stderr)
+            print(f'target_benchmark_sweep: {exc}', file=sys.stderr)
             return 2
         print(f'Regenerated {report_path}')
         return 0
     if not args.sweep_yaml:
-        print('g1_benchmark_sweep: sweep_yaml is required unless --report-only is used.',
+        print('target_benchmark_sweep: sweep_yaml is required unless --report-only is used.',
               file=sys.stderr)
         return 2
 
@@ -720,7 +720,7 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         sweep_dir, success = run_sweep(spec, configs, package_share=package_share)
     except (OSError, ValueError, RuntimeError) as exc:
-        print(f'g1_benchmark_sweep: {exc}', file=sys.stderr)
+        print(f'target_benchmark_sweep: {exc}', file=sys.stderr)
         return 2
 
     print(f'Sweep outputs: {sweep_dir}')

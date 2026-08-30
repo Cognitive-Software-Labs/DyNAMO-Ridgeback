@@ -18,21 +18,21 @@ from ridgeback_autonomy.common.messages import (
     build_measurements_message,
 )
 from ridgeback_autonomy.common.tf_utils import lookup_transform_components
-from ridgeback_autonomy.msg import G1Detections, G1Measurements
-from ridgeback_autonomy.perception.estimators import parse_estimators
-from ridgeback_autonomy.perception.core.pointcloud_ranging import (
+from ridgeback_autonomy.msg import TargetDetections, TargetMeasurements
+from ridgeback_autonomy.perception.target_localization.contracts import (
+    POINTCLOUD_MEASUREMENTS_TOPIC,
+    RAW_DETECTIONS_TOPIC,
+)
+from ridgeback_autonomy.perception.target_localization.estimator_registry import parse_estimators
+from ridgeback_autonomy.perception.target_localization.core.pointcloud_ranging import (
     add_pointcloud_measurements,
     extract_organized_xyz,
 )
 
 
-RAW_DETECTIONS_TOPIC = 'detections/g1/raw'
-POINTCLOUD_MEASUREMENTS_TOPIC = 'measurements/g1/pointcloud'
-
-
-class G1PointcloudMeasurementNode(Node):
+class TargetPointcloudMeasurementNode(Node):
     def __init__(self) -> None:
-        super().__init__('g1_pointcloud_measurement_node')
+        super().__init__('target_pointcloud_measurement_node')
 
         default_base_frame = self.default_base_frame()
 
@@ -61,7 +61,7 @@ class G1PointcloudMeasurementNode(Node):
         self.tf_buffer = Buffer(node=self)
         self.tf_listener = TransformListener(self.tf_buffer, self, spin_thread=False)
 
-        self.latest_detections_msg: G1Detections | None = None
+        self.latest_detections_msg: TargetDetections | None = None
         self.latest_color_msg: Image | None = None
         self.latest_pointcloud_msg: PointCloud2 | None = None
         self.latest_pointcloud_xyz: np.ndarray | None = None
@@ -73,7 +73,7 @@ class G1PointcloudMeasurementNode(Node):
         self.stop_event = threading.Event()
 
         self.create_subscription(
-            G1Detections,
+            TargetDetections,
             self.detections_topic,
             self.detections_callback,
             10,
@@ -92,7 +92,7 @@ class G1PointcloudMeasurementNode(Node):
         )
 
         self.measurement_pub = self.create_publisher(
-            G1Measurements,
+            TargetMeasurements,
             self.measurement_topic,
             10,
         )
@@ -111,7 +111,7 @@ class G1PointcloudMeasurementNode(Node):
             return f'{namespace_name}/robot/base_link'
         return 'robot/base_link'
 
-    def detections_callback(self, detections_msg: G1Detections) -> None:
+    def detections_callback(self, detections_msg: TargetDetections) -> None:
         with self.processing_lock:
             self.latest_detections_msg = detections_msg
         self.process_event.set()
@@ -196,7 +196,7 @@ class G1PointcloudMeasurementNode(Node):
 
     def process_measurements(
         self,
-        detections_msg: G1Detections,
+        detections_msg: TargetDetections,
         pointcloud_xyz: np.ndarray | None,
         pointcloud_rotation: np.ndarray | None,
         pointcloud_translation: np.ndarray | None,
@@ -261,7 +261,7 @@ class G1PointcloudMeasurementNode(Node):
 
 def main() -> None:
     rclpy.init()
-    node = G1PointcloudMeasurementNode()
+    node = TargetPointcloudMeasurementNode()
     try:
         rclpy.spin(node)
     except (KeyboardInterrupt, ExternalShutdownException):

@@ -17,17 +17,17 @@ from launch.events import Shutdown
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
-from ridgeback_autonomy.perception.estimators import (
+from ridgeback_autonomy.perception.target_localization.estimator_registry import (
     parse_estimators,
     selected_mask_estimators,
     selected_pointcloud_estimators,
     uses_mask_estimators,
     uses_pointcloud_estimators,
 )
-from ridgeback_autonomy.perception.g1_launch import (
+from ridgeback_autonomy.perception.target_localization.launch import (
     CONFIG_LAUNCH_ARGUMENT_NAMES,
-    MASK_MEASUREMENT_TOPIC,
-    POINTCLOUD_MEASUREMENT_TOPIC,
+    MASK_MEASUREMENTS_TOPIC,
+    POINTCLOUD_MEASUREMENTS_TOPIC,
     RAW_DETECTIONS_TOPIC,
     SIMULATION_CAMERA_INPUTS,
     distance_hud_node,
@@ -39,8 +39,8 @@ from ridgeback_autonomy.perception.g1_launch import (
     resolved_camera_inputs,
     workspace_root_from_package_share,
 )
-from ridgeback_autonomy.perception.core.depth_common import DEPTH_GATE_DISABLED
-from ridgeback_autonomy.perception.core.isolation_3d import ISOLATION_3D_DEFAULT
+from ridgeback_autonomy.perception.target_localization.core.depth_common import DEPTH_GATE_DISABLED
+from ridgeback_autonomy.perception.target_localization.core.isolation_3d import ISOLATION_3D_DEFAULT
 
 
 ENV_READY_TIMEOUT_SEC = 300.0
@@ -134,8 +134,8 @@ def build_benchmark_nodes(context, *args, **kwargs):
 
     runner = Node(
         package='ridgeback_autonomy',
-        executable='g1_distance_benchmark_runner',
-        name='g1_distance_benchmark_runner',
+        executable='target_distance_benchmark_runner',
+        name='target_distance_benchmark_runner',
         namespace=namespace,
         parameters=[{
             'use_sim_time': use_sim_time,
@@ -147,8 +147,8 @@ def build_benchmark_nodes(context, *args, **kwargs):
             'settle_sec': settle_sec,
             'capture_sec': capture_sec,
             'estimators': ','.join(selected_estimators),
-            'pointcloud_measurement_topic': POINTCLOUD_MEASUREMENT_TOPIC,
-            'mask_measurement_topic': MASK_MEASUREMENT_TOPIC,
+            'pointcloud_measurement_topic': POINTCLOUD_MEASUREMENTS_TOPIC,
+            'mask_measurement_topic': MASK_MEASUREMENTS_TOPIC,
             'color_topic': camera_inputs.color_image_topic,
             'depth_source': LaunchConfiguration('depth_source'),
             'isolation_2d': LaunchConfiguration('isolation_2d'),
@@ -214,11 +214,11 @@ def generate_launch_description():
     namespace = LaunchConfiguration('namespace')
 
     arguments = [
-        # Shared with g1_benchmark_env.launch.py. Keep these defaults
+        # Shared with target_benchmark_env.launch.py. Keep these defaults
         # byte-identical: the first declaration inherited by a wrapper wins.
         DeclareLaunchArgument('namespace', default_value='r100_0001'),
         DeclareLaunchArgument('use_sim_time', default_value='true'),
-        DeclareLaunchArgument('world', default_value='g1_distance_calibration'),
+        DeclareLaunchArgument('world', default_value='target_distance_calibration'),
         DeclareLaunchArgument(
             'color_topic', default_value=SIMULATION_CAMERA_INPUTS.color_image_topic),
         DeclareLaunchArgument(

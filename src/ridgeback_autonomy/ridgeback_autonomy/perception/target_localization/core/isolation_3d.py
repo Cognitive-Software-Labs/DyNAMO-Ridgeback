@@ -19,7 +19,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from ridgeback_autonomy.perception.core.depth_common import (
+from ridgeback_autonomy.perception.target_localization.core.depth_common import (
     NEAREST_MODE_BIN_WIDTH_M_DEFAULT,
     NEAREST_MODE_MIN_BIN_FRACTION_DEFAULT,
     nearest_significant_mode,

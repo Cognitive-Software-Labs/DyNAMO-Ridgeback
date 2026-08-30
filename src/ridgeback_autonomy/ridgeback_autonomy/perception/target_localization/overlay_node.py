@@ -13,7 +13,7 @@ from geometry_msgs.msg import PointStamped
 from sensor_msgs.msg import CameraInfo, Image, LaserScan
 from tf2_ros import Buffer, TransformException, TransformListener
 
-from ridgeback_autonomy.perception.estimators import (
+from ridgeback_autonomy.perception.target_localization.estimator_registry import (
     DEPTH_PATH_ESTIMATORS,
     parse_estimators,
     parse_mask_gate,
@@ -24,33 +24,36 @@ from ridgeback_autonomy.common.messages import (
     build_bgr8_image_message,
 )
 from ridgeback_autonomy.common.tf_utils import lookup_transform_components
-from ridgeback_autonomy.msg import G1Measurements
-from ridgeback_autonomy.perception.core.image_utils import (
+from ridgeback_autonomy.msg import TargetMeasurements
+from ridgeback_autonomy.perception.target_localization.core.image_utils import (
     convert_color_image_message,
     convert_depth_to_meters_message,
     decode_image_message,
 )
-from ridgeback_autonomy.perception.core.intrinsics import (
+from ridgeback_autonomy.perception.target_localization.core.intrinsics import (
     intrinsics_from_camera_info,
     project_points,
 )
-from ridgeback_autonomy.perception.core.polar_profiling import scan_points_optical
-from ridgeback_autonomy.perception.core.rendering import (
+from ridgeback_autonomy.perception.target_localization.core.polar_profiling import scan_points_optical
+from ridgeback_autonomy.perception.target_localization.core.rendering import (
     PANEL_MAX_COLS_DEFAULT,
     RgbdOverlayRenderer,
 )
-from ridgeback_autonomy.perception.ground_truth import GROUND_TRUTH_TOPIC, truth_reading
+from ridgeback_autonomy.perception.target_localization.contracts import (
+    ALIGNED_DEPTH_DEBUG_TOPIC,
+    GROUND_TRUTH_TOPIC,
+    MASK_DEBUG_TOPIC,
+    MASK_MEASUREMENTS_TOPIC,
+    OVERLAY_IMAGE_TOPIC,
+    POINTCLOUD_MEASUREMENTS_TOPIC,
+)
+from ridgeback_autonomy.perception.target_localization.ground_truth import truth_reading
 
 
-POINTCLOUD_MEASUREMENTS_TOPIC = 'measurements/g1/pointcloud'
-MASK_MEASUREMENTS_TOPIC = 'measurements/g1/mask'
-MASK_DEBUG_TOPIC = 'debug/g1/mask'
-OVERLAY_IMAGE_TOPIC = 'debug/g1/overlay'
 # The mask node's debug republish of the depth frame its paths read. It only
 # converts depth on frames that carry a detection, so this panel updates on
 # detection frames and holds its last one in between, rather than tracking the
 # camera stream.
-ALIGNED_DEPTH_TOPIC = 'debug/g1/mask/aligned_depth'
 COLOR_CAMERA_INFO_TOPIC = 'sensors/camera_0/color/camera_info'
 SCAN_TOPIC = 'sensors/lidar2d_0/scan'
 DEPTH_MAX_METERS_DEFAULT = 10.0
@@ -69,15 +72,15 @@ MASK_FIELDS = (
 )
 
 
-class G1OverlayNode(Node):
+class TargetOverlayNode(Node):
     def __init__(self) -> None:
-        super().__init__('g1_overlay_node')
+        super().__init__('target_overlay_node')
 
         self.declare_parameter('measurement_topic', POINTCLOUD_MEASUREMENTS_TOPIC)
         self.declare_parameter('mask_measurement_topic', MASK_MEASUREMENTS_TOPIC)
         self.declare_parameter('color_topic', 'sensors/camera_0/color/image')
         self.declare_parameter('mask_debug_topic', MASK_DEBUG_TOPIC)
-        self.declare_parameter('aligned_depth_topic', ALIGNED_DEPTH_TOPIC)
+        self.declare_parameter('aligned_depth_topic', ALIGNED_DEPTH_DEBUG_TOPIC)
         self.declare_parameter('color_camera_info_topic', COLOR_CAMERA_INFO_TOPIC)
         self.declare_parameter('scan_topic', SCAN_TOPIC)
         self.declare_parameter('ground_truth_topic', GROUND_TRUTH_TOPIC)
@@ -112,14 +115,14 @@ class G1OverlayNode(Node):
             max_cols=max(1, int(self.get_parameter('max_cols').value)),
             rgb_panel_labels=self.rgb_panel_labels)
 
-        self.latest_measurements_msg: G1Measurements | None = None
+        self.latest_measurements_msg: TargetMeasurements | None = None
         self.latest_color_msg: Image | None = None
         self.latest_aligned_depth_msg: Image | None = None
         self.latest_color_info: CameraInfo | None = None
         self.latest_scan_msg: LaserScan | None = None
         self.latest_truth_msg: PointStamped | None = None
-        self.pointcloud_cache: OrderedDict[tuple, G1Measurements] = OrderedDict()
-        self.mask_cache: OrderedDict[tuple, G1Measurements] = OrderedDict()
+        self.pointcloud_cache: OrderedDict[tuple, TargetMeasurements] = OrderedDict()
+        self.mask_cache: OrderedDict[tuple, TargetMeasurements] = OrderedDict()
         self.mask_debug_cache: OrderedDict[tuple[int, int], Image] = OrderedDict()
         self.last_matched_silhouette = None
         self.last_scan_tf_fallback: str | None = None
@@ -133,10 +136,10 @@ class G1OverlayNode(Node):
         self.tf_listener = TransformListener(self.tf_buffer, self, spin_thread=False)
 
         self.create_subscription(
-            G1Measurements, self.get_parameter('measurement_topic').value,
+            TargetMeasurements, self.get_parameter('measurement_topic').value,
             self.measurement_callback, 10)
         self.create_subscription(
-            G1Measurements, self.get_parameter('mask_measurement_topic').value,
+            TargetMeasurements, self.get_parameter('mask_measurement_topic').value,
             self.mask_measurement_callback, 10)
         self.create_subscription(
             Image, self.color_topic, self.color_callback, qos_profile=qos_profile_sensor_data)
@@ -171,17 +174,17 @@ class G1OverlayNode(Node):
 
     # -- measurement inputs --
 
-    def measurement_callback(self, msg: G1Measurements) -> None:
+    def measurement_callback(self, msg: TargetMeasurements) -> None:
         self.cache_measurement(self.pointcloud_cache, msg)
         self.latest_measurements_msg = msg
         self.render_latest()
 
-    def mask_measurement_callback(self, msg: G1Measurements) -> None:
+    def mask_measurement_callback(self, msg: TargetMeasurements) -> None:
         self.cache_measurement(self.mask_cache, msg)
         self.latest_measurements_msg = msg
         self.render_latest()
 
-    def cache_measurement(self, cache: OrderedDict, msg: G1Measurements) -> None:
+    def cache_measurement(self, cache: OrderedDict, msg: TargetMeasurements) -> None:
         key = self.measurement_message_key(msg)
         cache[key] = msg
         cache.move_to_end(key)
@@ -293,7 +296,7 @@ class G1OverlayNode(Node):
             if other is not None and other is not primary:
                 self.merge_fields(batch, other, fields)
 
-    def merge_fields(self, batch, other_msg: G1Measurements, field_names) -> None:
+    def merge_fields(self, batch, other_msg: TargetMeasurements, field_names) -> None:
         other = batch_from_measurements_message(other_msg)
         for detection, other_detection in zip(batch.detections, other.detections):
             for name in field_names:
@@ -329,7 +332,7 @@ class G1OverlayNode(Node):
         uv, in_view = project_points(points_optical, intrinsics)
         return uv, (valid & in_view), points_optical
 
-    def match_mask_debug(self, measurements_msg: G1Measurements):
+    def match_mask_debug(self, measurements_msg: TargetMeasurements):
         """The silhouette artifact for the rendered stamp, else the newest one."""
 
         mask_msg = self.mask_debug_cache.get(
@@ -351,7 +354,7 @@ class G1OverlayNode(Node):
     # share an exact detection stamp, so pair within this window on equal count.
     MATCH_MAX_DT_SEC = 1.0
 
-    def match_measurement(self, cache: OrderedDict, primary_msg: G1Measurements):
+    def match_measurement(self, cache: OrderedDict, primary_msg: TargetMeasurements):
         if not cache:
             return None
         exact = cache.get(self.measurement_message_key(primary_msg))
@@ -375,7 +378,7 @@ class G1OverlayNode(Node):
     def stamp_seconds(stamp) -> float:
         return float(stamp.sec) + float(stamp.nanosec) * 1e-9
 
-    def measurement_message_key(self, msg: G1Measurements) -> tuple:
+    def measurement_message_key(self, msg: TargetMeasurements) -> tuple:
         return (
             msg.header.frame_id,
             int(msg.header.stamp.sec),
@@ -392,7 +395,7 @@ class G1OverlayNode(Node):
 
 def main() -> None:
     rclpy.init()
-    node = G1OverlayNode()
+    node = TargetOverlayNode()
     try:
         rclpy.spin(node)
     except (KeyboardInterrupt, ExternalShutdownException):

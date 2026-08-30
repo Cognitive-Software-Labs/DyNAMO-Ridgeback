@@ -5,7 +5,7 @@ import math
 import numpy as np
 import pytest
 
-from ridgeback_autonomy.perception.core.isolation_3d import (
+from ridgeback_autonomy.perception.target_localization.core.isolation_3d import (
     BASE_ABOVE_FLOOR_M_DEFAULT,
     CAMERA_HEIGHT_M_DEFAULT,
     ISOLATION_3D_DEFAULT,

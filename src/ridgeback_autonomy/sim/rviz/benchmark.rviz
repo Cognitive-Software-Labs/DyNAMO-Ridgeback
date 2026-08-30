@@ -6,7 +6,7 @@ Panels:
       Expanded:
         - /Global Options1
         - /RobotModel1
-        - /G1 Estimates1
+        - /Target Estimates1
       Splitter Ratio: 0.5
     Tree Height: 720
   - Class: rviz_common/Selection
@@ -93,21 +93,21 @@ Visualization Manager:
         Durability Policy: Volatile
         History Policy: Keep Last
         Reliability Policy: Best Effort
-        Value: /r100_0001/debug/g1/overlay
+        Value: /r100_0001/debug/target/overlay
       Value: true
     - Class: rviz_default_plugins/MarkerArray
       Enabled: true
-      Name: G1 Estimates
+      Name: Target Estimates
       Topic:
         Depth: 5
         Durability Policy: Volatile
         History Policy: Keep Last
         Reliability Policy: Reliable
-        Value: /r100_0001/visualization/g1/estimates
+        Value: /r100_0001/visualization/target/estimates
       Value: true
     - Class: rviz_default_plugins/MarkerArray
       Enabled: true
-      Name: G1 Polar Rays
+      Name: Target Polar Rays
       Namespaces:
         polar/used: true
         polar/wedge: true
@@ -117,7 +117,7 @@ Visualization Manager:
         Durability Policy: Volatile
         History Policy: Keep Last
         Reliability Policy: Reliable
-        Value: /r100_0001/visualization/g1/polar_rays
+        Value: /r100_0001/visualization/target/polar_rays
       Value: true
     - Class: rviz_2d_overlay_plugins/TextOverlay
       Enabled: true

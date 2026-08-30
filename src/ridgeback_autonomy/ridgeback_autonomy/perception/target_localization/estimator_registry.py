@@ -7,12 +7,12 @@ PUBLIC_ESTIMATOR_ORDER = (
     'polar_profiling',
 )
 
-# The organized-``PointCloud2`` row (g1_pointcloud_measurement_node), the one
+# The organized-``PointCloud2`` row (target_pointcloud_measurement_node), the one
 # path that reads the cloud directly rather than deprojecting depth itself --
 # which is what the mask stack's deprojection was validated against.
 POINTCLOUD_ESTIMATORS = frozenset({'pointcloud'})
 
-# The mask-based localization rows (g1_mask_measurement_node), all sharing the
+# The mask-based localization rows (target_mask_measurement_node), all sharing the
 # mask front-end and the camera-optical frame, independent of the pointcloud
 # row. The estimator key is already the self-describing path name.
 MASK_ESTIMATORS = frozenset({
@@ -29,7 +29,7 @@ DEPTH_PATH_ESTIMATORS = frozenset({'projective_ranging', 'euclidean_reconstructi
 # The mask front-end (gate) axis: the rasterized box (rect) gate and the
 # silhouette (tight segmentation) gate. A run picks one via the ``mask_gate``
 # parameter; the value folds into every mask-row output name. Tokens mirror
-# ``g1_mask_measurement_node.MASK_GATES`` by value (cross-checked in tests).
+# ``target_mask_measurement_node.MASK_GATES`` by value (cross-checked in tests).
 MASK_GATE_BOX = 'box'
 MASK_GATE_SILHOUETTE = 'silhouette'
 MASK_GATES = (MASK_GATE_BOX, MASK_GATE_SILHOUETTE)
@@ -42,7 +42,7 @@ ESTIMATOR_FIELD_KEYS = {
     'polar_profiling': 'polar_profiling_distance_m',
 }
 
-# Per-detection miss-reason arrays on G1Measurements, for the mask estimators
+# Per-detection miss-reason arrays on TargetMeasurements, for the mask estimators
 # that write a status. The pointcloud row has no status field; the benchmark
 # infers a coarse OK/UNSET for it from finiteness.
 ESTIMATOR_STATUS_FIELD_KEYS = {
@@ -56,7 +56,7 @@ ESTIMATOR_STATUS_FIELD_KEYS = {
 # assignment. Every registered estimator places its detection, and the display
 # surfaces rely on that: a distance-only row would have no direction of its own
 # and would draw its ring down the boresight, wrong by the whole lateral
-# component. ``test_estimate_viz`` asserts this covers PUBLIC_ESTIMATOR_ORDER.
+# component. ``test_target_visualization`` asserts this covers PUBLIC_ESTIMATOR_ORDER.
 ESTIMATOR_POSITION_ATTRS = {
     'pointcloud': ('pointcloud_forward_m', 'pointcloud_lateral_m'),
     'projective_ranging': ('projective_ranging_forward_m', 'projective_ranging_lateral_m'),
@@ -88,7 +88,7 @@ def display_distance(read_distance, index: int) -> float | None:
     """The one distance that speaks for a detection, in canonical order.
 
     ``read_distance(estimator, index)`` is supplied by the caller, so the same
-    rule serves the ``G1Measurements`` array shape and the ``Detection``
+    rule serves the ``TargetMeasurements`` array shape and the ``Detection``
     dataclass shape. First usable estimator wins rather than the smallest one:
     producers see different estimator sets, and a rule that ranks by whichever
     number happens to be lowest would let two nodes disagree about the same

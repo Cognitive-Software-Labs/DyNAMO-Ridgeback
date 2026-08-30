@@ -5,20 +5,20 @@ reconstruction / polar profiling benchmark rows.
 Consumes detections plus the camera stream the depth source reads and
 the 2D LiDAR scan, builds one mask per detection, and runs the localization
 paths per mask: the two depth paths
-(``perception/core/projective_ranging.py`` / ``euclidean_reconstruction.py``)
+(``target_localization/core/projective_ranging.py`` / ``euclidean_reconstruction.py``)
 against the aligned depth frame, and polar profiling
-(``perception/core/polar_profiling.py``) against the scan projected into the
+(``target_localization/core/polar_profiling.py``) against the scan projected into the
 camera optical frame via TF. Each path's result is converted from the camera
 optical frame to the base-frame planar-distance convention every benchmark
 row shares (ground truth included) through the optical -> base extrinsics
 from TF -- the camera's mounting pose, translation included, is modeled
-exactly -- and published as ``G1Measurements`` with
+exactly -- and published as ``TargetMeasurements`` with
 the identity fields of the source detections message -- so the benchmark
 runner can merge them into the same aligned event as the pointcloud
 measurements.
 
 Which of the three rows a run fills is the ``enabled_estimators`` parameter,
-the same name and ``all`` default ``g1_pointcloud_measurement_node`` carries,
+the same name and ``all`` default ``target_pointcloud_measurement_node`` carries,
 so one comma-separated list selects across both stacks. A path that
 was not selected is never run: its fields stay NaN, its status stays ``UNSET``,
 and the inputs only it needs are never subscribed to -- a polar-only run builds
@@ -27,14 +27,14 @@ depth-only run never touches the scan.
 
 The mask front-end is the ``mask_gate`` parameter: ``box`` rasterizes each
 detection box into a ``rect`` mask (no model, no extra input); ``silhouette``
-prompts a segmentation model (``perception/core/segmentation.py``) with the
+prompts a segmentation model (``target_localization/core/segmentation.py``) with the
 boxes on the exact color frame the detections were made on, producing
 ``tight`` masks. Masks never cross the wire either way
 (``mask_component.md`` Section 5.3) -- the segmenter runs in this process.
 
 The aligned depth frame is produced here, on demand, at the detection stamp:
 the ``depth_source`` parameter picks a strategy from
-``perception/core/depth_sources.py``, this node buffers that strategy's input
+``target_localization/core/depth_sources.py``, this node buffers that strategy's input
 stream raw and converts only the frame the detections were made on. Every
 frame is received and none is discarded blind, so the exact-stamp match is a
 lookup into a buffer this process filled rather than an intersection with some
@@ -42,7 +42,7 @@ other process's thinning. Nothing downstream branches on which source ran.
 Polar profiling needs no depth frame -- only the scan, the mask, and the
 color-grid intrinsics -- so it runs independently of depth availability.
 Deliberately independent of the pointcloud estimator
-(``perception/core/pointcloud_ranging.py``): constants are mirrored by value,
+(``target_localization/core/pointcloud_ranging.py``): constants are mirrored by value,
 never imported.
 """
 
@@ -67,7 +67,7 @@ from sensor_msgs.msg import CameraInfo, Image, LaserScan
 from tf2_ros import Buffer, TransformException, TransformListener
 from visualization_msgs.msg import MarkerArray
 
-from ridgeback_autonomy.perception.estimators import (
+from ridgeback_autonomy.perception.target_localization.estimator_registry import (
     DEPTH_PATH_ESTIMATORS,
     ESTIMATOR_FIELD_KEYS,
     MASK_ESTIMATORS,
@@ -82,60 +82,62 @@ from ridgeback_autonomy.common.messages import (
 )
 from ridgeback_autonomy.common.miss_reason import MissReason
 from ridgeback_autonomy.common.tf_utils import lookup_transform_components
-from ridgeback_autonomy.msg import G1Detections, G1Measurements
-from ridgeback_autonomy.perception.core.depth_common import (
+from ridgeback_autonomy.msg import TargetDetections, TargetMeasurements
+from ridgeback_autonomy.perception.target_localization.core.depth_common import (
     DEPTH_GATE_DISABLED,
     MASK_DEPTH_GATE_DEFAULT,
     resolve_depth_gate,
     valid_depth,
 )
-from ridgeback_autonomy.perception.core.depth_sources import (
+from ridgeback_autonomy.perception.target_localization.core.depth_sources import (
     DEPTH_ANYTHING_MODEL_ID_DEFAULT,
     DEPTH_SOURCE_STEREOSCOPIC,
     build_depth_source,
     encode_depth_message,
 )
-from ridgeback_autonomy.perception.core.image_utils import decode_color_to_rgb
-from ridgeback_autonomy.perception.core.intrinsics import intrinsics_from_camera_info
-from ridgeback_autonomy.perception.core.isolation_2d import (
+from ridgeback_autonomy.perception.target_localization.core.image_utils import decode_color_to_rgb
+from ridgeback_autonomy.perception.target_localization.core.intrinsics import intrinsics_from_camera_info
+from ridgeback_autonomy.perception.target_localization.core.isolation_2d import (
     ISOLATION_2D_DEFAULT,
     ISOLATION_2D_RECIPES,
 )
-from ridgeback_autonomy.perception.core.isolation_3d import (
+from ridgeback_autonomy.perception.target_localization.core.isolation_3d import (
     BASE_ABOVE_FLOOR_M_DEFAULT,
     ISOLATION_3D_DEFAULT,
     ISOLATION_3D_RECIPES,
     build_isolation_3d,
     camera_floor_geometry,
 )
-from ridgeback_autonomy.perception.core.mask import (
+from ridgeback_autonomy.perception.target_localization.core.mask import (
     MaskPrecision,
     mask_from_array,
     rasterize_detection,
 )
-from ridgeback_autonomy.perception.core.projective_ranging import localize_projective_ranging
-from ridgeback_autonomy.perception.core.euclidean_reconstruction import localize_euclidean_reconstruction
-from ridgeback_autonomy.perception.core.polar_profiling import (
+from ridgeback_autonomy.perception.target_localization.core.projective_ranging import localize_projective_ranging
+from ridgeback_autonomy.perception.target_localization.core.euclidean_reconstruction import localize_euclidean_reconstruction
+from ridgeback_autonomy.perception.target_localization.core.polar_profiling import (
     localize_projected_polar_profiling,
     project_scan_to_image,
     scan_points_optical,
     select_bbox_beams,
 )
-from ridgeback_autonomy.perception.core.segmentation import (
+from ridgeback_autonomy.perception.target_localization.core.segmentation import (
     SEGMENTATION_MIN_PREDICTED_IOU_DEFAULT,
     SEGMENTATION_MODEL_DEFAULT,
     SamBoxSegmenter,
 )
+from ridgeback_autonomy.perception.target_localization.contracts import (
+    ALIGNED_DEPTH_DEBUG_TOPIC,
+    MASK_DEBUG_TOPIC,
+    MASK_MEASUREMENTS_TOPIC,
+    POLAR_RAYS_TOPIC,
+    RAW_DETECTIONS_TOPIC,
+)
 
 
-RAW_DETECTIONS_TOPIC = 'detections/g1/raw'
-MASK_MEASUREMENTS_TOPIC = 'measurements/g1/mask'
 COLOR_TOPIC_DEFAULT = 'sensors/camera_0/color/image'
 DEPTH_TOPIC_DEFAULT = 'sensors/camera_0/depth/image'
 CAMERA_INFO_TOPIC_DEFAULT = 'sensors/camera_0/color/camera_info'
-MASK_DEBUG_TOPIC = 'debug/g1/mask'
-ALIGNED_DEPTH_DEBUG_TOPIC = 'debug/g1/mask/aligned_depth'
-RAY_MARKER_TOPIC = 'visualization/g1/polar_rays'
 
 # Markers expire rather than being explicitly deleted, so they vanish on their
 # own when detections stop. Mirrors the estimate rings' lifetime.
@@ -611,17 +613,17 @@ def grid_mismatch_warning(intrinsics, batch) -> str | None:
     )
 
 
-class G1MaskMeasurementNode(Node):
+class TargetMaskMeasurementNode(Node):
     def __init__(self, depth_source=None, **node_kwargs) -> None:
         # ``node_kwargs`` reaches rclpy's Node: tests pass
         # ``parameter_overrides`` to stand the node up on a chosen
         # configuration without a launch file or CLI arguments.
-        super().__init__('g1_mask_measurement_node', **node_kwargs)
+        super().__init__('target_mask_measurement_node', **node_kwargs)
 
         self.declare_parameter('detections_topic', RAW_DETECTIONS_TOPIC)
         self.declare_parameter('measurement_topic', MASK_MEASUREMENTS_TOPIC)
         # Which of the three mask rows this run fills, same parameter name and
-        # "all" default as g1_pointcloud_measurement_node. Non-mask keys
+        # "all" default as target_pointcloud_measurement_node. Non-mask keys
         # in the value are ignored (a run selects across both stacks with one
         # list); the paths not selected are never run, so their fields stay NaN
         # and their statuses stay UNSET.
@@ -652,7 +654,7 @@ class G1MaskMeasurementNode(Node):
         self.declare_parameter('depth_anything_device', '')
         self.declare_parameter('scan_topic', 'sensors/lidar2d_0/scan')
         self.declare_parameter('scan_match_tolerance_s', SCAN_MATCH_TOLERANCE_S_DEFAULT)
-        self.declare_parameter('ray_marker_topic', RAY_MARKER_TOPIC)
+        self.declare_parameter('ray_marker_topic', POLAR_RAYS_TOPIC)
         self.declare_parameter('ray_marker_lifetime_sec', RAY_MARKER_LIFETIME_SEC)
         self.declare_parameter('base_frame', BASE_FRAME_DEFAULT)
         self.declare_parameter('front_offset_m', ROBOT_FRONT_OFFSET_M_DEFAULT)
@@ -712,7 +714,7 @@ class G1MaskMeasurementNode(Node):
         # the input topic (and, for the monocular source, the model).
         # Seam: tests inject a stub source (an ``input_kind`` and a scripted
         # ``produce``) so the node stands up without a model, mirroring
-        # G1DetectorNode(detector=...).
+        # TargetDetectorNode(detector=...).
         self.depth_source = None
         if self.needs_depth:
             self.depth_source = depth_source or build_depth_source(
@@ -762,7 +764,7 @@ class G1MaskMeasurementNode(Node):
         self.last_scan_tf_fallback: str | None = None
         self.last_base_tf_fallback: str | None = None
 
-        self.latest_detections_msg: G1Detections | None = None
+        self.latest_detections_msg: TargetDetections | None = None
         # Depth input and scan are matched to the detection stamp, not
         # paired latest-wins, so they are buffered rather than kept as a single
         # slot. Depth = exact stamp; scan = nearest within scan_match_tolerance_s.
@@ -790,7 +792,7 @@ class G1MaskMeasurementNode(Node):
         self.last_skip_warning: str | None = None
 
         self.create_subscription(
-            G1Detections,
+            TargetDetections,
             str(self.get_parameter('detections_topic').value),
             self.detections_callback,
             10,
@@ -826,7 +828,7 @@ class G1MaskMeasurementNode(Node):
             )
 
         self.measurement_pub = self.create_publisher(
-            G1Measurements,
+            TargetMeasurements,
             str(self.get_parameter('measurement_topic').value),
             10,
         )
@@ -917,7 +919,7 @@ class G1MaskMeasurementNode(Node):
                 f'Unknown {parameter_name} recipe "{key}". Expected one of: {supported}')
         return key
 
-    def detections_callback(self, detections_msg: G1Detections) -> None:
+    def detections_callback(self, detections_msg: TargetDetections) -> None:
         with self.processing_lock:
             self.latest_detections_msg = detections_msg
         self.process_event.set()
@@ -988,7 +990,7 @@ class G1MaskMeasurementNode(Node):
 
     def process_measurements(
         self,
-        detections_msg: G1Detections,
+        detections_msg: TargetDetections,
         depth_input_msg: Image | None,
         scan_msg: LaserScan | None,
         camera_info: CameraInfo | None,
@@ -1120,7 +1122,7 @@ class G1MaskMeasurementNode(Node):
 
     def masks_for_batch(
         self,
-        detections_msg: G1Detections,
+        detections_msg: TargetDetections,
         batch,
         *,
         color_hint: Image | None = None,
@@ -1317,7 +1319,7 @@ class G1MaskMeasurementNode(Node):
             return
         self.aligned_depth_debug_pub.publish(encode_depth_message(depth_m, header))
 
-    def camera_extrinsic_for_batch(self, detections_msg: G1Detections):
+    def camera_extrinsic_for_batch(self, detections_msg: TargetDetections):
         """Camera-optical -> base ``(rotation, translation)`` from TF, or ``None``.
 
         Looked up at the detection stamp for the frame the detections (and
@@ -1342,7 +1344,7 @@ class G1MaskMeasurementNode(Node):
             return None
         return rotation, translation
 
-    def scan_points_for_batch(self, detections_msg: G1Detections, scan_msg: LaserScan | None):
+    def scan_points_for_batch(self, detections_msg: TargetDetections, scan_msg: LaserScan | None):
         """Scan in the camera optical frame ``(points, valid)``, or ``None``.
 
         Looks up the scan -> optical extrinsic from TF at the detection stamp
@@ -1388,12 +1390,12 @@ class G1MaskMeasurementNode(Node):
 def main() -> None:
     rclpy.init()
     try:
-        node = G1MaskMeasurementNode()
+        node = TargetMaskMeasurementNode()
     except RuntimeError as exc:
         # Silhouette gate without the venv (no transformers/torch). Fail
         # cleanly with a clear message instead of dumping a traceback --
-        # same pattern as g1_detector_node.
-        get_logger('g1_mask_measurement').fatal(str(exc))
+        # same pattern as target_detector_node.
+        get_logger('target_mask_measurement').fatal(str(exc))
         if rclpy.ok():
             rclpy.shutdown()
         return

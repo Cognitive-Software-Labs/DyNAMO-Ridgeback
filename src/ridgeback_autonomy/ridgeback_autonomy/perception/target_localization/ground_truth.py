@@ -5,12 +5,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 
-# Ground truth the benchmark runner republishes during a trial's capture
-# window and the overlay renders as a reference label line. Benchmark-only:
-# nothing publishes this topic in the exploration stack, so the overlay line
-# never appears there.
-GROUND_TRUTH_TOPIC = 'benchmark/g1/ground_truth'
-
 # How long a truth message stays displayable. The runner publishes only while a
 # capture window is open, so the gate is what makes the line disappear between
 # trials instead of sitting next to a target that has already been teleported

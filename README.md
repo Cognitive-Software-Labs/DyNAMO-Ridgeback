@@ -1,10 +1,11 @@
-# Ridgeback Exploration, Perception, and G1 Benchmarking
+# Ridgeback Exploration, Target Localization, and Benchmarking
 
-Autonomous exploration, G1 perception, and distance benchmarking for a [Clearpath Ridgeback](https://clearpathrobotics.com/ridgeback-indoor-robot-platform/) robot in Gazebo Harmonic with ROS 2 Jazzy.
+Autonomous exploration, reusable target localization, and distance benchmarking for a [Clearpath Ridgeback](https://clearpathrobotics.com/ridgeback-indoor-robot-platform/) robot in Gazebo Harmonic with ROS 2 Jazzy. The shipped simulation benchmark currently uses a Unitree G1 as its target model; the ROS interfaces and localization package are target-generic.
 
 This workspace supports 3 main human workflows:
-- full autonomous exploration with G1 perception (any world)
-- repeatable G1 distance benchmarking across the point-cloud and mask-based measurements
+- full autonomous exploration with target localization (any world)
+- repeatable target-distance benchmarking across the point-cloud and mask-based measurements
+- manual mapping
 
 ## Docs
 
@@ -23,8 +24,8 @@ This workspace supports 3 main human workflows:
 | SLAM | slam_toolbox (online async, from source) | Map building + localization |
 | Navigation | Nav2 (MPPI omni controller) | Path planning + obstacle avoidance |
 | Exploration | explore_lite (m-explore-ros2) or in-repo `frontier_explorer_node` | Frontier detection + goal selection (selectable via `explorer:=`) |
-| Perception | Staged G1 perception pipeline | Raw OWLv2 detections plus the point-cloud and mask measurement nodes and an optional overlay |
-| Benchmarking | G1 distance benchmark runner | Controlled evaluation of the point-cloud and mask-based localization paths |
+| Perception | Staged target-localization pipeline | Raw OWLv2 detections plus the point-cloud and mask measurement nodes and an optional overlay |
+| Benchmarking | Target-distance benchmark runner | Controlled evaluation of the point-cloud and mask-based localization paths |
 
 ## Prerequisites
 
@@ -87,19 +88,19 @@ source install/setup.bash
 
 If you rename or move the workspace directory later, wipe `build/`, `install/`, and `log/` before rebuilding so the generated setup files do not keep stale absolute paths.
 
-### 3. (Optional) Set up G1 perception venv
+### 3. (Optional) Set up target localization venv
 
-The G1 perception/positioning stack (detection + point-cloud measurement +
+The target detection/localization stack (detection + point-cloud measurement +
 overlay) is **on by default** — `ridgeback_exploration.launch.py` ships with
-`g1_perception_enabled:=true`, which **requires** the venv below; without it the
+`target_localization_enabled:=true`, which **requires** the venv below; without it the
 detector logs a single clear error and exits cleanly. Disable the whole stack
-with `g1_perception_enabled:=false` for a normal exploration run that needs no
+with `target_localization_enabled:=false` for a normal exploration run that needs no
 venv and will not try to load any models.
 
 The stack follows a staged pipeline inside the installable Python package `ridgeback_autonomy/`:
-- raw detections on `detections/g1/raw`
-- point-cloud measurements on `measurements/g1/pointcloud`
-- mask-based measurements on `measurements/g1/mask`
+- raw detections on `detections/target/raw`
+- point-cloud measurements on `measurements/target/pointcloud`
+- mask-based measurements on `measurements/target/mask`
 
 It requires a Python venv with PyTorch and Transformers. All dependencies
 (pinned, with the correct CUDA torch index) live in
@@ -121,7 +122,7 @@ perception_venv/bin/python3 -m pip install -r requirements-perception.txt
 > and silently runs Depth-Anything / OWLv2 on the CPU. For a different
 > GPU/CUDA, change the index URL + torch pins in that file.
 
-Both public launch files automatically prepend `perception_venv/bin` to `PATH` and set `VIRTUAL_ENV` for the perception nodes. When you launch with `g1_perception_enabled:=true`, the first run will download the OWLv2 detector from Hugging Face. A benchmark run with `depth_source:=monocular` downloads the Depth-Anything V2 metric checkpoint on first use, and one with `mask_gate:=silhouette` the SlimSAM segmentation checkpoint.
+The exploration and benchmark-environment launches automatically prepend `perception_venv/bin` to `PATH` and set `VIRTUAL_ENV` for the perception nodes. When you launch with `target_localization_enabled:=true`, the first run will download the OWLv2 detector from Hugging Face. A benchmark run with `depth_source:=monocular` downloads the Depth-Anything V2 metric checkpoint on first use, and one with `mask_gate:=silhouette` the SlimSAM segmentation checkpoint.
 
 ### 4. (Optional) Install graphify post-commit hook
 
@@ -158,27 +159,27 @@ entrypoints; the benchmark environment/config pair are also public because the
 sweep supervisor invokes them as separate processes:
 
 - `ridgeback_exploration.launch.py`
-- `g1_distance_benchmark.launch.py`
-- `g1_benchmark_env.launch.py`
-- `g1_benchmark_config.launch.py`
+- `target_distance_benchmark.launch.py`
+- `target_benchmark_env.launch.py`
+- `target_benchmark_config.launch.py`
 - `manual_mapping.launch.py`
 
 The lower-level simulation, SLAM, Nav2, and frontier-exploration launches live under `launch/includes/` and are treated as internal launch building blocks rather than public entrypoints.
 
 ### `ridgeback_exploration.launch.py`
 
-Launches Gazebo, SLAM, Nav2, frontier exploration, and the G1 perception stack in sequence:
+Launches Gazebo, SLAM, Nav2, frontier exploration, and the target-localization stack in sequence:
 
 1. Gazebo + Ridgeback spawn
 2. Exploration RViz config
 3. `slam_toolbox` (after 20 s)
 4. Nav2 (after 65 s)
 5. The selected explorer — `explore_lite` (default) or the in-repo `frontier_explorer_node` (after 80 s)
-6. G1 perception nodes: `g1_detector_node`, the measurement nodes for the selected `estimators` (`g1_pointcloud_measurement_node` and/or `g1_mask_measurement_node`), `g1_estimate_viz_node`, `g1_overlay_node`, and a second `hud_node` for the distance panel
+6. Target-localization nodes: `target_detector_node`, the measurement nodes for the selected `estimators` (`target_pointcloud_measurement_node` and/or `target_mask_measurement_node`), `target_visualization_node`, `target_overlay_node`, and a second `hud_node` for the distance panel
 
-All four distance estimator rows run by default, the same set the benchmark compares — one RViz ring per row, each with its own bearing, plus a wide distance HUD top-right (`hud_g1_overlay`) listing the four side by side with the age of each reading. There is no ground truth in exploration, so that panel carries no truth line and no error column. Per-row visibility is an RViz Displays checkbox under `G1 Estimates`, one per estimator.
+All four distance estimator rows run by default, the same set the benchmark compares — one RViz ring per row, each with its own bearing, plus a wide distance HUD top-right (`hud_target_overlay`) listing the four side by side with the age of each reading. There is no ground truth in exploration, so that panel carries no truth line and no error column. Per-row visibility is an RViz Displays checkbox under `Target Estimates`, one per estimator.
 
-The perception overlay is published on `debug/g1/overlay` and shown by the configured RViz Image display.
+The perception overlay is published on `debug/target/overlay` and shown by the configured RViz Image display.
 
 Available worlds:
 
@@ -205,7 +206,7 @@ Arguments:
 | `depth_topic` | `sensors/camera_0/depth/image` | Compatibility override for aligned depth; a RealSense launch must set its driver-aligned topic |
 | `pointcloud_topic` | `sensors/camera_0/points` | Compatibility override for organized points; pass an empty value only when no pointcloud estimator is selected |
 | `exploration_rviz` | `true` | Launch the custom exploration RViz config |
-| `g1_perception_enabled` | `true` | Launch the G1 perception stack |
+| `target_localization_enabled` | `true` | Launch the target-localization stack |
 | `estimators` | `all` | Distance estimator rows to run — `all`, or a comma-separated subset of `pointcloud`, `projective_ranging`, `euclidean_reconstruction`, `polar_profiling`. Selects the measurement nodes, the rings and the HUD columns from one list |
 | `estimate_viz` | `true` | Publish the estimator rings and the wide distance HUD |
 | `depth_source` | `stereoscopic` | Aligned depth source for the mask rows — `stereoscopic` or `monocular` (Depth-Anything V2; downloads a checkpoint on first use) |
@@ -221,7 +222,7 @@ bash cleanup.sh
 
 ros2 launch ridgeback_autonomy ridgeback_exploration.launch.py world:=mock_hospital
 ros2 launch ridgeback_autonomy ridgeback_exploration.launch.py world:=warehouse exploration_rviz:=false
-ros2 launch ridgeback_autonomy ridgeback_exploration.launch.py world:=mock_hospital g1_perception_enabled:=false
+ros2 launch ridgeback_autonomy ridgeback_exploration.launch.py world:=mock_hospital target_localization_enabled:=false
 ros2 launch ridgeback_autonomy ridgeback_exploration.launch.py world:=office explorer:=custom
 
 # One ring instead of four: the pre-mask-row exploration stack
@@ -253,35 +254,35 @@ bash build_and_start_expl.sh office
 bash build_and_start_expl.sh office custom
 ```
 
-### `g1_distance_benchmark.launch.py`
+### `target_distance_benchmark.launch.py`
 
 ```bash
 # Default run: compare all four estimators
-ros2 launch ridgeback_autonomy g1_distance_benchmark.launch.py
+ros2 launch ridgeback_autonomy target_distance_benchmark.launch.py
 
 # Point cloud only
-ros2 launch ridgeback_autonomy g1_distance_benchmark.launch.py estimators:=pointcloud
+ros2 launch ridgeback_autonomy target_distance_benchmark.launch.py estimators:=pointcloud
 
 # Point cloud + the mask reference row
-ros2 launch ridgeback_autonomy g1_distance_benchmark.launch.py estimators:=pointcloud,projective_ranging
+ros2 launch ridgeback_autonomy target_distance_benchmark.launch.py estimators:=pointcloud,projective_ranging
 
 # Mask-based localization rows, stereoscopic aligned depth
-ros2 launch ridgeback_autonomy g1_distance_benchmark.launch.py estimators:=projective_ranging,euclidean_reconstruction,polar_profiling
+ros2 launch ridgeback_autonomy target_distance_benchmark.launch.py estimators:=projective_ranging,euclidean_reconstruction,polar_profiling
 
 # Same rows on monocular (Depth-Anything) aligned depth — compare depth
 # sources by running the benchmark twice, once per depth_source
-ros2 launch ridgeback_autonomy g1_distance_benchmark.launch.py estimators:=projective_ranging,euclidean_reconstruction depth_source:=monocular
+ros2 launch ridgeback_autonomy target_distance_benchmark.launch.py estimators:=projective_ranging,euclidean_reconstruction depth_source:=monocular
 
 # Silhouette mask front-end (segmentation model) instead of the rasterized
 # box — compare gates by running the benchmark twice, once per mask_gate
-ros2 launch ridgeback_autonomy g1_distance_benchmark.launch.py estimators:=projective_ranging,euclidean_reconstruction,polar_profiling mask_gate:=silhouette
+ros2 launch ridgeback_autonomy target_distance_benchmark.launch.py estimators:=projective_ranging,euclidean_reconstruction,polar_profiling mask_gate:=silhouette
 
 # One mask row on its own — polar profiling needs no depth at all, so this run
 # builds no depth source and subscribes to no depth stream
-ros2 launch ridgeback_autonomy g1_distance_benchmark.launch.py estimators:=polar_profiling
+ros2 launch ridgeback_autonomy target_distance_benchmark.launch.py estimators:=polar_profiling
 ```
 
-This compatibility launch composes two layers. `g1_benchmark_env.launch.py` owns the simulator, camera TF, RViz, and `g1_detector_node`; `g1_benchmark_config.launch.py` waits for the color and warm-detector topics, then starts the selected measurement nodes, visualizations, HUD, overlay, and `g1_distance_benchmark_runner`. Every row is individually selectable: `estimators` is split per stack and each measurement node is passed only the rows it owns, so a path that was not selected is never run — its fields stay NaN, it gets no CSV, and the inputs only it needs are never subscribed to. Selecting any mask row launches `g1_mask_measurement_node`, which for `projective_ranging`/`euclidean_reconstruction` obtains the aligned depth frame itself, at the detection stamp, through the source `depth_source` selects; `polar_profiling` needs no depth at all, so a polar-only run builds no depth source (and under `depth_source:=monocular`, loads no model). The mask node builds one mask per detection (`mask_gate:=box` rasterizes the detection box; `mask_gate:=silhouette` prompts a segmentation model with the boxes, needs `perception_venv`) and runs the localization paths from `object_localization_documentation/`.
+This compatibility launch composes two layers. `target_benchmark_env.launch.py` owns the simulator, camera TF, RViz, and `target_detector_node`; `target_benchmark_config.launch.py` waits for the color and warm-detector topics, then starts the selected measurement nodes, visualizations, HUD, overlay, and `target_distance_benchmark_runner`. Every row is individually selectable: `estimators` is split per stack and each measurement node is passed only the rows it owns, so a path that was not selected is never run — its fields stay NaN, it gets no CSV, and the inputs only it needs are never subscribed to. Selecting any mask row launches `target_mask_measurement_node`, which for `projective_ranging`/`euclidean_reconstruction` obtains the aligned depth frame itself, at the detection stamp, through the source `depth_source` selects; `polar_profiling` needs no depth at all, so a polar-only run builds no depth source (and under `depth_source:=monocular`, loads no model). The mask node builds one mask per detection (`mask_gate:=box` rasterizes the detection box; `mask_gate:=silhouette` prompts a segmentation model with the boxes, needs `perception_venv`) and runs the localization paths from `object_localization_documentation/`.
 
 The mask rows are identified by their config axes — the mask gate (`mask_gate`), the aligned-depth source (`depth_source`), the path, and on the box gate the foreground-isolation recipe (`isolation_2d` for projective ranging, `isolation_3d` for euclidean reconstruction) — so their CSV files fold the axes into a self-describing name. The stereoscopic box-gate run above writes `box_gated_stereoscopic_projective_ranging_nearest_mode_histogram.csv` and `box_gated_stereoscopic_euclidean_reconstruction_height_crop_nearest_mode_band.csv`; silhouette rows drop the isolation token (the tight branches never run a recipe), e.g. `silhouette_gated_stereoscopic_projective_ranging.csv`; polar profiling folds the gate only (`box_gated_polar_profiling.csv`). The `pointcloud` row keeps its plain name.
 
@@ -303,7 +304,7 @@ Arguments:
 | `namespace` | `r100_0001` | Namespace for simulation, detector, measurement node, and benchmark runner |
 | `use_sim_time` | `true` | Use Gazebo `/clock` |
 | `setup_path` | `~/clearpath/` | Directory containing `robot.yaml` and generated Clearpath files |
-| `world` | `g1_distance_calibration` | Gazebo world used for the benchmark run |
+| `world` | `target_distance_calibration` | Gazebo world used for the benchmark run |
 | `estimators` | `all` | Comma-separated estimator subset to compare in one run: `pointcloud`, `projective_ranging`, `euclidean_reconstruction`, `polar_profiling`. Any subset works, rows individually — `estimators:=polar_profiling` runs that row alone |
 | `depth_source` | `stereoscopic` | Aligned-depth producer for the `projective_ranging`/`euclidean_reconstruction` rows: `stereoscopic` or `monocular`; comparing sources = two runs |
 | `mask_gate` | `box` | Mask front-end for the mask-based rows: `box` (rasterized detection box, no model) or `silhouette` (segmentation model prompted with the boxes; needs `perception_venv`); comparing gates = two runs |
@@ -345,17 +346,17 @@ bash cleanup.sh
 SWEEP="$(ros2 pkg prefix ridgeback_autonomy)/share/ridgeback_autonomy/config/benchmark_sweep_baseline.yaml"
 
 # Validate all configs and print the trial/time estimate without launching.
-ros2 run ridgeback_autonomy g1_benchmark_sweep "$SWEEP" --dry-run
+ros2 run ridgeback_autonomy target_benchmark_sweep "$SWEEP" --dry-run
 
 # Run all 4 baseline configurations against one simulator boot.
-ros2 run ridgeback_autonomy g1_benchmark_sweep "$SWEEP"
+ros2 run ridgeback_autonomy target_benchmark_sweep "$SWEEP"
 
 # Run a named subset.
-ros2 run ridgeback_autonomy g1_benchmark_sweep "$SWEEP" \
+ros2 run ridgeback_autonomy target_benchmark_sweep "$SWEEP" \
   --only pointcloud,mask_polar_profiling
 
 # Rebuild the cross-config report for a partial or completed sweep.
-ros2 run ridgeback_autonomy g1_benchmark_sweep \
+ros2 run ridgeback_autonomy target_benchmark_sweep \
   --report-only benchmark-results/20260828_141530_baseline
 ```
 
@@ -417,12 +418,12 @@ observation-coverage drift as a long-lived simulator slows down.
 
 | Node | Output topic | Key params |
 |------|--------------|------------|
-| `g1_detector_node` | `detections/g1/raw` | `color_topic`, `detection_model`, `detection_threshold`, `detector_fps` |
-| `g1_pointcloud_measurement_node` | `measurements/g1/pointcloud` | `color_topic`, `pointcloud_topic`, `base_frame`, `enabled_estimators` |
-| `g1_mask_measurement_node` | `measurements/g1/mask` (+ `debug/g1/mask` on the silhouette gate, + `debug/g1/mask/aligned_depth` when a depth path is enabled, + `visualization/g1/polar_rays` when polar profiling is) | `enabled_estimators`, `depth_source`, `depth_topic`, `camera_info_topic`, `scan_topic`, `base_frame` (**must be passed** — its own default is the bare `base_link`, unlike the other nodes', which are namespace-derived), `pitch_deg`, `front_offset_m`, `isolation_2d`, `isolation_3d`, `mask_gate`, `segmentation_model`, `color_topic`, `ray_marker_topic` |
-| `g1_overlay_node` | `debug/g1/overlay` | `measurement_topic`, `mask_measurement_topic`, `color_topic`, `aligned_depth_topic`, `estimators`, `max_cols`, `rgb_panel_labels` |
-| `g1_estimate_viz_node` | `visualization/g1/estimates` + `hud/g1_distances` | `base_frame`, `world_frame`, `marker_lifetime_sec`, `ground_truth_topic`, `estimators` (gates both the HUD rows and the rings; defaults to `all`), `hud_layout` (`rows` — the benchmark's, with truth and error columns — or `wide`, exploration's estimator columns with an age under each) |
-| `g1_distance_benchmark_runner` | per-estimator CSVs + summary CSV + trial collage images + `video/run.mp4` | `estimators`, `output_dir`, `pointcloud_measurement_topic`, `mask_measurement_topic`, `color_topic`, `record_video`, `record_fps` |
+| `target_detector_node` | `detections/target/raw` | `color_topic`, `detection_model`, `detection_threshold`, `detector_fps` |
+| `target_pointcloud_measurement_node` | `measurements/target/pointcloud` | `color_topic`, `pointcloud_topic`, `base_frame`, `enabled_estimators` |
+| `target_mask_measurement_node` | `measurements/target/mask` (+ `debug/target/mask` on the silhouette gate, + `debug/target/mask/aligned_depth` when a depth path is enabled, + `visualization/target/polar_rays` when polar profiling is) | `enabled_estimators`, `depth_source`, `depth_topic`, `camera_info_topic`, `scan_topic`, `base_frame` (**must be passed** — its own default is the bare `base_link`, unlike the other nodes', which are namespace-derived), `pitch_deg`, `front_offset_m`, `isolation_2d`, `isolation_3d`, `mask_gate`, `segmentation_model`, `color_topic`, `ray_marker_topic` |
+| `target_overlay_node` | `debug/target/overlay` | `measurement_topic`, `mask_measurement_topic`, `color_topic`, `aligned_depth_topic`, `estimators`, `max_cols`, `rgb_panel_labels` |
+| `target_visualization_node` | `visualization/target/estimates` + `hud/target_distances` | `base_frame`, `world_frame`, `marker_lifetime_sec`, `ground_truth_topic`, `estimators` (gates both the HUD rows and the rings; defaults to `all`), `hud_layout` (`rows` — the benchmark's, with truth and error columns — or `wide`, exploration's estimator columns with an age under each) |
+| `target_distance_benchmark_runner` | per-estimator CSVs + summary CSV + trial collage images + `video/run.mp4` | `estimators`, `output_dir`, `pointcloud_measurement_topic`, `mask_measurement_topic`, `color_topic`, `record_video`, `record_fps` |
 
 The shared camera geometry lives in `config/camera_config.json`; the mask stack mirrors the values it needs rather than loading that file.
 
@@ -431,7 +432,7 @@ The shared camera geometry lives in `config/camera_config.json`; the mask stack 
 ### Robot sensors (`clearpath/robot.yaml`)
 
 - **Hokuyo UST-10LX**: Mounted at front of chassis, provides 2D laser scan for SLAM and costmaps
-- **Intel RealSense D455**: Mounted on a riser bracket, provides RGB, aligned depth, and camera-aligned point cloud to the G1 perception stack
+- **Intel RealSense D455**: Mounted on a riser bracket, provides RGB, aligned depth, and camera-aligned point cloud to the target-localization stack
 
 ### Key parameters to tune
 

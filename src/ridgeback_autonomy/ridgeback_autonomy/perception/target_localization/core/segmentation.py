@@ -24,7 +24,7 @@ import importlib
 
 import numpy as np
 
-from ridgeback_autonomy.perception.core.detection import resolve_torch_device
+from ridgeback_autonomy.perception.target_localization.core.detection import resolve_torch_device
 
 
 # Pinned by the Phase 0 spike (see segmentation_component.md): silhouette
@@ -149,8 +149,8 @@ class SamBoxSegmenter:
             transformers = importlib.import_module('transformers')
         except ModuleNotFoundError as exc:
             raise RuntimeError(
-                "G1 segmentation needs 'transformers' (and torch). Set up the "
-                "perception_venv — see README 'Set up G1 perception venv' — "
+                "Target segmentation needs 'transformers' (and torch). Set up the "
+                "perception_venv — see README 'Set up target localization venv' — "
                 "then relaunch, or run with mask_gate:=box which needs no "
                 "model."
             ) from exc

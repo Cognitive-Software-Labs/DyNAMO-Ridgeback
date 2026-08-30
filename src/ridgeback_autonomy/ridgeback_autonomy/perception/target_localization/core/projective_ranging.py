@@ -20,19 +20,19 @@ from typing import Callable
 import numpy as np
 
 from ridgeback_autonomy.common.miss_reason import MissReason
-from ridgeback_autonomy.perception.core.depth_common import (
+from ridgeback_autonomy.perception.target_localization.core.depth_common import (
     DEPTH_MAX_METERS_DEFAULT,
     valid_depth,
 )
-from ridgeback_autonomy.perception.core.intrinsics import (
+from ridgeback_autonomy.perception.target_localization.core.intrinsics import (
     CameraIntrinsics,
     deproject_pixel,
 )
-from ridgeback_autonomy.perception.core.isolation_2d import (
+from ridgeback_autonomy.perception.target_localization.core.isolation_2d import (
     ISOLATION_2D_DEFAULT,
     ISOLATION_2D_RECIPES,
 )
-from ridgeback_autonomy.perception.core.mask import Mask, MaskPrecision
+from ridgeback_autonomy.perception.target_localization.core.mask import Mask, MaskPrecision
 
 
 MIN_VALID_PIXELS_DEFAULT = 10  # mirrors POINTCLOUD_MIN_VALID_POINTS by value

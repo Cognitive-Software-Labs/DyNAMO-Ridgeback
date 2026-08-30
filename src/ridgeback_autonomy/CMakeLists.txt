@@ -10,8 +10,8 @@ find_package(gz-plugin2 REQUIRED)
 find_package(gz-common5 REQUIRED)
 
 rosidl_generate_interfaces(${PROJECT_NAME}
-  "msg/G1Detections.msg"
-  "msg/G1Measurements.msg"
+  "msg/TargetDetections.msg"
+  "msg/TargetMeasurements.msg"
   DEPENDENCIES std_msgs
 )
 
@@ -50,45 +50,45 @@ install(DIRECTORY
 )
 
 install(PROGRAMS
-  ridgeback_autonomy/perception/g1_detector_node.py
+  ridgeback_autonomy/perception/target_localization/detector_node.py
   DESTINATION lib/${PROJECT_NAME}
-  RENAME g1_detector_node
+  RENAME target_detector_node
 )
 
 install(PROGRAMS
-  ridgeback_autonomy/perception/g1_pointcloud_measurement_node.py
+  ridgeback_autonomy/perception/target_localization/pointcloud_measurement_node.py
   DESTINATION lib/${PROJECT_NAME}
-  RENAME g1_pointcloud_measurement_node
+  RENAME target_pointcloud_measurement_node
 )
 
 install(PROGRAMS
-  ridgeback_autonomy/perception/g1_overlay_node.py
+  ridgeback_autonomy/perception/target_localization/overlay_node.py
   DESTINATION lib/${PROJECT_NAME}
-  RENAME g1_overlay_node
+  RENAME target_overlay_node
 )
 
 install(PROGRAMS
-  ridgeback_autonomy/perception/g1_mask_measurement_node.py
+  ridgeback_autonomy/perception/target_localization/mask_measurement_node.py
   DESTINATION lib/${PROJECT_NAME}
-  RENAME g1_mask_measurement_node
+  RENAME target_mask_measurement_node
 )
 
 install(PROGRAMS
-  ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py
+  ridgeback_autonomy/benchmarking/target_distance_benchmark_runner_node.py
   DESTINATION lib/${PROJECT_NAME}
-  RENAME g1_distance_benchmark_runner
+  RENAME target_distance_benchmark_runner
 )
 
 install(PROGRAMS
-  ridgeback_autonomy/perception/g1_estimate_viz_node.py
+  ridgeback_autonomy/perception/target_localization/visualization_node.py
   DESTINATION lib/${PROJECT_NAME}
-  RENAME g1_estimate_viz_node
+  RENAME target_visualization_node
 )
 
 install(PROGRAMS
-  ridgeback_autonomy/benchmarking/g1_benchmark_sweep.py
+  ridgeback_autonomy/benchmarking/target_benchmark_sweep.py
   DESTINATION lib/${PROJECT_NAME}
-  RENAME g1_benchmark_sweep
+  RENAME target_benchmark_sweep
 )
 
 install(PROGRAMS
@@ -161,7 +161,7 @@ if(BUILD_TESTING)
   ament_add_pytest_test(test_association test/test_association.py)
   ament_add_pytest_test(test_scoring test/test_scoring.py)
   ament_add_pytest_test(test_report test/test_report.py)
-  ament_add_pytest_test(test_estimate_viz test/test_estimate_viz.py)
+  ament_add_pytest_test(test_target_visualization test/test_target_visualization.py)
   ament_add_pytest_test(test_recording test/test_recording.py)
   ament_add_pytest_test(test_sweep test/test_sweep.py)
   ament_add_pytest_test(test_sweep_report test/test_sweep_report.py)

@@ -5,7 +5,7 @@ import types
 import numpy as np
 import pytest
 
-from ridgeback_autonomy.perception.core.rendering import (
+from ridgeback_autonomy.perception.target_localization.core.rendering import (
     PANEL_ALIGNED_DEPTH,
     PANEL_BOX_MASK,
     PANEL_LIDAR,

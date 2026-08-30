@@ -18,7 +18,7 @@ up and the workspace sourced:
 python3 ~/tmp/cloud_provenance_test.py --ros-args \
     -r __ns:=/r100_0001 -r /tf:=tf -r /tf_static:=tf_static \
     -p use_sim_time:=true \
-    -p world:=g1_distance_calibration \
+    -p world:=target_distance_calibration \
     -p frames_target:=100
 ```
 
@@ -128,12 +128,12 @@ a separate session with its own prerequisites (`pointcloud.enable`,
 
 - Sim running with the sensor bridge up. As of writing, `gz sim` server runs
   but no camera topics are bridged — relaunch the stack
-  (`g1_distance_benchmark.launch.py` or `ridgeback_exploration.launch.py`)
+  (`target_distance_benchmark.launch.py` or `ridgeback_exploration.launch.py`)
   so these exist:
   - `/r100_0001/sensors/camera_0/color/image`
   - `/r100_0001/sensors/camera_0/depth/image`
   - `/r100_0001/sensors/camera_0/points`
-  - detections topic from the running `g1_detector_node` (script reuses live
+  - detections topic from the running `target_detector_node` (script reuses live
     detections instead of loading its own model)
 - A G1 spawned at a known pose (the benchmark runner's spawn machinery, or a
   manual `ros_gz_sim create` at a measured distance).
@@ -175,7 +175,7 @@ the plugin computed.
 | `sensors/camera_0/depth/image` | `sensor_msgs/Image` (32FC1) | deprojected variant input |
 | `sensors/camera_0/points` | `sensor_msgs/PointCloud2` | published variant input |
 | `sensors/camera_0/color/camera_info` | `sensor_msgs/CameraInfo` | intrinsics (if bridged) |
-| detections topic (`G1Detections`) | repo msg | shared ROI (bbox) |
+| detections topic (`TargetDetections`) | repo msg | shared ROI (bbox) |
 | `/world/<world>/pose/info` | gz bridged pose array | ground truth |
 
 **Sync:** match depth image, cloud, and detections on header stamp (exact match
@@ -219,7 +219,7 @@ Implementation notes:
 - Parse the cloud with `sensor_msgs_py.point_cloud2` or a direct
   `np.frombuffer` on the msg buffer using the field offsets — the direct route
   is what the timing should measure (that is what production code would do).
-- The script may import repo modules (`ridgeback_autonomy.perception.core.*`,
+- The script may import repo modules (`ridgeback_autonomy.perception.target_localization.core.*`,
   `geometry.py`) to guarantee the reduction is byte-identical to the existing
   estimator; if the function signature doesn't fit numpy arrays directly, a
   small adapter inside the script converts both variants to the same shape
@@ -248,7 +248,7 @@ deprojection code itself.
 ## 6. Results
 
 Collected 2026-07-11. 100 synced frames per position at 1.5 / 3.5 / 5.5 m
-forward (world `g1_distance_calibration`, G1 at lateral 0, yaw π; 640×480).
+forward (world `target_distance_calibration`, G1 at lateral 0, yaw π; 640×480).
 Raw CSVs: `~/tmp/cloud_provenance_d{1p5,3p5,5p5}.csv`.
 
 | Metric | Published | Deprojected |

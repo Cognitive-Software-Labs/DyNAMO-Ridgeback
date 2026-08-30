@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 from sensor_msgs.msg import Image
 
-from ridgeback_autonomy.perception.core.image_utils import (
+from ridgeback_autonomy.perception.target_localization.core.image_utils import (
     convert_color_image_message,
     convert_depth_to_meters_message,
     decode_color_to_rgb,

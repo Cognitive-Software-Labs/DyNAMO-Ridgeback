@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 
-"""Where each estimator thinks the G1 is, as RViz rings, plus a HUD readout.
+"""Where each estimator thinks the target is, as RViz rings, plus a HUD readout.
 
 Two renderings of the same measurements. The rings put every estimator's answer
 on the floor plan at once, so disagreement is spatial and immediate; the HUD
 panel prints the same numbers against the benchmark's ground truth, because a
 ring 60 mm off and a ring 2 m off look alike once they are small.
 
-The estimator set is driven from ``perception/estimators.py`` rather than
+The estimator set is driven from ``target_localization/estimator_registry.py`` rather than
 listed here, so a new estimator appears in both renderings by registering there.
 """
 
@@ -27,7 +27,7 @@ from std_msgs.msg import ColorRGBA
 from tf2_ros import Buffer, TransformException, TransformListener
 from visualization_msgs.msg import Marker, MarkerArray
 
-from ridgeback_autonomy.perception.estimators import (
+from ridgeback_autonomy.perception.target_localization.estimator_registry import (
     ESTIMATOR_FIELD_KEYS,
     ESTIMATOR_LABELS,
     ESTIMATOR_POSITION_ATTRS,
@@ -36,9 +36,16 @@ from ridgeback_autonomy.perception.estimators import (
     nearest_instance_index,
     parse_estimators,
 )
-from ridgeback_autonomy.msg import G1Measurements
-from ridgeback_autonomy.perception.core.vehicle_frame import remove_vehicle_front_offset
-from ridgeback_autonomy.perception.ground_truth import GROUND_TRUTH_TOPIC, truth_reading
+from ridgeback_autonomy.msg import TargetMeasurements
+from ridgeback_autonomy.perception.target_localization.contracts import (
+    ESTIMATE_MARKERS_TOPIC,
+    GROUND_TRUTH_TOPIC,
+    HUD_DISTANCES_PANEL_TOPIC,
+    MASK_MEASUREMENTS_TOPIC,
+    POINTCLOUD_MEASUREMENTS_TOPIC,
+)
+from ridgeback_autonomy.perception.target_localization.core.vehicle_frame import remove_vehicle_front_offset
+from ridgeback_autonomy.perception.target_localization.ground_truth import truth_reading
 
 
 # How long silence is tolerated, in the two places that have to agree on it: a
@@ -76,10 +83,6 @@ RING_LINE_WIDTH_M = 0.06
 
 # Z height above ground plane so markers sit on top of the costmap.
 MARKER_Z_M = 0.05
-
-POINTCLOUD_MEASUREMENTS_TOPIC = 'measurements/g1/pointcloud'
-MASK_MEASUREMENTS_TOPIC = 'measurements/g1/mask'
-HUD_DISTANCES_TOPIC = 'hud/g1_distances'
 
 # Two renderings of the same readings, for two panel shapes. ``rows`` is the
 # benchmark's: one labelled row per estimator, with the truth and error columns
@@ -201,8 +204,8 @@ def hud_truth_header(truth) -> str:
     """
 
     if truth is None:
-        return 'G1 DISTANCES'
-    header = f'G1 DISTANCES   truth {truth.distance_m:.3f} m'
+        return 'TARGET DISTANCES'
+    header = f'TARGET DISTANCES   truth {truth.distance_m:.3f} m'
     return f'{header}  [{truth.trial_id}]' if truth.trial_id else header
 
 
@@ -659,9 +662,9 @@ def hud_wide_text(
     return '<br/>'.join(''.join(cells) for cells in (headers, distances, ages))
 
 
-class G1EstimateVizNode(Node):
+class TargetVisualizationNode(Node):
     def __init__(self) -> None:
-        super().__init__('g1_estimate_viz_node')
+        super().__init__('target_visualization_node')
 
         namespace_name = self.get_namespace().strip('/')
         default_base_frame = (
@@ -674,7 +677,7 @@ class G1EstimateVizNode(Node):
         self.declare_parameter('max_observation_age_sec', MAX_OBSERVATION_AGE_S)
         self.declare_parameter('hud_publish_rate_hz', HUD_PUBLISH_RATE_HZ)
         self.declare_parameter('ground_truth_topic', GROUND_TRUTH_TOPIC)
-        self.declare_parameter('hud_distances_topic', HUD_DISTANCES_TOPIC)
+        self.declare_parameter('hud_distances_topic', HUD_DISTANCES_PANEL_TOPIC)
         # Which estimators this run selected, comma-separated, as the launch
         # file resolved it. "all" (the default) is every registered row.
         self.declare_parameter('estimators', 'all')
@@ -699,7 +702,7 @@ class G1EstimateVizNode(Node):
         # "how old is this observation", the receipt answers "is this producer
         # still running", and for the mask topic those two are a second or more
         # apart. See ``partition_measurements``.
-        self._latest: dict[str, tuple[G1Measurements, int] | None] = {
+        self._latest: dict[str, tuple[TargetMeasurements, int] | None] = {
             'pointcloud': None, 'mask': None,
         }
         self._latest_truth: PointStamped | None = None
@@ -709,7 +712,7 @@ class G1EstimateVizNode(Node):
             ('mask', MASK_MEASUREMENTS_TOPIC),
         ):
             self.create_subscription(
-                G1Measurements, topic,
+                TargetMeasurements, topic,
                 lambda msg, key=key: self._measurement_cb(key, msg), 10)
 
         # Depth 1: the truth line is a latest-value-wins signal, so a deeper
@@ -720,7 +723,7 @@ class G1EstimateVizNode(Node):
             PointStamped, str(self.get_parameter('ground_truth_topic').value),
             self._truth_cb, 1)
 
-        self._pub = self.create_publisher(MarkerArray, 'visualization/g1/estimates', 10)
+        self._pub = self.create_publisher(MarkerArray, ESTIMATE_MARKERS_TOPIC, 10)
         # The HUD aggregator owns the container style; this node contributes one
         # labelled section and nothing else.
         self._hud_pub = self.create_publisher(
@@ -742,7 +745,7 @@ class G1EstimateVizNode(Node):
             1.0 / (hud_rate if hud_rate > 0.0 else HUD_PUBLISH_RATE_HZ),
             self._render)
 
-    def _measurement_cb(self, key: str, msg: G1Measurements) -> None:
+    def _measurement_cb(self, key: str, msg: TargetMeasurements) -> None:
         # Cache only. Rendering is the timer's job, for both surfaces at once --
         # drawing markers from here and the panel from the timer is what let a
         # path's ring and its number describe different instants.
@@ -835,7 +838,7 @@ class G1EstimateVizNode(Node):
         id_base = _ESTIMATOR_ID_BASE[estimator]
         for offset in (0, 1):
             marker = Marker()
-            marker.ns = f'g1_estimates/{estimator}'
+            marker.ns = f'target_estimates/{estimator}'
             marker.id = id_base + offset
             marker.action = Marker.DELETE
             markers.append(marker)
@@ -920,7 +923,7 @@ class G1EstimateVizNode(Node):
         ring = Marker()
         ring.header.frame_id = frame_id
         ring.header.stamp = stamp
-        ring.ns = f'g1_estimates/{estimator}'
+        ring.ns = f'target_estimates/{estimator}'
         ring.id = id_base
         ring.type = Marker.LINE_STRIP
         ring.action = Marker.ADD
@@ -934,7 +937,7 @@ class G1EstimateVizNode(Node):
         dot = Marker()
         dot.header.frame_id = frame_id
         dot.header.stamp = stamp
-        dot.ns = f'g1_estimates/{estimator}'
+        dot.ns = f'target_estimates/{estimator}'
         dot.id = id_base + 1
         dot.type = Marker.SPHERE
         dot.action = Marker.ADD
@@ -1007,7 +1010,7 @@ def _get(arr, i: int) -> float | None:
 
 def main() -> None:
     rclpy.init()
-    node = G1EstimateVizNode()
+    node = TargetVisualizationNode()
     try:
         rclpy.spin(node)
     except (KeyboardInterrupt, ExternalShutdownException):

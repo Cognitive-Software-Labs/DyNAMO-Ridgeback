@@ -12,14 +12,14 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
-from ridgeback_autonomy.perception.estimators import (
+from ridgeback_autonomy.perception.target_localization.estimator_registry import (
     parse_estimators,
     selected_mask_estimators,
     selected_pointcloud_estimators,
     uses_mask_estimators,
     uses_pointcloud_estimators,
 )
-from ridgeback_autonomy.perception.g1_launch import (
+from ridgeback_autonomy.perception.target_localization.launch import (
     SIMULATION_CAMERA_INPUTS,
     distance_hud_node,
     estimate_viz_node,
@@ -33,11 +33,11 @@ from ridgeback_autonomy.perception.g1_launch import (
 
 # The distance HUD is a second overlay from the velocity/coverage one, and needs
 # its own aggregator: hud_node renders through QStaticText, which switches the
-# whole overlay to rich text as soon as any tag appears. The g1 panel is
+# whole overlay to rich text as soon as any tag appears. The target panel is
 # unconditionally rich (per-estimator span colours, <br/> breaks) while the
 # velocity and coverage panels line their columns up with runs of spaces, which
 # rich text collapses. One node cannot serve both contracts.
-HUD_G1_MARKER_TOPIC = 'hud_g1_overlay'
+HUD_TARGET_MARKER_TOPIC = 'hud_target_overlay'
 
 # The wide layout is four cells of HUD_WIDE_CELL_COLUMNS each, so ~40 columns.
 # text_size is in POINTS, so columns-to-pixels follows the display scaling --
@@ -45,10 +45,10 @@ HUD_G1_MARKER_TOPIC = 'hud_g1_overlay'
 # clips rather than wraps, so this covers the wider of the two (40 x 14.4 = 576)
 # with room for the insets. Too narrow silently drops the last estimator's whole
 # column, which reads as that row never reporting rather than as a layout fault.
-HUD_G1_OVERLAY_WIDTH = 660
+HUD_TARGET_OVERLAY_WIDTH = 660
 
 
-def build_g1_perception_nodes(context, *args, **kwargs):
+def build_target_localization_nodes(context, *args, **kwargs):
     """The measurement and display stack for the estimator rows this run selected.
 
     An OpaqueFunction because the selection has to be read as a string --
@@ -79,8 +79,8 @@ def build_g1_perception_nodes(context, *args, **kwargs):
 
     nodes = [Node(
         package='ridgeback_autonomy',
-        executable='g1_detector_node',
-        name='g1_detector',
+        executable='target_detector_node',
+        name='target_detector',
         namespace=namespace,
         parameters=[{
             'use_sim_time': use_sim_time,
@@ -135,9 +135,9 @@ def build_g1_perception_nodes(context, *args, **kwargs):
     nodes.append(distance_hud_node(
         namespace=namespace,
         use_sim_time=use_sim_time,
-        name='hud_g1_node',
-        overlay_width=HUD_G1_OVERLAY_WIDTH,
-        marker_topic=HUD_G1_MARKER_TOPIC,
+        name='hud_target_node',
+        overlay_width=HUD_TARGET_OVERLAY_WIDTH,
+        marker_topic=HUD_TARGET_MARKER_TOPIC,
         # The viz node is the only producer of the panel this aggregator merges.
         condition=launch.conditions.IfCondition(estimate_viz),
     ))
@@ -167,7 +167,7 @@ def generate_launch_description():
     setup_path = LaunchConfiguration('setup_path')
     world = LaunchConfiguration('world')
     exploration_rviz = LaunchConfiguration('exploration_rviz')
-    g1_perception_enabled = LaunchConfiguration('g1_perception_enabled')
+    target_localization_enabled = LaunchConfiguration('target_localization_enabled')
     mppi_visualize = LaunchConfiguration('mppi_visualize')
     explorer = LaunchConfiguration('explorer')
     coverage_overlay_enabled = LaunchConfiguration('coverage_overlay_enabled')
@@ -221,8 +221,8 @@ def generate_launch_description():
         ),
         DeclareLaunchArgument('exploration_rviz', default_value='true',
                               description='Launch the exploration RViz2 config'),
-        DeclareLaunchArgument('g1_perception_enabled', default_value='true',
-                              description='Launch the full G1 perception/positioning stack '
+        DeclareLaunchArgument('target_localization_enabled', default_value='true',
+                              description='Launch the full target-localization stack '
                                           '(detection + the selected measurement rows + '
                                           'rings, distance HUD and camera overlay); '
                                           'requires perception_venv'),
@@ -262,8 +262,8 @@ def generate_launch_description():
         # Detector, measurement nodes, rings, distance HUD and camera overlay
         # are gated as one unit: they are all downstream of detections.
         OpaqueFunction(
-            function=build_g1_perception_nodes,
-            condition=launch.conditions.IfCondition(g1_perception_enabled),
+            function=build_target_localization_nodes,
+            condition=launch.conditions.IfCondition(target_localization_enabled),
         ),
 
         IncludeLaunchDescription(

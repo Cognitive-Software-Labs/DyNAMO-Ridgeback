@@ -265,8 +265,8 @@ the estimate — indices into the **original scan array**, not the selected subs
 `selected_beams` is the mask ∩ FoV select; `merged_beams` is what survived the
 near-band merge and is therefore what the estimate medians over.
 
-`g1_mask_measurement_node` turns them into RViz markers on
-`visualization/g1/polar_rays`, in three namespaces (`polar/used`,
+`target_mask_measurement_node` turns them into RViz markers on
+`visualization/target/polar_rays`, in three namespaces (`polar/used`,
 `polar/dropped`, `polar/wedge`) so each toggles independently in RViz. Markers
 are built in the scan's own frame, where a beam is
 `angle_min + i*angle_increment` at `ranges[i]`, so no extrinsics are re-applied.
@@ -298,7 +298,7 @@ disagrees by one beam at each edge, which would make the wedge and the rays
 contradict each other under a box gate, where they are the same set by
 definition.
 
-**Known divergence.** `perception/core/rendering.py:polar_highlight_beams` still
+**Known divergence.** `perception/target_localization/core/rendering.py:polar_highlight_beams` still
 re-runs `segment_range_profile` + `merge_near_band` at *library defaults* to
 drive the 2D overlay panel, rather than reading the published indices. The node
 calls `localize_polar_profiling` with no kwargs, so the two agree today. The
@@ -308,7 +308,7 @@ separate change.
 
 **Known divergence.** This node ranks the nearest instance from its own three
 estimators, because nothing else has filled the batch by the time the rays are
-published, while `g1_estimate_viz_node` ranks the merged measurement topics and
+published, while `target_visualization_node` ranks the merged measurement topics and
 so starts at `pointcloud`. Two robots at near-equal range can therefore put the rays on
 one and the estimate rings on the other for a frame. Both sides walk
 `PUBLIC_ESTIMATOR_ORDER` and break ties on the lower index, which bounds the
@@ -372,7 +372,7 @@ module, the node as a thin shell, the estimator as an opt-in benchmark row. The
 scan-validity clips started as by-value copies of the legacy estimator's; with
 that estimator deleted, `polar_profiling.py` is their sole owner.
 
-**`perception/core/polar_profiling.py`** — the pure path, no ROS:
+**`perception/target_localization/core/polar_profiling.py`** — the pure path, no ROS:
 
 ```python
 @dataclass(frozen=True)
@@ -402,7 +402,7 @@ analogue of the isolation recipes — and like them it can grow alternatives
 behind the same contract if the benchmark motivates any (the incumbent
 percentile band being the obvious first alternative row).
 
-**`perception/core/intrinsics.py`** — ~~add the forward projection
+**`perception/target_localization/core/intrinsics.py`** — ~~add the forward projection
 (`project_points(points, intrinsics) -> (uv, valid)`: an `(N, 2)` pixel
 array plus an in-front-and-in-bounds selector), the inverse of the existing
 `deproject_*` helpers; polar profiling is its first consumer.~~ — done
@@ -414,7 +414,7 @@ polar→Cartesian + extrinsic transform, §2.1–2.2): the retargeted equivalent
 `extract_scan_points_base`, living in the new stack. Per-scan work, cached and
 shared across masks per §3.
 
-**Node wiring** (done) — polar profiling runs inside `g1_mask_measurement_node`
+**Node wiring** (done) — polar profiling runs inside `target_mask_measurement_node`
 alongside the two depth paths, keeping all new-stack rows in one node on the
 camera-optical frame with `camera_info` intrinsics. The node gained a
 `LaserScan` subscription (`scan_topic`) and a TF listener; per frame it looks
@@ -430,7 +430,7 @@ not the color-grid `camera_info` this stack uses. That node has since been
 deleted outright.
 
 **Benchmark row** (done) — `polar_profiling` estimator key, opt-in via
-`estimators:=`, published on `measurements/g1/mask`. It is in `MASK_ESTIMATORS`
+`estimators:=`, published on `measurements/target/mask`. It is in `MASK_ESTIMATORS`
 (so it launches the mask node) but not `DEPTH_PATH_ESTIMATORS`, so its
 self-describing names fold only the gate: the CSV file is
 `box_gated_polar_profiling.csv` and the summary/log prose is "box-gated polar
@@ -485,7 +485,7 @@ at 696e101 went away with the file: the legacy stack and its tests are gone.)
   1. **Tune on the benchmark, not exploration** — tuning needs ground truth
      (known spawn distance → MAE), which only the benchmark has; exploration
      has no labelled target to measure error against.
-  2. **Harden the benchmark scenario first** — the `g1_distance_calibration`
+  2. **Harden the benchmark scenario first** — the `target_distance_calibration`
      world is a sterile empty room, so it barely stresses these
      background-rejection knobs (risk: over-fit, e.g. a huge `range_band_m`
      still scores well with no clutter to admit). Add a neighbour G1 / clutter /

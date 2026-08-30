@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 import re
 
-from ridgeback_autonomy.perception.estimators import (
+from ridgeback_autonomy.perception.target_localization.estimator_registry import (
     DEPTH_PATH_ESTIMATORS,
     ESTIMATOR_LABELS,
     MASK_GATE_DEFAULT,

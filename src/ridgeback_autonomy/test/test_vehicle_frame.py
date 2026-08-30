@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import math
 
-from ridgeback_autonomy.perception.core.vehicle_frame import (
+from ridgeback_autonomy.perception.target_localization.core.vehicle_frame import (
     ROBOT_FRONT_OFFSET_M,
     apply_vehicle_front_offset,
     planar_measurement_from_vehicle_front,

@@ -39,9 +39,9 @@ class OwlV2Detector:
             transformers = importlib.import_module('transformers')
         except ModuleNotFoundError as exc:
             raise RuntimeError(
-                "G1 perception needs 'transformers' (and torch). Set up the "
-                "perception_venv — see README 'Set up G1 perception venv' — then "
-                "launch with g1_perception_enabled:=true."
+                "Target localization needs 'transformers' (and torch). Set up the "
+                "perception_venv — see README 'Set up target localization venv' — then "
+                "launch with target_localization_enabled:=true."
             ) from exc
         self.logger.info(f'Loading detection model: {self.model_name}')
         self.logger.info(f'Using detection device: {self.device}')

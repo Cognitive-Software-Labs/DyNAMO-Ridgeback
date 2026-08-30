@@ -9,7 +9,7 @@ import pytest
 from builtin_interfaces.msg import Time as TimeMsg
 from geometry_msgs.msg import PointStamped
 
-from ridgeback_autonomy.perception.estimators import (
+from ridgeback_autonomy.perception.target_localization.estimator_registry import (
     ESTIMATOR_LABELS,
     ESTIMATOR_POSITION_ATTRS,
     ESTIMATOR_SHORT_LABELS,
@@ -18,9 +18,9 @@ from ridgeback_autonomy.perception.estimators import (
     nearest_instance_index,
     parse_estimators,
 )
-from ridgeback_autonomy.perception.g1_estimate_viz_node import (
+from ridgeback_autonomy.perception.target_localization.visualization_node import (
     ESTIMATOR_COLOURS,
-    G1EstimateVizNode,
+    TargetVisualizationNode,
     HUD_AGED_LUMINANCE,
     HUD_LAYOUTS,
     HUD_LAYOUT_ROWS,
@@ -46,13 +46,13 @@ from ridgeback_autonomy.perception.g1_estimate_viz_node import (
     partition_measurements,
     world_marker_point,
 )
-from ridgeback_autonomy.msg import G1Measurements
+from ridgeback_autonomy.msg import TargetMeasurements
 from visualization_msgs.msg import Marker
-from ridgeback_autonomy.perception.core.vehicle_frame import (
+from ridgeback_autonomy.perception.target_localization.core.vehicle_frame import (
     ROBOT_FRONT_OFFSET_M,
     planar_measurement_from_vehicle_front,
 )
-from ridgeback_autonomy.perception.ground_truth import TRUTH_MAX_AGE_S, truth_reading
+from ridgeback_autonomy.perception.target_localization.ground_truth import TRUTH_MAX_AGE_S, truth_reading
 
 
 def test_every_registered_estimator_has_a_colour() -> None:
@@ -89,7 +89,7 @@ def test_marker_id_bases_are_distinct() -> None:
 
 
 def test_mask_estimator_positions_are_read_from_the_message() -> None:
-    msg = G1Measurements()
+    msg = TargetMeasurements()
     msg.detected = True
     msg.count = 1
     msg.polar_profiling_forward_m = [3.0]
@@ -106,7 +106,7 @@ def test_mask_estimator_positions_are_read_from_the_message() -> None:
 def test_absent_estimator_slots_read_as_none() -> None:
     # Every producer publishes the same message type, so the fields belonging to
     # other nodes are simply empty -- that must read as "no value", not crash.
-    msg = G1Measurements()
+    msg = TargetMeasurements()
     msg.detected = True
     msg.count = 1
 
@@ -114,7 +114,7 @@ def test_absent_estimator_slots_read_as_none() -> None:
 
 
 def test_nan_slots_read_as_none() -> None:
-    msg = G1Measurements()
+    msg = TargetMeasurements()
     msg.detected = True
     msg.count = 1
     msg.pointcloud_distance_m = [float('nan')]
@@ -158,8 +158,8 @@ def test_a_frame_no_estimator_placed_ranks_to_nothing() -> None:
     assert nearest_instance_index(2, reader_from({})) is None
 
 
-def measurements(count: int, *, stamp_ns: int = 0, **fields) -> G1Measurements:
-    msg = G1Measurements()
+def measurements(count: int, *, stamp_ns: int = 0, **fields) -> TargetMeasurements:
+    msg = TargetMeasurements()
     msg.detected = count > 0
     msg.count = count
     msg.header.stamp = TimeMsg(
@@ -314,7 +314,7 @@ def _place(
     """
 
     markers: list = []
-    G1EstimateVizNode._add_estimator_markers(
+    TargetVisualizationNode._add_estimator_markers(
         SimpleNamespace(marker_lifetime=1.5),
         markers,
         estimator,
@@ -445,17 +445,17 @@ def test_hud_truth_header_names_the_trial_the_number_belongs_to() -> None:
         _truth_message(3.25, 'bed_occluder_single', 0), 0)
 
     assert hud_truth_header(reading) == (
-        'G1 DISTANCES   truth 3.250 m  [bed_occluder_single]')
+        'TARGET DISTANCES   truth 3.250 m  [bed_occluder_single]')
 
 
 def test_hud_truth_header_drops_the_truth_entirely_when_it_has_expired() -> None:
-    assert hud_truth_header(None) == 'G1 DISTANCES'
+    assert hud_truth_header(None) == 'TARGET DISTANCES'
 
 
 def test_hud_truth_header_omits_empty_brackets_for_an_unnamed_trial() -> None:
     reading = truth_reading(_truth_message(2.25, '', 0), 0)
 
-    assert hud_truth_header(reading) == 'G1 DISTANCES   truth 2.250 m'
+    assert hud_truth_header(reading) == 'TARGET DISTANCES   truth 2.250 m'
 
 
 FRESH_AGE_S = 0.1
@@ -735,7 +735,7 @@ def test_the_hud_still_renders_when_the_truth_has_gone_but_readings_have_not() -
         dated([measurements(1, pointcloud_distance_m=[3.885])]), [], 0, None)
 
     assert text.count('<br/>') == len(PUBLIC_ESTIMATOR_ORDER)
-    assert 'G1&nbsp;DISTANCES' in text
+    assert 'TARGET&nbsp;DISTANCES' in text
     assert 'truth' not in text
 
 
@@ -1047,9 +1047,9 @@ def _published_markers(
         _pub=SimpleNamespace(publish=lambda ma: published.extend(ma.markers)),
     )
     stub._add_estimator_markers = MethodType(
-        G1EstimateVizNode._add_estimator_markers, stub)
+        TargetVisualizationNode._add_estimator_markers, stub)
     stub._add_delete_markers = MethodType(
-        G1EstimateVizNode._add_delete_markers, stub)
+        TargetVisualizationNode._add_delete_markers, stub)
 
     # The same snapshot the node's tick builds, so the markers under test come
     # from the shipped path rather than from a second reading of the messages.
@@ -1060,7 +1060,7 @@ def _published_markers(
     )
     readings = collect_readings(entries, aged_entries, nearest, selected)
 
-    G1EstimateVizNode._publish_markers(stub, readings)
+    TargetVisualizationNode._publish_markers(stub, readings)
     return published
 
 
@@ -1076,12 +1076,12 @@ def _added(markers: list) -> list:
 
 
 def _marker_estimators(markers: list) -> set[str]:
-    return {marker.ns.removeprefix('g1_estimates/') for marker in _added(markers)}
+    return {marker.ns.removeprefix('target_estimates/') for marker in _added(markers)}
 
 
 def _deleted_estimators(markers: list) -> set[str]:
     return {
-        marker.ns.removeprefix('g1_estimates/')
+        marker.ns.removeprefix('target_estimates/')
         for marker in markers if marker.action == Marker.DELETE
     }
 

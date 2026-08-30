@@ -217,7 +217,7 @@ is the signal to spend the extra cost and move to euclidean reconstruction.
 
 ## 6. Relationship to the current stack
 
-Projective ranging is shipped as `perception/core/projective_ranging.py`
+Projective ranging is shipped as `perception/target_localization/core/projective_ranging.py`
 (`localize_projective_ranging`). The **legacy** depth estimator is close but not
 identical, and the differences are exactly what the shipped path resolves:
 
@@ -240,13 +240,13 @@ consumer/fusion stage.
 
 - ~~**Representative-pixel rule**~~ — resolved 2026-07-12: the representative
   pixel is the mean row/column of the foreground pixel set
-  (`perception/core/projective_ranging.py`); a sparse mask falls under the invalid-depth
+  (`perception/target_localization/core/projective_ranging.py`); a sparse mask falls under the invalid-depth
   fallback below.
 - **`rect` foreground recipe** — the `rect` branch is a pluggable strategy
   (input: depth frame + mask; output: the foreground pixel set).
   ~~Choose among the candidates in `foreground_isolation_2d.md` and document the
   thresholds~~ — resolved 2026-07-23: `nearest_mode_histogram` (default) and
-  `otsu` are implemented and wired in `perception/core/isolation_2d.py` with
+  `otsu` are implemented and wired in `perception/target_localization/core/isolation_2d.py` with
   their thresholds as module constants. Benchmarking the recipes against each
   other behind the fixed contract stays open.
 - ~~**Coordinate frame**~~ — resolved 2026-07-23/24 in two parts. **(1) Downstream
@@ -259,7 +259,7 @@ consumer/fusion stage.
   paths hit MAE ~0.057 m with correct left-positive lateral signs against ground
   truth, and a flipped axis or handedness would give grossly wrong estimates, not
   ~5 cm errors. Outstanding only as a belt-and-suspenders **RealSense-SDK/TF axis
-  cross-check on real hardware** (tracked at `perception/core/intrinsics.py`) — not
+  cross-check on real hardware** (tracked at `perception/target_localization/core/intrinsics.py`) — not
   a suspected bug.
 - ~~**Invalid-depth fallback**~~ — resolved 2026-07-12: skip —
   `localize_projective_ranging` returns `None` when fewer than `min_valid_pixels` valid

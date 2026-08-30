@@ -6,11 +6,11 @@ import cv2
 import numpy as np
 
 from ridgeback_autonomy.benchmarking.alignment import MeasurementEvent
-from ridgeback_autonomy.perception.estimators import (
+from ridgeback_autonomy.perception.target_localization.estimator_registry import (
     ESTIMATOR_FIELD_KEYS,
     ESTIMATOR_LABELS,
 )
-from ridgeback_autonomy.perception.core.rendering import RgbdOverlayRenderer
+from ridgeback_autonomy.perception.target_localization.core.rendering import RgbdOverlayRenderer
 
 
 # Every panel is the colour frame with that estimator's boxes and numbers drawn
@@ -255,9 +255,9 @@ class BenchmarkCollageRenderer:
         box_annotations: list[dict] | None,
     ) -> tuple[str, tuple[int, int, int]]:
         # Without per-instance annotations (single-robot / tests) keep the
-        # historical green "G1 #i" label so those collages stay identical.
+        # historical green target label so those collages stay visually consistent.
         if box_annotations is None or estimator is None:
-            return f'G1 #{index + 1}', (0, 255, 0)
+            return f'Target #{index + 1}', (0, 255, 0)
         annotation = box_annotations[index] if index < len(box_annotations) else None
         if annotation is None:
             # Detection matched no ground truth: an extra / false positive.

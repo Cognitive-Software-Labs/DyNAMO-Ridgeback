@@ -4,11 +4,11 @@ import numpy as np
 import pytest
 
 from ridgeback_autonomy.common.miss_reason import MissReason
-from ridgeback_autonomy.perception.core import euclidean_reconstruction
-from ridgeback_autonomy.perception.core.intrinsics import CameraIntrinsics
-from ridgeback_autonomy.perception.core.isolation_3d import RangeBand
-from ridgeback_autonomy.perception.core.mask import MaskPrecision, mask_from_array, rasterize_bbox
-from ridgeback_autonomy.perception.core.euclidean_reconstruction import localize_euclidean_reconstruction
+from ridgeback_autonomy.perception.target_localization.core import euclidean_reconstruction
+from ridgeback_autonomy.perception.target_localization.core.intrinsics import CameraIntrinsics
+from ridgeback_autonomy.perception.target_localization.core.isolation_3d import RangeBand
+from ridgeback_autonomy.perception.target_localization.core.mask import MaskPrecision, mask_from_array, rasterize_bbox
+from ridgeback_autonomy.perception.target_localization.core.euclidean_reconstruction import localize_euclidean_reconstruction
 
 
 HEIGHT, WIDTH = 60, 80

@@ -32,11 +32,11 @@ from functools import lru_cache
 import numpy as np
 
 from ridgeback_autonomy.common.miss_reason import MissReason
-from ridgeback_autonomy.perception.core.intrinsics import (
+from ridgeback_autonomy.perception.target_localization.core.intrinsics import (
     CameraIntrinsics,
     project_points,
 )
-from ridgeback_autonomy.perception.core.mask import Mask
+from ridgeback_autonomy.perception.target_localization.core.mask import Mask
 
 
 # Scan-validity clips (not accuracy knobs): drop physically impossible returns

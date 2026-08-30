@@ -5,7 +5,7 @@ import math
 import pytest
 import yaml
 
-from ridgeback_autonomy.perception.core.depth_common import (
+from ridgeback_autonomy.perception.target_localization.core.depth_common import (
     DEPTH_GATE_DISABLED,
     resolve_depth_gate,
     valid_depth,

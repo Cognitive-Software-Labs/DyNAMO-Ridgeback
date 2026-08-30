@@ -13,26 +13,26 @@ from rclpy.qos import qos_profile_sensor_data
 from sensor_msgs.msg import Image
 
 from ridgeback_autonomy.common.messages import build_detections_message
-from ridgeback_autonomy.msg import G1Detections
-from ridgeback_autonomy.perception.core.detection import (
+from ridgeback_autonomy.msg import TargetDetections
+from ridgeback_autonomy.perception.target_localization.contracts import RAW_DETECTIONS_TOPIC
+from ridgeback_autonomy.perception.target_localization.core.detection import (
     DETECTION_MODEL_DEFAULT,
     DETECTION_THRESHOLD,
     OwlV2Detector,
     parse_owl_detections,
 )
-from ridgeback_autonomy.perception.core.image_utils import (
+from ridgeback_autonomy.perception.target_localization.core.image_utils import (
     bgr_frame_to_pil,
     convert_color_image_message,
 )
 
 
-RAW_DETECTIONS_TOPIC = 'detections/g1/raw'
 DETECTOR_FPS_DEFAULT = 5.0
 
 
-class G1DetectorNode(Node):
+class TargetDetectorNode(Node):
     def __init__(self, detector=None) -> None:
-        super().__init__('g1_detector_node')
+        super().__init__('target_detector_node')
 
         self.declare_parameter('detection_model', DETECTION_MODEL_DEFAULT)
         self.declare_parameter('detection_threshold', DETECTION_THRESHOLD)
@@ -59,7 +59,7 @@ class G1DetectorNode(Node):
         self.stop_event = threading.Event()
 
         self.detections_pub = self.create_publisher(
-            G1Detections,
+            TargetDetections,
             self.detections_topic,
             10,
         )
@@ -153,11 +153,11 @@ class G1DetectorNode(Node):
 def main() -> None:
     rclpy.init()
     try:
-        node = G1DetectorNode()
+        node = TargetDetectorNode()
     except RuntimeError as exc:
         # Perception enabled without the venv (no transformers/torch). Fail
         # cleanly with a clear message instead of dumping a traceback.
-        get_logger('g1_detector').fatal(str(exc))
+        get_logger('target_detector').fatal(str(exc))
         if rclpy.ok():
             rclpy.shutdown()
         return

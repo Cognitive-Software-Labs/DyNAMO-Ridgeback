@@ -5,8 +5,8 @@ import re
 
 import yaml
 
-from ridgeback_autonomy.perception.estimators import PUBLIC_ESTIMATOR_ORDER
-from ridgeback_autonomy.perception.g1_launch import CONFIG_LAUNCH_ARGUMENT_NAMES
+from ridgeback_autonomy.perception.target_localization.estimator_registry import PUBLIC_ESTIMATOR_ORDER
+from ridgeback_autonomy.perception.target_localization.launch import CONFIG_LAUNCH_ARGUMENT_NAMES
 
 
 def _package_root() -> Path:
@@ -31,11 +31,11 @@ def test_public_launch_surface_is_limited_to_known_entrypoints() -> None:
     )
 
     assert top_level_launches == [
-        'g1_benchmark_config.launch.py',
-        'g1_benchmark_env.launch.py',
-        'g1_distance_benchmark.launch.py',
         'manual_mapping.launch.py',
         'ridgeback_exploration.launch.py',
+        'target_benchmark_config.launch.py',
+        'target_benchmark_env.launch.py',
+        'target_distance_benchmark.launch.py',
     ]
 
 
@@ -53,7 +53,7 @@ def test_internal_launch_includes_exist_and_are_referenced() -> None:
     assert sorted(path.name for path in includes_dir.glob('*.launch.py')) == expected_includes
 
     exploration_text = (launch_dir / 'ridgeback_exploration.launch.py').read_text(encoding='utf-8')
-    benchmark_env_text = (launch_dir / 'g1_benchmark_env.launch.py').read_text(encoding='utf-8')
+    benchmark_env_text = (launch_dir / 'target_benchmark_env.launch.py').read_text(encoding='utf-8')
 
     assert 'includes' in exploration_text
     assert 'includes' in benchmark_env_text
@@ -62,7 +62,7 @@ def test_internal_launch_includes_exist_and_are_referenced() -> None:
 def test_benchmark_default_world_is_allowed_by_clearpath_simulation() -> None:
     repo_root = Path(__file__).resolve().parents[3]
     benchmark_env_text = (
-        repo_root / 'src' / 'ridgeback_autonomy' / 'launch' / 'g1_benchmark_env.launch.py'
+        repo_root / 'src' / 'ridgeback_autonomy' / 'launch' / 'target_benchmark_env.launch.py'
     ).read_text(encoding='utf-8')
     clearpath_simulation_text = (
         repo_root
@@ -73,8 +73,8 @@ def test_benchmark_default_world_is_allowed_by_clearpath_simulation() -> None:
         / 'simulation.launch.py'
     ).read_text(encoding='utf-8')
 
-    assert "DeclareLaunchArgument('world', default_value='g1_distance_calibration')" in benchmark_env_text
-    assert "'g1_distance_calibration'" in clearpath_simulation_text
+    assert "DeclareLaunchArgument('world', default_value='target_distance_calibration')" in benchmark_env_text
+    assert "'target_distance_calibration'" in clearpath_simulation_text
 
 
 def test_exploration_uses_unique_mock_hospital_world() -> None:
@@ -109,13 +109,13 @@ def test_exploration_uses_unique_mock_hospital_world() -> None:
 def test_benchmark_launch_uses_new_multi_estimator_interface() -> None:
     repo_root = Path(__file__).resolve().parents[3]
     benchmark_text = (
-        repo_root / 'src' / 'ridgeback_autonomy' / 'launch' / 'g1_benchmark_config.launch.py'
+        repo_root / 'src' / 'ridgeback_autonomy' / 'launch' / 'target_benchmark_config.launch.py'
     ).read_text(encoding='utf-8')
 
     assert "'estimators'" in benchmark_text
     assert "'output_dir'" in benchmark_text
     assert "'benchmark-results'" in benchmark_text
-    assert '/tmp/g1_distance_benchmark_runs' not in benchmark_text
+    assert '/tmp/target_distance_benchmark_runs' not in benchmark_text
     assert "DeclareLaunchArgument('estimators', default_value='all')" in benchmark_text
     assert 'measurement_backend' not in benchmark_text
     assert 'primary_metric' not in benchmark_text
@@ -163,8 +163,8 @@ def test_exploration_gives_the_distance_hud_its_own_aggregator() -> None:
     # columns with runs of spaces, which rich text collapses.
     exploration_text = _exploration_text()
 
-    assert "name='hud_g1_node'" in exploration_text
-    assert 'marker_topic=HUD_G1_MARKER_TOPIC' in exploration_text
+    assert "name='hud_target_node'" in exploration_text
+    assert 'marker_topic=HUD_TARGET_MARKER_TOPIC' in exploration_text
     # The rich-text panel and the alignment come from the shared factory, so the
     # benchmark's aggregator and this one cannot drift apart on that contract.
     assert 'distance_hud_node(' in exploration_text
@@ -182,10 +182,10 @@ def test_exploration_rviz_configures_one_checkbox_per_registered_estimator() -> 
     # new row arrived unconfigured.
     config = yaml.safe_load(_exploration_rviz_path().read_text(encoding='utf-8'))
     displays = config['Visualization Manager']['Displays']
-    estimates = next(d for d in displays if d['Name'] == 'G1 Estimates')
+    estimates = next(d for d in displays if d['Name'] == 'Target Estimates')
 
     assert set(estimates['Namespaces']) == {
-        f'g1_estimates/{estimator}' for estimator in PUBLIC_ESTIMATOR_ORDER
+        f'target_estimates/{estimator}' for estimator in PUBLIC_ESTIMATOR_ORDER
     }
     assert all(estimates['Namespaces'].values())
 
@@ -202,7 +202,7 @@ def test_exploration_rviz_shows_the_overlay_and_the_distance_hud() -> None:
     # the 3D view and do not.
     assert config['Window Geometry']['Perception overlay'] == {'collapsed': False}
 
-    assert by_name['G1 HUD']['Topic']['Value'] == '/r100_0001/hud_g1_overlay'
+    assert by_name['Target HUD']['Topic']['Value'] == '/r100_0001/hud_target_overlay'
     assert by_name['HUD']['Topic']['Value'] == '/r100_0001/hud_overlay'
 
 
@@ -214,7 +214,8 @@ def test_camera_overlay_is_rviz_only() -> None:
         / 'ridgeback_autonomy'
         / 'ridgeback_autonomy'
         / 'perception'
-        / 'g1_overlay_node.py'
+        / 'target_localization'
+        / 'overlay_node.py'
     ).read_text(encoding='utf-8')
 
     assert 'build_bgr8_image_message' in overlay_text
@@ -234,13 +235,13 @@ def test_camera_overlay_is_rviz_only() -> None:
 
 def test_benchmark_layers_declare_identical_shared_arguments() -> None:
     launch_dir = Path(__file__).resolve().parents[1] / 'launch'
-    env_text = (launch_dir / 'g1_benchmark_env.launch.py').read_text(encoding='utf-8')
-    config_text = (launch_dir / 'g1_benchmark_config.launch.py').read_text(encoding='utf-8')
+    env_text = (launch_dir / 'target_benchmark_env.launch.py').read_text(encoding='utf-8')
+    config_text = (launch_dir / 'target_benchmark_config.launch.py').read_text(encoding='utf-8')
 
     shared_declarations = [
         "DeclareLaunchArgument('namespace', default_value='r100_0001')",
         "DeclareLaunchArgument('use_sim_time', default_value='true')",
-        "DeclareLaunchArgument('world', default_value='g1_distance_calibration')",
+        "DeclareLaunchArgument('world', default_value='target_distance_calibration')",
     ]
     for declaration in shared_declarations:
         assert env_text.count(declaration) == 1
@@ -265,21 +266,21 @@ def test_benchmark_layers_declare_identical_shared_arguments() -> None:
 
 def test_benchmark_wrapper_only_composes_the_two_layers() -> None:
     launch_dir = Path(__file__).resolve().parents[1] / 'launch'
-    wrapper_text = (launch_dir / 'g1_distance_benchmark.launch.py').read_text(encoding='utf-8')
+    wrapper_text = (launch_dir / 'target_distance_benchmark.launch.py').read_text(encoding='utf-8')
 
-    assert 'g1_benchmark_env.launch.py' in wrapper_text
-    assert 'g1_benchmark_config.launch.py' in wrapper_text
+    assert 'target_benchmark_env.launch.py' in wrapper_text
+    assert 'target_benchmark_config.launch.py' in wrapper_text
     assert wrapper_text.count('DeclareLaunchArgument(') == 1
     assert "'shutdown_on_complete'" in wrapper_text
 
 
 def test_benchmark_environment_owns_detector_and_config_is_readiness_gated() -> None:
     launch_dir = Path(__file__).resolve().parents[1] / 'launch'
-    env_text = (launch_dir / 'g1_benchmark_env.launch.py').read_text(encoding='utf-8')
-    config_text = (launch_dir / 'g1_benchmark_config.launch.py').read_text(encoding='utf-8')
+    env_text = (launch_dir / 'target_benchmark_env.launch.py').read_text(encoding='utf-8')
+    config_text = (launch_dir / 'target_benchmark_config.launch.py').read_text(encoding='utf-8')
 
-    assert "executable='g1_detector_node'" in env_text
-    assert "executable='g1_detector_node'" not in config_text
+    assert "executable='target_detector_node'" in env_text
+    assert "executable='target_detector_node'" not in config_text
     assert "'launch_wait'" in config_text
     assert 'RAW_DETECTIONS_TOPIC' in config_text
     assert 'gate_benchmark_environment_ready' in config_text

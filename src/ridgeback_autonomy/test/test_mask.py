@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 
 from ridgeback_autonomy.common.models import Detection, DetectionBatch
-from ridgeback_autonomy.perception.core.mask import (
+from ridgeback_autonomy.perception.target_localization.core.mask import (
     Mask,
     MaskPrecision,
     mask_from_array,

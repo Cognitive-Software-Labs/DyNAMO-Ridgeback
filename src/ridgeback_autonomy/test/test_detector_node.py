@@ -49,9 +49,9 @@ def ros_context():
 
 
 def _make_node(detector):
-    from ridgeback_autonomy.perception.g1_detector_node import G1DetectorNode
+    from ridgeback_autonomy.perception.target_localization.detector_node import TargetDetectorNode
 
-    return G1DetectorNode(detector=detector)
+    return TargetDetectorNode(detector=detector)
 
 
 def test_seam_injects_stub_and_calls_load_without_owlv2(ros_context) -> None:

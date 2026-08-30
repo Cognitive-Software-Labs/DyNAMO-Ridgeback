@@ -69,12 +69,12 @@ PATTERNS=(
     ros2-daemon
     rviz2
     camera_windows_node
-    g1_detector_node
-    g1_pointcloud_measurement_node
-    g1_overlay_node
-    g1_mask_measurement_node
-    g1_estimate_viz_node
-    g1_distance_benchmark_runner
+    target_detector_node
+    target_pointcloud_measurement_node
+    target_overlay_node
+    target_mask_measurement_node
+    target_visualization_node
+    target_distance_benchmark_runner
     g1_detection_node
     velocity_overlay_node
     coverage_overlay_node

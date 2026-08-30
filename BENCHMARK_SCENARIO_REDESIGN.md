@@ -1,11 +1,11 @@
-# G1 Distance Benchmark — Scenario-Spec Redesign
+# Target Distance Benchmark — Scenario-Spec Redesign
 
 Record of the benchmark redesign carried out on branch **`benchmark-redesign`**:
 what it does, why, how it's built, how to run it, and how it was validated.
 
 ## 1. Motivation
 
-The original benchmark ([G1_DISTANCE_BENCHMARKING.md](G1_DISTANCE_BENCHMARKING.md))
+The original benchmark ([TARGET_DISTANCE_BENCHMARKING.md](TARGET_DISTANCE_BENCHMARKING.md))
 spawned **one** G1 per trial on a hardcoded `5 forward × 3 lateral` grid, facing
 the robot, and scored only single-detection frames. The goal of this work was to
 vary the scene along several axes:
@@ -18,7 +18,7 @@ vary the scene along several axes:
 **Key discovery that made this cheap:** the perception pipeline (detector → the
 three measurement nodes → messages) is *already* fully multi-instance — the
 detector emits N detections, every node loops over all of them, and the
-`G1Detections`/`G1Measurements` messages carry N-element arrays. The single-target
+`TargetDetections`/`TargetMeasurements` messages carry N-element arrays. The single-target
 assumption lived **only in the benchmark scoring layer** (`count==1` gate,
 scalar collapse, single ground-truth pose). So no perception code changed.
 
@@ -67,7 +67,7 @@ scalar collapse, single ground-truth pose). So no perception code changed.
   runs the association **once per frame** (sensor-only), aggregates the matched
   detection's per-estimator distance to a **median per (instance, estimator)**;
   a GT never matched in any frame is MISSED.
-- **Runner** (`benchmarking/g1_distance_benchmark_runner_node.py`) — iterates
+- **Runner** (`benchmarking/target_distance_benchmark_runner_node.py`) — iterates
   scenes, spawns robots + objects via `ros_gz_sim/create`, computes per-instance
   ground truth, scores. Single-robot uses the scalar-median path (regression
   guard); multi-robot uses `score_scene`.
@@ -137,7 +137,7 @@ source install/setup.bash
 bash cleanup.sh
 
 # Full set, mask estimators, silhouette gate (needs perception_venv / SlimSAM):
-ros2 launch ridgeback_autonomy g1_distance_benchmark.launch.py \
+ros2 launch ridgeback_autonomy target_distance_benchmark.launch.py \
   scenario:=$PWD/src/ridgeback_autonomy/config/benchmark_scenarios_full.yaml \
   estimators:=projective_ranging,euclidean_reconstruction,polar_profiling \
   mask_gate:=silhouette \

@@ -6,8 +6,8 @@ how it is prompted, and the semantics of its output. How the resulting mask is
 consumed is unchanged and documented with the paths; the mask *object* is
 documented in `mask_component.md`.
 
-**Code:** `perception/core/segmentation.py` (`SamBoxSegmenter`), wired into
-`g1_mask_measurement_node` behind the `mask_gate` parameter
+**Code:** `perception/target_localization/core/segmentation.py` (`SamBoxSegmenter`), wired into
+`target_mask_measurement_node` behind the `mask_gate` parameter
 (`box` | `silhouette`).
 
 **History note (2026-07-17):** Florence-2 was evaluated as a candidate
@@ -109,18 +109,18 @@ the SAM 3 spike passed its gates and the adoption question is open (§7.2).
   silently rasterizing would mislabel the benchmark row (the run *is* the gate
   axis).
 
-## 4. Execution host: inside `g1_mask_measurement_node`
+## 4. Execution host: inside `target_mask_measurement_node`
 
 `mask_component.md` §5.3 pins the wire convention: **consumers never take the
 mask off the wire**; a published mask topic is debug-only. A tight mask cannot
 be reconstructed from the detections message the way a rect mask can, so the
 only convention-respecting host is the consuming node itself — the segmenter
-runs in `g1_mask_measurement_node`'s process and hands the boolean array over
+runs in `target_mask_measurement_node`'s process and hands the boolean array over
 in-process. This mirrors the rect precedent: rasterization also executes in
 the consuming node while belonging to the front-end's contract.
 
 Rejected alternatives (both would push masks across a process boundary):
-inside `g1_detector_node` (couples the two model loops, full-rate mask
+inside `target_detector_node` (couples the two model loops, full-rate mask
 serialization even for `box` runs) and a separate segmentation node (same wire
 violation plus a third model-hosting process to sequence in bringup).
 
@@ -162,7 +162,7 @@ ranging`.
 ## 6. Debug artifact
 
 In silhouette mode the node publishes the union of the frame's tight masks as
-a `mono8` Image on `debug/g1/mask` (debug-only, per the §5.3 wire convention;
+a `mono8` Image on `debug/target/mask` (debug-only, per the §5.3 wire convention;
 compressed transport gives PNG at a few kB). The overlay mask panel consumes
 the published artifact when its stamp matches the rendered measurements
 exactly, so the panel shows exactly what downstream consumed; otherwise it

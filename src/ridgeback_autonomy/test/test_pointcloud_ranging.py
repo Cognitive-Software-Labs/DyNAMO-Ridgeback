@@ -5,7 +5,7 @@ import math
 import numpy as np
 
 from ridgeback_autonomy.common.models import Detection, DetectionBatch
-from ridgeback_autonomy.perception.core.pointcloud_ranging import (
+from ridgeback_autonomy.perception.target_localization.core.pointcloud_ranging import (
     add_pointcloud_measurements,
     compute_pointcloud_measurement,
     focus_bbox,

@@ -8,12 +8,12 @@ import re
 
 import yaml
 
-from ridgeback_autonomy.perception.estimators import (
+from ridgeback_autonomy.perception.target_localization.estimator_registry import (
     DEPTH_PATH_ESTIMATORS,
     MASK_ESTIMATORS,
     parse_estimators,
 )
-from ridgeback_autonomy.perception.g1_launch import (
+from ridgeback_autonomy.perception.target_localization.launch import (
     CONFIG_LAUNCH_ARGUMENT_NAMES,
     ENV_LAYER_CONFIG_KEYS,
 )

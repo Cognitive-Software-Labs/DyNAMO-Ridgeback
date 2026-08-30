@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from ridgeback_autonomy.perception.estimators import (
+from ridgeback_autonomy.perception.target_localization.estimator_registry import (
     ESTIMATOR_FIELD_KEYS,
     ESTIMATOR_LABELS,
 )

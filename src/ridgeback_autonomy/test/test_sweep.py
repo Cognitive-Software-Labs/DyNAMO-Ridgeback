@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from ridgeback_autonomy.benchmarking.g1_benchmark_sweep import (
+from ridgeback_autonomy.benchmarking.target_benchmark_sweep import (
     _launch_argument_tokens,
 )
 from ridgeback_autonomy.benchmarking.sweep import parse_sweep

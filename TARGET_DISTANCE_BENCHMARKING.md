@@ -1,10 +1,10 @@
-# G1 Distance Benchmarking
+# Target Distance Benchmarking
 
 ## Purpose
 
-This note describes the current benchmark workflow for comparing G1 distance estimators in `ridgeback_autonomy`.
+This note describes the current benchmark workflow for comparing target-distance estimators in `ridgeback_autonomy`.
 
-The benchmark keeps the same OWLv2 RGB detection front-end and compares different range-estimation backends on the same spawned target poses inside the `g1_distance_calibration` world.
+The benchmark keeps the same OWLv2 RGB detection front-end and compares different range-estimation backends on the same spawned target poses inside the `target_distance_calibration` world. The current scenario asset is a Unitree G1, but the ROS APIs and reusable perception modules are target-generic.
 
 ## Supported Estimators
 
@@ -22,7 +22,7 @@ mask-based localization paths documented under `object_localization_documentatio
 
 Main entrypoint:
 
-- [src/ridgeback_autonomy/launch/g1_distance_benchmark.launch.py](src/ridgeback_autonomy/launch/g1_distance_benchmark.launch.py)
+- [src/ridgeback_autonomy/launch/target_distance_benchmark.launch.py](src/ridgeback_autonomy/launch/target_distance_benchmark.launch.py)
 
 Typical usage:
 
@@ -30,13 +30,13 @@ Typical usage:
 bash cleanup.sh
 
 # Compare everything
-ros2 launch ridgeback_autonomy g1_distance_benchmark.launch.py
+ros2 launch ridgeback_autonomy target_distance_benchmark.launch.py
 
 # Single-estimator run
-ros2 launch ridgeback_autonomy g1_distance_benchmark.launch.py estimators:=pointcloud
+ros2 launch ridgeback_autonomy target_distance_benchmark.launch.py estimators:=pointcloud
 
 # Mixed comparison
-ros2 launch ridgeback_autonomy g1_distance_benchmark.launch.py estimators:=pointcloud,polar_profiling
+ros2 launch ridgeback_autonomy target_distance_benchmark.launch.py estimators:=pointcloud,polar_profiling
 ```
 
 Key public arguments:
@@ -91,13 +91,13 @@ going — that is the only toggle mechanism; there are no parameters for it.
 
 | Display | Shows |
 |---|---|
-| `G1 Estimates` | one coloured ring per estimator, at where it thinks the G1 is |
-| `G1 Polar Rays` | the LiDAR beams behind the polar profiling estimate |
+| `Target Estimates` | one coloured ring per estimator, at where it thinks the target is |
+| `Target Polar Rays` | the LiDAR beams behind the polar profiling estimate |
 | `HUD` | top-right: every estimator's distance against the trial's ground truth |
 | `Perception overlay` | docked under the 3D view: the color and mask panels |
 
 The HUD colours each row to match that estimator's ring, from the one table in
-`g1_estimate_viz_node`, so a reading and its ring cannot drift apart. Dark ring
+`target_visualization_node`, so a reading and its ring cannot drift apart. Dark ring
 colours (red, and Depth-Anything's purple) are lightened just enough to stay
 readable on the HUD's dark panel, keeping the hue so the ring is still
 recognisable.
@@ -109,7 +109,7 @@ no per-display dock-area key, so **that blob is the only thing placing it**. If 
 is ever dropped, the overlay silently reverts to a narrow left-dock strip a few
 tens of pixels tall.
 
-`G1 Polar Rays` expands into three namespaces, each with its own checkbox:
+`Target Polar Rays` expands into three namespaces, each with its own checkbox:
 
 - `polar/used` — the beams the estimate medians over, in amber
 - `polar/dropped` — beams the mask selected but the range segmentation discarded,
@@ -244,21 +244,21 @@ Every panel shows:
 - the current frame value
 - the trial median
 - the ground-truth distance
-- the shared G1 bounding box
+- the shared target bounding box
 
 ## Main Implementation Files
 
-- [src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py](src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py)
-- [src/ridgeback_autonomy/ridgeback_autonomy/perception/estimators.py](src/ridgeback_autonomy/ridgeback_autonomy/perception/estimators.py)
+- [src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/target_distance_benchmark_runner_node.py](src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/target_distance_benchmark_runner_node.py)
+- [src/ridgeback_autonomy/ridgeback_autonomy/perception/target_localization/estimator_registry.py](src/ridgeback_autonomy/ridgeback_autonomy/perception/target_localization/estimator_registry.py)
 - [src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/alignment.py](src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/alignment.py)
 - [src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/reduction.py](src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/reduction.py)
 - [src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/rendering.py](src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/rendering.py)
 - [src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/summary.py](src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/summary.py)
-- [src/ridgeback_autonomy/ridgeback_autonomy/perception/g1_pointcloud_measurement_node.py](src/ridgeback_autonomy/ridgeback_autonomy/perception/g1_pointcloud_measurement_node.py)
-- [src/ridgeback_autonomy/ridgeback_autonomy/perception/g1_mask_measurement_node.py](src/ridgeback_autonomy/ridgeback_autonomy/perception/g1_mask_measurement_node.py)
+- [src/ridgeback_autonomy/ridgeback_autonomy/perception/target_localization/pointcloud_measurement_node.py](src/ridgeback_autonomy/ridgeback_autonomy/perception/target_localization/pointcloud_measurement_node.py)
+- [src/ridgeback_autonomy/ridgeback_autonomy/perception/target_localization/mask_measurement_node.py](src/ridgeback_autonomy/ridgeback_autonomy/perception/target_localization/mask_measurement_node.py)
 
 ## Practical Notes
 
-- `pointcloud` comes from `g1_pointcloud_measurement_node`; the three mask rows come from `g1_mask_measurement_node`
+- `pointcloud` comes from `target_pointcloud_measurement_node`; the three mask rows come from `target_mask_measurement_node`
 - when the benchmark launch receives a subset in `estimators`, only the required measurement nodes are launched
 - each node is told which of its own rows to compute, so an unselected branch never runs

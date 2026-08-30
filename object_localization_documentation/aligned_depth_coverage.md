@@ -5,14 +5,14 @@
 simulation, even though depth is nominally available. This is a **timing /
 coverage** failure mode of the aligned-depth contract (`aligned_depth.md` §1,
 the "Timing" bullet), not an accuracy problem. The measurements below were
-taken 2026-07-24 on the `g1_distance_calibration` world.
+taken 2026-07-24 on the `target_distance_calibration` world.
 
 The symptom surfaced through the benchmark's per-estimator miss-reason
 attribution (`object_localization_pipeline.md`): a box-gate run tallies the
 depth rows almost entirely as `NO_DEPTH_FRAME`.
 
 > **Resolved 2026-08-26 by option 1 (§6).** Depth acquisition now happens
-> inside `g1_mask_measurement_node`, at the detection stamp; there is no
+> inside `target_mask_measurement_node`, at the detection stamp; there is no
 > depth producer process and no depth topic. Sections 1–5 describe the
 > topology that caused the loss and are kept as the diagnosis that motivated
 > the fix. §6 records the decision.
@@ -40,7 +40,7 @@ Two things stand out:
   depth is matched to the detection.
 
 `NO_DEPTH_FRAME` is stamped in `fill_path_measurements`
-(`g1_mask_measurement_node.py`) when the depth lookup for a detection returns
+(`target_mask_measurement_node.py`) when the depth lookup for a detection returns
 `None` — i.e. no aligned depth frame carried that detection's exact stamp.
 
 ---
@@ -48,7 +48,7 @@ Two things stand out:
 ## 2. The matching contract
 
 The mask node matches depth to a detection by **exact stamp, no tolerance**
-(`g1_mask_measurement_node.py`, `StampedMessageBuffer.lookup`):
+(`target_mask_measurement_node.py`, `StampedMessageBuffer.lookup`):
 
 ```
 depth_msg = self.depth_buffer.lookup(detections_msg.header.stamp)   # exact key, or None
@@ -83,7 +83,7 @@ sub-sampled the stream**, and they kept *different* frames:
    rgbd_camera (color+depth, shared stamps, ~30 Hz nominal)
         │
         ├──▶ detector          latest-wins slot + detector_fps=5 cap  ──▶ detections at stamps {D}
-        │        (g1_detector_node.py: grab latest color, set None)
+        │        (target_detector_node.py: grab latest color, set None)
         │
         └──▶ aligned_depth_node                                       ──▶ aligned depth at stamps {A}
                  thinned mostly at the rmw/executor layer (§4), not by
@@ -191,12 +191,12 @@ consumer, with a full NN forward pass, and scored 130/135.
 
 ### What was built
 
-- `perception/core/depth_sources.py` holds both sources unchanged
+- `perception/target_localization/core/depth_sources.py` holds both sources unchanged
   (`StereoDepthSource`, `MonocularDepthSource`) plus a `build_depth_source`
   factory. Monocular moved in with stereo rather than staying a producer: the
   same specificity argument applies to it, and running the NN once per
   detection batch (5 Hz) is not obviously worse than once per camera frame.
-- `g1_mask_measurement_node` subscribes to the source's *input* stream
+- `target_mask_measurement_node` subscribes to the source's *input* stream
   (`input_kind`), buffers it raw in the `StampedMessageBuffer` it already
   owned, and converts only the frame at the detection stamp. Monocular reads
   the same color buffer the silhouette gate uses — one buffer, two readers,
@@ -206,7 +206,7 @@ consumer, with a full NN forward pass, and scored 130/135.
   `camera_info_matches_depth` check (the consumer's `grid_mismatch_warning`
   covers it). The aligned-depth **artifact** contract is unchanged; only its
   transport is, from a topic to a call at stamp `T`. It is still published on
-  `debug/g1/mask/aligned_depth` for the overlay panel, encoded only when
+  `debug/target/mask/aligned_depth` for the overlay panel, encoded only when
   something is subscribed.
 
 ### Measured effect

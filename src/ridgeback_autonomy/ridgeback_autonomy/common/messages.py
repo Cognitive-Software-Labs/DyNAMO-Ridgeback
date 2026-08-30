@@ -8,7 +8,7 @@ from sensor_msgs.msg import Image
 
 from ridgeback_autonomy.common.miss_reason import MissReason
 from ridgeback_autonomy.common.models import Detection, DetectionBatch
-from ridgeback_autonomy.msg import G1Detections, G1Measurements
+from ridgeback_autonomy.msg import TargetDetections, TargetMeasurements
 
 
 MISSING_FLOAT = float('nan')
@@ -33,14 +33,14 @@ def decode_optional_status(values, index: int) -> int | None:
     return None if value == int(MissReason.UNSET) else value
 
 
-def build_detections_message(batch: DetectionBatch, header) -> G1Detections:
-    msg = G1Detections()
+def build_detections_message(batch: DetectionBatch, header) -> TargetDetections:
+    msg = TargetDetections()
     _populate_identity_fields(msg, batch, header)
     return msg
 
 
-def build_measurements_message(batch: DetectionBatch, header) -> G1Measurements:
-    msg = G1Measurements()
+def build_measurements_message(batch: DetectionBatch, header) -> TargetMeasurements:
+    msg = TargetMeasurements()
     _populate_identity_fields(msg, batch, header)
 
     for detection in batch.detections:
@@ -63,7 +63,7 @@ def build_measurements_message(batch: DetectionBatch, header) -> G1Measurements:
     return msg
 
 
-def batch_from_detections_message(msg: G1Detections) -> DetectionBatch:
+def batch_from_detections_message(msg: TargetDetections) -> DetectionBatch:
     batch = DetectionBatch(
         image_width=int(msg.image_width),
         image_height=int(msg.image_height),
@@ -80,7 +80,7 @@ def batch_from_detections_message(msg: G1Detections) -> DetectionBatch:
     return batch
 
 
-def batch_from_measurements_message(msg: G1Measurements) -> DetectionBatch:
+def batch_from_measurements_message(msg: TargetMeasurements) -> DetectionBatch:
     batch = batch_from_detections_message(msg)
 
     for index, detection in enumerate(batch.detections):
@@ -125,7 +125,7 @@ def decode_bbox_quads(values) -> list[tuple[int, int, int, int]]:
     return bboxes
 
 
-def snapshot_measurements_message(msg: G1Measurements) -> dict[str, Any]:
+def snapshot_measurements_message(msg: TargetMeasurements) -> dict[str, Any]:
     return {
         'detected': bool(msg.detected),
         'count': int(msg.count),
