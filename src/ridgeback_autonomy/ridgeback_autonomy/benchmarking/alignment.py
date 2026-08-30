@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import OrderedDict
 from dataclasses import dataclass, field
 from typing import Any, Mapping
 
@@ -22,6 +23,7 @@ from ridgeback_autonomy.perception.target_localization.estimator_registry import
 
 
 MeasurementEventKey = tuple[Any, ...]
+PREVIEW_BUFFER_LIMIT = 256
 
 
 @dataclass
@@ -252,6 +254,59 @@ def find_exact_preview_match(
         matched_delta_ms=0.0,
         nearest_stamp_ns=nearest_stamp_ns,
         nearest_delta_ms=nearest_delta_ms,
+    )
+
+
+def store_buffered_preview(
+    preview_buffer: OrderedDict[int, Any],
+    stamp_ns: int,
+    preview,
+    limit: int = PREVIEW_BUFFER_LIMIT,
+) -> None:
+    """Store one preview in stamp order and bound the rolling buffer."""
+
+    preview_buffer[stamp_ns] = preview
+    preview_buffer.move_to_end(stamp_ns)
+    while len(preview_buffer) > limit:
+        preview_buffer.popitem(last=False)
+
+
+def apply_preview_match(event: MeasurementEvent, prefix: str, match) -> None:
+    """Attach one exact preview match while retaining nearest-miss diagnostics."""
+
+    setattr(event.preview, f'{prefix}_nearest_stamp_ns', match.nearest_stamp_ns)
+    setattr(event.preview, f'{prefix}_nearest_delta_ms', match.nearest_delta_ms)
+
+    if match.image_bgr is None or match.matched_stamp_ns is None:
+        return
+
+    preview_attribute = f'{prefix}_bgr'
+    stamp_attribute = f'{prefix}_stamp_ns'
+    delta_attribute = f'{prefix}_delta_ms'
+    current_delta_ms = getattr(event.preview, delta_attribute)
+    if (
+        current_delta_ms is not None
+        and match.matched_delta_ms is not None
+        and current_delta_ms <= match.matched_delta_ms
+    ):
+        return
+
+    setattr(event.preview, preview_attribute, match.image_bgr)
+    setattr(event.preview, stamp_attribute, match.matched_stamp_ns)
+    setattr(event.preview, delta_attribute, match.matched_delta_ms)
+
+
+def attach_exact_preview(
+    event: MeasurementEvent,
+    prefix: str,
+    preview_buffer,
+) -> None:
+    """Find and attach an exact-stamp preview from one named source."""
+
+    apply_preview_match(
+        event,
+        prefix,
+        find_exact_preview_match(preview_buffer, event.stamp_ns),
     )
 
 

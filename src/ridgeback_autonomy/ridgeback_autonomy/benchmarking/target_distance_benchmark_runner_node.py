@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from collections import OrderedDict
-from dataclasses import dataclass
 import os
 import subprocess
 import time
@@ -19,9 +18,10 @@ from rclpy.qos import qos_profile_sensor_data
 from sensor_msgs.msg import Image
 
 from ridgeback_autonomy.benchmarking.alignment import (
+    attach_exact_preview,
     ensure_measurement_event,
-    find_exact_preview_match,
     stamp_to_nanoseconds,
+    store_buffered_preview,
     update_measurement_event,
 )
 from ridgeback_autonomy.perception.target_localization.estimator_registry import (
@@ -45,15 +45,11 @@ from ridgeback_autonomy.benchmarking.naming import (
 )
 from ridgeback_autonomy.benchmarking.reduction import (
     choose_representative_event,
-    compute_status_histogram,
     compute_trial_medians,
-    dominant_miss_reason,
     format_status_tally,
     merge_status_histograms,
-    union_usable_events,
-    usable_events_by_estimator,
+    summarize_capture_events,
 )
-from ridgeback_autonomy.benchmarking.association import GtPoint, assign_to_ground_truth
 from ridgeback_autonomy.benchmarking.rendering import BenchmarkCollageRenderer
 from ridgeback_autonomy.benchmarking.recording import (
     DEFAULT_FPS,
@@ -72,11 +68,17 @@ from ridgeback_autonomy.benchmarking.report import render_run_report
 from ridgeback_autonomy.benchmarking.scenarios import Scene, load_scenarios
 from ridgeback_autonomy.benchmarking.scoring import (
     MISS_OUTCOMES,
-    OUTCOME_DETECTOR_MISS,
-    OUTCOME_NO_VALUE,
-    SceneScore,
-    build_display_instance_estimate,
     score_scene,
+)
+from ridgeback_autonomy.benchmarking.simulation import (
+    TARGET_SPAWN_HEIGHT_M,
+    GroundTruthInstance,
+    compute_ground_truth_instances,
+    despawn_model_command,
+    model_sdf_path,
+    pose_snapshot_command,
+    pose_snapshot_from_payload,
+    spawn_model_command,
 )
 from ridgeback_autonomy.benchmarking.summary import (
     build_run_document,
@@ -84,37 +86,21 @@ from ridgeback_autonomy.benchmarking.summary import (
     write_run_json,
     write_trial_csv,
 )
+from ridgeback_autonomy.benchmarking.trial_results import (
+    build_box_annotations,
+    build_trial_result,
+    build_trials,
+    dominant_miss_reasons,
+)
 from ridgeback_autonomy.msg import TargetMeasurements
 from ridgeback_autonomy.perception.target_localization.core.image_utils import convert_color_image_message
-from ridgeback_autonomy.perception.target_localization.core.vehicle_frame import (
-    planar_measurement_from_vehicle_front,
-    yaw_from_quaternion,
-)
 from ridgeback_autonomy.perception.target_localization.core.isolation_2d import ISOLATION_2D_DEFAULT
 from ridgeback_autonomy.perception.target_localization.core.isolation_3d import ISOLATION_3D_DEFAULT
+from ridgeback_autonomy.perception.target_localization.ground_truth import (
+    ground_truth_point_message,
+)
 
 
-def ground_truth_point_message(true_pose: dict[str, float], trial_id: str) -> PointStamped:
-    """Pack a trial's ground truth as x=lateral, y=forward, z=distance.
-
-    ``ground_truth.truth_reading`` unpacks the same convention; the values are
-    the base-frame planar measurement every benchmark row shares, not a 3D
-    point in any TF frame. ``header.frame_id`` carries the trial id for that
-    same reason -- it is not a TF frame either, and a truth number that names
-    its own trial can be checked against the scene the display is showing.
-    """
-
-    msg = PointStamped()
-    msg.header.frame_id = trial_id
-    msg.point.x = float(true_pose['lateral_m'])
-    msg.point.y = float(true_pose['forward_m'])
-    msg.point.z = float(true_pose['distance_m'])
-    return msg
-
-
-# Robots and objects spawn with their model origin on the floor plane; each
-# model bakes in its own vertical offset so origin-at-z=0 sits it on the ground.
-TARGET_SPAWN_HEIGHT_M = 0.0
 COMMAND_TIMEOUT_SEC = 10.0
 COMMAND_RETRY_SLEEP_SEC = 0.5
 STREAM_WAIT_TIMEOUT_SEC = 300.0
@@ -132,28 +118,10 @@ DEPTH_GATE_DISABLED = 0.0
 RECORD_WINDOW_CLASS_DEFAULT = 'rviz'
 # RViz starts alongside this node, so allow it a moment to map its window.
 RECORD_WINDOW_WAIT_SEC = 20.0
-PREVIEW_BUFFER_LIMIT = 256
 # Declared by rclpy itself, not by the launch file, so it is not part of a
 # run's configuration. ``use_sim_time`` is deliberately NOT excluded: the
 # launch sets it and it changes how stamps are interpreted.
 RCLPY_INTERNAL_PARAMETERS = frozenset({'start_type_description_service'})
-
-
-@dataclass
-class GtInstance:
-    """Ground truth for one spawned robot in a scene (from the sim's true pose).
-
-    The sim's true pose is used only here (and for the scoring assignment); it
-    never feeds the estimators, which are sensor-only.
-    """
-
-    index: int
-    model_name: str
-    world_x: float
-    world_y: float
-    forward_m: float
-    lateral_m: float
-    distance_m: float
 
 
 class TargetDistanceBenchmarkRunner(Node):
@@ -335,7 +303,7 @@ class TargetDistanceBenchmarkRunner(Node):
 
         event = ensure_measurement_event(self.capture_events, msg)
         update_measurement_event(event, msg, self.selected_pointcloud_estimators)
-        self.attach_buffered_previews(event)
+        attach_exact_preview(event, 'color', self.color_preview_buffer)
 
     def on_mask_measurement(self, msg: TargetMeasurements) -> None:
         self.mask_measurement_seen = True
@@ -344,7 +312,7 @@ class TargetDistanceBenchmarkRunner(Node):
 
         event = ensure_measurement_event(self.capture_events, msg)
         update_measurement_event(event, msg, self.selected_mask_estimators)
-        self.attach_buffered_previews(event)
+        attach_exact_preview(event, 'color', self.color_preview_buffer)
 
     def on_color_image(self, msg: Image) -> None:
         self.color_stream_seen = True
@@ -362,7 +330,7 @@ class TargetDistanceBenchmarkRunner(Node):
 
         preview = self.collage_renderer.make_color_preview(frame)
         stamp_ns = stamp_to_nanoseconds(msg.header.stamp)
-        self.store_buffered_preview(self.color_preview_buffer, stamp_ns, preview)
+        store_buffered_preview(self.color_preview_buffer, stamp_ns, preview)
         self.backfill_previews_from_buffers()
 
     def log_code_provenance(self) -> None:
@@ -431,7 +399,7 @@ class TargetDistanceBenchmarkRunner(Node):
         }
         total_extra_detections = 0
 
-        for trial in self.build_trials():
+        for trial in build_trials(self.scenes, self.repeats):
             result = self.run_trial(trial)
             if result is None:
                 skipped_trials += 1
@@ -564,22 +532,6 @@ class TargetDistanceBenchmarkRunner(Node):
             status_histograms=self.status_aggregate,
         ))
 
-    def build_trials(self) -> list[dict[str, Any]]:
-        trials: list[dict[str, Any]] = []
-        for scene in self.scenes:
-            effective_repeats = scene.repeats_override or self.repeats
-            for repeat_index in range(effective_repeats):
-                trial_id = (
-                    scene.id if effective_repeats == 1
-                    else f'{scene.id}_rep{repeat_index + 1}'
-                )
-                trials.append({
-                    'trial_id': trial_id,
-                    'repeat_index': repeat_index + 1,
-                    'scene': scene,
-                })
-        return trials
-
     def run_trial(self, trial: dict[str, Any]) -> dict[str, dict[str, Any]] | None:
         trial_id = trial['trial_id']
         scene: Scene = trial['scene']
@@ -618,9 +570,11 @@ class TargetDistanceBenchmarkRunner(Node):
                 scene_score = score_scene(
                     usable_by_estimator, gt_instances, self.selected_estimators,
                     detector_fired=capture['any_detected'])
-                return self.build_trial_result(
-                    trial, scene, gt_instances, scene_score, usable_by_estimator, '',
-                    capture['status_histogram'], capture['total_events'])
+                return build_trial_result(
+                    trial, scene, gt_instances, scene_score,
+                    self.selected_estimators, self.estimator_display_names,
+                    usable_by_estimator, '', capture['status_histogram'],
+                    capture['total_events'])
 
             # Frame-level scalar medians drive the representative-frame choice
             # and the collage only. Partial by design: an estimator with no
@@ -639,7 +593,8 @@ class TargetDistanceBenchmarkRunner(Node):
                 self.selected_estimators,
                 scalar_medians,
             )
-            box_annotations = self.build_box_annotations(representative_event, gt_instances)
+            box_annotations = build_box_annotations(
+                representative_event, gt_instances, self.selected_estimators)
             image_path = self.save_trial_collage(
                 trial_id,
                 representative_event,
@@ -647,16 +602,22 @@ class TargetDistanceBenchmarkRunner(Node):
                 gt_instances[0].distance_m,
                 box_annotations,
                 len(scene_score.detector_missed),
-                self.dominant_miss_reasons(capture['status_histogram'], scalar_medians),
+                dominant_miss_reasons(
+                    self.selected_estimators,
+                    capture['status_histogram'],
+                    scalar_medians,
+                ),
             )
 
             self.log_trial(
                 trial_id, scalar_medians, gt_instances[0].distance_m,
                 len(usable_events), image_path,
                 len(scene_score.detector_missed), scene_score.extra_count)
-            return self.build_trial_result(
-                trial, scene, gt_instances, scene_score, usable_by_estimator, image_path,
-                capture['status_histogram'], capture['total_events'])
+            return build_trial_result(
+                trial, scene, gt_instances, scene_score,
+                self.selected_estimators, self.estimator_display_names,
+                usable_by_estimator, image_path, capture['status_histogram'],
+                capture['total_events'])
         except Exception as exc:
             self.get_logger().error(f'{trial_id} failed: {exc}')
             return None
@@ -678,140 +639,8 @@ class TargetDistanceBenchmarkRunner(Node):
             self.active_truth = None
             self.active_trial_id = ''
 
-        usable_by_estimator = usable_events_by_estimator(
+        return summarize_capture_events(
             self.capture_events, self.selected_estimators)
-        return {
-            'total_events': len(self.capture_events),
-            # Whether the detector produced ANY detection this window, which
-            # separates "nothing was there to measure" from "the estimators
-            # could not measure what was there".
-            'any_detected': any(
-                event.detected for event in self.capture_events.values()),
-            'usable_by_estimator': usable_by_estimator,
-            'usable_events': union_usable_events(usable_by_estimator),
-            'status_histogram': compute_status_histogram(
-                self.capture_events, self.selected_estimators),
-        }
-
-    def build_trial_result(
-        self,
-        trial: dict[str, Any],
-        scene: Scene,
-        gt_instances: list[GtInstance],
-        scene_score: SceneScore,
-        usable_by_estimator: dict[str, list],
-        image_path: str,
-        status_histogram: dict[str, dict[int, int]],
-        frames_captured: int,
-    ) -> dict[str, Any]:
-        """One row per (instance, estimator), scored or not.
-
-        A miss keeps its row with null estimate/error columns, its ``outcome``
-        naming which of the four it was, and -- for ``no_value`` -- the dominant
-        ``miss_reason`` behind it. The failure stays attached to the scene that
-        caused it instead of collapsing into a run-level count.
-        """
-
-        rows: dict[str, list[dict[str, Any]]] = {
-            estimator: [] for estimator in self.selected_estimators}
-        for gt in gt_instances:
-            medians = scene_score.medians.get(gt.index, {})
-            outcomes = scene_score.outcomes.get(gt.index, {})
-            for estimator in self.selected_estimators:
-                estimate = medians.get(estimator)
-                if estimate is not None:
-                    abs_error = abs(estimate - gt.distance_m)
-                    rel_error = abs_error / gt.distance_m if gt.distance_m > 0.0 else None
-                else:
-                    abs_error = None
-                    rel_error = None
-                outcome = outcomes.get(estimator, OUTCOME_DETECTOR_MISS)
-                # A MissReason only exists for no_value (the estimator's own
-                # node reported why). gate_miss and detector_miss are already
-                # fully described by the outcome itself.
-                miss_reason = (
-                    dominant_miss_reason(status_histogram.get(estimator))
-                    if outcome == OUTCOME_NO_VALUE else None
-                )
-                rows[estimator].append({
-                    'trial_id': trial['trial_id'],
-                    'repeat_index': trial['repeat_index'],
-                    'scene_id': scene.id,
-                    'instance_index': gt.index,
-                    'spawn_world_x': gt.world_x,
-                    'spawn_world_y': gt.world_y,
-                    'spawn_yaw_rad': scene.robots[gt.index].yaw,
-                    'true_forward_m': gt.forward_m,
-                    'true_lateral_m': gt.lateral_m,
-                    'true_distance_m': gt.distance_m,
-                    'estimator': self.estimator_display_names[estimator],
-                    'outcome': outcome,
-                    'miss_reason': miss_reason,
-                    'trial_estimate_m': estimate,
-                    'abs_error_m': abs_error,
-                    'rel_error': rel_error,
-                    'usable_aligned_events': len(usable_by_estimator.get(estimator, [])),
-                    'frames_captured': frames_captured,
-                    'image_path': image_path,
-                })
-
-        return {
-            'rows': rows,
-            'missed_count': len(scene_score.detector_missed),
-            'outcome_counts': {
-                estimator: scene_score.outcome_counts(estimator)
-                for estimator in self.selected_estimators
-            },
-            'extra_count': scene_score.extra_count,
-        }
-
-    def build_box_annotations(
-        self,
-        representative_event,
-        gt_instances: list[GtInstance],
-    ) -> list[dict | None]:
-        """Map each box in the representative frame to its ground-truth instance.
-
-        Sensor-only association on the one displayed frame, purely for the
-        collage labels (``#i e<est>/t<true>``). Unmatched boxes stay ``None`` and
-        render as ``extra``.
-        """
-
-        instances = [
-            build_display_instance_estimate(detection, index, self.selected_estimators)
-            for index, detection in enumerate(representative_event.detections)
-        ]
-        gt_points = [
-            GtPoint(index=gt.index, forward_m=gt.forward_m, lateral_m=gt.lateral_m,
-                    distance_m=gt.distance_m)
-            for gt in gt_instances
-        ]
-        assignment = assign_to_ground_truth(instances, gt_points)
-        true_by_gt = {gt.index: gt.distance_m for gt in gt_instances}
-        annotations: list[dict | None] = [None] * len(representative_event.detections)
-        for gt_index, det_index in assignment.matches:
-            annotations[det_index] = {
-                'instance_index': gt_index,
-                'true_distance_m': true_by_gt[gt_index],
-            }
-        return annotations
-
-    def dominant_miss_reasons(
-        self,
-        status_histogram: dict[str, dict[int, int]],
-        trial_medians: dict[str, float],
-    ) -> dict[str, str]:
-        """For estimators with no median this trial: the most frequent non-OK
-        reason from the capture window, for the collage panel."""
-
-        reasons: dict[str, str] = {}
-        for estimator in self.selected_estimators:
-            if estimator in trial_medians:
-                continue
-            reason = dominant_miss_reason(status_histogram.get(estimator))
-            if reason is not None:
-                reasons[estimator] = reason
-        return reasons
 
     def save_trial_collage(
         self,
@@ -841,48 +670,12 @@ class TargetDistanceBenchmarkRunner(Node):
     def clear_preview_buffers(self) -> None:
         self.color_preview_buffer.clear()
 
-    def store_buffered_preview(
-        self,
-        preview_buffer: OrderedDict[int, Any],
-        stamp_ns: int,
-        preview,
-    ) -> None:
-        preview_buffer[stamp_ns] = preview
-        preview_buffer.move_to_end(stamp_ns)
-        while len(preview_buffer) > PREVIEW_BUFFER_LIMIT:
-            preview_buffer.popitem(last=False)
-
     def backfill_previews_from_buffers(self) -> None:
         if not self.capture_active:
             return
 
         for event in self.capture_events.values():
-            self.attach_buffered_previews(event)
-
-    def attach_buffered_previews(self, event) -> None:
-        self.apply_preview_match(
-            event,
-            'color',
-            find_exact_preview_match(self.color_preview_buffer, event.stamp_ns),
-        )
-
-    def apply_preview_match(self, event, prefix: str, match) -> None:
-        setattr(event.preview, f'{prefix}_nearest_stamp_ns', match.nearest_stamp_ns)
-        setattr(event.preview, f'{prefix}_nearest_delta_ms', match.nearest_delta_ms)
-
-        if match.image_bgr is None or match.matched_stamp_ns is None:
-            return
-
-        preview_attribute = f'{prefix}_bgr'
-        stamp_attribute = f'{prefix}_stamp_ns'
-        delta_attribute = f'{prefix}_delta_ms'
-        current_delta_ms = getattr(event.preview, delta_attribute)
-        if current_delta_ms is not None and match.matched_delta_ms is not None and current_delta_ms <= match.matched_delta_ms:
-            return
-
-        setattr(event.preview, preview_attribute, match.image_bgr)
-        setattr(event.preview, stamp_attribute, match.matched_stamp_ns)
-        setattr(event.preview, delta_attribute, match.matched_delta_ms)
+            attach_exact_preview(event, 'color', self.color_preview_buffer)
 
     def wait_for_required_streams(self) -> None:
         if self.needs_pointcloud:
@@ -927,54 +720,21 @@ class TargetDistanceBenchmarkRunner(Node):
     def compute_scene_ground_truth(
         self,
         robot_models: list[tuple[int, str, Any]],
-    ) -> list[GtInstance]:
+    ) -> list[GroundTruthInstance]:
         """Ground truth per spawned robot, from one pose snapshot.
 
         Truth is used here only to produce reference distances (and later the
         scoring assignment); it never reaches the estimators.
         """
 
-        snapshot = self.get_pose_snapshot()
-        robot_pose = snapshot.get(self.robot_model_name)
-        if robot_pose is None:
-            raise RuntimeError(
-                f'Robot pose "{self.robot_model_name}" not present on {self.pose_info_topic}')
-        robot_yaw = yaw_from_quaternion(
-            robot_pose['orientation']['x'],
-            robot_pose['orientation']['y'],
-            robot_pose['orientation']['z'],
-            robot_pose['orientation']['w'],
-        )
-
-        instances: list[GtInstance] = []
-        for index, model_name, _robot in robot_models:
-            target_pose = snapshot.get(model_name)
-            if target_pose is None:
-                raise RuntimeError(
-                    f'Target pose "{model_name}" not present on {self.pose_info_topic}')
-            dx_world = target_pose['position']['x'] - robot_pose['position']['x']
-            dy_world = target_pose['position']['y'] - robot_pose['position']['y']
-            forward_m, lateral_m, distance_m = planar_measurement_from_vehicle_front(
-                dx_world,
-                dy_world,
-                robot_yaw,
-            )
-            instances.append(GtInstance(
-                index=index,
-                model_name=model_name,
-                world_x=target_pose['position']['x'],
-                world_y=target_pose['position']['y'],
-                forward_m=forward_m,
-                lateral_m=lateral_m,
-                distance_m=distance_m,
-            ))
-        return instances
+        try:
+            return compute_ground_truth_instances(
+                self.get_pose_snapshot(), self.robot_model_name, robot_models)
+        except RuntimeError as exc:
+            raise RuntimeError(f'{exc} on {self.pose_info_topic}') from exc
 
     def object_model_sdf(self, model: str) -> str:
-        path = os.path.join(self.models_dir, model, 'model.sdf')
-        if not os.path.isfile(path):
-            raise RuntimeError(f'Object model "{model}" has no model.sdf at {path}')
-        return path
+        return model_sdf_path(self.models_dir, model)
 
     def spawn_scene(
         self,
@@ -1018,16 +778,8 @@ class TargetDistanceBenchmarkRunner(Node):
         z_m: float,
         yaw_rad: float,
     ) -> None:
-        command = [
-            '/opt/ros/jazzy/lib/ros_gz_sim/create',
-            '-world', self.world,
-            '-file', model_ref,
-            '-name', model_name,
-            '-x', f'{x_m:.6f}',
-            '-y', f'{y_m:.6f}',
-            '-z', f'{z_m:.6f}',
-            '-Y', f'{yaw_rad:.6f}',
-        ]
+        command = spawn_model_command(
+            self.world, model_ref, model_name, x_m, y_m, z_m, yaw_rad)
         deadline = time.monotonic() + POSE_WAIT_TIMEOUT_SEC
         last_error = None
         while time.monotonic() < deadline:
@@ -1045,15 +797,7 @@ class TargetDistanceBenchmarkRunner(Node):
 
     def despawn_model(self, model_name: str) -> None:
         deadline = time.monotonic() + DELETE_TIMEOUT_SEC
-        command = [
-            'gz',
-            'service',
-            '-s', f'/world/{self.world}/remove/blocking',
-            '--reqtype', 'gz.msgs.Entity',
-            '--reptype', 'gz.msgs.Boolean',
-            '--timeout', '5000',
-            '--req', f'name: "{model_name}" type: MODEL',
-        ]
+        command = despawn_model_command(self.world, model_name)
 
         while time.monotonic() < deadline:
             try:
@@ -1079,47 +823,13 @@ class TargetDistanceBenchmarkRunner(Node):
         self.get_logger().warn(f'Entity "{model_name}" was not removed before timeout.')
 
     def get_pose_snapshot(self) -> dict[str, dict[str, Any]]:
-        command = [
-            'gz',
-            'topic',
-            '-e',
-            '-t', self.pose_info_topic,
-            '--json-output',
-            '-n', '1',
-        ]
+        command = pose_snapshot_command(self.pose_info_topic)
         result = self.run_command(
             command,
             timeout_sec=COMMAND_TIMEOUT_SEC,
             description=f'read {self.pose_info_topic}',
         )
-        payload = self.extract_json_payload(result.stdout)
-        poses = payload.get('pose', [])
-        return {
-            pose['name']: self.normalize_pose(pose)
-            for pose in poses
-            if isinstance(pose, dict) and pose.get('name')
-        }
-
-    def normalize_pose(self, pose: dict[str, Any]) -> dict[str, Any]:
-        position = pose.get('position') or {}
-        orientation = pose.get('orientation') or {}
-        return {
-            **pose,
-            'position': {
-                'x': float(position.get('x', 0.0)),
-                'y': float(position.get('y', 0.0)),
-                'z': float(position.get('z', 0.0)),
-            },
-            'orientation': {
-                'x': float(orientation.get('x', 0.0)),
-                'y': float(orientation.get('y', 0.0)),
-                'z': float(orientation.get('z', 0.0)),
-                'w': float(orientation.get('w', 1.0)),
-            },
-        }
-
-    def extract_json_payload(self, text: str) -> dict[str, Any]:
-        return extract_json_payload(text)
+        return pose_snapshot_from_payload(extract_json_payload(result.stdout))
 
     def run_command(
         self,

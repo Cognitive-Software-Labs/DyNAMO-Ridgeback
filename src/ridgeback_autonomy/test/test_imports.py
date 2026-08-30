@@ -36,6 +36,8 @@ def test_packaged_modules_import() -> None:
         'ridgeback_autonomy.common.tf_utils',
         'ridgeback_autonomy.benchmarking.alignment',
         'ridgeback_autonomy.benchmarking.naming',
+        'ridgeback_autonomy.benchmarking.simulation',
+        'ridgeback_autonomy.benchmarking.trial_results',
         'ridgeback_autonomy.common.camera_inputs',
         'ridgeback_autonomy.perception.target_localization.core.depth_common',
         'ridgeback_autonomy.perception.target_localization.core.depth_sources',
@@ -140,6 +142,27 @@ def test_reusable_target_helpers_do_not_depend_on_node_orchestration() -> None:
 
     assert not violations, (
         'reusable target helpers must not import node orchestration: '
+        f'{violations}'
+    )
+
+
+def test_benchmark_domain_modules_do_not_depend_on_the_runner_node() -> None:
+    """Keep the benchmark runner as the top orchestration layer."""
+
+    benchmarking_root = PACKAGE_ROOT / 'benchmarking'
+    runner_module = (
+        'ridgeback_autonomy.benchmarking.target_distance_benchmark_runner_node')
+    violations = []
+    for path in sorted(benchmarking_root.glob('*.py')):
+        if path.name == 'target_distance_benchmark_runner_node.py':
+            continue
+        violations.extend(
+            f'{path.name}:{line} imports {runner_module}'
+            for line in _imports_from(path, runner_module)
+        )
+
+    assert not violations, (
+        'benchmark domain modules must stay below runner orchestration: '
         f'{violations}'
     )
 

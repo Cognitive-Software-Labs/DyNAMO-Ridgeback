@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from geometry_msgs.msg import PointStamped
+
 
 # How long a truth message stays displayable. The runner publishes only while a
 # capture window is open, so the gate is what makes the line disappear between
@@ -25,6 +27,20 @@ class TruthReading:
     forward_m: float
     distance_m: float
     trial_id: str
+
+
+def ground_truth_point_message(
+    true_pose: dict[str, float],
+    trial_id: str,
+) -> PointStamped:
+    """Pack x=lateral, y=forward, z=distance for the display contract."""
+
+    msg = PointStamped()
+    msg.header.frame_id = trial_id
+    msg.point.x = float(true_pose['lateral_m'])
+    msg.point.y = float(true_pose['forward_m'])
+    msg.point.z = float(true_pose['distance_m'])
+    return msg
 
 
 def truth_reading(msg, now_nanoseconds: int, max_age_s: float = TRUTH_MAX_AGE_S):

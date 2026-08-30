@@ -66,6 +66,22 @@ def union_usable_events(
     return sorted(seen.values(), key=lambda event: event.stamp_ns)
 
 
+def summarize_capture_events(
+    events: dict,
+    selected_estimators: tuple[str, ...],
+) -> dict:
+    """Reduce a completed capture window to the runner's immutable summary."""
+
+    usable_by_estimator = usable_events_by_estimator(events, selected_estimators)
+    return {
+        'total_events': len(events),
+        'any_detected': any(event.detected for event in events.values()),
+        'usable_by_estimator': usable_by_estimator,
+        'usable_events': union_usable_events(usable_by_estimator),
+        'status_histogram': compute_status_histogram(events, selected_estimators),
+    }
+
+
 def compute_status_histogram(
     events: dict,
     selected_estimators: tuple[str, ...],

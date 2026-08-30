@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from collections import OrderedDict
 
 import numpy as np
 import pytest
@@ -8,8 +9,10 @@ import pytest
 from ridgeback_autonomy.benchmarking.alignment import (
     EventPreview,
     MeasurementEvent,
+    attach_exact_preview,
     ensure_measurement_event,
     find_exact_preview_match,
+    store_buffered_preview,
     update_measurement_event,
 )
 from ridgeback_autonomy.perception.target_localization.estimator_registry import (
@@ -22,8 +25,12 @@ from ridgeback_autonomy.benchmarking.naming import (
     benchmark_display_name,
     benchmark_output_name,
 )
-from ridgeback_autonomy.benchmarking.target_distance_benchmark_runner_node import (
+from ridgeback_autonomy.benchmarking.process_utils import (
     extract_json_payload,
+    format_commit,
+    git_provenance,
+)
+from ridgeback_autonomy.perception.target_localization.ground_truth import (
     ground_truth_point_message,
 )
 from ridgeback_autonomy.benchmarking.reduction import (
@@ -145,27 +152,21 @@ def test_trial_rows_use_exactly_the_declared_csv_columns(tmp_path) -> None:
     # whose DictWriter raises on any key missing from TRIAL_CSV_COLUMNS. Without
     # this guard a stale column name only surfaces on the first real sim run,
     # after the whole grid has been spawned.
-    from types import SimpleNamespace
-
-    from ridgeback_autonomy.benchmarking.target_distance_benchmark_runner_node import (
-        TargetDistanceBenchmarkRunner,
-        GtInstance,
-    )
     from ridgeback_autonomy.benchmarking.scenarios import RobotSpec, Scene
     from ridgeback_autonomy.benchmarking.scoring import OUTCOME_SCORED, SceneScore
+    from ridgeback_autonomy.benchmarking.simulation import GroundTruthInstance
     from ridgeback_autonomy.benchmarking.summary import TRIAL_CSV_COLUMNS, write_trial_csv
+    from ridgeback_autonomy.benchmarking.trial_results import build_trial_result
 
-    runner = SimpleNamespace(
-        selected_estimators=('pointcloud',),
-        estimator_display_names={'pointcloud': 'Point Cloud'},
-    )
+    selected_estimators = ('pointcloud',)
+    display_names = {'pointcloud': 'Point Cloud'}
     scene = Scene(
         id='scene_a',
         robots=(RobotSpec(x=2.0, y=0.0, yaw=3.14),),
         objects=(),
         repeats_override=None,
     )
-    gt = GtInstance(
+    gt = GroundTruthInstance(
         index=0, model_name='bench_r0', world_x=2.0, world_y=0.0,
         forward_m=2.0, lateral_m=0.0, distance_m=2.0,
     )
@@ -176,10 +177,10 @@ def test_trial_rows_use_exactly_the_declared_csv_columns(tmp_path) -> None:
         extra_count=0,
     )
 
-    result = TargetDistanceBenchmarkRunner.build_trial_result(
-        runner,
+    result = build_trial_result(
         {'trial_id': 'scene_a_rep1', 'repeat_index': 1},
-        scene, [gt], score, {'pointcloud': []}, '/tmp/x.png',
+        scene, [gt], score, selected_estimators, display_names,
+        {'pointcloud': []}, '/tmp/x.png',
         {'pointcloud': {}}, 20,
     )
 
@@ -199,25 +200,19 @@ def test_trial_rows_use_exactly_the_declared_csv_columns(tmp_path) -> None:
 def test_no_value_miss_row_carries_its_reason(tmp_path) -> None:
     # The point of the miss_reason column: a failure stays attached to the scene
     # that caused it, instead of only existing in a run-level histogram.
-    from types import SimpleNamespace
-
-    from ridgeback_autonomy.benchmarking.target_distance_benchmark_runner_node import (
-        TargetDistanceBenchmarkRunner,
-        GtInstance,
-    )
     from ridgeback_autonomy.benchmarking.scenarios import RobotSpec, Scene
     from ridgeback_autonomy.benchmarking.scoring import OUTCOME_NO_VALUE, SceneScore
+    from ridgeback_autonomy.benchmarking.simulation import GroundTruthInstance
+    from ridgeback_autonomy.benchmarking.trial_results import build_trial_result
     from ridgeback_autonomy.common.miss_reason import MissReason
 
-    runner = SimpleNamespace(
-        selected_estimators=('polar_profiling',),
-        estimator_display_names={'polar_profiling': 'box-gated polar profiling'},
-    )
+    selected_estimators = ('polar_profiling',)
+    display_names = {'polar_profiling': 'box-gated polar profiling'}
     scene = Scene(
         id='scan_blocked', robots=(RobotSpec(x=3.0, y=0.0, yaw=3.14),),
         objects=(), repeats_override=None,
     )
-    gt = GtInstance(
+    gt = GroundTruthInstance(
         index=0, model_name='bench_r0', world_x=3.0, world_y=0.0,
         forward_m=3.0, lateral_m=0.0, distance_m=3.0,
     )
@@ -230,10 +225,10 @@ def test_no_value_miss_row_carries_its_reason(tmp_path) -> None:
     histogram = {'polar_profiling': {
         int(MissReason.UNSET): 12, int(MissReason.SCAN_INVALID): 8}}
 
-    result = TargetDistanceBenchmarkRunner.build_trial_result(
-        runner,
+    result = build_trial_result(
         {'trial_id': 'scan_blocked_rep1', 'repeat_index': 1},
-        scene, [gt], score, {'polar_profiling': []}, '', histogram, 20,
+        scene, [gt], score, selected_estimators, display_names,
+        {'polar_profiling': []}, '', histogram, 20,
     )
 
     row = result['rows']['polar_profiling'][0]
@@ -343,10 +338,6 @@ def test_runner_uses_explicit_run_dir_name_verbatim(tmp_path) -> None:
 
 
 def test_format_commit_makes_a_dirty_tree_impossible_to_miss() -> None:
-    from ridgeback_autonomy.benchmarking.target_distance_benchmark_runner_node import (
-        format_commit,
-    )
-
     dirty = format_commit({'commit': 'e1bdc17', 'branch': 'main', 'dirty_count': 23})
     assert '23 uncommitted file(s)' in dirty
     # The hash alone would imply a reproducibility that does not exist.
@@ -361,10 +352,6 @@ def test_format_commit_makes_a_dirty_tree_impossible_to_miss() -> None:
 
 
 def test_git_provenance_survives_a_non_repository() -> None:
-    from ridgeback_autonomy.benchmarking.target_distance_benchmark_runner_node import (
-        git_provenance,
-    )
-
     # Bookkeeping must never take a benchmark down with it.
     provenance = git_provenance('/')
 
@@ -373,10 +360,6 @@ def test_git_provenance_survives_a_non_repository() -> None:
 
 
 def format_commit_is_unknown(provenance) -> bool:
-    from ridgeback_autonomy.benchmarking.target_distance_benchmark_runner_node import (
-        format_commit,
-    )
-
     return format_commit(provenance) == 'unknown'
 
 
@@ -467,6 +450,57 @@ def test_find_exact_preview_match_uses_only_exact_stamp() -> None:
     assert unmatched.matched_stamp_ns is None
     assert unmatched.nearest_stamp_ns == 100_000_000
     assert unmatched.nearest_delta_ms == pytest.approx(50.0, rel=1e-6)
+
+
+def test_preview_buffer_is_bounded_without_weakening_exact_stamp_matching() -> None:
+    previews = OrderedDict()
+    first = np.full((2, 2, 3), 1, dtype=np.uint8)
+    second = np.full((2, 2, 3), 2, dtype=np.uint8)
+    third = np.full((2, 2, 3), 3, dtype=np.uint8)
+    store_buffered_preview(previews, 100, first, limit=2)
+    store_buffered_preview(previews, 200, second, limit=2)
+    store_buffered_preview(previews, 300, third, limit=2)
+
+    assert list(previews) == [200, 300]
+    event = MeasurementEvent(
+        key=('exact',), stamp_ns=300, detected=True, count=0, bboxes=(),
+        image_width=2, image_height=2, preview=EventPreview())
+    attach_exact_preview(event, 'color', previews)
+    assert event.preview.color_bgr is third
+
+    unmatched = MeasurementEvent(
+        key=('unmatched',), stamp_ns=301, detected=True, count=0, bboxes=(),
+        image_width=2, image_height=2, preview=EventPreview())
+    attach_exact_preview(unmatched, 'color', previews)
+    assert unmatched.preview.color_bgr is None
+    assert unmatched.preview.color_nearest_stamp_ns == 300
+
+
+def test_simulation_truth_uses_one_normalized_pose_snapshot() -> None:
+    from ridgeback_autonomy.benchmarking.simulation import (
+        compute_ground_truth_instances,
+        pose_snapshot_from_payload,
+    )
+
+    snapshot = pose_snapshot_from_payload({'pose': [
+        {
+            'name': 'robot',
+            'position': {},
+            'orientation': {'w': 1},
+        },
+        {
+            'name': 'target',
+            'position': {'x': 3.25},
+            'orientation': {'w': 1},
+        },
+    ]})
+    truth = compute_ground_truth_instances(
+        snapshot, 'robot', [(0, 'target', object())])[0]
+
+    assert truth.world_x == pytest.approx(3.25)
+    assert truth.forward_m == pytest.approx(3.0)
+    assert truth.lateral_m == pytest.approx(0.0)
+    assert truth.distance_m == pytest.approx(3.0)
 
 
 def test_usable_aligned_events_require_the_full_selected_estimator_set() -> None:
