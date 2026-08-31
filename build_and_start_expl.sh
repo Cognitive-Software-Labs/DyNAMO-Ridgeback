@@ -16,6 +16,8 @@ set +u
 source /opt/ros/jazzy/setup.bash
 set -u
 
-colcon build --symlink-install --base-paths "$SCRIPT_DIR/src"
+# An absolute log base also works when this helper is invoked outside the repo.
+colcon --log-base "${COLCON_LOG_PATH:-$SCRIPT_DIR/artifacts/colcon}" \
+    build --symlink-install --base-paths "$SCRIPT_DIR/src"
 
 exec bash "$SCRIPT_DIR/start_exploration.sh" "$WORLD" "$@"

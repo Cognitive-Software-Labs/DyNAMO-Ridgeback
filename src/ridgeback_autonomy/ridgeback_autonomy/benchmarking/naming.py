@@ -54,7 +54,7 @@ def scenario_slug(scenario_path: str) -> str:
 
     ``benchmark_scenarios_full.yaml`` -> ``full``; anything else keeps its
     stem. The shared prefix carries no information once it is inside a
-    ``benchmark-results`` folder, and dropping it keeps the name short enough
+    ``artifacts/benchmarks`` folder, and dropping it keeps the name short enough
     to read at a glance.
     """
 

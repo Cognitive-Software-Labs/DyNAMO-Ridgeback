@@ -17,7 +17,7 @@ the standalone helpers. The two never mix silently: ``as_mask_region`` and
 ``MaskRegion.to_mask`` are the only crossings, and production never converts a
 region back to full-grid between stages.
 
-See ``object_localization_documentation/mask_component.md``. This component is
+See ``docs/localization/mask_component.md``. This component is
 deliberately standalone -- no ROS or OpenCV dependency -- but its output *is*
 consumed by all three coordinate paths (depth-image, point-cloud, LiDAR). The
 two depth paths fork on the precision tag; polar profiling does not, because

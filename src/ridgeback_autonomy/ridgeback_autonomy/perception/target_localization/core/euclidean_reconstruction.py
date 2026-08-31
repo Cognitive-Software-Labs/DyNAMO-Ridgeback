@@ -1,10 +1,10 @@
-"""Euclidean reconstruction -- deproject-then-aggregate (``euclidean_reconstruction.md``).
+"""Euclidean reconstruction -- deproject-then-aggregate (``docs/localization/euclidean_reconstruction.md``).
 
 The point-domain localization path: deproject the valid masked pixels of the
 aligned depth frame into camera-optical-frame points, isolate the foreground
 in the point domain, and reduce the survivors to one coordinate. The
 deprojected cloud is the canonical input -- the published cloud topic is
-never consumed (provenance decision of ``pointcloud_provenance_test.md``).
+never consumed (provenance decision of ``docs/history/pointcloud_provenance_test.md``).
 
 The isolate step is the only place the mask's ``tight | rect`` tag changes
 behavior: ``tight`` takes a statistical outlier pass (median +/- k*MAD on
@@ -24,7 +24,7 @@ The reduced coordinate is the centroid of the foreground points; the
 published distance is derived from that coordinate downstream (planar
 projection into the base frame), so coordinate and distance stay
 self-consistent by resting on the same point. Runs per mask (1:1:1
-hierarchy, ``mask_component.md`` Section 6.1); a mask with too few valid
+hierarchy, ``docs/localization/mask_component.md`` Section 6.1); a mask with too few valid
 points is skipped by returning ``None``.
 """
 

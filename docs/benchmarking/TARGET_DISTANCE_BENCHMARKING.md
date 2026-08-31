@@ -16,13 +16,13 @@ The public benchmark interface uses these estimator names:
 - `polar_profiling`
 
 `pointcloud` reads the organized `PointCloud2` directly; the other three are the
-mask-based localization paths documented under `object_localization_documentation/`.
+mask-based localization paths documented under `docs/localization/`.
 
 ## Launch Interface
 
 Main entrypoint:
 
-- [src/ridgeback_autonomy/launch/target_distance_benchmark.launch.py](src/ridgeback_autonomy/launch/target_distance_benchmark.launch.py)
+- [src/ridgeback_autonomy/launch/target_distance_benchmark.launch.py](../../src/ridgeback_autonomy/launch/target_distance_benchmark.launch.py)
 
 Typical usage:
 
@@ -132,11 +132,11 @@ clean scene every ring lands within centimetres of the others.
 
 Default output root:
 
-- `<repo-root>/benchmark-results`
+- `<repo-root>/artifacts/benchmarks`
 
 Each run creates:
 
-- `<repo-root>/benchmark-results/<timestamp>_<scenario>[_<gate>][_<depth_source>]/`
+- `<repo-root>/artifacts/benchmarks/<timestamp>_<scenario>[_<gate>][_<depth_source>]/`
 
   e.g. `20260822_202851_v2_silhouette_stereoscopic`. The timestamp leads so the
   directory sorts chronologically; the gate and depth source appear only when a
@@ -198,7 +198,7 @@ commit, branch, `uncommitted_files`, scenario, scene/instance/trial counts), a
 entry per estimator carrying the accuracy aggregates, a nested `missed`
 breakdown, a nested `observations` group, and `reason_histogram` as a real
 mapping. Field-by-field meanings:
-[benchmark_v2_followups.md](object_localization_documentation/benchmark_v2_followups.md)
+[benchmark_v2_followups.md](benchmark_v2_followups.md)
 → Output reference.
 
 It replaced `comparison_summary.csv`, which duplicated most of `summary.md`
@@ -248,14 +248,14 @@ Every panel shows:
 
 ## Main Implementation Files
 
-- [src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/target_distance_benchmark_runner_node.py](src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/target_distance_benchmark_runner_node.py)
-- [src/ridgeback_autonomy/ridgeback_autonomy/perception/target_localization/estimator_registry.py](src/ridgeback_autonomy/ridgeback_autonomy/perception/target_localization/estimator_registry.py)
-- [src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/alignment.py](src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/alignment.py)
-- [src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/reduction.py](src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/reduction.py)
-- [src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/rendering.py](src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/rendering.py)
-- [src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/summary.py](src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/summary.py)
-- [src/ridgeback_autonomy/ridgeback_autonomy/perception/target_localization/pointcloud_measurement_node.py](src/ridgeback_autonomy/ridgeback_autonomy/perception/target_localization/pointcloud_measurement_node.py)
-- [src/ridgeback_autonomy/ridgeback_autonomy/perception/target_localization/mask_measurement_node.py](src/ridgeback_autonomy/ridgeback_autonomy/perception/target_localization/mask_measurement_node.py)
+- [src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/target_distance_benchmark_runner_node.py](../../src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/target_distance_benchmark_runner_node.py)
+- [src/ridgeback_autonomy/ridgeback_autonomy/perception/target_localization/estimator_registry.py](../../src/ridgeback_autonomy/ridgeback_autonomy/perception/target_localization/estimator_registry.py)
+- [src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/alignment.py](../../src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/alignment.py)
+- [src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/reduction.py](../../src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/reduction.py)
+- [src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/rendering.py](../../src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/rendering.py)
+- [src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/summary.py](../../src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/summary.py)
+- [src/ridgeback_autonomy/ridgeback_autonomy/perception/target_localization/pointcloud_measurement_node.py](../../src/ridgeback_autonomy/ridgeback_autonomy/perception/target_localization/pointcloud_measurement_node.py)
+- [src/ridgeback_autonomy/ridgeback_autonomy/perception/target_localization/mask_measurement_node.py](../../src/ridgeback_autonomy/ridgeback_autonomy/perception/target_localization/mask_measurement_node.py)
 
 ## Practical Notes
 

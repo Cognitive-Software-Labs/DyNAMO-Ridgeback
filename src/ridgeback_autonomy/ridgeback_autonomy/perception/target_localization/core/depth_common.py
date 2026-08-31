@@ -3,7 +3,7 @@
 Three of them, all deliberately independent of which localization path is
 calling:
 
-- ``valid_depth`` -- the clean rule (``projective_ranging.md`` Section 2.2,
+- ``valid_depth`` -- the clean rule (``docs/localization/projective_ranging.md`` Section 2.2,
   applied verbatim by euclidean reconstruction): ``0`` means no depth return,
   ``NaN``/``inf`` are undefined, and values past a sane maximum are far-field
   noise.

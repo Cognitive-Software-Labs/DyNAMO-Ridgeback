@@ -4,10 +4,10 @@
 frame into 3D points, selects the points under the mask, isolates the
 foreground in the point domain, and reduces the surviving points to one
 coordinate. This document describes euclidean reconstruction end to end. The mask contract is
-`mask_component.md`; the aligned depth frame contract is `aligned_depth.md`;
+`docs/localization/mask_component.md`; the aligned depth frame contract is `docs/localization/aligned_depth.md`;
 the 3D foreground-isolation methods are catalogued in
-`foreground_isolation_3d.md`; projective ranging, the cheaper image-domain sibling, is
-`projective_ranging.md`.
+`docs/localization/foreground_isolation_3d.md`; projective ranging, the cheaper image-domain sibling, is
+`docs/localization/projective_ranging.md`.
 
 ---
 
@@ -16,16 +16,16 @@ the 3D foreground-isolation methods are catalogued in
 **Inputs**
 
 - A **mask** from the mask interface: a boolean selector on the RGB color
-  grid, plus its precision tag (`tight` | `rect`). See `mask_component.md`.
+  grid, plus its precision tag (`tight` | `rect`). See `docs/localization/mask_component.md`.
 - An **aligned depth frame** (canonical input): 1:1 with the RGB pixels, from
-  either depth source (`aligned_depth.md`). Euclidean reconstruction builds its own point
+  either depth source (`docs/localization/aligned_depth.md`). Euclidean reconstruction builds its own point
   cloud from it — see the provenance note below.
 
 **Output**
 
 - One coordinate `(X, Y, Z)` in the **camera optical frame**, per mask (the
   downstream `base_link` planar conversion is fixed —
-  `object_localization_pipeline.md` Section 7). Unlike
+  `docs/localization/object_localization_pipeline.md` Section 7). Unlike
   projective ranging, euclidean reconstruction also has the full foreground point set available as a
   by-product (extent, orientation, footprint) if a later consumer wants it.
 
@@ -38,7 +38,7 @@ per frame.
 
 A **published** organized cloud (sim: gz `rgbd_camera` plugin; real: the
 driver's pointcloud filter) also exists, but it is **not a euclidean reconstruction input** —
-this was tested and decided 2026-07-11 (`pointcloud_provenance_test.md` §6–7):
+this was tested and decided 2026-07-11 (`docs/history/pointcloud_provenance_test.md` §6–7):
 accuracy bit-identical, masked deprojection ~10× cheaper than parsing the
 cloud, wire cost 6× against the published cloud, and on real hardware the
 published cloud lives on the depth grid where the mask cannot index it. The
@@ -83,7 +83,7 @@ Two implementation notes:
   (`~5–20 k` instead of `H×W`), which is the form production code should use.
   The full-frame form exists for debugging and RViz export.
 - **Where the ROI stops.** The mask *selection* is read off the mask's own
-  storage window (`mask_component.md` Section 7), but the deprojection is not:
+  storage window (`docs/localization/mask_component.md` Section 7), but the deprojection is not:
   the surviving indices are lifted to full-grid coordinates and gathered from
   the original depth frame against the original color intrinsics. There are no
   ROI-adjusted intrinsics. `deproject_masked` gathers the selected depths
@@ -91,7 +91,7 @@ Two implementation notes:
   frame this way without casting it.
 
 Invalid depth pixels (0 / NaN / inf — see the cleaning rules in
-`projective_ranging.md` §2.2, which apply verbatim) must be dropped either before
+`docs/localization/projective_ranging.md` §2.2, which apply verbatim) must be dropped either before
 deprojection or carried as invalid points and dropped in step 3; they must
 never reach the reduction.
 
@@ -107,7 +107,7 @@ points_masked = points[mask]   # (N, 3) — the box frustum's points
 The same grid precondition applies: mask and cloud must share resolution,
 intrinsics, and alignment. With deprojection this holds by construction —
 one of the reasons the published cloud was rejected as an input
-(`pointcloud_provenance_test.md` §7: on real hardware it lives on the depth
+(`docs/history/pointcloud_provenance_test.md` §7: on real hardware it lives on the depth
 grid, not the color grid).
 
 ### 2.3 Isolate — the mask-tag fork
@@ -130,7 +130,7 @@ and whatever background falls inside the box. Selecting by mask only cuts the
 frustum — everything inside it survives, so the foreground must be isolated in
 the point domain. The methods — from the extrinsic height crop and the
 range-band incumbent up to min-cut and learned segmentation — are catalogued
-with pros, cons, and citations in `foreground_isolation_3d.md`. The contract
+with pros, cons, and citations in `docs/localization/foreground_isolation_3d.md`. The contract
 is the same shape as projective ranging's:
 
 - **Input:** the masked point set (organized where possible, so pixel indices
@@ -142,13 +142,13 @@ normal filter) followed by a background-separator (range band or Euclidean
 clustering) makes a complete isolator.
 
 **Placement alternative.** Isolation can instead run in 2D *before*
-deprojection: apply a `foreground_isolation_2d.md` recipe to the depth frame +
+deprojection: apply a `docs/localization/foreground_isolation_2d.md` recipe to the depth frame +
 mask, then deproject only the returned foreground pixels. That placement
 shares one isolation implementation with projective ranging and deprojects fewer pixels;
 the 3D placement exploits geometry the 2D methods cannot express (the floor is
 a plane in 3D but a mode-less ramp in the depth histogram). The two placements
 are a swap point of the benchmark matrix, and they compose — 2D coarse, 3D
-fine. See the cross-route comparison in `foreground_isolation_3d.md`'s
+fine. See the cross-route comparison in `docs/localization/foreground_isolation_3d.md`'s
 evaluation protocol.
 
 ### 2.4 Reduce
@@ -170,7 +170,7 @@ Collapse the foreground point set to the single output:
 ## 3. Batch / per-mask granularity
 
 Euclidean reconstruction runs **per mask** over shared per-frame work, with the same 1:1:1
-hierarchy as projective ranging (`mask_component.md` §6.1): one object → one post-NMS
+hierarchy as projective ranging (`docs/localization/mask_component.md` §6.1): one object → one post-NMS
 detection → one mask → one coordinate, masks never compared or merged. The
 cost split:
 
@@ -182,7 +182,7 @@ cost split:
 
 With masked-only deprojection the per-mask cost scales with the box area, not
 the frame area. Results are packed into the same parallel, index-aligned
-arrays as projective ranging's (`mask_component.md` Section 6); results are never merged
+arrays as projective ranging's (`docs/localization/mask_component.md` Section 6); results are never merged
 across masks.
 
 ---
@@ -199,7 +199,7 @@ across masks.
   from the foreground set.
 - **Cost:** deprojection of the masked pixels (sub-millisecond with the ray
   table) plus the isolation method's own runtime (see the speed column in
-  `foreground_isolation_3d.md`). The heavier isolation methods, not the
+  `docs/localization/foreground_isolation_3d.md`). The heavier isolation methods, not the
   deprojection, dominate.
 
 Projective ranging stays the default cheap path; euclidean reconstruction is the escalation when projective ranging's
@@ -217,14 +217,14 @@ three differences the shipped path resolves:
 
 | Aspect | Legacy estimator | euclidean reconstruction (shipped) |
 |--------|-------------------|---------------|
-| Cloud provenance | subscribes the published cloud topic | deprojects the aligned depth (published cloud dropped — `pointcloud_provenance_test.md` §7) |
+| Cloud provenance | subscribes the published cloud topic | deprojects the aligned depth (published cloud dropped — `docs/history/pointcloud_provenance_test.md` §7) |
 | Region | focus crop of the bbox | the actual mask, forked on tag |
-| Isolation | range band (25th-percentile anchor, −0.10/+0.35 m window) | pluggable strategy (`foreground_isolation_3d.md`; range band = incumbent) |
+| Isolation | range band (25th-percentile anchor, −0.10/+0.35 m window) | pluggable strategy (`docs/localization/foreground_isolation_3d.md`; range band = incumbent) |
 | Output | nearest-inlier scalar range, vehicle frame, front offset applied | `(X, Y, Z)` centroid in the camera frame |
 
 The `pointcloud` estimator compared against here is also stereo-only and
 sim-only in practice (no cloud is published on hardware today; see
-`pointcloud_provenance_test.md` §1). It is the one legacy row that survives. Euclidean
+`docs/history/pointcloud_provenance_test.md` §1). It is the one legacy row that survives. Euclidean
 reconstruction generalizes it the same way projective ranging generalizes the
 depth estimator: mask instead of crop, tag fork, pluggable isolation,
 camera-frame coordinate output.
@@ -247,19 +247,19 @@ camera-frame coordinate output.
   percentile-anchored `RangeBand` chain, whose anchor is only correct while the
   object is the nearest quarter of the point set and which was held inside that
   regime by the depth gate rather than by anything in the recipe
-  (`foreground_isolation_3d.md` §2). Benchmarking the recipes against each
+  (`docs/localization/foreground_isolation_3d.md` §2). Benchmarking the recipes against each
   other stays open — the swap is unmeasured on real scenes.
 - **Isolation placement** — 2D-before-deprojection vs. 3D-after: benchmark the
-  swap point (`foreground_isolation_3d.md`, evaluation protocol step 4).
+  swap point (`docs/localization/foreground_isolation_3d.md`, evaluation protocol step 4).
 - ~~**Provenance decision**~~ — resolved 2026-07-11: deprojected only; the
-  published cloud is demoted to RViz/debug (`pointcloud_provenance_test.md` §7).
+  published cloud is demoted to RViz/debug (`docs/history/pointcloud_provenance_test.md` §7).
 - ~~**Sparse-mask fallback**~~ — resolved 2026-07-21: skip —
   `localize_euclidean_reconstruction` returns `None` when too few valid points
   survive isolation, so the benchmark drops the row (never substituted). Any
   defer-to-projective-ranging / polar-profiling routing is a production-pipeline
   consumer concern, not the estimator's.
 - ~~**Coordinate frame**~~ — resolved 2026-07-24, same basis as projective ranging
-  (`projective_ranging.md` §7, deferring to `object_localization_pipeline.md` Section 7):
+  (`docs/localization/projective_ranging.md` §7, deferring to `docs/localization/object_localization_pipeline.md` Section 7):
   euclidean reconstruction and projective ranging share `deproject_*` +
   `optical_to_base_planar`, so the frame confirmation is identical for both. Two
   parts: (1) the downstream camera-optical → `base_link` conversion is fixed (full

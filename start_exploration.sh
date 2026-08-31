@@ -45,11 +45,14 @@ set -u
 
 bash "$SCRIPT_DIR/cleanup.sh"
 
-# Timestamped, non-clobbering log: one file per launch so a stalled session
-# can be reviewed after the fact instead of being overwritten by the next run.
-LOG_DIR="${LOG_DIR:-$SCRIPT_DIR/logs}"
+# One non-clobbering directory per launch, with console and ROS logs together.
+# LOG_DIR overrides the exploration output root; ROS_LOG_DIR remains independent.
+LOG_DIR="${LOG_DIR:-$SCRIPT_DIR/artifacts/exploration}"
 mkdir -p "$LOG_DIR"
-LOG_FILE="$LOG_DIR/ridgeback_$(date +%Y-%m-%d_%H-%M-%S)_${WORLD}_${EXPLORER}.log"
+RUN_LOG_DIR="$(mktemp -d "$LOG_DIR/ridgeback_$(date +%Y-%m-%d_%H-%M-%S)_${WORLD}_${EXPLORER}.XXXXXX")"
+LOG_FILE="$RUN_LOG_DIR/console.log"
+export ROS_LOG_DIR="${ROS_LOG_DIR:-$RUN_LOG_DIR/ros}"
+mkdir -p "$ROS_LOG_DIR"
 echo "Logging to $LOG_FILE"
 exec > >(tee "$LOG_FILE") 2>&1
 

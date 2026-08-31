@@ -43,7 +43,7 @@ region follows the object's true silhouette, which is recorded by the
 **precision tag** (`tight` | `rect`).
 
 The tight mask is described only briefly here (Section 4); its producer has
-its own document, `segmentation_component.md`. The remainder of this document
+its own document, `docs/localization/segmentation_component.md`. The remainder of this document
 describes the **rectangular mask** thoroughly, because it is the default mask
 produced from the detector (OWLv2).
 
@@ -158,7 +158,7 @@ uses an encoded form — see the wire-cost note in Section 5.3.
 ## 4. Tight mask
 
 The tight mask is the second front-end and is **not** detailed here — see
-`segmentation_component.md`. In short: a box-promptable segmentation model
+`docs/localization/segmentation_component.md`. In short: a box-promptable segmentation model
 (SlimSAM by default), prompted with the detector's boxes, produces a
 pixel-precise `True` region (an arbitrary blob, not a rectangle), tagged
 `tight`, with negligible background contamination. It emits into the identical
@@ -231,7 +231,7 @@ reconstructible at the consumer:
 - **Silhouette Mask panel (display the real artifact):** a tight mask is *not*
   reconstructible downstream, so the mask node publishes the union of the
   frame's consumed masks as a debug-only `mono8` Image on `debug/target/mask`
-  (`segmentation_component.md` §6) — silhouette gate only. The panel never
+  (`docs/localization/segmentation_component.md` §6) — silhouette gate only. The panel never
   shows substitute content: it renders the artifact whose stamp matches the
   rendered frame exactly (what downstream received), holding the most recent
   artifact when the current frame's mask has not landed yet (it lags the
@@ -397,7 +397,7 @@ around to a pixel on the far edge of the payload.
 Storage was previously one full-grid array per detection regardless of how small
 the detection was. For a production-sized box (~2% of frame) the region is
 roughly 50× smaller, at either 640×480 or 1280×720. The measured consequences,
-and the two cases that got slower, are recorded in `roi_mask_migration.md`.
+and the two cases that got slower, are recorded in `docs/history/roi_mask_migration.md`.
 
 ---
 
@@ -411,7 +411,7 @@ Resolved:
   2026-07-21: `Mask.__post_init__` (`perception/target_localization/core/mask.py`) enforces the
   2D-boolean array, and the precision tag is a real `MaskPrecision(str, Enum)`.
 - **Tight-mask front-end** — implemented and documented in
-  `segmentation_component.md` (box-prompted SlimSAM behind the `mask_gate`
+  `docs/localization/segmentation_component.md` (box-prompted SlimSAM behind the `mask_gate`
   parameter).
 - **Visualization data source** — per panel, see Section 5.3: the Box Mask
   panel derives the rect union at render time; the Silhouette Mask panel

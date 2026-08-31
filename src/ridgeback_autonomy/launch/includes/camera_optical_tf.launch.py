@@ -18,7 +18,7 @@ def generate_launch_description():
         ),
 
         # Simulation-only: publish the camera optical-frame TF that the RealSense driver
-        # provides on real hardware. See ISSUES.md "Camera Optical Frame TF in Simulation".
+        # provides on real hardware. See docs/ISSUES.md "Camera Optical Frame TF in Simulation".
         Node(
             package='tf2_ros',
             executable='static_transform_publisher',

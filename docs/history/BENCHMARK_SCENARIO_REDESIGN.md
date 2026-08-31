@@ -5,7 +5,7 @@ what it does, why, how it's built, how to run it, and how it was validated.
 
 ## 1. Motivation
 
-The original benchmark ([TARGET_DISTANCE_BENCHMARKING.md](TARGET_DISTANCE_BENCHMARKING.md))
+The original benchmark ([TARGET_DISTANCE_BENCHMARKING.md](../benchmarking/TARGET_DISTANCE_BENCHMARKING.md))
 spawned **one** G1 per trial on a hardcoded `5 forward × 3 lateral` grid, facing
 the robot, and scored only single-detection frames. The goal of this work was to
 vary the scene along several axes:
@@ -146,7 +146,7 @@ ros2 launch ridgeback_autonomy target_distance_benchmark.launch.py \
 
 Launch args: `scenario` (empty = packaged grid), `repeats`, `estimators`,
 `mask_gate` (`box`|`silhouette`), `depth_source`, `isolation_2d`/`isolation_3d`,
-`overlay`. Output → `benchmark-results/<timestamp>/` (per-estimator CSVs,
+`overlay`. Output → `artifacts/benchmarks/<timestamp>/` (per-estimator CSVs,
 `comparison_summary.csv` with `missed_instance_count`/`extra_detection_count`,
 `images/` collages). The runner exits when done but the launch stays up — Ctrl-C,
 then `bash cleanup.sh`.

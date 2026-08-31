@@ -26,6 +26,10 @@ from ridgeback_autonomy.benchmarking.process_utils import (
     try_command,
 )
 from ridgeback_autonomy.benchmarking.report import markdown_table
+from ridgeback_autonomy.benchmarking.paths import (
+    default_output_directory,
+    subprocess_log_environment,
+)
 from ridgeback_autonomy.benchmarking.scenarios import load_scenarios
 from ridgeback_autonomy.benchmarking.sweep import SweepConfig, SweepSpec, load_sweep
 from ridgeback_autonomy.benchmarking.sweep_report import load_json, write_sweep_report
@@ -531,7 +535,7 @@ def run_sweep(
 ) -> tuple[str, bool]:
     workspace_root = workspace_root_from_package_share(package_share)
     output_root = spec.defaults.get(
-        'output_dir', os.path.join(workspace_root, 'benchmark-results'))
+        'output_dir', default_output_directory(workspace_root))
     output_root = os.path.abspath(os.path.expanduser(output_root))
     os.makedirs(output_root, exist_ok=True)
 
@@ -560,6 +564,7 @@ def run_sweep(
             _environment_command(spec),
             stdin=subprocess.DEVNULL,
             start_new_session=True,
+            env=subprocess_log_environment(os.path.join(sweep_dir, 'environment')),
         )
         time.sleep(1.0)
         if environment.poll() is not None:
@@ -618,6 +623,7 @@ def run_sweep(
                 _config_command(arguments),
                 stdin=subprocess.DEVNULL,
                 start_new_session=True,
+                env=subprocess_log_environment(output_path),
             )
             trials = estimate_trials(config, default_scenario_path)
             timeout_sec = max(30.0 * 60.0, trials * TRIAL_WALL_TIME_SEC * 2.0 + 600.0)

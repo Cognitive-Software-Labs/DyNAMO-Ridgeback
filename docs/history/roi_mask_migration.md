@@ -2,11 +2,11 @@
 
 2026-08-31. Behaviour-preserving migration of the target-localization mask
 pipeline to one ROI-native representation. The contract itself is documented in
-`mask_component.md` Section 7; this file records what was proven and what was
+`docs/localization/mask_component.md` Section 7; this file records what was proven and what was
 measured.
 
 Scope note: this is a representation change. It does not close the exact-stamp
-depth-availability gap tracked in `refactor_validation.md`, and nothing here
+depth-availability gap tracked in `docs/history/refactor_validation.md`, and nothing here
 should be read as having done so.
 
 ## What changed
@@ -136,7 +136,7 @@ gate, headless. Artifacts (temporary, not checked in):
 `/tmp/dynamo-roi-smoke/box` and `/tmp/dynamo-roi-smoke/silhouette`.
 
 **Box gate reproduces the pre-migration benchmark exactly.** Baseline column is
-the pre-refactor run recorded in `refactor_validation.md`:
+the pre-refactor run recorded in `docs/history/refactor_validation.md`:
 
 | Estimator | MAE now (m) | Pre-migration MAE (m) | Δ | Scored |
 |---|---:|---:|---:|---|

@@ -1,14 +1,14 @@
 # Aligned Depth — Stamp-Matching Coverage in Sim
 
-**Scope:** why the two depth-based paths (`projective_ranging.md`,
-`euclidean_reconstruction.md`) report *no estimate* on most frames in
+**Scope:** why the two depth-based paths (`docs/localization/projective_ranging.md`,
+`docs/localization/euclidean_reconstruction.md`) report *no estimate* on most frames in
 simulation, even though depth is nominally available. This is a **timing /
-coverage** failure mode of the aligned-depth contract (`aligned_depth.md` §1,
+coverage** failure mode of the aligned-depth contract (`docs/localization/aligned_depth.md` §1,
 the "Timing" bullet), not an accuracy problem. The measurements below were
 taken 2026-07-24 on the `target_distance_calibration` world.
 
 The symptom surfaced through the benchmark's per-estimator miss-reason
-attribution (`object_localization_pipeline.md`): a box-gate run tallies the
+attribution (`docs/localization/object_localization_pipeline.md`): a box-gate run tallies the
 depth rows almost entirely as `NO_DEPTH_FRAME`.
 
 > **Resolved 2026-08-26 by option 1 (§6).** Depth acquisition now happens
@@ -161,7 +161,7 @@ With the producer keeping up, `{A}` ≈ the full stamp grid, `{D} ⊆ {A}`, and
 exact-stamp coverage approaches 100 %. **Exact-stamp matching is the correct
 choice there** — it is only pathological when a starved producer thins `{A}`.
 
-(The monocular Depth-Anything source, `aligned_depth.md` §3, *is* a genuine
+(The monocular Depth-Anything source, `docs/localization/aligned_depth.md` §3, *is* a genuine
 per-frame NN cost and would thin `{A}` on any host; it is a separate axis from
 this sim-contention finding.)
 
@@ -225,11 +225,11 @@ detections slot drops backlog — and should be unchanged by this work.
 
 ## 7. Cross-references
 
-- `aligned_depth.md` — the aligned-depth contract and its two sources; §1
+- `docs/localization/aligned_depth.md` — the aligned-depth contract and its two sources; §1
   "Timing" bullet is the invariant this document stresses.
-- `projective_ranging.md`, `euclidean_reconstruction.md` — the two consumers
+- `docs/localization/projective_ranging.md`, `docs/localization/euclidean_reconstruction.md` — the two consumers
   that report `NO_DEPTH_FRAME` together.
-- `polar_profiling.md` — the LiDAR path, at 100 % here because it matches the
+- `docs/localization/polar_profiling.md` — the LiDAR path, at 100 % here because it matches the
   scan within a tolerance window rather than on an exact stamp.
-- `object_localization_pipeline.md` — the benchmark and its per-estimator
+- `docs/localization/object_localization_pipeline.md` — the benchmark and its per-estimator
   miss-reason attribution, which surfaced this.

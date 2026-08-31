@@ -1,14 +1,14 @@
 # The Aligned Depth Frame — Depth Acquisition
 
 **Scope:** how the depth that the localization paths consume is produced. Both
-projective ranging (`projective_ranging.md`) and euclidean reconstruction (`euclidean_reconstruction.md`) consume one and the
+projective ranging (`docs/localization/projective_ranging.md`) and euclidean reconstruction (`docs/localization/euclidean_reconstruction.md`) consume one and the
 same artifact — the **aligned depth frame** — and neither cares how it was
 made. This document defines that contract and the two sources that satisfy
 it: the physical depth camera (`camera → aligned depth`) and monocular
 estimation (`RGB frame → aligned depth`). Both live in
 `perception/target_localization/core/depth_sources.py` and are pulled by
 `target_mask_measurement_node` at the detection stamp — there is no depth
-producer process (`aligned_depth_coverage.md` §6).
+producer process (`docs/history/aligned_depth_coverage.md` §6).
 
 ```
                  ┌───────────────────────────┐
@@ -31,13 +31,13 @@ An **aligned depth frame** is a depth image that satisfies:
 - **Grid:** `H×W` equal to the RGB color image; depth pixel `(u, v)` lies on
   the *same ray* as color pixel `(u, v)`. This is the property the mask
   interface depends on — masks are defined on the color grid
-  (`mask_component.md`), and both paths index depth (or points deprojected
+  (`docs/localization/mask_component.md`), and both paths index depth (or points deprojected
   from it) with the mask directly.
 - **Units:** metric depth in meters, float. (The RealSense driver natively
   publishes `16UC1` millimeters; conversion to float meters is part of the
   source, not the localization path.)
 - **Invalid pixels:** `0`, `NaN`, or `inf` mean "no depth here"; consumers
-  filter them (`projective_ranging.md` §2.2) and sources must not encode invalid
+  filter them (`docs/localization/projective_ranging.md` §2.2) and sources must not encode invalid
   as any other value.
 - **Usable ceiling:** every source declares `usable_max_m` — the farthest
   reading it can produce that still means something. This is a property of the
@@ -46,7 +46,7 @@ An **aligned depth frame** is a depth image that satisfies:
   The two answer different questions — "can this value be believed" versus "how
   much of the scene do we want to admit" — and the node cleans against the
   tighter of them. They were one 10 m constant until 2026-08-27; the cost of
-  that conflation is written up in `foreground_isolation_3d.md` §2.
+  that conflation is written up in `docs/localization/foreground_isolation_3d.md` §2.
 
   Only monocular declares a finite ceiling, and it *derives* it rather than
   naming it. Stereo declares none, as of 2026-08-28. There is no honest number
@@ -63,12 +63,12 @@ An **aligned depth frame** is a depth image that satisfies:
   node buffers the source's input stream raw and converts only the frame the
   detections were made on, so "the depth at stamp `T`" is a lookup into a
   buffer this process filled, not an intersection with another process's
-  thinning (`aligned_depth_coverage.md`).
+  thinning (`docs/history/aligned_depth_coverage.md`).
 
 Everything downstream — select, clean/isolate, aggregate, deproject — is
 identical regardless of which source made the frame. The depth source is a
 **strategy**: a config choice behind this one contract, and an axis of the
-benchmark matrix (`object_localization_pipeline.md` §8).
+benchmark matrix (`docs/localization/object_localization_pipeline.md` §8).
 
 ---
 
@@ -98,7 +98,7 @@ align. Consequences to design around:
   fine structure can shift by a pixel.
 - **Cost.** The align filter runs in the driver. It is the price of admission
   for every mask-based consumer, so for cost accounting it is a *sunk* cost —
-  see `pointcloud_provenance_test.md` §2.
+  see `docs/history/pointcloud_provenance_test.md` §2.
 - **Configured but unverified hardware path.** `clearpath/robot.yaml` now sets
   `align_depth.enable: true` and `enable_sync: true`; the repository's
   Clearpath parser test confirms both values survive into generated RealSense
@@ -119,7 +119,7 @@ on raw real depth. Routing *real* through the driver's align filter and *sim*
 straight through is a launch-wiring choice (`depth_topic`), not a code branch —
 `decode_depth_to_meters` accepts `16UC1`/`mono16`/`32FC1`, so both grids reach
 the same contract unchanged. Divergences to keep in mind (details in
-`object_localization_pipeline.md` §2):
+`docs/localization/object_localization_pipeline.md` §2):
 
 | | Sim | Real |
 |---|---|---|
@@ -142,7 +142,7 @@ subscribes to the **color** camera's `camera_info` directly and deprojects with
 it (resolved 2026-07-21; the republish hop went away with the producer node on
 2026-08-26). `grid_mismatch_warning` skips the frame's paths if that grid and
 the detection grid ever disagree. The provenance test self-calibrates as a
-cross-check (`pointcloud_provenance_test.md` §3).
+cross-check (`docs/history/pointcloud_provenance_test.md` §3).
 
 ---
 
@@ -195,12 +195,12 @@ or QoS settings, and never falls back to a nearest color frame.
   soft at depth discontinuities. The clean step passes almost everything; the
   burden shifts to the aggregate/isolate stage, and the benchmark rows differ
   accordingly (sim run of 2026-07-13: `sensor_depth` MAE 0.586 m vs.
-  `depth_anything` MAE 0.931 m; see `benchmark-results/` for the run summaries —
+  `depth_anything` MAE 0.931 m; see `artifacts/benchmarks/` for the run summaries —
   these figures may be superseded by a later run).
 - **No published cloud.** The monocular source produces only a depth image.
   euclidean reconstruction reaches it exclusively through in-code deprojection — the reason the
   deprojected provenance is euclidean reconstruction's canonical input
-  (`pointcloud_provenance_test.md`).
+  (`docs/history/pointcloud_provenance_test.md`).
 
 ---
 
@@ -292,4 +292,4 @@ which stream the node buffers raw and hands back at the detection stamp.
   acquisition moved into `target_mask_measurement_node`, which now buffers the
   source's input raw and converts at the detection stamp; the second thinning
   stage no longer exists. Diagnosis, profiling and the decision are in
-  `aligned_depth_coverage.md`.
+  `docs/history/aligned_depth_coverage.md`.

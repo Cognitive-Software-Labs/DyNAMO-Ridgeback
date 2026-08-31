@@ -42,6 +42,10 @@ from ridgeback_autonomy.benchmarking.naming import (
     benchmark_output_name,
     benchmark_run_folder_name,
 )
+from ridgeback_autonomy.benchmarking.paths import (
+    default_output_directory,
+    subprocess_log_environment,
+)
 from ridgeback_autonomy.benchmarking.reduction import (
     choose_representative_event,
     compute_trial_medians,
@@ -138,7 +142,7 @@ class TargetDistanceBenchmarkRunner(Node):
         # from this directory, not just the default output path.
         self.workspace_root = os.path.abspath(
             os.path.join(pkg_share, '..', '..', '..', '..'))
-        default_output_dir = os.path.join(self.workspace_root, 'benchmark-results')
+        default_output_dir = default_output_directory(self.workspace_root)
 
         self.declare_parameter('world', 'target_distance_calibration')
         self.declare_parameter('scenario', '')
@@ -245,9 +249,7 @@ class TargetDistanceBenchmarkRunner(Node):
         # summary's observation columns.
         self.status_aggregate: dict[str, dict[int, int]] = {}
 
-        self.command_env = os.environ.copy()
-        self.command_env.setdefault('ROS_LOG_DIR', '/tmp/ros_logs')
-        os.makedirs(self.command_env['ROS_LOG_DIR'], exist_ok=True)
+        self.command_env = subprocess_log_environment(self.run_output_dir)
 
         self.collage_renderer = BenchmarkCollageRenderer()
 

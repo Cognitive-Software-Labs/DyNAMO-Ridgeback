@@ -3,18 +3,18 @@
 A box-promptable segmenter (SAM family) prompted with the OWLv2 detection
 boxes -- one box prompt, one pixel-precise mask -- keeping the detector's
 open-vocabulary property and the 1:1:1 frame -> detection -> mask hierarchy
-(``mask_component.md`` Section 6). Blobs are returned on the **full color
+(``docs/localization/mask_component.md`` Section 6). Blobs are returned on the **full color
 grid**, which is this module's boundary; the consuming node crops each one to
 its own extent with ``region_from_blob(blob, MaskPrecision.TIGHT)`` and the
 frame-sized output expires there. This module returns plain arrays and knows
 nothing about producers or consumers, same as ``region_from_bbox`` on the rect
 side.
 
-Cost split (``mask_component.md`` Section 6): all boxes of a frame go through
+Cost split (``docs/localization/mask_component.md`` Section 6): all boxes of a frame go through
 **one** forward pass -- the image encoder runs once per frame, the prompt
 decoder once per box.
 
-See ``object_localization_documentation/segmentation_component.md``. Import
+See ``docs/localization/segmentation_component.md``. Import
 of this module is torch-free; the model libraries load lazily in
 ``SamBoxSegmenter.load()`` so the ``box`` gate never pays for them.
 """
@@ -29,7 +29,7 @@ import numpy as np
 from ridgeback_autonomy.perception.target_localization.core.detection import resolve_torch_device
 
 
-# Pinned by the Phase 0 spike (see segmentation_component.md): silhouette
+# Pinned by the Phase 0 spike (see docs/localization/segmentation_component.md): silhouette
 # fidelity on the G1's legs at benchmark distances, latency, and VRAM.
 SEGMENTATION_MODEL_DEFAULT = 'Zigeng/SlimSAM-uniform-50'
 
@@ -45,7 +45,7 @@ PROMPT_PADDING_REL_DEFAULT = 0.05
 # score high. So this drops low-quality/uncertain masks (which correlate with
 # bad prompt boxes) but will NOT catch a crisp wrong-object mask; full
 # correctness would need a depth-consistency or class check (out of scope).
-# Spike range for good G1 masks was 0.94-0.99 (segmentation_component.md). A
+# Spike range for good G1 masks was 0.94-0.99 (docs/localization/segmentation_component.md). A
 # conservative 0.5 default leaves headroom for real D435 imagery scoring below
 # sim -- a tunable knob, not a magic truth.
 SEGMENTATION_MIN_PREDICTED_IOU_DEFAULT = 0.5

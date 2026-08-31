@@ -22,7 +22,7 @@ class PrintLogger:
 
 
 def test_pinned_defaults() -> None:
-    # The Phase 0 spike pins (see segmentation_component.md); a change here is
+    # The Phase 0 spike pins (see docs/localization/segmentation_component.md); a change here is
     # a deliberate re-pin, not a drive-by.
     assert SEGMENTATION_MODEL_DEFAULT == 'Zigeng/SlimSAM-uniform-50'
     assert PROMPT_PADDING_REL_DEFAULT == 0.05

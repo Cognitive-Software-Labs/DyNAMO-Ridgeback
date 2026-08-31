@@ -1,12 +1,12 @@
 """2D foreground isolation recipes for projective ranging's ``rect`` branch.
 
-Contract (``projective_ranging.md`` Section 2.3): input the aligned depth frame and
+Contract (``docs/localization/projective_ranging.md`` Section 2.3): input the aligned depth frame and
 a mask, both ``H x W`` on the color grid; output the **foreground pixels** as
 an ``H x W`` boolean array -- always a subset of the valid masked pixels. An
 empty (all-``False``) result is allowed and means the recipe found no
 foreground.
 
-Each recipe is one entry of the catalogue in ``foreground_isolation_2d.md``.
+Each recipe is one entry of the catalogue in ``docs/localization/foreground_isolation_2d.md``.
 They are registered in ``ISOLATION_2D_RECIPES`` so choosing one is a config
 choice, and the benchmark swaps recipes behind this contract to compare them
 on identical input.

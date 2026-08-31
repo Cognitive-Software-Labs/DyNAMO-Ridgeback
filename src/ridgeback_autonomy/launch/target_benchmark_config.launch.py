@@ -17,6 +17,7 @@ from launch.events import Shutdown
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
+from ridgeback_autonomy.benchmarking.paths import default_output_directory
 from ridgeback_autonomy.perception.target_localization.estimator_registry import (
     parse_estimators,
     selected_mask_estimators,
@@ -210,7 +211,7 @@ def build_readiness_gate(context, *args, **kwargs):
 def generate_launch_description():
     pkg_this = get_package_share_directory('ridgeback_autonomy')
     workspace_root = workspace_root_from_package_share(pkg_this)
-    benchmark_output_dir = os.path.join(workspace_root, 'benchmark-results')
+    benchmark_output_dir = default_output_directory(workspace_root)
     namespace = LaunchConfiguration('namespace')
 
     arguments = [

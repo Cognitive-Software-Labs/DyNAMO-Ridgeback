@@ -9,8 +9,9 @@ This workspace supports 3 main human workflows:
 
 ## Docs
 
+- [Documentation index](docs/README.md): localization, benchmarking, plans, and historical validation
 - `README.md`: installation, public launch usage, and normal human workflows
-- `ISSUES.md`: troubleshooting, resolved root causes, and operational gotchas
+- `docs/ISSUES.md`: troubleshooting, resolved root causes, and operational gotchas
 - `AI_CONTEXT.md`: agent-facing repo conventions, mental model, and documentation rules
 - `AGENTS.md` / `CLAUDE.md`: thin entrypoints into the shared agent guidance
 
@@ -86,7 +87,7 @@ colcon build --symlink-install --base-paths src
 source install/setup.bash
 ```
 
-If you rename or move the workspace directory later, wipe `build/`, `install/`, and `log/` before rebuilding so the generated setup files do not keep stale absolute paths.
+If you rename or move the workspace directory later, regenerate `build/` and `install/` before rebuilding so the generated setup files do not keep stale absolute paths. Preserve `artifacts/`: its logs and benchmark results are independent evidence, not build products.
 
 ### 3. (Optional) Set up target localization venv
 
@@ -244,7 +245,7 @@ DEPTH_ANYTHING_ENABLED=true bash start_exploration.sh office
 FASTRTPS_NO_SHM=true bash start_exploration.sh office    # use the UDP-only FastDDS profile
 ```
 
-By default the script uses the system-default RMW (shared memory on); set `FASTRTPS_NO_SHM=true` to force a UDP-only FastDDS profile that dodges stale shared-memory locks — see [ISSUES.md](ISSUES.md) for the rationale and toggle.
+By default the script uses the system-default RMW (shared memory on); set `FASTRTPS_NO_SHM=true` to force a UDP-only FastDDS profile that dodges stale shared-memory locks — see [ISSUES.md](docs/ISSUES.md) for the rationale and toggle.
 
 `build_and_start_expl.sh` rebuilds the workspace first, then runs the same exploration quick-start (extra args are forwarded to `start_exploration.sh`):
 
@@ -282,12 +283,12 @@ ros2 launch ridgeback_autonomy target_distance_benchmark.launch.py estimators:=p
 ros2 launch ridgeback_autonomy target_distance_benchmark.launch.py estimators:=polar_profiling
 ```
 
-This compatibility launch composes two layers. `target_benchmark_env.launch.py` owns the simulator, camera TF, RViz, and `target_detector_node`; `target_benchmark_config.launch.py` waits for the color and warm-detector topics, then starts the selected measurement nodes, visualizations, HUD, overlay, and `target_distance_benchmark_runner`. Every row is individually selectable: `estimators` is split per stack and each measurement node is passed only the rows it owns, so a path that was not selected is never run — its fields stay NaN, it gets no CSV, and the inputs only it needs are never subscribed to. Selecting any mask row launches `target_mask_measurement_node`, which for `projective_ranging`/`euclidean_reconstruction` obtains the aligned depth frame itself, at the detection stamp, through the source `depth_source` selects; `polar_profiling` needs no depth at all, so a polar-only run builds no depth source (and under `depth_source:=monocular`, loads no model). The mask node builds one mask per detection (`mask_gate:=box` rasterizes the detection box; `mask_gate:=silhouette` prompts a segmentation model with the boxes, needs `perception_venv`) and runs the localization paths from `object_localization_documentation/`.
+This compatibility launch composes two layers. `target_benchmark_env.launch.py` owns the simulator, camera TF, RViz, and `target_detector_node`; `target_benchmark_config.launch.py` waits for the color and warm-detector topics, then starts the selected measurement nodes, visualizations, HUD, overlay, and `target_distance_benchmark_runner`. Every row is individually selectable: `estimators` is split per stack and each measurement node is passed only the rows it owns, so a path that was not selected is never run — its fields stay NaN, it gets no CSV, and the inputs only it needs are never subscribed to. Selecting any mask row launches `target_mask_measurement_node`, which for `projective_ranging`/`euclidean_reconstruction` obtains the aligned depth frame itself, at the detection stamp, through the source `depth_source` selects; `polar_profiling` needs no depth at all, so a polar-only run builds no depth source (and under `depth_source:=monocular`, loads no model). The mask node builds one mask per detection (`mask_gate:=box` rasterizes the detection box; `mask_gate:=silhouette` prompts a segmentation model with the boxes, needs `perception_venv`) and runs the localization paths from `docs/localization/`.
 
 The mask rows are identified by their config axes — the mask gate (`mask_gate`), the aligned-depth source (`depth_source`), the path, and on the box gate the foreground-isolation recipe (`isolation_2d` for projective ranging, `isolation_3d` for euclidean reconstruction) — so their CSV files fold the axes into a self-describing name. The stereoscopic box-gate run above writes `box_gated_stereoscopic_projective_ranging_nearest_mode_histogram.csv` and `box_gated_stereoscopic_euclidean_reconstruction_height_crop_nearest_mode_band.csv`; silhouette rows drop the isolation token (the tight branches never run a recipe), e.g. `silhouette_gated_stereoscopic_projective_ranging.csv`; polar profiling folds the gate only (`box_gated_polar_profiling.csv`). The `pointcloud` row keeps its plain name.
 
 Each benchmark run writes under
-`benchmark-results/<timestamp>_<scenario>[_<gate>][_<depth_source>]/` by default
+`artifacts/benchmarks/<timestamp>_<scenario>[_<gate>][_<depth_source>]/` by default
 (e.g. `20260822_202851_v2_silhouette_stereoscopic`):
 - `summary.md` — the readable report; start here
 - one trial-level CSV per selected estimator
@@ -313,7 +314,7 @@ Arguments:
 | `mask_depth_max_meters` | `0.0` | Working depth gate for the mask rows; `0` means no gate, leaving each row bounded only by what its depth source declares it can resolve |
 | `camera_info_topic` | `sensors/camera_0/color/camera_info` | Compatibility override for the shared camera contract's color-grid intrinsics |
 | `repeats` | `5` | Number of positive-trial repeats per spawn pose |
-| `output_dir` | `<repo-root>/benchmark-results` | Root directory that will receive one timestamped subfolder per run |
+| `output_dir` | `<repo-root>/artifacts/benchmarks` | Root directory that will receive one timestamped subfolder per run |
 | `run_dir_name` | empty | Optional exact run-folder name under `output_dir`; sweeps use the configuration name. Empty preserves the timestamped single-run naming |
 | `shutdown_on_complete` | `false` | Shut down the config launch service when the runner exits. The sweep sets this to `true`; the compatibility launch leaves the completed stack open for inspection |
 | `settle_sec` | `2.0` | Delay after spawning the target before sampling |
@@ -357,7 +358,7 @@ ros2 run ridgeback_autonomy target_benchmark_sweep "$SWEEP" \
 
 # Rebuild the cross-config report for a partial or completed sweep.
 ros2 run ridgeback_autonomy target_benchmark_sweep \
-  --report-only benchmark-results/20260828_141530_baseline
+  --report-only artifacts/benchmarks/20260828_141530_baseline
 ```
 
 Do **not** run `cleanup.sh` between configurations: it kills Gazebo and RViz,
@@ -400,7 +401,7 @@ Outputs use one timestamped sweep folder with a resumable manifest and a
 comparison report:
 
 ```text
-benchmark-results/20260828_141530_baseline/
+artifacts/benchmarks/20260828_141530_baseline/
   sweep.json
   summary.md
   pointcloud/
@@ -447,6 +448,24 @@ The shared camera geometry lives in `config/camera_config.json`; the mask stack 
 | `config/nav2_params.yaml` | `max_accel` / `max_decel` | Velocity smoother acceleration and braking limits |
 | `config/slam_toolbox_params.yaml` | `resolution` | Map resolution (m/pixel) |
 
+## Generated artifacts
+
+Repository-owned logs and results live under the Git-ignored `artifacts/` directory:
+
+| Directory | Contents |
+|-----------|----------|
+| `artifacts/colcon/` | Colcon build/test logs; older logs are preserved under `history/` |
+| `artifacts/exploration/<run>/` | `console.log` and `ros/` for each quick-start launch; older flat `.log` files remain alongside these folders |
+| `artifacts/benchmarks/<run-or-sweep>/` | Benchmark JSON/CSV reports, images, video, and child-process logs |
+
+`colcon_defaults.yaml` sets the log base for Colcon commands run from the workspace root. Use `colcon --log-base /somewhere/else build ...` to override it. The build helper also uses an absolute log base when invoked from elsewhere and honors `COLCON_LOG_PATH`.
+
+`LOG_DIR` overrides the exploration output root, and `output_dir:=...` (or a sweep's `defaults.output_dir`) overrides benchmark output. `ROS_LOG_DIR` always overrides the managed child ROS-log locations. Without that override, sweep environment logs live in `<sweep>/environment/logs/ros/`, config logs in `<sweep>/<config>/logs/ros/`, and standalone runner command logs in `<run>/logs/ros/`.
+
+Direct `ros2 launch` commands still use ROS's normal log destination unless you set `ROS_LOG_DIR` before launching, for example `ROS_LOG_DIR="$PWD/artifacts/ros" ros2 launch ...`. Existing `~/.ros/log` and `/tmp` logs are not moved.
+
+Existing runs were relocated without rewriting their contents: absolute paths recorded in old run metadata describe the original execution location. Reports and sweep resume use the relocated folders. Do not treat benchmark results as disposable logs; no automatic pruning is enabled.
+
 ## Patches and Issue History
 
 This project still relies on two local patches:
@@ -454,4 +473,4 @@ This project still relies on two local patches:
 1. `patches/clearpath_gz_customizations.patch` patches `src/clearpath_simulator/clearpath_gz` to add this repo's Gazebo worlds/models to the simulator search path and to expose the custom `SpawnG1` Gazebo GUI plugin.
 2. `patches/slam_toolbox_tf_namespace.patch` patches `src/slam_toolbox` so `slam_toolbox` respects namespaced TF remappings.
 
-The deeper root-cause notes, previous middleware workarounds, namespace gotchas, and troubleshooting tips now live in [ISSUES.md](ISSUES.md).
+The deeper root-cause notes, previous middleware workarounds, namespace gotchas, and troubleshooting tips now live in [ISSUES.md](docs/ISSUES.md).

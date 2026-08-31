@@ -114,7 +114,7 @@ def test_benchmark_launch_uses_new_multi_estimator_interface() -> None:
 
     assert "'estimators'" in benchmark_text
     assert "'output_dir'" in benchmark_text
-    assert "'benchmark-results'" in benchmark_text
+    assert 'benchmark_output_dir = default_output_directory(workspace_root)' in benchmark_text
     assert '/tmp/target_distance_benchmark_runs' not in benchmark_text
     assert "DeclareLaunchArgument('estimators', default_value='all')" in benchmark_text
     assert 'measurement_backend' not in benchmark_text

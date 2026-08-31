@@ -1,4 +1,4 @@
-"""Aligned depth frame sources (object_localization_documentation/aligned_depth.md).
+"""Aligned depth frame sources (docs/localization/aligned_depth.md).
 
 Produces the "aligned depth frame" contract: a float32 depth image in meters
 on the color camera's pixel grid, stamped with the frame it is aligned to,

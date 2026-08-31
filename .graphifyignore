@@ -2,6 +2,9 @@
 build/
 install/
 log/
+logs/
+benchmark-results/
+artifacts/
 
 # python virtualenvs
 perception_venv/

@@ -1,6 +1,6 @@
 # Euclidean reconstruction — Foreground Isolation Methods (3D Point-Domain Route)
 
-**Context.** Companion to `foreground_isolation_2d.md`, which covers the 2D
+**Context.** Companion to `docs/localization/foreground_isolation_2d.md`, which covers the 2D
 depth-image route (projective ranging). In euclidean reconstruction the mask has already selected a point set
 out of the organized cloud — but with a *rect* mask that set is the whole box
 frustum: the G1 **plus** the floor strip under it **plus** whatever background
@@ -87,7 +87,7 @@ point-domain twin of the 2D nearest-mode histogram.
 
 **Pros**
 - Benchmarked (MAE 0.156 m in the 70-trial sim run of 2026-07-13; see
-  `benchmark-results/`, figure possibly superseded by a later run). It was the
+  `artifacts/benchmarks/`, figure possibly superseded by a later run). It was the
   default until 2026-08-28 and is the baseline a change to this stage is
   measured against, but it is no longer what ships — see §2b.
 - Still what the legacy `pointcloud` estimator does, unchanged, which is the
@@ -423,7 +423,7 @@ background-separators — one of each makes a complete isolator.
    floor-remover (1, 3, 4) in front; Method 5 with nearest-vs-largest cluster
    selection; Method 2's window width sensitivity.
 4. **Cross-route comparison:** run the winning 2D recipe
-   (`foreground_isolation_2d.md`) and the winning 3D recipe on identical frames —
+   (`docs/localization/foreground_isolation_2d.md`) and the winning 3D recipe on identical frames —
    this is the "isolate-in-2D-then-deproject vs. deproject-then-isolate-in-3D"
    swap point of the pipeline's benchmark matrix.
 5. **Report:** as in the 2D protocol, highlight cases where a crude foreground

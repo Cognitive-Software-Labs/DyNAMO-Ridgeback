@@ -75,7 +75,7 @@ to earlier runs.
   CPU-starved depth producer process thinned the depth stream independently of
   the detector, so the exact-stamp match rarely landed. Depth acquisition now
   happens inside the mask node at the detection stamp and the producer is gone
-  ([aligned_depth_coverage.md](aligned_depth_coverage.md) §6). Runs predating
+  ([aligned_depth_coverage.md](../history/aligned_depth_coverage.md) §6). Runs predating
   that change still show the thin depth-path sample.
 - Launch default `estimators` still excludes the mask stack — pass the full
   list explicitly (below) or bump the default.
@@ -143,7 +143,7 @@ so it cannot drift as parameters are added.
 | `observations.total` | Every detected box across every capture window. One 2-robot frame contributes 2; single-robot scenes have one box per frame, so this equals the frame count there. |
 | `observations.ok` | Boxes where this estimator delivered a value (`MissReason.OK`). |
 | `observations.coverage` | `ok / total` — how often the estimator answers at all, independent of accuracy. |
-| `reason_histogram` | `reason → count` naming why the non-OK boxes failed. Codes glossary: `object_localization_pipeline.md` → Glossary → "Miss-reason codes". |
+| `reason_histogram` | `reason → count` naming why the non-OK boxes failed. Codes glossary: `docs/localization/object_localization_pipeline.md` → Glossary → "Miss-reason codes". |
 
 Accuracy and miss fields are per **instance**; the `observations` group is per
 **box**. Keeping them as separate objects is why this is JSON: the file it
@@ -181,7 +181,7 @@ ros2 launch ridgeback_autonomy target_distance_benchmark.launch.py \
   mask_gate:=silhouette
 ```
 
-Results land in `benchmark-results/<timestamp>_<scenario>[_<gate>][_<depth_source>]/`
+Results land in `artifacts/benchmarks/<timestamp>_<scenario>[_<gate>][_<depth_source>]/`
 (e.g. `20260726_115556_v2_silhouette_stereoscopic`): **`summary.md`** (start here —
 the readable report), per-estimator trial CSVs, `run.json` (the same run-level
 numbers for machines, plus provenance and parameters), and per-scene collages

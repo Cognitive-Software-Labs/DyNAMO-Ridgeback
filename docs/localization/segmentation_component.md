@@ -1,10 +1,10 @@
 # Segmentation Component
 
 **Scope:** the *tight* (silhouette) mask front-end — the instance-segmentation
-producer that `mask_component.md` §4 defers to. This document covers the model,
+producer that `docs/localization/mask_component.md` §4 defers to. This document covers the model,
 how it is prompted, and the semantics of its output. How the resulting mask is
 consumed is unchanged and documented with the paths; the mask *object* is
-documented in `mask_component.md`.
+documented in `docs/localization/mask_component.md`.
 
 **Code:** `perception/target_localization/core/segmentation.py` (`SamBoxSegmenter`), wired into
 `target_mask_measurement_node` behind the `mask_gate` parameter
@@ -27,7 +27,7 @@ zero-shot. Instead a **promptable segmenter is prompted with the OWLv2
 detection boxes**: one box prompt → one pixel-precise mask. This keeps the
 detector's open-vocabulary property, reuses the existing detector unchanged,
 and preserves the 1:1:1 frame → detection → mask hierarchy
-(`mask_component.md` §6).
+(`docs/localization/mask_component.md` §6).
 
 **Pinned default:** `Zigeng/SlimSAM-uniform-50` (SlimSAM, a pruned SAM with
 the identical prompting API), selected by the Phase 0 spike on raw sim frames
@@ -43,7 +43,7 @@ across the full 1.5–5.5 m benchmark grid against `facebook/sam-vit-base` and
 The selection criterion was **silhouette fidelity on the G1's legs**: the leg
 gap must come out `False` — that gap is precisely what the tight mask buys
 polar profiling (a rect mask admits through-the-gap background rays,
-`object_localization_pipeline.md` §5). All three candidates passed the leg-gap
+`docs/localization/object_localization_pipeline.md` §5). All three candidates passed the leg-gap
 check visually; SlimSAM won on stable quality at the lowest footprint. Latency
 is well inside the 5 FPS detector cadence. The model stays a public parameter
 (`segmentation_model`) because the real robot's compute budget is undecided;
@@ -52,7 +52,7 @@ checkpoint's `model_type`).
 
 The specific detector-plus-segmenter stack (OWLv2 + SlimSAM) is an
 **implementation detail of this component, not an architectural fixture** —
-`object_localization_pipeline.md` §2 shows only the abstract segmentation
+`docs/localization/object_localization_pipeline.md` §2 shows only the abstract segmentation
 front-end, and nothing downstream of the mask interface depends on the choice.
 It is a **swappable, benchmarkable axis**: multiple segmentation implementations
 are planned to be compared on the same three metrics used above —
@@ -83,7 +83,7 @@ the SAM 3 spike passed its gates and the adoption question is open (§7.2).
   box-clipped feet at 3.5 m with no background bleed; 10% added nothing.
 - **One forward per frame.** All of a frame's boxes go through a single model
   forward: the image encoder runs once per frame, the prompt decoder once per
-  box (`mask_component.md` §6 cost split). N masks cost roughly one
+  box (`docs/localization/mask_component.md` §6 cost split). N masks cost roughly one
   frame-encode plus N light decodes.
 - **Multimask output → highest predicted IoU.** SAM returns several mask
   options per prompt with predicted-IoU scores; the highest-scoring option is
@@ -107,7 +107,7 @@ the SAM 3 spike passed its gates and the adoption question is open (§7.2).
   returned silhouette can legitimately extend past the box that produced it,
   and cropping to the box would delete those pixels. The crop is copied, so the
   frame-sized blob expires at that point rather than being kept alive as the
-  region's backing store. See `mask_component.md` Section 7.
+  region's backing store. See `docs/localization/mask_component.md` Section 7.
 - **Empty or below-floor segmentation → `None` → trial drops.** A winning mask
   that is empty **or** whose predicted IoU falls below the floor
   (`segmentation_min_iou`, default 0.5 — §2) yields `None` for that detection;
@@ -117,7 +117,7 @@ the SAM 3 spike passed its gates and the adoption question is open (§7.2).
 
 ## 4. Execution host: inside `target_mask_measurement_node`
 
-`mask_component.md` §5.3 pins the wire convention: **consumers never take the
+`docs/localization/mask_component.md` §5.3 pins the wire convention: **consumers never take the
 mask off the wire**; a published mask topic is debug-only. A tight mask cannot
 be reconstructed from the detections message the way a rect mask can, so the
 only convention-respecting host is the consuming node itself — the segmenter
@@ -173,7 +173,7 @@ compressed transport gives PNG at a few kB). The overlay mask panel consumes
 the published artifact when its stamp matches the rendered measurements
 exactly, so the panel shows exactly what downstream consumed; otherwise it
 keeps deriving the rect union at render time. This resolves the
-"visualization data source" open item of `mask_component.md` §7.
+"visualization data source" open item of `docs/localization/mask_component.md` §7.
 
 ## 7. Other options evaluated
 
