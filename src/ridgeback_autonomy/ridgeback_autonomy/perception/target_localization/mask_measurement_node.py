@@ -42,8 +42,8 @@ other process's thinning. Nothing downstream branches on which source ran.
 Polar profiling needs no depth frame -- only the scan, the mask, and the
 color-grid intrinsics -- so it runs independently of depth availability.
 Deliberately independent of the pointcloud estimator
-(``target_localization/core/pointcloud_ranging.py``): constants are mirrored by value,
-never imported.
+(``target_localization/core/pointcloud_ranging.py``): shared defaults come from
+``core/ranging_defaults.py``, never from the sibling estimator.
 """
 
 from __future__ import annotations
@@ -66,6 +66,8 @@ from visualization_msgs.msg import MarkerArray
 
 from ridgeback_autonomy.perception.target_localization.estimator_registry import (
     DEPTH_PATH_ESTIMATORS,
+    MASK_GATE_BOX,
+    MASK_GATE_SILHOUETTE,
 )
 from ridgeback_autonomy.common.markers import PolarBeamRecord, build_polar_ray_markers
 from ridgeback_autonomy.common.messages import (
@@ -73,6 +75,7 @@ from ridgeback_autonomy.common.messages import (
     build_measurements_message,
 )
 from ridgeback_autonomy.common.miss_reason import MissReason
+from ridgeback_autonomy.common.stamps import stamp_key
 from ridgeback_autonomy.common.tf_utils import lookup_transform_components
 from ridgeback_autonomy.msg import TargetDetections, TargetMeasurements
 from ridgeback_autonomy.perception.target_localization.core.depth_common import (
@@ -111,6 +114,9 @@ from ridgeback_autonomy.perception.target_localization.core.segmentation import 
     SEGMENTATION_MODEL_DEFAULT,
     SamBoxSegmenter,
 )
+from ridgeback_autonomy.perception.target_localization.core.vehicle_frame import (
+    ROBOT_FRONT_OFFSET_M,
+)
 from ridgeback_autonomy.perception.target_localization.contracts import (
     ALIGNED_DEPTH_DEBUG_TOPIC,
     MASK_DEBUG_TOPIC,
@@ -119,10 +125,7 @@ from ridgeback_autonomy.perception.target_localization.contracts import (
     RAW_DETECTIONS_TOPIC,
 )
 from ridgeback_autonomy.perception.target_localization.measurement_pipeline import (
-    MASK_GATE_BOX,
-    MASK_GATE_SILHOUETTE,
     MAX_BOX_FRAME_FRACTION,
-    ROBOT_FRONT_OFFSET_M_DEFAULT,
     box_within_frame_fraction,
     encode_mask_debug_image,
     fill_path_measurements,
@@ -141,7 +144,6 @@ from ridgeback_autonomy.perception.target_localization.synchronization import (
     DepthMatchDiagnostics,
     PreparedColorFrame,
     StampedMessageBuffer,
-    stamp_key,
 )
 
 
@@ -196,7 +198,7 @@ class TargetMaskMeasurementNode(Node):
         self.declare_parameter('ray_marker_topic', POLAR_RAYS_TOPIC)
         self.declare_parameter('ray_marker_lifetime_sec', RAY_MARKER_LIFETIME_SEC)
         self.declare_parameter('base_frame', BASE_FRAME_DEFAULT)
-        self.declare_parameter('front_offset_m', ROBOT_FRONT_OFFSET_M_DEFAULT)
+        self.declare_parameter('front_offset_m', ROBOT_FRONT_OFFSET_M)
         self.declare_parameter('isolation_2d', ISOLATION_2D_DEFAULT)
         self.declare_parameter('isolation_3d', ISOLATION_3D_DEFAULT)
         # Height of the base origin above the floor, added to the TF

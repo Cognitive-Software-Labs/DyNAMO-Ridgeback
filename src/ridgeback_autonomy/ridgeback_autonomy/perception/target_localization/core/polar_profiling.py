@@ -37,6 +37,9 @@ from ridgeback_autonomy.perception.target_localization.core.intrinsics import (
     project_points,
 )
 from ridgeback_autonomy.perception.target_localization.core.mask import Mask
+from ridgeback_autonomy.perception.target_localization.core.ranging_defaults import (
+    NEAR_SURFACE_BAND_M as RANGE_BAND_M_DEFAULT,
+)
 
 
 # Scan-validity clips (not accuracy knobs): drop physically impossible returns
@@ -61,10 +64,9 @@ RANGE_JUMP_M_DEFAULT = 0.30
 # front-to-back depth (~0.2 m for the G1) so both legs and torso merge but the
 # wall behind does not. Too small keeps one leg (lateral offset, leg-face
 # range); too large admits parallax / neighbour background. The value is an
-# untuned starting point mirroring NEAREST_MODE_BAND_M_DEFAULT (the projective
-# ranging near-band width), not a fit to the object depth -- tuning tracked in
-# polar_profiling.md Section 8.
-RANGE_BAND_M_DEFAULT = 0.35
+# untuned starting point shared with the projective-ranging near-band width
+# through ranging_defaults, not a fit to the object depth -- tuning tracked
+# in polar_profiling.md Section 8.
 
 # Run split on a bearing gap: start a new run where the beam index gaps by
 # more than this many increments -- i.e. once that many or more consecutive

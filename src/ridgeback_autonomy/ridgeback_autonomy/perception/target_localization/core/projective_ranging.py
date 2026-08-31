@@ -33,9 +33,9 @@ from ridgeback_autonomy.perception.target_localization.core.isolation_2d import 
     ISOLATION_2D_RECIPES,
 )
 from ridgeback_autonomy.perception.target_localization.core.mask import Mask, MaskPrecision
-
-
-MIN_VALID_PIXELS_DEFAULT = 10  # mirrors POINTCLOUD_MIN_VALID_POINTS by value
+from ridgeback_autonomy.perception.target_localization.core.ranging_defaults import (
+    MIN_VALID_SAMPLES as MIN_VALID_PIXELS_DEFAULT,
+)
 
 
 @dataclass(frozen=True)

@@ -28,8 +28,8 @@ DEPTH_PATH_ESTIMATORS = frozenset({'projective_ranging', 'euclidean_reconstructi
 
 # The mask front-end (gate) axis: the rasterized box (rect) gate and the
 # silhouette (tight segmentation) gate. A run picks one via the ``mask_gate``
-# parameter; the value folds into every mask-row output name. Tokens mirror
-# ``measurement_pipeline.MASK_GATES`` by value (cross-checked in tests).
+# parameter; the value folds into every mask-row output name. This is the one
+# token contract used by measurement, launch, and benchmark consumers.
 MASK_GATE_BOX = 'box'
 MASK_GATE_SILHOUETTE = 'silhouette'
 MASK_GATES = (MASK_GATE_BOX, MASK_GATE_SILHOUETTE)

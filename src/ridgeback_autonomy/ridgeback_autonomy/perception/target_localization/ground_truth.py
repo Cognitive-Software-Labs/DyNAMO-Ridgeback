@@ -6,6 +6,7 @@ from dataclasses import dataclass
 
 from geometry_msgs.msg import PointStamped
 
+from ridgeback_autonomy.common.stamps import stamp_to_nanoseconds
 
 # How long a truth message stays displayable. The runner publishes only while a
 # capture window is open, so the gate is what makes the line disappear between
@@ -59,8 +60,7 @@ def truth_reading(msg, now_nanoseconds: int, max_age_s: float = TRUTH_MAX_AGE_S)
 
     if msg is None:
         return None
-    stamp = msg.header.stamp
-    stamp_nanoseconds = int(stamp.sec) * 1_000_000_000 + int(stamp.nanosec)
+    stamp_nanoseconds = stamp_to_nanoseconds(msg.header.stamp)
     if now_nanoseconds - stamp_nanoseconds > max_age_s * 1_000_000_000:
         return None
     return TruthReading(

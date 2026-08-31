@@ -27,17 +27,12 @@ from ridgeback_autonomy.perception.target_localization.core.projective_ranging i
 from ridgeback_autonomy.perception.target_localization.estimator_registry import (
     ESTIMATOR_FIELD_KEYS,
     MASK_ESTIMATORS,
+    MASK_GATES,
     nearest_instance_index,
     parse_estimators,
     selected_mask_estimators,
 )
 
-
-ROBOT_FRONT_OFFSET_M_DEFAULT = 0.25  # mirrors vehicle_frame.ROBOT_FRONT_OFFSET_M
-
-MASK_GATE_BOX = 'box'
-MASK_GATE_SILHOUETTE = 'silhouette'
-MASK_GATES = (MASK_GATE_BOX, MASK_GATE_SILHOUETTE)
 
 # A detector box covering more than this fraction of the frame is almost always
 # a failure (OWLv2 occasionally boxes the whole scene at close range); masking

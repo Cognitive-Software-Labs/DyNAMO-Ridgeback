@@ -8,8 +8,8 @@ foreground points.
 Isolators are callables satisfying that contract. ``Chain`` composes them --
 per the docs, one floor-remover (``HeightCrop``) plus one
 background-separator (``RangeBand``) makes a complete isolator, and that chain
-is the default recipe. Geometry constants mirror ``config/camera_config.json``
-by value; this stack deliberately never imports them.
+is the default recipe. Camera geometry comes from TF at runtime; the constants
+here are standalone/static defaults, not copies of the camera configuration.
 """
 
 from __future__ import annotations
@@ -24,6 +24,11 @@ from ridgeback_autonomy.perception.target_localization.core.depth_common import 
     NEAREST_MODE_MIN_BIN_FRACTION_DEFAULT,
     nearest_significant_mode,
 )
+from ridgeback_autonomy.perception.target_localization.core.ranging_defaults import (
+    FRONT_PERCENTILE as RANGE_BAND_PERCENTILE_DEFAULT,
+    INLIER_AHEAD_MARGIN_M as RANGE_BAND_AHEAD_M_DEFAULT,
+    INLIER_BEHIND_MARGIN_M as RANGE_BAND_BEHIND_M_DEFAULT,
+)
 
 
 CAMERA_HEIGHT_M_DEFAULT = 1.053  # static/test default only; at runtime the height comes from TF via camera_floor_geometry. Mask-stack only: config/camera_config.json's height_m stays 0.85 and is deliberately not touched here.
@@ -33,10 +38,6 @@ FLOOR_MARGIN_M_DEFAULT = 0.05
 # not a TF frame, so this stays a measured constant rather than a lookup. Added
 # to the TF camera-above-base height to get camera-above-floor.
 BASE_ABOVE_FLOOR_M_DEFAULT = 0.026
-
-RANGE_BAND_PERCENTILE_DEFAULT = 25.0  # mirrors POINTCLOUD_FRONT_PERCENTILE
-RANGE_BAND_AHEAD_M_DEFAULT = 0.10  # mirrors POINTCLOUD_INLIER_AHEAD_MARGIN_M
-RANGE_BAND_BEHIND_M_DEFAULT = 0.35  # mirrors POINTCLOUD_INLIER_BEHIND_MARGIN_M
 
 MAD_K_DEFAULT = 3.0
 

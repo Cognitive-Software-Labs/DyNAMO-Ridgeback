@@ -5,25 +5,73 @@ import importlib
 from pathlib import Path
 import re
 
+import pytest
 
 PACKAGE_ROOT = Path(__file__).parents[1] / 'ridgeback_autonomy'
 
 
-def _imports_from(path: Path, package: str) -> list[int]:
-    """Line numbers importing ``package`` or one of its submodules."""
+def _imports_in_source(source: str, source_package: str, package: str) -> list[int]:
+    """Resolve absolute, parent-package, and relative static import edges."""
 
     imported_at = []
-    tree = ast.parse(path.read_text(), filename=str(path))
+    tree = ast.parse(source)
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
             names = (alias.name for alias in node.names)
-        elif isinstance(node, ast.ImportFrom) and node.module is not None:
-            names = (node.module,)
+        elif isinstance(node, ast.ImportFrom):
+            module = node.module or ''
+            if node.level:
+                module = importlib.util.resolve_name('.' * node.level + module, source_package)
+            # ``from ridgeback_autonomy import benchmarking`` is an edge too,
+            # not just ``from ridgeback_autonomy.benchmarking import ...``.
+            names = (module, *(f'{module}.{alias.name}' for alias in node.names))
         else:
             continue
         if any(name == package or name.startswith(f'{package}.') for name in names):
             imported_at.append(node.lineno)
     return imported_at
+
+
+def _imports_from(path: Path, package: str) -> list[int]:
+    parts = path.relative_to(PACKAGE_ROOT.parent).with_suffix('').parts
+    source_package = '.'.join(parts[:-1])
+    return _imports_in_source(path.read_text(), source_package, package)
+
+
+@pytest.mark.parametrize('source', [
+    'import ridgeback_autonomy.benchmarking',
+    'import ridgeback_autonomy.benchmarking.alignment as alignment',
+    'from ridgeback_autonomy.benchmarking import alignment',
+    'from ridgeback_autonomy import benchmarking',
+    'from ...benchmarking import alignment',
+    'from ... import benchmarking',
+])
+def test_dependency_guard_recognizes_import_spellings(source):
+    assert _imports_in_source(
+        source, 'ridgeback_autonomy.perception.target_localization',
+        'ridgeback_autonomy.benchmarking') == [1]
+
+
+def test_dependency_guard_allows_lower_layers_and_ignores_comments():
+    source = '''
+# from ridgeback_autonomy import benchmarking
+from ...common import stamps
+from . import estimator_registry
+'''
+    assert _imports_in_source(
+        source, 'ridgeback_autonomy.perception.target_localization',
+        'ridgeback_autonomy.benchmarking') == []
+
+
+def test_every_python_test_is_registered_with_colcon():
+    package_dir = PACKAGE_ROOT.parent
+    registered = set(re.findall(
+        r'ament_add_pytest_test\(\w+\s+test/(test_\w+\.py)\)',
+        (package_dir / 'CMakeLists.txt').read_text()))
+    present = {path.name for path in (package_dir / 'test').glob('test_*.py')}
+    assert registered == present, (
+        f'unregistered tests: {present - registered}; '
+        f'stale registrations: {registered - present}')
 
 
 def test_packaged_modules_import() -> None:
@@ -33,6 +81,7 @@ def test_packaged_modules_import() -> None:
         'ridgeback_autonomy.common.launch_wait',
         'ridgeback_autonomy.common.messages',
         'ridgeback_autonomy.common.models',
+        'ridgeback_autonomy.common.stamps',
         'ridgeback_autonomy.common.tf_utils',
         'ridgeback_autonomy.benchmarking.alignment',
         'ridgeback_autonomy.benchmarking.naming',
@@ -48,6 +97,7 @@ def test_packaged_modules_import() -> None:
         'ridgeback_autonomy.perception.target_localization.core.isolation_3d',
         'ridgeback_autonomy.perception.target_localization.core.mask',
         'ridgeback_autonomy.perception.target_localization.core.projective_ranging',
+        'ridgeback_autonomy.perception.target_localization.core.ranging_defaults',
         'ridgeback_autonomy.perception.target_localization.core.euclidean_reconstruction',
         'ridgeback_autonomy.perception.target_localization.core.pointcloud_ranging',
         'ridgeback_autonomy.perception.target_localization.core.polar_profiling',
@@ -120,6 +170,8 @@ def test_reusable_target_helpers_do_not_depend_on_node_orchestration() -> None:
 
     target_root = PACKAGE_ROOT / 'perception' / 'target_localization'
     helper_names = (
+        'estimator_registry.py',
+        'ground_truth.py',
         'synchronization.py',
         'measurement_pipeline.py',
         'visualization_readings.py',
@@ -127,16 +179,17 @@ def test_reusable_target_helpers_do_not_depend_on_node_orchestration() -> None:
         'hud_rendering.py',
         'marker_rendering.py',
     )
-    node_modules = (
-        'ridgeback_autonomy.perception.target_localization.mask_measurement_node',
-        'ridgeback_autonomy.perception.target_localization.visualization_node',
+    node_modules = tuple(
+        f'ridgeback_autonomy.perception.target_localization.{path.stem}'
+        for path in target_root.glob('*_node.py')
     )
     violations = []
-    for helper_name in helper_names:
-        path = target_root / helper_name
+    helper_paths = [*(target_root / name for name in helper_names),
+                    *(target_root / 'core').rglob('*.py')]
+    for path in helper_paths:
         for node_module in node_modules:
             violations.extend(
-                f'{helper_name}:{line} imports {node_module}'
+                f'{path.relative_to(target_root)}:{line} imports {node_module}'
                 for line in _imports_from(path, node_module)
             )
 

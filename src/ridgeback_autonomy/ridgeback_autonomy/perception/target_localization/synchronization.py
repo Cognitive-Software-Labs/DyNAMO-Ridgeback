@@ -8,6 +8,7 @@ from dataclasses import dataclass
 import numpy as np
 from sensor_msgs.msg import Image
 
+from ridgeback_autonomy.common.stamps import stamp_key
 
 # ~0.5 s of color frames at 30 fps -- comfortably above the detector latency
 # (~200 ms at 5 FPS), so the exact-stamp lookup only misses when the pipeline
@@ -20,10 +21,6 @@ COLOR_BUFFER_DEPTH_DEFAULT = 15
 DEPTH_MATCH_BUFFER_DEPTH = 15
 SCAN_MATCH_BUFFER_DEPTH = 20
 SCAN_MATCH_TOLERANCE_S_DEFAULT = 0.05
-
-
-def stamp_key(stamp) -> tuple[int, int]:
-    return int(stamp.sec), int(stamp.nanosec)
 
 
 @dataclass(frozen=True)

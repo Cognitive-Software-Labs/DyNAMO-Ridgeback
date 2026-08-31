@@ -15,6 +15,13 @@ from sensor_msgs.msg import PointCloud2
 from sensor_msgs_py import point_cloud2
 
 from ridgeback_autonomy.common.models import DetectionBatch
+from ridgeback_autonomy.perception.target_localization.core.ranging_defaults import (
+    FRONT_PERCENTILE as POINTCLOUD_FRONT_PERCENTILE,
+    INLIER_AHEAD_MARGIN_M as POINTCLOUD_INLIER_AHEAD_MARGIN_M,
+    INLIER_BEHIND_MARGIN_M as POINTCLOUD_INLIER_BEHIND_MARGIN_M,
+    MAX_RANGE_M as POINTCLOUD_MAX_METERS,
+    MIN_VALID_SAMPLES as POINTCLOUD_MIN_VALID_POINTS,
+)
 from ridgeback_autonomy.perception.target_localization.core.vehicle_frame import apply_vehicle_front_offset
 
 
@@ -25,11 +32,6 @@ DEPTH_FOCUS_X_MAX = 0.76
 DEPTH_FOCUS_Y_MIN = 0.18
 DEPTH_FOCUS_Y_MAX = 0.62
 
-POINTCLOUD_MAX_METERS = 10.0
-POINTCLOUD_FRONT_PERCENTILE = 25.0
-POINTCLOUD_INLIER_AHEAD_MARGIN_M = 0.10
-POINTCLOUD_INLIER_BEHIND_MARGIN_M = 0.35
-POINTCLOUD_MIN_VALID_POINTS = 10
 POINTCLOUD_MIN_INLIERS = 3
 
 

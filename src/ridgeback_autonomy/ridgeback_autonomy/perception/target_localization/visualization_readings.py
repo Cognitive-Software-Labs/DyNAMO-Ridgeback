@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from ridgeback_autonomy.common.stamps import stamp_to_nanoseconds
 from ridgeback_autonomy.perception.target_localization.estimator_registry import (
     ESTIMATOR_FIELD_KEYS,
     ESTIMATOR_POSITION_ATTRS,
@@ -64,10 +65,6 @@ def nearest_detection_index(batch: list) -> int:
     return 0 if nearest is None else nearest
 
 
-def stamp_nanoseconds(stamp) -> int:
-    return int(stamp.sec) * 1_000_000_000 + int(stamp.nanosec)
-
-
 def partition_measurements(
     cached,
     now_nanoseconds: int,
@@ -90,7 +87,7 @@ def partition_measurements(
         msg, receipt_nanoseconds = entry
         if now_nanoseconds - receipt_nanoseconds > liveness_budget_s * 1_000_000_000:
             continue
-        stamp = stamp_nanoseconds(msg.header.stamp)
+        stamp = stamp_to_nanoseconds(msg.header.stamp)
         if now_nanoseconds - stamp > max_observation_age_s * 1_000_000_000:
             continue
         live.append((msg, stamp))

@@ -27,11 +27,12 @@ from ridgeback_autonomy.perception.target_localization.mask_measurement_node imp
     BASE_FRAME_DEFAULT,
     TargetMaskMeasurementNode,
 )
-from ridgeback_autonomy.perception.target_localization.measurement_pipeline import (
+from ridgeback_autonomy.perception.target_localization.estimator_registry import (
     MASK_GATE_BOX,
     MASK_GATE_SILHOUETTE,
+)
+from ridgeback_autonomy.perception.target_localization.measurement_pipeline import (
     MAX_BOX_FRAME_FRACTION,
-    ROBOT_FRONT_OFFSET_M_DEFAULT,
     box_within_frame_fraction,
     encode_mask_debug_image,
     fill_path_measurements,
@@ -83,15 +84,11 @@ def test_base_adapter_applies_camera_mounting_translation() -> None:
     assert lateral == pytest.approx(0.018)
 
 
-def test_defaults_mirror_shared_constants_by_value() -> None:
-    # The node's front-offset default mirrors the shared frame constant by value
-    # (the mask stack imports nothing from the estimator modules). The pure
-    # core-module mirrors are covered in test_mirrored_constants; this one needs
-    # the ROS-importing node module, so it lives here.
+def test_node_uses_the_shared_vehicle_front_offset() -> None:
     from ridgeback_autonomy.perception.target_localization.core import vehicle_frame
 
-    assert ROBOT_FRONT_OFFSET_M_DEFAULT == vehicle_frame.ROBOT_FRONT_OFFSET_M
-    assert ROBOT_FRONT_OFFSET_M_DEFAULT == 0.25
+    assert mask_measurement_node.ROBOT_FRONT_OFFSET_M is vehicle_frame.ROBOT_FRONT_OFFSET_M
+    assert vehicle_frame.ROBOT_FRONT_OFFSET_M == 0.25
     assert BASE_FRAME_DEFAULT == 'base_link'
 
 

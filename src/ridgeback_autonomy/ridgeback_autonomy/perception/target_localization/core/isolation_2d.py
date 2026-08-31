@@ -25,9 +25,10 @@ from ridgeback_autonomy.perception.target_localization.core.depth_common import 
     nearest_significant_mode,
     valid_depth,
 )
+from ridgeback_autonomy.perception.target_localization.core.ranging_defaults import (
+    NEAR_SURFACE_BAND_M as NEAREST_MODE_BAND_M_DEFAULT,
+)
 
-
-NEAREST_MODE_BAND_M_DEFAULT = 0.35
 
 OTSU_BIN_WIDTH_M_DEFAULT = 0.05
 

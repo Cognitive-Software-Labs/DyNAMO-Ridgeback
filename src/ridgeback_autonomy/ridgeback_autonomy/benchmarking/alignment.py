@@ -13,6 +13,7 @@ from ridgeback_autonomy.common.messages import (
 )
 from ridgeback_autonomy.common.miss_reason import MissReason
 from ridgeback_autonomy.common.models import Detection
+from ridgeback_autonomy.common.stamps import stamp_to_nanoseconds
 from ridgeback_autonomy.msg import TargetMeasurements
 
 from ridgeback_autonomy.perception.target_localization.estimator_registry import (
@@ -69,10 +70,6 @@ class MeasurementEvent:
     # to ground truth. Empty until the first measurement message is merged.
     detections: list[Detection] = field(default_factory=list)
     preview: EventPreview = field(default_factory=EventPreview)
-
-
-def stamp_to_nanoseconds(stamp) -> int:
-    return int(stamp.sec) * 1_000_000_000 + int(stamp.nanosec)
 
 
 def measurement_message_key(msg: TargetMeasurements) -> MeasurementEventKey:

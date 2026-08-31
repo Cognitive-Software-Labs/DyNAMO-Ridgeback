@@ -16,6 +16,21 @@ from ridgeback_autonomy.common.messages import (
 )
 from ridgeback_autonomy.common.miss_reason import MissReason
 from ridgeback_autonomy.common.models import Detection, DetectionBatch
+from ridgeback_autonomy.common.stamps import stamp_key, stamp_to_nanoseconds
+
+
+@pytest.mark.parametrize('sec,nanosec,expected', [
+    (0, 0, 0),
+    (1, 1, 1_000_000_001),
+    (-1, 999_999_999, -1),
+    (2_000_000_000, 123_456_789, 2_000_000_000_123_456_789),
+])
+def test_stamp_conversion_preserves_nanosecond_precision(sec, nanosec, expected):
+    from builtin_interfaces.msg import Time
+
+    stamp = Time(sec=sec, nanosec=nanosec)
+    assert stamp_key(stamp) == (sec, nanosec)
+    assert stamp_to_nanoseconds(stamp) == expected
 
 
 def test_build_detections_message_serializes_identity_fields() -> None:

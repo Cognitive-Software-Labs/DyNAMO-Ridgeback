@@ -20,7 +20,6 @@ from sensor_msgs.msg import Image
 from ridgeback_autonomy.benchmarking.alignment import (
     attach_exact_preview,
     ensure_measurement_event,
-    stamp_to_nanoseconds,
     store_buffered_preview,
     update_measurement_event,
 )
@@ -93,6 +92,8 @@ from ridgeback_autonomy.benchmarking.trial_results import (
     dominant_miss_reasons,
 )
 from ridgeback_autonomy.msg import TargetMeasurements
+from ridgeback_autonomy.common.stamps import stamp_to_nanoseconds
+from ridgeback_autonomy.perception.target_localization.core.depth_common import DEPTH_GATE_DISABLED
 from ridgeback_autonomy.perception.target_localization.core.image_utils import convert_color_image_message
 from ridgeback_autonomy.perception.target_localization.core.isolation_2d import ISOLATION_2D_DEFAULT
 from ridgeback_autonomy.perception.target_localization.core.isolation_3d import ISOLATION_3D_DEFAULT
@@ -111,7 +112,6 @@ DELETE_TIMEOUT_SEC = 15.0
 # older than the scene it describes.
 TRUTH_PUBLISH_PERIOD_SEC = 0.2
 DEPTH_SOURCE_DEFAULT = 'stereoscopic'
-DEPTH_GATE_DISABLED = 0.0
 
 # WM_CLASS of the window to record. RViz holds the whole picture once the
 # perception overlay is published into it, so one window is the whole run.

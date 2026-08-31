@@ -20,8 +20,8 @@ Two depth ceilings live here, and they are not interchangeable:
 - ``DEPTH_MAX_METERS_DEFAULT`` -- 10 m, for the callers that still need a
   finite number: the depth colorizers, which normalize by it and would render a
   uniform frame given infinity, and the isolation catalogues' static defaults.
-  It mirrors ``pointcloud_ranging.POINTCLOUD_MAX_METERS`` by value; the mask
-  stack deliberately never imports from the pointcloud path.
+  It shares ``ranging_defaults.MAX_RANGE_M`` with the pointcloud path without
+  either path importing the other estimator.
 """
 
 from __future__ import annotations
@@ -30,8 +30,10 @@ import math
 
 import numpy as np
 
+from ridgeback_autonomy.perception.target_localization.core.ranging_defaults import (
+    MAX_RANGE_M as DEPTH_MAX_METERS_DEFAULT,
+)
 
-DEPTH_MAX_METERS_DEFAULT = 10.0
 
 MASK_DEPTH_GATE_DEFAULT = math.inf
 
