@@ -1,6 +1,6 @@
 """Rules shared by every consumer of an aligned depth frame.
 
-Two of them, both deliberately independent of which localization path is
+Three of them, all deliberately independent of which localization path is
 calling:
 
 - ``valid_depth`` -- the clean rule (``projective_ranging.md`` Section 2.2,
@@ -10,6 +10,8 @@ calling:
 - ``nearest_significant_mode`` -- the near-surface anchor, shared by the 2D and
   3D isolation catalogues so the pixel domain and the point domain agree on
   where the subject starts.
+- ``prepare_depth_region`` -- the per-detection select+clean prologue both depth
+  estimators consume, cut to the mask's own storage window.
 
 Two depth ceilings live here, and they are not interchangeable:
 
@@ -27,9 +29,11 @@ Two depth ceilings live here, and they are not interchangeable:
 from __future__ import annotations
 
 import math
+from dataclasses import dataclass
 
 import numpy as np
 
+from ridgeback_autonomy.perception.target_localization.core.mask import MaskRegion
 from ridgeback_autonomy.perception.target_localization.core.ranging_defaults import (
     MAX_RANGE_M as DEPTH_MAX_METERS_DEFAULT,
 )
@@ -69,6 +73,49 @@ def valid_depth(
     depths = np.asarray(depths)
     with np.errstate(invalid='ignore'):
         return np.isfinite(depths) & (depths > 0.0) & (depths <= depth_max)
+
+
+@dataclass(frozen=True)
+class PreparedDepthRegion:
+    """One detection's depth selection, cut to its mask's storage window.
+
+    The select+clean prologue both depth estimators used to run separately,
+    computed once per detection and handed to whichever of them is enabled. The
+    two must see the *same* selection: a row present for one estimator and
+    absent for the other would make their misses incomparable.
+
+    ``depth_full`` is retained by reference, not copied -- euclidean
+    reconstruction deprojects with global indices against the original frame and
+    the original color intrinsics, which is exactly what keeps the ROI from
+    needing adjusted intrinsics of its own.
+    """
+
+    region: MaskRegion
+    depth_full: np.ndarray  # the whole aligned depth frame, by reference
+    roi_depth: np.ndarray  # ``depth_full`` restricted to the region's window
+    valid_masked: np.ndarray  # region-local: selected by the mask AND valid depth
+
+
+def prepare_depth_region(
+    region: MaskRegion,
+    depth_m: np.ndarray,
+    frame_valid_depth: np.ndarray,
+) -> PreparedDepthRegion:
+    """Cut one shared frame-wide depth validity image down to one mask's window.
+
+    ``frame_valid_depth`` is ``valid_depth(depth_m, gate)`` for the whole frame,
+    computed at most once per batch by the caller: the gate is frame-wide, so
+    recomputing it per detection would re-scan the frame N times to get the same
+    answer. Slicing it is what makes the per-detection cost proportional to the
+    detection rather than to the image.
+    """
+
+    return PreparedDepthRegion(
+        region=region,
+        depth_full=depth_m,
+        roi_depth=region.slice_image(depth_m),
+        valid_masked=region.data & region.slice_image(frame_valid_depth),
+    )
 
 
 def nearest_significant_mode(

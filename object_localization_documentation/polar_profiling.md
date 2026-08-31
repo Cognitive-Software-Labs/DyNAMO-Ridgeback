@@ -18,7 +18,7 @@ architecture-level view of polar profiling is `object_localization_pipeline.md` 
 
 **Inputs**
 
-- A **mask** from the mask interface: an `H×W` boolean array on the RGB color
+- A **mask** from the mask interface: a boolean selector on the RGB color
   grid, plus its precision tag (`tight` | `rect`). See `mask_component.md`.
   Same interface as projective ranging and euclidean reconstruction — polar profiling rejoins the pipeline only here.
 - A **LaserScan** from the front Hokuyo UST (`sensors/lidar2d_0/scan`): 270°
@@ -126,7 +126,7 @@ The mask indexes the projected points exactly as it indexes depth pixels in
 projective ranging — the same one-line selection mechanic, in sparse form:
 
 ```python
-keep = mask.data[v_px, u_px]         # per-point membership test
+keep = mask.contains_pixels(u_px, v_px)   # per-point membership test
 ```
 
 This is the whole payoff of the mask interface for polar profiling: `tight` and `rect`

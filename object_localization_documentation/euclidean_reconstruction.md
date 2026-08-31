@@ -15,7 +15,7 @@ the 3D foreground-isolation methods are catalogued in
 
 **Inputs**
 
-- A **mask** from the mask interface: an `H×W` boolean array on the RGB color
+- A **mask** from the mask interface: a boolean selector on the RGB color
   grid, plus its precision tag (`tight` | `rect`). See `mask_component.md`.
 - An **aligned depth frame** (canonical input): 1:1 with the RGB pixels, from
   either depth source (`aligned_depth.md`). Euclidean reconstruction builds its own point
@@ -82,6 +82,13 @@ Two implementation notes:
   on the same grid, the multiply can be restricted to the masked pixels
   (`~5–20 k` instead of `H×W`), which is the form production code should use.
   The full-frame form exists for debugging and RViz export.
+- **Where the ROI stops.** The mask *selection* is read off the mask's own
+  storage window (`mask_component.md` Section 7), but the deprojection is not:
+  the surviving indices are lifted to full-grid coordinates and gathered from
+  the original depth frame against the original color intrinsics. There are no
+  ROI-adjusted intrinsics. `deproject_masked` gathers the selected depths
+  *before* widening them to float64 precisely so it can be handed the whole
+  frame this way without casting it.
 
 Invalid depth pixels (0 / NaN / inf — see the cleaning rules in
 `projective_ranging.md` §2.2, which apply verbatim) must be dropped either before

@@ -15,7 +15,7 @@ is `euclidean_reconstruction.md`.
 
 **Inputs**
 
-- A **mask** from the mask interface: an `H×W` boolean array on the RGB color
+- A **mask** from the mask interface: a boolean selector on the RGB color
   grid, plus its precision tag (`tight` | `rect`). See `mask_component.md`.
 - An **aligned depth frame**: a depth image that is 1:1 with the RGB pixels, so
   that depth pixel `(u, v)` is the same ray as color pixel `(u, v)`. Producing
@@ -102,7 +102,13 @@ one recipe, the `rect` branch is defined as a single component with a fixed
 contract, so multiple recipes can be implemented and benchmarked against each
 other on identical input:
 
-- **Input:** the aligned depth frame and the mask (both `H×W` on the color grid).
+- **Input:** the aligned depth frame and the mask. Production runs this on the
+  mask's own **storage window** — a depth view, the mask payload and the sliced
+  validity image, all the same ROI shape — and lifts the surviving pixels back
+  to full-grid coordinates before deprojection (`mask_component.md` Section 7).
+  The recipes are shape-agnostic, and a window's valid pixels are the frame's
+  valid pixels in the same row-major order, so the histogram sees the identical
+  value sequence either way.
 - **Output:** the **foreground pixels** — the subset of the masked pixels that
   belong to the object (the G1), with the background pixels dropped. Concretely,
   the pixel coordinates inside the frame that the strategy classifies as object;

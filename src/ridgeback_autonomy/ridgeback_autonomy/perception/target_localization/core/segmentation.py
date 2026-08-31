@@ -3,10 +3,12 @@
 A box-promptable segmenter (SAM family) prompted with the OWLv2 detection
 boxes -- one box prompt, one pixel-precise mask -- keeping the detector's
 open-vocabulary property and the 1:1:1 frame -> detection -> mask hierarchy
-(``mask_component.md`` Section 6). The consuming node wraps each returned
-blob with ``mask_from_array(blob, MaskPrecision.TIGHT)``; this module returns
-plain arrays and knows nothing about producers or consumers, same as
-``rasterize_*`` on the rect side.
+(``mask_component.md`` Section 6). Blobs are returned on the **full color
+grid**, which is this module's boundary; the consuming node crops each one to
+its own extent with ``region_from_blob(blob, MaskPrecision.TIGHT)`` and the
+frame-sized output expires there. This module returns plain arrays and knows
+nothing about producers or consumers, same as ``region_from_bbox`` on the rect
+side.
 
 Cost split (``mask_component.md`` Section 6): all boxes of a frame go through
 **one** forward pass -- the image encoder runs once per frame, the prompt

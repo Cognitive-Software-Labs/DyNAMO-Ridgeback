@@ -11,10 +11,11 @@ from ridgeback_autonomy.common.markers import PolarBeamRecord
 from ridgeback_autonomy.common.miss_reason import MissReason
 from ridgeback_autonomy.perception.target_localization.core.depth_common import (
     MASK_DEPTH_GATE_DEFAULT,
+    prepare_depth_region,
     valid_depth,
 )
 from ridgeback_autonomy.perception.target_localization.core.euclidean_reconstruction import (
-    localize_euclidean_reconstruction,
+    localize_prepared_euclidean_reconstruction,
 )
 from ridgeback_autonomy.perception.target_localization.core.polar_profiling import (
     localize_projected_polar_profiling,
@@ -22,7 +23,7 @@ from ridgeback_autonomy.perception.target_localization.core.polar_profiling impo
     select_bbox_beams,
 )
 from ridgeback_autonomy.perception.target_localization.core.projective_ranging import (
-    localize_projective_ranging,
+    localize_prepared_projective_ranging,
 )
 from ridgeback_autonomy.perception.target_localization.estimator_registry import (
     ESTIMATOR_FIELD_KEYS,
@@ -139,13 +140,17 @@ def fill_path_measurements(
     beam_records: list | None = None,
     enabled=MASK_ESTIMATORS,
 ) -> None:
-    """Run every enabled path for each index-aligned detection and mask, in place.
+    """Run every enabled path for each index-aligned detection and region, in place.
 
-    A ``None`` mask is a deliberate no-fallback miss and stays unset. Paths
+    A ``None`` region is a deliberate no-fallback miss and stays unset. Paths
     outside ``enabled`` are never run or status-stamped. Frame-wide depth
     validity and scan projection are each computed lazily at most once, then
     shared across detections; optional beam records are by-products of polar
     work that was already selected, never a reason to run it.
+
+    Both depth estimators receive the **same** ``PreparedDepthRegion``, prepared
+    once per detection. Preparing it twice would cost a second pass and, worse,
+    leave the two rows free to disagree about which pixels were selected.
     """
 
     wants_projective = 'projective_ranging' in enabled
@@ -164,16 +169,16 @@ def fill_path_measurements(
             if wants_euclidean:
                 detection.euclidean_reconstruction_status = int(MissReason.NO_DEPTH_FRAME)
         else:
-            valid_masked = None
+            prepared = None
             if wants_projective or wants_euclidean:
                 if frame_valid_depth is None:
                     frame_valid_depth = valid_depth(depth_m, depth_max)
-                valid_masked = mask.data & frame_valid_depth
+                prepared = prepare_depth_region(mask, depth_m, frame_valid_depth)
 
             if wants_projective:
-                result_a, reason_a = localize_projective_ranging(
-                    depth_m, mask, intrinsics, isolation=isolation_2d,
-                    depth_max=depth_max, valid_masked=valid_masked)
+                result_a, reason_a = localize_prepared_projective_ranging(
+                    prepared, intrinsics, isolation=isolation_2d,
+                    depth_max=depth_max)
                 detection.projective_ranging_status = int(reason_a)
                 if result_a is not None:
                     (
@@ -185,9 +190,8 @@ def fill_path_measurements(
                         front_offset_m)
 
             if wants_euclidean:
-                result_b, reason_b = localize_euclidean_reconstruction(
-                    depth_m, mask, intrinsics, isolation=isolation_3d,
-                    depth_max=depth_max, valid_masked=valid_masked)
+                result_b, reason_b = localize_prepared_euclidean_reconstruction(
+                    prepared, intrinsics, isolation=isolation_3d)
                 detection.euclidean_reconstruction_status = int(reason_b)
                 if result_b is not None:
                     (
@@ -259,12 +263,17 @@ def nearest_beam_record(batch, beam_records):
 
 
 def encode_mask_debug_image(masks, image_height: int, image_width: int, header) -> Image:
-    """Union of the frame's masks as a ``mono8`` Image (255 = object)."""
+    """Union of the frame's mask regions as a ``mono8`` Image (255 = object).
+
+    Each region is blitted into the one output buffer. Materializing a
+    full-frame mask per detection first would allocate the whole image once per
+    detection to produce the same bytes.
+    """
 
     union = np.zeros((image_height, image_width), dtype=np.uint8)
     for mask in masks:
         if mask is not None:
-            union[mask.data] = 255
+            mask.blit_into(union, 255)
     msg = Image()
     msg.header = header
     msg.height = image_height

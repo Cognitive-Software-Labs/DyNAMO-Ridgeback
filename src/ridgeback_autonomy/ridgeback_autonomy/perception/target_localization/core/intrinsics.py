@@ -111,9 +111,15 @@ def deproject_masked(
     pixels is the production form of euclidean reconstruction's deproject step
     (``euclidean_reconstruction.md`` Section 2.1). Returns an ``(N, 3)`` float array in
     the camera optical frame.
+
+    The gather happens **before** the float64 conversion, not after: casting
+    first would widen the whole frame for every detection, which is why a caller
+    can safely hand this the full depth frame plus one mask's global indices
+    instead of cropping. float32 -> float64 is exact and elementwise, so the
+    order does not move a single value.
     """
 
-    z = np.asarray(depth_m, dtype=np.float64)[rows, cols]
+    z = np.asarray(depth_m)[rows, cols].astype(np.float64, copy=False)
     x = (np.asarray(cols, dtype=np.float64) - intrinsics.cx) / intrinsics.fx * z
     y = (np.asarray(rows, dtype=np.float64) - intrinsics.cy) / intrinsics.fy * z
     return np.stack((x, y, z), axis=-1)

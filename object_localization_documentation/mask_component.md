@@ -16,9 +16,15 @@ downstream agnostic to which model ran, all front-ends emit into a **single
 common representation**: a binary mask plus a precision tag. Downstream code
 reads only this representation and never branches on which detector produced it.
 
-A mask is fundamentally a **selector**: an `H×W` boolean array that answers, for
-every pixel of the RGB color image, "does this pixel belong to the detected
-object?" Pixels marked `True` are the object's region; everything else is `False`.
+A mask is fundamentally a **selector**: it answers, for every pixel of the RGB
+color image, "does this pixel belong to the detected object?" Pixels marked
+`True` are the object's region; everything else is `False`.
+
+That question is about the whole color grid; how the answer is *stored* is a
+separate matter, covered in Section 7. Production stores it as a `MaskRegion` —
+a boolean payload over a rectangular window of the grid, with everything outside
+the window implicitly `False`. Sections 2–6 describe the selector and hold for
+either storage form.
 
 ---
 
@@ -31,8 +37,8 @@ There are **two** types of mask, both emitted into the same interface:
 | Tight  | `tight` | instance segmentation (pixel-precise)    | an arbitrary blob          |
 | Rect   | `rect`  | object detection → rasterized bounding box | a solid rectangle        |
 
-Both are the same *type* — an `H×W` binary mask — so downstream selection is
-written once and works for either. They differ only in how faithfully the `True`
+Both are the same *type* — a boolean selector plus a tag — so downstream
+selection is written once and works for either. They differ only in how faithfully the `True`
 region follows the object's true silhouette, which is recorded by the
 **precision tag** (`tight` | `rect`).
 
@@ -67,17 +73,31 @@ component depends on which detector produced the box — only on the box.
 
 ### 3.2 Rasterization to a binary mask
 
-Converting the box to the mask representation is a single fill operation: every
-pixel inside the box becomes `True`, every pixel outside becomes `False`.
+Converting the box to the mask representation selects every pixel inside the
+box and nothing outside it. Because the selected set *is* the box, production
+stores the box as its own window and the payload needs no `False` at all:
 
 ```python
-mask = np.zeros((H, W), dtype=bool)   # H, W = RGB color image height, width
+x1, y1, x2, y2 = clamp_box(bbox_xyxy, H, W)   # H, W = color image height, width
+region = MaskRegion(
+    data=np.ones((y2 - y1, x2 - x1), dtype=bool),
+    origin_u=x1, origin_v=y1,
+    image_width=W, image_height=H,
+    precision=MaskPrecision.RECT,
+)
+```
+
+The full-grid form of the same selector is what `rasterize_bbox` returns, for
+whole-frame artifacts:
+
+```python
+mask = np.zeros((H, W), dtype=bool)
 mask[y1:y2, x1:x2] = True             # solid rectangle of True
 ```
 
-The result is an `H×W` boolean array at the **resolution of the RGB color
-image**. There is no interpolation, no thresholding, and no model inference in
-this step — it is a pure, deterministic geometric fill.
+Both go through the same `clamp_box`, so they cover identical pixels. There is
+no interpolation, no thresholding, and no model inference in either — it is a
+pure, deterministic geometric fill.
 
 ### 3.3 Pixel grid
 
@@ -85,8 +105,9 @@ The mask is defined in exactly one coordinate system: the **RGB color image
 pixel grid**. Concretely, that grid is fixed by three things:
 
 - **Resolution** — the color grid of the active backend (the current Clearpath
-  default is `640 × 480`). The mask is allocated at this size, so
-  `mask.shape == (H, W)` of the color frame.
+  default is `640 × 480`). Every mask records this grid, whether or not it
+  allocates the whole of it: a `Mask` is `(H, W)`, a `MaskRegion` carries
+  `image_shape == (H, W)` alongside its smaller payload.
 - **Intrinsics** — the color camera's projection parameters. They are not used
   to build the mask, but they define what each pixel index *means* as a ray into
   the scene, which matters the moment the mask is used as a selector.
@@ -119,7 +140,8 @@ The `rect` tag is exactly that marker.
 
 A rectangular mask is:
 
-- an `H×W` boolean array at color-image resolution,
+- a boolean selector over the color-image grid (stored as the box's own
+  window — Section 7),
 - with a solid rectangle of `True` pixels matching the detector's box,
 - tagged `rect`,
 - bound to the color frame's grid (resolution, intrinsics, timestamp),
@@ -140,7 +162,7 @@ The tight mask is the second front-end and is **not** detailed here — see
 (SlimSAM by default), prompted with the detector's boxes, produces a
 pixel-precise `True` region (an arbitrary blob, not a rectangle), tagged
 `tight`, with negligible background contamination. It emits into the identical
-mask interface via `mask_from_array(blob, MaskPrecision.TIGHT)`, so nothing
+mask interface via `region_from_blob(blob, MaskPrecision.TIGHT)`, so nothing
 that consumes a mask changed when it was added. The front-end is selected per
 run by the `mask_gate` parameter (`box` | `silhouette`).
 
@@ -312,7 +334,74 @@ by detection index `i` to recover each object's mask region and its result.
 
 ---
 
-## 7. Open items
+## 7. Storage: a local window, global meaning
+
+Sections 1–6 describe what a mask *means*: a selector over the color grid. This
+section describes how one is *stored*, which is a different thing and has been
+since the ROI migration.
+
+### 7.1 Two representations
+
+| Type | Indexing | Where it is used |
+|------|----------|------------------|
+| `MaskRegion` | `data[local_row, local_col]`, offset by `(origin_u, origin_v)` | every per-detection measurement stage — the canonical production form |
+| `Mask` | `data[v, u]` over the whole image | whole-frame artifacts, masks arriving off the wire, the standalone helper signatures |
+
+A `MaskRegion` carries a boolean payload sized to a **rectangular storage
+window** of the color grid, plus the window's origin, the full grid's
+dimensions, and the same `MaskPrecision` tag. Outside the window, membership is
+implicitly `False`. A region and the `Mask` it materializes to therefore select
+exactly the same pixels — Sections 1–6 hold unchanged for both.
+
+Both forms carry the precision tag explicitly. Precision is never inferred from
+the shape of the storage: a `tight` silhouette that happens to fill its window
+completely is still `tight`, and still gets the tight foreground policy.
+
+### 7.2 What each producer stores
+
+- **`rect`** (`region_from_bbox`): the clamped detector box *is* the window, so
+  the payload is all-`True` and carries no `False` at all. `clamp_box` is shared
+  with the full-grid rasterizers, so both forms cover identical pixels.
+- **`tight`** (`region_from_blob`): the segmenter returns a blob on the full
+  color grid — that is the model boundary and it does not move. The producer
+  crops it to the blob's **own nonzero extent**, not to the detector box, and
+  copies. Cropping to the box would delete real silhouette pixels: the prompt is
+  padded (`PROMPT_PADDING_REL_DEFAULT`), so the returned silhouette can extend
+  past the box that prompted it. The copy is what lets the frame-sized model
+  output expire immediately; the region does not keep it alive as a numpy base.
+
+A degenerate or fully clamped-away box yields the **canonical empty region** — a
+`(0, 0)` payload that still names its grid and precision. That is a valid
+selector with zero pixels, and it is *not* `None`. The distinction from Section
+6.1's oversized-box `None` is load-bearing: `None` means "no mask for this
+detection, skip it", while an empty region is measured normally and fails
+through the ordinary minimum-count guards with the ordinary miss reasons.
+
+### 7.3 Local storage, global coordinates
+
+Everything a mask hands to a consumer that is defined against the camera is in
+**full-grid** coordinates, because the intrinsics describe the color grid and
+nothing else. The rule downstream is therefore:
+
+- select on window-local arrays (depth window, mask payload, sliced validity),
+- convert to global with `MaskRegion.global_pixels` exactly once,
+- deproject against the original frame and the original intrinsics.
+
+There are no ROI-adjusted intrinsics, no resampling, and no per-region cache.
+Membership queries (`contains_pixels`) test the window bounds *before* indexing,
+so a coordinate outside the window reads as "not selected" instead of wrapping
+around to a pixel on the far edge of the payload.
+
+### 7.4 Why the window rather than the frame
+
+Storage was previously one full-grid array per detection regardless of how small
+the detection was. For a production-sized box (~2% of frame) the region is
+roughly 50× smaller, at either 640×480 or 1280×720. The measured consequences,
+and the two cases that got slower, are recorded in `roi_mask_migration.md`.
+
+---
+
+## 8. Open items
 
 Resolved:
 

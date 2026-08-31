@@ -97,11 +97,17 @@ the SAM 3 spike passed its gates and the adoption question is open (§7.2).
 
 ## 3. Output semantics
 
-- One blob per box, index-aligned with the detections.
-- The consuming node wraps each blob with
-  `mask_from_array(blob, MaskPrecision.TIGHT)` — the module returns plain
+- One blob per box, index-aligned with the detections, on the **full color
+  grid**. That is this module's boundary and it does not move.
+- The consuming node crops each blob to its own extent with
+  `region_from_blob(blob, MaskPrecision.TIGHT)` — the module returns plain
   arrays and knows nothing about producers or consumers, mirroring
-  `rasterize_*` on the rect side.
+  `region_from_bbox` on the rect side. The crop is to the blob's **nonzero
+  extent, not to the prompt box**: the prompt is padded (Section 2), so a
+  returned silhouette can legitimately extend past the box that produced it,
+  and cropping to the box would delete those pixels. The crop is copied, so the
+  frame-sized blob expires at that point rather than being kept alive as the
+  region's backing store. See `mask_component.md` Section 7.
 - **Empty or below-floor segmentation → `None` → trial drops.** A winning mask
   that is empty **or** whose predicted IoU falls below the floor
   (`segmentation_min_iou`, default 0.5 — §2) yields `None` for that detection;

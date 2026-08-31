@@ -36,7 +36,7 @@ from ridgeback_autonomy.perception.target_localization.core.intrinsics import (
     CameraIntrinsics,
     project_points,
 )
-from ridgeback_autonomy.perception.target_localization.core.mask import Mask
+from ridgeback_autonomy.perception.target_localization.core.mask import as_mask_region
 from ridgeback_autonomy.perception.target_localization.core.ranging_defaults import (
     NEAR_SURFACE_BAND_M as RANGE_BAND_M_DEFAULT,
 )
@@ -281,12 +281,22 @@ def project_in_view(
     return projection.beam_indices, projection.uv
 
 
-def select_mask_beams(projection: ScanImageProjection, mask: Mask) -> np.ndarray:
-    """Original scan beam indices selected by one mask from a prepared mapping."""
+def select_mask_beams(projection: ScanImageProjection, mask) -> np.ndarray:
+    """Original scan beam indices selected by one mask from a prepared mapping.
+
+    Membership goes through the region geometry rather than a raw
+    ``data[v_px, u_px]`` index, so a beam projecting outside a cropped mask's
+    storage window reads as "not selected" instead of wrapping around to a pixel
+    on the far edge of the payload. Both mask representations are accepted;
+    ``project_points`` has already clipped every compact beam to the grid, so a
+    full-grid mask selects exactly what it always did.
+    """
 
     if projection.beam_indices.size == 0:
         return projection.beam_indices
-    return projection.beam_indices[mask.data[projection.v_px, projection.u_px]]
+    region = as_mask_region(mask)
+    return projection.beam_indices[
+        region.contains_pixels(projection.u_px, projection.v_px)]
 
 
 def select_bbox_beams(
@@ -308,7 +318,7 @@ def select_bbox_beams(
 def select_beams(
     points_optical: np.ndarray,
     valid: np.ndarray,
-    mask: Mask,
+    mask,
     intrinsics: CameraIntrinsics,
 ) -> np.ndarray:
     """Beam indices inside both the camera FoV and ``mask`` -- the SELECT step.
@@ -349,7 +359,7 @@ def beams_in_bbox(
 
 def localize_projected_polar_profiling(
     projection: ScanImageProjection,
-    mask: Mask,
+    mask,
     *,
     range_jump_m: float = RANGE_JUMP_M_DEFAULT,
     range_band_m: float = RANGE_BAND_M_DEFAULT,
@@ -413,7 +423,7 @@ def localize_projected_polar_profiling(
 def localize_polar_profiling(
     points_optical: np.ndarray,
     valid: np.ndarray,
-    mask: Mask,
+    mask,
     intrinsics: CameraIntrinsics,
     *,
     range_jump_m: float = RANGE_JUMP_M_DEFAULT,

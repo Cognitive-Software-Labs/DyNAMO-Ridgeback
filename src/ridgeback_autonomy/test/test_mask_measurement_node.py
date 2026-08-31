@@ -18,7 +18,10 @@ from ridgeback_autonomy.common.messages import (
 from ridgeback_autonomy.common.models import Detection, DetectionBatch
 from ridgeback_autonomy.common.miss_reason import MissReason
 from ridgeback_autonomy.perception.target_localization.core.intrinsics import CameraIntrinsics
-from ridgeback_autonomy.perception.target_localization.core.mask import MaskPrecision, mask_from_array
+from ridgeback_autonomy.perception.target_localization.core.mask import (
+    MaskPrecision,
+    region_from_blob,
+)
 from ridgeback_autonomy.perception.target_localization import (
     mask_measurement_node,
     measurement_pipeline,
@@ -299,7 +302,7 @@ def forbidden_isolation(*args, **kwargs):
 
 def test_fill_with_tight_masks_runs_paths_without_isolation_recipes() -> None:
     batch = build_fill_batch()
-    masks = [mask_from_array(tight_blob(), MaskPrecision.TIGHT)]
+    masks = [region_from_blob(tight_blob(), MaskPrecision.TIGHT)]
 
     fill_path_measurements(
         batch,
@@ -328,36 +331,33 @@ def test_fill_computes_valid_depth_once_and_shares_each_masked_result(
 ) -> None:
     batch = build_fill_batch(count=2)
     masks = [
-        mask_from_array(tight_blob(), MaskPrecision.TIGHT),
-        mask_from_array(tight_blob(), MaskPrecision.TIGHT),
+        region_from_blob(tight_blob(), MaskPrecision.TIGHT),
+        region_from_blob(tight_blob(), MaskPrecision.TIGHT),
     ]
     depth_m = build_fill_depth()
     validity_calls = []
-    projective_valid = []
-    euclidean_valid = []
+    projective_prepared = []
+    euclidean_prepared = []
 
     def compute_valid_once(depth_arg, depth_max):
         validity_calls.append((depth_arg, depth_max))
         return np.isfinite(depth_arg) & (depth_arg > 0.0) & (depth_arg <= depth_max)
 
-    def projective_stub(
-        depth_arg, mask_arg, intrinsics_arg, *, valid_masked, **kwargs,
-    ):
-        projective_valid.append(valid_masked)
+    def projective_stub(prepared_arg, intrinsics_arg, **kwargs):
+        projective_prepared.append(prepared_arg)
         return None, MissReason.ISOLATION_EMPTY
 
-    def euclidean_stub(
-        depth_arg, mask_arg, intrinsics_arg, *, valid_masked, **kwargs,
-    ):
-        euclidean_valid.append(valid_masked)
+    def euclidean_stub(prepared_arg, intrinsics_arg, **kwargs):
+        euclidean_prepared.append(prepared_arg)
         return None, MissReason.ISOLATION_EMPTY
 
     monkeypatch.setattr(
         measurement_pipeline, 'valid_depth', compute_valid_once)
     monkeypatch.setattr(
-        measurement_pipeline, 'localize_projective_ranging', projective_stub)
+        measurement_pipeline, 'localize_prepared_projective_ranging', projective_stub)
     monkeypatch.setattr(
-        measurement_pipeline, 'localize_euclidean_reconstruction', euclidean_stub)
+        measurement_pipeline,
+        'localize_prepared_euclidean_reconstruction', euclidean_stub)
 
     fill_path_measurements(
         batch, masks, FILL_INTRINSICS, depth_m, None,
@@ -373,13 +373,22 @@ def test_fill_computes_valid_depth_once_and_shares_each_masked_result(
     assert len(validity_calls) == 1
     assert validity_calls[0][0] is depth_m
     assert validity_calls[0][1] == 3.0
-    assert len(projective_valid) == len(euclidean_valid) == 2
-    for index, mask in enumerate(masks):
-        assert projective_valid[index] is euclidean_valid[index]
+    assert len(projective_prepared) == len(euclidean_prepared) == 2
+    for index, region in enumerate(masks):
+        prepared = projective_prepared[index]
+        # One preparation per detection, handed to both depth estimators: the
+        # same object, not two equal ones.
+        assert prepared is euclidean_prepared[index]
+        assert prepared.region is region
+        assert prepared.depth_full is depth_m
+        # The selection is region-local, and it selects the same global pixels
+        # the full-frame form would have.
+        assert prepared.valid_masked.shape == region.roi_shape
+        expected = np.zeros(depth_m.shape, dtype=bool)
+        expected[prepared.valid_masked.nonzero()[0] + region.origin_v,
+                 prepared.valid_masked.nonzero()[1] + region.origin_u] = True
         assert np.array_equal(
-            projective_valid[index],
-            mask.data & (depth_m <= 3.0),
-        )
+            expected, region.to_full_array() & (depth_m <= 3.0))
 
 
 def build_fill_scan(near_ratios, near_z: float = 2.0, wall_z: float = 5.0, count: int = 41):
@@ -398,7 +407,7 @@ def build_fill_scan(near_ratios, near_z: float = 2.0, wall_z: float = 5.0, count
 
 def test_fill_records_the_beams_polar_reduced() -> None:
     batch = build_fill_batch()
-    masks = [mask_from_array(tight_blob(), MaskPrecision.TIGHT)]
+    masks = [region_from_blob(tight_blob(), MaskPrecision.TIGHT)]
     scan_points = build_fill_scan(lambda ratios: np.abs(ratios) <= 0.05)
     records: list = []
 
@@ -431,7 +440,7 @@ def test_fill_records_beams_even_when_polar_produces_no_estimate() -> None:
     # still what a viewer needs -- that is how "declined" is told apart from
     # "latched onto the near thing".
     batch = build_fill_batch()
-    masks = [mask_from_array(tight_blob(), MaskPrecision.TIGHT)]
+    masks = [region_from_blob(tight_blob(), MaskPrecision.TIGHT)]
     scan_points = build_fill_scan(
         lambda ratios: np.isclose(ratios, 0.0, atol=1e-9), near_z=1.0)
     records: list = []
@@ -458,8 +467,8 @@ def test_fill_projects_one_scan_once_for_multiple_polar_masks(
 ) -> None:
     batch = build_fill_batch(count=2)
     masks = [
-        mask_from_array(tight_blob(), MaskPrecision.TIGHT),
-        mask_from_array(tight_blob(), MaskPrecision.TIGHT),
+        region_from_blob(tight_blob(), MaskPrecision.TIGHT),
+        region_from_blob(tight_blob(), MaskPrecision.TIGHT),
     ]
     calls = []
     original_project = measurement_pipeline.project_scan_to_image
@@ -492,8 +501,8 @@ def test_fill_projects_one_scan_once_for_multiple_polar_masks(
 def test_failed_polar_rviz_path_still_projects_once(monkeypatch) -> None:
     batch = build_fill_batch(count=2)
     masks = [
-        mask_from_array(tight_blob(), MaskPrecision.TIGHT),
-        mask_from_array(tight_blob(), MaskPrecision.TIGHT),
+        region_from_blob(tight_blob(), MaskPrecision.TIGHT),
+        region_from_blob(tight_blob(), MaskPrecision.TIGHT),
     ]
     calls = []
     original_project = measurement_pipeline.project_scan_to_image
@@ -529,10 +538,10 @@ def test_failed_polar_rviz_path_still_projects_once(monkeypatch) -> None:
     [
         ([None, None], build_fill_scan(lambda ratios: np.abs(ratios) <= 0.05),
          frozenset({'polar_profiling'})),
-        ([mask_from_array(tight_blob(), MaskPrecision.TIGHT)],
+        ([region_from_blob(tight_blob(), MaskPrecision.TIGHT)],
          build_fill_scan(lambda ratios: np.abs(ratios) <= 0.05),
          frozenset({'projective_ranging'})),
-        ([mask_from_array(tight_blob(), MaskPrecision.TIGHT)], None,
+        ([region_from_blob(tight_blob(), MaskPrecision.TIGHT)], None,
          frozenset({'polar_profiling'})),
     ],
     ids=('all-masks-none', 'polar-disabled', 'scan-unavailable'),
@@ -602,7 +611,7 @@ def test_a_batch_with_no_estimates_still_draws_its_beams() -> None:
 
 def test_fill_skips_none_mask_entries_fields_stay_unset() -> None:
     batch = build_fill_batch(count=2)
-    masks = [None, mask_from_array(tight_blob(), MaskPrecision.TIGHT)]
+    masks = [None, region_from_blob(tight_blob(), MaskPrecision.TIGHT)]
 
     fill_path_measurements(
         batch,
@@ -633,9 +642,9 @@ def test_encode_mask_debug_image_unions_masks_and_skips_none() -> None:
     header.stamp.sec = 7
 
     msg = encode_mask_debug_image(
-        [mask_from_array(mask_a, MaskPrecision.TIGHT),
+        [region_from_blob(mask_a, MaskPrecision.TIGHT),
          None,
-         mask_from_array(mask_b, MaskPrecision.TIGHT)],
+         region_from_blob(mask_b, MaskPrecision.TIGHT)],
         4, 6, header)
 
     assert msg.encoding == 'mono8'
@@ -649,7 +658,7 @@ def test_encode_mask_debug_image_unions_masks_and_skips_none() -> None:
 def _status_fixture():
     from ridgeback_autonomy.common.models import Detection, DetectionBatch
     from ridgeback_autonomy.perception.target_localization.core.intrinsics import CameraIntrinsics
-    from ridgeback_autonomy.perception.target_localization.core.mask import rasterize_bbox
+    from ridgeback_autonomy.perception.target_localization.core.mask import region_from_bbox
 
     intrinsics = CameraIntrinsics(fx=100.0, fy=100.0, cx=40.0, cy=30.0, width=80, height=60)
     depth = np.full((60, 80), 4.0, dtype=np.float32)
@@ -657,7 +666,7 @@ def _status_fixture():
     batch = DetectionBatch(
         image_width=80, image_height=60,
         detections=[Detection(bbox_xyxy=(25, 15, 55, 45), label='r', score=0.9)])
-    masks = [rasterize_bbox((25, 15, 55, 45), 60, 80)]
+    masks = [region_from_bbox((25, 15, 55, 45), 60, 80)]
     return intrinsics, depth, batch, masks
 
 
@@ -712,7 +721,7 @@ def test_fill_with_no_depth_still_lets_polar_fill_the_same_frame() -> None:
     from ridgeback_autonomy.common.miss_reason import MissReason
 
     batch = build_fill_batch()
-    masks = [mask_from_array(tight_blob(), MaskPrecision.TIGHT)]
+    masks = [region_from_blob(tight_blob(), MaskPrecision.TIGHT)]
 
     fill_path_measurements(
         batch, masks, FILL_INTRINSICS, None,
@@ -740,7 +749,7 @@ def test_fill_runs_only_the_enabled_paths_leaving_the_rest_unset() -> None:
     from ridgeback_autonomy.common.miss_reason import MissReason
 
     batch = build_fill_batch()
-    masks = [mask_from_array(tight_blob(), MaskPrecision.TIGHT)]
+    masks = [region_from_blob(tight_blob(), MaskPrecision.TIGHT)]
 
     # Depth AND scan both available: only the selection keeps the depth rows out.
     fill_path_measurements(
@@ -768,7 +777,7 @@ def test_fill_splits_the_two_depth_paths_independently() -> None:
     from ridgeback_autonomy.common.miss_reason import MissReason
 
     batch = build_fill_batch()
-    masks = [mask_from_array(tight_blob(), MaskPrecision.TIGHT)]
+    masks = [region_from_blob(tight_blob(), MaskPrecision.TIGHT)]
 
     fill_path_measurements(
         batch, masks, FILL_INTRINSICS, build_fill_depth(), None,
@@ -794,7 +803,7 @@ def test_fill_without_depth_leaves_a_disabled_depth_row_unset_not_missing() -> N
     from ridgeback_autonomy.common.miss_reason import MissReason
 
     batch = build_fill_batch()
-    masks = [mask_from_array(tight_blob(), MaskPrecision.TIGHT)]
+    masks = [region_from_blob(tight_blob(), MaskPrecision.TIGHT)]
 
     fill_path_measurements(
         batch, masks, FILL_INTRINSICS, None, None,
@@ -813,7 +822,7 @@ def test_fill_without_depth_leaves_a_disabled_depth_row_unset_not_missing() -> N
 
 def test_fill_records_no_beams_when_polar_is_not_enabled() -> None:
     batch = build_fill_batch()
-    masks = [mask_from_array(tight_blob(), MaskPrecision.TIGHT)]
+    masks = [region_from_blob(tight_blob(), MaskPrecision.TIGHT)]
     records: list = []
 
     fill_path_measurements(

@@ -103,8 +103,8 @@ from ridgeback_autonomy.perception.target_localization.core.isolation_3d import 
 )
 from ridgeback_autonomy.perception.target_localization.core.mask import (
     MaskPrecision,
-    mask_from_array,
-    rasterize_detection,
+    region_from_blob,
+    region_from_detection,
 )
 from ridgeback_autonomy.perception.target_localization.core.polar_profiling import (
     scan_points_optical,
@@ -668,9 +668,10 @@ class TargetMaskMeasurementNode(Node):
         *,
         color_hint: Image | None = None,
     ) -> tuple[list | None, PreparedColorFrame | None]:
-        """One mask per detection plus an optional prepared RGB frame.
+        """One mask region per detection plus an optional prepared RGB frame.
 
-        ``box``: rasterize each detection box (never fails). ``silhouette``:
+        ``box``: the detection box becomes its own window (never fails).
+        ``silhouette``:
         prompt the segmenter with all boxes on the stamp-matched color frame
         -- one forward and one RGB preparation per frame. A missing color frame
         returns ``None`` (skip the frame's paths, never downgrade to rect --
@@ -694,7 +695,7 @@ class TargetMaskMeasurementNode(Node):
             box_masks: list = []
             for detection, keep in zip(batch.detections, accepted):
                 if keep:
-                    box_masks.append(rasterize_detection(
+                    box_masks.append(region_from_detection(
                         detection, batch.image_height, batch.image_width))
                 else:
                     set_mask_estimator_status(
@@ -755,7 +756,9 @@ class TargetMaskMeasurementNode(Node):
                     self.enabled_estimators)
                 masks.append(None)
             else:
-                masks.append(mask_from_array(blob, MaskPrecision.TIGHT))
+                # Cropped to the blob's own extent and copied, so the frame-sized
+                # model output is free to expire at the end of this loop.
+                masks.append(region_from_blob(blob, MaskPrecision.TIGHT))
         return masks, prepared_color
 
     def log_segmentation_latency(self, elapsed_ms: float, mask_count: int) -> None:
