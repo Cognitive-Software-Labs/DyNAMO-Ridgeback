@@ -3,14 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 
-@dataclass(frozen=True)
-class CameraConfig:
-    depth_hfov_deg: float
-    depth_vfov_deg: float
-    pitch_deg: float
-    height_m: float
-
-
 @dataclass
 class Detection:
     bbox_xyxy: tuple[int, int, int, int]

@@ -190,7 +190,6 @@ Benchmark stack:
 - `src/ridgeback_autonomy/config/slam_toolbox_params.yaml`: SLAM config
 - `src/ridgeback_autonomy/config/explore_lite_params.yaml`: `explore_lite` frontier exploration config
 - `src/ridgeback_autonomy/config/frontier_explorer_params.yaml`: in-repo `frontier_explorer_node` config (used when `explorer:=custom`)
-- `src/ridgeback_autonomy/config/camera_config.json`: **dead config, kept only as a record.** Nothing reads it — intrinsics come from `CameraInfo`. Its loader, `common/camera_config.py`, has no production caller either; only `test_imports` names it. Do not treat it as a tuning surface
 - `fastrtps_no_shm.xml`: UDP-only FastDDS profile exported by `start_exploration.sh` when `FASTRTPS_NO_SHM=true`
 
 ## External Dependencies

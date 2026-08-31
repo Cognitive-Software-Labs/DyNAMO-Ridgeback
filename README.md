@@ -445,7 +445,7 @@ observation-coverage drift as a long-lived simulator slows down.
 | `target_visualization_node` | `visualization/target/estimates` + `hud/target_distances` | `base_frame`, `world_frame`, `marker_lifetime_sec`, `ground_truth_topic`, `estimators` (gates both the HUD rows and the rings; defaults to `all`), `hud_layout` (`rows` — the benchmark's, with truth and error columns — or `wide`, exploration's estimator columns with an age under each) |
 | `target_distance_benchmark_runner` | per-estimator CSVs + summary CSV + trial collage images + `video/run.mp4` | `estimators`, `output_dir`, `pointcloud_measurement_topic`, `mask_measurement_topic`, `color_topic`, `record_video`, `record_fps` |
 
-`config/camera_config.json` is **inert**: no estimator reads it. The mask stack takes its intrinsics from the colour camera's `CameraInfo`, and the legacy estimators that once fell back to this file's FoV constants were deleted. `common/camera_config.py` still parses it but has no production caller. Changing its values changes nothing.
+Camera intrinsics come from the colour camera's `CameraInfo`. There is no intrinsics config file to tune — `config/camera_config.json` and its loader were deleted once the last estimator that read their FoV constants was removed.
 
 ## Configuration
 

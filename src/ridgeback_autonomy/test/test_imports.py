@@ -76,7 +76,6 @@ def test_every_python_test_is_registered_with_colcon():
 
 def test_packaged_modules_import() -> None:
     module_names = [
-        'ridgeback_autonomy.common.camera_config',
         'ridgeback_autonomy.common.coverage_utils',
         'ridgeback_autonomy.common.launch_wait',
         'ridgeback_autonomy.common.messages',

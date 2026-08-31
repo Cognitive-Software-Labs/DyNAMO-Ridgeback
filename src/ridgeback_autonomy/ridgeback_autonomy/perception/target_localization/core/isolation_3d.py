@@ -31,7 +31,7 @@ from ridgeback_autonomy.perception.target_localization.core.ranging_defaults imp
 )
 
 
-CAMERA_HEIGHT_M_DEFAULT = 1.053  # static/test default only; at runtime the height comes from TF via camera_floor_geometry. Mask-stack only: config/camera_config.json's height_m stays 0.85 and is deliberately not touched here.
+CAMERA_HEIGHT_M_DEFAULT = 1.053  # static/test default only; at runtime the height comes from TF via camera_floor_geometry.
 CAMERA_PITCH_DEG_DEFAULT = 0.0  # static/test default; runtime pitch is read from the TF rotation
 FLOOR_MARGIN_M_DEFAULT = 0.05
 # base_link origin above the floor: stable chassis geometry, and the floor is
