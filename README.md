@@ -79,6 +79,9 @@ cd src/clearpath_simulator/clearpath_gz && git apply ../../../patches/clearpath_
 # Apply slam_toolbox patch (fixes TF namespace issue)
 cd src/slam_toolbox && git apply ../../patches/slam_toolbox_tf_namespace.patch && cd ../..
 
+# Apply clearpath_common patch (camera model owns its own frames in simulation)
+cd src/clearpath_common && git apply ../../patches/clearpath_realsense_sim_frames.patch && cd ../..
+
 # Install any remaining deps
 rosdep install --from-paths src --ignore-src -r -y
 
@@ -144,6 +147,22 @@ The Clearpath simulator expects the robot config at `~/clearpath/`:
 mkdir -p ~/clearpath
 cp clearpath/robot.yaml ~/clearpath/robot.yaml
 ```
+
+**If `~/clearpath/robot.yaml` already exists, diff before you overwrite it**, and
+work out whether the differences are local customization or just staleness:
+
+```bash
+diff -u ~/clearpath/robot.yaml clearpath/robot.yaml
+cp ~/clearpath/robot.yaml ~/clearpath/robot.yaml.bak   # rollback point before writing
+```
+
+This directory is a *deployment* location, so a copy sitting there can legitimately
+carry host, namespace, or mount settings the repo does not know about — but it can
+equally be an old `cp` that simply never got refreshed. The two cases call for
+opposite actions, and only the diff tells them apart. Copying the repo file
+wholesale replaces every setting at once; to change one sensor, edit that block in
+place. Regenerate the setup's outputs afterwards, and treat writing to a *robot's*
+deployed configuration as a separate, explicitly authorized step.
 
 ## Usage
 
@@ -433,7 +452,7 @@ The shared camera geometry lives in `config/camera_config.json`; the mask stack 
 ### Robot sensors (`clearpath/robot.yaml`)
 
 - **Hokuyo UST-10LX**: Mounted at front of chassis, provides 2D laser scan for SLAM and costmaps
-- **Intel RealSense D455**: Mounted on a riser bracket, provides RGB, aligned depth, and camera-aligned point cloud to the target-localization stack
+- **Intel RealSense D455**: Mounted on a riser bracket. `device_type: d455` selects both the driver's device filter and the URDF model, so it decides the camera's geometry as well as which device the driver binds to. Configured streams are RGB and depth with `align_depth.enable: true` and `enable_sync: true`; stream profiles are left unspecified so Clearpath's 640x480 @ 30 defaults apply. It supplies RGB and aligned depth to the target-localization stack. An organized point cloud is enabled in the checked-out Clearpath defaults but is **not** wired as an application input — its layout, frame, and timestamps are unverified on hardware. The D455 also has an IMU, which this stack neither enables nor consumes.
 
 ### Key parameters to tune
 
@@ -468,9 +487,21 @@ Existing runs were relocated without rewriting their contents: absolute paths re
 
 ## Patches and Issue History
 
-This project still relies on two local patches:
+This project still relies on three local patches:
 
 1. `patches/clearpath_gz_customizations.patch` patches `src/clearpath_simulator/clearpath_gz` to add this repo's Gazebo worlds/models to the simulator search path and to expose the custom `SpawnG1` Gazebo GUI plugin.
 2. `patches/slam_toolbox_tf_namespace.patch` patches `src/slam_toolbox` so `slam_toolbox` respects namespaced TF remappings.
+3. `patches/clearpath_realsense_sim_frames.patch` patches `src/clearpath_common` (recorded against revision `9960354`) so `intel_realsense.urdf.xacro` forwards `is_sim` into the camera macro as `use_nominal_extrinsics`, and so the Gazebo render sensor sits on the model's colour frame. Without it, simulation has no `camera_0_color_optical_frame` TF and the mask estimators report `TF_MISS_EXTRINSIC`.
+
+Each patch is a plain `git apply`, which is not idempotent. Check before re-running:
+
+```bash
+# "not applied" -> apply it; "already applied" -> skip; anything else -> local conflict, resolve by hand
+cd src/clearpath_common
+git apply --check      ../../patches/clearpath_realsense_sim_frames.patch && echo "not applied"
+git apply --reverse --check ../../patches/clearpath_realsense_sim_frames.patch && echo "already applied"
+```
+
+Never re-run an apply that failed, and never resolve a conflict by discarding unrelated changes in the dependency checkout.
 
 The deeper root-cause notes, previous middleware workarounds, namespace gotchas, and troubleshooting tips now live in [ISSUES.md](docs/ISSUES.md).

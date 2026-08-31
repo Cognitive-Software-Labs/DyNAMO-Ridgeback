@@ -133,6 +133,7 @@ install(DIRECTORY
 if(BUILD_TESTING)
   find_package(ament_cmake_pytest REQUIRED)
 
+  ament_add_pytest_test(test_camera_description test/test_camera_description.py)
   ament_add_pytest_test(test_camera_inputs test/test_camera_inputs.py)
   ament_add_pytest_test(test_artifacts test/test_artifacts.py)
   ament_add_pytest_test(test_depth_common test/test_depth_common.py)

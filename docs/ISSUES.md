@@ -155,36 +155,39 @@ On April 12, 2026, the stack was A/B tested in the `office` world with and witho
 
 **Fix**: Set `minimum_travel_distance: 0.05` and `minimum_travel_heading: 0.05` in `slam_toolbox_params.yaml`. This gates scan processing to moments when the robot has moved ≥ 5 cm or rotated ≥ 3°, eliminating spurious updates while stationary.
 
-## Camera Optical Frame TF in Simulation
+## Camera Optical Frame TF Ownership
 
 ### Problem
 
-The lidar estimator requires a TF transform from `camera_0_color_optical_frame` to `base_link` to project scan points into camera space and gate them against the detection bounding box. Without it, the node logs an error and produces no lidar measurements.
+Every mask estimator needs a TF transform from `camera_0_color_optical_frame` to the base frame to project between camera space and the robot. Without it the node stamps the whole frame `TF_MISS_EXTRINSIC` and produces no measurements.
 
-### Root Cause
+### Who owns that transform
 
-On real hardware, the `realsense2_camera` driver reads factory-calibrated extrinsics from the camera firmware and publishes them as TF at runtime — including the `camera_0_link` → `camera_0_color_optical_frame` chain. Because the driver owns these frames, the D435 URDF (`d435.urdf.xacro`) gates the same joints behind `use_nominal_extrinsics=false` (the default) to avoid a conflict. In simulation there is no driver — Gazebo stamps image messages with `camera_0_color_optical_frame` (via `<optical_frame_id>` in `intel_realsense.urdf.xacro`) but never publishes the corresponding TF, leaving the tree incomplete.
+Exactly one publisher, in either deployment:
 
-### Fix
+| Deployment | Owner | How |
+|---|---|---|
+| Hardware (`use_sim_time:=false`) | `realsense2_camera` driver | Reads factory-calibrated extrinsics off the camera firmware and publishes them at runtime |
+| Simulation (`use_sim_time:=true`) | `robot_state_publisher` | The camera macro passes `use_nominal_extrinsics="$(arg is_sim)"`, so the selected model's URDF emits the nominal chain as fixed joints |
 
-Both launch files include a `static_transform_publisher` node behind `IfCondition(use_sim_time)` that publishes the nominal version of the transform:
+The description must never publish a competing copy on hardware, which is why the Intel macros default `use_nominal_extrinsics` to false and why the sim value is derived from `is_sim` rather than from a parameter of its own. `test_camera_description.py` asserts both halves, plus that no launch file publishes a rival `camera_0_color_optical_frame` transform.
+
+The same `is_sim` flag also gates the Gazebo render sensor, which hangs off `camera_0_color_frame` so the rendered viewpoint *is* the pose of the `camera_0_color_optical_frame` its images and cloud are labelled with.
+
+### Historical: the D435 static publisher (removed 2026-08-31)
+
+Before this, the sim chain was supplied by a `static_transform_publisher` included by both launch files behind `IfCondition(use_sim_time)`:
 
 ```
 camera_0_link → camera_0_color_optical_frame
-  xyz = 0  0.015  0          (colour lens offset from d435.urdf.xacro)
+  xyz = 0  0.015  0          (colour lens offset copied from d435.urdf.xacro)
   rpy = -π/2  0  -π/2       (standard ROS optical frame rotation)
 ```
 
-This node does **not** start on a real robot (`use_sim_time:=false`), where the RealSense driver takes over.
+Two defects, both fixed by moving to the model's own frames:
 
-### Symptom If Missing
-
-The lidar node logs:
-```
-[ERROR] Lidar measurement skipped: TF lookup from "camera_0_color_optical_frame" to
-"r100_0001/robot/base_link" failed: ... In simulation, ensure the
-camera_0_color_optical_tf static_transform_publisher is running (requires use_sim_time:=true).
-```
+1. The offset was a hand-copied D435 constant living in a second file, so it did not follow `device_type`. The robot is a D455, whose nominal depth-to-colour offset is `-0.059`, not `+0.015`.
+2. The render sensor sat on `camera_0_link` while its products were labelled `camera_0_color_optical_frame`, so the rendered viewpoint and the advertised frame disagreed by the colour offset no matter which camera was configured.
 
 ## Namespace Gotchas
 

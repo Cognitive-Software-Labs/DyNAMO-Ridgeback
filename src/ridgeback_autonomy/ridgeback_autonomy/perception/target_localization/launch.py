@@ -206,7 +206,7 @@ def mask_measurement_node(
             },
             {
                 'depth_source': depth_source,
-                # On a real D435 this must be the driver's
+                # On hardware this must be the RealSense driver's
                 # aligned_depth_to_color stream: the stereo source converts
                 # units, it does not align.
                 'depth_topic': depth_topic,

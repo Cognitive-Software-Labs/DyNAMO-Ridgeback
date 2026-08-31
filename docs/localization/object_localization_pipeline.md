@@ -8,37 +8,45 @@
 
 ## 1. Sensor stack
 
-### Intel RealSense D435 (camera-based sensors)
+### Intel RealSense D455 (camera-based sensors)
 
-The robot carries a single **Intel RealSense D435**, forward-facing, mounted at `xyz [0.3, 0.0, 0.85]` on `default_mount` (`clearpath/robot.yaml: device_type: d435`). It is a standard Clearpath camera accessory. The **same** `robot.yaml` drives both the Gazebo sim model and the real `realsense2_camera` driver, but the two produce their data very differently. This section documents only the **camera-based** products used by the localization pipeline (the 2D LiDAR is covered separately, below).
+The robot carries a single **Intel RealSense D455**, forward-facing, mounted at `xyz [0.3, 0.0, 0.85]` on `default_mount` (`clearpath/robot.yaml: device_type: d455`). It is a standard Clearpath camera accessory. The **same** `robot.yaml` drives both the Gazebo sim model and the real `realsense2_camera` driver, but the two produce their data very differently. This section documents only the **camera-based** products used by the localization pipeline (the 2D LiDAR is covered separately, below).
+
+`device_type` is not a family selector: the driver uses it as a device-name filter, and the description generator uses it to pick which `intel/*.urdf.xacro` model is expanded. So the one key decides both the driver's device match and the robot's camera geometry.
 
 **Data products we use:**
 
-1. **RGB color image** - input to detection / segmentation. The repo leaves the stream profile unspecified, so the checked-out Clearpath configuration supplies its 640x480 @ 30 fps default to both backends. Sim: rendered color frame; real D435: hardware stream selected by the driver.
+1. **RGB color image** - input to detection / segmentation. The repo leaves the stream profile unspecified, so the checked-out Clearpath configuration supplies its 640x480 @ 30 fps default to both backends. Sim: rendered color frame; hardware: the stream the driver selects. Record the profile the driver actually activates rather than inferring it from YAML.
 2. **Depth image** (made 1:1 with RGB) - input to projective ranging and euclidean reconstruction. Euclidean reconstruction deprojects its masked pixels into camera-frame points in code (`docs/localization/euclidean_reconstruction.md`; provenance decision in `docs/history/pointcloud_provenance_test.md` §7) - the points are a derived, in-code representation, not a sensor product.
-3. **Camera IMU - NONE.** The D435 SKU has no IMU; only the D435i does.
+3. **Camera IMU - present on the device, unused by this stack.** The D455 carries an IMU, unlike the D435. Nothing here enables, subscribes to, or fuses those streams, and SLAM does not consume them. Capability is not configuration.
+4. **Organized point cloud - configured, unverified.** Clearpath's checked-out `IntelRealsense` sets `POINTCLOUD_ENABLED = True`, so the parser emits `pointcloud.enable: true` for hardware. That is a *driver default resolved from the checked-out config*, which is a different fact from what the device actually publishes and a different fact again from whether the published layout can feed the `pointcloud` estimator. `common/camera_inputs.py` therefore leaves the organized-cloud input **unspecified** for the `realsense` profile. Before wiring it, verify organization (`height > 1`), colour-grid indexing, frame, and timestamps on the robot.
 
 **How depth is produced - this is where sim and real diverge:**
 
-- **Real D435:** active infrared **stereo**. Two IR imagers (left/right) plus a Class-1 IR laser projector that casts a texture pattern; the on-board D4 ASIC rectifies the pair and matches horizontal disparity into a per-pixel depth map. Raw depth is expressed in the **left IR imager frame, NOT the RGB frame**, so it must be **aligned** (reprojected) onto the color pixel grid before use. Depth FoV (HD 16:9) is **86° H x 57° V** (datasheet); usable range ~0.2 m to >10 m.
-- **Sim (Gazebo `rgbd_camera`):** no IR, no projector, no stereo matching. Gazebo renders the scene and reads the GPU **depth (Z) buffer** directly - the exact geometric distance to the first surface along each pixel ray, clipped to `near 0.3 / far 100`. Because color and depth come from the **same render pass and pose**, sim depth is **already co-registered with RGB** - no alignment step exists or is needed. The sim camera renders at `horizontal_fov = 1.25 rad = 71.6°`, NOT the real 86-87°.
+- **Real D455:** active infrared **stereo**. Two IR imagers plus an IR projector; the on-board ASIC rectifies the pair and matches horizontal disparity into a per-pixel depth map. Raw depth is expressed in the **left IR imager frame, NOT the RGB frame**, so it must be **aligned** (reprojected) onto the color pixel grid before use — which is what `align_depth.enable: true` buys. Read the operating FoV and intrinsics off the driver's `CameraInfo` on the robot; a datasheet *recommended range* is not a validity cutoff, and a finite depth outside it is not automatically discarded.
+- **Sim (Gazebo `rgbd_camera`):** no IR, no projector, no stereo matching. Gazebo renders the scene and reads the GPU **depth (Z) buffer** directly - the exact geometric distance to the first surface along each pixel ray, clipped to `near 0.3 / far 100`. Because color and depth come from the **same render pass and pose**, sim depth is **already co-registered with RGB** - no alignment step exists or is needed. The sim camera renders at `horizontal_fov = 1.25 rad = 71.6°`.
+
+**Simulated geometry vs simulated optics.** These are scoped separately, and only the first is modelled faithfully. The **body and frame geometry** are the D455's own: `d455.urdf.xacro` supplies the mount-to-link transform and the nominal internal frames, including the `-0.059 m` depth-to-colour offset, and the render sensor hangs off `camera_0_color_frame` so the rendered viewpoint is the pose its products are labelled with. The **optics** remain a single idealized RGBD camera: one 71.6° FoV, no stereo baseline, no IR projector, no noise model, no per-model distortion. Sim is not a D455 fidelity simulator and benchmark numbers should not be read as one.
 
 **Sim vs real summary (camera-based):**
 
 | Data product | Simulation | Real robot |
 |---|---|---|
-| RGB color | rendered frame (Clearpath default 640x480 @ 30) | D435 RGB sensor (Clearpath default 640x480 @ 30; verify on hardware) |
-| Depth source | rendered GPU Z-buffer (ground truth) | active IR stereo on D4 ASIC |
+| RGB color | rendered frame (Clearpath default 640x480 @ 30) | D455 RGB sensor (Clearpath default 640x480 @ 30; verify on hardware) |
+| Depth source | rendered GPU Z-buffer (ground truth) | active IR stereo on the device ASIC |
 | Depth alignment to RGB | none - co-registered by construction | required (depth in left-IR frame) |
-| Depth FoV | 71.6° H (rendered) | 86° H x 57° V (config uses 87x58) |
-| Camera IMU | none (D435) | none (D435) |
+| Depth FoV | 71.6° H (rendered) | read from the driver's `CameraInfo`; not yet recorded |
+| Camera IMU | not rendered | present on the D455, not enabled or consumed |
+| Internal camera TF | `robot_state_publisher`, from the D455 nominal frames | `realsense2_camera`, from the factory calibration |
 
 **Hardware verification items** (invisible in sim, so the sim benchmark cannot prove them):
 
-- `robot.yaml` now sets `align_depth.enable: true` and `enable_sync: true`, and the Clearpath parser preserves both. Confirm on the robot that `sensors/camera_0/aligned_depth_to_color/image_raw` exists, has the color image dimensions, and retains the driver timestamps; hardware support remains unverified until then (`docs/localization/aligned_depth.md` §2.1).
-- `config/camera_config.json` intrinsics (87° x 58°) match the real D435, **not** the sim render (71.6°) - so estimators assume the wrong FoV in sim.
+- `robot.yaml` sets `align_depth.enable: true` and `enable_sync: true`, and the Clearpath parser preserves both. Confirm on the robot that `sensors/camera_0/aligned_depth_to_color/image_raw` exists, has the color image dimensions, and retains the driver timestamps; hardware support remains unverified until then (`docs/localization/aligned_depth.md` §2.1).
+- Confirm the enumerated device is a D455 and that `device_type` plus `serial_no: "0"` select it as intended in the installed wrapper version.
+- Record the active colour/depth profiles and the `CameraInfo` intrinsics, and confirm exactly one publisher of the internal camera TF chain.
+- `config/camera_config.json` still holds `87° x 58°`, but **no estimator reads it**: `load_camera_config` has no production caller and the mask stack takes its intrinsics from `CameraInfo`. The file is inert here; its values are left alone rather than re-derived.
 
-Sources: Intel RealSense D400 Series Datasheet (doc 337029-005, §2.3 / §3.6 / Table 4-5 / §4.5 / §4.9.1); Gazebo `gz-sensors` RgbdCameraSensor docs; Clearpath RealSense D435 + Cameras config docs; repo `clearpath/robot.yaml`, `intel_realsense.urdf.xacro`, `config/camera_config.json`, `r100.urdf.xacro`.
+Sources: Gazebo `gz-sensors` RgbdCameraSensor docs; Clearpath Cameras config docs; repo `clearpath/robot.yaml`, `intel_realsense.urdf.xacro`, `intel/d455.urdf.xacro`, `config/camera_config.json`, `r100.urdf.xacro`. Model-specific depth-range and FoV figures previously quoted here came from the D400-series datasheet entry for the **D435** and have been removed rather than relabelled.
 
 ### 2D LiDAR (Hokuyo UST, planar 270°)
 

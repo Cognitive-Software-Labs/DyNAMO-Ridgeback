@@ -62,7 +62,7 @@ The spikes recorded in §7 are early, one-off entries in that comparison, not th
 systematic run.
 
 The spike ran on **rendered Gazebo frames**; SAM segments real imagery
-differently, so the pin should be revisited on real D435 data before the
+differently, so the pin should be revisited on real D455 data before the
 real-hardware pass.
 
 **Known limit (accepted):** SAM-family models are class-blind — the box prompt
@@ -338,6 +338,6 @@ zero annotation cost.
 
 **Against:** closed vocabulary — the network knows the G1 and nothing else; a
 new target class means regenerating data and retraining; sim-to-real transfer
-on real D435 imagery is the classic failure mode and must be validated before
+on real D455 imagery is the classic failure mode and must be validated before
 any real-hardware reliance; a training pipeline becomes repo infrastructure to
 own and maintain.

@@ -12,7 +12,7 @@ producer process (`docs/history/aligned_depth_coverage.md` §6).
 
 ```
                  ┌───────────────────────────┐
-   D435 depth ──▶│ stereo source:            │
+  D455 depth ──▶│ stereo source:            │
    (sensor)      │ capture → align to color  │──┐
                  └───────────────────────────┘  │   ┌─────────────────────┐
                                                 ├──▶│ ALIGNED DEPTH FRAME │──▶ projective ranging / euclidean reconstruction
@@ -50,14 +50,18 @@ An **aligned depth frame** is a depth image that satisfies:
 
   Only monocular declares a finite ceiling, and it *derives* it rather than
   naming it. Stereo declares none, as of 2026-08-28. There is no honest number
-  to put there: Intel's D400 datasheet (337029-017) gives the D435 as "0.2 m to
-  over 3 m (varies with lighting conditions)", while the simulated camera is an
-  exact render out to a 100 m far clip
+  to put there. A datasheet range is a *recommended operating* range, not the
+  distance past which the device stops returning values, so it cannot be
+  promoted into a validity cutoff; and the simulated camera is an exact render
+  out to a 100 m far clip
   (`clearpath_sensors_description/urdf/intel_realsense.urdf.xacro`, no noise
-  model). The 10 m that used to sit there matched neither and was inherited
-  from `POINTCLOUD_MAX_METERS`. Out-of-range readings are already excluded by
-  the invalid-pixel rule above, which both sources satisfy — a value past what
-  a source can resolve arrives as `0`/`NaN`/`inf`, not as a confident number.
+  model), which no device figure describes. The 10 m that used to sit there
+  matched neither and was inherited from `POINTCLOUD_MAX_METERS`.
+
+  The invalid-pixel rule above covers less than it appears to. Where a source
+  resolves nothing it writes `0`/`NaN`/`inf` and those are dropped — but the
+  converse does not hold: a finite positive stereo depth can still be
+  inaccurate, at any range, and nothing here filters for that.
 - **Timing:** stamped with the color frame it is aligned to, so mask and depth
   can be matched frame-to-frame. The frame is *made* at that stamp: the mask
   node buffers the source's input stream raw and converts only the frame the
@@ -74,12 +78,13 @@ benchmark matrix (`docs/localization/object_localization_pipeline.md` §8).
 
 ## 2. Source 1: depth camera → aligned depth (stereo)
 
-### 2.1 Real hardware (D435)
+### 2.1 Real hardware (D455)
 
-The D435 computes depth by IR stereo matching. That depth image is native to
+The D455 computes depth by IR stereo matching. That depth image is native to
 the **left-IR (depth optical) frame**, not the color camera: different sensor
-position, different FoV (depth 87°×58° vs. color 69°×42°), potentially
-different resolution. Raw depth pixel `(u, v)` is therefore *not* the same ray
+position, different FoV, potentially different resolution — read the actual
+figures off the driver's depth and colour `CameraInfo` rather than from a
+datasheet. Raw depth pixel `(u, v)` is therefore *not* the same ray
 as color pixel `(u, v)` — using it against a color-grid mask is a grid
 mismatch, not a small error.
 

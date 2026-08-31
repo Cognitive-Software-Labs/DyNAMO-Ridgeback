@@ -266,16 +266,6 @@ def generate_launch_description():
             condition=launch.conditions.IfCondition(target_localization_enabled),
         ),
 
-        IncludeLaunchDescription(
-            PythonLaunchDescriptionSource(
-                os.path.join(includes_dir, 'camera_optical_tf.launch.py')
-            ),
-            launch_arguments={
-                'namespace': namespace,
-                'use_sim_time': use_sim_time,
-            }.items(),
-        ),
-
         # 1. Launch Gazebo simulation
         IncludeLaunchDescription(
                     PythonLaunchDescriptionSource(

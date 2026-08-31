@@ -92,16 +92,5 @@ def generate_launch_description():
             }.items(),
         ),
 
-        IncludeLaunchDescription(
-            PythonLaunchDescriptionSource(
-                os.path.join(includes_dir, 'camera_optical_tf.launch.py')
-            ),
-            launch_arguments={
-                'namespace': namespace,
-                # This include declares the argument without a default.
-                'use_sim_time': use_sim_time,
-            }.items(),
-        ),
-
         OpaqueFunction(function=build_detector),
     ])

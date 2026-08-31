@@ -44,7 +44,6 @@ def test_internal_launch_includes_exist_and_are_referenced() -> None:
     includes_dir = launch_dir / 'includes'
 
     expected_includes = [
-        'camera_optical_tf.launch.py',
         'explore.launch.py',
         'nav2.launch.py',
         'simulation.launch.py',

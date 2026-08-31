@@ -142,8 +142,17 @@ a separate session with its own prerequisites (`pointcloud.enable`,
 
 ### Intrinsics caveat (important)
 
+> **Superseded, kept for method.** This described the repo as of the 2026-07-11
+> run. The estimators now take their intrinsics from `CameraInfo` and
+> `config/camera_config.json` has no production caller, so the mismatch below
+> is no longer live. The run itself executed against `device_type: d435`; the
+> camera was corrected to `d455` on 2026-08-31 and the render pose moved onto
+> the colour frame, so these measurements describe a different geometry than
+> runs taken after that date.
+
 Nothing in the repo subscribes to `camera_info` today; the estimators use FoV
-values from `config/camera_config.json` (87°, the *real* D435), while the sim
+values from `config/camera_config.json` (87°, quoted then as the *real* D435),
+while the sim
 camera renders with `horizontal_fov = 1.25 rad ≈ 71.6°` at 640×480. Deprojecting
 with the config FoV would bake a systematic error into the deprojected variant
 and invalidate the comparison. The script must therefore:

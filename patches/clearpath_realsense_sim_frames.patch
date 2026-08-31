@@ -1,0 +1,117 @@
+diff --git a/clearpath_sensors_description/urdf/intel_realsense.urdf.xacro b/clearpath_sensors_description/urdf/intel_realsense.urdf.xacro
+index 9a3ceb3..4ddc10f 100644
+--- a/clearpath_sensors_description/urdf/intel_realsense.urdf.xacro
++++ b/clearpath_sensors_description/urdf/intel_realsense.urdf.xacro
+@@ -1,61 +1,85 @@
+ <?xml version="1.0"?>
+ <robot xmlns:xacro="http://ros.org/wiki/xacro">
++  <!-- Supplied by the platform description, which derives it from use_sim_time.
++       Declared here too so this macro also expands standalone. -->
++  <xacro:arg name="is_sim" default="false" />
++
+   <xacro:macro name="intel_realsense" params="name parent_link model *origin
+                                               update_rate:=30.0 image_height:=480 image_width:=640">
+ 
++    <!-- On hardware the RealSense driver publishes the factory-calibrated
++         internal camera extrinsics, so the description must not publish a
++         competing copy. Simulation has no driver, so the selected model's
++         nominal frames are the only source for that part of the chain. -->
++    <xacro:property name="use_nominal_extrinsics" value="$(arg is_sim)" />
++
+     <xacro:if value="${model == 'd415'}">
+       <xacro:include filename="$(find clearpath_sensors_description)/urdf/intel/d415.urdf.xacro" />
+-      <xacro:sensor_d415 name="${name}" parent="${parent_link}">
++      <xacro:sensor_d415 name="${name}" parent="${parent_link}"
++                         use_nominal_extrinsics="${use_nominal_extrinsics}">
+         <xacro:insert_block name="origin" />
+       </xacro:sensor_d415>
+     </xacro:if>
+     <xacro:if value="${model == 'd435'}">
+       <xacro:include filename="$(find clearpath_sensors_description)/urdf/intel/d435.urdf.xacro" />
+-      <xacro:sensor_d435 name="${name}" parent="${parent_link}">
++      <xacro:sensor_d435 name="${name}" parent="${parent_link}"
++                         use_nominal_extrinsics="${use_nominal_extrinsics}">
+         <xacro:insert_block name="origin" />
+       </xacro:sensor_d435>
+     </xacro:if>
+     <xacro:if value="${model == 'd435i'}">
+       <xacro:include filename="$(find clearpath_sensors_description)/urdf/intel/d435i.urdf.xacro" />
+-      <xacro:sensor_d435i name="${name}" parent="${parent_link}">
++      <xacro:sensor_d435i name="${name}" parent="${parent_link}"
++                          use_nominal_extrinsics="${use_nominal_extrinsics}">
+         <xacro:insert_block name="origin" />
+       </xacro:sensor_d435i>
+     </xacro:if>
+     <xacro:if value="${model == 'd455'}">
+       <xacro:include filename="$(find clearpath_sensors_description)/urdf/intel/d455.urdf.xacro" />
+-      <xacro:sensor_d455 name="${name}" parent="${parent_link}">
++      <xacro:sensor_d455 name="${name}" parent="${parent_link}"
++                         use_nominal_extrinsics="${use_nominal_extrinsics}">
+         <xacro:insert_block name="origin" />
+       </xacro:sensor_d455>
+     </xacro:if>
+     <xacro:if value="${model == 'd456'}">
+       <xacro:include filename="$(find clearpath_sensors_description)/urdf/intel/d456.urdf.xacro" />
+-      <xacro:sensor_d456 name="${name}" parent="${parent_link}">
++      <xacro:sensor_d456 name="${name}" parent="${parent_link}"
++                         use_nominal_extrinsics="${use_nominal_extrinsics}">
+         <xacro:insert_block name="origin" />
+       </xacro:sensor_d456>
+     </xacro:if>
+ 
+-    <gazebo reference="${name}_link">
+-      <sensor name="${name}" type="rgbd_camera">
+-        <camera>
+-          <horizontal_fov>1.25</horizontal_fov>
+-          <image>
+-            <width>${image_width}</width>
+-            <height>${image_height}</height>
+-          </image>
+-          <clip>
+-            <near>0.3</near>
+-            <far>100</far>
+-          </clip>
+-          <gz_frame_id>${name}_link</gz_frame_id>
+-          <optical_frame_id>${name}_color_optical_frame</optical_frame_id>
+-        </camera>
+-        <always_on>1</always_on>
+-        <update_rate>${update_rate}</update_rate>
+-        <visualize>true</visualize>
+-        <gz_frame_id>${name}_link</gz_frame_id>
+-        <topic>$(arg namespace)/sensors/${name}</topic>
+-      </sensor>
+-    </gazebo>
++    <!-- Simulation renders one idealized RGBD camera in place of the whole
++         device. It hangs off the selected model's colour frame so the rendered
++         viewpoint is the pose of the ${name}_color_optical_frame its products
++         are labelled with. The optics stay simplified on purpose: one FoV, no
++         stereo baseline, no noise model. Only expanded in simulation, both
++         because there is nothing to render on hardware and because the colour
++         frame only exists alongside the nominal extrinsics. -->
++    <xacro:if value="$(arg is_sim)">
++      <gazebo reference="${name}_color_frame">
++        <sensor name="${name}" type="rgbd_camera">
++          <camera>
++            <horizontal_fov>1.25</horizontal_fov>
++            <image>
++              <width>${image_width}</width>
++              <height>${image_height}</height>
++            </image>
++            <clip>
++              <near>0.3</near>
++              <far>100</far>
++            </clip>
++            <gz_frame_id>${name}_color_frame</gz_frame_id>
++            <optical_frame_id>${name}_color_optical_frame</optical_frame_id>
++          </camera>
++          <always_on>1</always_on>
++          <update_rate>${update_rate}</update_rate>
++          <visualize>true</visualize>
++          <gz_frame_id>${name}_color_frame</gz_frame_id>
++          <topic>$(arg namespace)/sensors/${name}</topic>
++        </sensor>
++      </gazebo>
++    </xacro:if>
+ 
+   </xacro:macro>
+ </robot>

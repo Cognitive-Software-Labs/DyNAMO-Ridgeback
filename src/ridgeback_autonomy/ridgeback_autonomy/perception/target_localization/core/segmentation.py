@@ -46,7 +46,7 @@ PROMPT_PADDING_REL_DEFAULT = 0.05
 # bad prompt boxes) but will NOT catch a crisp wrong-object mask; full
 # correctness would need a depth-consistency or class check (out of scope).
 # Spike range for good G1 masks was 0.94-0.99 (docs/localization/segmentation_component.md). A
-# conservative 0.5 default leaves headroom for real D435 imagery scoring below
+# conservative 0.5 default leaves headroom for real D455 imagery scoring below
 # sim -- a tunable knob, not a magic truth.
 SEGMENTATION_MIN_PREDICTED_IOU_DEFAULT = 0.5
 

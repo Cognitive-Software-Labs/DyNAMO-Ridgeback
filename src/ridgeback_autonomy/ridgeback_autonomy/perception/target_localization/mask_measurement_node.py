@@ -170,9 +170,9 @@ class TargetMaskMeasurementNode(Node):
         # and their statuses stay UNSET.
         self.declare_parameter('enabled_estimators', 'all')
         self.declare_parameter('depth_source', DEPTH_SOURCE_STEREOSCOPIC)
-        # The stereo source's input. On a real D435 this must be the driver's
-        # ``aligned_depth_to_color`` stream: the source converts units, it does
-        # not align. Unused when depth_source is monocular.
+        # The stereo source's input. On hardware this must be the RealSense
+        # driver's ``aligned_depth_to_color`` stream: the source converts
+        # units, it does not align. Unused when depth_source is monocular.
         self.declare_parameter('depth_topic', DEPTH_TOPIC_DEFAULT)
         # The working depth gate for the two depth paths. Unbounded by
         # default, because the only ceiling a mask measurement needs is

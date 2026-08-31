@@ -29,13 +29,16 @@ two.
 Only the monocular source declares a finite one, and it derives it rather than
 naming it: the metric head saturates at a known fraction of the checkpoint's
 ``max_depth``, so the ceiling is a fact about the loaded weights. Stereo
-declares none. There is no honest number to put there -- Intel's D400
-datasheet gives the D435 as "0.2 m to over 3 m (varies with lighting
-conditions)" while the simulated camera is an exact render out to its 100 m
-far clip -- and a made-up ceiling is not a safety net. Out-of-range readings
-are already excluded by the frame contract above, which both sources satisfy:
-a value past what the source can resolve arrives as 0/NaN/inf, not as a
-confident number.
+declares none, and that is not an oversight. A datasheet range is a
+*recommended operating* range, not the point past which the device stops
+returning numbers, so it cannot be turned into a validity cutoff; and the
+simulated camera is an exact render out to its 100 m far clip, so no single
+constant describes both backends. A made-up ceiling is not a safety net.
+
+What the frame contract does guarantee is narrower than it looks: where a
+source resolves nothing it writes 0/NaN/inf, and those are dropped. It does
+**not** guarantee the converse -- a finite positive stereo depth can still be
+inaccurate, at any range. Nothing here filters for that.
 
 This module is deliberately independent of the pointcloud estimator
 (pointcloud_ranging.py); it shares no code with it.
@@ -85,8 +88,8 @@ def decode_depth_to_meters(msg: Image) -> np.ndarray:
     A real camera driver may emit row-aligned buffers (``step > width *
     itemsize``); the previous hand-rolled ``reshape(height, width)`` rejected
     every such frame. This stays the contract's single entry point, so both
-    the ``16UC1`` millimetres a real D435 ships and the ``32FC1`` metres sim
-    renders decode the same way.
+    the ``16UC1`` millimetres the RealSense driver ships and the ``32FC1``
+    metres sim renders decode the same way.
     """
 
     if msg.encoding not in ('16UC1', 'mono16', '32FC1'):
