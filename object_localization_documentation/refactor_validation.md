@@ -1,7 +1,9 @@
 # Target-localization refactor validation
 
 2026-08-31. Structural implementation is complete. Runtime accuracy and exploration
-checks passed; depth-row coverage parity remains an open validation item.
+checks passed. The depth-row coverage item is now closed: it was a pre-existing
+blocking TF fallback, not a refactor regression — see "Resolution of the coverage
+item" below. A smaller exact-stamp depth-availability loss remains open.
 
 ## Committed implementation
 
@@ -58,6 +60,66 @@ but do not establish why coverage differs from the baseline. Do not describe the
 two lower post-refactor results as proven harmless variance or performance parity.
 A controlled before/after timing investigation is the remaining check; no gate,
 matching tolerance, scheduling, or numerical tuning was changed to conceal it.
+
+### Resolution of the coverage item (2026-08-31)
+
+The open coverage item above is closed. Three findings must be kept apart.
+
+**1. Refactor parity.** Matched three-repeat reruns of the old build `ebf3a02`
+(44.12%) and refactored `f16afd0` (45.68%) did not reproduce a fixed refactor
+regression; the earlier 40.71% / 40.08% single-repeat figures were not a stable
+signal. This is absence of a reproduced regression, not proof of performance
+equivalence for all workloads.
+
+**2. The real defect was pre-existing and in TF.** `lookup_transform_components`
+gave every candidate frame the full 0.5 s timeout, so the unresolvable configured
+frame `r100_0001/robot/base_link` was waited on before the already-buffered
+`base_link` on every call. That throttled the mask worker below its input rate,
+and its latest-wins pending slot discarded the overflow as `UNSET`. Root cause
+and fix are recorded in [ISSUES.md](../ISSUES.md); `test_tf_utils` guards it.
+
+**3. Measured effect of the fix**, same examples scenario, three repeats, normal
+namespaced `base_frame` default — no `base_frame:=base_link` workaround:
+
+| Estimator | Coverage before | Coverage after | `UNSET` before | `UNSET` after |
+|---|---:|---:|---:|---:|
+| Pointcloud | 97.62% | 99.60% | — | 3 |
+| Projective ranging | 45.68% | 90.23% | 396 | 0 |
+| Euclidean reconstruction | 45.68% | 90.23% | 396 | 0 |
+| Polar profiling | 38.49% | 83.40% | — | 0 |
+
+Both depth rows went from 344 to 674 valid observations of 747. `UNSET` is zero:
+every detected box now reaches a mask result. Polar's remaining 124 misses are
+all `TOO_FEW_RAYS_SELECTED`, a real sparse-ray outcome rather than a dropped
+batch.
+
+Accuracy is unchanged at six decimals, and scored outcomes are identical —
+18/24, 18/24, 18/24, 15/24, six detector misses each plus three polar no-value
+results, no extra detections, 15 trials with none skipped:
+
+| Estimator | MAE (m) before | MAE (m) after |
+|---|---:|---:|
+| Pointcloud | 0.129655 | 0.129655 |
+| Projective ranging | 0.055221 | 0.055221 |
+| Euclidean reconstruction | 0.056944 | 0.056944 |
+| Polar profiling | 0.081697 | 0.081697 |
+
+**4. Residual loss, still open.** Both depth rows report `NO_DEPTH_FRAME` ×73 of
+747 (9.77%). That is the separate exact-stamp depth-availability gap, unaffected
+by this fix; the earlier direct-frame probe showed 7.32% of a smaller
+single-repeat sample. It needs correlated generation/arrival/lookup
+instrumentation before any change. Do not close it by switching to nearest-frame
+depth matching or by widening the tolerance.
+
+Provenance: run
+`/tmp/dynamo-tf-fix-benchmark/20260831_134214_examples_box_stereoscopic`,
+executed from an isolated worktree at `f16afd0` plus the TF fix, with its own
+build and install tree, `ROS_DOMAIN_ID=42`. Isolation was necessary because
+unrelated concurrent work was live in the primary working tree; the worktree's
+four uncommitted files were the fix, its test, the test registration, and a venv
+symlink. The host was loaded by those concurrent sessions (one `ekf_node`
+update-rate warning, load average ~6). Load depresses throughput, so it cannot
+have inflated this coverage result.
 
 Post-refactor artifact directories (temporary, not checked in):
 

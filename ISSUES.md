@@ -9,6 +9,7 @@
 | Detection overlay does not appear | Make sure `target_localization_enabled:=true`, enable the `Perception overlay` Image display in RViz, and check `/r100_0001/debug/target/overlay` plus `/r100_0001/sensors/camera_0/color/image` |
 | Perception overlay is a sliver in the narrow left dock | Expected until `exploration.rviz`'s `QMainWindow State` blob is regenerated — `addPane()` hardcodes the left dock area. Drag the pane to the bottom dock, stretch it full width, File → Save Config. If the *whole* layout reverted to defaults instead, `restoreState` rejected the blob and restored nothing |
 | Fewer than four rings, or a missing HUD column | `ros2 node list` should show `target_pointcloud_measurement`, `target_mask_measurement`, `target_visualization` and `hud_target_node`; then `ros2 topic hz /r100_0001/measurements/target/mask`. A column reading `--` means that estimator ran and reported nothing; a column missing entirely means `estimators` did not select it |
+| All three mask rows blank while `pointcloud` still reads | Suspect `base_frame`. Grep the startup log for `Configured base frame ... is unavailable`; a wrong frame skips the segmenter for the whole batch. See "A namespaced `base_frame` is not automatically a real TF frame" below |
 | `explore_lite` not finding frontiers | Verify `track_unknown_space: true` in the global costmap config |
 | TF errors | Ensure all nodes use `use_sim_time: true` |
 | Startup hangs / a stage never comes up | Bringup is event-driven (readiness gates) — find the `gate_*` process log `[launch_wait]: waiting for …`; the `unmet:` list on timeout names the exact missing topic/service. See "Event-Driven Startup" below. Do **not** re-add `TimerAction` delays |
@@ -194,19 +195,71 @@ If you add new nodes to this project, always:
 3. Use `/**/node_name:` as the YAML root key in parameter files so namespaced nodes still match their params
 4. Set `use_sim_time: true` in simulation
 
-### `target_mask_measurement_node`'s `base_frame` default is not namespace-aware
+### A namespaced `base_frame` is not automatically a real TF frame
 
 Every launch caller must pass `base_frame` explicitly to the mask node. Its own
 default is the bare string `base_link`
 (`target_mask_measurement_node.BASE_FRAME_DEFAULT`), while the pointcloud and viz
 nodes derive `<namespace>/robot/base_link` from `get_namespace()` at
-construction. Under a namespace the bare default therefore names a frame nothing
-publishes, and polar profiling's scan→base lookup fails.
+construction, and `target_benchmark_config.launch.py` declares the same
+namespaced default.
 
-It fails **silently**, which is the trap: the row simply reports nothing, which
-on the HUD is indistinguishable from an estimator that ran and found nothing.
-The benchmark has always passed the frame, so the bad default was never
-exercised there. `launch_common.mask_measurement_node()` now makes `base_frame` a
-required keyword argument rather than an optional one, so a new caller cannot
-inherit it by omission. Fixing the node's own default would be the better repair;
-this only closes the launch-layer path to it.
+**A topic namespace does not establish what `frame_id` strings exist inside
+`/tf`.** These are two independent naming systems, and this repository's
+simulated graph disagrees with the assumption on both sides: the topics are
+namespaced, but the frames are not. In the `target_distance_calibration`
+benchmark, `r100_0001/robot/base_link` does not resolve and bare `base_link`
+does — the opposite of what the configured default expects. Both the pointcloud
+and mask nodes log the fallback once at startup:
+
+```text
+Configured base frame "r100_0001/robot/base_link" is unavailable; using "base_link" for transforms.
+```
+
+Do not read that as "every deployment uses `base_link`" either. The frame that
+exists is whatever the robot's TF publishers emit; hardware has not been tested.
+Check it directly rather than deriving it from the namespace:
+
+```bash
+ros2 run tf2_tools view_frames        # writes frames.gv/frames.pdf listing every frame
+ros2 topic echo /r100_0001/tf --once  # read header.frame_id / child_frame_id directly
+```
+
+The failure is **silent in the row**, which is the trap. `base_frame` feeds the
+mask node's `camera_extrinsic_for_batch`, which gates all three mask rows: a miss
+stamps the whole frame `TF_MISS_EXTRINSIC` and skips the segmenter entirely, so
+the HUD shows three estimators that ran and found nothing rather than one bad
+frame. `launch_common.mask_measurement_node()` makes `base_frame` a required
+keyword argument, so a new caller cannot inherit the bare default by omission.
+
+### The fallback used to cost half a second per lookup
+
+`common/tf_utils.lookup_transform_components()` tries the configured frame, then
+its last path segment. Until 2026-08-31 it gave **each** candidate the full
+`TF_LOOKUP_TIMEOUT_SEC` (0.5 s). A configured frame nothing publishes never
+resolves, so every call spent that timeout before reaching the fallback that was
+already sitting in the buffer. `last_fallback_frame` suppressed the repeat
+*warning* but not the repeat *wait* — the cost was invisible in the log and paid
+on every call.
+
+Measured on the live benchmark graph: 502.8–512.0 ms per namespaced lookup
+versus 0.021–0.036 ms when asking for `base_link` directly, with identical
+rotation and translation returned.
+
+That is a throughput bug, not just latency. The mask node looks the extrinsic up
+once per detected batch, and its pending-detections slot is latest-wins. At
+~4.2 incoming batches/s, a worker blocked ≥0.5 s per batch overwrites pending
+work and processes only ~2 batches/s; every overwritten batch scores `UNSET`.
+
+**Fix:** the helper now runs the same candidates in the same order twice — first
+with a zero timeout, then, only if nothing was buffered, with the original
+bounded per-candidate wait. An available fallback returns immediately; a
+transform that genuinely has not arrived yet still gets its wait. Nothing is
+cached between calls, so a configured frame that starts publishing later wins
+again on the next call. `test_tf_utils` covers this with a recording buffer
+rather than a wall-clock assertion.
+
+If mask coverage is low, split `UNSET` from `NO_DEPTH_FRAME` in `run.json`
+before diagnosing: `UNSET` means no mask result was produced for that
+observation at all (the failure above), while `NO_DEPTH_FRAME` means the batch
+ran but its exact-stamp depth input was missing — a separate, still-open loss.
