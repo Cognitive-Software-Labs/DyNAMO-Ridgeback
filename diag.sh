@@ -106,26 +106,15 @@ for node in controller_server planner_server bt_navigator; do
     fi
 done
 
-# 9. SHM errors in log
-section "SHM / TRANSPORT ERRORS"
-if [ -n "$LOGFILE" ] && [ -f "$LOGFILE" ]; then
-    SHM_COUNT=$(grep -c "RTPS_TRANSPORT_SHM.*Error\|open_and_lock_file" "$LOGFILE" 2>/dev/null)
-    echo "  SHM errors in log: $SHM_COUNT"
-    UNICAST=$(grep -c "No unicast locators" "$LOGFILE" 2>/dev/null)
-    echo "  Unicast errors: $UNICAST"
-else
-    echo "  No logfile specified (pass as arg)"
-fi
-
-# 10. Key errors from log
+# 9. Key errors from log
 section "RECENT ERRORS (from log)"
 if [ -n "$LOGFILE" ] && [ -f "$LOGFILE" ]; then
-    grep -E "\[ERROR\]|\[FATAL\]|process has died|RuntimeError|Traceback" "$LOGFILE" 2>/dev/null | grep -v "SHM\|RTPS\|open_and_lock" | tail -10
+    grep -E "\[ERROR\]|\[FATAL\]|process has died|RuntimeError|Traceback" "$LOGFILE" 2>/dev/null | tail -10
     echo "---"
     echo "  SLAM lines:"
-    grep "slam_toolbox" "$LOGFILE" 2>/dev/null | grep -v "SHM\|RTPS" | tail -5
+    grep "slam_toolbox" "$LOGFILE" 2>/dev/null | tail -5
     echo "  Clock/EKF lines:"
-    grep -E "ekf_node|clock" "$LOGFILE" 2>/dev/null | grep -iv "SHM\|RTPS\|open_and_lock\|No clock received" | tail -5
+    grep -E "ekf_node|clock" "$LOGFILE" 2>/dev/null | grep -iv "No clock received" | tail -5
 else
     echo "  No logfile"
 fi

@@ -119,34 +119,6 @@ Passing `shared_from_this()` makes the listener use `slam_toolbox`'s own node in
 
 None of those resolved the underlying subscription problem. The 1-line source patch was the change that made the namespaced setup work reliably.
 
-## FastDDS Shared-Memory Workaround
-
-`start_exploration.sh` exports a UDP-only FastDDS profile (`fastrtps_no_shm.xml`) by default. This sidesteps the SHM failures listed below, which historically broke discovery on this setup after Gazebo/ROS crashes:
-
-- `RTPS_TRANSPORT_SHM`
-- `open_and_lock_file`
-- `No unicast locators`
-
-Related cleanup the script and tooling still do:
-
-- `cleanup.sh` removes `/dev/shm/fastrtps_*` and `/dev/shm/sem.fastrtps_*`
-- `diag.sh` looks for SHM-related FastDDS errors
-
-### Toggling It On
-
-The script defaults to the system RMW (shared memory on). If you hit stale
-shared-memory lock symptoms, force the UDP-only profile with:
-
-```bash
-FASTRTPS_NO_SHM=true bash start_exploration.sh office
-```
-
-That exports `RMW_IMPLEMENTATION`, `FASTRTPS_DEFAULT_PROFILES_FILE`, and `RMW_FASTRTPS_USE_QOS_FROM_XML`. With the default (`false`) the script leaves them untouched, and the launch file (`ridgeback_exploration.launch.py`) does not set these on its own, so `ros2 launch` invocations honor whatever is in your shell env.
-
-### A/B History
-
-On April 12, 2026, the stack was A/B tested in the `office` world with and without the UDP-only profile. Both runs brought up Gazebo, `/clock`, SLAM, and the target-localization nodes; no SHM-specific FastDDS errors appeared on that machine in either run. The profile had previously fixed sim-bringup failures on a different machine, but since there was no observed downside to plain shared memory it is now off by default and kept available as an opt-in toggle.
-
 ## SLAM Drift in Featureless Environments (Office World)
 
 **Symptom**: After launching in the office world, the robot appears to jump/move randomly in RViz (map→odom transform drifts) while the robot remains physically stationary in Gazebo.

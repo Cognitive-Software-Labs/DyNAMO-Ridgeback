@@ -62,7 +62,7 @@ Use `README.md` for the full human runbook. In particular, point humans there fo
 
 Use `docs/ISSUES.md` when the task touches:
 - `slam_toolbox` TF namespace behavior
-- the FastDDS shared-memory workaround (`FASTRTPS_NO_SHM` toggle in `start_exploration.sh`)
+- the CycloneDDS quick-start default and exact-stamp transport investigation
 - stale-process cleanup, diagnostics, or recurring environment failures
 
 ## Repo Mental Model
@@ -171,7 +171,7 @@ Benchmark stack:
 
 - Generated runtime output belongs under `artifacts/`: `colcon/` for build/test logs, `exploration/` for quick-start console/ROS logs, and `benchmarks/` for runs and sweeps. `colcon_defaults.yaml` configures root-invoked Colcon; the build helper pins an absolute log base. `benchmarking/paths.py` owns the shared benchmark output default and child ROS-log environment. Preserve explicit `output_dir`, `LOG_DIR`, and `ROS_LOG_DIR` overrides. Direct ROS launches still need `ROS_LOG_DIR` set before launch to move their parent logs; do not redirect user-wide logs or rewrite historical provenance during a relocation.
 - Always run `bash cleanup.sh` before launching from the repo runbooks or helper scripts. For a benchmark sweep, run it once before the supervisor; never run it between configs because the simulator and RViz are intentionally persistent
-- `start_exploration.sh` is the canonical quick-start: sources the workspace, runs cleanup, and forwards `world` (positional 1), `EXPLORER` / explorer (positional 2 or env), and `FASTRTPS_NO_SHM` (env) to the public launch
+- `start_exploration.sh` is the canonical quick-start: sources the workspace, runs cleanup, defaults an unset `RMW_IMPLEMENTATION` to `rmw_cyclonedds_cpp`, and forwards `world` (positional 1) and `EXPLORER` / explorer (positional 2 or env) to the public launch
 - `build_and_start_expl.sh` rebuilds the workspace before forwarding to `start_exploration.sh`; pass-through args are positional in the same order
 - The target overlay is published on `debug/target/overlay` for the RViz Image display; it has no standalone GUI
 - The `mock_hospital` world is the main exploration scenario; `warehouse` is the larger exploration test; `office` is the common perception-debug world
@@ -183,7 +183,7 @@ Benchmark stack:
 - `clearpath/robot.yaml` must also exist at `~/clearpath/robot.yaml` for the simulator default path
 - Sensor names are auto-indexed by Clearpath, so the first camera becomes `camera_0` and the first 2D lidar becomes `lidar2d_0`
 - `slam_toolbox` is sourced from `.repos` and still needs the local TF namespace patch described in `docs/ISSUES.md`
-- The UDP-only FastDDS profile is a `start_exploration.sh` toggle (`FASTRTPS_NO_SHM`, default `false` — shared memory on); the public launches do not set FastDDS env vars themselves, so `ros2 launch` invocations honor whatever is in your shell. Keep the historical rationale and toggle docs in `docs/ISSUES.md`, not in `README.md`
+- CycloneDDS is the `start_exploration.sh` default because the 2026-09-01 matched exact-stamp benchmark eliminated depth delivery loss. An explicit `RMW_IMPLEMENTATION` remains authoritative. The rejected UDP-only FastDDS profile and its toggle were removed. Public launches do not select an RMW, so direct `ros2 launch` invocations honor the shell. Detailed transport evidence belongs in `docs/history/exact_stamp_depth_availability.md`
 
 ## Key Config And Entry Files
 
@@ -200,7 +200,6 @@ Benchmark stack:
 - `src/ridgeback_autonomy/config/slam_toolbox_params.yaml`: SLAM config
 - `src/ridgeback_autonomy/config/explore_lite_params.yaml`: `explore_lite` frontier exploration config
 - `src/ridgeback_autonomy/config/frontier_explorer_params.yaml`: in-repo `frontier_explorer_node` config (used when `explorer:=custom`)
-- `fastrtps_no_shm.xml`: UDP-only FastDDS profile exported by `start_exploration.sh` when `FASTRTPS_NO_SHM=true`
 
 ## External Dependencies
 

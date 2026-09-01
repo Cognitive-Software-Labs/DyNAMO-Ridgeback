@@ -186,7 +186,7 @@ def script_workspace(tmp_path, monkeypatch):
     commands = tmp_path / 'bin'
     commands.mkdir()
     stubs = {
-        'ros2': '#!/bin/bash\nprintf "ros-log-dir=%s\\n" "$ROS_LOG_DIR"\nprintf "arg=%s\\n" "$@"\nexit 7\n',
+        'ros2': '#!/bin/bash\nprintf "ros-log-dir=%s\\n" "$ROS_LOG_DIR"\nprintf "rmw=%s\\n" "$RMW_IMPLEMENTATION"\nprintf "arg=%s\\n" "$@"\nexit 7\n',
         'date': '#!/bin/bash\nprintf "2026-08-31_12-00-00\\n"\n',
         'colcon': '#!/bin/bash\nprintf "colcon-arg=%s\\n" "$@"\n',
     }
@@ -195,7 +195,9 @@ def script_workspace(tmp_path, monkeypatch):
         path.write_text(content)
         path.chmod(0o755)
     monkeypatch.setenv('PATH', str(commands) + os.pathsep + os.environ['PATH'])
-    for name in ('LOG_DIR', 'ROS_LOG_DIR', 'COLCON_LOG_PATH', 'FASTRTPS_NO_SHM', 'EXPLORER'):
+    for name in (
+            'LOG_DIR', 'ROS_LOG_DIR', 'COLCON_LOG_PATH',
+            'RMW_IMPLEMENTATION', 'EXPLORER'):
         monkeypatch.delenv(name, raising=False)
     return tmp_path
 
@@ -213,6 +215,7 @@ def test_exploration_logs_and_overrides_are_non_clobbering(script_workspace, mon
             ['bash', str(root / 'start_exploration.sh'), 'office', 'custom', 'estimators:=pointcloud'],
             cwd=root.parent, capture_output=True, text=True, timeout=10)
         assert result.returncode == 7  # tee must not hide launch failures.
+        assert 'rmw=rmw_cyclonedds_cpp' in result.stdout
         assert 'arg=world:=office' in result.stdout
         assert 'arg=explorer:=custom' in result.stdout
         assert 'arg=estimators:=pointcloud' in result.stdout
@@ -223,6 +226,16 @@ def test_exploration_logs_and_overrides_are_non_clobbering(script_workspace, mon
         assert ros_logs.is_dir()
         assert f'ros-log-dir={ros_logs}' in (run / 'console.log').read_text()
     assert not (root / 'logs').exists()
+
+
+def test_exploration_rmw_override(script_workspace, monkeypatch):
+    root = script_workspace
+    monkeypatch.setenv('RMW_IMPLEMENTATION', 'rmw_fastrtps_cpp')
+    result = subprocess.run(
+        ['bash', str(root / 'start_exploration.sh'), 'office'],
+        cwd=root.parent, capture_output=True, text=True, timeout=10)
+    assert result.returncode == 7
+    assert 'rmw=rmw_fastrtps_cpp' in result.stdout
 
 
 @pytest.mark.parametrize('override', [False, True])

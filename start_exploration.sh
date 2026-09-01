@@ -6,7 +6,7 @@
 #   bash start_exploration.sh office                         # office + explore_lite
 #   bash start_exploration.sh mock_hospital custom           # mock_hospital + custom explorer
 #   EXPLORER=custom bash start_exploration.sh office         # office + custom explorer
-#   FASTRTPS_NO_SHM=true bash start_exploration.sh           # use the UDP-only FastDDS profile
+#   RMW_IMPLEMENTATION=rmw_fastrtps_cpp bash start_exploration.sh  # explicit RMW override
 
 set -euo pipefail
 
@@ -27,15 +27,9 @@ if [[ "$EXPLORER" != "explore_lite" && "$EXPLORER" != "custom" ]]; then
     exit 2
 fi
 
-# FastDDS shared-memory locks can get stale after Gazebo/ROS crashes and make
-# nodes disappear from discovery. The UDP-only FastDDS profile sidesteps that.
-# Default off (shared memory on); set FASTRTPS_NO_SHM=true to use the UDP-only profile.
-FASTRTPS_NO_SHM="${FASTRTPS_NO_SHM:-false}"
-if [[ "$FASTRTPS_NO_SHM" == "true" ]]; then
-    export RMW_IMPLEMENTATION="${RMW_IMPLEMENTATION:-rmw_fastrtps_cpp}"
-    export FASTRTPS_DEFAULT_PROFILES_FILE="${FASTRTPS_DEFAULT_PROFILES_FILE:-$SCRIPT_DIR/fastrtps_no_shm.xml}"
-    export RMW_FASTRTPS_USE_QOS_FROM_XML="${RMW_FASTRTPS_USE_QOS_FROM_XML:-1}"
-fi
+# CycloneDDS is the measured default for image/depth delivery. An explicitly
+# selected RMW remains authoritative.
+export RMW_IMPLEMENTATION="${RMW_IMPLEMENTATION:-rmw_cyclonedds_cpp}"
 export ROS_DOMAIN_ID="${ROS_DOMAIN_ID:-42}"
 
 set +u

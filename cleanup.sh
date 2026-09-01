@@ -108,13 +108,6 @@ if [ -n "$REMAINING" ]; then
     sleep 0.5
 fi
 
-# Clean up FastRTPS/FastDDS shared memory files AND semaphore locks.
-# POSIX semaphores live in /dev/shm/sem.* — the glob fastrtps_* misses them,
-# leaving stale port-mutex locks that cause "Failed init_port … open_and_lock_file
-# failed" on the next launch, which breaks TRANSIENT_LOCAL topic delivery.
-rm -f /dev/shm/fastrtps_* 2>/dev/null || true
-rm -f /dev/shm/sem.fastrtps_* 2>/dev/null || true
-
 echo "=== Cleanup complete ==="
 # Final check
 STILL=$(ps -u "$CURRENT_USER" -o user=,pid=,pcpu=,pmem=,args= | grep -E "ros2|gz sim|parameter_bridge|slam_toolbox|nav2|explore|ekf_node|tf_relay|robot_state_pub|joy_linux|teleop|marker_server|image_bridge|rviz" | grep -v grep | grep -v cleanup.sh | grep -v start_exploration.sh | grep -v "bash -c" || true)

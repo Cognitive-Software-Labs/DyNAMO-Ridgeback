@@ -261,10 +261,13 @@ bash start_exploration.sh office                         # office + explore_lite
 bash start_exploration.sh mock_hospital custom           # mock_hospital + custom explorer
 EXPLORER=custom bash start_exploration.sh office         # office + custom explorer
 DEPTH_ANYTHING_ENABLED=true bash start_exploration.sh office
-FASTRTPS_NO_SHM=true bash start_exploration.sh office    # use the UDP-only FastDDS profile
+RMW_IMPLEMENTATION=rmw_fastrtps_cpp bash start_exploration.sh office  # explicit override
 ```
 
-By default the script uses the system-default RMW (shared memory on); set `FASTRTPS_NO_SHM=true` to force a UDP-only FastDDS profile that dodges stale shared-memory locks — see [ISSUES.md](docs/ISSUES.md) for the rationale and toggle.
+The script defaults to CycloneDDS, selected by the exact-stamp image-delivery
+benchmark. An explicit `RMW_IMPLEMENTATION` remains authoritative. The rejected
+UDP-only FastDDS experiment is retained in the
+[investigation history](docs/history/exact_stamp_depth_availability.md).
 
 `build_and_start_expl.sh` rebuilds the workspace first, then runs the same exploration quick-start (extra args are forwarded to `start_exploration.sh`):
 

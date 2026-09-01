@@ -39,6 +39,16 @@ def test_public_launch_surface_is_limited_to_known_entrypoints() -> None:
     ]
 
 
+def test_manual_mapping_does_not_force_a_dds_profile() -> None:
+    launch_text = (
+        _package_root() / 'launch' / 'manual_mapping.launch.py'
+    ).read_text(encoding='utf-8')
+
+    assert 'FASTRTPS' not in launch_text
+    assert 'fastrtps' not in launch_text
+    assert 'SetEnvironmentVariable' not in launch_text
+
+
 def test_internal_launch_includes_exist_and_are_referenced() -> None:
     launch_dir = Path(__file__).resolve().parents[1] / 'launch'
     includes_dir = launch_dir / 'includes'

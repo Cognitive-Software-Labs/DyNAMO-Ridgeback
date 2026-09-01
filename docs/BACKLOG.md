@@ -6,27 +6,6 @@ unselected alternatives belong in `docs/do_not_try_again/`. Closing an item mean
 its completion criteria and moving durable results to the relevant reference or
 history document—not retaining a crossed-out entry here.
 
-## Exact-stamp depth availability
-
-**Gap.** After the blocking TF fallback was fixed, the recorded 2026-08-31 run
-still had `NO_DEPTH_FRAME` on 73/747 detected-box observations for both depth
-rows. That historical rate is not assumed current. Exact matching is intentional.
-
-**Why it matters.** It reduces projective/euclidean coverage independently of
-their geometry. The present evidence does not distinguish generation,
-publication, DDS/callback arrival, buffer lookup timing, or workload loss.
-
-**Completion criteria.** Reproduce on current source; correlate source
-generation/publication, node arrival, lookup, and detection stamps with
-low-overhead instrumentation; identify which stage loses each frame; implement
-only the evidenced remedy; preserve exact-stamp matching and miss accounting;
-repeat a fixed benchmark and record `run.json` provenance. Nearest-frame matching
-and tolerance widening are not acceptable substitutes.
-
-**Context.** [Refactor validation](history/refactor_validation.md),
-[aligned-depth history](history/aligned_depth_coverage.md),
-`synchronization.py`, and `mask_measurement_node.py`.
-
 ## Physical camera validation
 
 **Gap.** The repository selects a D455 and has parser/description tests, but no

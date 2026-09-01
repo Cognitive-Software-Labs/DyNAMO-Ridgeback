@@ -29,6 +29,7 @@ implementations or committed backlog work.
 
 - [Segmentation](do_not_try_again/segmentation.md)
 - [Foreground isolation](do_not_try_again/foreground_isolation.md)
+- [Exact-stamp depth delivery](do_not_try_again/exact_stamp_depth_delivery.md)
 
 ## Active plans
 
@@ -44,6 +45,8 @@ implementations or committed backlog work.
 - [Point-cloud provenance evaluation](history/pointcloud_provenance_evaluation.md)
 - [Target-localization refactor validation](history/refactor_validation.md)
 - [ROI mask migration](history/roi_mask_migration.md)
+- [Exact-stamp depth availability](history/exact_stamp_depth_availability.md)
+- [Exact-stamp investigation handoff](plans/exact_stamp_depth_availability_handoff.md)
 
 History preserves dated evidence and limitations. Read the corresponding
 localization or benchmark reference for current behaviour.

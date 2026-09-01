@@ -306,6 +306,7 @@ class TargetMaskMeasurementNode(Node):
         self.last_base_tf_fallback: str | None = None
 
         self.latest_detections_msg: TargetDetections | None = None
+        self.latest_detections_received_monotonic_ns: int | None = None
         # Depth input and scan are matched to the detection stamp, not
         # paired latest-wins, so they are buffered rather than kept as a single
         # slot. Depth = exact stamp; scan = nearest within scan_match_tolerance_s.
@@ -461,15 +462,44 @@ class TargetMaskMeasurementNode(Node):
         return key
 
     def detections_callback(self, detections_msg: TargetDetections) -> None:
+        diagnostics = self.depth_match_diagnostics
+        waiting_started_ns = (
+            time.monotonic_ns() if diagnostics is not None else None)
         with self.processing_lock:
+            acquired_ns = (
+                time.monotonic_ns() if diagnostics is not None else None)
+            replaced_pending = self.latest_detections_msg is not None
             self.latest_detections_msg = detections_msg
+            self.latest_detections_received_monotonic_ns = acquired_ns
+            if diagnostics is not None:
+                diagnostics.record_detection_arrival(
+                    replaced_pending=replaced_pending)
+                diagnostics.record_lock_timing(
+                    'detections_callback',
+                    acquired_ns - waiting_started_ns,
+                    time.monotonic_ns() - acquired_ns,
+                )
         self.process_event.set()
 
     def depth_callback(self, depth_msg: Image) -> None:
+        diagnostics = self.depth_match_diagnostics
+        waiting_started_ns = (
+            time.monotonic_ns() if diagnostics is not None else None)
         with self.processing_lock:
+            acquired_ns = (
+                time.monotonic_ns() if diagnostics is not None else None)
             self.depth_buffer.store(depth_msg)
-            if self.depth_match_diagnostics is not None:
-                self.depth_match_diagnostics.depth_rx += 1
+            if diagnostics is not None:
+                sec, nanosec = stamp_key(depth_msg.header.stamp)
+                diagnostics.record_depth_arrival(
+                    sec * 1_000_000_000 + nanosec,
+                    now_ns=acquired_ns,
+                )
+                diagnostics.record_lock_timing(
+                    'depth_callback',
+                    acquired_ns - waiting_started_ns,
+                    time.monotonic_ns() - acquired_ns,
+                )
 
     def scan_callback(self, scan_msg: LaserScan) -> None:
         with self.processing_lock:
@@ -491,12 +521,24 @@ class TargetMaskMeasurementNode(Node):
             self.process_event.clear()
 
             while not self.stop_event.is_set():
+                diagnostics = self.depth_match_diagnostics
+                waiting_started_ns = (
+                    time.monotonic_ns() if diagnostics is not None else None)
                 with self.processing_lock:
+                    acquired_ns = (
+                        time.monotonic_ns() if diagnostics is not None else None)
                     detections_msg = self.latest_detections_msg
                     self.latest_detections_msg = None
+                    detections_received_ns = (
+                        self.latest_detections_received_monotonic_ns)
+                    self.latest_detections_received_monotonic_ns = None
                     depth_input_msg = None
                     scan_msg = None
                     if detections_msg is not None:
+                        if (diagnostics is not None
+                                and detections_received_ns is not None):
+                            diagnostics.record_detection_dequeue(
+                                acquired_ns - detections_received_ns)
                         # Match the mask's own instant: the depth source's input
                         # shares the color stamp (exact), the free-running scan
                         # matches the nearest within tolerance. A miss -> None ->
@@ -504,19 +546,28 @@ class TargetMaskMeasurementNode(Node):
                         stamp = detections_msg.header.stamp
                         if self.depth_input_buffer is not None:
                             depth_input_msg = self.depth_input_buffer.lookup(stamp)
-                            if self.depth_match_diagnostics is not None:
+                            if diagnostics is not None:
                                 sec, nanosec = stamp_key(stamp)
-                                self.depth_match_diagnostics.record_lookup(
+                                diagnostics.record_lookup(
                                     depth_input_msg is not None,
                                     sec * 1_000_000_000 + nanosec,
-                                    self.depth_input_buffer.stamps_ns())
+                                    self.depth_input_buffer.stamps_ns(),
+                                    now_ns=time.monotonic_ns())
                         if self.scan_buffer is not None:
                             scan_msg = self.scan_buffer.lookup_nearest(
                                 stamp, self.scan_match_tolerance_s)
+                    if diagnostics is not None:
+                        diagnostics.record_lock_timing(
+                            'worker_snapshot',
+                            acquired_ns - waiting_started_ns,
+                            time.monotonic_ns() - acquired_ns,
+                        )
 
                 if detections_msg is None:
                     break
 
+                processing_started_ns = (
+                    time.monotonic_ns() if diagnostics is not None else None)
                 try:
                     self.process_measurements(
                         detections_msg, depth_input_msg, scan_msg,
@@ -524,6 +575,13 @@ class TargetMaskMeasurementNode(Node):
                 except Exception:  # noqa: BLE001 - worker must survive any frame
                     self.get_logger().error(
                         'Mask measurement frame failed:\n' + traceback.format_exc())
+                finally:
+                    if diagnostics is not None:
+                        processing_elapsed_ns = (
+                            time.monotonic_ns() - processing_started_ns)
+                        with self.processing_lock:
+                            diagnostics.record_worker_processing(
+                                processing_elapsed_ns)
 
                 if not self.process_event.is_set():
                     break
@@ -928,6 +986,10 @@ class TargetMaskMeasurementNode(Node):
         self.process_event.set()
         if self.worker_thread.is_alive():
             self.worker_thread.join(timeout=1.0)
+        if self.depth_match_diagnostics is not None and rclpy.ok():
+            with self.processing_lock:
+                summary = self.depth_match_diagnostics.summary()
+            self.get_logger().info('Final ' + summary)
         return super().destroy_node()
 
 

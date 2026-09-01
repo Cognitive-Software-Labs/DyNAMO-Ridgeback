@@ -46,6 +46,8 @@ from ridgeback_autonomy.perception.target_localization.measurement_pipeline impo
     resolve_mask_gate,
 )
 from ridgeback_autonomy.perception.target_localization.synchronization import (
+    DEPTH_MATCH_RECORD_LIMIT,
+    DepthMatchDiagnostics,
     StampedMessageBuffer,
 )
 
@@ -261,6 +263,62 @@ def test_stamped_buffer_nearest_miss_outside_tolerance_returns_none() -> None:
     buffer.store(color_image(10, 0))            # 100 ms away
 
     assert buffer.lookup_nearest(stamp(10, 100_000_000), tolerance_s=0.05) is None
+
+
+def test_depth_match_diagnostics_resolves_a_late_exact_arrival() -> None:
+    diagnostics = DepthMatchDiagnostics()
+
+    diagnostics.record_lookup(
+        False, 200, [100, 300], now_ns=1_000_000)
+    diagnostics.record_depth_arrival(200, now_ns=4_000_000)
+
+    record = diagnostics.miss_records[200]
+    assert diagnostics.miss_target_inside == 1
+    assert diagnostics.late_arrivals == 1
+    assert record.arrival_monotonic_ns == 4_000_000
+    assert list(diagnostics.late_arrival_delay_ns) == [3_000_000]
+
+
+def test_depth_match_diagnostics_keeps_permanent_gap_unresolved() -> None:
+    diagnostics = DepthMatchDiagnostics()
+
+    diagnostics.record_depth_arrival(100, now_ns=1_000_000)
+    diagnostics.record_depth_arrival(300, now_ns=2_000_000)
+    diagnostics.record_lookup(
+        False, 200, [100, 300], now_ns=3_000_000)
+    diagnostics.record_depth_arrival(400, now_ns=4_000_000)
+
+    assert diagnostics.late_arrivals == 0
+    assert diagnostics.miss_records[200].arrival_monotonic_ns is None
+    assert 'unresolved_bounded=1' in diagnostics.summary()
+
+
+def test_depth_match_diagnostics_bounds_stamp_only_miss_records() -> None:
+    diagnostics = DepthMatchDiagnostics()
+
+    for target_ns in range(DEPTH_MATCH_RECORD_LIMIT + 1):
+        diagnostics.record_lookup(
+            False, target_ns, [], now_ns=target_ns)
+
+    assert len(diagnostics.miss_records) == DEPTH_MATCH_RECORD_LIMIT
+    assert diagnostics.evicted_unresolved_records == 1
+
+
+def test_depth_match_diagnostics_accounts_for_scheduling_and_lock_timing() -> None:
+    diagnostics = DepthMatchDiagnostics()
+
+    diagnostics.record_detection_arrival(replaced_pending=False)
+    diagnostics.record_detection_arrival(replaced_pending=True)
+    diagnostics.record_detection_dequeue(2_000_000)
+    diagnostics.record_worker_processing(3_000_000)
+    diagnostics.record_lock_timing('depth_callback', 4_000, 5_000)
+
+    summary = diagnostics.summary()
+    assert diagnostics.detections_rx == 2
+    assert diagnostics.detection_slot_replacements == 1
+    assert 'dequeue_age_ms=mean=2.000 max=2.000' in summary
+    assert 'worker_ms=mean=3.000 max=3.000' in summary
+    assert 'lock depth_callback: wait_ms=mean=0.004 max=0.004' in summary
 
 
 # --- fill_path_measurements with tight masks: the silhouette-gate consumption
