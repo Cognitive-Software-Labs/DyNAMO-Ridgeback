@@ -1,6 +1,6 @@
 """3D foreground isolation for euclidean reconstruction's ``rect`` branch (plus tight cleanup).
 
-Contract (``docs/localization/foreground_isolation_3d.md``): input the masked point set as an
+Contract (``docs/target_localization/euclidean_reconstruction.md``): input the masked point set as an
 ``(N, 3)`` float array in the camera optical frame (X right, Y down, Z
 forward, meters); output a boolean keep-selector of shape ``(N,)`` marking the
 foreground points.

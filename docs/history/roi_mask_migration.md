@@ -2,7 +2,7 @@
 
 2026-08-31. Behaviour-preserving migration of the target-localization mask
 pipeline to one ROI-native representation. The contract itself is documented in
-`docs/localization/mask_component.md` Section 7; this file records what was proven and what was
+`docs/target_localization/mask_representation.md` Section 7; this file records what was proven and what was
 measured.
 
 Scope note: this is a representation change. It does not close the exact-stamp
@@ -14,7 +14,7 @@ should be read as having done so.
 | Boundary | Before | After |
 |---|---|---|
 | Producers | `rasterize_detection` / `mask_from_array` → full-grid `Mask` | `region_from_bbox` / `region_from_blob` → `MaskRegion` |
-| Per-detection depth prep | `mask.data & frame_valid`, full-grid, once per estimator | one shared `PreparedDepthRegion` per detection, ROI-sized |
+| Per-detection depth prep | `mask.data & frame_valid`, full-grid, once per detection and already shared by both depth estimators | one shared `PreparedDepthRegion` per detection, ROI-sized |
 | Depth estimators | one entry point, precision fork inline | `select_foreground_pixels` / `select_foreground_points` policy + shared reduction, behind two entry points |
 | Polar membership | `mask.data[v_px, u_px]` | `MaskRegion.contains_pixels`, bounds-tested before indexing |
 | Debug union | full-grid write per mask | `MaskRegion.blit_into` one output buffer |
@@ -45,9 +45,13 @@ finite and unlimited depth gates, float32 and float64 depth, a scene carrying
 zero / NaN / inf / negative returns, both starvation reasons, and polar beam
 selection under both mask types.
 
-Both entry points reproduce every case exactly: foreground pixel/point counts,
-ordered point sets, representative global UV, optical XYZ, and original beam
-indices, at `abs=1e-9`.
+Both entry points pass the reference comparisons: exact checks for miss reasons,
+foreground pixel/point counts and original beam indices, plus numerical checks
+for recorded depth, representative global UV and optical coordinates using
+`pytest.approx(..., abs=1e-9)`. Euclidean point sets are checked through their
+count, first/last points and coordinate sums (the sums use `rel=1e-12`), not an
+element-by-element comparison of the entire ordered set. These are fixture-level
+parity checks, not a claim of bitwise equality for every runtime output.
 
 Tests: **541 → 633** (`541` measured at `f16afd0` before this work started, `+9`
 from the concurrent TF fix since committed as `e9ff5f3`, **`+83` added here**).
@@ -124,9 +128,10 @@ At 1280×720 the same shape holds: 12 × small goes 29.6 → 7.7 ms, 12 × large
 - **1 × large is essentially unchanged in time** (3.77 → 3.55 ms). A mask
   covering half the frame has little ROI to save.
 
-Smaller mask storage is not evidence of lower end-to-end latency and does not
-address dropped frames. No live simulator run was performed for this change (see
-below), so nothing here is an end-to-end claim.
+Smaller mask storage and these CPU microbenchmarks do not establish lower
+end-to-end latency or resolve dropped frames. The simulator runs below check
+integration and aggregate accuracy; they are not a controlled end-to-end latency
+comparison.
 
 ## Simulator smoke, both mask gates
 
@@ -135,8 +140,10 @@ all four estimators, stereoscopic depth, default recipes, unlimited mask-depth
 gate, headless. Artifacts (temporary, not checked in):
 `/tmp/dynamo-roi-smoke/box` and `/tmp/dynamo-roi-smoke/silhouette`.
 
-**Box gate reproduces the pre-migration benchmark exactly.** Baseline column is
-the pre-refactor run recorded in `docs/history/refactor_validation.md`:
+**Box-gate aggregate MAE matches the recorded baseline to six decimal places,
+with the same scored-instance counts.** The baseline column is the pre-refactor
+run recorded in `docs/history/refactor_validation.md`. This does not establish
+per-frame or bitwise equality:
 
 | Estimator | MAE now (m) | Pre-migration MAE (m) | Δ | Scored |
 |---|---:|---:|---:|---|
@@ -151,9 +158,9 @@ rows — the residual exact-stamp gap, untouched by this change — and
 
 **Silhouette gate exercises `region_from_blob` in production.** There is no
 pre-migration silhouette baseline to diff against, so this is an integration
-check rather than a bit-exactness one — but a mis-placed crop origin would move
-the representative pixel by tens of pixels and wreck the lateral component, so
-the distances are the evidence:
+check rather than a before/after parity check. Aggregate distance errors alone
+cannot verify every crop origin or rule out coordinate bugs. Crop placement and
+tight-path numerical parity are checked by the unit and reference tests above:
 
 | Estimator | Box MAE (m) | Silhouette MAE (m) | Scored (both) |
 |---|---:|---:|---|
@@ -162,13 +169,19 @@ the distances are the evidence:
 | Euclidean reconstruction | 0.056944 | 0.060593 | 6/8 |
 | Polar profiling | 0.081697 | 0.072268 | 5/8 |
 
-`pointcloud` consumes no mask, and it is identical to six decimals across both
-runs — which is the control: the harness is run-to-run deterministic here, so
-the mask-row differences are attributable to the gate rather than to noise. Two
-of the three mask rows improve, as a tighter mask should; euclidean's small
-regression is the `tight` MAD pass versus the `rect` 3D recipe, the documented
-precision fork, not a geometry error. SlimSAM ran 11 segmentation batches and
-the mask rows produced 230 / 230 / 203 OK observations. `NO_COLOR_FRAME` ×3
+`pointcloud` consumes no mask, and its aggregate MAE matches to six decimals
+across both runs. This is a useful consistency check, not proof of identical
+input frames or a deterministic harness; it does not isolate all mask-row
+differences from run-to-run variation.
+
+Two mask rows have lower aggregate MAE in this comparison; euclidean has higher
+MAE. Tighter masks do not guarantee improved estimates. The existing `tight` MAD
+versus `rect` 3D isolation fork is a possible contributor, but these two runs do
+not establish causality or independently exclude a geometry fault. The unit and
+reference tests provide the geometry and parity evidence.
+
+SlimSAM ran 11 segmentation batches and the mask rows produced
+230 / 230 / 203 OK observations. `NO_COLOR_FRAME` ×3
 appears only under this gate, which is correct — it is the one gate that needs
 the exact-stamp color frame. Both runs recorded one `UNSET` batch.
 

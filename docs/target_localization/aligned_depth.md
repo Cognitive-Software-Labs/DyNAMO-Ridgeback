@@ -1,7 +1,7 @@
 # The Aligned Depth Frame — Depth Acquisition
 
 **Scope:** how the depth that the localization paths consume is produced. Both
-projective ranging (`docs/localization/projective_ranging.md`) and euclidean reconstruction (`docs/localization/euclidean_reconstruction.md`) consume one and the
+projective ranging (`docs/target_localization/projective_ranging.md`) and euclidean reconstruction (`docs/target_localization/euclidean_reconstruction.md`) consume one and the
 same artifact — the **aligned depth frame** — and neither cares how it was
 made. This document defines that contract and the two sources that satisfy
 it: the physical depth camera (`camera → aligned depth`) and monocular
@@ -31,13 +31,13 @@ An **aligned depth frame** is a depth image that satisfies:
 - **Grid:** `H×W` equal to the RGB color image; depth pixel `(u, v)` lies on
   the *same ray* as color pixel `(u, v)`. This is the property the mask
   interface depends on — masks are defined on the color grid
-  (`docs/localization/mask_component.md`), and both paths index depth (or points deprojected
+  (`docs/target_localization/mask_representation.md`), and both paths index depth (or points deprojected
   from it) with the mask directly.
 - **Units:** metric depth in meters, float. (The RealSense driver natively
   publishes `16UC1` millimeters; conversion to float meters is part of the
   source, not the localization path.)
 - **Invalid pixels:** `0`, `NaN`, or `inf` mean "no depth here"; consumers
-  filter them (`docs/localization/projective_ranging.md` §2.2) and sources must not encode invalid
+  filter them (`docs/target_localization/projective_ranging.md` §2.2) and sources must not encode invalid
   as any other value.
 - **Usable ceiling:** every source declares `usable_max_m` — the farthest
   reading it can produce that still means something. This is a property of the
@@ -46,7 +46,7 @@ An **aligned depth frame** is a depth image that satisfies:
   The two answer different questions — "can this value be believed" versus "how
   much of the scene do we want to admit" — and the node cleans against the
   tighter of them. They were one 10 m constant until 2026-08-27; the cost of
-  that conflation is written up in `docs/localization/foreground_isolation_3d.md` §2.
+  that conflation is discussed in `docs/target_localization/euclidean_reconstruction.md` §2.3.
 
   Only monocular declares a finite ceiling, and it *derives* it rather than
   naming it. Stereo declares none, as of 2026-08-28. There is no honest number
@@ -72,7 +72,7 @@ An **aligned depth frame** is a depth image that satisfies:
 Everything downstream — select, clean/isolate, aggregate, deproject — is
 identical regardless of which source made the frame. The depth source is a
 **strategy**: a config choice behind this one contract, and an axis of the
-benchmark matrix (`docs/localization/object_localization_pipeline.md` §8).
+benchmark matrix (`docs/target_localization/target_localization_pipeline.md` §8).
 
 ---
 
@@ -103,7 +103,7 @@ align. Consequences to design around:
   fine structure can shift by a pixel.
 - **Cost.** The align filter runs in the driver. It is the price of admission
   for every mask-based consumer, so for cost accounting it is a *sunk* cost —
-  see `docs/history/pointcloud_provenance_test.md` §2.
+  see `docs/history/pointcloud_provenance_evaluation.md` §2.
 - **Configured but unverified hardware path.** `clearpath/robot.yaml` now sets
   `align_depth.enable: true` and `enable_sync: true`; the repository's
   Clearpath parser test confirms both values survive into generated RealSense
@@ -124,14 +124,14 @@ on raw real depth. Routing *real* through the driver's align filter and *sim*
 straight through is a launch-wiring choice (`depth_topic`), not a code branch —
 `decode_depth_to_meters` accepts `16UC1`/`mono16`/`32FC1`, so both grids reach
 the same contract unchanged. Divergences to keep in mind (details in
-`docs/localization/object_localization_pipeline.md` §2):
+`docs/target_localization/target_localization_pipeline.md` §2):
 
 | | Sim | Real |
 |---|---|---|
 | Depth origin | color camera's Z-buffer | left-IR stereo, reprojected |
 | Alignment | by construction | driver filter, must be enabled |
-| FoV | 71.6° (`horizontal_fov` 1.25 rad) | 87°×58° depth / 69°×42° color |
-| Resolution | 640×480 @ 30 (profile keys in `robot.yaml` are stale — see pipeline doc) | per `depth_module.profile` |
+| FoV | 71.6° (`horizontal_fov` 1.25 rad) | read color/depth `CameraInfo`; no value is pinned here |
+| Resolution/rate | current simulation contract 640×480 @ 30 | active driver profiles; record on hardware |
 | Encoding | `32FC1` m | `16UC1` mm |
 | Noise / holes | none (clean render) | speckle, dropouts, alignment holes |
 
@@ -140,14 +140,14 @@ the same contract unchanged. Divergences to keep in mind (details in
 Deprojection (projective ranging §2.4, euclidean reconstruction §2.1) needs the intrinsics *of the grid the
 frame lives on* — after alignment that is the **color** camera's intrinsics.
 The **deleted legacy estimators** derived intrinsics from
-`config/camera_config.json` FoV values (87°/58° — the real depth FoV), which was
+the since-deleted `config/camera_config.json` FoV constants, which was
 wrong for the sim render (71.6°) and wrong-in-principle for aligned real depth
 (color FoV). No surviving path does this: the mask node
 subscribes to the **color** camera's `camera_info` directly and deprojects with
 it (resolved 2026-07-21; the republish hop went away with the producer node on
 2026-08-26). `grid_mismatch_warning` skips the frame's paths if that grid and
 the detection grid ever disagree. The provenance test self-calibrates as a
-cross-check (`docs/history/pointcloud_provenance_test.md` §3).
+cross-check (`docs/history/pointcloud_provenance_evaluation.md` §3).
 
 ---
 
@@ -205,7 +205,7 @@ or QoS settings, and never falls back to a nearest color frame.
 - **No published cloud.** The monocular source produces only a depth image.
   euclidean reconstruction reaches it exclusively through in-code deprojection — the reason the
   deprojected provenance is euclidean reconstruction's canonical input
-  (`docs/history/pointcloud_provenance_test.md`).
+  (`docs/history/pointcloud_provenance_evaluation.md`).
 
 ---
 
@@ -243,58 +243,22 @@ which stream the node buffers raw and hands back at the detection stamp.
 
 ---
 
-## 5. Open items
+## 5. Validation boundaries
 
-- **`align_depth` on hardware** — configuration and parser preservation are
-  complete (`align_depth.enable: true`, `enable_sync: true`). Still confirm on
-  the robot: effective stream profiles, aligned-depth topic name and
-  dimensions, matching color/depth header timing, optical-frame TF to base,
-  and organized-pointcloud availability/layout before selecting its estimator.
-- ~~**Widen the depth gate**~~ — done 2026-08-28. The mask rows' gate
-  (`mask_depth_max_meters`) defaults to `0`, meaning no gate, so the only
-  ceiling on a mask measurement is whatever its source declares: monocular's
-  derived 18 m, and nothing at all for stereo. Landed together with the
-  isolation default moving to `height_crop_nearest_mode_band`, which was the
-  ordering constraint — widening first would have been the regression. The
-  legacy camera rows kept a finite `depth_max_meters` of 10 m, having no source
-  ceiling behind them; those rows and that parameter are both gone.
-  **Unmeasured.** No benchmark has run with these defaults; the A/B is now a
-  regression check rather than a gate, and the benchmark cannot see the change
-  it is checking for, since its scenes top out at 5.8 m in a world whose far
-  wall is at 12 m. Exploration (`mock_hospital`, ~22 m) is where it bites.
-- ~~**Intrinsics source** — switch deprojection to `camera_info` of the color
-  camera instead of the FoV constants in `camera_config.json` (§2.3).~~ —
-  resolved 2026-07-21: the mask node subscribes to the color camera's
-  `camera_info` and deprojects with it. The legacy estimators that fell back to
-  the `camera_config.json` FoV constants have since been deleted, so nothing
-  reads those constants any more.
-- ~~**Metric-scale validation**~~ — resolved 2026-07-24: measured Depth-Anything's
-  scale directly as a pixel-wise `mono / stereo` depth ratio on identical sim
-  frames (isolating the scale term from surface warping and noise). On the **G1
-  region** — the pixels euclidean reconstruction actually consumes — the ratio is
-  ≈**1.0** (overall median 1.02) but **range-dependent**: it over-reads ~10–15% at
-  2–3 m (ratio 1.10–1.15) and converges to metric (~1.0) by 4–6 m. On the **whole
-  frame** (dominated by floor and walls) it reads ~13% short (median 0.87), a
-  separate warping of large flat surfaces. So Depth-Anything is *approximately
-  metric on the object* with mild close-range warping — **not** a constant global
-  bias correctable by a single factor. Consequence: euclidean's absolute-metric
-  isolation (`HeightCrop` floor plane, `RangeBand` ±0.10/0.35 m windows) is
-  genuinely soft at close range on the monocular source; treat monocular euclidean
-  rows as range-warped, not scale-shiftable. (Consistent with the end-to-end
-  monocular MAE ~0.19–0.22 m vs. stereo ~0.07 m — the excess is warping, not a
-  fixable offset.)
-- ~~**Topic-level contract**~~ — superseded 2026-08-26. It was resolved
-  2026-07-12 as a pair of topics (`perception/aligned_depth/image` +
-  `.../camera_info`) published by `aligned_depth_node`; that transport is gone.
-  The contract is now a **call** at the detection stamp
-  (`depth_sources.produce`), and the frame is republished only as the debug
-  artifact `debug/target/mask/aligned_depth` for the overlay panel. The artifact
-  itself (§1) is unchanged.
-- ~~**Stamp-matching coverage in sim**~~ — resolved 2026-08-26. The exact-stamp
-  match between detections and aligned depth (the §1 "Timing" invariant) missed
-  on ~80–90% of frames in sim because a separate producer process thinned the
-  depth stream independently of the detector, under CPU starvation. Depth
-  acquisition moved into `target_mask_measurement_node`, which now buffers the
-  source's input raw and converts at the detection stamp; the second thinning
-  stage no longer exists. Diagnosis, profiling and the decision are in
-  `docs/history/aligned_depth_coverage.md`.
+Depth acquisition, color `CameraInfo` intrinsics, metric monocular inference,
+and driver-owned hardware alignment are implemented contracts, not open design
+choices. The mask gate defaults to disabled (`mask_depth_max_meters=0`), leaving
+only the source ceiling: none for stereo, derived from the metric checkpoint for
+monocular (18 m for the default checkpoint). The current 3D isolation default is
+`height_crop_nearest_mode_band`.
+
+The former independently throttled producer was removed; its diagnosis and the
+2026-07-24 monocular scale observation live in
+[history](../history/aligned_depth_coverage.md). This does not close the separate
+[residual exact-stamp availability gap](../BACKLOG.md#exact-stamp-depth-availability).
+Smoke runs with current recipes do not replace the controlled
+[isolation comparison](../BACKLOG.md#isolation-validation), especially for long-range backgrounds.
+
+Repository alignment/configuration support does not establish physical readiness.
+The [hardware validation plan](../plans/camera_hardware_validation.md) owns the
+device, profiles, grids, stamps, TF, and optional pointcloud checks.

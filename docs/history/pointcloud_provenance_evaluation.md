@@ -1,4 +1,4 @@
-# Point-Cloud Provenance Test: Published vs. Deprojected
+# Point-cloud provenance evaluation: published vs. deprojected
 
 **Question:** euclidean reconstruction consumes an organized point cloud. That cloud can come from
 two places — the **published** cloud (sim: gz `rgbd_camera` plugin; real:
@@ -120,7 +120,7 @@ cannot answer the real-robot grid question (published real cloud lives on the
 depth grid; the mask lives on the color grid). The real-hardware comparison is
 a separate session with its own prerequisites (`pointcloud.enable`,
 `ordered_pc` passthrough, grid verification) — see
-`docs/localization/object_localization_pipeline.md`.
+`docs/target_localization/target_localization_pipeline.md`.
 
 ---
 
@@ -330,15 +330,15 @@ real-hardware published cloud lives on the wrong grid for mask indexing.
 
 Consequences applied to the other docs:
 
-- `docs/localization/euclidean_reconstruction.md` — deprojected is the sole input; the published-variant
+- `docs/target_localization/euclidean_reconstruction.md` — deprojected is the sole input; the published-variant
   caveats collapse into a historical note pointing here.
-- `docs/localization/object_localization_pipeline.md` — the organized point cloud is no longer
+- `docs/target_localization/target_localization_pipeline.md` — the organized point cloud is no longer
   listed as a pipeline input; "euclidean reconstruction has no input on hardware" is void (euclidean reconstruction
   needs only the aligned depth frame there).
 - The `pointcloud.enable` / `ordered_pc` config gap on the real robot is
   **downgraded from blocker to irrelevant-for-the-paths** (matters only if
   someone wants the RViz debug cloud). The config gap that *does* matter on
-  hardware is `align_depth.enable` (`docs/localization/aligned_depth.md` §2.1).
+  hardware is `align_depth.enable` (`docs/target_localization/aligned_depth.md` §2.1).
 - The planned real-hardware published-vs-deprojected comparison is **cancelled**
   — with no production role for the published cloud there is nothing left to
   compare; hardware validation effort moves to the aligned-depth topic itself

@@ -1,13 +1,13 @@
 # Projective ranging — Aggregate-Then-Deproject (2D Depth-Image Route)
 
-**Scope:** the cheapest of the three localization paths. It takes a mask plus an
+**Scope:** the aggregate-then-deproject localization path. It takes a mask plus an
 aligned depth frame, reads the depth at the masked pixels, reduces them to a
 single distance, and deprojects one representative pixel into a 3D point. This
 document describes projective ranging end to end. The mask object it consumes is defined in
-`docs/localization/mask_component.md`; how the aligned depth frame is produced (stereo alignment
-or monocular estimation) is defined in `docs/localization/aligned_depth.md`. This doc assumes
+`docs/target_localization/mask_representation.md`; how the aligned depth frame is produced (stereo alignment
+or monocular estimation) is defined in `docs/target_localization/aligned_depth.md`. This doc assumes
 both contracts and does not re-describe them. Euclidean reconstruction, the point-domain sibling,
-is `docs/localization/euclidean_reconstruction.md`.
+is `docs/target_localization/euclidean_reconstruction.md`.
 
 ---
 
@@ -16,20 +16,21 @@ is `docs/localization/euclidean_reconstruction.md`.
 **Inputs**
 
 - A **mask** from the mask interface: a boolean selector on the RGB color
-  grid, plus its precision tag (`tight` | `rect`). See `docs/localization/mask_component.md`.
+  grid, plus its precision tag (`tight` | `rect`). See `docs/target_localization/mask_representation.md`.
 - An **aligned depth frame**: a depth image that is 1:1 with the RGB pixels, so
   that depth pixel `(u, v)` is the same ray as color pixel `(u, v)`. Producing
-  this is a separate component (`docs/localization/aligned_depth.md`); projective ranging assumes it is
+  this is a separate component (`docs/target_localization/aligned_depth.md`); projective ranging assumes it is
   already aligned.
 
 **Output**
 
 - One coordinate `(X, Y, Z)` in the **camera optical frame**, per mask. (The
   downstream `base_link` planar conversion is fixed —
-  `docs/localization/object_localization_pipeline.md` Section 7.)
+  `docs/target_localization/target_localization_pipeline.md` Section 7.)
 
-Projective ranging is the cheapest path because it never builds a 3D structure — it collapses
-the masked depths to a single number and deprojects exactly one pixel.
+Projective ranging does not build a 3D point set: it collapses masked depths to
+one number and deprojects exactly one representative pixel. End-to-end cost
+also includes the selected mask and depth producers.
 
 ---
 
@@ -61,21 +62,12 @@ the same rays and the result is meaningless.
 
 ### 2.2 Clean
 
-A depth frame contains invalid pixels even inside a perfect mask, so they must be
-filtered **before** aggregating:
-
-- **0** — no depth return (occlusion gaps left by alignment, surfaces too close,
-  specular reflections, beyond max range).
-- **NaN / inf** — undefined values.
-- **out of range** — values past a sane maximum are far-field noise.
-
-```python
-valid = np.isfinite(depths) & (depths > 0.0) & (depths <= depth_max)
-depths = depths[valid]
-```
-
-Skipping this biases the aggregate. Zeros in particular pull the result toward
-zero, making the object look closer than it is.
+Before aggregation, `valid_depth` rejects non-finite and non-positive samples.
+An effective finite ceiling also rejects samples above it. The node combines
+the optional `mask_depth_max_meters` gate (0 disables it) with the source's
+`usable_max_m`. Stereo has no source ceiling; the metric monocular checkpoint
+declares one. A finite positive stereo value is not necessarily accurate.
+See [aligned depth](aligned_depth.md) for that contract.
 
 ### 2.3 Aggregate — the mask-tag fork
 
@@ -105,7 +97,7 @@ other on identical input:
 - **Input:** the aligned depth frame and the mask. Production runs this on the
   mask's own **storage window** — a depth view, the mask payload and the sliced
   validity image, all the same ROI shape — and lifts the surviving pixels back
-  to full-grid coordinates before deprojection (`docs/localization/mask_component.md` Section 7).
+  to full-grid coordinates before deprojection (`docs/target_localization/mask_representation.md` Section 7).
   The recipes are shape-agnostic, and a window's valid pixels are the frame's
   valid pixels in the same row-major order, so the histogram sees the identical
   value sequence either way.
@@ -114,12 +106,46 @@ other on identical input:
   the pixel coordinates inside the frame that the strategy classifies as object;
   the depth values and the centroid both follow from those coordinates.
 
-The candidate recipes — from the nearest-depth-mode histogram baseline up to
-box-prompted SAM — are catalogued with pros, cons, and citations in
-`docs/localization/foreground_isolation_2d.md`. Each decides which masked pixels are foreground
-and returns exactly that set. Choosing a recipe is a config choice, and the
-benchmark swaps recipes behind the fixed contract to compare them against
-ground truth.
+The isolation callable returns a boolean selector; the estimator obtains its
+foreground coordinates. An empty selection is valid at the recipe boundary;
+the estimator applies its minimum-count guard and reports `ISOLATION_EMPTY` when
+too few pixels survive. An optional precomputed `valid_masked` selector avoids
+repeating the validity pass.
+
+#### Implemented 2D recipes
+
+| Launch token (`isolation_2d`) | Algorithm | Default |
+|---|---|---|
+| `nearest_mode_histogram` | Nearest significant depth bin followed by a symmetric inlier band | Yes |
+| `otsu` | Histogram threshold maximizing between-class variance; retain the near side | No |
+
+**Nearest-mode histogram.** `nearest_significant_mode` chooses the nearest bin
+meeting the 5% sample-significance floor. If no bin meets that floor, it chooses
+the nearest non-empty bin rather than the global mode. The recipe retains depths
+within `band_m` of the anchor. The mode helper lives in `core/depth_common.py`;
+shared numeric defaults live in `core/ranging_defaults.py`.
+
+This assumes the target is the nearest coherent surface. A closer occluder can
+win, spatial connectivity is not enforced, and bin width, significance, and
+band width affect the result.
+
+**Otsu.** `otsu_foreground` selects the threshold with maximum between-class
+variance and retains depths on its near side. It still has a bin-width setting
+(`0.05 m` by default). A single-bin distribution is retained whole and an input
+with no valid depths yields an empty selector. Multiple background layers or a
+changing foreground/background ratio can move the threshold away from the
+target. The method follows N. Otsu, *A Threshold Selection Method from Gray-Level
+Histograms*, IEEE TSMC 9(1), 1979, DOI `10.1109/TSMC.1979.4310076`.
+
+Recipe names are launch-selectable, but not every function keyword is exposed
+as a launch parameter. These are deterministic NumPy baselines, not guarantees
+of foreground identity or measured zero-cost operations. Tests in
+[`test_isolation_2d.py`](../../src/ridgeback_autonomy/test/test_isolation_2d.py)
+cover subset, invalid/unimodal, and dispersed-histogram behavior. Comparative
+validation is tracked in [the backlog](../BACKLOG.md#isolation-validation), and
+unimplemented methods live in
+[foreground-isolation candidates](../do_not_try_again/foreground_isolation.md).
+SAM is a mask producer, not a depth-isolation recipe.
 
 This foreground set is the single source for both remaining steps: the
 **aggregate** takes the median of the foreground pixels' depths, and the
@@ -127,10 +153,11 @@ This foreground set is the single source for both remaining steps: the
 the representative pixel. Because both read the *same* set, they agree by
 construction.
 
-The practical consequence of the fork: choosing the cheap box detector also puts
-projective ranging on the heavier `rect` branch — but here the extra work is small (a
-histogram or a weighting), which is exactly why projective ranging is the path where "the box
-stays cheap."
+The `rect` branch adds a histogram-based isolation pass over the selected ROI;
+the `tight` branch instead pays for segmentation before this estimator. Their
+end-to-end costs depend on ROI, frame, producer, and hardware. Scoped CPU
+measurements are recorded in the ROI migration history; this contract does not
+claim either complete configuration is always cheaper.
 
 ### 2.4 Deproject
 
@@ -170,7 +197,7 @@ pixel, so it needs no extra guard.
 Projective ranging does not care *how* the aligned depth frame was produced. The same four
 steps run unchanged on RealSense stereo depth (after alignment) and on
 Depth-Anything monocular depth (after metric scaling). Both producers and the
-contract they converge to are specified in `docs/localization/aligned_depth.md`; the depth
+contract they converge to are specified in `docs/target_localization/aligned_depth.md`; the depth
 source is a swappable input and both are benchmarked through the identical
 path.
 
@@ -179,7 +206,7 @@ path.
 ## 4. Batch / per-mask granularity
 
 Projective ranging runs **per mask**, looped within a frame, over a shared depth frame. The
-hierarchy is strictly 1:1:1 (`docs/localization/mask_component.md` §6.1): one visible object →
+hierarchy is strictly 1:1:1 (`docs/target_localization/mask_representation.md` §6.1): one visible object →
 one post-NMS detection → one mask → one `(X, Y, Z)`. Two G1s in view means two
 masks and two independent projective ranging runs — masks are never compared, merged, or
 ranked against each other; object *i*'s coordinate is computed as if the other
@@ -212,7 +239,7 @@ projective ranging from euclidean reconstruction:
 - **Aggregate-then-deproject (projective ranging):** collapse the masked depths to one
   number, then deproject one representative pixel. Cheap, yields a single point,
   but fragile on the choice of that pixel.
-- **Deproject-then-aggregate (euclidean reconstruction, `docs/localization/euclidean_reconstruction.md`):** deproject *all*
+- **Deproject-then-aggregate (euclidean reconstruction, `docs/target_localization/euclidean_reconstruction.md`):** deproject *all*
   masked pixels into 3D points first, then reduce the point set (e.g.
   centroid). Heavier, more robust, recovers full geometry.
 
@@ -221,52 +248,17 @@ is the signal to spend the extra cost and move to euclidean reconstruction.
 
 ---
 
-## 6. Relationship to the current stack
+## 6. Implementation and checks
 
-Projective ranging is shipped as `perception/target_localization/core/projective_ranging.py`
-(`localize_projective_ranging`). The **legacy** depth estimator is close but not
-identical, and the differences are exactly what the shipped path resolves:
+Production uses `localize_prepared_projective_ranging` on the shared prepared
+region; `localize_projective_ranging` preserves the standalone full-grid API.
+Both use the same selection and reduction. The representative pixel is the mean
+foreground row/column, and Z is the median foreground depth. Too few valid or
+isolated pixels yields no result, never substitution by another path. The node
+performs the live optical-to-base conversion before publishing.
 
-| Aspect | Legacy estimator | projective ranging (shipped) |
-|--------|-------------------|---------------|
-| Region | inner "focus" crop of the box + Gaussian center weighting | the actual mask, forked on tag |
-| `rect` foreground | crop + weight (assumes the object is centered) | pluggable isolation strategy (`docs/localization/foreground_isolation_2d.md`) |
-| Order | deprojects every ROI pixel, averages the *distances* | aggregate depth, deproject one pixel |
-| Output | a scalar range, in the **vehicle** frame, with a front offset applied | `(X, Y, Z)` in the **camera** frame |
-
-In other words that legacy estimator (since deleted) was permanently on a `rect`-style branch,
-approximates foreground recovery with a fixed crop, and emits a range rather than
-a point. Projective ranging generalizes it: it replaces the crop with the mask, adds the tag fork,
-and emits a camera-frame coordinate, leaving the base-frame transform to a later
-consumer/fusion stage.
-
----
-
-## 7. Open items
-
-- ~~**Representative-pixel rule**~~ — resolved 2026-07-12: the representative
-  pixel is the mean row/column of the foreground pixel set
-  (`perception/target_localization/core/projective_ranging.py`); a sparse mask falls under the invalid-depth
-  fallback below.
-- **`rect` foreground recipe** — the `rect` branch is a pluggable strategy
-  (input: depth frame + mask; output: the foreground pixel set).
-  ~~Choose among the candidates in `docs/localization/foreground_isolation_2d.md` and document the
-  thresholds~~ — resolved 2026-07-23: `nearest_mode_histogram` (default) and
-  `otsu` are implemented and wired in `perception/target_localization/core/isolation_2d.py` with
-  their thresholds as module constants. Benchmarking the recipes against each
-  other behind the fixed contract stays open.
-- ~~**Coordinate frame**~~ — resolved 2026-07-23/24 in two parts. **(1) Downstream
-  base conversion:** the camera-optical → `base_link` planar convention is fixed and
-  applied via the full live-TF extrinsic (rotation *and* translation) at the
-  detection stamp — lateral = base +Y, left-positive (REP-103)
-  (`docs/localization/object_localization_pipeline.md` Section 7; the camera-family lateral-sign split
-  is documented there). **(2) Raw optical axis/handedness** (X right, Y down, Z
-  forward, assumed by `deproject_pixel`): empirically confirmed in sim — the mask
-  paths hit MAE ~0.057 m with correct left-positive lateral signs against ground
-  truth, and a flipped axis or handedness would give grossly wrong estimates, not
-  ~5 cm errors. Outstanding only as a belt-and-suspenders **RealSense-SDK/TF axis
-  cross-check on real hardware** (tracked at `perception/target_localization/core/intrinsics.py`) — not
-  a suspected bug.
-- ~~**Invalid-depth fallback**~~ — resolved 2026-07-12: skip —
-  `localize_projective_ranging` returns `None` when fewer than `min_valid_pixels` valid
-  (or foreground) pixels remain.
+[Tests](../../src/ridgeback_autonomy/test/test_projective_ranging.py) cover the
+algorithm; ROI parity is recorded in [migration history](../history/roi_mask_migration.md).
+[Estimator history](../history/estimator_evolution.md) retains the comparison
+with the deleted depth estimator. Comparative and hardware work is tracked in
+[the backlog](../BACKLOG.md), not as unresolved interface decisions.

@@ -1,14 +1,14 @@
 """Camera intrinsics and inverse pinhole deprojection for the localization paths.
 
 Deprojection needs the intrinsics *of the grid the frame lives on*
-(``docs/localization/aligned_depth.md`` Section 2.3): for an aligned depth frame that is the
+(``docs/target_localization/aligned_depth.md`` Section 2.3): for an aligned depth frame that is the
 color camera. ``intrinsics_from_camera_info`` reads them from that camera's
 ``CameraInfo`` -- no FoV constants.
 
 Frame convention: all coordinates are in the **camera optical frame** --
-X right, Y down, Z forward, meters (``docs/localization/object_localization_pipeline.md``
-Section 7). The RealSense-SDK/TF axis/handedness cross-check on real hardware
-stays an open item (``docs/localization/projective_ranging.md`` Section 7).
+X right, Y down, Z forward, meters (``docs/target_localization/target_localization_pipeline.md``
+Section 7). Physical RealSense/TF validation is tracked in
+``docs/plans/camera_hardware_validation.md``.
 
 This module is deliberately independent of the pointcloud estimator
 (``pointcloud_ranging.py``); it shares no code with it.
@@ -109,7 +109,7 @@ def deproject_masked(
     ``rows`` / ``cols`` are the pixel indices to deproject (typically
     ``np.nonzero`` of a cleaned mask). Restricting the multiply to the masked
     pixels is the production form of euclidean reconstruction's deproject step
-    (``docs/localization/euclidean_reconstruction.md`` Section 2.1). Returns an ``(N, 3)`` float array in
+    (``docs/target_localization/euclidean_reconstruction.md`` Section 2.1). Returns an ``(N, 3)`` float array in
     the camera optical frame.
 
     The gather happens **before** the float64 conversion, not after: casting

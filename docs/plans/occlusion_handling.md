@@ -3,12 +3,14 @@
 **Scope:** how the mask-based estimators behave when a foreground object partially occludes the robot
 (the occluder is *closer* to the camera than the robot, but part of the robot is still visible), why
 they currently fail, and the proposed recovery. Cross-cutting across the three paths
-(`docs/localization/projective_ranging.md`, `docs/localization/euclidean_reconstruction.md`, `docs/localization/polar_profiling.md`) and their isolation
-recipes (`docs/localization/foreground_isolation_2d.md`, `docs/localization/foreground_isolation_3d.md`).
+(`docs/target_localization/projective_ranging.md`, `docs/target_localization/euclidean_reconstruction.md`, `docs/target_localization/polar_profiling.md`) and their estimator-owned isolation stages.
 
-**Status (2026-07-24):** the **problem** below is current behaviour. The **proposed solution** is a
-planned, benchmark-gated change — *not yet implemented*. The benchmark scenes to validate it exist
-(`config/benchmark_scenarios_full.yaml`: `objpartial_*`, `objocc_*`, `interocc_*`).
+**Status (updated 2026-08-31):** this is an unapproved recovery proposal, not
+the current contract. Its failure mechanism follows from the implemented
+nearest-surface rules, but the current defaults must first be characterized on
+the existing `objpartial_*`, `objocc_*`, and `interocc_*` scenes. That gate is
+owned by [the backlog](../BACKLOG.md#occlusion-characterization). Do not begin
+Phase 1 merely because the proposal is detailed.
 
 ---
 
@@ -20,9 +22,9 @@ the visible robot parts (middle), and background seen past the robot (farthest).
 Every path's foreground-isolation assumes **the target is the nearest coherent surface in the mask** —
 which the occluder violates:
 
-- **Projective ranging** — `nearest_mode_histogram` (`docs/localization/foreground_isolation_2d.md`) keeps the **nearest**
+- **Projective ranging** — `nearest_mode_histogram` (`docs/target_localization/projective_ranging.md` §2.3) keeps the **nearest**
   significant depth mode → the occluder.
-- **Euclidean reconstruction** — `NearestModeBand` (`docs/localization/foreground_isolation_3d.md`, the default since
+- **Euclidean reconstruction** — `NearestModeBand` (`docs/target_localization/euclidean_reconstruction.md` §2.3, the default since
   2026-08-28) anchors on the nearest significant range mode → the occluder; the robot, if more than
   the inlier window behind it, is dropped. The `RangeBand` chain it replaced anchors at the 25th
   percentile instead, which fails here **twice**: the occluder takes the anchor *and* pushes the
@@ -35,13 +37,13 @@ which the occluder violates:
 
 **The damaging part:** this is not a clean miss. Each path returns a **confident wrong-near** value —
 the occluder's distance reported as the robot's — which silently poisons the benchmark MAE rather than
-dropping the trial. (See the parallax note in `docs/localization/object_localization_pipeline.md` §5 for the related
+dropping the trial. (See the parallax note in `docs/target_localization/target_localization_pipeline.md` §5 for the related
 LiDAR case.)
 
 **Front-end contributions.** Partial occlusion can also make the detector shrink the box to the visible
-parts, **split** the robot into two boxes (→ `count != 1`, frame dropped, or a false second robot), or
+parts, **split** the robot into two boxes (which can produce association misses or an extra detection), or
 drop below the detection threshold entirely. On the silhouette gate, a box-prompted SAM
-(`docs/localization/segmentation_component.md`) may segment the salient occluder rather than the robot, and its
+(`docs/target_localization/segmentation.md`) may segment the salient occluder rather than the robot, and its
 predicted-IoU can be high on that wrong mask, so the confidence floor does not catch it.
 
 **The one configuration that already helps.** A *correct tight mask that excludes the occluder* fixes
@@ -61,10 +63,12 @@ front of the G1 with per-instance ground truth still equal to the robot:
 - `objocc_*` — object fully blocks the robot (the honest-miss case),
 - `interocc_*` — a near robot occludes a far robot.
 
-Per-estimator miss reasons and coverage are already reported (`run.json` observation
-columns + the trial CSVs' `miss_reason`, the L3 status pipeline —
-`common/miss_reason.py`), so both recovery (lower MAE, higher correct coverage) and honest misses (an
-occlusion reason instead of a wrong number) are directly observable.
+Per-estimator miss reasons and coverage are already reported (`run.json`
+observation columns plus trial CSV `miss_reason`). The latter is currently
+per trial/estimator, not reliably per ground-truth instance in a multi-robot
+trial; see [the benchmark contract](../benchmarking/target_distance_benchmarking.md).
+Accuracy/outcome rows still make recovery versus confident wrong-near output
+observable, while the finer causal attribution has that stated limit.
 
 ---
 
@@ -147,14 +151,14 @@ wrong-near values; on `single_*` / `objclear_*` they must match the current reci
 
 - **Class-aware segmentation (SAM 3).** Segment *robot-only* pixels so the occluder never enters any
   path — the most structural fix, and it would also settle the pending SAM 3 adoption (see
-  `docs/localization/segmentation_component.md` §7). Deferred as the heaviest option (model wiring + ~3.4 GB VRAM, a
+  `docs/target_localization/segmentation.md` §7). Deferred as the heaviest option (model wiring + ~3.4 GB VRAM, a
   real-hardware GPU-budget question).
 - **Honest-miss only.** Detect the occlusion signature and return `None` + `OCCLUDED` without attempting
   recovery. Cheapest, but yields no distance under occlusion — subsumed by the clustering approach,
   which emits the same reason when it cannot recover.
 - **Temporal tracking.** A sudden nearer-jump between frames is an occluder appearing; per-frame code
   cannot see it (no tracker exists — the hierarchy is deliberately per-frame,
-  `docs/localization/mask_component.md` §6). A future tracking layer could both flag occlusion onset and carry the
+  `docs/target_localization/mask_representation.md` §6). A future tracking layer could both flag occlusion onset and carry the
   robot's last position through it; out of scope here.
 
 ---
@@ -223,9 +227,9 @@ guard. Judged against the Phase 0 baseline:
 
 ### Phase 4 — docs
 
-Rewrite §3 of this document to the as-built design with the A/B numbers, and strike the
-planned-status note in the header. Add pointers from `docs/localization/foreground_isolation_2d.md` /
-`docs/localization/foreground_isolation_3d.md` and the isolation sections of the path docs.
+Rewrite §3 of this document to the as-built design with the A/B numbers, strike
+the planned-status note in the header, and update the isolation sections of the
+projective-ranging and euclidean-reconstruction references.
 
 ### Reuse (nothing re-invented)
 

@@ -1,4 +1,4 @@
-"""Polar profiling -- project-then-segment (``docs/localization/polar_profiling.md``).
+"""Polar profiling -- project-then-segment (``docs/target_localization/polar_profiling.md``).
 
 The LiDAR localization path: transform the planar scan into the camera
 optical frame, project the points onto the color grid, keep the points the
@@ -9,12 +9,12 @@ LiDAR and is not emitted.
 
 Unlike projective ranging and euclidean reconstruction there is no
 ``tight | rect`` fork: parallax lets occluded background points project inside
-even a pixel-precise mask (``docs/localization/polar_profiling.md`` Section 2.5), so both tags
+even a pixel-precise mask (``docs/target_localization/polar_profiling.md`` Section 2.5), so both tags
 run the same recovery -- the tag only changes how wide the admitted window
 effectively is.
 
 Runs per mask over shared per-scan work (``scan_points_optical``); the caller
-loops masks (1:1:1 hierarchy, ``docs/localization/mask_component.md`` Section 6.1). A mask that
+loops masks (1:1:1 hierarchy, ``docs/target_localization/mask_representation.md`` Section 6.1). A mask that
 selects too few rays -- the scan plane missed the object, or it sits outside
 the FoV overlap -- is skipped by returning ``None``: no estimate for that
 mask, never an error.
@@ -48,7 +48,7 @@ LIDAR_RANGE_MIN_M_DEFAULT = 0.05  # drop sub-5cm self-hits
 LIDAR_RANGE_MAX_M_DEFAULT = 10.0  # drop far-field noise
 
 # Foreground-isolation parameters -- the LiDAR analogue of the isolation_2d /
-# isolation_3d recipes (``docs/localization/polar_profiling.md`` Section 2.5). They decide which
+# isolation_3d recipes (``docs/target_localization/polar_profiling.md`` Section 2.5). They decide which
 # of the masked beams are the object vs. background, so these are the knobs to
 # tune for accuracy. Each notes what it does and which way it fails.
 
@@ -65,8 +65,8 @@ RANGE_JUMP_M_DEFAULT = 0.30
 # wall behind does not. Too small keeps one leg (lateral offset, leg-face
 # range); too large admits parallax / neighbour background. The value is an
 # untuned starting point shared with the projective-ranging near-band width
-# through ranging_defaults, not a fit to the object depth -- tuning tracked
-# in docs/localization/polar_profiling.md Section 8.
+# through ranging_defaults, not a fit to the object depth. Its current ownership
+# and validation boundary are documented in docs/target_localization/polar_profiling.md.
 
 # Run split on a bearing gap: start a new run where the beam index gaps by
 # more than this many increments -- i.e. once that many or more consecutive
@@ -231,7 +231,7 @@ def merge_near_band(
 ) -> np.ndarray:
     """Merge the runs within a range band of the nearest run (step 2).
 
-    Convention (pinned, ``docs/localization/object_localization_pipeline.md`` Section 5): on a
+    Convention (pinned, ``docs/target_localization/target_localization_pipeline.md`` Section 5): on a
     legged object the nearest run alone would be one leg; merging every run
     whose median range lies within ``range_band_m`` of the nearest run's
     median averages both legs in range and bearing. Returns the merged

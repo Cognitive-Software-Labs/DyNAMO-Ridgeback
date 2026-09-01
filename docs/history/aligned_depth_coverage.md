@@ -1,14 +1,14 @@
 # Aligned Depth — Stamp-Matching Coverage in Sim
 
-**Scope:** why the two depth-based paths (`docs/localization/projective_ranging.md`,
-`docs/localization/euclidean_reconstruction.md`) report *no estimate* on most frames in
+**Scope:** why the two depth-based paths (`docs/target_localization/projective_ranging.md`,
+`docs/target_localization/euclidean_reconstruction.md`) report *no estimate* on most frames in
 simulation, even though depth is nominally available. This is a **timing /
-coverage** failure mode of the aligned-depth contract (`docs/localization/aligned_depth.md` §1,
+coverage** failure mode of the aligned-depth contract (`docs/target_localization/aligned_depth.md` §1,
 the "Timing" bullet), not an accuracy problem. The measurements below were
 taken 2026-07-24 on the `target_distance_calibration` world.
 
 The symptom surfaced through the benchmark's per-estimator miss-reason
-attribution (`docs/localization/object_localization_pipeline.md`): a box-gate run tallies the
+attribution (`docs/target_localization/target_localization_pipeline.md`): a box-gate run tallies the
 depth rows almost entirely as `NO_DEPTH_FRAME`.
 
 > **Resolved 2026-08-26 by option 1 (§6).** Depth acquisition now happens
@@ -161,7 +161,7 @@ With the producer keeping up, `{A}` ≈ the full stamp grid, `{D} ⊆ {A}`, and
 exact-stamp coverage approaches 100 %. **Exact-stamp matching is the correct
 choice there** — it is only pathological when a starved producer thins `{A}`.
 
-(The monocular Depth-Anything source, `docs/localization/aligned_depth.md` §3, *is* a genuine
+(The monocular Depth-Anything source, `docs/target_localization/aligned_depth.md` §3, *is* a genuine
 per-frame NN cost and would thin `{A}` on any host; it is a separate axis from
 this sim-contention finding.)
 
@@ -225,11 +225,35 @@ detections slot drops backlog — and should be unchanged by this work.
 
 ## 7. Cross-references
 
-- `docs/localization/aligned_depth.md` — the aligned-depth contract and its two sources; §1
+- `docs/target_localization/aligned_depth.md` — the aligned-depth contract and its two sources; §1
   "Timing" bullet is the invariant this document stresses.
-- `docs/localization/projective_ranging.md`, `docs/localization/euclidean_reconstruction.md` — the two consumers
+- `docs/target_localization/projective_ranging.md`, `docs/target_localization/euclidean_reconstruction.md` — the two consumers
   that report `NO_DEPTH_FRAME` together.
-- `docs/localization/polar_profiling.md` — the LiDAR path, at 100 % here because it matches the
+- `docs/target_localization/polar_profiling.md` — the LiDAR path, at 100 % here because it matches the
   scan within a tolerance window rather than on an exact stamp.
-- `docs/localization/object_localization_pipeline.md` — the benchmark and its per-estimator
+- `docs/target_localization/target_localization_pipeline.md` — the benchmark and its per-estimator
   miss-reason attribution, which surfaced this.
+
+
+## Recorded monocular metric-scale check
+
+The following result was previously embedded in the aligned-depth TODO list.
+It is a historical simulation observation and interpretation, not fresh hardware
+validation or a calibration prescription. It predates the D455 geometry change;
+the original passage did not include an exact run identifier.
+
+**Recorded 2026-07-24:** measured Depth-Anything's
+  scale directly as a pixel-wise `mono / stereo` depth ratio on identical sim
+  frames (isolating the scale term from surface warping and noise). On the **G1
+  region** — the pixels euclidean reconstruction actually consumes — the ratio is
+  ≈**1.0** (overall median 1.02) but **range-dependent**: it over-reads ~10–15% at
+  2–3 m (ratio 1.10–1.15) and converges to metric (~1.0) by 4–6 m. On the **whole
+  frame** (dominated by floor and walls) it reads ~13% short (median 0.87), a
+  separate warping of large flat surfaces. So Depth-Anything is *approximately
+  metric on the object* with mild close-range warping — **not** a constant global
+  bias correctable by a single factor. Consequence: euclidean's absolute-metric
+  isolation (`HeightCrop` floor plane, `RangeBand` ±0.10/0.35 m windows) is
+  genuinely soft at close range on the monocular source; treat monocular euclidean
+  rows as range-warped, not scale-shiftable. (Consistent with the end-to-end
+  monocular MAE ~0.19–0.22 m vs. stereo ~0.07 m — the excess is warping, not a
+  fixable offset.)

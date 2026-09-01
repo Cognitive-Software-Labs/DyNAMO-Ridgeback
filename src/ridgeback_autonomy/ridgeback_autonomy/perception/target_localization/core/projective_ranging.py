@@ -1,4 +1,4 @@
-"""Projective ranging -- aggregate-then-deproject (``docs/localization/projective_ranging.md``).
+"""Projective ranging -- aggregate-then-deproject (``docs/target_localization/projective_ranging.md``).
 
 The cheapest localization path: select the masked depths, clean them,
 collapse them to one distance, and deproject exactly one representative
@@ -17,7 +17,7 @@ shape, so a custom isolation callable still sees the absolute coordinates it
 may depend on.
 
 Runs per mask over a shared aligned depth frame; the caller loops masks
-(1:1:1 hierarchy, ``docs/localization/mask_component.md`` Section 6.1). A mask with too few
+(1:1:1 hierarchy, ``docs/target_localization/mask_representation.md`` Section 6.1). A mask with too few
 valid depth pixels is skipped by returning ``None`` -- the docs'
 invalid-depth fallback.
 """

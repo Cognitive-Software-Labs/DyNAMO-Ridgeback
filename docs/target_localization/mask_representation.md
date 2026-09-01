@@ -1,8 +1,8 @@
-# Mask Component
+# Mask representation
 
-**Scope:** the front-end stage that turns a detector output into the common
-mask representation consumed by every downstream path. This document covers the
-mask *object* and how it is produced. It deliberately does **not** describe how
+**Scope:** the mask representation, geometric constructors, storage boundaries,
+and visualization semantics shared by target-localization paths. Learned mask
+production has its own [segmentation contract](segmentation.md). It deliberately does **not** describe how
 the paths (depth-image, point-cloud, LiDAR) consume the mask — that integration
 is documented separately.
 
@@ -43,7 +43,7 @@ region follows the object's true silhouette, which is recorded by the
 **precision tag** (`tight` | `rect`).
 
 The tight mask is described only briefly here (Section 4); its producer has
-its own document, `docs/localization/segmentation_component.md`. The remainder of this document
+its own document, `docs/target_localization/segmentation.md`. The remainder of this document
 describes the **rectangular mask** thoroughly, because it is the default mask
 produced from the detector (OWLv2).
 
@@ -53,23 +53,17 @@ produced from the detector (OWLv2).
 
 ### 3.1 Source
 
-The rectangular mask is built from the object detector's output. The current
-detector is OWLv2 (`google/owlv2-base-patch16-ensemble`), an open-vocabulary
-detector that emits, per detection, an axis-aligned bounding box together with a
-label and a confidence score. After confidence thresholding and non-maximum
-suppression, each surviving detection carries a box in the form `bbox_xyxy`:
+The rectangular mask starts from the accepted-box contract owned by
+[detection](detection.md). Each surviving detection supplies one box in the
+form `bbox_xyxy`:
 
 ```
 bbox_xyxy = (x1, y1, x2, y2)
 ```
 
-where `(x1, y1)` is the top-left corner and `(x2, y2)` is the bottom-right
-corner, both in **pixel coordinates of the RGB color image**. The box is already
-clamped to the image bounds, with `x2 > x1` and `y2 > y1` guaranteed (a minimum
-extent of one pixel), so it is always a valid, non-degenerate rectangle.
-
-The detector model itself is an implementation detail. Nothing in the mask
-component depends on which detector produced the box — only on the box.
+where `(x1, y1)` is inclusive and `(x2, y2)` is exclusive in **RGB colour-image
+pixel coordinates**. Detection guarantees a clamped, non-degenerate box. Mask
+representation neither knows nor depends on which model produced it.
 
 ### 3.2 Rasterization to a binary mask
 
@@ -158,7 +152,7 @@ uses an encoded form — see the wire-cost note in Section 5.3.
 ## 4. Tight mask
 
 The tight mask is the second front-end and is **not** detailed here — see
-`docs/localization/segmentation_component.md`. In short: a box-promptable segmentation model
+`docs/target_localization/segmentation.md`. In short: a box-promptable segmentation model
 (SlimSAM by default), prompted with the detector's boxes, produces a
 pixel-precise `True` region (an arbitrary blob, not a rectangle), tagged
 `tight`, with negligible background contamination. It emits into the identical
@@ -231,7 +225,7 @@ reconstructible at the consumer:
 - **Silhouette Mask panel (display the real artifact):** a tight mask is *not*
   reconstructible downstream, so the mask node publishes the union of the
   frame's consumed masks as a debug-only `mono8` Image on `debug/target/mask`
-  (`docs/localization/segmentation_component.md` §6) — silhouette gate only. The panel never
+  (`docs/target_localization/segmentation.md` §6) — silhouette gate only. The panel never
   shows substitute content: it renders the artifact whose stamp matches the
   rendered frame exactly (what downstream received), holding the most recent
   artifact when the current frame's mask has not landed yet (it lags the
@@ -239,26 +233,24 @@ reconstructible at the consumer:
   artifact at all (box gate, startup) shows the "No silhouette mask"
   placeholder.
 
-**Wire cost of the target.** A naive published mask (1 byte per pixel) scales
+**Wire cost of the artifact.** A raw published mask (1 byte per pixel) scales
 with the active backend's color grid. At the current `640 × 480` default it is
 `≈ 0.3 MB` per mask; any future higher-resolution profile scales directly with
 pixel count. The convention that keeps it harmless:
 
-- **Consumers never take the mask off the wire.** The whole perception stack
-  runs on one machine (robot PC or workstation — never split across both), so
-  projective ranging, euclidean reconstruction, and polar profiling receive the boolean array by in-process handoff at zero wire
-  cost.
-- **The published topic is debug/visualization only**, and goes out encoded:
-  `mono8` Image with compressed transport (PNG). Binary masks compress to a few
-  kB — two to three orders of magnitude under the naive figure — at negligible
-  CPU cost.
+- **Measurement consumers never take the mask off the wire.** Projective
+  ranging, euclidean reconstruction, and polar profiling receive it by
+  in-process handoff, so this debug publication is not part of measurement dataflow.
+- **The published topic is debug/visualization only** and uses a normal
+  `sensor_msgs/Image` publisher with `mono8` encoding. Compressed image transport
+  is not part of this component's contract; do not assume PNG size or CPU cost.
 
 ### 5.4 Cost
 
-Negligible: one boolean fill plus one masked copy per panel per rendered
-frame. No model inference in the panels themselves. The grid is three color
-frames wide by two rows tall, and the composite is published for the RViz
-Image display.
+Panel composition performs boolean fills/copies and image rendering per output
+frame; no model inference occurs in the panel code itself. Its cost depends on
+grid size, detection count, enabled panels, and subscriber-driven artifacts.
+The composite is published for the RViz Image display.
 
 ---
 
@@ -283,12 +275,9 @@ frame
          └─ 1 result each    (one coordinate per mask, per path)
 ```
 
-Two G1s in view means `count = 2`, two masks, two coordinates. There is **no**
-"N detections per object" layer: the raw detector head does propose many
-candidate boxes per object, but confidence thresholding and non-maximum
-suppression collapse them *inside the detector front-end*, before anything is
-published. Everything downstream of the detector — the messages, the masks,
-the paths — sees only post-NMS detections.
+Two G1s in view means `count = 2`, two masks, two coordinates. Everything
+downstream starts from the post-filtering boxes published by
+[detection](detection.md); raw model proposals are outside the mask contract.
 
 Consequences worth pinning:
 
@@ -314,12 +303,9 @@ Two properties follow, and both matter downstream:
 - **Masks are independent and never merged.** Each mask selects one object's
   pixels and yields one result for *that* object. Two different objects always
   get two separate coordinates; there is no "distance for the whole batch."
-  Masks may even partially overlap: the detector's non-maximum suppression is
-  per-label — it suppresses a candidate only against a same-label kept box that
-  either overlaps it above `IoU > 0.5` or nearly contains it
-  (`intersection_over_smaller > 0.95`, the near-total-containment case).
-  Cross-label overlaps are kept, and each surviving mask is still selected on
-  its own.
+  Masks may even partially overlap. Detection owns duplicate suppression and
+  retains legitimate surviving overlap; each published box is still selected
+  independently here.
 - **The source frame is shared; only selection is per-mask.** The RGB frame —
   and anything derived from it once per frame (e.g. an aligned depth frame) — is
   produced a single time and then indexed once per mask. The expensive
@@ -399,20 +385,11 @@ the detection was. For a production-sized box (~2% of frame) the region is
 roughly 50× smaller, at either 640×480 or 1280×720. The measured consequences,
 and the two cases that got slower, are recorded in `docs/history/roi_mask_migration.md`.
 
----
+## 8. Contract checks
 
-## 8. Open items
-
-Resolved:
-
-- ~~**Interface signature** — pin the in-code contract for the mask object (the
-  `H×W` boolean array plus the `tight | rect` tag) so the separation between
-  front-ends and consumers is enforced, not just described.~~ — resolved
-  2026-07-21: `Mask.__post_init__` (`perception/target_localization/core/mask.py`) enforces the
-  2D-boolean array, and the precision tag is a real `MaskPrecision(str, Enum)`.
-- **Tight-mask front-end** — implemented and documented in
-  `docs/localization/segmentation_component.md` (box-prompted SlimSAM behind the `mask_gate`
-  parameter).
-- **Visualization data source** — per panel, see Section 5.3: the Box Mask
-  panel derives the rect union at render time; the Silhouette Mask panel
-  consumes the published `debug/target/mask` artifact.
+`Mask` and `MaskRegion` validate boolean payloads and dimensions; the region also
+validates bounds and retains its explicit `MaskPrecision`. `None` is not an
+empty selector. Constructors, origin-aware membership, copy/ownership rules,
+and whole-grid compatibility are covered by
+[region tests](../../src/ridgeback_autonomy/test/test_mask_region.py).
+Migration evidence and limitations live in [history](../history/roi_mask_migration.md).

@@ -1,10 +1,14 @@
-# Object Localization Pipeline
+# Target-localization pipeline
 
-**Purpose:** Given a RealSense camera (and optionally a planar 2D LiDAR), detect objects of a target class in the RGB image and report each object's coordinates **relative to the camera frame**. The system is designed as a set of swappable components so that every combination of detector, depth source, and downstream path can be benchmarked for accuracy vs. compute.
+**Purpose:** Detect a target class in RGB and report per-detection planar
+positions relative to the robot front. This document covers target localization,
+not the project's mapping, navigation, or exploration architecture.
 
-**Output contract:** Every path terminates at a single representation — `(X, Y, Z)` in the camera frame (the LiDAR path yields `(X, Z)` only; see polar profiling). This shared output makes the paths directly comparable and fusible.
-
----
+**Output contract:** Pure mask estimators produce camera-optical coordinates
+(XYZ for depth paths, XZ for polar). The measurement pipeline transforms them
+at the detection stamp into `(lateral_m, forward_m, distance_m)` in the shared
+base convention (Section 7). The separate `pointcloud` row publishes the same
+planar convention. No estimator fusion or fallback substitution is implemented.
 
 ## 1. Sensor stack
 
@@ -17,7 +21,7 @@ The robot carries a single **Intel RealSense D455**, forward-facing, mounted at 
 **Data products we use:**
 
 1. **RGB color image** - input to detection / segmentation. The repo leaves the stream profile unspecified, so the checked-out Clearpath configuration supplies its 640x480 @ 30 fps default to both backends. Sim: rendered color frame; hardware: the stream the driver selects. Record the profile the driver actually activates rather than inferring it from YAML.
-2. **Depth image** (made 1:1 with RGB) - input to projective ranging and euclidean reconstruction. Euclidean reconstruction deprojects its masked pixels into camera-frame points in code (`docs/localization/euclidean_reconstruction.md`; provenance decision in `docs/history/pointcloud_provenance_test.md` §7) - the points are a derived, in-code representation, not a sensor product.
+2. **Depth image** (made 1:1 with RGB) - input to projective ranging and euclidean reconstruction. Euclidean reconstruction deprojects its masked pixels into camera-frame points in code (`docs/target_localization/euclidean_reconstruction.md`; provenance decision in `docs/history/pointcloud_provenance_evaluation.md` §7) - the points are a derived, in-code representation, not a sensor product.
 3. **Camera IMU - present on the device, unused by this stack.** The D455 carries an IMU, unlike the D435. Nothing here enables, subscribes to, or fuses those streams, and SLAM does not consume them. Capability is not configuration.
 4. **Organized point cloud - configured, unverified.** Clearpath's checked-out `IntelRealsense` sets `POINTCLOUD_ENABLED = True`, so the parser emits `pointcloud.enable: true` for hardware. That is a *driver default resolved from the checked-out config*, which is a different fact from what the device actually publishes and a different fact again from whether the published layout can feed the `pointcloud` estimator. `common/camera_inputs.py` therefore leaves the organized-cloud input **unspecified** for the `realsense` profile. Before wiring it, verify organization (`height > 1`), colour-grid indexing, frame, and timestamps on the robot.
 
@@ -39,14 +43,14 @@ The robot carries a single **Intel RealSense D455**, forward-facing, mounted at 
 | Camera IMU | not rendered | present on the D455, not enabled or consumed |
 | Internal camera TF | `robot_state_publisher`, from the D455 nominal frames | `realsense2_camera`, from the factory calibration |
 
-**Hardware verification items** (invisible in sim, so the sim benchmark cannot prove them):
+Hardware readiness is tracked once in the [camera validation plan](../plans/camera_hardware_validation.md).
+Simulation and parser tests cannot establish physical profiles, matching stamps,
+device selection, or driver TF ownership. The old `camera_config.json` and its
+unused loader have been deleted; active paths use the color `CameraInfo`.
 
-- `robot.yaml` sets `align_depth.enable: true` and `enable_sync: true`, and the Clearpath parser preserves both. Confirm on the robot that `sensors/camera_0/aligned_depth_to_color/image_raw` exists, has the color image dimensions, and retains the driver timestamps; hardware support remains unverified until then (`docs/localization/aligned_depth.md` §2.1).
-- Confirm the enumerated device is a D455 and that `device_type` plus `serial_no: "0"` select it as intended in the installed wrapper version.
-- Record the active colour/depth profiles and the `CameraInfo` intrinsics, and confirm exactly one publisher of the internal camera TF chain.
-- `config/camera_config.json` still holds `87° x 58°`, but **no estimator reads it**: `load_camera_config` has no production caller and the mask stack takes its intrinsics from `CameraInfo`. The file is inert here; its values are left alone rather than re-derived.
-
-Sources: Gazebo `gz-sensors` RgbdCameraSensor docs; Clearpath Cameras config docs; repo `clearpath/robot.yaml`, `intel_realsense.urdf.xacro`, `intel/d455.urdf.xacro`, `config/camera_config.json`, `r100.urdf.xacro`. Model-specific depth-range and FoV figures previously quoted here came from the D400-series datasheet entry for the **D435** and have been removed rather than relabelled.
+Repository sources: `clearpath/robot.yaml`, the Clearpath RealSense/D455 model,
+and `common/camera_inputs.py`. The removed D435 transform and its root cause are
+recorded in [ISSUES](../ISSUES.md#historical-the-d435-static-publisher-removed-2026-08-31).
 
 ### 2D LiDAR (Hokuyo UST, planar 270°)
 
@@ -81,7 +85,12 @@ Rationale — easy maintenance:
 - **Isolate divergence behind one boundary.** Every sim/real quirk (intrinsics source, where depth alignment happens, topic names, noise handling) lives in exactly one place — the backend — instead of being scattered as conditionals through the pipeline.
 - **Swappable and testable.** A backend can be replaced, or faked for tests, without touching any downstream path.
 
-The concrete mechanism (how intrinsics are obtained, where alignment is performed, what is solved by driver config vs. in code) is deliberately **deferred**. This section fixes only the principle: *very similar code and interfaces across both versions, with all environment-specific behaviour confined to one swappable backend.*
+The boundary is implemented: `common/camera_inputs.py` resolves simulation or
+RealSense topic contracts; color `CameraInfo` provides intrinsics; the hardware
+driver owns alignment; `core/depth_sources.py` converts the selected input at
+the detection stamp. This is source/configuration support, not proof of a live
+hardware deployment. Noise and finite-but-inaccurate depths are not silently
+corrected by a backend.
 
 ---
 
@@ -99,9 +108,10 @@ flowchart TD
         RAST --> MASK_B["Binary Mask<br/>(rectangle)"]
     end
     RGB --> SEG
+    DET -->|box prompts| SEG
     RGB --> DET
 
-    MASK_S -->|"tag: tight"| IFACE["Mask Interface<br/>(H×W binary + precision tag)"]
+    MASK_S -->|"tag: tight"| IFACE["MaskRegion<br/>(ROI boolean + origin + full grid + precision)"]
     MASK_B -->|"tag: rect"| IFACE
 
     subgraph DEPTHSRC["Depth Sources"]
@@ -146,9 +156,12 @@ flowchart TD
     ALIGNED --> SELECT
     IFACE --> SELECT
 
-    A_COORD --> FINAL["Object Coordinates<br/>relative to Camera Frame<br/>(X, Y, Z) · polar profiling: X,Z only"]
+    A_COORD --> FINAL["Live TF at detection stamp<br/>+ robot-front offset"]
     B_COORD --> FINAL
     C_COORD --> FINAL
+    FINAL --> PLANAR["Published lateral / forward / distance"]
+    CLOUD["Organized PointCloud2"] --> PC["pointcloud estimator"]
+    PC --> PLANAR
 
     %% invisible links: push euclidean reconstruction one rank down,
     %% keep the LiDAR column on the right side of the layout
@@ -160,12 +173,20 @@ flowchart TD
 
 ## 3. Front-end: detection components and the mask interface
 
-Two detector components run off the RGB frame. They are kept structurally separate (different models, different compute profiles, independently versioned and benchmarked) but are unified behind a **common data contract**.
+The [detection component](detection.md) publishes one index-aligned batch of
+accepted boxes from an RGB frame.
+Inside the measurement node, `mask_gate` chooses how those boxes become masks:
 
-- **Segmentation component** — emits a pixel-precise (*tight*) binary mask. Implemented as a **box-promptable segmenter prompted with the detection component's boxes** (SlimSAM by default; `perception/target_localization/core/segmentation.py`, documented in `docs/localization/segmentation_component.md` — evaluated alternatives in §7 there: Florence-2 spike failed, SAM 3 spike passed with adoption undecided), which keeps the detector's open-vocabulary property: one box prompt → one mask. Like rasterization, it executes in the consuming measurement node (the mask never crosses the wire); a run selects it with `mask_gate:=silhouette`.
-- **Detection component** — emits a bounding box, then **rasterizes the box into a rectangular binary mask** (the default, `mask_gate:=box`). The detector model is an implementation detail (an open-vocabulary detector such as OWLv2 is the current implementation; nothing downstream depends on the choice). In code the rasterization currently executes in the consuming measurement node (`rasterize_detection` in `perception/target_localization/core/mask.py`) — it belongs to this component's contract regardless of where it runs.
+- `box`: `region_from_bbox` constructs an all-true rectangular ROI.
+- `silhouette`: the [segmenter](segmentation.md) consumes those boxes and the
+  exact RGB frame; `region_from_blob` crops each output to its nonzero extent.
 
-Both emit into the **Mask Interface**: an `H×W` binary mask plus a **precision tag** (`tight` | `rect`). Everything downstream reads only this interface and never branches on which model produced the mask. Adding a third front-end later means another component emitting into the same interface, with zero downstream changes.
+Both produce a `MaskRegion`: ROI boolean payload, origin, full color-grid
+dimensions, and an explicit `rect`/`tight` precision tag. The model boundary
+still returns full-grid blobs; production measurement does not allocate a full
+mask per detection. [Mask representation](mask_representation.md) owns that
+contract. Model alternatives belong to
+[segmentation candidates](../do_not_try_again/segmentation.md).
 
 > **Design note:** the rasterize step is a deliberate, lossy adapter — it discards shape to conform to the interface. The rectangular mask is *not* a real segmentation; it carries a known background contamination. Mark this clearly at the code boundary so it is never mistaken for a tight mask.
 
@@ -201,32 +222,32 @@ and euclidean reconstruction. Their algorithms diverge only after this common
 selection; standalone calls may omit the precomputed array and retain the same
 self-contained behavior.
 
-### Projective ranging — 2D depth-image route (cheapest)
-Extract depth values at the masked pixels, aggregate to a single distance, then deproject the representative pixel (centroid of the foreground pixels — `docs/localization/projective_ranging.md` §2.4) + aggregated depth through the intrinsics to a 3D point.
+### Projective ranging — aggregate depth, then deproject
+Extract depth values at the masked pixels, aggregate to a single distance, then deproject the representative pixel (centroid of the foreground pixels — `docs/target_localization/projective_ranging.md` §2.4) + aggregated depth through the intrinsics to a 3D point.
 
 - **tight branch:** direct robust median of the masked depths.
-- **rect branch:** the masked depths are multimodal (object + background), so a plain median can land on background. Isolate the foreground first with a pluggable 2D recipe (`isolation_2d.py`; implemented: nearest-mode histogram — the default — and Otsu; catalogue in `docs/localization/foreground_isolation_2d.md`), *then* median.
+- **rect branch:** the masked depths are multimodal (object + background), so a plain median can land on background. Isolate the foreground first with a pluggable 2D recipe (`isolation_2d.py`; implemented: nearest-mode histogram — the default — and Otsu; catalogue in `docs/target_localization/projective_ranging.md`), *then* median.
 - **Output:** `(X, Y, Z)` from a single representative pixel.
 
-> Projective ranging's coordinate is only as good as that one representative pixel. If the centroid lands on a depth discontinuity (object edge vs. far background) the depth can be wrong even when the aggregate range was fine. The representative pixel must be the centroid of the *foreground* pixels — the isolation output on the `rect` branch, all valid masked pixels on the `tight` branch — never the raw geometric box center (`docs/localization/projective_ranging.md` §2.4). Both the aggregate and the centroid read the same foreground set, so they agree by construction.
+> Projective ranging's coordinate is only as good as that one representative pixel. If the centroid lands on a depth discontinuity (object edge vs. far background) the depth can be wrong even when the aggregate range was fine. The representative pixel must be the centroid of the *foreground* pixels — the isolation output on the `rect` branch, all valid masked pixels on the `tight` branch — never the raw geometric box center (`docs/target_localization/projective_ranging.md` §2.4). Both the aggregate and the centroid read the same foreground set, so they agree by construction.
 
-### Euclidean reconstruction — 3D point-domain route (richest)
-Select the valid masked pixels, deproject only those into camera-optical-frame points (select and deproject commute, so no full organized cloud is ever materialized — the published cloud topic is never consumed, per `docs/history/pointcloud_provenance_test.md`), isolate the foreground in the point domain, and take the centroid.
+### Euclidean reconstruction — deproject, then aggregate
+Select the valid masked pixels, deproject only those into camera-optical-frame points (select and deproject commute, so no full organized cloud is ever materialized — the published cloud topic is never consumed, per `docs/history/pointcloud_provenance_evaluation.md`), isolate the foreground in the point domain, and take the centroid.
 
 - **tight branch:** statistical outlier removal (median ± k·MAD on camera-frame range) → centroid.
-- **rect branch:** the box drags in the floor and background, so a pluggable 3D isolation recipe runs (`isolation_3d.py`; catalogue in `docs/localization/foreground_isolation_3d.md`). Implemented default: **height crop** (extrinsic ground-plane crop — the floor is removed by known calibration, not estimation) → **range band** (percentile anchor + asymmetric inlier window tied to the object's body depth). Heavier catalogue entries (RANSAC plane removal, Euclidean clustering, min-cut) remain swap-ins, deliberately not implemented — see the catalogue for why RANSAC's dominant-plane premise is weak inside a detector box.
-- **Output:** centroid `(X, Y, Z)`; the distance is the median camera-frame range of the same foreground set, so coordinate and distance agree by construction. The foreground points are returned as a by-product (extent, oriented box later if wanted).
+- **rect branch:** the box drags in the floor and background, so a pluggable 3D isolation recipe runs (`isolation_3d.py`; registered recipes in `docs/target_localization/euclidean_reconstruction.md`). The implemented default is **height crop → nearest-mode band**. RANSAC, clustering, min-cut, and learned approaches are unimplemented [candidates](../do_not_try_again/foreground_isolation.md), not selectable swap-ins.
+- **Output:** centroid `(X, Y, Z)`; published distance is derived from that centroid after base-frame conversion, not from a separate range median. The foreground points are returned as a by-product for any later geometry analysis.
 
-### Polar profiling — 2D 270° LiDAR route (accurate, planar only)
+### Polar profiling — project and segment the planar scan
 Independent sensor stream; rejoins the pipeline only at the mask. Convert the scan to Cartesian, transform into the camera frame via **extrinsic calibration**, project into the image plane with the intrinsics, then keep only the points falling inside the mask ∩ camera FoV.
 
 - **tight branch:** segment the 1D range profile, **merge the runs lying within a small range band of the nearest run**, and median the merged set — same recovery as the rect branch, only over a narrower bearing window. A plain median over the arc is unsafe even with a tight mask: parallax lets background points into the arc (see the callout below).
 - **rect branch:** the wider box widens the bearing window and admits neighbors, so segment the 1D range profile, merge the runs within the range band of the nearest, and median the merged set.
 - **Output:** `(X, Z)` in the camera frame. **Y (height) is unobservable** from a single-plane LiDAR.
 
-> Polar profiling only returns points where the scan plane physically intersects the object at the LiDAR's height. A valid mask can yield zero LiDAR points if the plane passes above/below the object → the path returns `None`, which is first-class (`docs/localization/polar_profiling.md` §4). In the **benchmark** a miss simply drops that row — it is never substituted with another path's answer. Any fallback routing to projective ranging / euclidean reconstruction is a **production-pipeline consumer concern only** (unresolved, deferred — §10.4), never something the benchmark does.
+> Polar profiling only returns points where the scan plane physically intersects the object at the LiDAR's height. A valid mask can yield zero LiDAR points if the plane passes above/below the object → the path returns `None`, which is first-class (`docs/target_localization/polar_profiling.md` §4). In the **benchmark** a miss records a no-value outcome — it is never substituted with another path's answer. Any fallback routing to projective ranging / euclidean reconstruction is a **production-pipeline consumer concern only** (not implemented; Section 9), never something the benchmark does.
 >
-> **Parallax contamination — why even the tight branch segments:** the mask is defined from the camera's viewpoint, but the LiDAR samples from a different position. A `rect` mask admits background the camera can see through gaps in the object (between the G1's legs at scan height). A `tight` mask rejects those (gap pixels are False) but still admits background the camera *cannot* see: an occluded point projects inside the silhouette by definition of occlusion — the sensors' vertical offset means a beam through the leg gap that hits the wall behind lands on *torso* pixels from the camera's higher viewpoint (full geometry in `docs/localization/polar_profiling.md` §2.5). Mask membership only certifies that the *camera's* ray hits the object; it says nothing about a LiDAR point further along that ray. The zero-point fallback does not catch this (points exist, they are just wrong); segmenting the range profile and keeping only the near runs drops them. **Convention (pinned):** runs lying within a small range band of the nearest run are merged before the median. On a legged object the nearest run alone would be one leg (range = leg face, offset from body center); merging the band averages both legs.
+> **Parallax contamination — why even the tight branch segments:** the mask is defined from the camera's viewpoint, but the LiDAR samples from a different position. A `rect` mask admits background the camera can see through gaps in the object (between the G1's legs at scan height). A `tight` mask rejects those (gap pixels are False) but still admits background the camera *cannot* see: an occluded point projects inside the silhouette by definition of occlusion — the sensors' vertical offset means a beam through the leg gap that hits the wall behind lands on *torso* pixels from the camera's higher viewpoint (full geometry in `docs/target_localization/polar_profiling.md` §2.5). Mask membership only certifies that the *camera's* ray hits the object; it says nothing about a LiDAR point further along that ray. The zero-point fallback does not catch this (points exist, they are just wrong); segmenting the range profile and keeping only the near runs drops them. **Convention (pinned):** runs lying within a small range band of the nearest run are merged before the median. On a legged object the nearest run alone would be one leg (range = leg face, offset from body center); merging the band averages both legs.
 
 ---
 
@@ -237,10 +258,10 @@ The common interface unifies the **selection** mechanic (indexing depth / points
 | Path | tight branch | rect branch (extra work) |
 |------|--------------|--------------------------|
 | projective ranging (2D depth) | robust median | 2D isolation recipe (default: nearest-mode histogram) → median |
-| euclidean reconstruction (point cloud) | MAD outlier removal | 3D isolation recipe (default: height crop → range band) |
+| euclidean reconstruction (point cloud) | MAD outlier removal | 3D isolation recipe (default: height crop → nearest-mode band) |
 | polar profiling (LiDAR) | arc segmentation → merge near-band runs → median (narrow window) | arc segmentation → merge near-band runs → median (wide window admits neighbors) |
 
-Selection stays shared; the fork sits exactly where behavior genuinely diverges. Polar profiling is the exception: parallax contaminates even the tight mask (see the polar profiling callout), so its branches run the same recovery and differ only in bearing-window width. The rect recoveries are pluggable recipes (`ISOLATION_2D_RECIPES` / `ISOLATION_3D_RECIPES`, selected per launch via the `isolation_2d` / `isolation_3d` parameters of `target_mask_measurement_node`). The implemented defaults are all cheap NumPy, so the box detector's extra recovery is currently near-free on every path; only the heavier catalogued recipes (clustering, min-cut) would reintroduce a real cost asymmetry.
+Selection stays shared; the fork sits exactly where behavior genuinely diverges. Polar profiling is the exception: parallax contaminates even the tight mask (see the polar profiling callout), so its branches run the same recovery and differ only in bearing-window width. The rect recoveries are pluggable recipes (`ISOLATION_2D_RECIPES` / `ISOLATION_3D_RECIPES`, selected per launch via the `isolation_2d` / `isolation_3d` parameters of `target_mask_measurement_node`). The implemented defaults use NumPy; extra recovery still has a cost, and alternative recipe costs require measurement on the selected hardware.
 
 ---
 
@@ -256,39 +277,44 @@ The **forward** component is likewise uniform: base +X minus the 0.25 m robot fr
 
 ---
 
-## 8. Combination matrix to benchmark
+## 8. Supported comparison axes
 
-The design intent is to evaluate every combination on two axes: **accuracy** (vs. ground-truth coordinates) and **latency / compute**.
+The benchmark exposes mask gate (`box`/`silhouette`), depth source
+(`stereoscopic`/`monocular`), estimator selection, and registered isolation
+recipes. Polar is independent of depth source; the pointcloud row uses its own
+organized-cloud input. A silhouette depth row bypasses rect isolation recipes.
+See [benchmark semantics](../benchmarking/target_distance_benchmarking.md).
 
-- **Detectors (2):** segmentation (tight) · detection→rect
-- **Depth sources (2):** RealSense stereo · Depth Anything (projective ranging and euclidean reconstruction); LiDAR is its own source for polar profiling
-- **Paths (3):** projective ranging (2D depth) · euclidean reconstruction (point cloud) · polar profiling (LiDAR)
+These are supported configurations, not a claim that the complete matrix has
+been measured. [Isolation validation](../BACKLOG.md#isolation-validation) owns
+the controlled comparison; unselected methods live in `docs/do_not_try_again/`.
 
-Working hypotheses to validate:
+## 9. Conditional extensions, not current behaviour
 
-- **Box + euclidean reconstruction** may approach mask + euclidean reconstruction in accuracy because the 3D isolation recovers what the mask would have given for free. With the implemented height-crop → range-band chain that recovery is nearly free, so the comparison is purely about accuracy; only the heavier catalogued recipes would spend the detector savings back.
-- **Box + projective ranging** is where the box stays genuinely cheap end-to-end.
-- **Polar profiling** is the most accurate within its plane but only 2D; best as a high-accuracy range cross-check or fallback, not a standalone 3D source.
+Shared coordinate conventions permit comparison, but do not establish a fusion
+policy or comparable per-path confidence. Fusion, polar/depth consistency guards,
+and `None`-to-another-path routing require a production-consumer requirement and
+an explicit selection policy. Benchmark rows must remain independent; no failed
+row is replaced with another estimator's answer.
 
----
+Front/rear LiDAR merging is also outside the current target-localization
+contract, which uses `lidar2d_0`. Pitched-camera polar geometry requires separate
+validation because the reduction discards optical Y. Neither is a current
+implementation commitment merely because the interface could be extended.
 
-## 9. Fusion opportunity
+## 10. Integration and validation boundaries
 
-Because every path emits in the same frame and at least `(X, Z)`, the outputs are mutually checkable and fusible: weight by per-path confidence, prefer euclidean reconstruction's full geometry when available, fall back to projective ranging or polar profiling otherwise, and use polar profiling's accurate range to cross-validate euclidean reconstruction's depth. No further frame juggling is required once Section 7 is fixed.
+`perception/target_localization/launch.py` supplies shared factories to exploration
+and benchmarking; `contracts.py` owns their ROS topic names. `measurement_pipeline.py`
+owns batch-local preparation and path execution, while `synchronization.py` owns
+stamp matching and diagnostics. The node owns subscriptions, TF, and model life
+cycles. `test_imports.py`, `test_shared_defaults.py`, and `test_launch_layout.py`
+guard dependency direction and shared wiring.
 
----
-
-## 10. Open items / TODO
-
-1. ~~**Pin the camera-frame convention** (Section 7) — axes, handedness, units — against SDK + robot TF.~~ — resolved 2026-07-23 for the mask stack: paths emit `base_link` planar measurements via the live TF extrinsic (`optical_to_base_planar`), lateral left-positive (REP-103) — Section 7. The camera family that still emitted right-positive has since been deleted, so the convention is now unified rather than split.
-2. **Calibration procedures:** RealSense intrinsics/extrinsics are factory-calibrated; the **camera–LiDAR extrinsic** must be calibrated and documented. Define the procedure and store the transform.
-3. ~~**Time synchronization** between camera and LiDAR — without matched timestamps, a moving platform/object smears the LiDAR projection against the mask.~~ — resolved 2026-07-23 in the mask node: depth and scan are matched to the detection (mask) stamp via `StampedMessageBuffer` (depth exact-stamp; scan nearest within `scan_match_tolerance_s`), not latest-wins (`docs/localization/polar_profiling.md` §8, `docs/localization/aligned_depth.md` §1). Accurate sensor clocks/timestamping on real hardware remain a driver concern the software matching relies on.
-4. **Fallback routing** for polar profiling empty returns (scan plane misses object). `None` is first-class (`docs/localization/polar_profiling.md` §4): in the **benchmark** the row is dropped, never substituted. Where the `None` → projective ranging / euclidean reconstruction escalation lives is a **production-pipeline consumer concern only** (unresolved, deferred), never inside the benchmark.
-5. **Metric-scaling strategy** for Depth Anything — **decided:** the metric-trained variant (`Depth-Anything-V2-Metric-Indoor`) is implemented in `depth_sources.MonocularDepthSource`; no calibration against stereo. Revisit only if the metric variant's absolute scale proves off in the benchmark.
-6. ~~**Build the benchmark scaffold** — enumerate the matrix rows, columns for accuracy + latency, drop in measured numbers.~~ — **Resolved 2026-07-21:** the benchmark scaffold exists and runs (`target_distance_benchmark.launch.py` drives the matrix; measured numbers are already landing).
-7. ~~**Define the component interface signatures** in code (the mask-interface contract, the per-path recovery dispatch) so the separation is enforced, not just diagrammed.~~ — **Resolved 2026-07-21:** the in-code contracts exist — the mask interface is `Mask` / `MaskPrecision` in `perception/target_localization/core/mask.py`, and the per-path recovery dispatches on the precision tag.
-
----
+Depth uses an exact detection-stamp match; scans use the nearest stamp within
+`scan_match_tolerance_s`. Those software rules do not prove sensor clocks are
+aligned. Outstanding depth-availability and physical-calibration work is tracked
+in the [backlog](../BACKLOG.md), not duplicated as local TODOs.
 
 ## Glossary
 

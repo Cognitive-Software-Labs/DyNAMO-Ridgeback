@@ -30,7 +30,7 @@ detection box into a ``rect`` mask (no model, no extra input); ``silhouette``
 prompts a segmentation model (``target_localization/core/segmentation.py``) with the
 boxes on the exact color frame the detections were made on, producing
 ``tight`` masks. Masks never cross the wire either way
-(``docs/localization/mask_component.md`` Section 5.3) -- the segmenter runs in this process.
+(``docs/target_localization/mask_representation.md`` Section 5.3) -- the segmenter runs in this process.
 
 The aligned depth frame is produced here, on demand, at the detection stamp:
 the ``depth_source`` parameter picks a strategy from
@@ -187,7 +187,7 @@ class TargetMaskMeasurementNode(Node):
         # constant nobody picked for that job, and the reason an object past
         # the gate came back as TOO_FEW_VALID_PIXELS, blaming the mask for a
         # range decision. The isolation default is mode-anchored now
-        # (``docs/localization/foreground_isolation_3d.md`` Section 2b), so nothing depends on
+        # (``docs/target_localization/euclidean_reconstruction.md`` Section 2.3), so nothing depends on
         # the gate being tight.
         self.declare_parameter('depth_max_meters', DEPTH_GATE_DISABLED)
         self.declare_parameter('camera_info_topic', CAMERA_INFO_TOPIC_DEFAULT)
@@ -374,7 +374,7 @@ class TargetMaskMeasurementNode(Node):
             10,
         )
 
-        # Debug-only artifact (docs/localization/mask_component.md Section 5.3): the union of
+        # Debug-only artifact (docs/target_localization/mask_representation.md Section 5.3): the union of
         # the tight masks actually consumed this frame, so the overlay panel
         # can show exactly what downstream saw. Never consumed off the wire
         # by measurement code; only exists on the silhouette gate (the rect
