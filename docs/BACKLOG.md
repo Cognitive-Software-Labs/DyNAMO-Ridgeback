@@ -25,6 +25,11 @@ and `common/camera_inputs.py`.
 
 ## Camera-LiDAR calibration
 
+**Deployment gate.** Resolve this before treating polar-profiling measurements
+from the physical robot as valid. Hardware bring-up and data collection may
+precede it, but deployment must not rely on camera-to-LiDAR projection results
+until the completion criteria below have been satisfied.
+
 **Gap.** Simulation has exact model transforms; a documented physical
 camera-to-LiDAR calibration and clock validation is absent.
 

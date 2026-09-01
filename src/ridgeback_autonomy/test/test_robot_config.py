@@ -10,6 +10,7 @@ ROBOT_YAML = REPO_ROOT / 'clearpath' / 'robot.yaml'
 # device-name filter for the driver and the model selector for the generated
 # description, so it is not a generic D400-family token.
 EXPECTED_DEVICE_TYPE = 'd455'
+EXPECTED_RMW_IMPLEMENTATION = 'rmw_cyclonedds_cpp'
 EXPECTED_MOUNT_XYZ = [0.3, 0.0, 0.85]
 EXPECTED_MOUNT_RPY = [0.0, 0.0, 0.0]
 
@@ -17,6 +18,12 @@ EXPECTED_MOUNT_RPY = [0.0, 0.0, 0.0]
 def _camera_source() -> dict:
     config = yaml.safe_load(ROBOT_YAML.read_text(encoding='utf-8'))
     return config['sensors']['camera'][0]
+
+
+def test_robot_config_selects_cyclonedds() -> None:
+    config = yaml.safe_load(ROBOT_YAML.read_text(encoding='utf-8'))
+
+    assert config['system']['ros2']['middleware']['implementation'] == EXPECTED_RMW_IMPLEMENTATION
 
 
 def _parsed_camera():

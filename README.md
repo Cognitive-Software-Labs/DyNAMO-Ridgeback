@@ -454,6 +454,9 @@ Camera intrinsics come from the colour camera's `CameraInfo`. There is no intrin
 
 ### Robot sensors (`clearpath/robot.yaml`)
 
+- **ROS middleware**: The checked-in Clearpath setup selects CycloneDDS
+  (`rmw_cyclonedds_cpp`), matching the measured exact-stamp delivery default.
+  Deploy it to the robot only through an approved configuration diff.
 - **Hokuyo UST-10LX**: Mounted at front of chassis, provides 2D laser scan for SLAM and costmaps
 - **Intel RealSense D455**: Mounted on a riser bracket. `device_type: d455` selects both the driver's device filter and the URDF model, so it decides the camera's geometry as well as which device the driver binds to. Configured streams are RGB and depth with `align_depth.enable: true` and `enable_sync: true`; stream profiles are left unspecified so Clearpath's 640x480 @ 30 defaults apply. It supplies RGB and aligned depth to the target-localization stack. An organized point cloud is enabled in the checked-out Clearpath defaults but is **not** wired as an application input — its layout, frame, and timestamps are unverified on hardware. The D455 also has an IMU, which this stack neither enables nor consumes.
 
