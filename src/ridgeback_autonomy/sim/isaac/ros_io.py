@@ -32,11 +32,11 @@ class LidarScanAssembler:
 
     The 6.0.1 bridge laser_scan writer mislabels ROTARY sensors with an
     azimuth ROI (hardcoded 360-deg FOV — see sensors.py), but its
-    point_cloud output is sensor-frame correct. Each cloud message carries
-    the returns of the render frame's accumulated sweep segment, so bins
-    are updated newest-wins and expire after STALE_SWEEPS sweep periods
-    (a real spinning lidar refreshes each azimuth once per sweep; expiry
-    turns never-refreshed bins into inf instead of freezing old hits).
+    point_cloud output is sensor-frame correct. A published bin only ever
+    comes from the current completed tick (updated == t) — a bin that
+    wasn't refreshed by either half-arc cloud this tick is +inf, never a
+    stale hit carried over from an earlier sweep (measured to reduce
+    rotation-induced map smear vs. carrying bins across sweeps).
 
     UST-10LX geometry: 1081 bins, -135..+135 deg, 0.25 deg step, 40 Hz.
     """
@@ -47,10 +47,6 @@ class LidarScanAssembler:
     RANGE_MIN = 0.06
     RANGE_MAX = 10.0
     SCAN_PERIOD = 1.0 / 40.0
-    # 3 sweeps (75 ms): each half-arc refreshes from its own prim at
-    # render cadence; tighter expiry flaps whole halves to inf when a
-    # render frame runs long under co-tenant load
-    STALE_SWEEPS = 3.0
 
     def __init__(self, node, index: int):
         from functools import partial
@@ -98,7 +94,7 @@ class LidarScanAssembler:
             return
 
         out = self._ranges.copy()
-        out[self._updated < t - self.STALE_SWEEPS * self.SCAN_PERIOD] = np.inf
+        out[self._updated != t] = np.inf
         scan = self._LaserScan()
         scan.header.stamp = msg.header.stamp
         scan.header.frame_id = self._frame
@@ -121,7 +117,7 @@ class RosIO:
         from geometry_msgs.msg import PoseStamped, Twist, TwistStamped
         from nav_msgs.msg import Odometry
         from rosgraph_msgs.msg import Clock
-        from sensor_msgs.msg import Imu
+        from sensor_msgs.msg import Imu, JointState
         from std_srvs.srv import Trigger
         from tf2_ros import TransformBroadcaster, StaticTransformBroadcaster
 
@@ -151,6 +147,11 @@ class RosIO:
             Imu, "sensors/imu_0/data_raw", 10)
         self._gt_pub = self.node.create_publisher(
             PoseStamped, "ground_truth/pose", 10)
+        # The planar Isaac drive rig does not expose the URDF wheel joints as
+        # articulation DOFs. Publish their (static, always-zero) positions so
+        # robot_state_publisher can still provide all four wheel-link TFs.
+        self._joint_state_pub = self.node.create_publisher(
+            JointState, "joint_states", 10)
         self._tf = TransformBroadcaster(self.node)
         self._static_tf = StaticTransformBroadcaster(self.node)
 
@@ -170,7 +171,7 @@ class RosIO:
         self.node.create_service(Trigger, "sim/reset", self._on_reset)
 
         self._msgs = dict(Odometry=Odometry, PoseStamped=PoseStamped,
-                          Clock=Clock)
+                          Clock=Clock, JointState=JointState)
         # contract LaserScan assembled from the bridge's point clouds
         # (see LidarScanAssembler for why the bridge's own laser_scan
         # output cannot be used)
@@ -221,6 +222,16 @@ class RosIO:
         msg = self._msgs["Clock"]()
         msg.clock = self._stamp(sim_time)
         self._clock_pub.publish(msg)
+
+    def publish_wheel_joint_states(self, sim_time: float):
+        msg = self._msgs["JointState"]()
+        msg.header.stamp = self._stamp(sim_time)
+        msg.name = [
+            "front_left_wheel_joint", "front_right_wheel_joint",
+            "rear_left_wheel_joint", "rear_right_wheel_joint",
+        ]
+        msg.position = [0.0] * 4
+        self._joint_state_pub.publish(msg)
 
     def publish_odom(self, sim_time: float, odom_state, body_twist):
         stamp = self._stamp(sim_time)

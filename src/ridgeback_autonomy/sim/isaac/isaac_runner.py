@@ -337,6 +337,7 @@ def run(app, args) -> int:
 
         sim_time = timeline.get_current_time()
         ros.publish_clock(sim_time)
+        ros.publish_wheel_joint_states(sim_time)
         odom_state, body_twist = rig.update_odom()
         ros.publish_odom(sim_time, odom_state, body_twist)
         dt = frame_dt
