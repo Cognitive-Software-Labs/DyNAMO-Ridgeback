@@ -1,0 +1,108 @@
+# Controlled foreground-isolation comparison on the packaged full benchmark.
+#
+# One config runs at a time against the same persistent Gazebo, Ridgeback,
+# camera, TF graph, and detector.  Keeping one estimator per config measures
+# each recipe without contention from another localization path.
+#
+# At repeats:=1 the full scenario currently produces 109 trials per config.
+# The 12-config sweep therefore takes roughly 5.6 hours at the baseline
+# estimate of 15.4 seconds per trial.  Use --dry-run before the full run to
+# verify the current trial count and time estimate.
+
+sweep:
+  name: isolation
+  description: >
+    Registered 2D and 3D isolation recipes, box-versus-silhouette controls,
+    and paired current-default depth-gate checks on the full benchmark.
+
+defaults:
+  scenario: ''        # packaged config/benchmark_scenarios_full.yaml
+  repeats: 1
+
+configs:
+  # Fixed non-mask reference.  No mask-only knob applies to this config.
+  - name: pointcloud_reference
+    estimators: pointcloud
+
+  # Projective ranging: every registered 2D box recipe.
+  - name: projective_nearest_mode_unbounded
+    estimators: projective_ranging
+    mask_gate: box
+    depth_source: stereoscopic
+    isolation_2d: nearest_mode_histogram
+    mask_depth_max_meters: 0.0
+
+  - name: projective_otsu_unbounded
+    estimators: projective_ranging
+    mask_gate: box
+    depth_source: stereoscopic
+    isolation_2d: otsu
+    mask_depth_max_meters: 0.0
+
+  # Paired finite-gate control for the current default recipe.  The old camera
+  # rows used 10 m; pairing only the default isolates the gate effect without
+  # doubling the whole recipe matrix.
+  - name: projective_nearest_mode_10m
+    estimators: projective_ranging
+    mask_gate: box
+    depth_source: stereoscopic
+    isolation_2d: nearest_mode_histogram
+    mask_depth_max_meters: 10.0
+
+  # Appearance-mask control: silhouette mode bypasses the 2D box isolator.
+  - name: projective_silhouette_unbounded
+    estimators: projective_ranging
+    mask_gate: silhouette
+    depth_source: stereoscopic
+    mask_depth_max_meters: 0.0
+
+  # Euclidean reconstruction: every registered 3D box recipe.
+  - name: euclidean_height_crop_unbounded
+    estimators: euclidean_reconstruction
+    mask_gate: box
+    depth_source: stereoscopic
+    isolation_3d: height_crop
+    mask_depth_max_meters: 0.0
+
+  - name: euclidean_range_band_unbounded
+    estimators: euclidean_reconstruction
+    mask_gate: box
+    depth_source: stereoscopic
+    isolation_3d: range_band
+    mask_depth_max_meters: 0.0
+
+  - name: euclidean_nearest_mode_band_unbounded
+    estimators: euclidean_reconstruction
+    mask_gate: box
+    depth_source: stereoscopic
+    isolation_3d: nearest_mode_band
+    mask_depth_max_meters: 0.0
+
+  - name: euclidean_height_crop_range_band_unbounded
+    estimators: euclidean_reconstruction
+    mask_gate: box
+    depth_source: stereoscopic
+    isolation_3d: height_crop_range_band
+    mask_depth_max_meters: 0.0
+
+  - name: euclidean_height_crop_nearest_mode_unbounded
+    estimators: euclidean_reconstruction
+    mask_gate: box
+    depth_source: stereoscopic
+    isolation_3d: height_crop_nearest_mode_band
+    mask_depth_max_meters: 0.0
+
+  # Paired finite-gate control for the current default 3D recipe.
+  - name: euclidean_height_crop_nearest_mode_10m
+    estimators: euclidean_reconstruction
+    mask_gate: box
+    depth_source: stereoscopic
+    isolation_3d: height_crop_nearest_mode_band
+    mask_depth_max_meters: 10.0
+
+  # Appearance-mask control: silhouette mode bypasses the 3D box isolator.
+  - name: euclidean_silhouette_unbounded
+    estimators: euclidean_reconstruction
+    mask_gate: silhouette
+    depth_source: stereoscopic
+    mask_depth_max_meters: 0.0
