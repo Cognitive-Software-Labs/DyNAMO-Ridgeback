@@ -128,6 +128,26 @@ RECORD_WINDOW_WAIT_SEC = 20.0
 RCLPY_INTERNAL_PARAMETERS = frozenset({'start_type_description_service'})
 
 
+def format_summary_log_row(row: dict[str, Any]) -> str:
+    """Format one aggregate row without assuming it has accuracy metrics."""
+
+    if row['trial_count'] == 0:
+        return f'{row["estimator"]}: no comparable trials.'
+    if row['scored_count'] == 0:
+        return (
+            f'{row["estimator"]} | n={row["trial_count"]} | '
+            'scored=0 | no accuracy metrics.'
+        )
+    return (
+        f'{row["estimator"]} | '
+        f'n={row["trial_count"]} | '
+        f'MAE={row["mean_abs_error_m"]:.3f}m | '
+        f'MedianAE={row["median_abs_error_m"]:.3f}m | '
+        f'P95AE={row["p95_abs_error_m"]:.3f}m | '
+        f'MeanRel={row["mean_rel_error"]:.3f}'
+    )
+
+
 class TargetDistanceBenchmarkRunner(Node):
     def __init__(self) -> None:
         super().__init__('target_distance_benchmark_runner')
@@ -575,8 +595,8 @@ class TargetDistanceBenchmarkRunner(Node):
                 return build_trial_result(
                     trial, scene, gt_instances, scene_score,
                     self.selected_estimators, self.estimator_display_names,
-                    usable_by_estimator, '', capture['status_histogram'],
-                    capture['total_events'])
+                    usable_by_estimator, '', capture['total_events'],
+                    captured_events=tuple(self.capture_events.values()))
 
             # Frame-level scalar medians drive the representative-frame choice
             # and the collage only. Partial by design: an estimator with no
@@ -618,8 +638,8 @@ class TargetDistanceBenchmarkRunner(Node):
             return build_trial_result(
                 trial, scene, gt_instances, scene_score,
                 self.selected_estimators, self.estimator_display_names,
-                usable_by_estimator, image_path, capture['status_histogram'],
-                capture['total_events'])
+                usable_by_estimator, image_path, capture['total_events'],
+                captured_events=tuple(self.capture_events.values()))
         except Exception as exc:
             self.get_logger().error(f'{trial_id} failed: {exc}')
             return None
@@ -933,18 +953,8 @@ class TargetDistanceBenchmarkRunner(Node):
             f'Included trials: {included_trials} | skipped trials: {skipped_trials}'
         )
         for row in summary_rows:
-            if row['trial_count'] == 0:
-                self.get_logger().info(f'{row["estimator"]}: no comparable trials.')
-                continue
             # row['estimator'] is already the display prose (set above).
-            self.get_logger().info(
-                f'{row["estimator"]} | '
-                f'n={row["trial_count"]} | '
-                f'MAE={row["mean_abs_error_m"]:.3f}m | '
-                f'MedianAE={row["median_abs_error_m"]:.3f}m | '
-                f'P95AE={row["p95_abs_error_m"]:.3f}m | '
-                f'MeanRel={row["mean_rel_error"]:.3f}'
-            )
+            self.get_logger().info(format_summary_log_row(row))
 
 
 def main() -> int:

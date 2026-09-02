@@ -180,8 +180,7 @@ def test_trial_rows_use_exactly_the_declared_csv_columns(tmp_path) -> None:
     result = build_trial_result(
         {'trial_id': 'scene_a_rep1', 'repeat_index': 1},
         scene, [gt], score, selected_estimators, display_names,
-        {'pointcloud': []}, '/tmp/x.png',
-        {'pointcloud': {}}, 20,
+        {'pointcloud': []}, '/tmp/x.png', 20,
     )
 
     row = result['rows']['pointcloud'][0]
@@ -222,13 +221,23 @@ def test_no_value_miss_row_carries_its_reason(tmp_path) -> None:
         detector_missed=(),
         extra_count=0,
     )
-    histogram = {'polar_profiling': {
-        int(MissReason.UNSET): 12, int(MissReason.SCAN_INVALID): 8}}
+    captured_events = tuple(
+        MeasurementEvent(
+            key=('frame', index), stamp_ns=index, detected=True, count=1,
+            bboxes=((1, 2, 30, 40),), image_width=640, image_height=480,
+            detections=[Detection(
+                bbox_xyxy=(1, 2, 30, 40), label='r', score=0.9,
+                polar_profiling_status=status,
+            )],
+        )
+        for index, status in enumerate(
+            [int(MissReason.UNSET)] * 12 + [int(MissReason.SCAN_INVALID)] * 8)
+    )
 
     result = build_trial_result(
         {'trial_id': 'scan_blocked_rep1', 'repeat_index': 1},
         scene, [gt], score, selected_estimators, display_names,
-        {'polar_profiling': []}, '', histogram, 20,
+        {'polar_profiling': []}, '', 20, captured_events=captured_events,
     )
 
     row = result['rows']['polar_profiling'][0]
@@ -237,6 +246,148 @@ def test_no_value_miss_row_carries_its_reason(tmp_path) -> None:
     assert row['trial_estimate_m'] is None
     assert row['abs_error_m'] is None
     assert row['frames_captured'] == 20
+
+
+def test_multi_instance_no_value_reasons_follow_direct_association() -> None:
+    from ridgeback_autonomy.benchmarking.scenarios import RobotSpec, Scene
+    from ridgeback_autonomy.benchmarking.scoring import OUTCOME_NO_VALUE, SceneScore
+    from ridgeback_autonomy.benchmarking.simulation import GroundTruthInstance
+    from ridgeback_autonomy.benchmarking.trial_results import build_trial_result
+    from ridgeback_autonomy.common.miss_reason import MissReason
+
+    selected = ('projective_ranging',)
+    scene = Scene(
+        id='two_distinct_failures',
+        robots=(
+            RobotSpec(x=2.0, y=0.0, yaw=3.14),
+            RobotSpec(x=4.0, y=1.0, yaw=3.14),
+        ),
+        objects=(),
+        repeats_override=None,
+    )
+    ground_truth = [
+        GroundTruthInstance(
+            index=0, model_name='bench_r0', world_x=2.0, world_y=0.0,
+            forward_m=2.0, lateral_m=0.0, distance_m=2.0,
+        ),
+        GroundTruthInstance(
+            index=1, model_name='bench_r1', world_x=4.0, world_y=1.0,
+            forward_m=4.0, lateral_m=1.0, distance_m=4.12,
+        ),
+    ]
+    event = MeasurementEvent(
+        key=('frame',), stamp_ns=1, detected=True, count=2,
+        bboxes=((100, 100, 180, 300), (300, 100, 380, 300)),
+        image_width=640, image_height=480,
+        # Reverse detection order to prove attribution follows geometry, not index.
+        detections=[
+            Detection(
+                bbox_xyxy=(300, 100, 380, 300), label='r', score=0.9,
+                projective_ranging_forward_m=4.0,
+                projective_ranging_lateral_m=1.0,
+                projective_ranging_status=int(MissReason.TOO_FEW_VALID_PIXELS),
+            ),
+            Detection(
+                bbox_xyxy=(100, 100, 180, 300), label='r', score=0.9,
+                projective_ranging_forward_m=2.0,
+                projective_ranging_lateral_m=0.0,
+                projective_ranging_status=int(MissReason.NO_DEPTH_FRAME),
+            ),
+        ],
+    )
+    score = SceneScore(
+        medians={0: {'projective_ranging': None}, 1: {'projective_ranging': None}},
+        outcomes={
+            0: {'projective_ranging': OUTCOME_NO_VALUE},
+            1: {'projective_ranging': OUTCOME_NO_VALUE},
+        },
+        detector_missed=(),
+        extra_count=0,
+    )
+    result = build_trial_result(
+        {'trial_id': scene.id, 'repeat_index': 1},
+        scene, ground_truth, score, selected,
+        {'projective_ranging': 'Projective Ranging'},
+        {'projective_ranging': []}, '', 1,
+        captured_events=(event,),
+    )
+
+    assert [row['miss_reason'] for row in result['rows']['projective_ranging']] == [
+        'NO_DEPTH_FRAME', 'TOO_FEW_VALID_PIXELS']
+    # Instance attribution leaves the observation accounting at box granularity.
+    from ridgeback_autonomy.benchmarking.reduction import compute_status_histogram
+    assert compute_status_histogram({'frame': event}, selected) == {'projective_ranging': {
+        int(MissReason.NO_DEPTH_FRAME): 1,
+        int(MissReason.TOO_FEW_VALID_PIXELS): 1,
+    }}
+
+
+def test_multi_instance_no_value_reason_stays_unknown_without_own_locator() -> None:
+    from ridgeback_autonomy.benchmarking.scenarios import RobotSpec, Scene
+    from ridgeback_autonomy.benchmarking.scoring import OUTCOME_NO_VALUE, SceneScore
+    from ridgeback_autonomy.benchmarking.simulation import GroundTruthInstance
+    from ridgeback_autonomy.benchmarking.trial_results import build_trial_result
+    from ridgeback_autonomy.common.miss_reason import MissReason
+
+    selected = ('projective_ranging',)
+    scene = Scene(
+        id='two_ambiguous_failures',
+        robots=(
+            RobotSpec(x=2.0, y=0.0, yaw=3.14),
+            RobotSpec(x=4.0, y=1.0, yaw=3.14),
+        ),
+        objects=(),
+        repeats_override=None,
+    )
+    ground_truth = [
+        GroundTruthInstance(
+            index=0, model_name='bench_r0', world_x=2.0, world_y=0.0,
+            forward_m=2.0, lateral_m=0.0, distance_m=2.0,
+        ),
+        GroundTruthInstance(
+            index=1, model_name='bench_r1', world_x=4.0, world_y=1.0,
+            forward_m=4.0, lateral_m=1.0, distance_m=4.12,
+        ),
+    ]
+    event = MeasurementEvent(
+        key=('frame',), stamp_ns=1, detected=True, count=2,
+        bboxes=((100, 100, 180, 300), (300, 100, 380, 300)),
+        image_width=640, image_height=480,
+        detections=[
+            # Another estimator can locate these boxes, but projective ranging
+            # cannot. Its miss reasons must not borrow pointcloud identity.
+            Detection(
+                bbox_xyxy=(100, 100, 180, 300), label='r', score=0.9,
+                pointcloud_forward_m=2.0, pointcloud_lateral_m=0.0,
+                pointcloud_distance_m=2.0,
+                projective_ranging_status=int(MissReason.NO_DEPTH_FRAME),
+            ),
+            Detection(
+                bbox_xyxy=(300, 100, 380, 300), label='r', score=0.9,
+                pointcloud_forward_m=4.0, pointcloud_lateral_m=1.0,
+                pointcloud_distance_m=4.12,
+                projective_ranging_status=int(MissReason.TOO_FEW_VALID_PIXELS),
+            ),
+        ],
+    )
+    score = SceneScore(
+        medians={0: {'projective_ranging': None}, 1: {'projective_ranging': None}},
+        outcomes={
+            0: {'projective_ranging': OUTCOME_NO_VALUE},
+            1: {'projective_ranging': OUTCOME_NO_VALUE},
+        },
+        detector_missed=(),
+        extra_count=0,
+    )
+    result = build_trial_result(
+        {'trial_id': scene.id, 'repeat_index': 1},
+        scene, ground_truth, score, selected,
+        {'projective_ranging': 'Projective Ranging'},
+        {'projective_ranging': []}, '', 1,
+        captured_events=(event,),
+    )
+
+    assert [row['miss_reason'] for row in result['rows']['projective_ranging']] == [None, None]
 
 
 def test_run_folder_name_leads_with_the_timestamp_then_applied_axes() -> None:
@@ -755,6 +906,24 @@ def test_build_summary_rows_aggregates_trial_level_estimator_rows() -> None:
 
     assert polar_row['trial_count'] == 1
     assert polar_row['p95_abs_error_m'] == pytest.approx(0.1, rel=1e-6)
+
+
+def test_summary_log_row_survives_an_included_all_miss_trial() -> None:
+    from ridgeback_autonomy.benchmarking.target_distance_benchmark_runner_node import (
+        format_summary_log_row,
+    )
+
+    text = format_summary_log_row({
+        'estimator': 'box-gated stereoscopic projective ranging',
+        'trial_count': 3,
+        'scored_count': 0,
+        'mean_abs_error_m': None,
+        'median_abs_error_m': None,
+        'p95_abs_error_m': None,
+        'mean_rel_error': None,
+    })
+
+    assert text.endswith('n=3 | scored=0 | no accuracy metrics.')
 
 
 def test_ground_truth_point_message_packs_planar_truth() -> None:

@@ -45,21 +45,6 @@ segmentation to absorb an extrinsic error.
 **Context.** [Polar profiling](target_localization/polar_profiling.md) and the
 [hardware plan](plans/camera_hardware_validation.md).
 
-## Per-instance miss attribution
-
-**Gap.** A multi-instance trial row currently receives the dominant miss reason
-from one trial/estimator histogram. Both rows can therefore show the same reason.
-Matched detections can carry statuses through association; a `no_value` instance
-has no estimator measurement to associate directly.
-
-**Completion criteria.** Define attribution for matched, unmatched, detector-miss,
-gate-miss, and no-value cases without inventing identity; preserve current
-run-level/observation histograms; add multi-instance tests proving distinct
-reasons do not leak between instances; document any intentionally unknown result.
-
-**Context.** [Benchmark semantics](benchmarking/target_distance_benchmarking.md),
-`benchmarking/scoring.py`, `trial_results.py`, and `reduction.py`.
-
 ## Isolation validation
 
 **Gap.** 2D/3D recipes and current defaults are implemented, but the

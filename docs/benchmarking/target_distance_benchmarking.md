@@ -96,17 +96,26 @@ estimator's associated values. Consequences:
   perception miss.
 - No-detection frames and per-frame raw estimates are not themselves accuracy rows.
 
-## Miss reasons and current attribution boundary
+## Miss reasons and attribution boundary
 
 Mask measurement messages carry a status per detection and estimator.
 `compute_status_histogram` counts every box; a specific failure outranks UNSET
-when selecting a dominant trial explanation. Trial CSV `miss_reason` is populated
+when selecting a dominant explanation. Trial CSV `miss_reason` is populated only
 for `no_value`; the other miss categories are already named by `outcome`.
 
-The reason on a trial row is currently per trial/estimator, not truly per
-ground-truth instance. In a multi-instance trial, two no-value rows can therefore
-show the same dominant reason. This is an explicit active gap, tracked in
-[per-instance attribution](../BACKLOG.md#per-instance-miss-attribution).
+Attribution never borrows another estimator's position or assumes detection
+order. In a multi-instance trial, a box status reaches an instance row only when
+that same estimator's locator associates the box to that ground-truth instance.
+Statuses on unmatched boxes remain observation-level evidence. The one exception
+is an event containing exactly one target and one box, where identity is
+unambiguous even without an estimator locator. When a `no_value` row has no safe
+association, `miss_reason` is blank and the report renders `no_value (reason
+unknown)` rather than copying the trial's dominant reason onto one or more
+unproven identities.
+
+`scored` rows need no reason; `gate_miss` and `detector_miss` are already explicit
+outcomes. The collage remains a trial-level evidence view and may show a dominant
+estimator reason; it is not an instance attribution source.
 
 Accuracy/miss fields are per instance. `observations` and `reason_histogram` are
 per detected box. Do not add those granularities together or interpret coverage

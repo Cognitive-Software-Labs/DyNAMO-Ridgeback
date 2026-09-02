@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+from collections import Counter
 from typing import Any
 
+from ridgeback_autonomy.benchmarking.alignment import detection_status
 from ridgeback_autonomy.benchmarking.association import GtPoint, assign_to_ground_truth
 from ridgeback_autonomy.benchmarking.reduction import dominant_miss_reason
 from ridgeback_autonomy.benchmarking.scoring import (
@@ -11,6 +13,7 @@ from ridgeback_autonomy.benchmarking.scoring import (
     OUTCOME_NO_VALUE,
     SceneScore,
     build_display_instance_estimate,
+    build_instance_estimate,
 )
 from ridgeback_autonomy.benchmarking.scenarios import Scene
 from ridgeback_autonomy.benchmarking.simulation import GroundTruthInstance
@@ -36,6 +39,58 @@ def build_trials(scenes: tuple[Scene, ...] | list[Scene], repeats: int) -> list[
     return trials
 
 
+def compute_instance_status_histogram(
+    captured_events,
+    ground_truth_instances: list[GroundTruthInstance],
+    selected_estimators: tuple[str, ...],
+) -> dict[int, dict[str, dict[int, int]]]:
+    """Count statuses only where that estimator locates the same detection.
+
+    A status is per detected box, while a trial row is per ground-truth target.
+    The two granularities may be joined only through the named estimator's own
+    association. Borrowing another estimator's locator or assuming box order
+    would manufacture identity precisely when the estimator produced no value.
+    Unmatched statuses intentionally remain only in the observation histogram.
+    """
+
+    ground_truth_points = [
+        GtPoint(
+            index=truth.index,
+            forward_m=truth.forward_m,
+            lateral_m=truth.lateral_m,
+            distance_m=truth.distance_m,
+        )
+        for truth in ground_truth_instances
+    ]
+    counts: dict[int, dict[str, Counter]] = {
+        truth.index: {estimator: Counter() for estimator in selected_estimators}
+        for truth in ground_truth_instances
+    }
+    for event in captured_events:
+        for estimator in selected_estimators:
+            estimates = [
+                build_instance_estimate(detection, index, estimator)
+                for index, detection in enumerate(event.detections)
+            ]
+            assignment = assign_to_ground_truth(estimates, ground_truth_points)
+            matches = assignment.matches
+            if not matches and len(ground_truth_points) == 1 and len(event.detections) == 1:
+                # No estimator locator exists, but there is still only one
+                # possible box-to-target identity in this event.
+                matches = ((ground_truth_points[0].index, 0),)
+            for ground_truth_index, detection_index in matches:
+                counts[ground_truth_index][estimator][detection_status(
+                    event.detections[detection_index], estimator)] += 1
+
+    return {
+        ground_truth_index: {
+            estimator: dict(code_counts)
+            for estimator, code_counts in per_estimator.items()
+        }
+        for ground_truth_index, per_estimator in counts.items()
+    }
+
+
 def build_trial_result(
     trial: dict[str, Any],
     scene: Scene,
@@ -45,11 +100,13 @@ def build_trial_result(
     estimator_display_names: dict[str, str],
     usable_by_estimator: dict[str, list],
     image_path: str,
-    status_histogram: dict[str, dict[int, int]],
     frames_captured: int,
+    captured_events=(),
 ) -> dict[str, Any]:
     """Build one scored-or-missed row per target instance and estimator."""
 
+    instance_status_histogram = compute_instance_status_histogram(
+        captured_events, ground_truth_instances, selected_estimators)
     rows: dict[str, list[dict[str, Any]]] = {
         estimator: [] for estimator in selected_estimators}
     for ground_truth in ground_truth_instances:
@@ -67,10 +124,14 @@ def build_trial_result(
                 absolute_error = None
                 relative_error = None
             outcome = outcomes.get(estimator, OUTCOME_DETECTOR_MISS)
-            miss_reason = (
-                dominant_miss_reason(status_histogram.get(estimator))
-                if outcome == OUTCOME_NO_VALUE else None
-            )
+            if outcome == OUTCOME_NO_VALUE:
+                # Use only statuses joined through this estimator's association
+                # (or the unambiguous one-target/one-box case). An empty result
+                # is intentionally unknown.
+                code_counts = instance_status_histogram[ground_truth.index][estimator]
+                miss_reason = dominant_miss_reason(code_counts)
+            else:
+                miss_reason = None
             rows[estimator].append({
                 'trial_id': trial['trial_id'],
                 'repeat_index': trial['repeat_index'],

@@ -41,11 +41,13 @@ def test_markdown_table_pads_columns_so_the_raw_file_is_readable() -> None:
 def test_cell_shows_the_estimate_or_the_marked_reason() -> None:
     scored = _row('s', 0, 'LiDAR', OUTCOME_SCORED, estimate=2.5)
     no_value = _row('s', 0, 'LiDAR', OUTCOME_NO_VALUE, reason='SCAN_INVALID')
+    unknown = _row('s', 1, 'LiDAR', OUTCOME_NO_VALUE)
     gate = _row('s', 0, 'LiDAR', OUTCOME_GATE_MISS)
 
     assert cell_for(scored) == '2.500'
     # no_value carries a MissReason; gate_miss has none, so the outcome names it.
     assert cell_for(no_value).endswith('SCAN_INVALID')
+    assert cell_for(unknown).endswith('no_value (reason unknown)')
     assert cell_for(gate).endswith('gate_miss')
 
 

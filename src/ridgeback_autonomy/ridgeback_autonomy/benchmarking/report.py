@@ -20,7 +20,7 @@ from ridgeback_autonomy.perception.target_localization.estimator_registry import
     ESTIMATOR_LABELS,
     PUBLIC_ESTIMATOR_ORDER,
 )
-from ridgeback_autonomy.benchmarking.scoring import OUTCOME_SCORED
+from ridgeback_autonomy.benchmarking.scoring import OUTCOME_NO_VALUE, OUTCOME_SCORED
 from ridgeback_autonomy.common.miss_reason import (
     MissReason,
     observation_totals,
@@ -167,6 +167,8 @@ def cell_for(row: dict) -> str:
 
     if row.get('outcome') == OUTCOME_SCORED and row.get('trial_estimate_m') is not None:
         return format_metres(row['trial_estimate_m'])
+    if row.get('outcome') == OUTCOME_NO_VALUE and not row.get('miss_reason'):
+        return f'{MISS_MARK} {OUTCOME_NO_VALUE} (reason unknown)'
     return f'{MISS_MARK} {row.get("miss_reason") or row.get("outcome") or "miss"}'
 
 
