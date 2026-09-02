@@ -104,6 +104,12 @@ install(PROGRAMS
 )
 
 install(PROGRAMS
+  ridgeback_autonomy/common/scan_merger_node.py
+  DESTINATION lib/${PROJECT_NAME}
+  RENAME scan_merger_node
+)
+
+install(PROGRAMS
   ridgeback_autonomy/diagnostics/hud_node.py
   DESTINATION lib/${PROJECT_NAME}
   RENAME hud_node

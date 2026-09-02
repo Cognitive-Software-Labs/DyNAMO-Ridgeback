@@ -42,6 +42,7 @@ def generate_launch_description():
     camera = LaunchConfiguration('camera')
     sim_mode = LaunchConfiguration('sim_mode')
     sensor_hz = LaunchConfiguration('sensor_hz')
+    slam_source = LaunchConfiguration('slam_source')
 
     rviz_config = os.path.join(pkg_this, 'sim', 'rviz', 'exploration.rviz')
 
@@ -131,6 +132,18 @@ def generate_launch_description():
         DeclareLaunchArgument(
             'sensor_hz', default_value='40.0',
             description='Isaac: lidar rate / deterministic fixed dt (gz ignores)'),
+        DeclareLaunchArgument(
+            'slam_source',
+            default_value=PythonExpression(
+                ["'merged' if '", sim, "' == 'isaac' else 'front_only'"]),
+            choices=['front_only', 'merged'],
+            description='front_only or merged (slam_toolbox reads '
+                        'scan_merger_node.py\'s SLAM-only front+rear merge '
+                        'instead of raw front; Nav2/collision_monitor '
+                        'always keep the raw front+rear topics unchanged '
+                        'either way). Isaac default: merged. Gazebo '
+                        'default: front_only (unaffected unless explicitly '
+                        'overridden).'),
         DeclareLaunchArgument('exploration_rviz', default_value='true',
                               description='Launch the exploration RViz2 config'),
         DeclareLaunchArgument('g1_perception_enabled', default_value='true',
@@ -267,6 +280,7 @@ def generate_launch_description():
                     launch_arguments={
                         'setup_path': setup_path,
                         'use_sim_time': use_sim_time,
+                        'slam_source': slam_source,
                     }.items(),
                 ),
                 gate_nav2,

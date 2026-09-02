@@ -7,7 +7,7 @@ from launch.actions import (
 )
 from launch.event_handlers import OnProcessExit
 from launch.substitutions import LaunchConfiguration
-from launch_ros.actions import LifecycleNode, LifecycleTransition
+from launch_ros.actions import LifecycleNode, LifecycleTransition, Node
 from launch_ros.event_handlers import OnStateTransition
 from lifecycle_msgs.msg import Transition
 
@@ -26,7 +26,16 @@ def launch_setup(context, *args, **kwargs):
     config = read_yaml(os.path.join(setup_path.perform(context), 'robot.yaml'))
     clearpath_config = ClearpathConfig(config)
     namespace = clearpath_config.system.namespace
-    scan_topic = f'/{namespace}/sensors/lidar2d_0/scan'
+    raw_scan_topic = f'/{namespace}/sensors/lidar2d_0/scan'
+
+    # slam_source: front_only (default, unchanged production behavior) or
+    # merged (slam_toolbox reads scan_merger_node's SLAM-only front+rear
+    # merge instead of the raw front scan). Nav2/collision_monitor/etc.
+    # always keep consuming raw_scan_topic and the rear topic directly,
+    # unaffected by this choice either way.
+    slam_source = LaunchConfiguration('slam_source').perform(context)
+    merged_scan_topic = f'/{namespace}/sensors/scan_slam_merged'
+    scan_topic = merged_scan_topic if slam_source == 'merged' else raw_scan_topic
 
     slam_params_file = os.path.join(pkg_this, 'config', 'slam_toolbox_params.yaml')
 
@@ -74,7 +83,7 @@ def launch_setup(context, *args, **kwargs):
         transition_ids=[Transition.TRANSITION_ACTIVATE],
     )
 
-    return [
+    actions = [
         slam_node,
         gate_configure,
         RegisterEventHandler(OnProcessExit(
@@ -86,11 +95,34 @@ def launch_setup(context, *args, **kwargs):
         )),
     ]
 
+    if slam_source == 'merged':
+        # Publishes ONLY to merged_scan_topic (slam_toolbox's input above);
+        # raw front/rear topics keep publishing to every other consumer
+        # unaffected by this node. See scan_merger_node.py.
+        actions.append(Node(
+            package='ridgeback_autonomy',
+            executable='scan_merger_node',
+            name='scan_merger_node',
+            namespace=namespace,
+            output='screen',
+            parameters=[{'use_sim_time': use_sim_time}],
+        ))
+
+    return actions
+
 
 def generate_launch_description():
     return LaunchDescription([
         DeclareLaunchArgument('use_sim_time', default_value='true'),
         DeclareLaunchArgument('setup_path',
                               default_value=os.path.expanduser('~/clearpath/')),
+        DeclareLaunchArgument(
+            'slam_source', default_value='front_only',
+            choices=['front_only', 'merged'],
+            description='front_only (default, production-unchanged) or '
+                        'merged (slam_toolbox reads scan_merger_node.py\'s '
+                        'SLAM-only front+rear merge instead; Nav2/'
+                        'collision_monitor still get raw front/rear topics '
+                        'unchanged either way).'),
         OpaqueFunction(function=launch_setup),
     ])
