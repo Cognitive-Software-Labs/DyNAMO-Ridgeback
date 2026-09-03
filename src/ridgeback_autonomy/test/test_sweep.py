@@ -1,11 +1,16 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from ridgeback_autonomy.benchmarking.target_benchmark_sweep import (
     _launch_argument_tokens,
 )
-from ridgeback_autonomy.benchmarking.sweep import parse_sweep
+from ridgeback_autonomy.benchmarking.sweep import load_sweep, parse_sweep
+
+
+REPO_ROOT = Path(__file__).resolve().parents[3]
 
 
 def _scenario(tmp_path):
@@ -155,3 +160,60 @@ def test_relative_scenario_path_resolves_against_sweep_source(tmp_path) -> None:
     spec = parse_sweep(document, source=source)
 
     assert spec.configs[0].arguments['scenario'] == str(scenario)
+
+
+def test_model_concurrency_sweep_is_the_ordered_factorial_contract() -> None:
+    path = (
+        REPO_ROOT
+        / 'src/ridgeback_autonomy/config/benchmark_sweep_model_concurrency.yaml'
+    )
+
+    spec = load_sweep(str(path))
+
+    assert spec.name == 'model_concurrency'
+    assert spec.defaults['repeats'] == '3'
+    assert spec.defaults['estimators'] == (
+        'projective_ranging,euclidean_reconstruction')
+    assert Path(spec.configs[0].arguments['scenario']).name == (
+        'benchmark_scenarios_examples.yaml')
+    assert [config.name for config in spec.configs] == [
+        'aa_combined_diagnostics_off',
+        'aa_combined_diagnostics_on',
+        'r1_a_box_stereo',
+        'r1_b_silhouette_stereo',
+        'r1_c_box_monocular',
+        'r1_d_silhouette_monocular',
+        'r2_d_silhouette_monocular',
+        'r2_c_box_monocular',
+        'r2_b_silhouette_stereo',
+        'r2_a_box_stereo',
+        'r3_b_silhouette_stereo',
+        'r3_d_silhouette_monocular',
+        'r3_a_box_stereo',
+        'r3_c_box_monocular',
+    ]
+
+    assert spec.configs[0].arguments['depth_match_debug'] == 'false'
+    assert spec.configs[1].arguments['depth_match_debug'] == 'true'
+    expected_matrix = [
+        ('box', 'stereoscopic'),
+        ('silhouette', 'stereoscopic'),
+        ('box', 'monocular'),
+        ('silhouette', 'monocular'),
+        ('silhouette', 'monocular'),
+        ('box', 'monocular'),
+        ('silhouette', 'stereoscopic'),
+        ('box', 'stereoscopic'),
+        ('silhouette', 'stereoscopic'),
+        ('silhouette', 'monocular'),
+        ('box', 'stereoscopic'),
+        ('box', 'monocular'),
+    ]
+    assert [
+        (config.arguments['mask_gate'], config.arguments['depth_source'])
+        for config in spec.configs[2:]
+    ] == expected_matrix
+    assert all(
+        config.arguments['depth_match_debug'] == 'true'
+        for config in spec.configs[2:]
+    )

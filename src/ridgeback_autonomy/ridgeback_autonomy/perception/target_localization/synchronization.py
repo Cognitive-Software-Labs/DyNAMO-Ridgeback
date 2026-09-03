@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 from collections import OrderedDict, deque
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+import math
 import time
 
 import numpy as np
@@ -23,6 +24,18 @@ DEPTH_MATCH_BUFFER_DEPTH = 15
 SCAN_MATCH_BUFFER_DEPTH = 20
 SCAN_MATCH_TOLERANCE_S_DEFAULT = 0.05
 DEPTH_MATCH_RECORD_LIMIT = 256
+TIMING_SAMPLE_LIMIT = 512
+TIMING_COLD_SAMPLE_COUNT = 5
+TIMING_STAGE_NAMES = (
+    'slimsam_load',
+    'rgb_prepare',
+    'mask_region_prepare',
+    'slimsam',
+    'stereo_depth',
+    'depth_anything',
+    'estimator_reduction',
+    'cuda_sync',
+)
 
 
 @dataclass(frozen=True)
@@ -46,23 +59,61 @@ class DepthMissRecord:
 
 @dataclass
 class TimingStats:
-    """Constant-space timing summary in nanoseconds."""
+    """Constant-space cold/warm timing summary in nanoseconds."""
 
     count: int = 0
     total_ns: int = 0
     max_ns: int = 0
+    first_ns: int | None = None
+    cold_samples_ns: list[int] = field(default_factory=list)
+    samples_ns: deque[int] = field(
+        default_factory=lambda: deque(maxlen=TIMING_SAMPLE_LIMIT))
 
     def record(self, elapsed_ns: int) -> None:
         elapsed_ns = max(0, int(elapsed_ns))
+        if self.first_ns is None:
+            self.first_ns = elapsed_ns
+        if len(self.cold_samples_ns) < TIMING_COLD_SAMPLE_COUNT:
+            self.cold_samples_ns.append(elapsed_ns)
         self.count += 1
         self.total_ns += elapsed_ns
         self.max_ns = max(self.max_ns, elapsed_ns)
+        self.samples_ns.append(elapsed_ns)
+
+    @staticmethod
+    def _percentile(values: list[int], fraction: float) -> int:
+        """Nearest-rank percentile for a non-empty sample."""
+
+        ordered = sorted(values)
+        index = max(0, math.ceil(fraction * len(ordered)) - 1)
+        return ordered[index]
 
     def format_ms(self) -> str:
         if not self.count:
             return 'n/a'
-        mean_ms = self.total_ns / self.count / 1e6
-        return f'mean={mean_ms:.3f} max={self.max_ns / 1e6:.3f}'
+        # Early calls may include lazy model loading, allocator setup, and
+        # kernel warm-up. Keep the first five visible but exclude them from the
+        # warm distribution. Once the bounded deque rolls over, every retained
+        # sample at or beyond index five is warm.
+        retained = list(self.samples_ns)
+        oldest_retained_index = self.count - len(retained)
+        cold_values_still_retained = max(
+            0, TIMING_COLD_SAMPLE_COUNT - oldest_retained_index)
+        warm = retained[cold_values_still_retained:]
+        if warm:
+            warm_mean_ms = sum(warm) / len(warm) / 1e6
+            warm_text = (
+                f'warm_n={len(warm)} warm_mean={warm_mean_ms:.3f} '
+                f'warm_p50={self._percentile(warm, 0.50) / 1e6:.3f} '
+                f'warm_p95={self._percentile(warm, 0.95) / 1e6:.3f} '
+                f'warm_p99={self._percentile(warm, 0.99) / 1e6:.3f}')
+        else:
+            warm_text = 'warm_n=0 warm_mean=n/a warm_p50=n/a warm_p95=n/a warm_p99=n/a'
+        cold_text = ','.join(
+            f'{value / 1e6:.3f}' for value in self.cold_samples_ns)
+        return (
+            f'count={self.count} first={self.first_ns / 1e6:.3f} '
+            f'cold_ms=[{cold_text}] {warm_text} max={self.max_ns / 1e6:.3f}')
 
 
 class StampedMessageBuffer:
@@ -156,8 +207,20 @@ class DepthMatchDiagnostics:
         self.evicted_unresolved_records = 0
         self.detections_rx = 0
         self.detection_slot_replacements = 0
+        self.last_detection_arrival_monotonic_ns: int | None = None
+        self.detection_interarrival = TimingStats()
         self.detection_queue_age = TimingStats()
         self.worker_processing = TimingStats()
+        self.publication_age = TimingStats()
+        self.completed_batches = 0
+        self.failed_batches = 0
+        self.batch_outcomes: deque[tuple[int, str]] = deque(
+            maxlen=DEPTH_MATCH_RECORD_LIMIT)
+        self.failed_batch_stamps_ns: deque[int] = deque(
+            maxlen=DEPTH_MATCH_RECORD_LIMIT)
+        self.stage_timing = {
+            name: TimingStats() for name in TIMING_STAGE_NAMES
+        }
         self.lock_wait: dict[str, TimingStats] = {}
         self.lock_hold: dict[str, TimingStats] = {}
 
@@ -191,16 +254,42 @@ class DepthMatchDiagnostics:
             self.late_arrival_delay_ns.append(
                 max(0, now_ns - record.lookup_monotonic_ns))
 
-    def record_detection_arrival(self, *, replaced_pending: bool) -> None:
+    def record_detection_arrival(
+        self,
+        *,
+        replaced_pending: bool,
+        now_ns: int | None = None,
+    ) -> None:
+        now_ns = time.monotonic_ns() if now_ns is None else int(now_ns)
         self.detections_rx += 1
         if replaced_pending:
             self.detection_slot_replacements += 1
+        if self.last_detection_arrival_monotonic_ns is not None:
+            self.detection_interarrival.record(
+                now_ns - self.last_detection_arrival_monotonic_ns)
+        self.last_detection_arrival_monotonic_ns = now_ns
 
     def record_detection_dequeue(self, age_ns: int) -> None:
         self.detection_queue_age.record(age_ns)
 
     def record_worker_processing(self, elapsed_ns: int) -> None:
         self.worker_processing.record(elapsed_ns)
+
+    def record_stage(self, name: str, elapsed_ns: int) -> None:
+        if name not in self.stage_timing:
+            raise ValueError(f'Unknown timing stage "{name}".')
+        self.stage_timing[name].record(elapsed_ns)
+
+    def record_batch_completed(self, stamp_ns: int, publication_age_ns: int) -> None:
+        self.completed_batches += 1
+        self.batch_outcomes.append((int(stamp_ns), 'ok'))
+        self.publication_age.record(publication_age_ns)
+
+    def record_batch_failed(self, stamp_ns: int) -> None:
+        self.failed_batches += 1
+        stamp_ns = int(stamp_ns)
+        self.batch_outcomes.append((stamp_ns, 'failed'))
+        self.failed_batch_stamps_ns.append(stamp_ns)
 
     def record_lock_timing(self, owner: str, wait_ns: int, hold_ns: int) -> None:
         self.lock_wait.setdefault(owner, TimingStats()).record(wait_ns)
@@ -300,8 +389,29 @@ class DepthMatchDiagnostics:
         lines.append(
             f'  detections: rx={self.detections_rx} '
             f'pending_replaced={self.detection_slot_replacements} '
+            f'interarrival_ms={self.detection_interarrival.format_ms()} '
             f'dequeue_age_ms={self.detection_queue_age.format_ms()} '
             f'worker_ms={self.worker_processing.format_ms()}')
+        finished = self.completed_batches + self.failed_batches
+        completion_rate = (
+            self.completed_batches / finished if finished else float('nan'))
+        lines.append(
+            f'  batches: completed={self.completed_batches} failed={self.failed_batches} '
+            f'completion_rate={completion_rate:.3f} '
+            f'publication_age_ms={self.publication_age.format_ms()}')
+        if self.batch_outcomes:
+            outcome_sample = ','.join(
+                f'{stamp_ns}:{outcome}'
+                for stamp_ns, outcome in list(self.batch_outcomes)[-8:])
+            lines.append(f'  batch outcomes (latest 8): {outcome_sample}')
+        if self.failed_batch_stamps_ns:
+            failed_sample = ','.join(
+                str(stamp_ns) for stamp_ns in list(self.failed_batch_stamps_ns)[-8:])
+            lines.append(f'  failed target stamps ns (latest 8): {failed_sample}')
+        for name in TIMING_STAGE_NAMES:
+            stats = self.stage_timing[name]
+            if stats.count:
+                lines.append(f'  stage {name}_ms={stats.format_ms()}')
         for owner in sorted(self.lock_wait):
             lines.append(
                 f'  lock {owner}: wait_ms={self.lock_wait[owner].format_ms()} '

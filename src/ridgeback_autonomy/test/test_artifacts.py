@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import importlib.util
 import json
 import os
@@ -140,11 +141,13 @@ def test_sweep_routes_output_and_child_logs_without_changing_commands(tmp_path, 
 def test_relocated_sweep_keeps_resume_and_report_inputs(tmp_path, monkeypatch):
     scenario = tmp_path / 'scenes.yaml'
     scenario.write_text('scenes:\n  - id: one\n    robots: [{ x: 2.0, y: 0.0 }]\n')
+    sweep_source = tmp_path / 'sweep.yaml'
+    sweep_source.write_text('fixed sweep contract\n')
     spec = parse_sweep({
         'sweep': {'name': 'unit'},
         'defaults': {'scenario': str(scenario), 'repeats': 1},
         'configs': [{'name': 'pointcloud', 'estimators': 'pointcloud'}],
-    }, source=str(tmp_path / 'sweep.yaml'))
+    }, source=str(sweep_source))
     old = tmp_path / 'benchmark-results/20260831_120000_unit'
     run = old / 'pointcloud'
     run.mkdir(parents=True)
@@ -155,6 +158,12 @@ def test_relocated_sweep_keeps_resume_and_report_inputs(tmp_path, monkeypatch):
     original_bytes = (run / 'run.json').read_bytes()
     monkeypatch.setattr(sweep, 'git_provenance', lambda _: {})
     manifest = sweep._new_manifest(spec, spec.configs, str(old), str(tmp_path))
+    assert manifest['sweep']['source_sha256'] == hashlib.sha256(
+        sweep_source.read_bytes()).hexdigest()
+    assert manifest['configs'][0]['scenario_sha256'] == hashlib.sha256(
+        scenario.read_bytes()).hexdigest()
+    assert manifest['resume_signature']['sweep_source_sha256'] == (
+        manifest['sweep']['source_sha256'])
     manifest['configs'][0]['status'] = 'success'
     sweep._write_manifest(str(old), manifest)
     before_rows = collect_comparison_rows(manifest, str(old))
@@ -170,6 +179,33 @@ def test_relocated_sweep_keeps_resume_and_report_inputs(tmp_path, monkeypatch):
     resumed = sweep._resume_manifest(manifest, spec, spec.configs, str(new))
     assert resumed['configs'][0]['arguments']['output_dir'] == str(new)
     assert resumed['configs'][0]['output_path'] == 'pointcloud'
+
+
+def test_sweep_or_scenario_byte_change_invalidates_resume_signature(tmp_path):
+    scenario = tmp_path / 'scenes.yaml'
+    scenario.write_text('scenes:\n  - id: one\n    robots: [{ x: 2.0, y: 0.0 }]\n')
+    source = tmp_path / 'sweep.yaml'
+    source.write_text('version one\n')
+    spec = parse_sweep({
+        'sweep': {'name': 'unit'},
+        'defaults': {'scenario': str(scenario), 'repeats': 1},
+        'configs': [{'name': 'pointcloud', 'estimators': 'pointcloud'}],
+    }, source=str(source))
+
+    original = sweep._resume_signature(spec, spec.configs)
+    source.write_text('version two\n')
+    source_changed = sweep._resume_signature(spec, spec.configs)
+    assert source_changed != original
+    assert source_changed['sweep_source_sha256'] != original['sweep_source_sha256']
+
+    source.write_text('version one\n')
+    scenario.write_text(
+        'scenes:\n  - id: one\n    robots: [{ x: 3.0, y: 0.0 }]\n')
+    scenario_changed = sweep._resume_signature(spec, spec.configs)
+    assert scenario_changed != original
+    assert (
+        scenario_changed['configs']['pointcloud']['scenario_sha256']
+        != original['configs']['pointcloud']['scenario_sha256'])
 
 
 @pytest.fixture

@@ -121,6 +121,7 @@ def render_sweep_report(manifest: dict, sweep_dir: str) -> str:
         'Started': str(sweep.get('started') or '—'),
         'Finished': str(sweep.get('finished') or '—'),
         'Source': str(sweep.get('source') or '—'),
+        'Source SHA-256': str(sweep.get('source_sha256') or '—'),
         'Commit': str(commit),
         'Branch': str(provenance.get('branch') or 'unknown'),
     }

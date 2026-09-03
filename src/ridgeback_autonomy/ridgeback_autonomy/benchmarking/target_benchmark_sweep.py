@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import re
@@ -66,6 +67,18 @@ def _write_manifest(sweep_dir: str, manifest: dict) -> None:
         json.dump(manifest, handle, indent=2, sort_keys=False)
         handle.write('\n')
     os.replace(temporary, path)
+
+
+def _file_sha256(path: str | None) -> str | None:
+    """Hash one existing input file without making in-memory specs invalid."""
+
+    if not path or not os.path.isfile(path):
+        return None
+    digest = hashlib.sha256()
+    with open(path, 'rb') as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b''):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def _selected_configs(spec: SweepSpec, only: str | None) -> tuple[SweepConfig, ...]:
@@ -193,11 +206,16 @@ def _resume_signature(spec: SweepSpec, configs: tuple[SweepConfig, ...]) -> dict
     if 'setup_path' in spec.defaults:
         environment['setup_path'] = spec.defaults['setup_path']
     return {
+        'sweep_source_sha256': _file_sha256(spec.source),
         'environment': environment,
         'configs': {
             config.name: {
-                key: value for key, value in config.arguments.items()
-                if key not in ignored
+                **{
+                    key: value for key, value in config.arguments.items()
+                    if key not in ignored
+                },
+                'scenario_sha256': _file_sha256(
+                    config.arguments.get('scenario')),
             }
             for config in configs
         },
@@ -247,6 +265,7 @@ def _new_manifest(
             'name': spec.name,
             'description': spec.description,
             'source': os.path.abspath(spec.source),
+            'source_sha256': _file_sha256(spec.source),
             'status': 'running',
             'started': _wall_timestamp(),
             'finished': None,
@@ -259,6 +278,8 @@ def _new_manifest(
             {
                 'name': config.name,
                 'arguments': _resolved_arguments(spec, config, sweep_dir),
+                'scenario_sha256': _file_sha256(
+                    config.arguments.get('scenario')),
                 'status': 'pending',
                 'wall_time_sec': None,
                 'output_path': config.name,

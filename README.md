@@ -331,6 +331,7 @@ Arguments:
 | `estimators` | `all` | Comma-separated estimator subset to compare in one run: `pointcloud`, `projective_ranging`, `euclidean_reconstruction`, `polar_profiling`. Any subset works, rows individually — `estimators:=polar_profiling` runs that row alone |
 | `depth_source` | `stereoscopic` | Aligned-depth producer for the `projective_ranging`/`euclidean_reconstruction` rows: `stereoscopic` or `monocular`; comparing sources = two runs |
 | `mask_gate` | `box` | Mask front-end for the mask-based rows: `box` (rasterized detection box, no model) or `silhouette` (segmentation model prompted with the boxes; needs `perception_venv`); comparing gates = two runs |
+| `depth_match_debug` | `false` | Default-off mask-worker evidence logging: exact-depth delivery, pending replacements, batch completion/publication age, and bounded cold/warm percentiles for RGB, SlimSAM, depth production, mask preparation, estimator reduction, worker, lock, and CUDA-synchronization timing |
 | `isolation_2d` | `nearest_mode_histogram` | Projective-ranging box-gate foreground recipe: `nearest_mode_histogram` or `otsu` |
 | `isolation_3d` | `height_crop_nearest_mode_band` | Euclidean-reconstruction box-gate foreground recipe: `height_crop_nearest_mode_band`, `height_crop_range_band`, `height_crop`, `nearest_mode_band`, or `range_band`. The two chains differ only in how the background separator anchors — nearest mode vs. percentile; the percentile one slides as background grows and is what the `pointcloud` row does |
 | `mask_depth_max_meters` | `0.0` | Working depth gate for the mask rows; `0` means no gate, leaving each row bounded only by what its depth source declares it can resolve |
@@ -382,6 +383,14 @@ ros2 run ridgeback_autonomy target_benchmark_sweep "$SWEEP" \
 ros2 run ridgeback_autonomy target_benchmark_sweep \
   --report-only artifacts/benchmarks/20260828_141530_baseline
 ```
+
+The shipped `benchmark_sweep_model_concurrency.yaml` is the controlled
+sequential evidence run for the SlimSAM/Depth-Anything question. It starts with
+a diagnostics-off/on A/A pair and then runs three rotated replications of the
+box/silhouette by stereoscopic/monocular matrix. Run it only from a clean,
+committed checkout; its `sweep.json` records the exact sweep and scenario file
+hashes. See [the model-concurrency evidence plan](docs/plans/model_concurrency_evidence.md)
+for the decision gates and interpretation.
 
 Do **not** run `cleanup.sh` between configurations: it kills Gazebo and RViz,
 which are deliberately persistent. The supervisor owns each config process

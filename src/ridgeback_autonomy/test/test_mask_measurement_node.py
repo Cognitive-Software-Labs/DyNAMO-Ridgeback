@@ -47,8 +47,11 @@ from ridgeback_autonomy.perception.target_localization.measurement_pipeline impo
 )
 from ridgeback_autonomy.perception.target_localization.synchronization import (
     DEPTH_MATCH_RECORD_LIMIT,
+    TIMING_COLD_SAMPLE_COUNT,
+    TIMING_SAMPLE_LIMIT,
     DepthMatchDiagnostics,
     StampedMessageBuffer,
+    TimingStats,
 )
 
 target_mask_measurement_node = mask_measurement_node
@@ -307,8 +310,10 @@ def test_depth_match_diagnostics_bounds_stamp_only_miss_records() -> None:
 def test_depth_match_diagnostics_accounts_for_scheduling_and_lock_timing() -> None:
     diagnostics = DepthMatchDiagnostics()
 
-    diagnostics.record_detection_arrival(replaced_pending=False)
-    diagnostics.record_detection_arrival(replaced_pending=True)
+    diagnostics.record_detection_arrival(
+        replaced_pending=False, now_ns=1_000_000)
+    diagnostics.record_detection_arrival(
+        replaced_pending=True, now_ns=3_000_000)
     diagnostics.record_detection_dequeue(2_000_000)
     diagnostics.record_worker_processing(3_000_000)
     diagnostics.record_lock_timing('depth_callback', 4_000, 5_000)
@@ -316,9 +321,49 @@ def test_depth_match_diagnostics_accounts_for_scheduling_and_lock_timing() -> No
     summary = diagnostics.summary()
     assert diagnostics.detections_rx == 2
     assert diagnostics.detection_slot_replacements == 1
-    assert 'dequeue_age_ms=mean=2.000 max=2.000' in summary
-    assert 'worker_ms=mean=3.000 max=3.000' in summary
-    assert 'lock depth_callback: wait_ms=mean=0.004 max=0.004' in summary
+    assert 'interarrival_ms=count=1 first=2.000' in summary
+    assert 'dequeue_age_ms=count=1 first=2.000' in summary
+    assert 'worker_ms=count=1 first=3.000' in summary
+    assert 'lock depth_callback: wait_ms=count=1 first=0.004' in summary
+
+
+def test_timing_stats_separates_first_call_and_bounds_warm_samples() -> None:
+    stats = TimingStats()
+
+    for value_ms in range(TIMING_SAMPLE_LIMIT + TIMING_COLD_SAMPLE_COUNT):
+        stats.record(value_ms * 1_000_000)
+
+    assert stats.count == TIMING_SAMPLE_LIMIT + TIMING_COLD_SAMPLE_COUNT
+    assert stats.first_ns == 0
+    assert len(stats.samples_ns) == TIMING_SAMPLE_LIMIT
+    summary = stats.format_ms()
+    assert 'first=0.000' in summary
+    assert f'warm_n={TIMING_SAMPLE_LIMIT}' in summary
+    assert 'warm_p50=' in summary
+    assert 'warm_p95=' in summary
+    assert 'warm_p99=' in summary
+    assert f'max={TIMING_SAMPLE_LIMIT + TIMING_COLD_SAMPLE_COUNT - 1:.3f}' in summary
+
+
+def test_depth_match_diagnostics_reports_stages_and_batch_outcomes() -> None:
+    diagnostics = DepthMatchDiagnostics()
+
+    for value_ms in (10, 9, 8, 7, 6, 4):
+        diagnostics.record_stage('slimsam', value_ms * 1_000_000)
+    diagnostics.record_batch_completed(100, 12_000_000)
+    diagnostics.record_batch_failed(200)
+
+    summary = diagnostics.summary()
+    assert 'batches: completed=1 failed=1 completion_rate=0.500' in summary
+    assert 'publication_age_ms=count=1 first=12.000' in summary
+    assert 'batch outcomes (latest 8): 100:ok,200:failed' in summary
+    assert 'stage slimsam_ms=count=6 first=10.000' in summary
+    assert 'cold_ms=[10.000,9.000,8.000,7.000,6.000]' in summary
+    assert 'warm_p95=4.000' in summary
+    assert 'failed target stamps ns (latest 8): 200' in summary
+
+    with pytest.raises(ValueError, match='Unknown timing stage'):
+        diagnostics.record_stage('mystery_model', 1)
 
 
 # --- fill_path_measurements with tight masks: the silhouette-gate consumption
@@ -1060,6 +1105,44 @@ def configure_silhouette_node(node) -> _RecordingSegmenter:
     segmenter = _RecordingSegmenter()
     node.segmenter = segmenter
     return segmenter
+
+
+def test_depth_match_and_stage_diagnostics_are_default_off(ros_context) -> None:
+    node = _mask_node(_StubDepthSource('depth'))
+    try:
+        assert node.depth_match_diagnostics is None
+    finally:
+        node.destroy_node()
+
+
+def test_enabled_diagnostics_record_silhouette_and_monocular_stages(
+    ros_context, monkeypatch,
+) -> None:
+    source = _RgbDepthSource()
+    source.frame = (build_fill_depth(), Header())
+    node = _mask_node(source, depth_match_debug=True)
+    configure_silhouette_node(node)
+    # Unit proof does not need to import torch or synchronize real CUDA. The
+    # live sweep exercises that diagnostic-only barrier around both models.
+    monkeypatch.setattr(node, 'synchronize_cuda_for_timing', lambda: None)
+    detections_msg = fill_detections_message(7, 42)
+    batch = build_fill_batch()
+    color = rgb_image(7, 42)
+    try:
+        masks, prepared = node.masks_for_batch(
+            detections_msg, batch, color_hint=color)
+        depth_m = node.depth_for_batch(color, batch, prepared_color=prepared)
+
+        diagnostics = node.depth_match_diagnostics
+        assert len(masks) == 1
+        assert depth_m is source.frame[0]
+        assert diagnostics.stage_timing['rgb_prepare'].count == 1
+        assert diagnostics.stage_timing['slimsam'].count == 1
+        assert diagnostics.stage_timing['mask_region_prepare'].count == 1
+        assert diagnostics.stage_timing['depth_anything'].count == 1
+        assert diagnostics.stage_timing['stereo_depth'].count == 0
+    finally:
+        node.destroy_node()
 
 
 def test_silhouette_monocular_reuses_early_color_hint_and_one_rgb_array(

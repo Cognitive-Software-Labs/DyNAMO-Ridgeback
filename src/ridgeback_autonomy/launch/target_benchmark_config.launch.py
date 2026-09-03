@@ -277,7 +277,7 @@ def generate_launch_description():
         DeclareLaunchArgument(
             'depth_match_debug',
             default_value='false',
-            description='Log mask depth-input lookup accounting',
+            description='Log bounded mask depth-input and stage-timing evidence',
         ),
         DeclareLaunchArgument('scan_topic', default_value='sensors/lidar2d_0/scan'),
         DeclareLaunchArgument(

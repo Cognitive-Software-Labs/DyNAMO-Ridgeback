@@ -42,13 +42,16 @@ Answer these separately:
   and every discarded stamp.
 - Do not interpret GPU utilization alone as useful overlap. Completion rate,
   end-to-end latency, drops, accuracy, RTF, RSS/PSS and VRAM decide.
-- Do not modify production architecture in this assignment. Temporary probes or
-  prototypes belong in an isolated worktree and must not be committed. If a
-  candidate wins, produce a separate implementation handoff.
+- Do not modify production execution architecture in this assignment. The
+  default-off timing diagnostic and reproducible sweep configuration are
+  preparation and should be committed; concurrency prototypes belong in an
+  isolated worktree and must not be committed. If a candidate wins, produce a
+  separate implementation handoff.
 - Preserve unrelated processes and changes. Use a dedicated ROS domain and
   unique `/tmp/dynamo-model-concurrency-*` artifact roots. Inspect ownership
   before cleanup and never terminate another agent's run.
-- Record exact commands and environments. Do not commit or push.
+- Record exact commands and environments. Commit and validate every preparation
+  file before starting Gazebo; do not push unless explicitly requested.
 
 ## Phase 0: freeze provenance and host conditions
 
@@ -109,11 +112,11 @@ loads from steady-state percentiles, but report them as an independent result.
 
 Add focused tests proving diagnostics are bounded, default-off, do not alter
 the output/status contract, and count one completed/replaced batch correctly.
-Run the A/A comparison as a two-configuration diagnostic sweep against one
-persistent environment, with the only changed YAML key being diagnostics
-disabled versus enabled. If that key does not yet exist in the sweep launch
-contract, add and validate it as part of the probe. If the probe materially
-changes throughput or replacements, reduce it before proceeding.
+Run the A/A comparison as the first two configurations in the same persistent
+sweep, with the only changed YAML key being `depth_match_debug: false` versus
+`true`. If the probe materially changes throughput or replacements, treat the
+remaining instrumented matrix as observational and reduce the probe before a
+follow-up run.
 
 ## Phase 2: current-architecture factorial benchmark
 
@@ -126,14 +129,15 @@ Run these four cells with identical estimator selection and benchmark settings:
 | C: monocular | `box` | `monocular` | Depth-Anything only |
 | D: combined | `silhouette` | `monocular` | SlimSAM then Depth-Anything |
 
-Create and install
-`config/benchmark_sweep_model_concurrency.yaml`. Treat it as part of the
-evidence: cover it with the existing sweep parser/artifact tests and record its
-SHA-256 in the report. Its shared `defaults` must pin the scenario, three scene
-repeats, `estimators: projective_ranging,euclidean_reconstruction`, timing
-diagnostics, capture/settle settings, and every other non-factor setting. Every
-config must explicitly pin `mask_gate` and `depth_source`; inheritance must not
-make the two experimental axes ambiguous.
+Use the installed `config/benchmark_sweep_model_concurrency.yaml` as the
+experiment contract. It begins with the combined-path diagnostic A/A pair and
+then contains the twelve matrix configurations below. Its shared `defaults`
+pin the examples scenario, three scene repeats,
+`estimators: projective_ranging,euclidean_reconstruction`, capture/settle
+settings and every non-factor setting. Every config explicitly pins
+`mask_gate`, `depth_source`, and the diagnostic state, so inheritance cannot
+make the experimental axes ambiguous. The supervisor records the sweep and
+scenario SHA-256 values in `sweep.json`.
 
 Encode three process-level replications as twelve uniquely named configs in
 this exact rotated order:
@@ -144,19 +148,20 @@ replicate 2: D, C, B, A
 replicate 3: B, D, A, C
 ```
 
-The YAML list order is the execution order. The rotation distributes warm-up
-and thermal drift instead of always favouring the same cell. A replicate is a
-fresh per-config process; `repeats: 3` inside each config supplies the repeated
-scenes. Do not replace this with twelve separately started environments.
+The YAML list order is the execution order. The A/A pair runs first; the matrix
+rotation distributes warm-up and thermal drift instead of always favouring the
+same cell. A replicate is a fresh per-config process; `repeats: 3` inside each
+config supplies the repeated scenes. Do not replace this with twelve separately
+started environments.
 
 Procedure:
 
-1. Validate the installed YAML and its resolved trial/time estimate with
+1. Finish the diagnostic, YAML, tests, documentation and installed-workspace
+   build. Commit every changed file and require `git status --porcelain` to be
+   empty before any command is allowed to start Gazebo.
+2. Validate the installed YAML and its resolved trial/time estimate with
    `target_benchmark_sweep <yaml> --dry-run`.
-2. Before the formal run, use a disposable copy of the same four cell
-   definitions with `repeats: 1` for the A/B/C/D load smoke. This smoke is not
-   decision evidence and must be kept outside the checked-in result matrix.
-3. Run the complete twelve-config YAML once through
+3. Run the complete fourteen-config YAML once through
    `target_benchmark_sweep`. Let the supervisor execute configurations
    sequentially against its one persistent environment and use its normal
    resume behavior after an interruption.

@@ -162,9 +162,19 @@ does not fail a trial. Collages are evidence aids, not machine-readable truth.
 
 `target_benchmark_sweep` validates YAML, starts one persistent environment,
 runs one restartable config at a time, resumes configs only from valid `run.json`,
-records real-time factor, and emits `sweep.json` plus `summary.md`. Do not replace
-process restarts with runtime estimator mutation: selected rows determine node
-existence.
+records real-time factor plus sweep/scenario SHA-256 provenance, and emits
+`sweep.json` plus `summary.md`. Do not replace process restarts with runtime
+estimator mutation: selected rows determine node existence.
+
+For model-throughput investigations, `depth_match_debug:=true` also emits a
+bounded mask-worker timing summary. Each distribution retains the first five
+calls as cold evidence and reports warm count/mean/P50/P95/P99 plus the all-time
+maximum.
+Stages cover RGB preparation, SlimSAM load/inference, stereo or monocular depth,
+mask-region preparation, estimator reduction, CUDA synchronization, total worker
+time, dequeue age and detection-receipt-to-publication age. The switch remains
+off by default and does not change matching, queueing, estimator, or publication
+semantics.
 
 Key ownership:
 

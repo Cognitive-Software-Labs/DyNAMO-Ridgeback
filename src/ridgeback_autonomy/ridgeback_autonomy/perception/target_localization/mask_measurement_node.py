@@ -48,6 +48,7 @@ Deliberately independent of the pointcloud estimator
 
 from __future__ import annotations
 
+import importlib
 import threading
 import time
 import traceback
@@ -215,8 +216,8 @@ class TargetMaskMeasurementNode(Node):
             'segmentation_min_iou', SEGMENTATION_MIN_PREDICTED_IOU_DEFAULT)
         self.declare_parameter('mask_debug_topic', MASK_DEBUG_TOPIC)
         self.declare_parameter('aligned_depth_debug_topic', ALIGNED_DEPTH_DEBUG_TOPIC)
-        # Periodic accounting of depth-input lookup hits and misses. Off by
-        # default: it is a run-time investigation aid, not part of the pipeline.
+        # Periodic accounting of depth-input delivery and bounded worker-stage
+        # timing. Off by default: it is an investigation aid, not pipeline work.
         self.declare_parameter('depth_match_debug', False)
         self.declare_parameter('depth_match_debug_period_s', 5.0)
 
@@ -230,6 +231,19 @@ class TargetMaskMeasurementNode(Node):
         # Depth-Anything.
         self.needs_depth = bool(self.enabled_estimators & DEPTH_PATH_ESTIMATORS)
         self.needs_scan = 'polar_profiling' in self.enabled_estimators
+
+        # This existing default-off switch now owns both exact-depth delivery
+        # accounting and the bounded stage timings used by the model-concurrency
+        # sweep. Construct it before model setup so eager SlimSAM load time can
+        # be separated from warm per-batch work.
+        self.depth_match_diagnostics: DepthMatchDiagnostics | None = None
+        if bool(self.get_parameter('depth_match_debug').value):
+            if self.needs_depth:
+                self.depth_match_diagnostics = DepthMatchDiagnostics()
+            else:
+                self.get_logger().warn(
+                    'depth_match_debug is set but no depth path is enabled; '
+                    'there is no depth lookup or depth-path timing to account for.')
 
         self.base_frame = str(self.get_parameter('base_frame').value)
         self.scan_match_tolerance_s = float(
@@ -294,7 +308,15 @@ class TargetMaskMeasurementNode(Node):
             # Load eagerly: a missing perception_venv fails at startup with
             # the actionable RuntimeError (caught in main), not per frame in
             # the worker.
-            self.segmenter.load()
+            load_started_ns = (
+                time.monotonic_ns()
+                if self.depth_match_diagnostics is not None else None)
+            try:
+                self.segmenter.load()
+            finally:
+                if load_started_ns is not None:
+                    self.depth_match_diagnostics.record_stage(
+                        'slimsam_load', time.monotonic_ns() - load_started_ns)
 
         # TF serves two extrinsics per frame: scan -> optical (polar profiling
         # projects the scan into the camera frame) and optical -> base (every
@@ -414,20 +436,12 @@ class TargetMaskMeasurementNode(Node):
                 10,
             )
 
-        # Diagnostics timer runs on the executor, so it observes exactly the
-        # thread that would be starved if reception is the problem. Only the
-        # depth paths do a stamp lookup worth accounting for.
-        self.depth_match_diagnostics: DepthMatchDiagnostics | None = None
-        if bool(self.get_parameter('depth_match_debug').value):
-            if self.needs_depth:
-                self.depth_match_diagnostics = DepthMatchDiagnostics()
-                self.create_timer(
-                    float(self.get_parameter('depth_match_debug_period_s').value),
-                    self.log_depth_match_diagnostics)
-            else:
-                self.get_logger().warn(
-                    'depth_match_debug is set but no depth path is enabled; '
-                    'there is no depth lookup to account for.')
+        # The timer runs on the executor, so it observes exactly the thread
+        # that would be starved if reception is the problem.
+        if self.depth_match_diagnostics is not None:
+            self.create_timer(
+                float(self.get_parameter('depth_match_debug_period_s').value),
+                self.log_depth_match_diagnostics)
 
         self.worker_thread = threading.Thread(target=self.processing_loop, daemon=True)
         self.worker_thread.start()
@@ -436,6 +450,31 @@ class TargetMaskMeasurementNode(Node):
         with self.processing_lock:
             summary = self.depth_match_diagnostics.summary()
         self.get_logger().info(summary)
+
+    def record_stage_timing(self, name: str, started_ns: int | None) -> None:
+        """Record one diagnostic stage without affecting the default-off path."""
+
+        if started_ns is None or self.depth_match_diagnostics is None:
+            return
+        elapsed_ns = time.monotonic_ns() - started_ns
+        with self.processing_lock:
+            self.depth_match_diagnostics.record_stage(name, elapsed_ns)
+
+    def synchronize_cuda_for_timing(self) -> None:
+        """Make optional GPU stage timings honest, and account for the cost."""
+
+        if self.depth_match_diagnostics is None:
+            return
+        started_ns = time.monotonic_ns()
+        try:
+            torch = importlib.import_module('torch')
+            if torch.cuda.is_available():
+                torch.cuda.synchronize()
+        except Exception:  # noqa: BLE001 - diagnostics must never break inference
+            # A CPU-only run or unavailable CUDA runtime needs no barrier. The
+            # model call itself remains authoritative and will report failures.
+            pass
+        self.record_stage_timing('cuda_sync', started_ns)
 
     def effective_depth_max(self) -> float:
         """The depth cutoff to clean against: the tighter of gate and source ceiling.
@@ -473,7 +512,9 @@ class TargetMaskMeasurementNode(Node):
             self.latest_detections_received_monotonic_ns = acquired_ns
             if diagnostics is not None:
                 diagnostics.record_detection_arrival(
-                    replaced_pending=replaced_pending)
+                    replaced_pending=replaced_pending,
+                    now_ns=acquired_ns,
+                )
                 diagnostics.record_lock_timing(
                     'detections_callback',
                     acquired_ns - waiting_started_ns,
@@ -568,11 +609,27 @@ class TargetMaskMeasurementNode(Node):
 
                 processing_started_ns = (
                     time.monotonic_ns() if diagnostics is not None else None)
+                stamp_sec, stamp_nanosec = stamp_key(detections_msg.header.stamp)
+                target_stamp_ns = stamp_sec * 1_000_000_000 + stamp_nanosec
                 try:
                     self.process_measurements(
                         detections_msg, depth_input_msg, scan_msg,
                         self.latest_camera_info)
+                    if diagnostics is not None:
+                        completed_ns = time.monotonic_ns()
+                        received_ns = (
+                            detections_received_ns
+                            if detections_received_ns is not None
+                            else processing_started_ns)
+                        with self.processing_lock:
+                            diagnostics.record_batch_completed(
+                                target_stamp_ns,
+                                completed_ns - received_ns,
+                            )
                 except Exception:  # noqa: BLE001 - worker must survive any frame
+                    if diagnostics is not None:
+                        with self.processing_lock:
+                            diagnostics.record_batch_failed(target_stamp_ns)
                     self.get_logger().error(
                         'Mask measurement frame failed:\n' + traceback.format_exc())
                 finally:
@@ -652,22 +709,29 @@ class TargetMaskMeasurementNode(Node):
                         scan_points, scan_reason = self.scan_points_for_batch(
                             detections_msg, scan_msg)
                         beam_records = self.ray_marker_records()
-                        fill_path_measurements(
-                            batch,
-                            masks,
-                            intrinsics,
-                            depth_m,
-                            scan_points,
-                            camera_rotation=camera_rotation,
-                            camera_translation=camera_translation,
-                            front_offset_m=self.front_offset_m,
-                            isolation_2d=self.isolation_2d,
-                            isolation_3d=isolation_3d,
-                            depth_max=self.effective_depth_max(),
-                            scan_reason=scan_reason,
-                            beam_records=beam_records,
-                            enabled=self.enabled_estimators,
-                        )
+                        reduction_started_ns = (
+                            time.monotonic_ns()
+                            if self.depth_match_diagnostics is not None else None)
+                        try:
+                            fill_path_measurements(
+                                batch,
+                                masks,
+                                intrinsics,
+                                depth_m,
+                                scan_points,
+                                camera_rotation=camera_rotation,
+                                camera_translation=camera_translation,
+                                front_offset_m=self.front_offset_m,
+                                isolation_2d=self.isolation_2d,
+                                isolation_3d=isolation_3d,
+                                depth_max=self.effective_depth_max(),
+                                scan_reason=scan_reason,
+                                beam_records=beam_records,
+                                enabled=self.enabled_estimators,
+                            )
+                        finally:
+                            self.record_stage_timing(
+                                'estimator_reduction', reduction_started_ns)
                         if beam_records is not None:
                             self.publish_ray_markers(
                                 nearest_beam_record(batch, beam_records), scan_msg)
@@ -750,16 +814,23 @@ class TargetMaskMeasurementNode(Node):
         self.log_oversized_skip(accepted.count(False))
 
         if self.mask_gate == MASK_GATE_BOX:
+            regions_started_ns = (
+                time.monotonic_ns()
+                if self.depth_match_diagnostics is not None else None)
             box_masks: list = []
-            for detection, keep in zip(batch.detections, accepted):
-                if keep:
-                    box_masks.append(region_from_detection(
-                        detection, batch.image_height, batch.image_width))
-                else:
-                    set_mask_estimator_status(
-                        detection, MissReason.MASK_OVERSIZED_BOX,
-                        self.enabled_estimators)
-                    box_masks.append(None)
+            try:
+                for detection, keep in zip(batch.detections, accepted):
+                    if keep:
+                        box_masks.append(region_from_detection(
+                            detection, batch.image_height, batch.image_width))
+                    else:
+                        set_mask_estimator_status(
+                            detection, MissReason.MASK_OVERSIZED_BOX,
+                            self.enabled_estimators)
+                        box_masks.append(None)
+            finally:
+                self.record_stage_timing(
+                    'mask_region_prepare', regions_started_ns)
             return box_masks, None
 
         color_msg = None
@@ -780,10 +851,16 @@ class TargetMaskMeasurementNode(Node):
 
         # Both inference backends consume this one contiguous RGB object. Only
         # accepted boxes are prompted; oversized ones map straight to ``None``.
-        prepared_color = PreparedColorFrame(
-            message=color_msg,
-            rgb=np.ascontiguousarray(decode_color_to_rgb(color_msg)),
-        )
+        rgb_started_ns = (
+            time.monotonic_ns()
+            if self.depth_match_diagnostics is not None else None)
+        try:
+            prepared_color = PreparedColorFrame(
+                message=color_msg,
+                rgb=np.ascontiguousarray(decode_color_to_rgb(color_msg)),
+            )
+        finally:
+            self.record_stage_timing('rgb_prepare', rgb_started_ns)
         prompt_boxes = [
             detection.bbox_xyxy
             for detection, keep in zip(batch.detections, accepted)
@@ -792,31 +869,46 @@ class TargetMaskMeasurementNode(Node):
         blobs: list = []
         if prompt_boxes:
             started = time.perf_counter()
-            blobs = self.segmenter.segment_boxes(
-                prepared_color.rgb, prompt_boxes,
-                min_predicted_iou=self.segmentation_min_iou)
+            self.synchronize_cuda_for_timing()
+            model_started_ns = (
+                time.monotonic_ns()
+                if self.depth_match_diagnostics is not None else None)
+            try:
+                blobs = self.segmenter.segment_boxes(
+                    prepared_color.rgb, prompt_boxes,
+                    min_predicted_iou=self.segmentation_min_iou)
+                self.synchronize_cuda_for_timing()
+            finally:
+                self.record_stage_timing('slimsam', model_started_ns)
             elapsed_ms = (time.perf_counter() - started) * 1000.0
             self.log_segmentation_latency(elapsed_ms, len(blobs))
 
         # Re-align the segmenter's per-prompt blobs back to full detection order.
+        regions_started_ns = (
+            time.monotonic_ns()
+            if self.depth_match_diagnostics is not None else None)
         blob_iter = iter(blobs)
         masks: list = []
-        for detection, keep in zip(batch.detections, accepted):
-            if not keep:
-                set_mask_estimator_status(
-                    detection, MissReason.MASK_OVERSIZED_BOX, self.enabled_estimators)
-                masks.append(None)
-                continue
-            blob = next(blob_iter)
-            if blob is None:
-                set_mask_estimator_status(
-                    detection, MissReason.MASK_EMPTY_SEGMENTATION,
-                    self.enabled_estimators)
-                masks.append(None)
-            else:
-                # Cropped to the blob's own extent and copied, so the frame-sized
-                # model output is free to expire at the end of this loop.
-                masks.append(region_from_blob(blob, MaskPrecision.TIGHT))
+        try:
+            for detection, keep in zip(batch.detections, accepted):
+                if not keep:
+                    set_mask_estimator_status(
+                        detection, MissReason.MASK_OVERSIZED_BOX,
+                        self.enabled_estimators)
+                    masks.append(None)
+                    continue
+                blob = next(blob_iter)
+                if blob is None:
+                    set_mask_estimator_status(
+                        detection, MissReason.MASK_EMPTY_SEGMENTATION,
+                        self.enabled_estimators)
+                    masks.append(None)
+                else:
+                    # Cropped to the blob's own extent and copied, so the frame-sized
+                    # model output is free to expire at the end of this loop.
+                    masks.append(region_from_blob(blob, MaskPrecision.TIGHT))
+        finally:
+            self.record_stage_timing('mask_region_prepare', regions_started_ns)
         return masks, prepared_color
 
     def log_segmentation_latency(self, elapsed_ms: float, mask_count: int) -> None:
@@ -865,6 +957,13 @@ class TargetMaskMeasurementNode(Node):
 
         if depth_input_msg is None and prepared_color is None:
             return None
+        is_monocular = self.depth_source.input_kind == 'color'
+        stage_name = 'depth_anything' if is_monocular else 'stereo_depth'
+        if is_monocular:
+            self.synchronize_cuda_for_timing()
+        started_ns = (
+            time.monotonic_ns()
+            if self.depth_match_diagnostics is not None else None)
         try:
             produce_from_rgb = getattr(self.depth_source, 'produce_from_rgb', None)
             if (prepared_color is not None
@@ -879,6 +978,10 @@ class TargetMaskMeasurementNode(Node):
         except ValueError as exc:
             self.log_skip_warning(f'Aligned depth frame skipped: {exc}')
             return None
+        finally:
+            if is_monocular:
+                self.synchronize_cuda_for_timing()
+            self.record_stage_timing(stage_name, started_ns)
         if frame is None:
             return None
         depth_m, _ = frame
