@@ -34,6 +34,7 @@ implementations or committed backlog work.
 ## Active plans
 
 - [D455 hardware validation](plans/camera_hardware_validation.md)
+- [Model-concurrency evidence](plans/model_concurrency_evidence.md)
 - [Occlusion-handling proposal](plans/occlusion_handling.md)
 
 ## History and validation
