@@ -77,7 +77,34 @@ During exploration runs, Gazebo may occasionally log `platform_velocity_controll
 
 This is usually ROS/Gazebo timing jitter around Clearpath's generated `reference_timeout: 0.1` in `/home/deivid/clearpath/platform/config/control.yaml`. Do not change the generated Clearpath controller config as a first response. First check whether Nav2 retarget churn or collision-monitor approach flicker is causing irregular command timing, then instrument `/cmd_vel`, `/cmd_vel_smoothed`, `/platform/cmd_vel`, sim-time rate, and controller update timing if the warnings remain frequent after startup.
 
-## Camera rate collapses under GUI contention on a remote-desktop session
+## Camera rate collapses when X falls back to software rendering
+
+### Check this first
+
+```bash
+glxinfo | grep "OpenGL renderer"
+```
+
+`llvmpipe` means Mesa is rasterizing on the CPU and the GPU is doing no
+graphics at all. Gazebo then renders every camera frame in software, and the
+sensor rate collapses as soon as anything else wants CPU. Fix by forcing the
+NVIDIA GLX vendor for the simulator:
+
+```bash
+export __GLX_VENDOR_LIBRARY_NAME=nvidia
+export __NV_PRIME_RENDER_OFFLOAD=1
+```
+
+Measured on cell D, identical config, only this variable changed:
+
+| GL renderer | camera |
+|---|---|
+| `llvmpipe (LLVM 20.1.2)` | 3.80 Hz |
+| `NVIDIA RTX PRO 6000 Blackwell` | **28.07 Hz** |
+
+The session defaults to `llvmpipe` under XRDP even though the hardware path is
+available; it can also change across reboots, so a run that was healthy
+yesterday is not evidence that today's is.
 
 ### Symptom
 
@@ -86,54 +113,53 @@ sees the identical reduced count, so it looks like a subscriber or QoS fault and
 is not one. Downstream this caps the detector at the camera rate no matter what
 `detector_fps` says, which silently invalidates any cadence measurement.
 
-### Measured
-
-Same config, same scenario, comparable spans:
-
-| run | camera rate |
-|---|---|
-| 2026-09-03 sweep, `r1_d_silhouette_monocular` | 27.87 Hz |
-| 2026-09-04 sweep, `d_silhouette_monocular` | 4.95 Hz |
-| 2026-09-04, environment layer alone | 27.92 Hz |
-
-The environment layer on its own is healthy. The collapse needs the per-config
-layer on top of it.
-
 ### Root cause
 
-CPU starvation of Gazebo's render path, not GPU and not ROS. Sampled during the
-degraded state:
+Gazebo rasterizes every camera frame on the CPU, because the X session
+resolves GL to `llvmpipe`. The GPU does no graphics at all -- which is why it
+reads as nearly idle (25% utilization, all of it CUDA from the perception
+models) while `gz sim gui` burns three cores. The camera sensor then holds its
+rate only while spare CPU exists, and collapses as soon as the per-config layer
+adds the mask node.
 
-```
-292% CPU  gz sim gui
-182% CPU  gz sim server
-121% CPU  target_detector_node
- 55% CPU  rviz2
- 19% CPU  Xorg :10 -config xrdp/xorg.conf
- 15% CPU  ffmpeg -f x11grab ... -window_id
-GPU: 25% util, 2632 MHz, 2910 MiB   <- not the constraint
-```
+Sim time keeps advancing normally, so **RTF does not reveal this** -- it stayed
+~0.89 throughout. Only the sensor rate drops.
 
-`Xorg :10 ... xrdp/xorg.conf` is an XRDP session with no hardware GL, so Gazebo
-renders on the CPU and `gz sim gui` alone costs three cores. Add RViz and the
-ffmpeg screen-grab and the camera sensor loses its budget. Sim time keeps
-advancing (RTF stayed ~0.89), so RTF does **not** reveal this — only the sensor
-rate drops.
+### Do not re-derive these
 
-### What to check first
+Each was tested against the collapse and refuted. The camera rate is identical
+at every subscriber in every case, so it is never a subscriber-side fault.
 
-Compare the camera rate against a known-good figure before trusting any timing
-result. `ros2 topic hz` reports nothing here because the stream is best-effort
-and the CLI subscribes reliable by default; use a subscriber with
-`qos_profile_sensor_data`.
+| suspected cause | test | result |
+|---|---|---|
+| detector dropping frames at its subscription | compare detector `rx` to mask node `rx color` over identical windows | identical counts, always |
+| QoS mismatch | both nodes use `qos_profile_sensor_data` | same profile |
+| `ffmpeg` screen-grab | rerun with `record_video:=false` | 4.19 Hz, no change |
+| the default-off timing probe | rerun with `detector_debug:=false` | 3.80 Hz, no change |
+| detector rate / GPU load | rerun at `detector_fps:=4.13`, matching the last healthy run | 3.55 Hz, no change |
+| orphaned processes | `ps` after a clean shutdown | none |
+| CUDA unavailable | `torch.cuda.is_available()` in `perception_venv` | True, models on GPU |
 
-### Mitigation
+Turning off the Gazebo GUI would only reduce a competing rasterizer client; the
+camera would still be rendered in software. Headless is not the fix.
 
-For timing runs on a remote-desktop session, drop the GUI load: `gz_gui:=false`
-and `exploration_rviz:=false` on the environment layer. Note that neither is in
-`ENV_LAYER_CONFIG_KEYS` today, so `target_benchmark_sweep` cannot yet run
-headless from a YAML; a sweep whose purpose is cadence measurement needs them
-added first.
+### Measured, same config and scenario
+
+| run | GL renderer | camera |
+|---|---|---|
+| 2026-09-03 `r1_d_silhouette_monocular` | hardware (implied) | 27.87 Hz |
+| 2026-09-04 `d_silhouette_monocular` | `llvmpipe` | 4.95 Hz |
+| 2026-09-05, video off | `llvmpipe` | 4.19 Hz |
+| 2026-09-05, video off + probe off | `llvmpipe` | 3.80 Hz |
+| 2026-09-05, probe off + forced NVIDIA GLX | **NVIDIA RTX PRO 6000** | **28.07 Hz** |
+
+### How to measure the camera rate
+
+`ros2 topic hz` reports nothing on this stream: it is best-effort and the CLI
+subscribes reliable by default, so the subscription never matches. Use a
+subscriber with `qos_profile_sensor_data`, or read the mask node's
+`depth-match: rx color=` counter across two log lines and divide by the
+timestamp delta.
 
 ## Historical: the detector throttle overshot its own setpoint (fixed 2026-09-04)
 

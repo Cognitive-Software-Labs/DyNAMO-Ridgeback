@@ -71,6 +71,7 @@ CONFIG_LAUNCH_ARGUMENT_NAMES = frozenset({
     'mask_depth_max_meters',
     'mask_gate',
     'depth_match_debug',
+    'record_video',
     'scan_topic',
     'pointcloud_topic',
     'base_frame',

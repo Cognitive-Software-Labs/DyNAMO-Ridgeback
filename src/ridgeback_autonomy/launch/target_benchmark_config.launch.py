@@ -157,6 +157,10 @@ def build_benchmark_nodes(context, *args, **kwargs):
             'mask_gate': LaunchConfiguration('mask_gate'),
             # Recorded, not applied: this records the mask row's actual gate.
             'mask_depth_max_meters': LaunchConfiguration('mask_depth_max_meters'),
+            # The recorder screen-grabs the RViz window, which competes with
+            # the simulator's render path. Turn it off for timing runs and take
+            # visual integrity from a separate smoke run instead.
+            'record_video': LaunchConfiguration('record_video'),
         }],
         remappings=[('/tf', 'tf'), ('/tf_static', 'tf_static')],
         output='screen',
@@ -273,6 +277,14 @@ def generate_launch_description():
             'mask_gate',
             default_value='box',
             description='Mask front-end: box or silhouette',
+        ),
+        DeclareLaunchArgument(
+            'record_video',
+            default_value='true',
+            description=(
+                'Record the RViz window to video/run.mp4. Turn off for timing '
+                'runs: the screen grab competes with the simulator render path'
+            ),
         ),
         DeclareLaunchArgument(
             'depth_match_debug',
