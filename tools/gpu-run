@@ -1,0 +1,42 @@
+#!/bin/sh
+# gpu-run -- run a command with OpenGL routed to the NVIDIA GPU.
+#
+# Remote sessions (xrdp, VNC) have no NVIDIA GLX module, so GLVND falls back to
+# Mesa and Mesa picks llvmpipe: OpenGL renders on the CPU. Harmless for desktop
+# apps, but it silently wrecks Gazebo camera/depth rates -- measured 3.80 Hz
+# against 28.07 Hz on an identical configuration -- while physics, sim time and
+# therefore RTF stay normal, so nothing else in a run reveals it.
+# See docs/ISSUES.md, "Camera rate collapses when X falls back to software
+# rendering".
+#
+# Use this per workload, NOT session-wide. The NVIDIA path renders on the GPU
+# and reads every frame back over PCIe at roughly 290 MB/s, which caps a
+# fullscreen 1920x1080 GL window near 35 FPS -- a win for a small, expensive 3D
+# scene like a simulated sensor, a loss for a large, cheap one like a desktop
+# window. Exporting these variables for a whole session makes ordinary remote
+# apps worse.
+#
+#   gpu-run ros2 run ridgeback_autonomy target_benchmark_sweep <sweep.yaml>
+#   gpu-run gz sim ...
+#   gpu-run                # no args: report which renderer this session gets
+#
+# On a physical seat this is a no-op: NVIDIA GLX is already native there.
+#
+# A host may install its own copy on PATH (this workstation has one at
+# /usr/local/bin/gpu-run). This copy exists so the same fix is reproducible on
+# a machine that does not.
+
+set -eu
+
+if [ "$#" -eq 0 ]; then
+    printf 'without gpu-run: '
+    glxinfo -B 2>/dev/null | sed -n 's/^OpenGL renderer string: //p' \
+        || echo '(glxinfo unavailable -- install mesa-utils)'
+    printf 'with    gpu-run: '
+    __GLX_VENDOR_LIBRARY_NAME=nvidia __NV_PRIME_RENDER_OFFLOAD=1 \
+        glxinfo -B 2>/dev/null | sed -n 's/^OpenGL renderer string: //p' \
+        || echo '(glxinfo unavailable -- install mesa-utils)'
+    exit 0
+fi
+
+exec env __GLX_VENDOR_LIBRARY_NAME=nvidia __NV_PRIME_RENDER_OFFLOAD=1 "$@"

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 import subprocess
 from typing import Any
 
@@ -151,20 +152,39 @@ def gl_renderer_provenance() -> dict[str, Any]:
     return parse_gl_renderer(result.stdout)
 
 
-def software_gl_warning(gl: dict[str, Any]) -> str | None:
-    """The operator-facing warning for a software-rasterized run, or ``None``."""
+def software_gl_warning(
+    gl: dict[str, Any],
+    *,
+    gpu_run_available: bool | None = None,
+) -> str | None:
+    """The operator-facing warning for a software-rasterized run, or ``None``.
+
+    The remedy is a wrapper that scopes the change to one command, never a
+    session-wide export: routing every GL client to NVIDIA pays a per-frame
+    PCIe readback that costs more than software rendering for large,
+    cheap-to-draw windows. A host may install ``gpu-run`` on PATH; where it has
+    not, the repository ships its own copy, so the advice works off this
+    workstation too.
+    """
 
     if not gl.get('software'):
         return None
+    if gpu_run_available is None:
+        gpu_run_available = shutil.which('gpu-run') is not None
+    wrapper = 'gpu-run' if gpu_run_available else 'tools/gpu-run'
+    remedy = (
+        f'Re-run through the GPU wrapper ("{wrapper} ros2 run '
+        'ridgeback_autonomy target_benchmark_sweep ...") rather than exporting '
+        'the variables session-wide'
+    )
     renderer = gl.get('renderer') or 'unknown'
     return (
         f'GL renders in software ("{renderer}"). Gazebo will rasterize every '
         'camera and depth frame on the CPU, so those sensors can run at a '
         'fraction of their configured rate. Sim time and RTF stay normal, so '
         'nothing else in this run will reveal it, and any cadence or coverage '
-        'number it produces may be invalid. Fix with '
-        '"export __GLX_VENDOR_LIBRARY_NAME=nvidia" before launching, then '
-        'confirm with "glxinfo -B | grep renderer".'
+        f'number it produces may be invalid. {remedy}, then confirm with '
+        '"glxinfo -B | grep renderer".'
     )
 
 

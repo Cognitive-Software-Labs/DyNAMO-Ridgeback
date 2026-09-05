@@ -520,10 +520,18 @@ def test_software_gl_is_detected_and_warned_about() -> None:
     assert gl['renderer'].startswith('llvmpipe')
     assert gl['software'] is True
 
-    warning = software_gl_warning(gl)
-    assert 'llvmpipe' in warning
-    # The warning has to name the remedy, not merely the symptom.
-    assert '__GLX_VENDOR_LIBRARY_NAME=nvidia' in warning
+    # The warning has to name the remedy, not merely the symptom, and it must
+    # point at whichever wrapper this host actually has.
+    installed = software_gl_warning(gl, gpu_run_available=True)
+    assert 'llvmpipe' in installed
+    assert 'gpu-run ros2 run' in installed
+
+    shipped = software_gl_warning(gl, gpu_run_available=False)
+    assert 'tools/gpu-run' in shipped
+    # A session-wide export costs more than software rendering for large
+    # windows, so the warning must argue against it rather than hand it over.
+    assert 'export __GLX' not in shipped
+    assert 'rather than exporting' in shipped
 
 
 def test_hardware_gl_produces_no_warning() -> None:
