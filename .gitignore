@@ -25,6 +25,7 @@ src/slam_toolbox/
 # Perception virtual environments
 vlm_venv/
 perception_venv/
+isaac_venv/
 
 # Python cache artifacts
 __pycache__/
