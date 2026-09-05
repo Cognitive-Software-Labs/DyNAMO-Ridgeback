@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  CycloneDDS settings for this workspace.
+
+  Every ROS 2 process joining a domain claims a participant index, and Cyclone
+  only searches up to MaxAutoParticipantIndex before giving up with
+
+      Failed to find a free participant index for domain <N>
+      rmw_create_node: failed to create domain, error Error
+
+  The default ceiling is far below what ridgeback_exploration.launch.py needs:
+  it starts 51 processes, and on the default setting 15 of them failed to
+  create a node. That is not a graceful degradation -- slam_toolbox and the
+  whole Nav2 stack abort with SIGABRT, and the explorer dies with them, so the
+  launch comes up looking alive while navigation is simply absent.
+
+  The benchmark entrypoint stayed under the ceiling, which is why this went
+  unnoticed when CycloneDDS became the default transport.
+
+  Raising the ceiling only widens the range of ports Cyclone probes when it
+  claims an index; it changes no wire behaviour and costs a slightly longer
+  scan in the worst case.
+
+  Set CYCLONEDDS_URI yourself to override this entirely -- the launch files
+  only apply this file when that variable is unset.
+-->
+<CycloneDDS xmlns="https://cdds.io/config">
+  <Domain id="any">
+    <Discovery>
+      <ParticipantIndex>auto</ParticipantIndex>
+      <MaxAutoParticipantIndex>250</MaxAutoParticipantIndex>
+    </Discovery>
+  </Domain>
+</CycloneDDS>

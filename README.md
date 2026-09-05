@@ -269,6 +269,14 @@ benchmark. An explicit `RMW_IMPLEMENTATION` remains authoritative. The rejected
 UDP-only FastDDS experiment is retained in the
 [investigation history](docs/history/exact_stamp_depth_availability.md).
 
+Every launch entrypoint also points `CYCLONEDDS_URI` at
+`config/cyclonedds.xml`, which raises the participant-index ceiling. Exploration
+starts 51 processes and aborts `slam_toolbox`, the whole Nav2 stack and the
+explorer on Cyclone's default — see
+[docs/ISSUES.md](docs/ISSUES.md), "Nav2 and slam_toolbox abort on CycloneDDS's
+participant-index ceiling". Setting `CYCLONEDDS_URI` yourself overrides it; the
+launch files only fill in a value when none exists.
+
 `build_and_start_expl.sh` rebuilds the workspace first, then runs the same exploration quick-start (extra args are forwarded to `start_exploration.sh`):
 
 ```bash

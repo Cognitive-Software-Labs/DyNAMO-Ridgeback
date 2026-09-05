@@ -22,6 +22,7 @@ from ridgeback_autonomy.perception.target_localization.estimator_registry import
 )
 from ridgeback_autonomy.perception.target_localization.launch import (
     SIMULATION_CAMERA_INPUTS,
+    cyclonedds_actions,
     distance_hud_node,
     estimate_viz_node,
     mask_measurement_node,
@@ -207,6 +208,7 @@ def generate_launch_description():
     )
 
     return LaunchDescription([
+        *cyclonedds_actions(pkg_this),
         *perception_venv_actions(pkg_this),
         DeclareLaunchArgument('namespace', default_value='r100_0001'),
         DeclareLaunchArgument('use_sim_time', default_value='true'),

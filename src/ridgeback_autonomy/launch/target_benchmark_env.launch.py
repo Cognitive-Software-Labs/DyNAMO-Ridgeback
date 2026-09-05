@@ -14,6 +14,7 @@ from launch_ros.parameter_descriptions import ParameterValue
 from ridgeback_autonomy.perception.target_localization.launch import (
     RAW_DETECTIONS_TOPIC,
     SIMULATION_CAMERA_INPUTS,
+    cyclonedds_actions,
     perception_venv_actions,
     resolved_camera_inputs,
 )
@@ -57,6 +58,7 @@ def generate_launch_description():
     exploration_rviz = LaunchConfiguration('exploration_rviz')
 
     return LaunchDescription([
+        *cyclonedds_actions(pkg_this),
         *perception_venv_actions(pkg_this),
         # Shared with target_benchmark_config.launch.py. Keep these defaults
         # byte-identical: the first declaration inherited by a wrapper wins.

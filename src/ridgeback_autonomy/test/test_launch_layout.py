@@ -283,6 +283,47 @@ def test_benchmark_wrapper_only_composes_the_two_layers() -> None:
     assert "'shutdown_on_complete'" in wrapper_text
 
 
+def test_every_entrypoint_supplies_the_cyclonedds_configuration() -> None:
+    """Exploration aborts on Cyclone's default participant-index ceiling.
+
+    It starts 51 processes; on the default setting slam_toolbox and the whole
+    Nav2 stack died with "failed to find a free participant index". Each
+    entrypoint is launched as its own process -- the sweep supervisor starts
+    the environment and per-config layers separately -- so each has to supply
+    the configuration itself rather than inherit it from a sibling.
+    """
+
+    launch_dir = Path(__file__).resolve().parents[1] / 'launch'
+    for name in (
+        'ridgeback_exploration.launch.py',
+        'target_benchmark_env.launch.py',
+        'target_benchmark_config.launch.py',
+    ):
+        text = (launch_dir / name).read_text(encoding='utf-8')
+        assert 'cyclonedds_actions(pkg_this)' in text, name
+
+
+def test_cyclonedds_configuration_yields_to_an_operator_setting(tmp_path, monkeypatch) -> None:
+    from ridgeback_autonomy.perception.target_localization.launch import cyclonedds_actions
+
+    share = tmp_path / 'share'
+    (share / 'config').mkdir(parents=True)
+    config = share / 'config' / 'cyclonedds.xml'
+    config.write_text('<CycloneDDS/>', encoding='utf-8')
+
+    monkeypatch.delenv('CYCLONEDDS_URI', raising=False)
+    actions = cyclonedds_actions(str(share))
+    assert len(actions) == 1
+
+    # A configuration someone chose deliberately must not be discarded.
+    monkeypatch.setenv('CYCLONEDDS_URI', '/etc/mine.xml')
+    assert cyclonedds_actions(str(share)) == []
+
+    # Nor may a missing file leave CYCLONEDDS_URI pointing at nothing.
+    monkeypatch.delenv('CYCLONEDDS_URI', raising=False)
+    assert cyclonedds_actions(str(tmp_path / 'absent')) == []
+
+
 def test_benchmark_environment_owns_detector_and_config_is_readiness_gated() -> None:
     launch_dir = Path(__file__).resolve().parents[1] / 'launch'
     env_text = (launch_dir / 'target_benchmark_env.launch.py').read_text(encoding='utf-8')

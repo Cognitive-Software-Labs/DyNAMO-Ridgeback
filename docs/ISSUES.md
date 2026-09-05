@@ -77,6 +77,54 @@ During exploration runs, Gazebo may occasionally log `platform_velocity_controll
 
 This is usually ROS/Gazebo timing jitter around Clearpath's generated `reference_timeout: 0.1` in `/home/deivid/clearpath/platform/config/control.yaml`. Do not change the generated Clearpath controller config as a first response. First check whether Nav2 retarget churn or collision-monitor approach flicker is causing irregular command timing, then instrument `/cmd_vel`, `/cmd_vel_smoothed`, `/platform/cmd_vel`, sim-time rate, and controller update timing if the warnings remain frequent after startup.
 
+## Nav2 and slam_toolbox abort on CycloneDDS's participant-index ceiling
+
+### Symptom
+
+`ridgeback_exploration.launch.py` comes up with Gazebo, the detector and RViz
+alive while navigation is simply absent. The first sign is not a death but a
+node-creation failure:
+
+```
+Failed to find a free participant index for domain 106
+[ERROR] [rmw_cyclonedds_cpp]: rmw_create_node: failed to create domain, error Error
+```
+
+`slam_toolbox`, every Nav2 server and `explore_lite` then abort with SIGABRT
+(`exit code -6`), and the readiness gates die with them. Measured on a default
+configuration: **51 processes started, 15 failed to create a node.**
+
+### Root cause
+
+Each ROS 2 process claims a CycloneDDS participant index, and Cyclone only
+probes up to `MaxAutoParticipantIndex` before failing. The default ceiling sits
+below what exploration needs. The benchmark entrypoint starts far fewer
+processes and stays under it, which is why this survived the switch to
+CycloneDDS unnoticed — exploration had not been run in simulation since.
+
+### Fix
+
+`config/cyclonedds.xml` raises the ceiling, and all three entrypoints apply it
+through `cyclonedds_actions()`. Each entrypoint sets it for itself because the
+sweep supervisor starts the environment and per-config layers as separate
+processes; neither inherits from the other.
+
+It defers to an operator: if `CYCLONEDDS_URI` is already set, the launch files
+leave it alone rather than discard a configuration someone chose. To override,
+export your own before launching.
+
+Raising the ceiling only widens the range of ports probed when claiming an
+index. It changes no wire behaviour.
+
+### If it comes back
+
+Check the variable actually reached the nodes — an entrypoint launched by hand
+from a shell that exports an unrelated `CYCLONEDDS_URI` will use that instead:
+
+```bash
+echo "${CYCLONEDDS_URI:-<unset>}"
+```
+
 ## Camera rate collapses when X falls back to software rendering
 
 ### Check this first

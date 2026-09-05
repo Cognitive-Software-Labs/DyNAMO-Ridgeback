@@ -114,6 +114,30 @@ def perception_venv_actions(package_share: str):
     ]
 
 
+def cyclonedds_actions(package_share: str):
+    """Point CycloneDDS at this workspace's config, unless one is already set.
+
+    Cyclone's default participant-index ceiling is below what exploration
+    needs: it starts 51 processes, and on the default setting slam_toolbox and
+    the entire Nav2 stack abort with "failed to find a free participant index".
+    The benchmark stays under the ceiling, which is why the default survived
+    the switch to CycloneDDS unnoticed.
+
+    An operator who has already chosen a configuration keeps it -- this only
+    fills in a value where none exists, so it cannot silently discard tuning
+    that someone set deliberately.
+    """
+
+    from launch.actions import SetEnvironmentVariable
+
+    if os.environ.get('CYCLONEDDS_URI'):
+        return []
+    config = os.path.join(package_share, 'config', 'cyclonedds.xml')
+    if not os.path.isfile(config):
+        return []
+    return [SetEnvironmentVariable('CYCLONEDDS_URI', config)]
+
+
 def _measurement_parameters(wiring: dict, tuning: dict) -> list:
     """Fixed topic wiring plus whichever tuning values the caller supplied.
 

@@ -31,6 +31,7 @@ from ridgeback_autonomy.perception.target_localization.launch import (
     POINTCLOUD_MEASUREMENTS_TOPIC,
     RAW_DETECTIONS_TOPIC,
     SIMULATION_CAMERA_INPUTS,
+    cyclonedds_actions,
     distance_hud_node,
     estimate_viz_node,
     mask_measurement_node,
@@ -316,6 +317,7 @@ def generate_launch_description():
     return LaunchDescription([
         # A sweep starts this launch in a separate process from the environment,
         # so its children need their own copy of the venv environment actions.
+        *cyclonedds_actions(pkg_this),
         *perception_venv_actions(pkg_this),
         *arguments,
         OpaqueFunction(function=build_readiness_gate),
