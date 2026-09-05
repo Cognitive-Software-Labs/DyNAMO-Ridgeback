@@ -11,6 +11,7 @@ from launch.event_handlers import OnProcessExit
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
+from launch_ros.parameter_descriptions import ParameterValue
 
 from ridgeback_autonomy.perception.target_localization.estimator_registry import (
     parse_estimators,
@@ -85,6 +86,11 @@ def build_target_localization_nodes(context, *args, **kwargs):
         parameters=[{
             'use_sim_time': use_sim_time,
             'color_topic': camera_inputs.color_image_topic,
+            # Typed explicitly: the node declares a double, so an integer
+            # spelling like ``detector_fps:=10`` would otherwise be rejected.
+            'detector_fps': ParameterValue(
+                LaunchConfiguration('detector_fps'), value_type=float),
+            'detector_debug': LaunchConfiguration('detector_debug'),
         }],
         remappings=[('/tf', 'tf'), ('/tf_static', 'tf_static')],
         output='screen',
@@ -233,6 +239,15 @@ def generate_launch_description():
                                           'comma-separated subset of pointcloud, '
                                           'projective_ranging, euclidean_reconstruction, '
                                           'polar_profiling'),
+        DeclareLaunchArgument('detector_fps', default_value='10.0',
+                              description='Upper bound on detection rate, in frames per '
+                                          'second; every measurement row inherits this '
+                                          'cadence'),
+        DeclareLaunchArgument('detector_debug', default_value='false',
+                              description='Default-off detector evidence logging: achieved '
+                                          'cadence, superseded frames, and bounded cold/warm '
+                                          'percentiles for the throttle wait, decode, '
+                                          'inference, parse, publish and CUDA synchronization'),
         DeclareLaunchArgument('depth_source', default_value='stereoscopic',
                               description='Aligned depth source for the mask rows: '
                                           'stereoscopic or monocular'),

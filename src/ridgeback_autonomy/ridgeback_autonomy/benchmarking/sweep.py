@@ -23,9 +23,16 @@ from ridgeback_autonomy.benchmarking.scenarios import load_scenarios
 PATH_SAFE_NAME = re.compile(r'^[A-Za-z0-9][A-Za-z0-9._-]*$')
 TOP_LEVEL_KEYS = frozenset({'sweep', 'defaults', 'configs'})
 SWEEP_METADATA_KEYS = frozenset({'name', 'description'})
-# setup_path belongs only to the environment launch, but is legal as a
-# sweep-wide default so an installation can select its Clearpath setup once.
-SWEEP_DEFAULT_ARGUMENT_NAMES = CONFIG_LAUNCH_ARGUMENT_NAMES | frozenset({'setup_path'})
+# These belong only to the environment launch, but are legal as sweep-wide
+# defaults: an installation selects its Clearpath setup once, and the detector
+# rate and its diagnostic are fixed for the life of the persistent layer.
+ENVIRONMENT_ONLY_DEFAULT_NAMES = frozenset({
+    'setup_path',
+    'detector_fps',
+    'detector_debug',
+})
+SWEEP_DEFAULT_ARGUMENT_NAMES = (
+    CONFIG_LAUNCH_ARGUMENT_NAMES | ENVIRONMENT_ONLY_DEFAULT_NAMES)
 
 # Only explicit per-config keys are checked. A defaults block may intentionally
 # spell every axis once while legacy configurations inherit knobs they never

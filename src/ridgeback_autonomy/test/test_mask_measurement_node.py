@@ -45,13 +45,15 @@ from ridgeback_autonomy.perception.target_localization.measurement_pipeline impo
     resolve_enabled_estimators,
     resolve_mask_gate,
 )
-from ridgeback_autonomy.perception.target_localization.synchronization import (
-    DEPTH_MATCH_RECORD_LIMIT,
+from ridgeback_autonomy.perception.target_localization.core.timing import (
     TIMING_COLD_SAMPLE_COUNT,
     TIMING_SAMPLE_LIMIT,
+    TimingStats,
+)
+from ridgeback_autonomy.perception.target_localization.synchronization import (
+    DEPTH_MATCH_RECORD_LIMIT,
     DepthMatchDiagnostics,
     StampedMessageBuffer,
-    TimingStats,
 )
 
 target_mask_measurement_node = mask_measurement_node

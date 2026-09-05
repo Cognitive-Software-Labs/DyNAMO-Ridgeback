@@ -84,6 +84,11 @@ ENV_LAYER_CONFIG_KEYS = frozenset({
     'namespace',
     'use_sim_time',
     'color_topic',
+    # The detector lives in the persistent layer, so its rate and diagnostic
+    # are properties of a whole sweep. A per-config value would silently apply
+    # to every other config too.
+    'detector_fps',
+    'detector_debug',
 })
 
 

@@ -102,6 +102,7 @@ def test_packaged_modules_import() -> None:
         'ridgeback_autonomy.perception.target_localization.core.polar_profiling',
         'ridgeback_autonomy.perception.target_localization.core.vehicle_frame',
         'ridgeback_autonomy.perception.target_localization.core.rendering',
+        'ridgeback_autonomy.perception.target_localization.core.timing',
         'ridgeback_autonomy.perception.target_localization.contracts',
         'ridgeback_autonomy.perception.target_localization.hud_rendering',
         'ridgeback_autonomy.perception.target_localization.marker_rendering',

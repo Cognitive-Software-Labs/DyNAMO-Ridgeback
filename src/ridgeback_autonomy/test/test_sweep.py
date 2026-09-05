@@ -64,13 +64,40 @@ def test_sweep_rejects_duplicate_and_unsafe_names(tmp_path) -> None:
 
 
 @pytest.mark.parametrize(
-    'field', ['world', 'setup_path', 'namespace', 'use_sim_time', 'color_topic'])
+    'field',
+    [
+        'world', 'setup_path', 'namespace', 'use_sim_time', 'color_topic',
+        'detector_fps', 'detector_debug',
+    ],
+)
 def test_sweep_rejects_environment_key_on_config(tmp_path, field) -> None:
     document = _document(tmp_path)
     document['configs'][0][field] = 'changed'
 
     with pytest.raises(ValueError, match=rf'field "{field}" belongs to the persistent environment'):
         parse_sweep(document)
+
+
+@pytest.mark.parametrize(
+    ('field', 'value', 'expected'),
+    [('detector_fps', 5.0, '5.0'), ('detector_debug', True, 'true')])
+def test_sweep_accepts_detector_settings_as_defaults(
+    tmp_path, field, value, expected,
+) -> None:
+    """The detector belongs to the layer that outlives every configuration.
+
+    Its rate and diagnostic are therefore sweep-wide: legal in ``defaults``,
+    rejected per config (above), and forwarded to the environment launch rather
+    than to the per-config one.
+    """
+
+    document = _document(tmp_path)
+    document['defaults'][field] = value
+
+    spec = parse_sweep(document)
+
+    assert spec.defaults[field] == expected
+    assert field not in spec.configs[0].arguments
 
 
 @pytest.mark.parametrize(

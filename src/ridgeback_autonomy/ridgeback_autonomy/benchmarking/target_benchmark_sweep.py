@@ -32,7 +32,12 @@ from ridgeback_autonomy.benchmarking.paths import (
     subprocess_log_environment,
 )
 from ridgeback_autonomy.benchmarking.scenarios import load_scenarios
-from ridgeback_autonomy.benchmarking.sweep import SweepConfig, SweepSpec, load_sweep
+from ridgeback_autonomy.benchmarking.sweep import (
+    ENVIRONMENT_ONLY_DEFAULT_NAMES,
+    SweepConfig,
+    SweepSpec,
+    load_sweep,
+)
 from ridgeback_autonomy.benchmarking.sweep_report import load_json, write_sweep_report
 
 
@@ -167,8 +172,11 @@ def _launch_argument_tokens(arguments: dict[str, str]) -> list[str]:
 
 def _environment_command(spec: SweepSpec) -> list[str]:
     arguments = _shared_arguments(spec)
-    if 'setup_path' in spec.defaults:
-        arguments['setup_path'] = spec.defaults['setup_path']
+    # Sorted so the recorded command is byte-identical between runs of the
+    # same sweep; a frozenset's iteration order is not stable across processes.
+    for name in sorted(ENVIRONMENT_ONLY_DEFAULT_NAMES):
+        if name in spec.defaults:
+            arguments[name] = spec.defaults[name]
     return [
         'ros2', 'launch', 'ridgeback_autonomy', 'target_benchmark_env.launch.py',
         *_launch_argument_tokens(arguments),

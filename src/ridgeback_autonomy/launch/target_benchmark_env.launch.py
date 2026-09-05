@@ -9,6 +9,7 @@ from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, Opaq
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
+from launch_ros.parameter_descriptions import ParameterValue
 
 from ridgeback_autonomy.perception.target_localization.launch import (
     RAW_DETECTIONS_TOPIC,
@@ -31,6 +32,11 @@ def build_detector(context, *args, **kwargs):
             'use_sim_time': LaunchConfiguration('use_sim_time'),
             'color_topic': inputs.color_image_topic,
             'detections_topic': RAW_DETECTIONS_TOPIC,
+            # Typed explicitly: the node declares a double, so an integer
+            # spelling like ``detector_fps:=10`` would otherwise be rejected.
+            'detector_fps': ParameterValue(
+                LaunchConfiguration('detector_fps'), value_type=float),
+            'detector_debug': LaunchConfiguration('detector_debug'),
         }],
         remappings=[('/tf', 'tf'), ('/tf_static', 'tf_static')],
         output='screen',
@@ -67,6 +73,23 @@ def generate_launch_description():
             'exploration_rviz',
             default_value='true',
             description='Launch the persistent benchmark RViz2 window',
+        ),
+        # The detector belongs to this persistent layer, so its rate is fixed
+        # for a whole sweep: a per-config layer cannot change it.
+        DeclareLaunchArgument(
+            'detector_fps',
+            default_value='10.0',
+            description='Upper bound on detection rate, in frames per second',
+        ),
+        DeclareLaunchArgument(
+            'detector_debug',
+            default_value='false',
+            description=(
+                'Default-off detector evidence logging: achieved cadence, '
+                'superseded frames, and bounded cold/warm percentiles for the '
+                'throttle wait, decode, inference, parse, publish and CUDA '
+                'synchronization'
+            ),
         ),
 
         Node(

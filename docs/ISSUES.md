@@ -77,6 +77,121 @@ During exploration runs, Gazebo may occasionally log `platform_velocity_controll
 
 This is usually ROS/Gazebo timing jitter around Clearpath's generated `reference_timeout: 0.1` in `/home/deivid/clearpath/platform/config/control.yaml`. Do not change the generated Clearpath controller config as a first response. First check whether Nav2 retarget churn or collision-monitor approach flicker is causing irregular command timing, then instrument `/cmd_vel`, `/cmd_vel_smoothed`, `/platform/cmd_vel`, sim-time rate, and controller update timing if the warnings remain frequent after startup.
 
+## Camera rate collapses under GUI contention on a remote-desktop session
+
+### Symptom
+
+The simulated camera publishes at ~4–6 Hz instead of ~28 Hz. Every subscriber
+sees the identical reduced count, so it looks like a subscriber or QoS fault and
+is not one. Downstream this caps the detector at the camera rate no matter what
+`detector_fps` says, which silently invalidates any cadence measurement.
+
+### Measured
+
+Same config, same scenario, comparable spans:
+
+| run | camera rate |
+|---|---|
+| 2026-09-03 sweep, `r1_d_silhouette_monocular` | 27.87 Hz |
+| 2026-09-04 sweep, `d_silhouette_monocular` | 4.95 Hz |
+| 2026-09-04, environment layer alone | 27.92 Hz |
+
+The environment layer on its own is healthy. The collapse needs the per-config
+layer on top of it.
+
+### Root cause
+
+CPU starvation of Gazebo's render path, not GPU and not ROS. Sampled during the
+degraded state:
+
+```
+292% CPU  gz sim gui
+182% CPU  gz sim server
+121% CPU  target_detector_node
+ 55% CPU  rviz2
+ 19% CPU  Xorg :10 -config xrdp/xorg.conf
+ 15% CPU  ffmpeg -f x11grab ... -window_id
+GPU: 25% util, 2632 MHz, 2910 MiB   <- not the constraint
+```
+
+`Xorg :10 ... xrdp/xorg.conf` is an XRDP session with no hardware GL, so Gazebo
+renders on the CPU and `gz sim gui` alone costs three cores. Add RViz and the
+ffmpeg screen-grab and the camera sensor loses its budget. Sim time keeps
+advancing (RTF stayed ~0.89), so RTF does **not** reveal this — only the sensor
+rate drops.
+
+### What to check first
+
+Compare the camera rate against a known-good figure before trusting any timing
+result. `ros2 topic hz` reports nothing here because the stream is best-effort
+and the CLI subscribes reliable by default; use a subscriber with
+`qos_profile_sensor_data`.
+
+### Mitigation
+
+For timing runs on a remote-desktop session, drop the GUI load: `gz_gui:=false`
+and `exploration_rviz:=false` on the environment layer. Note that neither is in
+`ENV_LAYER_CONFIG_KEYS` today, so `target_benchmark_sweep` cannot yet run
+headless from a YAML; a sweep whose purpose is cadence measurement needs them
+added first.
+
+## Historical: the detector throttle overshot its own setpoint (fixed 2026-09-04)
+
+### Problem
+
+`detector_fps` was documented and read as a rate, but the achieved rate sat
+consistently under it. The 2026-09-03 model-concurrency sweep measured a
+detection interarrival of **242.0 ms warm p50** across all twelve matrix
+configurations (spread 0.56 ms) from a `detector_fps: 5.0` setting whose period
+is 200 ms — 4.13 Hz delivered against a 5.0 Hz setpoint, 17% short.
+
+### Root cause
+
+`processing_loop` advanced its clock *after* the detection step:
+
+```python
+next_allowed_time = self.last_detection_time + self.detector_period
+...sleep...
+self.run_detection_step(color_msg)
+self.last_detection_time = time.monotonic()   # after the work
+```
+
+That makes the period a **gap between a step ending and the next beginning**,
+so the cycle is `configured_period + inference`, not `configured_period`. The
+overshoot is exactly one inference: 242 − 200 = ~42 ms.
+
+### Why it stayed hidden
+
+Nothing measured the detector from inside. Its cost could only be inferred from
+the gap seen by a downstream consumer, and that gap conflates inference with the
+deliberate throttle wait — so a period longer than the setpoint read as "the
+model is slow" rather than "the schedule is wrong". The two are now separate
+stages (`gate_wait` versus `detector_step`) under `detector_debug`.
+
+### Fix
+
+Advance the clock before the step, making the period a floor on step *starts*.
+The achieved period becomes `max(configured_period, inference)`, which both
+hits the setpoint when there is headroom and degrades gracefully without a
+hot-loop when there is not. Measured with a 40 ms stub inference:
+
+| configured | achieved period p50 | achieved rate |
+|---|---|---|
+| 5 Hz (200 ms) | 200.09 ms | 5.00 Hz |
+| 10 Hz (100 ms) | 100.05 ms | 9.99 Hz |
+| 40 Hz (25 ms) | 40.41 ms | 24.74 Hz (inference-bound, as expected) |
+
+Advancing before the step also preserves the older guarantee it was written for:
+a frame that always raises still waits a full period and cannot hot-loop.
+
+### Reading the diagnostic
+
+`detector_debug:=true` logs achieved cadence and per-stage percentiles every
+`detector_debug_period_s`. `gate_wait` near zero means the throttle is no longer
+the limiter and the detector has become inference-bound; `superseded` counts
+camera frames dropped by the latest-wins slot, which is by design whenever the
+camera outruns the detector.
+
 ## Historical: slam_toolbox TF Namespace Issue
 
 This project requires `patches/slam_toolbox_tf_namespace.patch` because `slam_toolbox` otherwise fails in a namespaced Clearpath setup.

@@ -3,18 +3,19 @@
 from __future__ import annotations
 
 from collections import OrderedDict, deque
-from dataclasses import dataclass, field
-import math
+from dataclasses import dataclass
 import time
 
 import numpy as np
 from sensor_msgs.msg import Image
 
 from ridgeback_autonomy.common.stamps import stamp_key
+from ridgeback_autonomy.perception.target_localization.core.timing import TimingStats
 
-# ~0.5 s of color frames at 30 fps -- comfortably above the detector latency
-# (~200 ms at 5 FPS), so the exact-stamp lookup only misses when the pipeline
-# is genuinely stalled.
+# ~0.5 s of color frames at 30 fps -- comfortably above the detector's
+# publish latency, so the exact-stamp lookup only misses when the pipeline is
+# genuinely stalled. The margin widens, never narrows, as the detector rate
+# rises: a faster detector reaches each frame sooner after it is buffered.
 COLOR_BUFFER_DEPTH_DEFAULT = 15
 
 # Depth input and scans are buffered across detector latency plus jitter. Depth
@@ -24,8 +25,6 @@ DEPTH_MATCH_BUFFER_DEPTH = 15
 SCAN_MATCH_BUFFER_DEPTH = 20
 SCAN_MATCH_TOLERANCE_S_DEFAULT = 0.05
 DEPTH_MATCH_RECORD_LIMIT = 256
-TIMING_SAMPLE_LIMIT = 512
-TIMING_COLD_SAMPLE_COUNT = 5
 TIMING_STAGE_NAMES = (
     'slimsam_load',
     'rgb_prepare',
@@ -55,65 +54,6 @@ class DepthMissRecord:
     placement: str
     nearest_delta_ns: int | None
     arrival_monotonic_ns: int | None = None
-
-
-@dataclass
-class TimingStats:
-    """Constant-space cold/warm timing summary in nanoseconds."""
-
-    count: int = 0
-    total_ns: int = 0
-    max_ns: int = 0
-    first_ns: int | None = None
-    cold_samples_ns: list[int] = field(default_factory=list)
-    samples_ns: deque[int] = field(
-        default_factory=lambda: deque(maxlen=TIMING_SAMPLE_LIMIT))
-
-    def record(self, elapsed_ns: int) -> None:
-        elapsed_ns = max(0, int(elapsed_ns))
-        if self.first_ns is None:
-            self.first_ns = elapsed_ns
-        if len(self.cold_samples_ns) < TIMING_COLD_SAMPLE_COUNT:
-            self.cold_samples_ns.append(elapsed_ns)
-        self.count += 1
-        self.total_ns += elapsed_ns
-        self.max_ns = max(self.max_ns, elapsed_ns)
-        self.samples_ns.append(elapsed_ns)
-
-    @staticmethod
-    def _percentile(values: list[int], fraction: float) -> int:
-        """Nearest-rank percentile for a non-empty sample."""
-
-        ordered = sorted(values)
-        index = max(0, math.ceil(fraction * len(ordered)) - 1)
-        return ordered[index]
-
-    def format_ms(self) -> str:
-        if not self.count:
-            return 'n/a'
-        # Early calls may include lazy model loading, allocator setup, and
-        # kernel warm-up. Keep the first five visible but exclude them from the
-        # warm distribution. Once the bounded deque rolls over, every retained
-        # sample at or beyond index five is warm.
-        retained = list(self.samples_ns)
-        oldest_retained_index = self.count - len(retained)
-        cold_values_still_retained = max(
-            0, TIMING_COLD_SAMPLE_COUNT - oldest_retained_index)
-        warm = retained[cold_values_still_retained:]
-        if warm:
-            warm_mean_ms = sum(warm) / len(warm) / 1e6
-            warm_text = (
-                f'warm_n={len(warm)} warm_mean={warm_mean_ms:.3f} '
-                f'warm_p50={self._percentile(warm, 0.50) / 1e6:.3f} '
-                f'warm_p95={self._percentile(warm, 0.95) / 1e6:.3f} '
-                f'warm_p99={self._percentile(warm, 0.99) / 1e6:.3f}')
-        else:
-            warm_text = 'warm_n=0 warm_mean=n/a warm_p50=n/a warm_p95=n/a warm_p99=n/a'
-        cold_text = ','.join(
-            f'{value / 1e6:.3f}' for value in self.cold_samples_ns)
-        return (
-            f'count={self.count} first={self.first_ns / 1e6:.3f} '
-            f'cold_ms=[{cold_text}] {warm_text} max={self.max_ns / 1e6:.3f}')
 
 
 class StampedMessageBuffer:
