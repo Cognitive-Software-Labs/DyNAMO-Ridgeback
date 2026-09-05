@@ -30,6 +30,9 @@ implementations or committed backlog work.
 - [Segmentation](do_not_try_again/segmentation.md)
 - [Foreground isolation](do_not_try_again/foreground_isolation.md)
 - [Exact-stamp depth delivery](do_not_try_again/exact_stamp_depth_delivery.md)
+- [Monocular depth error](do_not_try_again/monocular_depth_error.md) — the ~9x
+  gap against `stereoscopic` is **not a bug**: that baseline is a noise-free
+  ground-truth render. Reopen only on the Isaac Sim migration
 
 ## Active plans
 
