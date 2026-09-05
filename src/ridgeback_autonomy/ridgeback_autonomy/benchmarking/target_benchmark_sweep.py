@@ -23,7 +23,9 @@ from ridgeback_autonomy.perception.target_localization.launch import (
 from ridgeback_autonomy.benchmarking.process_utils import (
     extract_json_payload,
     git_provenance,
+    gl_renderer_provenance,
     run_command,
+    software_gl_warning,
     try_command,
 )
 from ridgeback_autonomy.benchmarking.report import markdown_table
@@ -140,6 +142,11 @@ def print_dry_run(configs: tuple[SweepConfig, ...], default_scenario_path: str) 
     ))
     print(f'\n{len(configs)} configs resolved; estimated sweep wall time: '
           f'{_format_hours(total_seconds)} ({TRIAL_WALL_TIME_SEC:.1f} s/trial).')
+    # Reported on the dry run too, so the renderer can be corrected before
+    # committing hours to a sweep whose sensor rates would be invalid.
+    warning = software_gl_warning(gl_renderer_provenance())
+    if warning is not None:
+        print(f'\nWARNING: {warning}')
 
 
 def _shared_arguments(spec: SweepSpec) -> dict[str, str]:
@@ -279,6 +286,10 @@ def _new_manifest(
             'finished': None,
         },
         'provenance': git_provenance(workspace_root),
+        # Records whether the simulator rasterized on the CPU. Without it a
+        # run that produced a fraction of its configured sensor rate is
+        # indistinguishable, after the fact, from a healthy one.
+        'gl': gl_renderer_provenance(),
         'defaults': dict(spec.defaults),
         'selected_configs': [config.name for config in configs],
         'resume_signature': _resume_signature(spec, configs),
@@ -584,6 +595,13 @@ def run_sweep(
         _log(f'Resuming incomplete sweep {sweep_dir}')
     _write_manifest(sweep_dir, manifest)
     write_sweep_report(sweep_dir, manifest)
+
+    # Last point before Gazebo starts. A software rasterizer does not fail the
+    # run, it quietly reduces every rendered sensor, so say so loudly here as
+    # well as recording it in the manifest.
+    gl_warning = software_gl_warning(manifest.get('gl') or {})
+    if gl_warning is not None:
+        _log(f'WARNING: {gl_warning}')
 
     environment: subprocess.Popen | None = None
     current_config_process: subprocess.Popen | None = None

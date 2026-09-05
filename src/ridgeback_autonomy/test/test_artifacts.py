@@ -119,6 +119,9 @@ def test_sweep_routes_output_and_child_logs_without_changing_commands(tmp_path, 
     monkeypatch.setattr(sweep.subprocess, 'Popen', FakeProcess)
     monkeypatch.setattr(sweep.time, 'sleep', lambda _: None)
     monkeypatch.setattr(sweep, 'git_provenance', lambda _: {})
+    # Probing the real GL stack would spawn a subprocess through the
+    # patched Popen and land in the launch-command fake below.
+    monkeypatch.setattr(sweep, 'gl_renderer_provenance', lambda: {})
     monkeypatch.setattr(sweep, 'stop_process_group', lambda *_: None)
     monkeypatch.setattr(sweep, 'reap_orphan_benchmark_entities', lambda _: [])
     monkeypatch.setattr(sweep, 'sample_real_time_factor', lambda: 1.0)
@@ -157,6 +160,9 @@ def test_relocated_sweep_keeps_resume_and_report_inputs(tmp_path, monkeypatch):
     (run / 'run.json').write_text(json.dumps(document))
     original_bytes = (run / 'run.json').read_bytes()
     monkeypatch.setattr(sweep, 'git_provenance', lambda _: {})
+    # Probing the real GL stack would spawn a subprocess through the
+    # patched Popen and land in the launch-command fake below.
+    monkeypatch.setattr(sweep, 'gl_renderer_provenance', lambda: {})
     manifest = sweep._new_manifest(spec, spec.configs, str(old), str(tmp_path))
     assert manifest['sweep']['source_sha256'] == hashlib.sha256(
         sweep_source.read_bytes()).hexdigest()

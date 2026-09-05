@@ -8,6 +8,10 @@ from typing import Any
 
 
 GIT_TIMEOUT_SEC = 5.0
+GLXINFO_TIMEOUT_SEC = 10.0
+# Mesa's CPU rasterizers. A remote display session (xrdp, VNC, Xvfb) has no
+# GPU attached to its X server and resolves GL to one of these.
+SOFTWARE_GL_RENDERERS = ('llvmpipe', 'softpipe', 'swrast', 'lavapipe')
 
 
 def extract_json_payload(text: str) -> dict[str, Any]:
@@ -95,6 +99,73 @@ def git_provenance(repo_dir: str) -> dict[str, Any]:
             else len([line for line in status.splitlines() if line.strip()])
         ),
     }
+
+
+def parse_gl_renderer(text: str) -> dict[str, Any]:
+    """Pull vendor/renderer out of ``glxinfo`` output and classify it.
+
+    Split from the subprocess call so the classification can be asserted
+    without a GL stack present.
+    """
+
+    vendor = renderer = None
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped.startswith('OpenGL vendor string:'):
+            vendor = stripped.split(':', 1)[1].strip()
+        elif stripped.startswith('OpenGL renderer string:'):
+            renderer = stripped.split(':', 1)[1].strip()
+    software = None
+    if renderer is not None:
+        lowered = renderer.lower()
+        software = any(name in lowered for name in SOFTWARE_GL_RENDERERS)
+    return {'vendor': vendor, 'renderer': renderer, 'software': software}
+
+
+def gl_renderer_provenance() -> dict[str, Any]:
+    """Best-effort GL renderer, and whether it is a CPU rasterizer.
+
+    This belongs beside the commit in a benchmark's provenance because it
+    silently decides whether the result is usable. A remote display session
+    resolves GL to Mesa software, and the simulator then rasterizes every
+    camera and depth frame on the CPU: those sensors collapse to a fraction of
+    their configured rate while physics, sim time and therefore **RTF stay
+    normal**. Nothing else in the recorded metrics reveals it, so a run can
+    look healthy and still carry cadence and coverage numbers that are wrong.
+    """
+
+    try:
+        result = subprocess.run(
+            ['glxinfo', '-B'],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=GLXINFO_TIMEOUT_SEC,
+        )
+    except (OSError, subprocess.SubprocessError):
+        # glxinfo absent (mesa-utils not installed) or DISPLAY unreachable.
+        # Unknown is reported as unknown; it is not evidence of either state.
+        return {'vendor': None, 'renderer': None, 'software': None}
+    if result.returncode != 0:
+        return {'vendor': None, 'renderer': None, 'software': None}
+    return parse_gl_renderer(result.stdout)
+
+
+def software_gl_warning(gl: dict[str, Any]) -> str | None:
+    """The operator-facing warning for a software-rasterized run, or ``None``."""
+
+    if not gl.get('software'):
+        return None
+    renderer = gl.get('renderer') or 'unknown'
+    return (
+        f'GL renders in software ("{renderer}"). Gazebo will rasterize every '
+        'camera and depth frame on the CPU, so those sensors can run at a '
+        'fraction of their configured rate. Sim time and RTF stay normal, so '
+        'nothing else in this run will reveal it, and any cadence or coverage '
+        'number it produces may be invalid. Fix with '
+        '"export __GLX_VENDOR_LIBRARY_NAME=nvidia" before launching, then '
+        'confirm with "glxinfo -B | grep renderer".'
+    )
 
 
 def format_commit(provenance: dict[str, Any]) -> str:

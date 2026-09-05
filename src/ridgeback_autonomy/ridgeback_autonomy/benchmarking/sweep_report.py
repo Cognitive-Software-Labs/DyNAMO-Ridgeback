@@ -125,6 +125,14 @@ def render_sweep_report(manifest: dict, sweep_dir: str) -> str:
         'Commit': str(commit),
         'Branch': str(provenance.get('branch') or 'unknown'),
     }
+    # Only surfaced when it invalidates the numbers below it. A run rendered in
+    # software produced a fraction of its configured sensor rate, and no other
+    # recorded metric shows that -- RTF stays normal.
+    gl = manifest.get('gl') or {}
+    if gl.get('software'):
+        metadata['GL renderer'] = (
+            f'{gl.get("renderer") or "unknown"} — SOFTWARE RASTERIZER; '
+            'sensor rates and coverage in this run are not trustworthy')
 
     table_rows = [
         [

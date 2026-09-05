@@ -29,6 +29,8 @@ from ridgeback_autonomy.benchmarking.process_utils import (
     extract_json_payload,
     format_commit,
     git_provenance,
+    parse_gl_renderer,
+    software_gl_warning,
 )
 from ridgeback_autonomy.perception.target_localization.ground_truth import (
     ground_truth_point_message,
@@ -486,6 +488,60 @@ def test_runner_uses_explicit_run_dir_name_verbatim(tmp_path) -> None:
         if node is not None:
             node.destroy_node()
         rclpy.shutdown()
+
+
+SOFTWARE_GLXINFO = """\
+name of display: :10.0
+direct rendering: Yes
+OpenGL vendor string: Mesa
+OpenGL renderer string: llvmpipe (LLVM 20.1.2, 256 bits)
+OpenGL version string: 4.5 (Compatibility Profile) Mesa 25.0.7
+"""
+
+HARDWARE_GLXINFO = """\
+name of display: :10.0
+direct rendering: Yes
+OpenGL vendor string: NVIDIA Corporation
+OpenGL renderer string: NVIDIA RTX PRO 6000 Blackwell Workstation Edition/PCIe/SSE2
+OpenGL version string: 4.6.0 NVIDIA 580.173.02
+"""
+
+
+def test_software_gl_is_detected_and_warned_about() -> None:
+    """A CPU-rasterized run silently reduces every rendered sensor.
+
+    Physics and RTF stay normal, so nothing else in the recorded metrics
+    reveals it; measured 3.80 Hz against 28.07 Hz on the same configuration.
+    """
+
+    gl = parse_gl_renderer(SOFTWARE_GLXINFO)
+
+    assert gl['vendor'] == 'Mesa'
+    assert gl['renderer'].startswith('llvmpipe')
+    assert gl['software'] is True
+
+    warning = software_gl_warning(gl)
+    assert 'llvmpipe' in warning
+    # The warning has to name the remedy, not merely the symptom.
+    assert '__GLX_VENDOR_LIBRARY_NAME=nvidia' in warning
+
+
+def test_hardware_gl_produces_no_warning() -> None:
+    gl = parse_gl_renderer(HARDWARE_GLXINFO)
+
+    assert gl['vendor'] == 'NVIDIA Corporation'
+    assert gl['software'] is False
+    assert software_gl_warning(gl) is None
+
+
+def test_unknown_gl_is_not_reported_as_either_state() -> None:
+    """glxinfo missing, or DISPLAY unreachable, is not evidence of health."""
+
+    gl = parse_gl_renderer('')
+
+    assert gl == {'vendor': None, 'renderer': None, 'software': None}
+    # Absence of proof must not raise a false alarm on a headless CI box.
+    assert software_gl_warning(gl) is None
 
 
 def test_format_commit_makes_a_dirty_tree_impossible_to_miss() -> None:
