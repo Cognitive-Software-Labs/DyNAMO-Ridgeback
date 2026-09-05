@@ -1,0 +1,94 @@
+# Seat validation: the same sweep run once per display, then compared.
+#
+# The question is whether a benchmark taken on an xrdp session can be quoted as
+# a physical-seat number. Remote has no NVIDIA GLX, so the GL stack has to be
+# routed to NVIDIA per workload (`gpu-run`), which pays a per-frame PCIe
+# readback the seat does not. Run this file identically on both displays, always
+# through the wrapper so the command is the same:
+#
+#   gpu-run ros2 run ridgeback_autonomy target_benchmark_sweep \
+#       <share>/config/benchmark_sweep_seat_validation.yaml
+#
+# `gpu-run` is a no-op on the physical seat. See
+# docs/plans/remote_vs_physical_seat_validation.md for the decision rules.
+#
+# Two cells of the mask matrix, three process-level replicates each, rotated so
+# startup and thermal drift do not land on one cell. A -- box gate, stereoscopic
+# depth -- loads neither model and is the floor. D -- silhouette gate, monocular
+# depth -- loads both and is the only cell whose worker margin is thin enough
+# for a seat difference to show at all.
+#
+# Three replicates is the minimum, not a luxury: two runs of an identical D
+# configuration on one seat gave worker p95 of 71.9 ms and 140.2 ms, so a single
+# run per seat would report that spread as a seat difference. The comparison is
+# between distributions.
+#
+# `record_video` is off. The screen grab is a large-surface readback, which is
+# precisely the cost that differs between the two displays, so recording it
+# would fold the thing under test into every measurement. Take a separate visual
+# smoke with it on.
+#
+# Cost: 5 example scenes x 3 repeats = 15 trials per config at ~15 s, so ~4 min
+# per config and ~30 min per display including per-config node startup.
+
+sweep:
+  name: seat_validation
+  description: >
+    Cells A and D, three rotated replicates each, run once per display to
+    establish within-seat spread before any across-seat claim.
+
+defaults:
+  namespace: r100_0001
+  use_sim_time: true
+  world: target_distance_calibration
+  scenario: benchmark_scenarios_examples.yaml
+  repeats: 3
+  settle_sec: 2.0
+  capture_sec: 10.0
+  estimators: projective_ranging,euclidean_reconstruction
+  estimate_viz: false
+  overlay: false
+  isolation_2d: nearest_mode_histogram
+  isolation_3d: height_crop_nearest_mode_band
+  mask_depth_max_meters: 0.0
+  record_video: false
+  # The detector lives in the persistent layer, so its rate and its diagnostic
+  # are properties of the whole sweep. The diagnostic is what separates a
+  # scheduling difference from a model difference, and it is the only place the
+  # achieved detector rate is reported.
+  detector_fps: 10.0
+  detector_debug: true
+
+configs:
+  # Replicate 1: A, D.
+  - name: r1_a_box_stereo
+    mask_gate: box
+    depth_source: stereoscopic
+    depth_match_debug: true
+
+  - name: r1_d_silhouette_monocular
+    mask_gate: silhouette
+    depth_source: monocular
+    depth_match_debug: true
+
+  # Replicate 2: D, A.
+  - name: r2_d_silhouette_monocular
+    mask_gate: silhouette
+    depth_source: monocular
+    depth_match_debug: true
+
+  - name: r2_a_box_stereo
+    mask_gate: box
+    depth_source: stereoscopic
+    depth_match_debug: true
+
+  # Replicate 3: A, D.
+  - name: r3_a_box_stereo
+    mask_gate: box
+    depth_source: stereoscopic
+    depth_match_debug: true
+
+  - name: r3_d_silhouette_monocular
+    mask_gate: silhouette
+    depth_source: monocular
+    depth_match_debug: true
