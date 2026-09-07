@@ -518,6 +518,14 @@ This project still relies on three local patches:
 2. `patches/slam_toolbox_tf_namespace.patch` patches `src/slam_toolbox` so `slam_toolbox` respects namespaced TF remappings.
 3. `patches/clearpath_realsense_sim_frames.patch` patches `src/clearpath_common` (recorded against revision `9960354`) so `intel_realsense.urdf.xacro` forwards `is_sim` into the camera macro as `use_nominal_extrinsics`, and so the Gazebo render sensor sits on the model's colour frame. Without it, simulation has no `camera_0_color_optical_frame` TF and the mask estimators report `TF_MISS_EXTRINSIC`.
 
+Because the patches are recorded against specific upstream revisions, `.repos`
+pins every dependency to an exact commit rather than to a branch tip. Do not
+change a pin to `jazzy`/`main` to pick up a fix: a fresh `vcs import` would then
+clone commits the patches were never rebased onto. As of 2026-09-07 the pinned
+`clearpath_common` was 39 commits behind its branch tip, and the realsense patch
+did not apply to that tip. Refreshing the pins is a deliberate, gated task — see
+"Upstream dependency refresh" in [BACKLOG.md](docs/BACKLOG.md).
+
 Each patch is a plain `git apply`, which is not idempotent. Check before re-running:
 
 ```bash

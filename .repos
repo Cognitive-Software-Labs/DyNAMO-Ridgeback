@@ -1,25 +1,42 @@
+# Dependencies are pinned to exact revisions, not to branch tips.
+#
+# The three patches in `patches/` are recorded against these revisions, and every
+# measurement under `artifacts/` was produced against them. Tracking a branch tip
+# makes a fresh `vcs import` silently pick up upstream commits the patches were
+# never rebased onto: as of 2026-09-07, `clearpath_common` jazzy had moved 39
+# commits past the pin, and `clearpath_realsense_sim_frames.patch` no longer
+# applied. See docs/BACKLOG.md, "Upstream dependency refresh".
+#
+# Bumping a pin means re-applying the patches, rebasing any that conflict, and
+# re-running the sim gates. Do not bump one in isolation to fix a build error.
 repositories:
   src/clearpath_simulator:
     type: git
     url: https://github.com/clearpathrobotics/clearpath_simulator.git
-    version: jazzy
+    # jazzy @ 2.9.2
+    version: 25997cb564d65867d85de155233b95567e8724a3
   src/clearpath_common:
     type: git
     url: https://github.com/clearpathrobotics/clearpath_common.git
-    version: jazzy
+    # jazzy @ 2.9.8
+    version: 99603548679f90dcc7bc51b6e8d5569dc6f069dc
   src/clearpath_config:
     type: git
     url: https://github.com/clearpathrobotics/clearpath_config.git
-    version: jazzy
+    # jazzy @ 2.9.3
+    version: 5c92caaf646d96cb3d3028477c8b74a1ef8ddcca
   src/clearpath_msgs:
     type: git
     url: https://github.com/clearpathrobotics/clearpath_msgs.git
-    version: jazzy
+    # jazzy
+    version: 5d041717d6a50eb7cd60c0df23d91f6baeb4192b
   src/m-explore-ros2:
     type: git
     url: https://github.com/robo-friends/m-explore-ros2.git
-    version: main
+    # main
+    version: 86742bff6edd53fcce16f99dbc8c06ed5d7eed22
   src/slam_toolbox:
     type: git
     url: https://github.com/SteveMacenski/slam_toolbox.git
-    version: jazzy
+    # jazzy
+    version: ec8f7635dea317b531c419f798f87d90a336f32e
