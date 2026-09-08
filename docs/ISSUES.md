@@ -31,6 +31,78 @@ topic before each config and removes leftover `bench_*` models from a crashed
 runner. If the supervisor itself is interrupted, rerun the same command to
 resume completed `run.json` outputs; do not manually clean between its configs.
 
+**"Run cleanup once before" is not optional, and skipping it fails in a way
+that does not name its cause.** A preceding single-run
+`target_distance_benchmark.launch.py` leaves `gz sim server` and `gz sim gui`
+alive after its launch service exits — the launch log even reports the
+`ruby ... gz sim` wrapper escalating to `SIGTERM`, but those two children
+outlive it. Start a sweep on top of them and there are **two servers bound to
+the same world name**, so gz-transport service calls are answered by whichever
+one replies first: the target spawns into one world and the pose query is
+served by the other. Every trial then fails with
+
+```
+single_facing_01_rep1 failed: Target pose
+"bench_<stamp>_single_facing_01_rep1_target_0" not present on
+/world/target_distance_calibration/pose/info
+```
+
+which reads as a spawn or naming fault and is neither. Confirm with
+`pgrep -af "gz sim"`: **two** `gz sim server` entries (and two GUIs) means this,
+not the pre-existing single-trial `pose/info` segfault that drops one trial per
+run. `bash cleanup.sh` clears it; then restart the sweep. The partial sweep
+folder is safe to discard — a sweep that failed this way writes no `run.json`
+for any configuration.
+
+## A long sweep dies in the Gazebo GUI's render thread
+
+Observed 2026-09-08 on a 15-configuration sweep: at configuration 9, roughly
+6.4 hours in, `gz sim` exited with
+
+```
+Segmentation fault (Address not mapped to object [(nil)])
+  gz::gui::plugins::RenderThread  ->  GzSceneManager::Update
+  ->  RenderUtil::Update()  ->  SceneManager::CreateVisual
+  ->  LoadGeometry  ->  libgz-rendering-ogre2
+```
+
+That is the **GUI** render path (`libMinimalScene.so`, `libGzSceneManager.so`)
+building a visual for a freshly spawned model — not the server's sensor
+rendering, which is what the measurements depend on.
+
+**The early warning is per-configuration wall time, not RTF.** Configurations
+lengthened monotonically for hours first — 0.43, 0.51, 0.55, 0.67, 0.67, 0.80,
+0.84, 0.93 h — while the pre-run real-time factor held at 0.97+, host RAM stayed
+at ~70 GB free and GPU memory flat. RTF is measured over a short settled window
+and says nothing about this, so a steadily growing config time on a fixed trial
+count is the signal to act on.
+
+When it dies, trials fail in a recognisable order: first
+`Timed out waiting for Gazebo pose of "bench_..."`, then
+`Failed to spawn "bench_...": Command timed out after 10.0s`. The supervisor and
+every per-config node keep running against a dead simulator, so the run does not
+stop on its own — confirm with `pgrep -f "gz sim"` returning nothing.
+
+Recovery: stop the supervisor, `bash cleanup.sh`, and rerun the **same** command.
+Configurations with a valid `run.json` are skipped and the sweep continues in the
+same directory. Sweeps expected to run past ~5 h are worth splitting.
+
+## Editing a sweep YAML mid-run breaks its own resume
+
+`config/` is installed by **symlink**, so editing
+`src/ridgeback_autonomy/config/benchmark_sweep_*.yaml` edits the file a running
+sweep is reading. `target_benchmark_sweep` records
+`resume_signature.sweep_source_sha256` in `sweep.json` and `_find_resumable_sweep`
+demands an exact match, so changing even a comment makes the next invocation
+create a **new** sweep directory and orphan every completed configuration
+instead of resuming.
+
+Before resuming, compare the installed YAML's SHA-256 against
+`resume_signature.sweep_source_sha256` in `<sweep_dir>/sweep.json`; restore the
+original bytes if they differ. For the same reason `--only` with a different
+configuration set forks a new directory — `selected_configs` must match exactly
+— so it cannot be used to batch a resume that should land in the existing folder.
+
 ## Event-Driven Startup (Readiness Gates)
 
 Bringup is sequenced by **readiness gates**, not fixed timers. Each stage waits
