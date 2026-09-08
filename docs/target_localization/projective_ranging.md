@@ -64,10 +64,13 @@ the same rays and the result is meaningless.
 
 Before aggregation, `valid_depth` rejects non-finite and non-positive samples.
 An effective finite ceiling also rejects samples above it. The node combines
-the optional `mask_depth_max_meters` gate (0 disables it) with the source's
-`usable_max_m`. Stereo has no source ceiling; the metric monocular checkpoint
-declares one. A finite positive stereo value is not necessarily accurate.
-See [aligned depth](aligned_depth.md) for that contract.
+its optional working gate (the `depth_max_meters` node parameter, spelled
+`mask_depth_max_meters` as a benchmark launch argument; 0 disables it) with the
+source's `usable_max_m`. Stereo has no source ceiling; the metric monocular
+checkpoint declares one — its configured maximum depth taken at
+`MONOCULAR_USABLE_RANGE_FRACTION = 0.9`, so a 20 m checkpoint contributes an
+18 m ceiling rather than 20. A finite positive stereo value is not necessarily
+accurate. See [aligned depth](aligned_depth.md) for that contract.
 
 ### 2.3 Aggregate — the mask-tag fork
 
@@ -108,9 +111,11 @@ other on identical input:
 
 The isolation callable returns a boolean selector; the estimator obtains its
 foreground coordinates. An empty selection is valid at the recipe boundary;
-the estimator applies its minimum-count guard and reports `ISOLATION_EMPTY` when
-too few pixels survive. An optional precomputed `valid_masked` selector avoids
-repeating the validity pass.
+the estimator applies its minimum-count guard (`min_valid_pixels`, default 10)
+and reports `ISOLATION_EMPTY` when too few pixels survive — or
+`TOO_FEW_VALID_PIXELS` on the `tight` branch, which never runs a recipe. An
+optional precomputed `valid_masked` selector avoids repeating the validity
+pass.
 
 #### Implemented 2D recipes
 
@@ -122,12 +127,16 @@ repeating the validity pass.
 **Nearest-mode histogram.** `nearest_significant_mode` chooses the nearest bin
 meeting the 5% sample-significance floor. If no bin meets that floor, it chooses
 the nearest non-empty bin rather than the global mode. The recipe retains depths
-within `band_m` of the anchor. The mode helper lives in `core/depth_common.py`;
-shared numeric defaults live in `core/ranging_defaults.py`.
+within `band_m` of the anchor. The mode helper and its two numeric defaults
+(`NEAREST_MODE_BIN_WIDTH_M_DEFAULT`, `NEAREST_MODE_MIN_BIN_FRACTION_DEFAULT`)
+live in `core/depth_common.py`, shared with the point-domain twin;
+`core/ranging_defaults.py` owns only the band (`NEAR_SURFACE_BAND_M`).
 
 This assumes the target is the nearest coherent surface. A closer occluder can
 win, spatial connectivity is not enforced, and bin width, significance, and
-band width affect the result.
+band width affect the result. How much each of them moves the estimate is
+measured in
+[projective parameter sensitivity](../history/projective_parameter_sensitivity.md).
 
 **Otsu.** `otsu_foreground` selects the threshold with maximum between-class
 variance and retains depths on its near side. It still has a bin-width setting
@@ -137,8 +146,13 @@ changing foreground/background ratio can move the threshold away from the
 target. The method follows N. Otsu, *A Threshold Selection Method from Gray-Level
 Histograms*, IEEE TSMC 9(1), 1979, DOI `10.1109/TSMC.1979.4310076`.
 
-Recipe names are launch-selectable, but not every function keyword is exposed
-as a launch parameter. These are deterministic NumPy baselines, not guarantees
+Recipe names are launch-selectable, and so are the three numbers the recipes
+tune on: `isolation_2d_bin_width_m`, `isolation_2d_band_m` and
+`isolation_2d_min_bin_fraction`, plus the estimator's own `min_valid_pixels`.
+`core/isolation_2d.build_isolation_2d` binds each onto the selected recipe and
+drops the ones that recipe does not accept, so one argument spans both. Every
+default is the constant the recipe already used, so leaving them unset is the
+behaviour that shipped. These are deterministic NumPy baselines, not guarantees
 of foreground identity or measured zero-cost operations. Tests in
 [`test_isolation_2d.py`](../../src/ridgeback_autonomy/test/test_isolation_2d.py)
 cover subset, invalid/unimodal, and dispersed-histogram behavior. Comparative

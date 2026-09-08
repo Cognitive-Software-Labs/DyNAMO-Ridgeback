@@ -51,6 +51,7 @@ implementations or committed backlog work.
 - [Target-localization refactor validation](history/refactor_validation.md)
 - [ROI mask migration](history/roi_mask_migration.md)
 - [Exact-stamp depth availability](history/exact_stamp_depth_availability.md)
+- [Projective parameter sensitivity](history/projective_parameter_sensitivity.md)
 - [Exact-stamp investigation handoff](plans/exact_stamp_depth_availability_handoff.md)
 
 History preserves dated evidence and limitations. Read the corresponding

@@ -345,6 +345,10 @@ Arguments:
 | `isolation_2d` | `nearest_mode_histogram` | Projective-ranging box-gate foreground recipe: `nearest_mode_histogram` or `otsu` |
 | `isolation_3d` | `height_crop_nearest_mode_band` | Euclidean-reconstruction box-gate foreground recipe: `height_crop_nearest_mode_band`, `height_crop_range_band`, `height_crop`, `nearest_mode_band`, or `range_band`. The two chains differ only in how the background separator anchors — nearest mode vs. percentile; the percentile one slides as background grows and is what the `pointcloud` row does |
 | `mask_depth_max_meters` | `0.0` | Working depth gate for the mask rows; `0` means no gate, leaving each row bounded only by what its depth source declares it can resolve |
+| `isolation_2d_bin_width_m` | `0.05` | Depth-histogram bin width of the selected `isolation_2d` recipe. Applies to whichever recipe is chosen — both bin the masked depths |
+| `isolation_2d_band_m` | `0.35` | Depth band kept around the near-surface anchor. `nearest_mode_histogram` only; `otsu` has no band and ignores it |
+| `isolation_2d_min_bin_fraction` | `0.05` | Fraction of the masked depths a histogram bin must hold before the anchor may sit on it. `nearest_mode_histogram` only |
+| `min_valid_pixels` | `10` | Foreground pixels projective ranging requires before it reports a distance; below it the row misses with `ISOLATION_EMPTY` (box gate) or `TOO_FEW_VALID_PIXELS` (silhouette gate) |
 | `camera_info_topic` | `sensors/camera_0/color/camera_info` | Compatibility override for the shared camera contract's color-grid intrinsics |
 | `repeats` | `5` | Number of positive-trial repeats per spawn pose |
 | `output_dir` | `<repo-root>/artifacts/benchmarks` | Root directory that will receive one timestamped subfolder per run |
@@ -401,6 +405,14 @@ box/silhouette by stereoscopic/monocular matrix. Run it only from a clean,
 committed checkout; its `sweep.json` records the exact sweep and scenario file
 hashes. See [the model-concurrency evidence plan](docs/plans/model_concurrency_evidence.md)
 for the decision gates and interpretation.
+
+The shipped `benchmark_sweep_projective_parameters.yaml` varies one projective
+ranging tuning constant at a time — `isolation_2d_band_m`,
+`isolation_2d_min_bin_fraction`, `isolation_2d_bin_width_m` and
+`min_valid_pixels` — around their current values, and repeats the default
+configuration twice as an in-sweep noise control. See
+[projective parameter sensitivity](docs/history/projective_parameter_sensitivity.md)
+for what is already settled and what those runs are meant to answer.
 
 Do **not** run `cleanup.sh` between configurations: it kills Gazebo and RViz,
 which are deliberately persistent. The supervisor owns each config process
@@ -462,7 +474,7 @@ observation-coverage drift as a long-lived simulator slows down.
 |------|--------------|------------|
 | `target_detector_node` | `detections/target/raw` | `color_topic`, `detection_model`, `detection_threshold`, `detector_fps` (default `10.0`; an upper bound on *step starts*, so the achieved rate matches the setpoint until inference alone exceeds the period), `detector_debug` |
 | `target_pointcloud_measurement_node` | `measurements/target/pointcloud` | `color_topic`, `pointcloud_topic`, `base_frame`, `enabled_estimators` |
-| `target_mask_measurement_node` | `measurements/target/mask` (+ `debug/target/mask` on the silhouette gate, + `debug/target/mask/aligned_depth` when a depth path is enabled, + `visualization/target/polar_rays` when polar profiling is) | `enabled_estimators`, `depth_source`, `depth_topic`, `camera_info_topic`, `scan_topic`, `base_frame` (**must be passed** — its own default is the bare `base_link`, unlike the other nodes', which are namespace-derived), `pitch_deg`, `front_offset_m`, `isolation_2d`, `isolation_3d`, `mask_gate`, `segmentation_model`, `color_topic`, `ray_marker_topic` |
+| `target_mask_measurement_node` | `measurements/target/mask` (+ `debug/target/mask` on the silhouette gate, + `debug/target/mask/aligned_depth` when a depth path is enabled, + `visualization/target/polar_rays` when polar profiling is) | `enabled_estimators`, `depth_source`, `depth_topic`, `camera_info_topic`, `scan_topic`, `base_frame` (**must be passed** — its own default is the bare `base_link`, unlike the other nodes', which are namespace-derived), `pitch_deg`, `front_offset_m`, `isolation_2d`, `isolation_2d_bin_width_m`, `isolation_2d_band_m`, `isolation_2d_min_bin_fraction`, `min_valid_pixels`, `isolation_3d`, `mask_gate`, `segmentation_model`, `color_topic`, `ray_marker_topic` |
 | `target_overlay_node` | `debug/target/overlay` | `measurement_topic`, `mask_measurement_topic`, `color_topic`, `aligned_depth_topic`, `estimators`, `max_cols`, `rgb_panel_labels` |
 | `target_visualization_node` | `visualization/target/estimates` + `hud/target_distances` | `base_frame`, `world_frame`, `marker_lifetime_sec`, `ground_truth_topic`, `estimators` (gates both the HUD rows and the rings; defaults to `all`), `hud_layout` (`rows` — the benchmark's, with truth and error columns — or `wide`, exploration's estimator columns with an age under each) |
 | `target_distance_benchmark_runner` | per-estimator CSVs + summary CSV + trial collage images + `video/run.mp4` | `estimators`, `output_dir`, `pointcloud_measurement_topic`, `mask_measurement_topic`, `color_topic`, `record_video`, `record_fps` |
