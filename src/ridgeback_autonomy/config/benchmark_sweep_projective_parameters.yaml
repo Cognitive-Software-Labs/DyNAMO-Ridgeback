@@ -1,0 +1,119 @@
+# One-factor-at-a-time sensitivity of projective ranging's ungrounded constants.
+#
+# Each of the numbers below is a round value with no measurement behind it.
+# This sweep answers one question per axis: how far does the distance estimate
+# move when that number moves?  Every config is the current default except for
+# a single axis, so a difference in the paired per-trial join is attributable
+# to that axis alone.
+#
+# The two baseline configs measure the run-to-run floor from inside the sweep.
+# Measured 2026-09-08: that floor is EXACTLY ZERO -- baseline_a and baseline_b
+# produced identical estimates on all 135 trial rows.  The pipeline is
+# deterministic on a fixed configuration, so any difference between two configs
+# here is attributable to the one parameter that differs.  The 31% spread the
+# archive appears to show (0.1236 in 20260828_152011_baseline versus 0.1621 in
+# 20260902_202659_isolation) is NOT noise: 20260828 predates the D455 correction
+# 7e31f02 and is a different camera setup.  Results:
+# docs/history/projective_parameter_sensitivity.md
+#
+# At repeats:=1 the full scenario currently produces 109 trials per config, so
+# 15 configs is roughly 6.5 hours at the baseline 15.4 seconds per trial.  Run
+# --dry-run first to confirm the count, and --only to split it across sessions.
+# record_video is off: the screen grab competes with the simulator render path.
+
+sweep:
+  name: projective_parameters
+  description: >
+    Per-axis sensitivity of the isolation_2d band, bin width and significance
+    floor, and of projective ranging's minimum-pixel guard, against a repeated
+    default baseline that measures the run-to-run noise floor.
+
+defaults:
+  scenario: ''        # packaged config/benchmark_scenarios_full.yaml
+  repeats: 1
+  estimators: projective_ranging
+  mask_gate: box
+  depth_source: stereoscopic
+  mask_depth_max_meters: 0.0
+  record_video: false
+
+configs:
+  # The default configuration, run twice. Everything else is read against the
+  # gap between these two.
+  - name: baseline_a
+    isolation_2d: nearest_mode_histogram
+
+  - name: baseline_b
+    isolation_2d: nearest_mode_histogram
+
+  # Axis 1: the near-surface band, default 0.35 m.  The one axis already known
+  # to matter: at 0.35 the anchor locks onto a near occluder and the band is too
+  # narrow to reach the target behind it, pinning ~0.62 m of error on every
+  # interfere_infront / interfere_pair / interfere_multi trial.  0.50 and 0.75
+  # test whether widening the band recovers those without costing accuracy
+  # elsewhere; 0.15 and 0.25 bound it from below.
+  - name: band_0p15
+    isolation_2d: nearest_mode_histogram
+    isolation_2d_band_m: 0.15
+
+  - name: band_0p25
+    isolation_2d: nearest_mode_histogram
+    isolation_2d_band_m: 0.25
+
+  - name: band_0p50
+    isolation_2d: nearest_mode_histogram
+    isolation_2d_band_m: 0.50
+
+  - name: band_0p75
+    isolation_2d: nearest_mode_histogram
+    isolation_2d_band_m: 0.75
+
+  # Axis 2: the fraction of masked depths a bin must hold to be anchored on,
+  # default 0.05.  Lower admits thinner peaks (a distant or heavily occluded
+  # target); higher demands a broader surface and walks the anchor backwards.
+  - name: min_bin_fraction_0p01
+    isolation_2d: nearest_mode_histogram
+    isolation_2d_min_bin_fraction: 0.01
+
+  - name: min_bin_fraction_0p15
+    isolation_2d: nearest_mode_histogram
+    isolation_2d_min_bin_fraction: 0.15
+
+  # Axis 3: histogram bin width under the default recipe, default 0.05 m.  The
+  # anchor is a bin centre, so quantization alone can only contribute
+  # +/- bin_width/2 -- 25 mm at the default.  Anything larger than that is the
+  # bin *choice* moving, not the rounding.
+  - name: bin_width_0p02
+    isolation_2d: nearest_mode_histogram
+    isolation_2d_bin_width_m: 0.02
+
+  - name: bin_width_0p10
+    isolation_2d: nearest_mode_histogram
+    isolation_2d_bin_width_m: 0.10
+
+  # Axis 4: the foreground-pixel floor, default 10.  Its miss code has never
+  # fired in the whole archive, so this measures how far from the operating
+  # regime it sits rather than what it currently costs.
+  - name: min_valid_pixels_100
+    isolation_2d: nearest_mode_histogram
+    min_valid_pixels: 100
+
+  - name: min_valid_pixels_1000
+    isolation_2d: nearest_mode_histogram
+    min_valid_pixels: 1000
+
+  # Axis 3 repeated under otsu, which bins the same depths for a different
+  # decision (a threshold rather than a peak) and takes no band or significance
+  # floor.  Included with its own default so the three are a complete curve and
+  # not two points against the nearest_mode baseline.
+  - name: otsu_bin_width_0p02
+    isolation_2d: otsu
+    isolation_2d_bin_width_m: 0.02
+
+  - name: otsu_bin_width_0p05
+    isolation_2d: otsu
+    isolation_2d_bin_width_m: 0.05
+
+  - name: otsu_bin_width_0p10
+    isolation_2d: otsu
+    isolation_2d_bin_width_m: 0.10
