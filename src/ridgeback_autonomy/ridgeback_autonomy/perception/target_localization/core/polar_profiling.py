@@ -42,9 +42,11 @@ from ridgeback_autonomy.perception.target_localization.core.ranging_defaults imp
 )
 
 
-# Scan-validity clips (not accuracy knobs): drop physically impossible returns
-# before anything else. This module is their only owner.
-LIDAR_RANGE_MIN_M_DEFAULT = 0.05  # drop sub-5cm self-hits
+# Scan-validity clip (not an accuracy knob): drop physically impossible returns
+# before anything else. This module is its only owner. The near floor is not
+# here because it belongs to the device: every driver publishes its own
+# ``range_min`` (0.06 m for the UST family), which is per-model and always
+# tighter than a constant picked here would be.
 LIDAR_RANGE_MAX_M_DEFAULT = 10.0  # drop far-field noise
 
 # Foreground-isolation parameters -- the LiDAR analogue of the isolation_2d /
@@ -153,7 +155,6 @@ def scan_points_optical(
     rotation: np.ndarray,
     translation: np.ndarray,
     *,
-    range_min_m: float = LIDAR_RANGE_MIN_M_DEFAULT,
     range_max_m: float = LIDAR_RANGE_MAX_M_DEFAULT,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Per-scan work: validity clean + polar->Cartesian + extrinsic transform.
@@ -178,7 +179,7 @@ def scan_points_optical(
     valid = np.isfinite(ranges)
     safe_ranges = np.where(valid, ranges, 0.0)
 
-    range_floor = max(float(scan.range_min), range_min_m)
+    range_floor = float(scan.range_min)
     range_cap = float(scan.range_max)
     if not (math.isfinite(range_cap) and range_cap > 0.0):
         range_cap = range_max_m
