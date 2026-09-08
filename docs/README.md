@@ -36,6 +36,7 @@ implementations or committed backlog work.
 
 ## Active plans
 
+- [Offline measurement replay benchmark](plans/offline_measurement_replay_benchmark.md) — capture detector/sensor evidence once and evaluate measurement variants in parallel
 - [Remote vs physical seat validation](plans/remote_vs_physical_seat_validation.md) — can a benchmark taken over xrdp be quoted as a physical-seat number
 - [D455 hardware validation](plans/camera_hardware_validation.md)
 - [Model-concurrency evidence](plans/model_concurrency_evidence.md)
