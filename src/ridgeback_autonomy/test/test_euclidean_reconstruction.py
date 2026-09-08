@@ -106,10 +106,12 @@ def test_tight_mask_mad_pass_drops_edge_bleed() -> None:
     result, _ = localize_euclidean_reconstruction(depth, mask, INTRINSICS)
 
     assert result is not None
-    # The bleed points (range ~6 m) are gone; some legitimate far-corner
-    # plate points may fall with them, so bound the count instead of pinning it.
+    # Exactly the bleed goes: 400 plate pixels in, the 5 at 6 m out, and no
+    # legitimate plate point with them. Pinned rather than bounded because the
+    # margin is the whole point -- against a raw MAD the same cut also took 6
+    # real far-corner points, and a loose bound hid that.
     assert result.foreground_points[:, 2].max() < 3.0
-    assert 300 <= result.foreground_points.shape[0] <= 395
+    assert result.foreground_points.shape[0] == 400 - len(bleed)
     assert np.allclose(result.xyz_optical, OBJECT_CENTROID_XYZ, atol=0.02)
 
 

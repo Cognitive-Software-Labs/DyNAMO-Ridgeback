@@ -9,6 +9,8 @@ from ridgeback_autonomy.perception.target_localization.core.isolation_3d import 
     BASE_ABOVE_FLOOR_M_DEFAULT,
     ISOLATION_3D_DEFAULT,
     ISOLATION_3D_NAMES,
+    MAD_K_DEFAULT,
+    MAD_SIGMA_SCALE,
     Chain,
     HeightCrop,
     NearestModeBand,
@@ -187,7 +189,7 @@ def test_chain_leaves_exactly_the_object() -> None:
 
 def test_mad_outlier_removal_drops_injected_outlier() -> None:
     # Ranges spread uniformly over 0.2 m, so the whole cluster sits inside
-    # median +/- 3*MAD, while the injected point at 6 m is far outside it.
+    # median +/- 3 sigma, while the injected point at 6 m is far outside it.
     z = np.linspace(1.9, 2.1, 50)
     cluster = np.stack((np.zeros_like(z), np.zeros_like(z), z), axis=-1)
     points = np.concatenate((cluster, [[0.0, 0.0, 6.0]]))
@@ -196,6 +198,21 @@ def test_mad_outlier_removal_drops_injected_outlier() -> None:
 
     assert keep[:-1].all()
     assert not keep[-1]
+
+
+def test_mad_threshold_is_scaled_to_sigma_not_raw_deviations() -> None:
+    # The consistency constant is behavior, not decoration: it widens the cut
+    # by ~48%, and dropping it silently trims target surface. This probe sits
+    # in the gap -- 0.198 m from the median, outside the raw 3*MAD cut of
+    # 0.159 m and inside the rescaled 0.236 m -- so it survives only while the
+    # rescaling is applied.
+    z = np.append(np.linspace(1.9, 2.1, 50), 2.20)
+    points = np.stack((np.zeros_like(z), np.zeros_like(z), z), axis=-1)
+    ranges = point_ranges(points)
+    raw_mad_m = float(np.median(np.abs(ranges - np.median(ranges))))
+
+    assert raw_mad_m * MAD_K_DEFAULT < 0.198 < raw_mad_m * MAD_SIGMA_SCALE * MAD_K_DEFAULT
+    assert mad_outlier_removal(points).all()
 
 
 def test_mad_outlier_removal_zero_spread_keeps_all() -> None:

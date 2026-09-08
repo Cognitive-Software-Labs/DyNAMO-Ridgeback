@@ -37,6 +37,16 @@ FLOOR_MARGIN_M_DEFAULT = 0.05
 # to the TF camera-above-base height to get camera-above-floor.
 BASE_ABOVE_FLOOR_M_DEFAULT = 0.026
 
+# Consistency constant that rescales a raw MAD into an estimate of sigma for
+# normally distributed data -- the same b R's ``mad()`` applies by default. It
+# is what lets ``MAD_K_DEFAULT`` be read as a number of standard deviations
+# instead of as a number of raw median deviations, which are ~32% smaller.
+MAD_SIGMA_SCALE = 1.4826
+# Miller (1991)'s "very conservative" outlier threshold, as reported by Leys et
+# al. (2013); their own recommendation is the moderately conservative 2.5.
+# Conservative is the right side to err on here: the tight branch is cleaning a
+# silhouette the segmenter already vouched for, so the job is dropping edge
+# bleed onto background rather than trimming the target.
 MAD_K_DEFAULT = 3.0
 
 
@@ -159,11 +169,17 @@ class Chain:
 
 
 def mad_outlier_removal(points: np.ndarray, k: float = MAD_K_DEFAULT) -> np.ndarray:
-    """Statistical cleanup for the ``tight`` branch: median +/- k*MAD on range.
+    """Statistical cleanup for the ``tight`` branch: median +/- k sigma on range.
 
     A tight mask's points are nearly all object; the stragglers are edge bleed
     onto the background, which shows up as range outliers. Zero spread (MAD of
     0) means there is nothing to remove, so everything is kept.
+
+    Sigma is the MAD rescaled by ``MAD_SIGMA_SCALE``, so ``k`` carries the
+    meaning it has in the literature the value comes from. Ranges across a body
+    surface are not normally distributed -- bounded, skewed, with a hard near
+    edge -- so the rescaling does not make the threshold correct for this data;
+    it makes it mean the same thing as the published number.
     """
 
     points = np.asarray(points, dtype=np.float64)
@@ -171,10 +187,10 @@ def mad_outlier_removal(points: np.ndarray, k: float = MAD_K_DEFAULT) -> np.ndar
         return np.zeros(0, dtype=bool)
     ranges = point_ranges(points)
     median_m = float(np.median(ranges))
-    mad_m = float(np.median(np.abs(ranges - median_m)))
-    if mad_m == 0.0:
+    sigma_m = MAD_SIGMA_SCALE * float(np.median(np.abs(ranges - median_m)))
+    if sigma_m == 0.0:
         return np.ones(points.shape[0], dtype=bool)
-    return np.abs(ranges - median_m) <= k * mad_m
+    return np.abs(ranges - median_m) <= k * sigma_m
 
 
 # The config swap point: the selectable recipe names, all building isolators

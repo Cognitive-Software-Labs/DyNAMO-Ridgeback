@@ -113,8 +113,17 @@ What the selection returns depends on the mask precision:
 **`tight` branch.** The points are nearly all object; a statistical outlier
 removal pass is enough before reducing. The shipped rule
 (`mad_outlier_removal` in `perception/target_localization/core/isolation_3d.py`) keeps the points
-whose camera-frame range is within median ± 3·MAD of the range distribution —
+whose camera-frame range is within median ± `k`·σ of the range distribution —
 the stragglers being edge bleed onto the background.
+
+σ is the MAD rescaled by the consistency constant `1.4826`, so `k = 3` is
+Miller (1991)'s "very conservative" threshold as reported by Leys et al.
+(2013), rather than three raw median deviations (which is the same cut at
+`k ≈ 2.02`). The rescaling is derived under normality and body-surface ranges
+are not normal, so it does not make the threshold correct for this data — it
+makes `k` mean what the published number means. Neither `k` nor the branch has
+been measured on this path: no benchmark configuration has yet produced a
+scored `tight` euclidean run.
 
 **`rect` branch.** The box frustum contains the G1, the floor strip under it,
 and whatever background falls inside the box. Selecting by mask only cuts the
