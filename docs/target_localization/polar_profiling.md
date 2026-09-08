@@ -177,9 +177,12 @@ The recovery, identical for both tags:
    scan order (beam index order — the scan's native bearing order; no sort,
    and no reordering by camera-frame bearing, which parallax can make
    non-monotonic), split wherever the range jumps by more than a
-   discontinuity threshold or the beam index gaps by more than a few
-   increments — a gap means intervening beams hit something else or
-   returned invalid.
+   discontinuity threshold. Range structure is the only split signal: a
+   beam-index gap is deliberately *not* one, because the partition feeds the
+   median-based band test in step 2, so splitting on missing beams re-cuts one
+   continuous surface into pieces whose medians straddle the band rather than
+   separating anything. Two objects at the same range across a gap merge back
+   regardless, which is what that split was once supposed to prevent.
 2. **Merge the near band**: take the nearest run, then merge every run whose
    range lies within a small band of it. **Convention (pinned,
    `docs/target_localization/target_localization_pipeline.md` §5):** on a legged object the nearest run
@@ -353,7 +356,7 @@ prevent the polar path from running.
 on `measurements/target/mask`. Its output names include the mask gate but no
 depth-source or rect-isolation token. No fallback measurement is substituted.
 
-`range_band_m`, `range_jump_m`, `max_bearing_gap_beams`, and `min_valid_rays`
+`range_band_m`, `range_jump_m`, and `min_valid_rays`
 remain core function arguments: the current pipeline calls their defaults and
 does not expose them as launch sweep knobs. [Tests](../../src/ridgeback_autonomy/test/test_polar_profiling.py)
 cover synthetic profiles, mask membership, projection, and sparse failures.

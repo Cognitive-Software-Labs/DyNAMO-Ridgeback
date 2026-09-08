@@ -322,14 +322,33 @@ def test_merge_leaves_too_few_returns_too_few_rays_merged() -> None:
     assert reason is MissReason.TOO_FEW_RAYS_MERGED
 
 
-def test_segment_range_profile_splits_on_jump_and_gap() -> None:
-    beam_indices = np.array([10, 11, 12, 13, 17, 18])
+def test_segment_range_profile_splits_on_range_jump_only() -> None:
     planar_range_m = np.array([2.0, 2.02, 5.0, 5.01, 5.02, 5.03])
 
-    runs = segment_range_profile(beam_indices, planar_range_m)
+    runs = segment_range_profile(planar_range_m)
 
-    # Range jump splits after position 1; the beam gap (13 -> 17) after 3.
-    assert [run.tolist() for run in runs] == [[0, 1], [2, 3], [4, 5]]
+    # The 2.02 -> 5.0 jump is the only split. Positions 2..5 stay one run even
+    # though a beam-index gap sits inside them: range structure is the only
+    # signal, because the partition feeds a median-based band test.
+    assert [run.tolist() for run in runs] == [[0, 1], [2, 3, 4, 5]]
+
+
+def test_beam_gaps_do_not_separate_two_objects_at_the_same_range() -> None:
+    """Why the bearing-gap split went: ``merge_near_band`` undoes it anyway.
+
+    Segmenting on a beam-index gap was justified as keeping "two objects
+    sharing a range across an empty gap" apart. It cannot: the band test
+    compares run medians, and two runs at the same range differ by 0, so they
+    merge straight back. Splitting only perturbed the medians of one
+    continuous surface.
+    """
+
+    planar_range_m = np.array([2.0, 2.0, 2.0, 2.0, 2.0, 2.0])
+
+    runs = segment_range_profile(planar_range_m)
+    merged = merge_near_band(runs, planar_range_m)
+
+    assert merged.tolist() == [0, 1, 2, 3, 4, 5]
 
 
 def test_merge_near_band_keeps_both_legs_only() -> None:

@@ -64,12 +64,6 @@ RANGE_JUMP_M_DEFAULT = 0.30
 # through ranging_defaults, not a fit to the object depth. Its current ownership
 # and validation boundary are documented in docs/target_localization/polar_profiling.md.
 
-# Run split on a bearing gap: start a new run where the beam index gaps by
-# more than this many increments -- i.e. once that many or more consecutive
-# beams are missing (invalid, or projecting outside the mask) -- so two objects
-# sharing a range across an empty gap are not glued together. Minor knob.
-MAX_BEARING_GAP_BEAMS_DEFAULT = 2
-
 # Sparse floor: return ``None`` (no estimate -> that trial is simply dropped
 # from this path's benchmark row, no fallback) when fewer than this many beams
 # survive the mask select or the near-band merge. A handful of beams gives a
@@ -190,30 +184,28 @@ def scan_points_optical(
 
 
 def segment_range_profile(
-    beam_indices: np.ndarray,
     planar_range_m: np.ndarray,
     *,
     range_jump_m: float = RANGE_JUMP_M_DEFAULT,
-    max_bearing_gap_beams: int = MAX_BEARING_GAP_BEAMS_DEFAULT,
 ) -> list[np.ndarray]:
     """Split the selected rays into contiguous runs (doc Section 2.5 step 1).
 
-    ``beam_indices`` are the original scan indices of the selected rays, in
-    scan order (= bearing order); ``planar_range_m`` their planar ranges. A
-    run breaks where the range jumps by more than ``range_jump_m`` (the beam
-    slipped from one surface to another) or the beam index gaps by more than
-    ``max_bearing_gap_beams`` (the intervening beams hit something outside
-    the mask or returned invalid). Returns position-index arrays into the
-    selected-ray arrays.
+    ``planar_range_m`` holds the selected rays' planar ranges in scan order
+    (= bearing order). A run breaks where the range jumps by more than
+    ``range_jump_m`` -- the beam slipped from one surface to another. Returns
+    position-index arrays into the selected-ray arrays.
+
+    Range structure is the only split signal. A beam-index gap is not one: the
+    partition feeds ``merge_near_band``, which compares run *medians*, so
+    splitting on missing beams mostly re-cuts one continuous surface into
+    pieces whose medians straddle the band.
     """
 
-    count = int(beam_indices.size)
+    planar_range_m = np.asarray(planar_range_m, dtype=np.float64)
+    count = int(planar_range_m.size)
     if count == 0:
         return []
-    breaks = (
-        (np.diff(np.asarray(beam_indices, dtype=np.int64)) > max_bearing_gap_beams)
-        | (np.abs(np.diff(np.asarray(planar_range_m, dtype=np.float64))) > range_jump_m)
-    )
+    breaks = np.abs(np.diff(planar_range_m)) > range_jump_m
     return np.split(np.arange(count), np.flatnonzero(breaks) + 1)
 
 
@@ -345,7 +337,6 @@ def localize_projected_polar_profiling(
     *,
     range_jump_m: float = RANGE_JUMP_M_DEFAULT,
     range_band_m: float = RANGE_BAND_M_DEFAULT,
-    max_bearing_gap_beams: int = MAX_BEARING_GAP_BEAMS_DEFAULT,
     min_valid_rays: int = MIN_VALID_RAYS_DEFAULT,
 ) -> PolarProfilingAttempt:
     """Localize one mask from an already-prepared scan image projection.
@@ -372,12 +363,7 @@ def localize_projected_polar_profiling(
     # mask): segment the range profile, merge the near band, median-reduce.
     selected = np.asarray(projection.points_optical, dtype=np.float64)[beam_indices]
     planar_range_m = np.hypot(selected[:, 0], selected[:, 2])
-    runs = segment_range_profile(
-        beam_indices,
-        planar_range_m,
-        range_jump_m=range_jump_m,
-        max_bearing_gap_beams=max_bearing_gap_beams,
-    )
+    runs = segment_range_profile(planar_range_m, range_jump_m=range_jump_m)
     merged = merge_near_band(runs, planar_range_m, range_band_m=range_band_m)
     if merged.size < min_valid_rays:
         return PolarProfilingAttempt(
@@ -408,7 +394,6 @@ def localize_polar_profiling(
     *,
     range_jump_m: float = RANGE_JUMP_M_DEFAULT,
     range_band_m: float = RANGE_BAND_M_DEFAULT,
-    max_bearing_gap_beams: int = MAX_BEARING_GAP_BEAMS_DEFAULT,
     min_valid_rays: int = MIN_VALID_RAYS_DEFAULT,
 ) -> tuple[PolarProfilingResult | None, MissReason]:
     """Compatibility wrapper for one-off localization callers."""
@@ -418,7 +403,6 @@ def localize_polar_profiling(
         mask,
         range_jump_m=range_jump_m,
         range_band_m=range_band_m,
-        max_bearing_gap_beams=max_bearing_gap_beams,
         min_valid_rays=min_valid_rays,
     )
     return attempt.result, attempt.reason

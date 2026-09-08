@@ -431,7 +431,7 @@ def polar_highlight_beams(
 
     points = np.asarray(scan_points_optical, dtype=np.float64)[mask_beams]
     planar_range_m = np.hypot(points[:, 0], points[:, 2])
-    runs = segment_range_profile(mask_beams, planar_range_m)
+    runs = segment_range_profile(planar_range_m)
     merged = merge_near_band(runs, planar_range_m)
     highlight[mask_beams[merged]] = True
     return highlight
