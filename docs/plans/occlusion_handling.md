@@ -76,7 +76,7 @@ observable, while the finer causal attribution has that stated limit.
 
 Replace the "nearest = object" assumption, in the `rect` branch, with **cluster the masked depth and
 pick the robot cluster by geometry, not by nearness.** New recipes are **opt-in** additions to the
-pluggable registries (`ISOLATION_2D_RECIPES` / `ISOLATION_3D_RECIPES`); the current defaults are
+pluggable registries (`ISOLATION_2D_RECIPES` / `ISOLATION_3D_NAMES`); the current defaults are
 untouched, so this is a benchmarkable A/B rather than a swap.
 
 Clustering is a cheap **1-D range-gap split** (sort masked points by camera-frame range, break where
@@ -209,7 +209,8 @@ Pure-test matrix (synthetic point/pixel sets, no ROS):
 
 ### Phase 2 — wiring
 
-Register the recipes in `ISOLATION_2D_RECIPES` / `ISOLATION_3D_RECIPES`; thread the polar parameter;
+Register the recipes in `ISOLATION_2D_RECIPES` / `ISOLATION_3D_NAMES` (and, for a 3D recipe, in
+`build_isolation_3d`); thread the polar parameter;
 extend the launch arguments' documented choices. No message change (the status fields exist), so the
 only build requirement is the usual node-script reinstall.
 

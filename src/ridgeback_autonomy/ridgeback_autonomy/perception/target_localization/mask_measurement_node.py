@@ -52,6 +52,7 @@ import importlib
 import threading
 import time
 import traceback
+from collections.abc import Collection
 
 import numpy as np
 import rclpy
@@ -101,7 +102,7 @@ from ridgeback_autonomy.perception.target_localization.core.isolation_2d import 
 from ridgeback_autonomy.perception.target_localization.core.isolation_3d import (
     BASE_ABOVE_FLOOR_M_DEFAULT,
     ISOLATION_3D_DEFAULT,
-    ISOLATION_3D_RECIPES,
+    ISOLATION_3D_NAMES,
     build_isolation_3d,
     camera_floor_geometry,
 )
@@ -287,7 +288,7 @@ class TargetMaskMeasurementNode(Node):
         # The 3D recipe is rebuilt per frame with the TF-derived floor pose, so
         # store the validated name (not a pre-built callable) and the offset.
         self.isolation_3d_name = self.resolve_recipe_name(
-            'isolation_3d', ISOLATION_3D_RECIPES)
+            'isolation_3d', ISOLATION_3D_NAMES)
         self.base_above_floor_m = float(
             self.get_parameter('base_above_floor_m').value)
         self.mask_gate = resolve_mask_gate(self.get_parameter('mask_gate').value)
@@ -520,7 +521,8 @@ class TargetMaskMeasurementNode(Node):
         usable_max_m = getattr(self.depth_source, 'usable_max_m', float('inf'))
         return min(self.depth_max_gate_m, float(usable_max_m))
 
-    def resolve_recipe_name(self, parameter_name: str, registry: dict) -> str:
+    def resolve_recipe_name(
+            self, parameter_name: str, registry: Collection[str]) -> str:
         key = str(self.get_parameter(parameter_name).value).strip()
         if key not in registry:
             supported = ', '.join(sorted(registry))
@@ -723,13 +725,13 @@ class TargetMaskMeasurementNode(Node):
                         )
                         camera_rotation, camera_translation = camera_extrinsic
                         # The euclidean floor crop tracks the live mount: derive
-                        # its height/pitch from the same extrinsic and build the
-                        # recipe for this frame.
-                        camera_height_m, camera_pitch_deg = camera_floor_geometry(
+                        # its height and gravity-down direction from the same
+                        # extrinsic and build the recipe for this frame.
+                        camera_height_m, camera_down_optical = camera_floor_geometry(
                             camera_rotation, camera_translation,
                             self.base_above_floor_m)
                         isolation_3d = build_isolation_3d(
-                            self.isolation_3d_name, camera_height_m, camera_pitch_deg)
+                            self.isolation_3d_name, camera_height_m, camera_down_optical)
                         depth_m = self.depth_for_batch(
                             depth_input_msg, batch, prepared_color=prepared_color)
                         self.publish_aligned_depth_debug(

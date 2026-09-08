@@ -6,7 +6,11 @@ import pytest
 from ridgeback_autonomy.common.miss_reason import MissReason
 from ridgeback_autonomy.perception.target_localization.core import euclidean_reconstruction
 from ridgeback_autonomy.perception.target_localization.core.intrinsics import CameraIntrinsics
-from ridgeback_autonomy.perception.target_localization.core.isolation_3d import RangeBand
+from ridgeback_autonomy.perception.target_localization.core.isolation_3d import (
+    ISOLATION_3D_DEFAULT,
+    RangeBand,
+    build_isolation_3d,
+)
 from ridgeback_autonomy.perception.target_localization.core.mask import MaskPrecision, mask_from_array, rasterize_bbox
 from ridgeback_autonomy.perception.target_localization.core.euclidean_reconstruction import localize_euclidean_reconstruction
 
@@ -21,6 +25,17 @@ BACKGROUND_DEPTH_M = 4.0
 OBJECT_SLICE = (slice(20, 40), slice(30, 50))
 OBJECT_CENTROID_XYZ = (-0.01, -0.01, 2.0)
 RECT_BBOX = (25, 15, 55, 45)
+
+# This robot's level mount, camera 1.1855 m above the floor. The scene is not
+# floor: its lowest pixels reach optical Y = 0.56, well above the 1.1355 m crop
+# plane, so the height crop keeps everything and only the range band selects.
+CAMERA_HEIGHT_M = 1.1855
+LEVEL_DOWN_OPTICAL = (0.0, 1.0, 0.0)
+
+
+def default_isolation():
+    return build_isolation_3d(
+        ISOLATION_3D_DEFAULT, CAMERA_HEIGHT_M, LEVEL_DOWN_OPTICAL)
 
 
 def build_depth() -> np.ndarray:
@@ -38,7 +53,8 @@ def object_mask_data() -> np.ndarray:
 def test_rect_mask_default_chain_recovers_object_centroid() -> None:
     mask = rasterize_bbox(RECT_BBOX, HEIGHT, WIDTH)
 
-    result, reason = localize_euclidean_reconstruction(build_depth(), mask, INTRINSICS)
+    result, reason = localize_euclidean_reconstruction(
+        build_depth(), mask, INTRINSICS, isolation=default_isolation())
 
     assert result is not None
     assert reason is MissReason.OK
@@ -71,6 +87,7 @@ def test_precomputed_valid_mask_avoids_recleaning(monkeypatch) -> None:
         depth,
         mask,
         INTRINSICS,
+        isolation=default_isolation(),
         valid_masked=valid_masked,
     )
 

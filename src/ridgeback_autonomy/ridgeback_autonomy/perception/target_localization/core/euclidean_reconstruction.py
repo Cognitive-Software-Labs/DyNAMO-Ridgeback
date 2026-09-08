@@ -8,9 +8,9 @@ never consumed (provenance decision of ``docs/history/pointcloud_provenance_eval
 
 The isolate step is the only place the mask's ``tight | rect`` tag changes
 behavior: ``tight`` takes a statistical outlier pass (median +/- k*MAD on
-range); ``rect`` runs a pluggable 3D recipe (``isolation_3d.py``, default:
-height crop then range band). That fork lives in ``select_foreground_points``
-and nowhere else.
+range); ``rect`` runs a pluggable 3D recipe (``isolation_3d.py``), which the
+caller must supply because it is pose-dependent. That fork lives in
+``select_foreground_points`` and nowhere else.
 
 Two entry points, one implementation.
 ``localize_prepared_euclidean_reconstruction`` is the production one: the mask
@@ -46,8 +46,6 @@ from ridgeback_autonomy.perception.target_localization.core.intrinsics import (
     deproject_masked,
 )
 from ridgeback_autonomy.perception.target_localization.core.isolation_3d import (
-    ISOLATION_3D_DEFAULT,
-    ISOLATION_3D_RECIPES,
     mad_outlier_removal,
 )
 from ridgeback_autonomy.perception.target_localization.core.mask import Mask, MaskPrecision
@@ -75,12 +73,21 @@ def select_foreground_points(
     ``tight`` silhouettes carry only the object, so the remaining spread is
     noise and a MAD pass is the right tool; a ``rect`` box carries real
     background, which needs a recipe that knows where the object starts.
+
+    That recipe has to be supplied. There is no default to fall back to,
+    because the default chain crops the floor against the camera's pose and
+    only the caller has it (from TF); substituting a guess would return a
+    plausible wrong answer with no error and no log. ``None`` stays legal on
+    the ``tight`` branch, which never looks at it.
     """
 
     if precision is MaskPrecision.TIGHT:
         return mad_outlier_removal(points)
     if isolation is None:
-        isolation = ISOLATION_3D_RECIPES[ISOLATION_3D_DEFAULT]
+        raise ValueError(
+            'A rect mask needs an explicit isolation recipe; build one with '
+            'build_isolation_3d() at the live camera pose from '
+            'camera_floor_geometry().')
     return isolation(points)
 
 
@@ -149,8 +156,8 @@ def localize_euclidean_reconstruction(
     """Localize one full-grid mask against one aligned depth frame.
 
     The standalone signature. ``isolation`` is the ``rect``-branch
-    keep-selector (an ``ISOLATION_3D_RECIPES`` entry; default recipe when
-    ``None``); the ``tight`` branch uses MAD outlier removal instead. Returns
+    keep-selector (from ``build_isolation_3d``; required on that branch); the
+    ``tight`` branch uses MAD outlier removal instead. Returns
     ``(result, MissReason.OK)`` on success, or ``(None, <reason>)`` when fewer
     than ``min_valid_points`` points enter or survive isolation. ``valid_masked``
     may carry the caller's already-cleaned ``mask & valid_depth`` array;

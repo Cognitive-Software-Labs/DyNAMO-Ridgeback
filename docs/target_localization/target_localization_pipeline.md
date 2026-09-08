@@ -261,7 +261,7 @@ The common interface unifies the **selection** mechanic (indexing depth / points
 | euclidean reconstruction (point cloud) | MAD outlier removal | 3D isolation recipe (default: height crop → nearest-mode band) |
 | polar profiling (LiDAR) | arc segmentation → merge near-band runs → median (narrow window) | arc segmentation → merge near-band runs → median (wide window admits neighbors) |
 
-Selection stays shared; the fork sits exactly where behavior genuinely diverges. Polar profiling is the exception: parallax contaminates even the tight mask (see the polar profiling callout), so its branches run the same recovery and differ only in bearing-window width. The rect recoveries are pluggable recipes (`ISOLATION_2D_RECIPES` / `ISOLATION_3D_RECIPES`, selected per launch via the `isolation_2d` / `isolation_3d` parameters of `target_mask_measurement_node`). The implemented defaults use NumPy; extra recovery still has a cost, and alternative recipe costs require measurement on the selected hardware.
+Selection stays shared; the fork sits exactly where behavior genuinely diverges. Polar profiling is the exception: parallax contaminates even the tight mask (see the polar profiling callout), so its branches run the same recovery and differ only in bearing-window width. The rect recoveries are pluggable recipes (`ISOLATION_2D_RECIPES` / `ISOLATION_3D_NAMES`, selected per launch via the `isolation_2d` / `isolation_3d` parameters of `target_mask_measurement_node`). The implemented defaults use NumPy; extra recovery still has a cost, and alternative recipe costs require measurement on the selected hardware.
 
 ---
 

@@ -26,6 +26,10 @@ from ridgeback_autonomy.perception.target_localization.core.intrinsics import (
     CameraIntrinsics,
     deproject_masked,
 )
+from ridgeback_autonomy.perception.target_localization.core.isolation_3d import (
+    ISOLATION_3D_DEFAULT,
+    build_isolation_3d,
+)
 from ridgeback_autonomy.perception.target_localization.core.mask import (
     MaskPrecision,
     MaskRegion,
@@ -50,6 +54,11 @@ LEVEL_OPTICAL_TO_BASE = np.array([
     [0.0, -1.0, 0.0],
 ], dtype=np.float64)
 ZERO_TRANSLATION = np.zeros(3, dtype=np.float64)
+# The rect branch needs a real recipe, and it is built once here rather than
+# inside the measured call: peak_bytes would otherwise charge its allocation to
+# fill_path_measurements. This robot's level mount, camera 1.1855 m up.
+LEVEL_ISOLATION_3D = build_isolation_3d(
+    ISOLATION_3D_DEFAULT, camera_height_m=1.1855, down_optical=(0.0, 1.0, 0.0))
 
 
 def peak_bytes(call) -> int:
@@ -88,7 +97,7 @@ def run_fill(masks, depth, batch) -> None:
         camera_translation=ZERO_TRANSLATION,
         front_offset_m=0.25,
         isolation_2d=None,
-        isolation_3d=None,
+        isolation_3d=LEVEL_ISOLATION_3D,
     )
 
 

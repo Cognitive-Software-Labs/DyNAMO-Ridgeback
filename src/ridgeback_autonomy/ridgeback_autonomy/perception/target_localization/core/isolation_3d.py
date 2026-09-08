@@ -8,13 +8,13 @@ foreground points.
 Isolators are callables satisfying that contract. ``Chain`` composes them --
 per the docs, one floor-remover (``HeightCrop``) plus one
 background-separator (``RangeBand``) makes a complete isolator, and that chain
-is the default recipe. Camera geometry comes from TF at runtime; the constants
-here are standalone/static defaults, not copies of the camera configuration.
+is the default recipe. The camera pose ``HeightCrop`` needs comes from TF at
+runtime and from nowhere else: there is no static mount in this module, so a
+recipe cannot be built without one.
 """
 
 from __future__ import annotations
 
-import math
 from dataclasses import dataclass
 
 import numpy as np
@@ -31,8 +31,6 @@ from ridgeback_autonomy.perception.target_localization.core.ranging_defaults imp
 )
 
 
-CAMERA_HEIGHT_M_DEFAULT = 1.053  # static/test default only; at runtime the height comes from TF via camera_floor_geometry.
-CAMERA_PITCH_DEG_DEFAULT = 0.0  # static/test default; runtime pitch is read from the TF rotation
 FLOOR_MARGIN_M_DEFAULT = 0.05
 # base_link origin above the floor: stable chassis geometry, and the floor is
 # not a TF frame, so this stays a measured constant rather than a lookup. Added
@@ -53,22 +51,28 @@ class HeightCrop:
     """Catalogue #1: extrinsic ground-plane crop -- a floor-remover.
 
     The camera's pose above the floor is known (calibrated extrinsics), so the
-    floor is removed by prior knowledge, not estimation: rotate to the
-    gravity-aligned frame and drop every point at or below the floor plus a
-    margin. Far background passes untouched -- pair with a
-    background-separator (``RangeBand``) via ``Chain``.
+    floor is removed by prior knowledge, not estimation: project every point
+    onto gravity-down and drop the ones at or below the floor plus a margin.
+    Far background passes untouched -- pair with a background-separator
+    (``RangeBand``) via ``Chain``.
+
+    ``down_optical`` is the unit gravity-down direction expressed in the camera
+    optical frame, straight from the extrinsic (``camera_floor_geometry``); the
+    crop is then the half-space test ``points @ down_optical``, exact for any
+    mount orientation including roll. Both pose fields are required -- there is
+    no default mount, because a wrong one crops silently.
+
+    The vector is a tuple rather than an ``ndarray`` so the frozen dataclass
+    keeps a working generated ``__eq__``.
     """
 
-    camera_height_m: float = CAMERA_HEIGHT_M_DEFAULT
-    pitch_deg: float = CAMERA_PITCH_DEG_DEFAULT
+    camera_height_m: float
+    down_optical: tuple[float, float, float]
     floor_margin_m: float = FLOOR_MARGIN_M_DEFAULT
 
     def __call__(self, points: np.ndarray) -> np.ndarray:
         points = np.asarray(points, dtype=np.float64)
-        pitch = math.radians(self.pitch_deg)
-        # Gravity-aligned down component: optical Y is straight down at zero
-        # pitch; a downward pitch folds part of optical Z into it.
-        down_m = math.cos(pitch) * points[:, 1] + math.sin(pitch) * points[:, 2]
+        down_m = points @ np.asarray(self.down_optical, dtype=np.float64)
         height_above_floor_m = self.camera_height_m - down_m
         return height_above_floor_m > self.floor_margin_m
 
@@ -173,18 +177,18 @@ def mad_outlier_removal(points: np.ndarray, k: float = MAD_K_DEFAULT) -> np.ndar
     return np.abs(ranges - median_m) <= k * mad_m
 
 
-# The config swap point: isolators keyed by name, all satisfying the contract
-# above. ``ISOLATION_3D_DEFAULT`` is what euclidean reconstruction uses when none is chosen.
-# These carry the static default pose; the node builds a pose-parameterized
-# recipe per frame via ``build_isolation_3d`` (below). The registry stays for
-# name validation, listing, and pure unit tests.
-ISOLATION_3D_RECIPES: dict[str, object] = {
-    'height_crop': HeightCrop(),
-    'range_band': RangeBand(),
-    'nearest_mode_band': NearestModeBand(),
-    'height_crop_range_band': Chain((HeightCrop(), RangeBand())),
-    'height_crop_nearest_mode_band': Chain((HeightCrop(), NearestModeBand())),
-}
+# The config swap point: the selectable recipe names, all building isolators
+# that satisfy the contract above. Names only, not instances -- every recipe
+# containing a ``HeightCrop`` needs the live camera pose, so the only way to get
+# one is ``build_isolation_3d`` (below). This set is what parameter validation
+# and listing check against.
+ISOLATION_3D_NAMES = frozenset({
+    'height_crop',
+    'range_band',
+    'nearest_mode_band',
+    'height_crop_range_band',
+    'height_crop_nearest_mode_band',
+})
 # The mode-anchored chain is the default. The percentile chain it replaces is
 # correct only while the object is the nearest quarter of the point set, and
 # what kept it inside that regime was the depth gate bounding how much
@@ -201,37 +205,42 @@ def camera_floor_geometry(
     rotation: np.ndarray,
     translation: np.ndarray,
     base_above_floor_m: float,
-) -> tuple[float, float]:
-    """Camera height above the floor and pitch, from the optical->base transform.
+) -> tuple[float, tuple[float, float, float]]:
+    """Camera height above the floor and gravity-down, from the optical->base transform.
 
     ``rotation`` / ``translation`` are the camera-optical -> base extrinsics
     (from TF). Height above the floor is the camera's height above the base
     origin (``translation[2]``) plus the fixed chassis offset of that origin
-    above the floor (``base_above_floor_m``). Pitch comes from the rotation:
-    gravity-down expressed in the optical frame is the negated base-up row of
-    the transform, and ``HeightCrop`` models that direction as
-    ``[0, cos p, sin p]``, so ``p`` is the angle of its (Y, Z) components -- 0
-    for a level mount.
+    above the floor (``base_above_floor_m``). The direction is the negated
+    base-up row of the rotation, which is gravity-down expressed in the optical
+    frame -- handed to ``HeightCrop`` as-is, with no angle in between to lose
+    the X component to.
     """
 
     rotation = np.asarray(rotation, dtype=np.float64)
     translation = np.asarray(translation, dtype=np.float64)
     camera_height_m = float(translation[2]) + float(base_above_floor_m)
     down_optical = -rotation[2, :]
-    pitch_deg = math.degrees(math.atan2(float(down_optical[2]), float(down_optical[1])))
-    return camera_height_m, pitch_deg
+    return camera_height_m, (
+        float(down_optical[0]), float(down_optical[1]), float(down_optical[2]))
 
 
-def build_isolation_3d(name: str, camera_height_m: float, pitch_deg: float):
+def build_isolation_3d(
+    name: str,
+    camera_height_m: float,
+    down_optical: tuple[float, float, float],
+):
     """Build the named recipe with its floor crop set to a specific camera pose.
 
-    Mirrors ``ISOLATION_3D_RECIPES`` but constructs any ``HeightCrop`` step at
-    the given height and pitch (typically from ``camera_floor_geometry``) rather
-    than the static defaults. The background-separators take no pose -- they
+    The only constructor for an ``ISOLATION_3D_NAMES`` recipe: any
+    ``HeightCrop`` step is built at the given pose (typically straight from
+    ``camera_floor_geometry``), so no caller can end up cropping against a mount
+    that is not the live one. The background-separators take no pose -- they
     work on rotation-invariant camera-frame ranges -- so they are unchanged.
     """
 
-    height_crop = HeightCrop(camera_height_m=camera_height_m, pitch_deg=pitch_deg)
+    height_crop = HeightCrop(
+        camera_height_m=camera_height_m, down_optical=down_optical)
     if name == 'height_crop':
         return height_crop
     if name == 'range_band':
@@ -242,5 +251,5 @@ def build_isolation_3d(name: str, camera_height_m: float, pitch_deg: float):
         return Chain((height_crop, RangeBand()))
     if name == 'height_crop_nearest_mode_band':
         return Chain((height_crop, NearestModeBand()))
-    supported = ', '.join(sorted(ISOLATION_3D_RECIPES))
+    supported = ', '.join(sorted(ISOLATION_3D_NAMES))
     raise ValueError(f'Unknown isolation_3d recipe "{name}". Expected one of: {supported}')

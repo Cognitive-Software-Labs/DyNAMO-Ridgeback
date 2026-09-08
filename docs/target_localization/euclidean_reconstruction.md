@@ -140,12 +140,15 @@ minimum-count guard decides whether a measurement can be emitted.
 | `height_crop_nearest_mode_band` | `HeightCrop` then `NearestModeBand` — current default |
 
 **Height crop.** `HeightCrop` retains points whose estimated height above the
-floor exceeds `floor_margin_m` (`0.05 m` by default). It uses optical Y/Z plus
-camera height and pitch. Runtime geometry comes from live TF and the chassis
-base-above-floor offset; `build_isolation_3d` injects it into recipes containing
-a crop. This removes floor, not walls. Calibration error, ramps, and uneven
-ground can remove target points or retain floor points; this is not plane
-fitting.
+floor exceeds `floor_margin_m` (`0.05 m` by default). Height above the floor is
+the camera's height minus the point's projection onto gravity-down, so the crop
+is a half-space test that is exact for any mount orientation, roll included.
+Both the height and the gravity-down direction come from live TF (plus the
+chassis base-above-floor offset) via `camera_floor_geometry`; there is no static
+mount and no default pose, so a recipe containing a crop can only be built
+through `build_isolation_3d`, and only from a pose the caller actually has.
+This removes floor, not walls. Calibration error, ramps, and uneven ground can
+remove target points or retain floor points; this is not plane fitting.
 
 **Percentile range band.** `RangeBand` anchors at the 25th percentile of
 Euclidean camera-frame range and retains the interval from `0.10 m` ahead to

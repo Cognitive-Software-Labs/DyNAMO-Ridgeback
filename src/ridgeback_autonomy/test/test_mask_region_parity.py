@@ -37,7 +37,9 @@ from ridgeback_autonomy.perception.target_localization.core.isolation_2d import 
     ISOLATION_2D_RECIPES,
 )
 from ridgeback_autonomy.perception.target_localization.core.isolation_3d import (
-    ISOLATION_3D_RECIPES,
+    ISOLATION_3D_DEFAULT,
+    ISOLATION_3D_NAMES,
+    build_isolation_3d,
 )
 from ridgeback_autonomy.perception.target_localization.core.mask import (
     Mask,
@@ -64,6 +66,15 @@ INTRINSICS = CameraIntrinsics(
     fx=320.0, fy=320.0, cx=160.0, cy=120.0, width=320, height=240)
 RECT_BBOX = (195, 65, 280, 135)
 TOLERANCE = 1e-9
+
+# The camera pose the 3D recipes are built at: this robot's level mount, camera
+# 1.1855 m above the floor. The reference numbers are pose-independent here --
+# the deepest row of the rect box against the 6 m wall lands at optical
+# Y = 0.2625, an order of magnitude under the 1.1355 m crop plane, so the crop
+# keeps every point whatever the mount. A moved golden means that stopped
+# holding, not that the file is stale.
+CAMERA_HEIGHT_M = 1.1855
+LEVEL_DOWN_OPTICAL = (0.0, 1.0, 0.0)
 
 
 def build_scene(dtype=np.float32) -> np.ndarray:
@@ -231,13 +242,14 @@ def test_projective_shortfall_keeps_too_few_valid_pixels() -> None:
 # --- euclidean reconstruction ----------------------------------------------
 
 
-@pytest.mark.parametrize('label,recipe', [
-    ('default', None),
-    *((key, ISOLATION_3D_RECIPES[key]) for key in sorted(ISOLATION_3D_RECIPES)),
+@pytest.mark.parametrize('label,recipe_name', [
+    ('default', ISOLATION_3D_DEFAULT),
+    *((key, key) for key in sorted(ISOLATION_3D_NAMES)),
 ])
-def test_euclidean_rect_recipes_match_pre_migration(label, recipe) -> None:
+def test_euclidean_rect_recipes_match_pre_migration(label, recipe_name) -> None:
     depth = build_scene()
     name = f'euclidean_rect_{label}'
+    recipe = build_isolation_3d(recipe_name, CAMERA_HEIGHT_M, LEVEL_DOWN_OPTICAL)
 
     check_euclidean(name, *localize_euclidean_reconstruction(
         depth, build_rect_mask(), INTRINSICS, isolation=recipe))
@@ -268,11 +280,13 @@ def test_euclidean_finite_gate_matches_pre_migration() -> None:
 
 def test_euclidean_float64_depth_matches_pre_migration() -> None:
     depth = build_scene(np.float64)
+    recipe = build_isolation_3d(
+        ISOLATION_3D_DEFAULT, CAMERA_HEIGHT_M, LEVEL_DOWN_OPTICAL)
 
     check_euclidean('euclidean_float64', *localize_euclidean_reconstruction(
-        depth, build_rect_mask(), INTRINSICS))
+        depth, build_rect_mask(), INTRINSICS, isolation=recipe))
     check_euclidean('euclidean_float64', *localize_prepared_euclidean_reconstruction(
-        prepare(rect_region(), depth), INTRINSICS))
+        prepare(rect_region(), depth), INTRINSICS, isolation=recipe))
 
 
 def test_euclidean_shortfall_keeps_too_few_valid_points() -> None:

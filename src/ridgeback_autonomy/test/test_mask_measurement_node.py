@@ -21,6 +21,10 @@ from ridgeback_autonomy.perception.target_localization.core.intrinsics import Ca
 from ridgeback_autonomy.perception.target_localization.core import (
     isolation_2d as isolation_2d_module,
 )
+from ridgeback_autonomy.perception.target_localization.core.isolation_3d import (
+    ISOLATION_3D_DEFAULT,
+    build_isolation_3d,
+)
 from ridgeback_autonomy.perception.target_localization.core.mask import (
     MaskPrecision,
     region_from_blob,
@@ -786,7 +790,11 @@ def test_fill_path_measurements_stamps_ok_and_scan_reason() -> None:
     fill_path_measurements(
         batch, masks, intrinsics, depth, None,
         camera_rotation=np.eye(3), camera_translation=np.zeros(3), front_offset_m=0.0,
-        isolation_2d=None, isolation_3d=None, scan_reason=MissReason.NO_SCAN)
+        isolation_2d=None,
+        isolation_3d=build_isolation_3d(
+            ISOLATION_3D_DEFAULT, camera_height_m=1.1855,
+            down_optical=(0.0, 1.0, 0.0)),
+        scan_reason=MissReason.NO_SCAN)
 
     det = batch.detections[0]
     assert det.projective_ranging_status == int(MissReason.OK)
