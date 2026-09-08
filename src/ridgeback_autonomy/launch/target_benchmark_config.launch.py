@@ -26,6 +26,7 @@ from ridgeback_autonomy.perception.target_localization.estimator_registry import
     uses_pointcloud_estimators,
 )
 from ridgeback_autonomy.perception.target_localization.launch import (
+    ALIGNED_DEPTH_DEBUG_TOPIC,
     CONFIG_LAUNCH_ARGUMENT_NAMES,
     MASK_MEASUREMENTS_TOPIC,
     POINTCLOUD_MEASUREMENTS_TOPIC,
@@ -175,6 +176,14 @@ def build_benchmark_nodes(context, *args, **kwargs):
             'run_dir_name': LaunchConfiguration('run_dir_name'),
             'settle_sec': settle_sec,
             'capture_sec': capture_sec,
+            'replay_dataset_dir': LaunchConfiguration('replay_dataset_dir'),
+            'capture_batches': LaunchConfiguration('capture_batches'),
+            'capture_drain_sec': LaunchConfiguration('capture_drain_sec'),
+            'capture_timeout_sec': LaunchConfiguration('capture_timeout_sec'),
+            'raw_detections_topic': RAW_DETECTIONS_TOPIC,
+            'aligned_depth_debug_topic': ALIGNED_DEPTH_DEBUG_TOPIC,
+            'camera_info_topic': camera_inputs.color_camera_info_topic,
+            'base_frame': base_frame,
             'estimators': ','.join(selected_estimators),
             'pointcloud_measurement_topic': POINTCLOUD_MEASUREMENTS_TOPIC,
             'mask_measurement_topic': MASK_MEASUREMENTS_TOPIC,
@@ -293,6 +302,22 @@ def generate_launch_description():
         DeclareLaunchArgument('run_dir_name', default_value=''),
         DeclareLaunchArgument('settle_sec', default_value='2.0'),
         DeclareLaunchArgument('capture_sec', default_value='10.0'),
+        DeclareLaunchArgument(
+            'replay_dataset_dir', default_value='',
+            description='New directory for a V1 projective-ranging replay capture',
+        ),
+        DeclareLaunchArgument(
+            'capture_batches', default_value='0',
+            description='Raw detector batches per replay trial; empty batches count',
+        ),
+        DeclareLaunchArgument(
+            'capture_drain_sec', default_value='2.0',
+            description='Bounded depth-match drain after the replay batch quota',
+        ),
+        DeclareLaunchArgument(
+            'capture_timeout_sec', default_value='30.0',
+            description='Hard stall bound for one replay-capture trial',
+        ),
         DeclareLaunchArgument(
             'depth_topic', default_value=SIMULATION_CAMERA_INPUTS.aligned_depth_topic),
         DeclareLaunchArgument(

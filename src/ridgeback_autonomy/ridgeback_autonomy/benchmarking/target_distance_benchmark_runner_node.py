@@ -9,6 +9,7 @@ import time
 from typing import Any
 
 import cv2
+import numpy as np
 import rclpy
 from ament_index_python.packages import get_package_share_directory
 from geometry_msgs.msg import PointStamped
@@ -16,6 +17,10 @@ from rclpy.executors import ExternalShutdownException
 from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
 from sensor_msgs.msg import Image
+from sensor_msgs.msg import CameraInfo
+from tf2_ros import Buffer, TransformListener
+from tf2_ros import TransformException
+from rclpy.time import Time
 
 from ridgeback_autonomy.benchmarking.alignment import (
     attach_exact_preview,
@@ -60,6 +65,7 @@ from ridgeback_autonomy.benchmarking.recording import (
     ScreenRecorder,
     find_window_id,
 )
+from ridgeback_autonomy.benchmarking.replay import ReplayDatasetWriter, sha256_file
 from ridgeback_autonomy.benchmarking.process_utils import (
     extract_json_payload,
     format_commit,
@@ -95,7 +101,7 @@ from ridgeback_autonomy.benchmarking.trial_results import (
     build_trials,
     dominant_miss_reasons,
 )
-from ridgeback_autonomy.msg import TargetMeasurements
+from ridgeback_autonomy.msg import TargetDetections, TargetMeasurements
 from ridgeback_autonomy.common.stamps import stamp_to_nanoseconds
 from ridgeback_autonomy.perception.target_localization.core.depth_common import (
     DEPTH_GATE_DISABLED,
@@ -103,6 +109,15 @@ from ridgeback_autonomy.perception.target_localization.core.depth_common import 
     NEAREST_MODE_MIN_BIN_FRACTION_DEFAULT,
 )
 from ridgeback_autonomy.perception.target_localization.core.image_utils import convert_color_image_message
+from ridgeback_autonomy.perception.target_localization.core.depth_sources import decode_depth_to_meters
+from ridgeback_autonomy.perception.target_localization.core.intrinsics import intrinsics_from_camera_info
+from ridgeback_autonomy.perception.target_localization.core.mask import clamp_box
+from ridgeback_autonomy.common.messages import batch_from_detections_message
+from ridgeback_autonomy.common.tf_utils import lookup_transform_components
+from ridgeback_autonomy.perception.target_localization.contracts import (
+    ALIGNED_DEPTH_DEBUG_TOPIC,
+    RAW_DETECTIONS_TOPIC,
+)
 from ridgeback_autonomy.perception.target_localization.core.isolation_2d import ISOLATION_2D_DEFAULT
 from ridgeback_autonomy.perception.target_localization.core.isolation_3d import (
     FLOOR_MARGIN_M_DEFAULT,
@@ -185,6 +200,14 @@ class TargetDistanceBenchmarkRunner(Node):
         self.declare_parameter('run_dir_name', '')
         self.declare_parameter('settle_sec', 2.0)
         self.declare_parameter('capture_sec', 10.0)
+        self.declare_parameter('replay_dataset_dir', '')
+        self.declare_parameter('capture_batches', 0)
+        self.declare_parameter('capture_drain_sec', 2.0)
+        self.declare_parameter('capture_timeout_sec', 30.0)
+        self.declare_parameter('raw_detections_topic', RAW_DETECTIONS_TOPIC)
+        self.declare_parameter('aligned_depth_debug_topic', ALIGNED_DEPTH_DEBUG_TOPIC)
+        self.declare_parameter('camera_info_topic', 'sensors/camera_0/color/camera_info')
+        self.declare_parameter('base_frame', 'base_link')
         self.declare_parameter('estimators', 'all')
         self.declare_parameter('pointcloud_measurement_topic', POINTCLOUD_MEASUREMENTS_TOPIC)
         self.declare_parameter('mask_measurement_topic', MASK_MEASUREMENTS_TOPIC)
@@ -239,6 +262,10 @@ class TargetDistanceBenchmarkRunner(Node):
         self.run_dir_name = str(self.get_parameter('run_dir_name').value).strip()
         self.settle_sec = float(self.get_parameter('settle_sec').value)
         self.capture_sec = float(self.get_parameter('capture_sec').value)
+        self.replay_dataset_dir = str(self.get_parameter('replay_dataset_dir').value).strip()
+        self.capture_batches = int(self.get_parameter('capture_batches').value)
+        self.capture_drain_sec = float(self.get_parameter('capture_drain_sec').value)
+        self.capture_timeout_sec = float(self.get_parameter('capture_timeout_sec').value)
         self.selected_estimators = parse_estimators(str(self.get_parameter('estimators').value))
         self.pointcloud_measurement_topic = str(
             self.get_parameter('pointcloud_measurement_topic').value)
@@ -248,6 +275,10 @@ class TargetDistanceBenchmarkRunner(Node):
         self.isolation_3d = str(self.get_parameter('isolation_3d').value)
         self.mask_gate = parse_mask_gate(str(self.get_parameter('mask_gate').value))
         self.color_topic = str(self.get_parameter('color_topic').value)
+        self.raw_detections_topic = str(self.get_parameter('raw_detections_topic').value)
+        self.aligned_depth_debug_topic = str(self.get_parameter('aligned_depth_debug_topic').value)
+        self.camera_info_topic = str(self.get_parameter('camera_info_topic').value)
+        self.base_frame = str(self.get_parameter('base_frame').value)
         self.record_video = bool(self.get_parameter('record_video').value)
         self.record_window_class = str(self.get_parameter('record_window_class').value)
         self.recorder = ScreenRecorder(
@@ -275,6 +306,22 @@ class TargetDistanceBenchmarkRunner(Node):
         self.run_output_dir = os.path.join(self.output_dir, run_folder)
         self.images_dir = os.path.join(self.run_output_dir, 'images')
         os.makedirs(self.images_dir, exist_ok=False)
+
+        self.replay_writer: ReplayDatasetWriter | None = None
+        if self.replay_dataset_dir:
+            if self.capture_batches < 1:
+                raise ValueError('capture_batches must be positive when replay_dataset_dir is set.')
+            if self.selected_estimators != ('projective_ranging',):
+                raise ValueError('Replay capture V1 requires estimators:=projective_ranging.')
+            if self.mask_gate != 'box' or self.depth_source != 'stereoscopic':
+                raise ValueError('Replay capture V1 requires mask_gate:=box and depth_source:=stereoscopic.')
+            self.replay_writer = ReplayDatasetWriter(self.replay_dataset_dir, {
+                'dataset_id': self.run_label,
+                'scenario_path': self.scenario_path,
+                'scenario_sha256': sha256_file(self.scenario_path),
+                'capture_parameters': self.declared_parameters(),
+                'source': git_provenance(self.workspace_root),
+            })
 
         # Self-describing names: the underscore ``output`` form (gate, source,
         # path, isolation) names the CSV file; the spaced ``display`` prose
@@ -319,6 +366,10 @@ class TargetDistanceBenchmarkRunner(Node):
         self.capture_active = False
         self.capture_events = {}
         self.color_preview_buffer: OrderedDict[int, Any] = OrderedDict()
+        self.replay_capture_events: OrderedDict[int, dict[str, Any]] = OrderedDict()
+        self.latest_replay_camera_info: CameraInfo | None = None
+        self.replay_tf_buffer: Buffer | None = None
+        self.replay_tf_listener: TransformListener | None = None
 
         self.last_color_decode_warning = None
 
@@ -340,6 +391,28 @@ class TargetDistanceBenchmarkRunner(Node):
             self.on_color_image,
             qos_profile_sensor_data,
         )
+        if self.replay_writer is not None:
+            self.replay_tf_buffer = Buffer(node=self)
+            self.replay_tf_listener = TransformListener(
+                self.replay_tf_buffer, self, spin_thread=False)
+            self.create_subscription(
+                TargetDetections,
+                self.raw_detections_topic,
+                self.on_replay_raw_detections,
+                10,
+            )
+            self.create_subscription(
+                Image,
+                self.aligned_depth_debug_topic,
+                self.on_replay_aligned_depth,
+                qos_profile_sensor_data,
+            )
+            self.create_subscription(
+                CameraInfo,
+                self.camera_info_topic,
+                self.on_replay_camera_info,
+                qos_profile_sensor_data,
+            )
 
         # Ground truth for the display surfaces' reference line, republished
         # while a capture window is active so their age gates drop the line
@@ -387,6 +460,85 @@ class TargetDistanceBenchmarkRunner(Node):
         stamp_ns = stamp_to_nanoseconds(msg.header.stamp)
         store_buffered_preview(self.color_preview_buffer, stamp_ns, preview)
         self.backfill_previews_from_buffers()
+
+    def on_replay_camera_info(self, msg: CameraInfo) -> None:
+        self.latest_replay_camera_info = msg
+
+    def on_replay_raw_detections(self, msg: TargetDetections) -> None:
+        """Freeze detector identity before a measurement recipe can change it."""
+
+        if not self.capture_active or len(self.replay_capture_events) >= self.capture_batches:
+            return
+        stamp_ns = stamp_to_nanoseconds(msg.header.stamp)
+        if stamp_ns in self.replay_capture_events:
+            return
+        batch = batch_from_detections_message(msg)
+        intrinsics = None
+        if self.latest_replay_camera_info is not None:
+            camera = intrinsics_from_camera_info(self.latest_replay_camera_info)
+            intrinsics = {
+                'fx': camera.fx, 'fy': camera.fy, 'cx': camera.cx, 'cy': camera.cy,
+                'width': camera.width, 'height': camera.height,
+            }
+        rotation = translation = None
+        if self.replay_tf_buffer is not None:
+            try:
+                rotation_value, translation_value, _ = lookup_transform_components(
+                    self.replay_tf_buffer,
+                    self.base_frame,
+                    msg.header.frame_id,
+                    Time.from_msg(msg.header.stamp),
+                    self.get_logger(),
+                    None,
+                )
+                rotation = np.asarray(rotation_value, dtype=float).tolist()
+                translation = np.asarray(translation_value, dtype=float).tolist()
+            except TransformException:
+                pass
+        self.replay_capture_events[stamp_ns] = {
+            'stamp_ns': stamp_ns,
+            'frame_id': str(msg.header.frame_id),
+            'detected': bool(msg.detected),
+            'count': int(msg.count),
+            'image_width': int(msg.image_width),
+            'image_height': int(msg.image_height),
+            'intrinsics': intrinsics,
+            'camera_rotation': rotation,
+            'camera_translation': translation,
+            'front_offset_m': 0.25,
+            # Stereo depth has no source-defined finite usable ceiling.
+            'depth_usable_max_m': None,
+            'detections': [
+                {
+                    'bbox_xyxy': list(detection.bbox_xyxy),
+                    'label': detection.label,
+                    'score': detection.score,
+                    'depth_roi': None,
+                }
+                for detection in batch.detections
+            ],
+        }
+
+    def on_replay_aligned_depth(self, msg: Image) -> None:
+        if not self.capture_active:
+            return
+        event = self.replay_capture_events.get(stamp_to_nanoseconds(msg.header.stamp))
+        if event is None:
+            return
+        try:
+            depth_m = decode_depth_to_meters(msg)
+        except ValueError as exc:
+            self.get_logger().warning(f'Replay capture skipped unusable aligned depth: {exc}')
+            return
+        if depth_m.shape != (event['image_height'], event['image_width']):
+            self.get_logger().warning(
+                f'Replay capture depth grid {depth_m.shape} differs from detection grid '
+                f'({event["image_height"]}, {event["image_width"]}); recording no match.')
+            return
+        for detection in event['detections']:
+            x1, y1, x2, y2 = clamp_box(
+                tuple(detection['bbox_xyxy']), event['image_height'], event['image_width'])
+            detection['depth_roi'] = np.array(depth_m[y1:y2, x1:x2], dtype=np.float32, copy=True)
 
     def log_code_provenance(self) -> None:
         """Say which code is about to produce these results, before it does.
@@ -475,6 +627,13 @@ class TargetDistanceBenchmarkRunner(Node):
             estimator_rows, total_extra_detections, outcome_counts, self.status_aggregate)
         self.write_run_outputs(
             summary_rows, estimator_rows, included_trials, skipped_trials)
+
+        if self.replay_writer is not None:
+            self.replay_writer.finalize(
+                live_run_dir=self.run_output_dir,
+                trials_included=included_trials,
+                trials_skipped=skipped_trials,
+            )
 
         self.log_summary(summary_rows, included_trials, skipped_trials)
         self.get_logger().info(f'Benchmark run written to {self.run_output_dir}')
@@ -608,6 +767,8 @@ class TargetDistanceBenchmarkRunner(Node):
             }
             self.active_trial_id = trial_id
             capture = self.capture_measurement_window(self.capture_sec)
+            if self.replay_writer is not None:
+                self.write_replay_trial(trial, gt_instances, capture['replay_events'])
             merge_status_histograms(self.status_aggregate, capture['status_histogram'])
             usable_by_estimator = capture['usable_by_estimator']
             usable_events = capture['usable_events']
@@ -686,16 +847,60 @@ class TargetDistanceBenchmarkRunner(Node):
     def capture_measurement_window(self, duration_sec: float) -> dict[str, Any]:
         self.capture_events = {}
         self.clear_preview_buffers()
+        self.replay_capture_events.clear()
         self.capture_active = True
         try:
-            self.spin_for(duration_sec)
+            if self.replay_writer is None:
+                self.spin_for(duration_sec)
+            else:
+                deadline = time.monotonic() + self.capture_timeout_sec
+                while (rclpy.ok() and time.monotonic() < deadline
+                       and len(self.replay_capture_events) < self.capture_batches):
+                    rclpy.spin_once(self, timeout_sec=0.1)
+                    self.publish_active_truth()
+                if len(self.replay_capture_events) < self.capture_batches:
+                    raise RuntimeError(
+                        f'Replay capture saw {len(self.replay_capture_events)}/{self.capture_batches} '
+                        'raw detection batches before capture_timeout_sec.')
+                self.spin_for(self.capture_drain_sec)
         finally:
             self.capture_active = False
             self.active_truth = None
             self.active_trial_id = ''
 
-        return summarize_capture_events(
+        summary = summarize_capture_events(
             self.capture_events, self.selected_estimators)
+        if self.replay_writer is not None:
+            summary['replay_events'] = list(self.replay_capture_events.values())
+        return summary
+
+    def write_replay_trial(
+        self,
+        trial: dict[str, Any],
+        ground_truth_instances: list[GroundTruthInstance],
+        events: list[dict[str, Any]],
+    ) -> None:
+        if self.replay_writer is None:
+            return
+        scene: Scene = trial['scene']
+        self.replay_writer.write_trial({
+            'trial_id': trial['trial_id'],
+            'repeat_index': trial['repeat_index'],
+            'scene_id': scene.id,
+            'ground_truth': [
+                {
+                    'index': instance.index,
+                    'model_name': instance.model_name,
+                    'world_x': instance.world_x,
+                    'world_y': instance.world_y,
+                    'forward_m': instance.forward_m,
+                    'lateral_m': instance.lateral_m,
+                    'distance_m': instance.distance_m,
+                    'spawn_yaw_rad': scene.robots[instance.index].yaw,
+                }
+                for instance in ground_truth_instances
+            ],
+        }, events)
 
     def save_trial_collage(
         self,
