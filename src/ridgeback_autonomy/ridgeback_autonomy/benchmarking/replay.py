@@ -270,6 +270,8 @@ def _event_from_payload(event: dict, arguments: dict[str, str]) -> ReplayMeasure
             detection.projective_ranging_status = int(MissReason.MASK_OVERSIZED_BOX)
         elif intrinsics is None:
             detection.projective_ranging_status = int(MissReason.NO_CAMERA_INFO)
+        elif (intrinsics.width, intrinsics.height) != (width, height):
+            detection.projective_ranging_status = int(MissReason.GRID_MISMATCH)
         elif rotation is None or translation is None:
             detection.projective_ranging_status = int(MissReason.TF_MISS_EXTRINSIC)
         elif payload_detection.get('depth_roi') is None:

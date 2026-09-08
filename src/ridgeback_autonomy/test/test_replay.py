@@ -101,6 +101,17 @@ def test_missing_depth_is_explicit_no_value_reason(tmp_path: Path) -> None:
     assert row['miss_reason'] == 'NO_DEPTH_FRAME'
 
 
+def test_intrinsics_grid_mismatch_preserves_the_live_miss_reason(tmp_path: Path) -> None:
+    event = _event(depth_roi=np.full((4, 4), 2.0, dtype=np.float32))
+    event['intrinsics']['width'] = 5
+    dataset = _dataset(tmp_path, [event])
+
+    row = evaluate_dataset(dataset, (_variant(),))['baseline']['rows']['projective_ranging'][0]
+
+    assert row['outcome'] == 'no_value'
+    assert row['miss_reason'] == 'GRID_MISMATCH'
+
+
 def test_replay_parallel_output_keeps_order_and_values(tmp_path: Path) -> None:
     dataset = _dataset(tmp_path, [_event(depth_roi=np.full((4, 4), 2.0, dtype=np.float32))])
     variants = (_variant('baseline'), _variant('wide', isolation_2d_band_m='0.75'))
