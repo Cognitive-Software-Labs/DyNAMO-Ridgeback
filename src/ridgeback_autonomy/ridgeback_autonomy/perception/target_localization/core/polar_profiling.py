@@ -89,8 +89,6 @@ class PolarProfilingResult:
     """One polar profiling localization: a planar point in the camera optical frame."""
 
     xz_optical: np.ndarray  # (2,) X right, Z forward, meters; Y unobserved
-    foreground_points: np.ndarray  # (M, 2) the merged (X, Z) set, by-product
-    ray_count: int  # rays that survived the mask ∩ FoV select
     # Beam indices into the ORIGINAL scan array, so a consumer can map an estimate
     # back to the rays it came from without re-deriving the selection. Reporting
     # both sides is the point: the gap between them is what the range segmentation
@@ -103,13 +101,13 @@ class PolarProfilingResult:
 class ScanImageProjection:
     """One scan's camera-image mapping, prepared for one detection batch.
 
-    ``uv`` preserves the full original-beam projection contract, including
-    invalid and out-of-view rows. The remaining three arrays are the compact,
-    valid in-view subset used repeatedly by every per-mask selection.
+    ``points_optical`` stays indexed by original scan beam, which is what lets
+    ``beam_indices`` be reported against the scan the caller passed in. The
+    other three are the compact valid in-view subset every per-mask selection
+    indexes.
     """
 
     points_optical: np.ndarray  # (N, 3), indexed by original scan beam
-    uv: np.ndarray  # (N, 2), float projection of every original beam
     beam_indices: np.ndarray  # (K,), valid and in-view original beam indices
     u_px: np.ndarray  # (K,), rounded compact image columns
     v_px: np.ndarray  # (K,), rounded compact image rows
@@ -259,22 +257,10 @@ def project_scan_to_image(
     beam_indices = np.flatnonzero(selectable)
     return ScanImageProjection(
         points_optical=points_optical,
-        uv=uv,
         beam_indices=beam_indices,
         u_px=np.rint(uv[beam_indices, 0]).astype(np.intp),
         v_px=np.rint(uv[beam_indices, 1]).astype(np.intp),
     )
-
-
-def project_in_view(
-    points_optical: np.ndarray,
-    valid: np.ndarray,
-    intrinsics: CameraIntrinsics,
-) -> tuple[np.ndarray, np.ndarray]:
-    """Compatibility wrapper returning the historical ``(beam_indices, uv)``."""
-
-    projection = project_scan_to_image(points_optical, valid, intrinsics)
-    return projection.beam_indices, projection.uv
 
 
 def select_mask_beams(projection: ScanImageProjection, mask) -> np.ndarray:
@@ -405,8 +391,6 @@ def localize_projected_polar_profiling(
     return PolarProfilingAttempt(
         PolarProfilingResult(
             xz_optical=xz_optical,
-            foreground_points=foreground,
-            ray_count=int(beam_indices.size),
             selected_beams=beam_indices,
             # ``merged`` indexes into the selected set, not the scan, so map it back.
             merged_beams=beam_indices[merged],

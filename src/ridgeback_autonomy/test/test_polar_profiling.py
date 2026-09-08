@@ -7,7 +7,10 @@ import numpy as np
 import pytest
 
 from ridgeback_autonomy.common.miss_reason import MissReason
-from ridgeback_autonomy.perception.target_localization.core.intrinsics import CameraIntrinsics
+from ridgeback_autonomy.perception.target_localization.core.intrinsics import (
+    CameraIntrinsics,
+    project_points,
+)
 from ridgeback_autonomy.perception.target_localization.core.mask import MaskPrecision, mask_from_array, rasterize_bbox
 from ridgeback_autonomy.perception.target_localization.core import polar_profiling
 from ridgeback_autonomy.perception.target_localization.core.polar_profiling import (
@@ -15,7 +18,6 @@ from ridgeback_autonomy.perception.target_localization.core.polar_profiling impo
     localize_projected_polar_profiling,
     localize_polar_profiling,
     merge_near_band,
-    project_in_view,
     project_scan_to_image,
     scan_points_optical,
     segment_range_profile,
@@ -82,14 +84,14 @@ def test_two_legs_merge_drops_parallax_wall() -> None:
     # Both legs merged: X medians to the body center, Z to the leg depth.
     assert np.allclose(result.xz_optical, (0.0, LEG_Z_M), atol=1e-6)
     # Exactly the 9-beam legs survive (both sides); every wall beam is gone.
-    assert result.foreground_points.shape == (18, 2)
-    assert result.ray_count > 18  # wall beams did enter the mask select
+    assert result.merged_beams.size == 18
+    assert result.selected_beams.size > 18  # wall beams did enter the mask select
 
 
 def test_reported_beams_index_the_original_scan() -> None:
     # The beam sets are what a visualization draws, so they have to index the
     # scan the caller passed in -- not the selected subset the merge works on.
-    # Indexing the input array by merged_beams must reproduce the foreground.
+    # Indexing the input array by merged_beams must reproduce the estimate.
     points = two_legs_profile()
     mask = rasterize_bbox(MASK_BBOX, HEIGHT, WIDTH)
 
@@ -97,9 +99,9 @@ def test_reported_beams_index_the_original_scan() -> None:
         points, np.ones(points.shape[0], dtype=bool), mask, INTRINSICS)
 
     assert result is not None
-    assert np.array_equal(points[result.merged_beams][:, (0, 2)], result.foreground_points)
+    assert np.allclose(
+        np.median(points[result.merged_beams][:, (0, 2)], axis=0), result.xz_optical)
     assert set(result.merged_beams.tolist()) <= set(result.selected_beams.tolist())
-    assert result.selected_beams.size == result.ray_count
 
     # The gap between the two sets is exactly the parallax wall the segmentation
     # discarded -- the beams a "dropped" overlay exists to show.
@@ -138,26 +140,28 @@ def test_bbox_beams_are_a_superset_of_a_tighter_silhouette() -> None:
     assert set(selected.tolist()) < set(in_bbox.tolist())
 
 
-def test_scan_image_projection_preserves_full_uv_and_compact_original_indices() -> None:
+def test_scan_image_projection_keeps_compact_original_indices() -> None:
     points = np.vstack((
         two_legs_profile(),
-        # These rows must remain in the full UV array even though neither is
-        # selectable: one is beyond the image edge, the other behind camera.
+        # Neither of these is selectable: one is beyond the image edge, the
+        # other behind the camera. Both must be absent from beam_indices.
         np.array([[10.0, SCAN_PLANE_Y_M, 1.0], [0.0, SCAN_PLANE_Y_M, -1.0]]),
     ))
     valid = np.ones(points.shape[0], dtype=bool)
     valid[0] = False
 
     projection = project_scan_to_image(points, valid, INTRINSICS)
-    legacy_indices, legacy_uv = project_in_view(points, valid, INTRINSICS)
 
-    assert projection.uv.shape == (points.shape[0], 2)
-    assert np.array_equal(projection.uv, legacy_uv, equal_nan=True)
-    assert np.array_equal(projection.beam_indices, legacy_indices)
+    # beam_indices addresses the ORIGINAL scan, so u_px/v_px must be the
+    # rounded projection of exactly those rows -- an off-by-one here would
+    # silently select a neighbouring beam's pixel.
+    expected_uv, _ = project_points(points, INTRINSICS)
     assert np.array_equal(
-        projection.u_px, np.rint(projection.uv[legacy_indices, 0]).astype(np.intp))
+        projection.u_px,
+        np.rint(expected_uv[projection.beam_indices, 0]).astype(np.intp))
     assert np.array_equal(
-        projection.v_px, np.rint(projection.uv[legacy_indices, 1]).astype(np.intp))
+        projection.v_px,
+        np.rint(expected_uv[projection.beam_indices, 1]).astype(np.intp))
     assert {0, points.shape[0] - 2, points.shape[0] - 1}.isdisjoint(
         projection.beam_indices.tolist())
 
@@ -238,7 +242,7 @@ def test_unequal_legs_median_stays_on_object() -> None:
     left_x = LEG_Z_M * np.tan(np.radians(-4.0))
     right_x = LEG_Z_M * np.tan(np.radians(4.0))
     assert left_x <= result.xz_optical[0] <= right_x
-    assert result.foreground_points.shape == (14, 2)
+    assert result.merged_beams.size == 14
 
 
 def test_tight_tag_runs_identical_recovery() -> None:
@@ -254,7 +258,7 @@ def test_tight_tag_runs_identical_recovery() -> None:
 
     assert rect_result is not None and tight_result is not None
     assert np.array_equal(rect_result.xz_optical, tight_result.xz_optical)
-    assert rect_result.ray_count == tight_result.ray_count
+    assert np.array_equal(rect_result.selected_beams, tight_result.selected_beams)
 
 
 def test_wall_behind_single_object_rejected() -> None:
@@ -269,7 +273,7 @@ def test_wall_behind_single_object_rejected() -> None:
 
     assert result is not None
     assert np.allclose(result.xz_optical, (0.0, LEG_Z_M), atol=1e-6)
-    assert result.foreground_points.shape[0] == 13
+    assert result.merged_beams.size == 13
 
 
 def test_no_beam_in_mask_returns_too_few_rays_selected() -> None:

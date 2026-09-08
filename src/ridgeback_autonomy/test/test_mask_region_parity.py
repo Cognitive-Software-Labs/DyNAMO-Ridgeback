@@ -360,20 +360,20 @@ def test_polar_beam_parity_across_both_representations(label) -> None:
             expected['selected_beams'])
         result, reason = localize_polar_profiling(points, valid, selector, INTRINSICS)
         assert int(reason) == expected['reason']
-        assert result.ray_count == expected['ray_count']
+        assert result.selected_beams.tolist() == expected['selected_beams']
         assert result.merged_beams.tolist() == expected['merged_beams']
         assert result.xz_optical == pytest.approx(
             expected['xz_optical'], abs=TOLERANCE)
 
 
 def test_polar_projection_keeps_every_original_beam_row() -> None:
-    """``uv`` is indexed by ORIGINAL beam, invalid rows included."""
+    """``beam_indices`` addresses the ORIGINAL scan, so invalid beams just drop out."""
 
     points, valid = build_scan()
 
     projection = project_scan_to_image(points, valid, INTRINSICS)
 
-    assert projection.uv.shape == (points.shape[0], 2)
+    assert projection.points_optical.shape == (points.shape[0], 3)
     assert 5 not in projection.beam_indices
     assert 150 not in projection.beam_indices
 
