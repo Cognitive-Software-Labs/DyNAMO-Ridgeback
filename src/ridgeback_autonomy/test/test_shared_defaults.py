@@ -7,12 +7,14 @@ import inspect
 
 import pytest
 
-from ridgeback_autonomy.perception.target_localization.core import ranging_defaults
+from ridgeback_autonomy.perception.target_localization.core import (
+    depth_common,
+    pointcloud_ranging,
+    ranging_defaults,
+)
 
 
 @pytest.mark.parametrize('module_name,local_name,shared_name', [
-    ('depth_common', 'DEPTH_MAX_METERS_DEFAULT', 'MAX_RANGE_M'),
-    ('pointcloud_ranging', 'POINTCLOUD_MAX_METERS', 'MAX_RANGE_M'),
     ('pointcloud_ranging', 'POINTCLOUD_FRONT_PERCENTILE', 'FRONT_PERCENTILE'),
     ('pointcloud_ranging', 'POINTCLOUD_INLIER_AHEAD_MARGIN_M', 'INLIER_AHEAD_MARGIN_M'),
     ('pointcloud_ranging', 'POINTCLOUD_INLIER_BEHIND_MARGIN_M', 'INLIER_BEHIND_MARGIN_M'),
@@ -47,8 +49,31 @@ def test_shared_defaults_are_imported_from_one_owner(module_name, local_name, sh
     ), f'{module_name}.{local_name} must not redefine the default'
 
 
-def test_shared_values_preserve_the_validated_tuning() -> None:
-    assert ranging_defaults.MAX_RANGE_M == 10.0
+def test_pointcloud_owns_its_range_clamp() -> None:
+    """The 10 m clamp belongs to one estimator and must not be shared again.
+
+    It is a planar-distance limit on what the pointcloud row will report, not a
+    per-pixel validity rule, so the mask paths have no use for it -- they gate
+    on optical depth against the node's ``effective_depth_max()``. While the
+    two lived in one shared constant a coincidence looked like a decision, and
+    a ceiling from an estimator that was not running reached every mask
+    signature as a default.
+    """
+
+    assert pointcloud_ranging.POINTCLOUD_MAX_METERS == 10.0
+    assert not hasattr(ranging_defaults, 'MAX_RANGE_M')
+    assert not hasattr(depth_common, 'DEPTH_MAX_METERS_DEFAULT')
+
+
+def test_shared_values_are_pinned_so_a_change_is_deliberate() -> None:
+    """Pins the shipped values; it does not vouch for them.
+
+    Only ``MIN_VALID_SAMPLES`` and the two margins have ever been examined, and
+    ``NEAR_SURFACE_BAND_M`` is measured *wrong* -- 0.75 removes 88% of the
+    error tail (``docs/history/projective_parameter_sensitivity.md``). This
+    test exists so that moving one is a decision, not a drift.
+    """
+
     assert ranging_defaults.MIN_VALID_SAMPLES == 10
     assert ranging_defaults.FRONT_PERCENTILE == 25.0
     assert ranging_defaults.INLIER_AHEAD_MARGIN_M == 0.10

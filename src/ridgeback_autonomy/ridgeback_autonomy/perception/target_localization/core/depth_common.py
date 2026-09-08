@@ -13,17 +13,17 @@ calling:
 - ``prepare_depth_region`` -- the per-detection select+clean prologue both depth
   estimators consume, cut to the mask's own storage window.
 
-Two depth ceilings live here, and they are not interchangeable:
+One depth ceiling lives here: ``MASK_DEPTH_GATE_DEFAULT``, the mask stack's
+working gate. Unbounded, so the only ceiling on a mask measurement is whatever
+the depth source declares it can resolve. A finite value here is an operator
+choice about how much scene to admit, never a validity rule.
 
-- ``MASK_DEPTH_GATE_DEFAULT`` -- the mask stack's working gate. Unbounded, so
-  the only ceiling on a mask measurement is whatever the depth source declares
-  it can resolve. A finite value here is an operator choice about how much
-  scene to admit, never a validity rule.
-- ``DEPTH_MAX_METERS_DEFAULT`` -- 10 m, for the callers that still need a
-  finite number: the depth colorizers, which normalize by it and would render a
-  uniform frame given infinity, and the isolation catalogues' static defaults.
-  It shares ``ranging_defaults.MAX_RANGE_M`` with the pointcloud path without
-  either path importing the other estimator.
+There is deliberately no default ceiling to fall back on. ``valid_depth`` takes
+its ``depth_max`` from the caller, because how far a reading can be trusted is
+a property of the depth source and the operator's gate -- resolved per batch by
+the node's ``effective_depth_max()`` -- and not something this module can
+answer. A module-level default here previously carried the *pointcloud*
+estimator's 10 m output clamp into every mask signature, where it never fired.
 """
 
 from __future__ import annotations
@@ -34,9 +34,6 @@ from dataclasses import dataclass
 import numpy as np
 
 from ridgeback_autonomy.perception.target_localization.core.mask import MaskRegion
-from ridgeback_autonomy.perception.target_localization.core.ranging_defaults import (
-    MAX_RANGE_M as DEPTH_MAX_METERS_DEFAULT,
-)
 
 
 MASK_DEPTH_GATE_DEFAULT = math.inf
@@ -66,7 +63,7 @@ def resolve_depth_gate(depth_max_meters: float) -> float:
 
 def valid_depth(
     depths: np.ndarray,
-    depth_max: float = DEPTH_MAX_METERS_DEFAULT,
+    depth_max: float,
 ) -> np.ndarray:
     """Boolean selector of the usable depth values: finite, positive, in range."""
 

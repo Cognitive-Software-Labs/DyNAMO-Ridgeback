@@ -31,7 +31,6 @@ import numpy as np
 
 from ridgeback_autonomy.common.miss_reason import MissReason
 from ridgeback_autonomy.perception.target_localization.core.depth_common import (
-    DEPTH_MAX_METERS_DEFAULT,
     PreparedDepthRegion,
     valid_depth,
 )
@@ -65,7 +64,7 @@ def select_foreground_pixels(
     precision: MaskPrecision,
     *,
     isolation: Callable[..., np.ndarray] | None,
-    depth_max: float,
+    depth_max: float | None,
     min_valid_pixels: int,
     valid_masked: np.ndarray | None,
 ) -> tuple[np.ndarray | None, MissReason]:
@@ -77,10 +76,24 @@ def select_foreground_pixels(
     order, so both grids feed the histogram the identical value sequence.
 
     Returns ``(foreground, MissReason.OK)`` or ``(None, <reason>)``. The two
-    shortfalls stay distinct because they mean different things: a ``tight``
-    silhouette that never had enough valid depth is ``TOO_FEW_VALID_PIXELS``,
-    while a ``rect`` box whose recipe rejected everything is ``ISOLATION_EMPTY``.
+    shortfalls are split by *branch*, not by cause: the ``tight`` branch reports
+    ``TOO_FEW_VALID_PIXELS`` and the ``rect`` branch ``ISOLATION_EMPTY``. On
+    ``rect`` the count is only checked after isolation, so a box that never held
+    enough valid depth reports ``ISOLATION_EMPTY`` too -- naming the recipe even
+    where it rejected nothing. Splitting those apart would need a second count
+    before the recipe runs, which is a scan nothing else wants.
+
+    ``depth_max`` is the ceiling to clean against and is needed only when
+    ``valid_masked`` is absent. A caller that already cleaned the selection has
+    no second ceiling to apply and passes ``None``; there is no default,
+    because the trustworthy range is a property of the depth source and the
+    operator's gate rather than of this function.
     """
+
+    if valid_masked is None and depth_max is None:
+        raise ValueError(
+            'select_foreground_pixels needs a depth_max when valid_masked is '
+            'not precomputed; there is no default ceiling to fall back on.')
 
     if precision is MaskPrecision.TIGHT:
         # A tight silhouette already is the object: keep its valid depths.
@@ -92,14 +105,11 @@ def select_foreground_pixels(
 
     if isolation is None:
         isolation = ISOLATION_2D_RECIPES[ISOLATION_2D_DEFAULT]
-    # Standalone callers retain the recipe's original select+clean path. The
-    # batch caller passes the already-cleaned mask, which the built-in recipes
-    # consume without rescanning for validity.
-    if valid_masked is None:
-        foreground = isolation(depth, mask_data, depth_max=depth_max)
-    else:
-        foreground = isolation(
-            depth, mask_data, depth_max=depth_max, valid_masked=valid_masked)
+    # Both are handed over and the recipe reads whichever applies: standalone
+    # callers retain its original select+clean path, while the batch caller's
+    # already-cleaned mask is consumed without rescanning for validity.
+    foreground = isolation(
+        depth, mask_data, depth_max=depth_max, valid_masked=valid_masked)
     if int(np.count_nonzero(foreground)) < min_valid_pixels:
         return None, MissReason.ISOLATION_EMPTY
     return foreground, MissReason.OK
@@ -144,7 +154,6 @@ def localize_prepared_projective_ranging(
     intrinsics: CameraIntrinsics,
     *,
     isolation: Callable[..., np.ndarray] | None = None,
-    depth_max: float = DEPTH_MAX_METERS_DEFAULT,
     min_valid_pixels: int = MIN_VALID_PIXELS_DEFAULT,
 ) -> tuple[ProjectiveRangingResult | None, MissReason]:
     """Localize one prepared mask region -- the ROI-native production path.
@@ -153,6 +162,12 @@ def localize_prepared_projective_ranging(
     it must be a built-in ``ISOLATION_2D_RECIPES`` entry or another recipe
     written against relative coordinates. A callable that reads absolute pixel
     positions belongs on ``localize_projective_ranging`` instead.
+
+    There is no ``depth_max`` here: a ``PreparedDepthRegion`` arrives already
+    cleaned against the caller's gate, so a ceiling on this signature would
+    have nothing left to reject. It used to take one and thread it two levels
+    down to be ignored. ``localize_prepared_euclidean_reconstruction`` never
+    had one, and this now matches it.
     """
 
     region = prepared.region
@@ -161,7 +176,7 @@ def localize_prepared_projective_ranging(
         region.data,
         region.precision,
         isolation=isolation,
-        depth_max=depth_max,
+        depth_max=None,
         min_valid_pixels=min_valid_pixels,
         valid_masked=prepared.valid_masked,
     )
@@ -181,7 +196,7 @@ def localize_projective_ranging(
     intrinsics: CameraIntrinsics,
     *,
     isolation: Callable[..., np.ndarray] | None = None,
-    depth_max: float = DEPTH_MAX_METERS_DEFAULT,
+    depth_max: float | None,
     min_valid_pixels: int = MIN_VALID_PIXELS_DEFAULT,
     valid_masked: np.ndarray | None = None,
 ) -> tuple[ProjectiveRangingResult | None, MissReason]:

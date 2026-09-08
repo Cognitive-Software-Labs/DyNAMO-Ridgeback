@@ -37,7 +37,6 @@ import numpy as np
 
 from ridgeback_autonomy.common.miss_reason import MissReason
 from ridgeback_autonomy.perception.target_localization.core.depth_common import (
-    DEPTH_MAX_METERS_DEFAULT,
     PreparedDepthRegion,
     valid_depth,
 )
@@ -149,7 +148,7 @@ def localize_euclidean_reconstruction(
     intrinsics: CameraIntrinsics,
     *,
     isolation: Callable[[np.ndarray], np.ndarray] | None = None,
-    depth_max: float = DEPTH_MAX_METERS_DEFAULT,
+    depth_max: float | None,
     min_valid_points: int = MIN_VALID_POINTS_DEFAULT,
     valid_masked: np.ndarray | None = None,
 ) -> tuple[EuclideanReconstructionResult | None, MissReason]:

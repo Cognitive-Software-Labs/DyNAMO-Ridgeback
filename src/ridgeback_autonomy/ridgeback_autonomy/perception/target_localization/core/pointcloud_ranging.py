@@ -19,11 +19,23 @@ from ridgeback_autonomy.perception.target_localization.core.ranging_defaults imp
     FRONT_PERCENTILE as POINTCLOUD_FRONT_PERCENTILE,
     INLIER_AHEAD_MARGIN_M as POINTCLOUD_INLIER_AHEAD_MARGIN_M,
     INLIER_BEHIND_MARGIN_M as POINTCLOUD_INLIER_BEHIND_MARGIN_M,
-    MAX_RANGE_M as POINTCLOUD_MAX_METERS,
     MIN_VALID_SAMPLES as POINTCLOUD_MIN_VALID_POINTS,
 )
 from ridgeback_autonomy.perception.target_localization.core.vehicle_frame import apply_vehicle_front_offset
 
+
+# This estimator's own range clamp, applied to planar distance in the base
+# frame after the extrinsic transform -- a limit on what it will report, not a
+# per-pixel validity rule. It lives here rather than in ``ranging_defaults``
+# because nothing else applies it: the mask paths gate per pixel on optical
+# depth, before isolation, against the node's ``effective_depth_max()``. The
+# two were once the same 10.0 in one shared constant, which made a coincidence
+# look like a decision.
+#
+# It decides recorded outcomes and has no parameter or override, so the
+# benchmark set carries scenario families named after it -- ``far_clamp`` sits
+# inside it, ``far_beyond`` past it. Changing it silently re-scopes both.
+POINTCLOUD_MAX_METERS = 10.0
 
 # The ROI crop inside a detection box: a centre patch, biased upward, so the
 # torso rather than the floor under the feet drives the range.

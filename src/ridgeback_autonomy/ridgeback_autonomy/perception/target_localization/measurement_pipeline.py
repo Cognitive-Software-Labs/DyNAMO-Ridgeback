@@ -185,7 +185,7 @@ def fill_path_measurements(
             if wants_projective:
                 result_a, reason_a = localize_prepared_projective_ranging(
                     prepared, intrinsics, isolation=isolation_2d,
-                    depth_max=depth_max, min_valid_pixels=min_valid_pixels)
+                    min_valid_pixels=min_valid_pixels)
                 detection.projective_ranging_status = int(reason_a)
                 if result_a is not None:
                     (

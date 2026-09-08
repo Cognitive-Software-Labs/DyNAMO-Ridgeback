@@ -6,7 +6,6 @@ remain with their owners even when their numeric values happen to coincide.
 Imports bind plain constants once; there is no per-frame configuration layer.
 """
 
-MAX_RANGE_M = 10.0
 MIN_VALID_SAMPLES = 10
 FRONT_PERCENTILE = 25.0
 INLIER_AHEAD_MARGIN_M = 0.10

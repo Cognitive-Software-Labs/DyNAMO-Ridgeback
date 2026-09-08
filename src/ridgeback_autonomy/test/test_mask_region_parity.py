@@ -21,7 +21,6 @@ import pytest
 
 from ridgeback_autonomy.common.miss_reason import MissReason
 from ridgeback_autonomy.perception.target_localization.core.depth_common import (
-    DEPTH_MAX_METERS_DEFAULT,
     prepare_depth_region,
     valid_depth,
 )
@@ -65,6 +64,10 @@ REFERENCE = json.loads(
 INTRINSICS = CameraIntrinsics(
     fx=320.0, fy=320.0, cx=160.0, cy=120.0, width=320, height=240)
 RECT_BBOX = (195, 65, 280, 135)
+# The ceiling the reference file was captured under. Pinned as a literal now
+# that no shared default supplies it -- the goldens are only reproducible
+# against this number.
+REFERENCE_GATE_M = 10.0
 TOLERANCE = 1e-9
 
 # The camera pose the 3D recipes are built at: this robot's level mount, camera
@@ -126,7 +129,7 @@ def build_scan() -> tuple[np.ndarray, np.ndarray]:
     return points, valid
 
 
-def prepare(region, depth, gate=DEPTH_MAX_METERS_DEFAULT):
+def prepare(region, depth, gate=REFERENCE_GATE_M):
     return prepare_depth_region(region, depth, valid_depth(depth, gate))
 
 
@@ -184,7 +187,7 @@ def test_projective_rect_recipes_match_pre_migration(label, recipe) -> None:
     name = f'projective_rect_{label}'
 
     check_projective(name, *localize_projective_ranging(
-        depth, build_rect_mask(), INTRINSICS, isolation=recipe))
+        depth, build_rect_mask(), INTRINSICS, isolation=recipe, depth_max=REFERENCE_GATE_M))
     check_projective(name, *localize_prepared_projective_ranging(
         prepare(rect_region(), depth), INTRINSICS, isolation=recipe))
 
@@ -194,7 +197,7 @@ def test_projective_tight_matches_pre_migration() -> None:
     tight = Mask(data=build_tight_blob(), precision=MaskPrecision.TIGHT)
 
     check_projective('projective_tight', *localize_projective_ranging(
-        depth, tight, INTRINSICS))
+        depth, tight, INTRINSICS, depth_max=REFERENCE_GATE_M))
     check_projective('projective_tight', *localize_prepared_projective_ranging(
         prepare(tight_region(), depth), INTRINSICS))
 
@@ -206,7 +209,7 @@ def test_projective_finite_gate_matches_pre_migration() -> None:
     check_projective('projective_tight_gated', *localize_projective_ranging(
         depth, tight, INTRINSICS, depth_max=2.45))
     check_projective('projective_tight_gated', *localize_prepared_projective_ranging(
-        prepare(tight_region(), depth, 2.45), INTRINSICS, depth_max=2.45))
+        prepare(tight_region(), depth, 2.45), INTRINSICS))
 
 
 def test_projective_unlimited_gate_matches_pre_migration() -> None:
@@ -216,14 +219,14 @@ def test_projective_unlimited_gate_matches_pre_migration() -> None:
         depth, build_rect_mask(), INTRINSICS, depth_max=np.inf))
     check_projective(
         'projective_rect_unlimited', *localize_prepared_projective_ranging(
-            prepare(rect_region(), depth, np.inf), INTRINSICS, depth_max=np.inf))
+            prepare(rect_region(), depth, np.inf), INTRINSICS))
 
 
 def test_projective_float64_depth_matches_pre_migration() -> None:
     depth = build_scene(np.float64)
 
     check_projective('projective_float64', *localize_projective_ranging(
-        depth, build_rect_mask(), INTRINSICS))
+        depth, build_rect_mask(), INTRINSICS, depth_max=REFERENCE_GATE_M))
     check_projective('projective_float64', *localize_prepared_projective_ranging(
         prepare(rect_region(), depth), INTRINSICS))
 
@@ -233,7 +236,7 @@ def test_projective_shortfall_keeps_too_few_valid_pixels() -> None:
     tight = Mask(data=build_tight_blob(), precision=MaskPrecision.TIGHT)
 
     check_projective('projective_tight_starved', *localize_projective_ranging(
-        depth, tight, INTRINSICS, min_valid_pixels=100000))
+        depth, tight, INTRINSICS, min_valid_pixels=100000, depth_max=REFERENCE_GATE_M))
     check_projective(
         'projective_tight_starved', *localize_prepared_projective_ranging(
             prepare(tight_region(), depth), INTRINSICS, min_valid_pixels=100000))
@@ -252,7 +255,7 @@ def test_euclidean_rect_recipes_match_pre_migration(label, recipe_name) -> None:
     recipe = build_isolation_3d(recipe_name, CAMERA_HEIGHT_M, LEVEL_DOWN_OPTICAL)
 
     check_euclidean(name, *localize_euclidean_reconstruction(
-        depth, build_rect_mask(), INTRINSICS, isolation=recipe))
+        depth, build_rect_mask(), INTRINSICS, isolation=recipe, depth_max=REFERENCE_GATE_M))
     check_euclidean(name, *localize_prepared_euclidean_reconstruction(
         prepare(rect_region(), depth), INTRINSICS, isolation=recipe))
 
@@ -262,7 +265,7 @@ def test_euclidean_tight_matches_pre_migration() -> None:
     tight = Mask(data=build_tight_blob(), precision=MaskPrecision.TIGHT)
 
     check_euclidean('euclidean_tight', *localize_euclidean_reconstruction(
-        depth, tight, INTRINSICS))
+        depth, tight, INTRINSICS, depth_max=REFERENCE_GATE_M))
     check_euclidean('euclidean_tight', *localize_prepared_euclidean_reconstruction(
         prepare(tight_region(), depth), INTRINSICS))
 
@@ -284,7 +287,7 @@ def test_euclidean_float64_depth_matches_pre_migration() -> None:
         ISOLATION_3D_DEFAULT, CAMERA_HEIGHT_M, LEVEL_DOWN_OPTICAL)
 
     check_euclidean('euclidean_float64', *localize_euclidean_reconstruction(
-        depth, build_rect_mask(), INTRINSICS, isolation=recipe))
+        depth, build_rect_mask(), INTRINSICS, isolation=recipe, depth_max=REFERENCE_GATE_M))
     check_euclidean('euclidean_float64', *localize_prepared_euclidean_reconstruction(
         prepare(rect_region(), depth), INTRINSICS, isolation=recipe))
 
@@ -293,7 +296,7 @@ def test_euclidean_shortfall_keeps_too_few_valid_points() -> None:
     depth = build_scene()
 
     check_euclidean('euclidean_rect_starved', *localize_euclidean_reconstruction(
-        depth, build_rect_mask(), INTRINSICS, min_valid_points=100000))
+        depth, build_rect_mask(), INTRINSICS, min_valid_points=100000, depth_max=REFERENCE_GATE_M))
     check_euclidean(
         'euclidean_rect_starved', *localize_prepared_euclidean_reconstruction(
             prepare(rect_region(), depth), INTRINSICS, min_valid_points=100000))
@@ -307,14 +310,14 @@ def test_isolation_shortfall_keeps_its_own_reason_on_both_paths() -> None:
     empty_3d = (lambda points: np.zeros(points.shape[0], dtype=bool))
 
     _, reason = localize_projective_ranging(
-        depth, build_rect_mask(), INTRINSICS, isolation=empty_2d)
+        depth, build_rect_mask(), INTRINSICS, isolation=empty_2d, depth_max=REFERENCE_GATE_M)
     assert reason is MissReason.ISOLATION_EMPTY
     _, reason = localize_prepared_projective_ranging(
         prepare(rect_region(), depth), INTRINSICS, isolation=empty_2d)
     assert reason is MissReason.ISOLATION_EMPTY
 
     _, reason = localize_euclidean_reconstruction(
-        depth, build_rect_mask(), INTRINSICS, isolation=empty_3d)
+        depth, build_rect_mask(), INTRINSICS, isolation=empty_3d, depth_max=REFERENCE_GATE_M)
     assert reason is MissReason.ISOLATION_EMPTY
     _, reason = localize_prepared_euclidean_reconstruction(
         prepare(rect_region(), depth), INTRINSICS, isolation=empty_3d)

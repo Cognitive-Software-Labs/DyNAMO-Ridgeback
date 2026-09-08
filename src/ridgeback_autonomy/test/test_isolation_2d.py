@@ -19,6 +19,10 @@ BACKGROUND_DEPTH_M = 4.0
 # Object plate and the (oversized) rect ROI around it, as index slices.
 OBJECT_SLICE = (slice(20, 40), slice(30, 50))
 MASK_SLICE = (slice(15, 45), slice(25, 55))
+# The ceiling these fixtures assert against. Stated here because the recipes
+# take no default one: the 15 m pixel below is "out of range" only relative to
+# a number somebody chose.
+DEPTH_GATE_M = 10.0
 
 
 def build_scene() -> tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -44,7 +48,7 @@ def build_scene() -> tuple[np.ndarray, np.ndarray, np.ndarray]:
 
     object_region = np.zeros((HEIGHT, WIDTH), dtype=bool)
     object_region[OBJECT_SLICE] = True
-    object_region &= valid_depth(depth)
+    object_region &= valid_depth(depth, DEPTH_GATE_M)
     return depth, mask, object_region
 
 
@@ -52,7 +56,7 @@ def build_scene() -> tuple[np.ndarray, np.ndarray, np.ndarray]:
 def test_recipe_recovers_exactly_the_object_pixels(recipe) -> None:
     depth, mask, object_region = build_scene()
 
-    foreground = recipe(depth, mask)
+    foreground = recipe(depth, mask, depth_max=DEPTH_GATE_M)
 
     assert foreground.shape == mask.shape
     assert foreground.dtype == np.bool_
@@ -63,9 +67,9 @@ def test_recipe_recovers_exactly_the_object_pixels(recipe) -> None:
 def test_recipe_output_is_subset_of_valid_masked_pixels(recipe) -> None:
     depth, mask, _ = build_scene()
 
-    foreground = recipe(depth, mask)
+    foreground = recipe(depth, mask, depth_max=DEPTH_GATE_M)
 
-    assert not np.any(foreground & ~(mask & valid_depth(depth)))
+    assert not np.any(foreground & ~(mask & valid_depth(depth, DEPTH_GATE_M)))
 
 
 @pytest.mark.parametrize('recipe', [nearest_mode_histogram, otsu_foreground])
@@ -75,7 +79,7 @@ def test_unimodal_roi_keeps_all_valid_masked_pixels(recipe) -> None:
     mask = np.zeros((HEIGHT, WIDTH), dtype=bool)
     mask[OBJECT_SLICE] = True
 
-    foreground = recipe(depth, mask)
+    foreground = recipe(depth, mask, depth_max=DEPTH_GATE_M)
 
     assert np.array_equal(foreground, mask)
 
@@ -103,11 +107,11 @@ def test_nearest_mode_dispersed_histogram_picks_nearest_not_global_mode() -> Non
         values, bins=int(np.ceil((values.max() - values.min()) / 0.05)))
     assert hist.max() < 0.05 * values.size  # no bin clears the floor -> fallback
 
-    foreground = nearest_mode_histogram(depth, mask)
+    foreground = nearest_mode_histogram(depth, mask, depth_max=DEPTH_GATE_M)
 
     assert foreground.shape == mask.shape
     assert foreground.any()
-    assert not np.any(foreground & ~valid_depth(depth))
+    assert not np.any(foreground & ~valid_depth(depth, DEPTH_GATE_M))
     # The near cluster is isolated; the far wall is never selected.
     assert depth[foreground].max() < 3.0
     assert not np.any(foreground & (depth > 3.0))
@@ -119,7 +123,7 @@ def test_all_invalid_roi_yields_empty_foreground(recipe) -> None:
     mask = np.zeros((HEIGHT, WIDTH), dtype=bool)
     mask[MASK_SLICE] = True
 
-    foreground = recipe(depth, mask)
+    foreground = recipe(depth, mask, depth_max=DEPTH_GATE_M)
 
     assert foreground.shape == mask.shape
     assert not foreground.any()
@@ -180,9 +184,10 @@ def test_built_band_widens_what_the_recipe_keeps() -> None:
     mask = np.zeros((HEIGHT, WIDTH), dtype=bool)
     mask[OBJECT_SLICE] = True
 
-    default_band = build_isolation_2d('nearest_mode_histogram')(depth, mask)
-    wide_band = build_isolation_2d(
-        'nearest_mode_histogram', band_m=0.75)(depth, mask)
+    default_band = build_isolation_2d('nearest_mode_histogram')(
+        depth, mask, depth_max=DEPTH_GATE_M)
+    wide_band = build_isolation_2d('nearest_mode_histogram', band_m=0.75)(
+        depth, mask, depth_max=DEPTH_GATE_M)
 
     assert depth[default_band].max() == pytest.approx(2.0)
     assert depth[wide_band].max() == pytest.approx(2.5)

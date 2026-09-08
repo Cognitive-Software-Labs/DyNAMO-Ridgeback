@@ -22,7 +22,6 @@ from typing import Callable
 import numpy as np
 
 from ridgeback_autonomy.perception.target_localization.core.depth_common import (
-    DEPTH_MAX_METERS_DEFAULT,
     NEAREST_MODE_BIN_WIDTH_M_DEFAULT,
     NEAREST_MODE_MIN_BIN_FRACTION_DEFAULT,
     nearest_significant_mode,
@@ -39,13 +38,24 @@ OTSU_BIN_WIDTH_M_DEFAULT = 0.05
 def _valid_masked(
     depth_m: np.ndarray,
     mask: np.ndarray,
-    depth_max: float,
+    depth_max: float | None,
     valid_masked: np.ndarray | None = None,
 ):
-    """Shared select+clean prologue: the valid masked pixels and their depths."""
+    """Shared select+clean prologue: the valid masked pixels and their depths.
+
+    ``depth_max`` is read only when ``valid_masked`` is absent, so a caller
+    that already cleaned its selection passes ``None``. Neither has a default:
+    between them they decide which pixels a recipe may see, and inheriting that
+    from a module constant is how a ceiling belonging to another estimator used
+    to reach this one.
+    """
 
     depth_m = np.asarray(depth_m)
     if valid_masked is None:
+        if depth_max is None:
+            raise ValueError(
+                'A recipe needs a depth_max when valid_masked is not '
+                'precomputed; there is no default ceiling to fall back on.')
         valid = np.asarray(mask, dtype=bool) & valid_depth(depth_m, depth_max)
     else:
         valid = np.asarray(valid_masked)
@@ -64,7 +74,7 @@ def nearest_mode_histogram(
     bin_width_m: float = NEAREST_MODE_BIN_WIDTH_M_DEFAULT,
     band_m: float = NEAREST_MODE_BAND_M_DEFAULT,
     min_bin_fraction: float = NEAREST_MODE_MIN_BIN_FRACTION_DEFAULT,
-    depth_max: float = DEPTH_MAX_METERS_DEFAULT,
+    depth_max: float | None,
     valid_masked: np.ndarray | None = None,
 ) -> np.ndarray:
     """Catalogue #1 (baseline): nearest significant depth mode, fixed band.
@@ -94,7 +104,7 @@ def otsu_foreground(
     mask: np.ndarray,
     *,
     bin_width_m: float = OTSU_BIN_WIDTH_M_DEFAULT,
-    depth_max: float = DEPTH_MAX_METERS_DEFAULT,
+    depth_max: float | None,
     valid_masked: np.ndarray | None = None,
 ) -> np.ndarray:
     """Catalogue #2: Otsu threshold on the masked depth histogram, keep the near side.

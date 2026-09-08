@@ -17,6 +17,10 @@ from ridgeback_autonomy.perception.target_localization.core.euclidean_reconstruc
 
 HEIGHT, WIDTH = 60, 80
 INTRINSICS = CameraIntrinsics(fx=100.0, fy=100.0, cx=40.0, cy=30.0, width=WIDTH, height=HEIGHT)
+# The ceiling these fixtures run under. Stated because the entry points
+# take no default one -- the trustworthy range belongs to the depth source
+# and the operator gate, not to a module constant.
+DEPTH_GATE_M = 10.0
 
 OBJECT_DEPTH_M = 2.0
 BACKGROUND_DEPTH_M = 4.0
@@ -54,7 +58,7 @@ def test_rect_mask_default_chain_recovers_object_centroid() -> None:
     mask = rasterize_bbox(RECT_BBOX, HEIGHT, WIDTH)
 
     result, reason = localize_euclidean_reconstruction(
-        build_depth(), mask, INTRINSICS, isolation=default_isolation())
+        build_depth(), mask, INTRINSICS, isolation=default_isolation(), depth_max=DEPTH_GATE_M)
 
     assert result is not None
     assert reason is MissReason.OK
@@ -66,7 +70,8 @@ def test_rect_mask_default_chain_recovers_object_centroid() -> None:
 def test_rect_accepts_explicit_isolation_recipe() -> None:
     mask = rasterize_bbox(RECT_BBOX, HEIGHT, WIDTH)
 
-    result, _ = localize_euclidean_reconstruction(build_depth(), mask, INTRINSICS, isolation=RangeBand())
+    result, _ = localize_euclidean_reconstruction(
+        build_depth(), mask, INTRINSICS, isolation=RangeBand(), depth_max=DEPTH_GATE_M)
 
     assert result is not None
     assert np.allclose(result.xyz_optical, OBJECT_CENTROID_XYZ)
@@ -88,8 +93,7 @@ def test_precomputed_valid_mask_avoids_recleaning(monkeypatch) -> None:
         mask,
         INTRINSICS,
         isolation=default_isolation(),
-        valid_masked=valid_masked,
-    )
+        valid_masked=valid_masked, depth_max=DEPTH_GATE_M)
 
     assert result is not None
     assert reason is MissReason.OK
@@ -103,7 +107,7 @@ def test_tight_mask_mad_pass_drops_edge_bleed() -> None:
         depth[row, col] = 6.0
     mask = mask_from_array(object_mask_data(), MaskPrecision.TIGHT)
 
-    result, _ = localize_euclidean_reconstruction(depth, mask, INTRINSICS)
+    result, _ = localize_euclidean_reconstruction(depth, mask, INTRINSICS, depth_max=DEPTH_GATE_M)
 
     assert result is not None
     # Exactly the bleed goes: 400 plate pixels in, the 5 at 6 m out, and no
@@ -119,7 +123,8 @@ def test_all_invalid_depth_returns_too_few_valid_points() -> None:
     depth = np.zeros((HEIGHT, WIDTH), dtype=np.float32)
     mask = rasterize_bbox(RECT_BBOX, HEIGHT, WIDTH)
 
-    result, reason = localize_euclidean_reconstruction(depth, mask, INTRINSICS)
+    result, reason = localize_euclidean_reconstruction(depth, mask, INTRINSICS,
+        depth_max=DEPTH_GATE_M)
 
     assert result is None
     assert reason is MissReason.TOO_FEW_VALID_POINTS
@@ -128,7 +133,8 @@ def test_all_invalid_depth_returns_too_few_valid_points() -> None:
 def test_sparse_mask_returns_too_few_valid_points() -> None:
     mask = rasterize_bbox((10, 10, 13, 13), HEIGHT, WIDTH)
 
-    result, reason = localize_euclidean_reconstruction(build_depth(), mask, INTRINSICS)
+    result, reason = localize_euclidean_reconstruction(build_depth(), mask, INTRINSICS,
+        depth_max=DEPTH_GATE_M)
 
     assert result is None
     assert reason is MissReason.TOO_FEW_VALID_POINTS
@@ -142,7 +148,7 @@ def test_isolation_dropping_all_points_returns_isolation_empty() -> None:
         return np.zeros(points.shape[0], dtype=bool)
 
     result, reason = localize_euclidean_reconstruction(
-        build_depth(), mask, INTRINSICS, isolation=drop_all)
+        build_depth(), mask, INTRINSICS, isolation=drop_all, depth_max=DEPTH_GATE_M)
 
     assert result is None
     assert reason is MissReason.ISOLATION_EMPTY
