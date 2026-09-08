@@ -18,6 +18,9 @@ from ridgeback_autonomy.common.messages import (
 from ridgeback_autonomy.common.models import Detection, DetectionBatch
 from ridgeback_autonomy.common.miss_reason import MissReason
 from ridgeback_autonomy.perception.target_localization.core.intrinsics import CameraIntrinsics
+from ridgeback_autonomy.perception.target_localization.core import (
+    isolation_2d as isolation_2d_module,
+)
 from ridgeback_autonomy.perception.target_localization.core.mask import (
     MaskPrecision,
     region_from_blob,
@@ -1581,3 +1584,114 @@ def test_source_ceiling_tightens_the_gate_but_never_widens_it(ros_context) -> No
         assert generous_source.effective_depth_max() == 10.0
     finally:
         generous_source.destroy_node()
+
+
+def test_isolation_2d_parameters_reach_the_recipe(ros_context) -> None:
+    """The three recipe numbers are bound onto the callable the paths run.
+
+    Until they became parameters they were import-time constants, so no
+    benchmark config could vary them and no sweep could measure what they were
+    worth.
+    """
+
+    node = _mask_node(
+        _StubDepthSource('depth'),
+        isolation_2d='nearest_mode_histogram',
+        isolation_2d_bin_width_m=0.02,
+        isolation_2d_band_m=0.75,
+        isolation_2d_min_bin_fraction=0.15,
+    )
+    try:
+        assert node.isolation_2d.func is isolation_2d_module.nearest_mode_histogram
+        assert node.isolation_2d.keywords == {
+            'bin_width_m': 0.02,
+            'band_m': 0.75,
+            'min_bin_fraction': 0.15,
+        }
+    finally:
+        node.destroy_node()
+
+
+def test_otsu_takes_the_bin_width_and_ignores_the_band(ros_context) -> None:
+    # One launch argument spans both recipes, so selecting the recipe with
+    # fewer knobs must not fail on the ones it does not have.
+    node = _mask_node(
+        _StubDepthSource('depth'),
+        isolation_2d='otsu',
+        isolation_2d_bin_width_m=0.02,
+        isolation_2d_band_m=0.75,
+    )
+    try:
+        assert node.isolation_2d.func is isolation_2d_module.otsu_foreground
+        assert node.isolation_2d.keywords == {'bin_width_m': 0.02}
+    finally:
+        node.destroy_node()
+
+
+def test_unknown_isolation_2d_recipe_is_rejected_by_name(ros_context) -> None:
+    with pytest.raises(ValueError, match='Unknown isolation_2d recipe'):
+        _mask_node(_StubDepthSource('depth'), isolation_2d='not_a_recipe')
+
+
+def test_min_valid_pixels_parameter_reaches_the_estimator(ros_context) -> None:
+    """A raised floor actually rejects a region the default would have kept.
+
+    The pipeline used to drop this argument, so the guard behind it could not
+    fire at any value.
+    """
+
+    node = _mask_node(_StubDepthSource('depth'), min_valid_pixels=10_000)
+    try:
+        assert node.min_valid_pixels == 10_000
+    finally:
+        node.destroy_node()
+
+
+def test_raised_min_valid_pixels_rejects_a_tight_region_the_default_keeps() -> None:
+    """The floor is threaded through the pipeline, not dropped on the way in.
+
+    ``fill_path_measurements`` used to omit this argument, so the estimator ran
+    at its own import-time default no matter what a caller asked for and the
+    guard was unreachable from the node.
+    """
+
+    from ridgeback_autonomy.common.miss_reason import MissReason
+
+    masks = [region_from_blob(tight_blob(), MaskPrecision.TIGHT)]
+    common = dict(
+        camera_rotation=LEVEL_OPTICAL_TO_BASE,
+        camera_translation=ZERO_TRANSLATION,
+        front_offset_m=0.25,
+        isolation_2d=forbidden_isolation,
+        isolation_3d=forbidden_isolation,
+        enabled=frozenset({'projective_ranging'}),
+    )
+
+    kept = build_fill_batch()
+    fill_path_measurements(
+        kept, masks, FILL_INTRINSICS, build_fill_depth(), None, **common)
+    assert kept.detections[0].projective_ranging_status == int(MissReason.OK)
+
+    rejected = build_fill_batch()
+    fill_path_measurements(
+        rejected, masks, FILL_INTRINSICS, build_fill_depth(), None,
+        min_valid_pixels=10_000, **common)
+    assert rejected.detections[0].projective_ranging_status == int(
+        MissReason.TOO_FEW_VALID_PIXELS)
+    assert rejected.detections[0].projective_ranging_distance_m is None
+
+
+def test_raised_min_valid_pixels_empties_the_rect_isolation_branch() -> None:
+    # The rect branch reports the shortfall as ISOLATION_EMPTY rather than
+    # TOO_FEW_VALID_PIXELS: the region had the depth, the recipe rejected it.
+    from ridgeback_autonomy.common.miss_reason import MissReason
+
+    intrinsics, depth, batch, masks = _status_fixture()
+    fill_path_measurements(
+        batch, masks, intrinsics, depth, None,
+        camera_rotation=np.eye(3), camera_translation=np.zeros(3),
+        front_offset_m=0.0, isolation_2d=None, isolation_3d=None,
+        min_valid_pixels=10_000, enabled=frozenset({'projective_ranging'}))
+
+    assert batch.detections[0].projective_ranging_status == int(
+        MissReason.ISOLATION_EMPTY)

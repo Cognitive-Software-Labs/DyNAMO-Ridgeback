@@ -97,10 +97,18 @@ from ridgeback_autonomy.benchmarking.trial_results import (
 )
 from ridgeback_autonomy.msg import TargetMeasurements
 from ridgeback_autonomy.common.stamps import stamp_to_nanoseconds
-from ridgeback_autonomy.perception.target_localization.core.depth_common import DEPTH_GATE_DISABLED
+from ridgeback_autonomy.perception.target_localization.core.depth_common import (
+    DEPTH_GATE_DISABLED,
+    NEAREST_MODE_BIN_WIDTH_M_DEFAULT,
+    NEAREST_MODE_MIN_BIN_FRACTION_DEFAULT,
+)
 from ridgeback_autonomy.perception.target_localization.core.image_utils import convert_color_image_message
 from ridgeback_autonomy.perception.target_localization.core.isolation_2d import ISOLATION_2D_DEFAULT
 from ridgeback_autonomy.perception.target_localization.core.isolation_3d import ISOLATION_3D_DEFAULT
+from ridgeback_autonomy.perception.target_localization.core.ranging_defaults import (
+    MIN_VALID_SAMPLES,
+    NEAR_SURFACE_BAND_M,
+)
 from ridgeback_autonomy.perception.target_localization.ground_truth import (
     ground_truth_point_message,
 )
@@ -186,6 +194,15 @@ class TargetDistanceBenchmarkRunner(Node):
         # Declared so declared_parameters() records the gate the mask rows ran
         # under. The runner itself never applies it.
         self.declare_parameter('mask_depth_max_meters', DEPTH_GATE_DISABLED)
+        # Record-only for the same reason: the projective-parameter sweep varies
+        # these per config, and run.json is where the value a config actually
+        # ran at is read back from.
+        self.declare_parameter(
+            'isolation_2d_bin_width_m', NEAREST_MODE_BIN_WIDTH_M_DEFAULT)
+        self.declare_parameter('isolation_2d_band_m', NEAR_SURFACE_BAND_M)
+        self.declare_parameter(
+            'isolation_2d_min_bin_fraction', NEAREST_MODE_MIN_BIN_FRACTION_DEFAULT)
+        self.declare_parameter('min_valid_pixels', MIN_VALID_SAMPLES)
 
         # Screen recording of the RViz window for the length of the run. The
         # collages freeze one frame per trial; this keeps the motion around it.

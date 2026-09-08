@@ -25,6 +25,9 @@ from ridgeback_autonomy.perception.target_localization.core.polar_profiling impo
 from ridgeback_autonomy.perception.target_localization.core.projective_ranging import (
     localize_prepared_projective_ranging,
 )
+from ridgeback_autonomy.perception.target_localization.core.ranging_defaults import (
+    MIN_VALID_SAMPLES as MIN_VALID_PIXELS_DEFAULT,
+)
 from ridgeback_autonomy.perception.target_localization.estimator_registry import (
     ESTIMATOR_FIELD_KEYS,
     MASK_ESTIMATORS,
@@ -136,6 +139,7 @@ def fill_path_measurements(
     isolation_2d,
     isolation_3d,
     depth_max: float = MASK_DEPTH_GATE_DEFAULT,
+    min_valid_pixels: int = MIN_VALID_PIXELS_DEFAULT,
     scan_reason: MissReason = MissReason.NO_SCAN,
     beam_records: list | None = None,
     enabled=MASK_ESTIMATORS,
@@ -151,6 +155,9 @@ def fill_path_measurements(
     Both depth estimators receive the **same** ``PreparedDepthRegion``, prepared
     once per detection. Preparing it twice would cost a second pass and, worse,
     leave the two rows free to disagree about which pixels were selected.
+
+    ``min_valid_pixels`` is projective ranging's own sufficiency floor; euclidean
+    reconstruction carries its isolation-empty handling inside its recipe chain.
     """
 
     wants_projective = 'projective_ranging' in enabled
@@ -178,7 +185,7 @@ def fill_path_measurements(
             if wants_projective:
                 result_a, reason_a = localize_prepared_projective_ranging(
                     prepared, intrinsics, isolation=isolation_2d,
-                    depth_max=depth_max)
+                    depth_max=depth_max, min_valid_pixels=min_valid_pixels)
                 detection.projective_ranging_status = int(reason_a)
                 if result_a is not None:
                     (

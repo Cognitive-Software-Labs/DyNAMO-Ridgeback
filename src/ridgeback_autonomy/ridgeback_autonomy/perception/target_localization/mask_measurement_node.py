@@ -81,6 +81,8 @@ from ridgeback_autonomy.common.tf_utils import lookup_transform_components
 from ridgeback_autonomy.msg import TargetDetections, TargetMeasurements
 from ridgeback_autonomy.perception.target_localization.core.depth_common import (
     DEPTH_GATE_DISABLED,
+    NEAREST_MODE_BIN_WIDTH_M_DEFAULT,
+    NEAREST_MODE_MIN_BIN_FRACTION_DEFAULT,
     resolve_depth_gate,
 )
 from ridgeback_autonomy.perception.target_localization.core.depth_sources import (
@@ -94,6 +96,7 @@ from ridgeback_autonomy.perception.target_localization.core.intrinsics import in
 from ridgeback_autonomy.perception.target_localization.core.isolation_2d import (
     ISOLATION_2D_DEFAULT,
     ISOLATION_2D_RECIPES,
+    build_isolation_2d,
 )
 from ridgeback_autonomy.perception.target_localization.core.isolation_3d import (
     BASE_ABOVE_FLOOR_M_DEFAULT,
@@ -109,6 +112,10 @@ from ridgeback_autonomy.perception.target_localization.core.mask import (
 )
 from ridgeback_autonomy.perception.target_localization.core.polar_profiling import (
     scan_points_optical,
+)
+from ridgeback_autonomy.perception.target_localization.core.ranging_defaults import (
+    MIN_VALID_SAMPLES,
+    NEAR_SURFACE_BAND_M,
 )
 from ridgeback_autonomy.perception.target_localization.core.segmentation import (
     SEGMENTATION_MIN_PREDICTED_IOU_DEFAULT,
@@ -201,6 +208,21 @@ class TargetMaskMeasurementNode(Node):
         self.declare_parameter('base_frame', BASE_FRAME_DEFAULT)
         self.declare_parameter('front_offset_m', ROBOT_FRONT_OFFSET_M)
         self.declare_parameter('isolation_2d', ISOLATION_2D_DEFAULT)
+        # The selected 2D recipe's own numbers, exposed so a benchmark sweep can
+        # measure what each one is worth. None of the three had a traceable
+        # justification; they are declared here at exactly their historical
+        # values, so an unset run is the run that was always happening. A recipe
+        # that does not take one of them ignores it (build_isolation_2d), which
+        # is what lets one bin-width argument span both recipes.
+        self.declare_parameter(
+            'isolation_2d_bin_width_m', NEAREST_MODE_BIN_WIDTH_M_DEFAULT)
+        self.declare_parameter('isolation_2d_band_m', NEAR_SURFACE_BAND_M)
+        self.declare_parameter(
+            'isolation_2d_min_bin_fraction', NEAREST_MODE_MIN_BIN_FRACTION_DEFAULT)
+        # Projective ranging's sufficiency floor. Until this became a parameter
+        # the pipeline dropped it entirely, so the guard behind it could not
+        # fire at all -- see fill_path_measurements.
+        self.declare_parameter('min_valid_pixels', MIN_VALID_SAMPLES)
         self.declare_parameter('isolation_3d', ISOLATION_3D_DEFAULT)
         # Height of the base origin above the floor, added to the TF
         # camera-above-base height to place the euclidean floor crop per frame.
@@ -251,8 +273,17 @@ class TargetMaskMeasurementNode(Node):
         self.ray_marker_lifetime_sec = float(
             self.get_parameter('ray_marker_lifetime_sec').value)
         self.front_offset_m = float(self.get_parameter('front_offset_m').value)
-        self.isolation_2d = self.resolve_recipe(
-            'isolation_2d', ISOLATION_2D_RECIPES)
+        # Validated by name first, so an unknown recipe still fails with the
+        # "expected one of" message every other recipe parameter produces.
+        self.isolation_2d = build_isolation_2d(
+            self.resolve_recipe_name('isolation_2d', ISOLATION_2D_RECIPES),
+            bin_width_m=float(
+                self.get_parameter('isolation_2d_bin_width_m').value),
+            band_m=float(self.get_parameter('isolation_2d_band_m').value),
+            min_bin_fraction=float(
+                self.get_parameter('isolation_2d_min_bin_fraction').value),
+        )
+        self.min_valid_pixels = int(self.get_parameter('min_valid_pixels').value)
         # The 3D recipe is rebuilt per frame with the TF-derived floor pose, so
         # store the validated name (not a pre-built callable) and the offset.
         self.isolation_3d_name = self.resolve_recipe_name(
@@ -489,9 +520,6 @@ class TargetMaskMeasurementNode(Node):
         usable_max_m = getattr(self.depth_source, 'usable_max_m', float('inf'))
         return min(self.depth_max_gate_m, float(usable_max_m))
 
-    def resolve_recipe(self, parameter_name: str, registry: dict):
-        return registry[self.resolve_recipe_name(parameter_name, registry)]
-
     def resolve_recipe_name(self, parameter_name: str, registry: dict) -> str:
         key = str(self.get_parameter(parameter_name).value).strip()
         if key not in registry:
@@ -725,6 +753,7 @@ class TargetMaskMeasurementNode(Node):
                                 isolation_2d=self.isolation_2d,
                                 isolation_3d=isolation_3d,
                                 depth_max=self.effective_depth_max(),
+                                min_valid_pixels=self.min_valid_pixels,
                                 scan_reason=scan_reason,
                                 beam_records=beam_records,
                                 enabled=self.enabled_estimators,

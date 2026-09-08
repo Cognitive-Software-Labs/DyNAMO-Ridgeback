@@ -7,6 +7,7 @@ from ridgeback_autonomy.perception.target_localization.core.depth_common import 
 from ridgeback_autonomy.perception.target_localization.core.isolation_2d import (
     ISOLATION_2D_DEFAULT,
     ISOLATION_2D_RECIPES,
+    build_isolation_2d,
     nearest_mode_histogram,
     otsu_foreground,
 )
@@ -128,3 +129,60 @@ def test_registry_exposes_both_recipes_and_a_default() -> None:
     assert ISOLATION_2D_RECIPES['nearest_mode_histogram'] is nearest_mode_histogram
     assert ISOLATION_2D_RECIPES['otsu'] is otsu_foreground
     assert ISOLATION_2D_DEFAULT in ISOLATION_2D_RECIPES
+
+
+def test_build_binds_only_the_kwargs_the_recipe_accepts() -> None:
+    """One launch argument spans every recipe, so an unaccepted one is dropped.
+
+    ``otsu`` bins the masked depths but has no band and no significance floor.
+    Forwarding them would be a ``TypeError`` on a sweep that varies the bin
+    width across both recipes.
+    """
+
+    built = build_isolation_2d(
+        'otsu', bin_width_m=0.02, band_m=0.75, min_bin_fraction=0.15)
+
+    assert built.func is otsu_foreground
+    assert built.keywords == {'bin_width_m': 0.02}
+
+    built = build_isolation_2d(
+        'nearest_mode_histogram',
+        bin_width_m=0.02, band_m=0.75, min_bin_fraction=0.15)
+
+    assert built.func is nearest_mode_histogram
+    assert built.keywords == {
+        'bin_width_m': 0.02, 'band_m': 0.75, 'min_bin_fraction': 0.15}
+
+
+def test_build_without_values_is_the_registry_entry_itself() -> None:
+    # The safety property the launch plumbing rests on: a caller that sets
+    # nothing gets exactly the behaviour that shipped before it existed.
+    for name, recipe in ISOLATION_2D_RECIPES.items():
+        assert build_isolation_2d(name) is recipe
+
+
+def test_build_rejects_an_unknown_recipe_name() -> None:
+    with pytest.raises(ValueError, match='Unknown isolation_2d recipe'):
+        build_isolation_2d('not_a_recipe')
+
+
+def test_built_band_widens_what_the_recipe_keeps() -> None:
+    """A bound value reaches the recipe, and the axis moves the result.
+
+    Two surfaces 0.5 m apart: the default 0.35 m band reaches only the near
+    one, a 0.75 m band reaches both. That gap is the failure mode the archive
+    pins ~0.62 m of interfere_infront error on.
+    """
+
+    depth = np.full((HEIGHT, WIDTH), BACKGROUND_DEPTH_M, dtype=np.float32)
+    depth[20:40, 30:40] = 2.0   # near surface, 200 px
+    depth[20:40, 40:50] = 2.5   # target behind it, 200 px
+    mask = np.zeros((HEIGHT, WIDTH), dtype=bool)
+    mask[OBJECT_SLICE] = True
+
+    default_band = build_isolation_2d('nearest_mode_histogram')(depth, mask)
+    wide_band = build_isolation_2d(
+        'nearest_mode_histogram', band_m=0.75)(depth, mask)
+
+    assert depth[default_band].max() == pytest.approx(2.0)
+    assert depth[wide_band].max() == pytest.approx(2.5)

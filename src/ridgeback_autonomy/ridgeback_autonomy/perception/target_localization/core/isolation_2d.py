@@ -15,6 +15,8 @@ on identical input.
 
 from __future__ import annotations
 
+import functools
+import inspect
 from typing import Callable
 
 import numpy as np
@@ -137,3 +139,46 @@ ISOLATION_2D_RECIPES: dict[str, Callable[..., np.ndarray]] = {
     'otsu': otsu_foreground,
 }
 ISOLATION_2D_DEFAULT = 'nearest_mode_histogram'
+
+def build_isolation_2d(
+    name: str,
+    *,
+    bin_width_m: float | None = None,
+    band_m: float | None = None,
+    min_bin_fraction: float | None = None,
+) -> Callable[..., np.ndarray]:
+    """Build the named recipe with runtime values in place of its own defaults.
+
+    The 2D counterpart of ``isolation_3d.build_isolation_3d``, and the reason
+    the numbers above are reachable from a launch argument at all. The recipes
+    are plain functions rather than dataclasses, so the binding is a
+    ``functools.partial`` instead of a constructor call.
+
+    Recipes take different subsets of these settings -- ``otsu`` bins but has no
+    band or significance floor -- so each value is bound only if that recipe
+    accepts it. Passing one it does not is silently ignored rather than a
+    ``TypeError``: one launch argument spans every recipe, and a sweep that
+    varies the bin width across both must not fail on the recipe with fewer
+    knobs. ``None`` means "leave the recipe's own default", so a caller that
+    sets nothing gets exactly ``ISOLATION_2D_RECIPES[name]``.
+    """
+
+    if name not in ISOLATION_2D_RECIPES:
+        supported = ', '.join(sorted(ISOLATION_2D_RECIPES))
+        raise ValueError(f'Unknown isolation_2d recipe "{name}". Expected one of: {supported}')
+    recipe = ISOLATION_2D_RECIPES[name]
+
+    requested = {
+        'bin_width_m': bin_width_m,
+        'band_m': band_m,
+        'min_bin_fraction': min_bin_fraction,
+    }
+    accepted = inspect.signature(recipe).parameters
+    bound = {
+        key: float(value)
+        for key, value in requested.items()
+        if value is not None and key in accepted
+    }
+    if not bound:
+        return recipe
+    return functools.partial(recipe, **bound)

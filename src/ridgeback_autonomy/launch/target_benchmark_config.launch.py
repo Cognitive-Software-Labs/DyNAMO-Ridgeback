@@ -41,8 +41,16 @@ from ridgeback_autonomy.perception.target_localization.launch import (
     resolved_camera_inputs,
     workspace_root_from_package_share,
 )
-from ridgeback_autonomy.perception.target_localization.core.depth_common import DEPTH_GATE_DISABLED
+from ridgeback_autonomy.perception.target_localization.core.depth_common import (
+    DEPTH_GATE_DISABLED,
+    NEAREST_MODE_BIN_WIDTH_M_DEFAULT,
+    NEAREST_MODE_MIN_BIN_FRACTION_DEFAULT,
+)
 from ridgeback_autonomy.perception.target_localization.core.isolation_3d import ISOLATION_3D_DEFAULT
+from ridgeback_autonomy.perception.target_localization.core.ranging_defaults import (
+    MIN_VALID_SAMPLES,
+    NEAR_SURFACE_BAND_M,
+)
 
 
 ENV_READY_TIMEOUT_SEC = 300.0
@@ -93,6 +101,11 @@ def build_benchmark_nodes(context, *args, **kwargs):
             camera_info_topic=camera_inputs.color_camera_info_topic,
             scan_topic=scan_topic,
             isolation_2d=LaunchConfiguration('isolation_2d'),
+            isolation_2d_bin_width_m=LaunchConfiguration('isolation_2d_bin_width_m'),
+            isolation_2d_band_m=LaunchConfiguration('isolation_2d_band_m'),
+            isolation_2d_min_bin_fraction=LaunchConfiguration(
+                'isolation_2d_min_bin_fraction'),
+            min_valid_pixels=LaunchConfiguration('min_valid_pixels'),
             isolation_3d=LaunchConfiguration('isolation_3d'),
             mask_gate=LaunchConfiguration('mask_gate'),
             color_topic=camera_inputs.color_image_topic,
@@ -158,6 +171,14 @@ def build_benchmark_nodes(context, *args, **kwargs):
             'mask_gate': LaunchConfiguration('mask_gate'),
             # Recorded, not applied: this records the mask row's actual gate.
             'mask_depth_max_meters': LaunchConfiguration('mask_depth_max_meters'),
+            # Recorded, not applied, for the same reason: run.json is where a
+            # sweep's per-config parameter values are read back from, and these
+            # four are the axes the projective-parameter sweep varies.
+            'isolation_2d_bin_width_m': LaunchConfiguration('isolation_2d_bin_width_m'),
+            'isolation_2d_band_m': LaunchConfiguration('isolation_2d_band_m'),
+            'isolation_2d_min_bin_fraction': LaunchConfiguration(
+                'isolation_2d_min_bin_fraction'),
+            'min_valid_pixels': LaunchConfiguration('min_valid_pixels'),
             # The recorder screen-grabs the RViz window, which competes with
             # the simulator's render path. Turn it off for timing runs and take
             # visual integrity from a separate smoke run instead.
@@ -263,6 +284,36 @@ def generate_launch_description():
             'isolation_2d',
             default_value='nearest_mode_histogram',
             description='Projective-ranging box-gate foreground recipe',
+        ),
+        # The selected 2D recipe's own numbers. Defaulted to the constants the
+        # recipes have always used, so an unset run is byte-identical to the
+        # runs already in the archive; they are declared here only so a sweep
+        # can measure how far each one moves the estimate.
+        DeclareLaunchArgument(
+            'isolation_2d_bin_width_m',
+            default_value=str(NEAREST_MODE_BIN_WIDTH_M_DEFAULT),
+            description='Depth-histogram bin width of the isolation_2d recipe',
+        ),
+        DeclareLaunchArgument(
+            'isolation_2d_band_m',
+            default_value=str(NEAR_SURFACE_BAND_M),
+            description=(
+                'Depth band kept around the near-surface anchor '
+                '(nearest_mode_histogram only)'
+            ),
+        ),
+        DeclareLaunchArgument(
+            'isolation_2d_min_bin_fraction',
+            default_value=str(NEAREST_MODE_MIN_BIN_FRACTION_DEFAULT),
+            description=(
+                'Fraction of masked depths a bin must hold to anchor on it '
+                '(nearest_mode_histogram only)'
+            ),
+        ),
+        DeclareLaunchArgument(
+            'min_valid_pixels',
+            default_value=str(MIN_VALID_SAMPLES),
+            description='Projective ranging: foreground pixels required for an estimate',
         ),
         DeclareLaunchArgument(
             'isolation_3d',
