@@ -19,8 +19,9 @@ selects too few rays -- the scan plane missed the object, or it sits outside
 the FoV overlap -- is skipped by returning ``None``: no estimate for that
 mask, never an error.
 
-This module owns the LiDAR scan-validity clips outright -- there is no longer a
-second estimator holding a copy of them.
+Scan validity is the driver's to declare, not this module's to guess: the
+``range_min`` / ``range_max`` the message carries are the only bounds applied.
+Nothing here narrows them.
 """
 
 from __future__ import annotations
@@ -41,13 +42,6 @@ from ridgeback_autonomy.perception.target_localization.core.ranging_defaults imp
     NEAR_SURFACE_BAND_M as RANGE_BAND_M_DEFAULT,
 )
 
-
-# Scan-validity clip (not an accuracy knob): drop physically impossible returns
-# before anything else. This module is its only owner. The near floor is not
-# here because it belongs to the device: every driver publishes its own
-# ``range_min`` (0.06 m for the UST family), which is per-model and always
-# tighter than a constant picked here would be.
-LIDAR_RANGE_MAX_M_DEFAULT = 10.0  # drop far-field noise
 
 # Foreground-isolation parameters -- the LiDAR analogue of the isolation_2d /
 # isolation_3d recipes (``docs/target_localization/polar_profiling.md`` Section 2.5). They decide which
@@ -154,8 +148,6 @@ def scan_points_optical(
     scan,
     rotation: np.ndarray,
     translation: np.ndarray,
-    *,
-    range_max_m: float = LIDAR_RANGE_MAX_M_DEFAULT,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Per-scan work: validity clean + polar->Cartesian + extrinsic transform.
 
@@ -179,11 +171,14 @@ def scan_points_optical(
     valid = np.isfinite(ranges)
     safe_ranges = np.where(valid, ranges, 0.0)
 
-    range_floor = float(scan.range_min)
+    valid &= safe_ranges >= float(scan.range_min)
+    # No ceiling of our own. A return past the object is background the
+    # segmentation is there to reject (Section 2.5); silently invalidating it
+    # instead would hide a parallax failure as a clean miss, and cap the path
+    # to a range nobody chose. Only an unusable declared cap is ignored.
     range_cap = float(scan.range_max)
-    if not (math.isfinite(range_cap) and range_cap > 0.0):
-        range_cap = range_max_m
-    valid &= (safe_ranges >= range_floor) & (safe_ranges <= min(range_cap, range_max_m))
+    if math.isfinite(range_cap) and range_cap > 0.0:
+        valid &= safe_ranges <= range_cap
 
     unit_directions = _scan_unit_directions(
         int(ranges.size),

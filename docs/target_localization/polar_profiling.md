@@ -84,8 +84,10 @@ y = ranges * np.sin(angles)          # z = 0: single plane
 
 Invalid returns must be dropped first — the LiDAR analogue of the depth clean
 step (`docs/target_localization/projective_ranging.md` §2.2): non-finite ranges, ranges below `range_min`
-(mixed-pixel and self-hit artifacts), ranges beyond `range_max` / a sane
-maximum. They must never survive into the range profile, where a stray 0.06 m
+(mixed-pixel and self-hit artifacts), ranges beyond `range_max`. Both bounds
+are the driver's declared ones — the path applies no ceiling of its own, so a
+far return is background for the segmentation to reject (§2.5), not something
+quietly dropped here. They must never survive into the range profile, where a stray 0.06 m
 self-hit would masquerade as the nearest run.
 
 ### 2.2 Transform

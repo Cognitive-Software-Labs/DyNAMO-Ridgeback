@@ -352,7 +352,7 @@ def test_scan_points_optical_transform_and_validity() -> None:
     )
 
     assert points.shape == (5, 3)
-    # NaN, below the range floor, and beyond the 10 m cap are invalid.
+    # NaN, below the message's range_min, and beyond its range_max are invalid.
     assert valid.tolist() == [True, False, False, False, True]
     # Beam 0: straight ahead at 2 m -> optical (0, 0.65, 2.09).
     assert np.allclose(points[0], (0.0, 0.65, 2.09))
@@ -363,6 +363,49 @@ def test_scan_points_optical_transform_and_validity() -> None:
         3.0 * math.cos(0.4) + 0.09,
     )
     assert np.allclose(points[4], expected)
+
+
+def test_scan_points_optical_honours_the_declared_range_max() -> None:
+    """The message's ``range_max`` is the only ceiling; nothing narrows it.
+
+    The path used to clamp every scan to a hard 10 m regardless of what the
+    driver declared, which capped a 30 m sensor at a third of its range and
+    surfaced the loss as ``TOO_FEW_RAYS_SELECTED`` -- a range limit disguised
+    as "the scan plane missed the object". Beam 1 is the guard: it is past
+    that old ceiling but well inside the declared range.
+    """
+
+    scan = SimpleNamespace(
+        ranges=[2.0, 12.0, 20.0],
+        angle_min=0.0,
+        angle_increment=0.1,
+        range_min=0.02,
+        range_max=15.0,
+    )
+
+    _, valid = scan_points_optical(
+        scan, ROTATION_LIDAR_TO_OPTICAL, TRANSLATION_LIDAR_TO_OPTICAL,
+    )
+
+    assert valid.tolist() == [True, True, False]
+
+
+def test_scan_points_optical_ignores_an_unusable_range_max() -> None:
+    """A driver publishing a nonsense cap gets no cap, not a guessed one."""
+
+    scan = SimpleNamespace(
+        ranges=[2.0, 25.0],
+        angle_min=0.0,
+        angle_increment=0.1,
+        range_min=0.02,
+        range_max=0.0,
+    )
+
+    _, valid = scan_points_optical(
+        scan, ROTATION_LIDAR_TO_OPTICAL, TRANSLATION_LIDAR_TO_OPTICAL,
+    )
+
+    assert valid.tolist() == [True, True]
 
 
 def test_scan_points_optical_reuses_immutable_unit_directions() -> None:
