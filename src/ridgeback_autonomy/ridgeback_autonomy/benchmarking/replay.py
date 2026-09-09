@@ -62,6 +62,7 @@ from ridgeback_autonomy.perception.target_localization.core.vehicle_frame import
 
 
 REPLAY_SCHEMA_VERSION = 1
+REPLAY_CAPTURE_BATCHES_DEFAULT = 5
 MANIFEST_NAME = 'manifest.json'
 
 

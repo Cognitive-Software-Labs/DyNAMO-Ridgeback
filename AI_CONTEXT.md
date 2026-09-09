@@ -164,7 +164,11 @@ Benchmark stack:
   missing matches. Any skipped trial leaves the dataset unloadable as
   `incomplete`. Replay reuses the
   live reduction/scoring/trial/report modules and is not evidence about detector,
-  ROS transport, latency, throughput, or integration behavior.
+  ROS transport, latency, throughput, or integration behavior. Five raw batches
+  per trial is the validated default: on 2026-09-09 its full 109-trial capture
+  matched all 135 live result rows and the 15-variant end-to-end path was about
+  50x faster than the prior live-sweep estimate. The worker knee was 16 on a
+  32-thread host; it is a host measurement, not a portable worker default.
 
 ## Namespace And Topic Conventions
 

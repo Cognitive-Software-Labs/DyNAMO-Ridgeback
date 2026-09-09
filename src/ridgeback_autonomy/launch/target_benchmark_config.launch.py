@@ -18,6 +18,7 @@ from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
 from ridgeback_autonomy.benchmarking.paths import default_output_directory
+from ridgeback_autonomy.benchmarking.replay import REPLAY_CAPTURE_BATCHES_DEFAULT
 from ridgeback_autonomy.perception.target_localization.estimator_registry import (
     parse_estimators,
     selected_mask_estimators,
@@ -307,7 +308,7 @@ def generate_launch_description():
             description='New directory for a V1 projective-ranging replay capture',
         ),
         DeclareLaunchArgument(
-            'capture_batches', default_value='0',
+            'capture_batches', default_value=str(REPLAY_CAPTURE_BATCHES_DEFAULT),
             description='Raw detector batches per replay trial; empty batches count',
         ),
         DeclareLaunchArgument(

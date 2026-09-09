@@ -364,7 +364,7 @@ Arguments:
 | `settle_sec` | `2.0` | Delay after spawning the target before sampling |
 | `capture_sec` | `10.0` | Sampling window length for collecting usable detections |
 | `replay_dataset_dir` | empty | New directory for an experimental V1 replay dataset. Setting it switches this run from elapsed-time capture to an exact raw-batch quota and requires projective ranging, box gating, and stereoscopic depth |
-| `capture_batches` | `0` | Raw detector batches captured per trial when `replay_dataset_dir` is set; empty batches count. Must be positive in replay-capture mode |
+| `capture_batches` | `5` | Raw detector batches captured per trial when `replay_dataset_dir` is set; empty batches count. Five was selected by the 2026-09-09 convergence run |
 | `capture_drain_sec` | `2.0` | Maximum post-quota drain for matching exact depth, camera context, and live measurement messages. Capture ends early when every selected stamp is complete and preserves missing matches when the bound expires |
 | `capture_timeout_sec` | `30.0` | Hard wall-time bound for obtaining the raw detector-batch quota; it is a stall guard, not the normal capture duration |
 | `color_topic` | `sensors/camera_0/color/image` | Compatibility override for the shared camera contract's color image; feeds detector, measurements, overlay, runner, and readiness gate |
@@ -481,7 +481,7 @@ records each configuration's wall time and a pre-run real-time-factor sample;
 RTF is diagnostic only, but helps distinguish configuration effects from
 observation-coverage drift as a long-lived simulator slows down.
 
-### Offline projective replay (experimental)
+### Offline projective replay
 
 Use replay when only the box-gated stereoscopic `projective_ranging` recipe or
 its numeric parameters change. One live run freezes raw detections, exact-stamp
@@ -491,8 +491,7 @@ inputs. It does not replace live runs for detector, transport, throughput,
 latency, model, or final-integration questions.
 
 Both the dataset directory and offline output directory must be new. This
-five-scene command is a smoke workflow; `capture_batches:=1` is deliberately
-small and is not yet the selected full-benchmark sampling count.
+five-scene command is a smoke workflow and uses the selected five-batch default.
 
 ```bash
 SCENARIO="$(ros2 pkg prefix ridgeback_autonomy)/share/ridgeback_autonomy/config/benchmark_scenarios_examples.yaml"
@@ -505,7 +504,7 @@ ros2 launch ridgeback_autonomy target_distance_benchmark.launch.py \
   scenario:="$SCENARIO" repeats:=1 estimators:=projective_ranging \
   mask_gate:=box depth_source:=stereoscopic record_video:=false gz_gui:=false \
   output_dir:="$LIVE_OUTPUT" run_dir_name:=matching_live \
-  replay_dataset_dir:="$DATASET" capture_batches:=1 \
+  replay_dataset_dir:="$DATASET" \
   capture_drain_sec:=2.0 capture_timeout_sec:=30.0 \
   shutdown_on_complete:=true
 
@@ -521,9 +520,13 @@ offline loader refuses it instead of silently comparing a reduced scenario set.
 
 The offline root contains `summary.md` and `sweep.json` for the cross-variant
 comparison, `replay.json` for dataset/evaluator provenance and total evaluation
-time, and one normal CSV/`run.json`/`summary.md` set per variant. The current
-implementation remains experimental until a clean full-scenario run selects a
-batch count and records the planned 5x end-to-end speed gate.
+time, and one normal CSV/`run.json`/`summary.md` set per variant. The clean
+2026-09-09 full-scenario validation captured 109/109 trials, matched all 135
+live rows, and reduced the estimated 6.99-hour 15-variant sweep to 8 minutes 22
+seconds end to end (about 50x). Five batches is therefore the V1 default. On
+the measured 32-thread host, 16 workers was the replay knee; choose workers for
+the machine rather than blindly using every logical CPU. See
+[`docs/history/offline_measurement_replay_validation.md`](docs/history/offline_measurement_replay_validation.md).
 
 ### Perception interfaces
 

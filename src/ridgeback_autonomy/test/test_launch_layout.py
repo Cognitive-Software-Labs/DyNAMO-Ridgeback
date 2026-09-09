@@ -5,6 +5,7 @@ import re
 
 import yaml
 
+from ridgeback_autonomy.benchmarking.replay import REPLAY_CAPTURE_BATCHES_DEFAULT
 from ridgeback_autonomy.perception.target_localization.estimator_registry import PUBLIC_ESTIMATOR_ORDER
 from ridgeback_autonomy.perception.target_localization.launch import CONFIG_LAUNCH_ARGUMENT_NAMES
 
@@ -146,6 +147,8 @@ def test_benchmark_launch_uses_new_multi_estimator_interface() -> None:
     assert "DeclareLaunchArgument('output_csv'" not in benchmark_text
     assert 'overlay_window' not in benchmark_text
     assert 'show_window' not in benchmark_text
+    assert REPLAY_CAPTURE_BATCHES_DEFAULT == 5
+    assert "default_value=str(REPLAY_CAPTURE_BATCHES_DEFAULT)" in benchmark_text
     # The mask-gate axis: declared once, forwarded to the mask node, the runner
     # (output names must match the node's gate), and the overlay (its mask panel
     # follows the gate).

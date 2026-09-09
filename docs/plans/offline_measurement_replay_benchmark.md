@@ -1,28 +1,28 @@
 # Plan: offline replay benchmark for measurement strategies
 
-Status: **IMPLEMENTED; FULL VALIDATION PENDING.** Replay V1 now captures detector
-and sensor inputs once, then evaluates any number of projective-ranging
-configurations against those identical inputs. It does not replace the live
-benchmark and does not authorize a production-default change. The remaining
-gate is a clean full-scenario run that selects `capture_batches`, proves the
-109-trial live/offline contract, and records at least a 5x end-to-end speedup.
+Status: **COMPLETE.** Replay V1 captures detector and sensor inputs once, then
+evaluates any number of projective-ranging configurations against those
+identical inputs. The clean 2026-09-09 full-scenario run selected five batches,
+proved the 109-trial live/offline contract, and measured about a 50x end-to-end
+speedup. It does not replace the live benchmark and does not authorize a
+production measurement-default change.
 
 Prepared 2026-09-09 against `79ccb8fc`.
 
-### Current evidence
+### Validation evidence
 
-The 2026-09-09 five-scene smoke capture exercised one raw batch per trial,
-including multiple targets and detector misses. Its baseline replay had zero
-outcome mismatches against the matching live run; the maximum trial-estimate
-difference was `8.4e-8 m`, consistent with the live message's float32 transport.
-The repaired evaluator ran all 15 projective variants over those five frozen
-trials through the installed executable with two workers in `0.094 s` and
-produced a cross-variant report.
-
-This is implementation evidence, not the stop-condition result: the captures
-were made from dirty worktrees, one batch does not exercise trial medians, and
-the full 109-trial dataset, worker-count knee, peak memory, compression ratio,
-and capture-plus-evaluation wall time have not yet been recorded.
+The clean run at commit `b5a22c15` captured all 109 trials and 135 instances in
+`501.118 s`, with no skipped trials and exactly five raw batches per payload.
+The dataset occupies 11 MB and its NumPy payload entries compress 2.91:1. The
+offline baseline matched all live outcomes and miss reasons; across 112 numeric
+estimates its maximum live/offline difference was `4.04e-7 m`, consistent with
+the live message's float32 transport. All 15 output CSVs were byte-identical at
+1, 2, 4, 8, 16, and 32 workers. Sixteen workers was the measured knee on the
+32-thread host at `0.53 s` end to end (`0.331 s` median evaluator time over five
+runs). Capture plus evaluation was about 8 minutes 22 seconds, roughly 50x
+faster than the prior 6.99-hour live-sweep estimate. See
+[`docs/history/offline_measurement_replay_validation.md`](../history/offline_measurement_replay_validation.md)
+for hashes, batch convergence, scaling, memory, limitations, and artifact paths.
 
 ## Decision to make
 

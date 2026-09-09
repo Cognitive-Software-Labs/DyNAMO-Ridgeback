@@ -209,9 +209,12 @@ marks the complete capture `incomplete`. `replay.json` records dataset and sweep
 hashes, evaluator Git provenance, worker count, and evaluation wall time. The
 root `summary.md` compares variants over the same frozen trials.
 
-The root README owns the experimental capture and replay commands. Replay is
+The root README owns the capture and replay commands. Replay is
 not authoritative for detector behavior, ROS delivery, timing, throughput, or
-final integration, and the full-scenario performance gate remains outstanding.
+final integration. The 2026-09-09 clean full-scenario run selected five batches,
+proved live/offline parity across 135 rows, and cleared the performance gate by
+about 50x; the complete evidence is in
+[the validation history](../history/offline_measurement_replay_validation.md).
 
 Architecture guards prohibit reusable benchmark modules from importing the
 runner node and prohibit perception/exploration from importing benchmarking.

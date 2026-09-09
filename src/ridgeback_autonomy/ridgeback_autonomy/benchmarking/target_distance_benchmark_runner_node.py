@@ -66,7 +66,11 @@ from ridgeback_autonomy.benchmarking.recording import (
     ScreenRecorder,
     find_window_id,
 )
-from ridgeback_autonomy.benchmarking.replay import ReplayDatasetWriter, sha256_file
+from ridgeback_autonomy.benchmarking.replay import (
+    REPLAY_CAPTURE_BATCHES_DEFAULT,
+    ReplayDatasetWriter,
+    sha256_file,
+)
 from ridgeback_autonomy.benchmarking.process_utils import (
     extract_json_payload,
     format_commit,
@@ -205,7 +209,7 @@ class TargetDistanceBenchmarkRunner(Node):
         self.declare_parameter('settle_sec', 2.0)
         self.declare_parameter('capture_sec', 10.0)
         self.declare_parameter('replay_dataset_dir', '')
-        self.declare_parameter('capture_batches', 0)
+        self.declare_parameter('capture_batches', REPLAY_CAPTURE_BATCHES_DEFAULT)
         self.declare_parameter('capture_drain_sec', 2.0)
         self.declare_parameter('capture_timeout_sec', 30.0)
         self.declare_parameter('raw_detections_topic', RAW_DETECTIONS_TOPIC)
