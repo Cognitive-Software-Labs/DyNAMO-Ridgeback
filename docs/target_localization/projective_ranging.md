@@ -16,7 +16,12 @@ is `docs/target_localization/euclidean_reconstruction.md`.
 **Inputs**
 
 - A **mask** from the mask interface: a boolean selector on the RGB color
-  grid, plus its precision tag (`tight` | `rect`). See `docs/target_localization/mask_representation.md`.
+  grid, plus its precision tag (`tight` | `rect`). Production hands over a
+  `MaskRegion` — the same selector stored in its own rectangular window rather
+  than at full-frame size (`docs/target_localization/mask_representation.md`
+  Section 7) — and the estimator works in that window throughout, lifting only
+  the surviving coordinates back to the full grid before deprojection. See
+  `docs/target_localization/mask_representation.md`.
 - An **aligned depth frame**: a depth image that is 1:1 with the RGB pixels, so
   that depth pixel `(u, v)` is the same ray as color pixel `(u, v)`. Producing
   this is a separate component (`docs/target_localization/aligned_depth.md`); projective ranging assumes it is
@@ -60,6 +65,12 @@ precondition that the mask and the depth frame share the grid (same resolution,
 same intrinsics, aligned) — if that does not hold, the indices do not refer to
 the same rays and the result is meaningless.
 
+That line is the meaning, not the literal production code. Only the standalone
+full-grid entry point indexes a whole frame; the production one indexes the
+mask's storage window with the same selector and gets the same values in the
+same order (§2.3), which is what makes the per-detection cost proportional to
+the detection rather than to the image.
+
 ### 2.2 Clean
 
 Before aggregation, `valid_depth` rejects non-finite and non-positive samples.
@@ -71,6 +82,18 @@ checkpoint declares one — its configured maximum depth taken at
 `MONOCULAR_USABLE_RANGE_FRACTION = 0.9`, so a 20 m checkpoint contributes an
 18 m ceiling rather than 20. A finite positive stereo value is not necessarily
 accurate. See [aligned depth](aligned_depth.md) for that contract.
+
+**There is no default ceiling to fall back on.** How far a reading can be
+trusted is a property of the depth source and the operator's gate, so no
+function here can answer it and none of them tries: `depth_max` is stated by the
+caller, typed `float | None`, and a call that supplies neither it nor an
+already-cleaned `valid_masked` raises rather than quietly adopting some number.
+`None` means "this selection is already clean, there is no ceiling left to
+apply" — which is what the production path passes, because a
+`PreparedDepthRegion` was cleaned against the node's gate before it was built.
+The 10 m that used to sit in these signatures was the *pointcloud* estimator's
+output clamp, arriving through shared defaults; it never fired on a mask row and
+now lives with its owner (`core/pointcloud_ranging.py`).
 
 ### 2.3 Aggregate — the mask-tag fork
 
@@ -117,6 +140,12 @@ and reports `ISOLATION_EMPTY` when too few pixels survive — or
 optional precomputed `valid_masked` selector avoids repeating the validity
 pass.
 
+The two codes split by *branch*, not by cause. On the `rect` branch the count is
+checked only after isolation, so a box that never held enough valid depth to
+begin with also reports `ISOLATION_EMPTY` — the recipe is named even when it
+rejected nothing. Read that code as "the `rect` branch came up short", not as
+proof the recipe is at fault.
+
 #### Implemented 2D recipes
 
 | Launch token (`isolation_2d`) | Algorithm | Default |
@@ -125,12 +154,23 @@ pass.
 | `otsu` | Histogram threshold maximizing between-class variance; retain the near side | No |
 
 **Nearest-mode histogram.** `nearest_significant_mode` chooses the nearest bin
-meeting the 5% sample-significance floor. If no bin meets that floor, it chooses
-the nearest non-empty bin rather than the global mode. The recipe retains depths
-within `band_m` of the anchor. The mode helper and its two numeric defaults
-(`NEAREST_MODE_BIN_WIDTH_M_DEFAULT`, `NEAREST_MODE_MIN_BIN_FRACTION_DEFAULT`)
-live in `core/depth_common.py`, shared with the point-domain twin;
-`core/ranging_defaults.py` owns only the band (`NEAR_SURFACE_BAND_M`).
+meeting the sample-significance floor, which is `max(1, min_bin_fraction × N)`
+over the `N` valid masked depths — the 5% fraction, but never below one sample,
+so on a set smaller than `1 / min_bin_fraction` (20 at the default) the floor
+degenerates to "non-empty" and the significance test does nothing. If no bin
+meets the floor, it chooses the nearest non-empty bin rather than the global
+mode. The recipe retains depths within `band_m` of the anchor. The mode helper
+and its two numeric defaults (`NEAREST_MODE_BIN_WIDTH_M_DEFAULT`,
+`NEAREST_MODE_MIN_BIN_FRACTION_DEFAULT`) live in `core/depth_common.py`, shared
+with the point-domain twin; `core/ranging_defaults.py` owns only the band
+(`NEAR_SURFACE_BAND_M`).
+
+The twin shares the **anchor**, not the window. `isolation_3d.NearestModeBand`
+calls the same helper and then applies euclidean reconstruction's asymmetric
+band (`0.10 m` ahead, `0.35 m` behind); this recipe applies a symmetric
+`±band_m`. The two domains therefore agree on where the near surface is and
+still retain different sets, so a band change on one side is not automatically
+right for the other.
 
 This assumes the target is the nearest coherent surface. A closer occluder can
 win, spatial connectivity is not enforced, and bin width, significance, and
@@ -270,6 +310,14 @@ Both use the same selection and reduction. The representative pixel is the mean
 foreground row/column, and Z is the median foreground depth. Too few valid or
 isolated pixels yields no result, never substitution by another path. The node
 performs the live optical-to-base conversion before publishing.
+
+The two entry points differ on one thing beyond array shape: the ceiling (§2.2).
+`localize_prepared_projective_ranging` takes no `depth_max` at all — its region
+arrives cleaned, so a ceiling on that signature would have nothing left to
+reject, and it matches `localize_prepared_euclidean_reconstruction`, which never
+had one. `localize_projective_ranging` requires `depth_max` as a keyword with no
+default, so a standalone caller states the range it trusts instead of inheriting
+one.
 
 [Tests](../../src/ridgeback_autonomy/test/test_projective_ranging.py) cover the
 algorithm; ROI parity is recorded in [migration history](../history/roi_mask_migration.md).
