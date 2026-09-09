@@ -131,6 +131,9 @@ from ridgeback_autonomy.perception.target_localization.core.ranging_defaults imp
     MIN_VALID_SAMPLES,
     NEAR_SURFACE_BAND_M,
 )
+from ridgeback_autonomy.perception.target_localization.core.vehicle_frame import (
+    ROBOT_FRONT_OFFSET_M,
+)
 from ridgeback_autonomy.perception.target_localization.ground_truth import (
     ground_truth_point_message,
 )
@@ -294,6 +297,7 @@ class TargetDistanceBenchmarkRunner(Node):
         )
         self.pose_info_topic = f'/world/{self.world}/pose/info'
         self.run_started_at = time.localtime()
+        self.run_started_monotonic = time.monotonic()
         self.run_label = time.strftime('%Y%m%d_%H%M%S', self.run_started_at)
         # The folder carries the axes that change the results, so a results
         # directory reads without opening anything.
@@ -372,6 +376,7 @@ class TargetDistanceBenchmarkRunner(Node):
         self.latest_replay_camera_info: CameraInfo | None = None
         self.replay_tf_buffer: Buffer | None = None
         self.replay_tf_listener: TransformListener | None = None
+        self.replay_last_fallback_frame: str | None = None
 
         self.last_color_decode_warning = None
 
@@ -475,28 +480,6 @@ class TargetDistanceBenchmarkRunner(Node):
         if stamp_ns in self.replay_capture_events:
             return
         batch = batch_from_detections_message(msg)
-        intrinsics = None
-        if self.latest_replay_camera_info is not None:
-            camera = intrinsics_from_camera_info(self.latest_replay_camera_info)
-            intrinsics = {
-                'fx': camera.fx, 'fy': camera.fy, 'cx': camera.cx, 'cy': camera.cy,
-                'width': camera.width, 'height': camera.height,
-            }
-        rotation = translation = None
-        if self.replay_tf_buffer is not None:
-            try:
-                rotation_value, translation_value, _ = lookup_transform_components(
-                    self.replay_tf_buffer,
-                    self.base_frame,
-                    msg.header.frame_id,
-                    Time.from_msg(msg.header.stamp),
-                    self.get_logger(),
-                    None,
-                )
-                rotation = np.asarray(rotation_value, dtype=float).tolist()
-                translation = np.asarray(translation_value, dtype=float).tolist()
-            except TransformException:
-                pass
         self.replay_capture_events[stamp_ns] = {
             'stamp_ns': stamp_ns,
             'frame_id': str(msg.header.frame_id),
@@ -504,10 +487,10 @@ class TargetDistanceBenchmarkRunner(Node):
             'count': int(msg.count),
             'image_width': int(msg.image_width),
             'image_height': int(msg.image_height),
-            'intrinsics': intrinsics,
-            'camera_rotation': rotation,
-            'camera_translation': translation,
-            'front_offset_m': 0.25,
+            'intrinsics': None,
+            'camera_rotation': None,
+            'camera_translation': None,
+            'front_offset_m': ROBOT_FRONT_OFFSET_M,
             # Stereo depth has no source-defined finite usable ceiling.
             'depth_usable_max_m': None,
             'detections': [
@@ -520,6 +503,7 @@ class TargetDistanceBenchmarkRunner(Node):
                 for detection in batch.detections
             ],
         }
+        self.backfill_replay_event_context(self.replay_capture_events[stamp_ns])
         depth_m = self.replay_depth_buffer.get(stamp_ns)
         if depth_m is not None:
             self.store_replay_depth_rois(self.replay_capture_events[stamp_ns], depth_m)
@@ -552,20 +536,67 @@ class TargetDistanceBenchmarkRunner(Node):
                 tuple(detection['bbox_xyxy']), event['image_height'], event['image_width'])
             detection['depth_roi'] = np.array(depth_m[y1:y2, x1:x2], dtype=np.float32, copy=True)
 
+    def backfill_replay_event_context(self, event: dict[str, Any]) -> None:
+        """Fill capture context that may arrive after the raw detector batch."""
+
+        if event['intrinsics'] is None and self.latest_replay_camera_info is not None:
+            camera = intrinsics_from_camera_info(self.latest_replay_camera_info)
+            event['intrinsics'] = {
+                'fx': camera.fx, 'fy': camera.fy, 'cx': camera.cx, 'cy': camera.cy,
+                'width': camera.width, 'height': camera.height,
+            }
+        if (event['camera_rotation'] is not None
+                and event['camera_translation'] is not None):
+            return
+        if self.replay_tf_buffer is None:
+            return
+        try:
+            rotation, translation, fallback = lookup_transform_components(
+                self.replay_tf_buffer,
+                self.base_frame,
+                event['frame_id'],
+                Time(nanoseconds=int(event['stamp_ns'])),
+                self.get_logger(),
+                self.replay_last_fallback_frame,
+            )
+        except TransformException:
+            return
+        self.replay_last_fallback_frame = fallback
+        event['camera_rotation'] = np.asarray(rotation, dtype=float).tolist()
+        event['camera_translation'] = np.asarray(translation, dtype=float).tolist()
+
+    def backfill_replay_capture_context(self) -> None:
+        for event in self.replay_capture_events.values():
+            self.backfill_replay_event_context(event)
+
     def replay_capture_is_complete(self) -> bool:
-        """Whether every frozen, detected batch has its exact depth crop.
+        """Whether every frozen batch has both replay input and a live result.
 
         A raw-detection callback can run before its aligned-depth callback on
         the ROS executor.  Counting raw batches alone therefore produces a
         replay file that looks complete but cannot reproduce the live score.
+        Likewise, stopping on depth alone can omit the matching live measurement
+        and make a parity comparison grade different event sets.
         """
         if len(self.replay_capture_events) < self.capture_batches:
             return False
-        return all(
+        if not all(
+            event['intrinsics'] is not None
+            and event['camera_rotation'] is not None
+            and event['camera_translation'] is not None
+            for event in self.replay_capture_events.values()
+        ):
+            return False
+        if not all(
             not event['detected']
             or all(detection['depth_roi'] is not None for detection in event['detections'])
             for event in self.replay_capture_events.values()
-        )
+        ):
+            return False
+        measurement_stamps = {
+            event.stamp_ns for event in self.capture_events.values()
+        }
+        return set(self.replay_capture_events).issubset(measurement_stamps)
 
     def log_code_provenance(self) -> None:
         """Say which code is about to produce these results, before it does.
@@ -656,11 +687,16 @@ class TargetDistanceBenchmarkRunner(Node):
             summary_rows, estimator_rows, included_trials, skipped_trials)
 
         if self.replay_writer is not None:
-            self.replay_writer.finalize(
-                live_run_dir=self.run_output_dir,
-                trials_included=included_trials,
-                trials_skipped=skipped_trials,
-            )
+            replay_metadata = {
+                'live_run_dir': self.run_output_dir,
+                'trials_included': included_trials,
+                'trials_skipped': skipped_trials,
+                'capture_wall_time_sec': time.monotonic() - self.run_started_monotonic,
+            }
+            if skipped_trials:
+                self.replay_writer.mark_incomplete(**replay_metadata)
+            else:
+                self.replay_writer.finalize(**replay_metadata)
 
         self.log_summary(summary_rows, included_trials, skipped_trials)
         self.get_logger().info(f'Benchmark run written to {self.run_output_dir}')
@@ -883,20 +919,48 @@ class TargetDistanceBenchmarkRunner(Node):
             else:
                 deadline = time.monotonic() + self.capture_timeout_sec
                 while (rclpy.ok() and time.monotonic() < deadline
-                       and not self.replay_capture_is_complete()):
+                       and len(self.replay_capture_events) < self.capture_batches):
                     rclpy.spin_once(self, timeout_sec=0.1)
                     self.publish_active_truth()
                 if len(self.replay_capture_events) < self.capture_batches:
                     raise RuntimeError(
                         f'Replay capture saw {len(self.replay_capture_events)}/{self.capture_batches} '
                         'raw detection batches before capture_timeout_sec.')
-                if not self.replay_capture_is_complete():
-                    raise RuntimeError(
-                        'Replay capture did not receive exact aligned-depth frames for every '
-                        'detected raw batch before capture_timeout_sec.')
-                self.spin_for(self.capture_drain_sec)
+                drain_deadline = time.monotonic() + max(0.0, self.capture_drain_sec)
+                while (rclpy.ok() and time.monotonic() < drain_deadline
+                       and not self.replay_capture_is_complete()):
+                    rclpy.spin_once(self, timeout_sec=min(
+                        0.1, max(0.0, drain_deadline - time.monotonic())))
+                    self.backfill_replay_capture_context()
+                    self.publish_active_truth()
                 self.capture_events = restrict_events_to_stamps(
                     self.capture_events, set(self.replay_capture_events))
+                if not self.replay_capture_is_complete():
+                    missing_depth = sum(
+                        1
+                        for event in self.replay_capture_events.values()
+                        if event['detected'] and any(
+                            detection['depth_roi'] is None
+                            for detection in event['detections'])
+                    )
+                    measurement_stamps = {
+                        event.stamp_ns for event in self.capture_events.values()
+                    }
+                    missing_measurements = len(
+                        set(self.replay_capture_events) - measurement_stamps)
+                    missing_context = sum(
+                        1
+                        for event in self.replay_capture_events.values()
+                        if event['intrinsics'] is None
+                        or event['camera_rotation'] is None
+                        or event['camera_translation'] is None
+                    )
+                    self.get_logger().warning(
+                        'Replay capture drain ended with '
+                        f'{missing_depth} raw batch(es) missing exact depth and '
+                        f'{missing_context} missing camera context and '
+                        f'{missing_measurements} missing a live measurement; '
+                        'the absent evidence is preserved in the dataset.')
         finally:
             self.capture_active = False
             self.active_truth = None

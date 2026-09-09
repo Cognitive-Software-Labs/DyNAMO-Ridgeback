@@ -2,14 +2,17 @@ from __future__ import annotations
 
 import statistics
 from collections import Counter
+from typing import TYPE_CHECKING
 
-from ridgeback_autonomy.benchmarking.alignment import (
-    MeasurementEvent,
+from ridgeback_autonomy.benchmarking.event_values import (
     detection_status,
     event_has_panel_preview,
     has_all_selected_estimates,
 )
 from ridgeback_autonomy.common.miss_reason import MissReason, reason_name
+
+if TYPE_CHECKING:
+    from ridgeback_autonomy.benchmarking.alignment import MeasurementEvent
 
 
 def usable_aligned_events(

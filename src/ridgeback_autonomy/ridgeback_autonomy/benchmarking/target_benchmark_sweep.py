@@ -587,6 +587,7 @@ def run_sweep(
     configs: tuple[SweepConfig, ...],
     *,
     package_share: str,
+    preflight_cleanup: bool = True,
 ) -> tuple[str, bool]:
     workspace_root = workspace_root_from_package_share(package_share)
     output_root = spec.defaults.get(
@@ -622,7 +623,12 @@ def run_sweep(
     current_config_process: subprocess.Popen | None = None
     interrupted = False
     try:
-        run_preflight_cleanup(workspace_root)
+        if preflight_cleanup:
+            run_preflight_cleanup(workspace_root)
+        else:
+            _log(
+                'Skipping cleanup.sh by operator request; existing ROS/Gazebo '
+                'processes may collide with this sweep.')
         environment = subprocess.Popen(
             _environment_command(spec),
             stdin=subprocess.DEVNULL,
@@ -753,6 +759,14 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument('--only', help='Comma-separated configuration names to run')
     parser.add_argument('--dry-run', action='store_true', help='Validate and estimate without launching')
     parser.add_argument(
+        '--skip-preflight-cleanup',
+        action='store_true',
+        help=(
+            'Do not run the aggressive same-user ROS/Gazebo cleanup before the '
+            'sweep; use only when another session must remain alive'
+        ),
+    )
+    parser.add_argument(
         '--report-only',
         metavar='SWEEP_DIR',
         help='Regenerate summary.md for an existing sweep and exit',
@@ -787,7 +801,12 @@ def main(argv: list[str] | None = None) -> int:
         if args.dry_run:
             print_dry_run(configs, default_scenario_path)
             return 0
-        sweep_dir, success = run_sweep(spec, configs, package_share=package_share)
+        sweep_dir, success = run_sweep(
+            spec,
+            configs,
+            package_share=package_share,
+            preflight_cleanup=not args.skip_preflight_cleanup,
+        )
     except (OSError, ValueError, RuntimeError) as exc:
         print(f'target_benchmark_sweep: {exc}', file=sys.stderr)
         return 2

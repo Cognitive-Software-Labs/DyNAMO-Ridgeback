@@ -1,11 +1,28 @@
 # Plan: offline replay benchmark for measurement strategies
 
-Status: **PROPOSED.** This plan defines a measurement-accuracy benchmark that
-captures detector and sensor inputs once, then evaluates any number of
-measurement configurations against those identical inputs. It does not replace
-the live benchmark and does not authorize a production-default change.
+Status: **IMPLEMENTED; FULL VALIDATION PENDING.** Replay V1 now captures detector
+and sensor inputs once, then evaluates any number of projective-ranging
+configurations against those identical inputs. It does not replace the live
+benchmark and does not authorize a production-default change. The remaining
+gate is a clean full-scenario run that selects `capture_batches`, proves the
+109-trial live/offline contract, and records at least a 5x end-to-end speedup.
 
 Prepared 2026-09-09 against `79ccb8fc`.
+
+### Current evidence
+
+The 2026-09-09 five-scene smoke capture exercised one raw batch per trial,
+including multiple targets and detector misses. Its baseline replay had zero
+outcome mismatches against the matching live run; the maximum trial-estimate
+difference was `8.4e-8 m`, consistent with the live message's float32 transport.
+The repaired evaluator ran all 15 projective variants over those five frozen
+trials through the installed executable with two workers in `0.094 s` and
+produced a cross-variant report.
+
+This is implementation evidence, not the stop-condition result: the captures
+were made from dirty worktrees, one batch does not exercise trial medians, and
+the full 109-trial dataset, worker-count knee, peak memory, compression ratio,
+and capture-plus-evaluation wall time have not yet been recorded.
 
 ## Decision to make
 

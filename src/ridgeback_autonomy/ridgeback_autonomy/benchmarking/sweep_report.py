@@ -94,7 +94,10 @@ def _format_rtf(value) -> str:
 def _format_duration(seconds) -> str:
     if seconds is None:
         return '—'
-    total = max(0, int(round(float(seconds))))
+    seconds = max(0.0, float(seconds))
+    if seconds < 1.0:
+        return f'{seconds:.3f}s'
+    total = int(round(seconds))
     hours, remainder = divmod(total, 3600)
     minutes, secs = divmod(remainder, 60)
     if hours:
@@ -125,6 +128,8 @@ def render_sweep_report(manifest: dict, sweep_dir: str) -> str:
         'Commit': str(commit),
         'Branch': str(provenance.get('branch') or 'unknown'),
     }
+    if sweep.get('wall_time_sec') is not None:
+        metadata['Evaluation wall time'] = _format_duration(sweep['wall_time_sec'])
     # Only surfaced when it invalidates the numbers below it. A run rendered in
     # software produced a fraction of its configured sensor rate, and no other
     # recorded metric shows that -- RTF stays normal.
@@ -134,27 +139,59 @@ def render_sweep_report(manifest: dict, sweep_dir: str) -> str:
             f'{gl.get("renderer") or "unknown"} — SOFTWARE RASTERIZER; '
             'sensor rates and coverage in this run are not trustworthy')
 
-    table_rows = [
-        [
-            row['config'],
-            row['estimator'],
-            format_metres(row['mean_abs_error_m']),
-            format_metres(row['median_abs_error_m']),
-            format_metres(row['p95_abs_error_m']),
-            format_percent(row['mean_rel_error']),
-            f'{row["scored_count"]}/{row["trial_count"]}',
-            format_percent(row['coverage']),
-            str(row['missed']),
-            _format_rtf(row['rtf']),
-            _format_duration(row['wall_time_sec']),
+    replay = manifest.get('replay')
+    if replay:
+        table_rows = [
+            [
+                row['config'],
+                row['estimator'],
+                format_metres(row['mean_abs_error_m']),
+                format_metres(row['median_abs_error_m']),
+                format_metres(row['p95_abs_error_m']),
+                format_percent(row['mean_rel_error']),
+                f'{row["scored_count"]}/{row["trial_count"]}',
+                format_percent(row['coverage']),
+                str(row['missed']),
+            ]
+            for row in rows
         ]
-        for row in rows
-    ]
-    comparison = markdown_table(
-        ['Config', 'Estimator', 'MAE', 'Median', 'P95', 'Mean rel',
-         'Scored', 'Coverage', 'Missed', 'RTF', 'Wall'],
-        table_rows,
-    )
+        comparison = markdown_table(
+            ['Config', 'Estimator', 'MAE', 'Median', 'P95', 'Mean rel',
+             'Scored', 'Coverage', 'Missed'],
+            table_rows,
+        )
+        comparison_note = (
+            'Rows are sorted by mean absolute error. Every configuration consumed '
+            'the same frozen replay trials; the evaluation wall time above covers '
+            'the complete variant set.'
+        )
+    else:
+        table_rows = [
+            [
+                row['config'],
+                row['estimator'],
+                format_metres(row['mean_abs_error_m']),
+                format_metres(row['median_abs_error_m']),
+                format_metres(row['p95_abs_error_m']),
+                format_percent(row['mean_rel_error']),
+                f'{row["scored_count"]}/{row["trial_count"]}',
+                format_percent(row['coverage']),
+                str(row['missed']),
+                _format_rtf(row['rtf']),
+                _format_duration(row['wall_time_sec']),
+            ]
+            for row in rows
+        ]
+        comparison = markdown_table(
+            ['Config', 'Estimator', 'MAE', 'Median', 'P95', 'Mean rel',
+             'Scored', 'Coverage', 'Missed', 'RTF', 'Wall'],
+            table_rows,
+        )
+        comparison_note = (
+            'Rows are sorted by mean absolute error. RTF is sampled immediately\n'
+            'before the configuration and is recorded for diagnosing coverage drift;\n'
+            'it never changes execution.'
+        )
 
     notes_text = '\n'.join(notes) if notes else 'Every selected configuration completed in this sweep.'
     return '\n'.join([
@@ -166,9 +203,7 @@ def render_sweep_report(manifest: dict, sweep_dir: str) -> str:
         '',
         comparison,
         '',
-        'Rows are sorted by mean absolute error. RTF is sampled immediately',
-        'before the configuration and is recorded for diagnosing coverage drift;',
-        'it never changes execution.',
+        comparison_note,
         '',
         '## Failed and skipped configurations',
         '',

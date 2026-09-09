@@ -22,12 +22,12 @@ from typing import Any
 import numpy as np
 
 from ridgeback_autonomy.benchmarking.report import render_run_report
-from ridgeback_autonomy.benchmarking.association import GtPoint, assign_to_ground_truth
+from ridgeback_autonomy.benchmarking.reduction import (
+    merge_status_histograms,
+    summarize_capture_events,
+)
 from ridgeback_autonomy.benchmarking.scoring import (
     MISS_OUTCOMES,
-    OUTCOME_NO_VALUE,
-    OUTCOME_DETECTOR_MISS,
-    build_instance_estimate,
     score_scene,
 )
 from ridgeback_autonomy.benchmarking.summary import (
@@ -37,12 +37,17 @@ from ridgeback_autonomy.benchmarking.summary import (
     write_trial_csv,
 )
 from ridgeback_autonomy.benchmarking.simulation import GroundTruthInstance
-from ridgeback_autonomy.common.miss_reason import MissReason, reason_name
+from ridgeback_autonomy.benchmarking.sweep_report import write_sweep_report
+from ridgeback_autonomy.benchmarking.trial_results import build_trial_result
+from ridgeback_autonomy.common.miss_reason import MissReason
 from ridgeback_autonomy.common.models import Detection
 from ridgeback_autonomy.perception.target_localization.core.depth_common import (
     PreparedDepthRegion,
     resolve_depth_gate,
     valid_depth,
+)
+from ridgeback_autonomy.perception.target_localization.core.box_gate import (
+    box_within_frame_fraction,
 )
 from ridgeback_autonomy.perception.target_localization.core.intrinsics import CameraIntrinsics
 from ridgeback_autonomy.perception.target_localization.core.isolation_2d import build_isolation_2d
@@ -50,11 +55,14 @@ from ridgeback_autonomy.perception.target_localization.core.mask import region_f
 from ridgeback_autonomy.perception.target_localization.core.projective_ranging import (
     localize_prepared_projective_ranging,
 )
+from ridgeback_autonomy.perception.target_localization.core.vehicle_frame import (
+    ROBOT_FRONT_OFFSET_M,
+    optical_to_base_planar,
+)
 
 
 REPLAY_SCHEMA_VERSION = 1
 MANIFEST_NAME = 'manifest.json'
-MAX_BOX_FRAME_FRACTION = 0.60
 
 
 @dataclass
@@ -69,28 +77,6 @@ class ReplayMeasurementEvent:
     image_height: int
     detections: list[Detection]
     estimates: dict[str, float | None]
-
-
-def box_within_frame_fraction(
-    bbox_xyxy: tuple[int, int, int, int], image_height: int, image_width: int,
-) -> bool:
-    x1, y1, x2, y2 = bbox_xyxy
-    return (
-        image_height > 0 and image_width > 0
-        and max(0, x2 - x1) * max(0, y2 - y1)
-        <= MAX_BOX_FRAME_FRACTION * image_height * image_width
-    )
-
-
-def optical_to_base_planar(
-    xyz_optical: np.ndarray,
-    rotation: np.ndarray,
-    translation: np.ndarray,
-    front_offset_m: float,
-) -> tuple[float, float, float]:
-    point_base = rotation @ np.asarray(xyz_optical, dtype=np.float64) + translation
-    lateral, forward = float(point_base[1]), float(point_base[0]) - front_offset_m
-    return lateral, forward, math.hypot(lateral, forward)
 
 
 def sha256_file(path: str | Path) -> str:
@@ -181,8 +167,24 @@ class ReplayDatasetWriter:
         _write_json_atomic(self.root / MANIFEST_NAME, self.manifest)
 
     def finalize(self, **metadata: Any) -> None:
+        skipped = int(metadata.get('trials_skipped', 0))
+        included = int(metadata.get('trials_included', len(self.manifest['trials'])))
+        if skipped:
+            raise ValueError(
+                f'Cannot finalize replay dataset with {skipped} skipped trial(s).')
+        if included != len(self.manifest['trials']):
+            raise ValueError(
+                f'Replay dataset contains {len(self.manifest["trials"])} payload(s) '
+                f'but reports {included} included trial(s).')
         self.manifest.update(metadata)
         self.manifest['state'] = 'complete'
+        _write_json_atomic(self.root / MANIFEST_NAME, self.manifest)
+
+    def mark_incomplete(self, **metadata: Any) -> None:
+        """Close a partial capture without making it loadable as benchmark input."""
+
+        self.manifest.update(metadata)
+        self.manifest['state'] = 'incomplete'
         _write_json_atomic(self.root / MANIFEST_NAME, self.manifest)
 
 
@@ -200,9 +202,18 @@ def load_dataset(path: str | Path) -> ReplayDataset:
             f'expected {REPLAY_SCHEMA_VERSION}.')
     if manifest.get('state') != 'complete':
         raise ValueError(f'Replay dataset is not complete: {root}')
+    skipped = manifest.get('trials_skipped', 0)
+    if isinstance(skipped, bool) or not isinstance(skipped, int) or skipped != 0:
+        raise ValueError(
+            f'Replay dataset reports {skipped!r} skipped trial(s): {root}')
     trials = manifest.get('trials')
     if not isinstance(trials, list) or not trials:
         raise ValueError(f'Replay dataset {root} contains no trials.')
+    included = manifest.get('trials_included', len(trials))
+    if isinstance(included, bool) or not isinstance(included, int) or included != len(trials):
+        raise ValueError(
+            f'Replay dataset reports {included!r} included trial(s) but contains '
+            f'{len(trials)} payload(s): {root}')
     for entry in trials:
         payload = root / str(entry.get('payload', ''))
         if not payload.is_file() or sha256_file(payload) != entry.get('sha256'):
@@ -294,7 +305,7 @@ def _event_from_payload(event: dict, arguments: dict[str, str]) -> ReplayMeasure
             if result is not None:
                 lateral, forward, distance = optical_to_base_planar(
                     result.xyz_optical, rotation, translation,
-                    float(event.get('front_offset_m', 0.25)))
+                    float(event.get('front_offset_m', ROBOT_FRONT_OFFSET_M)))
                 detection.projective_ranging_lateral_m = lateral
                 detection.projective_ranging_forward_m = forward
                 detection.projective_ranging_distance_m = distance
@@ -313,111 +324,13 @@ def _event_from_payload(event: dict, arguments: dict[str, str]) -> ReplayMeasure
     )
 
 
-def _summarize_events(events: dict, selected: tuple[str, ...]) -> dict:
-    usable_by_estimator = {estimator: [] for estimator in selected}
-    histogram = {estimator: Counter() for estimator in selected}
-    for event in sorted(events.values(), key=lambda item: item.stamp_ns):
-        for detection in event.detections:
-            for estimator in selected:
-                status = getattr(detection, f'{estimator}_status', None)
-                histogram[estimator][int(MissReason.UNSET if status is None else status)] += 1
-        if event.detected:
-            for estimator in selected:
-                if event.estimates.get(estimator) is not None:
-                    usable_by_estimator[estimator].append(event)
-    return {
-        'total_events': len(events),
-        'any_detected': any(event.detected for event in events.values()),
-        'usable_by_estimator': usable_by_estimator,
-        'status_histogram': {name: dict(counts) for name, counts in histogram.items()},
-    }
-
-
-def merge_status_histograms(aggregate: dict[str, dict[int, int]], trial: dict[str, dict[int, int]]) -> None:
-    for estimator, counts in trial.items():
-        target = aggregate.setdefault(estimator, {})
-        for code, count in counts.items():
-            target[code] = target.get(code, 0) + count
-
-
-def _build_trial_result(
-    trial: dict,
-    scene,
-    ground_truth: list[GroundTruthInstance],
-    scene_score,
-    selected: tuple[str, ...],
-    usable_by_estimator: dict[str, list[ReplayMeasurementEvent]],
-    frames_captured: int,
-    captured_events: tuple[ReplayMeasurementEvent, ...],
-) -> dict:
-    status_by_instance = {truth.index: Counter() for truth in ground_truth}
-    gt_points = [
-        GtPoint(index=item.index, forward_m=item.forward_m, lateral_m=item.lateral_m,
-                distance_m=item.distance_m)
-        for item in ground_truth
-    ]
-    for event in captured_events:
-        estimates = [build_instance_estimate(detection, index, 'projective_ranging')
-                     for index, detection in enumerate(event.detections)]
-        matches = assign_to_ground_truth(estimates, gt_points).matches
-        if not matches and len(gt_points) == 1 and len(event.detections) == 1:
-            matches = ((gt_points[0].index, 0),)
-        for ground_truth_index, detection_index in matches:
-            status = event.detections[detection_index].projective_ranging_status
-            status_by_instance[ground_truth_index][int(
-                MissReason.UNSET if status is None else status)] += 1
-
-    rows = {'projective_ranging': []}
-    for ground_truth_instance in ground_truth:
-        estimator = 'projective_ranging'
-        estimate = scene_score.medians[ground_truth_instance.index][estimator]
-        outcome = scene_score.outcomes[ground_truth_instance.index][estimator]
-        abs_error = None if estimate is None else abs(estimate - ground_truth_instance.distance_m)
-        miss_reason = None
-        if outcome == OUTCOME_NO_VALUE:
-            misses = {
-                code: count for code, count in status_by_instance[ground_truth_instance.index].items()
-                if code != int(MissReason.OK)
-            }
-            if misses:
-                specific = {code: count for code, count in misses.items() if code != int(MissReason.UNSET)}
-                miss_reason = reason_name(max(specific or misses, key=(specific or misses).get))
-        rows[estimator].append({
-            'trial_id': trial['trial_id'],
-            'repeat_index': int(trial['repeat_index']),
-            'scene_id': scene.id,
-            'instance_index': ground_truth_instance.index,
-            'spawn_world_x': ground_truth_instance.world_x,
-            'spawn_world_y': ground_truth_instance.world_y,
-            'spawn_yaw_rad': scene.robots[ground_truth_instance.index].yaw,
-            'true_forward_m': ground_truth_instance.forward_m,
-            'true_lateral_m': ground_truth_instance.lateral_m,
-            'true_distance_m': ground_truth_instance.distance_m,
-            'estimator': 'Projective Ranging',
-            'outcome': outcome,
-            'miss_reason': miss_reason,
-            'trial_estimate_m': estimate,
-            'abs_error_m': abs_error,
-            'rel_error': (abs_error / ground_truth_instance.distance_m
-                          if abs_error is not None and ground_truth_instance.distance_m > 0 else None),
-            'usable_aligned_events': len(usable_by_estimator[estimator]),
-            'frames_captured': frames_captured,
-            'image_path': '',
-        })
-    return {
-        'rows': rows,
-        'outcome_counts': {'projective_ranging': scene_score.outcome_counts('projective_ranging')},
-        'extra_count': scene_score.extra_count,
-    }
-
-
 def evaluate_trial(trial: dict, events: list[dict], arguments: dict[str, str]) -> dict:
     selected = ('projective_ranging',)
     measurement_events = {
         (index, int(event['stamp_ns'])): _event_from_payload(event, arguments)
         for index, event in enumerate(events)
     }
-    capture = _summarize_events(measurement_events, selected)
+    capture = summarize_capture_events(measurement_events, selected)
     truth = [
         GroundTruthInstance(**{key: value for key, value in item.items() if key != 'spawn_yaw_rad'})
         for item in trial['ground_truth']
@@ -429,9 +342,18 @@ def evaluate_trial(trial: dict, events: list[dict], arguments: dict[str, str]) -
     scene_score = score_scene(
         capture['usable_by_estimator'], truth, selected,
         detector_fired=capture['any_detected'])
-    result = _build_trial_result(
-        trial, scene, truth, scene_score, selected, capture['usable_by_estimator'],
-        capture['total_events'], tuple(measurement_events.values()))
+    result = build_trial_result(
+        trial,
+        scene,
+        truth,
+        scene_score,
+        selected,
+        {'projective_ranging': 'Projective Ranging'},
+        capture['usable_by_estimator'],
+        '',
+        capture['total_events'],
+        captured_events=tuple(measurement_events.values()),
+    )
     result['status_histogram'] = capture['status_histogram']
     return result
 
@@ -499,6 +421,9 @@ def write_replay_results(
     *,
     evaluation_provenance: dict,
     worker_count: int,
+    evaluation_wall_time_sec: float,
+    sweep_name: str,
+    sweep_description: str,
 ) -> None:
     root = Path(output_root).expanduser().resolve()
     root.mkdir(parents=True, exist_ok=False)
@@ -545,6 +470,7 @@ def write_replay_results(
             'dataset_content_hash': sha256_file(dataset.root / MANIFEST_NAME),
             'schema_version': REPLAY_SCHEMA_VERSION,
             'evaluation': evaluation_provenance,
+            'evaluation_wall_time_sec': evaluation_wall_time_sec,
             'worker_count': worker_count,
             'execution_mode': 'offline',
             'paired_against': baseline_name,
@@ -572,11 +498,46 @@ def write_replay_results(
             parameters=variant.arguments,
         )
         (variant_root / 'summary.md').write_text(report, encoding='utf-8')
-    _write_json_atomic(root / 'replay.json', {
+    dataset_hash = sha256_file(dataset.root / MANIFEST_NAME)
+    replay_document = {
         'dataset': str(dataset.root),
         'dataset_id': dataset.manifest.get('dataset_id'),
+        'dataset_content_hash': dataset_hash,
         'schema_version': REPLAY_SCHEMA_VERSION,
         'variants': [variant.name for variant in variants],
         'baseline': baseline_name,
         'worker_count': worker_count,
-    })
+        'evaluation_wall_time_sec': evaluation_wall_time_sec,
+        'evaluation': evaluation_provenance,
+    }
+    _write_json_atomic(root / 'replay.json', replay_document)
+    sweep_manifest = {
+        'version': 1,
+        'sweep': {
+            'name': sweep_name,
+            'description': sweep_description,
+            'source': evaluation_provenance.get('sweep'),
+            'source_sha256': evaluation_provenance.get('sweep_sha256'),
+            'status': 'complete',
+            'started': evaluation_provenance.get('started'),
+            'finished': evaluation_provenance.get('finished'),
+            'wall_time_sec': evaluation_wall_time_sec,
+        },
+        'provenance': {
+            key: evaluation_provenance.get(key)
+            for key in ('commit', 'branch', 'dirty_count')
+        },
+        'selected_configs': [variant.name for variant in variants],
+        'configs': [
+            {
+                'name': variant.name,
+                'status': 'success',
+                'output_path': variant.name,
+                'arguments': variant.arguments,
+            }
+            for variant in variants
+        ],
+        'replay': replay_document,
+    }
+    _write_json_atomic(root / 'sweep.json', sweep_manifest)
+    write_sweep_report(str(root), sweep_manifest)

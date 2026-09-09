@@ -6,6 +6,7 @@ import subprocess
 import pytest
 
 from ridgeback_autonomy.benchmarking.target_benchmark_sweep import (
+    _parser,
     _launch_argument_tokens,
     run_preflight_cleanup,
 )
@@ -72,6 +73,12 @@ def test_sweep_runs_repo_cleanup_before_starting_the_environment(tmp_path, monke
 def test_sweep_refuses_to_start_without_its_cleanup_script(tmp_path) -> None:
     with pytest.raises(RuntimeError, match='cleanup script is missing'):
         run_preflight_cleanup(str(tmp_path))
+
+
+def test_sweep_cleanup_can_be_skipped_for_a_shared_process_session() -> None:
+    args = _parser().parse_args(['sweep.yaml', '--skip-preflight-cleanup'])
+
+    assert args.skip_preflight_cleanup is True
 
 
 def test_sweep_rejects_unknown_config_key(tmp_path) -> None:

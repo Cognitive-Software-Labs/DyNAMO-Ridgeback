@@ -16,6 +16,12 @@ from ridgeback_autonomy.common.models import Detection
 from ridgeback_autonomy.common.stamps import stamp_to_nanoseconds
 from ridgeback_autonomy.msg import TargetMeasurements
 
+from ridgeback_autonomy.benchmarking.event_values import (
+    detection_status,
+    event_has_panel_preview,
+    has_all_selected_estimates,
+)
+
 from ridgeback_autonomy.perception.target_localization.estimator_registry import (
     ESTIMATOR_FIELD_KEYS,
     ESTIMATOR_POSITION_ATTRS,
@@ -109,23 +115,6 @@ def extract_estimator_statuses(msg: TargetMeasurements) -> dict[str, int]:
     return statuses
 
 
-def detection_status(detection: Detection, estimator: str) -> int:
-    """One estimator's status code on ONE detection.
-
-    The per-detection counterpart of ``extract_estimator_statuses``, which only
-    ever reads index 0. Mask estimators carry an explicit ``*_status`` decoded
-    per detection; the pointcloud row publishes none, so the same coarse
-    ``OK``/``UNSET`` is inferred from whether THIS detection got a distance.
-    """
-
-    status_key = ESTIMATOR_STATUS_FIELD_KEYS.get(estimator)
-    if status_key is not None:
-        code = getattr(detection, status_key)
-        return int(code) if code is not None else int(MissReason.UNSET)
-    value = getattr(detection, ESTIMATOR_FIELD_KEYS[estimator])
-    return int(MissReason.OK if value is not None else MissReason.UNSET)
-
-
 def ensure_measurement_event(
     events: dict[MeasurementEventKey, MeasurementEvent],
     msg: TargetMeasurements,
@@ -211,23 +200,6 @@ def _copy_estimator_fields(target: Detection, source: Detection, estimator: str)
     status_attr = ESTIMATOR_STATUS_FIELD_KEYS.get(estimator)
     if status_attr is not None:
         setattr(target, status_attr, getattr(source, status_attr))
-
-
-def has_all_selected_estimates(
-    event: MeasurementEvent,
-    selected_estimators: tuple[str, ...],
-) -> bool:
-    return all(event.estimates.get(estimator) is not None for estimator in selected_estimators)
-
-
-def event_has_panel_preview(event: MeasurementEvent) -> bool:
-    """Whether this event's collage panels can be drawn at all.
-
-    One question for the whole event rather than one per estimator: every panel
-    is the same colour frame, so either all of them render or none do.
-    """
-
-    return event.preview.color_bgr is not None
 
 
 def find_exact_preview_match(

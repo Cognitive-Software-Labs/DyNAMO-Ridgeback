@@ -357,6 +357,10 @@ Arguments:
 | `shutdown_on_complete` | `false` | Shut down the config launch service when the runner exits. The sweep sets this to `true`; the compatibility launch leaves the completed stack open for inspection |
 | `settle_sec` | `2.0` | Delay after spawning the target before sampling |
 | `capture_sec` | `10.0` | Sampling window length for collecting usable detections |
+| `replay_dataset_dir` | empty | New directory for an experimental V1 replay dataset. Setting it switches this run from elapsed-time capture to an exact raw-batch quota and requires projective ranging, box gating, and stereoscopic depth |
+| `capture_batches` | `0` | Raw detector batches captured per trial when `replay_dataset_dir` is set; empty batches count. Must be positive in replay-capture mode |
+| `capture_drain_sec` | `2.0` | Maximum post-quota drain for matching exact depth, camera context, and live measurement messages. Capture ends early when every selected stamp is complete and preserves missing matches when the bound expires |
+| `capture_timeout_sec` | `30.0` | Hard wall-time bound for obtaining the raw detector-batch quota; it is a stall guard, not the normal capture duration |
 | `color_topic` | `sensors/camera_0/color/image` | Compatibility override for the shared camera contract's color image; feeds detector, measurements, overlay, runner, and readiness gate |
 | `depth_topic` | `sensors/camera_0/depth/image` | Simulation's color-aligned depth. A hardware RealSense launch must override this to `sensors/camera_0/aligned_depth_to_color/image_raw` |
 | `pointcloud_topic` | `sensors/camera_0/points` | Simulation's organized point cloud. It is optional on RealSense; omit the pointcloud estimator or override this only after confirming driver output |
@@ -449,6 +453,10 @@ knobs are rejected. `world`, `setup_path`, `namespace`, `use_sim_time`, and
 `color_topic` may be set only in `defaults` because the environment cannot
 change mid-sweep.
 
+Use `--skip-preflight-cleanup` only when another same-user ROS/Gazebo session
+must remain alive. The sweep then skips the aggressive repository cleanup and
+warns that any stale processes are the operator's responsibility.
+
 Outputs use one timestamped sweep folder with a resumable manifest and a
 comparison report:
 
@@ -466,6 +474,50 @@ artifacts/benchmarks/20260828_141530_baseline/
 records each configuration's wall time and a pre-run real-time-factor sample;
 RTF is diagnostic only, but helps distinguish configuration effects from
 observation-coverage drift as a long-lived simulator slows down.
+
+### Offline projective replay (experimental)
+
+Use replay when only the box-gated stereoscopic `projective_ranging` recipe or
+its numeric parameters change. One live run freezes raw detections, exact-stamp
+depth ROIs, intrinsics, transforms, and ground truth; the offline command then
+evaluates every configuration in the existing projective sweep over those same
+inputs. It does not replace live runs for detector, transport, throughput,
+latency, model, or final-integration questions.
+
+Both the dataset directory and offline output directory must be new. This
+five-scene command is a smoke workflow; `capture_batches:=1` is deliberately
+small and is not yet the selected full-benchmark sampling count.
+
+```bash
+SCENARIO="$(ros2 pkg prefix ridgeback_autonomy)/share/ridgeback_autonomy/config/benchmark_scenarios_examples.yaml"
+SWEEP="$(ros2 pkg prefix ridgeback_autonomy)/share/ridgeback_autonomy/config/benchmark_sweep_projective_parameters.yaml"
+DATASET="$PWD/artifacts/benchmarks/replay_projective_smoke_dataset"
+LIVE_OUTPUT="$PWD/artifacts/benchmarks/replay_projective_smoke_live"
+OFFLINE_OUTPUT="$PWD/artifacts/benchmarks/replay_projective_smoke_offline"
+
+ros2 launch ridgeback_autonomy target_distance_benchmark.launch.py \
+  scenario:="$SCENARIO" repeats:=1 estimators:=projective_ranging \
+  mask_gate:=box depth_source:=stereoscopic record_video:=false gz_gui:=false \
+  output_dir:="$LIVE_OUTPUT" run_dir_name:=matching_live \
+  replay_dataset_dir:="$DATASET" capture_batches:=1 \
+  capture_drain_sec:=2.0 capture_timeout_sec:=30.0 \
+  shutdown_on_complete:=true
+
+ros2 run ridgeback_autonomy target_offline_replay_benchmark \
+  "$DATASET" "$SWEEP" --output-dir "$OFFLINE_OUTPUT" --workers 4
+```
+
+Capture counts raw detector batches rather than elapsed seconds. Once the quota
+arrives, it drains only until every selected stamp has matching depth, camera
+context, and a live measurement or `capture_drain_sec` expires. Missing matches
+remain explicit replay evidence. Any skipped trial leaves the dataset `incomplete`, and the
+offline loader refuses it instead of silently comparing a reduced scenario set.
+
+The offline root contains `summary.md` and `sweep.json` for the cross-variant
+comparison, `replay.json` for dataset/evaluator provenance and total evaluation
+time, and one normal CSV/`run.json`/`summary.md` set per variant. The current
+implementation remains experimental until a clean full-scenario run selects a
+batch count and records the planned 5x end-to-end speed gate.
 
 ### Perception interfaces
 

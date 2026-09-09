@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
-import math
-
 import numpy as np
 from sensor_msgs.msg import Image
 
 from ridgeback_autonomy.common.markers import PolarBeamRecord
 from ridgeback_autonomy.common.miss_reason import MissReason
+from ridgeback_autonomy.perception.target_localization.core.box_gate import (
+    MAX_BOX_FRAME_FRACTION,
+    box_within_frame_fraction,
+)
 from ridgeback_autonomy.perception.target_localization.core.depth_common import (
     MASK_DEPTH_GATE_DEFAULT,
     prepare_depth_region,
@@ -28,6 +30,9 @@ from ridgeback_autonomy.perception.target_localization.core.projective_ranging i
 from ridgeback_autonomy.perception.target_localization.core.ranging_defaults import (
     MIN_VALID_SAMPLES as MIN_VALID_PIXELS_DEFAULT,
 )
+from ridgeback_autonomy.perception.target_localization.core.vehicle_frame import (
+    optical_to_base_planar,
+)
 from ridgeback_autonomy.perception.target_localization.estimator_registry import (
     ESTIMATOR_FIELD_KEYS,
     MASK_ESTIMATORS,
@@ -36,37 +41,6 @@ from ridgeback_autonomy.perception.target_localization.estimator_registry import
     parse_estimators,
     selected_mask_estimators,
 )
-
-
-# A detector box covering more than this fraction of the frame is almost always
-# a failure (OWLv2 occasionally boxes the whole scene at close range); masking
-# with it isolates the background wall and poisons every path. Detections that
-# fail this gate are skipped rather than measured against the room.
-MAX_BOX_FRAME_FRACTION = 0.60
-
-
-def optical_to_base_planar(
-    xyz_optical,
-    rotation: np.ndarray,
-    translation: np.ndarray,
-    front_offset_m: float,
-) -> tuple[float, float, float]:
-    """Camera-optical point -> planar position and distance in the base frame.
-
-    The camera-optical -> base extrinsic includes the mount translation; the
-    vehicle-front offset is then removed from base-forward before distance is
-    calculated. Lateral remains REP-103 left-positive.
-    """
-
-    point_base = (
-        np.asarray(rotation, dtype=np.float64)
-        @ np.asarray(xyz_optical, dtype=np.float64)
-        + np.asarray(translation, dtype=np.float64)
-    )
-    lateral_m = float(point_base[1])
-    forward_m = float(point_base[0]) - front_offset_m
-    distance_m = math.hypot(lateral_m, forward_m)
-    return lateral_m, forward_m, distance_m
 
 
 def resolve_mask_gate(value) -> str:
@@ -93,22 +67,6 @@ def resolve_enabled_estimators(value) -> frozenset:
             f'enabled_estimators "{value}" selects no mask estimator; this node '
             f'fills only: {supported}.')
     return enabled
-
-
-def box_within_frame_fraction(
-    bbox_xyxy,
-    image_height: int,
-    image_width: int,
-    max_fraction: float = MAX_BOX_FRAME_FRACTION,
-) -> bool:
-    """True if the detector box covers at most ``max_fraction`` of the frame."""
-
-    frame_area = float(image_height) * float(image_width)
-    if frame_area <= 0.0:
-        return False
-    x1, y1, x2, y2 = bbox_xyxy
-    box_area = float(max(0, x2 - x1)) * float(max(0, y2 - y1))
-    return box_area <= max_fraction * frame_area
 
 
 def set_mask_estimator_status(

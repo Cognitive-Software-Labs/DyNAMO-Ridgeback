@@ -185,7 +185,33 @@ Key ownership:
 - `summary.py`: reports; `rendering.py`: collages;
 - `target_distance_benchmark_runner_node.py`: ROS orchestration and lifecycle;
 - `sweep.py`, `target_benchmark_sweep.py`, `sweep_report.py`: sweep domain,
-  supervisor, and reporting.
+supervisor, and reporting.
+
+## Offline projective replay
+
+Replay V1 is the measurement-accuracy path for box-gated stereoscopic
+`projective_ranging` parameter sweeps. The live runner counts an exact number
+of raw detector batches per trial, then performs a bounded exact-stamp drain.
+It stores raw depth ROIs and camera context, including invalid values and
+explicit missing matches; it never stores isolated foreground pixels or final
+measurements.
+
+The offline executor loads one trial per worker task and applies every variant
+while that trial's arrays are resident. It reuses the live capture reduction,
+association, scoring, trial-row, JSON/CSV, and sweep-report code. Per-config
+keys that do not affect projective ranging are rejected; live-only sweep
+defaults are removed from variant provenance.
+
+A dataset is loadable only when every scenario trial produced a payload and the
+manifest reports zero skipped trials. A bounded drain may legitimately retain
+`NO_DEPTH_FRAME` evidence, but an infrastructure failure that skips the trial
+marks the complete capture `incomplete`. `replay.json` records dataset and sweep
+hashes, evaluator Git provenance, worker count, and evaluation wall time. The
+root `summary.md` compares variants over the same frozen trials.
+
+The root README owns the experimental capture and replay commands. Replay is
+not authoritative for detector behavior, ROS delivery, timing, throughput, or
+final integration, and the full-scenario performance gate remains outstanding.
 
 Architecture guards prohibit reusable benchmark modules from importing the
 runner node and prohibit perception/exploration from importing benchmarking.
