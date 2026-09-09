@@ -46,15 +46,19 @@ from ridgeback_autonomy.perception.target_localization.core.mask import as_mask_
 # tune for accuracy. Each notes what it does and which way it fails.
 
 # Run split: start a new run where consecutive beams jump in range by more than
-# this. Sits between the object's own front-to-back depth (~0.2 m for the G1)
-# and the object-to-background gap (metres). Too small shatters the object into
+# this. Meant to sit between the object's own front-to-back depth and the
+# object-to-background gap (metres). Too small shatters the object into
 # slivers -> keeps only the nearest sliver -> reads too near; too large glues
-# the background onto the object.
+# the background onto the object. Note 0.30 does NOT bracket the object: the
+# G1's measured fore/aft extent is 0.4457 m (0.5749 m at worst-case yaw,
+# docs/history/projective_parameter_sensitivity.md), so the value sits on the
+# shattering side of its own rule. Untuned, and never swept.
 RANGE_JUMP_M_DEFAULT = 0.30
 
 # Near-band merge width: after taking the nearest run, also keep runs whose
 # median range is within this of it. Wants to span the object's own
-# front-to-back depth (~0.2 m for the G1) so both legs and torso merge but the
+# front-to-back depth -- measured at 0.4457 m for the G1, so 0.35 does not
+# reach across it -- letting both legs and torso merge while the
 # wall behind does not. Too small keeps one leg (lateral offset, leg-face
 # range); too large admits parallax / neighbour background. An untuned starting
 # point, not a fit to the object depth. Its current ownership and validation
@@ -73,9 +77,21 @@ RANGE_BAND_M_DEFAULT = 0.35
 
 # Sparse floor: return ``None`` (no estimate -> that trial is simply dropped
 # from this path's benchmark row, no fallback) when fewer than this many beams
-# survive the mask select or the near-band merge. A handful of beams gives a
-# noisy median; raising it trades availability (fewer usable trials) for a
-# tighter estimate.
+# survive the mask select or the near-band merge. The rule it encodes is "one
+# beam is not evidence": at 1 the median IS that single return, so a lone beam
+# slipping through a leg gap onto the wall behind would be published as the
+# distance with nothing corroborating it. On the merge side the floor catches
+# exactly that -- it can only fire when the nearest run is a single beam and
+# every other run sits more than ``RANGE_BAND_M_DEFAULT`` behind it. Dropping
+# to 1 would also make that check unreachable, since ``merge_near_band`` always
+# returns at least the nearest run.
+#
+# Raising it is the move to think twice about, because any floor is implicitly
+# a MAXIMUM RANGE: the G1's 0.3631 m width spans 2*atan(0.18/R) of bearing, so
+# at the 0.25 deg beam pitch it covers ~28 beams at 3 m but only ~8 at 10.5 m.
+# A floor of 8 would therefore cap this path at ~10.4 m, and 10 at ~8.3 m --
+# the same trap min_valid_pixels turned out to be on the projective path. At 2
+# the implied limit is ~41.6 m, comfortably past both the sensor and the world.
 MIN_VALID_RAYS_DEFAULT = 2
 
 # A driver normally publishes one fixed scan geometry. Keep a few immutable
