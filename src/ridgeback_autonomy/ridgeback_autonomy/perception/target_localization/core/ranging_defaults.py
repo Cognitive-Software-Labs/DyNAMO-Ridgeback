@@ -32,4 +32,19 @@ Current tenants and why each earns it:
 MIN_VALID_SAMPLES = 10
 FRONT_PERCENTILE = 25.0
 INLIER_AHEAD_MARGIN_M = 0.10
+
+# How far behind the anchor a point may sit and still count as target. Its job
+# is to span the target's own front-to-back extent, so geometry brackets it:
+# the G1 measures 0.4457 m fore/aft square-on and 0.5749 m yawed, and the
+# nearest thing that must stay out is the occluder at 0.62 m standoff. That
+# puts the usable window at roughly 0.45-0.62 m and leaves 0.35 **below the
+# entire bracket** -- it truncates the target's own far surface, which biases
+# the centroid near on every trial rather than only on hard ones.
+#
+# Left at 0.35 regardless: the bracket is an argument from geometry, not a
+# measurement, and this file's values move on measurements. It is now
+# sweepable as isolation_3d_behind_m (67b648c) on the euclidean side, so the
+# way to settle it is to measure it. Note the pointcloud row reads the same
+# constant against forward-axis distance rather than euclidean range, so a
+# change here moves both.
 INLIER_BEHIND_MARGIN_M = 0.35
