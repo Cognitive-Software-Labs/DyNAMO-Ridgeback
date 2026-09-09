@@ -1689,6 +1689,45 @@ def test_raised_min_valid_pixels_rejects_a_tight_region_the_default_keeps() -> N
     assert rejected.detections[0].projective_ranging_distance_m is None
 
 
+def test_min_valid_pixels_gates_both_depth_rows_alike() -> None:
+    """One floor, both rows -- they guard the same prepared selection.
+
+    The two pre-isolation guards count the same ``valid_masked`` array, so a
+    floor that rejects the region for one row must reject it for the other.
+    While the pipeline threaded the argument to projective ranging only, a
+    raised floor produced a row that missed next to a row that reported on the
+    identical pixels.
+    """
+
+    from ridgeback_autonomy.common.miss_reason import MissReason
+
+    masks = [region_from_blob(tight_blob(), MaskPrecision.TIGHT)]
+    common = dict(
+        camera_rotation=LEVEL_OPTICAL_TO_BASE,
+        camera_translation=ZERO_TRANSLATION,
+        front_offset_m=0.25,
+        isolation_2d=forbidden_isolation,
+        isolation_3d=forbidden_isolation,
+        enabled=frozenset({'projective_ranging', 'euclidean_reconstruction'}),
+    )
+
+    kept = build_fill_batch()
+    fill_path_measurements(
+        kept, masks, FILL_INTRINSICS, build_fill_depth(), None, **common)
+    assert kept.detections[0].projective_ranging_status == int(MissReason.OK)
+    assert kept.detections[0].euclidean_reconstruction_status == int(MissReason.OK)
+
+    rejected = build_fill_batch()
+    fill_path_measurements(
+        rejected, masks, FILL_INTRINSICS, build_fill_depth(), None,
+        min_valid_pixels=10_000, **common)
+    assert rejected.detections[0].projective_ranging_status == int(
+        MissReason.TOO_FEW_VALID_PIXELS)
+    assert rejected.detections[0].euclidean_reconstruction_status == int(
+        MissReason.TOO_FEW_VALID_POINTS)
+    assert rejected.detections[0].euclidean_reconstruction_distance_m is None
+
+
 def test_raised_min_valid_pixels_empties_the_rect_isolation_branch() -> None:
     # The rect branch reports the shortfall as ISOLATION_EMPTY rather than
     # TOO_FEW_VALID_PIXELS: the region had the depth, the recipe rejected it.

@@ -220,9 +220,10 @@ class TargetMaskMeasurementNode(Node):
         self.declare_parameter('isolation_2d_band_m', NEAR_SURFACE_BAND_M)
         self.declare_parameter(
             'isolation_2d_min_bin_fraction', NEAREST_MODE_MIN_BIN_FRACTION_DEFAULT)
-        # Projective ranging's sufficiency floor. Until this became a parameter
-        # the pipeline dropped it entirely, so the guard behind it could not
-        # fire at all -- see fill_path_measurements.
+        # Sufficiency floor for both depth rows: their pre-isolation guards
+        # count the same prepared selection, so one floor covers both. Until
+        # this became a parameter the pipeline dropped it entirely, so the guard
+        # behind it could not fire at all -- see fill_path_measurements.
         self.declare_parameter('min_valid_pixels', MIN_VALID_SAMPLES)
         self.declare_parameter('isolation_3d', ISOLATION_3D_DEFAULT)
         # Height of the base origin above the floor, added to the TF

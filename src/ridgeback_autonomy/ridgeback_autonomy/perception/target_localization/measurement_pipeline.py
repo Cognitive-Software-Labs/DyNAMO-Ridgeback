@@ -156,8 +156,12 @@ def fill_path_measurements(
     once per detection. Preparing it twice would cost a second pass and, worse,
     leave the two rows free to disagree about which pixels were selected.
 
-    ``min_valid_pixels`` is projective ranging's own sufficiency floor; euclidean
-    reconstruction carries its isolation-empty handling inside its recipe chain.
+    ``min_valid_pixels`` is the sufficiency floor for **both** depth rows. Their
+    pre-isolation guards count the same array -- the prepared region's
+    ``valid_masked`` -- so the two names ("pixels", "points") describe one
+    quantity, and giving each row its own floor would let one report on a
+    selection the other rejected, which is the same disagreement preparing the
+    region once exists to prevent.
     """
 
     wants_projective = 'projective_ranging' in enabled
@@ -198,7 +202,8 @@ def fill_path_measurements(
 
             if wants_euclidean:
                 result_b, reason_b = localize_prepared_euclidean_reconstruction(
-                    prepared, intrinsics, isolation=isolation_3d)
+                    prepared, intrinsics, isolation=isolation_3d,
+                    min_valid_points=min_valid_pixels)
                 detection.euclidean_reconstruction_status = int(reason_b)
                 if result_b is not None:
                     (
