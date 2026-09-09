@@ -19,7 +19,6 @@ from ridgeback_autonomy.perception.target_localization.core.ranging_defaults imp
     FRONT_PERCENTILE as POINTCLOUD_FRONT_PERCENTILE,
     INLIER_AHEAD_MARGIN_M as POINTCLOUD_INLIER_AHEAD_MARGIN_M,
     INLIER_BEHIND_MARGIN_M as POINTCLOUD_INLIER_BEHIND_MARGIN_M,
-    MIN_VALID_SAMPLES as POINTCLOUD_MIN_VALID_POINTS,
 )
 from ridgeback_autonomy.perception.target_localization.core.vehicle_frame import apply_vehicle_front_offset
 
@@ -36,6 +35,15 @@ from ridgeback_autonomy.perception.target_localization.core.vehicle_frame import
 # benchmark set carries scenario families named after it -- ``far_clamp`` sits
 # inside it, ``far_beyond`` past it. Changing it silently re-scopes both.
 POINTCLOUD_MAX_METERS = 10.0
+
+# This estimator's own sufficiency floor: how many finite points the focus ROI
+# must hold before it is reduced at all. It is not the mask paths' floor even
+# though it is also 10 -- theirs counts pixels a segmenter selected and a depth
+# gate cleaned, is reached by a node parameter, and guards a per-detection mask
+# region; this one counts raw cloud points inside a fixed fractional crop of a
+# detection box and has no override. Sharing one constant made that a decision
+# instead of the coincidence it is.
+POINTCLOUD_MIN_VALID_POINTS = 10
 
 # The ROI crop inside a detection box: a centre patch, biased upward, so the
 # torso rather than the floor under the feet drives the range.

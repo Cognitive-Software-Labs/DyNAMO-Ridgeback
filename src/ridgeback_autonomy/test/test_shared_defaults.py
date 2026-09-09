@@ -9,7 +9,9 @@ import pytest
 
 from ridgeback_autonomy.perception.target_localization.core import (
     depth_common,
+    euclidean_reconstruction,
     pointcloud_ranging,
+    projective_ranging,
     ranging_defaults,
 )
 
@@ -18,7 +20,6 @@ from ridgeback_autonomy.perception.target_localization.core import (
     ('pointcloud_ranging', 'POINTCLOUD_FRONT_PERCENTILE', 'FRONT_PERCENTILE'),
     ('pointcloud_ranging', 'POINTCLOUD_INLIER_AHEAD_MARGIN_M', 'INLIER_AHEAD_MARGIN_M'),
     ('pointcloud_ranging', 'POINTCLOUD_INLIER_BEHIND_MARGIN_M', 'INLIER_BEHIND_MARGIN_M'),
-    ('pointcloud_ranging', 'POINTCLOUD_MIN_VALID_POINTS', 'MIN_VALID_SAMPLES'),
     ('isolation_3d', 'RANGE_BAND_PERCENTILE_DEFAULT', 'FRONT_PERCENTILE'),
     ('isolation_3d', 'RANGE_BAND_AHEAD_M_DEFAULT', 'INLIER_AHEAD_MARGIN_M'),
     ('isolation_3d', 'RANGE_BAND_BEHIND_M_DEFAULT', 'INLIER_BEHIND_MARGIN_M'),
@@ -63,6 +64,39 @@ def test_pointcloud_owns_its_range_clamp() -> None:
     assert pointcloud_ranging.POINTCLOUD_MAX_METERS == 10.0
     assert not hasattr(ranging_defaults, 'MAX_RANGE_M')
     assert not hasattr(depth_common, 'DEPTH_MAX_METERS_DEFAULT')
+
+
+def test_pointcloud_owns_its_sufficiency_floor() -> None:
+    """The 10-sample floor is two different quantities, not one shared policy.
+
+    The mask rows count pixels a segmenter selected and a depth gate cleaned,
+    off a shared prepared region, reachable through the ``min_valid_pixels``
+    node parameter. This one counts raw cloud points inside a fixed fractional
+    crop of a detection box, with no override. Equal values, unrelated
+    decisions -- so raising one must not move the other.
+    """
+
+    assert pointcloud_ranging.POINTCLOUD_MIN_VALID_POINTS == 10
+    source = inspect.getsource(pointcloud_ranging)
+    assert not any(
+        isinstance(node, ast.ImportFrom)
+        and node.module == ranging_defaults.__name__
+        and any(alias.name == 'MIN_VALID_SAMPLES' for alias in node.names)
+        for node in ast.parse(source).body
+    ), 'the pointcloud floor must not be imported from ranging_defaults again'
+
+
+def test_the_mask_rows_still_share_one_floor() -> None:
+    """Both depth rows guard the same prepared selection, so both read one floor.
+
+    Split these and a raised floor makes one row miss while the other reports
+    on the identical pixels -- the disagreement ``prepare_depth_region`` exists
+    to prevent.
+    """
+
+    assert (projective_ranging.MIN_VALID_PIXELS_DEFAULT
+            == euclidean_reconstruction.MIN_VALID_POINTS_DEFAULT
+            == ranging_defaults.MIN_VALID_SAMPLES)
 
 
 def test_shared_values_are_pinned_so_a_change_is_deliberate() -> None:
