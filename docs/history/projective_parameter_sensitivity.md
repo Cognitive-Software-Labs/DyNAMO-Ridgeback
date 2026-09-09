@@ -25,6 +25,19 @@ Out of scope by decision:
   is a design decision, not parameter grounding. Measured and reported here;
   no default changed.
 
+**Follow-up 2026-09-08 — `79ccb8f` acted on #6.** §1.3 closed by recording one
+narrow cleanup as out of scope but worth not losing: drop the unused `depth_max`
+default so the signatures stop implying a production ceiling that never applies.
+`79ccb8f` did exactly that, and went further — `MAX_RANGE_M` left
+`core/ranging_defaults.py` altogether, on the grounds that the pointcloud row
+clamps planar distance in the base frame while the mask rows gate per pixel on
+optical depth, so the two were equal by coincidence rather than shared by
+intent. The measurements below are unaffected; four of the *code-location*
+claims are, and each is marked **[superseded 79ccb8f]** where it appears. In
+short: there is no `MAX_RANGE_M` and no `DEPTH_MAX_METERS_DEFAULT` any more, the
+10 m is `POINTCLOUD_MAX_METERS` local to `core/pointcloud_ranging.py`, and the
+mask signatures have no default ceiling at all.
+
 ---
 
 ## 1. The constants
@@ -48,7 +61,9 @@ step (full contract in
    depth source's declared `usable_max_m`; for the monocular source that
    ceiling is the checkpoint's maximum depth taken at **#8
    `MONOCULAR_USABLE_RANGE_FRACTION`**. **#6 `MAX_RANGE_M`** is the default
-   ceiling for callers that supply none.
+   ceiling for callers that supply none. **[superseded 79ccb8f: there is no
+   default ceiling now — `depth_max` is caller-stated and a call supplying
+   neither it nor a cleaned selection raises.]**
    *Exists to prevent:* treating a reading the sensor cannot actually resolve
    as if it were a measurement.
 4. **Isolate the foreground.** A `rect` mask covers object *and* background, so
@@ -100,7 +115,7 @@ moving it do to the answer*; for the second, *how far is the edge*.
 | 3 | `NEAREST_MODE_BIN_WIDTH_M_DEFAULT` | 0.05 | `core/depth_common.py` | **Right.** Near optimal; safe to widen, not to narrow — §4.3 |
 | 4 | `OTSU_BIN_WIDTH_M_DEFAULT` | 0.05 | `core/isolation_2d.py` | **Cosmetic.** ±4 mm over a 5× range — §4.3 |
 | 5 | `MIN_VALID_SAMPLES` (as `min_valid_pixels`) | 10 | `core/ranging_defaults.py` | **Inert here, live elsewhere.** ≈ 82 m range limit on this path; gates raw points on the pointcloud path — §4.4, §1.3 |
-| 6 | `MAX_RANGE_M` / `DEPTH_MAX_METERS_DEFAULT` | 10.0 | `core/ranging_defaults.py` | **Unused here, load-bearing elsewhere.** Not deletable — §2.3, §1.3 |
+| 6 | `MAX_RANGE_M` / `DEPTH_MAX_METERS_DEFAULT` | 10.0 | `core/ranging_defaults.py` **[superseded 79ccb8f: now `POINTCLOUD_MAX_METERS` in `core/pointcloud_ranging.py`]** | **Unused here, load-bearing elsewhere.** Not deletable — §2.3, §1.3 |
 | 7 | `MAX_BOX_FRAME_FRACTION` | 0.60 | `measurement_pipeline.py` | **Inert**, with an analytic margin — §2.1, §3.2 |
 | 8 | `MONOCULAR_USABLE_RANGE_FRACTION` | 0.9 | `core/depth_sources.py` | **Cannot fire in this world** — §3.4 |
 
@@ -119,12 +134,14 @@ set: one moves a trial by 9.5 m, the other by 4 mm.
 Every verdict above is scoped to **box-gated projective ranging**. Two of these
 constants live in `core/ranging_defaults.py`, whose entire purpose is to hold
 values *deliberately shared across estimators*, and both are load-bearing on the
-pointcloud path even though this path barely touches them:
+pointcloud path even though this path barely touches them. **[superseded
+79ccb8f: one of them, not two — `MAX_RANGE_M` was judged shared by coincidence
+rather than by intent and moved out to its owner. `MIN_VALID_SAMPLES` stays.]**
 
 | Constant | On the projective path | On the pointcloud path |
 |---|---|---|
-| #6 `MAX_RANGE_M` | Never applied: the node always passes `effective_depth_max()`, so the default argument is decoration (§2.3) | **`pointcloud_ranging.py:147`** — `valid &= planar_distance <= POINTCLOUD_MAX_METERS`. A hard 10 m ceiling with no parameter and no override |
-| #5 `MIN_VALID_SAMPLES` | Never fires below 1000 (§4.4) | **`pointcloud_ranging.py:133`** — rejects an ROI holding fewer than 10 finite points, before any reduction |
+| #6 `MAX_RANGE_M` | Never applied: the node always passes `effective_depth_max()`, so the default argument is decoration (§2.3) | **`pointcloud_ranging.py:159`** — `valid &= planar_distance <= POINTCLOUD_MAX_METERS`. A hard 10 m ceiling with no parameter and no override |
+| #5 `MIN_VALID_SAMPLES` | Never fires below 1000 (§4.4) | **`pointcloud_ranging.py:145`** — rejects an ROI holding fewer than 10 finite points, before any reduction |
 
 #6's pointcloud ceiling is not theoretical; it decides recorded outcomes. In
 `20260902_202659_isolation/pointcloud_reference`:
@@ -234,6 +251,13 @@ path the 10.0 survives only as the standalone API's default and in the depth
 colorizers. It is emphatically **not** unused in the codebase — see §1.3, where
 the same constant is a hard, unoverridable range ceiling on the pointcloud
 estimator that determines recorded benchmark outcomes.
+
+**[superseded 79ccb8f]** Both halves of that sentence moved. The standalone
+default is gone, leaving only the colorizer's own
+`overlay_node.DEPTH_MAX_METERS_DEFAULT`; and it is no longer "the same
+constant" on the pointcloud path, because the two were deliberately split. The
+finding the paragraph reports — that the 10.0 was inert here and decisive there
+— is what motivated the split, and still holds.
 
 Where a 10 m ceiling *was* applied as a gate, the same sweep measured it as
 marginally **better**, not worse: `projective_nearest_mode_10m` scored
