@@ -67,13 +67,21 @@ full cloud: it uses the grid relationship to deproject selected samples only.
 
 Two implementation notes:
 
-- **Ray table.** `(u - cx)/fx` and `(v - cy)/fy` depend only on the intrinsics,
-  so they are precomputed once as an `(H, W, 2)` ray table; per frame the
-  deprojection is one multiply by `Z`.
 - **Masked-only deprojection.** Steps 1 and 2 commute: because the mask lives
   on the same grid, the multiply can be restricted to the masked pixels
-  (`~5–20 k` instead of `H×W`), which is the form production uses.
-  The full-frame form exists for debugging and RViz export.
+  (`~5–20 k` instead of `H×W`), which is the form production uses — and the
+  only form implemented. `deproject_masked` is the whole deprojection surface;
+  there is no function that materializes an `(H, W, 3)` cloud, so the organized
+  cloud in the step list above is a way of describing the geometry, not an
+  array that exists at runtime.
+- **No ray table.** `(u - cx)/fx` and `(v - cy)/fy` depend only on the
+  intrinsics, so they *could* be precomputed once as an `(H, W, 2)` table with
+  the per-frame work reduced to one multiply by `Z`. They are not:
+  `deproject_masked` recomputes both coefficients on every call, over the
+  selected pixels only. This document previously described the table as shipped
+  and priced it in the cost split below; treat it as an available optimization
+  that nothing has yet needed, since the multiply is already restricted to a
+  box rather than a frame.
 - **Where the ROI stops.** The mask *selection* is read off the mask's own
   storage window (`docs/target_localization/mask_representation.md` Section 7), but the deprojection is not:
   the surviving indices are lifted to full-grid coordinates and gathered from
@@ -222,8 +230,11 @@ cost split:
 | Work | Frequency |
 |------|-----------|
 | decode + align the depth frame | once per frame |
-| ray table | once per intrinsics change (effectively once) |
 | masked deproject, isolate, reduce | once per mask |
+
+The per-mask row includes recomputing the inverse-pinhole coefficients, since
+there is no ray table (§2.1). It is per mask rather than per frame because the
+work is proportional to the selected pixels, not to the grid.
 
 With masked-only deprojection the per-mask cost scales with the box area, not
 the frame area. Results are packed into the same parallel, index-aligned
