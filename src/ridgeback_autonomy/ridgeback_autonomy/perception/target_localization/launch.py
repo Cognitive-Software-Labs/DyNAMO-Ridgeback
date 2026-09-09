@@ -78,6 +78,9 @@ CONFIG_LAUNCH_ARGUMENT_NAMES = frozenset({
     'isolation_3d_behind_m',
     'isolation_3d_bin_width_m',
     'isolation_3d_min_bin_fraction',
+    'polar_range_jump_m',
+    'polar_range_band_m',
+    'polar_min_valid_rays',
     'mask_depth_max_meters',
     'mask_gate',
     'depth_match_debug',
@@ -224,6 +227,9 @@ def mask_measurement_node(
     isolation_3d_behind_m=None,
     isolation_3d_bin_width_m=None,
     isolation_3d_min_bin_fraction=None,
+    polar_range_jump_m=None,
+    polar_range_band_m=None,
+    polar_min_valid_rays=None,
     mask_gate=None,
     color_topic=None,
     depth_max_meters=None,
@@ -277,6 +283,13 @@ def mask_measurement_node(
                 'isolation_3d_behind_m': isolation_3d_behind_m,
                 'isolation_3d_bin_width_m': isolation_3d_bin_width_m,
                 'isolation_3d_min_bin_fraction': isolation_3d_min_bin_fraction,
+                # Polar profiling's foreground isolation, the LiDAR analogue of
+                # the isolation_2d / isolation_3d recipe numbers above. Neither
+                # jump nor band is grounded in a measurement yet, which is what
+                # exposing them here is for.
+                'polar_range_jump_m': polar_range_jump_m,
+                'polar_range_band_m': polar_range_band_m,
+                'polar_min_valid_rays': polar_min_valid_rays,
                 'mask_gate': mask_gate,
                 'color_topic': color_topic,
                 'depth_max_meters': depth_max_meters,

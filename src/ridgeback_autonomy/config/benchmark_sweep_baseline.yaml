@@ -23,9 +23,10 @@
 # Knobs are only written on configs where they are live. depth_source and
 # mask_depth_max_meters reach projective ranging and euclidean reconstruction;
 # mask_gate reaches all three mask paths; isolation_2d is projective ranging's
-# alone and isolation_3d is euclidean reconstruction's alone. Polar profiling
-# is mask-based but LiDAR-sourced, so it takes the gate and nothing else. None
-# of them reach the point cloud path.
+# alone, isolation_3d is euclidean reconstruction's alone, and the polar_* trio
+# is polar profiling's alone -- it is mask-based but LiDAR-sourced, so it takes
+# the gate and its own isolation, never a depth axis. None of them reach the
+# point cloud path.
 
 sweep:
   name: baseline

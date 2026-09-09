@@ -114,6 +114,9 @@ from ridgeback_autonomy.perception.target_localization.core.mask import (
     region_from_detection,
 )
 from ridgeback_autonomy.perception.target_localization.core.polar_profiling import (
+    MIN_VALID_RAYS_DEFAULT,
+    RANGE_BAND_M_DEFAULT,
+    RANGE_JUMP_M_DEFAULT,
     scan_points_optical,
 )
 from ridgeback_autonomy.perception.target_localization.core.ranging_defaults import (
@@ -246,6 +249,20 @@ class TargetMaskMeasurementNode(Node):
             'isolation_3d_bin_width_m', NEAREST_MODE_BIN_WIDTH_M_DEFAULT)
         self.declare_parameter(
             'isolation_3d_min_bin_fraction', NEAREST_MODE_MIN_BIN_FRACTION_DEFAULT)
+        # Polar profiling's foreground isolation -- the LiDAR analogue of the
+        # two recipe sets above, on the same terms: declared at exactly their
+        # shipped values, so an unset run is the run that was always happening.
+        # The jump decides what counts as one connected surface and the band how
+        # far a DISCONNECTED one may sit; neither is grounded in a measurement
+        # yet, and the 0.30 jump is known to sit below the G1's own 0.4457 m
+        # fore/aft extent. Exposing them is what lets a sweep settle that.
+        self.declare_parameter('polar_range_jump_m', RANGE_JUMP_M_DEFAULT)
+        self.declare_parameter('polar_range_band_m', RANGE_BAND_M_DEFAULT)
+        # Not a tuning axis like those two: the ray floor encodes "one beam is
+        # not evidence", and raising it silently caps the path's range -- a
+        # floor of 8 puts the ceiling at ~10.4 m. Exposed to be measurable, not
+        # because it is expected to move.
+        self.declare_parameter('polar_min_valid_rays', MIN_VALID_RAYS_DEFAULT)
         # Height of the base origin above the floor, added to the TF
         # camera-above-base height to place the euclidean floor crop per frame.
         self.declare_parameter('base_above_floor_m', BASE_ABOVE_FLOOR_M_DEFAULT)
@@ -306,6 +323,11 @@ class TargetMaskMeasurementNode(Node):
                 self.get_parameter('isolation_2d_min_bin_fraction').value),
         )
         self.min_valid_pixels = int(self.get_parameter('min_valid_pixels').value)
+        self.polar_isolation = {
+            'range_jump_m': float(self.get_parameter('polar_range_jump_m').value),
+            'range_band_m': float(self.get_parameter('polar_range_band_m').value),
+            'min_valid_rays': int(self.get_parameter('polar_min_valid_rays').value),
+        }
         # The 3D recipe is rebuilt per frame with the TF-derived floor pose, so
         # store the validated name (not a pre-built callable), the offset, and
         # the settings to rebuild it with -- read once here rather than per
@@ -787,6 +809,7 @@ class TargetMaskMeasurementNode(Node):
                                 isolation_3d=isolation_3d,
                                 depth_max=self.effective_depth_max(),
                                 min_valid_pixels=self.min_valid_pixels,
+                                polar_isolation=self.polar_isolation,
                                 scan_reason=scan_reason,
                                 beam_records=beam_records,
                                 enabled=self.enabled_estimators,

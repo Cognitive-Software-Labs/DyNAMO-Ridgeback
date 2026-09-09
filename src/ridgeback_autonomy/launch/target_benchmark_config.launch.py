@@ -53,6 +53,11 @@ from ridgeback_autonomy.perception.target_localization.core.isolation_3d import 
     FLOOR_MARGIN_M_DEFAULT,
     ISOLATION_3D_DEFAULT,
 )
+from ridgeback_autonomy.perception.target_localization.core.polar_profiling import (
+    MIN_VALID_RAYS_DEFAULT,
+    RANGE_BAND_M_DEFAULT,
+    RANGE_JUMP_M_DEFAULT,
+)
 from ridgeback_autonomy.perception.target_localization.core.ranging_defaults import (
     FRONT_PERCENTILE,
     INLIER_AHEAD_MARGIN_M,
@@ -120,6 +125,9 @@ def build_benchmark_nodes(context, *args, **kwargs):
             isolation_3d_percentile=LaunchConfiguration('isolation_3d_percentile'),
             isolation_3d_ahead_m=LaunchConfiguration('isolation_3d_ahead_m'),
             isolation_3d_behind_m=LaunchConfiguration('isolation_3d_behind_m'),
+            polar_range_jump_m=LaunchConfiguration('polar_range_jump_m'),
+            polar_range_band_m=LaunchConfiguration('polar_range_band_m'),
+            polar_min_valid_rays=LaunchConfiguration('polar_min_valid_rays'),
             isolation_3d_bin_width_m=LaunchConfiguration('isolation_3d_bin_width_m'),
             isolation_3d_min_bin_fraction=LaunchConfiguration(
                 'isolation_3d_min_bin_fraction'),
@@ -205,6 +213,9 @@ def build_benchmark_nodes(context, *args, **kwargs):
             'isolation_3d_bin_width_m': LaunchConfiguration('isolation_3d_bin_width_m'),
             'isolation_3d_min_bin_fraction': LaunchConfiguration(
                 'isolation_3d_min_bin_fraction'),
+            'polar_range_jump_m': LaunchConfiguration('polar_range_jump_m'),
+            'polar_range_band_m': LaunchConfiguration('polar_range_band_m'),
+            'polar_min_valid_rays': LaunchConfiguration('polar_min_valid_rays'),
             # The recorder screen-grabs the RViz window, which competes with
             # the simulator's render path. Turn it off for timing runs and take
             # visual integrity from a separate smoke run instead.
@@ -391,6 +402,29 @@ def generate_launch_description():
                 'Fraction of ranges a bin must hold to anchor on it '
                 '(nearest_mode_band only)'
             ),
+        ),
+        # Polar profiling's foreground isolation. Its analogue of the two recipe
+        # sets above, and the only axes it has beyond the mask gate.
+        DeclareLaunchArgument(
+            'polar_range_jump_m',
+            default_value=str(RANGE_JUMP_M_DEFAULT),
+            description=(
+                'Polar profiling: range step between adjacent beams that starts '
+                'a new run'
+            ),
+        ),
+        DeclareLaunchArgument(
+            'polar_range_band_m',
+            default_value=str(RANGE_BAND_M_DEFAULT),
+            description=(
+                'Polar profiling: how far past the nearest beam a disconnected '
+                'run may sit and still merge'
+            ),
+        ),
+        DeclareLaunchArgument(
+            'polar_min_valid_rays',
+            default_value=str(MIN_VALID_RAYS_DEFAULT),
+            description='Polar profiling: beams required for an estimate',
         ),
         DeclareLaunchArgument(
             'mask_depth_max_meters',

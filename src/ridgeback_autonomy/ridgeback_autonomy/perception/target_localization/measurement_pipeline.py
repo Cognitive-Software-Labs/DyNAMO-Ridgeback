@@ -140,6 +140,7 @@ def fill_path_measurements(
     isolation_3d,
     depth_max: float = MASK_DEPTH_GATE_DEFAULT,
     min_valid_pixels: int = MIN_VALID_PIXELS_DEFAULT,
+    polar_isolation: dict | None = None,
     scan_reason: MissReason = MissReason.NO_SCAN,
     beam_records: list | None = None,
     enabled=MASK_ESTIMATORS,
@@ -162,6 +163,12 @@ def fill_path_measurements(
     quantity, and giving each row its own floor would let one report on a
     selection the other rejected, which is the same disagreement preparing the
     region once exists to prevent.
+
+    ``polar_isolation`` carries polar profiling's own three settings
+    (``range_jump_m``, ``range_band_m``, ``min_valid_rays``) as one mapping,
+    since they are always set together by the node and mean nothing apart.
+    ``None`` runs the core defaults, which is what every non-benchmark caller
+    wants.
     """
 
     wants_projective = 'projective_ranging' in enabled
@@ -224,7 +231,8 @@ def fill_path_measurements(
             if scan_projection is None:
                 scan_projection = project_scan_to_image(
                     points_optical, valid, intrinsics)
-            attempt = localize_projected_polar_profiling(scan_projection, mask)
+            attempt = localize_projected_polar_profiling(
+                scan_projection, mask, **(polar_isolation or {}))
             result_c = attempt.result
             detection.polar_profiling_status = int(attempt.reason)
             if result_c is not None:
