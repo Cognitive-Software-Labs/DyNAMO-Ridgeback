@@ -145,8 +145,10 @@ def test_sweep_accepts_detector_settings_as_defaults(
         ('pointcloud', 'mask_depth_max_meters', 10.0),
         ('pointcloud', 'mask_gate', 'silhouette'),
         ('pointcloud', 'isolation_3d', 'range_band'),
+        ('pointcloud', 'isolation_3d_floor_margin_m', 0.08),
         ('euclidean_reconstruction', 'isolation_2d', 'otsu'),
         ('projective_ranging', 'isolation_3d', 'range_band'),
+        ('projective_ranging', 'isolation_3d_bin_width_m', 0.02),
     ],
 )
 def test_sweep_rejects_inapplicable_explicit_knob(
@@ -160,6 +162,16 @@ def test_sweep_rejects_inapplicable_explicit_knob(
 
     with pytest.raises(ValueError, match=rf'field "{field}" does not apply'):
         parse_sweep(document)
+
+
+def test_sweep_accepts_shared_sufficiency_floor_for_euclidean(tmp_path) -> None:
+    document = _document(tmp_path)
+    document['configs'][0].update(
+        estimators='euclidean_reconstruction', min_valid_pixels=25)
+
+    spec = parse_sweep(document)
+
+    assert spec.configs[0].arguments['min_valid_pixels'] == '25'
 
 
 def test_sweep_rejects_bad_estimator(tmp_path) -> None:

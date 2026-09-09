@@ -362,7 +362,7 @@ def generate_launch_description():
         DeclareLaunchArgument(
             'min_valid_pixels',
             default_value=str(MIN_VALID_SAMPLES),
-            description='Projective ranging: foreground pixels required for an estimate',
+            description='Depth rows: foreground samples required for an estimate',
         ),
         DeclareLaunchArgument(
             'isolation_3d',

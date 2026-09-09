@@ -161,8 +161,8 @@ Benchmark stack:
   trial per worker. Its quota is event-driven; `capture_timeout_sec` guards only
   raw-batch stalls, while `capture_drain_sec` is a bounded depth/camera-context/
   live-measurement drain that ends early on complete evidence and preserves
-  missing matches. Any
-  skipped trial leaves the dataset unloadable as `incomplete`. Replay reuses the
+  missing matches. Any skipped trial leaves the dataset unloadable as
+  `incomplete`. Replay reuses the
   live reduction/scoring/trial/report modules and is not evidence about detector,
   ROS transport, latency, throughput, or integration behavior.
 
