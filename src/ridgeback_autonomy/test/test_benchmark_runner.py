@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 from collections import OrderedDict
+from types import SimpleNamespace
 
 import numpy as np
 import pytest
@@ -38,6 +39,7 @@ from ridgeback_autonomy.perception.target_localization.ground_truth import (
 from ridgeback_autonomy.benchmarking.reduction import (
     choose_representative_event,
     compute_trial_medians,
+    restrict_events_to_stamps,
     usable_aligned_events,
     union_usable_events,
     usable_events_by_estimator,
@@ -46,6 +48,16 @@ from ridgeback_autonomy.benchmarking.rendering import BenchmarkCollageRenderer
 from ridgeback_autonomy.benchmarking.summary import build_summary_rows
 from ridgeback_autonomy.common.models import Detection
 from ridgeback_autonomy.msg import TargetMeasurements
+
+
+def test_replay_capture_restricts_live_scoring_to_frozen_detector_batches() -> None:
+    events = OrderedDict([
+        (('camera', 10), SimpleNamespace(stamp_ns=10)),
+        (('camera', 20), SimpleNamespace(stamp_ns=20)),
+        (('camera', 30), SimpleNamespace(stamp_ns=30)),
+    ])
+
+    assert list(restrict_events_to_stamps(events, {10})) == [('camera', 10)]
 
 
 def test_parse_estimators_uses_canonical_order() -> None:

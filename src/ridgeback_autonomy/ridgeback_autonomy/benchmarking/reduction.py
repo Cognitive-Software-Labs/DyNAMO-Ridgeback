@@ -82,6 +82,21 @@ def summarize_capture_events(
     }
 
 
+def restrict_events_to_stamps(events: dict, stamps: set[int]) -> dict:
+    """Keep only measurement events whose detector batch was frozen for replay.
+
+    Replay capture has a bounded depth drain after its raw-batch quota.  The
+    drain must complete the quota's measurements, not silently add later
+    detector batches to the live side of a parity comparison.
+    """
+
+    return {
+        key: event
+        for key, event in events.items()
+        if event.stamp_ns in stamps
+    }
+
+
 def compute_status_histogram(
     events: dict,
     selected_estimators: tuple[str, ...],

@@ -56,6 +56,7 @@ from ridgeback_autonomy.benchmarking.reduction import (
     compute_trial_medians,
     format_status_tally,
     merge_status_histograms,
+    restrict_events_to_stamps,
     summarize_capture_events,
 )
 from ridgeback_autonomy.benchmarking.rendering import BenchmarkCollageRenderer
@@ -863,6 +864,8 @@ class TargetDistanceBenchmarkRunner(Node):
                         f'Replay capture saw {len(self.replay_capture_events)}/{self.capture_batches} '
                         'raw detection batches before capture_timeout_sec.')
                 self.spin_for(self.capture_drain_sec)
+                self.capture_events = restrict_events_to_stamps(
+                    self.capture_events, set(self.replay_capture_events))
         finally:
             self.capture_active = False
             self.active_truth = None
