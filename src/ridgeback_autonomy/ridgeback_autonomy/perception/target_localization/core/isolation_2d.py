@@ -27,10 +27,22 @@ from ridgeback_autonomy.perception.target_localization.core.depth_common import 
     nearest_significant_mode,
     valid_depth,
 )
-from ridgeback_autonomy.perception.target_localization.core.ranging_defaults import (
-    NEAR_SURFACE_BAND_M as NEAREST_MODE_BAND_M_DEFAULT,
-)
 
+# Depth kept either side of the near-surface anchor. Its job is to span from the
+# anchor to the far side of whatever the anchor landed on, so the bound that
+# matters is the occluder standoff (0.62 m in the shipped scene set), not the
+# target's own 0.4457 m depth extent: when an occluder takes the anchor, only a
+# band wider than the standoff can reach the target behind it.
+#
+# 0.35 is therefore measured **wrong** -- 0.75 removes 88% of the error tail at
+# no cost (docs/history/projective_parameter_sensitivity.md). It is left at the
+# shipped value here because moving it is a behaviour change with goldens to
+# regenerate, not part of the cleanup that gave it its own home.
+#
+# It lived in ``ranging_defaults`` until the polar path, which read the same
+# constant as a lidar run-merge distance, was given its own. The two were equal
+# by history, not by intent.
+NEAREST_MODE_BAND_M_DEFAULT = 0.35
 
 OTSU_BIN_WIDTH_M_DEFAULT = 0.05
 

@@ -46,6 +46,9 @@ from ridgeback_autonomy.perception.target_localization.core.depth_common import 
     NEAREST_MODE_BIN_WIDTH_M_DEFAULT,
     NEAREST_MODE_MIN_BIN_FRACTION_DEFAULT,
 )
+from ridgeback_autonomy.perception.target_localization.core.isolation_2d import (
+    NEAREST_MODE_BAND_M_DEFAULT,
+)
 from ridgeback_autonomy.perception.target_localization.core.isolation_3d import (
     FLOOR_MARGIN_M_DEFAULT,
     ISOLATION_3D_DEFAULT,
@@ -55,7 +58,6 @@ from ridgeback_autonomy.perception.target_localization.core.ranging_defaults imp
     INLIER_AHEAD_MARGIN_M,
     INLIER_BEHIND_MARGIN_M,
     MIN_VALID_SAMPLES,
-    NEAR_SURFACE_BAND_M,
 )
 
 
@@ -320,7 +322,7 @@ def generate_launch_description():
         ),
         DeclareLaunchArgument(
             'isolation_2d_band_m',
-            default_value=str(NEAR_SURFACE_BAND_M),
+            default_value=str(NEAREST_MODE_BAND_M_DEFAULT),
             description=(
                 'Depth band kept around the near-surface anchor '
                 '(nearest_mode_histogram only)'

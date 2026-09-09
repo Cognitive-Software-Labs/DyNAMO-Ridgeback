@@ -97,6 +97,7 @@ from ridgeback_autonomy.perception.target_localization.core.intrinsics import in
 from ridgeback_autonomy.perception.target_localization.core.isolation_2d import (
     ISOLATION_2D_DEFAULT,
     ISOLATION_2D_RECIPES,
+    NEAREST_MODE_BAND_M_DEFAULT,
     build_isolation_2d,
 )
 from ridgeback_autonomy.perception.target_localization.core.isolation_3d import (
@@ -120,7 +121,6 @@ from ridgeback_autonomy.perception.target_localization.core.ranging_defaults imp
     INLIER_AHEAD_MARGIN_M,
     INLIER_BEHIND_MARGIN_M,
     MIN_VALID_SAMPLES,
-    NEAR_SURFACE_BAND_M,
 )
 from ridgeback_autonomy.perception.target_localization.core.segmentation import (
     SEGMENTATION_MIN_PREDICTED_IOU_DEFAULT,
@@ -221,7 +221,7 @@ class TargetMaskMeasurementNode(Node):
         # is what lets one bin-width argument span both recipes.
         self.declare_parameter(
             'isolation_2d_bin_width_m', NEAREST_MODE_BIN_WIDTH_M_DEFAULT)
-        self.declare_parameter('isolation_2d_band_m', NEAR_SURFACE_BAND_M)
+        self.declare_parameter('isolation_2d_band_m', NEAREST_MODE_BAND_M_DEFAULT)
         self.declare_parameter(
             'isolation_2d_min_bin_fraction', NEAREST_MODE_MIN_BIN_FRACTION_DEFAULT)
         # Sufficiency floor for both depth rows: their pre-isolation guards

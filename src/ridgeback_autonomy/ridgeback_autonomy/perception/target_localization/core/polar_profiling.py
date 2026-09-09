@@ -38,9 +38,6 @@ from ridgeback_autonomy.perception.target_localization.core.intrinsics import (
     project_points,
 )
 from ridgeback_autonomy.perception.target_localization.core.mask import as_mask_region
-from ridgeback_autonomy.perception.target_localization.core.ranging_defaults import (
-    NEAR_SURFACE_BAND_M as RANGE_BAND_M_DEFAULT,
-)
 
 
 # Foreground-isolation parameters -- the LiDAR analogue of the isolation_2d /
@@ -59,10 +56,20 @@ RANGE_JUMP_M_DEFAULT = 0.30
 # median range is within this of it. Wants to span the object's own
 # front-to-back depth (~0.2 m for the G1) so both legs and torso merge but the
 # wall behind does not. Too small keeps one leg (lateral offset, leg-face
-# range); too large admits parallax / neighbour background. The value is an
-# untuned starting point shared with the projective-ranging near-band width
-# through ranging_defaults, not a fit to the object depth. Its current ownership
-# and validation boundary are documented in docs/target_localization/polar_profiling.md.
+# range); too large admits parallax / neighbour background. An untuned starting
+# point, not a fit to the object depth. Its current ownership and validation
+# boundary are documented in docs/target_localization/polar_profiling.md.
+#
+# It was read from ``ranging_defaults`` until it became clear the sharing was
+# only ever numeric: the projective near-surface band is a depth window around a
+# camera anchor, while this is a merge distance between lidar bearing runs, and
+# the two answer to different sensors and different failure modes. The
+# projective one is measured wrong at 0.35 (0.75 removes 88% of its error tail,
+# docs/history/projective_parameter_sensitivity.md); that result is about
+# occluder standoff in the camera frame and says nothing about leg merging, so
+# it must not reach this path by moving one shared constant. Widening here would
+# in fact merge more of the parallax background the band exists to drop.
+RANGE_BAND_M_DEFAULT = 0.35
 
 # Sparse floor: return ``None`` (no estimate -> that trial is simply dropped
 # from this path's benchmark row, no fallback) when fewer than this many beams
