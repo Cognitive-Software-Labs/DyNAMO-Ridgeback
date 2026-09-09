@@ -190,6 +190,21 @@ def _environment_command(spec: SweepSpec) -> list[str]:
     ]
 
 
+def run_preflight_cleanup(workspace_root: str) -> None:
+    """Clear stale ROS/Gazebo processes once before starting a sweep."""
+
+    cleanup_script = os.path.join(workspace_root, 'cleanup.sh')
+    if not os.path.isfile(cleanup_script):
+        raise RuntimeError(f'Benchmark cleanup script is missing: {cleanup_script}')
+    _log('Running cleanup.sh before the persistent benchmark environment.')
+    subprocess.run(
+        ['bash', cleanup_script],
+        cwd=workspace_root,
+        stdin=subprocess.DEVNULL,
+        check=True,
+    )
+
+
 def _config_command(arguments: dict[str, str]) -> list[str]:
     return [
         'ros2', 'launch', 'ridgeback_autonomy', 'target_benchmark_config.launch.py',
@@ -607,6 +622,7 @@ def run_sweep(
     current_config_process: subprocess.Popen | None = None
     interrupted = False
     try:
+        run_preflight_cleanup(workspace_root)
         environment = subprocess.Popen(
             _environment_command(spec),
             stdin=subprocess.DEVNULL,

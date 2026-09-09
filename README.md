@@ -379,9 +379,6 @@ OWLv2 once per sweep; silhouette configurations still load their segmentation
 model inside their per-config mask node.
 
 ```bash
-# Start from a clean machine once, before the persistent environment starts.
-bash cleanup.sh
-
 SWEEP="$(ros2 pkg prefix ridgeback_autonomy)/share/ridgeback_autonomy/config/benchmark_sweep_baseline.yaml"
 
 # Validate all configs and print the trial/time estimate without launching.
@@ -416,12 +413,13 @@ configuration twice as an in-sweep noise control. See
 for what is already settled and what those runs are meant to answer.
 
 Do **not** run `cleanup.sh` between configurations: it kills Gazebo and RViz,
-which are deliberately persistent. The supervisor owns each config process
-group, removes any orphan `bench_*` entities after an unclean exit, and shuts
-the environment down at the end. If a sweep is interrupted, rerun the same
-command: the latest incomplete sweep with the same YAML and `--only` selection
-is resumed, valid `run.json` configurations are skipped, and partial config
-folders are preserved with an `.incomplete_<timestamp>` suffix before retry.
+which are deliberately persistent. The supervisor runs it once, immediately
+before starting that environment. It then owns each config process group,
+removes any orphan `bench_*` entities after an unclean exit, and shuts the
+environment down at the end. If a sweep is interrupted, rerun the same command:
+the latest incomplete sweep with the same YAML and `--only` selection is resumed,
+valid `run.json` configurations are skipped, and partial config folders are
+preserved with an `.incomplete_<timestamp>` suffix before retry.
 
 The YAML format is a metadata block, sweep-wide defaults, and named configs:
 

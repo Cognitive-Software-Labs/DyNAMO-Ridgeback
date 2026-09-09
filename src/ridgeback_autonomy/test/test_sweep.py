@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 from pathlib import Path
+import subprocess
 
 import pytest
 
 from ridgeback_autonomy.benchmarking.target_benchmark_sweep import (
     _launch_argument_tokens,
+    run_preflight_cleanup,
 )
 from ridgeback_autonomy.benchmarking.sweep import load_sweep, parse_sweep
 
@@ -41,6 +43,35 @@ def test_launch_argument_tokens_omit_empty_launch_defaults() -> None:
         'estimators:=pointcloud',
         'repeats:=1',
     ]
+
+
+def test_sweep_runs_repo_cleanup_before_starting_the_environment(tmp_path, monkeypatch) -> None:
+    cleanup = tmp_path / 'cleanup.sh'
+    cleanup.write_text('exit 0\n', encoding='utf-8')
+    calls = []
+
+    def fake_run(command, **kwargs):
+        calls.append((command, kwargs))
+
+    monkeypatch.setattr(
+        'ridgeback_autonomy.benchmarking.target_benchmark_sweep.subprocess.run',
+        fake_run,
+    )
+
+    run_preflight_cleanup(str(tmp_path))
+
+    assert calls == [
+        (['bash', str(cleanup)], {
+            'cwd': str(tmp_path),
+            'stdin': subprocess.DEVNULL,
+            'check': True,
+        }),
+    ]
+
+
+def test_sweep_refuses_to_start_without_its_cleanup_script(tmp_path) -> None:
+    with pytest.raises(RuntimeError, match='cleanup script is missing'):
+        run_preflight_cleanup(str(tmp_path))
 
 
 def test_sweep_rejects_unknown_config_key(tmp_path) -> None:
