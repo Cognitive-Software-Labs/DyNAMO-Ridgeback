@@ -5,7 +5,7 @@ from launch.actions import (
     AppendEnvironmentVariable, DeclareLaunchArgument, IncludeLaunchDescription,
 )
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import LaunchConfiguration
+from launch.substitutions import LaunchConfiguration, PythonExpression
 from ament_index_python.packages import get_package_share_directory
 
 
@@ -16,6 +16,7 @@ def generate_launch_description():
     setup_path = LaunchConfiguration('setup_path')
     world = LaunchConfiguration('world')
     clearpath_rviz = LaunchConfiguration('clearpath_rviz')
+    gz_gui = LaunchConfiguration('gz_gui')
 
     return LaunchDescription([
         DeclareLaunchArgument(
@@ -60,7 +61,12 @@ def generate_launch_description():
                 'world': world,
                 'rviz': clearpath_rviz,
                 'use_sim_time': 'true',
-                'gz_gui': LaunchConfiguration('gz_gui'),
+                # Clearpath's simulation launch uses this flag for its actual
+                # server-only mode.  Passing a made-up ``gz_gui`` argument is
+                # silently ignored by launch, leaving a GUI client behind.
+                'headless_rendering': PythonExpression([
+                    "'false' if '", gz_gui, "' == 'true' else 'true'",
+                ]),
             }.items(),
         ),
     ])

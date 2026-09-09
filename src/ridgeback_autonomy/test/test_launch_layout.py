@@ -86,6 +86,20 @@ def test_benchmark_default_world_is_allowed_by_clearpath_simulation() -> None:
     assert "'target_distance_calibration'" in clearpath_simulation_text
 
 
+def test_benchmark_forwards_gazebo_gui_choice_to_simulation() -> None:
+    benchmark_env_text = (
+        _package_root() / 'launch' / 'target_benchmark_env.launch.py'
+    ).read_text(encoding='utf-8')
+    simulation_text = (
+        _package_root() / 'launch' / 'includes' / 'simulation.launch.py'
+    ).read_text(encoding='utf-8')
+
+    assert "DeclareLaunchArgument(\n            'gz_gui'" in benchmark_env_text
+    assert "'gz_gui': gz_gui" in benchmark_env_text
+    assert "'headless_rendering': PythonExpression(" in simulation_text
+    assert "'false' if '" in simulation_text
+
+
 def test_exploration_uses_unique_mock_hospital_world() -> None:
     repo_root = Path(__file__).resolve().parents[3]
     exploration_text = (

@@ -60,6 +60,47 @@ def test_replay_capture_restricts_live_scoring_to_frozen_detector_batches() -> N
     assert list(restrict_events_to_stamps(events, {10})) == [('camera', 10)]
 
 
+def test_replay_capture_keeps_exact_depth_that_arrives_before_its_detection() -> None:
+    from ridgeback_autonomy.benchmarking.target_distance_benchmark_runner_node import (
+        TargetDistanceBenchmarkRunner,
+    )
+
+    early_depth = np.arange(12, dtype=np.float32).reshape(3, 4)
+    depth_buffer = OrderedDict()
+    store_buffered_preview(depth_buffer, 42, early_depth)
+    event = {
+        'image_height': 3,
+        'image_width': 4,
+        'detections': [{'bbox_xyxy': [1, 1, 3, 3], 'depth_roi': None}],
+    }
+
+    TargetDistanceBenchmarkRunner.store_replay_depth_rois(
+        SimpleNamespace(get_logger=lambda: SimpleNamespace(warning=lambda _message: None)),
+        event,
+        depth_buffer[42],
+    )
+
+    assert event['detections'][0]['depth_roi'].tolist() == [[5.0, 6.0], [9.0, 10.0]]
+
+
+def test_replay_capture_waits_for_every_detected_batch_to_have_exact_depth() -> None:
+    from ridgeback_autonomy.benchmarking.target_distance_benchmark_runner_node import (
+        TargetDistanceBenchmarkRunner,
+    )
+
+    runner = SimpleNamespace(
+        capture_batches=1,
+        replay_capture_events=OrderedDict([
+            (42, {'detected': True, 'detections': [{'depth_roi': None}]}),
+        ]),
+    )
+
+    assert not TargetDistanceBenchmarkRunner.replay_capture_is_complete(runner)
+
+    runner.replay_capture_events[42]['detections'][0]['depth_roi'] = np.ones((2, 2))
+    assert TargetDistanceBenchmarkRunner.replay_capture_is_complete(runner)
+
+
 def test_parse_estimators_uses_canonical_order() -> None:
     assert parse_estimators('') == (
         'pointcloud', 'projective_ranging', 'euclidean_reconstruction',

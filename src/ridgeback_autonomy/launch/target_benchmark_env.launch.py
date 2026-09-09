@@ -56,6 +56,7 @@ def generate_launch_description():
     world = LaunchConfiguration('world')
     color_topic = LaunchConfiguration('color_topic')
     exploration_rviz = LaunchConfiguration('exploration_rviz')
+    gz_gui = LaunchConfiguration('gz_gui')
 
     return LaunchDescription([
         *cyclonedds_actions(pkg_this),
@@ -75,6 +76,11 @@ def generate_launch_description():
             'exploration_rviz',
             default_value='true',
             description='Launch the persistent benchmark RViz2 window',
+        ),
+        DeclareLaunchArgument(
+            'gz_gui',
+            default_value='true',
+            description='Launch the Gazebo GUI window',
         ),
         # The detector belongs to this persistent layer, so its rate is fixed
         # for a whole sweep: a per-config layer cannot change it.
@@ -114,6 +120,7 @@ def generate_launch_description():
                 'setup_path': setup_path,
                 'world': world,
                 'clearpath_rviz': 'false',
+                'gz_gui': gz_gui,
             }.items(),
         ),
 

@@ -368,6 +368,7 @@ class TargetDistanceBenchmarkRunner(Node):
         self.capture_events = {}
         self.color_preview_buffer: OrderedDict[int, Any] = OrderedDict()
         self.replay_capture_events: OrderedDict[int, dict[str, Any]] = OrderedDict()
+        self.replay_depth_buffer: OrderedDict[int, np.ndarray] = OrderedDict()
         self.latest_replay_camera_info: CameraInfo | None = None
         self.replay_tf_buffer: Buffer | None = None
         self.replay_tf_listener: TransformListener | None = None
@@ -519,18 +520,28 @@ class TargetDistanceBenchmarkRunner(Node):
                 for detection in batch.detections
             ],
         }
+        depth_m = self.replay_depth_buffer.get(stamp_ns)
+        if depth_m is not None:
+            self.store_replay_depth_rois(self.replay_capture_events[stamp_ns], depth_m)
 
     def on_replay_aligned_depth(self, msg: Image) -> None:
         if not self.capture_active:
-            return
-        event = self.replay_capture_events.get(stamp_to_nanoseconds(msg.header.stamp))
-        if event is None:
             return
         try:
             depth_m = decode_depth_to_meters(msg)
         except ValueError as exc:
             self.get_logger().warning(f'Replay capture skipped unusable aligned depth: {exc}')
             return
+        stamp_ns = stamp_to_nanoseconds(msg.header.stamp)
+        event = self.replay_capture_events.get(stamp_ns)
+        if event is None:
+            store_buffered_preview(self.replay_depth_buffer, stamp_ns, depth_m)
+            return
+        self.store_replay_depth_rois(event, depth_m)
+
+    def store_replay_depth_rois(self, event: dict[str, Any], depth_m: np.ndarray) -> None:
+        """Attach one exact-stamp depth frame to its frozen detection ROIs."""
+
         if depth_m.shape != (event['image_height'], event['image_width']):
             self.get_logger().warning(
                 f'Replay capture depth grid {depth_m.shape} differs from detection grid '
@@ -540,6 +551,21 @@ class TargetDistanceBenchmarkRunner(Node):
             x1, y1, x2, y2 = clamp_box(
                 tuple(detection['bbox_xyxy']), event['image_height'], event['image_width'])
             detection['depth_roi'] = np.array(depth_m[y1:y2, x1:x2], dtype=np.float32, copy=True)
+
+    def replay_capture_is_complete(self) -> bool:
+        """Whether every frozen, detected batch has its exact depth crop.
+
+        A raw-detection callback can run before its aligned-depth callback on
+        the ROS executor.  Counting raw batches alone therefore produces a
+        replay file that looks complete but cannot reproduce the live score.
+        """
+        if len(self.replay_capture_events) < self.capture_batches:
+            return False
+        return all(
+            not event['detected']
+            or all(detection['depth_roi'] is not None for detection in event['detections'])
+            for event in self.replay_capture_events.values()
+        )
 
     def log_code_provenance(self) -> None:
         """Say which code is about to produce these results, before it does.
@@ -849,6 +875,7 @@ class TargetDistanceBenchmarkRunner(Node):
         self.capture_events = {}
         self.clear_preview_buffers()
         self.replay_capture_events.clear()
+        self.replay_depth_buffer.clear()
         self.capture_active = True
         try:
             if self.replay_writer is None:
@@ -856,13 +883,17 @@ class TargetDistanceBenchmarkRunner(Node):
             else:
                 deadline = time.monotonic() + self.capture_timeout_sec
                 while (rclpy.ok() and time.monotonic() < deadline
-                       and len(self.replay_capture_events) < self.capture_batches):
+                       and not self.replay_capture_is_complete()):
                     rclpy.spin_once(self, timeout_sec=0.1)
                     self.publish_active_truth()
                 if len(self.replay_capture_events) < self.capture_batches:
                     raise RuntimeError(
                         f'Replay capture saw {len(self.replay_capture_events)}/{self.capture_batches} '
                         'raw detection batches before capture_timeout_sec.')
+                if not self.replay_capture_is_complete():
+                    raise RuntimeError(
+                        'Replay capture did not receive exact aligned-depth frames for every '
+                        'detected raw batch before capture_timeout_sec.')
                 self.spin_for(self.capture_drain_sec)
                 self.capture_events = restrict_events_to_stamps(
                     self.capture_events, set(self.replay_capture_events))
