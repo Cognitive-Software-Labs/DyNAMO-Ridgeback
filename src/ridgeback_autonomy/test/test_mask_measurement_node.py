@@ -457,11 +457,11 @@ def test_fill_computes_valid_depth_once_and_shares_each_masked_result(
 
     def projective_stub(prepared_arg, intrinsics_arg, **kwargs):
         projective_prepared.append(prepared_arg)
-        return None, MissReason.ISOLATION_EMPTY
+        return None, MissReason.TOO_FEW_AFTER_ISOLATION
 
     def euclidean_stub(prepared_arg, intrinsics_arg, **kwargs):
         euclidean_prepared.append(prepared_arg)
-        return None, MissReason.ISOLATION_EMPTY
+        return None, MissReason.TOO_FEW_AFTER_ISOLATION
 
     monkeypatch.setattr(
         measurement_pipeline, 'valid_depth', compute_valid_once)
@@ -1782,7 +1782,7 @@ def test_min_valid_pixels_gates_both_depth_rows_alike() -> None:
 def test_raised_min_valid_pixels_blames_the_floor_not_the_rect_recipe() -> None:
     """A floor the region cannot clear is the floor's shortfall on either tag.
 
-    This asserted ``ISOLATION_EMPTY``, on the reasoning that the region had the
+    This asserted ``TOO_FEW_AFTER_ISOLATION``, on the reasoning that the region had the
     depth and the recipe rejected it. It did not: at a floor of 10 000 the
     region never held enough to begin with and the recipe threw nothing away.
     The old reason pointed a reader at recipe tuning for what was a sufficiency

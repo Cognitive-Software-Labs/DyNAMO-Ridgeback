@@ -31,10 +31,15 @@ class MissReason(IntEnum):
     TF_MISS_SCAN = 22          # polar: scan -> optical transform unavailable
     SCAN_INVALID = 23          # polar: scan message present but malformed/undecodable
 
-    # Path-internal (projective + euclidean).
-    TOO_FEW_VALID_PIXELS = 30  # projective: fewer than min valid masked pixels
-    TOO_FEW_VALID_POINTS = 31  # euclidean: fewer than min valid deprojected points
-    ISOLATION_EMPTY = 32       # foreground isolation left too few pixels/points
+    # Path-internal (projective + euclidean). The pair splits by cause: the
+    # selection was short before any recipe saw it, or a recipe was given
+    # enough and returned too little. It was ``ISOLATION_EMPTY`` until 32 came
+    # to mean "fewer than the floor" rather than "none at all" -- the value is
+    # unchanged, so archived runs still decode, but reports written before the
+    # rename carry the old spelling.
+    TOO_FEW_VALID_PIXELS = 30    # projective: fewer than min valid masked pixels
+    TOO_FEW_VALID_POINTS = 31    # euclidean: fewer than min valid deprojected points
+    TOO_FEW_AFTER_ISOLATION = 32 # isolation returned fewer than the floor
 
     # Path-internal (polar).
     NO_BEAMS_IN_VIEW = 40      # no scan beam projects into the image

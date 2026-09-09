@@ -151,4 +151,4 @@ def test_isolation_dropping_all_points_returns_isolation_empty() -> None:
         build_depth(), mask, INTRINSICS, isolation=drop_all, depth_max=DEPTH_GATE_M)
 
     assert result is None
-    assert reason is MissReason.ISOLATION_EMPTY
+    assert reason is MissReason.TOO_FEW_AFTER_ISOLATION

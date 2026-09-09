@@ -78,12 +78,13 @@ def select_foreground_pixels(
     Returns ``(foreground, MissReason.OK)`` or ``(None, <reason>)``. The two
     shortfalls are split by *cause*, on both branches: a selection that never
     held enough valid depth is ``TOO_FEW_VALID_PIXELS``, and only a recipe that
-    was given enough and returned too little is ``ISOLATION_EMPTY``. The rect
-    branch used to report the recipe's name for both, blaming an isolation that
-    had rejected nothing, on the grounds that counting first meant a scan
-    nothing else wanted. It does not: the validity array is computed here in
-    either case -- the caller usually supplies it precomputed -- and is then
-    handed to the recipe, which takes it rather than rescanning. Euclidean
+    was given enough and returned too little is ``TOO_FEW_AFTER_ISOLATION``.
+    The rect branch used to report the recipe's name for both, blaming an
+    isolation that had rejected nothing, on the grounds that counting first
+    meant a scan nothing else wanted. It does not: the validity array is
+    computed here in either case -- the caller usually supplies it precomputed
+    -- and is then handed to the recipe, which takes it rather than rescanning.
+    Euclidean
     reconstruction has always split these, so this is the two paths agreeing
     about what they mean rather than a new policy.
 
@@ -118,7 +119,7 @@ def select_foreground_pixels(
     foreground = isolation(
         depth, mask_data, depth_max=depth_max, valid_masked=valid_masked)
     if int(np.count_nonzero(foreground)) < min_valid_pixels:
-        return None, MissReason.ISOLATION_EMPTY
+        return None, MissReason.TOO_FEW_AFTER_ISOLATION
     return foreground, MissReason.OK
 
 

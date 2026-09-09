@@ -107,7 +107,7 @@ def _reduce_points(
     keep = select_foreground_points(points, precision, isolation=isolation)
     foreground = points[keep]
     if foreground.shape[0] < min_valid_points:
-        return None, MissReason.ISOLATION_EMPTY
+        return None, MissReason.TOO_FEW_AFTER_ISOLATION
 
     # The coordinate is the foreground centroid. A robust median range is
     # recoverable from foreground_points if a consumer ever needs one.

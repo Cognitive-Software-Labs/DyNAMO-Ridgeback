@@ -136,17 +136,19 @@ The isolation callable returns a boolean selector; the estimator obtains its
 foreground coordinates. An empty selection is valid at the recipe boundary;
 the estimator applies its minimum-count guard (`min_valid_pixels`, default 10)
 and reports `TOO_FEW_VALID_PIXELS` when the selection never held enough, or
-`ISOLATION_EMPTY` when it did and the recipe returned too little. An optional
-precomputed `valid_masked` selector avoids repeating the validity pass.
+`TOO_FEW_AFTER_ISOLATION` when it did and the recipe returned too little. An
+optional precomputed `valid_masked` selector avoids repeating the validity
+pass.
 
 The two codes split by *cause*, and identically on both branches: the mask tag
-decides which recipe runs, never what a shortfall is called. `ISOLATION_EMPTY`
-therefore does name the recipe as the thing that discarded the pixels, and is
-safe to read that way.
+decides which recipe runs, never what a shortfall is called.
+`TOO_FEW_AFTER_ISOLATION` therefore does name the recipe as the thing that
+discarded the pixels, and is safe to read that way.
 
 They used to split by branch instead — the `rect` count was taken only after
 isolation, so a box that never held enough valid depth reported
-`ISOLATION_EMPTY` and sent a reader to tune a recipe that had rejected nothing.
+`TOO_FEW_AFTER_ISOLATION` and sent a reader to tune a recipe that had rejected
+nothing.
 The stated reason for leaving it was that counting first needed an extra scan;
 it does not, because the validity array is built before the recipe either way
 and then handed to it. Euclidean reconstruction had always split by cause, so

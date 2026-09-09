@@ -303,7 +303,7 @@ def test_euclidean_shortfall_keeps_too_few_valid_points() -> None:
 
 
 def test_isolation_shortfall_keeps_its_own_reason_on_both_paths() -> None:
-    """An emptied isolation is ISOLATION_EMPTY, not a validity shortfall."""
+    """An emptied isolation is TOO_FEW_AFTER_ISOLATION, not a validity shortfall."""
 
     depth = build_scene()
     empty_2d = (lambda depth_arg, mask_arg, **kwargs: np.zeros_like(mask_arg))
@@ -311,17 +311,17 @@ def test_isolation_shortfall_keeps_its_own_reason_on_both_paths() -> None:
 
     _, reason = localize_projective_ranging(
         depth, build_rect_mask(), INTRINSICS, isolation=empty_2d, depth_max=REFERENCE_GATE_M)
-    assert reason is MissReason.ISOLATION_EMPTY
+    assert reason is MissReason.TOO_FEW_AFTER_ISOLATION
     _, reason = localize_prepared_projective_ranging(
         prepare(rect_region(), depth), INTRINSICS, isolation=empty_2d)
-    assert reason is MissReason.ISOLATION_EMPTY
+    assert reason is MissReason.TOO_FEW_AFTER_ISOLATION
 
     _, reason = localize_euclidean_reconstruction(
         depth, build_rect_mask(), INTRINSICS, isolation=empty_3d, depth_max=REFERENCE_GATE_M)
-    assert reason is MissReason.ISOLATION_EMPTY
+    assert reason is MissReason.TOO_FEW_AFTER_ISOLATION
     _, reason = localize_prepared_euclidean_reconstruction(
         prepare(rect_region(), depth), INTRINSICS, isolation=empty_3d)
-    assert reason is MissReason.ISOLATION_EMPTY
+    assert reason is MissReason.TOO_FEW_AFTER_ISOLATION
 
 
 def test_empty_region_is_a_selector_with_zero_pixels_not_a_crash() -> None:

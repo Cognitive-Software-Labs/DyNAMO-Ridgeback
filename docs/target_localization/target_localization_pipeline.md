@@ -358,7 +358,7 @@ them over all captured events. Grouped by where in the pipeline the frame died:
 
 - `TOO_FEW_VALID_PIXELS` — projective: too few valid masked depth pixels.
 - `TOO_FEW_VALID_POINTS` — euclidean: too few valid deprojected points.
-- `ISOLATION_EMPTY` — foreground isolation left too few pixels/points.
+- `TOO_FEW_AFTER_ISOLATION` — foreground isolation left too few pixels/points.
 - `NO_BEAMS_IN_VIEW` — polar: no scan beam projects into the image.
 - `TOO_FEW_RAYS_SELECTED` — polar: too few beams fall inside the mask (the
   expected signature when an occluder blocks the scan plane).

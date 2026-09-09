@@ -166,7 +166,7 @@ def test_measurements_message_round_trips_estimator_statuses() -> None:
             Detection(
                 bbox_xyxy=(1, 2, 30, 40), label='humanoid robot', score=0.9,
                 projective_ranging_status=int(MissReason.OK),
-                euclidean_reconstruction_status=int(MissReason.ISOLATION_EMPTY),
+                euclidean_reconstruction_status=int(MissReason.TOO_FEW_AFTER_ISOLATION),
                 polar_profiling_status=int(MissReason.SCAN_INVALID),
             ),
         ],
@@ -177,7 +177,8 @@ def test_measurements_message_round_trips_estimator_statuses() -> None:
 
     decoded = batch_from_measurements_message(msg).detections[0]
     assert decoded.projective_ranging_status == int(MissReason.OK)
-    assert decoded.euclidean_reconstruction_status == int(MissReason.ISOLATION_EMPTY)
+    assert decoded.euclidean_reconstruction_status == int(
+        MissReason.TOO_FEW_AFTER_ISOLATION)
     assert decoded.polar_profiling_status == int(MissReason.SCAN_INVALID)
 
 
