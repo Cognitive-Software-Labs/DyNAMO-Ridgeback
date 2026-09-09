@@ -31,6 +31,25 @@ Current tenants and why each earns it:
 
 MIN_VALID_SAMPLES = 10
 FRONT_PERCENTILE = 25.0
+# How far IN FRONT of the anchor a point may sit and still count as target.
+# Nothing real is in front of the near surface, so this is not an extent: it
+# covers the gap between the anchor *statistic* and the actual nearest target
+# point, plus whatever depth noise puts a sample early. Both anchors sit behind
+# the surface they name -- ``nearest_significant_mode`` returns a bin CENTRE,
+# so half a bin (0.025 at the shipped 0.05 width) of its own anchor bin is
+# nearer than it, and ``RangeBand``'s 25th percentile has a quarter of the
+# whole set nearer by construction. Zero is therefore not "no slack", it is a
+# truncation: it would discard the near half of the anchor bin, or a quarter of
+# the points, every frame.
+#
+# 0.10 is sized for the percentile anchor, which has to reach back toward the
+# minimum. The default recipe is mode-anchored and wants roughly the half-bin.
+# At 0.05 bins, 0.10 reaches back TWO bins and so readmits points from bins
+# that failed ``min_bin_fraction`` -- partially undoing the significance test
+# that was the reason for moving off the percentile anchor. Left as shipped:
+# that is a value judgement, and it is now sweepable as isolation_3d_ahead_m.
+# Note sim cannot settle it -- the renderer has no noise model, so only the
+# quantization half of the term is exercised there.
 INLIER_AHEAD_MARGIN_M = 0.10
 
 # How far behind the anchor a point may sit and still count as target. Its job
