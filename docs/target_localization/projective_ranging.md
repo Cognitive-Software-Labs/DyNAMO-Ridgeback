@@ -135,16 +135,22 @@ other on identical input:
 The isolation callable returns a boolean selector; the estimator obtains its
 foreground coordinates. An empty selection is valid at the recipe boundary;
 the estimator applies its minimum-count guard (`min_valid_pixels`, default 10)
-and reports `ISOLATION_EMPTY` when too few pixels survive — or
-`TOO_FEW_VALID_PIXELS` on the `tight` branch, which never runs a recipe. An
-optional precomputed `valid_masked` selector avoids repeating the validity
-pass.
+and reports `TOO_FEW_VALID_PIXELS` when the selection never held enough, or
+`ISOLATION_EMPTY` when it did and the recipe returned too little. An optional
+precomputed `valid_masked` selector avoids repeating the validity pass.
 
-The two codes split by *branch*, not by cause. On the `rect` branch the count is
-checked only after isolation, so a box that never held enough valid depth to
-begin with also reports `ISOLATION_EMPTY` — the recipe is named even when it
-rejected nothing. Read that code as "the `rect` branch came up short", not as
-proof the recipe is at fault.
+The two codes split by *cause*, and identically on both branches: the mask tag
+decides which recipe runs, never what a shortfall is called. `ISOLATION_EMPTY`
+therefore does name the recipe as the thing that discarded the pixels, and is
+safe to read that way.
+
+They used to split by branch instead — the `rect` count was taken only after
+isolation, so a box that never held enough valid depth reported
+`ISOLATION_EMPTY` and sent a reader to tune a recipe that had rejected nothing.
+The stated reason for leaving it was that counting first needed an extra scan;
+it does not, because the validity array is built before the recipe either way
+and then handed to it. Euclidean reconstruction had always split by cause, so
+the two paths now agree.
 
 #### Implemented 2D recipes
 

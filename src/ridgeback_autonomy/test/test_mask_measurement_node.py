@@ -1779,9 +1779,16 @@ def test_min_valid_pixels_gates_both_depth_rows_alike() -> None:
     assert rejected.detections[0].euclidean_reconstruction_distance_m is None
 
 
-def test_raised_min_valid_pixels_empties_the_rect_isolation_branch() -> None:
-    # The rect branch reports the shortfall as ISOLATION_EMPTY rather than
-    # TOO_FEW_VALID_PIXELS: the region had the depth, the recipe rejected it.
+def test_raised_min_valid_pixels_blames_the_floor_not_the_rect_recipe() -> None:
+    """A floor the region cannot clear is the floor's shortfall on either tag.
+
+    This asserted ``ISOLATION_EMPTY``, on the reasoning that the region had the
+    depth and the recipe rejected it. It did not: at a floor of 10 000 the
+    region never held enough to begin with and the recipe threw nothing away.
+    The old reason pointed a reader at recipe tuning for what was a sufficiency
+    setting.
+    """
+
     from ridgeback_autonomy.common.miss_reason import MissReason
 
     intrinsics, depth, batch, masks = _status_fixture()
@@ -1792,4 +1799,4 @@ def test_raised_min_valid_pixels_empties_the_rect_isolation_branch() -> None:
         min_valid_pixels=10_000, enabled=frozenset({'projective_ranging'}))
 
     assert batch.detections[0].projective_ranging_status == int(
-        MissReason.ISOLATION_EMPTY)
+        MissReason.TOO_FEW_VALID_PIXELS)

@@ -139,11 +139,12 @@ def test_rect_branch_respects_custom_depth_max() -> None:
     assert kept.depth_m == 6.0
     assert kept.foreground_pixel_count == 400
 
-    # Tighten the cutoff below the object: the recipe now cleans it away and the
-    # mask is left with too few pixels, so the call returns None.
+    # Tighten the cutoff below the object: the gate cleans it away and the
+    # selection is left with too few pixels, so the call returns None. The
+    # shortfall is the gate's, not the recipe's -- which never ran.
     capped, capped_reason = localize_projective_ranging(depth, mask, INTRINSICS, depth_max=4.0)
     assert capped is None
-    assert capped_reason is MissReason.ISOLATION_EMPTY
+    assert capped_reason is MissReason.TOO_FEW_VALID_PIXELS
 
 
 def test_tight_mask_takes_the_median_directly() -> None:
@@ -160,25 +161,28 @@ def test_tight_mask_takes_the_median_directly() -> None:
     assert result.foreground_pixel_count == 400
 
 
-def test_all_invalid_depth_returns_isolation_empty() -> None:
+def test_all_invalid_depth_blames_the_selection_not_the_recipe() -> None:
+    # Nothing valid ever entered, so the recipe rejected nothing; reporting its
+    # name here sent anyone reading the tally to tune a recipe that never ran.
     depth = np.zeros((HEIGHT, WIDTH), dtype=np.float32)
     mask = rasterize_bbox(RECT_BBOX, HEIGHT, WIDTH)
 
     result, reason = localize_projective_ranging(depth, mask, INTRINSICS, depth_max=DEPTH_GATE_M)
 
     assert result is None
-    assert reason is MissReason.ISOLATION_EMPTY
+    assert reason is MissReason.TOO_FEW_VALID_PIXELS
 
 
-def test_sparse_rect_mask_returns_isolation_empty() -> None:
-    # A 3x3 rect box holds fewer valid pixels than min_valid_pixels.
+def test_sparse_rect_mask_reports_the_same_shortfall_as_a_sparse_tight_one() -> None:
+    # A 3x3 rect box holds fewer valid pixels than min_valid_pixels. The mask
+    # tag decides which recipe runs, never what a shortfall is called.
     mask = rasterize_bbox((10, 10, 13, 13), HEIGHT, WIDTH)
 
     result, reason = localize_projective_ranging(build_depth(), mask, INTRINSICS,
         depth_max=DEPTH_GATE_M)
 
     assert result is None
-    assert reason is MissReason.ISOLATION_EMPTY
+    assert reason is MissReason.TOO_FEW_VALID_PIXELS
 
 
 def test_sparse_tight_mask_returns_too_few_valid_pixels() -> None:

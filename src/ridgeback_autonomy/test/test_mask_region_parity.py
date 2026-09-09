@@ -331,11 +331,10 @@ def test_empty_region_is_a_selector_with_zero_pixels_not_a_crash() -> None:
         prepared = prepare(empty_region(240, 320, precision), depth)
         assert prepared.valid_masked.shape == (0, 0)
 
+        # Both tags, and both paths: an empty region held nothing to isolate.
         result, reason = localize_prepared_projective_ranging(prepared, INTRINSICS)
         assert result is None
-        assert reason is (
-            MissReason.TOO_FEW_VALID_PIXELS if precision is MaskPrecision.TIGHT
-            else MissReason.ISOLATION_EMPTY)
+        assert reason is MissReason.TOO_FEW_VALID_PIXELS
 
         result, reason = localize_prepared_euclidean_reconstruction(prepared, INTRINSICS)
         assert result is None

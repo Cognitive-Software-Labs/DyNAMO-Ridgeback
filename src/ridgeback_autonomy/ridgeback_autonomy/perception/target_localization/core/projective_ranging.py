@@ -76,12 +76,16 @@ def select_foreground_pixels(
     order, so both grids feed the histogram the identical value sequence.
 
     Returns ``(foreground, MissReason.OK)`` or ``(None, <reason>)``. The two
-    shortfalls are split by *branch*, not by cause: the ``tight`` branch reports
-    ``TOO_FEW_VALID_PIXELS`` and the ``rect`` branch ``ISOLATION_EMPTY``. On
-    ``rect`` the count is only checked after isolation, so a box that never held
-    enough valid depth reports ``ISOLATION_EMPTY`` too -- naming the recipe even
-    where it rejected nothing. Splitting those apart would need a second count
-    before the recipe runs, which is a scan nothing else wants.
+    shortfalls are split by *cause*, on both branches: a selection that never
+    held enough valid depth is ``TOO_FEW_VALID_PIXELS``, and only a recipe that
+    was given enough and returned too little is ``ISOLATION_EMPTY``. The rect
+    branch used to report the recipe's name for both, blaming an isolation that
+    had rejected nothing, on the grounds that counting first meant a scan
+    nothing else wanted. It does not: the validity array is computed here in
+    either case -- the caller usually supplies it precomputed -- and is then
+    handed to the recipe, which takes it rather than rescanning. Euclidean
+    reconstruction has always split these, so this is the two paths agreeing
+    about what they mean rather than a new policy.
 
     ``depth_max`` is the ceiling to clean against and is needed only when
     ``valid_masked`` is absent. A caller that already cleaned the selection has
@@ -95,19 +99,22 @@ def select_foreground_pixels(
             'select_foreground_pixels needs a depth_max when valid_masked is '
             'not precomputed; there is no default ceiling to fall back on.')
 
+    # Sufficiency is judged on the selection before any recipe sees it, so the
+    # answer means the same thing on both branches.
+    if valid_masked is None:
+        valid_masked = np.asarray(mask_data, dtype=bool) & valid_depth(depth, depth_max)
+    if int(np.count_nonzero(valid_masked)) < min_valid_pixels:
+        return None, MissReason.TOO_FEW_VALID_PIXELS
+
     if precision is MaskPrecision.TIGHT:
         # A tight silhouette already is the object: keep its valid depths.
-        if valid_masked is None:
-            valid_masked = mask_data & valid_depth(depth, depth_max)
-        if int(np.count_nonzero(valid_masked)) < min_valid_pixels:
-            return None, MissReason.TOO_FEW_VALID_PIXELS
         return valid_masked, MissReason.OK
 
     if isolation is None:
         isolation = ISOLATION_2D_RECIPES[ISOLATION_2D_DEFAULT]
-    # Both are handed over and the recipe reads whichever applies: standalone
-    # callers retain its original select+clean path, while the batch caller's
-    # already-cleaned mask is consumed without rescanning for validity.
+    # The recipe is handed the validity array rather than the ceiling that
+    # produced it, so it consumes the selection just counted instead of
+    # rescanning for its own.
     foreground = isolation(
         depth, mask_data, depth_max=depth_max, valid_masked=valid_masked)
     if int(np.count_nonzero(foreground)) < min_valid_pixels:
