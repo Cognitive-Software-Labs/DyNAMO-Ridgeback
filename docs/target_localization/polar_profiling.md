@@ -33,7 +33,7 @@ architecture-level view of polar profiling is `docs/target_localization/target_l
   on) — needed to project the scan points into the image plane so the mask can
   select them. Same intrinsics caveat as the depth paths
   (`docs/target_localization/aligned_depth.md` §2.3): use the grid's `camera_info`, not the FoV
-  constants in `camera_config.json`.
+  constants any static config might carry.
 
 **Output**
 
@@ -42,14 +42,18 @@ architecture-level view of polar profiling is `docs/target_localization/target_l
   `docs/target_localization/target_localization_pipeline.md` §7).
   **Y (height) is unobservable** from a single-plane LiDAR: the result
   carries no Y at all, and the benchmark's optical→base conversion folds
-  `Y = 0`, which is exact at the benchmark's zero camera pitch (Section 7, resolved).
+  `Y = 0`, which is exact at the benchmark's zero camera pitch and is flagged in
+  §6 as needing re-evaluation for a pitched-camera deployment.
   The scan-plane's own Y in the camera frame is available as a by-product, but
   it is the *plane's* height, not the object center's — do not substitute it.
 
-Polar profiling is the accuracy specialist: within its plane the UST is typically more
-accurate and longer-range than RealSense stereo, but it recovers no height and
-only returns anything at all when the scan plane physically intersects the
-object.
+Within its plane the UST is typically more accurate and longer-ranged than
+RealSense stereo as a *sensor*, and this path no longer narrows that range
+(§2.1). The path built on it is not automatically the accuracy specialist,
+though: measured, its median error is excellent and its tail is not (§7). It
+recovers no height, and it returns something only when the scan plane both
+intersects the object **and** projects inside the image — the second condition
+is the binding one at close range (§7).
 
 ---
 
@@ -87,8 +91,9 @@ step (`docs/target_localization/projective_ranging.md` §2.2): non-finite ranges
 (mixed-pixel and self-hit artifacts), ranges beyond `range_max`. Both bounds
 are the driver's declared ones — the path applies no ceiling of its own, so a
 far return is background for the segmentation to reject (§2.5), not something
-quietly dropped here. They must never survive into the range profile, where a stray 0.06 m
-self-hit would masquerade as the nearest run.
+quietly dropped here. A sub-`range_min` self-hit must never survive into the
+range profile, where it would masquerade as the nearest run and anchor the band
+onto nothing.
 
 ### 2.2 Transform
 
@@ -118,7 +123,9 @@ v = fy * Y / Z + cy      # valid only for Z > 0
 
 Keep only points with `Z > 0` (in front of the camera) and `(u, v)` inside the
 image bounds — this implements the "∩ camera FoV" clip: the LiDAR sees 270°
-but the mask can only certify the camera's ~70–87°. Note `v` is *not*
+but the mask can only certify the colour camera's own, which is 71.6° as the sim
+renders it and is read off the driver's `camera_info` on hardware rather than
+assumed. Note `v` is *not*
 constant: the scan plane is at fixed height, so nearer points project to
 lower rows than farther ones. This is why the selection is a genuine 2D
 mask test, not just a column/bearing gate.
@@ -178,13 +185,23 @@ The recovery, identical for both tags:
    and no reordering by camera-frame bearing, which parallax can make
    non-monotonic), split wherever the range jumps by more than a
    discontinuity threshold. Range structure is the only split signal: a
-   beam-index gap is deliberately *not* one, because the partition feeds the
-   median-based band test in step 2, so splitting on missing beams re-cuts one
-   continuous surface into pieces whose medians straddle the band rather than
-   separating anything. Two objects at the same range across a gap merge back
-   regardless, which is what that split was once supposed to prevent.
-2. **Merge the near band**: take the nearest run, then merge every run whose
-   range lies within a small band of it. **Convention (pinned,
+   beam-index gap is deliberately *not* one. Two objects at the same range
+   across a gap merge back in step 2 regardless, which is what that split was
+   once supposed to prevent, so all it did was re-cut one continuous surface.
+2. **Merge the near band**: anchor on the **nearest point** in the profile, then
+   merge every run that *reaches* within `range_band_m` of it — a run is
+   represented by its **minimum**, not its median. The representative matters:
+   under a median the outcome depended on how points happened to be partitioned,
+   because splitting a run changes both pieces' medians and can pull a piece
+   *into* a band the whole run sat outside of. Minima cannot do that, so a finer
+   partition can only drop points, never add them, and the two thresholds become
+   independent — `range_jump_m` decides what is connected, `range_band_m` how
+   far a *disconnected* surface may sit.
+   Kept runs are kept **whole**, which is the point of segmenting at all:
+   connectivity vouches for the far end of a surface whose near end is in the
+   band, so an oblique face deeper than `range_band_m` survives instead of being
+   truncated at it.
+   **Convention (pinned,
    `docs/target_localization/target_localization_pipeline.md` §5):** on a legged object the nearest run
    alone would be one leg — range = that leg's face, laterally offset from the
    body center; merging the band averages both legs in range *and* bearing.
@@ -262,10 +279,14 @@ the pipeline publishes no substitute, zero, or stale value for that estimator.
 
 ### 4.1 Seeing which beams were used (implemented)
 
-`localize_polar_profiling` returns `selected_beams` and `merged_beams` alongside
-the estimate — indices into the **original scan array**, not the selected subset.
-`selected_beams` is the mask ∩ FoV select; `merged_beams` is what survived the
-near-band merge and is therefore what the estimate medians over.
+`localize_projected_polar_profiling` returns both beam sets as indices into the
+**original scan array**, not the selected subset. `selected_beams` — the mask ∩
+FoV select — sits on the returned `PolarProfilingAttempt`, because a **miss** has
+one too; `merged_beams`, what survived the near-band merge and therefore what the
+estimate medians over, sits on the `PolarProfilingResult` inside it, which only a
+hit has. Splitting them that way is why there is exactly one place to read each
+from. The standalone `localize_polar_profiling` wrapper returns only the result,
+so it does not report a selection at all.
 
 `target_mask_measurement_node` turns them into RViz markers on
 `visualization/target/polar_rays`, in three namespaces (`polar/used`,
@@ -300,13 +321,20 @@ disagrees by one beam at each edge, which would make the wedge and the rays
 contradict each other under a box gate, where they are the same set by
 definition.
 
-**Known divergence.** `perception/target_localization/core/rendering.py:polar_highlight_beams` still
+**Known divergence — now live.** `perception/target_localization/core/rendering.py:polar_highlight_beams`
 re-runs `segment_range_profile` + `merge_near_band` at *library defaults* to
-drive the 2D overlay panel, rather than reading the published indices. The node
-calls `localize_polar_profiling` with no kwargs, so the two agree today. The
-If the pipeline later exposes and passes non-default knobs, the 2D overlay panel
-and RViz rays could disagree. Routing the panel through the same indices belongs
-with any such scoped parameterization change.
+drive the 2D overlay panel, rather than reading the published indices. This was
+harmless while nothing could pass anything else. It no longer is: the three
+isolation settings are node parameters and launch arguments (§6), so a sweep
+setting `polar_range_band_m` moves the estimate and the RViz rays while the 2D
+panel keeps highlighting the default band. The panel is debug-only and the
+published measurement is unaffected, but during a sweep it does not depict the
+run it is drawn on. Routing the panel through the published indices is the fix.
+
+`target_overlay_node` also does its **own** `scan_points_optical` +
+`project_points` from the *latest* scan rather than the one matched within
+`scan_match_tolerance_s`, plus its own TF lookup, so the panel can diverge from
+the rays on a moving platform independently of any knob.
 
 **Known divergence.** This node ranks the nearest instance from its own three
 estimators, because nothing else has filled the batch by the time the rays are
@@ -328,8 +356,10 @@ and accepting a frame of coupling between the nodes.
   an image grid; actual end-to-end cost is a measurement question.
 - **No Y.** Planar only; never a standalone 3D source.
 - **Conditional availability.** Only fires when the scan plane intersects the
-  object — availability depends on object height and range, unlike projective
-  ranging / euclidean reconstruction which fire whenever the mask has valid depth.
+  object *and* projects inside the image — availability depends on object height
+  and range, unlike projective ranging / euclidean reconstruction which fire
+  whenever the mask has valid depth. The second condition puts a hard floor at
+  ≈1.27 m on this mount (§7.1), which no parameter can lift.
 - **Extrinsic + sync sensitivity.** A camera–LiDAR miscalibration or timestamp
   skew translates directly into wrong mask membership; the depth paths have no
   analogous inter-sensor coupling (their alignment is factory-calibrated or by
@@ -356,9 +386,19 @@ prevent the polar path from running.
 on `measurements/target/mask`. Its output names include the mask gate but no
 depth-source or rect-isolation token. No fallback measurement is substituted.
 
-`range_band_m`, `range_jump_m`, and `min_valid_rays`
-remain core function arguments: the current pipeline calls their defaults and
-does not expose them as launch sweep knobs. [Tests](../../src/ridgeback_autonomy/test/test_polar_profiling.py)
+`range_jump_m`, `range_band_m`, and `min_valid_rays` are node parameters and
+launch arguments — `polar_range_jump_m`, `polar_range_band_m`,
+`polar_min_valid_rays` — declared at exactly their shipped values, so a run that
+sets none of them is the run that was always happening. They are the only axes
+polar profiling has beyond the mask gate, and none of them reaches a depth row or
+the point cloud path. The `polar_` prefix is deliberate: `range_band_m` would sit
+one line from `isolation_2d_band_m` in the same node, and the two answer to
+different sensors — that one is a depth window around a camera anchor, this one a
+merge distance between LiDAR bearing runs.
+
+Neither the jump nor the band is grounded in a measurement, and the 0.30 jump is
+known to sit *below* the G1's own 0.4457 m fore/aft extent (§7).
+[Tests](../../src/ridgeback_autonomy/test/test_polar_profiling.py)
 cover synthetic profiles, mask membership, projection, and sparse failures.
 
 ## 7. Evidence and validation boundaries
@@ -368,6 +408,60 @@ LiDAR-row comparison and early scores. That baseline is not runnable today,
 and those results do not isolate a tuning effect from a surface/center offset.
 Any future tuning should compare against ground truth on existing clutter and
 occlusion scenes; exploration is only a qualitative check.
+
+### 7.1 A near-range floor the geometry imposes
+
+The scan plane sits **0.686 m below the camera** (camera optical origin 1.028 m
+above `base_link`, `lidar2d_0_laser` 0.342 m), so it projects to
+`v = fy·0.686/Z + cy`. At `fy = 443.53`, `cy = 240` on a 480-row frame:
+
+| target range | scan-plane row |
+|---|---|
+| 0.84 m | 602 — off-frame |
+| 1.09 m | 519 — off-frame |
+| **1.27 m** | **480 — the floor** |
+| 2.45 m | 364 |
+| 10.0 m | 270 |
+
+**Below ≈1.27 m the scan plane projects off the bottom of the image**, so the
+in-FoV clip (§2.3) removes every beam that could have hit the target and the mask
+can only ever select background. This is structural, not a tuning failure: no
+value of any parameter in §6 recovers it. It is a stronger condition than "the
+scan plane intersects the object", and it is the one that binds up close.
+
+### 7.2 Measured, 2026-09-09
+
+`artifacts/benchmarks/20260909_210559_polar_validation`, polar alone, box gate,
+full scenario set, 109 trials:
+
+| | scored | MAE | median | p95 |
+|---|---|---|---|---|
+| this run | 94 | 0.5774 | 0.0760 | 1.3565 |
+| minus 4 wall latches | 90 | 0.1687 | 0.0740 | 0.7333 |
+
+**Four trials carry 72 % of all error**, every one of them reporting the
+`wall_east` inner face at ~11.9 m instead of the target: `near_clip_03`
+(0.84 → 11.652), `near_clip_01` (1.09 → 11.693), `interfere_samerange_01`
+(2.45 → 11.689), `objpartial_04` (3.59 → 12.027). The first two are §7.1; the
+other two have an occluder standing in the scan plane (a table at 2.17 m, an IV
+pole at 2.37 m). All four are the same shape — the target contributes no beams,
+so the wall is the nearest run — and that is the parallax failure §4 records as
+**unguarded**.
+
+Read the median, not the MAE, when judging a change to §2.5: the core reduction
+is accurate and the distribution is all tail.
+
+Two caveats. The comparison point (`20260828_152011`, MAE 0.1496) predates the
+D455 render-pose fix, so it is a different camera setup, not a controlled A/B.
+And these numbers are *worse* than that baseline because the 10 m scan clip was
+removed (§2.1) — that clip was suppressing the wall by accident of this world's
+geometry, not guarding against it, and hiding the failure was judged worse than
+showing it.
+
+A mask-height consistency guard would catch all four (a G1 at range `Z` subtends
+`fy·1.3228/Z` px, and each latch is 3.4–9.6× too tall for the range it reports),
+but it is not implemented: choosing its threshold needs per-trial mask geometry,
+which is deliberately outside what this benchmark measures.
 
 [Calibration](../BACKLOG.md#camera-lidar-calibration) and
 [occlusion characterization](../BACKLOG.md#occlusion-characterization) remain
