@@ -241,15 +241,13 @@ def fill_path_measurements(
                     camera_translation, front_offset_m)
 
             if beam_records is not None:
-                if result_c is not None:
-                    selected, merged = result_c.selected_beams, result_c.merged_beams
-                else:
-                    selected = attempt.selected_beams
-                    merged = np.empty(0, dtype=np.intp)
+                # The attempt carries the selection on every path, so only the
+                # merged side depends on whether an estimate came out.
                 beam_records.append(PolarBeamRecord(
                     detection_index=index,
-                    selected=selected,
-                    merged=merged,
+                    selected=attempt.selected_beams,
+                    merged=(result_c.merged_beams if result_c is not None
+                            else np.empty(0, dtype=np.intp)),
                     in_bbox=select_bbox_beams(scan_projection, detection.bbox_xyxy),
                 ))
 

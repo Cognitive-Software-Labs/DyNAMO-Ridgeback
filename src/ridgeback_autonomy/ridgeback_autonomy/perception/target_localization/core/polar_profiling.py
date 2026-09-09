@@ -106,11 +106,11 @@ class PolarProfilingResult:
     """One polar profiling localization: a planar point in the camera optical frame."""
 
     xz_optical: np.ndarray  # (2,) X right, Z forward, meters; Y unobserved
-    # Beam indices into the ORIGINAL scan array, so a consumer can map an estimate
-    # back to the rays it came from without re-deriving the selection. Reporting
-    # both sides is the point: the gap between them is what the range segmentation
-    # threw away, which is how an occluder latch becomes visible.
-    selected_beams: np.ndarray  # (N,) the mask ∩ FoV select
+    # Indices into the ORIGINAL scan array, so a consumer can map an estimate back
+    # to the rays it came from without re-deriving the selection. The select side
+    # lives on the enclosing attempt instead, because a MISS has one too; the gap
+    # between the two is what the range segmentation threw away, which is how an
+    # occluder latch becomes visible.
     merged_beams: np.ndarray  # (M,) the near-band survivors -- what the estimate reduces
 
 
@@ -132,7 +132,11 @@ class ScanImageProjection:
 
 @dataclass(frozen=True)
 class PolarProfilingAttempt:
-    """One localization attempt, retaining its selection even on a miss."""
+    """One localization attempt, retaining its selection even on a miss.
+
+    ``selected_beams`` is the sole copy: it is set on every path, hit or miss,
+    so a consumer never has to ask which of two objects to read it from.
+    """
 
     result: PolarProfilingResult | None
     reason: MissReason
@@ -238,20 +242,34 @@ def merge_near_band(
     *,
     range_band_m: float = RANGE_BAND_M_DEFAULT,
 ) -> np.ndarray:
-    """Merge the runs within a range band of the nearest run (step 2).
+    """Merge the runs reaching within a range band of the nearest point (step 2).
 
     Convention (pinned, ``docs/target_localization/target_localization_pipeline.md`` Section 5): on a
     legged object the nearest run alone would be one leg; merging every run
-    whose median range lies within ``range_band_m`` of the nearest run's
-    median averages both legs in range and bearing. Returns the merged
-    position indices; background runs (parallax and neighbors) fall outside
-    the band and are dropped.
+    that reaches within ``range_band_m`` of the nearest one averages both legs
+    in range and bearing. Returns the merged position indices; background runs
+    (parallax and neighbors) fall outside the band and are dropped.
+
+    A run is represented by its **minimum**, not its median, and the anchor is
+    therefore the nearest point in the profile. Testing medians made the result
+    depend on how points happened to be partitioned: splitting one run into two
+    changes both pieces' medians, which can pull a piece INTO the band that the
+    whole run was outside of. Minima cannot do that -- splitting a run leaves
+    the piece holding the old minimum unchanged and can only raise the others,
+    so a finer partition can only drop points, never add them. It also makes
+    ``range_jump_m`` and ``range_band_m`` independent: one decides what is
+    connected, the other how far a DISCONNECTED surface may sit.
+
+    Kept runs are kept whole, which is the point of segmenting at all:
+    connectivity vouches for the far end of a surface whose near end is in the
+    band, so an oblique face deeper than ``range_band_m`` survives instead of
+    being truncated at it.
     """
 
     planar_range_m = np.asarray(planar_range_m, dtype=np.float64)
-    medians = [float(np.median(planar_range_m[run])) for run in runs]
-    nearest_m = min(medians)
-    kept = [run for run, median_m in zip(runs, medians) if median_m - nearest_m <= range_band_m]
+    minima = [float(planar_range_m[run].min()) for run in runs]
+    nearest_m = min(minima)
+    kept = [run for run, min_m in zip(runs, minima) if min_m - nearest_m <= range_band_m]
     return np.concatenate(kept)
 
 
@@ -400,7 +418,6 @@ def localize_projected_polar_profiling(
     return PolarProfilingAttempt(
         PolarProfilingResult(
             xz_optical=xz_optical,
-            selected_beams=beam_indices,
             # ``merged`` indexes into the selected set, not the scan, so map it back.
             merged_beams=beam_indices[merged],
         ),

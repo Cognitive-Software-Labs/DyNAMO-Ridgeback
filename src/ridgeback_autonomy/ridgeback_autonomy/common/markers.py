@@ -56,7 +56,9 @@ WEDGE_SEGMENTS = 24
 class PolarBeamRecord:
     """The beam sets for one detection, all indexing the original scan array.
 
-    ``selected`` and ``merged`` come straight from ``PolarProfilingResult``.
+    ``selected`` comes from the ``PolarProfilingAttempt`` and ``merged`` from its
+    ``PolarProfilingResult``, which is why a miss still fills the first: the
+    attempt has a selection whether or not an estimate came out of it.
     ``in_bbox`` is a superset of ``selected`` under a silhouette gate and equal to
     it under a box gate -- the difference is what the silhouette removed.
 

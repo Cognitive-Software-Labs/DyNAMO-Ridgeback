@@ -76,16 +76,18 @@ def test_two_legs_merge_drops_parallax_wall() -> None:
     points = two_legs_profile()
     mask = rasterize_bbox(MASK_BBOX, HEIGHT, WIDTH)
 
-    result, reason = localize_polar_profiling(
-        points, np.ones(points.shape[0], dtype=bool), mask, INTRINSICS)
+    projection = project_scan_to_image(
+        points, np.ones(points.shape[0], dtype=bool), INTRINSICS)
 
-    assert result is not None
-    assert reason is MissReason.OK
+    attempt = localize_projected_polar_profiling(projection, mask)
+
+    assert attempt.result is not None
+    assert attempt.reason is MissReason.OK
     # Both legs merged: X medians to the body center, Z to the leg depth.
-    assert np.allclose(result.xz_optical, (0.0, LEG_Z_M), atol=1e-6)
+    assert np.allclose(attempt.result.xz_optical, (0.0, LEG_Z_M), atol=1e-6)
     # Exactly the 9-beam legs survive (both sides); every wall beam is gone.
-    assert result.merged_beams.size == 18
-    assert result.selected_beams.size > 18  # wall beams did enter the mask select
+    assert attempt.result.merged_beams.size == 18
+    assert attempt.selected_beams.size > 18  # wall beams did enter the mask select
 
 
 def test_reported_beams_index_the_original_scan() -> None:
@@ -95,20 +97,23 @@ def test_reported_beams_index_the_original_scan() -> None:
     points = two_legs_profile()
     mask = rasterize_bbox(MASK_BBOX, HEIGHT, WIDTH)
 
-    result, _ = localize_polar_profiling(
-        points, np.ones(points.shape[0], dtype=bool), mask, INTRINSICS)
+    projection = project_scan_to_image(
+        points, np.ones(points.shape[0], dtype=bool), INTRINSICS)
 
-    assert result is not None
+    attempt = localize_projected_polar_profiling(projection, mask)
+
+    assert attempt.result is not None
+    merged = attempt.result.merged_beams
     assert np.allclose(
-        np.median(points[result.merged_beams][:, (0, 2)], axis=0), result.xz_optical)
-    assert set(result.merged_beams.tolist()) <= set(result.selected_beams.tolist())
+        np.median(points[merged][:, (0, 2)], axis=0), attempt.result.xz_optical)
+    assert set(merged.tolist()) <= set(attempt.selected_beams.tolist())
 
     # The gap between the two sets is exactly the parallax wall the segmentation
     # discarded -- the beams a "dropped" overlay exists to show.
-    dropped = np.setdiff1d(result.selected_beams, result.merged_beams)
+    dropped = np.setdiff1d(attempt.selected_beams, merged)
     assert dropped.size > 0
     assert np.allclose(points[dropped][:, 2], WALL_Z_M)
-    assert np.allclose(points[result.merged_beams][:, 2], LEG_Z_M)
+    assert np.allclose(points[merged][:, 2], LEG_Z_M)
 
 
 def test_bbox_beams_equal_mask_beams_under_a_box_gate() -> None:
@@ -197,7 +202,6 @@ def test_projected_localization_matches_legacy_and_retains_failed_selection() ->
 
     assert attempt.reason is legacy_reason is MissReason.OK
     assert np.array_equal(attempt.result.xz_optical, legacy_result.xz_optical)
-    assert np.array_equal(attempt.result.selected_beams, legacy_result.selected_beams)
     assert np.array_equal(attempt.result.merged_beams, legacy_result.merged_beams)
 
     sparse_points = profile_points(
@@ -258,7 +262,7 @@ def test_tight_tag_runs_identical_recovery() -> None:
 
     assert rect_result is not None and tight_result is not None
     assert np.array_equal(rect_result.xz_optical, tight_result.xz_optical)
-    assert np.array_equal(rect_result.selected_beams, tight_result.selected_beams)
+    assert np.array_equal(rect_result.merged_beams, tight_result.merged_beams)
 
 
 def test_wall_behind_single_object_rejected() -> None:
@@ -349,6 +353,37 @@ def test_beam_gaps_do_not_separate_two_objects_at_the_same_range() -> None:
     merged = merge_near_band(runs, planar_range_m)
 
     assert merged.tolist() == [0, 1, 2, 3, 4, 5]
+
+
+def test_merge_near_band_is_not_swayed_by_how_runs_are_partitioned() -> None:
+    """Splitting a run must not pull points INTO the band.
+
+    The band anchors on the nearest point and represents each run by its
+    minimum. Under the old median representative these two partitions of the
+    same profile disagreed: as one run the median was 2.09, outside a 0.35 band
+    from the 1.55 anchor, so all three points dropped; split apart, the 1.82
+    piece's median was its own value and fell inside. Minima cannot do that.
+    """
+
+    planar_range_m = np.array([1.55, 2.38, 2.09, 1.82])
+    whole = [np.array([0]), np.array([1, 2, 3])]
+    split = [np.array([0]), np.array([1]), np.array([2]), np.array([3])]
+
+    # Connectivity vouches for the whole run: its minimum (1.82) is within the
+    # band of the 1.55 anchor, so the deeper points come along.
+    assert merge_near_band(whole, planar_range_m).tolist() == [0, 1, 2, 3]
+    # A finer partition can only DROP the pieces that do not reach the band.
+    assert merge_near_band(split, planar_range_m).tolist() == [0, 3]
+
+
+def test_merge_near_band_keeps_a_surface_deeper_than_the_band() -> None:
+    """One connected oblique face is not truncated at ``range_band_m``."""
+
+    planar_range_m = np.array([3.0, 3.2, 3.4, 3.6])
+    runs = [np.arange(4)]
+
+    # Spread is 0.6 m, well past the 0.35 band, but it is all one surface.
+    assert merge_near_band(runs, planar_range_m).tolist() == [0, 1, 2, 3]
 
 
 def test_merge_near_band_keeps_both_legs_only() -> None:
