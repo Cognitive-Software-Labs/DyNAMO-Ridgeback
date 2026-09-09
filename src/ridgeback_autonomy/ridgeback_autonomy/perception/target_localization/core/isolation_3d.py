@@ -15,7 +15,7 @@ recipe cannot be built without one.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
 
 import numpy as np
 
@@ -245,27 +245,61 @@ def build_isolation_3d(
     name: str,
     camera_height_m: float,
     down_optical: tuple[float, float, float],
+    *,
+    floor_margin_m: float | None = None,
+    percentile: float | None = None,
+    ahead_m: float | None = None,
+    behind_m: float | None = None,
+    bin_width_m: float | None = None,
+    min_bin_fraction: float | None = None,
 ):
-    """Build the named recipe with its floor crop set to a specific camera pose.
+    """Build the named recipe at a specific camera pose and set of settings.
 
     The only constructor for an ``ISOLATION_3D_NAMES`` recipe: any
     ``HeightCrop`` step is built at the given pose (typically straight from
     ``camera_floor_geometry``), so no caller can end up cropping against a mount
     that is not the live one. The background-separators take no pose -- they
-    work on rotation-invariant camera-frame ranges -- so they are unchanged.
+    work on rotation-invariant camera-frame ranges.
+
+    The keyword settings are the numbers the recipes above declare as field
+    defaults, and the reason those numbers are reachable from a launch argument
+    at all. Steps take different subsets -- ``HeightCrop`` has only a margin,
+    ``RangeBand`` anchors on a percentile where ``NearestModeBand`` histograms
+    -- so each value is bound only to the steps that accept it, and one a step
+    does not take is ignored rather than raising: one launch argument spans
+    every recipe, and a sweep varying the window across both separators must
+    not fail on the one with fewer knobs. ``None`` means "leave the step's own
+    default", so a caller that sets nothing gets exactly the shipped recipe.
     """
 
-    height_crop = HeightCrop(
-        camera_height_m=camera_height_m, down_optical=down_optical)
+    requested = {
+        'floor_margin_m': floor_margin_m,
+        'percentile': percentile,
+        'ahead_m': ahead_m,
+        'behind_m': behind_m,
+        'bin_width_m': bin_width_m,
+        'min_bin_fraction': min_bin_fraction,
+    }
+
+    def step(cls, **fixed):
+        accepted = {field.name for field in fields(cls)}
+        return cls(**fixed, **{
+            key: float(value)
+            for key, value in requested.items()
+            if value is not None and key in accepted
+        })
+
+    height_crop = step(
+        HeightCrop, camera_height_m=camera_height_m, down_optical=down_optical)
     if name == 'height_crop':
         return height_crop
     if name == 'range_band':
-        return RangeBand()
+        return step(RangeBand)
     if name == 'nearest_mode_band':
-        return NearestModeBand()
+        return step(NearestModeBand)
     if name == 'height_crop_range_band':
-        return Chain((height_crop, RangeBand()))
+        return Chain((height_crop, step(RangeBand)))
     if name == 'height_crop_nearest_mode_band':
-        return Chain((height_crop, NearestModeBand()))
+        return Chain((height_crop, step(NearestModeBand)))
     supported = ', '.join(sorted(ISOLATION_3D_NAMES))
     raise ValueError(f'Unknown isolation_3d recipe "{name}". Expected one of: {supported}')

@@ -1636,6 +1636,57 @@ def test_otsu_takes_the_bin_width_and_ignores_the_band(ros_context) -> None:
         node.destroy_node()
 
 
+def test_isolation_3d_recipe_numbers_reach_the_rebuilt_recipe(ros_context) -> None:
+    """The 3D recipe's numbers are configurable, same as the 2D ones.
+
+    They were import-time field defaults with no parameter, so the shipped
+    default recipe -- the one production actually runs -- was the only recipe on
+    either side whose numbers no configuration could reach.
+    """
+
+    node = _mask_node(
+        _StubDepthSource('depth'),
+        isolation_3d='height_crop_nearest_mode_band',
+        isolation_3d_floor_margin_m=0.08,
+        isolation_3d_ahead_m=0.02,
+        isolation_3d_behind_m=0.75,
+        isolation_3d_bin_width_m=0.02,
+        isolation_3d_min_bin_fraction=0.15,
+    )
+    try:
+        # Built per frame against the live TF pose, so the settings are what the
+        # node stores; this is the same call the batch path makes.
+        height_crop, band = build_isolation_3d(
+            node.isolation_3d_name, 1.2, (0.0, 1.0, 0.0),
+            **node.isolation_3d_settings).steps
+
+        assert height_crop.floor_margin_m == 0.08
+        assert (band.ahead_m, band.behind_m) == (0.02, 0.75)
+        assert (band.bin_width_m, band.min_bin_fraction) == (0.02, 0.15)
+    finally:
+        node.destroy_node()
+
+
+def test_range_band_takes_the_percentile_and_ignores_the_bin_width(ros_context) -> None:
+    # One launch argument set spans every recipe, so selecting a separator with
+    # different knobs must not fail on the ones it does not have.
+    node = _mask_node(
+        _StubDepthSource('depth'),
+        isolation_3d='range_band',
+        isolation_3d_percentile=40.0,
+        isolation_3d_bin_width_m=0.02,
+    )
+    try:
+        band = build_isolation_3d(
+            node.isolation_3d_name, 1.2, (0.0, 1.0, 0.0),
+            **node.isolation_3d_settings)
+
+        assert band.percentile == 40.0
+        assert not hasattr(band, 'bin_width_m')
+    finally:
+        node.destroy_node()
+
+
 def test_unknown_isolation_2d_recipe_is_rejected_by_name(ros_context) -> None:
     with pytest.raises(ValueError, match='Unknown isolation_2d recipe'):
         _mask_node(_StubDepthSource('depth'), isolation_2d='not_a_recipe')

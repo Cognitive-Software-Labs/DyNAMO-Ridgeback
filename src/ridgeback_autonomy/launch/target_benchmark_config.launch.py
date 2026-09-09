@@ -46,8 +46,14 @@ from ridgeback_autonomy.perception.target_localization.core.depth_common import 
     NEAREST_MODE_BIN_WIDTH_M_DEFAULT,
     NEAREST_MODE_MIN_BIN_FRACTION_DEFAULT,
 )
-from ridgeback_autonomy.perception.target_localization.core.isolation_3d import ISOLATION_3D_DEFAULT
+from ridgeback_autonomy.perception.target_localization.core.isolation_3d import (
+    FLOOR_MARGIN_M_DEFAULT,
+    ISOLATION_3D_DEFAULT,
+)
 from ridgeback_autonomy.perception.target_localization.core.ranging_defaults import (
+    FRONT_PERCENTILE,
+    INLIER_AHEAD_MARGIN_M,
+    INLIER_BEHIND_MARGIN_M,
     MIN_VALID_SAMPLES,
     NEAR_SURFACE_BAND_M,
 )
@@ -107,6 +113,14 @@ def build_benchmark_nodes(context, *args, **kwargs):
                 'isolation_2d_min_bin_fraction'),
             min_valid_pixels=LaunchConfiguration('min_valid_pixels'),
             isolation_3d=LaunchConfiguration('isolation_3d'),
+            isolation_3d_floor_margin_m=LaunchConfiguration(
+                'isolation_3d_floor_margin_m'),
+            isolation_3d_percentile=LaunchConfiguration('isolation_3d_percentile'),
+            isolation_3d_ahead_m=LaunchConfiguration('isolation_3d_ahead_m'),
+            isolation_3d_behind_m=LaunchConfiguration('isolation_3d_behind_m'),
+            isolation_3d_bin_width_m=LaunchConfiguration('isolation_3d_bin_width_m'),
+            isolation_3d_min_bin_fraction=LaunchConfiguration(
+                'isolation_3d_min_bin_fraction'),
             mask_gate=LaunchConfiguration('mask_gate'),
             color_topic=camera_inputs.color_image_topic,
             depth_max_meters=LaunchConfiguration('mask_depth_max_meters'),
@@ -173,12 +187,22 @@ def build_benchmark_nodes(context, *args, **kwargs):
             'mask_depth_max_meters': LaunchConfiguration('mask_depth_max_meters'),
             # Recorded, not applied, for the same reason: run.json is where a
             # sweep's per-config parameter values are read back from, and these
-            # four are the axes the projective-parameter sweep varies.
+            # are the axes a recipe sweep varies -- on either side, so the
+            # euclidean row's numbers are recoverable from an archived run the
+            # same way the projective row's already were.
             'isolation_2d_bin_width_m': LaunchConfiguration('isolation_2d_bin_width_m'),
             'isolation_2d_band_m': LaunchConfiguration('isolation_2d_band_m'),
             'isolation_2d_min_bin_fraction': LaunchConfiguration(
                 'isolation_2d_min_bin_fraction'),
             'min_valid_pixels': LaunchConfiguration('min_valid_pixels'),
+            'isolation_3d_floor_margin_m': LaunchConfiguration(
+                'isolation_3d_floor_margin_m'),
+            'isolation_3d_percentile': LaunchConfiguration('isolation_3d_percentile'),
+            'isolation_3d_ahead_m': LaunchConfiguration('isolation_3d_ahead_m'),
+            'isolation_3d_behind_m': LaunchConfiguration('isolation_3d_behind_m'),
+            'isolation_3d_bin_width_m': LaunchConfiguration('isolation_3d_bin_width_m'),
+            'isolation_3d_min_bin_fraction': LaunchConfiguration(
+                'isolation_3d_min_bin_fraction'),
             # The recorder screen-grabs the RViz window, which competes with
             # the simulator's render path. Turn it off for timing runs and take
             # visual integrity from a separate smoke run instead.
@@ -319,6 +343,52 @@ def generate_launch_description():
             'isolation_3d',
             default_value=ISOLATION_3D_DEFAULT,
             description='Euclidean-reconstruction box-gate foreground recipe',
+        ),
+        # The selected 3D recipe's own numbers, on the same terms as the 2D set
+        # above. Separate arguments from their 2D namesakes: the 2D histogram
+        # bins optical Z and the 3D one bins euclidean range, so a single
+        # argument could not honestly set both.
+        DeclareLaunchArgument(
+            'isolation_3d_floor_margin_m',
+            default_value=str(FLOOR_MARGIN_M_DEFAULT),
+            description=(
+                'Height above the floor a point must clear to survive the '
+                'ground-plane crop (height_crop steps only)'
+            ),
+        ),
+        DeclareLaunchArgument(
+            'isolation_3d_percentile',
+            default_value=str(FRONT_PERCENTILE),
+            description=(
+                'Range percentile the inlier window anchors on '
+                '(range_band only)'
+            ),
+        ),
+        DeclareLaunchArgument(
+            'isolation_3d_ahead_m',
+            default_value=str(INLIER_AHEAD_MARGIN_M),
+            description='Inlier window kept in front of the anchor range',
+        ),
+        DeclareLaunchArgument(
+            'isolation_3d_behind_m',
+            default_value=str(INLIER_BEHIND_MARGIN_M),
+            description='Inlier window kept behind the anchor range',
+        ),
+        DeclareLaunchArgument(
+            'isolation_3d_bin_width_m',
+            default_value=str(NEAREST_MODE_BIN_WIDTH_M_DEFAULT),
+            description=(
+                'Range-histogram bin width of the isolation_3d recipe '
+                '(nearest_mode_band only)'
+            ),
+        ),
+        DeclareLaunchArgument(
+            'isolation_3d_min_bin_fraction',
+            default_value=str(NEAREST_MODE_MIN_BIN_FRACTION_DEFAULT),
+            description=(
+                'Fraction of ranges a bin must hold to anchor on it '
+                '(nearest_mode_band only)'
+            ),
         ),
         DeclareLaunchArgument(
             'mask_depth_max_meters',

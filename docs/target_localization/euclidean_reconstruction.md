@@ -161,7 +161,8 @@ remove target points or retain floor points; this is not plane fitting.
 
 **Percentile range band.** `RangeBand` anchors at the 25th percentile of
 Euclidean camera-frame range and retains the interval from `0.10 m` ahead to
-`0.35 m` behind. Those defaults live in `core/ranging_defaults.py`. The values
+`0.35 m` behind. Those defaults live in `core/ranging_defaults.py`, shared with
+the pointcloud estimator whose isolation this ports. The values
 come from the original G1 tuning and are not automatically target-generic. If
 background dominates the box, the percentile can anchor on it. This recipe
 remains selectable but is no longer the default.
@@ -172,8 +173,17 @@ It reduces dependence on background proportions but still assumes that the
 nearest significant surface is the target. A nearer occluder can therefore win.
 The default chain removes floor before applying this step.
 
-Recipe names are launch-selectable; `build_isolation_3d` supplies live
-floor-geometry parameters where required. Tests in
+Recipe names are launch-selectable, and so are the six numbers the steps tune
+on: `isolation_3d_floor_margin_m`, `isolation_3d_percentile`,
+`isolation_3d_ahead_m`, `isolation_3d_behind_m`, `isolation_3d_bin_width_m` and
+`isolation_3d_min_bin_fraction`, plus the depth rows' shared `min_valid_pixels`.
+`build_isolation_3d` supplies live floor-geometry parameters where required,
+binds each number onto the steps that declare it, and drops the ones a step does
+not accept, so one argument set spans every recipe. Every default is the
+constant the step already used, so leaving them unset is the behaviour that
+shipped. The bin-width and bin-fraction arguments are separate from their
+`isolation_2d_` namesakes on purpose: the 2D histogram bins optical Z and this
+one bins Euclidean range, and the two diverge for an off-axis target. Tests in
 [`test_isolation_3d.py`](../../src/ridgeback_autonomy/test/test_isolation_3d.py)
 cover registered chains, pose-dependent crops, empty selections, and selection
 behavior. Comparative validation is tracked in

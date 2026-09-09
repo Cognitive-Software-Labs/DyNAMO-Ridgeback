@@ -104,8 +104,14 @@ from ridgeback_autonomy.perception.target_localization.core.depth_common import 
 )
 from ridgeback_autonomy.perception.target_localization.core.image_utils import convert_color_image_message
 from ridgeback_autonomy.perception.target_localization.core.isolation_2d import ISOLATION_2D_DEFAULT
-from ridgeback_autonomy.perception.target_localization.core.isolation_3d import ISOLATION_3D_DEFAULT
+from ridgeback_autonomy.perception.target_localization.core.isolation_3d import (
+    FLOOR_MARGIN_M_DEFAULT,
+    ISOLATION_3D_DEFAULT,
+)
 from ridgeback_autonomy.perception.target_localization.core.ranging_defaults import (
+    FRONT_PERCENTILE,
+    INLIER_AHEAD_MARGIN_M,
+    INLIER_BEHIND_MARGIN_M,
     MIN_VALID_SAMPLES,
     NEAR_SURFACE_BAND_M,
 )
@@ -194,15 +200,25 @@ class TargetDistanceBenchmarkRunner(Node):
         # Declared so declared_parameters() records the gate the mask rows ran
         # under. The runner itself never applies it.
         self.declare_parameter('mask_depth_max_meters', DEPTH_GATE_DISABLED)
-        # Record-only for the same reason: the projective-parameter sweep varies
-        # these per config, and run.json is where the value a config actually
-        # ran at is read back from.
+        # Record-only for the same reason: a recipe sweep varies these per
+        # config, and run.json is where the value a config actually ran at is
+        # read back from. Both rows' recipe settings are recorded, so an
+        # archived euclidean run is as reconstructable as a projective one.
         self.declare_parameter(
             'isolation_2d_bin_width_m', NEAREST_MODE_BIN_WIDTH_M_DEFAULT)
         self.declare_parameter('isolation_2d_band_m', NEAR_SURFACE_BAND_M)
         self.declare_parameter(
             'isolation_2d_min_bin_fraction', NEAREST_MODE_MIN_BIN_FRACTION_DEFAULT)
         self.declare_parameter('min_valid_pixels', MIN_VALID_SAMPLES)
+        self.declare_parameter(
+            'isolation_3d_floor_margin_m', FLOOR_MARGIN_M_DEFAULT)
+        self.declare_parameter('isolation_3d_percentile', FRONT_PERCENTILE)
+        self.declare_parameter('isolation_3d_ahead_m', INLIER_AHEAD_MARGIN_M)
+        self.declare_parameter('isolation_3d_behind_m', INLIER_BEHIND_MARGIN_M)
+        self.declare_parameter(
+            'isolation_3d_bin_width_m', NEAREST_MODE_BIN_WIDTH_M_DEFAULT)
+        self.declare_parameter(
+            'isolation_3d_min_bin_fraction', NEAREST_MODE_MIN_BIN_FRACTION_DEFAULT)
 
         # Screen recording of the RViz window for the length of the run. The
         # collages freeze one frame per trial; this keeps the motion around it.

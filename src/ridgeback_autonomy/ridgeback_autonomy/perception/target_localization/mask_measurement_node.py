@@ -101,6 +101,7 @@ from ridgeback_autonomy.perception.target_localization.core.isolation_2d import 
 )
 from ridgeback_autonomy.perception.target_localization.core.isolation_3d import (
     BASE_ABOVE_FLOOR_M_DEFAULT,
+    FLOOR_MARGIN_M_DEFAULT,
     ISOLATION_3D_DEFAULT,
     ISOLATION_3D_NAMES,
     build_isolation_3d,
@@ -115,6 +116,9 @@ from ridgeback_autonomy.perception.target_localization.core.polar_profiling impo
     scan_points_optical,
 )
 from ridgeback_autonomy.perception.target_localization.core.ranging_defaults import (
+    FRONT_PERCENTILE,
+    INLIER_AHEAD_MARGIN_M,
+    INLIER_BEHIND_MARGIN_M,
     MIN_VALID_SAMPLES,
     NEAR_SURFACE_BAND_M,
 )
@@ -226,6 +230,22 @@ class TargetMaskMeasurementNode(Node):
         # behind it could not fire at all -- see fill_path_measurements.
         self.declare_parameter('min_valid_pixels', MIN_VALID_SAMPLES)
         self.declare_parameter('isolation_3d', ISOLATION_3D_DEFAULT)
+        # The selected 3D recipe's own numbers, on the same terms as the 2D set
+        # above: declared at exactly their shipped values, so an unset run is
+        # the run that was always happening, and a step that does not take one
+        # ignores it (build_isolation_3d). They are separate parameters from the
+        # 2D ones on purpose even where the name repeats -- the 2D histogram
+        # bins optical Z, the 3D one bins euclidean range, and the two diverge
+        # for an off-axis target, so one argument could not honestly set both.
+        self.declare_parameter(
+            'isolation_3d_floor_margin_m', FLOOR_MARGIN_M_DEFAULT)
+        self.declare_parameter('isolation_3d_percentile', FRONT_PERCENTILE)
+        self.declare_parameter('isolation_3d_ahead_m', INLIER_AHEAD_MARGIN_M)
+        self.declare_parameter('isolation_3d_behind_m', INLIER_BEHIND_MARGIN_M)
+        self.declare_parameter(
+            'isolation_3d_bin_width_m', NEAREST_MODE_BIN_WIDTH_M_DEFAULT)
+        self.declare_parameter(
+            'isolation_3d_min_bin_fraction', NEAREST_MODE_MIN_BIN_FRACTION_DEFAULT)
         # Height of the base origin above the floor, added to the TF
         # camera-above-base height to place the euclidean floor crop per frame.
         self.declare_parameter('base_above_floor_m', BASE_ABOVE_FLOOR_M_DEFAULT)
@@ -287,9 +307,18 @@ class TargetMaskMeasurementNode(Node):
         )
         self.min_valid_pixels = int(self.get_parameter('min_valid_pixels').value)
         # The 3D recipe is rebuilt per frame with the TF-derived floor pose, so
-        # store the validated name (not a pre-built callable) and the offset.
+        # store the validated name (not a pre-built callable), the offset, and
+        # the settings to rebuild it with -- read once here rather than per
+        # frame, since parameters do not change mid-run.
         self.isolation_3d_name = self.resolve_recipe_name(
             'isolation_3d', ISOLATION_3D_NAMES)
+        self.isolation_3d_settings = {
+            key: float(self.get_parameter(f'isolation_3d_{key}').value)
+            for key in (
+                'floor_margin_m', 'percentile', 'ahead_m', 'behind_m',
+                'bin_width_m', 'min_bin_fraction',
+            )
+        }
         self.base_above_floor_m = float(
             self.get_parameter('base_above_floor_m').value)
         self.mask_gate = resolve_mask_gate(self.get_parameter('mask_gate').value)
@@ -732,7 +761,8 @@ class TargetMaskMeasurementNode(Node):
                             camera_rotation, camera_translation,
                             self.base_above_floor_m)
                         isolation_3d = build_isolation_3d(
-                            self.isolation_3d_name, camera_height_m, camera_down_optical)
+                            self.isolation_3d_name, camera_height_m,
+                            camera_down_optical, **self.isolation_3d_settings)
                         depth_m = self.depth_for_batch(
                             depth_input_msg, batch, prepared_color=prepared_color)
                         self.publish_aligned_depth_debug(

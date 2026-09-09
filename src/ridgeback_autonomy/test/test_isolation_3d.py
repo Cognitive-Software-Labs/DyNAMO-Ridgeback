@@ -340,6 +340,57 @@ def test_build_isolation_3d_parameterizes_heightcrop_in_the_mode_chain() -> None
     assert isinstance(band, NearestModeBand)
 
 
+def test_build_isolation_3d_binds_each_setting_to_the_steps_that_take_it() -> None:
+    """One argument set spans every recipe; a step ignores what it has no field for.
+
+    ``HeightCrop`` has only a margin and ``RangeBand`` anchors on a percentile
+    where ``NearestModeBand`` histograms, so forwarding the whole set to each
+    would be a ``TypeError`` on any sweep that varies the window across both
+    separators.
+    """
+
+    settings = dict(
+        floor_margin_m=0.08, percentile=40.0, ahead_m=0.02, behind_m=0.75,
+        bin_width_m=0.02, min_bin_fraction=0.15)
+
+    height_crop, range_band = build_isolation_3d(
+        'height_crop_range_band', 1.2, LEVEL_DOWN_OPTICAL, **settings).steps
+    assert height_crop == HeightCrop(1.2, LEVEL_DOWN_OPTICAL, floor_margin_m=0.08)
+    assert range_band == RangeBand(percentile=40.0, ahead_m=0.02, behind_m=0.75)
+
+    _, mode_band = build_isolation_3d(
+        'height_crop_nearest_mode_band', 1.2, LEVEL_DOWN_OPTICAL, **settings).steps
+    assert mode_band == NearestModeBand(
+        ahead_m=0.02, behind_m=0.75, bin_width_m=0.02, min_bin_fraction=0.15)
+
+
+def test_build_isolation_3d_without_settings_is_the_shipped_recipe() -> None:
+    # The safety property the launch plumbing rests on: a caller that sets
+    # nothing gets exactly the behaviour that shipped before it existed.
+    _, band = build_isolation_3d(
+        'height_crop_nearest_mode_band', 1.2, LEVEL_DOWN_OPTICAL).steps
+    assert band == NearestModeBand()
+    assert build_isolation_3d('range_band', 1.2, LEVEL_DOWN_OPTICAL) == RangeBand()
+    assert build_isolation_3d(
+        'height_crop', 1.2, LEVEL_DOWN_OPTICAL) == HeightCrop(1.2, LEVEL_DOWN_OPTICAL)
+
+
+def test_built_floor_margin_moves_what_the_crop_drops() -> None:
+    """A bound value reaches the step, and the axis moves the result.
+
+    A point 0.06 m above the floor clears the shipped 0.05 m margin and fails a
+    0.08 m one. Without the argument that margin was an import-time constant no
+    configuration could reach.
+    """
+
+    # Level mount, so gravity-down is +Y and height above floor is 1.2 - y.
+    point = np.array([[0.0, 1.2 - 0.06, 3.0]])
+
+    assert build_isolation_3d('height_crop', 1.2, LEVEL_DOWN_OPTICAL)(point).all()
+    assert not build_isolation_3d(
+        'height_crop', 1.2, LEVEL_DOWN_OPTICAL, floor_margin_m=0.08)(point).any()
+
+
 def test_build_isolation_3d_rejects_unknown_name() -> None:
     with pytest.raises(ValueError, match='Unknown isolation_3d recipe'):
         build_isolation_3d(
