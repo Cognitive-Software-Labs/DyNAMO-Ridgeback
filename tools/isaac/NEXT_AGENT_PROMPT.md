@@ -1,71 +1,54 @@
-# Continue the Isaac Sim 6.0 port — P5 (E2E exploration + A/B sign-off)
+# Continue the Isaac Sim 6.0 port — validate the post-P7 batch, then P8
 
 You are picking up an in-flight port of a Ridgeback autonomy stack from
 Gazebo Harmonic to **Isaac Sim 6.0 GA**. Work happens ONLY in the worktree
-`/home/deivid/dev/DyNAMO-Ridgeback/.claude/worktrees/jolly-borg-f48cab` on
-branch `feat/isaac-sim-6-port` — the main checkout stays on `dev`.
+`/home/deivid/dev/DyNAMO-Ridgeback/.claude/worktrees/isaac` on branch
+`feat/isaac-sim-6-port` — the main checkout stays on its own branch.
 
 ## Read these first, in order
 
 1. Your memory file `isaac-sim-6-port` (the 6.0.1 landmine list + the SLAM
    root-cause paragraph — trust it, do not rediscover). Also skim
    `nav-tuning-in-flight` and `shared-dev-box-contention`.
-2. `tools/isaac/PORT_PLAN.md` — the authoritative 9-phase plan. **P0–P4 done,
-   P5 is next.** Phase checkboxes are kept current; keep them current.
-3. `tools/isaac/SLAM_QUALITY_REPORT.md` — the sensor pipeline was just
-   overhauled (3 bugs fixed). This is now the source of truth for how the
-   RTX lidar reaches ROS; the old P4 "270° ROI honored" claim was WRONG.
-4. `AI_CONTEXT.md` (repo conventions, doc ownership: README/AI_CONTEXT/ISSUES),
-   and `ISSUES.md` (troubleshooting + the new lidar entry).
+2. `tools/isaac/PORT_PLAN.md` — the authoritative 9-phase plan. **P0–P4 + P7
+   done; P5 plumbing done, A/B sign-off open; a post-P7 batch landed
+   2026-09-02 unvalidated; P6 deferred; P8 next.** Phase checkboxes are kept
+   current; keep them current.
+3. `tools/isaac/SLAM_QUALITY_REPORT.md` — source of truth for how the RTX
+   lidar reaches ROS. The old P4 "270° ROI honored" claim was WRONG; the
+   assembler synthesizes the 270° contract scan from two OmniLidar prims.
+4. `AI_CONTEXT.md` (repo conventions, doc ownership: README/AI_CONTEXT/ISSUES)
+   and `ISSUES.md` (troubleshooting + the lidar entry). Note: AI_CONTEXT.md
+   still has **zero** Isaac content — that rewrite is P8 scope, not drift.
 
-## State as of this handoff (2026-07-12)
+## State as of this handoff (2026-09-10)
 
-- **Just landed** (branch tip): SLAM-quality investigation. The rotation-
-  smeared maps were NOT slam params — they were three Isaac 6.0.1 sensor
-  bugs (bridge laser_scan writer hardcodes 360° for ROTARY; rotary model
-  fires only 180°/tick so one prim is half-blind; runner starved ROS
-  callbacks). Fixed in `66493670` + `e1862498`. Lidar now publishes point
-  clouds from TWO OmniLidar prims per frame; `ros_io.LidarScanAssembler`
-  bins them into the true 270° contract `LaserScan`. Verified: 40 Hz
-  sim-time, full FOV, closed-loop pose RMSE 0.19–0.23 m, loop error 7–9 cm,
-  map IoU ~0.55.
-- Committed slam config change: `link_match_minimum_response_fine 0.1 → 0.8`
-  in `slam_toolbox_params.yaml` (only surviving delta; travel-gating measured
-  strictly worse, kept at 0.0/0.0).
-- New reusable harness under `tools/isaac/`: `gt_occupancy.py` (analytic GT
-  grid from SDF), `slam_quality_probe.py` (GT-feedback closed loop + metrics
-  + overlay), `scan_geometry_check.py` (sensor regression check). These feed
-  the P5 gate directly.
-- Working tree is clean. There may be a windowed sim + rviz still running on
-  the user's VNC display from the demo — check `ps aux | grep isaac_runner`;
-  kill by PID if you need a clean box (`ps aux | grep X | grep -v grep`, NOT
-  `pgrep -f` in a loop — it self-matches, see gotcha below).
+- Branch tip `1a4079b9`, clean tree, in sync with `origin`, contains all of
+  `master` (74 commits ahead, 0 behind).
+- **Post-P7 batch (2026-09-02) is landed but NOT re-validated** — see the
+  dedicated PORT_PLAN section. Three commits: `warehouse_full` GT map,
+  `LidarScanAssembler` stale-bin fix + wheel `JointState`, and the new
+  `scan_merger_node` (`slam_source:=merged`, default under `sim:=isaac`).
+  They were measured in a since-discarded working tree; nothing has been run
+  from this checkout against a fresh Isaac boot.
+- **P5 A/B remains unsigned.** Not a code bug — a measurement problem.
+  Coverage variance is 51–83% run-to-run; `odom_noise=1.0` costs ~10 pts and
+  2× aborts; residual drift is scan-match rotation. Firm numbers need 3–5
+  seeds per condition on a single-tenant box, which this one never is.
+- **P6 untouched.** The G1 benchmark still runs the gz spawn/remove/pose
+  plumbing.
 
-## Your objective: P5 — E2E exploration + sign-off
+## Your objective
 
-Exact scope and acceptance are in `PORT_PLAN.md` §P5. Summary:
-
-1. **`ridgeback_exploration.launch.py`**: forward a `sim:=gz|isaac` arg down
-   the include chain; set `sim_ready_timeout` (45 s gz / 300 s isaac) on the
-   first readiness gate. Add the HUD localization-error panel (GT pose vs
-   SLAM `map→base_link`) — the TF-vs-GT computation already exists in
-   `slam_quality_probe.py`, reuse it.
-2. **`tools/isaac/ab_compare.py`** (new): gz-vs-isaac results table —
-   coverage complete/accuracy, time-to-complete, achieved RTF, aborts,
-   success, isaac localization error.
-3. **Run the A/B matrix** on mock_hospital via the real exploration
-   entrypoint (`bash start_exploration.sh mock_hospital sim:=isaac`), NOT the
-   diagnostic probe — the probe was a SLAM-quality tool; P5 exercises the
-   actual nav2 + frontier_explorer stack.
-
-**Acceptance (from the plan):** 3/3 isaac runs complete; coverage-complete
-≥ gz mean − 10 pts (loose — sensors differ by design); genuine aborts ≤ gz
-max; achieved RTF ≥ 0.8 throttled; one `--rtf 0` run finishes faster
-wall-clock. gz baseline numbers are in `tools/isaac/baseline/`.
-
-Confirm scope with the user before you start building `ab_compare.py` — the
-gz baseline capture and the exact comparison columns are the kind of thing
-worth a 30-second check.
+1. **Validate the post-P7 batch, `odom_noise:=0` first.** Perfect odom is the
+   right starting condition: the merger motion-compensates the rear scan
+   through the odom→base_link chain, so zero-noise odom isolates the merge
+   geometry from the drift lever P5 already characterized. Only then repeat
+   with realistic noise. Check the merger's own log line
+   (`front=/paired=/front_only=/tf_misses=/delta_abs_*`) before trusting any
+   downstream map — a high `front_only` or `tf_misses` count means the merge
+   is silently degrading to front-only.
+2. **Then P8** (Gazebo removal + docs + graphify) — scope in the plan.
 
 ## How to run the stack (learned the hard way)
 
@@ -77,9 +60,18 @@ export CYCLONEDDS_URI=file://$PWD/cyclonedds.xml
 # sim (headless):
 ros2 launch install/ridgeback_autonomy/share/ridgeback_autonomy/launch/includes/simulation_isaac.launch.py world:=mock_hospital
 #   + odom_noise:=0 to isolate odom drift; headless:=false for windowed
-# slam standalone:
-ros2 launch install/ridgeback_autonomy/share/ridgeback_autonomy/launch/includes/slam.launch.py use_sim_time:=true setup_path:=$PWD/clearpath/
+# full exploration:
+bash start_exploration.sh warehouse_full sim:=isaac sim_mode:=deterministic \
+  camera:=false g1_perception_enabled:=false
 ```
+
+**Benchmark hygiene is mandatory** (it was wrong for months): `camera:=false`
+(the runner used to render the D455 unconditionally, RTF 0.33→0.65),
+`g1_perception_enabled:=false`, an isolated `ROS_DOMAIN_ID` (a co-tenant ran
+a `/r100_0001` stack on domain 42 whose `hud_node` publishes the same
+`hud/coverage` the probe reads), and `setup_path:=/tmp/bench-clearpath/`. Use
+`sim_mode:=deterministic` for anything A/B — realtime mode couples frame_dt to
+render-wall duration, so contention smears the lidar sweep.
 
 Sim warm-boots in ~1 s if kit is cached; cold boot up to ~4 min. Measure all
 rates in **sim time**, not wall-clock (RTF ≈ 0.5–0.8 under load makes 40 Hz
@@ -92,38 +84,38 @@ look like 20 Hz on the wall).
   and poison every measurement. Use `ps aux | grep X | grep -v grep | wc -l`
   in loops; kill by explicit PID; put kill calls in a separate tool call from
   launches.
+- **A stale `ros2 daemon` hides namespaced topics from the CLI** (`ros2
+  daemon stop`, or `--no-daemon`). rclpy probes are unaffected but still need
+  the CycloneDDS env above.
 - **The user's VNC display number rotates per session** (was `:0`, then `:3`).
   Before any windowed launch or rviz, detect it from a live session process's
   env: find a `xfce4-session`/terminal PID owned by `deivid`, read `DISPLAY`
-  and `XAUTHORITY` (`~/.Xauthority`) from `/proc/<pid>/environ`. Never assume
-  `:0`.
-- **Shared box.** Run the `box-health` agent before any long GPU session
-  (GPU seat ACL `getfacl /dev/dri/renderD128` first, then co-tenant CPU/GPU).
-  One kit boot crashed spontaneously mid-investigation (breakpad); a plain
-  relaunch fixed it — treat a single boot crash as flaky, don't over-diagnose.
+  and `XAUTHORITY` from `/proc/<pid>/environ`. Never assume `:0`.
+- **Shared box.** Check the GPU seat ACL (`getfacl /dev/dri/renderD128`)
+  before any long GPU session, then co-tenant CPU/GPU load. One kit boot
+  crashed spontaneously mid-investigation (breakpad); a plain relaunch fixed
+  it — treat a single boot crash as flaky, don't over-diagnose.
 - **The full 6.0.1 landmine list** is in your memory file (bridge-after-
   open-stage segfault, ArticulationRoot rules, timeline end-time, importer
-  drops meshes/collisions, etc.). Read it before touching the runner or USD.
+  drops meshes/collisions, remote-anchor `AddReference` needing a `file://`
+  URI, etc.). Read it before touching the runner or USD.
 
-## When you finish P5
+## When you finish a deliverable
 
-Commit in repo style (`Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>`
-trailer), rebuild graphify
+Commit in repo style — **no AI-attribution trailers** (no `Co-Authored-By`,
+no "Generated with"; the user is the author). Then rebuild graphify
 (`GRAPHIFY_PYTHON=/home/deivid/dev/DyNAMO-Ridgeback/perception_venv/bin/python3
 bash "$(git rev-parse --show-toplevel)/tools/rebuild_graphify"`, or the
-post-commit hook with that env var set), tick the P5 checkbox in
-`PORT_PLAN.md`, and update the `isaac-sim-6-port` memory. Then P6 (G1
-distance benchmark port) is next.
+post-commit hook with that env var set), update the affected PORT_PLAN
+section, and update the `isaac-sim-6-port` memory.
 
-## Remaining phases after P5 (for context, don't start them yet)
+## Remaining phases (for context)
 
 - **P6** — G1 distance benchmark: rewrite gz spawn/remove/pose plumbing onto
   `simulation_interfaces` Control services; recalibrate estimators for D455.
-- **P7** — stock envs (warehouse/hospital/office) + `generate_gt_map.py` USD
-  ground-truth maps + repeat harness.
 - **P8** — remove Gazebo entirely; fresh-clone drill; final docs.
 
 The user works terse and expects you to act autonomously on reversible work,
 stopping only for destructive actions or genuine scope decisions. They caught
-a real bug by eyeballing rviz last session — show them results they can
-eyeball, and verify your own claims by measurement, not by reading the config.
+a real bug by eyeballing rviz — show them results they can eyeball, and verify
+your own claims by measurement, not by reading the config.

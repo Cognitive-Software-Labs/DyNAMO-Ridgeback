@@ -106,6 +106,12 @@ def launch_setup(context, *args, **kwargs):
             namespace=namespace,
             output='screen',
             parameters=[{'use_sim_time': use_sim_time}],
+            # tf2_ros.TransformListener subscribes to the ABSOLUTE '/tf' and
+            # '/tf_static' -- the node's namespace does not move it. Without
+            # this remap its buffer stays empty forever (the whole stack
+            # publishes into '<ns>/tf'), every odom lookup fails, and each
+            # rear scan is silently dropped instead of motion-compensated.
+            remappings=[('/tf', 'tf'), ('/tf_static', 'tf_static')],
         ))
 
     return actions

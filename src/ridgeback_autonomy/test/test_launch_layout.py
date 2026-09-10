@@ -116,3 +116,20 @@ def test_slam_lifecycle_configure_and_activate_are_event_driven() -> None:
     assert 'change_state' in slam_text
     assert 'period=2.0' not in slam_text
     assert 'period=8.0' not in slam_text
+
+
+def test_scan_merger_node_remaps_tf_into_the_namespace() -> None:
+    """tf2_ros.TransformListener subscribes to the ABSOLUTE '/tf'; the node's
+    namespace does not move it. Without the remap the merger's TF buffer stays
+    permanently empty (the stack publishes into '<ns>/tf'), every odom lookup
+    fails, and each rear scan is silently dropped instead of being
+    motion-compensated -- a front-only scan wearing a merged scan's name."""
+    repo_root = Path(__file__).resolve().parents[3]
+    slam_text = (
+        repo_root / 'src' / 'ridgeback_autonomy' / 'launch' / 'includes' / 'slam.launch.py'
+    ).read_text(encoding='utf-8')
+
+    merger_block = slam_text.split("executable='scan_merger_node'", 1)
+    assert len(merger_block) == 2, 'scan_merger_node is no longer launched from slam.launch.py'
+    assert "('/tf', 'tf')" in merger_block[1].split('))', 1)[0]
+    assert "('/tf_static', 'tf_static')" in merger_block[1].split('))', 1)[0]

@@ -86,6 +86,14 @@ class ScanMergerNode(Node):
         rx, ry, _, ryaw = self.get_parameter('rear_lidar_xyz_yaw').value
         self.front_pose = (fx, fy, fyaw)
         self.rear_pose = (rx, ry, ryaw)
+        # Merged points are expressed in base_link, not in a lidar frame, so a
+        # return at the sensor's own range_max lands up to |lidar offset|
+        # further out (10.00 m ahead of the front lidar = 10.39 m from
+        # base_link). Publishing the sensor's range_max verbatim would make
+        # consumers discard that outermost shell -- slam_toolbox drops any
+        # reading above range_max -- so merged mode would see LESS than
+        # front_only. Pad by the largest lidar offset.
+        self._range_pad = max(math.hypot(fx, fy), math.hypot(rx, ry))
 
         sensor_qos = QoSProfile(
             depth=10, reliability=ReliabilityPolicy.BEST_EFFORT,
@@ -111,6 +119,7 @@ class ScanMergerNode(Node):
         self._n_front = 0
         self._n_paired = 0
         self._n_front_only = 0
+        self._n_rear_dropped = 0
         self._deltas = deque(maxlen=500)
         self._tf_misses = 0
 
@@ -201,11 +210,17 @@ class ScanMergerNode(Node):
             self._deltas.append(delta)
             if abs(delta) < 1e-6:
                 rear_points = self._scan_points_in_frame(rear_msg, self.rear_pose)
+                self._n_paired += 1
             else:
                 odom_front = self._odom_base(t_front)
                 odom_rear = self._odom_base(t_rear)
                 if odom_front is None or odom_rear is None:
+                    # No odom chain -> the rear scan cannot be brought into
+                    # the front's capture time, so it is dropped whole. That
+                    # publish is front-only data; counting it as "paired"
+                    # would report a healthy merge that never happened.
                     self._tf_misses += 1
+                    self._n_rear_dropped += 1
                 else:
                     # motion-compensate rear (captured at t_rear) into the
                     # base_link frame AT t_front, via the odom chain only
@@ -217,7 +232,7 @@ class ScanMergerNode(Node):
                         cx + c * rear_local[:, 0] - s * rear_local[:, 1],
                         cy + s * rear_local[:, 0] + c * rear_local[:, 1],
                     )) if rear_local.shape[0] else rear_local
-            self._n_paired += 1
+                    self._n_paired += 1
         else:
             self._n_front_only += 1
 
@@ -245,7 +260,7 @@ class ScanMergerNode(Node):
         out.time_increment = 0.0
         out.scan_time = front_msg.scan_time
         out.range_min = front_msg.range_min
-        out.range_max = front_msg.range_max
+        out.range_max = front_msg.range_max + self._range_pad
         out.ranges = ranges.tolist()
         self._pub.publish(out)
 
@@ -260,6 +275,7 @@ class ScanMergerNode(Node):
         self.get_logger().info(
             f'scan_merger: front={self._n_front} paired={self._n_paired} '
             f'front_only(no rear in tolerance)={self._n_front_only} '
+            f'rear_dropped(no odom TF)={self._n_rear_dropped} '
             f'tf_misses={self._tf_misses} {stats}')
 
 
