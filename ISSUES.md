@@ -1,10 +1,15 @@
 # Issues and Troubleshooting
 
+This file is the **archive**: solved problems, with the diagnosis worth
+keeping. What is currently broken on the Isaac port lives in
+[`tools/isaac/OPEN_ISSUES.md`](tools/isaac/OPEN_ISSUES.md).
+
 ## Troubleshooting
 
 | Problem | Check |
 |---------|-------|
-| Robot doesn't move | `ros2 topic echo /r100_0001/cmd_vel` - if empty, Nav2 may not be active |
+| Robot doesn't move | `ros2 topic echo /r100_0001/cmd_vel` - if empty, Nav2 may not be active. **On Isaac this is a known open bug:** `collision_monitor` latches `FootprintApproach` on phantom lidar returns and emits nothing while `cmd_vel_nav` is healthy — compare the two topics' message counts before assuming Nav2 is down (`OPEN_ISSUES.md` §1) |
+| Wheels hover above the floor | Expected on stock worlds today: `--spawn-z` is tuned for `mock_hospital`'s 0.05 floor, so the robot floats 49.8 mm everywhere else, and the scan plane rides up with it (`OPEN_ISSUES.md` §2) |
 | No map in RViz | `ros2 topic hz /r100_0001/map` - if 0, check `slam_toolbox` logs and the scan topic |
 | Detection overlay does not appear | Make sure `g1_perception_enabled:=true`, remember the overlay is a separate OpenCV window, and check `/r100_0001/sensors/camera_0/color/image` |
 | Explorer not finding frontiers | Verify `track_unknown_space: true` in the global costmap config |

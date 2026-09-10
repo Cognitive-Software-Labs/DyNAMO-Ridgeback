@@ -9,10 +9,18 @@ This workspace supports 2 main human workflows:
 ## Docs
 
 - `README.md`: installation, public launch usage, and normal human workflows
-- `ISSUES.md`: troubleshooting, resolved root causes, and operational gotchas
+- `ISSUES.md`: troubleshooting archive — resolved root causes and operational gotchas
 - `AI_CONTEXT.md`: agent-facing repo conventions, mental model, and documentation rules
 - `AGENTS.md` / `CLAUDE.md`: thin entrypoints into the shared agent guidance
 - `docs/demos/`: self-contained demo snapshots (e.g. `isaac-first-drive/` — the Isaac port's first SLAM drive, with regeneration steps)
+
+Isaac Sim port (in progress, `feat/isaac-sim-6-port`):
+
+- `tools/isaac/OPEN_ISSUES.md`: **what is currently broken** — start here
+- `tools/isaac/PORT_PLAN.md`: the 9-phase plan and its history
+- `tools/isaac/SLAM_QUALITY_REPORT.md`: how the RTX lidar reaches ROS
+- `tools/isaac/robot_geometry.svg` / `robot_render.png`: sensor mounting, dimensioned
+- `tools/isaac/NEXT_AGENT_PROMPT.md`: session handoff
 
 ## Stack
 

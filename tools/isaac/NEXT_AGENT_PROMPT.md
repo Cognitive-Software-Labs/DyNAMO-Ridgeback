@@ -1,4 +1,4 @@
-# Continue the Isaac Sim 6.0 port — rerun baselines on corrected geometry, then P8
+# Continue the Isaac Sim 6.0 port — navigation is blocked, fix that first
 
 You are picking up an in-flight port of a Ridgeback autonomy stack from
 Gazebo Harmonic to **Isaac Sim 6.0 GA**. Work happens ONLY in the worktree
@@ -7,17 +7,39 @@ Gazebo Harmonic to **Isaac Sim 6.0 GA**. Work happens ONLY in the worktree
 
 ## Read these first, in order
 
-1. Your memory file `isaac-sim-6-port` (the 6.0.1 landmine list + the SLAM
-   root-cause paragraph — trust it, do not rediscover). Also skim
-   `nav-tuning-in-flight` and `shared-dev-box-contention`.
-2. `tools/isaac/PORT_PLAN.md` — the authoritative 9-phase plan. **P0–P4 + P7
-   done; P5 plumbing done, A/B sign-off open; P6 deferred; P8 next.** The
-   post-P7 section and improvement 2 carry the 2026-09-10 sensor work.
-3. `tools/isaac/SLAM_QUALITY_REPORT.md` — source of truth for how the RTX
-   lidar reaches ROS. The old P4 "270° ROI honored" claim was WRONG; the
+1. **`tools/isaac/OPEN_ISSUES.md`** — the live register of what is broken.
+   Start here. It records what has been ruled out *by measurement* for each
+   open bug, which is most of the value: several plausible theories are
+   already dead and re-testing them wastes a day.
+2. Your memory file `isaac-sim-6-port` (the 6.0.1 landmine list — trust it,
+   do not rediscover). Also skim `nav-tuning-in-flight` and
+   `shared-dev-box-contention`.
+3. `tools/isaac/PORT_PLAN.md` — the 9-phase plan and its history. Its
+   performance numbers are **stale by design**; geometry changed four times on
+   2026-09-10 and nothing has been rerun since.
+4. `tools/isaac/SLAM_QUALITY_REPORT.md` — how the RTX lidar reaches ROS. The
    assembler synthesizes the 270° contract scan from two OmniLidar prims.
-4. `AI_CONTEXT.md` and `ISSUES.md`. Note: AI_CONTEXT.md still has **zero**
-   Isaac content — that rewrite is P8 scope, not drift.
+5. `tools/isaac/robot_geometry.svg` + `robot_render.png` — the sensor mounting,
+   dimensioned. Worth 5 minutes before touching anything geometric.
+6. `AI_CONTEXT.md`. Note: it still has **zero** Isaac content — that rewrite is
+   P8 scope, not drift.
+
+## Where things actually stand
+
+**Navigation does not run.** `collision_monitor` latches on 13 phantom lidar
+returns and publishes zero `cmd_vel` while the controller is healthy. The
+robot never moves in `hospital` or `warehouse_full`. This blocks the baselines,
+which blocks the P5 A/B, which blocks P8. `OPEN_ISSUES.md` §1 has the full
+evidence table and the cheapest untried test (read
+`local_costmap/published_footprint` — it has never been looked at, and every
+"inside the footprint" claim so far used an assumed hull).
+
+**The robot also floats 49.8 mm** on every stock world, which puts the scan
+plane 5 cm high (`OPEN_ISSUES.md` §2). Independent of the stall — the bare
+runner floats too and shows no phantom returns.
+
+**No baseline has ever been rerun.** That was the original request and it is
+still outstanding.
 
 ## The worktree is already built — do not redo this
 
@@ -74,22 +96,13 @@ On `mock_hospital`, `odom_noise:=0`, deterministic, camera off, isolated domain:
 
 ## Your objective
 
-1. **Rerun the Isaac baselines.** Two sensor-geometry changes are stacked
-   (coplanar + the 11.6 cm drop) and *every* Isaac coverage number in the plan
-   predates both. Nothing has been rerun. Treat all existing Isaac numbers as
-   void, not as a baseline to compare against.
-2. **Then the P5 A/B**, which needs 3–5 seeds per condition on a genuinely
-   single-tenant box — which this one never is (pratham/vilmos/stefi/digit
-   rotate). Coverage variance run-to-run is 51–83%, so single runs prove
-   nothing. Do not quote a number from one run.
-3. **Then P8** (Gazebo removal + docs + graphify).
-
-Still unconfirmed and worth one question to the owner: whether the units are
-UST-**10**LX or UST-**20**LX. Both carry the same "Smart-URG" casing branding
-and are physically identical; only the side label or the device distinguishes
-them. If it is a 20LX then `farRangeM: 10.0` in `ust10lx_2d.json` and
-`max_laser_range: 10` in the slam params are both wrong. Cheapest check when
-the robot is powered: `ros2 topic echo /scan --field range_max` off `urg_node`.
+1. **Unblock navigation** (`OPEN_ISSUES.md` §1). Nothing downstream can be
+   measured until the robot moves.
+2. **Seat the robot** (§2), then regenerate the ground-truth maps once — the
+   seat fix moves the slice plane for stock worlds and invalidates them again,
+   so do it in that order, not the reverse.
+3. **Then the baselines**, then the P5 A/B (3–5 seeds per condition; single
+   runs prove nothing at 51–83% variance), then P8.
 
 ## How to run the stack
 

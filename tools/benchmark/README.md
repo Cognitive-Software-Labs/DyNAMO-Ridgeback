@@ -4,6 +4,11 @@ Instrumented exploration benchmark runs, promoted from the 2026-07-10 tuning
 sessions. The `sim-runner` project subagent (`.claude/agents/sim-runner.md`)
 automates this recipe.
 
+> ⚠️ **Exploration benchmarks do not currently run on Isaac.**
+> `collision_monitor` latches on phantom lidar returns and the robot never
+> moves in `hospital` or `warehouse_full`. See `tools/isaac/OPEN_ISSUES.md` §1
+> before spending a session on a run that cannot produce a number.
+
 ## Canonical run
 
 ```bash
@@ -15,19 +20,41 @@ bash cleanup.sh
 mkdir -p /tmp/bench-clearpath
 cp tools/benchmark/robot_no_camera.yaml /tmp/bench-clearpath/robot.yaml
 
-# 3. Launch (NVIDIA EGL headless; headless_rendering also implies gz -s server-only)
-export __EGL_VENDOR_LIBRARY_FILENAMES=/usr/share/glvnd/egl_vendor.d/10_nvidia.json
-setsid nohup bash start_exploration.sh warehouse \
-    g1_perception_enabled:=false exploration_rviz:=false \
-    headless_rendering:=true setup_path:=/tmp/bench-clearpath/ \
-    >/dev/null 2>&1 &
+# 3. Launch. Every flag below is load-bearing — see "Hygiene".
+export ROS_DOMAIN_ID=77          # NOT 42: a co-tenant runs a /r100_0001 stack
+                                 # there whose hud_node publishes the same
+                                 # hud/coverage topic the probe reads
+bash start_exploration.sh warehouse_full sim:=isaac \
+    sim_mode:=deterministic camera:=false g1_perception_enabled:=false \
+    exploration_rviz:=false odom_noise:=0.0 setup_path:=/tmp/bench-clearpath/
 
-# 4. Attach the probe once the explorer node is up
+# 4. Attach the probe once the explorer node is up (separate shell)
 source install/setup.bash
-export ROS_DOMAIN_ID=42 RMW_IMPLEMENTATION=rmw_cyclonedds_cpp \
+export ROS_DOMAIN_ID=77 RMW_IMPLEMENTATION=rmw_cyclonedds_cpp \
        CYCLONEDDS_URI=file://$PWD/cyclonedds.xml
 python3 tools/benchmark/explore_probe.py <tag> [max_wall_seconds]
 ```
+
+## Hygiene — every flag earns its place
+
+| flag | why |
+|---|---|
+| `sim:=isaac` | gz is still runnable during the port; without this you benchmark the wrong simulator |
+| `sim_mode:=deterministic` | `realtime` couples `frame_dt` to render-wall duration, so co-tenant load smears the lidar sweep — a sim artefact, not a nav result |
+| `camera:=false` | the runner used to render the D455 unconditionally: RTF 0.33 → 0.65 |
+| `g1_perception_enabled:=false` | keeps the GPU for the sim |
+| isolated `ROS_DOMAIN_ID` | co-tenant `/r100_0001` stacks otherwise cross-publish `hud/coverage` |
+| `setup_path:=/tmp/bench-clearpath/` | the generator writes artefacts into this directory; keep it out of the repo |
+
+Measure all rates in **sim time**. RTF ≈0.65 makes a 40 Hz scan look like
+26 Hz on the wall — expected, not a fault.
+
+**Do not launch with `nohup ... &` and then `kill $!`.** That kills the bash
+wrapper and leaves the python child running; two stacks then publish to the
+same topics and silently corrupt the run. Kill by explicit PID in a *separate*
+command from the launch, and verify the count is zero afterwards — `pkill -f`
+and `ps | grep <pattern>` both match the calling shell when the pattern
+appears in your own command line.
 
 ## explore_probe.py
 
