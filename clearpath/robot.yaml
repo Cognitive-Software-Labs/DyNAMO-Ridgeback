@@ -31,9 +31,17 @@ sensors:
       xyz: [-0.3922, 0.0, 0.179]
       rpy: [0.0, 0.0, 3.14159]
   camera:
+    # Measured 2026-09-10: camera bottom face 0.740 m above the top plate, so
+    # 0.280 (deck top) + 0.740 = 1.020 above base_link; default_mount sits at
+    # 0.295, hence z = 0.725. The old 0.85 put it 12.5 cm too high -- the same
+    # unmeasured-offset error as the 2D lidars, except here the height was
+    # wrong rather than the parent. Fore/aft taken as a fraction of the hull
+    # (78 of 98 on the tape, applied to the model's 0.9325 m length) because
+    # the tape's total ran ~5 cm over both the Clearpath mesh and NVIDIA's
+    # asset, which agree with each other and match the spec width exactly.
     - model: intel_realsense
       parent: default_mount
-      xyz: [0.3, 0.0, 0.85]
+      xyz: [0.2692, 0.0, 0.725]
       rpy: [0.0, 0.0, 0.0]
       ros_parameters:
         intel_realsense:

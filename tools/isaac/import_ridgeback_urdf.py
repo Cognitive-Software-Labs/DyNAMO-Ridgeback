@@ -662,6 +662,49 @@ VENDOR_REPLACED_MESHES = {
 }
 
 
+# Camera mast, measured off the robot 2026-09-10. A 37.5 mm square aluminium
+# extrusion on a plate bolted to the top deck. It is not in the Clearpath
+# description at all -- the URDF leaves the camera floating in mid-air -- so it
+# is authored here rather than coming through the import.
+#
+# The D435 is bracketed to the mast's FRONT FACE, not sitting on top: the
+# camera's back face lands at 0.2590 against a mast front face of 0.2143, i.e.
+# a ~45 mm standoff. So the extrusion runs past the camera and ends 50 mm above
+# its top (1.045), rather than terminating at the camera's underside.
+MAST_SIZE = 0.0375          # square section, m
+MAST_X = 0.1955             # 70 of 98 on the tape, as a fraction of the hull
+MAST_Z0 = 0.2800            # top deck upper face, above base_link
+MAST_Z1 = 1.0950            # camera top 1.045 + 50 mm of extrusion above it
+
+
+def _author_camera_mast(stage, chassis_prim) -> None:
+    """Author the mast the camera actually stands on.
+
+    Purely cosmetic-plus-collision: no ROS frame hangs off it, so nothing in
+    the TF tree changes. It sits entirely above the 2D lidar plane (0.2264),
+    starting at the deck top 0.280, so it cannot occlude either scanner --
+    worth re-checking in the empty world after any change to these numbers.
+    """
+    from pxr import Gf, UsdGeom, UsdPhysics
+
+    height = MAST_Z1 - MAST_Z0
+    if height <= 0:
+        print(f"WARNING: mast height {height:.3f} <= 0, skipped", flush=True)
+        return
+
+    cube = UsdGeom.Cube.Define(
+        stage, chassis_prim.GetPath().AppendChild("camera_mast"))
+    cube.CreateSizeAttr(1.0)
+    UsdGeom.XformCommonAPI(cube).SetTranslate(
+        Gf.Vec3d(MAST_X, 0.0, MAST_Z0 + height / 2.0))
+    UsdGeom.XformCommonAPI(cube).SetScale(
+        Gf.Vec3f(MAST_SIZE, MAST_SIZE, height))
+    UsdPhysics.CollisionAPI.Apply(cube.GetPrim())
+    print(f"camera mast: {MAST_SIZE*1000:.1f} mm square, {height:.3f} m tall, "
+          f"x={MAST_X:+.4f}, spans z {MAST_Z0:.3f}..{MAST_Z1:.3f} "
+          f"(lidar plane 0.2264 is below it)", flush=True)
+
+
 def graft_vendor_chassis(usd_path: Path) -> None:
     """Swap the imported chassis shell for Clearpath's authored one.
 
@@ -733,6 +776,8 @@ def graft_vendor_chassis(usd_path: Path) -> None:
         chassis.GetPath().AppendChild("vendor_chassis"), "Xform")
     vendor.GetReferences().AddReference(
         f"./payloads/meshes/{chassis_usd.name}")
+
+    _author_camera_mast(stage, chassis)
 
     stage.GetRootLayer().Save()
     print(f"vendor chassis grafted ({len(hidden)} imported prims hidden, "
