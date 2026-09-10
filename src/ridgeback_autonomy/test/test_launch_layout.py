@@ -283,6 +283,18 @@ def test_benchmark_wrapper_only_composes_the_two_layers() -> None:
     assert "'shutdown_on_complete'" in wrapper_text
 
 
+def test_headless_rendering_is_optional_and_owned_by_the_environment() -> None:
+    launch_dir = Path(__file__).resolve().parents[1] / 'launch'
+    env_text = (launch_dir / 'target_benchmark_env.launch.py').read_text(encoding='utf-8')
+    config_text = (launch_dir / 'target_benchmark_config.launch.py').read_text(encoding='utf-8')
+    simulation_text = (launch_dir / 'includes/simulation.launch.py').read_text(encoding='utf-8')
+
+    assert "'headless_rendering',\n            default_value='false'" in env_text
+    assert "'headless_rendering': headless_rendering" in env_text
+    assert "'headless_rendering'" not in config_text
+    assert "'headless_rendering',\n            default_value='false'" in simulation_text
+
+
 def test_every_entrypoint_supplies_the_cyclonedds_configuration() -> None:
     """Exploration aborts on Cyclone's default participant-index ceiling.
 

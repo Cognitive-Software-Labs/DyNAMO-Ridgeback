@@ -47,7 +47,6 @@ This project has a graphify knowledge graph at `graphify-out/`.
 
 Rules:
 - Before answering architecture or codebase questions, read `graphify-out/GRAPH_REPORT.md` for god nodes and community structure
-- If `graphify-out/wiki/index.md` exists, navigate it instead of reading raw files
 - After modifying code files, run `bash "$(git rev-parse --show-toplevel)/tools/rebuild_graphify"` to keep the repo-root graph current
 - Do not use the old `python3 -c "from graphify.watch import _rebuild_code ..."` one-liner in this repo; the helper script is the canonical rebuild path
 
@@ -74,6 +73,10 @@ Use `docs/ISSUES.md` when the task touches:
   `target_benchmark_config.launch.py` as public process-level layers because
   `target_benchmark_sweep` invokes them separately. The compatibility
   `target_distance_benchmark.launch.py` includes both and inherits their arguments.
+- `headless_rendering` is an optional, default-off property of the persistent
+  simulation environment. Sweeps may set it only in `defaults`; it cannot vary
+  per configuration. It provides a server-only EGL path and does not replace
+  the GUI-capable `tools/gpu-run` NVIDIA GLX workflow.
 - `manual_mapping.launch.py` is the fifth top-level public launch file.
 - Lower-level launches in `src/ridgeback_autonomy/launch/includes/` are internal building blocks
 - Bringup is **event-driven**: stages are sequenced by readiness gates (`ros2 run ridgeback_autonomy launch_wait`, in `common/launch_wait.py`) chained via `OnProcessExit`, not fixed `TimerAction` delays — each stage starts when its prerequisite topic/service exists, with a `--timeout` fallback. See docs/ISSUES.md "Event-Driven Startup". Don't reintroduce timer delays
@@ -88,7 +91,7 @@ Exploration stack:
 - Gazebo simulation
 - `slam_toolbox`
 - Nav2
-- frontier explorer — either `explore_lite` (default) or the in-repo `frontier_explorer_node`, dispatched in `launch/includes/explore.launch.py` based on the `explorer` arg
+- frontier explorer — the in-repo `frontier_explorer_node`, launched by `launch/includes/explore.launch.py` (explore_lite was removed 2026-07-10 after a head-to-head benchmark; findings in ISSUES.md "Exploration Quits Early")
 - HUD is a general aggregator: producers publish `rviz_2d_overlay_msgs/OverlayText` "panels" on their own topics (`hud/velocity`, `hud/coverage`, …); `hud_node` merges them in the configured `panels` order into one `hud_overlay` (the single RViz `TextOverlay` display). Add a metric = new publisher + its topic in `panels`; no RViz change.
 - `velocity_overlay_node` publishes the velocity panel on `hud/velocity` (4-stage cmd_vel chain: `planned` from MPPI, `capped` from velocity_smoother, `controller` from collision_monitor, `actual` from `platform/odom/filtered`)
 - `coverage_overlay_node` publishes the live exploration-coverage panel on `hud/coverage`: compares the SLAM map to the ground-truth map for the current `world` (reusing `common/coverage_utils.py`), reporting `complete` (discovered fraction of gt-free) and `accuracy` (coverage over explored gt-free); worlds without a ground-truth map show `n/a`. Gated by `coverage_overlay_enabled` (default true). Ground-truth maps live in the package at `sim/ground_truth_maps/` (installed to `share/`, alongside `sim/worlds/`); the node resolves them via `get_package_share_directory`. Capture/preview tooling (`capture_ground_truth.sh`, `render_previews.py`) and the README sit alongside the maps in `sim/ground_truth_maps/`
@@ -171,12 +174,22 @@ Benchmark stack:
 
 - Generated runtime output belongs under `artifacts/`: `colcon/` for build/test logs, `exploration/` for quick-start console/ROS logs, and `benchmarks/` for runs and sweeps. `colcon_defaults.yaml` configures root-invoked Colcon; the build helper pins an absolute log base. `benchmarking/paths.py` owns the shared benchmark output default and child ROS-log environment. Preserve explicit `output_dir`, `LOG_DIR`, and `ROS_LOG_DIR` overrides. Direct ROS launches still need `ROS_LOG_DIR` set before launch to move their parent logs; do not redirect user-wide logs or rewrite historical provenance during a relocation.
 - Always run `bash cleanup.sh` before launching from the repo runbooks or helper scripts. For a benchmark sweep, run it once before the supervisor; never run it between configs because the simulator and RViz are intentionally persistent
-- `start_exploration.sh` is the canonical quick-start: sources the workspace, runs cleanup, defaults an unset `RMW_IMPLEMENTATION` to `rmw_cyclonedds_cpp`, and forwards `world` (positional 1) and `EXPLORER` / explorer (positional 2 or env) to the public launch
+- `start_exploration.sh` is the canonical quick-start: sources the workspace, runs cleanup, defaults an unset `RMW_IMPLEMENTATION` to `rmw_cyclonedds_cpp`, accepts an optional world as positional argument 1, and forwards later `key:=value` launch arguments
 - `build_and_start_expl.sh` rebuilds the workspace before forwarding to `start_exploration.sh`; pass-through args are positional in the same order
 - The target overlay is published on `debug/target/overlay` for the RViz Image display; it has no standalone GUI
 - The `mock_hospital` world is the main exploration scenario; `warehouse` is the larger exploration test; `office` is the common perception-debug world
 - `perception_venv/` is expected for OWLv2 and Depth-Anything dependencies; the public launches prepend its `bin/` directory to `PATH`
 - If you move or rename sim assets that are referenced by patched Clearpath files, update `patches/clearpath_gz_customizations.patch` in the same change
+
+## Project Subagents
+
+Committed under `.claude/agents/` (Claude Code picks them up automatically):
+
+- `sim-runner` — launches/monitors/stops instrumented benchmark runs (full recipe incl. probe attach, `tools/benchmark/`)
+- `log-triage` — read-only launch-log diagnosis against the ISSUES.md failure signatures
+- `box-health` — read-only shared-box triage (GPU seat ACL, co-tenant load, stale processes)
+
+Keep their recipes in sync when the underlying scripts (`cleanup.sh`, `start_exploration.sh`, `tools/benchmark/`) or ISSUES.md sections change.
 
 ## Key Repo Facts Agents Should Remember
 
@@ -198,8 +211,8 @@ Benchmark stack:
 - `build_and_start_expl.sh`: rebuild then forward to `start_exploration.sh`
 - `src/ridgeback_autonomy/config/nav2_params.yaml`: Nav2 config
 - `src/ridgeback_autonomy/config/slam_toolbox_params.yaml`: SLAM config
-- `src/ridgeback_autonomy/config/explore_lite_params.yaml`: `explore_lite` frontier exploration config
-- `src/ridgeback_autonomy/config/frontier_explorer_params.yaml`: in-repo `frontier_explorer_node` config (used when `explorer:=custom`)
+- `src/ridgeback_autonomy/config/frontier_explorer_params.yaml`: `frontier_explorer_node` config
+- `src/ridgeback_autonomy/config/cyclonedds.xml`: package-owned CycloneDDS participant-index configuration used by public launch entrypoints when `CYCLONEDDS_URI` is unset
 
 ## External Dependencies
 
@@ -208,7 +221,6 @@ Managed through `.repos`:
 - `clearpath_common`
 - `clearpath_config`
 - `clearpath_msgs`
-- `m-explore-ros2`
 - `slam_toolbox`
 
 If you remove, rename, or add repo dependencies, check:

@@ -24,7 +24,7 @@ This workspace supports 3 main human workflows:
 | Perception | Intel RealSense D455 (~1m height) | Depth/RGB for overlay and distance estimation |
 | SLAM | slam_toolbox (online async, from source) | Map building + localization |
 | Navigation | Nav2 (MPPI omni controller) | Path planning + obstacle avoidance |
-| Exploration | explore_lite (m-explore-ros2) or in-repo `frontier_explorer_node` | Frontier detection + goal selection (selectable via `explorer:=`) |
+| Exploration | in-repo `frontier_explorer_node` | Frontier detection + goal selection |
 | Perception | Staged target-localization pipeline | Raw OWLv2 detections plus the point-cloud and mask measurement nodes and an optional overlay |
 | Benchmarking | Target-distance benchmark runner | Controlled evaluation of the point-cloud and mask-based localization paths |
 
@@ -192,14 +192,16 @@ Launches Gazebo, SLAM, Nav2, frontier exploration, and the target-localization s
 
 1. Gazebo + Ridgeback spawn
 2. Exploration RViz config
-3. `slam_toolbox` (after 20 s)
-4. Nav2 (after 65 s)
-5. The selected explorer — `explore_lite` (default) or the in-repo `frontier_explorer_node` (after 80 s)
+3. `slam_toolbox` (once the scan and filtered-odometry topics publish)
+4. Nav2 (once `/map` publishes)
+5. The in-repo `frontier_explorer_node` (once the global costmap publishes)
 6. Target-localization nodes: `target_detector_node`, the measurement nodes for the selected `estimators` (`target_pointcloud_measurement_node` and/or `target_mask_measurement_node`), `target_visualization_node`, `target_overlay_node`, and a second `hud_node` for the distance panel
 
 All four distance estimator rows run by default, the same set the benchmark compares — one RViz ring per row, each with its own bearing, plus a wide distance HUD top-right (`hud_target_overlay`) listing the four side by side with the age of each reading. There is no ground truth in exploration, so that panel carries no truth line and no error column. Per-row visibility is an RViz Displays checkbox under `Target Estimates`, one per estimator.
 
 The perception overlay is published on `debug/target/overlay` and shown by the configured RViz Image display.
+
+Bringup is **event-driven** (readiness gates), not fixed timers — each stage starts when its prerequisite exists, with a `--timeout` fallback. See [docs/ISSUES.md](docs/ISSUES.md), "Event-Driven Startup".
 
 Available worlds:
 
@@ -232,7 +234,7 @@ Arguments:
 | `depth_source` | `stereoscopic` | Aligned depth source for the mask rows — `stereoscopic` or `monocular` (Depth-Anything V2; downloads a checkpoint on first use) |
 | `mask_gate` | `box` | Mask front-end — `box` (no segmentation model) or `silhouette` (SlimSAM) |
 | `mppi_visualize` | `false` | Publish MPPI trajectory visualization topics (RViz already has `MPPI Optimal` and `MPPI Samples` displays subscribed to `/r100_0001/optimal_trajectory` and `/r100_0001/trajectories`) |
-| `explorer` | `explore_lite` | Frontier explorer to dispatch — `explore_lite` or `custom` (the in-repo `frontier_explorer_node`) |
+| `headless_rendering` | `false` | Optional server-only EGL sensor rendering for SSH/non-seat sessions; the existing `tools/gpu-run` NVIDIA GLX workflow remains the default GUI-capable path (see [docs/ISSUES.md](docs/ISSUES.md), "Camera rate collapses") |
 
 Examples:
 
@@ -243,24 +245,23 @@ bash cleanup.sh
 ros2 launch ridgeback_autonomy ridgeback_exploration.launch.py world:=mock_hospital
 ros2 launch ridgeback_autonomy ridgeback_exploration.launch.py world:=warehouse exploration_rviz:=false
 ros2 launch ridgeback_autonomy ridgeback_exploration.launch.py world:=mock_hospital target_localization_enabled:=false
-ros2 launch ridgeback_autonomy ridgeback_exploration.launch.py world:=office explorer:=custom
+ros2 launch ridgeback_autonomy ridgeback_exploration.launch.py world:=office headless_rendering:=true
 
 # One ring instead of four: the pre-mask-row exploration stack
 ros2 launch ridgeback_autonomy ridgeback_exploration.launch.py estimators:=pointcloud
 ```
 
-The `custom` explorer is the in-repo `frontier_explorer_node` (sources under `src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer/`). It and `explore_lite` both consume the Nav2 global costmap and send goals via `NavigateToPose`; pick whichever you want to evaluate.
+The explorer is the in-repo `frontier_explorer_node` (sources under `src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer/`). It consumes the Nav2 global costmap and sends goals via `NavigateToPose`. It replaced `explore_lite` after a head-to-head benchmark — see [docs/ISSUES.md](docs/ISSUES.md), "Exploration Quits Early", for the findings.
 
 #### Quick-start script
 
-`start_exploration.sh` sources the workspace, runs cleanup, and launches exploration. The script accepts the world as the first positional arg and the explorer (`explore_lite` or `custom`) as the second; `EXPLORER` works as an env-var alternative:
+`start_exploration.sh` sources the workspace, runs cleanup, and launches exploration. It accepts an optional world as the first positional argument and forwards later `key:=value` launch arguments:
 
 ```bash
-bash start_exploration.sh                                # mock_hospital + explore_lite
-bash start_exploration.sh office                         # office + explore_lite
-bash start_exploration.sh mock_hospital custom           # mock_hospital + custom explorer
-EXPLORER=custom bash start_exploration.sh office         # office + custom explorer
-DEPTH_ANYTHING_ENABLED=true bash start_exploration.sh office
+bash start_exploration.sh                                # mock_hospital
+bash start_exploration.sh office                         # office world
+bash start_exploration.sh headless_rendering:=true       # default world, EGL server rendering
+bash start_exploration.sh office estimators:=pointcloud  # office with one estimator row
 RMW_IMPLEMENTATION=rmw_fastrtps_cpp bash start_exploration.sh office  # explicit override
 ```
 
@@ -282,7 +283,7 @@ launch files only fill in a value when none exists.
 ```bash
 bash build_and_start_expl.sh
 bash build_and_start_expl.sh office
-bash build_and_start_expl.sh office custom
+bash build_and_start_expl.sh office headless_rendering:=true
 ```
 
 ### `target_distance_benchmark.launch.py`
@@ -342,6 +343,7 @@ Arguments:
 | `depth_match_debug` | `false` | Default-off mask-worker evidence logging: exact-depth delivery, pending replacements, batch completion/publication age, and bounded cold/warm percentiles for RGB, SlimSAM, depth production, mask preparation, estimator reduction, worker, lock, and CUDA-synchronization timing |
 | `detector_fps` | `10.0` | Upper bound on the detection rate every measurement row inherits. Belongs to the persistent environment layer, so in a sweep it is a `defaults` key and cannot vary per configuration |
 | `detector_debug` | `false` | Default-off detector evidence logging: achieved cadence, superseded frames, and bounded cold/warm percentiles for the throttle wait, decode, inference, parse, publish and CUDA synchronization. Environment-layer, like `detector_fps` |
+| `headless_rendering` | `false` | Optional default-off server-only EGL sensor rendering. In sweeps this is a persistent-environment `defaults` key and cannot vary per configuration; `tools/gpu-run` remains the GUI-capable NVIDIA GLX path |
 | `isolation_2d` | `nearest_mode_histogram` | Projective-ranging box-gate foreground recipe: `nearest_mode_histogram` or `otsu` |
 | `isolation_3d` | `height_crop_nearest_mode_band` | Euclidean-reconstruction box-gate foreground recipe: `height_crop_nearest_mode_band`, `height_crop_range_band`, `height_crop`, `nearest_mode_band`, or `range_band`. The two chains differ only in how the background separator anchors — nearest mode vs. percentile; the percentile one slides as background grows and is what the `pointcloud` row does |
 | `mask_depth_max_meters` | `0.0` | Working depth gate for the mask rows; `0` means no gate, leaving each row bounded only by what its depth source declares it can resolve |
@@ -495,9 +497,8 @@ Camera intrinsics come from the colour camera's `CameraInfo`. There is no intrin
 
 | File | Parameter | Effect |
 |------|-----------|--------|
-| `config/explore_lite_params.yaml` | `min_frontier_size` | Minimum frontier size (m) to consider — increase to skip small gaps |
-| `config/explore_lite_params.yaml` | `planner_frequency` | How often (Hz) to re-evaluate frontiers; lower values reduce goal preemption churn |
-| `config/frontier_explorer_params.yaml` | `min_frontier_size` / `near_frontier_radius` / `goal_advance_cells` | Custom-explorer frontier clustering, near-tier preference, and goal placement past the centroid |
+| `config/frontier_explorer_params.yaml` | `min_frontier_size` / `near_frontier_radius` / `goal_advance_cells` | Frontier clustering, near-tier preference, and goal placement past the centroid |
+| `config/frontier_explorer_params.yaml` | `progress_timeout` / `abort_blacklist_threshold` | Stall timeout (cancels only when no progress) and failures required before a frontier is blacklisted |
 | `config/frontier_explorer_params.yaml` | `distance_weight` / `size_weight` | Scoring trade-off between how close vs. how large a far-tier frontier is |
 | `config/frontier_explorer_params.yaml` | `goal_cost_threshold` / `goal_safety_margin` / `lethal_cost_threshold` | Goal-safety filtering against the costmap |
 | `config/nav2_params.yaml` | `vx_max` / `vy_max` / `wz_max` | Robot linear and turn-rate limits |

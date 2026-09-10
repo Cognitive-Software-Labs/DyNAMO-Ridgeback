@@ -10,7 +10,7 @@
 | Perception overlay is a sliver in the narrow left dock | Expected until `exploration.rviz`'s `QMainWindow State` blob is regenerated — `addPane()` hardcodes the left dock area. Drag the pane to the bottom dock, stretch it full width, File → Save Config. If the *whole* layout reverted to defaults instead, `restoreState` rejected the blob and restored nothing |
 | Fewer than four rings, or a missing HUD column | `ros2 node list` should show `target_pointcloud_measurement`, `target_mask_measurement`, `target_visualization` and `hud_target_node`; then `ros2 topic hz /r100_0001/measurements/target/mask`. A column reading `--` means that estimator ran and reported nothing; a column missing entirely means `estimators` did not select it |
 | All three mask rows blank while `pointcloud` still reads | Suspect `base_frame`. Grep the startup log for `Configured base frame ... is unavailable`; a wrong frame skips the segmenter for the whole batch. See "A namespaced `base_frame` is not automatically a real TF frame" below |
-| `explore_lite` not finding frontiers | Verify `track_unknown_space: true` in the global costmap config |
+| Frontier explorer not finding frontiers | Verify `track_unknown_space: true` in the global costmap config |
 | TF errors | Ensure all nodes use `use_sim_time: true` |
 | Startup hangs / a stage never comes up | Bringup is event-driven (readiness gates) — find the `gate_*` process log `[launch_wait]: waiting for …`; the `unmet:` list on timeout names the exact missing topic/service. See "Event-Driven Startup" below. Do **not** re-add `TimerAction` delays |
 | Stale processes from previous runs | Run `bash cleanup.sh` before each launch |
@@ -260,8 +260,12 @@ at every subscriber in every case, so it is never a subscriber-side fault.
 | orphaned processes | `ps` after a clean shutdown | none |
 | CUDA unavailable | `torch.cuda.is_available()` in `perception_venv` | True, models on GPU |
 
-Turning off the Gazebo GUI would only reduce a competing rasterizer client; the
-camera would still be rendered in software. Headless is not the fix.
+Turning off the Gazebo GUI alone only reduces a competing rasterizer client;
+the camera remains software-rendered. The primary measured fix remains
+`tools/gpu-run`, which selects NVIDIA GLX while retaining the GUI. As an
+additional server-only option, launch with `headless_rendering:=true` and an
+NVIDIA EGL vendor selection when the run does not need Gazebo's GUI. Headless
+rendering is default-off and is not a replacement for the measured GLX path.
 
 ### Measured, same config and scenario
 

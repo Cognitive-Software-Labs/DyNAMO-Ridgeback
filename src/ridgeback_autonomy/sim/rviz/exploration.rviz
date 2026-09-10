@@ -87,6 +87,18 @@ Visualization Manager:
         Reliability Policy: Best Effort
         Value: /r100_0001/sensors/lidar2d_0/scan
       Value: true
+    - Class: rviz_default_plugins/Polygon
+      Alpha: 1
+      Color: 255; 25; 0
+      Enabled: true
+      Name: Collision Zone (approach)
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /r100_0001/collision_monitor/footprint_approach
+      Value: true
     - Class: rviz_default_plugins/LaserScan
       Color: 0; 0; 255
       Color Transformer: FlatColor

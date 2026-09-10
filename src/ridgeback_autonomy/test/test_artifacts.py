@@ -214,6 +214,39 @@ def test_sweep_or_scenario_byte_change_invalidates_resume_signature(tmp_path):
         != original['configs']['pointcloud']['scenario_sha256'])
 
 
+@pytest.mark.parametrize(
+    ('field', 'before', 'after'),
+    [
+        ('setup_path', '/tmp/setup-a', '/tmp/setup-b'),
+        ('headless_rendering', False, True),
+        ('detector_fps', 5.0, 10.0),
+        ('detector_debug', False, True),
+    ],
+)
+def test_environment_default_change_invalidates_resume_signature(
+    tmp_path, field, before, after,
+):
+    scenario = tmp_path / 'scenes.yaml'
+    scenario.write_text(
+        'scenes:\n  - id: one\n    robots: [{ x: 2.0, y: 0.0 }]\n')
+    source = tmp_path / 'sweep.yaml'
+    source.write_text('stable sweep bytes\n')
+
+    def signature(value):
+        spec = parse_sweep({
+            'sweep': {'name': 'unit'},
+            'defaults': {
+                'scenario': str(scenario),
+                'repeats': 1,
+                field: value,
+            },
+            'configs': [{'name': 'pointcloud', 'estimators': 'pointcloud'}],
+        }, source=str(source))
+        return sweep._resume_signature(spec, spec.configs)
+
+    assert signature(before) != signature(after)
+
+
 @pytest.fixture
 def script_workspace(tmp_path, monkeypatch):
     """Exercise real shell control flow with inert ROS setup/cleanup/commands."""
@@ -239,7 +272,7 @@ def script_workspace(tmp_path, monkeypatch):
     monkeypatch.setenv('PATH', str(commands) + os.pathsep + os.environ['PATH'])
     for name in (
             'LOG_DIR', 'ROS_LOG_DIR', 'COLCON_LOG_PATH',
-            'RMW_IMPLEMENTATION', 'EXPLORER'):
+            'RMW_IMPLEMENTATION'):
         monkeypatch.delenv(name, raising=False)
     return tmp_path
 
@@ -254,12 +287,12 @@ def test_exploration_logs_and_overrides_are_non_clobbering(script_workspace, mon
         monkeypatch.setenv('ROS_LOG_DIR', str(root / 'custom ros logs'))
     for _ in range(2):
         result = subprocess.run(
-            ['bash', str(root / 'start_exploration.sh'), 'office', 'custom', 'estimators:=pointcloud'],
+            ['bash', str(root / 'start_exploration.sh'), 'office', 'estimators:=pointcloud'],
             cwd=root.parent, capture_output=True, text=True, timeout=10)
         assert result.returncode == 7  # tee must not hide launch failures.
         assert 'rmw=rmw_cyclonedds_cpp' in result.stdout
         assert 'arg=world:=office' in result.stdout
-        assert 'arg=explorer:=custom' in result.stdout
+        assert 'arg=explorer:=' not in result.stdout
         assert 'arg=estimators:=pointcloud' in result.stdout
     runs = sorted(output.iterdir())
     assert len(runs) == 2
@@ -287,10 +320,11 @@ def test_build_helper_sets_log_base_outside_workspace(script_workspace, monkeypa
     if override:
         monkeypatch.setenv('COLCON_LOG_PATH', str(expected))
     result = subprocess.run(
-        ['bash', str(root / 'build_and_start_expl.sh'), 'office', 'custom'],
+        ['bash', str(root / 'build_and_start_expl.sh'), 'office', 'headless_rendering:=true'],
         cwd=root.parent, capture_output=True, text=True, timeout=10)
     assert result.returncode == 7
     assert f'colcon-arg=--log-base\ncolcon-arg={expected}\ncolcon-arg=build' in result.stdout
+    assert 'arg=headless_rendering:=true' in result.stdout
 
 
 @pytest.mark.parametrize('override', [False, True])

@@ -100,11 +100,11 @@ saved in `$HOME` by copying it into the package maps dir.
 ```bash
 source install/setup.bash
 ros2 launch ridgeback_autonomy ridgeback_exploration.launch.py \
-  world:=mock_hospital explorer:=custom
+  world:=mock_hospital
 ```
 
-Valid worlds: `mock_hospital`, `warehouse`, `office`. `explorer:=` accepts
-`custom` or `explore_lite`. Launches Gazebo + full Nav2 + the frontier explorer.
+Valid worlds: `mock_hospital`, `warehouse`, `office`. This launches Gazebo,
+full Nav2, and the sole in-repo `frontier_explorer_node`.
 
 `coverage_overlay_node` compares the live SLAM map against the ground-truth map
 for `world` and publishes the **COVERAGE** panel in the RViz HUD (alongside

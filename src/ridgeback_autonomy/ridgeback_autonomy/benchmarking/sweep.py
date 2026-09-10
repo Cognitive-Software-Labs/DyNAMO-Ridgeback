@@ -24,10 +24,11 @@ PATH_SAFE_NAME = re.compile(r'^[A-Za-z0-9][A-Za-z0-9._-]*$')
 TOP_LEVEL_KEYS = frozenset({'sweep', 'defaults', 'configs'})
 SWEEP_METADATA_KEYS = frozenset({'name', 'description'})
 # These belong only to the environment launch, but are legal as sweep-wide
-# defaults: an installation selects its Clearpath setup once, and the detector
-# rate and its diagnostic are fixed for the life of the persistent layer.
+# defaults: an installation selects its Clearpath setup and rendering mode once,
+# and the detector rate and its diagnostic are fixed for the persistent layer.
 ENVIRONMENT_ONLY_DEFAULT_NAMES = frozenset({
     'setup_path',
+    'headless_rendering',
     'detector_fps',
     'detector_debug',
 })
