@@ -126,6 +126,34 @@ else:
 for _ in range(120):
     app.update()
 
+# Re-assert collider drawing AFTER the physx extension has finished loading;
+# set before app.update() it gets clobbered by the extension's own defaults.
+for key in ("/persistent/physics/visualizationDisplayColliders",
+            "/physics/visualizationDisplayColliders"):
+    settings.set(key, True)
+try:
+    from omni.physx import get_physx_visualization_interface
+    get_physx_visualization_interface().enable_visualization(True)
+    print("collider visualisation enabled via omni.physx", flush=True)
+except Exception as exc:
+    print(f"omni.physx visualisation toggle unavailable ({exc}); "
+          f"use the PhysX button in the toolbar", flush=True)
+
+# PhysX only draws collision shapes once cooking has run, which happens when
+# the timeline starts -- with it stopped the debug pass has nothing to draw and
+# the viewport looks like visualisation simply failed.
+if args.compare_colliders:
+    try:
+        import omni.timeline
+        omni.timeline.get_timeline_interface().play()
+        print("timeline playing (required for PhysX to cook and draw shapes)",
+              flush=True)
+    except Exception as exc:
+        print(f"could not start timeline ({exc}); press Play manually",
+              flush=True)
+for _ in range(60):
+    app.update()
+
 print("\nINSPECTOR READY", flush=True)
 try:
     while app.is_running():
