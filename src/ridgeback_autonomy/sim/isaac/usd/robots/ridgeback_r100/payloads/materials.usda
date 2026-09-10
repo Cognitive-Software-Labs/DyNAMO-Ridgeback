@@ -3,16 +3,16 @@
     customLayerData = {
         string creator = "URDF USD Converter v0.1.3"
     }
-    doc = """Generated from Composed Stage of root layer /tmp/tmp3z1oczum/r100-0001.usdc
+    doc = """Generated from Composed Stage of root layer /tmp/tmp7tw9tksz/r100-0001.usdc
 
 
-Generated from Composed Stage of root layer /tmp/urdf_import_ridgeback_r100_9jthanqw/usdex_ridgeback_r100/r100-0001.usdc
+Generated from Composed Stage of root layer /tmp/urdf_import_ridgeback_r100_gr2zgrig/usdex_ridgeback_r100/r100-0001.usdc
 
 
-Generated from Composed Stage of root layer /tmp/urdf_import_ridgeback_r100_9jthanqw/temp_ridgeback_r100/ridgeback_r100.usd
+Generated from Composed Stage of root layer /tmp/urdf_import_ridgeback_r100_gr2zgrig/temp_ridgeback_r100/ridgeback_r100.usd
 
 
-Generated from Composed Stage of root layer /home/deivid/dev/DyNAMO-Ridgeback/.claude/worktrees/isaac/src/ridgeback_autonomy/sim/isaac/usd/robots/ridgeback_r100.usd/ridgeback_r100/payloads/base.usd
+Generated from Composed Stage of root layer /home/deivid/dev/DyNAMO-Ridgeback/.claude/worktrees/isaac/src/ridgeback_autonomy/sim/isaac/usd/robots/ridgeback_r100.usd/ridgeback_r100_1/payloads/base.usd
 """
     kilogramsPerUnit = 1
     metersPerUnit = 1
@@ -214,6 +214,39 @@ def Scope "Materials"
             prepend float inputs:metallic.connect = </Materials/clearpath_dark_grey.inputs:metallic>
             prepend float inputs:opacity.connect = </Materials/clearpath_dark_grey.inputs:opacity>
             prepend float inputs:roughness.connect = </Materials/clearpath_dark_grey.inputs:roughness>
+            token outputs:displacement
+            token outputs:surface
+        }
+    }
+
+    def Material "clearpath_aluminum"
+    {
+        color3f inputs:diffuseColor = (0.21404114, 0.21404114, 0.21404114)
+        float inputs:metallic = 0
+        float inputs:opacity = 1
+        float inputs:roughness = 0.5
+        token inputs:wrapMode = "repeat"
+        token outputs:displacement (
+            displayGroup = "Outputs"
+        )
+        prepend token outputs:displacement.connect = </Materials/clearpath_aluminum/PreviewSurface.outputs:displacement>
+        token outputs:surface (
+            displayGroup = "Outputs"
+        )
+        prepend token outputs:surface.connect = </Materials/clearpath_aluminum/PreviewSurface.outputs:surface>
+        token outputs:volume (
+            displayGroup = "Outputs"
+        )
+
+        def Shader "PreviewSurface" (
+            apiSchemas = ["NodeDefAPI"]
+        )
+        {
+            token info:id = "UsdPreviewSurface"
+            prepend color3f inputs:diffuseColor.connect = </Materials/clearpath_aluminum.inputs:diffuseColor>
+            prepend float inputs:metallic.connect = </Materials/clearpath_aluminum.inputs:metallic>
+            prepend float inputs:opacity.connect = </Materials/clearpath_aluminum.inputs:opacity>
+            prepend float inputs:roughness.connect = </Materials/clearpath_aluminum.inputs:roughness>
             token outputs:displacement
             token outputs:surface
         }

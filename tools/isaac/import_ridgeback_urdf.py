@@ -477,6 +477,21 @@ def attach_visual_meshes(app, usd_path: Path, urdf_path: Path) -> None:
             if not slot:
                 slot = stage.DefinePrim(
                     link_prim.GetPath().AppendChild(safe), "Xform")
+
+            # The importer marks some visual slots instanceable, and USD
+            # refuses to author inside an instance proxy -- DefinePrim below
+            # then throws. Seen switching the RealSense from d435 (a DAE,
+            # which came through as a plain hierarchy) to d455 (a lone STL,
+            # which the importer instanced). De-instance the ancestor chain;
+            # each mesh is referenced exactly once here, so instancing buys
+            # nothing.
+            anc = slot
+            while anc.IsValid() and not anc.IsPseudoRoot():
+                if anc.IsInstanceable():
+                    anc.SetInstanceable(False)
+                    print(f"  de-instanced {anc.GetPath()} "
+                          f"(cannot author into an instance proxy)", flush=True)
+                anc = anc.GetParent()
             dst, unit_scale = convert(src)
             # reference on a CHILD prim, never on the slot: direct arcs
             # beat ancestral ones, so a reference on the slot itself lets
@@ -711,25 +726,35 @@ def _bind(prim, material) -> None:
     UsdShade.MaterialBindingAPI(prim).Bind(material)
 
 
-def _paint_sensors(stage, root_path: str, dark) -> int:
-    """Give the lidar and camera meshes a sensible colour.
+CAMERA_MESH_TOKENS = ("/d435/", "/d435i/", "/d455/", "/realsense/")
 
-    The STL/DAE converter binds a flat white `DefaultMaterial` to the Hokuyo
-    geometry, so both scanners render as white blocks against the vendor
-    chassis's proper materials. Those bindings are *direct* on the mesh, so an
-    inherited binding on the parent would lose -- rebind each mesh.
+
+def _paint_sensors(stage, root_path: str, dark, silver):
+    """Give the lidar and camera meshes sensible colours.
+
+    The converter binds a flat white `DefaultMaterial` to any mesh whose
+    source carried no material, so the Hokuyos render as white blocks against
+    the vendor chassis's proper colours. The D455 arrives the same way -- it
+    ships as a lone STL, unlike the D435's DAE, which brought its own silver
+    materials along. Those bindings are *direct* on the mesh, so an inherited
+    binding on the parent would lose; rebind each mesh.
+
+    Lidars take a dark grey, the RealSense a silver, matching the real bodies.
     """
-    from pxr import Usd, UsdGeom
+    from pxr import UsdGeom
 
-    painted = 0
+    lidars = cameras = 0
     for prim in stage.Traverse():
         path = str(prim.GetPath())
         if not path.startswith(root_path) or not prim.IsA(UsdGeom.Mesh):
             continue
-        if any(tok in path for tok in SENSOR_MESH_TOKENS):
+        if any(tok in path for tok in CAMERA_MESH_TOKENS):
+            _bind(prim, silver)
+            cameras += 1
+        elif any(tok in path for tok in SENSOR_MESH_TOKENS):
             _bind(prim, dark)
-            painted += 1
-    return painted
+            lidars += 1
+    return lidars, cameras
 
 
 def _camera_mesh_bounds(stage):
@@ -783,6 +808,10 @@ def _author_camera_mast(stage, chassis_prim) -> None:
                              (0.045, 0.045, 0.05), 0.0, 0.55)
     sensor_grey = _ensure_material(stage, f"{mats}/sensor_dark_grey",
                                    (0.14, 0.145, 0.16), 0.25, 0.45)
+    # The real D455 is a brushed-aluminium bar; the D435's DAE used to supply
+    # that silver itself, but the D455 ships as a bare STL with no materials.
+    camera_silver = _ensure_material(stage, f"{mats}/camera_silver",
+                                     (0.80, 0.81, 0.83), 0.90, 0.22)
 
     def box(name, centre, size, material, collide=True):
         cube = UsdGeom.Cube.Define(
@@ -823,10 +852,11 @@ def _author_camera_mast(stage, chassis_prim) -> None:
             print(f"camera standoff: {span*1000:.1f} mm bracket, black, "
                   f"x {x0:.4f}..{x1:.4f} at z {zc:.4f}", flush=True)
 
-    painted = _paint_sensors(stage, str(chassis_prim.GetPath().GetParentPath()),
-                             sensor_grey)
-    print(f"sensor meshes re-coloured: {painted} "
-          f"(lidars + RealSense; the converter left them flat white)",
+    lidars, cameras = _paint_sensors(
+        stage, str(chassis_prim.GetPath().GetParentPath()),
+        sensor_grey, camera_silver)
+    print(f"sensor meshes re-coloured: {lidars} lidar (dark grey) + "
+          f"{cameras} camera (silver); the converter left them flat white",
           flush=True)
 
 

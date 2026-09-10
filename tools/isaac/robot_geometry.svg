@@ -53,12 +53,12 @@
 <!-- mast -->
 <rect class="mast" x="363.6" y="75.8" width="13.5" height="293.4"/>
 <!-- standoff bracket -->
-<rect x="377.1" y="97.9" width="16.1" height="10.8" fill="#1b1d22" stroke="#1b1d22" stroke-width="0.8"/>
+<rect x="377.1" y="92.2" width="16.1" height="10.8" fill="#1b1d22" stroke="#1b1d22" stroke-width="0.8"/>
 <!-- camera -->
-<rect class="sens" x="393.2" y="93.8" width="9.1" height="9"/>
+<rect class="sens" x="393.2" y="92.4" width="9.4" height="10.4"/>
 <text class="lbl" x="412" y="86">D455</text>
 <text class="monod" x="412" y="100">bracketed to the mast's FRONT face</text>
-<text class="monod" x="412" y="114">44.8 mm black standoff — not top-mounted</text>
+<text class="monod" x="412" y="114">44.7 mm black standoff — not top-mounted</text>
 <text class="monod" x="412" y="128">mast runs 50 mm past the camera top</text>
 
 <!-- height dimensions on the left -->
@@ -114,7 +114,7 @@
 <!-- mast -->
 <rect class="mast" x="360.1" y="693.6" width="12.8" height="12.8"/>
 <!-- camera -->
-<rect class="sens" x="388" y="684.7" width="8.6" height="30.6"/>
+<rect class="sens" x="388.1" y="678.9" width="8.8" height="42.2"/>
 
 <text class="monod" x="433" y="686" text-anchor="middle">front lidar</text>
 <text class="monod" x="166" y="686" text-anchor="middle">rear lidar (yaw 180°)</text>
@@ -131,24 +131,25 @@
 <text class="mono" x="298" y="876" text-anchor="middle">0.9325 long  (x −0.4706 … +0.4618)</text>
 
 <!-- notes -->
-<rect x="580" y="596" width="278" height="300" rx="6" fill="#f5f6f8" stroke="#e2e5e9"/>
+<rect x="580" y="596" width="278" height="312" rx="6" fill="#f5f6f8" stroke="#e2e5e9"/>
 <text class="lbl" x="596" y="620">Mounting notes</text>
 <text class="monod" x="596" y="644">lidar2d_0_laser  (+0.3922, 0, 0.2264)</text>
 <text class="monod" x="596" y="660">lidar2d_1_laser  (−0.3922, 0, 0.2264)</text>
 <text class="monod" x="596" y="676">D455 bottom       z 1.0200, x +0.2716</text>
 <text class="monod" x="596" y="692">mast 37.5 mm sq   x +0.1955, y 0</text>
 <text class="monod" x="596" y="708">mast spans z      0.280 → 1.095</text>
-<text class="monod" x="596" y="724">standoff          44.8 mm, black</text>
+<text class="monod" x="596" y="724">standoff          44.7 mm, black</text>
+<text class="monod" x="596" y="740">D455 body         124 x 26 x 29 mm</text>
 
-<text class="sub" x="596" y="748">Both lidars are coplanar and recessed in</text>
-<text class="sub" x="596" y="762">the body notch — they are NOT deck-</text>
-<text class="sub" x="596" y="776">mounted. Casings span z 0.179–0.249,</text>
-<text class="sub" x="596" y="790">origin at the unit's base, laser +0.0474</text>
-<text class="sub" x="596" y="804">above it.</text>
+<text class="sub" x="596" y="756">Both lidars are coplanar and recessed in</text>
+<text class="sub" x="596" y="770">the body notch — they are NOT deck-</text>
+<text class="sub" x="596" y="784">mounted. Casings span z 0.179–0.249,</text>
+<text class="sub" x="596" y="798">origin at the unit's base, laser +0.0474</text>
+<text class="sub" x="596" y="812">above it.</text>
 
-<text class="sub" x="596" y="826">Mast base clears the scan plane by</text>
-<text class="sub" x="596" y="842">53.6 mm. The flared base plate is not</text>
-<text class="sub" x="596" y="858">modelled, so real clearance is smaller.</text>
+<text class="sub" x="596" y="834">Mast base clears the scan plane by</text>
+<text class="sub" x="596" y="850">53.6 mm. The flared base plate is not</text>
+<text class="sub" x="596" y="866">modelled, so real clearance is smaller.</text>
 
 <text class="sub" x="596" y="884">Verified: 0/1081 self-returns, ±135°.</text>
 </svg>

@@ -3,7 +3,6 @@
     customLayerData = {
         string creator = "URDF USD Converter v0.1.3"
     }
-    defaultPrim = "tn__r1000001_bC"
     doc = """Generated from Composed Stage of root layer /tmp/tmp7tw9tksz/r100-0001.usdc
 
 
@@ -17,38 +16,31 @@ Generated from Composed Stage of root layer /home/deivid/dev/DyNAMO-Ridgeback/.c
 """
     kilogramsPerUnit = 1
     metersPerUnit = 1
-    subLayers = [
-        @./physics.usda@
-    ]
     upAxis = "Z"
 )
 
-over "tn__r1000001_bC"
+def Scope "Instances"
 {
-    over "Physics"
+    def Xform "d455" (
+        prepend references = @./geometries.usd@</Geometries/d455>
+    )
     {
-        over "front_left_wheel_joint" (
-            prepend apiSchemas = ["PhysxJointAPI"]
+        over "d455" (
+            apiSchemas = ["MaterialBindingAPI"]
         )
         {
+            custom rel material:binding
+            prepend rel material:binding = </Instances/d455/VisualMaterials/clearpath_aluminum>
         }
 
-        over "front_right_wheel_joint" (
-            prepend apiSchemas = ["PhysxJointAPI"]
-        )
+        def Scope "VisualMaterials"
         {
-        }
-
-        over "rear_left_wheel_joint" (
-            prepend apiSchemas = ["PhysxJointAPI"]
-        )
-        {
-        }
-
-        over "rear_right_wheel_joint" (
-            prepend apiSchemas = ["PhysxJointAPI"]
-        )
-        {
+            def Material "clearpath_aluminum" (
+                instanceable = true
+                prepend references = @./materials.usda@</Materials/clearpath_aluminum>
+            )
+            {
+            }
         }
     }
 }
