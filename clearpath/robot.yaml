@@ -28,7 +28,7 @@ sensors:
       rpy: [0.0, 0.0, 0.0]
     - model: hokuyo_ust
       parent: default_mount
-      xyz: [-0.3922, 0.0, 0.05]
+      xyz: [-0.3922, 0.0, 0.0]
       rpy: [0.0, 0.0, 3.14159]
   camera:
     - model: intel_realsense

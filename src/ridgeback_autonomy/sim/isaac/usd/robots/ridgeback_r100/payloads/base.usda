@@ -500,7 +500,7 @@ def Xform "tn__r1000001_bC" (
                         {
                             quatf xformOp:orient = (0.0000013267949, 0, 0, 1)
                             float3 xformOp:scale = (1, 1, 1)
-                            double3 xformOp:translate = (-0.3922, 0, 0.05)
+                            double3 xformOp:translate = (-0.3922, 0, 0)
                             uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient", "xformOp:scale"]
 
                             def Xform "hokuyo_ust" (
