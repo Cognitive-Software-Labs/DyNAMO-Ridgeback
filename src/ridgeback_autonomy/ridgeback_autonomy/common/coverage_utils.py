@@ -34,8 +34,19 @@ OCCUPIED = 1
 def pgm_to_grid(pgm_path: Path):
     """Load a PGM + companion YAML and return a normalised int8 grid + meta dict.
 
-    PGM pixel convention (ROS default, negate=0): pixels >= 200 are free,
-    <= 50 occupied, the rest unknown.
+    Classification follows the map_server trinary rule using the companion
+    YAML's own thresholds: occupancy p = (255 - px)/255 (or px/255 when
+    negate=1), then p > occupied_thresh is occupied, p < free_thresh is free,
+    and anything between is unknown.
+
+    This used to be a hardcoded `px >= 200 -> free`, which silently swallowed
+    the conventional unknown grey (205, p = 0.196078) into FREE -- 205 >= 200.
+    Every unknown cell then landed in the gt-free denominator that `complete`
+    divides by, understating coverage. The effect is bounded by the crop
+    `align_grids` takes (out-of-building unknown is mostly outside the SLAM
+    map), so it measured ~1 point of `complete` and ~3 of `accuracy` on a
+    hospital run in progress -- but it grows with the SLAM map's extent, and
+    the map's own YAML always said 205 was unknown.
     """
     pgm_path = Path(pgm_path)
     img = cv2.imread(str(pgm_path), cv2.IMREAD_GRAYSCALE)
@@ -48,9 +59,10 @@ def pgm_to_grid(pgm_path: Path):
     with open(yaml_path) as f:
         meta = yaml.safe_load(f)
 
+    p = img / 255.0 if meta.get('negate', 0) else (255.0 - img) / 255.0
     grid = np.full(img.shape, UNKNOWN, dtype=np.int8)
-    grid[img >= 200] = FREE
-    grid[img <= 50] = OCCUPIED
+    grid[p < float(meta.get('free_thresh', 0.196))] = FREE
+    grid[p > float(meta.get('occupied_thresh', 0.65))] = OCCUPIED
 
     return grid, meta
 
