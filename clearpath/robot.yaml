@@ -23,12 +23,12 @@ mounts: {}
 sensors:
   lidar2d:
     - model: hokuyo_ust
-      parent: default_mount
-      xyz: [0.3922, 0.0, 0.0]
+      parent: base_link
+      xyz: [0.3922, 0.0, 0.179]
       rpy: [0.0, 0.0, 0.0]
     - model: hokuyo_ust
-      parent: default_mount
-      xyz: [-0.3922, 0.0, 0.0]
+      parent: base_link
+      xyz: [-0.3922, 0.0, 0.179]
       rpy: [0.0, 0.0, 3.14159]
   camera:
     - model: intel_realsense

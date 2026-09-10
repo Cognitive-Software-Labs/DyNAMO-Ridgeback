@@ -4,16 +4,16 @@
         string creator = "URDF USD Converter v0.1.3"
     }
     defaultPrim = "tn__r1000001_bC"
-    doc = """Generated from Composed Stage of root layer /tmp/tmpq3z8vj71/r100-0001.usdc
+    doc = """Generated from Composed Stage of root layer /tmp/tmpakuxzuat/r100-0001.usdc
 
 
-Generated from Composed Stage of root layer /tmp/urdf_import_ridgeback_r100_08j9comu/usdex_ridgeback_r100/r100-0001.usdc
+Generated from Composed Stage of root layer /tmp/urdf_import_ridgeback_r100_5ywu0nza/usdex_ridgeback_r100/r100-0001.usdc
 
 
-Generated from Composed Stage of root layer /tmp/urdf_import_ridgeback_r100_08j9comu/temp_ridgeback_r100/ridgeback_r100.usd
+Generated from Composed Stage of root layer /tmp/urdf_import_ridgeback_r100_5ywu0nza/temp_ridgeback_r100/ridgeback_r100.usd
 
 
-Generated from Composed Stage of root layer /home/deivid/dev/DyNAMO-Ridgeback/.claude/worktrees/jolly-borg-f48cab/src/ridgeback_autonomy/sim/isaac/usd/robots/ridgeback_r100.usd/ridgeback_r100/payloads/base.usd
+Generated from Composed Stage of root layer /home/deivid/dev/DyNAMO-Ridgeback/.claude/worktrees/isaac/src/ridgeback_autonomy/sim/isaac/usd/robots/ridgeback_r100.usd/ridgeback_r100/payloads/base.usd
 """
     kilogramsPerUnit = 1
     metersPerUnit = 1
@@ -469,60 +469,6 @@ def Xform "tn__r1000001_bC" (
                         double3 xformOp:translate = (0, 0, 0.07500000000000001)
                         uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient", "xformOp:scale"]
 
-                        def Xform "lidar2d_0_link"
-                        {
-                            quatf xformOp:orient = (1, 0, 0, 0)
-                            float3 xformOp:scale = (1, 1, 1)
-                            double3 xformOp:translate = (0.3922, 0, 0)
-                            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient", "xformOp:scale"]
-
-                            def Xform "hokuyo_ust" (
-                                prepend apiSchemas = ["MaterialBindingAPI"]
-                            )
-                            {
-                                rel material:binding = </tn__r1000001_bC/Materials/clearpath_dark_grey>
-                                quatf xformOp:orient = (1, 0, 0, 0)
-                                float3 xformOp:scale = (1, 1, 1)
-                                double3 xformOp:translate = (0, 0, 0)
-                                uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient", "xformOp:scale"]
-                            }
-
-                            def Xform "lidar2d_0_laser"
-                            {
-                                quatf xformOp:orient = (1, 0, 0, 0)
-                                float3 xformOp:scale = (1, 1, 1)
-                                double3 xformOp:translate = (0, 0, 0.0474)
-                                uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient", "xformOp:scale"]
-                            }
-                        }
-
-                        def Xform "lidar2d_1_link"
-                        {
-                            quatf xformOp:orient = (0.0000013267949, 0, 0, 1)
-                            float3 xformOp:scale = (1, 1, 1)
-                            double3 xformOp:translate = (-0.3922, 0, 0)
-                            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient", "xformOp:scale"]
-
-                            def Xform "hokuyo_ust" (
-                                prepend apiSchemas = ["MaterialBindingAPI"]
-                            )
-                            {
-                                rel material:binding = </tn__r1000001_bC/Materials/clearpath_dark_grey>
-                                quatf xformOp:orient = (1, 0, 0, 0)
-                                float3 xformOp:scale = (1, 1, 1)
-                                double3 xformOp:translate = (0, 0, 0)
-                                uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient", "xformOp:scale"]
-                            }
-
-                            def Xform "lidar2d_1_laser"
-                            {
-                                quatf xformOp:orient = (1, 0, 0, 0)
-                                float3 xformOp:scale = (1, 1, 1)
-                                double3 xformOp:translate = (0, 0, 0.0474)
-                                uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient", "xformOp:scale"]
-                            }
-                        }
-
                         def Xform "camera_0_bottom_screw_frame"
                         {
                             quatf xformOp:orient = (1, 0, 0, 0)
@@ -595,6 +541,60 @@ def Xform "tn__r1000001_bC" (
                     quatf xformOp:orient = (1, 0, 0, 0)
                     float3 xformOp:scale = (1, 1, 1)
                     double3 xformOp:translate = (0.2085, -0.2902, 0.1681)
+                    uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient", "xformOp:scale"]
+                }
+            }
+
+            def Xform "lidar2d_0_link"
+            {
+                quatf xformOp:orient = (1, 0, 0, 0)
+                float3 xformOp:scale = (1, 1, 1)
+                double3 xformOp:translate = (0.3922, 0, 0.179)
+                uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient", "xformOp:scale"]
+
+                def Xform "hokuyo_ust" (
+                    prepend apiSchemas = ["MaterialBindingAPI"]
+                )
+                {
+                    rel material:binding = </tn__r1000001_bC/Materials/clearpath_dark_grey>
+                    quatf xformOp:orient = (1, 0, 0, 0)
+                    float3 xformOp:scale = (1, 1, 1)
+                    double3 xformOp:translate = (0, 0, 0)
+                    uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient", "xformOp:scale"]
+                }
+
+                def Xform "lidar2d_0_laser"
+                {
+                    quatf xformOp:orient = (1, 0, 0, 0)
+                    float3 xformOp:scale = (1, 1, 1)
+                    double3 xformOp:translate = (0, 0, 0.0474)
+                    uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient", "xformOp:scale"]
+                }
+            }
+
+            def Xform "lidar2d_1_link"
+            {
+                quatf xformOp:orient = (0.0000013267949, 0, 0, 1)
+                float3 xformOp:scale = (1, 1, 1)
+                double3 xformOp:translate = (-0.3922, 0, 0.179)
+                uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient", "xformOp:scale"]
+
+                def Xform "hokuyo_ust" (
+                    prepend apiSchemas = ["MaterialBindingAPI"]
+                )
+                {
+                    rel material:binding = </tn__r1000001_bC/Materials/clearpath_dark_grey>
+                    quatf xformOp:orient = (1, 0, 0, 0)
+                    float3 xformOp:scale = (1, 1, 1)
+                    double3 xformOp:translate = (0, 0, 0)
+                    uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient", "xformOp:scale"]
+                }
+
+                def Xform "lidar2d_1_laser"
+                {
+                    quatf xformOp:orient = (1, 0, 0, 0)
+                    float3 xformOp:scale = (1, 1, 1)
+                    double3 xformOp:translate = (0, 0, 0.0474)
                     uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient", "xformOp:scale"]
                 }
             }
