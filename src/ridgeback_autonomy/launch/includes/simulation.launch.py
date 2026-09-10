@@ -17,6 +17,7 @@ def generate_launch_description():
     world = LaunchConfiguration('world')
     clearpath_rviz = LaunchConfiguration('clearpath_rviz')
     gz_gui = LaunchConfiguration('gz_gui')
+    headless_rendering = LaunchConfiguration('headless_rendering')
 
     return LaunchDescription([
         DeclareLaunchArgument(
@@ -38,6 +39,12 @@ def generate_launch_description():
             'gz_gui',
             default_value='true',
             description='Launch the Gazebo GUI window',
+        ),
+        DeclareLaunchArgument(
+            'headless_rendering',
+            default_value='false',
+            description='Render server sensors via EGL without an X display '
+                        '(GPU rendering for non-seat/SSH sessions; see ISSUES.md)',
         ),
         # Add our worlds and models directories so Gazebo can find them
         AppendEnvironmentVariable(
@@ -63,9 +70,12 @@ def generate_launch_description():
                 'use_sim_time': 'true',
                 # Clearpath's simulation launch uses this flag for its actual
                 # server-only mode.  Passing a made-up ``gz_gui`` argument is
-                # silently ignored by launch, leaving a GUI client behind.
+                # silently ignored by launch. Keep the benchmark's historical
+                # gz_gui:=false switch and the explicit EGL option: either one
+                # requests Clearpath's server-only headless mode.
                 'headless_rendering': PythonExpression([
-                    "'false' if '", gz_gui, "' == 'true' else 'true'",
+                    "'false' if '", gz_gui, "' == 'true' and '",
+                    headless_rendering, "' == 'false' else 'true'",
                 ]),
             }.items(),
         ),

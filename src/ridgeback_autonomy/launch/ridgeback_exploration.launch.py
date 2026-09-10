@@ -176,7 +176,6 @@ def generate_launch_description():
     exploration_rviz = LaunchConfiguration('exploration_rviz')
     target_localization_enabled = LaunchConfiguration('target_localization_enabled')
     mppi_visualize = LaunchConfiguration('mppi_visualize')
-    explorer = LaunchConfiguration('explorer')
     coverage_overlay_enabled = LaunchConfiguration('coverage_overlay_enabled')
 
     rviz_config = os.path.join(pkg_this, 'sim', 'rviz', 'exploration.rviz')
@@ -258,10 +257,11 @@ def generate_launch_description():
                                           'silhouette'),
         DeclareLaunchArgument('mppi_visualize', default_value='false',
                               description='Publish MPPI trajectory visualization topics'),
-        DeclareLaunchArgument('explorer', default_value='explore_lite',
-                              description='Which explorer to use: "explore_lite" or "custom"'),
         DeclareLaunchArgument('coverage_overlay_enabled', default_value='true',
                               description='Publish the live exploration-coverage HUD panel'),
+        DeclareLaunchArgument('headless_rendering', default_value='false',
+                              description='Render Gazebo server sensors via EGL without an X '
+                                          'display (GPU rendering for SSH sessions; ISSUES.md)'),
 
         # RViz2
         Node(
@@ -292,6 +292,7 @@ def generate_launch_description():
                 'setup_path': setup_path,
                 'world': world,
                 'clearpath_rviz': 'false',
+                'headless_rendering': LaunchConfiguration('headless_rendering'),
             }.items(),
         ),
 
@@ -340,7 +341,6 @@ def generate_launch_description():
                     launch_arguments={
                         'namespace': namespace,
                         'use_sim_time': use_sim_time,
-                        'explorer': explorer,
                     }.items(),
                 ),
             ],

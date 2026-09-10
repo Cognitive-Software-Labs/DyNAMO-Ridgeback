@@ -57,6 +57,7 @@ def generate_launch_description():
     color_topic = LaunchConfiguration('color_topic')
     exploration_rviz = LaunchConfiguration('exploration_rviz')
     gz_gui = LaunchConfiguration('gz_gui')
+    headless_rendering = LaunchConfiguration('headless_rendering')
 
     return LaunchDescription([
         *cyclonedds_actions(pkg_this),
@@ -81,6 +82,11 @@ def generate_launch_description():
             'gz_gui',
             default_value='true',
             description='Launch the Gazebo GUI window',
+        ),
+        DeclareLaunchArgument(
+            'headless_rendering',
+            default_value='false',
+            description='Optional server-only EGL sensor rendering without an X display',
         ),
         # The detector belongs to this persistent layer, so its rate is fixed
         # for a whole sweep: a per-config layer cannot change it.
@@ -121,6 +127,7 @@ def generate_launch_description():
                 'world': world,
                 'clearpath_rviz': 'false',
                 'gz_gui': gz_gui,
+                'headless_rendering': headless_rendering,
             }.items(),
         ),
 

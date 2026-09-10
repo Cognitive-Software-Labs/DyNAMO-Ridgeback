@@ -233,8 +233,9 @@ def _resume_signature(spec: SweepSpec, configs: tuple[SweepConfig, ...]) -> dict
 
     ignored = {'output_dir', 'run_dir_name', 'shutdown_on_complete'}
     environment = _shared_arguments(spec)
-    if 'setup_path' in spec.defaults:
-        environment['setup_path'] = spec.defaults['setup_path']
+    for name in sorted(ENVIRONMENT_ONLY_DEFAULT_NAMES):
+        if name in spec.defaults:
+            environment[name] = spec.defaults[name]
     return {
         'sweep_source_sha256': _file_sha256(spec.source),
         'environment': environment,

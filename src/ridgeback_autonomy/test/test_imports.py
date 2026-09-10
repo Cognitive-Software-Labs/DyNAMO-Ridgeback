@@ -128,7 +128,6 @@ def test_packaged_modules_import() -> None:
         'ridgeback_autonomy.diagnostics.hud_node',
         'ridgeback_autonomy.diagnostics.coverage_overlay_node',
         'ridgeback_autonomy.frontier_explorer.navigator',
-        'ridgeback_autonomy.frontier_explorer.path_finding',
         'ridgeback_autonomy.frontier_explorer.frontier_explorer_node',
     ]
 

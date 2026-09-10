@@ -105,7 +105,7 @@ def test_sweep_rejects_duplicate_and_unsafe_names(tmp_path) -> None:
     'field',
     [
         'world', 'setup_path', 'namespace', 'use_sim_time', 'color_topic',
-        'detector_fps', 'detector_debug',
+        'headless_rendering', 'detector_fps', 'detector_debug',
     ],
 )
 def test_sweep_rejects_environment_key_on_config(tmp_path, field) -> None:
@@ -136,6 +136,16 @@ def test_sweep_accepts_detector_settings_as_defaults(
 
     assert spec.defaults[field] == expected
     assert field not in spec.configs[0].arguments
+
+
+def test_sweep_accepts_headless_rendering_as_environment_default(tmp_path) -> None:
+    document = _document(tmp_path)
+    document['defaults']['headless_rendering'] = True
+
+    spec = parse_sweep(document)
+
+    assert spec.defaults['headless_rendering'] == 'true'
+    assert 'headless_rendering' not in spec.configs[0].arguments
 
 
 @pytest.mark.parametrize(

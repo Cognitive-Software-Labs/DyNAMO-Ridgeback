@@ -68,8 +68,17 @@ CONFIG_LAUNCH_ARGUMENT_NAMES = frozenset({
 })
 
 ENV_LAYER_CONFIG_KEYS = frozenset({
-    'world', 'setup_path', 'namespace', 'use_sim_time', 'color_topic',
-    'detector_fps', 'detector_debug',
+    'world',
+    'setup_path',
+    'namespace',
+    'use_sim_time',
+    'color_topic',
+    'headless_rendering',
+    # The detector lives in the persistent layer, so its rate and diagnostic
+    # are properties of a whole sweep. A per-config value would silently apply
+    # to every other config too.
+    'detector_fps',
+    'detector_debug',
 })
 
 def workspace_root_from_package_share(package_share: str) -> str:

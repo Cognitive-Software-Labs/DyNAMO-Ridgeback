@@ -97,7 +97,6 @@ Measured drift at the moment of pinning:
 | `clearpath_msgs` | `5d04171` | `36b9529` | 15 |
 | `clearpath_simulator` | `25997cb` | `590a451` | 13 |
 | `slam_toolbox` | `ec8f763` | `02afdde` | 4 |
-| `m-explore-ros2` | `86742bf` | `326cf8a` | 1 |
 
 Checked against those tips, `clearpath_gz_customizations.patch` and
 `slam_toolbox_tf_namespace.patch` still applied cleanly;
