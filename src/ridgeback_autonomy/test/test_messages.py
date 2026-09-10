@@ -2,16 +2,21 @@ from __future__ import annotations
 
 import math
 
+import numpy as np
 import pytest
+from sensor_msgs.msg import LaserScan
 from std_msgs.msg import Header
 
+from ridgeback_autonomy.common.markers import PolarBeamRecord
 from ridgeback_autonomy.common.messages import (
     batch_from_detections_message,
     batch_from_measurements_message,
     build_detections_message,
     build_measurements_message,
+    build_polar_beams_message,
     decode_optional_status,
     optional_status,
+    polar_beam_booleans,
     snapshot_measurements_message,
 )
 from ridgeback_autonomy.common.miss_reason import MissReason
@@ -192,3 +197,73 @@ def test_unset_status_decodes_to_none() -> None:
     decoded = batch_from_measurements_message(build_measurements_message(batch, Header()))
 
     assert decoded.detections[0].projective_ranging_status is None
+
+
+def scan_message(beam_count: int, sec: int = 7, nanosec: int = 500) -> LaserScan:
+    scan = LaserScan()
+    scan.header.frame_id = 'lidar2d_0_laser'
+    scan.header.stamp.sec = sec
+    scan.header.stamp.nanosec = nanosec
+    scan.ranges = [1.0] * beam_count
+    return scan
+
+
+def beam_record(index: int, selected, merged) -> PolarBeamRecord:
+    return PolarBeamRecord(
+        detection_index=index,
+        selected=np.array(selected, dtype=np.intp),
+        merged=np.array(merged, dtype=np.intp),
+        in_bbox=np.array(selected, dtype=np.intp),
+    )
+
+
+def test_polar_beams_message_unions_across_detections() -> None:
+    # Two robots at different ranges each keep their own band. The single-band
+    # union the overlay used to compute would have dropped the far one entirely.
+    records = [
+        beam_record(0, [1, 2, 3], [2, 3]),
+        beam_record(1, [3, 8, 9], [8, 9]),
+    ]
+    header = Header()
+    header.stamp.sec = 42
+    header.frame_id = 'camera_0_color_optical_frame'
+
+    msg = build_polar_beams_message(records, scan_message(12), header)
+
+    assert list(msg.selected) == [1, 2, 3, 8, 9]  # sorted, de-duplicated
+    assert list(msg.merged) == [2, 3, 8, 9]
+    assert msg.beam_count == 12
+    # Two stamps: the frame this explains, and the scan the indices index into.
+    assert msg.header.stamp.sec == 42
+    assert (msg.scan_stamp.sec, msg.scan_stamp.nanosec) == (7, 500)
+    assert msg.scan_frame_id == 'lidar2d_0_laser'
+
+
+def test_polar_beams_message_with_no_records_is_empty_not_absent() -> None:
+    msg = build_polar_beams_message([], scan_message(12), Header())
+
+    assert list(msg.selected) == []
+    assert list(msg.merged) == []
+    assert msg.beam_count == 12
+
+
+def test_polar_beam_booleans_round_trip_marks_used_and_dropped() -> None:
+    records = [beam_record(0, [1, 2, 3], [2, 3])]
+
+    msg = build_polar_beams_message(records, scan_message(6), Header())
+    used, dropped = polar_beam_booleans(msg, 6)
+
+    assert list(np.flatnonzero(used)) == [2, 3]
+    # Selected but discarded by the range band -- the distinction the panel
+    # exists to draw, and the one a used-only highlight cannot express.
+    assert list(np.flatnonzero(dropped)) == [1]
+
+
+def test_polar_beam_booleans_refuse_a_mismatched_beam_count() -> None:
+    # Indexing a differently sized scan would shift the highlight onto beams the
+    # estimator never touched. A missing highlight is the required failure mode.
+    msg = build_polar_beams_message(
+        [beam_record(0, [1, 2], [2])], scan_message(6), Header())
+
+    assert polar_beam_booleans(msg, 7) is None
+    assert polar_beam_booleans(msg, 6) is not None

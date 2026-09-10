@@ -1052,16 +1052,65 @@ def _mask_node(source, **parameters):
     )
 
 
-def test_ray_debug_records_skipped_with_no_subscriber(ros_context) -> None:
+def test_beam_records_skipped_when_nothing_consumes_them(ros_context) -> None:
     node = _mask_node(
         _StubDepthSource('depth'), enabled_estimators='polar_profiling')
     try:
         node.ray_marker_pub.get_subscription_count = lambda: 0
+        node.polar_beams_pub.get_subscription_count = lambda: 0
 
-        assert node.ray_marker_records() is None
+        assert node.polar_beam_records() is None
 
         node.ray_marker_pub.get_subscription_count = lambda: 1
-        assert node.ray_marker_records() == []
+        assert node.polar_beam_records() == []
+    finally:
+        node.destroy_node()
+
+
+def test_beam_records_allocated_for_the_beams_topic_alone(ros_context) -> None:
+    # The two publishers read one list of records, so a run with the overlay
+    # subscribed but the RViz rays hidden must still collect them.
+    node = _mask_node(
+        _StubDepthSource('depth'), enabled_estimators='polar_profiling')
+    try:
+        node.ray_marker_pub.get_subscription_count = lambda: 0
+        node.polar_beams_pub.get_subscription_count = lambda: 1
+
+        assert node.polar_beam_records() == []
+    finally:
+        node.destroy_node()
+
+
+def test_polar_beams_publish_rechecks_subscriber_before_build(ros_context) -> None:
+    node = _mask_node(
+        _StubDepthSource('depth'), enabled_estimators='polar_profiling')
+    node.polar_beams_pub = _DebugPublisher(0)
+    try:
+        node.publish_polar_beams([beam_record(0)], LaserScan(), Header())
+        assert node.polar_beams_pub.published == []
+
+        node.polar_beams_pub.subscription_count = 1
+        scan = LaserScan()
+        scan.ranges = [1.0] * 5
+        node.publish_polar_beams([beam_record(0)], scan, Header())
+
+        published = node.polar_beams_pub.published[0]
+        assert list(published.merged) == [1]
+        assert published.beam_count == 5
+    finally:
+        node.destroy_node()
+
+
+def test_polar_beams_are_not_published_without_a_scan(ros_context) -> None:
+    # No scan means no records were collected against one; there is nothing the
+    # indices could be valid against, so nothing is claimed.
+    node = _mask_node(
+        _StubDepthSource('depth'), enabled_estimators='polar_profiling')
+    node.polar_beams_pub = _DebugPublisher(1)
+    try:
+        node.publish_polar_beams([beam_record(0)], None, Header())
+
+        assert node.polar_beams_pub.published == []
     finally:
         node.destroy_node()
 

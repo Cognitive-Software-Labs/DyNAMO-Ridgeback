@@ -8,7 +8,7 @@ from sensor_msgs.msg import Image
 
 from ridgeback_autonomy.common.miss_reason import MissReason
 from ridgeback_autonomy.common.models import Detection, DetectionBatch
-from ridgeback_autonomy.msg import TargetDetections, TargetMeasurements
+from ridgeback_autonomy.msg import PolarBeams, TargetDetections, TargetMeasurements
 
 
 MISSING_FLOAT = float('nan')
@@ -61,6 +61,63 @@ def build_measurements_message(batch: DetectionBatch, header) -> TargetMeasureme
         msg.polar_profiling_status.append(optional_status(detection.polar_profiling_status))
 
     return msg
+
+
+def build_polar_beams_message(records, scan_msg, header) -> PolarBeams:
+    """The frame's polar beam indices, unioned across its detections.
+
+    ``header`` is the detection/measurement stamp so a consumer can key this the
+    way it keys the silhouette artifact; the scan identity travels separately
+    because the indices are only valid against that one array.
+
+    The union is what makes this different from the ray markers, which draw the
+    nearest detection alone to keep the 3D view readable
+    (``docs/target_localization/polar_profiling.md`` Section 4). A 2D panel has no such
+    clutter problem, so every ranged detection is shown.
+    """
+
+    msg = PolarBeams()
+    msg.header = header
+    msg.scan_stamp = scan_msg.header.stamp
+    msg.scan_frame_id = scan_msg.header.frame_id
+    msg.beam_count = len(scan_msg.ranges)
+    msg.selected = union_beam_indices(record.selected for record in records)
+    msg.merged = union_beam_indices(record.merged for record in records)
+    return msg
+
+
+def union_beam_indices(index_arrays) -> np.ndarray:
+    """Sorted, de-duplicated ``uint32`` union of per-detection beam indices."""
+
+    arrays = [np.asarray(indices, dtype=np.uint32).ravel() for indices in index_arrays]
+    if not arrays:
+        return np.empty(0, dtype=np.uint32)
+    return np.unique(np.concatenate(arrays)).astype(np.uint32)
+
+
+def polar_beam_booleans(msg: PolarBeams, beam_count: int):
+    """``(used, dropped)`` per-beam booleans over a scan of ``beam_count`` beams.
+
+    ``None`` when the message was recorded against a differently sized scan: the
+    indices would land on the wrong beams, and a misaligned highlight is worse
+    than none. ``dropped`` is selected-but-discarded -- the set that tells a
+    frame the estimator threw away apart from a frame that saw nothing.
+    """
+
+    if int(msg.beam_count) != int(beam_count):
+        return None
+
+    selected_indices = np.asarray(msg.selected, dtype=np.intp)
+    merged_indices = np.asarray(msg.merged, dtype=np.intp)
+    for indices in (selected_indices, merged_indices):
+        if indices.size and int(indices.max()) >= beam_count:
+            return None
+
+    selected = np.zeros(beam_count, dtype=bool)
+    used = np.zeros(beam_count, dtype=bool)
+    selected[selected_indices] = True
+    used[merged_indices] = True
+    return used, selected & ~used
 
 
 def batch_from_detections_message(msg: TargetDetections) -> DetectionBatch:

@@ -22,9 +22,11 @@ from ridgeback_autonomy.perception.target_localization.estimator_registry import
 from ridgeback_autonomy.common.messages import (
     batch_from_measurements_message,
     build_bgr8_image_message,
+    polar_beam_booleans,
 )
+from ridgeback_autonomy.common.stamps import stamp_key
 from ridgeback_autonomy.common.tf_utils import lookup_transform_components
-from ridgeback_autonomy.msg import TargetMeasurements
+from ridgeback_autonomy.msg import PolarBeams, TargetMeasurements
 from ridgeback_autonomy.perception.target_localization.core.image_utils import (
     convert_color_image_message,
     convert_depth_to_meters_message,
@@ -38,6 +40,7 @@ from ridgeback_autonomy.perception.target_localization.core.polar_profiling impo
 from ridgeback_autonomy.perception.target_localization.core.rendering import (
     PANEL_MAX_COLS_DEFAULT,
     RgbdOverlayRenderer,
+    ScanHighlight,
 )
 from ridgeback_autonomy.perception.target_localization.contracts import (
     ALIGNED_DEPTH_DEBUG_TOPIC,
@@ -46,6 +49,7 @@ from ridgeback_autonomy.perception.target_localization.contracts import (
     MASK_MEASUREMENTS_TOPIC,
     OVERLAY_IMAGE_TOPIC,
     POINTCLOUD_MEASUREMENTS_TOPIC,
+    POLAR_BEAMS_TOPIC,
 )
 from ridgeback_autonomy.perception.target_localization.ground_truth import truth_reading
 
@@ -83,6 +87,7 @@ class TargetOverlayNode(Node):
         self.declare_parameter('aligned_depth_topic', ALIGNED_DEPTH_DEBUG_TOPIC)
         self.declare_parameter('color_camera_info_topic', COLOR_CAMERA_INFO_TOPIC)
         self.declare_parameter('scan_topic', SCAN_TOPIC)
+        self.declare_parameter('polar_beams_topic', POLAR_BEAMS_TOPIC)
         self.declare_parameter('ground_truth_topic', GROUND_TRUTH_TOPIC)
         self.declare_parameter('depth_max_meters', DEPTH_MAX_METERS_DEFAULT)
         # The run config: which estimators, the aligned-depth source, and the
@@ -119,11 +124,15 @@ class TargetOverlayNode(Node):
         self.latest_color_msg: Image | None = None
         self.latest_aligned_depth_msg: Image | None = None
         self.latest_color_info: CameraInfo | None = None
-        self.latest_scan_msg: LaserScan | None = None
         self.latest_truth_msg: PointStamped | None = None
         self.pointcloud_cache: OrderedDict[tuple, TargetMeasurements] = OrderedDict()
         self.mask_cache: OrderedDict[tuple, TargetMeasurements] = OrderedDict()
         self.mask_debug_cache: OrderedDict[tuple[int, int], Image] = OrderedDict()
+        self.polar_beams_cache: OrderedDict[tuple[int, int], PolarBeams] = OrderedDict()
+        # Scans are kept by identity rather than latest-wins because a beams
+        # message names the one its indices belong to, and that is rarely the
+        # newest by the time the measurement it explains has been rendered.
+        self.scan_cache: OrderedDict[tuple[str, int, int], LaserScan] = OrderedDict()
         self.last_matched_silhouette = None
         self.last_scan_tf_fallback: str | None = None
         self.last_color_warning: str | None = None
@@ -131,6 +140,7 @@ class TargetOverlayNode(Node):
         self.last_mask_debug_warning: str | None = None
         self.last_scan_tf_warning: str | None = None
         self.last_scan_decode_warning: str | None = None
+        self.last_beam_count_warning: str | None = None
 
         self.tf_buffer = Buffer(node=self)
         self.tf_listener = TransformListener(self.tf_buffer, self, spin_thread=False)
@@ -166,6 +176,12 @@ class TargetOverlayNode(Node):
             self.create_subscription(
                 LaserScan, self.get_parameter('scan_topic').value,
                 self.scan_callback, qos_profile=qos_profile_sensor_data)
+            # The beams the measuring node actually reduced. Subscribing is what
+            # makes it publish, and what makes this panel show the run it is
+            # drawn on rather than a locally re-derived guess at it.
+            self.create_subscription(
+                PolarBeams, self.get_parameter('polar_beams_topic').value,
+                self.polar_beams_callback, 10)
 
         # The composite is a topic so RViz can hold it alongside the 3D view.
         self.overlay_pub = self.create_publisher(
@@ -185,10 +201,16 @@ class TargetOverlayNode(Node):
         self.render_latest()
 
     def cache_measurement(self, cache: OrderedDict, msg: TargetMeasurements) -> None:
-        key = self.measurement_message_key(msg)
+        self.cache_by_key(cache, self.measurement_message_key(msg), msg)
+
+    # Deep enough to cover the lag between a measurement and the artifacts that
+    # explain it, shallow enough that a stalled consumer cannot grow unbounded.
+    CACHE_DEPTH = 32
+
+    def cache_by_key(self, cache: OrderedDict, key, msg) -> None:
         cache[key] = msg
         cache.move_to_end(key)
-        while len(cache) > 32:
+        while len(cache) > self.CACHE_DEPTH:
             cache.popitem(last=False)
 
     # -- image / scan inputs --
@@ -203,7 +225,8 @@ class TargetOverlayNode(Node):
         self.latest_color_info = info_msg
 
     def scan_callback(self, scan_msg: LaserScan) -> None:
-        self.latest_scan_msg = scan_msg
+        self.cache_by_key(
+            self.scan_cache, self.scan_key(scan_msg.header), scan_msg)
 
     def ground_truth_callback(self, msg: PointStamped) -> None:
         self.latest_truth_msg = msg
@@ -223,17 +246,29 @@ class TargetOverlayNode(Node):
         return (reading.lateral_m, reading.forward_m, reading.distance_m)
 
     def mask_debug_callback(self, mask_msg: Image) -> None:
-        key = (mask_msg.header.stamp.sec, mask_msg.header.stamp.nanosec)
-        self.mask_debug_cache[key] = mask_msg
-        self.mask_debug_cache.move_to_end(key)
-        while len(self.mask_debug_cache) > 32:
-            self.mask_debug_cache.popitem(last=False)
-        # The silhouette artifact lags its measurements message by the
-        # segmentation latency, so re-render when the matching mask arrives,
-        # otherwise the panel keeps its fallback content.
+        key = stamp_key(mask_msg.header.stamp)
+        self.cache_by_key(self.mask_debug_cache, key, mask_msg)
+        self.rerender_if_pending(key)
+
+    def polar_beams_callback(self, beams_msg: PolarBeams) -> None:
+        key = stamp_key(beams_msg.header.stamp)
+        self.cache_by_key(self.polar_beams_cache, key, beams_msg)
+        self.rerender_if_pending(key)
+
+    def rerender_if_pending(self, key: tuple[int, int]) -> None:
+        """Re-render when a per-frame artifact for the pending stamp arrives.
+
+        Both the silhouette image and the beam indices lag their measurements
+        message -- by segmentation latency and by the estimator reduction
+        respectively -- so the frame is first rendered without them. Without
+        this the panel would keep its fallback content until the next
+        measurement arrived.
+        """
+
         measurements_msg = self.latest_measurements_msg
-        if measurements_msg is not None and key == (
-                measurements_msg.header.stamp.sec, measurements_msg.header.stamp.nanosec):
+        if measurements_msg is None:
+            return
+        if key == stamp_key(measurements_msg.header.stamp):
             self.render_latest()
 
     # -- rendering --
@@ -257,7 +292,7 @@ class TargetOverlayNode(Node):
         batch = batch_from_measurements_message(self.latest_measurements_msg)
         self.merge_measurements(batch)
 
-        scan_uv, scan_in_view, scan_points_optical = self.project_scan()
+        scan_uv, scan_in_view, scan_highlight = self.project_published_scan()
         annotated = self.renderer.render(
             frame,
             batch,
@@ -265,7 +300,7 @@ class TargetOverlayNode(Node):
             published_mask=self.match_mask_debug(self.latest_measurements_msg),
             scan_uv=scan_uv,
             scan_in_view=scan_in_view,
-            scan_points_optical=scan_points_optical,
+            scan_highlight=scan_highlight,
             truth=self.current_truth(),
         )
         self.overlay_pub.publish(
@@ -302,17 +337,33 @@ class TargetOverlayNode(Node):
             for name in field_names:
                 setattr(detection, name, getattr(other_detection, name))
 
-    def project_scan(self):
-        if not self.wants_polar:
-            return None, None, None
-        if (self.latest_scan_msg is None or self.latest_color_info is None
+    def project_published_scan(self):
+        """``(uv, in_view, highlight)`` for the scan the measurement was made on.
+
+        Not the latest scan: the beams message names the array its indices index
+        into, and applying them to a newer scan would put the highlight on the
+        wrong beams -- silently, and worst exactly when the platform is moving.
+        A scan that has aged out of the cache, or a frame with no beams message
+        yet, therefore draws nothing at all. A missing highlight is the required
+        failure mode here; a misaligned one is not.
+        """
+
+        if (not self.wants_polar or self.latest_color_info is None
                 or self.latest_measurements_msg is None):
+            return None, None, None
+        beams_msg = self.polar_beams_cache.get(
+            stamp_key(self.latest_measurements_msg.header.stamp))
+        if beams_msg is None:
+            return None, None, None
+        scan_msg = self.scan_cache.get(
+            (beams_msg.scan_frame_id, *stamp_key(beams_msg.scan_stamp)))
+        if scan_msg is None:
             return None, None, None
         try:
             rotation, translation, self.last_scan_tf_fallback = lookup_transform_components(
                 self.tf_buffer,
                 self.latest_measurements_msg.header.frame_id,
-                self.latest_scan_msg.header.frame_id,
+                scan_msg.header.frame_id,
                 Time.from_msg(self.latest_measurements_msg.header.stamp),
                 self.get_logger(),
                 self.last_scan_tf_fallback,
@@ -323,20 +374,34 @@ class TargetOverlayNode(Node):
             return None, None, None
         try:
             points_optical, valid = scan_points_optical(
-                self.latest_scan_msg, rotation, translation)
+                scan_msg, rotation, translation)
         except ValueError as exc:
             self.log_warning_once(
                 'last_scan_decode_warning', f'Polar overlay scan skipped: {exc}')
             return None, None, None
         intrinsics = intrinsics_from_camera_info(self.latest_color_info)
         uv, in_view = project_points(points_optical, intrinsics)
-        return uv, (valid & in_view), points_optical
+        return uv, (valid & in_view), self.beam_highlight(beams_msg, scan_msg)
+
+    def beam_highlight(self, beams_msg: PolarBeams, scan_msg: LaserScan):
+        """The per-beam states, or ``None`` if they cannot be trusted here."""
+
+        booleans = polar_beam_booleans(beams_msg, len(scan_msg.ranges))
+        if booleans is None:
+            self.log_warning_once(
+                'last_beam_count_warning',
+                f'Polar beams recorded against {beams_msg.beam_count} beams but '
+                f'the matched scan has {len(scan_msg.ranges)}; drawing the scan '
+                'without a highlight. Check that one scan producer is running.')
+            return None
+        self.last_beam_count_warning = None
+        used, dropped = booleans
+        return ScanHighlight(used=used, dropped=dropped)
 
     def match_mask_debug(self, measurements_msg: TargetMeasurements):
         """The silhouette artifact for the rendered stamp, else the newest one."""
 
-        mask_msg = self.mask_debug_cache.get(
-            (measurements_msg.header.stamp.sec, measurements_msg.header.stamp.nanosec))
+        mask_msg = self.mask_debug_cache.get(stamp_key(measurements_msg.header.stamp))
         if mask_msg is None:
             return self.last_matched_silhouette
         try:
@@ -377,6 +442,12 @@ class TargetOverlayNode(Node):
     @staticmethod
     def stamp_seconds(stamp) -> float:
         return float(stamp.sec) + float(stamp.nanosec) * 1e-9
+
+    @staticmethod
+    def scan_key(header) -> tuple[str, int, int]:
+        """Frame plus stamp: what a beams message names its scan by."""
+
+        return (header.frame_id, *stamp_key(header.stamp))
 
     def measurement_message_key(self, msg: TargetMeasurements) -> tuple:
         return (

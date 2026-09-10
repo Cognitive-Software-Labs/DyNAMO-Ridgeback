@@ -4,15 +4,17 @@ project(ridgeback_autonomy)
 find_package(ament_cmake REQUIRED)
 find_package(ament_cmake_python REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
+find_package(builtin_interfaces REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(gz-gui8 REQUIRED)
 find_package(gz-plugin2 REQUIRED)
 find_package(gz-common5 REQUIRED)
 
 rosidl_generate_interfaces(${PROJECT_NAME}
+  "msg/PolarBeams.msg"
   "msg/TargetDetections.msg"
   "msg/TargetMeasurements.msg"
-  DEPENDENCIES std_msgs
+  DEPENDENCIES builtin_interfaces std_msgs
 )
 
 # Qt for MOC
@@ -150,6 +152,7 @@ if(BUILD_TESTING)
   ament_add_pytest_test(test_mask_region_allocation test/test_mask_region_allocation.py)
   ament_add_pytest_test(test_mask_region_parity test/test_mask_region_parity.py)
   ament_add_pytest_test(test_mask_measurement_node test/test_mask_measurement_node.py)
+  ament_add_pytest_test(test_overlay_node test/test_overlay_node.py)
   ament_add_pytest_test(test_shared_defaults test/test_shared_defaults.py)
   ament_add_pytest_test(test_tf_utils test/test_tf_utils.py)
   ament_add_pytest_test(test_miss_reason test/test_miss_reason.py)

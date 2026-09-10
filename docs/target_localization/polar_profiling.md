@@ -294,11 +294,15 @@ so it does not report a selection at all.
 are built in the scan's own frame, where a beam is
 `angle_min + i*angle_increment` at `ranges[i]`, so no extrinsics are re-applied.
 
-While the marker topic has a subscriber, beams are recorded for every detection
-but **only the nearest one is drawn** — four estimate rings plus three ray layers
-for every robot would be unreadable when a scene holds two. With no subscriber the
-estimator still runs, but debug records, wedge selection, and marker construction
-are skipped. `nearest_beam_record` ranks the batch with the shared
+While either beam consumer has a subscriber, beams are recorded for every
+detection but **only the nearest one is drawn as rays** — four estimate rings
+plus three ray layers for every robot would be unreadable when a scene holds two.
+The 2D panel has no such clutter problem and therefore shows **every** detection;
+that difference is intentional, and it is what lets the panel range two robots at
+different distances where the old union-of-masks single band kept only the
+nearer. With neither subscribed the estimator still runs, but debug records,
+wedge selection, and marker construction are skipped. `nearest_beam_record` ranks
+the batch with the shared
 `nearest_instance_index` and matches the chosen index against
 `PolarBeamRecord.detection_index`, never against the list position: a detection
 whose segmentation came back empty records no beams, so the two disagree. Each
@@ -321,20 +325,39 @@ disagrees by one beam at each edge, which would make the wedge and the rays
 contradict each other under a box gate, where they are the same set by
 definition.
 
-**Known divergence — now live.** `perception/target_localization/core/rendering.py:polar_highlight_beams`
-re-runs `segment_range_profile` + `merge_near_band` at *library defaults* to
-drive the 2D overlay panel, rather than reading the published indices. This was
-harmless while nothing could pass anything else. It no longer is: the three
-isolation settings are node parameters and launch arguments (§6), so a sweep
-setting `polar_range_band_m` moves the estimate and the RViz rays while the 2D
-panel keeps highlighting the default band. The panel is debug-only and the
-published measurement is unaffected, but during a sweep it does not depict the
-run it is drawn on. Routing the panel through the published indices is the fix.
+### The 2D panel consumes the same indices
 
-`target_overlay_node` also does its **own** `scan_points_optical` +
-`project_points` from the *latest* scan rather than the one matched within
-`scan_match_tolerance_s`, plus its own TF lookup, so the panel can diverge from
-the rays on a moving platform independently of any knob.
+The same records go out verbatim on `debug/target/polar_beams` as a `PolarBeams`
+message, and `target_overlay_node` renders its LiDAR panel from that. The panel
+computes no selection of its own — no mask, no range profile, no band — so it
+cannot depict a different run than the one it is drawn on. The message is the
+union of `selected` and of `merged` across the frame's detections; their
+difference is the dropped set, which the panel colours exactly as the
+`polar/dropped` ray layer does, so the two surfaces read beam for beam.
+
+This replaced a second implementation of the algorithm inside the renderer, which
+re-ran `segment_range_profile` + `merge_near_band` at *library defaults* against
+its own silhouette-union mask and its own latest scan. That was harmless while
+nothing could pass anything else, and stopped being harmless when the three
+isolation settings became node parameters (§6): a sweep setting
+`polar_range_band_m` moved the estimate and the RViz rays while the panel kept
+highlighting the default band. It also collapsed the frame to one band, blanking
+a second robot at a different range, and had no ray floor, so it highlighted
+merges the estimator rejected with `TOO_FEW_RAYS_MERGED`. Forwarding the three
+parameters to the overlay would have fixed only the first of those and left two
+copies of the algorithm to keep in sync by hand.
+
+Two stamps travel with the indices, and both are load-bearing. The header carries
+the **measurement** stamp, so the overlay keys the message exactly as it keys the
+silhouette artifact on `debug/target/mask`. `scan_stamp` plus `scan_frame_id`
+name the **scan array the indices index into**; the overlay caches scans by that
+key rather than keeping a latest-wins slot, because the scan a measurement was
+made on is rarely the newest by the time the panel renders it. `beam_count` is a
+hard guard: a cached scan of a different length means the indices would land on
+beams the estimator never touched, so the panel drops the highlight and draws the
+scan plain. Every failure here — no beams message yet, a scan aged out of the
+cache, a length mismatch — degrades to a *missing* highlight, never a misaligned
+one.
 
 **Known divergence.** This node ranks the nearest instance from its own three
 estimators, because nothing else has filled the batch by the time the rays are
@@ -385,6 +408,11 @@ prevent the polar path from running.
 `polar_profiling` is part of the default `estimators=all` registry and publishes
 on `measurements/target/mask`. Its output names include the mask gate but no
 depth-source or rect-isolation token. No fallback measurement is substituted.
+Two debug artifacts accompany it, both subscriber-gated and both built from the
+one list of `PolarBeamRecord`s: the RViz rays on `visualization/target/polar_rays`
+and the beam indices on `debug/target/polar_beams` (§4). The topic names live in
+`contracts.py`, so the mask node and the overlay node default to the same string
+and no launch file has to pass it.
 
 `range_jump_m`, `range_band_m`, and `min_valid_rays` are node parameters and
 launch arguments — `polar_range_jump_m`, `polar_range_band_m`,

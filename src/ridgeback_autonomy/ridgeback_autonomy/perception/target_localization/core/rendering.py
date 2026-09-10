@@ -20,10 +20,6 @@ from ridgeback_autonomy.perception.target_localization.core.mask import (
     masked_rgb,
     rasterize_batch,
 )
-from ridgeback_autonomy.perception.target_localization.core.polar_profiling import (
-    merge_near_band,
-    segment_range_profile,
-)
 
 
 # Panel kinds. A run renders only the ones its selected estimators need, so the
@@ -39,10 +35,33 @@ PANEL_LIDAR = 'lidar'
 PANEL_MAX_COLS_DEFAULT = 3
 
 
+# Scan-point colours, BGR. The first two are the RViz ray colours from
+# ``common/markers.py`` (COLOR_USED / COLOR_DROPPED) converted to BGR, so the 2D
+# panel and the 3D layers name the same beam the same way and can be compared
+# directly. The third is for beams whose state is unknown.
+SCAN_COLOR_USED = (0, 166, 255)
+SCAN_COLOR_DROPPED = (148, 140, 140)
+SCAN_COLOR_UNKNOWN = (90, 90, 90)
+
+
 @dataclass(frozen=True)
 class PanelSpec:
     kind: str
     title: str
+
+
+@dataclass(frozen=True)
+class ScanHighlight:
+    """Per-beam booleans over one scan, as the measuring node reduced it.
+
+    Both index the scan array the beams came from, so they mean nothing beside a
+    different scan. ``common/messages.py:polar_beam_booleans`` decodes them from
+    a ``PolarBeams`` message and refuses when the scan it is handed is not the
+    one the indices were recorded against.
+    """
+
+    used: np.ndarray
+    dropped: np.ndarray
 
 
 def select_panels(estimators, depth_source: str, mask_gate: str) -> list[PanelSpec]:
@@ -147,7 +166,6 @@ class RgbdOverlayRenderer:
         self.depth_max_meters = depth_max_meters
         self.estimators = tuple(estimators)
         self.depth_source = depth_source
-        self.mask_gate = mask_gate
         self.max_cols = max_cols
         self.rgb_panel_labels = rgb_panel_labels
         self.panels = select_panels(self.estimators, depth_source, mask_gate)
@@ -161,7 +179,7 @@ class RgbdOverlayRenderer:
         published_mask: np.ndarray | None = None,
         scan_uv: np.ndarray | None = None,
         scan_in_view: np.ndarray | None = None,
-        scan_points_optical: np.ndarray | None = None,
+        scan_highlight: ScanHighlight | None = None,
         truth: tuple[float, float, float] | None = None,
     ) -> np.ndarray:
         images = [
@@ -171,7 +189,7 @@ class RgbdOverlayRenderer:
                 published_mask=published_mask,
                 scan_uv=scan_uv,
                 scan_in_view=scan_in_view,
-                scan_points_optical=scan_points_optical,
+                scan_highlight=scan_highlight,
                 truth=truth,
             )
             for spec in self.panels
@@ -188,7 +206,7 @@ class RgbdOverlayRenderer:
         published_mask,
         scan_uv,
         scan_in_view,
-        scan_points_optical,
+        scan_highlight,
         truth=None,
     ) -> np.ndarray:
         if spec.kind == PANEL_RGB:
@@ -203,8 +221,7 @@ class RgbdOverlayRenderer:
         elif spec.kind == PANEL_SILHOUETTE:
             panel = self.make_silhouette_mask_panel(frame, published_mask)
         elif spec.kind == PANEL_LIDAR:
-            panel = self.make_lidar_panel(
-                frame, batch, published_mask, scan_uv, scan_in_view, scan_points_optical)
+            panel = self.make_lidar_panel(frame, batch, scan_uv, scan_in_view, scan_highlight)
         else:
             panel = np.zeros_like(frame)
 
@@ -245,40 +262,21 @@ class RgbdOverlayRenderer:
         self,
         frame: np.ndarray,
         batch: DetectionBatch,
-        published_mask: np.ndarray | None,
         scan_uv: np.ndarray | None,
         scan_in_view: np.ndarray | None,
-        scan_points_optical: np.ndarray | None,
+        scan_highlight: ScanHighlight | None,
     ) -> np.ndarray:
+        """The colour frame with the scan drawn on it, as the estimator saw it.
+
+        The panel decides nothing: which beams were used and which were dropped
+        arrive already reduced from the node that published the measurement, so
+        this cannot show a different band than the run it is labelling.
+        """
+
         panel = frame.copy()
         self.annotate_detections(panel, batch, draw_labels=False)
-        highlight = None
-        if scan_uv is not None and scan_points_optical is not None:
-            select_mask = self.lidar_select_mask(frame.shape[:2], batch, published_mask)
-            highlight = polar_highlight_beams(
-                scan_uv, scan_in_view, scan_points_optical, select_mask)
-        draw_scan_points(panel, scan_uv, highlight)
+        draw_scan_points(panel, scan_uv, scan_in_view, scan_highlight)
         return panel
-
-    def lidar_select_mask(
-        self,
-        color_shape,
-        batch: DetectionBatch,
-        published_mask: np.ndarray | None,
-    ) -> np.ndarray | None:
-        """The boolean selector polar profiling would use: the silhouette union
-        when it is available, else the rasterized detection boxes."""
-
-        if (self.mask_gate == MASK_GATE_SILHOUETTE
-                and published_mask is not None
-                and published_mask.shape == tuple(color_shape)):
-            return published_mask.astype(bool)
-        if not batch.detected:
-            return None
-        mask = rasterize_batch(batch)
-        if mask.data.shape == tuple(color_shape):
-            return mask.data
-        return None
 
     def stack_panel_grid(self, top_panels, bottom_panels) -> np.ndarray:
         """Retained for callers still passing explicit rows: pack them together."""
@@ -391,74 +389,46 @@ class RgbdOverlayRenderer:
             text_y += line_height
 
 
-def polar_highlight_beams(
-    scan_uv: np.ndarray,
-    scan_in_view: np.ndarray,
-    scan_points_optical: np.ndarray,
-    select_mask: np.ndarray | None,
-) -> np.ndarray:
-    """Per-beam boolean of the beams polar profiling actually reduces.
-
-    Not merely "inside the mask": the mask select also admits the far
-    background (the scan's field of view sees past the object, and by
-    perspective those far beams land near the horizon -- torso/arm height in the
-    image). Those beams are dropped by the range segmentation, so the highlight
-    applies the same nearest-range-band merge the estimator uses and marks only
-    the survivors. Assumes one near object across the mask union (the common
-    single-robot case); multiple objects at different ranges would keep only the
-    nearest band.
-    """
-
-    scan_uv = np.asarray(scan_uv, dtype=np.float64)
-    highlight = np.zeros(scan_uv.shape[0], dtype=bool)
-    if select_mask is None:
-        return highlight
-
-    beams = np.flatnonzero(np.asarray(scan_in_view, dtype=bool))
-    if beams.size == 0:
-        return highlight
-    height, width = select_mask.shape[:2]
-    u_px = np.rint(scan_uv[beams, 0]).astype(np.intp)
-    v_px = np.rint(scan_uv[beams, 1]).astype(np.intp)
-    inside_frame = (u_px >= 0) & (u_px < width) & (v_px >= 0) & (v_px < height)
-    beams = beams[inside_frame]
-    if beams.size == 0:
-        return highlight
-    in_mask = select_mask[v_px[inside_frame], u_px[inside_frame]]
-    mask_beams = beams[in_mask]
-    if mask_beams.size == 0:
-        return highlight
-
-    points = np.asarray(scan_points_optical, dtype=np.float64)[mask_beams]
-    planar_range_m = np.hypot(points[:, 0], points[:, 2])
-    runs = segment_range_profile(planar_range_m)
-    merged = merge_near_band(runs, planar_range_m)
-    highlight[mask_beams[merged]] = True
-    return highlight
-
-
 def draw_scan_points(
     panel: np.ndarray,
     scan_uv: np.ndarray | None,
-    highlight: np.ndarray | None,
+    scan_in_view: np.ndarray | None,
+    highlight: ScanHighlight | None,
 ) -> None:
-    """Draw the beams polar profiling reduces to its estimate, and only those.
+    """Draw the projected scan, coloured by what the estimator did with it.
 
-    The other in-view beams are deliberately not drawn: the panel answers
-    "which rays produced this distance", so the background returns the range
-    segmentation discards would read as part of the measurement. An empty
-    highlight (no mask, or no run survived) therefore draws nothing -- the
-    honest picture of a frame that produced no polar estimate.
+    The two states are the ones the 3D ray layers draw, in the same colours, so
+    the panel and the markers can be read against each other beam for beam: the
+    survivors the estimate medians over, and the beams the mask selected but the
+    range segmentation discarded. Drawing only the survivors would make a frame
+    where the estimator threw the robot away look like a frame where nothing was
+    there.
+
+    ``highlight`` of ``None`` means the selection could not be trusted for this
+    scan -- the message named a different-sized array -- so the in-view beams are
+    drawn plain. That says "the scan is here, which beams were used is unknown",
+    which is the honest picture; asserting a state would be a misaligned
+    highlight, and drawing nothing would read as a missing scan.
     """
 
-    if scan_uv is None or highlight is None:
+    if scan_uv is None:
         return
     scan_uv = np.asarray(scan_uv, dtype=np.float64)
-    highlight = np.asarray(highlight, dtype=bool)
+    if highlight is None:
+        if scan_in_view is None:
+            return
+        layers = ((np.asarray(scan_in_view, dtype=bool), SCAN_COLOR_UNKNOWN, 2),)
+    else:
+        layers = (
+            (np.asarray(highlight.dropped, dtype=bool), SCAN_COLOR_DROPPED, 2),
+            (np.asarray(highlight.used, dtype=bool), SCAN_COLOR_USED, 3),
+        )
+
     height, width = panel.shape[:2]
-    for index in np.flatnonzero(highlight):
-        u_px = int(round(float(scan_uv[index, 0])))
-        v_px = int(round(float(scan_uv[index, 1])))
-        if not (0 <= u_px < width and 0 <= v_px < height):
-            continue
-        cv2.circle(panel, (u_px, v_px), 3, (0, 255, 255), -1, cv2.LINE_AA)
+    for beams, color, radius in layers:
+        for index in np.flatnonzero(beams):
+            u_px = int(round(float(scan_uv[index, 0])))
+            v_px = int(round(float(scan_uv[index, 1])))
+            if not (0 <= u_px < width and 0 <= v_px < height):
+                continue
+            cv2.circle(panel, (u_px, v_px), radius, color, -1, cv2.LINE_AA)

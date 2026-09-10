@@ -5,16 +5,21 @@ import types
 import numpy as np
 import pytest
 
+from ridgeback_autonomy.common.models import Detection, DetectionBatch
 from ridgeback_autonomy.perception.target_localization.core.rendering import (
     PANEL_ALIGNED_DEPTH,
     PANEL_BOX_MASK,
     PANEL_LIDAR,
     PANEL_RGB,
     PANEL_SILHOUETTE,
+    SCAN_COLOR_DROPPED,
+    SCAN_COLOR_UNKNOWN,
+    SCAN_COLOR_USED,
+    RgbdOverlayRenderer,
+    ScanHighlight,
     active_label_lines,
     draw_scan_points,
     pack_panels,
-    polar_highlight_beams,
     select_panels,
     truth_label_line,
 )
@@ -145,55 +150,63 @@ def test_truth_label_line_matches_position_line_format() -> None:
     assert truth_label_line((-0.75, 3.5, 3.58)) == 'Truth x=-0.75 z=+3.50 d=3.58m'
 
 
-def test_polar_highlight_beams_keeps_near_band_only() -> None:
-    # 20 beams all projecting into the mask except the last; beams 0-9 are the
-    # near object (range 1.5 m), 10-19 the far background (range 4.0 m). Only the
-    # near band should highlight -- the far beams are what the estimator drops,
-    # and the reason they used to light up torso/arm height.
-    n = 20
-    uv = np.full((n, 2), 10.0)
-    uv[19] = (2.0, 2.0)                 # projects outside the mask
-    in_view = np.ones(n, dtype=bool)
-    in_view[0] = False                  # beam 0 not in view
-    points = np.zeros((n, 3))
-    points[:10, 2] = 1.5               # near (Z=1.5 -> planar range 1.5)
-    points[10:, 2] = 4.0               # far
-    select_mask = np.zeros((20, 20), dtype=bool)
-    select_mask[5:15, 5:15] = True     # (10,10) inside, (2,2) outside
+def test_draw_scan_points_separates_used_from_dropped() -> None:
+    # A used beam and a selected-but-discarded one must be distinguishable: a
+    # frame where the estimator threw the robot away has to look different from
+    # a frame where nothing was there.
+    panel = np.zeros((60, 60, 3), dtype=np.uint8)
+    uv = np.array([[10.0, 10.0], [30.0, 30.0], [50.0, 50.0]])
+    highlight = ScanHighlight(
+        used=np.array([True, False, False]),
+        dropped=np.array([False, True, False]),
+    )
 
-    highlight = polar_highlight_beams(uv, in_view, points, select_mask)
+    draw_scan_points(panel, uv, np.ones(3, dtype=bool), highlight)
 
-    assert highlight.shape == (n,)
-    assert not highlight[0]             # out of view
-    assert highlight[1:10].all()        # near band, in mask, in view
-    assert not highlight[10:19].any()   # far background dropped by the range band
-    assert not highlight[19]            # outside the mask
+    assert panel[10, 10].tolist() == list(SCAN_COLOR_USED)
+    assert panel[30, 30].tolist() == list(SCAN_COLOR_DROPPED)
+    # The third beam is in neither set: not selected at all, so nothing is drawn
+    # for it even though it is in view.
+    assert not panel[47:54, 47:54].any()
 
 
-def test_polar_highlight_beams_none_mask_is_empty() -> None:
-    highlight = polar_highlight_beams(
-        np.full((5, 2), 3.0), np.ones(5, dtype=bool), np.ones((5, 3)), None)
-
-    assert not highlight.any()
-
-
-def test_draw_scan_points_draws_only_the_highlighted_beams() -> None:
+def test_draw_scan_points_no_highlight_draws_the_in_view_beams_plain() -> None:
+    # The highlight is withheld when it cannot be trusted against this scan.
+    # Drawing nothing would read as "no scan"; asserting a state would be a lie.
     panel = np.zeros((40, 40, 3), dtype=np.uint8)
     uv = np.array([[10.0, 10.0], [30.0, 30.0]])
-    highlight = np.array([True, False])
 
-    draw_scan_points(panel, uv, highlight)
+    draw_scan_points(panel, uv, np.array([True, False]), None)
 
-    assert panel[10, 10].tolist() == [0, 255, 255]
-    # The dropped beam leaves no trace: a 3 px marker at (30, 30) would tint
-    # every pixel within a couple of pixels of it.
+    assert panel[10, 10].tolist() == list(SCAN_COLOR_UNKNOWN)
     assert not panel[27:34, 27:34].any()
 
 
 def test_draw_scan_points_empty_highlight_draws_nothing() -> None:
     panel = np.zeros((40, 40, 3), dtype=np.uint8)
+    empty = ScanHighlight(
+        used=np.zeros(5, dtype=bool), dropped=np.zeros(5, dtype=bool))
 
-    draw_scan_points(panel, np.full((5, 2), 20.0), np.zeros(5, dtype=bool))
-    draw_scan_points(panel, np.full((5, 2), 20.0), None)
+    draw_scan_points(panel, np.full((5, 2), 20.0), np.ones(5, dtype=bool), empty)
+    draw_scan_points(panel, None, np.ones(5, dtype=bool), empty)
+    draw_scan_points(panel, np.full((5, 2), 20.0), None, None)
 
     assert not panel.any()
+
+
+def test_lidar_panel_draws_the_highlight_it_was_handed() -> None:
+    # The panel decides nothing about which beams matter: it renders exactly
+    # what the measuring node published, so it cannot show a different band.
+    renderer = RgbdOverlayRenderer(10.0, ('polar_profiling',))
+    batch = DetectionBatch(image_width=60, image_height=60)
+    batch.detections.append(Detection(bbox_xyxy=(0, 0, 1, 1), label='g1', score=0.9))
+    frame = np.zeros((60, 60, 3), dtype=np.uint8)
+    highlight = ScanHighlight(
+        used=np.array([True, False]), dropped=np.array([False, True]))
+
+    panel = renderer.make_lidar_panel(
+        frame, batch, np.array([[40.0, 40.0], [20.0, 55.0]]),
+        np.ones(2, dtype=bool), highlight)
+
+    assert panel[40, 40].tolist() == list(SCAN_COLOR_USED)
+    assert panel[55, 20].tolist() == list(SCAN_COLOR_DROPPED)

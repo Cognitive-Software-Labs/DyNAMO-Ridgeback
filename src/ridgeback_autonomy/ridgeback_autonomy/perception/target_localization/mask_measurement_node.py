@@ -75,11 +75,12 @@ from ridgeback_autonomy.common.markers import PolarBeamRecord, build_polar_ray_m
 from ridgeback_autonomy.common.messages import (
     batch_from_detections_message,
     build_measurements_message,
+    build_polar_beams_message,
 )
 from ridgeback_autonomy.common.miss_reason import MissReason
 from ridgeback_autonomy.common.stamps import stamp_key
 from ridgeback_autonomy.common.tf_utils import lookup_transform_components
-from ridgeback_autonomy.msg import TargetDetections, TargetMeasurements
+from ridgeback_autonomy.msg import PolarBeams, TargetDetections, TargetMeasurements
 from ridgeback_autonomy.perception.target_localization.core.depth_common import (
     DEPTH_GATE_DISABLED,
     NEAREST_MODE_BIN_WIDTH_M_DEFAULT,
@@ -137,6 +138,7 @@ from ridgeback_autonomy.perception.target_localization.contracts import (
     ALIGNED_DEPTH_DEBUG_TOPIC,
     MASK_DEBUG_TOPIC,
     MASK_MEASUREMENTS_TOPIC,
+    POLAR_BEAMS_TOPIC,
     POLAR_RAYS_TOPIC,
     RAW_DETECTIONS_TOPIC,
 )
@@ -213,6 +215,7 @@ class TargetMaskMeasurementNode(Node):
         self.declare_parameter('scan_match_tolerance_s', SCAN_MATCH_TOLERANCE_S_DEFAULT)
         self.declare_parameter('ray_marker_topic', POLAR_RAYS_TOPIC)
         self.declare_parameter('ray_marker_lifetime_sec', RAY_MARKER_LIFETIME_SEC)
+        self.declare_parameter('polar_beams_topic', POLAR_BEAMS_TOPIC)
         self.declare_parameter('base_frame', BASE_FRAME_DEFAULT)
         self.declare_parameter('front_offset_m', ROBOT_FRONT_OFFSET_M)
         self.declare_parameter('isolation_2d', ISOLATION_2D_DEFAULT)
@@ -512,11 +515,23 @@ class TargetMaskMeasurementNode(Node):
         # layers are separate marker namespaces, so RViz's own per-namespace
         # checkboxes do the enabling and disabling without a round trip through
         # this node.
+        #
+        # The same records also go out verbatim as beam indices, for consumers
+        # that need the selection rather than a picture of it -- the 2D overlay
+        # panel, which used to re-derive it from its own mask and its own scan
+        # at library defaults and so drew a different band than the run it was
+        # labelling (docs/target_localization/polar_profiling.md Section 4).
         self.ray_marker_pub = None
+        self.polar_beams_pub = None
         if self.needs_scan:
             self.ray_marker_pub = self.create_publisher(
                 MarkerArray,
                 str(self.get_parameter('ray_marker_topic').value),
+                10,
+            )
+            self.polar_beams_pub = self.create_publisher(
+                PolarBeams,
+                str(self.get_parameter('polar_beams_topic').value),
                 10,
             )
 
@@ -791,7 +806,7 @@ class TargetMaskMeasurementNode(Node):
                             depth_m, detections_msg.header)
                         scan_points, scan_reason = self.scan_points_for_batch(
                             detections_msg, scan_msg)
-                        beam_records = self.ray_marker_records()
+                        beam_records = self.polar_beam_records()
                         reduction_started_ns = (
                             time.monotonic_ns()
                             if self.depth_match_diagnostics is not None else None)
@@ -818,8 +833,13 @@ class TargetMaskMeasurementNode(Node):
                             self.record_stage_timing(
                                 'estimator_reduction', reduction_started_ns)
                         if beam_records is not None:
+                            # Both readers work off this one list: the markers
+                            # draw the nearest record, the beams message carries
+                            # every record. Neither recomputes a selection.
                             self.publish_ray_markers(
                                 nearest_beam_record(batch, beam_records), scan_msg)
+                            self.publish_polar_beams(
+                                beam_records, scan_msg, detections_msg.header)
         elif batch.detected:
             self.log_skip_warning(
                 'No camera_info received yet; publishing measurements without '
@@ -830,14 +850,19 @@ class TargetMaskMeasurementNode(Node):
         self.measurement_pub.publish(
             build_measurements_message(batch, detections_msg.header))
 
-    def ray_marker_records(self) -> list[PolarBeamRecord] | None:
-        """Allocate debug records only while the ray topic has a subscriber."""
+    def polar_beam_records(self) -> list[PolarBeamRecord] | None:
+        """Allocate debug records only while a beam consumer is subscribed.
 
-        if self.ray_marker_pub is None:
-            return None
-        if self.ray_marker_pub.get_subscription_count() <= 0:
-            return None
-        return []
+        Two publishers read the same records -- the RViz rays and the beam-index
+        message -- so either subscriber is reason enough to record. Neither
+        subscribed means the estimator still runs and nothing is collected.
+        """
+
+        publishers = (self.ray_marker_pub, self.polar_beams_pub)
+        for publisher in publishers:
+            if publisher is not None and publisher.get_subscription_count() > 0:
+                return []
+        return None
 
     def publish_ray_markers(self, beam_record, scan_msg) -> None:
         """Draw the nearest detection's polar beams, given a scan to draw from.
@@ -859,6 +884,21 @@ class TargetMaskMeasurementNode(Node):
         )
         if markers:
             self.ray_marker_pub.publish(MarkerArray(markers=markers))
+
+    def publish_polar_beams(self, beam_records, scan_msg, header) -> None:
+        """Publish the frame's beam indices for consumers that reduce them again.
+
+        Stamped from the detections rather than the scan, unlike the markers:
+        this is keyed against the measurement it explains, and it names its own
+        scan in the payload instead.
+        """
+
+        if self.polar_beams_pub is None or scan_msg is None:
+            return
+        if self.polar_beams_pub.get_subscription_count() <= 0:
+            return
+        self.polar_beams_pub.publish(
+            build_polar_beams_message(beam_records, scan_msg, header))
 
     def stamp_frame_reason(self, batch, reason: MissReason) -> None:
         """Stamp a frame-level miss reason on the enabled mask estimators of
