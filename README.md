@@ -17,7 +17,8 @@ This workspace supports 2 main human workflows:
 Isaac Sim port (in progress, `feat/isaac-sim-6-port`):
 
 - `tools/isaac/OPEN_ISSUES.md`: **what is currently broken** — start here
-- `tools/isaac/PORT_PLAN.md`: the 9-phase plan and its history
+- `tools/isaac/PORT_PLAN.md`: the phase plan (P0–P9)
+- `tools/isaac/PORT_HISTORY.md`: superseded investigation narratives
 - `tools/isaac/SLAM_QUALITY_REPORT.md`: how the RTX lidar reaches ROS
 - `tools/isaac/robot_geometry.svg` / `robot_render.png`: sensor mounting, dimensioned
 - `tools/isaac/NEXT_AGENT_PROMPT.md`: session handoff

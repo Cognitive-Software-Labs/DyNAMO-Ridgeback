@@ -1,6 +1,6 @@
 # Port plan: Gazebo Harmonic → NVIDIA Isaac Sim 6.0
 
-Status: **in progress — P0–P4 + P7 done; P5 plumbing done, A/B sign-off BLOCKED; P6 (G1 benchmark) deferred; P8 (gz removal) not started.**
+Status: **in progress — P0–P4 + P7 done; P5 plumbing done, A/B sign-off BLOCKED; P6 (G1 benchmark) deferred; P8 (gz removal) and P9 (Isaac 6.1) not started.**
 
 > ⚠️ **P8 is not the next task.** Navigation does not run: `collision_monitor`
 > latches on phantom lidar returns and the robot never moves in `hospital` or
@@ -9,7 +9,8 @@ Status: **in progress — P0–P4 + P7 done; P5 plumbing done, A/B sign-off BLOC
 > chassis graft, camera + mast + D455) voids every coverage number below.
 > **See `OPEN_ISSUES.md` — that is the live register; this file is the phase
 > plan and its history.** Treat performance figures here as "claimed at the
-> time", not current.
+> time", not current. Superseded investigation narratives live in
+> `PORT_HISTORY.md`.
 
 Branch: `feat/isaac-sim-6-port` (cut from `dev`), pushed at `53a924a6`. Base includes `4f8b72d8` (explore_lite removed — single in-repo `frontier_explorer_node`).
 
@@ -32,7 +33,7 @@ Decisions:
 - GA (6.0.0/6.0.1). Pip `isaacsim[all,extscache]==6.0.1 --extra-index-url https://pypi.nvidia.com`, **Python 3.12** = Jazzy's — one venv sources ROS + imports isaacsim.
 - ROS 2 bridge: OmniGraph nodes; Jazzy supported; **bundles rmw_cyclonedds_cpp** (source system ROS first → bridge uses system DDS; repo default CycloneDDS works). Clock/TF/Odometry/IMU/RTX-lidar→LaserScan/camera publishers; Twist(Stamped) subscriber.
 - **Simulation Control ROS 2 services** new in 6.0 (`simulation_interfaces`: SpawnEntities, GetSpawnables, GetEntityBounds, entity state/reset family) → replaces gz spawn/remove/pose CLI plumbing; also enables in-session benchmark reset.
-- **No Ridgeback USD in the 6.0 catalog** (only Jackal/Dingo; old Ridgeback+arm assets gone and were visual-only) → **URDF import is the primary robot source**.
+- ~~**No Ridgeback USD in the 6.0 catalog**~~ — **WRONG, disproved 2026-09-10.** `/Isaac/Robots/Clearpath/RidgebackUr/ridgeback_ur5.usd` and `RidgebackFranka/` both exist (BSD-3-Clause, Clearpath Robotics). This claim is why URDF import became the primary robot source, and the import's coarse shell cost real time. The catalog asset now supplies the chassis geometry and colliders; the URDF import still supplies the link skeleton, joints and sensor frames, since the catalog asset carries **no sensors** and a UR5 we do not have. Lesson: re-check catalog claims against the live bucket, not against notes.
 - **No Unitree G1 in the 6.0 catalog** (only Z1/Dex) → vendor from `github.com/unitreerobotics/unitree_sim_isaaclab` (git-lfs; 4.5/5.x-era but static-visual USD fine in 6.0; license check + attribution).
 - RealSense **D455** USD asset: `/Isaac/Sensors/RealSense/D455/rsd455.usd` (RGB + depth + IMU). No D435 asset.
 - Stock USD environments: Warehouse, Hospital, Office (NVIDIA assets browser).
@@ -120,21 +121,11 @@ Bootstrap: cut `feat/isaac-sim-6-port` from `dev`; workspace already built in th
 - ✓ Isaac include alone: all contract topics live, types/QoS match baseline, camera_info = D455 1280×720 (intentional divergence, matches new camera_config.json), EKF publishes filtered odom + TF, view_frames complete, standalone slam_toolbox maps.
 - **DONE** — include-alone acceptance: 14/14 contract topics live, QoS RELIABLE/VOLATILE matches baseline, camera_info 1280×720 fx=631 frame=color-optical, EKF filtered odom within ~1 mm of GT while raw drifts (IMU+odom fusion), TF tree 22 edges incl. odom→base_link from EKF, slam_toolbox maps standalone (1758 occ / 17k free cells after one arc). Deviations, all documented in code: 6.0 replaced lidar JSON profiles with OmniLidar prims (`ust10lx_2d.json` is now our spec file that sensors.py authors onto the prim; needs `omni:sensor:tickRate` 40 + `accumulateOutputs`); **[CORRECTED 2026-07-12]** the "LaserScan is a 360° frame with the rear 90° inf, ROI honored, effective 270°" claim here was WRONG — both the mechanism it describes and the state it asserted. The 6.0.1 bridge laser_scan writer hardcodes 360° for ROTARY lidars (ignores the ROI) and only fires 180°/tick, so the P4 scan was actually half-blind (135°, right side only) and rotation-warped — never a clean 270°. The fix (commits `66493670` + `e1862498`) makes the 270° outcome real but NOT via the mechanism above: two OmniLidar prims per laser frame publish point clouds, and `ros_io.LidarScanAssembler` emits a **native 270° message** (`angle_min -135°`, 1081 bins, `angle_max +135°`) — there is no 360° frame and no rear-inf sector anymore. So the FOV number now matches by outcome, but the "360° frame with rear inf, ROI honored" description was never how this worked. Full writeup: `tools/isaac/SLAM_QUALITY_REPORT.md`. Scan now 40 Hz sim-time; odom ~30 Hz — render-frame-locked under co-tenant load (gz baseline 37/46; slam fine, revisit at P5 RTF gate); camera = plain USD camera with true D455 720p intrinsics at the RealSense mount pose (**the description said `d435` until 2026-09-10 and now says `d455`, matching the intrinsics**) instead of referencing the cloud `rsd455.usd` asset (self-contained repo beats a boot-time network fetch; mesh is cosmetic); UST-10LX min range 0.06 m per datasheet (plan said 0.05).
 
-### P5 — E2E exploration + sign-off [M] (transient A/B window opens) — plumbing ✅, A/B ⛔ blocked
-- ✅ `ridgeback_exploration.launch.py`: forwards `sim` + `rtf`/`headless`/`livestream` down the include chain (simulation.launch.py already dispatched on `sim`); `sim_ready_timeout` (45 gz / 300 isaac, PythonExpression default) on the first gate. HUD localization-error panel (GT pose vs SLAM `map->base_link`) via new `localization_overlay_node` (Isaac-only — gz has no `ground_truth/pose`), wired into the HUD aggregator. `explore_probe` now logs GT-drift + achieved RTF (from `/clock`) + coverage accuracy (additive; gz schema unchanged). (9e0f3c02)
-- ✅ `tools/isaac/ab_compare.py`: pure-stdlib gz-vs-isaac table + §P5 gate checker (coverage complete/accuracy, time-to-complete, achieved RTF, aborts, success, isaac localization error). Verified vs the gz baseline + synthetic pass/fail sets. (9e0f3c02)
-- ⛔ Acceptance NOT met — deferred. Live `sim:=isaac` validated (gates pass, all HUD panels publish, probe captures every field), but exploration **stalls ~40% coverage**: the SLAM map yaws ~14° in feature-poor rooms → phantom costmap wall the explorer can't pass (surfaced by the new localization panel: yaw err −14°, trans 1.14 m). The A/B green run (3/3 complete; coverage ≥ gz mean − 10; genuine aborts ≤ gz max; RTF ≥0.8 throttled headless; one `--rtf 0` faster wall-clock) waits on the drift fix below.
-- 🔬 SLAM-drift investigation (2026-07-13, 858ee678) — diagnosed, not closed. Extended `slam_quality_probe` to split the yaw error into `phi_ekf` (odom/EKF heading = `yaw(odom→base) − yaw(GT)`) vs `theta_mo` (SLAM `map→odom`), with a `--repro` high-wz drive into the feature-poor NE room. Measured facts:
-  - **Cause is SLAM scan-match rotation** (`theta_mo` 5–9°), NOT the EKF (`phi_ekf` stable ~2.5°) and NOT rotation-rate smear (wz 0.8 measured *worse* than 1.8 → nav2 wz-cap **ruled out**). `theta_mo` is noise-bound run-to-run, so single-run SLAM param A/B is unreliable — angle-penalty + rotation-search-bound tweaks were inconclusive and **reverted**.
-  - **`odom_noise=1.0` is a major upstream inflator**: perfect odom (`odom_noise=0`) cut drift ~14°→~6°, but did NOT clear the plateau (~45%, abort-churn). 1.0 is likely pessimistic for wheel+IMU.
-  - **Sensor is NOT the cap**: `tools/isaac/coverage_ceiling.py` → 90.8% observable @10 m vs 91.4% @25 m (gz). So the 83% gate is reachable; the plateau is drift-induced map inconsistency, not range.
-  - Landed durable: probe yaw-decomposition + `--wz-max`/`--repro`; `headless`/`livestream`/`odom_noise` threaded through the launch chain; `frontier_explorer` costmap-clear-on-stall (kept — the aggressive 30 s / blacklist-2 timeouts abort-churned and were reverted to 60 s/3); `coverage_ceiling.py`. Reaching 83% needs a focused multi-factor effort: realistic `odom_noise`, the residual scan-match degeneracy, and explorer robustness.
-- 🔎 **Noise + hygiene A/B (2026-07-13, follow-up) — the ~40% "plateau" does NOT reproduce.** With benchmark hygiene corrected (below), clean `mock_hospital sim:=isaac` runs land **51–83% coverage**, never ~40%.
-  - **`odom_noise` is a real but PARTIAL lever, not the cap.** Clean paired A/B (camera-off, domain-isolated): `odom_noise=0` → 61.9% / 16 aborts; `odom_noise=1.0` → 51.3% / 35 aborts — ~10 pts + 2× aborts, not a slam to 40%.
-  - **Prime suspect for the historical ~40% = the OLD aggressive explorer timeouts** (30 s / blacklist-2, already reverted to 60 s/3). The prior "~45% noise-off" run's abort-churn matches those timeouts, not SLAM/sensor/odom.
-  - **H2 (assembler flap) is dead:** 0 flap events across ~110k scans (all runs), incl. under GPU contention. **H3 (RTF/timing) does not cap coverage.** Residual drift = H1 scan-match rotation (`--repro`, noise off: `theta_mo` 1.47° rms > `phi_ekf` 0.71° rms — scan-match, not EKF; on full scans), transient + loop-closure-recoverable.
-  - **Benchmark hygiene (mandatory; was wrong before):** the runner rendered the D455 **unconditionally** (RTF 0.33–0.45). Added `camera:=false` (commit b9c46c77 → RTF 0.55–0.65) + `g1_perception_enabled:=false` + isolate `ROS_DOMAIN_ID` — co-tenant `stefi` ran a `/r100_0001` stack on domain 42 whose `hud_node` publishes the same `hud/coverage` topic the probe reads. Canonical: `camera:=false g1_perception_enabled:=false ROS_DOMAIN_ID=<isolated> setup_path:=/tmp/bench-clearpath/`.
-  - **CAVEAT:** coverage variance is large run-to-run (62–83% noise-off; loc-err 0.9–9.4 m) — stochastic scan-match excursions + intermittent co-tenant GPU bursts dominate. Firm numbers need **multi-seed (3–5/condition) on a genuinely single-tenant box** — this box (pratham/vilmos/stefi/digit rotating) never is. New read-only tool: `scan_pipeline_probe` (per-scan finite-bin/flap/pair telemetry vs RTF).
+### P5 — E2E exploration + sign-off [M] — plumbing ✅, A/B ⛔ BLOCKED
+- ✅ Launch chain forwards `sim`/`rtf`/`headless`/`livestream`/`odom_noise`; readiness gates; HUD localization-error panel; `explore_probe` logs GT-drift, achieved RTF, coverage accuracy (`9e0f3c02`).
+- ✅ `tools/isaac/ab_compare.py` — gz-vs-isaac table + gate checker (`9e0f3c02`).
+- ⛔ **Blocked, and no longer for the reason recorded in 2026-07.** Navigation does not run at all: `collision_monitor` latches on phantom returns → `OPEN_ISSUES.md` §1. The earlier SLAM-drift and "40% plateau" investigation is in `PORT_HISTORY.md`; its headline conclusion was that the plateau **does not reproduce** (clean runs land 51–83%) and that `odom_noise` is a partial lever, not the cap.
+- Gate when unblocked: 3/3 complete, coverage ≥ gz mean − 10, genuine aborts ≤ gz max, RTF ≥ 0.8 throttled headless. Needs 3–5 seeds/condition — variance is 51–83%.
 
 ### P6 — G1 distance benchmark port [L]
 - Rewrite gz plumbing in place in `g1_distance_benchmark_runner_node.py`: spawn/remove/pose → Simulation Control services (`simulation_interfaces`; exact names via `ros2 service list` with the sim-control extension enabled). Fallback: custom rclpy srvs in `ros_io.py` on the USD stage.
@@ -148,42 +139,15 @@ Bootstrap: cut `feat/isaac-sim-6-port` from `dev`; workspace already built in th
 - ✅ **Nav2 fix for stock worlds.** The global costmap was static/map-synced (no `rolling_window`); a stock-env slam_toolbox seeds `/map` with an origin offset from the (0,0) spawn, so every plan aborted "start outside bounds" and the robot never moved. Made the global costmap rolling (60 m window; ⊇ the small worlds' maps → their planning is unchanged, no A/B regression).
 - ✅ **Live acceptance** (`start_exploration.sh warehouse sim:=isaac sim_mode:=deterministic camera:=false g1_perception_enabled:=false`, isolated `ROS_DOMAIN_ID`): RUNNER READY, robot spawns+drives, SLAM maps, coverage HUD live — **34% complete / 93% accuracy** on the near-empty stock `warehouse.usd` (its own frontier ceiling, not a gate). `--repeat 2`: run 1 = **89/89 goals, 0 aborts, 4 cm mean loc-err**, summary written; reset all-ok (runner teleport confirmed in-log, `runner/slam/global/local:ok`); run 2 re-explored (94 goals). Achieved RTF 0.54 under a co-tenant GPU job (deterministic mode kept SLAM correct). **Deviation:** coverage carries across a reset — `slam_toolbox/reset` clears the pose graph but not the already-published occupancy grid, so run 2 is a real run but not a blank-map run (documentable refinement; `--repeat` still yields N summaries without relaunch). office + hospital: runner smoke green — both stream from S3, robot composes (`world_fix` root), **and both fire the PhysicsScene fallback** (they ship without one, unlike warehouse — the fallback was genuinely needed), RUNNER READY; full exploration is world-agnostic (same rolling-costmap fix). Bench hygiene needs the CycloneDDS env + `ros2 daemon stop` (a stale daemon hides the namespaced topics from the CLI; rclpy probes are unaffected).
 
-### Post-P7 batch (2026-09-02) — landed on the branch tip, ⚠️ NOT re-validated
+### Post-P7 batch (2026-09-02) — landed, ⚠️ NOT re-validated
+`ca903276` warehouse_full GT map · `e647ac5a` lidar/joint-state runtime correctness · `1a4079b9` front+rear scan merge for SLAM input only. A 2026-09-10 audit then found and fixed two real bugs in the merger (missing `/tf` remap silently dropped **every** rear scan; `range_max` copied from sensor frame into a `base_link` message) — `2ed1674a`. Full detail: `PORT_HISTORY.md`.
 
-Three commits that sit outside the phase numbering (they refine P4/P7 deliverables rather than opening a new phase). All three were developed and measured in a since-discarded working tree; **none has been re-run against a fresh Isaac boot from this clean checkout**, so treat every performance claim below as "claimed, unconfirmed".
+### Vendor chassis graft + sensor mounting (2026-09-10)
+The URDF import produced a coarse shell with no rear panel; replaced with Clearpath's authored chassis from the Isaac asset catalog (BSD-3-Clause), grafted under our link skeleton and folded into the importer so a regen cannot wipe it. Collider moved from an AABB `Cube` (25.4% over-volume) to the vendor `convexHull` (6.9%). Camera corrected 12.5 cm down onto a modelled 37.5 mm mast, and the RealSense corrected D435 → **D455**.
 
-- **`ca903276` — `warehouse_full` GT map.** The stock `full_warehouse.usd` (7 racking rows + open staging) replaces the near-empty `warehouse.usd` as the real exploration workout — the latter has its own ~40% frontier ceiling that makes coverage gates meaningless. Analytic map, 34×58 m. Gotcha: dense geometry lands `generate_gt_map.py`'s auto flood-seed on a shelf (free=277 cells), so it needs `--origin=-10,5` on open floor; documented in the maps README table.
-- **`e647ac5a` — lidar + joint-state runtime correctness.** (a) `LidarScanAssembler` no longer carries a bin forward across ticks: a published bin comes only from the current completed tick, unrefreshed bins go `+inf`. Claimed to cut rotation-induced map smear. (b) Runner publishes a static all-zero wheel `JointState` — the planar drive rig never exposes the URDF wheel joints as articulation DOFs, so `robot_state_publisher` had no source for the four wheel-link transforms.
-- **`1a4079b9` — front+rear scan merge for SLAM input only.** New `common/scan_merger_node.py`: pairs front/rear `LaserScan` within a stamp tolerance, motion-compensates rear into front's capture time via the **odom→base_link** chain (never slam_toolbox's own `map→base_link` — that would be circular), publishes a 360° virtual scan on `sensors/scan_slam_merged`. No stale ranges, no interpolation; unobserved bins stay `+inf`; a genuine bin collision keeps the nearer return. Raw `lidar2d_{0,1}/scan` keep publishing unchanged to every other consumer (Nav2 costmaps, collision_monitor). `slam.launch.py` gains `slam_source` (`front_only` default / `merged`) switching only slam_toolbox's `scan_topic`; the merger node launches only under `merged`. `ridgeback_exploration.launch.py` defaults it to `merged` under `sim:=isaac`, `front_only` otherwise — so gz behavior is untouched.
+Commits `eaea0674` `70a5faa6` `e993ee29` `d26edef5` `0a81fbf6` `53a924a6`. Geometry drawing: `robot_geometry.svg` + `robot_render.png`. Full derivation and the measurement lessons: `PORT_HISTORY.md`.
 
-**Merger audit (2026-09-10) — two bugs found and fixed before any live run.** Proven offline with synthetic scans on an isolated domain (no Isaac needed; harness pattern: rear lidar sees one wall 3.0 m straight behind, front sees nothing, so the merged bin at `π` must read 3.3922 m — `+inf` means the rear scan was dropped):
-
-- **The merger was launched without the `/tf` remap.** `tf2_ros.TransformListener` subscribes to the *absolute* `/tf`, so a node namespace does not move it, and the whole stack publishes into `<ns>/tf`. Its buffer was therefore permanently empty, every `odom→base_link` lookup failed, and **every rear scan whose stamp differed from the front's was silently discarded** — `merged` mode degraded to front-only. Measured: stamps 10 ms apart with TF on `<ns>/tf` only → rear bin `+inf`; add a global `/tf` publisher → 3.3922 m. Fixed by adding `remappings=[('/tf', 'tf'), ('/tf_static', 'tf_static')]`, with a regression test (`test_scan_merger_node_remaps_tf_into_the_namespace`) so it cannot silently come back. **This was latent in sim** — both Isaac lidars stamp off the same tick, hitting the `abs(delta) < 1e-6` static-extrinsic fast path that never consults TF — and would have bitten on real hardware, where the two lidars have independent clocks.
-- **`range_max` was copied from the sensor frame into a `base_link` message.** The lidars sit ±0.3922 m off `base_link`, so a return at the front sensor's 10.00 m range_max lands at 10.39 m from `base_link` — above the declared `range_max`, so slam_toolbox discarded it. Merged mode was losing the outermost shell of returns that `front_only` keeps. Fixed by padding `range_max` with the largest lidar offset.
-- **The health log overstated itself:** a TF-miss merge still incremented `paired`, so the counters read `paired=4 tf_misses=1` for four publishes of which one carried no rear data at all. Split out `rear_dropped(no odom TF)`; the same probe now reads `paired=3 rear_dropped=1`.
-- Not bugs, checked: the hardcoded planar extrinsics match the robot USD chain (base_link → riser_link `(0,0,0.22)` → default_mount `(0,0,0.075)` → lidar link), identity rotation throughout, so front `(0.3922, 0, 0)` / rear `(-0.3922, 0, π)` are right; bin math (1440 bins, `angle_min=-π`, nearest-wins) is right; the correction composes to `T_front←rear` off the odom chain only, never `map→base_link`. The 5 cm rear-lidar height offset the audit flagged (a gz-only workaround) was removed the same day — see improvement 2 above; both lasers are now coplanar. **Superseded 2026-09-10:** the mount was also 11.6 cm too high, so the plane is now **0.2264** above `base_link`, not the 0.3424 this line originally recorded.
-
-Validation still owed: fresh-boot run with `odom_noise:=0` first (perfect odom isolates the merge geometry from the drift lever P5 already measured), then the noisy case. Confirm there whether Isaac really does stamp front and rear identically — if it does, the motion-compensation path is dead code in sim and only the real robot exercises it.
-
-### Vendor chassis graft (2026-09-10, branch `feat/isaac-vendor-chassis`)
-
-The URDF importer produced a coarse body — open gaps under the deck, **no rear end panel at all**, flat untextured materials. NVIDIA ships an authored Ridgeback in the Isaac asset catalog (`/Isaac/Robots/Clearpath/RidgebackUr/ridgeback_ur5.usd`, BSD-3-Clause, Clearpath Robotics, from `ridgeback_manipulation`) whose hull matches ours to a few mm but is closed, chamfered and textured. `tools/isaac/extract_vendor_chassis.py` pulls the chassis out; `import_ridgeback_urdf.py:graft_vendor_chassis` references it and hides the 12 imported prims it replaces.
-
-- **Geometry needed no re-referencing.** Both models bottom out at z = −0.0262 (wheel contact plane) and agree in y to 1.4 mm, so the vendor root *is* our `base_link` and the tape-measured 0.179 lidar mount carries over untouched. Verified after regen: laser frames at `(±0.3922, 0, 0.2264)`.
-- **Wheels stay ours** (articulated, they spin); the vendor drives its base as one rigid body with static wheels, so taking theirs would double them. The UR5, its mount plate, the dummy joint chain and the vendor `physicsScene` are dropped — a second articulation root would fight ours.
-- **Collider: `convexHull`, decided 2026-09-10.** Measured on the chassis collision mesh: true volume 0.15968 m³, `convexHull` 0.17064 (**+6.9 %**), the AABB `Cube` it replaces 0.20018 (**+25.4 %**). The hull keeps 119 verts / 234 facets against the source's 972 / 324, so it tracks the real form; what it over-claims is the underside cavity between the wheels, which the wheel cylinders already occupy and nothing else reaches. `convexDecomposition` would chase that last 6.9 % at per-step contact cost — rejected. Compare them with `tools/isaac/inspect_robot.py --compare-colliders`.
-- **Self-occlusion cleared, and an earlier theory refuted.** In `sim/isaac/usd/worlds/empty.usda` (added for this — floor slab, nothing else, so any finite return is necessarily the robot seeing itself) both lidars read **0/1081 finite bins** across the full ±135°, before *and* after the graft. The "grazing the side cover at 0.52 m" explanation for the Nav2 stall was **wrong**; that geometry never occluded the lidars.
-
-Two traps this uncovered, both silent:
-
-- `import_ridgeback_urdf.py` `rmtree`s the entire committed robot directory during its flatten step, which also deletes the vendored chassis and its licence. They are now stashed and restored across the rebuild.
-- Kit runs with `--/app/fastShutdown=True`, so `app.close()` **hard-exits the process** — a post-processing step appended after `import_urdf_to_usd()` returns never runs, while the script still prints `IMPORT OK` and exits 0. Anything post-import must sit inside, before the close.
-
-**Camera + mast corrected (2026-09-10, measured).** The D435 was floating at z = 1.145 with no supporting structure. Owner's tape: bottom face **0.740 m above the top plate** → 0.280 + 0.740 = **1.020** above `base_link`, so the model had it **12.5 cm too high**; `robot.yaml` camera z 0.85 → **0.725**. Fore/aft taken as a *fraction* of the hull (78 of 98 on the tape → 0.796 × 0.9325) giving x = **+0.2716**, because the tape's 98 cm total overran both the Clearpath mesh (0.9325) and NVIDIA's asset (0.9330) — two independent sources that agree with each other, and whose **width matches the official 793 mm spec to 0.2 mm**. The mast itself is authored in `_author_camera_mast` (not in the Clearpath description at all): 37.5 mm square, on the centreline at x = +0.1955, spanning deck 0.280 → **1.095**, i.e. 50 mm past the camera's top — the D435 is **bracketed to the mast's front face**, ~45 mm standoff, not sitting on it. Mast base clears the 0.2264 lidar plane by 53.6 mm; the modelled column omits the flared base plate, so the real clearance is smaller (still above the deck, so still clear).
-
-**Pattern worth naming: sensors here are never mounted where the obvious surface suggests.** The 2D lidars read as deck-mounted but are recessed in a body notch (−11.6 cm). The camera reads as mast-top but is bracketed to the mast's front face. Both were modelled from an unmeasured offset onto a plausible parent, and both were wrong. Measure the mounting face, and ask *how* it attaches, before authoring an offset.
-
-⚠️ **Rerun debt grows again:** the graft changes rendered geometry the RTX lidar raytraces, so the GT slice wants re-checking and every coverage number is void until it is.
+⚠️ Four geometry changes in one day — **every coverage number in this file predates all of them.**
 
 ### P8 — Gazebo removal + docs + graphify [M]
 - `.repos`: remove `clearpath_simulator` (stay-list above). Delete `patches/clearpath_gz_customizations.patch`, `sim/gz_plugins/` (SpawnG1.*). CMakeLists drops gz/Qt5 + SpawnG1; package.xml drops `clearpath_gz`/gz vendors/Qt5, adds `robot_localization`.
@@ -191,6 +155,33 @@ Two traps this uncovered, both silent:
 - Keep `sim/worlds/*.sdf` as converter source-of-truth (documented). Retire `capture_ground_truth.sh` to historical.
 - Update `diag.sh` (Isaac section), `cleanup.sh` (drop gz), README (isaac_venv install, livestream, spawn_g1, repeat mode), AI_CONTEXT.md (runner architecture, asset layout, regen workflows), ISSUES.md (retire gz-EGL RTF recipe; add Isaac shader-cache/VRAM/rclpy-DDS sections; keep camera-optical-TF), `.claude/agents/{sim-runner,box-health,log-triage}.md`, `tools/benchmark/README.md`, `start_exploration.sh` comments (positional contract: `world` only, unchanged). This file marked completed. `bash tools/rebuild_graphify`.
 - ✓ Fresh-clone drill: `vcs import` → `colcon build` → `install_isaac_venv.sh` → `bash start_exploration.sh` completes Isaac mock_hospital exploration. `grep -ri "clearpath_gz\|ros_gz\|gz sim"` → only intentional historical mentions. `colcon test` green.
+
+### P9 — Isaac Sim 6.1 migration [M] — planned, sequenced last on purpose
+
+Move off 6.0.1. Several of this port's ugliest workarounds exist only because
+of 6.0.1 defects, and each is a candidate to delete on 6.1:
+
+- the bridge `laser_scan` writer hardcodes 360° for ROTARY lidars and ignores
+  the azimuth ROI, firing only 180°/tick — the reason `ros_io.LidarScanAssembler`
+  and the two-prim-per-lidar rig exist at all
+- the URDF importer drops visual meshes and mesh `<collision>` elements, and
+  marks STL-derived visual slots instanceable (`attach_visual_meshes`,
+  `_author_chassis_collider`, the de-instancing pass)
+- `--/app/fastShutdown=True` hard-exits on `app.close()`
+- PhysX collider debug draw cannot be enabled programmatically
+
+**Why last, not first.** The upgrade is only measurable against a baseline,
+and there is no baseline — see `OPEN_ISSUES.md` §3. Migrating first means
+changing the platform and the geometry in the same step with nothing to
+compare against, and every workaround above would need revalidation anyway
+without knowing whether behaviour changed. Get navigation running, seat the
+robot, take **one** clean 6.0.1 baseline, then migrate and rerun the identical
+benchmark. That turns "6.1 feels different" into a number.
+
+The one thing that would justify resequencing: if the Nav2 stall
+(`OPEN_ISSUES.md` §1) turns out to be a 6.0.1 sensor-pipeline defect rather
+than a config problem. Check the 6.1 release notes for the `laser_scan` ROI
+fix before assuming it is ours.
 
 ## Key risks
 

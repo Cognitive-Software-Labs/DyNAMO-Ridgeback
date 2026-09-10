@@ -140,6 +140,27 @@ box is never genuinely single-tenant. Needs 3–5 seeds per condition.
 
 ---
 
+## 🔵 Scheduled
+
+### 7. Migrate to Isaac Sim 6.1
+
+Not broken — planned. Several workarounds in this port exist only because of
+6.0.1 defects and are candidates to delete on 6.1: the `LidarScanAssembler`
+plus two-prim-per-lidar rig (the bridge ignores the azimuth ROI and fires
+180°/tick), the importer's dropped meshes and instanceable STL slots, the
+`fastShutdown` hard-exit, and the collider debug draw that will not enable.
+
+**Sequenced after the first baseline, deliberately.** The upgrade is only
+measurable against one, and issue 3 means none exists. Migrating first changes
+the platform with nothing to compare against. Order: unblock nav → seat the
+robot → one clean 6.0.1 baseline → migrate → rerun the identical benchmark.
+
+Resequence only if issue 1 proves to be a 6.0.1 sensor-pipeline defect rather
+than config — check the 6.1 notes for the `laser_scan` ROI fix. See
+`PORT_PLAN.md` §P9.
+
+---
+
 ## 🟡 Known and accepted
 
 - **`mock_hospital` has no ground-truth map.** Deliberate (`69b5182e`) — it is

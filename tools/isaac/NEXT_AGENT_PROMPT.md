@@ -102,7 +102,12 @@ On `mock_hospital`, `odom_noise:=0`, deterministic, camera off, isolated domain:
    seat fix moves the slice plane for stock worlds and invalidates them again,
    so do it in that order, not the reverse.
 3. **Then the baselines**, then the P5 A/B (3–5 seeds per condition; single
-   runs prove nothing at 51–83% variance), then P8.
+   runs prove nothing at 51–83% variance).
+4. **Then Isaac 6.1** (`PORT_PLAN.md` §P9), and only then P8. The 6.1 move is
+   sequenced after a baseline on purpose: it is the only way to tell whether
+   the upgrade helped, and it may let several 6.0.1 workarounds be deleted
+   outright. Do not migrate first — you would change the platform with nothing
+   to compare against.
 
 ## How to run the stack
 
