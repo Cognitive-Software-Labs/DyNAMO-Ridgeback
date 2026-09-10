@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 from collections import OrderedDict
+from types import SimpleNamespace
 
 import numpy as np
 import pytest
@@ -38,6 +39,7 @@ from ridgeback_autonomy.perception.target_localization.ground_truth import (
 from ridgeback_autonomy.benchmarking.reduction import (
     choose_representative_event,
     compute_trial_medians,
+    restrict_events_to_stamps,
     usable_aligned_events,
     union_usable_events,
     usable_events_by_estimator,
@@ -46,6 +48,125 @@ from ridgeback_autonomy.benchmarking.rendering import BenchmarkCollageRenderer
 from ridgeback_autonomy.benchmarking.summary import build_summary_rows
 from ridgeback_autonomy.common.models import Detection
 from ridgeback_autonomy.msg import TargetMeasurements
+
+
+def test_replay_capture_restricts_live_scoring_to_frozen_detector_batches() -> None:
+    events = OrderedDict([
+        (('camera', 10), SimpleNamespace(stamp_ns=10)),
+        (('camera', 20), SimpleNamespace(stamp_ns=20)),
+        (('camera', 30), SimpleNamespace(stamp_ns=30)),
+    ])
+
+    assert list(restrict_events_to_stamps(events, {10})) == [('camera', 10)]
+
+
+def test_replay_capture_keeps_exact_depth_that_arrives_before_its_detection() -> None:
+    from ridgeback_autonomy.benchmarking.target_distance_benchmark_runner_node import (
+        TargetDistanceBenchmarkRunner,
+    )
+
+    early_depth = np.arange(12, dtype=np.float32).reshape(3, 4)
+    depth_buffer = OrderedDict()
+    store_buffered_preview(depth_buffer, 42, early_depth)
+    event = {
+        'image_height': 3,
+        'image_width': 4,
+        'detections': [{'bbox_xyxy': [1, 1, 3, 3], 'depth_roi': None}],
+    }
+
+    TargetDistanceBenchmarkRunner.store_replay_depth_rois(
+        SimpleNamespace(get_logger=lambda: SimpleNamespace(warning=lambda _message: None)),
+        event,
+        depth_buffer[42],
+    )
+
+    assert event['detections'][0]['depth_roi'].tolist() == [[5.0, 6.0], [9.0, 10.0]]
+
+
+def test_replay_capture_waits_for_context_depth_and_live_measurement() -> None:
+    from ridgeback_autonomy.benchmarking.target_distance_benchmark_runner_node import (
+        TargetDistanceBenchmarkRunner,
+    )
+
+    runner = SimpleNamespace(
+        capture_batches=1,
+        replay_capture_events=OrderedDict([
+            (42, {
+                'detected': True,
+                'intrinsics': {'fx': 1.0},
+                'camera_rotation': [[1.0, 0.0, 0.0]],
+                'camera_translation': [0.0, 0.0, 0.0],
+                'detections': [{'depth_roi': None}],
+            }),
+        ]),
+        capture_events={},
+    )
+
+    assert not TargetDistanceBenchmarkRunner.replay_capture_is_complete(runner)
+
+    runner.replay_capture_events[42]['detections'][0]['depth_roi'] = np.ones((2, 2))
+    assert not TargetDistanceBenchmarkRunner.replay_capture_is_complete(runner)
+
+    runner.capture_events[('camera', 42)] = SimpleNamespace(stamp_ns=42)
+    assert TargetDistanceBenchmarkRunner.replay_capture_is_complete(runner)
+
+    runner.replay_capture_events[42]['camera_rotation'] = None
+    assert not TargetDistanceBenchmarkRunner.replay_capture_is_complete(runner)
+
+
+def test_replay_capture_backfills_late_exact_camera_context(monkeypatch) -> None:
+    import ridgeback_autonomy.benchmarking.target_distance_benchmark_runner_node as runner_module
+
+    event = {
+        'stamp_ns': 42,
+        'frame_id': 'camera',
+        'image_width': 20,
+        'image_height': 21,
+        'intrinsics': None,
+        'intrinsics_stamp_ns': None,
+        'camera_rotation': None,
+        'camera_translation': None,
+    }
+    runner = SimpleNamespace(
+        replay_capture_events=OrderedDict([(42, event)]),
+        replay_camera_info_buffer=OrderedDict(),
+        static_replay_camera_info=None,
+        replay_tf_buffer=object(),
+        base_frame='base_link',
+        replay_last_fallback_frame=None,
+        get_logger=lambda: SimpleNamespace(
+            warn=lambda _message: None,
+            warning=lambda _message: None,
+        ),
+    )
+    monkeypatch.setattr(
+        runner_module,
+        'intrinsics_from_camera_info',
+        lambda _msg: SimpleNamespace(
+            fx=10.0, fy=11.0, cx=5.0, cy=6.0, width=20, height=21),
+    )
+    monkeypatch.setattr(
+        runner_module,
+        'lookup_transform_components',
+        lambda *_args: (np.eye(3), np.array([1.0, 2.0, 3.0]), 'base_link'),
+    )
+    runner.store_replay_intrinsics = lambda target, info, *, stamp_ns: (
+        runner_module.TargetDistanceBenchmarkRunner.store_replay_intrinsics(
+            runner, target, info, stamp_ns=stamp_ns))
+    camera_info = SimpleNamespace(
+        header=SimpleNamespace(stamp=SimpleNamespace(sec=0, nanosec=42)))
+
+    runner_module.TargetDistanceBenchmarkRunner.on_replay_camera_info(
+        runner, camera_info)
+
+    runner_module.TargetDistanceBenchmarkRunner.backfill_replay_event_context(
+        runner, event)
+
+    assert event['intrinsics']['width'] == 20
+    assert event['intrinsics_stamp_ns'] == 42
+    assert event['camera_rotation'] == np.eye(3).tolist()
+    assert event['camera_translation'] == [1.0, 2.0, 3.0]
+    assert runner.replay_last_fallback_frame == 'base_link'
 
 
 def test_parse_estimators_uses_canonical_order() -> None:

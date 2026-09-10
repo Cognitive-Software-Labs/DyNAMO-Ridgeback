@@ -5,6 +5,7 @@ import re
 
 import yaml
 
+from ridgeback_autonomy.benchmarking.replay import REPLAY_CAPTURE_BATCHES_DEFAULT
 from ridgeback_autonomy.perception.target_localization.estimator_registry import PUBLIC_ESTIMATOR_ORDER
 from ridgeback_autonomy.perception.target_localization.launch import CONFIG_LAUNCH_ARGUMENT_NAMES
 
@@ -86,6 +87,20 @@ def test_benchmark_default_world_is_allowed_by_clearpath_simulation() -> None:
     assert "'target_distance_calibration'" in clearpath_simulation_text
 
 
+def test_benchmark_forwards_gazebo_gui_choice_to_simulation() -> None:
+    benchmark_env_text = (
+        _package_root() / 'launch' / 'target_benchmark_env.launch.py'
+    ).read_text(encoding='utf-8')
+    simulation_text = (
+        _package_root() / 'launch' / 'includes' / 'simulation.launch.py'
+    ).read_text(encoding='utf-8')
+
+    assert "DeclareLaunchArgument(\n            'gz_gui'" in benchmark_env_text
+    assert "'gz_gui': gz_gui" in benchmark_env_text
+    assert "'headless_rendering': PythonExpression(" in simulation_text
+    assert "'false' if '" in simulation_text
+
+
 def test_exploration_uses_unique_mock_hospital_world() -> None:
     repo_root = Path(__file__).resolve().parents[3]
     exploration_text = (
@@ -132,6 +147,8 @@ def test_benchmark_launch_uses_new_multi_estimator_interface() -> None:
     assert "DeclareLaunchArgument('output_csv'" not in benchmark_text
     assert 'overlay_window' not in benchmark_text
     assert 'show_window' not in benchmark_text
+    assert REPLAY_CAPTURE_BATCHES_DEFAULT == 5
+    assert "default_value=str(REPLAY_CAPTURE_BATCHES_DEFAULT)" in benchmark_text
     # The mask-gate axis: declared once, forwarded to the mask node, the runner
     # (output names must match the node's gate), and the overlay (its mask panel
     # follows the gate).

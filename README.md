@@ -336,6 +336,7 @@ Arguments:
 | `use_sim_time` | `true` | Use Gazebo `/clock` |
 | `setup_path` | `~/clearpath/` | Directory containing `robot.yaml` and generated Clearpath files |
 | `world` | `target_distance_calibration` | Gazebo world used for the benchmark run |
+| `gz_gui` | `true` | Launch Gazebo's GUI; set `false` for unattended benchmark runs |
 | `estimators` | `all` | Comma-separated estimator subset to compare in one run: `pointcloud`, `projective_ranging`, `euclidean_reconstruction`, `polar_profiling`. Any subset works, rows individually — `estimators:=polar_profiling` runs that row alone |
 | `depth_source` | `stereoscopic` | Aligned-depth producer for the `projective_ranging`/`euclidean_reconstruction` rows: `stereoscopic` or `monocular`; comparing sources = two runs |
 | `mask_gate` | `box` | Mask front-end for the mask-based rows: `box` (rasterized detection box, no model) or `silhouette` (segmentation model prompted with the boxes; needs `perception_venv`); comparing gates = two runs |
@@ -344,11 +345,17 @@ Arguments:
 | `detector_debug` | `false` | Default-off detector evidence logging: achieved cadence, superseded frames, and bounded cold/warm percentiles for the throttle wait, decode, inference, parse, publish and CUDA synchronization. Environment-layer, like `detector_fps` |
 | `isolation_2d` | `nearest_mode_histogram` | Projective-ranging box-gate foreground recipe: `nearest_mode_histogram` or `otsu` |
 | `isolation_3d` | `height_crop_nearest_mode_band` | Euclidean-reconstruction box-gate foreground recipe: `height_crop_nearest_mode_band`, `height_crop_range_band`, `height_crop`, `nearest_mode_band`, or `range_band`. The two chains differ only in how the background separator anchors — nearest mode vs. percentile; the percentile one slides as background grows and is what the `pointcloud` row does |
+| `isolation_3d_floor_margin_m` | `0.05` | Height above the floor a point must clear in Euclidean recipes containing `height_crop` |
+| `isolation_3d_percentile` | `25.0` | Range percentile used as the anchor by the Euclidean `range_band` step |
+| `isolation_3d_ahead_m` | `0.10` | Euclidean inlier window retained in front of its range anchor |
+| `isolation_3d_behind_m` | `0.35` | Euclidean inlier window retained behind its range anchor |
+| `isolation_3d_bin_width_m` | `0.05` | Euclidean range-histogram bin width used by `nearest_mode_band` |
+| `isolation_3d_min_bin_fraction` | `0.05` | Fraction of Euclidean ranges a histogram bin must hold before it may anchor `nearest_mode_band` |
 | `mask_depth_max_meters` | `0.0` | Working depth gate for the mask rows; `0` means no gate, leaving each row bounded only by what its depth source declares it can resolve |
 | `isolation_2d_bin_width_m` | `0.05` | Depth-histogram bin width of the selected `isolation_2d` recipe. Applies to whichever recipe is chosen — both bin the masked depths |
 | `isolation_2d_band_m` | `0.35` | Depth band kept around the near-surface anchor. `nearest_mode_histogram` only; `otsu` has no band and ignores it |
 | `isolation_2d_min_bin_fraction` | `0.05` | Fraction of the masked depths a histogram bin must hold before the anchor may sit on it. `nearest_mode_histogram` only |
-| `min_valid_pixels` | `10` | Foreground pixels projective ranging requires before it reports a distance; below it the row misses with `ISOLATION_EMPTY` (box gate) or `TOO_FEW_VALID_PIXELS` (silhouette gate) |
+| `min_valid_pixels` | `10` | Shared foreground-sample floor for projective ranging and Euclidean reconstruction; both depth rows reject a prepared selection below it |
 | `camera_info_topic` | `sensors/camera_0/color/camera_info` | Compatibility override for the shared camera contract's color-grid intrinsics |
 | `repeats` | `5` | Number of positive-trial repeats per spawn pose |
 | `output_dir` | `<repo-root>/artifacts/benchmarks` | Root directory that will receive one timestamped subfolder per run |
@@ -356,6 +363,11 @@ Arguments:
 | `shutdown_on_complete` | `false` | Shut down the config launch service when the runner exits. The sweep sets this to `true`; the compatibility launch leaves the completed stack open for inspection |
 | `settle_sec` | `2.0` | Delay after spawning the target before sampling |
 | `capture_sec` | `10.0` | Sampling window length for collecting usable detections |
+| `replay_dataset_dir` | empty | New directory for the compact legacy measurement replay dataset. Setting it switches this run from elapsed-time capture to an exact raw-batch quota and requires projective ranging, box gating, and stereoscopic depth |
+| `sensor_capture_dir` | empty | New immutable full sensor-capture artifact for `mask-output`/`mask-model` replay. Stores exact RGB, float32 aligned depth, raw detections, calibration, and transforms; mutually exclusive with `replay_dataset_dir` |
+| `capture_batches` | `5` | Raw detector batches captured per trial when either replay output is set; empty batches count. Five was selected by the 2026-09-09 convergence run |
+| `capture_drain_sec` | `2.0` | Maximum post-quota drain for matching exact depth, camera context, and live measurement messages. Capture ends early when every selected stamp is complete and preserves missing matches when the bound expires |
+| `capture_timeout_sec` | `30.0` | Hard wall-time bound for obtaining the raw detector-batch quota; it is a stall guard, not the normal capture duration |
 | `color_topic` | `sensors/camera_0/color/image` | Compatibility override for the shared camera contract's color image; feeds detector, measurements, overlay, runner, and readiness gate |
 | `depth_topic` | `sensors/camera_0/depth/image` | Simulation's color-aligned depth. A hardware RealSense launch must override this to `sensors/camera_0/aligned_depth_to_color/image_raw` |
 | `pointcloud_topic` | `sensors/camera_0/points` | Simulation's organized point cloud. It is optional on RealSense; omit the pointcloud estimator or override this only after confirming driver output |
@@ -369,6 +381,23 @@ Benchmark semantics:
 - each estimator CSV stores one row per included trial, using the median estimate over that trial’s aligned usable detections
 - the shared collage image for each trial is built from one representative aligned detection event that is closest to the per-trial medians across the selected estimators
 
+### Local benchmark configurator
+
+Use the local configurator to build and validate a benchmark job without
+starting Gazebo or writing benchmark artifacts. It binds only to loopback and
+opens a browser by default; use `--no-open` on a remote or headless session.
+
+```bash
+ros2 run ridgeback_autonomy target_benchmark_configurator
+ros2 run ridgeback_autonomy target_benchmark_configurator --no-open
+```
+
+The UI exports a canonical replay-job YAML plus its exact command. It supports
+legacy measurement replay, frozen mask-output comparison, rerunnable
+mask-model materialization, and live-system sweeps. It validates selected
+artifacts against the same replay-job contract used by the CLI. See
+[benchmarking reference](docs/benchmarking/target_distance_benchmarking.md).
+
 ### Benchmark sweeps
 
 Use the sweep supervisor when comparing configurations. It starts Gazebo,
@@ -378,9 +407,6 @@ OWLv2 once per sweep; silhouette configurations still load their segmentation
 model inside their per-config mask node.
 
 ```bash
-# Start from a clean machine once, before the persistent environment starts.
-bash cleanup.sh
-
 SWEEP="$(ros2 pkg prefix ridgeback_autonomy)/share/ridgeback_autonomy/config/benchmark_sweep_baseline.yaml"
 
 # Validate all configs and print the trial/time estimate without launching.
@@ -415,12 +441,13 @@ configuration twice as an in-sweep noise control. See
 for what is already settled and what those runs are meant to answer.
 
 Do **not** run `cleanup.sh` between configurations: it kills Gazebo and RViz,
-which are deliberately persistent. The supervisor owns each config process
-group, removes any orphan `bench_*` entities after an unclean exit, and shuts
-the environment down at the end. If a sweep is interrupted, rerun the same
-command: the latest incomplete sweep with the same YAML and `--only` selection
-is resumed, valid `run.json` configurations are skipped, and partial config
-folders are preserved with an `.incomplete_<timestamp>` suffix before retry.
+which are deliberately persistent. The supervisor runs it once, immediately
+before starting that environment. It then owns each config process group,
+removes any orphan `bench_*` entities after an unclean exit, and shuts the
+environment down at the end. If a sweep is interrupted, rerun the same command:
+the latest incomplete sweep with the same YAML and `--only` selection is resumed,
+valid `run.json` configurations are skipped, and partial config folders are
+preserved with an `.incomplete_<timestamp>` suffix before retry.
 
 The YAML format is a metadata block, sweep-wide defaults, and named configs:
 
@@ -450,6 +477,10 @@ knobs are rejected. `world`, `setup_path`, `namespace`, `use_sim_time`, and
 `color_topic` may be set only in `defaults` because the environment cannot
 change mid-sweep.
 
+Use `--skip-preflight-cleanup` only when another same-user ROS/Gazebo session
+must remain alive. The sweep then skips the aggressive repository cleanup and
+warns that any stale processes are the operator's responsibility.
+
 Outputs use one timestamped sweep folder with a resumable manifest and a
 comparison report:
 
@@ -468,13 +499,143 @@ records each configuration's wall time and a pre-run real-time-factor sample;
 RTF is diagnostic only, but helps distinguish configuration effects from
 observation-coverage drift as a long-lived simulator slows down.
 
+### Legacy measurement replay
+
+Use replay when only the box-gated stereoscopic `projective_ranging` recipe or
+its numeric parameters change. One live run freezes raw detections, exact-stamp
+depth ROIs, intrinsics, transforms, and ground truth; the offline command then
+evaluates every configuration in the existing projective sweep over those same
+inputs. It does not replace live runs for detector, transport, throughput,
+latency, model, or final-integration questions.
+
+Both the dataset directory and offline output directory must be new. This
+five-scene command is a smoke workflow and uses the selected five-batch default.
+
+```bash
+SCENARIO="$(ros2 pkg prefix ridgeback_autonomy)/share/ridgeback_autonomy/config/benchmark_scenarios_examples.yaml"
+SWEEP="$(ros2 pkg prefix ridgeback_autonomy)/share/ridgeback_autonomy/config/benchmark_sweep_projective_parameters.yaml"
+DATASET="$PWD/artifacts/benchmarks/replay_projective_smoke_dataset"
+LIVE_OUTPUT="$PWD/artifacts/benchmarks/replay_projective_smoke_live"
+OFFLINE_OUTPUT="$PWD/artifacts/benchmarks/replay_projective_smoke_offline"
+
+ros2 launch ridgeback_autonomy target_distance_benchmark.launch.py \
+  scenario:="$SCENARIO" repeats:=1 estimators:=projective_ranging \
+  mask_gate:=box depth_source:=stereoscopic record_video:=false gz_gui:=false \
+  output_dir:="$LIVE_OUTPUT" run_dir_name:=matching_live \
+  replay_dataset_dir:="$DATASET" \
+  capture_drain_sec:=2.0 capture_timeout_sec:=30.0 \
+  shutdown_on_complete:=true
+
+ros2 run ridgeback_autonomy target_offline_replay_benchmark \
+  "$DATASET" "$SWEEP" --output-dir "$OFFLINE_OUTPUT" --workers 4
+```
+
+Capture counts raw detector batches rather than elapsed seconds. Once the quota
+arrives, it drains only until every selected stamp has matching depth, camera
+context, and a live measurement or `capture_drain_sec` expires. Missing matches
+remain explicit replay evidence. Any skipped trial leaves the dataset `incomplete`, and the
+offline loader refuses it instead of silently comparing a reduced scenario set.
+
+The offline root contains `summary.md` and `sweep.json` for the cross-variant
+comparison, `replay.json` for dataset/evaluator provenance and total evaluation
+time, and one normal CSV/`run.json`/`summary.md` set per variant. The clean
+2026-09-09 full-scenario validation captured 109/109 trials, matched all 135
+live rows, and reduced the estimated 6.99-hour 15-variant sweep to 8 minutes 22
+seconds end to end (about 50x). Five batches is therefore the legacy capture default. On
+the measured 32-thread host, 16 workers was the replay knee; choose workers for
+the machine rather than blindly using every logical CPU. See
+[`docs/history/offline_measurement_replay_validation.md`](docs/history/offline_measurement_replay_validation.md).
+
+### Layered mask replay
+
+Use the typed replay path when masks themselves must be compared or rerun. The
+four profiles and their legal axes are available without ROS or model imports:
+
+```bash
+ros2 run ridgeback_autonomy target_replay_describe --json
+```
+
+Capture one full sensor parent with the existing benchmark launch. The capture
+still counts raw batches, including empty batches, and stores missing exact RGB,
+depth, or context explicitly after the bounded drain.
+
+```bash
+SCENARIO="$(ros2 pkg prefix ridgeback_autonomy)/share/ridgeback_autonomy/config/benchmark_scenarios_examples.yaml"
+SENSOR="$PWD/artifacts/benchmarks/sensor_capture"
+LIVE_OUTPUT="$PWD/artifacts/benchmarks/sensor_capture_live"
+
+ros2 launch ridgeback_autonomy target_distance_benchmark.launch.py \
+  scenario:="$SCENARIO" repeats:=1 estimators:=projective_ranging \
+  mask_gate:=box depth_source:=stereoscopic record_video:=false gz_gui:=false \
+  output_dir:="$LIVE_OUTPUT" run_dir_name:=sensor_capture_live \
+  sensor_capture_dir:="$SENSOR" capture_batches:=5 \
+  capture_drain_sec:=2.0 capture_timeout_sec:=30.0 \
+  shutdown_on_complete:=true
+```
+
+Derive immutable caches independently. A changed checkpoint, revision, prompt
+padding, IoU floor, device/dtype, dependency version, or code provenance yields
+a different producer signature and artifact identity.
+
+```bash
+ros2 run ridgeback_autonomy target_replay_materialize_masks \
+  "$SENSOR" --producer box \
+  --output-dir "$PWD/artifacts/benchmarks/masks_box"
+
+ros2 run ridgeback_autonomy target_replay_materialize_masks \
+  "$SENSOR" --producer slimsam \
+  --model Zigeng/SlimSAM-uniform-50 \
+  --output-dir "$PWD/artifacts/benchmarks/masks_slimsam"
+```
+
+The generalized executor accepts a canonical job YAML/JSON. `mask-output`
+requires the sensor parent plus one or more caches; `mask-model` requires the
+sensor parent plus `materializations` and creates its caches once before running
+all measurement variants.
+
+```yaml
+job_version: 1
+question: compare-mask-outputs
+profile: mask-output
+inputs:
+  sensor_capture: ./artifacts/benchmarks/sensor_capture
+  mask_caches:
+    - ./artifacts/benchmarks/masks_box
+    - ./artifacts/benchmarks/masks_slimsam
+sweep:
+  sweep:
+    name: paired_mask_measurements
+    description: Compare two measurement bands over every frozen mask cache.
+  configs:
+    - name: baseline
+      estimators: projective_ranging,euclidean_reconstruction
+      isolation_2d_band_m: 0.35
+    - name: wider_2d_band
+      estimators: projective_ranging,euclidean_reconstruction
+      isolation_2d_band_m: 0.50
+resources:
+  measurement_workers: 4
+comparison_baseline: masks_box:baseline
+output_dir: ./artifacts/benchmarks/paired_masks
+```
+
+```bash
+ros2 run ridgeback_autonomy target_replay_benchmark replay-job.yaml
+```
+
+Outputs appear only after the whole job succeeds. Offline reports state their
+profile, supported claims, artifact hashes, cache lineage, worker count, and
+limitations. Mask-production time is diagnostic; only the existing live-system
+benchmark can support transport, throughput, end-to-end latency, GPU-contention,
+or integration claims.
+
 ### Perception interfaces
 
 | Node | Output topic | Key params |
 |------|--------------|------------|
 | `target_detector_node` | `detections/target/raw` | `color_topic`, `detection_model`, `detection_threshold`, `detector_fps` (default `10.0`; an upper bound on *step starts*, so the achieved rate matches the setpoint until inference alone exceeds the period), `detector_debug` |
 | `target_pointcloud_measurement_node` | `measurements/target/pointcloud` | `color_topic`, `pointcloud_topic`, `base_frame`, `enabled_estimators` |
-| `target_mask_measurement_node` | `measurements/target/mask` (+ `debug/target/mask` on the silhouette gate, + `debug/target/mask/aligned_depth` when a depth path is enabled, + `visualization/target/polar_rays` when polar profiling is) | `enabled_estimators`, `depth_source`, `depth_topic`, `camera_info_topic`, `scan_topic`, `base_frame` (**must be passed** — its own default is the bare `base_link`, unlike the other nodes', which are namespace-derived), `pitch_deg`, `front_offset_m`, `isolation_2d`, `isolation_2d_bin_width_m`, `isolation_2d_band_m`, `isolation_2d_min_bin_fraction`, `min_valid_pixels`, `isolation_3d`, `mask_gate`, `segmentation_model`, `color_topic`, `ray_marker_topic` |
+| `target_mask_measurement_node` | `measurements/target/mask` (+ `debug/target/mask` on the silhouette gate, + `debug/target/mask/aligned_depth` when a depth path is enabled, + `visualization/target/polar_rays` when polar profiling is) | `enabled_estimators`, `depth_source`, `depth_topic`, `camera_info_topic`, `scan_topic`, `base_frame` (**must be passed** — its own default is the bare `base_link`, unlike the other nodes', which are namespace-derived), `pitch_deg`, `front_offset_m`, `isolation_2d` and its three numeric settings, `min_valid_pixels`, `isolation_3d` and its six numeric settings, `mask_gate`, `segmentation_model`, `color_topic`, `ray_marker_topic` |
 | `target_overlay_node` | `debug/target/overlay` | `measurement_topic`, `mask_measurement_topic`, `color_topic`, `aligned_depth_topic`, `estimators`, `max_cols`, `rgb_panel_labels` |
 | `target_visualization_node` | `visualization/target/estimates` + `hud/target_distances` | `base_frame`, `world_frame`, `marker_lifetime_sec`, `ground_truth_topic`, `estimators` (gates both the HUD rows and the rings; defaults to `all`), `hud_layout` (`rows` — the benchmark's, with truth and error columns — or `wide`, exploration's estimator columns with an age under each) |
 | `target_distance_benchmark_runner` | per-estimator CSVs + summary CSV + trial collage images + `video/run.mp4` | `estimators`, `output_dir`, `pointcloud_measurement_topic`, `mask_measurement_topic`, `color_topic`, `record_video`, `record_fps` |

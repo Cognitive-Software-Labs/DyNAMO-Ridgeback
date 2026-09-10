@@ -9,8 +9,28 @@ from __future__ import annotations
 
 import math
 
+import numpy as np
+
 
 ROBOT_FRONT_OFFSET_M = 0.25
+
+
+def optical_to_base_planar(
+    xyz_optical,
+    rotation: np.ndarray,
+    translation: np.ndarray,
+    front_offset_m: float,
+) -> tuple[float, float, float]:
+    """Camera-optical point -> planar position and distance in the base frame."""
+
+    point_base = (
+        np.asarray(rotation, dtype=np.float64)
+        @ np.asarray(xyz_optical, dtype=np.float64)
+        + np.asarray(translation, dtype=np.float64)
+    )
+    lateral_m = float(point_base[1])
+    forward_m = float(point_base[0]) - front_offset_m
+    return lateral_m, forward_m, math.hypot(lateral_m, forward_m)
 
 
 def apply_vehicle_front_offset(lateral_m, forward_m):

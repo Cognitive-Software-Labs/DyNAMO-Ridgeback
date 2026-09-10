@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 from pathlib import Path
+import subprocess
 
 import pytest
 
 from ridgeback_autonomy.benchmarking.target_benchmark_sweep import (
+    _parser,
     _launch_argument_tokens,
+    run_preflight_cleanup,
 )
 from ridgeback_autonomy.benchmarking.sweep import load_sweep, parse_sweep
 
@@ -41,6 +44,41 @@ def test_launch_argument_tokens_omit_empty_launch_defaults() -> None:
         'estimators:=pointcloud',
         'repeats:=1',
     ]
+
+
+def test_sweep_runs_repo_cleanup_before_starting_the_environment(tmp_path, monkeypatch) -> None:
+    cleanup = tmp_path / 'cleanup.sh'
+    cleanup.write_text('exit 0\n', encoding='utf-8')
+    calls = []
+
+    def fake_run(command, **kwargs):
+        calls.append((command, kwargs))
+
+    monkeypatch.setattr(
+        'ridgeback_autonomy.benchmarking.target_benchmark_sweep.subprocess.run',
+        fake_run,
+    )
+
+    run_preflight_cleanup(str(tmp_path))
+
+    assert calls == [
+        (['bash', str(cleanup)], {
+            'cwd': str(tmp_path),
+            'stdin': subprocess.DEVNULL,
+            'check': True,
+        }),
+    ]
+
+
+def test_sweep_refuses_to_start_without_its_cleanup_script(tmp_path) -> None:
+    with pytest.raises(RuntimeError, match='cleanup script is missing'):
+        run_preflight_cleanup(str(tmp_path))
+
+
+def test_sweep_cleanup_can_be_skipped_for_a_shared_process_session() -> None:
+    args = _parser().parse_args(['sweep.yaml', '--skip-preflight-cleanup'])
+
+    assert args.skip_preflight_cleanup is True
 
 
 def test_sweep_rejects_unknown_config_key(tmp_path) -> None:
@@ -107,8 +145,10 @@ def test_sweep_accepts_detector_settings_as_defaults(
         ('pointcloud', 'mask_depth_max_meters', 10.0),
         ('pointcloud', 'mask_gate', 'silhouette'),
         ('pointcloud', 'isolation_3d', 'range_band'),
+        ('pointcloud', 'isolation_3d_floor_margin_m', 0.08),
         ('euclidean_reconstruction', 'isolation_2d', 'otsu'),
         ('projective_ranging', 'isolation_3d', 'range_band'),
+        ('projective_ranging', 'isolation_3d_bin_width_m', 0.02),
     ],
 )
 def test_sweep_rejects_inapplicable_explicit_knob(
@@ -122,6 +162,16 @@ def test_sweep_rejects_inapplicable_explicit_knob(
 
     with pytest.raises(ValueError, match=rf'field "{field}" does not apply'):
         parse_sweep(document)
+
+
+def test_sweep_accepts_shared_sufficiency_floor_for_euclidean(tmp_path) -> None:
+    document = _document(tmp_path)
+    document['configs'][0].update(
+        estimators='euclidean_reconstruction', min_valid_pixels=25)
+
+    spec = parse_sweep(document)
+
+    assert spec.configs[0].arguments['min_valid_pixels'] == '25'
 
 
 def test_sweep_rejects_bad_estimator(tmp_path) -> None:

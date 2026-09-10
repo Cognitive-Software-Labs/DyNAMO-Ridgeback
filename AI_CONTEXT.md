@@ -154,6 +154,21 @@ Benchmark stack:
   resumes valid config outputs by `run.json`, records RTF, and writes
   sweep-level `sweep.json` + `summary.md`. Never add runtime parameter mutation
   to avoid the per-config process restart; node existence is estimator-driven.
+- Replay V1 is a separate measurement-accuracy path for box-gated stereoscopic
+  `projective_ranging`: the live runner freezes an exact raw-detection-batch
+  quota plus exact-stamp depth ROIs/intrinsics/extrinsics, and
+  `target_offline_replay_benchmark` applies every relevant sweep variant to one
+  trial per worker. Its quota is event-driven; `capture_timeout_sec` guards only
+  raw-batch stalls, while `capture_drain_sec` is a bounded depth/camera-context/
+  live-measurement drain that ends early on complete evidence and preserves
+  missing matches. Any skipped trial leaves the dataset unloadable as
+  `incomplete`. Replay reuses the
+  live reduction/scoring/trial/report modules and is not evidence about detector,
+  ROS transport, latency, throughput, or integration behavior. Five raw batches
+  per trial is the validated default: on 2026-09-09 its full 109-trial capture
+  matched all 135 live result rows and the 15-variant end-to-end path was about
+  50x faster than the prior live-sweep estimate. The worker knee was 16 on a
+  32-thread host; it is a host measurement, not a portable worker default.
 
 ## Namespace And Topic Conventions
 

@@ -2,14 +2,17 @@ from __future__ import annotations
 
 import statistics
 from collections import Counter
+from typing import TYPE_CHECKING
 
-from ridgeback_autonomy.benchmarking.alignment import (
-    MeasurementEvent,
+from ridgeback_autonomy.benchmarking.event_values import (
     detection_status,
     event_has_panel_preview,
     has_all_selected_estimates,
 )
 from ridgeback_autonomy.common.miss_reason import MissReason, reason_name
+
+if TYPE_CHECKING:
+    from ridgeback_autonomy.benchmarking.alignment import MeasurementEvent
 
 
 def usable_aligned_events(
@@ -79,6 +82,21 @@ def summarize_capture_events(
         'usable_by_estimator': usable_by_estimator,
         'usable_events': union_usable_events(usable_by_estimator),
         'status_histogram': compute_status_histogram(events, selected_estimators),
+    }
+
+
+def restrict_events_to_stamps(events: dict, stamps: set[int]) -> dict:
+    """Keep only measurement events whose detector batch was frozen for replay.
+
+    Replay capture has a bounded depth drain after its raw-batch quota.  The
+    drain must complete the quota's measurements, not silently add later
+    detector batches to the live side of a parity comparison.
+    """
+
+    return {
+        key: event
+        for key, event in events.items()
+        if event.stamp_ns in stamps
     }
 
 

@@ -100,6 +100,7 @@ def test_sweep_routes_output_and_child_logs_without_changing_commands(tmp_path, 
                         'configs': [{'name': 'pointcloud', 'estimators': 'pointcloud'}]},
                        source=str(tmp_path / 'sweep.yaml'))
     calls = []
+    cleanup_calls = []
 
     class FakeProcess:
         returncode = 0
@@ -123,12 +124,14 @@ def test_sweep_routes_output_and_child_logs_without_changing_commands(tmp_path, 
     # patched Popen and land in the launch-command fake below.
     monkeypatch.setattr(sweep, 'gl_renderer_provenance', lambda: {})
     monkeypatch.setattr(sweep, 'stop_process_group', lambda *_: None)
+    monkeypatch.setattr(sweep, 'run_preflight_cleanup', cleanup_calls.append)
     monkeypatch.setattr(sweep, 'reap_orphan_benchmark_entities', lambda _: [])
     monkeypatch.setattr(sweep, 'sample_real_time_factor', lambda: 1.0)
     monkeypatch.setattr(sweep, '_wait_for_config', lambda *_: ('success', None))
     share = tmp_path / 'install/ridgeback_autonomy/share/ridgeback_autonomy'
     sweep_dir, success = sweep.run_sweep(spec, spec.configs, package_share=str(share))
     assert success
+    assert cleanup_calls == [str(tmp_path)]
     assert Path(sweep_dir).parent == expected
     assert len(calls) == 2
     assert calls[0][0] == sweep._environment_command(spec)

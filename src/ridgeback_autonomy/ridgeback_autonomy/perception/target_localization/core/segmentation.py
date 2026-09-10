@@ -137,10 +137,20 @@ class SamBoxSegmenter:
     family is dispatched on the checkpoint's ``model_type``.
     """
 
-    def __init__(self, model_name: str, logger) -> None:
+    def __init__(
+        self,
+        model_name: str,
+        logger,
+        *,
+        revision: str | None = None,
+        device: str | None = None,
+        dtype: str = 'auto',
+    ) -> None:
         self.model_name = model_name
+        self.revision = revision or None
         self.logger = logger
-        self.device = resolve_torch_device()
+        self.device = resolve_torch_device() if device in (None, '', 'auto') else str(device)
+        self.dtype = str(dtype)
         self._model = None
         self._processor = None
         # Replaced by torch.inference_mode in load(); a no-op context keeps
@@ -160,13 +170,26 @@ class SamBoxSegmenter:
         self.logger.info(f'Loading segmentation model: {self.model_name}')
         self.logger.info(f'Using segmentation device: {self.device}')
         model_class, processor_class = self._model_classes(transformers)
-        self._model = model_class.from_pretrained(self.model_name).to(self.device).eval()
-        self._processor = processor_class.from_pretrained(self.model_name)
-        self._inference_mode = importlib.import_module('torch').inference_mode
+        pretrained_kwargs = {'revision': self.revision} if self.revision else {}
+        model = model_class.from_pretrained(self.model_name, **pretrained_kwargs)
+        torch = importlib.import_module('torch')
+        if self.dtype in ('', 'auto'):
+            model = model.to(self.device)
+        else:
+            dtype = getattr(torch, self.dtype, None)
+            if dtype is None:
+                raise ValueError(
+                    f'Unknown torch dtype "{self.dtype}" for segmentation model.')
+            model = model.to(self.device, dtype=dtype)
+        self._model = model.eval()
+        self._processor = processor_class.from_pretrained(
+            self.model_name, **pretrained_kwargs)
+        self._inference_mode = torch.inference_mode
         self.logger.info('Segmentation model loaded.')
 
     def _model_classes(self, transformers) -> tuple[type, type]:
-        config = transformers.AutoConfig.from_pretrained(self.model_name)
+        kwargs = {'revision': self.revision} if self.revision else {}
+        config = transformers.AutoConfig.from_pretrained(self.model_name, **kwargs)
         model_type = str(getattr(config, 'model_type', ''))
         if model_type.startswith('sam2'):
             return transformers.Sam2Model, transformers.Sam2Processor

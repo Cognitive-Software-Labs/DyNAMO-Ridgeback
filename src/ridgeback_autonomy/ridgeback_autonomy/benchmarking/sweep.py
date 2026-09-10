@@ -13,7 +13,7 @@ from ridgeback_autonomy.perception.target_localization.estimator_registry import
     MASK_ESTIMATORS,
     parse_estimators,
 )
-from ridgeback_autonomy.perception.target_localization.launch import (
+from ridgeback_autonomy.benchmarking.replay_profiles import (
     CONFIG_LAUNCH_ARGUMENT_NAMES,
     ENV_LAYER_CONFIG_KEYS,
 )
@@ -42,14 +42,19 @@ KNOB_ESTIMATORS = {
     'mask_depth_max_meters': DEPTH_PATH_ESTIMATORS,
     'mask_gate': MASK_ESTIMATORS,
     'isolation_2d': frozenset({'projective_ranging'}),
-    # The 2D recipe's own numbers and projective ranging's sufficiency floor.
-    # Nothing else reads them, so a config that sets one without selecting that
-    # estimator is a config whose knob does nothing.
+    # The recipes' own numbers. A config that sets one without selecting the
+    # estimator that consumes it is a duplicate run with a knob that does nothing.
     'isolation_2d_bin_width_m': frozenset({'projective_ranging'}),
     'isolation_2d_band_m': frozenset({'projective_ranging'}),
     'isolation_2d_min_bin_fraction': frozenset({'projective_ranging'}),
-    'min_valid_pixels': frozenset({'projective_ranging'}),
+    'min_valid_pixels': DEPTH_PATH_ESTIMATORS,
     'isolation_3d': frozenset({'euclidean_reconstruction'}),
+    'isolation_3d_floor_margin_m': frozenset({'euclidean_reconstruction'}),
+    'isolation_3d_percentile': frozenset({'euclidean_reconstruction'}),
+    'isolation_3d_ahead_m': frozenset({'euclidean_reconstruction'}),
+    'isolation_3d_behind_m': frozenset({'euclidean_reconstruction'}),
+    'isolation_3d_bin_width_m': frozenset({'euclidean_reconstruction'}),
+    'isolation_3d_min_bin_fraction': frozenset({'euclidean_reconstruction'}),
 }
 
 

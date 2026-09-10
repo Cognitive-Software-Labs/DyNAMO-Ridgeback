@@ -5,8 +5,8 @@ from __future__ import annotations
 from collections import Counter
 from typing import Any
 
-from ridgeback_autonomy.benchmarking.alignment import detection_status
 from ridgeback_autonomy.benchmarking.association import GtPoint, assign_to_ground_truth
+from ridgeback_autonomy.benchmarking.event_values import detection_status
 from ridgeback_autonomy.benchmarking.reduction import dominant_miss_reason
 from ridgeback_autonomy.benchmarking.scoring import (
     OUTCOME_DETECTOR_MISS,

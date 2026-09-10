@@ -36,6 +36,9 @@ implementations or committed backlog work.
 
 ## Active plans
 
+- [Offline measurement replay benchmark](plans/offline_measurement_replay_benchmark.md) — capture detector/sensor evidence once and evaluate measurement variants in parallel
+- [Layered replay profiles and derived evidence caches](plans/layered_replay_profiles.md) — implemented core with live parity, real model, storage, and scaling gates still open
+- [Local benchmark configuration GUI](plans/benchmark_configuration_gui.md) — implemented question-first configurator for offline and live benchmark jobs
 - [Remote vs physical seat validation](plans/remote_vs_physical_seat_validation.md) — can a benchmark taken over xrdp be quoted as a physical-seat number
 - [D455 hardware validation](plans/camera_hardware_validation.md)
 - [Model-concurrency evidence](plans/model_concurrency_evidence.md)
@@ -54,6 +57,7 @@ implementations or committed backlog work.
 - [Exact-stamp depth availability](history/exact_stamp_depth_availability.md)
 - [Projective parameter sensitivity](history/projective_parameter_sensitivity.md)
 - [Chassis attitude and the floor crop](history/chassis_attitude_and_floor_crop.md)
+- [Layered replay implementation validation](history/layered_replay_implementation_validation.md)
 - [Exact-stamp investigation handoff](plans/exact_stamp_depth_availability_handoff.md)
 
 History preserves dated evidence and limitations. Read the corresponding

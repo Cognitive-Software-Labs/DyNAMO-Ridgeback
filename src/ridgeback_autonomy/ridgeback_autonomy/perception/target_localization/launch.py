@@ -49,7 +49,8 @@ SHARED_BENCHMARK_ARGUMENT_DEFAULTS = {
 
 # The source launch writes every declaration out explicitly so ``--show-args``
 # and the source-layout guards remain useful. This catalogue is the validator's
-# matching public contract; test_launch_layout verifies that it does not drift.
+# matching public launch contract; replay profile stage ownership lives in the
+# ROS-free benchmarking registry.
 CONFIG_LAUNCH_ARGUMENT_NAMES = frozenset({
     'namespace',
     'use_sim_time',
@@ -63,6 +64,11 @@ CONFIG_LAUNCH_ARGUMENT_NAMES = frozenset({
     'output_dir',
     'settle_sec',
     'capture_sec',
+    'replay_dataset_dir',
+    'sensor_capture_dir',
+    'capture_batches',
+    'capture_drain_sec',
+    'capture_timeout_sec',
     'depth_topic',
     'camera_info_topic',
     'depth_source',
@@ -104,7 +110,6 @@ ENV_LAYER_CONFIG_KEYS = frozenset({
     'detector_fps',
     'detector_debug',
 })
-
 
 def workspace_root_from_package_share(package_share: str) -> str:
     return os.path.abspath(os.path.join(package_share, '..', '..', '..', '..'))

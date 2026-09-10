@@ -18,6 +18,7 @@ from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
 from ridgeback_autonomy.benchmarking.paths import default_output_directory
+from ridgeback_autonomy.benchmarking.replay import REPLAY_CAPTURE_BATCHES_DEFAULT
 from ridgeback_autonomy.perception.target_localization.estimator_registry import (
     parse_estimators,
     selected_mask_estimators,
@@ -26,6 +27,7 @@ from ridgeback_autonomy.perception.target_localization.estimator_registry import
     uses_pointcloud_estimators,
 )
 from ridgeback_autonomy.perception.target_localization.launch import (
+    ALIGNED_DEPTH_DEBUG_TOPIC,
     CONFIG_LAUNCH_ARGUMENT_NAMES,
     MASK_MEASUREMENTS_TOPIC,
     POINTCLOUD_MEASUREMENTS_TOPIC,
@@ -185,6 +187,15 @@ def build_benchmark_nodes(context, *args, **kwargs):
             'run_dir_name': LaunchConfiguration('run_dir_name'),
             'settle_sec': settle_sec,
             'capture_sec': capture_sec,
+            'replay_dataset_dir': LaunchConfiguration('replay_dataset_dir'),
+            'sensor_capture_dir': LaunchConfiguration('sensor_capture_dir'),
+            'capture_batches': LaunchConfiguration('capture_batches'),
+            'capture_drain_sec': LaunchConfiguration('capture_drain_sec'),
+            'capture_timeout_sec': LaunchConfiguration('capture_timeout_sec'),
+            'raw_detections_topic': RAW_DETECTIONS_TOPIC,
+            'aligned_depth_debug_topic': ALIGNED_DEPTH_DEBUG_TOPIC,
+            'camera_info_topic': camera_inputs.color_camera_info_topic,
+            'base_frame': base_frame,
             'estimators': ','.join(selected_estimators),
             'pointcloud_measurement_topic': POINTCLOUD_MEASUREMENTS_TOPIC,
             'mask_measurement_topic': MASK_MEASUREMENTS_TOPIC,
@@ -307,6 +318,26 @@ def generate_launch_description():
         DeclareLaunchArgument('settle_sec', default_value='2.0'),
         DeclareLaunchArgument('capture_sec', default_value='10.0'),
         DeclareLaunchArgument(
+            'replay_dataset_dir', default_value='',
+            description='New directory for a compact legacy measurement replay capture',
+        ),
+        DeclareLaunchArgument(
+            'sensor_capture_dir', default_value='',
+            description='New typed sensor-capture artifact for mask-model replay',
+        ),
+        DeclareLaunchArgument(
+            'capture_batches', default_value=str(REPLAY_CAPTURE_BATCHES_DEFAULT),
+            description='Raw detector batches per replay trial; empty batches count',
+        ),
+        DeclareLaunchArgument(
+            'capture_drain_sec', default_value='2.0',
+            description='Bounded depth-match drain after the replay batch quota',
+        ),
+        DeclareLaunchArgument(
+            'capture_timeout_sec', default_value='30.0',
+            description='Hard stall bound for one replay-capture trial',
+        ),
+        DeclareLaunchArgument(
             'depth_topic', default_value=SIMULATION_CAMERA_INPUTS.aligned_depth_topic),
         DeclareLaunchArgument(
             'camera_info_topic',
@@ -350,7 +381,7 @@ def generate_launch_description():
         DeclareLaunchArgument(
             'min_valid_pixels',
             default_value=str(MIN_VALID_SAMPLES),
-            description='Projective ranging: foreground pixels required for an estimate',
+            description='Depth rows: foreground samples required for an estimate',
         ),
         DeclareLaunchArgument(
             'isolation_3d',
