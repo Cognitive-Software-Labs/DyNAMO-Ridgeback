@@ -6,18 +6,38 @@
 #   bash start_exploration.sh office                         # office + explore_lite
 #   bash start_exploration.sh mock_hospital custom           # mock_hospital + custom explorer
 #   EXPLORER=custom bash start_exploration.sh office         # office + custom explorer
+#   bash start_exploration.sh estimators:=polar_profiling    # defaults + launch arguments
+#   bash start_exploration.sh office --ros-args --log-level info
 #   RMW_IMPLEMENTATION=rmw_fastrtps_cpp bash start_exploration.sh  # explicit RMW override
+#
+# Both positional slots are optional and either may be omitted: everything from
+# the first launch argument or option onward is passed through, so passthrough
+# arguments do not have to sit behind two placeholders.
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-WORLD="${1:-mock_hospital}"
-if [[ $# -gt 0 ]]; then
+
+# Everything bound for ros2 launch rather than for this script: ``name:=value``
+# arguments and ``-``-prefixed options. Neither can name a world or an explorer,
+# so neither may be consumed as a positional.
+#
+# The world slot tested nothing at all and the explorer slot tested ``*":="``,
+# which matches a string ENDING in ":=" -- something no launch argument is. So
+# both slots swallowed passthrough arguments: the first became the world, the
+# second tripped the explorer check and exited 2.
+is_passthrough() {
+    [[ "$1" == *":="* || "$1" == -* ]]
+}
+
+WORLD=mock_hospital
+if [[ $# -gt 0 ]] && ! is_passthrough "$1"; then
+    WORLD="$1"
     shift
 fi
 
 EXPLORER="${EXPLORER:-explore_lite}"
-if [[ $# -gt 0 && "$1" != *":=" ]]; then
+if [[ $# -gt 0 ]] && ! is_passthrough "$1"; then
     EXPLORER="$1"
     shift
 fi
