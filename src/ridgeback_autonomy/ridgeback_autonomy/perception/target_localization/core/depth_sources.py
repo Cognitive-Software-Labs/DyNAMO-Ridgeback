@@ -28,8 +28,12 @@ two.
 
 Only the monocular source declares a finite one, and it derives it rather than
 naming it: the metric head saturates at a known fraction of the checkpoint's
-``max_depth``, so the ceiling is a fact about the loaded weights. Stereo
-declares none, and that is not an oversight. A datasheet range is a
+``max_depth``, so the ceiling is a fact about the loaded weights. A checkpoint
+that states no ``max_depth`` is refused on load rather than given a stand-in
+figure -- this module has no range of its own to fall back on, and the last one
+it carried was the Indoor checkpoint's 20 m, hardcoding the very number the
+derivation exists to avoid. Stereo declares none, and that is not an
+oversight. A datasheet range is a
 *recommended operating* range, not the point past which the device stops
 returning numbers, so it cannot be turned into a validity cutoff; and the
 simulated camera is an exact render out to its 100 m far clip, so no single
@@ -73,11 +77,10 @@ MONOCULAR_RETRY_COOLDOWN_S_DEFAULT = 30.0
 # of that range is where the sigmoid saturates rather than where the scene is:
 # predictions crowd toward the ceiling instead of resolving against it. Keep
 # the fraction of the range where the head still discriminates and treat the
-# rest as no-return.
+# rest as no-return. The fraction means nothing on its own -- it scales
+# whatever ``config.max_depth`` the checkpoint declares -- so a checkpoint that
+# declares none gets no ceiling invented for it (``_resolve_usable_max``).
 MONOCULAR_USABLE_RANGE_FRACTION = 0.9
-# Used only when the loaded config does not expose ``max_depth``; matches the
-# Metric Indoor checkpoint this module defaults to.
-MONOCULAR_MAX_DEPTH_FALLBACK_M = 20.0
 
 
 def decode_depth_to_meters(msg: Image) -> np.ndarray:
@@ -176,9 +179,12 @@ class MonocularDepthSource:
         self._now_fn = now_fn
         self._cooldown_s = float(cooldown_s)
         self._retry_after = 0.0
-        # Refined from the checkpoint's own config on load; this standing value
-        # only covers the window before the first successful load.
-        self.usable_max_m = MONOCULAR_MAX_DEPTH_FALLBACK_M * MONOCULAR_USABLE_RANGE_FRACTION
+        # Read from the checkpoint's own config on load. Until then no ceiling
+        # is declared, because none is known: ``produce`` returns ``None``
+        # while the model is unloaded, so nothing is cleaned against this in
+        # that window anyway, and a placeholder here would only be a number
+        # this module invented.
+        self.usable_max_m = math.inf
 
     @staticmethod
     def resolve_device() -> str:
@@ -243,7 +249,16 @@ class MonocularDepthSource:
         would pass the depth gate to look plausible. ``model_id`` is a free
         parameter, so refuse here rather than let that reach the estimators.
 
-        Raises ``ValueError`` when the configured checkpoint is not metric.
+        A metric checkpoint that states no ``max_depth`` is refused on the same
+        grounds. ``MONOCULAR_USABLE_RANGE_FRACTION`` scales that figure and
+        means nothing without it, so the alternatives are to invent a range or
+        to declare none. Both are worse than refusing: an invented ceiling
+        deletes the far end of the scene as ``TOO_FEW_VALID_PIXELS``, blaming
+        the mask for a number this module made up, and no ceiling admits the
+        saturated top of the head as though it resolved.
+
+        Raises ``ValueError`` when the checkpoint is not metric, or is metric
+        but does not declare its range.
         """
 
         config = getattr(getattr(self._pipeline, 'model', None), 'config', None)
@@ -256,10 +271,12 @@ class MonocularDepthSource:
                 f'(e.g. "{DEPTH_ANYTHING_MODEL_ID_DEFAULT}")')
         max_depth = getattr(config, 'max_depth', None)
         if not max_depth:
-            self.logger.warn(
-                f'Checkpoint "{self.model_id}" exposes no max_depth; assuming '
-                f'{MONOCULAR_MAX_DEPTH_FALLBACK_M:.0f} m.')
-            max_depth = MONOCULAR_MAX_DEPTH_FALLBACK_M
+            raise ValueError(
+                f'model "{self.model_id}" declares no config.max_depth, so the '
+                'scale of its own metric head is unknown and no usable ceiling '
+                'can be derived from it; the aligned depth frame contract needs '
+                'a checkpoint that states its range '
+                f'(e.g. "{DEPTH_ANYTHING_MODEL_ID_DEFAULT}")')
         return float(max_depth) * MONOCULAR_USABLE_RANGE_FRACTION
 
     def load(self) -> bool:

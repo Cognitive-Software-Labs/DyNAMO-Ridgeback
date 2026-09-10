@@ -193,7 +193,16 @@ or QoS settings, and never falls back to a nearest color frame.
   is where the sigmoid saturates rather than where the scene is — predictions
   crowd toward the ceiling instead of resolving against it — so the last tenth
   is treated as no-return. Nothing here is hardcoded to the Indoor figure;
-  swapping checkpoints moves the ceiling with them.
+  swapping checkpoints moves the ceiling with them. A metric checkpoint that
+  declares no `max_depth` is **refused on the same path as a relative one**:
+  the 0.9 scales that figure and means nothing without it, so the only
+  alternatives are to invent a range or to declare none, and both are worse
+  than refusing. An invented range deletes the far end of the scene and reports
+  it as `TOO_FEW_VALID_PIXELS`, blaming the mask for a number the source made
+  up; no range at all admits the saturated top of the head as though it
+  resolved. That fallback existed until 2026-09-10 and stood at 20 m — the
+  Indoor checkpoint's figure, hardcoded in the one place this contract says it
+  is not.
 - **Error character is inverted vs. stereo.** Stereo depth has *holes and
   speckle* but locally accurate values; monocular depth is *dense and smooth*
   (no invalid pixels, no occlusion holes) but can be globally off in scale and

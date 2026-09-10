@@ -8,7 +8,6 @@ from sensor_msgs.msg import Image
 from std_msgs.msg import Header
 
 from ridgeback_autonomy.perception.target_localization.core.depth_sources import (
-    MONOCULAR_MAX_DEPTH_FALLBACK_M,
     MONOCULAR_USABLE_RANGE_FRACTION,
     MonocularDepthSource,
     StereoDepthSource,
@@ -148,7 +147,10 @@ def test_monocular_source_retries_after_cooldown(monkeypatch) -> None:
         attempts['n'] += 1
         if attempts['n'] == 1:
             raise RuntimeError('transient CUDA OOM')
-        return object()  # a "loaded pipeline"
+        # A metric checkpoint that states its range: this test is about the
+        # cooldown, and a pipeline whose config cannot be read is refused on
+        # its own grounds.
+        return _FakePipeline(_FakeConfig('metric', 20))
 
     monkeypatch.setattr(source, '_build_pipeline', build)
 
@@ -387,12 +389,24 @@ def test_monocular_refuses_a_relative_checkpoint(monkeypatch) -> None:
     assert source._pipeline is None
 
 
-def test_monocular_falls_back_when_config_exposes_no_max_depth(monkeypatch) -> None:
+def test_monocular_refuses_a_checkpoint_that_states_no_max_depth(monkeypatch) -> None:
+    # MONOCULAR_USABLE_RANGE_FRACTION scales config.max_depth and means nothing
+    # without it. This used to assume 20 m -- the Indoor checkpoint's figure,
+    # hardcoded -- which silently capped the scene at 18 m and reported the
+    # deleted far end as a mask shortfall.
     source = _loaded_source(_FakeConfig('metric'), monkeypatch)
 
-    assert source.load() is True
-    assert source.usable_max_m == pytest.approx(
-        MONOCULAR_MAX_DEPTH_FALLBACK_M * MONOCULAR_USABLE_RANGE_FRACTION)
+    assert source.load() is False
+    assert source._pipeline is None
+    assert source.usable_max_m == math.inf
+
+
+def test_monocular_declares_no_ceiling_before_it_loads() -> None:
+    # produce() returns None while unloaded, so nothing is cleaned against this
+    # value; naming a finite one here would be a range this module invented.
+    source = MonocularDepthSource('some/checkpoint', 'cpu', _NullLogger())
+
+    assert source.usable_max_m == math.inf
 
 
 def test_stereo_source_declares_no_ceiling_but_accepts_one() -> None:
