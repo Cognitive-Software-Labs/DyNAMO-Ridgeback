@@ -4,13 +4,13 @@
         string creator = "URDF USD Converter v0.1.3"
     }
     defaultPrim = "tn__r1000001_bC"
-    doc = """Generated from Composed Stage of root layer /tmp/tmpdn4xa525/r100-0001.usdc
+    doc = """Generated from Composed Stage of root layer /tmp/tmp3z1oczum/r100-0001.usdc
 
 
-Generated from Composed Stage of root layer /tmp/urdf_import_ridgeback_r100_jpf869vj/usdex_ridgeback_r100/r100-0001.usdc
+Generated from Composed Stage of root layer /tmp/urdf_import_ridgeback_r100_9jthanqw/usdex_ridgeback_r100/r100-0001.usdc
 
 
-Generated from Composed Stage of root layer /tmp/urdf_import_ridgeback_r100_jpf869vj/temp_ridgeback_r100/ridgeback_r100.usd
+Generated from Composed Stage of root layer /tmp/urdf_import_ridgeback_r100_9jthanqw/temp_ridgeback_r100/ridgeback_r100.usd
 
 
 Generated from Composed Stage of root layer /home/deivid/dev/DyNAMO-Ridgeback/.claude/worktrees/isaac/src/ridgeback_autonomy/sim/isaac/usd/robots/ridgeback_r100.usd/ridgeback_r100/payloads/base.usd
@@ -146,6 +146,135 @@ def Xform "tn__r1000001_bC" (
                                     )
                                     {
                                         float3 xformOp:scale = (0.01, 0.01, 0.01)
+
+                                        over "ID2"
+                                        {
+                                            over "ID107" (
+                                                prepend apiSchemas = ["MaterialBindingAPI"]
+                                            )
+                                            {
+                                                rel material:binding = </tn__r1000001_bC/Materials/sensor_dark_grey>
+                                            }
+
+                                            over "ID101" (
+                                                prepend apiSchemas = ["MaterialBindingAPI"]
+                                            )
+                                            {
+                                                rel material:binding = </tn__r1000001_bC/Materials/sensor_dark_grey>
+                                            }
+
+                                            over "ID95" (
+                                                prepend apiSchemas = ["MaterialBindingAPI"]
+                                            )
+                                            {
+                                                rel material:binding = </tn__r1000001_bC/Materials/sensor_dark_grey>
+                                            }
+
+                                            over "ID89" (
+                                                prepend apiSchemas = ["MaterialBindingAPI"]
+                                            )
+                                            {
+                                                rel material:binding = </tn__r1000001_bC/Materials/sensor_dark_grey>
+                                            }
+
+                                            over "ID83" (
+                                                prepend apiSchemas = ["MaterialBindingAPI"]
+                                            )
+                                            {
+                                                rel material:binding = </tn__r1000001_bC/Materials/sensor_dark_grey>
+                                            }
+
+                                            over "ID3" (
+                                                prepend apiSchemas = ["MaterialBindingAPI"]
+                                            )
+                                            {
+                                                rel material:binding = </tn__r1000001_bC/Materials/sensor_dark_grey>
+                                            }
+
+                                            over "ID11" (
+                                                prepend apiSchemas = ["MaterialBindingAPI"]
+                                            )
+                                            {
+                                                rel material:binding = </tn__r1000001_bC/Materials/sensor_dark_grey>
+                                            }
+
+                                            over "ID17" (
+                                                prepend apiSchemas = ["MaterialBindingAPI"]
+                                            )
+                                            {
+                                                rel material:binding = </tn__r1000001_bC/Materials/sensor_dark_grey>
+                                            }
+
+                                            over "ID23" (
+                                                prepend apiSchemas = ["MaterialBindingAPI"]
+                                            )
+                                            {
+                                                rel material:binding = </tn__r1000001_bC/Materials/sensor_dark_grey>
+                                            }
+
+                                            over "ID29" (
+                                                prepend apiSchemas = ["MaterialBindingAPI"]
+                                            )
+                                            {
+                                                rel material:binding = </tn__r1000001_bC/Materials/sensor_dark_grey>
+                                            }
+
+                                            over "ID35" (
+                                                prepend apiSchemas = ["MaterialBindingAPI"]
+                                            )
+                                            {
+                                                rel material:binding = </tn__r1000001_bC/Materials/sensor_dark_grey>
+                                            }
+
+                                            over "ID41" (
+                                                prepend apiSchemas = ["MaterialBindingAPI"]
+                                            )
+                                            {
+                                                rel material:binding = </tn__r1000001_bC/Materials/sensor_dark_grey>
+                                            }
+
+                                            over "ID47" (
+                                                prepend apiSchemas = ["MaterialBindingAPI"]
+                                            )
+                                            {
+                                                rel material:binding = </tn__r1000001_bC/Materials/sensor_dark_grey>
+                                            }
+
+                                            over "ID53" (
+                                                prepend apiSchemas = ["MaterialBindingAPI"]
+                                            )
+                                            {
+                                                rel material:binding = </tn__r1000001_bC/Materials/sensor_dark_grey>
+                                            }
+
+                                            over "ID59" (
+                                                prepend apiSchemas = ["MaterialBindingAPI"]
+                                            )
+                                            {
+                                                rel material:binding = </tn__r1000001_bC/Materials/sensor_dark_grey>
+                                            }
+
+                                            over "ID65" (
+                                                prepend apiSchemas = ["MaterialBindingAPI"]
+                                            )
+                                            {
+                                                rel material:binding = </tn__r1000001_bC/Materials/sensor_dark_grey>
+                                            }
+
+                                            over "ID71" (
+                                                prepend apiSchemas = ["MaterialBindingAPI"]
+                                            )
+                                            {
+                                                rel material:binding = </tn__r1000001_bC/Materials/sensor_dark_grey>
+                                            }
+
+                                            over "ID77" (
+                                                prepend apiSchemas = ["MaterialBindingAPI"]
+                                            )
+                                            {
+                                                rel material:binding = </tn__r1000001_bC/Materials/sensor_dark_grey>
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -364,12 +493,24 @@ def Xform "tn__r1000001_bC" (
                 }
 
                 def Cube "camera_mast" (
-                    prepend apiSchemas = ["PhysicsCollisionAPI"]
+                    prepend apiSchemas = ["PhysicsCollisionAPI", "MaterialBindingAPI"]
                 )
                 {
+                    rel material:binding = </tn__r1000001_bC/Materials/mast_aluminium>
                     double size = 1
                     float3 xformOp:scale = (0.0375, 0.0375, 0.815)
                     double3 xformOp:translate = (0.1955, 0, 0.6875)
+                    uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:scale"]
+                }
+
+                def Cube "camera_standoff" (
+                    prepend apiSchemas = ["PhysicsCollisionAPI", "MaterialBindingAPI"]
+                )
+                {
+                    rel material:binding = </tn__r1000001_bC/Materials/bracket_black>
+                    double size = 1
+                    float3 xformOp:scale = (0.0447953, 0.03, 0.03)
+                    double3 xformOp:translate = (0.23664765009270647, 0, 1.0325)
                     uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:scale"]
                 }
             }
@@ -453,6 +594,15 @@ def Xform "tn__r1000001_bC" (
                         prepend references = @./payloads/meshes/hokuyo_ust.usd@
                     )
                     {
+                        over "node_"
+                        {
+                            over "mesh_" (
+                                prepend apiSchemas = ["MaterialBindingAPI"]
+                            )
+                            {
+                                rel material:binding = </tn__r1000001_bC/Materials/sensor_dark_grey>
+                            }
+                        }
                     }
                 }
             }
@@ -536,6 +686,15 @@ def Xform "tn__r1000001_bC" (
                         prepend references = @./payloads/meshes/hokuyo_ust.usd@
                     )
                     {
+                        over "node_"
+                        {
+                            over "mesh_" (
+                                prepend apiSchemas = ["MaterialBindingAPI"]
+                            )
+                            {
+                                rel material:binding = </tn__r1000001_bC/Materials/sensor_dark_grey>
+                            }
+                        }
                     }
                 }
             }
@@ -570,6 +729,51 @@ def Xform "tn__r1000001_bC" (
             float drive:angular:physics:damping = 0
             float drive:angular:physics:stiffness = 0
             float drive:angular:physics:targetVelocity = 0
+        }
+    }
+
+    over "Materials"
+    {
+        def Material "mast_aluminium"
+        {
+            token outputs:surface.connect = </tn__r1000001_bC/Materials/mast_aluminium/PreviewSurface.outputs:surface>
+
+            def Shader "PreviewSurface"
+            {
+                uniform token info:id = "UsdPreviewSurface"
+                color3f inputs:diffuseColor = (0.74, 0.75, 0.77)
+                float inputs:metallic = 0.85
+                float inputs:roughness = 0.32
+                token outputs:surface
+            }
+        }
+
+        def Material "bracket_black"
+        {
+            token outputs:surface.connect = </tn__r1000001_bC/Materials/bracket_black/PreviewSurface.outputs:surface>
+
+            def Shader "PreviewSurface"
+            {
+                uniform token info:id = "UsdPreviewSurface"
+                color3f inputs:diffuseColor = (0.045, 0.045, 0.05)
+                float inputs:metallic = 0
+                float inputs:roughness = 0.55
+                token outputs:surface
+            }
+        }
+
+        def Material "sensor_dark_grey"
+        {
+            token outputs:surface.connect = </tn__r1000001_bC/Materials/sensor_dark_grey/PreviewSurface.outputs:surface>
+
+            def Shader "PreviewSurface"
+            {
+                uniform token info:id = "UsdPreviewSurface"
+                color3f inputs:diffuseColor = (0.14, 0.145, 0.16)
+                float inputs:metallic = 0.25
+                float inputs:roughness = 0.45
+                token outputs:surface
+            }
         }
     }
     variantSet "Physics" = {

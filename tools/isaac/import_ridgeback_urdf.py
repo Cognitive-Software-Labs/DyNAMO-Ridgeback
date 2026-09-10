@@ -676,14 +676,98 @@ MAST_X = 0.1955             # 70 of 98 on the tape, as a fraction of the hull
 MAST_Z0 = 0.2800            # top deck upper face, above base_link
 MAST_Z1 = 1.0950            # camera top 1.045 + 50 mm of extrusion above it
 
+# The bracket carrying the camera off the mast's front face. Its span is
+# derived from the live camera mesh rather than hardcoded, so it still fits
+# when the RealSense model changes (the D455 body is deeper and much wider
+# than the D435 mesh the import currently pulls in).
+STANDOFF_SECTION = 0.030                   # square, m
+
+# Mesh path fragments identifying the sensor bodies to re-colour. Matches any
+# RealSense variant: the model name is part of the mesh filename, so pinning
+# one spelling silently stops painting when the model is swapped.
+SENSOR_MESH_TOKENS = ("/hokuyo_ust/", "/d435/", "/d435i/", "/d455/",
+                      "/realsense/")
+
+
+def _ensure_material(stage, path, diffuse, metallic, roughness):
+    """Author a UsdPreviewSurface material (idempotent)."""
+    from pxr import Gf, Sdf, UsdShade
+
+    mat = UsdShade.Material.Define(stage, path)
+    shader = UsdShade.Shader.Define(stage, path + "/PreviewSurface")
+    shader.CreateIdAttr("UsdPreviewSurface")
+    shader.CreateInput("diffuseColor", Sdf.ValueTypeNames.Color3f).Set(
+        Gf.Vec3f(*diffuse))
+    shader.CreateInput("metallic", Sdf.ValueTypeNames.Float).Set(metallic)
+    shader.CreateInput("roughness", Sdf.ValueTypeNames.Float).Set(roughness)
+    mat.CreateSurfaceOutput().ConnectToSource(shader.ConnectableAPI(), "surface")
+    return mat
+
+
+def _bind(prim, material) -> None:
+    from pxr import UsdShade
+
+    UsdShade.MaterialBindingAPI.Apply(prim)
+    UsdShade.MaterialBindingAPI(prim).Bind(material)
+
+
+def _paint_sensors(stage, root_path: str, dark) -> int:
+    """Give the lidar and camera meshes a sensible colour.
+
+    The STL/DAE converter binds a flat white `DefaultMaterial` to the Hokuyo
+    geometry, so both scanners render as white blocks against the vendor
+    chassis's proper materials. Those bindings are *direct* on the mesh, so an
+    inherited binding on the parent would lose -- rebind each mesh.
+    """
+    from pxr import Usd, UsdGeom
+
+    painted = 0
+    for prim in stage.Traverse():
+        path = str(prim.GetPath())
+        if not path.startswith(root_path) or not prim.IsA(UsdGeom.Mesh):
+            continue
+        if any(tok in path for tok in SENSOR_MESH_TOKENS):
+            _bind(prim, dark)
+            painted += 1
+    return painted
+
+
+def _camera_mesh_bounds(stage):
+    """World-space bounds of the RealSense body, or None if it is absent."""
+    import numpy as np
+    from pxr import Usd, UsdGeom
+
+    tc = Usd.TimeCode.Default()
+    lo = np.array([np.inf] * 3)
+    hi = np.array([-np.inf] * 3)
+    found = False
+    for prim in stage.Traverse():
+        path = str(prim.GetPath())
+        if not prim.IsA(UsdGeom.Mesh):
+            continue
+        if not any(t in path for t in ("/d435/", "/d435i/", "/d455/",
+                                       "/realsense/")):
+            continue
+        pts = UsdGeom.Mesh(prim).GetPointsAttr().Get()
+        if not pts:
+            continue
+        found = True
+        a = np.array([[q[0], q[1], q[2]] for q in pts], dtype=np.float64)
+        m = np.array(UsdGeom.Imageable(prim).ComputeLocalToWorldTransform(tc),
+                     dtype=np.float64).reshape(4, 4)
+        w = (np.c_[a, np.ones(len(a))] @ m)[:, :3]
+        lo = np.minimum(lo, w.min(0))
+        hi = np.maximum(hi, w.max(0))
+    return (lo, hi) if found else None
+
 
 def _author_camera_mast(stage, chassis_prim) -> None:
-    """Author the mast the camera actually stands on.
+    """Author the mast, the camera standoff bracket, and their materials.
 
-    Purely cosmetic-plus-collision: no ROS frame hangs off it, so nothing in
-    the TF tree changes. It sits entirely above the 2D lidar plane (0.2264),
-    starting at the deck top 0.280, so it cannot occlude either scanner --
-    worth re-checking in the empty world after any change to these numbers.
+    Purely cosmetic-plus-collision: no ROS frame hangs off either, so nothing
+    in the TF tree changes. Both sit entirely above the 2D lidar plane
+    (0.2264), starting at the deck top 0.280, so neither can occlude a scanner
+    -- worth re-checking in the empty world after any change to these numbers.
     """
     from pxr import Gf, UsdGeom, UsdPhysics
 
@@ -692,17 +776,58 @@ def _author_camera_mast(stage, chassis_prim) -> None:
         print(f"WARNING: mast height {height:.3f} <= 0, skipped", flush=True)
         return
 
-    cube = UsdGeom.Cube.Define(
-        stage, chassis_prim.GetPath().AppendChild("camera_mast"))
-    cube.CreateSizeAttr(1.0)
-    UsdGeom.XformCommonAPI(cube).SetTranslate(
-        Gf.Vec3d(MAST_X, 0.0, MAST_Z0 + height / 2.0))
-    UsdGeom.XformCommonAPI(cube).SetScale(
-        Gf.Vec3f(MAST_SIZE, MAST_SIZE, height))
-    UsdPhysics.CollisionAPI.Apply(cube.GetPrim())
+    mats = "/tn__r1000001_bC/Materials"
+    alu = _ensure_material(stage, f"{mats}/mast_aluminium",
+                           (0.74, 0.75, 0.77), 0.85, 0.32)
+    black = _ensure_material(stage, f"{mats}/bracket_black",
+                             (0.045, 0.045, 0.05), 0.0, 0.55)
+    sensor_grey = _ensure_material(stage, f"{mats}/sensor_dark_grey",
+                                   (0.14, 0.145, 0.16), 0.25, 0.45)
+
+    def box(name, centre, size, material, collide=True):
+        cube = UsdGeom.Cube.Define(
+            stage, chassis_prim.GetPath().AppendChild(name))
+        cube.CreateSizeAttr(1.0)
+        UsdGeom.XformCommonAPI(cube).SetTranslate(Gf.Vec3d(*centre))
+        UsdGeom.XformCommonAPI(cube).SetScale(Gf.Vec3f(*size))
+        if collide:
+            UsdPhysics.CollisionAPI.Apply(cube.GetPrim())
+        _bind(cube.GetPrim(), material)
+        return cube
+
+    box("camera_mast", (MAST_X, 0.0, MAST_Z0 + height / 2.0),
+        (MAST_SIZE, MAST_SIZE, height), alu)
     print(f"camera mast: {MAST_SIZE*1000:.1f} mm square, {height:.3f} m tall, "
           f"x={MAST_X:+.4f}, spans z {MAST_Z0:.3f}..{MAST_Z1:.3f} "
-          f"(lidar plane 0.2264 is below it)", flush=True)
+          f"(lidar plane 0.2264 is below it), light-grey aluminium",
+          flush=True)
+
+    # Standoff: mast front face out to the camera's back face, at the camera's
+    # mid-height. Derived from the live mesh so it still fits if the RealSense
+    # model changes.
+    cam = _camera_mesh_bounds(stage)
+    if cam is None:
+        print("WARNING: no RealSense mesh found — standoff skipped", flush=True)
+    else:
+        lo, hi = cam
+        x0 = MAST_X + MAST_SIZE / 2.0
+        x1 = float(lo[0])
+        span = x1 - x0
+        if span <= 0.001:
+            print(f"WARNING: camera back face {x1:.4f} is not clear of the "
+                  f"mast front {x0:.4f} — standoff skipped", flush=True)
+        else:
+            zc = float(0.5 * (lo[2] + hi[2]))
+            box("camera_standoff", (x0 + span / 2.0, 0.0, zc),
+                (span, STANDOFF_SECTION, STANDOFF_SECTION), black)
+            print(f"camera standoff: {span*1000:.1f} mm bracket, black, "
+                  f"x {x0:.4f}..{x1:.4f} at z {zc:.4f}", flush=True)
+
+    painted = _paint_sensors(stage, str(chassis_prim.GetPath().GetParentPath()),
+                             sensor_grey)
+    print(f"sensor meshes re-coloured: {painted} "
+          f"(lidars + RealSense; the converter left them flat white)",
+          flush=True)
 
 
 def graft_vendor_chassis(usd_path: Path) -> None:

@@ -67,7 +67,7 @@ app = SimulationApp({"headless": False}, experience=str(exp))
 
 import carb  # noqa: E402
 import omni.usd  # noqa: E402
-from pxr import Gf, Usd, UsdGeom, UsdLux, UsdPhysics  # noqa: E402
+from pxr import Gf, Sdf, Usd, UsdGeom, UsdLux, UsdPhysics  # noqa: E402
 
 settings = carb.settings.get_settings()
 # Draw collision geometry from the start; without this the comparison is
@@ -151,6 +151,52 @@ if args.compare_colliders:
     except Exception as exc:
         print(f"could not start timeline ({exc}); press Play manually",
               flush=True)
+
+def frame_camera():
+    """Point the viewport at the robot from a three-quarter view.
+
+    The camera-to-world basis is built explicitly. Gf.Matrix4d.SetLookAt
+    returns a view matrix whose inverse *should* be the camera transform, and
+    omni's frame_viewport_prims should fit the prims outright -- both were
+    tried, and both left the robot off-frame or nose-first into the mast. A
+    hand-built basis is unambiguous: USD cameras look down -Z with +Y up, and
+    pxr uses row vectors, so the rows are the axes and the last row is the eye.
+    """
+    try:
+        import numpy as np
+        from omni.kit.viewport.utility import get_active_viewport
+        vp = get_active_viewport()
+        cam = UsdGeom.Camera.Define(stage, "/World/inspect_cam")
+        cam.CreateFocalLengthAttr(24.0)
+        cam.CreateClippingRangeAttr(Gf.Vec2f(0.05, 500.0))
+
+        if args.compare_colliders:
+            mid_y, dist = args.separation / 2.0, 3.6
+        else:
+            mid_y, dist = 0.0, 2.9
+        eye = np.array([dist * 0.72, mid_y - dist * 0.72, 1.45])
+        target = np.array([0.0, mid_y, 0.48])
+
+        fwd = target - eye
+        fwd /= np.linalg.norm(fwd)
+        zax = -fwd                                   # camera looks down -Z
+        xax = np.cross(np.array([0.0, 0.0, 1.0]), zax)
+        xax /= np.linalg.norm(xax)
+        yax = np.cross(zax, xax)
+        m = Gf.Matrix4d(
+            float(xax[0]), float(xax[1]), float(xax[2]), 0.0,
+            float(yax[0]), float(yax[1]), float(yax[2]), 0.0,
+            float(zax[0]), float(zax[1]), float(zax[2]), 0.0,
+            float(eye[0]), float(eye[1]), float(eye[2]), 1.0)
+        cam.MakeMatrixXform().Set(m)
+        vp.camera_path = "/World/inspect_cam"
+        print(f"viewport framed: eye {tuple(round(float(v),2) for v in eye)} "
+              f"-> {tuple(round(float(v),2) for v in target)}", flush=True)
+    except Exception as exc:
+        print(f"camera framing skipped ({exc}); orbit manually", flush=True)
+
+
+frame_camera()
 for _ in range(60):
     app.update()
 
