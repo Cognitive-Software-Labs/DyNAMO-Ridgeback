@@ -113,7 +113,7 @@ def clearpath_package_paths() -> list:
     return paths
 
 
-def import_urdf_to_usd(urdf_path: Path) -> None:
+def import_urdf_to_usd(urdf_path: Path, graft: bool = True) -> None:
     # NOTE: app.close() fast-shuts the process — nothing after it runs.
     # All work (import, rig, cleanup, verdict print) happens before close.
     import traceback
@@ -160,12 +160,42 @@ def import_urdf_to_usd(urdf_path: Path) -> None:
 
         # flatten <staging .usd dir>/ridgeback_r100/... -> robots/ridgeback_r100/
         import shutil
+        import tempfile
         pkg_dir = Path(out).parent                 # <staging>/ridgeback_r100
         final_dir = ENTRY_USD.parent
+
+        # The rmtree below wipes the whole committed robot directory, which is
+        # where the vendored Clearpath chassis and its licence live. They are
+        # not importer output and re-fetching them costs a 7.5 MB download, so
+        # carry them across.
+        carried = {}
+        vendor_dir = final_dir / "payloads" / "meshes"
+        stash = Path(tempfile.mkdtemp(prefix="ridgeback_vendor_"))
+        for name in ("ridgeback_chassis_clearpath.usd",
+                     "ridgeback_chassis_clearpath.LICENSE"):
+            src = vendor_dir / name
+            if src.exists():
+                shutil.copy2(src, stash / name)
+                carried[name] = stash / name
+
         if final_dir.exists():
             shutil.rmtree(final_dir)
         pkg_dir.rename(final_dir)
         shutil.rmtree(OUT_USD, ignore_errors=True)
+
+        for name, src in carried.items():
+            (final_dir / "payloads" / "meshes").mkdir(parents=True, exist_ok=True)
+            shutil.copy2(src, final_dir / "payloads" / "meshes" / name)
+        shutil.rmtree(stash, ignore_errors=True)
+        if carried:
+            print(f"carried {len(carried)} vendored file(s) across the rebuild",
+                  flush=True)
+
+        # Must happen here, not after import_urdf_to_usd returns: kit runs with
+        # --/app/fastShutdown=True, so app.close() below hard-exits the process
+        # and anything queued after this call never runs.
+        if graft:
+            graft_vendor_chassis(ENTRY_USD)
 
         urdf_path.unlink(missing_ok=True)
         ok = True
@@ -620,10 +650,104 @@ def _author_chassis_collider(stage, chassis_prim) -> None:
           f"({center[0]:.3f}, {center[1]:.3f}, {center[2]:.3f})", flush=True)
 
 
+# Imported meshes the vendor chassis supersedes. Matched against what each
+# "geom" prim references rather than against prim paths: attach_visual_meshes
+# nests geoms differently per link (body/geom, but side_cover/geom under
+# *_side_cover_link), and a hardcoded path list silently misses the odd ones --
+# which is how the first pass left both side covers and both end covers
+# rendering on top of the vendor's.
+VENDOR_REPLACED_MESHES = {
+    "body.usd", "side-cover.usd", "end-cover.usd", "lights.usd",
+    "axle.usd", "rocker.usd", "top.usd",
+}
+
+
+def graft_vendor_chassis(usd_path: Path) -> None:
+    """Swap the imported chassis shell for Clearpath's authored one.
+
+    The 6.0.1 importer yields a coarse body -- open gaps under the deck, no
+    rear end panel, flat materials. tools/isaac/extract_vendor_chassis.py
+    pulls the authored chassis out of NVIDIA's stock Ridgeback asset; this
+    references it and hides what it replaces.
+
+    Wheels stay ours (articulated, they spin; the vendor's are static and were
+    dropped on extract). The AABB Cube collider from _author_chassis_collider
+    is deactivated in favour of the vendor convexHull, which is tighter at the
+    chamfered corners where the box was square.
+    """
+    from pxr import Usd, UsdGeom
+
+    chassis_usd = (usd_path.parent / "payloads" / "meshes"
+                   / "ridgeback_chassis_clearpath.usd")
+    if not chassis_usd.exists():
+        print(f"WARNING: {chassis_usd.name} missing — keeping the imported "
+              f"shell. Run tools/isaac/extract_vendor_chassis.py to fetch it.",
+              flush=True)
+        return
+
+    stage = Usd.Stage.Open(str(usd_path))
+    stage.SetEditTarget(stage.GetRootLayer())
+    chassis = None
+    for prim in stage.Traverse():
+        if prim.GetName() == "chassis_link":
+            chassis = prim
+            break
+    if chassis is None:
+        print("WARNING: no chassis_link — vendor graft skipped", flush=True)
+        return
+
+    hidden = []
+    for prim in Usd.PrimRange(chassis):
+        refs = prim.GetMetadata("references")
+        if not refs:
+            continue
+        assets = [Path(r.assetPath).name
+                  for r in getattr(refs, "prependedItems", []) or []]
+        assets += [Path(r.assetPath).name
+                   for r in getattr(refs, "addedItems", []) or []]
+        if not any(a in VENDOR_REPLACED_MESHES for a in assets):
+            continue
+        # Hide the geom's PARENT: the geom itself carries the reference, but
+        # the parent is the link-level prim the rest of the tree addresses.
+        target = prim.GetParent() if prim.GetName() == "geom" else prim
+        UsdGeom.Imageable(target).CreateVisibilityAttr().Set(
+            UsdGeom.Tokens.invisible)
+        hidden.append(str(target.GetPath()).split("chassis_link/")[-1])
+
+    # riser_link/box is a *rendered* Cube (only box_1, its collider, is
+    # guide-purpose). The vendor deck is the real top surface now, so the box
+    # would z-fight it.
+    box = stage.GetPrimAtPath(chassis.GetPath().AppendChild("riser_link")
+                              .AppendChild("box"))
+    if box:
+        UsdGeom.Imageable(box).CreateVisibilityAttr().Set(
+            UsdGeom.Tokens.invisible)
+        hidden.append("riser_link/box")
+
+    cube = stage.GetPrimAtPath(
+        chassis.GetPath().AppendChild("chassis_collision"))
+    if cube:
+        cube.SetActive(False)
+
+    vendor = stage.DefinePrim(
+        chassis.GetPath().AppendChild("vendor_chassis"), "Xform")
+    vendor.GetReferences().AddReference(
+        f"./payloads/meshes/{chassis_usd.name}")
+
+    stage.GetRootLayer().Save()
+    print(f"vendor chassis grafted ({len(hidden)} imported prims hidden, "
+          f"AABB collider deactivated) -> {usd_path}", flush=True)
+    for h in sorted(hidden):
+        print(f"    hidden: {h}", flush=True)
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--skip-generate", action="store_true",
                     help="reuse existing clearpath/robot.urdf.xacro")
+    ap.add_argument("--no-vendor-chassis", action="store_true",
+                    help="keep the imported shell instead of grafting "
+                         "Clearpath's authored chassis over it")
     args = ap.parse_args()
 
     workdir = OUT_USD.parent
@@ -638,7 +762,7 @@ def main():
     else:
         flat = generate_flat_urdf(workdir)
 
-    import_urdf_to_usd(flat)
+    import_urdf_to_usd(flat, graft=not args.no_vendor_chassis)
     flat.unlink(missing_ok=True)
     print("done")
 
