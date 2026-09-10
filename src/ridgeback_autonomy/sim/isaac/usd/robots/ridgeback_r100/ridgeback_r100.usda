@@ -109,6 +109,7 @@ def Xform "tn__r1000001_bC" (
             over "chassis_link"
             {
                 def Cube "chassis_collision" (
+                    active = false
                     prepend apiSchemas = ["PhysicsCollisionAPI"]
                 )
                 {
@@ -155,6 +156,8 @@ def Xform "tn__r1000001_bC" (
                     {
                         over "top"
                         {
+                            token visibility = "invisible"
+
                             def Xform "geom" (
                                 prepend references = @./payloads/meshes/top.usd@
                             )
@@ -162,10 +165,17 @@ def Xform "tn__r1000001_bC" (
                             }
                         }
                     }
+
+                    over "box"
+                    {
+                        token visibility = "invisible"
+                    }
                 }
 
                 over "body"
                 {
+                    token visibility = "invisible"
+
                     def Xform "geom" (
                         prepend references = @./payloads/meshes/body.usd@
                     )
@@ -177,11 +187,18 @@ def Xform "tn__r1000001_bC" (
                 {
                     def Xform "side_cover"
                     {
+                        token visibility = "invisible"
+
                         def Xform "geom" (
                             prepend references = @./payloads/meshes/side-cover.usd@
                         )
                         {
                         }
+                    }
+
+                    over "tn__sidecover_pD"
+                    {
+                        token visibility = "invisible"
                     }
                 }
 
@@ -189,11 +206,18 @@ def Xform "tn__r1000001_bC" (
                 {
                     def Xform "side_cover"
                     {
+                        token visibility = "invisible"
+
                         def Xform "geom" (
                             prepend references = @./payloads/meshes/side-cover.usd@
                         )
                         {
                         }
+                    }
+
+                    over "tn__sidecover_pD"
+                    {
+                        token visibility = "invisible"
                     }
                 }
 
@@ -201,11 +225,18 @@ def Xform "tn__r1000001_bC" (
                 {
                     def Xform "end_cover"
                     {
+                        token visibility = "invisible"
+
                         def Xform "geom" (
                             prepend references = @./payloads/meshes/end-cover.usd@
                         )
                         {
                         }
+                    }
+
+                    over "tn__endcover_aC"
+                    {
+                        token visibility = "invisible"
                     }
                 }
 
@@ -213,11 +244,18 @@ def Xform "tn__r1000001_bC" (
                 {
                     def Xform "end_cover"
                     {
+                        token visibility = "invisible"
+
                         def Xform "geom" (
                             prepend references = @./payloads/meshes/end-cover.usd@
                         )
                         {
                         }
+                    }
+
+                    over "tn__endcover_aC"
+                    {
+                        token visibility = "invisible"
                     }
                 }
 
@@ -225,6 +263,8 @@ def Xform "tn__r1000001_bC" (
                 {
                     over "lights"
                     {
+                        token visibility = "invisible"
+
                         def Xform "geom" (
                             prepend references = @./payloads/meshes/lights.usd@
                         )
@@ -237,6 +277,8 @@ def Xform "tn__r1000001_bC" (
                 {
                     over "lights"
                     {
+                        token visibility = "invisible"
+
                         def Xform "geom" (
                             prepend references = @./payloads/meshes/lights.usd@
                         )
@@ -249,6 +291,8 @@ def Xform "tn__r1000001_bC" (
                 {
                     over "axle"
                     {
+                        token visibility = "invisible"
+
                         def Xform "geom" (
                             prepend references = @./payloads/meshes/axle.usd@
                         )
@@ -260,6 +304,8 @@ def Xform "tn__r1000001_bC" (
                     {
                         over "rocker"
                         {
+                            token visibility = "invisible"
+
                             def Xform "geom" (
                                 prepend references = @./payloads/meshes/rocker.usd@
                             )
@@ -296,6 +342,8 @@ def Xform "tn__r1000001_bC" (
                     {
                         over "rocker"
                         {
+                            token visibility = "invisible"
+
                             def Xform "geom" (
                                 prepend references = @./payloads/meshes/rocker.usd@
                             )
@@ -327,6 +375,12 @@ def Xform "tn__r1000001_bC" (
                             }
                         }
                     }
+                }
+
+                def Xform "vendor_chassis" (
+                    prepend references = @./payloads/meshes/ridgeback_chassis_clearpath.usd@
+                )
+                {
                 }
             }
 

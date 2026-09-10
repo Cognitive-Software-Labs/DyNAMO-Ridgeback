@@ -1,0 +1,76 @@
+#usda 1.0
+(
+    doc = """Featureless inspection world: floor slab, physics scene, lighting.
+
+    For looking at the robot itself -- mesh alignment, sensor mounting, self-
+    occlusion -- with nothing in the scene to confuse a lidar return for an
+    obstacle. Any short return here is the robot seeing itself.
+
+    The slab's top face is at z = 0.05, matching mock_hospital, so the runner's
+    default --spawn-z 0.076 lands the wheel bottoms on it (0.076 + axle 0.050 -
+    wheel radius 0.0759 = 0.0501). Do not move the slab without moving spawn_z.
+    """
+    defaultPrim = "empty"
+    metersPerUnit = 1
+    upAxis = "Z"
+)
+
+def Xform "empty"
+{
+    def PhysicsScene "physicsScene"
+    {
+        vector3f physics:gravityDirection = (0, 0, -1)
+        float physics:gravityMagnitude = 9.81
+    }
+
+    def Scope "Looks"
+    {
+        def Material "mat_floor"
+        {
+            token outputs:surface.connect = </empty/Looks/mat_floor/shader.outputs:surface>
+
+            def Shader "shader"
+            {
+                uniform token info:id = "UsdPreviewSurface"
+                color3f inputs:diffuseColor = (0.62, 0.62, 0.64)
+                color3f inputs:emissiveColor = (0, 0, 0)
+                float inputs:metallic = 0
+                float inputs:roughness = 0.9
+                token outputs:surface
+            }
+        }
+    }
+
+    def Xform "Lighting"
+    {
+        def DomeLight "dome"
+        {
+            float inputs:intensity = 900
+            color3f inputs:color = (1, 1, 1)
+        }
+
+        def DistantLight "key"
+        {
+            float inputs:angle = 1.5
+            float inputs:intensity = 2200
+            color3f inputs:color = (1, 0.98, 0.94)
+            quatf xformOp:orient = (0.85, -0.42, 0.22, 0.24)
+            uniform token[] xformOpOrder = ["xformOp:orient"]
+        }
+    }
+
+    def Xform "Floor"
+    {
+        def Cube "slab" (
+            prepend apiSchemas = ["MaterialBindingAPI", "PhysicsCollisionAPI"]
+        )
+        {
+            float3[] extent = [(-0.5, -0.5, -0.5), (0.5, 0.5, 0.5)]
+            rel material:binding = </empty/Looks/mat_floor>
+            double size = 1
+            float3 xformOp:scale = (40, 40, 0.05)
+            double3 xformOp:translate = (0, 0, 0.025)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:scale"]
+        }
+    }
+}
