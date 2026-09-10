@@ -384,6 +384,49 @@ Passing `shared_from_this()` makes the listener use `slam_toolbox`'s own node in
 
 None of those resolved the underlying subscription problem. The 1-line source patch was the change that made the namespaced setup work reliably.
 
+## SLAM TF Lag Aborts Valid Nav2 Plans
+
+### Symptom
+
+In a long warehouse exploration run, a path can look geometrically valid in
+RViz but stop almost immediately. MPPI reports `Unable to transform goal pose
+into costmap frame`, Nav2 aborts the goal, and the explorer retries or
+blacklists the frontier. The paired TF error says that `map -> odom` would
+require extrapolation into the future, often by only a few milliseconds.
+
+### Root Cause
+
+MPPI transforms the map-frame goal into the local costmap's `odom` frame at
+the current robot-pose timestamp. By default, slam_toolbox stamps `map -> odom`
+from the processed scan timestamp plus `transform_timeout`. Once asynchronous
+scan processing lags, that transform stays behind the controller's requested
+time. MPPI's `transform_tolerance` only waits for the exact timestamp; it does
+not authorize use of the latest transform. The wait itself then causes missed
+controller cycles and stale velocity commands before the goal aborts.
+
+The 2026-09-10 40-minute warehouse visual run recorded 334 future-extrapolation
+failures. The requested-minus-latest gap had a 25 ms median, 145 ms p90, 1.021 s
+p99, and 1.714 s maximum. slam_toolbox also dropped 147 stale scans. The config
+still had `scan_queue_size: 10`, retained from an earlier namespace workaround;
+slam_toolbox's asynchronous mode requires a latest-scan queue of one.
+
+### Fix
+
+Set `restamp_tf: true` so slam_toolbox publishes its latest `map -> odom`
+correction at the current clock plus its existing transform timeout, and set
+`scan_queue_size: 1` so asynchronous mapping cannot accumulate stale scans.
+This fixes timestamp ownership at the SLAM producer; do not increase MPPI's
+wait or patch Nav2 to combine arbitrary transform-chain timestamps.
+
+A same-workload visual warehouse A/B run on 2026-09-10 then ran for 15 minutes
+past startup and through the original failure window. It reached 66.1% peak
+coverage with 12 completed goals, all successful: zero future-TF
+extrapolations, missed controller loops, aborts, blacklists, or node deaths.
+slam_toolbox discarded 80 scans when its depth-one queue was busy; those
+drops are intentional latest-scan back-pressure and did not interrupt mapping
+or navigation. The console log is
+`artifacts/exploration/ridgeback_2026-09-10_21-15-43_warehouse.xcZJoj/console.log`.
+
 ## SLAM Drift in Featureless Environments (Office World)
 
 **Symptom**: After launching in the office world, the robot appears to jump/move randomly in RViz (map→odom transform drifts) while the robot remains physically stationary in Gazebo.

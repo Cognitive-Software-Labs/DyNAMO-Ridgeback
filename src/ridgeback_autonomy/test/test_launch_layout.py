@@ -23,6 +23,12 @@ def _exploration_rviz_path() -> Path:
     return _package_root() / 'sim' / 'rviz' / 'exploration.rviz'
 
 
+def _slam_parameters() -> dict[str, object]:
+    config_path = _package_root() / 'config' / 'slam_toolbox_params.yaml'
+    config = yaml.safe_load(config_path.read_text(encoding='utf-8'))
+    return config['slam_toolbox']['ros__parameters']
+
+
 def test_public_launch_surface_is_limited_to_known_entrypoints() -> None:
     launch_dir = Path(__file__).resolve().parents[1] / 'launch'
     top_level_launches = sorted(
@@ -365,3 +371,12 @@ def test_slam_lifecycle_configure_and_activate_are_event_driven() -> None:
     assert 'change_state' in slam_text
     assert 'period=2.0' not in slam_text
     assert 'period=8.0' not in slam_text
+
+
+def test_async_slam_does_not_publish_scan_lag_into_nav2_tf() -> None:
+    params = _slam_parameters()
+
+    # MPPI transforms the map-frame goal at the current robot-pose timestamp.
+    # Keep map->odom current and do not retain stale scans in async mapping.
+    assert params['restamp_tf'] is True
+    assert params['scan_queue_size'] == 1
