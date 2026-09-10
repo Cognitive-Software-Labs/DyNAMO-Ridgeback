@@ -16,6 +16,12 @@ from ridgeback_autonomy.benchmarking.replay import (
     write_replay_results,
 )
 from ridgeback_autonomy.benchmarking.sweep import SweepConfig, load_sweep
+from ridgeback_autonomy.benchmarking.replay_profiles import (
+    MEASUREMENT_AXES,
+    PROFILE_MEASUREMENT,
+    ProfileValidationError,
+    validate_profile_axes,
+)
 from ridgeback_autonomy.perception.target_localization.core.depth_common import (
     DEPTH_GATE_DISABLED,
     NEAREST_MODE_BIN_WIDTH_M_DEFAULT,
@@ -41,6 +47,7 @@ REPLAY_V1_ARGUMENT_DEFAULTS = {
     'isolation_2d_min_bin_fraction': str(NEAREST_MODE_MIN_BIN_FRACTION_DEFAULT),
     'min_valid_pixels': str(MIN_VALID_SAMPLES),
 }
+# Compatibility aliases for callers/tests that imported the original names.
 REPLAY_V1_ARGUMENT_NAMES = frozenset(REPLAY_V1_ARGUMENT_DEFAULTS)
 
 
@@ -60,18 +67,27 @@ def _validated_v1_variants(spec) -> tuple[SweepConfig, ...]:
     variants = []
     for config in spec.configs:
         arguments = config.arguments
+        try:
+            validate_profile_axes(PROFILE_MEASUREMENT, config.explicit_keys)
+        except ProfileValidationError as exc:
+            raise ValueError(
+                f'{exc.field} does not affect offline projective ranging; {exc}') from exc
         if arguments.get('estimators') != 'projective_ranging':
             raise ValueError(
-                f'Replay V1 config "{config.name}" must select projective_ranging only.')
+                f'Measurement replay config "{config.name}" must select '
+                'projective_ranging only for legacy evidence.')
         if arguments.get('mask_gate', 'box') != 'box':
-            raise ValueError(f'Replay V1 config "{config.name}" must use mask_gate:=box.')
+            raise ValueError(
+                f'Measurement replay config "{config.name}" requires the frozen box mask.')
         if arguments.get('depth_source', 'stereoscopic') != 'stereoscopic':
-            raise ValueError(f'Replay V1 config "{config.name}" must use stereoscopic depth.')
-        irrelevant = sorted(config.explicit_keys - REPLAY_V1_ARGUMENT_NAMES)
+            raise ValueError(
+                f'Measurement replay config "{config.name}" requires its frozen '
+                'stereoscopic depth.')
+        irrelevant = sorted(config.explicit_keys - MEASUREMENT_AXES)
         if irrelevant:
             raise ValueError(
-                f'Replay V1 config "{config.name}" explicitly sets "{irrelevant[0]}", '
-                'which does not affect offline projective ranging.')
+                f'Measurement replay config "{config.name}" explicitly sets '
+                f'"{irrelevant[0]}", which is frozen or irrelevant.')
         resolved = dict(REPLAY_V1_ARGUMENT_DEFAULTS)
         resolved.update({
             key: value for key, value in arguments.items()

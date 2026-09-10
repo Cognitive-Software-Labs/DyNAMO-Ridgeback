@@ -187,9 +187,30 @@ Key ownership:
 - `sweep.py`, `target_benchmark_sweep.py`, `sweep_report.py`: sweep domain,
 supervisor, and reporting.
 
-## Offline projective replay
+## Local configuration UI
 
-Replay V1 is the measurement-accuracy path for box-gated stereoscopic
+`target_benchmark_configurator` is a local-only, read-only browser UI for
+building benchmark sweep YAML before any benchmark process starts. It binds
+only to `127.0.0.1`, chooses an available port by default, and puts an
+unguessable token in the URL and every API request. Use `--no-open` to print
+the URL for a headless or remote session.
+
+The UI imports and exports the canonical replay-job format, then validates the
+generated document through `parse_job`, exactly as the replay command does.
+Its command preview comes from the same structured argument-list renderer; it
+never invokes a shell, creates an output directory, starts ROS, or changes an
+artifact. Importing and immediately exporting an unchanged job is byte-stable.
+
+The browser is a client of the ROS-free replay-profile capability contract;
+the service is the authority for profile and axis decisions. All four profile
+cards are executable: legacy `measurement` replay, frozen `mask-output`
+comparison, `mask-model` materialization, and `live-system` sweeps. The GUI
+validates canonical replay jobs and their typed artifacts before export, so it
+cannot misrepresent a live or box-gated run as a frozen-mask experiment.
+
+## Legacy measurement replay
+
+The legacy measurement profile is the measurement-accuracy path for box-gated stereoscopic
 `projective_ranging` parameter sweeps. The live runner counts an exact number
 of raw detector batches per trial, then performs a bounded exact-stamp drain.
 It stores raw depth ROIs and camera context, including invalid values and
@@ -215,6 +236,70 @@ final integration. The 2026-09-09 clean full-scenario run selected five batches,
 proved live/offline parity across 135 rows, and cleared the performance gate by
 about 50x; the complete evidence is in
 [the validation history](../history/offline_measurement_replay_validation.md).
+
+## Layered replay profiles
+
+`benchmarking/replay_profiles.py` is the ROS-free authority for the four stable
+profile IDs, question mappings, mutable/frozen stages, legal axes, types,
+ranges, compatible estimators, supported claims, and limitations. The command
+`target_replay_describe --json` exposes that exact contract to CLIs and the
+configurator. Invalid upstream knobs use structured errors; for example,
+`segmentation_model` under `mask-output` recommends `mask-model`.
+
+The offline artifact graph uses a version-2 typed envelope while the compact
+`schema_version: 1` dataset continues to load unchanged:
+
+```text
+sensor-capture (exact detections + RGB + depth + calibration + TF)
+    ├── box mask-cache ───────────┐
+    └── SlimSAM mask-cache ───────┴── measurement variants
+```
+
+Each typed manifest records `format: dynamo-replay`, manifest/payload versions,
+a content-derived artifact ID, completeness, payload hashes, producer signature,
+Git/dependency/model provenance, and trial/event/detection counts. A mask cache
+also pins its sensor parent by artifact ID and exact manifest SHA-256. Loading a
+cache without that parent, with a different parent, with a changed manifest, or
+with a changed payload fails before evaluation.
+
+Sensor payloads contain one losslessly compressed NumPy file per trial. Every
+raw batch remains present, including empty detections. RGB is exact `uint8` on
+the detection grid; aligned depth is exact float32 metres with NaN/Inf/zero
+semantics retained. Missing RGB, depth, intrinsics, or transforms remain
+explicit `null` evidence. Ground truth is stored only in trial scoring metadata
+and is never passed into a mask producer.
+
+Mask caches store one index-aligned outcome per parent detection. `None` is an
+explicit producer miss and differs from a valid empty `MaskRegion`. Regions
+retain origin, full-grid size, `rect|tight` precision, shape, and bit-packed
+boolean pixels. Tight regions use their actual nonzero extent, which may extend
+outside the padded prompt box. Changing any producer parameter or provenance
+creates a separately identified immutable cache.
+
+`target_replay_materialize_masks` loads one model once and streams all parent
+trials through it; the box producer needs no model. A canonical `mask-model` job
+may name several materializations. Its default is one model worker, and parallel
+model workers require distinct explicit devices so a parameter grid cannot load
+many copies onto one GPU accidentally.
+
+`target_replay_benchmark` validates a job and all lineage before work. CPU
+workers load one trial plus its selected caches and evaluate every compatible
+projective/Euclidean numeric variant while the arrays are resident. Both depth
+rows call the live `fill_path_measurements` kernel and therefore share one
+prepared depth region per detection. Process-map ordering plus ordered reduction
+makes sequential and parallel result rows byte-stable. Offline jobs accept only
+the selected profile's axes in both sweep defaults and individual configs; use
+a replay-specific sweep rather than carrying ignored live-only defaults into a
+job. The public output directory appears only after the entire job succeeds;
+interrupted staging directories are not accepted as results.
+
+Offline reports carry the profile boundary. `measurement` and `mask-output`
+cannot support model/runtime claims. `mask-model` may retain isolated producer
+duration as diagnostics, but only `live-system` can establish ROS delivery,
+end-to-end latency, throughput, GPU contention, simulator real-time factor, or
+integration behavior. Implementation evidence and the remaining live gates are
+recorded in
+[the layered replay validation note](../history/layered_replay_implementation_validation.md).
 
 Architecture guards prohibit reusable benchmark modules from importing the
 runner node and prohibit perception/exploration from importing benchmarking.

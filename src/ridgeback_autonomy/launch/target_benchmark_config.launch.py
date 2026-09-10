@@ -178,6 +178,7 @@ def build_benchmark_nodes(context, *args, **kwargs):
             'settle_sec': settle_sec,
             'capture_sec': capture_sec,
             'replay_dataset_dir': LaunchConfiguration('replay_dataset_dir'),
+            'sensor_capture_dir': LaunchConfiguration('sensor_capture_dir'),
             'capture_batches': LaunchConfiguration('capture_batches'),
             'capture_drain_sec': LaunchConfiguration('capture_drain_sec'),
             'capture_timeout_sec': LaunchConfiguration('capture_timeout_sec'),
@@ -305,7 +306,11 @@ def generate_launch_description():
         DeclareLaunchArgument('capture_sec', default_value='10.0'),
         DeclareLaunchArgument(
             'replay_dataset_dir', default_value='',
-            description='New directory for a V1 projective-ranging replay capture',
+            description='New directory for a compact legacy measurement replay capture',
+        ),
+        DeclareLaunchArgument(
+            'sensor_capture_dir', default_value='',
+            description='New typed sensor-capture artifact for mask-model replay',
         ),
         DeclareLaunchArgument(
             'capture_batches', default_value=str(REPLAY_CAPTURE_BATCHES_DEFAULT),

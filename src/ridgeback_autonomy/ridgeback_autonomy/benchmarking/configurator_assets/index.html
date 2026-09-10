@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Benchmark configurator</title>
+    <link rel="stylesheet" href="app.css">
+  </head>
+  <body>
+    <div class="ambient ambient-a"></div><div class="ambient ambient-b"></div>
+    <main class="workspace">
+      <header class="hero"><div><p class="eyebrow">RIDGEBACK / BENCHMARKING</p><h1>Configure a<br><em>reproducible</em> benchmark.</h1><p>Choose the evidence boundary first; only then configure the parameters that can change it.</p></div><div class="hero-status"><span class="status-dot"></span><span>LOCAL ONLY</span><small>no benchmark processes start here</small></div></header>
+      <section class="panel question-panel"><div><p class="step">1. Benchmark question</p><div id="questions" class="questions" aria-label="Benchmark question"></div></div><aside id="boundary" class="boundary" aria-live="polite"></aside></section>
+      <section class="panel"><p class="step">2. Inputs</p><div id="input-fields" class="field-grid"></div><div class="artifact-row"><button id="inspect" type="button" class="secondary">Inspect evidence</button><span id="artifact-summary" class="muted"></span></div></section>
+      <section class="panel"><div class="section-title"><div><p class="step">3. Variants</p><p class="muted">Fields are supplied by the selected profile. Inapplicable controls disappear.</p></div><button id="add-variant" type="button" class="secondary">Add variant</button></div><div id="variants" class="variants"></div></section>
+      <section class="bottom-grid"><section class="panel"><p class="step">4. Resource estimate</p><div id="estimates" class="estimate-grid"></div></section><section class="panel"><p class="step">5. Review and export</p><div id="issues" aria-live="polite"></div><pre id="command" class="command">Validate a job to see the exact command.</pre><div class="actions"><button id="download" type="button">Download job</button><button id="copy" type="button" class="secondary">Copy command</button><label class="import secondary">Import job<input id="import" type="file" accept=".yaml,.yml,text/yaml"></label><button id="reset" type="button" class="text-button">Reset draft</button></div></section></section>
+    </main>
+    <script src="app.js" defer></script>
+  </body>
+</html>

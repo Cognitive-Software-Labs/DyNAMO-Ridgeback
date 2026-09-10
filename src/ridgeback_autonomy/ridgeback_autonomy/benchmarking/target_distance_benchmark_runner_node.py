@@ -71,6 +71,10 @@ from ridgeback_autonomy.benchmarking.replay import (
     ReplayDatasetWriter,
     sha256_file,
 )
+from ridgeback_autonomy.benchmarking.replay_artifacts import (
+    SensorCaptureWriter,
+    dependency_versions,
+)
 from ridgeback_autonomy.benchmarking.process_utils import (
     extract_json_payload,
     format_commit,
@@ -113,7 +117,10 @@ from ridgeback_autonomy.perception.target_localization.core.depth_common import 
     NEAREST_MODE_BIN_WIDTH_M_DEFAULT,
     NEAREST_MODE_MIN_BIN_FRACTION_DEFAULT,
 )
-from ridgeback_autonomy.perception.target_localization.core.image_utils import convert_color_image_message
+from ridgeback_autonomy.perception.target_localization.core.image_utils import (
+    convert_color_image_message,
+    decode_color_to_rgb,
+)
 from ridgeback_autonomy.perception.target_localization.core.depth_sources import decode_depth_to_meters
 from ridgeback_autonomy.perception.target_localization.core.intrinsics import intrinsics_from_camera_info
 from ridgeback_autonomy.perception.target_localization.core.mask import clamp_box
@@ -125,6 +132,7 @@ from ridgeback_autonomy.perception.target_localization.contracts import (
 )
 from ridgeback_autonomy.perception.target_localization.core.isolation_2d import ISOLATION_2D_DEFAULT
 from ridgeback_autonomy.perception.target_localization.core.isolation_3d import (
+    BASE_ABOVE_FLOOR_M_DEFAULT,
     FLOOR_MARGIN_M_DEFAULT,
     ISOLATION_3D_DEFAULT,
 )
@@ -209,6 +217,7 @@ class TargetDistanceBenchmarkRunner(Node):
         self.declare_parameter('settle_sec', 2.0)
         self.declare_parameter('capture_sec', 10.0)
         self.declare_parameter('replay_dataset_dir', '')
+        self.declare_parameter('sensor_capture_dir', '')
         self.declare_parameter('capture_batches', REPLAY_CAPTURE_BATCHES_DEFAULT)
         self.declare_parameter('capture_drain_sec', 2.0)
         self.declare_parameter('capture_timeout_sec', 30.0)
@@ -271,6 +280,7 @@ class TargetDistanceBenchmarkRunner(Node):
         self.settle_sec = float(self.get_parameter('settle_sec').value)
         self.capture_sec = float(self.get_parameter('capture_sec').value)
         self.replay_dataset_dir = str(self.get_parameter('replay_dataset_dir').value).strip()
+        self.sensor_capture_dir = str(self.get_parameter('sensor_capture_dir').value).strip()
         self.capture_batches = int(self.get_parameter('capture_batches').value)
         self.capture_drain_sec = float(self.get_parameter('capture_drain_sec').value)
         self.capture_timeout_sec = float(self.get_parameter('capture_timeout_sec').value)
@@ -317,6 +327,10 @@ class TargetDistanceBenchmarkRunner(Node):
         os.makedirs(self.images_dir, exist_ok=False)
 
         self.replay_writer: ReplayDatasetWriter | None = None
+        self.sensor_writer: SensorCaptureWriter | None = None
+        if self.replay_dataset_dir and self.sensor_capture_dir:
+            raise ValueError(
+                'replay_dataset_dir and sensor_capture_dir are mutually exclusive.')
         if self.replay_dataset_dir:
             if self.capture_batches < 1:
                 raise ValueError('capture_batches must be positive when replay_dataset_dir is set.')
@@ -331,6 +345,37 @@ class TargetDistanceBenchmarkRunner(Node):
                 'capture_parameters': self.declared_parameters(),
                 'source': git_provenance(self.workspace_root),
             })
+        elif self.sensor_capture_dir:
+            if self.capture_batches < 1:
+                raise ValueError(
+                    'capture_batches must be positive when sensor_capture_dir is set.')
+            if not any(
+                estimator in {'projective_ranging', 'euclidean_reconstruction'}
+                for estimator in self.selected_estimators
+            ):
+                raise ValueError(
+                    'Sensor capture requires a depth-image measurement estimator '
+                    'so exact aligned depth is published.')
+            if self.depth_source != 'stereoscopic':
+                raise ValueError(
+                    'Sensor capture currently requires stereoscopic depth so its '
+                    'source range contract is preserved exactly.')
+            source = git_provenance(self.workspace_root)
+            self.sensor_writer = SensorCaptureWriter(
+                self.sensor_capture_dir,
+                producer={
+                    **source,
+                    'model': 'live-sensor-capture',
+                    'model_revision': None,
+                    'dependencies': dependency_versions(('numpy',)),
+                    'parameters': self.declared_parameters(),
+                },
+                metadata={
+                    'dataset_id': self.run_label,
+                    'scenario_path': self.scenario_path,
+                    'scenario_sha256': sha256_file(self.scenario_path),
+                },
+            )
 
         # Self-describing names: the underscore ``output`` form (gate, source,
         # path, isolation) names the CSV file; the spaced ``display`` prose
@@ -377,7 +422,9 @@ class TargetDistanceBenchmarkRunner(Node):
         self.color_preview_buffer: OrderedDict[int, Any] = OrderedDict()
         self.replay_capture_events: OrderedDict[int, dict[str, Any]] = OrderedDict()
         self.replay_depth_buffer: OrderedDict[int, np.ndarray] = OrderedDict()
-        self.latest_replay_camera_info: CameraInfo | None = None
+        self.sensor_rgb_buffer: OrderedDict[int, np.ndarray] = OrderedDict()
+        self.replay_camera_info_buffer: OrderedDict[int, CameraInfo] = OrderedDict()
+        self.static_replay_camera_info: CameraInfo | None = None
         self.replay_tf_buffer: Buffer | None = None
         self.replay_tf_listener: TransformListener | None = None
         self.replay_last_fallback_frame: str | None = None
@@ -402,7 +449,7 @@ class TargetDistanceBenchmarkRunner(Node):
             self.on_color_image,
             qos_profile_sensor_data,
         )
-        if self.replay_writer is not None:
+        if self.capture_artifact_enabled():
             self.replay_tf_buffer = Buffer(node=self)
             self.replay_tf_listener = TransformListener(
                 self.replay_tf_buffer, self, spin_thread=False)
@@ -470,10 +517,34 @@ class TargetDistanceBenchmarkRunner(Node):
         preview = self.collage_renderer.make_color_preview(frame)
         stamp_ns = stamp_to_nanoseconds(msg.header.stamp)
         store_buffered_preview(self.color_preview_buffer, stamp_ns, preview)
+        if getattr(self, 'sensor_writer', None) is not None:
+            try:
+                rgb = np.ascontiguousarray(decode_color_to_rgb(msg))
+            except ValueError as exc:
+                self.log_warning_once(
+                    'last_color_decode_warning',
+                    f'Failed to decode exact replay RGB from '
+                    f'"{self.resolved_topic(self.color_topic)}": {exc}',
+                )
+            else:
+                store_buffered_preview(self.sensor_rgb_buffer, stamp_ns, rgb)
+                event = self.replay_capture_events.get(stamp_ns)
+                if event is not None:
+                    self.store_replay_rgb(event, rgb)
         self.backfill_previews_from_buffers()
 
     def on_replay_camera_info(self, msg: CameraInfo) -> None:
-        self.latest_replay_camera_info = msg
+        stamp_ns = stamp_to_nanoseconds(msg.header.stamp)
+        if stamp_ns == 0:
+            self.static_replay_camera_info = msg
+            for event in self.replay_capture_events.values():
+                if event['intrinsics'] is None:
+                    self.store_replay_intrinsics(event, msg, stamp_ns=0)
+            return
+        store_buffered_preview(self.replay_camera_info_buffer, stamp_ns, msg)
+        event = self.replay_capture_events.get(stamp_ns)
+        if event is not None:
+            self.store_replay_intrinsics(event, msg, stamp_ns=stamp_ns)
 
     def on_replay_raw_detections(self, msg: TargetDetections) -> None:
         """Freeze detector identity before a measurement recipe can change it."""
@@ -484,7 +555,7 @@ class TargetDistanceBenchmarkRunner(Node):
         if stamp_ns in self.replay_capture_events:
             return
         batch = batch_from_detections_message(msg)
-        self.replay_capture_events[stamp_ns] = {
+        event = {
             'stamp_ns': stamp_ns,
             'frame_id': str(msg.header.frame_id),
             'detected': bool(msg.detected),
@@ -492,12 +563,31 @@ class TargetDistanceBenchmarkRunner(Node):
             'image_width': int(msg.image_width),
             'image_height': int(msg.image_height),
             'intrinsics': None,
+            'intrinsics_stamp_ns': None,
             'camera_rotation': None,
             'camera_translation': None,
             'front_offset_m': ROBOT_FRONT_OFFSET_M,
             # Stereo depth has no source-defined finite usable ceiling.
             'depth_usable_max_m': None,
-            'detections': [
+            'detections': [],
+        }
+        if getattr(self, 'sensor_writer', None) is not None:
+            event['rgb'] = None
+            event['depth_m'] = None
+            event['base_above_floor_m'] = BASE_ABOVE_FLOOR_M_DEFAULT
+            event['detections'] = [
+                {
+                    'bbox_xyxy': list(detection.bbox_xyxy),
+                    'label': detection.label,
+                    'score': detection.score,
+                }
+                for detection in batch.detections
+            ]
+            rgb = self.sensor_rgb_buffer.get(stamp_ns)
+            if rgb is not None:
+                self.store_replay_rgb(event, rgb)
+        else:
+            event['detections'] = [
                 {
                     'bbox_xyxy': list(detection.bbox_xyxy),
                     'label': detection.label,
@@ -505,12 +595,19 @@ class TargetDistanceBenchmarkRunner(Node):
                     'depth_roi': None,
                 }
                 for detection in batch.detections
-            ],
-        }
-        self.backfill_replay_event_context(self.replay_capture_events[stamp_ns])
+            ]
+        self.replay_capture_events[stamp_ns] = event
+        camera_info = (
+            self.replay_camera_info_buffer.get(stamp_ns)
+            or self.static_replay_camera_info
+        )
+        if camera_info is not None:
+            camera_stamp_ns = stamp_to_nanoseconds(camera_info.header.stamp)
+            self.store_replay_intrinsics(event, camera_info, stamp_ns=camera_stamp_ns)
+        self.backfill_replay_event_context(event)
         depth_m = self.replay_depth_buffer.get(stamp_ns)
         if depth_m is not None:
-            self.store_replay_depth_rois(self.replay_capture_events[stamp_ns], depth_m)
+            self.store_replay_depth(event, depth_m)
 
     def on_replay_aligned_depth(self, msg: Image) -> None:
         if not self.capture_active:
@@ -525,7 +622,47 @@ class TargetDistanceBenchmarkRunner(Node):
         if event is None:
             store_buffered_preview(self.replay_depth_buffer, stamp_ns, depth_m)
             return
+        self.store_replay_depth(event, depth_m)
+
+    def store_replay_depth(self, event: dict[str, Any], depth_m: np.ndarray) -> None:
+        if self.sensor_writer is not None:
+            if depth_m.shape != (event['image_height'], event['image_width']):
+                self.get_logger().warning(
+                    f'Sensor capture depth grid {depth_m.shape} differs from detection grid '
+                    f'({event["image_height"]}, {event["image_width"]}); recording no match.')
+                return
+            event['depth_m'] = np.array(depth_m, dtype=np.float32, copy=True)
+            return
         self.store_replay_depth_rois(event, depth_m)
+
+    def store_replay_rgb(self, event: dict[str, Any], rgb: np.ndarray) -> None:
+        expected = (event['image_height'], event['image_width'], 3)
+        if rgb.shape != expected:
+            self.get_logger().warning(
+                f'Sensor capture RGB grid {rgb.shape} differs from detection grid '
+                f'{expected}; recording no match.')
+            return
+        event['rgb'] = np.array(rgb, dtype=np.uint8, copy=True)
+
+    def store_replay_intrinsics(
+        self,
+        event: dict[str, Any],
+        camera_info: CameraInfo,
+        *,
+        stamp_ns: int,
+    ) -> None:
+        camera = intrinsics_from_camera_info(camera_info)
+        expected = (event['image_width'], event['image_height'])
+        if (camera.width, camera.height) != expected:
+            self.get_logger().warning(
+                f'Sensor capture camera-info grid {(camera.width, camera.height)} '
+                f'differs from detection grid {expected}; recording no match.')
+            return
+        event['intrinsics'] = {
+            'fx': camera.fx, 'fy': camera.fy, 'cx': camera.cx, 'cy': camera.cy,
+            'width': camera.width, 'height': camera.height,
+        }
+        event['intrinsics_stamp_ns'] = int(stamp_ns)
 
     def store_replay_depth_rois(self, event: dict[str, Any], depth_m: np.ndarray) -> None:
         """Attach one exact-stamp depth frame to its frozen detection ROIs."""
@@ -542,13 +679,6 @@ class TargetDistanceBenchmarkRunner(Node):
 
     def backfill_replay_event_context(self, event: dict[str, Any]) -> None:
         """Fill capture context that may arrive after the raw detector batch."""
-
-        if event['intrinsics'] is None and self.latest_replay_camera_info is not None:
-            camera = intrinsics_from_camera_info(self.latest_replay_camera_info)
-            event['intrinsics'] = {
-                'fx': camera.fx, 'fy': camera.fy, 'cx': camera.cx, 'cy': camera.cy,
-                'width': camera.width, 'height': camera.height,
-            }
         if (event['camera_rotation'] is not None
                 and event['camera_translation'] is not None):
             return
@@ -591,11 +721,16 @@ class TargetDistanceBenchmarkRunner(Node):
             for event in self.replay_capture_events.values()
         ):
             return False
-        if not all(
-            not event['detected']
-            or all(detection['depth_roi'] is not None for detection in event['detections'])
-            for event in self.replay_capture_events.values()
-        ):
+        if getattr(self, 'sensor_writer', None) is not None:
+            if not all(
+                event.get('rgb') is not None and event.get('depth_m') is not None
+                for event in self.replay_capture_events.values()
+            ):
+                return False
+        elif not all(
+                not event['detected']
+                or all(detection['depth_roi'] is not None for detection in event['detections'])
+                for event in self.replay_capture_events.values()):
             return False
         measurement_stamps = {
             event.stamp_ns for event in self.capture_events.values()
@@ -690,17 +825,18 @@ class TargetDistanceBenchmarkRunner(Node):
         self.write_run_outputs(
             summary_rows, estimator_rows, included_trials, skipped_trials)
 
-        if self.replay_writer is not None:
+        if self.capture_artifact_enabled():
             replay_metadata = {
                 'live_run_dir': self.run_output_dir,
                 'trials_included': included_trials,
                 'trials_skipped': skipped_trials,
                 'capture_wall_time_sec': time.monotonic() - self.run_started_monotonic,
             }
+            writer = self.replay_writer or self.sensor_writer
             if skipped_trials:
-                self.replay_writer.mark_incomplete(**replay_metadata)
+                writer.mark_incomplete(**replay_metadata)
             else:
-                self.replay_writer.finalize(**replay_metadata)
+                writer.finalize(**replay_metadata)
 
         self.log_summary(summary_rows, included_trials, skipped_trials)
         self.get_logger().info(f'Benchmark run written to {self.run_output_dir}')
@@ -834,7 +970,7 @@ class TargetDistanceBenchmarkRunner(Node):
             }
             self.active_trial_id = trial_id
             capture = self.capture_measurement_window(self.capture_sec)
-            if self.replay_writer is not None:
+            if self.capture_artifact_enabled():
                 self.write_replay_trial(trial, gt_instances, capture['replay_events'])
             merge_status_histograms(self.status_aggregate, capture['status_histogram'])
             usable_by_estimator = capture['usable_by_estimator']
@@ -916,9 +1052,11 @@ class TargetDistanceBenchmarkRunner(Node):
         self.clear_preview_buffers()
         self.replay_capture_events.clear()
         self.replay_depth_buffer.clear()
+        self.sensor_rgb_buffer.clear()
+        self.replay_camera_info_buffer.clear()
         self.capture_active = True
         try:
-            if self.replay_writer is None:
+            if not self.capture_artifact_enabled():
                 self.spin_for(duration_sec)
             else:
                 deadline = time.monotonic() + self.capture_timeout_sec
@@ -940,13 +1078,22 @@ class TargetDistanceBenchmarkRunner(Node):
                 self.capture_events = restrict_events_to_stamps(
                     self.capture_events, set(self.replay_capture_events))
                 if not self.replay_capture_is_complete():
-                    missing_depth = sum(
-                        1
-                        for event in self.replay_capture_events.values()
-                        if event['detected'] and any(
-                            detection['depth_roi'] is None
-                            for detection in event['detections'])
-                    )
+                    if self.sensor_writer is not None:
+                        missing_depth = sum(
+                            event.get('depth_m') is None
+                            for event in self.replay_capture_events.values())
+                        missing_rgb = sum(
+                            event.get('rgb') is None
+                            for event in self.replay_capture_events.values())
+                    else:
+                        missing_depth = sum(
+                            1
+                            for event in self.replay_capture_events.values()
+                            if event['detected'] and any(
+                                detection['depth_roi'] is None
+                                for detection in event['detections'])
+                        )
+                        missing_rgb = 0
                     measurement_stamps = {
                         event.stamp_ns for event in self.capture_events.values()
                     }
@@ -962,6 +1109,7 @@ class TargetDistanceBenchmarkRunner(Node):
                     self.get_logger().warning(
                         'Replay capture drain ended with '
                         f'{missing_depth} raw batch(es) missing exact depth and '
+                        f'{missing_rgb} missing exact RGB and '
                         f'{missing_context} missing camera context and '
                         f'{missing_measurements} missing a live measurement; '
                         'the absent evidence is preserved in the dataset.')
@@ -972,7 +1120,7 @@ class TargetDistanceBenchmarkRunner(Node):
 
         summary = summarize_capture_events(
             self.capture_events, self.selected_estimators)
-        if self.replay_writer is not None:
+        if self.capture_artifact_enabled():
             summary['replay_events'] = list(self.replay_capture_events.values())
         return summary
 
@@ -982,10 +1130,11 @@ class TargetDistanceBenchmarkRunner(Node):
         ground_truth_instances: list[GroundTruthInstance],
         events: list[dict[str, Any]],
     ) -> None:
-        if self.replay_writer is None:
+        if not self.capture_artifact_enabled():
             return
         scene: Scene = trial['scene']
-        self.replay_writer.write_trial({
+        writer = self.replay_writer or self.sensor_writer
+        writer.write_trial({
             'trial_id': trial['trial_id'],
             'repeat_index': trial['repeat_index'],
             'scene_id': scene.id,
@@ -1031,6 +1180,11 @@ class TargetDistanceBenchmarkRunner(Node):
 
     def clear_preview_buffers(self) -> None:
         self.color_preview_buffer.clear()
+
+    def capture_artifact_enabled(self) -> bool:
+        return (
+            getattr(self, 'replay_writer', None) is not None
+            or getattr(self, 'sensor_writer', None) is not None)
 
     def backfill_previews_from_buffers(self) -> None:
         if not self.capture_active:

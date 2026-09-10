@@ -363,8 +363,9 @@ Arguments:
 | `shutdown_on_complete` | `false` | Shut down the config launch service when the runner exits. The sweep sets this to `true`; the compatibility launch leaves the completed stack open for inspection |
 | `settle_sec` | `2.0` | Delay after spawning the target before sampling |
 | `capture_sec` | `10.0` | Sampling window length for collecting usable detections |
-| `replay_dataset_dir` | empty | New directory for an experimental V1 replay dataset. Setting it switches this run from elapsed-time capture to an exact raw-batch quota and requires projective ranging, box gating, and stereoscopic depth |
-| `capture_batches` | `5` | Raw detector batches captured per trial when `replay_dataset_dir` is set; empty batches count. Five was selected by the 2026-09-09 convergence run |
+| `replay_dataset_dir` | empty | New directory for the compact legacy measurement replay dataset. Setting it switches this run from elapsed-time capture to an exact raw-batch quota and requires projective ranging, box gating, and stereoscopic depth |
+| `sensor_capture_dir` | empty | New immutable full sensor-capture artifact for `mask-output`/`mask-model` replay. Stores exact RGB, float32 aligned depth, raw detections, calibration, and transforms; mutually exclusive with `replay_dataset_dir` |
+| `capture_batches` | `5` | Raw detector batches captured per trial when either replay output is set; empty batches count. Five was selected by the 2026-09-09 convergence run |
 | `capture_drain_sec` | `2.0` | Maximum post-quota drain for matching exact depth, camera context, and live measurement messages. Capture ends early when every selected stamp is complete and preserves missing matches when the bound expires |
 | `capture_timeout_sec` | `30.0` | Hard wall-time bound for obtaining the raw detector-batch quota; it is a stall guard, not the normal capture duration |
 | `color_topic` | `sensors/camera_0/color/image` | Compatibility override for the shared camera contract's color image; feeds detector, measurements, overlay, runner, and readiness gate |
@@ -379,6 +380,23 @@ Benchmark semantics:
 - a trial is included only if every selected estimator has a usable aligned event
 - each estimator CSV stores one row per included trial, using the median estimate over that trial’s aligned usable detections
 - the shared collage image for each trial is built from one representative aligned detection event that is closest to the per-trial medians across the selected estimators
+
+### Local benchmark configurator
+
+Use the local configurator to build and validate a benchmark job without
+starting Gazebo or writing benchmark artifacts. It binds only to loopback and
+opens a browser by default; use `--no-open` on a remote or headless session.
+
+```bash
+ros2 run ridgeback_autonomy target_benchmark_configurator
+ros2 run ridgeback_autonomy target_benchmark_configurator --no-open
+```
+
+The UI exports a canonical replay-job YAML plus its exact command. It supports
+legacy measurement replay, frozen mask-output comparison, rerunnable
+mask-model materialization, and live-system sweeps. It validates selected
+artifacts against the same replay-job contract used by the CLI. See
+[benchmarking reference](docs/benchmarking/target_distance_benchmarking.md).
 
 ### Benchmark sweeps
 
@@ -481,7 +499,7 @@ records each configuration's wall time and a pre-run real-time-factor sample;
 RTF is diagnostic only, but helps distinguish configuration effects from
 observation-coverage drift as a long-lived simulator slows down.
 
-### Offline projective replay
+### Legacy measurement replay
 
 Use replay when only the box-gated stereoscopic `projective_ranging` recipe or
 its numeric parameters change. One live run freezes raw detections, exact-stamp
@@ -523,10 +541,93 @@ comparison, `replay.json` for dataset/evaluator provenance and total evaluation
 time, and one normal CSV/`run.json`/`summary.md` set per variant. The clean
 2026-09-09 full-scenario validation captured 109/109 trials, matched all 135
 live rows, and reduced the estimated 6.99-hour 15-variant sweep to 8 minutes 22
-seconds end to end (about 50x). Five batches is therefore the V1 default. On
+seconds end to end (about 50x). Five batches is therefore the legacy capture default. On
 the measured 32-thread host, 16 workers was the replay knee; choose workers for
 the machine rather than blindly using every logical CPU. See
 [`docs/history/offline_measurement_replay_validation.md`](docs/history/offline_measurement_replay_validation.md).
+
+### Layered mask replay
+
+Use the typed replay path when masks themselves must be compared or rerun. The
+four profiles and their legal axes are available without ROS or model imports:
+
+```bash
+ros2 run ridgeback_autonomy target_replay_describe --json
+```
+
+Capture one full sensor parent with the existing benchmark launch. The capture
+still counts raw batches, including empty batches, and stores missing exact RGB,
+depth, or context explicitly after the bounded drain.
+
+```bash
+SCENARIO="$(ros2 pkg prefix ridgeback_autonomy)/share/ridgeback_autonomy/config/benchmark_scenarios_examples.yaml"
+SENSOR="$PWD/artifacts/benchmarks/sensor_capture"
+LIVE_OUTPUT="$PWD/artifacts/benchmarks/sensor_capture_live"
+
+ros2 launch ridgeback_autonomy target_distance_benchmark.launch.py \
+  scenario:="$SCENARIO" repeats:=1 estimators:=projective_ranging \
+  mask_gate:=box depth_source:=stereoscopic record_video:=false gz_gui:=false \
+  output_dir:="$LIVE_OUTPUT" run_dir_name:=sensor_capture_live \
+  sensor_capture_dir:="$SENSOR" capture_batches:=5 \
+  capture_drain_sec:=2.0 capture_timeout_sec:=30.0 \
+  shutdown_on_complete:=true
+```
+
+Derive immutable caches independently. A changed checkpoint, revision, prompt
+padding, IoU floor, device/dtype, dependency version, or code provenance yields
+a different producer signature and artifact identity.
+
+```bash
+ros2 run ridgeback_autonomy target_replay_materialize_masks \
+  "$SENSOR" --producer box \
+  --output-dir "$PWD/artifacts/benchmarks/masks_box"
+
+ros2 run ridgeback_autonomy target_replay_materialize_masks \
+  "$SENSOR" --producer slimsam \
+  --model Zigeng/SlimSAM-uniform-50 \
+  --output-dir "$PWD/artifacts/benchmarks/masks_slimsam"
+```
+
+The generalized executor accepts a canonical job YAML/JSON. `mask-output`
+requires the sensor parent plus one or more caches; `mask-model` requires the
+sensor parent plus `materializations` and creates its caches once before running
+all measurement variants.
+
+```yaml
+job_version: 1
+question: compare-mask-outputs
+profile: mask-output
+inputs:
+  sensor_capture: ./artifacts/benchmarks/sensor_capture
+  mask_caches:
+    - ./artifacts/benchmarks/masks_box
+    - ./artifacts/benchmarks/masks_slimsam
+sweep:
+  sweep:
+    name: paired_mask_measurements
+    description: Compare two measurement bands over every frozen mask cache.
+  configs:
+    - name: baseline
+      estimators: projective_ranging,euclidean_reconstruction
+      isolation_2d_band_m: 0.35
+    - name: wider_2d_band
+      estimators: projective_ranging,euclidean_reconstruction
+      isolation_2d_band_m: 0.50
+resources:
+  measurement_workers: 4
+comparison_baseline: masks_box:baseline
+output_dir: ./artifacts/benchmarks/paired_masks
+```
+
+```bash
+ros2 run ridgeback_autonomy target_replay_benchmark replay-job.yaml
+```
+
+Outputs appear only after the whole job succeeds. Offline reports state their
+profile, supported claims, artifact hashes, cache lineage, worker count, and
+limitations. Mask-production time is diagnostic; only the existing live-system
+benchmark can support transport, throughput, end-to-end latency, GPU-contention,
+or integration claims.
 
 ### Perception interfaces
 

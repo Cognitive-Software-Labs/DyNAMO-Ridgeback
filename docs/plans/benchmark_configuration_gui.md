@@ -1,13 +1,18 @@
 # Plan: local benchmark configuration GUI
 
-Status: **PROPOSED — REVIEW REQUIRED.** This plan defines a small local GUI for
+Status: **IMPLEMENTED.** This plan defines a small local GUI for
 choosing a benchmark level, configuring only valid inputs, validating the
 result, and exporting a reproducible job. It depends on the shared profile and
 job-spec contract in
-[`layered_replay_profiles.md`](layered_replay_profiles.md). It does not yet run
-or supervise benchmarks.
+[`layered_replay_profiles.md`](layered_replay_profiles.md). It deliberately does
+not run or supervise benchmarks.
 
 Prepared 2026-09-09 against `aafa4385`.
+
+Implemented 2026-09-10 as the installed loopback-only
+`target_benchmark_configurator`. All four profiles consume the canonical
+capability/job/artifact contracts, and the exported command remains a
+structured preview rather than an execution surface.
 
 ## Decision
 

@@ -114,22 +114,30 @@ def test_replay_capture_waits_for_context_depth_and_live_measurement() -> None:
     assert not TargetDistanceBenchmarkRunner.replay_capture_is_complete(runner)
 
 
-def test_replay_capture_backfills_late_camera_context(monkeypatch) -> None:
+def test_replay_capture_backfills_late_exact_camera_context(monkeypatch) -> None:
     import ridgeback_autonomy.benchmarking.target_distance_benchmark_runner_node as runner_module
 
     event = {
         'stamp_ns': 42,
         'frame_id': 'camera',
+        'image_width': 20,
+        'image_height': 21,
         'intrinsics': None,
+        'intrinsics_stamp_ns': None,
         'camera_rotation': None,
         'camera_translation': None,
     }
     runner = SimpleNamespace(
-        latest_replay_camera_info=object(),
+        replay_capture_events=OrderedDict([(42, event)]),
+        replay_camera_info_buffer=OrderedDict(),
+        static_replay_camera_info=None,
         replay_tf_buffer=object(),
         base_frame='base_link',
         replay_last_fallback_frame=None,
-        get_logger=lambda: SimpleNamespace(warn=lambda _message: None),
+        get_logger=lambda: SimpleNamespace(
+            warn=lambda _message: None,
+            warning=lambda _message: None,
+        ),
     )
     monkeypatch.setattr(
         runner_module,
@@ -142,11 +150,20 @@ def test_replay_capture_backfills_late_camera_context(monkeypatch) -> None:
         'lookup_transform_components',
         lambda *_args: (np.eye(3), np.array([1.0, 2.0, 3.0]), 'base_link'),
     )
+    runner.store_replay_intrinsics = lambda target, info, *, stamp_ns: (
+        runner_module.TargetDistanceBenchmarkRunner.store_replay_intrinsics(
+            runner, target, info, stamp_ns=stamp_ns))
+    camera_info = SimpleNamespace(
+        header=SimpleNamespace(stamp=SimpleNamespace(sec=0, nanosec=42)))
+
+    runner_module.TargetDistanceBenchmarkRunner.on_replay_camera_info(
+        runner, camera_info)
 
     runner_module.TargetDistanceBenchmarkRunner.backfill_replay_event_context(
         runner, event)
 
     assert event['intrinsics']['width'] == 20
+    assert event['intrinsics_stamp_ns'] == 42
     assert event['camera_rotation'] == np.eye(3).tolist()
     assert event['camera_translation'] == [1.0, 2.0, 3.0]
     assert runner.replay_last_fallback_frame == 'base_link'

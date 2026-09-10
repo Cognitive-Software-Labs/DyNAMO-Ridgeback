@@ -49,63 +49,28 @@ SHARED_BENCHMARK_ARGUMENT_DEFAULTS = {
 
 # The source launch writes every declaration out explicitly so ``--show-args``
 # and the source-layout guards remain useful. This catalogue is the validator's
-# matching public contract; test_launch_layout verifies that it does not drift.
+# matching public launch contract; replay profile stage ownership lives in the
+# ROS-free benchmarking registry.
 CONFIG_LAUNCH_ARGUMENT_NAMES = frozenset({
-    'namespace',
-    'use_sim_time',
-    'world',
-    'color_topic',
-    'estimate_viz',
-    'overlay',
-    'estimators',
-    'scenario',
-    'repeats',
-    'output_dir',
-    'settle_sec',
-    'capture_sec',
-    'replay_dataset_dir',
-    'capture_batches',
-    'capture_drain_sec',
-    'capture_timeout_sec',
-    'depth_topic',
-    'camera_info_topic',
-    'depth_source',
-    'isolation_2d',
-    'isolation_2d_bin_width_m',
-    'isolation_2d_band_m',
-    'isolation_2d_min_bin_fraction',
-    'min_valid_pixels',
-    'isolation_3d',
-    'isolation_3d_floor_margin_m',
-    'isolation_3d_percentile',
-    'isolation_3d_ahead_m',
-    'isolation_3d_behind_m',
-    'isolation_3d_bin_width_m',
-    'isolation_3d_min_bin_fraction',
-    'mask_depth_max_meters',
-    'mask_gate',
-    'depth_match_debug',
-    'record_video',
-    'scan_topic',
-    'pointcloud_topic',
-    'base_frame',
-    'run_dir_name',
+    'namespace', 'use_sim_time', 'world', 'color_topic', 'estimate_viz',
+    'overlay', 'estimators', 'scenario', 'repeats', 'output_dir', 'settle_sec',
+    'capture_sec', 'replay_dataset_dir', 'sensor_capture_dir', 'capture_batches',
+    'capture_drain_sec', 'capture_timeout_sec', 'depth_topic',
+    'camera_info_topic', 'depth_source', 'isolation_2d',
+    'isolation_2d_bin_width_m', 'isolation_2d_band_m',
+    'isolation_2d_min_bin_fraction', 'min_valid_pixels', 'isolation_3d',
+    'isolation_3d_floor_margin_m', 'isolation_3d_percentile',
+    'isolation_3d_ahead_m', 'isolation_3d_behind_m',
+    'isolation_3d_bin_width_m', 'isolation_3d_min_bin_fraction',
+    'mask_depth_max_meters', 'mask_gate', 'depth_match_debug', 'record_video',
+    'scan_topic', 'pointcloud_topic', 'base_frame', 'run_dir_name',
     'shutdown_on_complete',
 })
 
 ENV_LAYER_CONFIG_KEYS = frozenset({
-    'world',
-    'setup_path',
-    'namespace',
-    'use_sim_time',
-    'color_topic',
-    # The detector lives in the persistent layer, so its rate and diagnostic
-    # are properties of a whole sweep. A per-config value would silently apply
-    # to every other config too.
-    'detector_fps',
-    'detector_debug',
+    'world', 'setup_path', 'namespace', 'use_sim_time', 'color_topic',
+    'detector_fps', 'detector_debug',
 })
-
 
 def workspace_root_from_package_share(package_share: str) -> str:
     return os.path.abspath(os.path.join(package_share, '..', '..', '..', '..'))

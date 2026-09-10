@@ -3,9 +3,7 @@
 from __future__ import annotations
 
 import numpy as np
-from sensor_msgs.msg import Image
 
-from ridgeback_autonomy.common.markers import PolarBeamRecord
 from ridgeback_autonomy.common.miss_reason import MissReason
 from ridgeback_autonomy.perception.target_localization.core.box_gate import (
     MAX_BOX_FRAME_FRACTION,
@@ -204,6 +202,10 @@ def fill_path_measurements(
                 else:
                     selected = attempt.selected_beams
                     merged = np.empty(0, dtype=np.intp)
+                # Marker message dependencies stay outside this pure measurement
+                # module until visualization is actually requested. Offline
+                # depth replay never imports geometry/std/visualization_msgs.
+                from ridgeback_autonomy.common.markers import PolarBeamRecord
                 beam_records.append(PolarBeamRecord(
                     detection_index=index,
                     selected=selected,
@@ -232,13 +234,15 @@ def nearest_beam_record(batch, beam_records):
     return beam_records[0]
 
 
-def encode_mask_debug_image(masks, image_height: int, image_width: int, header) -> Image:
+def encode_mask_debug_image(masks, image_height: int, image_width: int, header):
     """Union of the frame's mask regions as a ``mono8`` Image (255 = object).
 
     Each region is blitted into the one output buffer. Materializing a
     full-frame mask per detection first would allocate the whole image once per
     detection to produce the same bytes.
     """
+
+    from sensor_msgs.msg import Image
 
     union = np.zeros((image_height, image_width), dtype=np.uint8)
     for mask in masks:

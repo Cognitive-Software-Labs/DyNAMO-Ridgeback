@@ -1,11 +1,20 @@
 # Plan: layered replay profiles and derived evidence caches
 
-Status: **PROPOSED — REVIEW REQUIRED.** This plan extends the validated offline
+Status: **IMPLEMENTED — LIVE VALIDATION GATES REMAIN.** This plan extends the validated offline
 measurement replay so an operator can choose the earliest stage to rerun. It is
 not authorization to change a production measurement default or to treat
 offline results as latency, throughput, transport, or integration evidence.
 
 Prepared 2026-09-09 against `aafa4385`.
+
+Implemented 2026-09-10 in the non-GUI benchmark core: shared profiles/jobs,
+typed sensor and mask-cache artifacts, exact-evidence runner capture, box and
+SlimSAM materializers, projective/Euclidean cache replay, atomic outputs, and
+the three generalized commands. Unit/compatibility/import/determinism tests and
+a preliminary lossless storage spike pass. A fresh full live sensor capture,
+box/SlimSAM live parity, real full-frame storage/scaling measurements, and a
+candidate checkpoint run remain required before this plan can move to history;
+see `docs/history/layered_replay_implementation_validation.md`.
 
 ## Decision
 

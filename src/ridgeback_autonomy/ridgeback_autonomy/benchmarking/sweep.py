@@ -13,7 +13,7 @@ from ridgeback_autonomy.perception.target_localization.estimator_registry import
     MASK_ESTIMATORS,
     parse_estimators,
 )
-from ridgeback_autonomy.perception.target_localization.launch import (
+from ridgeback_autonomy.benchmarking.replay_profiles import (
     CONFIG_LAUNCH_ARGUMENT_NAMES,
     ENV_LAYER_CONFIG_KEYS,
 )
