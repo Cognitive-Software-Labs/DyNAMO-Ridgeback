@@ -32,14 +32,15 @@ wall/shelf (else the map comes back mostly unknown). mock_hospital and
 g1_distance_calibration keep their exact SDF path (gt_occupancy.py) — this tool
 is for the mesh-only stock worlds.
 
-Plane default 0.418 m = the front UST-10LX height in the committed robot USD,
-matching gt_occupancy.py.
+Plane default = the front UST-10LX height in the committed robot USD. It is
+imported from gt_occupancy.py rather than restated here: the two constants
+were separate copies until 2026-09-10, which is exactly how a stale slice
+height survives a geometry fix in one of them.
 """
 from __future__ import annotations
 
 import argparse
 import sys
-from collections import deque
 from pathlib import Path
 
 import numpy as np
@@ -48,11 +49,14 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]
                        / "src/ridgeback_autonomy/sim/isaac"))
 
-LIDAR_PLANE_Z = 0.418
+# One slice height, one flood-fill, one map writer -- all owned by
+# gt_occupancy. These were separate copies until 2026-09-10, which is exactly
+# how a stale slice height survives a geometry fix in only one of them.
+from gt_occupancy import (  # noqa: E402
+    LIDAR_PLANE_Z, flood_free, write_map_set,
+)
+
 RESOLUTION = 0.05
-PX_FREE = 254
-PX_OCC = 0
-PX_UNKNOWN = 205
 
 
 def parse_args():
@@ -230,34 +234,6 @@ def _rasterize(segs, cell, bounds):
     return occ, (xmin, ymin)
 
 
-def _flood_free(occ, origin, seed_xy, cell):
-    """Free = flood-fill of non-occupied cells reachable from seed; the rest is
-    unknown. Nearest non-occupied cell is used if the seed lands on a wall."""
-    ny, nx = occ.shape
-    sx = int((seed_xy[0] - origin[0]) / cell)
-    sy = int((seed_xy[1] - origin[1]) / cell)
-    sx = min(max(sx, 0), nx - 1)
-    sy = min(max(sy, 0), ny - 1)
-    if occ[sy, sx]:                      # nudge to the nearest open cell
-        openc = np.argwhere(~occ)
-        if openc.size == 0:
-            return np.zeros_like(occ)
-        d = np.abs(openc[:, 0] - sy) + np.abs(openc[:, 1] - sx)
-        sy, sx = openc[d.argmin()]
-    free = np.zeros_like(occ)
-    q = deque([(int(sy), int(sx))])
-    free[sy, sx] = True
-    while q:
-        y, x = q.popleft()
-        for dy, dx in ((1, 0), (-1, 0), (0, 1), (0, -1)):
-            ny_, nx_ = y + dy, x + dx
-            if 0 <= ny_ < ny and 0 <= nx_ < nx and not free[ny_, nx_] \
-                    and not occ[ny_, nx_]:
-                free[ny_, nx_] = True
-                q.append((ny_, nx_))
-    return free
-
-
 def generate(app, args) -> int:
     import omni.usd
     from pxr import UsdGeom
@@ -318,53 +294,15 @@ def generate(app, args) -> int:
         inb = (mx >= xlo) & (mx <= xhi) & (my >= ylo) & (my <= yhi)
         seed = (float(np.median(mx[inb])) * mpu,
                 float(np.median(my[inb])) * mpu)
-    free = _flood_free(occ, (ox_m, oy_m), seed, args.cell_size)
+    free = flood_free(occ, (ox_m, oy_m), seed, args.cell_size)
     unknown = ~occ & ~free
     ny, nx = occ.shape
     print(f"grid {nx}x{ny}: occ={int(occ.sum())} free={int(free.sum())} "
           f"unknown={int(unknown.sum())} origin=({ox_m:.3f},{oy_m:.3f})",
           flush=True)
-    return _write_outputs(args, occ, free, unknown, nx, ny, ox_m, oy_m)
-
-
-def _write_outputs(args, occ, free, unknown, nx, ny, xmin, ymin) -> int:
-    """.npz keeps the bottom-first (origin = lower-left) convention
-    gt_occupancy.load_grid expects; the ROS pgm is flipped to top-first."""
-    from PIL import Image
-
-    stem = args.name or args.world
-    out = args.out
-    out.mkdir(parents=True, exist_ok=True)
-    res_m = args.cell_size
-
-    grid = np.zeros((ny, nx), dtype=np.uint8)
-    grid[occ] = 100
-    np.savez_compressed(
-        out / f"{stem}.npz", grid=grid, ignore=unknown,
-        origin=np.array([xmin, ymin]), resolution=res_m, plane_z=args.plane_z)
-
-    px = np.full((ny, nx), PX_UNKNOWN, dtype=np.uint8)
-    px[free] = PX_FREE
-    px[occ] = PX_OCC
-    Image.fromarray(np.flipud(px), mode="L").save(out / f"{stem}.pgm")
-    (out / f"{stem}.yaml").write_text(
-        f"image: {stem}.pgm\n"
-        f"mode: trinary\n"
-        f"resolution: {res_m:.4f}\n"
-        f"origin: [{xmin:.4f}, {ymin:.4f}, 0]\n"
-        f"negate: 0\n"
-        f"occupied_thresh: 0.65\n"
-        f"free_thresh: 0.196\n")
-
-    rgb = np.full((ny, nx, 3), 255, dtype=np.uint8)
-    rgb[unknown] = (255, 200, 120)
-    rgb[occ] = (0, 0, 0)
-    Image.fromarray(rgb[::-1]).resize((nx * 2, ny * 2), Image.NEAREST).save(
-        out / f"{stem}.png")
-
-    print(f"wrote {out}/{stem}.{{pgm,yaml,png,npz}} — {nx}x{ny} @ {res_m} m, "
-          f"origin ({xmin:.3f},{ymin:.3f})", flush=True)
-    return 0
+    return write_map_set(args.out, args.name or args.world, occ, free,
+                         unknown, (ox_m, oy_m), args.cell_size,
+                         args.plane_z)
 
 
 def main():

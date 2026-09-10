@@ -34,16 +34,26 @@ Canonical maps (analytic, from the Isaac stock world USDs):
 
 | World | Size | Resolution | Origin | Source |
 |-------|------|------------|--------|--------|
-| warehouse | 440×680 px (22×34 m) | 0.05 m/px | [-11.430, -13.200, 0] | `generate_gt_map.py` |
+| warehouse | 440×680 px (22×34 m) | 0.05 m/px | [-11.430, -13.200, 0] | `generate_gt_map.py --origin=0.2,6.12` |
 | warehouse_full | 680×1160 px (34×58 m) | 0.05 m/px | [-27.430, -24.400, 0] | `generate_gt_map.py --origin=-10,5` |
 | office | 760×2040 px (38×102 m) | 0.05 m/px | [-27.075, -37.673, 0] | `generate_gt_map.py` |
 | hospital | 1560×880 px (78×44 m) | 0.05 m/px | [-49.440, -5.450, 0] | `generate_gt_map.py` |
 
-`warehouse_full` (the shelved variant — 7 racking rows, a real exploration
-workout vs the near-empty `warehouse`) needs an explicit `--origin` on open
-floor: its geometry is so dense that the auto-seed centroid lands *on* a shelf
-and the free-space flood never fills (`free=277`). `--origin=-10,5` seeds the
-staging area (note the `=`; argparse eats a bare `-10,5` as a flag).
+**Slice height.** All four are sliced at the 2D lidar plane, `LIDAR_PLANE_Z` in
+`tools/isaac/gt_occupancy.py` (`generate_gt_map.py` imports it — one owner, so
+a geometry fix cannot land in only one copy). It is **0.3024 m** = the front
+UST-10LX 0.2264 m above `base_link` plus the resting `spawn_z` 0.076 m. It was
+0.418 m until 2026-09-10, when the lidars were found mounted 11.6 cm too high;
+**every map sliced before that date is stale and so is every coverage number
+measured against one.** Regenerate after any change to the lidar mounting in
+`clearpath/robot.yaml`.
+
+`warehouse` and `warehouse_full` both need an explicit `--origin` on open
+floor: their geometry is dense enough that the auto-seed centroid lands *on* a
+shelf and the free-space flood never fills (`free=277` for `warehouse_full`;
+`free=3` for `warehouse` at the 0.3024 m plane, where the seed that used to
+work at 0.418 m now lands inside a rack). Note the `=` — argparse eats a bare
+`-10,5` as a flag.
 
 Each ships a `.npz` alongside the `.pgm`/`.yaml`/`.png` (grid + unknown mask +
 origin/resolution) for `tools/isaac/coverage_ceiling.py`. Standard ROS
@@ -58,9 +68,9 @@ different, retired world geometry).
 
 PNG previews live next to each `.pgm` (regenerate with `render_previews.py`):
 
-| mock_hospital | warehouse | office |
-|---|---|---|
-| ![mock_hospital](mock_hospital.png) | ![warehouse](warehouse.png) | ![office](office.png) |
+| warehouse | warehouse_full | office | hospital |
+|---|---|---|---|
+| ![warehouse](warehouse.png) | ![warehouse_full](warehouse_full.png) | ![office](office.png) | ![hospital](hospital.png) |
 
 ## Tools (this folder)
 

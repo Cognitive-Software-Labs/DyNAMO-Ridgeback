@@ -18,15 +18,18 @@ Pure python + numpy (parse layer of sdf2usd has no pxr dependency):
         src/ridgeback_autonomy/sim/worlds/mock_hospital.sdf \
         /tmp/gt_hospital.npz --png /tmp/gt_hospital.png
 
-The lidar plane default (0.418 m) is the front UST-10LX height in the
-committed robot USD (0.342 m above base_link) plus the resting spawn_z
-(0.076 m).
+The lidar plane default (0.3024 m) is the front UST-10LX height in the
+committed robot USD (0.2264 m above base_link) plus the resting spawn_z
+(0.076 m). It was 0.418 until 2026-09-10, when the lidars were found to be
+mounted 11.6 cm too high -- parented to the top deck instead of recessed in
+the body's notch. Every map sliced before that date is stale.
 """
 from __future__ import annotations
 
 import argparse
 import math
 import sys
+from collections import deque
 from pathlib import Path
 
 import numpy as np
@@ -34,8 +37,11 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).parent))
 from sdf2usd import parse_world  # noqa: E402  (dependency-free parse layer)
 
-LIDAR_PLANE_Z = 0.418
+LIDAR_PLANE_Z = 0.3024
 RESOLUTION = 0.05
+PX_FREE = 254
+PX_OCC = 0
+PX_UNKNOWN = 205
 
 
 def _geom_world_pose(model_pose, geom_pose):
@@ -171,6 +177,83 @@ def save_png(grid, ignore, path, scale=3):
     im = Image.fromarray(img[::-1])            # world y-up -> image y-down
     im = im.resize((nx * scale, ny * scale), Image.NEAREST)
     im.save(path)
+
+
+def flood_free(occ, origin, seed_xy, cell):
+    """Free = flood-fill of non-occupied cells reachable from seed; the rest is
+    unknown. Nearest non-occupied cell is used if the seed lands on a wall.
+
+    Without this, every cell the rasterizer did not paint reads as free --
+    including the band outside the building, which inflates the gt-free
+    denominator every coverage percentage divides by.
+    """
+    ny, nx = occ.shape
+    sx = int((seed_xy[0] - origin[0]) / cell)
+    sy = int((seed_xy[1] - origin[1]) / cell)
+    sx = min(max(sx, 0), nx - 1)
+    sy = min(max(sy, 0), ny - 1)
+    if occ[sy, sx]:                      # nudge to the nearest open cell
+        openc = np.argwhere(~occ)
+        if openc.size == 0:
+            return np.zeros_like(occ)
+        d = np.abs(openc[:, 0] - sy) + np.abs(openc[:, 1] - sx)
+        sy, sx = openc[d.argmin()]
+    free = np.zeros_like(occ)
+    q = deque([(int(sy), int(sx))])
+    free[sy, sx] = True
+    while q:
+        y, x = q.popleft()
+        for dy, dx in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+            ny_, nx_ = y + dy, x + dx
+            if 0 <= ny_ < ny and 0 <= nx_ < nx and not free[ny_, nx_] \
+                    and not occ[ny_, nx_]:
+                free[ny_, nx_] = True
+                q.append((ny_, nx_))
+    return free
+
+
+def write_map_set(out_dir, stem, occ, free, unknown, origin, resolution,
+                  plane_z) -> int:
+    """Write the canonical `<stem>.{npz,pgm,yaml,png}` set.
+
+    The .npz keeps the bottom-first (origin = lower-left) convention
+    `load_grid` expects; the ROS pgm is flipped to top-first.
+    """
+    from PIL import Image
+
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    ny, nx = occ.shape
+    xmin, ymin = origin
+
+    grid = np.zeros((ny, nx), dtype=np.uint8)
+    grid[occ] = 100
+    np.savez_compressed(
+        out_dir / f"{stem}.npz", grid=grid, ignore=unknown,
+        origin=np.array([xmin, ymin]), resolution=resolution, plane_z=plane_z)
+
+    px = np.full((ny, nx), PX_UNKNOWN, dtype=np.uint8)
+    px[free] = PX_FREE
+    px[occ] = PX_OCC
+    Image.fromarray(np.flipud(px), mode="L").save(out_dir / f"{stem}.pgm")
+    (out_dir / f"{stem}.yaml").write_text(
+        f"image: {stem}.pgm\n"
+        f"mode: trinary\n"
+        f"resolution: {resolution:.4f}\n"
+        f"origin: [{xmin:.4f}, {ymin:.4f}, 0]\n"
+        f"negate: 0\n"
+        f"occupied_thresh: 0.65\n"
+        f"free_thresh: 0.196\n")
+
+    rgb = np.full((ny, nx, 3), 255, dtype=np.uint8)
+    rgb[unknown] = (255, 200, 120)
+    rgb[occ] = (0, 0, 0)
+    Image.fromarray(rgb[::-1]).resize((nx * 2, ny * 2), Image.NEAREST).save(
+        out_dir / f"{stem}.png")
+
+    print(f"wrote {out_dir}/{stem}.{{pgm,yaml,png,npz}} — {nx}x{ny} @ "
+          f"{resolution} m, origin ({xmin:.3f},{ymin:.3f})", flush=True)
+    return 0
 
 
 def load_grid(npz_path):
