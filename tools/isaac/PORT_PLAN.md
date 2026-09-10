@@ -155,6 +155,24 @@ Three commits that sit outside the phase numbering (they refine P4/P7 deliverabl
 
 Validation still owed: fresh-boot run with `odom_noise:=0` first (perfect odom isolates the merge geometry from the drift lever P5 already measured), then the noisy case. Confirm there whether Isaac really does stamp front and rear identically — if it does, the motion-compensation path is dead code in sim and only the real robot exercises it.
 
+### Vendor chassis graft (2026-09-10, branch `feat/isaac-vendor-chassis`)
+
+The URDF importer produced a coarse body — open gaps under the deck, **no rear end panel at all**, flat untextured materials. NVIDIA ships an authored Ridgeback in the Isaac asset catalog (`/Isaac/Robots/Clearpath/RidgebackUr/ridgeback_ur5.usd`, BSD-3-Clause, Clearpath Robotics, from `ridgeback_manipulation`) whose hull matches ours to a few mm but is closed, chamfered and textured. `tools/isaac/extract_vendor_chassis.py` pulls the chassis out; `import_ridgeback_urdf.py:graft_vendor_chassis` references it and hides the 12 imported prims it replaces.
+
+- **Geometry needed no re-referencing.** Both models bottom out at z = −0.0262 (wheel contact plane) and agree in y to 1.4 mm, so the vendor root *is* our `base_link` and the tape-measured 0.179 lidar mount carries over untouched. Verified after regen: laser frames at `(±0.3922, 0, 0.2264)`.
+- **Wheels stay ours** (articulated, they spin); the vendor drives its base as one rigid body with static wheels, so taking theirs would double them. The UR5, its mount plate, the dummy joint chain and the vendor `physicsScene` are dropped — a second articulation root would fight ours.
+- **Collider: `convexHull`, decided 2026-09-10.** Measured on the chassis collision mesh: true volume 0.15968 m³, `convexHull` 0.17064 (**+6.9 %**), the AABB `Cube` it replaces 0.20018 (**+25.4 %**). The hull keeps 119 verts / 234 facets against the source's 972 / 324, so it tracks the real form; what it over-claims is the underside cavity between the wheels, which the wheel cylinders already occupy and nothing else reaches. `convexDecomposition` would chase that last 6.9 % at per-step contact cost — rejected. Compare them with `tools/isaac/inspect_robot.py --compare-colliders`.
+- **Self-occlusion cleared, and an earlier theory refuted.** In `sim/isaac/usd/worlds/empty.usda` (added for this — floor slab, nothing else, so any finite return is necessarily the robot seeing itself) both lidars read **0/1081 finite bins** across the full ±135°, before *and* after the graft. The "grazing the side cover at 0.52 m" explanation for the Nav2 stall was **wrong**; that geometry never occluded the lidars.
+
+Two traps this uncovered, both silent:
+
+- `import_ridgeback_urdf.py` `rmtree`s the entire committed robot directory during its flatten step, which also deletes the vendored chassis and its licence. They are now stashed and restored across the rebuild.
+- Kit runs with `--/app/fastShutdown=True`, so `app.close()` **hard-exits the process** — a post-processing step appended after `import_urdf_to_usd()` returns never runs, while the script still prints `IMPORT OK` and exits 0. Anything post-import must sit inside, before the close.
+
+Known defect, not addressed: the **D435 floats at z = 1.145–1.170 m** with no supporting structure — `robot.yaml` parents it to `default_mount` (the 0.295 deck) with a further `xyz: [0.3, 0, 0.85]`. Owner confirms the real robot has a mast, so the height is right and the *mast geometry* is what the model lacks. Same shape of error as the lidar mount, opposite resolution. Camera plays no part in SLAM, collision monitoring or any benchmark (every run uses `camera:=false`).
+
+⚠️ **Rerun debt grows again:** the graft changes rendered geometry the RTX lidar raytraces, so the GT slice wants re-checking and every coverage number is void until it is.
+
 ### P8 — Gazebo removal + docs + graphify [M]
 - `.repos`: remove `clearpath_simulator` (stay-list above). Delete `patches/clearpath_gz_customizations.patch`, `sim/gz_plugins/` (SpawnG1.*). CMakeLists drops gz/Qt5 + SpawnG1; package.xml drops `clearpath_gz`/gz vendors/Qt5, adds `robot_localization`.
 - `simulation.launch.py` becomes the Isaac include (dispatch/`sim`/`gz_gui` die; `headless_rendering` semantics = Isaac headless + `livestream` arg; `sim_ready_timeout` settles 300).
