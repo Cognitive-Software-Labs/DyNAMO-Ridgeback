@@ -397,40 +397,40 @@ Cohesion: 0.25
 Nodes (5): BenchmarkCollageRenderer, PanelContext, The colour frame every estimator's panel is drawn on, or a placeholder., MeasurementEvent, ndarray
 
 ### Community 52 - "Community 52"
-Cohesion: 0.18
-Nodes (18): build_target_localization_nodes(), The measurement and display stack for the estimator rows this run selected., build_benchmark_nodes(), parse_estimators(), parse_mask_gate(), Validate the run-level ``mask_gate`` parameter (``box`` | ``silhouette``)., selected_mask_estimators(), selected_pointcloud_estimators() (+10 more)
-
-### Community 53 - "Community 53"
 Cohesion: 0.11
 Nodes (9): Collection, DepthMatchDiagnostics, Counts why the depth input lookup hits or misses, for one run.      Answers thre, Account for one depth callback and resolve any earlier miss., test_depth_match_diagnostics_accounts_for_scheduling_and_lock_timing(), test_depth_match_diagnostics_bounds_stamp_only_miss_records(), test_depth_match_diagnostics_keeps_permanent_gap_unresolved(), test_depth_match_diagnostics_reports_stages_and_batch_outcomes() (+1 more)
 
-### Community 54 - "Community 54"
+### Community 53 - "Community 53"
 Cohesion: 0.12
 Nodes (15): PolarBeamRecord, The beam sets for one detection, all indexing the original scan array.      ``se, CameraInfo, MissReason, PolarBeamRecord, MissReason, Allocate debug records only while the ray topic has a subscriber., Stamp a frame-level miss reason on the enabled mask estimators of         every (+7 more)
 
-### Community 55 - "Community 55"
+### Community 54 - "Community 54"
 Cohesion: 0.16
 Nodes (18): deproject_masked(), deproject_pixel(), intrinsics_from_camera_info(), project_points(), Camera intrinsics and inverse pinhole deprojection for the localization paths., Vectorized inverse pinhole over the masked pixels only.      ``rows`` / ``cols``, Read the intrinsics out of a ``sensor_msgs/CameraInfo``-shaped object.      Duck, Inverse pinhole projection of one pixel (projective ranging Section 2.4).      ` (+10 more)
 
-### Community 56 - "Community 56"
+### Community 55 - "Community 55"
 Cohesion: 0.18
 Nodes (18): frontier_mask(), get_frontier_clusters(), is_frontier_point(), Checks if a point is a valid frontier (A FREE cell next to an UNKNOWN cell)., Group adjacent frontier points into clusters (8-connectivity flood fill).      R, Boolean mask of frontier cells: FREE cells 4-adjacent to an UNKNOWN cell.      V, _as_cluster_sets(), _grid() (+10 more)
 
-### Community 57 - "Community 57"
+### Community 56 - "Community 56"
 Cohesion: 0.22
 Nodes (15): _color_message(), _make_node(), The cadence must not stretch by however long inference took.      The clock used, Injected in place of OwlV2Detector: no torch, scripted detect().      ``load()``, Poll until the worker thread has made the expected progress., _StubDetector, test_default_rate_and_period_agree(), test_diagnostics_are_off_by_default_and_cost_nothing() (+7 more)
 
-### Community 58 - "Community 58"
+### Community 57 - "Community 57"
 Cohesion: 0.22
 Nodes (17): bgr_frame_to_pil(), convert_color_image_message(), convert_depth_to_meters_message(), decode_buffer(), decode_image_message(), normalize_to_uint8(), dtype, Image (+9 more)
 
-### Community 59 - "Community 59"
+### Community 58 - "Community 58"
 Cohesion: 0.14
 Nodes (16): Path, _imports_from(), _imports_in_source(), Keep common <- perception <- benchmarking as a one-way dependency chain., Resolve absolute, parent-package, and relative static import edges., Keep pure/reusable target layers below their ROS orchestration modules., Keep the benchmark runner as the top orchestration layer., Keep every generic target topic literal in the contracts module. (+8 more)
 
-### Community 60 - "Community 60"
+### Community 59 - "Community 59"
 Cohesion: 0.15
 Nodes (18): TargetMeasurements, _array_value(), collect_readings(), estimator_reading(), EstimatorReading, merged_distance_reader(), nearest_detection_index(), Select one coherent estimator snapshot for every visualization surface.  This mo (+10 more)
+
+### Community 60 - "Community 60"
+Cohesion: 0.20
+Nodes (16): build_target_localization_nodes(), The measurement and display stack for the estimator rows this run selected., build_benchmark_nodes(), parse_estimators(), parse_mask_gate(), Validate the run-level ``mask_gate`` parameter (``box`` | ``silhouette``)., selected_mask_estimators(), selected_pointcloud_estimators() (+8 more)
 
 ### Community 61 - "Community 61"
 Cohesion: 0.11
@@ -557,44 +557,44 @@ Cohesion: 0.27
 Nodes (10): display_distance(), nearest_instance_index(), Index of the closest detection, or ``None`` when nothing is rankable.      The s, The one distance that speaks for a detection, in canonical order.      ``read_di, ``(estimator, index) -> distance`` from a ``{index: {estimator: value}}``., reader_from(), test_a_frame_no_estimator_placed_ranks_to_nothing(), test_canonical_order_decides_which_estimator_speaks_for_a_detection() (+2 more)
 
 ### Community 92 - "Community 92"
+Cohesion: 0.20
+Nodes (10): distance_hud_node(), estimate_viz_node(), _measurement_parameters(), overlay_node(), pointcloud_measurement_node(), Fixed topic wiring plus whichever tuning values the caller supplied.      ``None, The ``pointcloud`` row's producer, wired to the shared measurement topic.      S, The estimator rings and the distance panel that names them.      ``estimators`` (+2 more)
+
+### Community 93 - "Community 93"
 Cohesion: 0.31
 Nodes (3): main(), VelocityOverlayNode, Node
 
-### Community 93 - "Community 93"
+### Community 94 - "Community 94"
 Cohesion: 0.25
 Nodes (8): build_readiness_gate(), Per-configuration measurement, visualization, and runner benchmark layer., Start the config stack only after the persistent layer is genuinely ready., _resolved_topic(), build_detector(), Resolve the compatibility color override before starting the detector., The camera topic set, with whichever launch arguments the caller declares., resolved_camera_inputs()
 
-### Community 94 - "Community 94"
+### Community 95 - "Community 95"
 Cohesion: 0.39
 Nodes (8): Path, _dataset(), _job(), Focused contract and safety tests for the local benchmark configurator., test_canonical_job_import_round_trips(), test_import_export_round_trip_is_stable(), test_mask_model_is_enabled_and_reports_its_required_sensor_input(), test_server_requires_token_and_serves_assets_through_a_symlink()
 
-### Community 95 - "Community 95"
+### Community 96 - "Community 96"
 Cohesion: 0.32
 Nodes (7): detection_status(), event_has_panel_preview(), has_all_selected_estimates(), Pure value accessors shared by live capture and offline replay., Return one estimator's status code for one detection-like value., Whether this event's collage panels can be drawn at all., Any
 
-### Community 96 - "Community 96"
+### Community 97 - "Community 97"
 Cohesion: 0.25
 Nodes (7): box_within_frame_fraction(), Pure detector-box acceptance policy shared by live and replay paths., True if the detector box covers at most ``max_fraction`` of the frame., test_box_within_frame_fraction_accepts_normal_box(), test_box_within_frame_fraction_boundary_at_max_fraction(), test_box_within_frame_fraction_degenerate_frame_is_rejected(), test_box_within_frame_fraction_rejects_near_full_frame_box()
 
-### Community 97 - "Community 97"
+### Community 98 - "Community 98"
 Cohesion: 0.25
 Nodes (8): merge_near_band(), Split the selected rays into contiguous runs (doc Section 2.5 step 1).      ``pl, Merge the runs within a range band of the nearest run (step 2).      Convention, segment_range_profile(), Why the bearing-gap split went: ``merge_near_band`` undoes it anyway.      Segme, test_beam_gaps_do_not_separate_two_objects_at_the_same_range(), test_merge_near_band_keeps_both_legs_only(), test_segment_range_profile_splits_on_range_jump_only()
 
-### Community 99 - "Community 99"
+### Community 100 - "Community 100"
 Cohesion: 0.25
 Nodes (4): Get robot position in map frame., Main exploration loop., Cancel the active Nav2 goal, if any., Cancel the goal if the robot has made no progress toward it.          Stall-base
 
-### Community 100 - "Community 100"
+### Community 101 - "Community 101"
 Cohesion: 0.25
 Nodes (4): Check if a goal position has enough clearance from obstacles.                  C, Return True if pos is too close to a recently-visited goal., Return the goal position for a cluster.          Advances PAST the frontier boun, Find the best safe, non-blacklisted frontier.          Selection strategy (tier-
 
-### Community 101 - "Community 101"
+### Community 102 - "Community 102"
 Cohesion: 0.29
 Nodes (4): Select a new frontier goal., Publish frontier cluster centroids as spheres for RViz., Convert grid coordinates to world coordinates., Send goal to Nav2 NavigateToPose action. Returns True if sent.
-
-### Community 102 - "Community 102"
-Cohesion: 0.25
-Nodes (8): estimate_viz_node(), mask_measurement_node(), _measurement_parameters(), overlay_node(), Fixed topic wiring plus whichever tuning values the caller supplied.      ``None, The three mask rows' producer, wired to the shared measurement topic.      ``bas, The estimator rings and the distance panel that names them.      ``estimators``, The camera overlay, one panel per selected path, packed into one row.      ``max
 
 ### Community 104 - "Community 104"
 Cohesion: 0.29
@@ -712,11 +712,11 @@ Nodes (3): enabledMcpjsonServers, permissions, allow
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `TargetDistanceBenchmarkRunner` connect `Community 5` to `Community 0`, `Community 10`, `Community 16`, `Community 51`, `Community 52`, `Community 92`, `Community 30`?**
+- **Why does `TargetDistanceBenchmarkRunner` connect `Community 5` to `Community 0`, `Community 10`, `Community 16`, `Community 51`, `Community 60`, `Community 93`, `Community 30`?**
   _High betweenness centrality (0.062) - this node is a cross-community bridge._
-- **Why does `TargetMaskMeasurementNode` connect `Community 17` to `Community 32`, `Community 70`, `Community 12`, `Community 13`, `Community 77`, `Community 79`, `Community 18`, `Community 53`, `Community 54`, `Community 92`?**
+- **Why does `TargetMaskMeasurementNode` connect `Community 17` to `Community 32`, `Community 70`, `Community 12`, `Community 13`, `Community 77`, `Community 79`, `Community 18`, `Community 52`, `Community 53`, `Community 93`?**
   _High betweenness centrality (0.055) - this node is a cross-community bridge._
-- **Why does `parse_estimators()` connect `Community 52` to `Community 0`, `Community 3`, `Community 6`, `Community 40`, `Community 42`, `Community 80`, `Community 27`, `Community 61`, `Community 62`?**
+- **Why does `parse_estimators()` connect `Community 60` to `Community 0`, `Community 3`, `Community 6`, `Community 40`, `Community 42`, `Community 80`, `Community 27`, `Community 61`, `Community 62`?**
   _High betweenness centrality (0.049) - this node is a cross-community bridge._
 - **Are the 81 inferred relationships involving `ValueError` (e.g. with `_inspect_job_inputs()` and `main()`) actually correct?**
   _`ValueError` has 81 INFERRED edges - model-reasoned connections that need verification._
