@@ -94,20 +94,38 @@ On `mock_hospital`, `odom_noise:=0`, deterministic, camera off, isolated domain:
 - merged scan `range_max` 10.3922, slam_toolbox subscribed, map at 0.05 m
 - 326 finite returns in the rear-only sector (|θ|>135°) the front cannot see
 
-## Your objective
+## Your objective — correctness only, no benchmarking
 
-1. **Unblock navigation** (`open-issues.md` §1). Nothing downstream can be
-   measured until the robot moves.
-2. **Seat the robot** (§2), then regenerate the ground-truth maps once — the
-   seat fix moves the slice plane for stock worlds and invalidates them again,
-   so do it in that order, not the reverse.
-3. **Then the baselines**, then the P5 A/B (3–5 seeds per condition; single
-   runs prove nothing at 51–83% variance).
-4. **Then Isaac 6.1** (`port-plan.md` §P9), and only then P8. The 6.1 move is
-   sequenced after a baseline on purpose: it is the only way to tell whether
-   the upgrade helped, and it may let several 6.0.1 workarounds be deleted
-   outright. Do not migrate first — you would change the platform with nothing
-   to compare against.
+**Do not run baselines, A/B comparisons, or coverage benchmarks this session.**
+They are explicitly out of scope. `open-issues.md` §3 and §6 stay open and
+untouched; do not let "just one run to see" pull you into a 45-minute
+exploration run that cannot produce a trustworthy number anyway.
+
+1. **Unblock navigation** — `open-issues.md` §1. The robot never moves:
+   `collision_monitor` emits zero `cmd_vel` while the controller is healthy.
+   Five hypotheses are already dead **by measurement**; read that table before
+   forming a sixth. The cheapest untried test is one command: echo
+   `/r100_0001/local_costmap/published_footprint` while stalled. Every
+   "inside the footprint" claim on record used an *assumed* hull, and that
+   topic has never actually been read.
+
+2. **Seat the robot** — `open-issues.md` §2. It floats 49.8 mm on every stock
+   world because `--spawn-z 0.076` is tuned for `mock_hospital`'s 0.05 floor.
+   The scan plane rides up with it, so the lidars sample 5 cm high everywhere
+   except `mock_hospital`. Fix shape: `spawn_z = floor_z + 0.0259`, and
+   `LIDAR_PLANE_Z` becomes `floor_z + 0.2523` rather than one constant.
+
+3. **Regenerate the ground-truth maps once**, after the seat fix — it moves
+   the slice plane for stock worlds. This is map *correctness*, not
+   benchmarking: no runs, just `generate_gt_map.py`. `open-issues.md` §4.
+
+4. **Validate the hull collider** — `open-issues.md` §5. Drive into a wall,
+   confirm the robot stops where the geometry says it should. One short
+   manual drive, not a benchmark.
+
+Only if those land and time remains: the `worlds` doc split (world resolution,
+stock envs, spawn/floor heights, GT generation — currently spread across
+`worlds.py`, the maps README, and §2).
 
 ## How to run the stack
 
