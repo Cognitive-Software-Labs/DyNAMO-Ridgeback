@@ -94,12 +94,12 @@ On `mock_hospital`, `odom_noise:=0`, deterministic, camera off, isolated domain:
 - merged scan `range_max` 10.3922, slam_toolbox subscribed, map at 0.05 m
 - 326 finite returns in the rear-only sector (|θ|>135°) the front cannot see
 
-## Your objective — correctness only, no benchmarking
+## Your objective
 
-**Do not run baselines, A/B comparisons, or coverage benchmarks this session.**
-They are explicitly out of scope. `open-issues.md` §3 and §6 stay open and
-untouched; do not let "just one run to see" pull you into a 45-minute
-exploration run that cannot produce a trustworthy number anyway.
+**Out of scope: the G1 distance/detection benchmark (P6).** Do not port it,
+do not run it, do not touch `g1_distance_benchmark.launch.py`, the G1
+perception stack or `G1_DISTANCE_BENCHMARKING.md`. Every exploration run uses
+`g1_perception_enabled:=false` anyway. P6 stays deferred.
 
 1. **Unblock navigation** — `open-issues.md` §1. The robot never moves:
    `collision_monitor` emits zero `cmd_vel` while the controller is healthy.
@@ -107,7 +107,8 @@ exploration run that cannot produce a trustworthy number anyway.
    forming a sixth. The cheapest untried test is one command: echo
    `/r100_0001/local_costmap/published_footprint` while stalled. Every
    "inside the footprint" claim on record used an *assumed* hull, and that
-   topic has never actually been read.
+   topic has never actually been read. Nothing below can be measured until
+   this lands.
 
 2. **Seat the robot** — `open-issues.md` §2. It floats 49.8 mm on every stock
    world because `--spawn-z 0.076` is tuned for `mock_hospital`'s 0.05 floor.
@@ -116,16 +117,24 @@ exploration run that cannot produce a trustworthy number anyway.
    `LIDAR_PLANE_Z` becomes `floor_z + 0.2523` rather than one constant.
 
 3. **Regenerate the ground-truth maps once**, after the seat fix — it moves
-   the slice plane for stock worlds. This is map *correctness*, not
-   benchmarking: no runs, just `generate_gt_map.py`. `open-issues.md` §4.
+   the slice plane for stock worlds, so doing it first wastes the work.
+   `open-issues.md` §4.
 
 4. **Validate the hull collider** — `open-issues.md` §5. Drive into a wall,
-   confirm the robot stops where the geometry says it should. One short
-   manual drive, not a benchmark.
+   confirm the robot stops where the geometry says it should.
 
-Only if those land and time remains: the `worlds` doc split (world resolution,
-stock envs, spawn/floor heights, GT generation — currently spread across
-`worlds.py`, the maps README, and §2).
+5. **Then the exploration baselines** — `open-issues.md` §3, the original
+   request and still unmet. Canonical recipe and the hygiene table are in
+   `../../tools/benchmark/README.md`; every flag there earns its place.
+
+6. **Then the P5 A/B** — 3–5 seeds per condition. Coverage variance ran
+   51–83%, so a single run proves nothing and this box is never genuinely
+   single-tenant.
+
+7. **Then Isaac 6.1** (`port-plan.md` §P9), and only then P8. The 6.1 move is
+   sequenced after a baseline deliberately: it is the only way to tell whether
+   the upgrade helped, and it may let several 6.0.1 workarounds be deleted
+   outright. Do not migrate first.
 
 ## How to run the stack
 
