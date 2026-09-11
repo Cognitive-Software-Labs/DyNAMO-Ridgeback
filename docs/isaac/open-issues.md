@@ -6,7 +6,16 @@ and what each phase delivered; this file holds what is **currently wrong**.
 once they are solved and the writeup is worth keeping.
 
 Last reviewed: **2026-09-11**. Branch `feat/isaac-sim-6-port`.
-`feat/isaac-vendor-chassis` points at an older commit and is redundant.
+
+**Branch state, corrected 2026-09-11.** `feat/isaac-vendor-chassis` was not
+"the same commit, redundant" — it was the branch actually carrying the newest
+work. The `isaac` worktree was checked out on it, so the two handoff-doc
+commits (`74583fbe`, `16afbda8`) landed there while `feat/isaac-sim-6-port`
+and `origin/feat/isaac-sim-6-port` both sat behind at `15348256`.
+`feat/isaac-sim-6-port` has since been fast-forwarded over them (no rewrite;
+it was a strict ancestor) and the worktree now tracks it. `origin` is still
+behind — these commits are **unpushed**. Check `git rev-parse --abbrev-ref HEAD`
+before committing in that worktree.
 
 ---
 
