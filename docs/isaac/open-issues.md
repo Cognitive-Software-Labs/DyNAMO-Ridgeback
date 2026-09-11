@@ -21,12 +21,16 @@ before committing in that worktree.
 
 ## 🔴 Blocking
 
-### 1. `collision_monitor` phantom returns — PRIMARY BAND FIXED, a second band remains
+### 1. `collision_monitor` phantom returns — mechanism found, root fix not yet applied
 
-> **2026-09-11.** Root cause of the *original* latch found, fixed and verified;
-> the robot now drives. It re-stalls later on a **second, distinct** phantom
-> band that had never been recorded. Details in "What was settled" below —
-> read that before re-testing anything here.
+> **2026-09-11.** The mechanism is identified and measured: **the lidar frame
+> does not rotate with the chassis**, so the chassis sweeps underneath a
+> stationary sensor and its own notch edge becomes reachable. A masking
+> mitigation is in place and the robot now drives, but the underlying
+> transform bug is **not fixed**, and a second band (same cause, different
+> notch edge) still re-stalls it. Read this whole section before re-testing —
+> one earlier mechanism here was asserted, retracted, then partly vindicated
+> for a different reason.
 
 **Original symptom.** In `hospital` and `warehouse_full`, the robot planned but
 never drove. Net odom displacement over 25 s was `0.000 m`, and
@@ -41,7 +45,7 @@ Spin/DriveOnHeading recoveries that exceed their time allowance.
 
 #### What was settled on 2026-09-11, by measurement
 
-**Trigger of the original band (mechanism still OPEN).** The band appears only
+**Trigger of the original band.** The band appears only
 while the robot is **moving**: returns at **0.40–0.55 m, bearings +129…+135
 deg, in ~9% of frames, up to 6 points — exactly `collision_monitor`'s
 `min_points: 6`**. That closed a self-sustaining loop: motion → ≥6 phantom
@@ -66,32 +70,74 @@ points → `cmd_vel` zeroed → nav2 recovers by spinning → more motion.
 > 0.40–0.55 m, but 0.4 rad/s is only 0.57 deg per 40 Hz tick — one tick of
 > smear predicts ~3.5 m, not 0.5 m.
 
-**Candidate mechanisms, none tested yet.** Non-handedness plus short ranges
-points at a lag/precision artefact rather than geometry:
+**Candidate mechanisms (the first is now CONFIRMED — see the test below).**
+Non-handedness plus short ranges pointed at a transform/lag artefact rather
+than static geometry:
 
-- **Sensor-pose vs. geometry-snapshot desync** (leading). The lidar prims hang
-  off `base_link`, while `chassis_link` is the PhysX-driven body via the rig's
-  `rz` joint (`carrier_y → chassis_link`). If the RTX geometry snapshot and
-  the sensor pose come from different sub-steps — or if yaw is applied at both
-  `base_link` and `rz` — a transient relative yaw appears, and the near
-  tangency amplifies it enormously (δ of 4 deg suffices). Needs ~175 ms of
-  lag, which is large but not absurd if the BVH refit trails several frames.
+- **Sensor-pose vs. geometry desync** — **CONFIRMED**, and not as a transient
+  slip but in the extreme: the lidar frame does not rotate *at all*. The lidar
+  prims hang off `base_link`, while `chassis_link` is the PhysX-driven body via
+  the rig's `rz` joint (`carrier_y → chassis_link`). Physics writes back to the
+  body; `base_link` and everything parented to it is left at its authored
+  pose. Evidence below.
 - **Intra-sweep pose vs. static geometry** across the 180-deg/tick drum
   transit — same algebra, same required δ.
 - **BVH/precision behaviour on near-tangent triangles**, manifesting only when
   the transform matrix changes between frames.
 
-**Decisive test.** Log the *live* world transforms of `lidar2d_0_laser` and a
-known notch vertex during rotation and diff them against the authored static
-values. Divergence of degrees ⇒ desync, and the geometric story is dead for
-good. Do this before attempting any further fix.
+**Decisive test — RUN, and it fired.** `tools/isaac/diag_rig.py
+--spin-transforms --wz 0.4` spins in place and logs both frames' live world
+yaw. At 0.4 rad/s over 240 frames:
+
+```
+ frame  chassis_tensor  chassis_usd  lidar_usd  lidar-chassis  notch_r_from_lidar
+     1         +0.0318      +0.0396    +0.0000      -0.039565             0.04900
+    60        +20.8174     +20.8174    +0.0000     -20.817398             0.14113
+   120        +43.7384     +43.7384    +0.0000     -43.738361             0.27747
+   240        +89.5848     +89.5848    +0.0000     -89.584766             0.51913
+```
+
+**The lidar prim's USD world yaw never changes — it is pinned at +0.0000
+while the chassis rotates to +89.58 deg.** Not a subtle timing slip: the
+chassis is the PhysX body and gets written back, while `base_link` (and the
+`lidar2d_*_link/..._laser` prims hanging off it) is never updated.
+
+And `notch_r_from_lidar` — the live distance from the emitter to the notch
+vertex — sweeps **0.049 → 0.519 m**, straight through the measured 0.40–0.55 m
+band. The chassis rotates *underneath a stationary sensor frame*, so the
+relative geometry is time-varying and the tangency becomes reachable.
+
+This resurrects a geometric explanation, but for a different reason than the
+retracted one: not "a rigid body's rotation changed its self-occlusion"
+(impossible), but "the sim does not keep the body rigid". It also explains
+every signature at once:
+
+- **stationary is clean** — no relative rotation, the ray diverges from the
+  edge exactly as the static ray-cast found (0/1081);
+- **not handed** — the notch is a 4-fold-symmetric diamond, so either
+  direction sweeps an edge through the same bearing sector;
+- **~9% of frames** — an edge crosses the narrow tangent sector only for part
+  of each revolution;
+- **the second band at +94.5…+97.5 deg** — a different notch edge (they sit
+  90 deg apart) crossing at a different relative yaw. Consistent with the two
+  bands being one bug, as suspected.
+
+> **CAVEAT — do not "fix the pose composition" on this alone.** The test
+> proves the **USD-stage** transform is stale, not that the RTX sensor reads
+> that stale transform; the sensor may take its pose from Fabric/USDRT, which
+> physics *does* update. SLAM having ever worked (RMSE 0.23) is evidence the
+> emitted scan rotates correctly. **Discriminating test:** spin while checking
+> whether *distant* world returns stay consistent with the robot's yaw. If
+> they do, the sensor pose is fine and it is the **chassis geometry** that is
+> mis-transformed in the RTX scene — the inverse desync, same root area, but a
+> different fix.
 
 Reproduced **on demand without nav2**: a bare `cmd_vel` rotation against the
 sim-only layer (`tools/isaac/stall_probe.py`, and the spin/probe recipe in
 `../../tools/benchmark/README.md`). Clean stationary, phantoms while rotating,
 both directions, clean again on stop.
 
-**Mitigation** (not a fix — the mechanism is unknown, see above).
+**Mitigation** (masks the symptom; the transform bug above is the real fix).
 `LidarScanAssembler.EDGE_MASK_DEG = 10.0` (`sim/isaac/ros_io.py`)
 drops the outer 10 deg of each 270 deg window — 40 of 1081 bins per end, 7.4%
 of the arc. The band does **not** end sharply (it thins inward: 6 points/frame
@@ -140,9 +186,14 @@ the computed x near the lidar's own 0.3922 offset, which looks like a flat
 vertical surface and is not one.
 
 **Next steps, in order.**
-1. Test the side-cover elevation-tangency hypothesis above — if it holds, the
-   fix is geometric (raise the scan plane or lower the covers), not a mask.
-2. Re-run the full stack and confirm the robot explores rather than
+1. Run the discriminating test in the CAVEAT above (spin, check distant
+   returns against the robot's yaw) to decide which side of the transform
+   graph is wrong: stale sensor pose, or mis-transformed chassis geometry.
+2. Fix that, then re-run `diag_rig.py --spin-transforms` and expect
+   `lidar-chassis` to stay at 0.
+3. With the root cause fixed, try dropping `EDGE_MASK_DEG` back to 0 and
+   confirm both bands stay gone — the mask costs 7.4% of each arc.
+4. Re-run the full stack and confirm the robot explores rather than
    re-stalling; only then are the §3 baselines measurable.
 
 ```

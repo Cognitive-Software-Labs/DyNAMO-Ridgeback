@@ -61,13 +61,21 @@ def main():
     ap.add_argument("--battery", action="store_true",
                     help="run the P3 motion acceptance battery instead of "
                          "the passive 300-frame diagnostic")
+    ap.add_argument("--spin-transforms", action="store_true",
+                    help="spin in place and log whether the LIDAR prim's "
+                         "world transform keeps up with the chassis body's "
+                         "(open-issues.md §1 desync test)")
+    ap.add_argument("--wz", type=float, default=0.4,
+                    help="yaw rate for --spin-transforms (rad/s)")
+    ap.add_argument("--frames", type=int, default=240,
+                    help="frames to spin for --spin-transforms")
     args = ap.parse_args()
 
     from isaacsim import SimulationApp
     app = SimulationApp({"headless": True})
     code = 1
     try:
-        code = run(app, battery=args.battery)
+        code = run(app, battery=args.battery, spin_transforms=args)
     except Exception:
         import traceback
         traceback.print_exc()
@@ -77,7 +85,7 @@ def main():
     sys.exit(code)
 
 
-def run(app, battery: bool = False) -> int:
+def run(app, battery: bool = False, spin_transforms=None) -> int:
     import omni.timeline
     import omni.usd
     from isaacsim.core.utils.extensions import enable_extension
@@ -274,6 +282,11 @@ def run(app, battery: bool = False) -> int:
         im = q.GetImaginary()
         return t, yaw_of_wxyz(q.GetReal(), im[0], im[1], im[2])
 
+    if spin_transforms is not None and spin_transforms.spin_transforms:
+        return run_spin_transforms(
+            app, timeline, rig, stage, robot_prim_path, tc,
+            tensor_pose, spin_transforms.wz, spin_transforms.frames)
+
     if battery:
         return run_battery(app, timeline, rig, contacts)
 
@@ -335,6 +348,108 @@ def run(app, battery: bool = False) -> int:
               f"dx={c1[0]-d1[0]:+.4f} dy={c1[1]-d1[1]:+.4f} "
               f"dyaw={y1-d1[2]:+.4f}", flush=True)
     print("\nDIAG DONE", flush=True)
+    return 0
+
+
+LIDAR_LASER = "Geometry/base_link/lidar2d_0_link/lidar2d_0_laser"
+# diamond-notch vertex nearest the front lidar, in base_link (sliced from the
+# committed robot USD at the scan plane by tools/isaac/self_occlusion_check.py)
+NOTCH_VERTEX_BASE = (0.3432, -0.0002, 0.2264)
+
+
+def run_spin_transforms(app, timeline, rig, stage, robot_prim_path, tc,
+                        tensor_pose, wz, frames) -> int:
+    """Does the LIDAR prim's world transform keep up with the chassis body?
+
+    The desync test for `docs/isaac/open-issues.md` §1. The phantom return
+    band appears only while the robot moves, but the chassis and the lidars
+    are one rigid body, so geometry alone cannot explain it. If the sensor's
+    pose and the geometry it rays against are taken from different instants,
+    a transient relative yaw appears -- and the notch tangency amplifies a few
+    degrees of it into a 0.4-0.5 m false return.
+
+    `lidar2d_0_laser` and `chassis_link` are both children of `base_link`, so
+    their relative yaw is authored as ZERO and must stay zero at every instant
+    under any rigid motion. Any nonzero value here is the bug.
+    """
+    from pxr import UsdGeom
+
+    def usd_yaw(rel):
+        p = stage.GetPrimAtPath(f"{robot_prim_path}/{rel}")
+        m = UsdGeom.Xformable(p).ComputeLocalToWorldTransform(tc)
+        q = m.ExtractRotationQuat()
+        im = q.GetImaginary()
+        return (m.ExtractTranslation(),
+                yaw_of_wxyz(q.GetReal(), im[0], im[1], im[2]))
+
+    print(f"\n=== SPIN TRANSFORM DESYNC TEST (wz={wz} rad/s, "
+          f"{frames} frames) ===", flush=True)
+    print("lidar2d_0_laser and chassis_link are both under base_link, so"
+          " their\nrelative yaw is authored 0 and must stay 0. Nonzero =="
+          " desync.\n", flush=True)
+    print(f"{'frame':>6s} {'chassis_tensor':>15s} {'chassis_usd':>12s} "
+          f"{'lidar_usd':>10s} {'lidar-chassis':>14s} {'notch_r_from_lidar':>19s}",
+          flush=True)
+
+    worst = 0.0
+    worst_frame = -1
+    last = timeline.get_current_time()
+    for f in range(1, frames + 1):
+        t = timeline.get_current_time()
+        dt = max(t - last, 0.0)
+        last = t
+        rig.set_cmd(0.0, 0.0, wz, now=t)
+        rig.step(dt if dt > 0 else 1.0 / 60.0, now=t)
+        app.update()
+
+        _, ct = tensor_pose("chassis")
+        cpos, cy = usd_yaw(CHASSIS)
+        lpos, ly = usd_yaw(LIDAR_LASER)
+        rel = math.degrees(ly - cy)
+        rel = (rel + 180.0) % 360.0 - 180.0
+        if abs(rel) > abs(worst):
+            worst, worst_frame = rel, f
+        # where the notch vertex sits relative to the lidar, live
+        nx = cpos[0] + NOTCH_VERTEX_BASE[0] * math.cos(cy) \
+            - NOTCH_VERTEX_BASE[1] * math.sin(cy)
+        ny = cpos[1] + NOTCH_VERTEX_BASE[0] * math.sin(cy) \
+            + NOTCH_VERTEX_BASE[1] * math.cos(cy)
+        notch_r = math.hypot(nx - lpos[0], ny - lpos[1])
+        if f % 20 == 0 or f <= 3:
+            ct_s = f"{math.degrees(ct):+.4f}" if ct is not None else "n/a"
+            print(f"{f:6d} {ct_s:>15s} {math.degrees(cy):+12.4f} "
+                  f"{math.degrees(ly):+10.4f} {rel:+14.6f} "
+                  f"{notch_r:19.5f}", flush=True)
+
+    print(f"\nworst |lidar - chassis| yaw = {abs(worst):.6f} deg "
+          f"(frame {worst_frame})", flush=True)
+    # 0.4 rad/s needs ~3.6-5 deg of relative yaw to fake a 0.40-0.55 m return
+    # off the notch edge, which passes 34.6 mm from the emitter.
+    if abs(worst) < 0.01:
+        print("VERDICT: transforms stay locked — the USD/physics transform "
+              "graph is NOT desyncing.\n         The band must originate "
+              "inside the RTX sensor pipeline (ray generation\n         or "
+              "BVH), not in the robot's pose composition.", flush=True)
+    elif abs(worst) < 3.0:
+        print("VERDICT: measurable desync, but too small on its own to "
+              "explain 0.40-0.55 m\n         returns (needs ~3.6-5 deg). "
+              "Contributing factor at most.", flush=True)
+    else:
+        print("VERDICT: the USD-stage transform of the lidar prim does NOT "
+              "follow the chassis.", flush=True)
+        print("         Large enough to explain the band, and notch_r above "
+              "sweeps straight\n         through the observed 0.40-0.55 m "
+              "range.", flush=True)
+        print("         CAVEAT before acting: this proves the USD-STAGE read "
+              "is stale, not\n         that the RTX sensor uses that stale "
+              "transform — it may take its pose\n         from Fabric/USDRT, "
+              "which physics does update. SLAM working at all is\n         "
+              "evidence the emitted scan does rotate correctly. Discriminate "
+              "first:\n         spin while checking whether DISTANT world "
+              "returns stay consistent with\n         the robot's yaw. If "
+              "they do, the sensor pose is fine and it is the\n         "
+              "chassis geometry that is mis-transformed in the RTX scene — "
+              "the inverse\n         desync, same root area.", flush=True)
     return 0
 
 

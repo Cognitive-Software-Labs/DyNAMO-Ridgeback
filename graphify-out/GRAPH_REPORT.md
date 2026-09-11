@@ -1,7 +1,7 @@
 # Graph Report - /home/deivid/dev/DyNAMO-Ridgeback/.claude/worktrees/isaac  (2026-09-11)
 
 ## Corpus Check
-- 197 files · ~127,856 words
+- 197 files · ~128,584 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
