@@ -170,7 +170,11 @@ def _canonical_document(raw: object) -> dict:
         selected_inputs = {'sensor_capture': str(inputs.get('sensor_capture', '')).strip()}
     else:
         selected_inputs = {}
-    materializations = raw.get('materializations')
+    # The browser keeps one draft across profile switches, so it still carries a
+    # materialization after the user moves off mask-model even though no profile
+    # but that one renders the field. Forwarding it would fail validation on a
+    # value the operator can neither see nor clear.
+    materializations = raw.get('materializations') if profile == 'mask-model' else None
     if profile == 'mask-model' and not materializations:
         materializations = [{'name': 'candidate', 'mask_producer': 'slimsam'}]
     return {
