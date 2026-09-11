@@ -21,7 +21,7 @@ before committing in that worktree.
 
 ## 🔴 Blocking
 
-### 1. `collision_monitor` phantom returns — mechanism found, root fix not yet applied
+### 1. Lidars detached from the articulation — root cause found, fix not yet applied
 
 > **2026-09-11.** The mechanism is identified and measured: **the lidar frame
 > does not rotate with the chassis**, so the chassis sweeps underneath a
@@ -122,15 +122,45 @@ every signature at once:
   90 deg apart) crossing at a different relative yaw. Consistent with the two
   bands being one bug, as suspected.
 
-> **CAVEAT — do not "fix the pose composition" on this alone.** The test
-> proves the **USD-stage** transform is stale, not that the RTX sensor reads
-> that stale transform; the sensor may take its pose from Fabric/USDRT, which
-> physics *does* update. SLAM having ever worked (RMSE 0.23) is evidence the
-> emitted scan rotates correctly. **Discriminating test:** spin while checking
-> whether *distant* world returns stay consistent with the robot's yaw. If
-> they do, the sensor pose is fine and it is the **chassis geometry** that is
-> mis-transformed in the RTX scene — the inverse desync, same root area, but a
-> different fix.
+**Discriminating test — RUN, and the caveat did not save it.** The emitted
+scan does **not** rotate either. Spinning 234 deg and tracking a fixed wall's
+bearing in the sensor frame (`wall r = 4.97 m`):
+
+    d(bearing)/d(yaw) = -0.0025        # -1.0 expected if the sensor rotates
+
+The world stays fixed in the sensor frame while the physics tensor shows the
+chassis genuinely turning. So the sensor really is static in world.
+
+#### ROOT CAUSE: the lidar links are orphan rigid bodies
+
+Read from the committed robot USD:
+
+- `lidar2d_0_link`, `lidar2d_1_link` (and their `_laser` children) carry
+  `RigidBodyAPI` but sit under **`base_link`**, which is *not* a physics body
+  and has **no joint** attaching it to the articulation. They are detached.
+- Everything that does rotate — covers, `axle_link`, both rockers, all four
+  wheels, `riser_link`, `top_link`, the D455 and `imu_0_link` — sits under
+  **`chassis_link`**, which is the articulation link PhysX drives via the
+  rig's `rz` joint.
+- `chassis_link`'s authored local transform is **identity**: it is coincident
+  with `base_link`.
+
+This is a **regression from `a33111c2`** ("lidars were mounted 11.6 cm too
+high"), which reparented them from `chassis_link/riser_link/default_mount` to
+`base_link`. The height fix was right; moving them out of the `chassis_link`
+subtree detached them from the body's motion. It also means the **RMSE 0.23 /
+loop-err 7 cm SLAM figures predate this rig and do not describe it** — every
+scan since `a33111c2` has been emitted from a non-rotating frame, which is
+reason enough for exploration never having worked.
+
+**Fix.** In `clearpath/robot.yaml`, both `lidar2d` entries change
+`parent: base_link` → `parent: chassis_link`, then regenerate the robot USD.
+Because `chassis_link` is coincident with `base_link`, `xyz` stays
+`[±0.3922, 0.0, 0.179]` and published TF is unchanged. Expect this to remove
+**both** phantom bands (the notch becomes static relative to the emitter
+again, restoring the 0/1081 static case) and to let `EDGE_MASK_DEG` go back to
+0 — re-verify with `diag_rig.py --spin-transforms` (expect `lidar-chassis` ≈ 0)
+and the scan-rotation test (expect slope ≈ −1).
 
 Reproduced **on demand without nav2**: a bare `cmd_vel` rotation against the
 sim-only layer (`tools/isaac/stall_probe.py`, and the spin/probe recipe in
@@ -186,15 +216,16 @@ the computed x near the lidar's own 0.3922 offset, which looks like a flat
 vertical surface and is not one.
 
 **Next steps, in order.**
-1. Run the discriminating test in the CAVEAT above (spin, check distant
-   returns against the robot's yaw) to decide which side of the transform
-   graph is wrong: stale sensor pose, or mis-transformed chassis geometry.
-2. Fix that, then re-run `diag_rig.py --spin-transforms` and expect
-   `lidar-chassis` to stay at 0.
-3. With the root cause fixed, try dropping `EDGE_MASK_DEG` back to 0 and
-   confirm both bands stay gone — the mask costs 7.4% of each arc.
-4. Re-run the full stack and confirm the robot explores rather than
-   re-stalling; only then are the §3 baselines measurable.
+1. Apply the reparent above (`parent: chassis_link` for both `lidar2d`
+   entries) and regenerate the robot USD.
+2. Re-run `diag_rig.py --spin-transforms` (expect `lidar-chassis` ≈ 0) and the
+   scan-rotation test (expect slope ≈ −1). Re-check TF is unchanged.
+3. Then drop `EDGE_MASK_DEG` to 0 and confirm both bands stay gone — the mask
+   costs 7.4% of each arc and should no longer be needed.
+4. Re-measure SLAM quality from scratch (`slam_quality_probe.py`). The
+   RMSE 0.23 figure predates this rig and cannot be carried forward.
+5. Re-run the full stack and confirm the robot explores; only then are the §3
+   baselines measurable.
 
 ```
 cmd_vel_nav       267 msgs   (controller output, healthy)
