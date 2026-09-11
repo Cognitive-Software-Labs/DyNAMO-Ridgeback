@@ -19,6 +19,11 @@ slam_toolbox:
     debug_logging: false
     throttle_scans: 1
     transform_publish_period: 0.02
+    # Online Nav2 asks for map->odom at the current robot-pose stamp. Publish
+    # the latest SLAM correction at the current time instead of retaining the
+    # processed scan's older stamp, or MPPI eventually aborts on future TF
+    # extrapolation as scan processing falls behind.
+    restamp_tf: true
     map_update_interval: 0.5
     resolution: 0.05
     max_laser_range: 20.0
@@ -26,7 +31,9 @@ slam_toolbox:
     transform_timeout: 0.5
     tf_buffer_duration: 30.0
     stack_size_to_use: 40000000
-    scan_queue_size: 10
+    # slam_toolbox's asynchronous mode must be latest-scan-first; buffering old
+    # scans here makes the published map->odom correction increasingly stale.
+    scan_queue_size: 1
     enable_interactive_mode: true
 
     # General Parameters

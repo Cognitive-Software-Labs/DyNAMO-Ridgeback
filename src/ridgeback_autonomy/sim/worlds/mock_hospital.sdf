@@ -273,7 +273,6 @@
       <link name="link">
         <visual name="nurse_counter_top"><pose>-4.2 -2.6 0.94 0 0 0</pose><geometry><box><size>1.95 0.75 0.08</size></box></geometry><material><ambient>0.88 0.90 0.88 1</ambient><diffuse>0.88 0.90 0.88 1</diffuse></material></visual>
         <visual name="nurse_monitor"><pose>-4.4 -2.62 1.35 0 0 0</pose><geometry><box><size>0.48 0.06 0.32</size></box></geometry><material><ambient>0.02 0.04 0.05 1</ambient><diffuse>0.02 0.04 0.05 1</diffuse><emissive>0.04 0.22 0.28 1</emissive></material></visual>
-        <visual name="privacy_curtain_n1"><pose>5.2 6.1 1.25 0 0 0</pose><geometry><box><size>0.06 1.7 1.6</size></box></geometry><material><ambient>0.62 0.82 0.88 0.55</ambient><diffuse>0.62 0.82 0.88 0.55</diffuse></material></visual>
         <visual name="privacy_curtain_s2"><pose>11.6 -6.1 1.25 0 0 0</pose><geometry><box><size>0.06 1.7 1.6</size></box></geometry><material><ambient>0.62 0.82 0.88 0.55</ambient><diffuse>0.62 0.82 0.88 0.55</diffuse></material></visual>
         <visual name="wall_panel_north"><pose>5.2 7.89 1.45 0 0 0</pose><geometry><box><size>2.2 0.04 0.8</size></box></geometry><material><ambient>0.84 0.88 0.91 1</ambient><diffuse>0.84 0.88 0.91 1</diffuse></material></visual>
         <visual name="wall_panel_south"><pose>6.2 -7.89 1.45 0 0 0</pose><geometry><box><size>2.2 0.04 0.8</size></box></geometry><material><ambient>0.84 0.88 0.91 1</ambient><diffuse>0.84 0.88 0.91 1</diffuse></material></visual>

@@ -2,30 +2,23 @@
 # Clean up stale processes and launch the exploration stack.
 #
 # Usage:
-#   bash start_exploration.sh                                # mock_hospital + explore_lite
-#   bash start_exploration.sh office                         # office + explore_lite
-#   bash start_exploration.sh mock_hospital custom           # mock_hospital + custom explorer
-#   EXPLORER=custom bash start_exploration.sh office         # office + custom explorer
-#   bash start_exploration.sh estimators:=polar_profiling    # defaults + launch arguments
-#   bash start_exploration.sh office --ros-args --log-level info
+#   bash start_exploration.sh                                # mock_hospital
+#   bash start_exploration.sh office                         # office world
+#   bash start_exploration.sh warehouse key:=value ...       # extra launch args
+#   bash start_exploration.sh headless_rendering:=true       # default world, EGL rendering
+#   bash start_exploration.sh --ros-args --log-level info     # pass options through
 #   RMW_IMPLEMENTATION=rmw_fastrtps_cpp bash start_exploration.sh  # explicit RMW override
 #
-# Both positional slots are optional and either may be omitted: everything from
-# the first launch argument or option onward is passed through, so passthrough
-# arguments do not have to sit behind two placeholders.
+# The positional world is optional: everything from the first launch argument
+# or option onward is passed through without requiring a world placeholder.
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Everything bound for ros2 launch rather than for this script: ``name:=value``
-# arguments and ``-``-prefixed options. Neither can name a world or an explorer,
-# so neither may be consumed as a positional.
-#
-# The world slot tested nothing at all and the explorer slot tested ``*":="``,
-# which matches a string ENDING in ":=" -- something no launch argument is. So
-# both slots swallowed passthrough arguments: the first became the world, the
-# second tripped the explorer check and exited 2.
+# arguments and ``-``-prefixed options. Neither can name a world, so neither may
+# be consumed as the optional positional.
 is_passthrough() {
     [[ "$1" == *":="* || "$1" == -* ]]
 }
@@ -36,19 +29,9 @@ if [[ $# -gt 0 ]] && ! is_passthrough "$1"; then
     shift
 fi
 
-EXPLORER="${EXPLORER:-explore_lite}"
-if [[ $# -gt 0 ]] && ! is_passthrough "$1"; then
-    EXPLORER="$1"
-    shift
-fi
-
-if [[ "$EXPLORER" != "explore_lite" && "$EXPLORER" != "custom" ]]; then
-    echo "Unknown explorer '$EXPLORER'. Expected 'explore_lite' or 'custom'." >&2
-    exit 2
-fi
-
 # CycloneDDS is the measured default for image/depth delivery. An explicitly
-# selected RMW remains authoritative.
+# selected RMW remains authoritative. Public launches supply the package-owned
+# CycloneDDS participant-index config when CYCLONEDDS_URI is unset.
 export RMW_IMPLEMENTATION="${RMW_IMPLEMENTATION:-rmw_cyclonedds_cpp}"
 export ROS_DOMAIN_ID="${ROS_DOMAIN_ID:-42}"
 
@@ -63,7 +46,7 @@ bash "$SCRIPT_DIR/cleanup.sh"
 # LOG_DIR overrides the exploration output root; ROS_LOG_DIR remains independent.
 LOG_DIR="${LOG_DIR:-$SCRIPT_DIR/artifacts/exploration}"
 mkdir -p "$LOG_DIR"
-RUN_LOG_DIR="$(mktemp -d "$LOG_DIR/ridgeback_$(date +%Y-%m-%d_%H-%M-%S)_${WORLD}_${EXPLORER}.XXXXXX")"
+RUN_LOG_DIR="$(mktemp -d "$LOG_DIR/ridgeback_$(date +%Y-%m-%d_%H-%M-%S)_${WORLD}.XXXXXX")"
 LOG_FILE="$RUN_LOG_DIR/console.log"
 export ROS_LOG_DIR="${ROS_LOG_DIR:-$RUN_LOG_DIR/ros}"
 mkdir -p "$ROS_LOG_DIR"
@@ -72,5 +55,4 @@ exec > >(tee "$LOG_FILE") 2>&1
 
 exec ros2 launch ridgeback_autonomy ridgeback_exploration.launch.py \
     world:="$WORLD" \
-    explorer:="$EXPLORER" \
     "$@"

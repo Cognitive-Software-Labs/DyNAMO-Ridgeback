@@ -42,6 +42,9 @@
 
       # Exploration loop timing
       planner_frequency: 2.0
+      # Stall timeout: cancels a goal only after this many seconds WITHOUT
+      # progress (nav2 feedback distance_remaining not improving). Long
+      # traverses that keep moving are never cancelled.
       progress_timeout: 60.0
       startup_delay: 5.0
       abort_retry_delay: 5.0            # Seconds (wall clock) to wait before retrying after a goal abort

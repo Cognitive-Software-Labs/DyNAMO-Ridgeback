@@ -10,7 +10,7 @@
 | Perception overlay is a sliver in the narrow left dock | Expected until `exploration.rviz`'s `QMainWindow State` blob is regenerated — `addPane()` hardcodes the left dock area. Drag the pane to the bottom dock, stretch it full width, File → Save Config. If the *whole* layout reverted to defaults instead, `restoreState` rejected the blob and restored nothing |
 | Fewer than four rings, or a missing HUD column | `ros2 node list` should show `target_pointcloud_measurement`, `target_mask_measurement`, `target_visualization` and `hud_target_node`; then `ros2 topic hz /r100_0001/measurements/target/mask`. A column reading `--` means that estimator ran and reported nothing; a column missing entirely means `estimators` did not select it |
 | All three mask rows blank while `pointcloud` still reads | Suspect `base_frame`. Grep the startup log for `Configured base frame ... is unavailable`; a wrong frame skips the segmenter for the whole batch. See "A namespaced `base_frame` is not automatically a real TF frame" below |
-| `explore_lite` not finding frontiers | Verify `track_unknown_space: true` in the global costmap config |
+| Frontier explorer not finding frontiers | Verify `track_unknown_space: true` in the global costmap config |
 | TF errors | Ensure all nodes use `use_sim_time: true` |
 | Startup hangs / a stage never comes up | Bringup is event-driven (readiness gates) — find the `gate_*` process log `[launch_wait]: waiting for …`; the `unmet:` list on timeout names the exact missing topic/service. See "Event-Driven Startup" below. Do **not** re-add `TimerAction` delays |
 | Stale processes from previous runs | Run `bash cleanup.sh` before each launch |
@@ -260,8 +260,12 @@ at every subscriber in every case, so it is never a subscriber-side fault.
 | orphaned processes | `ps` after a clean shutdown | none |
 | CUDA unavailable | `torch.cuda.is_available()` in `perception_venv` | True, models on GPU |
 
-Turning off the Gazebo GUI would only reduce a competing rasterizer client; the
-camera would still be rendered in software. Headless is not the fix.
+Turning off the Gazebo GUI alone only reduces a competing rasterizer client;
+the camera remains software-rendered. The primary measured fix remains
+`tools/gpu-run`, which selects NVIDIA GLX while retaining the GUI. As an
+additional server-only option, launch with `headless_rendering:=true` and an
+NVIDIA EGL vendor selection when the run does not need Gazebo's GUI. Headless
+rendering is default-off and is not a replacement for the measured GLX path.
 
 ### Measured, same config and scenario
 
@@ -379,6 +383,49 @@ Passing `shared_from_this()` makes the listener use `slam_toolbox`'s own node in
 3. larger `scan_queue_size` values
 
 None of those resolved the underlying subscription problem. The 1-line source patch was the change that made the namespaced setup work reliably.
+
+## SLAM TF Lag Aborts Valid Nav2 Plans
+
+### Symptom
+
+In a long warehouse exploration run, a path can look geometrically valid in
+RViz but stop almost immediately. MPPI reports `Unable to transform goal pose
+into costmap frame`, Nav2 aborts the goal, and the explorer retries or
+blacklists the frontier. The paired TF error says that `map -> odom` would
+require extrapolation into the future, often by only a few milliseconds.
+
+### Root Cause
+
+MPPI transforms the map-frame goal into the local costmap's `odom` frame at
+the current robot-pose timestamp. By default, slam_toolbox stamps `map -> odom`
+from the processed scan timestamp plus `transform_timeout`. Once asynchronous
+scan processing lags, that transform stays behind the controller's requested
+time. MPPI's `transform_tolerance` only waits for the exact timestamp; it does
+not authorize use of the latest transform. The wait itself then causes missed
+controller cycles and stale velocity commands before the goal aborts.
+
+The 2026-09-10 40-minute warehouse visual run recorded 334 future-extrapolation
+failures. The requested-minus-latest gap had a 25 ms median, 145 ms p90, 1.021 s
+p99, and 1.714 s maximum. slam_toolbox also dropped 147 stale scans. The config
+still had `scan_queue_size: 10`, retained from an earlier namespace workaround;
+slam_toolbox's asynchronous mode requires a latest-scan queue of one.
+
+### Fix
+
+Set `restamp_tf: true` so slam_toolbox publishes its latest `map -> odom`
+correction at the current clock plus its existing transform timeout, and set
+`scan_queue_size: 1` so asynchronous mapping cannot accumulate stale scans.
+This fixes timestamp ownership at the SLAM producer; do not increase MPPI's
+wait or patch Nav2 to combine arbitrary transform-chain timestamps.
+
+A same-workload visual warehouse A/B run on 2026-09-10 then ran for 15 minutes
+past startup and through the original failure window. It reached 66.1% peak
+coverage with 12 completed goals, all successful: zero future-TF
+extrapolations, missed controller loops, aborts, blacklists, or node deaths.
+slam_toolbox discarded 80 scans when its depth-one queue was busy; those
+drops are intentional latest-scan back-pressure and did not interrupt mapping
+or navigation. The console log is
+`artifacts/exploration/ridgeback_2026-09-10_21-15-43_warehouse.xcZJoj/console.log`.
 
 ## SLAM Drift in Featureless Environments (Office World)
 

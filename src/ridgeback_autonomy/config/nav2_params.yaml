@@ -43,6 +43,14 @@ controller_server:
       time_steps: 56
       model_dt: 0.05
       batch_size: 2000
+      # Keep sampling accel limits HIGH (above the velocity_smoother's real
+      # 1.0/2.0 caps) even though that looks inconsistent. A/B on warehouse
+      # (2026-07-09): matching these to the smoother (1.0/1.0/2.0) limits the
+      # per-step velocity delta to ax*model_dt=0.05 m/s, MPPI ramps so slowly
+      # that explore_lite's goal preemption + the progress checker abort every
+      # goal before speed builds — moving-time fraction fell 0.71 -> ~0.1 and
+      # exploration collapsed. The smoother softening MPPI's optimistic ramps
+      # is harmless because MPPI replans at 20 Hz from measured odometry.
       ax_max: 3.0
       ax_min: -3.0
       ay_max: 3.0
@@ -86,7 +94,7 @@ controller_server:
       PreferForwardCritic:
         enabled: true
         cost_power: 1
-        cost_weight: 15.0
+        cost_weight: 5.0
         threshold_to_consider: 0.5
       CostCritic:
         enabled: true
@@ -119,7 +127,15 @@ controller_server:
         offset_from_furthest: 4
         threshold_to_consider: 0.5
         max_angle_to_furthest: 1.0
-        mode: 0
+        # mode 1 = NO_DIRECTIONAL_PREFERENCE: heading-agnostic, lets the omni
+        # base reverse out of dead-ends instead of forcing a 180 turn.
+        # NOT mode 2 (CONSIDER_FEASIBLE_PATH_ORIENTATIONS): mode 2 needs a
+        # feasible planner (Smac) that stamps orientations on path poses; the
+        # NavFn planner used here leaves identity orientations, so mode 2
+        # penalized any heading away from world yaw=0 — an arbitrary bias.
+        # A/B on warehouse (2026-07-09): motion quality equal to mode 2
+        # (moving fraction 0.735 vs 0.71), early coverage slightly faster.
+        mode: 1
 
 local_costmap:
   local_costmap:
@@ -133,7 +149,11 @@ local_costmap:
       width: 5
       height: 5
       resolution: 0.06
-      footprint: "[ [0.480, 0.3965], [0.480, -0.3965], [-0.480, -0.3965], [-0.480, 0.3965] ]"
+      # Circumscribing octagon of the r100 body-collision mesh: tangent to the
+      # real chamfered hull, so it ENCLOSES the body (never cuts inside it) while
+      # trimming the front/back corners the bounding rectangle over-claimed.
+      # Sides stay at +-0.395 (exact); corners cut to (+-0.335,+-0.395)/(+-0.466,+-0.263).
+      footprint: "[ [0.466, 0.263], [0.335, 0.395], [-0.335, 0.395], [-0.466, 0.263], [-0.466, -0.263], [-0.335, -0.395], [0.335, -0.395], [0.466, -0.263] ]"
       always_send_full_costmap: true
       plugins: ["voxel_layer", "inflation_layer"]
       inflation_layer:
@@ -179,7 +199,11 @@ global_costmap:
       publish_frequency: 2.0
       global_frame: map
       robot_base_frame: base_link
-      footprint: "[ [0.480, 0.3965], [0.480, -0.3965], [-0.480, -0.3965], [-0.480, 0.3965] ]"
+      # Circumscribing octagon of the r100 body-collision mesh: tangent to the
+      # real chamfered hull, so it ENCLOSES the body (never cuts inside it) while
+      # trimming the front/back corners the bounding rectangle over-claimed.
+      # Sides stay at +-0.395 (exact); corners cut to (+-0.335,+-0.395)/(+-0.466,+-0.263).
+      footprint: "[ [0.466, 0.263], [0.335, 0.395], [-0.335, 0.395], [-0.466, 0.263], [-0.466, -0.263], [-0.335, -0.395], [0.335, -0.395], [0.466, -0.263] ]"
       resolution: 0.06
       track_unknown_space: true
       always_send_full_costmap: true
@@ -222,7 +246,12 @@ planner_server:
     planner_plugins: ["GridBased"]
     GridBased:
       plugin: "nav2_navfn_planner::NavfnPlanner"
-      tolerance: 0.75
+      # Frontier centroids often sit flush against walls, inside the inscribed-
+      # lethal band of the 0.75 m inflation. With tolerance below that band's
+      # width NavFn finds no valid endpoint, the goal aborts, and explore_lite
+      # blacklists the frontier — runs quit with half the map unexplored.
+      # 1.5 lets the planner stop at the nearest reachable cell instead.
+      tolerance: 1.5
       use_astar: false
       allow_unknown: true
 
@@ -299,7 +328,8 @@ collision_monitor:
       time_before_collision: 1.2
       simulation_time_step: 0.1
       min_points: 6
-      visualize: false
+      visualize: true
+      polygon_pub_topic: "collision_monitor/footprint_approach"
       enabled: true
     observation_sources: ["scan", "scan_rear"]
     scan:
