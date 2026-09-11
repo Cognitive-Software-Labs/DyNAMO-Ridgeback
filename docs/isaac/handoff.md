@@ -200,8 +200,15 @@ like 27 Hz on the wall — that is expected, not a bug).
 - **A stale `ros2 daemon` hides namespaced topics from the CLI** (`ros2 daemon
   stop`, or `--no-daemon`). rclpy probes are unaffected but still need the
   CycloneDDS env above.
-- **The Bash tool's working directory persists between calls.** A `cd` in one
-  command silently changes the cwd for every later one. Use absolute paths.
+- **The Bash tool's working directory persists between calls — and can reset
+  without warning.** A `cd` in one command silently changes the cwd for every
+  later one, *and* the shell is periodically re-initialized from the user's
+  profile, which snaps the cwd back to the primary checkout
+  (`/home/deivid/dev/DyNAMO-Ridgeback`) mid-session. In a worktree session that
+  means a relative path can silently act on the **wrong checkout**. Hit on
+  2026-09-11: a `bash -n cleanup.sh` and a `pgrep` dry-run both ran against the
+  main checkout and reported a false negative. Use absolute paths for anything
+  that reads or writes, and `git -C <worktree>` for git.
 - **mock_hospital logs `CreateJoint - cannot create a joint between static
   bodies`** for the G1 model prims at startup. Pre-existing and harmless; do
   not chase it.
