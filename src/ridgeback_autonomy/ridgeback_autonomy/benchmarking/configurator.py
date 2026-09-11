@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """Loopback-only benchmark job configurator.
 
 The browser deliberately owns presentation and draft state only. This module
