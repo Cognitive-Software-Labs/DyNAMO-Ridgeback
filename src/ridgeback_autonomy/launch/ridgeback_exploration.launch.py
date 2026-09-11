@@ -261,7 +261,8 @@ def generate_launch_description():
                               description='Publish the live exploration-coverage HUD panel'),
         DeclareLaunchArgument('headless_rendering', default_value='false',
                               description='Render Gazebo server sensors via EGL without an X '
-                                          'display (GPU rendering for SSH sessions; ISSUES.md)'),
+                                          'display (GPU rendering for SSH sessions; '
+                                          'docs/troubleshooting.md)'),
 
         # RViz2
         Node(

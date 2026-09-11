@@ -1,0 +1,120 @@
+#!/bin/bash
+# Verify pinned dependency revisions and optionally apply the recorded patches.
+# Usage: tools/check_dependencies [--apply]
+
+set -u
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+CHECKOUT_ROOT="${DYNAMO_DEPENDENCY_ROOT:-$REPO_ROOT}"
+MANIFEST="$REPO_ROOT/.repos"
+APPLY_PATCHES=false
+
+if [ "${1:-}" = "--apply" ]; then
+    APPLY_PATCHES=true
+    shift
+fi
+if [ "$#" -ne 0 ]; then
+    echo "Usage: tools/check_dependencies [--apply]" >&2
+    exit 2
+fi
+
+declare -A PATCHES=(
+    [src/clearpath_simulator]="patches/clearpath_gz_customizations.patch"
+    [src/clearpath_common]="patches/clearpath_realsense_sim_frames.patch"
+    [src/slam_toolbox]="patches/slam_toolbox_tf_namespace.patch"
+)
+
+if ! dependency_text="$(python3 - "$MANIFEST" <<'PY'
+import sys
+
+import yaml
+
+with open(sys.argv[1], encoding='utf-8') as stream:
+    repositories = yaml.safe_load(stream)['repositories']
+
+for path, specification in repositories.items():
+    print(f"{path}\t{specification['version']}")
+PY
+)"; then
+    echo "ERROR: could not parse $MANIFEST" >&2
+    exit 1
+fi
+
+if [ -z "$dependency_text" ]; then
+    echo "ERROR: $MANIFEST contains no dependencies" >&2
+    exit 1
+fi
+mapfile -t DEPENDENCIES <<< "$dependency_text"
+
+failures=0
+
+fail() {
+    echo "ERROR: $*" >&2
+    failures=$((failures + 1))
+}
+
+for dependency in "${DEPENDENCIES[@]}"; do
+    IFS=$'\t' read -r relative_path expected_revision <<< "$dependency"
+    checkout="$CHECKOUT_ROOT/$relative_path"
+    patch_relative="${PATCHES[$relative_path]:-}"
+
+    if [ ! -e "$checkout/.git" ]; then
+        fail "$relative_path is missing; run 'vcs import < .repos'"
+        continue
+    fi
+
+    actual_revision="$(git -C "$checkout" rev-parse HEAD)"
+    if [ "$actual_revision" != "$expected_revision" ]; then
+        fail "$relative_path is at $actual_revision, expected $expected_revision"
+        continue
+    fi
+
+    untracked="$(git -C "$checkout" ls-files --others --exclude-standard)"
+    if [ -n "$untracked" ]; then
+        fail "$relative_path has untracked files: ${untracked//$'\n'/, }"
+        continue
+    fi
+
+    if [ -z "$patch_relative" ]; then
+        if git -C "$checkout" diff --quiet HEAD --; then
+            echo "OK: $relative_path @ ${expected_revision:0:8} (clean)"
+        else
+            fail "$relative_path has unexpected tracked modifications"
+        fi
+        continue
+    fi
+
+    patch="$REPO_ROOT/$patch_relative"
+    if git -C "$checkout" apply --reverse --check "$patch" >/dev/null 2>&1; then
+        if diff -q "$patch" <(git -C "$checkout" diff --no-ext-diff HEAD --) >/dev/null; then
+            echo "OK: $relative_path @ ${expected_revision:0:8} ($patch_relative applied)"
+        else
+            fail "$relative_path contains changes beyond $patch_relative"
+        fi
+        continue
+    fi
+
+    if ! git -C "$checkout" apply --check "$patch" >/dev/null 2>&1; then
+        fail "$patch_relative is neither cleanly applied nor cleanly applicable"
+        continue
+    fi
+
+    if [ "$APPLY_PATCHES" = false ]; then
+        fail "$patch_relative is not applied; rerun with --apply"
+        continue
+    fi
+
+    if git -C "$checkout" apply "$patch" &&
+       diff -q "$patch" <(git -C "$checkout" diff --no-ext-diff HEAD --) >/dev/null; then
+        echo "APPLIED: $patch_relative to $relative_path @ ${expected_revision:0:8}"
+    else
+        fail "$patch_relative did not produce the recorded dependency diff"
+    fi
+done
+
+if [ "$failures" -ne 0 ]; then
+    echo "$failures dependency check(s) failed." >&2
+    exit 1
+fi
+
+echo "All dependencies match .repos and contain only recorded patches."

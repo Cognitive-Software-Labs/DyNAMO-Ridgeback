@@ -50,7 +50,7 @@ unused loader have been deleted; active paths use the color `CameraInfo`.
 
 Repository sources: `clearpath/robot.yaml`, the Clearpath RealSense/D455 model,
 and `common/camera_inputs.py`. The removed D435 transform and its root cause are
-recorded in [ISSUES](../ISSUES.md#historical-the-d435-static-publisher-removed-2026-08-31).
+recorded in [operational incident history](../history/operational_incidents.md#d435-static-camera-transform--removed-2026-08-31).
 
 ### 2D LiDAR (Hokuyo UST, planar 270°)
 

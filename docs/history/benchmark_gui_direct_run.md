@@ -4,8 +4,9 @@ Dated 2026-09-11, implemented on branch `feat/benchmark-gui` against `18eacb4`.
 This records why the configurator stopped being export-only, what was measured
 while building it, and what deliberately did not land.
 
-Supersedes the "not a process supervisor" decision in
-[`../plans/benchmark_configuration_gui.md`](../plans/benchmark_configuration_gui.md).
+Supersedes the "not a process supervisor" decision taken in the retired
+benchmark-configuration-GUI plan. The current contract lives in
+[target-distance benchmarking](../benchmarking/target_distance_benchmarking.md).
 
 ## Why the exported command had to go
 
@@ -79,7 +80,7 @@ so every rename was refused. Both are covered by tests now.
   so it matches. `target_benchmark_sweep` calls `run_preflight_cleanup` before
   Gazebo starts, so a GUI-launched sweep would `kill -9` the GUI mid-click. The
   UI states this reason next to a disabled Start rather than hiding the button.
-  See `docs/ISSUES.md`.
+  See [`docs/troubleshooting.md`](../troubleshooting.md).
 - **Working around it with `--skip-preflight-cleanup`.** That flag produces the
   two-`gz sim` failure where every trial dies with "Target pose not present".
 - **Concurrent runs.** Refused server-side, not merely disabled in the UI. Two

@@ -4,8 +4,8 @@ description: Launches, monitors, and stops warehouse exploration benchmark runs 
 tools: Bash, Read, Grep, Glob
 ---
 
-You run instrumented exploration benchmarks for DyNAMO-Ridgeback. Follow this
-recipe exactly — every step exists because skipping it burned a session once.
+You run instrumented exploration benchmarks for DyNAMO-Ridgeback. Read
+`docs/exploration/benchmarking.md` first and follow that canonical recipe.
 
 ## Launch sequence
 
@@ -35,15 +35,17 @@ recipe exactly — every step exists because skipping it burned a session once.
    export ROS_DOMAIN_ID=42 RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
    setsid nohup python3 tools/benchmark/explore_probe.py <tag> 2400 > <tag>_probe.log 2>&1 &
    ```
-7. Record `uptime` load — sim health tracks total box load; a run under
-   load >30 has a coverage ceiling regardless of nav config.
+7. Record `uptime` load and the host CPU count so contention is interpreted in
+   the context of the machine running the benchmark.
 
 ## Known quirks (do not "fix" these)
 
 - `pkill` returning exit 144 is benign.
 - NEVER `pkill -f "gz sim gui"` — it can take the parent wrapper and server
-  down. A GUI is expected on the default GLX path and absent only in optional
-  `headless_rendering:=true` mode; report a mismatch, don't kill it directly.
+  down. `cleanup.sh` preserves that process while removing the simulator
+  server and ROS stack. A GUI is expected on the default GLX path and absent
+  only in optional `headless_rendering:=true` mode; report a mismatch, don't
+  kill it directly.
 - Sim launches need access to the selected GLX/EGL devices and display path.
 - `ros2` CLI without `ROS_DOMAIN_ID=42` sees the wrong system's topics.
 

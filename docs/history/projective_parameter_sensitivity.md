@@ -7,11 +7,10 @@ most cases no comment. They are round numbers someone picked. This document
 records, for each one, how much it actually moves the distance estimate, the
 evidence, and whether a grounding now exists.
 
-Opened 2026-09-07. Evidence below is drawn from `artifacts/benchmarks/`
-(45 `run.json`, 31 `projective_ranging` blocks, 35,641 status observations),
-from the shipped simulation assets, and — for the axes no archived run varies —
-from a sweep that is **not yet run**; §5 says exactly which conclusions are
-still open.
+Opened 2026-09-07 and completed 2026-09-08. Evidence below is drawn from
+`artifacts/benchmarks/` (45 `run.json`, 31 `projective_ranging` blocks, 35,641
+status observations), the shipped simulation assets, and the completed
+15-configuration sweep named in §6.
 
 Out of scope by decision:
 
@@ -90,8 +89,10 @@ step (full contract in
    between-class variance over a histogram binned at **#4
    `OTSU_BIN_WIDTH_M`**, keeping everything on the near side.
 5. **Guard on sufficiency.** Fewer than **#5 `MIN_VALID_SAMPLES`** surviving
-   pixels reports a miss rather than an estimate — `ISOLATION_EMPTY` on the
-   `rect` branch, `TOO_FEW_VALID_PIXELS` on the `tight` branch.
+   pixels reports a miss rather than an estimate. The current contract reports
+   `TOO_FEW_VALID_PIXELS` before isolation and `TOO_FEW_AFTER_ISOLATION` when a
+   recipe was given enough pixels but returned too few. Archived reports below
+   use the older `ISOLATION_EMPTY` spelling for the latter code.
    *Exists to prevent:* publishing a distance derived from a handful of pixels,
    where a single outlier moves the median.
 6. **Reduce.** The median of the surviving depths is `Z`; the centroid of the
@@ -282,10 +283,9 @@ The two later runs agree on MAE, p95 **and** scored count to every digit
 recorded, five days and several commits apart. The outlier is the earlier one,
 and the boundary between them is `7e31f02` (2026-08-31), the D455 correction —
 which moved the Gazebo RGBD sensor onto `camera_0_color_frame` and changed
-where the scene is rendered from. `AI_CONTEXT.md` already states that runs
-recorded before 2026-08-31 used the D435 model and the old render pose and must
-not be presented as the same setup; this is that warning showing up as a
-number.
+where the scene is rendered from. Runs recorded before 2026-08-31 used the
+D435 model and the old render pose and must not be presented as the same setup;
+this is that warning showing up as a number.
 
 So the full-set benchmark is **reproducible, not noisy**, and a small MAE delta
 between two configurations in one sweep is readable rather than drowned.
@@ -365,7 +365,7 @@ The anchor `nearest_significant_mode` returns is a bin **centre**, so bin width
 alone can contribute at most ±`bin_width_m`/2 = **±25 mm** to Z at the default.
 Any effect larger than that in a bin-width sweep is the bin *choice* moving —
 a different bin winning the "nearest significant" test — not rounding. That is
-the discriminator to read the pending curves with.
+the discriminator used to read the measured curves below.
 
 ### 3.4 #8 cannot fire in this world
 
@@ -521,7 +521,8 @@ so the resemblance holds only near the threshold.
 | 1000 | 101 | rejects 10 trials; survivors bit-identical | ≈ 8 m |
 
 At 1000 the guard fired for the first time anywhere in this repo's recorded
-history — 1052 `ISOLATION_EMPTY` observations — and it rejected exactly the far
+history — 1052 observations recorded under the then-current
+`ISOLATION_EMPTY` name (now `TOO_FEW_AFTER_ISOLATION`) — and it rejected exactly the far
 scenes: `far_clamp_01` (9.36 m), `far_clamp_02` (9.08 m) and all eight repeats
 of `far_mid_01` (7.96 m). Mean true distance of the rejected trials is 8.22 m
 against 3.57 m for those kept.
@@ -583,8 +584,9 @@ that was already happening:
 
 New tests cover the factory's kwarg binding and unknown-name rejection, the
 identity property when nothing is set, a bound `band_m` changing what the
-recipe keeps, and a raised `min_valid_pixels` actually producing
-`TOO_FEW_VALID_PIXELS` (tight branch) and `ISOLATION_EMPTY` (rect branch).
+recipe keeps, and a raised `min_valid_pixels` exercising the sufficiency guard.
+The later cause-based reason split reports `TOO_FEW_VALID_PIXELS` before
+isolation and `TOO_FEW_AFTER_ISOLATION` after it, independent of mask precision.
 
 ---
 
@@ -622,7 +624,7 @@ projective_parameters.yaml`, 2026-09-07/08, sweep directory
   pointcloud range limit* was never measured — that is a separate question this
   sweep did not ask.
 
-Preconditions for re-running are in `docs/ISSUES.md`: confirm
+Preconditions for re-running are in `docs/troubleshooting.md`: confirm
 `glxinfo | grep "OpenGL renderer"` does not report `llvmpipe` (Gazebo then
 CPU-rasterizes and the camera runs at 4 Hz instead of 28, which RTF does not
 reveal); run `cleanup.sh` **before** the supervisor and not between its

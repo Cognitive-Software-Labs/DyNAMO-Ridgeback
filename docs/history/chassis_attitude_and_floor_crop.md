@@ -124,7 +124,7 @@ floor happening to produce a level robot; it is a robot that cannot tilt.
 The margin's *cost* is simulator-visible even though its benefit is not. The
 crop discards everything below `floor_margin_m`, so an object shorter than 5 cm
 loses every point after a successful detection, and the miss surfaces as
-`ISOLATION_EMPTY` rather than as a height-related reason. At 640 px wide and
+`TOO_FEW_AFTER_ISOLATION` rather than as a height-related reason. At 640 px wide and
 f ≈ 443 px, a 5 cm object still spans ~9.5 px at 2 m, so the sensor is not the
 limit — the crop is. That regression reproduces without any of the error
 sources the margin exists to absorb.

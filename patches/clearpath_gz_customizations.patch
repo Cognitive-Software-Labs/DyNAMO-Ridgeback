@@ -88,10 +88,10 @@ index 4d74475..8e92f6f 100644
      </gz-gui>
  </plugin>
 diff --git a/clearpath_gz/launch/gz_sim.launch.py b/clearpath_gz/launch/gz_sim.launch.py
-index 69135ab..0f743a9 100644
+index 93c8104..74a28c9 100644
 --- a/clearpath_gz/launch/gz_sim.launch.py
 +++ b/clearpath_gz/launch/gz_sim.launch.py
-@@ -35,6 +35,10 @@ ARGUMENTS = [
+@@ -37,6 +37,10 @@ ARGUMENTS = [
      DeclareLaunchArgument('auto_start', default_value='true',
                            choices=['true', 'false'],
                            description='Auto-start Gazebo simulation'),
@@ -99,10 +99,10 @@ index 69135ab..0f743a9 100644
 +                          choices=['true', 'false'],
 +                          description='Render server sensors via EGL without an X display '
 +                                      '(gz sim --headless-rendering)'),
- ]
- 
- 
-@@ -58,6 +62,13 @@ def gz_launch(context, *args, **kwargs):
+     DeclareLaunchArgument('setup_path',
+                           default_value=[EnvironmentVariable('HOME'), '/clearpath/'],
+                           description='Clearpath setup path'),
+@@ -83,6 +87,13 @@ def gz_launch(context, *args, **kwargs):
      if (auto_start == 'true'):
          auto_start_option = ' -r'
  
@@ -116,7 +116,7 @@ index 69135ab..0f743a9 100644
      # Gazebo Simulator
      gz_sim = IncludeLaunchDescription(
          PythonLaunchDescriptionSource([gz_sim_launch]),
-@@ -65,6 +76,7 @@ def gz_launch(context, *args, **kwargs):
+@@ -90,6 +101,7 @@ def gz_launch(context, *args, **kwargs):
              ('gz_args', [LaunchConfiguration('world'),
                           '.sdf',
                           auto_start_option,
@@ -124,32 +124,32 @@ index 69135ab..0f743a9 100644
                           ' -v 4',
                           ' --gui-config ',
                           gui_config])
-@@ -84,13 +96,24 @@ def generate_launch_description():
+@@ -108,14 +120,23 @@ def generate_launch_description():
+     # Determine all ros packages that are sourced
      packages_paths = [os.path.join(p, 'share') for p in os.getenv('AMENT_PREFIX_PATH').split(':')]
  
-     # Set ignition resource path to include all sourced ros packages
-+    # Also include ridgeback_autonomy simulation worlds and models
-+    pkg_this_exploration = get_package_share_directory('ridgeback_autonomy')
+-    # Set ignition resource path to include all sourced ros packages
++    # Set ignition resource path to include all sourced ros packages and this
++    # workspace's custom simulation worlds and models.
++    pkg_ridgeback_autonomy = get_package_share_directory('ridgeback_autonomy')
      gz_sim_resource_path = SetEnvironmentVariable(
          name='GZ_SIM_RESOURCE_PATH',
          value=[
              os.path.join(pkg_clearpath_gz, 'worlds') + ':',
              os.path.join(pkg_clearpath_gz, 'meshes') + ':',
-+            os.path.join(pkg_this_exploration, 'sim', 'worlds') + ':',
-+            os.path.join(pkg_this_exploration, 'sim', 'models') + ':',
++            os.path.join(pkg_ridgeback_autonomy, 'sim', 'worlds') + ':',
++            os.path.join(pkg_ridgeback_autonomy, 'sim', 'models') + ':',
              ':' + ':'.join(packages_paths)])
  
-+    # Add SpawnG1 plugin path so Gazebo GUI can find it
 +    gz_gui_plugin_path = SetEnvironmentVariable(
 +        name='GZ_GUI_PLUGIN_PATH',
 +        value=os.path.join(
-+            get_package_share_directory('ridgeback_autonomy'),
-+            '..', '..', 'lib', 'ridgeback_autonomy'))
++            pkg_ridgeback_autonomy, '..', '..', 'lib', 'ridgeback_autonomy'))
 +
      # Clock bridge
      clock_bridge = Node(
          package='ros_gz_bridge',
-@@ -105,6 +128,7 @@ def generate_launch_description():
+@@ -130,6 +151,7 @@ def generate_launch_description():
      # Create launch description and add actions
      ld = LaunchDescription(ARGUMENTS)
      ld.add_action(gz_sim_resource_path)
@@ -158,18 +158,22 @@ index 69135ab..0f743a9 100644
      ld.add_action(clock_bridge)
      return ld
 diff --git a/clearpath_gz/launch/simulation.launch.py b/clearpath_gz/launch/simulation.launch.py
-index 010f7fb..3bd348a 100644
+index f7df8f2..44b2e5f 100644
 --- a/clearpath_gz/launch/simulation.launch.py
 +++ b/clearpath_gz/launch/simulation.launch.py
-@@ -29,6 +29,8 @@ ARGUMENTS = [
+@@ -29,10 +29,12 @@ ARGUMENTS = [
      DeclareLaunchArgument('world', default_value='warehouse',
                            choices=[
                                'construction',
 +                              'mock_hospital',
-+                              'target_distance_calibration',
                                'office',
                                'orchard',
                                'pipeline',
+                               'solar_farm',
++                              'target_distance_calibration',
+                               'warehouse',
+                           ],
+                           description='Gazebo World'),
 @@ -42,6 +44,9 @@ ARGUMENTS = [
      DeclareLaunchArgument('use_sim_time', default_value='true',
                            choices=['true', 'false'],
@@ -180,13 +184,11 @@ index 010f7fb..3bd348a 100644
  ]
  
  for pose_element in ['x', 'y', 'yaw']:
-@@ -66,7 +71,8 @@ def generate_launch_description():
-     gz_sim = IncludeLaunchDescription(
-         PythonLaunchDescriptionSource([gz_sim_launch]),
+@@ -68,6 +73,7 @@ def generate_launch_description():
          launch_arguments=[
--            ('world', LaunchConfiguration('world'))
-+            ('world', LaunchConfiguration('world')),
-+            ('headless_rendering', LaunchConfiguration('headless_rendering'))
+             ('world', LaunchConfiguration('world')),
+             ('setup_path', LaunchConfiguration('setup_path')),
++            ('headless_rendering', LaunchConfiguration('headless_rendering')),
          ]
      )
  

@@ -1,9 +1,11 @@
 # Plan: establish whether model concurrency is a real bottleneck
 
-Status: **READY FOR MEASUREMENT.** This is an evidence-gathering assignment,
-not authorization to integrate AutoVision or change the production execution
-architecture. It was prepared 2026-09-03 against `cb8061a` after the exact-depth
-transport investigation selected CycloneDDS.
+Status: **READY FOR MEASUREMENT.** The default-off timing instrumentation and
+the fourteen-configuration sweep contract are implemented; the controlled run
+and decision remain open. This is not authorization to integrate AutoVision or
+change the production execution architecture. The plan was prepared 2026-09-03
+against `cb8061a` after the exact-depth transport investigation selected
+CycloneDDS.
 
 ## Decision to make
 
@@ -196,7 +198,7 @@ the sequential cost is simply additive.
 
 ## Phase 3: decide whether a concurrency problem exists
 
-Use observed cadence, not only the nominal 5 FPS limit. Declare a current warm
+Use observed cadence, not only the current nominal 10 FPS limit. Declare a current warm
 throughput problem only if repeated D runs show one or more of:
 
 - pending replacements or a materially lower completed-batch ratio than B/C;

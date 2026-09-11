@@ -86,10 +86,12 @@ statuses, while pointcloud receives coarse OK/UNSET attribution from finiteness.
 Trial CSVs gained `miss_reason`, and the shared dominant-reason rule made a
 specific status outrank UNSET.
 
-This did not create truthful per-ground-truth-instance failure attribution. A
-missing value has no estimator position with which to associate its reason.
-That remaining boundary is tracked in the current backlog and benchmark
-reference.
+This transition alone did not create truthful per-ground-truth-instance failure
+attribution: a missing value has no estimator position with which to associate
+its reason. Later per-estimator planar association closed the safe-attribution
+part of that boundary while leaving unmatched-box reasons at observation
+granularity. The current contract is in the
+[benchmark reference](../benchmarking/target_distance_benchmarking.md#miss-reasons-and-attribution-boundary).
 
 ## Depth acquisition transition
 
@@ -131,7 +133,7 @@ internal camera frames from the selected model, renders from the colour-frame
 pose, and leaves hardware camera-internal TF to the RealSense driver.
 
 The root cause and removed transform are recorded in
-[ISSUES](../ISSUES.md#historical-the-d435-static-publisher-removed-2026-08-31).
+[operational incident history](operational_incidents.md#d435-static-camera-transform--removed-2026-08-31).
 This note exists here only because the change creates a benchmark provenance
 boundary: pre- and post-correction runs must not be presented as the same camera
 geometry.

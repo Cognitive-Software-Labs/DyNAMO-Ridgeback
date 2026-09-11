@@ -16,7 +16,7 @@ are:
 | Model | `google/owlv2-base-patch16-ensemble` |
 | Candidate label | `humanoid robot` |
 | Confidence threshold | `0.55` |
-| Maximum inference cadence | `5 Hz` |
+| Maximum inference cadence | `10 Hz` |
 | Same-label NMS IoU threshold | `0.5` |
 | Same-label containment threshold | `0.95` intersection-over-smaller |
 

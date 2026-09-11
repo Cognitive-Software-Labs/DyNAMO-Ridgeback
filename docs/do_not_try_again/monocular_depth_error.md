@@ -161,5 +161,4 @@ Reopen as a defect only on one of these, not on a large ratio alone:
 Benchmark runs on this host can silently degrade: the camera collapses from
 ~28 Hz to ~5 Hz under GUI contention on the XRDP session, changing coverage
 without changing RTF. Check the camera rate before trusting a new run. See
-`docs/ISSUES.md`, "Camera rate collapses under GUI contention on a
-remote-desktop session".
+[`docs/troubleshooting.md`](../troubleshooting.md#camera-rate-collapses-under-software-rendering).

@@ -64,11 +64,11 @@ front of the G1 with per-instance ground truth still equal to the robot:
 - `interocc_*` — a near robot occludes a far robot.
 
 Per-estimator miss reasons and coverage are already reported (`run.json`
-observation columns plus trial CSV `miss_reason`). The latter is currently
-per trial/estimator, not reliably per ground-truth instance in a multi-robot
-trial; see [the benchmark contract](../benchmarking/target_distance_benchmarking.md).
-Accuracy/outcome rows still make recovery versus confident wrong-near output
-observable, while the finer causal attribution has that stated limit.
+observation columns plus trial CSV `miss_reason`). Multi-target scoring
+associates each estimator's planar outputs independently; it never borrows
+another estimator's position or assumes detection order. Unmatched-box reasons
+remain observation-level rather than being assigned to an unproven target
+identity; see [the benchmark contract](../benchmarking/target_distance_benchmarking.md).
 
 ---
 
@@ -173,8 +173,8 @@ green after each.
 Run the **current** defaults over the new scenario set and read per-scene MAE plus the per-estimator
 miss-reason histograms (`run.json` → `reason_histogram`). This measures the failure
 before building the fix: it splits
-isolation-level failures (the §1 wrong-near lock) from detection-level ones (box shrink/split, the
-single-detection gate), and identifies any `objpartial_*` cases that already survive (occluder sliver
+isolation-level failures (the §1 wrong-near lock) from detection and association outcomes (box shrink,
+split, miss, or unmatched extra detection), and identifies any `objpartial_*` cases that already survive (occluder sliver
 under the nearest-mode significance floor). Output: a per-scene-group baseline table the Phase 3 A/B
 is judged against — and possibly a re-scoping of the phases below.
 

@@ -39,7 +39,8 @@ so it matches.
 so a GUI-launched sweep would `kill -9` the GUI mid-click. Do **not** work around
 it with `--skip-preflight-cleanup`; that flag produces the two-`gz sim` failure
 where every trial dies with "Target pose ... not present". The catch-all must be
-narrowed to actual nodes first. Full description in `docs/ISSUES.md`.
+narrowed to actual nodes first. Full description in
+[`docs/troubleshooting.md`](../troubleshooting.md).
 
 ## Why live is riskier than the three profiles already running
 
@@ -136,7 +137,7 @@ Run pytest from the repo root or `msg` imports fail; source
 ## Build and edit notes for the implementer
 
 `--symlink-install` behaves three different ways in this package; the rule is in
-`AI_CONTEXT.md`. The short version: `configurator.py` is an
+[`docs/project/conventions.md`](../project/conventions.md). The short version: `configurator.py` is an
 `install(PROGRAMS ... RENAME)` **copy**, so it needs `colcon build` and must be
 verified by grepping
 `install/ridgeback_autonomy/lib/ridgeback_autonomy/target_benchmark_configurator`

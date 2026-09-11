@@ -10,9 +10,9 @@ from the aligned depth frame. Is there any difference in *accuracy* or
 > code and never consumes a published cloud, so this question no longer gates
 > the path — the material below is retained as the supporting evidence.
 
-**Status:** script implemented at `~/tmp/cloud_provenance_test.py` (outside the
-repo, never committed — delete after §6 is filled). Run with the sim + detector
-up and the workspace sourced:
+**Status:** completed 2026-07-11. The temporary script described below was
+outside the repository, was never committed, and is no longer a maintained
+rerun entrypoint. Sections 2–7 preserve its protocol, results, and decision.
 
 ```bash
 python3 ~/tmp/cloud_provenance_test.py --ros-args \
@@ -23,10 +23,9 @@ python3 ~/tmp/cloud_provenance_test.py --ros-args \
 ```
 
 One run per G1 position; each writes `~/tmp/cloud_provenance_<label>.csv` and
-prints column medians at exit. `pidstat` / `ros2 topic bw` / `delay` remain
+prints column medians at exit. `pidstat` / `ros2 topic bw` / `delay` were
 manual, per §2. **Results collected 2026-07-11 — see §6. Decision taken — see
-§7: Euclidean reconstruction uses the deprojected cloud only.** Script and CSVs kept in `~/tmp/`
-for re-runs; delete once the decision is implemented.
+§7: Euclidean reconstruction uses the deprojected cloud only.**
 
 ---
 
@@ -310,8 +309,10 @@ parse cost. The wire layer favors the depth image 6× per frame, and the
 producer layer showed no measurable savings from disabling the cloud — so per
 §5 row 3, the published variant can be dropped from the sim benchmark matrix
 entirely, kept only as a debug/RViz reference and as the real-robot control
-case. The real-hardware comparison (raw vs aligned depth, grid mismatch)
-remains open per §2 scope.
+case. The real-hardware comparison (raw vs aligned depth, grid mismatch) was
+still open at this point in the investigation; §7 cancels the
+published-vs-deprojected comparison and redirects hardware validation to the
+aligned-depth contract.
 
 ---
 
@@ -343,6 +344,7 @@ Consequences applied to the other docs:
   — with no production role for the published cloud there is nothing left to
   compare; hardware validation effort moves to the aligned-depth topic itself
   (grid check, hole rate, `align_depth` passthrough).
-- The existing `pointcloud` estimator keeps consuming the published topic until
-  euclidean reconstruction replaces it; its benchmark row is now understood as "deprojected-
-  equivalent geometry + percentile-anchor reduction" per §6.
+- The independent `pointcloud` estimator continues to consume the published
+  topic as its own reference row; that topic is not an input to Euclidean
+  reconstruction. Its benchmark row is understood as "deprojected-equivalent
+  geometry + percentile-anchor reduction" per §6.

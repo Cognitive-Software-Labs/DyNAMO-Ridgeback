@@ -9,10 +9,10 @@ This workspace supports 3 main human workflows:
 
 ## Docs
 
-- [Documentation index](docs/README.md): localization, benchmarking, plans, and historical validation
+- [Documentation index](docs/index.md): project context, architecture, benchmarking, plans, and historical validation
 - `README.md`: installation, public launch usage, and normal human workflows
-- `docs/ISSUES.md`: troubleshooting, resolved root causes, and operational gotchas
-- `AI_CONTEXT.md`: agent-facing repo conventions, mental model, and documentation rules
+- `docs/troubleshooting.md`: current failure signatures and recovery steps
+- `docs/project/`: project context, documentation ownership, and repository conventions
 - `AGENTS.md` / `CLAUDE.md`: thin entrypoints into the shared agent guidance
 
 ## Stack
@@ -73,14 +73,8 @@ cd /path/to/DyNAMO-Ridgeback
 # Clone external dependencies
 vcs import < .repos
 
-# Apply clearpath_gz patch (adds custom worlds/models + SpawnG1 Gazebo GUI plugin)
-cd src/clearpath_simulator/clearpath_gz && git apply ../../../patches/clearpath_gz_customizations.patch && cd ../../..
-
-# Apply slam_toolbox patch (fixes TF namespace issue)
-cd src/slam_toolbox && git apply ../../patches/slam_toolbox_tf_namespace.patch && cd ../..
-
-# Apply clearpath_common patch (camera model owns its own frames in simulation)
-cd src/clearpath_common && git apply ../../patches/clearpath_realsense_sim_frames.patch && cd ../..
+# Verify every checkout is pinned and apply the recorded patches idempotently
+tools/check_dependencies --apply
 
 # Install any remaining deps
 rosdep install --from-paths src --ignore-src -r -y
@@ -94,8 +88,9 @@ If you rename or move the workspace directory later, regenerate `build/` and `in
 
 ### 3. (Optional) Set up target localization venv
 
-The target detection/localization stack (detection + point-cloud measurement +
-overlay) is **on by default** — `ridgeback_exploration.launch.py` ships with
+The target detection/localization stack (detection, the selected measurement
+rows, rings, HUD, and camera overlay) is **on by default** —
+`ridgeback_exploration.launch.py` ships with
 `target_localization_enabled:=true`, which **requires** the venv below; without it the
 detector logs a single clear error and exits cleanly. Disable the whole stack
 with `target_localization_enabled:=false` for a normal exploration run that needs no
@@ -201,7 +196,7 @@ All four distance estimator rows run by default, the same set the benchmark comp
 
 The perception overlay is published on `debug/target/overlay` and shown by the configured RViz Image display.
 
-Bringup is **event-driven** (readiness gates), not fixed timers — each stage starts when its prerequisite exists, with a `--timeout` fallback. See [docs/ISSUES.md](docs/ISSUES.md), "Event-Driven Startup".
+Bringup is **event-driven** (readiness gates), not fixed timers — each stage starts when its prerequisite exists, with a `--timeout` fallback. See [troubleshooting](docs/troubleshooting.md#event-driven-startup).
 
 Available worlds:
 
@@ -231,10 +226,13 @@ Arguments:
 | `target_localization_enabled` | `true` | Launch the target-localization stack |
 | `estimators` | `all` | Distance estimator rows to run — `all`, or a comma-separated subset of `pointcloud`, `projective_ranging`, `euclidean_reconstruction`, `polar_profiling`. Selects the measurement nodes, the rings and the HUD columns from one list |
 | `estimate_viz` | `true` | Publish the estimator rings and the wide distance HUD |
+| `detector_fps` | `10.0` | Upper bound on detection step starts; every selected measurement row inherits this cadence |
+| `detector_debug` | `false` | Log detector cadence, superseded frames, and bounded stage timings |
 | `depth_source` | `stereoscopic` | Aligned depth source for the mask rows — `stereoscopic` or `monocular` (Depth-Anything V2; downloads a checkpoint on first use) |
 | `mask_gate` | `box` | Mask front-end — `box` (no segmentation model) or `silhouette` (SlimSAM) |
 | `mppi_visualize` | `false` | Publish MPPI trajectory visualization topics (RViz already has `MPPI Optimal` and `MPPI Samples` displays subscribed to `/r100_0001/optimal_trajectory` and `/r100_0001/trajectories`) |
-| `headless_rendering` | `false` | Optional server-only EGL sensor rendering for SSH/non-seat sessions; the existing `tools/gpu-run` NVIDIA GLX workflow remains the default GUI-capable path (see [docs/ISSUES.md](docs/ISSUES.md), "Camera rate collapses") |
+| `coverage_overlay_enabled` | `true` | Publish the live exploration-coverage HUD panel |
+| `headless_rendering` | `false` | Optional server-only EGL sensor rendering for SSH/non-seat sessions; the existing `tools/gpu-run` NVIDIA GLX workflow remains the default GUI-capable path (see [troubleshooting](docs/troubleshooting.md#camera-rate-collapses-under-software-rendering)) |
 
 Examples:
 
@@ -251,7 +249,7 @@ ros2 launch ridgeback_autonomy ridgeback_exploration.launch.py world:=office hea
 ros2 launch ridgeback_autonomy ridgeback_exploration.launch.py estimators:=pointcloud
 ```
 
-The explorer is the in-repo `frontier_explorer_node` (sources under `src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer/`). It consumes the Nav2 global costmap and sends goals via `NavigateToPose`. It replaced `explore_lite` after a head-to-head benchmark — see [docs/ISSUES.md](docs/ISSUES.md), "Exploration Quits Early", for the findings.
+The explorer is the in-repo `frontier_explorer_node` (sources under `src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer/`). It consumes the Nav2 global costmap and sends goals via `NavigateToPose`. The component boundary and readiness sequence are documented in [exploration architecture](docs/exploration/architecture.md).
 
 #### Quick-start script
 
@@ -271,12 +269,12 @@ UDP-only FastDDS experiment is retained in the
 [investigation history](docs/history/exact_stamp_depth_availability.md).
 
 Every launch entrypoint also points `CYCLONEDDS_URI` at
-`config/cyclonedds.xml`, which raises the participant-index ceiling. Exploration
-starts 51 processes and aborts `slam_toolbox`, the whole Nav2 stack and the
-explorer on Cyclone's default — see
-[docs/ISSUES.md](docs/ISSUES.md), "Nav2 and slam_toolbox abort on CycloneDDS's
-participant-index ceiling". Setting `CYCLONEDDS_URI` yourself overrides it; the
-launch files only fill in a value when none exists.
+`config/cyclonedds.xml`, which raises the participant-index ceiling. The full
+exploration process set exceeds Cyclone's default and can abort `slam_toolbox`,
+the Nav2 stack, and the explorer — see
+[troubleshooting](docs/troubleshooting.md#cyclonedds-participant-ceiling).
+Setting `CYCLONEDDS_URI` yourself overrides it; the launch files only fill in a
+value when none exists.
 
 `build_and_start_expl.sh` rebuilds the workspace first, then runs the same exploration quick-start (extra args are forwarded to `start_exploration.sh`):
 
@@ -314,7 +312,7 @@ ros2 launch ridgeback_autonomy target_distance_benchmark.launch.py estimators:=p
 ros2 launch ridgeback_autonomy target_distance_benchmark.launch.py estimators:=polar_profiling
 ```
 
-This compatibility launch composes two layers. `target_benchmark_env.launch.py` owns the simulator, camera TF, RViz, and `target_detector_node`; `target_benchmark_config.launch.py` waits for the color and warm-detector topics, then starts the selected measurement nodes, visualizations, HUD, overlay, and `target_distance_benchmark_runner`. Every row is individually selectable: `estimators` is split per stack and each measurement node is passed only the rows it owns, so a path that was not selected is never run — its fields stay NaN, it gets no CSV, and the inputs only it needs are never subscribed to. Selecting any mask row launches `target_mask_measurement_node`, which for `projective_ranging`/`euclidean_reconstruction` obtains the aligned depth frame itself, at the detection stamp, through the source `depth_source` selects; `polar_profiling` needs no depth at all, so a polar-only run builds no depth source (and under `depth_source:=monocular`, loads no model). The mask node builds one mask per detection (`mask_gate:=box` rasterizes the detection box; `mask_gate:=silhouette` prompts a segmentation model with the boxes, needs `perception_venv`) and runs the localization paths from `docs/localization/`.
+This compatibility launch composes two layers. `target_benchmark_env.launch.py` owns the simulator, camera TF, RViz, and `target_detector_node`; `target_benchmark_config.launch.py` waits for the color and warm-detector topics, then starts the selected measurement nodes, visualizations, HUD, overlay, and `target_distance_benchmark_runner`. Every row is individually selectable: `estimators` is split per stack and each measurement node is passed only the rows it owns, so a path that was not selected is never run — its fields stay NaN, it gets no CSV, and the inputs only it needs are never subscribed to. Selecting any mask row launches `target_mask_measurement_node`, which for `projective_ranging`/`euclidean_reconstruction` obtains the aligned depth frame itself, at the detection stamp, through the source `depth_source` selects; `polar_profiling` needs no depth at all, so a polar-only run builds no depth source (and under `depth_source:=monocular`, loads no model). The mask node builds one mask per detection (`mask_gate:=box` rasterizes the detection box; `mask_gate:=silhouette` prompts a segmentation model with the boxes, needs `perception_venv`) and runs the localization paths documented under [`docs/target_localization/`](docs/target_localization/target_localization_pipeline.md).
 
 The mask rows are identified by their config axes — the mask gate (`mask_gate`), the aligned-depth source (`depth_source`), the path, and on the box gate the foreground-isolation recipe (`isolation_2d` for projective ranging, `isolation_3d` for euclidean reconstruction) — so their CSV files fold the axes into a self-describing name. The stereoscopic box-gate run above writes `box_gated_stereoscopic_projective_ranging_nearest_mode_histogram.csv` and `box_gated_stereoscopic_euclidean_reconstruction_height_crop_nearest_mode_band.csv`; silhouette rows drop the isolation token (the tight branches never run a recipe), e.g. `silhouette_gated_stereoscopic_projective_ranging.csv`; polar profiling folds the gate only (`box_gated_polar_profiling.csv`). The `pointcloud` row keeps its plain name.
 
@@ -338,7 +336,11 @@ Arguments:
 | `setup_path` | `~/clearpath/` | Directory containing `robot.yaml` and generated Clearpath files |
 | `world` | `target_distance_calibration` | Gazebo world used for the benchmark run |
 | `gz_gui` | `true` | Launch Gazebo's GUI; set `false` for unattended benchmark runs |
+| `exploration_rviz` | `true` | Launch the persistent benchmark RViz window |
+| `estimate_viz` | `true` | Publish estimator rings and the benchmark distance HUD |
+| `overlay` | `true` | Publish the camera overlay with selected estimator panels |
 | `estimators` | `all` | Comma-separated estimator subset to compare in one run: `pointcloud`, `projective_ranging`, `euclidean_reconstruction`, `polar_profiling`. Any subset works, rows individually — `estimators:=polar_profiling` runs that row alone |
+| `scenario` | empty | Scenario YAML; empty uses the packaged full scenario set |
 | `depth_source` | `stereoscopic` | Aligned-depth producer for the `projective_ranging`/`euclidean_reconstruction` rows: `stereoscopic` or `monocular`; comparing sources = two runs |
 | `mask_gate` | `box` | Mask front-end for the mask-based rows: `box` (rasterized detection box, no model) or `silhouette` (segmentation model prompted with the boxes; needs `perception_venv`); comparing gates = two runs |
 | `depth_match_debug` | `false` | Default-off mask-worker evidence logging: exact-depth delivery, pending replacements, batch completion/publication age, and bounded cold/warm percentiles for RGB, SlimSAM, depth production, mask preparation, estimator reduction, worker, lock, and CUDA-synchronization timing |
@@ -358,6 +360,9 @@ Arguments:
 | `isolation_2d_band_m` | `0.35` | Depth band kept around the near-surface anchor. `nearest_mode_histogram` only; `otsu` has no band and ignores it |
 | `isolation_2d_min_bin_fraction` | `0.05` | Fraction of the masked depths a histogram bin must hold before the anchor may sit on it. `nearest_mode_histogram` only |
 | `min_valid_pixels` | `10` | Shared foreground-sample floor for projective ranging and Euclidean reconstruction; both depth rows reject a prepared selection below it |
+| `polar_range_jump_m` | `0.30` | Adjacent-beam range step that starts a new polar run |
+| `polar_range_band_m` | `0.35` | Maximum offset behind the nearest run for merging another polar run |
+| `polar_min_valid_rays` | `2` | Beam floor required for a polar estimate |
 | `camera_info_topic` | `sensors/camera_0/color/camera_info` | Compatibility override for the shared camera contract's color-grid intrinsics |
 | `repeats` | `5` | Number of positive-trial repeats per spawn pose |
 | `output_dir` | `<repo-root>/artifacts/benchmarks` | Root directory that will receive one timestamped subfolder per run |
@@ -370,6 +375,7 @@ Arguments:
 | `capture_batches` | `5` | Raw detector batches captured per trial when either replay output is set; empty batches count. Five was selected by the 2026-09-09 convergence run |
 | `capture_drain_sec` | `2.0` | Maximum post-quota drain for matching exact depth, camera context, and live measurement messages. Capture ends early when every selected stamp is complete and preserves missing matches when the bound expires |
 | `capture_timeout_sec` | `30.0` | Hard wall-time bound for obtaining the raw detector-batch quota; it is a stall guard, not the normal capture duration |
+| `record_video` | `true` | Best-effort RViz recording to `video/run.mp4`; disable for timing runs where screen capture would be unwanted load |
 | `color_topic` | `sensors/camera_0/color/image` | Compatibility override for the shared camera contract's color image; feeds detector, measurements, overlay, runner, and readiness gate |
 | `depth_topic` | `sensors/camera_0/depth/image` | Simulation's color-aligned depth. A hardware RealSense launch must override this to `sensors/camera_0/aligned_depth_to_color/image_raw` |
 | `pointcloud_topic` | `sensors/camera_0/points` | Simulation's organized point cloud. It is optional on RealSense; omit the pointcloud estimator or override this only after confirming driver output |
@@ -377,11 +383,12 @@ Arguments:
 | `base_frame` | `<namespace>/robot/base_link` | Vehicle frame used for point-cloud and scan projection |
 
 Benchmark semantics:
-- only positive spawned-target trials are kept
-- only successful single-target detections are used
-- a trial is included only if every selected estimator has a usable aligned event
-- each estimator CSV stores one row per included trial, using the median estimate over that trial’s aligned usable detections
-- the shared collage image for each trial is built from one representative aligned detection event that is closest to the per-trial medians across the selected estimators
+
+- each estimator scores its own usable events; one estimator may score while another misses
+- multi-target events are associated per estimator from planar positions, never by detection order or another estimator's result
+- zero-detection, gate-miss, and no-value outcomes remain scored misses; only infrastructure failures skip a trial
+- each estimator CSV stores one row per ground-truth instance, using the median of that estimator's associated values
+- the shared trial collage uses one representative event chosen from the available previews and estimates; it is evidence for the trial, not an instance-association source
 
 ### Local benchmark configurator
 
@@ -410,7 +417,8 @@ archiving or hand-editing.
 
 **Live sweeps still start from a terminal.** They need a GPU-backed X session,
 and `target_benchmark_sweep` runs `cleanup.sh` before Gazebo starts, which would
-kill the page — see [docs/ISSUES.md](docs/ISSUES.md). Copy the command instead.
+kill the page — see [docs/troubleshooting.md](docs/troubleshooting.md). Copy
+the command instead.
 
 The Results panel lists typed artifacts and run outputs, and can rename them.
 Rename is refused where the directory name is load-bearing — a sweep's config
@@ -460,11 +468,12 @@ configuration twice as an in-sweep noise control. See
 [projective parameter sensitivity](docs/history/projective_parameter_sensitivity.md)
 for what is already settled and what those runs are meant to answer.
 
-Do **not** run `cleanup.sh` between configurations: it kills Gazebo and RViz,
-which are deliberately persistent. The supervisor runs it once, immediately
-before starting that environment. It then owns each config process group,
-removes any orphan `bench_*` entities after an unclean exit, and shuts the
-environment down at the end. If a sweep is interrupted, rerun the same command:
+Do **not** run `cleanup.sh` between configurations: it kills the Gazebo server
+and RViz, which are deliberately persistent, although it leaves `gz sim gui`
+running. The supervisor runs it once, immediately before starting that
+environment. It then owns each config process group, removes any orphan
+`bench_*` entities after an unclean exit, and shuts the environment down at the
+end. If a sweep is interrupted, rerun the same command:
 the latest incomplete sweep with the same YAML and `--only` selection is resumed,
 valid `run.json` configurations are skipped, and partial config folders are
 preserved with an `.incomplete_<timestamp>` suffix before retry.
@@ -655,10 +664,10 @@ or integration claims.
 |------|--------------|------------|
 | `target_detector_node` | `detections/target/raw` | `color_topic`, `detection_model`, `detection_threshold`, `detector_fps` (default `10.0`; an upper bound on *step starts*, so the achieved rate matches the setpoint until inference alone exceeds the period), `detector_debug` |
 | `target_pointcloud_measurement_node` | `measurements/target/pointcloud` | `color_topic`, `pointcloud_topic`, `base_frame`, `enabled_estimators` |
-| `target_mask_measurement_node` | `measurements/target/mask` (+ `debug/target/mask` on the silhouette gate, + `debug/target/mask/aligned_depth` when a depth path is enabled, + `visualization/target/polar_rays` when polar profiling is) | `enabled_estimators`, `depth_source`, `depth_topic`, `camera_info_topic`, `scan_topic`, `base_frame` (**must be passed** — its own default is the bare `base_link`, unlike the other nodes', which are namespace-derived), `pitch_deg`, `front_offset_m`, `isolation_2d` and its three numeric settings, `min_valid_pixels`, `isolation_3d` and its six numeric settings, `mask_gate`, `segmentation_model`, `color_topic`, `ray_marker_topic` |
+| `target_mask_measurement_node` | `measurements/target/mask` (+ subscriber-gated mask/aligned-depth debug images, `visualization/target/polar_rays`, and `debug/target/polar_beams` as selected) | `enabled_estimators`, `depth_source`, `depth_topic`, `camera_info_topic`, `scan_topic`, `base_frame` (**must be passed** — its own default is the bare `base_link`, unlike the other nodes', which are namespace-derived), `pitch_deg`, `front_offset_m`, `isolation_2d` and its three numeric settings, `min_valid_pixels`, `isolation_3d` and its six numeric settings, polar-isolation settings, `mask_gate`, `segmentation_model`, `color_topic`, `ray_marker_topic` |
 | `target_overlay_node` | `debug/target/overlay` | `measurement_topic`, `mask_measurement_topic`, `color_topic`, `aligned_depth_topic`, `estimators`, `max_cols`, `rgb_panel_labels` |
 | `target_visualization_node` | `visualization/target/estimates` + `hud/target_distances` | `base_frame`, `world_frame`, `marker_lifetime_sec`, `ground_truth_topic`, `estimators` (gates both the HUD rows and the rings; defaults to `all`), `hud_layout` (`rows` — the benchmark's, with truth and error columns — or `wide`, exploration's estimator columns with an age under each) |
-| `target_distance_benchmark_runner` | per-estimator CSVs + summary CSV + trial collage images + `video/run.mp4` | `estimators`, `output_dir`, `pointcloud_measurement_topic`, `mask_measurement_topic`, `color_topic`, `record_video`, `record_fps` |
+| `target_distance_benchmark_runner` | per-estimator CSVs + `run.json` + `summary.md` + trial collage images + optional `video/run.mp4` | `estimators`, `output_dir`, `pointcloud_measurement_topic`, `mask_measurement_topic`, `color_topic`, `record_video`, `record_fps` |
 
 Camera intrinsics come from the colour camera's `CameraInfo`. There is no intrinsics config file to tune — `config/camera_config.json` and its loader were deleted once the last estimator that read their FoV constants was removed.
 
@@ -690,8 +699,8 @@ Repository-owned logs and results live under the Git-ignored `artifacts/` direct
 
 | Directory | Contents |
 |-----------|----------|
-| `artifacts/colcon/` | Colcon build/test logs; older logs are preserved under `history/` |
-| `artifacts/exploration/<run>/` | `console.log` and `ros/` for each quick-start launch; older flat `.log` files remain alongside these folders |
+| `artifacts/colcon/` | Colcon's timestamped build/test log directories and its `latest*` links |
+| `artifacts/exploration/<run>/` | `console.log` and `ros/` for each quick-start launch |
 | `artifacts/benchmarks/<run-or-sweep>/` | Benchmark JSON/CSV reports, images, video, and child-process logs |
 
 `colcon_defaults.yaml` sets the log base for Colcon commands run from the workspace root. Use `colcon --log-base /somewhere/else build ...` to override it. The build helper also uses an absolute log base when invoked from elsewhere and honors `COLCON_LOG_PATH`.
@@ -702,31 +711,33 @@ Direct `ros2 launch` commands still use ROS's normal log destination unless you 
 
 Existing runs were relocated without rewriting their contents: absolute paths recorded in old run metadata describe the original execution location. Reports and sweep resume use the relocated folders. Do not treat benchmark results as disposable logs; no automatic pruning is enabled.
 
-## Patches and Issue History
+## Patches, troubleshooting, and history
 
 This project still relies on three local patches:
 
 1. `patches/clearpath_gz_customizations.patch` patches `src/clearpath_simulator/clearpath_gz` to add this repo's Gazebo worlds/models to the simulator search path and to expose the custom `SpawnG1` Gazebo GUI plugin.
 2. `patches/slam_toolbox_tf_namespace.patch` patches `src/slam_toolbox` so `slam_toolbox` respects namespaced TF remappings.
-3. `patches/clearpath_realsense_sim_frames.patch` patches `src/clearpath_common` (recorded against revision `9960354`) so `intel_realsense.urdf.xacro` forwards `is_sim` into the camera macro as `use_nominal_extrinsics`, and so the Gazebo render sensor sits on the model's colour frame. Without it, simulation has no `camera_0_color_optical_frame` TF and the mask estimators report `TF_MISS_EXTRINSIC`.
+3. `patches/clearpath_realsense_sim_frames.patch` patches `src/clearpath_common` so `intel_realsense.urdf.xacro` forwards `is_sim` into every supported camera macro as `use_nominal_extrinsics`, and so the Gazebo render sensor sits on the model's colour frame. Without it, simulation has no `camera_0_color_optical_frame` TF and the mask estimators report `TF_MISS_EXTRINSIC`.
 
 Because the patches are recorded against specific upstream revisions, `.repos`
 pins every dependency to an exact commit rather than to a branch tip. Do not
 change a pin to `jazzy`/`main` to pick up a fix: a fresh `vcs import` would then
-clone commits the patches were never rebased onto. As of 2026-09-07 the pinned
-`clearpath_common` was 39 commits behind its branch tip, and the realsense patch
-did not apply to that tip. Refreshing the pins is a deliberate, gated task — see
-"Upstream dependency refresh" in [BACKLOG.md](docs/BACKLOG.md).
+clone commits the patches were never rebased onto. The complete import, refresh,
+live-checkout migration, and rollback procedure lives in the
+[dependency runbook](docs/project/dependencies.md). The latest completed refresh
+and its evidence are recorded in
+[dependency refresh history](docs/history/dependency_refresh.md).
 
-Each patch is a plain `git apply`, which is not idempotent. Check before re-running:
+`tools/check_dependencies` verifies every checkout revision and rejects
+untracked files or changes beyond the recorded patches. Its `--apply` mode
+applies missing patches idempotently; without that option it is a read-only
+gate. Run it after every import and before builds:
 
 ```bash
-# "not applied" -> apply it; "already applied" -> skip; anything else -> local conflict, resolve by hand
-cd src/clearpath_common
-git apply --check      ../../patches/clearpath_realsense_sim_frames.patch && echo "not applied"
-git apply --reverse --check ../../patches/clearpath_realsense_sim_frames.patch && echo "already applied"
+tools/check_dependencies --apply
 ```
 
-Never re-run an apply that failed, and never resolve a conflict by discarding unrelated changes in the dependency checkout.
+Never resolve a reported conflict by discarding unrelated changes in a
+dependency checkout.
 
-The deeper root-cause notes, previous middleware workarounds, namespace gotchas, and troubleshooting tips now live in [ISSUES.md](docs/ISSUES.md).
+Current recovery steps live in [troubleshooting](docs/troubleshooting.md), while dated root causes and measurements live in [operational incident history](docs/history/operational_incidents.md).
