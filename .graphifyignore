@@ -8,19 +8,31 @@ artifacts/
 
 # python virtualenvs
 perception_venv/
+isaac_venv/
 .venv/
 venv/
 
-# generated clearpath runtime config (auto-generated from clearpath/robot.yaml)
-clearpath/
+# local Python/tool caches
+.pytest_cache/
+__pycache__/
+*.pyc
+
+# tool-managed worktrees contain duplicate repository checkouts
+.claude/worktrees/
+
+# Clearpath runtime output generated from the canonical clearpath/robot.yaml
+clearpath/manipulators/
+clearpath/platform/
+clearpath/sensors/
+clearpath/robot.srdf
+clearpath/robot.srdf.xacro
+clearpath/robot.urdf.xacro
 
 # vendored external ROS 2 dependencies (tracked via .repos, not our code)
 src/clearpath_common/
 src/clearpath_config/
 src/clearpath_msgs/
-src/clearpath_nav2_demos/
 src/clearpath_simulator/
-src/m-explore-ros2/
 src/slam_toolbox/
 
 # patches directory contains upstream diffs, not project code
