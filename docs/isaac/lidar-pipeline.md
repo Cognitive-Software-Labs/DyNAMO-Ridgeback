@@ -5,7 +5,7 @@ Handoff dossier for the "rotation cooks the SLAM map" investigation on
 fixed; the originally-suspected `slam_toolbox` params were largely exonerated
 by measurement. Commits: `66493670` (scan-from-cloud + harness),
 `e1862498` (left-half FOV restore). Artifacts referenced below live in
-[`slam_quality_report/`](slam_quality_report/).
+[`assets/slam-quality/`](assets/slam-quality/).
 
 ## TL;DR
 
@@ -46,15 +46,15 @@ into bin labels spanning 360°:
   probe run below: slam estimate collapsed near the origin while the
   robot drove the loop; GT walls blue, GT trajectory green, slam red).
 
-![Run A: baseline on the broken sensor — starburst map, estimate stuck near origin](slam_quality_report/A_overlay.png)
+![Run A: baseline on the broken sensor — starburst map, estimate stuck near origin](assets/slam-quality/A_overlay.png)
 
 **Exoneration matrix** (broken sensor): baseline (A), travel-gated params
 (B), zero odometry noise (C) all failed identically — RMSE 7–8 m, IoU ~0.1.
 Neither the slam params nor odom noise was the cause.
 
-![Run B: travel-gated slam params on the broken sensor — still destroyed](slam_quality_report/B_overlay.png)
+![Run B: travel-gated slam params on the broken sensor — still destroyed](assets/slam-quality/B_overlay.png)
 
-![Run C: zero odometry noise on the broken sensor — still destroyed](slam_quality_report/C_overlay.png)
+![Run C: zero odometry noise on the broken sensor — still destroyed](assets/slam-quality/C_overlay.png)
 
 **Fix (`66493670`)**: the bridge publishes the lidar's `point_cloud` output
 (Cartesian returns, verified sensor-frame correct to ~2.6 cm against the
@@ -69,7 +69,7 @@ left*. The published scan covered azimuths [−135°, 0°] only — the drawing
 below shows the configured 270° arc (green) vs the measured rays (red):
 522 right, 0 left.
 
-![FOV proof: configured 270° arc (green) vs measured returns (red) — left half empty](slam_quality_report/fov_proof.png)
+![FOV proof: configured 270° arc (green) vs measured returns (red) — left half empty](assets/slam-quality/fov_proof.png)
 
 Measured mechanism (offset experiments, all on fresh single-sim boots):
 
@@ -98,9 +98,9 @@ stamp pair**, so a scan never mixes two capture instants (mixed-freshness
 halves measurably warped the map: IoU 0.48 vs 0.54, loop error 0.33 m vs
 0.07 m):
 
-![Run B5: full FOV but seamed scans — whole map slightly offset from GT](slam_quality_report/B5_overlay.png)
+![Run B5: full FOV but seamed scans — whole map slightly offset from GT](assets/slam-quality/B5_overlay.png)
 
-![Run B6: pair-consistent scans — ship state](slam_quality_report/B6_overlay.png)
+![Run B6: pair-consistent scans — ship state](assets/slam-quality/B6_overlay.png)
 
 ## Bug 3 — runner processed one ROS callback per render frame
 
@@ -127,9 +127,9 @@ rigid and re-localizes at rest); travel gating is strictly worse here;
 `link_match_minimum_response_fine: 0.8` (stock) gives small consistent
 gains. Shipped config = gz-era gating + link 0.8 only.
 
-![Run B3: right half tracked cleanly, then one bad loop closure folded the graph 7.4 m](slam_quality_report/B3_overlay.png)
+![Run B3: right half tracked cleanly, then one bad loop closure folded the graph 7.4 m](assets/slam-quality/B3_overlay.png)
 
-![Run B4: best half-blind-era map — note the west-end trajectory excursion](slam_quality_report/B4_overlay.png)
+![Run B4: best half-blind-era map — note the west-end trajectory excursion](assets/slam-quality/B4_overlay.png)
 
 Note B4's IoU (0.74) exceeding B6's (0.54) is an artifact: the half-blind
 sensor observed a much smaller region, concentrated where geometry was
@@ -149,21 +149,21 @@ crisp. B6 is the honest sensor.
 Final windowed full-loop overlay (map black, GT walls blue, GT trajectory
 green, slam estimate red, waypoints orange):
 
-![WINDOWED3: final full-loop run on the fixed sensor — RMSE 0.195 m](slam_quality_report/WINDOWED3_overlay.png)
+![WINDOWED3: final full-loop run on the fixed sensor — RMSE 0.195 m](assets/slam-quality/WINDOWED3_overlay.png)
 
 The analytic ground-truth grid the metrics score against (rasterized from
 the SDF at the lidar plane z=0.418 (**stale: the plane is 0.3024 since the 2026-09-10 mount correction — figure not regenerated**); orange = G1 ignore mask):
 
-![Analytic GT occupancy grid from mock_hospital.sdf](slam_quality_report/gt_hospital.png)
+![Analytic GT occupancy grid from mock_hospital.sdf](assets/slam-quality/gt_hospital.png)
 
 A live-scan world-frame debug plot from the bug-1 era (points landing on
 walls that should be occluded — the angular warp made wrong geometry look
 locally plausible):
 
-![Scan debug plot during bug 1: warped angular mapping](slam_quality_report/scan_debug.png)
+![Scan debug plot during bug 1: warped angular mapping](assets/slam-quality/scan_debug.png)
 
 All runs' metrics JSONs sit beside the images in
-[`slam_quality_report/`](slam_quality_report/).
+[`assets/slam-quality/`](assets/slam-quality/).
 
 Known residuals (accepted, documented):
 - transient pose error ~0.2 m during long corridor legs — longitudinal

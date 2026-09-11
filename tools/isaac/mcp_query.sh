@@ -6,7 +6,7 @@
 #   tools/isaac/mcp_query.sh list
 #   tools/isaac/mcp_query.sh call <tool_name> '<json-arguments>'
 #
-# Server setup: docs in tools/isaac/PORT_PLAN.md (P1). Container:
+# Server setup: docs in docs/isaac/port-plan.md (P1). Container:
 #   docker run -d --name isaacsim-mcp -p 127.0.0.1:9904:9904 \
 #     --env-file ~/.config/nvidia/mcp.env isaacsim-mcp:latest
 set -euo pipefail

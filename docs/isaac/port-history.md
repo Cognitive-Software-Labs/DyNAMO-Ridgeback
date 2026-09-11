@@ -1,8 +1,8 @@
 # Isaac port — investigation history
 
 Superseded and completed investigation narratives, moved out of
-`PORT_PLAN.md` so the plan stays readable. Nothing here is current status:
-`OPEN_ISSUES.md` is what is broken now, `PORT_PLAN.md` is the phase plan.
+`port-plan.md` so the plan stays readable. Nothing here is current status:
+`open-issues.md` is what is broken now, `port-plan.md` is the phase plan.
 
 Kept rather than deleted because each records **what was ruled out and how**,
 which is the expensive part to reproduce. Several of these conclusions were

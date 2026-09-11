@@ -1,6 +1,6 @@
 # Isaac port — open issues
 
-Live register for the Isaac Sim 6.0 port. `PORT_PLAN.md` holds the phase plan
+Live register for the Isaac Sim 6.0 port. `port-plan.md` holds the phase plan
 and what each phase delivered; this file holds what is **currently wrong**.
 `../../ISSUES.md` is the repo-wide troubleshooting archive — issues move there
 once they are solved and the writeup is worth keeping.
@@ -118,7 +118,7 @@ phantom returns.
 The original task. Still zero numbers produced. Sensor geometry changed **four
 times** on 2026-09-10 (coplanar lidars, −11.6 cm mount, vendor chassis graft,
 camera + mast + D455), and issue 1 means exploration cannot run at all in the
-worlds that matter. Every coverage figure in `PORT_PLAN.md` predates all of it
+worlds that matter. Every coverage figure in `port-plan.md` predates all of it
 and should be treated as void, not as a comparison point.
 
 ### 4. Ground-truth maps need one more regeneration
@@ -157,7 +157,7 @@ robot → one clean 6.0.1 baseline → migrate → rerun the identical benchmark
 
 Resequence only if issue 1 proves to be a 6.0.1 sensor-pipeline defect rather
 than config — check the 6.1 notes for the `laser_scan` ROI fix. See
-`PORT_PLAN.md` §P9.
+`port-plan.md` §P9.
 
 ---
 

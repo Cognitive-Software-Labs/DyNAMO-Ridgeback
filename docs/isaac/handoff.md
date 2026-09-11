@@ -7,19 +7,19 @@ Gazebo Harmonic to **Isaac Sim 6.0 GA**. Work happens ONLY in the worktree
 
 ## Read these first, in order
 
-1. **`tools/isaac/OPEN_ISSUES.md`** — the live register of what is broken.
+1. **`docs/isaac/open-issues.md`** — the live register of what is broken.
    Start here. It records what has been ruled out *by measurement* for each
    open bug, which is most of the value: several plausible theories are
    already dead and re-testing them wastes a day.
 2. Your memory file `isaac-sim-6-port` (the 6.0.1 landmine list — trust it,
    do not rediscover). Also skim `nav-tuning-in-flight` and
    `shared-dev-box-contention`.
-3. `tools/isaac/PORT_PLAN.md` — the 9-phase plan and its history. Its
+3. `docs/isaac/port-plan.md` — the 9-phase plan and its history. Its
    performance numbers are **stale by design**; geometry changed four times on
    2026-09-10 and nothing has been rerun since.
-4. `tools/isaac/SLAM_QUALITY_REPORT.md` — how the RTX lidar reaches ROS. The
+4. `docs/isaac/lidar-pipeline.md` — how the RTX lidar reaches ROS. The
    assembler synthesizes the 270° contract scan from two OmniLidar prims.
-5. `tools/isaac/robot_geometry.svg` + `robot_render.png` — the sensor mounting,
+5. `docs/isaac/assets/robot-geometry.svg` + `robot_render.png` — the sensor mounting,
    dimensioned. Worth 5 minutes before touching anything geometric.
 6. `AI_CONTEXT.md`. Note: it still has **zero** Isaac content — that rewrite is
    P8 scope, not drift.
@@ -29,13 +29,13 @@ Gazebo Harmonic to **Isaac Sim 6.0 GA**. Work happens ONLY in the worktree
 **Navigation does not run.** `collision_monitor` latches on 13 phantom lidar
 returns and publishes zero `cmd_vel` while the controller is healthy. The
 robot never moves in `hospital` or `warehouse_full`. This blocks the baselines,
-which blocks the P5 A/B, which blocks P8. `OPEN_ISSUES.md` §1 has the full
+which blocks the P5 A/B, which blocks P8. `open-issues.md` §1 has the full
 evidence table and the cheapest untried test (read
 `local_costmap/published_footprint` — it has never been looked at, and every
 "inside the footprint" claim so far used an assumed hull).
 
 **The robot also floats 49.8 mm** on every stock world, which puts the scan
-plane 5 cm high (`OPEN_ISSUES.md` §2). Independent of the stall — the bare
+plane 5 cm high (`open-issues.md` §2). Independent of the stall — the bare
 runner floats too and shows no phantom returns.
 
 **No baseline has ever been rerun.** That was the original request and it is
@@ -96,14 +96,14 @@ On `mock_hospital`, `odom_noise:=0`, deterministic, camera off, isolated domain:
 
 ## Your objective
 
-1. **Unblock navigation** (`OPEN_ISSUES.md` §1). Nothing downstream can be
+1. **Unblock navigation** (`open-issues.md` §1). Nothing downstream can be
    measured until the robot moves.
 2. **Seat the robot** (§2), then regenerate the ground-truth maps once — the
    seat fix moves the slice plane for stock worlds and invalidates them again,
    so do it in that order, not the reverse.
 3. **Then the baselines**, then the P5 A/B (3–5 seeds per condition; single
    runs prove nothing at 51–83% variance).
-4. **Then Isaac 6.1** (`PORT_PLAN.md` §P9), and only then P8. The 6.1 move is
+4. **Then Isaac 6.1** (`port-plan.md` §P9), and only then P8. The 6.1 move is
    sequenced after a baseline on purpose: it is the only way to tell whether
    the upgrade helped, and it may let several 6.0.1 workarounds be deleted
    outright. Do not migrate first — you would change the platform with nothing

@@ -6,7 +6,7 @@ automates this recipe.
 
 > ⚠️ **Exploration benchmarks do not currently run on Isaac.**
 > `collision_monitor` latches on phantom lidar returns and the robot never
-> moves in `hospital` or `warehouse_full`. See `tools/isaac/OPEN_ISSUES.md` §1
+> moves in `hospital` or `warehouse_full`. See `docs/isaac/open-issues.md` §1
 > before spending a session on a run that cannot produce a number.
 
 ## Canonical run

@@ -8,6 +8,15 @@ Shared repository guidance for AI coding agents working in this repo.
 - `AI_CONTEXT.md`: canonical agent-facing repo conventions, mental model, and documentation rules
 - `ISSUES.md`: troubleshooting, historical root causes, and operational gotchas
 - `AGENTS.md` / `CLAUDE.md`: thin entrypoints that point agents here
+- `docs/isaac/`: the Isaac Sim port — see `docs/isaac/README.md` for the index
+
+Isaac port docs own their own topics and are the canonical source for them:
+
+- `docs/isaac/open-issues.md`: what is currently broken on the port
+- `docs/isaac/port-plan.md`: phases P0–P9, acceptance criteria
+- `docs/isaac/robot-model.md`: URDF → USD → meshes → sensors → colliders
+- `docs/isaac/lidar-pipeline.md`: how the RTX lidar reaches ROS, SLAM quality
+- `docs/isaac/port-history.md`: concluded/superseded investigations
 
 ## Documentation Rules
 
@@ -21,6 +30,7 @@ Update rules:
 - If a change affects user setup, launch commands, public parameters, or operator workflow, update `README.md`
 - If a change affects agent behavior, repo conventions, codebase navigation, graphify workflow, or non-obvious implementation context, update `AI_CONTEXT.md`
 - If a change explains a failure mode, workaround, debugging recipe, or historical root cause, update `ISSUES.md`
+- If a change affects the Isaac port, update the matching `docs/isaac/` file rather than growing `ISSUES.md` or `README.md`: broken-now goes to `open-issues.md`, robot geometry to `robot-model.md`, sensor pipeline to `lidar-pipeline.md`. `ISSUES.md` receives an issue only once it is **solved** and the writeup is worth keeping
 - If a fact belongs in multiple places, prefer one canonical source and cross-reference it
 - Small duplication is acceptable only when the second doc serves a different audience and the fact is stable and high-value
 - `AI_CONTEXT.md` may reference a `README.md` section and then expand it when agents need more precision or extra context
