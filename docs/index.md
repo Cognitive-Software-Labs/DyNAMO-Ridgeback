@@ -13,12 +13,12 @@ troubleshooting, planning, and historical documentation.
 - [Project conventions](project/conventions.md) — namespaces, generated state,
   tooling, dependencies, and entrypoint conventions
 - [Active engineering gaps](BACKLOG.md)
-- [Troubleshooting](ISSUES.md)
+- [Troubleshooting](troubleshooting.md)
 
 ## Exploration
 
 - [Exploration architecture](exploration/architecture.md)
-- [Exploration benchmark runbook](../tools/benchmark/README.md)
+- [Exploration benchmark runbook](exploration/benchmarking.md)
 - [Ground-truth maps](../src/ridgeback_autonomy/sim/ground_truth_maps/README.md)
 
 ## Target localization
@@ -61,6 +61,7 @@ They are not supported implementations or automatic backlog commitments.
 
 ## History and validation
 
+- [Operational incidents](history/operational_incidents.md)
 - [Benchmark evolution](history/benchmark_evolution.md)
 - [Segmentation experiments](history/segmentation_experiments.md)
 - [Estimator evolution](history/estimator_evolution.md)

@@ -36,7 +36,7 @@ building blocks unless a technical reference says otherwise.
 - [Exploration architecture](../exploration/architecture.md)
 - [Target-localization pipeline](../target_localization/target_localization_pipeline.md)
 - [Target-distance benchmarking](../benchmarking/target_distance_benchmarking.md)
-- [Troubleshooting](../ISSUES.md)
+- [Troubleshooting](../troubleshooting.md)
 - [Active engineering gaps](../BACKLOG.md)
 
 For codebase structure, also inspect `graphify-out/GRAPH_REPORT.md` before

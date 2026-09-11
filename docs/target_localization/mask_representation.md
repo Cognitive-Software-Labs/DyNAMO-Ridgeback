@@ -168,31 +168,27 @@ It is useful to **see** the mask alongside the other camera views while the
 pipeline runs, both to sanity-check detection and to make the `rect` mask's
 background contamination (Section 3.4) visually obvious.
 
-### 5.1 Placement
+### 5.1 Panel selection and placement
 
-The live perception overlay already shows a single horizontal row of
-color-image-sized panels:
+The live perception overlay is driven by the selected estimator set rather
+than a fixed grid. RGB is always the anchor. The depth and active gate-mask
+panels appear only when `projective_ranging` or `euclidean_reconstruction` is
+selected, and the LiDAR panel appears only for `polar_profiling`:
 
-```
-[ RGB Detection | Sensor Depth | Depth-Anything ]
-```
-
-The mask views form a **second row below** the camera panels — one panel per
-front-end, so both mask types are visible at once and directly comparable:
-
-```
-[ RGB Detection | Sensor Depth | Depth-Anything ]
-[ Box Mask      | Silhouette Mask |             ]
+```text
+depth path:  [ RGB Detection | Aligned Depth (<source>) | <Box or Silhouette> Mask ]
+polar only:  [ RGB Detection | Polar Profiling ]
+all paths:   [ RGB Detection | Aligned Depth (<source>) | <active gate> Mask ]
+             [ Polar Profiling | black padding          | black padding       ]
 ```
 
-All panels share the active backend's color-image resolution, so the mask
-panels are the same size as the others (the shorter mask row is black-padded
-to the grid width).
+`max_cols` controls grid packing; its default is three. All panels use the
+active color-image dimensions, and the last row is black-padded when needed.
 
 ### 5.2 Panel style: masked RGB
 
-Both mask panels render as **masked RGB**: pixels **inside** the mask show the
-real RGB content; everything **outside** the mask is black.
+The selected gate's mask panel renders as **masked RGB**: pixels **inside** the
+mask show the real RGB content; everything **outside** the mask is black.
 
 ```
 panel = zeros (all black)
@@ -206,19 +202,20 @@ contamination directly visible — floor, wall, and neighbouring objects caught
 inside the box appear right next to the target. The panel therefore doubles as a
 visual measure of "how much background is this box dragging in."
 
-The silhouette panel renders the same style off the tight mask: black outside,
-RGB inside the true object outline. Side by side, the two panels make the
-precision difference immediately obvious — a clean cut-out (`tight`) versus a
-rectangle full of background (`rect`).
+The silhouette panel uses the same style for a tight mask: black outside, RGB
+inside the object outline. Gate comparisons therefore use separate runs or
+captures; the live overlay shows the mask actually used by the current run,
+never both gates at once.
 
 ### 5.3 Data source (per panel)
 
-The two panels have different sources, because only one of the two masks is
-reconstructible at the consumer:
+The panel's source depends on the active gate because only a rectangular mask
+is reconstructible at the consumer:
 
 - **Box Mask panel (derive at render time):** the rect mask is fully
   determined by the detection boxes already on the wire, so the panel
-  *recomputes* it at draw time (union of boxes, rasterized). Always shown.
+  *recomputes* it at draw time (union of boxes, rasterized) when the box gate
+  and a depth path are active.
   Note the union is **display-only**: localization always uses one mask per
   detection (Section 6.1) and never consumes the union — merging masks would
   destroy per-object coordinates.
@@ -227,11 +224,10 @@ reconstructible at the consumer:
   frame's consumed masks as a debug-only `mono8` Image on `debug/target/mask`
   (`docs/target_localization/segmentation.md` §6) — silhouette gate only. The panel never
   shows substitute content: it renders the artifact whose stamp matches the
-  rendered frame exactly (what downstream received), holding the most recent
-  artifact when the current frame's mask has not landed yet (it lags the
-  measurements by the segmentation latency). Only a run that has produced no
-  artifact at all (box gate, startup) shows the "No silhouette mask"
-  placeholder.
+  rendered frame exactly (what downstream received). Because the artifact
+  arrives after its measurement, the overlay re-renders a pending matching
+  frame when it lands; it does not substitute a mask from another stamp. Before
+  the first matching artifact it shows a placeholder.
 
 **Wire cost of the artifact.** A raw published mask (1 byte per pixel) scales
 with the active backend's color grid. At the current `640 × 480` default it is
@@ -261,7 +257,7 @@ detections, and each detection produces exactly **one** mask. So per frame the
 interface carries a *list* of masks, not a single mask.
 
 - `count = 0` — nothing detected, no masks.
-- `count = 1` — one mask (the common single-target case, e.g. the benchmark).
+- `count = 1` — one mask for a single accepted detection.
 - `count = N` — N independent masks carried together.
 
 ### 6.1 The hierarchy: one object → one detection → one mask

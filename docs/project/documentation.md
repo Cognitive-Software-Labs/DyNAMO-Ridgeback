@@ -12,7 +12,7 @@ Other pages summarize it only when useful and link back to that owner.
 | Documentation policy and precedence | this page |
 | Cross-cutting repository conventions | `docs/project/conventions.md` |
 | Implemented behavior and interfaces | topic reference under `docs/` |
-| Current failures and diagnostic recipes | `docs/ISSUES.md` |
+| Current failures and diagnostic recipes | `docs/troubleshooting.md` |
 | Active evidenced engineering gaps | `docs/BACKLOG.md` |
 | Approved work not yet complete | `docs/plans/` |
 | Rejected, deferred, or unselected approaches | `docs/do_not_try_again/` |

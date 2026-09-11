@@ -50,7 +50,7 @@ not duplicated here.
 
 ## Validation
 
-The [exploration benchmark runbook](../../tools/benchmark/README.md) records the
+The [exploration benchmark runbook](benchmarking.md) records the
 instrumented probe workflow. Current failure signatures and recovery steps live
-in [troubleshooting](../ISSUES.md); dated tuning and incident evidence belongs
+in [troubleshooting](../troubleshooting.md); dated tuning and incident evidence belongs
 in history.

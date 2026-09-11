@@ -20,7 +20,7 @@ owner. If enabling `pointcloud`, additionally prove organization, color-grid
 indexing, frame, and timestamps before wiring it as a RealSense input.
 
 **Context.** [Aligned depth](target_localization/aligned_depth.md), the
-[removed D435 transform](ISSUES.md#historical-the-d435-static-publisher-removed-2026-08-31),
+[removed D435 transform](history/operational_incidents.md#d435-static-camera-transform--removed-2026-08-31),
 and `common/camera_inputs.py`.
 
 ## Camera-LiDAR calibration

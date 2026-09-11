@@ -131,7 +131,7 @@ internal camera frames from the selected model, renders from the colour-frame
 pose, and leaves hardware camera-internal TF to the RealSense driver.
 
 The root cause and removed transform are recorded in
-[ISSUES](../ISSUES.md#historical-the-d435-static-publisher-removed-2026-08-31).
+[operational incident history](operational_incidents.md#d435-static-camera-transform--removed-2026-08-31).
 This note exists here only because the change creates a benchmark provenance
 boundary: pre- and post-correction runs must not be presented as the same camera
 geometry.

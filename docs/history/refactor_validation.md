@@ -76,7 +76,7 @@ gave every candidate frame the full 0.5 s timeout, so the unresolvable configure
 frame `r100_0001/robot/base_link` was waited on before the already-buffered
 `base_link` on every call. That throttled the mask worker below its input rate,
 and its latest-wins pending slot discarded the overflow as `UNSET`. Root cause
-and fix are recorded in [ISSUES.md](../ISSUES.md); `test_tf_utils` guards it.
+and fix are recorded in [operational incident history](operational_incidents.md#base-frame-fallback-latency--fixed-2026-08-31); `test_tf_utils` guards it.
 
 **3. Measured effect of the fix**, same examples scenario, three repeats, normal
 namespaced `base_frame` default — no `base_frame:=base_link` workaround:

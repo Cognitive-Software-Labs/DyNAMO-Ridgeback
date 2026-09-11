@@ -621,7 +621,7 @@ projective_parameters.yaml`, 2026-09-07/08, sweep directory
   pointcloud range limit* was never measured — that is a separate question this
   sweep did not ask.
 
-Preconditions for re-running are in `docs/ISSUES.md`: confirm
+Preconditions for re-running are in `docs/troubleshooting.md`: confirm
 `glxinfo | grep "OpenGL renderer"` does not report `llvmpipe` (Gazebo then
 CPU-rasterizes and the camera runs at 4 Hz instead of 28, which RTF does not
 reveal); run `cleanup.sh` **before** the supervisor and not between its

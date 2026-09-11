@@ -1,8 +1,8 @@
-# Benchmark harness
+# Exploration benchmark runbook
 
-Instrumented exploration benchmark runs, promoted from the 2026-07-10 tuning
-sessions. The `sim-runner` project subagent (`.claude/agents/sim-runner.md`)
-automates this recipe.
+This runbook owns instrumented exploration benchmark runs. The probe and
+camera-less robot profile remain under `tools/benchmark/`; the `sim-runner`
+project helper (`.claude/agents/sim-runner.md`) automates the same recipe.
 
 ## Canonical run
 
@@ -58,8 +58,8 @@ Caveats:
 
 ## Reading results
 
-Record `uptime` load with every run — sim health tracks total box load
-(see ISSUES.md and `~/workstation.md`; co-tenant training/build storms cap
-coverage regardless of nav config). Launch logs land in
-`artifacts/exploration/<run>/console.log`; triage recipes live in
-`docs/ISSUES.md` ("Exploration Quits Early", "Phantom Coverage", "Camera rate collapses").
+Record `uptime` load with every run: simulator health depends on total host
+load, so an uncontrolled co-tenant workload can invalidate a navigation
+comparison. Launch logs land in `artifacts/exploration/<run>/console.log`.
+Current failure signatures and recovery steps live in
+[troubleshooting](../troubleshooting.md).

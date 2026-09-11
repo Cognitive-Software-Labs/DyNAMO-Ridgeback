@@ -6,8 +6,7 @@
 # apps, but it silently wrecks Gazebo camera/depth rates -- measured 3.80 Hz
 # against 28.07 Hz on an identical configuration -- while physics, sim time and
 # therefore RTF stay normal, so nothing else in a run reveals it.
-# See docs/ISSUES.md, "Camera rate collapses when X falls back to software
-# rendering".
+# See docs/troubleshooting.md, "Camera rate collapses under software rendering".
 #
 # Use this per workload, NOT session-wide. The NVIDIA path renders on the GPU
 # and reads every frame back over PCIe at roughly 290 MB/s, which caps a

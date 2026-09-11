@@ -44,7 +44,8 @@ def generate_launch_description():
             'headless_rendering',
             default_value='false',
             description='Render server sensors via EGL without an X display '
-                        '(GPU rendering for non-seat/SSH sessions; see ISSUES.md)',
+                        '(GPU rendering for non-seat/SSH sessions; see '
+                        'docs/troubleshooting.md)',
         ),
         # Add our worlds and models directories so Gazebo can find them
         AppendEnvironmentVariable(

@@ -64,8 +64,9 @@ ros2 launch ridgeback_autonomy manual_mapping.launch.py world:=<world>
 
 Supported worlds: `mock_hospital`, `warehouse`, `office`
 
-Brings up Gazebo, SLAM (slam_toolbox), RViz, twist_mux, and activates the
-`platform_velocity_controller` after 15 s (inactive by default in sim).
+Brings up Gazebo, SLAM (slam_toolbox), RViz, and twist_mux. It activates the
+inactive `platform_velocity_controller` as soon as the controller-manager
+service is ready.
 
 ### Terminal 2 — keyboard teleop
 
@@ -133,8 +134,9 @@ don't conflate them:
 ## Known quirks
 
 - **`platform_velocity_controller` starts inactive in simulation.**
-  `manual_mapping.launch.py` activates it automatically after 15 s. If the robot
-  does not respond, activate manually:
+  `manual_mapping.launch.py` activates it when the controller-manager service
+  becomes ready. If the robot still does not respond, inspect the
+  `gate_controller` output before activating it manually:
   ```bash
   ros2 service call /r100_0001/controller_manager/switch_controller \
     controller_manager_msgs/srv/SwitchController \

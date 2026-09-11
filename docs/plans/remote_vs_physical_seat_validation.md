@@ -31,7 +31,7 @@ timing through CPU/GPU contention is exactly what is unmeasured.
 
 - **Software GL is the failure mode, not remoteness per se.** `llvmpipe` gave
   3.80 Hz camera, forced NVIDIA gave 28.07 Hz, same configuration. See
-  `docs/ISSUES.md`.
+  [`docs/troubleshooting.md`](../troubleshooting.md#camera-rate-collapses-under-software-rendering).
 - Refuted causes of that collapse: subscriber drops, QoS, the ffmpeg screen
   recorder, the `detector_debug` probe, detector rate, orphaned processes, CUDA
   availability. All tested. The table is in ISSUES.

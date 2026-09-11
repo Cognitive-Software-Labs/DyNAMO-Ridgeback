@@ -233,7 +233,7 @@ open.
 
 On success, remove the item from `docs/BACKLOG.md`; put current behaviour in the
 target-localization reference and dated evidence in `docs/history/`; update
-`docs/ISSUES.md` only for a reusable operational failure; move rejected options
+`docs/troubleshooting.md` only for a reusable operational failure; move rejected options
 with evidence to `docs/do_not_try_again/`; then mark or retire this plan.
 
 The final report must state the proven boundary/cause, evidence against serious

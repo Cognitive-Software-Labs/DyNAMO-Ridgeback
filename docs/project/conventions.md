@@ -47,7 +47,7 @@ notes affected by that change. If a simulation asset referenced by a Clearpath
 patch moves, update the patch in the same change.
 
 The `slam_toolbox` namespace patch is required by this stack; its rationale and
-failure signature live in [troubleshooting](../ISSUES.md).
+failure signature live in [troubleshooting](../troubleshooting.md).
 
 ## Graphify
 
