@@ -73,12 +73,12 @@ these facts cost an hour to rediscover, and the five dependency checkouts are
   `clearpath_msgs 5d04171`, `clearpath_simulator 69e6833`,
   `slam_toolbox 22450ca`. Verified against the on-disk checkouts on
   2026-09-11 — all five matched. `src/clearpath_*` and `src/slam_toolbox` are
-  **gitignored with zero tracked files**, so after a fresh `vcs import` you
-  must `git checkout <hash>` in each and re-apply both patches in `patches/`
-  (they are tracked, and their diffs are exactly the local modifications those
-  two repos carry).
-  **Do not `vcs import` over an existing tree** without re-pinning — see the
-  landmine below.
+  **gitignored with zero tracked files**, so `.repos` (exact commits, pinned
+  2026-09-11) plus `patches/` are the only record of them. Restore or verify
+  with `bash tools/setup_deps.sh [--check]` — it imports the pins, applies the
+  patches idempotently, and fails on drift. Both patches were verified
+  byte-identical to the live working diffs, with no untracked files in any
+  dependency.
 
 ## What landed 2026-09-10
 
@@ -224,12 +224,14 @@ like 27 Hz on the wall — that is expected, not a bug).
 
 ## Landmines that will cost you an hour each
 
-- **`.repos` pins branches (`version: jazzy`), not commits.** A fresh
-  `vcs import` pulls whatever upstream HEAD is that day. On 2026-09-10 all
-  five deps came down different from the main checkout,
-  `clearpath_simulator` by five months, and
-  `clearpath_gz_customizations.patch` stopped applying entirely. A background
-  task is filed to pin them. Until then, re-pin by hand after any import.
+- **~~`.repos` pins branches, not commits~~ — FIXED 2026-09-11.** It pinned
+  `version: jazzy` for all five deps, so `vcs import` pulled whatever upstream
+  HEAD was that day; on 2026-09-10 all five came down different (
+  `clearpath_simulator` by five months) and
+  `clearpath_gz_customizations.patch` stopped applying entirely. `.repos` now
+  pins exact commits. Restore or verify with `bash tools/setup_deps.sh
+  [--check]`, which imports the pins, applies `patches/` idempotently, and
+  fails on any drift beyond them. See `patches/README.md`.
 - **`.repos` paths already start with `src/`.** Run `vcs import < .repos` from
   the repo root, NOT `vcs import src < .repos` — the latter creates
   `src/src/...`.

@@ -403,10 +403,10 @@ identical benchmark.
   `inspect_robot.py --compare-colliders` sets the scene up regardless.
 - **Payload layers churn 6 lines on every regen** — the importer stamps its
   `/tmp` staging paths into `doc` metadata. Cosmetic.
-- **`.repos` pins branches, not commits.** A fresh `vcs import` pulls whatever
-  upstream HEAD is that day; on 2026-09-10 all five deps came down different
-  and `clearpath_gz_customizations.patch` stopped applying. Re-pin by hand
-  after any import.
+- **~~`.repos` pins branches, not commits~~ — fixed 2026-09-11.** It now pins
+  exact commits, and `tools/setup_deps.sh [--check]` imports them, applies
+  `patches/` idempotently and fails on any drift. The dependency trees are
+  gitignored, so those two records are the only thing that reproduces them.
 
 ---
 

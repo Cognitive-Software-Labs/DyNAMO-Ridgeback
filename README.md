@@ -78,14 +78,11 @@ source /opt/ros/jazzy/setup.bash
 ```bash
 cd /path/to/DyNAMO-Ridgeback
 
-# Clone external dependencies
-vcs import < .repos
-
-# Apply clearpath_gz patch (adds custom worlds/models + SpawnG1 Gazebo GUI plugin)
-cd src/clearpath_simulator/clearpath_gz && git apply ../../../patches/clearpath_gz_customizations.patch && cd ../../..
-
-# Apply slam_toolbox patch (fixes TF namespace issue)
-cd src/slam_toolbox && git apply ../../patches/slam_toolbox_tf_namespace.patch && cd ../..
+# Clone external dependencies at their pinned commits and apply patches/.
+# Idempotent; `--check` verifies an existing tree instead of touching it.
+# The dependency trees are gitignored, so .repos + patches/ are the only
+# record of them -- see patches/README.md.
+bash tools/setup_deps.sh
 
 # Install any remaining deps
 rosdep install --from-paths src --ignore-src -r -y

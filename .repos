@@ -1,21 +1,43 @@
+# Dependency pins for the Ridgeback autonomy workspace.
+#
+# `version:` holds an EXACT COMMIT, not a branch. It used to say `jazzy` for
+# all five, which made `vcs import` non-deterministic: on 2026-09-10 every one
+# of them came down different from the working checkout (clearpath_simulator
+# by five months) and `patches/clearpath_gz_customizations.patch` stopped
+# applying entirely. Patches are only reproducible against a known base, so
+# the base is pinned here.
+#
+# All five commits are on each upstream's `jazzy` branch (recorded below so a
+# future bump knows where to look). To move a pin: check out the new commit,
+# re-apply the patches, confirm they still apply, then update both the hash
+# and the date comment here.
+#
+# Restore a checkout with `tools/setup_deps.sh`, which imports these pins and
+# applies `patches/` idempotently. Do not hand-edit the dependency trees --
+# put the change in a patch instead (see patches/README.md).
 repositories:
   src/clearpath_simulator:
     type: git
     url: https://github.com/clearpathrobotics/clearpath_simulator.git
-    version: jazzy
+    # jazzy @ 2026-09-10; patched by clearpath_gz_customizations.patch
+    version: 69e68331a13e9f1f51de8807b49f2c9e84913f71
   src/clearpath_common:
     type: git
     url: https://github.com/clearpathrobotics/clearpath_common.git
-    version: jazzy
+    # jazzy @ 2026-09-10
+    version: 99603548679f90dcc7bc51b6e8d5569dc6f069dc
   src/clearpath_config:
     type: git
     url: https://github.com/clearpathrobotics/clearpath_config.git
-    version: jazzy
+    # jazzy @ 2026-09-10
+    version: 5c92caaf646d96cb3d3028477c8b74a1ef8ddcca
   src/clearpath_msgs:
     type: git
     url: https://github.com/clearpathrobotics/clearpath_msgs.git
-    version: jazzy
+    # jazzy @ 2026-09-10
+    version: 5d041717d6a50eb7cd60c0df23d91f6baeb4192b
   src/slam_toolbox:
     type: git
     url: https://github.com/SteveMacenski/slam_toolbox.git
-    version: jazzy
+    # jazzy @ 2026-09-10; patched by slam_toolbox_tf_namespace.patch
+    version: 22450ca095b9a517358090b5e1e2e5989a9a82e5
