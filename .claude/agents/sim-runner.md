@@ -42,8 +42,10 @@ You run instrumented exploration benchmarks for DyNAMO-Ridgeback. Read
 
 - `pkill` returning exit 144 is benign.
 - NEVER `pkill -f "gz sim gui"` — it can take the parent wrapper and server
-  down. A GUI is expected on the default GLX path and absent only in optional
-  `headless_rendering:=true` mode; report a mismatch, don't kill it directly.
+  down. `cleanup.sh` preserves that process while removing the simulator
+  server and ROS stack. A GUI is expected on the default GLX path and absent
+  only in optional `headless_rendering:=true` mode; report a mismatch, don't
+  kill it directly.
 - Sim launches need access to the selected GLX/EGL devices and display path.
 - `ros2` CLI without `ROS_DOMAIN_ID=42` sees the wrong system's topics.
 

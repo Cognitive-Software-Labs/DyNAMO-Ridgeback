@@ -1,21 +1,27 @@
 #!/bin/bash
-# Kill ALL ROS 2 / Gazebo processes from previous launches.
+# Kill stale ROS 2 processes and Gazebo servers from previous launches.
 # Usage: bash cleanup.sh
 #
-# This is aggressive — it kills everything ROS/Gazebo related.
-# Run before launching to ensure a clean slate.
+# This is aggressive, but deliberately preserves the Gazebo GUI so it can be
+# reused across server restarts.
 
 set -e
 
-echo "=== Killing all ROS/Gazebo processes ==="
+echo "=== Killing ROS/Gazebo processes (preserving Gazebo GUI) ==="
 CURRENT_USER="$(id -un)"
 SELF_PID="$$"
 PARENT_PID="$PPID"
 
+is_gazebo_gui() {
+    local command
+    command=$(ps -p "$1" -o args= 2>/dev/null || true)
+    [[ "$command" == *"gz sim gui"* ]]
+}
+
 kill_matches() {
     local pattern="$1"
     pgrep -u "$CURRENT_USER" -f "$pattern" 2>/dev/null | while read -r pid; do
-        if [ "$pid" != "$SELF_PID" ] && [ "$pid" != "$PARENT_PID" ]; then
+        if [ "$pid" != "$SELF_PID" ] && [ "$pid" != "$PARENT_PID" ] && ! is_gazebo_gui "$pid"; then
             kill -9 "$pid" 2>/dev/null || true
         fi
     done
@@ -37,7 +43,8 @@ fi
 kill_matches "ros2.*launch"
 sleep 0.5
 
-# Kill Gazebo
+# Kill Gazebo servers and wrappers. kill_matches excludes the GUI even though
+# these broad patterns also discover it.
 kill_matches "gz sim"
 kill_matches "ruby.*gz"
 kill_matches "gz-sim"
@@ -97,7 +104,7 @@ kill_matches "lib/ridgeback_autonomy/"
 sleep 1
 
 # Verify nothing is left
-REMAINING=$(ps -u "$CURRENT_USER" -o user=,pid=,pcpu=,pmem=,args= | grep -E "ros2|gz sim|parameter_bridge|slam_toolbox|nav2|explore|ekf_node|tf_relay|robot_state_pub|joy_linux|teleop|marker_server|image_bridge|rviz|overlay_node|hud_node" | grep -v grep | grep -v cleanup.sh | grep -v start_exploration.sh | grep -v "bash -c" || true)
+REMAINING=$(ps -u "$CURRENT_USER" -o user=,pid=,pcpu=,pmem=,args= | grep -E "ros2|gz sim|parameter_bridge|slam_toolbox|nav2|explore|ekf_node|tf_relay|robot_state_pub|joy_linux|teleop|marker_server|image_bridge|rviz|overlay_node|hud_node" | grep -Fv "gz sim gui" | grep -v grep | grep -v cleanup.sh | grep -v start_exploration.sh | grep -v "bash -c" || true)
 
 if [ -n "$REMAINING" ]; then
     echo "WARNING: Some processes still running:"
@@ -110,10 +117,10 @@ fi
 
 echo "=== Cleanup complete ==="
 # Final check
-STILL=$(ps -u "$CURRENT_USER" -o user=,pid=,pcpu=,pmem=,args= | grep -E "ros2|gz sim|parameter_bridge|slam_toolbox|nav2|explore|ekf_node|tf_relay|robot_state_pub|joy_linux|teleop|marker_server|image_bridge|rviz|overlay_node|hud_node" | grep -v grep | grep -v cleanup.sh | grep -v start_exploration.sh | grep -v "bash -c" || true)
+STILL=$(ps -u "$CURRENT_USER" -o user=,pid=,pcpu=,pmem=,args= | grep -E "ros2|gz sim|parameter_bridge|slam_toolbox|nav2|explore|ekf_node|tf_relay|robot_state_pub|joy_linux|teleop|marker_server|image_bridge|rviz|overlay_node|hud_node" | grep -Fv "gz sim gui" | grep -v grep | grep -v cleanup.sh | grep -v start_exploration.sh | grep -v "bash -c" || true)
 if [ -n "$STILL" ]; then
     echo "WARNING: Could not kill:"
     echo "$STILL"
 else
-    echo "All ROS/Gazebo processes terminated."
+    echo "All targeted ROS/Gazebo processes terminated; Gazebo GUI preserved."
 fi

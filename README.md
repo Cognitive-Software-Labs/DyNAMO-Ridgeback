@@ -455,11 +455,12 @@ configuration twice as an in-sweep noise control. See
 [projective parameter sensitivity](docs/history/projective_parameter_sensitivity.md)
 for what is already settled and what those runs are meant to answer.
 
-Do **not** run `cleanup.sh` between configurations: it kills Gazebo and RViz,
-which are deliberately persistent. The supervisor runs it once, immediately
-before starting that environment. It then owns each config process group,
-removes any orphan `bench_*` entities after an unclean exit, and shuts the
-environment down at the end. If a sweep is interrupted, rerun the same command:
+Do **not** run `cleanup.sh` between configurations: it kills the Gazebo server
+and RViz, which are deliberately persistent, although it leaves `gz sim gui`
+running. The supervisor runs it once, immediately before starting that
+environment. It then owns each config process group, removes any orphan
+`bench_*` entities after an unclean exit, and shuts the environment down at the
+end. If a sweep is interrupted, rerun the same command:
 the latest incomplete sweep with the same YAML and `--only` selection is resumed,
 valid `run.json` configurations are skipped, and partial config folders are
 preserved with an `.incomplete_<timestamp>` suffix before retry.

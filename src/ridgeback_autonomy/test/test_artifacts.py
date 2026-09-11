@@ -22,6 +22,14 @@ from ridgeback_autonomy.benchmarking.sweep_report import collect_comparison_rows
 REPO_ROOT = Path(__file__).resolve().parents[3]
 
 
+def test_cleanup_preserves_the_gazebo_gui_in_every_kill_pass() -> None:
+    cleanup = (REPO_ROOT / 'cleanup.sh').read_text(encoding='utf-8')
+
+    assert '[[ "$command" == *"gz sim gui"* ]]' in cleanup
+    assert '! is_gazebo_gui "$pid"' in cleanup
+    assert cleanup.count('grep -Fv "gz sim gui"') == 2
+
+
 def test_benchmark_output_default_is_pure_and_workspace_relative(tmp_path):
     assert default_output_directory(str(tmp_path)) == str(tmp_path / 'artifacts/benchmarks')
     assert not (tmp_path / 'artifacts').exists()

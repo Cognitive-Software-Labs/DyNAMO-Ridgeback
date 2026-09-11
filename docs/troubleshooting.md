@@ -21,10 +21,11 @@ investigations and measurements live in
 
 ## Benchmark sweep cleanup
 
-`cleanup.sh` intentionally kills Gazebo, RViz, ROS launches, and package nodes.
-Run it once before `target_benchmark_sweep`, never between configurations: the
-sweep deliberately keeps Gazebo, RViz, the robot, camera TF, detector, and clock
-alive while it restarts only the configuration layer.
+`cleanup.sh` intentionally kills Gazebo servers, RViz, ROS launches, and package
+nodes, while preserving an existing `gz sim gui` process. Run it once before
+`target_benchmark_sweep`, never between configurations: the sweep deliberately
+keeps its Gazebo server, RViz, robot, camera TF, detector, and clock alive while
+it restarts only the configuration layer.
 
 Two `gz sim server` processes indicate that a stale single-run environment was
 not cleaned. Gazebo transport may then spawn a target in one server and query
