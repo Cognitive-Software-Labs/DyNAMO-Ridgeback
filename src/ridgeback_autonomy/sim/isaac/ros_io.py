@@ -40,23 +40,36 @@ class LidarScanAssembler:
 
     UST-10LX geometry: 1081 bins, -135..+135 deg, 0.25 deg step, 40 Hz.
 
-    The outermost EDGE_MASK_DEG of each end is dropped. Both lidars sit at a
-    tip of the chassis's diamond notch, whose edges run at exactly +-135 deg
-    — so the extreme rays are *tangent* to the robot's own notch edge, which
-    passes 34.8 mm from the emitter. Stationary they miss it (measured: zero
-    returns under 0.9 m). Rotating, they clip it: 0.40-0.48 m returns appear
-    at +129..+135 deg in ~9% of frames, up to 6 points — exactly
-    collision_monitor's `min_points: 6`, so nav2 zeroed cmd_vel, recovered by
-    spinning, and span more phantoms (open-issues.md §1, the "never moves"
-    stall). Reproduced on demand with a bare cmd_vel rotation in the sim-only
-    layer, and absent when still, in both rotation directions.
+    The outermost EDGE_MASK_DEG of each end is dropped, to suppress a phantom
+    return band whose MECHANISM IS NOT YET KNOWN. What is measured:
 
-    Masking is the honest fix rather than raising `min_points`: the tangency
-    is real geometry, and the seam is an artefact of the two-prim 180-deg/tick
-    workaround the 6.0.1 bridge forces on us. The front and rear units are
-    mounted back-to-back, so each one's masked sector is inside the other's
-    arc and the merged scan — plus every costmap and collision_monitor, which
-    take both as observation sources — keeps full 360-deg coverage.
+    - it appears only while the robot is MOVING; stationary is clean in every
+      run (zero returns under 0.9 m)
+    - 0.40-0.55 m, bearings +129..+135 deg, ~9% of frames, up to 6 points —
+      exactly collision_monitor's `min_points: 6`, which zeroed cmd_vel, and
+      nav2 then recovered by spinning and spawned more (open-issues.md §1,
+      the "never moves" stall)
+    - reproducible without nav2: a bare cmd_vel rotation against the sim-only
+      layer, clean again on stop
+
+    It is NOT the robot occluding itself. Both units do sit at a tip of the
+    chassis's diamond notch, whose edges run at exactly +-135 deg, 34.6 mm
+    from the emitter — but the body is rigid (all fixed joints), so relative
+    geometry cannot depend on the body's own yaw, and a static ray-cast of the
+    whole arc against the sliced robot USD self-occludes 0/1081 bins: for
+    theta < 135 deg the ray *diverges* from that edge. The band is also not
+    handed (+0.4 and -0.4 rad/s both put it at +129 deg on the same prim),
+    which no geometric swing can produce. See open-issues.md §1 for the
+    candidate mechanisms (sensor-pose vs. geometry-snapshot desync is the
+    leading one) and the test that would settle it.
+
+    So this mask is a MITIGATION, not a fix: it is chosen over raising
+    `min_points` because it keeps the threshold meaningful for real obstacles.
+    The front and rear units are mounted back-to-back, so each one's masked
+    sector is inside the other's arc and the merged scan — plus every costmap
+    and collision_monitor, which take both as observation sources — keeps full
+    360-deg coverage. Revisit once the mechanism is known; the right fix may
+    remove the need for it.
     """
 
     N_BINS = 1081
@@ -65,16 +78,17 @@ class LidarScanAssembler:
     RANGE_MIN = 0.06
     RANGE_MAX = 10.0
     SCAN_PERIOD = 1.0 / 40.0
-    # The artefact does not end sharply — it thins inward as the yaw rate
-    # grows (6 points/frame past 129 deg, 1-2 down at 126.5). A 7 deg mask
-    # already drops it under min_points, but left a residual at the new
-    # boundary; 10 deg clears it outright at 0.4 rad/s. 40 of 1081 bins per
-    # end = 7.4% of the arc, none of it unique to this unit.
+    # The band does not end sharply — it thins inward (6 points/frame past
+    # 129 deg, 1-2 down at 126.5). A 7 deg mask already drops it under
+    # min_points, but left a residual at the new boundary; 10 deg clears it
+    # at 0.4 rad/s. 40 of 1081 bins per end = 7.4% of the arc, none of it
+    # unique to this unit. Empirical width, not a derived one — it is not
+    # known to hold at higher yaw rates than were tested.
     EDGE_MASK_DEG = 10.0
 
     @classmethod
     def edge_mask(cls):
-        """Bins dropped as notch-tangent seam (see class docstring).
+        """Bins dropped at each arc end (see class docstring).
 
         A classmethod so it is testable without an rclpy node. Counted in
         bins rather than compared in degrees: the radians round-trip leaves
@@ -98,7 +112,7 @@ class LidarScanAssembler:
         self._frame = f"lidar2d_{index}_laser"
         self._ranges = np.full(self.N_BINS, np.inf, dtype=np.float32)
         self._updated = np.full(self.N_BINS, -1.0, dtype=np.float64)
-        # notch-tangent seam bins (see class docstring), precomputed once
+        # arc-edge mask bins (see class docstring), precomputed once
         self._edge_masked = self.edge_mask()
         self._half_stamp = [None, None]
         self._pub = node.create_publisher(

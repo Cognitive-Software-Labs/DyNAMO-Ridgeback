@@ -1,11 +1,13 @@
 """Contract tests for the Isaac RTX-lidar scan assembler (no rclpy needed).
 
-Covers the notch-tangent edge mask added for `docs/isaac/open-issues.md` §1:
-the extreme rays of each 270-deg window are tangent to the chassis's diamond
-notch and clip it under rotation, producing 0.40-0.48 m phantom returns at
-+129..+135 deg that tripped `collision_monitor`'s `min_points: 6` and pinned
-`cmd_vel` at zero. The mask must cover that band on BOTH ends and must not
-eat into the arc the robot actually navigates by.
+Covers the arc-edge mask added for `docs/isaac/open-issues.md` §1: while the
+robot moves, phantom returns at 0.40-0.55 m appear at +129..+135 deg and trip
+`collision_monitor`'s `min_points: 6`, pinning `cmd_vel` at zero. The
+mechanism is still unknown (a self-occlusion explanation was retracted — the
+body is rigid and a static ray-cast self-occludes 0/1081 bins), so the mask is
+a mitigation with an empirically chosen width. What these tests pin is the
+mask's shape, not its justification: it must cover the measured band on BOTH
+ends, stay symmetric, and not eat into the arc the robot navigates by.
 """
 import importlib.util
 import math

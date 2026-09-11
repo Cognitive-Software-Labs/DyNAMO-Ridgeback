@@ -5,10 +5,12 @@ sessions. The `sim-runner` project subagent (`.claude/agents/sim-runner.md`)
 automates this recipe.
 
 > ⚠️ **Exploration benchmarks do not fully run on Isaac yet.**
-> As of 2026-09-11 the robot *does* drive (the notch-tangency phantom band is
-> fixed), but it re-stalls on a second phantom band at +94.5…+97.5 deg and
-> does not complete a sweep. See `docs/isaac/open-issues.md` §1 before
-> spending a session on a run that cannot produce a number.
+> As of 2026-09-11 the robot *does* drive (the +129…+135 deg phantom band is
+> masked in the assembler), but it re-stalls on a second phantom band at
+> +94.5…+97.5 deg and does not complete a sweep. The mask is a mitigation —
+> the mechanism behind both bands is still unknown. See
+> `docs/isaac/open-issues.md` §1 before spending a session on a run that
+> cannot produce a number.
 >
 > To reproduce the phantom mechanism in ~30 s without nav2, bring up the
 > sim-only layer (`includes/simulation_isaac.launch.py`) and publish a

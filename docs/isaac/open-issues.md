@@ -41,31 +41,68 @@ Spin/DriveOnHeading recoveries that exceed their time allowance.
 
 #### What was settled on 2026-09-11, by measurement
 
-**Cause of the original band.** Both lidars sit at a tip of the chassis's
-diamond notch, whose edges run at **exactly ±45/±135 deg** — so each unit's
-extreme ray is *tangent* to its own notch edge, which passes **34.8 mm** from
-the emitter. Stationary, the rays miss it. Rotating, they clip it: returns at
-**0.40–0.48 m, bearings +129…+135 deg, in ~9% of frames, up to 6 points —
-exactly `collision_monitor`'s `min_points: 6`**. That closed a self-sustaining
-loop: rotation → ≥6 phantom points → `cmd_vel` zeroed → nav2 recovers by
-spinning → more rotation.
+**Trigger of the original band (mechanism still OPEN).** The band appears only
+while the robot is **moving**: returns at **0.40–0.55 m, bearings +129…+135
+deg, in ~9% of frames, up to 6 points — exactly `collision_monitor`'s
+`min_points: 6`**. That closed a self-sustaining loop: motion → ≥6 phantom
+points → `cmd_vel` zeroed → nav2 recovers by spinning → more motion.
+
+> ⚠️ **A "notch tangency" mechanism was asserted here and is RETRACTED.** The
+> claim was that each unit's extreme ray is tangent to the chassis's diamond
+> notch edge (which is true — the edges run at exactly ±45/±135 deg, 34.6 mm
+> from the emitter) and that rotation makes the ray clip it. That is
+> incoherent: the chassis and the lidars are **one rigid body** (all
+> `PhysicsFixedJoint`), so relative geometry cannot depend on the body's own
+> yaw. Two measurements independently kill it:
+>
+> - a static ray-cast of the whole arc against the sliced robot USD
+>   self-occludes **0/1081 bins** — and for θ < 135 deg the ray *diverges*
+>   from that edge (t = −0.532 for the 131.25 deg ray), so no in-window ray
+>   can reach it at any yaw;
+> - the band is **not handed**: +0.4 and −0.4 rad/s both place it at +129 deg
+>   on the same prim. A geometric swing must be handed.
+>
+> The arithmetic also fails: r = 0.0346/sin δ needs δ ≈ 3.6–5 deg to land at
+> 0.40–0.55 m, but 0.4 rad/s is only 0.57 deg per 40 Hz tick — one tick of
+> smear predicts ~3.5 m, not 0.5 m.
+
+**Candidate mechanisms, none tested yet.** Non-handedness plus short ranges
+points at a lag/precision artefact rather than geometry:
+
+- **Sensor-pose vs. geometry-snapshot desync** (leading). The lidar prims hang
+  off `base_link`, while `chassis_link` is the PhysX-driven body via the rig's
+  `rz` joint (`carrier_y → chassis_link`). If the RTX geometry snapshot and
+  the sensor pose come from different sub-steps — or if yaw is applied at both
+  `base_link` and `rz` — a transient relative yaw appears, and the near
+  tangency amplifies it enormously (δ of 4 deg suffices). Needs ~175 ms of
+  lag, which is large but not absurd if the BVH refit trails several frames.
+- **Intra-sweep pose vs. static geometry** across the 180-deg/tick drum
+  transit — same algebra, same required δ.
+- **BVH/precision behaviour on near-tangent triangles**, manifesting only when
+  the transform matrix changes between frames.
+
+**Decisive test.** Log the *live* world transforms of `lidar2d_0_laser` and a
+known notch vertex during rotation and diff them against the authored static
+values. Divergence of degrees ⇒ desync, and the geometric story is dead for
+good. Do this before attempting any further fix.
 
 Reproduced **on demand without nav2**: a bare `cmd_vel` rotation against the
 sim-only layer (`tools/isaac/stall_probe.py`, and the spin/probe recipe in
 `../../tools/benchmark/README.md`). Clean stationary, phantoms while rotating,
 both directions, clean again on stop.
 
-**Fix.** `LidarScanAssembler.EDGE_MASK_DEG = 10.0` (`sim/isaac/ros_io.py`)
+**Mitigation** (not a fix — the mechanism is unknown, see above).
+`LidarScanAssembler.EDGE_MASK_DEG = 10.0` (`sim/isaac/ros_io.py`)
 drops the outer 10 deg of each 270 deg window — 40 of 1081 bins per end, 7.4%
 of the arc. The band does **not** end sharply (it thins inward: 6 points/frame
 past 129 deg, 1–2 at 126.5), so 7 deg left a residual at its own boundary.
 The two units are mounted back-to-back, so each masked sector lies inside the
 other's arc: the merged scan, both costmaps and `collision_monitor` (all of
 which take both scans as observation sources) keep full 360 deg coverage.
-Regression test: `test/test_lidar_scan_assembler.py`. Masking beats raising
-`min_points` — the tangency is real geometry that a real UST-10LX would also
-see, while the *seam* is an artefact of the two-prim 180-deg/tick workaround
-the 6.0.1 bridge forces on us (§7).
+Regression test: `test/test_lidar_scan_assembler.py`. Masking is preferred
+over raising `min_points` only because it keeps that threshold meaningful for
+real obstacles — it is not claimed to be the correct fix, and the 10 deg width
+is empirical (untested above 0.4 rad/s).
 
 **Newly ruled out, each by measurement** (do not re-test):
 
@@ -87,11 +124,16 @@ read that scatter as a surface shape.
 Once moving, `lidar2d_0/scan` shows ~15 returns at **+94.5…+97.5 deg, 0.42–
 0.57 m**, which the ±125 deg mask does not cover. These cannot be world
 geometry either: the robot had travelled only 0.37 m, so the nearest real
-geometry was still ~5.2 m away. Candidate worth checking first: the side
-covers' **top** face (`visuals/mesh_10` / `mesh_13`, both topping at z=0.220)
-sits only **6.4 mm** below the 0.2264 scan plane, so a near-horizontal ray
-grazes it — a tangency in elevation rather than azimuth, which would explain
-why it appears at a bearing the azimuth mask cannot reach.
+geometry was still ~5.2 m away.
+
+A "side-cover top face in elevation" hypothesis was floated here and is
+**withdrawn** — it has the same rigid-body flaw as the retracted tangency
+story (the covers are fixed to the chassis, so nothing about them can depend
+on the body's yaw), and the returns sit ~0.6 m from `base_link` origin,
+outside the 0.395 m body, so they are not robot surfaces at all. Most likely
+this band and the +129…+135 deg one are the same underlying artefact at a
+different bearing; treat them as one problem and run the desync test above
+before theorising further.
 
 Beware when reading base_link coordinates near ±90 deg: `cos(95°) ≈ 0` pins
 the computed x near the lidar's own 0.3922 offset, which looks like a flat
@@ -255,12 +297,20 @@ Resequence only if issue 1 proves to be a 6.0.1 sensor-pipeline defect rather
 than config — check the 6.1 notes for the `laser_scan` ROI fix. See
 `port-plan.md` §P9.
 
-**2026-09-11: this clause did NOT fire.** Issue 1's primary band is the
-lidar's extreme ray being tangent to the chassis's own notch edge at ±135 deg
-— real geometry that a real UST-10LX shares, at the *contract window* edge,
-not at the 0 deg seam between the two prims. So it is not a 6.0.1 sensor
-defect and does not justify migrating early. Keep the order: finish issue 1's
-second band → seat the robot → one clean 6.0.1 baseline → migrate.
+**2026-09-11: this clause is UNDECIDED, and was briefly recorded as "did not
+fire" on reasoning that has since been retracted.** That note argued issue 1
+was real tangency geometry a real UST-10LX shares, hence not a 6.0.1 defect.
+The tangency mechanism is retracted (§1), so the argument is void. The live
+candidates — sensor-pose vs. geometry-snapshot desync, intra-sweep pose
+handling across the 180-deg/tick drum transit, BVH precision on near-tangent
+triangles — are **all sensor-pipeline** in nature, so the clause may well
+fire. Run §1's desync test before deciding; if it confirms desync, check the
+6.1 notes for both the `laser_scan` ROI fix and any RTX sensor-pose/transform
+sync fix, because that could remove the two-prim rig *and* the edge mask.
+
+Until then keep the order: settle issue 1's mechanism → seat the robot → one
+clean 6.0.1 baseline → migrate. Do not migrate on the strength of a
+hypothesis.
 
 ---
 
