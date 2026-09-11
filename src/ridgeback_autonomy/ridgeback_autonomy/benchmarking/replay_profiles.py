@@ -8,7 +8,7 @@ same dataclasses and validation helpers.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
 import math
 from typing import Any, Iterable
 
@@ -39,7 +39,9 @@ from ridgeback_autonomy.perception.target_localization.core.isolation_2d import 
     NEAREST_MODE_BAND_M_DEFAULT,
 )
 from ridgeback_autonomy.perception.target_localization.core.isolation_3d import (
+    Chain,
     ISOLATION_3D_NAMES,
+    build_isolation_3d,
 )
 from ridgeback_autonomy.perception.target_localization.core.polar_profiling import (
     MIN_VALID_RAYS_DEFAULT,
@@ -195,6 +197,27 @@ _DEPTH_ESTIMATORS = tuple(
     estimator for estimator in PUBLIC_ESTIMATOR_ORDER
     if estimator in DEPTH_PATH_ESTIMATORS)
 
+
+def _recipes_binding(setting: str) -> tuple[str, ...]:
+    """Which ``isolation_3d`` recipes actually bind ``setting``.
+
+    ``build_isolation_3d`` gives each value only to the steps whose dataclass
+    declares it and drops the rest, so reachability is a property of the built
+    recipe rather than of its name -- ``height_crop`` takes a margin and no
+    window, ``range_band`` anchors on a percentile where ``nearest_mode_band``
+    histograms. Asking the recipes themselves keeps the scope from drifting when
+    a step gains or loses a field. The pose is a placeholder: no step's field
+    list depends on where the camera is.
+    """
+
+    reaching = []
+    for name in sorted(ISOLATION_3D_NAMES):
+        recipe = build_isolation_3d(name, 0.0, (0.0, 0.0, -1.0))
+        steps = recipe.steps if isinstance(recipe, Chain) else (recipe,)
+        if any(setting in {field.name for field in fields(step)} for step in steps):
+            reaching.append(name)
+    return tuple(reaching)
+
 # Measurement knobs retain the launch spelling so existing sweep YAML remains
 # valid.  Materializer knobs are deliberately distinct from live-only node
 # internals: they form the immutable producer signature of a mask cache.
@@ -232,30 +255,39 @@ AXES: dict[str, AxisSpec] = {
         STAGE_MEASUREMENT, 'Euclidean recipe',
         choices=tuple(sorted(ISOLATION_3D_NAMES)),
         estimators=('euclidean_reconstruction',)),
+    # Each of the six is scoped to the recipes that bind it, so a chain without
+    # a floor crop stops offering a margin and a percentile anchor stops
+    # offering a bin width.
     'isolation_3d_floor_margin_m': _axis(
         'isolation_3d_floor_margin_m', 'number', 0.05, STAGE_MEASUREMENT,
         'Floor margin', minimum=0.0,
-        estimators=('euclidean_reconstruction',)),
+        estimators=('euclidean_reconstruction',),
+        recipes=_recipes_binding('floor_margin_m')),
     'isolation_3d_percentile': _axis(
         'isolation_3d_percentile', 'number', FRONT_PERCENTILE, STAGE_MEASUREMENT,
         'Front percentile', minimum=0.0, maximum=100.0,
-        estimators=('euclidean_reconstruction',)),
+        estimators=('euclidean_reconstruction',),
+        recipes=_recipes_binding('percentile')),
     'isolation_3d_ahead_m': _axis(
         'isolation_3d_ahead_m', 'number', INLIER_AHEAD_MARGIN_M, STAGE_MEASUREMENT,
         '3D band ahead', minimum=0.0,
-        estimators=('euclidean_reconstruction',)),
+        estimators=('euclidean_reconstruction',),
+        recipes=_recipes_binding('ahead_m')),
     'isolation_3d_behind_m': _axis(
         'isolation_3d_behind_m', 'number', INLIER_BEHIND_MARGIN_M, STAGE_MEASUREMENT,
         '3D band behind', minimum=0.0,
-        estimators=('euclidean_reconstruction',)),
+        estimators=('euclidean_reconstruction',),
+        recipes=_recipes_binding('behind_m')),
     'isolation_3d_bin_width_m': _axis(
         'isolation_3d_bin_width_m', 'number', 0.05, STAGE_MEASUREMENT,
         '3D histogram bin width', minimum=0.0,
-        estimators=('euclidean_reconstruction',)),
+        estimators=('euclidean_reconstruction',),
+        recipes=_recipes_binding('bin_width_m')),
     'isolation_3d_min_bin_fraction': _axis(
         'isolation_3d_min_bin_fraction', 'number', 0.05, STAGE_MEASUREMENT,
         '3D minimum bin fraction', minimum=0.0, maximum=1.0,
-        estimators=('euclidean_reconstruction',)),
+        estimators=('euclidean_reconstruction',),
+        recipes=_recipes_binding('min_bin_fraction')),
     # Polar profiling reads the LiDAR scan, which the frozen sensor capture does
     # not hold, so these three are measurement knobs that only the live profile
     # can actually move. The estimator restriction keeps them out of the offline

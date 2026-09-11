@@ -115,19 +115,19 @@ def test_selecting_both_estimators_keeps_both_parameter_sets(tmp_path):
     config = _variant('mask-output', {
         'estimators': 'projective_ranging,euclidean_reconstruction',
         'isolation_2d_band_m': 0.75,
-        'isolation_3d_percentile': 12.0,
+        'isolation_3d_floor_margin_m': 0.12,
     }, tmp_path)
 
     # The value is an estimator list, so membership decides reachability: the
     # whole comma-joined string never equals one estimator's name.
     assert config['isolation_2d_band_m'] == 0.75
-    assert config['isolation_3d_percentile'] == 12.0
+    assert config['isolation_3d_floor_margin_m'] == 0.12
     assert config['estimators'] == 'projective_ranging,euclidean_reconstruction'
 
 
 @pytest.mark.parametrize('estimator,kept,dropped', [
-    ('projective_ranging', 'isolation_2d_band_m', 'isolation_3d_percentile'),
-    ('euclidean_reconstruction', 'isolation_3d_percentile', 'isolation_2d_band_m'),
+    ('projective_ranging', 'isolation_2d_band_m', 'isolation_3d_floor_margin_m'),
+    ('euclidean_reconstruction', 'isolation_3d_floor_margin_m', 'isolation_2d_band_m'),
 ])
 def test_one_estimator_carries_only_its_own_parameters(tmp_path, estimator, kept, dropped):
     config = _variant('mask-output', {'estimators': estimator}, tmp_path)
@@ -158,6 +158,26 @@ def test_a_job_whose_recipe_drops_fields_still_validates(tmp_path):
     assert 'isolation_2d_band_m' not in rendered['job']['sweep']['configs'][0]
 
 
+@pytest.mark.parametrize('recipe,settings', [
+    ('height_crop', {'floor_margin_m'}),
+    ('range_band', {'percentile', 'ahead_m', 'behind_m'}),
+    ('nearest_mode_band', {'ahead_m', 'behind_m', 'bin_width_m', 'min_bin_fraction'}),
+    ('height_crop_range_band', {'floor_margin_m', 'percentile', 'ahead_m', 'behind_m'}),
+    ('height_crop_nearest_mode_band',
+     {'floor_margin_m', 'ahead_m', 'behind_m', 'bin_width_m', 'min_bin_fraction'}),
+])
+def test_each_euclidean_recipe_carries_exactly_the_settings_it_binds(
+        tmp_path, recipe, settings):
+    config = _variant('mask-output', {
+        'estimators': 'euclidean_reconstruction', 'isolation_3d': recipe}, tmp_path)
+
+    # build_isolation_3d binds a value only to the steps that declare it: a
+    # chain without a floor crop never reads a margin, and a percentile anchor
+    # never reads a bin width.
+    assert {key.removeprefix('isolation_3d_') for key in config
+            if key.startswith('isolation_3d_')} == settings
+
+
 def test_capabilities_scope_each_field_to_what_can_reach_it():
     fields = {field['key']: field
               for field in capabilities()['profiles']['mask-output']['variant_fields']}
@@ -165,6 +185,14 @@ def test_capabilities_scope_each_field_to_what_can_reach_it():
     assert fields['isolation_2d_band_m']['recipes'] == ['nearest_mode_histogram']
     assert fields['isolation_2d_min_bin_fraction']['recipes'] == ['nearest_mode_histogram']
     assert fields['isolation_2d_bin_width_m']['recipes'] == []
+    assert fields['isolation_3d_percentile']['recipes'] == [
+        'height_crop_range_band', 'range_band']
+    assert fields['isolation_3d_floor_margin_m']['recipes'] == [
+        'height_crop', 'height_crop_nearest_mode_band', 'height_crop_range_band']
+    # An empty scope reads as "every recipe reaches this", so a euclidean
+    # setting that reached none would be offered everywhere, not nowhere.
+    assert all(field['recipes'] for key, field in fields.items()
+               if key.startswith('isolation_3d_'))
     # Unscoped, and therefore reachable on every profile: the estimator choice
     # itself cannot be hidden behind an estimator.
     assert fields['estimators']['estimators'] == []
@@ -194,7 +222,7 @@ def test_the_measurement_profile_accepts_euclidean_against_legacy_evidence(tmp_p
 
     assert outcome['valid'] is True
     assert outcome['job']['sweep']['configs'][0]['estimators'] == 'euclidean_reconstruction'
-    assert 'isolation_3d_percentile' in outcome['job']['sweep']['configs'][0]
+    assert 'isolation_3d_floor_margin_m' in outcome['job']['sweep']['configs'][0]
 
 
 def test_one_variant_per_estimator_carries_only_that_estimators_parameters(tmp_path):
@@ -205,8 +233,8 @@ def test_one_variant_per_estimator_carries_only_that_estimators_parameters(tmp_p
 
     projective, euclidean = _ui_sweep(raw, 'mask-output', tmp_path)['configs']
 
-    assert 'isolation_2d_band_m' in projective and 'isolation_3d_percentile' not in projective
-    assert 'isolation_3d_percentile' in euclidean and 'isolation_2d_band_m' not in euclidean
+    assert 'isolation_2d_band_m' in projective and 'isolation_3d_floor_margin_m' not in projective
+    assert 'isolation_3d_floor_margin_m' in euclidean and 'isolation_2d_band_m' not in euclidean
 
 
 def test_rendered_measurement_job_is_accepted_by_the_canonical_job_parser(tmp_path):
