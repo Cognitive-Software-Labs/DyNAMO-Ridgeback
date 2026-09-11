@@ -39,6 +39,24 @@ class LidarScanAssembler:
     rotation-induced map smear vs. carrying bins across sweeps).
 
     UST-10LX geometry: 1081 bins, -135..+135 deg, 0.25 deg step, 40 Hz.
+
+    The outermost EDGE_MASK_DEG of each end is dropped. Both lidars sit at a
+    tip of the chassis's diamond notch, whose edges run at exactly +-135 deg
+    — so the extreme rays are *tangent* to the robot's own notch edge, which
+    passes 34.8 mm from the emitter. Stationary they miss it (measured: zero
+    returns under 0.9 m). Rotating, they clip it: 0.40-0.48 m returns appear
+    at +129..+135 deg in ~9% of frames, up to 6 points — exactly
+    collision_monitor's `min_points: 6`, so nav2 zeroed cmd_vel, recovered by
+    spinning, and span more phantoms (open-issues.md §1, the "never moves"
+    stall). Reproduced on demand with a bare cmd_vel rotation in the sim-only
+    layer, and absent when still, in both rotation directions.
+
+    Masking is the honest fix rather than raising `min_points`: the tangency
+    is real geometry, and the seam is an artefact of the two-prim 180-deg/tick
+    workaround the 6.0.1 bridge forces on us. The front and rear units are
+    mounted back-to-back, so each one's masked sector is inside the other's
+    arc and the merged scan — plus every costmap and collision_monitor, which
+    take both as observation sources — keeps full 360-deg coverage.
     """
 
     N_BINS = 1081
@@ -47,6 +65,28 @@ class LidarScanAssembler:
     RANGE_MIN = 0.06
     RANGE_MAX = 10.0
     SCAN_PERIOD = 1.0 / 40.0
+    # The artefact does not end sharply — it thins inward as the yaw rate
+    # grows (6 points/frame past 129 deg, 1-2 down at 126.5). A 7 deg mask
+    # already drops it under min_points, but left a residual at the new
+    # boundary; 10 deg clears it outright at 0.4 rad/s. 40 of 1081 bins per
+    # end = 7.4% of the arc, none of it unique to this unit.
+    EDGE_MASK_DEG = 10.0
+
+    @classmethod
+    def edge_mask(cls):
+        """Bins dropped as notch-tangent seam (see class docstring).
+
+        A classmethod so it is testable without an rclpy node. Counted in
+        bins rather than compared in degrees: the radians round-trip leaves
+        the boundary bin at 128.00000000000003, which masks one end and not
+        the other and quietly makes the arc asymmetric.
+        """
+        n = int(round(cls.EDGE_MASK_DEG / math.degrees(cls.ANGLE_INC)))
+        mask = np.zeros(cls.N_BINS, dtype=bool)
+        if n > 0:
+            mask[:n] = True
+            mask[-n:] = True
+        return mask
 
     def __init__(self, node, index: int):
         from functools import partial
@@ -58,6 +98,8 @@ class LidarScanAssembler:
         self._frame = f"lidar2d_{index}_laser"
         self._ranges = np.full(self.N_BINS, np.inf, dtype=np.float32)
         self._updated = np.full(self.N_BINS, -1.0, dtype=np.float64)
+        # notch-tangent seam bins (see class docstring), precomputed once
+        self._edge_masked = self.edge_mask()
         self._half_stamp = [None, None]
         self._pub = node.create_publisher(
             LaserScan, f"sensors/lidar2d_{index}/scan", QoSProfile(depth=10))
@@ -95,6 +137,7 @@ class LidarScanAssembler:
 
         out = self._ranges.copy()
         out[self._updated != t] = np.inf
+        out[self._edge_masked] = np.inf
         scan = self._LaserScan()
         scan.header.stamp = msg.header.stamp
         scan.header.frame_id = self._frame

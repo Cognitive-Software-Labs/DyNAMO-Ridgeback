@@ -5,18 +5,94 @@ and what each phase delivered; this file holds what is **currently wrong**.
 `../../ISSUES.md` is the repo-wide troubleshooting archive — issues move there
 once they are solved and the writeup is worth keeping.
 
-Last reviewed: **2026-09-10**. Branch `feat/isaac-sim-6-port` @ `53a924a6`
-(pushed). `feat/isaac-vendor-chassis` points at the same commit and is
-redundant.
+Last reviewed: **2026-09-11**. Branch `feat/isaac-sim-6-port`.
+`feat/isaac-vendor-chassis` points at an older commit and is redundant.
 
 ---
 
 ## 🔴 Blocking
 
-### 1. Nav2 never moves the robot — `collision_monitor` latches on phantom returns
+### 1. `collision_monitor` phantom returns — PRIMARY BAND FIXED, a second band remains
 
-**Symptom.** In `hospital` and `warehouse_full`, the robot plans but never
-drives. Net odom displacement over 25 s is `0.000 m`.
+> **2026-09-11.** Root cause of the *original* latch found, fixed and verified;
+> the robot now drives. It re-stalls later on a **second, distinct** phantom
+> band that had never been recorded. Details in "What was settled" below —
+> read that before re-testing anything here.
+
+**Original symptom.** In `hospital` and `warehouse_full`, the robot planned but
+never drove. Net odom displacement over 25 s was `0.000 m`, and
+`collision_monitor` logged `Robot to approach ... away from collision`
+*continuously*.
+
+**Status after the fix** (`warehouse_full`, full stack, deterministic,
+camera off, domain 78): robot drives to odom `(0.090, 0.357)` with ~41 deg of
+rotation, the explorer issues frontier goals, and the collision log drops from
+continuous to **11 occurrences**. It then re-stalls, with nav2 cycling
+Spin/DriveOnHeading recoveries that exceed their time allowance.
+
+#### What was settled on 2026-09-11, by measurement
+
+**Cause of the original band.** Both lidars sit at a tip of the chassis's
+diamond notch, whose edges run at **exactly ±45/±135 deg** — so each unit's
+extreme ray is *tangent* to its own notch edge, which passes **34.8 mm** from
+the emitter. Stationary, the rays miss it. Rotating, they clip it: returns at
+**0.40–0.48 m, bearings +129…+135 deg, in ~9% of frames, up to 6 points —
+exactly `collision_monitor`'s `min_points: 6`**. That closed a self-sustaining
+loop: rotation → ≥6 phantom points → `cmd_vel` zeroed → nav2 recovers by
+spinning → more rotation.
+
+Reproduced **on demand without nav2**: a bare `cmd_vel` rotation against the
+sim-only layer (`tools/isaac/stall_probe.py`, and the spin/probe recipe in
+`../../tools/benchmark/README.md`). Clean stationary, phantoms while rotating,
+both directions, clean again on stop.
+
+**Fix.** `LidarScanAssembler.EDGE_MASK_DEG = 10.0` (`sim/isaac/ros_io.py`)
+drops the outer 10 deg of each 270 deg window — 40 of 1081 bins per end, 7.4%
+of the arc. The band does **not** end sharply (it thins inward: 6 points/frame
+past 129 deg, 1–2 at 126.5), so 7 deg left a residual at its own boundary.
+The two units are mounted back-to-back, so each masked sector lies inside the
+other's arc: the merged scan, both costmaps and `collision_monitor` (all of
+which take both scans as observation sources) keep full 360 deg coverage.
+Regression test: `test/test_lidar_scan_assembler.py`. Masking beats raising
+`min_points` — the tangency is real geometry that a real UST-10LX would also
+see, while the *seam* is an artefact of the two-prim 180-deg/tick workaround
+the 6.0.1 bridge forces on us (§7).
+
+**Newly ruled out, each by measurement** (do not re-test):
+
+| hypothesis | test | result |
+|---|---|---|
+| published footprint oversized/offset | echoed all three topics while stalled | **dead** — `collision_monitor/footprint_approach` is the configured octagon ±0.466/±0.395 plus nav2's default `footprint_padding: 0.01` → ±0.476/±0.405. Costmap copies are that same octagon rigidly placed in odom/map (all vertex radii about the centroid are 0.5322/0.5485) |
+| assembler mis-bins edge azimuths | raw bridge clouds | **dead** — the hits exist pre-assembler, identical bearings/ranges, in `sensors/lidar2d_0/points_l` |
+| robot's own visible body | triangle-sliced the robot USD at the scan plane, ray-cast the full arc (`tools/isaac/self_occlusion_check.py`) | **0/1081 bins** self-occluded. Slicer validated: 178–204 segments spanning y ±0.392 at z ≤ 0.20, collapsing to 8 at 0.2264 |
+| robot collision meshes | same slice | **dead** — `vendor_chassis/.../collisions/*` are `purpose=guide`, so the RTX lidar (render meshes only) never sees them; they slice to the same diamond anyway |
+| world geometry at the spawn | sliced `full_warehouse.usd` at the plane with prim attribution and no max-extent skip (`tools/isaac/world_probe.py`) | **nearest geometry 5.534 m** (`SM_WallA_6M14` at x=+5.46). GT map's `free` verdict is correct |
+| rig asymmetry (prim config/pose) | dumped all four `OmniLidar` prims | **dead** — co-located at z=0.2264, identical config (single emitter, `elevationDeg=[0]`, `elevationErrorStd=0`, `nearRangeM=0.06`, `rangeAccuracyM=0.04`); only `startAzimuthOffsetDeg` differs (0 vs −135) |
+| "only under the full launch stack" | bare runner vs sim-only vs full, same world/USD | **the framing was wrong** — it is *motion*, not the launch. Bare and sim-only are byte-identical (`points_l` degmax +114.78, nearest 4.895 m) because nothing commands the robot; the launch merely provides the rotation |
+
+`rangeAccuracyM = 0.04` explains the ±2 cm scatter in the returns — do not
+read that scatter as a surface shape.
+
+#### The remaining band (open)
+
+Once moving, `lidar2d_0/scan` shows ~15 returns at **+94.5…+97.5 deg, 0.42–
+0.57 m**, which the ±125 deg mask does not cover. These cannot be world
+geometry either: the robot had travelled only 0.37 m, so the nearest real
+geometry was still ~5.2 m away. Candidate worth checking first: the side
+covers' **top** face (`visuals/mesh_10` / `mesh_13`, both topping at z=0.220)
+sits only **6.4 mm** below the 0.2264 scan plane, so a near-horizontal ray
+grazes it — a tangency in elevation rather than azimuth, which would explain
+why it appears at a bearing the azimuth mask cannot reach.
+
+Beware when reading base_link coordinates near ±90 deg: `cos(95°) ≈ 0` pins
+the computed x near the lidar's own 0.3922 offset, which looks like a flat
+vertical surface and is not one.
+
+**Next steps, in order.**
+1. Test the side-cover elevation-tangency hypothesis above — if it holds, the
+   fix is geometric (raise the scan plane or lower the covers), not a mask.
+2. Re-run the full stack and confirm the robot explores rather than
+   re-stalling; only then are the §3 baselines measurable.
 
 ```
 cmd_vel_nav       267 msgs   (controller output, healthy)
@@ -35,7 +111,10 @@ ground-truth map says `free` at every corresponding world position. The rear
 lidar shows zero. In `hospital` it was the rear lidar instead: whichever unit
 faces geometry.
 
-**Ruled out, each by measurement:**
+*(2026-09-11: "whichever unit faces geometry" was a red herring — it is
+whichever unit's notch edge the current rotation clips.)*
+
+**Ruled out, each by measurement (2026-09-10):**
 
 | hypothesis | test | result |
 |---|---|---|
@@ -46,27 +125,22 @@ faces geometry.
 | assembler mis-bins edge azimuths | `ros_io.py:87` | bins outside `[0, 1081)` are correctly dropped |
 | robot spawned against an obstacle | GT map, 3×3 m around spawn | all `free` |
 
-**What that leaves.** The phantom returns appear **only under the full launch
+**What that leaves.** ~~The phantom returns appear **only under the full launch
 stack**, never under the bare runner in the same world with the same robot
 USD. So it is something the launch adds or configures, not the world, not the
-robot, not the sensor model.
+robot, not the sensor model.~~
 
-**Live hypothesis — the published footprint.** `collision_monitor` does not
-consult the PhysX collider at all; it projects
-`local_costmap/published_footprint`. That topic has **never been read**. Every
-"inside the footprint" claim so far, including the table above, used an
-*assumed* 0.9325 × 0.7932 hull. If the published footprint is oversized or
-offset, returns that clear the real robot still trip `FootprintApproach`.
+**Superseded 2026-09-11.** The observation was right, the inference wrong.
+Nothing the launch *configures* matters — the runner args are effectively
+identical, and bare and sim-only runs are byte-identical. What the launch adds
+is a robot that *rotates*, and rotation is the trigger. The row above marked
+"grazing the side cover" as dead was also too strong: a tangency of exactly
+this kind is the confirmed cause, just against the notch edge rather than the
+side cover.
 
-**Next steps, in order.**
-1. Echo `/r100_0001/local_costmap/published_footprint` while stalled and
-   compare against the measured hull. This is the cheapest test and it is the
-   one that has been skipped twice.
-2. Diff the remaining runner args between bare and launch: `--animate-g1`,
-   `--rtf`, `--sensor-hz`, `--namespace`, `--livestream`. `--sim-mode` is
-   already cleared.
-3. If the footprint is fine, subscribe to the raw `points`/`points_l` clouds
-   and check whether the 0.53 m hits exist pre-assembler.
+All three of the 2026-09-10 next steps (read the published footprint, diff the
+runner args, check the raw clouds pre-assembler) were carried out on
+2026-09-11 and are folded into the tables above. The footprint was innocent.
 
 ---
 
@@ -105,6 +179,19 @@ broken — but both sides are 5 cm off from a correctly seated robot.
 **Fix shape.** `spawn_z = floor_z + 0.0259` per world, and `LIDAR_PLANE_Z`
 stops being a single constant: it becomes `floor_z + 0.2523`. Needs a per-world
 floor height (repo worlds 0.05, stock worlds 0.0) or a floor query at spawn.
+
+**Measured correction (2026-09-11).** Those two constants are 0.3 mm off. The
+`0.0259` came from the runner's own help text (axle `0.05` − radius `0.0759`),
+but the wheel *mesh* in the committed USD bottoms at **−0.02617** in
+`base_link` (all four identical; bbox height 0.15234, so the radius is
+0.07617, not 0.0759). Per the repo's own "verify against the mesh, not the
+primitive" rule the mesh wins:
+
+    spawn_z       = floor_z + 0.02617
+    LIDAR_PLANE_Z = floor_z + 0.25257     (front lidar is 0.2264 above base_link)
+
+0.3 mm is far below the 0.05 m map resolution, so it changes no GT map — but
+use the measured pair so the numbers stop disagreeing between documents.
 
 **Not the stall cause** — the bare runner floats identically and shows no
 phantom returns.
@@ -158,6 +245,13 @@ robot → one clean 6.0.1 baseline → migrate → rerun the identical benchmark
 Resequence only if issue 1 proves to be a 6.0.1 sensor-pipeline defect rather
 than config — check the 6.1 notes for the `laser_scan` ROI fix. See
 `port-plan.md` §P9.
+
+**2026-09-11: this clause did NOT fire.** Issue 1's primary band is the
+lidar's extreme ray being tangent to the chassis's own notch edge at ±135 deg
+— real geometry that a real UST-10LX shares, at the *contract window* edge,
+not at the 0 deg seam between the two prims. So it is not a 6.0.1 sensor
+defect and does not justify migrating early. Keep the order: finish issue 1's
+second band → seat the robot → one clean 6.0.1 baseline → migrate.
 
 ---
 

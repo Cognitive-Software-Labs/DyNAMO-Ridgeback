@@ -4,10 +4,18 @@ Instrumented exploration benchmark runs, promoted from the 2026-07-10 tuning
 sessions. The `sim-runner` project subagent (`.claude/agents/sim-runner.md`)
 automates this recipe.
 
-> ⚠️ **Exploration benchmarks do not currently run on Isaac.**
-> `collision_monitor` latches on phantom lidar returns and the robot never
-> moves in `hospital` or `warehouse_full`. See `docs/isaac/open-issues.md` §1
-> before spending a session on a run that cannot produce a number.
+> ⚠️ **Exploration benchmarks do not fully run on Isaac yet.**
+> As of 2026-09-11 the robot *does* drive (the notch-tangency phantom band is
+> fixed), but it re-stalls on a second phantom band at +94.5…+97.5 deg and
+> does not complete a sweep. See `docs/isaac/open-issues.md` §1 before
+> spending a session on a run that cannot produce a number.
+>
+> To reproduce the phantom mechanism in ~30 s without nav2, bring up the
+> sim-only layer (`includes/simulation_isaac.launch.py`) and publish a
+> `cmd_vel` rotation while watching `sensors/lidar2d_0/scan` for returns
+> under 1 m: clean stationary, phantoms while rotating. Watch the assembled
+> `scan`, not the raw `points`/`points_l` clouds — the mask that suppresses
+> the band lives in the assembler, so the raw clouds still show it by design.
 
 ## Canonical run
 
