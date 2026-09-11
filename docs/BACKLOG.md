@@ -119,5 +119,5 @@ should not land, because the accuracy results under `artifacts/` were all
 produced against the current pins.
 
 **Context.** [`.repos`](../.repos), the patch inventory in
-[README.md](../README.md#patches-and-issue-history), and
+[README.md](../README.md#patches-troubleshooting-and-history), and
 [`camera_0_color_optical_frame` ownership](target_localization/aligned_depth.md).

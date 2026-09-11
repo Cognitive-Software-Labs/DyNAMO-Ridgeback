@@ -208,6 +208,13 @@ comparison, `mask-model` materialization, and `live-system` sweeps. The GUI
 validates canonical replay jobs and their typed artifacts before export, so it
 cannot misrepresent a live or box-gated run as a frozen-mask experiment.
 
+The combined installed-package suite passed with 758 tests after the
+configurator landed, as recorded in
+[layered replay implementation validation](../history/layered_replay_implementation_validation.md).
+That record contains no canonical browser screenshot or visual-acceptance
+artifact; the functional contract is verified, while visual proof is not
+claimed.
+
 ## Legacy measurement replay
 
 The legacy measurement profile is the measurement-accuracy path for box-gated stereoscopic

@@ -3,7 +3,9 @@
 2026-08-31. Structural implementation is complete. Runtime accuracy and exploration
 checks passed. The depth-row coverage item is now closed: it was a pre-existing
 blocking TF fallback, not a refactor regression — see "Resolution of the coverage
-item" below. A smaller exact-stamp depth-availability loss remains open.
+item" below. The later
+[exact-stamp investigation](exact_stamp_depth_availability.md) closed the
+remaining depth-availability loss by selecting CycloneDDS.
 
 ## Committed implementation
 
@@ -58,7 +60,8 @@ Final-run depth rows had 101 valid observations, 15 `NO_DEPTH_FRAME`, and 136
 `UNSET` out of 252 observations. These counters show unavailable depth inputs,
 but do not establish why coverage differs from the baseline. Do not describe the
 two lower post-refactor results as proven harmless variance or performance parity.
-A controlled before/after timing investigation is the remaining check; no gate,
+A controlled before/after timing investigation was the remaining check at this
+stage; no gate,
 matching tolerance, scheduling, or numerical tuning was changed to conceal it.
 
 ### Resolution of the coverage item (2026-08-31)
@@ -104,12 +107,11 @@ results, no extra detections, 15 trials with none skipped:
 | Euclidean reconstruction | 0.056944 | 0.056944 |
 | Polar profiling | 0.081697 | 0.081697 |
 
-**4. Residual loss, still open.** Both depth rows report `NO_DEPTH_FRAME` ×73 of
-747 (9.77%). That is the separate exact-stamp depth-availability gap, unaffected
-by this fix; the earlier direct-frame probe showed 7.32% of a smaller
-single-repeat sample. It needs correlated generation/arrival/lookup
-instrumentation before any change. Do not close it by switching to nearest-frame
-depth matching or by widening the tolerance.
+**4. Residual loss at this stage, closed 2026-09-01.** Both depth rows reported
+`NO_DEPTH_FRAME` ×73 of 747 (9.77%). The later correlated transport
+investigation located subscriber-specific image delivery loss under Fast DDS;
+the matched CycloneDDS run delivered 706/706 observations with no
+`NO_DEPTH_FRAME`. Exact matching and its zero-tolerance contract did not change.
 
 Provenance: run
 `/tmp/dynamo-tf-fix-benchmark/20260831_134214_examples_box_stereoscopic`,

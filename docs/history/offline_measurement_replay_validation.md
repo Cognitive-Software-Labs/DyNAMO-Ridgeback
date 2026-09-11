@@ -22,6 +22,11 @@ throughput, model changes, or final integration.
   reconstruction because the V1 payload already contains depth ROIs,
   intrinsics, and extrinsics, but this run does not validate that code path.
 
+This was the V1 decision at the date of the run. The later
+[layered replay implementation](layered_replay_implementation_validation.md)
+added typed sensor/mask artifacts and projective-plus-Euclidean execution; its
+remaining live-parity and scaling gates supersede this extension note.
+
 ## Batch-count selection
 
 The selection artifact is

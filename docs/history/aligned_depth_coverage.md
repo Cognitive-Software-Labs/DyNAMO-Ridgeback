@@ -1,8 +1,8 @@
 # Aligned Depth — Stamp-Matching Coverage in Sim
 
 **Scope:** why the two depth-based paths (`docs/target_localization/projective_ranging.md`,
-`docs/target_localization/euclidean_reconstruction.md`) report *no estimate* on most frames in
-simulation, even though depth is nominally available. This is a **timing /
+`docs/target_localization/euclidean_reconstruction.md`) reported *no estimate* on most frames in
+simulation, even though depth was nominally available. This was a **timing /
 coverage** failure mode of the aligned-depth contract (`docs/target_localization/aligned_depth.md` §1,
 the "Timing" bullet), not an accuracy problem. The measurements below were
 taken 2026-07-24 on the `target_distance_calibration` world.
@@ -82,7 +82,7 @@ sub-sampled the stream**, and they kept *different* frames:
 ```
    rgbd_camera (color+depth, shared stamps, ~30 Hz nominal)
         │
-        ├──▶ detector          latest-wins slot + detector_fps=5 cap  ──▶ detections at stamps {D}
+        ├──▶ detector          latest-wins slot + then-5-fps cap       ──▶ detections at stamps {D}
         │        (target_detector_node.py: grab latest color, set None)
         │
         └──▶ aligned_depth_node                                       ──▶ aligned depth at stamps {A}
@@ -147,23 +147,18 @@ Consequences for any fix:
 
 ---
 
-## 5. Real hardware: the problem largely evaporates
+## 5. Hardware expectation was not validation
 
-On a real robot this failure mode is mostly a sim artifact:
+The original hypothesis was that a RealSense driver publishing synchronized
+color and aligned depth without Gazebo render/physics contention would avoid
+the separate-producer starvation seen here. That is plausible but was not
+tested on the physical robot. Hardware stream rates, stamps, alignment, holes,
+and exact-match coverage remain owned by the
+[D455 validation plan](../plans/camera_hardware_validation.md).
 
-- A RealSense publishes hardware-synchronized color + `aligned_depth_to_color`
-  at a true 30 fps with **shared stamps**, on dedicated compute that is not
-  contending with a renderer and a physics engine.
-- Alignment happens in the driver, so the stereo source is again a trivial
-  unit-convert-and-restamp.
-
-With the producer keeping up, `{A}` ≈ the full stamp grid, `{D} ⊆ {A}`, and
-exact-stamp coverage approaches 100 %. **Exact-stamp matching is the correct
-choice there** — it is only pathological when a starved producer thins `{A}`.
-
-(The monocular Depth-Anything source, `docs/target_localization/aligned_depth.md` §3, *is* a genuine
-per-frame NN cost and would thin `{A}` on any host; it is a separate axis from
-this sim-contention finding.)
+The monocular Depth-Anything source has genuine per-request neural-network
+cost on any host and is a separate axis from this historical simulator
+contention finding.
 
 ---
 
@@ -195,7 +190,7 @@ consumer, with a full NN forward pass, and scored 130/135.
   (`StereoDepthSource`, `MonocularDepthSource`) plus a `build_depth_source`
   factory. Monocular moved in with stereo rather than staying a producer: the
   same specificity argument applies to it, and running the NN once per
-  detection batch (5 Hz) is not obviously worse than once per camera frame.
+  detection batch (the then-current 5 Hz setting) was not obviously worse than once per camera frame.
 - `target_mask_measurement_node` subscribes to the source's *input* stream
   (`input_kind`), buffers it raw in the `StampedMessageBuffer` it already
   owned, and converts only the frame at the detection stamp. Monocular reads
@@ -213,13 +208,15 @@ consumer, with a full NN forward pass, and scored 130/135.
 
 | | before (`20260825_203145`, silhouette / stereoscopic) | after |
 |---|---|---|
-| projective ranging | 12 / 135 (8.9 %), `NO_DEPTH_FRAME` ×85 | not yet re-run |
-| euclidean reconstruction | 12 / 135 (8.9 %), `NO_DEPTH_FRAME` ×85 | not yet re-run |
+| projective ranging | 12 / 135 (8.9 %), `NO_DEPTH_FRAME` ×85 | not yet re-run at this stage |
+| euclidean reconstruction | 12 / 135 (8.9 %), `NO_DEPTH_FRAME` ×85 | not yet re-run at this stage |
 | polar profiling | unaffected (never depended on depth) | — |
 
-Expected after: roughly 97/135 for the two depth rows. The residual `UNSET`
-×37 in that run is a **different** defect — the mask node's own latest-wins
-detections slot drops backlog — and should be unchanged by this work.
+Later work closed both remaining causes rather than leaving this expectation
+open: the TF fallback fix removed the `UNSET` backlog, and the matched
+CycloneDDS run delivered 706/706 requested observations with zero
+`NO_DEPTH_FRAME`. See [refactor validation](refactor_validation.md) and
+[exact-stamp depth availability](exact_stamp_depth_availability.md).
 
 ---
 

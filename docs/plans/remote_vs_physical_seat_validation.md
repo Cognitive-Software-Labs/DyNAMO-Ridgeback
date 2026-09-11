@@ -4,7 +4,7 @@ Status: **READY TO RUN.** Prepared 2026-09-05 against `262e8a1`.
 
 ## Decision to make
 
-With `gpu-run` applied, does a benchmark run on the **xrdp session (`:10`)**
+With `tools/gpu-run` applied, does a benchmark run on the **remote X session**
 produce the same measurements as one on the **physical seat (`:0`)**? If not,
 name every surviving difference and say which of them invalidate a result
 rather than merely slowing it.
@@ -14,7 +14,8 @@ quoted as if it came from the seat".
 
 ## Why it is open
 
-`:0` has NVIDIA GLX natively. `:10` does not, so `gpu-run` routes GLX to NVIDIA
+The physical seat has NVIDIA GLX natively. The remote session does not, so
+`tools/gpu-run` routes GLX to NVIDIA
 and NVIDIA reads every frame back over PCIe at roughly 290 MB/s. That readback
 is a real, measured cost that the seat does not pay:
 
@@ -34,11 +35,11 @@ timing through CPU/GPU contention is exactly what is unmeasured.
   [`docs/troubleshooting.md`](../troubleshooting.md#camera-rate-collapses-under-software-rendering).
 - Refuted causes of that collapse: subscriber drops, QoS, the ffmpeg screen
   recorder, the `detector_debug` probe, detector rate, orphaned processes, CUDA
-  availability. All tested. The table is in ISSUES.
-- **Only OpenGL/GLX is exposed. Vulkan is not** — Isaac/Omniverse enumerates the
-  GPU through the kernel driver and never touches the X GL stack
-  (WORKSTATION.md #13). Gazebo is the affected engine.
-- **`gpu-run` reproduces the manual export**: 25.61 Hz vs 26.51 Hz camera on the
+  availability. All tested. The evidence is in
+  [operational incident history](../history/operational_incidents.md#camera-software-rendering-collapse--measured-2026-09-05).
+- **This plan tests Gazebo's OpenGL/GLX path.** It makes no claim about other
+  rendering APIs or simulators.
+- **`tools/gpu-run` reproduces the manual export**: 25.61 Hz vs 26.51 Hz camera on the
   same config.
 - Exploration needed the CycloneDDS participant ceiling raised (`262e8a1`);
   that is orthogonal to seat and already fixed for both.
@@ -61,9 +62,9 @@ between distributions, not between single values.
 
 - Tree clean at a known commit; `git status --porcelain` empty.
 - Nothing else running: `ps` clear of `gz sim`, `rviz2`, `ffmpeg`, `target_*`.
-- Fix A status recorded. It repoints xrdp glamor at the iGPU and applies only to
-  **newly started** xrdp sessions, so note whether the session under test began
-  before or after it (`ps -o lstart= -p $(pgrep -f 'Xorg :10')`).
+- Record the remote session's active renderer and Xorg start time. Host display
+  configuration changes apply only to newly started remote sessions, so a
+  pre-existing session is not evidence that the current configuration works.
 - On `:0`, confirm no one is using the seat. Do not take over an active session.
 
 ## Phase 0 — freeze provenance
@@ -72,7 +73,7 @@ For each of the two runs record, before starting:
 
 ```bash
 echo "$DISPLAY"; glxinfo -B | grep -E "OpenGL (vendor|renderer)"
-ps -o lstart= -p $(pgrep -f 'Xorg :(0|10)' | head -1)
+ps -o lstart= -p $(pgrep -f 'Xorg' | head -1)
 git rev-parse --short HEAD; git status --porcelain | wc -l
 nvidia-smi --query-gpu=name,memory.used,clocks.sm,temperature.gpu --format=csv
 uptime; nproc; free -g | head -2
@@ -102,10 +103,10 @@ configs:   # rotated, three replicates each
 ```
 
 Run identically on both seats, through the wrapper in both cases so the command
-is the same (`gpu-run` is a no-op on `:0`):
+is the same (`tools/gpu-run` is a no-op on `:0`):
 
 ```bash
-gpu-run ros2 run ridgeback_autonomy target_benchmark_sweep <yaml>
+tools/gpu-run ros2 run ridgeback_autonomy target_benchmark_sweep <yaml>
 ```
 
 Keep `record_video` at one setting for both, and state which. Video off is the
@@ -140,8 +141,8 @@ Decision rules:
 
 Outcomes:
 
-1. **Equivalent** — remote numbers may be quoted as seat numbers. Say so in
-   ISSUES so nobody re-litigates it.
+1. **Equivalent** — remote numbers may be quoted as seat numbers. Record the
+   result in history so the comparison is not re-litigated.
 2. **Equivalent for sensors, worse for display** — the expected result. Record
    which metrics travel and which do not.
 3. **Sensor-path difference survives** — remote is not a valid measurement
@@ -157,19 +158,18 @@ Worker p95 was 71.9 ms then 140.2 ms in a 100 ms budget, replacements 9 then 18,
 than running anything extra. If p95 routinely exceeds 100 ms, 10 Hz is at the
 edge and the concurrency question reopens earlier than 16 Hz.
 
-### H2. Gazebo cannot open the node Fix A points at
+### H2. Gazebo cannot open the render node selected for remote X
 
-The exploration launch logged, before Fix A could apply:
+One exploration launch logged:
 
 ```
 libEGL warning: failed to open /dev/dri/renderD129: Permission denied
 libEGL warning: failed to open /dev/dri/renderD128: Permission denied
 ```
 
-`renderD129` is the iGPU that Fix A repoints xrdp glamor at. If that permission
-does not hold for this user, Fix A cannot deliver hardware GL and the session
-stays on `llvmpipe`. Check `ls -l /dev/dri/render*` and group membership on a
-**new** xrdp session. Cheap, and it decides whether Fix A is real. For deivid.
+If the intended render-node permission does not hold for the current user, the
+remote session stays on `llvmpipe`. Check `ls -l /dev/dri/render*`, group
+membership, and the active renderer in a newly started remote session.
 
 ### H3. Ground truth is measured to the wrong surface
 
@@ -213,9 +213,8 @@ if a faster cadence is actually wanted.
 - Do not change estimator recipes, scenario bytes, detector settings or the
   transport for this experiment.
 - Do not run the two seats concurrently — they share the GPU and the host.
-- Do not take over an occupied physical session, and do not touch lightdm or the
-  seat0 display configuration; WORKSTATION.md #10 records a seat crash from
-  exactly that.
+- Do not take over an occupied physical session, and do not modify the display
+  manager or seat configuration as part of this measurement.
 - Preserve other users' processes. Inspect ownership before terminating
   anything; an interrupted sweep can orphan a benchmark runner that `cleanup.sh`
   does not catch.
@@ -227,8 +226,8 @@ if a faster cadence is actually wanted.
   the mask node's `rx color=` counter across two log lines.
 - **RTF does not reveal a software-GL run.** It stayed ~0.89 while the camera was
   at 3.80 Hz. Trust the recorded GL renderer, not RTF.
-- **Fix A only affects newly started xrdp sessions.** A session that predates it
-  keeps the old config, so "I reset it" is not the same as a reconnect — verify
-  with the X server's start time.
+- **Remote X configuration applies at session start.** A session that predates
+  a host change keeps the old configuration, so verify the X server's start
+  time rather than assuming a reset affected it.
 - **Cold model load is not steady state.** First-use slot replacements are
   expected in every run; only replacements after the load window count.

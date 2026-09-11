@@ -437,6 +437,11 @@ and those results do not isolate a tuning effect from a surface/center offset.
 Any future tuning should compare against ground truth on existing clutter and
 occlusion scenes; exploration is only a qualitative check.
 
+The published-beam-index contract that drives both the 3D markers and 2D LiDAR
+panel is implemented and covered by focused tests. No post-2026-09-10 in-sim
+visual acceptance run is recorded, so treat visual integration as awaiting a
+smoke check even though the data contract is current.
+
 ### 7.1 A near-range floor the geometry imposes
 
 The scan plane sits **0.686 m below the camera** (camera optical origin 1.028 m

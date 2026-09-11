@@ -30,7 +30,7 @@ gap must come out `False` — that gap is precisely what the tight mask buys
 polar profiling (a rect mask admits through-the-gap background rays,
 `docs/target_localization/target_localization_pipeline.md` §5). All three candidates passed the leg-gap
 check visually; SlimSAM won on stable quality at the lowest footprint. Latency
-is well inside the 5 FPS detector cadence. The model stays a public parameter
+was well inside the then-current 5 FPS detector cadence. The model stays a public parameter
 (`segmentation_model`) because the real robot's compute budget is undecided;
 both SAM 1 and SAM 2 checkpoints load (the family is dispatched on the
 checkpoint's `model_type`).
@@ -76,7 +76,8 @@ load and the peak across the run are recorded alongside.
    on every frame of the grid; a candidate must match that shape, not just
    approach it.
 2. **Latency.** Budget: **200 ms per frame, all instances included**,
-   matching the 5 FPS detector cadence the front-end runs at. Measured as the
+   matching the 5 FPS detector cadence used for this historical experiment.
+   Measured as the
    synchronized end-to-end time above, after warm-up.
 3. **Multi-instance separation.** On the two-G1 frames the candidate must
    produce exactly one confident instance per robot, with pairwise-disjoint

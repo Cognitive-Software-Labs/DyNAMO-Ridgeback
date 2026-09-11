@@ -7,10 +7,10 @@ offline results as latency, throughput, transport, or integration evidence.
 
 Prepared 2026-09-09 against `aafa4385`.
 
-Implemented 2026-09-10 in the non-GUI benchmark core: shared profiles/jobs,
-typed sensor and mask-cache artifacts, exact-evidence runner capture, box and
-SlimSAM materializers, projective/Euclidean cache replay, atomic outputs, and
-the three generalized commands. Unit/compatibility/import/determinism tests and
+Implemented 2026-09-10 in the benchmark core and local configurator: shared
+profiles/jobs, typed sensor and mask-cache artifacts, exact-evidence runner
+capture, box and SlimSAM materializers, projective/Euclidean cache replay,
+atomic outputs, and the three generalized commands. Unit/compatibility/import/determinism tests and
 a preliminary lossless storage spike pass. A fresh full live sensor capture,
 box/SlimSAM live parity, real full-frame storage/scaling measurements, and a
 candidate checkpoint run remain required before this plan can move to history;
@@ -110,7 +110,7 @@ choose profile "mask-model" to vary it.
 ```
 
 Expose the resolved contract as JSON-compatible data so command-line tools, the
-planned configurator GUI, tests, and reports all consume the same facts.
+configurator UI, tests, and reports all consume the same facts.
 Describe the existing `live-system` benchmark through the same capability
 surface for configuration purposes, but route it to the existing live workflow,
 not through a replay executor.
@@ -250,7 +250,7 @@ bytes are frozen and which stages each profile reruns.
 - Add the typed manifest dispatcher and legacy schema adapter.
 - Move the current replay-specific allowed-argument checks behind the shared
   registry without changing accepted legacy sweeps or outputs.
-- Expose a JSON description for the future GUI.
+- Expose a JSON description consumed by the configurator UI.
 
 Gate: every legacy replay test and golden result remains unchanged; every axis
 is owned by one stage and invalid profile/axis combinations fail before work.
