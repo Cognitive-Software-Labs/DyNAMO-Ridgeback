@@ -1,5 +1,7 @@
 build/
 install/
+# Generated output; legacy names stay ignored for older checkouts/explicit overrides.
+artifacts/
 log/
 benchmark-results/
 
