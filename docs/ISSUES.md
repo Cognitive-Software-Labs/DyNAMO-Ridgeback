@@ -15,7 +15,7 @@
 | Startup hangs / a stage never comes up | Bringup is event-driven (readiness gates) — find the `gate_*` process log `[launch_wait]: waiting for …`; the `unmet:` list on timeout names the exact missing topic/service. See "Event-Driven Startup" below. Do **not** re-add `TimerAction` delays |
 | Stale processes from previous runs | Run `bash cleanup.sh` before each launch |
 | Gazebo/RViz vanished during a benchmark sweep | Do not run `cleanup.sh` between sweep configurations; it kills the persistent environment. Run it once before starting the supervisor |
-| Diagnostics | Run `bash diag.sh /tmp/logfile.log hospital` or `bash diag.sh /tmp/logfile.log warehouse` |
+| Diagnostics | Run `bash tools/diag.sh /tmp/logfile.log hospital` or `bash tools/diag.sh /tmp/logfile.log warehouse` |
 
 ## Benchmark Sweep Cleanup Trap
 

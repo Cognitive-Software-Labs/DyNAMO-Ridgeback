@@ -1,11 +1,11 @@
 #!/bin/bash
 # Full diagnostic for the Ridgeback SLAM exploration stack
-# Usage: bash diag.sh [logfile] [world]
+# Usage: bash tools/diag.sh [logfile] [world]
 
 set -o pipefail
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source /opt/ros/jazzy/setup.bash 2>/dev/null
-[ -f "$SCRIPT_DIR/install/setup.bash" ] && source "$SCRIPT_DIR/install/setup.bash" 2>/dev/null
+[ -f "$REPO_ROOT/install/setup.bash" ] && source "$REPO_ROOT/install/setup.bash" 2>/dev/null
 
 LOGFILE="${1:-}"
 WORLD_ARG="${2:-}"
