@@ -1,12 +1,14 @@
 # Port plan: Gazebo Harmonic → NVIDIA Isaac Sim 6.0
 
-Status: **in progress — P0–P4 + P7 done; P5 plumbing done, A/B sign-off BLOCKED; P6 (G1 benchmark) deferred; P8 (gz removal) and P9 (Isaac 6.1) not started.**
+Status: **in progress — P0–P4 + P7 done; P5 plumbing done, A/B sign-off pending a first baseline; P6 (G1 benchmark) deferred; P8 (gz removal) and P9 (Isaac 6.1) not started.**
 
-> ⚠️ **P8 is not the next task.** Navigation does not run: `collision_monitor`
-> latches on phantom lidar returns and the robot never moves in `hospital` or
-> `warehouse_full`. No Isaac baseline has ever been rerun, and the 2026-09-10
-> sensor-geometry work (four changes: coplanar lidars, −11.6 cm mount, vendor
-> chassis graft, camera + mast + D455) voids every coverage number below.
+> ⚠️ **P8 is not the next task.** The first Isaac baseline is — none has ever
+> been rerun. Navigation itself was fixed on 2026-09-11 (the lidars were
+> parented to `base_link` and so never rotated with the robot;
+> `open-issues.md` §1). Every coverage number below is void: the 2026-09-10
+> sensor-geometry work (coplanar lidars, −11.6 cm mount, vendor chassis graft,
+> camera + mast + D455) invalidated the earlier ones, and everything measured
+> between that and the 2026-09-11 reparent used a sensor that did not rotate.
 > **See `open-issues.md` — that is the live register; this file is the phase
 > plan and its history.** Treat performance figures here as "claimed at the
 > time", not current. Superseded investigation narratives live in
@@ -76,7 +78,7 @@ Decisions:
 - `ros_io.py` — in-process rclpy (`isaac_sim_runner`, ns `r100_0001`, tf remaps): TwistStamped sub on `cmd_vel` (+ tolerant Twist sub), raw odom pub, IMU pub, `ground_truth/pose` pub, `/clock` pub, `sim/spawn_g1` Trigger service, reset glue. TF `odom→base_link` ownership: EKF (runner TF off) — matches real robot.
 - OmniGraph only for GPU sensor paths: `isaacsim.ros2.bridge.ROS2RtxLidarHelper` (laser_scan, namespaced), `ROS2CameraHelper` (rgb/depth/depth_pcl) + `ROS2CameraInfoHelper`, `ROS2PublishImu`. Exact 6.0 ids resolved via Isaac Sim MCP / `og.get_registered_nodes()`. Fallback if rclpy-in-process misbehaves: all-OmniGraph I/O.
 
-**Drive rig** (added at import): `world → prismatic-X → prismatic-Y → revolute-Z → base_link`, velocity drives (stiffness 0, high damping). Per step: read θ, rotate body twist to world, set 3 velocity targets; accel-limited (1.0 m/s² platform match); 0.5 s cmd timeout. Wheels free/visual; URDF colliders keep PhysX contacts real (no tunneling).
+**Drive rig** (added at import): `world → prismatic-X → prismatic-Y → revolute-Z → chassis_link` (**not** `base_link` — that is a bare Xform with no joint, and parenting sensors to it detaches them; see `robot-model.md` "The drive rig"), velocity drives (stiffness 0, high damping). Per step: read θ, rotate body twist to world, set 3 velocity targets; accel-limited (1.0 m/s² platform match); 0.5 s cmd timeout. Wheels free/visual; URDF colliders keep PhysX contacts real (no tunneling).
 
 **Timing**: physics 120 Hz (divides 40 Hz lidar, 30 Hz camera under 6.0 multitick), render decoupled, RTF throttle per flag.
 
@@ -116,11 +118,11 @@ Bootstrap: cut `feat/isaac-sim-6-port` from `dev`; workspace already built in th
 - ✓ Isaac include alone: all contract topics live, types/QoS match baseline, camera_info = D455 1280×720 (intentional divergence, matches new camera_config.json), EKF publishes filtered odom + TF, view_frames complete, standalone slam_toolbox maps.
 - **DONE** — include-alone acceptance: 14/14 contract topics live, QoS RELIABLE/VOLATILE matches baseline, camera_info 1280×720 fx=631 frame=color-optical, EKF filtered odom within ~1 mm of GT while raw drifts (IMU+odom fusion), TF tree 22 edges incl. odom→base_link from EKF, slam_toolbox maps standalone (1758 occ / 17k free cells after one arc). Deviations, all documented in code: 6.0 replaced lidar JSON profiles with OmniLidar prims (`ust10lx_2d.json` is now our spec file that sensors.py authors onto the prim; needs `omni:sensor:tickRate` 40 + `accumulateOutputs`); **[CORRECTED 2026-07-12]** the "LaserScan is a 360° frame with the rear 90° inf, ROI honored, effective 270°" claim here was WRONG — both the mechanism it describes and the state it asserted. The 6.0.1 bridge laser_scan writer hardcodes 360° for ROTARY lidars (ignores the ROI) and only fires 180°/tick, so the P4 scan was actually half-blind (135°, right side only) and rotation-warped — never a clean 270°. The fix (commits `66493670` + `e1862498`) makes the 270° outcome real but NOT via the mechanism above: two OmniLidar prims per laser frame publish point clouds, and `ros_io.LidarScanAssembler` emits a **native 270° message** (`angle_min -135°`, 1081 bins, `angle_max +135°`) — there is no 360° frame and no rear-inf sector anymore. So the FOV number now matches by outcome, but the "360° frame with rear inf, ROI honored" description was never how this worked. Full writeup: `docs/isaac/lidar-pipeline.md`. Scan now 40 Hz sim-time; odom ~30 Hz — render-frame-locked under co-tenant load (gz baseline 37/46; slam fine, revisit at P5 RTF gate); camera = plain USD camera with true D455 720p intrinsics at the RealSense mount pose (**the description said `d435` until 2026-09-10 and now says `d455`, matching the intrinsics**) instead of referencing the cloud `rsd455.usd` asset (self-contained repo beats a boot-time network fetch; mesh is cosmetic); UST-10LX min range 0.06 m per datasheet (plan said 0.05).
 
-### P5 — E2E exploration + sign-off [M] — plumbing ✅, A/B ⛔ BLOCKED
+### P5 — E2E exploration + sign-off [M] — plumbing ✅, A/B ⏳ awaiting a baseline
 - ✅ Launch chain forwards `sim`/`rtf`/`headless`/`livestream`/`odom_noise`; readiness gates; HUD localization-error panel; `explore_probe` logs GT-drift, achieved RTF, coverage accuracy (`9e0f3c02`).
 - ✅ `tools/isaac/ab_compare.py` — gz-vs-isaac table + gate checker (`9e0f3c02`).
-- ⛔ **Blocked, and no longer for the reason recorded in 2026-07.** Navigation does not run at all: `collision_monitor` latches on phantom returns → `open-issues.md` §1. The earlier SLAM-drift and "40% plateau" investigation is in `port-history.md`; its headline conclusion was that the plateau **does not reproduce** (clean runs land 51–83%) and that `odom_noise` is a partial lever, not the cap.
-- Gate when unblocked: 3/3 complete, coverage ≥ gz mean − 10, genuine aborts ≤ gz max, RTF ≥ 0.8 throttled headless. Needs 3–5 seeds/condition — variance is 51–83%.
+- ⏳ **Unblocked 2026-09-11, not yet run.** The blocker was never a nav-tuning problem: the lidars were detached from the articulation and the scan did not rotate with the robot (`open-issues.md` §1). Exploration now drives and frontier goals succeed, so the A/B needs a baseline run, not a fix. The earlier SLAM-drift and "40% plateau" investigation is in `port-history.md`; its headline conclusion was that the plateau **does not reproduce** (clean runs land 51–83%) and that `odom_noise` is a partial lever, not the cap — but note those runs predate every 2026-09 geometry change.
+- Gate: 3/3 complete, coverage ≥ gz mean − 10, genuine aborts ≤ gz max, RTF ≥ 0.8 throttled headless. Needs 3–5 seeds/condition — variance is 51–83%.
 
 ### P6 — G1 distance benchmark port [L]
 - Rewrite gz plumbing in place in `g1_distance_benchmark_runner_node.py`: spawn/remove/pose → Simulation Control services (`simulation_interfaces`; exact names via `ros2 service list` with the sim-control extension enabled). Fallback: custom rclpy srvs in `ros_io.py` on the USD stage.

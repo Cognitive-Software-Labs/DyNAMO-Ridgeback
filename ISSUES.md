@@ -8,7 +8,7 @@ keeping. What is currently broken on the Isaac port lives in
 
 | Problem | Check |
 |---------|-------|
-| Robot doesn't move | `ros2 topic echo /r100_0001/cmd_vel` - if empty, Nav2 may not be active. **On Isaac this is a known open bug:** `collision_monitor` latches `FootprintApproach` on phantom lidar returns and emits nothing while `cmd_vel_nav` is healthy — compare the two topics' message counts before assuming Nav2 is down (`docs/isaac/open-issues.md` §1) |
+| Robot doesn't move | `ros2 topic echo /r100_0001/cmd_vel` - if empty, Nav2 may not be active. **On Isaac this had a known cause, fixed 2026-09-11:** `collision_monitor` latched `FootprintApproach` on phantom lidar returns and emitted nothing while `cmd_vel_nav` stayed healthy, because the 2D lidars were parented to `base_link` and never rotated with the chassis. If it recurs, compare the two topics' message counts before assuming Nav2 is down, then run `tools/isaac/diag_rig.py --spin-transforms` to confirm the sensor still tracks the body (`docs/isaac/open-issues.md` §1) |
 | Wheels hover above the floor | Expected on stock worlds today: `--spawn-z` is tuned for `mock_hospital`'s 0.05 floor, so the robot floats 49.8 mm everywhere else, and the scan plane rides up with it (`docs/isaac/open-issues.md` §2) |
 | No map in RViz | `ros2 topic hz /r100_0001/map` - if 0, check `slam_toolbox` logs and the scan topic |
 | Detection overlay does not appear | Make sure `g1_perception_enabled:=true`, remember the overlay is a separate OpenCV window, and check `/r100_0001/sensors/camera_0/color/image` |

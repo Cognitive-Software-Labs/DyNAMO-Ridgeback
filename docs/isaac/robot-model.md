@@ -49,8 +49,11 @@ Committed artefact; regeneration is deliberate and reviewed in git.
 
 ## Geometry, as built
 
-All values in metres relative to `base_link`, which sits **0.0259 above the
-floor** (axle 0.050 − mecanum wheel radius 0.0759).
+All values in metres relative to `base_link`, which sits **0.02617 above the
+floor**. Measured from the wheel mesh: all four bottom at −0.02617 in
+`base_link`, bbox height 0.15234, so the radius is 0.07617. The
+axle 0.050 − radius 0.0759 derivation quoted here previously gives 0.0259 and
+is 0.27 mm off — below map resolution, but prefer the measured value.
 
 | | x | y | z |
 |---|---|---|---|
@@ -90,9 +93,23 @@ corners reach 0.3486 along ±x and ±y while the lidars sit at ±0.3922, so a ra
 leaving a lidar at exactly ±135° runs **parallel** to a diamond face, 30.8 mm
 outside it. Invisible in any photo, load-bearing in the geometry.
 
+Careful with which prim you measure, though: both `riser_link` Cubes are
+**invisible / `guide` purpose**, so the RTX lidar never rays against them. The
+notch surface it actually sees is the vendor chassis *visual* mesh, whose
+plane-slice diamond has its vertex at +0.3432, putting the tangent face
+**34.6 mm** from the emitter. Same mechanism, slightly different number — use
+34.6 mm for anything about what the sensor perceives.
+
 Verified in `sim/isaac/usd/worlds/empty.usda` — floor slab, nothing else, so
 any finite return is necessarily the robot seeing itself: **0/1081 finite bins
-on both lidars** across the full ±135°.
+on both lidars** across the full ±135°. A static ray-cast of the sliced USD
+agrees: 0/1081 (`tools/isaac/self_occlusion_check.py`).
+
+⚠️ Both of those are **static** results, and they were read as "the robot can
+never see itself". That is only true while the sensor and the chassis move
+together. From `a33111c2` to 2026-09-11 they did not (see "The drive rig"), and
+the robot saw its own notch every time it turned. A zero here does not license
+skipping the moving case.
 
 ---
 
@@ -176,13 +193,31 @@ into a wall to confirm it stops where it should (`open-issues.md` §5).
 
 ## The drive rig
 
-`world → prismatic-X → prismatic-Y → revolute-Z → base_link`, velocity drives
-(stiffness 0, high damping). Per step the runner reads θ, rotates the body
-twist to world, and sets three velocity targets. Wheels are free visuals;
+`world → prismatic-X → prismatic-Y → revolute-Z → chassis_link`, velocity
+drives (stiffness 0, high damping). Per step the runner reads θ, rotates the
+body twist to world, and sets three velocity targets. Wheels are free visuals;
 colliders keep PhysX contacts real.
 
 Structurally the same pattern NVIDIA uses (`world → dummy_base_x →
 dummy_base_y → base_link`).
+
+> 🔴 **The chain ends at `chassis_link`, NOT `base_link`.** This doc said
+> `base_link` until 2026-09-11 and that error cost a week of debugging.
+> `base_link` is a bare `Xform` with **no `RigidBodyAPI` and no joint** — it
+> is only a naming parent. PhysX drives `chassis_link`, writes its transform
+> back, and leaves `base_link` at its authored pose.
+>
+> **Consequence: anything parented to `base_link` does not move with the
+> robot.** `a33111c2` parented the 2D lidars there, which silently made them
+> orphan rigid bodies — the scan stopped rotating with the body
+> (`d(bearing)/d(yaw)` measured −0.0025 where −1 is correct) and the chassis
+> swept under a stationary emitter, faking close returns off its own notch.
+> That was the `collision_monitor` stall. Verify with
+> `tools/isaac/diag_rig.py --spin-transforms`: `lidar-chassis` must stay 0.
+>
+> Mount sensors on `chassis_link` or a descendant. The two links are
+> coincident (identity local transform), so offsets carry over unchanged and
+> published TF does not move.
 
 **There is no vertical joint**, so `base_link` z is fixed at `--spawn-z` and
 the robot cannot settle onto a floor. That is why it floats 49.8 mm on stock

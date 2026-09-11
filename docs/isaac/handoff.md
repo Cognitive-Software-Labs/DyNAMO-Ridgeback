@@ -1,9 +1,13 @@
-# Continue the Isaac Sim 6.0 port — navigation is blocked, fix that first
+# Continue the Isaac Sim 6.0 port — navigation works, produce the first baseline
 
 You are picking up an in-flight port of a Ridgeback autonomy stack from
 Gazebo Harmonic to **Isaac Sim 6.0 GA**. Work happens ONLY in the worktree
 `/home/deivid/dev/DyNAMO-Ridgeback/.claude/worktrees/isaac` on branch
-`feat/isaac-sim-6-port` — the main checkout stays on its own branch.
+`feat/isaac-sim-6-port` — the main checkout stays on its own branch. If that
+worktree is gone, recreate it per "Recreating the worktree" below; the branch
+is on `origin`. **Check `git rev-parse --abbrev-ref HEAD` before committing** —
+the worktree was once checked out on `feat/isaac-vendor-chassis` and two
+commits landed on the wrong branch.
 
 ## Read these first, in order
 
@@ -15,8 +19,9 @@ Gazebo Harmonic to **Isaac Sim 6.0 GA**. Work happens ONLY in the worktree
    do not rediscover). Also skim `nav-tuning-in-flight` and
    `shared-dev-box-contention`.
 3. `docs/isaac/port-plan.md` — the 9-phase plan and its history. Its
-   performance numbers are **stale by design**; geometry changed four times on
-   2026-09-10 and nothing has been rerun since.
+   performance numbers are **stale by design**: geometry changed four times on
+   2026-09-10, the lidars were reparented on 2026-09-11, and nothing has been
+   rerun since.
 4. `docs/isaac/lidar-pipeline.md` — how the RTX lidar reaches ROS. The
    assembler synthesizes the 270° contract scan from two OmniLidar prims.
 5. `docs/isaac/assets/robot-geometry.svg` + `robot_render.png` — the sensor mounting,
@@ -26,38 +31,54 @@ Gazebo Harmonic to **Isaac Sim 6.0 GA**. Work happens ONLY in the worktree
 
 ## Where things actually stand
 
-**Navigation does not run.** `collision_monitor` latches on 13 phantom lidar
-returns and publishes zero `cmd_vel` while the controller is healthy. The
-robot never moves in `hospital` or `warehouse_full`. This blocks the baselines,
-which blocks the P5 A/B, which blocks P8. `open-issues.md` §1 has the full
-evidence table and the cheapest untried test (read
-`local_costmap/published_footprint` — it has never been looked at, and every
-"inside the footprint" claim so far used an assumed hull).
+**Navigation runs, as of 2026-09-11.** The long-standing stall is fixed. The
+2D lidars had been parented to `base_link`, which is a bare Xform with **no
+joint into the articulation**, so they were orphan rigid bodies: PhysX turned
+`chassis_link` and left the sensors behind. The chassis then swept underneath
+a stationary emitter and its own diamond-notch edge came into range, which is
+what produced the "phantom" returns that tripped `collision_monitor`'s
+`min_points: 6` and pinned `cmd_vel` at zero. One-line fix in
+`clearpath/robot.yaml` (`parent: chassis_link`) plus a USD regen.
+`open-issues.md` §1 has the measurements and the full reasoning trail.
 
-**The robot also floats 49.8 mm** on every stock world, which puts the scan
-plane 5 cm high (`open-issues.md` §2). Independent of the stall — the bare
-runner floats too and shows no phantom returns.
+After the fix, in `warehouse_full`: `cmd_vel` 799 msgs / 40 s (was 0), odom
+displacement 1.15 m (was 0.000), zero `away from collision` log lines (was
+continuous), and frontier goals reaching `Goal succeeded`.
 
-**No baseline has ever been rerun.** That was the original request and it is
-still outstanding.
+**The robot still floats 49.8 mm** on every stock world, which puts the scan
+plane 5 cm high (`open-issues.md` §2). Independent of the stall, and still
+open.
 
-## The worktree is already built — do not redo this
+**No baseline has ever been rerun.** That is the original request, it is still
+outstanding, and it is now actually achievable. Every coverage and SLAM number
+on record predates the fix and was measured with a sensor that did not rotate
+with the robot — they are void, not comparison points.
 
-Set up 2026-09-10, and it costs an hour to rediscover:
+## Recreating the worktree
+
+It was set up on 2026-09-10 and may have been deleted since. Nothing is lost if
+it was — everything tracked is pushed to `origin/feat/isaac-sim-6-port` — but
+these facts cost an hour to rediscover, and the five dependency checkouts are
+**gitignored**, so they come back only from the hashes below:
 
 - **`isaac_venv` is a symlink** to the main checkout's venv, not a copy. Saves
   a 30–50 GB reinstall. It shows as untracked because `.gitignore` has
   `isaac_venv/` with a trailing slash, which does not match a symlink. Leave
   it. Verify with
   `OMNI_KIT_ACCEPT_EULA=YES isaac_venv/bin/python3 -c "import isaacsim"`.
-- **`colcon build` is done** — 24 packages, clean. The only stderr is
+- **`colcon build`** covers 24 packages and is clean. The only stderr is
   `tl_expected` deprecation noise.
 - **Dependencies are pinned by hand** to the main checkout's commits:
   `clearpath_common 9960354`, `clearpath_config 5c92caa`,
   `clearpath_msgs 5d04171`, `clearpath_simulator 69e6833`,
-  `slam_toolbox 22450ca`. Both patches in `patches/` are applied.
-  **Do not `vcs import` over this** without re-pinning — see the landmine
-  below.
+  `slam_toolbox 22450ca`. Verified against the on-disk checkouts on
+  2026-09-11 — all five matched. `src/clearpath_*` and `src/slam_toolbox` are
+  **gitignored with zero tracked files**, so after a fresh `vcs import` you
+  must `git checkout <hash>` in each and re-apply both patches in `patches/`
+  (they are tracked, and their diffs are exactly the local modifications those
+  two repos carry).
+  **Do not `vcs import` over an existing tree** without re-pinning — see the
+  landmine below.
 
 ## What landed 2026-09-10
 
@@ -79,10 +100,33 @@ Four commits, all verified live unless noted:
   unnecessary. This deliberately breaks the gz lidars; accepted, gz dies in P8.
 - **`a33111c2` — lidars were mounted 11.6 cm too high.** They were parented to
   `default_mount` (the top deck) when physically they sit recessed in a
-  diamond notch under the top plate. Now `parent: base_link`,
-  `xyz: [±0.3922, 0.0, 0.179]` → laser plane 0.252 m off the floor. Robot USD
-  regenerated, not hand-patched. Full derivation in PORT_PLAN improvement 2.
+  diamond notch under the top plate. `xyz: [±0.3922, 0.0, 0.179]` → laser
+  plane 0.252 m off the floor. Robot USD regenerated, not hand-patched. Full
+  derivation in PORT_PLAN improvement 2. **The height was right, but the
+  `parent: base_link` it also introduced detached the sensors from the
+  articulation — see 2026-09-11 below.**
 - `686ecc0b` — graphify rebuild.
+
+## What landed 2026-09-11
+
+- **The lidars were orphan rigid bodies.** `parent: base_link` →
+  `parent: chassis_link` in `clearpath/robot.yaml` + USD regen. `chassis_link`
+  is coincident with `base_link` (identity local transform), so `xyz` and
+  published TF are unchanged. This is what unblocked navigation.
+- **A 10° scan edge mask was added, then removed.** It masked the symptom;
+  once the root cause landed it measured unnecessary and cost 7.4% of each
+  arc. `test_lidar_scan_assembler.py` fails if one is reintroduced.
+- **New diagnostics.** `diag_rig.py --spin-transforms` is the permanent guard
+  for this class of bug — it spins in place and asserts the sensor's world yaw
+  tracks the chassis (expect `lidar-chassis` ≈ 0 and a constant `notch_r`).
+  Also `stall_probe.py` (footprint + scans + raw clouds + the `cmd_vel` chain
+  in one attach), `self_occlusion_check.py` (self-occlusion sliced from the
+  robot USD) and `world_probe.py` (world geometry at the scan plane, with prim
+  attribution).
+- **`cleanup.sh` matches this workspace's nodes by install path now.** The
+  hand-maintained name list had missed `scan_merger_node` since `2ed1674a`, so
+  an orphaned merger survived every cleanup for 16 h and double-published into
+  a benchmark run.
 
 ## Verified live, so you don't have to re-prove it
 
@@ -94,6 +138,12 @@ On `mock_hospital`, `odom_noise:=0`, deterministic, camera off, isolated domain:
 - merged scan `range_max` 10.3922, slam_toolbox subscribed, map at 0.05 m
 - 326 finite returns in the rear-only sector (|θ|>135°) the front cannot see
 
+⚠️ **All measured before the 2026-09-11 reparent**, i.e. with a sensor that did
+not rotate with the robot. The static facts (TF offsets, rates, `range_max`,
+merger pairing) are unaffected and still hold — the reparent changes no
+offsets. Anything that depends on the robot *moving* — map quality, coverage,
+the rear-sector count while driving — must be re-measured.
+
 ## Your objective
 
 **Out of scope: the G1 distance/detection benchmark (P6).** Do not port it,
@@ -101,37 +151,34 @@ do not run it, do not touch `g1_distance_benchmark.launch.py`, the G1
 perception stack or `G1_DISTANCE_BENCHMARKING.md`. Every exploration run uses
 `g1_perception_enabled:=false` anyway. P6 stays deferred.
 
-1. **Unblock navigation** — `open-issues.md` §1. The robot never moves:
-   `collision_monitor` emits zero `cmd_vel` while the controller is healthy.
-   Five hypotheses are already dead **by measurement**; read that table before
-   forming a sixth. The cheapest untried test is one command: echo
-   `/r100_0001/local_costmap/published_footprint` while stalled. Every
-   "inside the footprint" claim on record used an *assumed* hull, and that
-   topic has never actually been read. Nothing below can be measured until
-   this lands.
-
-2. **Seat the robot** — `open-issues.md` §2. It floats 49.8 mm on every stock
+1. **Seat the robot** — `open-issues.md` §2. It floats 49.8 mm on every stock
    world because `--spawn-z 0.076` is tuned for `mock_hospital`'s 0.05 floor.
    The scan plane rides up with it, so the lidars sample 5 cm high everywhere
-   except `mock_hospital`. Fix shape: `spawn_z = floor_z + 0.0259`, and
-   `LIDAR_PLANE_Z` becomes `floor_z + 0.2523` rather than one constant.
+   except `mock_hospital`. Fix shape: `spawn_z = floor_z + 0.02617`, and
+   `LIDAR_PLANE_Z` becomes `floor_z + 0.25257` rather than one constant.
+   (Those are the **measured** wheel-mesh values; the 0.0259/0.2523 quoted
+   before came from axle − radius using a 0.0759 radius, and the mesh bottoms
+   at −0.02617 with radius 0.07617. The 0.3 mm is below map resolution, but
+   use the measured pair so the docs stop disagreeing.)
 
-3. **Regenerate the ground-truth maps once**, after the seat fix — it moves
+2. **Regenerate the ground-truth maps once**, after the seat fix — it moves
    the slice plane for stock worlds, so doing it first wastes the work.
    `open-issues.md` §4.
 
-4. **Validate the hull collider** — `open-issues.md` §5. Drive into a wall,
+3. **Validate the hull collider** — `open-issues.md` §5. Drive into a wall,
    confirm the robot stops where the geometry says it should.
 
-5. **Then the exploration baselines** — `open-issues.md` §3, the original
-   request and still unmet. Canonical recipe and the hygiene table are in
-   `../../tools/benchmark/README.md`; every flag there earns its place.
+4. **Then the exploration baselines** — `open-issues.md` §3, the original
+   request and still unmet, now unblocked. Canonical recipe and the hygiene
+   table are in `../../tools/benchmark/README.md`; every flag there earns its
+   place. Re-measure SLAM quality too (`slam_quality_probe.py`) — the old
+   RMSE 0.23 describes a different rig.
 
-6. **Then the P5 A/B** — 3–5 seeds per condition. Coverage variance ran
+5. **Then the P5 A/B** — 3–5 seeds per condition. Coverage variance ran
    51–83%, so a single run proves nothing and this box is never genuinely
    single-tenant.
 
-7. **Then Isaac 6.1** (`port-plan.md` §P9), and only then P8. The 6.1 move is
+6. **Then Isaac 6.1** (`port-plan.md` §P9), and only then P8. The 6.1 move is
    sequenced after a baseline deliberately: it is the only way to tell whether
    the upgrade helped, and it may let several 6.0.1 workarounds be deleted
    outright. Do not migrate first.

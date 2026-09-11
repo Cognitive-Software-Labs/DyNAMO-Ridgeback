@@ -20,12 +20,17 @@ Isaac.
 
 ## Current state, in one paragraph
 
-Navigation **does not run**: `collision_monitor` latches on phantom lidar
-returns and the robot never moves in `hospital` or `warehouse_full`. That
-blocks the baselines, which block the P5 A/B, which blocks Gazebo removal. No
-Isaac baseline has ever been rerun, and four sensor-geometry changes on
-2026-09-10 voided every coverage number on record. P0–P4 and P7 are done; P5
-plumbing is done with sign-off blocked; P6 is deferred.
+Navigation **runs** as of 2026-09-11. The long-standing stall was the 2D
+lidars being parented to `base_link`, which has no joint into the
+articulation, so PhysX turned `chassis_link` and left the sensors behind; the
+chassis sweeping under a stationary emitter is what produced the "phantom"
+returns that pinned `cmd_vel` at zero. Reparenting them to `chassis_link`
+fixed it. **No Isaac baseline has ever been rerun** — that is the next
+deliverable — and every coverage and SLAM number on record is void, having
+been measured either before the 2026-09-10 geometry changes or with a sensor
+that did not rotate with the robot. The robot still floats 49.8 mm on stock
+worlds (§2). P0–P4 and P7 are done; P5 plumbing is done with sign-off pending
+a baseline; P6 is deferred.
 
 ## Where facts live
 

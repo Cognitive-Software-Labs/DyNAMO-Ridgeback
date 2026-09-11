@@ -26,7 +26,7 @@
 
 <!-- floor / wheel contact -->
 <line class="axis" x1="80" y1="479" x2="700" y2="479"/>
-<text class="monod" x="84" y="495">floor / wheel contact — base_link sits 0.0259 above it</text>
+<text class="monod" x="84" y="495">floor / wheel contact — base_link sits 0.02617 above it</text>
 
 <!-- wheels -->
 <circle cx="186.6" cy="452" r="27.4" fill="none" stroke="#6b7280" stroke-width="1.3"/>

@@ -1,5 +1,18 @@
 # SLAM Quality Investigation — Isaac 6.0 Port (2026-07-12)
 
+> ⚠️ **Every number in this file is from 2026-07-12 and describes a rig that
+> no longer exists.** Two later changes invalidate them: `a33111c2`
+> (2026-09-10) lowered the lidars 11.6 cm, moving the scan plane from 0.418 to
+> 0.2264 above `base_link`; and the same commit parented them to `base_link`,
+> which detached them from the articulation so the scan stopped rotating with
+> the robot until that was fixed on 2026-09-11 (`open-issues.md` §1). The
+> RMSE / loop-error / IoU figures below are **not** a baseline and must not be
+> quoted as one — re-measure with `tools/isaac/slam_quality_probe.py`.
+>
+> What *does* still hold is the mechanism half of this document: the three
+> sensor-pipeline bugs, why the assembler exists, and the 6.0.1 defects that
+> force it. Read it for how the pipeline works, not for how well it scored.
+
 Handoff dossier for the "rotation cooks the SLAM map" investigation on
 `feat/isaac-sim-6-port`. Three distinct sensor-pipeline bugs were found and
 fixed; the originally-suspected `slam_toolbox` params were largely exonerated

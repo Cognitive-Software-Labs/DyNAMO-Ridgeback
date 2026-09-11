@@ -45,8 +45,15 @@ a geometry fix cannot land in only one copy). It is **0.3024 m** = the front
 UST-10LX 0.2264 m above `base_link` plus the resting `spawn_z` 0.076 m. It was
 0.418 m until 2026-09-10, when the lidars were found mounted 11.6 cm too high;
 **every map sliced before that date is stale and so is every coverage number
-measured against one.** Regenerate after any change to the lidar mounting in
-`clearpath/robot.yaml`.
+measured against one.** Regenerate after any change that moves the scan
+plane — i.e. the lidar `xyz` in `clearpath/robot.yaml`, or `--spawn-z`.
+
+Not every `robot.yaml` edit qualifies: the 2026-09-11 reparent of the lidars
+from `base_link` to `chassis_link` changed the parent only, and the two links
+are coincident, so the plane did not move and these maps stayed valid. The
+pending seat fix (`docs/isaac/open-issues.md` §2) *does* move it — the plane
+becomes `floor_z + 0.25257`, so stock worlds drop from 0.3024 to 0.25257 and
+all four maps need one regeneration then.
 
 `warehouse` and `warehouse_full` both need an explicit `--origin` on open
 floor: their geometry is dense enough that the auto-seed centroid lands *on* a
