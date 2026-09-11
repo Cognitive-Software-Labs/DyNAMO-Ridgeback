@@ -66,6 +66,14 @@ ARTIFACT_MASK_CACHE = 'mask-cache'
 
 @dataclass(frozen=True)
 class AxisSpec:
+    """One benchmark parameter, and which selections can actually reach it.
+
+    ``estimators`` and ``recipes`` are reachability scopes: a setting the chosen
+    estimator or the chosen isolation recipe never binds is inert, so it is
+    dropped from the rendered job instead of being carried as a value that does
+    nothing. Empty means the axis is unscoped and always reachable.
+    """
+
     name: str
     value_type: str
     default: Any
@@ -75,6 +83,7 @@ class AxisSpec:
     minimum: float | int | None = None
     maximum: float | int | None = None
     estimators: tuple[str, ...] = ()
+    recipes: tuple[str, ...] = ()
     description: str = ''
 
     def as_dict(self) -> dict[str, Any]:
@@ -90,6 +99,7 @@ class AxisSpec:
                 'minimum': self.minimum,
                 'maximum': self.maximum,
                 'estimators': list(self.estimators),
+                'recipes': list(self.recipes),
                 'description': self.description,
             }.items()
             if value not in (None, (), [], '')
@@ -203,14 +213,17 @@ AXES: dict[str, AxisSpec] = {
         'isolation_2d_bin_width_m', 'number', 0.05, STAGE_MEASUREMENT,
         '2D histogram bin width', minimum=0.0,
         estimators=('projective_ranging',)),
+    # otsu_foreground takes a bin width and nothing else, so build_isolation_2d
+    # silently drops these two on that recipe. The scope keeps them off screen
+    # rather than offering a number the measurement never reads.
     'isolation_2d_band_m': _axis(
         'isolation_2d_band_m', 'number', NEAREST_MODE_BAND_M_DEFAULT,
         STAGE_MEASUREMENT, '2D near-surface band', minimum=0.0,
-        estimators=('projective_ranging',)),
+        estimators=('projective_ranging',), recipes=('nearest_mode_histogram',)),
     'isolation_2d_min_bin_fraction': _axis(
         'isolation_2d_min_bin_fraction', 'number', 0.05, STAGE_MEASUREMENT,
         '2D minimum bin fraction', minimum=0.0, maximum=1.0,
-        estimators=('projective_ranging',)),
+        estimators=('projective_ranging',), recipes=('nearest_mode_histogram',)),
     'min_valid_pixels': _axis(
         'min_valid_pixels', 'integer', MIN_VALID_SAMPLES, STAGE_MEASUREMENT,
         'Minimum valid samples', minimum=1, estimators=_DEPTH_ESTIMATORS),
@@ -383,9 +396,9 @@ MASK_AXES = frozenset(
 # depth, intrinsics and transforms only. Moving a polar knob during replay would
 # report a number the stored evidence cannot produce, so the offline profiles
 # freeze these axes outright rather than accept a setting they would ignore.
-# This is a missing-evidence limit, not the estimator-compatibility filter the
-# GUI applies -- the measurement profile deliberately still admits the euclidean
-# axes it cannot select, because that evidence *is* on disk.
+# This is a missing-evidence limit, not an estimator preference: the euclidean
+# axes stay available on every offline profile because the extrinsics its floor
+# reference needs are on disk, where a LiDAR scan is not.
 SCAN_AXES = frozenset(
     name for name, spec in AXES.items()
     if spec.estimators == ('polar_profiling',))
@@ -406,7 +419,7 @@ PROFILES: dict[str, ProfileSpec] = {
         frozen_stages=(STAGE_DETECTOR, STAGE_SENSOR, STAGE_MASK),
         rerun_stages=(STAGE_MEASUREMENT,),
         allowed_axes=OFFLINE_MEASUREMENT_AXES,
-        compatible_estimators=('projective_ranging',),
+        compatible_estimators=_DEPTH_ESTIMATORS,
         compatible_depth_sources=('stereoscopic',),
         compatible_mask_gates=('box',),
         supported_claims=('accuracy', 'coverage', 'miss-reason', 'paired-results'),

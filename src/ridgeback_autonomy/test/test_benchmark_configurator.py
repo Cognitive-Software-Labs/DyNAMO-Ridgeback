@@ -14,6 +14,7 @@ import pytest
 
 from ridgeback_autonomy.benchmarking.configurator import (
     ConfiguratorError,
+    _ui_sweep,
     capabilities,
     import_job,
     make_server,
@@ -101,6 +102,111 @@ def test_capabilities_expose_all_four_canonical_profiles():
     assert data['profiles']['measurement']['available'] is True
     assert data['profiles']['mask-output']['available'] is True
     assert data['profiles']['mask-model']['available'] is True
+
+
+def _variant(profile: str, arguments: dict, root: Path) -> dict:
+    """The one variant a draft renders, after unreachable settings are dropped."""
+
+    raw = {'variants': [{'name': 'baseline', 'arguments': arguments}]}
+    return _ui_sweep(raw, profile, root)['configs'][0]
+
+
+def test_selecting_both_estimators_keeps_both_parameter_sets(tmp_path):
+    config = _variant('mask-output', {
+        'estimators': 'projective_ranging,euclidean_reconstruction',
+        'isolation_2d_band_m': 0.75,
+        'isolation_3d_percentile': 12.0,
+    }, tmp_path)
+
+    # The value is an estimator list, so membership decides reachability: the
+    # whole comma-joined string never equals one estimator's name.
+    assert config['isolation_2d_band_m'] == 0.75
+    assert config['isolation_3d_percentile'] == 12.0
+    assert config['estimators'] == 'projective_ranging,euclidean_reconstruction'
+
+
+@pytest.mark.parametrize('estimator,kept,dropped', [
+    ('projective_ranging', 'isolation_2d_band_m', 'isolation_3d_percentile'),
+    ('euclidean_reconstruction', 'isolation_3d_percentile', 'isolation_2d_band_m'),
+])
+def test_one_estimator_carries_only_its_own_parameters(tmp_path, estimator, kept, dropped):
+    config = _variant('mask-output', {'estimators': estimator}, tmp_path)
+
+    assert kept in config
+    assert dropped not in config
+
+
+def test_a_recipe_only_carries_the_settings_it_binds(tmp_path):
+    nearest = _variant('measurement', {'isolation_2d': 'nearest_mode_histogram'}, tmp_path)
+    otsu = _variant('measurement', {
+        'isolation_2d': 'otsu', 'isolation_2d_band_m': 0.75}, tmp_path)
+
+    assert {'isolation_2d_band_m', 'isolation_2d_min_bin_fraction'} <= set(nearest)
+    # otsu_foreground accepts a bin width only, so the other two are inert.
+    assert 'isolation_2d_band_m' not in otsu
+    assert 'isolation_2d_min_bin_fraction' not in otsu
+    assert 'isolation_2d_bin_width_m' in otsu
+
+
+def test_a_job_whose_recipe_drops_fields_still_validates(tmp_path):
+    draft = {**_job(_dataset(tmp_path)), 'variants': [
+        {'name': 'baseline', 'arguments': {'isolation_2d': 'otsu'}}]}
+
+    rendered = render_job(draft, tmp_path)
+
+    assert rendered['valid'] is True
+    assert 'isolation_2d_band_m' not in rendered['job']['sweep']['configs'][0]
+
+
+def test_capabilities_scope_each_field_to_what_can_reach_it():
+    fields = {field['key']: field
+              for field in capabilities()['profiles']['mask-output']['variant_fields']}
+
+    assert fields['isolation_2d_band_m']['recipes'] == ['nearest_mode_histogram']
+    assert fields['isolation_2d_min_bin_fraction']['recipes'] == ['nearest_mode_histogram']
+    assert fields['isolation_2d_bin_width_m']['recipes'] == []
+    # Unscoped, and therefore reachable on every profile: the estimator choice
+    # itself cannot be hidden behind an estimator.
+    assert fields['estimators']['estimators'] == []
+    assert fields['estimators']['recipes'] == []
+
+
+def test_every_profile_offers_both_depth_estimators(tmp_path):
+    offered = {
+        name: next(field['options'] for field in profile['variant_fields']
+                   if field['key'] == 'estimators')
+        for name, profile in capabilities()['profiles'].items()
+    }
+
+    # Both estimators read the same frozen evidence, so no profile may offer one
+    # and then refuse it. The choices are still scoped to what the profile can
+    # evaluate: nothing here offers polar profiling, which needs a LiDAR scan.
+    assert set(offered) == {'measurement', 'mask-output', 'mask-model', 'live-system'}
+    for options in offered.values():
+        assert options == ['projective_ranging', 'euclidean_reconstruction']
+
+
+def test_the_measurement_profile_accepts_euclidean_against_legacy_evidence(tmp_path):
+    draft = {**_job(_dataset(tmp_path)), 'variants': [
+        {'name': 'baseline', 'arguments': {'estimators': 'euclidean_reconstruction'}}]}
+
+    outcome = validate_job(draft, tmp_path)
+
+    assert outcome['valid'] is True
+    assert outcome['job']['sweep']['configs'][0]['estimators'] == 'euclidean_reconstruction'
+    assert 'isolation_3d_percentile' in outcome['job']['sweep']['configs'][0]
+
+
+def test_one_variant_per_estimator_carries_only_that_estimators_parameters(tmp_path):
+    raw = {'variants': [
+        {'name': 'projective', 'arguments': {'estimators': 'projective_ranging'}},
+        {'name': 'euclidean', 'arguments': {'estimators': 'euclidean_reconstruction'}},
+    ]}
+
+    projective, euclidean = _ui_sweep(raw, 'mask-output', tmp_path)['configs']
+
+    assert 'isolation_2d_band_m' in projective and 'isolation_3d_percentile' not in projective
+    assert 'isolation_3d_percentile' in euclidean and 'isolation_2d_band_m' not in euclidean
 
 
 def test_rendered_measurement_job_is_accepted_by_the_canonical_job_parser(tmp_path):

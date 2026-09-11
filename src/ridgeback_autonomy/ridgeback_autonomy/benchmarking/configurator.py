@@ -81,7 +81,14 @@ def capabilities() -> dict:
                 'options': axis.get('choices', []),
                 'min': axis.get('minimum'), 'max': axis.get('maximum'),
                 'estimators': axis.get('estimators', []),
+                'recipes': axis.get('recipes', []),
             }
+            if name == 'estimators':
+                # The axis lists every estimator the replay paths know, but a
+                # profile evaluates only some of them. Offering one the profile
+                # then refuses makes the operator discover it from an error.
+                allowed = set(profile['compatible_estimators'])
+                rendered['options'] = [item for item in rendered['options'] if item in allowed]
             (fields if axis['stage'] == 'measurement' else materialization_fields).append(rendered)
         profiles[profile['id']] = {
             'label': profile['label'], 'available': True,
@@ -111,6 +118,12 @@ def _issue(error: ProfileValidationError) -> dict:
     return error.as_dict()
 
 
+def _reaches(declared, selected: set[str]) -> bool:
+    """Whether a field scoped to ``declared`` is reachable from ``selected``."""
+
+    return not declared or bool(set(declared).intersection(selected))
+
+
 def _ui_sweep(raw: dict, profile: str, root: Path) -> dict | str:
     if profile == 'live-system':
         return anchored_path(str(root), str(raw.get('sweep_path', '')))
@@ -132,9 +145,16 @@ def _ui_sweep(raw: dict, profile: str, root: Path) -> dict | str:
             value.strip() for value in str(arguments.get('estimators', '')).split(',')
             if value.strip()
         }
+        # A recipe-scoped field names the values of exactly one recipe axis, and
+        # no recipe name is shared between axes, so matching it against every
+        # selected choice needs no per-axis mapping.
+        selected_choices = {
+            str(arguments[field['key']]) for field in descriptor['variant_fields']
+            if field.get('options')
+        }
         for field in descriptor['variant_fields']:
-            compatible = set(field.get('estimators', ()))
-            if compatible and not compatible.intersection(selected_estimators):
+            if not (_reaches(field.get('estimators'), selected_estimators)
+                    and _reaches(field.get('recipes'), selected_choices)):
                 arguments.pop(field['key'], None)
         configs.append({'name': name, **arguments})
     return {

@@ -94,6 +94,70 @@ def test_replay_uses_box_roi_and_same_projective_result(tmp_path: Path) -> None:
     assert result['status_histogram']['projective_ranging'] == {0: 1}
 
 
+def _deprojectable_event() -> dict:
+    """The shared event with a focal length and a camera height worth deprojecting.
+
+    Projective ranging reads depth off the window and never deprojects, so the
+    shared fixture's 1-pixel focal length and floor-level camera cost it
+    nothing. Euclidean reconstruction does deproject: there the same numbers
+    scatter a 4x4 patch across six metres and put it below the floor, which its
+    isolation then correctly throws away.
+    """
+
+    event = _event(depth_roi=np.full((4, 4), 2.0, dtype=np.float32))
+    event['intrinsics'].update({'fx': 100.0, 'fy': 100.0})
+    event['camera_translation'] = [0.0, 0.0, 1.16]
+    return event
+
+
+def test_euclidean_reconstruction_measures_the_same_frozen_roi(tmp_path: Path) -> None:
+    dataset = _dataset(tmp_path, [_deprojectable_event()])
+
+    result = evaluate_dataset(
+        dataset, (_variant(estimators='euclidean_reconstruction'),))['baseline']
+
+    # The floor reference comes from the stored optical-to-base extrinsics, so
+    # this needs no evidence the projective path did not already require.
+    row = result['rows']['euclidean_reconstruction'][0]
+    assert row['outcome'] == 'scored'
+    assert row['trial_estimate_m'] == pytest.approx(1.75)
+    assert 'projective_ranging' not in result['rows']
+
+
+def test_both_depth_estimators_score_from_one_pass(tmp_path: Path) -> None:
+    dataset = _dataset(tmp_path, [_deprojectable_event()])
+
+    result = evaluate_dataset(dataset, (_variant(
+        estimators='projective_ranging,euclidean_reconstruction'),))['baseline']
+
+    assert set(result['rows']) == {'projective_ranging', 'euclidean_reconstruction'}
+    assert {rows[0]['outcome'] for rows in result['rows'].values()} == {'scored'}
+    # Both read one prepared region, so neither can score on a selection the
+    # other never saw.
+    assert [rows[0]['trial_estimate_m'] for rows in result['rows'].values()] == [
+        pytest.approx(1.75), pytest.approx(1.75)]
+
+
+def test_a_missing_depth_roi_is_a_miss_for_every_selected_estimator(tmp_path: Path) -> None:
+    dataset = _dataset(tmp_path, [_event(depth_roi=None)])
+
+    result = evaluate_dataset(dataset, (_variant(
+        estimators='projective_ranging,euclidean_reconstruction'),))['baseline']
+
+    assert {rows[0]['miss_reason'] for rows in result['rows'].values()} == {'NO_DEPTH_FRAME'}
+
+
+def test_an_estimator_the_legacy_dataset_cannot_feed_is_refused() -> None:
+    config = SimpleNamespace(
+        name='baseline',
+        arguments=_variant(estimators='polar_profiling').arguments,
+        explicit_keys=frozenset({'estimators'}),
+    )
+
+    with pytest.raises(ValueError, match='needs evidence the legacy dataset does not carry'):
+        _validated_v1_variants(SimpleNamespace(configs=(config,)))
+
+
 def test_empty_detector_batch_is_a_detector_miss(tmp_path: Path) -> None:
     dataset = _dataset(tmp_path, [_event(detected=False)])
 
@@ -181,7 +245,7 @@ def test_replay_variants_strip_live_defaults_and_reject_irrelevant_axes() -> Non
     assert variants[0].arguments['isolation_2d'] == 'nearest_mode_histogram'
 
     config.explicit_keys = frozenset({'capture_sec'})
-    with pytest.raises(ValueError, match='does not affect offline projective ranging'):
+    with pytest.raises(ValueError, match='does not affect offline depth measurement'):
         _validated_v1_variants(SimpleNamespace(configs=(config,)))
 
 
