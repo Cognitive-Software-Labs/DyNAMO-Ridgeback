@@ -61,6 +61,7 @@ They are not supported implementations or automatic backlog commitments.
 
 ## History and validation
 
+- [Upstream dependency refresh](history/dependency_refresh.md)
 - [Operational incidents](history/operational_incidents.md)
 - [Benchmark evolution](history/benchmark_evolution.md)
 - [Segmentation experiments](history/segmentation_experiments.md)

@@ -73,14 +73,8 @@ cd /path/to/DyNAMO-Ridgeback
 # Clone external dependencies
 vcs import < .repos
 
-# Apply clearpath_gz patch (adds custom worlds/models + SpawnG1 Gazebo GUI plugin)
-cd src/clearpath_simulator/clearpath_gz && git apply ../../../patches/clearpath_gz_customizations.patch && cd ../../..
-
-# Apply slam_toolbox patch (fixes TF namespace issue)
-cd src/slam_toolbox && git apply ../../patches/slam_toolbox_tf_namespace.patch && cd ../..
-
-# Apply clearpath_common patch (camera model owns its own frames in simulation)
-cd src/clearpath_common && git apply ../../patches/clearpath_realsense_sim_frames.patch && cd ../..
+# Verify every checkout is pinned and apply the recorded patches idempotently
+tools/check_dependencies --apply
 
 # Install any remaining deps
 rosdep install --from-paths src --ignore-src -r -y
@@ -704,25 +698,26 @@ This project still relies on three local patches:
 
 1. `patches/clearpath_gz_customizations.patch` patches `src/clearpath_simulator/clearpath_gz` to add this repo's Gazebo worlds/models to the simulator search path and to expose the custom `SpawnG1` Gazebo GUI plugin.
 2. `patches/slam_toolbox_tf_namespace.patch` patches `src/slam_toolbox` so `slam_toolbox` respects namespaced TF remappings.
-3. `patches/clearpath_realsense_sim_frames.patch` patches `src/clearpath_common` (recorded against revision `9960354`) so `intel_realsense.urdf.xacro` forwards `is_sim` into the camera macro as `use_nominal_extrinsics`, and so the Gazebo render sensor sits on the model's colour frame. Without it, simulation has no `camera_0_color_optical_frame` TF and the mask estimators report `TF_MISS_EXTRINSIC`.
+3. `patches/clearpath_realsense_sim_frames.patch` patches `src/clearpath_common` so `intel_realsense.urdf.xacro` forwards `is_sim` into every supported camera macro as `use_nominal_extrinsics`, and so the Gazebo render sensor sits on the model's colour frame. Without it, simulation has no `camera_0_color_optical_frame` TF and the mask estimators report `TF_MISS_EXTRINSIC`.
 
 Because the patches are recorded against specific upstream revisions, `.repos`
 pins every dependency to an exact commit rather than to a branch tip. Do not
 change a pin to `jazzy`/`main` to pick up a fix: a fresh `vcs import` would then
-clone commits the patches were never rebased onto. As of 2026-09-07 the pinned
-`clearpath_common` was 39 commits behind its branch tip, and the realsense patch
-did not apply to that tip. Refreshing the pins is a deliberate, gated task — see
-"Upstream dependency refresh" in [BACKLOG.md](docs/BACKLOG.md).
+clone commits the patches were never rebased onto. Refresh all pins as one
+gated change, re-record the patches from clean checkouts, and repeat the build,
+test, and simulator checks. The latest completed refresh and its rollback
+evidence are recorded in [dependency refresh history](docs/history/dependency_refresh.md).
 
-Each patch is a plain `git apply`, which is not idempotent. Check before re-running:
+`tools/check_dependencies` verifies every checkout revision and rejects
+untracked files or changes beyond the recorded patches. Its `--apply` mode
+applies missing patches idempotently; without that option it is a read-only
+gate. Run it after every import and before builds:
 
 ```bash
-# "not applied" -> apply it; "already applied" -> skip; anything else -> local conflict, resolve by hand
-cd src/clearpath_common
-git apply --check      ../../patches/clearpath_realsense_sim_frames.patch && echo "not applied"
-git apply --reverse --check ../../patches/clearpath_realsense_sim_frames.patch && echo "already applied"
+tools/check_dependencies --apply
 ```
 
-Never re-run an apply that failed, and never resolve a conflict by discarding unrelated changes in the dependency checkout.
+Never resolve a reported conflict by discarding unrelated changes in a
+dependency checkout.
 
 Current recovery steps live in [troubleshooting](docs/troubleshooting.md), while dated root causes and measurements live in [operational incident history](docs/history/operational_incidents.md).

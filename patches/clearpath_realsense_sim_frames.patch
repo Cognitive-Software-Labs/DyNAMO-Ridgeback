@@ -1,8 +1,8 @@
 diff --git a/clearpath_sensors_description/urdf/intel_realsense.urdf.xacro b/clearpath_sensors_description/urdf/intel_realsense.urdf.xacro
-index 9a3ceb3..4ddc10f 100644
+index 9a99e3a..aa0ad94 100644
 --- a/clearpath_sensors_description/urdf/intel_realsense.urdf.xacro
 +++ b/clearpath_sensors_description/urdf/intel_realsense.urdf.xacro
-@@ -1,61 +1,85 @@
+@@ -1,66 +1,91 @@
  <?xml version="1.0"?>
  <robot xmlns:xacro="http://ros.org/wiki/xacro">
 +  <!-- Supplied by the platform description, which derives it from use_sim_time.
@@ -11,13 +11,20 @@ index 9a3ceb3..4ddc10f 100644
 +
    <xacro:macro name="intel_realsense" params="name parent_link model *origin
                                                update_rate:=30.0 image_height:=480 image_width:=640">
- 
 +    <!-- On hardware the RealSense driver publishes the factory-calibrated
 +         internal camera extrinsics, so the description must not publish a
 +         competing copy. Simulation has no driver, so the selected model's
 +         nominal frames are the only source for that part of the chain. -->
 +    <xacro:property name="use_nominal_extrinsics" value="$(arg is_sim)" />
 +
+     <xacro:if value="${model == 'd405'}">
+       <xacro:include filename="$(find clearpath_sensors_description)/urdf/intel/d405.urdf.xacro" />
+-      <xacro:sensor_d405 name="${name}" parent="${parent_link}">
++      <xacro:sensor_d405 name="${name}" parent="${parent_link}"
++                         use_nominal_extrinsics="${use_nominal_extrinsics}">
+         <xacro:insert_block name="origin" />
+       </xacro:sensor_d405>
+     </xacro:if>
      <xacro:if value="${model == 'd415'}">
        <xacro:include filename="$(find clearpath_sensors_description)/urdf/intel/d415.urdf.xacro" />
 -      <xacro:sensor_d415 name="${name}" parent="${parent_link}">
