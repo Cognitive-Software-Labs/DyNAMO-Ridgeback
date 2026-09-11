@@ -54,6 +54,42 @@ run. `bash cleanup.sh` clears it; then restart the sweep. The partial sweep
 folder is safe to discard — a sweep that failed this way writes no `run.json`
 for any configuration.
 
+## `cleanup.sh` kills the benchmark configurator and any run it started
+
+The catch-all at the end of `cleanup.sh`
+
+```bash
+# Every node here is installed under lib/ridgeback_autonomy, so match that.
+kill_matches "lib/ridgeback_autonomy/"
+```
+
+is a `pgrep -f` substring match on the command line, and `kill_matches` is
+`kill -9` excluding only `$$` and `$PPID`. The comment states a true fact —
+every node is installed there — but the code implements its false converse, that
+everything installed there is a node. At least eight installed executables are
+not: the configurator, both sweep orchestrators, the four replay CLIs, and
+`launch_wait`. `target_benchmark_sweep` matches the same pattern and survives
+only because it happens to be cleanup's `$PPID`.
+
+Two consequences, both live today:
+
+- An open `target_benchmark_configurator` dies whenever anyone runs
+  `cleanup.sh` from a terminal — and `start_exploration.sh` runs it
+  automatically on every exploration launch.
+- A `target_replay_benchmark` started from that page dies the same way, leaving
+  a `.<name>.partial-<pid>-<uuid>` staging directory behind. That staging
+  directory is safe to delete; the run published nothing.
+
+Confirm with `pgrep -u "$USER" -af "lib/ridgeback_autonomy/"` before running
+cleanup.
+
+**This is also why the configurator cannot start a `live-system` sweep.**
+`target_benchmark_sweep` calls `run_preflight_cleanup` before Gazebo starts, so
+a sweep launched from the page would `kill -9` the page mid-click. Do not work
+around it with `--skip-preflight-cleanup`: that produces the two-`gz sim`
+failure above. Start live sweeps from a terminal until the catch-all is narrowed
+to actual nodes.
+
 ## A long sweep dies in the Gazebo GUI's render thread
 
 Observed 2026-09-08 on a 15-configuration sweep: at configuration 9, roughly

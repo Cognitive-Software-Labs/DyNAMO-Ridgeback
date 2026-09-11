@@ -1,18 +1,24 @@
 # Plan: local benchmark configuration GUI
 
-Status: **IMPLEMENTED.** This plan defines a small local GUI for
-choosing a benchmark level, configuring only valid inputs, validating the
-result, and exporting a reproducible job. It depends on the shared profile and
-job-spec contract in
-[`layered_replay_profiles.md`](layered_replay_profiles.md). It deliberately does
-not run or supervise benchmarks.
+Status: **IMPLEMENTED, and partly superseded.** This plan defines a small local
+GUI for choosing a benchmark level, configuring only valid inputs, validating
+the result, and exporting a reproducible job. It depends on the shared profile
+and job-spec contract in
+[`layered_replay_profiles.md`](layered_replay_profiles.md).
 
 Prepared 2026-09-09 against `aafa4385`.
 
 Implemented 2026-09-10 as the installed loopback-only
 `target_benchmark_configurator`. All four profiles consume the canonical
-capability/job/artifact contracts, and the exported command remains a
-structured preview rather than an execution surface.
+capability/job/artifact contracts.
+
+**Superseded 2026-09-11:** the "not a process supervisor" decision below no
+longer holds. Command export could not work as designed — the browser downloads
+a job to a directory it cannot disclose, while every relative path inside a job
+resolves against the job file's own parent — so the server now writes the job
+itself and starts, supervises, and cancels the three offline profiles. The
+`live-system` profile stays terminal-only. The reversal and its evidence are in
+[`docs/history/benchmark_gui_direct_run.md`](../history/benchmark_gui_direct_run.md).
 
 ## Decision
 
@@ -41,6 +47,10 @@ exports a job that the existing command-line tools execute. A run button would
 introduce cancellation, signal forwarding, log streaming, process ownership,
 stale ROS cleanup, resume, and browser-disconnect semantics; add that only under
 a separate reviewed extension if command export proves insufficient.
+
+> Reversed 2026-09-11. Command export proved insufficient, and the separate
+> extension landed for the three offline profiles. Each concern above was
+> answered rather than dropped; see the history note.
 
 ## User outcome
 

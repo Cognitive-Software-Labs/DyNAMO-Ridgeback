@@ -1,0 +1,14 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "benchmark-configurator",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": [
+        "-lc",
+        "source /opt/ros/jazzy/setup.bash && source install/setup.bash && exec ros2 run ridgeback_autonomy target_benchmark_configurator --no-open --port 8899"
+      ],
+      "port": 8899
+    }
+  ]
+}

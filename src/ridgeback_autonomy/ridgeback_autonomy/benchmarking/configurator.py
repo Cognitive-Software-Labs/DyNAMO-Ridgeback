@@ -9,9 +9,9 @@ the same parser and command renderer that benchmark execution uses.
 from __future__ import annotations
 
 import argparse
-from dataclasses import dataclass
 import json
 from pathlib import Path
+import re
 import secrets
 import shlex
 import sys
@@ -22,6 +22,16 @@ import webbrowser
 
 import yaml
 
+from ridgeback_autonomy.benchmarking.configurator_errors import ConfiguratorError
+from ridgeback_autonomy.benchmarking.configurator_results import (
+    artifact_summary,
+    discover_artifacts,
+    discover_results,
+    inspect_path,
+    rename_result,
+)
+from ridgeback_autonomy.benchmarking.configurator_runs import RunSupervisor, write_job_file
+from ridgeback_autonomy.benchmarking.paths import anchored_path
 from ridgeback_autonomy.benchmarking.replay_artifacts import (
     SENSOR_CAPTURE_KIND,
     ReplayArtifact,
@@ -34,23 +44,8 @@ from ridgeback_autonomy.benchmarking.replay_profiles import (
 )
 
 
-ARTIFACT_ROOT_RELATIVE = Path('artifacts/benchmarks')
+RUN_ID_PATTERN = re.compile(r'[0-9]{8}_[0-9]{6}_[0-9a-f]{6}')
 
-
-@dataclass(frozen=True)
-class ConfiguratorError(Exception):
-    """One field-oriented error suitable for the browser response."""
-
-    field: str
-    code: str
-    message: str
-    suggested_profile: str | None = None
-
-    def as_dict(self) -> dict[str, str]:
-        result = {'field': self.field, 'code': self.code, 'message': self.message}
-        if self.suggested_profile:
-            result['suggested_profile'] = self.suggested_profile
-        return result
 
 def _safe_variant_name(value, index: int) -> str:
     name = str(value or f'variant_{index + 1}').strip()
@@ -116,9 +111,9 @@ def _issue(error: ProfileValidationError) -> dict:
     return error.as_dict()
 
 
-def _ui_sweep(raw: dict, profile: str) -> dict | str:
+def _ui_sweep(raw: dict, profile: str, root: Path) -> dict | str:
     if profile == 'live-system':
-        return str(raw.get('sweep_path', '')).strip()
+        return anchored_path(str(root), str(raw.get('sweep_path', '')))
     descriptor = capabilities()['profiles'][profile]
     variants = raw.get('variants') or [{'name': 'baseline', 'arguments': {}}]
     configs = []
@@ -148,26 +143,33 @@ def _ui_sweep(raw: dict, profile: str) -> dict | str:
     }
 
 
-def _canonical_document(raw: object) -> dict:
+def _canonical_document(raw: object, root: Path) -> dict:
     if not isinstance(raw, dict):
         raise ConfiguratorError('job', 'invalid_job', 'The job must be a JSON object.')
     profile = str(raw.get('profile', 'measurement'))
     inputs = raw.get('inputs') or {}
     if not isinstance(inputs, dict):
         raise ConfiguratorError('inputs', 'invalid_inputs', 'Inputs must be an object.')
+    # Every operator-supplied path is anchored on the workspace root here, once,
+    # so that the path this page inspects and the path the runner opens are the
+    # same string no matter where the job file ends up.
+    def anchored(value: object) -> str:
+        return anchored_path(str(root), str(value or ''))
+
     selected_inputs: dict[str, object]
     if profile == 'measurement':
-        selected_inputs = {'measurement_dataset': str(inputs.get('dataset', inputs.get('measurement_dataset', ''))).strip()}
+        selected_inputs = {'measurement_dataset': anchored(
+            inputs.get('dataset', inputs.get('measurement_dataset', '')))}
     elif profile == 'mask-output':
         caches = inputs.get('mask_caches', [])
         if isinstance(caches, str):
             caches = [item.strip() for item in caches.split(',') if item.strip()]
         selected_inputs = {
-            'sensor_capture': str(inputs.get('sensor_capture', '')).strip(),
-            'mask_caches': caches,
+            'sensor_capture': anchored(inputs.get('sensor_capture', '')),
+            'mask_caches': [anchored(item) for item in caches],
         }
     elif profile == 'mask-model':
-        selected_inputs = {'sensor_capture': str(inputs.get('sensor_capture', '')).strip()}
+        selected_inputs = {'sensor_capture': anchored(inputs.get('sensor_capture', ''))}
     else:
         selected_inputs = {}
     # The browser keeps one draft across profile switches, so it still carries a
@@ -182,32 +184,14 @@ def _canonical_document(raw: object) -> dict:
         'question': str(raw.get('question', '')),
         'profile': profile,
         'inputs': selected_inputs,
-        'sweep': _ui_sweep(raw, profile),
+        'sweep': _ui_sweep(raw, profile, root),
         'resources': {
             'measurement_workers': raw.get('workers', 1),
             'model_workers': raw.get('model_workers', 1),
         },
-        'output_dir': str(raw.get('output_dir', '')).strip(),
+        'output_dir': anchored(raw.get('output_dir', '')),
         'comparison_baseline': str(raw.get('baseline', '')).strip(),
         **({'materializations': materializations} if materializations else {}),
-    }
-
-
-def _artifact_summary(value) -> dict:
-    if isinstance(value, ReplayArtifact):
-        trials = value.trial_entries
-        return {
-            'path': str(value.root), 'kind': value.kind, 'state': value.manifest['artifact']['state'],
-            'id': value.id, 'trials': len(trials),
-            'events': sum(int(item.get('event_count', 0)) for item in trials),
-            'detections': sum(int(item.get('detection_count', 0)) for item in trials),
-            'manifest_version': value.manifest.get('manifest_version'),
-        }
-    trials = value.trial_entries
-    return {
-        'path': str(value.root), 'kind': 'legacy-measurement', 'state': value.manifest.get('state'),
-        'trials': len(trials), 'events': sum(int(item.get('event_count', 0)) for item in trials),
-        'schema_version': value.manifest.get('schema_version'),
     }
 
 
@@ -215,15 +199,15 @@ def _inspect_job_inputs(job) -> dict[str, dict]:
     if job.profile == 'live-system':
         return {}
     if job.profile == 'measurement':
-        return {'measurement_dataset': _artifact_summary(
+        return {'measurement_dataset': artifact_summary(
             load_replay_input(job.inputs['measurement_dataset']))}
     sensor = load_replay_input(job.inputs['sensor_capture'])
     if not isinstance(sensor, ReplayArtifact) or sensor.kind != SENSOR_CAPTURE_KIND:
         raise ValueError('The selected sensor capture is not a typed sensor-capture artifact.')
-    inspected = {'sensor_capture': _artifact_summary(sensor)}
+    inspected = {'sensor_capture': artifact_summary(sensor)}
     if job.profile == 'mask-output':
         inspected['mask_caches'] = [
-            _artifact_summary(load_replay_input(path, parent=sensor))
+            artifact_summary(load_replay_input(path, parent=sensor))
             for path in job.inputs['mask_caches']
         ]
     return inspected
@@ -246,11 +230,12 @@ def _estimate(job, artifacts: dict[str, dict]) -> dict:
     }
 
 
-def validate_job(raw: object) -> dict:
+def validate_job(raw: object, workspace_root: Path | None = None) -> dict:
     """Resolve the browser draft through the canonical replay-job validator."""
 
+    root = workspace_root or _workspace_root()
     try:
-        document = _canonical_document(raw)
+        document = _canonical_document(raw, root)
         job = parse_job(document)
     except ConfiguratorError as exc:
         return {'job': raw, 'issues': [exc.as_dict()], 'valid': False}
@@ -270,15 +255,25 @@ def validate_job(raw: object) -> dict:
             'estimates': _estimate(job, artifacts)}
 
 
-def render_job(raw: object) -> dict:
-    outcome = validate_job(raw)
+def render_job(raw: object, workspace_root: Path | None = None) -> dict:
+    """Validate, save the job server-side, and render the command that runs it.
+
+    The command names the saved copy rather than a downloaded one: the browser
+    chooses its own download directory and cannot report it back, so a command
+    written against the download would resolve the job's relative paths, and its
+    own argument, somewhere the server never knew about.
+    """
+
+    root = workspace_root or _workspace_root()
+    outcome = validate_job(raw, root)
     if not outcome['valid']:
         return outcome
     job = parse_job(outcome['job'])
-    filename = f'benchmark-{job.profile}.yaml'
-    argv = command_argv(f'./{filename}', job)
+    job_path = write_job_file(root, job)
+    argv = command_argv(str(job_path), job)
     return {**outcome, 'yaml': yaml.safe_dump(job.document, sort_keys=False, allow_unicode=True),
-            'filename': filename, 'argv': argv, 'command': shlex.join(argv)}
+            'filename': job_path.name, 'job_path': str(job_path),
+            'argv': argv, 'command': shlex.join(argv)}
 
 
 def _ui_draft(document: dict) -> dict:
@@ -323,31 +318,27 @@ def _ui_draft(document: dict) -> dict:
     return raw
 
 
-def import_job(text: str) -> dict:
+def import_job(text: str, workspace_root: Path | None = None) -> dict:
     try:
         document = yaml.safe_load(text)
         draft = _ui_draft(document)
-        outcome = validate_job(draft)
+        outcome = validate_job(draft, workspace_root)
         return {**outcome, 'job': draft}
     except (yaml.YAMLError, ProfileValidationError, ValueError) as exc:
         raise ConfiguratorError('import', 'invalid_job', f'Cannot import replay job: {exc}') from exc
 
 
-def inspect_path(value: str) -> dict:
-    path = Path(value).expanduser().resolve()
-    if not path.exists():
-        raise ConfiguratorError('path', 'missing_path', f'Path does not exist: {path}')
-    try:
-        return {**_artifact_summary(load_replay_input(path)), 'issues': []}
-    except ValueError as exc:
-        return {'path': str(path), 'kind': 'unknown', 'issues': [str(exc)]}
+def start_run(raw: object, supervisor: RunSupervisor, workspace_root: Path | None = None) -> dict:
+    """Validate a draft and hand the resulting job to the run supervisor."""
 
-
-def discover_artifacts(workspace_root: Path) -> list[dict]:
-    root = workspace_root / ARTIFACT_ROOT_RELATIVE
-    if not root.is_dir():
-        return []
-    return [inspect_path(str(path.parent)) for path in sorted(root.rglob('manifest.json'))[:100]]
+    root = workspace_root or _workspace_root()
+    # Asked before validation: whether the referenced sweep parses is beside the
+    # point for a profile this page will not start either way.
+    supervisor.ensure_startable(str(raw.get('profile', '')) if isinstance(raw, dict) else '')
+    outcome = validate_job(raw, root)
+    if not outcome['valid']:
+        return outcome
+    return {**outcome, 'run': supervisor.start(parse_job(outcome['job']))}
 
 
 def _assets_directory() -> Path:
@@ -371,12 +362,34 @@ def _workspace_root() -> Path:
     return Path.cwd()
 
 
-def make_server(*, port: int = 0, token: str | None = None, workspace_root: Path | None = None) -> ThreadingHTTPServer:
+def _run_id_for(path: str, suffix: str) -> str | None:
+    """The run id in ``/api/runs/<id><suffix>``, or None if that is not the route.
+
+    A run id names a directory, so it is matched against the exact shape the
+    supervisor generates rather than merely screened for path separators.
+    """
+
+    head = path.split('?', 1)[0]
+    prefix = '/api/runs/'
+    if not head.startswith(prefix) or not head.endswith(suffix):
+        return None
+    candidate = head[len(prefix):len(head) - len(suffix) if suffix else None]
+    return candidate if RUN_ID_PATTERN.fullmatch(candidate) else None
+
+
+def make_server(
+    *,
+    port: int = 0,
+    token: str | None = None,
+    workspace_root: Path | None = None,
+    supervisor: RunSupervisor | None = None,
+) -> ThreadingHTTPServer:
     """Create an unstarted loopback server for tests and the executable."""
 
     expected_token = token or secrets.token_urlsafe(32)
     assets = _assets_directory().resolve()
     root = workspace_root or _workspace_root()
+    runs = supervisor or RunSupervisor(root)
 
     class Handler(BaseHTTPRequestHandler):
         server_version = 'RidgebackBenchmarkConfigurator/1.0'
@@ -443,6 +456,16 @@ def make_server(*, port: int = 0, token: str | None = None, workspace_root: Path
                     return self._json(HTTPStatus.OK, capabilities())
                 if path == '/api/artifacts':
                     return self._json(HTTPStatus.OK, {'artifacts': discover_artifacts(root)})
+                if path == '/api/results':
+                    return self._json(HTTPStatus.OK, {'results': discover_results(root)})
+                if path == '/api/runs':
+                    return self._json(HTTPStatus.OK, {'runs': runs.records()})
+                run_id = _run_id_for(path, '')
+                if run_id:
+                    try:
+                        return self._json(HTTPStatus.OK, runs.detail(run_id))
+                    except ConfiguratorError as exc:
+                        return self._json(HTTPStatus.NOT_FOUND, {'issues': [exc.as_dict()]})
             self.send_error(HTTPStatus.NOT_FOUND)
 
         def do_POST(self):
@@ -451,14 +474,22 @@ def make_server(*, port: int = 0, token: str | None = None, workspace_root: Path
                 return self._json(HTTPStatus.FORBIDDEN, {'error': 'Invalid configurator token.'})
             try:
                 request = self._body()
+                cancelling = _run_id_for(self.path, '/cancel')
                 if self.path == '/api/inspect':
-                    response = inspect_path(str(request.get('path', '')))
+                    response = inspect_path(str(request.get('path', '')), root)
                 elif self.path == '/api/validate':
-                    response = validate_job(request.get('job'))
+                    response = validate_job(request.get('job'), root)
                 elif self.path == '/api/render':
-                    response = render_job(request.get('job'))
+                    response = render_job(request.get('job'), root)
                 elif self.path == '/api/import':
-                    response = import_job(str(request.get('yaml', '')))
+                    response = import_job(str(request.get('yaml', '')), root)
+                elif self.path == '/api/run':
+                    response = start_run(request.get('job'), runs, root)
+                elif cancelling:
+                    response = runs.cancel(cancelling)
+                elif self.path == '/api/results/rename':
+                    response = rename_result(
+                        root, str(request.get('path', '')), str(request.get('name', '')))
                 else:
                     self.send_error(HTTPStatus.NOT_FOUND)
                     return

@@ -4,8 +4,11 @@ from __future__ import annotations
 
 import http.client
 import json
+import os
 from pathlib import Path
+import signal
 import threading
+import time
 
 import pytest
 
@@ -15,10 +18,26 @@ from ridgeback_autonomy.benchmarking.configurator import (
     import_job,
     make_server,
     render_job,
+    start_run,
     validate_job,
 )
+from ridgeback_autonomy.benchmarking import configurator_runs
+from ridgeback_autonomy.benchmarking.configurator_results import (
+    classify,
+    discover_results,
+    inspect_path,
+    rename_result,
+)
+from ridgeback_autonomy.benchmarking.configurator_runs import RunSupervisor, is_alive
 from ridgeback_autonomy.benchmarking.replay import ReplayDatasetWriter
 from ridgeback_autonomy.benchmarking.replay_jobs import parse_job
+
+
+# Long enough that a same-machine process cannot die inside it by accident,
+# short enough to keep the suite fast.
+GRACE_SEC = 1.0
+QUICK_ESCALATION = (
+    (signal.SIGINT, GRACE_SEC), (signal.SIGTERM, GRACE_SEC), (signal.SIGKILL, 0.0))
 
 
 def _dataset(tmp_path: Path) -> Path:
@@ -44,6 +63,37 @@ def _job(dataset: Path) -> dict:
     }
 
 
+def _workspace(tmp_path: Path) -> tuple[Path, dict]:
+    """A workspace whose job refers to its evidence and output relatively."""
+
+    _dataset(tmp_path)
+    return tmp_path, {
+        **_job(tmp_path / 'replay'),
+        'inputs': {'dataset': 'replay'},
+        'output_dir': 'artifacts/benchmarks/first',
+    }
+
+
+def _settled(supervisor: RunSupervisor, run_id: str, timeout: float = 20.0) -> dict:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        record = supervisor.detail(run_id)
+        if record['state'] not in configurator_runs.ACTIVE_STATES:
+            return record
+        time.sleep(0.02)
+    raise AssertionError(f'Run {run_id} never settled: {supervisor.detail(run_id)}')
+
+
+@pytest.fixture
+def fixed_command(monkeypatch):
+    """Replace the rendered benchmark command with a controllable one."""
+
+    def use(*argv: str):
+        monkeypatch.setattr(configurator_runs, 'command_argv', lambda _path, _job: list(argv))
+
+    return use
+
+
 def test_capabilities_expose_all_four_canonical_profiles():
     data = capabilities()
     assert [item['id'] for item in data['questions']] == [
@@ -54,16 +104,16 @@ def test_capabilities_expose_all_four_canonical_profiles():
 
 
 def test_rendered_measurement_job_is_accepted_by_the_canonical_job_parser(tmp_path):
-    rendered = render_job(_job(_dataset(tmp_path)))
+    rendered = render_job(_job(_dataset(tmp_path)), tmp_path)
     assert rendered['valid'] is True
     assert 'target_replay_benchmark' in rendered['command']
     assert parse_job(__import__('yaml').safe_load(rendered['yaml'])).profile == 'measurement'
 
 
 def test_import_export_round_trip_is_stable(tmp_path):
-    first = render_job(_job(_dataset(tmp_path)))
-    imported = import_job(first['yaml'])
-    second = render_job(imported['job'])
+    first = render_job(_job(_dataset(tmp_path)), tmp_path)
+    imported = import_job(first['yaml'], tmp_path)
+    second = render_job(imported['job'], tmp_path)
     assert second['yaml'] == first['yaml']
 
 
@@ -74,8 +124,8 @@ def test_mask_model_is_enabled_and_reports_its_required_sensor_input():
 
 
 def test_canonical_job_import_round_trips(tmp_path):
-    rendered = render_job(_job(_dataset(tmp_path)))
-    imported = import_job(rendered['yaml'])
+    rendered = render_job(_job(_dataset(tmp_path)), tmp_path)
+    imported = import_job(rendered['yaml'], tmp_path)
     assert imported['job']['profile'] == 'measurement'
     assert imported['valid'] is True
 
@@ -116,3 +166,327 @@ def test_server_requires_token_and_serves_assets_through_a_symlink(tmp_path, mon
         server.shutdown()
         server.server_close()
         thread.join(timeout=2)
+
+
+# -- the job the server writes ------------------------------------------------
+
+
+def test_rendered_command_names_the_saved_job_by_absolute_path(tmp_path):
+    root, draft = _workspace(tmp_path)
+    rendered = render_job(draft, root)
+
+    saved = Path(rendered['job_path'])
+    assert saved.parent == root / 'artifacts' / 'benchmark-jobs'
+    assert saved.is_file()
+    # A downloaded job lands in a directory the page cannot name, so the command
+    # may never depend on the shell's working directory to find it.
+    assert './' not in rendered['command']
+    assert str(saved) in rendered['command']
+
+
+def test_relative_paths_resolve_the_same_way_for_inspection_and_execution(tmp_path):
+    root, draft = _workspace(tmp_path)
+
+    inspected = inspect_path('replay', root)
+    document = validate_job(draft, root)['job']
+
+    assert inspected['path'] == document['inputs']['measurement_dataset']
+    assert document['inputs']['measurement_dataset'] == str((root / 'replay').resolve())
+    assert document['output_dir'] == str((root / 'artifacts/benchmarks/first').resolve())
+
+
+def test_a_written_job_runs_from_an_unrelated_working_directory(tmp_path, monkeypatch):
+    from ridgeback_autonomy.benchmarking import target_replay_benchmark
+
+    root, draft = _workspace(tmp_path)
+    rendered = render_job(draft, root)
+    elsewhere = tmp_path / 'unrelated'
+    elsewhere.mkdir()
+    monkeypatch.chdir(elsewhere)
+
+    assert target_replay_benchmark.main([rendered['job_path']]) == 0
+    assert (root / 'artifacts/benchmarks/first/results').is_dir()
+
+
+# -- spawn, liveness, and settling --------------------------------------------
+
+
+def test_a_spawned_run_is_recorded_then_settles_from_its_exit_code(tmp_path, fixed_command):
+    root, draft = _workspace(tmp_path)
+    fixed_command('true')
+    supervisor = RunSupervisor(root)
+
+    record = start_run(draft, supervisor, root)['run']
+    assert record['state'] == 'running'
+    assert (root / 'artifacts/configurator/runs' / record['run_id'] / 'run.json').is_file()
+    assert Path(record['job_path']).is_file()
+
+    settled = _settled(supervisor, record['run_id'])
+    assert (settled['state'], settled['returncode']) == ('succeeded', 0)
+    assert settled['finished']
+
+
+def test_a_failing_run_settles_as_failed(tmp_path, fixed_command):
+    root, draft = _workspace(tmp_path)
+    fixed_command('false')
+    supervisor = RunSupervisor(root)
+
+    settled = _settled(supervisor, start_run(draft, supervisor, root)['run']['run_id'])
+    assert (settled['state'], settled['returncode']) == ('failed', 1)
+
+
+def test_liveness_rejects_a_reused_pid_whose_command_line_differs():
+    own_argv = Path(f'/proc/{os.getpid()}/cmdline').read_bytes().rstrip(b'\0').split(b'\0')
+
+    assert is_alive({
+        'pid': os.getpid(),
+        'spawn_argv': [part.decode() for part in own_argv],
+    }) is True
+    # The same live PID, recorded by a run that is long gone.
+    assert is_alive({'pid': os.getpid(), 'spawn_argv': ['bash', '-c', 'other']}) is False
+
+
+def test_single_flight_refuses_a_second_start(tmp_path, fixed_command):
+    root, draft = _workspace(tmp_path)
+    fixed_command('sleep', '30')
+    supervisor = RunSupervisor(root, escalation=QUICK_ESCALATION)
+
+    first = start_run(draft, supervisor, root)['run']
+    try:
+        second = dict(draft, output_dir='artifacts/benchmarks/second')
+        with pytest.raises(ConfiguratorError) as raised:
+            start_run(second, supervisor, root)
+        assert raised.value.code == 'run_in_progress'
+    finally:
+        supervisor.cancel(first['run_id'])
+        supervisor.await_cancellation(first['run_id'], timeout=10)
+
+
+def test_an_existing_output_directory_is_refused_before_anything_is_spawned(tmp_path, fixed_command):
+    root, draft = _workspace(tmp_path)
+    fixed_command('true')
+    (root / 'artifacts/benchmarks/first').mkdir(parents=True)
+    supervisor = RunSupervisor(root)
+
+    with pytest.raises(ConfiguratorError) as raised:
+        start_run(draft, supervisor, root)
+
+    assert raised.value.field == 'output_dir'
+    assert raised.value.code == 'output_exists'
+    assert supervisor.records() == []
+
+
+def test_live_system_is_not_startable_from_the_page(tmp_path):
+    supervisor = RunSupervisor(tmp_path)
+    sweep = tmp_path / 'sweep.yaml'
+    sweep.write_text('name: s\nconfigs:\n  - name: baseline\n', encoding='utf-8')
+    draft = {'profile': 'live-system', 'question': 'measure-live-system',
+             'sweep_path': str(sweep), 'output_dir': 'artifacts/benchmarks/live'}
+
+    with pytest.raises(ConfiguratorError) as raised:
+        start_run(draft, supervisor, tmp_path)
+
+    assert raised.value.code == 'live_run_unsupported'
+
+
+# -- cancellation --------------------------------------------------------------
+
+
+def test_cancel_interrupts_first_and_escalates_only_after_the_grace_period(tmp_path, fixed_command):
+    root, draft = _workspace(tmp_path)
+    # SIG_IGN is inherited, so neither this shell nor its child honours SIGINT.
+    # The run can therefore only end once cancellation escalates past it.
+    fixed_command('bash', '-c', "trap '' INT; sleep 30")
+    supervisor = RunSupervisor(root, escalation=QUICK_ESCALATION)
+    record = start_run(draft, supervisor, root)['run']
+
+    requested = time.monotonic()
+    cancelling = supervisor.cancel(record['run_id'])
+    assert cancelling['state'] == 'cancelling'
+    supervisor.await_cancellation(record['run_id'], timeout=20)
+    elapsed = time.monotonic() - requested
+
+    assert elapsed >= GRACE_SEC
+    assert supervisor.detail(record['run_id'])['state'] == 'cancelled'
+
+
+def test_cancelling_a_finished_run_is_refused(tmp_path, fixed_command):
+    root, draft = _workspace(tmp_path)
+    fixed_command('true')
+    supervisor = RunSupervisor(root)
+    record = _settled(supervisor, start_run(draft, supervisor, root)['run']['run_id'])
+
+    with pytest.raises(ConfiguratorError) as raised:
+        supervisor.cancel(record['run_id'])
+
+    assert raised.value.code == 'not_running'
+
+
+def test_a_run_whose_process_vanished_without_an_exit_code_is_unknown(tmp_path, fixed_command):
+    root, draft = _workspace(tmp_path)
+    fixed_command('true')
+    supervisor = RunSupervisor(root)
+    run_id = _settled(supervisor, start_run(draft, supervisor, root)['run']['run_id'])['run_id']
+
+    # Re-open the run the way a restarted configurator would: no child handle,
+    # no exit code on disk, and a PID that is no longer the recorded process.
+    directory = root / 'artifacts/configurator/runs' / run_id
+    (directory / 'returncode').unlink()
+    record = json.loads((directory / 'run.json').read_text(encoding='utf-8'))
+    (directory / 'run.json').write_text(
+        json.dumps({**record, 'state': 'running', 'finished': None}), encoding='utf-8')
+
+    assert RunSupervisor(root).detail(run_id)['state'] == 'unknown'
+
+
+# -- results browser and rename ------------------------------------------------
+
+
+def _benchmarks(root: Path) -> Path:
+    directory = root / 'artifacts' / 'benchmarks'
+    directory.mkdir(parents=True, exist_ok=True)
+    return directory
+
+
+def _sweep(root: Path, name: str = '20260101_000000_demo') -> Path:
+    sweep = _benchmarks(root) / name
+    (sweep / 'alpha').mkdir(parents=True)
+    (sweep / 'alpha' / 'run.json').write_text(
+        json.dumps({'run': {'label': '20260101_000001'}}), encoding='utf-8')
+    (sweep / 'sweep.json').write_text(json.dumps({
+        'configs': [
+            {'name': 'alpha', 'arguments': {'output_dir': str(sweep), 'run_dir_name': 'alpha'}},
+            {'name': 'beta', 'arguments': {'output_dir': '/stale/elsewhere'}},
+        ],
+    }), encoding='utf-8')
+    return sweep
+
+
+def _replay_output(root: Path, name: str = 'replay_out') -> Path:
+    output = _benchmarks(root) / name
+    (output / 'results').mkdir(parents=True)
+    (output / 'job.json').write_text(
+        json.dumps({'profile': 'measurement', 'sweep': {'configs': [{'name': 'baseline'}]}}),
+        encoding='utf-8')
+    return output
+
+
+def test_directories_are_classified_by_what_they_contain(tmp_path):
+    sweep = _sweep(tmp_path)
+    replay = _replay_output(tmp_path)
+    trial = _benchmarks(tmp_path) / 'lone_trial'
+    trial.mkdir()
+    (trial / 'run.json').write_text(json.dumps({'run': {'label': 'x'}}), encoding='utf-8')
+    staging = _benchmarks(tmp_path) / '.replay_out.partial-123-abc'
+    staging.mkdir()
+
+    assert classify(sweep) == 'sweep'
+    assert classify(sweep / 'alpha') == 'sweep-config'
+    assert classify(replay) == 'replay-output'
+    assert classify(trial) == 'trial-output'
+    assert classify(staging) == 'staging'
+    assert classify(_dataset(tmp_path)) == 'artifact'
+
+
+def test_the_browser_lists_both_kinds_and_hides_staging_directories(tmp_path):
+    _sweep(tmp_path)
+    _replay_output(tmp_path)
+    staging = _benchmarks(tmp_path) / '.replay_out.partial-123-abc'
+    staging.mkdir()
+    (staging / 'manifest.json').write_text('{}', encoding='utf-8')
+    dataset = _dataset(tmp_path)
+    (dataset).rename(_benchmarks(tmp_path) / 'evidence')
+
+    listed = {entry['name']: entry for entry in discover_results(tmp_path)}
+
+    assert set(listed) == {'20260101_000000_demo', 'replay_out', 'evidence'}
+    assert listed['evidence']['category'] == 'artifact'
+    assert listed['replay_out']['category'] == 'result'
+
+
+def test_renaming_a_replay_output_is_free(tmp_path):
+    output = _replay_output(tmp_path)
+
+    renamed = rename_result(tmp_path, str(output), 'named_by_hand')
+
+    assert renamed['name'] == 'named_by_hand'
+    assert (output.parent / 'named_by_hand' / 'job.json').is_file()
+    assert not output.exists()
+
+
+def test_renaming_a_sweep_rewrites_every_recorded_config_output_path(tmp_path):
+    sweep = _sweep(tmp_path)
+
+    renamed = rename_result(tmp_path, str(sweep), 'polar_rebaseline')
+
+    destination = sweep.parent / 'polar_rebaseline'
+    manifest = json.loads((destination / 'sweep.json').read_text(encoding='utf-8'))
+    assert [config['arguments']['output_dir'] for config in manifest['configs']] == [
+        str(destination), str(destination)]
+    assert renamed['kind'] == 'sweep'
+
+
+def test_renaming_a_config_inside_a_sweep_is_refused(tmp_path):
+    sweep = _sweep(tmp_path)
+
+    with pytest.raises(ConfiguratorError) as raised:
+        rename_result(tmp_path, str(sweep / 'alpha'), 'gamma')
+
+    assert raised.value.code == 'rename_refused'
+    assert (sweep / 'alpha').is_dir()
+
+
+def test_renaming_a_staging_directory_is_refused(tmp_path):
+    staging = _benchmarks(tmp_path) / '.replay_out.partial-123-abc'
+    staging.mkdir()
+
+    with pytest.raises(ConfiguratorError) as raised:
+        rename_result(tmp_path, str(staging), 'recovered')
+
+    assert raised.value.code == 'rename_refused'
+
+
+def test_renaming_a_typed_artifact_warns_about_the_jobs_that_name_it(tmp_path):
+    dataset = _dataset(tmp_path)
+    evidence = _benchmarks(tmp_path) / 'evidence'
+    dataset.rename(evidence)
+    render_job({**_job(evidence), 'output_dir': 'artifacts/benchmarks/out'}, tmp_path)
+
+    entry = next(item for item in discover_results(tmp_path) if item['name'] == 'evidence')
+    assert entry['rename']['allowed'] is True
+    assert len(entry['rename']['referencing_jobs']) == 1
+    assert 'name inputs by path' in entry['rename']['warning']
+
+    renamed = rename_result(tmp_path, str(evidence), 'evidence_2026')
+    assert renamed['summary']['trials'] == 1
+
+
+@pytest.mark.parametrize('name', ['../escape', 'nested/name', '.hidden', '', '..'])
+def test_a_rename_target_must_be_one_plain_path_component(tmp_path, name):
+    output = _replay_output(tmp_path)
+
+    with pytest.raises(ConfiguratorError) as raised:
+        rename_result(tmp_path, str(output), name)
+
+    assert raised.value.code == 'invalid_name'
+
+
+def test_a_rename_outside_the_benchmark_root_is_refused(tmp_path):
+    outside = tmp_path / 'somewhere_else'
+    outside.mkdir()
+    _benchmarks(tmp_path)
+
+    with pytest.raises(ConfiguratorError) as raised:
+        rename_result(tmp_path, str(outside), 'renamed')
+
+    assert raised.value.code == 'outside_benchmarks'
+
+
+def test_renaming_onto_an_existing_name_is_refused(tmp_path):
+    output = _replay_output(tmp_path)
+    (output.parent / 'taken').mkdir()
+
+    with pytest.raises(ConfiguratorError) as raised:
+        rename_result(tmp_path, str(output), 'taken')
+
+    assert raised.value.code == 'name_taken'
