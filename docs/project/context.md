@@ -24,7 +24,9 @@ building blocks unless a technical reference says otherwise.
 - `src/ridgeback_autonomy/` — the ROS package, launch/configuration files,
   Python package, tests, messages, and simulation assets
 - `clearpath/robot.yaml` — canonical robot and sensor declaration
-- `patches/` — maintained changes to dependencies imported through `.repos`
+- `patches/` — maintained changes to dependencies imported through `.repos`;
+  these are standalone ignored repositories governed by the
+  [dependency runbook](dependencies.md)
 - `tools/` — diagnostics, benchmark helpers, and development utilities
 - `artifacts/` — generated run evidence and logs
 - `build/` and `install/` — normal top-level Colcon outputs
@@ -36,6 +38,7 @@ building blocks unless a technical reference says otherwise.
 - [Exploration architecture](../exploration/architecture.md)
 - [Target-localization pipeline](../target_localization/target_localization_pipeline.md)
 - [Target-distance benchmarking](../benchmarking/target_distance_benchmarking.md)
+- [External dependency management](dependencies.md)
 - [Troubleshooting](../troubleshooting.md)
 - [Active engineering gaps](../BACKLOG.md)
 

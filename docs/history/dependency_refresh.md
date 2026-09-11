@@ -2,7 +2,9 @@
 
 On 2026-09-11, all five external ROS repositories were advanced together from
 their reproducibility pins to the then-current `jazzy` branch tips. The manifest
-still records immutable commits; it does not track moving branch names.
+still records immutable commits; it does not track moving branch names. The
+[dependency runbook](../project/dependencies.md) owns the current procedure;
+this page preserves the evidence from this refresh.
 
 ## Revision transition
 

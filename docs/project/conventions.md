@@ -46,9 +46,9 @@ check the root installation instructions, local patches, and any operational
 notes affected by that change. If a simulation asset referenced by a Clearpath
 patch moves, update the patch in the same change.
 
-Run `tools/check_dependencies` before builds. Use its `--apply` mode after a
-fresh `vcs import`; it applies missing patches but rejects revision drift,
-untracked files, and dependency changes not represented by a maintained patch.
+The [dependency runbook](dependencies.md) owns the import, verification, refresh,
+live-checkout migration, and rollback procedure. Run `tools/check_dependencies`
+before builds and do not discard a nested-repository change to satisfy it.
 
 The `slam_toolbox` namespace patch is required by this stack; its rationale and
 failure signature live in [troubleshooting](../troubleshooting.md).

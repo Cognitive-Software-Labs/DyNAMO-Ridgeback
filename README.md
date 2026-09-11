@@ -703,10 +703,11 @@ This project still relies on three local patches:
 Because the patches are recorded against specific upstream revisions, `.repos`
 pins every dependency to an exact commit rather than to a branch tip. Do not
 change a pin to `jazzy`/`main` to pick up a fix: a fresh `vcs import` would then
-clone commits the patches were never rebased onto. Refresh all pins as one
-gated change, re-record the patches from clean checkouts, and repeat the build,
-test, and simulator checks. The latest completed refresh and its rollback
-evidence are recorded in [dependency refresh history](docs/history/dependency_refresh.md).
+clone commits the patches were never rebased onto. The complete import, refresh,
+live-checkout migration, and rollback procedure lives in the
+[dependency runbook](docs/project/dependencies.md). The latest completed refresh
+and its evidence are recorded in
+[dependency refresh history](docs/history/dependency_refresh.md).
 
 `tools/check_dependencies` verifies every checkout revision and rejects
 untracked files or changes beyond the recorded patches. Its `--apply` mode

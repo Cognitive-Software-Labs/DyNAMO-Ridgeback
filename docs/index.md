@@ -12,6 +12,8 @@ troubleshooting, planning, and historical documentation.
   precedence, and update rules
 - [Project conventions](project/conventions.md) — namespaces, generated state,
   tooling, dependencies, and entrypoint conventions
+- [External dependency management](project/dependencies.md) — import, patch,
+  refresh, verification, live migration, and rollback procedure
 - [Active engineering gaps](BACKLOG.md)
 - [Troubleshooting](troubleshooting.md)
 
