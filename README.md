@@ -392,19 +392,38 @@ Benchmark semantics:
 
 ### Local benchmark configurator
 
-Use the local configurator to build and validate a benchmark job without
-starting Gazebo or writing benchmark artifacts. It binds only to loopback and
-opens a browser by default; use `--no-open` on a remote or headless session.
+Use the local configurator to build, validate, and run an offline benchmark job.
+It binds only to loopback and opens a browser by default; use `--no-open` on a
+remote or headless session.
 
 ```bash
 ros2 run ridgeback_autonomy target_benchmark_configurator
 ros2 run ridgeback_autonomy target_benchmark_configurator --no-open
 ```
 
-The UI exports a canonical replay-job YAML plus its exact command. It supports
-legacy measurement replay, frozen mask-output comparison, rerunnable
-mask-model materialization, and live-system sweeps. It validates selected
-artifacts against the same replay-job contract used by the CLI. See
+The UI supports legacy measurement replay, frozen mask-output comparison,
+rerunnable mask-model materialization, and live-system sweeps, validating
+selected artifacts against the same replay-job contract used by the CLI. Paths
+you type resolve against the workspace root, so `artifacts/benchmarks/…` means
+the same directory to the page and to the runner.
+
+**Start** runs the three offline profiles from the page. The job YAML is written
+to `artifacts/benchmark-jobs/` and the run is recorded under
+`artifacts/configurator/runs/<run id>/` with its log and exit code, so a run
+survives closing the tab or restarting the service — reopen the page to
+re-attach. One run at a time. Cancel signals the run's whole process group,
+escalating SIGINT → SIGTERM → SIGKILL. Save a copy still downloads the job for
+archiving or hand-editing.
+
+**Live sweeps still start from a terminal.** They need a GPU-backed X session,
+and `target_benchmark_sweep` runs `cleanup.sh` before Gazebo starts, which would
+kill the page — see [docs/troubleshooting.md](docs/troubleshooting.md). Copy
+the command instead.
+
+The Results panel lists typed artifacts and run outputs, and can rename them.
+Rename is refused where the directory name is load-bearing — a sweep's config
+subdirectories, and staging directories — and renaming a sweep also rewrites the
+output paths recorded in its `sweep.json`. See
 [benchmarking reference](docs/benchmarking/target_distance_benchmarking.md).
 
 ### Benchmark sweeps

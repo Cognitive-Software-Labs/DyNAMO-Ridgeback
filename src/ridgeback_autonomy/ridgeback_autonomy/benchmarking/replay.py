@@ -1,9 +1,14 @@
-"""Versioned, ROS-free replay data and evaluation for projective ranging.
+"""Versioned, ROS-free replay data and evaluation for the depth estimators.
 
-V1 deliberately stores only the evidence the box-gated projective path reads:
-raw detection identity, its aligned-depth ROI, camera intrinsics, and the
+V1 deliberately stores only the evidence the box-gated depth paths read: raw
+detection identity, its aligned-depth ROI, camera intrinsics, and the
 camera-to-base transform.  It therefore cannot accidentally start Gazebo,
 OWLv2, or a depth model while evaluating a parameter sweep.
+
+Both projective ranging and euclidean reconstruction run off that evidence.
+Euclidean needs one thing projective does not -- a floor reference -- and it
+comes from the same optical-to-base extrinsics the projective path already
+requires, so neither estimator can run on an event the other cannot.
 """
 
 from __future__ import annotations
@@ -49,8 +54,17 @@ from ridgeback_autonomy.perception.target_localization.core.depth_common import 
 from ridgeback_autonomy.perception.target_localization.core.box_gate import (
     box_within_frame_fraction,
 )
+from ridgeback_autonomy.perception.target_localization.core.euclidean_reconstruction import (
+    localize_prepared_euclidean_reconstruction,
+)
 from ridgeback_autonomy.perception.target_localization.core.intrinsics import CameraIntrinsics
 from ridgeback_autonomy.perception.target_localization.core.isolation_2d import build_isolation_2d
+from ridgeback_autonomy.perception.target_localization.core.isolation_3d import (
+    BASE_ABOVE_FLOOR_M_DEFAULT,
+    ISOLATION_3D_DEFAULT,
+    build_isolation_3d,
+    camera_floor_geometry,
+)
 from ridgeback_autonomy.perception.target_localization.core.mask import region_from_bbox
 from ridgeback_autonomy.perception.target_localization.core.projective_ranging import (
     localize_prepared_projective_ranging,
@@ -58,6 +72,15 @@ from ridgeback_autonomy.perception.target_localization.core.projective_ranging i
 from ridgeback_autonomy.perception.target_localization.core.vehicle_frame import (
     ROBOT_FRONT_OFFSET_M,
     optical_to_base_planar,
+)
+from ridgeback_autonomy.perception.target_localization.estimator_registry import (
+    DEPTH_PATH_ESTIMATORS,
+    ESTIMATOR_FIELD_KEYS,
+    ESTIMATOR_LABELS,
+    parse_estimators,
+)
+from ridgeback_autonomy.perception.target_localization.measurement_pipeline import (
+    set_mask_estimator_status,
 )
 
 
@@ -246,7 +269,25 @@ def load_trial(dataset: ReplayDataset, entry: dict) -> tuple[dict, list[dict]]:
     return metadata['trial'], events
 
 
-def _event_from_payload(event: dict, arguments: dict[str, str]) -> ReplayMeasurementEvent:
+def _optional_float(arguments: dict[str, str], key: str) -> float | None:
+    return float(arguments[key]) if key in arguments else None
+
+
+def _selected_estimators(arguments: dict[str, str]) -> tuple[str, ...]:
+    selected = tuple(
+        estimator for estimator in parse_estimators(arguments.get('estimators'))
+        if estimator in DEPTH_PATH_ESTIMATORS)
+    if not selected:
+        raise ValueError(
+            'Replay requires projective ranging and/or euclidean reconstruction.')
+    return selected
+
+
+def _event_from_payload(
+    event: dict,
+    arguments: dict[str, str],
+) -> tuple[ReplayMeasurementEvent, tuple[str, ...]]:
+    selected = _selected_estimators(arguments)
     detections: list[Detection] = []
     width = int(event['image_width'])
     height = int(event['image_height'])
@@ -264,13 +305,31 @@ def _event_from_payload(event: dict, arguments: dict[str, str]) -> ReplayMeasure
     translation = np.asarray(translation_data, dtype=np.float64) if translation_data is not None else None
     isolation = build_isolation_2d(
         arguments.get('isolation_2d', 'nearest_mode_histogram'),
-        bin_width_m=float(arguments['isolation_2d_bin_width_m'])
-        if 'isolation_2d_bin_width_m' in arguments else None,
-        band_m=float(arguments['isolation_2d_band_m'])
-        if 'isolation_2d_band_m' in arguments else None,
-        min_bin_fraction=float(arguments['isolation_2d_min_bin_fraction'])
-        if 'isolation_2d_min_bin_fraction' in arguments else None,
+        bin_width_m=_optional_float(arguments, 'isolation_2d_bin_width_m'),
+        band_m=_optional_float(arguments, 'isolation_2d_band_m'),
+        min_bin_fraction=_optional_float(arguments, 'isolation_2d_min_bin_fraction'),
     )
+    isolation_3d = None
+    if 'euclidean_reconstruction' in selected and rotation is not None and translation is not None:
+        # The floor reference euclidean needs, derived from the same extrinsics
+        # projective already requires. V1 carries no chassis height of its own,
+        # so the offset of base_link above the floor is the shipped constant --
+        # a chassis figure rather than per-event evidence, confirmed in sim at
+        # 0.0259 m, which is where this dataset was captured.
+        camera_height, down_optical = camera_floor_geometry(
+            rotation, translation,
+            float(event.get('base_above_floor_m', BASE_ABOVE_FLOOR_M_DEFAULT)))
+        isolation_3d = build_isolation_3d(
+            arguments.get('isolation_3d', ISOLATION_3D_DEFAULT),
+            camera_height,
+            down_optical,
+            floor_margin_m=_optional_float(arguments, 'isolation_3d_floor_margin_m'),
+            percentile=_optional_float(arguments, 'isolation_3d_percentile'),
+            ahead_m=_optional_float(arguments, 'isolation_3d_ahead_m'),
+            behind_m=_optional_float(arguments, 'isolation_3d_behind_m'),
+            bin_width_m=_optional_float(arguments, 'isolation_3d_bin_width_m'),
+            min_bin_fraction=_optional_float(arguments, 'isolation_3d_min_bin_fraction'),
+        )
     min_valid_pixels = int(arguments.get('min_valid_pixels', '10'))
     for payload_detection in event['detections']:
         detection = Detection(
@@ -279,40 +338,68 @@ def _event_from_payload(event: dict, arguments: dict[str, str]) -> ReplayMeasure
             score=float(payload_detection.get('score', 0.0)),
         )
         if not box_within_frame_fraction(detection.bbox_xyxy, height, width):
-            detection.projective_ranging_status = int(MissReason.MASK_OVERSIZED_BOX)
+            set_mask_estimator_status(detection, MissReason.MASK_OVERSIZED_BOX, selected)
         elif intrinsics is None:
-            detection.projective_ranging_status = int(MissReason.NO_CAMERA_INFO)
+            set_mask_estimator_status(detection, MissReason.NO_CAMERA_INFO, selected)
         elif (intrinsics.width, intrinsics.height) != (width, height):
-            detection.projective_ranging_status = int(MissReason.GRID_MISMATCH)
+            set_mask_estimator_status(detection, MissReason.GRID_MISMATCH, selected)
         elif rotation is None or translation is None:
-            detection.projective_ranging_status = int(MissReason.TF_MISS_EXTRINSIC)
+            set_mask_estimator_status(detection, MissReason.TF_MISS_EXTRINSIC, selected)
         elif payload_detection.get('depth_roi') is None:
-            detection.projective_ranging_status = int(MissReason.NO_DEPTH_FRAME)
+            set_mask_estimator_status(detection, MissReason.NO_DEPTH_FRAME, selected)
         else:
             region = region_from_bbox(detection.bbox_xyxy, height, width)
             roi_depth = np.asarray(payload_detection['depth_roi'], dtype=np.float32)
             if roi_depth.shape != region.roi_shape:
                 raise ValueError(
                     f'Depth ROI shape {roi_depth.shape} does not match box region {region.roi_shape}.')
+            # Euclidean reconstruction deprojects with full-grid indices against
+            # the original colour intrinsics, so the stored window is placed
+            # back at its own origin on an empty frame. Nothing outside the
+            # window is ever addressed: every index comes from the region.
+            depth_full = np.zeros((height, width), dtype=np.float32)
+            depth_full[region.origin_v:region.origin_v + region.roi_shape[0],
+                       region.origin_u:region.origin_u + region.roi_shape[1]] = roi_depth
             prepared = PreparedDepthRegion(
                 region=region,
-                depth_full=roi_depth,
+                depth_full=depth_full,
                 roi_depth=roi_depth,
                 valid_masked=region.data & valid_depth(roi_depth, effective_depth_max),
             )
-            result, reason = localize_prepared_projective_ranging(
-                prepared, intrinsics, isolation=isolation, min_valid_pixels=min_valid_pixels)
-            detection.projective_ranging_status = int(reason)
-            if result is not None:
-                lateral, forward, distance = optical_to_base_planar(
-                    result.xyz_optical, rotation, translation,
-                    float(event.get('front_offset_m', ROBOT_FRONT_OFFSET_M)))
-                detection.projective_ranging_lateral_m = lateral
-                detection.projective_ranging_forward_m = forward
-                detection.projective_ranging_distance_m = distance
+            front_offset = float(event.get('front_offset_m', ROBOT_FRONT_OFFSET_M))
+            if 'projective_ranging' in selected:
+                result, reason = localize_prepared_projective_ranging(
+                    prepared, intrinsics, isolation=isolation,
+                    min_valid_pixels=min_valid_pixels)
+                detection.projective_ranging_status = int(reason)
+                if result is not None:
+                    (
+                        detection.projective_ranging_lateral_m,
+                        detection.projective_ranging_forward_m,
+                        detection.projective_ranging_distance_m,
+                    ) = optical_to_base_planar(
+                        result.xyz_optical, rotation, translation, front_offset)
+            if 'euclidean_reconstruction' in selected:
+                result, reason = localize_prepared_euclidean_reconstruction(
+                    prepared, intrinsics, isolation=isolation_3d,
+                    min_valid_points=min_valid_pixels)
+                detection.euclidean_reconstruction_status = int(reason)
+                if result is not None:
+                    (
+                        detection.euclidean_reconstruction_lateral_m,
+                        detection.euclidean_reconstruction_forward_m,
+                        detection.euclidean_reconstruction_distance_m,
+                    ) = optical_to_base_planar(
+                        result.xyz_optical, rotation, translation, front_offset)
         detections.append(detection)
-    estimates = [item.projective_ranging_distance_m for item in detections]
-    first_estimate = next((value for value in estimates if value is not None), None)
+    estimates = {
+        estimator: next((
+            getattr(detection, ESTIMATOR_FIELD_KEYS[estimator])
+            for detection in detections
+            if getattr(detection, ESTIMATOR_FIELD_KEYS[estimator]) is not None
+        ), None)
+        for estimator in selected
+    }
     return ReplayMeasurementEvent(
         stamp_ns=int(event['stamp_ns']),
         detected=bool(event['detected']),
@@ -321,15 +408,16 @@ def _event_from_payload(event: dict, arguments: dict[str, str]) -> ReplayMeasure
         image_width=width,
         image_height=height,
         detections=detections,
-        estimates={'projective_ranging': first_estimate},
-    )
+        estimates=estimates,
+    ), selected
 
 
 def evaluate_trial(trial: dict, events: list[dict], arguments: dict[str, str]) -> dict:
-    selected = ('projective_ranging',)
+    converted = [_event_from_payload(event, arguments) for event in events]
+    selected = converted[0][1] if converted else _selected_estimators(arguments)
     measurement_events = {
-        (index, int(event['stamp_ns'])): _event_from_payload(event, arguments)
-        for index, event in enumerate(events)
+        (index, item[0].stamp_ns): item[0]
+        for index, item in enumerate(converted)
     }
     capture = summarize_capture_events(measurement_events, selected)
     truth = [
@@ -349,13 +437,14 @@ def evaluate_trial(trial: dict, events: list[dict], arguments: dict[str, str]) -
         truth,
         scene_score,
         selected,
-        {'projective_ranging': 'Projective Ranging'},
+        {estimator: ESTIMATOR_LABELS[estimator] for estimator in selected},
         capture['usable_by_estimator'],
         '',
         capture['total_events'],
         captured_events=tuple(measurement_events.values()),
     )
     result['status_histogram'] = capture['status_histogram']
+    result['selected_estimators'] = selected
     return result
 
 
@@ -379,16 +468,20 @@ def evaluate_dataset(
 ) -> dict[str, dict]:
     """Evaluate every variant over every trial, in deterministic input order."""
 
-    collected = {
-        variant.name: {
-            'rows': {'projective_ranging': []},
-            'outcome_counts': {'projective_ranging': Counter({outcome: 0 for outcome in MISS_OUTCOMES})},
+    collected = {}
+    for variant in variants:
+        selected = _selected_estimators(variant.arguments)
+        collected[variant.name] = {
+            'rows': {estimator: [] for estimator in selected},
+            'outcome_counts': {
+                estimator: Counter({outcome: 0 for outcome in MISS_OUTCOMES})
+                for estimator in selected
+            },
             'status_histogram': {},
             'extra_count': 0,
             'trial_count': 0,
+            'selected_estimators': selected,
         }
-        for variant in variants
-    }
     encoded_variants = tuple((variant.name, variant.arguments) for variant in variants)
     tasks = [
         (str(dataset.root), dataset.manifest, entry, encoded_variants)
@@ -406,9 +499,10 @@ def evaluate_dataset(
             result = trial_results[variant.name]
             target = collected[variant.name]
             target['trial_count'] += 1
-            target['rows']['projective_ranging'].extend(result['rows']['projective_ranging'])
-            for outcome, count in result['outcome_counts']['projective_ranging'].items():
-                target['outcome_counts']['projective_ranging'][outcome] += count
+            for estimator in target['selected_estimators']:
+                target['rows'][estimator].extend(result['rows'][estimator])
+                for outcome, count in result['outcome_counts'][estimator].items():
+                    target['outcome_counts'][estimator][outcome] += count
             merge_status_histograms(target['status_histogram'], result['status_histogram'])
             target['extra_count'] += result['extra_count']
     return collected
@@ -430,30 +524,42 @@ def write_replay_results(
     root.mkdir(parents=True, exist_ok=False)
     baseline_name = variants[0].name
     baseline_rows = {
-        (row['trial_id'], row['instance_index']): row
-        for row in results[baseline_name]['rows']['projective_ranging']
+        estimator: {(row['trial_id'], row['instance_index']): row for row in rows}
+        for estimator, rows in results[baseline_name]['rows'].items()
     }
     for variant in variants:
         result = results[variant.name]
         variant_root = root / variant.name
         variant_root.mkdir()
-        rows = result['rows']['projective_ranging']
-        csv_path = variant_root / 'projective_ranging.csv'
-        write_trial_csv(str(csv_path), rows)
+        display_names = {
+            estimator: ESTIMATOR_LABELS[estimator]
+            for estimator in result['selected_estimators']
+        }
+        for estimator, rows in result['rows'].items():
+            write_trial_csv(str(variant_root / f'{estimator}.csv'), rows)
         summary_rows = build_summary_rows(
             result['rows'], result['extra_count'], result['outcome_counts'], result['status_histogram'])
-        paired = []
-        for row in rows:
-            baseline = baseline_rows[(row['trial_id'], row['instance_index'])]
-            paired.append({
-                'trial_id': row['trial_id'],
-                'instance_index': row['instance_index'],
-                'baseline_outcome': baseline['outcome'],
-                'outcome': row['outcome'],
-                'estimate_delta_m': (
-                    None if row['trial_estimate_m'] is None or baseline['trial_estimate_m'] is None
-                    else row['trial_estimate_m'] - baseline['trial_estimate_m']),
-            })
+        # A variant that selects an estimator the baseline did not has nothing
+        # to be paired against, so those rows carry no delta rather than a
+        # comparison with a row measured by a different estimator.
+        paired = {}
+        for estimator, rows in result['rows'].items():
+            reference = baseline_rows.get(estimator, {})
+            paired[estimator] = [
+                {
+                    'trial_id': row['trial_id'],
+                    'instance_index': row['instance_index'],
+                    'baseline_outcome': reference[key]['outcome'],
+                    'outcome': row['outcome'],
+                    'estimate_delta_m': (
+                        None
+                        if row['trial_estimate_m'] is None
+                        or reference[key]['trial_estimate_m'] is None
+                        else row['trial_estimate_m'] - reference[key]['trial_estimate_m']),
+                }
+                for row in rows
+                if (key := (row['trial_id'], row['instance_index'])) in reference
+            ]
         document = build_run_document(
             summary_rows,
             run_metadata={
@@ -463,7 +569,7 @@ def write_replay_results(
                 'trials_skipped': 0,
             },
             parameters=variant.arguments,
-            display_names={'projective_ranging': 'Projective Ranging'},
+            display_names=display_names,
             status_histograms=result['status_histogram'],
         )
         document['replay'] = {
@@ -478,15 +584,16 @@ def write_replay_results(
             'paired_trial_differences': paired,
         }
         write_run_json(str(variant_root / 'run.json'), document)
-        scenes = len({row['scene_id'] for row in rows})
-        instances = len({(row['trial_id'], row['instance_index']) for row in rows})
+        rows_flat = [row for rows in result['rows'].values() for row in rows]
+        scenes = len({row['scene_id'] for row in rows_flat})
+        instances = len({(row['trial_id'], row['instance_index']) for row in rows_flat})
         report = render_run_report(
             run_label=variant.name,
             scenario_path=str(dataset.manifest.get('scenario_path', 'frozen replay dataset')),
             summary_rows=summary_rows,
             estimator_rows=result['rows'],
             status_histograms=result['status_histogram'],
-            display_names={'projective_ranging': 'Projective Ranging'},
+            display_names=display_names,
             included_trials=result['trial_count'],
             skipped_trials=0,
             scenes=scenes,

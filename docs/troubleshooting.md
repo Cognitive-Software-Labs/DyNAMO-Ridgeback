@@ -33,6 +33,29 @@ its pose from the other, producing a misleading `Target pose ... not present`
 failure. Clean once and restart the sweep. A valid `run.json` lets the supervisor
 resume completed configurations.
 
+## `cleanup.sh` kills the configurator and any run it started
+
+The catch-all at the end of `cleanup.sh` is a `pgrep -f` substring match on
+`lib/ridgeback_autonomy/`, and `kill_matches` is `kill -9` excluding only `$$`
+and `$PPID`. Every node is installed there, but so are at least eight
+executables that are not nodes: the configurator, both sweep orchestrators, the
+four replay CLIs, and `launch_wait`. `target_benchmark_sweep` survives only
+because it happens to be cleanup's `$PPID`.
+
+- An open `target_benchmark_configurator` dies whenever anyone runs
+  `cleanup.sh`, including the automatic run inside `start_exploration.sh`.
+- A `target_replay_benchmark` started from that page dies the same way and
+  leaves a `.<name>.partial-<pid>-<uuid>` staging directory, which is safe to
+  delete; the run published nothing.
+
+Check with `pgrep -u "$USER" -af "lib/ridgeback_autonomy/"` before running
+cleanup. This is also why the configurator cannot start a `live-system` sweep:
+`target_benchmark_sweep` runs `run_preflight_cleanup` before Gazebo starts, so a
+sweep launched from the page would `kill -9` the page mid-click. Do not work
+around it with `--skip-preflight-cleanup`; that produces the two-`gz sim`
+failure above. Start live sweeps from a terminal until the catch-all is narrowed
+to actual nodes.
+
 ## Long sweep loses Gazebo
 
 A long GUI-backed sweep can fail in Gazebo's render thread while creating a

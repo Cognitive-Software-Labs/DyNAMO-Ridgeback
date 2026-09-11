@@ -31,9 +31,24 @@ behavior stays in the relevant technical reference.
 
 - `build/` and `install/` are expected top-level Colcon directories.
 - Generated run output belongs under `artifacts/`: `colcon/` for build/test
-  logs, `exploration/` for exploration runs, and `benchmarks/` for benchmark
-  runs and sweeps.
+  logs, `exploration/` for exploration runs, `benchmarks/` for benchmark
+  runs and sweeps, `benchmark-jobs/` for jobs the configurator writes, and
+  `configurator/runs/` for its run records.
 - Preserve explicit `output_dir`, `LOG_DIR`, and `ROS_LOG_DIR` overrides.
+- `benchmarking/paths.py` owns those roots and `anchored_path`, which anchors
+  every operator-supplied benchmark path on the workspace root once, at job
+  canonicalisation. Do not add a second anchor: the runner resolves a job's
+  relative paths against **the job file's own parent**, so anything resolving
+  against its own working directory instead will disagree with execution.
+- `--symlink-install` behaves three ways inside `ridgeback_autonomy`, which
+  decides what an edit requires afterwards: `configurator_assets/*` are
+  symlinked, so reload the browser; modules under `ridgeback_autonomy/` are
+  symlinked into `site-packages`, so restart the process that imported them;
+  anything listed in an `install(PROGRAMS ... RENAME)` rule — `configurator.py`,
+  `target_replay_benchmark.py`, the node scripts — is a real **copy**, so run
+  `colcon build`. Verify such a change landed by grepping the executable under
+  `install/ridgeback_autonomy/lib/ridgeback_autonomy/`, never `site-packages`,
+  which is a symlink and shows the edit whether or not you rebuilt.
 - `clearpath/robot.yaml` is canonical. Generated descriptions and installed
   copies are not editing targets.
 - `perception_venv/` supplies OWLv2, segmentation, and monocular-depth

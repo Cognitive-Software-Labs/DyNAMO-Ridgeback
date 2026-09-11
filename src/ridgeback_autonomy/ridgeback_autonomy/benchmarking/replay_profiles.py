@@ -8,7 +8,7 @@ same dataclasses and validation helpers.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
 import math
 from typing import Any, Iterable
 
@@ -39,7 +39,9 @@ from ridgeback_autonomy.perception.target_localization.core.isolation_2d import 
     NEAREST_MODE_BAND_M_DEFAULT,
 )
 from ridgeback_autonomy.perception.target_localization.core.isolation_3d import (
+    Chain,
     ISOLATION_3D_NAMES,
+    build_isolation_3d,
 )
 from ridgeback_autonomy.perception.target_localization.core.polar_profiling import (
     MIN_VALID_RAYS_DEFAULT,
@@ -66,6 +68,14 @@ ARTIFACT_MASK_CACHE = 'mask-cache'
 
 @dataclass(frozen=True)
 class AxisSpec:
+    """One benchmark parameter, and which selections can actually reach it.
+
+    ``estimators`` and ``recipes`` are reachability scopes: a setting the chosen
+    estimator or the chosen isolation recipe never binds is inert, so it is
+    dropped from the rendered job instead of being carried as a value that does
+    nothing. Empty means the axis is unscoped and always reachable.
+    """
+
     name: str
     value_type: str
     default: Any
@@ -75,6 +85,7 @@ class AxisSpec:
     minimum: float | int | None = None
     maximum: float | int | None = None
     estimators: tuple[str, ...] = ()
+    recipes: tuple[str, ...] = ()
     description: str = ''
 
     def as_dict(self) -> dict[str, Any]:
@@ -90,6 +101,7 @@ class AxisSpec:
                 'minimum': self.minimum,
                 'maximum': self.maximum,
                 'estimators': list(self.estimators),
+                'recipes': list(self.recipes),
                 'description': self.description,
             }.items()
             if value not in (None, (), [], '')
@@ -185,6 +197,27 @@ _DEPTH_ESTIMATORS = tuple(
     estimator for estimator in PUBLIC_ESTIMATOR_ORDER
     if estimator in DEPTH_PATH_ESTIMATORS)
 
+
+def _recipes_binding(setting: str) -> tuple[str, ...]:
+    """Which ``isolation_3d`` recipes actually bind ``setting``.
+
+    ``build_isolation_3d`` gives each value only to the steps whose dataclass
+    declares it and drops the rest, so reachability is a property of the built
+    recipe rather than of its name -- ``height_crop`` takes a margin and no
+    window, ``range_band`` anchors on a percentile where ``nearest_mode_band``
+    histograms. Asking the recipes themselves keeps the scope from drifting when
+    a step gains or loses a field. The pose is a placeholder: no step's field
+    list depends on where the camera is.
+    """
+
+    reaching = []
+    for name in sorted(ISOLATION_3D_NAMES):
+        recipe = build_isolation_3d(name, 0.0, (0.0, 0.0, -1.0))
+        steps = recipe.steps if isinstance(recipe, Chain) else (recipe,)
+        if any(setting in {field.name for field in fields(step)} for step in steps):
+            reaching.append(name)
+    return tuple(reaching)
+
 # Measurement knobs retain the launch spelling so existing sweep YAML remains
 # valid.  Materializer knobs are deliberately distinct from live-only node
 # internals: they form the immutable producer signature of a mask cache.
@@ -203,14 +236,17 @@ AXES: dict[str, AxisSpec] = {
         'isolation_2d_bin_width_m', 'number', 0.05, STAGE_MEASUREMENT,
         '2D histogram bin width', minimum=0.0,
         estimators=('projective_ranging',)),
+    # otsu_foreground takes a bin width and nothing else, so build_isolation_2d
+    # silently drops these two on that recipe. The scope keeps them off screen
+    # rather than offering a number the measurement never reads.
     'isolation_2d_band_m': _axis(
         'isolation_2d_band_m', 'number', NEAREST_MODE_BAND_M_DEFAULT,
         STAGE_MEASUREMENT, '2D near-surface band', minimum=0.0,
-        estimators=('projective_ranging',)),
+        estimators=('projective_ranging',), recipes=('nearest_mode_histogram',)),
     'isolation_2d_min_bin_fraction': _axis(
         'isolation_2d_min_bin_fraction', 'number', 0.05, STAGE_MEASUREMENT,
         '2D minimum bin fraction', minimum=0.0, maximum=1.0,
-        estimators=('projective_ranging',)),
+        estimators=('projective_ranging',), recipes=('nearest_mode_histogram',)),
     'min_valid_pixels': _axis(
         'min_valid_pixels', 'integer', MIN_VALID_SAMPLES, STAGE_MEASUREMENT,
         'Minimum valid samples', minimum=1, estimators=_DEPTH_ESTIMATORS),
@@ -219,30 +255,39 @@ AXES: dict[str, AxisSpec] = {
         STAGE_MEASUREMENT, 'Euclidean recipe',
         choices=tuple(sorted(ISOLATION_3D_NAMES)),
         estimators=('euclidean_reconstruction',)),
+    # Each of the six is scoped to the recipes that bind it, so a chain without
+    # a floor crop stops offering a margin and a percentile anchor stops
+    # offering a bin width.
     'isolation_3d_floor_margin_m': _axis(
         'isolation_3d_floor_margin_m', 'number', 0.05, STAGE_MEASUREMENT,
         'Floor margin', minimum=0.0,
-        estimators=('euclidean_reconstruction',)),
+        estimators=('euclidean_reconstruction',),
+        recipes=_recipes_binding('floor_margin_m')),
     'isolation_3d_percentile': _axis(
         'isolation_3d_percentile', 'number', FRONT_PERCENTILE, STAGE_MEASUREMENT,
         'Front percentile', minimum=0.0, maximum=100.0,
-        estimators=('euclidean_reconstruction',)),
+        estimators=('euclidean_reconstruction',),
+        recipes=_recipes_binding('percentile')),
     'isolation_3d_ahead_m': _axis(
         'isolation_3d_ahead_m', 'number', INLIER_AHEAD_MARGIN_M, STAGE_MEASUREMENT,
         '3D band ahead', minimum=0.0,
-        estimators=('euclidean_reconstruction',)),
+        estimators=('euclidean_reconstruction',),
+        recipes=_recipes_binding('ahead_m')),
     'isolation_3d_behind_m': _axis(
         'isolation_3d_behind_m', 'number', INLIER_BEHIND_MARGIN_M, STAGE_MEASUREMENT,
         '3D band behind', minimum=0.0,
-        estimators=('euclidean_reconstruction',)),
+        estimators=('euclidean_reconstruction',),
+        recipes=_recipes_binding('behind_m')),
     'isolation_3d_bin_width_m': _axis(
         'isolation_3d_bin_width_m', 'number', 0.05, STAGE_MEASUREMENT,
         '3D histogram bin width', minimum=0.0,
-        estimators=('euclidean_reconstruction',)),
+        estimators=('euclidean_reconstruction',),
+        recipes=_recipes_binding('bin_width_m')),
     'isolation_3d_min_bin_fraction': _axis(
         'isolation_3d_min_bin_fraction', 'number', 0.05, STAGE_MEASUREMENT,
         '3D minimum bin fraction', minimum=0.0, maximum=1.0,
-        estimators=('euclidean_reconstruction',)),
+        estimators=('euclidean_reconstruction',),
+        recipes=_recipes_binding('min_bin_fraction')),
     # Polar profiling reads the LiDAR scan, which the frozen sensor capture does
     # not hold, so these three are measurement knobs that only the live profile
     # can actually move. The estimator restriction keeps them out of the offline
@@ -383,9 +428,9 @@ MASK_AXES = frozenset(
 # depth, intrinsics and transforms only. Moving a polar knob during replay would
 # report a number the stored evidence cannot produce, so the offline profiles
 # freeze these axes outright rather than accept a setting they would ignore.
-# This is a missing-evidence limit, not the estimator-compatibility filter the
-# GUI applies -- the measurement profile deliberately still admits the euclidean
-# axes it cannot select, because that evidence *is* on disk.
+# This is a missing-evidence limit, not an estimator preference: the euclidean
+# axes stay available on every offline profile because the extrinsics its floor
+# reference needs are on disk, where a LiDAR scan is not.
 SCAN_AXES = frozenset(
     name for name, spec in AXES.items()
     if spec.estimators == ('polar_profiling',))
@@ -406,7 +451,7 @@ PROFILES: dict[str, ProfileSpec] = {
         frozen_stages=(STAGE_DETECTOR, STAGE_SENSOR, STAGE_MASK),
         rerun_stages=(STAGE_MEASUREMENT,),
         allowed_axes=OFFLINE_MEASUREMENT_AXES,
-        compatible_estimators=('projective_ranging',),
+        compatible_estimators=_DEPTH_ESTIMATORS,
         compatible_depth_sources=('stereoscopic',),
         compatible_mask_gates=('box',),
         supported_claims=('accuracy', 'coverage', 'miss-reason', 'paired-results'),

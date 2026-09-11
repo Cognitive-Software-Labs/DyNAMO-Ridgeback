@@ -43,6 +43,9 @@ troubleshooting, planning, and historical documentation.
 
 - [Layered replay profiles](plans/layered_replay_profiles.md) — implementation
   landed; live parity, real-model, storage, and scaling gates remain open
+- [Live sweep from the configurator GUI](plans/benchmark_gui_direct_run.md) —
+  the three offline profiles run from the page; the `live-system` phase is
+  blocked on the `cleanup.sh` catch-all
 - [D455 hardware validation](plans/camera_hardware_validation.md)
 - [Model-concurrency evidence](plans/model_concurrency_evidence.md)
 - [Occlusion characterization](plans/occlusion_handling.md)
@@ -77,6 +80,7 @@ They are not supported implementations or automatic backlog commitments.
 - [Chassis attitude and floor crop](history/chassis_attitude_and_floor_crop.md)
 - [Offline measurement replay validation](history/offline_measurement_replay_validation.md)
 - [Layered replay implementation validation](history/layered_replay_implementation_validation.md)
+- [Running benchmarks from the configurator GUI](history/benchmark_gui_direct_run.md)
 
 History preserves dated evidence and limitations. Read the corresponding
 technical reference for current behavior.

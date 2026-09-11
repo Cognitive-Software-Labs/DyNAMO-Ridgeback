@@ -189,24 +189,43 @@ supervisor, and reporting.
 
 ## Local configuration UI
 
-`target_benchmark_configurator` is a local-only, read-only browser UI for
-building benchmark sweep YAML before any benchmark process starts. It binds
-only to `127.0.0.1`, chooses an available port by default, and puts an
-unguessable token in the URL and every API request. Use `--no-open` to print
-the URL for a headless or remote session.
+`target_benchmark_configurator` is a local-only browser UI for building a
+benchmark job and running it. It binds only to `127.0.0.1`, chooses an available
+port by default, and puts an unguessable token in the URL and every API request.
+Use `--no-open` to print the URL for a headless or remote session.
 
 The UI imports and exports the canonical replay-job format, then validates the
 generated document through `parse_job`, exactly as the replay command does.
-Its command preview comes from the same structured argument-list renderer; it
-never invokes a shell, creates an output directory, starts ROS, or changes an
-artifact. Importing and immediately exporting an unchanged job is byte-stable.
+Importing and immediately exporting an unchanged job is byte-stable.
+
+The server writes the job itself, to
+`artifacts/benchmark-jobs/benchmark-<profile>-<run id>.yaml` with absolute paths
+throughout, and the rendered command names that file. Every operator-supplied
+path is anchored on the workspace root once, by `paths.anchored_path`, so what
+the page reports about an input is what the run resolves. Browser download of a
+job cannot do this: the page never learns the download directory, while a job's
+relative paths resolve against the job file's own parent. The reversal and its
+evidence are in
+[running benchmarks from the configurator GUI](../history/benchmark_gui_direct_run.md).
+
+The three offline profiles — legacy `measurement` replay, frozen `mask-output`
+comparison, and `mask-model` materialization — start, cancel, and tail their log
+from the page. They route through one command and import no ROS runtime, so they
+cannot orphan a simulator. Run records live under
+`artifacts/configurator/runs/<run_id>/`; runs outlive the GUI and the tab
+re-attaches from disk. Concurrent runs are refused server-side, because two
+replays contend for the worker counts the operator chose. Cancellation signals
+the process group and escalates SIGINT → SIGTERM → SIGKILL.
+
+`live-system` sweeps stay terminal-only: `target_benchmark_sweep` runs
+`run_preflight_cleanup`, whose catch-all would `kill -9` the page. The UI shows
+a disabled Start with that reason. See
+[troubleshooting](../troubleshooting.md).
 
 The browser is a client of the ROS-free replay-profile capability contract;
-the service is the authority for profile and axis decisions. All four profile
-cards are executable: legacy `measurement` replay, frozen `mask-output`
-comparison, `mask-model` materialization, and `live-system` sweeps. The GUI
-validates canonical replay jobs and their typed artifacts before export, so it
-cannot misrepresent a live or box-gated run as a frozen-mask experiment.
+the service is the authority for profile and axis decisions. The GUI validates
+canonical replay jobs and their typed artifacts before running, so it cannot
+misrepresent a live or box-gated run as a frozen-mask experiment.
 
 The combined installed-package suite passed with 758 tests after the
 configurator landed, as recorded in

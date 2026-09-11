@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Evaluate a projective-ranging sweep from a frozen replay dataset."""
+"""Evaluate a depth-measurement sweep from a frozen replay dataset."""
 
 from __future__ import annotations
 
@@ -17,10 +17,16 @@ from ridgeback_autonomy.benchmarking.replay import (
 )
 from ridgeback_autonomy.benchmarking.sweep import SweepConfig, load_sweep
 from ridgeback_autonomy.benchmarking.replay_profiles import (
+    AXES,
     MEASUREMENT_AXES,
+    OFFLINE_MEASUREMENT_AXES,
     PROFILE_MEASUREMENT,
     ProfileValidationError,
     validate_profile_axes,
+)
+from ridgeback_autonomy.perception.target_localization.estimator_registry import (
+    DEPTH_PATH_ESTIMATORS,
+    parse_estimators,
 )
 from ridgeback_autonomy.perception.target_localization.core.depth_common import (
     DEPTH_GATE_DISABLED,
@@ -36,6 +42,15 @@ from ridgeback_autonomy.perception.target_localization.core.ranging_defaults imp
 )
 
 
+# Euclidean reconstruction reads the same frozen ROI as projective ranging, so
+# its settings are resolved from the canonical axis table rather than repeated
+# here; the two estimators cannot drift apart on a default that way.
+_EUCLIDEAN_ARGUMENT_DEFAULTS = {
+    name: str(AXES[name].default)
+    for name in sorted(OFFLINE_MEASUREMENT_AXES)
+    if AXES[name].estimators == ('euclidean_reconstruction',)
+}
+
 REPLAY_V1_ARGUMENT_DEFAULTS = {
     'estimators': 'projective_ranging',
     'mask_gate': 'box',
@@ -46,6 +61,7 @@ REPLAY_V1_ARGUMENT_DEFAULTS = {
     'isolation_2d_band_m': str(NEAREST_MODE_BAND_M_DEFAULT),
     'isolation_2d_min_bin_fraction': str(NEAREST_MODE_MIN_BIN_FRACTION_DEFAULT),
     'min_valid_pixels': str(MIN_VALID_SAMPLES),
+    **_EUCLIDEAN_ARGUMENT_DEFAULTS,
 }
 # Compatibility aliases for callers/tests that imported the original names.
 REPLAY_V1_ARGUMENT_NAMES = frozenset(REPLAY_V1_ARGUMENT_DEFAULTS)
@@ -53,7 +69,7 @@ REPLAY_V1_ARGUMENT_NAMES = frozenset(REPLAY_V1_ARGUMENT_DEFAULTS)
 
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description='Evaluate a projective-ranging parameter sweep without ROS or Gazebo.')
+        description='Evaluate a depth-measurement parameter sweep without ROS or Gazebo.')
     parser.add_argument('dataset', help='Completed replay dataset directory')
     parser.add_argument('sweep', help='Existing benchmark sweep YAML')
     parser.add_argument('--output-dir', required=True, help='New output directory')
@@ -71,11 +87,13 @@ def _validated_v1_variants(spec) -> tuple[SweepConfig, ...]:
             validate_profile_axes(PROFILE_MEASUREMENT, config.explicit_keys)
         except ProfileValidationError as exc:
             raise ValueError(
-                f'{exc.field} does not affect offline projective ranging; {exc}') from exc
-        if arguments.get('estimators') != 'projective_ranging':
+                f'{exc.field} does not affect offline depth measurement; {exc}') from exc
+        unsupported = sorted(
+            set(parse_estimators(arguments.get('estimators'))) - DEPTH_PATH_ESTIMATORS)
+        if unsupported:
             raise ValueError(
-                f'Measurement replay config "{config.name}" must select '
-                'projective_ranging only for legacy evidence.')
+                f'Measurement replay config "{config.name}" selects "{unsupported[0]}", '
+                'which needs evidence the legacy dataset does not carry.')
         if arguments.get('mask_gate', 'box') != 'box':
             raise ValueError(
                 f'Measurement replay config "{config.name}" requires the frozen box mask.')
