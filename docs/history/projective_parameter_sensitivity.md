@@ -282,10 +282,9 @@ The two later runs agree on MAE, p95 **and** scored count to every digit
 recorded, five days and several commits apart. The outlier is the earlier one,
 and the boundary between them is `7e31f02` (2026-08-31), the D455 correction —
 which moved the Gazebo RGBD sensor onto `camera_0_color_frame` and changed
-where the scene is rendered from. `AI_CONTEXT.md` already states that runs
-recorded before 2026-08-31 used the D435 model and the old render pose and must
-not be presented as the same setup; this is that warning showing up as a
-number.
+where the scene is rendered from. Runs recorded before 2026-08-31 used the
+D435 model and the old render pose and must not be presented as the same setup;
+this is that warning showing up as a number.
 
 So the full-set benchmark is **reproducible, not noisy**, and a small MAE delta
 between two configurations in one sweep is readable rather than drowned.

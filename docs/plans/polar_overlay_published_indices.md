@@ -201,7 +201,7 @@ Design notes for whoever implements it:
      divergence — now live" block with the published-indices contract, and amend
      the nearest-only paragraph to state that the 2D panel now shows every
      detection while the 3D rays stay nearest-only, with the reason.
-   - check whether `AI_CONTEXT.md` enumerates the message set or the overlay's
+   - check whether `docs/project/context.md` enumerates the message set or the overlay's
      inputs; update if so.
 
 ## Verification

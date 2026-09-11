@@ -9,10 +9,10 @@ This workspace supports 3 main human workflows:
 
 ## Docs
 
-- [Documentation index](docs/README.md): localization, benchmarking, plans, and historical validation
+- [Documentation index](docs/index.md): project context, architecture, benchmarking, plans, and historical validation
 - `README.md`: installation, public launch usage, and normal human workflows
 - `docs/ISSUES.md`: troubleshooting, resolved root causes, and operational gotchas
-- `AI_CONTEXT.md`: agent-facing repo conventions, mental model, and documentation rules
+- `docs/project/`: project context, documentation ownership, and repository conventions
 - `AGENTS.md` / `CLAUDE.md`: thin entrypoints into the shared agent guidance
 
 ## Stack
