@@ -1,13 +1,17 @@
 """Contract tests for the Isaac RTX-lidar scan assembler (no rclpy needed).
 
-Covers the arc-edge mask added for `docs/isaac/open-issues.md` §1: while the
-robot moves, phantom returns at 0.40-0.55 m appear at +129..+135 deg and trip
-`collision_monitor`'s `min_points: 6`, pinning `cmd_vel` at zero. The
-mechanism is still unknown (a self-occlusion explanation was retracted — the
-body is rigid and a static ray-cast self-occludes 0/1081 bins), so the mask is
-a mitigation with an empirically chosen width. What these tests pin is the
-mask's shape, not its justification: it must cover the measured band on BOTH
-ends, stay symmetric, and not eat into the arc the robot navigates by.
+Pins the published scan geometry to the UST-10LX contract, and guards the
+regression that `docs/isaac/open-issues.md` §1 turned out to be: the lidar
+links were parented to `base_link`, a bare Xform with no joint into the
+articulation, so PhysX turned `chassis_link` and left the sensors behind. The
+chassis then swept under a static emitter and its own notch edge came into
+range, producing phantom 0.40-0.55 m returns that tripped
+`collision_monitor`'s `min_points: 6` and pinned `cmd_vel` at zero.
+
+A 10-deg edge mask was added here first and is gone: it masked the symptom,
+and once the reparent landed it measured unnecessary. So these tests also
+assert the assembler drops NO bins of its own — if someone reintroduces a
+mask to hide a geometry or transform bug, this fails.
 """
 import importlib.util
 import math
@@ -15,7 +19,6 @@ import sys
 from pathlib import Path
 
 import numpy as np
-import pytest
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 _ROS_IO = (_REPO_ROOT / "src" / "ridgeback_autonomy" / "sim" / "isaac"
@@ -41,40 +44,28 @@ def test_contract_scan_geometry_is_the_ust_10lx_window():
     assert math.isclose(bin_degrees()[-1], 135.0, abs_tol=1e-9)
 
 
-def test_edge_mask_covers_the_measured_phantom_band_on_both_ends():
-    mask = A.edge_mask()
+def test_range_window_matches_the_sensor():
+    # the RTX prims are authored nearRangeM 0.06 / farRangeM 10.0
+    assert math.isclose(A.RANGE_MIN, 0.06, abs_tol=1e-9)
+    assert math.isclose(A.RANGE_MAX, 10.0, abs_tol=1e-9)
+    assert math.isclose(A.SCAN_PERIOD, 1.0 / 40.0, abs_tol=1e-12)
+
+
+def test_assembler_declares_no_bin_mask():
+    """No edge/seam mask. The phantom band §1 chased was a detached-sensor
+    transform bug, fixed in clearpath/robot.yaml by reparenting the lidars to
+    chassis_link — not something the assembler should hide."""
+    assert not hasattr(A, "EDGE_MASK_DEG"), \
+        "an edge mask is back; fix the root cause instead (open-issues.md §1)"
+    assert not hasattr(A, "edge_mask"), \
+        "an edge mask is back; fix the root cause instead (open-issues.md §1)"
+
+
+def test_full_270_deg_arc_is_publishable():
+    """Every bin in the contract window must be reachable — the arc is the
+    robot's whole forward+lateral sensing envelope and the earlier mask cost
+    7.4% of it per unit."""
     deg = bin_degrees()
-    # measured artefact reached inward to 126.5 deg at 0.4 rad/s (it thins
-    # inward rather than ending sharply); mirror the band for the far end
-    for lo, hi in ((126.5, 135.0), (-135.0, -126.5)):
-        band = (deg >= lo) & (deg <= hi)
-        assert band.any(), f"no bins in {lo}..{hi}"
-        assert mask[band].all(), f"phantom band {lo}..{hi} deg not masked"
-
-
-def test_edge_mask_is_symmetric_and_only_touches_the_arc_ends():
-    mask = A.edge_mask()
-    assert np.array_equal(mask, mask[::-1]), "mask must be symmetric"
-    deg = bin_degrees()
-    keep = 135.0 - A.EDGE_MASK_DEG
-    assert not mask[np.abs(deg) <= keep - 1e-9].any(), \
-        "mask reaches inside the retained arc"
-    # the forward/lateral arc the robot navigates by must survive untouched
-    assert not mask[np.abs(deg) <= 120.0].any()
-
-
-def test_edge_mask_cost_stays_small():
-    mask = A.edge_mask()
-    # 10 deg per end at 0.25 deg/bin = 40 bins per end
-    assert mask.sum() == 80, mask.sum()
-    assert mask.sum() / A.N_BINS < 0.08
-
-
-def test_masked_sector_is_inside_the_other_lidar_arc():
-    """Each masked sector must be covered by the opposite, back-to-back unit,
-    so nothing in the merged scan (or either costmap) goes blind."""
-    kept_half_width = 135.0 - A.EDGE_MASK_DEG
-    # the other unit is yawed 180 deg, so it sees bearings |theta - 180| <= kept
-    # a masked bearing b (|b| > kept) maps to |b - 180| = 180 - |b| < 180 - kept
-    worst = 180.0 - 135.0          # bearing +-135 maps to 45 deg off the rear
-    assert worst < kept_half_width, "rear unit cannot cover the masked sector"
+    assert deg.min() <= -135.0 + 1e-9
+    assert deg.max() >= 135.0 - 1e-9
+    assert len(deg) == A.N_BINS

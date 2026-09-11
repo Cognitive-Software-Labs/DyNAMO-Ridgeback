@@ -22,12 +22,22 @@ platform:
 mounts: {}
 sensors:
   lidar2d:
+    # parent MUST be chassis_link, not base_link. base_link is a bare Xform
+    # with no joint into the articulation, so a sensor parented there becomes
+    # an orphan rigid body: PhysX drives chassis_link and leaves the sensor
+    # behind. Measured 2026-09-11 — the chassis turned 89.6 deg while the
+    # lidar frame stayed at 0.0, the scan did not rotate with the robot
+    # (d(bearing)/d(yaw) = -0.0025 over 234 deg), and the chassis sweeping
+    # under a static emitter is what produced the phantom returns that pinned
+    # cmd_vel at zero (docs/isaac/open-issues.md §1).
+    # chassis_link is coincident with base_link (identity local transform), so
+    # these xyz values and the published TF are unchanged by the reparent.
     - model: hokuyo_ust
-      parent: base_link
+      parent: chassis_link
       xyz: [0.3922, 0.0, 0.179]
       rpy: [0.0, 0.0, 0.0]
     - model: hokuyo_ust
-      parent: base_link
+      parent: chassis_link
       xyz: [-0.3922, 0.0, 0.179]
       rpy: [0.0, 0.0, 3.14159]
   camera:

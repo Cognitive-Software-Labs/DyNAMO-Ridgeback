@@ -351,7 +351,8 @@ def run(app, battery: bool = False, spin_transforms=None) -> int:
     return 0
 
 
-LIDAR_LASER = "Geometry/base_link/lidar2d_0_link/lidar2d_0_laser"
+LIDAR_LASER_NAME = "lidar2d_0_laser"   # located by name: its parent chain
+                                       # moved when the reparent fix landed
 # diamond-notch vertex nearest the front lidar, in base_link (sliced from the
 # committed robot USD at the scan plane by tools/isaac/self_occlusion_check.py)
 NOTCH_VERTEX_BASE = (0.3432, -0.0002, 0.2264)
@@ -374,13 +375,29 @@ def run_spin_transforms(app, timeline, rig, stage, robot_prim_path, tc,
     """
     from pxr import UsdGeom
 
-    def usd_yaw(rel):
-        p = stage.GetPrimAtPath(f"{robot_prim_path}/{rel}")
+    def usd_yaw_prim(p):
         m = UsdGeom.Xformable(p).ComputeLocalToWorldTransform(tc)
         q = m.ExtractRotationQuat()
         im = q.GetImaginary()
         return (m.ExtractTranslation(),
                 yaw_of_wxyz(q.GetReal(), im[0], im[1], im[2]))
+
+    def usd_yaw(rel):
+        p = stage.GetPrimAtPath(f"{robot_prim_path}/{rel}")
+        if not p:
+            raise RuntimeError(f"prim not found: {robot_prim_path}/{rel}")
+        return usd_yaw_prim(p)
+
+    from pxr import Usd
+    laser = None
+    for prim in Usd.PrimRange(stage.GetPrimAtPath(robot_prim_path)):
+        if prim.GetName() == LIDAR_LASER_NAME:
+            laser = prim
+            break
+    if laser is None:
+        raise RuntimeError(f"{LIDAR_LASER_NAME} not found under "
+                           f"{robot_prim_path}")
+    print(f"lidar prim: {laser.GetPath()}", flush=True)
 
     print(f"\n=== SPIN TRANSFORM DESYNC TEST (wz={wz} rad/s, "
           f"{frames} frames) ===", flush=True)
@@ -404,7 +421,7 @@ def run_spin_transforms(app, timeline, rig, stage, robot_prim_path, tc,
 
         _, ct = tensor_pose("chassis")
         cpos, cy = usd_yaw(CHASSIS)
-        lpos, ly = usd_yaw(LIDAR_LASER)
+        lpos, ly = usd_yaw_prim(laser)
         rel = math.degrees(ly - cy)
         rel = (rel + 180.0) % 360.0 - 180.0
         if abs(rel) > abs(worst):
@@ -426,10 +443,12 @@ def run_spin_transforms(app, timeline, rig, stage, robot_prim_path, tc,
     # 0.4 rad/s needs ~3.6-5 deg of relative yaw to fake a 0.40-0.55 m return
     # off the notch edge, which passes 34.6 mm from the emitter.
     if abs(worst) < 0.01:
-        print("VERDICT: transforms stay locked — the USD/physics transform "
-              "graph is NOT desyncing.\n         The band must originate "
-              "inside the RTX sensor pipeline (ray generation\n         or "
-              "BVH), not in the robot's pose composition.", flush=True)
+        print("VERDICT: transforms stay locked — the sensor turns with the "
+              "chassis.\n         This is the expected PASS once the lidars "
+              "are parented to chassis_link\n         (open-issues.md §1). "
+              "notch_r above should also hold constant; if it\n         "
+              "sweeps, the sensor is detached from the body again.",
+              flush=True)
     elif abs(worst) < 3.0:
         print("VERDICT: measurable desync, but too small on its own to "
               "explain 0.40-0.55 m\n         returns (needs ~3.6-5 deg). "

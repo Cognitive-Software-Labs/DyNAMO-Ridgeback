@@ -4,20 +4,16 @@ Instrumented exploration benchmark runs, promoted from the 2026-07-10 tuning
 sessions. The `sim-runner` project subagent (`.claude/agents/sim-runner.md`)
 automates this recipe.
 
-> ⚠️ **Exploration benchmarks do not fully run on Isaac yet.**
-> As of 2026-09-11 the robot *does* drive (the +129…+135 deg phantom band is
-> masked in the assembler), but it re-stalls on a second phantom band at
-> +94.5…+97.5 deg and does not complete a sweep. The mask is a mitigation —
-> the mechanism behind both bands is still unknown. See
-> `docs/isaac/open-issues.md` §1 before spending a session on a run that
-> cannot produce a number.
+> ✅ **Exploration runs on Isaac as of 2026-09-11.** The long-standing stall
+> (`collision_monitor` pinning `cmd_vel` at zero) was the 2D lidars being
+> parented to `base_link`, which has no joint into the articulation — PhysX
+> turned `chassis_link` and left the sensors behind. Reparenting them to
+> `chassis_link` fixed it: `cmd_vel` flows, the robot drives, and frontier
+> goals succeed. See `docs/isaac/open-issues.md` §1.
 >
-> To reproduce the phantom mechanism in ~30 s without nav2, bring up the
-> sim-only layer (`includes/simulation_isaac.launch.py`) and publish a
-> `cmd_vel` rotation while watching `sensors/lidar2d_0/scan` for returns
-> under 1 m: clean stationary, phantoms while rotating. Watch the assembled
-> `scan`, not the raw `points`/`points_l` clouds — the mask that suppresses
-> the band lives in the assembler, so the raw clouds still show it by design.
+> **No Isaac coverage baseline exists yet**, and every pre-2026-09-11 figure
+> is void — they were measured with a sensor that did not rotate with the
+> robot. Producing the first real baseline is the current deliverable.
 
 ## Canonical run
 

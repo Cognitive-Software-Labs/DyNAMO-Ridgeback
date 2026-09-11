@@ -21,16 +21,40 @@ before committing in that worktree.
 
 ## 🔴 Blocking
 
-### 1. Lidars detached from the articulation — root cause found, fix not yet applied
+### 1. ~~Lidars detached from the articulation~~ — FIXED 2026-09-11
 
-> **2026-09-11.** The mechanism is identified and measured: **the lidar frame
-> does not rotate with the chassis**, so the chassis sweeps underneath a
-> stationary sensor and its own notch edge becomes reachable. A masking
-> mitigation is in place and the robot now drives, but the underlying
-> transform bug is **not fixed**, and a second band (same cause, different
-> notch edge) still re-stalls it. Read this whole section before re-testing —
-> one earlier mechanism here was asserted, retracted, then partly vindicated
-> for a different reason.
+> ## ✅ FIXED — `clearpath/robot.yaml`, `parent: base_link` → `chassis_link`
+>
+> The lidars were **orphan rigid bodies**: parented to `base_link`, a bare
+> Xform with no joint into the articulation, so PhysX turned `chassis_link`
+> and left the sensors behind. The chassis swept under a static emitter and
+> its own notch edge came into range — that was the phantom band.
+>
+> **Verified after the reparent** (`warehouse_full`, deterministic, camera
+> off, domain 78):
+>
+> | check | before | after |
+> |---|---|---|
+> | `diag_rig.py --spin-transforms` lidar−chassis yaw | −89.58 deg @ 240 frames | **0.000000** every frame |
+> | `notch_r_from_lidar` over a spin | swept 0.049 → **0.519 m** | constant **0.049 m** |
+> | scan rotates with body, d(bearing)/d(yaw) | **−0.0025** | **−1.0352** |
+> | near returns <1 m, spinning both ways, mask OFF | up to 6/frame | **0** |
+> | publishable arc | +114.78 deg | **+135.00 deg** |
+> | `cmd_vel` msgs / 40 s | **0** | **799** |
+> | odom displacement | 0.000 m | **1.1453 m** |
+> | `away from collision` log lines | continuous | **0** |
+> | frontier goals | none reached | **"Goal succeeded"**, explorer advanced |
+>
+> The 10-deg `EDGE_MASK_DEG` mitigation was then measured unnecessary and
+> **removed**, restoring 7.4% of each arc. The reasoning history below is kept
+> deliberately: a mechanism was asserted, retracted on a correct rigid-body
+> objection, then vindicated for a different reason (the sim was not keeping
+> the body rigid). Regression guard: `test_lidar_scan_assembler.py` fails if a
+> mask is reintroduced.
+>
+> **Consequence:** the RMSE 0.23 / loop-err 7 cm SLAM figures predate this rig
+> and describe a detached sensor. They must be re-measured, not carried
+> forward. Every coverage number from `a33111c2` onward is void.
 
 **Original symptom.** In `hospital` and `warehouse_full`, the robot planned but
 never drove. Net odom displacement over 25 s was `0.000 m`, and
@@ -167,8 +191,8 @@ sim-only layer (`tools/isaac/stall_probe.py`, and the spin/probe recipe in
 `../../tools/benchmark/README.md`). Clean stationary, phantoms while rotating,
 both directions, clean again on stop.
 
-**Mitigation** (masks the symptom; the transform bug above is the real fix).
-`LidarScanAssembler.EDGE_MASK_DEG = 10.0` (`sim/isaac/ros_io.py`)
+**Mitigation, since REMOVED** (it masked the symptom; the reparent is the
+real fix). `LidarScanAssembler.EDGE_MASK_DEG = 10.0` (`sim/isaac/ros_io.py`)
 drops the outer 10 deg of each 270 deg window — 40 of 1081 bins per end, 7.4%
 of the arc. The band does **not** end sharply (it thins inward: 6 points/frame
 past 129 deg, 1–2 at 126.5), so 7 deg left a residual at its own boundary.
@@ -215,42 +239,12 @@ Beware when reading base_link coordinates near ±90 deg: `cos(95°) ≈ 0` pins
 the computed x near the lidar's own 0.3922 offset, which looks like a flat
 vertical surface and is not one.
 
-**Next steps, in order.**
-1. Apply the reparent above (`parent: chassis_link` for both `lidar2d`
-   entries) and regenerate the robot USD.
-2. Re-run `diag_rig.py --spin-transforms` (expect `lidar-chassis` ≈ 0) and the
-   scan-rotation test (expect slope ≈ −1). Re-check TF is unchanged.
-3. Then drop `EDGE_MASK_DEG` to 0 and confirm both bands stay gone — the mask
-   costs 7.4% of each arc and should no longer be needed.
-4. Re-measure SLAM quality from scratch (`slam_quality_probe.py`). The
-   RMSE 0.23 figure predates this rig and cannot be carried forward.
-5. Re-run the full stack and confirm the robot explores; only then are the §3
-   baselines measurable.
+**Remaining work from this issue.**
+1. Re-measure SLAM quality from scratch (`slam_quality_probe.py`) — the old
+   RMSE predates the fix.
+2. The §3 baselines are now actually runnable. That is the next deliverable.
 
-```
-cmd_vel_nav       267 msgs   (controller output, healthy)
-cmd_vel_smoothed  201 msgs   (smoother output, healthy)
-cmd_vel             0 msgs   <- collision_monitor emits nothing
-```
-
-`collision_monitor` logs `Robot to approach for 1.200000 seconds away from
-collision` continuously. Its `FootprintApproach` polygon has `min_points: 6`
-and it sees **13** lidar returns inside the projected footprint.
-
-**The returns are not real.** All 13 sit at bearings **+132.00…+135.00°** —
-the last 13 bins of the 270° window and nowhere else — all at ~0.53 m, all
-mapping to `base_link` y ≈ +0.38…+0.40 (the robot's **left flank**), and the
-ground-truth map says `free` at every corresponding world position. The rear
-lidar shows zero. In `hospital` it was the rear lidar instead: whichever unit
-faces geometry.
-
-*(2026-09-11: "whichever unit faces geometry" was a red herring — it is
-whichever unit's notch edge the current rotation clips.)*
-
-**Ruled out, each by measurement (2026-09-10):**
-
-| hypothesis | test | result |
-|---|---|---|
+---|---|---|
 | lidars see the robot's own body | `empty.usda`, nothing in scene | **0/1081** both lidars, before *and* after the chassis graft |
 | grazing the side cover at 0.52 m | same | dead — this theory was wrong, see PORT_PLAN |
 | real world geometry | bare runner, `warehouse_full` | **0 returns < 0.90 m**, 556 finite front / 154 rear |
@@ -333,12 +327,13 @@ phantom returns.
 
 ## 🟠 Correctness debt
 
-### 3. No Isaac baseline has ever been rerun
+### 3. No Isaac baseline has ever been rerun — NOW UNBLOCKED (2026-09-11)
 
 The original task. Still zero numbers produced. Sensor geometry changed **four
 times** on 2026-09-10 (coplanar lidars, −11.6 cm mount, vendor chassis graft,
-camera + mast + D455), and issue 1 means exploration cannot run at all in the
-worlds that matter. Every coverage figure in `port-plan.md` predates all of it
+camera + mast + D455) and once more on 2026-09-11 (lidars reparented to
+`chassis_link`). Issue 1 is fixed, so exploration now runs — this is the next
+deliverable. Every coverage figure in `port-plan.md` predates all of it
 and should be treated as void, not as a comparison point.
 
 ### 4. Ground-truth maps need one more regeneration
@@ -379,20 +374,15 @@ Resequence only if issue 1 proves to be a 6.0.1 sensor-pipeline defect rather
 than config — check the 6.1 notes for the `laser_scan` ROI fix. See
 `port-plan.md` §P9.
 
-**2026-09-11: this clause is UNDECIDED, and was briefly recorded as "did not
-fire" on reasoning that has since been retracted.** That note argued issue 1
-was real tangency geometry a real UST-10LX shares, hence not a 6.0.1 defect.
-The tangency mechanism is retracted (§1), so the argument is void. The live
-candidates — sensor-pose vs. geometry-snapshot desync, intra-sweep pose
-handling across the 180-deg/tick drum transit, BVH precision on near-tangent
-triangles — are **all sensor-pipeline** in nature, so the clause may well
-fire. Run §1's desync test before deciding; if it confirms desync, check the
-6.1 notes for both the `laser_scan` ROI fix and any RTX sensor-pose/transform
-sync fix, because that could remove the two-prim rig *and* the edge mask.
+**2026-09-11: this clause did NOT fire — on evidence this time.** Issue 1 was
+a robot-model parenting bug (lidars on `base_link` instead of `chassis_link`),
+not a 6.0.1 sensor-pipeline defect: reparenting fixed it outright and the
+symptom mask was removed. An earlier note here claimed the same conclusion
+from the since-retracted tangency argument, and a later one downgraded it to
+UNDECIDED; the reparent settles it.
 
-Until then keep the order: settle issue 1's mechanism → seat the robot → one
-clean 6.0.1 baseline → migrate. Do not migrate on the strength of a
-hypothesis.
+Keep the order: one clean 6.0.1 baseline (now unblocked) → migrate → rerun the
+identical benchmark.
 
 ---
 
@@ -446,7 +436,16 @@ hypothesis.
 
 ---
 
-## Recently closed (2026-09-10)
+## Recently closed
+
+**2026-09-11**
+
+| issue | commit |
+|---|---|
+| Lidars were orphan rigid bodies under `base_link` — sensor never rotated with the chassis, phantom returns pinned `cmd_vel` at zero | this session |
+| Phantom-band edge mask (mitigation) added, then removed once the root cause landed | this session |
+
+**2026-09-10**
 
 | issue | commit |
 |---|---|
