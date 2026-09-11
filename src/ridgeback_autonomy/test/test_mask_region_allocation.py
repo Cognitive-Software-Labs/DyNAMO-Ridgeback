@@ -205,6 +205,10 @@ def test_debug_union_allocates_one_output_not_one_mask_per_detection() -> None:
     masks = [region_from_bbox(BOX, HEIGHT, WIDTH) for _ in range(8)]
     union_bytes = HEIGHT * WIDTH
 
+    # Layered replay keeps ROS message imports lazy so offline workers remain
+    # ROS-free. Warm the first message construction before tracing: this test
+    # measures per-frame mask buffers, not one-time rosidl type initialization.
+    encode_mask_debug_image(masks, HEIGHT, WIDTH, Header())
     peak = peak_bytes(
         lambda: encode_mask_debug_image(masks, HEIGHT, WIDTH, Header()))
 

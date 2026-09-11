@@ -12482,7 +12482,7 @@
       "source_location": "L183",
       "_origin": "ast",
       "id": "target_localization_launch_mask_measurement_node",
-      "community": 60,
+      "community": 92,
       "norm_label": "mask_measurement_node()"
     },
     {
@@ -12522,7 +12522,7 @@
       "source_location": "L364",
       "_origin": "ast",
       "id": "target_localization_launch_distance_hud_node",
-      "community": 92,
+      "community": 60,
       "norm_label": "distance_hud_node()"
     },
     {
@@ -12582,7 +12582,7 @@
       "source_location": "L210",
       "_origin": "ast",
       "id": "target_localization_launch_rationale_210",
-      "community": 60,
+      "community": 92,
       "norm_label": "the three mask rows' producer, wired to the shared measurement topic.      ``bas"
     },
     {
@@ -12622,7 +12622,7 @@
       "source_location": "L373",
       "_origin": "ast",
       "id": "target_localization_launch_rationale_373",
-      "community": 92,
+      "community": 60,
       "norm_label": "a hud_node aggregator dedicated to the distance panel.      dedicated because ``"
     },
     {
@@ -70498,7 +70498,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.8,
       "source_file": "src/ridgeback_autonomy/test/test_mask_region_allocation.py",
-      "source_location": "L209",
+      "source_location": "L211",
       "weight": 1.0,
       "source": "test_test_mask_region_allocation_test_debug_union_allocates_one_output_not_one_mask_per_detection",
       "target": "target_localization_measurement_pipeline_encode_mask_debug_image"
@@ -85231,7 +85231,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "src/ridgeback_autonomy/test/test_mask_region_allocation.py",
-      "source_location": "L208",
+      "source_location": "L212",
       "weight": 1.0,
       "source": "test_test_mask_region_allocation_test_debug_union_allocates_one_output_not_one_mask_per_detection",
       "target": "test_test_mask_region_allocation_peak_bytes",
@@ -97714,5 +97714,5 @@
     }
   ],
   "hyperedges": [],
-  "built_at_commit": "7fffe2d4e8c69dbd5087a68e5213561cf54afe3d"
+  "built_at_commit": "7ec4ae4fcc21993c4e0e3ef36dcf7c452cfe7975"
 }

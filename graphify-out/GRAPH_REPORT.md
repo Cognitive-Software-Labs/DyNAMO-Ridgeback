@@ -1,7 +1,7 @@
-# Graph Report - /home/deivid/dev/DyNAMO-Ridgeback  (2026-09-10)
+# Graph Report - /home/deivid/dev/DyNAMO-Ridgeback  (2026-09-11)
 
 ## Corpus Check
-- 247 files · ~235,559 words
+- 247 files · ~235,596 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
@@ -558,7 +558,7 @@ Nodes (10): display_distance(), nearest_instance_index(), Index of the closest d
 
 ### Community 92 - "Community 92"
 Cohesion: 0.20
-Nodes (10): distance_hud_node(), estimate_viz_node(), _measurement_parameters(), overlay_node(), pointcloud_measurement_node(), Fixed topic wiring plus whichever tuning values the caller supplied.      ``None, The ``pointcloud`` row's producer, wired to the shared measurement topic.      S, The estimator rings and the distance panel that names them.      ``estimators`` (+2 more)
+Nodes (10): estimate_viz_node(), mask_measurement_node(), _measurement_parameters(), overlay_node(), pointcloud_measurement_node(), Fixed topic wiring plus whichever tuning values the caller supplied.      ``None, The ``pointcloud`` row's producer, wired to the shared measurement topic.      S, The three mask rows' producer, wired to the shared measurement topic.      ``bas (+2 more)
 
 ### Community 93 - "Community 93"
 Cohesion: 0.31
