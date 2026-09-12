@@ -151,16 +151,19 @@ OMNI_KIT_ACCEPT_EULA=YES isaac_venv/bin/python3 tools/isaac/smoke_test.py
 The first install is roughly 30–50 GB. Stock Isaac worlds also need access to
 NVIDIA's asset root; the repo-local `mock_hospital` world does not.
 
-### 5. (Optional) Install graphify post-commit hook
+### 5. (Optional) Install graphify pre-commit hook
 
-If you use the graphify knowledge graph, install the post-commit hook to auto-rebuild it after each commit:
+If you use the graphify knowledge graph, install the pre-commit hook to rebuild
+and stage it whenever staged code changes are committed:
 
 ```bash
 perception_venv/bin/python3 -m pip install graphifyy==0.8.35
 bash tools/install_hooks
 ```
 
-The hook only triggers on code-file changes and calls `tools/rebuild_graphify`. The hook source lives in `tools/hooks/post-commit`.
+The hook only triggers on staged code-file changes, calls
+`tools/rebuild_graphify`, and stages the generated graph in the same commit.
+The hook source lives in `tools/hooks/pre-commit`.
 
 ### 6. Set up robot config
 

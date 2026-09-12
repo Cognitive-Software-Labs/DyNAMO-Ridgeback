@@ -6,6 +6,20 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 HOOKS_SRC="$REPO_ROOT/tools/hooks"
 HOOKS_DST="$REPO_ROOT/.git/hooks"
 
+LEGACY_POST_COMMIT="$HOOKS_DST/post-commit"
+if [ -f "$LEGACY_POST_COMMIT" ] && \
+        grep -q '^# graphify-hook-start$' "$LEGACY_POST_COMMIT" && \
+        grep -q '^# graphify-hook-end$' "$LEGACY_POST_COMMIT"; then
+    OUTSIDE_GRAPHIFY=$(sed '/^# graphify-hook-start$/,/^# graphify-hook-end$/d' \
+        "$LEGACY_POST_COMMIT" | sed '/^[[:space:]]*$/d')
+    if [ "$OUTSIDE_GRAPHIFY" = '#!/bin/bash' ]; then
+        rm "$LEGACY_POST_COMMIT"
+        echo "Removed obsolete graphify post-commit hook"
+    else
+        echo "Preserved custom post-commit hook; remove its graphify block manually" >&2
+    fi
+fi
+
 for hook in "$HOOKS_SRC"/*; do
     name="$(basename "$hook")"
     cp "$hook" "$HOOKS_DST/$name"
