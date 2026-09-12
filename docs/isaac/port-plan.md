@@ -1,8 +1,11 @@
-# Port plan: Gazebo Harmonic → NVIDIA Isaac Sim 6.0
+# Port plan: NVIDIA Isaac Sim 6.0 backend
 
-Status: **in progress — P0–P4 + P7 done; P5 plumbing done, A/B sign-off pending a first baseline; P6 (G1 benchmark) deferred; P8 (gz removal) and P9 (Isaac 6.1) not started.**
+Status: **in progress — P0–P4, P7, and P8 done; P5 plumbing done,
+A/B sign-off pending a first baseline; P6 (G1 benchmark) deferred; P9 (Isaac
+6.1) not started. The earlier plan to delete Gazebo was superseded: Gazebo,
+Isaac, and hardware are now separate adapters around one autonomy package.**
 
-> ⚠️ **P8 is not the next task.** The first Isaac baseline is — none has ever
+> The first Isaac baseline is the next Isaac-specific task — none has ever
 > been rerun. Navigation itself was fixed on 2026-09-11 (the lidars were
 > parented to `base_link` and so never rotated with the robot;
 > `open-issues.md` §1). Every coverage number below is void: the 2026-09-10
@@ -18,10 +21,16 @@ Branch: `feat/isaac-sim-6-port` (cut from `dev`), pushed at `53a924a6`. Base inc
 
 ## Context
 
-The simulation layer runs on Gazebo Harmonic via the Clearpath stack (`clearpath_simulator` in `.repos` + `patches/clearpath_gz_customizations.patch`). This port moves it to **Isaac Sim 6.0 (GA)**, **fully replacing Gazebo** — both public entrypoints (`ridgeback_exploration.launch.py`, `target_distance_benchmark.launch.py`) end up on Isaac. **Not a bug-for-bug copy**: where Isaac-native approaches beat the gz-era design, we adopt them (approved list below).
+The original simulation layer ran on Gazebo Harmonic via the Clearpath stack.
+This port adds **Isaac Sim 6.0 (GA)** as a first-class backend while retaining
+Gazebo and adding a hardware adapter. `ridgeback_exploration.launch.py` selects
+the provider with `backend:=gz|isaac|hardware`; the target-distance benchmark
+remains Gazebo-specific until P6. **Not a bug-for-bug copy**: where
+Isaac-native approaches beat the gz-era design, we adopt them.
 
 Decisions:
-- Replace Gazebo outright; gz stays runnable only during the port for sign-off, removed in the final phase.
+- Keep Gazebo and Isaac as optional adapter packages with no simulator
+  dependency in the common `ridgeback_autonomy` package.
 - Full scope: exploration + G1 distance benchmark.
 - Kinematic holonomic drive (planar virtual joints); true mecanum = documented upgrade path.
 - G1 model from `unitree_sim_isaaclab` (Unitree official USD); STL→USD converter fallback.
@@ -50,14 +59,16 @@ Decisions:
 - Bringup event-driven (`launch_wait` gates scan+odom → map → costmap → explorer; no timers). **Single explorer**: in-repo `frontier_explorer_node` (`explore_lite` removed in `4f8b72d8`; no `explorer` launch arg; `start_exploration.sh` takes only `world` positionally; `explore/status` is `std_msgs/String` with `exploration_started`/`exploration_complete`).
 - `mock_hospital.sdf` = 98 boxes + 2 spheres + 1 include. GT maps exist for mock_hospital/office/warehouse (gz-captured). `tools/benchmark/explore_probe.py` is pure ROS, reused unchanged.
 - Perception `base_frame` default `r100_0001/robot/base_link` (identity shim needed).
-- `.repos` after port: **remove** `clearpath_simulator`; **stay**: `clearpath_common` (description xacros + `generate_description`; `clearpath_control` EKF configs reused), `clearpath_config`, `clearpath_msgs` (build dep), `slam_toolbox`. (`m-explore-ros2` already removed on dev.)
+- Dependency manifests are split: `dependencies/core.repos` carries
+  `clearpath_common`, `clearpath_config`, `clearpath_msgs`, and `slam_toolbox`;
+  `dependencies/gz.repos` carries optional `clearpath_simulator`.
 - Remaining patches: `clearpath_gz_customizations.patch` (dies in P8), `slam_toolbox_tf_namespace.patch` (stays).
 
 ## Deliberate improvements over the gz version (approved)
 
 1. **D455-native camera**: generate a self-contained USD camera at the D455
    colour-frame origin, publishing 1280×720@30 with 631 px focal lengths from
-   `sim/isaac/d455_camera.json`. Perception consumes the backend's live
+   `src/ridgeback_autonomy_isaac/sim/isaac/d455_camera.json`. Perception consumes the backend's live
    `CameraInfo`, so Gazebo's deliberate 640×480 optics remain valid too.
 2. **Real UST-10LX lidars**: 270° FOV, 0.05–10 m, realistic range noise, 40 Hz, custom RTX profile JSON. Front+rear pair covers 360° combined, coplanar, recessed in the body notch. **Both sensor mounts were corrected on 2026-09-10** — the lidars were 11.6 cm too high, the camera 12.5 cm — and the chassis was replaced with Clearpath's authored asset. Full geometry, derivation and the measurement lessons: [`robot-model.md`](robot-model.md). ⚠️ Marks every sensor-geometry baseline for rerun.
 
@@ -65,14 +76,17 @@ Decisions:
 4. **USD-derived GT maps**: analytic occupancy grids from the stage (occupancy-map generator) → `sim/ground_truth_maps/` for every Isaac world. Replaces manual capture drives; `capture_ground_truth.sh` retired to historical.
 5. **GT pose + localization-error metric**: runner publishes `ground_truth/pose`; probe + HUD gain live SLAM drift (map→odom error). New HUD panel via the existing aggregator pattern.
 6. **In-session reset**: `simulation_interfaces` reset/entity services → `--repeat N` exploration runs without sim relaunch.
-7. **Headless + WebRTC livestream** as the only GUI story; `gz_gui` concept dies; seat-ACL pain class gone.
+7. **Headless + WebRTC livestream** for the Isaac adapter; Gazebo retains its
+   own GUI/headless-rendering controls.
 8. **Unthrottled mode** `--rtf 0` for benchmarks (all-sim-time stack), RTF 1.0 default interactive.
-9. **Repo-local setup_path default**: use in-repo `clearpath/` directly; `~/clearpath/` mirror requirement dropped.
+9. **Backend-owned setup-path semantics**: simulation defaults to
+   `~/clearpath/`; hardware defaults to `/etc/clearpath/` and attaches to
+   existing services.
 10. **Isaac stock environments** (Warehouse/Hospital/Office USD) as NEW worlds with USD-derived GT maps — replaces the dying gz office/warehouse; old GT maps marked historical.
 
 ## Architecture
 
-**Runner**: standalone `SimulationApp` process under `src/ridgeback_autonomy/sim/isaac/`, launched via `ExecuteProcess` with `<workspace>/isaac_venv/bin/python3` (perception_venv precedent), ROS Jazzy + CycloneDDS env inherited.
+**Runner**: standalone `SimulationApp` process under `src/ridgeback_autonomy_isaac/sim/isaac/`, launched via `ExecuteProcess` with `<workspace>/isaac_venv/bin/python3` (perception_venv precedent), ROS Jazzy + CycloneDDS env inherited.
 
 - `isaac_runner.py` — CLI: `--world <name|path.usd> --namespace r100_0001 --headless --livestream --physics-hz 120 --rtf {1.0,0} --odom-noise <profile|0> --robot-usd <override>`. Lifecycle, main loop, clean SIGINT.
 - `worlds.py` — name → `share/.../sim/isaac/usd/worlds/{name}.usda` resolver + registry for stock-env worlds. `start_exploration.sh mock_hospital` works verbatim.
@@ -101,13 +115,13 @@ Bootstrap: cut `feat/isaac-sim-6-port` from `dev`; workspace already built in th
 
 ### P2 — Assets: worlds + G1 [L] ✅
 - `tools/isaac/sdf2usd.py`: xml parse layer (unit-testable, no pxr) + pxr emit layer (Cube/Sphere, colliders exactly where SDF `<collision>`, UsdPreviewSurface, lights, PhysicsScene, `model://g1` → USD reference). `.usda` text output. `--check` re-opens USD, asserts per-model AABB/pose vs SDF.
-- Convert `mock_hospital`, `target_distance_calibration` → `src/ridgeback_autonomy/sim/isaac/usd/worlds/`.
-- G1: vendor USD from `unitree_sim_isaaclab` (git-lfs; license check + attribution) → `sim/isaac/usd/models/g1/`; fallback `tools/isaac/convert_g1_model.py` (STL→USD).
+- Convert `mock_hospital`, `target_distance_calibration` → `src/ridgeback_autonomy_isaac/sim/isaac/usd/worlds/`.
+- G1: vendor USD from `unitree_sim_isaaclab` (git-lfs; license check + attribution) → `src/ridgeback_autonomy_isaac/sim/isaac/usd/models/g1/`; fallback `tools/isaac/convert_g1_model.py` (STL→USD).
 - Pytest `test_sdf2usd_parse.py` (98 boxes/2 spheres/1 include, exact named-wall poses) in CMake BUILD_TESTING.
 - ✓ `--check` passes both worlds; `colcon test` green; headless screenshot eyeball.
 
 ### P3 — Robot: URDF import + rig + raw odom/IMU/TF/clock [L] ✅
-- `tools/isaac/import_ridgeback_urdf.py`: `clearpath_generator_common generate_description` (repo-local setup_path) → xacro → URDF → URDF importer (`merge_fixed_joints=False`, no drives) → append planar rig → committed `sim/isaac/usd/robots/ridgeback_r100.usda`. Regen only when robot.yaml changes.
+- `tools/isaac/import_ridgeback_urdf.py`: `clearpath_generator_common generate_description` (repo-local setup_path) → xacro → URDF → URDF importer (`merge_fixed_joints=False`, no drives) → append planar rig → committed `src/ridgeback_autonomy_isaac/sim/isaac/usd/robots/ridgeback_r100.usda`. Regen only when robot.yaml changes.
 - `isaac_runner.py`, `worlds.py`, `robot_rig.py` (+ odom noise model), `ros_io.py`.
 - ✓ Manual: runner headless in mock_hospital; TwistStamped teleop → raw odom ≈50 Hz arcs, /clock ticks, stop ≤0.5 s, strafe proves holonomic; `--odom-noise 0` vs default shows drift in odom while `ground_truth/pose` stays exact.
 - **DONE** — motion verified two ways: `tools/isaac/diag_rig.py --battery` 10/10 (stillness at spawn, zero wheel contacts, sim-time advance, set_planar_pose teleport, fwd/strafe/spin/combined tracking exact, stop drift 0.00 cm, cmd-timeout stop) + live-runner ROS checks (/clock advances at RTF≈1, odom arcs under teleop, strafe-at-yaw holonomic, stop twist ~0, noisy odom vs exact GT split). Deviation: raw odom publishes at the render rate (~35 Hz under co-tenant load), not 50 Hz — publish-per-physics-step decoupling is a P4 option if the EKF wants it.
@@ -115,8 +129,13 @@ Bootstrap: cut `feat/isaac-sim-6-port` from `dev`; workspace already built in th
 ### P4 — Sensors + EKF + launch include: full contract [L] ✅
 - `sensors.py`, `ust10lx_2d.json`, generated D455 camera from
   `d455_camera.json`, and the IMU publisher.
-- `launch/includes/simulation_isaac.launch.py`: event chain generate_description → OnProcessExit → robot_state_publisher + `robot_localization` ekf_node (→ `platform/odom/filtered` + TF) + runner ExecuteProcess. Same arg surface as the gz include.
-- `includes/simulation.launch.py`: transient `sim:=gz|isaac` dispatch (default gz until P8).
+- `ridgeback_autonomy_isaac/launch/backend.launch.py`: event chain
+  generate_description → OnProcessExit → robot_state_publisher +
+  `robot_localization` ekf_node (→ `platform/odom/filtered` + TF) + runner
+  ExecuteProcess. It implements the normalized backend adapter surface.
+- `ridgeback_autonomy/launch/includes/simulation.launch.py`: lazy
+  `backend:=gz|isaac|hardware` dispatch, retaining `sim` as a compatibility
+  alias.
 - `cleanup.sh` += isaac kill patterns (user-scoped `isaac_runner.py`, `omni.kit`); extend `test_launch_layout.py`.
 - Config deltas land here: slam `max_laser_range` 10, costmap range review (documented in commit).
 - ✓ Isaac include alone: all contract topics live, types/QoS match baseline,
@@ -159,14 +178,26 @@ Commits `eaea0674` `70a5faa6` `e993ee29` `d26edef5` `0a81fbf6` `53a924a6`. Geome
 
 ⚠️ Four geometry changes in one day — **every coverage number in this file predates all of them.**
 
-### P8 — Gazebo removal + docs + graphify [M]
-- `.repos`: remove `clearpath_simulator` (stay-list above). Delete `patches/clearpath_gz_customizations.patch`, `sim/gz_plugins/` (SpawnG1.*). CMakeLists drops gz/Qt5 + SpawnG1; package.xml drops `clearpath_gz`/gz vendors/Qt5, adds `robot_localization`.
-- `simulation.launch.py` becomes the Isaac include (dispatch/`sim`/`gz_gui` die; `headless_rendering` semantics = Isaac headless + `livestream` arg; `sim_ready_timeout` settles 300).
-- Keep `sim/worlds/*.sdf` as converter source-of-truth (documented). Retire `capture_ground_truth.sh` to historical.
-- Update `tools/diag.sh`, `cleanup.sh`, the root README, topic references,
-  `docs/troubleshooting.md`, `docs/history/`, the agent helpers, and
-  `start_exploration.sh`. Mark this file completed and rebuild graphify.
-- ✓ Fresh-clone drill: `vcs import` → `colcon build` → `install_isaac_venv.sh` → `bash start_exploration.sh` completes Isaac mock_hospital exploration. `grep -ri "clearpath_gz\|ros_gz\|gz sim"` → only intentional historical mentions. `colcon test` green.
+### P8 — Backend package/dependency split + hardware-safe adapter [M] ✅
+
+- `ridgeback_autonomy` is backend-neutral; Gazebo/Qt build dependencies and
+  `SpawnG1` moved to `ridgeback_autonomy_gz`, while the Isaac runner/assets and
+  launch moved to `ridgeback_autonomy_isaac`.
+- `ridgeback_autonomy_hardware` attaches to existing Clearpath services by
+  default. Platform bringup and frontier goals are separate explicit opt-ins;
+  the wrapper avoids simulator cleanup and a fabricated hardware ROS domain.
+- `dependencies/core.repos` and `dependencies/gz.repos` make the optional
+  simulator source closure explicit. `tools/check_dependencies --profile ...`
+  verifies the selected closure.
+- The common camera contract chooses simulation or RealSense topic profiles at
+  launch time. Hardware excludes the unvalidated organized pointcloud path and
+  truth-map overlays by default.
+- Gazebo removal was cancelled. Gazebo SDF worlds/models and its plugin are
+  owned by the Gazebo adapter; Isaac converter tooling reads those assets only
+  when conversion is requested.
+- Acceptance: all four packages build, common/static contracts pass, each
+  backend launch loads, dependency profiles verify, docs and Graphify are
+  current. Physical command-chain and D455 validation remain deployment gates.
 
 ### P9 — Isaac Sim 6.1 migration [M] — planned, sequenced last on purpose
 

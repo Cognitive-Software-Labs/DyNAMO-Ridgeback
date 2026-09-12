@@ -1,6 +1,6 @@
 <svg viewBox="0 0 880 940" xmlns="http://www.w3.org/2000/svg" width="880" height="940" role="img">
 <title>Ridgeback R100 sensor geometry, as built in the Isaac robot USD</title>
-<desc>Side elevation and plan view with every measured sensor position relative to base_link. Generated to match src/ridgeback_autonomy/sim/isaac/usd/robots/ridgeback_r100.</desc>
+<desc>Side elevation and plan view with every measured sensor position relative to base_link. Generated to match src/ridgeback_autonomy_isaac/sim/isaac/usd/robots/ridgeback_r100.</desc>
 <style>
   .bg{fill:#ffffff}
   .ttl{font:600 15px system-ui,sans-serif;fill:#16181d}

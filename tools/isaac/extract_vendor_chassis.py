@@ -53,7 +53,7 @@ DROP_ROOT_CHILDREN = {"world", "dummy_base_x", "dummy_base_y"}
 def parse_args():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--out", type=Path,
-                    default=Path("src/ridgeback_autonomy/sim/isaac/usd/robots/"
+                    default=Path("src/ridgeback_autonomy_isaac/sim/isaac/usd/robots/"
                                  "ridgeback_r100/payloads/meshes"),
                     help="directory to write ridgeback_chassis_clearpath.usd into")
     ap.add_argument("--name", default="ridgeback_chassis_clearpath")

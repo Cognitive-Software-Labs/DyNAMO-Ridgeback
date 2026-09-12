@@ -1,4 +1,4 @@
-"""Isaac Sim 6.0 simulation include (P4) — replaces the clearpath_gz chain.
+"""Isaac Sim 6.0 provider for the backend-neutral autonomy stack.
 
 Event chain (all publisher-gated downstream, no timers):
   generate_description (robot.yaml -> robot.urdf.xacro)
@@ -27,8 +27,9 @@ from launch_ros.parameter_descriptions import ParameterValue
 
 
 def generate_launch_description():
-    pkg_this = get_package_share_directory('ridgeback_autonomy')
-    namespace = 'r100_0001'   # frozen contract namespace (matches robot.yaml)
+    pkg_adapter = get_package_share_directory('ridgeback_autonomy_isaac')
+    pkg_core = get_package_share_directory('ridgeback_autonomy')
+    namespace = LaunchConfiguration('namespace')
 
     setup_path = LaunchConfiguration('setup_path')
     world = LaunchConfiguration('world')
@@ -42,7 +43,7 @@ def generate_launch_description():
 
     isaac_python = os.environ.get(
         'ISAAC_PYTHON', os.path.join(os.getcwd(), 'isaac_venv/bin/python3'))
-    runner = os.path.join(pkg_this, 'sim', 'isaac', 'isaac_runner.py')
+    runner = os.path.join(pkg_adapter, 'sim', 'isaac', 'isaac_runner.py')
 
     generate_description = ExecuteProcess(
         cmd=['ros2', 'run', 'clearpath_generator_common',
@@ -90,7 +91,7 @@ def generate_launch_description():
         name='ekf_node',
         namespace=namespace,
         output='screen',
-        parameters=[os.path.join(pkg_this, 'config', 'ekf_isaac.yaml'),
+        parameters=[os.path.join(pkg_core, 'config', 'ekf_isaac.yaml'),
                     {'use_sim_time': True}],
         remappings=[
             ('odometry/filtered', 'platform/odom/filtered'),
@@ -124,6 +125,7 @@ def generate_launch_description():
             default_value=os.path.join(os.getcwd(), 'clearpath/'),
             description='Path to clearpath config directory (robot.yaml)',
         ),
+        DeclareLaunchArgument('namespace', default_value='r100_0001'),
         DeclareLaunchArgument('world', default_value='mock_hospital',
                               description='Isaac world name or USD path'),
         DeclareLaunchArgument('headless', default_value='true'),

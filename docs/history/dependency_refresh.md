@@ -51,7 +51,9 @@ carried forward:
 
 ## Reproducibility gate
 
-`tools/check_dependencies` now verifies every checkout against `.repos`. It
+At the time of this refresh, `tools/check_dependencies` verified every checkout
+against the then-single `.repos` manifest. The current repository splits those
+pins between `dependencies/core.repos` and `dependencies/gz.repos`. The checker
 accepts either a clean dependency or the exact maintained patch for that
 dependency, rejects revision drift, untracked files, and additional tracked
 changes, and can idempotently apply missing patches with `--apply`.

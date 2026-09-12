@@ -13,7 +13,7 @@ the drive, 14/14 contract topics live from the Isaac include alone,
 
 ```bash
 # terminal 1 — sim (add headless:=false for the Isaac GUI window)
-ros2 launch install/ridgeback_autonomy/share/ridgeback_autonomy/launch/includes/simulation_isaac.launch.py world:=mock_hospital
+ros2 launch ridgeback_autonomy_isaac backend.launch.py world:=mock_hospital
 
 # terminal 2 — slam
 ros2 launch install/ridgeback_autonomy/share/ridgeback_autonomy/launch/includes/slam.launch.py use_sim_time:=true setup_path:=$PWD/clearpath/

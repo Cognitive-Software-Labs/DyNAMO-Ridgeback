@@ -2,9 +2,11 @@
 
 Autonomous exploration, reusable target localization, and distance benchmarking
 for a [Clearpath Ridgeback](https://clearpathrobotics.com/ridgeback-indoor-robot-platform/)
-robot in Gazebo Harmonic or NVIDIA Isaac Sim 6.0 with ROS 2 Jazzy. The shipped
-simulation benchmark currently uses a Unitree G1 as its target model; the ROS
-interfaces and localization package are target-generic.
+robot on physical hardware, in Gazebo Harmonic, or in NVIDIA Isaac Sim 6.0 with
+ROS 2 Jazzy. The same `ridgeback_autonomy` application package runs in all three
+environments; thin backend packages own simulator- or hardware-specific
+bringup. The shipped simulation benchmark currently uses a Unitree G1 as its
+target model; the ROS interfaces and localization package are target-generic.
 
 This workspace supports 3 main human workflows:
 - full autonomous exploration with target localization (any world)
@@ -32,7 +34,8 @@ Isaac Sim port (in progress, `feat/isaac-sim-6-port`):
 
 | Layer | Package | Purpose |
 |-------|---------|---------|
-| Simulation | Gazebo Harmonic + clearpath_simulator, or Isaac Sim 6.0 | Physics, sensors, world |
+| Backend adapter | `ridgeback_autonomy_gz`, `_isaac`, or `_hardware` | Supplies the common ROS sensor, odometry, TF, and clock contract |
+| Simulation | Gazebo Harmonic + clearpath_simulator, or Isaac Sim 6.0 | Optional physics, sensors, and world providers |
 | Perception | Hokuyo UST-10LX 2D lidar | Obstacle detection + SLAM input |
 | Perception | Intel RealSense D455 (~1m height) | Depth/RGB for overlay and distance estimation |
 | SLAM | slam_toolbox (online async, from source) | Map building + localization |
@@ -67,8 +70,14 @@ sudo apt install -y \
   python3-rosdep \
   python3-vcstool \
   ros-jazzy-navigation2 \
-  ros-jazzy-nav2-bringup \
-  ros-jazzy-ros-gz
+  ros-jazzy-nav2-bringup
+```
+
+Gazebo hosts additionally need the ROS/Gazebo bridge and the Qt/Gazebo
+development packages resolved by `rosdep` after importing the Gazebo profile:
+
+```bash
+sudo apt install -y ros-jazzy-ros-gz
 ```
 
 ```bash
@@ -83,11 +92,14 @@ source /opt/ros/jazzy/setup.bash
 ```bash
 cd /path/to/DyNAMO-Ridgeback
 
-# Clone external dependencies
-vcs import < .repos
+# Clone the common source dependencies (all deployments)
+vcs import < dependencies/core.repos
+
+# Gazebo hosts only: add the simulator source dependency
+vcs import < dependencies/gz.repos
 
 # Verify every checkout is pinned and apply the recorded patches idempotently
-tools/check_dependencies --apply
+tools/check_dependencies --apply --profile all
 
 # Install any remaining deps
 rosdep install --from-paths src --ignore-src -r -y
@@ -97,7 +109,12 @@ colcon build --symlink-install --base-paths src
 source install/setup.bash
 ```
 
-If you rename or move the workspace directory later, regenerate `build/` and `install/` before rebuilding so the generated setup files do not keep stale absolute paths. Preserve `artifacts/`: its logs and benchmark results are independent evidence, not build products.
+For Isaac-only or hardware hosts, omit `dependencies/gz.repos` and use
+`tools/check_dependencies --apply --profile core`. The core dependency closure
+does not import or build Gazebo. If you rename or move the workspace directory
+later, regenerate `build/` and `install/` before rebuilding so the generated
+setup files do not keep stale absolute paths. Preserve `artifacts/`: its logs
+and benchmark results are independent evidence, not build products.
 
 ### 3. (Optional) Set up target localization venv
 
@@ -157,7 +174,7 @@ If you use the graphify knowledge graph, install the pre-commit hook to rebuild
 and stage it whenever staged code changes are committed:
 
 ```bash
-perception_venv/bin/python3 -m pip install graphifyy==0.8.35
+perception_venv/bin/python3 -m pip install -r requirements-dev.txt
 bash tools/install_hooks
 ```
 
@@ -167,7 +184,7 @@ The hook source lives in `tools/hooks/pre-commit`.
 
 ### 6. Set up robot config
 
-The Clearpath simulator expects the robot config at `~/clearpath/`:
+The simulator adapters expect the development robot config at `~/clearpath/`:
 
 ```bash
 mkdir -p ~/clearpath
@@ -210,18 +227,21 @@ sweep supervisor invokes them as separate processes:
 - `target_benchmark_config.launch.py`
 - `manual_mapping.launch.py`
 
-The lower-level simulation, SLAM, Nav2, and frontier-exploration launches live under `launch/includes/` and are treated as internal launch building blocks rather than public entrypoints.
+The lower-level dispatcher, SLAM, Nav2, and frontier-exploration launches live
+under `ridgeback_autonomy/launch/includes/`. Each backend package exposes an
+internal `launch/backend.launch.py` adapter with the same normalized contract.
 
 ### `ridgeback_exploration.launch.py`
 
-Launches the selected simulator, SLAM, Nav2, frontier exploration, and the
-target-localization stack in sequence:
+Launches the selected backend, SLAM, Nav2, optional frontier exploration, and
+the target-localization stack in sequence:
 
-1. Gazebo or Isaac + Ridgeback spawn
+1. Gazebo or Isaac + Ridgeback spawn, or attach to physical hardware
 2. Exploration RViz config
 3. `slam_toolbox` (once the scan and filtered-odometry topics publish)
 4. Nav2 (once `/map` publishes)
-5. The in-repo `frontier_explorer_node` (once the global costmap publishes)
+5. The in-repo `frontier_explorer_node` (once the global costmap publishes and
+   autonomous motion is enabled)
 6. Target-localization nodes: `target_detector_node`, the measurement nodes for the selected `estimators` (`target_pointcloud_measurement_node` and/or `target_mask_measurement_node`), `target_visualization_node`, `target_overlay_node`, and a second `hud_node` for the distance panel
 
 All four distance estimator rows run by default, the same set the benchmark compares — one RViz ring per row, each with its own bearing, plus a wide distance HUD top-right (`hud_target_overlay`) listing the four side by side with the age of each reading. There is no ground truth in exploration, so that panel carries no truth line and no error column. Per-row visibility is an RViz Displays checkbox under `Target Estimates`, one per estimator.
@@ -234,7 +254,7 @@ Available worlds:
 
 | World | Source | Notes |
 |-------|--------|-------|
-| `mock_hospital` | Custom (`sim/worlds/`) | Default; detailed multi-room clinical layout |
+| `mock_hospital` | Custom (`src/ridgeback_autonomy_gz/sim/worlds/`) | Default; detailed multi-room clinical layout |
 | `warehouse` | Clearpath | Large open floor plan |
 | `office` | Clearpath | Smaller rooms and corridors |
 | `construction` | Clearpath | Outdoor construction site |
@@ -247,60 +267,82 @@ Arguments:
 | Argument | Default | Meaning |
 |----------|---------|---------|
 | `world` | `mock_hospital` | World to load (see table above) |
-| `sim` | `gz` | Simulation backend: `gz` or `isaac` |
+| `backend` | value of `sim` (`gz`) | I/O provider: `gz`, `isaac`, or `hardware` |
+| `sim` | `gz` | Deprecated compatibility alias for `backend`; accepts `gz` or `isaac` |
 | `namespace` | `r100_0001` | ROS namespace for all nodes |
-| `use_sim_time` | `true` | Use Gazebo `/clock` |
-| `setup_path` | `~/clearpath/` | Directory containing `robot.yaml` and generated Clearpath files |
-| `color_topic` | `sensors/camera_0/color/image` | Compatibility override for the shared camera contract's color image |
+| `use_sim_time` | backend-derived | `true` in simulation; `false` on hardware |
+| `setup_path` | backend-derived | `~/clearpath/` in simulation; `/etc/clearpath/` on hardware |
+| `color_topic` | backend-derived | Simulation image or RealSense `color/image_raw` |
 | `camera_info_topic` | `sensors/camera_0/color/camera_info` | Compatibility override for color-grid camera intrinsics |
-| `depth_topic` | `sensors/camera_0/depth/image` | Compatibility override for aligned depth; a RealSense launch must set its driver-aligned topic |
-| `pointcloud_topic` | `sensors/camera_0/points` | Compatibility override for organized points; pass an empty value only when no pointcloud estimator is selected |
+| `depth_topic` | backend-derived | Simulation depth or RealSense `aligned_depth_to_color/image_raw` |
+| `pointcloud_topic` | backend-derived | Simulation organized points; empty on hardware until its layout is validated |
 | `exploration_rviz` | `true` | Launch the custom exploration RViz config |
 | `target_localization_enabled` | `true` | Launch the target-localization stack |
-| `estimators` | `all` | Distance estimator rows to run — `all`, or a comma-separated subset of `pointcloud`, `projective_ranging`, `euclidean_reconstruction`, `polar_profiling`. Selects the measurement nodes, the rings and the HUD columns from one list |
+| `estimators` | backend-derived | `all` in simulation; aligned-depth-only `projective_ranging,euclidean_reconstruction` on hardware |
 | `estimate_viz` | `true` | Publish the estimator rings and the wide distance HUD |
 | `detector_fps` | `10.0` | Upper bound on detection step starts; every selected measurement row inherits this cadence |
 | `detector_debug` | `false` | Log detector cadence, superseded frames, and bounded stage timings |
 | `depth_source` | `stereoscopic` | Aligned depth source for the mask rows — `stereoscopic` or `monocular` (Depth-Anything V2; downloads a checkpoint on first use) |
 | `mask_gate` | `box` | Mask front-end — `box` (no segmentation model) or `silhouette` (SlimSAM) |
 | `mppi_visualize` | `false` | Publish MPPI trajectory visualization topics (RViz already has `MPPI Optimal` and `MPPI Samples` displays subscribed to `/r100_0001/optimal_trajectory` and `/r100_0001/trajectories`) |
-| `coverage_overlay_enabled` | `true` | Publish the live exploration-coverage HUD panel |
+| `coverage_overlay_enabled` | backend-derived | `true` in simulation; `false` on hardware, which has no packaged truth map |
+| `autonomous_motion_enabled` | backend-derived | `true` in simulation; `false` on hardware until the operator explicitly enables frontier goals |
+| `start_hardware_platform` | `false` | Hardware only: attach to existing Clearpath services by default; `true` explicitly includes platform bringup |
 | `headless_rendering` | `false` | Optional server-only EGL sensor rendering for SSH/non-seat sessions; the existing `tools/gpu-run` NVIDIA GLX workflow remains the default GUI-capable path (see [troubleshooting](docs/troubleshooting.md#camera-rate-collapses-under-software-rendering)) |
 | `headless` / `livestream` | `true` / `false` | Isaac window and WebRTC controls; ignored by Gazebo |
 | `rtf` / `sim_mode` | `1.0` / `realtime` | Isaac timing controls; use `deterministic` for comparisons |
 | `odom_noise` | `1.0` | Isaac odometry-drift scale; `0` gives exact debug odometry |
 | `camera` | `true` | Attach the Isaac D455 renderer; disable for lidar-only performance runs |
 | `sensor_hz` | `40.0` | Isaac deterministic step/lidar rate; camera cadence stays at its authored 30 Hz |
-| `slam_source` | backend-dependent | `front_only` for Gazebo, `merged` for Isaac unless explicitly overridden |
+| `slam_source` | `front_only` | Identical default for every backend; `merged` is an explicit opt-in |
 
 Examples:
 
 ```bash
-# Always clean up stale processes first
+# Simulation only: clean up stale processes first
 bash cleanup.sh
 
 ros2 launch ridgeback_autonomy ridgeback_exploration.launch.py world:=mock_hospital
 ros2 launch ridgeback_autonomy ridgeback_exploration.launch.py world:=warehouse exploration_rviz:=false
 ros2 launch ridgeback_autonomy ridgeback_exploration.launch.py world:=mock_hospital target_localization_enabled:=false
 ros2 launch ridgeback_autonomy ridgeback_exploration.launch.py world:=office headless_rendering:=true
-ros2 launch ridgeback_autonomy ridgeback_exploration.launch.py sim:=isaac world:=mock_hospital sim_mode:=deterministic
+ros2 launch ridgeback_autonomy ridgeback_exploration.launch.py backend:=isaac world:=mock_hospital sim_mode:=deterministic
 
 # One ring instead of four: the pre-mask-row exploration stack
 ros2 launch ridgeback_autonomy ridgeback_exploration.launch.py estimators:=pointcloud
+
+# Hardware-safe smoke: attach only, use real-sensor topics, and never send
+# frontier goals. Keep the robot's approved platform/sensor services running.
+ros2 launch ridgeback_autonomy ridgeback_exploration.launch.py \
+  backend:=hardware autonomous_motion_enabled:=false
 ```
+
+The hardware adapter is intentionally attach-only by default. It does not start
+the Clearpath platform unless `start_hardware_platform:=true`, and the quick-start
+wrapper does not run broad process cleanup or force `ROS_DOMAIN_ID=42` on
+hardware. Before setting `autonomous_motion_enabled:=true`, validate the deployed
+command chain and confirm the controller's `Twist`/`TwistStamped` contract; the
+checked-in generated configuration is not proof of the live robot contract.
+The [hardware camera plan](docs/plans/camera_hardware_validation.md) owns the
+physical D455 acceptance gates.
 
 The explorer is the in-repo `frontier_explorer_node` (sources under `src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer/`). It consumes the Nav2 global costmap and sends goals via `NavigateToPose`. The component boundary and readiness sequence are documented in [exploration architecture](docs/exploration/architecture.md).
 
 #### Quick-start script
 
-`start_exploration.sh` sources the workspace, runs cleanup, and launches exploration. It accepts an optional world as the first positional argument and forwards later `key:=value` launch arguments:
+`start_exploration.sh` sources the workspace and launches exploration. For
+simulation it first runs the simulator cleanup and defaults `ROS_DOMAIN_ID` to
+42. For `backend:=hardware` it preserves existing ROS processes and the caller's
+domain. It accepts an optional world as the first positional argument and
+forwards later `key:=value` launch arguments:
 
 ```bash
 bash start_exploration.sh                                # mock_hospital
 bash start_exploration.sh office                         # office world
 bash start_exploration.sh headless_rendering:=true       # default world, EGL server rendering
 bash start_exploration.sh office estimators:=pointcloud  # office with one estimator row
-bash start_exploration.sh mock_hospital sim:=isaac sim_mode:=deterministic
+bash start_exploration.sh mock_hospital backend:=isaac sim_mode:=deterministic
+bash start_exploration.sh backend:=hardware autonomous_motion_enabled:=false
 RMW_IMPLEMENTATION=rmw_fastrtps_cpp bash start_exploration.sh office  # explicit override
 ```
 
@@ -326,6 +368,10 @@ bash build_and_start_expl.sh office headless_rendering:=true
 ```
 
 ### `target_distance_benchmark.launch.py`
+
+The live target-distance benchmark currently requires the Gazebo adapter and
+`dependencies/gz.repos`; its measurement and report code remains target-generic,
+but Isaac entity-control plumbing is still P6 of the Isaac plan.
 
 ```bash
 # Default run: compare all four estimators
@@ -713,7 +759,8 @@ or integration claims.
 Perception gets camera intrinsics exclusively from the colour camera's live
 `CameraInfo`; there is no application-side FoV override to tune. Gazebo renders
 the generated Clearpath profile (640×480 at 30 Hz). Isaac's generated USD camera
-uses `sim/isaac/d455_camera.json` (1280×720, 631 px focal lengths, 30 Hz), and
+uses `src/ridgeback_autonomy_isaac/sim/isaac/d455_camera.json` (1280×720,
+631 px focal lengths, 30 Hz), and
 publishes the resulting intrinsics through the same `CameraInfo` interface.
 
 ## Configuration
@@ -764,8 +811,9 @@ This project still relies on three local patches:
 2. `patches/slam_toolbox_tf_namespace.patch` patches `src/slam_toolbox` so `slam_toolbox` respects namespaced TF remappings.
 3. `patches/clearpath_realsense_sim_frames.patch` patches `src/clearpath_common` so `intel_realsense.urdf.xacro` forwards `is_sim` into every supported camera macro as `use_nominal_extrinsics`, and so the Gazebo render sensor sits on the model's colour frame. Without it, simulation has no `camera_0_color_optical_frame` TF and the mask estimators report `TF_MISS_EXTRINSIC`.
 
-Because the patches are recorded against specific upstream revisions, `.repos`
-pins every dependency to an exact commit rather than to a branch tip. Do not
+Because the patches are recorded against specific upstream revisions,
+`dependencies/core.repos` and `dependencies/gz.repos` pin every dependency to
+an exact commit rather than to a branch tip. Do not
 change a pin to `jazzy`/`main` to pick up a fix: a fresh `vcs import` would then
 clone commits the patches were never rebased onto. The complete import, refresh,
 live-checkout migration, and rollback procedure lives in the
@@ -779,7 +827,7 @@ applies missing patches idempotently; without that option it is a read-only
 gate. Run it after every import and before builds:
 
 ```bash
-tools/check_dependencies --apply
+tools/check_dependencies --apply --profile all
 ```
 
 Never resolve a reported conflict by discarding unrelated changes in a

@@ -35,7 +35,7 @@ import sys
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
-SIM_DIR = REPO / "src/ridgeback_autonomy/sim/isaac"
+SIM_DIR = REPO / "src/ridgeback_autonomy_isaac/sim/isaac"
 sys.path.insert(0, str(SIM_DIR))
 
 SPAWN_Z = 0.076         # mirror isaac_runner.py default

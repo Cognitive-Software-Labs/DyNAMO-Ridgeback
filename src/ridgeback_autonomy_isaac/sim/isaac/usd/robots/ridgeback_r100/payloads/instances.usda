@@ -12,7 +12,7 @@ Generated from Composed Stage of root layer /tmp/urdf_import_ridgeback_r100_u372
 Generated from Composed Stage of root layer /tmp/urdf_import_ridgeback_r100_u372wake/temp_ridgeback_r100/ridgeback_r100.usd
 
 
-Generated from Composed Stage of root layer /home/deivid/dev/DyNAMO-Ridgeback/src/ridgeback_autonomy/sim/isaac/usd/robots/ridgeback_r100.usd/ridgeback_r100/payloads/base.usd
+Generated from Composed Stage of root layer /home/deivid/dev/DyNAMO-Ridgeback/src/ridgeback_autonomy_isaac/sim/isaac/usd/robots/ridgeback_r100.usd/ridgeback_r100/payloads/base.usd
 """
     kilogramsPerUnit = 1
     metersPerUnit = 1

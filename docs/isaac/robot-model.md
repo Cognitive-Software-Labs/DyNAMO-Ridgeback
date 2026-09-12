@@ -37,7 +37,7 @@ OMNI_KIT_ACCEPT_EULA=YES isaac_venv/bin/python3 tools/isaac/import_ridgeback_urd
 7. the staging directory is flattened into the committed layout
 8. `graft_vendor_chassis` swaps in Clearpath's authored chassis
 
-Output: `src/ridgeback_autonomy/sim/isaac/usd/robots/ridgeback_r100/` —
+Output: `src/ridgeback_autonomy_isaac/sim/isaac/usd/robots/ridgeback_r100/` —
 `ridgeback_r100.usda` (entry) plus `payloads/{base,robot,materials}.usda`,
 `payloads/Physics/{physics,physx,mujoco}.usda`, and `payloads/meshes/`.
 Committed artefact; regeneration is deliberate and reviewed in git.
@@ -102,7 +102,8 @@ Isaac's importer also expands the simulation description, then creates
 `d455_color` at the exact same colour-frame origin. The prim carries only the
 USD-to-ROS camera-axis rotation—there is no copied D435 translation—and
 `OmniSensorAPI` authors the 30 Hz cadence. Its backend-specific 1280×720,
-631 px focal-length input lives in `sim/isaac/d455_camera.json`; the generated
+631 px focal-length input lives in
+`src/ridgeback_autonomy_isaac/sim/isaac/d455_camera.json`; the generated
 USD bakes that contract. Runtime perception never reads this file or a FoV
 constant: both backends publish `CameraInfo`, which is the application input.
 
@@ -136,7 +137,7 @@ plane-slice diamond has its vertex at +0.3432, putting the tangent face
 **34.6 mm** from the emitter. Same mechanism, slightly different number — use
 34.6 mm for anything about what the sensor perceives.
 
-Verified in `sim/isaac/usd/worlds/empty.usda` — floor slab, nothing else, so
+Verified in `src/ridgeback_autonomy_isaac/sim/isaac/usd/worlds/empty.usda` — floor slab, nothing else, so
 any finite return is necessarily the robot seeing itself: **0/1081 finite bins
 on both lidars** across the full ±135°. A static ray-cast of the sliced USD
 agrees: 0/1081 (`tools/isaac/self_occlusion_check.py`).
@@ -310,6 +311,6 @@ OMNI_KIT_ACCEPT_EULA=YES isaac_venv/bin/python3 tools/isaac/inspect_robot.py
 
 # self-occlusion check: nothing in the scene, so any finite return is the
 # robot seeing itself
-isaac_venv/bin/python3 src/ridgeback_autonomy/sim/isaac/isaac_runner.py \
+isaac_venv/bin/python3 src/ridgeback_autonomy_isaac/sim/isaac/isaac_runner.py \
     --world empty --headless false --camera false
 ```

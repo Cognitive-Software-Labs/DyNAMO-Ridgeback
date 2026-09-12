@@ -1,157 +1,74 @@
+"""Compatibility dispatcher for the optional backend adapter packages.
+
+New callers select ``backend``. The old ``sim`` argument remains as the default
+source so existing ``sim:=gz`` and ``sim:=isaac`` commands keep working during
+the migration. Package lookup happens only for the selected backend; the core
+package therefore has no runtime dependency on unselected simulators.
+"""
+
 import os
 
-from launch import LaunchDescription
-from launch.actions import (
-    AppendEnvironmentVariable, DeclareLaunchArgument, IncludeLaunchDescription,
-)
-from launch.conditions import IfCondition, UnlessCondition
-from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import (
-    EqualsSubstitution, LaunchConfiguration, PythonExpression,
-)
 from ament_index_python.packages import get_package_share_directory
+from launch import LaunchDescription
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, OpaqueFunction
+from launch.launch_description_sources import PythonLaunchDescriptionSource
+from launch.substitutions import LaunchConfiguration, PythonExpression
+
+
+ADAPTER_PACKAGES = {
+    'gz': 'ridgeback_autonomy_gz',
+    'isaac': 'ridgeback_autonomy_isaac',
+    'hardware': 'ridgeback_autonomy_hardware',
+}
+
+
+def _include_selected_backend(context):
+    backend = LaunchConfiguration('backend').perform(context)
+    package = ADAPTER_PACKAGES[backend]
+    adapter_launch = os.path.join(
+        get_package_share_directory(package), 'launch', 'backend.launch.py')
+    argument_names = (
+        'setup_path', 'world', 'namespace', 'clearpath_rviz', 'gz_gui',
+        'headless_rendering', 'rtf', 'headless', 'livestream', 'odom_noise',
+        'camera', 'sim_mode', 'sensor_hz', 'start_hardware_platform',
+    )
+    arguments = {name: LaunchConfiguration(name) for name in argument_names}
+    # The hardware adapter deliberately calls this option ``start_platform``;
+    # the public name makes its hardware-only scope explicit.
+    arguments['start_platform'] = arguments.pop('start_hardware_platform')
+    return [IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(adapter_launch),
+        launch_arguments=arguments.items(),
+    )]
 
 
 def generate_launch_description():
-    pkg_this = get_package_share_directory('ridgeback_autonomy')
-    pkg_clearpath_gz = get_package_share_directory('clearpath_gz')
-
-    setup_path = LaunchConfiguration('setup_path')
-    world = LaunchConfiguration('world')
-    clearpath_rviz = LaunchConfiguration('clearpath_rviz')
-    sim = LaunchConfiguration('sim')
-    gz_gui = LaunchConfiguration('gz_gui')
-    headless_rendering = LaunchConfiguration('headless_rendering')
-
+    legacy_sim = LaunchConfiguration('sim')
     return LaunchDescription([
-        # transient dispatch during the Isaac port: gz stays the default
-        # until P8 removes it
+        DeclareLaunchArgument('sim', default_value='gz', choices=['gz', 'isaac'],
+                              description='Deprecated compatibility alias for backend'),
         DeclareLaunchArgument(
-            'sim',
-            default_value='gz',
-            choices=['gz', 'isaac'],
-            description='Simulation backend',
-        ),
+            'backend', default_value=legacy_sim, choices=sorted(ADAPTER_PACKAGES),
+            description='I/O provider: Gazebo, Isaac Sim, or physical hardware'),
         DeclareLaunchArgument(
             'setup_path',
-            default_value=os.path.expanduser('~/clearpath/'),
-            description='Path to clearpath config directory containing robot.yaml',
+            default_value=PythonExpression([
+                "'/etc/clearpath/' if '", LaunchConfiguration('backend'),
+                "' == 'hardware' else '", os.path.expanduser('~/clearpath/'), "'",
+            ]),
         ),
-        DeclareLaunchArgument(
-            'world',
-            default_value='warehouse',
-            description='Gazebo world to load',
-        ),
-        DeclareLaunchArgument(
-            'clearpath_rviz',
-            default_value='false',
-            description='Launch the Clearpath-provided RViz instance',
-        ),
-        DeclareLaunchArgument(
-            'gz_gui',
-            default_value='true',
-            description='Launch the Gazebo GUI window',
-        ),
-        DeclareLaunchArgument(
-            'headless_rendering',
-            default_value='false',
-            description='Render server sensors via EGL without an X display '
-                        '(GPU rendering for non-seat/SSH sessions; see '
-                        'docs/troubleshooting.md)',
-        ),
-        DeclareLaunchArgument(
-            'rtf',
-            default_value='1.0',
-            description='Isaac real-time factor; 0 = unthrottled '
-                        '(ignored under gz)',
-        ),
-        DeclareLaunchArgument(
-            'headless',
-            default_value='true',
-            description='Isaac: run without the sim GUI window '
-                        '(ignored under gz)',
-        ),
-        DeclareLaunchArgument(
-            'livestream',
-            default_value='false',
-            description='Isaac: WebRTC livestream (ignored under gz)',
-        ),
-        DeclareLaunchArgument(
-            'odom_noise',
-            default_value='1.0',
-            description='Isaac: odometry drift scale; 0 = perfect odom '
-                        '(ignored under gz)',
-        ),
-        DeclareLaunchArgument(
-            'camera',
-            default_value='true',
-            description='Isaac: attach D455 camera; false = lidar-only '
-                        '(saves GPU/RTF; ignored under gz)',
-        ),
-        DeclareLaunchArgument(
-            'sim_mode',
-            default_value='realtime',
-            description='Isaac: realtime | deterministic timing mode '
-                        '(ignored under gz)',
-        ),
-        DeclareLaunchArgument(
-            'sensor_hz',
-            default_value='40.0',
-            description='Isaac: lidar rate / deterministic fixed dt '
-                        '(ignored under gz)',
-        ),
-        # Add our worlds and models directories so Gazebo can find them
-        AppendEnvironmentVariable(
-            'GZ_SIM_RESOURCE_PATH',
-            os.path.join(pkg_this, 'sim', 'worlds'),
-        ),
-        AppendEnvironmentVariable(
-            'GZ_SIM_RESOURCE_PATH',
-            os.path.join(pkg_this, 'sim', 'models'),
-        ),
-        AppendEnvironmentVariable(
-            'GZ_GUI_PLUGIN_PATH',
-            os.path.join(os.path.abspath(os.path.join(pkg_this, '..', '..')), 'lib', 'ridgeback_autonomy'),
-        ),
-        IncludeLaunchDescription(
-            PythonLaunchDescriptionSource(
-                os.path.join(pkg_clearpath_gz, 'launch', 'simulation.launch.py')
-            ),
-            condition=UnlessCondition(
-                EqualsSubstitution(sim, 'isaac')),
-            launch_arguments={
-                'setup_path': setup_path,
-                'world': world,
-                'rviz': clearpath_rviz,
-                'use_sim_time': 'true',
-                # Clearpath's simulation launch uses this flag for its actual
-                # server-only mode.  Passing a made-up ``gz_gui`` argument is
-                # silently ignored by launch. Keep the benchmark's historical
-                # gz_gui:=false switch and the explicit EGL option: either one
-                # requests Clearpath's server-only headless mode.
-                'headless_rendering': PythonExpression([
-                    "'false' if '", gz_gui, "' == 'true' and '",
-                    headless_rendering, "' == 'false' else 'true'",
-                ]),
-            }.items(),
-        ),
-        IncludeLaunchDescription(
-            PythonLaunchDescriptionSource(
-                os.path.join(pkg_this, 'launch', 'includes',
-                             'simulation_isaac.launch.py')
-            ),
-            condition=IfCondition(EqualsSubstitution(sim, 'isaac')),
-            launch_arguments={
-                'setup_path': setup_path,
-                'world': world,
-                'rtf': LaunchConfiguration('rtf'),
-                'headless': LaunchConfiguration('headless'),
-                'livestream': LaunchConfiguration('livestream'),
-                'odom_noise': LaunchConfiguration('odom_noise'),
-                'camera': LaunchConfiguration('camera'),
-                'sim_mode': LaunchConfiguration('sim_mode'),
-                'sensor_hz': LaunchConfiguration('sensor_hz'),
-                # the gz_gui concept has no Isaac equivalent (P8 retires it)
-            }.items(),
-        ),
+        DeclareLaunchArgument('world', default_value='mock_hospital'),
+        DeclareLaunchArgument('namespace', default_value='r100_0001'),
+        DeclareLaunchArgument('clearpath_rviz', default_value='false'),
+        DeclareLaunchArgument('gz_gui', default_value='true'),
+        DeclareLaunchArgument('headless_rendering', default_value='false'),
+        DeclareLaunchArgument('rtf', default_value='1.0'),
+        DeclareLaunchArgument('headless', default_value='true'),
+        DeclareLaunchArgument('livestream', default_value='false'),
+        DeclareLaunchArgument('odom_noise', default_value='1.0'),
+        DeclareLaunchArgument('camera', default_value='true'),
+        DeclareLaunchArgument('sim_mode', default_value='realtime'),
+        DeclareLaunchArgument('sensor_hz', default_value='40.0'),
+        DeclareLaunchArgument('start_hardware_platform', default_value='false'),
+        OpaqueFunction(function=_include_selected_backend),
     ])

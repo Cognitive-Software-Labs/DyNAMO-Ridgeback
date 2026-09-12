@@ -44,7 +44,7 @@ def _candidate_dirs() -> list[Path]:
     dirs.append(here / "usd" / "worlds")          # source tree / symlink-install
     try:
         from ament_index_python.packages import get_package_share_directory
-        dirs.append(Path(get_package_share_directory("ridgeback_autonomy"))
+        dirs.append(Path(get_package_share_directory("ridgeback_autonomy_isaac"))
                     / "sim" / "isaac" / "usd" / "worlds")
     except Exception:
         pass

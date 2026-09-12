@@ -12,7 +12,7 @@ rclpy/CycloneDDS):
 
     source install/setup.bash
     OMNI_KIT_ACCEPT_EULA=YES isaac_venv/bin/python3 \
-        src/ridgeback_autonomy/sim/isaac/isaac_runner.py \
+        src/ridgeback_autonomy_isaac/sim/isaac/isaac_runner.py \
         --world mock_hospital --headless true
 
 Timing: physics at --physics-hz (default 120). --rtf 1.0 keeps sim time

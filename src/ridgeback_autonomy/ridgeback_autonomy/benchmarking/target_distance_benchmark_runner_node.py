@@ -200,10 +200,6 @@ class TargetDistanceBenchmarkRunner(Node):
         super().__init__('target_distance_benchmark_runner')
 
         pkg_share = get_package_share_directory('ridgeback_autonomy')
-        # The runner is target-generic; the shipped scenario currently selects
-        # the Unitree G1 asset as its concrete simulated target.
-        self.target_model_sdf = os.path.join(pkg_share, 'sim', 'models', 'g1', 'model.sdf')
-        self.models_dir = os.path.join(pkg_share, 'sim', 'models')
         default_scenario = os.path.join(pkg_share, 'config', 'benchmark_scenarios_full.yaml')
         # Kept on the node: the git provenance recorded with each run is read
         # from this directory, not just the default output path.
@@ -212,6 +208,11 @@ class TargetDistanceBenchmarkRunner(Node):
         default_output_dir = default_output_directory(self.workspace_root)
 
         self.declare_parameter('world', 'target_distance_calibration')
+        # The runner stays target/provider-neutral. The Gazebo benchmark launch
+        # supplies its concrete asset roots; a future Isaac benchmark can
+        # supply a different implementation without importing Gazebo here.
+        self.declare_parameter('target_model_sdf', '')
+        self.declare_parameter('models_dir', '')
         self.declare_parameter('scenario', '')
         self.declare_parameter('repeats', 5)
         self.declare_parameter('output_dir', default_output_dir)
@@ -270,6 +271,9 @@ class TargetDistanceBenchmarkRunner(Node):
         self.declare_parameter('record_window_class', RECORD_WINDOW_CLASS_DEFAULT)
 
         self.world = str(self.get_parameter('world').value)
+        self.target_model_sdf = str(
+            self.get_parameter('target_model_sdf').value)
+        self.models_dir = str(self.get_parameter('models_dir').value)
         scenario_param = str(self.get_parameter('scenario').value).strip()
         self.scenario_path = (
             os.path.abspath(os.path.expanduser(scenario_param))

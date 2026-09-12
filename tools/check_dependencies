@@ -1,22 +1,41 @@
 #!/bin/bash
 # Verify pinned dependency revisions and optionally apply the recorded patches.
-# Usage: tools/check_dependencies [--apply]
+# Usage: tools/check_dependencies [--apply] [--profile core|gz|all]
 
 set -u
 
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 CHECKOUT_ROOT="${DYNAMO_DEPENDENCY_ROOT:-$REPO_ROOT}"
-MANIFEST="$REPO_ROOT/.repos"
 APPLY_PATCHES=false
+PROFILE=all
 
-if [ "${1:-}" = "--apply" ]; then
-    APPLY_PATCHES=true
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --apply)
+            APPLY_PATCHES=true
+            ;;
+        --profile)
+            shift
+            PROFILE="${1:-}"
+            ;;
+        *)
+            echo "Usage: tools/check_dependencies [--apply] [--profile core|gz|all]" >&2
+            exit 2
+            ;;
+    esac
     shift
-fi
-if [ "$#" -ne 0 ]; then
-    echo "Usage: tools/check_dependencies [--apply]" >&2
-    exit 2
-fi
+done
+
+case "$PROFILE" in
+    core) MANIFESTS=("$REPO_ROOT/dependencies/core.repos") ;;
+    gz) MANIFESTS=("$REPO_ROOT/dependencies/gz.repos") ;;
+    all) MANIFESTS=("$REPO_ROOT/dependencies/core.repos"
+                    "$REPO_ROOT/dependencies/gz.repos") ;;
+    *)
+        echo "Unknown dependency profile: $PROFILE" >&2
+        exit 2
+        ;;
+esac
 
 declare -A PATCHES=(
     [src/clearpath_simulator]="patches/clearpath_gz_customizations.patch"
@@ -24,24 +43,28 @@ declare -A PATCHES=(
     [src/slam_toolbox]="patches/slam_toolbox_tf_namespace.patch"
 )
 
-if ! dependency_text="$(python3 - "$MANIFEST" <<'PY'
+if ! dependency_text="$(python3 - "${MANIFESTS[@]}" <<'PY'
 import sys
 
 import yaml
 
-with open(sys.argv[1], encoding='utf-8') as stream:
-    repositories = yaml.safe_load(stream)['repositories']
-
-for path, specification in repositories.items():
-    print(f"{path}\t{specification['version']}")
+seen = set()
+for manifest in sys.argv[1:]:
+    with open(manifest, encoding='utf-8') as stream:
+        repositories = yaml.safe_load(stream)['repositories']
+    for path, specification in repositories.items():
+        if path in seen:
+            raise ValueError(f'duplicate dependency {path} in {manifest}')
+        seen.add(path)
+        print(f"{path}\t{specification['version']}")
 PY
 )"; then
-    echo "ERROR: could not parse $MANIFEST" >&2
+    echo "ERROR: could not parse dependency profile $PROFILE" >&2
     exit 1
 fi
 
 if [ -z "$dependency_text" ]; then
-    echo "ERROR: $MANIFEST contains no dependencies" >&2
+    echo "ERROR: dependency profile $PROFILE contains no dependencies" >&2
     exit 1
 fi
 mapfile -t DEPENDENCIES <<< "$dependency_text"
@@ -53,13 +76,26 @@ fail() {
     failures=$((failures + 1))
 }
 
+patch_matches_checkout() {
+    local patch="$1"
+    local checkout="$2"
+    # Git-generated diffs prefix a blank context line with one space. Recorded
+    # patch files omit that otherwise-trailing byte so the root repository's
+    # own `git diff --check` stays clean. Normalize only this no-content case;
+    # every behavior-bearing byte must still match exactly.
+    diff -q \
+        <(sed 's/^ $//' "$patch") \
+        <(git -C "$checkout" diff --no-ext-diff HEAD -- | sed 's/^ $//') \
+        >/dev/null
+}
+
 for dependency in "${DEPENDENCIES[@]}"; do
     IFS=$'\t' read -r relative_path expected_revision <<< "$dependency"
     checkout="$CHECKOUT_ROOT/$relative_path"
     patch_relative="${PATCHES[$relative_path]:-}"
 
     if [ ! -e "$checkout/.git" ]; then
-        fail "$relative_path is missing; run 'vcs import < .repos'"
+        fail "$relative_path is missing; import the $PROFILE dependency profile"
         continue
     fi
 
@@ -86,7 +122,7 @@ for dependency in "${DEPENDENCIES[@]}"; do
 
     patch="$REPO_ROOT/$patch_relative"
     if git -C "$checkout" apply --reverse --check "$patch" >/dev/null 2>&1; then
-        if diff -q "$patch" <(git -C "$checkout" diff --no-ext-diff HEAD --) >/dev/null; then
+        if patch_matches_checkout "$patch" "$checkout"; then
             echo "OK: $relative_path @ ${expected_revision:0:8} ($patch_relative applied)"
         else
             fail "$relative_path contains changes beyond $patch_relative"
@@ -105,7 +141,7 @@ for dependency in "${DEPENDENCIES[@]}"; do
     fi
 
     if git -C "$checkout" apply "$patch" &&
-       diff -q "$patch" <(git -C "$checkout" diff --no-ext-diff HEAD --) >/dev/null; then
+       patch_matches_checkout "$patch" "$checkout"; then
         echo "APPLIED: $patch_relative to $relative_path @ ${expected_revision:0:8}"
     else
         fail "$patch_relative did not produce the recorded dependency diff"
@@ -117,4 +153,4 @@ if [ "$failures" -ne 0 ]; then
     exit 1
 fi
 
-echo "All dependencies match .repos and contain only recorded patches."
+echo "All $PROFILE dependencies match their manifests and contain only recorded patches."

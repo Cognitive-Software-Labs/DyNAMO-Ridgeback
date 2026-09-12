@@ -16,8 +16,23 @@ investigations and measurements live in
 | All mask rows blank, pointcloud works | Inspect startup logs for an unavailable configured `base_frame` |
 | Explorer finds no frontiers | Confirm the global costmap has `track_unknown_space: true` |
 | Startup stage stalls | Read the matching `gate_*` process's `unmet:` list; do not add a fixed timer |
-| Stale processes | Run `bash cleanup.sh` before a normal launch or once before a sweep |
+| Stale simulator processes | Run `bash cleanup.sh` before a simulation launch or once before a sweep; never use it as hardware bringup cleanup |
 | Need a log summary | Run `bash tools/diag.sh <console.log> hospital` or `warehouse` |
+
+## Hardware launch is deliberately motionless
+
+`backend:=hardware` defaults to `start_hardware_platform:=false` and
+`autonomous_motion_enabled:=false`. The first setting attaches to existing
+Clearpath services; the second prevents `frontier_explorer_node` from sending
+goals. `start_exploration.sh` also skips `cleanup.sh` and leaves
+`ROS_DOMAIN_ID` untouched for hardware.
+
+If the readiness gate lists scan or filtered odometry as missing, inspect the
+approved robot-side bringup, namespace, domain, RMW, and effective topics. Do
+not bypass the gate by switching to a simulator profile or enable platform
+bringup/motion just to make a topic appear. The physical command-chain and D455
+validation gates remain in the [backlog](BACKLOG.md) and
+[hardware camera plan](plans/camera_hardware_validation.md).
 
 ## Benchmark sweep cleanup
 

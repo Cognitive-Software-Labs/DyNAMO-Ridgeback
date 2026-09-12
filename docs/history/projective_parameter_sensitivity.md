@@ -318,7 +318,7 @@ trials, matching `20260902_115213`; the `repeats:=3` variants sit at 0.0602 /
 
 The attractive hypothesis was that 0.35 m is the G1's own fore/aft extent, so
 the band spans the target and nothing more. Walking all 36 `<visual>` meshes in
-`sim/models/g1/model.sdf` with each visual's pose applied
+`src/ridgeback_autonomy_gz/sim/models/g1/model.sdf` with each visual's pose applied
 (`load_stl` → rotate by RPY → translate, accumulated into one model-frame AABB):
 
 | Axis | Range | Extent |

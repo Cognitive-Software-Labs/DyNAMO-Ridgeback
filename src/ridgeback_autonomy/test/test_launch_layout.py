@@ -64,7 +64,6 @@ def test_internal_launch_includes_exist_and_are_referenced() -> None:
         'explore.launch.py',
         'nav2.launch.py',
         'simulation.launch.py',
-        'simulation_isaac.launch.py',
         'slam.launch.py',
     ]
     assert sorted(path.name for path in includes_dir.glob('*.launch.py')) == expected_includes
@@ -98,14 +97,14 @@ def test_benchmark_forwards_gazebo_gui_choice_to_simulation() -> None:
     benchmark_env_text = (
         _package_root() / 'launch' / 'target_benchmark_env.launch.py'
     ).read_text(encoding='utf-8')
-    simulation_text = (
-        _package_root() / 'launch' / 'includes' / 'simulation.launch.py'
+    gazebo_adapter_text = (
+        _package_root().parent / 'ridgeback_autonomy_gz' / 'launch' / 'backend.launch.py'
     ).read_text(encoding='utf-8')
 
     assert "DeclareLaunchArgument(\n            'gz_gui'" in benchmark_env_text
     assert "'gz_gui': gz_gui" in benchmark_env_text
-    assert "'headless_rendering': PythonExpression(" in simulation_text
-    assert "'false' if '" in simulation_text
+    assert "'headless_rendering': PythonExpression(" in gazebo_adapter_text
+    assert "'false' if '" in gazebo_adapter_text
 
 
 def test_exploration_uses_unique_mock_hospital_world() -> None:
@@ -122,7 +121,8 @@ def test_exploration_uses_unique_mock_hospital_world() -> None:
         / 'simulation.launch.py'
     ).read_text(encoding='utf-8')
     mock_hospital_world = (
-        repo_root / 'src' / 'ridgeback_autonomy' / 'sim' / 'worlds' / 'mock_hospital.sdf'
+        repo_root / 'src' / 'ridgeback_autonomy_gz' / 'sim' / 'worlds'
+        / 'mock_hospital.sdf'
     ).read_text(encoding='utf-8')
 
     assert "DeclareLaunchArgument('world', default_value='mock_hospital')" in exploration_text
@@ -130,10 +130,11 @@ def test_exploration_uses_unique_mock_hospital_world() -> None:
     assert "'hospital'" not in clearpath_simulation_text
     assert '<world name="mock_hospital">' in mock_hospital_world
     assert not (
-        repo_root / 'src' / 'ridgeback_autonomy' / 'sim' / 'worlds' / 'hospital.sdf'
+        repo_root / 'src' / 'ridgeback_autonomy_gz' / 'sim' / 'worlds' / 'hospital.sdf'
     ).exists()
     assert not (
-        repo_root / 'src' / 'ridgeback_autonomy' / 'sim' / 'worlds' / 'detailed_hospital.sdf'
+        repo_root / 'src' / 'ridgeback_autonomy_gz' / 'sim' / 'worlds'
+        / 'detailed_hospital.sdf'
     ).exists()
 
 
@@ -175,7 +176,10 @@ def test_exploration_runs_the_same_four_estimator_rows_as_the_benchmark() -> Non
     # benchmark does, and the shared factories are what stop the two stacks
     # measuring off different topics.
     assert "'estimators': 'pointcloud'" not in exploration_text
-    assert "DeclareLaunchArgument('estimators', default_value='all'" in exploration_text
+    assert "DeclareLaunchArgument('estimators', default_value=_backend_default(" in (
+        exploration_text)
+    assert "'all'," in exploration_text
+    assert "'projective_ranging,euclidean_reconstruction'" in exploration_text
     assert 'pointcloud_measurement_node(' in exploration_text
     assert 'mask_measurement_node(' in exploration_text
     assert 'parse_estimators' in exploration_text
@@ -311,12 +315,77 @@ def test_headless_rendering_is_optional_and_owned_by_the_environment() -> None:
     launch_dir = Path(__file__).resolve().parents[1] / 'launch'
     env_text = (launch_dir / 'target_benchmark_env.launch.py').read_text(encoding='utf-8')
     config_text = (launch_dir / 'target_benchmark_config.launch.py').read_text(encoding='utf-8')
-    simulation_text = (launch_dir / 'includes/simulation.launch.py').read_text(encoding='utf-8')
+    gazebo_adapter_text = (
+        _package_root().parent / 'ridgeback_autonomy_gz' / 'launch' / 'backend.launch.py'
+    ).read_text(encoding='utf-8')
 
     assert "'headless_rendering',\n            default_value='false'" in env_text
     assert "'headless_rendering': headless_rendering" in env_text
     assert "'headless_rendering'" not in config_text
-    assert "'headless_rendering',\n            default_value='false'" in simulation_text
+    assert "DeclareLaunchArgument('headless_rendering', default_value='false')" in (
+        gazebo_adapter_text)
+
+
+def test_backend_packages_keep_simulator_dependencies_out_of_core() -> None:
+    source_root = _package_root().parent
+    core_cmake = (_package_root() / 'CMakeLists.txt').read_text(encoding='utf-8')
+    core_manifest = (_package_root() / 'package.xml').read_text(encoding='utf-8')
+    gz_cmake = (source_root / 'ridgeback_autonomy_gz/CMakeLists.txt').read_text(
+        encoding='utf-8')
+    gz_manifest = (source_root / 'ridgeback_autonomy_gz/package.xml').read_text(
+        encoding='utf-8')
+    dispatcher = (_package_root() / 'launch/includes/simulation.launch.py').read_text(
+        encoding='utf-8')
+    benchmark_runner = (
+        _package_root()
+        / 'ridgeback_autonomy/benchmarking/target_distance_benchmark_runner_node.py'
+    ).read_text(encoding='utf-8')
+
+    for simulator_dependency in ('clearpath_gz', 'gz-gui', 'gz-plugin', 'Qt5', 'SpawnG1'):
+        assert simulator_dependency not in core_cmake + core_manifest
+    for simulator_dependency in ('clearpath_gz', 'gz-gui', 'gz-plugin', 'Qt5', 'SpawnG1'):
+        assert simulator_dependency in gz_cmake + gz_manifest
+    assert "'hardware': 'ridgeback_autonomy_hardware'" in dispatcher
+    assert "'isaac': 'ridgeback_autonomy_isaac'" in dispatcher
+    assert "'gz': 'ridgeback_autonomy_gz'" in dispatcher
+    assert "get_package_share_directory('clearpath_gz')" not in dispatcher
+    assert 'ridgeback_autonomy_gz' not in benchmark_runner
+
+
+def test_dependency_profiles_keep_gazebo_out_of_the_common_closure() -> None:
+    repo_root = _package_root().parents[1]
+    core = yaml.safe_load(
+        (repo_root / 'dependencies/core.repos').read_text(encoding='utf-8'))[
+            'repositories']
+    gazebo = yaml.safe_load(
+        (repo_root / 'dependencies/gz.repos').read_text(encoding='utf-8'))[
+            'repositories']
+    checker = (repo_root / 'tools/check_dependencies').read_text(encoding='utf-8')
+
+    assert set(core).isdisjoint(gazebo)
+    assert set(gazebo) == {'src/clearpath_simulator'}
+    assert 'src/clearpath_simulator' not in core
+    assert 'core|gz|all' in checker
+
+
+def test_hardware_backend_is_attach_only_and_uses_real_sensor_defaults() -> None:
+    source_root = _package_root().parent
+    hardware = (source_root / 'ridgeback_autonomy_hardware/launch/backend.launch.py').read_text(
+        encoding='utf-8')
+    exploration = _exploration_text()
+    start_script = (source_root.parent / 'start_exploration.sh').read_text(encoding='utf-8')
+
+    assert "'start_platform', default_value='false'" in hardware
+    assert "'use_sim_time': 'false'" in hardware
+    assert "'backend', default_value=legacy_sim" in exploration
+    assert 'REALSENSE_CAMERA_INPUTS' in exploration
+    assert "'projective_ranging,euclidean_reconstruction'" in exploration
+    assert "'autonomous_motion_enabled'" in exploration
+    assert "default_value=_backend_default('true', 'false')" in exploration
+    assert 'condition=launch.conditions.IfCondition(\n                        autonomous_motion_enabled)' in (
+        exploration)
+    assert 'if [ "$BACKEND" = hardware ]' in start_script
+    assert 'preserving existing ROS and Clearpath processes' in start_script
 
 
 def test_every_entrypoint_supplies_the_cyclonedds_configuration() -> None:

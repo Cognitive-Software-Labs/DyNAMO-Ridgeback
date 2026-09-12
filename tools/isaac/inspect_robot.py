@@ -35,9 +35,9 @@ import sys
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
-ROBOT = (REPO / "src/ridgeback_autonomy/sim/isaac/usd/robots/ridgeback_r100"
+ROBOT = (REPO / "src/ridgeback_autonomy_isaac/sim/isaac/usd/robots/ridgeback_r100"
               / "ridgeback_r100.usda")
-CHASSIS = (REPO / "src/ridgeback_autonomy/sim/isaac/usd/robots/ridgeback_r100"
+CHASSIS = (REPO / "src/ridgeback_autonomy_isaac/sim/isaac/usd/robots/ridgeback_r100"
                 / "payloads/meshes/ridgeback_chassis_clearpath.usd")
 
 

@@ -28,7 +28,7 @@ from pathlib import Path
 import numpy as np
 
 REPO = Path(__file__).resolve().parents[2]
-ROBOT = (REPO / "src/ridgeback_autonomy/sim/isaac/usd/robots/ridgeback_r100"
+ROBOT = (REPO / "src/ridgeback_autonomy_isaac/sim/isaac/usd/robots/ridgeback_r100"
               / "ridgeback_r100.usda")
 
 # Contract scan geometry (mirrors ros_io.LidarScanAssembler).

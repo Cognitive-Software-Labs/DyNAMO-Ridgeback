@@ -1,9 +1,10 @@
 #!/bin/bash
-# Kill stale ROS 2 processes and Gazebo servers from previous launches.
+# Kill stale ROS 2 processes and simulator servers from previous launches.
 # Usage: bash cleanup.sh
 #
 # This is aggressive, but deliberately preserves the Gazebo GUI so it can be
-# reused across server restarts.
+# reused across server restarts. Never run this as hardware bringup cleanup;
+# start_exploration.sh skips it when backend:=hardware.
 
 set -e
 

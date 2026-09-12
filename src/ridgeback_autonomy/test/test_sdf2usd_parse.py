@@ -13,7 +13,7 @@ import pytest
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 _SDF2USD = _REPO_ROOT / "tools" / "isaac" / "sdf2usd.py"
-_WORLDS = _REPO_ROOT / "src" / "ridgeback_autonomy" / "sim" / "worlds"
+_WORLDS = _REPO_ROOT / "src" / "ridgeback_autonomy_gz" / "sim" / "worlds"
 
 spec = importlib.util.spec_from_file_location("sdf2usd", _SDF2USD)
 sdf2usd = importlib.util.module_from_spec(spec)

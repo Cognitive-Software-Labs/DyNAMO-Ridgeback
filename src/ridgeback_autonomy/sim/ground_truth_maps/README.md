@@ -13,11 +13,14 @@ office, which are *different geometry* from the Isaac stock envs) are archived
 under `historical/`; the manual capture workflow (Part 1) is kept for reference
 only.
 
-- **This folder** is the package maps dir
-  (`src/ridgeback_autonomy/sim/ground_truth_maps/`, beside `sim/worlds/`). It is
-  installed to `share/ridgeback_autonomy/sim/ground_truth_maps/`, so nodes
-  resolve it via `get_package_share_directory` on any machine. It holds the
-  `.pgm`/`.yaml` maps, their `.png` previews, and the dev tools that make them.
+- **This folder** is the common package maps dir
+  (`src/ridgeback_autonomy/sim/ground_truth_maps/`). Gazebo source worlds now
+  live under `src/ridgeback_autonomy_gz/sim/worlds/`, while Isaac USD worlds
+  live under `src/ridgeback_autonomy_isaac/sim/isaac/usd/worlds/`. The maps are
+  installed to `share/ridgeback_autonomy/sim/ground_truth_maps/`, so common
+  diagnostic nodes resolve them through `get_package_share_directory` on any
+  machine. It holds the `.pgm`/`.yaml` maps, their `.png` previews, and the dev
+  tools that make them.
 - **Live coverage during exploration is built in** — `coverage_overlay_node`
   publishes the `COVERAGE` panel in the RViz HUD automatically (see Part 2). No
   separate monitor script is needed.

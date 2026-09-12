@@ -21,7 +21,7 @@ from pathlib import Path
 import numpy as np
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
-_ROS_IO = (_REPO_ROOT / "src" / "ridgeback_autonomy" / "sim" / "isaac"
+_ROS_IO = (_REPO_ROOT / "src" / "ridgeback_autonomy_isaac" / "sim" / "isaac"
            / "ros_io.py")
 
 spec = importlib.util.spec_from_file_location("isaac_ros_io", _ROS_IO)

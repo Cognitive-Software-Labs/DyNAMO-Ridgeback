@@ -16,6 +16,7 @@ from __future__ import annotations
 import os
 
 from ridgeback_autonomy.common.camera_inputs import (
+    REALSENSE_BACKEND,
     SIMULATION_BACKEND,
     resolve_camera_inputs,
 )
@@ -39,6 +40,7 @@ HUD_DISTANCES_TEXT_SIZE = 16.0
 # Every simulation launch resolves the camera topic set from the same backend,
 # so the default each of them declares comes from one place.
 SIMULATION_CAMERA_INPUTS = resolve_camera_inputs(SIMULATION_BACKEND)
+REALSENSE_CAMERA_INPUTS = resolve_camera_inputs(REALSENSE_BACKEND)
 
 SHARED_BENCHMARK_ARGUMENT_DEFAULTS = {
     'namespace': 'r100_0001',
@@ -307,7 +309,11 @@ def mask_measurement_node(
     )
 
 
-def resolved_camera_inputs(context, *argument_names: str):
+def resolved_camera_inputs(
+    context,
+    *argument_names: str,
+    backend: str = SIMULATION_BACKEND,
+):
     """The camera topic set, with whichever launch arguments the caller declares.
 
     Each entrypoint declares a different subset -- the environment layer only
@@ -317,7 +323,7 @@ def resolved_camera_inputs(context, *argument_names: str):
 
     from launch.substitutions import LaunchConfiguration
 
-    return resolve_camera_inputs(SIMULATION_BACKEND, {
+    return resolve_camera_inputs(backend, {
         name: LaunchConfiguration(name).perform(context)
         for name in argument_names
     })

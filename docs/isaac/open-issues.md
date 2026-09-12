@@ -192,7 +192,8 @@ sim-only layer (`tools/isaac/stall_probe.py`, and the spin/probe recipe in
 both directions, clean again on stop.
 
 **Mitigation, since REMOVED** (it masked the symptom; the reparent is the
-real fix). `LidarScanAssembler.EDGE_MASK_DEG = 10.0` (`sim/isaac/ros_io.py`)
+real fix). `LidarScanAssembler.EDGE_MASK_DEG = 10.0`
+(`src/ridgeback_autonomy_isaac/sim/isaac/ros_io.py`)
 drops the outer 10 deg of each 270 deg window — 40 of 1081 bins per end, 7.4%
 of the arc. The band does **not** end sharply (it thins inward: 6 points/frame
 past 129 deg, 1–2 at 126.5), so 7 deg left a residual at its own boundary.
@@ -403,7 +404,8 @@ identical benchmark.
   `inspect_robot.py --compare-colliders` sets the scene up regardless.
 - **Payload layers churn 6 lines on every regen** — the importer stamps its
   `/tmp` staging paths into `doc` metadata. Cosmetic.
-- **~~`.repos` pins branches, not commits~~ — fixed 2026-09-11.** It now pins
+- **~~Dependency manifests pin branches, not commits~~ — fixed 2026-09-11.**
+  `dependencies/core.repos` and `dependencies/gz.repos` now pin
   exact commits, and `tools/check_dependencies --apply` verifies them, applies
   `patches/` idempotently and fails on any drift. The dependency trees are
   gitignored, so those two records are the only thing that reproduces them.

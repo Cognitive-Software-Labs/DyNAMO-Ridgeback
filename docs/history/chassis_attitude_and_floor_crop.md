@@ -64,7 +64,7 @@ rest — while the pose stream is captured continuously.
 
 The floor is not at `z = 0`. `calibration_floor` is an `18 × 10 × 0.1` box
 posed at `3 0 0`, so its **top surface is at z = +0.05**
-(`sim/worlds/target_distance_calibration.sdf`).
+(`src/ridgeback_autonomy_gz/sim/worlds/target_distance_calibration.sdf`).
 
 | Quantity | Value |
 |---|---|

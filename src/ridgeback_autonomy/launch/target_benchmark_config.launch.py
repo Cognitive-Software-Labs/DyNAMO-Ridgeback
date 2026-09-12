@@ -72,6 +72,7 @@ ENV_READY_TIMEOUT_SEC = 300.0
 
 
 def build_benchmark_nodes(context, *args, **kwargs):
+    gz_share = get_package_share_directory('ridgeback_autonomy_gz')
     namespace = LaunchConfiguration('namespace')
     use_sim_time = LaunchConfiguration('use_sim_time')
     world = LaunchConfiguration('world')
@@ -181,6 +182,9 @@ def build_benchmark_nodes(context, *args, **kwargs):
         parameters=[{
             'use_sim_time': use_sim_time,
             'world': world,
+            'target_model_sdf': os.path.join(
+                gz_share, 'sim', 'models', 'g1', 'model.sdf'),
+            'models_dir': os.path.join(gz_share, 'sim', 'models'),
             'scenario': LaunchConfiguration('scenario'),
             'repeats': repeats,
             'output_dir': output_dir,

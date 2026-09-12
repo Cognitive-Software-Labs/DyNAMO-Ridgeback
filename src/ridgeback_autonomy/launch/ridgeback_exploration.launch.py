@@ -2,13 +2,13 @@ import os
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-import launch.conditions
 from launch.actions import (
     DeclareLaunchArgument, ExecuteProcess, IncludeLaunchDescription,
     OpaqueFunction, RegisterEventHandler,
 )
 from launch.event_handlers import OnProcessExit
 from launch.launch_description_sources import PythonLaunchDescriptionSource
+import launch.conditions
 from launch.substitutions import (
     EqualsSubstitution, LaunchConfiguration, PythonExpression,
 )
@@ -23,7 +23,6 @@ from ridgeback_autonomy.perception.target_localization.estimator_registry import
     uses_pointcloud_estimators,
 )
 from ridgeback_autonomy.perception.target_localization.launch import (
-    SIMULATION_CAMERA_INPUTS,
     cyclonedds_actions,
     distance_hud_node,
     estimate_viz_node,
@@ -31,7 +30,9 @@ from ridgeback_autonomy.perception.target_localization.launch import (
     overlay_node,
     perception_venv_actions,
     pointcloud_measurement_node,
+    REALSENSE_CAMERA_INPUTS,
     resolved_camera_inputs,
+    SIMULATION_CAMERA_INPUTS,
 )
 
 
@@ -65,9 +66,14 @@ def build_target_localization_nodes(context, *args, **kwargs):
     depth_source = LaunchConfiguration('depth_source')
     mask_gate = LaunchConfiguration('mask_gate')
     estimate_viz = LaunchConfiguration('estimate_viz')
+    camera_backend = (
+        'realsense'
+        if LaunchConfiguration('backend').perform(context) == 'hardware'
+        else 'simulation'
+    )
     camera_inputs = resolved_camera_inputs(
         context, 'color_topic', 'camera_info_topic',
-        'depth_topic', 'pointcloud_topic')
+        'depth_topic', 'pointcloud_topic', backend=camera_backend)
 
     # The mask node's own base_frame default is the bare string "base_link",
     # unlike the pointcloud and viz nodes which derive a namespaced frame from
@@ -179,7 +185,9 @@ def generate_launch_description():
     target_localization_enabled = LaunchConfiguration('target_localization_enabled')
     mppi_visualize = LaunchConfiguration('mppi_visualize')
     coverage_overlay_enabled = LaunchConfiguration('coverage_overlay_enabled')
-    sim = LaunchConfiguration('sim')
+    autonomous_motion_enabled = LaunchConfiguration('autonomous_motion_enabled')
+    backend = LaunchConfiguration('backend')
+    legacy_sim = LaunchConfiguration('sim')
     sim_ready_timeout = LaunchConfiguration('sim_ready_timeout')
     rtf = LaunchConfiguration('rtf')
     headless = LaunchConfiguration('headless')
@@ -222,23 +230,35 @@ def generate_launch_description():
         timeout=60,
     )
 
+    def _backend_default(simulation_value, hardware_value):
+        return PythonExpression([
+            "'", hardware_value, "' if '", backend,
+            "' == 'hardware' else '", simulation_value, "'",
+        ])
+
     return LaunchDescription([
         *cyclonedds_actions(pkg_this),
         *perception_venv_actions(pkg_this),
         DeclareLaunchArgument('namespace', default_value='r100_0001'),
-        DeclareLaunchArgument('use_sim_time', default_value='true'),
-        DeclareLaunchArgument('setup_path',
-                              default_value=os.path.expanduser('~/clearpath/')),
-        DeclareLaunchArgument('world', default_value='mock_hospital'),
         DeclareLaunchArgument(
             'sim', default_value='gz', choices=['gz', 'isaac'],
-            description='Simulation backend, forwarded down the include chain'),
+            description='Deprecated compatibility alias for backend'),
+        DeclareLaunchArgument(
+            'backend', default_value=legacy_sim,
+            choices=['gz', 'isaac', 'hardware'],
+            description='I/O provider for the shared autonomy stack'),
+        DeclareLaunchArgument(
+            'use_sim_time', default_value=_backend_default('true', 'false')),
+        DeclareLaunchArgument('setup_path',
+                              default_value=_backend_default(
+                                  os.path.expanduser('~/clearpath/'),
+                                  '/etc/clearpath/')),
+        DeclareLaunchArgument('world', default_value='mock_hospital'),
         DeclareLaunchArgument(
             'sim_ready_timeout',
             default_value=PythonExpression(
-                ["'300' if '", sim, "' == 'isaac' else '45'"]),
-            description='Seconds the first readiness gate waits for the sim to '
-                        'publish scan+odom (Isaac cold-boots slower than gz)'),
+                ["'300' if '", backend, "' == 'isaac' else '45'"]),
+            description='Seconds the first readiness gate waits for scan+odom'),
         DeclareLaunchArgument(
             'rtf', default_value='1.0',
             description='Isaac real-time factor; 0 = unthrottled (gz ignores)'),
@@ -263,27 +283,33 @@ def generate_launch_description():
             description='Isaac: lidar rate / deterministic fixed dt (gz ignores)'),
         DeclareLaunchArgument(
             'slam_source',
-            default_value=PythonExpression(
-                ["'merged' if '", sim, "' == 'isaac' else 'front_only'"]),
+            default_value='front_only',
             choices=['front_only', 'merged'],
             description='front_only or merged (slam_toolbox reads '
-                        'scan_merger_node.py\'s SLAM-only front+rear merge '
+                        "scan_merger_node.py's SLAM-only front+rear merge "
                         'instead of raw front; Nav2/collision_monitor '
                         'always keep the raw front+rear topics unchanged '
-                        'either way). Isaac default: merged. Gazebo '
-                        'default: front_only (unaffected unless explicitly '
-                        'overridden).'),
+                        'either way). The default is identical on every '
+                        'backend; merged scans remain an explicit opt-in.'),
         DeclareLaunchArgument(
-            'color_topic', default_value=SIMULATION_CAMERA_INPUTS.color_image_topic),
+            'color_topic', default_value=_backend_default(
+                SIMULATION_CAMERA_INPUTS.color_image_topic,
+                REALSENSE_CAMERA_INPUTS.color_image_topic)),
         DeclareLaunchArgument(
             'camera_info_topic',
-            default_value=SIMULATION_CAMERA_INPUTS.color_camera_info_topic,
+            default_value=_backend_default(
+                SIMULATION_CAMERA_INPUTS.color_camera_info_topic,
+                REALSENSE_CAMERA_INPUTS.color_camera_info_topic),
         ),
         DeclareLaunchArgument(
-            'depth_topic', default_value=SIMULATION_CAMERA_INPUTS.aligned_depth_topic),
+            'depth_topic', default_value=_backend_default(
+                SIMULATION_CAMERA_INPUTS.aligned_depth_topic,
+                REALSENSE_CAMERA_INPUTS.aligned_depth_topic)),
         DeclareLaunchArgument(
             'pointcloud_topic',
-            default_value=SIMULATION_CAMERA_INPUTS.organized_points_topic or '',
+            default_value=_backend_default(
+                SIMULATION_CAMERA_INPUTS.organized_points_topic or '',
+                REALSENSE_CAMERA_INPUTS.organized_points_topic or ''),
         ),
         DeclareLaunchArgument('exploration_rviz', default_value='true',
                               description='Launch the exploration RViz2 config'),
@@ -294,7 +320,9 @@ def generate_launch_description():
                                           'requires perception_venv'),
         DeclareLaunchArgument('estimate_viz', default_value='true',
                               description='Publish the estimator rings and the wide distance HUD'),
-        DeclareLaunchArgument('estimators', default_value='all',
+        DeclareLaunchArgument('estimators', default_value=_backend_default(
+                                  'all',
+                                  'projective_ranging,euclidean_reconstruction'),
                               description='Which distance estimator rows to run: "all" or a '
                                           'comma-separated subset of pointcloud, '
                                           'projective_ranging, euclidean_reconstruction, '
@@ -316,8 +344,22 @@ def generate_launch_description():
                                           'silhouette'),
         DeclareLaunchArgument('mppi_visualize', default_value='false',
                               description='Publish MPPI trajectory visualization topics'),
-        DeclareLaunchArgument('coverage_overlay_enabled', default_value='true',
-                              description='Publish the live exploration-coverage HUD panel'),
+        DeclareLaunchArgument(
+            'coverage_overlay_enabled',
+            default_value=_backend_default('true', 'false'),
+            description='Publish the live exploration-coverage HUD panel; '
+                        'hardware defaults false because no simulation truth map exists'),
+        DeclareLaunchArgument(
+            'autonomous_motion_enabled',
+            default_value=_backend_default('true', 'false'),
+            choices=['true', 'false'],
+            description='Allow frontier goals to command motion; hardware '
+                        'defaults false and requires explicit operator opt-in'),
+        DeclareLaunchArgument(
+            'start_hardware_platform', default_value='false',
+            choices=['true', 'false'],
+            description='Hardware only: explicitly start Clearpath platform '
+                        'bringup; false attaches to existing robot services'),
         DeclareLaunchArgument('headless_rendering', default_value='false',
                               description='Render Gazebo server sensors via EGL without an X '
                                           'display (GPU rendering for SSH sessions; '
@@ -343,15 +385,18 @@ def generate_launch_description():
             condition=launch.conditions.IfCondition(target_localization_enabled),
         ),
 
-        # 1. Launch the selected simulation backend
+        # 1. Launch the selected I/O provider. The dispatcher resolves only the
+        # selected optional package, so hardware never loads simulator code.
         IncludeLaunchDescription(
-                    PythonLaunchDescriptionSource(
-                        os.path.join(includes_dir, 'simulation.launch.py')
-                    ),
+            PythonLaunchDescriptionSource(
+                os.path.join(includes_dir, 'simulation.launch.py')
+            ),
             launch_arguments={
-                'sim': sim,
+                'sim': legacy_sim,
+                'backend': backend,
                 'setup_path': setup_path,
                 'world': world,
+                'namespace': namespace,
                 'clearpath_rviz': 'false',
                 'headless_rendering': LaunchConfiguration('headless_rendering'),
                 'rtf': rtf,
@@ -361,6 +406,8 @@ def generate_launch_description():
                 'camera': camera,
                 'sim_mode': sim_mode,
                 'sensor_hz': sensor_hz,
+                'start_hardware_platform': LaunchConfiguration(
+                    'start_hardware_platform'),
             }.items(),
         ),
 
@@ -411,6 +458,8 @@ def generate_launch_description():
                         'namespace': namespace,
                         'use_sim_time': use_sim_time,
                     }.items(),
+                    condition=launch.conditions.IfCondition(
+                        autonomous_motion_enabled),
                 ),
             ],
         )),
@@ -439,7 +488,10 @@ def generate_launch_description():
             }],
             remappings=[('/tf', 'tf'), ('/tf_static', 'tf_static')],
             output='screen',
-            condition=launch.conditions.IfCondition(coverage_overlay_enabled),
+            condition=launch.conditions.IfCondition(PythonExpression([
+                "'", backend, "' != 'hardware' and '",
+                coverage_overlay_enabled, "' == 'true'",
+            ])),
         ),
 
         # Localization-error panel (GT pose vs SLAM map->base_link) ->
@@ -455,7 +507,7 @@ def generate_launch_description():
             remappings=[('/tf', 'tf'), ('/tf_static', 'tf_static')],
             output='screen',
             condition=launch.conditions.IfCondition(
-                EqualsSubstitution(sim, 'isaac')),
+                EqualsSubstitution(backend, 'isaac')),
         ),
 
         # General HUD aggregator: merges the panels into one screen overlay.

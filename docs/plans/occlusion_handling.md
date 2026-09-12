@@ -241,4 +241,6 @@ projective-ranging and euclidean-reconstruction references.
   the per-estimator status fields, and the benchmark's histogram/coverage aggregation — the benchmark
   side needs **no changes** for `OCCLUDED` to appear in the reports.
 - The occlusion scenario set, occluder models, and per-instance ground truth
-  (`config/benchmark_scenarios_full.yaml`, `sim/models/hospital_bed`, `sim/models/privacy_curtain`).
+  (`config/benchmark_scenarios_full.yaml`,
+  `src/ridgeback_autonomy_gz/sim/models/hospital_bed`, and
+  `src/ridgeback_autonomy_gz/sim/models/privacy_curtain`).

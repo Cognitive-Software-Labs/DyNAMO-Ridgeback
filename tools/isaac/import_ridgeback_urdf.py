@@ -23,7 +23,7 @@ Run under isaac_venv with the workspace sourced:
     OMNI_KIT_ACCEPT_EULA=YES isaac_venv/bin/python3 \
         tools/isaac/import_ridgeback_urdf.py
 
-Output: src/ridgeback_autonomy/sim/isaac/usd/robots/ridgeback_r100.usd
+Output: src/ridgeback_autonomy_isaac/sim/isaac/usd/robots/ridgeback_r100.usd
 (committed artifact; regeneration is deliberate, reviewed in git).
 """
 import argparse
@@ -37,11 +37,11 @@ SETUP_PATH = REPO / "clearpath"
 # The 6.0 importer treats usd_path as a package DIRECTORY and writes
 # <usd_path>/<stem>/<stem>.usda (+ payloads/, Textures/). We flatten one
 # level so the committed layout is robots/ridgeback_r100/ridgeback_r100.usda.
-OUT_DIR = REPO / "src/ridgeback_autonomy/sim/isaac/usd/robots"
+OUT_DIR = REPO / "src/ridgeback_autonomy_isaac/sim/isaac/usd/robots"
 OUT_USD = OUT_DIR / "ridgeback_r100.usd"          # importer staging dir
 ENTRY_USD = OUT_DIR / "ridgeback_r100" / "ridgeback_r100.usda"
 CAMERA_SPEC = (
-    REPO / "src/ridgeback_autonomy/sim/isaac/d455_camera.json"
+    REPO / "src/ridgeback_autonomy_isaac/sim/isaac/d455_camera.json"
 )
 
 RIG = {
@@ -577,7 +577,7 @@ def add_sensor_prims(usd_path: Path) -> None:
     from omni.sensors.schema import OmniSensorAPI
     from pxr import Gf, Sdf, Usd, UsdGeom, Vt
 
-    sim_dir = REPO / "src/ridgeback_autonomy/sim/isaac"
+    sim_dir = REPO / "src/ridgeback_autonomy_isaac/sim/isaac"
     lidar_spec = json.loads((sim_dir / "ust10lx_2d.json").read_text())["attributes"]
     cam_spec = load_camera_spec()
 

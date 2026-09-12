@@ -1,7 +1,8 @@
 # Isaac Sim port
 
-Porting the Ridgeback autonomy stack from Gazebo Harmonic to **Isaac Sim 6.0
-GA**. In progress on `feat/isaac-sim-6-port`.
+Adding **Isaac Sim 6.0 GA** as a first-class backend for the shared Ridgeback
+autonomy stack. Gazebo and hardware remain separate adapters. In progress on
+`feat/isaac-sim-6-port`.
 
 ## Start here
 

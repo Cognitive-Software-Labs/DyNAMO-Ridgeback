@@ -1,4 +1,4 @@
-# G1 perception + dev-tooling dependencies for perception_venv.
+# Target-localization model dependencies for perception_venv.
 #
 # Setup (first time only):
 #   python3 -m venv --system-site-packages perception_venv
@@ -23,7 +23,3 @@ torchvision==0.26.0+cu128
 transformers==5.10.2
 accelerate==1.13.0
 Pillow>=10.0
-
-# Knowledge-graph pre-commit hook — tools/rebuild_graphify does `import graphify`,
-# which is provided by the `graphifyy` distribution (note the double "y").
-graphifyy==0.8.35

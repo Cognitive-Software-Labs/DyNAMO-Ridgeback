@@ -21,11 +21,12 @@ Resolve these explicitly before execution:
 2. The camera configuration uses `serial_no: "0"`. That does not prove which
    physical D455 the driver selected. Enumerate the connected device, record its
    serial, and pin or otherwise prove selection through an approved config diff.
-3. `ridgeback_exploration.launch.py` is a simulation entrypoint and always starts
-   Gazebo. Do not run it on the robot as the hardware smoke. Use the robot's
-   approved Clearpath hardware bringup plus the existing perception nodes
-   directly for the first validation. A reusable hardware localization launch
-   is a separate implementation decision after the raw camera contract passes.
+3. `ridgeback_exploration.launch.py backend:=hardware` now provides the reusable
+   hardware adapter. It is attach-only by default, selects RealSense color and
+   aligned-depth topics, disables the unvalidated pointcloud estimator and
+   frontier goals, uses wall time, and does not run simulator cleanup. Keep the
+   robot's approved Clearpath services running and do not set
+   `start_hardware_platform:=true` during the first camera validation.
 
 ## Scope and non-goals
 
@@ -44,8 +45,8 @@ Not part of the required pass:
 - enabling or accepting the optional organized point cloud;
 - changing estimator recipes, thresholds, exact-stamp semantics, or scoring;
 - claiming estimator accuracy from a visual overlay;
-- implementing a hardware launch file or fixing a failed gate without separate
-  approval.
+- enabling autonomous motion, starting platform bringup from this repository,
+  or fixing a failed gate without separate approval.
 
 ## Phase 0: freeze provenance and evidence storage
 
@@ -145,8 +146,9 @@ calibration. LiDAR integration remains owned by the separate
 
 ## Phase 4: minimal target-localization smoke
 
-Keep the approved hardware bringup running and start the existing detector and
-mask-measurement nodes without the simulation launch. Freeze these settings:
+Keep the approved hardware bringup running and launch the shared stack with
+`backend:=hardware autonomous_motion_enabled:=false
+start_hardware_platform:=false`. Freeze these settings:
 
 - CycloneDDS and the robot's ROS domain;
 - `use_sim_time:=false`;

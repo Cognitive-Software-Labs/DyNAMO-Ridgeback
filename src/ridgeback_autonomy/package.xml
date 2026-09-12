@@ -3,7 +3,7 @@
 <package format="3">
   <name>ridgeback_autonomy</name>
   <version>0.1.0</version>
-  <description>Launch files, perception nodes, and configs for Ridgeback autonomy in Gazebo</description>
+  <description>Backend-neutral Ridgeback autonomy, perception, SLAM, and navigation stack</description>
   <maintainer email="davszi@todo.com">davszi</maintainer>
   <license>BSD-3-Clause</license>
 
@@ -11,14 +11,9 @@
   <buildtool_depend>ament_cmake_python</buildtool_depend>
   <buildtool_depend>rosidl_default_generators</buildtool_depend>
 
-  <build_depend>gz-gui-vendor</build_depend>
-  <build_depend>gz-plugin-vendor</build_depend>
-  <build_depend>gz-common-vendor</build_depend>
-  <build_depend>qtbase5-dev</build_depend>
-  <build_depend>qtdeclarative5-dev</build_depend>
-
-  <exec_depend>clearpath_gz</exec_depend>
   <exec_depend>clearpath_config</exec_depend>
+  <exec_depend>launch</exec_depend>
+  <exec_depend>launch_ros</exec_depend>
   <exec_depend>slam_toolbox</exec_depend>
   <exec_depend>navigation2</exec_depend>
   <exec_depend>nav2_bringup</exec_depend>
@@ -32,6 +27,10 @@
   <exec_depend>std_msgs</exec_depend>
   <exec_depend>builtin_interfaces</exec_depend>
   <exec_depend>tf2_ros</exec_depend>
+  <exec_depend>geometry_msgs</exec_depend>
+  <exec_depend>lifecycle_msgs</exec_depend>
+  <exec_depend>visualization_msgs</exec_depend>
+  <exec_depend>cv_bridge</exec_depend>
   <exec_depend>rosidl_default_runtime</exec_depend>
   <exec_depend>python3-numpy</exec_depend>
   <exec_depend>python3-opencv</exec_depend>

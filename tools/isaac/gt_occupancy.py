@@ -15,7 +15,7 @@ metrics skip those cells rather than mis-scoring them.
 Pure python + numpy (parse layer of sdf2usd has no pxr dependency):
 
     python3 tools/isaac/gt_occupancy.py \
-        src/ridgeback_autonomy/sim/worlds/mock_hospital.sdf \
+        src/ridgeback_autonomy_gz/sim/worlds/mock_hospital.sdf \
         /tmp/gt_hospital.npz --png /tmp/gt_hospital.png
 
 The lidar plane default (0.3024 m) is the front UST-10LX height in the

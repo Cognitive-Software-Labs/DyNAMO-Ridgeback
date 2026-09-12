@@ -1,14 +1,16 @@
 # Project context
 
 DyNAMO-Ridgeback is a ROS 2 Jazzy workspace for autonomous Ridgeback
-exploration, target localization, and repeatable simulator benchmarking.
+exploration and target localization across Gazebo, Isaac Sim, and physical
+hardware, plus repeatable simulator benchmarking.
 This page is intentionally short: it provides orientation and routes detailed
 facts to their canonical documents.
 
 ## Public workflows
 
-- `ridgeback_exploration.launch.py` runs simulation, SLAM, Nav2, the in-repo
-  frontier explorer, diagnostics, and optional target localization.
+- `ridgeback_exploration.launch.py` selects `backend:=gz|isaac|hardware`, then
+  runs the shared SLAM, Nav2, diagnostics, and optional target localization;
+  frontier goals default off on hardware.
 - `target_distance_benchmark.launch.py` compares the registered localization
   estimators on declarative simulator scenarios.
 - `manual_mapping.launch.py` supports map generation and validation.
@@ -21,10 +23,16 @@ building blocks unless a technical reference says otherwise.
 
 ## Repository map
 
-- `src/ridgeback_autonomy/` — the ROS package, launch/configuration files,
-  Python package, tests, messages, and simulation assets
+- `src/ridgeback_autonomy/` — backend-neutral nodes, messages, configuration,
+  tests, readiness gates, and public launch workflows
+- `src/ridgeback_autonomy_gz/` — Gazebo adapter, worlds, models, and GUI plugin
+- `src/ridgeback_autonomy_isaac/` — Isaac adapter, runner, sensor specs, and USD
+- `src/ridgeback_autonomy_hardware/` — attach-first Clearpath hardware adapter
+- `dependencies/` — split `vcstool` manifests: common source dependencies and
+  the optional Gazebo source dependency
 - `clearpath/robot.yaml` — canonical robot and sensor declaration
-- `patches/` — maintained changes to dependencies imported through `.repos`;
+- `patches/` — maintained changes to dependencies imported through the
+  manifests under `dependencies/`;
   these are standalone ignored repositories governed by the
   [dependency runbook](dependencies.md)
 - `tools/` — diagnostics, benchmark helpers, and development utilities

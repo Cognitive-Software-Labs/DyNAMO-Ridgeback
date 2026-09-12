@@ -72,8 +72,8 @@ void SpawnG1::LoadConfig(const tinyxml2::XMLElement *_pluginElem)
       {
         if (path.empty()) continue;
         const std::vector<std::string> candidates = {
-          path + "/../../share/ridgeback_autonomy/sim/models/g1/model.sdf",
-          path + "/../../../share/ridgeback_autonomy/sim/models/g1/model.sdf",
+          path + "/../../share/ridgeback_autonomy_gz/sim/models/g1/model.sdf",
+          path + "/../../../share/ridgeback_autonomy_gz/sim/models/g1/model.sdf",
         };
         for (const auto &candidate : candidates)
         {

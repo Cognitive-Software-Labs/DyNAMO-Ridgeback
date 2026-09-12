@@ -35,7 +35,7 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]
-                       / "src/ridgeback_autonomy/sim/isaac"))
+                       / "src/ridgeback_autonomy_isaac/sim/isaac"))
 
 from gt_occupancy import LIDAR_PLANE_Z  # noqa: E402  (one owner for the plane)
 

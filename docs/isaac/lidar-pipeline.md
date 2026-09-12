@@ -203,9 +203,9 @@ Run recipe (headless, from the worktree root):
 ```bash
 source install/setup.bash
 export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp CYCLONEDDS_URI=file://$PWD/cyclonedds.xml
-ros2 launch install/.../includes/simulation_isaac.launch.py world:=mock_hospital
+ros2 launch ridgeback_autonomy_isaac backend.launch.py world:=mock_hospital
 ros2 launch install/.../includes/slam.launch.py use_sim_time:=true setup_path:=$PWD/clearpath/
-python3 tools/isaac/gt_occupancy.py src/ridgeback_autonomy/sim/worlds/mock_hospital.sdf /tmp/gt.npz
+python3 tools/isaac/gt_occupancy.py src/ridgeback_autonomy_gz/sim/worlds/mock_hospital.sdf /tmp/gt.npz
 python3 tools/isaac/slam_quality_probe.py --tag X --gt-grid /tmp/gt.npz \
     --slam-log <slam launch log> --out <dir>
 ```

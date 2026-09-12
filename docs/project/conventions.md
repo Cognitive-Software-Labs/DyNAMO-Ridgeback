@@ -10,7 +10,7 @@ behavior stays in the relevant technical reference.
   `('/tf_static', 'tf_static')` when they consume TF.
 - A ROS topic namespace does not determine the frame IDs carried inside TF.
   Inspect the actual graph instead of deriving `base_frame` from the namespace.
-- Simulation nodes use `use_sim_time: true`.
+- Simulation nodes use `use_sim_time: true`; hardware uses wall time.
 - Sensor names are auto-indexed: the first camera is `camera_0`; the first 2D
   LiDAR is `lidar2d_0`.
 
@@ -21,9 +21,14 @@ behavior stays in the relevant technical reference.
 - Bringup is event-driven through `launch_wait` readiness gates chained by
   process/state events. Do not replace a real readiness condition with a fixed
   `TimerAction` delay.
-- `start_exploration.sh` sources the workspace, cleans stale processes, selects
-  CycloneDDS only when the caller has not selected an RMW, accepts the world as
-  positional argument 1, and forwards later `key:=value` arguments.
+- `start_exploration.sh` sources the workspace, selects CycloneDDS only when the
+  caller has not selected an RMW, accepts the world as positional argument 1,
+  and forwards later `key:=value` arguments. It runs simulator cleanup and
+  supplies domain 42 only for simulation; hardware preserves live processes and
+  requires the deployment domain from the caller/environment.
+- `backend:=gz|isaac|hardware` is canonical. `sim:=gz|isaac` is a deprecated
+  compatibility alias. Backend launch packages implement I/O; application
+  behavior remains in `ridgeback_autonomy`.
 - Run `cleanup.sh` once before a benchmark sweep, never between its persistent
   configurations.
 
@@ -56,7 +61,8 @@ behavior stays in the relevant technical reference.
 
 ## Dependencies and patches
 
-External ROS repositories are declared in `.repos`. When a dependency changes,
+External ROS repositories are declared in `dependencies/core.repos` and the
+optional `dependencies/gz.repos`. When a dependency changes,
 check the root installation instructions, local patches, and any operational
 notes affected by that change. If a simulation asset referenced by a Clearpath
 patch moves, update the patch in the same change.

@@ -1,0 +1,3 @@
+# Repository tooling only; not required by the autonomy or perception runtime.
+# tools/rebuild_graphify imports `graphify`, provided by the graphifyy package.
+graphifyy==0.8.35

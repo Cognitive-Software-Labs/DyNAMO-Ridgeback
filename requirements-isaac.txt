@@ -1,7 +1,7 @@
 # Isaac Sim 6.0 simulator dependencies for isaac_venv (see README "Isaac Sim venv").
 #
 # Pinned to the 6.0.1 GA patch release; the port's runner code
-# (src/ridgeback_autonomy/sim/isaac/) is written against these APIs and
+# (src/ridgeback_autonomy_isaac/sim/isaac/) is written against these APIs and
 # 6.x minor bumps have historically renamed extensions. Bump deliberately,
 # re-running tools/isaac/smoke_test.py afterwards.
 #

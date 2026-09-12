@@ -47,7 +47,7 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]
-                       / "src/ridgeback_autonomy/sim/isaac"))
+                       / "src/ridgeback_autonomy_isaac/sim/isaac"))
 
 # One slice height, one flood-fill, one map writer -- all owned by
 # gt_occupancy. These were separate copies until 2026-09-10, which is exactly

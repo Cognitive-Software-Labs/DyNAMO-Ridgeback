@@ -28,14 +28,14 @@ rather than hiding the button.
 kill_matches "lib/ridgeback_autonomy/"
 ```
 
-([`cleanup.sh:95`](../../cleanup.sh:95)) is a `pgrep -f` substring match, and
+([`cleanup.sh`](../../cleanup.sh)) is a `pgrep -f` substring match, and
 `kill_matches` is `kill -9` excluding only `$$` and `$PPID`. The configurator's
 installed copy lives at
 `install/ridgeback_autonomy/lib/ridgeback_autonomy/target_benchmark_configurator`,
 so it matches.
 
 `target_benchmark_sweep` calls `run_preflight_cleanup` before Gazebo starts
-([`target_benchmark_sweep.py:628`](../../src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/target_benchmark_sweep.py:628)),
+([`target_benchmark_sweep.py`](../../src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/target_benchmark_sweep.py)),
 so a GUI-launched sweep would `kill -9` the GUI mid-click. Do **not** work around
 it with `--skip-preflight-cleanup`; that flag produces the two-`gz sim` failure
 where every trial dies with "Target pose ... not present". The catch-all must be
@@ -56,7 +56,7 @@ narrowed to actual nodes first. Full description in
 ### 2.1 Progress is already on disk
 
 The sweep writes `sweep.json` and regenerates `summary.md` after **every
-config** ([`target_benchmark_sweep.py:726`](../../src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/target_benchmark_sweep.py:726)),
+config** ([`target_benchmark_sweep.py`](../../src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/target_benchmark_sweep.py)),
 carrying per-config `status`, `error`, `wall_time_sec` and `real_time_factor`.
 The GUI polls that file. No log-streaming protocol to invent — this is the
 single biggest reason Phase 2 is smaller than it looks.
@@ -66,7 +66,7 @@ Note the filename is `sweep.json`, not `manifest.json`.
 ### 2.2 Locating the sweep directory
 
 `sweep_dir = os.path.join(output_root, f'{_timestamp()}_{spec.name}')`
-([`target_benchmark_sweep.py:601`](../../src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/target_benchmark_sweep.py:601)),
+([`target_benchmark_sweep.py`](../../src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/target_benchmark_sweep.py)),
 or an existing directory when `_find_resumable_sweep` matches. Parse it from the
 log lines `Created sweep directory <path>` / `Resuming incomplete sweep <path>`
 rather than recomputing the timestamp, which would race. The run log the

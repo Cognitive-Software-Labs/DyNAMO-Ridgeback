@@ -10,11 +10,11 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[3]
 IMPORTER = REPO_ROOT / 'tools' / 'isaac' / 'import_ridgeback_urdf.py'
 ROBOT_USDA = (
-    REPO_ROOT / 'src/ridgeback_autonomy/sim/isaac/usd/robots/'
+    REPO_ROOT / 'src/ridgeback_autonomy_isaac/sim/isaac/usd/robots/'
     'ridgeback_r100/ridgeback_r100.usda'
 )
 ISAAC_LAUNCH = (
-    REPO_ROOT / 'src/ridgeback_autonomy/launch/includes/simulation_isaac.launch.py'
+    REPO_ROOT / 'src/ridgeback_autonomy_isaac/launch/backend.launch.py'
 )
 
 module_spec = importlib.util.spec_from_file_location('import_ridgeback_urdf', IMPORTER)

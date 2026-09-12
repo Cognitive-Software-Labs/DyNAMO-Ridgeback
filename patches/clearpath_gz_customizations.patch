@@ -88,7 +88,7 @@ index 4d74475..8e92f6f 100644
      </gz-gui>
  </plugin>
 diff --git a/clearpath_gz/launch/gz_sim.launch.py b/clearpath_gz/launch/gz_sim.launch.py
-index 93c8104..74a28c9 100644
+index 93c8104..ca1e3e1 100644
 --- a/clearpath_gz/launch/gz_sim.launch.py
 +++ b/clearpath_gz/launch/gz_sim.launch.py
 @@ -37,6 +37,10 @@ ARGUMENTS = [
@@ -131,20 +131,20 @@ index 93c8104..74a28c9 100644
 -    # Set ignition resource path to include all sourced ros packages
 +    # Set ignition resource path to include all sourced ros packages and this
 +    # workspace's custom simulation worlds and models.
-+    pkg_ridgeback_autonomy = get_package_share_directory('ridgeback_autonomy')
++    pkg_ridgeback_autonomy_gz = get_package_share_directory('ridgeback_autonomy_gz')
      gz_sim_resource_path = SetEnvironmentVariable(
          name='GZ_SIM_RESOURCE_PATH',
          value=[
              os.path.join(pkg_clearpath_gz, 'worlds') + ':',
              os.path.join(pkg_clearpath_gz, 'meshes') + ':',
-+            os.path.join(pkg_ridgeback_autonomy, 'sim', 'worlds') + ':',
-+            os.path.join(pkg_ridgeback_autonomy, 'sim', 'models') + ':',
++            os.path.join(pkg_ridgeback_autonomy_gz, 'sim', 'worlds') + ':',
++            os.path.join(pkg_ridgeback_autonomy_gz, 'sim', 'models') + ':',
              ':' + ':'.join(packages_paths)])
  
 +    gz_gui_plugin_path = SetEnvironmentVariable(
 +        name='GZ_GUI_PLUGIN_PATH',
 +        value=os.path.join(
-+            pkg_ridgeback_autonomy, '..', '..', 'lib', 'ridgeback_autonomy'))
++            pkg_ridgeback_autonomy_gz, '..', '..', 'lib', 'ridgeback_autonomy_gz'))
 +
      # Clock bridge
      clock_bridge = Node(

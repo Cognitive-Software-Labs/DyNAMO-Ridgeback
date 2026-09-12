@@ -29,24 +29,44 @@ if [[ $# -gt 0 ]] && ! is_passthrough "$1"; then
     shift
 fi
 
+# Resolve the provider before setting process policy. ``backend`` is canonical;
+# ``sim`` remains a compatibility alias and is only consulted when backend was
+# not supplied.
+BACKEND=
+for arg in "$@"; do
+    [[ "$arg" == backend:=* ]] && BACKEND="${arg#backend:=}"
+done
+if [ -z "$BACKEND" ]; then
+    BACKEND=gz
+    for arg in "$@"; do
+        [[ "$arg" == sim:=* ]] && BACKEND="${arg#sim:=}"
+    done
+fi
+
 # CycloneDDS is the measured default for image/depth delivery. An explicitly
 # selected RMW remains authoritative. Public launches supply the package-owned
 # CycloneDDS participant-index config when CYCLONEDDS_URI is unset.
 export RMW_IMPLEMENTATION="${RMW_IMPLEMENTATION:-rmw_cyclonedds_cpp}"
-export ROS_DOMAIN_ID="${ROS_DOMAIN_ID:-42}"
+if [ "$BACKEND" != hardware ]; then
+    export ROS_DOMAIN_ID="${ROS_DOMAIN_ID:-42}"
+fi
 
 set +u
 source /opt/ros/jazzy/setup.bash
 source "$SCRIPT_DIR/install/setup.bash"
 set -u
 
-bash "$SCRIPT_DIR/cleanup.sh"
+if [ "$BACKEND" = hardware ]; then
+    echo "Hardware backend: preserving existing ROS and Clearpath processes"
+else
+    bash "$SCRIPT_DIR/cleanup.sh"
+fi
 
 # One non-clobbering directory per launch, with console and ROS logs together.
 # LOG_DIR overrides the exploration output root; ROS_LOG_DIR remains independent.
 LOG_DIR="${LOG_DIR:-$SCRIPT_DIR/artifacts/exploration}"
 mkdir -p "$LOG_DIR"
-RUN_LOG_DIR="$(mktemp -d "$LOG_DIR/ridgeback_$(date +%Y-%m-%d_%H-%M-%S)_${WORLD}.XXXXXX")"
+RUN_LOG_DIR="$(mktemp -d "$LOG_DIR/ridgeback_$(date +%Y-%m-%d_%H-%M-%S)_${BACKEND}_${WORLD}.XXXXXX")"
 LOG_FILE="$RUN_LOG_DIR/console.log"
 export ROS_LOG_DIR="${ROS_LOG_DIR:-$RUN_LOG_DIR/ros}"
 mkdir -p "$ROS_LOG_DIR"

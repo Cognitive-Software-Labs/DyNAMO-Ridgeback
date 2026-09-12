@@ -13,7 +13,10 @@ are not stored in the root repository's history.
 
 The compatibility unit has three root-owned parts:
 
-- [`.repos`](../../.repos) owns upstream URLs and immutable commit pins.
+- [`dependencies/core.repos`](../../dependencies/core.repos) owns the source
+  dependencies shared by every deployment.
+- [`dependencies/gz.repos`](../../dependencies/gz.repos) owns the optional
+  Gazebo-only `clearpath_simulator` pin.
 - [`patches/`](../../patches/) owns intentional changes to those pinned sources.
 - [`tools/check_dependencies`](../../tools/check_dependencies) verifies that
   every checkout is at its pin and contains either no changes or exactly its
@@ -25,21 +28,30 @@ src/<repository> status` when inspecting one checkout directly.
 
 ## Fresh checkout and routine verification
 
-From the workspace root:
+From the workspace root, import only the deployment closure you need:
 
 ```bash
-vcs import < .repos
-tools/check_dependencies --apply
+# Every deployment
+vcs import < dependencies/core.repos
+
+# Gazebo development only
+vcs import < dependencies/gz.repos
+
+# Verify both profiles after a Gazebo import
+tools/check_dependencies --apply --profile all
 ```
 
-`vcs import` creates the nested repositories at the exact commits in `.repos`.
-The checker then applies missing maintained patches. Its `--apply` mode is
-idempotent: an exact already-applied patch is accepted.
+On an Isaac-only or hardware host, omit the Gazebo import and run
+`tools/check_dependencies --apply --profile core`. `--profile gz` checks only
+the optional simulator checkout. `vcs import` creates the nested repositories
+at the exact manifest commits. The checker then applies missing maintained
+patches. Its `--apply` mode is idempotent: an exact already-applied patch is
+accepted.
 
 Before later builds, use the read-only form:
 
 ```bash
-tools/check_dependencies
+tools/check_dependencies --profile all
 ```
 
 The checker rejects:
@@ -100,21 +112,21 @@ The maintained mappings are:
 | `src/clearpath_common` | `patches/clearpath_realsense_sim_frames.patch` |
 | `src/slam_toolbox` | `patches/slam_toolbox_tf_namespace.patch` |
 
-Update all `.repos` pins and patch files in the same root commit.
+Update all affected manifest pins and patch files in the same root commit.
 
 ### 4. Prove the clean-import contract
 
 Against clean checkouts at the proposed pins:
 
 - confirm each patch passes `git apply --check` before application;
-- run `tools/check_dependencies --apply`;
-- rerun `tools/check_dependencies` and require a clean result;
+- run `tools/check_dependencies --apply --profile all`;
+- rerun `tools/check_dependencies --profile all` and require a clean result;
 - confirm each patched checkout's complete `git diff HEAD` exactly equals its
   recorded root patch;
 - remove and reapply at least one patch to exercise the missing-patch and
   idempotence paths.
 
-`vcstool validate` is not the acceptance gate here: versions in `.repos` are raw
+`vcstool validate` is not the acceptance gate here: manifest versions are raw
 commit hashes, while `tools/check_dependencies` checks the exact checkout and
 patch shape required by this workspace.
 
@@ -164,8 +176,9 @@ deliverable.
 ## Rollback
 
 Treat pins and patches as an inseparable set. The clean rollback is to restore
-the previous root commit's `.repos` and `patches/`, recreate or switch all nested
-checkouts to those pins, and run the restored checker with `--apply`.
+the previous root commit's `dependencies/*.repos` and `patches/`, recreate or
+switch all nested checkouts to those pins, and run the restored checker with
+`--apply` and the relevant profile.
 
 Do not selectively combine an old dependency pin with a new patch. Restore a
 saved live-checkout stash only on the revision where it was created, inspect the

@@ -6,6 +6,24 @@ unselected alternatives belong in `docs/do_not_try_again/`. Closing an item mean
 its completion criteria and moving durable results to the relevant reference or
 history document—not retaining a crossed-out entry here.
 
+## Physical command-chain validation
+
+**Deployment gate.** The hardware adapter is attach-only and autonomous motion
+defaults off, but the repository has not proven the deployed base controller's
+velocity message contract. The generated setup currently mixes stamped Nav2,
+velocity-smoother, collision-monitor, and mux commands with a generated R100
+mecanum controller setting that reports `use_stamped_vel: false`.
+
+**Completion criteria.** On the exact approved robot configuration, trace the
+message type, topic, QoS, frame/timeout semantics, mux ownership, collision
+monitor, controller input, e-stop, and deadman behavior from Nav2 to the base.
+Resolve any mismatch at the narrowest owning layer; then perform stationary,
+lifted/blocked-wheel where approved, low-speed clear-space, stop, timeout, and
+e-stop tests before enabling `autonomous_motion_enabled:=true`.
+
+**Context.** [Exploration architecture](exploration/architecture.md#hardware-safety-boundary)
+and the public hardware workflow in the [README](../README.md).
+
 ## Gazebo collision-stack parity for the measured lidar mounts
 
 **Gap.** The shared robot description now carries the physically measured,
