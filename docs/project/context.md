@@ -44,6 +44,7 @@ building blocks unless a technical reference says otherwise.
 ## Architecture pointers
 
 - [Exploration architecture](../exploration/architecture.md)
+- [Camera stack](../target_localization/camera_stack.md)
 - [Target-localization pipeline](../target_localization/target_localization_pipeline.md)
 - [Target-distance benchmarking](../benchmarking/target_distance_benchmarking.md)
 - [External dependency management](dependencies.md)

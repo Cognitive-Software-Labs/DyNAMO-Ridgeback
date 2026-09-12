@@ -126,14 +126,14 @@ straight through is a launch-wiring choice (`depth_topic`), not a code branch �
 the same contract unchanged. Divergences to keep in mind (details in
 `docs/target_localization/target_localization_pipeline.md` §2):
 
-| | Sim | Real |
-|---|---|---|
-| Depth origin | color camera's Z-buffer | left-IR stereo, reprojected |
-| Alignment | by construction | driver filter, must be enabled |
-| FoV | 71.6° (`horizontal_fov` 1.25 rad) | read color/depth `CameraInfo`; no value is pinned here |
-| Resolution/rate | current simulation contract 640×480 @ 30 | active driver profiles; record on hardware |
-| Encoding | `32FC1` m | `16UC1` mm |
-| Noise / holes | none (clean render) | speckle, dropouts, alignment holes |
+| | Gazebo | Isaac | Real |
+|---|---|---|---|
+| Depth origin | colour-camera Z-buffer | colour-camera render product | left-IR stereo, reprojected |
+| Alignment | by construction | by construction | driver filter, must be enabled |
+| Horizontal FoV | 71.62 deg | 90.81 deg | live colour `CameraInfo`; pending |
+| Resolution/rate | 640x480 @ 30 | 1280x720 @ 30 | active driver profiles; record on hardware |
+| Encoding | `32FC1` m | `32FC1` m | expected `16UC1` mm; verify live |
+| Noise / holes | none (clean render) | none (clean render) | speckle, dropouts, alignment holes |
 
 ### 2.3 Intrinsics caveat
 
@@ -141,7 +141,7 @@ Deprojection (projective ranging §2.4, euclidean reconstruction §2.1) needs th
 frame lives on* — after alignment that is the **color** camera's intrinsics.
 The **deleted legacy estimators** derived intrinsics from
 the since-deleted `config/camera_config.json` FoV constants, which was
-wrong for the sim render (71.6°) and wrong-in-principle for aligned real depth
+wrong for either simulator's optics and wrong-in-principle for aligned real depth
 (color FoV). No surviving path does this: the mask node
 subscribes to the **color** camera's `camera_info` directly and deprojects with
 it (resolved 2026-07-21; the republish hop went away with the producer node on

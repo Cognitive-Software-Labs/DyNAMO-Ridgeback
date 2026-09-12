@@ -123,9 +123,9 @@ v = fy * Y / Z + cy      # valid only for Z > 0
 
 Keep only points with `Z > 0` (in front of the camera) and `(u, v)` inside the
 image bounds — this implements the "∩ camera FoV" clip: the LiDAR sees 270°
-but the mask can only certify the colour camera's own, which is 71.6° as the sim
-renders it and is read off the driver's `camera_info` on hardware rather than
-assumed. Note `v` is *not*
+but the mask can only certify the active colour camera's own FoV. It is 71.62
+deg horizontally in Gazebo, 90.81 deg in Isaac, and is read from the driver's
+`camera_info` on hardware rather than assumed. Note `v` is *not*
 constant: the scan plane is at fixed height, so nearer points project to
 lower rows than farther ones. This is why the selection is a genuine 2D
 mask test, not just a column/bearing gate.

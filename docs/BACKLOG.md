@@ -80,6 +80,21 @@ segmentation to absorb an extrinsic error.
 **Context.** [Polar profiling](target_localization/polar_profiling.md) and the
 [hardware plan](plans/camera_hardware_validation.md).
 
+## Camera-geometry benchmark recertification
+
+**Gap.** The current measured camera and LiDAR mounts supersede the geometry
+used to generate the visibility fractions and pixel-grid certifications in
+`benchmark_scenarios_full.yaml`. The scenes remain a stable A/B input set, but
+their old certified fractions are not current evidence.
+
+**Completion criteria.** Regenerate the pixel/visibility audit from the current
+robot description separately for Gazebo and Isaac optics; update scenario
+certifications and the gallery; rerun every benchmark whose inputs or measured
+behavior depend on camera or LiDAR geometry before quoting its numbers.
+
+**Context.** [Camera stack](target_localization/camera_stack.md) and
+[Isaac robot and sensor model](isaac/robot-model.md).
+
 ## Isolation validation
 
 **Gap.** 2D/3D recipes and current defaults are implemented, but the

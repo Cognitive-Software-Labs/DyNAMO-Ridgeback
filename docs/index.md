@@ -34,6 +34,8 @@ troubleshooting, planning, and historical documentation.
 
 ## Target localization
 
+- [Camera stack](target_localization/camera_stack.md) — mount and frames,
+  Gazebo/Isaac/hardware optics, topics, launch ownership, and consumers
 - [Pipeline](target_localization/target_localization_pipeline.md)
 - [Detection](target_localization/detection.md)
 - [Aligned depth](target_localization/aligned_depth.md)

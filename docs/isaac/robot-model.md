@@ -105,7 +105,8 @@ USD-to-ROS camera-axis rotation—there is no copied D435 translation—and
 631 px focal-length input lives in
 `src/ridgeback_autonomy_isaac/sim/isaac/d455_camera.json`; the generated
 USD bakes that contract. Runtime perception never reads this file or a FoV
-constant: both backends publish `CameraInfo`, which is the application input.
+constant: both simulator backends publish `CameraInfo`, which is the
+application input; hardware gets the same input from the RealSense driver.
 
 The merged runtime was checked live on 2026-09-12. Isaac published 1280×720
 `rgb8` colour and `32FC1` depth, both labelled
