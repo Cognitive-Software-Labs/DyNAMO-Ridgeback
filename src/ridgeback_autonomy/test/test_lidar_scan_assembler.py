@@ -69,3 +69,17 @@ def test_full_270_deg_arc_is_publishable():
     assert deg.min() <= -135.0 + 1e-9
     assert deg.max() >= 135.0 - 1e-9
     assert len(deg) == A.N_BINS
+
+
+def test_ros_io_subscribes_only_to_the_frozen_twist_stamped_contract():
+    """CycloneDDS rejects two message types on one topic in one participant.
+
+    The old plain-Twist fallback made the Isaac runner fail during startup
+    before any sensor could publish. Nav2 and the captured topic contract both
+    use TwistStamped, so keep exactly that subscription.
+    """
+    source = _ROS_IO.read_text(encoding="utf-8")
+    assert 'from geometry_msgs.msg import PoseStamped, TwistStamped' in source
+    assert 'TwistStamped, "cmd_vel", self._on_twist_stamped, 10' in source
+    assert 'Twist, "cmd_vel"' not in source
+    assert 'def _on_twist(self, msg)' not in source

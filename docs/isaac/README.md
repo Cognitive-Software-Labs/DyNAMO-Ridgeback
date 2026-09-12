@@ -12,7 +12,6 @@ GA**. In progress on `feat/isaac-sim-6-port`.
 | [robot-model.md](robot-model.md) | URDF → USD → meshes → sensors → colliders |
 | [lidar-pipeline.md](lidar-pipeline.md) | how the RTX lidar reaches ROS, and SLAM quality |
 | [port-history.md](port-history.md) | superseded investigation narratives |
-| [handoff.md](handoff.md) | session handoff for the next agent |
 
 Assets: [`assets/robot-geometry.svg`](assets/robot-geometry.svg) is the
 dimensioned mounting drawing; `assets/robot-render.png` is the same geometry in
@@ -41,8 +40,9 @@ Each fact has one home. Cross-reference rather than copy:
 - **robot geometry, the importer, colliders** → `robot-model.md`
 - **lidar → ROS, scan assembly, SLAM quality** → `lidar-pipeline.md`
 - **concluded investigations** → `port-history.md`
-- **solved problems worth keeping** → `../../ISSUES.md` (repo-wide archive)
-- **benchmark recipe and hygiene** → `../../tools/benchmark/README.md`
+- **cross-backend recovery procedures** → `../troubleshooting.md`
+- **completed root causes and evidence** → `../history/`
+- **benchmark recipe and hygiene** → `../exploration/benchmarking.md`
 - **ground-truth maps** → `../../src/ridgeback_autonomy/sim/ground_truth_maps/README.md`
 
 Numbers in `port-plan.md` and `port-history.md` are **claims at the time they

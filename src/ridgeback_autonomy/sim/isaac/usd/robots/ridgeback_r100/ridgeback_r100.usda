@@ -4,16 +4,16 @@
         string creator = "URDF USD Converter v0.1.3"
     }
     defaultPrim = "tn__r1000001_bC"
-    doc = """Generated from Composed Stage of root layer /tmp/tmp3jgwzs3u/r100-0001.usdc
+    doc = """Generated from Composed Stage of root layer /tmp/tmpksigxdi9/r100-0001.usdc
 
 
-Generated from Composed Stage of root layer /tmp/urdf_import_ridgeback_r100_8h97qxgu/usdex_ridgeback_r100/r100-0001.usdc
+Generated from Composed Stage of root layer /tmp/urdf_import_ridgeback_r100_u372wake/usdex_ridgeback_r100/r100-0001.usdc
 
 
-Generated from Composed Stage of root layer /tmp/urdf_import_ridgeback_r100_8h97qxgu/temp_ridgeback_r100/ridgeback_r100.usd
+Generated from Composed Stage of root layer /tmp/urdf_import_ridgeback_r100_u372wake/temp_ridgeback_r100/ridgeback_r100.usd
 
 
-Generated from Composed Stage of root layer /home/deivid/dev/DyNAMO-Ridgeback/.claude/worktrees/isaac/src/ridgeback_autonomy/sim/isaac/usd/robots/ridgeback_r100.usd/ridgeback_r100/payloads/base.usd
+Generated from Composed Stage of root layer /home/deivid/dev/DyNAMO-Ridgeback/src/ridgeback_autonomy/sim/isaac/usd/robots/ridgeback_r100.usd/ridgeback_r100/payloads/base.usd
 """
     kilogramsPerUnit = 1
     metersPerUnit = 1
@@ -312,15 +312,22 @@ def Xform "tn__r1000001_bC" (
                         {
                             over "camera_0_link"
                             {
-                                def Camera "d455_color"
+                                over "camera_0_color_frame"
                                 {
-                                    float2 clippingRange = (0.1, 100)
-                                    float focalLength = 24
-                                    float horizontalAperture = 48.684628
-                                    float verticalAperture = 27.385103
-                                    quatf xformOp:orient = (0.5, 0.5, -0.5, -0.5)
-                                    double3 xformOp:translate = (0, 0.015, 0)
-                                    uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient"]
+                                    def Camera "d455_color" (
+                                        prepend apiSchemas = ["OmniSensorAPI"]
+                                    )
+                                    {
+                                        float2 clippingRange = (0.1, 100)
+                                        custom int dynamo:resolutionHeight = 720
+                                        custom int dynamo:resolutionWidth = 1280
+                                        float focalLength = 24
+                                        float horizontalAperture = 48.684628
+                                        float omni:sensor:tickRate = 30
+                                        float verticalAperture = 27.385103
+                                        quatf xformOp:orient = (0.5, 0.5, -0.5, -0.5)
+                                        uniform token[] xformOpOrder = ["xformOp:orient"]
+                                    }
                                 }
 
                                 over "d455" (

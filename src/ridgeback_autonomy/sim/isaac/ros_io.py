@@ -1,8 +1,8 @@
 """In-process ROS 2 I/O for the Isaac runner (rclpy side).
 
-Owns everything that is NOT a GPU sensor path: /clock, cmd_vel
-subscriptions (TwistStamped per the Nav2 contract, plus a tolerant plain
-Twist), odometry + odom->base_link TF, and the exact ground-truth pose.
+Owns everything that is NOT a GPU sensor path: /clock, the TwistStamped
+cmd_vel subscription, odometry + odom->base_link TF, and the exact
+ground-truth pose.
 GPU sensors (RTX lidar, camera) publish through OmniGraph bridge helpers
 instead (sensors.py, P4).
 
@@ -127,7 +127,7 @@ class RosIO:
                  odom_frame: str = "odom", odom_tf: bool = False,
                  imu_frame: str = "imu_0_link"):
         import rclpy
-        from geometry_msgs.msg import PoseStamped, Twist, TwistStamped
+        from geometry_msgs.msg import PoseStamped, TwistStamped
         from nav_msgs.msg import Odometry
         from rosgraph_msgs.msg import Clock
         from sensor_msgs.msg import Imu, JointState
@@ -171,9 +171,6 @@ class RosIO:
         self._new_cmd = None
         self.node.create_subscription(
             TwistStamped, "cmd_vel", self._on_twist_stamped, 10)
-        # tolerant plain-Twist fallback on the same topic (logs once)
-        self._warned_plain = False
-        self.node.create_subscription(Twist, "cmd_vel", self._on_twist, 10)
 
         # in-session benchmark reset (P7): teleport the robot back to spawn +
         # re-zero odom without relaunching the sim, for probe --repeat N. The
@@ -197,13 +194,6 @@ class RosIO:
     def _on_twist_stamped(self, msg):
         t = msg.twist
         self._new_cmd = (t.linear.x, t.linear.y, t.angular.z)
-
-    def _on_twist(self, msg):
-        if not self._warned_plain:
-            self.node.get_logger().warn(
-                "plain Twist on cmd_vel — contract is TwistStamped; accepting")
-            self._warned_plain = True
-        self._new_cmd = (msg.linear.x, msg.linear.y, msg.angular.z)
 
     def take_cmd(self):
         """Return and clear the newest cmd (vx, vy, wz), or None."""

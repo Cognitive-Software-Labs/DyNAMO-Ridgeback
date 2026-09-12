@@ -7,7 +7,7 @@ from launch.actions import (
 from launch.conditions import IfCondition, UnlessCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import (
-    EqualsSubstitution, LaunchConfiguration,
+    EqualsSubstitution, LaunchConfiguration, PythonExpression,
 )
 from ament_index_python.packages import get_package_share_directory
 
@@ -20,6 +20,8 @@ def generate_launch_description():
     world = LaunchConfiguration('world')
     clearpath_rviz = LaunchConfiguration('clearpath_rviz')
     sim = LaunchConfiguration('sim')
+    gz_gui = LaunchConfiguration('gz_gui')
+    headless_rendering = LaunchConfiguration('headless_rendering')
 
     return LaunchDescription([
         # transient dispatch during the Isaac port: gz stays the default
@@ -54,7 +56,8 @@ def generate_launch_description():
             'headless_rendering',
             default_value='false',
             description='Render server sensors via EGL without an X display '
-                        '(GPU rendering for non-seat/SSH sessions; see ISSUES.md)',
+                        '(GPU rendering for non-seat/SSH sessions; see '
+                        'docs/troubleshooting.md)',
         ),
         DeclareLaunchArgument(
             'rtf',
@@ -121,8 +124,15 @@ def generate_launch_description():
                 'world': world,
                 'rviz': clearpath_rviz,
                 'use_sim_time': 'true',
-                'gz_gui': LaunchConfiguration('gz_gui'),
-                'headless_rendering': LaunchConfiguration('headless_rendering'),
+                # Clearpath's simulation launch uses this flag for its actual
+                # server-only mode.  Passing a made-up ``gz_gui`` argument is
+                # silently ignored by launch. Keep the benchmark's historical
+                # gz_gui:=false switch and the explicit EGL option: either one
+                # requests Clearpath's server-only headless mode.
+                'headless_rendering': PythonExpression([
+                    "'false' if '", gz_gui, "' == 'true' and '",
+                    headless_rendering, "' == 'false' else 'true'",
+                ]),
             }.items(),
         ),
         IncludeLaunchDescription(

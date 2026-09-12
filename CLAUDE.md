@@ -1,11 +1,10 @@
 # CLAUDE.md
 
-Shared repository guidance now lives in `AI_CONTEXT.md`.
+Shared repository guidance lives under `docs/project/`.
 
-Read `AI_CONTEXT.md` for:
-- repo conventions and documentation rules
-- graphify workflow
-- architecture and namespace conventions
-- key repo notes and dependency context
+Start with `docs/project/context.md`, then follow its links to:
+- documentation ownership
+- project and graphify conventions
+- subsystem architecture and technical references
 
 There are currently no Claude-specific overrides beyond that shared guidance.

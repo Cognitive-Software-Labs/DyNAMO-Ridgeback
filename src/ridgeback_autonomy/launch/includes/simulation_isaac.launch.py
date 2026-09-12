@@ -3,9 +3,8 @@
 Event chain (all publisher-gated downstream, no timers):
   generate_description (robot.yaml -> robot.urdf.xacro)
   -> OnProcessExit:
-     - robot_state_publisher (URDF frames; sensor frames for perception)
-     - camera optical TF is published by the separate camera_optical_tf
-       include, same as under gz
+     - robot_state_publisher (simulation URDF frames; the D455 description
+       owns the nominal colour and optical frames exactly once)
      - imu_filter_madgwick  (sensors/imu_0/data_raw -> data)
      - robot_localization EKF (platform/odom + imu -> platform/odom/filtered
        + odom->base_link TF)
@@ -60,7 +59,7 @@ def generate_launch_description():
         parameters=[{
             'use_sim_time': True,
             'robot_description': ParameterValue(
-                Command(['xacro ', setup_path, 'robot.urdf.xacro']),
+                Command(['xacro ', setup_path, 'robot.urdf.xacro is_sim:=true']),
                 value_type=str),
         }],
         remappings=[('/tf', 'tf'), ('/tf_static', 'tf_static')],

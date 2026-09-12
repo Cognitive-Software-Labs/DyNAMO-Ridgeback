@@ -10,7 +10,7 @@ Pipeline (run when clearpath/robot.yaml changes, not per-launch):
 3. Isaac's URDF importer (isaacsim.asset.importer.urdf, 6.0 class API)
    converts it to USD, keeping every fixed-joint frame as a prim
    (merge_fixed_joints=False) so the sensor frames the topic contract
-   names (lidar2d_{0,1}_laser, camera_0_link) exist for sensor mounting
+   names (lidar2d_{0,1}_laser, camera_0_color_frame) exist for sensor mounting
 4. A kinematic-holonomic drive rig is appended: a world-anchored
    prismatic-X -> prismatic-Y -> revolute-Z chain into base_link, each
    joint with a pure velocity drive (stiffness 0). The runner converts
@@ -27,6 +27,7 @@ Output: src/ridgeback_autonomy/sim/isaac/usd/robots/ridgeback_r100.usd
 (committed artifact; regeneration is deliberate, reviewed in git).
 """
 import argparse
+import json
 import subprocess
 import sys
 from pathlib import Path
@@ -39,6 +40,9 @@ SETUP_PATH = REPO / "clearpath"
 OUT_DIR = REPO / "src/ridgeback_autonomy/sim/isaac/usd/robots"
 OUT_USD = OUT_DIR / "ridgeback_r100.usd"          # importer staging dir
 ENTRY_USD = OUT_DIR / "ridgeback_r100" / "ridgeback_r100.usda"
+CAMERA_SPEC = (
+    REPO / "src/ridgeback_autonomy/sim/isaac/d455_camera.json"
+)
 
 RIG = {
     "px": dict(kind="prismatic", axis="X"),
@@ -47,6 +51,32 @@ RIG = {
 }
 DRIVE_DAMPING = 1e5      # pure velocity drive: stiffness 0, high damping
 DUMMY_MASS = 1.0         # kg; carriers between the virtual joints
+
+
+def load_camera_spec(path: Path = CAMERA_SPEC) -> dict:
+    """Load the Isaac render contract and reject values USD cannot express."""
+    spec = json.loads(path.read_text(encoding="utf-8"))
+    resolution = spec["resolution"]
+    intrinsics = spec["intrinsics_px"]
+    width = int(resolution["width"])
+    height = int(resolution["height"])
+    fx = float(intrinsics["fx"])
+    fy = float(intrinsics["fy"])
+    cx = float(intrinsics["cx"])
+    cy = float(intrinsics["cy"])
+    tick_rate = float(spec["tick_rate_hz"])
+    clipping = tuple(float(value) for value in spec["clipping_range_m"])
+
+    if width <= 0 or height <= 0 or fx <= 0 or fy <= 0 or tick_rate <= 0:
+        raise ValueError(f"invalid positive camera value in {path}")
+    if (cx, cy) != (width / 2, height / 2):
+        raise ValueError(
+            "Isaac's ROS camera-info helper assumes a centered principal "
+            f"point; got ({cx}, {cy}) for {width}x{height}"
+        )
+    if len(clipping) != 2 or not 0 < clipping[0] < clipping[1]:
+        raise ValueError(f"invalid camera clipping range in {path}: {clipping}")
+    return spec
 
 
 def sh(*cmd, **kw):
@@ -59,7 +89,8 @@ def generate_flat_urdf(workdir: Path) -> Path:
        "-s", f"{SETUP_PATH}/")
     flat = workdir / "ridgeback_r100.urdf"
     with flat.open("w") as f:
-        subprocess.run(["xacro", str(SETUP_PATH / "robot.urdf.xacro")],
+        subprocess.run(["xacro", str(SETUP_PATH / "robot.urdf.xacro"),
+                        "is_sim:=true"],
                        check=True, stdout=f)
     _sanitize_urdf(flat)
     return flat
@@ -534,23 +565,21 @@ def add_sensor_prims(usd_path: Path) -> None:
     """Author the GPU sensor prims INTO the robot package so the committed
     USD is the complete digital twin (open it in the Isaac GUI and the
     sensors are there). Specs stay in their committed sources —
-    sim/isaac/ust10lx_2d.json and config/camera_config.json — and are
+    sim/isaac/ust10lx_2d.json and sim/isaac/d455_camera.json — and are
     baked here at regen time; sensors.py only binds render products and
     ROS publishers to these prims at runtime.
     """
-    import json
     import math
 
     from isaacsim.core.utils.extensions import enable_extension
     # registers OmniLidar + OmniSensorGenericLidarCoreAPI
     enable_extension("omni.usd.schema.omni_sensors")
-    from pxr import Gf, Usd, UsdGeom, Vt
+    from omni.sensors.schema import OmniSensorAPI
+    from pxr import Gf, Sdf, Usd, UsdGeom, Vt
 
     sim_dir = REPO / "src/ridgeback_autonomy/sim/isaac"
     lidar_spec = json.loads((sim_dir / "ust10lx_2d.json").read_text())["attributes"]
-    cam_cfg = json.loads(
-        (REPO / "src/ridgeback_autonomy/config/camera_config.json")
-        .read_text())["camera"]
+    cam_spec = load_camera_spec()
 
     stage = Usd.Stage.Open(str(usd_path))
 
@@ -590,26 +619,47 @@ def add_sensor_prims(usd_path: Path) -> None:
             lidar.GetAttribute(
                 "omni:sensor:Core:startAzimuthOffsetDeg").Set(az_offset)
 
-    link = find("camera_0_link")
+    # The generated simulation description owns the nominal D455 internal
+    # frame chain. Mount the renderer at its colour-frame origin so the image
+    # and the TF label cannot drift apart. The camera prim's orientation only
+    # converts USD's -Z-forward/+Y-up convention to the ROS body convention;
+    # robot_state_publisher supplies color_frame -> color_optical_frame.
+    color_frame = find("camera_0_color_frame")
     cam = UsdGeom.Camera.Define(
-        stage, link.GetPath().AppendChild("d455_color"))
+        stage, color_frame.GetPath().AppendChild("d455_color"))
     xf = UsdGeom.Xformable(cam.GetPrim())
-    # color optical pose (matches the camera_optical_tf static publish);
-    # quaternion turns USD's -Z-forward/+Y-up into the ROS optical frame
-    xf.AddTranslateOp().Set(Gf.Vec3d(0.0, 0.015, 0.0))
     xf.AddOrientOp().Set(Gf.Quatf(0.5, 0.5, -0.5, -0.5))
-    width, height = int(cam_cfg["width"]), int(cam_cfg["height"])
-    fx, fy = float(cam_cfg["fx"]), float(cam_cfg["fy"])
+    resolution = cam_spec["resolution"]
+    intrinsics = cam_spec["intrinsics_px"]
+    width, height = int(resolution["width"]), int(resolution["height"])
+    fx, fy = float(intrinsics["fx"]), float(intrinsics["fy"])
     focal = 24.0
     cam.CreateFocalLengthAttr(focal)
     cam.CreateHorizontalApertureAttr(width * focal / fx)
     cam.CreateVerticalApertureAttr(height * focal / fy)
-    cam.CreateClippingRangeAttr(Gf.Vec2f(0.1, 100.0))
+    near, far = (float(value) for value in cam_spec["clipping_range_m"])
+    cam.CreateClippingRangeAttr(Gf.Vec2f(near, far))
+
+    sensor_api = OmniSensorAPI.Apply(cam.GetPrim())
+    if not sensor_api:
+        raise RuntimeError("OmniSensorAPI not registered for D455 camera")
+    sensor_api.CreateOmniSensorTickRateAttr().Set(
+        float(cam_spec["tick_rate_hz"])
+    )
+    # USD cameras do not carry render resolution. Bake the generator input as
+    # audit-friendly custom metadata and let sensors.py consume it directly.
+    cam.GetPrim().CreateAttribute(
+        "dynamo:resolutionWidth", Sdf.ValueTypeNames.Int, custom=True
+    ).Set(width)
+    cam.GetPrim().CreateAttribute(
+        "dynamo:resolutionHeight", Sdf.ValueTypeNames.Int, custom=True
+    ).Set(height)
 
     stage.GetRootLayer().Save()
     hfov = math.degrees(2 * math.atan(width / (2 * fx)))
     print(f"sensor prims baked: 2x UST-10LX + D455 camera "
-          f"({width}x{height}, hfov {hfov:.1f} deg) -> {usd_path}", flush=True)
+          f"({width}x{height}@{cam_spec['tick_rate_hz']:g} Hz, "
+          f"hfov {hfov:.1f} deg) -> {usd_path}", flush=True)
 
 
 def _stl_aabb(path: Path):

@@ -135,8 +135,9 @@ ros2 launch ridgeback_autonomy manual_mapping.launch.py world:=<world>
 
 Supported worlds: `mock_hospital`, `warehouse`, `office`
 
-Brings up Gazebo, SLAM (slam_toolbox), RViz, twist_mux, and activates the
-`platform_velocity_controller` after 15 s (inactive by default in sim).
+Brings up Gazebo, SLAM (slam_toolbox), RViz, and twist_mux. It activates the
+inactive `platform_velocity_controller` as soon as the controller-manager
+service is ready.
 
 ### Terminal 2 — keyboard teleop
 
@@ -171,11 +172,11 @@ saved in `$HOME` by copying it into the package maps dir.
 ```bash
 source install/setup.bash
 ros2 launch ridgeback_autonomy ridgeback_exploration.launch.py \
-  world:=mock_hospital explorer:=custom
+  world:=mock_hospital
 ```
 
-Valid worlds: `mock_hospital`, `warehouse`, `office`. `explorer:=` accepts
-`custom` or `explore_lite`. Launches Gazebo + full Nav2 + the frontier explorer.
+Valid worlds: `mock_hospital`, `warehouse`, `office`. This launches Gazebo,
+full Nav2, and the sole in-repo `frontier_explorer_node`.
 
 `coverage_overlay_node` compares the live SLAM map against the ground-truth map
 for `world` and publishes the **COVERAGE** panel in the RViz HUD (alongside
@@ -204,8 +205,9 @@ don't conflate them:
 ## Known quirks
 
 - **`platform_velocity_controller` starts inactive in simulation.**
-  `manual_mapping.launch.py` activates it automatically after 15 s. If the robot
-  does not respond, activate manually:
+  `manual_mapping.launch.py` activates it when the controller-manager service
+  becomes ready. If the robot still does not respond, inspect the
+  `gate_controller` output before activating it manually:
   ```bash
   ros2 service call /r100_0001/controller_manager/switch_controller \
     controller_manager_msgs/srv/SwitchController \

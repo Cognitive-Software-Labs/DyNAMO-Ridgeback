@@ -1,8 +1,8 @@
 diff --git a/src/slam_toolbox_common.cpp b/src/slam_toolbox_common.cpp
-index 43c6515..2cbb386 100644
+index 0210b2c..b372e22 100644
 --- a/src/slam_toolbox_common.cpp
 +++ b/src/slam_toolbox_common.cpp
-@@ -120,7 +120,7 @@ CallbackReturn SlamToolbox::on_configure(const rclcpp_lifecycle::State &)
+@@ -123,7 +123,7 @@ CallbackReturn SlamToolbox::on_configure(const rclcpp_lifecycle::State &)
      get_node_base_interface(),
      get_node_timers_interface());
    tf_->setCreateTimerInterface(timer_interface);

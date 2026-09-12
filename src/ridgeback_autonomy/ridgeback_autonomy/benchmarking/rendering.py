@@ -6,11 +6,16 @@ import cv2
 import numpy as np
 
 from ridgeback_autonomy.benchmarking.alignment import MeasurementEvent
-from ridgeback_autonomy.benchmarking.estimators import (
+from ridgeback_autonomy.perception.target_localization.estimator_registry import (
+    ESTIMATOR_FIELD_KEYS,
     ESTIMATOR_LABELS,
-    RGB_DEBUG_VIEW_ESTIMATORS,
 )
-from ridgeback_autonomy.perception.core.rendering import RgbdOverlayRenderer
+from ridgeback_autonomy.perception.target_localization.core.rendering import RgbdOverlayRenderer
+
+
+# Every panel is the colour frame with that estimator's boxes and numbers drawn
+# on it -- none of the surviving estimators has imagery of its own to show.
+COLOR_SOURCE_LABEL = 'RGB Debug View'
 
 
 @dataclass
@@ -26,16 +31,15 @@ class PanelContext:
 
 
 class BenchmarkCollageRenderer:
-    def __init__(self, depth_max_meters: float, panel_max_width: int = 320) -> None:
-        self.overlay = RgbdOverlayRenderer(depth_max_meters)
+    def __init__(self, panel_max_width: int = 320) -> None:
+        # Borrowed for its title and label-block drawing only: the collage no
+        # longer renders any depth imagery, so the renderer's depth range is
+        # never consulted.
+        self.overlay = RgbdOverlayRenderer(depth_max_meters=0.0)
         self.panel_max_width = panel_max_width
 
     def make_color_preview(self, frame_bgr: np.ndarray) -> np.ndarray:
         return self.resize_panel(frame_bgr)
-
-    def make_depth_preview(self, depth_meters: np.ndarray) -> np.ndarray:
-        panel = self.overlay.make_depth_panel(depth_meters.shape[:2], depth_meters)
-        return self.resize_panel(panel)
 
     def render_trial_collage(
         self,
@@ -44,14 +48,23 @@ class BenchmarkCollageRenderer:
         selected_estimators: tuple[str, ...],
         trial_medians: dict[str, float],
         true_distance_m: float,
+        box_annotations: list[dict] | None = None,
+        missed_count: int = 0,
+        miss_reasons: dict[str, str] | None = None,
     ) -> np.ndarray:
+        # trial_medians is partial: an estimator with no usable events has no
+        # key, and its panel shows the dominant miss reason instead of a value.
+        miss_reasons = miss_reasons or {}
         panels = [
             self.render_estimator_panel(
                 estimator,
                 trial_id,
                 representative_event,
-                trial_medians[estimator],
+                trial_medians.get(estimator),
                 true_distance_m,
+                box_annotations,
+                missed_count,
+                miss_reasons.get(estimator),
             )
             for estimator in selected_estimators
         ]
@@ -62,13 +75,18 @@ class BenchmarkCollageRenderer:
         estimator: str,
         trial_id: str,
         event: MeasurementEvent,
-        trial_median_m: float,
+        trial_median_m: float | None,
         true_distance_m: float,
+        box_annotations: list[dict] | None = None,
+        missed_count: int = 0,
+        miss_reason: str | None = None,
     ) -> np.ndarray:
-        context = self.panel_context_for_estimator(estimator, event)
+        context = self.panel_context_for_event(event)
         panel = context.panel.copy()
         self.overlay.draw_panel_title(panel, ESTIMATOR_LABELS[estimator])
-        self.draw_bboxes(panel, event)
+        self.draw_bboxes(panel, event, estimator, box_annotations)
+        if missed_count:
+            self.draw_missed_note(panel, missed_count)
 
         frame_value = event.estimates.get(estimator)
         lines = self.build_panel_lines(
@@ -79,66 +97,23 @@ class BenchmarkCollageRenderer:
             true_distance_m,
             event.stamp_ns,
         )
+        if trial_median_m is None and miss_reason:
+            lines.append(f'Reason: {miss_reason}')
         self.draw_value_block(panel, lines)
         return panel
 
-    def panel_context_for_estimator(
-        self,
-        estimator: str,
-        event: MeasurementEvent,
-    ) -> PanelContext:
-        if estimator == 'sensor_depth' and event.preview.sensor_depth_bgr is not None:
-            return self.build_panel_context(
-                panel=event.preview.sensor_depth_bgr,
-                source_label='Sensor Depth',
-                expected_source_label='Sensor Depth',
-                preview_available=True,
-                matched_stamp_ns=event.preview.sensor_depth_stamp_ns,
-                match_delta_ms=event.preview.sensor_depth_delta_ms,
-                nearest_stamp_ns=event.preview.sensor_depth_nearest_stamp_ns,
-                nearest_delta_ms=event.preview.sensor_depth_nearest_delta_ms,
-            )
-        if estimator == 'sensor_depth':
-            return self.build_panel_context(
-                panel=self.make_missing_panel(event),
-                source_label='Sensor Depth',
-                expected_source_label='Sensor Depth',
-                preview_available=False,
-                matched_stamp_ns=None,
-                match_delta_ms=None,
-                nearest_stamp_ns=event.preview.sensor_depth_nearest_stamp_ns,
-                nearest_delta_ms=event.preview.sensor_depth_nearest_delta_ms,
-            )
+    def panel_context_for_event(self, event: MeasurementEvent) -> PanelContext:
+        """The colour frame every estimator's panel is drawn on, or a placeholder.
 
-        if estimator == 'depth_anything' and event.preview.depth_anything_bgr is not None:
-            return self.build_panel_context(
-                panel=event.preview.depth_anything_bgr,
-                source_label='Depth-Anything',
-                expected_source_label='Depth-Anything',
-                preview_available=True,
-                matched_stamp_ns=event.preview.depth_anything_stamp_ns,
-                match_delta_ms=event.preview.depth_anything_delta_ms,
-                nearest_stamp_ns=event.preview.depth_anything_nearest_stamp_ns,
-                nearest_delta_ms=event.preview.depth_anything_nearest_delta_ms,
-            )
-        if estimator == 'depth_anything':
-            return self.build_panel_context(
-                panel=self.make_missing_panel(event),
-                source_label='Depth-Anything',
-                expected_source_label='Depth-Anything',
-                preview_available=False,
-                matched_stamp_ns=None,
-                match_delta_ms=None,
-                nearest_stamp_ns=event.preview.depth_anything_nearest_stamp_ns,
-                nearest_delta_ms=event.preview.depth_anything_nearest_delta_ms,
-            )
+        One context for the whole collage: no estimator renders its own imagery
+        any more, so the panels differ in their annotations, not their source.
+        """
 
-        color_source_label = 'RGB Debug View' if estimator in RGB_DEBUG_VIEW_ESTIMATORS else 'RGB'
         if event.preview.color_bgr is not None:
             return self.build_panel_context(
                 panel=event.preview.color_bgr,
-                source_label=color_source_label,
-                expected_source_label=color_source_label,
+                source_label=COLOR_SOURCE_LABEL,
+                expected_source_label=COLOR_SOURCE_LABEL,
                 preview_available=True,
                 matched_stamp_ns=event.preview.color_stamp_ns,
                 match_delta_ms=event.preview.color_delta_ms,
@@ -147,8 +122,8 @@ class BenchmarkCollageRenderer:
             )
         return self.build_panel_context(
             panel=self.make_missing_panel(event),
-            source_label=color_source_label,
-            expected_source_label=color_source_label,
+            source_label=COLOR_SOURCE_LABEL,
+            expected_source_label=COLOR_SOURCE_LABEL,
             preview_available=False,
             matched_stamp_ns=None,
             match_delta_ms=None,
@@ -210,7 +185,7 @@ class BenchmarkCollageRenderer:
         context: PanelContext,
         trial_id: str,
         frame_value: float | None,
-        trial_median_m: float,
+        trial_median_m: float | None,
         true_distance_m: float,
         event_stamp_ns: int,
     ) -> list[str]:
@@ -241,7 +216,13 @@ class BenchmarkCollageRenderer:
             interpolation=cv2.INTER_AREA,
         )
 
-    def draw_bboxes(self, panel: np.ndarray, event: MeasurementEvent) -> None:
+    def draw_bboxes(
+        self,
+        panel: np.ndarray,
+        event: MeasurementEvent,
+        estimator: str | None = None,
+        box_annotations: list[dict] | None = None,
+    ) -> None:
         if not event.bboxes:
             return
 
@@ -253,17 +234,46 @@ class BenchmarkCollageRenderer:
             sy1 = int(round(y1 * scale_y))
             sx2 = int(round(x2 * scale_x))
             sy2 = int(round(y2 * scale_y))
-            cv2.rectangle(panel, (sx1, sy1), (sx2, sy2), (0, 255, 0), 2)
+            label, color = self.box_label_and_color(event, index, estimator, box_annotations)
+            cv2.rectangle(panel, (sx1, sy1), (sx2, sy2), color, 2)
             cv2.putText(
                 panel,
-                f'G1 #{index + 1}',
+                label,
                 (sx1, max(26, sy1 - 8)),
                 cv2.FONT_HERSHEY_SIMPLEX,
                 0.55,
-                (0, 255, 0),
+                color,
                 2,
                 cv2.LINE_AA,
             )
+
+    def box_label_and_color(
+        self,
+        event: MeasurementEvent,
+        index: int,
+        estimator: str | None,
+        box_annotations: list[dict] | None,
+    ) -> tuple[str, tuple[int, int, int]]:
+        # Without per-instance annotations (single-robot / tests) keep the
+        # historical green target label so those collages stay visually consistent.
+        if box_annotations is None or estimator is None:
+            return f'Target #{index + 1}', (0, 255, 0)
+        annotation = box_annotations[index] if index < len(box_annotations) else None
+        if annotation is None:
+            # Detection matched no ground truth: an extra / false positive.
+            return 'extra', (0, 165, 255)
+        value = None
+        if index < len(event.detections):
+            value = getattr(event.detections[index], ESTIMATOR_FIELD_KEYS[estimator], None)
+        value_str = f'{value:.2f}' if value is not None else 'NA'
+        label = f"#{annotation['instance_index']} e{value_str}/t{annotation['true_distance_m']:.2f}"
+        return label, (0, 255, 0)
+
+    def draw_missed_note(self, panel: np.ndarray, missed_count: int) -> None:
+        text = f'missed: {missed_count}'
+        (text_width, _), _ = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)
+        origin = (max(10, panel.shape[1] - text_width - 12), 30)
+        cv2.putText(panel, text, origin, cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2, cv2.LINE_AA)
 
     def draw_value_block(self, panel: np.ndarray, lines: list[str]) -> None:
         self.overlay.draw_label_block(

@@ -18,7 +18,7 @@ Branch: `feat/isaac-sim-6-port` (cut from `dev`), pushed at `53a924a6`. Base inc
 
 ## Context
 
-The simulation layer runs on Gazebo Harmonic via the Clearpath stack (`clearpath_simulator` in `.repos` + `patches/clearpath_gz_customizations.patch`). This port moves it to **Isaac Sim 6.0 (GA)**, **fully replacing Gazebo** — both public entrypoints (`ridgeback_exploration.launch.py`, `g1_distance_benchmark.launch.py`) end up on Isaac. **Not a bug-for-bug copy**: where Isaac-native approaches beat the gz-era design, we adopt them (approved list below).
+The simulation layer runs on Gazebo Harmonic via the Clearpath stack (`clearpath_simulator` in `.repos` + `patches/clearpath_gz_customizations.patch`). This port moves it to **Isaac Sim 6.0 (GA)**, **fully replacing Gazebo** — both public entrypoints (`ridgeback_exploration.launch.py`, `target_distance_benchmark.launch.py`) end up on Isaac. **Not a bug-for-bug copy**: where Isaac-native approaches beat the gz-era design, we adopt them (approved list below).
 
 Decisions:
 - Replace Gazebo outright; gz stays runnable only during the port for sign-off, removed in the final phase.
@@ -55,7 +55,10 @@ Decisions:
 
 ## Deliberate improvements over the gz version (approved)
 
-1. **D455-native camera**: mount `rsd455.usd`, publish 1280×720@30 with true D455 intrinsics. Update `config/camera_config.json` (single source of intrinsics); perception estimators recalibrated. Fixes gz's silent 640×480 render. D455 IMU available.
+1. **D455-native camera**: generate a self-contained USD camera at the D455
+   colour-frame origin, publishing 1280×720@30 with 631 px focal lengths from
+   `sim/isaac/d455_camera.json`. Perception consumes the backend's live
+   `CameraInfo`, so Gazebo's deliberate 640×480 optics remain valid too.
 2. **Real UST-10LX lidars**: 270° FOV, 0.05–10 m, realistic range noise, 40 Hz, custom RTX profile JSON. Front+rear pair covers 360° combined, coplanar, recessed in the body notch. **Both sensor mounts were corrected on 2026-09-10** — the lidars were 11.6 cm too high, the camera 12.5 cm — and the chassis was replaced with Clearpath's authored asset. Full geometry, derivation and the measurement lessons: [`robot-model.md`](robot-model.md). ⚠️ Marks every sensor-geometry baseline for rerun.
 
 3. **Honest odometry pipeline**: runner publishes **noise-injected raw wheel odom** (configurable per-meter translational + yaw drift; σ=0 debug knob) + **IMU** → ROS-side `robot_localization` EKF (config derived from `clearpath_control`) → `platform/odom/filtered`. SLAM earns its keep; closest to the real robot.
@@ -75,7 +78,7 @@ Decisions:
 - `worlds.py` — name → `share/.../sim/isaac/usd/worlds/{name}.usda` resolver + registry for stock-env worlds. `start_exploration.sh mock_hospital` works verbatim.
 - `robot_rig.py` — robot USD load, planar drive rig, per-step velocity targets, raw-odom integration + noise model.
 - `sensors.py` + `ust10lx_2d.json` — 2× RTX lidar (UST-10LX datasheet spec) on `lidar2d_{0,1}_laser` prims; D455 rig on camera mount (USD −Z-forward → ROS optical rotation), color+depth+points+camera_info, IMU.
-- `ros_io.py` — in-process rclpy (`isaac_sim_runner`, ns `r100_0001`, tf remaps): TwistStamped sub on `cmd_vel` (+ tolerant Twist sub), raw odom pub, IMU pub, `ground_truth/pose` pub, `/clock` pub, `sim/spawn_g1` Trigger service, reset glue. TF `odom→base_link` ownership: EKF (runner TF off) — matches real robot.
+- `ros_io.py` — in-process rclpy (`isaac_sim_runner`, ns `r100_0001`, tf remaps): the frozen TwistStamped sub on `cmd_vel`, raw odom pub, IMU pub, `ground_truth/pose` pub, `/clock` pub, `sim/spawn_g1` Trigger service, reset glue. A second plain-Twist subscription is invalid on the same DDS topic and must not be reintroduced. TF `odom→base_link` ownership: EKF (runner TF off) — matches real robot.
 - OmniGraph only for GPU sensor paths: `isaacsim.ros2.bridge.ROS2RtxLidarHelper` (laser_scan, namespaced), `ROS2CameraHelper` (rgb/depth/depth_pcl) + `ROS2CameraInfoHelper`, `ROS2PublishImu`. Exact 6.0 ids resolved via Isaac Sim MCP / `og.get_registered_nodes()`. Fallback if rclpy-in-process misbehaves: all-OmniGraph I/O.
 
 **Drive rig** (added at import): `world → prismatic-X → prismatic-Y → revolute-Z → chassis_link` (**not** `base_link` — that is a bare Xform with no joint, and parenting sensors to it detaches them; see `robot-model.md` "The drive rig"), velocity drives (stiffness 0, high damping). Per step: read θ, rotate body twist to world, set 3 velocity targets; accel-limited (1.0 m/s² platform match); 0.5 s cmd timeout. Wheels free/visual; URDF colliders keep PhysX contacts real (no tunneling).
@@ -98,7 +101,7 @@ Bootstrap: cut `feat/isaac-sim-6-port` from `dev`; workspace already built in th
 
 ### P2 — Assets: worlds + G1 [L] ✅
 - `tools/isaac/sdf2usd.py`: xml parse layer (unit-testable, no pxr) + pxr emit layer (Cube/Sphere, colliders exactly where SDF `<collision>`, UsdPreviewSurface, lights, PhysicsScene, `model://g1` → USD reference). `.usda` text output. `--check` re-opens USD, asserts per-model AABB/pose vs SDF.
-- Convert `mock_hospital`, `g1_distance_calibration` → `src/ridgeback_autonomy/sim/isaac/usd/worlds/`.
+- Convert `mock_hospital`, `target_distance_calibration` → `src/ridgeback_autonomy/sim/isaac/usd/worlds/`.
 - G1: vendor USD from `unitree_sim_isaaclab` (git-lfs; license check + attribution) → `sim/isaac/usd/models/g1/`; fallback `tools/isaac/convert_g1_model.py` (STL→USD).
 - Pytest `test_sdf2usd_parse.py` (98 boxes/2 spheres/1 include, exact named-wall poses) in CMake BUILD_TESTING.
 - ✓ `--check` passes both worlds; `colcon test` green; headless screenshot eyeball.
@@ -110,12 +113,15 @@ Bootstrap: cut `feat/isaac-sim-6-port` from `dev`; workspace already built in th
 - **DONE** — motion verified two ways: `tools/isaac/diag_rig.py --battery` 10/10 (stillness at spawn, zero wheel contacts, sim-time advance, set_planar_pose teleport, fwd/strafe/spin/combined tracking exact, stop drift 0.00 cm, cmd-timeout stop) + live-runner ROS checks (/clock advances at RTF≈1, odom arcs under teleop, strafe-at-yaw holonomic, stop twist ~0, noisy odom vs exact GT split). Deviation: raw odom publishes at the render rate (~35 Hz under co-tenant load), not 50 Hz — publish-per-physics-step decoupling is a P4 option if the EKF wants it.
 
 ### P4 — Sensors + EKF + launch include: full contract [L] ✅
-- `sensors.py`, `ust10lx_2d.json`, D455 rig + `camera_config.json` update (real D455 intrinsics), IMU publisher.
+- `sensors.py`, `ust10lx_2d.json`, generated D455 camera from
+  `d455_camera.json`, and the IMU publisher.
 - `launch/includes/simulation_isaac.launch.py`: event chain generate_description → OnProcessExit → robot_state_publisher + `robot_localization` ekf_node (→ `platform/odom/filtered` + TF) + runner ExecuteProcess. Same arg surface as the gz include.
 - `includes/simulation.launch.py`: transient `sim:=gz|isaac` dispatch (default gz until P8).
 - `cleanup.sh` += isaac kill patterns (user-scoped `isaac_runner.py`, `omni.kit`); extend `test_launch_layout.py`.
 - Config deltas land here: slam `max_laser_range` 10, costmap range review (documented in commit).
-- ✓ Isaac include alone: all contract topics live, types/QoS match baseline, camera_info = D455 1280×720 (intentional divergence, matches new camera_config.json), EKF publishes filtered odom + TF, view_frames complete, standalone slam_toolbox maps.
+- ✓ Isaac include alone: all contract topics live, types/QoS match baseline,
+  camera_info = D455 1280×720 at 30 Hz (intentional backend divergence), EKF
+  publishes filtered odom + TF, view_frames complete, standalone slam_toolbox maps.
 - **DONE** — include-alone acceptance: 14/14 contract topics live, QoS RELIABLE/VOLATILE matches baseline, camera_info 1280×720 fx=631 frame=color-optical, EKF filtered odom within ~1 mm of GT while raw drifts (IMU+odom fusion), TF tree 22 edges incl. odom→base_link from EKF, slam_toolbox maps standalone (1758 occ / 17k free cells after one arc). Deviations, all documented in code: 6.0 replaced lidar JSON profiles with OmniLidar prims (`ust10lx_2d.json` is now our spec file that sensors.py authors onto the prim; needs `omni:sensor:tickRate` 40 + `accumulateOutputs`); **[CORRECTED 2026-07-12]** the "LaserScan is a 360° frame with the rear 90° inf, ROI honored, effective 270°" claim here was WRONG — both the mechanism it describes and the state it asserted. The 6.0.1 bridge laser_scan writer hardcodes 360° for ROTARY lidars (ignores the ROI) and only fires 180°/tick, so the P4 scan was actually half-blind (135°, right side only) and rotation-warped — never a clean 270°. The fix (commits `66493670` + `e1862498`) makes the 270° outcome real but NOT via the mechanism above: two OmniLidar prims per laser frame publish point clouds, and `ros_io.LidarScanAssembler` emits a **native 270° message** (`angle_min -135°`, 1081 bins, `angle_max +135°`) — there is no 360° frame and no rear-inf sector anymore. So the FOV number now matches by outcome, but the "360° frame with rear inf, ROI honored" description was never how this worked. Full writeup: `docs/isaac/lidar-pipeline.md`. Scan now 40 Hz sim-time; odom ~30 Hz — render-frame-locked under co-tenant load (gz baseline 37/46; slam fine, revisit at P5 RTF gate); camera = plain USD camera with true D455 720p intrinsics at the RealSense mount pose (**the description said `d435` until 2026-09-10 and now says `d455`, matching the intrinsics**) instead of referencing the cloud `rsd455.usd` asset (self-contained repo beats a boot-time network fetch; mesh is cosmetic); UST-10LX min range 0.06 m per datasheet (plan said 0.05).
 
 ### P5 — E2E exploration + sign-off [M] — plumbing ✅, A/B ⏳ awaiting a baseline
@@ -124,17 +130,24 @@ Bootstrap: cut `feat/isaac-sim-6-port` from `dev`; workspace already built in th
 - ⏳ **Unblocked 2026-09-11, not yet run.** The blocker was never a nav-tuning problem: the lidars were detached from the articulation and the scan did not rotate with the robot (`open-issues.md` §1). Exploration now drives and frontier goals succeed, so the A/B needs a baseline run, not a fix. The earlier SLAM-drift and "40% plateau" investigation is in `port-history.md`; its headline conclusion was that the plateau **does not reproduce** (clean runs land 51–83%) and that `odom_noise` is a partial lever, not the cap — but note those runs predate every 2026-09 geometry change.
 - Gate: 3/3 complete, coverage ≥ gz mean − 10, genuine aborts ≤ gz max, RTF ≥ 0.8 throttled headless. Needs 3–5 seeds/condition — variance is 51–83%.
 
-### P6 — G1 distance benchmark port [L]
-- Rewrite gz plumbing in place in `g1_distance_benchmark_runner_node.py`: spawn/remove/pose → Simulation Control services (`simulation_interfaces`; exact names via `ros2 service list` with the sim-control extension enabled). Fallback: custom rclpy srvs in `ros_io.py` on the USD stage.
-- `ros_io.py` += `sim/spawn_g1` Trigger (G1 2 m ahead — SpawnG1-GUI replacement). Forward `sim` in `g1_distance_benchmark.launch.py`. Update `test_benchmark_runner.py` mocks (subprocess → service clients). Recalibrate estimators for D455 intrinsics via `g1_distance_calibration`.
-- ✓ Full run `sim:=isaac estimators:=rgb,sensor_depth,lidar repeats:=1`: 15 poses, comparison CSV + collages, lidar MAE sane (≤2× gz history band), repeat clean (no residual prims), manual spawn service works.
+### P6 — Target-distance benchmark port [L]
+- Replace the benchmark runner's Gazebo CLI spawn/remove/pose plumbing with a
+  backend interface and Isaac simulation-control services. Preserve the dev
+  branch's scenario schema, four registered estimators, layered replay, and
+  configurator rather than reviving the retired G1-specific runner.
+- Forward `sim` and the Isaac launch arguments through
+  `target_benchmark_env.launch.py`; update its process mocks and teardown
+  checks for both implementations.
+- ✓ Full run `sim:=isaac estimators:=all repeats:=1`: configured scenes,
+  comparison report and collages succeed, estimates remain in the Gazebo
+  history band, and repeat cleanup leaves no residual prims.
 
 ### P7 — Stock environments + USD GT maps + repeat harness [M] ✅
 - ✅ **Stock worlds load.** `worlds.get_assets_root()` (isaacsim.storage.native) feeds `resolve_world`, so `warehouse`/`office`/`hospital` stream from the NVIDIA S3 asset root (`STOCK_WORLDS`). **Robot-compose fix (a 6.0.1 landmine):** referencing the local robot USD onto a stage whose root layer is a remote S3 URL 404s — `AddReference` URL-joins a bare local path against the remote anchor. Fixed by an absolute `file://` URI (`Path(robot_usd).as_uri()`). PhysicsScene fallback authors `/physicsScene` if a stock USD ships without one. Verified live: warehouse streams from S3, `articulation root /ridgeback/drive_rig/world_fix`, sensors attach, RUNNER READY.
 - ✅ **`tools/isaac/generate_gt_map.py`** — analytic GT from the world USD. NOT the omap extension (needs `timeline.play()`, which trips an `omni.graph.core` crash on these stages) and NOT bbox rasterization (a consolidated wall mesh → whole-floor AABB): a pure-pxr **triangle slice at the lidar plane** (no physics, contention-immune), handling Mesh + native instance proxies + PointInstancer (proto-root-relative compose). A **dominant-cluster spatial crop** drops the far skybox/backdrop geometry stock envs ship (a count-based percentile can't — a heavily-tessellated far prop survives it). Fresh maps: warehouse 440×680, office 760×2040, hospital 1560×880 (`.pgm`/`.yaml`/`.png`/`.npz`), each visually verified as a real floor plan. Old gz-captured warehouse/office + mock_hospital maps → `sim/ground_truth_maps/historical/`; README rewritten (analytic canonical; gz manual capture = historical). mock_hospital dropped from the GT set (Cube/Sphere-based → the Mesh slicer skips it; it has the exact SDF path via `gt_occupancy.py`, and the world is being retired).
 - ✅ **In-session reset.** `ros_io` `sim/reset` (std_srvs/Trigger) → runner teleports to spawn + re-zeros odom on the main loop (physics ops off the callback thread). `explore_probe.py --repeat N`: observe → per-run summary → reset (runner `sim/reset` + `slam_toolbox/reset` + both costmap clears) → settle → repeat; combined summary at the end (repeat=1 keeps the unchanged single-run schema, ab_compare-compatible).
 - ✅ **Nav2 fix for stock worlds.** The global costmap was static/map-synced (no `rolling_window`); a stock-env slam_toolbox seeds `/map` with an origin offset from the (0,0) spawn, so every plan aborted "start outside bounds" and the robot never moved. Made the global costmap rolling (60 m window; ⊇ the small worlds' maps → their planning is unchanged, no A/B regression).
-- ✅ **Live acceptance** (`start_exploration.sh warehouse sim:=isaac sim_mode:=deterministic camera:=false g1_perception_enabled:=false`, isolated `ROS_DOMAIN_ID`): RUNNER READY, robot spawns+drives, SLAM maps, coverage HUD live — **34% complete / 93% accuracy** on the near-empty stock `warehouse.usd` (its own frontier ceiling, not a gate). `--repeat 2`: run 1 = **89/89 goals, 0 aborts, 4 cm mean loc-err**, summary written; reset all-ok (runner teleport confirmed in-log, `runner/slam/global/local:ok`); run 2 re-explored (94 goals). Achieved RTF 0.54 under a co-tenant GPU job (deterministic mode kept SLAM correct). **Deviation:** coverage carries across a reset — `slam_toolbox/reset` clears the pose graph but not the already-published occupancy grid, so run 2 is a real run but not a blank-map run (documentable refinement; `--repeat` still yields N summaries without relaunch). office + hospital: runner smoke green — both stream from S3, robot composes (`world_fix` root), **and both fire the PhysicsScene fallback** (they ship without one, unlike warehouse — the fallback was genuinely needed), RUNNER READY; full exploration is world-agnostic (same rolling-costmap fix). Bench hygiene needs the CycloneDDS env + `ros2 daemon stop` (a stale daemon hides the namespaced topics from the CLI; rclpy probes are unaffected).
+- ✅ **Live acceptance** (`start_exploration.sh warehouse sim:=isaac sim_mode:=deterministic camera:=false target_localization_enabled:=false`, isolated `ROS_DOMAIN_ID`): RUNNER READY, robot spawns+drives, SLAM maps, coverage HUD live — **34% complete / 93% accuracy** on the near-empty stock `warehouse.usd` (its own frontier ceiling, not a gate). `--repeat 2`: run 1 = **89/89 goals, 0 aborts, 4 cm mean loc-err**, summary written; reset all-ok (runner teleport confirmed in-log, `runner/slam/global/local:ok`); run 2 re-explored (94 goals). Achieved RTF 0.54 under a co-tenant GPU job (deterministic mode kept SLAM correct). **Deviation:** coverage carries across a reset — `slam_toolbox/reset` clears the pose graph but not the already-published occupancy grid, so run 2 is a real run but not a blank-map run (documentable refinement; `--repeat` still yields N summaries without relaunch). office + hospital: runner smoke green — both stream from S3, robot composes (`world_fix` root), **and both fire the PhysicsScene fallback** (they ship without one, unlike warehouse — the fallback was genuinely needed), RUNNER READY; full exploration is world-agnostic (same rolling-costmap fix). Bench hygiene needs the CycloneDDS env + `ros2 daemon stop` (a stale daemon hides the namespaced topics from the CLI; rclpy probes are unaffected).
 
 ### Post-P7 batch (2026-09-02) — landed, ⚠️ NOT re-validated
 `ca903276` warehouse_full GT map · `e647ac5a` lidar/joint-state runtime correctness · `1a4079b9` front+rear scan merge for SLAM input only. A 2026-09-10 audit then found and fixed two real bugs in the merger (missing `/tf` remap silently dropped **every** rear scan; `range_max` copied from sensor frame into a `base_link` message) — `2ed1674a`. Full detail: `port-history.md`.
@@ -150,7 +163,9 @@ Commits `eaea0674` `70a5faa6` `e993ee29` `d26edef5` `0a81fbf6` `53a924a6`. Geome
 - `.repos`: remove `clearpath_simulator` (stay-list above). Delete `patches/clearpath_gz_customizations.patch`, `sim/gz_plugins/` (SpawnG1.*). CMakeLists drops gz/Qt5 + SpawnG1; package.xml drops `clearpath_gz`/gz vendors/Qt5, adds `robot_localization`.
 - `simulation.launch.py` becomes the Isaac include (dispatch/`sim`/`gz_gui` die; `headless_rendering` semantics = Isaac headless + `livestream` arg; `sim_ready_timeout` settles 300).
 - Keep `sim/worlds/*.sdf` as converter source-of-truth (documented). Retire `capture_ground_truth.sh` to historical.
-- Update `diag.sh` (Isaac section), `cleanup.sh` (drop gz), README (isaac_venv install, livestream, spawn_g1, repeat mode), AI_CONTEXT.md (runner architecture, asset layout, regen workflows), ISSUES.md (retire gz-EGL RTF recipe; add Isaac shader-cache/VRAM/rclpy-DDS sections; keep camera-optical-TF), `.claude/agents/{sim-runner,box-health,log-triage}.md`, `tools/benchmark/README.md`, `start_exploration.sh` comments (positional contract: `world` only, unchanged). This file marked completed. `bash tools/rebuild_graphify`.
+- Update `tools/diag.sh`, `cleanup.sh`, the root README, topic references,
+  `docs/troubleshooting.md`, `docs/history/`, the agent helpers, and
+  `start_exploration.sh`. Mark this file completed and rebuild graphify.
 - ✓ Fresh-clone drill: `vcs import` → `colcon build` → `install_isaac_venv.sh` → `bash start_exploration.sh` completes Isaac mock_hospital exploration. `grep -ri "clearpath_gz\|ros_gz\|gz sim"` → only intentional historical mentions. `colcon test` green.
 
 ### P9 — Isaac Sim 6.1 migration [M] — planned, sequenced last on purpose

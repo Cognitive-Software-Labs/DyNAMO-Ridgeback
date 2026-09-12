@@ -24,7 +24,7 @@ if command -v nvidia-smi >/dev/null; then
     fi
     free_vram="$(nvidia-smi --query-gpu=memory.free --format=csv,noheader,nounits | head -1)"
     if [ "$free_vram" -lt "$MIN_FREE_VRAM_MB" ]; then
-        echo "WARNING: only ${free_vram} MiB VRAM free (<${MIN_FREE_VRAM_MB}); check co-tenants (ISSUES.md)" >&2
+        echo "WARNING: only ${free_vram} MiB VRAM free (<${MIN_FREE_VRAM_MB}); check co-tenants (docs/troubleshooting.md)" >&2
     fi
 else
     echo "WARNING: nvidia-smi not found; Isaac Sim needs an RTX-class GPU" >&2

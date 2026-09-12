@@ -1,0 +1,108 @@
+# Evidence sweep for the current sequential SlimSAM + Depth-Anything path.
+#
+# Run this file only from a clean committed checkout. The supervisor keeps one
+# Gazebo/D455/TF/Ridgeback/OWLv2 environment alive and restarts only the
+# per-config measurement layer. List order is execution order; the repeated
+# cells are intentionally rotated to distribute startup and thermal drift.
+#
+# The first pair is an A/A probe of the default-off diagnostic itself. The
+# remaining twelve configs are three process-level replications of the 2x2
+# mask-gate/depth-source matrix. Each config then repeats every example scene
+# three times inside its fresh process.
+
+sweep:
+  name: model_concurrency
+  description: >
+    Diagnostic A/A followed by three rotated replications of the box versus
+    SlimSAM and stereo versus Depth-Anything factorial comparison.
+
+defaults:
+  namespace: r100_0001
+  use_sim_time: true
+  world: target_distance_calibration
+  scenario: benchmark_scenarios_examples.yaml
+  repeats: 3
+  settle_sec: 2.0
+  capture_sec: 10.0
+  estimators: projective_ranging,euclidean_reconstruction
+  estimate_viz: false
+  overlay: false
+  isolation_2d: nearest_mode_histogram
+  isolation_3d: height_crop_nearest_mode_band
+  mask_depth_max_meters: 0.0
+
+configs:
+  # A/A instrumentation probe on the actual combined-model workload. Accuracy,
+  # coverage and wall time should remain within ordinary run variation.
+  - name: aa_combined_diagnostics_off
+    mask_gate: silhouette
+    depth_source: monocular
+    depth_match_debug: false
+
+  - name: aa_combined_diagnostics_on
+    mask_gate: silhouette
+    depth_source: monocular
+    depth_match_debug: true
+
+  # Replicate 1: A, B, C, D.
+  - name: r1_a_box_stereo
+    mask_gate: box
+    depth_source: stereoscopic
+    depth_match_debug: true
+
+  - name: r1_b_silhouette_stereo
+    mask_gate: silhouette
+    depth_source: stereoscopic
+    depth_match_debug: true
+
+  - name: r1_c_box_monocular
+    mask_gate: box
+    depth_source: monocular
+    depth_match_debug: true
+
+  - name: r1_d_silhouette_monocular
+    mask_gate: silhouette
+    depth_source: monocular
+    depth_match_debug: true
+
+  # Replicate 2: D, C, B, A.
+  - name: r2_d_silhouette_monocular
+    mask_gate: silhouette
+    depth_source: monocular
+    depth_match_debug: true
+
+  - name: r2_c_box_monocular
+    mask_gate: box
+    depth_source: monocular
+    depth_match_debug: true
+
+  - name: r2_b_silhouette_stereo
+    mask_gate: silhouette
+    depth_source: stereoscopic
+    depth_match_debug: true
+
+  - name: r2_a_box_stereo
+    mask_gate: box
+    depth_source: stereoscopic
+    depth_match_debug: true
+
+  # Replicate 3: B, D, A, C.
+  - name: r3_b_silhouette_stereo
+    mask_gate: silhouette
+    depth_source: stereoscopic
+    depth_match_debug: true
+
+  - name: r3_d_silhouette_monocular
+    mask_gate: silhouette
+    depth_source: monocular
+    depth_match_debug: true
+
+  - name: r3_a_box_stereo
+    mask_gate: box
+    depth_source: stereoscopic
+    depth_match_debug: true
+
+  - name: r3_c_box_monocular
+    mask_gate: box
+    depth_source: monocular
+    depth_match_debug: true

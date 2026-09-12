@@ -2,8 +2,8 @@
 
 Live register for the Isaac Sim 6.0 port. `port-plan.md` holds the phase plan
 and what each phase delivered; this file holds what is **currently wrong**.
-`../../ISSUES.md` is the repo-wide troubleshooting archive — issues move there
-once they are solved and the writeup is worth keeping.
+Cross-backend recovery procedures live in `../troubleshooting.md`; completed
+root causes and measurements belong under `../history/`.
 
 Last reviewed: **2026-09-11**. Branch `feat/isaac-sim-6-port`.
 
@@ -188,7 +188,7 @@ and the scan-rotation test (expect slope ≈ −1).
 
 Reproduced **on demand without nav2**: a bare `cmd_vel` rotation against the
 sim-only layer (`tools/isaac/stall_probe.py`, and the spin/probe recipe in
-`../../tools/benchmark/README.md`). Clean stationary, phantoms while rotating,
+`../exploration/benchmarking.md`). Clean stationary, phantoms while rotating,
 both directions, clean again on stop.
 
 **Mitigation, since REMOVED** (it masked the symptom; the reparent is the
@@ -404,7 +404,7 @@ identical benchmark.
 - **Payload layers churn 6 lines on every regen** — the importer stamps its
   `/tmp` staging paths into `doc` metadata. Cosmetic.
 - **~~`.repos` pins branches, not commits~~ — fixed 2026-09-11.** It now pins
-  exact commits, and `tools/setup_deps.sh [--check]` imports them, applies
+  exact commits, and `tools/check_dependencies --apply` verifies them, applies
   `patches/` idempotently and fails on any drift. The dependency trees are
   gitignored, so those two records are the only thing that reproduces them.
 

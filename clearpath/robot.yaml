@@ -8,7 +8,7 @@ system:
     namespace: r100_0001
     domain_id: 0
     middleware:
-      implementation: rmw_fastrtps_cpp
+      implementation: rmw_cyclonedds_cpp
     workspaces: []
 platform:
   controller: ps4
@@ -36,10 +36,18 @@ sensors:
       parent: chassis_link
       xyz: [0.3922, 0.0, 0.179]
       rpy: [0.0, 0.0, 0.0]
+      ros_parameters:
+        urg_node:
+          angle_min: -2.35619449
+          angle_max: 2.35619449
     - model: hokuyo_ust
       parent: chassis_link
       xyz: [-0.3922, 0.0, 0.179]
       rpy: [0.0, 0.0, 3.14159]
+      ros_parameters:
+        urg_node:
+          angle_min: -2.35619449
+          angle_max: 2.35619449
   camera:
     # Measured 2026-09-10: camera bottom face 0.740 m above the top plate, so
     # 0.280 (deck top) + 0.740 = 1.020 above base_link; default_mount sits at
@@ -59,6 +67,6 @@ sensors:
           device_type: d455
           serial_no: "0"
           enable_color: true
-          rgb_camera.profile: 1280,720,30
           enable_depth: true
-          depth_module.profile: 1280,720,30
+          align_depth.enable: true
+          enable_sync: true

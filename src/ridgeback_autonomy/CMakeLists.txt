@@ -4,15 +4,17 @@ project(ridgeback_autonomy)
 find_package(ament_cmake REQUIRED)
 find_package(ament_cmake_python REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
+find_package(builtin_interfaces REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(gz-gui8 REQUIRED)
 find_package(gz-plugin2 REQUIRED)
 find_package(gz-common5 REQUIRED)
 
 rosidl_generate_interfaces(${PROJECT_NAME}
-  "msg/G1Detections.msg"
-  "msg/G1Measurements.msg"
-  DEPENDENCIES std_msgs
+  "msg/PolarBeams.msg"
+  "msg/TargetDetections.msg"
+  "msg/TargetMeasurements.msg"
+  DEPENDENCIES builtin_interfaces std_msgs
 )
 
 # Qt for MOC
@@ -50,39 +52,75 @@ install(DIRECTORY
 )
 
 install(PROGRAMS
-  ridgeback_autonomy/perception/g1_detector_node.py
+  ridgeback_autonomy/perception/target_localization/detector_node.py
   DESTINATION lib/${PROJECT_NAME}
-  RENAME g1_detector_node
+  RENAME target_detector_node
 )
 
 install(PROGRAMS
-  ridgeback_autonomy/perception/g1_camera_measurement_node.py
+  ridgeback_autonomy/perception/target_localization/pointcloud_measurement_node.py
   DESTINATION lib/${PROJECT_NAME}
-  RENAME g1_camera_measurement_node
+  RENAME target_pointcloud_measurement_node
 )
 
 install(PROGRAMS
-  ridgeback_autonomy/perception/g1_lidar_measurement_node.py
+  ridgeback_autonomy/perception/target_localization/overlay_node.py
   DESTINATION lib/${PROJECT_NAME}
-  RENAME g1_lidar_measurement_node
+  RENAME target_overlay_node
 )
 
 install(PROGRAMS
-  ridgeback_autonomy/perception/g1_overlay_node.py
+  ridgeback_autonomy/perception/target_localization/mask_measurement_node.py
   DESTINATION lib/${PROJECT_NAME}
-  RENAME g1_overlay_node
+  RENAME target_mask_measurement_node
 )
 
 install(PROGRAMS
-  ridgeback_autonomy/benchmarking/g1_distance_benchmark_runner_node.py
+  ridgeback_autonomy/benchmarking/target_distance_benchmark_runner_node.py
   DESTINATION lib/${PROJECT_NAME}
-  RENAME g1_distance_benchmark_runner
+  RENAME target_distance_benchmark_runner
 )
 
 install(PROGRAMS
-  ridgeback_autonomy/benchmarking/g1_estimate_viz_node.py
+  ridgeback_autonomy/perception/target_localization/visualization_node.py
   DESTINATION lib/${PROJECT_NAME}
-  RENAME g1_estimate_viz_node
+  RENAME target_visualization_node
+)
+
+install(PROGRAMS
+  ridgeback_autonomy/benchmarking/target_benchmark_sweep.py
+  DESTINATION lib/${PROJECT_NAME}
+  RENAME target_benchmark_sweep
+)
+
+install(PROGRAMS
+  ridgeback_autonomy/benchmarking/target_offline_replay_benchmark.py
+  DESTINATION lib/${PROJECT_NAME}
+  RENAME target_offline_replay_benchmark
+)
+
+install(PROGRAMS
+  ridgeback_autonomy/benchmarking/target_replay_describe.py
+  DESTINATION lib/${PROJECT_NAME}
+  RENAME target_replay_describe
+)
+
+install(PROGRAMS
+  ridgeback_autonomy/benchmarking/target_replay_materialize_masks.py
+  DESTINATION lib/${PROJECT_NAME}
+  RENAME target_replay_materialize_masks
+)
+
+install(PROGRAMS
+  ridgeback_autonomy/benchmarking/target_replay_benchmark.py
+  DESTINATION lib/${PROJECT_NAME}
+  RENAME target_replay_benchmark
+)
+
+install(PROGRAMS
+  ridgeback_autonomy/benchmarking/configurator.py
+  DESTINATION lib/${PROJECT_NAME}
+  RENAME target_benchmark_configurator
 )
 
 install(PROGRAMS
@@ -136,17 +174,65 @@ install(DIRECTORY
   PATTERN "__pycache__" EXCLUDE
 )
 
+install(DIRECTORY
+  ridgeback_autonomy/benchmarking/configurator_assets
+  DESTINATION share/${PROJECT_NAME}
+)
+
 if(BUILD_TESTING)
   find_package(ament_cmake_pytest REQUIRED)
 
+  ament_add_pytest_test(test_camera_description test/test_camera_description.py)
+  ament_add_pytest_test(test_isaac_camera_spec test/test_isaac_camera_spec.py)
+  ament_add_pytest_test(test_camera_inputs test/test_camera_inputs.py)
+  ament_add_pytest_test(test_coverage_utils test/test_coverage_utils.py)
+  ament_add_pytest_test(test_artifacts test/test_artifacts.py)
+  ament_add_pytest_test(test_depth_common test/test_depth_common.py)
+  ament_add_pytest_test(test_depth_sources test/test_depth_sources.py)
   ament_add_pytest_test(test_detection test/test_detection.py)
-  ament_add_pytest_test(test_geometry test/test_geometry.py)
+  ament_add_pytest_test(test_detector_node test/test_detector_node.py)
+  ament_add_pytest_test(test_frontier_explorer test/test_frontier_explorer.py)
   ament_add_pytest_test(test_image_utils test/test_image_utils.py)
   ament_add_pytest_test(test_imports test/test_imports.py)
+  ament_add_pytest_test(test_intrinsics test/test_intrinsics.py)
+  ament_add_pytest_test(test_isolation_2d test/test_isolation_2d.py)
+  ament_add_pytest_test(test_isolation_3d test/test_isolation_3d.py)
+  ament_add_pytest_test(test_mask test/test_mask.py)
+  ament_add_pytest_test(test_mask_region test/test_mask_region.py)
+  ament_add_pytest_test(test_mask_region_allocation test/test_mask_region_allocation.py)
+  ament_add_pytest_test(test_mask_region_parity test/test_mask_region_parity.py)
+  ament_add_pytest_test(test_mask_measurement_node test/test_mask_measurement_node.py)
+  ament_add_pytest_test(test_overlay_node test/test_overlay_node.py)
+  ament_add_pytest_test(test_shared_defaults test/test_shared_defaults.py)
+  ament_add_pytest_test(test_tf_utils test/test_tf_utils.py)
+  ament_add_pytest_test(test_miss_reason test/test_miss_reason.py)
   ament_add_pytest_test(test_launch_layout test/test_launch_layout.py)
+  ament_add_pytest_test(test_markers test/test_markers.py)
   ament_add_pytest_test(test_messages test/test_messages.py)
+  ament_add_pytest_test(test_projective_ranging test/test_projective_ranging.py)
+  ament_add_pytest_test(test_rendering test/test_rendering.py)
+  ament_add_pytest_test(test_robot_config test/test_robot_config.py)
+  ament_add_pytest_test(test_segmentation test/test_segmentation.py)
+  ament_add_pytest_test(test_status_attribution test/test_status_attribution.py)
+  ament_add_pytest_test(test_euclidean_reconstruction test/test_euclidean_reconstruction.py)
+  ament_add_pytest_test(test_polar_profiling test/test_polar_profiling.py)
+  ament_add_pytest_test(test_pointcloud_ranging test/test_pointcloud_ranging.py)
+  ament_add_pytest_test(test_vehicle_frame test/test_vehicle_frame.py)
   ament_add_pytest_test(test_benchmark_runner test/test_benchmark_runner.py)
   ament_add_pytest_test(test_sdf2usd_parse test/test_sdf2usd_parse.py)
+  ament_add_pytest_test(test_scenarios test/test_scenarios.py)
+  ament_add_pytest_test(test_association test/test_association.py)
+  ament_add_pytest_test(test_scoring test/test_scoring.py)
+  ament_add_pytest_test(test_report test/test_report.py)
+  ament_add_pytest_test(test_target_visualization test/test_target_visualization.py)
+  ament_add_pytest_test(test_recording test/test_recording.py)
+  ament_add_pytest_test(test_replay test/test_replay.py)
+  ament_add_pytest_test(test_layered_replay test/test_layered_replay.py)
+  ament_add_pytest_test(test_lidar_scan_assembler test/test_lidar_scan_assembler.py)
+  ament_add_pytest_test(test_benchmark_configurator test/test_benchmark_configurator.py)
+  ament_add_pytest_test(test_sweep test/test_sweep.py)
+  ament_add_pytest_test(test_sweep_report test/test_sweep_report.py)
+  ament_add_pytest_test(test_hud_node test/test_hud_node.py)
 endif()
 
 ament_package()

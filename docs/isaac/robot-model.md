@@ -85,6 +85,42 @@ Both sensor mounts were wrong in the same way, and both cost time:
 offset.** `hokuyo_ust.stl` spans z 0.0000–0.0700, so its origin is the unit's
 **base** — the surface a tape measures to, not the glass band.
 
+### Camera render and TF contract
+
+The measured mount belongs only in `clearpath/robot.yaml`. From that one pose,
+the patched Clearpath D455 description establishes two mutually exclusive TF
+owners:
+
+- simulation expands with `is_sim:=true`; `robot_state_publisher` owns the
+  nominal `camera_0_link → camera_0_color_frame →
+  camera_0_color_optical_frame` chain;
+- hardware omits those internal frames, leaving the RealSense driver to
+  publish its device calibration.
+
+Gazebo's RGB-D sensor renders from `camera_0_color_frame` at 640×480 and 30 Hz.
+Isaac's importer also expands the simulation description, then creates
+`d455_color` at the exact same colour-frame origin. The prim carries only the
+USD-to-ROS camera-axis rotation—there is no copied D435 translation—and
+`OmniSensorAPI` authors the 30 Hz cadence. Its backend-specific 1280×720,
+631 px focal-length input lives in `sim/isaac/d455_camera.json`; the generated
+USD bakes that contract. Runtime perception never reads this file or a FoV
+constant: both backends publish `CameraInfo`, which is the application input.
+
+The merged runtime was checked live on 2026-09-12. Isaac published 1280×720
+`rgb8` colour and `32FC1` depth, both labelled
+`camera_0_color_optical_frame`; `CameraInfo` reported
+`fx=fy=631.0000005`, `cx=640`, `cy=360`, and advanced at exactly 30.0 Hz in
+simulation time. The namespaced TF tree resolved `base_link →
+camera_0_color_optical_frame` to `[0.280, -0.011, 1.034]` with the expected
+optical rotation.
+
+Isaac Sim 6's `depth_pcl` helper serializes the image-row-major cloud as
+`921600×1`, not `1280×720`. A matched live depth/cloud pair proved one point
+per pixel and exact optical-Z/depth agreement across 417,280 valid pixels.
+The pointcloud consumer therefore restores the 720×1280 grid only when the
+flat point count exactly matches the live colour dimensions; arbitrary flat
+clouds remain rejected.
+
 ### The riser diamond
 
 `riser_link` carries a `Cube` scaled 0.493 × 0.493 × 0.07, rotated **45°**,
@@ -110,6 +146,22 @@ never see itself". That is only true while the sensor and the chassis move
 together. From `a33111c2` to 2026-09-11 they did not (see "The drive rig"), and
 the robot saw its own notch every time it turned. A zero here does not license
 skipping the moving case.
+
+Gazebo's live proof was repeated after the shared config explicitly supplied
+the physical ±135° UST window. Without it, Clearpath's generic parser expanded
+the Gazebo sensor to 360° and both units produced 140 false near bins down to
+5.05 cm. With it, each sensor published 540/540 finite bins at 40 Hz and zero
+returns below 0.8 m while stationary. During a commanded turn the robot yaw
+changed by 0.390 rad and both scans again had 540/540 finite bins, zero below
+0.8 m; the nearest obstacle was 1.19 m. The camera simultaneously published
+640×480 `CameraInfo` at 30.3 Hz with `fx=fy=443.53` and
+`camera_0_color_optical_frame`.
+
+That closes raw-sensor compatibility for the physically accurate mounts. The
+full `collision_monitor` and SLAM consumer path remains an integration gate in
+`docs/BACKLOG.md`. Do not move the shared physical mounts to hide a downstream
+backend issue; any remaining correction belongs in Gazebo-only consumer
+configuration.
 
 ---
 

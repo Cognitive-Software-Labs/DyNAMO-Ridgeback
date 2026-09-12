@@ -1,0 +1,4 @@
+# Colcon discovers this filename in the workspace working directory.
+# Explicit --log-base arguments still override this default.
+"":
+  log-base: artifacts/colcon

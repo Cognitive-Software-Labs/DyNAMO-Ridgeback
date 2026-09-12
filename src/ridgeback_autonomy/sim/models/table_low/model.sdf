@@ -1,0 +1,68 @@
+<?xml version="1.0"?>
+<sdf version="1.9">
+  <model name="table_low">
+    <static>true</static>
+    <link name="link">
+      <collision name="collision_0">
+        <pose>0 0 0.525 0 0 0</pose>
+        <geometry><box><size>0.6 0.6 0.05</size></box></geometry>
+      </collision>
+      <visual name="visual_0">
+        <pose>0 0 0.525 0 0 0</pose>
+        <geometry><box><size>0.6 0.6 0.05</size></box></geometry>
+        <material>
+          <ambient>0.72 0.60 0.50 1</ambient>
+          <diffuse>0.72 0.60 0.50 1</diffuse>
+        </material>
+      </visual>
+      <collision name="collision_1">
+        <pose>0.27 0.27 0.25 0 0 0</pose>
+        <geometry><box><size>0.04 0.04 0.5</size></box></geometry>
+      </collision>
+      <visual name="visual_1">
+        <pose>0.27 0.27 0.25 0 0 0</pose>
+        <geometry><box><size>0.04 0.04 0.5</size></box></geometry>
+        <material>
+          <ambient>0.72 0.60 0.50 1</ambient>
+          <diffuse>0.72 0.60 0.50 1</diffuse>
+        </material>
+      </visual>
+      <collision name="collision_2">
+        <pose>0.27 -0.27 0.25 0 0 0</pose>
+        <geometry><box><size>0.04 0.04 0.5</size></box></geometry>
+      </collision>
+      <visual name="visual_2">
+        <pose>0.27 -0.27 0.25 0 0 0</pose>
+        <geometry><box><size>0.04 0.04 0.5</size></box></geometry>
+        <material>
+          <ambient>0.72 0.60 0.50 1</ambient>
+          <diffuse>0.72 0.60 0.50 1</diffuse>
+        </material>
+      </visual>
+      <collision name="collision_3">
+        <pose>-0.27 0.27 0.25 0 0 0</pose>
+        <geometry><box><size>0.04 0.04 0.5</size></box></geometry>
+      </collision>
+      <visual name="visual_3">
+        <pose>-0.27 0.27 0.25 0 0 0</pose>
+        <geometry><box><size>0.04 0.04 0.5</size></box></geometry>
+        <material>
+          <ambient>0.72 0.60 0.50 1</ambient>
+          <diffuse>0.72 0.60 0.50 1</diffuse>
+        </material>
+      </visual>
+      <collision name="collision_4">
+        <pose>-0.27 -0.27 0.25 0 0 0</pose>
+        <geometry><box><size>0.04 0.04 0.5</size></box></geometry>
+      </collision>
+      <visual name="visual_4">
+        <pose>-0.27 -0.27 0.25 0 0 0</pose>
+        <geometry><box><size>0.04 0.04 0.5</size></box></geometry>
+        <material>
+          <ambient>0.72 0.60 0.50 1</ambient>
+          <diffuse>0.72 0.60 0.50 1</diffuse>
+        </material>
+      </visual>
+    </link>
+  </model>
+</sdf>

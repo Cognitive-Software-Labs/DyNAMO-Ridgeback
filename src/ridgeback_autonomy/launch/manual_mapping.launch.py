@@ -28,7 +28,7 @@ from launch import LaunchDescription
 import launch.conditions
 from launch.actions import (
     DeclareLaunchArgument, ExecuteProcess, IncludeLaunchDescription,
-    RegisterEventHandler, SetEnvironmentVariable,
+    RegisterEventHandler,
 )
 from launch.event_handlers import OnProcessExit
 from launch.launch_description_sources import PythonLaunchDescriptionSource
@@ -42,8 +42,6 @@ def generate_launch_description():
     pkg_clearpath_control = get_package_share_directory('clearpath_control')
     launch_dir = os.path.join(pkg_this, 'launch')
     includes_dir = os.path.join(launch_dir, 'includes')
-    workspace_root = os.path.abspath(os.path.join(pkg_this, '..', '..', '..', '..'))
-    fastrtps_profile_abs = os.path.join(workspace_root, 'fastrtps_no_shm.xml')
 
     namespace = LaunchConfiguration('namespace')
     use_sim_time = LaunchConfiguration('use_sim_time')
@@ -71,8 +69,6 @@ def generate_launch_description():
     )
 
     return LaunchDescription([
-        SetEnvironmentVariable('FASTRTPS_DEFAULT_PROFILES_FILE', fastrtps_profile_abs),
-        
         DeclareLaunchArgument('namespace', default_value='r100_0001'),
         DeclareLaunchArgument('use_sim_time', default_value='true'),
         DeclareLaunchArgument('setup_path',
@@ -156,5 +152,4 @@ def generate_launch_description():
         ),
 
     ])
-
 

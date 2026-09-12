@@ -5,56 +5,34 @@
 #   bash start_exploration.sh                                # mock_hospital
 #   bash start_exploration.sh office                         # office world
 #   bash start_exploration.sh warehouse key:=value ...       # extra launch args
-#   DEPTH_ANYTHING_ENABLED=true bash start_exploration.sh    # enable Depth-Anything
+#   bash start_exploration.sh headless_rendering:=true       # default world, EGL rendering
+#   bash start_exploration.sh --ros-args --log-level info     # pass options through
+#   RMW_IMPLEMENTATION=rmw_fastrtps_cpp bash start_exploration.sh  # explicit RMW override
 #
-# DDS: defaults to CycloneDDS (cyclonedds.xml). Run tools/setup_dds.sh once (sudo)
-# for the large-message kernel tuning. To fall back to FastDDS:
-#   RMW_IMPLEMENTATION=rmw_fastrtps_cpp bash start_exploration.sh   # UDP-only profile
+# The positional world is optional: everything from the first launch argument
+# or option onward is passed through without requiring a world placeholder.
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-WORLD="${1:-mock_hospital}"
-if [[ $# -gt 0 ]]; then
+
+# Everything bound for ros2 launch rather than for this script: ``name:=value``
+# arguments and ``-``-prefixed options. Neither can name a world, so neither may
+# be consumed as the optional positional.
+is_passthrough() {
+    [[ "$1" == *":="* || "$1" == -* ]]
+}
+
+WORLD=mock_hospital
+if [[ $# -gt 0 ]] && ! is_passthrough "$1"; then
+    WORLD="$1"
     shift
 fi
 
-# Historical: a second positional used to select explore_lite vs custom.
-# explore_lite was removed (see ISSUES.md "Exploration Quits Early") — the
-# in-repo frontier_explorer_node is the only explorer. Swallow a stray
-# "custom" positional so old invocations keep working.
-if [[ $# -gt 0 && "$1" != *":="* ]]; then
-    if [[ "$1" != "custom" ]]; then
-        echo "Unknown explorer '$1'. explore_lite was removed; the custom frontier explorer is the only option." >&2
-        exit 2
-    fi
-    shift
-fi
-
-DEPTH_ANYTHING_ENABLED="${DEPTH_ANYTHING_ENABLED:-false}"
-
-# DDS middleware. Default CycloneDDS: more robust on this multi-NIC host than
-# FastDDS, whose shared-memory locks get stale after crashes and drop nodes from
-# discovery (see ISSUES.md). Override with RMW_IMPLEMENTATION=rmw_fastrtps_cpp.
+# CycloneDDS is the measured default for image/depth delivery. An explicitly
+# selected RMW remains authoritative. Public launches supply the package-owned
+# CycloneDDS participant-index config when CYCLONEDDS_URI is unset.
 export RMW_IMPLEMENTATION="${RMW_IMPLEMENTATION:-rmw_cyclonedds_cpp}"
-if [[ "$RMW_IMPLEMENTATION" == "rmw_cyclonedds_cpp" ]]; then
-    # Loopback interface + raised participant limit + large socket buffers.
-    export CYCLONEDDS_URI="${CYCLONEDDS_URI:-file://$SCRIPT_DIR/cyclonedds.xml}"
-    # Large-message buffers need a raised kernel ceiling; warn if not set up.
-    rmem=$(cat /proc/sys/net/core/rmem_max 2>/dev/null || echo 0)
-    if [[ "$rmem" -lt 10485760 ]]; then
-        echo "[start_exploration] WARN: net.core.rmem_max=$rmem (<10MB) -- large-message DDS (camera/costmap) may drop data." >&2
-        echo "[start_exploration]       One-time fix: bash $SCRIPT_DIR/tools/setup_dds.sh (sudo)" >&2
-    fi
-elif [[ "$RMW_IMPLEMENTATION" == "rmw_fastrtps_cpp" ]]; then
-    # FastDDS fallback. SHM is fragile here, so default to the UDP-only profile;
-    # set FASTRTPS_NO_SHM=false to use the system default (shared memory).
-    FASTRTPS_NO_SHM="${FASTRTPS_NO_SHM:-true}"
-    if [[ "$FASTRTPS_NO_SHM" == "true" ]]; then
-        export FASTRTPS_DEFAULT_PROFILES_FILE="${FASTRTPS_DEFAULT_PROFILES_FILE:-$SCRIPT_DIR/fastrtps_no_shm.xml}"
-        export RMW_FASTRTPS_USE_QOS_FROM_XML="${RMW_FASTRTPS_USE_QOS_FROM_XML:-1}"
-    fi
-fi
 export ROS_DOMAIN_ID="${ROS_DOMAIN_ID:-42}"
 
 set +u
@@ -64,15 +42,17 @@ set -u
 
 bash "$SCRIPT_DIR/cleanup.sh"
 
-# Timestamped, non-clobbering log: one file per launch so a stalled session
-# can be reviewed after the fact instead of being overwritten by the next run.
-LOG_DIR="${LOG_DIR:-$SCRIPT_DIR/logs}"
+# One non-clobbering directory per launch, with console and ROS logs together.
+# LOG_DIR overrides the exploration output root; ROS_LOG_DIR remains independent.
+LOG_DIR="${LOG_DIR:-$SCRIPT_DIR/artifacts/exploration}"
 mkdir -p "$LOG_DIR"
-LOG_FILE="$LOG_DIR/ridgeback_$(date +%Y-%m-%d_%H-%M-%S)_${WORLD}.log"
+RUN_LOG_DIR="$(mktemp -d "$LOG_DIR/ridgeback_$(date +%Y-%m-%d_%H-%M-%S)_${WORLD}.XXXXXX")"
+LOG_FILE="$RUN_LOG_DIR/console.log"
+export ROS_LOG_DIR="${ROS_LOG_DIR:-$RUN_LOG_DIR/ros}"
+mkdir -p "$ROS_LOG_DIR"
 echo "Logging to $LOG_FILE"
 exec > >(tee "$LOG_FILE") 2>&1
 
 exec ros2 launch ridgeback_autonomy ridgeback_exploration.launch.py \
     world:="$WORLD" \
-    depth_anything_enabled:="$DEPTH_ANYTHING_ENABLED" \
     "$@"

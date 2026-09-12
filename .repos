@@ -1,43 +1,36 @@
-# Dependency pins for the Ridgeback autonomy workspace.
+# Dependencies are pinned to exact revisions, not to branch tips.
 #
-# `version:` holds an EXACT COMMIT, not a branch. It used to say `jazzy` for
-# all five, which made `vcs import` non-deterministic: on 2026-09-10 every one
-# of them came down different from the working checkout (clearpath_simulator
-# by five months) and `patches/clearpath_gz_customizations.patch` stopped
-# applying entirely. Patches are only reproducible against a known base, so
-# the base is pinned here.
+# The three patches in `patches/` are recorded against these revisions. Tracking
+# a branch tip makes a fresh `vcs import` silently pick up upstream commits the
+# patches were never rebased onto. Use `tools/check_dependencies` after import
+# and before builds; the complete procedure lives in
+# `docs/project/dependencies.md`.
 #
-# All five commits are on each upstream's `jazzy` branch (recorded below so a
-# future bump knows where to look). To move a pin: check out the new commit,
-# re-apply the patches, confirm they still apply, then update both the hash
-# and the date comment here.
-#
-# Restore a checkout with `tools/setup_deps.sh`, which imports these pins and
-# applies `patches/` idempotently. Do not hand-edit the dependency trees --
-# put the change in a patch instead (see patches/README.md).
+# Bumping a pin means re-applying the patches, rebasing any that conflict, and
+# re-running the sim gates. Do not bump one in isolation to fix a build error.
 repositories:
   src/clearpath_simulator:
     type: git
     url: https://github.com/clearpathrobotics/clearpath_simulator.git
-    # jazzy @ 2026-09-10; patched by clearpath_gz_customizations.patch
-    version: 69e68331a13e9f1f51de8807b49f2c9e84913f71
+    # jazzy @ 2.9.4
+    version: 590a45118c599c08abdf3bd3d02d5fa7a8af9a49
   src/clearpath_common:
     type: git
     url: https://github.com/clearpathrobotics/clearpath_common.git
-    # jazzy @ 2026-09-10
-    version: 99603548679f90dcc7bc51b6e8d5569dc6f069dc
+    # jazzy @ 2.9.16
+    version: 33e4b311dd9a2dcaa8e8d262ae75fab2c53e560b
   src/clearpath_config:
     type: git
     url: https://github.com/clearpathrobotics/clearpath_config.git
-    # jazzy @ 2026-09-10
-    version: 5c92caaf646d96cb3d3028477c8b74a1ef8ddcca
+    # jazzy @ 2.9.7
+    version: b2a64ba3b12d20bfeeb1127c3869accc7704e634
   src/clearpath_msgs:
     type: git
     url: https://github.com/clearpathrobotics/clearpath_msgs.git
-    # jazzy @ 2026-09-10
-    version: 5d041717d6a50eb7cd60c0df23d91f6baeb4192b
+    # jazzy after 2.7.0
+    version: 797be60abaa140167629f246802c2802a616a495
   src/slam_toolbox:
     type: git
     url: https://github.com/SteveMacenski/slam_toolbox.git
-    # jazzy @ 2026-09-10; patched by slam_toolbox_tf_namespace.patch
-    version: 22450ca095b9a517358090b5e1e2e5989a9a82e5
+    # jazzy @ 2.8.5
+    version: 02afdde003313a10b8d21461a92d9e5f4f0bc5f2

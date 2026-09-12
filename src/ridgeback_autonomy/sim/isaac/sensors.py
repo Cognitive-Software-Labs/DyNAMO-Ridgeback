@@ -3,8 +3,8 @@
 The sensor PRIMS live in the committed robot USD — the import script
 (tools/isaac/import_ridgeback_urdf.py) bakes 2x UST-10LX OmniLidar prims
 onto the lidar2d_{0,1}_laser frames and a D455-intrinsics camera at the
-color optical pose, from the committed specs (ust10lx_2d.json and
-config/camera_config.json). This module only binds render products and
+generated D455 colour frame, from the committed specs (ust10lx_2d.json and
+d455_camera.json). This module only binds render products and
 ROS2 bridge helper publishers to those prims at runtime; plain-rclpy I/O
 lives in ros_io.py.
 
@@ -105,18 +105,26 @@ def attach_camera(stage, robot_root: str = "/ridgeback",
     import omni.graph.core as og
     from pxr import UsdGeom
 
-    link = _find_prim_by_name(stage, robot_root, "camera_0_link")
-    cam = link.GetChild("d455_color")
-    if not cam:
-        raise RuntimeError(f"{link.GetPath()}: no d455_color child — "
+    cam = _find_prim_by_name(stage, robot_root, "d455_color")
+    # Render resolution is generator metadata because it is not part of the
+    # standard USD Camera schema. Intrinsics and cadence are authored on the
+    # prim itself and consumed by Isaac's camera and ROS helpers.
+    width_attr = cam.GetAttribute("dynamo:resolutionWidth")
+    height_attr = cam.GetAttribute("dynamo:resolutionHeight")
+    tick_attr = cam.GetAttribute("omni:sensor:tickRate")
+    if not width_attr or not height_attr or not tick_attr:
+        raise RuntimeError(f"{cam.GetPath()}: camera contract metadata missing — "
                            + REGEN_HINT)
-    # resolution back-derived from the baked intrinsics: fx = w*f/hAp
+    width, height = int(width_attr.Get()), int(height_attr.Get())
+    tick_rate = float(tick_attr.Get())
+    if width <= 0 or height <= 0 or tick_rate <= 0:
+        raise RuntimeError(f"{cam.GetPath()}: invalid camera contract "
+                           f"{width}x{height}@{tick_rate} Hz")
+
     c = UsdGeom.Camera(cam)
     focal = c.GetFocalLengthAttr().Get()
     hap = c.GetHorizontalApertureAttr().Get()
-    vap = c.GetVerticalApertureAttr().Get()
-    fx = 1280 * focal / hap            # sanity print only
-    width, height = 1280, int(round(1280 * vap / hap))
+    fx = width * focal / hap            # sanity print only
     rp_path = _render_product(cam.GetPath(), [width, height])
 
     frame = "camera_0_color_optical_frame"
@@ -161,6 +169,6 @@ def attach_camera(stage, robot_root: str = "/ridgeback",
             og.Controller.Keys.SET_VALUES: values,
         },
     )
-    print(f"camera attached: {cam.GetPath()} {width}x{height} "
+    print(f"camera attached: {cam.GetPath()} {width}x{height}@{tick_rate:g} Hz "
           f"fx={fx:.0f}", flush=True)
     return str(cam.GetPath())

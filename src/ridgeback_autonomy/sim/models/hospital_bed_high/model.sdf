@@ -1,0 +1,20 @@
+<?xml version="1.0"?>
+<sdf version="1.9">
+  <model name="hospital_bed_high">
+    <static>true</static>
+    <link name="link">
+      <collision name="collision_0">
+        <pose>0 0 0.375 0 0 0</pose>
+        <geometry><box><size>2.0 1.0 0.75</size></box></geometry>
+      </collision>
+      <visual name="visual_0">
+        <pose>0 0 0.375 0 0 0</pose>
+        <geometry><box><size>2.0 1.0 0.75</size></box></geometry>
+        <material>
+          <ambient>0.78 0.88 0.95 1</ambient>
+          <diffuse>0.78 0.88 0.95 1</diffuse>
+        </material>
+      </visual>
+    </link>
+  </model>
+</sdf>

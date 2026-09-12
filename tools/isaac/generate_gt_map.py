@@ -29,7 +29,7 @@ Outputs, per world, into --out:
 The seed defaults to (0,0); the stock envs are centred near the origin so it
 lands on open floor, but pass --origin x,y for a world whose (0,0) is inside a
 wall/shelf (else the map comes back mostly unknown). mock_hospital and
-g1_distance_calibration keep their exact SDF path (gt_occupancy.py) — this tool
+target_distance_calibration keep their exact SDF path (gt_occupancy.py) — this tool
 is for the mesh-only stock worlds.
 
 Plane default = the front UST-10LX height in the committed robot USD. It is

@@ -242,10 +242,10 @@ Revisiting the P5 blocker: is odom noise the coverage cap, and does the prior
   stamp-pair telemetry vs RTF) carries this signal.
 - **Benchmark hygiene (was wrong; now enforced):** `isaac_runner` rendered the
   D455 unconditionally → RTF 0.33–0.45. Added `--camera false` (commit
-  b9c46c77) → RTF 0.55–0.65. Also `g1_perception_enabled:=false` and an
+  b9c46c77) → RTF 0.55–0.65. Also `target_localization_enabled:=false` and an
   isolated `ROS_DOMAIN_ID` — co-tenant `stefi`'s domain-42 `/r100_0001` stack
   publishes the same `hud/coverage` topic the probe reads. Canonical benchmark
-  invocation: `camera:=false g1_perception_enabled:=false
+  invocation: `camera:=false target_localization_enabled:=false
   ROS_DOMAIN_ID=<isolated> setup_path:=/tmp/bench-clearpath/`.
 - **Caveat:** coverage variance is large (62–83% noise-off; loc-err 0.9–9.4 m);
   stochastic scan-match excursions + intermittent co-tenant GPU bursts dominate.

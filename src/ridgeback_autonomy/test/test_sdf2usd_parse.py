@@ -107,6 +107,6 @@ def test_world_aabb_respects_yaw():
 
 
 def test_calibration_world_parses():
-    world = sdf2usd.parse_world(_WORLDS / "g1_distance_calibration.sdf")
+    world = sdf2usd.parse_world(_WORLDS / "target_distance_calibration.sdf")
     assert len(world.models) == 5
     assert all(m.static for m in world.models)

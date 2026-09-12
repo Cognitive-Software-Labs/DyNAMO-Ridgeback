@@ -1,6 +1,8 @@
 ## Shared Guidance
 
-Read `AI_CONTEXT.md` for the canonical shared repository guidance before doing substantial work in this repo.
+Read `docs/project/context.md` for repository orientation before doing
+substantial work. Documentation ownership and project conventions live in
+`docs/project/documentation.md` and `docs/project/conventions.md`.
 
 ## graphify
 

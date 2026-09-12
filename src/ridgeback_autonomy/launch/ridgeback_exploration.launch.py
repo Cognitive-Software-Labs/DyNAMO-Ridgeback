@@ -5,32 +5,178 @@ from launch import LaunchDescription
 import launch.conditions
 from launch.actions import (
     DeclareLaunchArgument, ExecuteProcess, IncludeLaunchDescription,
-    RegisterEventHandler, SetEnvironmentVariable,
+    OpaqueFunction, RegisterEventHandler,
 )
 from launch.event_handlers import OnProcessExit
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import (
-    AndSubstitution, EqualsSubstitution, LaunchConfiguration, PythonExpression,
+    EqualsSubstitution, LaunchConfiguration, PythonExpression,
 )
 from launch_ros.actions import Node
+from launch_ros.parameter_descriptions import ParameterValue
+
+from ridgeback_autonomy.perception.target_localization.estimator_registry import (
+    parse_estimators,
+    selected_mask_estimators,
+    selected_pointcloud_estimators,
+    uses_mask_estimators,
+    uses_pointcloud_estimators,
+)
+from ridgeback_autonomy.perception.target_localization.launch import (
+    SIMULATION_CAMERA_INPUTS,
+    cyclonedds_actions,
+    distance_hud_node,
+    estimate_viz_node,
+    mask_measurement_node,
+    overlay_node,
+    perception_venv_actions,
+    pointcloud_measurement_node,
+    resolved_camera_inputs,
+)
+
+
+# The distance HUD is a second overlay from the velocity/coverage one, and needs
+# its own aggregator: hud_node renders through QStaticText, which switches the
+# whole overlay to rich text as soon as any tag appears. The target panel is
+# unconditionally rich (per-estimator span colours, <br/> breaks) while the
+# velocity and coverage panels line their columns up with runs of spaces, which
+# rich text collapses. One node cannot serve both contracts.
+HUD_TARGET_MARKER_TOPIC = 'hud_target_overlay'
+
+# The wide layout is four cells of HUD_WIDE_CELL_COLUMNS each, so ~40 columns.
+# text_size is in POINTS, so columns-to-pixels follows the display scaling --
+# measured at 12.6 px/column on one monitor and 14.4 on another, and the overlay
+# clips rather than wraps, so this covers the wider of the two (40 x 14.4 = 576)
+# with room for the insets. Too narrow silently drops the last estimator's whole
+# column, which reads as that row never reporting rather than as a layout fault.
+HUD_TARGET_OVERLAY_WIDTH = 660
+
+
+def build_target_localization_nodes(context, *args, **kwargs):
+    """The measurement and display stack for the estimator rows this run selected.
+
+    An OpaqueFunction because the selection has to be read as a string --
+    ``parse_estimators`` decides which measurement nodes exist at all, and a
+    substitution cannot be branched on until a context resolves it.
+    """
+
+    namespace = LaunchConfiguration('namespace')
+    use_sim_time = LaunchConfiguration('use_sim_time')
+    depth_source = LaunchConfiguration('depth_source')
+    mask_gate = LaunchConfiguration('mask_gate')
+    estimate_viz = LaunchConfiguration('estimate_viz')
+    camera_inputs = resolved_camera_inputs(
+        context, 'color_topic', 'camera_info_topic',
+        'depth_topic', 'pointcloud_topic')
+
+    # The mask node's own base_frame default is the bare string "base_link",
+    # unlike the pointcloud and viz nodes which derive a namespaced frame from
+    # get_namespace(). Under this namespace that default resolves to a frame
+    # nothing publishes and polar profiling's scan->base lookup fails silently,
+    # so the frame is passed rather than defaulted.
+    base_frame = [namespace, '/robot/base_link']
+
+    selected_estimators = parse_estimators(
+        LaunchConfiguration('estimators').perform(context).strip()
+    )
+    estimators = ','.join(selected_estimators)
+
+    nodes = [Node(
+        package='ridgeback_autonomy',
+        executable='target_detector_node',
+        name='target_detector',
+        namespace=namespace,
+        parameters=[{
+            'use_sim_time': use_sim_time,
+            'color_topic': camera_inputs.color_image_topic,
+            # Typed explicitly: the node declares a double, so an integer
+            # spelling like ``detector_fps:=10`` would otherwise be rejected.
+            'detector_fps': ParameterValue(
+                LaunchConfiguration('detector_fps'), value_type=float),
+            'detector_debug': LaunchConfiguration('detector_debug'),
+        }],
+        remappings=[('/tf', 'tf'), ('/tf_static', 'tf_static')],
+        output='screen',
+    )]
+
+    if uses_pointcloud_estimators(selected_estimators):
+        nodes.append(pointcloud_measurement_node(
+            namespace=namespace,
+            use_sim_time=use_sim_time,
+            enabled_estimators=','.join(
+                selected_pointcloud_estimators(selected_estimators)),
+            base_frame=base_frame,
+            color_topic=camera_inputs.color_image_topic,
+            pointcloud_topic=camera_inputs.organized_points_topic,
+        ))
+
+    if uses_mask_estimators(selected_estimators):
+        nodes.append(mask_measurement_node(
+            namespace=namespace,
+            use_sim_time=use_sim_time,
+            enabled_estimators=','.join(
+                selected_mask_estimators(selected_estimators)),
+            base_frame=base_frame,
+            depth_source=depth_source,
+            mask_gate=mask_gate,
+            color_topic=camera_inputs.color_image_topic,
+            camera_info_topic=camera_inputs.color_camera_info_topic,
+            depth_topic=camera_inputs.aligned_depth_topic,
+        ))
+
+    # Rings on the floor plan plus the distance panel that names them. Both
+    # surfaces are filtered from the one selected set, so a ring can never
+    # appear without a column to name it, and a column is only shown for a path
+    # this run actually launched -- an unproduced row could only ever print
+    # "--", the same mark an estimator that ran and found nothing prints.
+    nodes.append(estimate_viz_node(
+        namespace=namespace,
+        use_sim_time=use_sim_time,
+        estimators=estimators,
+        # Exploration has no truth source, so the row layout's truth and error
+        # columns would be permanently blank.
+        hud_layout='wide',
+        condition=launch.conditions.IfCondition(estimate_viz),
+    ))
+
+    # Four cells of HUD_WIDE_CELL_COLUMNS each, so ~40 columns; 40 x 14.4 px =
+    # 576 plus insets.
+    nodes.append(distance_hud_node(
+        namespace=namespace,
+        use_sim_time=use_sim_time,
+        name='hud_target_node',
+        overlay_width=HUD_TARGET_OVERLAY_WIDTH,
+        marker_topic=HUD_TARGET_MARKER_TOPIC,
+        # The viz node is the only producer of the panel this aggregator merges.
+        condition=launch.conditions.IfCondition(estimate_viz),
+    ))
+
+    # The camera overlay picks its panels from the same set, so it grids one
+    # frame per path that has a producer here. Labels stay on, unlike the
+    # benchmark: there is no collage carrying the numbers separately.
+    nodes.append(overlay_node(
+        namespace=namespace,
+        use_sim_time=use_sim_time,
+        estimators=estimators,
+        color_topic=camera_inputs.color_image_topic,
+        depth_source=depth_source,
+        mask_gate=mask_gate,
+    ))
+
+    return nodes
 
 
 def generate_launch_description():
     pkg_this = get_package_share_directory('ridgeback_autonomy')
     launch_dir = os.path.join(pkg_this, 'launch')
     includes_dir = os.path.join(launch_dir, 'includes')
-    workspace_root = os.path.abspath(os.path.join(pkg_this, '..', '..', '..', '..'))
-    perception_venv_path = os.path.join(workspace_root, 'perception_venv')
-    perception_venv_bin = os.path.join(perception_venv_path, 'bin')
 
     namespace = LaunchConfiguration('namespace')
     use_sim_time = LaunchConfiguration('use_sim_time')
     setup_path = LaunchConfiguration('setup_path')
     world = LaunchConfiguration('world')
     exploration_rviz = LaunchConfiguration('exploration_rviz')
-    g1_perception_enabled = LaunchConfiguration('g1_perception_enabled')
-    estimate_viz = LaunchConfiguration('estimate_viz')
-    depth_anything_enabled = LaunchConfiguration('depth_anything_enabled')
+    target_localization_enabled = LaunchConfiguration('target_localization_enabled')
     mppi_visualize = LaunchConfiguration('mppi_visualize')
     coverage_overlay_enabled = LaunchConfiguration('coverage_overlay_enabled')
     sim = LaunchConfiguration('sim')
@@ -76,26 +222,9 @@ def generate_launch_description():
         timeout=60,
     )
 
-    # DDS middleware, set here so `ros2 launch` is consistent with the
-    # start_exploration.sh path (mismatched RMWs can't communicate). Respect an
-    # explicit override; otherwise default to CycloneDDS with the repo's tuned
-    # profile (loopback, raised participant limit, large socket buffers).
-    rmw_impl = os.environ.get('RMW_IMPLEMENTATION', 'rmw_cyclonedds_cpp')
-    dds_env = [SetEnvironmentVariable('RMW_IMPLEMENTATION', rmw_impl)]
-    if rmw_impl == 'rmw_cyclonedds_cpp':
-        cyclonedds_uri = os.environ.get(
-            'CYCLONEDDS_URI',
-            'file://' + os.path.join(workspace_root, 'cyclonedds.xml'),
-        )
-        dds_env.append(SetEnvironmentVariable('CYCLONEDDS_URI', cyclonedds_uri))
-
     return LaunchDescription([
-        *dds_env,
-        SetEnvironmentVariable('VIRTUAL_ENV', perception_venv_path),
-        SetEnvironmentVariable(
-            'PATH',
-            os.pathsep.join([perception_venv_bin, os.environ.get('PATH', '')]),
-        ),
+        *cyclonedds_actions(pkg_this),
+        *perception_venv_actions(pkg_this),
         DeclareLaunchArgument('namespace', default_value='r100_0001'),
         DeclareLaunchArgument('use_sim_time', default_value='true'),
         DeclareLaunchArgument('setup_path',
@@ -144,23 +273,55 @@ def generate_launch_description():
                         'either way). Isaac default: merged. Gazebo '
                         'default: front_only (unaffected unless explicitly '
                         'overridden).'),
+        DeclareLaunchArgument(
+            'color_topic', default_value=SIMULATION_CAMERA_INPUTS.color_image_topic),
+        DeclareLaunchArgument(
+            'camera_info_topic',
+            default_value=SIMULATION_CAMERA_INPUTS.color_camera_info_topic,
+        ),
+        DeclareLaunchArgument(
+            'depth_topic', default_value=SIMULATION_CAMERA_INPUTS.aligned_depth_topic),
+        DeclareLaunchArgument(
+            'pointcloud_topic',
+            default_value=SIMULATION_CAMERA_INPUTS.organized_points_topic or '',
+        ),
         DeclareLaunchArgument('exploration_rviz', default_value='true',
                               description='Launch the exploration RViz2 config'),
-        DeclareLaunchArgument('g1_perception_enabled', default_value='true',
-                              description='Launch the full G1 perception/positioning stack '
-                                          '(detection + camera/lidar measurement + overlay); '
+        DeclareLaunchArgument('target_localization_enabled', default_value='true',
+                              description='Launch the full target-localization stack '
+                                          '(detection + the selected measurement rows + '
+                                          'rings, distance HUD and camera overlay); '
                                           'requires perception_venv'),
-        DeclareLaunchArgument('estimate_viz', default_value='false',
-                              description='Launch the g1_estimate_viz_node RViz marker publisher'),
-        DeclareLaunchArgument('depth_anything_enabled', default_value='false',
-                              description='Enable Depth-Anything in the camera measurement node'),
+        DeclareLaunchArgument('estimate_viz', default_value='true',
+                              description='Publish the estimator rings and the wide distance HUD'),
+        DeclareLaunchArgument('estimators', default_value='all',
+                              description='Which distance estimator rows to run: "all" or a '
+                                          'comma-separated subset of pointcloud, '
+                                          'projective_ranging, euclidean_reconstruction, '
+                                          'polar_profiling'),
+        DeclareLaunchArgument('detector_fps', default_value='10.0',
+                              description='Upper bound on detection rate, in frames per '
+                                          'second; every measurement row inherits this '
+                                          'cadence'),
+        DeclareLaunchArgument('detector_debug', default_value='false',
+                              description='Default-off detector evidence logging: achieved '
+                                          'cadence, superseded frames, and bounded cold/warm '
+                                          'percentiles for the throttle wait, decode, '
+                                          'inference, parse, publish and CUDA synchronization'),
+        DeclareLaunchArgument('depth_source', default_value='stereoscopic',
+                              description='Aligned depth source for the mask rows: '
+                                          'stereoscopic or monocular'),
+        DeclareLaunchArgument('mask_gate', default_value='box',
+                              description='Mask front-end: box (no segmentation model) or '
+                                          'silhouette'),
         DeclareLaunchArgument('mppi_visualize', default_value='false',
                               description='Publish MPPI trajectory visualization topics'),
         DeclareLaunchArgument('coverage_overlay_enabled', default_value='true',
                               description='Publish the live exploration-coverage HUD panel'),
         DeclareLaunchArgument('headless_rendering', default_value='false',
                               description='Render Gazebo server sensors via EGL without an X '
-                                          'display (GPU rendering for SSH sessions; ISSUES.md)'),
+                                          'display (GPU rendering for SSH sessions; '
+                                          'docs/troubleshooting.md)'),
 
         # RViz2
         Node(
@@ -175,77 +336,14 @@ def generate_launch_description():
             condition=launch.conditions.IfCondition(exploration_rviz),
         ),
 
-        Node(
-            package='ridgeback_autonomy',
-            executable='g1_detector_node',
-            name='g1_detector',
-            namespace=namespace,
-            parameters=[{'use_sim_time': use_sim_time}],
-            remappings=[('/tf', 'tf'), ('/tf_static', 'tf_static')],
-            output='screen',
-            condition=launch.conditions.IfCondition(g1_perception_enabled),
+        # Detector, measurement nodes, rings, distance HUD and camera overlay
+        # are gated as one unit: they are all downstream of detections.
+        OpaqueFunction(
+            function=build_target_localization_nodes,
+            condition=launch.conditions.IfCondition(target_localization_enabled),
         ),
 
-        Node(
-            package='ridgeback_autonomy',
-            executable='g1_camera_measurement_node',
-            name='g1_camera_measurement',
-            namespace=namespace,
-            parameters=[{
-                'use_sim_time': use_sim_time,
-                'depth_anything_enabled': depth_anything_enabled,
-            }],
-            remappings=[('/tf', 'tf'), ('/tf_static', 'tf_static')],
-            output='screen',
-            condition=launch.conditions.IfCondition(g1_perception_enabled),
-        ),
-
-        Node(
-            package='ridgeback_autonomy',
-            executable='g1_lidar_measurement_node',
-            name='g1_lidar_measurement',
-            namespace=namespace,
-            parameters=[{'use_sim_time': use_sim_time}],
-            remappings=[('/tf', 'tf'), ('/tf_static', 'tf_static')],
-            output='screen',
-            condition=launch.conditions.IfCondition(g1_perception_enabled),
-        ),
-
-        IncludeLaunchDescription(
-            PythonLaunchDescriptionSource(
-                os.path.join(includes_dir, 'camera_optical_tf.launch.py')
-            ),
-            launch_arguments={
-                'namespace': namespace,
-                'use_sim_time': use_sim_time,
-            }.items(),
-        ),
-
-        Node(
-            package='ridgeback_autonomy',
-            executable='g1_estimate_viz_node',
-            name='g1_estimate_viz',
-            namespace=namespace,
-            parameters=[{'use_sim_time': use_sim_time}],
-            remappings=[('/tf', 'tf'), ('/tf_static', 'tf_static')],
-            output='screen',
-            condition=launch.conditions.IfCondition(
-                AndSubstitution(g1_perception_enabled, estimate_viz)
-            ),
-        ),
-
-        Node(
-            package='ridgeback_autonomy',
-            executable='g1_overlay_node',
-            name='g1_overlay',
-            namespace=namespace,
-            parameters=[{'use_sim_time': use_sim_time}],
-            remappings=[('/tf', 'tf'), ('/tf_static', 'tf_static')],
-            output='screen',
-            condition=launch.conditions.IfCondition(g1_perception_enabled),
-        ),
-
-        # 1. Launch Gazebo simulation
+        # 1. Launch the selected simulation backend
         IncludeLaunchDescription(
                     PythonLaunchDescriptionSource(
                         os.path.join(includes_dir, 'simulation.launch.py')
