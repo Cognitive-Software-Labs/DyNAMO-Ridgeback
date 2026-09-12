@@ -97,27 +97,29 @@ owners:
 - hardware omits those internal frames, leaving the RealSense driver to
   publish its device calibration.
 
-Gazebo's RGB-D sensor renders from `camera_0_color_frame` at 640×480 and 30 Hz.
-Isaac's importer also expands the simulation description, then creates
-`d455_color` at the exact same colour-frame origin. The prim carries only the
-USD-to-ROS camera-axis rotation—there is no copied D435 translation—and
-`OmniSensorAPI` authors the 30 Hz cadence. Its backend-specific 1280×720,
-631 px focal-length input lives in
-`src/ridgeback_autonomy_isaac/sim/isaac/d455_camera.json`; the generated
-USD bakes that contract. Runtime perception never reads this file or a FoV
-constant: both simulator backends publish `CameraInfo`, which is the
-application input; hardware gets the same input from the RealSense driver.
+Gazebo's RGB-D sensor and Isaac's camera adapter use the same nominal D455 RGB
+profiles from `ridgeback_autonomy/common/camera_profiles.py`: 640×480 is the
+default and 1280×720 is optional, both at 30 Hz. Isaac's importer expands the
+simulation description, then creates `d455_color` at the exact same colour-frame
+origin. The prim carries only the USD-to-ROS camera-axis rotation—there is no
+copied D435 translation—and `OmniSensorAPI` authors the cadence. Runtime
+selection updates both aperture and render-product dimensions so Isaac's
+published `CameraInfo` matches the selected profile. Perception reads that live
+message, never the profile table or a FoV constant; hardware gets its
+factory-calibrated input from the RealSense driver.
 
-The merged runtime was checked live on 2026-09-12. Isaac published 1280×720
+The pre-profile runtime was checked live on 2026-09-12. Isaac published 1280×720
 `rgb8` colour and `32FC1` depth, both labelled
 `camera_0_color_optical_frame`; `CameraInfo` reported
 `fx=fy=631.0000005`, `cx=640`, `cy=360`, and advanced at exactly 30.0 Hz in
-simulation time. The namespaced TF tree resolved `base_link →
+simulation time. That optics value is historical and has no manufacturer or
+device-calibration provenance; the shared nominal profile supersedes it and
+still needs a live two-profile rerun. The namespaced TF tree resolved `base_link →
 camera_0_color_optical_frame` to `[0.280, -0.011, 1.034]` with the expected
 optical rotation.
 
-Isaac Sim 6's `depth_pcl` helper serializes the image-row-major cloud as
-`921600×1`, not `1280×720`. A matched live depth/cloud pair proved one point
+Isaac Sim 6's `depth_pcl` helper serializes the image-row-major cloud as a flat
+`width*height × 1` grid. A matched live 1280×720 depth/cloud pair proved one point
 per pixel and exact optical-Z/depth agreement across 417,280 valid pixels.
 The pointcloud consumer therefore restores the 720×1280 grid only when the
 flat point count exactly matches the live colour dimensions; arbitrary flat
@@ -149,14 +151,15 @@ together. From `a33111c2` to 2026-09-11 they did not (see "The drive rig"), and
 the robot saw its own notch every time it turned. A zero here does not license
 skipping the moving case.
 
-Gazebo's live proof was repeated after the shared config explicitly supplied
+Gazebo's pre-profile live proof was repeated after the shared config explicitly supplied
 the physical ±135° UST window. Without it, Clearpath's generic parser expanded
 the Gazebo sensor to 360° and both units produced 140 false near bins down to
 5.05 cm. With it, each sensor published 540/540 finite bins at 40 Hz and zero
 returns below 0.8 m while stationary. During a commanded turn the robot yaw
 changed by 0.390 rad and both scans again had 540/540 finite bins, zero below
 0.8 m; the nearest obstacle was 1.19 m. The camera simultaneously published
-640×480 `CameraInfo` at 30.3 Hz with `fx=fy=443.53` and
+the retired generic Clearpath 640×480 `CameraInfo` at 30.3 Hz with
+`fx=fy=443.53` and
 `camera_0_color_optical_frame`.
 
 That closes raw-sensor compatibility for the physically accurate mounts. The

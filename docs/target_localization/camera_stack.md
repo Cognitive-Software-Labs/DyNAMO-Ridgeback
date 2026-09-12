@@ -42,22 +42,43 @@ copied from this table.
 
 ## Backend optics and producers
 
+Gazebo and Isaac use the same named nominal D455 RGB profiles from
+`ridgeback_autonomy/common/camera_profiles.py`. The default is `640x480`; select
+the larger grid with `camera_profile:=1280x720`. Both stay at 30 Hz.
+
+| Profile | Grid | Nominal pinhole `(fx, fy, cx, cy)` px | FoV (H x V) |
+|---|---:|---:|---:|
+| `640x480` (default) | 640 x 480 | `(384, 384, 320, 240)` | 79.61 x 64.01 deg |
+| `1280x720` | 1280 x 720 | `(640, 640, 640, 360)` | 90.00 x 58.72 deg |
+
+This is a reproducible simulation approximation, not a claim of factory
+calibration. The manufacturer specifies a 1280 x 800 maximum RGB stream and a
+nominal 90 x 65 degree RGB FoV. The model uses the 90-degree horizontal value,
+square pixels, and a centred principal point: the HD option is a centred
+1280 x 720 vertical crop, while VGA is a centred 4:3 crop scaled to 640 x 480.
+The resulting native vertical FoV is about 64 degrees, consistent with the
+rounded 65-degree datasheet value. The datasheet does not publish the effective
+intrinsics for every stream mode; only live `CameraInfo` can establish those
+for the physical unit.
+
+Manufacturer references: [D455 product specifications](https://www.realsenseai.com/products/real-sense-depth-camera-d455f/),
+the [D400 family datasheet](https://www.realsenseai.com/wp-content/uploads/2023/10/Intel-RealSense-D400-Series-Datasheet-September-2023.pdf),
+and the [librealsense per-stream intrinsics API](https://github.com/realsenseai/librealsense/wiki/API-How-To).
+
 | Contract | Gazebo | Isaac Sim 6 | Physical D455 |
 |---|---|---|---|
-| Producer | Clearpath Gazebo `rgbd_camera` plus ROS-Gazebo bridges | baked USD camera plus Isaac ROS 2 Camera Helpers | externally managed `realsense2_camera` service |
-| Resolution | 640 x 480 | 1280 x 720 | checked-out default 640 x 480; verify active profile |
-| Authored rate | 30 Hz | 30 Hz | checked-out default 30 Hz; verify live rate |
-| Intrinsics | `fx=fy=443.53`, `cx=320`, `cy=240` | `fx=fy=631`, `cx=640`, `cy=360` | factory calibration in live `CameraInfo` |
-| Field of view | 71.62 deg H, about 56.85 deg V | 90.81 deg H, 59.41 deg V | derive from live `CameraInfo`; not recorded yet |
+| Producer | Clearpath Gazebo `rgbd_camera` plus ROS-Gazebo bridges | generated USD camera plus Isaac ROS 2 Camera Helpers | externally managed `realsense2_camera` service |
+| Profile | shared `640x480` default or `1280x720` | shared `640x480` default or `1280x720` | driver/device-selected; verify both requested modes live |
+| Authored rate | 30 Hz | 30 Hz | verify live rate |
+| Intrinsics | selected nominal profile, published as `CameraInfo` | selected nominal profile, published as `CameraInfo` | factory calibration in live `CameraInfo` |
 | Clip/range model | 0.3-100 m render clip | 0.1-100 m render clip | physical stereo validity; no application hard cutoff |
 | Depth formation | clean GPU Z-buffer | clean rendered depth | active-IR stereo depth |
 | RGB/depth registration | same render product, aligned by construction | same render product, aligned by construction | driver align-to-colour filter (`align_depth.enable: true`) |
 | Distortion/noise | no D455 distortion, stereo, projector, or noise model | no physical stereo/projector model | real calibrated optics, holes, noise, and occlusions |
 | Internal camera TF owner | `robot_state_publisher`, nominal URDF frames | `robot_state_publisher`, nominal URDF frames | RealSense driver, factory extrinsics |
 
-The two simulators therefore share geometry and ROS topic semantics, not pixel
-geometry. Algorithms must consume each stream's `CameraInfo`; a hard-coded FoV
-or 640 x 480 assumption is invalid in Isaac and unsafe on hardware.
+Algorithms must consume each stream's `CameraInfo`; neither profile name nor a
+hard-coded FoV is an application projection input.
 
 ## ROS topics
 
@@ -76,8 +97,8 @@ transport topics to this contract; its parameter bridge carries both
 `CameraInfo` streams and the point cloud. Isaac creates one render product and
 attaches RGB, depth, depth-point-cloud, and two `CameraInfo` publishers to it.
 All Isaac camera products are labelled `camera_0_color_optical_frame`; its
-flattened `921600 x 1` point cloud is restored to the live 720 x 1280 image
-shape by the application after an exact point-count check.
+flattened `width*height x 1` point cloud is restored to the active image shape
+by the application after an exact point-count check.
 
 Hardware is attach-first. The hardware adapter does not start the camera or
 sensor service, including when its optional platform bringup is enabled; it
@@ -92,7 +113,7 @@ the intended physical device.
 ```mermaid
 flowchart LR
     YAML["robot.yaml<br/>D455 mount + driver intent"]
-    SELECT["ridgeback_exploration.launch.py<br/>backend = gz | isaac | hardware"]
+    SELECT["ridgeback_exploration.launch.py<br/>backend = gz | isaac | hardware<br/>camera_profile for simulators"]
     CONTRACT["camera_inputs.py<br/>backend topic profile + overrides"]
 
     YAML --> GZ["Gazebo adapter<br/>URDF/SDF RGBD sensor + bridges"]
@@ -124,6 +145,8 @@ backends and `realsense` inputs for hardware. `color_topic`,
 `camera_info_topic`, `depth_topic`, and `pointcloud_topic` remain explicit
 overrides. Backend selection changes only producers and those input topics; the
 detector and estimators are the same ROS nodes in all three environments.
+`camera_profile` is forwarded only to Gazebo and Isaac. The hardware adapter
+deliberately ignores it and remains attach-only.
 
 The detector uses sensor-data QoS, keeps only the newest RGB frame, and limits
 inference to 10 FPS by default even though the sensors are authored at 30 Hz.
@@ -141,10 +164,14 @@ contains a Gazebo-, Isaac-, or RealSense-specific projection constant.
 
 ## Validation state and known gaps
 
-- Isaac's live contract has been checked at 1280 x 720, `rgb8`/`32FC1`, 30
-  simulation Hz, and the nominal base-to-colour-optical transform above.
-- Gazebo's authored contract is 640 x 480 at 30 Hz; observed rate may fall
-  below 30 under rendering load and is not an alternate contract.
+- The shared profile math and Gazebo URDF/SDF expansion are covered at both
+  resolutions. The regenerated Isaac asset carries the default profile, and
+  its adapter changes aperture and render-product dimensions for either choice.
+- Isaac's earlier live check at 1280 x 720 used the retired hand-authored
+  `fx=fy=631` contract. It remains historical integration evidence, not
+  certification of the new shared nominal profile; rerun both modes live.
+- Gazebo's observed rate may fall below the authored 30 Hz under rendering
+  load; that is a performance failure, not an alternate camera contract.
 - Physical-camera validation is still pending. The
   [hardware validation plan](../plans/camera_hardware_validation.md) owns the
   device, profile, encoding, timestamp, TF-ownership, and organized-cloud gates.
@@ -163,8 +190,7 @@ contains a Gazebo-, Isaac-, or RealSense-specific projection constant.
 - Gazebo camera model: `clearpath_sensors_description/urdf/intel_realsense.urdf.xacro`
 - Gazebo generated bridges: `clearpath/sensors/config/camera_0.yaml` and
   `clearpath/sensors/launch/camera_0.launch.py`
-- Isaac optical specification: `ridgeback_autonomy_isaac/sim/isaac/d455_camera.json`
+- Shared simulation optics: `ridgeback_autonomy/common/camera_profiles.py`
 - Isaac publishers: `ridgeback_autonomy_isaac/sim/isaac/sensors.py`
 - Backend-neutral topic contract: `ridgeback_autonomy/common/camera_inputs.py`
 - Shared consumers: `ridgeback_autonomy/perception/target_localization/`
-

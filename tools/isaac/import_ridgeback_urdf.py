@@ -33,6 +33,15 @@ import sys
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
+CORE_PYTHON = REPO / "src/ridgeback_autonomy"
+if str(CORE_PYTHON) not in sys.path:
+    sys.path.insert(0, str(CORE_PYTHON))
+
+from ridgeback_autonomy.common.camera_profiles import (  # noqa: E402
+    DEFAULT_CAMERA_PROFILE,
+    resolve_camera_profile,
+)
+
 SETUP_PATH = REPO / "clearpath"
 # The 6.0 importer treats usd_path as a package DIRECTORY and writes
 # <usd_path>/<stem>/<stem>.usda (+ payloads/, Textures/). We flatten one
@@ -40,9 +49,6 @@ SETUP_PATH = REPO / "clearpath"
 OUT_DIR = REPO / "src/ridgeback_autonomy_isaac/sim/isaac/usd/robots"
 OUT_USD = OUT_DIR / "ridgeback_r100.usd"          # importer staging dir
 ENTRY_USD = OUT_DIR / "ridgeback_r100" / "ridgeback_r100.usda"
-CAMERA_SPEC = (
-    REPO / "src/ridgeback_autonomy_isaac/sim/isaac/d455_camera.json"
-)
 
 RIG = {
     "px": dict(kind="prismatic", axis="X"),
@@ -53,30 +59,23 @@ DRIVE_DAMPING = 1e5      # pure velocity drive: stiffness 0, high damping
 DUMMY_MASS = 1.0         # kg; carriers between the virtual joints
 
 
-def load_camera_spec(path: Path = CAMERA_SPEC) -> dict:
-    """Load the Isaac render contract and reject values USD cannot express."""
-    spec = json.loads(path.read_text(encoding="utf-8"))
-    resolution = spec["resolution"]
-    intrinsics = spec["intrinsics_px"]
-    width = int(resolution["width"])
-    height = int(resolution["height"])
-    fx = float(intrinsics["fx"])
-    fy = float(intrinsics["fy"])
-    cx = float(intrinsics["cx"])
-    cy = float(intrinsics["cy"])
-    tick_rate = float(spec["tick_rate_hz"])
-    clipping = tuple(float(value) for value in spec["clipping_range_m"])
-
-    if width <= 0 or height <= 0 or fx <= 0 or fy <= 0 or tick_rate <= 0:
-        raise ValueError(f"invalid positive camera value in {path}")
-    if (cx, cy) != (width / 2, height / 2):
-        raise ValueError(
-            "Isaac's ROS camera-info helper assumes a centered principal "
-            f"point; got ({cx}, {cy}) for {width}x{height}"
-        )
-    if len(clipping) != 2 or not 0 < clipping[0] < clipping[1]:
-        raise ValueError(f"invalid camera clipping range in {path}: {clipping}")
-    return spec
+def load_camera_spec(profile_name: str = DEFAULT_CAMERA_PROFILE) -> dict:
+    """Return one shared nominal profile in the importer's legacy shape."""
+    profile = resolve_camera_profile(profile_name)
+    return {
+        "description": "Shared nominal D455 RGB simulation profile",
+        "profile": profile.name,
+        "resolution": {"width": profile.width, "height": profile.height},
+        "intrinsics_px": {
+            "fx": profile.focal_length_px,
+            "fy": profile.focal_length_px,
+            "cx": profile.cx,
+            "cy": profile.cy,
+        },
+        "tick_rate_hz": profile.fps,
+        # Renderer clipping is not a physical-validity claim about the D455.
+        "clipping_range_m": [0.1, 100.0],
+    }
 
 
 def sh(*cmd, **kw):
@@ -565,7 +564,7 @@ def add_sensor_prims(usd_path: Path) -> None:
     """Author the GPU sensor prims INTO the robot package so the committed
     USD is the complete digital twin (open it in the Isaac GUI and the
     sensors are there). Specs stay in their committed sources —
-    sim/isaac/ust10lx_2d.json and sim/isaac/d455_camera.json — and are
+    sim/isaac/ust10lx_2d.json and the shared nominal D455 profiles — and are
     baked here at regen time; sensors.py only binds render products and
     ROS publishers to these prims at runtime.
     """

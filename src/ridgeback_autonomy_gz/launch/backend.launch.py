@@ -6,9 +6,27 @@ from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import (
     AppendEnvironmentVariable, DeclareLaunchArgument, IncludeLaunchDescription,
+    OpaqueFunction, SetLaunchConfiguration,
 )
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration, PythonExpression
+
+from ridgeback_autonomy.common.camera_profiles import (
+    CAMERA_PROFILE_CHOICES,
+    DEFAULT_CAMERA_PROFILE,
+    resolve_camera_profile,
+)
+
+
+def _configure_camera_profile(context):
+    profile = resolve_camera_profile(
+        LaunchConfiguration('camera_profile').perform(context))
+    return [
+        SetLaunchConfiguration('sim_camera_width', str(profile.width)),
+        SetLaunchConfiguration('sim_camera_height', str(profile.height)),
+        SetLaunchConfiguration(
+            'sim_camera_horizontal_fov', str(profile.horizontal_fov_rad)),
+    ]
 
 
 def generate_launch_description():
@@ -27,6 +45,11 @@ def generate_launch_description():
         DeclareLaunchArgument('clearpath_rviz', default_value='false'),
         DeclareLaunchArgument('gz_gui', default_value='true'),
         DeclareLaunchArgument('headless_rendering', default_value='false'),
+        DeclareLaunchArgument(
+            'camera_profile', default_value=DEFAULT_CAMERA_PROFILE,
+            choices=list(CAMERA_PROFILE_CHOICES),
+            description='Nominal D455 simulation profile'),
+        OpaqueFunction(function=_configure_camera_profile),
         AppendEnvironmentVariable(
             'GZ_SIM_RESOURCE_PATH', os.path.join(pkg_adapter, 'sim', 'worlds')),
         AppendEnvironmentVariable(

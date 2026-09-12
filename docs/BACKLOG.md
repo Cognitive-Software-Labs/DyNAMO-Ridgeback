@@ -48,11 +48,14 @@ recorded robot-side proof of the actual device, active profiles, topics, grids,
 stamps, TF ownership, or optional organized cloud.
 
 **Completion criteria.** Execute the [hardware plan](plans/camera_hardware_validation.md)
-against the approved robot setup; record device identity, effective configuration,
+against the approved robot setup; validate 640x480@30 and 1280x720@30 in
+separate runs; record device identity, effective configuration,
 color/depth/camera-info topics, dimensions/encodings/rates/stamps, exact-match
 observations, and optical-to-base TF; verify there is one internal-camera TF
-owner. If enabling `pointcloud`, additionally prove organization, color-grid
-indexing, frame, and timestamps before wiring it as a RealSense input.
+owner. Compare each live `CameraInfo` with the nominal shared simulation
+profile and record an explicit keep/update decision. If enabling `pointcloud`,
+additionally prove organization, color-grid indexing, frame, and timestamps
+before wiring it as a RealSense input.
 
 **Context.** [Aligned depth](target_localization/aligned_depth.md), the
 [removed D435 transform](history/operational_incidents.md#d435-static-camera-transform--removed-2026-08-31),
@@ -88,9 +91,10 @@ used to generate the visibility fractions and pixel-grid certifications in
 their old certified fractions are not current evidence.
 
 **Completion criteria.** Regenerate the pixel/visibility audit from the current
-robot description separately for Gazebo and Isaac optics; update scenario
-certifications and the gallery; rerun every benchmark whose inputs or measured
-behavior depend on camera or LiDAR geometry before quoting its numbers.
+robot description for both shared camera profiles and verify Gazebo/Isaac
+agreement; update scenario certifications and the gallery; rerun every
+benchmark whose inputs or measured behavior depend on camera or LiDAR geometry
+before quoting its numbers.
 
 **Context.** [Camera stack](target_localization/camera_stack.md) and
 [Isaac robot and sensor model](isaac/robot-model.md).

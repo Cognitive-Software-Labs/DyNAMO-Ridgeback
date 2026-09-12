@@ -32,7 +32,15 @@ bash cleanup.sh
 ros2 launch ridgeback_autonomy target_distance_benchmark.launch.py
 ros2 launch ridgeback_autonomy target_distance_benchmark.launch.py \
   estimators:=projective_ranging,polar_profiling mask_gate:=silhouette
+ros2 launch ridgeback_autonomy target_distance_benchmark.launch.py \
+  camera_profile:=1280x720
 ```
+
+`camera_profile` selects `640x480` (default) or `1280x720` for the persistent
+Gazebo environment. It is recorded in every run. A sweep may set it only under
+top-level `defaults`; it cannot vary per configuration because changing the
+render grid requires restarting the simulator. Results from different profiles
+are separate benchmark conditions and must not be pooled as repetitions.
 
 ## Scenario and comparison discipline
 

@@ -356,6 +356,10 @@ AXES: dict[str, AxisSpec] = {
     'world': _axis(
         'world', 'string', SHARED_BENCHMARK_ARGUMENT_DEFAULTS['world'],
         STAGE_SYSTEM, 'World'),
+    'camera_profile': _axis(
+        'camera_profile', 'choice',
+        SHARED_BENCHMARK_ARGUMENT_DEFAULTS['camera_profile'],
+        STAGE_SENSOR, 'Camera profile', choices=('640x480', '1280x720')),
     'color_topic': _axis(
         'color_topic', 'string', SIMULATION_CAMERA_INPUTS.color_image_topic,
         STAGE_SYSTEM, 'Color topic'),
@@ -410,7 +414,7 @@ _LIVE_ONLY_ARGUMENTS = {
     'replay_dataset_dir', 'sensor_capture_dir', 'depth_topic',
     'camera_info_topic', 'depth_match_debug', 'record_video', 'scan_topic',
     'pointcloud_topic', 'base_frame', 'run_dir_name', 'shutdown_on_complete',
-    'setup_path',
+    'setup_path', 'camera_profile',
 }
 for _name in sorted(_LIVE_ONLY_ARGUMENTS):
     AXES.setdefault(

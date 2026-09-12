@@ -16,6 +16,9 @@ ROBOT_USDA = (
 ISAAC_LAUNCH = (
     REPO_ROOT / 'src/ridgeback_autonomy_isaac/launch/backend.launch.py'
 )
+ISAAC_SENSORS = (
+    REPO_ROOT / 'src/ridgeback_autonomy_isaac/sim/isaac/sensors.py'
+)
 
 module_spec = importlib.util.spec_from_file_location('import_ridgeback_urdf', IMPORTER)
 importer = importlib.util.module_from_spec(module_spec)
@@ -23,13 +26,14 @@ sys.modules['import_ridgeback_urdf'] = importer
 module_spec.loader.exec_module(importer)
 
 
-def test_isaac_camera_spec_pins_d455_render_contract() -> None:
+def test_isaac_default_camera_spec_pins_d455_render_contract() -> None:
     spec = importer.load_camera_spec()
     resolution = spec['resolution']
     intrinsics = spec['intrinsics_px']
 
-    assert resolution == {'width': 1280, 'height': 720}
-    assert intrinsics == {'fx': 631.0, 'fy': 631.0, 'cx': 640.0, 'cy': 360.0}
+    assert spec['profile'] == '640x480'
+    assert resolution == {'width': 640, 'height': 480}
+    assert intrinsics == {'fx': 384.0, 'fy': 384.0, 'cx': 320.0, 'cy': 240.0}
     assert spec['tick_rate_hz'] == 30.0
     assert spec['clipping_range_m'] == [0.1, 100.0]
 
@@ -39,8 +43,16 @@ def test_isaac_camera_spec_pins_d455_render_contract() -> None:
     vertical_fov = math.degrees(
         2 * math.atan(resolution['height'] / (2 * intrinsics['fy']))
     )
-    assert horizontal_fov == pytest.approx(90.811, abs=0.001)
-    assert vertical_fov == pytest.approx(59.412, abs=0.001)
+    assert horizontal_fov == pytest.approx(79.611, abs=0.001)
+    assert vertical_fov == pytest.approx(64.011, abs=0.001)
+
+
+def test_isaac_hd_camera_spec_uses_the_same_nominal_lens() -> None:
+    spec = importer.load_camera_spec('1280x720')
+
+    assert spec['resolution'] == {'width': 1280, 'height': 720}
+    assert spec['intrinsics_px'] == {
+        'fx': 640.0, 'fy': 640.0, 'cx': 640.0, 'cy': 360.0}
 
 
 def test_committed_usd_camera_uses_generated_d455_frames_and_rate() -> None:
@@ -50,8 +62,8 @@ def test_committed_usd_camera_uses_generated_d455_frames_and_rate() -> None:
     assert 'def Camera "d455_color"' in text
     assert 'prepend apiSchemas = ["OmniSensorAPI"]' in text
     assert 'float omni:sensor:tickRate = 30' in text
-    assert 'custom int dynamo:resolutionWidth = 1280' in text
-    assert 'custom int dynamo:resolutionHeight = 720' in text
+    assert 'custom int dynamo:resolutionWidth = 640' in text
+    assert 'custom int dynamo:resolutionHeight = 480' in text
     assert 'double3 xformOp:translate = (0, 0.015, 0)' not in text
 
 
@@ -60,3 +72,13 @@ def test_isaac_robot_state_publisher_expands_the_simulation_frames() -> None:
 
     assert 'robot.urdf.xacro is_sim:=true' in text
     assert 'camera_optical_tf' not in text
+
+
+def test_isaac_runtime_updates_camera_metadata_and_aperture_as_one_contract() -> None:
+    text = ISAAC_SENSORS.read_text(encoding='utf-8')
+
+    assert 'width_attr.Set(width)' in text
+    assert 'height_attr.Set(height)' in text
+    assert 'tick_attr.Set(tick_rate)' in text
+    assert 'width * focal / profile.focal_length_px' in text
+    assert 'height * focal / profile.focal_length_px' in text

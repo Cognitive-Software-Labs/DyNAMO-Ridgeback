@@ -15,6 +15,11 @@ from launch.substitutions import (
 from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
 
+from ridgeback_autonomy.common.camera_profiles import (
+    CAMERA_PROFILE_CHOICES,
+    DEFAULT_CAMERA_PROFILE,
+)
+
 from ridgeback_autonomy.perception.target_localization.estimator_registry import (
     parse_estimators,
     selected_mask_estimators,
@@ -276,6 +281,11 @@ def generate_launch_description():
             description='Isaac: attach D455 camera; false = lidar-only '
                         '(saves GPU/RTF; gz ignores)'),
         DeclareLaunchArgument(
+            'camera_profile', default_value=DEFAULT_CAMERA_PROFILE,
+            choices=CAMERA_PROFILE_CHOICES,
+            description='Gazebo/Isaac nominal D455 render profile; hardware '
+                        'uses its externally managed active profile'),
+        DeclareLaunchArgument(
             'sim_mode', default_value='realtime',
             description='Isaac: realtime | deterministic timing (gz ignores)'),
         DeclareLaunchArgument(
@@ -404,6 +414,7 @@ def generate_launch_description():
                 'livestream': livestream,
                 'odom_noise': odom_noise,
                 'camera': camera,
+                'camera_profile': LaunchConfiguration('camera_profile'),
                 'sim_mode': sim_mode,
                 'sensor_hz': sensor_hz,
                 'start_hardware_platform': LaunchConfiguration(

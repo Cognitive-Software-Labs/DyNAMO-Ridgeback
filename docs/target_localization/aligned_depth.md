@@ -130,8 +130,8 @@ the same contract unchanged. Divergences to keep in mind (details in
 |---|---|---|---|
 | Depth origin | colour-camera Z-buffer | colour-camera render product | left-IR stereo, reprojected |
 | Alignment | by construction | by construction | driver filter, must be enabled |
-| Horizontal FoV | 71.62 deg | 90.81 deg | live colour `CameraInfo`; pending |
-| Resolution/rate | 640x480 @ 30 | 1280x720 @ 30 | active driver profiles; record on hardware |
+| Horizontal FoV | 79.61 or 90.00 deg | 79.61 or 90.00 deg | live colour `CameraInfo`; pending |
+| Resolution/rate | selected 640x480 or 1280x720 @ 30 | selected 640x480 or 1280x720 @ 30 | active driver profiles; record on hardware |
 | Encoding | `32FC1` m | `32FC1` m | expected `16UC1` mm; verify live |
 | Noise / holes | none (clean render) | none (clean render) | speckle, dropouts, alignment holes |
 

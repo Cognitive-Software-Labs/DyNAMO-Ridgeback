@@ -20,6 +20,7 @@ from ridgeback_autonomy.common.camera_inputs import (
     SIMULATION_BACKEND,
     resolve_camera_inputs,
 )
+from ridgeback_autonomy.common.camera_profiles import DEFAULT_CAMERA_PROFILE
 from ridgeback_autonomy.perception.target_localization.contracts import (
     ALIGNED_DEPTH_DEBUG_TOPIC,
     HUD_DISTANCES_PANEL_TOPIC,
@@ -46,6 +47,7 @@ SHARED_BENCHMARK_ARGUMENT_DEFAULTS = {
     'namespace': 'r100_0001',
     'use_sim_time': 'true',
     'world': 'target_distance_calibration',
+    'camera_profile': DEFAULT_CAMERA_PROFILE,
     'color_topic': 'sensors/camera_0/color/image',
 }
 
@@ -57,6 +59,7 @@ CONFIG_LAUNCH_ARGUMENT_NAMES = frozenset({
     'namespace',
     'use_sim_time',
     'world',
+    'camera_profile',
     'color_topic',
     'estimate_viz',
     'overlay',
@@ -102,6 +105,7 @@ CONFIG_LAUNCH_ARGUMENT_NAMES = frozenset({
 
 ENV_LAYER_CONFIG_KEYS = frozenset({
     'world',
+    'camera_profile',
     'setup_path',
     'namespace',
     'use_sim_time',

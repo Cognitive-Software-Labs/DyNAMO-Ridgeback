@@ -105,7 +105,7 @@ def test_sweep_rejects_duplicate_and_unsafe_names(tmp_path) -> None:
     'field',
     [
         'world', 'setup_path', 'namespace', 'use_sim_time', 'color_topic',
-        'headless_rendering', 'detector_fps', 'detector_debug',
+        'headless_rendering', 'camera_profile', 'detector_fps', 'detector_debug',
     ],
 )
 def test_sweep_rejects_environment_key_on_config(tmp_path, field) -> None:
@@ -146,6 +146,26 @@ def test_sweep_accepts_headless_rendering_as_environment_default(tmp_path) -> No
 
     assert spec.defaults['headless_rendering'] == 'true'
     assert 'headless_rendering' not in spec.configs[0].arguments
+
+
+def test_sweep_accepts_camera_profile_as_environment_default(tmp_path) -> None:
+    document = _document(tmp_path)
+    document['defaults']['camera_profile'] = '1280x720'
+
+    spec = parse_sweep(document)
+
+    assert spec.defaults['camera_profile'] == '1280x720'
+    # The config runner records it in run.json, but the validator still rejects
+    # per-config changes because the persistent simulator owns the renderer.
+    assert spec.configs[0].arguments['camera_profile'] == '1280x720'
+
+
+def test_sweep_rejects_unknown_camera_profile_early(tmp_path) -> None:
+    document = _document(tmp_path)
+    document['defaults']['camera_profile'] = '1920x1080'
+
+    with pytest.raises(ValueError, match='unknown camera profile'):
+        parse_sweep(document)
 
 
 @pytest.mark.parametrize(

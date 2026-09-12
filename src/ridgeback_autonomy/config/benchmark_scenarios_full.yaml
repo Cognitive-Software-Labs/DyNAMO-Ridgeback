@@ -1,8 +1,9 @@
-# v2 benchmark set: randomized poses under family constraints, pixel-certified
-# (id-buffer raster through sim intrinsics fx=443.53, 640x480, camera at
-# (0.25, 0, 0.85)). Sampler seed 20260725, generated 2026-07-26 by a one-shot
-# scratchpad script; this YAML is the durable artifact. Comments carry the
-# certified visible fractions measured at generation time.
+# v2 benchmark set: randomized poses under family constraints. Its historical
+# pixel certifications used fx=443.53 at 640x480 and camera (0.25, 0, 0.85).
+# They predate the current mounts and shared camera profiles, so the fractions
+# below must not be quoted until the camera-geometry recertification backlog is
+# complete. Sampler seed 20260725; generated 2026-07-26 by a one-shot scratchpad
+# script. This YAML remains the durable fixed scene input.
 #
 # Design: repeats:=1 at the runner; 3 probe scenes carry repeats_override 8
 # to measure the within-pose noise floor (single_facing_01, objpartial_01,
@@ -432,8 +433,9 @@ scenes:
   # ignored. These place one inside it, where the mask admits its beams and the
   # range segmentation is what has to reject them -- the other half of the axis.
   #
-  # Certified from the live URDF (~/clearpath, camera mount 0.0/0.72) and the
-  # world SDF: camera base_link + (0.011, 0.018, 1.028) fx 443.53 640x480;
+  # Historical certification from the then-live URDF (~/clearpath, camera mount
+  # 0.0/0.72) and world SDF: camera base_link + (0.011, 0.018, 1.028),
+  # fx 443.53 at 640x480. It is not current profile/mount evidence;
   # LiDAR base_link + (0.392, 0, 0.342), 270 deg at 0.25 deg per beam, so the
   # scan plane cuts the G1 mid-thigh. IV pole = 0.025 m shaft, z 0.05..1.80;
   # its 0.225 m base disc sits below the scan plane and the LiDAR never sees it.

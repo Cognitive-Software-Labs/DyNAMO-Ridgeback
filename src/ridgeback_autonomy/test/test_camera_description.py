@@ -14,6 +14,11 @@ from pathlib import Path
 
 import pytest
 
+from ridgeback_autonomy.common.camera_profiles import (
+    DEFAULT_CAMERA_PROFILE,
+    resolve_camera_profile,
+)
+
 REPO_ROOT = Path(__file__).resolve().parents[3]
 ROBOT_YAML = REPO_ROOT / 'clearpath' / 'robot.yaml'
 LAUNCH_DIR = Path(__file__).resolve().parents[1] / 'launch'
@@ -31,14 +36,23 @@ MOUNT_XYZ = (0.2692, 0.0, 0.725)
 TOLERANCE = 1e-9
 
 
-def _expand(setup_path: Path, *, is_sim: bool) -> ET.Element:
+def _expand(
+    setup_path: Path,
+    *,
+    is_sim: bool,
+    profile_name: str = DEFAULT_CAMERA_PROFILE,
+) -> ET.Element:
     xacro = pytest.importorskip('xacro')
+    profile = resolve_camera_profile(profile_name)
     document = xacro.process_file(
         str(setup_path / 'robot.urdf.xacro'),
         mappings={
             'is_sim': 'true' if is_sim else 'false',
             'namespace': 'r100_0001',
             'gazebo_controllers': '/dev/null',
+            'sim_camera_width': str(profile.width),
+            'sim_camera_height': str(profile.height),
+            'sim_camera_horizontal_fov': str(profile.horizontal_fov_rad),
         },
     )
     return ET.fromstring(document.toxml())
@@ -73,6 +87,7 @@ def gazebo_sdf(setup_path: Path) -> ET.Element:
 
     urdf_path = setup_path / 'robot_sim.urdf'
     xacro_module = pytest.importorskip('xacro')
+    profile = resolve_camera_profile(DEFAULT_CAMERA_PROFILE)
     urdf_path.write_text(
         xacro_module.process_file(
             str(setup_path / 'robot.urdf.xacro'),
@@ -80,6 +95,9 @@ def gazebo_sdf(setup_path: Path) -> ET.Element:
                 'is_sim': 'true',
                 'namespace': 'r100_0001',
                 'gazebo_controllers': '/dev/null',
+                'sim_camera_width': str(profile.width),
+                'sim_camera_height': str(profile.height),
+                'sim_camera_horizontal_fov': str(profile.horizontal_fov_rad),
             },
         ).toxml(),
         encoding='utf-8',
@@ -195,11 +213,34 @@ def test_only_simulation_carries_the_rendered_camera(
     sensor = blocks[0].find('sensor')
     assert sensor.find('camera/optical_frame_id').text == COLOR_OPTICAL_FRAME
     assert sensor.find('camera/gz_frame_id').text == COLOR_FRAME
-    # Simplified optics are deliberate: one FoV, no stereo baseline, no noise.
-    assert sensor.find('camera/horizontal_fov').text == '1.25'
-    assert sensor.find('camera/image/width').text == '640'
-    assert sensor.find('camera/image/height').text == '480'
+    # Simplified optics are deliberate: one nominal RGB pinhole, no stereo
+    # baseline or noise. The default is the shared low-resolution profile.
+    profile = resolve_camera_profile(DEFAULT_CAMERA_PROFILE)
+    assert float(sensor.find('camera/horizontal_fov').text) == pytest.approx(
+        profile.horizontal_fov_rad)
+    assert int(sensor.find('camera/image/width').text) == profile.width
+    assert int(sensor.find('camera/image/height').text) == profile.height
     assert sensor.find('update_rate').text == '30'
+
+
+@pytest.mark.parametrize('profile_name', ['640x480', '1280x720'])
+def test_simulation_profile_controls_gazebo_optics(
+    setup_path: Path,
+    profile_name: str,
+) -> None:
+    urdf = _expand(setup_path, is_sim=True, profile_name=profile_name)
+    profile = resolve_camera_profile(profile_name)
+    sensor = next(
+        sensor
+        for block in urdf.findall('gazebo')
+        for sensor in block.findall('sensor')
+        if sensor.get('type') == 'rgbd_camera'
+    )
+
+    assert int(sensor.find('camera/image/width').text) == profile.width
+    assert int(sensor.find('camera/image/height').text) == profile.height
+    assert float(sensor.find('camera/horizontal_fov').text) == pytest.approx(
+        profile.horizontal_fov_rad)
 
 
 def test_colour_frame_sits_at_the_configured_mount_plus_the_models_offsets(

@@ -326,6 +326,23 @@ def test_headless_rendering_is_optional_and_owned_by_the_environment() -> None:
         gazebo_adapter_text)
 
 
+def test_camera_profile_reaches_both_simulators_but_not_hardware() -> None:
+    source_root = _package_root().parent
+    dispatcher = (_package_root() / 'launch/includes/simulation.launch.py').read_text(
+        encoding='utf-8')
+    exploration = _exploration_text()
+    gazebo = (source_root / 'ridgeback_autonomy_gz/launch/backend.launch.py').read_text(
+        encoding='utf-8')
+    isaac = (source_root / 'ridgeback_autonomy_isaac/launch/backend.launch.py').read_text(
+        encoding='utf-8')
+
+    assert "arguments.pop('camera_profile')" in dispatcher
+    assert "'camera_profile': LaunchConfiguration('camera_profile')" in exploration
+    assert "LaunchConfiguration('camera_profile')" in gazebo
+    assert "'sim_camera_horizontal_fov'" in gazebo
+    assert "'--camera-profile', camera_profile" in isaac
+
+
 def test_backend_packages_keep_simulator_dependencies_out_of_core() -> None:
     source_root = _package_root().parent
     core_cmake = (_package_root() / 'CMakeLists.txt').read_text(encoding='utf-8')

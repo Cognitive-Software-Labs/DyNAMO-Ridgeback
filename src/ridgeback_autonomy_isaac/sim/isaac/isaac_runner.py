@@ -26,6 +26,11 @@ import sys
 import time
 from pathlib import Path
 
+from ridgeback_autonomy.common.camera_profiles import (
+    CAMERA_PROFILE_CHOICES,
+    DEFAULT_CAMERA_PROFILE,
+)
+
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 
@@ -63,6 +68,9 @@ def parse_args():
     ap.add_argument("--camera", default="true", choices=["true", "false"],
                     help="attach D455 camera render + publishers; false = "
                          "lidar-only (saves GPU/RTF for SLAM/nav benchmarks)")
+    ap.add_argument("--camera-profile", default=DEFAULT_CAMERA_PROFILE,
+                    choices=CAMERA_PROFILE_CHOICES,
+                    help="shared nominal D455 render profile")
     ap.add_argument("--robot-usd", default=None,
                     help="override the committed robot package entry USD")
     ap.add_argument("--odom-tf", default="false", choices=["true", "false"],
@@ -214,7 +222,7 @@ def run(app, args) -> int:
     from sensors import attach_camera, attach_lidars
     attach_lidars(stage, robot_prim_path, args.namespace)
     if args.camera == "true":
-        attach_camera(stage, robot_prim_path, args.namespace)
+        attach_camera(stage, robot_prim_path, args.namespace, args.camera_profile)
     else:
         print("camera disabled (--camera false): lidar-only run", flush=True)
 

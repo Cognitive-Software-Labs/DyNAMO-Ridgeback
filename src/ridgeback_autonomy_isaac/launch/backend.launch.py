@@ -25,6 +25,11 @@ from launch.substitutions import Command, LaunchConfiguration
 from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
 
+from ridgeback_autonomy.common.camera_profiles import (
+    CAMERA_PROFILE_CHOICES,
+    DEFAULT_CAMERA_PROFILE,
+)
+
 
 def generate_launch_description():
     pkg_adapter = get_package_share_directory('ridgeback_autonomy_isaac')
@@ -38,6 +43,7 @@ def generate_launch_description():
     rtf = LaunchConfiguration('rtf')
     odom_noise = LaunchConfiguration('odom_noise')
     camera = LaunchConfiguration('camera')
+    camera_profile = LaunchConfiguration('camera_profile')
     sim_mode = LaunchConfiguration('sim_mode')
     sensor_hz = LaunchConfiguration('sensor_hz')
 
@@ -108,6 +114,7 @@ def generate_launch_description():
              '--rtf', rtf,
              '--odom-noise', odom_noise,
              '--camera', camera,
+             '--camera-profile', camera_profile,
              '--sim-mode', sim_mode,
              '--sensor-hz', sensor_hz,
              '--animate-g1', LaunchConfiguration('animate_g1')],
@@ -138,6 +145,9 @@ def generate_launch_description():
         DeclareLaunchArgument('camera', default_value='true',
                               description='attach D455 camera; false = '
                                           'lidar-only (saves GPU/RTF)'),
+        DeclareLaunchArgument('camera_profile', default_value=DEFAULT_CAMERA_PROFILE,
+                              choices=CAMERA_PROFILE_CHOICES,
+                              description='Nominal D455 render profile'),
         DeclareLaunchArgument('sim_mode', default_value='realtime',
                               description='realtime | deterministic '
                                           '(fixed-step contention-immune A/B)'),

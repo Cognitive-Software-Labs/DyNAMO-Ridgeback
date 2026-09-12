@@ -67,9 +67,10 @@ Decisions:
 ## Deliberate improvements over the gz version (approved)
 
 1. **D455-native camera**: generate a self-contained USD camera at the D455
-   colour-frame origin, publishing 1280×720@30 with 631 px focal lengths from
-   `src/ridgeback_autonomy_isaac/sim/isaac/d455_camera.json`. Perception consumes the backend's live
-   `CameraInfo`, so Gazebo's deliberate 640×480 optics remain valid too.
+   colour-frame origin. Isaac and Gazebo now select the same nominal
+   datasheet-derived `640x480` (default) or `1280x720` profile at 30 Hz from
+   `ridgeback_autonomy/common/camera_profiles.py`. Perception consumes the
+   backend's live `CameraInfo`; physical profiles remain a hardware gate.
 2. **Real UST-10LX lidars**: 270° FOV, 0.05–10 m, realistic range noise, 40 Hz, custom RTX profile JSON. Front+rear pair covers 360° combined, coplanar, recessed in the body notch. **Both sensor mounts were corrected on 2026-09-10** — the lidars were 11.6 cm too high, the camera 12.5 cm — and the chassis was replaced with Clearpath's authored asset. Full geometry, derivation and the measurement lessons: [`robot-model.md`](robot-model.md). ⚠️ Marks every sensor-geometry baseline for rerun.
 
 3. **Honest odometry pipeline**: runner publishes **noise-injected raw wheel odom** (configurable per-meter translational + yaw drift; σ=0 debug knob) + **IMU** → ROS-side `robot_localization` EKF (config derived from `clearpath_control`) → `platform/odom/filtered`. SLAM earns its keep; closest to the real robot.
@@ -127,8 +128,8 @@ Bootstrap: cut `feat/isaac-sim-6-port` from `dev`; workspace already built in th
 - **DONE** — motion verified two ways: `tools/isaac/diag_rig.py --battery` 10/10 (stillness at spawn, zero wheel contacts, sim-time advance, set_planar_pose teleport, fwd/strafe/spin/combined tracking exact, stop drift 0.00 cm, cmd-timeout stop) + live-runner ROS checks (/clock advances at RTF≈1, odom arcs under teleop, strafe-at-yaw holonomic, stop twist ~0, noisy odom vs exact GT split). Deviation: raw odom publishes at the render rate (~35 Hz under co-tenant load), not 50 Hz — publish-per-physics-step decoupling is a P4 option if the EKF wants it.
 
 ### P4 — Sensors + EKF + launch include: full contract [L] ✅
-- `sensors.py`, `ust10lx_2d.json`, generated D455 camera from
-  `d455_camera.json`, and the IMU publisher.
+- `sensors.py`, `ust10lx_2d.json`, generated D455 camera from the shared
+  profile table, and the IMU publisher.
 - `ridgeback_autonomy_isaac/launch/backend.launch.py`: event chain
   generate_description → OnProcessExit → robot_state_publisher +
   `robot_localization` ekf_node (→ `platform/odom/filtered` + TF) + runner
@@ -138,10 +139,11 @@ Bootstrap: cut `feat/isaac-sim-6-port` from `dev`; workspace already built in th
   alias.
 - `cleanup.sh` += isaac kill patterns (user-scoped `isaac_runner.py`, `omni.kit`); extend `test_launch_layout.py`.
 - Config deltas land here: slam `max_laser_range` 10, costmap range review (documented in commit).
-- ✓ Isaac include alone: all contract topics live, types/QoS match baseline,
-  camera_info = D455 1280×720 at 30 Hz (intentional backend divergence), EKF
+- ✓ Historical Isaac include-alone check: all contract topics were live,
+  types/QoS matched baseline, camera_info was D455 1280×720 at 30 Hz under
+  the retired backend-specific optics contract, and EKF
   publishes filtered odom + TF, view_frames complete, standalone slam_toolbox maps.
-- **DONE** — include-alone acceptance: 14/14 contract topics live, QoS RELIABLE/VOLATILE matches baseline, camera_info 1280×720 fx=631 frame=color-optical, EKF filtered odom within ~1 mm of GT while raw drifts (IMU+odom fusion), TF tree 22 edges incl. odom→base_link from EKF, slam_toolbox maps standalone (1758 occ / 17k free cells after one arc). Deviations, all documented in code: 6.0 replaced lidar JSON profiles with OmniLidar prims (`ust10lx_2d.json` is now our spec file that sensors.py authors onto the prim; needs `omni:sensor:tickRate` 40 + `accumulateOutputs`); **[CORRECTED 2026-07-12]** the "LaserScan is a 360° frame with the rear 90° inf, ROI honored, effective 270°" claim here was WRONG — both the mechanism it describes and the state it asserted. The 6.0.1 bridge laser_scan writer hardcodes 360° for ROTARY lidars (ignores the ROI) and only fires 180°/tick, so the P4 scan was actually half-blind (135°, right side only) and rotation-warped — never a clean 270°. The fix (commits `66493670` + `e1862498`) makes the 270° outcome real but NOT via the mechanism above: two OmniLidar prims per laser frame publish point clouds, and `ros_io.LidarScanAssembler` emits a **native 270° message** (`angle_min -135°`, 1081 bins, `angle_max +135°`) — there is no 360° frame and no rear-inf sector anymore. So the FOV number now matches by outcome, but the "360° frame with rear inf, ROI honored" description was never how this worked. Full writeup: `docs/isaac/lidar-pipeline.md`. Scan now 40 Hz sim-time; odom ~30 Hz — render-frame-locked under co-tenant load (gz baseline 37/46; slam fine, revisit at P5 RTF gate); camera = plain USD camera with true D455 720p intrinsics at the RealSense mount pose (**the description said `d435` until 2026-09-10 and now says `d455`, matching the intrinsics**) instead of referencing the cloud `rsd455.usd` asset (self-contained repo beats a boot-time network fetch; mesh is cosmetic); UST-10LX min range 0.06 m per datasheet (plan said 0.05).
+- **DONE (historical camera contract)** — include-alone acceptance: 14/14 contract topics live, QoS RELIABLE/VOLATILE matches baseline, camera_info 1280×720 fx=631 frame=color-optical, EKF filtered odom within ~1 mm of GT while raw drifts (IMU+odom fusion), TF tree 22 edges incl. odom→base_link from EKF, slam_toolbox maps standalone (1758 occ / 17k free cells after one arc). The `fx=631` value was hand-authored and is superseded by the shared nominal profiles; rerun both selections before treating this as current camera evidence. Deviations, all documented in code: 6.0 replaced lidar JSON profiles with OmniLidar prims (`ust10lx_2d.json` is now our spec file that sensors.py authors onto the prim; needs `omni:sensor:tickRate` 40 + `accumulateOutputs`); **[CORRECTED 2026-07-12]** the "LaserScan is a 360° frame with the rear 90° inf, ROI honored, effective 270°" claim here was WRONG — both the mechanism it describes and the state it asserted. The 6.0.1 bridge laser_scan writer hardcodes 360° for ROTARY lidars (ignores the ROI) and only fires 180°/tick, so the P4 scan was actually half-blind (135°, right side only) and rotation-warped — never a clean 270°. The fix (commits `66493670` + `e1862498`) makes the 270° outcome real but NOT via the mechanism above: two OmniLidar prims per laser frame publish point clouds, and `ros_io.LidarScanAssembler` emits a **native 270° message** (`angle_min -135°`, 1081 bins, `angle_max +135°`) — there is no 360° frame and no rear-inf sector anymore. So the FOV number now matches by outcome, but the "360° frame with rear inf, ROI honored" description was never how this worked. Full writeup: `docs/isaac/lidar-pipeline.md`. Scan now 40 Hz sim-time; odom ~30 Hz — render-frame-locked under co-tenant load (gz baseline 37/46; slam fine, revisit at P5 RTF gate); camera = plain USD camera at the RealSense mount pose instead of referencing the cloud `rsd455.usd` asset (self-contained repo beats a boot-time network fetch; mesh is cosmetic); UST-10LX min range 0.06 m per datasheet (plan said 0.05).
 
 ### P5 — E2E exploration + sign-off [M] — plumbing ✅, A/B ⏳ awaiting a baseline
 - ✅ Launch chain forwards `sim`/`rtf`/`headless`/`livestream`/`odom_noise`; readiness gates; HUD localization-error panel; `explore_probe` logs GT-drift, achieved RTF, coverage accuracy (`9e0f3c02`).

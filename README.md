@@ -289,6 +289,7 @@ Arguments:
 | `autonomous_motion_enabled` | backend-derived | `true` in simulation; `false` on hardware until the operator explicitly enables frontier goals |
 | `start_hardware_platform` | `false` | Hardware only: attach to existing Clearpath services by default; `true` explicitly includes platform bringup |
 | `headless_rendering` | `false` | Optional server-only EGL sensor rendering for SSH/non-seat sessions; the existing `tools/gpu-run` NVIDIA GLX workflow remains the default GUI-capable path (see [troubleshooting](docs/troubleshooting.md#camera-rate-collapses-under-software-rendering)) |
+| `camera_profile` | `640x480` | Shared nominal D455 render profile for Gazebo and Isaac; `1280x720` is available for higher-resolution runs and requires a simulator restart |
 | `headless` / `livestream` | `true` / `false` | Isaac window and WebRTC controls; ignored by Gazebo |
 | `rtf` / `sim_mode` | `1.0` / `realtime` | Isaac timing controls; use `deterministic` for comparisons |
 | `odom_noise` | `1.0` | Isaac odometry-drift scale; `0` gives exact debug odometry |
@@ -434,6 +435,7 @@ Arguments:
 | `detector_fps` | `10.0` | Upper bound on the detection rate every measurement row inherits. Belongs to the persistent environment layer, so in a sweep it is a `defaults` key and cannot vary per configuration |
 | `detector_debug` | `false` | Default-off detector evidence logging: achieved cadence, superseded frames, and bounded cold/warm percentiles for the throttle wait, decode, inference, parse, publish and CUDA synchronization. Environment-layer, like `detector_fps` |
 | `headless_rendering` | `false` | Optional default-off server-only EGL sensor rendering. In sweeps this is a persistent-environment `defaults` key and cannot vary per configuration; `tools/gpu-run` remains the GUI-capable NVIDIA GLX path |
+| `camera_profile` | `640x480` | Gazebo camera profile (`640x480` or `1280x720`). It is a persistent-environment `defaults` key, is recorded in each run, and cannot vary per configuration without restarting Gazebo |
 | `isolation_2d` | `nearest_mode_histogram` | Projective-ranging box-gate foreground recipe: `nearest_mode_histogram` or `otsu` |
 | `isolation_3d` | `height_crop_nearest_mode_band` | Euclidean-reconstruction box-gate foreground recipe: `height_crop_nearest_mode_band`, `height_crop_range_band`, `height_crop`, `nearest_mode_band`, or `range_band`. The two chains differ only in how the background separator anchors — nearest mode vs. percentile; the percentile one slides as background grows and is what the `pointcloud` row does |
 | `isolation_3d_floor_margin_m` | `0.05` | Height above the floor a point must clear in Euclidean recipes containing `height_crop` |
@@ -575,6 +577,7 @@ sweep:
 defaults:
   scenario: ''       # packaged benchmark_scenarios_full.yaml
   repeats: 1
+  camera_profile: 640x480  # persistent; 1280x720 requires a new environment
 
 configs:
   - name: pointcloud
@@ -589,9 +592,9 @@ configs:
 Config values override `defaults`. Validation happens before Gazebo starts:
 unknown arguments, duplicate/unsafe names, bad estimators, missing scenario
 files, environment keys on individual configs, and estimator-inapplicable
-knobs are rejected. `world`, `setup_path`, `namespace`, `use_sim_time`, and
-`color_topic` may be set only in `defaults` because the environment cannot
-change mid-sweep.
+knobs are rejected. `world`, `setup_path`, `namespace`, `use_sim_time`,
+`color_topic`, and `camera_profile` may be set only in `defaults` because the
+environment cannot change mid-sweep.
 
 Use `--skip-preflight-cleanup` only when another same-user ROS/Gazebo session
 must remain alive. The sweep then skips the aggressive repository cleanup and
@@ -757,11 +760,14 @@ or integration claims.
 | `target_distance_benchmark_runner` | per-estimator CSVs + `run.json` + `summary.md` + trial collage images + optional `video/run.mp4` | `estimators`, `output_dir`, `pointcloud_measurement_topic`, `mask_measurement_topic`, `color_topic`, `record_video`, `record_fps` |
 
 Perception gets camera intrinsics exclusively from the colour camera's live
-`CameraInfo`; there is no application-side FoV override to tune. Gazebo renders
-the generated Clearpath profile (640×480 at 30 Hz). Isaac's generated USD camera
-uses `src/ridgeback_autonomy_isaac/sim/isaac/d455_camera.json` (1280×720,
-631 px focal lengths, 30 Hz), and
-publishes the resulting intrinsics through the same `CameraInfo` interface.
+`CameraInfo`; there is no application-side FoV override to tune. Gazebo and
+Isaac share nominal D455 RGB profiles: `640x480` is the default and
+`1280x720` is selectable with `camera_profile:=...`, both at 30 Hz. The optics
+are derived from the manufacturer's 1280×800, 90-degree horizontal RGB contract
+using centred crops and square pixels. Both backends publish the selected
+intrinsics through the same `CameraInfo` interface. See the
+[camera-stack reference](docs/target_localization/camera_stack.md) for the
+exact matrices, assumptions, and pending hardware comparison.
 
 ## Configuration
 

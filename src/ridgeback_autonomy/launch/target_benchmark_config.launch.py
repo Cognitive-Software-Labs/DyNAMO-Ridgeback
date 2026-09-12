@@ -17,6 +17,11 @@ from launch.events import Shutdown
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
+from ridgeback_autonomy.common.camera_profiles import (
+    CAMERA_PROFILE_CHOICES,
+    DEFAULT_CAMERA_PROFILE,
+)
+
 from ridgeback_autonomy.benchmarking.paths import default_output_directory
 from ridgeback_autonomy.benchmarking.replay import REPLAY_CAPTURE_BATCHES_DEFAULT
 from ridgeback_autonomy.perception.target_localization.estimator_registry import (
@@ -199,6 +204,7 @@ def build_benchmark_nodes(context, *args, **kwargs):
             'raw_detections_topic': RAW_DETECTIONS_TOPIC,
             'aligned_depth_debug_topic': ALIGNED_DEPTH_DEBUG_TOPIC,
             'camera_info_topic': camera_inputs.color_camera_info_topic,
+            'camera_profile': LaunchConfiguration('camera_profile'),
             'base_frame': base_frame,
             'estimators': ','.join(selected_estimators),
             'pointcloud_measurement_topic': POINTCLOUD_MEASUREMENTS_TOPIC,
@@ -298,6 +304,10 @@ def generate_launch_description():
         DeclareLaunchArgument('namespace', default_value='r100_0001'),
         DeclareLaunchArgument('use_sim_time', default_value='true'),
         DeclareLaunchArgument('world', default_value='target_distance_calibration'),
+        DeclareLaunchArgument(
+            'camera_profile', default_value=DEFAULT_CAMERA_PROFILE,
+            choices=CAMERA_PROFILE_CHOICES,
+            description='Camera profile owned by the persistent benchmark environment'),
         DeclareLaunchArgument(
             'color_topic', default_value=SIMULATION_CAMERA_INPUTS.color_image_topic),
         DeclareLaunchArgument(

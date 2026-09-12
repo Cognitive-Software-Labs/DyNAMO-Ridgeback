@@ -4,9 +4,9 @@ The sensor PRIMS live in the committed robot USD — the import script
 (tools/isaac/import_ridgeback_urdf.py) bakes 2x UST-10LX OmniLidar prims
 onto the lidar2d_{0,1}_laser frames and a D455-intrinsics camera at the
 generated D455 colour frame, from the committed specs (ust10lx_2d.json and
-d455_camera.json). This module only binds render products and
-ROS2 bridge helper publishers to those prims at runtime; plain-rclpy I/O
-lives in ros_io.py.
+the shared nominal D455 profile contract). This module only binds render
+products and ROS2 bridge helper publishers to those prims at runtime;
+plain-rclpy I/O lives in ros_io.py.
 
 Publish topics follow the frozen contract, default (RELIABLE/VOLATILE/
 KEEP_LAST 10) QoS from the bridge nodes.
@@ -17,6 +17,11 @@ mislabels our 270-deg ROI arc (details at the helper node below).
 ros_io.LidarScanAssembler bins the clouds into the contract LaserScan.
 """
 from __future__ import annotations
+
+from ridgeback_autonomy.common.camera_profiles import (
+    DEFAULT_CAMERA_PROFILE,
+    resolve_camera_profile,
+)
 
 REGEN_HINT = ("robot USD predates baked sensor prims — regenerate with "
               "tools/isaac/import_ridgeback_urdf.py")
@@ -98,7 +103,8 @@ def attach_lidars(stage, robot_root: str = "/ridgeback",
 
 
 def attach_camera(stage, robot_root: str = "/ridgeback",
-                  namespace: str = "r100_0001") -> str:
+                  namespace: str = "r100_0001",
+                  camera_profile: str = DEFAULT_CAMERA_PROFILE) -> str:
     """Bind one render product + color/depth/points/camera_info publishers
     to the baked D455 camera prim (depth aligned to color, like the gz
     setup and the real driver's align mode)."""
@@ -106,23 +112,31 @@ def attach_camera(stage, robot_root: str = "/ridgeback",
     from pxr import UsdGeom
 
     cam = _find_prim_by_name(stage, robot_root, "d455_color")
-    # Render resolution is generator metadata because it is not part of the
-    # standard USD Camera schema. Intrinsics and cadence are authored on the
-    # prim itself and consumed by Isaac's camera and ROS helpers.
+    profile = resolve_camera_profile(camera_profile)
+    width, height = profile.width, profile.height
+    tick_rate = profile.fps
     width_attr = cam.GetAttribute("dynamo:resolutionWidth")
     height_attr = cam.GetAttribute("dynamo:resolutionHeight")
     tick_attr = cam.GetAttribute("omni:sensor:tickRate")
     if not width_attr or not height_attr or not tick_attr:
         raise RuntimeError(f"{cam.GetPath()}: camera contract metadata missing — "
                            + REGEN_HINT)
-    width, height = int(width_attr.Get()), int(height_attr.Get())
-    tick_rate = float(tick_attr.Get())
+    width_attr.Set(width)
+    height_attr.Set(height)
+    tick_attr.Set(tick_rate)
     if width <= 0 or height <= 0 or tick_rate <= 0:
         raise RuntimeError(f"{cam.GetPath()}: invalid camera contract "
                            f"{width}x{height}@{tick_rate} Hz")
 
     c = UsdGeom.Camera(cam)
-    focal = c.GetFocalLengthAttr().Get()
+    # Resolution and aperture form one contract. Reusing the baked aperture at
+    # another aspect ratio would publish stretched, incorrect intrinsics.
+    focal = 24.0
+    c.GetFocalLengthAttr().Set(focal)
+    c.GetHorizontalApertureAttr().Set(
+        width * focal / profile.focal_length_px)
+    c.GetVerticalApertureAttr().Set(
+        height * focal / profile.focal_length_px)
     hap = c.GetHorizontalApertureAttr().Get()
     fx = width * focal / hap            # sanity print only
     rp_path = _render_product(cam.GetPath(), [width, height])
@@ -169,6 +183,7 @@ def attach_camera(stage, robot_root: str = "/ridgeback",
             og.Controller.Keys.SET_VALUES: values,
         },
     )
-    print(f"camera attached: {cam.GetPath()} {width}x{height}@{tick_rate:g} Hz "
+    print(f"camera attached: {cam.GetPath()} profile={profile.name} "
+          f"{width}x{height}@{tick_rate:g} Hz "
           f"fx={fx:.0f}", flush=True)
     return str(cam.GetPath())

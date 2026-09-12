@@ -8,6 +8,7 @@ import re
 
 import yaml
 
+from ridgeback_autonomy.common.camera_profiles import resolve_camera_profile
 from ridgeback_autonomy.perception.target_localization.estimator_registry import (
     DEPTH_PATH_ESTIMATORS,
     MASK_ESTIMATORS,
@@ -29,6 +30,7 @@ SWEEP_METADATA_KEYS = frozenset({'name', 'description'})
 ENVIRONMENT_ONLY_DEFAULT_NAMES = frozenset({
     'setup_path',
     'headless_rendering',
+    'camera_profile',
     'detector_fps',
     'detector_debug',
 })
@@ -217,6 +219,13 @@ def parse_sweep(
         key: _launch_value(value, owner=f'Sweep file {source} field "defaults"', field=key)
         for key, value in defaults_raw.items()
     }
+    if 'camera_profile' in defaults:
+        try:
+            resolve_camera_profile(defaults['camera_profile'])
+        except ValueError as exc:
+            raise ValueError(
+                f'Sweep file {source} field "defaults": {exc}'
+            ) from exc
 
     configs_raw = document.get('configs')
     if not isinstance(configs_raw, list) or not configs_raw:

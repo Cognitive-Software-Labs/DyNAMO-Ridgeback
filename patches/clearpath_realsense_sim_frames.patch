@@ -1,13 +1,76 @@
+diff --git a/clearpath_platform_description/launch/description.launch.py b/clearpath_platform_description/launch/description.launch.py
+index 6cc95ec..9164f3a 100644
+--- a/clearpath_platform_description/launch/description.launch.py
++++ b/clearpath_platform_description/launch/description.launch.py
+@@ -16,6 +16,9 @@ def generate_launch_description():
+     use_fake_hardware = LaunchConfiguration('use_fake_hardware')
+     use_manipulation_controllers = LaunchConfiguration('use_manipulation_controllers')
+     use_platform_controllers = LaunchConfiguration('use_platform_controllers')
++    sim_camera_width = LaunchConfiguration('sim_camera_width')
++    sim_camera_height = LaunchConfiguration('sim_camera_height')
++    sim_camera_horizontal_fov = LaunchConfiguration('sim_camera_horizontal_fov')
+
+     # Launch Arguments
+     arg_setup_path = DeclareLaunchArgument(
+@@ -47,6 +50,16 @@ def generate_launch_description():
+         description='Use platform controllers if true'
+     )
+
++    arg_sim_camera_width = DeclareLaunchArgument(
++        'sim_camera_width', default_value='0',
++        description='Simulation-only camera width override; zero uses robot.yaml')
++    arg_sim_camera_height = DeclareLaunchArgument(
++        'sim_camera_height', default_value='0',
++        description='Simulation-only camera height override; zero uses robot.yaml')
++    arg_sim_camera_horizontal_fov = DeclareLaunchArgument(
++        'sim_camera_horizontal_fov', default_value='0',
++        description='Simulation-only camera horizontal FoV override; zero uses model default')
++
+     # Paths
+     robot_urdf = PathJoinSubstitution([
+         setup_path, 'robot.urdf.xacro'])
+@@ -78,6 +91,15 @@ def generate_launch_description():
+             ' ',
+             'use_platform_controllers:=',
+             use_platform_controllers,
++            ' ',
++            'sim_camera_width:=',
++            sim_camera_width,
++            ' ',
++            'sim_camera_height:=',
++            sim_camera_height,
++            ' ',
++            'sim_camera_horizontal_fov:=',
++            sim_camera_horizontal_fov,
+         ]
+     )
+
+@@ -117,6 +139,9 @@ def generate_launch_description():
+     ld.add_action(arg_use_fake_hardware)
+     ld.add_action(arg_use_manipulation_controllers)
+     ld.add_action(arg_use_platform_controllers)
++    ld.add_action(arg_sim_camera_width)
++    ld.add_action(arg_sim_camera_height)
++    ld.add_action(arg_sim_camera_horizontal_fov)
+     ld.add_action(arg_robot_description_command)
+     # Nodes
+     ld.add_action(group_action_state_publishers)
 diff --git a/clearpath_sensors_description/urdf/intel_realsense.urdf.xacro b/clearpath_sensors_description/urdf/intel_realsense.urdf.xacro
-index 9a99e3a..aa0ad94 100644
+index 9a99e3a..c18a967 100644
 --- a/clearpath_sensors_description/urdf/intel_realsense.urdf.xacro
 +++ b/clearpath_sensors_description/urdf/intel_realsense.urdf.xacro
-@@ -1,66 +1,91 @@
+@@ -1,66 +1,106 @@
  <?xml version="1.0"?>
  <robot xmlns:xacro="http://ros.org/wiki/xacro">
 +  <!-- Supplied by the platform description, which derives it from use_sim_time.
 +       Declared here too so this macro also expands standalone. -->
 +  <xacro:arg name="is_sim" default="false" />
++  <!-- Optional simulator-only overrides. Zero preserves Clearpath's generated
++       camera dimensions and generic FoV for callers that do not select a
++       Ridgeback D455 profile. -->
++  <xacro:arg name="sim_camera_width" default="0" />
++  <xacro:arg name="sim_camera_height" default="0" />
++  <xacro:arg name="sim_camera_horizontal_fov" default="0" />
 +
    <xacro:macro name="intel_realsense" params="name parent_link model *origin
                                                update_rate:=30.0 image_height:=480 image_width:=640">
@@ -16,6 +79,15 @@ index 9a99e3a..aa0ad94 100644
 +         competing copy. Simulation has no driver, so the selected model's
 +         nominal frames are the only source for that part of the chain. -->
 +    <xacro:property name="use_nominal_extrinsics" value="$(arg is_sim)" />
++    <xacro:property name="sim_width" value="${int('$(arg sim_camera_width)')}" />
++    <xacro:property name="sim_height" value="${int('$(arg sim_camera_height)')}" />
++    <xacro:property name="sim_hfov" value="${float('$(arg sim_camera_horizontal_fov)')}" />
++    <xacro:property name="render_width"
++                    value="${sim_width if sim_width > 0 else image_width}" />
++    <xacro:property name="render_height"
++                    value="${sim_height if sim_height > 0 else image_height}" />
++    <xacro:property name="render_hfov"
++                    value="${sim_hfov if sim_hfov > 0 else 1.25}" />
 +
      <xacro:if value="${model == 'd405'}">
        <xacro:include filename="$(find clearpath_sensors_description)/urdf/intel/d405.urdf.xacro" />
@@ -99,10 +171,10 @@ index 9a99e3a..aa0ad94 100644
 +      <gazebo reference="${name}_color_frame">
 +        <sensor name="${name}" type="rgbd_camera">
 +          <camera>
-+            <horizontal_fov>1.25</horizontal_fov>
++            <horizontal_fov>${render_hfov}</horizontal_fov>
 +            <image>
-+              <width>${image_width}</width>
-+              <height>${image_height}</height>
++              <width>${render_width}</width>
++              <height>${render_height}</height>
 +            </image>
 +            <clip>
 +              <near>0.3</near>

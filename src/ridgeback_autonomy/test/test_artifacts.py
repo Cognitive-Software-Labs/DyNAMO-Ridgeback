@@ -234,6 +234,7 @@ def test_sweep_or_scenario_byte_change_invalidates_resume_signature(tmp_path):
     [
         ('setup_path', '/tmp/setup-a', '/tmp/setup-b'),
         ('headless_rendering', False, True),
+        ('camera_profile', '640x480', '1280x720'),
         ('detector_fps', 5.0, 10.0),
         ('detector_debug', False, True),
     ],

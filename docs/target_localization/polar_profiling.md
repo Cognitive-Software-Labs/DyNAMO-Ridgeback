@@ -123,9 +123,9 @@ v = fy * Y / Z + cy      # valid only for Z > 0
 
 Keep only points with `Z > 0` (in front of the camera) and `(u, v)` inside the
 image bounds — this implements the "∩ camera FoV" clip: the LiDAR sees 270°
-but the mask can only certify the active colour camera's own FoV. It is 71.62
-deg horizontally in Gazebo, 90.81 deg in Isaac, and is read from the driver's
-`camera_info` on hardware rather than assumed. Note `v` is *not*
+but the mask can only certify the active colour camera's own FoV. Both
+simulators publish 79.61 degrees for the default 640x480 profile or 90 degrees
+for 1280x720; hardware uses the driver's live `camera_info`. Note `v` is *not*
 constant: the scan plane is at fixed height, so nearer points project to
 lower rows than farther ones. This is why the selection is a genuine 2D
 mask test, not just a column/bearing gate.
@@ -446,17 +446,18 @@ smoke check even though the data contract is current.
 
 The scan plane sits **0.686 m below the camera** (camera optical origin 1.028 m
 above `base_link`, `lidar2d_0_laser` 0.342 m), so it projects to
-`v = fy·0.686/Z + cy`. At `fy = 443.53`, `cy = 240` on a 480-row frame:
+`v = fy·0.686/Z + cy`. At the shared default's `fy = 384`, `cy = 240` on a
+480-row frame:
 
 | target range | scan-plane row |
 |---|---|
-| 0.84 m | 602 — off-frame |
-| 1.09 m | 519 — off-frame |
-| **1.27 m** | **480 — the floor** |
-| 2.45 m | 364 |
-| 10.0 m | 270 |
+| 0.84 m | 554 — off-frame |
+| 1.09 m | 482 — off-frame |
+| **1.10 m** | **480 — approximately the floor** |
+| 2.45 m | 348 |
+| 10.0 m | 266 |
 
-**Below ≈1.27 m the scan plane projects off the bottom of the image**, so the
+**Below ≈1.10 m the scan plane projects off the bottom of the image**, so the
 in-FoV clip (§2.3) removes every beam that could have hit the target and the mask
 can only ever select background. This is structural, not a tuning failure: no
 value of any parameter in §6 recovers it. It is a stronger condition than "the

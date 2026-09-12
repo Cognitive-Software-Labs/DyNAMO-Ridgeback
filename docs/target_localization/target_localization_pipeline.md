@@ -24,10 +24,11 @@ consumer path live in the [camera-stack reference](camera_stack.md).
 
 **Data products we use:**
 
-1. **RGB color image** - input to detection / segmentation. Gazebo publishes
-   640x480 @ 30 Hz; Isaac publishes 1280x720 @ 30 Hz. The checked-out hardware
-   default is 640x480 @ 30 Hz, but the profile the driver actually activates
-   must be recorded on the robot rather than inferred from YAML.
+1. **RGB color image** - input to detection / segmentation. Gazebo and Isaac
+   publish the selected shared nominal profile, `640x480` by default or
+   `1280x720`, at 30 Hz. The checked-out hardware default is 640x480 @ 30 Hz,
+   but the profile the driver actually activates must be recorded on the robot
+   rather than inferred from YAML.
 2. **Depth image** (made 1:1 with RGB) - input to projective ranging and euclidean reconstruction. Euclidean reconstruction deprojects its masked pixels into camera-frame points in code (`docs/target_localization/euclidean_reconstruction.md`; provenance decision in `docs/history/pointcloud_provenance_evaluation.md` §7) - the points are a derived, in-code representation, not a sensor product.
 3. **Camera IMU - present on the device, unused by this stack.** The D455 carries an IMU, unlike the D435. Nothing here enables, subscribes to, or fuses those streams, and SLAM does not consume them. Capability is not configuration.
 4. **Organized point cloud - configured, unverified.** Clearpath's checked-out `IntelRealsense` sets `POINTCLOUD_ENABLED = True`, so the parser emits `pointcloud.enable: true` for hardware. That is a *driver default resolved from the checked-out config*, which is a different fact from what the device actually publishes and a different fact again from whether the published layout can feed the `pointcloud` estimator. `common/camera_inputs.py` therefore leaves the organized-cloud input **unspecified** for the `realsense` profile. Before wiring it, verify organization (`height > 1`), colour-grid indexing, frame, and timestamps on the robot.
@@ -37,25 +38,26 @@ consumer path live in the [camera-stack reference](camera_stack.md).
 - **Real D455:** active infrared **stereo**. Two IR imagers plus an IR projector; the on-board ASIC rectifies the pair and matches horizontal disparity into a per-pixel depth map. Raw depth is expressed in the **left IR imager frame, NOT the RGB frame**, so it must be **aligned** (reprojected) onto the color pixel grid before use — which is what `align_depth.enable: true` buys. Read the operating FoV and intrinsics off the driver's `CameraInfo` on the robot; a datasheet *recommended range* is not a validity cutoff, and a finite depth outside it is not automatically discarded.
 - **Gazebo and Isaac:** no IR, no projector, and no stereo matching. Each
   simulator publishes RGB and GPU-rendered depth from one render product, so
-  depth is co-registered by construction. Their optics intentionally differ:
-  Gazebo is 640x480 with a 71.62 deg horizontal FoV and 0.3-100 m clipping;
-  Isaac is 1280x720 with a 90.81 deg horizontal FoV and 0.1-100 m clipping.
+  depth is co-registered by construction. They use the same nominal pinhole
+  profile: 640x480 has a 79.61-degree horizontal FoV and 1280x720 has a
+  90-degree horizontal FoV. Backend render clipping remains 0.3-100 m in
+  Gazebo and 0.1-100 m in Isaac; those clips are not physical-validity claims.
 
 **Simulated geometry vs simulated optics.** Both simulators share the D455 body
 and nominal frame geometry, including the `-0.059 m` depth-to-colour offset,
-and render at the colour-frame pose. Their optics are idealized and different
-from each other: neither simulator models the D455 stereo pair, IR projector,
-factory distortion, or physical noise. Simulator results are not D455-fidelity
-measurements.
+and render at the colour-frame pose. Their idealized optics now share one
+datasheet-derived profile table, but neither simulator models the D455 stereo
+pair, IR projector, factory distortion, or physical noise. Simulator results
+are not D455-fidelity measurements.
 
 **Backend summary (camera-based):**
 
 | Data product | Gazebo | Isaac | Real robot |
 |---|---|---|---|
-| RGB | 640x480 @ 30 | 1280x720 @ 30 | default 640x480 @ 30; verify live |
+| RGB | selected 640x480 or 1280x720 @ 30 | selected 640x480 or 1280x720 @ 30 | default 640x480 @ 30; verify live |
 | Depth | rendered Z-buffer | rendered depth | active IR stereo |
 | Alignment | co-registered | co-registered | driver align-to-colour filter |
-| Horizontal FoV | 71.62 deg | 90.81 deg | live `CameraInfo`; pending |
+| Horizontal FoV | 79.61 or 90.00 deg | 79.61 or 90.00 deg | live `CameraInfo`; pending |
 | Internal TF owner | `robot_state_publisher` | `robot_state_publisher` | `realsense2_camera` |
 
 Hardware readiness is tracked once in the [camera validation plan](../plans/camera_hardware_validation.md).

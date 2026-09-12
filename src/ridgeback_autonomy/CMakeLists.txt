@@ -155,6 +155,7 @@ if(BUILD_TESTING)
   find_package(ament_cmake_pytest REQUIRED)
 
   ament_add_pytest_test(test_camera_description test/test_camera_description.py)
+  ament_add_pytest_test(test_camera_profiles test/test_camera_profiles.py)
   ament_add_pytest_test(test_isaac_camera_spec test/test_isaac_camera_spec.py)
   ament_add_pytest_test(test_camera_inputs test/test_camera_inputs.py)
   ament_add_pytest_test(test_coverage_utils test/test_coverage_utils.py)

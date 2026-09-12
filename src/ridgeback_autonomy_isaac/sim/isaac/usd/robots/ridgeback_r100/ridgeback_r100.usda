@@ -319,12 +319,12 @@ def Xform "tn__r1000001_bC" (
                                     )
                                     {
                                         float2 clippingRange = (0.1, 100)
-                                        custom int dynamo:resolutionHeight = 720
-                                        custom int dynamo:resolutionWidth = 1280
+                                        custom int dynamo:resolutionHeight = 480
+                                        custom int dynamo:resolutionWidth = 640
                                         float focalLength = 24
-                                        float horizontalAperture = 48.684628
+                                        float horizontalAperture = 40
                                         float omni:sensor:tickRate = 30
-                                        float verticalAperture = 27.385103
+                                        float verticalAperture = 30
                                         quatf xformOp:orient = (0.5, 0.5, -0.5, -0.5)
                                         uniform token[] xformOpOrder = ["xformOp:orient"]
                                     }
@@ -708,4 +708,3 @@ def Xform "tn__r1000001_bC" (
         }
     }
 }
-

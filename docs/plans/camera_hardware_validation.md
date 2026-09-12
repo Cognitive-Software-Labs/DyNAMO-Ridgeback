@@ -83,6 +83,14 @@ exclusive camera ownership is unavailable.
 5. Record the active color/depth profiles the driver reports. Do not infer them
    from the checked-in defaults.
 
+Hardware-profile TODO, when the robot is available: request and validate
+`640x480@30` and `1280x720@30` as separate evidence runs. For each mode capture
+the live colour `CameraInfo` matrices and distortion data, plus the effective
+aligned-depth grid. Compare those results with the repository's nominal
+simulation profiles; only then decide whether the shared Gazebo/Isaac model
+should be revised. Do not make simulation match a guessed or single-device
+calibration in advance.
+
 Pass requires exactly one intended D455, one driver owner, selection of the
 recorded serial, and the required alignment/synchronization parameters. A
 fallback to another device, duplicate driver, USB downgrade that changes the
@@ -90,7 +98,8 @@ profile, or remaining Fast DDS participant fails this phase.
 
 ## Phase 2: prove the stream and timing contract
 
-After a warm-up period, record at least 60 seconds of:
+For each supported profile established in Phase 1, after a warm-up period,
+record at least 60 seconds of:
 
 - `sensors/camera_0/color/image_raw`;
 - `sensors/camera_0/color/camera_info`;
@@ -221,6 +230,9 @@ Write a dated `docs/history/d455_hardware_validation_<YYYY-MM-DD>.md` containing
 - topic/QoS/profile/grid/encoding/rate tables;
 - stamp-set analysis and application status histograms;
 - TF graph, ownership, and optical-to-base transform;
+- a per-profile comparison of live `K`/`D`/`R`/`P`, derived FoV, and aligned
+  depth grid against `camera_profiles.py`, with an explicit keep/update decision
+  for the simulation model;
 - required and optional smoke results;
 - artifact paths/checksums and observer limitations;
 - every check not run, failed, or unavailable.

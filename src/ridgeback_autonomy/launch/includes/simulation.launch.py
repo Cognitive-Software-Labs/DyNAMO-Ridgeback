@@ -14,6 +14,11 @@ from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, Opaq
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration, PythonExpression
 
+from ridgeback_autonomy.common.camera_profiles import (
+    CAMERA_PROFILE_CHOICES,
+    DEFAULT_CAMERA_PROFILE,
+)
+
 
 ADAPTER_PACKAGES = {
     'gz': 'ridgeback_autonomy_gz',
@@ -31,11 +36,16 @@ def _include_selected_backend(context):
         'setup_path', 'world', 'namespace', 'clearpath_rviz', 'gz_gui',
         'headless_rendering', 'rtf', 'headless', 'livestream', 'odom_noise',
         'camera', 'sim_mode', 'sensor_hz', 'start_hardware_platform',
+        'camera_profile',
     )
     arguments = {name: LaunchConfiguration(name) for name in argument_names}
     # The hardware adapter deliberately calls this option ``start_platform``;
     # the public name makes its hardware-only scope explicit.
     arguments['start_platform'] = arguments.pop('start_hardware_platform')
+    # Hardware is attach-only: selecting a simulation render profile must not
+    # attempt to reconfigure an externally managed RealSense driver.
+    if backend == 'hardware':
+        arguments.pop('camera_profile')
     return [IncludeLaunchDescription(
         PythonLaunchDescriptionSource(adapter_launch),
         launch_arguments=arguments.items(),
@@ -67,6 +77,8 @@ def generate_launch_description():
         DeclareLaunchArgument('livestream', default_value='false'),
         DeclareLaunchArgument('odom_noise', default_value='1.0'),
         DeclareLaunchArgument('camera', default_value='true'),
+        DeclareLaunchArgument('camera_profile', default_value=DEFAULT_CAMERA_PROFILE,
+                              choices=CAMERA_PROFILE_CHOICES),
         DeclareLaunchArgument('sim_mode', default_value='realtime'),
         DeclareLaunchArgument('sensor_hz', default_value='40.0'),
         DeclareLaunchArgument('start_hardware_platform', default_value='false'),

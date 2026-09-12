@@ -11,6 +11,11 @@ from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
 
+from ridgeback_autonomy.common.camera_profiles import (
+    CAMERA_PROFILE_CHOICES,
+    DEFAULT_CAMERA_PROFILE,
+)
+
 from ridgeback_autonomy.perception.target_localization.launch import (
     RAW_DETECTIONS_TOPIC,
     SIMULATION_CAMERA_INPUTS,
@@ -67,6 +72,10 @@ def generate_launch_description():
         DeclareLaunchArgument('namespace', default_value='r100_0001'),
         DeclareLaunchArgument('use_sim_time', default_value='true'),
         DeclareLaunchArgument('world', default_value='target_distance_calibration'),
+        DeclareLaunchArgument(
+            'camera_profile', default_value=DEFAULT_CAMERA_PROFILE,
+            choices=CAMERA_PROFILE_CHOICES,
+            description='Gazebo D455 render profile; fixed for the persistent environment'),
         DeclareLaunchArgument(
             'color_topic', default_value=SIMULATION_CAMERA_INPUTS.color_image_topic),
         DeclareLaunchArgument(
@@ -128,6 +137,7 @@ def generate_launch_description():
                 'clearpath_rviz': 'false',
                 'gz_gui': gz_gui,
                 'headless_rendering': headless_rendering,
+                'camera_profile': LaunchConfiguration('camera_profile'),
             }.items(),
         ),
 

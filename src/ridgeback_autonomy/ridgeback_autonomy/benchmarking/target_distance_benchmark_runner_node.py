@@ -28,6 +28,7 @@ from ridgeback_autonomy.benchmarking.alignment import (
     store_buffered_preview,
     update_measurement_event,
 )
+from ridgeback_autonomy.common.camera_profiles import DEFAULT_CAMERA_PROFILE
 from ridgeback_autonomy.perception.target_localization.estimator_registry import (
     MASK_GATE_DEFAULT,
     parse_estimators,
@@ -227,6 +228,7 @@ class TargetDistanceBenchmarkRunner(Node):
         self.declare_parameter('raw_detections_topic', RAW_DETECTIONS_TOPIC)
         self.declare_parameter('aligned_depth_debug_topic', ALIGNED_DEPTH_DEBUG_TOPIC)
         self.declare_parameter('camera_info_topic', 'sensors/camera_0/color/camera_info')
+        self.declare_parameter('camera_profile', DEFAULT_CAMERA_PROFILE)
         self.declare_parameter('base_frame', 'base_link')
         self.declare_parameter('estimators', 'all')
         self.declare_parameter('pointcloud_measurement_topic', POINTCLOUD_MEASUREMENTS_TOPIC)
