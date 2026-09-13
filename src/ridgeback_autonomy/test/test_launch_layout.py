@@ -343,6 +343,27 @@ def test_camera_profile_reaches_both_simulators_but_not_hardware() -> None:
     assert "'--camera-profile', camera_profile" in isaac
 
 
+def test_depth_fidelity_reaches_only_isaac() -> None:
+    source_root = _package_root().parent
+    dispatcher = (_package_root() / 'launch/includes/simulation.launch.py').read_text(
+        encoding='utf-8')
+    exploration = _exploration_text()
+    gazebo = (source_root / 'ridgeback_autonomy_gz/launch/backend.launch.py').read_text(
+        encoding='utf-8')
+    hardware = (
+        source_root / 'ridgeback_autonomy_hardware/launch/backend.launch.py'
+    ).read_text(encoding='utf-8')
+    isaac = (source_root / 'ridgeback_autonomy_isaac/launch/backend.launch.py').read_text(
+        encoding='utf-8')
+
+    assert "if backend != 'isaac':" in dispatcher
+    assert "arguments.pop('depth_fidelity')" in dispatcher
+    assert "'depth_fidelity': LaunchConfiguration('depth_fidelity')" in exploration
+    assert "'--depth-fidelity', depth_fidelity" in isaac
+    assert 'depth_fidelity' not in gazebo
+    assert 'depth_fidelity' not in hardware
+
+
 def test_backend_packages_keep_simulator_dependencies_out_of_core() -> None:
     source_root = _package_root().parent
     core_cmake = (_package_root() / 'CMakeLists.txt').read_text(encoding='utf-8')

@@ -18,6 +18,8 @@ from launch_ros.parameter_descriptions import ParameterValue
 from ridgeback_autonomy.common.camera_profiles import (
     CAMERA_PROFILE_CHOICES,
     DEFAULT_CAMERA_PROFILE,
+    DEFAULT_DEPTH_FIDELITY,
+    DEPTH_FIDELITY_CHOICES,
 )
 
 from ridgeback_autonomy.perception.target_localization.estimator_registry import (
@@ -286,6 +288,12 @@ def generate_launch_description():
             description='Gazebo/Isaac nominal D455 render profile; hardware '
                         'uses its externally managed active profile'),
         DeclareLaunchArgument(
+            'depth_fidelity', default_value=DEFAULT_DEPTH_FIDELITY,
+            choices=DEPTH_FIDELITY_CHOICES,
+            description='Isaac depth source: ideal renderer or D455-like '
+                        'stereo disparity/noise/range artifacts; other '
+                        'backends ignore this simulator-only option'),
+        DeclareLaunchArgument(
             'sim_mode', default_value='realtime',
             description='Isaac: realtime | deterministic timing (gz ignores)'),
         DeclareLaunchArgument(
@@ -415,6 +423,7 @@ def generate_launch_description():
                 'odom_noise': odom_noise,
                 'camera': camera,
                 'camera_profile': LaunchConfiguration('camera_profile'),
+                'depth_fidelity': LaunchConfiguration('depth_fidelity'),
                 'sim_mode': sim_mode,
                 'sensor_hz': sensor_hz,
                 'start_hardware_platform': LaunchConfiguration(

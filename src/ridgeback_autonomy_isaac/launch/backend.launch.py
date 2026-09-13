@@ -28,6 +28,8 @@ from launch_ros.parameter_descriptions import ParameterValue
 from ridgeback_autonomy.common.camera_profiles import (
     CAMERA_PROFILE_CHOICES,
     DEFAULT_CAMERA_PROFILE,
+    DEFAULT_DEPTH_FIDELITY,
+    DEPTH_FIDELITY_CHOICES,
 )
 
 
@@ -44,6 +46,7 @@ def generate_launch_description():
     odom_noise = LaunchConfiguration('odom_noise')
     camera = LaunchConfiguration('camera')
     camera_profile = LaunchConfiguration('camera_profile')
+    depth_fidelity = LaunchConfiguration('depth_fidelity')
     sim_mode = LaunchConfiguration('sim_mode')
     sensor_hz = LaunchConfiguration('sensor_hz')
 
@@ -115,6 +118,7 @@ def generate_launch_description():
              '--odom-noise', odom_noise,
              '--camera', camera,
              '--camera-profile', camera_profile,
+             '--depth-fidelity', depth_fidelity,
              '--sim-mode', sim_mode,
              '--sensor-hz', sensor_hz,
              '--animate-g1', LaunchConfiguration('animate_g1')],
@@ -148,6 +152,10 @@ def generate_launch_description():
         DeclareLaunchArgument('camera_profile', default_value=DEFAULT_CAMERA_PROFILE,
                               choices=CAMERA_PROFILE_CHOICES,
                               description='Nominal D455 render profile'),
+        DeclareLaunchArgument(
+            'depth_fidelity', default_value=DEFAULT_DEPTH_FIDELITY,
+            choices=DEPTH_FIDELITY_CHOICES,
+            description='ideal renderer depth or D455-like native stereo depth'),
         DeclareLaunchArgument('sim_mode', default_value='realtime',
                               description='realtime | deterministic '
                                           '(fixed-step contention-immune A/B)'),

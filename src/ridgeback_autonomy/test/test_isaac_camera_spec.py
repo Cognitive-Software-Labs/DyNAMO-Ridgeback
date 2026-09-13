@@ -82,3 +82,17 @@ def test_isaac_runtime_updates_camera_metadata_and_aperture_as_one_contract() ->
     assert 'tick_attr.Set(tick_rate)' in text
     assert 'width * focal / profile.focal_length_px' in text
     assert 'height * focal / profile.focal_length_px' in text
+
+
+def test_isaac_d455_depth_mode_uses_native_processed_depth_aov() -> None:
+    text = ISAAC_SENSORS.read_text(encoding='utf-8')
+
+    assert 'D455_BASELINE_MM = 95.0' in text
+    assert 'D455_MAX_DISPARITY_PX = 123.0' in text
+    assert '"DepthSensorDistance"' in text
+    assert 'SingleViewDepthCameraSensor' in text
+    assert 'profile.depth_focal_length_px' in text
+    assert 'profile.minimum_depth_m' in text
+    assert 'camera_products = [("cam_rgb", "rgb"' in text
+    assert 'if depth_fidelity == "ideal"' in text
+    assert 'elif depth_fidelity == "d455"' in text

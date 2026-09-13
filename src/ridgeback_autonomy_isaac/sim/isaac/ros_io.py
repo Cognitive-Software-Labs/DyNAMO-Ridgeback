@@ -1,10 +1,11 @@
 """In-process ROS 2 I/O for the Isaac runner (rclpy side).
 
-Owns everything that is NOT a GPU sensor path: /clock, the TwistStamped
+Owns the ordinary ROS boundary: /clock, the TwistStamped
 cmd_vel subscription, odometry + odom->base_link TF, and the exact
 ground-truth pose.
-GPU sensors (RTX lidar, camera) publish through OmniGraph bridge helpers
-instead (sensors.py, P4).
+GPU sensors normally publish through OmniGraph bridge helpers. The native
+D455-like depth AOV is host-only, so this module also serializes that AOV's
+matched depth image and organized point cloud (sensors.py, P4).
 
 Runs on the system rclpy/CycloneDDS that the sourced workspace provides
 (the bridge loads system ROS when it is sourced before launch). The node
@@ -130,7 +131,7 @@ class RosIO:
         from geometry_msgs.msg import PoseStamped, TwistStamped
         from nav_msgs.msg import Odometry
         from rosgraph_msgs.msg import Clock
-        from sensor_msgs.msg import Imu, JointState
+        from sensor_msgs.msg import Image, Imu, JointState, PointCloud2
         from std_srvs.srv import Trigger
         from tf2_ros import TransformBroadcaster, StaticTransformBroadcaster
 
@@ -165,6 +166,10 @@ class RosIO:
         # robot_state_publisher can still provide all four wheel-link TFs.
         self._joint_state_pub = self.node.create_publisher(
             JointState, "joint_states", 10)
+        self._depth_pub = self.node.create_publisher(
+            Image, "sensors/camera_0/depth/image", 10)
+        self._points_pub = self.node.create_publisher(
+            PointCloud2, "sensors/camera_0/points", 10)
         self._tf = TransformBroadcaster(self.node)
         self._static_tf = StaticTransformBroadcaster(self.node)
 
@@ -181,7 +186,8 @@ class RosIO:
         self.node.create_service(Trigger, "sim/reset", self._on_reset)
 
         self._msgs = dict(Odometry=Odometry, PoseStamped=PoseStamped,
-                          Clock=Clock, JointState=JointState)
+                          Clock=Clock, JointState=JointState, Image=Image,
+                          PointCloud2=PointCloud2)
         # contract LaserScan assembled from the bridge's point clouds
         # (see LidarScanAssembler for why the bridge's own laser_scan
         # output cannot be used)
@@ -303,6 +309,57 @@ class RosIO:
         msg.pose.orientation.z = qz
         msg.pose.orientation.w = qw
         self._gt_pub.publish(msg)
+
+    def publish_d455_depth(self, sim_time: float, depth, points):
+        """Publish one matched native stereo-depth image/cloud pair."""
+        from sensor_msgs.msg import PointField
+
+        depth = np.ascontiguousarray(depth, dtype=np.float32)
+        points = np.ascontiguousarray(points, dtype=np.float32)
+        if depth.ndim != 2 or points.shape != (*depth.shape, 3):
+            raise ValueError(
+                f"invalid D455 AOV shapes: depth={depth.shape}, "
+                f"points={points.shape}")
+        height, width = depth.shape
+        stamp = self._stamp(sim_time)
+        frame = "camera_0_color_optical_frame"
+
+        image = self._msgs["Image"]()
+        image.header.stamp = stamp
+        image.header.frame_id = frame
+        image.height = height
+        image.width = width
+        image.encoding = "32FC1"
+        image.is_bigendian = False
+        image.step = width * depth.dtype.itemsize
+        image.data = depth.tobytes()
+        self._depth_pub.publish(image)
+
+        # Invalid native depth pixels can carry zero coordinates. ROS point
+        # cloud consumers expect missing organized samples to be NaN.
+        invalid = ~np.isfinite(depth) | (depth <= 0.0)
+        if invalid.any():
+            points = points.copy()
+            points[invalid] = np.nan
+        cloud = self._msgs["PointCloud2"]()
+        cloud.header.stamp = stamp
+        cloud.header.frame_id = frame
+        cloud.height = height
+        cloud.width = width
+        cloud.fields = [
+            PointField(name="x", offset=0, datatype=PointField.FLOAT32,
+                       count=1),
+            PointField(name="y", offset=4, datatype=PointField.FLOAT32,
+                       count=1),
+            PointField(name="z", offset=8, datatype=PointField.FLOAT32,
+                       count=1),
+        ]
+        cloud.is_bigendian = False
+        cloud.point_step = 12
+        cloud.row_step = width * cloud.point_step
+        cloud.data = points.tobytes()
+        cloud.is_dense = not invalid.any()
+        self._points_pub.publish(cloud)
 
     def _publish_base_link_shim(self):
         """Identity base_link -> <ns>/robot/base_link (perception default)."""

@@ -29,6 +29,8 @@ from pathlib import Path
 from ridgeback_autonomy.common.camera_profiles import (
     CAMERA_PROFILE_CHOICES,
     DEFAULT_CAMERA_PROFILE,
+    DEFAULT_DEPTH_FIDELITY,
+    DEPTH_FIDELITY_CHOICES,
 )
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -71,6 +73,10 @@ def parse_args():
     ap.add_argument("--camera-profile", default=DEFAULT_CAMERA_PROFILE,
                     choices=CAMERA_PROFILE_CHOICES,
                     help="shared nominal D455 render profile")
+    ap.add_argument("--depth-fidelity", default=DEFAULT_DEPTH_FIDELITY,
+                    choices=DEPTH_FIDELITY_CHOICES,
+                    help="ideal renderer depth or D455-like native stereo "
+                         "disparity/noise/range artifacts")
     ap.add_argument("--robot-usd", default=None,
                     help="override the committed robot package entry USD")
     ap.add_argument("--odom-tf", default="false", choices=["true", "false"],
@@ -107,6 +113,11 @@ def main():
 
     from isaacsim import SimulationApp
     app_cfg = {"headless": headless}
+    if args.depth_fidelity == "d455":
+        # Native depth post-processing cannot consume DLSS/DLAA's
+        # lower-resolution depth texture. Select full-resolution FXAA before
+        # the renderer starts; sensors.py repeats this defensively at attach.
+        app_cfg["anti_aliasing"] = 2
     if not headless:
         # Windowed on a software-X display (e.g. VNC): a vsync-locked
         # present loop can stall this manually-driven update loop (the
@@ -148,6 +159,10 @@ def run(app, args) -> int:
     ctx = omni.usd.get_context()
     ctx.open_stage(world_path)
     stage = ctx.get_stage()
+    if args.depth_fidelity == "d455":
+        # Opening a stage reapplies the experience's render defaults. Restore
+        # the full-resolution AA mode before creating any sensor products.
+        app._set_render_settings()
 
     # ORDER MATTERS (6.0.1): the ros2 bridge crashes in omni.graph.core
     # if a stage is opened after the extension is enabled — enable it only
@@ -219,14 +234,19 @@ def run(app, args) -> int:
     physx_scene = PhysxSchema.PhysxSceneAPI.Apply(scene_prim)
     physx_scene.CreateTimeStepsPerSecondAttr(float(args.physics_hz))
 
+    ros = RosIO(args.namespace, odom_tf=args.odom_tf == "true")
+
     from sensors import attach_camera, attach_lidars
     attach_lidars(stage, robot_prim_path, args.namespace)
+    depth_writer = None
     if args.camera == "true":
-        attach_camera(stage, robot_prim_path, args.namespace, args.camera_profile)
+        _, depth_writer = attach_camera(
+            stage, robot_prim_path, args.namespace,
+            args.camera_profile, args.depth_fidelity,
+            depth_sink=ros.publish_d455_depth)
     else:
         print("camera disabled (--camera false): lidar-only run", flush=True)
 
-    ros = RosIO(args.namespace, odom_tf=args.odom_tf == "true")
     rig = RidgebackRig(art_root_path, odom_noise=args.odom_noise)
 
     timeline = omni.timeline.get_timeline_interface()
@@ -371,6 +391,8 @@ def run(app, args) -> int:
     achieved = sim_elapsed / max(time.monotonic() - wall_start, 1e-9)
     print(f"RUNNER EXIT after {frames} frames, sim {sim_elapsed:.1f}s, "
           f"achieved RTF {achieved:.2f}", flush=True)
+    if depth_writer is not None:
+        depth_writer.detach()
     ros.shutdown()
     return 0
 

@@ -17,6 +17,8 @@ from launch.substitutions import LaunchConfiguration, PythonExpression
 from ridgeback_autonomy.common.camera_profiles import (
     CAMERA_PROFILE_CHOICES,
     DEFAULT_CAMERA_PROFILE,
+    DEFAULT_DEPTH_FIDELITY,
+    DEPTH_FIDELITY_CHOICES,
 )
 
 
@@ -37,6 +39,7 @@ def _include_selected_backend(context):
         'headless_rendering', 'rtf', 'headless', 'livestream', 'odom_noise',
         'camera', 'sim_mode', 'sensor_hz', 'start_hardware_platform',
         'camera_profile',
+        'depth_fidelity',
     )
     arguments = {name: LaunchConfiguration(name) for name in argument_names}
     # The hardware adapter deliberately calls this option ``start_platform``;
@@ -46,6 +49,8 @@ def _include_selected_backend(context):
     # attempt to reconfigure an externally managed RealSense driver.
     if backend == 'hardware':
         arguments.pop('camera_profile')
+    if backend != 'isaac':
+        arguments.pop('depth_fidelity')
     return [IncludeLaunchDescription(
         PythonLaunchDescriptionSource(adapter_launch),
         launch_arguments=arguments.items(),
@@ -79,6 +84,8 @@ def generate_launch_description():
         DeclareLaunchArgument('camera', default_value='true'),
         DeclareLaunchArgument('camera_profile', default_value=DEFAULT_CAMERA_PROFILE,
                               choices=CAMERA_PROFILE_CHOICES),
+        DeclareLaunchArgument('depth_fidelity', default_value=DEFAULT_DEPTH_FIDELITY,
+                              choices=DEPTH_FIDELITY_CHOICES),
         DeclareLaunchArgument('sim_mode', default_value='realtime'),
         DeclareLaunchArgument('sensor_hz', default_value='40.0'),
         DeclareLaunchArgument('start_hardware_platform', default_value='false'),
