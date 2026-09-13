@@ -53,7 +53,11 @@ def main() -> int:
     )
 
     (OUT_DIR / 'GRAPH_REPORT.md').write_text(report)
-    to_json(graph, communities, str(OUT_DIR / 'graph.json'))
+    # This repository commits generated graph artifacts via a pre-commit hook.
+    # Embedding HEAD would therefore make graph.json stale as soon as the
+    # commit containing it is created. An empty override intentionally omits
+    # that circular, volatile provenance field.
+    to_json(graph, communities, str(OUT_DIR / 'graph.json'), built_at_commit='')
     to_html(graph, communities, str(OUT_DIR / 'graph.html'), community_labels=labels)
     save_manifest(detection['files'], str(OUT_DIR / 'manifest.json'))
 

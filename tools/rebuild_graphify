@@ -21,4 +21,10 @@ else
   exit 1
 fi
 
+# Community detection receives a fixed random seed, but Python hash iteration
+# still changes the graph's insertion order unless the interpreter starts with
+# a stable hash seed. Enforce one canonical ordering so the pre-commit rebuild
+# is byte-identical to a manual rebuild of the same tree.
+export PYTHONHASHSEED=0
+
 exec "${python_bin}" "${repo_root}/tools/rebuild_graphify.py"
