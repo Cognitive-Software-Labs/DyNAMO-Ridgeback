@@ -3,9 +3,9 @@
 Owns the ordinary ROS boundary: /clock, the TwistStamped
 cmd_vel subscription, odometry + odom->base_link TF, and the exact
 ground-truth pose.
-GPU sensors normally publish through OmniGraph bridge helpers. The native
-D455-like depth AOV is host-only, so this module also serializes that AOV's
-matched depth image and organized point cloud (sensors.py, P4).
+GPU sensors normally publish through OmniGraph bridge helpers. The D455-like
+geometric fallback is processed on the host, so this module also serializes
+its matched depth image and organized point cloud (sensors.py, P4).
 
 Runs on the system rclpy/CycloneDDS that the sourced workspace provides
 (the bridge loads system ROS when it is sourced before launch). The node
@@ -311,7 +311,7 @@ class RosIO:
         self._gt_pub.publish(msg)
 
     def publish_d455_depth(self, sim_time: float, depth, points):
-        """Publish one matched native stereo-depth image/cloud pair."""
+        """Publish one matched D455-like stereo-depth image/cloud pair."""
         from sensor_msgs.msg import PointField
 
         depth = np.ascontiguousarray(depth, dtype=np.float32)
@@ -335,7 +335,7 @@ class RosIO:
         image.data = depth.tobytes()
         self._depth_pub.publish(image)
 
-        # Invalid native depth pixels can carry zero coordinates. ROS point
+        # Invalid depth pixels carry zero depth. ROS point
         # cloud consumers expect missing organized samples to be NaN.
         invalid = ~np.isfinite(depth) | (depth <= 0.0)
         if invalid.any():

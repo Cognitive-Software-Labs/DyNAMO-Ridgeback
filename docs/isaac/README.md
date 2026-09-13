@@ -1,6 +1,6 @@
 # Isaac Sim port
 
-Adding **Isaac Sim 6.0 GA** as a first-class backend for the shared Ridgeback
+Adding **Isaac Sim 6.1 GA** as a first-class backend for the shared Ridgeback
 autonomy stack. Gazebo and hardware remain separate adapters. In progress on
 `feat/isaac-sim-6-port`.
 
@@ -21,19 +21,18 @@ Isaac.
 
 ## Current state, in one paragraph
 
-Navigation **runs** as of 2026-09-11. The long-standing stall was the 2D
+Navigation **runs** on Isaac Sim 6.1. The long-standing stall was the 2D
 lidars being parented to `base_link`, which has no joint into the
 articulation, so PhysX turned `chassis_link` and left the sensors behind; the
 chassis sweeping under a stationary emitter is what produced the "phantom"
 returns that pinned `cmd_vel` at zero. Reparenting them to `chassis_link`
-fixed it. **No Isaac baseline has ever been rerun** — the approved next step
-is a bounded 6.0.1 compatibility control followed immediately by the 6.1
-migration — and every coverage and SLAM number on record is void, having
-been measured either before the 2026-09-10 geometry changes or with a sensor
-that did not rotate with the robot. The robot still floats 49.8 mm on stock
-worlds (§2). P0–P4 and P7 are done; P5 plumbing is done with sign-off pending
-a baseline; P6 is deferred; P9 is the next runtime phase. See
-[`migration-6.1.md`](migration-6.1.md) for the decision-complete runbook.
+fixed it. The 6.1 migration passed its bounded compatibility gate on
+2026-09-13 at RTF 0.868 with 17 successful goals and no aborts. This is not a
+statistical baseline, and every older coverage or SLAM number measured before
+the 2026-09-10 geometry correction remains void. The robot still floats
+49.8 mm on stock worlds (§2). P0–P4, P7, and the P9 runtime migration are
+done; P5 still needs a multi-seed baseline and P6 is deferred. See
+[`migration-6.1.md`](migration-6.1.md) for the execution record.
 
 ## Where facts live
 

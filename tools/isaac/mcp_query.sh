@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Query the local Isaac Sim MCP server (streamable HTTP, port 9904) from
-# the shell — used during the Isaac port to resolve exact 6.0 extension /
-# API / OmniGraph-node names without a native MCP client.
+# the shell. The transport is current, but NVIDIA's kit-usd-agents main branch
+# still bundles only an Isaac Sim 6.0 corpus (audited 2026-09-13). Do not treat
+# its API / extension answers as 6.1 evidence until NVIDIA publishes 6.1 data.
 #
 #   tools/isaac/mcp_query.sh list
 #   tools/isaac/mcp_query.sh call <tool_name> '<json-arguments>'

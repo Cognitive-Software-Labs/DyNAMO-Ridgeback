@@ -2,7 +2,7 @@
 
 Autonomous exploration, reusable target localization, and distance benchmarking
 for a [Clearpath Ridgeback](https://clearpathrobotics.com/ridgeback-indoor-robot-platform/)
-robot on physical hardware, in Gazebo Harmonic, or in NVIDIA Isaac Sim 6.0 with
+robot on physical hardware, in Gazebo Harmonic, or in NVIDIA Isaac Sim 6.1 with
 ROS 2 Jazzy. The same `ridgeback_autonomy` application package runs in all three
 environments; thin backend packages own simulator- or hardware-specific
 bringup. The shipped simulation benchmark currently uses a Unitree G1 as its
@@ -36,7 +36,7 @@ Isaac Sim port (in progress, `feat/isaac-sim-6-port`):
 | Layer | Package | Purpose |
 |-------|---------|---------|
 | Backend adapter | `ridgeback_autonomy_gz`, `_isaac`, or `_hardware` | Supplies the common ROS sensor, odometry, TF, and clock contract |
-| Simulation | Gazebo Harmonic + clearpath_simulator, or Isaac Sim 6.0 | Optional physics, sensors, and world providers |
+| Simulation | Gazebo Harmonic + clearpath_simulator, or Isaac Sim 6.1 | Optional physics, sensors, and world providers |
 | Perception | Hokuyo UST-10LX 2D lidar | Obstacle detection + SLAM input |
 | Perception | Intel RealSense D455 (~1m height) | Depth/RGB for overlay and distance estimation |
 | SLAM | slam_toolbox (online async, from source) | Map building + localization |
@@ -154,7 +154,7 @@ perception_venv/bin/python3 -m pip install -r requirements-perception.txt
 
 The exploration and benchmark-environment launches automatically prepend `perception_venv/bin` to `PATH` and set `VIRTUAL_ENV` for the perception nodes. When you launch with `target_localization_enabled:=true`, the first run will download the OWLv2 detector from Hugging Face. A benchmark run with `depth_source:=monocular` downloads the Depth-Anything V2 metric checkpoint on first use, and one with `mask_gate:=silhouette` the SlimSAM segmentation checkpoint.
 
-### 4. (Optional) Set up Isaac Sim 6.0
+### 4. (Optional) Set up Isaac Sim 6.1
 
 Isaac runs from its own large Python environment. The installer pins the
 version in `requirements-isaac.txt`, checks the driver/free VRAM, and can warm
@@ -168,6 +168,8 @@ OMNI_KIT_ACCEPT_EULA=YES isaac_venv/bin/python3 tools/isaac/smoke_test.py
 
 The first install is roughly 30–50 GB. Stock Isaac worlds also need access to
 NVIDIA's asset root; the repo-local `mock_hospital` world does not.
+The 2026-09-13 migration keeps the prior exact 6.0.1 environment at
+`isaac_venv_6_0_1`; canonical `isaac_venv` points to 6.1.
 
 ### 5. (Optional) Install graphify pre-commit hook
 

@@ -1,9 +1,14 @@
 # Isaac Sim 6.1 migration
 
-Status: **approved, not started**. This is the canonical migration and
-acceptance plan for moving the Ridgeback backend from Isaac Sim 6.0.1 to
-6.1.0.0. Current runtime documentation must continue to describe 6.0.1 until
-the migration passes every gate below.
+Status: **completed and promoted on 2026-09-13**.
+The pre-driver controls and post-upgrade Isaac Sim 6.1 acceptance gates passed
+on signed Ubuntu 595.84-open. The protected Isaac Sim 5.1 workload reproduced
+the known RTX scene-database crash twice; the operator explicitly accepted
+that regression on 2026-09-13 and an offline 580.173.02 rollback is preserved.
+This is the canonical migration and acceptance record for moving the
+Ridgeback backend from Isaac Sim 6.0.1 to 6.1.0.0. Current runtime
+documentation now describes the promoted 6.1 environment; historical controls
+below retain their original 6.0.1 labels.
 
 ## Decisions
 
@@ -14,8 +19,11 @@ the migration passes every gate below.
   working 6.0.1 environment until 6.1 is accepted.
 - Use only a driver configuration supported by NVIDIA. Isaac Sim 6.1 requires
   Linux driver 595.58.03 or newer; this workstation currently has 580.173.02.
-- Protect the workstation's active Isaac Sim 5.1 workflow with the same
-  representative G1 evaluation before and after the driver upgrade.
+- Measure the workstation's active Isaac Sim 5.1 workflow with the same
+  representative G1 evaluation before and after the driver upgrade. The
+  post-upgrade failure is now an explicitly accepted compatibility loss, not
+  a passed migration gate; every workstation user receives the shared 595
+  driver.
 - Land basic 6.1 compatibility before removing any 6.0.1 workaround. Remove a
   workaround only when a focused test proves it obsolete.
 - Use the 6.1 native stereo-depth path if it returns valid measurements. If it
@@ -27,18 +35,103 @@ the migration passes every gate below.
 Official references:
 
 - [Isaac Sim 6.1 system requirements](https://docs.isaacsim.omniverse.nvidia.com/6.1.0/installation/requirements.html)
-- [Isaac Sim release notes](https://docs.isaacsim.omniverse.nvidia.com/latest/overview/release_notes.html)
-- [Isaac Sim known issues](https://docs.isaacsim.omniverse.nvidia.com/latest/overview/known_issues.html)
+- [Isaac Sim 6.1 release notes](https://docs.isaacsim.omniverse.nvidia.com/6.1.0/overview/release_notes.html)
+- [Isaac Sim 6.1 known issues](https://docs.isaacsim.omniverse.nvidia.com/6.1.0/overview/known_issues.html)
+- [Isaac Sim MCP](https://docs.isaacsim.omniverse.nvidia.com/6.1.0/development_tools/isaac_sim_mcp.html)
 - [NVIDIA CUDA compatibility](https://docs.nvidia.com/deploy/cuda-compatibility/minor-version-compatibility.html)
+
+## Execution record: 2026-09-13
+
+The pre-driver gates are complete:
+
+- the retained environment reports `isaacsim==6.0.1.0`
+- the strengthened smoke gate booted on the RTX PRO 6000 with driver
+  580.173.02, registered the required ROS OmniGraph nodes, received 150
+  monotonic `/clock` messages through system CycloneDDS and advanced 40
+  fixed-step frames by exactly 1.0000 seconds
+- the bounded camera-disabled warehouse control reached 44.1% coverage at
+  96.7% map accuracy and RTF 0.803, with five successful goals and no aborts;
+  these are compatibility evidence, not benchmark claims
+- the exact Isaac Sim 5.1 G1 gate loaded the custom environment and checkpoint,
+  ran on the RTX PRO 6000, emitted 120 frames of 1280x720 H.264 and exited
+  cleanly
+- Ubuntu still offers every recorded 580.173.02 rollback package, and the
+  selected signed open-driver candidate is 595.84
+- `nvidia-driver-595-open` and `nvidia-dkms-595-open` 595.84 are installed;
+  DKMS built the signed module for kernel 7.0.0-31 with Secure Boot enabled,
+  package audit is clean and the host reports that a reboot is required
+
+After that reboot, `nvidia-smi`, Vulkan enumeration, Secure Boot module
+signing and the Isaac compatibility checker all passed. The exact Isaac Sim
+5.1 G1 gate then crashed twice during RTX initialization in
+`librtx.scenedb.plugin.so`, before the custom environment or checkpoint
+loaded. The second run rules out a one-time shader/cache failure. The generic
+IOMMU warning is not evidence for this crash: the host has one NVIDIA GPU and
+its self P2P checks completed, while the crash signature matches the earlier
+595 regression recorded in the workstation log.
+
+The plan originally required an immediate rollback at this point. On
+2026-09-13 the operator instead chose to accept the local Isaac Sim 5.1 loss
+and proceed with Isaac Sim 6.1 on 595.84. Driver selection cannot be scoped by
+user account because the kernel module and host libraries are system-wide.
+The exact 580.173.02 package set was therefore downloaded and checksummed at
+`~/.local/share/workstation-driver-rollback/nvidia-580.173.02/`, with the
+guarded rollback helper in
+`~/workstation-config/gpu/rollback-to-nvidia-580.173.02`.
+
+The side-by-side `isaac_venv_6_1` environment reports exact package version
+`6.1.0.0`. Its strengthened smoke test booted headless on the RTX PRO 6000,
+registered every required ROS OmniGraph node, received 150 monotonic `/clock`
+messages through system CycloneDDS and advanced 40 fixed-step frames by exactly
+1.0000 seconds.
+
+The native depth decision probe failed cleanly. In a controlled 3 m scene,
+ordinary RTX `distance_to_image_plane` returned 100% valid pixels with a 3.000 m
+median while `SingleViewDepthCameraSensor` returned finite all-zero output after
+90 updates. NVIDIA's authored D455 asset reproduced the same split: geometric
+depth was valid and native depth was all zero. The selected production path is
+therefore geometric depth from the physical left imager, followed by the D455
+disparity/noise model, 1/32-pixel quantization, range masking, colour-frame
+reprojection and nearest-depth z-buffering. Live ROS checks passed at 640x480
+and 1280x720 in both `ideal` and `d455` modes; image and point-cloud timestamps
+and colour optical frames matched. The pure occlusion check confirms that the
+nearest surface wins when two samples project to the same colour pixel.
+
+The bounded 6.1 camera-disabled warehouse run reached 44.4% coverage at 96.5%
+map accuracy and RTF 0.868, with 17 successful goals and no aborts. This clears
+the RTF >= 0.8 compatibility gate and exercises ROS topics, QoS, TF, SLAM,
+Nav2, lidar scan assembly and robot control. As with the pre-driver control,
+these figures are compatibility evidence rather than a statistical benchmark.
+
+Promotion preserves both environments without rewriting either venv:
+`isaac_venv` is a symlink to `isaac_venv_6_1`, while the previous exact
+6.0.1 environment lives at `isaac_venv_6_0_1`. To roll only this workspace
+back after restoring the 580 driver, repoint the symlink to
+`isaac_venv_6_0_1`; the old environment's original absolute entry-point paths
+then become valid again.
+
+Raw logs and summaries live under the ignored
+`artifacts/isaac-migration-6.1/{pre-driver,post-driver}/` directories. The
+retained 6.0.1 environment has not been overwritten.
+
+The MCP client and transport do not need a protocol change: `.mcp.json` uses
+the current streamable-HTTP `/mcp` endpoint, and the healthy local service
+reports MCP 1.25.0 with the expected five tools. Its embedded documentation
+corpus is still generated from Isaac Sim 6.0. A full-LFS audit of NVIDIA's
+current `kit-usd-agents` main branch at commit
+`9e9d69561f81fa368343382a53535f78f8c769fc` found only
+`isaacsim_fns/data/6.0`; its default `MCP_ISAACSIM_VERSION` is also `6.0`.
+Rebuilding would update the service implementation but would not produce 6.1
+answers, so the working port-9904 container is deliberately retained. MCP
+answers must not be used as 6.1 evidence until NVIDIA publishes a 6.1 corpus;
+the installed runtime and official 6.1 documentation remain authoritative.
 
 ## 1. Preserve work and capture the 6.0.1 control
 
-The in-progress camera/depth diff is a separate feature, not migration code.
-Preserve it on a local checkpoint branch, never push that checkpoint, and
-squash it into the finished camera deliverable after the 6.1 depth decision
-gate. Start the runtime migration from a clean commit so experimental private
-APIs and the known zero-output native-depth path cannot ride the dependency
-commit.
+The camera/depth prototype is a separate checkpoint commit, not migration
+code. Squash it into the finished camera deliverable after the 6.1 depth
+decision gate. Keep experimental private APIs and the known zero-output
+native-depth path out of the dependency commit.
 
 Run one deterministic, camera-disabled warehouse control under 6.0.1 using
 the recipe in `../exploration/benchmarking.md`, plus:
@@ -122,9 +215,13 @@ Isaac Sim 6.1:
 - the Isaac compatibility checker passes
 - the identical 5.1 G1 gate above passes
 
-If the 5.1 gate regresses, stop. Restore the recorded 580-open package set,
-reboot and rerun the pre-upgrade gate. Do not qualify 6.1 on the failed host
-state.
+The 5.1 gate did regress exactly as described above. The original automatic
+stop-and-rollback rule was superseded by the operator's explicit 2026-09-13
+decision to prioritize Isaac Sim 6.1. This is a scoped exception, not a claim
+that 5.1 works: do not launch or support the local 5.1 workload on 595. To
+restore it, run the recorded offline rollback helper, reboot and rerun the
+pre-upgrade gate. Do not delete the rollback bundle until 6.1 is accepted and
+the operator deliberately retires the 5.1 fallback.
 
 ## 4. Migrate the dependency and runtime
 
@@ -167,7 +264,7 @@ private lifecycle calls.
 
 The stable cross-backend options are:
 
-- `camera_profile:=d455_640|d455_1280`, default `d455_640`
+- `camera_profile:=640x480|1280x720`, default `640x480`
 - `depth_fidelity:=ideal|d455`, default `ideal`
 
 Real hardware intrinsics, extrinsics and noise remain a deployment validation

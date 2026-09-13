@@ -20,13 +20,11 @@ src/clearpath_config/
 src/clearpath_msgs/
 src/slam_toolbox/
 
-# Perception virtual environments
+# Python virtual environments
 vlm_venv/
 perception_venv/
-isaac_venv/
-
-# Isaac Sim virtual environment (tools/install_isaac_venv.sh)
-isaac_venv/
+isaac_venv
+isaac_venv*/
 
 # Python cache artifacts
 __pycache__/

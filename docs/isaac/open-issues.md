@@ -357,23 +357,23 @@ box is never genuinely single-tenant. Needs 3–5 seeds per condition.
 
 ---
 
-## 🔵 Scheduled
+## ✅ Completed migrations
 
-### 7. Migrate to Isaac Sim 6.1
+### 7. Isaac Sim 6.1 migration
 
-Approved and promoted to the next runtime phase. Canonical plan:
+Completed and promoted on 2026-09-13. Canonical execution record:
 [`migration-6.1.md`](migration-6.1.md).
 
-The old "seat robot → full 6.0.1 baseline → migrate" sequence is superseded.
-New order: preserve the camera WIP → take one bounded 6.0.1 compatibility
-control → validate the workstation's Isaac 5.1 G1 workload → upgrade to a
-supported 595-open driver in a coordinated window → revalidate 5.1 → qualify
-6.1 side-by-side → run the native-depth decision probe → revalidate and only
-then remove obsolete workarounds.
+The side-by-side 6.1 environment, exact-version smoke, geometric D455 fallback,
+both camera profiles and fidelity modes, and bounded camera-disabled navigation
+gate passed. The latter achieved RTF 0.868, 44.4% coverage and 96.5% accuracy,
+with 17 successful goals and no aborts. The 5.1 workload remains incompatible
+with driver 595.84 by explicit operator decision; its offline 580.173.02
+rollback is preserved.
 
-The bounded control is not a publishable multi-seed A/B baseline. New
-performance numbers require the full benchmark under 6.1. The migration does
-not include moving Gazebo lidar mounts.
+The bounded controls are not a publishable multi-seed A/B baseline. New
+performance numbers still require the full benchmark under 6.1. The migration
+did not include moving Gazebo lidar mounts.
 
 ---
 

@@ -1,4 +1,4 @@
-"""Isaac Sim 6.0 provider for the backend-neutral autonomy stack.
+"""Isaac Sim 6.1 provider for the backend-neutral autonomy stack.
 
 Event chain (all publisher-gated downstream, no timers):
   generate_description (robot.yaml -> robot.urdf.xacro)
@@ -155,7 +155,7 @@ def generate_launch_description():
         DeclareLaunchArgument(
             'depth_fidelity', default_value=DEFAULT_DEPTH_FIDELITY,
             choices=DEPTH_FIDELITY_CHOICES,
-            description='ideal renderer depth or D455-like native stereo depth'),
+            description='ideal renderer depth or D455-like geometric stereo depth'),
         DeclareLaunchArgument('sim_mode', default_value='realtime',
                               description='realtime | deterministic '
                                           '(fixed-step contention-immune A/B)'),

@@ -27,27 +27,100 @@ from ridgeback_autonomy.common.camera_profiles import (
 REGEN_HINT = ("robot USD predates baked sensor prims — regenerate with "
               "tools/isaac/import_ridgeback_urdf.py")
 
-# D455 depth model. Geometry/range values come from the D400-series datasheet;
-# the disparity noise/confidence defaults match Isaac Sim 6's certified D455
-# asset and native Single View Depth Camera model. The certified asset still
-# carries the schema's generic 55 mm baseline, so use the actual D455 95 mm
-# baseline here instead of copying that known-wrong field.
+# D455 depth model. Geometry/range values come from the D400-series datasheet.
+# Isaac Sim 6.1's native SingleViewDepthCameraSensor returns all-zero output on
+# this Blackwell host, including with NVIDIA's authored D455 asset, so the
+# production path applies the same disparity-domain artifacts to geometric
+# depth from the physical left imager and explicitly aligns it to color.
 D455_BASELINE_MM = 95.0
 D455_MAX_DISPARITY_PX = 123.0
-D455_CONFIDENCE_THRESHOLD = 0.0
 D455_DISPARITY_NOISE_MEAN_PX = 0.25
 D455_DISPARITY_NOISE_SIGMA_PX = 0.25
-D455_DISPARITY_NOISE_DOWNSCALE_PX = 1.0
+D455_DISPARITY_SUBPIXEL_STEPS = 32.0
+D455_DEPTH_TO_COLOR_X_M = -0.059
 
 
-def _attach_d455_ros_writer(render_product_path: str, sink, fps: float):
-    """Forward Isaac's host-only processed depth AOVs to the ROS sink.
+def _align_d455_depth(geometric_depth, profile, disparity_noise_px):
+    """Apply D455 disparity artifacts and align left-imager depth to color.
 
-    Isaac Sim 6's stock ROS camera helper is hard-wired to the ideal
-    ``DistanceToImagePlaneSD`` render variable. The native stereo-depth AOVs
-    intentionally use a host-memory pipeline and have no compatible pointer
-    adapter, so a small Replicator writer is the narrowest honest bridge.
+    The input and output use optical coordinates (X right, Y down, Z forward).
+    Invalid output pixels are zero and point-cloud samples are NaN. The nominal
+    simulator profile is rectified pinhole; real-device distortion remains a
+    hardware-calibration concern rather than an invented simulation constant.
     """
+    import numpy as np
+
+    depth = np.asarray(geometric_depth, dtype=np.float32).squeeze()
+    if depth.shape != (profile.height, profile.width):
+        raise ValueError(
+            f"geometric D455 depth shape {depth.shape}, expected "
+            f"{(profile.height, profile.width)}")
+    noise = np.asarray(disparity_noise_px, dtype=np.float32)
+    if noise.shape != depth.shape:
+        raise ValueError(
+            f"D455 disparity noise shape {noise.shape}, expected {depth.shape}")
+
+    baseline_m = D455_BASELINE_MM / 1000.0
+    focal_depth = profile.depth_focal_length_px
+    valid = np.isfinite(depth) & (depth >= profile.minimum_depth_m)
+    disparity = np.zeros_like(depth)
+    disparity[valid] = focal_depth * baseline_m / depth[valid]
+    disparity += noise
+    disparity = (
+        np.rint(disparity * D455_DISPARITY_SUBPIXEL_STEPS)
+        / D455_DISPARITY_SUBPIXEL_STEPS
+    )
+    valid &= (disparity > 0.0) & (disparity <= D455_MAX_DISPARITY_PX)
+
+    measured = np.zeros_like(depth)
+    measured[valid] = focal_depth * baseline_m / disparity[valid]
+    valid &= np.isfinite(measured) & (measured >= profile.minimum_depth_m)
+
+    rows, cols = np.indices(depth.shape, dtype=np.float32)
+    x_depth = (cols - profile.cx) * measured / focal_depth
+    y_depth = (rows - profile.cy) * measured / focal_depth
+    # The color imager is 59 mm right of the left/depth imager. Expressing a
+    # point from the depth optical frame in the color optical frame therefore
+    # subtracts 59 mm from optical X.
+    x_color = x_depth + D455_DEPTH_TO_COLOR_X_M
+    y_color = y_depth
+    z_color = measured
+    u_color = np.rint(profile.focal_length_px * x_color / np.maximum(z_color, 1e-12)
+                       + profile.cx).astype(np.int64)
+    v_color = np.rint(profile.focal_length_px * y_color / np.maximum(z_color, 1e-12)
+                       + profile.cy).astype(np.int64)
+    valid &= (
+        (u_color >= 0) & (u_color < profile.width)
+        & (v_color >= 0) & (v_color < profile.height)
+    )
+
+    source = np.flatnonzero(valid)
+    target = (v_color.ravel()[source] * profile.width
+              + u_color.ravel()[source])
+    z = z_color.ravel()[source]
+    # Sort by destination pixel, then increasing Z; the first sample for each
+    # pixel is the nearest visible surface.
+    order = np.lexsort((z, target))
+    target = target[order]
+    source = source[order]
+    _, first = np.unique(target, return_index=True)
+    target = target[first]
+    source = source[first]
+
+    aligned_depth = np.zeros(depth.size, dtype=np.float32)
+    aligned_points = np.full((depth.size, 3), np.nan, dtype=np.float32)
+    aligned_depth[target] = z_color.ravel()[source]
+    aligned_points[target, 0] = x_color.ravel()[source]
+    aligned_points[target, 1] = y_color.ravel()[source]
+    aligned_points[target, 2] = z_color.ravel()[source]
+    return (
+        aligned_depth.reshape(depth.shape),
+        aligned_points.reshape((*depth.shape, 3)),
+    )
+
+
+def _attach_d455_ros_writer(render_product_path: str, sink, profile):
+    """Turn geometric left-imager depth into aligned D455-like ROS output."""
     import numpy as np
     import omni.replicator.core as rep
 
@@ -55,11 +128,11 @@ def _attach_d455_ros_writer(render_product_path: str, sink, fps: float):
         def __init__(self):
             self.version = "1.0.0"
             self.annotators = [
-                "DepthSensorDistance",
-                "DepthSensorPointCloudPosition",
+                "distance_to_image_plane",
                 "IsaacReadSimulationTime",
             ]
             self._next_publish_time = None
+            self._rng = np.random.default_rng(0)
 
         def write_metadata(self):
             # Live ROS transport has no dataset metadata artifact.
@@ -85,12 +158,17 @@ def _attach_d455_ros_writer(render_product_path: str, sink, fps: float):
                     or sim_time + 1e-9 < self._next_publish_time - 1.0):
                 self._next_publish_time = sim_time
             while self._next_publish_time <= sim_time + 1e-9:
-                self._next_publish_time += 1.0 / fps
+                self._next_publish_time += 1.0 / profile.fps
 
-            depth = np.asarray(array("DepthSensorDistance"), dtype=np.float32)
-            points = np.asarray(
-                array("DepthSensorPointCloudPosition"), dtype=np.float32)
-            sink(sim_time, depth, points[..., :3])
+            geometric = np.asarray(
+                array("distance_to_image_plane"), dtype=np.float32).squeeze()
+            noise = self._rng.normal(
+                D455_DISPARITY_NOISE_MEAN_PX,
+                D455_DISPARITY_NOISE_SIGMA_PX,
+                geometric.shape,
+            ).astype(np.float32)
+            depth, points = _align_d455_depth(geometric, profile, noise)
+            sink(sim_time, depth, points)
 
     writer = D455RosWriter()
     writer.attach(render_product_path)
@@ -98,63 +176,33 @@ def _attach_d455_ros_writer(render_product_path: str, sink, fps: float):
 
 
 class _D455DepthHandle:
-    """Keep the native sensor alive and tear it down before rclpy."""
+    """Keep the Replicator writer alive and tear it down before rclpy."""
 
-    def __init__(self, sensor, writer):
-        self.sensor = sensor
+    def __init__(self, writer):
         self.writer = writer
 
     def detach(self):
         self.writer.detach()
-        self.sensor._invalidate_sensor()
 
 
-def _create_d455_depth(camera_path: str, profile, depth_sink):
-    """Create/configure Isaac's supported native stereo-depth sensor."""
-    import carb
-    from isaacsim.sensors.experimental.rtx import (
-        RtxCamera,
-        SingleViewDepthCameraSensor,
-    )
+def _create_d455_depth(stage, depth_frame_path: str, profile, depth_sink):
+    """Render from the physical left imager and attach the D455 model."""
+    from pxr import Gf, UsdGeom
 
-    # Disable automatic RTX settings schemas before the render product is
-    # created. Once USD render settings are enabled by the depth annotator,
-    # an already-auto-applied schema's DLSS default overrides the global AA
-    # setting and silently feeds a half-resolution depth texture.
-    settings = carb.settings.get_settings()
-    for scope in ("renderSettings", "camera", "renderProduct"):
-        settings.set(
-            f"/exts/omni.usd.schema.render_settings/rtx/{scope}/"
-            "apiSchemas/autoApply", None)
-    camera = RtxCamera(
-        camera_path, tick_rate=profile.fps,
-        reset_xform_op_properties=False)
-    sensor = SingleViewDepthCameraSensor(
-        camera,
-        resolution=(profile.height, profile.width),
-        annotators=[],
-    )
-    sensor.set_enabled_post_processing(True)
-    import os
-    if os.environ.get("DYNAMO_D455_DEFAULTS") != "1":
-        sensor.set_sensor_baseline(D455_BASELINE_MM)
-        sensor.set_sensor_focal_length(profile.depth_focal_length_px)
-        sensor.set_sensor_size(float(profile.width))
-        sensor.set_sensor_maximum_disparity(D455_MAX_DISPARITY_PX)
-        sensor.set_sensor_disparity_confidence(D455_CONFIDENCE_THRESHOLD)
-        sensor.set_sensor_noise_parameters(
-            noise_mean=D455_DISPARITY_NOISE_MEAN_PX,
-            noise_sigma=D455_DISPARITY_NOISE_SIGMA_PX,
-        )
-        sensor.set_sensor_disparity_noise_downscale(
-            D455_DISPARITY_NOISE_DOWNSCALE_PX)
-        sensor.set_enabled_outlier_removal(True)
-        sensor.set_sensor_distance_cutoffs(
-            minimum_distance=profile.minimum_depth_m)
-    render_product = sensor.render_product.GetPath().pathString
-    writer = _attach_d455_ros_writer(
-        render_product, depth_sink, profile.fps)
-    return render_product, _D455DepthHandle(sensor, writer)
+    camera_path = str(depth_frame_path) + "/d455_depth"
+    camera = UsdGeom.Camera.Define(stage, camera_path)
+    xform = UsdGeom.Xformable(camera.GetPrim())
+    xform.AddOrientOp().Set(Gf.Quatf(0.5, 0.5, -0.5, -0.5))
+    focal_mm = 24.0
+    camera.CreateFocalLengthAttr(focal_mm)
+    camera.CreateHorizontalApertureAttr(
+        profile.width * focal_mm / profile.depth_focal_length_px)
+    camera.CreateVerticalApertureAttr(
+        profile.height * focal_mm / profile.depth_focal_length_px)
+    camera.CreateClippingRangeAttr(Gf.Vec2f(0.1, 100.0))
+    render_product = _render_product(camera.GetPath(), [profile.width, profile.height])
+    writer = _attach_d455_ros_writer(render_product, depth_sink, profile)
+    return render_product, _D455DepthHandle(writer)
 
 
 def _find_prim_by_name(stage, root_path: str, name: str):
@@ -271,23 +319,15 @@ def attach_camera(stage, robot_root: str = "/ridgeback",
         height * focal / profile.focal_length_px)
     hap = c.GetHorizontalApertureAttr().Get()
     fx = width * focal / hap            # sanity print only
+    color_rp_path = _render_product(cam.GetPath(), [width, height])
+    depth_handle = None
     if depth_fidelity == "d455":
         if depth_sink is None:
             raise ValueError("d455 depth fidelity requires a ROS depth sink")
-        # DLSS/DLAA may render depth at half resolution; the native depth
-        # sensor explicitly requires matching full-resolution color/depth
-        # textures. FXAA (2) preserves the requested profile dimensions.
-        import carb
-        settings = carb.settings.get_settings()
-        settings.set("/rtx/post/aa/op", 2)
-        settings.set("/rtx-defaults/post/aa/op", 2)
-        settings.set("/rtx-transient/post/aa/limitedOps", False)
-    depth_handle = None
-    if depth_fidelity == "d455":
-        rp_path, depth_handle = _create_d455_depth(
-            str(cam.GetPath()), profile, depth_sink)
-    else:
-        rp_path = _render_product(cam.GetPath(), [width, height])
+        depth_frame = _find_prim_by_name(
+            stage, robot_root, "camera_0_depth_frame")
+        _, depth_handle = _create_d455_depth(
+            stage, str(depth_frame.GetPath()), profile, depth_sink)
 
     frame = "camera_0_color_optical_frame"
     base = "sensors/camera_0"
@@ -309,7 +349,7 @@ def attach_camera(stage, robot_root: str = "/ridgeback",
         nodes.append((node, "isaacsim.ros2.bridge.ROS2CameraHelper"))
         connects.append(("cam_tick.outputs:tick", f"{node}.inputs:execIn"))
         values += [
-            (f"{node}.inputs:renderProductPath", rp_path),
+            (f"{node}.inputs:renderProductPath", color_rp_path),
             (f"{node}.inputs:type", kind),
             (f"{node}.inputs:topicName", topic),
             (f"{node}.inputs:frameId", frame),
@@ -323,7 +363,7 @@ def attach_camera(stage, robot_root: str = "/ridgeback",
         nodes.append((node, "isaacsim.ros2.bridge.ROS2CameraInfoHelper"))
         connects.append(("cam_tick.outputs:tick", f"{node}.inputs:execIn"))
         values += [
-            (f"{node}.inputs:renderProductPath", rp_path),
+            (f"{node}.inputs:renderProductPath", color_rp_path),
             (f"{node}.inputs:topicName", topic),
             (f"{node}.inputs:frameId", frame),
             (f"{node}.inputs:nodeNamespace", f"/{namespace}"),
