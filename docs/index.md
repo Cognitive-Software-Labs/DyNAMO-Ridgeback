@@ -30,6 +30,7 @@ troubleshooting, planning, and historical documentation.
 - [RTX lidar pipeline](isaac/lidar-pipeline.md)
 - [Open Isaac correctness work](isaac/open-issues.md)
 - [Port phase plan](isaac/port-plan.md)
+- [Isaac Sim 6.1 migration](isaac/migration-6.1.md)
 - [Investigation history](isaac/port-history.md)
 
 ## Target localization

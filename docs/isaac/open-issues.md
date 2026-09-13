@@ -243,7 +243,8 @@ vertical surface and is not one.
 **Remaining work from this issue.**
 1. Re-measure SLAM quality from scratch (`slam_quality_probe.py`) — the old
    RMSE predates the fix.
-2. The §3 baselines are now actually runnable. That is the next deliverable.
+2. The §3 bounded compatibility control is now runnable and is the entry gate
+   for the approved 6.1 migration. The statistical baseline moves to 6.1.
 
 ---|---|---|
 | lidars see the robot's own body | `empty.usda`, nothing in scene | **0/1081** both lidars, before *and* after the chassis graft |
@@ -360,30 +361,19 @@ box is never genuinely single-tenant. Needs 3–5 seeds per condition.
 
 ### 7. Migrate to Isaac Sim 6.1
 
-Not broken — planned. Several workarounds in this port exist only because of
-6.0.1 defects and are candidates to delete on 6.1: the `LidarScanAssembler`
-plus two-prim-per-lidar rig (the bridge ignores the azimuth ROI and fires
-180°/tick), the importer's dropped meshes and instanceable STL slots, the
-`fastShutdown` hard-exit, and the collider debug draw that will not enable.
+Approved and promoted to the next runtime phase. Canonical plan:
+[`migration-6.1.md`](migration-6.1.md).
 
-**Sequenced after the first baseline, deliberately.** The upgrade is only
-measurable against one, and issue 3 means none exists. Migrating first changes
-the platform with nothing to compare against. Order: unblock nav → seat the
-robot → one clean 6.0.1 baseline → migrate → rerun the identical benchmark.
+The old "seat robot → full 6.0.1 baseline → migrate" sequence is superseded.
+New order: preserve the camera WIP → take one bounded 6.0.1 compatibility
+control → validate the workstation's Isaac 5.1 G1 workload → upgrade to a
+supported 595-open driver in a coordinated window → revalidate 5.1 → qualify
+6.1 side-by-side → run the native-depth decision probe → revalidate and only
+then remove obsolete workarounds.
 
-Resequence only if issue 1 proves to be a 6.0.1 sensor-pipeline defect rather
-than config — check the 6.1 notes for the `laser_scan` ROI fix. See
-`port-plan.md` §P9.
-
-**2026-09-11: this clause did NOT fire — on evidence this time.** Issue 1 was
-a robot-model parenting bug (lidars on `base_link` instead of `chassis_link`),
-not a 6.0.1 sensor-pipeline defect: reparenting fixed it outright and the
-symptom mask was removed. An earlier note here claimed the same conclusion
-from the since-retracted tangency argument, and a later one downgraded it to
-UNDECIDED; the reparent settles it.
-
-Keep the order: one clean 6.0.1 baseline (now unblocked) → migrate → rerun the
-identical benchmark.
+The bounded control is not a publishable multi-seed A/B baseline. New
+performance numbers require the full benchmark under 6.1. The migration does
+not include moving Gazebo lidar mounts.
 
 ---
 

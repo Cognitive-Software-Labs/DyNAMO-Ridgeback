@@ -2,7 +2,8 @@
 
 Status: **in progress — P0–P4, P7, and P8 done; P5 plumbing done,
 A/B sign-off pending a first baseline; P6 (G1 benchmark) deferred; P9 (Isaac
-6.1) not started. The earlier plan to delete Gazebo was superseded: Gazebo,
+6.1) approved and next, after a bounded 6.0.1 control. The earlier plan to
+delete Gazebo was superseded: Gazebo,
 Isaac, and hardware are now separate adapters around one autonomy package.**
 
 > The first Isaac baseline is the next Isaac-specific task — none has ever
@@ -201,10 +202,20 @@ Commits `eaea0674` `70a5faa6` `e993ee29` `d26edef5` `0a81fbf6` `53a924a6`. Geome
   backend launch loads, dependency profiles verify, docs and Graphify are
   current. Physical command-chain and D455 validation remain deployment gates.
 
-### P9 — Isaac Sim 6.1 migration [M] — planned, sequenced last on purpose
+### P9 — Isaac Sim 6.1 migration [M] — approved, next after bounded control
 
-Move off 6.0.1. Several of this port's ugliest workarounds exist only because
-of 6.0.1 defects, and each is a candidate to delete on 6.1:
+The migration is decision-complete in
+[`migration-6.1.md`](migration-6.1.md). It was deliberately resequenced: take
+one bounded 6.0.1 compatibility control, then move to 6.1 immediately. Do not
+wait for robot seating or a multi-seed 6.0.1 baseline; equally, do not describe
+the bounded run as a statistical A/B comparison.
+
+The shared workstation requires a coordinated driver change from 580.173.02
+to a supported 595-open package. The active Isaac Sim 5.1 G1 grasp-lift
+workflow in `/home/deivid/dev/isaac` is the mandatory before/after driver
+gate. Qualify 6.1 in a side-by-side venv and retain 6.0.1 until acceptance.
+
+Several workarounds remain candidates to delete on 6.1:
 
 - the bridge `laser_scan` writer hardcodes 360° for ROTARY lidars and ignores
   the azimuth ROI, firing only 180°/tick — the reason `ros_io.LidarScanAssembler`
@@ -215,18 +226,13 @@ of 6.0.1 defects, and each is a candidate to delete on 6.1:
 - `--/app/fastShutdown=True` hard-exits on `app.close()`
 - PhysX collider debug draw cannot be enabled programmatically
 
-**Why last, not first.** The upgrade is only measurable against a baseline,
-and there is no baseline — see `open-issues.md` §3. Migrating first means
-changing the platform and the geometry in the same step with nothing to
-compare against, and every workaround above would need revalidation anyway
-without knowing whether behaviour changed. Get navigation running, seat the
-robot, take **one** clean 6.0.1 baseline, then migrate and rerun the identical
-benchmark. That turns "6.1 feels different" into a number.
-
-The one thing that would justify resequencing: if the Nav2 stall
-(`open-issues.md` §1) turns out to be a 6.0.1 sensor-pipeline defect rather
-than a config problem. Check the 6.1 release notes for the `laser_scan` ROI
-fix before assuming it is ours.
+Land compatibility before cleanup and remove each workaround only after a
+focused equivalence test. The 6.1 native depth probe is a decision gate for
+the D455 implementation, not for the migration itself: valid native output
+selects the native sensor; another zero-output result selects the documented
+geometric/disparity fallback. Both paths explicitly align depth into the
+colour frame. Camera defaults remain 640 and ideal depth, with 1280 and D455
+fidelity selectable.
 
 ## Key risks
 
@@ -235,7 +241,8 @@ fix before assuming it is ours.
 | First-start shader compile trips gates | installer `--warmup`; `sim_ready_timeout` 300; publisher-based gates just wait |
 | RTF below gz; MPPI timing sensitivity | 120 Hz physics, decoupled render, headless; gate RTF ≥0.8; `--rtf 0` mode |
 | rclpy inside SimulationApp vs bundled bridge DDS | source system ROS first (documented pattern); fallback all-OmniGraph I/O |
-| 6.0 API churn (post-cutoff APIs, node ids) | pin 6.0.1; Isaac Sim MCP semantic search resolves exact names during impl; 5.1 fallbacks + `og.get_registered_nodes()` without it; smoke test asserts registration |
+| 6.1 API/extension churn | side-by-side venv; audit registered nodes and imports; exact-version smoke; retain 6.0.1 until acceptance |
+| Driver upgrade regresses active Isaac 5.1 work | coordinated window; identical G1 CUDA/PhysX/camera policy run before and after; recorded 580-open rollback |
 | Sim Control services incomplete/renamed | fallback custom rclpy srvs on the USD stage (designed in) |
 | 270°/10m lidar changes exploration behavior | intentional (approved); slam/costmap ranges adjusted; fresh baselines; loose A/B gate |
 | EKF tuning rabbit hole | start from clearpath_control config; `--odom-noise 0` isolates EKF vs sensor issues |

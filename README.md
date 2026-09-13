@@ -26,6 +26,7 @@ Isaac Sim port (in progress, `feat/isaac-sim-6-port`):
 
 - `docs/isaac/open-issues.md`: **what is currently broken** — start here
 - `docs/isaac/port-plan.md`: the phase plan (P0–P9)
+- `docs/isaac/migration-6.1.md`: approved 6.1 migration and workstation safety gates
 - `docs/isaac/port-history.md`: superseded investigation narratives
 - `docs/isaac/lidar-pipeline.md`: how the RTX lidar reaches ROS
 - `docs/isaac/assets/robot-geometry.svg` / `robot_render.png`: sensor mounting, dimensioned
