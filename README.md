@@ -27,6 +27,7 @@ Isaac Sim port (in progress, `feat/isaac-sim-6-port`):
 - `docs/isaac/open-issues.md`: **what is currently broken** — start here
 - `docs/isaac/port-plan.md`: the phase plan (P0–P9)
 - `docs/isaac/migration-6.1.md`: approved 6.1 migration and workstation safety gates
+- `docs/isaac/camera-depth.md`: Isaac D455 depth modes, alignment, ROS contract, and runbook
 - `docs/isaac/port-history.md`: superseded investigation narratives
 - `docs/isaac/lidar-pipeline.md`: how the RTX lidar reaches ROS
 - `docs/isaac/assets/robot-geometry.svg` / `robot_render.png`: sensor mounting, dimensioned
@@ -293,6 +294,7 @@ Arguments:
 | `start_hardware_platform` | `false` | Hardware only: attach to existing Clearpath services by default; `true` explicitly includes platform bringup |
 | `headless_rendering` | `false` | Optional server-only EGL sensor rendering for SSH/non-seat sessions; the existing `tools/gpu-run` NVIDIA GLX workflow remains the default GUI-capable path (see [troubleshooting](docs/troubleshooting.md#camera-rate-collapses-under-software-rendering)) |
 | `camera_profile` | `640x480` | Shared nominal D455 render profile for Gazebo and Isaac; `1280x720` is available for higher-resolution runs and requires a simulator restart |
+| `depth_fidelity` | `ideal` | Isaac depth path: clean colour-render depth (`ideal`) or nominal D455 stereo artifacts plus explicit colour alignment (`d455`); ignored by Gazebo and hardware |
 | `headless` / `livestream` | `true` / `false` | Isaac window and WebRTC controls; ignored by Gazebo |
 | `rtf` / `sim_mode` | `1.0` / `realtime` | Isaac timing controls; use `deterministic` for comparisons |
 | `odom_noise` | `1.0` | Isaac odometry-drift scale; `0` gives exact debug odometry |

@@ -11,6 +11,7 @@ autonomy stack. Gazebo and hardware remain separate adapters. In progress on
 | [**open-issues.md**](open-issues.md) | **what is currently broken** — read first |
 | [port-plan.md](port-plan.md) | the phase plan, P0–P9, and acceptance criteria |
 | [**migration-6.1.md**](migration-6.1.md) | **approved 6.1 migration, driver rollout, 5.1 safety gate, and depth decision** |
+| [**camera-depth.md**](camera-depth.md) | **Isaac D455 colour/depth implementation, modes, ROS contract, validation, and troubleshooting** |
 | [robot-model.md](robot-model.md) | URDF → USD → meshes → sensors → colliders |
 | [lidar-pipeline.md](lidar-pipeline.md) | how the RTX lidar reaches ROS, and SLAM quality |
 | [port-history.md](port-history.md) | superseded investigation narratives |
@@ -41,6 +42,7 @@ Each fact has one home. Cross-reference rather than copy:
 - **broken now** → `open-issues.md`
 - **plan, phases, acceptance** → `port-plan.md`
 - **6.1 migration and shared-driver procedure** → `migration-6.1.md`
+- **Isaac D455 image/depth implementation and runbook** → `camera-depth.md`
 - **robot geometry, the importer, colliders** → `robot-model.md`
 - **lidar → ROS, scan assembly, SLAM quality** → `lidar-pipeline.md`
 - **concluded investigations** → `port-history.md`

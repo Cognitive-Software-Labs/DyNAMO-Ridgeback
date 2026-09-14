@@ -3,7 +3,9 @@
 This page is the canonical end-to-end camera reference for Gazebo, Isaac Sim,
 and the physical D455. The robot mount and application-facing data contract are
 shared; image formation, topic production, and internal-frame ownership are
-backend-specific.
+backend-specific. The Isaac implementation, depth equations, mode selection,
+and diagnostic runbook live in
+[Isaac Sim D455 camera and depth pipeline](../isaac/camera-depth.md).
 
 ## Physical declaration and pose
 
@@ -67,14 +69,14 @@ and the [librealsense per-stream intrinsics API](https://github.com/realsenseai/
 
 | Contract | Gazebo | Isaac Sim 6 | Physical D455 |
 |---|---|---|---|
-| Producer | Clearpath Gazebo `rgbd_camera` plus ROS-Gazebo bridges | generated USD camera plus Isaac ROS 2 Camera Helpers | externally managed `realsense2_camera` service |
+| Producer | Clearpath Gazebo `rgbd_camera` plus ROS-Gazebo bridges | generated USD colour camera plus Isaac ROS 2 helpers; `d455` mode adds a left-depth render and custom matched publisher | externally managed `realsense2_camera` service |
 | Profile | shared `640x480` default or `1280x720` | shared `640x480` default or `1280x720` | driver/device-selected; verify both requested modes live |
 | Authored rate | 30 Hz | 30 Hz | verify live rate |
 | Intrinsics | selected nominal profile, published as `CameraInfo` | selected nominal profile, published as `CameraInfo` | factory calibration in live `CameraInfo` |
-| Clip/range model | 0.3-100 m render clip | 0.1-100 m render clip | physical stereo validity; no application hard cutoff |
-| Depth formation | clean GPU Z-buffer | clean rendered depth | active-IR stereo depth |
-| RGB/depth registration | same render product, aligned by construction | same render product, aligned by construction | driver align-to-colour filter (`align_depth.enable: true`) |
-| Distortion/noise | no D455 distortion, stereo, projector, or noise model | no physical stereo/projector model | real calibrated optics, holes, noise, and occlusions |
+| Clip/range model | 0.3-100 m render clip | 0.1-100 m render clip; `d455` additionally rejects below 0.32 m at VGA or 0.52 m at HD | physical stereo validity; no application hard cutoff |
+| Depth formation | clean GPU Z-buffer | selectable: clean colour-render depth (`ideal`) or geometric left-imager depth with nominal D455 disparity noise, quantization, and range masking (`d455`) | active-IR stereo depth |
+| RGB/depth registration | same render product, aligned by construction | `ideal`: same render product; `d455`: explicit 59 mm depth-to-colour reprojection with nearest-Z collision handling | driver align-to-colour filter (`align_depth.enable: true`) |
+| Distortion/noise | no D455 distortion, stereo, projector, or noise model | `ideal`: none; `d455`: nominal disparity-domain noise and holes, but no projector, material response, factory distortion, or temporal model | real calibrated optics, holes, noise, and occlusions |
 | Internal camera TF owner | `robot_state_publisher`, nominal URDF frames | `robot_state_publisher`, nominal URDF frames | RealSense driver, factory extrinsics |
 
 Algorithms must consume each stream's `CameraInfo`; neither profile name nor a
@@ -94,11 +96,15 @@ All application defaults below are relative to the robot namespace
 
 Gazebo's generated image bridges remap the simulator image and depth-image
 transport topics to this contract; its parameter bridge carries both
-`CameraInfo` streams and the point cloud. Isaac creates one render product and
-attaches RGB, depth, depth-point-cloud, and two `CameraInfo` publishers to it.
-All Isaac camera products are labelled `camera_0_color_optical_frame`; its
-flattened `width*height x 1` point cloud is restored to the active image shape
-by the application after an exact point-count check.
+`CameraInfo` streams and the point cloud. Isaac always creates the colour
+render product for RGB and both `CameraInfo` publishers. In `ideal` mode, depth
+and cloud helpers use that same product. In `d455` mode, a second render at the
+left-depth origin feeds the disparity model and explicit colour alignment;
+plain rclpy publishes one matched organized depth/cloud pair. All public Isaac
+camera products are labelled `camera_0_color_optical_frame`. The ideal bridge
+may emit its cloud as `1 x (width*height)`; the application restores that to the
+active image grid after an exact point-count check. The custom `d455` publisher
+emits `height x width` directly.
 
 Hardware is attach-first. The hardware adapter does not start the camera or
 sensor service, including when its optional platform bringup is enabled; it
@@ -167,9 +173,11 @@ contains a Gazebo-, Isaac-, or RealSense-specific projection constant.
 - The shared profile math and Gazebo URDF/SDF expansion are covered at both
   resolutions. The regenerated Isaac asset carries the default profile, and
   its adapter changes aperture and render-product dimensions for either choice.
-- Isaac's earlier live check at 1280 x 720 used the retired hand-authored
-  `fx=fy=631` contract. It remains historical integration evidence, not
-  certification of the new shared nominal profile; rerun both modes live.
+- Isaac Sim 6.1 live checks passed `ideal` and `d455` modes at 640 x 480 and
+  1280 x 720 with matching image/cloud grids, stamps, colour optical frames,
+  and finite scene measurements. The native single-view depth path failed its
+  numerical gate and is not used; see the
+  [Isaac camera guide](../isaac/camera-depth.md#why-native-isaac-61-depth-is-not-used).
 - Gazebo's observed rate may fall below the authored 30 Hz under rendering
   load; that is a performance failure, not an alternate camera contract.
 - Physical-camera validation is still pending. The
@@ -192,5 +200,6 @@ contains a Gazebo-, Isaac-, or RealSense-specific projection constant.
   `clearpath/sensors/launch/camera_0.launch.py`
 - Shared simulation optics: `ridgeback_autonomy/common/camera_profiles.py`
 - Isaac publishers: `ridgeback_autonomy_isaac/sim/isaac/sensors.py`
+- Isaac camera/depth implementation guide: `docs/isaac/camera-depth.md`
 - Backend-neutral topic contract: `ridgeback_autonomy/common/camera_inputs.py`
 - Shared consumers: `ridgeback_autonomy/perception/target_localization/`
