@@ -8,7 +8,7 @@ Other pages summarize it only when useful and link back to that owner.
 | Information | Canonical home |
 |---|---|
 | Installation, public commands, launch arguments, operator workflow | root `README.md` |
-| Short repository orientation | `docs/project/context.md` |
+| Short repository orientation | `docs/project/PROJECT_CONTEXT.md` |
 | Documentation policy and precedence | this page |
 | Cross-cutting repository conventions | `docs/project/conventions.md` |
 | Implemented behavior and interfaces | topic reference under `docs/` |
@@ -18,9 +18,20 @@ Other pages summarize it only when useful and link back to that owner.
 | Rejected, deferred, or unselected approaches | `docs/do_not_try_again/` |
 | Dated experiments, migrations, and validation evidence | `docs/history/` |
 
-`AGENTS.md` and `CLAUDE.md` are thin discovery entrypoints. They point to the
-project context and retain only tool-specific instructions that must be visible
-before deeper documentation is read.
+`AGENTS.md` and `CLAUDE.md` are thin discovery entrypoints. They route to
+`docs/project/PROJECT_CONTEXT.md` and retain only tool-specific instructions
+that must be visible before deeper documentation is read.
+
+They route differently because the tools differ. `CLAUDE.md` uses Claude Code's
+`@docs/project/PROJECT_CONTEXT.md` import, which inlines the file at session
+start; the path must stay outside backticks and code blocks or the import is
+ignored. `AGENTS.md` keeps a prose pointer because Codex reads that file
+verbatim and has no import syntax. Import only the project context; deeper
+documents stay links so they load on demand.
+
+The graphify rules are the one block deliberately duplicated in both
+entrypoints: each tool must see them before it reads or regenerates the graph.
+Edit both copies together.
 
 ## Update rules
 

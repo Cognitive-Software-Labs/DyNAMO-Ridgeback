@@ -6,7 +6,7 @@ troubleshooting, planning, and historical documentation.
 
 ## Project
 
-- [Project context](project/context.md) — short repository orientation and
+- [Project context](project/PROJECT_CONTEXT.md) — short repository orientation and
   pointers to the canonical technical references
 - [Documentation ownership](project/documentation.md) — where facts belong,
   precedence, and update rules

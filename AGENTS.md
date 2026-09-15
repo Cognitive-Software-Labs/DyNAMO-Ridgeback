@@ -1,6 +1,6 @@
-## Shared Guidance
+## Shared guidance
 
-Read `docs/project/context.md` for repository orientation before doing
+Read `docs/project/PROJECT_CONTEXT.md` for repository orientation before doing
 substantial work. Documentation ownership and project conventions live in
 `docs/project/documentation.md` and `docs/project/conventions.md`.
 
