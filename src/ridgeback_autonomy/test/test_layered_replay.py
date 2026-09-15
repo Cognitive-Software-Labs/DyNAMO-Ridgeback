@@ -658,12 +658,16 @@ def test_canonical_job_validates_profiles_resources_and_baseline(tmp_path):
         parse_job(frozen_default)
     assert caught.value.suggested_profile == 'live-system'
 
+    # A live job routes to target_benchmark_sweep, so it must either name a
+    # sweep file or carry one the configurator authored; an empty sweep is
+    # neither, and nothing downstream could resolve it.
     live = json.loads(json.dumps(model_job.document))
     live['profile'] = 'live-system'
     live['inputs'] = {}
     live['materializations'] = None
+    assert parse_job(live).sweep.configs[0].name == 'baseline'
     with pytest.raises(ProfileValidationError) as caught:
-        parse_job(live)
+        parse_job({**live, 'sweep': ''})
     assert caught.value.code == 'live_sweep_requires_path'
 
 

@@ -14,6 +14,7 @@ from typing import Any, Iterable
 
 from ridgeback_autonomy.perception.target_localization.estimator_registry import (
     DEPTH_PATH_ESTIMATORS,
+    MASK_ESTIMATORS,
     PUBLIC_ESTIMATOR_ORDER,
     parse_estimators,
 )
@@ -197,6 +198,10 @@ _DEPTH_ESTIMATORS = tuple(
     estimator for estimator in PUBLIC_ESTIMATOR_ORDER
     if estimator in DEPTH_PATH_ESTIMATORS)
 
+_MASK_ESTIMATORS = tuple(
+    estimator for estimator in PUBLIC_ESTIMATOR_ORDER
+    if estimator in MASK_ESTIMATORS)
+
 
 def _recipes_binding(setting: str) -> tuple[str, ...]:
     """Which ``isolation_3d`` recipes actually bind ``setting``.
@@ -222,9 +227,14 @@ def _recipes_binding(setting: str) -> tuple[str, ...]:
 # valid.  Materializer knobs are deliberately distinct from live-only node
 # internals: they form the immutable producer signature of a mask cache.
 AXES: dict[str, AxisSpec] = {
+    # Every estimator the registry publishes, because each profile already names
+    # the subset it can evaluate and both the rendered choices and validation
+    # narrow to that. Narrowing the axis itself would hide polar profiling and
+    # the point cloud from the live profile, which runs all four -- and would
+    # refuse a hand-written job naming them, not merely omit them from a menu.
     'estimators': _axis(
         'estimators', 'estimator-list', 'projective_ranging', STAGE_MEASUREMENT,
-        'Estimators', choices=_DEPTH_ESTIMATORS),
+        'Estimators', choices=PUBLIC_ESTIMATOR_ORDER),
     'mask_depth_max_meters': _axis(
         'mask_depth_max_meters', 'number', 0.0, STAGE_MEASUREMENT,
         'Depth ceiling', minimum=0.0, estimators=_DEPTH_ESTIMATORS),
@@ -329,9 +339,12 @@ AXES: dict[str, AxisSpec] = {
     'depth_source': _axis(
         'depth_source', 'choice', 'stereoscopic', STAGE_SENSOR, 'Depth source',
         choices=('stereoscopic', 'monocular')),
+    # The gate feeds the mask rows only. The point cloud reads the organized
+    # cloud directly and never sees a mask, so a config selecting it must not
+    # carry a gate -- the sweep parser rejects that as a knob that does nothing.
     'mask_gate': _axis(
         'mask_gate', 'choice', 'box', STAGE_MASK, 'Live mask gate',
-        choices=('box', 'silhouette')),
+        choices=('box', 'silhouette'), estimators=_MASK_ESTIMATORS),
     'detector_fps': _axis(
         'detector_fps', 'number', 5.0, STAGE_DETECTOR, 'Detector rate', minimum=0.0),
     'detector_debug': _axis(
@@ -435,6 +448,14 @@ SCAN_AXES = frozenset(
     name for name, spec in AXES.items()
     if spec.estimators == ('polar_profiling',))
 OFFLINE_MEASUREMENT_AXES = MEASUREMENT_AXES - SCAN_AXES
+
+# What a live sweep states once for every config it runs, rather than per
+# config. Offered apart from the per-variant settings because that is where the
+# YAML holds them, and because a sweep authored without them inherits the
+# packaged 88-scene set at five repeats -- hours of simulation nothing on the
+# page would have shown. Every other live argument is an installation constant
+# (topics, namespace, world, the viz toggles) that no shipped sweep varies.
+LIVE_SWEEP_DEFAULT_AXES = ('scenario', 'repeats')
 
 _OFFLINE_LIMITS = (
     'Does not establish ROS scheduling, camera delivery, end-to-end latency, '
@@ -589,7 +610,42 @@ def validate_profile_axes(profile_id: str, axes: Iterable[str]) -> None:
             )
 
 
-def validate_axis_values(values: dict[str, Any]) -> None:
+def validate_estimator_selection(profile_id: str, raw: Any) -> tuple[str, ...]:
+    """Check an estimator selection against what the profile can evaluate.
+
+    Membership is a profile question rather than a type question: the axis lists
+    the whole registry, and a well-formed list naming an estimator this profile
+    does not run is refused here so the failure names the estimator instead of
+    calling a valid list malformed.
+    """
+
+    selected = parse_estimators(raw if isinstance(raw, str) else str(raw or ''))
+    profile = get_profile(profile_id)
+    unsupported = [
+        estimator for estimator in selected
+        if estimator not in profile.compatible_estimators
+    ]
+    if not unsupported:
+        return selected
+    # Polar profiling and the point cloud are live-only, so the offline profiles
+    # send the operator to the one profile that does run them.
+    live = PROFILES[PROFILE_LIVE_SYSTEM].compatible_estimators
+    suggested = (
+        PROFILE_LIVE_SYSTEM
+        if profile.id != PROFILE_LIVE_SYSTEM and unsupported[0] in live else None)
+    raise ProfileValidationError(
+        field='estimators',
+        code='incompatible_estimator',
+        profile=profile.id,
+        suggested_profile=suggested,
+        message=(
+            f'Profile "{profile.id}" cannot evaluate estimator '
+            f'"{unsupported[0]}".'
+        ),
+    )
+
+
+def validate_axis_values(values: dict[str, Any], profile_id: str | None = None) -> None:
     """Validate values against the same type/range contract the UI renders."""
 
     for name, raw in values.items():
@@ -619,9 +675,7 @@ def validate_axis_values(values: dict[str, Any]) -> None:
                 else:
                     raise ValueError
             elif spec.value_type == 'estimator-list':
-                selected = parse_estimators(str(raw))
-                if any(estimator not in spec.choices for estimator in selected):
-                    raise ValueError
+                parse_estimators(str(raw))
                 value = str(raw).strip()
             else:
                 value = str(raw).strip()
@@ -630,6 +684,10 @@ def validate_axis_values(values: dict[str, Any]) -> None:
                 field=name, code='invalid_type',
                 message=f'Benchmark parameter "{name}" must be {spec.value_type}.',
             ) from exc
+        # Raised outside the block above: ProfileValidationError is a ValueError,
+        # so reporting it there would rewrite it as a type failure.
+        if spec.value_type == 'estimator-list' and profile_id is not None:
+            validate_estimator_selection(profile_id, value)
         if spec.choices and spec.value_type != 'estimator-list' and value not in spec.choices:
             raise ProfileValidationError(
                 field=name, code='invalid_choice',

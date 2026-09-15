@@ -11,9 +11,11 @@ import threading
 import time
 
 import pytest
+import yaml
 
 from ridgeback_autonomy.benchmarking.configurator import (
     ConfiguratorError,
+    _packaged_scenarios,
     _ui_sweep,
     capabilities,
     import_job,
@@ -31,8 +33,19 @@ from ridgeback_autonomy.benchmarking.configurator_results import (
 )
 from ridgeback_autonomy.benchmarking.configurator_runs import RunSupervisor, is_alive
 from ridgeback_autonomy.benchmarking.replay import ReplayDatasetWriter
-from ridgeback_autonomy.benchmarking.replay_jobs import parse_job
+from ridgeback_autonomy.benchmarking.replay_jobs import command_argv, parse_job
+from ridgeback_autonomy.benchmarking.replay_profiles import ProfileValidationError
+from ridgeback_autonomy.benchmarking.sweep import estimate_trials
+from ridgeback_autonomy.perception.target_localization.estimator_registry import (
+    PUBLIC_ESTIMATOR_ORDER,
+)
 
+
+REPO_ROOT = Path(__file__).resolve().parents[3]
+# Globbed rather than listed, so a sweep added to the repository is covered here
+# without anyone remembering to extend the list.
+SHIPPED_SWEEPS = sorted(
+    (REPO_ROOT / 'src/ridgeback_autonomy/config').glob('benchmark_sweep_*.yaml'))
 
 # Long enough that a same-machine process cannot die inside it by accident,
 # short enough to keep the suite fast.
@@ -199,19 +212,182 @@ def test_capabilities_scope_each_field_to_what_can_reach_it():
     assert fields['estimators']['recipes'] == []
 
 
-def test_every_profile_offers_both_depth_estimators(tmp_path):
+def test_each_profile_offers_exactly_the_estimators_it_runs():
     offered = {
         name: next(field['options'] for field in profile['variant_fields']
                    if field['key'] == 'estimators')
         for name, profile in capabilities()['profiles'].items()
     }
 
-    # Both estimators read the same frozen evidence, so no profile may offer one
-    # and then refuse it. The choices are still scoped to what the profile can
-    # evaluate: nothing here offers polar profiling, which needs a LiDAR scan.
+    # Both depth estimators read the same frozen evidence, so no offline profile
+    # may offer one and then refuse it; neither may offer what replay cannot run.
     assert set(offered) == {'measurement', 'mask-output', 'mask-model', 'live-system'}
-    for options in offered.values():
-        assert options == ['projective_ranging', 'euclidean_reconstruction']
+    for name in ('measurement', 'mask-output', 'mask-model'):
+        assert offered[name] == ['projective_ranging', 'euclidean_reconstruction']
+    # The live system runs all four: polar profiling needs a LiDAR scan and the
+    # point cloud needs the organized cloud, neither of which a capture freezes.
+    assert offered['live-system'] == list(PUBLIC_ESTIMATOR_ORDER)
+
+
+def test_every_shipped_sweep_yaml_is_referenceable_from_the_live_profile(tmp_path):
+    """The live profile must reach the sweeps the repository actually ships."""
+
+    assert SHIPPED_SWEEPS
+
+    # Rendered from a draft the page could actually be holding, variants and
+    # baseline included: a live job carrying leftovers from the authoring panel
+    # is the normal case, since one draft outlives every profile switch.
+    rendered = {
+        path.name: render_job(_live_draft(sweep_path=str(path)), tmp_path)
+        for path in SHIPPED_SWEEPS
+    }
+
+    # The baseline sweep is the canonical four-estimator comparison and the
+    # isolation sweep opens on a point cloud reference, so an estimator axis
+    # narrowed to the depth paths put both of them out of the GUI's reach.
+    assert {name: outcome['issues'] for name, outcome in rendered.items()
+            if not outcome['valid']} == {}
+    assert 'target_benchmark_sweep' in rendered['benchmark_sweep_baseline.yaml']['command']
+
+
+def _live_draft(**overrides) -> dict:
+    draft = {
+        'question': 'measure-live-system', 'profile': 'live-system', 'sweep_path': '',
+        'sweep_defaults': {'scenario': '', 'repeats': 1},
+        'variants': [{'name': 'polar', 'arguments': {
+            'estimators': 'polar_profiling', 'polar_range_band_m': 0.4}}],
+        'baseline': 'polar', 'output_dir': '',
+    }
+    return {**draft, **overrides}
+
+
+def test_an_authored_live_sweep_carries_the_polar_settings(tmp_path):
+    rendered = render_job(_live_draft(), tmp_path)
+
+    assert rendered['valid'] is True
+    # target_benchmark_sweep opens a YAML file, so the page cannot hand it a
+    # draft: the sweep has to be written before a command can name it.
+    written = Path(rendered['command'].split()[-1])
+    assert written.parent == tmp_path / 'artifacts' / 'benchmark-jobs'
+    assert rendered['job']['sweep'] == str(written)
+
+    document = yaml.safe_load(written.read_text())
+    assert document['defaults'] == {'scenario': '', 'repeats': 1}
+    assert document['configs'][0]['estimators'] == 'polar_profiling'
+    assert document['configs'][0]['polar_range_band_m'] == 0.4
+    # An input element only ever yields text. Written back as text, the authored
+    # file would quote every number and read unlike the sweeps it sits beside.
+    typed = render_job(_live_draft(sweep_defaults={'scenario': '', 'repeats': '2'},
+                                   variants=[{'name': 'polar', 'arguments': {
+                                       'estimators': 'polar_profiling',
+                                       'polar_range_band_m': '0.55'}}]), tmp_path)
+    authored = yaml.safe_load(Path(typed['command'].split()[-1]).read_text())
+    assert authored['defaults']['repeats'] == 2
+    assert authored['configs'][0]['polar_range_band_m'] == 0.55
+
+
+def test_naming_a_live_sweep_runs_that_file_rather_than_the_draft(tmp_path):
+    referenced = SHIPPED_SWEEPS[0]
+
+    rendered = render_job(_live_draft(sweep_path=str(referenced)), tmp_path)
+
+    # A referenced sweep is already validated and already says what it runs, so
+    # the variants on the page are not merged into it.
+    assert rendered['command'].endswith(str(referenced))
+    assert rendered['job']['sweep'] == str(referenced)
+
+
+def test_a_live_config_carries_the_gate_only_where_a_mask_row_reads_it(tmp_path):
+    rendered = render_job(_live_draft(baseline='polar', variants=[
+        {'name': 'polar', 'arguments': {
+            'estimators': 'polar_profiling', 'mask_gate': 'silhouette'}},
+        {'name': 'cloud', 'arguments': {
+            'estimators': 'pointcloud', 'mask_gate': 'silhouette'}},
+    ]), tmp_path)
+
+    polar, cloud = yaml.safe_load(
+        Path(rendered['command'].split()[-1]).read_text())['configs']
+
+    # The point cloud reads the organized cloud and never sees a mask, so a gate
+    # on that config is a knob that does nothing -- which the sweep parser
+    # refuses outright rather than running twice.
+    assert polar['mask_gate'] == 'silhouette'
+    assert 'mask_gate' not in cloud
+
+
+def test_a_live_job_estimates_trials_the_way_its_dry_run_does(tmp_path):
+    outcome = validate_job(_live_draft(sweep_defaults={
+        'scenario': '', 'repeats': 2}), tmp_path)
+
+    job = parse_job(outcome['job'])
+    expected = sum(
+        estimate_trials(config, _packaged_scenarios() or '')
+        for config in job.sweep.configs)
+
+    # Authoring a sweep without stating repeats inherits five, and the packaged
+    # scenario set is 88 scenes: hours of simulation the page would not show.
+    assert outcome['estimates']['trials'] == expected
+    assert 'h at' in outcome['estimates']['capture_duration']
+
+
+def test_an_authored_live_sweep_survives_export_and_reimport(tmp_path):
+    first = render_job(_live_draft(), tmp_path)
+
+    imported = import_job(first['yaml'], tmp_path)
+
+    # The written sweep is a real file by now, so reopening the job references
+    # it rather than authoring a second copy from the same draft.
+    assert imported['valid'] is True
+    assert imported['job']['sweep_path'] == first['job']['sweep']
+    assert render_job(imported['job'], tmp_path)['command'] == first['command']
+
+
+def test_a_live_command_refuses_a_sweep_that_was_never_written(tmp_path):
+    document = validate_job(_live_draft(), tmp_path)['job']
+
+    with pytest.raises(ProfileValidationError) as caught:
+        command_argv('/jobs/job.yaml', parse_job(document))
+
+    assert caught.value.code == 'live_sweep_requires_path'
+
+
+def test_an_estimator_the_profile_cannot_run_names_the_estimator(tmp_path):
+    draft = {**_job(_dataset(tmp_path)), 'variants': [
+        {'name': 'baseline', 'arguments': {'estimators': 'polar_profiling'}}]}
+
+    issue = validate_job(draft, tmp_path)['issues'][0]
+
+    # Membership is a profile question: the value is a well-formed estimator
+    # list, so reporting it as a malformed one named the field but not the cause.
+    assert issue['code'] == 'incompatible_estimator'
+    assert 'polar_profiling' in issue['message']
+    assert issue['suggested_profile'] == 'live-system'
+
+
+def test_offline_profiles_still_freeze_the_polar_axes():
+    rendered = {
+        name: {field['key'] for field in profile['variant_fields']}
+        for name, profile in capabilities()['profiles'].items()
+    }
+    document = {
+        'job_version': 1, 'profile': 'mask-output',
+        'inputs': {'sensor_capture': '/sensor', 'mask_caches': ['/box']},
+        'sweep': {'sweep': {'name': 'polar'}, 'configs': [{
+            'name': 'baseline', 'estimators': 'projective_ranging',
+            'polar_range_band_m': 0.5}]},
+    }
+
+    with pytest.raises(ProfileValidationError) as caught:
+        parse_job(document)
+
+    # A sensor capture freezes RGB, depth, intrinsics and transforms, never a
+    # LiDAR scan. Reaching polar profiling live must not offer its knobs offline.
+    assert caught.value.code == 'upstream_stage_frozen'
+    assert caught.value.suggested_profile == 'live-system'
+    for name in ('measurement', 'mask-output', 'mask-model'):
+        assert not any(key.startswith('polar_') for key in rendered[name])
+    assert {'polar_range_band_m', 'polar_range_jump_m', 'polar_min_valid_rays'} <= (
+        rendered['live-system'])
 
 
 def test_the_measurement_profile_accepts_euclidean_against_legacy_evidence(tmp_path):
@@ -300,6 +476,36 @@ def test_server_requires_token_and_serves_assets_through_a_symlink(tmp_path, mon
         server.shutdown()
         server.server_close()
         thread.join(timeout=2)
+
+
+def test_a_missing_live_sweep_is_reported_as_a_field_issue(tmp_path):
+    server = make_server(token='test-token', workspace_root=tmp_path)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        host, port = server.server_address[:2]
+        connection = http.client.HTTPConnection(host, port)
+        connection.request(
+            'POST', '/api/validate',
+            body=json.dumps({'job': {
+                'profile': 'live-system', 'sweep_path': 'config/absent.yaml'}}),
+            headers={'X-Configurator-Token': 'test-token',
+                     'Content-Type': 'application/json'})
+        response = connection.getresponse()
+        payload = json.loads(response.read())
+        connection.close()
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
+
+    # load_sweep reports a missing file as an OSError, which is not a ValueError.
+    # Uncaught it killed the handler thread, and the page reported an unreachable
+    # service for a path the operator simply mistyped.
+    assert response.status == 200
+    assert payload['valid'] is False
+    assert payload['issues'][0]['field'] == 'sweep_path'
+    assert 'config/absent.yaml' in payload['issues'][0]['message']
 
 
 # -- the job the server writes ------------------------------------------------

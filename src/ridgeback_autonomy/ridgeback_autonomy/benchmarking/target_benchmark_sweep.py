@@ -33,17 +33,17 @@ from ridgeback_autonomy.benchmarking.paths import (
     default_output_directory,
     subprocess_log_environment,
 )
-from ridgeback_autonomy.benchmarking.scenarios import load_scenarios
 from ridgeback_autonomy.benchmarking.sweep import (
     ENVIRONMENT_ONLY_DEFAULT_NAMES,
+    TRIAL_WALL_TIME_SEC,
     SweepConfig,
     SweepSpec,
+    estimate_trials,
     load_sweep,
 )
 from ridgeback_autonomy.benchmarking.sweep_report import load_json, write_sweep_report
 
 
-TRIAL_WALL_TIME_SEC = 15.4
 COMMAND_TIMEOUT_SEC = 10.0
 DELETE_TIMEOUT_SEC = 15.0
 ENV_GAZEBO_WAIT_TIMEOUT_SEC = 300.0
@@ -104,18 +104,6 @@ def _selected_configs(spec: SweepSpec, only: str | None) -> tuple[SweepConfig, .
     if len(set(requested)) != len(requested):
         raise ValueError('--only contains a duplicate configuration name.')
     return tuple(by_name[name] for name in requested)
-
-
-def _scenario_path(config: SweepConfig, default_scenario_path: str) -> str:
-    return config.arguments.get('scenario', '').strip() or default_scenario_path
-
-
-def estimate_trials(config: SweepConfig, default_scenario_path: str) -> int:
-    repeats = int(config.arguments.get('repeats', '5'))
-    return sum(
-        scene.repeats_override if scene.repeats_override is not None else repeats
-        for scene in load_scenarios(_scenario_path(config, default_scenario_path))
-    )
 
 
 def _format_hours(seconds: float) -> str:

@@ -208,6 +208,24 @@ relative paths resolve against the job file's own parent. The reversal and its
 evidence are in
 [running benchmarks from the configurator GUI](../history/benchmark_gui_direct_run.md).
 
+A `live-system` job may now either name an existing sweep YAML or author one.
+The sweep-path field decides: name a file and that file runs exactly as written,
+leave it blank and the variant cards below author a sweep instead. A small
+defaults block above them holds the two axes a live sweep states once rather
+than per config — `scenario` and `repeats` — because a sweep authored without
+them silently inherits the packaged 88-scene set at five repeats. Browser inputs
+yield text, so the authored document is typed before it is written; the file
+sits beside hand-written sweeps and has to read like them.
+
+Authoring changes the job contract: `parse_job` accepts an inline sweep document
+for `live-system`, where it previously demanded a path. The inline form exists so
+the page can validate on every keystroke without writing files. Rendering
+materializes it through `configurator_runs.write_sweep_file` to
+`artifacts/benchmark-jobs/sweep-<name>-<stamp>.yaml`, and the job then names that
+written path, so a saved job still resolves itself and `target_benchmark_sweep`
+still opens a file. A live job whose sweep was never written to disk cannot
+produce a command at all, rather than emitting one that names nothing.
+
 The three offline profiles — legacy `measurement` replay, frozen `mask-output`
 comparison, and `mask-model` materialization — start, cancel, and tail their log
 from the page. They route through one command and import no ROS runtime, so they
@@ -226,6 +244,16 @@ The browser is a client of the ROS-free replay-profile capability contract;
 the service is the authority for profile and axis decisions. The GUI validates
 canonical replay jobs and their typed artifacts before running, so it cannot
 misrepresent a live or box-gated run as a frozen-mask experiment.
+
+Each profile offers exactly the estimators it can evaluate: the three offline
+profiles offer the two depth rows, and `live-system` offers all four, polar
+profiling and the point cloud included. The estimator axis itself names every
+estimator the registry publishes, and the rendered choices narrow to the
+profile's own set — narrowing the axis instead would refuse a hand-written job
+naming a supported estimator, not merely omit it from a menu. Selecting an
+estimator a profile cannot evaluate reports `incompatible_estimator`, naming the
+estimator and suggesting `live-system` when that profile would accept it, rather
+than the type failure it used to report.
 
 The combined installed-package suite passed with 758 tests after the
 configurator landed, as recorded in
@@ -295,6 +323,19 @@ semantics retained. Missing RGB, depth, intrinsics, or transforms remain
 explicit `null` evidence. Ground truth is stored only in trial scoring metadata
 and is never passed into a mask producer.
 
+Sensor payload version 2 adds the LiDAR scan the live polar row measured from:
+float32 `ranges` as its own payload array, the beam geometry and source frame
+beside it, and the scan→camera-optical rotation and translation resolved at the
+event stamp. A version-1 capture has no scan and still loads; an event that
+never matched a scan keeps explicit `null` the same way a missing RGB frame
+does. Nothing offline consumes the scan yet — capturing it is what makes an
+offline polar row possible later, not what delivers one.
+
+In the 109-trial `sensor_capture_full_benchmark` capture, 526 of 545 events
+(96.5%) carried both a scan and its extrinsics, against 86.4% for exact RGB and
+71.9% for exact depth. The scan is therefore the most reliably captured channel,
+not a new completeness risk.
+
 Mask caches store one index-aligned outcome per parent detection. `None` is an
 explicit producer miss and differs from a valid empty `MaskRegion`. Regions
 retain origin, full-grid size, `rect|tight` precision, shape, and bit-packed
@@ -323,19 +364,6 @@ Offline reports carry the profile boundary. `measurement` and `mask-output`
 cannot support model/runtime claims. `mask-model` may retain isolated producer
 duration as diagnostics, but only `live-system` can establish ROS delivery,
 end-to-end latency, throughput, GPU contention, simulator real-time factor, or
-Sensor payload version 2 adds the LiDAR scan the live polar row measured from:
-float32 `ranges` as its own payload array, the beam geometry and source frame
-beside it, and the scan→camera-optical rotation and translation resolved at the
-event stamp. A version-1 capture has no scan and still loads; an event that
-never matched a scan keeps explicit `null` the same way a missing RGB frame
-does. Nothing offline consumes the scan yet — capturing it is what makes an
-offline polar row possible later, not what delivers one.
-
-In the 109-trial `sensor_capture_full_benchmark` capture, 526 of 545 events
-(96.5%) carried both a scan and its extrinsics, against 86.4% for exact RGB and
-71.9% for exact depth. The scan is therefore the most reliably captured channel,
-not a new completeness risk.
-
 integration behavior. Implementation evidence and the remaining live gates are
 recorded in
 [the layered replay validation note](../history/layered_replay_implementation_validation.md).
