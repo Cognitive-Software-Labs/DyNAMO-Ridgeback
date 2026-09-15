@@ -6,6 +6,15 @@ hardware, plus repeatable simulator benchmarking.
 This page is intentionally short: it provides orientation and routes detailed
 facts to their canonical documents.
 
+## Conventions
+
+@conventions.md
+
+The cross-cutting conventions above are imported rather than linked because
+every session needs them, including the graphify rules. They remain owned by
+`docs/project/conventions.md`; edit that file, not this one. Every other
+document below stays a link so it loads only when a task needs it.
+
 ## Public workflows
 
 - `ridgeback_exploration.launch.py` selects `backend:=gz|isaac|hardware`, then
@@ -52,6 +61,6 @@ building blocks unless a technical reference says otherwise.
 - [Active engineering gaps](../BACKLOG.md)
 - [Isaac Sim port](../isaac/README.md)
 
-For codebase structure, also inspect `graphify-out/GRAPH_REPORT.md` before
-making architecture claims. It identifies high-connectivity nodes and module
-communities but does not replace the maintained references above.
+The graph report required by the imported graphify conventions identifies
+high-connectivity nodes and module communities. It does not replace the
+maintained references above.

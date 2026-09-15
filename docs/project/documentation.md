@@ -24,14 +24,15 @@ that must be visible before deeper documentation is read.
 
 They route differently because the tools differ. `CLAUDE.md` uses Claude Code's
 `@docs/project/PROJECT_CONTEXT.md` import, which inlines the file at session
-start; the path must stay outside backticks and code blocks or the import is
-ignored. `AGENTS.md` keeps a prose pointer because Codex reads that file
-verbatim and has no import syntax. Import only the project context; deeper
-documents stay links so they load on demand.
+start, and the project context in turn imports `conventions.md`, so both arrive
+without the agent choosing to read them. An import path must stay outside
+backticks and code blocks or it is ignored. `AGENTS.md` names the same two files
+as prose because Codex reads that file verbatim and has no import syntax.
 
-The graphify rules are the one block deliberately duplicated in both
-entrypoints: each tool must see them before it reads or regenerates the graph.
-Edit both copies together.
+Only the project context and the conventions are imported; every other document
+stays a link so it loads when a task needs it. Neither entrypoint restates a
+rule it routes to — the graphify rules, in particular, are owned by
+`docs/project/conventions.md` alone.
 
 ## Update rules
 
