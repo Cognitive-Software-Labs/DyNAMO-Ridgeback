@@ -276,7 +276,7 @@ The offline artifact graph uses a version-2 typed envelope while the compact
 `schema_version: 1` dataset continues to load unchanged:
 
 ```text
-sensor-capture (exact detections + RGB + depth + calibration + TF)
+sensor-capture (exact detections + RGB + depth + LiDAR scan + calibration + TF)
     ├── box mask-cache ───────────┐
     └── SlimSAM mask-cache ───────┴── measurement variants
 ```
@@ -323,6 +323,19 @@ Offline reports carry the profile boundary. `measurement` and `mask-output`
 cannot support model/runtime claims. `mask-model` may retain isolated producer
 duration as diagnostics, but only `live-system` can establish ROS delivery,
 end-to-end latency, throughput, GPU contention, simulator real-time factor, or
+Sensor payload version 2 adds the LiDAR scan the live polar row measured from:
+float32 `ranges` as its own payload array, the beam geometry and source frame
+beside it, and the scan→camera-optical rotation and translation resolved at the
+event stamp. A version-1 capture has no scan and still loads; an event that
+never matched a scan keeps explicit `null` the same way a missing RGB frame
+does. Nothing offline consumes the scan yet — capturing it is what makes an
+offline polar row possible later, not what delivers one.
+
+In the 109-trial `sensor_capture_full_benchmark` capture, 526 of 545 events
+(96.5%) carried both a scan and its extrinsics, against 86.4% for exact RGB and
+71.9% for exact depth. The scan is therefore the most reliably captured channel,
+not a new completeness risk.
+
 integration behavior. Implementation evidence and the remaining live gates are
 recorded in
 [the layered replay validation note](../history/layered_replay_implementation_validation.md).

@@ -195,6 +195,9 @@ def build_benchmark_nodes(context, *args, **kwargs):
             'raw_detections_topic': RAW_DETECTIONS_TOPIC,
             'aligned_depth_debug_topic': ALIGNED_DEPTH_DEBUG_TOPIC,
             'camera_info_topic': camera_inputs.color_camera_info_topic,
+            # The same scan the mask node measures from, so a sensor capture
+            # freezes the beams the live polar row actually used.
+            'scan_topic': scan_topic,
             'base_frame': base_frame,
             'estimators': ','.join(selected_estimators),
             'pointcloud_measurement_topic': POINTCLOUD_MEASUREMENTS_TOPIC,

@@ -424,13 +424,13 @@ MASK_AXES = frozenset(
     name for name, spec in AXES.items()
     if spec.stage == STAGE_MASK and name != 'mask_gate')
 
-# Polar profiling measures off the LiDAR scan, and a sensor capture freezes RGB,
-# depth, intrinsics and transforms only. Moving a polar knob during replay would
-# report a number the stored evidence cannot produce, so the offline profiles
-# freeze these axes outright rather than accept a setting they would ignore.
-# This is a missing-evidence limit, not an estimator preference: the euclidean
-# axes stay available on every offline profile because the extrinsics its floor
-# reference needs are on disk, where a LiDAR scan is not.
+# Polar profiling measures off the LiDAR scan. A sensor capture now freezes that
+# scan alongside RGB, depth, intrinsics and transforms, but no offline executor
+# reads it yet, so moving a polar knob during replay would still report a number
+# no offline run produced. The offline profiles therefore keep freezing these
+# axes rather than accept a setting they would ignore. The freeze is waiting on
+# the replay path, not on the evidence: unfreeze it when an offline run can
+# measure a polar row, not merely when a capture carries beams.
 SCAN_AXES = frozenset(
     name for name, spec in AXES.items()
     if spec.estimators == ('polar_profiling',))

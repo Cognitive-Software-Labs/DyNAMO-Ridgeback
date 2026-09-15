@@ -31,8 +31,20 @@ MANIFEST_VERSION = 2
 MANIFEST_NAME = 'manifest.json'
 SENSOR_CAPTURE_KIND = 'sensor-capture'
 MASK_CACHE_KIND = 'mask-cache'
-SENSOR_PAYLOAD_VERSION = 1
+# Version 2 adds the LiDAR scan and its scan -> camera extrinsic per event, so
+# polar profiling can be measured off frozen evidence. Version 1 captures stay
+# readable with the scan simply absent: mask caches are parented to a specific
+# sensor capture by hash, and rejecting the parent would strand every cache
+# derived from it.
+SENSOR_PAYLOAD_VERSION = 2
+SENSOR_PAYLOAD_VERSIONS = (1, 2)
 MASK_PAYLOAD_VERSION = 1
+
+# The ``sensor_msgs/LaserScan`` geometry a stored scan must carry. ``ranges``
+# travels beside them as an npz array; these five are what turns a beam index
+# into a bearing and declare which returns the driver considers usable.
+SCAN_GEOMETRY_KEYS = (
+    'angle_min', 'angle_max', 'angle_increment', 'range_min', 'range_max')
 
 MASK_STATUS_OK = 'ok'
 MASK_STATUS_OVERSIZED_BOX = 'oversized-box'
@@ -129,6 +141,10 @@ class ReplayArtifact:
     @property
     def id(self) -> str:
         return str(self.manifest['artifact']['id'])
+
+    @property
+    def payload_version(self) -> int:
+        return int(self.manifest['artifact']['payload_version'])
 
     @property
     def trial_entries(self) -> tuple[dict, ...]:
@@ -249,7 +265,45 @@ class _ArtifactWriter:
             shutil.rmtree(self.temporary_root)
 
 
-def _validate_sensor_event(event: dict) -> tuple[np.ndarray | None, np.ndarray | None]:
+def _validate_sensor_scan(scan: dict | None) -> dict | None:
+    """Normalize one event's scan record, or ``None`` when no scan was captured.
+
+    Shape-checked the way RGB and depth are, and for the same reason: beam
+    position encodes bearing order, which the run segmentation depends on, so a
+    2-D or empty ranges payload has no profile to segment. The five geometry
+    scalars must all be present because without them the beams cannot be
+    projected at all.
+
+    Their VALUES are not second-guessed here. ``polar_profiling`` applies
+    ``range_min`` / ``range_max`` exactly as the driver declared them and
+    handles an unusable cap itself, so narrowing them at capture time would
+    silently discard returns the estimator is entitled to see.
+    """
+
+    if scan is None:
+        return None
+    if 'ranges' not in scan:
+        raise ValueError('Scan record carries no ranges array.')
+    missing = tuple(
+        key for key in (*SCAN_GEOMETRY_KEYS, 'frame_id', 'stamp_ns')
+        if scan.get(key) is None)
+    if missing:
+        raise ValueError(f'Scan record is missing {", ".join(missing)}.')
+    ranges = np.asarray(scan['ranges'], dtype=np.float32)
+    if ranges.ndim != 1 or ranges.size == 0:
+        raise ValueError(
+            f'Scan ranges must be a non-empty 1-D array; got shape {ranges.shape}.')
+    return {
+        **{key: float(scan[key]) for key in SCAN_GEOMETRY_KEYS},
+        'ranges': np.ascontiguousarray(ranges),
+        'frame_id': str(scan['frame_id']),
+        'stamp_ns': int(scan['stamp_ns']),
+    }
+
+
+def _validate_sensor_event(
+    event: dict,
+) -> tuple[np.ndarray | None, np.ndarray | None, dict | None]:
     height, width = int(event['image_height']), int(event['image_width'])
     detections = event.get('detections')
     if not isinstance(detections, list):
@@ -271,7 +325,7 @@ def _validate_sensor_event(event: dict) -> tuple[np.ndarray | None, np.ndarray |
         if depth.dtype != np.float32 or depth.shape != (height, width):
             raise ValueError(
                 f'Depth must be float32 {(height, width)}; got {depth.dtype} {depth.shape}.')
-    return rgb, depth
+    return rgb, depth, _validate_sensor_scan(event.get('scan'))
 
 
 class SensorCaptureWriter(_ArtifactWriter):
@@ -298,20 +352,27 @@ class SensorCaptureWriter(_ArtifactWriter):
         serialized_events: list[dict] = []
         detection_count = 0
         for event_index, event in enumerate(events):
-            rgb, depth = _validate_sensor_event(event)
+            rgb, depth, scan = _validate_sensor_event(event)
             item = {
                 key: deepcopy(value)
                 for key, value in event.items()
-                if key not in ('rgb', 'depth_m')
+                if key not in ('rgb', 'depth_m', 'scan')
             }
             item['rgb_key'] = None
             item['depth_key'] = None
+            item['scan_key'] = None
+            item['scan'] = None
             if rgb is not None:
                 item['rgb_key'] = f'rgb_{event_index}'
                 arrays[item['rgb_key']] = np.ascontiguousarray(rgb)
             if depth is not None:
                 item['depth_key'] = f'depth_{event_index}'
                 arrays[item['depth_key']] = np.asarray(depth, dtype=np.float32)
+            if scan is not None:
+                item['scan_key'] = f'scan_{event_index}'
+                arrays[item['scan_key']] = scan['ranges']
+                item['scan'] = {
+                    key: value for key, value in scan.items() if key != 'ranges'}
             serialized_events.append(item)
             detection_count += len(item['detections'])
         arrays['metadata_json'] = np.asarray(json.dumps({
@@ -451,13 +512,13 @@ def load_artifact(
     if declared_signature != producer_signature(unsigned_producer):
         raise ValueError(f'Replay artifact producer signature mismatch: {manifest_path}')
     kind = artifact_data.get('kind')
-    expected_payload = {
-        SENSOR_CAPTURE_KIND: SENSOR_PAYLOAD_VERSION,
-        MASK_CACHE_KIND: MASK_PAYLOAD_VERSION,
+    readable_payloads = {
+        SENSOR_CAPTURE_KIND: SENSOR_PAYLOAD_VERSIONS,
+        MASK_CACHE_KIND: (MASK_PAYLOAD_VERSION,),
     }.get(kind)
-    if expected_payload is None:
+    if readable_payloads is None:
         raise ValueError(f'Unsupported replay artifact kind {kind!r}.')
-    if artifact_data.get('payload_version') != expected_payload:
+    if artifact_data.get('payload_version') not in readable_payloads:
         raise ValueError(
             f'Unsupported {kind} payload version {artifact_data.get("payload_version")!r}.')
     expected_id = _artifact_identity(manifest)
@@ -506,19 +567,31 @@ def load_sensor_trial(artifact: ReplayArtifact, entry: dict) -> tuple[dict, list
     try:
         with np.load(path, allow_pickle=False) as payload:
             metadata = json.loads(_scalar_string(payload['metadata_json']))
-            if metadata.get('payload_version') != SENSOR_PAYLOAD_VERSION:
+            if metadata.get('payload_version') != artifact.payload_version:
                 raise ValueError('payload version differs from manifest')
             events: list[dict] = []
             for event in metadata['events']:
                 item = deepcopy(event)
                 rgb_key = item.pop('rgb_key', None)
                 depth_key = item.pop('depth_key', None)
+                # A payload-version-1 capture has neither key, and reads back
+                # with the scan explicitly absent rather than failing: every
+                # event then answers "is there a scan" the same way, whether the
+                # capture predates scan recording or simply missed one.
+                scan_key = item.pop('scan_key', None)
                 item['rgb'] = (
                     np.array(payload[rgb_key], dtype=np.uint8, copy=True)
                     if rgb_key is not None else None)
                 item['depth_m'] = (
                     np.array(payload[depth_key], dtype=np.float32, copy=True)
                     if depth_key is not None else None)
+                item['scan'] = (
+                    {
+                        **item['scan'],
+                        'ranges': np.array(
+                            payload[scan_key], dtype=np.float32, copy=True),
+                    }
+                    if scan_key is not None else None)
                 _validate_sensor_event(item)
                 events.append(item)
     except (OSError, KeyError, ValueError, json.JSONDecodeError) as exc:
