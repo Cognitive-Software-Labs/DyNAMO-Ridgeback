@@ -18,6 +18,7 @@ from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
 from sensor_msgs.msg import Image
 from sensor_msgs.msg import CameraInfo
+from sensor_msgs.msg import LaserScan
 from tf2_ros import Buffer, TransformListener
 from tf2_ros import TransformException
 from rclpy.time import Time
@@ -131,6 +132,11 @@ from ridgeback_autonomy.perception.target_localization.contracts import (
     ALIGNED_DEPTH_DEBUG_TOPIC,
     RAW_DETECTIONS_TOPIC,
 )
+from ridgeback_autonomy.perception.target_localization.synchronization import (
+    SCAN_MATCH_BUFFER_DEPTH,
+    SCAN_MATCH_TOLERANCE_S_DEFAULT,
+    StampedMessageBuffer,
+)
 from ridgeback_autonomy.perception.target_localization.core.isolation_2d import (
     ISOLATION_2D_DEFAULT,
     NEAREST_MODE_BAND_M_DEFAULT,
@@ -229,6 +235,12 @@ class TargetDistanceBenchmarkRunner(Node):
         self.declare_parameter('aligned_depth_debug_topic', ALIGNED_DEPTH_DEBUG_TOPIC)
         self.declare_parameter('camera_info_topic', 'sensors/camera_0/color/camera_info')
         self.declare_parameter('camera_profile', DEFAULT_CAMERA_PROFILE)
+        # The same scan the mask node measures polar profiling from, and the
+        # same nearest-stamp tolerance it matches with: a capture that froze a
+        # different beam set, or paired it by a different rule, could not be
+        # compared against the live polar numbers it is meant to reproduce.
+        self.declare_parameter('scan_topic', 'sensors/lidar2d_0/scan')
+        self.declare_parameter('scan_match_tolerance_s', SCAN_MATCH_TOLERANCE_S_DEFAULT)
         self.declare_parameter('base_frame', 'base_link')
         self.declare_parameter('estimators', 'all')
         self.declare_parameter('pointcloud_measurement_topic', POINTCLOUD_MEASUREMENTS_TOPIC)
@@ -304,6 +316,9 @@ class TargetDistanceBenchmarkRunner(Node):
         self.raw_detections_topic = str(self.get_parameter('raw_detections_topic').value)
         self.aligned_depth_debug_topic = str(self.get_parameter('aligned_depth_debug_topic').value)
         self.camera_info_topic = str(self.get_parameter('camera_info_topic').value)
+        self.scan_topic = str(self.get_parameter('scan_topic').value)
+        self.scan_match_tolerance_s = float(
+            self.get_parameter('scan_match_tolerance_s').value)
         self.base_frame = str(self.get_parameter('base_frame').value)
         self.record_video = bool(self.get_parameter('record_video').value)
         self.record_window_class = str(self.get_parameter('record_window_class').value)
@@ -433,9 +448,13 @@ class TargetDistanceBenchmarkRunner(Node):
         self.sensor_rgb_buffer: OrderedDict[int, np.ndarray] = OrderedDict()
         self.replay_camera_info_buffer: OrderedDict[int, CameraInfo] = OrderedDict()
         self.static_replay_camera_info: CameraInfo | None = None
+        # The scan free-runs on its own clock, so unlike RGB and depth it never
+        # shares the detection stamp and cannot be exact-matched.
+        self.sensor_scan_buffer: StampedMessageBuffer | None = None
         self.replay_tf_buffer: Buffer | None = None
         self.replay_tf_listener: TransformListener | None = None
         self.replay_last_fallback_frame: str | None = None
+        self.replay_last_scan_fallback_frame: str | None = None
 
         self.last_color_decode_warning = None
 
@@ -477,6 +496,18 @@ class TargetDistanceBenchmarkRunner(Node):
                 CameraInfo,
                 self.camera_info_topic,
                 self.on_replay_camera_info,
+                qos_profile_sensor_data,
+            )
+        # Both capture formats carry a scan now: the sensor capture from payload
+        # version 2, the legacy dataset from schema version 2. Gated on capture
+        # at all rather than on which writer, since neither can record beams it
+        # never subscribed to.
+        if self.capture_artifact_enabled():
+            self.sensor_scan_buffer = StampedMessageBuffer(SCAN_MATCH_BUFFER_DEPTH)
+            self.create_subscription(
+                LaserScan,
+                self.scan_topic,
+                self.on_replay_scan,
                 qos_profile_sensor_data,
             )
 
@@ -554,6 +585,20 @@ class TargetDistanceBenchmarkRunner(Node):
         if event is not None:
             self.store_replay_intrinsics(event, msg, stamp_ns=stamp_ns)
 
+    def on_replay_scan(self, msg: LaserScan) -> None:
+        """Buffer scans for the nearest-stamp match, capture windows only.
+
+        Outside a window there is no event to attach one to, and the buffer is
+        rebuilt per trial, so storing then would only age out the scans that
+        matter.
+        """
+
+        if not self.capture_active or self.sensor_scan_buffer is None:
+            return
+        self.sensor_scan_buffer.store(msg)
+        for event in self.replay_capture_events.values():
+            self.attach_replay_scan(event)
+
     def on_replay_raw_detections(self, msg: TargetDetections) -> None:
         """Freeze detector identity before a measurement recipe can change it."""
 
@@ -577,6 +622,15 @@ class TargetDistanceBenchmarkRunner(Node):
             'front_offset_m': ROBOT_FRONT_OFFSET_M,
             # Stereo depth has no source-defined finite usable ceiling.
             'depth_usable_max_m': None,
+            # Polar profiling's inputs: the scan itself, and the extrinsic that
+            # puts its beams in the frame the masks live in. Separate keys for
+            # the same reason the camera's are separate from its intrinsics --
+            # either can arrive without the other. Common to both writers: the
+            # scan is a per-event channel, and neither format's other evidence
+            # decides whether beams arrived.
+            'scan': None,
+            'scan_rotation': None,
+            'scan_translation': None,
             'detections': [],
         }
         if getattr(self, 'sensor_writer', None) is not None:
@@ -685,8 +739,76 @@ class TargetDistanceBenchmarkRunner(Node):
                 tuple(detection['bbox_xyxy']), event['image_height'], event['image_width'])
             detection['depth_roi'] = np.array(depth_m[y1:y2, x1:x2], dtype=np.float32, copy=True)
 
+    def attach_replay_scan(self, event: dict[str, Any]) -> None:
+        """Attach the buffered scan nearest this event's detection stamp.
+
+        The same rule the mask node matches by, so the frozen beam set is the
+        one the live polar row measured. A scan already attached is replaced
+        only by a strictly closer one: the buffer only ever gains newer scans,
+        so re-running this as they arrive converges on the true nearest instead
+        of freezing whichever happened to be buffered first.
+        """
+
+        if self.sensor_scan_buffer is None:
+            return
+        stamp_ns = int(event['stamp_ns'])
+        scan_msg = self.sensor_scan_buffer.lookup_nearest(
+            Time(nanoseconds=stamp_ns).to_msg(), self.scan_match_tolerance_s)
+        if scan_msg is None:
+            return
+        scan_stamp_ns = stamp_to_nanoseconds(scan_msg.header.stamp)
+        attached = event.get('scan')
+        if attached is not None and (
+            abs(int(attached['stamp_ns']) - stamp_ns)
+            <= abs(scan_stamp_ns - stamp_ns)
+        ):
+            return
+        event['scan'] = {
+            'ranges': np.asarray(scan_msg.ranges, dtype=np.float32),
+            'angle_min': float(scan_msg.angle_min),
+            'angle_max': float(scan_msg.angle_max),
+            'angle_increment': float(scan_msg.angle_increment),
+            'range_min': float(scan_msg.range_min),
+            'range_max': float(scan_msg.range_max),
+            'frame_id': str(scan_msg.header.frame_id),
+            'stamp_ns': int(scan_stamp_ns),
+        }
+        self.backfill_replay_scan_extrinsic(event)
+
+    def backfill_replay_scan_extrinsic(self, event: dict[str, Any]) -> None:
+        """Freeze scan -> camera optical at the detection stamp, as live does.
+
+        The mount is rigid, so this resolves as soon as TF is up and does not
+        change afterwards; it is still looked up at the event's own stamp so a
+        capture never depends on when the lookup happened to run.
+        """
+
+        scan = event.get('scan')
+        if scan is None or self.replay_tf_buffer is None:
+            return
+        if (event['scan_rotation'] is not None
+                and event['scan_translation'] is not None):
+            return
+        try:
+            rotation, translation, fallback = lookup_transform_components(
+                self.replay_tf_buffer,
+                event['frame_id'],
+                scan['frame_id'],
+                Time(nanoseconds=int(event['stamp_ns'])),
+                self.get_logger(),
+                self.replay_last_scan_fallback_frame,
+            )
+        except TransformException:
+            return
+        self.replay_last_scan_fallback_frame = fallback
+        event['scan_rotation'] = np.asarray(rotation, dtype=float).tolist()
+        event['scan_translation'] = np.asarray(translation, dtype=float).tolist()
+
     def backfill_replay_event_context(self, event: dict[str, Any]) -> None:
         """Fill capture context that may arrive after the raw detector batch."""
+        if self.sensor_scan_buffer is not None:
+            self.attach_replay_scan(event)
+            self.backfill_replay_scan_extrinsic(event)
         if (event['camera_rotation'] is not None
                 and event['camera_translation'] is not None):
             return
@@ -744,6 +866,44 @@ class TargetDistanceBenchmarkRunner(Node):
             event.stamp_ns for event in self.capture_events.values()
         }
         return set(self.replay_capture_events).issubset(measurement_stamps)
+
+    def replay_scan_capture_is_complete(self) -> bool:
+        """Whether every frozen batch carries a scan AND its extrinsic.
+
+        Deliberately not part of ``replay_capture_is_complete``: a scan that
+        does not land must not fail a capture the depth path can still use, and
+        must not strand the mask caches parented to it. This only tells the
+        drain there is still something worth waiting for.
+        """
+
+        if self.sensor_scan_buffer is None:
+            return True
+        return all(
+            event.get('scan') is not None
+            and event.get('scan_rotation') is not None
+            and event.get('scan_translation') is not None
+            for event in self.replay_capture_events.values()
+        )
+
+    def log_scan_capture_coverage(self) -> None:
+        """Report how much of this trial's evidence polar profiling could use.
+
+        Logged on every sensor-capture trial, complete or not: the scan is
+        captured opportunistically, so its landing rate is a measurement to be
+        taken, not a failure to be reported only when something else broke.
+        """
+
+        if self.sensor_scan_buffer is None:
+            return
+        events = self.replay_capture_events.values()
+        with_scan = sum(event.get('scan') is not None for event in events)
+        with_extrinsic = sum(
+            event.get('scan_rotation') is not None
+            and event.get('scan_translation') is not None
+            for event in events)
+        self.get_logger().info(
+            f'Sensor capture scan coverage: {with_scan}/{len(events)} batch(es) '
+            f'carry a scan, {with_extrinsic}/{len(events)} carry its extrinsic.')
 
     def log_code_provenance(self) -> None:
         """Say which code is about to produce these results, before it does.
@@ -1062,6 +1222,8 @@ class TargetDistanceBenchmarkRunner(Node):
         self.replay_depth_buffer.clear()
         self.sensor_rgb_buffer.clear()
         self.replay_camera_info_buffer.clear()
+        if self.sensor_scan_buffer is not None:
+            self.sensor_scan_buffer = StampedMessageBuffer(SCAN_MATCH_BUFFER_DEPTH)
         self.capture_active = True
         try:
             if not self.capture_artifact_enabled():
@@ -1077,14 +1239,21 @@ class TargetDistanceBenchmarkRunner(Node):
                         f'Replay capture saw {len(self.replay_capture_events)}/{self.capture_batches} '
                         'raw detection batches before capture_timeout_sec.')
                 drain_deadline = time.monotonic() + max(0.0, self.capture_drain_sec)
+                # The scan is drained for but not required: leaving early the
+                # moment the depth path is complete would measure the exit
+                # condition rather than how often a scan actually lands, and
+                # that landing rate is what decides whether a missing scan
+                # should ever block a capture.
                 while (rclpy.ok() and time.monotonic() < drain_deadline
-                       and not self.replay_capture_is_complete()):
+                       and not (self.replay_capture_is_complete()
+                                and self.replay_scan_capture_is_complete())):
                     rclpy.spin_once(self, timeout_sec=min(
                         0.1, max(0.0, drain_deadline - time.monotonic())))
                     self.backfill_replay_capture_context()
                     self.publish_active_truth()
                 self.capture_events = restrict_events_to_stamps(
                     self.capture_events, set(self.replay_capture_events))
+                self.log_scan_capture_coverage()
                 if not self.replay_capture_is_complete():
                     if self.sensor_writer is not None:
                         missing_depth = sum(

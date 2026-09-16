@@ -54,6 +54,10 @@ input, select { width: 100%; min-height: 2.56rem; border: 1px solid #314967; bor
 input:hover, select:hover { border-color: #527197; background: #0a192b; }
 .field input:focus, .variant input:focus, .variant select:focus, button:focus-visible { border-color: var(--accent); outline: 3px solid #69ebc542; outline-offset: 2px; }
 .artifact-row, .actions, .section-title { display: flex; align-items: center; flex-wrap: wrap; gap: .7rem; margin-top: 1rem; }
+/* The evidence line grows a reason per estimator it cannot feed, so it stacks
+   instead of sharing the button's baseline; the reasons are sentences. */
+#artifact-summary { display: flex; flex-direction: column; align-items: flex-start; gap: .3rem; flex: 1 1 24rem; }
+#artifact-summary .issue { margin: 0; }
 .section-title { justify-content: space-between; margin-top: 0; }
 .section-title .muted { margin: 0; font-size: .88rem; }
 .variants { display: grid; gap: .78rem; }

@@ -518,7 +518,9 @@ The Results panel lists typed artifacts and run outputs, and can rename them.
 Rename is refused where the directory name is load-bearing — a sweep's config
 subdirectories, and staging directories — and renaming a sweep also rewrites the
 output paths recorded in its `sweep.json`. See
-[benchmarking reference](docs/benchmarking/target_distance_benchmarking.md).
+[benchmark outputs](docs/benchmarking/outputs.md) for the rename rules, and
+[running benchmarks](docs/benchmarking/running_benchmarks.md) to choose between
+the configurator and the command line.
 
 ### Benchmark sweeps
 

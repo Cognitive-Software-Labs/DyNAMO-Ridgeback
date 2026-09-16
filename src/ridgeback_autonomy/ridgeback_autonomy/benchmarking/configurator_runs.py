@@ -119,6 +119,24 @@ def write_job_file(workspace_root: Path, job, stamp: str | None = None) -> Path:
     return path
 
 
+def write_sweep_file(workspace_root: Path, document: dict, stamp: str | None = None) -> Path:
+    """Write a sweep the page authored and return the path its command names.
+
+    A live job routes to ``target_benchmark_sweep``, which opens a YAML file, so
+    an authored sweep only becomes runnable once it exists on disk. It is written
+    beside the job that names it for the same reason the job is written here at
+    all: the page cannot put a file anywhere the server can then point at.
+    """
+
+    directory = workspace_root / JOB_ROOT_RELATIVE
+    directory.mkdir(parents=True, exist_ok=True)
+    path = directory / f'sweep-{document["sweep"]["name"]}-{stamp or _timestamp()}.yaml'
+    path.write_text(
+        yaml.safe_dump(document, sort_keys=False, allow_unicode=True),
+        encoding='utf-8')
+    return path
+
+
 class RunSupervisor:
     """One GUI-owned benchmark run at a time, recorded on disk."""
 

@@ -22,6 +22,9 @@ from ridgeback_autonomy.benchmarking.scenarios import load_scenarios
 
 
 PATH_SAFE_NAME = re.compile(r'^[A-Za-z0-9][A-Za-z0-9._-]*$')
+# Measured mean wall time of one benchmark trial, used for every estimate a
+# reader sees before committing to a sweep.
+TRIAL_WALL_TIME_SEC = 15.4
 TOP_LEVEL_KEYS = frozenset({'sweep', 'defaults', 'configs'})
 SWEEP_METADATA_KEYS = frozenset({'name', 'description'})
 # These belong only to the environment launch, but are legal as sweep-wide
@@ -281,6 +284,24 @@ def parse_sweep(
         defaults=defaults,
         configs=tuple(configs),
         source=source,
+    )
+
+
+def _scenario_path(config: SweepConfig, default_scenario_path: str) -> str:
+    return config.arguments.get('scenario', '').strip() or default_scenario_path
+
+
+def estimate_trials(config: SweepConfig, default_scenario_path: str) -> int:
+    """How many trials one config runs, honoring each scene's repeats override.
+
+    Kept beside the parser rather than in the runner so the dry run and the
+    configurator quote the same number from the same rule.
+    """
+
+    repeats = int(config.arguments.get('repeats', '5'))
+    return sum(
+        scene.repeats_override if scene.repeats_override is not None else repeats
+        for scene in load_scenarios(_scenario_path(config, default_scenario_path))
     )
 
 

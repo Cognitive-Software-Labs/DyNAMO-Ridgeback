@@ -18,10 +18,10 @@ from ridgeback_autonomy.benchmarking.replay_profiles import (
     ProfileValidationError,
     get_profile,
     validate_axis_values,
+    validate_estimator_selection,
     validate_profile_axes,
 )
 from ridgeback_autonomy.benchmarking.sweep import SweepConfig, SweepSpec, load_sweep, parse_sweep
-from ridgeback_autonomy.perception.target_localization.estimator_registry import parse_estimators
 
 
 JOB_VERSION = 1
@@ -100,9 +100,8 @@ def _load_sweep_value(value: Any, *, source: str) -> SweepSpec:
 
 
 def _validate_variants(profile_id: str, sweep: SweepSpec) -> tuple[SweepConfig, ...]:
-    profile = get_profile(profile_id)
     validate_profile_axes(profile_id, sweep.defaults)
-    validate_axis_values(sweep.defaults)
+    validate_axis_values(sweep.defaults, profile_id)
     variants = []
     for config in sweep.configs:
         validate_profile_axes(profile_id, config.explicit_keys)
@@ -110,24 +109,11 @@ def _validate_variants(profile_id: str, sweep: SweepSpec) -> tuple[SweepConfig, 
             key: config.arguments[key]
             for key in config.explicit_keys
             if key in config.arguments
-        })
-        selected = parse_estimators(config.arguments.get('estimators'))
-        unsupported = [
-            estimator for estimator in selected
-            if estimator not in profile.compatible_estimators
-        ]
-        if unsupported:
-            raise ProfileValidationError(
-                field='estimators',
-                code='incompatible_estimator',
-                profile=profile_id,
-                suggested_profile=(
-                    PROFILE_LIVE_SYSTEM if profile_id == PROFILE_MEASUREMENT else None),
-                message=(
-                    f'Profile "{profile_id}" cannot evaluate estimator '
-                    f'"{unsupported[0]}".'
-                ),
-            )
+        }, profile_id)
+        # Checked again on the merged arguments: a config that inherits its
+        # estimators from the sweep defaults lists the key in neither its own
+        # explicit keys nor, once overridden elsewhere, the defaults it kept.
+        validate_estimator_selection(profile_id, config.arguments.get('estimators'))
         variants.append(config)
     return tuple(variants)
 
@@ -252,14 +238,19 @@ def parse_job(document: Any, *, source: str = '<memory>') -> ReplayJob:
         )
 
     sweep_value = raw.get('sweep')
+    # A live job may either name an existing sweep or carry one it authored. The
+    # authored form is what lets the configurator validate a draft that has not
+    # been written yet; command_argv still refuses to name a sweep that is not on
+    # disk, so anything actually runnable resolves to a file.
     if profile_id == PROFILE_LIVE_SYSTEM and not (
-        isinstance(sweep_value, str) and sweep_value.strip()
+        (isinstance(sweep_value, str) and sweep_value.strip())
+        or isinstance(sweep_value, dict)
     ):
         raise ProfileValidationError(
             field='sweep', code='live_sweep_requires_path', profile=profile_id,
             message=(
-                'Profile "live-system" requires a sweep YAML path because it '
-                'routes to target_benchmark_sweep.'),
+                'Profile "live-system" requires a sweep YAML path or an authored '
+                'sweep, because it routes to target_benchmark_sweep.'),
         )
     sweep = _load_sweep_value(sweep_value, source=source)
     variants = _validate_variants(profile_id, sweep)
@@ -322,6 +313,16 @@ def canonical_job_json(job: ReplayJob) -> str:
 
 def command_argv(job_path: str, job: ReplayJob, *, output_dir: str | None = None) -> list[str]:
     if job.profile == PROFILE_LIVE_SYSTEM:
+        # target_benchmark_sweep opens a file, so an authored sweep has to have
+        # been written before a command can name it. Caught here rather than in
+        # the shell, where the argument would read as a parse error.
+        if not Path(job.sweep.source).is_file():
+            raise ProfileValidationError(
+                field='sweep', code='live_sweep_requires_path', profile=job.profile,
+                message=(
+                    'A live sweep must be written to disk before a command can '
+                    f'name it; "{job.sweep.source}" is not a file.'),
+            )
         return ['ros2', 'run', 'ridgeback_autonomy', 'target_benchmark_sweep', job.sweep.source]
     output = output_dir or job.output_dir
     argv = ['ros2', 'run', 'ridgeback_autonomy', 'target_replay_benchmark', job_path]

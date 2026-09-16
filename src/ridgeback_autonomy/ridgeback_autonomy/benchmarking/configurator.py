@@ -30,7 +30,11 @@ from ridgeback_autonomy.benchmarking.configurator_results import (
     inspect_path,
     rename_result,
 )
-from ridgeback_autonomy.benchmarking.configurator_runs import RunSupervisor, write_job_file
+from ridgeback_autonomy.benchmarking.configurator_runs import (
+    RunSupervisor,
+    write_job_file,
+    write_sweep_file,
+)
 from ridgeback_autonomy.benchmarking.paths import anchored_path
 from ridgeback_autonomy.benchmarking.replay_artifacts import (
     SENSOR_CAPTURE_KIND,
@@ -40,7 +44,14 @@ from ridgeback_autonomy.benchmarking.replay_artifacts import (
 from ridgeback_autonomy.benchmarking.replay_jobs import command_argv, parse_job
 from ridgeback_autonomy.benchmarking.replay_profiles import (
     describe_capabilities,
+    LIVE_SWEEP_DEFAULT_AXES,
     ProfileValidationError,
+)
+from ridgeback_autonomy.benchmarking.sweep import TRIAL_WALL_TIME_SEC, estimate_trials
+from ridgeback_autonomy.perception.target_localization.estimator_registry import (
+    ESTIMATOR_LABELS,
+    PUBLIC_ESTIMATOR_ORDER,
+    parse_estimators,
 )
 
 
@@ -57,6 +68,31 @@ def _stage_labels(stages: list[str]) -> list[str]:
     return [stage.replace('-', ' ').title() for stage in stages]
 
 
+def _rendered_field(axis: dict, profile: dict) -> dict:
+    """One axis as the browser draws it, scoped to what the profile can run."""
+
+    rendered = {
+        'key': axis['name'],
+        'label': axis['label'],
+        'type': (
+            'select' if axis.get('choices') else
+            'integer' if axis['type'] == 'integer' else
+            'number' if axis['type'] == 'number' else 'text'),
+        'default': axis.get('default', ''),
+        'options': axis.get('choices', []),
+        'min': axis.get('minimum'), 'max': axis.get('maximum'),
+        'estimators': axis.get('estimators', []),
+        'recipes': axis.get('recipes', []),
+    }
+    if axis['name'] == 'estimators':
+        # The axis lists every estimator the registry publishes, but a profile
+        # evaluates only some of them. Offering one the profile then refuses
+        # makes the operator discover it from an error.
+        allowed = set(profile['compatible_estimators'])
+        rendered['options'] = [item for item in rendered['options'] if item in allowed]
+    return rendered
+
+
 def capabilities() -> dict:
     """The canonical capability contract with small presentation adaptations."""
 
@@ -70,26 +106,18 @@ def capabilities() -> dict:
             axis = axes[name]
             if axis['stage'] not in {'measurement', 'mask-production'}:
                 continue
-            rendered = {
-                'key': name,
-                'label': axis['label'],
-                'type': (
-                    'select' if axis.get('choices') else
-                    'integer' if axis['type'] == 'integer' else
-                    'number' if axis['type'] == 'number' else 'text'),
-                'default': axis.get('default', ''),
-                'options': axis.get('choices', []),
-                'min': axis.get('minimum'), 'max': axis.get('maximum'),
-                'estimators': axis.get('estimators', []),
-                'recipes': axis.get('recipes', []),
-            }
-            if name == 'estimators':
-                # The axis lists every estimator the replay paths know, but a
-                # profile evaluates only some of them. Offering one the profile
-                # then refuses makes the operator discover it from an error.
-                allowed = set(profile['compatible_estimators'])
-                rendered['options'] = [item for item in rendered['options'] if item in allowed]
-            (fields if axis['stage'] == 'measurement' else materialization_fields).append(rendered)
+            rendered = _rendered_field(axis, profile)
+            # A live run rebuilds every stage per config, so its mask settings
+            # belong on the variant card: a separate materialization is a
+            # mask-model concept, and no other profile carries one.
+            per_variant = axis['stage'] == 'measurement' or profile['id'] == 'live-system'
+            (fields if per_variant else materialization_fields).append(rendered)
+        # Only a live sweep states arguments once for every config it runs; the
+        # offline profiles read frozen evidence that already fixed them.
+        sweep_defaults = [
+            _rendered_field(axes[name], profile) for name in LIVE_SWEEP_DEFAULT_AXES
+            if profile['id'] == 'live-system' and name in axes
+        ]
         profiles[profile['id']] = {
             'label': profile['label'], 'available': True,
             'held_constant': _stage_labels(profile['frozen_stages']),
@@ -98,6 +126,7 @@ def capabilities() -> dict:
             'limitations': profile['limitations'],
             'variant_fields': fields,
             'materialization_fields': materialization_fields,
+            'sweep_defaults_fields': sweep_defaults,
         }
     descriptions = {
         'measurement': 'Rerun measurement against frozen legacy evidence.',
@@ -124,9 +153,51 @@ def _reaches(declared, selected: set[str]) -> bool:
     return not declared or bool(set(declared).intersection(selected))
 
 
+def _typed(field: dict, value):
+    """A draft value in the axis's own type, since inputs only ever send text.
+
+    A value that will not convert is passed through untouched so the shared
+    validator reports it, rather than being quietly turned into something that
+    validates.
+    """
+
+    try:
+        if field['type'] == 'integer':
+            return int(str(value).strip())
+        if field['type'] == 'number':
+            return float(str(value).strip())
+    except (TypeError, ValueError):
+        return value
+    return value
+
+
+def _sweep_defaults(raw: dict, descriptor: dict, root: Path) -> dict:
+    """The arguments an authored sweep states once, above its configs."""
+
+    supplied = raw.get('sweep_defaults') or {}
+    if not isinstance(supplied, dict):
+        raise ConfiguratorError(
+            'sweep_defaults', 'invalid_defaults', 'Sweep defaults must be an object.')
+    defaults = {}
+    for field in descriptor.get('sweep_defaults_fields', []):
+        key = field['key']
+        value = supplied.get(key, field['default'])
+        # The scenario is an operator-supplied path like every other one on this
+        # page. Anchoring it here keeps a relative entry from resolving against
+        # whatever directory the server happens to have been started in.
+        defaults[key] = (
+            anchored_path(str(root), str(value)) if key == 'scenario'
+            else _typed(field, value))
+    return defaults
+
+
 def _ui_sweep(raw: dict, profile: str, root: Path) -> dict | str:
-    if profile == 'live-system':
-        return anchored_path(str(root), str(raw.get('sweep_path', '')))
+    referenced = str(raw.get('sweep_path', '')).strip()
+    # Naming a file means running that file. A referenced sweep is already
+    # validated and already describes what it runs, so regenerating it from the
+    # page's draft would run something other than what the command names.
+    if profile == 'live-system' and referenced:
+        return anchored_path(str(root), referenced)
     descriptor = capabilities()['profiles'][profile]
     variants = raw.get('variants') or [{'name': 'baseline', 'arguments': {}}]
     configs = []
@@ -140,7 +211,7 @@ def _ui_sweep(raw: dict, profile: str, root: Path) -> dict | str:
         arguments = {}
         for field in descriptor['variant_fields']:
             key = field['key']
-            arguments[key] = supplied.get(key, field['default'])
+            arguments[key] = _typed(field, supplied.get(key, field['default']))
         selected_estimators = {
             value.strip() for value in str(arguments.get('estimators', '')).split(',')
             if value.strip()
@@ -157,10 +228,14 @@ def _ui_sweep(raw: dict, profile: str, root: Path) -> dict | str:
                     and _reaches(field.get('recipes'), selected_choices)):
                 arguments.pop(field['key'], None)
         configs.append({'name': name, **arguments})
-    return {
+    document = {
         'sweep': {'name': f'gui_{profile}', 'description': 'Generated by target_benchmark_configurator.'},
         'configs': configs,
     }
+    defaults = _sweep_defaults(raw, descriptor, root)
+    if defaults:
+        document['defaults'] = defaults
+    return document
 
 
 def _canonical_document(raw: object, root: Path) -> dict:
@@ -199,18 +274,23 @@ def _canonical_document(raw: object, root: Path) -> dict:
     materializations = raw.get('materializations') if profile == 'mask-model' else None
     if profile == 'mask-model' and not materializations:
         materializations = [{'name': 'candidate', 'mask_producer': 'slimsam'}]
+    sweep = _ui_sweep(raw, profile, root)
+    # For the same reason: a referenced sweep names its own configs, so the
+    # baseline the page is still holding belongs to variants that sweep never
+    # had. Left in place it refuses the job over a name nothing on screen shows.
+    baseline = '' if isinstance(sweep, str) else str(raw.get('baseline', '')).strip()
     return {
         'job_version': 1,
         'question': str(raw.get('question', '')),
         'profile': profile,
         'inputs': selected_inputs,
-        'sweep': _ui_sweep(raw, profile, root),
+        'sweep': sweep,
         'resources': {
             'measurement_workers': raw.get('workers', 1),
             'model_workers': raw.get('model_workers', 1),
         },
         'output_dir': anchored(raw.get('output_dir', '')),
-        'comparison_baseline': str(raw.get('baseline', '')).strip(),
+        'comparison_baseline': baseline,
         **({'materializations': materializations} if materializations else {}),
     }
 
@@ -233,13 +313,85 @@ def _inspect_job_inputs(job) -> dict[str, dict]:
     return inspected
 
 
+def _evidence_issues(job, artifacts: dict[str, dict]) -> list[dict]:
+    """Estimators this job selects that the loaded evidence cannot feed.
+
+    The profile already refused the estimators its executor has no path for.
+    This is the other half: the profile runs it, but the artifact in hand does
+    not carry the channel it reads. Reported from the page because that is where
+    the selection and the artifact are both present -- left to the executor, the
+    operator learns it after the run has loaded every trial.
+
+    One issue per estimator rather than per variant: a sweep that selects polar
+    in twenty configs has one problem, and twenty copies of it would bury the
+    other fields.
+    """
+
+    root = artifacts.get('measurement_dataset') or artifacts.get('sensor_capture')
+    unavailable = (root or {}).get('unavailable_estimators') or {}
+    if not unavailable:
+        return []
+    selected: set[str] = set()
+    for config in job.sweep.configs:
+        selected.update(
+            parse_estimators(str(config.arguments.get('estimators') or '')))
+    return [
+        {
+            'field': 'estimators', 'code': 'evidence_cannot_feed_estimator',
+            'message': (
+                f'{ESTIMATOR_LABELS[estimator]} cannot be measured from the '
+                f'selected evidence: {unavailable[estimator]}.'),
+        }
+        for estimator in PUBLIC_ESTIMATOR_ORDER
+        if estimator in selected and estimator in unavailable
+    ]
+
+
+def _packaged_scenarios() -> str | None:
+    """The scenario set the sweep runner falls back to when a config names none."""
+
+    try:
+        from ament_index_python.packages import get_package_share_directory
+        path = Path(get_package_share_directory('ridgeback_autonomy'))
+    except (ImportError, LookupError):
+        return None
+    scenarios = path / 'config' / 'benchmark_scenarios_full.yaml'
+    return str(scenarios) if scenarios.is_file() else None
+
+
+def _live_estimate(job) -> dict:
+    """What a live sweep costs, counted by the same rule its dry run prints."""
+
+    unknown = {
+        'trials': None, 'events': None, 'measurement_work': None,
+        'capture_duration': 'Live sweep; use its --dry-run estimate.',
+        'hard_timeout': 'Defined by the referenced sweep.',
+        'assumptions': ['Live execution is delegated to target_benchmark_sweep.'],
+    }
+    scenarios = _packaged_scenarios()
+    try:
+        trials = sum(
+            estimate_trials(config, scenarios or '') for config in job.sweep.configs)
+    except (OSError, ValueError):
+        # A scenario file that does not parse is already reported as a field
+        # issue; the estimate declines rather than competing with it.
+        return unknown
+    configs = len(job.sweep.configs)
+    return {
+        **unknown,
+        'trials': trials,
+        'measurement_work': f'{configs} config' + ('' if configs == 1 else 's'),
+        'capture_duration': (
+            f'{trials * TRIAL_WALL_TIME_SEC / 3600.0:.2f} h at '
+            f'{TRIAL_WALL_TIME_SEC:.1f} s/trial'),
+        'hard_timeout': 'Defined by the sweep runner.',
+    }
+
+
 def _estimate(job, artifacts: dict[str, dict]) -> dict:
     root = artifacts.get('measurement_dataset') or artifacts.get('sensor_capture')
     if not root:
-        return {'trials': None, 'events': None, 'measurement_work': None,
-                'capture_duration': 'Live sweep; use its --dry-run estimate.',
-                'hard_timeout': 'Defined by the referenced sweep.',
-                'assumptions': ['Live execution is delegated to target_benchmark_sweep.']}
+        return _live_estimate(job)
     variants = len(job.sweep.configs)
     events = root['events']
     return {
@@ -265,12 +417,22 @@ def validate_job(raw: object, workspace_root: Path | None = None) -> dict:
         return {'job': document, 'issues': [{
             'field': 'job', 'code': 'cli_validation', 'message': str(exc),
         }], 'valid': False}
+    # A live job names a sweep YAML the operator typed, so a path that does not
+    # exist is an ordinary field mistake. load_sweep reports it as an OSError,
+    # which is not a ValueError: uncaught it kills the handler thread, and the
+    # page reports an unreachable service for a file that is merely missing.
+    except OSError as exc:
+        return {'job': document, 'issues': [{
+            'field': 'sweep_path', 'code': 'unreadable_sweep',
+            'message': f'Cannot read the referenced sweep YAML: {exc}',
+        }], 'valid': False}
     issues = []
     try:
         artifacts = _inspect_job_inputs(job)
     except ValueError as exc:
         artifacts = {}
         issues.append({'field': 'inputs', 'code': 'invalid_artifact', 'message': str(exc)})
+    issues.extend(_evidence_issues(job, artifacts))
     return {'job': job.document, 'issues': issues, 'artifacts': artifacts, 'valid': not issues,
             'estimates': _estimate(job, artifacts)}
 
@@ -288,10 +450,17 @@ def render_job(raw: object, workspace_root: Path | None = None) -> dict:
     outcome = validate_job(raw, root)
     if not outcome['valid']:
         return outcome
-    job = parse_job(outcome['job'])
+    document = outcome['job']
+    # An authored live sweep exists only in the draft until here. Writing it now
+    # and naming the written file keeps the saved job resolvable on its own: a
+    # live job read back from disk still points at a sweep the runner can open.
+    if document['profile'] == 'live-system' and isinstance(document.get('sweep'), dict):
+        document = {**document, 'sweep': str(write_sweep_file(root, document['sweep']))}
+    job = parse_job(document)
     job_path = write_job_file(root, job)
     argv = command_argv(str(job_path), job)
-    return {**outcome, 'yaml': yaml.safe_dump(job.document, sort_keys=False, allow_unicode=True),
+    return {**outcome, 'job': job.document,
+            'yaml': yaml.safe_dump(job.document, sort_keys=False, allow_unicode=True),
             'filename': job_path.name, 'job_path': str(job_path),
             'argv': argv, 'command': shlex.join(argv)}
 
@@ -328,7 +497,12 @@ def _ui_draft(document: dict) -> dict:
     if job.profile == 'measurement':
         raw['inputs']['dataset'] = job.inputs['measurement_dataset']
     elif job.profile == 'live-system':
-        raw['sweep_path'] = str(document['sweep'])
+        # A live job carries either a path to a sweep or one it authored. An
+        # authored sweep comes back as variants and defaults, so that reopening
+        # the job offers the same controls that produced it.
+        referenced = isinstance(document['sweep'], str)
+        raw['sweep_path'] = str(document['sweep']) if referenced else ''
+        raw['sweep_defaults'] = {} if referenced else dict(job.sweep.defaults)
     else:
         raw['inputs']['sensor_capture'] = job.inputs['sensor_capture']
         raw['inputs']['mask_caches'] = job.inputs.get('mask_caches', [])
@@ -344,7 +518,7 @@ def import_job(text: str, workspace_root: Path | None = None) -> dict:
         draft = _ui_draft(document)
         outcome = validate_job(draft, workspace_root)
         return {**outcome, 'job': draft}
-    except (yaml.YAMLError, ProfileValidationError, ValueError) as exc:
+    except (yaml.YAMLError, ProfileValidationError, ValueError, OSError) as exc:
         raise ConfiguratorError('import', 'invalid_job', f'Cannot import replay job: {exc}') from exc
 
 

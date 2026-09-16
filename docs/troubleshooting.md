@@ -71,6 +71,34 @@ around it with `--skip-preflight-cleanup`; that produces the two-`gz sim`
 failure above. Start live sweeps from a terminal until the catch-all is narrowed
 to actual nodes.
 
+## Editing a CLI module changes nothing until you rebuild
+
+`ridgeback_autonomy` is a `--symlink-install` package, so editing a module under
+`src/` takes effect immediately — for anything imported as
+`ridgeback_autonomy.*`. The executables under
+`install/ridgeback_autonomy/lib/ridgeback_autonomy/` are not symlinks: CMake
+copies them with `install(PROGRAMS)`, and several are copies of a module file
+rather than thin wrappers around it. `target_benchmark_configurator` is a byte
+copy of `benchmarking/configurator.py`.
+
+The failure is confusing rather than loud, because the two halves disagree: the
+running executable is the stale copy, while everything it imports is live. A
+configurator started this way served a current capability contract and current
+artifact summaries from the symlinked modules, but ran request handlers from
+whenever the package was last built — so a validation rule added that morning
+silently did not fire, with no error anywhere.
+
+```bash
+# The tell: the executable's mtime is older than the module it was copied from.
+stat -c '%y %n' install/ridgeback_autonomy/lib/ridgeback_autonomy/target_benchmark_configurator \
+                src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/configurator.py
+colcon build --packages-select ridgeback_autonomy --symlink-install   # ~1 s
+```
+
+Running the same call in-process (`python3 -c 'import ...; validate_job(...)'`)
+and over HTTP is what separates the two: identical inputs, different answers
+means the executable is stale, not the logic wrong.
+
 ## Long sweep loses Gazebo
 
 A long GUI-backed sweep can fail in Gazebo's render thread while creating a

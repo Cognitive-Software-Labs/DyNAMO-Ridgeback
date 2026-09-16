@@ -55,7 +55,7 @@ building blocks unless a technical reference says otherwise.
 - [Exploration architecture](../exploration/architecture.md)
 - [Camera stack](../target_localization/camera_stack.md)
 - [Target-localization pipeline](../target_localization/target_localization_pipeline.md)
-- [Target-distance benchmarking](../benchmarking/target_distance_benchmarking.md)
+- [Target-distance benchmarking](../benchmarking/overview.md)
 - [External dependency management](dependencies.md)
 - [Troubleshooting](../troubleshooting.md)
 - [Active engineering gaps](../BACKLOG.md)

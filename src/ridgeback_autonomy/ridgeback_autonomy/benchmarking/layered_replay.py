@@ -17,7 +17,11 @@ from ridgeback_autonomy.benchmarking.reduction import (
     merge_status_histograms,
     summarize_capture_events,
 )
-from ridgeback_autonomy.benchmarking.replay import ReplayMeasurementEvent
+from ridgeback_autonomy.benchmarking.replay import (
+    ReplayMeasurementEvent,
+    polar_isolation_settings,
+    replay_scan_points,
+)
 from ridgeback_autonomy.benchmarking.replay_artifacts import (
     MASK_STATUS_EMPTY_SEGMENTATION,
     MASK_STATUS_NO_COLOR_FRAME,
@@ -26,7 +30,9 @@ from ridgeback_autonomy.benchmarking.replay_artifacts import (
     ReplayArtifact,
     load_mask_trial,
     load_sensor_trial,
+    select_replay_estimators,
     trial_entry_map,
+    unavailable_estimators,
     validate_cache_alignment,
 )
 from ridgeback_autonomy.benchmarking.report import render_run_report
@@ -52,10 +58,8 @@ from ridgeback_autonomy.perception.target_localization.core.isolation_3d import 
     camera_floor_geometry,
 )
 from ridgeback_autonomy.perception.target_localization.estimator_registry import (
-    DEPTH_PATH_ESTIMATORS,
     ESTIMATOR_FIELD_KEYS,
     ESTIMATOR_LABELS,
-    parse_estimators,
 )
 from ridgeback_autonomy.perception.target_localization.measurement_pipeline import (
     fill_path_measurements,
@@ -142,12 +146,8 @@ def _measurement_event(
     event: dict,
     outcomes,
     arguments: dict[str, str],
-) -> tuple[ReplayMeasurementEvent, tuple[str, ...]]:
-    selected = tuple(
-        estimator for estimator in parse_estimators(arguments.get('estimators'))
-        if estimator in DEPTH_PATH_ESTIMATORS)
-    if not selected:
-        raise ValueError('Layered replay requires projective and/or euclidean estimation.')
+    selected: tuple[str, ...],
+) -> ReplayMeasurementEvent:
     width, height = int(event['image_width']), int(event['image_height'])
     if len(outcomes) != len(event['detections']):
         raise ValueError('Mask-cache detection count differs from its sensor event.')
@@ -220,12 +220,17 @@ def _measurement_event(
             resolve_depth_gate(float(arguments.get('mask_depth_max_meters', '0.0'))),
             source_max,
         )
+        # Projected only when polar was selected: the transform is per-event
+        # work that a depth-only variant would pay for and never read.
+        scan_points, scan_reason = (
+            replay_scan_points(event) if 'polar_profiling' in selected
+            else (None, MissReason.NO_SCAN))
         fill_path_measurements(
             batch,
             masks,
             intrinsics,
             event.get('depth_m'),
-            None,
+            scan_points,
             camera_rotation=rotation,
             camera_translation=translation,
             front_offset_m=float(event.get('front_offset_m', 0.25)),
@@ -233,6 +238,8 @@ def _measurement_event(
             isolation_3d=isolation_3d,
             depth_max=depth_max,
             min_valid_pixels=int(arguments.get('min_valid_pixels', '10')),
+            polar_isolation=polar_isolation_settings(arguments),
+            scan_reason=scan_reason,
             enabled=frozenset(selected),
         )
 
@@ -253,7 +260,7 @@ def _measurement_event(
         image_height=height,
         detections=detections,
         estimates=estimates,
-    ), selected
+    )
 
 
 def evaluate_sensor_trial(
@@ -261,20 +268,16 @@ def evaluate_sensor_trial(
     events: list[dict],
     mask_events,
     arguments: dict[str, str],
+    selected: tuple[str, ...],
 ) -> dict:
     if len(events) != len(mask_events):
         raise ValueError('Mask-cache event count differs from its sensor trial.')
     converted = [
-        _measurement_event(event, outcomes, arguments)
+        _measurement_event(event, outcomes, arguments, selected)
         for event, outcomes in zip(events, mask_events)
     ]
-    selected = converted[0][1] if converted else tuple(
-        estimator for estimator in parse_estimators(arguments.get('estimators'))
-        if estimator in DEPTH_PATH_ESTIMATORS)
-    if any(item[1] != selected for item in converted):
-        raise AssertionError('Estimator selection changed within one trial.')
     measurement_events = {
-        (index, item[0].stamp_ns): item[0]
+        (index, item.stamp_ns): item
         for index, item in enumerate(converted)
     }
     capture = summarize_capture_events(measurement_events, selected)
@@ -328,12 +331,12 @@ def _evaluate_task(task) -> dict[str, dict]:
     for cache_name, cache_root, cache_manifest, cache_hash, cache_entry in cache_payloads:
         cache = ReplayArtifact(Path(cache_root), cache_manifest, cache_hash)
         mask_events = load_mask_trial(cache, cache_entry)
-        for variant_name, arguments in variants:
+        for variant_name, arguments, selected in variants:
             expanded_name = (
                 variant_name if len(cache_payloads) == 1
                 else f'{cache_name}__{variant_name}')
             result[expanded_name] = evaluate_sensor_trial(
-                trial, events, mask_events, arguments)
+                trial, events, mask_events, arguments, selected)
     return result
 
 
@@ -351,11 +354,16 @@ def evaluate_sensor_capture(
     validate_cache_alignment(sensor, caches)
     named = named_caches(caches)
     expanded = expand_variants(caches, variants)
+    # One rule for the whole capture, so every variant and every worker agrees
+    # about what this evidence can answer.
+    unavailable = unavailable_estimators(sensor)
+    per_variant_selection = {
+        variant.name: select_replay_estimators(variant.arguments, unavailable)
+        for variant in expanded
+    }
     collected: dict[str, dict] = {}
     for variant in expanded:
-        selected = tuple(
-            estimator for estimator in parse_estimators(variant.arguments.get('estimators'))
-            if estimator in DEPTH_PATH_ESTIMATORS)
+        selected, dropped = per_variant_selection[variant.name]
         collected[variant.name] = {
             'rows': {estimator: [] for estimator in selected},
             'outcome_counts': {
@@ -366,9 +374,21 @@ def evaluate_sensor_capture(
             'extra_count': 0,
             'trial_count': 0,
             'selected_estimators': selected,
+            'dropped_estimators': dropped,
         }
     sensor_entries = trial_entry_map(sensor)
     cache_maps = {name: trial_entry_map(cache) for name, cache in named}
+    # Resolved here rather than inside the worker: expansion copies a variant's
+    # arguments verbatim, so the selection is the same for every cache, and a
+    # refusal belongs in the caller's stack rather than a pool subprocess.
+    task_variants = tuple(
+        (
+            variant.name,
+            variant.arguments,
+            select_replay_estimators(variant.arguments, unavailable)[0],
+        )
+        for variant in variants
+    )
     tasks = []
     for trial_id, sensor_entry in sensor_entries.items():
         cache_payloads = tuple(
@@ -383,8 +403,7 @@ def evaluate_sensor_capture(
         )
         tasks.append((
             str(sensor.root), sensor.manifest, sensor.manifest_sha256,
-            sensor_entry, cache_payloads,
-            tuple((variant.name, variant.arguments) for variant in variants),
+            sensor_entry, cache_payloads, task_variants,
         ))
     if workers == 1:
         per_trial = [_evaluate_task(task) for task in tasks]
@@ -478,8 +497,13 @@ def write_layered_results(
             ]
         document['replay'] = {
             'profile': profile,
+            # Named with its reason, because a table that simply lacks a row
+            # reads as an estimator that scored nothing rather than one this
+            # evidence could never run.
+            'dropped_estimators': result['dropped_estimators'],
             'sensor_capture': {
                 'artifact_id': sensor.id,
+                'payload_version': sensor.payload_version,
                 'manifest_sha256': sensor.manifest_sha256,
             },
             'mask_cache': {
@@ -517,6 +541,13 @@ def write_layered_results(
                 'Mask cache': variant.cache_name,
                 'Claims': ', '.join(profile['supported_claims']),
                 'Limitations': ' '.join(profile['limitations']),
+                # Only when something was actually dropped, so the common case
+                # keeps a header that is all load-bearing.
+                **({
+                    'Estimators not run': '; '.join(
+                        f'{ESTIMATOR_LABELS[estimator]} ({reason})'
+                        for estimator, reason in result['dropped_estimators'].items())
+                } if result['dropped_estimators'] else {}),
             },
             parameters=variant.arguments,
         )

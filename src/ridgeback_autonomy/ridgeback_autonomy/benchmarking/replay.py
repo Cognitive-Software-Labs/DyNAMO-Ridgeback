@@ -31,6 +31,11 @@ from ridgeback_autonomy.benchmarking.reduction import (
     merge_status_histograms,
     summarize_capture_events,
 )
+from ridgeback_autonomy.benchmarking.replay_artifacts import (
+    select_replay_estimators,
+    unavailable_estimators,
+    validate_scan_record,
+)
 from ridgeback_autonomy.benchmarking.scoring import (
     MISS_OUTCOMES,
     score_scene,
@@ -66,6 +71,11 @@ from ridgeback_autonomy.perception.target_localization.core.isolation_3d import 
     camera_floor_geometry,
 )
 from ridgeback_autonomy.perception.target_localization.core.mask import region_from_bbox
+from ridgeback_autonomy.perception.target_localization.core.polar_profiling import (
+    localize_projected_polar_profiling,
+    project_scan_to_image,
+    scan_points_optical,
+)
 from ridgeback_autonomy.perception.target_localization.core.projective_ranging import (
     localize_prepared_projective_ranging,
 )
@@ -77,14 +87,24 @@ from ridgeback_autonomy.perception.target_localization.estimator_registry import
     DEPTH_PATH_ESTIMATORS,
     ESTIMATOR_FIELD_KEYS,
     ESTIMATOR_LABELS,
-    parse_estimators,
 )
 from ridgeback_autonomy.perception.target_localization.measurement_pipeline import (
     set_mask_estimator_status,
 )
 
 
-REPLAY_SCHEMA_VERSION = 1
+# Version 2 adds the LiDAR scan and its scan -> camera extrinsic per event, so
+# polar profiling can be measured from this format too. Version 1 datasets stay
+# readable with the scan simply absent: they are the historical record the
+# depth-path miss reasons were validated against, and rejecting them to gain a
+# channel they never had would trade evidence for capability.
+REPLAY_SCHEMA_VERSION = 2
+REPLAY_SCHEMA_VERSIONS = (1, 2)
+# The first schema version that records a LiDAR scan. Read this rather than
+# comparing against the current version: what decides whether polar profiling is
+# reachable on a dataset is when scan recording began, not what the writer emits
+# today, and those two stop being the same number at version 3.
+REPLAY_SCAN_SCHEMA_VERSION: int | None = 2
 REPLAY_CAPTURE_BATCHES_DEFAULT = 5
 MANIFEST_NAME = 'manifest.json'
 
@@ -161,7 +181,20 @@ class ReplayDatasetWriter:
         arrays: dict[str, np.ndarray] = {}
         payload_events: list[dict] = []
         for event_index, event in enumerate(events):
-            event_metadata = {key: value for key, value in event.items() if key != 'detections'}
+            event_metadata = {
+                key: value for key, value in event.items()
+                if key not in ('detections', 'scan')
+            }
+            # Beams travel as their own array beside the depth ROIs, geometry in
+            # the JSON, exactly as the sensor capture stores them.
+            scan = validate_scan_record(event.get('scan'))
+            event_metadata['scan_key'] = None
+            event_metadata['scan'] = None
+            if scan is not None:
+                event_metadata['scan_key'] = f'scan_{event_index}'
+                arrays[event_metadata['scan_key']] = scan['ranges']
+                event_metadata['scan'] = {
+                    key: value for key, value in scan.items() if key != 'ranges'}
             detections: list[dict] = []
             for detection_index, detection in enumerate(event.get('detections', ())):
                 item = {key: value for key, value in detection.items() if key != 'depth_roi'}
@@ -220,10 +253,10 @@ def load_dataset(path: str | Path) -> ReplayDataset:
             manifest = json.load(handle)
     except (OSError, json.JSONDecodeError) as exc:
         raise ValueError(f'Cannot read replay dataset manifest {manifest_path}: {exc}') from exc
-    if manifest.get('schema_version') != REPLAY_SCHEMA_VERSION:
+    if manifest.get('schema_version') not in REPLAY_SCHEMA_VERSIONS:
         raise ValueError(
             f'Unsupported replay dataset schema {manifest.get("schema_version")!r}; '
-            f'expected {REPLAY_SCHEMA_VERSION}.')
+            f'expected one of {REPLAY_SCHEMA_VERSIONS}.')
     if manifest.get('state') != 'complete':
         raise ValueError(f'Replay dataset is not complete: {root}')
     skipped = manifest.get('trials_skipped', 0)
@@ -250,11 +283,22 @@ def load_trial(dataset: ReplayDataset, entry: dict) -> tuple[dict, list[dict]]:
     try:
         with np.load(path, allow_pickle=False) as payload:
             metadata = json.loads(_scalar_string(payload['metadata_json']))
-            if metadata.get('schema_version') != REPLAY_SCHEMA_VERSION:
+            if metadata.get('schema_version') != dataset.manifest.get('schema_version'):
                 raise ValueError('payload schema version differs from manifest')
             events: list[dict] = []
             for event in metadata['events']:
                 copied = {key: value for key, value in event.items() if key != 'detections'}
+                # A schema-1 dataset has no scan key, and reads back with the
+                # scan explicitly absent rather than failing: every event then
+                # answers "is there a scan" the same way, whether the dataset
+                # predates scan recording or simply missed one.
+                scan_key = copied.pop('scan_key', None)
+                copied['scan'] = (
+                    {
+                        **copied['scan'],
+                        'ranges': np.array(payload[scan_key], dtype=np.float32, copy=True),
+                    }
+                    if scan_key is not None else None)
                 copied_detections = []
                 for detection in event['detections']:
                     copied_detection = dict(detection)
@@ -273,21 +317,59 @@ def _optional_float(arguments: dict[str, str], key: str) -> float | None:
     return float(arguments[key]) if key in arguments else None
 
 
-def _selected_estimators(arguments: dict[str, str]) -> tuple[str, ...]:
-    selected = tuple(
-        estimator for estimator in parse_estimators(arguments.get('estimators'))
-        if estimator in DEPTH_PATH_ESTIMATORS)
-    if not selected:
-        raise ValueError(
-            'Replay requires projective ranging and/or euclidean reconstruction.')
-    return selected
+def replay_scan_points(event: dict):
+    """The stored scan in the camera optical frame, or why it is unusable.
+
+    Mirrors the live ``scan_points_for_batch`` failure split exactly. Collapsing
+    the three cases would make replay report a different miss reason than the
+    run it is supposed to reproduce, which is the one thing a parity check
+    cannot tolerate.
+
+    Shared with the layered path: both formats store the same scan record, so
+    reading it back is one function rather than two that could drift.
+    """
+
+    scan = event.get('scan')
+    if scan is None:
+        return None, MissReason.NO_SCAN
+    rotation = event.get('scan_rotation')
+    translation = event.get('scan_translation')
+    if rotation is None or translation is None:
+        return None, MissReason.TF_MISS_SCAN
+    try:
+        points = scan_points_optical(
+            SimpleNamespace(**scan),
+            np.asarray(rotation, dtype=np.float64),
+            np.asarray(translation, dtype=np.float64),
+        )
+    except ValueError:
+        return None, MissReason.SCAN_INVALID
+    return points, MissReason.OK
+
+
+def polar_isolation_settings(arguments: dict[str, str]) -> dict | None:
+    """Polar's three settings as one mapping, omitting the ones left unset.
+
+    An omitted key falls through to the core default, so a sweep that names only
+    one knob does not silently re-state the other two.
+    """
+
+    settings = {
+        'range_jump_m': _optional_float(arguments, 'polar_range_jump_m'),
+        'range_band_m': _optional_float(arguments, 'polar_range_band_m'),
+        'min_valid_rays': (
+            int(arguments['polar_min_valid_rays'])
+            if 'polar_min_valid_rays' in arguments else None),
+    }
+    chosen = {key: value for key, value in settings.items() if value is not None}
+    return chosen or None
 
 
 def _event_from_payload(
     event: dict,
     arguments: dict[str, str],
-) -> tuple[ReplayMeasurementEvent, tuple[str, ...]]:
-    selected = _selected_estimators(arguments)
+    selected: tuple[str, ...],
+) -> ReplayMeasurementEvent:
     detections: list[Detection] = []
     width = int(event['image_width'])
     height = int(event['image_height'])
@@ -331,6 +413,20 @@ def _event_from_payload(
             min_bin_fraction=_optional_float(arguments, 'isolation_3d_min_bin_fraction'),
         )
     min_valid_pixels = int(arguments.get('min_valid_pixels', '10'))
+    # Projected once per event and only when polar was selected, the way the
+    # live kernel does it: the transform is per-event work a depth-only variant
+    # would pay for and never read.
+    wants_polar = 'polar_profiling' in selected
+    scan_points, scan_reason = (
+        replay_scan_points(event) if wants_polar else (None, MissReason.NO_SCAN))
+    polar_isolation = polar_isolation_settings(arguments)
+    scan_projection = None
+    # The depth ROI gates the estimators that read depth, and only those. Polar
+    # profiling measures off the scan, so an event that never matched a depth
+    # frame must not take it down with them -- that is how the live run behaves,
+    # and replay that differed here would misreport coverage.
+    depth_selected = tuple(
+        estimator for estimator in selected if estimator in DEPTH_PATH_ESTIMATORS)
     for payload_detection in event['detections']:
         detection = Detection(
             bbox_xyxy=tuple(int(value) for value in payload_detection['bbox_xyxy']),
@@ -345,29 +441,54 @@ def _event_from_payload(
             set_mask_estimator_status(detection, MissReason.GRID_MISMATCH, selected)
         elif rotation is None or translation is None:
             set_mask_estimator_status(detection, MissReason.TF_MISS_EXTRINSIC, selected)
-        elif payload_detection.get('depth_roi') is None:
-            set_mask_estimator_status(detection, MissReason.NO_DEPTH_FRAME, selected)
         else:
             region = region_from_bbox(detection.bbox_xyxy, height, width)
-            roi_depth = np.asarray(payload_detection['depth_roi'], dtype=np.float32)
-            if roi_depth.shape != region.roi_shape:
-                raise ValueError(
-                    f'Depth ROI shape {roi_depth.shape} does not match box region {region.roi_shape}.')
-            # Euclidean reconstruction deprojects with full-grid indices against
-            # the original colour intrinsics, so the stored window is placed
-            # back at its own origin on an empty frame. Nothing outside the
-            # window is ever addressed: every index comes from the region.
-            depth_full = np.zeros((height, width), dtype=np.float32)
-            depth_full[region.origin_v:region.origin_v + region.roi_shape[0],
-                       region.origin_u:region.origin_u + region.roi_shape[1]] = roi_depth
-            prepared = PreparedDepthRegion(
-                region=region,
-                depth_full=depth_full,
-                roi_depth=roi_depth,
-                valid_masked=region.data & valid_depth(roi_depth, effective_depth_max),
-            )
             front_offset = float(event.get('front_offset_m', ROBOT_FRONT_OFFSET_M))
-            if 'projective_ranging' in selected:
+            prepared = None
+            if payload_detection.get('depth_roi') is None:
+                set_mask_estimator_status(
+                    detection, MissReason.NO_DEPTH_FRAME, depth_selected)
+            else:
+                roi_depth = np.asarray(payload_detection['depth_roi'], dtype=np.float32)
+                if roi_depth.shape != region.roi_shape:
+                    raise ValueError(
+                        f'Depth ROI shape {roi_depth.shape} does not match box region {region.roi_shape}.')
+                # Euclidean reconstruction deprojects with full-grid indices against
+                # the original colour intrinsics, so the stored window is placed
+                # back at its own origin on an empty frame. Nothing outside the
+                # window is ever addressed: every index comes from the region.
+                depth_full = np.zeros((height, width), dtype=np.float32)
+                depth_full[region.origin_v:region.origin_v + region.roi_shape[0],
+                           region.origin_u:region.origin_u + region.roi_shape[1]] = roi_depth
+                prepared = PreparedDepthRegion(
+                    region=region,
+                    depth_full=depth_full,
+                    roi_depth=roi_depth,
+                    valid_masked=region.data & valid_depth(roi_depth, effective_depth_max),
+                )
+            if wants_polar and scan_points is None:
+                detection.polar_profiling_status = int(scan_reason)
+            elif wants_polar:
+                points_optical, valid = scan_points
+                if scan_projection is None:
+                    scan_projection = project_scan_to_image(
+                        points_optical, valid, intrinsics)
+                attempt = localize_projected_polar_profiling(
+                    scan_projection, region, **(polar_isolation or {}))
+                detection.polar_profiling_status = int(attempt.reason)
+                if attempt.result is not None:
+                    # Polar profiling recovers optical X/Z only. Optical Y is
+                    # unobservable and substituted with zero before the full
+                    # camera-to-base extrinsic is applied.
+                    x_optical, z_optical = (
+                        float(value) for value in attempt.result.xz_optical)
+                    (
+                        detection.polar_profiling_lateral_m,
+                        detection.polar_profiling_forward_m,
+                        detection.polar_profiling_distance_m,
+                    ) = optical_to_base_planar(
+                        (x_optical, 0.0, z_optical), rotation, translation, front_offset)
+            if prepared is not None and 'projective_ranging' in selected:
                 result, reason = localize_prepared_projective_ranging(
                     prepared, intrinsics, isolation=isolation,
                     min_valid_pixels=min_valid_pixels)
@@ -379,7 +500,7 @@ def _event_from_payload(
                         detection.projective_ranging_distance_m,
                     ) = optical_to_base_planar(
                         result.xyz_optical, rotation, translation, front_offset)
-            if 'euclidean_reconstruction' in selected:
+            if prepared is not None and 'euclidean_reconstruction' in selected:
                 result, reason = localize_prepared_euclidean_reconstruction(
                     prepared, intrinsics, isolation=isolation_3d,
                     min_valid_points=min_valid_pixels)
@@ -409,14 +530,19 @@ def _event_from_payload(
         image_height=height,
         detections=detections,
         estimates=estimates,
-    ), selected
+    )
 
 
-def evaluate_trial(trial: dict, events: list[dict], arguments: dict[str, str]) -> dict:
-    converted = [_event_from_payload(event, arguments) for event in events]
-    selected = converted[0][1] if converted else _selected_estimators(arguments)
+def evaluate_trial(
+    trial: dict,
+    events: list[dict],
+    arguments: dict[str, str],
+    selected: tuple[str, ...],
+) -> dict:
+    converted = [
+        _event_from_payload(event, arguments, selected) for event in events]
     measurement_events = {
-        (index, item[0].stamp_ns): item[0]
+        (index, item.stamp_ns): item
         for index, item in enumerate(converted)
     }
     capture = summarize_capture_events(measurement_events, selected)
@@ -448,15 +574,15 @@ def evaluate_trial(trial: dict, events: list[dict], arguments: dict[str, str]) -
     return result
 
 
-def _evaluate_entry(task: tuple[str, dict, dict, tuple[tuple[str, dict[str, str]], ...]]) -> dict[str, dict]:
+def _evaluate_entry(task) -> dict[str, dict]:
     """Worker boundary: load one payload, then keep its ROIs hot for all variants."""
 
     root, manifest, entry, variants = task
     dataset = ReplayDataset(root=Path(root), manifest=manifest)
     trial, events = load_trial(dataset, entry)
     return {
-        name: evaluate_trial(trial, events, arguments)
-        for name, arguments in variants
+        name: evaluate_trial(trial, events, arguments, selected)
+        for name, arguments, selected in variants
     }
 
 
@@ -468,9 +594,12 @@ def evaluate_dataset(
 ) -> dict[str, dict]:
     """Evaluate every variant over every trial, in deterministic input order."""
 
+    # One rule for the whole dataset, so every variant and every worker agrees
+    # about what this evidence can answer.
+    unavailable = unavailable_estimators(dataset)
     collected = {}
     for variant in variants:
-        selected = _selected_estimators(variant.arguments)
+        selected, dropped = select_replay_estimators(variant.arguments, unavailable)
         collected[variant.name] = {
             'rows': {estimator: [] for estimator in selected},
             'outcome_counts': {
@@ -481,8 +610,14 @@ def evaluate_dataset(
             'extra_count': 0,
             'trial_count': 0,
             'selected_estimators': selected,
+            'dropped_estimators': dropped,
         }
-    encoded_variants = tuple((variant.name, variant.arguments) for variant in variants)
+    # Resolved here rather than inside the worker, so a refusal lands in the
+    # caller's stack rather than a pool subprocess.
+    encoded_variants = tuple(
+        (variant.name, variant.arguments,
+         collected[variant.name]['selected_estimators'])
+        for variant in variants)
     tasks = [
         (str(dataset.root), dataset.manifest, entry, encoded_variants)
         for entry in dataset.trial_entries
@@ -576,6 +711,10 @@ def write_replay_results(
             'dataset_id': dataset.manifest.get('dataset_id'),
             'dataset_content_hash': sha256_file(dataset.root / MANIFEST_NAME),
             'schema_version': REPLAY_SCHEMA_VERSION,
+            # Named with its reason, because a table that simply lacks a row
+            # reads as an estimator that scored nothing rather than one this
+            # evidence could never run.
+            'dropped_estimators': result['dropped_estimators'],
             'evaluation': evaluation_provenance,
             'evaluation_wall_time_sec': evaluation_wall_time_sec,
             'worker_count': worker_count,
@@ -602,6 +741,13 @@ def write_replay_results(
                 'Mode': 'offline replay',
                 'Dataset': str(dataset.manifest.get('dataset_id', 'unknown')),
                 'Scenario': str(dataset.manifest.get('scenario_path', 'frozen inputs')),
+                # Only when something was actually dropped, so the common case
+                # keeps a header that is all load-bearing.
+                **({
+                    'Estimators not run': '; '.join(
+                        f'{ESTIMATOR_LABELS[estimator]} ({reason})'
+                        for estimator, reason in result['dropped_estimators'].items())
+                } if result['dropped_estimators'] else {}),
             },
             parameters=variant.arguments,
         )

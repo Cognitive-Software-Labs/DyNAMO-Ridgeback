@@ -134,6 +134,9 @@ def test_replay_capture_backfills_late_exact_camera_context(monkeypatch) -> None
         replay_tf_buffer=object(),
         base_frame='base_link',
         replay_last_fallback_frame=None,
+        # Legacy V1 capture: no scan is recorded, so the camera context is the
+        # whole of this event's backfill.
+        sensor_scan_buffer=None,
         get_logger=lambda: SimpleNamespace(
             warn=lambda _message: None,
             warning=lambda _message: None,
