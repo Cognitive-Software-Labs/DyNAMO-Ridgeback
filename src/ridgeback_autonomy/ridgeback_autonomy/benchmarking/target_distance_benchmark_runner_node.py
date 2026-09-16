@@ -492,9 +492,11 @@ class TargetDistanceBenchmarkRunner(Node):
                 self.on_replay_camera_info,
                 qos_profile_sensor_data,
             )
-        # Only the sensor capture can hold a scan: the legacy V1 dataset stores
-        # depth ROIs against a fixed schema, and a scan has nowhere to go in it.
-        if self.sensor_writer is not None:
+        # Both capture formats carry a scan now: the sensor capture from payload
+        # version 2, the legacy dataset from schema version 2. Gated on capture
+        # at all rather than on which writer, since neither can record beams it
+        # never subscribed to.
+        if self.capture_artifact_enabled():
             self.sensor_scan_buffer = StampedMessageBuffer(SCAN_MATCH_BUFFER_DEPTH)
             self.create_subscription(
                 LaserScan,
@@ -614,18 +616,20 @@ class TargetDistanceBenchmarkRunner(Node):
             'front_offset_m': ROBOT_FRONT_OFFSET_M,
             # Stereo depth has no source-defined finite usable ceiling.
             'depth_usable_max_m': None,
+            # Polar profiling's inputs: the scan itself, and the extrinsic that
+            # puts its beams in the frame the masks live in. Separate keys for
+            # the same reason the camera's are separate from its intrinsics --
+            # either can arrive without the other. Common to both writers: the
+            # scan is a per-event channel, and neither format's other evidence
+            # decides whether beams arrived.
+            'scan': None,
+            'scan_rotation': None,
+            'scan_translation': None,
             'detections': [],
         }
         if getattr(self, 'sensor_writer', None) is not None:
             event['rgb'] = None
             event['depth_m'] = None
-            # Polar profiling's inputs: the scan itself, and the extrinsic that
-            # puts its beams in the frame the masks live in. Separate keys for
-            # the same reason the camera's are separate from its intrinsics --
-            # either can arrive without the other.
-            event['scan'] = None
-            event['scan_rotation'] = None
-            event['scan_translation'] = None
             event['base_above_floor_m'] = BASE_ABOVE_FLOOR_M_DEFAULT
             event['detections'] = [
                 {

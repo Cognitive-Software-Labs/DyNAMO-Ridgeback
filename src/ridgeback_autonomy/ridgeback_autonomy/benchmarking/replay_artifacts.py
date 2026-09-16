@@ -24,6 +24,9 @@ from ridgeback_autonomy.perception.target_localization.core.mask import (
     MaskPrecision,
     MaskRegion,
 )
+from ridgeback_autonomy.perception.target_localization.estimator_registry import (
+    parse_estimators,
+)
 
 
 FORMAT_NAME = 'dynamo-replay'
@@ -38,6 +41,11 @@ MASK_CACHE_KIND = 'mask-cache'
 # derived from it.
 SENSOR_PAYLOAD_VERSION = 2
 SENSOR_PAYLOAD_VERSIONS = (1, 2)
+# The first payload version that can carry a scan at all. Read this rather than
+# comparing against the current version: what decides whether polar profiling is
+# reachable on a capture is when scan recording began, not what the writer emits
+# today, and those two stop being the same number at version 3.
+SENSOR_SCAN_PAYLOAD_VERSION = 2
 MASK_PAYLOAD_VERSION = 1
 
 # The ``sensor_msgs/LaserScan`` geometry a stored scan must carry. ``ranges``
@@ -265,8 +273,13 @@ class _ArtifactWriter:
             shutil.rmtree(self.temporary_root)
 
 
-def _validate_sensor_scan(scan: dict | None) -> dict | None:
+def validate_scan_record(scan: dict | None) -> dict | None:
     """Normalize one event's scan record, or ``None`` when no scan was captured.
+
+    Shared by both evidence formats. The scan contract is a property of what a
+    ``LaserScan`` must carry to be replayable, not of the file it ends up in, so
+    the sensor capture and the legacy dataset check it with the same function
+    rather than drifting apart on which fields are required.
 
     Shape-checked the way RGB and depth are, and for the same reason: beam
     position encodes bearing order, which the run segmentation depends on, so a
@@ -325,7 +338,7 @@ def _validate_sensor_event(
         if depth.dtype != np.float32 or depth.shape != (height, width):
             raise ValueError(
                 f'Depth must be float32 {(height, width)}; got {depth.dtype} {depth.shape}.')
-    return rgb, depth, _validate_sensor_scan(event.get('scan'))
+    return rgb, depth, validate_scan_record(event.get('scan'))
 
 
 class SensorCaptureWriter(_ArtifactWriter):
@@ -477,7 +490,12 @@ def load_replay_input(
 
     root = Path(path).expanduser().resolve()
     manifest, manifest_path = _read_manifest(root)
-    if manifest.get('schema_version') == 1 and 'format' not in manifest:
+    # Which FORMAT this is, not which version of it. A legacy manifest is the
+    # one carrying a bare ``schema_version``; whether that version is readable is
+    # the legacy loader's own question, and answering it here would have to be
+    # restated every time that format gains a version -- and would report an
+    # unsupported one as an unknown kind.
+    if 'format' not in manifest and manifest.get('schema_version') is not None:
         from ridgeback_autonomy.benchmarking.replay import load_dataset
         return load_dataset(root)
     if manifest.get('format') == FORMAT_NAME:
@@ -642,6 +660,83 @@ def load_mask_trial(
     except (OSError, KeyError, ValueError, json.JSONDecodeError) as exc:
         raise ValueError(f'Cannot read mask-cache payload {path}: {exc}') from exc
     return events
+
+
+def unavailable_estimators(evidence) -> dict[str, str]:
+    """Which estimators this evidence cannot feed at all, and why.
+
+    The test is about the ARTIFACT, not one event. An event whose scan or depth
+    frame is missing is a miss the estimator reports for itself, and that frame
+    stays in the tables saying so. This is the other case: the evidence holds no
+    such channel anywhere, so every frame would carry the same miss and the row
+    would describe the capture rather than the estimator.
+
+    The reason travels with the drop because an absent row is indistinguishable
+    from an estimator that simply scored nothing.
+
+    One rule for both evidence formats, keyed on the version at which each began
+    recording a scan. The legacy dataset and the sensor capture answer this
+    differently today and will keep doing so; what must not differ is HOW they
+    answer, because the GUI, the layered path, and the legacy path all read it.
+    """
+
+    if isinstance(evidence, ReplayArtifact):
+        if evidence.kind != SENSOR_CAPTURE_KIND:
+            raise ValueError(
+                'Estimator availability is a question about capture evidence, '
+                f'not a {evidence.kind!r} artifact.')
+        format_name, version_label = 'sensor capture', 'payload version'
+        version = evidence.payload_version
+        first_scan_version = SENSOR_SCAN_PAYLOAD_VERSION
+        unavailable = {'pointcloud': (
+            'a sensor capture freezes aligned depth and the scan; the organized '
+            'point cloud this estimator reads is never recorded')}
+    else:
+        # Imported inside, exactly as ``load_replay_input`` does it: the legacy
+        # module is the heavy one and it reads this module, not the reverse.
+        from ridgeback_autonomy.benchmarking.replay import REPLAY_SCAN_SCHEMA_VERSION
+        format_name, version_label = 'legacy measurement dataset', 'schema version'
+        version = int(evidence.manifest.get('schema_version', 0))
+        first_scan_version = REPLAY_SCAN_SCHEMA_VERSION
+        unavailable = {'pointcloud': (
+            'a legacy measurement dataset freezes one depth ROI per detection; '
+            'the organized point cloud this estimator reads is never recorded')}
+    if first_scan_version is None:
+        unavailable['polar_profiling'] = (
+            f'no {version_label} of the {format_name} format records a LiDAR '
+            'scan, so polar profiling has no beams to segment')
+    elif version < first_scan_version:
+        unavailable['polar_profiling'] = (
+            f'this {format_name} is {version_label} {version}, written before '
+            'the LiDAR scan was recorded')
+    return unavailable
+
+
+def select_replay_estimators(
+    arguments: dict[str, str],
+    unavailable: dict[str, str],
+) -> tuple[tuple[str, ...], dict[str, str]]:
+    """Split the requested estimators into the runnable ones and the refusals.
+
+    Refusing outright when nothing survives is the point: an evaluation that
+    quietly kept going would write a complete-looking run with every requested
+    estimator missing from every table, which reads as "measured and found
+    nothing" rather than "never ran".
+    """
+
+    requested = parse_estimators(arguments.get('estimators'))
+    selected = tuple(
+        estimator for estimator in requested if estimator not in unavailable)
+    dropped = {
+        estimator: unavailable[estimator]
+        for estimator in requested if estimator in unavailable
+    }
+    if not selected:
+        detail = '; '.join(
+            f'{estimator}: {reason}' for estimator, reason in dropped.items())
+        raise ValueError(
+            f'This evidence can evaluate none of the requested estimators. {detail}')
+    return selected, dropped
 
 
 def trial_entry_map(artifact: ReplayArtifact) -> dict[str, dict]:

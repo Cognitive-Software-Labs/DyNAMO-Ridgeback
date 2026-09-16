@@ -11,7 +11,15 @@ import numpy as np
 import pytest
 import yaml
 
-from ridgeback_autonomy.benchmarking.layered_replay import evaluate_sensor_capture
+from ridgeback_autonomy.benchmarking.layered_replay import (
+    evaluate_sensor_capture,
+    write_layered_results,
+)
+from ridgeback_autonomy.benchmarking.replay import replay_scan_points
+from ridgeback_autonomy.common.miss_reason import MissReason
+from ridgeback_autonomy.perception.target_localization.core.polar_profiling import (
+    scan_points_optical,
+)
 from ridgeback_autonomy.benchmarking.replay_artifacts import (
     MASK_STATUS_EMPTY_SEGMENTATION,
     MASK_STATUS_OK,
@@ -28,7 +36,10 @@ from ridgeback_autonomy.benchmarking.replay_artifacts import (
     sha256_file,
 )
 from ridgeback_autonomy.benchmarking.replay_jobs import parse_job
-from ridgeback_autonomy.benchmarking.replay import ReplayDatasetWriter
+from ridgeback_autonomy.benchmarking.replay import (
+    REPLAY_SCHEMA_VERSION,
+    ReplayDatasetWriter,
+)
 from ridgeback_autonomy.benchmarking.replay_materialization import (
     materialize_masks,
     materializer_producer_document,
@@ -71,12 +82,32 @@ def _trial(trial_id='trial'):
     }
 
 
-def _scan(stamp_ns=120, beams=9):
+# Scan frame (x forward, y left, z up) into the camera optical frame
+# (X right, Y down, Z forward), with the two origins coincident.
+SCAN_TO_OPTICAL = [
+    [0.0, -1.0, 0.0],
+    [0.0, 0.0, -1.0],
+    [1.0, 0.0, 0.0],
+]
+
+
+def _scan(stamp_ns=120):
+    """A scan carrying a target at 2 m against a wall, across the detection box.
+
+    Under SCAN_TO_OPTICAL a beam at bearing t lands on image column
+    ``40 - 100*tan(t)`` and row 30, so bearings within +-0.09 rad fall inside the
+    [30, 50) x [20, 40) box and everything else is background. The 2.0 m / 6.0 m
+    split is the separation ``range_jump_m`` and ``range_band_m`` act on; without
+    one there is nothing for the segmentation to do and the test would pass on
+    an estimator that never ran it.
+    """
+
+    bearings = -0.2 + np.arange(21) * 0.02
     return {
-        'ranges': np.linspace(1.5, 3.5, beams, dtype=np.float32),
-        'angle_min': -0.8,
-        'angle_max': 0.8,
-        'angle_increment': 1.6 / (beams - 1),
+        'ranges': np.where(np.abs(bearings) <= 0.09, 2.0, 6.0).astype(np.float32),
+        'angle_min': -0.2,
+        'angle_max': 0.2,
+        'angle_increment': 0.02,
         'range_min': 0.15,
         'range_max': 12.0,
         'frame_id': 'lidar2d_0',
@@ -117,12 +148,8 @@ def _event(*, rgb=True, depth=True, detected=True, scan=False):
     }
     if scan:
         event['scan'] = _scan()
-        event['scan_rotation'] = [
-            [1.0, 0.0, 0.0],
-            [0.0, 1.0, 0.0],
-            [0.0, 0.0, 1.0],
-        ]
-        event['scan_translation'] = [0.0, -0.12, 0.34]
+        event['scan_rotation'] = SCAN_TO_OPTICAL
+        event['scan_translation'] = [0.0, 0.0, 0.0]
     return event
 
 
@@ -305,6 +332,119 @@ def test_payload_version_1_capture_still_loads_and_runs_the_depth_path(tmp_path)
     assert result['baseline']['rows']['projective_ranging'][0]['outcome'] == 'scored'
 
 
+def _box_cache(sensor, root):
+    return materialize_masks(
+        sensor, root, producer='box',
+        code_provenance={'commit': 'abc', 'dirty_count': 0})
+
+
+def test_stored_scan_reprojects_bit_identically_to_the_live_message(tmp_path):
+    """The capture is lossless for polar's inputs, which is what replay adds.
+
+    The estimator math is shared with the live node, so the only thing offline
+    polar can get wrong that live polar cannot is the evidence it starts from.
+    """
+
+    live = SimpleNamespace(**_scan())
+    expected_points, expected_valid = scan_points_optical(
+        live,
+        np.array(SCAN_TO_OPTICAL, dtype=np.float64),
+        np.zeros(3, dtype=np.float64),
+    )
+    sensor = _sensor(tmp_path, events=[_event(scan=True)])
+
+    _trial_data, loaded = load_sensor_trial(sensor, sensor.trial_entries[0])
+    replayed, reason = replay_scan_points(loaded[0])
+
+    assert reason is MissReason.OK
+    assert replayed[0].tobytes() == expected_points.tobytes()
+    assert np.array_equal(replayed[1], expected_valid)
+
+
+def test_polar_profiling_is_measured_from_the_captured_scan(tmp_path):
+    sensor = _sensor(tmp_path, events=[_event(scan=True)])
+    box = _box_cache(sensor, tmp_path / 'box')
+
+    _expanded, result = evaluate_sensor_capture(
+        sensor, (box,),
+        (_variant('polar', 'projective_ranging,polar_profiling'),))
+
+    polar = result['polar']
+    assert polar['selected_estimators'] == ('projective_ranging', 'polar_profiling')
+    assert polar['dropped_estimators'] == {}
+    row = polar['rows']['polar_profiling'][0]
+    assert row['outcome'] == 'scored'
+    # The target beams sit at 2.0 m and the robot front is 0.25 m ahead of the
+    # camera, so polar and the depth rows converge on the same 1.75 m truth.
+    assert row['trial_estimate_m'] == pytest.approx(1.75, abs=0.05)
+    assert polar['rows']['projective_ranging'][0]['outcome'] == 'scored'
+
+
+def test_one_event_without_a_scan_is_a_miss_reason_not_a_missing_row(tmp_path):
+    sensor = _sensor(tmp_path, events=[_event(scan=True), _event()])
+    box = _box_cache(sensor, tmp_path / 'box')
+
+    _expanded, result = evaluate_sensor_capture(
+        sensor, (box,), (_variant('polar', 'polar_profiling'),))
+
+    histogram = result['polar']['status_histogram']['polar_profiling']
+    assert histogram[int(MissReason.NO_SCAN)] == 1
+    assert histogram[int(MissReason.OK)] == 1
+    # The estimator still has a row: it measured what it could, and said why it
+    # could not measure the rest.
+    assert result['polar']['dropped_estimators'] == {}
+    assert result['polar']['rows']['polar_profiling'][0]['outcome'] == 'scored'
+
+
+def test_evidence_that_cannot_feed_an_estimator_drops_it_with_a_reason(tmp_path):
+    _downgrade_to_payload_v1(_sensor(tmp_path, events=[_event(scan=True)]))
+    legacy = load_artifact(tmp_path / 'sensor', require_parent=False)
+    box = _box_cache(legacy, tmp_path / 'box')
+
+    _expanded, result = evaluate_sensor_capture(
+        legacy, (box,),
+        (_variant('mixed', 'pointcloud,projective_ranging,polar_profiling'),))
+
+    dropped = result['mixed']['dropped_estimators']
+    assert result['mixed']['selected_estimators'] == ('projective_ranging',)
+    assert 'payload version 1' in dropped['polar_profiling']
+    assert 'point cloud' in dropped['pointcloud']
+    assert result['mixed']['rows']['projective_ranging'][0]['outcome'] == 'scored'
+
+    # Nothing left to run is refused rather than written as a clean empty run.
+    with pytest.raises(ValueError, match='can evaluate none of the requested'):
+        evaluate_sensor_capture(
+            legacy, (box,), (_variant('only', 'polar_profiling'),))
+
+
+def test_dropped_estimators_are_written_into_run_json_and_the_summary(tmp_path):
+    sensor = _sensor(tmp_path, events=[_event(scan=True)])
+    box = _box_cache(sensor, tmp_path / 'box')
+    variants = (_variant('mixed', 'pointcloud,polar_profiling'),)
+    expanded, results = evaluate_sensor_capture(sensor, (box,), variants)
+
+    write_layered_results(
+        tmp_path / 'results', sensor, (box,), expanded, results,
+        baseline_name='mixed',
+        profile={
+            'id': 'mask-output', 'supported_claims': ['accuracy'],
+            'limitations': ['offline'],
+        },
+        evaluation_provenance={'commit': 'abc', 'branch': 'main', 'dirty_count': 0},
+        worker_count=1,
+        evaluation_wall_time_sec=0.5,
+        sweep_name='paired',
+        sweep_description='',
+    )
+
+    document = json.loads((tmp_path / 'results/mixed/run.json').read_text())
+    summary = (tmp_path / 'results/mixed/summary.md').read_text()
+    assert document['replay']['sensor_capture']['payload_version'] == 2
+    assert 'point cloud' in document['replay']['dropped_estimators']['pointcloud']
+    assert 'Point Cloud' in summary
+    assert 'Estimators not run' in summary
+
+
 def test_manifest_dispatcher_keeps_legacy_measurement_inputs_loadable(tmp_path):
     writer = ReplayDatasetWriter(tmp_path / 'legacy', {'dataset_id': 'legacy'})
     writer.write_trial(_trial(), [{
@@ -315,7 +455,50 @@ def test_manifest_dispatcher_keeps_legacy_measurement_inputs_loadable(tmp_path):
 
     loaded = load_replay_input(tmp_path / 'legacy')
 
-    assert loaded.manifest['schema_version'] == 1
+    # Dispatched on the format -- a bare schema_version and no typed envelope --
+    # rather than on one readable version of it, so the legacy format can take a
+    # version without the dispatcher reporting it as an unknown kind.
+    assert loaded.manifest['schema_version'] == REPLAY_SCHEMA_VERSION
+
+
+def test_the_runner_attaches_a_scan_whichever_capture_format_is_writing():
+    """Both writers subscribe, so the scan is attached on the shared path.
+
+    The attach and extrinsic backfill are format-agnostic already; what would
+    silently make the legacy dataset scan-less is the buffer never being built,
+    or the event carrying no scan keys to fill.
+    """
+
+    from ridgeback_autonomy.benchmarking.target_distance_benchmark_runner_node import (
+        TargetDistanceBenchmarkRunner,
+    )
+
+    scan_msg = SimpleNamespace(
+        ranges=[2.0, 2.0, 2.0],
+        angle_min=-0.1, angle_max=0.1, angle_increment=0.1,
+        range_min=0.15, range_max=12.0,
+        header=SimpleNamespace(
+            frame_id='lidar2d_0', stamp=SimpleNamespace(sec=0, nanosec=123)),
+    )
+    event = {'stamp_ns': 123, 'scan': None,
+             'scan_rotation': None, 'scan_translation': None}
+    runner = SimpleNamespace(
+        # The legacy writer, which before schema 2 never built a scan buffer.
+        sensor_writer=None,
+        replay_writer=object(),
+        sensor_scan_buffer=SimpleNamespace(
+            lookup_nearest=lambda _stamp, _tolerance: scan_msg),
+        scan_match_tolerance_s=0.05,
+        replay_tf_buffer=None,
+    )
+    runner.backfill_replay_scan_extrinsic = (
+        lambda event: TargetDistanceBenchmarkRunner.backfill_replay_scan_extrinsic(
+            runner, event))
+
+    TargetDistanceBenchmarkRunner.attach_replay_scan(runner, event)
+
+    assert event['scan']['frame_id'] == 'lidar2d_0'
+    assert list(event['scan']['ranges']) == [2.0, 2.0, 2.0]
 
 
 def test_runner_sensor_mode_keeps_full_depth_and_waits_for_exact_rgb():

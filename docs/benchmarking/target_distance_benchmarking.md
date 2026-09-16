@@ -301,7 +301,8 @@ configurator. Invalid upstream knobs use structured errors; for example,
 `segmentation_model` under `mask-output` recommends `mask-model`.
 
 The offline artifact graph uses a version-2 typed envelope while the compact
-`schema_version: 1` dataset continues to load unchanged:
+legacy dataset keeps its own schema; historical `schema_version: 1` files
+continue to load unchanged:
 
 ```text
 sensor-capture (exact detections + RGB + depth + LiDAR scan + calibration + TF)
@@ -328,8 +329,9 @@ float32 `ranges` as its own payload array, the beam geometry and source frame
 beside it, and the scan→camera-optical rotation and translation resolved at the
 event stamp. A version-1 capture has no scan and still loads; an event that
 never matched a scan keeps explicit `null` the same way a missing RGB frame
-does. Nothing offline consumes the scan yet — capturing it is what makes an
-offline polar row possible later, not what delivers one.
+does. Layered replay projects that scan through the same `scan_points_optical`
+the live row uses, so `polar_profiling` is measurable offline on a version-2
+capture.
 
 In the 109-trial `sensor_capture_full_benchmark` capture, 526 of 545 events
 (96.5%) carried both a scan and its extrinsics, against 86.4% for exact RGB and
@@ -349,11 +351,36 @@ may name several materializations. Its default is one model worker, and parallel
 model workers require distinct explicit devices so a parameter grid cannot load
 many copies onto one GPU accidentally.
 
+Legacy schema version 2 adds the same scan to that format, stored the same way:
+float32 `ranges` as its own payload array beside the depth ROIs, beam geometry
+and source frame in the JSON, and the scan→camera-optical rotation and
+translation at the event stamp. One benchmark run therefore records beams into
+whichever format it is writing. A schema-1 dataset has no scan and still loads —
+it is the historical record the depth-path miss reasons were validated against.
+
+Which estimators an offline job may select is two questions, not one. The
+profile answers for its executor: every offline profile now runs all three mask
+rows, since both frozen formats record a scan, and only the live system reads
+the organized point cloud. The artifact then answers for its own channels,
+through `unavailable_estimators`, keyed on the version at which each format
+began recording a scan — a payload-version-1 capture and a schema-version-1
+dataset both refuse polar profiling because they predate it. Both refusals carry
+their reason. An estimator is never dropped silently: a job selecting one the
+evidence cannot feed is refused before the run, and an estimator dropped from a
+variant is named with its reason in `run.json` and in the summary, because a
+table that simply lacks a row reads as one that scored nothing.
+
+Polar profiling reads the scan, not depth, so an event whose depth frame never
+arrived still yields a polar row while the depth rows record `NO_DEPTH_FRAME` —
+the same split the live kernel makes. On the legacy dataset its mask is always
+the frozen detection box, because that format stores no RGB to re-segment.
+
 `target_replay_benchmark` validates a job and all lineage before work. CPU
 workers load one trial plus its selected caches and evaluate every compatible
-projective/Euclidean numeric variant while the arrays are resident. Both depth
-rows call the live `fill_path_measurements` kernel and therefore share one
-prepared depth region per detection. Process-map ordering plus ordered reduction
+numeric variant while the arrays are resident. Both depth rows call the live
+`fill_path_measurements` kernel and therefore share one prepared depth region
+per detection; polar profiling enters the same kernel with the stored scan and
+is projected only when it was selected. Process-map ordering plus ordered reduction
 makes sequential and parallel result rows byte-stable. Offline jobs accept only
 the selected profile's axes in both sweep defaults and individual configs; use
 a replay-specific sweep rather than carrying ignored live-only defaults into a
