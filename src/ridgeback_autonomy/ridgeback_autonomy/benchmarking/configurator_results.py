@@ -21,7 +21,12 @@ from ridgeback_autonomy.benchmarking.paths import (
     anchored_path,
     write_json_atomic,
 )
-from ridgeback_autonomy.benchmarking.replay_artifacts import ReplayArtifact, load_replay_input
+from ridgeback_autonomy.benchmarking.replay_artifacts import (
+    SENSOR_CAPTURE_KIND,
+    ReplayArtifact,
+    load_replay_input,
+    unavailable_estimators,
+)
 
 
 KIND_SWEEP = 'sweep'
@@ -113,7 +118,14 @@ def _trial_summary(path: Path) -> dict:
 
 
 def artifact_summary(value) -> dict:
-    """The operator-facing shape of one typed artifact or legacy dataset."""
+    """The operator-facing shape of one typed artifact or legacy dataset.
+
+    Measurement evidence carries what it cannot feed, because two files of the
+    same kind differ there: a capture written before scan recording offers no
+    polar row, and an unexplained missing option is indistinguishable from a
+    bug. A mask cache is not measurement evidence -- its parent capture answers
+    for it -- so it carries no such list rather than an empty one.
+    """
 
     if isinstance(value, ReplayArtifact):
         trials = value.trial_entries
@@ -123,12 +135,16 @@ def artifact_summary(value) -> dict:
             'events': sum(int(item.get('event_count', 0)) for item in trials),
             'detections': sum(int(item.get('detection_count', 0)) for item in trials),
             'manifest_version': value.manifest.get('manifest_version'),
+            'payload_version': value.payload_version,
+            **({'unavailable_estimators': unavailable_estimators(value)}
+               if value.kind == SENSOR_CAPTURE_KIND else {}),
         }
     trials = value.trial_entries
     return {
         'path': str(value.root), 'kind': 'legacy-measurement', 'state': value.manifest.get('state'),
         'trials': len(trials), 'events': sum(int(item.get('event_count', 0)) for item in trials),
         'schema_version': value.manifest.get('schema_version'),
+        'unavailable_estimators': unavailable_estimators(value),
     }
 
 

@@ -2,6 +2,13 @@
   const token = new URLSearchParams(location.search).get('token');
   const stateKey = 'ridgeback-benchmark-configurator-v1';
   let caps, result, draft;
+  // What the loaded evidence cannot feed, keyed by estimator, with the reason.
+  // Read out of the validation response rather than fetched separately: the
+  // server already inspects these artifacts to validate the job, and a second
+  // request could narrow the menu for a different file than the one being
+  // validated. Empty until evidence is named, and for the live profile, which
+  // reads no artifact at all.
+  let evidence = {};
   const $ = id => document.getElementById(id);
   const api = async (path, body) => {
     const response = await fetch(path, {method: body ? 'POST' : 'GET', headers: {'X-Configurator-Token': token, ...(body ? {'Content-Type':'application/json'} : {})}, body: body ? JSON.stringify(body) : undefined});
@@ -23,7 +30,14 @@
     const selected = key => String(args[key] ?? axes.find(item => item.key === key)?.default ?? '');
     // "estimators" is a comma-joined list, and a recipe-scoped field names the
     // values of one recipe axis, so both are tested as set membership.
-    const estimators = new Set(selected('estimators').split(',').map(item => item.trim()).filter(Boolean));
+    //
+    // An estimator this evidence cannot feed is dropped from the set before the
+    // test, so its settings disappear the same way an unselected estimator's
+    // do. A knob is offered only where it would change a number: on a capture
+    // that predates scan recording, a polar band is as inert as it is on a
+    // variant that never selected polar.
+    const estimators = new Set(selected('estimators').split(',').map(item => item.trim())
+      .filter(item => item && !evidence[item]));
     const choices = new Set(axes.filter(item => item.options?.length).map(item => selected(item.key)));
     return reaches(axis.estimators, estimators) && reaches(axis.recipes, choices);
   };
@@ -34,10 +48,15 @@
     // Naming a sweep or clearing the name switches the panel below between
     // running that file and authoring one, so it redraws on this keystroke.
     if(key==='sweep_path')renderVariants();save();validate();});document.querySelectorAll('[data-materialization]').forEach(i=>i.oninput=()=>{const m=draft.materializations?.[0]||{};m[i.dataset.materialization]=i.value;draft.materializations=[m];save();validate();}); }
+  // An estimator this evidence cannot feed is not offered. It is not removed
+  // from a draft that already names one: the server refuses that with the
+  // reason, and dropping it here would be exactly the silent omission the
+  // refusal exists to prevent.
+  const offered = axis => axis.key==='estimators'?axis.options.filter(item=>!evidence[item]):axis.options;
   // A job may hold several estimators on one axis, which no dropdown can show.
   // That value keeps its own option until the operator picks a single one, so
   // an imported sweep is displayed as written rather than quietly truncated.
-  const options = (axis,value) => axis.options.includes(String(value))?axis.options:[...axis.options,String(value)];
+  const options = (axis,value) => {const list=offered(axis);return list.includes(String(value))?list:[...list,String(value)];};
   function inputFor(axis,value,index){ const data=index==='materialization'?`data-materialization="${axis.key}"`:index==='sweep-default'?`data-sweep-default="${axis.key}"`:`data-axis="${axis.key}" data-index="${index}"`;const choices=axis.type==='select'?`<select ${data}>${options(axis,value).map(x=>`<option ${String(value)===String(x)?'selected':''}>${x}</option>`).join('')}</select>`:`<input ${data} type="${axis.type==='text'?'text':'number'}" value="${value}" min="${axis.min??''}" max="${axis.max??''}" step="${axis.type==='integer'?'1':'any'}">`;return `<label class="field">${axis.label}${choices}</label>`; }
   // One draft outlives profile switches and imports, so a selection the current
   // profile cannot evaluate would leave the control showing one value while the
@@ -51,8 +70,19 @@
   function renderVariants(){ const p=profile(); const referenced=draft.profile==='live-system'&&String(draft.sweep_path||'').trim()!=='';$('add-variant').disabled=referenced||!p.available;if(referenced){$('variants').innerHTML='<p class="muted">The referenced live sweep is the canonical configuration for this job.</p>';return;}$('variants').innerHTML=sweepDefaults()+draft.variants.map((variant,index)=>{const args=variant.arguments;repair(args);return `<article class="variant"><div class="variant-head"><input data-name="${index}" aria-label="Variant name" value="${variant.name}"><label class="field">Baseline<select data-baseline="${index}">${draft.variants.map(item=>`<option ${draft.baseline===item.name?'selected':''}>${item.name}</option>`).join('')}</select></label>${draft.variants.length>1?`<button class="secondary" data-remove="${index}">Remove</button>`:''}</div><div class="variant-fields">${p.variant_fields.filter(x=>visible(x,args)).map(x=>inputFor(x,args[x.key]??x.default,index)).join('')}</div></article>`;}).join(''); document.querySelectorAll('[data-axis]').forEach(i=>i.oninput=()=>{const v=draft.variants[+i.dataset.index];v.arguments[i.dataset.axis]=i.value;renderVariants();save();validate();});document.querySelectorAll('[data-name]').forEach(i=>i.oninput=()=>{const v=draft.variants[+i.dataset.name];if(draft.baseline===v.name)draft.baseline=i.value;v.name=i.value;save();validate();});document.querySelectorAll('[data-baseline]').forEach(i=>i.oninput=()=>{draft.baseline=i.value;save();validate();});document.querySelectorAll('[data-remove]').forEach(b=>b.onclick=()=>{draft.variants.splice(+b.dataset.remove,1);draft.baseline=draft.variants[0].name;render();});document.querySelectorAll('[data-sweep-default]').forEach(i=>i.oninput=()=>{draft.sweep_defaults={...draft.sweep_defaults,[i.dataset.sweepDefault]:i.value};save();validate();}); }
   function estimates(data){ const e=data.estimates||{};const cells=[['Trials',e.trials??'Unknown'],['Events',e.events??'Unknown'],['Measurement work',e.measurement_work??'Unknown'],['Capture',e.capture_duration??'Unknown'],['Hard limit',e.hard_timeout??'Unknown']]; $('estimates').innerHTML=cells.map(([a,b])=>`<div class="estimate"><small>${a}</small><strong>${b}</strong></div>`).join('')+(e.assumptions||[]).map(x=>`<p class="muted">${x}</p>`).join(''); }
   function issues(data){ $('issues').innerHTML=(data.issues||[]).map(x=>`<div class="issue">${x.message}</div>`).join('')+(data.valid?'<div class="issue notice">Validated by the same replay-job contract used by the CLI.</div>':''); }
-  async function validate(){ try{result=await api('/api/validate',{job:draft});issues(result);estimates(result);$('command').textContent=result.valid?'Ready to render the exact command.':'Resolve the listed issue(s) first.';}catch(e){issues({issues:e.issues||[{message:e.error||'Service unavailable.'}]});} }
-  async function inspect(){try{const path=draft.profile==='measurement'?draft.inputs.dataset:draft.inputs.sensor_capture;const x=await api('/api/inspect',{path});$('artifact-summary').textContent=x.issues?.length?x.issues[0]:`${x.kind}: ${x.trials} trials, ${x.events} events`;validate();}catch(e){$('artifact-summary').textContent=e.issues?.[0]?.message||'Could not inspect evidence.';}}
+  const estimatorLabel = key => caps.contract?.estimator_labels?.[key] || key;
+  // The evidence describes itself, including what it cannot answer. An option
+  // that is simply absent from the menu is indistinguishable from one the page
+  // forgot to draw, so every narrowing is stated here with its reason.
+  function describeEvidence(summary){ if(!summary){$('artifact-summary').innerHTML='';return;} const head=`${summary.kind}: ${summary.trials} trials, ${summary.events} events`; $('artifact-summary').innerHTML=`<span>${esc(head)}</span>`+Object.entries(summary.unavailable_estimators||{}).map(([key,reason])=>`<span class="issue">${esc(estimatorLabel(key))} unavailable: ${esc(reason)}.</span>`).join(''); }
+  const loadedEvidence = data => (data.artifacts||{}).measurement_dataset||(data.artifacts||{}).sensor_capture||null;
+  async function validate(){ try{result=await api('/api/validate',{job:draft});issues(result);estimates(result);const summary=loadedEvidence(result);describeEvidence(summary);
+    // Which estimators are reachable can change under the page whenever the
+    // named evidence changes, so the variant cards are redrawn on that edge
+    // rather than on every keystroke.
+    const next=summary?.unavailable_estimators||{};const changed=JSON.stringify(next)!==JSON.stringify(evidence);evidence=next;if(changed)renderVariants();
+    $('command').textContent=result.valid?'Ready to render the exact command.':'Resolve the listed issue(s) first.';}catch(e){issues({issues:e.issues||[{message:e.error||'Service unavailable.'}]});} }
+  async function inspect(){try{const path=draft.profile==='measurement'?draft.inputs.dataset:draft.inputs.sensor_capture;const x=await api('/api/inspect',{path});if(x.issues?.length)$('artifact-summary').innerHTML=`<span class="issue">${esc(x.issues[0])}</span>`;else describeEvidence(x);validate();}catch(e){$('artifact-summary').innerHTML=`<span class="issue">${esc(e.issues?.[0]?.message||'Could not inspect evidence.')}</span>`;}}
   // The server stamps times as "%Y-%m-%d %H:%M:%S %z", which Date cannot read
   // until the offset is separated by a colon.
   const stamp = value => {const parsed=new Date(String(value??'').replace(' ','T').replace(' ','').replace(/([+-]\d{2})(\d{2})$/,'$1:$2'));return isNaN(parsed)?null:parsed;};

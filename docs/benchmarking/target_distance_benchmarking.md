@@ -245,15 +245,28 @@ the service is the authority for profile and axis decisions. The GUI validates
 canonical replay jobs and their typed artifacts before running, so it cannot
 misrepresent a live or box-gated run as a frozen-mask experiment.
 
-Each profile offers exactly the estimators it can evaluate: the three offline
-profiles offer the two depth rows, and `live-system` offers all four, polar
-profiling and the point cloud included. The estimator axis itself names every
-estimator the registry publishes, and the rendered choices narrow to the
-profile's own set — narrowing the axis instead would refuse a hand-written job
-naming a supported estimator, not merely omit it from a menu. Selecting an
-estimator a profile cannot evaluate reports `incompatible_estimator`, naming the
-estimator and suggesting `live-system` when that profile would accept it, rather
-than the type failure it used to report.
+Each profile offers exactly the estimators it can evaluate: every offline
+profile offers the three mask rows, and `live-system` adds the point cloud. The
+estimator axis itself names every estimator the registry publishes, and the
+rendered choices narrow to the profile's own set — narrowing the axis instead
+would refuse a hand-written job naming a supported estimator, not merely omit it
+from a menu. Selecting an estimator a profile cannot evaluate reports
+`incompatible_estimator`, naming the estimator and the nearest profile that does
+run it, rather than the type failure it used to report.
+
+The menu narrows a second time once evidence is named, because two files of the
+same kind differ in what they can feed. The page reads
+`unavailable_estimators` off the validation response — not a separate request,
+which could narrow the menu for a different file than the one being validated —
+and states every narrowing beside the evidence line: *"Polar Profiling
+unavailable: this sensor capture is payload version 1, written before the LiDAR
+scan was recorded."* An estimator's settings disappear with it, so a polar band
+is never offered where it would not change a number.
+
+A draft that already names a refused estimator keeps showing it. Removing it
+silently is exactly what the refusal exists to prevent, so the value stays, its
+knobs go, and the job is refused with the reason before the run rather than
+after every trial has loaded.
 
 The combined installed-package suite passed with 758 tests after the
 configurator landed, as recorded in

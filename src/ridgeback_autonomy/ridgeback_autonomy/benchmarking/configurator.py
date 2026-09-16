@@ -48,6 +48,11 @@ from ridgeback_autonomy.benchmarking.replay_profiles import (
     ProfileValidationError,
 )
 from ridgeback_autonomy.benchmarking.sweep import TRIAL_WALL_TIME_SEC, estimate_trials
+from ridgeback_autonomy.perception.target_localization.estimator_registry import (
+    ESTIMATOR_LABELS,
+    PUBLIC_ESTIMATOR_ORDER,
+    parse_estimators,
+)
 
 
 RUN_ID_PATTERN = re.compile(r'[0-9]{8}_[0-9]{6}_[0-9a-f]{6}')
@@ -308,6 +313,40 @@ def _inspect_job_inputs(job) -> dict[str, dict]:
     return inspected
 
 
+def _evidence_issues(job, artifacts: dict[str, dict]) -> list[dict]:
+    """Estimators this job selects that the loaded evidence cannot feed.
+
+    The profile already refused the estimators its executor has no path for.
+    This is the other half: the profile runs it, but the artifact in hand does
+    not carry the channel it reads. Reported from the page because that is where
+    the selection and the artifact are both present -- left to the executor, the
+    operator learns it after the run has loaded every trial.
+
+    One issue per estimator rather than per variant: a sweep that selects polar
+    in twenty configs has one problem, and twenty copies of it would bury the
+    other fields.
+    """
+
+    root = artifacts.get('measurement_dataset') or artifacts.get('sensor_capture')
+    unavailable = (root or {}).get('unavailable_estimators') or {}
+    if not unavailable:
+        return []
+    selected: set[str] = set()
+    for config in job.sweep.configs:
+        selected.update(
+            parse_estimators(str(config.arguments.get('estimators') or '')))
+    return [
+        {
+            'field': 'estimators', 'code': 'evidence_cannot_feed_estimator',
+            'message': (
+                f'{ESTIMATOR_LABELS[estimator]} cannot be measured from the '
+                f'selected evidence: {unavailable[estimator]}.'),
+        }
+        for estimator in PUBLIC_ESTIMATOR_ORDER
+        if estimator in selected and estimator in unavailable
+    ]
+
+
 def _packaged_scenarios() -> str | None:
     """The scenario set the sweep runner falls back to when a config names none."""
 
@@ -393,6 +432,7 @@ def validate_job(raw: object, workspace_root: Path | None = None) -> dict:
     except ValueError as exc:
         artifacts = {}
         issues.append({'field': 'inputs', 'code': 'invalid_artifact', 'message': str(exc)})
+    issues.extend(_evidence_issues(job, artifacts))
     return {'job': job.document, 'issues': issues, 'artifacts': artifacts, 'valid': not issues,
             'estimates': _estimate(job, artifacts)}
 

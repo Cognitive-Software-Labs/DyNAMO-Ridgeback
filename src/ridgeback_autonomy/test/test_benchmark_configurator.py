@@ -15,6 +15,7 @@ import yaml
 
 from ridgeback_autonomy.benchmarking.configurator import (
     ConfiguratorError,
+    _evidence_issues,
     _packaged_scenarios,
     _ui_sweep,
     capabilities,
@@ -32,9 +33,15 @@ from ridgeback_autonomy.benchmarking.configurator_results import (
     rename_result,
 )
 from ridgeback_autonomy.benchmarking.configurator_runs import RunSupervisor, is_alive
-from ridgeback_autonomy.benchmarking.replay import ReplayDatasetWriter
+from ridgeback_autonomy.benchmarking.replay import (
+    REPLAY_SCHEMA_VERSION,
+    ReplayDatasetWriter,
+)
 from ridgeback_autonomy.benchmarking.replay_jobs import command_argv, parse_job
-from ridgeback_autonomy.benchmarking.replay_profiles import ProfileValidationError
+from ridgeback_autonomy.benchmarking.replay_profiles import (
+    ProfileValidationError,
+    offered_estimators,
+)
 from ridgeback_autonomy.benchmarking.sweep import estimate_trials
 from ridgeback_autonomy.perception.target_localization.estimator_registry import (
     PUBLIC_ESTIMATOR_ORDER,
@@ -219,13 +226,18 @@ def test_each_profile_offers_exactly_the_estimators_it_runs():
         for name, profile in capabilities()['profiles'].items()
     }
 
-    # Both depth estimators read the same frozen evidence, so no offline profile
-    # may offer one and then refuse it; neither may offer what replay cannot run.
+    # No profile may offer an estimator and then refuse it, nor offer one its
+    # executor has no path for.
     assert set(offered) == {'measurement', 'mask-output', 'mask-model', 'live-system'}
+    # Both frozen formats record the LiDAR scan now, so every offline profile
+    # runs every mask estimator. Whether the file in hand actually carries beams
+    # is a question about that artifact, asked separately, because two files of
+    # the same kind differ there.
     for name in ('measurement', 'mask-output', 'mask-model'):
-        assert offered[name] == ['projective_ranging', 'euclidean_reconstruction']
-    # The live system runs all four: polar profiling needs a LiDAR scan and the
-    # point cloud needs the organized cloud, neither of which a capture freezes.
+        assert offered[name] == [
+            'projective_ranging', 'euclidean_reconstruction', 'polar_profiling']
+    # Only the live system reads the organized point cloud, which no frozen
+    # evidence records.
     assert offered['live-system'] == list(PUBLIC_ESTIMATOR_ORDER)
 
 
@@ -353,41 +365,46 @@ def test_a_live_command_refuses_a_sweep_that_was_never_written(tmp_path):
 
 def test_an_estimator_the_profile_cannot_run_names_the_estimator(tmp_path):
     draft = {**_job(_dataset(tmp_path)), 'variants': [
-        {'name': 'baseline', 'arguments': {'estimators': 'polar_profiling'}}]}
+        {'name': 'baseline', 'arguments': {'estimators': 'pointcloud'}}]}
 
     issue = validate_job(draft, tmp_path)['issues'][0]
 
     # Membership is a profile question: the value is a well-formed estimator
     # list, so reporting it as a malformed one named the field but not the cause.
     assert issue['code'] == 'incompatible_estimator'
-    assert 'polar_profiling' in issue['message']
+    assert 'pointcloud' in issue['message']
+    # The organized cloud exists only while the system is running, so the live
+    # system is the one profile that can measure this row.
     assert issue['suggested_profile'] == 'live-system'
 
 
-def test_offline_profiles_still_freeze_the_polar_axes():
+def test_every_profile_renders_and_accepts_the_polar_axes():
+    """The blanket offline freeze is gone; availability moved to the artifact.
+
+    Both frozen formats record a scan now, so no profile can say in advance that
+    a polar knob is unreachable. What can still be unreachable is the individual
+    file, and the evidence rule answers that with its own reason.
+    """
+
     rendered = {
         name: {field['key'] for field in profile['variant_fields']}
         for name, profile in capabilities()['profiles'].items()
     }
-    document = {
-        'job_version': 1, 'profile': 'mask-output',
-        'inputs': {'sensor_capture': '/sensor', 'mask_caches': ['/box']},
-        'sweep': {'sweep': {'name': 'polar'}, 'configs': [{
-            'name': 'baseline', 'estimators': 'projective_ranging',
-            'polar_range_band_m': 0.5}]},
-    }
+    polar_axes = {'polar_range_band_m', 'polar_range_jump_m', 'polar_min_valid_rays'}
 
-    with pytest.raises(ProfileValidationError) as caught:
-        parse_job(document)
+    def document(profile: str, inputs: dict) -> dict:
+        return {
+            'job_version': 1, 'profile': profile, 'inputs': inputs,
+            'sweep': {'sweep': {'name': 'polar'}, 'configs': [{
+                'name': 'baseline', 'estimators': 'polar_profiling',
+                'polar_range_band_m': 0.5}]},
+        }
 
-    # A sensor capture freezes RGB, depth, intrinsics and transforms, never a
-    # LiDAR scan. Reaching polar profiling live must not offer its knobs offline.
-    assert caught.value.code == 'upstream_stage_frozen'
-    assert caught.value.suggested_profile == 'live-system'
-    for name in ('measurement', 'mask-output', 'mask-model'):
-        assert not any(key.startswith('polar_') for key in rendered[name])
-    assert {'polar_range_band_m', 'polar_range_jump_m', 'polar_min_valid_rays'} <= (
-        rendered['live-system'])
+    parse_job(document('measurement', {'measurement_dataset': '/legacy'}))
+    parse_job(document(
+        'mask-output', {'sensor_capture': '/sensor', 'mask_caches': ['/box']}))
+    for name in ('measurement', 'mask-output', 'mask-model', 'live-system'):
+        assert polar_axes <= rendered[name]
 
 
 def test_the_measurement_profile_accepts_euclidean_against_legacy_evidence(tmp_path):
@@ -399,6 +416,117 @@ def test_the_measurement_profile_accepts_euclidean_against_legacy_evidence(tmp_p
     assert outcome['valid'] is True
     assert outcome['job']['sweep']['configs'][0]['estimators'] == 'euclidean_reconstruction'
     assert 'isolation_3d_floor_margin_m' in outcome['job']['sweep']['configs'][0]
+
+
+def test_loaded_evidence_says_which_estimators_it_cannot_feed(tmp_path):
+    """The artifact explains itself, so an absent option is never unexplained."""
+
+    summary = inspect_path(str(_dataset(tmp_path)), tmp_path)
+
+    unavailable = summary['unavailable_estimators']
+    # A dataset written at the current schema carries a scan, so polar is not
+    # refused here; the organized point cloud is never recorded by any offline
+    # format and stays refused with the reason.
+    assert set(unavailable) == {'pointcloud'}
+    assert 'point cloud' in unavailable['pointcloud']
+    assert summary['schema_version'] == REPLAY_SCHEMA_VERSION
+
+
+def test_the_page_can_name_every_estimator_it_reports_on():
+    """Reasons are keyed by estimator id; the page shows them to a human.
+
+    Without this the browser would either print the raw key, which reads
+    differently than every run summary, or invent its own prose for names this
+    contract already owns.
+    """
+
+    labels = capabilities()['contract']['estimator_labels']
+
+    assert set(labels) == set(PUBLIC_ESTIMATOR_ORDER)
+    assert labels['polar_profiling'] == 'Polar Profiling'
+
+
+def test_validation_hands_the_page_the_evidence_it_must_narrow_by(tmp_path):
+    """The narrowing data rides on the validation response, not a second fetch.
+
+    The page redraws its estimator menu from this. Were it to ask separately, it
+    could narrow the menu for a different artifact than the one being validated,
+    and the menu and the issues below it would disagree.
+    """
+
+    outcome = validate_job(_job(_dataset(tmp_path)), tmp_path)
+
+    summary = outcome['artifacts']['measurement_dataset']
+    assert 'pointcloud' in summary['unavailable_estimators']
+    assert summary['schema_version'] == REPLAY_SCHEMA_VERSION
+
+
+def test_offered_estimators_intersect_the_profile_with_the_evidence(tmp_path):
+    """Two unlike refusals, one list, each keeping the reason that applies.
+
+    The profile answers for its executor and the artifact answers for its
+    channels. A capture written before scan recording is the case where the
+    profile runs polar and the file still cannot feed it, so the evidence reason
+    is the one the operator needs.
+    """
+
+    predates_scan = {'polar_profiling': 'this sensor capture is payload version 1'}
+
+    on_a_v1_capture = offered_estimators('mask-output', predates_scan)
+    on_a_v2_capture = offered_estimators('mask-output')
+
+    assert on_a_v2_capture['offered'] == (
+        'projective_ranging', 'euclidean_reconstruction', 'polar_profiling')
+    assert on_a_v1_capture['offered'] == (
+        'projective_ranging', 'euclidean_reconstruction')
+    assert on_a_v1_capture['unavailable']['polar_profiling'] == (
+        predates_scan['polar_profiling'])
+    # The point cloud is refused by both profiles for the same reason -- no
+    # offline executor reads the organized cloud -- and that reason names where
+    # it can be measured instead.
+    for offered in (on_a_v1_capture, on_a_v2_capture):
+        assert 'live-system' in offered['unavailable']['pointcloud']
+
+
+def test_a_capture_without_a_scan_refuses_polar_instead_of_dropping_it():
+    """The page refuses before the run, naming the estimator and the reason.
+
+    The evidence summary is stated rather than captured: that a payload-version-1
+    capture reports this is covered against a real one in the layered-replay
+    tests, and what is under test here is the page turning it into an issue
+    instead of letting the executor discover it after loading every trial.
+    """
+
+    job = parse_job({
+        'job_version': 1, 'profile': 'mask-output',
+        'inputs': {'sensor_capture': '/sensor', 'mask_caches': ['/box']},
+        'sweep': {'sweep': {'name': 'polar'}, 'configs': [
+            {'name': 'depth', 'estimators': 'projective_ranging'},
+            {'name': 'polar', 'estimators': 'projective_ranging,polar_profiling'},
+            {'name': 'polar_wide', 'estimators': 'polar_profiling',
+             'polar_range_band_m': 0.5},
+        ]},
+    })
+    artifacts = {'sensor_capture': {'unavailable_estimators': {
+        'polar_profiling': (
+            'this sensor capture is payload version 1, written before the LiDAR '
+            'scan was recorded'),
+        'pointcloud': 'the organized point cloud is never recorded',
+    }}}
+
+    issues = _evidence_issues(job, artifacts)
+
+    # One issue for two offending variants: a sweep that selects polar in
+    # twenty configs has one problem, and twenty copies would bury every other
+    # field on the page.
+    assert len(issues) == 1
+    assert issues[0]['field'] == 'estimators'
+    assert issues[0]['code'] == 'evidence_cannot_feed_estimator'
+    assert 'Polar Profiling' in issues[0]['message']
+    assert 'payload version 1' in issues[0]['message']
+    # The point cloud is equally unfeedable and equally unselected, so it is not
+    # reported: the page answers for the job in hand, not for the artifact.
+    assert 'Point Cloud' not in issues[0]['message']
 
 
 def test_one_variant_per_estimator_carries_only_that_estimators_parameters(tmp_path):

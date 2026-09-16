@@ -14,6 +14,7 @@ from typing import Any, Iterable
 
 from ridgeback_autonomy.perception.target_localization.estimator_registry import (
     DEPTH_PATH_ESTIMATORS,
+    ESTIMATOR_LABELS,
     MASK_ESTIMATORS,
     PUBLIC_ESTIMATOR_ORDER,
     parse_estimators,
@@ -437,17 +438,16 @@ MASK_AXES = frozenset(
     name for name, spec in AXES.items()
     if spec.stage == STAGE_MASK and name != 'mask_gate')
 
-# Polar profiling measures off the LiDAR scan. A sensor capture now freezes that
-# scan alongside RGB, depth, intrinsics and transforms, but no offline executor
-# reads it yet, so moving a polar knob during replay would still report a number
-# no offline run produced. The offline profiles therefore keep freezing these
-# axes rather than accept a setting they would ignore. The freeze is waiting on
-# the replay path, not on the evidence: unfreeze it when an offline run can
-# measure a polar row, not merely when a capture carries beams.
-SCAN_AXES = frozenset(
-    name for name, spec in AXES.items()
-    if spec.estimators == ('polar_profiling',))
-OFFLINE_MEASUREMENT_AXES = MEASUREMENT_AXES - SCAN_AXES
+# The polar axes used to be frozen here, because polar profiling measures off a
+# LiDAR scan and no offline evidence carried one. Both formats record it now --
+# the sensor capture from payload version 2, the legacy dataset from schema
+# version 2 -- so every profile allows every measurement axis and there is no
+# offline-only subset left to name.
+#
+# What replaced the freeze is a per-ARTIFACT rule rather than a per-profile one.
+# A frozen axis said no file of that kind could ever move it; the question now
+# is whether the file in hand predates scan recording, which is what
+# ``replay_artifacts.unavailable_estimators`` answers, with its reason.
 
 # What a live sweep states once for every config it runs, rather than per
 # config. Offered apart from the per-variant settings because that is where the
@@ -471,8 +471,8 @@ PROFILES: dict[str, ProfileSpec] = {
         required_artifacts=(ARTIFACT_LEGACY_MEASUREMENT,),
         frozen_stages=(STAGE_DETECTOR, STAGE_SENSOR, STAGE_MASK),
         rerun_stages=(STAGE_MEASUREMENT,),
-        allowed_axes=OFFLINE_MEASUREMENT_AXES,
-        compatible_estimators=_DEPTH_ESTIMATORS,
+        allowed_axes=MEASUREMENT_AXES,
+        compatible_estimators=_MASK_ESTIMATORS,
         compatible_depth_sources=('stereoscopic',),
         compatible_mask_gates=('box',),
         supported_claims=('accuracy', 'coverage', 'miss-reason', 'paired-results'),
@@ -486,8 +486,8 @@ PROFILES: dict[str, ProfileSpec] = {
         required_artifacts=(ARTIFACT_SENSOR_CAPTURE, ARTIFACT_MASK_CACHE),
         frozen_stages=(STAGE_DETECTOR, STAGE_SENSOR, STAGE_MASK),
         rerun_stages=(STAGE_MEASUREMENT,),
-        allowed_axes=OFFLINE_MEASUREMENT_AXES,
-        compatible_estimators=_DEPTH_ESTIMATORS,
+        allowed_axes=MEASUREMENT_AXES,
+        compatible_estimators=_MASK_ESTIMATORS,
         compatible_depth_sources=('frozen',),
         compatible_mask_gates=('cache',),
         supported_claims=('accuracy', 'coverage', 'miss-reason', 'paired-results'),
@@ -501,8 +501,8 @@ PROFILES: dict[str, ProfileSpec] = {
         required_artifacts=(ARTIFACT_SENSOR_CAPTURE,),
         frozen_stages=(STAGE_DETECTOR, STAGE_SENSOR),
         rerun_stages=(STAGE_MASK, STAGE_MEASUREMENT),
-        allowed_axes=OFFLINE_MEASUREMENT_AXES | MASK_AXES,
-        compatible_estimators=_DEPTH_ESTIMATORS,
+        allowed_axes=MEASUREMENT_AXES | MASK_AXES,
+        compatible_estimators=_MASK_ESTIMATORS,
         compatible_depth_sources=('frozen',),
         compatible_mask_gates=('box', 'silhouette'),
         supported_claims=(
@@ -573,10 +573,6 @@ def get_profile(profile_id: str) -> ProfileSpec:
 
 def suggested_profile_for_axis(axis: str) -> str | None:
     stage = AXES.get(axis).stage if axis in AXES else None
-    # Scan axes are measurement-stage but need live LiDAR, so the stage alone
-    # would suggest no profile at all; they only move under the live system.
-    if axis in SCAN_AXES:
-        return PROFILE_LIVE_SYSTEM
     if stage == STAGE_MASK:
         return PROFILE_MASK_MODEL
     if stage in (STAGE_SYSTEM, STAGE_DETECTOR, STAGE_SENSOR):
@@ -610,6 +606,68 @@ def validate_profile_axes(profile_id: str, axes: Iterable[str]) -> None:
             )
 
 
+def suggested_profile_for_estimator(
+    estimator: str,
+    profile_id: str | None = None,
+) -> str | None:
+    """The first other profile that evaluates this estimator, or ``None``.
+
+    Declaration order, which runs cheapest evidence first. Asking the profiles
+    rather than naming one keeps the suggestion correct as capability moves
+    between them: polar profiling now lands on a frozen-capture profile where it
+    used to land on the live system, and the point cloud still lands on the live
+    system because that is the only place its input exists.
+    """
+
+    return next(
+        (
+            candidate.id for candidate in PROFILES.values()
+            if candidate.id != profile_id
+            and estimator in candidate.compatible_estimators
+        ),
+        None)
+
+
+def offered_estimators(
+    profile_id: str,
+    unavailable: dict[str, str] | None = None,
+) -> dict[str, Any]:
+    """What a profile can evaluate on one piece of evidence, and why not the rest.
+
+    Two unlike refusals, reported as one list because the operator is asking one
+    question. A PROFILE refusal is about the question: this executor has no path
+    for that estimator whatever you load. An EVIDENCE refusal is about the
+    artifact: the profile runs it, but not on the file you chose. Where both
+    apply the evidence reason wins, because it is the one that names something
+    the operator can change.
+
+    ``unavailable`` comes from ``replay_artifacts.unavailable_estimators``, but
+    is passed in rather than derived here so this module stays a contract over
+    names and does not have to know how evidence is stored. Omitting it answers
+    for the profile alone, which is what a page with nothing loaded yet shows.
+    """
+
+    profile = get_profile(profile_id)
+    reasons = dict(unavailable or {})
+    for estimator in PUBLIC_ESTIMATOR_ORDER:
+        if estimator in profile.compatible_estimators or estimator in reasons:
+            continue
+        suggested = suggested_profile_for_estimator(estimator, profile.id)
+        elsewhere = f'; profile "{suggested}" evaluates it' if suggested else ''
+        reasons[estimator] = (
+            f'profile "{profile.id}" has no evaluation path for this estimator'
+            f'{elsewhere}')
+    return {
+        'offered': tuple(
+            estimator for estimator in profile.compatible_estimators
+            if estimator not in reasons),
+        'unavailable': {
+            estimator: reasons[estimator]
+            for estimator in PUBLIC_ESTIMATOR_ORDER if estimator in reasons
+        },
+    }
+
+
 def validate_estimator_selection(profile_id: str, raw: Any) -> tuple[str, ...]:
     """Check an estimator selection against what the profile can evaluate.
 
@@ -627,12 +685,7 @@ def validate_estimator_selection(profile_id: str, raw: Any) -> tuple[str, ...]:
     ]
     if not unsupported:
         return selected
-    # Polar profiling and the point cloud are live-only, so the offline profiles
-    # send the operator to the one profile that does run them.
-    live = PROFILES[PROFILE_LIVE_SYSTEM].compatible_estimators
-    suggested = (
-        PROFILE_LIVE_SYSTEM
-        if profile.id != PROFILE_LIVE_SYSTEM and unsupported[0] in live else None)
+    suggested = suggested_profile_for_estimator(unsupported[0], profile.id)
     raise ProfileValidationError(
         field='estimators',
         code='incompatible_estimator',
@@ -712,6 +765,10 @@ def describe_capabilities() -> dict[str, Any]:
         'contract_version': 1,
         'profiles': [profile.as_dict() for profile in PROFILES.values()],
         'axes': [AXES[name].as_dict() for name in sorted(AXES)],
+        # Estimator keys travel everywhere in this contract; a surface that
+        # reports one to an operator needs its prose name, and deriving that
+        # from the key would read differently than the run summaries do.
+        'estimator_labels': dict(ESTIMATOR_LABELS),
         'questions': [dict(question) for question in QUESTIONS],
         'artifact_kinds': [
             ARTIFACT_LEGACY_MEASUREMENT,
