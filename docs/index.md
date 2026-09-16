@@ -36,7 +36,18 @@ troubleshooting, planning, and historical documentation.
 
 ## Benchmarking
 
-- [Target-distance benchmarking](benchmarking/target_distance_benchmarking.md)
+- [Target-distance benchmarking](benchmarking/overview.md) — start here: what
+  the benchmark is, the estimators and axes, and what it may not claim
+- [Running benchmarks](benchmarking/running_benchmarks.md) — which question,
+  which profile, which of the four ways to start it
+- [Benchmark semantics](benchmarking/semantics.md) — scenarios, events,
+  observations, instances, and miss reasons
+- [Benchmark outputs](benchmarking/outputs.md) — run and sweep artifacts,
+  provenance, rename rules, and module ownership
+- [Replay profiles](benchmarking/profiles.md) — the legacy measurement dataset
+  and the four-profile layered replay contract
+- [Benchmark configurator](benchmarking/configurator.md) — the local browser UI
+  and its run substrate
 - [Scenario gallery](benchmarking/benchmark_scenarios_v2_gallery.html)
 
 ## Active plans

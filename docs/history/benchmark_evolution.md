@@ -2,7 +2,7 @@
 
 Historical record of the target-distance benchmark's structural and semantic
 changes. The current workflow, scenario contract, scoring semantics, and output
-schema live in [target-distance benchmarking](../benchmarking/target_distance_benchmarking.md).
+schema live in [the benchmarking references](../benchmarking/overview.md).
 This page explains why older results and older descriptions can differ from the
 current system; it is not a second runbook.
 
@@ -91,7 +91,7 @@ attribution: a missing value has no estimator position with which to associate
 its reason. Later per-estimator planar association closed the safe-attribution
 part of that boundary while leaving unmatched-box reasons at observation
 granularity. The current contract is in the
-[benchmark reference](../benchmarking/target_distance_benchmarking.md#miss-reasons-and-attribution-boundary).
+[benchmark semantics](../benchmarking/semantics.md#miss-reasons-and-attribution-boundary).
 
 ## Depth acquisition transition
 

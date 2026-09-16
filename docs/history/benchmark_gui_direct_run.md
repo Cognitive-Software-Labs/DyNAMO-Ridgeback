@@ -6,7 +6,7 @@ while building it, and what deliberately did not land.
 
 Supersedes the "not a process supervisor" decision taken in the retired
 benchmark-configuration-GUI plan. The current contract lives in
-[target-distance benchmarking](../benchmarking/target_distance_benchmarking.md).
+[the benchmark configurator reference](../benchmarking/configurator.md).
 
 ## Why the exported command had to go
 
