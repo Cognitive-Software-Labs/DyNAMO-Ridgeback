@@ -28,22 +28,6 @@ RTF is at least 0.8.
 [Isaac lidar pipeline](isaac/lidar-pipeline.md), and the resolved orphan-lidar
 investigation in [Isaac port history](isaac/port-history.md#lidars-detached-from-the-articulation-2026-09-11).
 
-## Isaac hull-collider validation
-
-**Gap.** The vendor chassis collider changed from an AABB cube that overclaimed
-volume by 25.4% to a `convexHull` that overclaims it by 6.9%. Static inspection
-and lidar self-occlusion checks passed, but no live contact test has driven the
-robot into representative walls to prove that the new hull stops at the right
-place without instability or tunnelling.
-
-**Completion criteria.** Run controlled low-speed frontal, lateral, and angled
-contacts against known geometry. Compare the observed stop pose with the
-rendered hull and collider, verify stable contacts and recovery, and record the
-accepted tolerance in the robot-model reference.
-
-**Context.** [Isaac robot model](isaac/robot-model.md#colliders) and the
-[vendor-chassis evidence](isaac/port-history.md#vendor-chassis-graft-2026-09-10).
-
 ## Isaac documentation lifecycle cleanup
 
 **Gap.** The Isaac documentation still mixes current contracts with port-era

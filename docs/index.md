@@ -105,6 +105,7 @@ They are not supported implementations or automatic backlog commitments.
 - [Layered replay implementation validation](history/layered_replay_implementation_validation.md)
 - [Running benchmarks from the configurator GUI](history/benchmark_gui_direct_run.md)
 - [Isaac world seating and map regeneration](history/isaac_world_seating.md)
+- [Isaac hull-collider live validation](history/isaac_hull_collider_validation.md)
 
 History preserves dated evidence and limitations. Read the corresponding
 technical reference for current behavior.

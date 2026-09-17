@@ -234,6 +234,15 @@ and the camera box. Wheel cylinders come from the vendor set.
 | **convexHull** | 0.17064 m³ | **+6.9%** |
 | AABB `Cube` (replaced) | 0.20018 m³ | +25.4% |
 
+The live contact acceptance tolerance is **10 mm collider-to-wall error** at
+0.05–0.20 m/s. The clean three-boot Isaac 6.1 qualification at `dbf50bc0`
+passed 39/39 frontal, lateral, and 45-degree contacts with 0 mm cross-boot
+spread. Worst measured stop error was 0.000335 mm, penetration 0.002951 mm,
+tangential drift 2.762 mm, and yaw drift 0.262 degrees. The retired AABB
+control reproduced its predicted 45-degree stop delta within 0.323 mm, proving
+that the harness distinguishes the two envelopes. See the
+[live validation record](../history/isaac_hull_collider_validation.md).
+
 The hull keeps 119 verts / 234 facets against the source's 972 / 324. What it
 over-claims is the underside cavity between the wheels, which the wheel
 cylinders already occupy and nothing else reaches. Compare them yourself:
