@@ -24,6 +24,12 @@ poses, velocities, signed separation, geometry snapshots, raw samples, and
 plots were retained under
 `artifacts/isaac-collider-validation/20260917T220000Z_clean-dbf50bc0/`.
 
+![Plan-view comparison of the rendered chassis, convex hull, and retired AABB at frontal, 45-degree, and lateral wall contacts.](assets/isaac-hull-collider/envelopes.png)
+
+The yellow hull follows the rendered chassis closely at each orientation. The
+dashed red AABB is similar at 0 and 90 degrees but visibly over-claims the
+45-degree approach, which makes it a useful control for the live test.
+
 ## Acceptance gates
 
 - stop error at most 10 mm and penetration at most 5 mm;
@@ -52,6 +58,12 @@ All 39/39 cases and every aggregate gate passed. The worst measurements were:
 | largest step translation | 1.667 mm | 20 mm |
 | cross-boot stop spread | 0 mm | 3 mm |
 | AABB-control prediction error | 0.323 mm | 10 mm |
+
+![Boot-one traces showing signed wall separation, planar speed, and yaw error for frontal, 45-degree, and lateral hull contacts.](assets/isaac-hull-collider/contact-traces.png)
+
+The traces show the approach, two-second held contact, zero-command interval,
+and reverse recovery. Frontal and lateral curves overlap almost exactly; the
+small 45-degree yaw response remains below the 0.5-degree gate.
 
 The old AABB over-claimed the angled envelope by about 96 mm. Its independently
 predicted and observed stop deltas agreed within 0.323 mm, so the near-zero hull
