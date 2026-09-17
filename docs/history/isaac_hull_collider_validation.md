@@ -24,11 +24,9 @@ poses, velocities, signed separation, geometry snapshots, raw samples, and
 plots were retained under
 `artifacts/isaac-collider-validation/20260917T220000Z_clean-dbf50bc0/`.
 
-![Plan-view comparison of the rendered chassis, convex hull, and retired AABB at frontal, 45-degree, and lateral wall contacts.](assets/isaac-hull-collider/envelopes.png)
-
-The yellow hull follows the rendered chassis closely at each orientation. The
-dashed red AABB is similar at 0 and 90 degrees but visibly over-claims the
-45-degree approach, which makes it a useful control for the live test.
+The current envelope comparison and accepted tolerance live in the
+[robot-model collider reference](../isaac/robot-model.md#colliders). This page
+retains the run-specific measurements and traces.
 
 ## Acceptance gates
 

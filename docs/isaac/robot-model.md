@@ -234,6 +234,12 @@ and the camera box. Wheel cylinders come from the vendor set.
 | **convexHull** | 0.17064 m³ | **+6.9%** |
 | AABB `Cube` (replaced) | 0.20018 m³ | +25.4% |
 
+![Plan-view comparison of the rendered chassis, convex hull, and retired AABB at frontal, 45-degree, and lateral wall contacts.](assets/collider/contact-envelopes.png)
+
+The yellow hull follows the rendered chassis closely at each orientation. The
+dashed red AABB is similar at 0 and 90 degrees but visibly over-claims the
+45-degree approach.
+
 The live contact acceptance tolerance is **10 mm collider-to-wall error** at
 0.05–0.20 m/s. The clean three-boot Isaac 6.1 qualification at `dbf50bc0`
 passed 39/39 frontal, lateral, and 45-degree contacts with 0 mm cross-boot
@@ -251,10 +257,6 @@ cylinders already occupy and nothing else reaches. Compare them yourself:
 OMNI_KIT_ACCEPT_EULA=YES isaac_venv/bin/python3 \
     tools/isaac/inspect_robot.py --compare-colliders
 ```
-
-⚠️ Physics with the hull is **unvalidated** — nothing has driven the robot
-into a wall to confirm it stops where it should
-([global backlog](../BACKLOG.md#isaac-hull-collider-validation)).
 
 ---
 
