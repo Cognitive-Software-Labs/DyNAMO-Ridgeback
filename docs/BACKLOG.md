@@ -28,25 +28,23 @@ RTF is at least 0.8.
 [Isaac lidar pipeline](isaac/lidar-pipeline.md), and the resolved orphan-lidar
 investigation in [Isaac port history](isaac/port-history.md#lidars-detached-from-the-articulation-2026-09-11).
 
-## Isaac documentation lifecycle cleanup
+## Deferred: Isaac target-distance benchmark port
 
-**Gap.** The Isaac documentation still mixes current contracts with port-era
-investigation and completed migration material. In particular,
-`lidar-pipeline.md` is indexed as a current reference but is structured as a
-dated Isaac 6.0 investigation; `port-plan.md` contains both the active phase
-gate and extensive completed-phase history; and `migration-6.1.md` combines a
-completed execution record with still-useful rollback instructions.
+**Status.** Deferred (former P6); this records scope, not approval to implement.
+The target-distance benchmark still requires Gazebo-specific entity control.
 
-**Completion criteria.** Make `lidar-pipeline.md` describe only the current
-Isaac 6.1 lidar-to-ROS contract and live verification procedure, moving dated
-bug evidence to history. Reduce `port-plan.md` to unfinished gates or mark it
-entirely historical. Split the completed 6.1 migration evidence from any live
-rollback/runbook material. Update the index and cross-links, and add an
-automated internal Markdown-link check so deleted or moved owners cannot leave
-dangling references.
+**Scope if resumed.** Replace Gazebo CLI spawn/remove/pose plumbing with a
+backend interface and Isaac simulation-control services. Preserve the current
+scenario schema, registered estimators, layered replay and configurator.
+Forward backend selection and Isaac arguments through the benchmark environment
+launch; cover process startup and teardown for both backends.
 
-**Context.** [Documentation ownership](project/documentation.md), the
-[Isaac document map](isaac/README.md), and [Isaac port history](isaac/port-history.md).
+**Acceptance.** An Isaac run with all registered estimators and one repeat
+completes the configured scenes, comparison report and collages; estimates are
+compared against a current matching Gazebo baseline, and repeated cleanup leaves
+no residual prims. Historical geometry-dependent numbers are not acceptance evidence.
+
+**Context.** [Target-distance benchmarking](benchmarking/overview.md).
 
 ## Physical command-chain validation
 

@@ -97,3 +97,17 @@ checkable documentation claim disagrees with the repository. Among documents:
 
 Resolve contradictions at the canonical owner and replace duplicate prose with
 a link. Do not preserve two independently editable versions of the same fact.
+
+## Offline link validation
+
+Run `python3 tools/check_doc_links.py` from the workspace (or pass `--root`).
+Install the test dependency `python3-markdown-it` through rosdep or apt first.
+The same check runs in the autonomy package's `test_doc_links` pytest/ament gate.
+
+It checks Markdown links and images in root Markdown files and `docs/`, including
+reference-style links, relative file targets, and Markdown heading fragments.
+Code examples, external URLs, email links and absolute/home-local paths are
+excluded. Non-Markdown fragments are not interpreted. Diagnostics identify the
+source block's first line and target; failures exit nonzero. The check needs
+neither network access nor simulator/build output. Raw HTML links are outside
+this Markdown-link gate; explicit HTML anchors in Markdown are recognized.

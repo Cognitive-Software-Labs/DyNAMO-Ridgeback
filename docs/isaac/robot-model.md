@@ -3,8 +3,8 @@
 How the robot gets from the Clearpath description into Isaac, what the
 geometry actually is, and which parts are hand-authored rather than imported.
 
-This is the canonical source for robot geometry. `port-plan.md` covers the
-phase plan, while the global `../BACKLOG.md` owns current gaps.
+This is the canonical source for robot geometry. The
+[global backlog](../BACKLOG.md) owns current gaps.
 
 ![robot render](assets/robot-render.png)
 
@@ -302,7 +302,10 @@ recorded in [Isaac world seating](../history/isaac_world_seating.md).
 
 ## Importer defects you will hit
 
-All 6.0.1. Several are candidates to delete on 6.1 (`port-plan.md` §P9).
+These defects were observed on 6.0.1. Retain their repairs until focused
+equivalence tests on the target runtime prove them unnecessary; a version
+upgrade alone is not proof. Generate candidate USDs to temporary output and
+compare visuals, prim structure, articulation and collisions before replacement.
 
 - **Visual meshes are silently dropped.** `attach_visual_meshes` converts each
   source mesh and references it back. It attaches on a **child** prim, never

@@ -25,8 +25,8 @@ This workspace supports 3 main human workflows:
 Isaac Sim port (in progress, `feat/isaac-sim-6-port`):
 
 - `docs/BACKLOG.md`: **all active engineering gaps**, including Isaac
-- `docs/isaac/port-plan.md`: the phase plan (P0–P9)
-- `docs/isaac/migration-6.1.md`: completed 6.1 migration and workstation safety gates
+- [Isaac rollback](docs/isaac/rollback.md): retained environments and driver recovery
+- [6.1 migration evidence](docs/history/2026-09-13-isaac-6.1-migration.md): compatibility controls and decisions
 - `docs/isaac/camera-depth.md`: Isaac D455 depth modes, alignment, ROS contract, and runbook
 - `docs/isaac/port-history.md`: superseded investigation narratives
 - `docs/isaac/lidar-pipeline.md`: how the RTX lidar reaches ROS

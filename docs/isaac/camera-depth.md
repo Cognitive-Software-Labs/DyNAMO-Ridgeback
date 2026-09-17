@@ -5,7 +5,7 @@ Status: **implemented and live-qualified on Isaac Sim 6.1.0.0**.
 This page owns the Isaac-specific image-formation and depth implementation.
 The cross-backend mount, ROS topic contract, and downstream perception flow
 remain canonical in [Camera stack](../target_localization/camera_stack.md).
-The dated migration evidence remains in [Isaac Sim 6.1 migration](migration-6.1.md).
+The dated migration evidence remains in [Isaac Sim 6.1 migration](../history/2026-09-13-isaac-6.1-migration.md).
 
 ## The system in one diagram
 

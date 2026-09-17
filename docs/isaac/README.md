@@ -1,57 +1,31 @@
-# Isaac Sim port
+# Isaac Sim
 
-Adding **Isaac Sim 6.1 GA** as a first-class backend for the shared Ridgeback
-autonomy stack. Gazebo and hardware remain separate adapters. In progress on
-`feat/isaac-sim-6-port`.
+Isaac Sim 6.1 is one of the shared autonomy stack's three backends, alongside
+Gazebo and physical hardware. The bounded migration compatibility gate passed;
+statistical exploration qualification remains open. The
+[global backlog](../BACKLOG.md) owns remaining work, including deferred benchmark
+support. Historical controls are not current performance baselines.
 
-## Start here
+## Current references
 
-| doc | what it owns |
+| Document | Owns |
 |---|---|
-| [**global backlog**](../BACKLOG.md) | **all active engineering gaps**, including Isaac |
-| [port-plan.md](port-plan.md) | the phase plan, P0–P9, and acceptance criteria |
-| [**migration-6.1.md**](migration-6.1.md) | **completed 6.1 migration, driver rollout, 5.1 safety gate, and depth decision** |
-| [**camera-depth.md**](camera-depth.md) | **Isaac D455 colour/depth implementation, modes, ROS contract, validation, and troubleshooting** |
-| [robot-model.md](robot-model.md) | URDF → USD → meshes → sensors → colliders |
-| [lidar-pipeline.md](lidar-pipeline.md) | how the RTX lidar reaches ROS, and SLAM quality |
-| [port-history.md](port-history.md) | superseded investigation narratives |
+| [Robot model](robot-model.md) | Geometry, importer, sensors and colliders |
+| [LiDAR pipeline](lidar-pipeline.md) | Scan assembly, ROS contract and qualification procedure |
+| [Camera depth](camera-depth.md) | D455 modes, ROS contract, validation and troubleshooting |
+| [Exploration benchmarking](../exploration/benchmarking.md) | Run procedure and benchmark hygiene |
+| [Ground-truth maps](../../src/ridgeback_autonomy/sim/ground_truth_maps/README.md) | Map generation and provenance |
+| [Rollback](rollback.md) | Retained environments, shared-driver recovery and verification |
 
-Assets: [`assets/robot-geometry.svg`](assets/robot-geometry.svg) is the
-dimensioned mounting drawing; `assets/robot-render.png` is the same geometry in
-Isaac.
+## Evidence and decisions
 
-## Current state, in one paragraph
+- [6.1 migration](../history/2026-09-13-isaac-6.1-migration.md): bounded controls,
+  accepted 5.1 regression and native-depth decision.
+- [Gazebo lidar integration](../history/2026-09-18-gazebo-lidar-integration.md):
+  measured mounts through collision monitoring and front-scan SLAM.
+- [World seating](../history/isaac_world_seating.md): floor-relative placement
+  and map regeneration.
+- [Investigation history](port-history.md): resolved causes and rejected theories.
 
-Navigation **runs** on Isaac Sim 6.1. The long-standing stall was the 2D
-lidars being parented to `base_link`, which has no joint into the
-articulation, so PhysX turned `chassis_link` and left the sensors behind; the
-chassis sweeping under a stationary emitter is what produced the "phantom"
-returns that pinned `cmd_vel` at zero. Reparenting them to `chassis_link`
-fixed it. The 6.1 migration passed its bounded compatibility gate on
-2026-09-13 at RTF 0.868 with 17 successful goals and no aborts. This is not a
-statistical baseline, and every older coverage or SLAM number measured before
-the 2026-09-10 geometry correction remains void. Robot and lidar heights now
-derive from each world's floor, and the stock maps were regenerated at the
-corrected scan plane on 2026-09-17. P0–P4 and P7–P9 are done; P5 still needs a
-multi-seed baseline and P6 is deferred. Active work is owned by the
-[global backlog](../BACKLOG.md). See
-[`migration-6.1.md`](migration-6.1.md) for the execution record.
-
-## Where facts live
-
-Each fact has one home. Cross-reference rather than copy:
-
-- **open work** → global `BACKLOG.md`
-- **plan, phases, acceptance** → `port-plan.md`
-- **6.1 migration and shared-driver procedure** → `migration-6.1.md`
-- **Isaac D455 image/depth implementation and runbook** → `camera-depth.md`
-- **robot geometry, the importer, colliders** → `robot-model.md`
-- **lidar → ROS, scan assembly, SLAM quality** → `lidar-pipeline.md`
-- **concluded investigations** → `port-history.md`
-- **cross-backend recovery procedures** → `../troubleshooting.md`
-- **completed root causes and evidence** → `../history/`
-- **benchmark recipe and hygiene** → `../exploration/benchmarking.md`
-- **ground-truth maps** → `../../src/ridgeback_autonomy/sim/ground_truth_maps/README.md`
-
-Numbers in `port-plan.md` and `port-history.md` are **claims at the time they
-were written**, not current — treat them as history, not as a baseline.
+Current behavior belongs in the references above. Dated evidence retains the
+limitations of its recorded configuration; it does not override the backlog.

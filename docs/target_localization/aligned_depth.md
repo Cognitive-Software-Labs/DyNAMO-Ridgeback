@@ -263,8 +263,8 @@ monocular (18 m for the default checkpoint). The current 3D isolation default is
 
 The former independently throttled producer was removed; its diagnosis and the
 2026-07-24 monocular scale observation live in
-[history](../history/aligned_depth_coverage.md). This does not close the separate
-[residual exact-stamp availability gap](../BACKLOG.md#exact-stamp-depth-availability).
+[history](../history/aligned_depth_coverage.md). The separate delivery investigation and its bounded resolution are recorded in
+[exact-stamp availability evidence](../history/exact_stamp_depth_availability.md).
 Smoke runs with current recipes do not replace the controlled
 [isolation comparison](../BACKLOG.md#isolation-validation), especially for long-range backgrounds.
 

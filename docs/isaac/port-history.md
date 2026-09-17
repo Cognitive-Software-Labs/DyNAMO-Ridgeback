@@ -1,9 +1,7 @@
 # Isaac port — investigation history
 
-Superseded and completed investigation narratives, moved out of
-`port-plan.md` so the plan stays readable. Nothing here is current status:
-the global [`BACKLOG.md`](../BACKLOG.md) owns open work, and `port-plan.md`
-records the phase plan.
+Superseded and completed investigation narratives. Nothing here is current
+status: the global [backlog](../BACKLOG.md) owns open work.
 
 Kept rather than deleted because each records **what was ruled out and how**,
 which is the expensive part to reproduce. Several of these conclusions were
@@ -104,3 +102,22 @@ Two traps this uncovered, both silent:
 **Pattern worth naming: sensors here are never mounted where the obvious surface suggests.** The 2D lidars read as deck-mounted but are recessed in a body notch (−11.6 cm). The camera reads as mast-top but is bracketed to the mast's front face. Both were modelled from an unmeasured offset onto a plausible parent, and both were wrong. Measure the mounting face, and ask *how* it attaches, before authoring an offset.
 
 ⚠️ **Rerun debt grows again:** the graft changes rendered geometry the RTX lidar raytraces, so the GT slice wants re-checking and every coverage number is void until it is.
+
+
+## Early port verification limits
+
+The removed port checklist recorded the following bounded checks under 6.0.1.
+They are retained for their failure boundaries, not as current acceptance or
+performance evidence; the sensor and seating corrections supersede them.
+
+| Check | Recorded evidence | Limitation |
+|---|---|---|
+| Planar rig | `diag_rig.py --battery` passed 10/10, including combined motion, teleport, zero stop drift and command timeout; live ROS checks exercised strafe at yaw and noisy odometry versus truth | Raw odometry followed rendering (~35 Hz under co-tenant load), not the intended 50 Hz |
+| Include-alone sensor stack | 14/14 topics, filtered odometry within ~1 mm of truth, 22 TF edges and standalone mapping | Camera optics were hand-authored; the original lidar aperture claim was disproved by the [lidar reference](lidar-pipeline.md) |
+| Stock-world repeat harness | Two warehouse runs completed on one simulator; second run issued 94 goals; office/hospital smoke tests exercised the missing-PhysicsScene fallback | Reported RTF 0.54 had a competing GPU job; reset cleared the pose graph but retained the published occupancy grid, so the second run was not a blank-map baseline |
+
+The original Gazebo controls were stored under
+`tools/isaac/baseline/gz_mock_hospital/` and topic captures under
+`tools/isaac/baseline/contract/`. Their old geometry prevents using those results
+as a current comparison baseline. Fresh-run hygiene belongs in the
+[benchmark runbook](../exploration/benchmarking.md).

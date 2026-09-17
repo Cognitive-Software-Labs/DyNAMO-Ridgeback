@@ -189,7 +189,7 @@ future-extrapolation gap, keep these settings:
 
 Increasing MPPI's transform wait does not fix stale producer timestamps and can
 cause missed controller cycles. The measured investigation is preserved in
-[operational incidents](history/operational_incidents.md#slam-tf-lag-2026-09-10).
+[operational incidents](history/operational_incidents.md#slam-tf-lag--2026-09-10).
 
 ## SLAM drift while stationary
 
