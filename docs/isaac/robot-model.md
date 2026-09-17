@@ -162,11 +162,14 @@ the retired generic Clearpath 640×480 `CameraInfo` at 30.3 Hz with
 `fx=fy=443.53` and
 `camera_0_color_optical_frame`.
 
-That closes raw-sensor compatibility for the physically accurate mounts. The
-full `collision_monitor` and SLAM consumer path remains an integration gate in
-`docs/BACKLOG.md`. Do not move the shared physical mounts to hide a downstream
-backend issue; any remaining correction belongs in Gazebo-only consumer
-configuration.
+The [2026-09-18 Gazebo integration check](../history/2026-09-18-gazebo-lidar-integration.md)
+also passed the `collision_monitor` and front-scan SLAM consumer gate in
+`mock_hospital`: raw scans stayed clean during forward motion and turning,
+collision monitoring passed the commands, and SLAM continued publishing maps.
+This verifies the measured mounts through those consumers in that scene;
+exploration coverage, map accuracy, and obstacle-stop performance were not
+qualified by this check. Keep the shared physical mounts and ±135° aperture at
+the measured values.
 
 ---
 

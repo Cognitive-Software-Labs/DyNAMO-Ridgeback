@@ -29,8 +29,9 @@ below retain their original 6.0.1 labels.
 - Use the 6.1 native stereo-depth path if it returns valid measurements. If it
   does not, use geometric depth from the physical left-depth origin plus our
   D455 disparity/noise model. Both paths align into the colour frame.
-- Do not spend this migration moving Gazebo lidar mounts. Their known physical
-  divergence remains documented and accepted.
+- Keep the shared measured lidar mounts unchanged. Gazebo uses the same
+  physical poses and ±135° aperture; its consumer integration was
+  [verified on 2026-09-18](../history/2026-09-18-gazebo-lidar-integration.md).
 
 Official references:
 

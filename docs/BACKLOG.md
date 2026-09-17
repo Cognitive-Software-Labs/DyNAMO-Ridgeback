@@ -66,23 +66,6 @@ e-stop tests before enabling `autonomous_motion_enabled:=true`.
 **Context.** [Exploration architecture](exploration/architecture.md#hardware-safety-boundary)
 and the public hardware workflow in the [README](../README.md).
 
-## Gazebo collision-stack parity for the measured lidar mounts
-
-**Gap.** The shared robot description now carries the physically measured,
-coplanar UST-10LX positions and explicit ±135° scan windows. Gazebo accepts
-them, preserves their poses in the reduced SDF, and produces clean stationary
-and moving raw scans. The full `collision_monitor` and SLAM consumers still
-need an integration run with that description.
-
-**Completion criteria.** Verify `collision_monitor` does not stop clear-space
-motion and that SLAM still receives the selected front scan. If behavior fails,
-implement a Gazebo-only collision-mask correction while keeping
-`clearpath/robot.yaml`, the ±135° aperture, and published TF at the measured
-poses. Repeat the scan, motion, and camera topic gates after the correction.
-
-**Context.** [Isaac robot and sensor model](isaac/robot-model.md) and
-`test_camera_description.py`'s fixed-joint-reduction guard.
-
 ## Optional: restore Gazebo exploration worlds and backend-specific maps
 
 **Opportunity.** Gazebo remains a supported backend, but the adapter currently
