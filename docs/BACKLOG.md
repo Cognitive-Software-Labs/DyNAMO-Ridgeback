@@ -12,6 +12,9 @@ history document—not retaining a crossed-out entry here.
 for the current robot. The [LiDAR/closed-loop SLAM qualification](history/2026-09-17-isaac-lidar-qualification.md)
 passed, but it does not qualify frontier exploration or provide the matching
 Gazebo coverage comparison. Earlier invalidated exploration numbers remain void.
+Merged scans improved median closed-loop results, but configured-noise seed 0
+regressed in pose RMSE/map IoU, and yaw components increased for two seeds;
+see the [paired results and interpretation](history/2026-09-17-isaac-lidar-qualification.md#interpretation).
 
 **Completion criteria.** With corrected seating, regenerated maps, and the
 qualified LiDAR pipeline, run autonomous exploration over 3–5 seeds per
@@ -20,6 +23,14 @@ Gazebo baseline. P5 passes
 only when 3/3 runs complete, coverage is at least the Gazebo mean minus 10
 points, genuine aborts do not exceed the Gazebo maximum, and throttled headless
 RTF is at least 0.8.
+
+**SLAM-source follow-up.** Compare `front_only` and `merged` with matched
+seeds at zero and configured noise during exploration. Investigate the noisy
+seed-0 regression and larger EKF/SLAM yaw components using signed yaw traces
+and total yaw error; component RMS values are not additive. Report per-seed
+pose/map quality, coverage, aborts, and timing alongside aggregate results.
+Keep `front_only` as the public default until a separate, evidence-backed
+default decision addresses these tradeoffs and the exploration/P5 results.
 
 **Context.** [Exploration benchmark runbook](exploration/benchmarking.md),
 [Isaac lidar pipeline](isaac/lidar-pipeline.md), and the resolved orphan-lidar
