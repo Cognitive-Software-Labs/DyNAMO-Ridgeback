@@ -6,6 +6,85 @@ unselected alternatives belong in `docs/do_not_try_again/`. Closing an item mean
 its completion criteria and moving durable results to the relevant reference or
 history document—not retaining a crossed-out entry here.
 
+## Isaac stock-world seating and ground-truth map regeneration
+
+**Gap.** The robot is seated correctly in `mock_hospital`, whose floor top is
+at z = 0.05 m, but floats 49.8 mm above every stock Isaac world because the
+runner's fixed `spawn_z=0.076` assumes that raised floor. The drive rig has no
+vertical degree of freedom and the wheels have no colliders, so physics cannot
+settle it. The stock-world maps are internally consistent with the floating
+robot, but their 0.3024 m slice plane is 49.8 mm above the physically seated
+UST-10LX plane.
+
+**Completion criteria.** Derive each world's spawn height from its floor level
+using the measured wheel-mesh bottom: `spawn_z = floor_z + 0.02617`. Derive the
+map slice from the same source as `floor_z + 0.25257`; do not introduce a second
+independent constant. Verify wheel contact height and scan height in
+`mock_hospital` and at least one stock world, then regenerate all affected
+stock-world maps and previews once.
+
+**Context.** [Isaac robot model](isaac/robot-model.md), the
+[ground-truth map runbook](../src/ridgeback_autonomy/sim/ground_truth_maps/README.md),
+and the original phase evidence in the [Isaac port plan](isaac/port-plan.md).
+
+## Isaac lidar and exploration recertification
+
+**Gap.** No statistically valid Isaac exploration baseline exists for the
+current robot. The measured sensor geometry changed repeatedly on 2026-09-10,
+and the 2026-09-11 lidar reparent fixed an orphan-body defect that left the
+emitters stationary while the chassis rotated. All earlier coverage and SLAM
+quality numbers are therefore void. The front/rear merged-scan path also still
+needs a fresh-boot live validation after its TF-remap and range-bound fixes.
+
+**Completion criteria.** After the seating and map regeneration above, validate
+the raw 270-degree scans and the merged SLAM scan from a clean Isaac 6.1 boot,
+first with zero odometry noise and then with the configured noise. Re-measure
+SLAM quality, confirm the front/rear stamp and motion-compensation behavior,
+and run 3–5 seeds per comparison condition on a suitably quiet host. P5 passes
+only when 3/3 runs complete, coverage is at least the Gazebo mean minus 10
+points, genuine aborts do not exceed the Gazebo maximum, and throttled headless
+RTF is at least 0.8.
+
+**Context.** [Exploration benchmark runbook](exploration/benchmarking.md),
+[Isaac lidar pipeline](isaac/lidar-pipeline.md), and the resolved orphan-lidar
+investigation in [Isaac port history](isaac/port-history.md#lidars-detached-from-the-articulation-2026-09-11).
+
+## Isaac hull-collider validation
+
+**Gap.** The vendor chassis collider changed from an AABB cube that overclaimed
+volume by 25.4% to a `convexHull` that overclaims it by 6.9%. Static inspection
+and lidar self-occlusion checks passed, but no live contact test has driven the
+robot into representative walls to prove that the new hull stops at the right
+place without instability or tunnelling.
+
+**Completion criteria.** Run controlled low-speed frontal, lateral, and angled
+contacts against known geometry. Compare the observed stop pose with the
+rendered hull and collider, verify stable contacts and recovery, and record the
+accepted tolerance in the robot-model reference.
+
+**Context.** [Isaac robot model](isaac/robot-model.md#colliders) and the
+[vendor-chassis evidence](isaac/port-history.md#vendor-chassis-graft-2026-09-10).
+
+## Isaac documentation lifecycle cleanup
+
+**Gap.** The Isaac documentation still mixes current contracts with port-era
+investigation and completed migration material. In particular,
+`lidar-pipeline.md` is indexed as a current reference but is structured as a
+dated Isaac 6.0 investigation; `port-plan.md` contains both the active phase
+gate and extensive completed-phase history; and `migration-6.1.md` combines a
+completed execution record with still-useful rollback instructions.
+
+**Completion criteria.** Make `lidar-pipeline.md` describe only the current
+Isaac 6.1 lidar-to-ROS contract and live verification procedure, moving dated
+bug evidence to history. Reduce `port-plan.md` to unfinished gates or mark it
+entirely historical. Split the completed 6.1 migration evidence from any live
+rollback/runbook material. Update the index and cross-links, and add an
+automated internal Markdown-link check so deleted or moved owners cannot leave
+dangling references.
+
+**Context.** [Documentation ownership](project/documentation.md), the
+[Isaac document map](isaac/README.md), and [Isaac port history](isaac/port-history.md).
+
 ## Physical command-chain validation
 
 **Deployment gate.** The hardware adapter is attach-only and autonomous motion

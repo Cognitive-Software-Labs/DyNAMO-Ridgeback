@@ -4,7 +4,7 @@ How the robot gets from the Clearpath description into Isaac, what the
 geometry actually is, and which parts are hand-authored rather than imported.
 
 This is the canonical source for robot geometry. `port-plan.md` covers the
-phase plan, `open-issues.md` what is currently broken.
+phase plan, while the global `../BACKLOG.md` owns current gaps.
 
 ![robot render](assets/robot-render.png)
 
@@ -244,7 +244,8 @@ OMNI_KIT_ACCEPT_EULA=YES isaac_venv/bin/python3 \
 ```
 
 ⚠️ Physics with the hull is **unvalidated** — nothing has driven the robot
-into a wall to confirm it stops where it should (`open-issues.md` §5).
+into a wall to confirm it stops where it should
+([global backlog](../BACKLOG.md#isaac-hull-collider-validation)).
 
 ---
 
@@ -278,7 +279,8 @@ dummy_base_y → base_link`).
 
 **There is no vertical joint**, so `base_link` z is fixed at `--spawn-z` and
 the robot cannot settle onto a floor. That is why it floats 49.8 mm on stock
-worlds — see `open-issues.md` §2.
+worlds — see the
+[global backlog](../BACKLOG.md#isaac-stock-world-seating-and-ground-truth-map-regeneration).
 
 ---
 

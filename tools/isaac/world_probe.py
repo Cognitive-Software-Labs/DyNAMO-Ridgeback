@@ -8,7 +8,8 @@ the world at the scan plane, reports every contributing prim within a radius
 of a query point, and optionally ray-casts from a lidar pose over the contract
 arc so the prediction can be compared bin-for-bin against a live scan.
 
-Built for `docs/isaac/open-issues.md` §1: the GT map reads `free` around the
+Built for the detached-lidar investigation in `docs/isaac/port-history.md`:
+the GT map reads `free` around the
 `warehouse_full` spawn, yet the front lidar returns 0.41-0.55 m on the robot's
 left. One of those two is wrong, and a grid cell cannot say which prim it came
 from.

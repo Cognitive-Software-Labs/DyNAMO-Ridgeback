@@ -9,7 +9,8 @@ project helper (`.claude/agents/sim-runner.md`) automates the same recipe.
 > parented to `base_link`, which has no joint into the articulation — PhysX
 > turned `chassis_link` and left the sensors behind. Reparenting them to
 > `chassis_link` fixed it: `cmd_vel` flows, the robot drives, and frontier
-> goals succeed. See `docs/isaac/open-issues.md` §1.
+> goals succeed. See the
+> [Isaac port history](../isaac/port-history.md#lidars-detached-from-the-articulation-2026-09-11).
 >
 > **No Isaac coverage baseline exists yet**, and every pre-2026-09-11 figure
 > is void — they were measured with a sensor that did not rotate with the

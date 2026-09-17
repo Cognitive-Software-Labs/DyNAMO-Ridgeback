@@ -64,7 +64,7 @@ def main():
     ap.add_argument("--spin-transforms", action="store_true",
                     help="spin in place and log whether the LIDAR prim's "
                          "world transform keeps up with the chassis body's "
-                         "(open-issues.md §1 desync test)")
+                         "(port-history.md detached-lidar desync test)")
     ap.add_argument("--wz", type=float, default=0.4,
                     help="yaw rate for --spin-transforms (rad/s)")
     ap.add_argument("--frames", type=int, default=240,
@@ -362,7 +362,7 @@ def run_spin_transforms(app, timeline, rig, stage, robot_prim_path, tc,
                         tensor_pose, wz, frames) -> int:
     """Does the LIDAR prim's world transform keep up with the chassis body?
 
-    The desync test for `docs/isaac/open-issues.md` §1. The phantom return
+    The desync test recorded in `docs/isaac/port-history.md`. The phantom return
     band appears only while the robot moves, but the chassis and the lidars
     are one rigid body, so geometry alone cannot explain it. If the sensor's
     pose and the geometry it rays against are taken from different instants,
@@ -445,7 +445,7 @@ def run_spin_transforms(app, timeline, rig, stage, robot_prim_path, tc,
     if abs(worst) < 0.01:
         print("VERDICT: transforms stay locked — the sensor turns with the "
               "chassis.\n         This is the expected PASS once the lidars "
-              "are parented to chassis_link\n         (open-issues.md §1). "
+              "are parented to chassis_link\n         (see docs/isaac/port-history.md). "
               "notch_r above should also hold constant; if it\n         "
               "sweeps, the sensor is detached from the body again.",
               flush=True)

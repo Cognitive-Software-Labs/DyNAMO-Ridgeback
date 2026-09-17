@@ -8,7 +8,8 @@ each lidar over the full 270-deg contract arc. Output is a self-occlusion
 range profile: for every bearing, the range at which the robot's own body
 would answer, or `inf` if the arc is clear.
 
-This is the offline half of `docs/isaac/open-issues.md` §1. The stall's
+This is the offline half of the detached-lidar investigation recorded in
+`docs/isaac/port-history.md`. The stall's
 phantom returns land at base_link y ~ +0.39 == the body half-width, so
 "the lidar sees its own body" needs a geometric verdict, not an AABB guess:
 the lidars sit recessed in a notch, so the cross-section at the scan plane

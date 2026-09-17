@@ -5,7 +5,8 @@
 > (2026-09-10) lowered the lidars 11.6 cm, moving the scan plane from 0.418 to
 > 0.2264 above `base_link`; and the same commit parented them to `base_link`,
 > which detached them from the articulation so the scan stopped rotating with
-> the robot until that was fixed on 2026-09-11 (`open-issues.md` §1). The
+> the robot until that was fixed on 2026-09-11
+> ([port history](port-history.md#lidars-detached-from-the-articulation-2026-09-11)). The
 > RMSE / loop-error / IoU figures below are **not** a baseline and must not be
 > quoted as one — re-measure with `tools/isaac/slam_quality_probe.py`.
 >

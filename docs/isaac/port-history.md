@@ -2,11 +2,48 @@
 
 Superseded and completed investigation narratives, moved out of
 `port-plan.md` so the plan stays readable. Nothing here is current status:
-`open-issues.md` is what is broken now, `port-plan.md` is the phase plan.
+the global [`BACKLOG.md`](../BACKLOG.md) owns open work, and `port-plan.md`
+records the phase plan.
 
 Kept rather than deleted because each records **what was ruled out and how**,
 which is the expensive part to reproduce. Several of these conclusions were
 later overturned — where that happened it is marked inline.
+
+---
+
+## Lidars detached from the articulation (2026-09-11)
+
+Isaac navigation had planned but remained pinned at zero velocity because
+`collision_monitor` repeatedly saw short returns near the edge of the front
+scan. The emitters were not producing a subtle timing artefact: both lidar
+links were parented under `base_link`, a bare Xform with no joint into the
+articulation, while PhysX rotated `chassis_link`. The chassis therefore moved
+under sensors that remained fixed in world coordinates.
+
+The decisive spin diagnostic measured the chassis turning to 89.58 degrees
+while lidar world yaw stayed at exactly zero. A fixed wall's sensor-frame
+bearing had `d(bearing)/d(yaw) = -0.0025` instead of the expected -1.0, and the
+distance from the stationary emitter to the rotating chassis notch swept from
+0.049 m to 0.519 m—straight through the phantom-return band.
+
+Changing both UST-10LX parents in `clearpath/robot.yaml` from `base_link` to
+the coincident `chassis_link` restored rigid motion without changing published
+TF. After regeneration:
+
+| check | before | after |
+|---|---:|---:|
+| lidar−chassis yaw after the spin | −89.58 deg | 0.000000 deg |
+| scan rotation slope | −0.0025 | −1.0352 |
+| returns below 1 m while spinning | up to 6/frame | 0 |
+| commanded messages over 40 s | 0 | 799 |
+| odom displacement | 0.000 m | 1.1453 m |
+
+The temporary 10-degree edge mask was removed; regression tests require the
+full ±135-degree scan to remain publishable. Static self-occlusion, footprint
+size, assembler binning, world geometry at spawn, and simulator mode had all
+been ruled out. Every SLAM and coverage result produced while the sensors were
+detached is invalid; current recertification is tracked in the
+[global backlog](../BACKLOG.md#isaac-lidar-and-exploration-recertification).
 
 ---
 

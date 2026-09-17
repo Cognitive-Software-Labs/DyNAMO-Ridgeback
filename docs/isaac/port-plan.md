@@ -1,20 +1,20 @@
-# Port plan: NVIDIA Isaac Sim 6.0 backend
+# Port plan: NVIDIA Isaac Sim backend
 
-Status: **in progress — P0–P4, P7, and P8 done; P5 plumbing done,
-A/B sign-off pending a first baseline; P6 (G1 benchmark) deferred; P9 (Isaac
-6.1) approved and next, after a bounded 6.0.1 control. The earlier plan to
-delete Gazebo was superseded: Gazebo,
+Status: **in progress — P0–P4 and P7–P9 done; P5 plumbing done,
+A/B sign-off pending a first valid baseline; P6 (G1 benchmark) deferred. The
+Isaac 6.1 migration and bounded compatibility control completed on 2026-09-13.
+The earlier plan to delete Gazebo was superseded: Gazebo,
 Isaac, and hardware are now separate adapters around one autonomy package.**
 
 > The first Isaac baseline is the next Isaac-specific task — none has ever
 > been rerun. Navigation itself was fixed on 2026-09-11 (the lidars were
 > parented to `base_link` and so never rotated with the robot;
-> `open-issues.md` §1). Every coverage number below is void: the 2026-09-10
+> see `port-history.md`). Every coverage number below is void: the 2026-09-10
 > sensor-geometry work (coplanar lidars, −11.6 cm mount, vendor chassis graft,
 > camera + mast + D455) invalidated the earlier ones, and everything measured
 > between that and the 2026-09-11 reparent used a sensor that did not rotate.
-> **See `open-issues.md` — that is the live register; this file is the phase
-> plan and its history.** Treat performance figures here as "claimed at the
+> **See the global `../BACKLOG.md` for live work; this file is the phase plan
+> and its history.** Treat performance figures here as "claimed at the
 > time", not current. Superseded investigation narratives live in
 > `port-history.md`.
 
@@ -149,7 +149,7 @@ Bootstrap: cut `feat/isaac-sim-6-port` from `dev`; workspace already built in th
 ### P5 — E2E exploration + sign-off [M] — plumbing ✅, A/B ⏳ awaiting a baseline
 - ✅ Launch chain forwards `sim`/`rtf`/`headless`/`livestream`/`odom_noise`; readiness gates; HUD localization-error panel; `explore_probe` logs GT-drift, achieved RTF, coverage accuracy (`9e0f3c02`).
 - ✅ `tools/isaac/ab_compare.py` — gz-vs-isaac table + gate checker (`9e0f3c02`).
-- ⏳ **Unblocked 2026-09-11, not yet run.** The blocker was never a nav-tuning problem: the lidars were detached from the articulation and the scan did not rotate with the robot (`open-issues.md` §1). Exploration now drives and frontier goals succeed, so the A/B needs a baseline run, not a fix. The earlier SLAM-drift and "40% plateau" investigation is in `port-history.md`; its headline conclusion was that the plateau **does not reproduce** (clean runs land 51–83%) and that `odom_noise` is a partial lever, not the cap — but note those runs predate every 2026-09 geometry change.
+- ⏳ **Unblocked 2026-09-11, not yet run.** The blocker was never a nav-tuning problem: the lidars were detached from the articulation and the scan did not rotate with the robot (see `port-history.md`). Exploration now drives and frontier goals succeed, so the A/B needs a baseline run, not a fix. The earlier SLAM-drift and "40% plateau" investigation is in `port-history.md`; its headline conclusion was that the plateau **does not reproduce** (clean runs land 51–83%) and that `odom_noise` is a partial lever, not the cap — but note those runs predate every 2026-09 geometry change.
 - Gate: 3/3 complete, coverage ≥ gz mean − 10, genuine aborts ≤ gz max, RTF ≥ 0.8 throttled headless. Needs 3–5 seeds/condition — variance is 51–83%.
 
 ### P6 — Target-distance benchmark port [L]
@@ -202,10 +202,11 @@ Commits `eaea0674` `70a5faa6` `e993ee29` `d26edef5` `0a81fbf6` `53a924a6`. Geome
   backend launch loads, dependency profiles verify, docs and Graphify are
   current. Physical command-chain and D455 validation remain deployment gates.
 
-### P9 — Isaac Sim 6.1 migration [M] — approved, next after bounded control
+### P9 — Isaac Sim 6.1 migration [M] ✅
 
-The migration is decision-complete in
-[`migration-6.1.md`](migration-6.1.md). It was deliberately resequenced: take
+The migration completed and was promoted on 2026-09-13; its execution record
+is [`migration-6.1.md`](migration-6.1.md). The plan below is retained as
+historical rationale. It was deliberately resequenced: take
 one bounded 6.0.1 compatibility control, then move to 6.1 immediately. Do not
 wait for robot seating or a multi-seed 6.0.1 baseline; equally, do not describe
 the bounded run as a statistical A/B comparison.

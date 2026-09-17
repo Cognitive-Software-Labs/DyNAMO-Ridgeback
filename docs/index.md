@@ -28,7 +28,7 @@ troubleshooting, planning, and historical documentation.
 - [Port status and document map](isaac/README.md)
 - [Robot, sensor, and generated-USD model](isaac/robot-model.md)
 - [RTX lidar pipeline](isaac/lidar-pipeline.md)
-- [Open Isaac correctness work](isaac/open-issues.md)
+- [Active Isaac engineering gaps](BACKLOG.md#isaac-stock-world-seating-and-ground-truth-map-regeneration)
 - [Port phase plan](isaac/port-plan.md)
 - [Isaac Sim 6.1 migration](isaac/migration-6.1.md)
 - [Investigation history](isaac/port-history.md)

@@ -29,7 +29,7 @@ sensors:
     # lidar frame stayed at 0.0, the scan did not rotate with the robot
     # (d(bearing)/d(yaw) = -0.0025 over 234 deg), and the chassis sweeping
     # under a static emitter is what produced the phantom returns that pinned
-    # cmd_vel at zero (docs/isaac/open-issues.md §1).
+    # cmd_vel at zero (docs/isaac/port-history.md, lidar detachment).
     # chassis_link is coincident with base_link (identity local transform), so
     # these xyz values and the published TF are unchanged by the reparent.
     - model: hokuyo_ust

@@ -54,7 +54,8 @@ plane — i.e. the lidar `xyz` in `clearpath/robot.yaml`, or `--spawn-z`.
 Not every `robot.yaml` edit qualifies: the 2026-09-11 reparent of the lidars
 from `base_link` to `chassis_link` changed the parent only, and the two links
 are coincident, so the plane did not move and these maps stayed valid. The
-pending seat fix (`docs/isaac/open-issues.md` §2) *does* move it — the plane
+pending seat fix ([global backlog](../../../../docs/BACKLOG.md#isaac-stock-world-seating-and-ground-truth-map-regeneration))
+*does* move it — the plane
 becomes `floor_z + 0.25257`, so stock worlds drop from 0.3024 to 0.25257 and
 all four maps need one regeneration then.
 

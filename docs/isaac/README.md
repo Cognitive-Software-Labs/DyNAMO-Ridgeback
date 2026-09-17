@@ -8,9 +8,9 @@ autonomy stack. Gazebo and hardware remain separate adapters. In progress on
 
 | doc | what it owns |
 |---|---|
-| [**open-issues.md**](open-issues.md) | **what is currently broken** — read first |
+| [**global backlog**](../BACKLOG.md) | **all active engineering gaps**, including Isaac |
 | [port-plan.md](port-plan.md) | the phase plan, P0–P9, and acceptance criteria |
-| [**migration-6.1.md**](migration-6.1.md) | **approved 6.1 migration, driver rollout, 5.1 safety gate, and depth decision** |
+| [**migration-6.1.md**](migration-6.1.md) | **completed 6.1 migration, driver rollout, 5.1 safety gate, and depth decision** |
 | [**camera-depth.md**](camera-depth.md) | **Isaac D455 colour/depth implementation, modes, ROS contract, validation, and troubleshooting** |
 | [robot-model.md](robot-model.md) | URDF → USD → meshes → sensors → colliders |
 | [lidar-pipeline.md](lidar-pipeline.md) | how the RTX lidar reaches ROS, and SLAM quality |
@@ -31,15 +31,16 @@ fixed it. The 6.1 migration passed its bounded compatibility gate on
 2026-09-13 at RTF 0.868 with 17 successful goals and no aborts. This is not a
 statistical baseline, and every older coverage or SLAM number measured before
 the 2026-09-10 geometry correction remains void. The robot still floats
-49.8 mm on stock worlds (§2). P0–P4, P7, and the P9 runtime migration are
-done; P5 still needs a multi-seed baseline and P6 is deferred. See
+49.8 mm on stock worlds. P0–P4 and P7–P9 are done; P5 still needs a
+multi-seed baseline and P6 is deferred. Active work is owned by the
+[global backlog](../BACKLOG.md). See
 [`migration-6.1.md`](migration-6.1.md) for the execution record.
 
 ## Where facts live
 
 Each fact has one home. Cross-reference rather than copy:
 
-- **broken now** → `open-issues.md`
+- **open work** → global `BACKLOG.md`
 - **plan, phases, acceptance** → `port-plan.md`
 - **6.1 migration and shared-driver procedure** → `migration-6.1.md`
 - **Isaac D455 image/depth implementation and runbook** → `camera-depth.md`

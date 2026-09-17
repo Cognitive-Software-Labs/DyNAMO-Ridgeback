@@ -1,7 +1,7 @@
 """Contract tests for the Isaac RTX-lidar scan assembler (no rclpy needed).
 
 Pins the published scan geometry to the UST-10LX contract, and guards the
-regression that `docs/isaac/open-issues.md` §1 turned out to be: the lidar
+regression recorded in `docs/isaac/port-history.md`: the lidar
 links were parented to `base_link`, a bare Xform with no joint into the
 articulation, so PhysX turned `chassis_link` and left the sensors behind. The
 chassis then swept under a static emitter and its own notch edge came into
@@ -56,9 +56,9 @@ def test_assembler_declares_no_bin_mask():
     transform bug, fixed in clearpath/robot.yaml by reparenting the lidars to
     chassis_link — not something the assembler should hide."""
     assert not hasattr(A, "EDGE_MASK_DEG"), \
-        "an edge mask is back; fix the root cause instead (open-issues.md §1)"
+        "an edge mask is back; fix the root cause instead (see Isaac port history)"
     assert not hasattr(A, "edge_mask"), \
-        "an edge mask is back; fix the root cause instead (open-issues.md §1)"
+        "an edge mask is back; fix the root cause instead (see Isaac port history)"
 
 
 def test_full_270_deg_arc_is_publishable():
