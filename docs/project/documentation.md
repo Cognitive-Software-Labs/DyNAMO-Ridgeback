@@ -52,6 +52,38 @@ rule it routes to — the graphify rules, in particular, are owned by
 - Prefer relative Markdown links so documentation remains valid in worktrees and
   on repository hosts.
 
+## Visual ownership and document scale
+
+Visuals are part of the documentation contract, not disposable decoration.
+Use a diagram, plot, annotated render, or comparison image when it makes a
+spatial relationship, mechanism, state transition, or measured result easier
+to verify than prose alone.
+
+- Put each durable visual under the asset directory of the document that owns
+  the claim, and embed it beside that claim. A current geometry figure belongs
+  with its technical reference; a run-specific trace belongs with its history
+  record.
+- Runtime output under `artifacts/` is evidence input, not durable
+  documentation. Promote the interpretation-ready figures needed by future
+  readers into tracked documentation assets.
+- Give embedded visuals descriptive alt text and a short caption that explains
+  what to notice. Preserve the command, revision, or evidence path needed to
+  regenerate them when that provenance matters.
+
+Aggregate documents must remain compact routers rather than grow into permanent
+catch-alls. This applies especially to indexes, overview pages, broad history
+or changelog pages, backlogs, and long-lived plans.
+
+- Review an aggregate page whenever adding a substantial section. If a topic
+  has its own narrative, evidence, assets, lifecycle, or reuse value, extract
+  it into a dedicated Markdown file under the same ownership family.
+- Leave a short summary and relative link at the aggregate owner after an
+  extraction. Do not retain a second editable copy of the extracted prose.
+- Prefer semantic extraction over a hard line-count limit: the trigger is that
+  a reader can understand or maintain the chunk independently. Regularly split
+  the largest self-contained chunks before the aggregate page stops being
+  quickly scannable.
+
 ## Precedence
 
 Current code and generated launch arguments are the final authority when a
