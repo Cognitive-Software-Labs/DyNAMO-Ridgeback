@@ -120,6 +120,35 @@ poses. Repeat the scan, motion, and camera topic gates after the correction.
 **Context.** [Isaac robot and sensor model](isaac/robot-model.md) and
 `test_camera_description.py`'s fixed-joint-reduction guard.
 
+## Optional: restore Gazebo exploration worlds and backend-specific maps
+
+**Opportunity.** Gazebo remains a supported backend, but the adapter currently
+ships only `mock_hospital` for exploration and `target_distance_calibration`
+for target benchmarking. The only Gazebo `mock_hospital`, `warehouse`, and
+`office` coverage maps are archived under `historical/`; the latter two source
+worlds are no longer present. Meanwhile the coverage overlay looks up
+`<world>.pgm` without considering the backend. Restoring same-named Gazebo and
+Isaac worlds under that contract could silently score one simulator against
+the other simulator's geometry.
+
+**Completion criteria.** Regenerate a complete analytical map set for the
+current Gazebo `mock_hospital` from its SDF. Restore or re-import the exact
+Gazebo `warehouse` and `office` world sources with recorded provenance before
+promoting their maps; do not promote the archived captures on name alone.
+Make map identity explicitly backend-qualified—for example,
+`ground_truth_maps/gz/<world>` and `ground_truth_maps/isaac/<world>`—and pass
+the selected backend into coverage-map resolution. Preserve convenient
+operator world names, but treat `(backend, world)` as the unique identity in
+storage, diagnostics, artifacts, and documentation. Add tests proving that a
+Gazebo run cannot fall back to an Isaac map, or vice versa, even when both
+worlds are named `warehouse` or `office`. Generate `.pgm`, `.yaml`, `.png`, and
+`.npz` artifacts for every restored map and visually verify them against their
+own simulator world.
+
+**Context.** [Ground-truth map runbook](../src/ridgeback_autonomy/sim/ground_truth_maps/README.md),
+[exploration benchmark runbook](exploration/benchmarking.md), and the Gazebo
+adapter worlds under `src/ridgeback_autonomy_gz/sim/worlds/`.
+
 ## Physical camera validation
 
 **Gap.** The repository selects a D455 and has parser/description tests, but no
