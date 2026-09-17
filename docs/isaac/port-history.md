@@ -41,7 +41,7 @@ full ±135-degree scan to remain publishable. Static self-occlusion, footprint
 size, assembler binning, world geometry at spawn, and simulator mode had all
 been ruled out. Every SLAM and coverage result produced while the sensors were
 detached is invalid; current recertification is tracked in the
-[global backlog](../BACKLOG.md#isaac-lidar-and-exploration-recertification).
+[global backlog](../BACKLOG.md#isaac-exploration-recertification--p5).
 
 ---
 

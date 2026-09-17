@@ -37,7 +37,8 @@ def _include_selected_backend(context):
     argument_names = (
         'setup_path', 'world', 'namespace', 'clearpath_rviz', 'gz_gui',
         'headless_rendering', 'rtf', 'headless', 'livestream', 'odom_noise',
-        'camera', 'sim_mode', 'sensor_hz', 'start_hardware_platform',
+        'noise_seed', 'camera', 'sim_mode', 'sensor_hz',
+        'start_hardware_platform',
         'camera_profile',
         'depth_fidelity',
     )
@@ -51,6 +52,7 @@ def _include_selected_backend(context):
         arguments.pop('camera_profile')
     if backend != 'isaac':
         arguments.pop('depth_fidelity')
+        arguments.pop('noise_seed')
     return [IncludeLaunchDescription(
         PythonLaunchDescriptionSource(adapter_launch),
         launch_arguments=arguments.items(),
@@ -81,6 +83,7 @@ def generate_launch_description():
         DeclareLaunchArgument('headless', default_value='true'),
         DeclareLaunchArgument('livestream', default_value='false'),
         DeclareLaunchArgument('odom_noise', default_value='1.0'),
+        DeclareLaunchArgument('noise_seed', default_value='0'),
         DeclareLaunchArgument('camera', default_value='true'),
         DeclareLaunchArgument('camera_profile', default_value=DEFAULT_CAMERA_PROFILE,
                               choices=CAMERA_PROFILE_CHOICES),

@@ -243,17 +243,18 @@ def attach_lidars(stage, robot_root: str = "/ridgeback",
         # correct (verified against the analytic world grid, ~2.6 cm), so
         # ros_io.py bins them into the contract LaserScan instead.
         #
-        # TWO prims per lidar: the generic rotary model only fires a
-        # 180-deg drum transit per tick from startAzimuthOffsetDeg (valid
-        # subset thereof), regardless of tickRate/emitter tricks —
-        # measured, not documented. rtx_lidar (offset 0) covers
-        # [-135, 0]; rtx_lidar_l (offset -135) covers [0, +135].
-        for prim_name, suffix in (("rtx_lidar", ""), ("rtx_lidar_l", "_l")):
+        # One complete rotary cloud per physical sensor. The ROS assembler
+        # clips to +/-135 degrees; RTX angular clipping is not used.
+        for prim_name, suffix in (("rtx_lidar", ""),):
             lidar = laser.GetChild(prim_name)
             if not lidar:
                 raise RuntimeError(f"{laser.GetPath()}: no {prim_name} "
                                    f"child — " + REGEN_HINT)
             created.append(str(lidar.GetPath()))
+            print(f"lidar configuration {lidar.GetPath()}: " + repr({
+                attr.GetName(): attr.Get() for attr in lidar.GetAttributes()
+                if attr.GetName().startswith("omni:sensor:")
+                and attr.HasAuthoredValueOpinion()}), flush=True)
             rp_path = _render_product(lidar.GetPath(), [32, 32])
             node = f"lidar{i}_pc{suffix}"
             nodes.append((node, "isaacsim.ros2.bridge.ROS2RtxLidarHelper"))

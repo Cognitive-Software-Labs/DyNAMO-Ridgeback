@@ -10,7 +10,7 @@ Answers, in one attach, the questions that section lists as untried:
    `action_type: approach`, so it is swept forward along cmd_vel for
    `time_before_collision` -- "inside the footprint" is not the static hull.
 3. Do the near returns exist BEFORE the assembler? The raw bridge clouds
-   (`points`, `points_l`) are reported per half-arc prim, so a phantom that
+   (`points`) are reported per physical sensor, so a phantom that
    only appears post-binning separates an assembler bug from a sensor one.
 4. Is the cmd_vel chain breaking where §1 says it is?
 
@@ -101,7 +101,7 @@ class StallProbe(Node):
             self.create_subscription(
                 LaserScan, f"sensors/lidar2d_{i}/scan",
                 lambda m, t=f"lidar2d_{i}/scan": self._on_scan(t, m), 10)
-            for suffix in ("points", "points_l"):
+            for suffix in ("points",):
                 topic = f"sensors/lidar2d_{i}/{suffix}"
                 self.create_subscription(
                     PointCloud2, topic,

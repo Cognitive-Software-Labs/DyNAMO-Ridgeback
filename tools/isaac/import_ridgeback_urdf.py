@@ -588,16 +588,11 @@ def add_sensor_prims(usd_path: Path) -> None:
                 return prim
         raise RuntimeError(f"prim {name} missing from imported robot")
 
-    # Two prims per lidar: the generic rotary model only fires a 180-deg
-    # drum transit per tick from startAzimuthOffsetDeg (the valid-window
-    # subset of it), regardless of tickRate or emitter patterns —
-    # measured against the analytic world grid, not documented. Offset 0
-    # covers azimuths [-135, 0], offset -135 covers [0, +135];
-    # ros_io.LidarScanAssembler merges both clouds into the 270-deg scan.
+    # A full rotary cloud avoids RTX's clipped-sector output path. The ROS
+    # assembler enforces the public +/-135-degree sensor window.
     for i in (0, 1):
         laser = find(f"lidar2d_{i}_laser")
-        for prim_name, az_offset in (("rtx_lidar", 0.0),
-                                     ("rtx_lidar_l", -135.0)):
+        for prim_name, az_offset in (("rtx_lidar", 0.0),):
             lidar = stage.DefinePrim(
                 laser.GetPath().AppendChild(prim_name), "OmniLidar")
             if not lidar.ApplyAPI("OmniSensorGenericLidarCoreAPI"):

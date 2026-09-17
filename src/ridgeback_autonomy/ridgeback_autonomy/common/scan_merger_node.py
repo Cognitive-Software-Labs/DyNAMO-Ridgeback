@@ -38,16 +38,23 @@ return, matching one physical surface being closer to one sensor than
 the other, not an average.
 """
 import math
+import time
 from collections import deque
 
 import numpy as np
 import rclpy
 import tf2_ros
 from rclpy.node import Node
+from rclpy.clock import Clock, ClockType
 from rclpy.qos import (DurabilityPolicy, HistoryPolicy, QoSProfile,
                        ReliabilityPolicy)
 from rclpy.time import Time
 from sensor_msgs.msg import LaserScan
+
+from ridgeback_autonomy.common.lidar_contract import (
+    FRONT_LIDAR_XY_YAW,
+    REAR_LIDAR_XY_YAW,
+)
 
 
 def yaw_of(q):
@@ -72,9 +79,11 @@ class ScanMergerNode(Node):
         # Static extrinsics (base_link -> lidar) -- provably constant across
         # all yaw, so looked up once here rather than per scan.
         self.declare_parameter('front_lidar_xyz_yaw',
-                               [0.3922, 0.0, 0.0, 0.0])
+                               [*FRONT_LIDAR_XY_YAW[:2], 0.0,
+                                FRONT_LIDAR_XY_YAW[2]])
         self.declare_parameter('rear_lidar_xyz_yaw',
-                               [-0.3922, 0.0, 0.0, math.pi])
+                               [*REAR_LIDAR_XY_YAW[:2], 0.0,
+                                REAR_LIDAR_XY_YAW[2]])
 
         front_topic = self.get_parameter('front_topic').value
         rear_topic = self.get_parameter('rear_topic').value
@@ -115,9 +124,13 @@ class ScanMergerNode(Node):
         self.create_subscription(LaserScan, rear_topic, self._on_rear, sensor_qos)
         self.create_subscription(LaserScan, front_topic, self._on_front, sensor_qos)
         self.create_timer(max(log_period, 1.0), self._log_summary)
+        self.create_timer(0.01, self._drain_pending,
+                          clock=Clock(clock_type=ClockType.STEADY_TIME))
 
         self._n_front = 0
         self._n_paired = 0
+        self._n_equal_stamp = 0
+        self._n_motion_compensated = 0
         self._n_front_only = 0
         self._n_rear_dropped = 0
         self._deltas = deque(maxlen=500)
@@ -181,7 +194,12 @@ class ScanMergerNode(Node):
 
     def _on_front(self, front_msg: LaserScan):
         self._n_front += 1
-        self._front_pending.append((stamp_s(front_msg.header.stamp), front_msg))
+        if len(self._front_pending) == self._front_pending.maxlen:
+            stamp, message, _ = self._front_pending.popleft()
+            rear_stamp, rear = self._nearest_rear(stamp)
+            self._publish_merge(stamp, message, rear_stamp, rear)
+        self._front_pending.append((stamp_s(front_msg.header.stamp), front_msg,
+                                    time.monotonic()))
         self._drain_pending()
 
     def _drain_pending(self):
@@ -190,12 +208,15 @@ class ScanMergerNode(Node):
         topic's message the executor happens to process first this cycle
         (see _front_pending's docstring note in __init__)."""
         while self._front_pending:
-            t_front, front_msg = self._front_pending[0]
+            t_front, front_msg, received_at = self._front_pending[0]
             t_rear, rear_msg = self._nearest_rear(t_front)
             # A same-or-later rear sample exists in the buffer, or this
             # front entry has aged past 2x tolerance with nothing arriving
             # -- either way it's time to resolve (merge or front-only).
-            age = self.get_clock().now().nanoseconds * 1e-9 - t_front
+            # A queued scan may already be old in simulation time when this
+            # subscriber starts. Give the rear callback a real opportunity
+            # to run; capture-time age is not a callback delivery deadline.
+            age = time.monotonic() - received_at
             if rear_msg is None and age < 2 * self.tolerance:
                 break   # give the rear callback a chance to still arrive
             self._front_pending.popleft()
@@ -211,6 +232,7 @@ class ScanMergerNode(Node):
             if abs(delta) < 1e-6:
                 rear_points = self._scan_points_in_frame(rear_msg, self.rear_pose)
                 self._n_paired += 1
+                self._n_equal_stamp += 1
             else:
                 odom_front = self._odom_base(t_front)
                 odom_rear = self._odom_base(t_rear)
@@ -233,36 +255,47 @@ class ScanMergerNode(Node):
                         cy + s * rear_local[:, 0] + c * rear_local[:, 1],
                     )) if rear_local.shape[0] else rear_local
                     self._n_paired += 1
+                    self._n_motion_compensated += 1
         else:
             self._n_front_only += 1
 
-        increment = front_msg.angle_increment
-        n_bins = int(round(2.0 * math.pi / increment))
-        angle_min = -math.pi
-        ranges = np.full(n_bins, np.inf, dtype=np.float64)
-
-        for points in (front_points, rear_points):
-            if points.shape[0] == 0:
-                continue
-            r = np.hypot(points[:, 0], points[:, 1])
-            ang = np.arctan2(points[:, 1], points[:, 0])
-            bin_idx = np.mod(np.round((ang - angle_min) / increment).astype(int),
-                            n_bins)
-            # "nearest valid range wins" on a genuine bin collision
-            np.minimum.at(ranges, bin_idx, r)
+        ranges, angle_min = self._project_points(
+            (front_points, rear_points), front_msg.angle_increment,
+            front_msg.range_min, front_msg.range_max + self._range_pad)
 
         out = LaserScan()
         out.header.stamp = front_msg.header.stamp   # t_front is the reference time
         out.header.frame_id = self.output_frame_id
         out.angle_min = angle_min
-        out.angle_max = angle_min + (n_bins - 1) * increment
-        out.angle_increment = increment
+        out.angle_max = angle_min + (len(ranges) - 1) * front_msg.angle_increment
+        out.angle_increment = front_msg.angle_increment
         out.time_increment = 0.0
         out.scan_time = front_msg.scan_time
         out.range_min = front_msg.range_min
         out.range_max = front_msg.range_max + self._range_pad
         out.ranges = ranges.tolist()
         self._pub.publish(out)
+
+    @staticmethod
+    def _project_points(point_sets, increment, range_min=0.0, range_max=math.inf):
+        """Project base-frame Cartesian points onto the merged angular grid."""
+        n_bins = int(round(2.0 * math.pi / increment))
+        angle_min = -math.pi
+        ranges = np.full(n_bins, np.inf, dtype=np.float64)
+        for points in point_sets:
+            if points.shape[0] == 0:
+                continue
+            r = np.hypot(points[:, 0], points[:, 1])
+            ang = np.arctan2(points[:, 1], points[:, 0])
+            # Apply base-frame limits before nearest-return reduction: an
+            # invalid close point must not hide a valid farther collision.
+            valid = np.isfinite(r) & (r >= range_min) & (r <= range_max)
+            r, ang = r[valid], ang[valid]
+            bin_idx = np.mod(np.round((ang - angle_min) / increment).astype(int),
+                            n_bins)
+            # "nearest valid range wins" on a genuine bin collision
+            np.minimum.at(ranges, bin_idx, r)
+        return ranges, angle_min
 
     def _log_summary(self):
         if self._deltas:
@@ -274,6 +307,8 @@ class ScanMergerNode(Node):
             stats = 'no paired samples yet'
         self.get_logger().info(
             f'scan_merger: front={self._n_front} paired={self._n_paired} '
+            f'equal_stamp={self._n_equal_stamp} '
+            f'motion_compensated={self._n_motion_compensated} '
             f'front_only(no rear in tolerance)={self._n_front_only} '
             f'rear_dropped(no odom TF)={self._n_rear_dropped} '
             f'tf_misses={self._tf_misses} {stats}')
@@ -288,7 +323,11 @@ def main():
         pass
     finally:
         node.destroy_node()
-        rclpy.shutdown()
+        # SIGINT may already have shut the default context down inside
+        # rclpy.spin(); avoid turning a clean diagnostic teardown into an
+        # RCLError from a second shutdown call.
+        if rclpy.ok():
+            rclpy.shutdown()
 
 
 if __name__ == '__main__':

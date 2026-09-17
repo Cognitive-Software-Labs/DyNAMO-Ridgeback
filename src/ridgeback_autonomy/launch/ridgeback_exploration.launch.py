@@ -200,6 +200,7 @@ def generate_launch_description():
     headless = LaunchConfiguration('headless')
     livestream = LaunchConfiguration('livestream')
     odom_noise = LaunchConfiguration('odom_noise')
+    noise_seed = LaunchConfiguration('noise_seed')
     camera = LaunchConfiguration('camera')
     sim_mode = LaunchConfiguration('sim_mode')
     sensor_hz = LaunchConfiguration('sensor_hz')
@@ -278,6 +279,10 @@ def generate_launch_description():
         DeclareLaunchArgument(
             'odom_noise', default_value='1.0',
             description='Isaac: odometry drift scale; 0 = perfect (gz ignores)'),
+        DeclareLaunchArgument(
+            'noise_seed', default_value='0',
+            description='Isaac: reproducible odometry/IMU noise seed '
+                        '(gz/hardware ignore)'),
         DeclareLaunchArgument(
             'camera', default_value='true',
             description='Isaac: attach D455 camera; false = lidar-only '
@@ -421,6 +426,7 @@ def generate_launch_description():
                 'headless': headless,
                 'livestream': livestream,
                 'odom_noise': odom_noise,
+                'noise_seed': noise_seed,
                 'camera': camera,
                 'camera_profile': LaunchConfiguration('camera_profile'),
                 'depth_fidelity': LaunchConfiguration('depth_fidelity'),

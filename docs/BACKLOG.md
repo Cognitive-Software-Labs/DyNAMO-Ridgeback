@@ -6,20 +6,17 @@ unselected alternatives belong in `docs/do_not_try_again/`. Closing an item mean
 its completion criteria and moving durable results to the relevant reference or
 history document—not retaining a crossed-out entry here.
 
-## Isaac lidar and exploration recertification
+## Isaac exploration recertification / P5
 
-**Gap.** No statistically valid Isaac exploration baseline exists for the
-current robot. The measured sensor geometry changed repeatedly on 2026-09-10,
-and the 2026-09-11 lidar reparent fixed an orphan-body defect that left the
-emitters stationary while the chassis rotated. All earlier coverage and SLAM
-quality numbers are therefore void. The front/rear merged-scan path also still
-needs a fresh-boot live validation after its TF-remap and range-bound fixes.
+**Gap.** No statistically valid autonomous Isaac exploration baseline exists
+for the current robot. The [LiDAR/closed-loop SLAM qualification](history/2026-09-17-isaac-lidar-qualification.md)
+passed, but it does not qualify frontier exploration or provide the matching
+Gazebo coverage comparison. Earlier invalidated exploration numbers remain void.
 
-**Completion criteria.** With the corrected seating and regenerated maps,
-validate the raw 270-degree scans and the merged SLAM scan from a clean Isaac
-6.1 boot, first with zero odometry noise and then with the configured noise. Re-measure
-SLAM quality, confirm the front/rear stamp and motion-compensation behavior,
-and run 3–5 seeds per comparison condition on a suitably quiet host. P5 passes
+**Completion criteria.** With corrected seating, regenerated maps, and the
+qualified LiDAR pipeline, run autonomous exploration over 3–5 seeds per
+comparison condition on a suitably quiet host. Establish a current matching
+Gazebo baseline. P5 passes
 only when 3/3 runs complete, coverage is at least the Gazebo mean minus 10
 points, genuine aborts do not exceed the Gazebo maximum, and throttled headless
 RTF is at least 0.8.

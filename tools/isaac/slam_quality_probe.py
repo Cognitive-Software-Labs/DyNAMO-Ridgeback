@@ -26,7 +26,10 @@ GT walls in blue, GT trajectory green, slam trajectory red).
 Run under a sourced workspace against a live sim + slam stack:
 
     python3 tools/isaac/slam_quality_probe.py --tag B \
-        --gt-grid <gt_hospital.npz> --slam-log <slam_launch.log> --out <dir>
+        --gt-grid <gt_hospital.npz> --slam-log <slam_launch.log> --out <dir> \
+        --slam-source merged --odom-noise 0.0 --noise-seed 0
+
+Condition arguments must match the live launch; they label the evidence.
 
 Rotation is capped at WZ_MAX=0.4 rad/s (frame-quantized sensor pose smears
 scale with wz; nav-realistic rates are the regime under test). Waypoints are
@@ -399,6 +402,13 @@ def main():
     ap.add_argument("--out", required=True, type=Path)
     ap.add_argument("--slam-log", type=Path, default=None)
     ap.add_argument("--namespace", default="r100_0001")
+    ap.add_argument("--slam-source", required=True,
+                    choices=("front_only", "merged"),
+                    help="launch condition recorded in the metrics artifact")
+    ap.add_argument("--odom-noise", required=True, type=float,
+                    help="launch odometry-noise scale recorded in the artifact")
+    ap.add_argument("--noise-seed", required=True, type=int,
+                    help="launch noise seed recorded in the artifact")
     ap.add_argument("--wz-max", type=float, default=WZ_MAX,
                     help="rotation-rate cap rad/s (default 0.4; raise to ~1.5 "
                          "to reproduce the fast-turn yaw drift)")
@@ -438,6 +448,9 @@ def main():
     metrics = {"tag": args.tag, "waypoints": waypoints,
                "mode": "repro" if args.repro else "loop",
                "wz_max": WZ_MAX, "vx_max": VX_MAX,
+               "slam_source": args.slam_source,
+               "odom_noise": args.odom_noise,
+               "noise_seed": args.noise_seed,
                "aborted": False, "abort_reason": ""}
     drive_t0 = probe.now_s()
     probe.gt_path.clear()

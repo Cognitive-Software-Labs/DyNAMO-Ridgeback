@@ -1,256 +1,151 @@
-# SLAM Quality Investigation — Isaac 6.0 Port (2026-07-12)
+# Isaac 6.1 LiDAR pipeline
 
-> ⚠️ **Every number in this file is from 2026-07-12 and describes a rig that
-> no longer exists.** Two later changes invalidate them: `a33111c2`
-> (2026-09-10) lowered the lidars 11.6 cm, moving the scan plane from 0.418 to
-> 0.2264 above `base_link`; and the same commit parented them to `base_link`,
-> which detached them from the articulation so the scan stopped rotating with
-> the robot until that was fixed on 2026-09-11
-> ([port history](port-history.md#lidars-detached-from-the-articulation-2026-09-11)). The
-> RMSE / loop-error / IoU figures below are **not** a baseline and must not be
-> quoted as one — re-measure with `tools/isaac/slam_quality_probe.py`.
->
-> What *does* still hold is the mechanism half of this document: the three
-> sensor-pipeline bugs, why the assembler exists, and the 6.0.1 defects that
-> force it. Read it for how the pipeline works, not for how well it scored.
+The two UST-10LX scans remain independent navigation inputs. `slam_source`
+selects SLAM input only: `front_only` (the public default) uses the front scan;
+`merged` explicitly enables a front/rear scan in `base_link`.
 
-Handoff dossier for the "rotation cooks the SLAM map" investigation on
-`feat/isaac-sim-6-port`. Three distinct sensor-pipeline bugs were found and
-fixed; the originally-suspected `slam_toolbox` params were largely exonerated
-by measurement. Commits: `66493670` (scan-from-cloud + harness),
-`e1862498` (left-half FOV restore). Artifacts referenced below live in
-[`assets/slam-quality/`](assets/slam-quality/).
-
-## TL;DR
-
-| | before | after |
-|---|---|---|
-| symptom | any rotation destroyed the map; loop closure never worked | 35.8 m closed loop maps clean |
-| pose RMSE vs GT | 8.36 m | 0.19–0.23 m |
-| end-at-start loop error | 1.15 m | 0.07–0.09 m |
-| map IoU vs analytic GT | 0.10 | 0.54–0.55 |
-| lidar FOV actually published | 135° (right half only) | true 270° |
-
-The fix is **not** in `slam_toolbox_params.yaml` (only
-`link_match_minimum_response_fine 0.1 → 0.8` survived measurement there).
-It is in how the RTX lidar gets from Isaac 6.0.1 into the ROS `LaserScan`.
-
-## Bug 1 — bridge laser_scan writer hardcodes 360° for ROTARY lidars
-
-`OgnROS2RtxLidarHelper._read_laser_scan_metadata()` (readable at
-`isaac_venv/lib/python3.12/site-packages/isaacsim/exts/isaacsim.ros2.nodes/
-isaacsim/ros2/nodes/nodes/OgnROS2RtxLidarHelper.py`):
-
-```python
-else:   # ROTARY
-    h_res = 360.0 * rotation_rate / firing_rate
-    az_start = -180.0
-    az_end = 180.0
-    h_fov = 360.0
+```text
+front RTX cloud ── 270° assembler ── front scan ──┬── navigation
+                                               ├── front_only SLAM
+                                               └──┐
+                                                  ├── merger ── merged SLAM
+rear RTX cloud ─── 270° assembler ── rear scan ──┬──┘
+                                               └── navigation
 ```
 
-`validStart/EndAzimuthDeg` is ignored for ROTARY sensors — only SOLID_STATE
-reads real emitter azimuths. Our UST-10LX's 270° arc of returns was packed
-into bin labels spanning 360°:
+## Current contracts
 
-- scan content rotated **4/3× the robot yaw** (spin cross-correlation test),
-  with the label window sliding with heading;
-- self-consistent under straight driving → crisp maps;
-- poison under any rotation → the observed smear/starburst (baseline
-  probe run below: slam estimate collapsed near the origin while the
-  robot drove the loop; GT walls blue, GT trajectory green, slam red).
+![Top view of the front and rear 270-degree scan windows, and the sensor-to-base range offset](assets/lidar/scan-contract.png)
 
-![Run A: baseline on the broken sensor — starburst map, estimate stuck near origin](assets/slam-quality/A_overlay.png)
+Each raw window is centered on its sensor's forward axis; the rear sensor
+faces backward. The sensor origins are ±0.3922 m from `base_link`. The right
+panel shows why a valid 10 m raw return requires a 10.3922 m merged limit.
+Arc radii on the left illustrate angular coverage, not maximum range.
+Regenerate with `python3 tools/isaac/lidar_qualification.py contract-plot
+--out docs/isaac/assets/lidar/scan-contract.png`.
 
-**Exoneration matrix** (broken sensor): baseline (A), travel-gated params
-(B), zero odometry noise (C) all failed identically — RMSE 7–8 m, IoU ~0.1.
-Neither the slam params nor odom noise was the cause.
+Topic names below are relative to `r100_0001`.
 
-![Run B: travel-gated slam params on the broken sensor — still destroyed](assets/slam-quality/B_overlay.png)
+| Topic | Frame | Geometry | Declared range |
+|---|---|---|---|
+| `sensors/lidar2d_0/scan` | `lidar2d_0_laser` | 1081 bins, -135° through +135°, 0.25° | 0.06–10.0 m |
+| `sensors/lidar2d_1/scan` | `lidar2d_1_laser` | same | 0.06–10.0 m |
+| `sensors/scan_slam_merged` | `base_link` | 1440 bins, -180° through +179.75°, 0.25° | 0.06–10.3922 m |
 
-![Run C: zero odometry noise on the broken sensor — still destroyed](assets/slam-quality/C_overlay.png)
+Raw scans have a 0.025 s scan period. In deterministic qualification they
+publish at 40 Hz in simulation time. A bin with no valid current return is
+positive infinity; the assembler does not interpolate or retain old rays.
+Nearest valid returns win when multiple points occupy a bin.
 
-**Fix (`66493670`)**: the bridge publishes the lidar's `point_cloud` output
-(Cartesian returns, verified sensor-frame correct to ~2.6 cm against the
-analytic grid), and `ros_io.LidarScanAssembler` bins the clouds into the
-contract `LaserScan` (1081 bins, −135°..+135°, 0.25°). SOLID_STATE authoring
-was tried and rejected — a 1081-emitter pattern returns nothing.
+One `OmniLidar` prim per physical sensor produces a complete 360° Cartesian
+cloud. `ros_io.LidarScanAssembler` clips it to the public 270° contract. The
+internal rotary tick/scan rates are both 40 Hz and the firing rate is 57600 Hz,
+giving 0.25° spacing. This avoids the missing sectors observed with the
+previous clipped-rotary/two-half-cloud configuration on Isaac 6.1. The robot
+importer reads `ust10lx_2d.json`; runtime uses the baked robot USD. Changing
+the JSON alone does not change the runtime asset.
 
-## Bug 2 — rotary model fires only a 180° drum transit per tick
+The raw scan contract applies after assembly; diagnostic `points` topics
+contain full-circle renderer output and are not navigation scan inputs.
 
-Caught by the user eyeballing rviz: *the robot never saw anything on its
-left*. The published scan covered azimuths [−135°, 0°] only — the drawing
-below shows the configured 270° arc (green) vs the measured rays (red):
-522 right, 0 left.
+## Merger and range limits
 
-![FOV proof: configured 270° arc (green) vs measured returns (red) — left half empty](assets/slam-quality/fov_proof.png)
+The front scan supplies the output timestamp. Static sensor poses are
+front `(0.3922, 0, 0)` and rear `(-0.3922, 0, pi)` relative to `base_link`.
+For equal stamps the rear points need only the static transform. For skewed
+stamps within the 20 ms tolerance, they use:
 
-Measured mechanism (offset experiments, all on fresh single-sim boots):
+```text
+rear sensor at t_rear
+   → base_link at t_rear → odom → base_link at t_front → merged angular bins
+```
 
-| `startAzimuthOffsetDeg` | fired window |
+The motion transform uses `odom → base_link`, never SLAM's own map correction.
+Both `/tf` and `/tf_static` are remapped to namespaced topics. An unavailable
+odom transform drops the rear contribution and increments TF-miss/rear-drop
+counters; it is not counted as a successful pair.
+
+Front callbacks wait up to twice the pairing tolerance from local receipt
+for a rear callback. This receipt deadline avoids mistaking queued startup
+messages for a missing rear sensor. A steady-clock timer resolves expired
+entries even when no further scans arrive.
+
+A 10 m forward ray from the front sensor is 10.3922 m from `base_link`.
+Accordingly, SLAM's `max_laser_range` is rewritten to 10.0 for `front_only`
+and 10.3922 for `merged`. `scan_buffer_maximum_scan_distance` is unchanged:
+it is not a ray-range limit. Transformed points outside the declared output
+limits are excluded before nearest-return reduction.
+
+The merger logs distinct counts for equal-stamp pairs, compensated pairs,
+front-only publishes, rear drops, and TF misses. Equal simulator timestamps
+can bypass compensation; only observed deltas and counters establish whether
+that happens in a particular run.
+
+## Qualification procedure
+
+![Measured front, rear, and merged scans with finite-bin coverage during rotation](../history/assets/2026-09-17-lidar/scan-coverage.png)
+
+The measured scan view shows both raw windows and the merged output. The
+lower panels count finite returns per bearing while the robot rotates;
+empty sectors would expose missing angular coverage. This run-specific
+figure is owned by the [dated qualification record](../history/2026-09-17-isaac-lidar-qualification.md),
+which records the source capture and regeneration procedure. It establishes
+LiDAR coverage; the closed-loop SLAM comparison is separate below.
+
+![All twelve SLAM trials, paired front-only and merged by seed at both noise settings](../history/assets/2026-09-17-lidar/slam-comparison.png)
+
+The fresh twelve-run baseline shows lower median pose/loop errors with merged
+scans, but mixed noisy-seed map and yaw results. Each line is a seed pair;
+none is selected as a representative best run. The dated record owns the full
+minimum/median/maximum tables, exclusions, and regeneration command.
+`front_only` remains the public default; this is not an exploration/P5 result.
+
+| Configured noise, seed 0: front only | Configured noise, seed 0: merged |
 |---|---|
-| 0 | [−135°, 0°] |
-| −135 | [0°, +135°] |
+| ![Front-only map and trajectory overlay, configured noise seed zero](../history/assets/2026-09-17-lidar/noise1-seed0-front-overlay.png) | ![Merged map and trajectory overlay, configured noise seed zero](../history/assets/2026-09-17-lidar/noise1-seed0-merged-overlay.png) |
 
-The generic rotary model fires the emitter pattern over a single **180°
-drum transit per tick** starting at `startAzimuthOffsetDeg`; the published
-points are the valid-window subset of that. `tickRate` 80 does not extend it
-(phase resets per tick), multi-emitter patterns interleave raggedly, and a
-1081-emitter SOLID_STATE pattern produces empty returns.
+Blue marks ground-truth occupied cells; black is the SLAM occupied map,
+gray is unknown, green is the ground-truth path, and red is the SLAM path.
+This fixed seed pair illustrates the noisy exception, not a best-run claim:
+front-only has higher IoU here despite merged's better median across seeds.
+The [evidence record](../history/2026-09-17-isaac-lidar-qualification.md#interpretation)
+owns the exact source paths and limitations.
 
-**Why not just rotate the lidar prim?** The fired window is defined in the
-sensor's own frame — rotating the prim rotates the window *and* the frame
-together, so coverage stays ≤180° wide (and only 135° of it survives the
-±135° valid window); rotation only repositions the blind wedge. No single
-prim can produce 270°.
+The [dated qualification record](../history/2026-09-17-isaac-lidar-qualification.md)
+records the completed gates and limitations. For repeat qualification, follow
+the procedure below. Keep raw evidence under ignored
+`artifacts/isaac-lidar-qualification/`; do not substitute the
+[invalidated July investigation](../history/2026-07-12-isaac-slam-investigation.md)
+for current measurements.
 
-**Fix (`e1862498`)**: bake TWO OmniLidar prims per laser frame —
-`rtx_lidar` (offset 0 → right half) and `rtx_lidar_l` (offset −135 → left
-half). Both fire on the same tick and stamp identically;
-`LidarScanAssembler` merges both clouds and publishes **once per completed
-stamp pair**, so a scan never mixes two capture instants (mixed-freshness
-halves measurably warped the map: IoU 0.48 vs 0.54, loop error 0.33 m vs
-0.07 m):
+- Stabilize geometry, regenerate analytic `mock_hospital` GT, verify dependencies,
+  rebuild affected packages, and inspect installed copied executables.
+- Use a dedicated, empty ROS domain and fresh headless deterministic boots at
+  `rtf:=1.0`. Disable camera, target localization, RViz, coverage overlay, and
+  autonomous frontier motion. Start with `odom_noise:=0.0 noise_seed:=0`.
+- Run `tools/isaac/lidar_qualification.py capture --pairs 500` during controlled
+  rotation. Inspect every-message geometry, all 45° sectors, independent
+  sensor contributions, finite-range validity, exact deltas, and cumulative
+  counters from boot. Record all launch arguments with repeated `--launch-arg`.
+- Use `windows` for consecutive internal RTX clouds (`--legacy-halves` only
+  when diagnosing the old two-cloud configuration). Receipt of a cloud alone
+  does not establish angular coverage.
+- On a separate empty domain, run `skew`: namespaced TF only, scans 10 ms
+  apart, rotating odometry, rear contribution, and a real transformed 10 m
+  ray. Require compensated pairs and zero TF misses.
+- Run the scan-versus-GT geometry check and preserve plots and logs.
+- Run `matrix --gt-grid <grid.npz> --out <new-directory>` for fresh simulator
+  and SLAM state per trial: noises 0 then 1; seeds 0, 1, 2; front then merged
+  at each seed. It stops at the first failed trial and retains its artifacts.
+  Diagnose failures before rerunning with `--condition noise/seed/source`.
+  Use `--start-at noise/seed/source` to resume the remaining ordered sequence
+  in a new artifact directory. The runner refuses an occupied GPU and stops
+  if a second GPU process appears; the summarizer rejects such trials.
+- Use `summarize '<repo-relative-glob>/*_metrics.json'` only on the 12 accepted
+  trial files. Require 3/3 complete runs per condition and finite metrics.
+  Report min/median/max and seed-paired merged-minus-front deltas. Preserve
+  rejected attempts with the reason; do not silently select favorable runs.
 
-![Run B5: full FOV but seamed scans — whole map slightly offset from GT](assets/slam-quality/B5_overlay.png)
-
-![Run B6: pair-consistent scans — ship state](assets/slam-quality/B6_overlay.png)
-
-## Bug 3 — runner processed one ROS callback per render frame
-
-`ros_io.spin_once()` called `rclpy.spin_once()` once per render frame
-(~35/s) while four ~28 Hz cloud streams plus cmd/clock callbacks were
-inbound — the queue backlogged, the assembler's stamp pairing compared
-stale halves, and the published scan collapsed to ~3 Hz. Fixed by draining
-up to 32 ready callbacks per frame. Scan verified at 40 Hz sim-time,
-1001/1081 finite bins, all six 45° sectors populated.
-
-## slam_toolbox params — what measurement actually said
-
-Same seeded closed-loop drive, fixed sensor, one variable at a time:
-
-| run | config | RMSE | loop err | IoU | verdict |
-|---|---|---|---|---|---|
-| A2 | gz-era (0.0/0.0 travel, link 0.1) | 0.52 | 0.012 | 0.70 | jerky graph (204 corrections, 1.2 m max jump) |
-| B2 | 0.2 m/10° gating, link 0.8 | 0.25 | 0.31 | 0.37 | map thins, at-rest estimate goes stale |
-| B3 | 0.1 m/5° gating, link 0.8 | 3.10 | 6.59 | 0.24 | one bad closure snapped the graph 7.4 m (below) |
-| B4 | 0.0/0.0, link 0.8 | 0.50 | 0.010 | 0.74 | best of the half-blind era (below) |
-
-Conclusions: **every-scan ingestion wins** (node density keeps the graph
-rigid and re-localizes at rest); travel gating is strictly worse here;
-`link_match_minimum_response_fine: 0.8` (stock) gives small consistent
-gains. Shipped config = gz-era gating + link 0.8 only.
-
-![Run B3: right half tracked cleanly, then one bad loop closure folded the graph 7.4 m](assets/slam-quality/B3_overlay.png)
-
-![Run B4: best half-blind-era map — note the west-end trajectory excursion](assets/slam-quality/B4_overlay.png)
-
-Note B4's IoU (0.74) exceeding B6's (0.54) is an artifact: the half-blind
-sensor observed a much smaller region, concentrated where geometry was
-crisp. B6 is the honest sensor.
-
-## Final state (B6 / windowed demo)
-
-| metric | B6 (headless) | WINDOWED3 (GUI load) |
-|---|---|---|
-| pose RMSE | 0.226 m | **0.195 m** (< 0.20 plan gate) |
-| pose max | 0.376 m | — |
-| loop error | 0.072 m | 0.090 m |
-| map IoU | 0.54 | 0.55 |
-| wall recall | 0.82 | 0.87 |
-| max map→odom jump | 0.25 m | — |
-
-Final windowed full-loop overlay (map black, GT walls blue, GT trajectory
-green, slam estimate red, waypoints orange):
-
-![WINDOWED3: final full-loop run on the fixed sensor — RMSE 0.195 m](assets/slam-quality/WINDOWED3_overlay.png)
-
-The analytic ground-truth grid the metrics score against (rasterized from
-the SDF at the lidar plane z=0.418 (**stale: the raised-world plane is 0.30257
-since the mount and seating corrections — figure not regenerated**); orange = G1 ignore mask):
-
-![Analytic GT occupancy grid from mock_hospital.sdf](assets/slam-quality/gt_hospital.png)
-
-A live-scan world-frame debug plot from the bug-1 era (points landing on
-walls that should be occluded — the angular warp made wrong geometry look
-locally plausible):
-
-![Scan debug plot during bug 1: warped angular mapping](assets/slam-quality/scan_debug.png)
-
-All runs' metrics JSONs sit beside the images in
-[`assets/slam-quality/`](assets/slam-quality/).
-
-Known residuals (accepted, documented):
-- transient pose error ~0.2 m during long corridor legs — longitudinal
-  ambiguity of a 10 m-range lidar in a 20 m corridor; converges at rest;
-- small (~0.1 m) constant map-anchor offset from early-drive drift;
-- karto's "Closing loop"/"REJECTED!" log strings never reach the console in
-  this slam_toolbox build — the probe's map→odom jump counter is the
-  closure-activity proxy.
-
-## Tooling (committed, reusable for the P5 gate)
-
-- `tools/isaac/gt_occupancy.py` — analytic GT occupancy grid straight from
-  the SDF (visual geoms crossing the lidar plane z=0.418 — **stale, raised
-  worlds now use 0.30257**); waypoint
-  clearance checker; ignore-mask for opaque includes (G1).
-- `tools/isaac/slam_quality_probe.py` — GT-feedback closed-loop drive
-  (35.8 m, returns to start, wz ≤ 0.4) + metrics JSON + GT-overlay PNG.
-- `tools/isaac/scan_geometry_check.py` — sensor regression check: static
-  raycast fit (PASS ≤ 0.08 m) + spin shift ratio (PASS ≈ +1.0; −1.33 was
-  bug 1's signature). **Lesson: fit checks validate only where data exists —
-  always also assert per-sector coverage** (bug 2 hid behind passing fits).
-
-Run recipe (headless, from the worktree root):
-
-```bash
-source install/setup.bash
-export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp CYCLONEDDS_URI=file://$PWD/cyclonedds.xml
-ros2 launch ridgeback_autonomy_isaac backend.launch.py world:=mock_hospital
-ros2 launch install/.../includes/slam.launch.py use_sim_time:=true setup_path:=$PWD/clearpath/
-python3 tools/isaac/gt_occupancy.py src/ridgeback_autonomy_gz/sim/worlds/mock_hospital.sdf /tmp/gt.npz
-python3 tools/isaac/slam_quality_probe.py --tag X --gt-grid /tmp/gt.npz \
-    --slam-log <slam launch log> --out <dir>
-```
-
-## Operational gotchas hit during this investigation
-
-- `pgrep -f` / `pkill -f` in a wait loop matches its own bash wrapper →
-  fake "process down" → two sims overlapped and poisoned several
-  intermediate diagnostics. Use `ps aux | grep X | grep -v grep` in loops;
-  kill by explicit PID.
-- The user's VNC display number rotates per session (`:0` → `:3` today).
-  Detect via a session process's env (`DISPLAY` + `XAUTHORITY`), never
-  assume.
-- One kit boot crashed spontaneously (breakpad, ~15th boot of the day);
-  relaunch succeeded — treat single boot crashes as flaky before digging.
-
-## Noise + hygiene follow-up (2026-07-13)
-
-Revisiting the P5 blocker: is odom noise the coverage cap, and does the prior
-"~40% plateau" hold? No on both.
-
-- **The ~40% plateau does not reproduce.** Every clean `mock_hospital` run
-  landed 51–83%. Prime suspect for the historical stall = the old aggressive
-  explorer timeouts (30 s / blacklist-2, since reverted to 60 s/3), not SLAM.
-- **odom_noise is a partial lever.** Clean paired A/B (camera-off, domain-43
-  isolated): noise=0 → 61.9% / 16 aborts; noise=1.0 → 51.3% / 35 aborts.
-- **Yaw decomposition (`--repro --wz-max 1.5`, noise off):** total yaw rms
-  2.11° / max 7.94°; `theta_mo` (scan-match) rms 1.47° / max 4.0° dominates
-  `phi_ekf` (EKF) rms 0.71° / max 4.3°. Residual is scan-match rotation on FULL
-  healthy scans (min 916/1081 bins, 0 flaps) — H1 geometry, not the assembler.
-- **Sensor pipeline exonerated (H2/H3):** `flap_events=0` across ~110k scans
-  over all runs; drift climbed on steady RTF and recurred after contention
-  cleared. New read-only tool `scan_pipeline_probe.py` (finite-bin / flap /
-  stamp-pair telemetry vs RTF) carries this signal.
-- **Benchmark hygiene (was wrong; now enforced):** `isaac_runner` rendered the
-  D455 unconditionally → RTF 0.33–0.45. Added `--camera false` (commit
-  b9c46c77) → RTF 0.55–0.65. Also `target_localization_enabled:=false` and an
-  isolated `ROS_DOMAIN_ID` — co-tenant `stefi`'s domain-42 `/r100_0001` stack
-  publishes the same `hud/coverage` topic the probe reads. Canonical benchmark
-  invocation: `camera:=false target_localization_enabled:=false
-  ROS_DOMAIN_ID=<isolated> setup_path:=/tmp/bench-clearpath/`.
-- **Caveat:** coverage variance is large (62–83% noise-off; loc-err 0.9–9.4 m);
-  stochastic scan-match excursions + intermittent co-tenant GPU bursts dominate.
-  Firm numbers need multi-seed on a single-tenant box. Raw artifacts live in the
-  session scratchpad (`clean_n0/clean_n1`, `REPRO_noiseoff`, `noiseoff_hosp_A`).
+`noise_seed=N` seeds Isaac odometry with N and IMU noise with N+1; seed 0
+preserves the original streams. The argument is not forwarded to Gazebo or
+hardware. Public invocation details are owned by the [README](../../README.md).

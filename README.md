@@ -298,6 +298,7 @@ Arguments:
 | `headless` / `livestream` | `true` / `false` | Isaac window and WebRTC controls; ignored by Gazebo |
 | `rtf` / `sim_mode` | `1.0` / `realtime` | Isaac timing controls; use `deterministic` for comparisons |
 | `odom_noise` | `1.0` | Isaac odometry-drift scale; `0` gives exact debug odometry |
+| `noise_seed` | `0` | Isaac-only repeatability: odometry uses N, IMU noise uses N+1; seed 0 preserves the original streams |
 | `camera` | `true` | Attach the Isaac D455 renderer; disable for lidar-only performance runs |
 | `sensor_hz` | `40.0` | Isaac deterministic step/lidar rate; camera cadence stays at its authored 30 Hz |
 | `slam_source` | `front_only` | Identical default for every backend; `merged` is an explicit opt-in |

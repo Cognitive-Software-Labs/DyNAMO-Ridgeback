@@ -15,6 +15,8 @@ from clearpath_config.clearpath_config import ClearpathConfig
 from clearpath_config.common.utils.yaml import read_yaml
 from nav2_common.launch import RewrittenYaml
 
+from ridgeback_autonomy.common.lidar_contract import slam_max_laser_range
+
 
 def launch_setup(context, *args, **kwargs):
     pkg_this = get_package_share_directory('ridgeback_autonomy')
@@ -36,6 +38,10 @@ def launch_setup(context, *args, **kwargs):
     slam_source = LaunchConfiguration('slam_source').perform(context)
     merged_scan_topic = f'/{namespace}/sensors/scan_slam_merged'
     scan_topic = merged_scan_topic if slam_source == 'merged' else raw_scan_topic
+    # RewrittenYaml normalizes rewrite values as launch substitutions, so it
+    # requires a string-like value here. convert_types=True restores the YAML
+    # scalar to a float in the generated parameter file.
+    max_laser_range = str(slam_max_laser_range(slam_source))
 
     slam_params_file = os.path.join(pkg_this, 'config', 'slam_toolbox_params.yaml')
 
@@ -44,6 +50,11 @@ def launch_setup(context, *args, **kwargs):
         root_key=namespace,
         param_rewrites={
             'scan_topic': scan_topic,
+            # Raw ranges are measured from the front sensor. Merged ranges
+            # are measured from base_link and include the 0.3922 m sensor
+            # offset, so retaining the raw 10 m threshold would discard the
+            # valid transformed outer shell.
+            'max_laser_range': max_laser_range,
         },
         convert_types=True,
     )

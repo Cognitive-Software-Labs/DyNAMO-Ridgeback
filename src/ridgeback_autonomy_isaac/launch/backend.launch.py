@@ -44,6 +44,7 @@ def generate_launch_description():
     livestream = LaunchConfiguration('livestream')
     rtf = LaunchConfiguration('rtf')
     odom_noise = LaunchConfiguration('odom_noise')
+    noise_seed = LaunchConfiguration('noise_seed')
     camera = LaunchConfiguration('camera')
     camera_profile = LaunchConfiguration('camera_profile')
     depth_fidelity = LaunchConfiguration('depth_fidelity')
@@ -116,6 +117,7 @@ def generate_launch_description():
              '--livestream', livestream,
              '--rtf', rtf,
              '--odom-noise', odom_noise,
+             '--noise-seed', noise_seed,
              '--camera', camera,
              '--camera-profile', camera_profile,
              '--depth-fidelity', depth_fidelity,
@@ -146,6 +148,9 @@ def generate_launch_description():
                               description='real-time factor; 0 = unthrottled'),
         DeclareLaunchArgument('odom_noise', default_value='1.0',
                               description='odometry drift scale; 0 = perfect'),
+        DeclareLaunchArgument(
+            'noise_seed', default_value='0',
+            description='reproducible Isaac odometry/IMU noise seed'),
         DeclareLaunchArgument('camera', default_value='true',
                               description='attach D455 camera; false = '
                                           'lidar-only (saves GPU/RTF)'),

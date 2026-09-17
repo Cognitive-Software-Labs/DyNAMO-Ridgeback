@@ -83,3 +83,45 @@ def test_ros_io_subscribes_only_to_the_frozen_twist_stamped_contract():
     assert 'TwistStamped, "cmd_vel", self._on_twist_stamped, 10' in source
     assert 'Twist, "cmd_vel"' not in source
     assert 'def _on_twist(self, msg)' not in source
+
+
+def test_full_rotary_cloud_yields_exact_window_without_stale_bins():
+    from sensor_msgs.msg import LaserScan
+    from sensor_msgs_py.point_cloud2 import create_cloud_xyz32
+    from std_msgs.msg import Header
+    from types import SimpleNamespace
+
+    messages = []
+    assembler = object.__new__(A)
+    assembler._LaserScan = LaserScan
+    assembler._frame = 'lidar2d_0_laser'
+    assembler._pub = SimpleNamespace(publish=messages.append)
+    angles = np.radians(np.arange(-180.0, 180.0, 0.25))
+    points = np.column_stack((2 * np.cos(angles), 2 * np.sin(angles),
+                              np.zeros_like(angles)))
+    assembler._on_cloud(create_cloud_xyz32(Header(), points))
+    scan = messages[-1]
+    assert len(scan.ranges) == 1081
+    assert np.allclose(scan.ranges, 2.0)
+    assert scan.header.frame_id == 'lidar2d_0_laser'
+
+    # All invalid sensor ranges disappear, and no old bin survives.
+    assembler._on_cloud(create_cloud_xyz32(
+        Header(), [[0, 0, 0], [0.03, 0, 0], [10.1, 0, 0]]))
+    assert np.all(np.isinf(messages[-1].ranges))
+
+
+def test_colliding_raw_returns_keep_the_nearest_valid_ray():
+    from sensor_msgs.msg import LaserScan
+    from sensor_msgs_py.point_cloud2 import create_cloud_xyz32
+    from std_msgs.msg import Header
+    from types import SimpleNamespace
+
+    messages = []
+    assembler = object.__new__(A)
+    assembler._LaserScan = LaserScan
+    assembler._frame = 'lidar2d_0_laser'
+    assembler._pub = SimpleNamespace(publish=messages.append)
+    assembler._on_cloud(create_cloud_xyz32(
+        Header(), [[2, 0, 0], [3, 0, 0], [0.03, 0, 0]]))
+    assert messages[-1].ranges[540] == 2.0

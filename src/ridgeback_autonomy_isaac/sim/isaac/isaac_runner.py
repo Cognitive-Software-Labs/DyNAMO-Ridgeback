@@ -67,6 +67,9 @@ def parse_args():
     ap.add_argument("--odom-noise", type=float, default=None,
                     help="odometry drift scale; 0 = perfect odom. Default by "
                          "mode: 0 (deterministic), 1.0 (realtime).")
+    ap.add_argument("--noise-seed", type=int, default=0,
+                    help="reproducible simulator noise seed. Odometry uses N "
+                         "and IMU noise uses N+1 (default: 0).")
     ap.add_argument("--camera", default="true", choices=["true", "false"],
                     help="attach D455 camera render + publishers; false = "
                          "lidar-only (saves GPU/RTF for SLAM/nav benchmarks)")
@@ -260,7 +263,8 @@ def run(app, args) -> int:
     else:
         print("camera disabled (--camera false): lidar-only run", flush=True)
 
-    rig = RidgebackRig(art_root_path, odom_noise=args.odom_noise)
+    rig = RidgebackRig(
+        art_root_path, odom_noise=args.odom_noise, seed=args.noise_seed)
 
     timeline = omni.timeline.get_timeline_interface()
     sim_dt = 1.0 / args.sensor_hz
@@ -334,7 +338,7 @@ def run(app, args) -> int:
     last_sim_time = timeline.get_current_time()
     last_body_twist = (0.0, 0.0, 0.0)
     import random as _random
-    imu_rng = _random.Random(1)
+    imu_rng = _random.Random(args.noise_seed + 1)
     imu_sigma_gyro = 0.005 * args.odom_noise      # rad/s
     imu_sigma_accel = 0.05 * args.odom_noise      # m/s^2
     while app.is_running() and not stop["flag"]:

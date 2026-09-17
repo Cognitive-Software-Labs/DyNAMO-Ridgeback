@@ -21,6 +21,8 @@ support. Historical controls are not current performance baselines.
 
 - [6.1 migration](../history/2026-09-13-isaac-6.1-migration.md): bounded controls,
   accepted 5.1 regression and native-depth decision.
+- [LiDAR qualification](../history/2026-09-17-isaac-lidar-qualification.md):
+  dated scan, timestamp, compensation and SLAM evidence.
 - [Gazebo lidar integration](../history/2026-09-18-gazebo-lidar-integration.md):
   measured mounts through collision monitoring and front-scan SLAM.
 - [World seating](../history/isaac_world_seating.md): floor-relative placement
