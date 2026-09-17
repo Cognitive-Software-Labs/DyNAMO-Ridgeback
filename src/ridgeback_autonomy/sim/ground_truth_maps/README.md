@@ -42,28 +42,21 @@ Canonical maps (analytic, from the Isaac stock world USDs):
 | office | 760×2040 px (38×102 m) | 0.05 m/px | [-27.075, -37.673, 0] | `generate_gt_map.py` |
 | hospital | 1560×880 px (78×44 m) | 0.05 m/px | [-49.440, -5.450, 0] | `generate_gt_map.py` |
 
-**Slice height.** All four are sliced at the 2D lidar plane, `LIDAR_PLANE_Z` in
-`tools/isaac/gt_occupancy.py` (`generate_gt_map.py` imports it — one owner, so
-a geometry fix cannot land in only one copy). It is **0.3024 m** = the front
-UST-10LX 0.2264 m above `base_link` plus the resting `spawn_z` 0.076 m. It was
-0.418 m until 2026-09-10, when the lidars were found mounted 11.6 cm too high;
-**every map sliced before that date is stale and so is every coverage number
-measured against one.** Regenerate after any change that moves the scan
-plane — i.e. the lidar `xyz` in `clearpath/robot.yaml`, or `--spawn-z`.
+**Slice height.** `src/ridgeback_autonomy_isaac/sim/isaac/worlds.py` is the
+single owner of floor, base-link clearance, and lidar offset. Both analytic
+generators derive their plane as `floor_z + 0.02617 + 0.2264`. The stock-world
+maps are therefore sliced at **0.25257 m**; raised repo worlds such as
+`mock_hospital` use **0.30257 m**. All four stock maps and previews were
+regenerated at 0.25257 m on 2026-09-17. Regenerate after a floor registration,
+wheel clearance, or lidar mounting change.
 
 Not every `robot.yaml` edit qualifies: the 2026-09-11 reparent of the lidars
 from `base_link` to `chassis_link` changed the parent only, and the two links
-are coincident, so the plane did not move and these maps stayed valid. The
-pending seat fix ([global backlog](../../../../docs/BACKLOG.md#isaac-stock-world-seating-and-ground-truth-map-regeneration))
-*does* move it — the plane
-becomes `floor_z + 0.25257`, so stock worlds drop from 0.3024 to 0.25257 and
-all four maps need one regeneration then.
+are coincident, so the plane did not move.
 
 `warehouse` and `warehouse_full` both need an explicit `--origin` on open
 floor: their geometry is dense enough that the auto-seed centroid lands *on* a
-shelf and the free-space flood never fills (`free=277` for `warehouse_full`;
-`free=3` for `warehouse` at the 0.3024 m plane, where the seed that used to
-work at 0.418 m now lands inside a rack). Note the `=` — argparse eats a bare
+shelf and the free-space flood never fills. Note the `=` — argparse eats a bare
 `-10,5` as a flag.
 
 Each ships a `.npz` alongside the `.pgm`/`.yaml`/`.png` (grid + unknown mask +

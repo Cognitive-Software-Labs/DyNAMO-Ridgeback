@@ -6,27 +6,6 @@ unselected alternatives belong in `docs/do_not_try_again/`. Closing an item mean
 its completion criteria and moving durable results to the relevant reference or
 history document—not retaining a crossed-out entry here.
 
-## Isaac stock-world seating and ground-truth map regeneration
-
-**Gap.** The robot is seated correctly in `mock_hospital`, whose floor top is
-at z = 0.05 m, but floats 49.8 mm above every stock Isaac world because the
-runner's fixed `spawn_z=0.076` assumes that raised floor. The drive rig has no
-vertical degree of freedom and the wheels have no colliders, so physics cannot
-settle it. The stock-world maps are internally consistent with the floating
-robot, but their 0.3024 m slice plane is 49.8 mm above the physically seated
-UST-10LX plane.
-
-**Completion criteria.** Derive each world's spawn height from its floor level
-using the measured wheel-mesh bottom: `spawn_z = floor_z + 0.02617`. Derive the
-map slice from the same source as `floor_z + 0.25257`; do not introduce a second
-independent constant. Verify wheel contact height and scan height in
-`mock_hospital` and at least one stock world, then regenerate all affected
-stock-world maps and previews once.
-
-**Context.** [Isaac robot model](isaac/robot-model.md), the
-[ground-truth map runbook](../src/ridgeback_autonomy/sim/ground_truth_maps/README.md),
-and the original phase evidence in the [Isaac port plan](isaac/port-plan.md).
-
 ## Isaac lidar and exploration recertification
 
 **Gap.** No statistically valid Isaac exploration baseline exists for the
@@ -36,9 +15,9 @@ emitters stationary while the chassis rotated. All earlier coverage and SLAM
 quality numbers are therefore void. The front/rear merged-scan path also still
 needs a fresh-boot live validation after its TF-remap and range-bound fixes.
 
-**Completion criteria.** After the seating and map regeneration above, validate
-the raw 270-degree scans and the merged SLAM scan from a clean Isaac 6.1 boot,
-first with zero odometry noise and then with the configured noise. Re-measure
+**Completion criteria.** With the corrected seating and regenerated maps,
+validate the raw 270-degree scans and the merged SLAM scan from a clean Isaac
+6.1 boot, first with zero odometry noise and then with the configured noise. Re-measure
 SLAM quality, confirm the front/rear stamp and motion-compensation behavior,
 and run 3–5 seeds per comparison condition on a suitably quiet host. P5 passes
 only when 3/3 runs complete, coverage is at least the Gazebo mean minus 10

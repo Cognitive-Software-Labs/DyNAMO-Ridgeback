@@ -28,7 +28,7 @@ troubleshooting, planning, and historical documentation.
 - [Port status and document map](isaac/README.md)
 - [Robot, sensor, and generated-USD model](isaac/robot-model.md)
 - [RTX lidar pipeline](isaac/lidar-pipeline.md)
-- [Active Isaac engineering gaps](BACKLOG.md#isaac-stock-world-seating-and-ground-truth-map-regeneration)
+- [Active Isaac engineering gaps](BACKLOG.md#isaac-lidar-and-exploration-recertification)
 - [Port phase plan](isaac/port-plan.md)
 - [Isaac Sim 6.1 migration](isaac/migration-6.1.md)
 - [Investigation history](isaac/port-history.md)
@@ -104,6 +104,7 @@ They are not supported implementations or automatic backlog commitments.
 - [Offline measurement replay validation](history/offline_measurement_replay_validation.md)
 - [Layered replay implementation validation](history/layered_replay_implementation_validation.md)
 - [Running benchmarks from the configurator GUI](history/benchmark_gui_direct_run.md)
+- [Isaac world seating and map regeneration](history/isaac_world_seating.md)
 
 History preserves dated evidence and limitations. Read the corresponding
 technical reference for current behavior.

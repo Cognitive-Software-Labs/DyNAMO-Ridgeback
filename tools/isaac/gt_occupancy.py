@@ -18,11 +18,10 @@ Pure python + numpy (parse layer of sdf2usd has no pxr dependency):
         src/ridgeback_autonomy_gz/sim/worlds/mock_hospital.sdf \
         /tmp/gt_hospital.npz --png /tmp/gt_hospital.png
 
-The lidar plane default (0.3024 m) is the front UST-10LX height in the
-committed robot USD (0.2264 m above base_link) plus the resting spawn_z
-(0.076 m). It was 0.418 until 2026-09-10, when the lidars were found to be
-mounted 11.6 cm too high -- parented to the top deck instead of recessed in
-the body's notch. Every map sliced before that date is stale.
+The default lidar plane is derived from the input world's registered floor,
+the measured 0.02617 m wheel-bottom clearance, and the front UST-10LX height
+of 0.2264 m above base_link. Use --plane-z only for an intentional diagnostic
+override.
 """
 from __future__ import annotations
 
@@ -35,9 +34,11 @@ from pathlib import Path
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).parent))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]
+                       / "src/ridgeback_autonomy_isaac/sim/isaac"))
 from sdf2usd import parse_world  # noqa: E402  (dependency-free parse layer)
+from worlds import lidar_plane_z_for_world  # noqa: E402
 
-LIDAR_PLANE_Z = 0.3024
 RESOLUTION = 0.05
 PX_FREE = 254
 PX_OCC = 0
@@ -79,7 +80,7 @@ def _footprint_at_plane(kind, size, wz, plane_z):
     return chord, chord
 
 
-def build_grid(world, plane_z=LIDAR_PLANE_Z, resolution=RESOLUTION,
+def build_grid(world, plane_z, resolution=RESOLUTION,
                margin=0.5, ignore_radius=0.7):
     """Rasterize -> (grid uint8 [iy, ix], ignore bool, origin (ox, oy)).
 
@@ -266,21 +267,27 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("sdf", type=Path)
     ap.add_argument("out", type=Path, help="output .npz")
-    ap.add_argument("--plane-z", type=float, default=LIDAR_PLANE_Z)
+    ap.add_argument("--plane-z", type=float, default=None,
+                    help="explicit world-space scan plane override; default "
+                         "is derived from the input world's registered floor")
     ap.add_argument("--resolution", type=float, default=RESOLUTION)
     ap.add_argument("--png", type=Path, help="optional preview PNG")
     args = ap.parse_args()
 
     world = parse_world(args.sdf)
+    plane_z = args.plane_z
+    if plane_z is None:
+        plane_z = lidar_plane_z_for_world(args.sdf)
     grid, ignore, origin = build_grid(
-        world, plane_z=args.plane_z, resolution=args.resolution)
+        world, plane_z=plane_z, resolution=args.resolution)
     np.savez_compressed(
         args.out, grid=grid, ignore=ignore, origin=np.array(origin),
-        resolution=args.resolution, plane_z=args.plane_z)
+        resolution=args.resolution, plane_z=plane_z)
     ny, nx = grid.shape
     print(f"wrote {args.out}: {nx}x{ny} @ {args.resolution} m, origin "
           f"({origin[0]:.2f},{origin[1]:.2f}), occupied "
-          f"{int((grid == 100).sum())} cells, ignore {int(ignore.sum())}")
+          f"{int((grid == 100).sum())} cells, ignore {int(ignore.sum())}, "
+          f"plane_z {plane_z:.5f}")
     if args.png:
         save_png(grid, ignore, args.png)
         print(f"preview: {args.png}")

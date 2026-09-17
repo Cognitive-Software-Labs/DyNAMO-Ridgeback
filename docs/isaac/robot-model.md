@@ -277,10 +277,12 @@ dummy_base_y → base_link`).
 > coincident (identity local transform), so offsets carry over unchanged and
 > published TF does not move.
 
-**There is no vertical joint**, so `base_link` z is fixed at `--spawn-z` and
-the robot cannot settle onto a floor. That is why it floats 49.8 mm on stock
-worlds — see the
-[global backlog](../BACKLOG.md#isaac-stock-world-seating-and-ground-truth-map-regeneration).
+**There is no vertical joint**, so the robot cannot settle onto a floor.
+`worlds.py` therefore owns each supported world's `floor_z`; the runner sets
+`base_link` to `floor_z + 0.02617` by default. This yields z=0.07617 in the
+raised repo worlds and z=0.02617 in the stock worlds. `--spawn-z` remains an
+explicit diagnostic override. The wheel and lidar height validation is
+recorded in [Isaac world seating](../history/isaac_world_seating.md).
 
 ---
 

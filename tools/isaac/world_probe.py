@@ -38,17 +38,15 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]
                        / "src/ridgeback_autonomy_isaac/sim/isaac"))
 
-from gt_occupancy import LIDAR_PLANE_Z  # noqa: E402  (one owner for the plane)
-
-
 def parse_args():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("world", help="world name (worlds.py) or explicit .usd path")
     ap.add_argument("--at", default="0,0", help="query centre x,y in metres")
     ap.add_argument("--radius", type=float, default=1.5,
                     help="report geometry within this radius of --at (m)")
-    ap.add_argument("--plane-z", type=float, default=LIDAR_PLANE_Z,
-                    help="world-frame scan plane height (m)")
+    ap.add_argument("--plane-z", type=float, default=None,
+                    help="explicit world-frame scan plane override; default "
+                         "is derived from the selected world's floor")
     ap.add_argument("--lidar", default=None,
                     help="x,y,yaw_deg of a lidar to ray-cast from (metres/deg)")
     ap.add_argument("--arc", default="-135,135",
@@ -227,9 +225,12 @@ def main():
 def run(app, args) -> int:
     import omni.usd
     from pxr import UsdGeom
-    from worlds import get_assets_root, resolve_world
+    from worlds import get_assets_root, lidar_plane_z_for_world, resolve_world
 
     world_path = resolve_world(args.world, get_assets_root())
+    plane_z = args.plane_z
+    if plane_z is None:
+        plane_z = lidar_plane_z_for_world(args.world)
     print(f"loading world: {world_path}", flush=True)
     ctx = omni.usd.get_context()
     ctx.open_stage(world_path)
@@ -243,14 +244,14 @@ def run(app, args) -> int:
     print(f"stage loaded after {i + 1} frames, metersPerUnit={mpu}", flush=True)
 
     cx_m, cy_m = (float(v) for v in args.at.split(","))
-    plane_u = args.plane_z / mpu
+    plane_u = plane_z / mpu
     cx, cy = cx_m / mpu, cy_m / mpu
     radius_u = args.radius / mpu
 
     per_prim, stats = slice_near(stage, plane_u, cx, cy, radius_u,
                                  args.max_extent / mpu)
     n = sum(len(v) for v in per_prim.values())
-    print(f"\nscan plane z = {args.plane_z} m   query ({cx_m},{cy_m}) "
+    print(f"\nscan plane z = {plane_z} m   query ({cx_m},{cy_m}) "
           f"r={args.radius} m")
     print(f"meshes sliced: {stats['considered']}  instancers: "
           f"{stats['instancers']}  instances near: {stats['instances']}  "

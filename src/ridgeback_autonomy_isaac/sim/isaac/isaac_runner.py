@@ -91,13 +91,10 @@ def parse_args():
                          "post-port addon)")
     ap.add_argument("--spawn", default="0,0,0",
                     help="robot spawn x,y,yaw in the world frame")
-    ap.add_argument("--spawn-z", type=float, default=0.076,
-                    help="base_link height. Wheels carry no colliders (the "
-                         "z-less rig would fight any floor contact), so this "
-                         "is visual + sensor-height truth: wheel bottoms sit "
-                         "at spawn_z + axle 0.05 - radius 0.0759; default "
-                         "puts them on mock_hospital's floor top (z=0.05) "
-                         "with 1 mm slack")
+    ap.add_argument("--spawn-z", type=float, default=None,
+                    help="explicit base_link world height override; by default "
+                         "the selected world's floor plus the measured "
+                         "0.02617 m wheel-mesh clearance is used")
     return ap.parse_args()
 
 
@@ -143,7 +140,15 @@ def run(app, args) -> int:
 
     from robot_rig import RidgebackRig
     from ros_io import RosIO
-    from worlds import get_assets_root, resolve_world
+    from worlds import (
+        BASE_LINK_FLOOR_CLEARANCE,
+        LIDAR_BASE_Z,
+        floor_z_for_world,
+        get_assets_root,
+        lidar_plane_z_for_world,
+        resolve_world,
+        spawn_z_for_world,
+    )
 
     # Stock envs (warehouse/office/hospital) resolve to <assets_root>/Isaac/...
     # and stream from S3/Nucleus; repo-local worlds ignore it. Only reachable
@@ -165,6 +170,24 @@ def run(app, args) -> int:
     robot_usd = args.robot_usd or str(
         Path(__file__).resolve().parent / "usd/robots/ridgeback_r100/ridgeback_r100.usda")
     x0, y0, yaw0 = (float(v) for v in args.spawn.split(","))
+    if args.spawn_z is None:
+        floor_z = floor_z_for_world(args.world)
+        spawn_z = spawn_z_for_world(args.world, floor_z=floor_z)
+        lidar_plane_z = lidar_plane_z_for_world(args.world, floor_z=floor_z)
+        height_source = "world floor"
+    else:
+        spawn_z = args.spawn_z
+        try:
+            floor_z = floor_z_for_world(args.world)
+        except ValueError:
+            floor_z = spawn_z - BASE_LINK_FLOOR_CLEARANCE
+        lidar_plane_z = spawn_z + LIDAR_BASE_Z
+        height_source = "--spawn-z override"
+    print(
+        f"robot heights ({height_source}): floor_z={floor_z:.5f} "
+        f"spawn_z={spawn_z:.5f} lidar_plane_z={lidar_plane_z:.5f}",
+        flush=True,
+    )
 
     robot_prim_path = "/ridgeback"
     robot_prim = stage.DefinePrim(robot_prim_path, "Xform")
@@ -180,12 +203,12 @@ def run(app, args) -> int:
     # unauthored localPos0 defaults to the world origin, which would yank
     # the chain back to z=0 and grind the wheels into the floor.
     UsdGeom.XformCommonAPI(robot_prim).SetTranslate(
-        Gf.Vec3d(0.0, 0.0, args.spawn_z))
+        Gf.Vec3d(0.0, 0.0, spawn_z))
     wf = stage.GetPrimAtPath(f"{robot_prim_path}/drive_rig/world_fix")
     if not wf:
         raise RuntimeError("drive_rig/world_fix joint missing from robot USD")
     UsdPhysics.FixedJoint(wf).CreateLocalPos0Attr(
-        Gf.Vec3f(0.0, 0.0, args.spawn_z))
+        Gf.Vec3f(0.0, 0.0, spawn_z))
     # spawn pose goes into the rig's joint offsets after initialize();
     # the reference itself stays at the world origin so px/py/rz remain
     # the single source of planar pose truth.

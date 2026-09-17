@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
 """One-boot standalone diagnostic for the P3 planar-rig motion bug.
 
-Loads mock_hospital + the Ridgeback package EXACTLY like isaac_runner.py
-(same stage order, same spawn_z translate + world_fix localPos0 authoring,
+Loads a selected world + the Ridgeback package EXACTLY like isaac_runner.py
+(same stage order, derived spawn_z translate + world_fix localPos0 authoring,
 same articulation bring-up), then steps ~300 frames with NO commands and
 prints the physical evidence the fling/slide fix must be based on:
 
   A. authored joint frames on the drive_rig (world_fix/px/py/rz) as
      composed on the live stage
   B. pre-play authored world transforms of chassis/axle/rockers/wheels,
-     wheel-cylinder radius, predicted wheel-bottom z vs the floor top
-     (mock_hospital floor top = 0.05)
+     wheel-cylinder radius, predicted wheel-bottom z vs the registered floor,
+     and both lidar planes vs their derived world height
   C. per-60-frame: rig dof positions/velocities (px/py/rz) vs chassis
      world pose from the physics tensor backend vs the USD-composed pose
      (do they agree?), wheel center/bottom world z
@@ -38,10 +38,9 @@ REPO = Path(__file__).resolve().parents[2]
 SIM_DIR = REPO / "src/ridgeback_autonomy_isaac/sim/isaac"
 sys.path.insert(0, str(SIM_DIR))
 
-SPAWN_Z = 0.076         # mirror isaac_runner.py default
-FLOOR_TOP = 0.05        # mock_hospital hospital_floor/col: 0.1 thick, centered z=0
 FRAMES = 300
 PRINT_EVERY = 60
+HEIGHT_TOLERANCE = 0.0005
 
 WHEELS = {
     "FL": "Geometry/base_link/chassis_link/axle_link/front_rocker_link/front_left_wheel_link",
@@ -58,6 +57,11 @@ def yaw_of_wxyz(w, x, y, z):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    ap.add_argument("--world", default="mock_hospital",
+                    help="registered Isaac world name")
+    ap.add_argument("--usd-only", action="store_true",
+                    help="verify authored wheel/lidar heights without starting "
+                         "SimulationApp (works on hosts without an RTX device)")
     ap.add_argument("--battery", action="store_true",
                     help="run the P3 motion acceptance battery instead of "
                          "the passive 300-frame diagnostic")
@@ -71,11 +75,15 @@ def main():
                     help="frames to spin for --spin-transforms")
     args = ap.parse_args()
 
+    if args.usd_only:
+        sys.exit(run_usd_geometry(args.world))
+
     from isaacsim import SimulationApp
     app = SimulationApp({"headless": True})
     code = 1
     try:
-        code = run(app, battery=args.battery, spin_transforms=args)
+        code = run(app, world=args.world, battery=args.battery,
+                   spin_transforms=args)
     except Exception:
         import traceback
         traceback.print_exc()
@@ -85,17 +93,86 @@ def main():
     sys.exit(code)
 
 
-def run(app, battery: bool = False, spin_transforms=None) -> int:
+def run_usd_geometry(world: str) -> int:
+    """Check authored robot heights using USD composition only."""
+    from pxr import Usd, UsdGeom
+
+    from worlds import (
+        floor_z_for_world,
+        lidar_plane_z_for_world,
+        spawn_z_for_world,
+    )
+
+    floor_z = floor_z_for_world(world)
+    spawn_z = spawn_z_for_world(world)
+    lidar_plane_z = lidar_plane_z_for_world(world)
+    robot_usd = SIM_DIR / "usd/robots/ridgeback_r100/ridgeback_r100.usda"
+    stage = Usd.Stage.Open(str(robot_usd))
+    root = stage.GetDefaultPrim()
+    if not root:
+        raise RuntimeError(f"robot USD has no default prim: {robot_usd}")
+    tc = Usd.TimeCode.Default()
+
+    def named(name):
+        matches = [p for p in Usd.PrimRange(root) if p.GetName() == name]
+        if len(matches) != 1:
+            raise RuntimeError(f"expected one {name}, found {len(matches)}")
+        return matches[0]
+
+    def relative_z(prim):
+        return float(UsdGeom.Xformable(prim).ComputeLocalToWorldTransform(
+            tc).ExtractTranslation()[2])
+
+    print(f"world={world} floor_z={floor_z:.5f} spawn_z={spawn_z:.5f} "
+          f"lidar_plane_z={lidar_plane_z:.5f}")
+    ok = True
+    cylinder = stage.GetPrimAtPath(
+        f"{root.GetPath()}/{WHEELS['FL']}/cylinder")
+    if not cylinder:
+        raise RuntimeError("front-left wheel cylinder missing")
+    radius = float(cylinder.GetAttribute("radius").Get())
+    wheel_bottom_z = spawn_z + relative_z(cylinder.GetParent()) - radius
+    wheel_error = wheel_bottom_z - floor_z
+    passed = abs(wheel_error) <= HEIGHT_TOLERANCE
+    ok &= passed
+    print(f"wheel_bottom_z={wheel_bottom_z:.5f} expected={floor_z:.5f} "
+          f"error={wheel_error:+.5f} [{'PASS' if passed else 'FAIL'}]")
+
+    for name in ("lidar2d_0_laser", "lidar2d_1_laser"):
+        sensor_z = spawn_z + relative_z(named(name))
+        error = sensor_z - lidar_plane_z
+        passed = abs(error) <= HEIGHT_TOLERANCE
+        ok &= passed
+        print(f"{name}_z={sensor_z:.5f} expected={lidar_plane_z:.5f} "
+              f"error={error:+.5f} [{'PASS' if passed else 'FAIL'}]")
+
+    print(f"USD GEOMETRY {'PASS' if ok else 'FAIL'}")
+    return 0 if ok else 1
+
+
+def run(app, world: str = "mock_hospital", battery: bool = False,
+        spin_transforms=None) -> int:
     import omni.timeline
     import omni.usd
     from isaacsim.core.utils.extensions import enable_extension
     from pxr import Gf, PhysxSchema, Usd, UsdGeom, UsdPhysics
 
     from robot_rig import RidgebackRig
-    from worlds import resolve_world
+    from worlds import (
+        floor_z_for_world,
+        get_assets_root,
+        lidar_plane_z_for_world,
+        resolve_world,
+        spawn_z_for_world,
+    )
 
-    world_path = resolve_world("mock_hospital")
+    world_path = resolve_world(world, get_assets_root())
+    floor_z = floor_z_for_world(world)
+    spawn_z = spawn_z_for_world(world)
+    lidar_plane_z = lidar_plane_z_for_world(world)
     print(f"loading world: {world_path}", flush=True)
+    print(f"expected heights: floor_z={floor_z:.5f} spawn_z={spawn_z:.5f} "
+          f"lidar_plane_z={lidar_plane_z:.5f}", flush=True)
     ctx = omni.usd.get_context()
     ctx.open_stage(world_path)
     stage = ctx.get_stage()
@@ -106,12 +183,14 @@ def run(app, battery: bool = False, spin_transforms=None) -> int:
     robot_usd = str(SIM_DIR / "usd/robots/ridgeback_r100/ridgeback_r100.usda")
     robot_prim_path = "/ridgeback"
     robot_prim = stage.DefinePrim(robot_prim_path, "Xform")
-    robot_prim.GetReferences().AddReference(robot_usd)
-    UsdGeom.XformCommonAPI(robot_prim).SetTranslate(Gf.Vec3d(0.0, 0.0, SPAWN_Z))
+    # Match the runner: a bare local path is URL-joined against a remote stock
+    # world's root layer and silently fails to compose the robot.
+    robot_prim.GetReferences().AddReference(Path(robot_usd).as_uri())
+    UsdGeom.XformCommonAPI(robot_prim).SetTranslate(Gf.Vec3d(0.0, 0.0, spawn_z))
     wf = stage.GetPrimAtPath(f"{robot_prim_path}/drive_rig/world_fix")
     if not wf:
         raise RuntimeError("drive_rig/world_fix missing")
-    UsdPhysics.FixedJoint(wf).CreateLocalPos0Attr(Gf.Vec3f(0.0, 0.0, SPAWN_Z))
+    UsdPhysics.FixedJoint(wf).CreateLocalPos0Attr(Gf.Vec3f(0.0, 0.0, spawn_z))
 
     # ---- A: authored joint frames on the composed stage -------------------
     print("\n=== A. drive_rig joint frames (composed stage) ===", flush=True)
@@ -162,10 +241,38 @@ def run(app, battery: bool = False, spin_transforms=None) -> int:
     if cyl:
         radius = cyl.GetAttribute("radius").Get()
     wz = world_of(WHEELS["FL"])
+    geometry_ok = True
     if radius is not None and wz is not None:
+        wheel_bottom_z = wz[2] - radius
+        wheel_error = wheel_bottom_z - floor_z
+        geometry_ok &= abs(wheel_error) <= HEIGHT_TOLERANCE
         print(f"  wheel radius={radius}  predicted wheel bottom z="
-              f"{wz[2] - radius:.4f}  floor top={FLOOR_TOP}  "
-              f"clearance={wz[2] - radius - FLOOR_TOP:+.4f}", flush=True)
+              f"{wheel_bottom_z:.5f}  floor top={floor_z:.5f}  "
+              f"error={wheel_error:+.5f} "
+              f"[{'PASS' if abs(wheel_error) <= HEIGHT_TOLERANCE else 'FAIL'}]",
+              flush=True)
+    else:
+        geometry_ok = False
+        print("  wheel height [FAIL: wheel cylinder missing]", flush=True)
+
+    laser_prims = {}
+    for prim in Usd.PrimRange(robot_prim):
+        if prim.GetName() in ("lidar2d_0_laser", "lidar2d_1_laser"):
+            laser_prims[prim.GetName()] = prim
+    for name in ("lidar2d_0_laser", "lidar2d_1_laser"):
+        prim = laser_prims.get(name)
+        if prim is None:
+            geometry_ok = False
+            print(f"  {name} [FAIL: prim missing]", flush=True)
+            continue
+        laser_world = UsdGeom.Xformable(prim).ComputeLocalToWorldTransform(
+            tc).ExtractTranslation()
+        sensor_error = laser_world[2] - lidar_plane_z
+        passed = abs(sensor_error) <= HEIGHT_TOLERANCE
+        geometry_ok &= passed
+        print(f"  {name}: world z={laser_world[2]:.5f} "
+              f"expected={lidar_plane_z:.5f} error={sensor_error:+.5f} "
+              f"[{'PASS' if passed else 'FAIL'}]", flush=True)
 
     # ---- contact reporting on wheels + chassis -----------------------------
     for rel in list(WHEELS.values()) + [CHASSIS]:
@@ -321,7 +428,7 @@ def run(app, battery: bool = False, spin_transforms=None) -> int:
                 if wpos is not None and radius is not None:
                     print(f"  wheel {k}: center z={wpos[2]:+.4f} "
                           f"bottom z={wpos[2] - radius:+.4f} "
-                          f"(floor {FLOOR_TOP}, pen {FLOOR_TOP - (wpos[2] - radius):+.4f})",
+                          f"(floor {floor_z}, pen {floor_z - (wpos[2] - radius):+.4f})",
                           flush=True)
             if contacts:
                 print("  contacts since last mark:", flush=True)
@@ -347,8 +454,9 @@ def run(app, battery: bool = False, spin_transforms=None) -> int:
         print(f"  dof-vs-world mismatch at end: "
               f"dx={c1[0]-d1[0]:+.4f} dy={c1[1]-d1[1]:+.4f} "
               f"dyaw={y1-d1[2]:+.4f}", flush=True)
-    print("\nDIAG DONE", flush=True)
-    return 0
+    print(f"\nGEOMETRY {'PASS' if geometry_ok else 'FAIL'}", flush=True)
+    print("DIAG DONE", flush=True)
+    return 0 if geometry_ok else 1
 
 
 LIDAR_LASER_NAME = "lidar2d_0_laser"   # located by name: its parent chain

@@ -30,8 +30,9 @@ returns that pinned `cmd_vel` at zero. Reparenting them to `chassis_link`
 fixed it. The 6.1 migration passed its bounded compatibility gate on
 2026-09-13 at RTF 0.868 with 17 successful goals and no aborts. This is not a
 statistical baseline, and every older coverage or SLAM number measured before
-the 2026-09-10 geometry correction remains void. The robot still floats
-49.8 mm on stock worlds. P0–P4 and P7–P9 are done; P5 still needs a
+the 2026-09-10 geometry correction remains void. Robot and lidar heights now
+derive from each world's floor, and the stock maps were regenerated at the
+corrected scan plane on 2026-09-17. P0–P4 and P7–P9 are done; P5 still needs a
 multi-seed baseline and P6 is deferred. Active work is owned by the
 [global backlog](../BACKLOG.md). See
 [`migration-6.1.md`](migration-6.1.md) for the execution record.

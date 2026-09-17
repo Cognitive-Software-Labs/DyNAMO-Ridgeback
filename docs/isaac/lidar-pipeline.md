@@ -166,7 +166,8 @@ green, slam estimate red, waypoints orange):
 ![WINDOWED3: final full-loop run on the fixed sensor — RMSE 0.195 m](assets/slam-quality/WINDOWED3_overlay.png)
 
 The analytic ground-truth grid the metrics score against (rasterized from
-the SDF at the lidar plane z=0.418 (**stale: the plane is 0.3024 since the 2026-09-10 mount correction — figure not regenerated**); orange = G1 ignore mask):
+the SDF at the lidar plane z=0.418 (**stale: the raised-world plane is 0.30257
+since the mount and seating corrections — figure not regenerated**); orange = G1 ignore mask):
 
 ![Analytic GT occupancy grid from mock_hospital.sdf](assets/slam-quality/gt_hospital.png)
 
@@ -190,7 +191,8 @@ Known residuals (accepted, documented):
 ## Tooling (committed, reusable for the P5 gate)
 
 - `tools/isaac/gt_occupancy.py` — analytic GT occupancy grid straight from
-  the SDF (visual geoms crossing the lidar plane z=0.418 — **stale, now 0.3024**); waypoint
+  the SDF (visual geoms crossing the lidar plane z=0.418 — **stale, raised
+  worlds now use 0.30257**); waypoint
   clearance checker; ignore-mask for opaque includes (G1).
 - `tools/isaac/slam_quality_probe.py` — GT-feedback closed-loop drive
   (35.8 m, returns to start, wz ≤ 0.4) + metrics JSON + GT-overlay PNG.

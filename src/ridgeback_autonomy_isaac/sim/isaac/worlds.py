@@ -13,6 +13,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
+# Measured robot geometry relative to base_link. World-relative heights must be
+# derived from these values and the selected world's floor, never duplicated as
+# absolute spawn or scan-plane constants.
+BASE_LINK_FLOOR_CLEARANCE = 0.02617
+LIDAR_BASE_Z = 0.2264
+
 # Isaac stock environments served from the NVIDIA asset root (P7).
 # Values are asset-root-relative; the runner prefixes the configured
 # assets root (isaacsim.storage.native get_assets_root_path).
@@ -22,6 +28,54 @@ STOCK_WORLDS = {
     "hospital": "/Isaac/Environments/Hospital/hospital.usd",
     "office": "/Isaac/Environments/Office/office.usd",
 }
+
+# Top surface of the floor at the supported spawn location, in world metres.
+# Repo-converted stages use a 0.1 m slab centred at z=0; NVIDIA stock worlds
+# place their walking surface at z=0.
+WORLD_FLOOR_Z = {
+    "empty": 0.05,
+    "g1_distance_calibration": 0.05,
+    "mock_hospital": 0.05,
+    **{name: 0.0 for name in STOCK_WORLDS},
+}
+
+
+def _world_key(name_or_path: str | Path) -> str:
+    value = str(name_or_path)
+    path = Path(value)
+    return path.stem if path.suffix.lower() in (".usd", ".usda", ".usdc", ".sdf") \
+        else value
+
+
+def floor_z_for_world(name_or_path: str | Path,
+                      floor_z: float | None = None) -> float:
+    """Return the selected world's floor top in metres.
+
+    Named supported worlds own their floor height here. An arbitrary world
+    path must provide ``floor_z`` explicitly because guessing from USD scene
+    geometry is ambiguous at stepped or multi-level spawn locations.
+    """
+    if floor_z is not None:
+        return float(floor_z)
+    key = _world_key(name_or_path)
+    try:
+        return WORLD_FLOOR_Z[key]
+    except KeyError as exc:
+        raise ValueError(
+            f"world {name_or_path!r} has no registered floor height; "
+            "provide an explicit floor/spawn override") from exc
+
+
+def spawn_z_for_world(name_or_path: str | Path,
+                      floor_z: float | None = None) -> float:
+    """base_link world height that seats the wheel mesh on the floor."""
+    return floor_z_for_world(name_or_path, floor_z) + BASE_LINK_FLOOR_CLEARANCE
+
+
+def lidar_plane_z_for_world(name_or_path: str | Path,
+                            floor_z: float | None = None) -> float:
+    """World-space UST-10LX scan plane derived from the same floor value."""
+    return spawn_z_for_world(name_or_path, floor_z) + LIDAR_BASE_Z
 
 
 def get_assets_root() -> str | None:

@@ -52,9 +52,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]
 # One slice height, one flood-fill, one map writer -- all owned by
 # gt_occupancy. These were separate copies until 2026-09-10, which is exactly
 # how a stale slice height survives a geometry fix in only one of them.
-from gt_occupancy import (  # noqa: E402
-    LIDAR_PLANE_Z, flood_free, write_map_set,
-)
+from gt_occupancy import flood_free, write_map_set  # noqa: E402
 
 RESOLUTION = 0.05
 
@@ -67,7 +65,9 @@ def parse_args():
                     help="output directory")
     ap.add_argument("--name", default=None, help="output stem (default: world)")
     ap.add_argument("--cell-size", type=float, default=RESOLUTION)
-    ap.add_argument("--plane-z", type=float, default=LIDAR_PLANE_Z)
+    ap.add_argument("--plane-z", type=float, default=None,
+                    help="explicit world-space scan plane override; default "
+                         "is derived from the selected world's floor")
     ap.add_argument("--origin", default=None,
                     help="flood-fill seed x,y in world metres; default = the "
                          "centroid of the dominant geometry cluster (nearest "
@@ -238,9 +238,12 @@ def generate(app, args) -> int:
     import omni.usd
     from pxr import UsdGeom
 
-    from worlds import get_assets_root, resolve_world
+    from worlds import get_assets_root, lidar_plane_z_for_world, resolve_world
 
     world_path = resolve_world(args.world, get_assets_root())
+    plane_z = args.plane_z
+    if plane_z is None:
+        plane_z = lidar_plane_z_for_world(args.world)
     print(f"loading world: {world_path}", flush=True)
     ctx = omni.usd.get_context()
     ctx.open_stage(world_path)
@@ -256,8 +259,8 @@ def generate(app, args) -> int:
             break
     mpu = UsdGeom.GetStageMetersPerUnit(stage) or 1.0
     print(f"stage loaded after {i + 1} frames, metersPerUnit={mpu}", flush=True)
-
-    plane = args.plane_z / mpu           # slice in stage units
+    print(f"lidar plane z: {plane_z:.5f} m", flush=True)
+    plane = plane_z / mpu                # slice in stage units
     segs, skipped, stats = _slice_segments(stage, plane, args.max_extent / mpu)
     print(f"sliced {len(segs)} plane-crossing segments "
           f"({skipped} oversized meshes skipped; {stats['instancers']} "
@@ -302,7 +305,7 @@ def generate(app, args) -> int:
           flush=True)
     return write_map_set(args.out, args.name or args.world, occ, free,
                          unknown, (ox_m, oy_m), args.cell_size,
-                         args.plane_z)
+                         plane_z)
 
 
 def main():
