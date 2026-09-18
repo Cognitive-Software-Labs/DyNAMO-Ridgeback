@@ -13,9 +13,9 @@ flowchart TD
     Y["clearpath/robot.yaml: robot and sensor declaration"] --> D["Generated Clearpath description"]
     D --> G["Gazebo model"]
     D --> I["Isaac import and USD additions"]
-    D --> H["Hardware configuration"]
+    R["Robot-local /etc/clearpath/robot.yaml"] --> H["Hardware description and TF"]
     P["Physical robot measurements and calibration"] -.-> Y
-    P -.-> H
+    P -.-> R
 ```
 
 [`clearpath/robot.yaml`](../../clearpath/robot.yaml) owns sensor selection and
@@ -40,6 +40,28 @@ radians. Read the generated TF chain for the resulting sensing frame.
 The YAML remains authoritative for these values. Camera internal transforms
 come from the nominal description in simulation and device calibration on
 hardware; a configured mount is not a calibration result.
+
+## Deployed hardware mounts
+
+The physical robot does not generate its description from the repository YAML.
+Clearpath's services on `r100_0160` read the robot's own
+`/etc/clearpath/robot.yaml`, which the integrator (MyBotShop) maintains
+separately. It differs from the repository declaration in namespace,
+middleware and sensors. Inspect the live TF rather than assuming the table above.
+
+| Item | Robot-local declaration | Relation to the repository YAML |
+|---|---|---|
+| Front Hokuyo | `chassis_link`, `[0.3922, 0, 0.1856]` | Same x; z differs by 6.6 mm, below the resolution of the field tape readings |
+| Rear Hokuyo | `chassis_link`, `[-0.3922, 0, 0.1856]`, yaw π | Same x after the field-verified symmetric correction; same z difference |
+| D455 | Not declared; the camera driver's frames are not connected to the robot tree | Repository mount unverified on hardware |
+
+The MyBotShop scan merger keeps its own copy of both LiDAR offsets for the
+merged `sensors/scan`. Change it together with the robot-local YAML.
+
+Field readings match the model deck height and the configured forward camera
+setback, and show symmetric front/rear LiDAR mounts. The camera housing height
+agrees with the declared mount to within tape precision. These are
+integration checks, not a calibration or a dimensional audit.
 
 ## Dimensioned reference drawing
 
@@ -89,3 +111,4 @@ model-derived dimension as a verified physical measurement.
 ## Archived evidence
 
 - [September 18 static envelope audit](../../archive/engineering/2026-09-18-collision-envelope-audit.md) — measured backend differences and regenerated top-down/side comparisons; hardware and drawing reconciliation remain open.
+- [r100_0160 field readings and LiDAR box checks](../../archive/engineering/2026-09-18-r100-0160-field-measurements.md) — tape mount readings, LiDAR range/side checks, and the rear-offset correction's evidence.

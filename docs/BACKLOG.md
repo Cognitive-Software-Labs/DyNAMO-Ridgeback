@@ -275,8 +275,8 @@ stopping proof. Those are separate tasks under this gate.
 
 ## Rear LiDAR mounting offset
 
-**Gap.** On `r100_0160` the deployed rear LiDAR sits at x = −0.4278 m (parent
-`chassis_link`). The 2026-09-18 field visit found it about 3.6 cm too far back.
+**Gap.** On `r100_0160` the deployed rear LiDAR was configured at x = −0.4278 m
+(parent `chassis_link`). The 2026-09-18 field visit found it about 3.6 cm too far back.
 A shared side target seen by both LiDARs needed a +3.5 cm rear shift to align,
 and the tape readings show symmetric mounts. The symmetric −0.3922 m used by
 Clearpath's dual-Hokuyo sample and the repository's `clearpath/robot.yaml`
