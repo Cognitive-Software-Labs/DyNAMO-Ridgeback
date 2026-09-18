@@ -39,6 +39,20 @@ complete; this plan now tracks qualification and acceptance only.
 
 ## Qualification checkpoint and remaining work
 
+Current handoff candidate: `eaacd24b2504e05a3d96c10e63c1f3d3b8d86ee3` on
+`feat/real-hardware-exploration`. This includes all four package-split commits,
+the Intel–Thor transport tools, and the DDS rollback/environment fixes. The
+combined tree passed 1,037 tests, the autonomy and hardware packages rebuilt,
+dependency pins/patches matched, and documentation checks passed. The new
+transport regression tests use temporary files and mocked services; they do
+not qualify the installed robot services. Local integration evidence is under
+`artifacts/package-split/integration-eaacd24b/`.
+
+The branch is available for deployment; neither host's installation or acceptance
+of this candidate has been recorded. Existing simulator runtime evidence below
+retains its original tested scope; the integration rerun did not repeat live
+Gazebo/Isaac performance measurements or physical tests.
+
 The interfaces extraction is commit `2e52712b`; the separately verified common/
 localization extraction is `3330cc2d`. Deployment roles, configurable labels,
 progress health, and latched mission supervision are implemented in
@@ -74,8 +88,9 @@ Workstation evidence is under `artifacts/package-split/`:
 
 Remaining gates (do not retire this plan yet):
 
-- Record the accepted final revision, manifest pins, and the matching installed
-  revision acknowledged by each robot team. Use the README's explicit per-host
+- Accept the candidate above or a subsequently tested revision, record manifest
+  pins, and obtain the matching installed revision acknowledged by each robot
+  team. Use the README's explicit per-host
   commands and the maintained contract's rollback procedure.
 - Robot teams qualify Thor inference software/GPU execution, clock alignment,
   transport, observed sensor/TF inputs, and stationary G1/person checks under the

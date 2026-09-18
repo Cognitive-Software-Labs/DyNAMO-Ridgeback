@@ -41,10 +41,11 @@ investigation in the archived evidence below.
 
 ## Physical stationary integration
 
-**Gap.** The application still combines localization, shared messages, and
-navigation dependencies in one package. A distributed Intel–Thor deployment,
-physical sensor suite, and joint stationary target tests have not been qualified.
-Three coordinated plans own execution:
+**Gap.** The package split and workstation checks are complete, and Intel–Thor
+transport tooling and preliminary network experiments are recorded. Matching
+robot installations, live GPU localization, the physical sensor suite, and joint
+stationary target tests have not been qualified. The three plans own their
+current progress and remaining acceptance gates:
 
 | Plan | Owner | Completion boundary |
 |---|---|---|
@@ -52,9 +53,10 @@ Three coordinated plans own execution:
 | [PHYSICAL — Intel–Thor deployment and transport qualification](plans/PHYSICAL_intel_thor_deployment.md) | Robot deployment team | Matching installed revision, GPU offload, measured transport/performance, stationary failure and recovery evidence. |
 | [PHYSICAL — Robot measurements and stationary sensor validation](plans/PHYSICAL_robot_measurements_and_validation.md) | People at the robot with agent assistance | Quick sensor-mount readings/photos, agent-run sensor/alignment checks, and distributed G1/person tests. |
 
-**Coordination.** Hardware inventory and measurements can start before the code
-split lands. Final distributed tests require its tested revision and interface
-handoff. Shared-code defects return to the workstation; robot teams own machine
+**Coordination.** The workstation handoff is available in the package-split plan;
+both robot hosts must acknowledge the same installed revision before final
+distributed tests. Mount measurements and sensor inspection can proceed in
+parallel. Shared-code defects return to the workstation; robot teams own machine
 configuration and physical evidence. Start with the D455 on Intel and explicit
 per-host commands; camera relocation is an evidence-led alternative. One-command
 remote startup and boot services are optional later stages.

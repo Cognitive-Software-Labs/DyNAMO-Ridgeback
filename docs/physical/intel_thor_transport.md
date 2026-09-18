@@ -17,8 +17,10 @@ deployment work lives in the
 
 ## Middleware
 
-Both hosts use CycloneDDS (`rmw_cyclonedds_cpp`) on ROS 2 Jazzy, which matches
-the repository's simulator default. Intel's Clearpath services ran Fast DDS
+The deployment selects CycloneDDS (`rmw_cyclonedds_cpp`) on both ROS 2 Jazzy
+hosts, matching the repository's simulator default. Confirm effective settings
+on each running process before acceptance; repository profiles do not prove
+the installed service state. Intel's Clearpath services ran Fast DDS
 only because the live `/etc/clearpath/robot.yaml` did not name a middleware.
 In a cross-host benchmark the two middlewares tied within the link's capacity.
 The team selected CycloneDDS so that the robot and the simulators use the same
