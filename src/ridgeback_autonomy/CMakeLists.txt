@@ -3,17 +3,6 @@ project(ridgeback_autonomy)
 
 find_package(ament_cmake REQUIRED)
 find_package(ament_cmake_python REQUIRED)
-find_package(rosidl_default_generators REQUIRED)
-find_package(builtin_interfaces REQUIRED)
-find_package(std_msgs REQUIRED)
-
-rosidl_generate_interfaces(${PROJECT_NAME}
-  "msg/PolarBeams.msg"
-  "msg/TargetDetections.msg"
-  "msg/TargetMeasurements.msg"
-  DEPENDENCIES builtin_interfaces std_msgs
-)
-
 ament_get_python_install_dir(python_install_dir)
 
 install(DIRECTORY
@@ -23,29 +12,9 @@ install(DIRECTORY
   PATTERN "__pycache__" EXCLUDE
 )
 
-install(PROGRAMS
-  ridgeback_autonomy/perception/target_localization/detector_node.py
-  DESTINATION lib/${PROJECT_NAME}
-  RENAME target_detector_node
-)
 
-install(PROGRAMS
-  ridgeback_autonomy/perception/target_localization/pointcloud_measurement_node.py
-  DESTINATION lib/${PROJECT_NAME}
-  RENAME target_pointcloud_measurement_node
-)
 
-install(PROGRAMS
-  ridgeback_autonomy/perception/target_localization/overlay_node.py
-  DESTINATION lib/${PROJECT_NAME}
-  RENAME target_overlay_node
-)
 
-install(PROGRAMS
-  ridgeback_autonomy/perception/target_localization/mask_measurement_node.py
-  DESTINATION lib/${PROJECT_NAME}
-  RENAME target_mask_measurement_node
-)
 
 install(PROGRAMS
   ridgeback_autonomy/benchmarking/target_distance_benchmark_runner_node.py
@@ -53,11 +22,6 @@ install(PROGRAMS
   RENAME target_distance_benchmark_runner
 )
 
-install(PROGRAMS
-  ridgeback_autonomy/perception/target_localization/visualization_node.py
-  DESTINATION lib/${PROJECT_NAME}
-  RENAME target_visualization_node
-)
 
 install(PROGRAMS
   ridgeback_autonomy/benchmarking/target_benchmark_sweep.py
@@ -174,6 +138,10 @@ if(BUILD_TESTING)
   ament_add_pytest_test(test_frontier_explorer test/test_frontier_explorer.py)
   ament_add_pytest_test(test_image_utils test/test_image_utils.py)
   ament_add_pytest_test(test_imports test/test_imports.py)
+  ament_add_pytest_test(test_package_split test/test_package_split.py)
+  ament_add_pytest_test(test_intel_thor_tools test/test_intel_thor_tools.py)
+  ament_add_pytest_test(test_localization_health test/test_localization_health.py)
+  ament_add_pytest_test(test_deployment_launch test/test_deployment_launch.py)
   ament_add_pytest_test(test_intrinsics test/test_intrinsics.py)
   ament_add_pytest_test(test_isolation_2d test/test_isolation_2d.py)
   ament_add_pytest_test(test_isolation_3d test/test_isolation_3d.py)
@@ -189,6 +157,7 @@ if(BUILD_TESTING)
   ament_add_pytest_test(test_launch_layout test/test_launch_layout.py)
   ament_add_pytest_test(test_markers test/test_markers.py)
   ament_add_pytest_test(test_messages test/test_messages.py)
+  ament_add_pytest_test(test_interface_serialization test/test_interface_serialization.py)
   ament_add_pytest_test(test_projective_ranging test/test_projective_ranging.py)
   ament_add_pytest_test(test_rendering test/test_rendering.py)
   ament_add_pytest_test(test_robot_config test/test_robot_config.py)
@@ -215,4 +184,6 @@ if(BUILD_TESTING)
   ament_add_pytest_test(test_hud_node test/test_hud_node.py)
 endif()
 
+install(PROGRAMS ridgeback_autonomy/diagnostics/localization_status_node.py
+  DESTINATION lib/${PROJECT_NAME} RENAME localization_status)
 ament_package()

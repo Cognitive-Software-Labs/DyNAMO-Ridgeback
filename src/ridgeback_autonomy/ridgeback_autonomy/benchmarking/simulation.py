@@ -6,7 +6,7 @@ from dataclasses import dataclass
 import os
 from typing import Any
 
-from ridgeback_autonomy.perception.target_localization.core.vehicle_frame import (
+from ridgeback_localization.core.vehicle_frame import (
     planar_measurement_from_vehicle_front,
     yaw_from_quaternion,
 )

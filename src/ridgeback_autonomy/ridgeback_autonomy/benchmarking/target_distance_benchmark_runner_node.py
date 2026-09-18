@@ -29,8 +29,8 @@ from ridgeback_autonomy.benchmarking.alignment import (
     store_buffered_preview,
     update_measurement_event,
 )
-from ridgeback_autonomy.common.camera_profiles import DEFAULT_CAMERA_PROFILE
-from ridgeback_autonomy.perception.target_localization.estimator_registry import (
+from ridgeback_common.camera_profiles import DEFAULT_CAMERA_PROFILE
+from ridgeback_localization.estimator_registry import (
     MASK_GATE_DEFAULT,
     parse_estimators,
     parse_mask_gate,
@@ -39,7 +39,7 @@ from ridgeback_autonomy.perception.target_localization.estimator_registry import
     uses_mask_estimators,
     uses_pointcloud_estimators,
 )
-from ridgeback_autonomy.perception.target_localization.contracts import (
+from ridgeback_localization.contracts import (
     GROUND_TRUTH_TOPIC,
     MASK_MEASUREMENTS_TOPIC,
     POINTCLOUD_MEASUREMENTS_TOPIC,
@@ -112,50 +112,50 @@ from ridgeback_autonomy.benchmarking.trial_results import (
     build_trials,
     dominant_miss_reasons,
 )
-from ridgeback_autonomy.msg import TargetDetections, TargetMeasurements
-from ridgeback_autonomy.common.stamps import stamp_to_nanoseconds
-from ridgeback_autonomy.perception.target_localization.core.depth_common import (
+from ridgeback_interfaces.msg import TargetDetections, TargetMeasurements
+from ridgeback_common.stamps import stamp_to_nanoseconds
+from ridgeback_localization.core.depth_common import (
     DEPTH_GATE_DISABLED,
     NEAREST_MODE_BIN_WIDTH_M_DEFAULT,
     NEAREST_MODE_MIN_BIN_FRACTION_DEFAULT,
 )
-from ridgeback_autonomy.perception.target_localization.core.image_utils import (
+from ridgeback_localization.core.image_utils import (
     convert_color_image_message,
     decode_color_to_rgb,
 )
-from ridgeback_autonomy.perception.target_localization.core.depth_sources import decode_depth_to_meters
-from ridgeback_autonomy.perception.target_localization.core.intrinsics import intrinsics_from_camera_info
-from ridgeback_autonomy.perception.target_localization.core.mask import clamp_box
-from ridgeback_autonomy.common.messages import batch_from_detections_message
-from ridgeback_autonomy.common.tf_utils import lookup_transform_components
-from ridgeback_autonomy.perception.target_localization.contracts import (
+from ridgeback_localization.core.depth_sources import decode_depth_to_meters
+from ridgeback_localization.core.intrinsics import intrinsics_from_camera_info
+from ridgeback_localization.core.mask import clamp_box
+from ridgeback_common.messages import batch_from_detections_message
+from ridgeback_common.tf_utils import lookup_transform_components
+from ridgeback_localization.contracts import (
     ALIGNED_DEPTH_DEBUG_TOPIC,
     RAW_DETECTIONS_TOPIC,
 )
-from ridgeback_autonomy.perception.target_localization.synchronization import (
+from ridgeback_localization.synchronization import (
     SCAN_MATCH_BUFFER_DEPTH,
     SCAN_MATCH_TOLERANCE_S_DEFAULT,
     StampedMessageBuffer,
 )
-from ridgeback_autonomy.perception.target_localization.core.isolation_2d import (
+from ridgeback_localization.core.isolation_2d import (
     ISOLATION_2D_DEFAULT,
     NEAREST_MODE_BAND_M_DEFAULT,
 )
-from ridgeback_autonomy.perception.target_localization.core.isolation_3d import (
+from ridgeback_localization.core.isolation_3d import (
     BASE_ABOVE_FLOOR_M_DEFAULT,
     FLOOR_MARGIN_M_DEFAULT,
     ISOLATION_3D_DEFAULT,
 )
-from ridgeback_autonomy.perception.target_localization.core.ranging_defaults import (
+from ridgeback_localization.core.ranging_defaults import (
     FRONT_PERCENTILE,
     INLIER_AHEAD_MARGIN_M,
     INLIER_BEHIND_MARGIN_M,
     MIN_VALID_SAMPLES,
 )
-from ridgeback_autonomy.perception.target_localization.core.vehicle_frame import (
+from ridgeback_localization.core.vehicle_frame import (
     ROBOT_FRONT_OFFSET_M,
 )
-from ridgeback_autonomy.perception.target_localization.ground_truth import (
+from ridgeback_localization.ground_truth import (
     ground_truth_point_message,
 )
 
@@ -214,6 +214,7 @@ class TargetDistanceBenchmarkRunner(Node):
             os.path.join(pkg_share, '..', '..', '..', '..'))
         default_output_dir = default_output_directory(self.workspace_root)
 
+        self.declare_parameter('target_labels', 'humanoid robot')
         self.declare_parameter('world', 'target_distance_calibration')
         # The runner stays target/provider-neutral. The Gazebo benchmark launch
         # supplies its concrete asset roots; a future Isaac benchmark can
@@ -1074,6 +1075,7 @@ class TargetDistanceBenchmarkRunner(Node):
             'Commit': format_commit(provenance),
             'Branch': provenance['branch'] or 'unknown',
             'Scenario': self.scenario_path,
+            'Target labels': self.get_parameter('target_labels').value,
         }
         # Named while the recorder is still running (it is stopped after the
         # report is written), so this is the path, not a claim the file is ready.
@@ -1107,6 +1109,7 @@ class TargetDistanceBenchmarkRunner(Node):
                 'branch': provenance['branch'],
                 'uncommitted_files': provenance['dirty_count'],
                 'scenario': self.scenario_path,
+                'target_labels': self.get_parameter('target_labels').value,
                 'scenes': scenes,
                 'instances': instances,
                 'trials_included': included_trials,

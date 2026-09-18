@@ -49,46 +49,46 @@ from ridgeback_autonomy.benchmarking.summary import (
 from ridgeback_autonomy.benchmarking.simulation import GroundTruthInstance
 from ridgeback_autonomy.benchmarking.sweep_report import write_sweep_report
 from ridgeback_autonomy.benchmarking.trial_results import build_trial_result
-from ridgeback_autonomy.common.miss_reason import MissReason
-from ridgeback_autonomy.common.models import Detection
-from ridgeback_autonomy.perception.target_localization.core.depth_common import (
+from ridgeback_common.miss_reason import MissReason
+from ridgeback_common.models import Detection
+from ridgeback_localization.core.depth_common import (
     PreparedDepthRegion,
     resolve_depth_gate,
     valid_depth,
 )
-from ridgeback_autonomy.perception.target_localization.core.box_gate import (
+from ridgeback_localization.core.box_gate import (
     box_within_frame_fraction,
 )
-from ridgeback_autonomy.perception.target_localization.core.euclidean_reconstruction import (
+from ridgeback_localization.core.euclidean_reconstruction import (
     localize_prepared_euclidean_reconstruction,
 )
-from ridgeback_autonomy.perception.target_localization.core.intrinsics import CameraIntrinsics
-from ridgeback_autonomy.perception.target_localization.core.isolation_2d import build_isolation_2d
-from ridgeback_autonomy.perception.target_localization.core.isolation_3d import (
+from ridgeback_localization.core.intrinsics import CameraIntrinsics
+from ridgeback_localization.core.isolation_2d import build_isolation_2d
+from ridgeback_localization.core.isolation_3d import (
     BASE_ABOVE_FLOOR_M_DEFAULT,
     ISOLATION_3D_DEFAULT,
     build_isolation_3d,
     camera_floor_geometry,
 )
-from ridgeback_autonomy.perception.target_localization.core.mask import region_from_bbox
-from ridgeback_autonomy.perception.target_localization.core.polar_profiling import (
+from ridgeback_localization.core.mask import region_from_bbox
+from ridgeback_localization.core.polar_profiling import (
     localize_projected_polar_profiling,
     project_scan_to_image,
     scan_points_optical,
 )
-from ridgeback_autonomy.perception.target_localization.core.projective_ranging import (
+from ridgeback_localization.core.projective_ranging import (
     localize_prepared_projective_ranging,
 )
-from ridgeback_autonomy.perception.target_localization.core.vehicle_frame import (
+from ridgeback_localization.core.vehicle_frame import (
     ROBOT_FRONT_OFFSET_M,
     optical_to_base_planar,
 )
-from ridgeback_autonomy.perception.target_localization.estimator_registry import (
+from ridgeback_localization.estimator_registry import (
     DEPTH_PATH_ESTIMATORS,
     ESTIMATOR_FIELD_KEYS,
     ESTIMATOR_LABELS,
 )
-from ridgeback_autonomy.perception.target_localization.measurement_pipeline import (
+from ridgeback_localization.measurement_pipeline import (
     set_mask_estimator_status,
 )
 

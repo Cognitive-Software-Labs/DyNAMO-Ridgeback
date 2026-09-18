@@ -6,7 +6,7 @@ from types import SimpleNamespace
 import numpy as np
 from visualization_msgs.msg import Marker
 
-from ridgeback_autonomy.common.markers import (
+from ridgeback_common.markers import (
     NS_DROPPED,
     NS_USED,
     NS_WEDGE,

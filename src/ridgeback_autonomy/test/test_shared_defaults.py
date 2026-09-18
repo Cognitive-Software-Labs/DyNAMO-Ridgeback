@@ -8,7 +8,7 @@ import pathlib
 
 import pytest
 
-from ridgeback_autonomy.perception.target_localization.core import (
+from ridgeback_localization.core import (
     depth_common,
     euclidean_reconstruction,
     pointcloud_ranging,
@@ -31,7 +31,7 @@ def test_shared_defaults_are_imported_from_one_owner(module_name, local_name, sh
     import importlib
 
     module = importlib.import_module(
-        f'ridgeback_autonomy.perception.target_localization.core.{module_name}')
+        f'ridgeback_localization.core.{module_name}')
     assert getattr(module, local_name) == getattr(ranging_defaults, shared_name)
     tree = ast.parse(inspect.getsource(module))
     assert any(
@@ -110,7 +110,7 @@ def test_the_near_surface_band_is_two_sensors_not_one_policy() -> None:
     made a two-sensor retune look like a one-line fix.
     """
 
-    from ridgeback_autonomy.perception.target_localization.core import (
+    from ridgeback_localization.core import (
         isolation_2d, polar_profiling,
     )
 

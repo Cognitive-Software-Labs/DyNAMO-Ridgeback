@@ -12,40 +12,40 @@ from dataclasses import dataclass, fields
 import math
 from typing import Any, Iterable
 
-from ridgeback_autonomy.perception.target_localization.estimator_registry import (
+from ridgeback_localization.estimator_registry import (
     DEPTH_PATH_ESTIMATORS,
     ESTIMATOR_LABELS,
     MASK_ESTIMATORS,
     PUBLIC_ESTIMATOR_ORDER,
     parse_estimators,
 )
-from ridgeback_autonomy.perception.target_localization.launch import (
+from ridgeback_autonomy.localization_launch import (
     CONFIG_LAUNCH_ARGUMENT_NAMES,
     ENV_LAYER_CONFIG_KEYS,
     SHARED_BENCHMARK_ARGUMENT_DEFAULTS,
     SIMULATION_CAMERA_INPUTS,
 )
-from ridgeback_autonomy.perception.target_localization.core.ranging_defaults import (
+from ridgeback_localization.core.ranging_defaults import (
     FRONT_PERCENTILE,
     INLIER_AHEAD_MARGIN_M,
     INLIER_BEHIND_MARGIN_M,
     MIN_VALID_SAMPLES,
 )
-from ridgeback_autonomy.perception.target_localization.core.segmentation import (
+from ridgeback_localization.core.segmentation import (
     PROMPT_PADDING_REL_DEFAULT,
     SEGMENTATION_MIN_PREDICTED_IOU_DEFAULT,
     SEGMENTATION_MODEL_DEFAULT,
 )
-from ridgeback_autonomy.perception.target_localization.core.isolation_2d import (
+from ridgeback_localization.core.isolation_2d import (
     ISOLATION_2D_RECIPES,
     NEAREST_MODE_BAND_M_DEFAULT,
 )
-from ridgeback_autonomy.perception.target_localization.core.isolation_3d import (
+from ridgeback_localization.core.isolation_3d import (
     Chain,
     ISOLATION_3D_NAMES,
     build_isolation_3d,
 )
-from ridgeback_autonomy.perception.target_localization.core.polar_profiling import (
+from ridgeback_localization.core.polar_profiling import (
     MIN_VALID_RAYS_DEFAULT,
     RANGE_BAND_M_DEFAULT,
     RANGE_JUMP_M_DEFAULT,
@@ -346,6 +346,8 @@ AXES: dict[str, AxisSpec] = {
     'mask_gate': _axis(
         'mask_gate', 'choice', 'box', STAGE_MASK, 'Live mask gate',
         choices=('box', 'silhouette'), estimators=_MASK_ESTIMATORS),
+    'target_labels': _axis(
+        'target_labels', 'string', 'humanoid robot', STAGE_DETECTOR, 'Target labels'),
     'detector_fps': _axis(
         'detector_fps', 'number', 5.0, STAGE_DETECTOR, 'Detector rate', minimum=0.0),
     'detector_debug': _axis(

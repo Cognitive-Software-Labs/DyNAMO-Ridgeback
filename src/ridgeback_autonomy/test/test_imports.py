@@ -8,6 +8,9 @@ import re
 import pytest
 
 PACKAGE_ROOT = Path(__file__).parents[1] / 'ridgeback_autonomy'
+SRC_ROOT = PACKAGE_ROOT.parents[1]
+LOCALIZATION_ROOT = SRC_ROOT / 'ridgeback_localization' / 'ridgeback_localization'
+COMMON_ROOT = SRC_ROOT / 'ridgeback_common' / 'ridgeback_common'
 
 
 def _imports_in_source(source: str, source_package: str, package: str) -> list[int]:
@@ -33,7 +36,7 @@ def _imports_in_source(source: str, source_package: str, package: str) -> list[i
 
 
 def _imports_from(path: Path, package: str) -> list[int]:
-    parts = path.relative_to(PACKAGE_ROOT.parent).with_suffix('').parts
+    parts = path.relative_to(SRC_ROOT).with_suffix('').parts[1:]
     source_package = '.'.join(parts[:-1])
     return _imports_in_source(path.read_text(), source_package, package)
 
@@ -78,52 +81,52 @@ def test_packaged_modules_import() -> None:
     module_names = [
         'ridgeback_autonomy.common.coverage_utils',
         'ridgeback_autonomy.common.launch_wait',
-        'ridgeback_autonomy.common.messages',
-        'ridgeback_autonomy.common.models',
-        'ridgeback_autonomy.common.stamps',
-        'ridgeback_autonomy.common.tf_utils',
+        'ridgeback_common.messages',
+        'ridgeback_common.models',
+        'ridgeback_common.stamps',
+        'ridgeback_common.tf_utils',
         'ridgeback_autonomy.benchmarking.alignment',
         'ridgeback_autonomy.benchmarking.event_values',
         'ridgeback_autonomy.benchmarking.naming',
         'ridgeback_autonomy.benchmarking.simulation',
         'ridgeback_autonomy.benchmarking.trial_results',
-        'ridgeback_autonomy.common.camera_inputs',
-        'ridgeback_autonomy.perception.target_localization.core.depth_common',
-        'ridgeback_autonomy.perception.target_localization.core.box_gate',
-        'ridgeback_autonomy.perception.target_localization.core.depth_sources',
-        'ridgeback_autonomy.perception.target_localization.core.detection',
-        'ridgeback_autonomy.perception.target_localization.core.image_utils',
-        'ridgeback_autonomy.perception.target_localization.core.intrinsics',
-        'ridgeback_autonomy.perception.target_localization.core.isolation_2d',
-        'ridgeback_autonomy.perception.target_localization.core.isolation_3d',
-        'ridgeback_autonomy.perception.target_localization.core.mask',
-        'ridgeback_autonomy.perception.target_localization.core.projective_ranging',
-        'ridgeback_autonomy.perception.target_localization.core.ranging_defaults',
-        'ridgeback_autonomy.perception.target_localization.core.euclidean_reconstruction',
-        'ridgeback_autonomy.perception.target_localization.core.pointcloud_ranging',
-        'ridgeback_autonomy.perception.target_localization.core.polar_profiling',
-        'ridgeback_autonomy.perception.target_localization.core.vehicle_frame',
-        'ridgeback_autonomy.perception.target_localization.core.rendering',
-        'ridgeback_autonomy.perception.target_localization.core.timing',
-        'ridgeback_autonomy.perception.target_localization.contracts',
-        'ridgeback_autonomy.perception.target_localization.hud_rendering',
-        'ridgeback_autonomy.perception.target_localization.marker_rendering',
-        'ridgeback_autonomy.perception.target_localization.measurement_pipeline',
-        'ridgeback_autonomy.perception.target_localization.synchronization',
+        'ridgeback_common.camera_inputs',
+        'ridgeback_localization.core.depth_common',
+        'ridgeback_localization.core.box_gate',
+        'ridgeback_localization.core.depth_sources',
+        'ridgeback_localization.core.detection',
+        'ridgeback_localization.core.image_utils',
+        'ridgeback_localization.core.intrinsics',
+        'ridgeback_localization.core.isolation_2d',
+        'ridgeback_localization.core.isolation_3d',
+        'ridgeback_localization.core.mask',
+        'ridgeback_localization.core.projective_ranging',
+        'ridgeback_localization.core.ranging_defaults',
+        'ridgeback_localization.core.euclidean_reconstruction',
+        'ridgeback_localization.core.pointcloud_ranging',
+        'ridgeback_localization.core.polar_profiling',
+        'ridgeback_localization.core.vehicle_frame',
+        'ridgeback_localization.core.rendering',
+        'ridgeback_localization.core.timing',
+        'ridgeback_localization.contracts',
+        'ridgeback_localization.hud_rendering',
+        'ridgeback_localization.marker_rendering',
+        'ridgeback_localization.measurement_pipeline',
+        'ridgeback_localization.synchronization',
         'ridgeback_autonomy.benchmarking.metrics',
         'ridgeback_autonomy.benchmarking.reduction',
         'ridgeback_autonomy.benchmarking.rendering',
         'ridgeback_autonomy.benchmarking.summary',
-        'ridgeback_autonomy.perception.target_localization.detector_node',
-        'ridgeback_autonomy.perception.target_localization.estimator_registry',
-        'ridgeback_autonomy.perception.target_localization.visualization_node',
-        'ridgeback_autonomy.perception.target_localization.visualization_readings',
-        'ridgeback_autonomy.perception.target_localization.visualization_style',
-        'ridgeback_autonomy.perception.target_localization.launch',
-        'ridgeback_autonomy.perception.target_localization.ground_truth',
-        'ridgeback_autonomy.perception.target_localization.mask_measurement_node',
-        'ridgeback_autonomy.perception.target_localization.pointcloud_measurement_node',
-        'ridgeback_autonomy.perception.target_localization.overlay_node',
+        'ridgeback_localization.detector_node',
+        'ridgeback_localization.estimator_registry',
+        'ridgeback_localization.visualization_node',
+        'ridgeback_localization.visualization_readings',
+        'ridgeback_localization.visualization_style',
+        'ridgeback_autonomy.localization_launch',
+        'ridgeback_localization.ground_truth',
+        'ridgeback_localization.mask_measurement_node',
+        'ridgeback_localization.pointcloud_measurement_node',
+        'ridgeback_localization.overlay_node',
         'ridgeback_autonomy.benchmarking.target_distance_benchmark_runner_node',
         'ridgeback_autonomy.diagnostics.hud_node',
         'ridgeback_autonomy.diagnostics.coverage_overlay_node',
@@ -140,19 +143,15 @@ def test_package_dependencies_flow_one_way() -> None:
 
     violations = []
     boundaries = {
-        'common': (
-            'ridgeback_autonomy.perception',
-            'ridgeback_autonomy.benchmarking',
-        ),
-        'perception': ('ridgeback_autonomy.benchmarking',),
+        COMMON_ROOT: ('ridgeback_localization', 'ridgeback_autonomy', 'torch', 'transformers'),
+        LOCALIZATION_ROOT: ('ridgeback_autonomy', 'nav2_msgs', 'rviz2'),
     }
-    for source_package, forbidden_packages in boundaries.items():
-        for path in sorted((PACKAGE_ROOT / source_package).rglob('*.py')):
+    for source_root, forbidden_packages in boundaries.items():
+        for path in sorted(source_root.rglob('*.py')):
             for forbidden in forbidden_packages:
                 violations.extend(
-                    f'{path.relative_to(PACKAGE_ROOT)}:{line} imports {forbidden}'
-                    for line in _imports_from(path, forbidden)
-                )
+                    f'{path.name}:{line} imports {forbidden}'
+                    for line in _imports_from(path, forbidden))
 
     exploration_launch = PACKAGE_ROOT.parent / 'launch' / 'ridgeback_exploration.launch.py'
     violations.extend(
@@ -169,7 +168,7 @@ def test_package_dependencies_flow_one_way() -> None:
 def test_reusable_target_helpers_do_not_depend_on_node_orchestration() -> None:
     """Keep pure/reusable target layers below their ROS orchestration modules."""
 
-    target_root = PACKAGE_ROOT / 'perception' / 'target_localization'
+    target_root = LOCALIZATION_ROOT
     helper_names = (
         'estimator_registry.py',
         'ground_truth.py',
@@ -181,7 +180,7 @@ def test_reusable_target_helpers_do_not_depend_on_node_orchestration() -> None:
         'marker_rendering.py',
     )
     node_modules = tuple(
-        f'ridgeback_autonomy.perception.target_localization.{path.stem}'
+        f'ridgeback_localization.{path.stem}'
         for path in target_root.glob('*_node.py')
     )
     violations = []
@@ -224,17 +223,17 @@ def test_benchmark_domain_modules_do_not_depend_on_the_runner_node() -> None:
 def test_target_wire_topics_have_one_owner() -> None:
     """Keep every generic target topic literal in the contracts module."""
 
-    contracts_path = PACKAGE_ROOT / 'perception' / 'target_localization' / 'contracts.py'
+    contracts_path = LOCALIZATION_ROOT / 'contracts.py'
     topic_literal = re.compile(
         r"['\"](?:detections|measurements|debug|visualization|benchmark|hud)/target[^'\"]*['\"]"
     )
     violations = []
-    for path in sorted(PACKAGE_ROOT.rglob('*.py')):
+    for path in sorted([*PACKAGE_ROOT.rglob('*.py'), *LOCALIZATION_ROOT.rglob('*.py')]):
         if path == contracts_path:
             continue
         for line_number, line in enumerate(path.read_text(encoding='utf-8').splitlines(), 1):
             if topic_literal.search(line):
-                violations.append(f'{path.relative_to(PACKAGE_ROOT)}:{line_number}')
+                violations.append(f'{path.relative_to(SRC_ROOT)}:{line_number}')
 
     assert not violations, f'target topic literals belong in contracts.py: {violations}'
 

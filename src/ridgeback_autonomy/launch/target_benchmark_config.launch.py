@@ -17,21 +17,21 @@ from launch.events import Shutdown
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
-from ridgeback_autonomy.common.camera_profiles import (
+from ridgeback_common.camera_profiles import (
     CAMERA_PROFILE_CHOICES,
     DEFAULT_CAMERA_PROFILE,
 )
 
 from ridgeback_autonomy.benchmarking.paths import default_output_directory
 from ridgeback_autonomy.benchmarking.replay import REPLAY_CAPTURE_BATCHES_DEFAULT
-from ridgeback_autonomy.perception.target_localization.estimator_registry import (
+from ridgeback_localization.estimator_registry import (
     parse_estimators,
     selected_mask_estimators,
     selected_pointcloud_estimators,
     uses_mask_estimators,
     uses_pointcloud_estimators,
 )
-from ridgeback_autonomy.perception.target_localization.launch import (
+from ridgeback_autonomy.localization_launch import (
     ALIGNED_DEPTH_DEBUG_TOPIC,
     CONFIG_LAUNCH_ARGUMENT_NAMES,
     MASK_MEASUREMENTS_TOPIC,
@@ -43,29 +43,28 @@ from ridgeback_autonomy.perception.target_localization.launch import (
     estimate_viz_node,
     mask_measurement_node,
     overlay_node,
-    perception_venv_actions,
     pointcloud_measurement_node,
     resolved_camera_inputs,
     workspace_root_from_package_share,
 )
-from ridgeback_autonomy.perception.target_localization.core.depth_common import (
+from ridgeback_localization.core.depth_common import (
     DEPTH_GATE_DISABLED,
     NEAREST_MODE_BIN_WIDTH_M_DEFAULT,
     NEAREST_MODE_MIN_BIN_FRACTION_DEFAULT,
 )
-from ridgeback_autonomy.perception.target_localization.core.isolation_2d import (
+from ridgeback_localization.core.isolation_2d import (
     NEAREST_MODE_BAND_M_DEFAULT,
 )
-from ridgeback_autonomy.perception.target_localization.core.isolation_3d import (
+from ridgeback_localization.core.isolation_3d import (
     FLOOR_MARGIN_M_DEFAULT,
     ISOLATION_3D_DEFAULT,
 )
-from ridgeback_autonomy.perception.target_localization.core.polar_profiling import (
+from ridgeback_localization.core.polar_profiling import (
     MIN_VALID_RAYS_DEFAULT,
     RANGE_BAND_M_DEFAULT,
     RANGE_JUMP_M_DEFAULT,
 )
-from ridgeback_autonomy.perception.target_localization.core.ranging_defaults import (
+from ridgeback_localization.core.ranging_defaults import (
     FRONT_PERCENTILE,
     INLIER_AHEAD_MARGIN_M,
     INLIER_BEHIND_MARGIN_M,
@@ -209,6 +208,7 @@ def build_benchmark_nodes(context, *args, **kwargs):
             # freezes the beams the live polar row actually used.
             'scan_topic': scan_topic,
             'base_frame': base_frame,
+            'target_labels': LaunchConfiguration('target_labels'),
             'estimators': ','.join(selected_estimators),
             'pointcloud_measurement_topic': POINTCLOUD_MEASUREMENTS_TOPIC,
             'mask_measurement_topic': MASK_MEASUREMENTS_TOPIC,
@@ -304,6 +304,7 @@ def generate_launch_description():
     arguments = [
         # Shared with target_benchmark_env.launch.py. Keep these defaults
         # byte-identical: the first declaration inherited by a wrapper wins.
+        DeclareLaunchArgument('target_labels', default_value='humanoid robot'),
         DeclareLaunchArgument('namespace', default_value='r100_0001'),
         DeclareLaunchArgument('use_sim_time', default_value='true'),
         DeclareLaunchArgument('world', default_value='target_distance_calibration'),
@@ -523,7 +524,6 @@ def generate_launch_description():
         # A sweep starts this launch in a separate process from the environment,
         # so its children need their own copy of the venv environment actions.
         *cyclonedds_actions(pkg_this),
-        *perception_venv_actions(pkg_this),
         *arguments,
         OpaqueFunction(function=build_readiness_gate),
     ])

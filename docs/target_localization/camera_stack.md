@@ -40,7 +40,7 @@ copied from this table.
 ## Backend optics and producers
 
 Gazebo and Isaac use the same named nominal D455 RGB profiles from
-`ridgeback_autonomy/common/camera_profiles.py`. The default is `640x480`; select
+`ridgeback_common/camera_profiles.py`. The default is `640x480`; select
 the larger grid with `camera_profile:=1280x720`. Both stay at 30 Hz.
 
 | Profile | Grid | Nominal pinhole `(fx, fy, cx, cy)` px | FoV (H x V) |
@@ -194,8 +194,8 @@ contains a Gazebo-, Isaac-, or RealSense-specific projection constant.
 - Gazebo camera model: `clearpath_sensors_description/urdf/intel_realsense.urdf.xacro`
 - Gazebo generated bridges: `clearpath/sensors/config/camera_0.yaml` and
   `clearpath/sensors/launch/camera_0.launch.py`
-- Shared simulation optics: `ridgeback_autonomy/common/camera_profiles.py`
+- Shared simulation optics: `ridgeback_common/camera_profiles.py`
 - Isaac publishers: `ridgeback_autonomy_isaac/sim/isaac/sensors.py`
 - Isaac camera/depth implementation guide: `docs/isaac/camera-depth.md`
-- Backend-neutral topic contract: `ridgeback_autonomy/common/camera_inputs.py`
-- Shared consumers: `ridgeback_autonomy/perception/target_localization/`
+- Backend-neutral topic contract: `ridgeback_common/camera_inputs.py`
+- Shared consumers: `ridgeback_localization/`

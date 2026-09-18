@@ -1,0 +1,32 @@
+# Dependencies are pinned to exact revisions, not to branch tips.
+#
+# Core dependencies shared by Isaac Sim and hardware are pinned here. Tracking
+# a branch tip makes a fresh `vcs import` silently pick up upstream commits the
+# patches were never rebased onto. Use `tools/check_dependencies` after import
+# and before builds; the complete procedure lives in
+# `docs/project/dependencies.md`.
+#
+# Bumping a pin means re-applying the patches, rebasing any that conflict, and
+# re-running every affected backend gate. Do not bump one in isolation to fix a
+# build error.
+repositories:
+  src/clearpath_common:
+    type: git
+    url: https://github.com/clearpathrobotics/clearpath_common.git
+    # jazzy @ 2.9.16
+    version: 33e4b311dd9a2dcaa8e8d262ae75fab2c53e560b
+  src/clearpath_config:
+    type: git
+    url: https://github.com/clearpathrobotics/clearpath_config.git
+    # jazzy @ 2.9.7
+    version: b2a64ba3b12d20bfeeb1127c3869accc7704e634
+  src/clearpath_msgs:
+    type: git
+    url: https://github.com/clearpathrobotics/clearpath_msgs.git
+    # jazzy after 2.7.0
+    version: 797be60abaa140167629f246802c2802a616a495
+  src/slam_toolbox:
+    type: git
+    url: https://github.com/SteveMacenski/slam_toolbox.git
+    # jazzy @ 2.8.5
+    version: 02afdde003313a10b8d21461a92d9e5f4f0bc5f2

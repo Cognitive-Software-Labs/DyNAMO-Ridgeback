@@ -18,7 +18,7 @@ ros_io.LidarScanAssembler bins the clouds into the contract LaserScan.
 """
 from __future__ import annotations
 
-from ridgeback_autonomy.common.camera_profiles import (
+from ridgeback_common.camera_profiles import (
     DEFAULT_CAMERA_PROFILE,
     DEFAULT_DEPTH_FIDELITY,
     resolve_camera_profile,

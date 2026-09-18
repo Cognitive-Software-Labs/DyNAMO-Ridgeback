@@ -12,6 +12,7 @@
   <exec_depend>clearpath_generator_common</exec_depend>
   <exec_depend>geometry_msgs</exec_depend>
   <exec_depend>imu_filter_madgwick</exec_depend>
+  <exec_depend>ridgeback_common</exec_depend>
   <exec_depend>launch</exec_depend>
   <exec_depend>launch_ros</exec_depend>
   <exec_depend>nav_msgs</exec_depend>

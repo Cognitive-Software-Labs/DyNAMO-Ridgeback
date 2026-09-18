@@ -23,16 +23,16 @@ from ridgeback_autonomy.benchmarking.replay_profiles import (
     ProfileValidationError,
     validate_profile_axes,
 )
-from ridgeback_autonomy.perception.target_localization.core.depth_common import (
+from ridgeback_localization.core.depth_common import (
     DEPTH_GATE_DISABLED,
     NEAREST_MODE_BIN_WIDTH_M_DEFAULT,
     NEAREST_MODE_MIN_BIN_FRACTION_DEFAULT,
 )
-from ridgeback_autonomy.perception.target_localization.core.isolation_2d import (
+from ridgeback_localization.core.isolation_2d import (
     ISOLATION_2D_DEFAULT,
     NEAREST_MODE_BAND_M_DEFAULT,
 )
-from ridgeback_autonomy.perception.target_localization.core.ranging_defaults import (
+from ridgeback_localization.core.ranging_defaults import (
     MIN_VALID_SAMPLES,
 )
 

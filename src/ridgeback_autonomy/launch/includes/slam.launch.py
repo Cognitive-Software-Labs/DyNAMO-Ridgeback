@@ -15,7 +15,7 @@ from clearpath_config.clearpath_config import ClearpathConfig
 from clearpath_config.common.utils.yaml import read_yaml
 from nav2_common.launch import RewrittenYaml
 
-from ridgeback_autonomy.common.lidar_contract import slam_max_laser_range
+from ridgeback_common.lidar_contract import slam_max_laser_range
 
 
 def launch_setup(context, *args, **kwargs):

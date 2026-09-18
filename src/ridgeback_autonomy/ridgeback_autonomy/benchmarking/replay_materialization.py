@@ -19,10 +19,10 @@ from ridgeback_autonomy.benchmarking.replay_artifacts import (
     dependency_versions,
     load_sensor_trial,
 )
-from ridgeback_autonomy.perception.target_localization.core.box_gate import (
+from ridgeback_localization.core.box_gate import (
     box_within_frame_fraction,
 )
-from ridgeback_autonomy.perception.target_localization.core.mask import (
+from ridgeback_localization.core.mask import (
     MaskPrecision,
     region_from_bbox,
     region_from_blob,
@@ -206,7 +206,7 @@ def materialize_masks(
             if not model:
                 raise ValueError('The slimsam producer requires a segmentation model.')
             if segmenter_factory is None:
-                from ridgeback_autonomy.perception.target_localization.core.segmentation import (
+                from ridgeback_localization.core.segmentation import (
                     SamBoxSegmenter,
                 )
                 segmenter_factory = SamBoxSegmenter

@@ -6,7 +6,7 @@ same artifact — the **aligned depth frame** — and neither cares how it was
 made. This document defines that contract and the two sources that satisfy
 it: the physical depth camera (`camera → aligned depth`) and monocular
 estimation (`RGB frame → aligned depth`). Both live in
-`perception/target_localization/core/depth_sources.py` and are pulled by
+`ridgeback_localization/core/depth_sources.py` and are pulled by
 `target_mask_measurement_node` at the detection stamp — there is no depth
 producer process.
 

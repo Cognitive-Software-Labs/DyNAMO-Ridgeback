@@ -27,11 +27,13 @@ sys.modules['import_ridgeback_urdf'] = importer
 module_spec.loader.exec_module(importer)
 
 sys.path.insert(0, str(REPO_ROOT / 'src' / 'ridgeback_autonomy'))
+sys.path.insert(0, str(REPO_ROOT / 'src' / 'ridgeback_common'))
+sys.path.insert(0, str(REPO_ROOT / 'src' / 'ridgeback_localization'))
 sensors_spec = importlib.util.spec_from_file_location(
     'ridgeback_isaac_sensors', ISAAC_SENSORS)
 sensors = importlib.util.module_from_spec(sensors_spec)
 sensors_spec.loader.exec_module(sensors)
-from ridgeback_autonomy.common.camera_profiles import resolve_camera_profile
+from ridgeback_common.camera_profiles import resolve_camera_profile
 
 
 def test_isaac_default_camera_spec_pins_d455_render_contract() -> None:

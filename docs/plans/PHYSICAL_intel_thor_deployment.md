@@ -1,13 +1,36 @@
 # PHYSICAL — Intel–Thor deployment and transport qualification
 
-Status: **approved plan; robot inventory and deployment validation pending.**
+Status: **network inventory and preliminary transport experiments recorded;
+distributed localization and robot acceptance pending.**
 Owner: people and agents working at the robot. The
 [project backlog](../BACKLOG.md#physical-stationary-integration) owns the
 stationary milestone. The [package split](PHYSICAL_package_split.md) supplies
 shared code and interfaces; the
 [measurement plan](PHYSICAL_robot_measurements_and_validation.md) supplies
-sensor-mount checks and stationary alignment evidence. Inventory can start now;
-deployment acceptance requires the tested workstation handoff.
+sensor-mount checks and stationary alignment evidence. The tested workstation
+handoff is available; deployment acceptance requires its matching installation
+on both hosts.
+
+## Progress and next evidence
+
+This checkpoint distinguishes committed tools and reported experiments from a
+verified installed deployment. The
+[transport reference](../physical/intel_thor_transport.md) owns the discovered
+topology, selected configuration, known limits, and dated evidence links.
+
+| Workstream | Recorded progress | Remaining acceptance evidence |
+|---|---|---|
+| Host and network inventory | Intel/Thor identities, Ethernet interfaces and 1 Gb/s link, ROS Jazzy middleware versions, and existing service ownership are partly recorded. | Complete OS, USB, GPU software, model and installed-package inventory on both hosts. |
+| DDS transport | Interface restrictions, receive-buffer configuration, link probe, middleware comparison, and service-switch tooling are implemented; preliminary synthetic tests are recorded. | Verify effective settings and persistence on the actual deployment, then validate live colour/depth/CameraInfo/scan/TF delivery. |
+| Shared application deployment | Package split, separate compute/consumer roles, and workstation failure tests are available in the handoff. | Matching installed revision, actual Thor GPU execution, and repeatable stationary startup/shutdown. |
+| Timing and performance | Network timing and a raw-HD bandwidth limit have been identified. | Bounded clock alignment and all four live model-mode measurements, including resource/thermal behavior and matched replay. |
+| Failure and joint acceptance | Supervision is tested locally with a fake navigation server. | Cross-host interruption/stall/recovery evidence and shared G1/person runs with the measurement team. |
+
+The September 18 transport experiments name revision
+`a01a4532a170fcb85df1a5aaffb8c28bf1601f96` plus uncommitted probe/configuration
+files, with partial provenance. They do not establish acceptance of the newer
+package-split handoff. Do not carry their performance numbers forward as a
+measurement of the deployed localization pipeline.
 
 ## Initial topology and operating boundary
 
@@ -35,9 +58,11 @@ live installation or run simulator cleanup. Use a stationary test launch that
 cannot issue base commands. Fault tests needing navigation actions use the
 workstation handoff's fake server in an isolated ROS domain.
 
-Ubuntu 24.04 and ROS Jazzy on both machines are expectations to verify. Ethernet
-speed, deployed middleware settings, Thor GPU software, and physical USB routing
-are discovery tasks, not assumed facts.
+ROS Jazzy and a 1 Gb/s Ethernet link are reported in the transport evidence.
+Verify them in the installation manifest rather than assuming the earlier run
+still describes the machines. Ubuntu 24.04 remains an expectation to verify;
+effective per-process middleware, Thor GPU software, and physical USB routing
+still need a complete deployment record.
 
 ## 1. Inventory and reproducible installation
 
@@ -68,10 +93,19 @@ CycloneDDS is selected for both hosts. The Ethernet-only configurations, the
 receive-buffer limit, the Intel service switch, and the `check_link` pre-deploy
 check are implemented; see the
 [transport reference](../physical/intel_thor_transport.md). Still open:
-- run the Intel service switch and persist Intel's buffer limit
-- source `dds_env.sh` in every deployed cross-host process
-- harden time sync; the check measured offsets of 0.75–4.2 ms with both hosts
-  on internet NTP
+
+- Confirm the current Intel service middleware and persisted receive-buffer
+  limits on both hosts. The middleware comparison predates the service switch;
+  a later transport note reports a switch and subsequent Hokuyo timeouts. That
+  does not establish current installed state. Inspect before applying changes,
+  preserve existing backups, and use the transport reference's rollback rules.
+- Verify that every deployed cross-host process sources `dds_env.sh` and uses
+  the intended interface restriction.
+- Harden time sync and record fresh offset/drift bounds. Earlier internet-NTP
+  measurements do not qualify acquisition-age measurements for acceptance.
+- Investigate or bound the reported simultaneous Hokuyo timeout/reconnect
+  failure before claiming repeatable stationary operation; preserve scan-gap
+  and service-recovery evidence.
 
 Verify matching ROS domain and interoperable deployed middleware, reachable
 sensor topics, publisher/subscriber QoS, packet delivery, and namespaced TF.
@@ -101,6 +135,12 @@ The goal is a baseline and transfer-cost evidence, not a new fixed real-time
 requirement or parameter-tuning campaign. Use the camera profiles qualified by
 the [D455 procedure](PHYSICAL_robot_measurements_and_validation.md#d455-camera-validation).
 Record unsupported requested profiles as open work.
+
+The transport reference identifies that raw HD RGB8 plus 16UC1 depth at 30 Hz
+exceeds the current 1 Gb/s link capacity. Camera profile support and cross-host
+delivery are separate checks. Keep that combination unresolved on this topology
+until a tested transport/topology change or an explicit scope decision addresses
+it; do not silently lower the requested rate and mark the original check passed.
 
 | Mask | Depth | Required mode evidence |
 |---|---|---|

@@ -1,6 +1,7 @@
 # PHYSICAL — Robot measurements and stationary sensor validation
 
-Status: **approved plan; physical measurements and validation pending.** Owner:
+Status: **preliminary camera transport observations recorded; field measurements
+and sensor/target acceptance not evidenced in the committed records.** Owner:
 people at the robot, assisted by an agent. The
 [project backlog](../BACKLOG.md#physical-stationary-integration) owns the overall
 stationary milestone; its individual geometry, camera, calibration, and motion
@@ -13,11 +14,36 @@ D455 checks below as the agent's procedure, not a manual worksheet for people.
 
 The visit covers quick mount measurements, both LiDARs, stationary camera–LiDAR
 alignment, and G1/person integration.
-Measurements and sensor inspection can start before the
-[workstation package split](PHYSICAL_package_split.md) completes. Final
-distributed tests use its accepted revision and the
+Measurements and sensor inspection can proceed alongside deployment. The
+[workstation package split](PHYSICAL_package_split.md) supplies an available
+handoff candidate; final distributed tests use its accepted installed revision and the
 [Intel–Thor deployment](PHYSICAL_intel_thor_deployment.md). Physical driving,
 braking, dynamic calibration, and autonomous missions remain outside this plan.
+
+## Progress and evidence still needed
+
+The September 18 transport records identify revision
+`a01a4532a170fcb85df1a5aaffb8c28bf1601f96`, with partial provenance. They contain
+short real-camera VGA colour-stream observations and later synthetic transport
+tests. The [transport reference](../physical/intel_thor_transport.md) owns those
+findings and their evidence links. They do not close the D455 or field-visit gates.
+
+| Part of this visit | Recorded progress | Evidence still needed |
+|---|---|---|
+| Mount readings and photos | The existing robot drawing and A–E guide are ready; no completed field note is committed. | Accessible tape readings, practical precision, and annotated mount photos. |
+| D455 identity and profiles | A VGA colour stream was observed during transport diagnosis. | Device/firmware/USB identity, effective VGA and HD profiles, and colour/depth/calibration contracts. |
+| D455 timing and TF | Preliminary colour-rate checks only. | Per-profile captures, real aligned-depth stamp matching, observed frames/TF ownership, and camera-only localization smoke. |
+| Front and rear LiDARs | Services/scans were observed; a timeout/reconnect incident is reported. | Individual identities, scan timing/geometry, box/board range/orientation checks, and stable recovery evidence. |
+| Camera–LiDAR alignment | No completed projection-overlay check is committed. | Near/farther/off-centre overlays and an independent placement after any correction. |
+| IMU, odometry and command-chain inspection | No completed stationary validation report is committed. | At-rest observations and configuration inspection, without base commands. |
+| G1/person integration | No completed distributed target runs are committed. | Both labels, required mask/depth modes, empty-scene behavior, and joint run evidence. |
+
+The hardware-transport commits supplied no new physical dimensions or accepted
+calibration values. The checked-in robot declaration, shared geometry, mount
+coordinates, and A–E measurement guide remain unchanged from the field-plan
+revision `a01a4532`. Do not interpret missing committed evidence as proof that
+nobody has taken measurements; obtain the robot team's captures before changing
+these statuses. Simulator dimensions remain nominal/model-derived references.
 
 ## Who does what
 
@@ -166,9 +192,12 @@ Do not rewrite timestamps, widen matching tolerance, or substitute nearby frames
 
 Inspect the live TF graph, including namespaced topics, and record its publishers.
 Query the observed colour-optical frame to the base frame the application
-actually requests. The public exploration launch currently derives that frame
-as `<namespace>/robot/base_link`; a ROS topic namespace alone does not establish
-that the frame exists. Record a mismatch as an integration failure.
+actually requests. The public exploration launch requires an explicitly supplied
+`base_frame` on hardware; it rejects an empty value
+when localization is enabled. Standalone compute and observer launches also
+require the observed frame. The namespace-based default is for simulation;
+a ROS topic namespace alone does not establish a physical frame. Record a
+mismatch as an integration failure.
 
 Pass requires a finite, stable camera-to-base transform and one owner of the
 camera's internal calibrated transforms: the hardware RealSense driver. Verify
@@ -183,11 +212,12 @@ For the existing single-host smoke, attach to hardware services using
 Use the public launch argument
 `estimators:=projective_ranging,euclidean_reconstruction`, with
 `depth_source:=stereoscopic mask_gate:=box depth_match_debug:=true`.
-Use the device's domain, wall time, and the verified camera input topics.
+Use the device's domain, wall time, the observed `base_frame`, and the verified
+camera input topics.
 Keep pointcloud and polar estimators out of this initial camera smoke. After
-the package split, use the verified per-host commands in its handoff with the
-same stationary defaults and estimator/input contracts; do not start a second
-Intel detector alongside Thor.
+installing the package-split handoff on both hosts, use its per-host commands
+with the same stationary defaults and estimator/input contracts; do not start
+a second Intel detector alongside Thor.
 
 Use predeclared visible, in-range targets at near, middle, farther, and one
 off-centre position. Record target placement, duration, detections, measurements,

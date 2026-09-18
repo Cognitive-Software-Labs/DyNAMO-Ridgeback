@@ -63,6 +63,7 @@ def test_benchmark_launch_uses_shared_output_default(tmp_path, monkeypatch):
     spec = importlib.util.spec_from_file_location('artifact_benchmark_launch', path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
+    monkeypatch.setenv('RIDGEBACK_WORKSPACE', str(tmp_path))
     share = tmp_path / 'install/ridgeback_autonomy/share/ridgeback_autonomy'
     monkeypatch.setattr(module, 'get_package_share_directory', lambda _: str(share))
     arguments = {action.name: action for action in module.generate_launch_description().entities
@@ -76,6 +77,7 @@ def test_standalone_runner_default_and_override(tmp_path, monkeypatch, override)
     import rclpy
     from ridgeback_autonomy.benchmarking import target_distance_benchmark_runner_node as runner
 
+    monkeypatch.setenv('RIDGEBACK_WORKSPACE', str(tmp_path))
     share = tmp_path / 'install/ridgeback_autonomy/share/ridgeback_autonomy'
     monkeypatch.setattr(runner, 'get_package_share_directory', lambda _: str(share))
     scenario = tmp_path / 'scenes.yaml'
@@ -100,6 +102,7 @@ def test_standalone_runner_default_and_override(tmp_path, monkeypatch, override)
 
 @pytest.mark.parametrize('override', [False, True])
 def test_sweep_routes_output_and_child_logs_without_changing_commands(tmp_path, monkeypatch, override):
+    monkeypatch.setenv('RIDGEBACK_WORKSPACE', str(tmp_path))
     scenario = tmp_path / 'scenes.yaml'
     scenario.write_text('scenes:\n  - id: one\n    robots: [{ x: 2.0, y: 0.0 }]\n')
     defaults = {'scenario': str(scenario), 'repeats': 1}
@@ -140,6 +143,7 @@ def test_sweep_routes_output_and_child_logs_without_changing_commands(tmp_path, 
     monkeypatch.setattr(sweep, 'reap_orphan_benchmark_entities', lambda _: [])
     monkeypatch.setattr(sweep, 'sample_real_time_factor', lambda: 1.0)
     monkeypatch.setattr(sweep, '_wait_for_config', lambda *_: ('success', None))
+    monkeypatch.setenv('RIDGEBACK_WORKSPACE', str(tmp_path))
     share = tmp_path / 'install/ridgeback_autonomy/share/ridgeback_autonomy'
     sweep_dir, success = sweep.run_sweep(spec, spec.configs, package_share=str(share))
     assert success

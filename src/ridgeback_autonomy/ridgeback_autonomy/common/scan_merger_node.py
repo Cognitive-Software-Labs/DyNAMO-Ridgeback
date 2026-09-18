@@ -51,7 +51,7 @@ from rclpy.qos import (DurabilityPolicy, HistoryPolicy, QoSProfile,
 from rclpy.time import Time
 from sensor_msgs.msg import LaserScan
 
-from ridgeback_autonomy.common.lidar_contract import (
+from ridgeback_common.lidar_contract import (
     FRONT_LIDAR_XY_YAW,
     REAR_LIDAR_XY_YAW,
 )

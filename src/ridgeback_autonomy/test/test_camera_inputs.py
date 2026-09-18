@@ -4,7 +4,7 @@ import dataclasses
 
 import pytest
 
-from ridgeback_autonomy.common.camera_inputs import (
+from ridgeback_common.camera_inputs import (
     REALSENSE_BACKEND,
     SIMULATION_BACKEND,
     resolve_camera_inputs,

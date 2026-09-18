@@ -11,7 +11,7 @@ import numpy as np
 import pytest
 from sensor_msgs.msg import LaserScan
 
-from ridgeback_autonomy.common.lidar_contract import (
+from ridgeback_common.lidar_contract import (
     FRONT_LIDAR_XY_YAW,
     MERGED_ANGLE_MAX,
     MERGED_ANGLE_MIN,

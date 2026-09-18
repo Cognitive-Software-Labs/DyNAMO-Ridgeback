@@ -7,8 +7,8 @@ import pytest
 from sensor_msgs_py import point_cloud2
 from std_msgs.msg import Header
 
-from ridgeback_autonomy.common.models import Detection, DetectionBatch
-from ridgeback_autonomy.perception.target_localization.core.pointcloud_ranging import (
+from ridgeback_common.models import Detection, DetectionBatch
+from ridgeback_localization.core.pointcloud_ranging import (
     add_pointcloud_measurements,
     compute_pointcloud_measurement,
     extract_organized_xyz,

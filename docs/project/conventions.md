@@ -61,7 +61,8 @@ behavior stays in the relevant technical reference.
 - `clearpath/robot.yaml` is canonical. Generated descriptions and installed
   copies are not editing targets.
 - `perception_venv/` supplies OWLv2, segmentation, and monocular-depth
-  dependencies; public localization launches prepend its `bin/` directory.
+  dependencies; only compute processes receive it. `RIDGEBACK_PERCEPTION_VENV`
+  selects a host-specific environment; external consumers keep their environment.
 
 ## Dependencies and patches
 

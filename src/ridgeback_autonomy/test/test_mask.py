@@ -3,8 +3,8 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from ridgeback_autonomy.common.models import Detection, DetectionBatch
-from ridgeback_autonomy.perception.target_localization.core.mask import (
+from ridgeback_common.models import Detection, DetectionBatch
+from ridgeback_localization.core.mask import (
     Mask,
     MaskPrecision,
     mask_from_array,

@@ -119,7 +119,7 @@ What the selection returns depends on the mask precision:
 
 **`tight` branch.** The points are nearly all object; a statistical outlier
 removal pass is enough before reducing. The shipped rule
-(`mad_outlier_removal` in `perception/target_localization/core/isolation_3d.py`) keeps the points
+(`mad_outlier_removal` in `ridgeback_localization/core/isolation_3d.py`) keeps the points
 whose camera-frame range is within median ± `k`·σ of the range distribution —
 the stragglers being edge bleed onto the background.
 

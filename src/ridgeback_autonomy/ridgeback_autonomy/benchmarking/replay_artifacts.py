@@ -20,11 +20,11 @@ import uuid
 
 import numpy as np
 
-from ridgeback_autonomy.perception.target_localization.core.mask import (
+from ridgeback_localization.core.mask import (
     MaskPrecision,
     MaskRegion,
 )
-from ridgeback_autonomy.perception.target_localization.estimator_registry import (
+from ridgeback_localization.estimator_registry import (
     parse_estimators,
 )
 

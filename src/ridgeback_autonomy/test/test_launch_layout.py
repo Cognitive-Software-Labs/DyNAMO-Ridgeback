@@ -6,8 +6,8 @@ import re
 import yaml
 
 from ridgeback_autonomy.benchmarking.replay import REPLAY_CAPTURE_BATCHES_DEFAULT
-from ridgeback_autonomy.perception.target_localization.estimator_registry import PUBLIC_ESTIMATOR_ORDER
-from ridgeback_autonomy.perception.target_localization.launch import CONFIG_LAUNCH_ARGUMENT_NAMES
+from ridgeback_localization.estimator_registry import PUBLIC_ESTIMATOR_ORDER
+from ridgeback_autonomy.localization_launch import CONFIG_LAUNCH_ARGUMENT_NAMES
 
 
 def _package_root() -> Path:
@@ -38,6 +38,7 @@ def test_public_launch_surface_is_limited_to_known_entrypoints() -> None:
     )
 
     assert top_level_launches == [
+        'localization_observer.launch.py',
         'manual_mapping.launch.py',
         'ridgeback_exploration.launch.py',
         'target_benchmark_config.launch.py',
@@ -191,7 +192,7 @@ def test_exploration_runs_the_same_four_estimator_rows_as_the_benchmark() -> Non
     # The mask node's own base_frame default is the bare string 'base_link',
     # which resolves to nothing under a namespace and fails polar profiling's
     # scan->base lookup silently. Every caller has to pass it.
-    assert "base_frame = [namespace, '/robot/base_link']" in exploration_text
+    assert "base_frame = LaunchConfiguration('base_frame').perform(context).strip()" in exploration_text
 
 
 def test_exploration_gives_the_distance_hud_its_own_aggregator() -> None:
@@ -248,10 +249,8 @@ def test_camera_overlay_is_rviz_only() -> None:
     overlay_text = (
         repo_root
         / 'src'
-        / 'ridgeback_autonomy'
-        / 'ridgeback_autonomy'
-        / 'perception'
-        / 'target_localization'
+        / 'ridgeback_localization'
+        / 'ridgeback_localization'
         / 'overlay_node.py'
     ).read_text(encoding='utf-8')
 
@@ -447,7 +446,7 @@ def test_every_entrypoint_supplies_the_cyclonedds_configuration() -> None:
 
 
 def test_cyclonedds_configuration_yields_to_an_operator_setting(tmp_path, monkeypatch) -> None:
-    from ridgeback_autonomy.perception.target_localization.launch import cyclonedds_actions
+    from ridgeback_autonomy.localization_launch import cyclonedds_actions
 
     share = tmp_path / 'share'
     (share / 'config').mkdir(parents=True)

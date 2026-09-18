@@ -16,12 +16,12 @@ from __future__ import annotations
 
 import os
 
-from ridgeback_autonomy.perception.target_localization.estimator_registry import (
+from ridgeback_localization.estimator_registry import (
     ESTIMATOR_LABELS,
     PUBLIC_ESTIMATOR_ORDER,
 )
 from ridgeback_autonomy.benchmarking.scoring import OUTCOME_NO_VALUE, OUTCOME_SCORED
-from ridgeback_autonomy.common.miss_reason import (
+from ridgeback_common.miss_reason import (
     MissReason,
     observation_totals,
     reason_name,

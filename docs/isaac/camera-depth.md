@@ -102,7 +102,7 @@ mount and nominal frame positions are tabulated in
 ## Nominal profiles
 
 Gazebo and Isaac share the profiles defined in
-`ridgeback_autonomy/common/camera_profiles.py`. They are deterministic
+`ridgeback_common/camera_profiles.py`. They are deterministic
 simulation profiles, not factory calibration for a physical camera.
 
 | Profile | Colour/aligned grid | Colour `(fx, fy, cx, cy)` px | Depth HFoV | Minimum modelled depth | Rate |
@@ -469,7 +469,7 @@ Never copy the simulation intrinsics into a physical-camera configuration.
 
 | Responsibility | Source |
 |---|---|
-| Shared profile definitions | `src/ridgeback_autonomy/ridgeback_autonomy/common/camera_profiles.py` |
+| Shared profile definitions | `src/ridgeback_common/ridgeback_common/camera_profiles.py` |
 | Robot camera/TF generation | `tools/isaac/import_ridgeback_urdf.py` |
 | Colour helpers and D455 model | `src/ridgeback_autonomy_isaac/sim/isaac/sensors.py` |
 | Custom ROS depth/cloud publisher | `src/ridgeback_autonomy_isaac/sim/isaac/ros_io.py` |

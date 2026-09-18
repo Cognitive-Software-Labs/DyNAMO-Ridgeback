@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from ridgeback_autonomy.common.miss_reason import MissReason
-from ridgeback_autonomy.perception.target_localization.estimator_registry import (
+from ridgeback_common.miss_reason import MissReason
+from ridgeback_localization.estimator_registry import (
     ESTIMATOR_FIELD_KEYS,
     ESTIMATOR_STATUS_FIELD_KEYS,
 )

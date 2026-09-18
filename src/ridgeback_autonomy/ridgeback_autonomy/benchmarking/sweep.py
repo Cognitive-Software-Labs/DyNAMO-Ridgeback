@@ -8,8 +8,8 @@ import re
 
 import yaml
 
-from ridgeback_autonomy.common.camera_profiles import resolve_camera_profile
-from ridgeback_autonomy.perception.target_localization.estimator_registry import (
+from ridgeback_common.camera_profiles import resolve_camera_profile
+from ridgeback_localization.estimator_registry import (
     DEPTH_PATH_ESTIMATORS,
     MASK_ESTIMATORS,
     parse_estimators,
