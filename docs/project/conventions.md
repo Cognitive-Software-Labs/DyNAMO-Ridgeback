@@ -31,6 +31,10 @@ behavior stays in the relevant technical reference.
   behavior remains in `ridgeback_autonomy`.
 - Run `cleanup.sh` once before a benchmark sweep, never between its persistent
   configurations.
+- Run `tools/intel_thor/check_link` on Intel before every Intel–Thor
+  deployment. Cross-host ROS processes source
+  `src/ridgeback_autonomy_hardware/config/intel_thor/dds_env.sh`; see the
+  [transport reference](../physical/intel_thor_transport.md).
 
 ## Generated state
 

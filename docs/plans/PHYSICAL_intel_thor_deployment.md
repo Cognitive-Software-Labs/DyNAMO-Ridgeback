@@ -64,6 +64,15 @@ are discovery tasks, not assumed facts.
 ## 2. Transport, time, and readiness
 
 Inspect actual interfaces and discovery before changing DDS configuration.
+CycloneDDS is selected for both hosts. The Ethernet-only configurations, the
+receive-buffer limit, the Intel service switch, and the `check_link` pre-deploy
+check are implemented; see the
+[transport reference](../physical/intel_thor_transport.md). Still open:
+- run the Intel service switch and persist Intel's buffer limit
+- source `dds_env.sh` in every deployed cross-host process
+- harden time sync; the check measured offsets of 0.75–4.2 ms with both hosts
+  on internet NTP
+
 Verify matching ROS domain and interoperable deployed middleware, reachable
 sensor topics, publisher/subscriber QoS, packet delivery, and namespaced TF.
 Confirm one sensor/TF owner and no duplicate localization workers on Intel.

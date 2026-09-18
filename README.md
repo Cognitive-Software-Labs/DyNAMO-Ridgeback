@@ -379,6 +379,51 @@ bash build_and_start_expl.sh office
 bash build_and_start_expl.sh office headless_rendering:=true
 ```
 
+### Intel-Thor link setup and pre-deploy check
+
+The distributed deployment runs ROS 2 on CycloneDDS on both the Intel PC and
+the Jetson Thor. Traffic between them uses the robot Ethernet only. The
+mechanism, the configuration files, and the reasons are in the
+[Intel–Thor DDS transport reference](docs/physical/intel_thor_transport.md).
+
+One-time setup, on each host from its checkout (Thor also needs
+`sudo apt install ros-jazzy-rmw-cyclonedds-cpp`):
+
+```bash
+sudo cp src/ridgeback_autonomy_hardware/config/intel_thor/60-dynamo-dds-buffers.conf /etc/sysctl.d/
+sudo sysctl --system
+```
+
+One-time switch of Intel's robot services from Fast DDS to CycloneDDS. The
+services restart, so keep the robot stationary with the e-stop in reach:
+
+```bash
+sudo tools/intel_thor/intel_services_rmw apply
+```
+
+`tools/intel_thor/intel_services_rmw status` shows the RMW that each service
+actually runs, and `sudo tools/intel_thor/intel_services_rmw rollback` restores
+the previous Fast DDS setup.
+
+In every shell that starts cross-host ROS processes or inspects Thor's topics,
+on both hosts:
+
+```bash
+source src/ridgeback_autonomy_hardware/config/intel_thor/dds_env.sh
+```
+
+Before every deployment, with the robot stationary, run on Intel:
+
+```bash
+tools/intel_thor/check_link
+```
+
+It checks routing, link speed, buffer limits, the middleware of Intel's
+services, the configurations, clock offset, and a 30 Hz camera-sized stream in
+both directions. It exits nonzero on any failure. Pass `--no-traffic` to skip
+the stream when the Ethernet segment must stay quiet.
+`tools/intel_thor/rmw_benchmark` repeats the Fast DDS/CycloneDDS comparison.
+
 ### `target_distance_benchmark.launch.py`
 
 Before parameter tuning or using new benchmark comparisons as reportable results,

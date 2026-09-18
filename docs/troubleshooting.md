@@ -17,6 +17,7 @@ investigations and measurements live in the Archived evidence section below.
 | Startup stage stalls | Read the matching `gate_*` process's `unmet:` list; do not add a fixed timer |
 | Stale simulator processes | Run `bash cleanup.sh` before a simulation launch or once before a sweep; never use it as hardware bringup cleanup |
 | Need a log summary | Run `bash tools/diag.sh <console.log> hospital` or `warehouse` |
+| Images on Thor stall or lag although ping is fast | See [Intel–Thor stream stalls](#intelthor-stream-stalls) |
 
 ## Hardware launch is deliberately motionless
 
@@ -195,6 +196,41 @@ Featureless worlds can drift if `slam_toolbox` processes every stationary scan.
 Keep `minimum_travel_distance: 0.05` and `minimum_travel_heading: 0.05` in
 `slam_toolbox_params.yaml`; these gates require about 5 cm or 3 degrees of
 motion before another scan update.
+
+## Intel–Thor stream stalls
+
+**Symptom.** Camera topics received on Thor drop to a few hertz or pause for
+seconds, or a Thor topic inspected on Intel is slow. Ping between the hosts
+stays below 1 ms, and `nstat UdpRcvbufErrors` on the receiving host climbs.
+
+**Cause.** The receiving process is not on its Ethernet-only CycloneDDS
+configuration. It may be running Fast DDS defaults, CycloneDDS's own choice of
+interface, or, on Intel, the robot services' Ethernet + Wi-Fi configuration
+from `/etc/clearpath/setup.bash`. The sender then also uses the lab Wi-Fi.
+
+**Fix.** Source `dds_env.sh` in the receiving shell, confirm with
+`tools/intel_thor/intel_services_rmw status` that Intel's services run
+CycloneDDS, and run `tools/intel_thor/check_link`. The
+[transport reference](physical/intel_thor_transport.md) owns the contract.
+
+## Hokuyo drivers stuck reconnecting
+
+**Symptom.** No `sensors/lidar2d_*/scan` data, and the `clearpath-sensors`
+journal repeats `Could not grab single echo scan`, then `Error count exceeded
+limit, reconnecting`, then `Error connecting to Hokuyo: Could not open network
+Hokuyo` every 2.5 s. `ss -tn | grep 10940` shows an established connection to
+each LiDAR next to a pending new one.
+
+**Cause.** After a read timeout, `urg_node` opens a new TCP connection without
+closing the old one. A Hokuyo UST serves one client at a time, so the driver
+never recovers on its own. On 2026-09-18 both LiDARs failed this way at the same
+moment, 4 minutes after Intel's services moved to CycloneDDS. The first timeout
+could not be reproduced with scan subscribers joining and leaving, including a
+reliable reader killed with SIGKILL.
+
+**Fix.** Run `sudo systemctl restart clearpath-sensors`. This restarts only the
+sensor drivers; motor power is unaffected. Record the time and what was running
+if the stall recurs.
 
 ## Camera optical-frame ownership
 

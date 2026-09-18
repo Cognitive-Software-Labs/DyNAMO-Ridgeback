@@ -22,6 +22,12 @@ troubleshooting, planning, and historical documentation.
 - [Geometry and mounting](robot/geometry.md) — configured mounts, model dimensions, and provenance
 - [Collision model and navigation footprint](robot/collision_model.md) — physical, simulator, and navigation envelopes
 
+## Physical deployment
+
+- [Intel–Thor DDS transport](physical/intel_thor_transport.md) — CycloneDDS on
+  both hosts, Ethernet-only configurations, the Intel service switch, and the
+  pre-deploy link check
+
 ## Exploration
 
 - [Exploration architecture](exploration/architecture.md)
