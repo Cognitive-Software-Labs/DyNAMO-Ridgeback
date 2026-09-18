@@ -69,8 +69,7 @@ troubleshooting, planning, and historical documentation.
 ## Active plans
 
 - [Live sweep from the configurator GUI](plans/benchmark_gui_direct_run.md) —
-  the three offline profiles run from the page; the `live-system` phase is
-  blocked on the `cleanup.sh` catch-all
+  blocked on live process ownership and cleanup; follows environment qualification
 - [D455 hardware validation](plans/camera_hardware_validation.md)
 - [Combined-model throughput measurement](plans/model_concurrency_evidence.md) — run the existing sweep and determine whether concurrency is needed
 - [Occlusion characterization](plans/occlusion_handling.md)

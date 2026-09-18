@@ -139,12 +139,27 @@ unresolved measurement. If it keeps up, close this item without redesign. Only
 a demonstrated bottleneck justifies proposing a separate concurrency experiment;
 no production architecture change is included here.
 
-## Other benchmarking execution plans
+## Live sweeps from the configurator
 
-These plans retain their execution detail; listing them here does not change
-their approval or completion status.
+**Status and priority.** Blocked on cleanup/process ownership; prioritize
+[execution-environment qualification](#benchmark-execution-environment-qualification)
+before this convenience feature. Qualification can use the terminal workflow.
 
-- [Live sweeps from the configurator](../plans/benchmark_gui_direct_run.md)
+**Gap.** The configurator authors live sweeps but cannot start them. Sweep
+preflight cleanup can kill the configurator through two broad install-path
+matches, and live process ownership/conflict handling is not qualified.
+
+**Remaining work.** Follow the [implementation plan](../plans/benchmark_gui_direct_run.md):
+fix owned-process cleanup; reuse the CLI dry-run estimate; show the actual child
+renderer and qualification status; detect genuine conflicting runs; support live
+start, progress, cancellation, and restart/reattachment through existing records.
+
+**Completion criteria.** Demonstrate that a live sweep starts without killing
+the configurator or unrelated processes, reports actual progress, reconnects
+after browser/server restart, and cancels its owned processes cleanly. Verify
+dry run has no launch/cleanup side effects and existing offline workflows remain
+intact. Record the lifecycle evidence in the qualified environment and update
+operator guidance. UI availability does not itself qualify benchmark results.
 
 ## Deferred: Isaac target-distance benchmark port
 

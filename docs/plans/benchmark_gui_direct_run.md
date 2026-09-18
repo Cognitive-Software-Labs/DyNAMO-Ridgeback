@@ -1,149 +1,102 @@
-# Plan: start a live sweep from the configurator GUI
+# Start live benchmark sweeps from the configurator
 
-Status: **PROPOSED — BLOCKED.** Phases 0, 1 and 3 of this plan shipped on
-2026-09-11; what remains is Phase 2, starting the `live-system` profile from the
-page. Delivered work, its evidence, and the reversals it required are recorded in the Archived evidence section below.
+Status: **blocked on process cleanup and ownership.** The
+[benchmarking backlog](../target_distance_benchmarking/BACKLOG.md#live-sweeps-from-the-configurator)
+owns this feature and its priority. Environment qualification takes priority;
+it can run through the existing terminal workflow without waiting for this UI.
+This plan covers the remaining live-run implementation, not the completed
+[offline run infrastructure](../target_distance_benchmarking/configurator.md).
 
-Prepared 2026-09-11 against `18eacb4`, branch `feat/benchmark-gui`.
+## Current blocker
 
-## What already exists
+The UI disables Start for `live-system`, and `RunSupervisor.ensure_startable`
+rejects it server-side. A sweep calls preflight cleanup before starting Gazebo.
+Two patterns in [`cleanup.sh`](../../cleanup.sh) can match the installed
+configurator process:
 
-The run substrate is built and exercised by the three offline profiles:
-server-side job write, one path anchor, on-disk run records with
-cmdline-verified liveness, graded SIGINT → SIGTERM → SIGKILL cancellation of the
-run's process group, server-side single flight, and a browser tab that
-re-attaches from disk instead of owning the run. Phase 2 reuses all of it and
-adds only what is genuinely live-system-specific.
+- `REPO_NODES_RE`, which matches executables under this checkout's installed
+  package `lib/` directories;
+- the later `lib/ridgeback_autonomy/` catch-all.
 
-The UI already shows a disabled Start for `live-system` with the reason stated,
-rather than hiding the button.
-
-## The blocker
-
-**`cleanup.sh` kills the configurator.** The catch-all
-
-```bash
-# Every node here is installed under lib/ridgeback_autonomy, so match that.
-kill_matches "lib/ridgeback_autonomy/"
+```mermaid
+flowchart LR
+    C["Configurator starts sweep"] --> P["Sweep preflight cleanup"]
+    P --> N["Installed-executable match"]
+    P --> A["Package catch-all match"]
+    N --> K["Configurator process is killed"]
+    A --> K
 ```
 
-([`cleanup.sh`](../../cleanup.sh)) is a `pgrep -f` substring match, and
-`kill_matches` is `kill -9` excluding only `$$` and `$PPID`. The configurator's
-installed copy lives at
-`install/ridgeback_autonomy/lib/ridgeback_autonomy/target_benchmark_configurator`,
-so it matches.
+Cleanup also has broad process-name matches. Correcting only one pattern or
+simply exempting the configurator does not establish isolation from unrelated
+runs. Do not enable Start by bypassing preflight cleanup.
 
-`target_benchmark_sweep` calls `run_preflight_cleanup` before Gazebo starts
-([`target_benchmark_sweep.py`](../../src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/target_benchmark_sweep.py)),
-so a GUI-launched sweep would `kill -9` the GUI mid-click. Do **not** work around
-it with `--skip-preflight-cleanup`; that flag produces the two-`gz sim` failure
-where every trial dies with "Target pose ... not present". The catch-all must be
-narrowed to actual nodes first. Full description in
-[`docs/troubleshooting.md`](../troubleshooting.md).
+## Remaining implementation
 
-## Why live is riskier than the three profiles already running
+### Process ownership and cleanup
 
-| Profile | Executor | Spawn risk | Why |
-|---|---|---|---|
-| `measurement` | `target_replay_benchmark` | Low | No `rclpy`, no Gazebo, no X. Pure CPU subprocess. |
-| `mask-output` | `target_replay_benchmark` | Low | Same. |
-| `mask-model` | `target_replay_benchmark` | Low | Same, plus segmentation model load. |
-| `live-system` | `target_benchmark_sweep` | High | Gazebo + RViz + ffmpeg screen capture, hours long, `kill -9` preflight, needs a GPU-backed X session |
+Establish which processes belong to a sweep and which stale processes it may
+clean up. Preserve the configurator, unrelated sessions, and other checkouts.
+Apply that ownership consistently to preflight, cancellation, and leftover
+checks. Audit both install-path patterns and broad simulator/node matches.
+Keep live Start disabled until the cleanup and ownership checks pass.
 
-## Phase 2 — Start for `live-system`
+### Dry-run estimate and execution environment
 
-### 2.1 Progress is already on disk
+Reuse `target_benchmark_sweep --dry-run` for validation and duration estimates;
+it must not start a simulator or terminate processes. Use the same canonical
+job/sweep parser as the CLI rather than recreating validation in browser code.
 
-The sweep writes `sweep.json` and regenerates `summary.md` after **every
-config** ([`target_benchmark_sweep.py`](../../src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/target_benchmark_sweep.py)),
-carrying per-config `status`, `error`, `wall_time_sec` and `real_time_factor`.
-The GUI polls that file. No log-streaming protocol to invent — this is the
-single biggest reason Phase 2 is smaller than it looks.
+Before Start, show the renderer for the environment the child will actually
+inherit, along with the recorded qualification status and covered conditions.
+A GPU renderer alone does not establish
+[environment qualification](../target_distance_benchmarking/BACKLOG.md#benchmark-execution-environment-qualification).
+Keep unknown or unqualified conditions explicit. Apply that workflow gate to
+tuning and result claims without inventing a second qualification policy.
 
-Note the filename is `sweep.json`, not `manifest.json`.
+### Conflicting runs
 
-### 2.2 Locating the sweep directory
+Extend the existing server-side single-run guard to identify genuinely
+conflicting terminal-started runs and stale processes. Report the conflicting
+process and resource, with an actionable resolution. The mere presence of a
+`gz sim` process, especially a retained GUI, does not establish a conflict.
+Recheck at launch so two near-simultaneous requests cannot bypass the guard.
 
-`sweep_dir = os.path.join(output_root, f'{_timestamp()}_{spec.name}')`
-([`target_benchmark_sweep.py`](../../src/ridgeback_autonomy/ridgeback_autonomy/benchmarking/target_benchmark_sweep.py)),
-or an existing directory when `_find_resumable_sweep` matches. Parse it from the
-log lines `Created sweep directory <path>` / `Resuming incomplete sweep <path>`
-rather than recomputing the timestamp, which would race. The run log the
-supervisor already writes is the place to read them from.
+### Start, progress, cancellation, and reconnection
 
-### 2.3 GL preflight
+Reuse existing persistent run records and process-group supervision. Locate the
+actual created or resumed sweep directory from the supervisor's output; do not
+recompute its timestamp. Read per-configuration progress and failures from
+`sweep.json` and link to the existing results artifacts.
 
-`software_gl_warning` fires immediately before Gazebo starts. An llvmpipe
-fallback does not fail the run — it silently reduces every rendered sensor,
-taking the camera from ~28 Hz to ~4 Hz, and RTF does not reveal it. The GUI
-inherits whatever `DISPLAY`/GL environment its own shell had, which for an SSH
-or reconnected-xrdp session may not be the GPU one.
+A tab close, browser restart, or configurator restart must not lose ownership
+of the live sweep. Reattach only after checking process identity. Cancellation
+must stop the owned live-run processes and finish recording their state, while
+preserving unrelated processes. Removing the browser and server live-start
+restrictions is the final step after these paths are verified.
 
-Surface the renderer **in the UI before Start**, not in a log nobody opens. An
-operator should not discover a software rasterizer six hours in.
+## Acceptance checks
 
-### 2.4 Concurrency, harder
+- Dry run returns validation and estimates without launching or killing anything.
+- Preflight preserves the configurator and unrelated sentinel processes while
+  removing only the identified stale benchmark processes; both broad install
+  matches and simulator/node matches are covered.
+- Real conflicts, including terminal-started runs, are identified before launch;
+  unrelated simulator GUIs do not cause a blanket refusal.
+- The displayed renderer describes the child environment, and qualification
+  status is not inferred merely from a successful GL probe.
+- Created and resumed sweeps reconnect to their actual output directory; progress
+  and failures agree with `sweep.json`.
+- Cancellation, tab close, browser restart, and server restart work during a
+  representative live sweep, with no orphaned owned processes or stale PID attach.
+- Existing offline start/cancel/reattach behavior still passes its focused checks.
 
-Server-side single flight already refuses a second GUI-owned run. The live guard
-must additionally detect a sweep **nobody started from the GUI**
-(`pgrep -af "gz sim"`), and say what it found rather than refusing blankly — two
-simultaneous sweeps is the documented catastrophic case, where the second
-`gz sim` server makes every trial fail with "Target pose not present".
-
-### 2.5 Detach and re-attach
-
-Already provided by the Phase 0 substrate: records live on disk, liveness is
-cmdline-verified, and the tab re-attaches on load. Phase 2 needs only to add the
-`sweep.json` view on top. Verify tab close, browser restart and GUI restart
-against a real multi-hour sweep before calling this done.
-
-### 2.6 Dry run
-
-The GUI still punts the live estimate:
-
-```python
-'capture_duration': 'Live sweep; use its --dry-run estimate.'
-```
-
-`target_benchmark_sweep --dry-run` validates and estimates without launching.
-Wire it to a Dry run button and show the real number before the operator commits
-the machine for an afternoon. Cheap, and it is the natural safety gate in front
-of a Start button this expensive. `--dry-run` does not run preflight cleanup, so
-this part is **not** blocked and could ship first.
-
-## Non-goals
-
-- Reimplementing any validation in `app.js`. The browser owns presentation and
-  draft state; the server canonicalises and validates through the same parser
-  the CLI uses. Adding an axis must still require no front-end change.
-- An operator toggle for `--skip-preflight-cleanup`. It is the flag that produces
-  the two-`gz sim` failure. The one legitimate use — keeping another session
-  alive — stays a CLI-only escape hatch.
-- Editing or deleting results beyond the rename that already shipped.
-- Changing the profile contract, the job format, or `replay_profiles.py`.
-
-## Testing
-
-- dry run returns an estimate without launching anything
-- the sweep directory is read from the log lines, not recomputed
-- a software-GL session is reported before Start, not after
-- an externally started `gz sim` blocks Start and is named in the refusal
-- a sweep survives GUI restart and re-attaches with its per-config progress
-
-Run pytest from the repo root or `msg` imports fail; source
-`/opt/ros/jazzy/setup.bash` then `install/setup.bash`.
-
-## Build and edit notes for the implementer
-
-`--symlink-install` behaves three different ways in this package; the rule is in
-[`docs/project/conventions.md`](../project/conventions.md). The short version: `configurator.py` is an
-`install(PROGRAMS ... RENAME)` **copy**, so it needs `colcon build` and must be
-verified by grepping
-`install/ridgeback_autonomy/lib/ridgeback_autonomy/target_benchmark_configurator`
-— not `site-packages`, which is a symlink and shows the edit either way.
-
-Several Claude sessions share this working tree. Re-check `git status` before
-blaming a failure on your own diff.
+Use focused process tests with harmless owned subprocesses before a live smoke.
+Then validate the lifecycle in the qualified environment. Keep benchmark inputs,
+measurement defaults, profile contracts, and scoring unchanged. Follow the
+[installed-file build rules](../project/conventions.md#generated-state).
+Record evidence, update the configurator reference and run guide, and close the
+owning backlog item when the acceptance checks pass.
 
 ## Archived evidence
 

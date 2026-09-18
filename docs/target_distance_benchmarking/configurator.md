@@ -61,7 +61,8 @@ is insufficient because the kernel reuses PIDs after a GUI restart.
 `live-system` sweeps stay terminal-only: `target_benchmark_sweep` runs
 `run_preflight_cleanup`, whose catch-all would `kill -9` the page. The UI shows
 a disabled Start with that reason. See
-[troubleshooting](../troubleshooting.md).
+[troubleshooting](../troubleshooting.md). Remaining implementation is tracked
+in the [benchmarking backlog](BACKLOG.md#live-sweeps-from-the-configurator).
 
 The Results panel lists typed artifacts and run outputs and can rename them;
 [outputs](outputs.md) owns the rename rules and their refusals.
