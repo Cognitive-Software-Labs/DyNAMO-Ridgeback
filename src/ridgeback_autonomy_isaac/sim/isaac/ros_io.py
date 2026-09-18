@@ -23,7 +23,7 @@ import math
 
 import numpy as np
 
-from ridgeback_autonomy.common.lidar_contract import (
+from ridgeback_common.lidar_contract import (
     RAW_ANGLE_INCREMENT,
     RAW_ANGLE_MIN,
     RAW_RANGE_MAX,

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from ridgeback_autonomy.frontier_explorer.mission_guard import MissionGuard
 
 import time as _time
 
@@ -24,8 +25,8 @@ from ridgeback_autonomy.frontier_explorer.params import UNKNOWN, OBSTACLE, FREE
 
 
 class FrontierExplorerNode(Node):
-    def __init__(self):
-        super().__init__('frontier_explorer_node')
+    def __init__(self, **node_kwargs):
+        super().__init__('frontier_explorer_node', **node_kwargs)
         
         # Declare parameters
         self.declare_parameter('robot_base_frame', 'base_link')
@@ -125,6 +126,7 @@ class FrontierExplorerNode(Node):
         self.current_goal = None
         self.goal_start_time = None
         self._current_goal_handle = None
+        self.mission_guard = MissionGuard(self)
         # Startup and retry timing (wall clock so it's immune to sim-time jumps)
         self._start_wall_time = _time.time()
         self._retry_after_wall_time = 0.0
@@ -211,6 +213,8 @@ class FrontierExplorerNode(Node):
     
     def exploration_callback(self):
         """Main exploration loop."""
+        if not self.mission_guard.allowed():
+            return
         if self.current_costmap is None or self.robot_awareness_map is None:
             return
         
@@ -446,6 +450,9 @@ class FrontierExplorerNode(Node):
     
     def _cancel_current_goal(self):
         """Cancel the active Nav2 goal, if any."""
+        if self.mission_guard.required:
+            self.mission_guard.cancel()
+            return
         if self._current_goal_handle is not None:
             cancel_future = self._current_goal_handle.cancel_goal_async()
             cancel_future.add_done_callback(self._cancel_done_callback)
@@ -550,6 +557,20 @@ class FrontierExplorerNode(Node):
         return (world_x, world_y)
     
     def send_goal_to_nav2(self, target_position):
+        with self.mission_guard.lock:
+            if not self.mission_guard.allowed() or (self.mission_guard.required and self.mission_guard.handle is not None):
+                return False
+            self.mission_guard.goal_pending = True
+            try:
+                sent = self._send_goal_to_nav2(target_position)
+            except Exception:
+                self.mission_guard.goal_pending = False
+                raise
+            if not sent:
+                self.mission_guard.goal_pending = False
+            return sent
+
+    def _send_goal_to_nav2(self, target_position):
         """Send goal to Nav2 NavigateToPose action. Returns True if sent."""
         goal_msg = NavigateToPose.Goal()
         goal_msg.pose = PoseStamped()
@@ -567,31 +588,58 @@ class FrontierExplorerNode(Node):
             self.get_logger().warn('NavigateToPose action server not available')
             return False
 
+        # Server discovery may have consumed the remaining health budget.
+        if self.mission_guard.required and (
+                self.mission_guard.paused or not self.mission_guard.healthy()):
+            return False
         send_future = self.nav_client.send_goal_async(
             goal_msg, feedback_callback=self._feedback_callback)
         send_future.add_done_callback(self._goal_response_callback)
         return True
 
     def _goal_response_callback(self, future):
+        with self.mission_guard.lock:
+            self._handle_goal_response(future)
+
+    def _handle_goal_response(self, future):
         """Handle goal acceptance; attach result callback."""
-        goal_handle = future.result()
+        self.mission_guard.goal_pending = False
+        try:
+            goal_handle = future.result()
+        except Exception as exc:
+            self.current_goal = None
+            self.mission_guard.pause('Goal acceptance failed: ' + str(exc))
+            return
         if not goal_handle.accepted:
             self.get_logger().warn('Goal rejected by Nav2, will retry.')
             self.current_goal = None
             return
         self._current_goal_handle = goal_handle
+        self.mission_guard.accepted(goal_handle)
         # Pass the handle through the closure so result callback can ignore stale results
         goal_handle.get_result_async().add_done_callback(
             lambda f, gh=goal_handle: self._goal_result_callback(f, gh)
         )
 
     def _goal_result_callback(self, future, goal_handle):
+        with self.mission_guard.lock:
+            self._handle_goal_result(future, goal_handle)
+
+    def _handle_goal_result(self, future, goal_handle):
         """Handle goal completion — immediately pick a new frontier."""
         # Ignore results from superseded goals (e.g. cancelled due to timeout preemption)
         if goal_handle is not self._current_goal_handle:
             return
         from action_msgs.msg import GoalStatus
-        status = future.result().status
+        try:
+            status = future.result().status
+        except Exception as exc:
+            self.mission_guard.pause('Navigation result unavailable: ' + str(exc))
+            return
+        if status not in (GoalStatus.STATUS_SUCCEEDED, GoalStatus.STATUS_CANCELED, GoalStatus.STATUS_ABORTED):
+            self.mission_guard.pause('Navigation result is not terminal')
+            return
+        self.mission_guard.finished(goal_handle)
         if status == GoalStatus.STATUS_SUCCEEDED:
             self.get_logger().info('Goal succeeded, selecting next frontier.')
             if self.current_goal is not None:

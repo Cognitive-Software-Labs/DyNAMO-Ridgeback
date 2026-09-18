@@ -6,7 +6,7 @@ how it is prompted, and the semantics of its output. How the resulting mask is
 consumed is unchanged and documented with the paths; the mask *object* is
 documented in `docs/target_localization/mask_representation.md`.
 
-**Code:** `perception/target_localization/core/segmentation.py` (`SamBoxSegmenter`), wired into
+**Code:** `ridgeback_localization/core/segmentation.py` (`SamBoxSegmenter`), wired into
 `target_mask_measurement_node` behind the `mask_gate` parameter
 (`box` | `silhouette`).
 

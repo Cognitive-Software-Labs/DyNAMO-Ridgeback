@@ -9,7 +9,7 @@ import pytest
 from builtin_interfaces.msg import Time as TimeMsg
 from geometry_msgs.msg import PointStamped
 
-from ridgeback_autonomy.perception.target_localization.estimator_registry import (
+from ridgeback_localization.estimator_registry import (
     ESTIMATOR_LABELS,
     ESTIMATOR_POSITION_ATTRS,
     ESTIMATOR_SHORT_LABELS,
@@ -18,7 +18,7 @@ from ridgeback_autonomy.perception.target_localization.estimator_registry import
     nearest_instance_index,
     parse_estimators,
 )
-from ridgeback_autonomy.perception.target_localization.hud_rendering import (
+from ridgeback_localization.hud_rendering import (
     HUD_AGED_LUMINANCE,
     HUD_LAYOUTS,
     HUD_LAYOUT_ROWS,
@@ -33,34 +33,34 @@ from ridgeback_autonomy.perception.target_localization.hud_rendering import (
     hud_wide_text,
     parse_hud_layout,
 )
-from ridgeback_autonomy.perception.target_localization.marker_rendering import (
+from ridgeback_localization.marker_rendering import (
     append_estimator_markers,
     world_marker_point,
 )
-from ridgeback_autonomy.perception.target_localization.visualization_node import (
+from ridgeback_localization.visualization_node import (
     MARKER_LIFETIME_SEC,
     MAX_OBSERVATION_AGE_S,
     TargetVisualizationNode,
 )
-from ridgeback_autonomy.perception.target_localization.visualization_readings import (
+from ridgeback_localization.visualization_readings import (
     batch_messages,
     collect_readings,
     estimator_reading,
     nearest_detection_index,
     partition_measurements,
 )
-from ridgeback_autonomy.perception.target_localization.visualization_style import (
+from ridgeback_localization.visualization_style import (
     ESTIMATOR_COLOURS,
     ESTIMATOR_MARKER_ID_BASES,
     RING_LINE_WIDTH_M,
 )
-from ridgeback_autonomy.msg import TargetMeasurements
+from ridgeback_interfaces.msg import TargetMeasurements
 from visualization_msgs.msg import Marker
-from ridgeback_autonomy.perception.target_localization.core.vehicle_frame import (
+from ridgeback_localization.core.vehicle_frame import (
     ROBOT_FRONT_OFFSET_M,
     planar_measurement_from_vehicle_front,
 )
-from ridgeback_autonomy.perception.target_localization.ground_truth import TRUTH_MAX_AGE_S, truth_reading
+from ridgeback_localization.ground_truth import TRUTH_MAX_AGE_S, truth_reading
 
 
 def test_every_registered_estimator_has_a_colour() -> None:
@@ -193,7 +193,7 @@ def test_nearest_detection_index_falls_back_to_the_first_detection() -> None:
 
 
 def luminance(colour) -> float:
-    from ridgeback_autonomy.perception.target_localization.hud_rendering import (
+    from ridgeback_localization.hud_rendering import (
         LUMA_WEIGHTS,
     )
 

@@ -7,6 +7,8 @@ are excluded from ordinary repository search and the generated knowledge graph.
 
 ## Localization and perception
 
+- [Package split simulator runtime qualification](2026-09-18-package-split-runtime.md)
+
 - [Depth producer sampling and monocular scale](aligned_depth_coverage.md)
 - [Exact-stamp DDS delivery comparison](exact_stamp_depth_availability.md)
 - [Published versus deprojected point geometry](pointcloud_provenance_evaluation.md)

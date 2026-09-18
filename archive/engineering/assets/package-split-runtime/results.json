@@ -1,0 +1,1818 @@
+[
+  {
+    "passed": true,
+    "command": [
+      "ros2",
+      "launch",
+      "ridgeback_autonomy",
+      "ridgeback_exploration.launch.py",
+      "backend:=gz",
+      "camera_profile:=1280x720",
+      "target_localization_enabled:=false",
+      "setup_path:=/home/deivid/dev/DyNAMO-Ridgeback/artifacts/package-split/runtime/gz-1280x720-false/clearpath/",
+      "autonomous_motion_enabled:=false",
+      "exploration_rviz:=false",
+      "coverage_overlay_enabled:=false",
+      "headless_rendering:=true",
+      "gz_gui:=false",
+      "headless:=true",
+      "world:=mock_hospital"
+    ],
+    "revision": "abdbc12566c7cb7f4ab86d89b53eabf5fc119040",
+    "duration_s": 11.21,
+    "counts": {
+      "clock": 2583,
+      "depth": 138,
+      "color": 142,
+      "scan": 207,
+      "odom": 248,
+      "map": 8
+    },
+    "nav2_states": {
+      "controller_server": "active",
+      "bt_navigator": "active"
+    },
+    "detected_batches": {},
+    "finite_measurements": {},
+    "frames": {
+      "depth": "camera_0_color_optical_frame",
+      "color": "camera_0_color_optical_frame",
+      "scan": "lidar2d_0_laser",
+      "odom": "odom",
+      "map": "map"
+    },
+    "sizes": {
+      "depth": [
+        1280,
+        720
+      ],
+      "color": [
+        1280,
+        720
+      ]
+    },
+    "health": [],
+    "launch_exit": null,
+    "case": "gz-1280x720-false"
+  },
+  {
+    "passed": true,
+    "command": [
+      "ros2",
+      "launch",
+      "ridgeback_autonomy",
+      "ridgeback_exploration.launch.py",
+      "backend:=gz",
+      "camera_profile:=1280x720",
+      "target_localization_enabled:=false",
+      "setup_path:=/home/deivid/dev/DyNAMO-Ridgeback/artifacts/package-split/runtime/gz-1280x720-false-final/clearpath/",
+      "autonomous_motion_enabled:=false",
+      "exploration_rviz:=false",
+      "coverage_overlay_enabled:=false",
+      "headless_rendering:=true",
+      "gz_gui:=false",
+      "headless:=true",
+      "world:=mock_hospital"
+    ],
+    "revision": "abdbc12566c7cb7f4ab86d89b53eabf5fc119040",
+    "duration_s": 11.21,
+    "counts": {
+      "clock": 2559,
+      "depth": 155,
+      "color": 155,
+      "scan": 205,
+      "odom": 245,
+      "map": 8
+    },
+    "nav2_states": {
+      "controller_server": "active",
+      "bt_navigator": "active"
+    },
+    "detected_batches": {},
+    "finite_measurements": {},
+    "frames": {
+      "depth": "camera_0_color_optical_frame",
+      "color": "camera_0_color_optical_frame",
+      "scan": "lidar2d_0_laser",
+      "odom": "odom",
+      "map": "map"
+    },
+    "sizes": {
+      "depth": [
+        1280,
+        720
+      ],
+      "color": [
+        1280,
+        720
+      ]
+    },
+    "health": [],
+    "launch_exit": null,
+    "case": "gz-1280x720-false-final"
+  },
+  {
+    "passed": true,
+    "command": [
+      "ros2",
+      "launch",
+      "ridgeback_autonomy",
+      "ridgeback_exploration.launch.py",
+      "backend:=gz",
+      "camera_profile:=1280x720",
+      "target_localization_enabled:=true",
+      "setup_path:=/home/deivid/dev/DyNAMO-Ridgeback/artifacts/package-split/runtime/gz-1280x720-true/clearpath/",
+      "autonomous_motion_enabled:=false",
+      "exploration_rviz:=false",
+      "coverage_overlay_enabled:=false",
+      "headless_rendering:=true",
+      "gz_gui:=false",
+      "headless:=true",
+      "world:=mock_hospital"
+    ],
+    "revision": "abdbc12566c7cb7f4ab86d89b53eabf5fc119040",
+    "duration_s": 12.33,
+    "counts": {
+      "health": 23,
+      "clock": 1773,
+      "depth": 103,
+      "color": 106,
+      "scan": 146,
+      "odom": 172,
+      "detections": 46,
+      "pointcloud": 46,
+      "mask": 46,
+      "map": 10
+    },
+    "nav2_states": {
+      "controller_server": "active",
+      "bt_navigator": "active"
+    },
+    "detected_batches": {
+      "detections": 0,
+      "pointcloud": 0,
+      "mask": 0
+    },
+    "finite_measurements": {
+      "pointcloud": 0,
+      "mask": 0
+    },
+    "frames": {
+      "health": "",
+      "depth": "camera_0_color_optical_frame",
+      "color": "camera_0_color_optical_frame",
+      "scan": "lidar2d_0_laser",
+      "odom": "odom",
+      "detections": "camera_0_color_optical_frame",
+      "pointcloud": "camera_0_color_optical_frame",
+      "mask": "camera_0_color_optical_frame",
+      "map": "map"
+    },
+    "sizes": {
+      "depth": [
+        1280,
+        720
+      ],
+      "color": [
+        1280,
+        720
+      ]
+    },
+    "health": [
+      {
+        "state": "startup",
+        "detail": "Waiting for color, camera_info, scan, depth, pointcloud, detections, mask, pointcloud_measurement"
+      },
+      {
+        "state": "startup",
+        "detail": "Waiting for color, camera_info, scan, depth, pointcloud, detections, mask, pointcloud_measurement"
+      },
+      {
+        "state": "startup",
+        "detail": "Waiting for color, camera_info, scan, depth, pointcloud, detections, mask, pointcloud_measurement"
+      },
+      {
+        "state": "startup",
+        "detail": "Waiting for color, camera_info, scan, depth, pointcloud, detections, mask, pointcloud_measurement"
+      },
+      {
+        "state": "startup",
+        "detail": "Waiting for color, camera_info, scan, depth, pointcloud, detections, mask, pointcloud_measurement"
+      },
+      {
+        "state": "startup",
+        "detail": "Waiting for color, camera_info, scan, depth, pointcloud, detections, mask, pointcloud_measurement"
+      },
+      {
+        "state": "startup",
+        "detail": "Waiting for detections, mask, pointcloud_measurement"
+      },
+      {
+        "state": "processing",
+        "detail": "Current input and output stamps advancing"
+      },
+      {
+        "state": "processing",
+        "detail": "Current input and output stamps advancing"
+      },
+      {
+        "state": "processing",
+        "detail": "Current input and output stamps advancing"
+      },
+      {
+        "state": "processing",
+        "detail": "Current input and output stamps advancing"
+      },
+      {
+        "state": "processing",
+        "detail": "Current input and output stamps advancing"
+      },
+      {
+        "state": "processing",
+        "detail": "Current input and output stamps advancing"
+      },
+      {
+        "state": "processing",
+        "detail": "Current input and output stamps advancing"
+      },
+      {
+        "state": "processing",
+        "detail": "Current input and output stamps advancing"
+      },
+      {
+        "state": "processing",
+        "detail": "Current input and output stamps advancing"
+      },
+      {
+        "state": "processing",
+        "detail": "Current input and output stamps advancing"
+      },
+      {
+        "state": "processing",
+        "detail": "Current input and output stamps advancing"
+      },
+      {
+        "state": "processing",
+        "detail": "Current input and output stamps advancing"
+      },
+      {
+        "state": "processing",
+        "detail": "Current input and output stamps advancing"
+      }
+    ],
+    "launch_exit": null,
+    "case": "gz-1280x720-true"
+  },
+  {
+    "passed": true,
+    "command": [
+      "ros2",
+      "launch",
+      "ridgeback_autonomy",
+      "ridgeback_exploration.launch.py",
+      "backend:=gz",
+      "camera_profile:=1280x720",
+      "target_localization_enabled:=true",
+      "setup_path:=/home/deivid/dev/DyNAMO-Ridgeback/artifacts/package-split/runtime/gz-1280x720-true-final/clearpath/",
+      "autonomous_motion_enabled:=false",
+      "exploration_rviz:=false",
+      "coverage_overlay_enabled:=false",
+      "headless_rendering:=true",
+      "gz_gui:=false",
+      "headless:=true",
+      "world:=mock_hospital"
+    ],
+    "revision": "abdbc12566c7cb7f4ab86d89b53eabf5fc119040",
+    "duration_s": 12.36,
+    "counts": {
+      "health": 23,
+      "clock": 1647,
+      "depth": 103,
+      "color": 103,
+      "scan": 136,
+      "odom": 158,
+      "detections": 46,
+      "mask": 46,
+      "pointcloud": 46,
+      "map": 9
+    },
+    "nav2_states": {
+      "controller_server": "active",
+      "bt_navigator": "active"
+    },
+    "detected_batches": {
+      "detections": 0,
+      "mask": 0,
+      "pointcloud": 0
+    },
+    "finite_measurements": {
+      "mask": 0,
+      "pointcloud": 0
+    },
+    "frames": {
+      "health": "",
+      "depth": "camera_0_color_optical_frame",
+      "color": "camera_0_color_optical_frame",
+      "scan": "lidar2d_0_laser",
+      "odom": "odom",
+      "detections": "camera_0_color_optical_frame",
+      "mask": "camera_0_color_optical_frame",
+      "pointcloud": "camera_0_color_optical_frame",
+      "map": "map"
+    },
+    "sizes": {
+      "depth": [
+        1280,
+        720
+      ],
+      "color": [
+        1280,
+        720
+      ]
+    },
+    "health": [
+      {
+        "state": "startup",
+        "detail": "Waiting for color, camera_info, scan, depth, pointcloud, detections, mask, pointcloud_measurement"
+      },
+      {
+        "state": "startup",
+        "detail": "Waiting for color, camera_info, scan, depth, pointcloud, detections, mask, pointcloud_measurement"
+      },
+      {
+        "state": "startup",
+        "detail": "Waiting for color, camera_info, scan, depth, pointcloud, detections, mask, pointcloud_measurement"
+      },
+      {
+        "state": "startup",
+        "detail": "Waiting for color, camera_info, scan, depth, pointcloud, detections, mask, pointcloud_measurement"
+      },
+      {
+        "state": "startup",
+        "detail": "Waiting for color, camera_info, scan, depth, pointcloud, detections, mask, pointcloud_measurement"
+      },
+      {
+        "state": "startup",
+        "detail": "Waiting for color, camera_info, scan, depth, pointcloud, detections, mask, pointcloud_measurement"
+      },
+      {
+        "state": "startup",
+        "detail": "Waiting for detections, mask, pointcloud_measurement"
+      },
+      {
+        "state": "processing",
+        "detail": "Current input and output stamps advancing"
+      },
+      {
+        "state": "processing",
+        "detail": "Current input and output stamps advancing"
+      },
+      {
+        "state": "processing",
+        "detail": "Current input and output stamps advancing"
+      },
+      {
+        "state": "processing",
+        "detail": "Current input and output stamps advancing"
+      },
+      {
+        "state": "processing",
+        "detail": "Current input and output stamps advancing"
+      },
+      {
+        "state": "processing",
+        "detail": "Current input and output stamps advancing"
+      },
+      {
+        "state": "processing",
+        "detail": "Current input and output stamps advancing"
+      },
+      {
+        "state": "processing",
+        "detail": "Current input and output stamps advancing"
+      },
+      {
+        "state": "processing",
+        "detail": "Current input and output stamps advancing"
+      },
+      {
+        "state": "processing",
+        "detail": "Current input and output stamps advancing"
+      },
+      {
+        "state": "processing",
+        "detail": "Current input and output stamps advancing"
+      },
+      {
+        "state": "processing",
+        "detail": "Current input and output stamps advancing"
+      },
+      {
+        "state": "processing",
+        "detail": "Current input and output stamps advancing"
+      }
+    ],
+    "launch_exit": null,
+    "case": "gz-1280x720-true-final"
+  },
+  {
+    "passed": true,
+    "command": [
+      "ros2",
+      "launch",
+      "ridgeback_autonomy",
+      "ridgeback_exploration.launch.py",
+      "backend:=gz",
+      "camera_profile:=640x480",
+      "target_localization_enabled:=false",
+      "setup_path:=/home/deivid/dev/DyNAMO-Ridgeback/artifacts/package-split/runtime/gz-640x480-false/clearpath/",
+      "autonomous_motion_enabled:=false",
+      "exploration_rviz:=false",
+      "coverage_overlay_enabled:=false",
+      "headless_rendering:=true",
+      "gz_gui:=false",
+      "headless:=true",
+      "world:=mock_hospital"
+    ],
+    "revision": "abdbc12566c7cb7f4ab86d89b53eabf5fc119040",
+    "duration_s": 11.2,
+    "counts": {
+      "clock": 2868,
+      "depth": 174,
+      "color": 174,
+      "scan": 230,
+      "odom": 276,
+      "map": 8
+    },
+    "nav2_states": {
+      "controller_server": "active",
+      "bt_navigator": "active"
+    },
+    "detected_batches": {},
+    "finite_measurements": {},
+    "frames": {
+      "depth": "camera_0_color_optical_frame",
+      "color": "camera_0_color_optical_frame",
+      "scan": "lidar2d_0_laser",
+      "odom": "odom",
+      "map": "map"
+    },
+    "sizes": {
+      "depth": [
+        640,
+        480
+      ],
+      "color": [
+        640,
+        480
+      ]
+    },
+    "health": [],
+    "launch_exit": null,
+    "case": "gz-640x480-false"
+  },
+  {
+    "passed": true,
+    "command": [
+      "ros2",
+      "launch",
+      "ridgeback_autonomy",
+      "ridgeback_exploration.launch.py",
+      "backend:=gz",
+      "camera_profile:=640x480",
+      "target_localization_enabled:=false",
+      "setup_path:=/home/deivid/dev/DyNAMO-Ridgeback/artifacts/package-split/runtime/gz-640x480-false-final/clearpath/",
+      "autonomous_motion_enabled:=false",
+      "exploration_rviz:=false",
+      "coverage_overlay_enabled:=false",
+      "headless_rendering:=true",
+      "gz_gui:=false",
+      "headless:=true",
+      "world:=mock_hospital"
+    ],
+    "revision": "abdbc12566c7cb7f4ab86d89b53eabf5fc119040",
+    "duration_s": 11.22,
+    "counts": {
+      "clock": 2881,
+      "depth": 175,
+      "color": 175,
+      "scan": 231,
+      "odom": 277,
+      "map": 8
+    },
+    "nav2_states": {
+      "controller_server": "active",
+      "bt_navigator": "active"
+    },
+    "detected_batches": {},
+    "finite_measurements": {},
+    "frames": {
+      "depth": "camera_0_color_optical_frame",
+      "color": "camera_0_color_optical_frame",
+      "scan": "lidar2d_0_laser",
+      "odom": "odom",
+      "map": "map"
+    },
+    "sizes": {
+      "depth": [
+        640,
+        480
+      ],
+      "color": [
+        640,
+        480
+      ]
+    },
+    "health": [],
+    "launch_exit": null,
+    "case": "gz-640x480-false-final"
+  },
+  {
+    "passed": true,
+    "command": [
+      "ros2",
+      "launch",
+      "ridgeback_autonomy",
+      "ridgeback_exploration.launch.py",
+      "backend:=gz",
+      "camera_profile:=640x480",
+      "target_localization_enabled:=true",
+      "setup_path:=/home/deivid/dev/DyNAMO-Ridgeback/artifacts/package-split/runtime/gz-640x480-true/clearpath/",
+      "autonomous_motion_enabled:=false",
+      "exploration_rviz:=false",
+      "coverage_overlay_enabled:=false",
+      "headless_rendering:=true",
+      "gz_gui:=false",
+      "headless:=true",
+      "world:=mock_hospital"
+    ],
+    "revision": "abdbc12566c7cb7f4ab86d89b53eabf5fc119040",
+    "duration_s": 11.3,
+    "counts": {
+      "health": 21,
+      "clock": 2584,
+      "depth": 157,
+      "color": 157,
+      "scan": 208,
+      "odom": 248,
+      "detections": 57,
+      "pointcloud": 57,
+      "mask": 57,
+      "map": 8
+    },
+    "nav2_states": {
+      "controller_server": "active",
+      "bt_navigator": "active"
+    },
+    "detected_batches": {
+      "detections": 0,
+      "pointcloud": 0,
+      "mask": 0
+    },
+    "finite_measurements": {
+      "pointcloud": 0,
+      "mask": 0
+    },
+    "frames": {
+      "health": "",
+      "depth": "camera_0_color_optical_frame",
+      "color": "camera_0_color_optical_frame",
+      "scan": "lidar2d_0_laser",
+      "odom": "odom",
+      "detections": "camera_0_color_optical_frame",
+      "pointcloud": "camera_0_color_optical_frame",
+      "mask": "camera_0_color_optical_frame",
+      "map": "map"
+    },
+    "sizes": {
+      "depth": [
+        640,
+        480
+      ],
+      "color": [
+        640,
+        480
+      ]
+    },
+    "health": [
+      {
+        "state": "startup",
+        "detail": "Waiting for color, camera_info, scan, depth, pointcloud, detections, mask, pointcloud_measurement"
+      },
+      {
+        "state": "startup",
+        "detail": "Waiting for color, camera_info, scan, depth, pointcloud, detections, mask, pointcloud_measurement"
+      },
+      {
+        "state": "startup",
+        "detail": "Waiting for color, camera_info, scan, depth, pointcloud, detections, mask, pointcloud_measurement"
+      },
+      {
+        "state": "startup",
+        "detail": "Waiting for color, camera_info, scan, depth, pointcloud, detections, mask, pointcloud_measurement"
+      },
+      {
+        "state": "startup",
+        "detail": "Waiting for color, camera_info, scan, depth, pointcloud, detections, mask, pointcloud_measurement"
+      },
+      {
+        "state": "startup",
+        "detail": "Waiting for color, camera_info, scan, depth, pointcloud, detections, mask, pointcloud_measurement"
+      },
+      {
+        "state": "startup",
+        "detail": "Waiting for color, camera_info, scan, depth, pointcloud, detections, mask, pointcloud_measurement"
+      },
+      {
+        "state": "startup",
+        "detail": "Waiting for color, camera_info, scan, depth, pointcloud, detections, mask, pointcloud_measurement"
+      },
+      {
+        "state": "processing",
+        "detail": "Current input and output stamps advancing"
+      },
+      {
+        "state": "processing",
+        "detail": "Current input and output stamps advancing"
+      },
+      {
+        "state": "processing",
+        "detail": "Current input and output stamps advancing"
+      },
+      {
+        "state": "processing",
+        "detail": "Current input and output stamps advancing"
+      },
+      {
+        "state": "processing",
+        "detail": "Current input and output stamps advancing"
+      },
+      {
+        "state": "processing",
+        "detail": "Current input and output stamps advancing"
+      },
+      {
+        "state": "processing",
+        "detail": "Current input and output stamps advancing"
+      },
+      {
+        "state": "processing",
+        "detail": "Current input and output stamps advancing"
+      },
+      {
+        "state": "processing",
+        "detail": "Current input and output stamps advancing"
+      },
+      {
+        "state": "processing",
+        "detail": "Current input and output stamps advancing"
+      },
+      {
+        "state": "processing",
+        "detail": "Current input and output stamps advancing"
+      },
+      {
+        "state": "processing",
+        "detail": "Current input and output stamps advancing"
+      }
+    ],
+    "launch_exit": null,
+    "case": "gz-640x480-true"
+  },
+  {
+    "passed": true,
+    "command": [
+      "ros2",
+      "launch",
+      "ridgeback_autonomy",
+      "ridgeback_exploration.launch.py",
+      "backend:=gz",
+      "camera_profile:=640x480",
+      "target_localization_enabled:=true",
+      "setup_path:=/home/deivid/dev/DyNAMO-Ridgeback/artifacts/package-split/runtime/gz-640x480-true-final/clearpath/",
+      "autonomous_motion_enabled:=false",
+      "exploration_rviz:=false",
+      "coverage_overlay_enabled:=false",
+      "headless_rendering:=true",
+      "gz_gui:=false",
+      "headless:=true",
+      "world:=mock_hospital"
+    ],
+    "revision": "abdbc12566c7cb7f4ab86d89b53eabf5fc119040",
+    "duration_s": 11.36,
+    "counts": {
+      "health": 21,
+      "clock": 2568,
+      "depth": 157,
+      "color": 156,
+      "scan": 206,
+      "odom": 247,
+      "detections": 57,
+      "mask": 57,
+      "pointcloud": 57,
+      "map": 8
+    },
+    "nav2_states": {
+      "controller_server": "active",
+      "bt_navigator": "active"
+    },
+    "detected_batches": {
+      "detections": 0,
+      "mask": 0,
+      "pointcloud": 0
+    },
+    "finite_measurements": {
+      "mask": 0,
+      "pointcloud": 0
+    },
+    "frames": {
+      "health": "",
+      "depth": "camera_0_color_optical_frame",
+      "color": "camera_0_color_optical_frame",
+      "scan": "lidar2d_0_laser",
+      "odom": "odom",
+      "detections": "camera_0_color_optical_frame",
+      "mask": "camera_0_color_optical_frame",
+      "pointcloud": "camera_0_color_optical_frame",
+      "map": "map"
+    },
+    "sizes": {
+      "depth": [
+        640,
+        480
+      ],
+      "color": [
+        640,
+        480
+      ]
+    },
+    "health": [
+      {
+        "state": "startup",
+        "detail": "Waiting for color, camera_info, scan, depth, pointcloud, detections, mask, pointcloud_measurement"
+      },
+      {
+        "state": "startup",
+        "detail": "Waiting for color, camera_info, scan, depth, pointcloud, detections, mask, pointcloud_measurement"
+      },
+      {
+        "state": "startup",
+        "detail": "Waiting for color, camera_info, scan, depth, pointcloud, detections, mask, pointcloud_measurement"
+      },
+      {
+        "state": "startup",
+        "detail": "Waiting for color, camera_info, scan, depth, pointcloud, detections, mask, pointcloud_measurement"
+      },
+      {
+        "state": "startup",
+        "detail": "Waiting for color, camera_info, scan, depth, pointcloud, detections, mask, pointcloud_measurement"
+      },
+      {
+        "state": "startup",
+        "detail": "Waiting for color, camera_info, scan, depth, pointcloud, detections, mask, pointcloud_measurement"
+      },
+      {
+        "state": "startup",
+        "detail": "Waiting for color, camera_info, scan, depth, pointcloud, detections, mask, pointcloud_measurement"
+      },
+      {
+        "state": "startup",
+        "detail": "Waiting for color, camera_info, scan, depth, pointcloud, detections, mask, pointcloud_measurement"
+      },
+      {
+        "state": "startup",
+        "detail": "Waiting for detections, mask, pointcloud_measurement"
+      },
+      {
+        "state": "processing",
+        "detail": "Current input and output stamps advancing"
+      },
+      {
+        "state": "processing",
+        "detail": "Current input and output stamps advancing"
+      },
+      {
+        "state": "processing",
+        "detail": "Current input and output stamps advancing"
+      },
+      {
+        "state": "processing",
+        "detail": "Current input and output stamps advancing"
+      },
+      {
+        "state": "processing",
+        "detail": "Current input and output stamps advancing"
+      },
+      {
+        "state": "processing",
+        "detail": "Current input and output stamps advancing"
+      },
+      {
+        "state": "processing",
+        "detail": "Current input and output stamps advancing"
+      },
+      {
+        "state": "processing",
+        "detail": "Current input and output stamps advancing"
+      },
+      {
+        "state": "processing",
+        "detail": "Current input and output stamps advancing"
+      },
+      {
+        "state": "processing",
+        "detail": "Current input and output stamps advancing"
+      },
+      {
+        "state": "processing",
+        "detail": "Current input and output stamps advancing"
+      }
+    ],
+    "launch_exit": null,
+    "case": "gz-640x480-true-final"
+  },
+  {
+    "passed": true,
+    "command": [
+      "ros2",
+      "launch",
+      "ridgeback_autonomy",
+      "ridgeback_exploration.launch.py",
+      "backend:=isaac",
+      "camera_profile:=1280x720",
+      "target_localization_enabled:=false",
+      "setup_path:=/home/deivid/dev/DyNAMO-Ridgeback/artifacts/package-split/runtime/isaac-1280x720-false/clearpath/",
+      "autonomous_motion_enabled:=false",
+      "exploration_rviz:=false",
+      "coverage_overlay_enabled:=false",
+      "headless_rendering:=true",
+      "gz_gui:=false",
+      "headless:=true",
+      "world:=mock_hospital"
+    ],
+    "revision": "abdbc12566c7cb7f4ab86d89b53eabf5fc119040",
+    "duration_s": 26.23,
+    "counts": {
+      "clock": 168,
+      "odom": 137,
+      "scan": 108,
+      "depth": 41,
+      "color": 74,
+      "map": 8
+    },
+    "nav2_states": {
+      "controller_server": "active",
+      "bt_navigator": "active"
+    },
+    "detected_batches": {},
+    "finite_measurements": {},
+    "frames": {
+      "odom": "odom",
+      "scan": "lidar2d_0_laser",
+      "depth": "camera_0_color_optical_frame",
+      "color": "camera_0_color_optical_frame",
+      "map": "map"
+    },
+    "sizes": {
+      "depth": [
+        1280,
+        720
+      ],
+      "color": [
+        1280,
+        720
+      ]
+    },
+    "health": [],
+    "launch_exit": null,
+    "case": "isaac-1280x720-false"
+  },
+  {
+    "passed": true,
+    "command": [
+      "ros2",
+      "launch",
+      "ridgeback_autonomy",
+      "ridgeback_exploration.launch.py",
+      "backend:=isaac",
+      "camera_profile:=1280x720",
+      "target_localization_enabled:=false",
+      "setup_path:=/home/deivid/dev/DyNAMO-Ridgeback/artifacts/package-split/runtime/isaac-1280x720-false-final/clearpath/",
+      "autonomous_motion_enabled:=false",
+      "exploration_rviz:=false",
+      "coverage_overlay_enabled:=false",
+      "headless_rendering:=true",
+      "gz_gui:=false",
+      "headless:=true",
+      "world:=mock_hospital"
+    ],
+    "revision": "abdbc12566c7cb7f4ab86d89b53eabf5fc119040",
+    "duration_s": 26.26,
+    "counts": {
+      "clock": 168,
+      "odom": 136,
+      "scan": 109,
+      "color": 81,
+      "depth": 81,
+      "map": 8
+    },
+    "nav2_states": {
+      "controller_server": "active",
+      "bt_navigator": "active"
+    },
+    "detected_batches": {},
+    "finite_measurements": {},
+    "frames": {
+      "odom": "odom",
+      "scan": "lidar2d_0_laser",
+      "color": "camera_0_color_optical_frame",
+      "depth": "camera_0_color_optical_frame",
+      "map": "map"
+    },
+    "sizes": {
+      "color": [
+        1280,
+        720
+      ],
+      "depth": [
+        1280,
+        720
+      ]
+    },
+    "health": [],
+    "launch_exit": null,
+    "case": "isaac-1280x720-false-final"
+  },
+  {
+    "passed": false,
+    "command": [
+      "ros2",
+      "launch",
+      "ridgeback_autonomy",
+      "ridgeback_exploration.launch.py",
+      "backend:=isaac",
+      "camera_profile:=1280x720",
+      "target_localization_enabled:=true",
+      "setup_path:=/home/deivid/dev/DyNAMO-Ridgeback/artifacts/package-split/runtime/isaac-1280x720-true/clearpath/",
+      "autonomous_motion_enabled:=false",
+      "exploration_rviz:=false",
+      "coverage_overlay_enabled:=false",
+      "headless_rendering:=true",
+      "gz_gui:=false",
+      "headless:=true",
+      "world:=mock_hospital"
+    ],
+    "revision": "abdbc12566c7cb7f4ab86d89b53eabf5fc119040",
+    "duration_s": 240.05,
+    "counts": {
+      "health": 479,
+      "clock": 4084,
+      "odom": 3183,
+      "scan": 2719,
+      "depth": 1776,
+      "color": 1952,
+      "detections": 1922,
+      "mask": 1922,
+      "pointcloud": 1922,
+      "map": 435
+    },
+    "nav2_states": {
+      "controller_server": "active",
+      "bt_navigator": "active"
+    },
+    "detected_batches": {
+      "detections": 0,
+      "mask": 0,
+      "pointcloud": 0
+    },
+    "finite_measurements": {
+      "mask": 0,
+      "pointcloud": 0
+    },
+    "frames": {
+      "health": "",
+      "odom": "odom",
+      "scan": "lidar2d_0_laser",
+      "depth": "camera_0_color_optical_frame",
+      "color": "camera_0_color_optical_frame",
+      "detections": "camera_0_color_optical_frame",
+      "mask": "camera_0_color_optical_frame",
+      "pointcloud": "camera_0_color_optical_frame",
+      "map": "map"
+    },
+    "sizes": {
+      "depth": [
+        1280,
+        720
+      ],
+      "color": [
+        1280,
+        720
+      ]
+    },
+    "health": [
+      {
+        "state": "stale_input",
+        "detail": "depth"
+      },
+      {
+        "state": "stale_input",
+        "detail": "depth"
+      },
+      {
+        "state": "stale_input",
+        "detail": "depth"
+      },
+      {
+        "state": "stale_input",
+        "detail": "camera_info"
+      },
+      {
+        "state": "stale_input",
+        "detail": "color"
+      },
+      {
+        "state": "stale_input",
+        "detail": "camera_info"
+      },
+      {
+        "state": "stale_input",
+        "detail": "depth"
+      },
+      {
+        "state": "stale_input",
+        "detail": "scan"
+      },
+      {
+        "state": "stale_input",
+        "detail": "color"
+      },
+      {
+        "state": "stale_input",
+        "detail": "color"
+      },
+      {
+        "state": "stale_input",
+        "detail": "depth"
+      },
+      {
+        "state": "stale_input",
+        "detail": "depth"
+      },
+      {
+        "state": "stale_input",
+        "detail": "depth"
+      },
+      {
+        "state": "stale_input",
+        "detail": "depth"
+      },
+      {
+        "state": "stale_input",
+        "detail": "depth"
+      },
+      {
+        "state": "stale_input",
+        "detail": "depth"
+      },
+      {
+        "state": "stale_input",
+        "detail": "depth"
+      },
+      {
+        "state": "stale_input",
+        "detail": "depth"
+      },
+      {
+        "state": "stale_input",
+        "detail": "color"
+      },
+      {
+        "state": "stale_input",
+        "detail": "depth"
+      }
+    ],
+    "launch_exit": null,
+    "case": "isaac-1280x720-true"
+  },
+  {
+    "passed": true,
+    "command": [
+      "ros2",
+      "launch",
+      "ridgeback_autonomy",
+      "ridgeback_exploration.launch.py",
+      "backend:=isaac",
+      "camera_profile:=1280x720",
+      "target_localization_enabled:=true",
+      "setup_path:=/home/deivid/dev/DyNAMO-Ridgeback/artifacts/package-split/runtime/isaac-1280x720-true-buffered/clearpath/",
+      "autonomous_motion_enabled:=false",
+      "exploration_rviz:=false",
+      "coverage_overlay_enabled:=false",
+      "headless_rendering:=true",
+      "gz_gui:=false",
+      "headless:=true",
+      "world:=mock_hospital"
+    ],
+    "revision": "abdbc12566c7cb7f4ab86d89b53eabf5fc119040",
+    "duration_s": 29.97,
+    "counts": {
+      "health": 59,
+      "clock": 162,
+      "odom": 127,
+      "scan": 105,
+      "depth": 78,
+      "color": 78,
+      "detections": 73,
+      "pointcloud": 73,
+      "mask": 73,
+      "map": 15
+    },
+    "nav2_states": {
+      "controller_server": "active",
+      "bt_navigator": "active"
+    },
+    "detected_batches": {
+      "detections": 0,
+      "pointcloud": 0,
+      "mask": 0
+    },
+    "finite_measurements": {
+      "pointcloud": 0,
+      "mask": 0
+    },
+    "frames": {
+      "health": "",
+      "odom": "odom",
+      "scan": "lidar2d_0_laser",
+      "depth": "camera_0_color_optical_frame",
+      "color": "camera_0_color_optical_frame",
+      "detections": "camera_0_color_optical_frame",
+      "pointcloud": "camera_0_color_optical_frame",
+      "mask": "camera_0_color_optical_frame",
+      "map": "map"
+    },
+    "sizes": {
+      "depth": [
+        1280,
+        720
+      ],
+      "color": [
+        1280,
+        720
+      ]
+    },
+    "health": [
+      {
+        "state": "startup",
+        "detail": "Waiting for color, camera_info, scan, depth, pointcloud, detections, mask, pointcloud_measurement"
+      },
+      {
+        "state": "startup",
+        "detail": "Waiting for color, camera_info, scan, depth, pointcloud, detections, mask, pointcloud_measurement"
+      },
+      {
+        "state": "startup",
+        "detail": "Waiting for detections, mask, pointcloud_measurement"
+      },
+      {
+        "state": "processing",
+        "detail": "Current input and output stamps advancing"
+      },
+      {
+        "state": "processing",
+        "detail": "Current input and output stamps advancing"
+      },
+      {
+        "state": "processing",
+        "detail": "Current input and output stamps advancing"
+      },
+      {
+        "state": "processing",
+        "detail": "Current input and output stamps advancing"
+      },
+      {
+        "state": "processing",
+        "detail": "Current input and output stamps advancing"
+      },
+      {
+        "state": "stale_input",
+        "detail": "color"
+      },
+      {
+        "state": "processing",
+        "detail": "Current input and output stamps advancing"
+      },
+      {
+        "state": "stale_input",
+        "detail": "camera_info"
+      },
+      {
+        "state": "stale_input",
+        "detail": "color"
+      },
+      {
+        "state": "stale_input",
+        "detail": "camera_info"
+      },
+      {
+        "state": "processing",
+        "detail": "Current input and output stamps advancing"
+      },
+      {
+        "state": "stale_input",
+        "detail": "color"
+      },
+      {
+        "state": "stale_input",
+        "detail": "scan"
+      },
+      {
+        "state": "stale_input",
+        "detail": "color"
+      },
+      {
+        "state": "processing",
+        "detail": "Current input and output stamps advancing"
+      },
+      {
+        "state": "processing",
+        "detail": "Current input and output stamps advancing"
+      },
+      {
+        "state": "processing",
+        "detail": "Current input and output stamps advancing"
+      }
+    ],
+    "launch_exit": null,
+    "case": "isaac-1280x720-true-buffered"
+  },
+  {
+    "passed": true,
+    "command": [
+      "ros2",
+      "launch",
+      "ridgeback_autonomy",
+      "ridgeback_exploration.launch.py",
+      "backend:=isaac",
+      "camera_profile:=1280x720",
+      "target_localization_enabled:=true",
+      "setup_path:=/home/deivid/dev/DyNAMO-Ridgeback/artifacts/package-split/runtime/isaac-1280x720-true-final/clearpath/",
+      "autonomous_motion_enabled:=false",
+      "exploration_rviz:=false",
+      "coverage_overlay_enabled:=false",
+      "headless_rendering:=true",
+      "gz_gui:=false",
+      "headless:=true",
+      "world:=mock_hospital"
+    ],
+    "revision": "abdbc12566c7cb7f4ab86d89b53eabf5fc119040",
+    "duration_s": 33.97,
+    "counts": {
+      "health": 67,
+      "clock": 245,
+      "odom": 188,
+      "scan": 160,
+      "depth": 120,
+      "color": 120,
+      "detections": 116,
+      "mask": 116,
+      "pointcloud": 116,
+      "map": 23
+    },
+    "nav2_states": {
+      "controller_server": "active",
+      "bt_navigator": "active"
+    },
+    "detected_batches": {
+      "detections": 0,
+      "mask": 0,
+      "pointcloud": 0
+    },
+    "finite_measurements": {
+      "mask": 0,
+      "pointcloud": 0
+    },
+    "frames": {
+      "health": "",
+      "odom": "odom",
+      "scan": "lidar2d_0_laser",
+      "depth": "camera_0_color_optical_frame",
+      "color": "camera_0_color_optical_frame",
+      "detections": "camera_0_color_optical_frame",
+      "mask": "camera_0_color_optical_frame",
+      "pointcloud": "camera_0_color_optical_frame",
+      "map": "map"
+    },
+    "sizes": {
+      "depth": [
+        1280,
+        720
+      ],
+      "color": [
+        1280,
+        720
+      ]
+    },
+    "health": [
+      {
+        "state": "processing",
+        "detail": "Current input and output stamps advancing"
+      },
+      {
+        "state": "processing",
+        "detail": "Current input and output stamps advancing"
+      },
+      {
+        "state": "processing",
+        "detail": "Current input and output stamps advancing"
+      },
+      {
+        "state": "processing",
+        "detail": "Current input and output stamps advancing"
+      },
+      {
+        "state": "stale_input",
+        "detail": "color"
+      },
+      {
+        "state": "stale_input",
+        "detail": "camera_info"
+      },
+      {
+        "state": "stale_input",
+        "detail": "color"
+      },
+      {
+        "state": "stale_input",
+        "detail": "color"
+      },
+      {
+        "state": "processing",
+        "detail": "Current input and output stamps advancing"
+      },
+      {
+        "state": "stale_input",
+        "detail": "color"
+      },
+      {
+        "state": "stale_input",
+        "detail": "color"
+      },
+      {
+        "state": "stale_input",
+        "detail": "color"
+      },
+      {
+        "state": "stale_input",
+        "detail": "camera_info"
+      },
+      {
+        "state": "processing",
+        "detail": "Current input and output stamps advancing"
+      },
+      {
+        "state": "stale_input",
+        "detail": "camera_info"
+      },
+      {
+        "state": "stale_input",
+        "detail": "camera_info"
+      },
+      {
+        "state": "stale_input",
+        "detail": "camera_info"
+      },
+      {
+        "state": "processing",
+        "detail": "Current input and output stamps advancing"
+      },
+      {
+        "state": "processing",
+        "detail": "Current input and output stamps advancing"
+      },
+      {
+        "state": "processing",
+        "detail": "Current input and output stamps advancing"
+      }
+    ],
+    "launch_exit": null,
+    "case": "isaac-1280x720-true-final"
+  },
+  {
+    "passed": true,
+    "command": [
+      "ros2",
+      "launch",
+      "ridgeback_autonomy",
+      "ridgeback_exploration.launch.py",
+      "backend:=isaac",
+      "camera_profile:=640x480",
+      "target_localization_enabled:=false",
+      "setup_path:=/home/deivid/dev/DyNAMO-Ridgeback/artifacts/package-split/runtime/isaac-640x480-false/clearpath/",
+      "autonomous_motion_enabled:=false",
+      "exploration_rviz:=false",
+      "coverage_overlay_enabled:=false",
+      "headless_rendering:=true",
+      "gz_gui:=false",
+      "headless:=true",
+      "world:=mock_hospital"
+    ],
+    "revision": "abdbc12566c7cb7f4ab86d89b53eabf5fc119040",
+    "duration_s": 26.23,
+    "counts": {
+      "clock": 170,
+      "odom": 139,
+      "scan": 111,
+      "depth": 83,
+      "color": 82,
+      "map": 8
+    },
+    "nav2_states": {
+      "controller_server": "active",
+      "bt_navigator": "active"
+    },
+    "detected_batches": {},
+    "finite_measurements": {},
+    "frames": {
+      "odom": "odom",
+      "scan": "lidar2d_0_laser",
+      "depth": "camera_0_color_optical_frame",
+      "color": "camera_0_color_optical_frame",
+      "map": "map"
+    },
+    "sizes": {
+      "depth": [
+        640,
+        480
+      ],
+      "color": [
+        640,
+        480
+      ]
+    },
+    "health": [],
+    "launch_exit": null,
+    "case": "isaac-640x480-false"
+  },
+  {
+    "passed": true,
+    "command": [
+      "ros2",
+      "launch",
+      "ridgeback_autonomy",
+      "ridgeback_exploration.launch.py",
+      "backend:=isaac",
+      "camera_profile:=640x480",
+      "target_localization_enabled:=false",
+      "setup_path:=/home/deivid/dev/DyNAMO-Ridgeback/artifacts/package-split/runtime/isaac-640x480-false-final/clearpath/",
+      "autonomous_motion_enabled:=false",
+      "exploration_rviz:=false",
+      "coverage_overlay_enabled:=false",
+      "headless_rendering:=true",
+      "gz_gui:=false",
+      "headless:=true",
+      "world:=mock_hospital"
+    ],
+    "revision": "abdbc12566c7cb7f4ab86d89b53eabf5fc119040",
+    "duration_s": 27.26,
+    "counts": {
+      "clock": 186,
+      "odom": 151,
+      "scan": 121,
+      "color": 91,
+      "depth": 91,
+      "map": 9
+    },
+    "nav2_states": {
+      "controller_server": "active",
+      "bt_navigator": "active"
+    },
+    "detected_batches": {},
+    "finite_measurements": {},
+    "frames": {
+      "odom": "odom",
+      "scan": "lidar2d_0_laser",
+      "color": "camera_0_color_optical_frame",
+      "depth": "camera_0_color_optical_frame",
+      "map": "map"
+    },
+    "sizes": {
+      "color": [
+        640,
+        480
+      ],
+      "depth": [
+        640,
+        480
+      ]
+    },
+    "health": [],
+    "launch_exit": null,
+    "case": "isaac-640x480-false-final"
+  },
+  {
+    "passed": true,
+    "command": [
+      "ros2",
+      "launch",
+      "ridgeback_autonomy",
+      "ridgeback_exploration.launch.py",
+      "backend:=isaac",
+      "camera_profile:=640x480",
+      "target_localization_enabled:=true",
+      "setup_path:=/home/deivid/dev/DyNAMO-Ridgeback/artifacts/package-split/runtime/isaac-640x480-true/clearpath/",
+      "autonomous_motion_enabled:=false",
+      "exploration_rviz:=false",
+      "coverage_overlay_enabled:=false",
+      "headless_rendering:=true",
+      "gz_gui:=false",
+      "headless:=true",
+      "world:=mock_hospital"
+    ],
+    "revision": "abdbc12566c7cb7f4ab86d89b53eabf5fc119040",
+    "duration_s": 26.48,
+    "counts": {
+      "health": 52,
+      "clock": 135,
+      "odom": 110,
+      "scan": 87,
+      "color": 64,
+      "depth": 64,
+      "detections": 53,
+      "pointcloud": 53,
+      "mask": 53,
+      "map": 9
+    },
+    "nav2_states": {
+      "controller_server": "active",
+      "bt_navigator": "active"
+    },
+    "detected_batches": {
+      "detections": 0,
+      "pointcloud": 0,
+      "mask": 0
+    },
+    "finite_measurements": {
+      "pointcloud": 0,
+      "mask": 0
+    },
+    "frames": {
+      "health": "",
+      "odom": "odom",
+      "scan": "lidar2d_0_laser",
+      "color": "camera_0_color_optical_frame",
+      "depth": "camera_0_color_optical_frame",
+      "detections": "camera_0_color_optical_frame",
+      "pointcloud": "camera_0_color_optical_frame",
+      "mask": "camera_0_color_optical_frame",
+      "map": "map"
+    },
+    "sizes": {
+      "color": [
+        640,
+        480
+      ],
+      "depth": [
+        640,
+        480
+      ]
+    },
+    "health": [
+      {
+        "state": "startup",
+        "detail": "Waiting for color, camera_info, scan, depth, pointcloud, detections, mask, pointcloud_measurement"
+      },
+      {
+        "state": "startup",
+        "detail": "Waiting for color, camera_info, scan, depth, pointcloud, detections, mask, pointcloud_measurement"
+      },
+      {
+        "state": "startup",
+        "detail": "Waiting for color, camera_info, scan, depth, pointcloud, detections, mask, pointcloud_measurement"
+      },
+      {
+        "state": "startup",
+        "detail": "Waiting for color, camera_info, scan, depth, pointcloud, detections, mask, pointcloud_measurement"
+      },
+      {
+        "state": "startup",
+        "detail": "Waiting for color, camera_info, scan, depth, pointcloud, detections, mask, pointcloud_measurement"
+      },
+      {
+        "state": "startup",
+        "detail": "Waiting for color, camera_info, scan, depth, pointcloud, detections, mask, pointcloud_measurement"
+      },
+      {
+        "state": "startup",
+        "detail": "Waiting for color, camera_info, scan, depth, pointcloud, detections, mask, pointcloud_measurement"
+      },
+      {
+        "state": "startup",
+        "detail": "Waiting for color, camera_info, scan, depth, pointcloud, detections, mask, pointcloud_measurement"
+      },
+      {
+        "state": "startup",
+        "detail": "Waiting for detections, mask, pointcloud_measurement"
+      },
+      {
+        "state": "processing",
+        "detail": "Current input and output stamps advancing"
+      },
+      {
+        "state": "processing",
+        "detail": "Current input and output stamps advancing"
+      },
+      {
+        "state": "processing",
+        "detail": "Current input and output stamps advancing"
+      },
+      {
+        "state": "stale_input",
+        "detail": "color"
+      },
+      {
+        "state": "stale_input",
+        "detail": "camera_info"
+      },
+      {
+        "state": "processing",
+        "detail": "Current input and output stamps advancing"
+      },
+      {
+        "state": "stale_input",
+        "detail": "color"
+      },
+      {
+        "state": "stale_input",
+        "detail": "color"
+      },
+      {
+        "state": "processing",
+        "detail": "Current input and output stamps advancing"
+      },
+      {
+        "state": "processing",
+        "detail": "Current input and output stamps advancing"
+      },
+      {
+        "state": "processing",
+        "detail": "Current input and output stamps advancing"
+      }
+    ],
+    "launch_exit": null,
+    "case": "isaac-640x480-true"
+  },
+  {
+    "passed": true,
+    "command": [
+      "ros2",
+      "launch",
+      "ridgeback_autonomy",
+      "ridgeback_exploration.launch.py",
+      "backend:=isaac",
+      "camera_profile:=640x480",
+      "target_localization_enabled:=true",
+      "setup_path:=/home/deivid/dev/DyNAMO-Ridgeback/artifacts/package-split/runtime/isaac-640x480-true-final/clearpath/",
+      "autonomous_motion_enabled:=false",
+      "exploration_rviz:=false",
+      "coverage_overlay_enabled:=false",
+      "headless_rendering:=true",
+      "gz_gui:=false",
+      "headless:=true",
+      "world:=mock_hospital"
+    ],
+    "revision": "abdbc12566c7cb7f4ab86d89b53eabf5fc119040",
+    "duration_s": 26.28,
+    "counts": {
+      "health": 51,
+      "clock": 131,
+      "odom": 102,
+      "scan": 85,
+      "color": 63,
+      "depth": 63,
+      "detections": 51,
+      "mask": 50,
+      "pointcloud": 50,
+      "map": 8
+    },
+    "nav2_states": {
+      "controller_server": "active",
+      "bt_navigator": "active"
+    },
+    "detected_batches": {
+      "detections": 0,
+      "mask": 0,
+      "pointcloud": 0
+    },
+    "finite_measurements": {
+      "mask": 0,
+      "pointcloud": 0
+    },
+    "frames": {
+      "health": "",
+      "odom": "odom",
+      "scan": "lidar2d_0_laser",
+      "color": "camera_0_color_optical_frame",
+      "depth": "camera_0_color_optical_frame",
+      "detections": "camera_0_color_optical_frame",
+      "mask": "camera_0_color_optical_frame",
+      "pointcloud": "camera_0_color_optical_frame",
+      "map": "map"
+    },
+    "sizes": {
+      "color": [
+        640,
+        480
+      ],
+      "depth": [
+        640,
+        480
+      ]
+    },
+    "health": [
+      {
+        "state": "startup",
+        "detail": "Waiting for color, camera_info, scan, depth, pointcloud, detections, mask, pointcloud_measurement"
+      },
+      {
+        "state": "startup",
+        "detail": "Waiting for color, camera_info, scan, depth, pointcloud, detections, mask, pointcloud_measurement"
+      },
+      {
+        "state": "startup",
+        "detail": "Waiting for color, camera_info, scan, depth, pointcloud, detections, mask, pointcloud_measurement"
+      },
+      {
+        "state": "startup",
+        "detail": "Waiting for color, camera_info, scan, depth, pointcloud, detections, mask, pointcloud_measurement"
+      },
+      {
+        "state": "startup",
+        "detail": "Waiting for color, camera_info, scan, depth, pointcloud, detections, mask, pointcloud_measurement"
+      },
+      {
+        "state": "startup",
+        "detail": "Waiting for color, camera_info, scan, depth, pointcloud, detections, mask, pointcloud_measurement"
+      },
+      {
+        "state": "startup",
+        "detail": "Waiting for color, camera_info, scan, depth, pointcloud, detections, mask, pointcloud_measurement"
+      },
+      {
+        "state": "startup",
+        "detail": "Waiting for color, camera_info, scan, depth, pointcloud, detections, mask, pointcloud_measurement"
+      },
+      {
+        "state": "startup",
+        "detail": "Waiting for color, camera_info, scan, depth, pointcloud, detections, mask, pointcloud_measurement"
+      },
+      {
+        "state": "startup",
+        "detail": "Waiting for depth, pointcloud, detections, mask, pointcloud_measurement"
+      },
+      {
+        "state": "processing",
+        "detail": "Current input and output stamps advancing"
+      },
+      {
+        "state": "stale_input",
+        "detail": "color"
+      },
+      {
+        "state": "processing",
+        "detail": "Current input and output stamps advancing"
+      },
+      {
+        "state": "processing",
+        "detail": "Current input and output stamps advancing"
+      },
+      {
+        "state": "processing",
+        "detail": "Current input and output stamps advancing"
+      },
+      {
+        "state": "processing",
+        "detail": "Current input and output stamps advancing"
+      },
+      {
+        "state": "processing",
+        "detail": "Current input and output stamps advancing"
+      },
+      {
+        "state": "processing",
+        "detail": "Current input and output stamps advancing"
+      },
+      {
+        "state": "processing",
+        "detail": "Current input and output stamps advancing"
+      },
+      {
+        "state": "processing",
+        "detail": "Current input and output stamps advancing"
+      }
+    ],
+    "launch_exit": null,
+    "case": "isaac-640x480-true-final"
+  }
+]

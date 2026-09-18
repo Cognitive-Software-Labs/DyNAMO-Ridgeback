@@ -3,16 +3,16 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from ridgeback_autonomy.common.miss_reason import MissReason
-from ridgeback_autonomy.perception.target_localization.core import euclidean_reconstruction
-from ridgeback_autonomy.perception.target_localization.core.intrinsics import CameraIntrinsics
-from ridgeback_autonomy.perception.target_localization.core.isolation_3d import (
+from ridgeback_common.miss_reason import MissReason
+from ridgeback_localization.core import euclidean_reconstruction
+from ridgeback_localization.core.intrinsics import CameraIntrinsics
+from ridgeback_localization.core.isolation_3d import (
     ISOLATION_3D_DEFAULT,
     RangeBand,
     build_isolation_3d,
 )
-from ridgeback_autonomy.perception.target_localization.core.mask import MaskPrecision, mask_from_array, rasterize_bbox
-from ridgeback_autonomy.perception.target_localization.core.euclidean_reconstruction import localize_euclidean_reconstruction
+from ridgeback_localization.core.mask import MaskPrecision, mask_from_array, rasterize_bbox
+from ridgeback_localization.core.euclidean_reconstruction import localize_euclidean_reconstruction
 
 
 HEIGHT, WIDTH = 60, 80

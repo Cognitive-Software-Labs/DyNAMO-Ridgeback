@@ -13,9 +13,9 @@ import pytest
 from sensor_msgs.msg import CameraInfo, LaserScan
 from std_msgs.msg import Header
 
-from ridgeback_autonomy.common.markers import PolarBeamRecord
-from ridgeback_autonomy.common.messages import build_polar_beams_message
-from ridgeback_autonomy.msg import TargetMeasurements
+from ridgeback_common.markers import PolarBeamRecord
+from ridgeback_common.messages import build_polar_beams_message
+from ridgeback_interfaces.msg import TargetMeasurements
 
 
 CAMERA_FRAME = 'camera_0_color_optical_frame'
@@ -41,7 +41,7 @@ def ros_context():
 
 
 def overlay_node():
-    from ridgeback_autonomy.perception.target_localization.overlay_node import (
+    from ridgeback_localization.overlay_node import (
         TargetOverlayNode,
     )
 
@@ -53,7 +53,7 @@ def overlay_node():
 def stub_transform(monkeypatch) -> None:
     """Pin the scan -> optical extrinsic; TF is not what these tests measure."""
 
-    from ridgeback_autonomy.perception.target_localization import overlay_node as module
+    from ridgeback_localization import overlay_node as module
 
     monkeypatch.setattr(
         module, 'lookup_transform_components',

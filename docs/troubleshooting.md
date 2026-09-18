@@ -161,6 +161,18 @@ override can silently restore the too-small ceiling:
 echo "${CYCLONEDDS_URI:-<unset>}"
 ```
 
+## Large sensor samples stop reaching localization health
+
+If high-resolution color/detections advance but localization health reports
+`stale_input` for depth or point clouds, inspect `CYCLONEDDS_URI` and
+`sysctl net.core.rmem_max`. The workspace CycloneDDS configuration requests a
+16 MiB socket receive buffer for large sensor bursts. The OS may cap the
+request; it must permit at least 16777216 bytes to provide that capacity.
+An explicit DDS configuration override must carry the receive-buffer setting
+as well as the participant ceiling. Restart affected processes after changing
+DDS configuration. Confirm advancing depth/point-cloud source stamps and
+`processing` health; extending health timeouts does not repair missing samples.
+
 ## Camera rate collapses under software rendering
 
 If the simulated camera falls from about 28 Hz to 4–6 Hz, inspect the renderer:

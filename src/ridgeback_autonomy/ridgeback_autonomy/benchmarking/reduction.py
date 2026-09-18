@@ -9,7 +9,7 @@ from ridgeback_autonomy.benchmarking.event_values import (
     event_has_panel_preview,
     has_all_selected_estimates,
 )
-from ridgeback_autonomy.common.miss_reason import MissReason, reason_name
+from ridgeback_common.miss_reason import MissReason, reason_name
 
 if TYPE_CHECKING:
     from ridgeback_autonomy.benchmarking.alignment import MeasurementEvent

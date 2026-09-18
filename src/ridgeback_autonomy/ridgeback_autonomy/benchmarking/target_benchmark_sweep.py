@@ -16,7 +16,7 @@ from typing import Any
 
 from ament_index_python.packages import get_package_share_directory
 
-from ridgeback_autonomy.perception.target_localization.launch import (
+from ridgeback_autonomy.localization_launch import (
     SHARED_BENCHMARK_ARGUMENT_DEFAULTS,
     workspace_root_from_package_share,
 )
@@ -169,7 +169,7 @@ def _environment_command(spec: SweepSpec) -> list[str]:
     arguments = _shared_arguments(spec)
     # Sorted so the recorded command is byte-identical between runs of the
     # same sweep; a frozenset's iteration order is not stable across processes.
-    for name in sorted(ENVIRONMENT_ONLY_DEFAULT_NAMES):
+    for name in sorted(ENVIRONMENT_ONLY_DEFAULT_NAMES | {'target_labels'}):
         if name in spec.defaults:
             arguments[name] = spec.defaults[name]
     return [
@@ -221,7 +221,7 @@ def _resume_signature(spec: SweepSpec, configs: tuple[SweepConfig, ...]) -> dict
 
     ignored = {'output_dir', 'run_dir_name', 'shutdown_on_complete'}
     environment = _shared_arguments(spec)
-    for name in sorted(ENVIRONMENT_ONLY_DEFAULT_NAMES):
+    for name in sorted(ENVIRONMENT_ONLY_DEFAULT_NAMES | {'target_labels'}):
         if name in spec.defaults:
             environment[name] = spec.defaults[name]
     return {

@@ -2,7 +2,7 @@ import math
 
 import pytest
 
-from ridgeback_autonomy.common.camera_profiles import (
+from ridgeback_common.camera_profiles import (
     CAMERA_PROFILE_CHOICES,
     DEFAULT_CAMERA_PROFILE,
     DEFAULT_DEPTH_FIDELITY,

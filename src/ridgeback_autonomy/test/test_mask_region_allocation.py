@@ -17,26 +17,26 @@ import tracemalloc
 import numpy as np
 import pytest
 
-from ridgeback_autonomy.common.models import Detection, DetectionBatch
-from ridgeback_autonomy.perception.target_localization.core.depth_common import (
+from ridgeback_common.models import Detection, DetectionBatch
+from ridgeback_localization.core.depth_common import (
     prepare_depth_region,
     valid_depth,
 )
-from ridgeback_autonomy.perception.target_localization.core.intrinsics import (
+from ridgeback_localization.core.intrinsics import (
     CameraIntrinsics,
     deproject_masked,
 )
-from ridgeback_autonomy.perception.target_localization.core.isolation_3d import (
+from ridgeback_localization.core.isolation_3d import (
     ISOLATION_3D_DEFAULT,
     build_isolation_3d,
 )
-from ridgeback_autonomy.perception.target_localization.core.mask import (
+from ridgeback_localization.core.mask import (
     MaskPrecision,
     MaskRegion,
     region_from_bbox,
     region_from_blob,
 )
-from ridgeback_autonomy.perception.target_localization.measurement_pipeline import (
+from ridgeback_localization.measurement_pipeline import (
     encode_mask_debug_image,
     fill_path_measurements,
 )

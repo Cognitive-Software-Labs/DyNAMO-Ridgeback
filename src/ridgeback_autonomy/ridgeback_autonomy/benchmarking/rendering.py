@@ -6,11 +6,11 @@ import cv2
 import numpy as np
 
 from ridgeback_autonomy.benchmarking.alignment import MeasurementEvent
-from ridgeback_autonomy.perception.target_localization.estimator_registry import (
+from ridgeback_localization.estimator_registry import (
     ESTIMATOR_FIELD_KEYS,
     ESTIMATOR_LABELS,
 )
-from ridgeback_autonomy.perception.target_localization.core.rendering import RgbdOverlayRenderer
+from ridgeback_localization.core.rendering import RgbdOverlayRenderer
 
 
 # Every panel is the colour frame with that estimator's boxes and numbers drawn

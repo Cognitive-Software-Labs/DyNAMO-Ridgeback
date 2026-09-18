@@ -459,7 +459,7 @@ import sys
 
 blocked = {
     'cv_bridge', 'geometry_msgs', 'launch', 'launch_ros', 'rclpy',
-    'ridgeback_autonomy.msg', 'sensor_msgs', 'std_msgs', 'tf2_ros',
+    'ridgeback_interfaces.msg', 'sensor_msgs', 'std_msgs', 'tf2_ros',
     'visualization_msgs',
 }
 

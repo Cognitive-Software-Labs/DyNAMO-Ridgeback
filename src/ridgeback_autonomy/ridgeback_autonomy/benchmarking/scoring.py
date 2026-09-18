@@ -36,7 +36,7 @@ from ridgeback_autonomy.benchmarking.association import (
     InstanceEstimate,
     assign_to_ground_truth,
 )
-from ridgeback_autonomy.perception.target_localization.estimator_registry import (
+from ridgeback_localization.estimator_registry import (
     ESTIMATOR_FIELD_KEYS,
     ESTIMATOR_POSITION_ATTRS,
 )

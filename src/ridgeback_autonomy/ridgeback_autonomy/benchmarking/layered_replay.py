@@ -45,23 +45,23 @@ from ridgeback_autonomy.benchmarking.summary import (
 )
 from ridgeback_autonomy.benchmarking.sweep_report import write_sweep_report
 from ridgeback_autonomy.benchmarking.trial_results import build_trial_result
-from ridgeback_autonomy.common.miss_reason import MissReason
-from ridgeback_autonomy.common.models import Detection, DetectionBatch
-from ridgeback_autonomy.perception.target_localization.core.depth_common import (
+from ridgeback_common.miss_reason import MissReason
+from ridgeback_common.models import Detection, DetectionBatch
+from ridgeback_localization.core.depth_common import (
     resolve_depth_gate,
 )
-from ridgeback_autonomy.perception.target_localization.core.intrinsics import CameraIntrinsics
-from ridgeback_autonomy.perception.target_localization.core.isolation_2d import build_isolation_2d
-from ridgeback_autonomy.perception.target_localization.core.isolation_3d import (
+from ridgeback_localization.core.intrinsics import CameraIntrinsics
+from ridgeback_localization.core.isolation_2d import build_isolation_2d
+from ridgeback_localization.core.isolation_3d import (
     BASE_ABOVE_FLOOR_M_DEFAULT,
     build_isolation_3d,
     camera_floor_geometry,
 )
-from ridgeback_autonomy.perception.target_localization.estimator_registry import (
+from ridgeback_localization.estimator_registry import (
     ESTIMATOR_FIELD_KEYS,
     ESTIMATOR_LABELS,
 )
-from ridgeback_autonomy.perception.target_localization.measurement_pipeline import (
+from ridgeback_localization.measurement_pipeline import (
     fill_path_measurements,
     set_mask_estimator_status,
 )

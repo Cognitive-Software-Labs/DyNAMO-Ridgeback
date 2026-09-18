@@ -8,40 +8,40 @@ from sensor_msgs.msg import Image, LaserScan
 from std_msgs.msg import Header
 
 from ridgeback_autonomy.benchmarking.alignment import measurement_message_key
-from ridgeback_autonomy.common.markers import PolarBeamRecord
-from ridgeback_autonomy.common.messages import (
+from ridgeback_common.markers import PolarBeamRecord
+from ridgeback_common.messages import (
     batch_from_detections_message,
     batch_from_measurements_message,
     build_detections_message,
     build_measurements_message,
 )
-from ridgeback_autonomy.common.models import Detection, DetectionBatch
-from ridgeback_autonomy.common.miss_reason import MissReason
-from ridgeback_autonomy.perception.target_localization.core.intrinsics import CameraIntrinsics
-from ridgeback_autonomy.perception.target_localization.core import (
+from ridgeback_common.models import Detection, DetectionBatch
+from ridgeback_common.miss_reason import MissReason
+from ridgeback_localization.core.intrinsics import CameraIntrinsics
+from ridgeback_localization.core import (
     isolation_2d as isolation_2d_module,
 )
-from ridgeback_autonomy.perception.target_localization.core.isolation_3d import (
+from ridgeback_localization.core.isolation_3d import (
     ISOLATION_3D_DEFAULT,
     build_isolation_3d,
 )
-from ridgeback_autonomy.perception.target_localization.core.mask import (
+from ridgeback_localization.core.mask import (
     MaskPrecision,
     region_from_blob,
 )
-from ridgeback_autonomy.perception.target_localization import (
+from ridgeback_localization import (
     mask_measurement_node,
     measurement_pipeline,
 )
-from ridgeback_autonomy.perception.target_localization.mask_measurement_node import (
+from ridgeback_localization.mask_measurement_node import (
     BASE_FRAME_DEFAULT,
     TargetMaskMeasurementNode,
 )
-from ridgeback_autonomy.perception.target_localization.estimator_registry import (
+from ridgeback_localization.estimator_registry import (
     MASK_GATE_BOX,
     MASK_GATE_SILHOUETTE,
 )
-from ridgeback_autonomy.perception.target_localization.measurement_pipeline import (
+from ridgeback_localization.measurement_pipeline import (
     MAX_BOX_FRAME_FRACTION,
     box_within_frame_fraction,
     encode_mask_debug_image,
@@ -52,12 +52,12 @@ from ridgeback_autonomy.perception.target_localization.measurement_pipeline impo
     resolve_enabled_estimators,
     resolve_mask_gate,
 )
-from ridgeback_autonomy.perception.target_localization.core.timing import (
+from ridgeback_localization.core.timing import (
     TIMING_COLD_SAMPLE_COUNT,
     TIMING_SAMPLE_LIMIT,
     TimingStats,
 )
-from ridgeback_autonomy.perception.target_localization.synchronization import (
+from ridgeback_localization.synchronization import (
     DEPTH_MATCH_RECORD_LIMIT,
     DepthMatchDiagnostics,
     StampedMessageBuffer,
@@ -102,7 +102,7 @@ def test_base_adapter_applies_camera_mounting_translation() -> None:
 
 
 def test_node_uses_the_shared_vehicle_front_offset() -> None:
-    from ridgeback_autonomy.perception.target_localization.core import vehicle_frame
+    from ridgeback_localization.core import vehicle_frame
 
     assert mask_measurement_node.ROBOT_FRONT_OFFSET_M is vehicle_frame.ROBOT_FRONT_OFFSET_M
     assert vehicle_frame.ROBOT_FRONT_OFFSET_M == 0.25
@@ -768,9 +768,9 @@ def test_encode_mask_debug_image_unions_masks_and_skips_none() -> None:
 
 
 def _status_fixture():
-    from ridgeback_autonomy.common.models import Detection, DetectionBatch
-    from ridgeback_autonomy.perception.target_localization.core.intrinsics import CameraIntrinsics
-    from ridgeback_autonomy.perception.target_localization.core.mask import region_from_bbox
+    from ridgeback_common.models import Detection, DetectionBatch
+    from ridgeback_localization.core.intrinsics import CameraIntrinsics
+    from ridgeback_localization.core.mask import region_from_bbox
 
     intrinsics = CameraIntrinsics(fx=100.0, fy=100.0, cx=40.0, cy=30.0, width=80, height=60)
     depth = np.full((60, 80), 4.0, dtype=np.float32)
@@ -783,8 +783,8 @@ def _status_fixture():
 
 
 def test_fill_path_measurements_stamps_ok_and_scan_reason() -> None:
-    from ridgeback_autonomy.common.miss_reason import MissReason
-    from ridgeback_autonomy.perception.target_localization.measurement_pipeline import fill_path_measurements
+    from ridgeback_common.miss_reason import MissReason
+    from ridgeback_localization.measurement_pipeline import fill_path_measurements
 
     intrinsics, depth, batch, masks = _status_fixture()
     fill_path_measurements(
@@ -803,8 +803,8 @@ def test_fill_path_measurements_stamps_ok_and_scan_reason() -> None:
 
 
 def test_fill_path_measurements_no_depth_stamps_no_depth_frame() -> None:
-    from ridgeback_autonomy.common.miss_reason import MissReason
-    from ridgeback_autonomy.perception.target_localization.measurement_pipeline import fill_path_measurements
+    from ridgeback_common.miss_reason import MissReason
+    from ridgeback_localization.measurement_pipeline import fill_path_measurements
 
     intrinsics, _depth, batch, masks = _status_fixture()
     fill_path_measurements(
@@ -819,7 +819,7 @@ def test_fill_path_measurements_no_depth_stamps_no_depth_frame() -> None:
 
 
 def test_fill_path_measurements_skips_none_mask() -> None:
-    from ridgeback_autonomy.perception.target_localization.measurement_pipeline import fill_path_measurements
+    from ridgeback_localization.measurement_pipeline import fill_path_measurements
 
     intrinsics, depth, batch, _masks = _status_fixture()
     fill_path_measurements(
@@ -834,7 +834,7 @@ def test_fill_path_measurements_skips_none_mask() -> None:
 def test_fill_with_no_depth_still_lets_polar_fill_the_same_frame() -> None:
     # The depth paths and polar profiling are independent: a source that
     # produced nothing at this stamp costs the two depth rows, not the scan row.
-    from ridgeback_autonomy.common.miss_reason import MissReason
+    from ridgeback_common.miss_reason import MissReason
 
     batch = build_fill_batch()
     masks = [region_from_blob(tight_blob(), MaskPrecision.TIGHT)]
@@ -862,7 +862,7 @@ def test_fill_with_no_depth_still_lets_polar_fill_the_same_frame() -> None:
 
 
 def test_fill_runs_only_the_enabled_paths_leaving_the_rest_unset() -> None:
-    from ridgeback_autonomy.common.miss_reason import MissReason
+    from ridgeback_common.miss_reason import MissReason
 
     batch = build_fill_batch()
     masks = [region_from_blob(tight_blob(), MaskPrecision.TIGHT)]
@@ -890,7 +890,7 @@ def test_fill_runs_only_the_enabled_paths_leaving_the_rest_unset() -> None:
 
 
 def test_fill_splits_the_two_depth_paths_independently() -> None:
-    from ridgeback_autonomy.common.miss_reason import MissReason
+    from ridgeback_common.miss_reason import MissReason
 
     batch = build_fill_batch()
     masks = [region_from_blob(tight_blob(), MaskPrecision.TIGHT)]
@@ -916,7 +916,7 @@ def test_fill_without_depth_leaves_a_disabled_depth_row_unset_not_missing() -> N
     # The NO_DEPTH_FRAME stamp follows the selection too: a row that was not
     # asked for must not be reported as a depth miss, or the benchmark's
     # miss-reason tally would blame a source the run never used.
-    from ridgeback_autonomy.common.miss_reason import MissReason
+    from ridgeback_common.miss_reason import MissReason
 
     batch = build_fill_batch()
     masks = [region_from_blob(tight_blob(), MaskPrecision.TIGHT)]
@@ -1040,7 +1040,7 @@ def ros_context():
 
 def _mask_node(source, **parameters):
     from rclpy.parameter import Parameter
-    from ridgeback_autonomy.perception.target_localization.mask_measurement_node import (
+    from ridgeback_localization.mask_measurement_node import (
         TargetMaskMeasurementNode,
     )
 
@@ -1763,7 +1763,7 @@ def test_raised_min_valid_pixels_rejects_a_tight_region_the_default_keeps() -> N
     guard was unreachable from the node.
     """
 
-    from ridgeback_autonomy.common.miss_reason import MissReason
+    from ridgeback_common.miss_reason import MissReason
 
     masks = [region_from_blob(tight_blob(), MaskPrecision.TIGHT)]
     common = dict(
@@ -1799,7 +1799,7 @@ def test_min_valid_pixels_gates_both_depth_rows_alike() -> None:
     identical pixels.
     """
 
-    from ridgeback_autonomy.common.miss_reason import MissReason
+    from ridgeback_common.miss_reason import MissReason
 
     masks = [region_from_blob(tight_blob(), MaskPrecision.TIGHT)]
     common = dict(
@@ -1838,7 +1838,7 @@ def test_raised_min_valid_pixels_blames_the_floor_not_the_rect_recipe() -> None:
     setting.
     """
 
-    from ridgeback_autonomy.common.miss_reason import MissReason
+    from ridgeback_common.miss_reason import MissReason
 
     intrinsics, depth, batch, masks = _status_fixture()
     fill_path_measurements(

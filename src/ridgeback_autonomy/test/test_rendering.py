@@ -5,8 +5,8 @@ import types
 import numpy as np
 import pytest
 
-from ridgeback_autonomy.common.models import Detection, DetectionBatch
-from ridgeback_autonomy.perception.target_localization.core.rendering import (
+from ridgeback_common.models import Detection, DetectionBatch
+from ridgeback_localization.core.rendering import (
     PANEL_ALIGNED_DEPTH,
     PANEL_BOX_MASK,
     PANEL_LIDAR,

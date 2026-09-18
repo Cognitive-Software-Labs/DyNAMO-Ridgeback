@@ -14,7 +14,7 @@ from ridgeback_autonomy.benchmarking.scoring import (
     build_instance_estimate,
     score_scene,
 )
-from ridgeback_autonomy.common.models import Detection
+from ridgeback_common.models import Detection
 
 
 def _pointcloud_detection(forward, lateral, distance):

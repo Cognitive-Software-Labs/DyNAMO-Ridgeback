@@ -19,40 +19,40 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from ridgeback_autonomy.common.miss_reason import MissReason
-from ridgeback_autonomy.perception.target_localization.core.depth_common import (
+from ridgeback_common.miss_reason import MissReason
+from ridgeback_localization.core.depth_common import (
     prepare_depth_region,
     valid_depth,
 )
-from ridgeback_autonomy.perception.target_localization.core.euclidean_reconstruction import (
+from ridgeback_localization.core.euclidean_reconstruction import (
     localize_euclidean_reconstruction,
     localize_prepared_euclidean_reconstruction,
 )
-from ridgeback_autonomy.perception.target_localization.core.intrinsics import (
+from ridgeback_localization.core.intrinsics import (
     CameraIntrinsics,
     deproject_masked,
 )
-from ridgeback_autonomy.perception.target_localization.core.isolation_2d import (
+from ridgeback_localization.core.isolation_2d import (
     ISOLATION_2D_RECIPES,
 )
-from ridgeback_autonomy.perception.target_localization.core.isolation_3d import (
+from ridgeback_localization.core.isolation_3d import (
     ISOLATION_3D_DEFAULT,
     ISOLATION_3D_NAMES,
     build_isolation_3d,
 )
-from ridgeback_autonomy.perception.target_localization.core.mask import (
+from ridgeback_localization.core.mask import (
     Mask,
     MaskPrecision,
     empty_region,
     region_from_bbox,
     region_from_blob,
 )
-from ridgeback_autonomy.perception.target_localization.core.polar_profiling import (
+from ridgeback_localization.core.polar_profiling import (
     localize_polar_profiling,
     project_scan_to_image,
     select_mask_beams,
 )
-from ridgeback_autonomy.perception.target_localization.core.projective_ranging import (
+from ridgeback_localization.core.projective_ranging import (
     localize_prepared_projective_ranging,
     localize_projective_ranging,
 )
