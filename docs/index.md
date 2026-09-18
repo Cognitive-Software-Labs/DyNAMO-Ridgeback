@@ -72,7 +72,7 @@ troubleshooting, planning, and historical documentation.
   the three offline profiles run from the page; the `live-system` phase is
   blocked on the `cleanup.sh` catch-all
 - [D455 hardware validation](plans/camera_hardware_validation.md)
-- [Model-concurrency evidence](plans/model_concurrency_evidence.md)
+- [Combined-model throughput measurement](plans/model_concurrency_evidence.md) — run the existing sweep and determine whether concurrency is needed
 - [Occlusion characterization](plans/occlusion_handling.md)
 - [Remote versus physical-seat validation](plans/remote_vs_physical_seat_validation.md)
 

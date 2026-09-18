@@ -93,13 +93,31 @@ and require non-occluded regression evidence.
 [segmentation candidates](../do_not_try_again/segmentation.md), and the
 [scenario gallery](benchmark_scenarios_v2_gallery.html).
 
+## Combined segmentation and monocular-depth throughput
+
+**Gap.** The combined SlimSAM/Depth-Anything path runs its models sequentially.
+Timing diagnostics and the fourteen-configuration sweep exist, but a controlled
+current comparison has not established whether this path keeps up or whether
+concurrency is needed. This is an evidence gap, not a confirmed performance bug.
+
+**Remaining work.** Execute the [measurement plan](../plans/model_concurrency_evidence.md):
+compare neither model, each model alone, and both together over three process
+replications, with a diagnostics-off/on control. Separate cold startup from
+steady-state completion, latency, scored outcomes, and resource use.
+
+**Completion criteria.** Preserve a reproducible evidence record and classify
+whether the current path keeps up, has a cold-start issue, suffers warm overload,
+or shows resource interaction. If results are inconclusive, retain the precise
+unresolved measurement. If it keeps up, close this item without redesign. Only
+a demonstrated bottleneck justifies proposing a separate concurrency experiment;
+no production architecture change is included here.
+
 ## Other benchmarking execution plans
 
 These plans retain their execution detail; listing them here does not change
 their approval or completion status.
 
 - [Live sweeps from the configurator](../plans/benchmark_gui_direct_run.md)
-- [Model-concurrency evidence](../plans/model_concurrency_evidence.md)
 - [Remote versus physical-seat comparison](../plans/remote_vs_physical_seat_validation.md)
 
 ## Deferred: Isaac target-distance benchmark port
