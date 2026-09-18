@@ -143,8 +143,13 @@ to flag it.
 
 ### Colliders
 
-Four in total: the chassis `convexHull`, the deck plate, the riser diamond,
-and the camera box. Wheel cylinders come from the vendor set.
+Enabled colliders include the vendor chassis `convexHull` and deck plate,
+the riser, camera and LiDAR boxes, and the authored mast and bracket. The
+importer removes wheel collision APIs for the planar drive; vendor wheel
+cylinders are also excluded during chassis extraction. Consequently the
+production model does not qualify wheel–floor or wheel–low-obstacle contact.
+The [wheel-contact experiment](mecanum-drive.md) evaluates a separate physical
+drive candidate.
 
 `convexHull` was chosen over `convexDecomposition` on measurement:
 

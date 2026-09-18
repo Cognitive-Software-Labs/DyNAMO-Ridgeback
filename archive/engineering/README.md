@@ -26,6 +26,8 @@ are excluded from ordinary repository search and the generated knowledge graph.
 
 ## Simulation and operations
 
+- [Physical mecanum drive investigation](2026-09-18-mecanum-drive-investigation.md)
+
 - [Isaac 6.0 first-drive snapshot](2026-07-11-isaac-first-drive.md)
 - [Invalidated July SLAM investigation](2026-07-12-isaac-slam-investigation.md)
 - [Sensor attachment and chassis investigations](port-history.md)

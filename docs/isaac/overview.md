@@ -14,6 +14,7 @@ owns deferred target-distance benchmark support. Historical controls are not cur
 | [Shared robot geometry](../robot/geometry.md) | Mounts, dimensions and provenance |
 | [Collision model](../robot/collision_model.md) | Physical envelope, Nav2 footprint and backend distinctions |
 | [Isaac robot model](robot-model.md) | USD import, articulation and PhysX colliders |
+| [Experimental wheel-contact drive](mecanum-drive.md) | Isolated physical-drive harness, assumptions and qualification gates |
 | [LiDAR pipeline](lidar-pipeline.md) | Scan assembly, ROS contract and qualification procedure |
 | [Camera depth](camera-depth.md) | D455 modes, ROS contract, validation and troubleshooting |
 | [Exploration evaluation](../exploration/evaluation.md) | Coverage, navigation outcomes, and run procedure |
