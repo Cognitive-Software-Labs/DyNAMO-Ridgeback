@@ -167,8 +167,10 @@ colour/depth pairing, round-trip time and CPU. It writes its results under
 - About 4 minutes after Intel's services first moved to CycloneDDS, both
   Hokuyo drivers timed out together. Because of a reconnect bug in `urg_node`,
   they could not recover until `clearpath-sensors` was restarted. The trigger
-  was not reproduced; see
-  [troubleshooting](../troubleshooting.md#hokuyo-drivers-stuck-reconnecting).
+  was not reproduced. Recovery is in
+  [troubleshooting](../troubleshooting.md#hokuyo-drivers-stuck-reconnecting),
+  and the open fix is in the
+  [backlog](../BACKLOG.md#hokuyo-driver-recovery-after-read-timeouts).
 - The check and the benchmark use synthetic frames from a Python probe. They
   do not prove camera-driver health, the real driver's timing, or the rate of
   the real perception pipeline.

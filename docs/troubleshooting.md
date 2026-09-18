@@ -223,14 +223,13 @@ each LiDAR next to a pending new one.
 
 **Cause.** After a read timeout, `urg_node` opens a new TCP connection without
 closing the old one. A Hokuyo UST serves one client at a time, so the driver
-never recovers on its own. On 2026-09-18 both LiDARs failed this way at the same
-moment, 4 minutes after Intel's services moved to CycloneDDS. The first timeout
-could not be reproduced with scan subscribers joining and leaving, including a
-reliable reader killed with SIGKILL.
+never recovers on its own. What triggers the first timeout is not yet known.
+The [backlog](BACKLOG.md#hokuyo-driver-recovery-after-read-timeouts) tracks the
+recovery fix, and the incident timeline is in the archived evidence below.
 
 **Fix.** Run `sudo systemctl restart clearpath-sensors`. This restarts only the
-sensor drivers; motor power is unaffected. Record the time and what was running
-if the stall recurs.
+sensor drivers; motor power is unaffected. Before restarting, note the time and
+what was running, and add it to the backlog entry.
 
 ## Camera optical-frame ownership
 
@@ -279,3 +278,4 @@ the upstream dependency pins and patches are one compatibility unit.
 
 - [operational incidents](../archive/engineering/operational_incidents.md)
 - [operational incidents](../archive/engineering/operational_incidents.md#slam-tf-lag--2026-09-10)
+- [operational incidents](../archive/engineering/operational_incidents.md#hokuyo-reconnect-lockout--2026-09-18)

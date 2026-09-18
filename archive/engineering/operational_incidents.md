@@ -1,6 +1,6 @@
 # Operational incident history
 
-Recorded dates: 2026-08-31, 2026-09-04, 2026-09-05, 2026-09-08, 2026-09-10
+Recorded dates: 2026-08-31, 2026-09-04, 2026-09-05, 2026-09-08, 2026-09-10, 2026-09-18
 
 Tested revisions: unknown
 
@@ -89,3 +89,38 @@ The supervisor correctly retained completed `run.json` results, but could not
 make progress against the dead simulator. This established rising wall time,
 not short-window RTF, as the useful early warning and motivated resumable split
 runs for long matrices.
+
+## Hokuyo reconnect lockout — 2026-09-18
+
+Intel's robot services moved from Fast DDS to CycloneDDS at 17:39 UTC with
+`tools/intel_thor/intel_services_rmw apply`. The branch was
+`feat/real-hardware-exploration` with the switch tooling uncommitted; it was
+later committed as `0600400a`. Both `urg_node` drivers (`ros-jazzy-urg-node`
+1.1.2) reconnected and logged `Streaming data` at 17:39:43. At 17:43:53, both
+began logging `Could not grab single echo scan`, hit `Error count exceeded
+limit, reconnecting`, and then logged `Error connecting to Hokuyo: Could not
+open network Hokuyo` every 2.5 s. Over 17:39–17:48 there were 20 grab failures
+and 203 connection errors, compared with none between 14:50 and 17:39 under
+Fast DDS.
+
+The Hokuyos answered ping. `ss` showed each driver holding an established
+session with a nonzero receive queue while a second connection sat in
+`SYN-SENT`. The driver had opened a new session without closing the old one,
+and a UST serves one client. There were no kernel or link events, and the
+Ethernet ports were idle, which ruled out a traffic flood. The vcan receive
+timeouts and Foxglove schema errors in the same window already occurred at the
+same rates before the switch.
+
+The failure coincided with verification commands under CycloneDDS: `ros2 daemon
+stop`, `ros2 node list --no-daemon`, and `ros2 topic hz` on the scan topics.
+`sudo systemctl restart clearpath-sensors` at 17:48:17 restored both drivers.
+The following did not reproduce the stall:
+
+- three minutes of passive observation
+- a best-effort `topic hz` subscriber
+- `node list`
+- a reliable `topic echo` subscriber killed with SIGKILL
+- a full `check_link` run, including the 30 Hz cross-host stream
+
+The trigger remains unknown. The lockout mechanism is a driver defect that is
+independent of the middleware.

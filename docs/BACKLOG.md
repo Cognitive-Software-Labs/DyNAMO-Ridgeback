@@ -85,6 +85,31 @@ and the public hardware workflow in the [README](../README.md). The
 [stationary measurement plan](plans/PHYSICAL_robot_measurements_and_validation.md#both-lidars-and-stationary-auxiliary-sensors)
 owns inspection only; its completion does not close this actuation gate.
 
+## Hokuyo driver recovery after read timeouts
+
+**Gap.** `urg_node` (`ros-jazzy-urg-node` 1.1.2) cannot recover from a burst
+of read timeouts. It reconnects without closing its old TCP session, and a
+Hokuyo UST serves one client at a time, so the new connection is refused
+indefinitely. The robot then has no scans until someone restarts
+`clearpath-sensors`, whatever the middleware. On 2026-09-18 both LiDARs entered
+this state together, 4 minutes after Intel's services moved to CycloneDDS. The
+initial timeout was not reproduced, and its cause is unknown.
+
+**Context.** Recovery steps are in
+[troubleshooting](troubleshooting.md#hokuyo-drivers-stuck-reconnecting). The
+incident timeline is in the archived evidence below. The CycloneDDS deployment is described in the
+[transport reference](physical/intel_thor_transport.md).
+
+**Completion criteria.**
+- A driver that loses its Hokuyo connection resumes publishing scans without
+  manual intervention. Achieve this with a maintained `urg_node` patch under
+  `patches/` that closes the old session before reconnecting, or with a
+  documented supervisor that restarts only the sensor drivers. Demonstrate it
+  by interrupting a LiDAR's TCP session on the robot.
+- Either explain the 2026-09-18 simultaneous timeout, or bound its recurrence
+  with a recorded multi-hour soak under CycloneDDS with the Intel services,
+  SLAM, and Nav2 running.
+
 ## Optional: restore Gazebo exploration worlds and backend-specific maps
 
 **Opportunity.** Gazebo remains a supported backend, but the adapter currently
@@ -252,3 +277,4 @@ stopping proof. Those are separate tasks under this gate.
 - [paired results and interpretation](../archive/engineering/2026-09-17-isaac-lidar-qualification.md#interpretation)
 - [Isaac port history](../archive/engineering/port-history.md#lidars-detached-from-the-articulation-2026-09-11)
 - [removed D435 transform](../archive/engineering/operational_incidents.md#d435-static-camera-transform--removed-2026-08-31)
+- [Hokuyo reconnect lockout](../archive/engineering/operational_incidents.md#hokuyo-reconnect-lockout--2026-09-18)
