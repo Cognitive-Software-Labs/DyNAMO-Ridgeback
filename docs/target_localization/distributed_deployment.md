@@ -152,12 +152,15 @@ stationary milestone.
 
 ## Qualification and paired rollback
 
-The package plan retains the [open workstation gates](../plans/PHYSICAL_package_split.md).
+The package plan retains the [remaining handoff gates](../plans/PHYSICAL_package_split.md).
 The current workstation checks include clean headless builds/imports, generated
 serialization, unchanged recorded-input estimator/scoring results, launch-role
-construction, and fake Nav2 action cancellation. Simulator runtime and physical
-qualification are separate gates. The robot team must acknowledge the exact
-commit actually installed on each host; branch names are insufficient.
+construction, fake Nav2 action cancellation, and bounded headless Gazebo/Isaac
+runtime checks with localization on/off at both supported camera resolutions.
+These startup and empty-frame progress checks do not qualify target-distance
+accuracy, sustained performance, GUI behavior, or physical deployment. The robot
+team must acknowledge the exact commit actually installed on each host; branch
+names are insufficient.
 
 Before deployment record `git rev-parse HEAD`, dependency-manifest hashes,
 `tools/check_dependencies` output, effective launch arguments, environment/model
@@ -173,3 +176,7 @@ stationary consumers/compute and recheck message types and health. Never pair
 new `ridgeback_interfaces` publishers with old `ridgeback_autonomy/msg/*`
 consumers. Preserve old bags unchanged; use their original environment or an
 explicit conversion. Do not run simulator cleanup on the robot.
+
+## Archived evidence
+
+- [Simulator runtime matrix and receive-buffer correction](../../archive/engineering/2026-09-18-package-split-runtime.md)

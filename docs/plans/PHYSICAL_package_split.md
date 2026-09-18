@@ -1,6 +1,6 @@
 # PHYSICAL — Package split for distributed deployment
 
-Status: **implementation complete; simulator runtime qualification and robot-team
+Status: **implementation and bounded simulator runtime checks complete; robot-team
 acceptance pending.** Owner: the workstation implementation team. Implemented
 contracts live in the [distributed deployment reference](../target_localization/distributed_deployment.md);
 operator commands live in the [README](../../README.md#distributed-localization).
@@ -41,9 +41,9 @@ complete; this plan now tracks qualification and acceptance only.
 
 The interfaces extraction is commit `2e52712b`; the separately verified common/
 localization extraction is `3330cc2d`. Deployment roles, configurable labels,
-progress health, and latched mission supervision are implemented in the next
-stage of this workstream. The package map and implemented behavior belong in
-the maintained reference linked above.
+progress health, and latched mission supervision are implemented in
+`abdbc12566c7cb7f4ab86d89b53eabf5fc119040`. The package map and implemented
+behavior belong in the maintained reference linked above.
 
 Workstation evidence is under `artifacts/package-split/`:
 
@@ -74,10 +74,6 @@ Workstation evidence is under `artifacts/package-split/`:
 
 Remaining gates (do not retire this plan yet):
 
-- Run bounded **Gazebo and Isaac runtime** localization checks with localization
-  enabled/disabled and both supported camera profiles on a simulator-capable
-  workstation. This host has no Gazebo executable, and `nvidia-smi` cannot
-  communicate with the NVIDIA driver. Launch construction is not runtime proof.
 - Record the accepted final revision, manifest pins, and the matching installed
   revision acknowledged by each robot team. Use the README's explicit per-host
   commands and the maintained contract's rollback procedure.
@@ -103,3 +99,7 @@ tests. Completion here establishes workstation compatibility and deployment
 interfaces; the linked robot plans establish hardware evidence. Move implemented
 contracts into their maintained references, retain consequential test evidence
 with provenance, and retire this plan when its deliverable is complete.
+
+## Archived evidence
+
+- [Simulator runtime matrix and receive-buffer correction](../../archive/engineering/2026-09-18-package-split-runtime.md)

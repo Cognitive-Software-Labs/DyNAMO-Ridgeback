@@ -1,0 +1,8 @@
+# Gazebo-only source dependency. Import this in addition to core.repos when the
+# ridgeback_autonomy_gz adapter is required.
+repositories:
+  src/clearpath_simulator:
+    type: git
+    url: https://github.com/clearpathrobotics/clearpath_simulator.git
+    # jazzy @ 2.9.4
+    version: 590a45118c599c08abdf3bd3d02d5fa7a8af9a49

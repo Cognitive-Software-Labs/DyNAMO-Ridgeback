@@ -30,10 +30,6 @@
       <ParticipantIndex>auto</ParticipantIndex>
       <MaxAutoParticipantIndex>250</MaxAutoParticipantIndex>
     </Discovery>
-    <Internal>
-      <!-- High-resolution depth/point-cloud bursts exceed the 1 MiB default.
-           Request 16 MiB; hosts retain their OS cap rather than failing startup. -->
-      <SocketReceiveBufferSize max="16MiB"/>
-    </Internal>
+    <Internal><SocketReceiveBufferSize min="16MiB"/></Internal>
   </Domain>
 </CycloneDDS>

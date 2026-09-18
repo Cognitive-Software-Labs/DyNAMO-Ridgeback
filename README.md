@@ -233,9 +233,9 @@ deployed configuration as a separate, explicitly authorized step.
 
 Use the same commit on Intel and Thor. The
 [deployment contract](docs/target_localization/distributed_deployment.md) owns
-health, QoS, timeout, frame, and rollback semantics. Simulator runtime and
-physical Intel–Thor qualification remain open; this is the stationary deployment
-interface, not permission to drive the robot.
+health, QoS, timeout, frame, and rollback semantics. Physical Intel–Thor
+qualification remains open; this is the stationary deployment interface,
+not permission to drive the robot.
 
 **Thor — build only localization.** In a new shell, source ROS Jazzy and no old
 workspace overlay. The subset needs no imported Clearpath source repositories,
@@ -436,7 +436,7 @@ The D455 section of
 [PHYSICAL — Robot measurements and stationary sensor validation](docs/plans/PHYSICAL_robot_measurements_and_validation.md#d455-camera-validation)
 owns the physical camera acceptance gates. The
 [three coordinated physical plans](docs/BACKLOG.md#physical-stationary-integration)
-cover remaining workstation qualification, Intel–Thor deployment, and robot
+cover revision handoff, Intel–Thor deployment, and robot
 measurements; they do not describe an already qualified distributed deployment.
 
 The explorer is the in-repo `frontier_explorer_node` (sources under `src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer/`). It consumes the Nav2 global costmap and sends goals via `NavigateToPose`. The component boundary and readiness sequence are documented in [exploration architecture](docs/exploration/architecture.md).

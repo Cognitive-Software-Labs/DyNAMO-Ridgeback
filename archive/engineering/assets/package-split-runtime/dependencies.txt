@@ -1,0 +1,6 @@
+OK: src/clearpath_common @ 33e4b311 (patches/clearpath_realsense_sim_frames.patch applied)
+OK: src/clearpath_config @ b2a64ba3 (clean)
+OK: src/clearpath_msgs @ 797be60a (clean)
+OK: src/slam_toolbox @ 02afdde0 (patches/slam_toolbox_tf_namespace.patch applied)
+OK: src/clearpath_simulator @ 590a4511 (patches/clearpath_gz_customizations.patch applied)
+All all dependencies match their manifests and contain only recorded patches.
