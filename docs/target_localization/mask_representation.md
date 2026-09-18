@@ -379,7 +379,7 @@ around to a pixel on the far edge of the payload.
 Storage was previously one full-grid array per detection regardless of how small
 the detection was. For a production-sized box (~2% of frame) the region is
 roughly 50× smaller, at either 640×480 or 1280×720. The measured consequences,
-and the two cases that got slower, are recorded in `docs/history/roi_mask_migration.md`.
+and the two cases that got slower, are recorded in the archived evidence below.
 
 ## 8. Contract checks
 
@@ -388,4 +388,8 @@ validates bounds and retains its explicit `MaskPrecision`. `None` is not an
 empty selector. Constructors, origin-aware membership, copy/ownership rules,
 and whole-grid compatibility are covered by
 [region tests](../../src/ridgeback_autonomy/test/test_mask_region.py).
-Migration evidence and limitations live in [history](../history/roi_mask_migration.md).
+Migration evidence and limitations live in the archived evidence below.
+
+## Archived evidence
+
+- [roi mask migration](../../archive/engineering/roi_mask_migration.md)

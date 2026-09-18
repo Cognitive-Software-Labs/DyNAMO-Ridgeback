@@ -93,5 +93,8 @@ as accuracy. The authoritative enum is `common/miss_reason.py`; the pipeline
 [glossary](../target_localization/target_localization_pipeline.md)
 explains stages.
 
-Historical scenario/status transitions are retained in
-[benchmark history](../history/benchmark_evolution.md).
+Historical scenario/status transitions are retained in the Archived evidence section below.
+
+## Archived evidence
+
+- [benchmark history](../../archive/engineering/benchmark_evolution.md)

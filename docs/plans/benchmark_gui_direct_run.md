@@ -2,8 +2,7 @@
 
 Status: **PROPOSED — BLOCKED.** Phases 0, 1 and 3 of this plan shipped on
 2026-09-11; what remains is Phase 2, starting the `live-system` profile from the
-page. Delivered work, its evidence, and the reversals it required are recorded in
-[`../history/benchmark_gui_direct_run.md`](../history/benchmark_gui_direct_run.md).
+page. Delivered work, its evidence, and the reversals it required are recorded in the Archived evidence section below.
 
 Prepared 2026-09-11 against `18eacb4`, branch `feat/benchmark-gui`.
 
@@ -145,3 +144,7 @@ verified by grepping
 
 Several Claude sessions share this working tree. Re-check `git status` before
 blaming a failure on your own diff.
+
+## Archived evidence
+
+- [GUI execution decision](../../archive/engineering/benchmark_gui_direct_run.md)

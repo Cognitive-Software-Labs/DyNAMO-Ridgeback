@@ -2,8 +2,8 @@
 
 The one path that reads the cloud the sensor publishes rather than deprojecting
 a depth image itself, which is why it is also the reference the mask stack's
-deprojection was validated against
-(``docs/history/pointcloud_provenance_evaluation.md``).
+deprojection was compared against in the July 11, 2026 simulation experiment
+(``archive/engineering/pointcloud_provenance_evaluation.md``).
 """
 
 from __future__ import annotations

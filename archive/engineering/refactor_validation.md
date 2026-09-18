@@ -1,40 +1,21 @@
-# Target-localization refactor validation
+# Refactor coverage investigation — August 30–31, 2026
 
-2026-08-31. Structural implementation is complete. Runtime accuracy and exploration
-checks passed. The depth-row coverage item is now closed: it was a pre-existing
-blocking TF fallback, not a refactor regression — see "Resolution of the coverage
-item" below. The later
-[exact-stamp investigation](exact_stamp_depth_availability.md) closed the
-remaining depth-availability loss by selecting CycloneDDS.
+Recorded dates: 2026-08-30, 2026-08-31
 
-## Committed implementation
+Tested revisions: `ebf3a02982f19925cd1a37d1479f437f02a2f123`, `f16afd0c70b3ef259c978d36949c8fae9fd4fec5`, `74a8597e9a7ee76b4848e5aa9b4d2553fa1fcaf5`, `95f4bd3db97c5799c6b8e16e878243e90416a940`
 
-- `1354265`: generic target names, role-based module ownership, shared launch and
-  topic contracts, one-way package dependencies.
-- `0b8c10f`: mask synchronization and batch processing separated from ROS orchestration.
-- `616c604`: visualization readings, HUD, markers, and style separated from the node.
-- `74a8597`: simulator geometry, trial results, preview alignment, and reduction
-  separated from benchmark runner orchestration.
-- `95f4bd3`: single-owner shared tuning defaults, gate tokens, front offset, and
-  integer timestamp helpers; stronger ownership and import tests.
+Provenance: partial
 
-Algorithm-specific defaults remain independent even when numerically equal.
-The pointcloud and mask processes remain separate; no model or process was added.
-Exact depth/color matching, batch-local RGB sharing, and zero-or-one scan projection
-per batch are preserved by the existing behavior tests.
+This is dated evidence. Missing revisions or preserved worktree inputs limit
+reproducibility; no new measurements were made during archive curation.
 
-## Automated checks
+## Conclusion
 
-- ROS-sourced direct pytest: **541 passed**.
-- Colcon: all **36 registered test groups passed**, **541 individual tests**,
-  zero errors/failures/skips. Three previously unregistered test files are now
-  included; a test ensures future files cannot be omitted accidentally.
-- Package build passed. All five public launches passed `--show-args`.
-- `git diff --check` passed.
-- Graphify rebuilt: 2,832 nodes, 5,147 edges, 152 communities.
-- Architecture guards cover absolute and relative imports, prohibit
-  `perception -> benchmarking` and `exploration -> benchmarking`, keep reusable
-  modules below node orchestration, and enforce shared topic/default ownership.
+The initial post-refactor single-run coverage drop did not reproduce as a fixed
+refactor regression. A separate pre-existing TF fallback wait throttled mask
+processing; correcting it improved measured coverage without changing scored
+outcomes or six-decimal aggregate accuracy. Exact-depth delivery was a separate
+investigation, not resolved by this refactor.
 
 ## Benchmark evidence
 
@@ -47,7 +28,7 @@ Baseline values below were captured during the pre-refactor run on 2026-08-30.
 Its temporary artifacts are no longer present on the host. Both post-refactor
 runs were inspected directly on 2026-08-31 and recorded clean-tree provenance.
 
-| Estimator | Scored, all runs | Baseline MAE (m) | Post-refactor MAE (m), both runs | Baseline coverage | `74a8597` coverage | `95f4bd3` coverage |
+| Estimator | Scored, all runs | Baseline MAE (m) | Post-refactor MAE (m), both runs | Baseline coverage | `74a8597e9a7ee76b4848e5aa9b4d2553fa1fcaf5` coverage | `95f4bd3db97c5799c6b8e16e878243e90416a940` coverage |
 |---|---:|---:|---:|---:|---:|---:|
 | Pointcloud | 6/8 | 0.129655 | 0.129655 | 97.61% | 97.63% | 97.62% |
 | Projective ranging | 6/8 | 0.055221 | 0.055221 | 45.02% | 40.71% | 40.08% |
@@ -68,8 +49,8 @@ matching tolerance, scheduling, or numerical tuning was changed to conceal it.
 
 The open coverage item above is closed. Three findings must be kept apart.
 
-**1. Refactor parity.** Matched three-repeat reruns of the old build `ebf3a02`
-(44.12%) and refactored `f16afd0` (45.68%) did not reproduce a fixed refactor
+**1. Refactor parity.** Matched three-repeat reruns of the old build `ebf3a02982f19925cd1a37d1479f437f02a2f123`
+(44.12%) and refactored `f16afd0c70b3ef259c978d36949c8fae9fd4fec5` (45.68%) did not reproduce a fixed refactor
 regression; the earlier 40.71% / 40.08% single-repeat figures were not a stable
 signal. This is absence of a reproduced regression, not proof of performance
 equivalence for all workloads.
@@ -92,7 +73,7 @@ namespaced `base_frame` default — no `base_frame:=base_link` workaround:
 | Polar profiling | 38.49% | 83.40% | — | 0 |
 
 Both depth rows went from 344 to 674 valid observations of 747. `UNSET` is zero:
-every detected box now reaches a mask result. Polar's remaining 124 misses are
+every detected box at that stage reaches a mask result. Polar's remaining 124 misses are
 all `TOO_FEW_RAYS_SELECTED`, a real sparse-ray outcome rather than a dropped
 batch.
 
@@ -115,7 +96,7 @@ the matched CycloneDDS run delivered 706/706 observations with no
 
 Provenance: run
 `/tmp/dynamo-tf-fix-benchmark/20260831_134214_examples_box_stereoscopic`,
-executed from an isolated worktree at `f16afd0` plus the TF fix, with its own
+executed from an isolated worktree at `f16afd0c70b3ef259c978d36949c8fae9fd4fec5` plus the TF fix, with its own
 build and install tree, `ROS_DOMAIN_ID=42`. Isolation was necessary because
 unrelated concurrent work was live in the primary working tree; the worktree's
 four uncommitted files were the fix, its test, the test registration, and a venv
@@ -149,6 +130,6 @@ the repeat. This was a smoke test, not a full exploration-completion test.
 The repeat had one collision-monitor heartbeat timeout; Nav2 automatically reset,
 reactivated, and resumed motion. Shutdown also exposed simulator/RViz termination
 delays and a mask-worker publisher-context race on Ctrl-C. The mask-worker shutdown
-path and subscriber-count query already exist in baseline `ebf3a02`; this refactor
+path and subscriber-count query already exist in baseline `ebf3a02982f19925cd1a37d1479f437f02a2f123`; this refactor
 does not address lifecycle behavior. Runtime checks used only targeted shutdown
 of processes belonging to these runs, not a machine-wide cleanup.

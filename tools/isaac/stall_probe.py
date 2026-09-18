@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Diagnose the collision_monitor stall (docs/isaac/port-history.md).
+"""Diagnose the collision_monitor stall (archive/engineering/port-history.md).
 
 Answers, in one attach, the questions that section lists as untried:
 

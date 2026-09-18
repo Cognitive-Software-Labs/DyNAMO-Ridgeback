@@ -29,7 +29,7 @@ consumer path live in the [camera-stack reference](camera_stack.md).
    `1280x720`, at 30 Hz. The checked-out hardware default is 640x480 @ 30 Hz,
    but the profile the driver actually activates must be recorded on the robot
    rather than inferred from YAML.
-2. **Depth image** (made 1:1 with RGB) - input to projective ranging and euclidean reconstruction. Euclidean reconstruction deprojects its masked pixels into camera-frame points in code (`docs/target_localization/euclidean_reconstruction.md`; provenance decision in `docs/history/pointcloud_provenance_evaluation.md` §7) - the points are a derived, in-code representation, not a sensor product.
+2. **Depth image** (made 1:1 with RGB) - input to projective ranging and euclidean reconstruction. Euclidean reconstruction deprojects its masked pixels into camera-frame points in code (`docs/target_localization/euclidean_reconstruction.md`) - the points are a derived, in-code representation, not a sensor product.
 3. **Camera IMU - present on the device, unused by this stack.** The D455 carries an IMU, unlike the D435. Nothing here enables, subscribes to, or fuses those streams, and SLAM does not consume them. Capability is not configuration.
 4. **Organized point cloud - configured, unverified.** Clearpath's checked-out `IntelRealsense` sets `POINTCLOUD_ENABLED = True`, so the parser emits `pointcloud.enable: true` for hardware. That is a *driver default resolved from the checked-out config*, which is a different fact from what the device actually publishes and a different fact again from whether the published layout can feed the `pointcloud` estimator. `common/camera_inputs.py` therefore leaves the organized-cloud input **unspecified** for the `realsense` profile. Before wiring it, verify organization (`height > 1`), colour-grid indexing, frame, and timestamps on the robot.
 
@@ -66,8 +66,7 @@ device selection, or driver TF ownership. The old `camera_config.json` and its
 unused loader have been deleted; active paths use the color `CameraInfo`.
 
 Repository sources: `clearpath/robot.yaml`, the Clearpath RealSense/D455 model,
-and `common/camera_inputs.py`. The removed D435 transform and its root cause are
-recorded in [operational incident history](../history/operational_incidents.md#d435-static-camera-transform--removed-2026-08-31).
+and `common/camera_inputs.py`.
 
 ### 2D LiDAR (Hokuyo UST, planar 270°)
 
@@ -211,7 +210,7 @@ contract. Model alternatives belong to
 
 ## 4. Depth sources
 
-Two interchangeable sources produce an **aligned depth frame** that is 1:1 with the RGB pixels. Both live in `perception/target_localization/core/depth_sources.py` behind one switch (`depth_source: stereoscopic | monocular`) and are pulled by `target_mask_measurement_node` at the detection stamp — there is no depth producer process and no depth topic between them and the paths that consume them (`docs/history/aligned_depth_coverage.md` §6). The node buffers the source's *input* stream raw and converts only the frame the detections were made on; the localization paths never branch on which source ran.
+Two interchangeable sources produce an **aligned depth frame** that is 1:1 with the RGB pixels. Both live in `perception/target_localization/core/depth_sources.py` behind one switch (`depth_source: stereoscopic | monocular`) and are pulled by `target_mask_measurement_node` at the detection stamp — there is no depth producer process and no depth topic between them and the paths that consume them. The node buffers the source's *input* stream raw and converts only the frame the detections were made on; the localization paths never branch on which source ran.
 
 - **RealSense stereo depth (`stereoscopic`)** — the raw depth lives in the left-IR frame, so it must be **aligned** (reprojected with the calibrated intrinsics + extrinsics) onto the RGB pixel grid. After alignment, depth pixel `(u, v)` corresponds to color pixel `(u, v)`. The alignment is not pipeline code: on hardware the driver performs it (`aligned_depth_to_color`); in sim color and depth are co-registered by construction (Section 1). The source converts the matched frame to float meters, nothing more — the RealSense camera contract therefore selects `sensors/camera_0/aligned_depth_to_color/image_raw`, pending robot verification.
 - **Depth Anything (`monocular`)** — predicted directly from the RGB frame, so it is *already* pixel-aligned. The implementation uses the **metric-trained variant** (`Depth-Anything-V2-Metric-Indoor`), which emits meters directly — no scaling step against stereo; the prediction is only resized to the color grid. (The base Depth Anything models output affine-invariant depth; choosing the metric variant is what removed the scaling stage from the architecture.)
@@ -249,7 +248,7 @@ Extract depth values at the masked pixels, aggregate to a single distance, then 
 > Projective ranging's coordinate is only as good as that one representative pixel. If the centroid lands on a depth discontinuity (object edge vs. far background) the depth can be wrong even when the aggregate range was fine. The representative pixel must be the centroid of the *foreground* pixels — the isolation output on the `rect` branch, all valid masked pixels on the `tight` branch — never the raw geometric box center (`docs/target_localization/projective_ranging.md` §2.4). Both the aggregate and the centroid read the same foreground set, so they agree by construction.
 
 ### Euclidean reconstruction — deproject, then aggregate
-Select the valid masked pixels, deproject only those into camera-optical-frame points (select and deproject commute, so no full organized cloud is ever materialized — the published cloud topic is never consumed, per `docs/history/pointcloud_provenance_evaluation.md`), isolate the foreground in the point domain, and take the centroid.
+Select the valid masked pixels, deproject only those into camera-optical-frame points (select and deproject commute, so no full organized cloud is ever materialized — this path never consumes the published cloud topic), isolate the foreground in the point domain, and take the centroid.
 
 - **tight branch:** statistical outlier removal (median ± k·MAD on camera-frame range) → centroid.
 - **rect branch:** the box drags in the floor and background, so a pluggable 3D isolation recipe runs (`isolation_3d.py`; registered recipes in `docs/target_localization/euclidean_reconstruction.md`). The implemented default is **height crop → nearest-mode band**. RANSAC, clustering, min-cut, and learned approaches are unimplemented [candidates](../do_not_try_again/foreground_isolation.md), not selectable swap-ins.
@@ -367,7 +366,7 @@ them over all captured events. Grouped by where in the pipeline the frame died:
   the detection's exact stamp — nothing buffered at that stamp, an unsupported
   encoding, a monocular model that is unavailable, or a grid the masks cannot
   index. Was the dominant sim miss until depth acquisition moved into the mask
-  node (`docs/history/aligned_depth_coverage.md` §6).
+  node.
 - `NO_SCAN` / `TF_MISS_SCAN` / `SCAN_INVALID` — polar: scan missing within
   tolerance / scan→optical TF unavailable / scan undecodable.
 
@@ -388,3 +387,9 @@ them over all captured events. Grouped by where in the pipeline the frame died:
   for this event's frame key (node behind the camera rate, or a legacy
   estimator on an event its node skipped). Not a path failure — the frame
   simply never reached the estimator.
+
+## Archived evidence
+
+- [operational incident history](../../archive/engineering/operational_incidents.md#d435-static-camera-transform--removed-2026-08-31)
+- [pointcloud provenance evaluation](../../archive/engineering/pointcloud_provenance_evaluation.md)
+- [aligned depth coverage](../../archive/engineering/aligned_depth_coverage.md)

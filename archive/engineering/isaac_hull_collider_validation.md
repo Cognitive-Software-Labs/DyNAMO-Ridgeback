@@ -1,5 +1,14 @@
 # Isaac hull-collider live validation
 
+Recorded dates: 2026-09-17
+
+Tested revisions: `dbf50bc0e5502b43d4dbad72abef1370b934b2a4`
+
+Provenance: partial
+
+This is dated evidence. Missing revisions or preserved worktree inputs limit
+reproducibility; no new measurements were made during archive curation.
+
 On 2026-09-17, the Ridgeback chassis `convexHull` passed a deterministic live
 PhysX contact qualification in Isaac Sim 6.1. The accepted production
 substrate was clean commit `dbf50bc0e5502b43d4dbad72abef1370b934b2a4`,
@@ -23,10 +32,6 @@ the composed USD geometry rather than copied dimensions. Contact reports,
 poses, velocities, signed separation, geometry snapshots, raw samples, and
 plots were retained under
 `artifacts/isaac-collider-validation/20260917T220000Z_clean-dbf50bc0/`.
-
-The current envelope comparison and accepted tolerance live in the
-[robot-model collider reference](../isaac/robot-model.md#colliders). This page
-retains the run-specific measurements and traces.
 
 ## Acceptance gates
 
@@ -67,15 +72,9 @@ The old AABB over-claimed the angled envelope by about 96 mm. Its independently
 predicted and observed stop deltas agreed within 0.323 mm, so the near-zero hull
 stop error was not produced by a harness that merely drove to a fixed pose.
 
-Implementation verification also passed the package build, the focused
-contract test at 7/7, and the full `ridgeback_autonomy` test suite at
-1,016/1,016.
+## Limits
 
-## Non-gating warnings
-
-Isaac emitted its existing fallback-inertia warnings for imported
-collider-free child links and the TGS velocity-iteration behavior warning.
-There were no non-finite states, discontinuities, failed contacts, or gate
-failures associated with them. A Matplotlib `Axes3D` import warning is also an
-environment issue; the harness writes its evidence plots directly as SVG and
-does not use 3D Matplotlib rendering.
+These tests exercised authored contact geometry in isolated floor/wall stages,
+not whole-world navigation or hardware collisions. Imported collider-free
+links emitted fallback-inertia warnings; no measured failure was attributed to
+them. Raw evidence availability was not rechecked during archival curation.

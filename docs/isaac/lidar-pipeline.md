@@ -83,40 +83,11 @@ that happens in a particular run.
 
 ## Qualification procedure
 
-![Measured front, rear, and merged scans with finite-bin coverage during rotation](../history/assets/2026-09-17-lidar/scan-coverage.png)
-
-The measured scan view shows both raw windows and the merged output. The
-lower panels count finite returns per bearing while the robot rotates;
-empty sectors would expose missing angular coverage. This run-specific
-figure is owned by the [dated qualification record](../history/2026-09-17-isaac-lidar-qualification.md),
-which records the source capture and regeneration procedure. It establishes
-LiDAR coverage; the closed-loop SLAM comparison is separate below.
-
-![All twelve SLAM trials, paired front-only and merged by seed at both noise settings](../history/assets/2026-09-17-lidar/slam-comparison.png)
-
-The fresh twelve-run baseline shows lower median pose/loop errors with merged
-scans, but mixed noisy-seed map and yaw results. Each line is a seed pair;
-none is selected as a representative best run. The dated record owns the full
-minimum/median/maximum tables, exclusions, and regeneration command.
-`front_only` remains the public default; this is not an exploration/P5 result.
-
-| Configured noise, seed 0: front only | Configured noise, seed 0: merged |
-|---|---|
-| ![Front-only map and trajectory overlay, configured noise seed zero](../history/assets/2026-09-17-lidar/noise1-seed0-front-overlay.png) | ![Merged map and trajectory overlay, configured noise seed zero](../history/assets/2026-09-17-lidar/noise1-seed0-merged-overlay.png) |
-
-Blue marks ground-truth occupied cells; black is the SLAM occupied map,
-gray is unknown, green is the ground-truth path, and red is the SLAM path.
-This fixed seed pair illustrates the noisy exception, not a best-run claim:
-front-only has higher IoU here despite merged's better median across seeds.
-The [evidence record](../history/2026-09-17-isaac-lidar-qualification.md#interpretation)
-owns the exact source paths and limitations.
-
-The [dated qualification record](../history/2026-09-17-isaac-lidar-qualification.md)
-records the completed gates and limitations. For repeat qualification, follow
-the procedure below. Keep raw evidence under ignored
-`artifacts/isaac-lidar-qualification/`; do not substitute the
-[invalidated July investigation](../history/2026-07-12-isaac-slam-investigation.md)
-for current measurements.
+The procedure below separates sensor coverage, skew compensation, geometry,
+and closed-loop SLAM checks. A scan topic alone does not prove aperture
+coverage, and an equal-stamp simulator run does not exercise compensation.
+Use fresh, uncontended runs before changing the public `front_only` default.
+Raw evidence belongs under ignored `artifacts/isaac-lidar-qualification/`.
 
 - Stabilize geometry, regenerate analytic `mock_hospital` GT, verify dependencies,
   rebuild affected packages, and inspect installed copied executables.
@@ -149,3 +120,8 @@ for current measurements.
 `noise_seed=N` seeds Isaac odometry with N and IMU noise with N+1; seed 0
 preserves the original streams. The argument is not forwarded to Gazebo or
 hardware. Public invocation details are owned by the [README](../../README.md).
+
+## Archived evidence
+
+- [September 17–18, 2026 lidar and SLAM qualification](../../archive/engineering/2026-09-17-isaac-lidar-qualification.md)
+- [Invalidated July 2026 investigation](../../archive/engineering/2026-07-12-isaac-slam-investigation.md)

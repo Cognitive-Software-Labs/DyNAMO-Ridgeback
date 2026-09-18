@@ -1,20 +1,18 @@
 # Documentation-backed engineering backlog
 
 Only active, evidenced gaps belong here. Implemented behaviour belongs in the
-technical references; completed experiments and migrations belong in history;
+technical references; dated experiments and migrations belong in the archive;
 unselected alternatives belong in `docs/do_not_try_again/`. Closing an item means satisfying
 its completion criteria and moving durable results to the relevant reference or
-history document—not retaining a crossed-out entry here.
+archival record, rather than retaining a crossed-out entry here.
 
 ## Isaac exploration recertification / P5
 
 **Gap.** No statistically valid autonomous Isaac exploration baseline exists
-for the current robot. The [LiDAR/closed-loop SLAM qualification](history/2026-09-17-isaac-lidar-qualification.md)
-passed, but it does not qualify frontier exploration or provide the matching
-Gazebo coverage comparison. Earlier invalidated exploration numbers remain void.
-Merged scans improved median closed-loop results, but configured-noise seed 0
-regressed in pose RMSE/map IoU, and yaw components increased for two seeds;
-see the [paired results and interpretation](history/2026-09-17-isaac-lidar-qualification.md#interpretation).
+for the current robot. The September 17–18, 2026 closed-loop qualification
+passed its bounded gates; it did not qualify frontier exploration or supply a
+matching Gazebo coverage comparison. Its noisy-seed tradeoffs motivate the
+SLAM-source follow-up below. Earlier invalidated exploration numbers remain void.
 
 **Completion criteria.** With corrected seating, regenerated maps, and the
 qualified LiDAR pipeline, run autonomous exploration over 3–5 seeds per
@@ -34,7 +32,7 @@ default decision addresses these tradeoffs and the exploration/P5 results.
 
 **Context.** [Exploration benchmark runbook](exploration/benchmarking.md),
 [Isaac lidar pipeline](isaac/lidar-pipeline.md), and the resolved orphan-lidar
-investigation in [Isaac port history](isaac/port-history.md#lidars-detached-from-the-articulation-2026-09-11).
+investigation in the archived evidence below.
 
 ## Deferred: Isaac target-distance benchmark port
 
@@ -117,9 +115,8 @@ profile and record an explicit keep/update decision. If enabling `pointcloud`,
 additionally prove organization, color-grid indexing, frame, and timestamps
 before wiring it as a RealSense input.
 
-**Context.** [Aligned depth](target_localization/aligned_depth.md), the
-[removed D435 transform](history/operational_incidents.md#d435-static-camera-transform--removed-2026-08-31),
-and `common/camera_inputs.py`.
+**Context.** [Aligned depth](target_localization/aligned_depth.md) and
+`common/camera_inputs.py`.
 
 ## Camera-LiDAR calibration
 
@@ -192,3 +189,10 @@ and require non-occluded regression evidence.
 **Context.** [Occlusion proposal](plans/occlusion_handling.md),
 [segmentation candidates](do_not_try_again/segmentation.md), and the
 [scenario gallery](benchmarking/benchmark_scenarios_v2_gallery.html).
+
+## Archived evidence
+
+- [LiDAR/closed-loop SLAM qualification](../archive/engineering/2026-09-17-isaac-lidar-qualification.md)
+- [paired results and interpretation](../archive/engineering/2026-09-17-isaac-lidar-qualification.md#interpretation)
+- [Isaac port history](../archive/engineering/port-history.md#lidars-detached-from-the-articulation-2026-09-11)
+- [removed D435 transform](../archive/engineering/operational_incidents.md#d435-static-camera-transform--removed-2026-08-31)

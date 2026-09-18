@@ -51,7 +51,7 @@ from ridgeback_autonomy.perception.target_localization.core.mask import as_mask_
 # slivers -> keeps only the nearest sliver -> reads too near; too large glues
 # the background onto the object. Note 0.30 does NOT bracket the object: the
 # G1's measured fore/aft extent is 0.4457 m (0.5749 m at worst-case yaw,
-# docs/history/projective_parameter_sensitivity.md), so the value sits on the
+# archive/engineering/projective_parameter_sensitivity.md), so the value sits on the
 # shattering side of its own rule. Untuned, and never swept.
 RANGE_JUMP_M_DEFAULT = 0.30
 
@@ -69,7 +69,7 @@ RANGE_JUMP_M_DEFAULT = 0.30
 # camera anchor, while this is a merge distance between lidar bearing runs, and
 # the two answer to different sensors and different failure modes. The
 # projective one is measured wrong at 0.35 (0.75 removes 88% of its error tail,
-# docs/history/projective_parameter_sensitivity.md); that result is about
+# archive/engineering/projective_parameter_sensitivity.md); that result is about
 # occluder standoff in the camera frame and says nothing about leg merging, so
 # it must not reach this path by moving one shared constant. Widening here would
 # in fact merge more of the parallax background the band exists to drop.

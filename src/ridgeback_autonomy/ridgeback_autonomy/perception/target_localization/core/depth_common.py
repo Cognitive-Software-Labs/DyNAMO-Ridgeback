@@ -128,13 +128,11 @@ def nearest_significant_mode(
     near surface, on the standing assumption that the subject is the nearest
     coherent surface in the set.
 
-    The property worth having is that the answer depends on *where* the near
-    surface sits, never on how much of the set is background. Adding far
-    samples adds far bins and leaves the nearest significant bin where it was.
-    A percentile anchor has no such invariance -- it asks how far in the k%
-    mark falls, so it slides outward as background's share of the set grows,
-    and that share is set by the scene's depth extent rather than by the
-    object.
+    The significance floor is a fraction of ALL samples. Adding background
+    can raise that floor above every target bin while a wall bin still
+    qualifies, changing the selected surface. The nearest-nonempty fallback
+    helps only when no bin qualifies. Bin width and scene composition both
+    affect the result; this is not a background-invariant foreground detector.
 
     ``values`` must be non-empty; callers already guard for that because an
     empty foreground is a miss they report separately.

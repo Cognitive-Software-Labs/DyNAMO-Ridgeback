@@ -16,7 +16,7 @@ documented in `docs/target_localization/mask_representation.md`.
 checkpoint's `model_type`. The default is `Zigeng/SlimSAM-uniform-50`;
 `segmentation_model` selects the checkpoint. The default was chosen for leg-gap
 fidelity and resource use in a recorded simulation comparison, not on verified
-D455 imagery. See [experimental evidence](../history/segmentation_experiments.md).
+D455 imagery. See the archived evidence below.
 
 The current stack is [OWLv2 detection](detection.md) followed, in silhouette mode, by a
 box-prompted segmenter. The segmenter is class-blind: class information comes
@@ -125,3 +125,7 @@ the published artifact when its stamp matches the rendered measurements
 exactly, so the panel shows exactly what downstream consumed; otherwise it
 keeps deriving the rect union at render time. This is visualization only; measurement consumers use in-process masks,
 not this published image.
+
+## Archived evidence
+
+- [experimental evidence](../../archive/engineering/segmentation_experiments.md)

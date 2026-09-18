@@ -1,8 +1,7 @@
 # Exact-stamp depth-delivery experiments
 
 Rejected or bounded alternatives from the 2026-09-01 investigation. The selected
-CycloneDDS remedy and full evidence are in
-[exact-stamp depth availability](../history/exact_stamp_depth_availability.md).
+CycloneDDS remedy and full evidence are in the Archived evidence section below.
 
 ## Do not widen the subscription queue as the fix
 
@@ -40,3 +39,7 @@ The trace recorded no pending detection replacements, sub-millisecond lock
 timings, 0.266 ms mean dequeue age, and 2.972 ms mean worker time. The missing
 stamps never reached the callback. A multithreaded executor, worker priority,
 or broader concurrency redesign therefore targets the wrong counter.
+
+## Archived evidence
+
+- [exact-stamp depth availability](../../archive/engineering/exact_stamp_depth_availability.md)

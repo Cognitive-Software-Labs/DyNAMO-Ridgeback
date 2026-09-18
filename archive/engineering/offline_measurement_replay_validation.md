@@ -1,9 +1,18 @@
 # Offline Measurement Replay V1 Validation
 
-Validated 2026-09-09 on branch `g1-distance-benchmarks`, commit `b5a22c15`,
+Recorded dates: 2026-09-09
+
+Tested revisions: `b5a22c15b774ac52657bab29dff5719acecd7e9d`
+
+Provenance: partial
+
+This is dated evidence. Missing revisions or preserved worktree inputs limit
+reproducibility; no new measurements were made during archive curation.
+
+Validated 2026-09-09 on branch `g1-distance-benchmarks`, commit `b5a22c15b774ac52657bab29dff5719acecd7e9d`,
 with a clean tracked worktree. Replay V1 passes its stop condition for
 box-gated stereoscopic `projective_ranging`: the default replay result preserves
-the live scoring contract and the current 15-variant projective sweep is about
+the live scoring contract and the then-recorded 15-variant projective sweep is about
 50x faster end to end than its prior live-sweep estimate.
 
 This validates a measurement-accuracy benchmark over frozen evidence. It does
@@ -61,7 +70,7 @@ The full artifact is
 |---|---|
 | Dataset ID | `20260909_184740` |
 | Dataset schema | 1 |
-| Source | `b5a22c15`, clean tree |
+| Source | `b5a22c15b774ac52657bab29dff5719acecd7e9d`, clean tree |
 | Scenario | `config/benchmark_scenarios_full.yaml` |
 | Scenario SHA-256 | `ce05ce4f278570aa8b02f47f92b37f9af5a924c05836c50875f55069b476fe67` |
 | Sweep SHA-256 | `6744d5bfe84ee4bc80ac3201bff511d76b3ab698cdd2d7ce4f9142a1e87aaf44` |

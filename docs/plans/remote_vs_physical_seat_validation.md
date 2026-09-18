@@ -36,7 +36,7 @@ timing through CPU/GPU contention is exactly what is unmeasured.
 - Refuted causes of that collapse: subscriber drops, QoS, the ffmpeg screen
   recorder, the `detector_debug` probe, detector rate, orphaned processes, CUDA
   availability. All tested. The evidence is in
-  [operational incident history](../history/operational_incidents.md#camera-software-rendering-collapse--measured-2026-09-05).
+  the archived evidence below.
 - **This plan tests Gazebo's OpenGL/GLX path.** It makes no claim about other
   rendering APIs or simulators.
 - **`tools/gpu-run` reproduces the manual export**: 25.61 Hz vs 26.51 Hz camera on the
@@ -142,7 +142,7 @@ Decision rules:
 Outcomes:
 
 1. **Equivalent** — remote numbers may be quoted as seat numbers. Record the
-   result in history so the comparison is not re-litigated.
+   result in the engineering archive so the comparison is not re-litigated.
 2. **Equivalent for sensors, worse for display** — the expected result. Record
    which metrics travel and which do not.
 3. **Sensor-path difference survives** — remote is not a valid measurement
@@ -231,3 +231,7 @@ if a faster cadence is actually wanted.
   time rather than assuming a reset affected it.
 - **Cold model load is not steady state.** First-use slot replacements are
   expected in every run; only replacements after the load window count.
+
+## Archived evidence
+
+- [operational incident history](../../archive/engineering/operational_incidents.md#camera-software-rendering-collapse--measured-2026-09-05)

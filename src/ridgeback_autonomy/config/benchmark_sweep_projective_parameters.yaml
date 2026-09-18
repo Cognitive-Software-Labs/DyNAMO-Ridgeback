@@ -14,7 +14,7 @@
 # archive appears to show (0.1236 in 20260828_152011_baseline versus 0.1621 in
 # 20260902_202659_isolation) is NOT noise: 20260828 predates the D455 correction
 # 7e31f02 and is a different camera setup.  Results:
-# docs/history/projective_parameter_sensitivity.md
+# archive/engineering/projective_parameter_sensitivity.md
 #
 # At repeats:=1 the full scenario currently produces 109 trials per config, so
 # 15 configs is roughly 6.5 hours at the baseline 15.4 seconds per trial.  Run

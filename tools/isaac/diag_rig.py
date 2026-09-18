@@ -470,7 +470,7 @@ def run_spin_transforms(app, timeline, rig, stage, robot_prim_path, tc,
                         tensor_pose, wz, frames) -> int:
     """Does the LIDAR prim's world transform keep up with the chassis body?
 
-    The desync test recorded in `docs/isaac/port-history.md`. The phantom return
+    The desync test recorded in `archive/engineering/port-history.md`. The phantom return
     band appears only while the robot moves, but the chassis and the lidars
     are one rigid body, so geometry alone cannot explain it. If the sensor's
     pose and the geometry it rays against are taken from different instants,
@@ -553,7 +553,7 @@ def run_spin_transforms(app, timeline, rig, stage, robot_prim_path, tc,
     if abs(worst) < 0.01:
         print("VERDICT: transforms stay locked — the sensor turns with the "
               "chassis.\n         This is the expected PASS once the lidars "
-              "are parented to chassis_link\n         (see docs/isaac/port-history.md). "
+              "are parented to chassis_link\n         (see archive/engineering/port-history.md). "
               "notch_r above should also hold constant; if it\n         "
               "sweeps, the sensor is detached from the body again.",
               flush=True)

@@ -8,7 +8,7 @@ it: the physical depth camera (`camera → aligned depth`) and monocular
 estimation (`RGB frame → aligned depth`). Both live in
 `perception/target_localization/core/depth_sources.py` and are pulled by
 `target_mask_measurement_node` at the detection stamp — there is no depth
-producer process (`docs/history/aligned_depth_coverage.md` §6).
+producer process.
 
 ```
                  ┌───────────────────────────┐
@@ -67,7 +67,7 @@ An **aligned depth frame** is a depth image that satisfies:
   node buffers the source's input stream raw and converts only the frame the
   detections were made on, so "the depth at stamp `T`" is a lookup into a
   buffer this process filled, not an intersection with another process's
-  thinning (`docs/history/aligned_depth_coverage.md`).
+  thinning.
 
 Everything downstream — select, clean/isolate, aggregate, deproject — is
 identical regardless of which source made the frame. The depth source is a
@@ -102,8 +102,7 @@ align. Consequences to design around:
 - **Resampling.** Depth values are interpolated/selected onto a new grid;
   fine structure can shift by a pixel.
 - **Cost.** The align filter runs in the driver. It is the price of admission
-  for every mask-based consumer, so for cost accounting it is a *sunk* cost —
-  see `docs/history/pointcloud_provenance_evaluation.md` §2.
+  for every mask-based consumer, so for cost accounting it is a *sunk* cost.
 - **Configured but unverified hardware path.** `clearpath/robot.yaml` now sets
   `align_depth.enable: true` and `enable_sync: true`; the repository's
   Clearpath parser test confirms both values survive into generated RealSense
@@ -146,8 +145,7 @@ wrong for either simulator's optics and wrong-in-principle for aligned real dept
 subscribes to the **color** camera's `camera_info` directly and deprojects with
 it (resolved 2026-07-21; the republish hop went away with the producer node on
 2026-08-26). `grid_mismatch_warning` skips the frame's paths if that grid and
-the detection grid ever disagree. The provenance test self-calibrates as a
-cross-check (`docs/history/pointcloud_provenance_evaluation.md` §3).
+the detection grid ever disagree. Intrinsics must come from the CameraInfo corresponding to the color grid.
 
 ---
 
@@ -213,8 +211,7 @@ or QoS settings, and never falls back to a nearest color frame.
   these figures may be superseded by a later run).
 - **No published cloud.** The monocular source produces only a depth image.
   euclidean reconstruction reaches it exclusively through in-code deprojection — the reason the
-  deprojected provenance is euclidean reconstruction's canonical input
-  (`docs/history/pointcloud_provenance_evaluation.md`).
+  deprojected provenance is euclidean reconstruction's canonical input.
 
 ---
 
@@ -261,13 +258,15 @@ only the source ceiling: none for stereo, derived from the metric checkpoint for
 monocular (18 m for the default checkpoint). The current 3D isolation default is
 `height_crop_nearest_mode_band`.
 
-The former independently throttled producer was removed; its diagnosis and the
-2026-07-24 monocular scale observation live in
-[history](../history/aligned_depth_coverage.md). The separate delivery investigation and its bounded resolution are recorded in
-[exact-stamp availability evidence](../history/exact_stamp_depth_availability.md).
 Smoke runs with current recipes do not replace the controlled
 [isolation comparison](../BACKLOG.md#isolation-validation), especially for long-range backgrounds.
 
 Repository alignment/configuration support does not establish physical readiness.
 The [hardware validation plan](../plans/camera_hardware_validation.md) owns the
 device, profiles, grids, stamps, TF, and optional pointcloud checks.
+
+## Archived evidence
+
+- [aligned depth coverage](../../archive/engineering/aligned_depth_coverage.md)
+- [exact-stamp availability evidence](../../archive/engineering/exact_stamp_depth_availability.md)
+- [pointcloud provenance evaluation](../../archive/engineering/pointcloud_provenance_evaluation.md)

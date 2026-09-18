@@ -1,9 +1,18 @@
 # Isaac world seating and map regeneration
 
+Recorded dates: 2026-09-17
+
+Tested revisions: unknown
+
+Provenance: partial
+
+This is dated evidence. Missing revisions or preserved worktree inputs limit
+reproducibility; no new measurements were made during archive curation.
+
 On 2026-09-17 the Isaac runner stopped applying the raised
-`mock_hospital` spawn height to every world. Supported worlds now register
-their floor top in `worlds.py`; the runner derives
-`spawn_z = floor_z + 0.02617`, and the analytic map tools derive the lidar
+`mock_hospital` spawn height to every world. The September 17 change registered
+world floor tops in `worlds.py`; the runner derived
+`spawn_z = floor_z + 0.02617`, and the analytic map tools derived the lidar
 plane from that same floor as `floor_z + 0.25257`.
 
 ## Height validation

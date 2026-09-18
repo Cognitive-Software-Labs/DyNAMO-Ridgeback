@@ -1,8 +1,7 @@
 # Troubleshooting
 
 This page owns current failure signatures and recovery steps. Dated root-cause
-investigations and measurements live in
-[operational incidents](history/operational_incidents.md).
+investigations and measurements live in the Archived evidence section below.
 
 ## Quick checks
 
@@ -188,8 +187,7 @@ future-extrapolation gap, keep these settings:
 - `scan_queue_size: 1`, so asynchronous mapping keeps only the latest scan.
 
 Increasing MPPI's transform wait does not fix stale producer timestamps and can
-cause missed controller cycles. The measured investigation is preserved in
-[operational incidents](history/operational_incidents.md#slam-tf-lag--2026-09-10).
+cause missed controller cycles. The measured investigation is preserved in the Archived evidence section below.
 
 ## SLAM drift while stationary
 
@@ -240,3 +238,8 @@ The stack currently requires the patches listed in the root README. In
 particular, `patches/slam_toolbox_tf_namespace.patch` makes the TF listener use
 the namespaced node interface. Apply each patch only after `git apply --check`;
 the upstream dependency pins and patches are one compatibility unit.
+
+## Archived evidence
+
+- [operational incidents](../archive/engineering/operational_incidents.md)
+- [operational incidents](../archive/engineering/operational_incidents.md#slam-tf-lag--2026-09-10)

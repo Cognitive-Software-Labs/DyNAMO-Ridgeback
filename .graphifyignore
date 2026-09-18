@@ -43,3 +43,6 @@ vlm_distance/
 
 # graphify's own outputs (memory/ is auto-included by the tool)
 graphify-out/
+
+# Archived experiments and preserved snapshots are not current knowledge.
+archive/

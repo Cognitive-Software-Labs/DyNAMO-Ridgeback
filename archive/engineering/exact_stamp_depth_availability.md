@@ -1,5 +1,14 @@
 # Exact-stamp depth availability investigation
 
+Recorded dates: 2026-09-01
+
+Tested revisions: `df744b2980e6fc8e9785a2e9f1015b6a978129f4`
+
+Provenance: partial
+
+This is dated evidence. Missing revisions or preserved worktree inputs limit
+reproducibility; no new measurements were made during archive curation.
+
 2026-09-01. This investigation traced intermittent `NO_DEPTH_FRAME` results to
 ROS image delivery under Fast DDS and selected CycloneDDS as the repository's
 quick-start default. Exact integer-stamp matching, buffer depth, estimator
@@ -37,7 +46,7 @@ Temporary artifacts are under:
 - Fast DDS pre: `/tmp/dynamo-exact-depth-current-5LwPlp/pre-host/benchmark`
 - CycloneDDS post: `/tmp/dynamo-exact-depth-current-5LwPlp/post-cyclone-3x/benchmark`
 
-Both use commit `df744b2`, branch `g1-distance-benchmarks`, the same scenario
+Both use commit `df744b2980e6fc8e9785a2e9f1015b6a978129f4`, branch `g1-distance-benchmarks`, the same scenario
 bytes (`sha256:6200a4d4ea2a94a121978f5e028dce74dfcd8c786852db8f63a6bc81f1f943c6`),
 five scenes, eight instances, three repeats, 2 s settle, 10 s capture,
 `mask_gate:=box`, `depth_source:=stereoscopic`, and exactly
@@ -86,9 +95,6 @@ but the contaminated GZ stamp probe is excluded from the result.
 | Detection replacement | Pending detection batches replaced | 0 of 881 | Reject |
 | Lock / worker / executor starvation | Long waits, holds, or worker times correlate with misses | Sub-ms lock timings; 2.972 ms mean worker | Reject |
 
-Queue and transport experiment details are retained in
-[exact-stamp depth delivery](../do_not_try_again/exact_stamp_depth_delivery.md).
-
 ## Runtime and RTF limits
 
 The matched launch transcripts both span 243 seconds, so the selected transport
@@ -111,26 +117,3 @@ Cyclone trial logged 98 controller `No clock received` fallbacks; the matched
 three-repeat run logged none. Neither symptom affected the matched results, but
 both should be rechecked on the Isaac Sim 6/Cyclone stack rather than generalized
 from Gazebo.
-
-## Implemented boundary
-
-`start_exploration.sh` now defaults an unset `RMW_IMPLEMENTATION` to
-`rmw_cyclonedds_cpp`. An explicit caller choice remains authoritative. The
-legacy UDP-only FastDDS toggle and XML profile were removed after the experiment
-showed substantially worse image delivery. `manual_mapping.launch.py` no longer
-forces that profile, and cleanup/diagnostic scripts no longer carry its special
-handling. `ridgeback_autonomy/package.xml` declares the Cyclone RMW runtime
-dependency.
-
-The diagnostics remain behind the existing `depth_match_debug` parameter,
-default `false`, so normal processing has no stamp recording or timing work.
-
-## Scope and limitations
-
-- No tolerance, nearest-frame fallback, retry, or status relabeling was added.
-- No estimator, gate, geometry, detector, scenario, or scoring change was made.
-- The host was shared with user-owned simulator and visualization processes;
-  they were preserved. This is not an idle-host benchmark.
-- Isaac Sim 6 was not installed or launched by this investigation. CycloneDDS is
-  now the selected transport, but Isaac camera QoS, `/clock`, control, and clean
-  shutdown still need migration validation.

@@ -1,16 +1,20 @@
-# Segmentation experiments
+# Segmentation candidate experiments — July 2026
 
-Historical evidence, not current performance guarantees. This preserves the
-recorded Phase 0 SAM comparison and the Florence-2/SAM3 spikes dated 2026-07-17.
-The original account did not give Phase 0 a separate date. These experiments
-precede the 2026-08-31 D455 simulation-geometry correction. Software versions,
-resource costs, gates, and artifact paths below describe those experiments;
-artifact availability has not been reverified during documentation consolidation.
+Recorded dates: 2026-07-17
 
-The current producer is documented in [Segmentation](../target_localization/segmentation.md).
-[Segmentation candidates](../do_not_try_again/segmentation.md) owns the unresolved
-adoption questions. A passed offline gate was not a deployment decision; no
-SAM3 or Florence-2 producer was integrated by these experiments.
+Tested revisions: unknown
+
+Provenance: partial
+
+This is dated evidence. Missing revisions or preserved worktree inputs limit
+reproducibility; no new measurements were made during archive curation.
+
+## Scope
+
+The Phase 0 SAM comparison had no separately recorded date. Florence-2 and
+SAM3 spikes were dated July 17. These runs preceded the August 31 D455 geometry
+correction. Temporary artifact availability has not been reverified. Passing
+an offline gate did not establish benchmark parity or authorize integration.
 
 ## 1. Phase 0: recorded SAM comparison and selection
 
@@ -27,75 +31,25 @@ across the full 1.5–5.5 m benchmark grid against `facebook/sam-vit-base` and
 
 The selection criterion was **silhouette fidelity on the G1's legs**: the leg
 gap must come out `False` — that gap is precisely what the tight mask buys
-polar profiling (a rect mask admits through-the-gap background rays,
-`docs/target_localization/target_localization_pipeline.md` §5). All three candidates passed the leg-gap
+polar profiling (a rectangular mask admits through-the-gap background rays). All three candidates passed the leg-gap
 check visually; SlimSAM won on stable quality at the lowest footprint. Latency
-was well inside the then-current 5 FPS detector cadence. The model stays a public parameter
-(`segmentation_model`) because the real robot's compute budget is undecided;
-both SAM 1 and SAM 2 checkpoints load (the family is dispatched on the
-checkpoint's `model_type`).
+was well inside the then-recorded 5 FPS detector cadence. That experiment did not settle the target hardware compute budget.
 
 The recorded padding check found that 5% recovered box-clipped feet at
 3.5 m without observed background bleed; 10% added no improvement in that check.
 This is a result on those frames, not a guarantee for physical-camera imagery.
 
-## 2. Recorded protocol for Florence-2 and SAM3
+## Recorded candidate protocol
 
-Every candidate is evaluated **offline, against acceptance gates fixed before
-the run, with no wiring into the pipeline**. A one-session throwaway script
-loads the candidate in the perception venv, runs the fixed frame set, and
-archives the evidence (a results JSON plus one overlay image per frame) under
-a per-candidate directory in `~/tmp/` — the evidence outlives the script; the
-script is not maintained. A candidate that fails any gate is recorded and
-dropped; a candidate that passes earns a *decision*, not adoption.
+Eight 640×480 simulation frames covered six single-target views at 1.5–5.5 m
+and two crowded views (overlapping and side-by-side). Recorded OWLv2 boxes
+served as references. A warmup preceded one synchronized GPU-timed pass per
+frame; resident and peak VRAM were recorded.
 
-**Frame set.** Eight 640×480 Gazebo renders captured from the benchmark
-scene:
-
-- Six single-G1 frames sampling the benchmark grid — one per forward distance
-  (1.5 m twice, then 2.5, 3.5, 4.5, 5.5 m) across lateral offsets −0.75, 0.0
-  and +0.75 m. Each carries the OWLv2 detection box recorded for it during
-  the SlimSAM spike, used as the reference box.
-- Two two-G1 frames covering the crowding requirement: one with the robots
-  overlapping in depth (their boxes overlap in the image) and one with them
-  side by side.
-
-**Measurement process.** One warm-up pass runs first so model compilation and
-cache effects stay out of the numbers. Each frame is then processed once,
-end-to-end (pre-processing, forward pass, post-processing to final masks),
-with GPU work synchronized before and after timing. GPU memory resident after
-load and the peak across the run are recorded alongside.
-
-**The gates and their parameters:**
-
-1. **Leg-gap fidelity.** The through-the-legs gap is what the tight mask buys
-   polar profiling (Section 1), so it is the first thing a candidate must not lose.
-   Metric: within the bottom 35% of each instance's box (the leg region), the
-   fraction of mask rows that show at least two separate filled runs — i.e. a
-   visible gap between the legs. Bar: the SlimSAM reference achieves 0.89+
-   on every frame of the grid; a candidate must match that shape, not just
-   approach it.
-2. **Latency.** Budget: **200 ms per frame, all instances included**,
-   matching the 5 FPS detector cadence used for this historical experiment.
-   Measured as the
-   synchronized end-to-end time above, after warm-up.
-3. **Multi-instance separation.** On the two-G1 frames the candidate must
-   produce exactly one confident instance per robot, with pairwise-disjoint
-   masks (mask overlap ≈ 0). Spurious extra instances are tolerable only if
-   the model emits per-instance confidence scores that cleanly separate them
-   from the real robots — without scores there is no principled way to
-   suppress duplicates (the Florence-2 lesson, Section 3).
-4. **Benchmark MAE parity.** Distance-estimate parity against the SlimSAM
-   silhouette benchmark rows. Not measurable in a spike — it requires wiring
-   the candidate in as a producer — so it is recorded as untested and becomes
-   the first post-adoption check. A failure of any earlier gate makes it moot.
-
-**Also recorded, outside the gates:** the candidate's own instance boxes are
-compared against the recorded OWLv2 reference boxes (box overlap per frame)
-to judge whether the candidate could absorb the detector stage as well; where
-the model emits per-instance confidence scores, the spike keeps them with a
-detection threshold of 0.5 so that borderline instances stay visible in the
-evidence rather than being filtered before inspection.
+The gates required leg-gap fidelity matching the reference's 0.89+ split-row
+fraction in the bottom 35% of each box, at most 200 ms/frame including all
+instances, and separate disjoint masks with usable confidence scores in the
+crowded views. Benchmark MAE parity could not be tested without integration.
 
 ## 3. Florence-2 — evaluated, spike FAILED (2026-07-17)
 
@@ -178,6 +132,5 @@ and non-functional in the pinned hub version).
 
 **Consequence:** per the decision recorded at spike time, a pass re-opens the
 main-path question. The choice — adopt SAM 3 single-stage (replacing
-OWLv2 + SlimSAM) or keep the current two-stage path — is open; no producer
-has been implemented. If adopted, the remaining gate is benchmark MAE parity
-plus a VRAM budget check on the target robot GPU.
+OWLv2 + SlimSAM) or keep the then-recorded two-stage path — was left open on July 17. The spike did not establish benchmark MAE
+parity or fit within the target robot's VRAM budget.

@@ -55,7 +55,7 @@ class LidarScanAssembler:
     were orphan rigid bodies: PhysX turned `chassis_link` and left the sensor
     behind, and the chassis sweeping under a static emitter brought its own
     notch edge into range. Fixed by reparenting to `chassis_link` in
-    `clearpath/robot.yaml` (docs/isaac/port-history.md); the mask was then measured to
+    `clearpath/robot.yaml` (archive/engineering/port-history.md); the mask was then measured to
     be unnecessary (zero returns under 1 m, stationary and spinning both
     ways, full +-135 deg arc) and removed. Do not reintroduce it to paper
     over a geometry or transform bug.

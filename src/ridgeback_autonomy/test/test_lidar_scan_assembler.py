@@ -1,7 +1,7 @@
 """Contract tests for the Isaac RTX-lidar scan assembler (no rclpy needed).
 
 Pins the published scan geometry to the UST-10LX contract, and guards the
-regression recorded in `docs/isaac/port-history.md`: the lidar
+regression recorded in `archive/engineering/port-history.md`: the lidar
 links were parented to `base_link`, a bare Xform with no joint into the
 articulation, so PhysX turned `chassis_link` and left the sensors behind. The
 chassis then swept under a static emitter and its own notch edge came into

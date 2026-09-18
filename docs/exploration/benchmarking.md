@@ -10,7 +10,7 @@ project helper (`.claude/agents/sim-runner.md`) automates the same recipe.
 > turned `chassis_link` and left the sensors behind. Reparenting them to
 > `chassis_link` fixed it: `cmd_vel` flows, the robot drives, and frontier
 > goals succeed. See the
-> [Isaac port history](../isaac/port-history.md#lidars-detached-from-the-articulation-2026-09-11).
+> archived evidence below.
 >
 > **No Isaac coverage baseline exists yet**, and every pre-2026-09-11 figure
 > is void — they were measured with a sensor that did not rotate with the
@@ -101,3 +101,7 @@ load, so an uncontrolled co-tenant workload can invalidate a navigation
 comparison. Launch logs land in `artifacts/exploration/<run>/console.log`.
 Current failure signatures and recovery steps live in
 [troubleshooting](../troubleshooting.md).
+
+## Archived evidence
+
+- [Isaac port history](../../archive/engineering/port-history.md#lidars-detached-from-the-articulation-2026-09-11)

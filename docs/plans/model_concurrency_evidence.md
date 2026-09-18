@@ -219,7 +219,7 @@ Distinguish four conclusions:
    cadence without a large interaction term.
 4. **Resource interaction:** D is materially worse than the additive prediction.
 
-If conclusion 1 holds, stop. Record the evidence in history and move this plan
+If conclusion 1 holds, stop. Record the evidence in the engineering archive and move this plan
 to `docs/do_not_try_again/` with the conditions that would justify reopening it.
 Do not prototype AutoVision.
 
@@ -300,7 +300,7 @@ Run `git diff --check`; rebuild Graphify after any temporary code work before
 capturing source-structure evidence. Remove all temporary product changes from
 the main worktree before delivery.
 
-Deliver one dated history document containing:
+Deliver one dated record under `archive/engineering/` containing:
 
 - provenance, commands, sweep-YAML path and hash, scenario hash and artifact
   paths;

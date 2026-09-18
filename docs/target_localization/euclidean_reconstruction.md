@@ -35,8 +35,7 @@ The path deprojects selected aligned-depth samples on the color grid. This works
 with both depth sources and does not require a published pointcloud. The
 separate `pointcloud` estimator still consumes a published organized cloud;
 its physical-camera eligibility must be validated, not inferred from driver
-defaults. The original source comparison and architectural decision are in
-[provenance history](../history/pointcloud_provenance_evaluation.md).
+defaults.
 
 ## 2. The four steps
 
@@ -160,12 +159,25 @@ minimum-count guard decides whether a measurement can be emitted.
 floor exceeds `floor_margin_m` (`0.05 m` by default). Height above the floor is
 the camera's height minus the point's projection onto gravity-down, so the crop
 is a half-space test that is exact for any mount orientation, roll included.
-Both the height and the gravity-down direction come from live TF (plus the
-chassis base-above-floor offset) via `camera_floor_geometry`; there is no static
-mount and no default pose, so a recipe containing a crop can only be built
-through `build_isolation_3d`, and only from a pose the caller actually has.
-This removes floor, not walls. Calibration error, ramps, and uneven ground can
-remove target points or retain floor points; this is not plane fitting.
+`camera_floor_geometry` uses the camera-optical-to-base TF and the fixed
+base-above-floor offset. It treats the base's up axis as the floor normal:
+camera mount orientation is represented, but the function does not observe a
+world floor plane or independently measure the chassis attitude. There is no
+fallback mount pose; the caller must supply an actual extrinsic to build a crop.
+
+![Side view of an assumed level floor and a tilted physical floor, showing height error growing with range.](assets/floor-crop-attitude.svg)
+
+In this two-dimensional cross-section, an unobserved floor-angle error θ gives
+height error Δh = R tan(θ) at horizontal range R (approximately Rθ for small
+angles in radians). A fixed margin therefore has less angular tolerance at long
+range. With a 0.05 m margin at 10.5 m, the illustrative threshold is about 0.273°;
+this is geometry, not a measured hardware tolerance.
+
+The crop removes floor, not walls, and is not plane fitting. Calibration error,
+ramps, or uneven ground can retain floor or remove target points. A level,
+noise-free simulator run cannot validate robustness against attitude errors
+it does not exercise. Targets wholly below the margin can lose all points and
+report `TOO_FEW_AFTER_ISOLATION`; a detected box alone does not prevent that loss.
 
 **Percentile range band.** `RangeBand` anchors at the 25th percentile of
 Euclidean camera-frame range and retains the interval from `0.10 m` ahead to
@@ -255,7 +267,7 @@ across masks.
 - **Full-geometry by-products.** The foreground set is available for later extent, orientation, or footprint
   calculations; those calculations are not emitted by this estimator.
 - **Cost:** selected-point deprojection plus the chosen isolation and reduction.
-  See [migration measurements](../history/roi_mask_migration.md) for scoped CPU
+  See the archived evidence below for scoped CPU
   evidence; there is no universal sub-millisecond or end-to-end guarantee.
 
 The paths are independent selected estimators. Geometry can motivate comparing
@@ -277,5 +289,10 @@ rows publish a planar position, not merely a scalar. Hardware cloud layout is
 unverified, not known absent.
 
 [Algorithm tests](../../src/ridgeback_autonomy/test/test_euclidean_reconstruction.py)
-and [ROI history](../history/roi_mask_migration.md) document correctness checks.
+and the archived evidence below document correctness checks.
 [The backlog](../BACKLOG.md) tracks comparative isolation and hardware validation.
+
+## Archived evidence
+
+- [provenance history](../../archive/engineering/pointcloud_provenance_evaluation.md)
+- [ROI history](../../archive/engineering/roi_mask_migration.md)

@@ -223,7 +223,7 @@ the failed phase and the relevant earlier control.
 
 ## Completion record and backlog decision
 
-Write a dated `docs/history/d455_hardware_validation_<YYYY-MM-DD>.md` containing:
+Write a dated `archive/engineering/d455_hardware_validation_<YYYY-MM-DD>.md` containing:
 
 - commands and frozen provenance;
 - device identity and effective parameter evidence;

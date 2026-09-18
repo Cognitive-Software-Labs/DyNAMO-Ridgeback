@@ -1,5 +1,14 @@
 # Gazebo measured-lidar integration check — 2026-09-18
 
+Recorded dates: 2026-09-18
+
+Tested revisions: unknown
+
+Provenance: partial
+
+This is dated evidence. Missing revisions or preserved worktree inputs limit
+reproducibility; no new measurements were made during archive curation.
+
 The measured lidar mounts passed a live Gazebo consumer integration check in
 `mock_hospital`: both raw scans remained clean during stationary, forward,
 turning, and stopping phases; collision monitoring passed the requested motion;
@@ -7,7 +16,7 @@ SLAM consumed the front scan and continued publishing maps.
 
 ## Run and evidence
 
-Base revision: `701725cd`, with pre-existing uncommitted Isaac qualification and
+Base revision: `701725cddd9fcc76bf64c8a7e6e8b21846498424`, with pre-existing uncommitted Isaac qualification and
 shared launch changes. This validates the working tree and installed workspace
 used for this run, not a clean checkout of that revision. No product code was
 changed for the test.
@@ -54,5 +63,4 @@ the transition into the stop phase.
 This closes the narrowly scoped collision-monitor/front-scan SLAM integration
 gate for these mounts in this scene. It does not establish exploration coverage,
 map accuracy, obstacle-stop performance, or all-world navigation parity.
-The lidar geometry and earlier aperture correction remain owned by
-[the robot model reference](../isaac/robot-model.md#the-riser-diamond).
+The earlier aperture correction was a separate investigation.

@@ -29,7 +29,7 @@ import numpy as np
 from ridgeback_autonomy.perception.target_localization.core.detection import resolve_torch_device
 
 
-# Pinned by the Phase 0 spike (see docs/history/segmentation_experiments.md): silhouette
+# Pinned by the Phase 0 spike (see archive/engineering/segmentation_experiments.md): silhouette
 # fidelity on the G1's legs at benchmark distances, latency, and VRAM.
 SEGMENTATION_MODEL_DEFAULT = 'Zigeng/SlimSAM-uniform-50'
 
@@ -46,7 +46,7 @@ PROMPT_PADDING_REL_DEFAULT = 0.05
 # bad prompt boxes) but will NOT catch a crisp wrong-object mask; full
 # correctness would need a depth-consistency or class check (out of scope).
 # Spike range for good G1 masks was 0.94-0.99
-# (docs/history/segmentation_experiments.md). A
+# (archive/engineering/segmentation_experiments.md). A
 # conservative 0.5 default leaves headroom for real D455 imagery scoring below
 # sim -- a tunable knob, not a magic truth.
 SEGMENTATION_MIN_PREDICTED_IOU_DEFAULT = 0.5

@@ -30,8 +30,6 @@ troubleshooting, planning, and historical documentation.
 - [RTX lidar pipeline](isaac/lidar-pipeline.md)
 - [Active Isaac engineering gaps](BACKLOG.md#isaac-exploration-recertification--p5)
 - [Isaac rollback](isaac/rollback.md)
-- [Isaac 6.1 migration evidence](history/2026-09-13-isaac-6.1-migration.md)
-- [Investigation history](isaac/port-history.md)
 
 ## Target localization
 
@@ -87,25 +85,8 @@ They are not supported implementations or automatic backlog commitments.
 - [Exact-stamp depth-delivery experiments](do_not_try_again/exact_stamp_depth_delivery.md)
 - [Monocular-depth error](do_not_try_again/monocular_depth_error.md)
 
-## History and validation
+## Archive
 
-- [Upstream dependency refresh](history/dependency_refresh.md)
-- [Operational incidents](history/operational_incidents.md)
-- [Benchmark evolution](history/benchmark_evolution.md)
-- [Segmentation experiments](history/segmentation_experiments.md)
-- [Estimator evolution](history/estimator_evolution.md)
-- [Aligned-depth coverage](history/aligned_depth_coverage.md)
-- [Point-cloud provenance evaluation](history/pointcloud_provenance_evaluation.md)
-- [Target-localization refactor validation](history/refactor_validation.md)
-- [ROI mask migration](history/roi_mask_migration.md)
-- [Exact-stamp depth availability](history/exact_stamp_depth_availability.md)
-- [Projective-parameter sensitivity](history/projective_parameter_sensitivity.md)
-- [Chassis attitude and floor crop](history/chassis_attitude_and_floor_crop.md)
-- [Offline measurement replay validation](history/offline_measurement_replay_validation.md)
-- [Layered replay implementation validation](history/layered_replay_implementation_validation.md)
-- [Running benchmarks from the configurator GUI](history/benchmark_gui_direct_run.md)
-- [Isaac world seating and map regeneration](history/isaac_world_seating.md)
-- [Isaac hull-collider live validation](history/isaac_hull_collider_validation.md)
-
-History preserves dated evidence and limitations. Read the corresponding
-technical reference for current behavior.
+[Engineering archive](../archive/engineering/README.md) — dated experiments,
+decisions, and validation limits. Current behavior is owned by the references
+above; historical records require deliberate consultation.

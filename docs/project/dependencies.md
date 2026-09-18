@@ -3,7 +3,7 @@
 This page owns the repository's procedure for importing, patching, verifying,
 refreshing, and rolling back external ROS source repositories. The root README
 keeps the public installation commands; dated refresh results belong in
-[`docs/history/`](../history/).
+[engineering archive](../../archive/engineering/README.md).
 
 ## Model and ownership
 
@@ -96,7 +96,7 @@ state, tracked diff, untracked files, and stashes. Classify each modification as
 Preserve all uncertain or intentional state before switching commits. A named
 stash with `--include-untracked` is suitable for local edits, or commit the work
 in the dependency repository when it belongs there. Dropping an edit requires
-an explicit reason in the refresh history.
+an explicit reason in the archived refresh record.
 
 ### 3. Rebase and re-record patches
 
@@ -167,10 +167,10 @@ refresh is committed and accepted.
 
 ### 7. Record and land the refresh
 
-Move the completed item out of the backlog and add a dated history page containing
+Move the completed item out of the backlog and add a dated record under `archive/engineering/` containing
 the revision table, useful upstream changes, local-edit decisions, validation
 evidence, limitations, and rollback boundary. Commit the manifest, patches,
-checker changes, current documentation, and validation history as one logical
+checker changes, current documentation, and archived validation evidence as one logical
 deliverable.
 
 ## Rollback

@@ -11,7 +11,7 @@ pointing at the documented fix.
 
 Input: a log path; default to the newest `artifacts/exploration/*/console.log`.
 Before classifying, read the relevant sections of `docs/troubleshooting.md` for
-current recipes and `docs/history/operational_incidents.md` for dated evidence.
+current recipes and `archive/engineering/operational_incidents.md` for dated evidence.
 Do not rely on this prompt alone.
 
 ## Signature checklist (count each, then classify)

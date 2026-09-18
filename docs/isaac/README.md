@@ -17,17 +17,10 @@ support. Historical controls are not current performance baselines.
 | [Ground-truth maps](../../src/ridgeback_autonomy/sim/ground_truth_maps/README.md) | Map generation and provenance |
 | [Rollback](rollback.md) | Retained environments, shared-driver recovery and verification |
 
-## Evidence and decisions
+## Archived evidence
 
-- [6.1 migration](../history/2026-09-13-isaac-6.1-migration.md): bounded controls,
-  accepted 5.1 regression and native-depth decision.
-- [LiDAR qualification](../history/2026-09-17-isaac-lidar-qualification.md):
-  dated scan, timestamp, compensation and SLAM evidence.
-- [Gazebo lidar integration](../history/2026-09-18-gazebo-lidar-integration.md):
-  measured mounts through collision monitoring and front-scan SLAM.
-- [World seating](../history/isaac_world_seating.md): floor-relative placement
-  and map regeneration.
-- [Investigation history](port-history.md): resolved causes and rejected theories.
-
-Current behavior belongs in the references above. Dated evidence retains the
-limitations of its recorded configuration; it does not override the backlog.
+- [6.1 migration](../../archive/engineering/2026-09-13-isaac-6.1-migration.md)
+- [LiDAR qualification](../../archive/engineering/2026-09-17-isaac-lidar-qualification.md)
+- [Gazebo lidar integration](../../archive/engineering/2026-09-18-gazebo-lidar-integration.md)
+- [World seating](../../archive/engineering/isaac_world_seating.md)
+- [Investigation history](../../archive/engineering/port-history.md)

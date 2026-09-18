@@ -28,16 +28,13 @@ from ridgeback_autonomy.perception.target_localization.core.depth_common import 
     valid_depth,
 )
 
-# Depth kept either side of the near-surface anchor. Its job is to span from the
-# anchor to the far side of whatever the anchor landed on, so the bound that
-# matters is the occluder standoff (0.62 m in the shipped scene set), not the
-# target's own 0.4457 m depth extent: when an occluder takes the anchor, only a
-# band wider than the standoff can reach the target behind it.
-#
-# 0.35 is therefore measured **wrong** -- 0.75 removes 88% of the error tail at
-# no cost (docs/history/projective_parameter_sensitivity.md). It is left at the
-# shipped value here because moving it is a behaviour change with goldens to
-# regenerate, not part of the cleanup that gave it its own home.
+# Depth retained either side of the near-surface anchor. If an occluder wins
+# the anchor, the band must reach past its standoff to include the target;
+# a wider band can also admit unwanted background. Target dimensions alone
+# do not determine a safe width. See the current projective-ranging reference.
+# The September 7–8, 2026 sweep favored 0.75 on its particular scene set
+# (archive/engineering/projective_parameter_sensitivity.md); that result did
+# not establish a universally better default. Keep the configured 0.35 here.
 #
 # It lived in ``ranging_defaults`` until the polar path, which read the same
 # constant as a lidar run-merge distance, was given its own. The two were equal

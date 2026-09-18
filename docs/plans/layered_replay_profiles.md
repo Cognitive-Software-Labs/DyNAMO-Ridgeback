@@ -13,8 +13,8 @@ capture, box and SlimSAM materializers, projective/Euclidean cache replay,
 atomic outputs, and the three generalized commands. Unit/compatibility/import/determinism tests and
 a preliminary lossless storage spike pass. A fresh full live sensor capture,
 box/SlimSAM live parity, real full-frame storage/scaling measurements, and a
-candidate checkpoint run remain required before this plan can move to history;
-see `docs/history/layered_replay_implementation_validation.md`.
+candidate checkpoint run remain required before this plan can be retired into the archive;
+see the archived evidence below.
 
 ## Decision
 
@@ -307,7 +307,7 @@ OWLv2, ROS, or model inference during measurement evaluation.
 - Run at least one segmentation candidate through `mask-model`, then reuse both
   resulting mask caches in a multi-variant measurement sweep.
 - Update the benchmark reference, README workflow, docs index, and dated
-  history only after all gates pass.
+  the archive only after all gates pass.
 
 Gate: the report states both the accuracy conclusion and the exact profile
 boundary, so a replay timing number cannot be mistaken for system efficiency.
@@ -362,3 +362,7 @@ separate need and plan.
   tests.
 - Updated technical reference and operator workflow plus dated validation
   evidence.
+
+## Archived evidence
+
+- [layered replay implementation validation](../../archive/engineering/layered_replay_implementation_validation.md)

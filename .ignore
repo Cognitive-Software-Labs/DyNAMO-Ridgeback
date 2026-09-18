@@ -1,0 +1,3 @@
+# Historical evidence is tracked but excluded from ordinary recursive search.
+# Opt in explicitly: rg --no-ignore PATTERN archive/engineering/
+/archive/

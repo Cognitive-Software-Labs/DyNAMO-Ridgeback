@@ -26,9 +26,7 @@ Isaac Sim port (in progress, `feat/isaac-sim-6-port`):
 
 - `docs/BACKLOG.md`: **all active engineering gaps**, including Isaac
 - [Isaac rollback](docs/isaac/rollback.md): retained environments and driver recovery
-- [6.1 migration evidence](docs/history/2026-09-13-isaac-6.1-migration.md): compatibility controls and decisions
 - `docs/isaac/camera-depth.md`: Isaac D455 depth modes, alignment, ROS contract, and runbook
-- `docs/isaac/port-history.md`: superseded investigation narratives
 - `docs/isaac/lidar-pipeline.md`: how the RTX lidar reaches ROS
 - `docs/isaac/assets/robot-geometry.svg` / `robot_render.png`: sensor mounting, dimensioned
 
@@ -355,8 +353,7 @@ RMW_IMPLEMENTATION=rmw_fastrtps_cpp bash start_exploration.sh office  # explicit
 
 The script defaults to CycloneDDS, selected by the exact-stamp image-delivery
 benchmark. An explicit `RMW_IMPLEMENTATION` remains authoritative. The rejected
-UDP-only FastDDS experiment is retained in the
-[investigation history](docs/history/exact_stamp_depth_availability.md).
+UDP-only FastDDS experiment is retained in the archived evidence below.
 
 Every launch entrypoint also points `CYCLONEDDS_URI` at
 `config/cyclonedds.xml`, which raises the participant-index ceiling. The full
@@ -561,8 +558,7 @@ The shipped `benchmark_sweep_projective_parameters.yaml` varies one projective
 ranging tuning constant at a time — `isolation_2d_band_m`,
 `isolation_2d_min_bin_fraction`, `isolation_2d_bin_width_m` and
 `min_valid_pixels` — around their current values, and repeats the default
-configuration twice as an in-sweep noise control. See
-[projective parameter sensitivity](docs/history/projective_parameter_sensitivity.md)
+configuration twice as an in-sweep noise control. See the Archived evidence section below
 for what is already settled and what those runs are meant to answer.
 
 Do **not** run `cleanup.sh` between configurations: it kills the Gazebo server
@@ -670,8 +666,7 @@ time, and one normal CSV/`run.json`/`summary.md` set per variant. The clean
 live rows, and reduced the estimated 6.99-hour 15-variant sweep to 8 minutes 22
 seconds end to end (about 50x). Five batches is therefore the legacy capture default. On
 the measured 32-thread host, 16 workers was the replay knee; choose workers for
-the machine rather than blindly using every logical CPU. See
-[`docs/history/offline_measurement_replay_validation.md`](docs/history/offline_measurement_replay_validation.md).
+the machine rather than blindly using every logical CPU. See the Archived evidence section below.
 
 ### Layered mask replay
 
@@ -832,8 +827,7 @@ change a pin to `jazzy`/`main` to pick up a fix: a fresh `vcs import` would then
 clone commits the patches were never rebased onto. The complete import, refresh,
 live-checkout migration, and rollback procedure lives in the
 [dependency runbook](docs/project/dependencies.md). The latest completed refresh
-and its evidence are recorded in
-[dependency refresh history](docs/history/dependency_refresh.md).
+and its evidence are recorded in the Archived evidence section below.
 
 `tools/check_dependencies` verifies every checkout revision and rejects
 untracked files or changes beyond the recorded patches. Its `--apply` mode
@@ -847,4 +841,14 @@ tools/check_dependencies --apply --profile all
 Never resolve a reported conflict by discarding unrelated changes in a
 dependency checkout.
 
-Current recovery steps live in [troubleshooting](docs/troubleshooting.md), while dated root causes and measurements live in [operational incident history](docs/history/operational_incidents.md).
+Current recovery steps live in [troubleshooting](docs/troubleshooting.md), while dated root causes and measurements live in the archived evidence below.
+
+## Archived evidence
+
+- [6.1 migration evidence](archive/engineering/2026-09-13-isaac-6.1-migration.md)
+- [investigation history](archive/engineering/exact_stamp_depth_availability.md)
+- [projective parameter sensitivity](archive/engineering/projective_parameter_sensitivity.md)
+- [Offline measurement replay validation](archive/engineering/offline_measurement_replay_validation.md)
+- [dependency refresh history](archive/engineering/dependency_refresh.md)
+- [operational incident history](archive/engineering/operational_incidents.md)
+- [port history](archive/engineering/port-history.md)

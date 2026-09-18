@@ -1,45 +1,26 @@
-# ROI-native mask migration
+# ROI-mask representation measurements — August 31, 2026
 
-2026-08-31. Behaviour-preserving migration of the target-localization mask
-pipeline to one ROI-native representation. The contract itself is documented in
-`docs/target_localization/mask_representation.md` Section 7; this file records what was proven and what was
-measured.
+Recorded dates: 2026-08-31
 
-Scope note: this is a representation change. It does not close the exact-stamp
-depth-availability gap tracked in `docs/history/refactor_validation.md`, and nothing here
-should be read as having done so.
+Tested revisions: unknown
 
-## What changed
+Provenance: partial
 
-| Boundary | Before | After |
-|---|---|---|
-| Producers | `rasterize_detection` / `mask_from_array` → full-grid `Mask` | `region_from_bbox` / `region_from_blob` → `MaskRegion` |
-| Per-detection depth prep | `mask.data & frame_valid`, full-grid, once per detection and already shared by both depth estimators | one shared `PreparedDepthRegion` per detection, ROI-sized |
-| Depth estimators | one entry point, precision fork inline | `select_foreground_pixels` / `select_foreground_points` policy + shared reduction, behind two entry points |
-| Polar membership | `mask.data[v_px, u_px]` | `MaskRegion.contains_pixels`, bounds-tested before indexing |
-| Debug union | full-grid write per mask | `MaskRegion.blit_into` one output buffer |
-| `deproject_masked` | `np.asarray(depth, float64)[rows, cols]` | gather, then widen |
+This is dated evidence. Missing revisions or preserved worktree inputs limit
+reproducibility; no new measurements were made during archive curation.
 
-Preserved deliberately: `MaskPrecision.RECT`/`TIGHT` and the different
-foreground policies behind them; recipe catalogues, defaults, thresholds and
-point ordering; every miss reason at the same logical stage; `None` vs empty;
-oversized-box and segmentation rejection; exact-stamp RGB/depth matching;
-`PreparedColorFrame` identity; zero-or-one scan projection per batch; all ROS
-topic and message contracts. No launch parameter, runtime toggle, dependency or
-strategy framework was added.
+## Scope
 
-Compatibility is confined to boundaries: `Mask`, `mask_from_array`,
-`rasterize_bbox` / `rasterize_detection` / `rasterize_batch`, `masked_rgb`, and
-the full-grid `localize_projective_ranging` / `localize_euclidean_reconstruction`
-keep their signatures and meaning, backed by the same geometry and reduction code
-rather than a second copy. A caller's precomputed `valid_masked` is still passed
-to a custom isolation callable by identity.
+The migration replaced full-image mask storage with owned ROI-sized data while
+preserving global pixel coordinates, precision policies, misses, and output
+contracts. This record retains parity evidence and measured tradeoffs; it does
+not establish lower whole-system latency or resolve depth-delivery losses.
 
 ## Correctness evidence
 
 Reference results were captured from the **pre-migration** implementation and
 checked in as `test/mask_region_pre_migration_reference.json`; the parity tests
-compare against that file, not against a second wrapper of today's code. Twenty
+compare against that file, not against a second wrapper of at the recorded date's code. Twenty
 reference cases cover both precisions, both 2D recipes and all three 3D recipes,
 finite and unlimited depth gates, float32 and float64 depth, a scene carrying
 zero / NaN / inf / negative returns, both starvation reasons, and polar beam
@@ -52,16 +33,6 @@ for recorded depth, representative global UV and optical coordinates using
 count, first/last points and coordinate sums (the sums use `rel=1e-12`), not an
 element-by-element comparison of the entire ordered set. These are fixture-level
 parity checks, not a claim of bitwise equality for every runtime output.
-
-Tests: **541 → 633** (`541` measured at `f16afd0` before this work started, `+9`
-from the concurrent TF fix since committed as `e9ff5f3`, **`+83` added here**).
-Nothing was removed or skipped.
-
-| File | Covers |
-|---|---|
-| `test_mask_region.py` | region contract, ownership/read-only, canonical empty, clamped/inverted/fractional boxes, tight-extent cropping, offset/edge/one-pixel windows, holes and disconnected components, negative and out-of-window membership, crop↔materialize round trips, the `Mask` crossing |
-| `test_mask_region_parity.py` | the frozen pre-migration numbers, shortfall reasons, empty-region behaviour, polar beam parity and overlap independence, `deproject_masked` gather order on float32/float64/strided/empty input |
-| `test_mask_region_allocation.py` | structural: no full-grid materialization in the pipeline (`to_full_array`/`to_mask` monkeypatched to raise), region-sized prepared arrays, no full-frame cast per euclidean call, one debug output rather than one mask per detection |
 
 Allocation assertions use `tracemalloc`'s peak counter, which covers numpy data
 buffers including temporaries freed before the call returns. They are bounds
@@ -142,10 +113,10 @@ gate, headless. Artifacts (temporary, not checked in):
 
 **Box-gate aggregate MAE matches the recorded baseline to six decimal places,
 with the same scored-instance counts.** The baseline column is the pre-refactor
-run recorded in `docs/history/refactor_validation.md`. This does not establish
+run recorded in `archive/engineering/refactor_validation.md`. This does not establish
 per-frame or bitwise equality:
 
-| Estimator | MAE now (m) | Pre-migration MAE (m) | Δ | Scored |
+| Estimator | MAE at that stage (m) | Pre-migration MAE (m) | Δ | Scored |
 |---|---:|---:|---:|---|
 | Point cloud | 0.129655 | 0.129655 | 0.000000 | 6/8 |
 | Projective ranging | 0.055221 | 0.055221 | 0.000000 | 6/8 |
@@ -184,16 +155,6 @@ SlimSAM ran 11 segmentation batches and the mask rows produced
 230 / 230 / 203 OK observations. `NO_COLOR_FRAME` ×3
 appears only under this gate, which is correct — it is the one gate that needs
 the exact-stamp color frame. Both runs recorded one `UNSET` batch.
-
-## Checks run
-
-- Direct ROS-sourced pytest, full package suite: **633 passed**.
-- `colcon build --symlink-install`, then the full suite again against the
-  rebuilt install tree, then `colcon test` / `colcon test-result`.
-- `ros2 launch ... ridgeback_exploration.launch.py --show-args` and
-  `target_distance_benchmark.launch.py --show-args`.
-- `git diff --check`.
-- Graphify rebuilt with the repository helper.
 
 ## Not performed
 

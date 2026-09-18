@@ -182,9 +182,32 @@ right for the other.
 
 This assumes the target is the nearest coherent surface. A closer occluder can
 win, spatial connectivity is not enforced, and bin width, significance, and
-band width affect the result. How much each of them moves the estimate is
-measured in
-[projective parameter sensitivity](../history/projective_parameter_sensitivity.md).
+band width affect the result. A band wide enough to include the target past a
+nearer occluder can also include unwanted background; its width is not determined
+by target dimensions alone.
+
+**Significance depends on scene composition.** The floor is a fraction of all
+valid masked samples. Adding background can raise that floor above every target
+bin while a concentrated wall bin still qualifies. The fallback runs only when
+*no* bin qualifies, so it cannot rescue this case. Narrower bins can have the
+same effect by spreading target samples across more bins. These parameters can
+change the selected surface, not just round its estimated depth.
+
+```mermaid
+flowchart LR
+    D["Valid masked depths"] --> H["Histogram at bin_width_m"]
+    H --> S{"Any bin has count ≥<br/>max(1, min_bin_fraction × N)?"}
+    S -->|yes| Q["Nearest qualifying bin<br/>may be background"]
+    S -->|no| F["Nearest nonempty bin"]
+    Q --> A["Bin center → ±band_m selection"]
+    F --> A
+```
+
+The minimum-pixel guard checks sample sufficiency before and after isolation.
+It does not establish that those samples belong to the target. For fixed camera
+and target geometry, projected sample count falls approximately as inverse
+range squared; raising the guard can therefore reject distant targets without
+altering surviving estimates.
 
 **Otsu.** `otsu_foreground` selects the threshold with maximum between-class
 variance and retains depths on its near side. It still has a bin-width setting
@@ -328,7 +351,11 @@ default, so a standalone caller states the range it trusts instead of inheriting
 one.
 
 [Tests](../../src/ridgeback_autonomy/test/test_projective_ranging.py) cover the
-algorithm; ROI parity is recorded in [migration history](../history/roi_mask_migration.md).
-[Estimator history](../history/estimator_evolution.md) retains the comparison
-with the deleted depth estimator. Comparative and hardware work is tracked in
+algorithm. Comparative and hardware work is tracked in
 [the backlog](../BACKLOG.md), not as unresolved interface decisions.
+
+## Archived evidence
+
+- [projective parameter sensitivity](../../archive/engineering/projective_parameter_sensitivity.md)
+- [migration history](../../archive/engineering/roi_mask_migration.md)
+- [Estimator history](../../archive/engineering/estimator_evolution.md)

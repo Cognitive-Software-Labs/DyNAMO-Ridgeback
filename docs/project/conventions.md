@@ -86,3 +86,22 @@ The repository graph lives in `graphify-out/`.
   owns the correct environment and output path.
 
 Graphify is required after code changes, not documentation-only edits.
+
+## Current knowledge and archive access
+
+For current-system questions, start with code and the maintained topic references
+under `docs/`. Ordinary recursive searches exclude `archive/` through `.ignore`;
+Graphify excludes it through `.graphifyignore`. Do not routinely bypass those
+exclusions or load the archive into default task context.
+
+Consult archived engineering evidence deliberately for a dated experiment,
+decision, regression comparison, or an explicitly cited evidence trail. Search
+it with `rg --no-ignore PATTERN archive/engineering/`. State the record's date
+and tested revision when using its findings. Verify its claims against current
+code before describing them as current behavior; partial or unknown provenance
+cannot establish reproduction of an exact tested state.
+
+The [documentation policy](documentation.md#archived-evidence) owns record
+format, content ownership, and immutable source-link requirements. Search
+exclusions guide retrieval; they do not restrict filesystem access or guarantee
+correct interpretation by an agent.

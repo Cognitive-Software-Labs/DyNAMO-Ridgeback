@@ -11,7 +11,7 @@ runtime producers or committed implementation tasks.
 | Sim-trained dedicated segmenter | Proposed, not spiked | Accept closed vocabulary and training maintenance; demonstrate dataset and sim-to-real feasibility |
 
 Detailed measurements, checkpoint/version pins, the eight-frame dataset, and
-artifact references live once in [Segmentation experiments](../history/segmentation_experiments.md).
+artifact references live once in the archived evidence below.
 The SAM3 spike's untested benchmark-parity gate must not be reported as passed.
 
 ## Evaluation criteria for a new experiment
@@ -46,3 +46,7 @@ new target class means regenerating data and retraining; sim-to-real transfer
 on real D455 imagery is the classic failure mode and must be validated before
 any real-hardware reliance; a training pipeline becomes repo infrastructure to
 own and maintain.
+
+## Archived evidence
+
+- [Segmentation experiments](../../archive/engineering/segmentation_experiments.md)

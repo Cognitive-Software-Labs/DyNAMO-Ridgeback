@@ -1,5 +1,14 @@
 # Chassis Attitude and the Floor Crop — Simulator Measurements
 
+Recorded dates: unknown
+
+Tested revisions: unknown
+
+Provenance: partial
+
+This is dated evidence. Missing revisions or preserved worktree inputs limit
+reproducibility; no new measurements were made during archive curation.
+
 **Scope:** the two constants behind `HeightCrop`
 (`perception/target_localization/core/isolation_3d.py`) —
 `BASE_ABOVE_FLOOR_M_DEFAULT = 0.026` and `FLOOR_MARGIN_M_DEFAULT = 0.05`. This
@@ -12,7 +21,7 @@ Two questions were asked of the simulator:
 2. Does the chassis tilt — statically or under acceleration — by enough for the
    floor margin to be doing work?
 
-The first is answered and the constant is now grounded. The second is answered
+The recorded run supported the simulator offset. The second question was examined
 in a way that forecloses the simulator as evidence for the margin at all.
 
 ## Why the margin depends on attitude
@@ -75,7 +84,7 @@ posed at `3 0 0`, so its **top surface is at z = +0.05**
 | predicted from URDF (`0.0759 − 0.0500`) | 0.0259 m |
 | contact penetration | 0.42 µm |
 
-The constant is correct to 0.1 mm, and this is now a measurement of where the
+The measured simulator offset agreed within 0.1 mm. This measured where the
 physics engine rests the robot rather than a re-reading of the description that
 generated it. The wheel-radius-minus-axle-offset derivation is confirmed
 independently.
@@ -86,7 +95,7 @@ heights were raised 15 mm at serial R100-0111 and the description models the
 taller variant (`deck_height` 0.280 puts the deck at ~306 mm above the floor).
 That discrepancy is untouched by anything here and remains open for hardware.
 
-## Result 2 — the simulated chassis cannot tilt
+## Result 2 — negligible tilt in the tested flat-floor run
 
 | | at rest | driving 0 → 0.8 m/s → 0 |
 |---|---|---|
@@ -98,26 +107,19 @@ That discrepancy is untouched by anything here and remains open for hardware.
 Peak observed tilt is roughly 560,000× below the 0.2728° threshold. The
 implied floor-height error at 10.5 m is 8.9e-08 m.
 
-The cause is structural, not incidental. The rockers carry revolute limits of
-±0.08726 rad but are instantiated with `joint_type="fixed"`
-(`clearpath_platform_description/urdf/r100/drivetrain/wheels.urdf.xacro`), and
-contact penetration is sub-micron. The model has no suspension degree of
-freedom, so chassis tilt has nowhere to express itself. This is not a flat
-floor happening to produce a level robot; it is a robot that cannot tilt.
+The inspected wheel description instantiated the rocker joints as fixed,
+despite their nominal revolute limits. This supported the absence of suspension
+compliance in that setup, but did not itself prove that the entire rigid body
+could never roll or pitch.
 
-## What this forecloses
+## Interpretation and correction — September 18, 2026
 
-- **The floor margin cannot be validated or falsified in simulation.** With
-  attitude error identically zero and depth rendered without a noise model or a
-  stereo baseline (stated in `intel_realsense.urdf.xacro`), every margin from
-  0 upward classifies floor points identically. A benchmark result showing no
-  sensitivity to `floor_margin_m` is a property of the model, not evidence
-  about the value.
-- **Simulation cannot estimate the hardware figure either.** Driving the model
-  was expected to yield an informed estimate of chassis pitch for this mass and
-  centre of gravity. It cannot: the compliance that would produce pitch is not
-  modelled at all. The simulator yields no information about hardware attitude
-  error — not a small value, no value.
+The original record interpreted the fixed rocker joints and near-zero observed
+tilt as proof that the simulated chassis could not tilt. That general conclusion
+exceeds the experiment: fixed internal joints alone do not rule out whole-body
+rotation. What the measurements establish is that this flat-floor run did not
+exercise an attitude-error term useful for calibrating the floor margin.
+It supplied no physical-robot attitude distribution or hardware margin bound.
 
 ## What remains measurable here
 
@@ -129,10 +131,10 @@ f ≈ 443 px, a 5 cm object still spans ~9.5 px at 2 m, so the sensor is not the
 limit — the crop is. That regression reproduces without any of the error
 sources the margin exists to absorb.
 
-## Consequences
+## Decision recorded with the experiment
 
-- `BASE_ABOVE_FLOOR_M_DEFAULT`'s comment may now honestly say measured, citing
-  the method above. Hardware remains unverified.
+- The experiment supported the simulator's base-height constant. It did not
+  validate that offset on hardware.
 - `FLOOR_MARGIN_M_DEFAULT` stays ungrounded and cannot be grounded from this
   repository. Its value is an error budget dominated by an attitude term that
   only hardware can supply.

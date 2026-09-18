@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 310" role="img" aria-labelledby="title desc">
+  <title id="title">Floor-crop height error grows with range</title>
+  <desc id="desc">An assumed horizontal floor and a tilted actual floor diverge. At horizontal range R the vertical difference is R tan theta.</desc>
+  <rect width="780" height="310" rx="16" fill="#101d30"/>
+  <g font-family="sans-serif" fill="#e9f1fb">
+    <text x="30" y="37" font-size="20" font-weight="bold">Unobserved floor angle becomes a height error</text>
+    <text x="30" y="64" font-size="14" fill="#aebed3">Illustrative side view · angle exaggerated · not a sensor measurement</text>
+    <line x1="80" y1="240" x2="670" y2="240" stroke="#9bacc4" stroke-width="2" stroke-dasharray="8 6"/>
+    <line x1="80" y1="240" x2="650" y2="125" stroke="#59d4c3" stroke-width="4"/>
+    <line x1="80" y1="209" x2="665" y2="209" stroke="#e3b769" stroke-width="2" stroke-dasharray="4 5"/>
+    <rect x="45" y="190" width="66" height="27" rx="4" fill="#91b7ff"/>
+    <circle cx="59" cy="231" r="9" fill="#91b7ff"/><circle cx="98" cy="231" r="9" fill="#91b7ff"/>
+    <text x="31" y="175" font-size="14">Base assumed level</text>
+    <text x="347" y="134" font-size="15" fill="#59d4c3">Physical floor</text>
+    <text x="294" y="231" font-size="14" fill="#aebed3">Assumed floor</text>
+    <text x="430" y="199" font-size="14" fill="#e3b769">Crop margin</text>
+    <line x1="650" y1="125" x2="650" y2="240" stroke="#ef879d" stroke-width="3"/>
+    <line x1="642" y1="125" x2="658" y2="125" stroke="#ef879d" stroke-width="2"/>
+    <line x1="642" y1="240" x2="658" y2="240" stroke="#ef879d" stroke-width="2"/>
+    <text x="667" y="174" font-size="16" fill="#ef879d">Δh</text>
+    <text x="541" y="103" font-size="17">Δh = R tan(θ)</text>
+    <path d="M180 240 A100 100 0 0 0 178 220" fill="none" stroke="#fff" stroke-width="2"/>
+    <text x="190" y="234" font-size="17">θ</text>
+    <line x1="80" y1="271" x2="650" y2="271" stroke="#aebed3" stroke-width="1.5"/>
+    <line x1="80" y1="265" x2="80" y2="277" stroke="#aebed3"/><line x1="650" y1="265" x2="650" y2="277" stroke="#aebed3"/>
+    <text x="268" y="297" font-size="15">Horizontal range R</text>
+  </g>
+</svg>

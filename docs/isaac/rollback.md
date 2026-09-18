@@ -2,8 +2,8 @@
 
 This workstation-specific procedure restores the pre-migration 580 driver and
 retained 6.0.1 environment. It changes the driver for **every user** and requires
-a reboot. Coordinate host downtime before executing it. The
-[migration evidence](../history/2026-09-13-isaac-6.1-migration.md) records why the
+a reboot. Coordinate host downtime before executing it. The archived migration
+record explains why the
 5.1 regression was accepted; it is not authorization for a new host change.
 
 ## Preflight and retained resources
@@ -77,3 +77,7 @@ no traceback, segmentation fault, CUDA or Vulkan error. This exercises
 CUDA/PhysX/rendering, not ROS; add the actual ROS workload if its recovery is
 required. Returning to 6.1 requires a separately qualified supported driver;
 repointing the venv alone does not restore driver compatibility.
+
+## Archived evidence
+
+- [migration evidence](../../archive/engineering/2026-09-13-isaac-6.1-migration.md)

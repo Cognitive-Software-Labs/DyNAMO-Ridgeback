@@ -431,7 +431,7 @@ cover synthetic profiles, mask membership, projection, and sparse failures.
 
 ## 7. Evidence and validation boundaries
 
-[Estimator history](../history/estimator_evolution.md) preserves the deleted
+The archived evidence below preserves the deleted
 LiDAR-row comparison and early scores. That baseline is not runnable today,
 and those results do not isolate a tuning effect from a surface/center offset.
 Any future tuning should compare against ground truth on existing clutter and
@@ -502,3 +502,7 @@ which is deliberately outside what this benchmark measures.
 active work. Fusion/parallax guards, fallback routing, and rear-scan merging are
 conditional extensions described in the [pipeline](target_localization_pipeline.md#9-conditional-extensions-not-current-behaviour),
 not missing pieces of the current independent-estimator contract.
+
+## Archived evidence
+
+- [Estimator history](../../archive/engineering/estimator_evolution.md)

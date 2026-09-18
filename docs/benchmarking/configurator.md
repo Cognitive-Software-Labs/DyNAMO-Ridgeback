@@ -22,9 +22,7 @@ throughout, and the rendered command names that file. Every operator-supplied
 path is anchored on the workspace root once, by `paths.anchored_path`, so what
 the page reports about an input is what the run resolves. Browser download of a
 job cannot do this: the page never learns the download directory, while a job's
-relative paths resolve against the job file's own parent. The reversal and its
-evidence are in
-[running benchmarks from the configurator GUI](../history/benchmark_gui_direct_run.md).
+relative paths resolve against the job file's own parent.
 
 ## Authoring a live sweep
 
@@ -55,7 +53,10 @@ cannot orphan a simulator. Run records live under
 `artifacts/configurator/runs/<run_id>/`; runs outlive the GUI and the tab
 re-attaches from disk. Concurrent runs are refused server-side, because two
 replays contend for the worker counts the operator chose. Cancellation signals
-the process group and escalates SIGINT → SIGTERM → SIGKILL.
+the process group and escalates SIGINT → SIGTERM → SIGKILL. It monitors the
+group, because the wrapper shell can exit before a child that ignores SIGINT.
+Reattachment instead verifies the recorded PID's command line: existence alone
+is insufficient because the kernel reuses PIDs after a GUI restart.
 
 `live-system` sweeps stay terminal-only: `target_benchmark_sweep` runs
 `run_preflight_cleanup`, whose catch-all would `kill -9` the page. The UI shows
@@ -95,11 +96,7 @@ silently is exactly what the refusal exists to prevent, so the value stays, its
 knobs go, and the job is refused with the reason before the run rather than
 after every trial has loaded.
 
-## Validation status
+## Archived evidence
 
-The combined installed-package suite passed with 758 tests after the
-configurator landed, as recorded in
-[layered replay implementation validation](../history/layered_replay_implementation_validation.md).
-That record contains no canonical browser screenshot or visual-acceptance
-artifact; the functional contract is verified, while visual proof is not
-claimed.
+- [running benchmarks from the configurator GUI](../../archive/engineering/benchmark_gui_direct_run.md)
+- [layered replay implementation validation](../../archive/engineering/layered_replay_implementation_validation.md)

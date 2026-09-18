@@ -4,7 +4,8 @@ The point-domain localization path: deproject the valid masked pixels of the
 aligned depth frame into camera-optical-frame points, isolate the foreground
 in the point domain, and reduce the survivors to one coordinate. The
 deprojected cloud is the canonical input -- the published cloud topic is
-never consumed (provenance decision of ``docs/history/pointcloud_provenance_evaluation.md``).
+never consumed by this path. The maintained reference above owns the mechanism
+and its input requirements; the independent pointcloud estimator has its own input.
 
 The isolate step is the only place the mask's ``tight | rect`` tag changes
 behavior: ``tight`` takes a statistical outlier pass (median +/- k*MAD on

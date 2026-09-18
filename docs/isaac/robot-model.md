@@ -162,15 +162,6 @@ the retired generic Clearpath 640×480 `CameraInfo` at 30.3 Hz with
 `fx=fy=443.53` and
 `camera_0_color_optical_frame`.
 
-The [2026-09-18 Gazebo integration check](../history/2026-09-18-gazebo-lidar-integration.md)
-also passed the `collision_monitor` and front-scan SLAM consumer gate in
-`mock_hospital`: raw scans stayed clean during forward motion and turning,
-collision monitoring passed the commands, and SLAM continued publishing maps.
-This verifies the measured mounts through those consumers in that scene;
-exploration coverage, map accuracy, and obstacle-stop performance were not
-qualified by this check. Keep the shared physical mounts and ±135° aperture at
-the measured values.
-
 ---
 
 ## The chassis comes from NVIDIA, not the importer
@@ -244,13 +235,10 @@ dashed red AABB is similar at 0 and 90 degrees but visibly over-claims the
 45-degree approach.
 
 The live contact acceptance tolerance is **10 mm collider-to-wall error** at
-0.05–0.20 m/s. The clean three-boot Isaac 6.1 qualification at `dbf50bc0`
-passed 39/39 frontal, lateral, and 45-degree contacts with 0 mm cross-boot
-spread. Worst measured stop error was 0.000335 mm, penetration 0.002951 mm,
-tangential drift 2.762 mm, and yaw drift 0.262 degrees. The retired AABB
-control reproduced its predicted 45-degree stop delta within 0.323 mm, proving
-that the harness distinguishes the two envelopes. See the
-[live validation record](../history/isaac_hull_collider_validation.md).
+0.05–0.20 m/s. Qualify frontal, lateral and angled approaches, held contact,
+stop/reverse recovery, and cross-boot repeatability. The retired AABB serves as
+a control: its predicted contact envelope must produce a distinct measured
+stop location. Dated outcomes and traces remain in the archived qualification.
 
 The hull keeps 119 verts / 234 facets against the source's 972 / 324. What it
 over-claims is the underside cavity between the wheels, which the wheel
@@ -296,7 +284,7 @@ dummy_base_y → base_link`).
 `base_link` to `floor_z + 0.02617` by default. This yields z=0.07617 in the
 raised repo worlds and z=0.02617 in the stock worlds. `--spawn-z` remains an
 explicit diagnostic override. The wheel and lidar height validation is
-recorded in [Isaac world seating](../history/isaac_world_seating.md).
+recorded in the archived evidence below.
 
 ---
 
@@ -339,3 +327,9 @@ OMNI_KIT_ACCEPT_EULA=YES isaac_venv/bin/python3 tools/isaac/inspect_robot.py
 isaac_venv/bin/python3 src/ridgeback_autonomy_isaac/sim/isaac/isaac_runner.py \
     --world empty --headless false --camera false
 ```
+
+## Archived evidence
+
+- [2026-09-18 Gazebo integration check](../../archive/engineering/2026-09-18-gazebo-lidar-integration.md)
+- [live validation record](../../archive/engineering/isaac_hull_collider_validation.md)
+- [Isaac world seating](../../archive/engineering/isaac_world_seating.md)

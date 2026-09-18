@@ -1,5 +1,14 @@
 # Isaac 6.1 LiDAR and SLAM qualification — 2026-09-17–18
 
+Recorded dates: 2026-09-17, 2026-09-18
+
+Tested revisions: unknown
+
+Provenance: partial
+
+This is dated evidence. Missing revisions or preserved worktree inputs limit
+reproducibility; no new measurements were made during archive curation.
+
 Status: **PASS for the bounded LiDAR and closed-loop SLAM qualification.**
 All twelve uncontended trials, the final fresh-boot capture, isolated
 compensation check, and affected-package tests passed. Exploration/P5 and
@@ -9,16 +18,11 @@ shared-load timing qualification remain outside this result.
 
 Regenerate this figure with `python3 tools/isaac/lidar_qualification.py plot
 artifacts/isaac-lidar-qualification/20260918_final_capture_rounding/capture
---out docs/history/assets/2026-09-17-lidar/scan-coverage.png`.
-
-The current interface is owned by the [LiDAR reference](../isaac/lidar-pipeline.md).
-This record covers LiDAR/SLAM evidence only, not autonomous exploration,
-Gazebo comparison, or the P5 coverage gate. The public default remains
-`front_only`.
+--out archive/engineering/assets/2026-09-17-lidar/scan-coverage.png`.
 
 ## Rig and protocol
 
-Seating/map-height work landed independently at `ca215ccc`. The regenerated
+Seating/map-height work landed independently at `ca215ccc53f123896154ba666228142d3486f872`. The regenerated
 analytic `mock_hospital` grid is 465×344 cells at 0.05 m resolution, sliced at
 world Z=0.30257 m. Trials use clean Isaac Sim 6.1.0.0 boots, deterministic
 timing, `rtf:=1.0`, camera/target localization/RViz/coverage overlay/frontier
@@ -76,7 +80,7 @@ rotating with the robot rather than the old angular-label stretching error.
 The first provenance-rich capture (`20260918_final_capture/`) failed only
 the recorder's 1 ns cadence tolerance: 479 intervals were exactly 25 ms,
 ten were 25 ms minus 2 ns, and ten were 25 ms plus 2 ns, identically across
-all topics, with no missing periods. The recorder now allows 10 ns rounding
+all topics, with no missing periods. The recorder at that stage allows 10 ns rounding
 (0.00004% of one period), with a regression rejecting 11 ns and lost periods.
 Exact deltas remain recorded. A fresh boot in
 `20260918_final_capture_rounding/` passed every gate; no sensor, merger, or
@@ -91,7 +95,7 @@ float32 declared maximum. Counters showed one compensated pair, zero
 equal-stamp pairs, zero front-only publishes, zero rear drops, and zero TF
 misses. No global `/tf` publisher was present.
 
-Startup delivery was checked separately: the merger now measures its rear
+Startup delivery was checked separately: the merger at that stage measures its rear
 callback deadline from local receipt rather than the capture timestamp,
 preventing already-queued startup scans from expiring immediately.
 
@@ -135,7 +139,7 @@ invalidated July number or quality threshold is used as the baseline.
 Each line pairs one seed, not an average. Regenerate with
 `python3 tools/isaac/lidar_qualification.py summary-plot
 artifacts/isaac-lidar-qualification/20260918_summary/slam_matrix_summary.json
---out docs/history/assets/2026-09-17-lidar/slam-comparison.png`.
+--out archive/engineering/assets/2026-09-17-lidar/slam-comparison.png`.
 
 Cells below are **median [minimum, maximum]** across three seeds. Deltas
 are computed per seed as merged minus front, then summarized; they are not
@@ -220,10 +224,6 @@ and showed no competing compute process. The simulator exited cleanly.
 The shared-load case remains unavailable: the collider task finished before
 this pilot started, and no competing workload was present afterward.
 These single-run results do not establish equivalence under contention.
-Pilot harness regression checks: 23 passed, one ROS integration test
-deselected; the required graph rebuild completed. An initial local test
-invocation failed because ROS logging targeted the read-only home directory;
-rerunning with an explicit writable `ROS_LOG_DIR` passed.
 
 The zero-noise seed-0 front/merged trials completed without a second GPU
 process in their saved host samples. A second Isaac process appeared during
@@ -240,30 +240,3 @@ the same measured simulation behavior: the later `ros_io.py` difference is
 comment-only, and qualification-tool changes affect evidence collection and
 plotting rather than the SLAM controller or sensor behavior. Seating and
 collider work landed separately and are not swept into this deliverable.
-
-## Final verification
-
-- `tools/check_dependencies`: all declared checkouts and recorded patches pass.
-- Affected package builds pass; the installed copied merger matches source.
-- Package-level `colcon test`: 58/58 test targets pass; scoped `colcon test-result`
-  reports 1030 tests, zero errors, zero failures, zero skips. This includes the
-  namespaced-TF/max-ray integration regression. Logs are under
-  `artifacts/isaac-lidar-qualification/20260918_verification/`.
-  The Isaac adapter package has no separate tests; its behavior is covered
-  by the autonomy package's Isaac suites. A workspace-wide result query also
-  found 22 old dependency XML-schema failures from September 12; these were
-  not produced by the current affected-package test run.
-- Public launch argument inspection retains `slam_source=front_only` and
-  `noise_seed=0` defaults. Tests exercise generated source-dependent range
-  YAML, Isaac-only seed forwarding, seed streams, geometry, range filtering,
-  merger branches/startup pairing, and invalid-summary rejection.
-- Required repository graph rebuild completed: 4124 nodes, 8737 edges,
-  218 communities. Documentation image/link validation passes offline.
-- Concurrent documentation cleanup landed separately in `6abbfdde`, including
-  the preliminary LiDAR lifecycle-backlog cleanup and removal of the old port
-  plan. Its shared-checkout changes are preserved; no history was rewritten.
-- The visual-ownership convention from `701725cd` is followed: the contract
-  diagram lives with the LiDAR reference, dated plots live with this record,
-  and both are embedded in the LiDAR page. Raw logs/JSON/overlays remain in
-  ignored artifacts. The completed active plan is removed; only exploration/
-  P5 remains in the recertification backlog.

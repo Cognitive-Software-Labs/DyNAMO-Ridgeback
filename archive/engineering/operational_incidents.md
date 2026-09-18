@@ -1,8 +1,16 @@
 # Operational incident history
 
-These dated investigations explain why current safeguards exist. They are not
-the current troubleshooting entrypoint; use [troubleshooting](../troubleshooting.md)
-for symptoms and recovery steps.
+Recorded dates: 2026-08-31, 2026-09-04, 2026-09-05, 2026-09-08, 2026-09-10
+
+Tested revisions: unknown
+
+Provenance: partial
+
+This is dated evidence. Missing revisions or preserved worktree inputs limit
+reproducibility; no new measurements were made during archive curation.
+
+These are dated root-cause findings and measurements. They do not prescribe
+recovery actions for the working tree.
 
 ## Detector throttle overshoot — fixed 2026-09-04
 
@@ -13,8 +21,7 @@ to immediately before the step made the period a floor on step starts:
 `max(configured period, inference)`.
 
 Stub measurements after the fix were 200.09 ms at 5 Hz, 100.05 ms at 10 Hz,
-and 40.41 ms at a 40 Hz request with 40 ms inference. The current diagnostic
-keeps `gate_wait` and `detector_step` separate and counts frames superseded by
+and 40.41 ms at a 40 Hz request with 40 ms inference. The diagnostic at that date kept `gate_wait` and `detector_step` separate and counted frames superseded by
 the intentional latest-wins slot.
 
 ## slam_toolbox namespaced TF — patched
@@ -49,9 +56,8 @@ Simulation previously added a hand-written
 offset, while the configured device was a D455. The render sensor also sat on
 `camera_0_link` while labeling output as the optical frame.
 
-The camera model now owns its nominal fixed joints in simulation, the hardware
-driver owns calibrated extrinsics on a robot, and the render sensor attaches to
-the model's color frame. This removed both the copied D435 constant and the
+The August 31 correction assigned nominal simulation joints to the camera model, left hardware calibration with
+the driver, and attached rendering to the color frame. This removed both the copied D435 constant and the
 render-pose/frame mismatch.
 
 ## Base-frame fallback latency — fixed 2026-08-31
@@ -62,8 +68,8 @@ while bare `base_link` was already buffered, so every mask batch paid the first
 timeout. Measurements were 502.8–512.0 ms for the failing namespaced lookup and
 0.021–0.036 ms for the valid fallback.
 
-The helper now probes candidates with zero timeout first and performs bounded
-waits only when neither is buffered. It does not cache the fallback, allowing a
+The August 31 fix probed candidates with zero timeout first and performed bounded
+waits only when neither is buffered. It did not cache the fallback, allowing a
 configured frame that appears later to become authoritative.
 
 ## Camera software-rendering collapse — measured 2026-09-05
