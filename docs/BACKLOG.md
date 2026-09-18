@@ -283,17 +283,15 @@ Clearpath's dual-Hokuyo sample and the repository's `clearpath/robot.yaml`
 fits. The offset is duplicated in two robot files:
 `/etc/clearpath/robot.yaml` (TF, and therefore SLAM, costmaps and the collision
 monitor) and MyBotShop's scan-merger `params_ridgeback.yaml` (the merged
-`sensors/scan`). The user chose the symmetric value on 2026-09-18. The edit is
-not applied yet.
+`sensors/scan`). The user chose the symmetric value on 2026-09-18. It was applied
+at 18:58 UTC the same day: both files were edited (backups `*.bak-rear-lidar`) and
+`clearpath-robot` was restarted, which also restarted the merger. The live TF and
+the merger's `laser2XOff` read −0.3922, and all three scans resumed at 40 Hz.
 
 **Context.** Measurements, method and the yaw-error caveat are in the archived
 evidence below.
 
 **Completion criteria.**
-- Both files set the rear x to −0.3922, with backups kept. `clearpath-robot` and
-  `clearpath-scan-merger` are restarted while the robot is stationary.
-- The namespaced TF shows `chassis_link → lidar2d_1_link` at x = −0.3922, and
-  the merger's `laser2XOff` parameter reads −0.3922.
 - The shared side-target check, repeated at a new placement, aligns the two
   scanners without an extra shift.
 
