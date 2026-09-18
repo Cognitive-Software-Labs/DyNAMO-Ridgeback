@@ -1,0 +1,237 @@
+#!/usr/bin/env python3
+"""Compare Fast DDS and CycloneDDS across the Intel–Thor Ethernet link.
+
+Run on Intel with the robot stationary. Every run streams synthetic D455-like
+frames with dds_link_probe.py in an isolated ROS domain, using the per-host
+configurations in src/ridgeback_autonomy_hardware/config/intel_thor/. The robot
+graph and its services are not touched.
+
+Variants:
+  fastdds   both hosts on Fast DDS with the Ethernet-only profiles
+  cyclone   both hosts on CycloneDDS with the Ethernet-only configurations
+  mixed     Intel publishes on Fast DDS, Thor subscribes on CycloneDDS
+            (the robot's camera services on Fast DDS, repository nodes on Cyclone)
+
+Scenarios are interleaved within each repeat so drift over the session does not
+favour a variant. Raw JSON lines and a Markdown summary go to
+artifacts/hardware/rmw_benchmark/<UTC timestamp>/.
+
+Usage: tools/intel_thor/rmw_benchmark [--repeats N] [--duration S] [--domain ID]
+                                      [--variants fastdds,cyclone,mixed]
+                                      [--scenarios NAME,...] [--thor USER@HOST]
+"""
+
+import argparse
+import datetime
+import json
+import os
+import pathlib
+import shlex
+import statistics
+import subprocess
+import sys
+import time
+
+REPO = pathlib.Path(__file__).resolve().parents[2]
+CONFIG = REPO / 'src/ridgeback_autonomy_hardware/config/intel_thor'
+PROBE = REPO / 'tools/intel_thor/dds_link_probe.py'
+REMOTE_DIR = '.cache/dynamo_rmw_benchmark'
+ROS_SETUP = 'source /opt/ros/jazzy/setup.bash'
+
+# name: (width, height, depth, direction)
+SCENARIOS = {
+    'vga_color': (640, 480, False, 'intel_to_thor'),
+    'vga_color_depth': (640, 480, True, 'intel_to_thor'),
+    'hd_color': (1280, 720, False, 'intel_to_thor'),
+    'hd_color_depth': (1280, 720, True, 'intel_to_thor'),
+    'vga_color_reverse': (640, 480, False, 'thor_to_intel'),
+}
+# variant: (intel RMW, thor RMW)
+VARIANTS = {
+    'fastdds': ('fastdds', 'fastdds'),
+    'cyclone': ('cyclone', 'cyclone'),
+    'mixed': ('fastdds', 'cyclone'),
+}
+
+
+def rmw_env(rmw, host, config_dir):
+    if rmw == 'fastdds':
+        return (f'export RMW_IMPLEMENTATION=rmw_fastrtps_cpp '
+                f'FASTRTPS_DEFAULT_PROFILES_FILE={config_dir}/fastdds_{host}.xml; '
+                'unset CYCLONEDDS_URI')
+    return (f'export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp '
+            f'CYCLONEDDS_URI=file://{config_dir}/cyclonedds_{host}.xml; '
+            'unset FASTRTPS_DEFAULT_PROFILES_FILE')
+
+
+def wifi_bytes(thor=None):
+    command = ("awk '{s += $1} END {print s + 0}' "
+               '/sys/class/net/wl*/statistics/rx_bytes /sys/class/net/wl*/statistics/tx_bytes')
+    if thor:
+        return int(ssh(thor, command).stdout.strip() or 0)
+    return int(subprocess.run(['bash', '-c', command], capture_output=True, text=True).stdout.strip() or 0)
+
+
+def ssh(thor, command, **kwargs):
+    return subprocess.run(['ssh', '-o', 'BatchMode=yes', thor, command],
+                          capture_output=True, text=True, **kwargs)
+
+
+def last_json(text):
+    for line in reversed(text.splitlines()):
+        line = line.strip()
+        if line.startswith('{'):
+            try:
+                return json.loads(line)
+            except json.JSONDecodeError:
+                pass
+    return None
+
+
+def run_once(args, variant, scenario):
+    width, height, depth, direction = SCENARIOS[scenario]
+    intel_rmw, thor_rmw = VARIANTS[variant]
+    flags = f'--width {width} --height {height} --echo' + (' --depth' if depth else '')
+    pub_args = f'pub {flags} --rate 30 --duration {args.duration + args.wait + 3}'
+    sub_args = f'sub {flags} --duration {args.duration} --wait {args.wait}'
+    base = f'{ROS_SETUP}; export ROS_DOMAIN_ID={args.domain}'
+    intel_cmd = f'{base}; {rmw_env(intel_rmw, "intel", CONFIG)}; exec python3 {shlex.quote(str(PROBE))}'
+    thor_cmd = (f'{base}; {rmw_env(thor_rmw, "thor", "$HOME/" + REMOTE_DIR)}; '
+                f'exec timeout {args.duration + args.wait + 20} python3 {REMOTE_DIR}/dds_link_probe.py')
+    if direction == 'intel_to_thor':
+        publisher = subprocess.Popen(['bash', '-c', f'{intel_cmd} {pub_args}'],
+                                     stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
+        wifi0 = wifi_bytes() + wifi_bytes(args.thor)
+        sub = ssh(args.thor, f'{thor_cmd} {sub_args}').stdout
+    else:
+        publisher = subprocess.Popen(['ssh', '-o', 'BatchMode=yes', args.thor, f'{thor_cmd} {pub_args}'],
+                                     stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
+        wifi0 = wifi_bytes() + wifi_bytes(args.thor)
+        sub = subprocess.run(['bash', '-c', f'{intel_cmd} {sub_args}'],
+                             capture_output=True, text=True).stdout
+    wifi_mbit = (wifi_bytes() + wifi_bytes(args.thor) - wifi0) * 8 / 1e6 / args.duration
+    pub = publisher.communicate(timeout=args.duration + args.wait + 60)[0]
+    return {
+        'variant': variant, 'scenario': scenario, 'direction': direction,
+        'sub': last_json(sub), 'pub': last_json(pub), 'wifi_mbit': round(wifi_mbit, 1),
+    }
+
+
+METRICS = [
+    # (label, source, key, better)
+    ('rate Hz', 'sub', 'rate_hz', 'high'),
+    ('loss %', 'sub', 'loss_pct', 'low'),
+    ('paired %', 'sub', 'paired_pct', 'high'),
+    ('max gap s', 'sub', 'max_gap_s', 'low'),
+    ('RTT p50 ms', 'pub', 'rtt_ms_p50', 'low'),
+    ('RTT p95 ms', 'pub', 'rtt_ms_p95', 'low'),
+    ('sub CPU %', 'sub', 'cpu_pct', 'low'),
+    ('pub CPU %', 'pub', 'cpu_pct', 'low'),
+    ('sock drops', 'sub', 'udp_drops', 'low'),
+]
+
+
+def summarize(results, variants, scenarios):
+    lines = ['Medians over repeats; the worst repeat is in brackets. RTT is a colour frame',
+             'one way plus a small reply. Blank means not applicable, or no frames arrived.', '']
+    for scenario in scenarios:
+        lines.append(f'### {scenario}')
+        lines.append('')
+        present = [v for v in variants if any(r['variant'] == v and r['scenario'] == scenario for r in results)]
+        lines.append('| metric | ' + ' | '.join(present) + ' |')
+        lines.append('|---|' + '---|' * len(present))
+        for label, source, key, better in METRICS:
+            cells = []
+            for variant in present:
+                values = []
+                for result in results:
+                    if result['variant'] == variant and result['scenario'] == scenario:
+                        record = result.get(source) or {}
+                        if key == 'rate_hz' and not record:
+                            values.append(0.0)
+                        elif record.get(key) is not None:
+                            values.append(record[key])
+                if not values:
+                    cells.append('')
+                    continue
+                worst = min(values) if better == 'high' else max(values)
+                cells.append(f'{statistics.median(values):g} [{worst:g}]')
+            lines.append(f'| {label} | ' + ' | '.join(cells) + ' |')
+        wifi = [r['wifi_mbit'] for r in results if r['scenario'] == scenario]
+        lines.append('')
+        lines.append(f'Wi-Fi during runs (both hosts, all variants): max {max(wifi):g} Mbit/s')
+        lines.append('')
+    return '\n'.join(lines)
+
+
+def manifest(args):
+    local = subprocess.run(
+        ['bash', '-c', 'uname -r; dpkg -l ros-jazzy-rmw-fastrtps-cpp ros-jazzy-fastrtps '
+         'ros-jazzy-rmw-cyclonedds-cpp ros-jazzy-cyclonedds | awk "/^ii/{print \\$2, \\$3}"; '
+         'sysctl net.core.rmem_max net.core.rmem_default'], capture_output=True, text=True).stdout
+    remote = ssh(args.thor, 'uname -r; dpkg -l ros-jazzy-rmw-fastrtps-cpp ros-jazzy-fastrtps '
+                 'ros-jazzy-rmw-cyclonedds-cpp ros-jazzy-cyclonedds | awk "/^ii/{print \\$2, \\$3}"; '
+                 'sysctl net.core.rmem_max net.core.rmem_default; nvpmodel -q 2>/dev/null | head -1; '
+                 'uptime').stdout
+    revision = subprocess.run(['git', '-C', str(REPO), 'rev-parse', 'HEAD'],
+                              capture_output=True, text=True).stdout.strip()
+    dirty = subprocess.run(['git', '-C', str(REPO), 'status', '--porcelain'],
+                           capture_output=True, text=True).stdout.strip()
+    return {
+        'revision': revision, 'dirty_tree': bool(dirty), 'args': vars(args),
+        'intel': local.strip().splitlines(), 'thor': remote.strip().splitlines(),
+    }
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument('--repeats', type=int, default=3)
+    parser.add_argument('--duration', type=int, default=15)
+    parser.add_argument('--wait', type=int, default=10)
+    parser.add_argument('--domain', type=int, default=88)
+    parser.add_argument('--variants', default='fastdds,cyclone,mixed')
+    parser.add_argument('--scenarios', default=','.join(SCENARIOS))
+    parser.add_argument('--thor', default='robot@192.168.131.51')
+    args = parser.parse_args()
+    variants = args.variants.split(',')
+    scenarios = args.scenarios.split(',')
+
+    if 'cyclone' in ''.join(VARIANTS[v][1] for v in variants):
+        check = ssh(args.thor, 'test -e /opt/ros/jazzy/lib/librmw_cyclonedds_cpp.so')
+        if check.returncode:
+            sys.exit('rmw_cyclonedds_cpp is not installed on Thor')
+    ssh(args.thor, f'mkdir -p {REMOTE_DIR}')
+    files = [str(PROBE)] + [str(CONFIG / f'{kind}_thor.xml') for kind in ('fastdds', 'cyclonedds')]
+    subprocess.run(['scp', '-q', *files, f'{args.thor}:{REMOTE_DIR}/'], check=True)
+
+    stamp = datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%dT%H%M%SZ')
+    out = REPO / 'artifacts/hardware/rmw_benchmark' / stamp
+    out.mkdir(parents=True, exist_ok=True)
+    (out / 'manifest.json').write_text(json.dumps(manifest(args), indent=2) + '\n')
+
+    results = []
+    plan = [(r, s, v) for r in range(args.repeats) for s in scenarios for v in variants
+            if not (v == 'mixed' and SCENARIOS[s][3] != 'intel_to_thor')]
+    started = time.monotonic()
+    with open(out / 'results.jsonl', 'w', encoding='utf-8') as raw:
+        for index, (repeat, scenario, variant) in enumerate(plan, 1):
+            result = run_once(args, variant, scenario)
+            result['repeat'] = repeat
+            results.append(result)
+            raw.write(json.dumps(result) + '\n')
+            raw.flush()
+            sub = result['sub'] or {}
+            print(f'[{index}/{len(plan)} {time.monotonic() - started:5.0f}s] '
+                  f'{variant:8} {scenario:18} rate {sub.get("rate_hz", 0):6} '
+                  f'loss {sub.get("loss_pct", "-")}% paired {sub.get("paired_pct", "-")} '
+                  f'rtt50 {(result["pub"] or {}).get("rtt_ms_p50", "-")} ms', flush=True)
+            time.sleep(2)
+
+    summary = summarize(results, variants, scenarios)
+    (out / 'summary.md').write_text(summary + '\n')
+    print('\n' + summary)
+    print(f'\nResults: {out.relative_to(REPO)}')
+
+
+if __name__ == '__main__':
+    main()
