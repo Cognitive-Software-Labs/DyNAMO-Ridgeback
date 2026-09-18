@@ -295,6 +295,19 @@ evidence below.
 - The shared side-target check, repeated at a new placement, aligns the two
   scanners without an extra shift.
 
+## Simulator and robot namespace mismatch
+
+**Gap.** The repository's `clearpath/robot.yaml`, the simulators and the launch
+defaults use the namespace `r100_0001`. The physical robot runs `r100_0160`,
+taken from its robot-local `/etc/clearpath/robot.yaml`. Every hardware command must
+therefore override the namespace, and a missed override silently
+targets topics that do not exist.
+
+**Next step.** Look into converging on one namespace, or making the hardware
+default follow the robot-local configuration. First find every place that
+hard-codes `r100_0001` (launches, tools, tests, Isaac assets, docs), and assess the
+effect on simulator and benchmark workflows. No scope or decision has been made yet.
+
 ## MyBotShop follow-ups
 
 Open questions for the next call with MyBotShop, the robot's integrator.
