@@ -273,6 +273,49 @@ that gate. Preserve backend-specific tolerances and rerun affected benchmarks.
 flags visible protrusions; it does not supply a surveyed outline or contact and
 stopping proof. Those are separate tasks under this gate.
 
+## Rear LiDAR mounting offset
+
+**Gap.** On `r100_0160` the deployed rear LiDAR sits at x = −0.4278 m (parent
+`chassis_link`). The 2026-09-18 field visit found it about 3.6 cm too far back.
+A shared side target seen by both LiDARs needed a +3.5 cm rear shift to align,
+and the tape readings show symmetric mounts. The symmetric −0.3922 m used by
+Clearpath's dual-Hokuyo sample and the repository's `clearpath/robot.yaml`
+fits. The offset is duplicated in two robot files:
+`/etc/clearpath/robot.yaml` (TF, and therefore SLAM, costmaps and the collision
+monitor) and MyBotShop's scan-merger `params_ridgeback.yaml` (the merged
+`sensors/scan`). The user chose the symmetric value on 2026-09-18. The edit is
+not applied yet.
+
+**Context.** Measurements, method and the yaw-error caveat are in the archived
+evidence below.
+
+**Completion criteria.**
+- Both files set the rear x to −0.3922, with backups kept. `clearpath-robot` and
+  `clearpath-scan-merger` are restarted while the robot is stationary.
+- The namespaced TF shows `chassis_link → lidar2d_1_link` at x = −0.3922, and
+  the merger's `laser2XOff` parameter reads −0.3922.
+- The shared side-target check, repeated at a new placement, aligns the two
+  scanners without an extra shift.
+
+## MyBotShop follow-ups
+
+Open questions for the next call with MyBotShop, the robot's integrator.
+Resolve each one here or move it to the item that owns it.
+
+- **Rear LiDAR offset.** Where did x = −0.4278 come from in
+  `/etc/clearpath/robot.yaml` (first seen 2026-08-06) and the scan-merger
+  `params_ridgeback.yaml` (2026-08-10)? Was it measured? The merger comments say
+  the offsets still needed live calibration. We changed it to the symmetric −0.3922
+  ([rear LiDAR mounting offset](#rear-lidar-mounting-offset)). Confirm that their
+  tooling will not restore the old value.
+- **`camera-web-ready.service`** fails at every boot because the RealSense topics
+  do not appear within its wait, observed after the 14:23 and 14:54 boots on
+  2026-09-18. Is it needed, and what should its wait be?
+- **Unit files changed on disk.** On 2026-09-18 systemd reported that the
+  `realsense-camera`, `camera-web-ready`, `clearpath-platform` and
+  `clearpath-sensors` units had changed since they were loaded. Which edits are
+  intended, and is a `daemon-reload` safe?
+
 ## Archived evidence
 
 - [LiDAR/closed-loop SLAM qualification](../archive/engineering/2026-09-17-isaac-lidar-qualification.md)
@@ -280,3 +323,4 @@ stopping proof. Those are separate tasks under this gate.
 - [Isaac port history](../archive/engineering/port-history.md#lidars-detached-from-the-articulation-2026-09-11)
 - [removed D435 transform](../archive/engineering/operational_incidents.md#d435-static-camera-transform--removed-2026-08-31)
 - [Hokuyo reconnect lockout](../archive/engineering/operational_incidents.md#hokuyo-reconnect-lockout--2026-09-18)
+- [r100_0160 field readings and LiDAR box checks](../archive/engineering/2026-09-18-r100-0160-field-measurements.md)

@@ -34,6 +34,7 @@ are excluded from ordinary repository search and the generated knowledge graph.
 - [Intel–Thor middleware benchmark](2026-09-18-intel-thor-rmw-benchmark.md) — Fast DDS vs CycloneDDS vs mixed across the link, and the reader-side interface rule.
 
 - [Physical mecanum drive investigation](2026-09-18-mecanum-drive-investigation.md)
+- [r100_0160 field readings and LiDAR box checks](2026-09-18-r100-0160-field-measurements.md) — tape mount readings, LiDAR range/side checks, and the rear-offset finding.
 
 - [Isaac 6.0 first-drive snapshot](2026-07-11-isaac-first-drive.md)
 - [Invalidated July SLAM investigation](2026-07-12-isaac-slam-investigation.md)

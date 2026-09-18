@@ -1,7 +1,7 @@
 # PHYSICAL — Robot measurements and stationary sensor validation
 
-Status: **preliminary camera transport observations recorded; field measurements
-and sensor/target acceptance not evidenced in the committed records.** Owner:
+Status: **mount readings and LiDAR box checks recorded (2026-09-18); camera,
+alignment and target acceptance still open.** Owner:
 people at the robot, assisted by an agent. The
 [project backlog](../BACKLOG.md#physical-stationary-integration) owns the overall
 stationary milestone; its individual geometry, camera, calibration, and motion
@@ -30,10 +30,10 @@ findings and their evidence links. They do not close the D455 or field-visit gat
 
 | Part of this visit | Recorded progress | Evidence still needed |
 |---|---|---|
-| Mount readings and photos | The existing robot drawing and A–E guide are ready; no completed field note is committed. | Accessible tape readings, practical precision, and annotated mount photos. |
+| Mount readings and photos | **Done 2026-09-18.** A 30.6, B 74 or 75 (within tape precision), C 25, D 18, E front 6.3 / rear 6.1 cm; camera confirmed centred and level. Photos waived by the user. | None. |
 | D455 identity and profiles | A VGA colour stream was observed during transport diagnosis. | Device/firmware/USB identity, effective VGA and HD profiles, and colour/depth/calibration contracts. |
 | D455 timing and TF | Preliminary colour-rate checks only. | Per-profile captures, real aligned-depth stamp matching, observed frames/TF ownership, and camera-only localization smoke. |
-| Front and rear LiDARs | Services/scans were observed; a timeout/reconnect incident is reported. | Individual identities, scan timing/geometry, box/board range/orientation checks, and stable recovery evidence. |
+| Front and rear LiDARs | **Box checks done 2026-09-18:** both pass near/far/side range and side checks; 40 Hz, ±135°, 0.25° scan timing and geometry recorded. The deployed rear x is ≈3.6 cm too far back; see the [backlog item](../BACKLOG.md#rear-lidar-mounting-offset). A timeout/reconnect incident is reported. | Merged-scan comparison, a saved scan overlay, applying the rear-offset correction, and stable recovery evidence. |
 | Camera–LiDAR alignment | No completed projection-overlay check is committed. | Near/farther/off-centre overlays and an independent placement after any correction. |
 | IMU, odometry and command-chain inspection | No completed stationary validation report is committed. | At-rest observations and configuration inspection, without base commands. |
 | G1/person integration | No completed distributed target runs are committed. | Both labels, required mask/depth modes, empty-scene behavior, and joint run evidence. |
@@ -347,3 +347,7 @@ exposed by a failed alignment check, physical motion, wheel response, braking,
 contact tests, and autonomous missions remain separate. A correction requires
 rerunning the affected check; a field visit does not certify simulator geometry
 or physical motion safety.
+
+## Archived evidence
+
+- [r100_0160 field readings and LiDAR box checks](../../archive/engineering/2026-09-18-r100-0160-field-measurements.md)
