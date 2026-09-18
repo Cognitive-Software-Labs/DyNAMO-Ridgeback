@@ -50,7 +50,7 @@ Three coordinated plans own execution:
 |---|---|---|
 | [PHYSICAL — Package split for distributed deployment](plans/PHYSICAL_package_split.md) | Workstation | Independently installable localization, preserved Gazebo/Isaac and benchmark workflows, tested interfaces and handoff. |
 | [PHYSICAL — Intel–Thor deployment and transport qualification](plans/PHYSICAL_intel_thor_deployment.md) | Robot deployment team | Matching installed revision, GPU offload, measured transport/performance, stationary failure and recovery evidence. |
-| [PHYSICAL — Robot measurements and stationary sensor validation](plans/PHYSICAL_robot_measurements_and_validation.md) | People at the robot with agent assistance | Traceable geometry, sensor/calibration evidence, and distributed G1/person tests. |
+| [PHYSICAL — Robot measurements and stationary sensor validation](plans/PHYSICAL_robot_measurements_and_validation.md) | People at the robot with agent assistance | Quick sensor-mount readings/photos, agent-run sensor/alignment checks, and distributed G1/person tests. |
 
 **Coordination.** Hardware inventory and measurements can start before the code
 split lands. Final distributed tests require its tested revision and interface
@@ -172,10 +172,11 @@ under robot motion; document recalibration triggers. Do not silently tune polar
 segmentation to absorb an extrinsic error.
 
 **Context.** [Polar profiling](target_localization/polar_profiling.md) and the
-stationary calibration procedure in
-[PHYSICAL — Robot measurements and stationary sensor validation](plans/PHYSICAL_robot_measurements_and_validation.md#stationary-cameralidar-calibration).
-That procedure supplies only the stationary portion of this gate; motion
-validation remains open after a stationary pass.
+stationary alignment check in
+[PHYSICAL — Robot measurements and stationary sensor validation](plans/PHYSICAL_robot_measurements_and_validation.md#stationary-cameralidar-alignment).
+That field check can expose a calibration problem without requiring a workshop
+survey. It does not establish formal extrinsic uncertainty or moving-robot
+validity; those parts of this gate remain open after an integration pass.
 
 ## Shared camera mast and bracket geometry
 
@@ -192,9 +193,11 @@ self-occlusion in both simulators, including motion. Record physical dimensions
 and measurement uncertainty. Rerun affected benchmarks before quoting results.
 
 **Context.** [Shared robot geometry](robot/geometry.md#known-representation-differences)
-and [Isaac additions](isaac/robot-model.md#hand-authored-parts). Physical dimensions
-come from the [measurement procedure](plans/PHYSICAL_robot_measurements_and_validation.md#geometry-measurements-and-provenance);
-implementing and verifying shared assets remains separate work.
+and [Isaac additions](isaac/robot-model.md#hand-authored-parts). The
+[field measurement visit](plans/PHYSICAL_robot_measurements_and_validation.md#quick-measurements)
+supplies sensor-placement photos and a few accessible offsets. Detailed
+attachment dimensions and implementing/verifying shared assets remain owned by
+this item, not prerequisites for the field visit.
 
 ## Robot geometry and drawing audit
 
@@ -211,7 +214,8 @@ and add a repeatable check for its declared dimensions and mount annotations.
 Rerun any benchmarks affected by geometry corrections.
 
 **Context.** [Geometry and dimensional provenance](robot/geometry.md) and the
-[physical measurement procedure](plans/PHYSICAL_robot_measurements_and_validation.md#geometry-measurements-and-provenance).
+[initial sensor-mount checks](plans/PHYSICAL_robot_measurements_and_validation.md#quick-measurements).
+The full dimensional audit here is separate from that limited field visit.
 
 ## Collision-envelope and navigation-footprint validation
 
@@ -238,8 +242,9 @@ that gate. Preserve backend-specific tolerances and rerun affected benchmarks.
 **Context.** [Collision model and footprint](robot/collision_model.md),
 [Isaac colliders](isaac/robot-model.md#colliders), and
 [physical command-chain validation](#physical-command-chain-validation). The
-[stationary measurement procedure](plans/PHYSICAL_robot_measurements_and_validation.md#geometry-measurements-and-provenance)
-supplies the physical outline and uncertainty, not contact or stopping proof.
+[field measurement visit](plans/PHYSICAL_robot_measurements_and_validation.md#quick-measurements)
+flags visible protrusions; it does not supply a surveyed outline or contact and
+stopping proof. Those are separate tasks under this gate.
 
 ## Archived evidence
 

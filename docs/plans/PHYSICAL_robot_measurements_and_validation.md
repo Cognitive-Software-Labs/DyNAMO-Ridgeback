@@ -6,13 +6,31 @@ people at the robot, assisted by an agent. The
 stationary milestone; its individual geometry, camera, calibration, and motion
 gates retain their own completion criteria.
 
-This plan incorporates the detailed D455 procedure and adds robot metrology,
-both LiDARs, stationary camera–LiDAR calibration, and G1/person integration.
+This is a field bring-up visit with a tape measure and phone, not a survey of
+every robot component. People check the sensor mounts, take a few photos, and
+place targets; the agent collects and checks the ROS data. Keep the detailed
+D455 checks below as the agent's procedure, not a manual worksheet for people.
+
+The visit covers quick mount measurements, both LiDARs, stationary camera–LiDAR
+alignment, and G1/person integration.
 Measurements and sensor inspection can start before the
 [workstation package split](PHYSICAL_package_split.md) completes. Final
 distributed tests use its accepted revision and the
 [Intel–Thor deployment](PHYSICAL_intel_thor_deployment.md). Physical driving,
 braking, dynamic calibration, and autonomous missions remain outside this plan.
+
+## Who does what
+
+| People beside the robot | Agent |
+|---|---|
+| Bring a tape and phone; take a side, front, and top/oblique photo showing the mounts. | Inspect the deployed setup and capture versions, parameters, topics, timing, and TF. |
+| Take the accessible readings A–E below; note the tape endpoints on a photo. | Convert those readings to the model's frame conventions and flag meaningful mismatches. |
+| Place a box/board, then the G1 and a person at a few positions. | Record streams, produce camera/scan overlays, run the model modes, and summarize passed/blocked checks. |
+
+No disassembly, workshop, calipers, custom calibration rig, or new drawing of
+every component is required. An ordinary upright box or board is sufficient
+for the first range/projection checks. If a check reveals a real calibration
+problem, record a targeted follow-up instead of expanding the whole visit.
 
 ## Preparation and evidence
 
@@ -22,60 +40,66 @@ CycloneDDS setting does not establish what is running on the robot or imply
 that it still needs changing. Preserve the robot's configuration and services.
 Do not overwrite its setup from the repository or run simulator cleanup.
 
-Record code/installed-workspace/dependency revisions, effective setup path and
-configuration, ROS domain/RMW, host load, USB topology, device firmware, driver
+The agent records code/installed-workspace/dependency revisions, effective setup
+path and configuration, ROS domain/RMW, host load, USB topology, device firmware, driver
 version, commands, and any applied configuration diff. Use a unique artifact
 root under `artifacts/hardware/` and preserve logs, topic captures, parameter
 dumps, timestamps, and TF evidence with checksums.
 
-Prepare a human measurement worksheet before physical access. Use tape,
-ruler/calipers, level, measured fixtures, and annotated photographs, with a
-person performing physical measurements and the agent recording/analyzing them.
-Record tool resolution and repeatability; request better instrumentation when
-basic tools cannot resolve the quantity rather than inventing precision.
+Use one short note containing the tape readings, units, and photo references.
+Write practical precision, such as "about 74 cm, readable to roughly 1 cm";
+repeat a reading only if it is unclear or disagrees with the model. Leave an
+inaccessible dimension unknown rather than requiring special equipment.
 
-Freeze the tested profiles, target placements, warm-up interval, recording
-window, stream-rate/gap criteria, timestamp criteria, and calibration validation
-tolerances before collecting acceptance results. Keep the robot stationary,
+The agent fixes profiles, warm-up/capture windows, software acceptance criteria,
+and target positions before the corresponding checks. Keep the robot stationary,
 autonomous motion disabled, and platform/sensor bringup owned by its existing
 approved services. Disabling frontier goals alone is not a physical motion lock;
 use the site's stationary setup and issue no base commands. A failed gate should
 identify a specific follow-up; do not tune recipes, alter timestamps, or change
 drivers/TF during the evidence run to turn it into a pass.
 
-## Geometry measurements and provenance
+## Quick measurements
 
-For each measurement record the object/quantity, physical datum and frame,
-axis/sign convention, units, method/tool, repeated readings, uncertainty,
-photograph/drawing reference, and whether the value is measured, configured,
-model-derived, or inferred. Record robot load, floor condition, and mounting
-state. Do not measure an optical or laser origin by treating its housing edge
-as the sensing origin.
+Start with the existing
+[dimensioned robot drawing](../robot/geometry.md#dimensioned-reference-drawing)
+to identify the camera, recessed LiDARs, deck, and mast. Its numbers are
+Isaac-model coordinates relative to `base_link`, not physical tape readings
+from the floor. Do not try to remeasure every number on it.
 
-| Worksheet group | Required observations |
-|---|---|
-| Body and floor reference | Chassis/deck bounds, accessible frame datums, floor clearance, wheel/contact references, and limits of the inferred base-frame placement. |
-| Attachments | Mast and bracket dimensions, offsets/orientations, fastenings, protrusions, cables, and height-dependent envelope. |
-| Sensors | Camera and both LiDAR housing/mount poses, orientation, accessible references, and the documented/calibrated offset to each sensing origin. |
-| Navigation envelope | Measured body/attachment outline in the common frame, uncertainty, configured/effective footprint, and containment discrepancies. |
+![Existing side and plan views of the Ridgeback, identifying the sensor mounts and showing model-derived dimensions.](../robot/assets/isaac-model-geometry.svg)
 
-```mermaid
-flowchart LR
-    P["Physical datums and repeated measurements"] --> U["Frame conventions and uncertainty"]
-    U --> V["Annotated plan and side views"]
-    C["Configured mounts and generated descriptions"] --> Compare["Geometry and footprint comparison"]
-    V --> Compare
-    Compare --> Findings["Measured facts and source-owned discrepancies"]
-```
+*Existing reference, reused unchanged. Use it for orientation; hardware
+agreement and the full dimensional audit remain separate work.*
 
-Produce annotated plan/side drawings with dimensions and sensing-origin
-provenance, plus an overlay of the measured envelope and navigation footprint.
-Compare with the [shared geometry](../robot/geometry.md) and
-[collision model](../robot/collision_model.md), separating each backend's
-model-derived contact plane from the physical floor reference. Record
-discrepancies at those canonical owners. Geometry corrections go to their
-source and require affected simulator/benchmark verification; measurements
-alone do not close shared-attachment or contact-validation work.
+The following schematic shows the small set of accessible tape endpoints for
+this visit. Record which face or window point you used in the photo.
+
+![Practical measurement guide: deck height, camera height above the deck, LiDAR window heights, and camera/LiDAR setbacks from visible deck or body edges.](assets/ridgeback-field-measurements.svg)
+
+| Mark | Take this reading | Why it is useful |
+|---|---|---|
+| A | Floor to top of the main deck plate. | Relates the visible deck to floor-based sensor heights. |
+| B | Deck top to the bottom face of the camera housing. | Checks the camera's mounting height; A + B gives its housing-bottom height above the floor. |
+| C | Floor to an identifiable point on each LiDAR window/housing; photograph the point. | Checks both scan-height estimates without guessing a hidden laser origin. |
+| D | Horizontal setback from the deck's front edge to the camera housing's front face. | Checks the camera's forward placement. Use a side/top photo to confirm it is roughly centred and level; measure a lateral offset only if visibly off-centre. |
+| E | Each LiDAR housing's outward face to the nearest front/rear body edge. | Checks whether the recessed front/rear mounting matches the description. Record a visible sideways offset if present. |
+
+Use normal tape precision. If an endpoint cannot be reached, photograph it and
+mark the reading unavailable. The agent uses the description/device transforms
+for housing-to-sensing-origin offsets and labels unmeasured values as nominal.
+Do not identify the floor with `base_link` or assume the robot's frame origin
+is exactly the midpoint of a body dimension.
+
+Photograph any obviously unexpected protrusion or loose/tilted mount. Measure
+overall width/length or an attachment only if the photos reveal a mismatch that
+matters to the current setup. Wheel/contact geometry, bracket thicknesses,
+fastenings, cable routing, and a full footprint outline are not required readings
+for this visit. Their [geometry](../BACKLOG.md#robot-geometry-and-drawing-audit),
+[shared-attachment](../BACKLOG.md#shared-camera-mast-and-bracket-geometry), and
+[collision-envelope](../BACKLOG.md#collision-envelope-and-navigation-footprint-validation)
+audits remain separate. Do not require people to redraw the robot or survey an
+outline before testing the sensors.
 
 ## D455 camera validation
 
@@ -180,67 +204,64 @@ required model modes after their GPU environment and inputs are qualified.
 
 ## Both LiDARs and stationary auxiliary sensors
 
-For each front/rear LiDAR, record device identity, driver/configuration,
+The agent records each front/rear LiDAR's device identity, driver/configuration,
 publisher ownership, topic/type/QoS, frame and TF, angular bounds/increment,
 range bounds, scan timing fields, rate, gaps, and timestamp behavior. Use the
 deployed device/configuration as evidence rather than assuming nominal settings.
 
-Measure ranges to suitable fixtures at multiple distances and bearings, with
-explicit target-surface and range-origin conventions. Check angle ordering,
-front/rear orientation, invalid-return handling, mounting/self-occlusion, and
-any merged-scan transformation against the individual scans. Preserve annotated
-scan/fixture plots and distinguish sensor error, fixture uncertainty, and
-representation effects. Set tolerances before validation; unresolved geometry
-or clock discrepancies block affected projection claims.
+Have a person place an upright box/board at a near and a farther position in
+front of each scanner, then one position to the side. Record approximate tape
+distance to the facing surface and the tape's starting point. The agent checks
+that the return appears at the expected side and distance, inspects invalid
+returns/self-hits, and compares any merged scan with the individual scans.
+Save a simple scan overlay. This catches gross mounting/range errors; an angular
+accuracy sweep or surveyed fixture set is not part of this visit.
 
-Inventory IMU and odometry publishers actually present. At rest, capture their
-frames, time bases, rates, covariance fields, stationary bias/drift, and
+The agent inventories IMU and odometry publishers actually present and captures
+their frames, time bases, rates, covariance fields, stationary bias/drift, and
 consistency with the stationary scene. Absence of an expected signal is an
 explicit finding; an at-rest check cannot validate wheel scale, lateral motion,
 dynamic odometry, or drift during travel.
 
-Inspect the deployed command-chain types, topics, QoS, mux ownership,
+The agent inspects the deployed command-chain types, topics, QoS, mux ownership,
 controller/timeout settings, and available e-stop/deadman configuration without
 issuing base commands. Hand findings to
 [physical command-chain validation](../BACKLOG.md#physical-command-chain-validation);
 its actuation, stop, timeout, and e-stop tests remain open.
 
-## Stationary camera–LiDAR calibration
+## Stationary camera–LiDAR alignment
 
-Qualify the front-LiDAR projection used by polar profiling after the camera and
-scan contracts pass. Validate the rear LiDAR's base transform separately; do
-not claim a camera–rear calibration without actual shared observations.
+Start with a practical alignment check using live camera calibration and the
+configured transforms, informed by the mount readings above. A full extrinsic
+calibration session is a follow-up if the check exposes a problem, not a
+prerequisite for collecting useful camera and LiDAR data.
 
-1. Define transform direction, units, frame conventions, fixture geometry,
-   intrinsics/distortion handling, and storage/publisher ownership. Use live
-   camera calibration and sensing origins; housing measurements supply a
-   starting estimate and uncertainty, not calibrated extrinsics.
-2. Choose fixtures visible in the camera whose surfaces intersect the scan
-   plane. Capture multiple distances, lateral placements, and orientations so
-   calibration is not fitted to one pose. Move fixtures while the base remains
-   stationary. Preserve paired observations and clock/timestamp evidence.
-3. Estimate or validate the transform, document the method and constrained
-   degrees of freedom, and report uncertainty. If the geometry does not
-   constrain the required transform, improve the setup or leave it unresolved.
-   Keep independent placements out of the fitting set.
-4. On the held-out placements, project beams onto images and compare against
-   the measured fixture surfaces. Preserve annotated overlays, residuals, and
-   uncertainty against the predeclared tolerances. Distinguish valid no-beam
-   cases from wrong projection or transform ownership.
-5. Publish an accepted transform through one designated owner, with the old
-   configuration retained for rollback. Document recalibration triggers such
-   as mount movement, impact, sensor replacement, or an unexplained residual
-   change. Do not tune polar segmentation to absorb an extrinsic error.
+1. Put an upright box/board in view of both the camera and the front scan plane.
+   The agent overlays the projected scan points on the image. Use a near,
+   farther, and off-centre placement; the base stays still.
+2. Check whether points on the board/box land on that object in the image.
+   Save the overlays and describe any consistent vertical/sideways mismatch.
+   Distinguish a target outside the camera/scan overlap from bad projection.
+3. If alignment is wrong, the agent checks frame conventions, live intrinsics,
+   transform ownership, and the few measured offsets first. If a real extrinsic
+   fit is needed, record the specific missing observation/setup as follow-up.
+   Do not ask for a whole-robot survey or tune segmentation to hide the error.
+4. After a transform correction, repeat at a new placement not used to make the
+   correction. Keep one transform publisher and the previous configuration for
+   rollback. A mount movement requires rechecking this alignment.
 
-This is stationary evidence only. A static scene cannot establish the effect
-of temporal skew during motion. The broader
-[camera–LiDAR deployment gate](../BACKLOG.md#camera-lidar-calibration) remains
-open for moving-robot validation even when its stationary portion passes.
+Call a successful result a stationary alignment/integration check for those
+placements, not a calibrated-accuracy claim. If alignment cannot be established,
+mark polar profiling blocked while reporting the independent camera/depth
+checks normally. Rear-LiDAR orientation/range checks do not establish a
+camera–rear calibration. Formal extrinsic uncertainty and moving-robot timing
+remain in the [camera–LiDAR deployment gate](../BACKLOG.md#camera-lidar-calibration);
+this visit does not close that broader gate.
 
 ## Joint stationary target tests
 
 Use the package-split handoff and the deployment plan's qualified environment,
-topology, model-mode matrix, and frozen recording protocol. The deployment plan
+topology, model-mode matrix, and recording protocol. The deployment plan
 owns transport/resource measurements; this plan owns scene placement and sensor
 validity. Record one shared run identifier so both reports refer to the same
 revision, configuration, captures, and acceptance observations.
@@ -249,13 +270,14 @@ Test a real G1 and a person as separately labelled cases. Use the default
 `humanoid robot` label for G1 and the new configurable `person` label for the
 person; record exact prompts and model/checkpoint versions. Calibration fixtures
 or supplied boxes cannot substitute for the live detector in this acceptance.
-Test near/middle/farther visible placements and off-centre positions with
-measured reference conventions, plus an empty scene to verify healthy
-no-detection behavior.
+Test near/middle/farther visible placements, one off-centre position, and an
+empty scene. Reuse floor marks and record approximate distances from a named
+robot edge to the target's facing surface. The agent accounts for that reference
+when comparing results; people do not need to survey the G1 or a person's shape.
 
 Run projective ranging and Euclidean reconstruction with all four combinations
 of box/silhouette masks and stereoscopic/monocular depth. Add polar profiling
-after its stationary calibration gate; do not expect every visible target to
+after its stationary alignment check; do not expect every visible target to
 intersect the scan plane. Declare valid-target and expected-no-return cases
 before the run. Keep organized point clouds optional and disabled unless their
 separate contract has been demonstrated.
@@ -272,26 +294,26 @@ benchmark or tune parameters during acceptance.
 
 ## Completion and separate work
 
-Completion requires traceable geometry measurements and diagrams, the core
-D455 gates, both LiDAR and auxiliary-sensor observations, stationary
-camera–LiDAR validation, and successful distributed G1/person tests. Unknown
-uncertainty, unsuitable equipment, unavailable profiles, and failed checks
-remain explicit open work rather than being hidden in a broad pass label.
+The people's deliverable is the A–E note, a few mount/target photos, and help
+placing targets. No complete CAD reconstruction, component inventory, precision
+worksheet, or new dimensioned drawing is required.
 
-Write a dated engineering record with provenance, worksheets, profile results,
-calibration method and validation plots, timing analysis, TF ownership,
-application outcomes, artifacts/checksums, observer limitations, and every
-unavailable/failed check. Update shared geometry, collision, and camera/polar
-references only with demonstrated facts. Hand the deployment team accepted
-frames/transforms, device/profile identities, uncertainty, scene definitions,
-configuration revisions, and limits; apply each backlog item's own completion
-criteria independently.
+The agent produces a short passed/blocked/not-tested summary for the D455,
+each LiDAR, stationary alignment, and G1/person tests, backed by saved software
+captures and overlays. Include tested revisions/configuration, approximate
+measurement precision, observed limits, and the next action for each failure.
+Unmeasured component dimensions do not block the core camera/depth smoke.
+Required sensor or alignment failures remain open; do not call the whole
+stationary integration passed until the required target tests pass.
+
+Hand the deployment team verified topics/frames, device/profile identities,
+the mount note, and shared run references. The agent updates canonical geometry
+and sensor references only with observations this visit actually establishes,
+and preserves meaningful evidence with its tested provenance.
 
 [Organized-pointcloud qualification](../BACKLOG.md#optional-physical-organized-pointcloud-qualification)
-remains optional. Stationary camera–LiDAR calibration is required for this
-broader plan but is independent of the core colour/aligned-depth camera gate.
-Physical motion, dynamic calibration, wheel response, braking, clearance/contact
-tests, and autonomous missions remain separate. A fix to a failed boundary
-requires a separately scoped change and rerunning the affected checks; a sensor
-plan pass does not automatically certify simulator geometry or close motion
-gates.
+remains optional. Full dimensional/footprint audits, formal calibration work
+exposed by a failed alignment check, physical motion, wheel response, braking,
+contact tests, and autonomous missions remain separate. A correction requires
+rerunning the affected check; a field visit does not certify simulator geometry
+or physical motion safety.

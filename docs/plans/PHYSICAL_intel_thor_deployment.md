@@ -6,8 +6,8 @@ Owner: people and agents working at the robot. The
 stationary milestone. The [package split](PHYSICAL_package_split.md) supplies
 shared code and interfaces; the
 [measurement plan](PHYSICAL_robot_measurements_and_validation.md) supplies
-physical sensor and calibration evidence. Inventory can start now; deployment
-acceptance requires the tested workstation handoff.
+sensor-mount checks and stationary alignment evidence. Inventory can start now;
+deployment acceptance requires the tested workstation handoff.
 
 ## Initial topology and operating boundary
 
@@ -100,8 +100,8 @@ Record unsupported requested profiles as open work.
 | `box` | `monocular` | Detector, metric monocular model, and camera estimators. |
 | `silhouette` | `monocular` | Combined model load and camera estimators. |
 
-Add polar profiling after the measurement plan's stationary camera–LiDAR gate;
-its scan input is independent of the selected camera depth source. Keep
+Add polar profiling after the measurement plan's stationary camera–LiDAR
+alignment check; its scan input is independent of the selected camera depth source. Keep
 organized point clouds optional. Use separately identified G1/person scenes and
 record the selected labels without tuning detector/estimator parameters.
 
@@ -126,8 +126,8 @@ The camera-on-Thor layout remains supported as an alternative. If the Intel
 layout has failed input contracts or unacceptable measured transfer cost,
 present the evidence and comparison proposal before physical relocation.
 For an agreed comparison, transfer driver ownership once, verify USB/device
-settings and TF, and repeat matched live runs. Retest calibration if the mount
-moved; measure any return imagery needed by Intel's display. Do not select a
+settings and TF, and repeat matched live runs. Repeat the mount/alignment checks
+if the mount moved; measure any return imagery needed by Intel's display. Do not select a
 layout from an invented latency target or silently treat replay as this test.
 
 ## 4. Failure and recovery acceptance

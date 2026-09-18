@@ -73,7 +73,7 @@ troubleshooting, planning, and historical documentation.
 - [BENCHMARKING — Live configurator sweeps](plans/BENCHMARKING_live_configurator_sweeps.md) — blocked on live process ownership and cleanup; follows environment qualification
 - [PHYSICAL — Package split for distributed deployment](plans/PHYSICAL_package_split.md) — workstation code restructuring, simulator compatibility, and tested handoff
 - [PHYSICAL — Intel–Thor deployment and transport qualification](plans/PHYSICAL_intel_thor_deployment.md) — robot-side installation, GPU offload, Ethernet measurements, and failure handling
-- [PHYSICAL — Robot measurements and stationary sensor validation](plans/PHYSICAL_robot_measurements_and_validation.md) — geometry, D455, both LiDARs, stationary calibration, and G1/person tests
+- [PHYSICAL — Robot measurements and stationary sensor validation](plans/PHYSICAL_robot_measurements_and_validation.md) — quick mount readings/photos, D455 and LiDAR checks, stationary alignment, and G1/person tests
 
 Only genuinely open work belongs here. Completed implementation plans are
 retired once their durable contract and evidence have canonical homes.
