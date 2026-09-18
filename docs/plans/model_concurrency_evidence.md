@@ -35,6 +35,11 @@ do not reconstruct the matrix as separate manual launches.
 
 ## Freeze the run
 
+Complete the [environment qualification gate](../target_distance_benchmarking/BACKLOG.md#benchmark-execution-environment-qualification)
+before using this experiment for a throughput or architecture decision. The
+A/D environment-qualification runs establish the environment; they do not replace
+this plan's full factorial comparison.
+
 - Use a clean, committed experimental checkout and verify the installed files
   match it. Preserve other sessions' work and processes; use an isolated checkout
   if needed rather than cleaning a shared tree.

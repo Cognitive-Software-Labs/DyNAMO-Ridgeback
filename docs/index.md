@@ -74,7 +74,7 @@ troubleshooting, planning, and historical documentation.
 - [D455 hardware validation](plans/camera_hardware_validation.md)
 - [Combined-model throughput measurement](plans/model_concurrency_evidence.md) — run the existing sweep and determine whether concurrency is needed
 - [Occlusion characterization](plans/occlusion_handling.md)
-- [Remote versus physical-seat validation](plans/remote_vs_physical_seat_validation.md)
+- [Benchmark environment qualification](plans/remote_vs_physical_seat_validation.md) — prerequisite for tuning and benchmark claims
 
 Only genuinely open work belongs here. Completed implementation plans are
 retired once their durable contract and evidence have canonical homes.

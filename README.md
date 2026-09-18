@@ -377,6 +377,11 @@ bash build_and_start_expl.sh office headless_rendering:=true
 
 ### `target_distance_benchmark.launch.py`
 
+Before parameter tuning or using new benchmark comparisons as reportable results,
+complete the [execution-environment qualification gate](docs/target_distance_benchmarking/BACKLOG.md#benchmark-execution-environment-qualification).
+Qualification and diagnostic runs establish that evidence; the CLI does not
+block unqualified runs. Replay tuning also depends on qualified capture provenance.
+
 The live target-distance benchmark currently requires the Gazebo adapter and
 `dependencies/gz.repos`; its measurement and report code remains target-generic,
 but Isaac entity-control plumbing is still P6 of the Isaac plan.

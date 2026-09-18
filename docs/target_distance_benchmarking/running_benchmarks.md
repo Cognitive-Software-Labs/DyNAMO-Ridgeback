@@ -6,6 +6,15 @@ does not explain. For what the benchmark is, what it compares, and what it may
 not claim, read [the overview](overview.md) first. The root README owns the
 commands.
 
+## Execution-environment prerequisite
+
+Before parameter tuning or using new benchmark comparisons as reportable results,
+complete the [execution-environment qualification gate](BACKLOG.md#benchmark-execution-environment-qualification).
+Qualification/diagnostic runs establish that evidence; their outputs are not yet
+qualified tuning results. Replay tuning also requires qualified capture provenance.
+Use only the recorded environment, workload, camera profile, and display/capture
+conditions covered by qualification. The CLI does not enforce this workflow gate.
+
 ## Which question, which profile
 
 `benchmarking/replay_profiles.py` is the authority; `target_replay_describe
