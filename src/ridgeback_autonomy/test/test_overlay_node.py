@@ -15,7 +15,7 @@ from std_msgs.msg import Header
 
 from ridgeback_autonomy.common.markers import PolarBeamRecord
 from ridgeback_autonomy.common.messages import build_polar_beams_message
-from ridgeback_autonomy.msg import TargetMeasurements
+from ridgeback_interfaces.msg import TargetMeasurements
 
 
 CAMERA_FRAME = 'camera_0_color_optical_frame'

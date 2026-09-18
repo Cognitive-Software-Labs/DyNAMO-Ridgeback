@@ -14,7 +14,7 @@ from ridgeback_autonomy.common.messages import (
 from ridgeback_autonomy.common.miss_reason import MissReason
 from ridgeback_autonomy.common.models import Detection
 from ridgeback_autonomy.common.stamps import stamp_to_nanoseconds
-from ridgeback_autonomy.msg import TargetMeasurements
+from ridgeback_interfaces.msg import TargetMeasurements
 
 from ridgeback_autonomy.benchmarking.event_values import (
     detection_status,

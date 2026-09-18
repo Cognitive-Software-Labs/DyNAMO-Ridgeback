@@ -32,7 +32,8 @@ building blocks unless a technical reference says otherwise.
 
 ## Repository map
 
-- `src/ridgeback_autonomy/` — backend-neutral nodes, messages, configuration,
+- `src/ridgeback_interfaces/` — shared ROS detection, measurement, and beam messages
+- `src/ridgeback_autonomy/` — backend-neutral nodes, configuration,
   tests, readiness gates, and public launch workflows
 - `src/ridgeback_autonomy_gz/` — Gazebo adapter, worlds, models, and GUI plugin
 - `src/ridgeback_autonomy_isaac/` — Isaac adapter, runner, sensor specs, and USD

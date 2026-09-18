@@ -26,7 +26,7 @@ from ridgeback_autonomy.common.messages import (
 )
 from ridgeback_autonomy.common.stamps import stamp_key
 from ridgeback_autonomy.common.tf_utils import lookup_transform_components
-from ridgeback_autonomy.msg import PolarBeams, TargetMeasurements
+from ridgeback_interfaces.msg import PolarBeams, TargetMeasurements
 from ridgeback_autonomy.perception.target_localization.core.image_utils import (
     convert_color_image_message,
     convert_depth_to_meters_message,

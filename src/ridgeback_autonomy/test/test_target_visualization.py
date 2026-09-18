@@ -54,7 +54,7 @@ from ridgeback_autonomy.perception.target_localization.visualization_style impor
     ESTIMATOR_MARKER_ID_BASES,
     RING_LINE_WIDTH_M,
 )
-from ridgeback_autonomy.msg import TargetMeasurements
+from ridgeback_interfaces.msg import TargetMeasurements
 from visualization_msgs.msg import Marker
 from ridgeback_autonomy.perception.target_localization.core.vehicle_frame import (
     ROBOT_FRONT_OFFSET_M,

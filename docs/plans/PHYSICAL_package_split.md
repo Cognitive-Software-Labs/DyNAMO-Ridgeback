@@ -1,8 +1,9 @@
 # PHYSICAL — Package split for distributed deployment
 
-Status: **approved plan; implementation and qualification pending.** Owner:
+Status: **implementation started; shared message extraction implemented, remaining stages and qualification pending.** Owner:
 the workstation implementation team. The package names and distributed roles
-below describe the intended implementation, not currently available commands.
+below describe the intended final implementation; only `ridgeback_interfaces`
+has been extracted so far.
 The [project backlog](../BACKLOG.md#physical-stationary-integration) owns the
 coordinated milestone: stationary integration, without physical driving or
 autonomous-mission qualification.
@@ -32,7 +33,7 @@ separate from shared code changes so both teams can review their own boundary.
 ## Intended package and runtime boundaries
 
 The current [application package](../../src/ridgeback_autonomy/package.xml)
-combines messages, perception, navigation orchestration, diagnostics, and
+combines perception, navigation orchestration, diagnostics, and
 benchmark tools. Extract responsibilities without creating a second localization
 implementation or changing estimator algorithms and model defaults.
 
@@ -143,6 +144,34 @@ semantics in the handoff rather than relying on illustrative commands.
 An unavailable simulator check or failed compatibility gate remains explicit
 open work, not a claimed pass. Keep the structural extraction and new runtime
 behavior reviewable as separately verified stages of the same workstream.
+
+## Implementation checkpoint
+
+The first boundary moves the three message definitions into
+`ridgeback_interfaces` and migrates all repository consumers. The
+[maintained interface contract](../target_localization/target_localization_pipeline.md#ros-interface-ownership)
+owns the implemented behavior and compatibility boundary.
+
+Baseline revision: `a01a4532a170fcb85df1a5aaffb8c28bf1601f96`. Dependency pins and
+recorded patches passed `tools/check_dependencies`; all 990 existing tests
+passed with local ROS networking enabled. Initial sandbox-only failures were
+log-directory/socket restrictions, not a code baseline failure.
+
+Verification artifacts live under `artifacts/package-split/`: original public
+launch arguments and test output in `baseline/`, clean build/install trees,
+and post-extraction evidence in `after/`. Message definitions were compared
+byte-for-byte with the baseline. A clean ROS-only build of interfaces and
+autonomy succeeded; the full suite additionally needs the existing backend
+and Clearpath underlay. All 993 post-extraction tests passed, including three generated-message
+serialization checks.
+
+The nested verification install exposes the existing fixed-depth workspace
+lookup: benchmark output and perception-venv roots resolve relative to that
+install location. Portable resource/environment resolution remains part of
+the later launch extraction; normal top-level install layout is unchanged.
+Gazebo/Isaac runtime smoke, recorded-input replay comparison, localization-only
+dependency closure, distributed roles, labels, and supervision remain open.
+The message-stage tests do not establish the final handoff gates.
 
 ## Handoff and completion
 

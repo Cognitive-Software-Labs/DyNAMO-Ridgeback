@@ -80,7 +80,7 @@ from ridgeback_autonomy.common.messages import (
 from ridgeback_autonomy.common.miss_reason import MissReason
 from ridgeback_autonomy.common.stamps import stamp_key
 from ridgeback_autonomy.common.tf_utils import lookup_transform_components
-from ridgeback_autonomy.msg import PolarBeams, TargetDetections, TargetMeasurements
+from ridgeback_interfaces.msg import PolarBeams, TargetDetections, TargetMeasurements
 from ridgeback_autonomy.perception.target_localization.core.depth_common import (
     DEPTH_GATE_DISABLED,
     NEAREST_MODE_BIN_WIDTH_M_DEFAULT,

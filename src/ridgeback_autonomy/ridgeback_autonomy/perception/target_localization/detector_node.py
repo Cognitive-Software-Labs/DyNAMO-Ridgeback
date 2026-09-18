@@ -15,7 +15,7 @@ from rclpy.qos import qos_profile_sensor_data
 from sensor_msgs.msg import Image
 
 from ridgeback_autonomy.common.messages import build_detections_message
-from ridgeback_autonomy.msg import TargetDetections
+from ridgeback_interfaces.msg import TargetDetections
 from ridgeback_autonomy.perception.target_localization.contracts import RAW_DETECTIONS_TOPIC
 from ridgeback_autonomy.perception.target_localization.core.detection import (
     DETECTION_MODEL_DEFAULT,

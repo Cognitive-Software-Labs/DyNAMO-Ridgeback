@@ -21,7 +21,7 @@ from rviz_2d_overlay_msgs.msg import OverlayText
 from tf2_ros import Buffer, TransformException, TransformListener
 from visualization_msgs.msg import MarkerArray
 
-from ridgeback_autonomy.msg import TargetMeasurements
+from ridgeback_interfaces.msg import TargetMeasurements
 from ridgeback_autonomy.perception.target_localization.contracts import (
     ESTIMATE_MARKERS_TOPIC,
     GROUND_TRUTH_TOPIC,

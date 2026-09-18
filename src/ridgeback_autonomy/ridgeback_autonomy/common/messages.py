@@ -8,7 +8,7 @@ from sensor_msgs.msg import Image
 
 from ridgeback_autonomy.common.miss_reason import MissReason
 from ridgeback_autonomy.common.models import Detection, DetectionBatch
-from ridgeback_autonomy.msg import PolarBeams, TargetDetections, TargetMeasurements
+from ridgeback_interfaces.msg import PolarBeams, TargetDetections, TargetMeasurements
 
 
 MISSING_FLOAT = float('nan')

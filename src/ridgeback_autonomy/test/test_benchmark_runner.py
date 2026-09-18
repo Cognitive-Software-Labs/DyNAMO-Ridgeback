@@ -47,7 +47,7 @@ from ridgeback_autonomy.benchmarking.reduction import (
 from ridgeback_autonomy.benchmarking.rendering import BenchmarkCollageRenderer
 from ridgeback_autonomy.benchmarking.summary import build_summary_rows
 from ridgeback_autonomy.common.models import Detection
-from ridgeback_autonomy.msg import TargetMeasurements
+from ridgeback_interfaces.msg import TargetMeasurements
 
 
 def test_replay_capture_restricts_live_scoring_to_frozen_detector_batches() -> None:

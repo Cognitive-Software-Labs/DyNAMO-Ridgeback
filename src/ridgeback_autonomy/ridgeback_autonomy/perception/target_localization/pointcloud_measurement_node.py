@@ -18,7 +18,7 @@ from ridgeback_autonomy.common.messages import (
     build_measurements_message,
 )
 from ridgeback_autonomy.common.tf_utils import lookup_transform_components
-from ridgeback_autonomy.msg import TargetDetections, TargetMeasurements
+from ridgeback_interfaces.msg import TargetDetections, TargetMeasurements
 from ridgeback_autonomy.perception.target_localization.contracts import (
     POINTCLOUD_MEASUREMENTS_TOPIC,
     RAW_DETECTIONS_TOPIC,

@@ -112,7 +112,7 @@ from ridgeback_autonomy.benchmarking.trial_results import (
     build_trials,
     dominant_miss_reasons,
 )
-from ridgeback_autonomy.msg import TargetDetections, TargetMeasurements
+from ridgeback_interfaces.msg import TargetDetections, TargetMeasurements
 from ridgeback_autonomy.common.stamps import stamp_to_nanoseconds
 from ridgeback_autonomy.perception.target_localization.core.depth_common import (
     DEPTH_GATE_DISABLED,

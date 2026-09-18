@@ -3,17 +3,6 @@ project(ridgeback_autonomy)
 
 find_package(ament_cmake REQUIRED)
 find_package(ament_cmake_python REQUIRED)
-find_package(rosidl_default_generators REQUIRED)
-find_package(builtin_interfaces REQUIRED)
-find_package(std_msgs REQUIRED)
-
-rosidl_generate_interfaces(${PROJECT_NAME}
-  "msg/PolarBeams.msg"
-  "msg/TargetDetections.msg"
-  "msg/TargetMeasurements.msg"
-  DEPENDENCIES builtin_interfaces std_msgs
-)
-
 ament_get_python_install_dir(python_install_dir)
 
 install(DIRECTORY
@@ -189,6 +178,7 @@ if(BUILD_TESTING)
   ament_add_pytest_test(test_launch_layout test/test_launch_layout.py)
   ament_add_pytest_test(test_markers test/test_markers.py)
   ament_add_pytest_test(test_messages test/test_messages.py)
+  ament_add_pytest_test(test_interface_serialization test/test_interface_serialization.py)
   ament_add_pytest_test(test_projective_ranging test/test_projective_ranging.py)
   ament_add_pytest_test(test_rendering test/test_rendering.py)
   ament_add_pytest_test(test_robot_config test/test_robot_config.py)

@@ -10,6 +10,27 @@ at the detection stamp into `(lateral_m, forward_m, distance_m)` in the shared
 base convention (Section 7). The separate `pointcloud` row publishes the same
 planar convention. No estimator fusion or fallback substitution is implemented.
 
+## ROS interface ownership
+
+`ridgeback_interfaces` owns `TargetDetections`, `TargetMeasurements`, and
+`PolarBeams`. It depends only on ROS interface generation/runtime support,
+`std_msgs`, and `builtin_interfaces`; application nodes consume its generated
+Python types through `ridgeback_interfaces.msg`.
+
+```mermaid
+flowchart LR
+    I["ridgeback_interfaces: ROS messages"] --> A["ridgeback_autonomy: localization and consumers"]
+    S["std_msgs and builtin_interfaces"] --> I
+```
+
+The package extraction preserves every message field, topic, acquisition stamp,
+and frame convention. The ROS type names changed from `ridgeback_autonomy/msg/*`
+to `ridgeback_interfaces/msg/*`; all communicating processes must use matching
+versions. Old bags retain their original types and require their original
+software environment or explicit conversion. Benchmark/replay files retain
+their existing schemas. The remaining common/localization extraction is tracked
+in the [distributed deployment plan](../plans/PHYSICAL_package_split.md).
+
 ## 1. Sensor stack
 
 ### Intel RealSense D455 (camera-based sensors)
