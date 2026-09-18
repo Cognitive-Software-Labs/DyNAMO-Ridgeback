@@ -31,7 +31,7 @@ approved robot-side bringup, namespace, domain, RMW, and effective topics. Do
 not bypass the gate by switching to a simulator profile or enable platform
 bringup/motion just to make a topic appear. The physical command-chain and D455
 validation gates remain in the [backlog](BACKLOG.md) and
-[PHYSICAL — D455 camera validation](plans/PHYSICAL_d455_validation.md).
+[PHYSICAL — Robot measurements and stationary sensor validation](plans/PHYSICAL_robot_measurements_and_validation.md#d455-camera-validation).
 
 ## Benchmark sweep cleanup
 

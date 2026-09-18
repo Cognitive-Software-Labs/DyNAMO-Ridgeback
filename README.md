@@ -332,8 +332,12 @@ wrapper does not run broad process cleanup or force `ROS_DOMAIN_ID=42` on
 hardware. Before setting `autonomous_motion_enabled:=true`, validate the deployed
 command chain and confirm the controller's `Twist`/`TwistStamped` contract; the
 checked-in generated configuration is not proof of the live robot contract.
-The [PHYSICAL — D455 camera validation](docs/plans/PHYSICAL_d455_validation.md) owns the
-physical D455 acceptance gates.
+The D455 section of
+[PHYSICAL — Robot measurements and stationary sensor validation](docs/plans/PHYSICAL_robot_measurements_and_validation.md#d455-camera-validation)
+owns the physical camera acceptance gates. The
+[three coordinated physical plans](docs/BACKLOG.md#physical-stationary-integration)
+cover the pending workstation package split, Intel–Thor deployment, and robot
+measurements; they do not describe an already qualified distributed deployment.
 
 The explorer is the in-repo `frontier_explorer_node` (sources under `src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer/`). It consumes the Nav2 global costmap and sends goals via `NavigateToPose`. The component boundary and readiness sequence are documented in [exploration architecture](docs/exploration/architecture.md).
 

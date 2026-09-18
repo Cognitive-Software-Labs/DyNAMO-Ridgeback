@@ -39,6 +39,32 @@ default decision addresses these tradeoffs and the exploration/P5 results.
 [Isaac lidar pipeline](isaac/lidar-pipeline.md), and the resolved orphan-lidar
 investigation in the archived evidence below.
 
+## Physical stationary integration
+
+**Gap.** The application still combines localization, shared messages, and
+navigation dependencies in one package. A distributed Intel–Thor deployment,
+physical sensor suite, and joint stationary target tests have not been qualified.
+Three coordinated plans own execution:
+
+| Plan | Owner | Completion boundary |
+|---|---|---|
+| [PHYSICAL — Package split for distributed deployment](plans/PHYSICAL_package_split.md) | Workstation | Independently installable localization, preserved Gazebo/Isaac and benchmark workflows, tested interfaces and handoff. |
+| [PHYSICAL — Intel–Thor deployment and transport qualification](plans/PHYSICAL_intel_thor_deployment.md) | Robot deployment team | Matching installed revision, GPU offload, measured transport/performance, stationary failure and recovery evidence. |
+| [PHYSICAL — Robot measurements and stationary sensor validation](plans/PHYSICAL_robot_measurements_and_validation.md) | People at the robot with agent assistance | Traceable geometry, sensor/calibration evidence, and distributed G1/person tests. |
+
+**Coordination.** Hardware inventory and measurements can start before the code
+split lands. Final distributed tests require its tested revision and interface
+handoff. Shared-code defects return to the workstation; robot teams own machine
+configuration and physical evidence. Start with the D455 on Intel and explicit
+per-host commands; camera relocation is an evidence-led alternative. One-command
+remote startup and boot services are optional later stages.
+
+**Completion criteria.** All three plans pass their stationary boundaries on
+the recorded configuration. Apply the existing camera, geometry, calibration,
+and command-chain criteria independently: stationary success does not close
+moving-robot calibration, physical stop/clearance, simulator contact, or
+autonomous-mission work. Pointcloud qualification remains optional.
+
 ## Physical command-chain validation
 
 **Deployment gate.** The hardware adapter is attach-only and autonomous motion
@@ -55,7 +81,9 @@ lifted/blocked-wheel where approved, low-speed clear-space, stop, timeout, and
 e-stop tests before enabling `autonomous_motion_enabled:=true`.
 
 **Context.** [Exploration architecture](exploration/architecture.md#hardware-safety-boundary)
-and the public hardware workflow in the [README](../README.md).
+and the public hardware workflow in the [README](../README.md). The
+[stationary measurement plan](plans/PHYSICAL_robot_measurements_and_validation.md#both-lidars-and-stationary-auxiliary-sensors)
+owns inspection only; its completion does not close this actuation gate.
 
 ## Optional: restore Gazebo exploration worlds and backend-specific maps
 
@@ -92,7 +120,8 @@ adapter worlds under `src/ridgeback_autonomy_gz/sim/worlds/`.
 profiles, colour/aligned-depth delivery, exact timestamps, TF ownership, and
 application behavior still need proof on the deployed robot.
 
-**Completion criteria.** Execute the [PHYSICAL — D455 camera validation](plans/PHYSICAL_d455_validation.md):
+**Completion criteria.** Execute the D455 section of
+[PHYSICAL — Robot measurements and stationary sensor validation](plans/PHYSICAL_robot_measurements_and_validation.md#d455-camera-validation):
 verify the intended device and driver, inspect effective configuration, validate
 image/depth/calibration contracts and timing, confirm the actual camera-to-base
 TF chain, and run a stationary projective/Euclidean application smoke. Test
@@ -121,7 +150,7 @@ invalid-point representation/density. Preserve device/profile provenance and
 application evidence. An unverified or unsuitable cloud remains disabled.
 
 **Context.** [Camera pointcloud contract](target_localization/camera_stack.md)
-and [PHYSICAL — D455 camera validation](plans/PHYSICAL_d455_validation.md).
+and [PHYSICAL — Robot measurements and stationary sensor validation](plans/PHYSICAL_robot_measurements_and_validation.md#completion-and-separate-work).
 
 ## Camera-LiDAR calibration
 
@@ -143,7 +172,10 @@ under robot motion; document recalibration triggers. Do not silently tune polar
 segmentation to absorb an extrinsic error.
 
 **Context.** [Polar profiling](target_localization/polar_profiling.md) and the
-[PHYSICAL — D455 camera validation](plans/PHYSICAL_d455_validation.md).
+stationary calibration procedure in
+[PHYSICAL — Robot measurements and stationary sensor validation](plans/PHYSICAL_robot_measurements_and_validation.md#stationary-cameralidar-calibration).
+That procedure supplies only the stationary portion of this gate; motion
+validation remains open after a stationary pass.
 
 ## Shared camera mast and bracket geometry
 
@@ -160,7 +192,9 @@ self-occlusion in both simulators, including motion. Record physical dimensions
 and measurement uncertainty. Rerun affected benchmarks before quoting results.
 
 **Context.** [Shared robot geometry](robot/geometry.md#known-representation-differences)
-and [Isaac additions](isaac/robot-model.md#hand-authored-parts).
+and [Isaac additions](isaac/robot-model.md#hand-authored-parts). Physical dimensions
+come from the [measurement procedure](plans/PHYSICAL_robot_measurements_and_validation.md#geometry-measurements-and-provenance);
+implementing and verifying shared assets remains separate work.
 
 ## Robot geometry and drawing audit
 
@@ -176,7 +210,8 @@ source. Regenerate the drawing from authoritative geometry where practical,
 and add a repeatable check for its declared dimensions and mount annotations.
 Rerun any benchmarks affected by geometry corrections.
 
-**Context.** [Geometry and dimensional provenance](robot/geometry.md).
+**Context.** [Geometry and dimensional provenance](robot/geometry.md) and the
+[physical measurement procedure](plans/PHYSICAL_robot_measurements_and_validation.md#geometry-measurements-and-provenance).
 
 ## Collision-envelope and navigation-footprint validation
 
@@ -202,7 +237,9 @@ that gate. Preserve backend-specific tolerances and rerun affected benchmarks.
 
 **Context.** [Collision model and footprint](robot/collision_model.md),
 [Isaac colliders](isaac/robot-model.md#colliders), and
-[physical command-chain validation](#physical-command-chain-validation).
+[physical command-chain validation](#physical-command-chain-validation). The
+[stationary measurement procedure](plans/PHYSICAL_robot_measurements_and_validation.md#geometry-measurements-and-provenance)
+supplies the physical outline and uncertainty, not contact or stopping proof.
 
 ## Archived evidence
 

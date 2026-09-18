@@ -28,7 +28,8 @@ The SAM3 spike's untested benchmark-parity gate must not be reported as passed.
    not a default change. Compare distance errors, misses/coverage, and costs on
    fixed benchmark scenes before claiming pipeline parity.
 5. Validate imagery and resource limits on the target robot before deployment;
-   see [PHYSICAL — D455 camera validation](../plans/PHYSICAL_d455_validation.md).
+   see [PHYSICAL — Robot measurements and stationary sensor validation](../plans/PHYSICAL_robot_measurements_and_validation.md#joint-stationary-target-tests)
+   and [PHYSICAL — Intel–Thor deployment and transport qualification](../plans/PHYSICAL_intel_thor_deployment.md#3-performance-characterization).
 
 ## Untested proposal: a sim-trained dedicated segmenter
 

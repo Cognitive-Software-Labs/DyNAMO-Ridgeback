@@ -176,8 +176,9 @@ contains a Gazebo-, Isaac-, or RealSense-specific projection constant.
 - Gazebo's observed rate may fall below the authored 30 Hz under rendering
   load; that is a performance failure, not an alternate camera contract.
 - Physical-camera validation is still pending. The
-  [PHYSICAL — D455 camera validation](../plans/PHYSICAL_d455_validation.md) owns the
-  device, profile, encoding, timestamp, TF-ownership, and organized-cloud gates.
+  [PHYSICAL — Robot measurements and stationary sensor validation](../plans/PHYSICAL_robot_measurements_and_validation.md#d455-camera-validation)
+  owns the device, profile, encoding, timestamp, and TF-ownership procedure;
+  organized-cloud qualification remains a separate optional gate.
 - Physical camera-to-LiDAR extrinsic and clock validation remains a deployment
   gate for polar profiling.
 - The committed benchmark scenarios carry visibility certifications generated

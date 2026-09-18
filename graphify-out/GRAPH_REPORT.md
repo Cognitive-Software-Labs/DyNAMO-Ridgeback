@@ -1,7 +1,7 @@
 # Graph Report - /home/deivid/dev/DyNAMO-Ridgeback  (2026-09-18)
 
 ## Corpus Check
-- 458 files · ~339,788 words
+- 460 files · ~343,996 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary

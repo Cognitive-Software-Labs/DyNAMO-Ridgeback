@@ -60,7 +60,8 @@ are not D455-fidelity measurements.
 | Horizontal FoV | 79.61 or 90.00 deg | 79.61 or 90.00 deg | live `CameraInfo`; pending |
 | Internal TF owner | `robot_state_publisher` | `robot_state_publisher` | `realsense2_camera` |
 
-Hardware readiness is tracked once in the [PHYSICAL — D455 camera validation](../plans/PHYSICAL_d455_validation.md).
+Physical camera validation follows the D455 procedure in
+[PHYSICAL — Robot measurements and stationary sensor validation](../plans/PHYSICAL_robot_measurements_and_validation.md#d455-camera-validation).
 Simulation and parser tests cannot establish physical profiles, matching stamps,
 device selection, or driver TF ownership. The old `camera_config.json` and its
 unused loader have been deleted; active paths use the color `CameraInfo`.

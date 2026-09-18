@@ -262,8 +262,9 @@ Smoke runs with current recipes do not replace the controlled
 [isolation comparison](../target_distance_benchmarking/BACKLOG.md#isolation-validation), especially for long-range backgrounds.
 
 Repository alignment/configuration support does not establish physical readiness.
-The [PHYSICAL — D455 camera validation](../plans/PHYSICAL_d455_validation.md) owns the
-device, profiles, grids, stamps, TF, and optional pointcloud checks.
+[PHYSICAL — Robot measurements and stationary sensor validation](../plans/PHYSICAL_robot_measurements_and_validation.md#d455-camera-validation)
+owns the device, profiles, grids, stamps, and TF procedure; pointcloud
+qualification remains a separate optional gate linked from that plan.
 
 ## Archived evidence
 
