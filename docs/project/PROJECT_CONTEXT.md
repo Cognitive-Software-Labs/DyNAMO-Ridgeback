@@ -60,7 +60,8 @@ building blocks unless a technical reference says otherwise.
 - [Target-distance benchmarking](../target_distance_benchmarking/overview.md)
 - [External dependency management](dependencies.md)
 - [Troubleshooting](../troubleshooting.md)
-- [Active engineering gaps](../BACKLOG.md)
+- [Project engineering gaps](../BACKLOG.md)
+- [Target-distance benchmarking gaps](../target_distance_benchmarking/BACKLOG.md)
 - [Isaac Sim port](../isaac/overview.md)
 
 The graph report required by the imported graphify conventions identifies

@@ -28,7 +28,8 @@ This workspace supports 3 main human workflows:
 
 Isaac Sim port (in progress, `feat/isaac-sim-6-port`):
 
-- `docs/BACKLOG.md`: **all active engineering gaps**, including Isaac
+- [Project backlog](docs/BACKLOG.md): robot, exploration, deployment, and shared gaps
+- [Benchmarking backlog](docs/target_distance_benchmarking/BACKLOG.md): target-distance benchmarking and estimator evaluation
 - [Isaac rollback](docs/isaac/rollback.md): retained environments and driver recovery
 - `docs/isaac/camera-depth.md`: Isaac D455 depth modes, alignment, ROS contract, and runbook
 - `docs/isaac/lidar-pipeline.md`: how the RTX lidar reaches ROS

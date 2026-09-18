@@ -11,7 +11,7 @@ Implemented 2D baselines live in
 and implemented 3D baselines live in
 [euclidean reconstruction](../target_localization/euclidean_reconstruction.md#implemented-3d-recipes).
 No candidate here is an automatic backlog commitment.
-[Occlusion characterization](../BACKLOG.md#occlusion-characterization)
+[Occlusion characterization](../target_distance_benchmarking/BACKLOG.md#occlusion-characterization)
 must establish the failure before a recovery algorithm is selected.
 
 ## 2D candidates
@@ -386,5 +386,5 @@ Learning on Point Sets in a Metric Space,"* NeurIPS 2017.
    quality and distance quality disagree, and do not equate missing output with
    accurate output. Record parameters, input provenance, and baseline revision.
 
-The active comparison task is [Isolation validation](../BACKLOG.md#isolation-validation).
+The active comparison task is [Isolation validation](../target_distance_benchmarking/BACKLOG.md#isolation-validation).
 Literature candidates require a separate selection decision before implementation.

@@ -14,7 +14,7 @@ troubleshooting, planning, and historical documentation.
   tooling, dependencies, and entrypoint conventions
 - [External dependency management](project/dependencies.md) — import, patch,
   refresh, verification, live migration, and rollback procedure
-- [Active engineering gaps](BACKLOG.md)
+- [Project engineering gaps](BACKLOG.md)
 - [Troubleshooting](troubleshooting.md)
 
 ## Robot
@@ -51,6 +51,7 @@ troubleshooting, planning, and historical documentation.
 
 ## Target-distance benchmarking
 
+- [Open benchmarking work](target_distance_benchmarking/BACKLOG.md) — validation gates, scenario recertification, and tooling gaps
 - [Target-distance benchmarking](target_distance_benchmarking/overview.md) — start here: what
   the benchmark is, the estimators and axes, and what it may not claim
 - [Running benchmarks](target_distance_benchmarking/running_benchmarks.md) — which question,
@@ -67,8 +68,6 @@ troubleshooting, planning, and historical documentation.
 
 ## Active plans
 
-- [Layered replay profiles](plans/layered_replay_profiles.md) — implementation
-  landed; live parity, real-model, storage, and scaling gates remain open
 - [Live sweep from the configurator GUI](plans/benchmark_gui_direct_run.md) —
   the three offline profiles run from the page; the `live-system` phase is
   blocked on the `cleanup.sh` catch-all

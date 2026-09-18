@@ -1,5 +1,10 @@
 # Documentation-backed engineering backlog
 
+This backlog owns robot, exploration, deployment, and cross-cutting gaps.
+The [target-distance benchmarking backlog](target_distance_benchmarking/BACKLOG.md)
+owns benchmark tooling and controlled estimator-evaluation work. Each item
+has one owner; cross-cutting prerequisites are linked rather than copied.
+
 Only active, evidenced gaps belong here. Implemented behaviour belongs in the
 technical references; dated experiments and migrations belong in the archive;
 unselected alternatives belong in `docs/do_not_try_again/`. Closing an item means satisfying
@@ -33,24 +38,6 @@ default decision addresses these tradeoffs and the exploration/P5 results.
 **Context.** [Exploration evaluation](exploration/evaluation.md),
 [Isaac lidar pipeline](isaac/lidar-pipeline.md), and the resolved orphan-lidar
 investigation in the archived evidence below.
-
-## Deferred: Isaac target-distance benchmark port
-
-**Status.** Deferred (former P6); this records scope, not approval to implement.
-The target-distance benchmark still requires Gazebo-specific entity control.
-
-**Scope if resumed.** Replace Gazebo CLI spawn/remove/pose plumbing with a
-backend interface and Isaac simulation-control services. Preserve the current
-scenario schema, registered estimators, layered replay and configurator.
-Forward backend selection and Isaac arguments through the benchmark environment
-launch; cover process startup and teardown for both backends.
-
-**Acceptance.** An Isaac run with all registered estimators and one repeat
-completes the configured scenes, comparison report and collages; estimates are
-compared against a current matching Gazebo baseline, and repeated cleanup leaves
-no residual prims. Historical geometry-dependent numbers are not acceptance evidence.
-
-**Context.** [Target-distance benchmarking](target_distance_benchmarking/overview.md).
 
 ## Physical command-chain validation
 
@@ -192,56 +179,6 @@ that gate. Preserve backend-specific tolerances and rerun affected benchmarks.
 **Context.** [Collision model and footprint](robot/collision_model.md),
 [Isaac colliders](isaac/robot-model.md#colliders), and
 [physical command-chain validation](#physical-command-chain-validation).
-
-## Camera-geometry benchmark recertification
-
-**Gap.** The current measured camera and LiDAR mounts supersede the geometry
-used to generate the visibility fractions and pixel-grid certifications in
-`benchmark_scenarios_full.yaml`. The scenes remain a stable A/B input set, but
-their old certified fractions are not current evidence.
-
-**Completion criteria.** Regenerate the pixel/visibility audit from the current
-robot description for both shared camera profiles and verify Gazebo/Isaac
-agreement; update scenario certifications and the gallery; rerun every
-benchmark whose inputs or measured behavior depend on camera or LiDAR geometry
-before quoting its numbers.
-
-**Context.** [Camera stack](target_localization/camera_stack.md) and
-[shared robot geometry](robot/geometry.md).
-
-## Isolation validation
-
-**Gap.** 2D/3D recipes and current defaults are implemented, but the
-2026-08-28 default/depth-gate transition and cross-recipe accuracy have not been
-established by a controlled current comparison, especially with deep backgrounds.
-
-**Completion criteria.** Fix one scenario YAML and revision; include clutter,
-near occluders, long backgrounds, ranges, and viewpoints; compare registered
-recipes and box/silhouette controls without regenerating scenes; record accuracy,
-misses/coverage, runtime, memory, and parameters; include exploration only as a
-qualitative follow-up. Treat a default change as a separate decision.
-
-**Context.** [Projective-ranging isolation](target_localization/projective_ranging.md#implemented-2d-recipes),
-[euclidean-reconstruction isolation](target_localization/euclidean_reconstruction.md#implemented-3d-recipes),
-and the [candidate protocol](do_not_try_again/foreground_isolation.md#evaluation-protocol).
-
-## Occlusion characterization
-
-**Gap.** Dedicated `interocc_*`, `objocc_*`, and `objpartial_*` scenes exist,
-but current defaults have not first been characterized well enough to select a
-recovery design. The [depth-clustering plan](plans/occlusion_handling.md) is a
-proposal, not an approved algorithm or current miss reason.
-
-**Completion criteria.** Run current defaults on the fixed occlusion families;
-separate detector, segmentation, depth/scan availability, isolation, association,
-and wrong-near estimates; identify which estimator/precision/scenes require
-change; decide whether the failure merits a new recipe, a wrong-object guard, an
-explicit occlusion reason, or no change. Only then approve a scoped implementation
-and require non-occluded regression evidence.
-
-**Context.** [Occlusion proposal](plans/occlusion_handling.md),
-[segmentation candidates](do_not_try_again/segmentation.md), and the
-[scenario gallery](target_distance_benchmarking/benchmark_scenarios_v2_gallery.html).
 
 ## Archived evidence
 

@@ -207,7 +207,7 @@ one bins Euclidean range, and the two diverge for an off-axis target. Tests in
 [`test_isolation_3d.py`](../../src/ridgeback_autonomy/test/test_isolation_3d.py)
 cover registered chains, pose-dependent crops, empty selections, and selection
 behavior. Comparative validation is tracked in
-[the backlog](../BACKLOG.md#isolation-validation).
+[the backlog](../target_distance_benchmarking/BACKLOG.md#isolation-validation).
 
 RANSAC, normal filters, clustering, min-cut, and learned methods remain
 [foreground-isolation candidates](../do_not_try_again/foreground_isolation.md), not

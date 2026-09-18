@@ -42,6 +42,7 @@ camera-less robot profile for measuring frontier exploration. It is a separate w
 
 ## Where to go next
 
+- [open benchmarking work](BACKLOG.md) — remaining validation, tooling, and scenario work
 - [running benchmarks](running_benchmarks.md) — which question, which profile,
   and which of the four ways to start it
 - [semantics](semantics.md) — scenarios, events, observations, instances, miss

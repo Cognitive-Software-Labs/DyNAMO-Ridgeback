@@ -227,7 +227,7 @@ behaviour that shipped. These are deterministic NumPy baselines, not guarantees
 of foreground identity or measured zero-cost operations. Tests in
 [`test_isolation_2d.py`](../../src/ridgeback_autonomy/test/test_isolation_2d.py)
 cover subset, invalid/unimodal, and dispersed-histogram behavior. Comparative
-validation is tracked in [the backlog](../BACKLOG.md#isolation-validation), and
+validation is tracked in [the backlog](../target_distance_benchmarking/BACKLOG.md#isolation-validation), and
 unimplemented methods live in
 [foreground-isolation candidates](../do_not_try_again/foreground_isolation.md).
 SAM is a mask producer, not a depth-isolation recipe.

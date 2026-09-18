@@ -131,7 +131,7 @@ cannot support model/runtime claims. `mask-model` may retain isolated producer
 duration as diagnostics, but only `live-system` can establish ROS delivery,
 end-to-end latency, throughput, GPU contention, simulator real-time factor, or
 integration behavior. Remaining live-parity, real-model, storage and scaling
-gates are owned by the [active replay plan](../plans/layered_replay_profiles.md).
+gates are owned by the [benchmarking backlog](BACKLOG.md#layered-replay-validation).
 
 ## Archived evidence
 

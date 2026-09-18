@@ -498,7 +498,7 @@ but it is not implemented: choosing its threshold needs per-trial mask geometry,
 which is deliberately outside what this benchmark measures.
 
 [Calibration](../BACKLOG.md#camera-lidar-calibration) and
-[occlusion characterization](../BACKLOG.md#occlusion-characterization) remain
+[occlusion characterization](../target_distance_benchmarking/BACKLOG.md#occlusion-characterization) remain
 active work. Fusion/parallax guards, fallback routing, and rear-scan merging are
 conditional extensions described in the [pipeline](target_localization_pipeline.md#9-conditional-extensions-not-current-behaviour),
 not missing pieces of the current independent-estimator contract.

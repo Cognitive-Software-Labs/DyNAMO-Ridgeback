@@ -16,7 +16,8 @@ Other pages summarize it only when useful and link back to that owner.
 | Backend-specific robot import, physics and sensors | backend topic reference, such as `docs/isaac/robot-model.md` |
 | Implemented behavior and interfaces | topic reference under `docs/` |
 | Current failures and diagnostic recipes | `docs/troubleshooting.md` |
-| Active evidenced engineering gaps | `docs/BACKLOG.md` |
+| Robot, exploration, deployment and cross-cutting gaps | `docs/BACKLOG.md` |
+| Target-distance benchmarking and controlled estimator-evaluation gaps | `docs/target_distance_benchmarking/BACKLOG.md` |
 | Approved work not yet complete | `docs/plans/` |
 | Rejected, deferred, or unselected approaches | `docs/do_not_try_again/` |
 | Dated experiments, migrations, and validation evidence | `archive/engineering/` |
@@ -46,8 +47,10 @@ rule it routes to — the graphify rules, in particular, are owned by
 - Add troubleshooting only when a reader can act on the symptom today. Move a
   completed investigation's detailed evidence to the archive and leave a short fix
   pointer where useful.
-- Put a gap in the backlog only when it remains active and has a completion
-  criterion. Put an implementation document in plans only while work remains.
+- Put a gap in its owning backlog only when it remains active and has a
+  completion criterion. Keep one entry; link cross-cutting prerequisites rather
+  than copying them. Use a plan when the remaining work needs a detailed
+  execution procedure; a checklist belongs in the backlog.
 - When work completes, remove it from active lists, put the implemented contract
   in its technical reference, and preserve only durable evidence in the archive.
 - Do not copy large implementation descriptions into project context. Add a

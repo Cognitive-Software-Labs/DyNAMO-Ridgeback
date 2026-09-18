@@ -9,7 +9,7 @@ they currently fail, and the proposed recovery. Cross-cutting across the three p
 the current contract. Its failure mechanism follows from the implemented
 nearest-surface rules, but the current defaults must first be characterized on
 the existing `objpartial_*`, `objocc_*`, and `interocc_*` scenes. That gate is
-owned by [the backlog](../BACKLOG.md#occlusion-characterization). Do not begin
+owned by [the backlog](../target_distance_benchmarking/BACKLOG.md#occlusion-characterization). Do not begin
 Phase 1 merely because the proposal is detailed.
 
 ---

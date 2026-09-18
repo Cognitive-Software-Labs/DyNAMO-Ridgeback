@@ -302,7 +302,7 @@ organized-cloud input. A silhouette depth row bypasses rect isolation recipes.
 See [the benchmark estimators and axes](../target_distance_benchmarking/overview.md).
 
 These are supported configurations, not a claim that the complete matrix has
-been measured. [Isolation validation](../BACKLOG.md#isolation-validation) owns
+been measured. [Isolation validation](../target_distance_benchmarking/BACKLOG.md#isolation-validation) owns
 the controlled comparison; unselected methods live in `docs/do_not_try_again/`.
 
 ## 9. Conditional extensions, not current behaviour

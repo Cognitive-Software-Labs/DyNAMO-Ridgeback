@@ -259,7 +259,7 @@ monocular (18 m for the default checkpoint). The current 3D isolation default is
 `height_crop_nearest_mode_band`.
 
 Smoke runs with current recipes do not replace the controlled
-[isolation comparison](../BACKLOG.md#isolation-validation), especially for long-range backgrounds.
+[isolation comparison](../target_distance_benchmarking/BACKLOG.md#isolation-validation), especially for long-range backgrounds.
 
 Repository alignment/configuration support does not establish physical readiness.
 The [hardware validation plan](../plans/camera_hardware_validation.md) owns the
