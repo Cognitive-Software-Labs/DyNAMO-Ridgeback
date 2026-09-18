@@ -1,0 +1,296 @@
+#!/bin/bash
+# Pre-deploy check of the Intel–Thor Ethernet link. Run on Intel before every
+# distributed deployment. Exits nonzero if any check FAILs.
+#
+# Usage: tools/intel_thor/check_link [--no-traffic] [--duration SECONDS]
+#                                    [--domain ID] [--thor USER@HOST]
+#
+# The traffic test streams ~220 Mbit/s of synthetic camera frames each way for
+# --duration seconds over CycloneDDS with the deployment configurations, in an
+# otherwise unused ROS domain. It never joins the robot graph, but it shares the
+# Ethernet segment with the LiDARs: run it with the robot stationary. See docs/physical/intel_thor_transport.md.
+
+set -u
+
+REPO_ROOT="$(git -C "$(dirname "$0")" rev-parse --show-toplevel)"
+CONFIG_DIR="$REPO_ROOT/src/ridgeback_autonomy_hardware/config/intel_thor"
+PROBE="$REPO_ROOT/tools/intel_thor/dds_link_probe.py"
+INTEL_IP=192.168.131.1
+THOR_IP=192.168.131.51
+THOR="robot@$THOR_IP"
+THOR_REPO='~/DyNAMO-Ridgeback'
+REMOTE_DIR='.cache/dynamo_check_link'
+REQUIRED_RMEM=16777216
+DOMAIN=87
+DURATION=10
+RATE=30
+TRAFFIC=true
+
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --no-traffic) TRAFFIC=false ;;
+        --duration) shift; DURATION="${1:-}" ;;
+        --domain) shift; DOMAIN="${1:-}" ;;
+        --thor) shift; THOR="${1:-}" ;;
+        *)
+            sed -n '5,6p' "$0" | sed 's/^# //' >&2
+            exit 2
+            ;;
+    esac
+    shift
+done
+
+FAILS=0
+WARNS=0
+pass() { printf '  PASS  %s\n' "$*"; }
+warn() { printf '  WARN  %s\n' "$*"; WARNS=$((WARNS + 1)); }
+fail() { printf '  FAIL  %s\n' "$*"; FAILS=$((FAILS + 1)); }
+section() { printf '\n%s\n' "$*"; }
+thor() { ssh -o BatchMode=yes -o ConnectTimeout=5 "$THOR" "$@"; }
+finish() {
+    printf '\n%d failure(s), %d warning(s)\n' "$FAILS" "$WARNS"
+    [ "$FAILS" -eq 0 ]
+    exit $?
+}
+
+# Bytes counters summed over the Wi-Fi interfaces (wl*) of a host.
+WIFI_BYTES="awk '{s += \$1} END {print s + 0}' /sys/class/net/wl*/statistics/rx_bytes /sys/class/net/wl*/statistics/tx_bytes 2>/dev/null"
+# The camera stream is ~220 Mbit/s; a duplicate Wi-Fi path shows up at that scale,
+# well above the background traffic of the robot's web and Foxglove services.
+WIFI_LIMIT_MBIT=20
+
+# Receive-buffer ceiling, live and persisted, on the named host.
+check_buffers() {
+    local host="$1" run=() value
+    [ "$host" = thor ] && run=(thor)
+    value="$("${run[@]}" sysctl -n net.core.rmem_max)"
+    if [ "${value:-0}" -ge "$REQUIRED_RMEM" ]; then
+        pass "$host net.core.rmem_max = $value"
+    else
+        fail "$host net.core.rmem_max = ${value:-?}; install 60-dynamo-dds-buffers.conf (need $REQUIRED_RMEM)"
+    fi
+    if "${run[@]}" grep -qs "net.core.rmem_max *= *$REQUIRED_RMEM" /etc/sysctl.d/60-dynamo-dds-buffers.conf; then
+        pass "$host buffer limit persisted in /etc/sysctl.d/60-dynamo-dds-buffers.conf"
+    else
+        warn "$host buffer limit not persisted in /etc/sysctl.d; it resets on reboot"
+    fi
+}
+
+section "Intel ($(hostname))"
+if ip -4 -o addr show | grep -q " $INTEL_IP/"; then
+    pass "robot Ethernet address $INTEL_IP present"
+else
+    fail "this host does not own $INTEL_IP; run the check on Intel"
+    finish
+fi
+
+route_dev="$(ip route get "$THOR_IP" | awk '{for (i = 1; i < NF; i++) if ($i == "dev") print $(i + 1); exit}')"
+case "$route_dev" in
+    wl*) fail "route to Thor leaves through Wi-Fi ($route_dev)" ;;
+    *) pass "route to Thor via $route_dev" ;;
+esac
+
+# Behind a bridge, find the physical port that learned Thor's MAC address.
+port="$route_dev"
+ping -c 1 -W 1 "$THOR_IP" > /dev/null 2>&1
+thor_mac="$(ip neigh show "$THOR_IP" dev "$route_dev" | awk '{print $3; exit}')"
+if [ -d "/sys/class/net/$route_dev/bridge" ] && [ -n "$thor_mac" ]; then
+    port="$(bridge fdb show br "$route_dev" | awk -v mac="$thor_mac" '$1 == mac {print $3; exit}')"
+fi
+speed="$(cat "/sys/class/net/$port/speed" 2>/dev/null)"
+duplex="$(cat "/sys/class/net/$port/duplex" 2>/dev/null)"
+if [ "$speed" = 1000 ] || [ "${speed:-0}" -gt 1000 ] 2>/dev/null && [ "$duplex" = full ]; then
+    pass "Thor-facing port $port: ${speed} Mb/s $duplex"
+else
+    fail "Thor-facing port ${port:-unknown}: ${speed:-?} Mb/s ${duplex:-?} (need 1000 full)"
+fi
+
+check_buffers intel
+services_rmw="$(grep -h '^export RMW_IMPLEMENTATION' /etc/clearpath/setup.bash 2>/dev/null | cut -d'"' -f2)"
+if [ "$services_rmw" = rmw_cyclonedds_cpp ]; then
+    pass "robot services configured for CycloneDDS (/etc/clearpath/setup.bash)"
+else
+    warn "robot services use ${services_rmw:-unknown}; switch with sudo tools/intel_thor/intel_services_rmw apply"
+fi
+leftover="$("$REPO_ROOT/tools/intel_thor/intel_services_rmw" status | awk '/active/ && /fastrtps|Fast DDS default/ {print $1}' | paste -sd' ')"
+if [ -n "$leftover" ]; then
+    warn "services still running Fast DDS: $leftover"
+fi
+
+ping_summary="$(ping -c 20 -i 0.2 -q "$THOR_IP" 2>&1)"
+loss="$(printf '%s\n' "$ping_summary" | grep -oE '[0-9.]+% packet loss' | cut -d% -f1)"
+rtt="$(printf '%s\n' "$ping_summary" | awk -F/ '/rtt/ {print $5 " avg / " $6 " ms max"}')"
+if [ "$loss" = 0 ]; then
+    pass "ping: 0% loss, $rtt"
+else
+    fail "ping: ${loss:-100}% loss ${rtt}"
+fi
+
+section "Thor ($THOR)"
+if ! thor_host="$(thor hostname 2>/dev/null)"; then
+    fail "key-based SSH to $THOR failed; install the Intel key with ssh-copy-id"
+    finish
+fi
+pass "SSH reachable ($thor_host)"
+
+thor_nic="$(thor "ip -4 -o addr show | awk '/ $THOR_IP\\// {print \$2}'")"
+thor_link="$(thor "cat /sys/class/net/$thor_nic/speed /sys/class/net/$thor_nic/duplex 2>/dev/null" | paste -sd' ')"
+if [ "$thor_link" = "1000 full" ]; then
+    pass "$thor_nic: 1000 Mb/s full"
+else
+    fail "${thor_nic:-no interface with $THOR_IP}: ${thor_link:-unknown} (need 1000 full)"
+fi
+
+check_buffers thor
+if thor test -e /opt/ros/jazzy/lib/librmw_cyclonedds_cpp.so; then
+    pass "rmw_cyclonedds_cpp installed"
+else
+    fail "rmw_cyclonedds_cpp missing; install ros-jazzy-rmw-cyclonedds-cpp"
+fi
+
+local_rev="$(git -C "$REPO_ROOT" rev-parse HEAD)"
+thor_rev="$(thor "git -C $THOR_REPO rev-parse HEAD 2>/dev/null")"
+if [ -z "$thor_rev" ]; then
+    warn "no checkout at $THOR_REPO on Thor"
+elif [ "$thor_rev" = "$local_rev" ]; then
+    pass "checkout revision matches Intel (${local_rev:0:7})"
+else
+    warn "checkout revision ${thor_rev:0:7} differs from Intel ${local_rev:0:7}"
+fi
+
+section "DDS configuration (this checkout)"
+# file|expected NetworkInterface entries, as attribute=value pairs
+for spec in "cyclonedds_thor.xml|address=$THOR_IP" \
+            "cyclonedds_intel.xml|address=$INTEL_IP" \
+            "cyclonedds_intel_services.xml|name=br0 name=wlp3s0"; do
+    file="${spec%%|*}"
+    expected="${spec#*|}"
+    if python3 - "$CONFIG_DIR/$file" "$expected" <<'PY'
+import sys
+import xml.etree.ElementTree as ET
+
+ns = {'c': 'https://cdds.io/config'}
+root = ET.parse(sys.argv[1]).getroot()
+found = sorted(f'{key}={value}' for element in root.iterfind('.//c:NetworkInterface', ns)
+               for key, value in element.attrib.items() if key in ('address', 'name'))
+sys.exit(0 if found == sorted(sys.argv[2].split()) else 1)
+PY
+    then
+        pass "$file interfaces: $expected"
+    else
+        fail "$file does not parse or its interfaces are not exactly: $expected"
+    fi
+done
+
+section "Clock"
+# One SSH channel answers timestamp requests; the lowest round trip bounds the error.
+clock="$(python3 - "$THOR" <<'PY'
+import shlex
+import subprocess
+import sys
+import time
+
+responder = 'import sys, time; [print(time.time_ns(), flush=True) for _ in sys.stdin]'
+proc = subprocess.Popen(
+    ['ssh', '-o', 'BatchMode=yes', sys.argv[1], 'python3 -c ' + shlex.quote(responder)],
+    stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
+best = None
+for _ in range(30):
+    sent = time.time_ns()
+    proc.stdin.write('\n')
+    proc.stdin.flush()
+    remote = int(proc.stdout.readline())
+    received = time.time_ns()
+    rtt = received - sent
+    if best is None or rtt < best[0]:
+        best = (rtt, remote - (sent + received) // 2)
+proc.stdin.close()
+proc.wait()
+print(f'{best[1] / 1e6:.2f} {best[0] / 2e6:.2f}')
+PY
+)"
+offset_ms="${clock% *}"
+bound_ms="${clock#* }"
+abs_offset="${offset_ms#-}"
+if [ -z "$clock" ]; then
+    fail "clock offset could not be measured"
+elif awk "BEGIN {exit !($abs_offset > 10)}"; then
+    fail "Thor clock offset ${offset_ms} ms (±${bound_ms}); over 10 ms"
+elif awk "BEGIN {exit !($abs_offset > 2)}"; then
+    warn "Thor clock offset ${offset_ms} ms (±${bound_ms}); over 2 ms"
+else
+    pass "Thor clock offset ${offset_ms} ms (±${bound_ms} ms)"
+fi
+for side in intel thor; do
+    if [ "$side" = intel ]; then
+        synced="$(timedatectl show -p NTPSynchronized --value)"
+    else
+        synced="$(thor timedatectl show -p NTPSynchronized --value)"
+    fi
+    [ "$synced" = yes ] && pass "$side NTP synchronized" || warn "$side NTP not synchronized"
+done
+
+if [ "$TRAFFIC" != true ]; then
+    finish
+fi
+
+section "Traffic: ${RATE} Hz 640x480 rgb8, ${DURATION} s each way, ROS domain $DOMAIN"
+if ! thor "mkdir -p $REMOTE_DIR" || ! scp -q "$PROBE" "$CONFIG_DIR/cyclonedds_thor.xml" "$THOR:$REMOTE_DIR/"; then
+    fail "could not copy the probe to Thor"
+    finish
+fi
+
+ros_env="source /opt/ros/jazzy/setup.bash; unset FASTRTPS_DEFAULT_PROFILES_FILE; export ROS_DOMAIN_ID=$DOMAIN RMW_IMPLEMENTATION=rmw_cyclonedds_cpp"
+intel_env="$ros_env CYCLONEDDS_URI=file://$CONFIG_DIR/cyclonedds_intel.xml"
+thor_env="$ros_env CYCLONEDDS_URI=file://\$HOME/$REMOTE_DIR/cyclonedds_thor.xml"
+publish_for=$((DURATION + 20))
+
+run_direction() {
+    local label="$1" receiver="$2"
+    local wifi_intel0 wifi_thor0 result wifi_mbit received rate gap drops
+    wifi_intel0="$(eval "$WIFI_BYTES")"
+    wifi_thor0="$(thor "$WIFI_BYTES")"
+    if [ "$receiver" = thor ]; then
+        bash -c "$intel_env; python3 '$PROBE' pub --rate $RATE --duration $publish_for" > /dev/null 2>&1 &
+        result="$(thor "$thor_env; python3 $REMOTE_DIR/dds_link_probe.py sub --duration $DURATION --wait 15" 2>/dev/null)"
+    else
+        thor "$thor_env; timeout $publish_for python3 $REMOTE_DIR/dds_link_probe.py pub --rate $RATE --duration $publish_for" > /dev/null 2>&1 &
+        result="$(bash -c "$intel_env; python3 '$PROBE' sub --duration $DURATION --wait 15" 2>/dev/null)"
+    fi
+    wifi_mbit="$(awk -v a="$(eval "$WIFI_BYTES")" -v a0="$wifi_intel0" -v b="$(thor "$WIFI_BYTES")" -v b0="$wifi_thor0" \
+        -v d="$DURATION" 'BEGIN {printf "%.1f", (a - a0 + b - b0) * 8 / 1e6 / d}')"
+    kill %1 2> /dev/null
+    wait 2> /dev/null
+    if [ "$receiver" = intel ]; then
+        thor "pkill -f '$REMOTE_DIR/dds_link_probe.py pub'" 2> /dev/null
+    fi
+
+    read -r received rate gap drops < <(printf '%s' "$result" | python3 -c '
+import json, sys
+r = json.load(sys.stdin)
+print(r["received"], r["rate_hz"], r["max_gap_s"], r["udp_drops"])' 2> /dev/null)
+    if [ -z "${received:-}" ] || [ "$received" -eq 0 ]; then
+        fail "$label: no frames received"
+        return
+    elif awk "BEGIN {exit !($rate < 0.9 * $RATE)}"; then
+        fail "$label: ${rate} Hz, max gap ${gap} s"
+    elif awk "BEGIN {exit !($gap > 0.1)}"; then
+        warn "$label: ${rate} Hz, but max gap ${gap} s"
+    else
+        pass "$label: ${rate} Hz, max gap ${gap} s"
+    fi
+    if [ "$drops" -gt 0 ]; then
+        warn "$label: $drops UDP receive-buffer drops on the $receiver probe's sockets"
+    else
+        pass "$label: no UDP receive-buffer drops on the $receiver probe's sockets"
+    fi
+    if awk "BEGIN {exit !($wifi_mbit > $WIFI_LIMIT_MBIT)}"; then
+        fail "$label: ${wifi_mbit} Mbit/s on Wi-Fi; DDS is duplicating over the lab network"
+    else
+        pass "$label: ${wifi_mbit} Mbit/s on Wi-Fi (background only)"
+    fi
+}
+
+run_direction "Intel -> Thor" thor
+run_direction "Thor -> Intel" intel
+finish
