@@ -28,6 +28,9 @@ are excluded from ordinary repository search and the generated knowledge graph.
 
 - [Static collision-envelope audit](2026-09-18-collision-envelope-audit.md) — description/USD/Nav2 comparison with top-down and side views.
 
+- [Intel–Thor DDS transport diagnosis](2026-09-18-intel-thor-dds-transport.md) — Wi-Fi duplication, receive-buffer drops, and Ethernet-only profile measurements.
+- [Intel–Thor middleware benchmark](2026-09-18-intel-thor-rmw-benchmark.md) — Fast DDS vs CycloneDDS vs mixed across the link, and the reader-side interface rule.
+
 - [Physical mecanum drive investigation](2026-09-18-mecanum-drive-investigation.md)
 
 - [Isaac 6.0 first-drive snapshot](2026-07-11-isaac-first-drive.md)
