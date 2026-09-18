@@ -41,9 +41,9 @@ import time
 import numpy as np
 
 REPO = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(REPO / 'src/ridgeback_autonomy'))
+sys.path.insert(0, str(REPO / 'src/ridgeback_common'))
 
-from ridgeback_autonomy.common.lidar_contract import (  # noqa: E402
+from ridgeback_common.lidar_contract import (  # noqa: E402
     FRONT_LIDAR_XY_YAW,
     MERGED_ANGLE_MAX,
     MERGED_ANGLE_MIN,
@@ -141,7 +141,7 @@ def _write_report(out_dir: Path, name: str, report: dict[str, object],
         REPO / 'src/ridgeback_autonomy_isaac/sim/isaac/usd/worlds/mock_hospital.usda',
         REPO / 'src/ridgeback_autonomy_isaac/sim/isaac/usd/robots/ridgeback_r100/ridgeback_r100.usda',
         REPO / 'src/ridgeback_autonomy/ridgeback_autonomy/common/scan_merger_node.py',
-        REPO / 'src/ridgeback_autonomy/ridgeback_autonomy/common/lidar_contract.py']
+        REPO / 'src/ridgeback_common/ridgeback_common/lidar_contract.py']
     provenance = {
         'created_utc': datetime.now(timezone.utc).isoformat(),
         'launch_arguments': launch_args,

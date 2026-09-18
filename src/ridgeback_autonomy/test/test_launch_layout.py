@@ -6,8 +6,8 @@ import re
 import yaml
 
 from ridgeback_autonomy.benchmarking.replay import REPLAY_CAPTURE_BATCHES_DEFAULT
-from ridgeback_autonomy.perception.target_localization.estimator_registry import PUBLIC_ESTIMATOR_ORDER
-from ridgeback_autonomy.perception.target_localization.launch import CONFIG_LAUNCH_ARGUMENT_NAMES
+from ridgeback_localization.estimator_registry import PUBLIC_ESTIMATOR_ORDER
+from ridgeback_autonomy.localization_launch import CONFIG_LAUNCH_ARGUMENT_NAMES
 
 
 def _package_root() -> Path:
@@ -248,10 +248,8 @@ def test_camera_overlay_is_rviz_only() -> None:
     overlay_text = (
         repo_root
         / 'src'
-        / 'ridgeback_autonomy'
-        / 'ridgeback_autonomy'
-        / 'perception'
-        / 'target_localization'
+        / 'ridgeback_localization'
+        / 'ridgeback_localization'
         / 'overlay_node.py'
     ).read_text(encoding='utf-8')
 
@@ -447,7 +445,7 @@ def test_every_entrypoint_supplies_the_cyclonedds_configuration() -> None:
 
 
 def test_cyclonedds_configuration_yields_to_an_operator_setting(tmp_path, monkeypatch) -> None:
-    from ridgeback_autonomy.perception.target_localization.launch import cyclonedds_actions
+    from ridgeback_autonomy.localization_launch import cyclonedds_actions
 
     share = tmp_path / 'share'
     (share / 'config').mkdir(parents=True)

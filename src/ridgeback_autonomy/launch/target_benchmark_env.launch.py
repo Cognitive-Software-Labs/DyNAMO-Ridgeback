@@ -1,3 +1,4 @@
+from ridgeback_localization.environment import compute_environment
 """Persistent simulator, visualization, transforms, and target detector."""
 
 import os
@@ -11,12 +12,12 @@ from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
 
-from ridgeback_autonomy.common.camera_profiles import (
+from ridgeback_common.camera_profiles import (
     CAMERA_PROFILE_CHOICES,
     DEFAULT_CAMERA_PROFILE,
 )
 
-from ridgeback_autonomy.perception.target_localization.launch import (
+from ridgeback_autonomy.localization_launch import (
     RAW_DETECTIONS_TOPIC,
     SIMULATION_CAMERA_INPUTS,
     cyclonedds_actions,
@@ -30,8 +31,9 @@ def build_detector(context, *args, **kwargs):
 
     inputs = resolved_camera_inputs(context, 'color_topic')
     return [Node(
-        package='ridgeback_autonomy',
+        package='ridgeback_localization',
         executable='target_detector_node',
+        additional_env=compute_environment(),
         name='target_detector',
         namespace=LaunchConfiguration('namespace'),
         parameters=[{

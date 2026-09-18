@@ -48,7 +48,7 @@ from ridgeback_autonomy.benchmarking.replay_profiles import (
     ProfileValidationError,
 )
 from ridgeback_autonomy.benchmarking.sweep import TRIAL_WALL_TIME_SEC, estimate_trials
-from ridgeback_autonomy.perception.target_localization.estimator_registry import (
+from ridgeback_localization.estimator_registry import (
     ESTIMATOR_LABELS,
     PUBLIC_ESTIMATOR_ORDER,
     parse_estimators,

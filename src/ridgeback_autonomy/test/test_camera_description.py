@@ -14,7 +14,7 @@ from pathlib import Path
 
 import pytest
 
-from ridgeback_autonomy.common.camera_profiles import (
+from ridgeback_common.camera_profiles import (
     DEFAULT_CAMERA_PROFILE,
     resolve_camera_profile,
 )

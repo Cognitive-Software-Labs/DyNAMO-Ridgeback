@@ -6,13 +6,13 @@ import statistics
 
 import numpy as np
 
-from ridgeback_autonomy.perception.target_localization.estimator_registry import PUBLIC_ESTIMATOR_ORDER
+from ridgeback_localization.estimator_registry import PUBLIC_ESTIMATOR_ORDER
 from ridgeback_autonomy.benchmarking.scoring import (
     OUTCOME_DETECTOR_MISS,
     OUTCOME_GATE_MISS,
     OUTCOME_NO_VALUE,
 )
-from ridgeback_autonomy.common.miss_reason import observation_totals, reason_name
+from ridgeback_common.miss_reason import observation_totals, reason_name
 
 
 TRIAL_CSV_COLUMNS = [

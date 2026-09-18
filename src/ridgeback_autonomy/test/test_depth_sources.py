@@ -7,7 +7,7 @@ import pytest
 from sensor_msgs.msg import Image
 from std_msgs.msg import Header
 
-from ridgeback_autonomy.perception.target_localization.core.depth_sources import (
+from ridgeback_localization.core.depth_sources import (
     MONOCULAR_USABLE_RANGE_FRACTION,
     MonocularDepthSource,
     StereoDepthSource,
@@ -16,7 +16,7 @@ from ridgeback_autonomy.perception.target_localization.core.depth_sources import
     decode_depth_to_meters,
     encode_depth_message,
 )
-from ridgeback_autonomy.perception.target_localization.core.image_utils import (
+from ridgeback_localization.core.image_utils import (
     decode_color_to_rgb as canonical_decode_color_to_rgb,
 )
 
@@ -234,7 +234,7 @@ def test_monocular_caches_pillow_and_opencv_across_frames(monkeypatch) -> None:
         raise AssertionError(f'unexpected import: {name}')
 
     monkeypatch.setattr(
-        'ridgeback_autonomy.perception.target_localization.core.depth_sources.importlib.import_module',
+        'ridgeback_localization.core.depth_sources.importlib.import_module',
         import_module)
     source = MonocularDepthSource('model', 'cpu', _NullLogger())
     monkeypatch.setattr(source, '_build_pipeline', lambda: pipeline)
@@ -267,7 +267,7 @@ def test_monocular_does_not_require_opencv_without_resizing(monkeypatch) -> None
         raise AssertionError(f'unexpected import: {name}')
 
     monkeypatch.setattr(
-        'ridgeback_autonomy.perception.target_localization.core.depth_sources.importlib.import_module',
+        'ridgeback_localization.core.depth_sources.importlib.import_module',
         import_module)
     source = MonocularDepthSource('model', 'cpu', _NullLogger())
     monkeypatch.setattr(source, '_build_pipeline', lambda: pipeline)
@@ -306,11 +306,11 @@ def test_monocular_produce_from_rgb_does_not_decode_a_ros_message(monkeypatch) -
     source = MonocularDepthSource('model', 'cpu', _NullLogger())
     monkeypatch.setattr(source, '_build_pipeline', lambda: pipeline)
     monkeypatch.setattr(
-        'ridgeback_autonomy.perception.target_localization.core.depth_sources.decode_color_to_rgb',
+        'ridgeback_localization.core.depth_sources.decode_color_to_rgb',
         lambda _msg: pytest.fail('produce_from_rgb must not decode a ROS message'),
     )
     monkeypatch.setattr(
-        'ridgeback_autonomy.perception.target_localization.core.depth_sources.importlib.import_module',
+        'ridgeback_localization.core.depth_sources.importlib.import_module',
         lambda name: _FakePilImage if name == 'PIL.Image' else pytest.fail(name),
     )
     header = Header()
@@ -338,7 +338,7 @@ def test_monocular_retries_a_failed_pillow_import_after_cooldown(monkeypatch) ->
         return _FakePilImage
 
     monkeypatch.setattr(
-        'ridgeback_autonomy.perception.target_localization.core.depth_sources.importlib.import_module',
+        'ridgeback_localization.core.depth_sources.importlib.import_module',
         import_module)
     source = MonocularDepthSource(
         'model', 'cpu', logger,

@@ -7,8 +7,8 @@ import pytest
 from sensor_msgs.msg import LaserScan
 from std_msgs.msg import Header
 
-from ridgeback_autonomy.common.markers import PolarBeamRecord
-from ridgeback_autonomy.common.messages import (
+from ridgeback_common.markers import PolarBeamRecord
+from ridgeback_common.messages import (
     batch_from_detections_message,
     batch_from_measurements_message,
     build_detections_message,
@@ -19,9 +19,9 @@ from ridgeback_autonomy.common.messages import (
     polar_beam_booleans,
     snapshot_measurements_message,
 )
-from ridgeback_autonomy.common.miss_reason import MissReason
-from ridgeback_autonomy.common.models import Detection, DetectionBatch
-from ridgeback_autonomy.common.stamps import stamp_key, stamp_to_nanoseconds
+from ridgeback_common.miss_reason import MissReason
+from ridgeback_common.models import Detection, DetectionBatch
+from ridgeback_common.stamps import stamp_key, stamp_to_nanoseconds
 
 
 @pytest.mark.parametrize('sec,nanosec,expected', [

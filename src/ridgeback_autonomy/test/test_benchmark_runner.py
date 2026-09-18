@@ -16,7 +16,7 @@ from ridgeback_autonomy.benchmarking.alignment import (
     store_buffered_preview,
     update_measurement_event,
 )
-from ridgeback_autonomy.perception.target_localization.estimator_registry import (
+from ridgeback_localization.estimator_registry import (
     MASK_GATE_DEFAULT,
     MASK_GATES,
     parse_estimators,
@@ -33,7 +33,7 @@ from ridgeback_autonomy.benchmarking.process_utils import (
     parse_gl_renderer,
     software_gl_warning,
 )
-from ridgeback_autonomy.perception.target_localization.ground_truth import (
+from ridgeback_localization.ground_truth import (
     ground_truth_point_message,
 )
 from ridgeback_autonomy.benchmarking.reduction import (
@@ -46,7 +46,7 @@ from ridgeback_autonomy.benchmarking.reduction import (
 )
 from ridgeback_autonomy.benchmarking.rendering import BenchmarkCollageRenderer
 from ridgeback_autonomy.benchmarking.summary import build_summary_rows
-from ridgeback_autonomy.common.models import Detection
+from ridgeback_common.models import Detection
 from ridgeback_interfaces.msg import TargetMeasurements
 
 
@@ -266,7 +266,7 @@ def test_silhouette_display_name_folds_the_gate() -> None:
 
 
 def test_mask_gate_tokens_have_one_owner() -> None:
-    from ridgeback_autonomy.perception.target_localization.measurement_pipeline import (
+    from ridgeback_localization.measurement_pipeline import (
         MASK_GATES as PIPELINE_MASK_GATES,
     )
 
@@ -329,7 +329,7 @@ def test_no_value_miss_row_carries_its_reason(tmp_path) -> None:
     from ridgeback_autonomy.benchmarking.scoring import OUTCOME_NO_VALUE, SceneScore
     from ridgeback_autonomy.benchmarking.simulation import GroundTruthInstance
     from ridgeback_autonomy.benchmarking.trial_results import build_trial_result
-    from ridgeback_autonomy.common.miss_reason import MissReason
+    from ridgeback_common.miss_reason import MissReason
 
     selected_estimators = ('polar_profiling',)
     display_names = {'polar_profiling': 'box-gated polar profiling'}
@@ -379,7 +379,7 @@ def test_multi_instance_no_value_reasons_follow_direct_association() -> None:
     from ridgeback_autonomy.benchmarking.scoring import OUTCOME_NO_VALUE, SceneScore
     from ridgeback_autonomy.benchmarking.simulation import GroundTruthInstance
     from ridgeback_autonomy.benchmarking.trial_results import build_trial_result
-    from ridgeback_autonomy.common.miss_reason import MissReason
+    from ridgeback_common.miss_reason import MissReason
 
     selected = ('projective_ranging',)
     scene = Scene(
@@ -453,7 +453,7 @@ def test_multi_instance_no_value_reason_stays_unknown_without_own_locator() -> N
     from ridgeback_autonomy.benchmarking.scoring import OUTCOME_NO_VALUE, SceneScore
     from ridgeback_autonomy.benchmarking.simulation import GroundTruthInstance
     from ridgeback_autonomy.benchmarking.trial_results import build_trial_result
-    from ridgeback_autonomy.common.miss_reason import MissReason
+    from ridgeback_common.miss_reason import MissReason
 
     selected = ('projective_ranging',)
     scene = Scene(
@@ -1141,7 +1141,7 @@ def test_run_document_is_machine_readable_with_full_precision(tmp_path) -> None:
 
     from ridgeback_autonomy.benchmarking.scoring import OUTCOME_NO_VALUE
     from ridgeback_autonomy.benchmarking.summary import build_run_document, write_run_json
-    from ridgeback_autonomy.common.miss_reason import MissReason
+    from ridgeback_common.miss_reason import MissReason
 
     summary_rows = build_summary_rows(
         {'polar_profiling': [{'abs_error_m': 0.05895917156831243, 'rel_error': 0.0158463}]},

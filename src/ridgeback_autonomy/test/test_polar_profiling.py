@@ -6,14 +6,14 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
-from ridgeback_autonomy.common.miss_reason import MissReason
-from ridgeback_autonomy.perception.target_localization.core.intrinsics import (
+from ridgeback_common.miss_reason import MissReason
+from ridgeback_localization.core.intrinsics import (
     CameraIntrinsics,
     project_points,
 )
-from ridgeback_autonomy.perception.target_localization.core.mask import MaskPrecision, mask_from_array, rasterize_bbox
-from ridgeback_autonomy.perception.target_localization.core import polar_profiling
-from ridgeback_autonomy.perception.target_localization.core.polar_profiling import (
+from ridgeback_localization.core.mask import MaskPrecision, mask_from_array, rasterize_bbox
+from ridgeback_localization.core import polar_profiling
+from ridgeback_localization.core.polar_profiling import (
     beams_in_bbox,
     localize_projected_polar_profiling,
     localize_polar_profiling,

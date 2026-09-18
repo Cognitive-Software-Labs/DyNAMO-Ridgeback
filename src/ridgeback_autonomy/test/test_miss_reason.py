@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from ridgeback_autonomy.common.miss_reason import MissReason, reason_name
+from ridgeback_common.miss_reason import MissReason, reason_name
 
 
 def test_sentinels() -> None:
@@ -24,7 +24,7 @@ def test_reason_name_tolerates_none_and_unknown() -> None:
 def test_observation_totals_is_the_shared_definition() -> None:
     # Both the CSV summary and the markdown report read totals through this,
     # so they cannot disagree about how many boxes an estimator saw.
-    from ridgeback_autonomy.common.miss_reason import MissReason, observation_totals
+    from ridgeback_common.miss_reason import MissReason, observation_totals
 
     total, ok = observation_totals({
         int(MissReason.OK): 30,

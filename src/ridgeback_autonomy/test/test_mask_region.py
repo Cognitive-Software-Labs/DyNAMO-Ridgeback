@@ -12,8 +12,8 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from ridgeback_autonomy.common.models import Detection
-from ridgeback_autonomy.perception.target_localization.core.mask import (
+from ridgeback_common.models import Detection
+from ridgeback_localization.core.mask import (
     MaskPrecision,
     MaskRegion,
     as_mask_region,

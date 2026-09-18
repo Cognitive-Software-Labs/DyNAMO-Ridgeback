@@ -32,6 +32,8 @@ building blocks unless a technical reference says otherwise.
 
 ## Repository map
 
+- `src/ridgeback_common/` — shared sensor contracts and utilities
+- `src/ridgeback_localization/` — inference, estimators, and optional result displays
 - `src/ridgeback_interfaces/` — shared ROS detection, measurement, and beam messages
 - `src/ridgeback_autonomy/` — backend-neutral nodes, configuration,
   tests, readiness gates, and public launch workflows

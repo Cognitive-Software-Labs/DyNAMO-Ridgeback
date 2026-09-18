@@ -17,21 +17,21 @@ from launch.events import Shutdown
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
-from ridgeback_autonomy.common.camera_profiles import (
+from ridgeback_common.camera_profiles import (
     CAMERA_PROFILE_CHOICES,
     DEFAULT_CAMERA_PROFILE,
 )
 
 from ridgeback_autonomy.benchmarking.paths import default_output_directory
 from ridgeback_autonomy.benchmarking.replay import REPLAY_CAPTURE_BATCHES_DEFAULT
-from ridgeback_autonomy.perception.target_localization.estimator_registry import (
+from ridgeback_localization.estimator_registry import (
     parse_estimators,
     selected_mask_estimators,
     selected_pointcloud_estimators,
     uses_mask_estimators,
     uses_pointcloud_estimators,
 )
-from ridgeback_autonomy.perception.target_localization.launch import (
+from ridgeback_autonomy.localization_launch import (
     ALIGNED_DEPTH_DEBUG_TOPIC,
     CONFIG_LAUNCH_ARGUMENT_NAMES,
     MASK_MEASUREMENTS_TOPIC,
@@ -48,24 +48,24 @@ from ridgeback_autonomy.perception.target_localization.launch import (
     resolved_camera_inputs,
     workspace_root_from_package_share,
 )
-from ridgeback_autonomy.perception.target_localization.core.depth_common import (
+from ridgeback_localization.core.depth_common import (
     DEPTH_GATE_DISABLED,
     NEAREST_MODE_BIN_WIDTH_M_DEFAULT,
     NEAREST_MODE_MIN_BIN_FRACTION_DEFAULT,
 )
-from ridgeback_autonomy.perception.target_localization.core.isolation_2d import (
+from ridgeback_localization.core.isolation_2d import (
     NEAREST_MODE_BAND_M_DEFAULT,
 )
-from ridgeback_autonomy.perception.target_localization.core.isolation_3d import (
+from ridgeback_localization.core.isolation_3d import (
     FLOOR_MARGIN_M_DEFAULT,
     ISOLATION_3D_DEFAULT,
 )
-from ridgeback_autonomy.perception.target_localization.core.polar_profiling import (
+from ridgeback_localization.core.polar_profiling import (
     MIN_VALID_RAYS_DEFAULT,
     RANGE_BAND_M_DEFAULT,
     RANGE_JUMP_M_DEFAULT,
 )
-from ridgeback_autonomy.perception.target_localization.core.ranging_defaults import (
+from ridgeback_localization.core.ranging_defaults import (
     FRONT_PERCENTILE,
     INLIER_AHEAD_MARGIN_M,
     INLIER_BEHIND_MARGIN_M,

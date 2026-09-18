@@ -12,29 +12,9 @@ install(DIRECTORY
   PATTERN "__pycache__" EXCLUDE
 )
 
-install(PROGRAMS
-  ridgeback_autonomy/perception/target_localization/detector_node.py
-  DESTINATION lib/${PROJECT_NAME}
-  RENAME target_detector_node
-)
 
-install(PROGRAMS
-  ridgeback_autonomy/perception/target_localization/pointcloud_measurement_node.py
-  DESTINATION lib/${PROJECT_NAME}
-  RENAME target_pointcloud_measurement_node
-)
 
-install(PROGRAMS
-  ridgeback_autonomy/perception/target_localization/overlay_node.py
-  DESTINATION lib/${PROJECT_NAME}
-  RENAME target_overlay_node
-)
 
-install(PROGRAMS
-  ridgeback_autonomy/perception/target_localization/mask_measurement_node.py
-  DESTINATION lib/${PROJECT_NAME}
-  RENAME target_mask_measurement_node
-)
 
 install(PROGRAMS
   ridgeback_autonomy/benchmarking/target_distance_benchmark_runner_node.py
@@ -42,11 +22,6 @@ install(PROGRAMS
   RENAME target_distance_benchmark_runner
 )
 
-install(PROGRAMS
-  ridgeback_autonomy/perception/target_localization/visualization_node.py
-  DESTINATION lib/${PROJECT_NAME}
-  RENAME target_visualization_node
-)
 
 install(PROGRAMS
   ridgeback_autonomy/benchmarking/target_benchmark_sweep.py
@@ -163,6 +138,7 @@ if(BUILD_TESTING)
   ament_add_pytest_test(test_frontier_explorer test/test_frontier_explorer.py)
   ament_add_pytest_test(test_image_utils test/test_image_utils.py)
   ament_add_pytest_test(test_imports test/test_imports.py)
+  ament_add_pytest_test(test_package_split test/test_package_split.py)
   ament_add_pytest_test(test_intrinsics test/test_intrinsics.py)
   ament_add_pytest_test(test_isolation_2d test/test_isolation_2d.py)
   ament_add_pytest_test(test_isolation_3d test/test_isolation_3d.py)

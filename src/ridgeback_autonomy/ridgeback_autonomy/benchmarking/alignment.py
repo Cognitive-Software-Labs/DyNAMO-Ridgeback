@@ -6,14 +6,14 @@ from typing import Any, Mapping
 
 import numpy as np
 
-from ridgeback_autonomy.common.messages import (
+from ridgeback_common.messages import (
     batch_from_measurements_message,
     decode_bbox_quads,
     first_finite_positive,
 )
-from ridgeback_autonomy.common.miss_reason import MissReason
-from ridgeback_autonomy.common.models import Detection
-from ridgeback_autonomy.common.stamps import stamp_to_nanoseconds
+from ridgeback_common.miss_reason import MissReason
+from ridgeback_common.models import Detection
+from ridgeback_common.stamps import stamp_to_nanoseconds
 from ridgeback_interfaces.msg import TargetMeasurements
 
 from ridgeback_autonomy.benchmarking.event_values import (
@@ -22,7 +22,7 @@ from ridgeback_autonomy.benchmarking.event_values import (
     has_all_selected_estimates,
 )
 
-from ridgeback_autonomy.perception.target_localization.estimator_registry import (
+from ridgeback_localization.estimator_registry import (
     ESTIMATOR_FIELD_KEYS,
     ESTIMATOR_POSITION_ATTRS,
     ESTIMATOR_STATUS_FIELD_KEYS,

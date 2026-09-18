@@ -1,3 +1,4 @@
+from ridgeback_localization.environment import compute_environment
 import os
 
 from ament_index_python.packages import get_package_share_directory
@@ -15,21 +16,21 @@ from launch.substitutions import (
 from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
 
-from ridgeback_autonomy.common.camera_profiles import (
+from ridgeback_common.camera_profiles import (
     CAMERA_PROFILE_CHOICES,
     DEFAULT_CAMERA_PROFILE,
     DEFAULT_DEPTH_FIDELITY,
     DEPTH_FIDELITY_CHOICES,
 )
 
-from ridgeback_autonomy.perception.target_localization.estimator_registry import (
+from ridgeback_localization.estimator_registry import (
     parse_estimators,
     selected_mask_estimators,
     selected_pointcloud_estimators,
     uses_mask_estimators,
     uses_pointcloud_estimators,
 )
-from ridgeback_autonomy.perception.target_localization.launch import (
+from ridgeback_autonomy.localization_launch import (
     cyclonedds_actions,
     distance_hud_node,
     estimate_viz_node,
@@ -95,8 +96,9 @@ def build_target_localization_nodes(context, *args, **kwargs):
     estimators = ','.join(selected_estimators)
 
     nodes = [Node(
-        package='ridgeback_autonomy',
+        package='ridgeback_localization',
         executable='target_detector_node',
+        additional_env=compute_environment(),
         name='target_detector',
         namespace=namespace,
         parameters=[{

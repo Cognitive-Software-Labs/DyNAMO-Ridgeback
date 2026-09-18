@@ -16,8 +16,8 @@ from ridgeback_autonomy.benchmarking.layered_replay import (
     write_layered_results,
 )
 from ridgeback_autonomy.benchmarking.replay import replay_scan_points
-from ridgeback_autonomy.common.miss_reason import MissReason
-from ridgeback_autonomy.perception.target_localization.core.polar_profiling import (
+from ridgeback_common.miss_reason import MissReason
+from ridgeback_localization.core.polar_profiling import (
     scan_points_optical,
 )
 from ridgeback_autonomy.benchmarking.replay_artifacts import (
@@ -54,7 +54,7 @@ from ridgeback_autonomy.benchmarking.target_replay_benchmark import (
     _materialization_kwargs,
     main as replay_main,
 )
-from ridgeback_autonomy.perception.target_localization.core.mask import (
+from ridgeback_localization.core.mask import (
     MaskPrecision,
     empty_region,
     region_from_blob,
@@ -574,7 +574,7 @@ def test_runner_keeps_the_closest_scan_and_refuses_one_outside_the_tolerance(mon
     from ridgeback_autonomy.benchmarking import (
         target_distance_benchmark_runner_node as runner_module,
     )
-    from ridgeback_autonomy.perception.target_localization.synchronization import (
+    from ridgeback_localization.synchronization import (
         SCAN_MATCH_BUFFER_DEPTH,
         StampedMessageBuffer,
     )

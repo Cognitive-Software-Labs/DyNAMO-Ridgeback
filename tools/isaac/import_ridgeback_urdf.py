@@ -33,11 +33,11 @@ import sys
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
-CORE_PYTHON = REPO / "src/ridgeback_autonomy"
+CORE_PYTHON = REPO / "src/ridgeback_common"
 if str(CORE_PYTHON) not in sys.path:
     sys.path.insert(0, str(CORE_PYTHON))
 
-from ridgeback_autonomy.common.camera_profiles import (  # noqa: E402
+from ridgeback_common.camera_profiles import (  # noqa: E402
     DEFAULT_CAMERA_PROFILE,
     resolve_camera_profile,
 )

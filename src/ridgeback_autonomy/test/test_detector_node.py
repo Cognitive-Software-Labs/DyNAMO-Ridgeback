@@ -52,7 +52,7 @@ def ros_context():
 
 def _make_node(detector, **parameters):
     from rclpy.parameter import Parameter
-    from ridgeback_autonomy.perception.target_localization.detector_node import TargetDetectorNode
+    from ridgeback_localization.detector_node import TargetDetectorNode
 
     return TargetDetectorNode(
         detector=detector,
@@ -134,7 +134,7 @@ def test_period_is_measured_from_the_start_of_a_step(ros_context) -> None:
 
 
 def test_default_rate_and_period_agree(ros_context) -> None:
-    from ridgeback_autonomy.perception.target_localization.detector_node import (
+    from ridgeback_localization.detector_node import (
         DETECTOR_FPS_DEFAULT,
     )
 
@@ -214,7 +214,7 @@ def test_enabled_diagnostics_count_a_failed_step(ros_context, monkeypatch) -> No
 
 
 def test_diagnostics_report_superseded_frames_and_achieved_rate() -> None:
-    from ridgeback_autonomy.perception.target_localization.detector_node import (
+    from ridgeback_localization.detector_node import (
         DetectorDiagnostics,
     )
 

@@ -12,9 +12,9 @@ from ridgeback_autonomy.benchmarking.reduction import (
     format_status_tally,
     merge_status_histograms,
 )
-from ridgeback_autonomy.common.messages import build_measurements_message
-from ridgeback_autonomy.common.miss_reason import MissReason
-from ridgeback_autonomy.common.models import Detection, DetectionBatch
+from ridgeback_common.messages import build_measurements_message
+from ridgeback_common.miss_reason import MissReason
+from ridgeback_common.models import Detection, DetectionBatch
 
 
 def _detection(**fields) -> Detection:

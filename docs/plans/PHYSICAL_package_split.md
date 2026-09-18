@@ -1,9 +1,9 @@
 # PHYSICAL — Package split for distributed deployment
 
-Status: **implementation started; shared message extraction implemented, remaining stages and qualification pending.** Owner:
+Status: **implementation started; package extraction implemented, remaining stages and qualification pending.** Owner:
 the workstation implementation team. The package names and distributed roles
-below describe the intended final implementation; only `ridgeback_interfaces`
-has been extracted so far.
+below describe the intended final implementation; all four package boundaries are extracted; deployment roles and qualification
+are still being implemented.
 The [project backlog](../BACKLOG.md#physical-stationary-integration) owns the
 coordinated milestone: stationary integration, without physical driving or
 autonomous-mission qualification.
@@ -172,6 +172,14 @@ the later launch extraction; normal top-level install layout is unchanged.
 Gazebo/Isaac runtime smoke, recorded-input replay comparison, localization-only
 dependency closure, distributed roles, labels, and supervision remain open.
 The message-stage tests do not establish the final handoff gates.
+
+The subsequent structural stage extracted common and localization packages,
+kept navigation utilities and benchmark launch orchestration in autonomy, and
+scoped the perception environment to compute nodes. All 993 existing tests and
+three new package-boundary checks passed. Nested install lookup is corrected
+through checkout discovery or `RIDGEBACK_WORKSPACE`; an explicit
+`RIDGEBACK_PERCEPTION_VENV` selects a host-specific inference environment.
+Evidence: `artifacts/package-split/stage2*`. Runtime qualification remains open.
 
 ## Handoff and completion
 

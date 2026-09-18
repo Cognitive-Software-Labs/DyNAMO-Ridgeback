@@ -43,7 +43,7 @@ from ridgeback_autonomy.benchmarking.replay_profiles import (
     offered_estimators,
 )
 from ridgeback_autonomy.benchmarking.sweep import estimate_trials
-from ridgeback_autonomy.perception.target_localization.estimator_registry import (
+from ridgeback_localization.estimator_registry import (
     PUBLIC_ESTIMATOR_ORDER,
 )
 

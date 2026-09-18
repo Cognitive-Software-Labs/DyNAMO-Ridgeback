@@ -12,7 +12,7 @@ from ridgeback_autonomy.benchmarking.scoring import (
     OUTCOME_NO_VALUE,
     OUTCOME_SCORED,
 )
-from ridgeback_autonomy.common.miss_reason import MissReason
+from ridgeback_common.miss_reason import MissReason
 
 
 def _row(scene, instance, estimator_label, outcome, estimate=None, reason=None, trial=None):
