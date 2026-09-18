@@ -1,0 +1,198 @@
+#!/bin/bash
+# Switch Intel's robot services between Fast DDS and CycloneDDS.
+#
+# Usage: tools/intel_thor/intel_services_rmw status
+#        sudo tools/intel_thor/intel_services_rmw apply [--yes]
+#        sudo tools/intel_thor/intel_services_rmw rollback [--yes]
+#
+# apply   installs the robot-service CycloneDDS configuration as
+#         /etc/clearpath/cyclonedds.xml and the receive-buffer sysctl, sets
+#         system.ros2.middleware and system.bash.env CYCLONEDDS_URI in
+#         /etc/clearpath/robot.yaml (clearpath-robot regenerates setup.bash),
+#         adds systemd drop-ins for the MyBotShop units that bypass the Clearpath
+#         setup, and restarts the services that were running.
+# rollback restores the saved robot.yaml, removes the drop-ins and the
+#         installed configuration, and restarts the same services.
+#
+# Restarting the platform briefly drops motor power and teleop: run it with the
+# robot stationary and the e-stop in reach. See
+# docs/physical/intel_thor_transport.md.
+
+set -eu
+
+REPO_ROOT="$(git -C "$(dirname "$0")" rev-parse --show-toplevel)"
+CONFIG_DIR="$REPO_ROOT/src/ridgeback_autonomy_hardware/config/intel_thor"
+ROBOT_YAML=/etc/clearpath/robot.yaml
+SETUP_BASH=/etc/clearpath/setup.bash
+INSTALLED_CONFIG=/etc/clearpath/cyclonedds.xml
+BACKUP_DIR=/etc/clearpath/dynamo-rmw-backup
+SYSCTL_FILE=/etc/sysctl.d/60-dynamo-dds-buffers.conf
+DROPIN_NAME=60-dynamo-cyclonedds.conf
+# Units whose ExecStart sources /etc/clearpath/setup.bash pick up the RMW from robot.yaml.
+CLEARPATH_UNITS=(clearpath-platform clearpath-sensors battery-sysfs-bridge)
+# MyBotShop units source only /opt/ros and /opt/mybotshop, so they need a drop-in.
+# The last four are one-shot or normally disabled; they get the drop-in so they
+# start on the same middleware whenever they run.
+MBS_UNITS=(clearpath-scan-merger clearpath-joy-x-combiner realsense-camera
+           depth-to-mono8 ridgeback-camera-mjpeg mbs-webserver
+           camera-web-ready ridgeback-startup-recover robot-slam robot-map-navi)
+
+command="${1:-}"
+assume_yes=false
+[ "${2:-}" = --yes ] && assume_yes=true
+
+effective_rmw() {
+    local unit="$1" pid pids
+    pid="$(systemctl show -p MainPID --value "$unit.service" 2>/dev/null)"
+    if [ -z "$pid" ] || [ "$pid" = 0 ]; then
+        echo "not running"
+        return
+    fi
+    pids="$pid $(pgrep -P "$pid" | tr '\n' ' ')"
+    for child in $(pgrep -P "$pid"); do
+        pids="$pids $(pgrep -P "$child" | tr '\n' ' ')"
+    done
+    if [ ! -r "/proc/$pid/environ" ]; then
+        echo "unknown (run with sudo)"
+        return
+    fi
+    # The deepest descendant is the ROS process; report every distinct setting.
+    for p in $pids; do
+        tr '\0' '\n' < "/proc/$p/environ" 2> /dev/null | grep '^RMW_IMPLEMENTATION=' || true
+    done | sort -u | sed 's/^RMW_IMPLEMENTATION=//' | paste -sd, | sed 's/^$/unset (Fast DDS default)/'
+}
+
+status() {
+    echo "setup.bash: $(grep -h '^export RMW_IMPLEMENTATION' "$SETUP_BASH" | cut -d= -f2)"
+    echo "installed config: $([ -e "$INSTALLED_CONFIG" ] && echo "$INSTALLED_CONFIG" || echo none)"
+    echo "rmem_max: $(sysctl -n net.core.rmem_max)"
+    for unit in "${CLEARPATH_UNITS[@]}" "${MBS_UNITS[@]}"; do
+        local dropin=""
+        [ -e "/etc/systemd/system/$unit.service.d/$DROPIN_NAME" ] && dropin=" [drop-in]"
+        printf '  %-26s %-9s %s%s\n' "$unit" "$(systemctl is-active "$unit.service" 2>/dev/null)" \
+            "$(effective_rmw "$unit")" "$dropin"
+    done
+}
+
+confirm() {
+    $assume_yes && return
+    read -r -p "Robot stationary and e-stop in reach? Services will restart. [y/N] " answer
+    [ "$answer" = y ] || [ "$answer" = Y ] || { echo "aborted"; exit 1; }
+}
+
+require_root() {
+    [ "$(id -u)" = 0 ] || { echo "run with sudo" >&2; exit 2; }
+}
+
+wait_for_setup() {
+    local rmw="$1"
+    for _ in $(seq 1 120); do
+        grep -q "^export RMW_IMPLEMENTATION=\"$rmw\"" "$SETUP_BASH" && return 0
+        sleep 1
+    done
+    echo "setup.bash was not regenerated with $rmw within 120 s" >&2
+    return 1
+}
+
+restart_active() {
+    # Restart what was running and is not already on the target middleware; keep
+    # stopped units (for example the camera) stopped. A repeated apply therefore
+    # restarts nothing that already switched.
+    local rmw="$1" unit
+    if ! grep -q "^export RMW_IMPLEMENTATION=\"$rmw\"" "$SETUP_BASH"; then
+        systemctl restart clearpath-robot.service
+    fi
+    wait_for_setup "$rmw"
+    for unit in "${CLEARPATH_UNITS[@]}" "${MBS_UNITS[@]}"; do
+        printf '%s\n' "${WAS_ACTIVE[@]}" | grep -qx "$unit" || continue
+        if [ "$(effective_rmw "$unit")" = "$rmw" ]; then
+            echo "already on $rmw: $unit"
+            continue
+        fi
+        echo "restarting $unit"
+        systemctl restart "$unit.service"
+    done
+}
+
+record_active() {
+    WAS_ACTIVE=()
+    local unit
+    for unit in "${CLEARPATH_UNITS[@]}" "${MBS_UNITS[@]}"; do
+        systemctl is-active --quiet "$unit.service" && WAS_ACTIVE+=("$unit")
+    done
+    return 0
+}
+
+apply() {
+    require_root
+    [ -e /opt/ros/jazzy/lib/librmw_cyclonedds_cpp.so ] || { echo "rmw_cyclonedds_cpp is not installed" >&2; exit 1; }
+    if grep -q '#' "$ROBOT_YAML"; then
+        echo "$ROBOT_YAML has comments that a YAML rewrite would drop; edit it by hand" >&2
+        exit 1
+    fi
+    confirm
+    record_active
+
+    mkdir -p "$BACKUP_DIR"
+    [ -e "$BACKUP_DIR/robot.yaml" ] || cp -p "$ROBOT_YAML" "$BACKUP_DIR/robot.yaml"
+    install -m 0644 "$CONFIG_DIR/cyclonedds_intel_services.xml" "$INSTALLED_CONFIG"
+    install -m 0644 "$CONFIG_DIR/60-dynamo-dds-buffers.conf" "$SYSCTL_FILE"
+    sysctl --quiet --system
+
+    python3 - "$ROBOT_YAML" "$INSTALLED_CONFIG" <<'PY'
+import sys
+
+import yaml
+
+path, config = sys.argv[1], sys.argv[2]
+with open(path, encoding='utf-8') as stream:
+    robot = yaml.safe_load(stream)
+system = robot.setdefault('system', {})
+system.setdefault('ros2', {})['middleware'] = {'implementation': 'rmw_cyclonedds_cpp'}
+system.setdefault('bash', {}).setdefault('env', {})['CYCLONEDDS_URI'] = f'file://{config}'
+with open(path, 'w', encoding='utf-8') as stream:
+    yaml.safe_dump(robot, stream, sort_keys=False)
+PY
+
+    for unit in "${MBS_UNITS[@]}"; do
+        mkdir -p "/etc/systemd/system/$unit.service.d"
+        cat > "/etc/systemd/system/$unit.service.d/$DROPIN_NAME" <<EOF
+# Installed by DyNAMO-Ridgeback tools/intel_thor/intel_services_rmw.
+[Service]
+Environment=RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+Environment=CYCLONEDDS_URI=file://$INSTALLED_CONFIG
+EOF
+    done
+    systemctl daemon-reload
+    restart_active rmw_cyclonedds_cpp
+    sleep 5
+    status
+}
+
+rollback() {
+    require_root
+    [ -e "$BACKUP_DIR/robot.yaml" ] || { echo "no backup at $BACKUP_DIR/robot.yaml" >&2; exit 1; }
+    confirm
+    record_active
+    cp -p "$BACKUP_DIR/robot.yaml" "$ROBOT_YAML"
+    for unit in "${MBS_UNITS[@]}"; do
+        rm -f "/etc/systemd/system/$unit.service.d/$DROPIN_NAME"
+        rmdir --ignore-fail-on-non-empty "/etc/systemd/system/$unit.service.d" 2> /dev/null || true
+    done
+    systemctl daemon-reload
+    restart_active rmw_fastrtps_cpp
+    rm -f "$INSTALLED_CONFIG"
+    rm -rf "$BACKUP_DIR"
+    sleep 5
+    status
+}
+
+case "$command" in
+    status) status ;;
+    apply) apply ;;
+    rollback) rollback ;;
+    *)
+        sed -n '4,6p' "$0" | sed 's/^# //' >&2
+        exit 2
+        ;;
+esac
