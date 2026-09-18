@@ -162,10 +162,11 @@ Rerun any benchmarks affected by geometry corrections.
 
 ## Collision-envelope and navigation-footprint validation
 
-**Drive-model prerequisite.** The [wheel-contact experiment](isaac/mecanum-drive.md)
-qualifies candidate physical drive separately. The production Isaac planar rig
-intentionally disables wheel collisions, so shared outlines cannot establish
-full wheel-contact parity. Review that experiment before choosing a replacement.
+**Drive scope.** Retain the [Isaac planar drive](isaac/robot-model.md#why-this-abstraction-fits-the-current-work)
+for flat-floor navigation/perception work. Physical roller simulation is deferred
+until a traction, terrain, traversal, or wheel-control requirement justifies it.
+Geometry and footprint validation can proceed independently; shared outlines do
+not establish wheel-contact parity.
 
 **Gap.** Nav2 defines its planar footprint separately from simulator collision
 geometry. Its comments claim a circumscribing body polygon, while the available

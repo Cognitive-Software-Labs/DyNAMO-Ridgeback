@@ -85,3 +85,7 @@ implementation remains documented with the
 The [shared attachment work](../BACKLOG.md#shared-camera-mast-and-bracket-geometry)
 owns closing that gap. Do not silently treat an Isaac-only addition or a
 model-derived dimension as a verified physical measurement.
+
+## Archived evidence
+
+- [September 18 static envelope audit](../../archive/engineering/2026-09-18-collision-envelope-audit.md) — measured backend differences and regenerated top-down/side comparisons; hardware and drawing reconciliation remain open.

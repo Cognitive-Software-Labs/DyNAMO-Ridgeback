@@ -12,7 +12,7 @@ Pipeline (run when clearpath/robot.yaml changes, not per-launch):
    (merge_fixed_joints=False) so the sensor frames the topic contract
    names (lidar2d_{0,1}_laser, camera_0_color_frame) exist for sensor mounting
 4. A kinematic-holonomic drive rig is appended: a world-anchored
-   prismatic-X -> prismatic-Y -> revolute-Z chain into base_link, each
+   prismatic-X -> prismatic-Y -> revolute-Z chain into chassis_link, each
    joint with a pure velocity drive (stiffness 0). The runner converts
    TwistStamped body velocities into these three joint targets; PhysX
    still resolves base collisions. Wheels stay undriven visuals.
@@ -726,10 +726,11 @@ VENDOR_REPLACED_MESHES = {
 # description at all -- the URDF leaves the camera floating in mid-air -- so it
 # is authored here rather than coming through the import.
 #
-# The D435 is bracketed to the mast's FRONT FACE, not sitting on top: the
+# The D455 is bracketed to the mast's FRONT FACE, not sitting on top: the
 # camera's back face lands at 0.2590 against a mast front face of 0.2143, i.e.
 # a ~45 mm standoff. So the extrusion runs past the camera and ends 50 mm above
-# its top (1.045), rather than terminating at the camera's underside.
+# the former camera top (1.045); the current D455 top is 1.049. The
+# retained mast height is model provenance, not a fresh hardware measurement.
 MAST_SIZE = 0.0375          # square section, m
 MAST_X = 0.1955             # 70 of 98 on the tape, as a fraction of the hull
 MAST_Z0 = 0.2800            # top deck upper face, above base_link
@@ -737,14 +738,12 @@ MAST_Z1 = 1.0950            # camera top 1.045 + 50 mm of extrusion above it
 
 # The bracket carrying the camera off the mast's front face. Its span is
 # derived from the live camera mesh rather than hardcoded, so it still fits
-# when the RealSense model changes (the D455 body is deeper and much wider
-# than the D435 mesh the import currently pulls in).
+# when the configured D455 mesh or mount changes.
 STANDOFF_SECTION = 0.030                   # square, m
 
-# Mesh path fragments identifying the sensor bodies to re-colour. Matches any
-# RealSense variant: the model name is part of the mesh filename, so pinning
-# one spelling silently stops painting when the model is swapped.
-SENSOR_MESH_TOKENS = ("/hokuyo_ust/", "/d435/", "/d435i/", "/d455/",
+# Mesh path fragments for the configured D455 and Hokuyos. Keep the generic
+# RealSense path because importers can use it for the selected camera mesh.
+SENSOR_MESH_TOKENS = ("/hokuyo_ust/", "/d455/",
                       "/realsense/")
 
 
@@ -770,7 +769,7 @@ def _bind(prim, material) -> None:
     UsdShade.MaterialBindingAPI(prim).Bind(material)
 
 
-CAMERA_MESH_TOKENS = ("/d435/", "/d435i/", "/d455/", "/realsense/")
+CAMERA_MESH_TOKENS = ("/d455/", "/realsense/")
 
 
 def _paint_sensors(stage, root_path: str, dark, silver):
@@ -814,8 +813,7 @@ def _camera_mesh_bounds(stage):
         path = str(prim.GetPath())
         if not prim.IsA(UsdGeom.Mesh):
             continue
-        if not any(t in path for t in ("/d435/", "/d435i/", "/d455/",
-                                       "/realsense/")):
+        if not any(t in path for t in CAMERA_MESH_TOKENS):
             continue
         pts = UsdGeom.Mesh(prim).GetPointsAttr().Get()
         if not pts:

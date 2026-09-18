@@ -109,7 +109,7 @@ had), both side covers, lights, rockers, centre rail, top deck, plus the
 chassis `convexHull` collider and the deck plate.
 
 **Not taken:** the wheels — the vendor drives its base as one rigid body with
-static wheels, while our rig keeps articulated wheel links that spin, so
+static wheels, while our rig keeps separate articulated wheel visuals, so
 taking theirs would double them. Also dropped: the UR5, its mount plate, the
 dummy joint chain and the vendor `physicsScene` (a second articulation root
 would fight ours).
@@ -175,9 +175,10 @@ stop/reverse recovery, and cross-boot repeatability. The retired AABB serves as
 a control: its predicted contact envelope must produce a distinct measured
 stop location. Dated outcomes and traces remain in the archived qualification.
 
-The hull keeps 119 verts / 234 facets against the source's 972 / 324. What it
-over-claims is the underside cavity between the wheels, which the wheel
-cylinders already occupy and nothing else reaches. Compare them yourself:
+The hull keeps 119 verts / 234 facets against the source's 972 / 324. Its
+convex approximation fills the underside cavity between the wheels. Wheel
+collisions are disabled, so this does not establish the correct response to
+low obstacles or terrain beneath the chassis. Compare the representations:
 
 ```bash
 OMNI_KIT_ACCEPT_EULA=YES isaac_venv/bin/python3 \
@@ -188,13 +189,69 @@ OMNI_KIT_ACCEPT_EULA=YES isaac_venv/bin/python3 \
 
 ## The drive rig
 
-`world → prismatic-X → prismatic-Y → revolute-Z → chassis_link`, velocity
-drives (stiffness 0, high damping). Per step the runner reads θ, rotates the
-body twist to world, and sets three velocity targets. Wheels are free visuals;
-colliders keep PhysX contacts real.
+The production model deliberately uses a **planar chassis drive**. It represents
+commanded holonomic motion on a flat floor without simulating traction through
+mecanum rollers. This is the retained architecture for navigation and perception
+experiments; detailed wheel-contact work is deferred until a concrete experiment
+requires it.
 
-Structurally the same pattern NVIDIA uses (`world → dummy_base_x →
-dummy_base_y → base_link`).
+```mermaid
+flowchart LR
+    C[Body velocity command] --> T[0.5 s timeout and acceleration limits]
+    T --> R[Rotate translation into world axes]
+    R --> J[X / Y / yaw joint velocity targets]
+    J --> P[PhysX integrates chassis motion and body contacts]
+    P --> S[Attached camera and LiDAR move with chassis]
+    P --> G[Planar ground truth]
+    G --> O[Pose increments plus optional synthetic drift]
+    O --> D[Published odometry]
+```
+
+The joint chain is `world → prismatic-X → prismatic-Y → revolute-Z →
+chassis_link`. Velocity drives have zero stiffness and high damping. The
+[rig controller](../../src/ridgeback_autonomy_isaac/sim/isaac/robot_rig.py) rotates
+body-frame translation using the current yaw, limits world-axis target changes
+to 1 m/s² and yaw to 2 rad/s², and drives stale commands toward zero after
+0.5 seconds. PhysX integrates these joints and resolves enabled chassis and
+attachment contacts; ordinary driving does not teleport the chassis.
+
+Wheels are undriven articulated visuals. Their collision APIs are deliberately
+removed: the fixed-height chassis cannot rise to resolve wheel–floor overlap,
+which previously generated sideways impulses. The original NVIDIA Ridgeback
+asset uses the same class of virtual planar joints. Neither that precedent nor
+stable movement proves realistic wheel dynamics.
+
+### Why this abstraction fits the current work
+
+Exploration, SLAM/Nav2 integration, and target-localization experiments need
+repeatable planar motion, correct sensor attachment, and qualified body/obstacle
+clearance. They do not require predicting individual roller contacts. A physical
+wheel model would add unmeasured roller, friction and actuator parameters and
+more solver work. Complexity alone would not make those experiments more valid.
+
+This is a scoped modeling choice, not a claim of hardware equivalence:
+
+| Appropriate use | What the model does not validate |
+|---|---|
+| Flat-floor path following and obstacle avoidance, after collider/footprint checks | Tire slip, traction limits, wheel torque or motor control |
+| Sensor motion, mapping and perception integration | Pitch/roll on slopes, gravity settling or step traversal |
+| Repeatable comparisons with a documented odometry-noise setting | Hardware encoder errors or calibrated real-world localization accuracy |
+
+Published odometry integrates measured planar chassis-pose increments with
+optional synthetic drift. `--odom-noise 0` disables that drift; ground truth
+remains separate. This is not wheel-derived encoder odometry, and its noise
+model is not hardware calibration. Keep model/noise settings fixed within a
+benchmark comparison and rerun affected benchmarks after changing them.
+
+Retaining this drive does **not** waive geometry validation. Gazebo and Isaac
+should represent the same intended chassis and attachments even though their
+wheel/contact approximations differ. The [collision reference](../robot/collision_model.md)
+owns those comparisons and the navigation outline. Reopen physical-wheel work
+only for a traction, terrain, traversal, or wheel-control requirement, using the
+isolated [experiment harness](mecanum-drive.md) rather than changing production
+implicitly.
+
+### Sensor attachment and spawn height
 
 > 🔴 **The chain ends at `chassis_link`, NOT `base_link`.** This doc said
 > `base_link` until 2026-09-11 and that error cost a week of debugging.
@@ -264,6 +321,8 @@ isaac_venv/bin/python3 src/ridgeback_autonomy_isaac/sim/isaac/isaac_runner.py \
 ```
 
 ## Archived evidence
+
+- [Physical-drive investigation and production control](../../archive/engineering/2026-09-18-mecanum-drive-investigation.md)
 
 - [Mount corrections and pre-profile camera checks](../../archive/engineering/port-history.md)
 - [2026-09-18 Gazebo integration check](../../archive/engineering/2026-09-18-gazebo-lidar-integration.md)

@@ -5,6 +5,16 @@ The production Isaac backend uses the planar chassis rig described in the
 wheel–ground contact can support a replacement. Its results do not change the
 production robot, public launches, ROS contract, or navigation footprint.
 
+## Status and reopening criterion
+
+Physical-wheel development is deferred. The production planar drive remains the
+chosen abstraction for flat-floor navigation and perception; its
+[rationale and limits](robot-model.md#why-this-abstraction-fits-the-current-work)
+are authoritative. The O3dyn modules were inspected but no Ridgeback adaptation
+or O3dyn-based qualification was completed. Resume this harness only when a
+traction, terrain, traversal, or wheel-control requirement needs it. Shared
+collision geometry and Nav2 outline validation proceed independently.
+
 ## What the experiment compares
 
 ```mermaid

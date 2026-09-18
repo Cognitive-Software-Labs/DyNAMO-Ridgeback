@@ -26,6 +26,8 @@ are excluded from ordinary repository search and the generated knowledge graph.
 
 ## Simulation and operations
 
+- [Static collision-envelope audit](2026-09-18-collision-envelope-audit.md) — description/USD/Nav2 comparison with top-down and side views.
+
 - [Physical mecanum drive investigation](2026-09-18-mecanum-drive-investigation.md)
 
 - [Isaac 6.0 first-drive snapshot](2026-07-11-isaac-first-drive.md)

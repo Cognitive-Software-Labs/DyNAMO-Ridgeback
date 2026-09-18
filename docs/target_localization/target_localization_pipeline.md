@@ -30,7 +30,7 @@ consumer path live in the [camera-stack reference](camera_stack.md).
    but the profile the driver actually activates must be recorded on the robot
    rather than inferred from YAML.
 2. **Depth image** (made 1:1 with RGB) - input to projective ranging and euclidean reconstruction. Euclidean reconstruction deprojects its masked pixels into camera-frame points in code (`docs/target_localization/euclidean_reconstruction.md`) - the points are a derived, in-code representation, not a sensor product.
-3. **Camera IMU - present on the device, unused by this stack.** The D455 carries an IMU, unlike the D435. Nothing here enables, subscribes to, or fuses those streams, and SLAM does not consume them. Capability is not configuration.
+3. **Camera IMU - present on the device, unused by this stack.** The D455 carries an IMU. Nothing here enables, subscribes to, or fuses those streams, and SLAM does not consume them. Capability is not configuration.
 4. **Organized point cloud - configured, unverified.** Clearpath's checked-out `IntelRealsense` sets `POINTCLOUD_ENABLED = True`, so the parser emits `pointcloud.enable: true` for hardware. That is a *driver default resolved from the checked-out config*, which is a different fact from what the device actually publishes and a different fact again from whether the published layout can feed the `pointcloud` estimator. `common/camera_inputs.py` therefore leaves the organized-cloud input **unspecified** for the `realsense` profile. Before wiring it, verify organization (`height > 1`), colour-grid indexing, frame, and timestamps on the robot.
 
 **How depth is produced - this is where sim and real diverge:**
