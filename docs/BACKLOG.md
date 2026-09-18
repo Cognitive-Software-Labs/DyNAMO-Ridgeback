@@ -92,7 +92,7 @@ adapter worlds under `src/ridgeback_autonomy_gz/sim/worlds/`.
 profiles, colour/aligned-depth delivery, exact timestamps, TF ownership, and
 application behavior still need proof on the deployed robot.
 
-**Completion criteria.** Execute the [hardware validation procedure](plans/camera_hardware_validation.md):
+**Completion criteria.** Execute the [PHYSICAL — D455 camera validation](plans/PHYSICAL_d455_validation.md):
 verify the intended device and driver, inspect effective configuration, validate
 image/depth/calibration contracts and timing, confirm the actual camera-to-base
 TF chain, and run a stationary projective/Euclidean application smoke. Test
@@ -121,7 +121,7 @@ invalid-point representation/density. Preserve device/profile provenance and
 application evidence. An unverified or unsuitable cloud remains disabled.
 
 **Context.** [Camera pointcloud contract](target_localization/camera_stack.md)
-and [hardware validation](plans/camera_hardware_validation.md).
+and [PHYSICAL — D455 camera validation](plans/PHYSICAL_d455_validation.md).
 
 ## Camera-LiDAR calibration
 
@@ -143,7 +143,7 @@ under robot motion; document recalibration triggers. Do not silently tune polar
 segmentation to absorb an extrinsic error.
 
 **Context.** [Polar profiling](target_localization/polar_profiling.md) and the
-[hardware plan](plans/camera_hardware_validation.md).
+[PHYSICAL — D455 camera validation](plans/PHYSICAL_d455_validation.md).
 
 ## Shared camera mast and bracket geometry
 

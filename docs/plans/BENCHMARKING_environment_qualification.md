@@ -1,4 +1,4 @@
-# Qualify remote and physical-seat benchmark environments
+# BENCHMARKING — Execution-environment qualification
 
 Status: **pending protocol freeze and matched runs.** The
 [benchmarking backlog](../target_distance_benchmarking/BACKLOG.md#benchmark-execution-environment-qualification)

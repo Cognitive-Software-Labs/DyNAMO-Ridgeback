@@ -461,7 +461,7 @@ Even `d455` mode is a controlled nominal approximation. It does not model:
 - physical camera-to-LiDAR calibration error.
 
 Hardware deployment must consume live `CameraInfo` and pass
-[the physical D455 validation plan](../plans/camera_hardware_validation.md).
+[PHYSICAL — D455 camera validation](../plans/PHYSICAL_d455_validation.md).
 Never copy the simulation intrinsics into a physical-camera configuration.
 
 ## Source and test map

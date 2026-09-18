@@ -68,11 +68,10 @@ troubleshooting, planning, and historical documentation.
 
 ## Active plans
 
-- [Live sweep from the configurator GUI](plans/benchmark_gui_direct_run.md) —
-  blocked on live process ownership and cleanup; follows environment qualification
-- [D455 hardware validation](plans/camera_hardware_validation.md) — physical device, stream, timing, TF, and stationary integration checks
-- [Combined-model throughput measurement](plans/model_concurrency_evidence.md) — run the existing sweep and determine whether concurrency is needed
-- [Benchmark environment qualification](plans/remote_vs_physical_seat_validation.md) — prerequisite for tuning and benchmark claims
+- [BENCHMARKING — Execution-environment qualification](plans/BENCHMARKING_environment_qualification.md) — prerequisite for tuning and benchmark claims
+- [BENCHMARKING — Combined-model throughput](plans/BENCHMARKING_model_throughput.md) — run the existing sweep and determine whether concurrency is needed
+- [BENCHMARKING — Live configurator sweeps](plans/BENCHMARKING_live_configurator_sweeps.md) — blocked on live process ownership and cleanup; follows environment qualification
+- [PHYSICAL — D455 camera validation](plans/PHYSICAL_d455_validation.md) — physical device, stream, timing, TF, and stationary integration checks
 
 Only genuinely open work belongs here. Completed implementation plans are
 retired once their durable contract and evidence have canonical homes.

@@ -8,7 +8,7 @@ color camera. ``intrinsics_from_camera_info`` reads them from that camera's
 Frame convention: all coordinates are in the **camera optical frame** --
 X right, Y down, Z forward, meters (``docs/target_localization/target_localization_pipeline.md``
 Section 7). Physical RealSense/TF validation is tracked in
-``docs/plans/camera_hardware_validation.md``.
+``docs/plans/PHYSICAL_d455_validation.md``.
 
 This module is deliberately independent of the pointcloud estimator
 (``pointcloud_ranging.py``); it shares no code with it.

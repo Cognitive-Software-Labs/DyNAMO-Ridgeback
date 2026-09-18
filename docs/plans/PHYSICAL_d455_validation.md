@@ -1,4 +1,4 @@
-# Validate the physical D455 camera input
+# PHYSICAL — D455 camera validation
 
 Status: **pending physical access and validation.** The
 [project backlog](../BACKLOG.md#physical-camera-validation) owns this deployment

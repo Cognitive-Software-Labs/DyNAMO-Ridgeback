@@ -332,7 +332,7 @@ wrapper does not run broad process cleanup or force `ROS_DOMAIN_ID=42` on
 hardware. Before setting `autonomous_motion_enabled:=true`, validate the deployed
 command chain and confirm the controller's `Twist`/`TwistStamped` contract; the
 checked-in generated configuration is not proof of the live robot contract.
-The [hardware camera plan](docs/plans/camera_hardware_validation.md) owns the
+The [PHYSICAL — D455 camera validation](docs/plans/PHYSICAL_d455_validation.md) owns the
 physical D455 acceptance gates.
 
 The explorer is the in-repo `frontier_explorer_node` (sources under `src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer/`). It consumes the Nav2 global costmap and sends goals via `NavigateToPose`. The component boundary and readiness sequence are documented in [exploration architecture](docs/exploration/architecture.md).
@@ -560,7 +560,7 @@ sequential evidence run for the SlimSAM/Depth-Anything question. It starts with
 a diagnostics-off/on A/A pair and then runs three rotated replications of the
 box/silhouette by stereoscopic/monocular matrix. Run it only from a clean,
 committed checkout; its `sweep.json` records the exact sweep and scenario file
-hashes. See [the model-concurrency evidence plan](docs/plans/model_concurrency_evidence.md)
+hashes. See [BENCHMARKING — Combined-model throughput](docs/plans/BENCHMARKING_model_throughput.md)
 for the decision gates and interpretation.
 
 The shipped `benchmark_sweep_projective_parameters.yaml` varies one projective

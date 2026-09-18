@@ -58,6 +58,25 @@ rule it routes to — the graphify rules, in particular, are owned by
 - Prefer relative Markdown links within current documentation or within the
   archive. Historical implementation sources use immutable commit links.
 
+## Plan names and scope
+
+Plan filenames start with an uppercase scope followed by a descriptive topic:
+`<SCOPE>_<topic>.md`. Titles and navigation labels use the same scope prefix,
+for example `BENCHMARKING — Execution-environment qualification`.
+
+Choose the scope by the work's primary owner:
+
+- `BENCHMARKING` — target-distance benchmark tooling, qualification, and experiments.
+- `PHYSICAL` — physical-robot deployment, calibration, and hardware validation.
+- `ISAAC` — Isaac-specific implementation or qualification.
+- `GAZEBO` — Gazebo-specific implementation or qualification.
+- `EXPLORATION` — exploration behavior, navigation, and exploration evaluation.
+
+A benchmarking experiment comparing remote and physical-seat execution stays
+`BENCHMARKING`; physical-seat access does not make it physical-robot validation.
+Use a backend name in the topic when it narrows the work. Update filenames,
+titles, and incoming links together; retain immutable historical links unchanged.
+
 ## Archived evidence
 
 Current references own mechanisms, assumptions, parameter rationale, constraints,

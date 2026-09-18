@@ -1,4 +1,4 @@
-# Measure combined segmentation and monocular-depth throughput
+# BENCHMARKING — Combined-model throughput
 
 Status: **measurement pending.** Timing diagnostics and the fourteen-configuration
 sweep already exist. The [benchmarking backlog](../target_distance_benchmarking/BACKLOG.md#combined-segmentation-and-monocular-depth-throughput)

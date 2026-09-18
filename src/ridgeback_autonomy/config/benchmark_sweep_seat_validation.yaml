@@ -10,7 +10,7 @@
 #       <share>/config/benchmark_sweep_seat_validation.yaml
 #
 # `gpu-run` is a no-op on the physical seat. See
-# docs/plans/remote_vs_physical_seat_validation.md for the decision rules.
+# docs/plans/BENCHMARKING_environment_qualification.md for the decision rules.
 #
 # Two cells of the mask matrix, three process-level replicates each, rotated so
 # startup and thermal drift do not land on one cell. A -- box gate, stereoscopic

@@ -1,4 +1,4 @@
-# Start live benchmark sweeps from the configurator
+# BENCHMARKING — Live configurator sweeps
 
 Status: **blocked on process cleanup and ownership.** The
 [benchmarking backlog](../target_distance_benchmarking/BACKLOG.md#live-sweeps-from-the-configurator)

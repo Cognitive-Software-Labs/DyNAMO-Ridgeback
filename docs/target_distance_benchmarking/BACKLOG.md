@@ -23,7 +23,7 @@ used for replay tuning. It is a documented workflow gate, not a CLI-enforced loc
 current Gazebo GLX workflow. Rendering load may affect sensor delivery, processing,
 and which events are scored. Neither session is automatically a valid baseline.
 
-**Remaining work.** Execute the [environment qualification plan](../plans/remote_vs_physical_seat_validation.md):
+**Remaining work.** Execute the [BENCHMARKING — Execution-environment qualification](../plans/BENCHMARKING_environment_qualification.md):
 verify actual rendering paths; freeze conditions and practical acceptance margins;
 compare matched light/heavy workloads with at least three independent replications
 per condition; assess sensor delivery, processing, scored outcomes, and uncertainty.
@@ -127,7 +127,7 @@ Timing diagnostics and the fourteen-configuration sweep exist, but a controlled
 current comparison has not established whether this path keeps up or whether
 concurrency is needed. This is an evidence gap, not a confirmed performance bug.
 
-**Remaining work.** Execute the [measurement plan](../plans/model_concurrency_evidence.md):
+**Remaining work.** Execute the [BENCHMARKING — Combined-model throughput](../plans/BENCHMARKING_model_throughput.md):
 compare neither model, each model alone, and both together over three process
 replications, with a diagnostics-off/on control. Separate cold startup from
 steady-state completion, latency, scored outcomes, and resource use.
@@ -149,7 +149,7 @@ before this convenience feature. Qualification can use the terminal workflow.
 preflight cleanup can kill the configurator through two broad install-path
 matches, and live process ownership/conflict handling is not qualified.
 
-**Remaining work.** Follow the [implementation plan](../plans/benchmark_gui_direct_run.md):
+**Remaining work.** Follow the [BENCHMARKING — Live configurator sweeps](../plans/BENCHMARKING_live_configurator_sweeps.md):
 fix owned-process cleanup; reuse the CLI dry-run estimate; show the actual child
 renderer and qualification status; detect genuine conflicting runs; support live
 start, progress, cancellation, and restart/reattachment through existing records.
