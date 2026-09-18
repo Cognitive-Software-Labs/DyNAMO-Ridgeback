@@ -72,7 +72,6 @@ troubleshooting, planning, and historical documentation.
   blocked on live process ownership and cleanup; follows environment qualification
 - [D455 hardware validation](plans/camera_hardware_validation.md) — physical device, stream, timing, TF, and stationary integration checks
 - [Combined-model throughput measurement](plans/model_concurrency_evidence.md) — run the existing sweep and determine whether concurrency is needed
-- [Occlusion characterization](plans/occlusion_handling.md)
 - [Benchmark environment qualification](plans/remote_vs_physical_seat_validation.md) — prerequisite for tuning and benchmark claims
 
 Only genuinely open work belongs here. Completed implementation plans are
@@ -80,11 +79,13 @@ retired once their durable contract and evidence have canonical homes.
 
 ## Rejected or deferred approaches
 
-These pages preserve negative results and the evidence required before a retry.
+These pages preserve negative results, unselected proposals, and the evidence
+required before an approach is selected or retried.
 They are not supported implementations or automatic backlog commitments.
 
 - [Segmentation candidates](do_not_try_again/segmentation.md)
 - [Foreground-isolation candidates](do_not_try_again/foreground_isolation.md)
+- [Occlusion-recovery candidates](do_not_try_again/occlusion_recovery.md) — deferred until baseline characterization
 - [Exact-stamp depth-delivery experiments](do_not_try_again/exact_stamp_depth_delivery.md)
 - [Monocular-depth error](do_not_try_again/monocular_depth_error.md)
 

@@ -12,7 +12,9 @@ and implemented 3D baselines live in
 [euclidean reconstruction](../target_localization/euclidean_reconstruction.md#implemented-3d-recipes).
 No candidate here is an automatic backlog commitment.
 [Occlusion characterization](../target_distance_benchmarking/BACKLOG.md#occlusion-characterization)
-must establish the failure before a recovery algorithm is selected.
+must establish the failure before a recovery algorithm is selected. The
+[occlusion-recovery candidates](occlusion_recovery.md) retain the unapproved
+cluster and plausibility-filter ideas.
 
 ## 2D candidates
 

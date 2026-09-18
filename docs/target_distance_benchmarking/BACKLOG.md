@@ -106,8 +106,8 @@ and the [candidate protocol](../do_not_try_again/foreground_isolation.md#evaluat
 
 **Gap.** Dedicated `interocc_*`, `objocc_*`, and `objpartial_*` scenes exist,
 but current defaults have not first been characterized well enough to select a
-recovery design. The [depth-clustering plan](../plans/occlusion_handling.md) is a
-proposal, not an approved algorithm or current miss reason.
+recovery design. Recovery candidates remain deferred until this evidence
+identifies the responsible failure boundaries.
 
 **Completion criteria.** Run current defaults on the fixed occlusion families;
 separate detector, segmentation, depth/scan availability, isolation, association,
@@ -116,7 +116,7 @@ change; decide whether the failure merits a new recipe, a wrong-object guard, an
 explicit occlusion reason, or no change. Only then approve a scoped implementation
 and require non-occluded regression evidence.
 
-**Context.** [Occlusion proposal](../plans/occlusion_handling.md),
+**Context.** [Deferred recovery candidates](../do_not_try_again/occlusion_recovery.md),
 [segmentation candidates](../do_not_try_again/segmentation.md), and the
 [scenario gallery](benchmark_scenarios_v2_gallery.html).
 
