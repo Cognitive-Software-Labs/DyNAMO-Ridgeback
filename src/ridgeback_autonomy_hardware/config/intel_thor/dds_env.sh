@@ -31,6 +31,8 @@ case "$_dynamo_dds_role" in
         ;;
     *)
         echo "dds_env.sh: not on the robot Ethernet; pass intel or thor explicitly" >&2
+        unset _dynamo_dds_dir _dynamo_dds_role
+        return 1
         ;;
 esac
 unset _dynamo_dds_dir _dynamo_dds_role

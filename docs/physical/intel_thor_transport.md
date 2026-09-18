@@ -79,6 +79,9 @@ Rules:
   [`config/cyclonedds.xml`](../../src/ridgeback_autonomy/config/cyclonedds.xml)
   is repeated in every configuration. `dds_env.sh` sets `CYCLONEDDS_URI`, so
   the launch files do not apply their own default.
+- If `dds_env.sh` cannot select a host, or receives an invalid role, it returns
+  nonzero and preserves the previous DDS environment. A chained
+  `source .../dds_env.sh intel && ros2 ...` therefore stops on setup failure.
 
 ## Intel service switch
 
@@ -90,7 +93,10 @@ reach.
 
 `apply` performs these steps:
 
-1. Saves `/etc/clearpath/robot.yaml` to `/etc/clearpath/dynamo-rmw-backup/`.
+1. Saves `/etc/clearpath/robot.yaml`, its middleware selection, the original
+   `/etc/clearpath/cyclonedds.xml`, and the managed service drop-ins to
+   `/etc/clearpath/dynamo-rmw-backup/`. File absence, permissions, and symlinks
+   are preserved. Repeated applies keep the first complete backup.
 2. Installs `cyclonedds_intel_services.xml` as `/etc/clearpath/cyclonedds.xml`,
    and installs the sysctl file.
 3. Sets `system.ros2.middleware.implementation: rmw_cyclonedds_cpp` and
@@ -112,11 +118,22 @@ reach.
    Stopped units stay stopped, so running `apply` again restarts nothing that
    has already switched.
 
-`rollback` restores the saved `robot.yaml`, removes the drop-ins and
-`/etc/clearpath/cyclonedds.xml`, and restarts the same units. It leaves the
-sysctl file in place. `battery-sysfs-bridge` sources the Clearpath setup, so
-the switch reaches it. The Fast DDS profile it exports has no effect under
-CycloneDDS.
+`rollback` restores the saved `robot.yaml`, DDS configuration, and managed
+drop-ins before regenerating the Clearpath setup and restarting the currently
+active units on the saved middleware. Files originally absent are removed;
+existing files and symlinks are restored. Settings are reloaded even when the
+previous middleware was already CycloneDDS. Stopped units remain stopped.
+The backup is removed only after successful restarts; a failed rollback can
+be retried. The receive-buffer sysctl file and live limit remain in place.
+
+An incomplete backup, including an older backup containing only `robot.yaml`,
+blocks both `apply` and `rollback` before host configuration is changed. Those
+older backups cannot establish the original DDS file or drop-in contents.
+Recover those originals manually and retain the old evidence separately before
+starting a new managed switch; do not treat current installed files as originals.
+
+`battery-sysfs-bridge` sources the Clearpath setup, so the switch reaches it.
+The Fast DDS profile it exports has no effect under CycloneDDS.
 
 ## Pre-deploy check
 

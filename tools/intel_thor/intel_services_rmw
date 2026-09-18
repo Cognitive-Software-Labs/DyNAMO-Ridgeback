@@ -11,8 +11,8 @@
 #         /etc/clearpath/robot.yaml (clearpath-robot regenerates setup.bash),
 #         adds systemd drop-ins for the MyBotShop units that bypass the Clearpath
 #         setup, and restarts the services that were running.
-# rollback restores the saved robot.yaml, removes the drop-ins and the
-#         installed configuration, and restarts the same services.
+# rollback restores the saved robot.yaml, DDS configuration and drop-ins (or
+#         their original absence), then restarts services on the saved middleware.
 #
 # Restarting the platform briefly drops motor power and teleop: run it with the
 # robot stationary and the e-stop in reach. See
@@ -98,14 +98,15 @@ restart_active() {
     # Restart what was running and is not already on the target middleware; keep
     # stopped units (for example the camera) stopped. A repeated apply therefore
     # restarts nothing that already switched.
-    local rmw="$1" unit
-    if ! grep -q "^export RMW_IMPLEMENTATION=\"$rmw\"" "$SETUP_BASH"; then
+    # Rollback must reload restored settings even when the RMW is unchanged.
+    local rmw="$1" force="${2:-false}" unit
+    if "$force" || ! grep -q "^export RMW_IMPLEMENTATION=\"$rmw\"" "$SETUP_BASH"; then
         systemctl restart clearpath-robot.service
     fi
     wait_for_setup "$rmw"
     for unit in "${CLEARPATH_UNITS[@]}" "${MBS_UNITS[@]}"; do
         printf '%s\n' "${WAS_ACTIVE[@]}" | grep -qx "$unit" || continue
-        if [ "$(effective_rmw "$unit")" = "$rmw" ]; then
+        if ! "$force" && [ "$(effective_rmw "$unit")" = "$rmw" ]; then
             echo "already on $rmw: $unit"
             continue
         fi
@@ -123,6 +124,71 @@ record_active() {
     return 0
 }
 
+backup_file() {
+    local path="$1" saved="$2"
+    if [ -e "$path" ] || [ -L "$path" ]; then
+        cp -a -- "$path" "$saved"
+    else
+        touch "$saved.absent"
+    fi
+}
+
+validate_backup() {
+    local name
+    if [ ! -f "$BACKUP_DIR/complete" ] || [ ! -f "$BACKUP_DIR/robot.yaml" ] ||
+       ! grep -Eq '^rmw_[a-z0-9_]+$' "$BACKUP_DIR/middleware" 2>/dev/null; then
+        echo "Incomplete or legacy backup at $BACKUP_DIR; recover the original host configuration manually before proceeding. Backup retained." >&2
+        return 1
+    fi
+    for name in cyclonedds.xml "${MBS_UNITS[@]}"; do
+        if [ -e "$BACKUP_DIR/$name" ] || [ -L "$BACKUP_DIR/$name" ]; then
+            [ ! -e "$BACKUP_DIR/$name.absent" ] || return 1
+        elif [ ! -f "$BACKUP_DIR/$name.absent" ]; then
+            echo "Incomplete backup: missing state for $name; backup retained." >&2
+            return 1
+        fi
+    done
+}
+
+save_original_state() {
+    local snapshot unit
+    if [ -e "$BACKUP_DIR" ]; then
+        validate_backup
+        return
+    fi
+    # Publish the backup only after every original file has been captured.
+    snapshot="$(mktemp -d "${BACKUP_DIR}.XXXXXX")"
+    cp -p "$ROBOT_YAML" "$snapshot/robot.yaml"
+    python3 - "$snapshot/robot.yaml" > "$snapshot/middleware" <<'PY'
+import re
+import sys
+import yaml
+
+with open(sys.argv[1], encoding='utf-8') as stream:
+    robot = yaml.safe_load(stream)
+rmw = (robot.get('system', {}).get('ros2', {}).get('middleware', {})
+       .get('implementation', 'rmw_fastrtps_cpp'))
+if not isinstance(rmw, str) or not re.fullmatch(r'rmw_[a-z0-9_]+', rmw):
+    sys.exit('Cannot determine the original middleware from robot.yaml')
+print(rmw)
+PY
+    backup_file "$INSTALLED_CONFIG" "$snapshot/cyclonedds.xml"
+    for unit in "${MBS_UNITS[@]}"; do
+        backup_file "/etc/systemd/system/$unit.service.d/$DROPIN_NAME" "$snapshot/$unit"
+    done
+    touch "$snapshot/complete"
+    mv -T -- "$snapshot" "$BACKUP_DIR"
+}
+
+restore_file() {
+    local saved="$1" path="$2"
+    rm -f -- "$path"
+    if [ ! -e "$saved.absent" ]; then
+        mkdir -p "$(dirname "$path")"
+        cp -a -- "$saved" "$path"
+    fi
+}
+
 apply() {
     require_root
     [ -e /opt/ros/jazzy/lib/librmw_cyclonedds_cpp.so ] || { echo "rmw_cyclonedds_cpp is not installed" >&2; exit 1; }
@@ -133,8 +199,9 @@ apply() {
     confirm
     record_active
 
-    mkdir -p "$BACKUP_DIR"
-    [ -e "$BACKUP_DIR/robot.yaml" ] || cp -p "$ROBOT_YAML" "$BACKUP_DIR/robot.yaml"
+    save_original_state
+    # Replace managed symlinks without modifying their original targets.
+    rm -f "$INSTALLED_CONFIG"
     install -m 0644 "$CONFIG_DIR/cyclonedds_intel_services.xml" "$INSTALLED_CONFIG"
     install -m 0644 "$CONFIG_DIR/60-dynamo-dds-buffers.conf" "$SYSCTL_FILE"
     sysctl --quiet --system
@@ -156,6 +223,7 @@ PY
 
     for unit in "${MBS_UNITS[@]}"; do
         mkdir -p "/etc/systemd/system/$unit.service.d"
+        rm -f "/etc/systemd/system/$unit.service.d/$DROPIN_NAME"
         cat > "/etc/systemd/system/$unit.service.d/$DROPIN_NAME" <<EOF
 # Installed by DyNAMO-Ridgeback tools/intel_thor/intel_services_rmw.
 [Service]
@@ -172,16 +240,26 @@ EOF
 rollback() {
     require_root
     [ -e "$BACKUP_DIR/robot.yaml" ] || { echo "no backup at $BACKUP_DIR/robot.yaml" >&2; exit 1; }
+    validate_backup
     confirm
-    record_active
+    # Retain the restart set across retries: a failed restart makes a formerly
+    # active unit appear stopped on the next invocation.
+    if [ -f "$BACKUP_DIR/rollback-active" ]; then
+        mapfile -t WAS_ACTIVE < "$BACKUP_DIR/rollback-active"
+    else
+        record_active
+        printf '%s\n' "${WAS_ACTIVE[@]}" > "$BACKUP_DIR/rollback-active"
+    fi
+    local original_rmw
+    original_rmw="$(cat "$BACKUP_DIR/middleware")"
     cp -p "$BACKUP_DIR/robot.yaml" "$ROBOT_YAML"
+    restore_file "$BACKUP_DIR/cyclonedds.xml" "$INSTALLED_CONFIG"
     for unit in "${MBS_UNITS[@]}"; do
-        rm -f "/etc/systemd/system/$unit.service.d/$DROPIN_NAME"
+        restore_file "$BACKUP_DIR/$unit" "/etc/systemd/system/$unit.service.d/$DROPIN_NAME"
         rmdir --ignore-fail-on-non-empty "/etc/systemd/system/$unit.service.d" 2> /dev/null || true
     done
     systemctl daemon-reload
-    restart_active rmw_fastrtps_cpp
-    rm -f "$INSTALLED_CONFIG"
+    restart_active "$original_rmw" true
     rm -rf "$BACKUP_DIR"
     sleep 5
     status

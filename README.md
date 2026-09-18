@@ -503,7 +503,9 @@ sudo tools/intel_thor/intel_services_rmw apply
 
 `tools/intel_thor/intel_services_rmw status` shows the RMW that each service
 actually runs, and `sudo tools/intel_thor/intel_services_rmw rollback` restores
-the previous Fast DDS setup.
+the saved middleware, DDS configuration, and service overrides. Backups from
+older versions that saved only `robot.yaml` require manual recovery; see the
+[rollback contract](docs/physical/intel_thor_transport.md#intel-service-switch).
 
 In every shell that starts cross-host ROS processes or inspects Thor's topics,
 on both hosts:
@@ -511,6 +513,10 @@ on both hosts:
 ```bash
 source src/ridgeback_autonomy_hardware/config/intel_thor/dds_env.sh
 ```
+
+An unknown host or invalid role returns nonzero without changing the DDS
+environment. Supply `intel` or `thor` explicitly when automatic selection is
+unavailable, and require successful setup before launching ROS processes.
 
 Before every deployment, with the robot stationary, run on Intel:
 
