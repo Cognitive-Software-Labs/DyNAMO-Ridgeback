@@ -17,6 +17,11 @@ troubleshooting, planning, and historical documentation.
 - [Active engineering gaps](BACKLOG.md)
 - [Troubleshooting](troubleshooting.md)
 
+## Robot
+
+- [Geometry and mounting](robot/geometry.md) — configured mounts, model dimensions, and provenance
+- [Collision model and navigation footprint](robot/collision_model.md) — physical, simulator, and navigation envelopes
+
 ## Exploration
 
 - [Exploration architecture](exploration/architecture.md)
@@ -26,7 +31,7 @@ troubleshooting, planning, and historical documentation.
 ## Isaac Sim
 
 - [Isaac backend overview](isaac/overview.md)
-- [Robot, sensor, and generated-USD model](isaac/robot-model.md)
+- [Isaac import, articulation, and collision geometry](isaac/robot-model.md)
 - [RTX lidar pipeline](isaac/lidar-pipeline.md)
 - [Active Isaac engineering gaps](BACKLOG.md#isaac-exploration-recertification--p5)
 - [Isaac rollback](isaac/rollback.md)

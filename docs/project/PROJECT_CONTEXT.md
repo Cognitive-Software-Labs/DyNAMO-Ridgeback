@@ -52,6 +52,8 @@ building blocks unless a technical reference says otherwise.
 
 ## Architecture pointers
 
+- [Shared robot geometry](../robot/geometry.md)
+- [Collision model and navigation footprint](../robot/collision_model.md)
 - [Exploration architecture](../exploration/architecture.md)
 - [Camera stack](../target_localization/camera_stack.md)
 - [Target-localization pipeline](../target_localization/target_localization_pipeline.md)

@@ -9,14 +9,9 @@ and diagnostic runbook live in
 
 ## Physical declaration and pose
 
-`clearpath/robot.yaml` declares one forward-facing Intel RealSense D455 named
-`camera_0` on `default_mount`:
-
-```yaml
-parent: default_mount
-xyz: [0.2692, 0.0, 0.725]
-rpy: [0.0, 0.0, 0.0]
-```
+The [shared robot geometry reference](../robot/geometry.md#configured-mounts)
+owns the configured D455 mount and its YAML source. This section derives the
+camera's nominal internal frames from that mount.
 
 The R100 description places `default_mount` at `[0, 0, 0.295]` relative to
 `base_link`. The D455 description then models the bottom screw, camera body,

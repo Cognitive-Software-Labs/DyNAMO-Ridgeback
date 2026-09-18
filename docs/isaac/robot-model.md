@@ -1,16 +1,12 @@
-# The Ridgeback robot model: URDF → USD → meshes → sensors
+# Isaac robot model: import, articulation, and collision geometry
 
-How the robot gets from the Clearpath description into Isaac, what the
-geometry actually is, and which parts are hand-authored rather than imported.
-
-This is the canonical source for robot geometry. The
+This page owns the Isaac representation: how the shared Clearpath description
+becomes USD, which parts are added by the importer, and how PhysX uses them.
+[Robot geometry](../robot/geometry.md) and the
+[collision model](../robot/collision_model.md) own the shared references. The
 [global backlog](../BACKLOG.md) owns current gaps.
 
 ![robot render](assets/robot-render.png)
-
-Dimensioned drawing: [`assets/robot-geometry.svg`](assets/robot-geometry.svg).
-It is **hand-plotted and does not self-correct** — check it after any mounting
-change.
 
 ---
 
@@ -47,83 +43,13 @@ Committed artefact; regeneration is deliberate and reviewed in git.
 
 ---
 
-## Geometry, as built
+## Geometry and camera references
 
-All values in metres relative to `base_link`, which sits **0.02617 above the
-floor**. Measured from the wheel mesh: all four bottom at −0.02617 in
-`base_link`, bbox height 0.15234, so the radius is 0.07617. The
-axle 0.050 − radius 0.0759 derivation quoted here previously gives 0.0259 and
-is 0.27 mm off — below map resolution, but prefer the measured value.
-
-| | x | y | z |
-|---|---|---|---|
-| chassis hull | −0.4706 … +0.4618 | ±0.3966 | +0.0037 … +0.2800 |
-| top deck plate | −0.4702 … +0.4614 | ±0.3950 | +0.2737 … +0.2800 |
-| `default_mount` | 0 | 0 | +0.2950 |
-| `lidar2d_0_laser` (front) | **+0.3922** | 0 | **+0.2264** |
-| `lidar2d_1_laser` (rear, yaw 180°) | **−0.3922** | 0 | **+0.2264** |
-| D455 body | +0.2590 … +0.2850 | ±0.0620 | +1.0200 … +1.0490 |
-| camera mast (37.5 mm sq) | +0.1955 | 0 | +0.2800 … +1.0950 |
-| standoff bracket | +0.2142 … +0.2590 | ±0.015 | centred 1.0345 |
-
-Hull is 0.9325 × 0.7932 — the width matches the official Ridgeback spec
-(793 mm) to 0.2 mm, which is the check that says the model is trustworthy.
-
-### Sensors are never where the obvious surface suggests
-
-Both sensor mounts were wrong in the same way, and both cost time:
-
-- **The 2D lidars read as deck-mounted. They are not.** They sit recessed in a
-  diamond notch under the top plate. Mounting them on `default_mount` put them
-  **11.6 cm too high**, so every coverage number taken before 2026-09-10 was
-  scanning above obstacles it should have hit.
-- **The camera reads as mast-top. It is not.** It is bracketed to the mast's
-  **front face** with a ~45 mm standoff. Modelling it on top left it 12.5 cm
-  high with a mast ending under it.
-
-**Measure the mounting face, and ask how it attaches, before authoring an
-offset.** `hokuyo_ust.stl` spans z 0.0000–0.0700, so its origin is the unit's
-**base** — the surface a tape measures to, not the glass band.
-
-### Camera render and TF contract
-
-The measured mount belongs only in `clearpath/robot.yaml`. From that one pose,
-the patched Clearpath D455 description establishes two mutually exclusive TF
-owners:
-
-- simulation expands with `is_sim:=true`; `robot_state_publisher` owns the
-  nominal `camera_0_link → camera_0_color_frame →
-  camera_0_color_optical_frame` chain;
-- hardware omits those internal frames, leaving the RealSense driver to
-  publish its device calibration.
-
-Gazebo's RGB-D sensor and Isaac's camera adapter use the same nominal D455 RGB
-profiles from `ridgeback_autonomy/common/camera_profiles.py`: 640×480 is the
-default and 1280×720 is optional, both at 30 Hz. Isaac's importer expands the
-simulation description, then creates `d455_color` at the exact same colour-frame
-origin. The prim carries only the USD-to-ROS camera-axis rotation—there is no
-copied D435 translation—and `OmniSensorAPI` authors the cadence. Runtime
-selection updates both aperture and render-product dimensions so Isaac's
-published `CameraInfo` matches the selected profile. Perception reads that live
-message, never the profile table or a FoV constant; hardware gets its
-factory-calibrated input from the RealSense driver.
-
-The pre-profile runtime was checked live on 2026-09-12. Isaac published 1280×720
-`rgb8` colour and `32FC1` depth, both labelled
-`camera_0_color_optical_frame`; `CameraInfo` reported
-`fx=fy=631.0000005`, `cx=640`, `cy=360`, and advanced at exactly 30.0 Hz in
-simulation time. That optics value is historical and has no manufacturer or
-device-calibration provenance; the shared nominal profile supersedes it and
-still needs a live two-profile rerun. The namespaced TF tree resolved `base_link →
-camera_0_color_optical_frame` to `[0.280, -0.011, 1.034]` with the expected
-optical rotation.
-
-Isaac Sim 6's `depth_pcl` helper serializes the image-row-major cloud as a flat
-`width*height × 1` grid. A matched live 1280×720 depth/cloud pair proved one point
-per pixel and exact optical-Z/depth agreement across 417,280 valid pixels.
-The pointcloud consumer therefore restores the 720×1280 grid only when the
-flat point count exactly matches the live colour dimensions; arbitrary flat
-clouds remain rejected.
+The [shared robot geometry reference](../robot/geometry.md) owns mount
+configuration, the dimensioned drawing, and scoped model-derived dimensions.
+The [camera stack](../target_localization/camera_stack.md) owns camera frames,
+profiles, and the shared ROS contract; the [Isaac camera pipeline](camera-depth.md)
+owns rendering, depth formation, and cloud layout.
 
 ### The riser diamond
 
@@ -230,6 +156,10 @@ and the camera box. Wheel cylinders come from the vendor set.
 
 ![Plan-view comparison of the rendered chassis, convex hull, and retired AABB at frontal, 45-degree, and lateral wall contacts.](assets/collider/contact-envelopes.png)
 
+This comparison describes Isaac geometry only; it does not qualify Gazebo
+contacts, the shared Nav2 footprint, or hardware clearance. See the
+[collision-model distinctions](../robot/collision_model.md).
+
 The yellow hull follows the rendered chassis closely at each orientation. The
 dashed red AABB is similar at 0 and 90 degrees but visibly over-claims the
 45-degree approach.
@@ -330,6 +260,7 @@ isaac_venv/bin/python3 src/ridgeback_autonomy_isaac/sim/isaac/isaac_runner.py \
 
 ## Archived evidence
 
+- [Mount corrections and pre-profile camera checks](../../archive/engineering/port-history.md)
 - [2026-09-18 Gazebo integration check](../../archive/engineering/2026-09-18-gazebo-lidar-integration.md)
 - [live validation record](../../archive/engineering/isaac_hull_collider_validation.md)
 - [Isaac world seating](../../archive/engineering/isaac_world_seating.md)

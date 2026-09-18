@@ -11,6 +11,9 @@ Other pages summarize it only when useful and link back to that owner.
 | Short repository orientation | `docs/project/PROJECT_CONTEXT.md` |
 | Documentation policy and precedence | this page |
 | Cross-cutting repository conventions | `docs/project/conventions.md` |
+| Shared robot mounts, dimensions and physical/model provenance | `docs/robot/geometry.md` |
+| Physical, simulator and navigation collision-envelope distinctions | `docs/robot/collision_model.md` |
+| Backend-specific robot import, physics and sensors | backend topic reference, such as `docs/isaac/robot-model.md` |
 | Implemented behavior and interfaces | topic reference under `docs/` |
 | Current failures and diagnostic recipes | `docs/troubleshooting.md` |
 | Active evidenced engineering gaps | `docs/BACKLOG.md` |

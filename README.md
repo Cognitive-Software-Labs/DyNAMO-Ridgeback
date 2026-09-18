@@ -23,13 +23,15 @@ This workspace supports 3 main human workflows:
 - [Exploration evaluation](docs/exploration/evaluation.md): coverage and navigation outcomes
 - [Target-distance benchmarking](docs/target_distance_benchmarking/overview.md): estimator comparisons
 
+- [Robot geometry](docs/robot/geometry.md): shared mounts, dimensioned model reference, and validation limits
+- [Collision model](docs/robot/collision_model.md): physical envelope, navigation footprint, and backend representations
+
 Isaac Sim port (in progress, `feat/isaac-sim-6-port`):
 
 - `docs/BACKLOG.md`: **all active engineering gaps**, including Isaac
 - [Isaac rollback](docs/isaac/rollback.md): retained environments and driver recovery
 - `docs/isaac/camera-depth.md`: Isaac D455 depth modes, alignment, ROS contract, and runbook
 - `docs/isaac/lidar-pipeline.md`: how the RTX lidar reaches ROS
-- `docs/isaac/assets/robot-geometry.svg` / `robot_render.png`: sensor mounting, dimensioned
 
 ## Stack
 

@@ -1,6 +1,6 @@
 # Isaac sensor and chassis investigations — September 2026
 
-Recorded dates: 2026-09-10, 2026-09-11
+Recorded dates: 2026-09-10, 2026-09-11, 2026-09-12
 
 Tested revisions: unknown
 
@@ -82,3 +82,24 @@ Two traps this uncovered, both silent:
 **Pattern worth naming: sensors here are never mounted where the obvious surface suggests.** The 2D lidars read as deck-mounted but are recessed in a body notch (−11.6 cm). The camera reads as mast-top but is bracketed to the mast's front face. Both were modelled from an unmeasured offset onto a plausible parent, and both were wrong. Measure the mounting face, and ask *how* it attaches, before authoring an offset.
 
 **Limitation at the time:** the graft changes rendered geometry the RTX lidar raytraces, so the GT slice wants re-checking and every coverage number is void until it is.
+
+## Pre-profile camera checks
+
+Curation annotation, September 18, 2026: the former robot-model reference
+reported a live check on September 12 with 1280×720 `rgb8` colour and `32FC1`
+depth in `camera_0_color_optical_frame`, `fx=fy=631.0000005`, `cx=640`,
+`cy=360`, at 30.0 Hz in simulation time. The reported base-to-optical TF
+translation was `[0.280, -0.011, 1.034]`. Those optics were later superseded by
+the shared nominal profiles and had no manufacturer or device-calibration
+provenance.
+
+The same reference reported a matched 1280×720 depth/cloud check with one
+point per pixel and optical-Z/depth agreement across 417,280 valid pixels.
+The exact date and tested revision of that cloud check were not recorded in
+the extracted passage. It described a flat image-row-major cloud, not a proof
+that arbitrary flat clouds could be reshaped.
+
+These measurements were transferred from the
+[pre-split documentation snapshot](https://github.com/Cognitive-Software-Labs/DyNAMO-Ridgeback/blob/6805326d9c4b60b1fcf84e700e7ab724d312179d/docs/isaac/robot-model.md).
+The snapshot identifies the source prose, not a tested runtime revision. No
+measurements were repeated during extraction.

@@ -83,6 +83,13 @@ detector, measurement paths, visualization, and benchmark semantics are owned
 by the [target-localization pipeline](../target_localization/target_localization_pipeline.md),
 not duplicated here.
 
+## Robot geometry
+
+The [shared collision reference](../robot/collision_model.md) owns the Nav2
+footprint and its distinction from physical and simulator contact envelopes.
+[Robot geometry](../robot/geometry.md) owns configured mounts and dimensional
+provenance across the three backends.
+
 ## Validation
 
 The [exploration evaluation runbook](evaluation.md) records the

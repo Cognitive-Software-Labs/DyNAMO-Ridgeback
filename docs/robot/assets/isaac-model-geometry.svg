@@ -1,6 +1,6 @@
-<svg viewBox="0 0 880 940" xmlns="http://www.w3.org/2000/svg" width="880" height="940" role="img">
+<svg viewBox="0 0 880 1040" xmlns="http://www.w3.org/2000/svg" width="880" height="1040" role="img">
 <title>Ridgeback R100 sensor geometry, as built in the Isaac robot USD</title>
-<desc>Side elevation and plan view with every measured sensor position relative to base_link. Generated to match src/ridgeback_autonomy_isaac/sim/isaac/usd/robots/ridgeback_r100.</desc>
+<desc>Hand-plotted Isaac-derived reference relative to base_link. Cross-backend and physical geometry audit remains open.</desc>
 <style>
   .bg{fill:#ffffff}
   .ttl{font:600 15px system-ui,sans-serif;fill:#16181d}
@@ -16,13 +16,13 @@
   .ref{stroke:#8aa0b8;stroke-width:1;stroke-dasharray:4 3;fill:none}
   .axis{stroke:#16181d;stroke-width:1.6}
 </style>
-<rect class="bg" x="0" y="0" width="880" height="940"/>
+<rect class="bg" x="0" y="0" width="880" height="1040"/>
 
 <text class="ttl" x="24" y="30">Ridgeback R100 — sensor geometry as built in the Isaac USD</text>
-<text class="sub" x="24" y="48">All values in metres, relative to base_link. Measured against the robot 2026-09-10; matches the committed robot USD.</text>
+<text class="sub" x="24" y="48">Metres relative to base_link. Model-derived dimensions; agreement with Gazebo and hardware awaits audit.</text>
 
 <!-- ================= SIDE ELEVATION ================= -->
-<text class="ttl" x="24" y="82">SIDE ELEVATION  (+X forward →)</text>
+<text class="ttl" x="24" y="65">SIDE ELEVATION  (+X forward →)</text>
 
 <!-- floor / wheel contact -->
 <line class="axis" x1="80" y1="479" x2="700" y2="479"/>
@@ -90,16 +90,17 @@
 <line class="ref" x1="370.4" y1="369" x2="370.4" y2="541"/>
 <text class="mono" x="335" y="552" text-anchor="middle">+0.1955 mast</text>
 
-<line class="dim" x1="300" y1="566" x2="397.8" y2="566"/>
-<line class="ref" x1="397.8" y1="103" x2="397.8" y2="569"/>
-<text class="mono" x="349" y="580" text-anchor="middle">+0.2716 camera</text>
+<line class="dim" x1="300" y1="566" x2="396.9" y2="566"/>
+<line class="ref" x1="396.9" y1="103" x2="396.9" y2="569"/>
+<text class="mono" x="349" y="580" text-anchor="middle">+0.2692 camera mount</text>
 
 <!-- base_link marker -->
 <circle cx="300" cy="470" r="3.6" fill="#16181d"/>
 <text class="lbl" x="306" y="466">base_link (0,0,0)</text>
 
 <!-- ================= PLAN VIEW ================= -->
-<text class="ttl" x="24" y="626">PLAN VIEW  (+X forward →, +Y left ↑)</text>
+<g transform="translate(0,100)">
+<text class="ttl" x="24" y="540">PLAN VIEW  (+X forward →, +Y left ↑)</text>
 
 <!-- hull -->
 <rect class="part" x="140" y="565.4" width="317" height="269.2" rx="22"/>
@@ -123,8 +124,7 @@
 <line class="dim" x1="510" y1="565.4" x2="510" y2="834.6"/>
 <line class="ref" x1="457" y1="565.4" x2="514" y2="565.4"/>
 <line class="ref" x1="457" y1="834.6" x2="514" y2="834.6"/>
-<text class="mono" x="518" y="696">0.7932 wide</text>
-<text class="monod" x="518" y="710">matches the 793 mm spec</text>
+<text class="mono" x="534" y="700" text-anchor="middle" transform="rotate(-90 534 700)">0.7932 wide</text>
 
 <!-- length dim -->
 <line class="dim" x1="140" y1="862" x2="457" y2="862"/>
@@ -135,7 +135,7 @@
 <text class="lbl" x="596" y="620">Mounting notes</text>
 <text class="monod" x="596" y="644">lidar2d_0_laser  (+0.3922, 0, 0.2264)</text>
 <text class="monod" x="596" y="660">lidar2d_1_laser  (−0.3922, 0, 0.2264)</text>
-<text class="monod" x="596" y="676">D455 bottom       z 1.0200, x +0.2716</text>
+<text class="monod" x="596" y="676">D455 bottom       z 1.0200, x +0.2692</text>
 <text class="monod" x="596" y="692">mast 37.5 mm sq   x +0.1955, y 0</text>
 <text class="monod" x="596" y="708">mast spans z      0.280 → 1.095</text>
 <text class="monod" x="596" y="724">standoff          44.7 mm, black</text>
@@ -149,7 +149,8 @@
 
 <text class="sub" x="596" y="834">Mast base clears the scan plane by</text>
 <text class="sub" x="596" y="850">53.6 mm. The flared base plate is not</text>
-<text class="sub" x="596" y="866">modelled, so real clearance is smaller.</text>
+<text class="sub" x="596" y="866">modelled; measure physical clearance.</text>
 
-<text class="sub" x="596" y="884">Verified: 0/1081 self-returns, ±135°.</text>
+<text class="sub" x="596" y="884">Cross-backend geometry audit: open.</text>
+</g>
 </svg>

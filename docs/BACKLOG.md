@@ -140,6 +140,59 @@ segmentation to absorb an extrinsic error.
 **Context.** [Polar profiling](target_localization/polar_profiling.md) and the
 [hardware plan](plans/camera_hardware_validation.md).
 
+## Shared camera mast and bracket geometry
+
+**Gap.** `tools/isaac/import_ridgeback_urdf.py` authors the camera mast and
+standoff as collision-enabled USD cubes. `clearpath/robot.yaml` supplies the
+camera mount but declares no shared mast/bracket attachment. The Isaac model
+therefore contains structural geometry outside the shared robot description.
+
+**Completion criteria.** Establish the measured attachment geometry in one
+shared description or asset source consumed by Gazebo and Isaac. Remove the
+independent Isaac authoring after equivalence checks. Preserve the configured
+camera pose; compare rendered and collision geometry, TF, and sensor
+self-occlusion in both simulators, including motion. Record physical dimensions
+and measurement uncertainty. Rerun affected benchmarks before quoting results.
+
+**Context.** [Shared robot geometry](robot/geometry.md#known-representation-differences)
+and [Isaac additions](isaac/robot-model.md#hand-authored-parts).
+
+## Robot geometry and drawing audit
+
+**Gap.** The shared reference retains dimensions and a hand-plotted drawing
+from the Isaac USD. It does not establish agreement with the generated Gazebo
+model or physical hardware, and the drawing cannot detect configuration drift.
+
+**Completion criteria.** Compare frame origins, sensor emission/optical origins,
+body bounds, attachment bounds, and floor-contact references in a common frame.
+Record source revisions and physical measurement uncertainty; distinguish
+configured, model-derived, and measured values. Correct discrepancies at their
+source. Regenerate the drawing from authoritative geometry where practical,
+and add a repeatable check for its declared dimensions and mount annotations.
+Rerun any benchmarks affected by geometry corrections.
+
+**Context.** [Geometry and dimensional provenance](robot/geometry.md).
+
+## Collision-envelope and navigation-footprint validation
+
+**Gap.** Nav2 defines its planar footprint separately from simulator collision
+geometry. Its comments claim a circumscribing body polygon, while the available
+contact-envelope illustration qualifies only Isaac representations. Agreement
+with Gazebo and the deployed hardware, including attachments, remains unproven.
+
+**Completion criteria.** Overlay the configured and effective Nav2 footprints,
+each simulator's collision geometry, and the measured physical envelope in the
+same frame, with height-dependent attachment limits and explicit uncertainty.
+Choose and document the required containment and clearance policy; fix any
+violations. Validate frontal, lateral, and angled contacts plus stop/reverse
+recovery separately in each simulator. Qualify hardware clearance under the
+physical command-chain validation gate; simulator contact results do not close
+that gate. Preserve backend-specific tolerances and rerun affected benchmarks.
+
+**Context.** [Collision model and footprint](robot/collision_model.md),
+[Isaac colliders](isaac/robot-model.md#colliders), and
+[physical command-chain validation](#physical-command-chain-validation).
+
 ## Camera-geometry benchmark recertification
 
 **Gap.** The current measured camera and LiDAR mounts supersede the geometry
@@ -154,7 +207,7 @@ benchmark whose inputs or measured behavior depend on camera or LiDAR geometry
 before quoting its numbers.
 
 **Context.** [Camera stack](target_localization/camera_stack.md) and
-[Isaac robot and sensor model](isaac/robot-model.md).
+[shared robot geometry](robot/geometry.md).
 
 ## Isolation validation
 
