@@ -70,7 +70,7 @@ troubleshooting, planning, and historical documentation.
 
 - [Live sweep from the configurator GUI](plans/benchmark_gui_direct_run.md) —
   blocked on live process ownership and cleanup; follows environment qualification
-- [D455 hardware validation](plans/camera_hardware_validation.md)
+- [D455 hardware validation](plans/camera_hardware_validation.md) — physical device, stream, timing, TF, and stationary integration checks
 - [Combined-model throughput measurement](plans/model_concurrency_evidence.md) — run the existing sweep and determine whether concurrency is needed
 - [Occlusion characterization](plans/occlusion_handling.md)
 - [Benchmark environment qualification](plans/remote_vs_physical_seat_validation.md) — prerequisite for tuning and benchmark claims

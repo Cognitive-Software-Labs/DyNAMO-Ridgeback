@@ -88,22 +88,40 @@ adapter worlds under `src/ridgeback_autonomy_gz/sim/worlds/`.
 
 ## Physical camera validation
 
-**Gap.** The repository selects a D455 and has parser/description tests, but no
-recorded robot-side proof of the actual device, active profiles, topics, grids,
-stamps, TF ownership, or optional organized cloud.
+**Gap.** The D455 input contract is implemented, but device identity, effective
+profiles, colour/aligned-depth delivery, exact timestamps, TF ownership, and
+application behavior still need proof on the deployed robot.
 
-**Completion criteria.** Execute the [hardware plan](plans/camera_hardware_validation.md)
-against the approved robot setup; validate 640x480@30 and 1280x720@30 in
-separate runs; record device identity, effective configuration,
-color/depth/camera-info topics, dimensions/encodings/rates/stamps, exact-match
-observations, and optical-to-base TF; verify there is one internal-camera TF
-owner. Compare each live `CameraInfo` with the nominal shared simulation
-profile and record an explicit keep/update decision. If enabling `pointcloud`,
-additionally prove organization, color-grid indexing, frame, and timestamps
-before wiring it as a RealSense input.
+**Completion criteria.** Execute the [hardware validation procedure](plans/camera_hardware_validation.md):
+verify the intended device and driver, inspect effective configuration, validate
+image/depth/calibration contracts and timing, confirm the actual camera-to-base
+TF chain, and run a stationary projective/Euclidean application smoke. Test
+640x480@30 and 1280x720@30 separately; record unsupported/fallback profiles as
+unresolved rather than silently accepting them. Freeze acceptance criteria
+before measurement. Preserve evidence and compare live calibration with the
+nominal simulation model without treating nominal values as hardware guarantees.
 
-**Context.** [Aligned depth](target_localization/aligned_depth.md) and
-`common/camera_inputs.py`.
+Close only after both required profiles and the core checks pass, or after an
+explicit deployment-scope decision revises the required profile set. Pointcloud,
+camera–LiDAR calibration, calibrated accuracy, and motion validation are separate.
+
+**Context.** [Camera stack](target_localization/camera_stack.md) and
+[aligned depth](target_localization/aligned_depth.md).
+
+## Optional physical organized-pointcloud qualification
+
+**Status.** Separate optional follow-up; not a blocker for core D455 colour and
+aligned-depth integration. The hardware input contract leaves pointcloud unwired
+until its organization and correspondence are demonstrated.
+
+**Completion criteria if needed.** Before wiring a RealSense pointcloud input,
+prove `PointCloud2.height > 1`, colour-grid dimensions and row-major pixel
+correspondence, frame/TF correctness, compatible timestamps, and documented
+invalid-point representation/density. Preserve device/profile provenance and
+application evidence. An unverified or unsuitable cloud remains disabled.
+
+**Context.** [Camera pointcloud contract](target_localization/camera_stack.md)
+and [hardware validation](plans/camera_hardware_validation.md).
 
 ## Camera-LiDAR calibration
 
