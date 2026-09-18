@@ -43,7 +43,6 @@ from ridgeback_autonomy.localization_launch import (
     estimate_viz_node,
     mask_measurement_node,
     overlay_node,
-    perception_venv_actions,
     pointcloud_measurement_node,
     resolved_camera_inputs,
     workspace_root_from_package_share,
@@ -209,6 +208,7 @@ def build_benchmark_nodes(context, *args, **kwargs):
             # freezes the beams the live polar row actually used.
             'scan_topic': scan_topic,
             'base_frame': base_frame,
+            'target_labels': LaunchConfiguration('target_labels'),
             'estimators': ','.join(selected_estimators),
             'pointcloud_measurement_topic': POINTCLOUD_MEASUREMENTS_TOPIC,
             'mask_measurement_topic': MASK_MEASUREMENTS_TOPIC,
@@ -304,6 +304,7 @@ def generate_launch_description():
     arguments = [
         # Shared with target_benchmark_env.launch.py. Keep these defaults
         # byte-identical: the first declaration inherited by a wrapper wins.
+        DeclareLaunchArgument('target_labels', default_value='humanoid robot'),
         DeclareLaunchArgument('namespace', default_value='r100_0001'),
         DeclareLaunchArgument('use_sim_time', default_value='true'),
         DeclareLaunchArgument('world', default_value='target_distance_calibration'),
@@ -523,7 +524,6 @@ def generate_launch_description():
         # A sweep starts this launch in a separate process from the environment,
         # so its children need their own copy of the venv environment actions.
         *cyclonedds_actions(pkg_this),
-        *perception_venv_actions(pkg_this),
         *arguments,
         OpaqueFunction(function=build_readiness_gate),
     ])

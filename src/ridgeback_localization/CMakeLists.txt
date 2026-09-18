@@ -29,4 +29,7 @@ install(PROGRAMS
   RENAME target_visualization_node
 )
 
+install(PROGRAMS ridgeback_localization/health_node.py
+  DESTINATION lib/${PROJECT_NAME} RENAME localization_health)
+install(DIRECTORY launch DESTINATION share/${PROJECT_NAME})
 ament_package()

@@ -18,6 +18,7 @@ from ridgeback_common.messages import (
     build_measurements_message,
 )
 from ridgeback_common.tf_utils import lookup_transform_components
+from ridgeback_localization.worker_state import WorkerState
 from ridgeback_interfaces.msg import TargetDetections, TargetMeasurements
 from ridgeback_localization.contracts import (
     POINTCLOUD_MEASUREMENTS_TOPIC,
@@ -33,6 +34,7 @@ from ridgeback_localization.core.pointcloud_ranging import (
 class TargetPointcloudMeasurementNode(Node):
     def __init__(self) -> None:
         super().__init__('target_pointcloud_measurement_node')
+        self.worker_state = WorkerState(self, 'pointcloud')
 
         default_base_frame = self.default_base_frame()
 
@@ -190,12 +192,16 @@ class TargetPointcloudMeasurementNode(Node):
                 if detections_msg is None:
                     break
 
-                self.process_measurements(
-                    detections_msg,
-                    pointcloud_xyz,
-                    pointcloud_rotation,
-                    pointcloud_translation,
-                )
+                try:
+                    self.process_measurements(
+                        detections_msg,
+                        pointcloud_xyz,
+                        pointcloud_rotation,
+                        pointcloud_translation,
+                    )
+                except Exception as exc:
+                    self.worker_state.set('failure', str(exc))
+                    self.get_logger().error(f'Pointcloud measurement failed: {exc}')
 
                 if not self.process_event.is_set():
                     break
@@ -237,6 +243,7 @@ class TargetPointcloudMeasurementNode(Node):
                 add_pointcloud_measurements(batch, None, None, None)
 
         self.measurement_pub.publish(build_measurements_message(batch, detections_msg.header))
+        self.worker_state.set('processing')
 
     def lookup_transform(self, pointcloud_msg: PointCloud2):
         rotation, translation, self.last_base_frame_fallback = lookup_transform_components(

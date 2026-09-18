@@ -1,0 +1,29 @@
+#!/usr/bin/env python3
+"""Run after sourcing only ROS and a clean localization-subset install."""
+import importlib
+import importlib.abc
+import pkgutil
+import sys
+from pathlib import Path
+from ament_index_python.packages import get_package_share_directory
+
+
+class ForbiddenImports(importlib.abc.MetaPathFinder):
+    def find_spec(self, fullname, path=None, target=None):
+        if fullname.split('.')[0] in {'ridgeback_autonomy', 'nav2_msgs', 'rviz2',
+                'torch', 'transformers', 'omni', 'isaacsim', 'ros_gz_sim'}:
+            raise AssertionError('Forbidden headless import: ' + fullname)
+
+
+sys.meta_path.insert(0, ForbiddenImports())
+for name in ('ridgeback_common', 'ridgeback_localization'):
+    package = importlib.import_module(name)
+    for module in pkgutil.walk_packages(package.__path__, package.__name__ + '.'):
+        importlib.import_module(module.name)
+share=Path(get_package_share_directory('ridgeback_localization'))
+assert (share/'launch/localization.launch.py').is_file()
+from ridgeback_interfaces.msg import LocalizationHealth, TargetDetections, TargetMeasurements, PolarBeams
+from rclpy.serialization import serialize_message, deserialize_message
+for typ in (LocalizationHealth, TargetDetections, TargetMeasurements, PolarBeams):
+    assert deserialize_message(serialize_message(typ()),typ)==typ()
+print('All common/localization modules import with autonomy, Nav2, RViz and inference imports blocked; resources and generated serialization pass.')

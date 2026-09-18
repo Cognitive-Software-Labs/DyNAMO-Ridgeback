@@ -38,6 +38,7 @@ def test_public_launch_surface_is_limited_to_known_entrypoints() -> None:
     )
 
     assert top_level_launches == [
+        'localization_observer.launch.py',
         'manual_mapping.launch.py',
         'ridgeback_exploration.launch.py',
         'target_benchmark_config.launch.py',
@@ -191,7 +192,7 @@ def test_exploration_runs_the_same_four_estimator_rows_as_the_benchmark() -> Non
     # The mask node's own base_frame default is the bare string 'base_link',
     # which resolves to nothing under a namespace and fails polar profiling's
     # scan->base lookup silently. Every caller has to pass it.
-    assert "base_frame = [namespace, '/robot/base_link']" in exploration_text
+    assert "base_frame = LaunchConfiguration('base_frame').perform(context).strip()" in exploration_text
 
 
 def test_exploration_gives_the_distance_hud_its_own_aggregator() -> None:

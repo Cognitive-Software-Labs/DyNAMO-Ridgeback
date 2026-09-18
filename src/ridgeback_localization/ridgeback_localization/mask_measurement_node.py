@@ -80,6 +80,7 @@ from ridgeback_common.messages import (
 from ridgeback_common.miss_reason import MissReason
 from ridgeback_common.stamps import stamp_key
 from ridgeback_common.tf_utils import lookup_transform_components
+from ridgeback_localization.worker_state import WorkerState
 from ridgeback_interfaces.msg import PolarBeams, TargetDetections, TargetMeasurements
 from ridgeback_localization.core.depth_common import (
     DEPTH_GATE_DISABLED,
@@ -178,6 +179,7 @@ class TargetMaskMeasurementNode(Node):
         # ``parameter_overrides`` to stand the node up on a chosen
         # configuration without a launch file or CLI arguments.
         super().__init__('target_mask_measurement_node', **node_kwargs)
+        self.worker_state = WorkerState(self, 'mask')
 
         self.declare_parameter('detections_topic', RAW_DETECTIONS_TOPIC)
         self.declare_parameter('measurement_topic', MASK_MEASUREMENTS_TOPIC)
@@ -723,7 +725,8 @@ class TargetMaskMeasurementNode(Node):
                                 target_stamp_ns,
                                 completed_ns - received_ns,
                             )
-                except Exception:  # noqa: BLE001 - worker must survive any frame
+                except Exception as exc:  # noqa: BLE001 - worker must survive any frame
+                    self.worker_state.set('failure', str(exc))
                     if diagnostics is not None:
                         with self.processing_lock:
                             diagnostics.record_batch_failed(target_stamp_ns)
@@ -849,6 +852,7 @@ class TargetMaskMeasurementNode(Node):
 
         self.measurement_pub.publish(
             build_measurements_message(batch, detections_msg.header))
+        self.worker_state.set('processing')
 
     def polar_beam_records(self) -> list[PolarBeamRecord] | None:
         """Allocate debug records only while a beam consumer is subscribed.

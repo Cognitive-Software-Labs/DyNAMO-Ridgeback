@@ -36,7 +36,6 @@ from ridgeback_autonomy.localization_launch import (
     estimate_viz_node,
     mask_measurement_node,
     overlay_node,
-    perception_venv_actions,
     pointcloud_measurement_node,
     REALSENSE_CAMERA_INPUTS,
     resolved_camera_inputs,
@@ -88,56 +87,82 @@ def build_target_localization_nodes(context, *args, **kwargs):
     # get_namespace(). Under this namespace that default resolves to a frame
     # nothing publishes and polar profiling's scan->base lookup fails silently,
     # so the frame is passed rather than defaulted.
-    base_frame = [namespace, '/robot/base_link']
+    base_frame = LaunchConfiguration('base_frame').perform(context).strip()
+    if not base_frame:
+        raise ValueError('Pass the observed base_frame explicitly on hardware')
+    mode = LaunchConfiguration('localization_mode').perform(context)
 
     selected_estimators = parse_estimators(
         LaunchConfiguration('estimators').perform(context).strip()
     )
     estimators = ','.join(selected_estimators)
 
-    nodes = [Node(
-        package='ridgeback_localization',
-        executable='target_detector_node',
-        additional_env=compute_environment(),
-        name='target_detector',
-        namespace=namespace,
-        parameters=[{
-            'use_sim_time': use_sim_time,
-            'color_topic': camera_inputs.color_image_topic,
-            # Typed explicitly: the node declares a double, so an integer
-            # spelling like ``detector_fps:=10`` would otherwise be rejected.
-            'detector_fps': ParameterValue(
-                LaunchConfiguration('detector_fps'), value_type=float),
-            'detector_debug': LaunchConfiguration('detector_debug'),
-        }],
-        remappings=[('/tf', 'tf'), ('/tf_static', 'tf_static')],
-        output='screen',
-    )]
-
-    if uses_pointcloud_estimators(selected_estimators):
-        nodes.append(pointcloud_measurement_node(
+    nodes = []
+    if mode == 'local':
+        nodes = [Node(
+            package='ridgeback_localization',
+            executable='target_detector_node',
+            additional_env=compute_environment() if mode == 'local' else {},
+            name='target_detector',
             namespace=namespace,
-            use_sim_time=use_sim_time,
-            enabled_estimators=','.join(
-                selected_pointcloud_estimators(selected_estimators)),
-            base_frame=base_frame,
-            color_topic=camera_inputs.color_image_topic,
-            pointcloud_topic=camera_inputs.organized_points_topic,
-        ))
+            parameters=[{
+                'use_sim_time': use_sim_time,
+                'color_topic': camera_inputs.color_image_topic,
+                'target_labels': ParameterValue(LaunchConfiguration('target_labels'), value_type=str),
+                # Typed explicitly: the node declares a double, so an integer
+                # spelling like ``detector_fps:=10`` would otherwise be rejected.
+                'detector_fps': ParameterValue(
+                    LaunchConfiguration('detector_fps'), value_type=float),
+                'detector_debug': LaunchConfiguration('detector_debug'),
+            }],
+            remappings=[('/tf', 'tf'), ('/tf_static', 'tf_static')],
+            output='screen',
+        )]
 
-    if uses_mask_estimators(selected_estimators):
-        nodes.append(mask_measurement_node(
-            namespace=namespace,
-            use_sim_time=use_sim_time,
-            enabled_estimators=','.join(
-                selected_mask_estimators(selected_estimators)),
-            base_frame=base_frame,
-            depth_source=depth_source,
-            mask_gate=mask_gate,
-            color_topic=camera_inputs.color_image_topic,
-            camera_info_topic=camera_inputs.color_camera_info_topic,
-            depth_topic=camera_inputs.aligned_depth_topic,
-        ))
+        if uses_pointcloud_estimators(selected_estimators):
+            nodes.append(pointcloud_measurement_node(
+                namespace=namespace,
+                use_sim_time=use_sim_time,
+                enabled_estimators=','.join(
+                    selected_pointcloud_estimators(selected_estimators)),
+                base_frame=base_frame,
+                color_topic=camera_inputs.color_image_topic,
+                pointcloud_topic=camera_inputs.organized_points_topic,
+            ))
+
+        if uses_mask_estimators(selected_estimators):
+            nodes.append(mask_measurement_node(
+                namespace=namespace,
+                use_sim_time=use_sim_time,
+                enabled_estimators=','.join(
+                    selected_mask_estimators(selected_estimators)),
+                base_frame=base_frame,
+                depth_source=depth_source,
+                mask_gate=mask_gate,
+                color_topic=camera_inputs.color_image_topic,
+                camera_info_topic=camera_inputs.color_camera_info_topic,
+                depth_topic=camera_inputs.aligned_depth_topic,
+                scan_topic=LaunchConfiguration('scan_topic'),
+            ))
+
+    if mode == 'external':
+        nodes = [Node(package='ridgeback_autonomy', executable='localization_status',
+            namespace=namespace, parameters=[{'use_sim_time': use_sim_time,
+                'health_timeout': ParameterValue(LaunchConfiguration('health_timeout'), value_type=float)}],
+            output='screen')]
+    else:
+        nodes.append(Node(package='ridgeback_localization', executable='localization_health',
+            namespace=namespace, parameters=[{
+                'use_sim_time': use_sim_time, 'mode': 'local', 'estimators': estimators,
+                'target_labels': ParameterValue(LaunchConfiguration('target_labels'), value_type=str),
+                'color_topic': camera_inputs.color_image_topic,
+                'depth_topic': camera_inputs.aligned_depth_topic,
+                'camera_info_topic': camera_inputs.color_camera_info_topic,
+                'pointcloud_topic': camera_inputs.organized_points_topic or '',
+                'scan_topic': LaunchConfiguration('scan_topic'), 'depth_source': depth_source, 'mask_gate': mask_gate,
+                **{name: ParameterValue(LaunchConfiguration(name), value_type=float)
+                   for name in ('startup_timeout', 'input_timeout', 'progress_timeout', 'source_age')},
+            }], output='screen'))
 
     # Rings on the floor plan plus the distance panel that names them. Both
     # surfaces are filtered from the one selected set, so a ring can never
@@ -151,6 +176,7 @@ def build_target_localization_nodes(context, *args, **kwargs):
         # Exploration has no truth source, so the row layout's truth and error
         # columns would be permanently blank.
         hud_layout='wide',
+        base_frame=base_frame,
         condition=launch.conditions.IfCondition(estimate_viz),
     ))
 
@@ -248,7 +274,6 @@ def generate_launch_description():
 
     return LaunchDescription([
         *cyclonedds_actions(pkg_this),
-        *perception_venv_actions(pkg_this),
         DeclareLaunchArgument('namespace', default_value='r100_0001'),
         DeclareLaunchArgument(
             'sim', default_value='gz', choices=['gz', 'isaac'],
@@ -343,6 +368,15 @@ def generate_launch_description():
                                           '(detection + the selected measurement rows + '
                                           'rings, distance HUD and camera overlay); '
                                           'requires perception_venv'),
+        DeclareLaunchArgument('localization_mode', default_value='local', choices=['local', 'external']),
+        DeclareLaunchArgument('localization_required', default_value=PythonExpression([
+            "'true' if '", LaunchConfiguration('localization_mode'), "' == 'external' else 'false'"])),
+        DeclareLaunchArgument('base_frame', default_value=PythonExpression(["'' if '", backend, "' == 'hardware' else '", namespace, "/robot/base_link'"])),
+        DeclareLaunchArgument('scan_topic', default_value='sensors/lidar2d_0/scan'),
+        DeclareLaunchArgument('target_labels', default_value='humanoid robot'),
+        *[DeclareLaunchArgument(name, default_value=value) for name, value in {
+            'startup_timeout':'120.0', 'input_timeout':'3.0', 'progress_timeout':'15.0',
+            'source_age':'15.0', 'health_timeout':'3.0', 'cancellation_timeout':'5.0'}.items()],
         DeclareLaunchArgument('estimate_viz', default_value='true',
                               description='Publish the estimator rings and the wide distance HUD'),
         DeclareLaunchArgument('estimators', default_value=_backend_default(
@@ -485,6 +519,10 @@ def generate_launch_description():
                     launch_arguments={
                         'namespace': namespace,
                         'use_sim_time': use_sim_time,
+                        'localization_required': LaunchConfiguration('localization_required'),
+                        'health_timeout': LaunchConfiguration('health_timeout'),
+                        'localization_progress_timeout': LaunchConfiguration('progress_timeout'),
+                        'cancellation_timeout': LaunchConfiguration('cancellation_timeout'),
                     }.items(),
                     condition=launch.conditions.IfCondition(
                         autonomous_motion_enabled),

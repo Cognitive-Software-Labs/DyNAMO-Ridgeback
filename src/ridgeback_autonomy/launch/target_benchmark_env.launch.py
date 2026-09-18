@@ -21,7 +21,6 @@ from ridgeback_autonomy.localization_launch import (
     RAW_DETECTIONS_TOPIC,
     SIMULATION_CAMERA_INPUTS,
     cyclonedds_actions,
-    perception_venv_actions,
     resolved_camera_inputs,
 )
 
@@ -40,6 +39,7 @@ def build_detector(context, *args, **kwargs):
             'use_sim_time': LaunchConfiguration('use_sim_time'),
             'color_topic': inputs.color_image_topic,
             'detections_topic': RAW_DETECTIONS_TOPIC,
+            'target_labels': ParameterValue(LaunchConfiguration('target_labels'), value_type=str),
             # Typed explicitly: the node declares a double, so an integer
             # spelling like ``detector_fps:=10`` would otherwise be rejected.
             'detector_fps': ParameterValue(
@@ -68,9 +68,9 @@ def generate_launch_description():
 
     return LaunchDescription([
         *cyclonedds_actions(pkg_this),
-        *perception_venv_actions(pkg_this),
         # Shared with target_benchmark_config.launch.py. Keep these defaults
         # byte-identical: the first declaration inherited by a wrapper wins.
+        DeclareLaunchArgument('target_labels', default_value='humanoid robot'),
         DeclareLaunchArgument('namespace', default_value='r100_0001'),
         DeclareLaunchArgument('use_sim_time', default_value='true'),
         DeclareLaunchArgument('world', default_value='target_distance_calibration'),

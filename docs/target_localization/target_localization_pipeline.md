@@ -10,26 +10,16 @@ at the detection stamp into `(lateral_m, forward_m, distance_m)` in the shared
 base convention (Section 7). The separate `pointcloud` row publishes the same
 planar convention. No estimator fusion or fallback substitution is implemented.
 
-## ROS interface ownership
+## Package and deployment interfaces
 
-`ridgeback_interfaces` owns `TargetDetections`, `TargetMeasurements`, and
-`PolarBeams`. It depends only on ROS interface generation/runtime support,
-`std_msgs`, and `builtin_interfaces`; application nodes consume its generated
-Python types through `ridgeback_interfaces.msg`.
-
-```mermaid
-flowchart LR
-    I["ridgeback_interfaces: ROS messages"] --> A["ridgeback_autonomy: localization and consumers"]
-    S["std_msgs and builtin_interfaces"] --> I
-```
-
-The package extraction preserves every message field, topic, acquisition stamp,
-and frame convention. The ROS type names changed from `ridgeback_autonomy/msg/*`
-to `ridgeback_interfaces/msg/*`; all communicating processes must use matching
-versions. Old bags retain their original types and require their original
-software environment or explicit conversion. Benchmark/replay files retain
-their existing schemas. The remaining common/localization extraction is tracked
-in the [distributed deployment plan](../plans/PHYSICAL_package_split.md).
+`ridgeback_interfaces` owns detection, measurement, beam, and health messages;
+`ridgeback_common` owns reusable contracts; `ridgeback_localization` owns the
+single inference/estimator implementation and optional result displays.
+Autonomy consumes those layers for navigation and benchmarks. See the
+[distributed deployment contract](distributed_deployment.md) for the package
+map, exact ROS types/QoS, labels, launch roles, health, mission pause/resume, and
+coordinated rollback. Message-package migration requires matching publishers
+and consumers; old bags retain their original types.
 
 ## 1. Sensor stack
 
@@ -52,7 +42,7 @@ consumer path live in the [camera-stack reference](camera_stack.md).
    rather than inferred from YAML.
 2. **Depth image** (made 1:1 with RGB) - input to projective ranging and euclidean reconstruction. Euclidean reconstruction deprojects its masked pixels into camera-frame points in code (`docs/target_localization/euclidean_reconstruction.md`) - the points are a derived, in-code representation, not a sensor product.
 3. **Camera IMU - present on the device, unused by this stack.** The D455 carries an IMU. Nothing here enables, subscribes to, or fuses those streams, and SLAM does not consume them. Capability is not configuration.
-4. **Organized point cloud - configured, unverified.** Clearpath's checked-out `IntelRealsense` sets `POINTCLOUD_ENABLED = True`, so the parser emits `pointcloud.enable: true` for hardware. That is a *driver default resolved from the checked-out config*, which is a different fact from what the device actually publishes and a different fact again from whether the published layout can feed the `pointcloud` estimator. `common/camera_inputs.py` therefore leaves the organized-cloud input **unspecified** for the `realsense` profile. Before wiring it, verify organization (`height > 1`), colour-grid indexing, frame, and timestamps on the robot.
+4. **Organized point cloud - configured, unverified.** Clearpath's checked-out `IntelRealsense` sets `POINTCLOUD_ENABLED = True`, so the parser emits `pointcloud.enable: true` for hardware. That is a *driver default resolved from the checked-out config*, which is a different fact from what the device actually publishes and a different fact again from whether the published layout can feed the `pointcloud` estimator. `ridgeback_common/camera_inputs.py` therefore leaves the organized-cloud input **unspecified** for the `realsense` profile. Before wiring it, verify organization (`height > 1`), colour-grid indexing, frame, and timestamps on the robot.
 
 **How depth is produced - this is where sim and real diverge:**
 
@@ -88,7 +78,7 @@ device selection, or driver TF ownership. The old `camera_config.json` and its
 unused loader have been deleted; active paths use the color `CameraInfo`.
 
 Repository sources: `clearpath/robot.yaml`, the Clearpath RealSense/D455 model,
-and `common/camera_inputs.py`.
+and `ridgeback_common/camera_inputs.py`.
 
 ### 2D LiDAR (Hokuyo UST, planar 270°)
 
@@ -123,7 +113,7 @@ Rationale — easy maintenance:
 - **Isolate divergence behind one boundary.** Every sim/real quirk (intrinsics source, where depth alignment happens, topic names, noise handling) lives in exactly one place — the backend — instead of being scattered as conditionals through the pipeline.
 - **Swappable and testable.** A backend can be replaced, or faked for tests, without touching any downstream path.
 
-The boundary is implemented: `common/camera_inputs.py` resolves simulation or
+The boundary is implemented: `ridgeback_common/camera_inputs.py` resolves simulation or
 RealSense topic contracts; color `CameraInfo` provides intrinsics; the hardware
 driver owns alignment; `core/depth_sources.py` converts the selected input at
 the detection stamp. This is source/configuration support, not proof of a live
@@ -232,7 +222,7 @@ contract. Model alternatives belong to
 
 ## 4. Depth sources
 
-Two interchangeable sources produce an **aligned depth frame** that is 1:1 with the RGB pixels. Both live in `perception/target_localization/core/depth_sources.py` behind one switch (`depth_source: stereoscopic | monocular`) and are pulled by `target_mask_measurement_node` at the detection stamp — there is no depth producer process and no depth topic between them and the paths that consume them. The node buffers the source's *input* stream raw and converts only the frame the detections were made on; the localization paths never branch on which source ran.
+Two interchangeable sources produce an **aligned depth frame** that is 1:1 with the RGB pixels. Both live in `ridgeback_localization/core/depth_sources.py` behind one switch (`depth_source: stereoscopic | monocular`) and are pulled by `target_mask_measurement_node` at the detection stamp — there is no depth producer process and no depth topic between them and the paths that consume them. The node buffers the source's *input* stream raw and converts only the frame the detections were made on; the localization paths never branch on which source ran.
 
 - **RealSense stereo depth (`stereoscopic`)** — the raw depth lives in the left-IR frame, so it must be **aligned** (reprojected with the calibrated intrinsics + extrinsics) onto the RGB pixel grid. After alignment, depth pixel `(u, v)` corresponds to color pixel `(u, v)`. The alignment is not pipeline code: on hardware the driver performs it (`aligned_depth_to_color`); in sim color and depth are co-registered by construction (Section 1). The source converts the matched frame to float meters, nothing more — the RealSense camera contract therefore selects `sensors/camera_0/aligned_depth_to_color/image_raw`, pending robot verification.
 - **Depth Anything (`monocular`)** — predicted directly from the RGB frame, so it is *already* pixel-aligned. The implementation uses the **metric-trained variant** (`Depth-Anything-V2-Metric-Indoor`), which emits meters directly — no scaling step against stereo; the prediction is only resized to the color grid. (The base Depth Anything models output affine-invariant depth; choosing the metric variant is what removed the scaling stage from the architecture.)
@@ -342,7 +332,7 @@ implementation commitment merely because the interface could be extended.
 
 ## 10. Integration and validation boundaries
 
-`perception/target_localization/launch.py` supplies shared factories to exploration
+`ridgeback_localization/launch_helpers.py` supplies shared factories to exploration
 and benchmarking; `contracts.py` owns their ROS topic names. `measurement_pipeline.py`
 owns batch-local preparation and path execution, while `synchronization.py` owns
 stamp matching and diagnostics. The node owns subscriptions, TF, and model life
@@ -365,7 +355,7 @@ in the [backlog](../BACKLOG.md), not duplicated as local TODOs.
 
 ### Miss-reason codes (`run.json` → `reason_histogram`, trial CSV → `miss_reason`)
 
-Authoritative source: `common/miss_reason.py` (`MissReason` enum). Every
+Authoritative source: `ridgeback_common/miss_reason.py` (`MissReason` enum). Every
 mask-estimator value carries one of these per detection; the benchmark tallies
 them over all captured events. Grouped by where in the pipeline the frame died:
 

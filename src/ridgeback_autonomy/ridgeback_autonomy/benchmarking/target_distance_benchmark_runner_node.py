@@ -214,6 +214,7 @@ class TargetDistanceBenchmarkRunner(Node):
             os.path.join(pkg_share, '..', '..', '..', '..'))
         default_output_dir = default_output_directory(self.workspace_root)
 
+        self.declare_parameter('target_labels', 'humanoid robot')
         self.declare_parameter('world', 'target_distance_calibration')
         # The runner stays target/provider-neutral. The Gazebo benchmark launch
         # supplies its concrete asset roots; a future Isaac benchmark can
@@ -1074,6 +1075,7 @@ class TargetDistanceBenchmarkRunner(Node):
             'Commit': format_commit(provenance),
             'Branch': provenance['branch'] or 'unknown',
             'Scenario': self.scenario_path,
+            'Target labels': self.get_parameter('target_labels').value,
         }
         # Named while the recorder is still running (it is stopped after the
         # report is written), so this is the path, not a claim the file is ready.
@@ -1107,6 +1109,7 @@ class TargetDistanceBenchmarkRunner(Node):
                 'branch': provenance['branch'],
                 'uncommitted_files': provenance['dirty_count'],
                 'scenario': self.scenario_path,
+                'target_labels': self.get_parameter('target_labels').value,
                 'scenes': scenes,
                 'instances': instances,
                 'trials_included': included_trials,

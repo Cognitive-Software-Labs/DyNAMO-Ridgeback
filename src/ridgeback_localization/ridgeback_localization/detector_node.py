@@ -28,6 +28,7 @@ from ridgeback_localization.core.image_utils import (
     convert_color_image_message,
 )
 from ridgeback_localization.core.timing import TimingStats
+from ridgeback_localization.worker_state import WorkerState
 
 
 DETECTOR_FPS_DEFAULT = 10.0
@@ -123,6 +124,12 @@ class TargetDetectorNode(Node):
         # configuration without a launch file or CLI arguments.
         super().__init__('target_detector_node', **node_kwargs)
 
+        self.worker_state = WorkerState(self, 'detector')
+        self.declare_parameter('target_labels', 'humanoid robot')
+        self.target_labels = [v.strip() for v in self.get_parameter('target_labels').value.split(',') if v.strip()]
+        if not self.target_labels:
+            raise ValueError('target_labels must contain at least one label')
+        self.get_logger().info(f'Target labels: {self.target_labels}')
         self.declare_parameter('detection_model', DETECTION_MODEL_DEFAULT)
         self.declare_parameter('detection_threshold', DETECTION_THRESHOLD)
         self.declare_parameter('detector_fps', DETECTOR_FPS_DEFAULT)
@@ -147,7 +154,11 @@ class TargetDetectorNode(Node):
         # Seam: tests inject a stub detector (whose load() is a no-op) so the
         # node stands up without pulling in OWLv2/torch.
         self.detector = detector or OwlV2Detector(self.detection_model, self.get_logger())
-        self.detector.load()
+        try:
+            self.detector.load()
+        except Exception as exc:
+            self.worker_state.set('failure', str(exc))
+            raise
         self.last_detection_time = 0.0
         self.last_error_log_monotonic = 0.0
         self.latest_color_msg: Image | None = None
@@ -281,6 +292,7 @@ class TargetDetectorNode(Node):
             self.process_color_image(color_msg)
         except Exception as exc:  # noqa: BLE001 - worker must survive any frame
             failed = True
+            self.worker_state.set('failure', str(exc))
             self.log_detection_error(exc)
         if self.diagnostics is not None:
             with self.processing_lock:
@@ -307,7 +319,7 @@ class TargetDetectorNode(Node):
 
         self.synchronize_cuda_for_timing()
         with self.timed_stage('inference'):
-            outputs = self.detector.detect(image, threshold=self.detection_threshold)
+            outputs = self.detector.detect(image, candidate_labels=self.target_labels, threshold=self.detection_threshold)
             self.synchronize_cuda_for_timing()
 
         with self.timed_stage('parse'):
@@ -319,6 +331,7 @@ class TargetDetectorNode(Node):
             )
         with self.timed_stage('publish'):
             self.detections_pub.publish(build_detections_message(batch, color_msg.header))
+            self.worker_state.set('processing')
         if self.diagnostics is not None:
             with self.processing_lock:
                 self.diagnostics.record_publication()

@@ -346,6 +346,8 @@ AXES: dict[str, AxisSpec] = {
     'mask_gate': _axis(
         'mask_gate', 'choice', 'box', STAGE_MASK, 'Live mask gate',
         choices=('box', 'silhouette'), estimators=_MASK_ESTIMATORS),
+    'target_labels': _axis(
+        'target_labels', 'string', 'humanoid robot', STAGE_DETECTOR, 'Target labels'),
     'detector_fps': _axis(
         'detector_fps', 'number', 5.0, STAGE_DETECTOR, 'Detector rate', minimum=0.0),
     'detector_debug': _axis(

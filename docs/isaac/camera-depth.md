@@ -102,7 +102,7 @@ mount and nominal frame positions are tabulated in
 ## Nominal profiles
 
 Gazebo and Isaac share the profiles defined in
-`ridgeback_autonomy/common/camera_profiles.py`. They are deterministic
+`ridgeback_common/camera_profiles.py`. They are deterministic
 simulation profiles, not factory calibration for a physical camera.
 
 | Profile | Colour/aligned grid | Colour `(fx, fy, cx, cy)` px | Depth HFoV | Minimum modelled depth | Rate |

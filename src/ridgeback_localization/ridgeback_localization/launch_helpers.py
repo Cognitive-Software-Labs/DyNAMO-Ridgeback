@@ -185,6 +185,7 @@ def estimate_viz_node(
     use_sim_time,
     estimators,
     hud_layout=None,
+    base_frame=None,
     condition=None,
 ):
     """The estimator rings and the distance panel that names them.
@@ -203,7 +204,7 @@ def estimate_viz_node(
         namespace=namespace,
         parameters=_measurement_parameters(
             {'use_sim_time': use_sim_time, 'estimators': estimators},
-            {'hud_layout': hud_layout},
+            {'hud_layout': hud_layout, 'base_frame': base_frame},
         ),
         remappings=[('/tf', 'tf'), ('/tf_static', 'tf_static')],
         output='screen',

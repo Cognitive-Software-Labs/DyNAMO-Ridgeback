@@ -21,3 +21,6 @@ POLAR_RAYS_TOPIC = 'visualization/target/polar_rays'
 
 GROUND_TRUTH_TOPIC = 'benchmark/target/ground_truth'
 HUD_DISTANCES_PANEL_TOPIC = 'hud/target_distances'
+
+HEALTH_TOPIC = 'localization/health'
+WORKER_STATE_TOPIC = 'localization/workers'

@@ -260,3 +260,20 @@ def test_process_color_image_passes_node_threshold(ros_context) -> None:
         assert seen[0]['threshold'] == node.detection_threshold
     finally:
         node.destroy_node()
+
+
+@pytest.mark.parametrize('labels, expected', [
+    ('humanoid robot', ['humanoid robot']), ('person', ['person']),
+    ('humanoid robot, person', ['humanoid robot', 'person']),
+])
+def test_configured_labels_reach_detector_without_threshold_changes(ros_context, labels, expected):
+    detector = _StubDetector()
+    seen = []
+    detector.detect = lambda image, **kwargs: seen.append(kwargs) or []
+    node = _make_node(detector, target_labels=labels)
+    try:
+        node.process_color_image(_color_message())
+        assert seen[0]['candidate_labels'] == expected
+        assert seen[0]['threshold'] == node.detection_threshold
+    finally:
+        node.destroy_node()

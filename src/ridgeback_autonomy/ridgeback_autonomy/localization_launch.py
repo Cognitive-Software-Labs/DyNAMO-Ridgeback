@@ -56,6 +56,7 @@ SHARED_BENCHMARK_ARGUMENT_DEFAULTS = {
 # matching public launch contract; replay profile stage ownership lives in the
 # ROS-free benchmarking registry.
 CONFIG_LAUNCH_ARGUMENT_NAMES = frozenset({
+    'target_labels',
     'namespace',
     'use_sim_time',
     'world',
@@ -116,17 +117,12 @@ ENV_LAYER_CONFIG_KEYS = frozenset({
     # to every other config too.
     'detector_fps',
     'detector_debug',
+    'target_labels',
 })
 
 def workspace_root_from_package_share(package_share: str) -> str:
     from ridgeback_common.paths import workspace_root
     return str(workspace_root(package_share))
-
-
-def perception_venv_actions(package_share: str):
-    # Compatibility for public launch builders: inference environment is now
-    # scoped to compute nodes, never applied to navigation or displays.
-    return []
 
 
 def cyclonedds_actions(package_share: str):

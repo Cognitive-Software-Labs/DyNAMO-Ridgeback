@@ -89,7 +89,7 @@ estimator reason; it is not an instance attribution source.
 
 Accuracy/miss fields are per instance. `observations` and `reason_histogram` are
 per detected box. Do not add those granularities together or interpret coverage
-as accuracy. The authoritative enum is `common/miss_reason.py`; the pipeline
+as accuracy. The authoritative enum is `ridgeback_common/miss_reason.py`; the pipeline
 [glossary](../target_localization/target_localization_pipeline.md)
 explains stages.
 
