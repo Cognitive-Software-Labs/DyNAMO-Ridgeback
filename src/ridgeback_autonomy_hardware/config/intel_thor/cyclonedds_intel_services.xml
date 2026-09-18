@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Intel robot services (Clearpath and MyBotShop units), installed as
+  /etc/clearpath/cyclonedds.xml by tools/intel_thor/intel_services_rmw.
+  br0 is the robot Ethernet; wlp3s0 keeps the robot graph reachable from lab
+  laptops. These services only publish to Thor, and Thor advertises only its
+  Ethernet address, so Intel-to-Thor traffic stays on br0. Interfaces are named
+  because the Wi-Fi address comes from DHCP.
+  See docs/physical/intel_thor_transport.md.
+
+  The receive buffer is a soft maximum: processes still start if
+  net.core.rmem_max has not been raised, and check_link verifies the limit.
+  The participant-index ceiling matches src/ridgeback_autonomy/config/cyclonedds.xml.
+-->
+<CycloneDDS xmlns="https://cdds.io/config">
+  <Domain id="any">
+    <General>
+      <Interfaces>
+        <NetworkInterface name="br0"/>
+        <NetworkInterface name="wlp3s0"/>
+      </Interfaces>
+    </General>
+    <Discovery>
+      <ParticipantIndex>auto</ParticipantIndex>
+      <MaxAutoParticipantIndex>250</MaxAutoParticipantIndex>
+    </Discovery>
+    <Internal>
+      <SocketReceiveBufferSize max="16MB"/>
+    </Internal>
+  </Domain>
+</CycloneDDS>

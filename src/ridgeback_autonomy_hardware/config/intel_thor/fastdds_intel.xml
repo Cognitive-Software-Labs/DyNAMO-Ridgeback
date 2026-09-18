@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Fast DDS counterpart of the CycloneDDS configuration, kept for
+  tools/intel_thor/rmw_benchmark comparisons. The deployment uses CycloneDDS;
+  see docs/physical/intel_thor_transport.md. Fast DDS 2.14 (Jazzy) reads
+  FASTRTPS_DEFAULT_PROFILES_FILE and ignores the FASTDDS_* spelling. UDP is
+  restricted to the robot Ethernet address; shared memory stays enabled.
+-->
+<profiles xmlns="http://www.eprosima.com/XMLSchemas/fastRTPS_Profiles">
+  <transport_descriptors>
+    <transport_descriptor>
+      <transport_id>robot_ethernet</transport_id>
+      <type>UDPv4</type>
+      <receiveBufferSize>16777216</receiveBufferSize>
+      <interfaceWhiteList>
+        <address>192.168.131.1</address>
+      </interfaceWhiteList>
+    </transport_descriptor>
+    <transport_descriptor>
+      <transport_id>same_host_shm</transport_id>
+      <type>SHM</type>
+    </transport_descriptor>
+  </transport_descriptors>
+  <participant profile_name="intel_thor_intel" is_default_profile="true">
+    <rtps>
+      <userTransports>
+        <transport_id>robot_ethernet</transport_id>
+        <transport_id>same_host_shm</transport_id>
+      </userTransports>
+      <useBuiltinTransports>false</useBuiltinTransports>
+    </rtps>
+  </participant>
+</profiles>

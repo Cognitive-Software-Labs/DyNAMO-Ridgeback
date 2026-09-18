@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Thor: every ROS process, through dds_env.sh. Robot Ethernet only, so
+  Intel–Thor traffic never uses (or silently fails over to) the lab Wi-Fi.
+  See docs/physical/intel_thor_transport.md.
+
+  The receive buffer is a soft maximum: processes still start if
+  net.core.rmem_max has not been raised, and check_link verifies the limit.
+  The participant-index ceiling matches src/ridgeback_autonomy/config/cyclonedds.xml.
+-->
+<CycloneDDS xmlns="https://cdds.io/config">
+  <Domain id="any">
+    <General>
+      <Interfaces>
+        <NetworkInterface address="192.168.131.51"/>
+      </Interfaces>
+    </General>
+    <Discovery>
+      <ParticipantIndex>auto</ParticipantIndex>
+      <MaxAutoParticipantIndex>250</MaxAutoParticipantIndex>
+    </Discovery>
+    <Internal>
+      <SocketReceiveBufferSize max="16MB"/>
+    </Internal>
+  </Domain>
+</CycloneDDS>
