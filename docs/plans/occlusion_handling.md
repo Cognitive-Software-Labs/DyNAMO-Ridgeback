@@ -68,7 +68,7 @@ observation columns plus trial CSV `miss_reason`). Multi-target scoring
 associates each estimator's planar outputs independently; it never borrows
 another estimator's position or assumes detection order. Unmatched-box reasons
 remain observation-level rather than being assigned to an unproven target
-identity; see [the benchmark contract](../benchmarking/semantics.md).
+identity; see [the benchmark contract](../target_distance_benchmarking/semantics.md).
 
 ---
 

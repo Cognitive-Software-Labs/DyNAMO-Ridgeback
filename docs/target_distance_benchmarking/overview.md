@@ -34,13 +34,11 @@ estimators it may select depends on the profile and on the evidence named — se
 The root README owns complete build/run instructions. Main launch:
 [`target_distance_benchmark.launch.py`](../../src/ridgeback_autonomy/launch/target_distance_benchmark.launch.py).
 
-## Not this: `tools/benchmark/`
+## Exploration evaluation
 
 `tools/benchmark/` is the instrumented **exploration** harness — a probe and a
-camera-less robot profile for measuring frontier exploration. It has nothing to
-do with target-distance benchmarking and shares no code, scenarios, or outputs
-with it. Its runbook is
-[the exploration benchmark runbook](../exploration/benchmarking.md).
+camera-less robot profile for measuring frontier exploration. It is a separate workflow with its own probe, scenarios, and outputs. Its runbook is
+[the exploration evaluation runbook](../exploration/evaluation.md).
 
 ## Where to go next
 

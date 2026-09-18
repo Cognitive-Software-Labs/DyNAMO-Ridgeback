@@ -20,12 +20,12 @@ troubleshooting, planning, and historical documentation.
 ## Exploration
 
 - [Exploration architecture](exploration/architecture.md)
-- [Exploration benchmark runbook](exploration/benchmarking.md)
+- [Exploration evaluation](exploration/evaluation.md)
 - [Ground-truth maps](../src/ridgeback_autonomy/sim/ground_truth_maps/README.md)
 
-## Isaac Sim port
+## Isaac Sim
 
-- [Port status and document map](isaac/README.md)
+- [Isaac backend overview](isaac/overview.md)
 - [Robot, sensor, and generated-USD model](isaac/robot-model.md)
 - [RTX lidar pipeline](isaac/lidar-pipeline.md)
 - [Active Isaac engineering gaps](BACKLOG.md#isaac-exploration-recertification--p5)
@@ -44,21 +44,21 @@ troubleshooting, planning, and historical documentation.
 - [Euclidean reconstruction](target_localization/euclidean_reconstruction.md)
 - [Polar profiling](target_localization/polar_profiling.md)
 
-## Benchmarking
+## Target-distance benchmarking
 
-- [Target-distance benchmarking](benchmarking/overview.md) — start here: what
+- [Target-distance benchmarking](target_distance_benchmarking/overview.md) — start here: what
   the benchmark is, the estimators and axes, and what it may not claim
-- [Running benchmarks](benchmarking/running_benchmarks.md) — which question,
+- [Running benchmarks](target_distance_benchmarking/running_benchmarks.md) — which question,
   which profile, which of the four ways to start it
-- [Benchmark semantics](benchmarking/semantics.md) — scenarios, events,
+- [Benchmark semantics](target_distance_benchmarking/semantics.md) — scenarios, events,
   observations, instances, and miss reasons
-- [Benchmark outputs](benchmarking/outputs.md) — run and sweep artifacts,
+- [Benchmark outputs](target_distance_benchmarking/outputs.md) — run and sweep artifacts,
   provenance, rename rules, and module ownership
-- [Replay profiles](benchmarking/profiles.md) — the legacy measurement dataset
+- [Replay profiles](target_distance_benchmarking/profiles.md) — the legacy measurement dataset
   and the four-profile layered replay contract
-- [Benchmark configurator](benchmarking/configurator.md) — the local browser UI
+- [Benchmark configurator](target_distance_benchmarking/configurator.md) — the local browser UI
   and its run substrate
-- [Scenario gallery](benchmarking/benchmark_scenarios_v2_gallery.html)
+- [Scenario gallery](target_distance_benchmarking/benchmark_scenarios_v2_gallery.html)
 
 ## Active plans
 

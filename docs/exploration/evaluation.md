@@ -1,20 +1,14 @@
-# Exploration benchmark runbook
+# Exploration evaluation
 
-This runbook owns instrumented exploration benchmark runs. The probe and
+This runbook measures frontier exploration: coverage, navigation outcomes, and
+completion time. Target-distance estimation has its own
+[benchmarking workflow](../target_distance_benchmarking/overview.md). The probe and
 camera-less robot profile remain under `tools/benchmark/`; the `sim-runner`
 project helper (`.claude/agents/sim-runner.md`) automates the same recipe.
 
-> ✅ **Exploration runs on Isaac as of 2026-09-11.** The long-standing stall
-> (`collision_monitor` pinning `cmd_vel` at zero) was the 2D lidars being
-> parented to `base_link`, which has no joint into the articulation — PhysX
-> turned `chassis_link` and left the sensors behind. Reparenting them to
-> `chassis_link` fixed it: `cmd_vel` flows, the robot drives, and frontier
-> goals succeed. See the
-> archived evidence below.
->
-> **No Isaac coverage baseline exists yet**, and every pre-2026-09-11 figure
-> is void — they were measured with a sensor that did not rotate with the
-> robot. Producing the first real baseline is the current deliverable.
+The [Isaac exploration qualification backlog](../BACKLOG.md#isaac-exploration-recertification--p5)
+owns baseline status and acceptance criteria. Dated sensor-attachment findings
+are linked under archived evidence below.
 
 ## Canonical run
 

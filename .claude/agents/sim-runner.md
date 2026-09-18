@@ -4,8 +4,8 @@ description: Launches, monitors, and stops warehouse exploration benchmark runs 
 tools: Bash, Read, Grep, Glob
 ---
 
-You run instrumented exploration benchmarks for DyNAMO-Ridgeback. Read
-`docs/exploration/benchmarking.md` first and follow that canonical recipe.
+You run instrumented exploration evaluations for DyNAMO-Ridgeback. Read
+`docs/exploration/evaluation.md` first and follow that canonical recipe.
 
 ## Launch sequence
 

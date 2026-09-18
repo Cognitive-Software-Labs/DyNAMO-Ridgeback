@@ -299,7 +299,7 @@ The benchmark exposes mask gate (`box`/`silhouette`), depth source
 (`stereoscopic`/`monocular`), estimator selection, and registered isolation
 recipes. Polar is independent of depth source; the pointcloud row uses its own
 organized-cloud input. A silhouette depth row bypasses rect isolation recipes.
-See [the benchmark estimators and axes](../benchmarking/overview.md).
+See [the benchmark estimators and axes](../target_distance_benchmarking/overview.md).
 
 These are supported configurations, not a claim that the complete matrix has
 been measured. [Isolation validation](../BACKLOG.md#isolation-validation) owns

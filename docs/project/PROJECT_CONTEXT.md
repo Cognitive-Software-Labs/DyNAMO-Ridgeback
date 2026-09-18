@@ -55,11 +55,11 @@ building blocks unless a technical reference says otherwise.
 - [Exploration architecture](../exploration/architecture.md)
 - [Camera stack](../target_localization/camera_stack.md)
 - [Target-localization pipeline](../target_localization/target_localization_pipeline.md)
-- [Target-distance benchmarking](../benchmarking/overview.md)
+- [Target-distance benchmarking](../target_distance_benchmarking/overview.md)
 - [External dependency management](dependencies.md)
 - [Troubleshooting](../troubleshooting.md)
 - [Active engineering gaps](../BACKLOG.md)
-- [Isaac Sim port](../isaac/README.md)
+- [Isaac Sim port](../isaac/overview.md)
 
 The graph report required by the imported graphify conventions identifies
 high-connectivity nodes and module communities. It does not replace the

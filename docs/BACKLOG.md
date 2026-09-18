@@ -30,7 +30,7 @@ pose/map quality, coverage, aborts, and timing alongside aggregate results.
 Keep `front_only` as the public default until a separate, evidence-backed
 default decision addresses these tradeoffs and the exploration/P5 results.
 
-**Context.** [Exploration benchmark runbook](exploration/benchmarking.md),
+**Context.** [Exploration evaluation](exploration/evaluation.md),
 [Isaac lidar pipeline](isaac/lidar-pipeline.md), and the resolved orphan-lidar
 investigation in the archived evidence below.
 
@@ -50,7 +50,7 @@ completes the configured scenes, comparison report and collages; estimates are
 compared against a current matching Gazebo baseline, and repeated cleanup leaves
 no residual prims. Historical geometry-dependent numbers are not acceptance evidence.
 
-**Context.** [Target-distance benchmarking](benchmarking/overview.md).
+**Context.** [Target-distance benchmarking](target_distance_benchmarking/overview.md).
 
 ## Physical command-chain validation
 
@@ -96,7 +96,7 @@ worlds are named `warehouse` or `office`. Generate `.pgm`, `.yaml`, `.png`, and
 own simulator world.
 
 **Context.** [Ground-truth map runbook](../src/ridgeback_autonomy/sim/ground_truth_maps/README.md),
-[exploration benchmark runbook](exploration/benchmarking.md), and the Gazebo
+[exploration evaluation runbook](exploration/evaluation.md), and the Gazebo
 adapter worlds under `src/ridgeback_autonomy_gz/sim/worlds/`.
 
 ## Physical camera validation
@@ -188,7 +188,7 @@ and require non-occluded regression evidence.
 
 **Context.** [Occlusion proposal](plans/occlusion_handling.md),
 [segmentation candidates](do_not_try_again/segmentation.md), and the
-[scenario gallery](benchmarking/benchmark_scenarios_v2_gallery.html).
+[scenario gallery](target_distance_benchmarking/benchmark_scenarios_v2_gallery.html).
 
 ## Archived evidence
 

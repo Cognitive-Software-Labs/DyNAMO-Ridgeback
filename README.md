@@ -20,7 +20,8 @@ This workspace supports 3 main human workflows:
 - `docs/troubleshooting.md`: current failure signatures and recovery steps
 - `docs/project/`: project context, documentation ownership, and repository conventions
 - `AGENTS.md` / `CLAUDE.md`: thin entrypoints into the shared agent guidance
-- `docs/demos/`: self-contained demo snapshots (e.g. `isaac-first-drive/` — the Isaac port's first SLAM drive, with regeneration steps)
+- [Exploration evaluation](docs/exploration/evaluation.md): coverage and navigation outcomes
+- [Target-distance benchmarking](docs/target_distance_benchmarking/overview.md): estimator comparisons
 
 Isaac Sim port (in progress, `feat/isaac-sim-6-port`):
 
@@ -516,8 +517,8 @@ The Results panel lists typed artifacts and run outputs, and can rename them.
 Rename is refused where the directory name is load-bearing — a sweep's config
 subdirectories, and staging directories — and renaming a sweep also rewrites the
 output paths recorded in its `sweep.json`. See
-[benchmark outputs](docs/benchmarking/outputs.md) for the rename rules, and
-[running benchmarks](docs/benchmarking/running_benchmarks.md) to choose between
+[benchmark outputs](docs/target_distance_benchmarking/outputs.md) for the rename rules, and
+[running benchmarks](docs/target_distance_benchmarking/running_benchmarks.md) to choose between
 the configurator and the command line.
 
 ### Benchmark sweeps

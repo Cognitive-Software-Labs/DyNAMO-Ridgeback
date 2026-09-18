@@ -26,6 +26,7 @@ are excluded from ordinary repository search and the generated knowledge graph.
 
 ## Simulation and operations
 
+- [Isaac 6.0 first-drive snapshot](2026-07-11-isaac-first-drive.md)
 - [Invalidated July SLAM investigation](2026-07-12-isaac-slam-investigation.md)
 - [Sensor attachment and chassis investigations](port-history.md)
 - [Isaac 6.1 migration controls](2026-09-13-isaac-6.1-migration.md)
@@ -45,3 +46,8 @@ chronology was consolidated into its investigation. Mechanism explanations and
 operational guidance were transferred to their maintained owners. No experiments
 were rerun, missing snapshots were not reconstructed, and temporary evidence
 availability was not newly certified. Original prose remains in Git history.
+
+A follow-up naming cleanup moved the July 11 first-drive presentation out of
+`docs/demos/` into this archive. Its embedded images and HTML were preserved
+unchanged; the record scopes its claims and links the old instructions through
+an immutable documentation snapshot.
