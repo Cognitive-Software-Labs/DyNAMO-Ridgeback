@@ -8,6 +8,37 @@ Operator commands live in the
 deployment work lives in the
 [Intel–Thor deployment plan](../plans/PHYSICAL_intel_thor_deployment.md).
 
+## Camera subscriber blocker
+
+The September 18 [camera](../plans/handoffs/PHYSICAL_d455_camera_runs_agent1.md)
+and [transport](../plans/handoffs/PHYSICAL_intel_thor_transport_agent2.md)
+handoffs report repeated LiDAR lockouts associated with new local camera
+subscribers under the installed services configuration. No verified fix is
+recorded. Suspend routine camera subscribers and localization acceptance on
+that configuration; controlled diagnosis belongs to the transport owner.
+
+```mermaid
+flowchart LR
+    R["Extra local camera reader"] --> B["Observed traffic on Intel bridge"]
+    B --> E["eno1: LiDAR and Thor segment"]
+    B --> M["enp2s0: 100 Mb/s MCU port"]
+    E -. "Suspected causal link; not established" .-> L["Hokuyo timeout and reconnect lockout"]
+```
+
+The camera-only probe measured about 92 Mbit/s on `br0` and both physical
+ports. Three lockouts were reported after subscriber starts; the later two
+followed within 1–2 seconds. Data multicast is a working hypothesis, and the
+cause of the Hokuyo TCP stalls remains unproven. Do not generalize this result
+to all CycloneDDS configurations. The committed services XML still has no
+explicit `AllowMulticast` restriction.
+
+The proposed discovery-only multicast change and any Fast DDS recovery need
+robot-side verification: a controlled local-reader wire test, 60 s camera
+capture, and observation of sensor recovery, followed by the
+[backlog's longer soak](../BACKLOG.md#hokuyo-driver-recovery-after-read-timeouts).
+The existing `check_link` pass does not exercise this failure: it uses
+Ethernet-only profiles, a separate domain, and one reader per probe topic.
+
 ## Topology
 
 | Host | Robot Ethernet | Also attached to |
@@ -134,6 +165,31 @@ older backups cannot establish the original DDS file or drop-in contents.
 Recover those originals manually and retain the old evidence separately before
 starting a new managed switch; do not treat current installed files as originals.
 
+### Recovery with later robot configuration changes
+
+The script restores the whole saved YAML; it does not merge later robot edits.
+The September 18 legacy backup predates the rear LiDAR correction. Copying it
+over the live YAML would restore the old rear x while leaving the separately
+corrected scan merger unchanged. Neither that whole-file copy nor deletion of
+the only backup is an acceptable recovery procedure for the later robot state.
+
+For robot-side manual recovery, first save the current YAML, DDS configuration,
+managed drop-ins, merger configuration, and active-service list. Compare them
+with the pre-switch backup and construct a reviewed middleware-only reversal:
+restore the prior `system.ros2.middleware` selection and the prior presence/value
+of `system.bash.env.CYCLONEDDS_URI`, preserving unrelated keys, sensor mounts,
+namespace and subsequent edits. Remove a now-empty container only if the
+comparison establishes it was created by the switch. Restore or remove only
+the DDS file and the exact ten drop-ins owned by the switch, after confirming
+their prior state; do not glob over unrelated service overrides.
+
+Reload systemd, regenerate Clearpath setup from that reviewed YAML, and restart
+the affected previously active services with the robot stationary. Verify the
+effective middleware, camera state, scan rates, rear TF x and merger
+`laser2XOff` (both expected −0.3922 m after the recorded correction). Retain both
+before/after snapshots and the legacy backup as evidence. This is a recovery
+procedure to execute and validate on the robot, not a claim it has been run.
+
 `battery-sysfs-bridge` sources the Clearpath setup, so the switch reaches it.
 The Fast DDS profile it exports has no effect under CycloneDDS.
 
@@ -141,6 +197,8 @@ The Fast DDS profile it exports has no effect under CycloneDDS.
 
 [`tools/intel_thor/check_link`](../../tools/intel_thor/check_link) runs on Intel
 and reaches Thor over key-based SSH. It exits nonzero on any failure.
+It does not qualify the installed services configuration or clear the
+[camera subscriber blocker](#camera-subscriber-blocker).
 
 | Area | Fails when | Warns when |
 |---|---|---|
@@ -183,10 +241,11 @@ colour/depth pairing, round-trip time and CPU. It writes its results under
   Thor between 0.75 ms and 4.2 ms ahead of Intel during one day. Hardening
   time sync (Intel serving the robot subnet) is open work in the deployment
   plan.
-- About 4 minutes after Intel's services first moved to CycloneDDS, both
-  Hokuyo drivers timed out together. Because of a reconnect bug in `urg_node`,
-  they could not recover until `clearpath-sensors` was restarted. The trigger
-  was not reproduced. Recovery is in
+- Repeated subscriber-associated camera failures and Hokuyo lockouts are
+  documented in the [camera subscriber blocker](#camera-subscriber-blocker).
+  The Ethernet traffic was measured; the multicast explanation and the cause
+  of the Hokuyo stalls remain hypotheses. Restarting drivers clears the
+  reconnect lockout but does not resolve the initiating problem. Recovery is in
   [troubleshooting](../troubleshooting.md#hokuyo-drivers-stuck-reconnecting),
   and the open fix is in the
   [backlog](../BACKLOG.md#hokuyo-driver-recovery-after-read-timeouts).

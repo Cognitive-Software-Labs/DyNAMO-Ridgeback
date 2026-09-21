@@ -12,6 +12,14 @@ The evidence folders listed here are under `artifacts/hardware/` on the robot
 host. They are not tracked by git. Each has `notes/result.md`, `notes/timeline.txt`
 and a `SHA256SUMS`.
 
+**Clarification, 2026-09-21:** the state below is the 18:44 snapshot. Mount
+readings and a later rear-LiDAR correction are now recorded in the governing
+plan and geometry reference. The selected camera launch and camera-to-base TF
+remain open; mount readings alone do not supply an optical-frame calibration.
+The accepted 150 ms gap criterion is retained, but the explanation below does
+not prove a maximum number of lost application measurements. Exact-depth
+availability must still be verified per processed detection on the final setup.
+
 ## 1. Robot state at handoff (18:44 UTC)
 
 | Item | State |

@@ -481,6 +481,13 @@ bash build_and_start_expl.sh office headless_rendering:=true
 
 ### Intel-Thor link setup and pre-deploy check
 
+**Deployment blocker:** the September 18 handoffs report camera delivery
+failures and LiDAR lockouts when local readers use the installed CycloneDDS
+services configuration. Follow the
+[transport blocker and recovery procedure](docs/physical/intel_thor_transport.md#camera-subscriber-blocker)
+before routine camera/localization runs. The setup and synthetic check below
+do not establish that this fault has been fixed.
+
 The distributed deployment runs ROS 2 on CycloneDDS on both the Intel PC and
 the Jetson Thor. Traffic between them uses the robot Ethernet only. The
 mechanism, the configuration files, and the reasons are in the

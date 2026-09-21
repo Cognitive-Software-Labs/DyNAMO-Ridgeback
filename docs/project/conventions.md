@@ -61,8 +61,11 @@ behavior stays in the relevant technical reference.
   `colcon build`. Verify such a change landed by grepping the executable under
   `install/ridgeback_autonomy/lib/ridgeback_autonomy/`, never `site-packages`,
   which is a symlink and shows the edit whether or not you rebuilt.
-- `clearpath/robot.yaml` is canonical. Generated descriptions and installed
-  copies are not editing targets.
+- `clearpath/robot.yaml` owns the repository declaration and simulator inputs.
+  Physical Clearpath services use the robot-local `/etc/clearpath/robot.yaml`;
+  inspect and preserve its deployment-specific settings as described in the
+  [geometry reference](../robot/geometry.md#deployed-hardware-mounts).
+  Generated descriptions and installed repository copies are not editing targets.
 - `perception_venv/` supplies OWLv2, segmentation, and monocular-depth
   dependencies; only compute processes receive it. `RIDGEBACK_PERCEPTION_VENV`
   selects a host-specific environment; external consumers keep their environment.

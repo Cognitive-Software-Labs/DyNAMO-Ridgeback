@@ -235,13 +235,19 @@ each LiDAR next to a pending new one.
 
 **Cause.** After a read timeout, `urg_node` opens a new TCP connection without
 closing the old one. A Hokuyo UST serves one client at a time, so the driver
-never recovers on its own. What triggers the first timeout is not yet known.
+never recovers on its own. Repeated local-camera-subscriber-associated failures
+and Ethernet traffic spikes are recorded in the
+[transport blocker](physical/intel_thor_transport.md#camera-subscriber-blocker);
+the initiating mechanism remains unproven.
 The [backlog](BACKLOG.md#hokuyo-driver-recovery-after-read-timeouts) tracks the
 recovery fix, and the incident timeline is in the archived evidence below.
 
-**Fix.** Run `sudo systemctl restart clearpath-sensors`. This restarts only the
-sensor drivers; motor power is unaffected. Before restarting, note the time and
-what was running, and add it to the backlog entry.
+**Recovery.** Stop the offending test subscribers and record the time and active
+configuration before restarting `clearpath-sensors`. This restarts only sensor
+drivers and clears the reconnect lockout; it does not fix the initiating fault.
+Resolve and validate the transport configuration before routine camera tests
+resume. The reported rear-offset service restart later restored scans, but no
+camera-load retest is recorded. Do not treat restored idle scans as acceptance.
 
 ## Camera optical-frame ownership
 

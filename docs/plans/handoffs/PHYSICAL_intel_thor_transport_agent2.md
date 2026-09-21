@@ -13,6 +13,12 @@ and the [Hokuyo recovery backlog item](../../BACKLOG.md#hokuyo-driver-recovery-a
 The evidence folders below are under `artifacts/hardware/` on the robot host
 and are not tracked by git.
 
+**Correction, 2026-09-21:** this is an 18:46 state snapshot. The rear LiDAR
+offset was changed later, at 18:58, and that service restart reportedly restored
+scans. No subsequent camera-load qualification is recorded. The former
+whole-YAML rollback recipe below has been withdrawn because it would undo the
+later sensor correction; use the maintained recovery procedure.
+
 ## 1. Robot state at handoff (18:46 UTC)
 
 | Item | State |
@@ -97,20 +103,12 @@ This is the most likely cause of the LiDAR lockouts, and it is not fixed.
      `intel_services_rmw rollback` **rejects this robot's backup**: the backup
      was written by the older script, so `/etc/clearpath/dynamo-rmw-backup/`
      holds only `robot.yaml`. The script treats it as legacy and requires
-     manual recovery. The pre-switch state is known exactly: `robot.yaml`
-     without the `system.bash` and `system.ros2.middleware` keys (the backup
-     copy), no `/etc/clearpath/cyclonedds.xml`, and none of the ten
-     `60-dynamo-cyclonedds.conf` drop-ins. Manual rollback, with the robot
-     stationary:
-
-     ```bash
-     sudo cp -p /etc/clearpath/dynamo-rmw-backup/robot.yaml /etc/clearpath/robot.yaml
-     sudo rm -f /etc/clearpath/cyclonedds.xml /etc/systemd/system/*.service.d/60-dynamo-cyclonedds.conf
-     sudo systemctl daemon-reload
-     sudo systemctl restart clearpath-robot   # regenerates setup.bash with Fast DDS
-     sudo systemctl restart clearpath-platform clearpath-sensors battery-sysfs-bridge clearpath-scan-merger clearpath-joy-x-combiner realsense-camera depth-to-mono8 ridgeback-camera-mjpeg mbs-webserver
-     sudo rm -rf /etc/clearpath/dynamo-rmw-backup
-     ```
+     manual recovery. **Correction, 2026-09-21:** do not restore the old YAML
+     wholesale or delete the only backup. The later rear-offset correction must
+     remain consistent in robot TF and the separately configured scan merger.
+     Use the maintained [recovery procedure for later configuration changes](../../physical/intel_thor_transport.md#recovery-with-later-robot-configuration-changes):
+     preserve current and original snapshots, reverse only the middleware/DDS
+     changes, and verify both rear offsets and effective services afterward.
 
    **Verify either path.** Start one extra local camera subscriber under
    `/etc/clearpath/setup.bash` and confirm that `eno1` and `enp2s0` stay near

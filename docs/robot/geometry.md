@@ -18,8 +18,9 @@ flowchart TD
     P -.-> R
 ```
 
-[`clearpath/robot.yaml`](../../clearpath/robot.yaml) owns sensor selection and
-mount poses. Generated descriptions are outputs. The
+[`clearpath/robot.yaml`](../../clearpath/robot.yaml) owns the repository's sensor
+selection and mount poses; deployed hardware uses the robot-local declaration
+described below. Generated descriptions are outputs. The
 [Isaac robot model](../isaac/robot-model.md) owns USD import, vendor mesh grafting,
 articulation, and Isaac-only additions. The
 [camera stack](../target_localization/camera_stack.md#physical-declaration-and-pose)
@@ -47,12 +48,13 @@ The physical robot does not generate its description from the repository YAML.
 Clearpath's services on `r100_0160` read the robot's own
 `/etc/clearpath/robot.yaml`, which the integrator (MyBotShop) maintains
 separately. It differs from the repository declaration in namespace,
-middleware and sensors. Inspect the live TF rather than assuming the table above.
+middleware and sensors. The table records the reported September 18 state,
+including the 18:58 rear correction. Inspect live TF before reuse.
 
 | Item | Robot-local declaration | Relation to the repository YAML |
 |---|---|---|
 | Front Hokuyo | `chassis_link`, `[0.3922, 0, 0.1856]` | Same x; z differs by 6.6 mm, below the resolution of the field tape readings |
-| Rear Hokuyo | `chassis_link`, `[-0.3922, 0, 0.1856]`, yaw π | Same x after the field-verified symmetric correction; same z difference |
+| Rear Hokuyo | `chassis_link`, `[-0.3922, 0, 0.1856]`, yaw π | Symmetric correction applied and live TF/merger values checked; independent target recheck pending; same z difference |
 | D455 | Not declared; the camera driver's frames are not connected to the robot tree | Repository mount unverified on hardware |
 
 The MyBotShop scan merger keeps its own copy of both LiDAR offsets for the
@@ -61,7 +63,37 @@ merged `sensors/scan`. Change it together with the robot-local YAML.
 Field readings match the model deck height and the configured forward camera
 setback, and show symmetric front/rear LiDAR mounts. The camera housing height
 agrees with the declared mount to within tape precision. These are
-integration checks, not a calibration or a dimensional audit.
+integration checks, not a calibration or a dimensional audit. The
+[rear-offset acceptance item](../BACKLOG.md#rear-lidar-mounting-offset) retains
+the independent-placement check and the recorded yaw-error ambiguity.
+
+## Physical field readings
+
+Robot `r100_0160`, September 18 visit: tape precision approximately **±1 cm**.
+The camera was reported centred and level; the user waived mount photos.
+The archived field record names checkout
+`a01a4532a170fcb85df1a5aaffb8c28bf1601f96` with partial provenance; raw probes,
+captures, and checksums remain on the robot. These are housing/edge readings,
+not fitted optical origins or a camera-to-base calibration.
+
+![Tape endpoints for the recorded physical mount readings.](../plans/assets/ridgeback-field-measurements.svg)
+
+*Endpoint guide only; dimensions below come from the field note, not the
+schematic. The separate Isaac drawing retains its model-derived dimensions.*
+
+| Mark | Endpoint | Recorded reading |
+|---|---|---|
+| A | Floor to main deck top | 30.6 cm |
+| B | Deck top to camera housing bottom | 74 or 75 cm; two readings dated September 10 and 18, not a resolved more precise value |
+| C | Floor to LiDAR window | 25 cm, accepted for both units |
+| D | Deck front edge to camera front face | 18 cm |
+| E | LiDAR housing outward face to nearest body edge | Front 6.3 cm; rear 6.1 cm |
+
+These readings support a gross mounting check. They cannot resolve the
+6.6 mm difference between configured LiDAR heights, or supply the missing
+camera-to-base transform by themselves. Reuse them for the
+[remaining stationary validation](../plans/PHYSICAL_robot_measurements_and_validation.md);
+repeat only a changed mount or a specific disputed endpoint.
 
 ## Dimensioned reference drawing
 

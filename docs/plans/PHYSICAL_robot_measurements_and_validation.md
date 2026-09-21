@@ -7,10 +7,12 @@ people at the robot, assisted by an agent. The
 stationary milestone; its individual geometry, camera, calibration, and motion
 gates retain their own completion criteria.
 
-This is a field bring-up visit with a tape measure and phone, not a survey of
-every robot component. People check the sensor mounts, take a few photos, and
-place targets; the agent collects and checks the ROS data. Keep the detailed
-D455 checks below as the agent's procedure, not a manual worksheet for people.
+This is a field bring-up visit, not a survey of every robot component. The
+September 18 mount readings are complete and the user waived mount photos.
+People now help place targets; the agent collects and checks the ROS data.
+Repeat mount readings only after a mount change or a specific discrepancy.
+Keep the detailed D455 checks below as the agent's procedure, not a manual
+worksheet for people.
 
 The visit covers quick mount measurements, both LiDARs, stationary camera–LiDAR
 alignment, and G1/person integration.
@@ -22,35 +24,42 @@ braking, dynamic calibration, and autonomous missions remain outside this plan.
 
 ## Progress and evidence still needed
 
-The September 18 transport records identify revision
-`a01a4532a170fcb85df1a5aaffb8c28bf1601f96`, with partial provenance. They contain
-short real-camera VGA colour-stream observations and later synthetic transport
-tests. The [transport reference](../physical/intel_thor_transport.md) owns those
-findings and their evidence links. They do not close the D455 or field-visit gates.
+The September 18 field record names checkout
+`a01a4532a170fcb85df1a5aaffb8c28bf1601f96`, with partial provenance: it tested
+robot-local services with ad-hoc probes, and raw captures remain on the robot.
+The later [camera handoff](handoffs/PHYSICAL_d455_camera_runs_agent1.md) reports
+VGA and HD aligned-depth tests on Fast DDS, followed by failures on CycloneDDS.
+Those passes apply to the recorded configurations; final deployment acceptance
+requires reruns after the [transport blocker](../physical/intel_thor_transport.md#camera-subscriber-blocker)
+is resolved. No new hardware tests were performed for this documentation update.
 
 | Part of this visit | Recorded progress | Evidence still needed |
 |---|---|---|
-| Mount readings and photos | **Done 2026-09-18.** A 30.6, B 74 or 75 (within tape precision), C 25, D 18, E front 6.3 / rear 6.1 cm; camera confirmed centred and level. Photos waived by the user. | None. |
-| D455 identity and profiles | A VGA colour stream was observed during transport diagnosis. | Device/firmware/USB identity, effective VGA and HD profiles, and colour/depth/calibration contracts. |
-| D455 timing and TF | Preliminary colour-rate checks only. | Per-profile captures, real aligned-depth stamp matching, observed frames/TF ownership, and camera-only localization smoke. |
+| Mount readings and photos | **Complete for this visit.** [A–E readings and precision](../robot/geometry.md#physical-field-readings) recorded; camera reported centred and level; mount photos waived. | No repeat survey or retrospective photo requirement. Recheck only changed or disputed mounts. |
+| D455 profiles and timing | Fast DDS VGA alignment and HD cold-start with infra2 off reportedly passed checks 1–3. HD with both infrared streams failed. CycloneDDS camera delivery failed. | Preserve device/profile manifests from the captures; implement the chosen camera launch and repeat both profiles on the final middleware. |
+| Camera TF and application smoke | Camera frames were reported disconnected from the robot tree. | Establish one camera-to-base TF owner using observed frame IDs, then validate exact-depth localization smoke. |
 | Front and rear LiDARs | **Box checks done 2026-09-18:** both pass near/far/side range and side checks; 40 Hz, ±135°, 0.25° scan timing and geometry recorded. The deployed rear x was ≈3.6 cm too far back and was corrected to the symmetric −0.3922 the same day; see the [backlog item](../BACKLOG.md#rear-lidar-mounting-offset). A timeout/reconnect incident is reported. | Merged-scan comparison, a saved scan overlay, a side-target recheck of the corrected rear offset, and stable recovery evidence. |
 | Camera–LiDAR alignment | No completed projection-overlay check is committed. | Near/farther/off-centre overlays and an independent placement after any correction. |
 | IMU, odometry and command-chain inspection | No completed stationary validation report is committed. | At-rest observations and configuration inspection, without base commands. |
 | G1/person integration | No completed distributed target runs are committed. | Both labels, required mask/depth modes, empty-scene behavior, and joint run evidence. |
 
-The hardware-transport commits supplied no new physical dimensions or accepted
-calibration values. The checked-in robot declaration, shared geometry, mount
-coordinates, and A–E measurement guide remain unchanged from the field-plan
-revision `a01a4532`. Do not interpret missing committed evidence as proof that
-nobody has taken measurements; obtain the robot team's captures before changing
-these statuses. Simulator dimensions remain nominal/model-derived references.
+The [geometry reference](../robot/geometry.md#deployed-hardware-mounts) separates
+physical readings, robot-local configuration, and nominal simulator geometry.
+The rear offset correction changed the robot YAML and vendor merger, not the
+repository's already symmetric declaration. Live parameter/TF verification does
+not replace the outstanding independent side-target recheck.
+
+Continue in this order: resolve and validate the services transport fault;
+confirm stable individual and merged scans and recheck the rear correction;
+implement the selected camera launch and missing camera-to-base TF; repeat
+camera checks; then run camera–LiDAR overlays and G1/person integration.
 
 ## Who does what
 
 | People beside the robot | Agent |
 |---|---|
-| Bring a tape and phone; take a side, front, and top/oblique photo showing the mounts. | Inspect the deployed setup and capture versions, parameters, topics, timing, and TF. |
-| Take the accessible readings A–E below; note the tape endpoints on a photo. | Convert those readings to the model's frame conventions and flag meaningful mismatches. |
+| Reuse the completed A–E note; no additional mount photos are required for this visit. | Inspect the deployed setup and capture versions, parameters, topics, timing, and TF. |
+| Remeasure a mount only if it moved or a specific mismatch needs resolving. | Interpret the recorded endpoints without treating housing points as calibrated sensing origins. |
 | Place a box/board, then the G1 and a person at a few positions. | Record streams, produce camera/scan overlays, run the model modes, and summarize passed/blocked checks. |
 
 No disassembly, workshop, calipers, custom calibration rig, or new drawing of
@@ -72,7 +81,9 @@ version, commands, and any applied configuration diff. Use a unique artifact
 root under `artifacts/hardware/` and preserve logs, topic captures, parameter
 dumps, timestamps, and TF evidence with checksums.
 
-Use one short note containing the tape readings, units, and photo references.
+Reuse the completed field note, including its units and approximate precision.
+For any targeted follow-up, record the endpoints and add photo references
+if available.
 Write practical precision, such as "about 74 cm, readable to roughly 1 cm";
 repeat a reading only if it is unclear or disagrees with the model. Leave an
 inaccessible dimension unknown rather than requiring special equipment.
@@ -87,6 +98,11 @@ drivers/TF during the evidence run to turn it into a pass.
 
 ## Quick measurements
 
+**Completed for the September 18 visit.** Values and their uncertainty live in
+the [physical field readings](../robot/geometry.md#physical-field-readings).
+The guide below identifies the recorded endpoints and supports future targeted
+remeasurement; it is not a new checklist to repeat. Mount photos were waived.
+
 Start with the existing
 [dimensioned robot drawing](../robot/geometry.md#dimensioned-reference-drawing)
 to identify the camera, recessed LiDARs, deck, and mast. Its numbers are
@@ -99,7 +115,8 @@ from the floor. Do not try to remeasure every number on it.
 agreement and the full dimensional audit remain separate work.*
 
 The following schematic shows the small set of accessible tape endpoints for
-this visit. Record which face or window point you used in the photo.
+this visit. For a future reading, name the face or window point in the note;
+a photo can help identify an ambiguous endpoint.
 
 ![Practical measurement guide: deck height, camera height above the deck, LiDAR window heights, and camera/LiDAR setbacks from visible deck or body edges.](assets/ridgeback-field-measurements.svg)
 
@@ -107,7 +124,7 @@ this visit. Record which face or window point you used in the photo.
 |---|---|---|
 | A | Floor to top of the main deck plate. | Relates the visible deck to floor-based sensor heights. |
 | B | Deck top to the bottom face of the camera housing. | Checks the camera's mounting height; A + B gives its housing-bottom height above the floor. |
-| C | Floor to an identifiable point on each LiDAR window/housing; photograph the point. | Checks both scan-height estimates without guessing a hidden laser origin. |
+| C | Floor to an identifiable point on each LiDAR window/housing; name the point. | Checks both scan-height estimates without guessing a hidden laser origin. |
 | D | Horizontal setback from the deck's front edge to the camera housing's front face. | Checks the camera's forward placement. Use a side/top photo to confirm it is roughly centred and level; measure a lateral offset only if visibly off-centre. |
 | E | Each LiDAR housing's outward face to the nearest front/rear body edge. | Checks whether the recessed front/rear mounting matches the description. Record a visible sideways offset if present. |
 
@@ -128,6 +145,19 @@ audits remain separate. Do not require people to redraw the robot or survey an
 outline before testing the sensors.
 
 ## D455 camera validation
+
+**Current gate:** do not start routine camera subscribers under the reported
+faulty services configuration. Controlled transport diagnosis belongs to the
+deployment owner; resume the procedure below after its validation.
+
+The recorded implementation choice is a repository-owned camera launch and
+parameter file, with the vendor service stopped during our sessions: aligned
+depth on, infra2 off, pinned serial, and an explicit camera-to-base transform.
+This launch is not implemented yet. Infra1 can create additional aligned streams;
+record its final setting and load instead of assuming those streams are free.
+HD must be tested by cold start: the vendor driver's runtime profile switch
+stopped colour delivery. The reason both infrared streams prevent HD colour
+is unresolved; the successful alternative is configuration-specific evidence.
 
 The [camera reference](../target_localization/camera_stack.md) owns the current
 input contract, nominal profiles, and TF ownership. This section retains the
@@ -179,12 +209,16 @@ For unique colour stamps `C` and aligned-depth stamps `D`, report both
 it does not receive a perfect matching score. Use the same declared steady-state
 capture interval and document boundary handling.
 
-The previous 99% raw-match target is a **proposed acceptance threshold** for
-both directions, to confirm before measurement. It is not an observed device
-guarantee. Preserve no-duplicate/no-regression criteria and the predeclared
-rate/gap requirements; diagnose observer losses before attributing them to the
-producer. The application smoke still requires exact depth availability for
-every processed detection stamp, regardless of the raw-stream percentage.
+The camera handoff records the accepted criteria as at least 99% exact matching
+in both directions, no duplicate/regressing stamps, sender-side rate at least
+29 Hz, and a longest sender-side gap of at most 150 ms (revised from 100 ms).
+Freeze these for the final-configuration rerun. The earlier passes used
+per-frame CameraInfo stamps to distinguish sender timing from Python image-probe
+loss; preserve image counts separately and verify that proxy against actual
+image delivery. These criteria do not guarantee depth for every detection:
+the application smoke still requires an exact depth frame for each processed
+detection stamp. A buffer or a nominal detector rate cannot establish a bound
+on lost measurements without the application evidence.
 
 Do not rewrite timestamps, widen matching tolerance, or substitute nearby frames.
 
@@ -233,6 +267,13 @@ an accuracy benchmark. The joint tests below extend this initial smoke to the
 required model modes after their GPU environment and inputs are qualified.
 
 ## Both LiDARs and stationary auxiliary sensors
+
+The September 18 near/far/side box checks and 60 s individual-scan timing
+capture are complete for their recorded setup. Continue with a new shared
+side-target placement after the rear-offset correction, a comparison of merged
+and individual scans, saved overlays, and recovery evidence. The procedure
+below is the reference for affected rechecks; do not repeat all field work
+solely because this plan remains open.
 
 The agent records each front/rear LiDAR's device identity, driver/configuration,
 publisher ownership, topic/type/QoS, frame and TF, angular bounds/increment,
@@ -324,9 +365,10 @@ benchmark or tune parameters during acceptance.
 
 ## Completion and separate work
 
-The people's deliverable is the A–E note, a few mount/target photos, and help
-placing targets. No complete CAD reconstruction, component inventory, precision
-worksheet, or new dimensioned drawing is required.
+The A–E note is complete and mount photos were waived. The remaining people's
+contribution is target placement and any specifically justified remeasurement;
+retain target photos if collected. No complete CAD reconstruction, component
+inventory, precision worksheet, or new dimensioned drawing is required.
 
 The agent produces a short passed/blocked/not-tested summary for the D455,
 each LiDAR, stationary alignment, and G1/person tests, backed by saved software

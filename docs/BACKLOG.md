@@ -93,9 +93,12 @@ owns inspection only; its completion does not close this actuation gate.
 of read timeouts. It reconnects without closing its old TCP session, and a
 Hokuyo UST serves one client at a time, so the new connection is refused
 indefinitely. The robot then has no scans until someone restarts
-`clearpath-sensors`, whatever the middleware. On 2026-09-18 both LiDARs entered
-this state together, 4 minutes after Intel's services moved to CycloneDDS. The
-initial timeout was not reproduced, and its cause is unknown.
+`clearpath-sensors`, whatever the middleware. September 18 handoffs report three
+subscriber-associated lockouts under the CycloneDDS services configuration and
+measured camera traffic leaving the bridge onto the sensor/MCU ports. The
+initiating mechanism remains unproven; the maintained
+[transport blocker](physical/intel_thor_transport.md#camera-subscriber-blocker)
+distinguishes observations from the multicast hypothesis.
 
 **Context.** Recovery steps are in
 [troubleshooting](troubleshooting.md#hokuyo-drivers-stuck-reconnecting). The
@@ -103,6 +106,11 @@ incident timeline is in the archived evidence below. The CycloneDDS deployment i
 [transport reference](physical/intel_thor_transport.md).
 
 **Completion criteria.**
+
+- Resolve the services-configuration camera fault and extend `check_link` to
+  cover an extra local camera reader under the installed services configuration,
+  observing physical-port traffic, image delivery and LiDAR errors. A synthetic
+  Ethernet-only probe pass does not satisfy this gate.
 - A driver that loses its Hokuyo connection resumes publishing scans without
   manual intervention. Achieve this with a maintained `urg_node` patch under
   `patches/` that closes the old session before reconnecting, or with a

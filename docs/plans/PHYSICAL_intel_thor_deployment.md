@@ -1,7 +1,7 @@
 # PHYSICAL — Intel–Thor deployment and transport qualification
 
-Status: **network inventory and preliminary transport experiments recorded;
-distributed localization and robot acceptance pending.**
+Status: **network inventory and service switch reported; live camera transport
+blocked by subscriber-associated failures; distributed acceptance pending.**
 Owner: people and agents working at the robot. The
 [project backlog](../BACKLOG.md#physical-stationary-integration) owns the
 stationary milestone. The [package split](PHYSICAL_package_split.md) supplies
@@ -21,8 +21,8 @@ topology, selected configuration, known limits, and dated evidence links.
 | Workstream | Recorded progress | Remaining acceptance evidence |
 |---|---|---|
 | Host and network inventory | Intel/Thor identities, Ethernet interfaces and 1 Gb/s link, ROS Jazzy middleware versions, and existing service ownership are partly recorded. | Complete OS, USB, GPU software, model and installed-package inventory on both hosts. |
-| DDS transport | Interface restrictions, receive-buffer configuration, link probe, middleware comparison, and service-switch tooling are implemented; preliminary synthetic tests are recorded. | Verify effective settings and persistence on the actual deployment, then validate live colour/depth/CameraInfo/scan/TF delivery. |
-| Shared application deployment | Package split, separate compute/consumer roles, and workstation failure tests are available in the handoff. | Matching installed revision, actual Thor GPU execution, and repeatable stationary startup/shutdown. |
+| DDS transport | Intel switched to CycloneDDS and both hosts' receive limits were reported persisted. Synthetic link checks passed, but local camera subscribers exposed the services-configuration blocker. | Resolve and validate that blocker, extend the check to cover it, then qualify live sensor/TF delivery. |
+| Shared application deployment | Workstation handoff is ready. At the September 18 transport handoff, Thor was still at `950aacb` with no perception environment. | Confirm fresh installed revisions on both hosts, install the GPU environment, and demonstrate stationary startup/shutdown. |
 | Timing and performance | Network timing and a raw-HD bandwidth limit have been identified. | Bounded clock alignment and all four live model-mode measurements, including resource/thermal behavior and matched replay. |
 | Failure and joint acceptance | Supervision is tested locally with a fake navigation server. | Cross-host interruption/stall/recovery evidence and shared G1/person runs with the measurement team. |
 
@@ -31,6 +31,11 @@ The September 18 transport experiments name revision
 files, with partial provenance. They do not establish acceptance of the newer
 package-split handoff. Do not carry their performance numbers forward as a
 measurement of the deployed localization pipeline.
+
+The later [transport handoff](handoffs/PHYSICAL_intel_thor_transport_agent2.md)
+records robot state at 18:46 UTC on September 18, not current live state.
+Read the maintained [blocker and recovery procedure](../physical/intel_thor_transport.md#camera-subscriber-blocker)
+before starting camera consumers. A passing synthetic check cannot clear it.
 
 ## Initial topology and operating boundary
 
@@ -94,11 +99,11 @@ receive-buffer limit, the Intel service switch, and the `check_link` pre-deploy
 check are implemented; see the
 [transport reference](../physical/intel_thor_transport.md). Still open:
 
-- Confirm the current Intel service middleware and persisted receive-buffer
-  limits on both hosts. The middleware comparison predates the service switch;
-  a later transport note reports a switch and subsequent Hokuyo timeouts. That
-  does not establish current installed state. Inspect before applying changes,
-  preserve existing backups, and use the transport reference's rollback rules.
+- Inspect current services and compare with the reported CycloneDDS switch and
+  persisted buffers. Resolve the camera-subscriber fault through a controlled
+  configuration change or recovery, preserving the later rear-offset correction
+  and existing backups. Validate local-reader wire load and camera delivery;
+  extend `check_link` to exercise the installed services configuration.
 - Verify that every deployed cross-host process sources `dds_env.sh` and uses
   the intended interface restriction.
 - Harden time sync and record fresh offset/drift bounds. Earlier internet-NTP
