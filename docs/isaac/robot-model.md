@@ -26,7 +26,8 @@ OMNI_KIT_ACCEPT_EULA=YES isaac_venv/bin/python3 tools/isaac/import_ridgeback_urd
    default it fabricates) and strips `<gazebo>` elements (their namespaced
    attributes become invalid USD attribute names)
 3. Isaac's URDF importer converts to USD with `merge_fixed_joints=False`, so
-   every sensor frame the topic contract names still exists as a prim
+   every sensor frame the topic contract names still exists as a prim; the
+   adapter explicitly selects the `physx` variant before constructing the rig
 4. `add_planar_rig` appends the drive chain
 5. `add_sensor_prims` bakes the lidar/camera prims
 6. `attach_visual_meshes` re-attaches the geometry the importer dropped
@@ -126,20 +127,28 @@ whole robot directory.
 
 ## Hand-authored parts
 
-Not everything comes from the description. These are authored in the importer
-and will not appear in the URDF:
+The importer supplies backend materials and collision adaptations. The camera
+support geometry itself comes from the shared description:
 
 | part | why |
 |---|---|
-| camera mast + standoff | not in the Clearpath description at all; the URDF leaves the camera floating in mid-air |
+| camera mast + standoff | shared URDF boxes adapted onto the existing chassis body; geometry owned by [shared camera support](../robot/geometry.md#shared-camera-support) |
 | `mast_aluminium`, `bracket_black`, `camera_silver`, `sensor_dark_grey` materials | the converter binds a flat white `DefaultMaterial` to any mesh whose source carried none |
 | chassis collider | see below |
 
-The standoff's length is **derived from the live camera mesh**, not hardcoded.
-That is deliberate: switching D435 → D455 changed the body from 90×25×25 to
-124×26×29, and the bracket refit itself (44.8 → 44.7 mm, centre 1.0325 →
-1.0345). Hardcoded, it would have been 0.1 mm long and 2 mm low with nothing
-to flag it.
+The importer reads the two shared support links before conversion and removes
+those links and fixed joints from its temporary URDF. `update_camera_support`
+places their boxes directly on the existing chassis body after the vendor graft.
+This preserves the planar drive's articulation and mass and prevents duplicate
+support geometry. No mast/bracket dimensions remain in the adapter. Sensor
+materials are retained. The default vendor path expands the support with a
+0.280 m deck input; `--no-vendor-chassis` uses the shared 0.295 m deck instead.
+
+The bracket endpoint and centre height are checked against the rendered D455
+housing before saving. A camera mount/mesh change that no longer fits fails
+regeneration and requires a reviewed shared-support update. Geometry assumptions
+and Gazebo's nominal inertias live in the
+[shared reference](../robot/geometry.md#shared-camera-support).
 
 ### Colliders
 

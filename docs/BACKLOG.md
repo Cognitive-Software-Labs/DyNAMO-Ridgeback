@@ -215,10 +215,14 @@ validity; those parts of this gate remain open after an integration pass.
 
 ## Shared camera mast and bracket geometry
 
-**Gap.** `tools/isaac/import_ridgeback_urdf.py` authors the camera mast and
-standoff as collision-enabled USD cubes. `clearpath/robot.yaml` supplies the
-camera mount but declares no shared mast/bracket attachment. The Isaac model
-therefore contains structural geometry outside the shared robot description.
+**Implemented.** One shared Xacro now supplies both simulators' mast and bracket.
+The camera pose and retained backend decks are preserved; Isaac adapts the shared
+boxes onto its existing chassis body. See [shared camera support](robot/geometry.md#shared-camera-support).
+
+**Remaining gap.** Detailed hardware attachment dimensions and mass/inertia are
+not fully measured. Focused stationary/turn checks passed in both simulators;
+broader sensor/contact qualification and affected benchmark reruns remain required.
+The implemented shared definition alone does not close this item.
 
 **Completion criteria.** Establish the measured attachment geometry in one
 shared description or asset source consumed by Gazebo and Isaac. Remove the
@@ -230,8 +234,8 @@ and measurement uncertainty. Rerun affected benchmarks before quoting results.
 **Context.** [Shared robot geometry](robot/geometry.md#known-representation-differences)
 and [Isaac additions](isaac/robot-model.md#hand-authored-parts). The
 [field measurement visit](plans/PHYSICAL_robot_measurements_and_validation.md#quick-measurements)
-supplies sensor-placement photos and a few accessible offsets. Detailed
-attachment dimensions and implementing/verifying shared assets remain owned by
+supplies recorded offsets; mount photos were waived. Detailed
+attachment dimensions and qualifying the shared assets remain owned by
 this item, not prerequisites for the field visit.
 
 ## Robot geometry and drawing audit

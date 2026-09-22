@@ -3,7 +3,17 @@
 **Author:** geometry discussion session  
 **Written:** 2026-09-22  
 **Inspected revision:** `f65197b1551cb4f1b7a46050b3a6a995c38355f6` (`dev`)  
-**Status:** discussion handoff; no geometry changes authorized by this document.
+**Status:** original discussion retained below; support-only implementation approved
+and completed September 22. See the implementation update before continuing.
+
+## September 22 implementation update
+
+The user approved the support-only proposal and requested retaining its image.
+The [shared reference](../../robot/geometry.md#shared-camera-support) now owns the
+implemented definition, retained deck inputs, simulation-mass assumptions and
+reviewed image. The shared geometry and Isaac asset adaptation are implemented;
+the original discussion below is historical context, not an instruction to redo
+the proposal. Remaining qualifications stay in the three owning backlog items.
 
 ## User direction and next-session objective
 

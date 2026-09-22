@@ -70,7 +70,8 @@ def generate_launch_description():
         parameters=[{
             'use_sim_time': True,
             'robot_description': ParameterValue(
-                Command(['xacro ', setup_path, 'robot.urdf.xacro is_sim:=true']),
+                Command(['xacro ', setup_path,
+                         'robot.urdf.xacro is_sim:=true camera_support_deck_z:=0.280']),
                 value_type=str),
         }],
         remappings=[('/tf', 'tf'), ('/tf_static', 'tf_static')],

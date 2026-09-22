@@ -17,7 +17,9 @@ platform:
     configuration: S1P2
   attachments: []
   extras:
-    urdf: null
+    urdf:
+      package: ridgeback_common
+      path: urdf/camera_support.urdf.xacro
     ros_parameters: {}
 mounts: {}
 sensors:

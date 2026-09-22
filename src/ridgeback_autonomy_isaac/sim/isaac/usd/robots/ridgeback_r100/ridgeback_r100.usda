@@ -507,6 +507,9 @@ def Xform "tn__r1000001_bC" (
 
                 def Cube "camera_mast" (
                     prepend apiSchemas = ["PhysicsCollisionAPI", "MaterialBindingAPI"]
+                    customData = {
+                        string geometry_source = "ridgeback_common/urdf/camera_support.urdf.xacro"
+                    }
                 )
                 {
                     rel material:binding = </tn__r1000001_bC/Materials/mast_aluminium>
@@ -518,12 +521,15 @@ def Xform "tn__r1000001_bC" (
 
                 def Cube "camera_standoff" (
                     prepend apiSchemas = ["PhysicsCollisionAPI", "MaterialBindingAPI"]
+                    customData = {
+                        string geometry_source = "ridgeback_common/urdf/camera_support.urdf.xacro"
+                    }
                 )
                 {
                     rel material:binding = </tn__r1000001_bC/Materials/bracket_black>
                     double size = 1
-                    float3 xformOp:scale = (0.044749998, 0.03, 0.03)
-                    double3 xformOp:translate = (0.23662499938899997, 0, 1.0344997668266187)
+                    float3 xformOp:scale = (0.04475, 0.03, 0.03)
+                    double3 xformOp:translate = (0.236625, 0, 1.03449976682663)
                     uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:scale"]
                 }
             }

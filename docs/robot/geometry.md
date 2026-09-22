@@ -128,17 +128,64 @@ physical seating and each backend require their own check.
 | camera mast (37.5 mm sq) | +0.1955 | 0 | +0.2800 … +1.0950 |
 | standoff bracket | +0.2142 … +0.2590 | ±0.015 | centred 1.0345 |
 
+## Shared camera support
+
+![Reviewed side and top views of the shared camera support, retaining each backend's deck and the camera pose.](assets/camera-support-shared.png)
+
+*Approved September 22 design. Gray boxes are per-part collision bounds for
+context, not detailed chassis silhouettes. The image retains the comparison
+with the former Isaac-only support; Gazebo now receives the green geometry.*
+
+[`camera_support.urdf.xacro`](../../src/ridgeback_common/urdf/camera_support.urdf.xacro)
+is the single mast/bracket geometry definition. The repository YAML includes it
+through `platform.extras.urdf`. The default deck input is 0.295 m for the shared
+Clearpath description; the Isaac importer supplies 0.280 m when grafting its
+retained vendor chassis. This gives 0.800 m and 0.815 m mast lengths respectively,
+with a common top at 1.095 m above `base_link`. The mast remains 37.5 mm square
+and centred at x=0.1955 m. The 30 mm square bracket spans x=0.21425–0.259 m,
+at z=1.0344997668 m. Dimensions retain model provenance, not a new survey.
+
+Both attachment joints are fixed to `chassis_link`. No sensor frame is parented
+to them. Camera housing bottom stays at 1.020 m above `base_link`; the camera
+mount remains owned by `clearpath/robot.yaml`. The bracket uses the reviewed
+D455 housing bounds. Isaac regeneration rejects a moved/mismatched housing;
+review the shared support if the camera pose or housing model changes.
+
+Gazebo retains the support through fixed-joint reduction, with identical visual
+and collision boxes. Its **nominal simulation masses** are 0.65 kg for the mast
+and 0.10 kg for the bracket, with uniform-box inertias. These are explicit
+approximations, not measured payload mass/inertia. Isaac reads the same expanded
+URDF boxes and attaches them to its existing chassis body; it omits the two
+support bodies from import to preserve the existing planar articulation and
+mass. The [Isaac adapter](../isaac/robot-model.md#hand-authored-parts) owns that
+backend treatment, not another set of dimensions.
+
+### Verification boundary
+
+The September 22 implementation was checked by expanding both deck inputs,
+converting Gazebo URDF to SDF, comparing the updated Isaac asset with its prior
+state, and running a complete isolated Isaac regeneration. Existing robot links,
+joints, sensor transforms and Isaac physics schemas were preserved; each backend
+has exactly one mast and one bracket collider. Isaac selects the `physx` variant
+before rig construction, including when the converter leaves it unselected.
+
+Bounded headless runs in `mock_hospital` at 640×480 passed in both simulators:
+RGB/depth and both scans published, SLAM/Nav2 became active, and the camera mount
+remained fixed during a commanded turn with no scan returns below 0.35 m. The
+Isaac run additionally checked the mast TF against its retained-deck geometry.
+These are focused integration checks, not full field-of-view, wall-contact,
+hardware-clearance or benchmark qualification. Neither benchmark results nor
+navigation-footprint parameters were updated by this change.
+
 ## Known representation differences
 
-The camera mast and standoff are authored by the Isaac importer rather than
-by the shared Clearpath description. They have collision geometry in Isaac;
-their presence there does not establish their presence in Gazebo. Their
-implementation remains documented with the
-[Isaac additions](../isaac/robot-model.md#hand-authored-parts).
-
-The [shared attachment work](../BACKLOG.md#shared-camera-mast-and-bracket-geometry)
-owns closing that gap. Do not silently treat an Isaac-only addition or a
-model-derived dimension as a verified physical measurement.
+Deck placements and chassis transforms remain different. Shared support
+geometry does not certify cross-backend contact behavior or hardware clearance.
+The retained beam top and simplified bracket have not been fully surveyed.
+The [shared support qualification](../BACKLOG.md#shared-camera-mast-and-bracket-geometry)
+retains broader sensor/contact, physical-dimension and affected-benchmark gates; the
+[envelope audit](../BACKLOG.md#collision-envelope-and-navigation-footprint-validation)
+retains effective footprint/padding and contact validation.
 
 ## Archived evidence
 

@@ -1,0 +1,47 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+  <!-- Shared geometric approximation, reviewed 2026-09-22. See docs/robot/geometry.md.
+       Only the mast base follows the retained backend deck. Camera TF is independent.
+       Gazebo uses positive nominal inertias so fixed-joint reduction retains the
+       colliders. These are simulation assumptions, not measured payload inertia.
+       Isaac attaches these shapes to its existing chassis body, preserving drive mass. -->
+  <xacro:arg name="camera_support_deck_z" default="0.295"/>
+  <xacro:property name="support_deck_z" value="$(arg camera_support_deck_z)"/>
+  <xacro:property name="support_top_z" value="1.095"/>
+  <xacro:property name="support_mast_x" value="0.1955"/>
+  <xacro:property name="support_mast_size" value="0.0375"/>
+  <!-- Current D455 visual housing rear and centre height in chassis_link.
+       Sensor/support alignment is checked against the expanded robot description. -->
+  <xacro:property name="support_camera_back_x" value="0.259"/>
+  <xacro:property name="support_camera_mid_z" value="1.03449976682663"/>
+  <xacro:property name="support_bracket_size" value="0.030"/>
+  <xacro:property name="support_mast_front" value="${support_mast_x + support_mast_size/2}"/>
+
+  <xacro:macro name="ridgeback_support_box" params="name x y z sx sy sz mass color">
+    <joint name="${name}_joint" type="fixed">
+      <parent link="chassis_link"/><child link="${name}"/>
+      <origin xyz="${x} ${y} ${z}" rpy="0 0 0"/>
+    </joint>
+    <link name="${name}">
+      <visual>
+        <geometry><box size="${sx} ${sy} ${sz}"/></geometry>
+        <material name="${name}_material"><color rgba="${color}"/></material>
+      </visual>
+      <collision><geometry><box size="${sx} ${sy} ${sz}"/></geometry></collision>
+      <inertial>
+        <mass value="${mass}"/>
+        <inertia ixx="${mass*(sy*sy+sz*sz)/12}" ixy="0" ixz="0"
+                 iyy="${mass*(sx*sx+sz*sz)/12}" iyz="0" izz="${mass*(sx*sx+sy*sy)/12}"/>
+      </inertial>
+    </link>
+  </xacro:macro>
+  <!-- 0.65 kg mast and 0.10 kg bracket: explicit nominal simulation masses. -->
+  <xacro:ridgeback_support_box name="camera_mast"
+    x="${support_mast_x}" y="0" z="${(support_deck_z+support_top_z)/2}"
+    sx="${support_mast_size}" sy="${support_mast_size}" sz="${support_top_z-support_deck_z}"
+    mass="0.65" color="0.74 0.75 0.77 1"/>
+  <xacro:ridgeback_support_box name="camera_standoff"
+    x="${(support_mast_front+support_camera_back_x)/2}" y="0" z="${support_camera_mid_z}"
+    sx="${support_camera_back_x-support_mast_front}" sy="${support_bracket_size}" sz="${support_bracket_size}"
+    mass="0.10" color="0.045 0.045 0.05 1"/>
+</robot>

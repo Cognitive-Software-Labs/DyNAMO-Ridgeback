@@ -83,13 +83,14 @@ def sh(*cmd, **kw):
     subprocess.run([str(c) for c in cmd], check=True, **kw)
 
 
-def generate_flat_urdf(workdir: Path) -> Path:
+def generate_flat_urdf(workdir: Path, *, vendor_chassis: bool = True) -> Path:
     sh("ros2", "run", "clearpath_generator_common", "generate_description",
        "-s", f"{SETUP_PATH}/")
     flat = workdir / "ridgeback_r100.urdf"
     with flat.open("w") as f:
         subprocess.run(["xacro", str(SETUP_PATH / "robot.urdf.xacro"),
-                        "is_sim:=true"],
+                        "is_sim:=true",
+                        f"camera_support_deck_z:={0.280 if vendor_chassis else 0.295}"],
                        check=True, stdout=f)
     _sanitize_urdf(flat)
     return flat
@@ -144,6 +145,7 @@ def clearpath_package_paths() -> list:
 
 
 def import_urdf_to_usd(urdf_path: Path, graft: bool = True) -> None:
+    support = _take_shared_support(urdf_path)
     # NOTE: app.close() fast-shuts the process — nothing after it runs.
     # All work (import, rig, cleanup, verdict print) happens before close.
     import traceback
@@ -226,6 +228,7 @@ def import_urdf_to_usd(urdf_path: Path, graft: bool = True) -> None:
         # and anything queued after this call never runs.
         if graft:
             graft_vendor_chassis(ENTRY_USD)
+        update_camera_support(ENTRY_USD, support)
 
         urdf_path.unlink(missing_ok=True)
         ok = True
@@ -233,7 +236,7 @@ def import_urdf_to_usd(urdf_path: Path, graft: bool = True) -> None:
     except Exception:
         traceback.print_exc()
         print("IMPORT FAILED", flush=True)
-    app.close()
+    app.close(exit_code=0 if ok else 1)
     if not ok:
         sys.exit(1)
 
@@ -244,6 +247,12 @@ def add_planar_rig(usd_path: Path) -> None:
 
     stage = Usd.Stage.Open(str(usd_path))
     default_prim = stage.GetDefaultPrim()
+    # The 6.1 converter declares physics variants without selecting one.
+    # Select before looking for rigid bodies, matching the committed asset.
+    physics = default_prim.GetVariantSet("Physics")
+    if "physx" not in physics.GetVariantNames():
+        raise RuntimeError("Imported robot has no physx physics variant")
+    physics.SetVariantSelection("physx")
     root_path = default_prim.GetPath()
 
     # Anchor the rig to the robot's root RIGID BODY. base_link itself is a
@@ -721,26 +730,6 @@ VENDOR_REPLACED_MESHES = {
 }
 
 
-# Camera mast, measured off the robot 2026-09-10. A 37.5 mm square aluminium
-# extrusion on a plate bolted to the top deck. It is not in the Clearpath
-# description at all -- the URDF leaves the camera floating in mid-air -- so it
-# is authored here rather than coming through the import.
-#
-# The D455 is bracketed to the mast's FRONT FACE, not sitting on top: the
-# camera's back face lands at 0.2590 against a mast front face of 0.2143, i.e.
-# a ~45 mm standoff. So the extrusion runs past the camera and ends 50 mm above
-# the former camera top (1.045); the current D455 top is 1.049. The
-# retained mast height is model provenance, not a fresh hardware measurement.
-MAST_SIZE = 0.0375          # square section, m
-MAST_X = 0.1955             # 70 of 98 on the tape, as a fraction of the hull
-MAST_Z0 = 0.2800            # top deck upper face, above base_link
-MAST_Z1 = 1.0950            # camera top 1.045 + 50 mm of extrusion above it
-
-# The bracket carrying the camera off the mast's front face. Its span is
-# derived from the live camera mesh rather than hardcoded, so it still fits
-# when the configured D455 mesh or mount changes.
-STANDOFF_SECTION = 0.030                   # square, m
-
 # Mesh path fragments for the configured D455 and Hokuyos. Keep the generic
 # RealSense path because importers can use it for the selected camera mesh.
 SENSOR_MESH_TOKENS = ("/hokuyo_ust/", "/d455/",
@@ -828,78 +817,89 @@ def _camera_mesh_bounds(stage):
     return (lo, hi) if found else None
 
 
-def _author_camera_mast(stage, chassis_prim) -> None:
-    """Author the mast, the camera standoff bracket, and their materials.
+def _take_shared_support(urdf_path: Path) -> list[dict]:
+    """Read shared box geometry, then omit its bodies from the planar importer.
 
-    Purely cosmetic-plus-collision: no ROS frame hangs off either, so nothing
-    in the TF tree changes. Both sit entirely above the 2D lidar plane
-    (0.2264), starting at the deck top 0.280, so neither can occlude a scanner
-    -- worth re-checking in the empty world after any change to these numbers.
+    Isaac keeps the existing chassis mass and articulation: the shared shapes
+    become colliders on that body. Gazebo uses the same URDF's fixed links and
+    nominal inertias. No support dimensions are independently authored here.
     """
-    from pxr import Gf, UsdGeom, UsdPhysics
+    import math
+    import xml.etree.ElementTree as ET
+    tree = ET.parse(urdf_path)
+    root = tree.getroot()
+    support = []
+    remove = []
+    for name in ("camera_mast", "camera_standoff"):
+        link = root.find(f"link[@name='{name}']")
+        joint = root.find(f"joint[@name='{name}_joint']")
+        if link is None or joint is None:
+            raise ValueError(f"Missing shared support {name}; regenerate the description")
+        if (joint.get("type") != "fixed"
+                or joint.find("parent").get("link") != "chassis_link"
+                or joint.find("child").get("link") != name):
+            raise ValueError(f"Expected fixed chassis attachment for {name}")
+        centre = [float(v) for v in joint.find("origin").get("xyz").split()]
+        rpy = [float(v) for v in joint.find("origin").get("rpy", "0 0 0").split()]
+        visual = link.find("visual")
+        collision = link.find("collision")
+        size = [float(v) for v in visual.find("geometry/box").get("size").split()]
+        collision_size = [float(v) for v in collision.find("geometry/box").get("size").split()]
+        if (len(centre) != 3 or len(size) != 3 or rpy != [0, 0, 0]
+                or not all(math.isfinite(v) for v in centre + size)
+                or min(size) <= 0 or size != collision_size
+                or visual.find("origin") is not None or collision.find("origin") is not None):
+            raise ValueError(f"Expected aligned positive visual/collision boxes for {name}")
+        color = [float(v) for v in visual.find("material/color").get("rgba").split()][:3]
+        support.append(dict(name=name, centre=centre, size=size, color=color))
+        remove.extend((link, joint))
+    for element in remove:
+        root.remove(element)
+    tree.write(urdf_path, xml_declaration=True, encoding="unicode")
+    return support
 
-    height = MAST_Z1 - MAST_Z0
-    if height <= 0:
-        print(f"WARNING: mast height {height:.3f} <= 0, skipped", flush=True)
-        return
 
-    mats = "/tn__r1000001_bC/Materials"
-    alu = _ensure_material(stage, f"{mats}/mast_aluminium",
-                           (0.74, 0.75, 0.77), 0.85, 0.32)
-    black = _ensure_material(stage, f"{mats}/bracket_black",
-                             (0.045, 0.045, 0.05), 0.0, 0.55)
-    sensor_grey = _ensure_material(stage, f"{mats}/sensor_dark_grey",
-                                   (0.14, 0.145, 0.16), 0.25, 0.45)
-    # The real D455 is a brushed-aluminium bar; the D435's DAE used to supply
-    # that silver itself, but the D455 ships as a bare STL with no materials.
-    camera_silver = _ensure_material(stage, f"{mats}/camera_silver",
-                                     (0.80, 0.81, 0.83), 0.90, 0.22)
-
-    def box(name, centre, size, material, collide=True):
-        cube = UsdGeom.Cube.Define(
-            stage, chassis_prim.GetPath().AppendChild(name))
-        cube.CreateSizeAttr(1.0)
-        UsdGeom.XformCommonAPI(cube).SetTranslate(Gf.Vec3d(*centre))
-        UsdGeom.XformCommonAPI(cube).SetScale(Gf.Vec3f(*size))
-        if collide:
-            UsdPhysics.CollisionAPI.Apply(cube.GetPrim())
-        _bind(cube.GetPrim(), material)
-        return cube
-
-    box("camera_mast", (MAST_X, 0.0, MAST_Z0 + height / 2.0),
-        (MAST_SIZE, MAST_SIZE, height), alu)
-    print(f"camera mast: {MAST_SIZE*1000:.1f} mm square, {height:.3f} m tall, "
-          f"x={MAST_X:+.4f}, spans z {MAST_Z0:.3f}..{MAST_Z1:.3f} "
-          f"(lidar plane 0.2264 is below it), light-grey aluminium",
-          flush=True)
-
-    # Standoff: mast front face out to the camera's back face, at the camera's
-    # mid-height. Derived from the live mesh so it still fits if the RealSense
-    # model changes.
+def update_camera_support(usd_path: Path, support: list[dict]) -> None:
+    """Adapt shared URDF boxes to the existing Isaac chassis without new bodies."""
+    from pxr import Gf, Usd, UsdGeom, UsdPhysics
+    stage = Usd.Stage.Open(str(usd_path))
+    chassis = next(p for p in stage.Traverse() if p.GetName() == "chassis_link")
     cam = _camera_mesh_bounds(stage)
+    bracket = next(b for b in support if b["name"] == "camera_standoff")
+    # The current source describes a level, centred D455. Fail regeneration if
+    # its mount/mesh drifts instead of silently leaving the bracket detached.
     if cam is None:
-        print("WARNING: no RealSense mesh found — standoff skipped", flush=True)
-    else:
-        lo, hi = cam
-        x0 = MAST_X + MAST_SIZE / 2.0
-        x1 = float(lo[0])
-        span = x1 - x0
-        if span <= 0.001:
-            print(f"WARNING: camera back face {x1:.4f} is not clear of the "
-                  f"mast front {x0:.4f} — standoff skipped", flush=True)
-        else:
-            zc = float(0.5 * (lo[2] + hi[2]))
-            box("camera_standoff", (x0 + span / 2.0, 0.0, zc),
-                (span, STANDOFF_SECTION, STANDOFF_SECTION), black)
-            print(f"camera standoff: {span*1000:.1f} mm bracket, black, "
-                  f"x {x0:.4f}..{x1:.4f} at z {zc:.4f}", flush=True)
-
+        raise ValueError("Cannot validate shared support without the camera visual mesh")
+    import numpy as np
+    inv = np.array(UsdGeom.Xformable(chassis).ComputeLocalToWorldTransform(
+        Usd.TimeCode.Default()).GetInverse())
+    local = (np.c_[np.array(cam), np.ones(2)] @ inv)[:, :3]
+    if (abs(bracket["centre"][0] + bracket["size"][0]/2 - local[0, 0]) > 1e-5
+            or abs(bracket["centre"][2] - local[:, 2].mean()) > 1e-5
+            or abs(local[:, 1].mean()) > 1e-5):
+        raise ValueError("D455 housing moved; update and review the shared support definition")
+    stage.SetEditTarget(stage.GetRootLayer())
+    mats = str(stage.GetDefaultPrim().GetPath()) + "/Materials"
+    for spec in support:
+        mast = spec["name"] == "camera_mast"
+        material = _ensure_material(stage, f"{mats}/{'mast_aluminium' if mast else 'bracket_black'}",
+                                    tuple(spec["color"]), 0.85 if mast else 0.0, 0.32 if mast else 0.55)
+        cube = UsdGeom.Cube.Define(stage, chassis.GetPath().AppendChild(spec["name"]))
+        cube.CreateSizeAttr(1.0)
+        UsdGeom.XformCommonAPI(cube).SetTranslate(Gf.Vec3d(*spec["centre"]))
+        UsdGeom.XformCommonAPI(cube).SetScale(Gf.Vec3f(*spec["size"]))
+        UsdPhysics.CollisionAPI.Apply(cube.GetPrim())
+        cube.GetPrim().SetCustomDataByKey("geometry_source", "ridgeback_common/urdf/camera_support.urdf.xacro")
+        _bind(cube.GetPrim(), material)
+    sensor_grey = _ensure_material(stage, f"{mats}/sensor_dark_grey", (0.14, 0.145, 0.16), 0.25, 0.45)
+    camera_silver = _ensure_material(stage, f"{mats}/camera_silver", (0.80, 0.81, 0.83), 0.90, 0.22)
     lidars, cameras = _paint_sensors(
-        stage, str(chassis_prim.GetPath().GetParentPath()),
+        stage, str(chassis.GetPath().GetParentPath()),
         sensor_grey, camera_silver)
     print(f"sensor meshes re-coloured: {lidars} lidar (dark grey) + "
           f"{cameras} camera (silver); the converter left them flat white",
           flush=True)
+    stage.GetRootLayer().Save()
 
 
 def graft_vendor_chassis(usd_path: Path) -> None:
@@ -974,8 +974,6 @@ def graft_vendor_chassis(usd_path: Path) -> None:
     vendor.GetReferences().AddReference(
         f"./payloads/meshes/{chassis_usd.name}")
 
-    _author_camera_mast(stage, chassis)
-
     stage.GetRootLayer().Save()
     print(f"vendor chassis grafted ({len(hidden)} imported prims hidden, "
           f"AABB collider deactivated) -> {usd_path}", flush=True)
@@ -998,11 +996,13 @@ def main():
     if args.skip_generate and (SETUP_PATH / "robot.urdf.xacro").exists():
         flat = workdir / "ridgeback_r100.urdf"
         with flat.open("w") as f:
-            subprocess.run(["xacro", str(SETUP_PATH / "robot.urdf.xacro")],
+            subprocess.run(["xacro", str(SETUP_PATH / "robot.urdf.xacro"),
+                            "is_sim:=true",
+                            f"camera_support_deck_z:={0.295 if args.no_vendor_chassis else 0.280}"],
                            check=True, stdout=f)
         _sanitize_urdf(flat)         # importer chokes on raw output either way
     else:
-        flat = generate_flat_urdf(workdir)
+        flat = generate_flat_urdf(workdir, vendor_chassis=not args.no_vendor_chassis)
 
     import_urdf_to_usd(flat, graft=not args.no_vendor_chassis)
     flat.unlink(missing_ok=True)
