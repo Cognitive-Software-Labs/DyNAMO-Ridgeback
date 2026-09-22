@@ -108,7 +108,7 @@ def test_benchmark_forwards_gazebo_gui_choice_to_simulation() -> None:
     assert "'false' if '" in gazebo_adapter_text
 
 
-def test_exploration_uses_unique_mock_hospital_world() -> None:
+def test_exploration_uses_unique_initial_test_world() -> None:
     repo_root = Path(__file__).resolve().parents[3]
     exploration_text = (
         repo_root / 'src' / 'ridgeback_autonomy' / 'launch' / 'ridgeback_exploration.launch.py'
@@ -121,18 +121,52 @@ def test_exploration_uses_unique_mock_hospital_world() -> None:
         / 'launch'
         / 'simulation.launch.py'
     ).read_text(encoding='utf-8')
-    mock_hospital_world = (
+    initial_test_world_world = (
         repo_root / 'src' / 'ridgeback_autonomy_gz' / 'sim' / 'worlds'
-        / 'mock_hospital.sdf'
+        / 'initial_test_world.sdf'
     ).read_text(encoding='utf-8')
 
-    assert "DeclareLaunchArgument('world', default_value='mock_hospital')" in exploration_text
-    assert "'mock_hospital'" in clearpath_simulation_text
+    assert "DeclareLaunchArgument('world', default_value='initial_test_world')" in exploration_text
+    assert "'initial_test_world'" in clearpath_simulation_text
     assert "'hospital'" not in clearpath_simulation_text
-    assert '<world name="mock_hospital">' in mock_hospital_world
+    assert '<world name="initial_test_world">' in initial_test_world_world
     assert not (
         repo_root / 'src' / 'ridgeback_autonomy_gz' / 'sim' / 'worlds' / 'hospital.sdf'
     ).exists()
+
+
+def test_gazebo_world_names_translate_at_the_adapter_boundary() -> None:
+    repo_root = Path(__file__).resolve().parents[3]
+    adapter_text = (
+        repo_root / 'src' / 'ridgeback_autonomy_gz' / 'launch' / 'backend.launch.py'
+    ).read_text(encoding='utf-8')
+
+    assert "'depot': 'warehouse'" in adapter_text
+    assert "'coworking_space': 'office'" in adapter_text
+    assert "'world': clearpath_world" in adapter_text
+    assert 'raise ValueError' in adapter_text
+
+    clearpath_worlds = (
+        repo_root / 'src' / 'clearpath_simulator' / 'clearpath_gz' / 'worlds'
+    )
+    assert (clearpath_worlds / 'warehouse.sdf').exists()
+    assert (clearpath_worlds / 'office.sdf').exists()
+
+
+def test_public_gazebo_maps_use_the_noncolliding_world_names() -> None:
+    repo_root = Path(__file__).resolve().parents[3]
+    maps = repo_root / 'src' / 'ridgeback_autonomy' / 'sim' / 'ground_truth_maps'
+
+    for world in ('initial_test_world', 'depot', 'coworking_space'):
+        assert (maps / f'{world}.pgm').exists()
+        assert (maps / f'{world}.png').exists()
+        assert (maps / f'{world}.yaml').read_text(encoding='utf-8').startswith(
+            f'image: {world}.pgm')
+
+    historical = maps / 'historical'
+    assert not (historical / 'mock_hospital.pgm').exists()
+    assert not (historical / 'warehouse.pgm').exists()
+    assert not (historical / 'office.pgm').exists()
     assert not (
         repo_root / 'src' / 'ridgeback_autonomy_gz' / 'sim' / 'worlds'
         / 'detailed_hospital.sdf'

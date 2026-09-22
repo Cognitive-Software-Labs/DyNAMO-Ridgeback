@@ -11,8 +11,8 @@ Parse layer is dependency-free (unit-tested via colcon); the emit/check
 layers need pxr and run under isaac_venv:
 
     isaac_venv/bin/python3 tools/isaac/sdf2usd.py \
-        src/ridgeback_autonomy_gz/sim/worlds/mock_hospital.sdf \
-        src/ridgeback_autonomy_isaac/sim/isaac/usd/worlds/mock_hospital.usda \
+        src/ridgeback_autonomy_gz/sim/worlds/initial_test_world.sdf \
+        src/ridgeback_autonomy_isaac/sim/isaac/usd/worlds/initial_test_world.usda \
         --model-ref g1=../models/g1/g1.usda
     ... --check   # re-open output, assert per-model world AABBs vs SDF
 

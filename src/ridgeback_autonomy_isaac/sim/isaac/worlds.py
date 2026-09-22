@@ -1,6 +1,6 @@
 """World-name resolution for the Isaac Sim runner.
 
-Keeps the gz-era operator contract: `start_exploration.sh mock_hospital`
+Keeps the gz-era operator contract: `start_exploration.sh initial_test_world`
 style short names keep working. A name resolves, in order, to:
 
 1. a repo-converted stage: sim/isaac/usd/worlds/<name>.usda (via the
@@ -35,7 +35,7 @@ STOCK_WORLDS = {
 WORLD_FLOOR_Z = {
     "empty": 0.05,
     "g1_distance_calibration": 0.05,
-    "mock_hospital": 0.05,
+    "initial_test_world": 0.05,
     **{name: 0.0 for name in STOCK_WORLDS},
 }
 

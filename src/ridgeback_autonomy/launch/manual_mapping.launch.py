@@ -11,9 +11,8 @@ Excludes Nav2 and frontier exploration so the operator can manually teleoperate
 through the entire reachable space to collect ground-truth maps.
 
 Usage:
-    ros2 launch ridgeback_autonomy manual_mapping.launch.py world:=hospital
-    ros2 launch ridgeback_autonomy manual_mapping.launch.py world:=warehouse
-    ros2 launch ridgeback_autonomy manual_mapping.launch.py world:=office
+    ros2 launch ridgeback_autonomy manual_mapping.launch.py \
+        world:=initial_test_world
 
 After driving through the entire space, save the map:
     ros2 run nav2_map_server map_saver_cli -f ground_truth_<world>
@@ -73,8 +72,9 @@ def generate_launch_description():
         DeclareLaunchArgument('use_sim_time', default_value='true'),
         DeclareLaunchArgument('setup_path',
                               default_value=os.path.expanduser('~/clearpath/')),
-        DeclareLaunchArgument('world', default_value='warehouse',
-                              description='World to load: hospital, warehouse, or office'),
+        DeclareLaunchArgument(
+            'world', default_value='initial_test_world',
+            description='Gazebo world to load: initial_test_world, depot, or coworking_space'),
         DeclareLaunchArgument('mapping_rviz', default_value='true',
                               description='Launch RViz for map visualization during mapping'),
 
@@ -152,4 +152,3 @@ def generate_launch_description():
         ),
 
     ])
-

@@ -2,7 +2,7 @@
 # Clean up stale processes and launch the exploration stack.
 #
 # Usage:
-#   bash start_exploration.sh                                # mock_hospital
+#   bash start_exploration.sh                                # initial_test_world
 #   bash start_exploration.sh office                         # office world
 #   bash start_exploration.sh warehouse key:=value ...       # extra launch args
 #   bash start_exploration.sh headless_rendering:=true       # default world, EGL rendering
@@ -23,7 +23,7 @@ is_passthrough() {
     [[ "$1" == *":="* || "$1" == -* ]]
 }
 
-WORLD=mock_hospital
+WORLD=initial_test_world
 if [[ $# -gt 0 ]] && ! is_passthrough "$1"; then
     WORLD="$1"
     shift

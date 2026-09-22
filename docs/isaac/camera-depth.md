@@ -298,7 +298,7 @@ Start the default 640 x 480 ideal camera:
 ```bash
 bash cleanup.sh
 ros2 launch ridgeback_autonomy ridgeback_exploration.launch.py \
-  backend:=isaac world:=mock_hospital \
+  backend:=isaac world:=initial_test_world \
   camera:=true camera_profile:=640x480 depth_fidelity:=ideal
 ```
 
@@ -307,7 +307,7 @@ Start the D455-like path:
 ```bash
 bash cleanup.sh
 ros2 launch ridgeback_autonomy ridgeback_exploration.launch.py \
-  backend:=isaac world:=mock_hospital sim_mode:=deterministic \
+  backend:=isaac world:=initial_test_world sim_mode:=deterministic \
   camera:=true camera_profile:=640x480 depth_fidelity:=d455
 ```
 
@@ -315,7 +315,7 @@ Use the HD grid by changing only the profile:
 
 ```bash
 ros2 launch ridgeback_autonomy ridgeback_exploration.launch.py \
-  backend:=isaac world:=mock_hospital \
+  backend:=isaac world:=initial_test_world \
   camera_profile:=1280x720 depth_fidelity:=d455
 ```
 

@@ -137,8 +137,8 @@ def _write_report(out_dir: Path, name: str, report: dict[str, object],
         REPO / 'src/ridgeback_autonomy_isaac/sim/isaac/ros_io.py',
         REPO / 'src/ridgeback_autonomy_isaac/sim/isaac/isaac_runner.py',
         REPO / 'src/ridgeback_autonomy_isaac/sim/isaac/worlds.py',
-        REPO / 'src/ridgeback_autonomy_gz/sim/worlds/mock_hospital.sdf',
-        REPO / 'src/ridgeback_autonomy_isaac/sim/isaac/usd/worlds/mock_hospital.usda',
+        REPO / 'src/ridgeback_autonomy_gz/sim/worlds/initial_test_world.sdf',
+        REPO / 'src/ridgeback_autonomy_isaac/sim/isaac/usd/worlds/initial_test_world.usda',
         REPO / 'src/ridgeback_autonomy_isaac/sim/isaac/usd/robots/ridgeback_r100/ridgeback_r100.usda',
         REPO / 'src/ridgeback_autonomy/ridgeback_autonomy/common/scan_merger_node.py',
         REPO / 'src/ridgeback_common/ridgeback_common/lidar_contract.py']
@@ -904,7 +904,7 @@ def matrix(args) -> int:
         trial = out / tag
         trial.mkdir()
         launch_args = [
-            'backend:=isaac', 'world:=mock_hospital', 'sim_mode:=deterministic',
+            'backend:=isaac', 'world:=initial_test_world', 'sim_mode:=deterministic',
             f'rtf:={0.5 if pilot_load else 1.0}', 'camera:=false', 'target_localization_enabled:=false',
             'exploration_rviz:=false', 'coverage_overlay_enabled:=false',
             'autonomous_motion_enabled:=false', f'odom_noise:={noise}',

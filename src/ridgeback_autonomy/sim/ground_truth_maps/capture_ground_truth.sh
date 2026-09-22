@@ -6,7 +6,7 @@
 if [ -z "$1" ]; then
     echo "Usage: $0 <world_name>"
     echo "Example: $0 warehouse"
-    echo "Supported worlds: warehouse, office, hospital (mock_hospital)"
+    echo "Supported Gazebo worlds: initial_test_world, depot, coworking_space"
     exit 1
 fi
 

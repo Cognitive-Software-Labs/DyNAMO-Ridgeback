@@ -140,7 +140,7 @@ def generate_launch_description():
             description='Path to clearpath config directory (robot.yaml)',
         ),
         DeclareLaunchArgument('namespace', default_value='r100_0001'),
-        DeclareLaunchArgument('world', default_value='mock_hospital',
+        DeclareLaunchArgument('world', default_value='initial_test_world',
                               description='Isaac world name or USD path'),
         DeclareLaunchArgument('headless', default_value='true'),
         DeclareLaunchArgument('livestream', default_value='false',

@@ -57,7 +57,7 @@ def yaw_of_wxyz(w, x, y, z):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument("--world", default="mock_hospital",
+    ap.add_argument("--world", default="initial_test_world",
                     help="registered Isaac world name")
     ap.add_argument("--usd-only", action="store_true",
                     help="verify authored wheel/lidar heights without starting "
@@ -150,7 +150,7 @@ def run_usd_geometry(world: str) -> int:
     return 0 if ok else 1
 
 
-def run(app, world: str = "mock_hospital", battery: bool = False,
+def run(app, world: str = "initial_test_world", battery: bool = False,
         spin_transforms=None) -> int:
     import omni.timeline
     import omni.usd

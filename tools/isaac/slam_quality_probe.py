@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """SLAM quality probe: drive a closed loop, score the run against analytic GT.
 
-Drives a GT-pose-feedback waypoint loop through mock_hospital that RETURNS TO
+Drives a GT-pose-feedback waypoint loop through initial_test_world that RETURNS TO
 START — the scripted demo drive never revisited mapped space, so loop closure
 was never actually exercised and "map looks crisp" stayed subjective. This
 harness makes it numeric:
@@ -56,7 +56,7 @@ import tf2_ros
 sys.path.insert(0, str(Path(__file__).parent))
 from gt_occupancy import check_waypoints, load_grid  # noqa: E402
 
-# Closed loop in mock_hospital known-free space: east down the corridor,
+# Closed loop in initial_test_world known-free space: east down the corridor,
 # through the x=11.8 north door into the NE room, a westward sweep inside,
 # back out and west along the corridor to the spawn pose. Verified >=0.8 m
 # clearance against the SDF wall boxes (actual minimum 1.33 m).

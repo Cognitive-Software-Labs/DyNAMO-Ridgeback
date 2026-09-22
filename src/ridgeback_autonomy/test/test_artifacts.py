@@ -307,11 +307,11 @@ def test_exploration_logs_and_overrides_are_non_clobbering(script_workspace, mon
         monkeypatch.setenv('ROS_LOG_DIR', str(root / 'custom ros logs'))
     for _ in range(2):
         result = subprocess.run(
-            ['bash', str(root / 'start_exploration.sh'), 'office', 'estimators:=pointcloud'],
+            ['bash', str(root / 'start_exploration.sh'), 'coworking_space', 'estimators:=pointcloud'],
             cwd=root.parent, capture_output=True, text=True, timeout=10)
         assert result.returncode == 7  # tee must not hide launch failures.
         assert 'rmw=rmw_cyclonedds_cpp' in result.stdout
-        assert 'arg=world:=office' in result.stdout
+        assert 'arg=world:=coworking_space' in result.stdout
         assert 'arg=explorer:=' not in result.stdout
         assert 'arg=estimators:=pointcloud' in result.stdout
     runs = sorted(output.iterdir())

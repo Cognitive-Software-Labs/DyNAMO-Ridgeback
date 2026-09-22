@@ -6,7 +6,7 @@
     occlusion -- with nothing in the scene to confuse a lidar return for an
     obstacle. Any short return here is the robot seeing itself.
 
-    The slab's top face is at z = 0.05, matching mock_hospital. worlds.py owns
+    The slab's top face is at z = 0.05, matching initial_test_world. worlds.py owns
     that floor height, so the runner derives spawn_z = 0.05 + 0.02617. Keep the
     registered floor height in sync if this slab moves.
     """

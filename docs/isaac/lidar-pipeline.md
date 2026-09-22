@@ -89,7 +89,7 @@ coverage, and an equal-stamp simulator run does not exercise compensation.
 Use fresh, uncontended runs before changing the public `front_only` default.
 Raw evidence belongs under ignored `artifacts/isaac-lidar-qualification/`.
 
-- Stabilize geometry, regenerate analytic `mock_hospital` GT, verify dependencies,
+- Stabilize geometry, regenerate analytic `initial_test_world` GT, verify dependencies,
   rebuild affected packages, and inspect installed copied executables.
 - Use a dedicated, empty ROS domain and fresh headless deterministic boots at
   `rtf:=1.0`. Disable camera, target localization, RViz, coverage overlay, and

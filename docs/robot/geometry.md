@@ -169,7 +169,7 @@ joints, sensor transforms and Isaac physics schemas were preserved; each backend
 has exactly one mast and one bracket collider. Isaac selects the `physx` variant
 before rig construction, including when the converter leaves it unselected.
 
-Bounded headless runs in `mock_hospital` at 640×480 passed in both simulators:
+Bounded headless runs in `initial_test_world` at 640×480 passed in both simulators:
 RGB/depth and both scans published, SLAM/Nav2 became active, and the camera mount
 remained fixed during a commanded turn with no scan returns below 0.35 m. The
 Isaac run additionally checked the mast TF against its retained-deck geometry.

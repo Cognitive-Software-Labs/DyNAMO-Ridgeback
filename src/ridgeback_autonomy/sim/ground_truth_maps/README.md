@@ -8,10 +8,11 @@ not driven-captured. For the Isaac stock worlds (`warehouse`, `office`,
 `hospital`) `tools/isaac/generate_gt_map.py` slices the world USD at the 2D
 lidar plane; for SDF-sourced worlds `tools/isaac/gt_occupancy.py` rasterizes
 the declared boxes/spheres. Both are exact and regeneratable — no capture
-drive. The old gz-captured `.pgm`/`.yaml` (for the retired Gazebo warehouse and
-office, which are *different geometry* from the Isaac stock envs) are archived
-under `historical/`; the manual capture workflow (Part 1) is kept for reference
-only.
+drive. The earlier Gazebo captures formerly named warehouse and office moved to
+the non-colliding identities `depot` and `coworking_space`; their geometry differs
+from the Isaac stock environments. Those driven captures restore live coverage
+lookup but remain pending recertification against the current dependency assets.
+The manual capture workflow (Part 1) is kept for that work.
 
 - **This folder** is the common package maps dir
   (`src/ridgeback_autonomy/sim/ground_truth_maps/`). Gazebo source worlds now
@@ -33,6 +34,17 @@ only.
 
 ## Maps
 
+Gazebo map sets restored from the earlier driven captures:
+
+| Public world | Clearpath 3D source | Current evidence state |
+|---|---|---|
+| `initial_test_world` | repository `initial_test_world.sdf` | Renamed capture; analytical regeneration pending |
+| `depot` | dependency `warehouse.sdf` | Renamed capture; source-to-map recertification pending |
+| `coworking_space` | dependency `office.sdf` | Renamed capture; source-to-map recertification pending |
+
+Each has `.pgm`, `.yaml`, `.png`, and `.npz`; the NPZ files are lossless format
+derivatives of the same captured grids, not independent qualification evidence.
+
 Canonical maps (analytic, from the Isaac stock world USDs):
 
 | World | Size | Resolution | Origin | Source |
@@ -46,7 +58,7 @@ Canonical maps (analytic, from the Isaac stock world USDs):
 single owner of floor, base-link clearance, and lidar offset. Both analytic
 generators derive their plane as `floor_z + 0.02617 + 0.2264`. The stock-world
 maps are therefore sliced at **0.25257 m**; raised repo worlds such as
-`mock_hospital` use **0.30257 m**. All four stock maps and previews were
+`initial_test_world` use **0.30257 m**. All four stock maps and previews were
 regenerated at 0.25257 m on 2026-09-17. Regenerate after a floor registration,
 wheel clearance, or lidar mounting change.
 
@@ -65,8 +77,10 @@ occupancy-grid format: `occupied_thresh: 0.65`, `free_thresh: 0.196`,
 `negate: 0`, `mode: trinary`. Rooms behind doors closed at the lidar plane read
 as unknown — correct, since those doors block the robot in-sim identically.
 
-`historical/` holds the superseded gz-captured `warehouse`/`office` maps (a
-different, retired world geometry).
+Gazebo's `depot` and `coworking_space` names are translated by the adapter to
+Clearpath's dependency-owned `warehouse.sdf` and `office.sdf`. The source package
+keeps its vendor filenames; public commands, maps, diagnostics, and artifacts use
+only the non-colliding names.
 
 ### Previews
 
@@ -130,7 +144,7 @@ source install/setup.bash
 ros2 launch ridgeback_autonomy manual_mapping.launch.py world:=<world>
 ```
 
-Supported worlds: `mock_hospital`, `warehouse`, `office`
+Supported Gazebo worlds: `initial_test_world`, `depot`, and `coworking_space`.
 
 Brings up Gazebo, SLAM (slam_toolbox), RViz, and twist_mux. It activates the
 inactive `platform_velocity_controller` as soon as the controller-manager
@@ -156,7 +170,7 @@ ros2 run nav2_map_server map_saver_cli \
   --ros-args --remap map:=/r100_0001/map -p map_subscribe_transient_local:=true
 ```
 
-Replace `<world>` with `mock_hospital`, `warehouse`, or `office`. Rebuild
+Replace `<world>` with `initial_test_world`, `depot`, or `coworking_space`. Rebuild
 (`colcon build`) so the new map installs to `share/`.
 
 `capture_ground_truth.sh <world>` prints this workflow and can finalize a map
@@ -169,11 +183,12 @@ saved in `$HOME` by copying it into the package maps dir.
 ```bash
 source install/setup.bash
 ros2 launch ridgeback_autonomy ridgeback_exploration.launch.py \
-  world:=mock_hospital
+  world:=initial_test_world
 ```
 
-Valid worlds: `mock_hospital`, `warehouse`, `office`. This launches Gazebo,
-full Nav2, and the sole in-repo `frontier_explorer_node`.
+The supported Gazebo worlds are `initial_test_world`, `depot`, and
+`coworking_space`. This launches Gazebo, full Nav2, and the sole in-repo
+`frontier_explorer_node`.
 
 `coverage_overlay_node` compares the live SLAM map against the ground-truth map
 for `world` and publishes the **COVERAGE** panel in the RViz HUD (alongside
@@ -219,5 +234,7 @@ don't conflate them:
 - **`map_saver_cli` QoS mismatch** — slam_toolbox publishes with `transient_local`
   QoS. Always add `-p map_subscribe_transient_local:=true` or the saver times out.
 
-- **Different default worlds** — `manual_mapping.launch.py` defaults to `warehouse`,
-  `ridgeback_exploration.launch.py` to `mock_hospital`. Pass `world:=` explicitly.
+- **World identity** — manual mapping and exploration default to
+  `initial_test_world`. The adapter translates `depot`/`coworking_space` to the
+  Clearpath source filenames; never pass the reserved Isaac identities
+  `warehouse`/`office` to the Gazebo backend.

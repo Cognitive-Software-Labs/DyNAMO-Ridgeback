@@ -23,11 +23,11 @@ spec.loader.exec_module(sdf2usd)
 
 @pytest.fixture(scope="module")
 def hospital():
-    return sdf2usd.parse_world(_WORLDS / "mock_hospital.sdf")
+    return sdf2usd.parse_world(_WORLDS / "initial_test_world.sdf")
 
 
 def test_world_inventory(hospital):
-    assert hospital.name == "mock_hospital"
+    assert hospital.name == "initial_test_world"
     assert len(hospital.models) == 32
     assert len(hospital.includes) == 1
     assert len(hospital.lights) == 2

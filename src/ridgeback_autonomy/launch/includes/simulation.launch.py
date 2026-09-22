@@ -74,7 +74,7 @@ def generate_launch_description():
                 "' == 'hardware' else '", os.path.expanduser('~/clearpath/'), "'",
             ]),
         ),
-        DeclareLaunchArgument('world', default_value='mock_hospital'),
+        DeclareLaunchArgument('world', default_value='initial_test_world'),
         DeclareLaunchArgument('namespace', default_value='r100_0001'),
         DeclareLaunchArgument('clearpath_rviz', default_value='false'),
         DeclareLaunchArgument('gz_gui', default_value='true'),

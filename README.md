@@ -185,7 +185,7 @@ OMNI_KIT_ACCEPT_EULA=YES isaac_venv/bin/python3 tools/isaac/smoke_test.py
 ```
 
 The first install is roughly 30–50 GB. Stock Isaac worlds also need access to
-NVIDIA's asset root; the repo-local `mock_hospital` world does not.
+NVIDIA's asset root; the repo-local `initial_test_world` world does not.
 The 2026-09-13 migration keeps the prior exact 6.0.1 environment at
 `isaac_venv_6_0_1`; canonical `isaac_venv` points to 6.1.
 
@@ -358,21 +358,25 @@ Bringup is **event-driven** (readiness gates), not fixed timers — each stage s
 
 Available worlds:
 
-| World | Source | Notes |
-|-------|--------|-------|
-| `mock_hospital` | Custom (`src/ridgeback_autonomy_gz/sim/worlds/`) | Default; detailed multi-room clinical layout |
-| `warehouse` | Clearpath | Large open floor plan |
-| `office` | Clearpath | Smaller rooms and corridors |
-| `construction` | Clearpath | Outdoor construction site |
-| `orchard` | Clearpath | Outdoor orchard rows |
-| `solar_farm` | Clearpath | Outdoor solar panel array |
-| `pipeline` | Clearpath | Outdoor pipeline facility |
+| World | Backend | Source | Notes |
+|-------|---------|--------|-------|
+| `initial_test_world` | Gazebo and Isaac | Repository SDF and converted USD | Default shared multi-room test geometry |
+| `depot` | Gazebo | Clearpath `warehouse.sdf`, translated by the adapter | Warehouse/depot geometry |
+| `coworking_space` | Gazebo | Clearpath `office.sdf`, translated by the adapter | Multi-room workplace geometry |
+| `warehouse` | Isaac | NVIDIA Simple Warehouse | Cropped warehouse environment |
+| `warehouse_full` | Isaac | NVIDIA Simple Warehouse | Full warehouse environment |
+| `office` | Isaac | NVIDIA Office | Office environment |
+| `hospital` | Isaac | NVIDIA Hospital | Hospital environment |
+
+The Gazebo adapter maps `depot` and `coworking_space` to Clearpath's internal
+filenames. Direct Gazebo requests for `warehouse` or `office` are rejected so
+distinct geometry never reuses an Isaac world name.
 
 Arguments:
 
 | Argument | Default | Meaning |
 |----------|---------|---------|
-| `world` | `mock_hospital` | World to load (see table above) |
+| `world` | `initial_test_world` | World to load (see table above) |
 | `backend` | value of `sim` (`gz`) | I/O provider: `gz`, `isaac`, or `hardware` |
 | `sim` | `gz` | Deprecated compatibility alias for `backend`; accepts `gz` or `isaac` |
 | `namespace` | `r100_0001` | ROS namespace for all nodes |
@@ -411,11 +415,13 @@ Examples:
 # Simulation only: clean up stale processes first
 bash cleanup.sh
 
-ros2 launch ridgeback_autonomy ridgeback_exploration.launch.py world:=mock_hospital
-ros2 launch ridgeback_autonomy ridgeback_exploration.launch.py world:=warehouse exploration_rviz:=false
-ros2 launch ridgeback_autonomy ridgeback_exploration.launch.py world:=mock_hospital target_localization_enabled:=false
-ros2 launch ridgeback_autonomy ridgeback_exploration.launch.py world:=office headless_rendering:=true
-ros2 launch ridgeback_autonomy ridgeback_exploration.launch.py backend:=isaac world:=mock_hospital sim_mode:=deterministic
+ros2 launch ridgeback_autonomy ridgeback_exploration.launch.py world:=initial_test_world
+ros2 launch ridgeback_autonomy ridgeback_exploration.launch.py world:=depot exploration_rviz:=false
+ros2 launch ridgeback_autonomy ridgeback_exploration.launch.py world:=coworking_space
+ros2 launch ridgeback_autonomy ridgeback_exploration.launch.py backend:=isaac world:=warehouse exploration_rviz:=false
+ros2 launch ridgeback_autonomy ridgeback_exploration.launch.py world:=initial_test_world target_localization_enabled:=false
+ros2 launch ridgeback_autonomy ridgeback_exploration.launch.py backend:=isaac world:=office headless:=true
+ros2 launch ridgeback_autonomy ridgeback_exploration.launch.py backend:=isaac world:=initial_test_world sim_mode:=deterministic
 
 # One ring instead of four: the pre-mask-row exploration stack
 ros2 launch ridgeback_autonomy ridgeback_exploration.launch.py estimators:=pointcloud
@@ -450,13 +456,13 @@ domain. It accepts an optional world as the first positional argument and
 forwards later `key:=value` launch arguments:
 
 ```bash
-bash start_exploration.sh                                # mock_hospital
-bash start_exploration.sh office                         # office world
+bash start_exploration.sh                                # initial_test_world
+bash start_exploration.sh office backend:=isaac          # Isaac office world
 bash start_exploration.sh headless_rendering:=true       # default world, EGL server rendering
-bash start_exploration.sh office estimators:=pointcloud  # office with one estimator row
-bash start_exploration.sh mock_hospital backend:=isaac sim_mode:=deterministic
+bash start_exploration.sh office backend:=isaac estimators:=pointcloud
+bash start_exploration.sh initial_test_world backend:=isaac sim_mode:=deterministic
 bash start_exploration.sh backend:=hardware autonomous_motion_enabled:=false base_frame:="${BASE_FRAME:?Set the observed base TF frame}"
-RMW_IMPLEMENTATION=rmw_fastrtps_cpp bash start_exploration.sh office  # explicit override
+RMW_IMPLEMENTATION=rmw_fastrtps_cpp bash start_exploration.sh office backend:=isaac
 ```
 
 The script defaults to CycloneDDS, selected by the exact-stamp image-delivery
@@ -475,8 +481,8 @@ value when none exists.
 
 ```bash
 bash build_and_start_expl.sh
-bash build_and_start_expl.sh office
-bash build_and_start_expl.sh office headless_rendering:=true
+bash build_and_start_expl.sh office backend:=isaac
+bash build_and_start_expl.sh office backend:=isaac headless:=true
 ```
 
 ### Intel-Thor link setup and pre-deploy check

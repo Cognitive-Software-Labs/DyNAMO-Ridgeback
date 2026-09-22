@@ -1,11 +1,11 @@
 #usda 1.0
 (
-    defaultPrim = "mock_hospital"
+    defaultPrim = "initial_test_world"
     metersPerUnit = 1
     upAxis = "Z"
 )
 
-def Xform "mock_hospital"
+def Xform "initial_test_world"
 {
     def PhysicsScene "physicsScene"
     {
@@ -17,7 +17,7 @@ def Xform "mock_hospital"
     {
         def Material "mat_000"
         {
-            token outputs:surface.connect = </mock_hospital/Looks/mat_000/shader.outputs:surface>
+            token outputs:surface.connect = </initial_test_world/Looks/mat_000/shader.outputs:surface>
 
             def Shader "shader"
             {
@@ -31,7 +31,7 @@ def Xform "mock_hospital"
 
         def Material "mat_001"
         {
-            token outputs:surface.connect = </mock_hospital/Looks/mat_001/shader.outputs:surface>
+            token outputs:surface.connect = </initial_test_world/Looks/mat_001/shader.outputs:surface>
 
             def Shader "shader"
             {
@@ -45,7 +45,7 @@ def Xform "mock_hospital"
 
         def Material "mat_002"
         {
-            token outputs:surface.connect = </mock_hospital/Looks/mat_002/shader.outputs:surface>
+            token outputs:surface.connect = </initial_test_world/Looks/mat_002/shader.outputs:surface>
 
             def Shader "shader"
             {
@@ -59,7 +59,7 @@ def Xform "mock_hospital"
 
         def Material "mat_003"
         {
-            token outputs:surface.connect = </mock_hospital/Looks/mat_003/shader.outputs:surface>
+            token outputs:surface.connect = </initial_test_world/Looks/mat_003/shader.outputs:surface>
 
             def Shader "shader"
             {
@@ -73,7 +73,7 @@ def Xform "mock_hospital"
 
         def Material "mat_004"
         {
-            token outputs:surface.connect = </mock_hospital/Looks/mat_004/shader.outputs:surface>
+            token outputs:surface.connect = </initial_test_world/Looks/mat_004/shader.outputs:surface>
 
             def Shader "shader"
             {
@@ -87,7 +87,7 @@ def Xform "mock_hospital"
 
         def Material "mat_005"
         {
-            token outputs:surface.connect = </mock_hospital/Looks/mat_005/shader.outputs:surface>
+            token outputs:surface.connect = </initial_test_world/Looks/mat_005/shader.outputs:surface>
 
             def Shader "shader"
             {
@@ -101,7 +101,7 @@ def Xform "mock_hospital"
 
         def Material "mat_006"
         {
-            token outputs:surface.connect = </mock_hospital/Looks/mat_006/shader.outputs:surface>
+            token outputs:surface.connect = </initial_test_world/Looks/mat_006/shader.outputs:surface>
 
             def Shader "shader"
             {
@@ -115,7 +115,7 @@ def Xform "mock_hospital"
 
         def Material "mat_007"
         {
-            token outputs:surface.connect = </mock_hospital/Looks/mat_007/shader.outputs:surface>
+            token outputs:surface.connect = </initial_test_world/Looks/mat_007/shader.outputs:surface>
 
             def Shader "shader"
             {
@@ -129,7 +129,7 @@ def Xform "mock_hospital"
 
         def Material "mat_008"
         {
-            token outputs:surface.connect = </mock_hospital/Looks/mat_008/shader.outputs:surface>
+            token outputs:surface.connect = </initial_test_world/Looks/mat_008/shader.outputs:surface>
 
             def Shader "shader"
             {
@@ -143,7 +143,7 @@ def Xform "mock_hospital"
 
         def Material "mat_009"
         {
-            token outputs:surface.connect = </mock_hospital/Looks/mat_009/shader.outputs:surface>
+            token outputs:surface.connect = </initial_test_world/Looks/mat_009/shader.outputs:surface>
 
             def Shader "shader"
             {
@@ -157,7 +157,7 @@ def Xform "mock_hospital"
 
         def Material "mat_010"
         {
-            token outputs:surface.connect = </mock_hospital/Looks/mat_010/shader.outputs:surface>
+            token outputs:surface.connect = </initial_test_world/Looks/mat_010/shader.outputs:surface>
 
             def Shader "shader"
             {
@@ -171,7 +171,7 @@ def Xform "mock_hospital"
 
         def Material "mat_011"
         {
-            token outputs:surface.connect = </mock_hospital/Looks/mat_011/shader.outputs:surface>
+            token outputs:surface.connect = </initial_test_world/Looks/mat_011/shader.outputs:surface>
 
             def Shader "shader"
             {
@@ -185,7 +185,7 @@ def Xform "mock_hospital"
 
         def Material "mat_012"
         {
-            token outputs:surface.connect = </mock_hospital/Looks/mat_012/shader.outputs:surface>
+            token outputs:surface.connect = </initial_test_world/Looks/mat_012/shader.outputs:surface>
 
             def Shader "shader"
             {
@@ -199,7 +199,7 @@ def Xform "mock_hospital"
 
         def Material "mat_013"
         {
-            token outputs:surface.connect = </mock_hospital/Looks/mat_013/shader.outputs:surface>
+            token outputs:surface.connect = </initial_test_world/Looks/mat_013/shader.outputs:surface>
 
             def Shader "shader"
             {
@@ -213,7 +213,7 @@ def Xform "mock_hospital"
 
         def Material "mat_014"
         {
-            token outputs:surface.connect = </mock_hospital/Looks/mat_014/shader.outputs:surface>
+            token outputs:surface.connect = </initial_test_world/Looks/mat_014/shader.outputs:surface>
 
             def Shader "shader"
             {
@@ -227,7 +227,7 @@ def Xform "mock_hospital"
 
         def Material "mat_015"
         {
-            token outputs:surface.connect = </mock_hospital/Looks/mat_015/shader.outputs:surface>
+            token outputs:surface.connect = </initial_test_world/Looks/mat_015/shader.outputs:surface>
 
             def Shader "shader"
             {
@@ -241,7 +241,7 @@ def Xform "mock_hospital"
 
         def Material "mat_016"
         {
-            token outputs:surface.connect = </mock_hospital/Looks/mat_016/shader.outputs:surface>
+            token outputs:surface.connect = </initial_test_world/Looks/mat_016/shader.outputs:surface>
 
             def Shader "shader"
             {
@@ -255,7 +255,7 @@ def Xform "mock_hospital"
 
         def Material "mat_017"
         {
-            token outputs:surface.connect = </mock_hospital/Looks/mat_017/shader.outputs:surface>
+            token outputs:surface.connect = </initial_test_world/Looks/mat_017/shader.outputs:surface>
 
             def Shader "shader"
             {
@@ -269,7 +269,7 @@ def Xform "mock_hospital"
 
         def Material "mat_018"
         {
-            token outputs:surface.connect = </mock_hospital/Looks/mat_018/shader.outputs:surface>
+            token outputs:surface.connect = </initial_test_world/Looks/mat_018/shader.outputs:surface>
 
             def Shader "shader"
             {
@@ -283,7 +283,7 @@ def Xform "mock_hospital"
 
         def Material "mat_019"
         {
-            token outputs:surface.connect = </mock_hospital/Looks/mat_019/shader.outputs:surface>
+            token outputs:surface.connect = </initial_test_world/Looks/mat_019/shader.outputs:surface>
 
             def Shader "shader"
             {
@@ -298,7 +298,7 @@ def Xform "mock_hospital"
 
         def Material "mat_020"
         {
-            token outputs:surface.connect = </mock_hospital/Looks/mat_020/shader.outputs:surface>
+            token outputs:surface.connect = </initial_test_world/Looks/mat_020/shader.outputs:surface>
 
             def Shader "shader"
             {
@@ -312,7 +312,7 @@ def Xform "mock_hospital"
 
         def Material "mat_021"
         {
-            token outputs:surface.connect = </mock_hospital/Looks/mat_021/shader.outputs:surface>
+            token outputs:surface.connect = </initial_test_world/Looks/mat_021/shader.outputs:surface>
 
             def Shader "shader"
             {
@@ -335,7 +335,7 @@ def Xform "mock_hospital"
             prepend apiSchemas = ["MaterialBindingAPI"]
         )
         {
-            rel material:binding = </mock_hospital/Looks/mat_000>
+            rel material:binding = </initial_test_world/Looks/mat_000>
             double size = 1
             quatf xformOp:orient = (1, 0, 0, 0)
             float3 xformOp:scale = (24, 18, 0.1)
@@ -367,7 +367,7 @@ def Xform "mock_hospital"
             prepend apiSchemas = ["MaterialBindingAPI"]
         )
         {
-            rel material:binding = </mock_hospital/Looks/mat_001>
+            rel material:binding = </initial_test_world/Looks/mat_001>
             double size = 1
             quatf xformOp:orient = (1, 0, 0, 0)
             float3 xformOp:scale = (20, 2.9, 0.01)
@@ -386,7 +386,7 @@ def Xform "mock_hospital"
             prepend apiSchemas = ["MaterialBindingAPI"]
         )
         {
-            rel material:binding = </mock_hospital/Looks/mat_002>
+            rel material:binding = </initial_test_world/Looks/mat_002>
             double size = 1
             quatf xformOp:orient = (1, 0, 0, 0)
             float3 xformOp:scale = (0.2, 16, 2.8)
@@ -418,7 +418,7 @@ def Xform "mock_hospital"
             prepend apiSchemas = ["MaterialBindingAPI"]
         )
         {
-            rel material:binding = </mock_hospital/Looks/mat_002>
+            rel material:binding = </initial_test_world/Looks/mat_002>
             double size = 1
             quatf xformOp:orient = (1, 0, 0, 0)
             float3 xformOp:scale = (0.2, 16, 2.8)
@@ -450,7 +450,7 @@ def Xform "mock_hospital"
             prepend apiSchemas = ["MaterialBindingAPI"]
         )
         {
-            rel material:binding = </mock_hospital/Looks/mat_002>
+            rel material:binding = </initial_test_world/Looks/mat_002>
             double size = 1
             quatf xformOp:orient = (1, 0, 0, 0)
             float3 xformOp:scale = (22, 0.2, 2.8)
@@ -482,7 +482,7 @@ def Xform "mock_hospital"
             prepend apiSchemas = ["MaterialBindingAPI"]
         )
         {
-            rel material:binding = </mock_hospital/Looks/mat_002>
+            rel material:binding = </initial_test_world/Looks/mat_002>
             double size = 1
             quatf xformOp:orient = (1, 0, 0, 0)
             float3 xformOp:scale = (22, 0.2, 2.8)
@@ -514,7 +514,7 @@ def Xform "mock_hospital"
             prepend apiSchemas = ["MaterialBindingAPI"]
         )
         {
-            rel material:binding = </mock_hospital/Looks/mat_003>
+            rel material:binding = </initial_test_world/Looks/mat_003>
             double size = 1
             quatf xformOp:orient = (1, 0, 0, 0)
             float3 xformOp:scale = (6.9, 0.2, 2.8)
@@ -546,7 +546,7 @@ def Xform "mock_hospital"
             prepend apiSchemas = ["MaterialBindingAPI"]
         )
         {
-            rel material:binding = </mock_hospital/Looks/mat_003>
+            rel material:binding = </initial_test_world/Looks/mat_003>
             double size = 1
             quatf xformOp:orient = (1, 0, 0, 0)
             float3 xformOp:scale = (7, 0.2, 2.8)
@@ -578,7 +578,7 @@ def Xform "mock_hospital"
             prepend apiSchemas = ["MaterialBindingAPI"]
         )
         {
-            rel material:binding = </mock_hospital/Looks/mat_003>
+            rel material:binding = </initial_test_world/Looks/mat_003>
             double size = 1
             quatf xformOp:orient = (1, 0, 0, 0)
             float3 xformOp:scale = (2.9, 0.2, 2.8)
@@ -610,7 +610,7 @@ def Xform "mock_hospital"
             prepend apiSchemas = ["MaterialBindingAPI"]
         )
         {
-            rel material:binding = </mock_hospital/Looks/mat_003>
+            rel material:binding = </initial_test_world/Looks/mat_003>
             double size = 1
             quatf xformOp:orient = (1, 0, 0, 0)
             float3 xformOp:scale = (8.2, 0.2, 2.8)
@@ -642,7 +642,7 @@ def Xform "mock_hospital"
             prepend apiSchemas = ["MaterialBindingAPI"]
         )
         {
-            rel material:binding = </mock_hospital/Looks/mat_003>
+            rel material:binding = </initial_test_world/Looks/mat_003>
             double size = 1
             quatf xformOp:orient = (1, 0, 0, 0)
             float3 xformOp:scale = (3.4, 0.2, 2.8)
@@ -674,7 +674,7 @@ def Xform "mock_hospital"
             prepend apiSchemas = ["MaterialBindingAPI"]
         )
         {
-            rel material:binding = </mock_hospital/Looks/mat_003>
+            rel material:binding = </initial_test_world/Looks/mat_003>
             double size = 1
             quatf xformOp:orient = (1, 0, 0, 0)
             float3 xformOp:scale = (4.8, 0.2, 2.8)
@@ -706,7 +706,7 @@ def Xform "mock_hospital"
             prepend apiSchemas = ["MaterialBindingAPI"]
         )
         {
-            rel material:binding = </mock_hospital/Looks/mat_004>
+            rel material:binding = </initial_test_world/Looks/mat_004>
             double size = 1
             quatf xformOp:orient = (1, 0, 0, 0)
             float3 xformOp:scale = (0.2, 6.4, 2.8)
@@ -738,7 +738,7 @@ def Xform "mock_hospital"
             prepend apiSchemas = ["MaterialBindingAPI"]
         )
         {
-            rel material:binding = </mock_hospital/Looks/mat_004>
+            rel material:binding = </initial_test_world/Looks/mat_004>
             double size = 1
             quatf xformOp:orient = (1, 0, 0, 0)
             float3 xformOp:scale = (0.2, 6.4, 2.8)
@@ -770,7 +770,7 @@ def Xform "mock_hospital"
             prepend apiSchemas = ["MaterialBindingAPI"]
         )
         {
-            rel material:binding = </mock_hospital/Looks/mat_005>
+            rel material:binding = </initial_test_world/Looks/mat_005>
             double size = 1
             quatf xformOp:orient = (1, 0, 0, 0)
             float3 xformOp:scale = (1.8, 0.9, 0.5)
@@ -802,7 +802,7 @@ def Xform "mock_hospital"
             prepend apiSchemas = ["MaterialBindingAPI"]
         )
         {
-            rel material:binding = </mock_hospital/Looks/mat_005>
+            rel material:binding = </initial_test_world/Looks/mat_005>
             double size = 1
             quatf xformOp:orient = (1, 0, 0, 0)
             float3 xformOp:scale = (1.8, 0.9, 0.5)
@@ -834,7 +834,7 @@ def Xform "mock_hospital"
             prepend apiSchemas = ["MaterialBindingAPI"]
         )
         {
-            rel material:binding = </mock_hospital/Looks/mat_005>
+            rel material:binding = </initial_test_world/Looks/mat_005>
             double size = 1
             quatf xformOp:orient = (1, 0, 0, 0)
             float3 xformOp:scale = (1.8, 0.9, 0.5)
@@ -866,7 +866,7 @@ def Xform "mock_hospital"
             prepend apiSchemas = ["MaterialBindingAPI"]
         )
         {
-            rel material:binding = </mock_hospital/Looks/mat_005>
+            rel material:binding = </initial_test_world/Looks/mat_005>
             double size = 1
             quatf xformOp:orient = (1, 0, 0, 0)
             float3 xformOp:scale = (1.8, 0.9, 0.5)
@@ -898,7 +898,7 @@ def Xform "mock_hospital"
             prepend apiSchemas = ["MaterialBindingAPI"]
         )
         {
-            rel material:binding = </mock_hospital/Looks/mat_006>
+            rel material:binding = </initial_test_world/Looks/mat_006>
             double size = 1
             quatf xformOp:orient = (1, 0, 0, 0)
             float3 xformOp:scale = (1.8, 0.6, 0.9)
@@ -930,7 +930,7 @@ def Xform "mock_hospital"
             prepend apiSchemas = ["MaterialBindingAPI"]
         )
         {
-            rel material:binding = </mock_hospital/Looks/mat_007>
+            rel material:binding = </initial_test_world/Looks/mat_007>
             double size = 1
             quatf xformOp:orient = (1, 0, 0, 0)
             float3 xformOp:scale = (1.35, 0.82, 0.1)
@@ -942,7 +942,7 @@ def Xform "mock_hospital"
             prepend apiSchemas = ["MaterialBindingAPI"]
         )
         {
-            rel material:binding = </mock_hospital/Looks/mat_008>
+            rel material:binding = </initial_test_world/Looks/mat_008>
             double size = 1
             quatf xformOp:orient = (1, 0, 0, 0)
             float3 xformOp:scale = (0.85, 0.45, 0.12)
@@ -954,7 +954,7 @@ def Xform "mock_hospital"
             prepend apiSchemas = ["MaterialBindingAPI"]
         )
         {
-            rel material:binding = </mock_hospital/Looks/mat_009>
+            rel material:binding = </initial_test_world/Looks/mat_009>
             double size = 1
             quatf xformOp:orient = (1, 0, 0, 0)
             float3 xformOp:scale = (0.08, 0.08, 0.56)
@@ -966,7 +966,7 @@ def Xform "mock_hospital"
             prepend apiSchemas = ["MaterialBindingAPI"]
         )
         {
-            rel material:binding = </mock_hospital/Looks/mat_009>
+            rel material:binding = </initial_test_world/Looks/mat_009>
             double size = 1
             quatf xformOp:orient = (1, 0, 0, 0)
             float3 xformOp:scale = (0.08, 0.08, 0.56)
@@ -978,7 +978,7 @@ def Xform "mock_hospital"
             prepend apiSchemas = ["MaterialBindingAPI"]
         )
         {
-            rel material:binding = </mock_hospital/Looks/mat_009>
+            rel material:binding = </initial_test_world/Looks/mat_009>
             double size = 1
             quatf xformOp:orient = (1, 0, 0, 0)
             float3 xformOp:scale = (0.08, 0.08, 0.56)
@@ -990,7 +990,7 @@ def Xform "mock_hospital"
             prepend apiSchemas = ["MaterialBindingAPI"]
         )
         {
-            rel material:binding = </mock_hospital/Looks/mat_009>
+            rel material:binding = </initial_test_world/Looks/mat_009>
             double size = 1
             quatf xformOp:orient = (1, 0, 0, 0)
             float3 xformOp:scale = (0.08, 0.08, 0.56)
@@ -1022,7 +1022,7 @@ def Xform "mock_hospital"
             prepend apiSchemas = ["MaterialBindingAPI"]
         )
         {
-            rel material:binding = </mock_hospital/Looks/mat_010>
+            rel material:binding = </initial_test_world/Looks/mat_010>
             double size = 1
             quatf xformOp:orient = (1, 0, 0, 0)
             float3 xformOp:scale = (0.46, 0.46, 0.1)
@@ -1034,7 +1034,7 @@ def Xform "mock_hospital"
             prepend apiSchemas = ["MaterialBindingAPI"]
         )
         {
-            rel material:binding = </mock_hospital/Looks/mat_010>
+            rel material:binding = </initial_test_world/Looks/mat_010>
             double size = 1
             quatf xformOp:orient = (1, 0, 0, 0)
             float3 xformOp:scale = (0.46, 0.08, 0.54)
@@ -1066,7 +1066,7 @@ def Xform "mock_hospital"
             prepend apiSchemas = ["MaterialBindingAPI"]
         )
         {
-            rel material:binding = </mock_hospital/Looks/mat_010>
+            rel material:binding = </initial_test_world/Looks/mat_010>
             double size = 1
             quatf xformOp:orient = (1, 0, 0, 0)
             float3 xformOp:scale = (0.46, 0.46, 0.1)
@@ -1078,7 +1078,7 @@ def Xform "mock_hospital"
             prepend apiSchemas = ["MaterialBindingAPI"]
         )
         {
-            rel material:binding = </mock_hospital/Looks/mat_010>
+            rel material:binding = </initial_test_world/Looks/mat_010>
             double size = 1
             quatf xformOp:orient = (1, 0, 0, 0)
             float3 xformOp:scale = (0.46, 0.08, 0.54)
@@ -1110,7 +1110,7 @@ def Xform "mock_hospital"
             prepend apiSchemas = ["MaterialBindingAPI"]
         )
         {
-            rel material:binding = </mock_hospital/Looks/mat_007>
+            rel material:binding = </initial_test_world/Looks/mat_007>
             double size = 1
             quatf xformOp:orient = (1, 0, 0, 0)
             float3 xformOp:scale = (1.42, 0.86, 0.1)
@@ -1122,7 +1122,7 @@ def Xform "mock_hospital"
             prepend apiSchemas = ["MaterialBindingAPI"]
         )
         {
-            rel material:binding = </mock_hospital/Looks/mat_008>
+            rel material:binding = </initial_test_world/Looks/mat_008>
             double size = 1
             quatf xformOp:orient = (1, 0, 0, 0)
             float3 xformOp:scale = (0.88, 0.48, 0.12)
@@ -1134,7 +1134,7 @@ def Xform "mock_hospital"
             prepend apiSchemas = ["MaterialBindingAPI"]
         )
         {
-            rel material:binding = </mock_hospital/Looks/mat_009>
+            rel material:binding = </initial_test_world/Looks/mat_009>
             double size = 1
             quatf xformOp:orient = (1, 0, 0, 0)
             float3 xformOp:scale = (0.08, 0.08, 0.56)
@@ -1146,7 +1146,7 @@ def Xform "mock_hospital"
             prepend apiSchemas = ["MaterialBindingAPI"]
         )
         {
-            rel material:binding = </mock_hospital/Looks/mat_009>
+            rel material:binding = </initial_test_world/Looks/mat_009>
             double size = 1
             quatf xformOp:orient = (1, 0, 0, 0)
             float3 xformOp:scale = (0.08, 0.08, 0.56)
@@ -1158,7 +1158,7 @@ def Xform "mock_hospital"
             prepend apiSchemas = ["MaterialBindingAPI"]
         )
         {
-            rel material:binding = </mock_hospital/Looks/mat_009>
+            rel material:binding = </initial_test_world/Looks/mat_009>
             double size = 1
             quatf xformOp:orient = (1, 0, 0, 0)
             float3 xformOp:scale = (0.08, 0.08, 0.56)
@@ -1170,7 +1170,7 @@ def Xform "mock_hospital"
             prepend apiSchemas = ["MaterialBindingAPI"]
         )
         {
-            rel material:binding = </mock_hospital/Looks/mat_009>
+            rel material:binding = </initial_test_world/Looks/mat_009>
             double size = 1
             quatf xformOp:orient = (1, 0, 0, 0)
             float3 xformOp:scale = (0.08, 0.08, 0.56)
@@ -1202,7 +1202,7 @@ def Xform "mock_hospital"
             prepend apiSchemas = ["MaterialBindingAPI"]
         )
         {
-            rel material:binding = </mock_hospital/Looks/mat_011>
+            rel material:binding = </initial_test_world/Looks/mat_011>
             double size = 1
             quatf xformOp:orient = (1, 0, 0, 0)
             float3 xformOp:scale = (0.42, 0.42, 0.5)
@@ -1234,7 +1234,7 @@ def Xform "mock_hospital"
             prepend apiSchemas = ["MaterialBindingAPI"]
         )
         {
-            rel material:binding = </mock_hospital/Looks/mat_011>
+            rel material:binding = </initial_test_world/Looks/mat_011>
             double size = 1
             quatf xformOp:orient = (1, 0, 0, 0)
             float3 xformOp:scale = (0.42, 0.42, 0.5)
@@ -1266,7 +1266,7 @@ def Xform "mock_hospital"
             prepend apiSchemas = ["MaterialBindingAPI"]
         )
         {
-            rel material:binding = </mock_hospital/Looks/mat_007>
+            rel material:binding = </initial_test_world/Looks/mat_007>
             double size = 1
             quatf xformOp:orient = (1, 0, 0, 0)
             float3 xformOp:scale = (1.35, 0.82, 0.1)
@@ -1278,7 +1278,7 @@ def Xform "mock_hospital"
             prepend apiSchemas = ["MaterialBindingAPI"]
         )
         {
-            rel material:binding = </mock_hospital/Looks/mat_008>
+            rel material:binding = </initial_test_world/Looks/mat_008>
             double size = 1
             quatf xformOp:orient = (1, 0, 0, 0)
             float3 xformOp:scale = (0.85, 0.45, 0.12)
@@ -1290,7 +1290,7 @@ def Xform "mock_hospital"
             prepend apiSchemas = ["MaterialBindingAPI"]
         )
         {
-            rel material:binding = </mock_hospital/Looks/mat_009>
+            rel material:binding = </initial_test_world/Looks/mat_009>
             double size = 1
             quatf xformOp:orient = (1, 0, 0, 0)
             float3 xformOp:scale = (0.08, 0.08, 0.56)
@@ -1302,7 +1302,7 @@ def Xform "mock_hospital"
             prepend apiSchemas = ["MaterialBindingAPI"]
         )
         {
-            rel material:binding = </mock_hospital/Looks/mat_009>
+            rel material:binding = </initial_test_world/Looks/mat_009>
             double size = 1
             quatf xformOp:orient = (1, 0, 0, 0)
             float3 xformOp:scale = (0.08, 0.08, 0.56)
@@ -1314,7 +1314,7 @@ def Xform "mock_hospital"
             prepend apiSchemas = ["MaterialBindingAPI"]
         )
         {
-            rel material:binding = </mock_hospital/Looks/mat_009>
+            rel material:binding = </initial_test_world/Looks/mat_009>
             double size = 1
             quatf xformOp:orient = (1, 0, 0, 0)
             float3 xformOp:scale = (0.08, 0.08, 0.56)
@@ -1326,7 +1326,7 @@ def Xform "mock_hospital"
             prepend apiSchemas = ["MaterialBindingAPI"]
         )
         {
-            rel material:binding = </mock_hospital/Looks/mat_009>
+            rel material:binding = </initial_test_world/Looks/mat_009>
             double size = 1
             quatf xformOp:orient = (1, 0, 0, 0)
             float3 xformOp:scale = (0.08, 0.08, 0.56)
@@ -1358,7 +1358,7 @@ def Xform "mock_hospital"
             prepend apiSchemas = ["MaterialBindingAPI"]
         )
         {
-            rel material:binding = </mock_hospital/Looks/mat_011>
+            rel material:binding = </initial_test_world/Looks/mat_011>
             double size = 1
             quatf xformOp:orient = (1, 0, 0, 0)
             float3 xformOp:scale = (0.42, 0.42, 0.5)
@@ -1390,7 +1390,7 @@ def Xform "mock_hospital"
             prepend apiSchemas = ["MaterialBindingAPI"]
         )
         {
-            rel material:binding = </mock_hospital/Looks/mat_007>
+            rel material:binding = </initial_test_world/Looks/mat_007>
             double size = 1
             quatf xformOp:orient = (1, 0, 0, 0)
             float3 xformOp:scale = (1.42, 0.86, 0.1)
@@ -1402,7 +1402,7 @@ def Xform "mock_hospital"
             prepend apiSchemas = ["MaterialBindingAPI"]
         )
         {
-            rel material:binding = </mock_hospital/Looks/mat_008>
+            rel material:binding = </initial_test_world/Looks/mat_008>
             double size = 1
             quatf xformOp:orient = (1, 0, 0, 0)
             float3 xformOp:scale = (0.88, 0.48, 0.12)
@@ -1414,7 +1414,7 @@ def Xform "mock_hospital"
             prepend apiSchemas = ["MaterialBindingAPI"]
         )
         {
-            rel material:binding = </mock_hospital/Looks/mat_009>
+            rel material:binding = </initial_test_world/Looks/mat_009>
             double size = 1
             quatf xformOp:orient = (1, 0, 0, 0)
             float3 xformOp:scale = (0.08, 0.08, 0.56)
@@ -1426,7 +1426,7 @@ def Xform "mock_hospital"
             prepend apiSchemas = ["MaterialBindingAPI"]
         )
         {
-            rel material:binding = </mock_hospital/Looks/mat_009>
+            rel material:binding = </initial_test_world/Looks/mat_009>
             double size = 1
             quatf xformOp:orient = (1, 0, 0, 0)
             float3 xformOp:scale = (0.08, 0.08, 0.56)
@@ -1438,7 +1438,7 @@ def Xform "mock_hospital"
             prepend apiSchemas = ["MaterialBindingAPI"]
         )
         {
-            rel material:binding = </mock_hospital/Looks/mat_009>
+            rel material:binding = </initial_test_world/Looks/mat_009>
             double size = 1
             quatf xformOp:orient = (1, 0, 0, 0)
             float3 xformOp:scale = (0.08, 0.08, 0.56)
@@ -1450,7 +1450,7 @@ def Xform "mock_hospital"
             prepend apiSchemas = ["MaterialBindingAPI"]
         )
         {
-            rel material:binding = </mock_hospital/Looks/mat_009>
+            rel material:binding = </initial_test_world/Looks/mat_009>
             double size = 1
             quatf xformOp:orient = (1, 0, 0, 0)
             float3 xformOp:scale = (0.08, 0.08, 0.56)
@@ -1482,7 +1482,7 @@ def Xform "mock_hospital"
             prepend apiSchemas = ["MaterialBindingAPI"]
         )
         {
-            rel material:binding = </mock_hospital/Looks/mat_011>
+            rel material:binding = </initial_test_world/Looks/mat_011>
             double size = 1
             quatf xformOp:orient = (1, 0, 0, 0)
             float3 xformOp:scale = (0.42, 0.42, 0.5)
@@ -1514,7 +1514,7 @@ def Xform "mock_hospital"
             prepend apiSchemas = ["MaterialBindingAPI"]
         )
         {
-            rel material:binding = </mock_hospital/Looks/mat_012>
+            rel material:binding = </initial_test_world/Looks/mat_012>
             double size = 1
             quatf xformOp:orient = (0.70710546, 0, 0, 0.7071081)
             float3 xformOp:scale = (0.5, 0.46, 0.1)
@@ -1526,7 +1526,7 @@ def Xform "mock_hospital"
             prepend apiSchemas = ["MaterialBindingAPI"]
         )
         {
-            rel material:binding = </mock_hospital/Looks/mat_012>
+            rel material:binding = </initial_test_world/Looks/mat_012>
             double size = 1
             quatf xformOp:orient = (0.70710546, 0, 0, 0.7071081)
             float3 xformOp:scale = (0.5, 0.08, 0.58)
@@ -1538,7 +1538,7 @@ def Xform "mock_hospital"
             prepend apiSchemas = ["MaterialBindingAPI"]
         )
         {
-            rel material:binding = </mock_hospital/Looks/mat_012>
+            rel material:binding = </initial_test_world/Looks/mat_012>
             double size = 1
             quatf xformOp:orient = (0.70710546, 0, 0, 0.7071081)
             float3 xformOp:scale = (0.5, 0.46, 0.1)
@@ -1550,7 +1550,7 @@ def Xform "mock_hospital"
             prepend apiSchemas = ["MaterialBindingAPI"]
         )
         {
-            rel material:binding = </mock_hospital/Looks/mat_012>
+            rel material:binding = </initial_test_world/Looks/mat_012>
             double size = 1
             quatf xformOp:orient = (0.70710546, 0, 0, 0.7071081)
             float3 xformOp:scale = (0.5, 0.08, 0.58)
@@ -1562,7 +1562,7 @@ def Xform "mock_hospital"
             prepend apiSchemas = ["MaterialBindingAPI"]
         )
         {
-            rel material:binding = </mock_hospital/Looks/mat_012>
+            rel material:binding = </initial_test_world/Looks/mat_012>
             double size = 1
             quatf xformOp:orient = (0.70710546, 0, 0, 0.7071081)
             float3 xformOp:scale = (0.5, 0.46, 0.1)
@@ -1574,7 +1574,7 @@ def Xform "mock_hospital"
             prepend apiSchemas = ["MaterialBindingAPI"]
         )
         {
-            rel material:binding = </mock_hospital/Looks/mat_012>
+            rel material:binding = </initial_test_world/Looks/mat_012>
             double size = 1
             quatf xformOp:orient = (0.70710546, 0, 0, 0.7071081)
             float3 xformOp:scale = (0.5, 0.08, 0.58)
@@ -1586,7 +1586,7 @@ def Xform "mock_hospital"
             prepend apiSchemas = ["MaterialBindingAPI"]
         )
         {
-            rel material:binding = </mock_hospital/Looks/mat_013>
+            rel material:binding = </initial_test_world/Looks/mat_013>
             double size = 1
             quatf xformOp:orient = (1, 0, 0, 0)
             float3 xformOp:scale = (0.95, 0.65, 0.08)
@@ -1598,7 +1598,7 @@ def Xform "mock_hospital"
             prepend apiSchemas = ["MaterialBindingAPI"]
         )
         {
-            rel material:binding = </mock_hospital/Looks/mat_014>
+            rel material:binding = </initial_test_world/Looks/mat_014>
             double size = 1
             quatf xformOp:orient = (1, 0, 0, 0)
             float3 xformOp:scale = (0.55, 0.35, 0.42)
@@ -1610,7 +1610,7 @@ def Xform "mock_hospital"
             prepend apiSchemas = ["MaterialBindingAPI"]
         )
         {
-            rel material:binding = </mock_hospital/Looks/mat_015>
+            rel material:binding = </initial_test_world/Looks/mat_015>
             double size = 1
             quatf xformOp:orient = (1, 0, 0, 0)
             float3 xformOp:scale = (0.08, 1.45, 1.15)
@@ -1622,7 +1622,7 @@ def Xform "mock_hospital"
             prepend apiSchemas = ["MaterialBindingAPI"]
         )
         {
-            rel material:binding = </mock_hospital/Looks/mat_016>
+            rel material:binding = </initial_test_world/Looks/mat_016>
             double size = 1
             quatf xformOp:orient = (1, 0, 0, 0)
             float3 xformOp:scale = (1.95, 0.08, 0.62)
@@ -1693,7 +1693,7 @@ def Xform "mock_hospital"
             prepend apiSchemas = ["MaterialBindingAPI"]
         )
         {
-            rel material:binding = </mock_hospital/Looks/mat_017>
+            rel material:binding = </initial_test_world/Looks/mat_017>
             double size = 1
             quatf xformOp:orient = (1, 0, 0, 0)
             float3 xformOp:scale = (1.95, 0.75, 0.08)
@@ -1705,7 +1705,7 @@ def Xform "mock_hospital"
             prepend apiSchemas = ["MaterialBindingAPI"]
         )
         {
-            rel material:binding = </mock_hospital/Looks/mat_018>
+            rel material:binding = </initial_test_world/Looks/mat_018>
             double size = 1
             quatf xformOp:orient = (1, 0, 0, 0)
             float3 xformOp:scale = (0.48, 0.06, 0.32)
@@ -1717,7 +1717,7 @@ def Xform "mock_hospital"
             prepend apiSchemas = ["MaterialBindingAPI"]
         )
         {
-            rel material:binding = </mock_hospital/Looks/mat_019>
+            rel material:binding = </initial_test_world/Looks/mat_019>
             double size = 1
             quatf xformOp:orient = (1, 0, 0, 0)
             float3 xformOp:scale = (0.06, 1.7, 1.6)
@@ -1729,7 +1729,7 @@ def Xform "mock_hospital"
             prepend apiSchemas = ["MaterialBindingAPI"]
         )
         {
-            rel material:binding = </mock_hospital/Looks/mat_020>
+            rel material:binding = </initial_test_world/Looks/mat_020>
             double size = 1
             quatf xformOp:orient = (1, 0, 0, 0)
             float3 xformOp:scale = (2.2, 0.04, 0.8)
@@ -1741,7 +1741,7 @@ def Xform "mock_hospital"
             prepend apiSchemas = ["MaterialBindingAPI"]
         )
         {
-            rel material:binding = </mock_hospital/Looks/mat_020>
+            rel material:binding = </initial_test_world/Looks/mat_020>
             double size = 1
             quatf xformOp:orient = (1, 0, 0, 0)
             float3 xformOp:scale = (2.2, 0.04, 0.8)
@@ -1760,7 +1760,7 @@ def Xform "mock_hospital"
             prepend apiSchemas = ["MaterialBindingAPI"]
         )
         {
-            rel material:binding = </mock_hospital/Looks/mat_021>
+            rel material:binding = </initial_test_world/Looks/mat_021>
             double radius = 0.3
             quatf xformOp:orient = (1, 0, 0, 0)
             double3 xformOp:translate = (0, 0, 0)
@@ -2076,4 +2076,3 @@ def Xform "mock_hospital"
         float inputs:intensity = 300
     }
 }
-

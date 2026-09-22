@@ -203,7 +203,7 @@ global_costmap:
       robot_base_frame: base_link
       # Rolling global costmap so it always contains the robot. The static
       # layer still overlays the full SLAM map within the window, so for worlds
-      # smaller than the window (e.g. mock_hospital) planning is unchanged; but
+      # smaller than the window (e.g. initial_test_world) planning is unchanged; but
       # the Isaac stock envs let slam_toolbox seed /map with an origin offset
       # from the robot's (0,0) spawn, and a map-synced (non-rolling) global
       # costmap then rejects the robot's own start cell as "outside bounds"

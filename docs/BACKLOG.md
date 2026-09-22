@@ -120,29 +120,29 @@ incident timeline is in the archived evidence below. The CycloneDDS deployment i
   with a recorded multi-hour soak under CycloneDDS with the Intel services,
   SLAM, and Nav2 running.
 
-## Optional: restore Gazebo exploration worlds and backend-specific maps
+## Gazebo ground-truth map recertification
 
-**Opportunity.** Gazebo remains a supported backend, but the adapter currently
-ships only `mock_hospital` for exploration and `target_distance_calibration`
-for target benchmarking. The only Gazebo `mock_hospital`, `warehouse`, and
-`office` coverage maps are archived under `historical/`; the latter two source
-worlds are no longer present. Meanwhile the coverage overlay looks up
-`<world>.pgm` without considering the backend. Restoring same-named Gazebo and
-Isaac worlds under that contract could silently score one simulator against
-the other simulator's geometry.
+**Implemented identity boundary.** The Gazebo adapter exposes the Clearpath
+`warehouse.sdf` and `office.sdf` sources as `depot` and `coworking_space` while
+leaving the dependency-owned filenames unchanged. It rejects direct Gazebo use
+of `warehouse` and `office`; those names remain Isaac stock-world identities.
+The former Gazebo captures moved to matching `depot` and `coworking_space` map
+names, and the shared converted geometry moved from `mock_hospital` to
+`initial_test_world` in both its SDF and USD descriptions.
 
-**Completion criteria.** Regenerate a complete analytical map set for the
-current Gazebo `mock_hospital` from its SDF. Restore or re-import the exact
-Gazebo `warehouse` and `office` world sources with recorded provenance before
-promoting their maps; do not promote the archived captures on name alone.
-Make map identity explicitly backend-qualified—for example,
-`ground_truth_maps/gz/<world>` and `ground_truth_maps/isaac/<world>`—and pass
-the selected backend into coverage-map resolution. Preserve convenient
-operator world names, but treat `(backend, world)` as the unique identity in
-storage, diagnostics, artifacts, and documentation. Add tests proving that a
-Gazebo run cannot fall back to an Isaac map, or vice versa, even when both
-worlds are named `warehouse` or `office`. Generate `.pgm`, `.yaml`, `.png`, and
-`.npz` artifacts for every restored map and visually verify them against their
+**Remaining gap.** The renamed Gazebo maps are the earlier driven captures, not
+fresh analytical or recertified products. Their `.pgm`, `.yaml`, `.png`, and
+derived `.npz` assets restore coverage and offline-grid lookup under the safe
+names, but the derivative format adds no new evidence; a current source-to-map
+visual check remains absent.
+
+**Completion criteria.** Regenerate a complete analytical map set for
+`initial_test_world` from its owning SDF and verify that the converted Isaac
+stage retains the same occupancy geometry. Recapture or otherwise certify the
+`depot` and `coworking_space` maps against the exact dependency revision and
+external model assets they load. Preserve backend in map provenance and
+diagnostics as a second safety check. Produce `.pgm`, `.yaml`, `.png`, and `.npz`
+artifacts for all three Gazebo identities and visually verify each against its
 own simulator world.
 
 **Context.** [Ground-truth map runbook](../src/ridgeback_autonomy/sim/ground_truth_maps/README.md),

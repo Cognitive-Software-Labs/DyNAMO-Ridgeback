@@ -288,7 +288,7 @@ def generate_launch_description():
                               default_value=_backend_default(
                                   os.path.expanduser('~/clearpath/'),
                                   '/etc/clearpath/')),
-        DeclareLaunchArgument('world', default_value='mock_hospital'),
+        DeclareLaunchArgument('world', default_value='initial_test_world'),
         DeclareLaunchArgument(
             'sim_ready_timeout',
             default_value=PythonExpression(

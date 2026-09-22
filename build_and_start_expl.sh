@@ -2,7 +2,7 @@
 # Build the workspace, then launch the exploration stack.
 #
 # Usage:
-#   bash build_and_start_expl.sh                   # defaults to mock_hospital
+#   bash build_and_start_expl.sh                   # defaults to initial_test_world
 #   bash build_and_start_expl.sh office
 #   bash build_and_start_expl.sh warehouse --ros-args --log-level info
 #   bash build_and_start_expl.sh estimators:=polar_profiling

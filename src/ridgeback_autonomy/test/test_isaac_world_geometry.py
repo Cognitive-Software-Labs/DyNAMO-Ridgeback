@@ -27,7 +27,7 @@ worlds = _load_worlds_module()
 @pytest.mark.parametrize(
     ('world', 'floor_z'),
     [
-        ('mock_hospital', 0.05),
+        ('initial_test_world', 0.05),
         ('empty', 0.05),
         ('g1_distance_calibration', 0.05),
         ('warehouse', 0.0),
@@ -44,7 +44,7 @@ def test_registered_world_heights_share_one_floor_source(world, floor_z):
 
 
 def test_known_world_file_uses_its_registered_floor(tmp_path):
-    world_path = tmp_path / 'mock_hospital.usda'
+    world_path = tmp_path / 'initial_test_world.usda'
     world_path.touch()
 
     assert worlds.floor_z_for_world(world_path) == pytest.approx(0.05)

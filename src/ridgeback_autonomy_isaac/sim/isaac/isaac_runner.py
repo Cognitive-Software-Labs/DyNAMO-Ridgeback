@@ -13,7 +13,7 @@ rclpy/CycloneDDS):
     source install/setup.bash
     OMNI_KIT_ACCEPT_EULA=YES isaac_venv/bin/python3 \
         src/ridgeback_autonomy_isaac/sim/isaac/isaac_runner.py \
-        --world mock_hospital --headless true
+        --world initial_test_world --headless true
 
 Timing: physics at --physics-hz (default 120). --rtf 1.0 keeps sim time
 at wall speed (interactive default); --rtf 0 runs unthrottled for
@@ -38,7 +38,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 def parse_args():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument("--world", default="mock_hospital")
+    ap.add_argument("--world", default="initial_test_world")
     ap.add_argument("--namespace", default="r100_0001")
     ap.add_argument("--headless", default="true",
                     choices=["true", "false"])
