@@ -264,10 +264,11 @@ until a traction, terrain, traversal, or wheel-control requirement justifies it.
 Geometry and footprint validation can proceed independently; shared outlines do
 not establish wheel-contact parity.
 
-**Qualified simulator state.** The nominal local/global octagons remain equal,
-and both costmaps now pin the audited 10 mm runtime padding explicitly. The
-effective footprint encloses the current Gazebo and Isaac collision projections
-with at least 5.337 mm static margin. Front, side and 45° contact, held contact,
+**Qualified simulator state.** The nominal local/global 16-point outlines remain
+equal, enclose the aligned shared simulator envelope with 2 mm model margin, and
+both costmaps pin the audited 10 mm runtime padding explicitly. The effective
+footprint encloses the raw Gazebo and Isaac collision projections with at least
+7.591 mm clearance. Front, side and 45° contact, held contact,
 and stop/reverse recovery passed at 0.05/0.10/0.20 m/s across three cold boots
 per backend. The [collision reference](robot/collision_model.md) owns the policy,
 limits and reproduction path.

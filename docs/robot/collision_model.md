@@ -15,7 +15,7 @@ An image of one does not establish the others.
 
 ## Configured navigation footprint
 
-![Configured Nav2 footprint in the base_link plane, with forward and left axes.](assets/navigation-footprint.png)
+![Configured 16-point Nav2 body outline in the base_link plane, with forward and left axes.](assets/navigation-footprint.png)
 
 The figure plots the identical local/global costmap `footprint` entries from
 [`nav2_params.yaml`](../../src/ridgeback_autonomy/config/nav2_params.yaml).
@@ -23,24 +23,34 @@ It shows the nominal polygon before runtime padding or costmap inflation. Both
 costmaps explicitly apply 10 mm of `footprint_padding`; this pins the former
 Nav2 default as part of the project configuration.
 
+![Gazebo and recentered Isaac collision projections with the fitted 16-point body outline.](assets/navigation-footprint-aligned-envelope.png)
+
+The nominal outline treats the 4.408 mm longitudinal and 0.201 mm lateral Isaac
+chassis translation as a backend origin-equivalence offset. After recentering
+Isaac onto Gazebo, their union is symmetrized and enclosed with 16 evenly spaced
+support directions plus 2 mm of model margin. Compared with the former octagon,
+the outline removes falsely occupied corners and reduces nominal area by 1.5%.
+
 ![Gazebo and Isaac collision projections inside the effective 10 mm padded Nav2 footprint.](assets/navigation-footprint-envelope.png)
 
-The September 22 static audit retained the nominal octagon. Isaac extends at
-most 4.663 mm outside that unpadded outline and the generated Gazebo description
-extends at most 0.254 mm outside it. The effective padded polygon encloses both
-projections with at least 5.337 mm clearance. The green union is diagnostic; it
-is not a replacement robot outline.
+In the raw backend frames, Isaac's accepted origin offset leaves its rear edge
+2.409 mm outside the nominal outline. The effective padded polygon encloses both
+raw simulator projections with at least 7.591 mm clearance. The green union is
+diagnostic; it is not a replacement robot outline.
 
-The containment policy is: the nominal polygon records the intended body
-outline, while the effective polygon must enclose every current simulator
-collision projection with at least 5 mm of static margin. Inflation remains an
-obstacle-cost policy and does not count toward this geometric margin. Physical
-hardware requires a separately measured outline and clearance qualification.
+The containment policy is: the nominal polygon encloses the aligned shared body
+envelope with at least 2 mm model margin, while the effective polygon must
+enclose every raw simulator collision projection with at least 5 mm clearance.
+Inflation remains an obstacle-cost policy and does not count toward either
+geometric margin. Physical hardware requires a separately measured outline and
+clearance qualification.
 
-Live Gazebo and Isaac launches both reported 10 mm padding and published the
-same padded octagon. Nav2's collision monitor consumes
-`local_costmap/published_footprint`; its initial visualization is empty before
-command flow begins, then publishes that full padded octagon in `base_link`.
+Live Gazebo and Isaac launches of the initial outline both reported the expected
+10 mm padding. After the refinement, a fresh Gazebo launch loaded the exact
+16-point polygon in both costmaps and published all 16 padded points. Nav2's
+collision monitor consumed `local_costmap/published_footprint` and republished
+the same padded outline in `base_link` during command flow. The archived runtime
+capture records the configured and observed points.
 
 ## Backend contact representations
 
@@ -131,3 +141,4 @@ static extraction does not qualify hardware.
 
 - [September 18 static envelope audit](../../archive/engineering/2026-09-18-collision-envelope-audit.md)
 - [September 22 simulator footprint qualification](../../archive/engineering/2026-09-22-navigation-footprint-qualification.md)
+- [September 22 refined-footprint runtime capture](../../archive/engineering/assets/2026-09-22-footprint-qualification/runtime-16-point.json)

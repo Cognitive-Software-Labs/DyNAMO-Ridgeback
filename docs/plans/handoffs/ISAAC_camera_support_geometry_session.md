@@ -19,11 +19,13 @@ continuation list.
 
 ## September 22 footprint and contact update
 
-The local/global source polygons remain equal and now explicitly pin their
-previous 10 mm Nav2 padding. Static extraction found at least 5.337 mm effective
-clearance around the union of current Gazebo and Isaac collision projections.
-Live launches published the expected padded polygon, including through the
-collision monitor during command flow.
+The local/global source polygons remain equal and explicitly pin their previous
+10 mm Nav2 padding. The accepted 16-point outline treats Isaac's 4.408 mm
+longitudinal chassis translation as backend-equivalent, encloses the aligned
+shared envelope with 2 mm model margin, and retains at least 7.591 mm effective
+clearance around both raw simulator projections. Live launches published the
+expected padded polygon, including through the collision monitor during command
+flow.
 
 Front, side and 45° wall contacts at 0.05/0.10/0.20 m/s, held contact and
 stop/reverse recovery passed across three cold boots per backend: 39 Isaac cases

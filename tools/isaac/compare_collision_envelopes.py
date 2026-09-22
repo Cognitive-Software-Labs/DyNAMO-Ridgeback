@@ -187,10 +187,22 @@ def hull(p):
     return p[ConvexHull(p).vertices]
 
 
-allp = np.concatenate([p for _, p in gz + isaac])
+gz_points = np.concatenate([p for _, p in gz])
+isaac_points = np.concatenate([p for _, p in isaac])
+gz_center_xy = (gz_points[:, :2].min(axis=0) + gz_points[:, :2].max(axis=0)) / 2
+isaac_center_xy = (
+    isaac_points[:, :2].min(axis=0) + isaac_points[:, :2].max(axis=0)
+) / 2
+isaac_alignment_xy = gz_center_xy - isaac_center_xy
+isaac_aligned = [
+    (name, p + np.array([*isaac_alignment_xy, 0.0])) for name, p in isaac
+]
+alignedp = np.concatenate([p for _, p in gz + isaac_aligned])
+allp = np.concatenate([gz_points, isaac_points])
 new = hull(allp[:, :2])
-gazebo_hull = hull(np.concatenate([p[:, :2] for _, p in gz]))
-isaac_hull = hull(np.concatenate([p[:, :2] for _, p in isaac]))
+gazebo_hull = hull(gz_points[:, :2])
+isaac_hull = hull(isaac_points[:, :2])
+isaac_aligned_hull = hull(np.concatenate([p[:, :2] for _, p in isaac_aligned]))
 effective = old + np.sign(old) * args.footprint_padding
 # Outward-oriented signed edge distances: positive means outside current polygon.
 def signed_outside(polygon, points):
@@ -203,6 +215,7 @@ def signed_outside(polygon, points):
 
 
 outside = signed_outside(old, allp[:, :2])
+aligned_outside = signed_outside(old, alignedp[:, :2])
 effective_outside = signed_outside(effective, allp[:, :2])
 plt.rcParams.update(
     {
@@ -298,6 +311,68 @@ fig.tight_layout(rect=(0.025, 0.23, 0.98, 0.92))
 fig.savefig(OUT / "topdown.png", dpi=180)
 fig.savefig(OUT / "topdown.svg")
 plt.close(fig)
+
+aligned_legend = [
+    Line2D([], [], color=COL["gz"], lw=2, label="Gazebo collision hull"),
+    Line2D([], [], color=COL["isaac"], lw=2, label="Isaac collision hull, recentered"),
+    Line2D([], [], color=COL["new"], lw=3, label="Configured 16-point outline"),
+]
+fig, axs = plt.subplots(1, 2, figsize=(14, 7), gridspec_kw={"width_ratios": [1.15, 1]})
+for ax in axs:
+    ax.add_patch(Polygon(old, facecolor=COL["new"], edgecolor="none", alpha=0.06))
+    poly(ax, gazebo_hull, COL["gz"], lw=1.5)
+    poly(ax, isaac_aligned_hull, COL["isaac"], lw=1.5)
+    poly(ax, old, COL["new"], lw=2.5)
+    style(ax, "Forward x (m)", "Left y (m)")
+axs[0].set(
+    xlim=(-0.50, 0.50),
+    ylim=(-0.43, 0.43),
+    title="Aligned shared envelope",
+)
+axs[0].annotate("Front →", (0.31, -0.41), color="#475467")
+axs[0].plot(0, 0, "+", color="#344054")
+axs[0].text(0.01, 0.015, "base_link", fontsize=9)
+axs[1].set(
+    xlim=(0.27, 0.49),
+    ylim=(0.18, 0.41),
+    title="Front-left corner • enlarged",
+)
+axs[1].annotate(
+    f"Minimum model margin\n{-aligned_outside * 1000:.3f} mm",
+    xy=(0.389, 0.348),
+    xytext=(0.30, 0.377),
+    color=COL["new"],
+    fontsize=10,
+    arrowprops={"arrowstyle": "->", "color": COL["new"]},
+)
+fig.suptitle(
+    "Aligned simulator envelope • accepted Nav2 body outline",
+    fontsize=20,
+    x=0.055,
+    ha="left",
+)
+fig.legend(
+    handles=aligned_legend,
+    loc="lower center",
+    ncol=3,
+    bbox_to_anchor=(0.5, 0.085),
+    frameon=False,
+)
+fig.text(
+    0.055,
+    0.033,
+    "ACCEPTED  •  Isaac recentered by "
+    f"({isaac_alignment_xy[0] * 1000:+.3f}, "
+    f"{isaac_alignment_xy[1] * 1000:+.3f}) mm to match Gazebo. "
+    f"Separate {args.footprint_padding * 1000:.0f} mm runtime padding is not shown.",
+    fontsize=10,
+    color="#475467",
+)
+fig.tight_layout(rect=(0.025, 0.19, 0.98, 0.92))
+fig.savefig(OUT / "aligned-topdown.png", dpi=180)
+fig.savefig(OUT / "aligned-topdown.svg")
+plt.close(fig)
+
 fig, axs = plt.subplots(1, 2, figsize=(14, 8), gridspec_kw={"width_ratios": [1.15, 1]})
 for ax in axs:
     outlines(ax, gz, [0, 2], COL["gz"])
@@ -384,7 +459,11 @@ result = {
     "diagnostic_union": new.tolist(),
     "gazebo_collision_hull": gazebo_hull.tolist(),
     "isaac_collision_hull": isaac_hull.tolist(),
+    "isaac_aligned_collision_hull": isaac_aligned_hull.tolist(),
+    "isaac_equivalence_alignment_xy_m": isaac_alignment_xy.tolist(),
     "max_outside_old_m": float(outside),
+    "max_outside_nominal_aligned_m": float(aligned_outside),
+    "minimum_nominal_aligned_clearance_m": float(-aligned_outside),
     "max_outside_effective_m": float(effective_outside),
     "minimum_effective_clearance_m": float(-effective_outside),
     "bounds": {

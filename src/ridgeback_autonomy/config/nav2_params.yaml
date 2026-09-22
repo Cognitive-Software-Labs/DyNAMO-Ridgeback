@@ -149,11 +149,10 @@ local_costmap:
       width: 5
       height: 5
       resolution: 0.06
-      # Circumscribing octagon of the r100 body-collision mesh: tangent to the
-      # real chamfered hull, so it ENCLOSES the body (never cuts inside it) while
-      # trimming the front/back corners the bounding rectangle over-claimed.
-      # Sides stay at +-0.395 (exact); corners cut to (+-0.335,+-0.395)/(+-0.466,+-0.263).
-      footprint: "[ [0.466, 0.263], [0.335, 0.395], [-0.335, 0.395], [-0.466, 0.263], [-0.466, -0.263], [-0.335, -0.395], [0.335, -0.395], [0.466, -0.263] ]"
+      # Symmetric 16-point outline fitted to the aligned Gazebo/Isaac collision
+      # envelope in base_link, with 2 mm of nominal model clearance. Backend
+      # origin-equivalence offsets are absorbed by the separate runtime padding.
+      footprint: "[ [0.468254, 0.156721], [0.392180, 0.340381], [0.355273, 0.377288], [0.307650, 0.397014], [-0.307650, 0.397014], [-0.355273, 0.377288], [-0.392180, 0.340381], [-0.468254, 0.156721], [-0.468254, -0.156721], [-0.392180, -0.340381], [-0.355273, -0.377288], [-0.307650, -0.397014], [0.307650, -0.397014], [0.355273, -0.377288], [0.392180, -0.340381], [0.468254, -0.156721] ]"
       # Explicit runtime clearance around the nominal body polygon. This was
       # previously Nav2's implicit default; keep it pinned and audited.
       footprint_padding: 0.01
@@ -213,11 +212,8 @@ global_costmap:
       rolling_window: true
       width: 60
       height: 60
-      # Circumscribing octagon of the r100 body-collision mesh: tangent to the
-      # real chamfered hull, so it ENCLOSES the body (never cuts inside it) while
-      # trimming the front/back corners the bounding rectangle over-claimed.
-      # Sides stay at +-0.395 (exact); corners cut to (+-0.335,+-0.395)/(+-0.466,+-0.263).
-      footprint: "[ [0.466, 0.263], [0.335, 0.395], [-0.335, 0.395], [-0.466, 0.263], [-0.466, -0.263], [-0.335, -0.395], [0.335, -0.395], [0.466, -0.263] ]"
+      # Keep this identical to the local-costmap nominal body outline.
+      footprint: "[ [0.468254, 0.156721], [0.392180, 0.340381], [0.355273, 0.377288], [0.307650, 0.397014], [-0.307650, 0.397014], [-0.355273, 0.377288], [-0.392180, 0.340381], [-0.468254, 0.156721], [-0.468254, -0.156721], [-0.392180, -0.340381], [-0.355273, -0.377288], [-0.307650, -0.397014], [0.307650, -0.397014], [0.355273, -0.377288], [0.392180, -0.340381], [0.468254, -0.156721] ]"
       footprint_padding: 0.01
       resolution: 0.06
       track_unknown_space: true
