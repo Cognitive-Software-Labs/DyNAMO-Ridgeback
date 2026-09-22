@@ -63,8 +63,11 @@ simulator, and navigation envelopes.
 - The CPU PhysX TGS solver uses 16 position and four velocity iterations for
   the candidate articulation. Self-collision is disabled. The chassis is free
   in all six degrees of freedom and spawns with 10 mm wheel-envelope clearance.
-- The mast and bracket are absent from the shared description and therefore
-  absent from this candidate. Sharing and measuring them remains backlog work.
+- The September 18 qualified candidate predated the shared camera support and
+  therefore omitted its mast and bracket. The current description includes both;
+  a new sweep would merge their fixed-link masses, inertias and colliders into
+  the experimental chassis. The archived result remains scoped to its older
+  geometry input and must not be presented as a qualification of the support.
 
 Root pose and joint state setters are used only between cases to reset the
 experiment. During each measured case, only wheel velocity targets drive the

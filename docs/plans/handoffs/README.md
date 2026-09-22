@@ -8,5 +8,3 @@ source of truth for what the work is, and resolved findings move to their
 technical reference.
 
 Filenames follow the plan convention, `<SCOPE>_<topic>_<author>.md`.
-
-- [ISAAC — Shared robot geometry, camera support and footprint](ISAAC_camera_support_geometry_session.md): whole-goal context and remaining geometry/footprint gates; shared camera support implemented with deck placement retained.
