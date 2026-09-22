@@ -24,7 +24,11 @@ ROOT = Path(__file__).resolve().parents[2]
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("--urdf", type=Path, required=True)
 parser.add_argument("--output", type=Path, required=True)
+parser.add_argument("--footprint-padding", type=float, default=0.0,
+                    help="runtime Nav2 footprint padding in metres")
 args = parser.parse_args()
+if args.footprint_padding < 0:
+    parser.error("--footprint-padding must be non-negative")
 OUT = args.output.resolve()
 OUT.relative_to(ROOT / "artifacts")
 OUT.mkdir(parents=True, exist_ok=False)
@@ -42,7 +46,8 @@ shutil.copy2(__file__, OUT / "comparison-source.py")
 (OUT / "source.patch").write_bytes(
     subprocess.check_output(["git", "diff", "HEAD"], cwd=ROOT)
 )
-COL = {"gz": "#297bd1", "isaac": "#df8728", "old": "#bd365d", "new": "#008d77"}
+COL = {"gz": "#297bd1", "isaac": "#df8728", "old": "#bd365d",
+       "effective": "#7656c9", "new": "#008d77"}
 
 
 def box(size):
@@ -184,15 +189,21 @@ def hull(p):
 
 allp = np.concatenate([p for _, p in gz + isaac])
 new = hull(allp[:, :2])
+gazebo_hull = hull(np.concatenate([p[:, :2] for _, p in gz]))
+isaac_hull = hull(np.concatenate([p[:, :2] for _, p in isaac]))
+effective = old + np.sign(old) * args.footprint_padding
 # Outward-oriented signed edge distances: positive means outside current polygon.
-e = np.roll(old, -1, axis=0) - old
-outside = np.max(
-    (
-        e[:, 1, None] * (allp[:, 0] - old[:, 0, None])
-        - e[:, 0, None] * (allp[:, 1] - old[:, 1, None])
-    )
-    / np.linalg.norm(e, axis=1)[:, None]
-)
+def signed_outside(polygon, points):
+    edges = np.roll(polygon, -1, axis=0) - polygon
+    return float(np.max(
+        (edges[:, 1, None] * (points[:, 0] - polygon[:, 0, None])
+         - edges[:, 0, None] * (points[:, 1] - polygon[:, 1, None]))
+        / np.linalg.norm(edges, axis=1)[:, None]
+    ))
+
+
+outside = signed_outside(old, allp[:, :2])
+effective_outside = signed_outside(effective, allp[:, :2])
 plt.rcParams.update(
     {
         "font.family": "DejaVu Sans",
@@ -232,6 +243,8 @@ legend = [
     Line2D([], [], color=COL["gz"], label="Gazebo description collisions"),
     Line2D([], [], color=COL["isaac"], label="Isaac authored collisions"),
     Line2D([], [], color=COL["old"], ls="--", lw=2, label="Current Nav2 (unpadded)"),
+    Line2D([], [], color=COL["effective"], ls=":", lw=2,
+           label=f"Effective Nav2 ({args.footprint_padding * 1000:.0f} mm padding)"),
     Line2D(
         [],
         [],
@@ -245,6 +258,7 @@ for ax in axs:
     outlines(ax, gz, [0, 1], COL["gz"])
     outlines(ax, isaac, [0, 1], COL["isaac"])
     poly(ax, old, COL["old"], "--")
+    poly(ax, effective, COL["effective"], ":")
     poly(ax, new, COL["new"])
     style(ax, "Forward x (m)", "Left y (m)")
 axs[0].set(xlim=(-0.54, 0.54), ylim=(-0.46, 0.46), title="Top view • complete robot")
@@ -276,7 +290,7 @@ fig.legend(
 fig.text(
     0.055,
     0.025,
-    "STATIC AUDIT  •  Union is diagnostic, not a proposed footprint or shared robot model. No padding.",
+    "STATIC AUDIT  •  Union is diagnostic, not a proposed footprint or shared robot model.",
     fontsize=10,
     color="#475467",
 )
@@ -292,13 +306,14 @@ for ax in axs:
 axs[0].set(xlim=(-0.54, 0.54), ylim=(-0.16, 1.18), title="Side view • collision shapes")
 for pts, y, color, ls in [
     (old, -0.07, COL["old"], "--"),
-    (new, -0.12, COL["new"], "-"),
+    (effective, -0.105, COL["effective"], ":"),
+    (new, -0.14, COL["new"], "-"),
 ]:
     axs[0].plot([pts[:, 0].min(), pts[:, 0].max()], [y, y], color=color, ls=ls, lw=3)
     for x in [pts[:, 0].min(), pts[:, 0].max()]:
         axs[0].plot([x, x], [y - 0.012, y + 0.012], color=color)
 axs[0].annotate(
-    "Mast and bracket\nIsaac only today",
+    "Shared mast and bracket",
     xy=(0.1955, 0.72),
     xytext=(-0.49, 0.82),
     arrowprops={"arrowstyle": "->", "color": "#475467"},
@@ -323,7 +338,9 @@ axs[1].set(
     ylim=(-0.085, 0.32),
     title="Body detail • rear / front extent changes",
 )
-for pts, color, ls in [(old, COL["old"], "--"), (new, COL["new"], "-")]:
+for pts, color, ls in [(old, COL["old"], "--"),
+                       (effective, COL["effective"], ":"),
+                       (new, COL["new"], "-")]:
     for x in [pts[:, 0].min(), pts[:, 0].max()]:
         axs[1].axvline(x, color=color, ls=ls, lw=1.5)
 axs[1].text(
@@ -362,8 +379,14 @@ result = {
         ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True
     ).strip(),
     "old": old.tolist(),
+    "effective": effective.tolist(),
+    "footprint_padding_m": args.footprint_padding,
     "diagnostic_union": new.tolist(),
+    "gazebo_collision_hull": gazebo_hull.tolist(),
+    "isaac_collision_hull": isaac_hull.tolist(),
     "max_outside_old_m": float(outside),
+    "max_outside_effective_m": float(effective_outside),
+    "minimum_effective_clearance_m": float(-effective_outside),
     "bounds": {
         k: {
             "min": np.concatenate([p for _, p in data]).min(axis=0).tolist(),
@@ -388,15 +411,10 @@ result["parts"] = {
             "max_outside_unpadded_m": float(
                 max(
                     0,
-                    np.max(
-                        (
-                            e[:, 1, None] * (p[:, 0] - old[:, 0, None])
-                            - e[:, 0, None] * (p[:, 1] - old[:, 1, None])
-                        )
-                        / np.linalg.norm(e, axis=1)[:, None]
-                    ),
+                    signed_outside(old, p[:, :2]),
                 )
             ),
+            "signed_outside_effective_m": signed_outside(effective, p[:, :2]),
         }
         for name, p in data
     ]

@@ -1,0 +1,114 @@
+{
+  "aabb_control_checks": {
+    "boot_1": true,
+    "boot_2": true,
+    "boot_3": true
+  },
+  "cases": {
+    "aabb_control_angle_0.10": {
+      "all_passed": true,
+      "boots": 3,
+      "median_stop_x": 0.39134863018989563,
+      "stop_spread": 0.0
+    },
+    "full_robot_angle_0.10": {
+      "all_passed": true,
+      "boots": 3,
+      "median_stop_x": 0.4869999885559082,
+      "stop_spread": 0.0
+    },
+    "full_robot_front_0.10": {
+      "all_passed": true,
+      "boots": 3,
+      "median_stop_x": 0.538154125213623,
+      "stop_spread": 0.0
+    },
+    "full_robot_side_0.10": {
+      "all_passed": true,
+      "boots": 3,
+      "median_stop_x": 0.6048046946525574,
+      "stop_spread": 0.0
+    },
+    "hull_only_angle_0.05": {
+      "all_passed": true,
+      "boots": 3,
+      "median_stop_x": 0.4869886040687561,
+      "stop_spread": 0.0
+    },
+    "hull_only_angle_0.10": {
+      "all_passed": true,
+      "boots": 3,
+      "median_stop_x": 0.4869999289512634,
+      "stop_spread": 0.0
+    },
+    "hull_only_angle_0.20": {
+      "all_passed": true,
+      "boots": 3,
+      "median_stop_x": 0.48702409863471985,
+      "stop_spread": 0.0
+    },
+    "hull_only_front_0.05": {
+      "all_passed": true,
+      "boots": 3,
+      "median_stop_x": 0.5381543636322021,
+      "stop_spread": 0.0
+    },
+    "hull_only_front_0.10": {
+      "all_passed": true,
+      "boots": 3,
+      "median_stop_x": 0.538154125213623,
+      "stop_spread": 0.0
+    },
+    "hull_only_front_0.20": {
+      "all_passed": true,
+      "boots": 3,
+      "median_stop_x": 0.5381535291671753,
+      "stop_spread": 0.0
+    },
+    "hull_only_side_0.05": {
+      "all_passed": true,
+      "boots": 3,
+      "median_stop_x": 0.6048046946525574,
+      "stop_spread": 0.0
+    },
+    "hull_only_side_0.10": {
+      "all_passed": true,
+      "boots": 3,
+      "median_stop_x": 0.6048046946525574,
+      "stop_spread": 0.0
+    },
+    "hull_only_side_0.20": {
+      "all_passed": true,
+      "boots": 3,
+      "median_stop_x": 0.604804515838623,
+      "stop_spread": 0.0
+    }
+  },
+  "checks": {
+    "aabb_control": true,
+    "all_boots_completed": true,
+    "all_cases_passed": true,
+    "child_processes": true,
+    "cross_boot_repeatability": true
+  },
+  "child_failures": [],
+  "conclusive": true,
+  "physics_passed": true,
+  "repeat_checks": {
+    "aabb_control_angle_0.10": true,
+    "full_robot_angle_0.10": true,
+    "full_robot_front_0.10": true,
+    "full_robot_side_0.10": true,
+    "hull_only_angle_0.05": true,
+    "hull_only_angle_0.10": true,
+    "hull_only_angle_0.20": true,
+    "hull_only_front_0.05": true,
+    "hull_only_front_0.10": true,
+    "hull_only_front_0.20": true,
+    "hull_only_side_0.05": true,
+    "hull_only_side_0.10": true,
+    "hull_only_side_0.20": true
+  },
+  "status": "PASS",
+  "validation_substrate_clean": true
+}

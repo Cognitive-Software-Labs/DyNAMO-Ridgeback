@@ -19,28 +19,43 @@ An image of one does not establish the others.
 
 The figure plots the identical local/global costmap `footprint` entries from
 [`nav2_params.yaml`](../../src/ridgeback_autonomy/config/nav2_params.yaml).
-It shows the configured polygon before any runtime padding or costmap inflation;
-no physical-body or simulator-collider outline is asserted by this plot.
-The configuration comments describe an intended circumscribing body octagon.
-That intent still needs the [envelope audit](../BACKLOG.md#collision-envelope-and-navigation-footprint-validation)
-against the actual backend meshes and physical attachments.
+It shows the nominal polygon before runtime padding or costmap inflation. Both
+costmaps explicitly apply 10 mm of `footprint_padding`; this pins the former
+Nav2 default as part of the project configuration.
 
-Nav2's collision monitor consumes `local_costmap/published_footprint` for its
-approach polygon. Inspect the effective parameters and published footprint when
-qualifying a deployment; a source configuration alone does not prove the live
-robot's clearance.
+![Gazebo and Isaac collision projections inside the effective 10 mm padded Nav2 footprint.](assets/navigation-footprint-envelope.png)
+
+The September 22 static audit retained the nominal octagon. Isaac extends at
+most 4.663 mm outside that unpadded outline and the generated Gazebo description
+extends at most 0.254 mm outside it. The effective padded polygon encloses both
+projections with at least 5.337 mm clearance. The green union is diagnostic; it
+is not a replacement robot outline.
+
+The containment policy is: the nominal polygon records the intended body
+outline, while the effective polygon must enclose every current simulator
+collision projection with at least 5 mm of static margin. Inflation remains an
+obstacle-cost policy and does not count toward this geometric margin. Physical
+hardware requires a separately measured outline and clearance qualification.
+
+Live Gazebo and Isaac launches both reported 10 mm padding and published the
+same padded octagon. Nav2's collision monitor consumes
+`local_costmap/published_footprint`; its initial visualization is empty before
+command flow begins, then publishes that full padded octagon in `base_link`.
 
 ## Backend contact representations
 
 | Backend | Current reference or limitation |
 |---|---|
-| Gazebo | Collision elements come through the generated robot description; agreement with the Isaac hull and physical robot has not been established by this documentation split. |
-| Isaac | The importer grafts vendor chassis geometry, uses its convex hull, and authors additional parts. The [Isaac collider reference](../isaac/robot-model.md#colliders) owns those shapes and its contact-envelope comparison. |
+| Gazebo | Collision elements come through the generated robot description. Three cold-boot wall-contact matrices passed for front, side and 45° approaches at 0.05, 0.10 and 0.20 m/s. |
+| Isaac | The importer grafts vendor chassis geometry, uses its convex hull, and authors additional parts. Three cold-boot wall-contact matrices passed the same orientation/speed set plus full-robot and retired-AABB controls. The [Isaac collider reference](../isaac/robot-model.md#colliders) owns those shapes. |
 | Hardware | The physical robot determines contact. Navigation geometry must account for the deployed attachments and required clearance; software polygons do not prove physical clearance. |
 
-The existing yellow-hull/red-box contact figure compares Isaac representations.
-It stays with that backend. Its contact tolerance and validation results cannot
-be transferred to Gazebo or hardware without separate evidence.
+Both simulator matrices used a 10 mm stop-position gate, 5 mm penetration,
+hold-oscillation and tangent-drift gates, 0.5° yaw drift, and stop/reverse
+recovery. Isaac passed all 39 cases. Gazebo passed all 27 cases; its worst
+penetration was 0.341 mm, worst stop-position spread across boots was 0.001 mm,
+and every recovery cleared the first 5 mm within 0.163 s. These simulator
+results do not transfer to hardware.
 
 ## Relationship between the outline and contact geometry
 
@@ -72,15 +87,14 @@ as separate settings.
 Gazebo and Isaac need an agreed chassis/attachment envelope, not identical wheel
 solvers. Isaac deliberately uses a fixed-height planar drive and disables wheel
 contacts; its [drive rationale and limits](../isaac/robot-model.md#why-this-abstraction-fits-the-current-work)
-explain the scope. Missing mast geometry or different chassis extents are still
-gaps to resolve. Enlarging Nav2 to the union of disagreeing models would not
-resolve those gaps.
+explain the scope. The small chassis-transform differences remain visible in the
+static comparison and are covered by the explicit clearance policy rather than
+being hidden by replacing the nominal polygon with the model union.
 
 ## Qualification ownership
 
-[Shared mast geometry](../BACKLOG.md#shared-camera-mast-and-bracket-geometry),
-[dimensional provenance](../BACKLOG.md#robot-geometry-and-drawing-audit), and
-[collision-envelope validation](../BACKLOG.md#collision-envelope-and-navigation-footprint-validation)
+[Dimensional provenance](../BACKLOG.md#robot-geometry-and-drawing-audit) and the
+remaining [physical envelope qualification](../BACKLOG.md#collision-envelope-and-navigation-footprint-validation)
 are separate completion gates. A geometry change that affects benchmark inputs
 or measured behavior requires rerunning the affected benchmarks before quoting
 results.
@@ -101,15 +115,19 @@ xacro artifacts/collision-envelope-validation/setup/robot.urdf.xacro \
 MPLCONFIGDIR=/tmp/ridgeback-mpl isaac_venv/bin/python \
   tools/isaac/compare_collision_envelopes.py \
   --urdf artifacts/collision-envelope-validation/robot.urdf \
-  --output artifacts/collision-envelope-validation/review-new
+  --output artifacts/collision-envelope-validation/review-new \
+  --footprint-padding 0.01
 ```
 
 The review directory must be fresh. Outputs include top-down and side figures,
-per-part bounds, input hashes, source/configuration snapshots and the dirty-tree
-patch. The plotted union is a diagnostic outline, not an automatically approved
-footprint. This static extraction does not inspect Gazebo's live physics engine,
-contact margins, runtime padding or hardware.
+backend collision hulls, per-part bounds, effective-footprint clearance, input
+hashes, source/configuration snapshots and the dirty-tree patch. The plotted
+union is a diagnostic outline, not an automatically approved footprint. Use
+`tools/isaac/validate_chassis_contacts.py` and
+`tools/gazebo/validate_chassis_contacts.py` for physics contact evidence; the
+static extraction does not qualify hardware.
 
 ## Archived evidence
 
 - [September 18 static envelope audit](../../archive/engineering/2026-09-18-collision-envelope-audit.md)
+- [September 22 simulator footprint qualification](../../archive/engineering/2026-09-22-navigation-footprint-qualification.md)

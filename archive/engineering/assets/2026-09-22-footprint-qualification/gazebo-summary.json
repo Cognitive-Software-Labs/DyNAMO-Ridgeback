@@ -1,0 +1,87 @@
+{
+  "status": "PASS",
+  "boots": 3,
+  "cases": {
+    "gazebo_front_0.05": {
+      "all_passed": true,
+      "stop_x_spread_m": 2.940254297811862e-07,
+      "max_penetration_m": 2.970968229298876e-05,
+      "max_hold_oscillation_m": 2.9954649072294615e-07,
+      "max_tangent_drift_m": 1.9955855167672157e-08,
+      "max_yaw_drift_deg": 0.0001152016770893261,
+      "max_recovery_end_s": 0.14056824101135135
+    },
+    "gazebo_front_0.10": {
+      "all_passed": true,
+      "stop_x_spread_m": 1.4713598517346327e-07,
+      "max_penetration_m": 6.728397558219967e-06,
+      "max_hold_oscillation_m": 0.0,
+      "max_tangent_drift_m": 0.0,
+      "max_yaw_drift_deg": 0.0,
+      "max_recovery_end_s": 0.1403327790030744
+    },
+    "gazebo_front_0.20": {
+      "all_passed": true,
+      "stop_x_spread_m": 2.230643936229626e-07,
+      "max_penetration_m": 0.0003409767712270195,
+      "max_hold_oscillation_m": 2.776972314322279e-06,
+      "max_tangent_drift_m": 6.140731543682285e-08,
+      "max_yaw_drift_deg": 5.001619551464324e-05,
+      "max_recovery_end_s": 0.1398826660006307
+    },
+    "gazebo_angle_0.05": {
+      "all_passed": true,
+      "stop_x_spread_m": 4.773781370204233e-11,
+      "max_penetration_m": 6.778335269075342e-06,
+      "max_hold_oscillation_m": 5.060751428587196e-06,
+      "max_tangent_drift_m": 7.472725950973473e-11,
+      "max_yaw_drift_deg": 4.884904994900866e-06,
+      "max_recovery_end_s": 0.14279214601265267
+    },
+    "gazebo_angle_0.10": {
+      "all_passed": true,
+      "stop_x_spread_m": 2.4726887204451486e-12,
+      "max_penetration_m": 7.896742411439561e-05,
+      "max_hold_oscillation_m": 4.68646468121392e-06,
+      "max_tangent_drift_m": 6.667265492320414e-11,
+      "max_yaw_drift_deg": 3.6370489128136053e-06,
+      "max_recovery_end_s": 0.1620384730049409
+    },
+    "gazebo_angle_0.20": {
+      "all_passed": true,
+      "stop_x_spread_m": 4.226868099976855e-08,
+      "max_penetration_m": 0.00017838196572661502,
+      "max_hold_oscillation_m": 5.53495857147368e-06,
+      "max_tangent_drift_m": 7.0952583342681e-11,
+      "max_yaw_drift_deg": 3.4375955336003593e-06,
+      "max_recovery_end_s": 0.15987599999061786
+    },
+    "gazebo_side_0.05": {
+      "all_passed": true,
+      "stop_x_spread_m": 7.829836601302986e-07,
+      "max_penetration_m": 2.8217932099394716e-05,
+      "max_hold_oscillation_m": 1.000127426209474e-06,
+      "max_tangent_drift_m": 9.152138096571406e-08,
+      "max_yaw_drift_deg": 2.887298187729595e-05,
+      "max_recovery_end_s": 0.14024083901313134
+    },
+    "gazebo_side_0.10": {
+      "all_passed": true,
+      "stop_x_spread_m": 6.880026859334976e-08,
+      "max_penetration_m": 6.6086174950186205e-06,
+      "max_hold_oscillation_m": 0.0,
+      "max_tangent_drift_m": 0.0,
+      "max_yaw_drift_deg": 0.0,
+      "max_recovery_end_s": 0.15988301901961677
+    },
+    "gazebo_side_0.20": {
+      "all_passed": true,
+      "stop_x_spread_m": 9.173897197456427e-09,
+      "max_penetration_m": 1.5843984096264307e-05,
+      "max_hold_oscillation_m": 1.1618242723443473e-07,
+      "max_tangent_drift_m": 1.9307582345483125e-07,
+      "max_yaw_drift_deg": 2.8009222268955397e-05,
+      "max_recovery_end_s": 0.1398155890055932
+    }
+  }
+}

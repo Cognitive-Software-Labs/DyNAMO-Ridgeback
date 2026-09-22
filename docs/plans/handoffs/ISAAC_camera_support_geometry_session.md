@@ -3,8 +3,9 @@
 **Author:** geometry discussion session  
 **Written:** 2026-09-22  
 **Inspected revision:** `f65197b1551cb4f1b7a46050b3a6a995c38355f6` (`dev`)  
-**Status:** original discussion retained below; support-only implementation approved
-and completed September 22. See the implementation update before continuing.
+**Status:** original discussion retained below; support implementation and the
+simulator footprint/contact continuation completed September 22. Physical
+envelope qualification remains with the owning backlog item.
 
 ## September 22 implementation update
 
@@ -13,7 +14,24 @@ The [shared reference](../../robot/geometry.md#shared-camera-support) now owns t
 implemented definition, retained deck inputs, simulation-mass assumptions and
 reviewed image. The shared geometry and Isaac asset adaptation are implemented;
 the original discussion below is historical context, not an instruction to redo
-the proposal. Remaining qualifications stay in the three owning backlog items.
+the proposal. Read the footprint/contact update before using the original
+continuation list.
+
+## September 22 footprint and contact update
+
+The local/global source polygons remain equal and now explicitly pin their
+previous 10 mm Nav2 padding. Static extraction found at least 5.337 mm effective
+clearance around the union of current Gazebo and Isaac collision projections.
+Live launches published the expected padded polygon, including through the
+collision monitor during command flow.
+
+Front, side and 45° wall contacts at 0.05/0.10/0.20 m/s, held contact and
+stop/reverse recovery passed across three cold boots per backend: 39 Isaac cases
+and 27 Gazebo cases. The maintained
+[collision reference](../../robot/collision_model.md) owns the current policy and
+reproduction path; the dated archive record owns the run evidence. The remaining
+gate is a measured physical envelope and hardware clearance under the physical
+command chain.
 
 ## User direction and next-session objective
 
@@ -209,6 +227,8 @@ was changed to create this handoff.
 
 ## Archived evidence
 
+- [September 22 footprint and simulator-contact qualification](../../../archive/engineering/2026-09-22-navigation-footprint-qualification.md):
+  effective footprint containment and three-boot Gazebo/Isaac contact matrices.
 - [September 18 physical mecanum investigation](../../../archive/engineering/2026-09-18-mecanum-drive-investigation.md):
   tested at `09840529df62af6612deadfe4d4990c9d1011e5c` with per-boot dirty-tree
   snapshots; partial provenance, qualification results and recorded-state videos.

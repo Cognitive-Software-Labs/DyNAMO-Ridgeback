@@ -154,6 +154,9 @@ local_costmap:
       # trimming the front/back corners the bounding rectangle over-claimed.
       # Sides stay at +-0.395 (exact); corners cut to (+-0.335,+-0.395)/(+-0.466,+-0.263).
       footprint: "[ [0.466, 0.263], [0.335, 0.395], [-0.335, 0.395], [-0.466, 0.263], [-0.466, -0.263], [-0.335, -0.395], [0.335, -0.395], [0.466, -0.263] ]"
+      # Explicit runtime clearance around the nominal body polygon. This was
+      # previously Nav2's implicit default; keep it pinned and audited.
+      footprint_padding: 0.01
       always_send_full_costmap: true
       plugins: ["voxel_layer", "inflation_layer"]
       inflation_layer:
@@ -215,6 +218,7 @@ global_costmap:
       # trimming the front/back corners the bounding rectangle over-claimed.
       # Sides stay at +-0.395 (exact); corners cut to (+-0.335,+-0.395)/(+-0.466,+-0.263).
       footprint: "[ [0.466, 0.263], [0.335, 0.395], [-0.335, 0.395], [-0.466, 0.263], [-0.466, -0.263], [-0.335, -0.395], [0.335, -0.395], [0.466, -0.263] ]"
+      footprint_padding: 0.01
       resolution: 0.06
       track_unknown_space: true
       always_send_full_costmap: true

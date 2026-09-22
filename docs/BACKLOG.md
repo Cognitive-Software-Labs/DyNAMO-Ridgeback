@@ -264,19 +264,24 @@ until a traction, terrain, traversal, or wheel-control requirement justifies it.
 Geometry and footprint validation can proceed independently; shared outlines do
 not establish wheel-contact parity.
 
-**Gap.** Nav2 defines its planar footprint separately from simulator collision
-geometry. Its comments claim a circumscribing body polygon, while the available
-contact-envelope illustration qualifies only Isaac representations. Agreement
-with Gazebo and the deployed hardware, including attachments, remains unproven.
+**Qualified simulator state.** The nominal local/global octagons remain equal,
+and both costmaps now pin the audited 10 mm runtime padding explicitly. The
+effective footprint encloses the current Gazebo and Isaac collision projections
+with at least 5.337 mm static margin. Front, side and 45° contact, held contact,
+and stop/reverse recovery passed at 0.05/0.10/0.20 m/s across three cold boots
+per backend. The [collision reference](robot/collision_model.md) owns the policy,
+limits and reproduction path.
 
-**Completion criteria.** Overlay the configured and effective Nav2 footprints,
-each simulator's collision geometry, and the measured physical envelope in the
-same frame, with height-dependent attachment limits and explicit uncertainty.
-Choose and document the required containment and clearance policy; fix any
-violations. Validate frontal, lateral, and angled contacts plus stop/reverse
-recovery separately in each simulator. Qualify hardware clearance under the
-physical command-chain validation gate; simulator contact results do not close
-that gate. Preserve backend-specific tolerances and rerun affected benchmarks.
+**Remaining gap.** Agreement with the deployed hardware, including attachments,
+is unproven. The field visit supplied selected tape readings rather than a
+surveyed planar outline, uncertainty model, or physical stopping/clearance test.
+
+**Completion criteria.** Add the measured physical envelope to the existing
+same-frame overlay, including height-dependent attachment limits and explicit
+uncertainty. Fix any violation of the documented containment policy. Qualify
+hardware clearance under the physical command-chain validation gate; simulator
+contact results do not close that gate. Rerun affected benchmarks if a geometry
+or footprint correction changes their inputs or measured behavior.
 
 **Context.** [Collision model and footprint](robot/collision_model.md),
 [Isaac colliders](isaac/robot-model.md#colliders), and
