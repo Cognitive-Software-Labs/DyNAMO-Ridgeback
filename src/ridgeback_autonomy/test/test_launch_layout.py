@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import json
 from pathlib import Path
 import re
 
@@ -162,6 +164,18 @@ def test_public_gazebo_maps_use_the_noncolliding_world_names() -> None:
         assert (maps / f'{world}.png').exists()
         assert (maps / f'{world}.yaml').read_text(encoding='utf-8').startswith(
             f'image: {world}.pgm')
+        provenance = json.loads(
+            (maps / f'{world}.provenance.json').read_text(encoding='utf-8'))
+        assert provenance['public_world'] == world
+        assert 'gz' in provenance['backends']
+        for suffix, expected in provenance['map_sha256'].items():
+            assert hashlib.sha256(
+                (maps / f'{world}.{suffix}').read_bytes()).hexdigest() == expected
+
+    exploration = (
+        repo_root / 'src' / 'ridgeback_autonomy' / 'launch' /
+        'ridgeback_exploration.launch.py').read_text(encoding='utf-8')
+    assert "'backend': backend" in exploration
 
     historical = maps / 'historical'
     assert not (historical / 'mock_hospital.pgm').exists()

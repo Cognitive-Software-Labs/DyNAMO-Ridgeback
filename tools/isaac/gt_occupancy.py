@@ -272,6 +272,12 @@ def main():
                          "is derived from the input world's registered floor")
     ap.add_argument("--resolution", type=float, default=RESOLUTION)
     ap.add_argument("--png", type=Path, help="optional preview PNG")
+    ap.add_argument(
+        "--map-set", action="store_true",
+        help="write the complete .pgm/.yaml/.png/.npz set at the output stem")
+    ap.add_argument(
+        "--seed", default="0,0", metavar="X,Y",
+        help="reachable-free-space flood seed used with --map-set (default: 0,0)")
     args = ap.parse_args()
 
     world = parse_world(args.sdf)
@@ -280,6 +286,20 @@ def main():
         plane_z = lidar_plane_z_for_world(args.sdf)
     grid, ignore, origin = build_grid(
         world, plane_z=plane_z, resolution=args.resolution)
+    if args.map_set:
+        try:
+            seed = tuple(float(value) for value in args.seed.split(","))
+        except ValueError as exc:
+            ap.error(f"--seed must be X,Y: {exc}")
+        if len(seed) != 2:
+            ap.error("--seed must be X,Y")
+        occupied = grid == 100
+        free = flood_free(
+            occupied, origin, seed, args.resolution)
+        unknown = ~(occupied | free) | ignore
+        return write_map_set(
+            args.out.parent, args.out.stem, occupied, free, unknown, origin,
+            args.resolution, plane_z)
     np.savez_compressed(
         args.out, grid=grid, ignore=ignore, origin=np.array(origin),
         resolution=args.resolution, plane_z=plane_z)

@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "public_world": "coworking_space",
+  "backends": ["gz"],
+  "source_world": "office",
+  "source_revision": "590a45118c599c08abdf3bd3d02d5fa7a8af9a49",
+  "source_sha256": {
+    "clearpath_gz/worlds/office.sdf": "ad9b9f34b42c69800ec91219fad4c3c0a1e623aabde938f5731e07901560aaa7",
+    "clearpath_gz/meshes/office/office.dae": "b3fe071a54093209e6b0073220c24f1adc74ce0b0f5c977df41369f5c3f2be05",
+    "clearpath_gz/meshes/accessories/wibotic_tr301.dae": "f207ae483556a61d1db986dc2a794e9edb68c4e36b55dd5d28fe00763ab3795e",
+    "clearpath_gz/meshes/accessories/wibotic_tr301.stl": "5b7bfbb12242ebbc4fcbe34f5026afce15da805e27cc576bbb94986651f867bd"
+  },
+  "map_kind": "driven_capture_recertified",
+  "map_sha256": {
+    "pgm": "5ee0d9b94215a323c52db769a824d8fc40b8575d714796a3a2a514b3e0691250",
+    "yaml": "3877591f397703c22ddb84b663390cc699f63e7f5e1d6e1e1ffe9f6ce8de9701",
+    "png": "48b0ffabe560a71cff202fee02eb75c2046c378c7204aee11e8b452673c499d8",
+    "npz": "d78a2e57b96f7a702c727b9b140dea921fa86685670d616cd3db2e36d1cd8c41"
+  },
+  "resolution_m": 0.05,
+  "plane_z_m": 0.25257,
+  "certified_on": "2026-09-23"
+}

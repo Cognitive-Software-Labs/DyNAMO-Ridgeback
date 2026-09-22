@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "public_world": "initial_test_world",
+  "backends": ["gz", "isaac"],
+  "source_world": "initial_test_world",
+  "source_revision": "8c703794d1e4b20e70fe20baad7dd5ce664999db",
+  "source_sha256": {
+    "src/ridgeback_autonomy_gz/sim/worlds/initial_test_world.sdf": "47de9fb00af3dae9f89049824b2e5fde604e662c752cb29c03d4aef8103ce70d",
+    "src/ridgeback_autonomy_isaac/sim/isaac/usd/worlds/initial_test_world.usda": "724ccd941462173476fca44f996a6a160464f2bfdd919c3f47de6d727e8f958c"
+  },
+  "map_kind": "analytical_sdf_slice",
+  "map_sha256": {
+    "pgm": "1a35545684a6af357bc770fbd03bd747b12f5907da3c1499f340e41b3c764af3",
+    "yaml": "bed42b87c34b877a0e4cde7ae656e0804a3678ed468d83e510096b661b20b07f",
+    "png": "bc816d339a53f2b6b4587c05dc43e4b00f14b81d7c19531e2f52aebd1c42fcec",
+    "npz": "92b39c080bed6941de25e98a6a83596fdd79367afea574bfb3c53a2030a1a992"
+  },
+  "resolution_m": 0.05,
+  "plane_z_m": 0.30257,
+  "free_space_seed_xy_m": [0.0, 0.0],
+  "certified_on": "2026-09-23"
+}

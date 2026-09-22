@@ -15,6 +15,8 @@ Worlds without a ground-truth map (e.g. ``hospital``) just show ``n/a`` — the
 node never crashes.
 """
 
+import hashlib
+import json
 import os
 
 import rclpy
@@ -42,12 +44,14 @@ class CoverageOverlayNode(Node):
         super().__init__('coverage_overlay_node')
 
         self.declare_parameter('world', '')
+        self.declare_parameter('backend', '')
         self.declare_parameter('ground_truth_dir', '')
         self.declare_parameter('map_topic', 'map')
         self.declare_parameter('panel_topic', 'hud/coverage')
         self.declare_parameter('publish_rate_hz', 1.0)
 
         self.world = self.get_parameter('world').value or ''
+        self.backend = self.get_parameter('backend').value or ''
         gt_dir = self.get_parameter('ground_truth_dir').value or ''
         if not gt_dir:
             # Default to the maps installed with the package, so this works on
@@ -70,8 +74,35 @@ class CoverageOverlayNode(Node):
             self._gt_reason = f'no ground truth for {self.world}'
         else:
             try:
+                provenance_path = os.path.join(
+                    gt_dir, f'{self.world}.provenance.json')
+                provenance = None
+                if os.path.exists(provenance_path):
+                    with open(provenance_path, encoding='utf-8') as stream:
+                        provenance = json.load(stream)
+                    if provenance.get('public_world') != self.world:
+                        raise ValueError(
+                            'provenance public_world does not match requested '
+                            f'world {self.world!r}')
+                    if self.backend and self.backend not in provenance.get('backends', []):
+                        raise ValueError(
+                            f'ground truth is not certified for backend '
+                            f'{self.backend!r}')
+                    expected_pgm = provenance.get('map_sha256', {}).get('pgm')
+                    if expected_pgm:
+                        with open(gt_pgm, 'rb') as stream:
+                            actual_pgm = hashlib.sha256(stream.read()).hexdigest()
+                        if actual_pgm != expected_pgm:
+                            raise ValueError(
+                                'ground-truth PGM does not match its certified '
+                                'provenance')
                 self._gt_grid, self._gt_meta = pgm_to_grid(gt_pgm)
-                self.get_logger().info(f'Loaded ground truth: {gt_pgm}')
+                source = (
+                    f" from {provenance['source_world']}"
+                    if provenance else '')
+                self.get_logger().info(
+                    f'Loaded ground truth: {gt_pgm}{source} '
+                    f'(backend={self.backend or "unspecified"})')
             except Exception as exc:  # noqa: BLE001 - report, never crash the HUD
                 self._gt_reason = 'ground truth load failed'
                 self.get_logger().error(f'Failed to load ground truth {gt_pgm}: {exc}')
@@ -100,7 +131,8 @@ class CoverageOverlayNode(Node):
         self.pub.publish(m)
 
     def _panel_text(self):
-        title = f'COVERAGE  ({self.world})' if self.world else 'COVERAGE'
+        identity = '/'.join(value for value in (self.backend, self.world) if value)
+        title = f'COVERAGE  ({identity})' if identity else 'COVERAGE'
 
         if self._gt_grid is None:
             return self._pad(f'{title}\n n/a ({self._gt_reason})')

@@ -4,6 +4,7 @@ import importlib.util
 from pathlib import Path
 import sys
 
+import numpy as np
 import pytest
 
 
@@ -72,3 +73,32 @@ def test_runtime_and_map_tools_do_not_pin_old_geometry_defaults():
 
     assert 'default=0.076' not in runner
     assert 'LIDAR_PLANE_Z = 0.3024' not in occupancy
+
+
+def test_initial_test_world_map_matches_analytical_sdf_slice():
+    repo = _repo_root()
+    tools = repo / 'tools' / 'isaac'
+    sys.path.insert(0, str(tools))
+    try:
+        from sdf2usd import parse_world
+        from gt_occupancy import build_grid, flood_free
+    finally:
+        sys.path.remove(str(tools))
+
+    sdf = (repo / 'src' / 'ridgeback_autonomy_gz' / 'sim' / 'worlds' /
+           'initial_test_world.sdf')
+    plane_z = worlds.lidar_plane_z_for_world(sdf)
+    source_grid, include_mask, origin = build_grid(
+        parse_world(sdf), plane_z=plane_z)
+    occupied = source_grid == 100
+    free = flood_free(occupied, origin, (0.0, 0.0), 0.05)
+    unknown = ~(occupied | free) | include_mask
+
+    map_path = (repo / 'src' / 'ridgeback_autonomy' / 'sim' /
+                'ground_truth_maps' / 'initial_test_world.npz')
+    with np.load(map_path) as committed:
+        assert np.array_equal(committed['grid'], source_grid)
+        assert np.array_equal(committed['ignore'], unknown)
+        assert committed['origin'] == pytest.approx(origin)
+        assert float(committed['resolution']) == pytest.approx(0.05)
+        assert float(committed['plane_z']) == pytest.approx(plane_z)

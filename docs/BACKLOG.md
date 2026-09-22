@@ -120,35 +120,6 @@ incident timeline is in the archived evidence below. The CycloneDDS deployment i
   with a recorded multi-hour soak under CycloneDDS with the Intel services,
   SLAM, and Nav2 running.
 
-## Gazebo ground-truth map recertification
-
-**Implemented identity boundary.** The Gazebo adapter exposes the Clearpath
-`warehouse.sdf` and `office.sdf` sources as `depot` and `coworking_space` while
-leaving the dependency-owned filenames unchanged. It rejects direct Gazebo use
-of `warehouse` and `office`; those names remain Isaac stock-world identities.
-The former Gazebo captures moved to matching `depot` and `coworking_space` map
-names, and the shared converted geometry moved from `mock_hospital` to
-`initial_test_world` in both its SDF and USD descriptions.
-
-**Remaining gap.** The renamed Gazebo maps are the earlier driven captures, not
-fresh analytical or recertified products. Their `.pgm`, `.yaml`, `.png`, and
-derived `.npz` assets restore coverage and offline-grid lookup under the safe
-names, but the derivative format adds no new evidence; a current source-to-map
-visual check remains absent.
-
-**Completion criteria.** Regenerate a complete analytical map set for
-`initial_test_world` from its owning SDF and verify that the converted Isaac
-stage retains the same occupancy geometry. Recapture or otherwise certify the
-`depot` and `coworking_space` maps against the exact dependency revision and
-external model assets they load. Preserve backend in map provenance and
-diagnostics as a second safety check. Produce `.pgm`, `.yaml`, `.png`, and `.npz`
-artifacts for all three Gazebo identities and visually verify each against its
-own simulator world.
-
-**Context.** [Ground-truth map runbook](../src/ridgeback_autonomy/sim/ground_truth_maps/README.md),
-[exploration evaluation runbook](exploration/evaluation.md), and the Gazebo
-adapter worlds under `src/ridgeback_autonomy_gz/sim/worlds/`.
-
 ## Physical camera validation
 
 **Gap.** The D455 input contract is implemented, but device identity, effective

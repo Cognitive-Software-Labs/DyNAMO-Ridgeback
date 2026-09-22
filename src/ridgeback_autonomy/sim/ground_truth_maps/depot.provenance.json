@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "public_world": "depot",
+  "backends": ["gz"],
+  "source_world": "warehouse",
+  "source_revision": "590a45118c599c08abdf3bd3d02d5fa7a8af9a49",
+  "source_sha256": {
+    "clearpath_gz/worlds/warehouse.sdf": "f28bfa410a467cc12bf3615413780315977bccd2b1c623e3ed4b0f56b61c9235",
+    "fuel/OpenRobotics/Warehouse/5": "ba65a8a1156626697138ac6ca41740c54f64b6f1c880efd7e07b4c71dda14165",
+    "fuel/MovAi/shelf/1": "4923f10173e170edf9c0eadb739f57a8609bf7028ee3f70aff966093c9f9935a",
+    "fuel/MovAi/shelf_big/2": "618bf60fce85bdb33268de270c4b3760414f6bd3de509bcb9a35c6f99a677026",
+    "fuel/OpenRobotics/Jersey Barrier/6": "71f5edf4fa54c11ad1d5777c6e0befb324888f2ebf2debe1a4e4b027eaf82980",
+    "fuel/OpenRobotics/Chair/3": "52036f15d3f0748e4e0f28d972ac83f81d497b987218d9a008f6f8c88821e414",
+    "fuel/OpenRobotics/foldable_chair/3": "864c092633bb00b9abc4a1b568d1fbdb01f423ce551dd768f03b79722f0ba950",
+    "fuel/OpenRobotics/Table/4": "18db0a3f022bdb23a183467cffb41130cb6a1c786f553771de9d2bf7aa46d790",
+    "fuel/OpenRobotics/MaleVisitorOnPhone/2": "417ae43db40adb6877c94058c880727ebc55b65d30de6228d277c98ee13217fb",
+    "fuel/Plateau/Casual female/1": "ac4a902832043ce08d2083d2342dabf525814e01e7f5a13ae1432c1f1ce0aadb"
+  },
+  "map_kind": "driven_capture_recertified",
+  "map_sha256": {
+    "pgm": "a41af98b1f357d3a2b072a5d8bb5c5369de5ae74afc9a72f38e89c3bb7bfa460",
+    "yaml": "9268bdeb9d4acf16af211017e395facb926cbee1a8a229003906c2fa862d1c8e",
+    "png": "ca8d5cbc7aa89a8b7cb82c0cb70c45dc81a69715f92cb2417578de898685f618",
+    "npz": "8b24cffc48519dbcf6b937a98f2c4f844a11dbcb04687527a658cb517cf91c8a"
+  },
+  "resolution_m": 0.05,
+  "plane_z_m": 0.25257,
+  "certified_on": "2026-09-23"
+}

@@ -549,6 +549,7 @@ def generate_launch_description():
             namespace=namespace,
             parameters=[{
                 'use_sim_time': use_sim_time,
+                'backend': backend,
                 'world': world,
                 'map_topic': 'map',
             }],

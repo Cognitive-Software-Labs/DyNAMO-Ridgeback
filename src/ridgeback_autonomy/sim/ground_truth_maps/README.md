@@ -3,16 +3,16 @@
 Ground-truth occupancy maps define the "true reachable area" used as the
 coverage reference for exploration sweeps.
 
-**Canonical maps are now generated analytically from the simulation geometry**,
-not driven-captured. For the Isaac stock worlds (`warehouse`, `office`,
-`hospital`) `tools/isaac/generate_gt_map.py` slices the world USD at the 2D
-lidar plane; for SDF-sourced worlds `tools/isaac/gt_occupancy.py` rasterizes
-the declared boxes/spheres. Both are exact and regeneratable — no capture
-drive. The earlier Gazebo captures formerly named warehouse and office moved to
+**Canonical maps are generated from or certified against their owning simulation
+geometry.** For the Isaac stock worlds (`warehouse`, `office`, `hospital`)
+`tools/isaac/generate_gt_map.py` slices the world USD at the 2D lidar plane; for
+repository SDF worlds `tools/isaac/gt_occupancy.py` rasterizes the declared
+boxes and spheres. The earlier Gazebo captures formerly named warehouse and office moved to
 the non-colliding identities `depot` and `coworking_space`; their geometry differs
-from the Isaac stock environments. Those driven captures restore live coverage
-lookup but remain pending recertification against the current dependency assets.
-The manual capture workflow (Part 1) is kept for that work.
+from the Isaac stock environments. They are certified against the pinned
+Clearpath revision and exact external asset bundles recorded in their provenance
+sidecars. The manual capture workflow (Part 1) remains as the replacement path
+when those inputs change.
 
 - **This folder** is the common package maps dir
   (`src/ridgeback_autonomy/sim/ground_truth_maps/`). Gazebo source worlds now
@@ -34,16 +34,19 @@ The manual capture workflow (Part 1) is kept for that work.
 
 ## Maps
 
-Gazebo map sets restored from the earlier driven captures:
+Certified Gazebo map sets:
 
 | Public world | Clearpath 3D source | Current evidence state |
 |---|---|---|
-| `initial_test_world` | repository `initial_test_world.sdf` | Renamed capture; analytical regeneration pending |
-| `depot` | dependency `warehouse.sdf` | Renamed capture; source-to-map recertification pending |
-| `coworking_space` | dependency `office.sdf` | Renamed capture; source-to-map recertification pending |
+| `initial_test_world` | repository `initial_test_world.sdf` | Analytical SDF slice at 0.30257 m |
+| `depot` | dependency `warehouse.sdf` | Driven capture recertified against Clearpath `590a4511` and pinned Fuel bundles |
+| `coworking_space` | dependency `office.sdf` | Driven capture recertified against Clearpath `590a4511` and repository meshes |
 
-Each has `.pgm`, `.yaml`, `.png`, and `.npz`; the NPZ files are lossless format
-derivatives of the same captured grids, not independent qualification evidence.
+Each has `.pgm`, `.yaml`, `.png`, `.npz`, and `.provenance.json`. The provenance
+records public and source identities, allowed backends, source revision and
+asset hashes. The coverage diagnostic checks that contract and displays the
+`backend/world` pair. `depot` and `coworking_space` remain driven grids; their
+NPZ files are lossless derivatives, not independent evidence.
 
 Canonical maps (analytic, from the Isaac stock world USDs):
 
@@ -90,6 +93,18 @@ PNG previews live next to each `.pgm` (regenerate with `render_previews.py`):
 |---|---|---|---|
 | ![warehouse](warehouse.png) | ![warehouse_full](warehouse_full.png) | ![office](office.png) | ![hospital](hospital.png) |
 
+| initial_test_world | depot | coworking_space |
+|---|---|---|
+| ![Analytical initial test world occupancy](initial_test_world.png) | ![Recertified Clearpath depot occupancy](depot.png) | ![Recertified Clearpath coworking-space occupancy](coworking_space.png) |
+
+The `initial_test_world` preview is the rasterized SDF itself. The other two
+were visually compared with the matching world renders stored in the pinned
+Clearpath checkout (`docs/warehouse/warehouse_world.png` and
+`docs/office/office_world.png`). Both source worlds also completed 100 live
+Gazebo Sim 8.15 iterations on 2026-09-23 with all referenced meshes present.
+The warehouse emitted only its known SDF/material migration warnings; neither
+world reported a missing asset.
+
 ## Tools (this folder)
 
 | Script | Purpose |
@@ -122,7 +137,15 @@ far skybox/backdrop geometry stock envs ship) and writes `<world>.{pgm,yaml,png,
 Pass `--origin x,y` if a world's building is not where the auto-seed lands.
 
 **SDF-sourced worlds** — `tools/isaac/gt_occupancy.py <world>.sdf` rasterizes the
-declared boxes/spheres analytically (used for the converted worlds).
+declared boxes/spheres analytically. Regenerate the complete shared-world set
+with:
+
+```bash
+python3 tools/isaac/gt_occupancy.py \
+  src/ridgeback_autonomy_gz/sim/worlds/initial_test_world.sdf \
+  src/ridgeback_autonomy/sim/ground_truth_maps/initial_test_world.npz \
+  --map-set --seed 0,0
+```
 
 Rebuild after regenerating so the maps install to `share/`:
 `colcon build --packages-select ridgeback_autonomy`.
