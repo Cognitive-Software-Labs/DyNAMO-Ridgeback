@@ -9,4 +9,4 @@ technical reference.
 
 Filenames follow the plan convention, `<SCOPE>_<topic>_<author>.md`.
 
-- [ISAAC — Camera support and deck geometry discussion](ISAAC_camera_support_geometry_session.md): retain deck placement for now; discuss fitting the camera support while distinguishing geometry from camera TF.
+- [ISAAC — Shared robot geometry, camera support and footprint](ISAAC_camera_support_geometry_session.md): whole-goal context, completed investigations and remaining geometry/footprint gates; next discussion retains deck placement and focuses on camera support.
