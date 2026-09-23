@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "worlds": [
+    {
+      "backend": "gz",
+      "public_world": "depot",
+      "source_world": "warehouse",
+      "source_revision": "590a45118c599c08abdf3bd3d02d5fa7a8af9a49",
+      "image": "gz/depot.png",
+      "image_sha256": "9b2fef3eb6f4f8903bf1f9392440fdaf453513e30ff9476b7638f2dd2aca0083",
+      "description": "Clearpath warehouse with storage racks and open loading areas."
+    },
+    {
+      "backend": "gz",
+      "public_world": "coworking_space",
+      "source_world": "office",
+      "source_revision": "590a45118c599c08abdf3bd3d02d5fa7a8af9a49",
+      "image": "gz/coworking_space.png",
+      "image_sha256": "b29e765bcc95ebed4b90dd8adc2f140a423fbfe3eed4e0431ecb222b4d19bd01",
+      "description": "Clearpath office with work areas, meeting rooms, and corridors."
+    }
+  ]
+}

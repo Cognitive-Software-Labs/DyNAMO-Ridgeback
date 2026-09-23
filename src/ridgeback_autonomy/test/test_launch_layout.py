@@ -187,6 +187,24 @@ def test_public_gazebo_maps_use_the_noncolliding_world_names() -> None:
     ).exists()
 
 
+def test_world_preview_catalog_uses_public_backend_qualified_names() -> None:
+    repo_root = Path(__file__).resolve().parents[3]
+    preview_root = (
+        repo_root / 'src' / 'ridgeback_autonomy' / 'sim' / 'world_previews')
+    catalog = json.loads(
+        (preview_root / 'catalog.json').read_text(encoding='utf-8'))
+
+    entries = {
+        (entry['backend'], entry['public_world']): entry
+        for entry in catalog['worlds']
+    }
+    assert set(entries) == {('gz', 'depot'), ('gz', 'coworking_space')}
+    for entry in entries.values():
+        image = preview_root / entry['image']
+        assert image.exists()
+        assert hashlib.sha256(image.read_bytes()).hexdigest() == entry['image_sha256']
+
+
 def test_benchmark_launch_uses_new_multi_estimator_interface() -> None:
     repo_root = Path(__file__).resolve().parents[3]
     benchmark_text = (
