@@ -5,10 +5,11 @@ behavior stays in the relevant technical reference.
 
 ## ROS namespace and time
 
-- Clearpath uses a non-empty namespace. The repository declaration and the
-  simulators use `r100_0001`; the physical robot `r100_0160` uses `r100_0160`,
-  so hardware runs pass `namespace:=r100_0160`. Whether to converge on one
-  namespace is an open [backlog item](../BACKLOG.md#simulator-and-robot-namespace-mismatch).
+- Clearpath uses a non-empty namespace. The repository declaration, simulators,
+  and benchmark contracts use `r100_0001`. Hardware launches instead read the
+  identity from the robot-local `<setup_path>/robot.yaml` (normally
+  `/etc/clearpath/robot.yaml`) and fail if it is unavailable; an explicit
+  `namespace:=...` remains authoritative.
 - New namespaced nodes remap `('/tf', 'tf')` and
   `('/tf_static', 'tf_static')` when they consume TF.
 - A ROS topic namespace does not determine the frame IDs carried inside TF.

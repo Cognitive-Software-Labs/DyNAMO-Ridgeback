@@ -11,11 +11,13 @@ from launch_ros.actions import LifecycleNode, LifecycleTransition, Node
 from launch_ros.event_handlers import OnStateTransition
 from lifecycle_msgs.msg import Transition
 
-from clearpath_config.clearpath_config import ClearpathConfig
-from clearpath_config.common.utils.yaml import read_yaml
 from nav2_common.launch import RewrittenYaml
 
 from ridgeback_common.lidar_contract import slam_max_laser_range
+from ridgeback_autonomy.namespace_resolution import (
+    namespace_from_robot_yaml,
+    normalize_namespace,
+)
 
 
 def launch_setup(context, *args, **kwargs):
@@ -24,10 +26,14 @@ def launch_setup(context, *args, **kwargs):
     use_sim_time = LaunchConfiguration('use_sim_time')
     setup_path = LaunchConfiguration('setup_path')
 
-    # Read namespace from robot.yaml
-    config = read_yaml(os.path.join(setup_path.perform(context), 'robot.yaml'))
-    clearpath_config = ClearpathConfig(config)
-    namespace = clearpath_config.system.namespace
+    # The public launch passes its already-resolved value so every component
+    # shares one identity. Retain robot.yaml discovery for direct internal use.
+    requested_namespace = LaunchConfiguration('namespace').perform(context).strip()
+    if requested_namespace:
+        namespace = normalize_namespace(
+            requested_namespace, source='namespace launch argument')
+    else:
+        namespace = namespace_from_robot_yaml(setup_path.perform(context))
     raw_scan_topic = f'/{namespace}/sensors/lidar2d_0/scan'
 
     # slam_source: front_only (default, unchanged production behavior) or
@@ -133,6 +139,9 @@ def generate_launch_description():
         DeclareLaunchArgument('use_sim_time', default_value='true'),
         DeclareLaunchArgument('setup_path',
                               default_value=os.path.expanduser('~/clearpath/')),
+        DeclareLaunchArgument(
+            'namespace', default_value='',
+            description='Resolved namespace; empty reads setup_path/robot.yaml'),
         DeclareLaunchArgument(
             'slam_source', default_value='front_only',
             choices=['front_only', 'merged'],

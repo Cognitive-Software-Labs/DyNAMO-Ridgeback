@@ -306,8 +306,13 @@ def test_exploration_rviz_shows_the_overlay_and_the_distance_hud() -> None:
     # the 3D view and do not.
     assert config['Window Geometry']['Perception overlay'] == {'collapsed': False}
 
-    assert by_name['Target HUD']['Topic']['Value'] == '/r100_0001/hud_target_overlay'
-    assert by_name['HUD']['Topic']['Value'] == '/r100_0001/hud_overlay'
+    assert by_name['Target HUD']['Topic']['Value'] == 'hud_target_overlay'
+    assert by_name['HUD']['Topic']['Value'] == 'hud_overlay'
+
+    # RViz itself is launched in the selected robot namespace. Relative display
+    # topics therefore follow either simulator or hardware identity instead of
+    # pinning the config to the simulator namespace.
+    assert 'r100_0001' not in _exploration_rviz_path().read_text(encoding='utf-8')
 
 
 def test_camera_overlay_is_rviz_only() -> None:
@@ -480,7 +485,10 @@ def test_hardware_backend_is_attach_only_and_uses_real_sensor_defaults() -> None
 
     assert "'start_platform', default_value='false'" in hardware
     assert "'use_sim_time': 'false'" in hardware
+    assert "'namespace', default_value=''" in hardware
+    assert 'resolve_namespace(' in hardware
     assert "'backend', default_value=legacy_sim" in exploration
+    assert "'namespace', default_value=''" in exploration
     assert 'REALSENSE_CAMERA_INPUTS' in exploration
     assert "'projective_ranging,euclidean_reconstruction'" in exploration
     assert "'autonomous_motion_enabled'" in exploration

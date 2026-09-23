@@ -1,6 +1,6 @@
 #!/bin/bash
 # Full diagnostic for the Ridgeback SLAM exploration stack
-# Usage: bash tools/diag.sh [logfile] [world]
+# Usage: bash tools/diag.sh [logfile] [world] [namespace]
 
 set -o pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -9,7 +9,7 @@ source /opt/ros/jazzy/setup.bash 2>/dev/null
 
 LOGFILE="${1:-}"
 WORLD_ARG="${2:-}"
-NS="r100_0001"
+NS="${3:-${RIDGEBACK_NAMESPACE:-r100_0001}}"
 TIMEOUT=5
 
 section() { echo -e "\n===== $1 ====="; }

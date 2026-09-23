@@ -7,8 +7,8 @@ investigations and measurements live in the Archived evidence section below.
 
 | Symptom | Check or action |
 |---|---|
-| Robot does not move | Inspect `/r100_0001/cmd_vel`; if it is empty, Nav2 may not be active |
-| No map in RViz | Check `/r100_0001/map`, `slam_toolbox`, and the scan topic |
+| Robot does not move | Inspect `/<namespace>/cmd_vel`; if it is empty, Nav2 may not be active |
+| No map in RViz | Check `/<namespace>/map`, `slam_toolbox`, and the scan topic |
 | Target overlay missing | Confirm `target_localization_enabled:=true`, enable RViz's `Perception overlay`, and inspect the color and `debug/target/overlay` topics |
 | Overlay is a sliver in the left dock | Drag the pane to the bottom, stretch it, and save the RViz config; pane placement is stored in `QMainWindow State` |
 | Estimator ring or HUD column missing | Verify the estimator was selected and the corresponding measurement node/topic exists; `--` means the estimator ran but returned no value |
@@ -16,7 +16,7 @@ investigations and measurements live in the Archived evidence section below.
 | Explorer finds no frontiers | Confirm the global costmap has `track_unknown_space: true` |
 | Startup stage stalls | Read the matching `gate_*` process's `unmet:` list; do not add a fixed timer |
 | Stale simulator processes | Run `bash cleanup.sh` before a simulation launch or once before a sweep; never use it as hardware bringup cleanup |
-| Need a log summary | Run `bash tools/diag.sh <console.log> hospital` or `warehouse` |
+| Need a log summary | Run `bash tools/diag.sh <console.log> <world> [namespace]`; the namespace defaults to `RIDGEBACK_NAMESPACE`, then `r100_0001` |
 | Images on Thor stall or lag although ping is fast | See [Intel–Thor stream stalls](#intelthor-stream-stalls) |
 
 ## Hardware launch is deliberately motionless
@@ -25,7 +25,10 @@ investigations and measurements live in the Archived evidence section below.
 `autonomous_motion_enabled:=false`. The first setting attaches to existing
 Clearpath services; the second prevents `frontier_explorer_node` from sending
 goals. `start_exploration.sh` also skips `cleanup.sh` and leaves
-`ROS_DOMAIN_ID` untouched for hardware.
+`ROS_DOMAIN_ID` untouched for hardware. Unless explicitly overridden, the
+hardware namespace comes from `<setup_path>/robot.yaml` and launch aborts if
+that configuration cannot be read; it never silently falls back to the
+simulator's `r100_0001` identity.
 
 If the readiness gate lists scan or filtered odometry as missing, inspect the
 approved robot-side bringup, namespace, domain, RMW, and effective topics. Do

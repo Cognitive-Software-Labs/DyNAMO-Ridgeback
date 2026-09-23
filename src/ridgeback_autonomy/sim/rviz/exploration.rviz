@@ -51,7 +51,7 @@ Visualization Manager:
         Durability Policy: Volatile
         History Policy: Keep Last
         Reliability Policy: Reliable
-        Value: /r100_0001/robot_description
+        Value: robot_description
       Enabled: true
       Name: RobotModel
       TF Prefix: ""
@@ -65,13 +65,13 @@ Visualization Manager:
         Durability Policy: Transient Local
         History Policy: Keep Last
         Reliability Policy: Reliable
-        Value: /r100_0001/map
+        Value: map
       Update Topic:
         Depth: 5
         Durability Policy: Volatile
         History Policy: Keep Last
         Reliability Policy: Reliable
-        Value: /r100_0001/map_updates
+        Value: map_updates
       Value: true
     - Class: rviz_default_plugins/LaserScan
       Color: 255; 0; 0
@@ -85,7 +85,7 @@ Visualization Manager:
         Durability Policy: Volatile
         History Policy: Keep Last
         Reliability Policy: Best Effort
-        Value: /r100_0001/sensors/lidar2d_0/scan
+        Value: sensors/lidar2d_0/scan
       Value: true
     - Class: rviz_default_plugins/Polygon
       Alpha: 1
@@ -97,7 +97,7 @@ Visualization Manager:
         Durability Policy: Volatile
         History Policy: Keep Last
         Reliability Policy: Reliable
-        Value: /r100_0001/collision_monitor/footprint_approach
+        Value: collision_monitor/footprint_approach
       Value: true
     - Class: rviz_default_plugins/LaserScan
       Color: 0; 0; 255
@@ -111,19 +111,19 @@ Visualization Manager:
         Durability Policy: Volatile
         History Policy: Keep Last
         Reliability Policy: Best Effort
-        Value: /r100_0001/sensors/lidar2d_1/scan
+        Value: sensors/lidar2d_1/scan
       Value: true
     - Class: rviz_default_plugins/Map
       Color Scheme: costmap
       Enabled: false
       Name: Global Costmap
-      Topic: /r100_0001/global_costmap/costmap
+      Topic: global_costmap/costmap
       Value: true
     - Class: rviz_default_plugins/Map
       Color Scheme: costmap
       Enabled: false
       Name: Local Costmap
-      Topic: /r100_0001/local_costmap/costmap
+      Topic: local_costmap/costmap
       Value: true
     - Class: rviz_default_plugins/Path
       Color: 0; 255; 0
@@ -134,7 +134,7 @@ Visualization Manager:
         Durability Policy: Volatile
         History Policy: Keep Last
         Reliability Policy: Reliable
-        Value: /r100_0001/plan
+        Value: plan
       Value: true
     - Class: rviz_default_plugins/MarkerArray
       Enabled: true
@@ -155,7 +155,7 @@ Visualization Manager:
         Durability Policy: Volatile
         History Policy: Keep Last
         Reliability Policy: Reliable
-        Value: /r100_0001/visualization/target/estimates
+        Value: visualization/target/estimates
       Value: true
     - Class: rviz_default_plugins/MarkerArray
       Enabled: true
@@ -169,7 +169,7 @@ Visualization Manager:
         Durability Policy: Volatile
         History Policy: Keep Last
         Reliability Policy: Reliable
-        Value: /r100_0001/visualization/target/polar_rays
+        Value: visualization/target/polar_rays
       Value: true
     - Class: rviz_default_plugins/Image
       Enabled: true
@@ -184,7 +184,7 @@ Visualization Manager:
         Durability Policy: Volatile
         History Policy: Keep Last
         Reliability Policy: Best Effort
-        Value: /r100_0001/debug/target/overlay
+        Value: debug/target/overlay
       Value: true
     - Class: rviz_default_plugins/MarkerArray
       Enabled: true
@@ -194,7 +194,7 @@ Visualization Manager:
         Durability Policy: Volatile
         History Policy: Keep Last
         Reliability Policy: Reliable
-        Value: /r100_0001/explore/frontiers
+        Value: explore/frontiers
       Value: true
     - Class: rviz_default_plugins/TF
       Enabled: false
@@ -216,7 +216,7 @@ Visualization Manager:
         Durability Policy: Volatile
         History Policy: Keep Last
         Reliability Policy: Reliable
-        Value: /r100_0001/optimal_trajectory
+        Value: optimal_trajectory
       Value: true
     - Class: rviz_default_plugins/MarkerArray
       Enabled: true
@@ -226,7 +226,7 @@ Visualization Manager:
         Durability Policy: Volatile
         History Policy: Keep Last
         Reliability Policy: Reliable
-        Value: /r100_0001/trajectories
+        Value: trajectories
       Value: true
     - Class: rviz_2d_overlay_plugins/TextOverlay
       Enabled: true
@@ -236,7 +236,7 @@ Visualization Manager:
         Durability Policy: Volatile
         History Policy: Keep Last
         Reliability Policy: Reliable
-        Value: /r100_0001/hud_overlay
+        Value: hud_overlay
       Value: true
     # A second overlay, from hud_target_node: the distance panel is rich text and
     # the velocity/coverage panels align their columns with runs of spaces,
@@ -250,7 +250,7 @@ Visualization Manager:
         Durability Policy: Volatile
         History Policy: Keep Last
         Reliability Policy: Reliable
-        Value: /r100_0001/hud_target_overlay
+        Value: hud_target_overlay
       Value: true
   Enabled: true
   Global Options:
@@ -265,9 +265,9 @@ Visualization Manager:
     - Class: rviz_default_plugins/Measure
       Line color: 128; 128; 0
     - Class: rviz_default_plugins/SetInitialPose
-      Topic: /r100_0001/initialpose
+      Topic: initialpose
     - Class: rviz_default_plugins/SetGoal
-      Topic: /r100_0001/goal_pose
+      Topic: goal_pose
   Transformation:
     Current:
       Class: rviz_default_plugins/TF

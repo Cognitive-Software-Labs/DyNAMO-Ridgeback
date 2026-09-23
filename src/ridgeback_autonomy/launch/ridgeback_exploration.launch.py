@@ -5,7 +5,7 @@ from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import (
     DeclareLaunchArgument, ExecuteProcess, IncludeLaunchDescription,
-    OpaqueFunction, RegisterEventHandler,
+    LogInfo, OpaqueFunction, RegisterEventHandler, SetLaunchConfiguration,
 )
 from launch.event_handlers import OnProcessExit
 from launch.launch_description_sources import PythonLaunchDescriptionSource
@@ -41,6 +41,7 @@ from ridgeback_autonomy.localization_launch import (
     resolved_camera_inputs,
     SIMULATION_CAMERA_INPUTS,
 )
+from ridgeback_autonomy.namespace_resolution import resolve_namespace
 
 
 # The distance HUD is a second overlay from the velocity/coverage one, and needs
@@ -58,6 +59,20 @@ HUD_TARGET_MARKER_TOPIC = 'hud_target_overlay'
 # with room for the insets. Too narrow silently drops the last estimator's whole
 # column, which reads as that row never reporting rather than as a layout fault.
 HUD_TARGET_OVERLAY_WIDTH = 660
+
+
+def resolve_launch_namespace(context, *args, **kwargs):
+    """Set one namespace before any backend or shared nodes are expanded."""
+
+    resolved = resolve_namespace(
+        backend=LaunchConfiguration('backend').perform(context),
+        requested=LaunchConfiguration('namespace').perform(context),
+        setup_path=LaunchConfiguration('setup_path').perform(context),
+    )
+    return [
+        SetLaunchConfiguration('namespace', resolved),
+        LogInfo(msg=f'Using ROS namespace: {resolved}'),
+    ]
 
 
 def build_target_localization_nodes(context, *args, **kwargs):
@@ -274,7 +289,6 @@ def generate_launch_description():
 
     return LaunchDescription([
         *cyclonedds_actions(pkg_this),
-        DeclareLaunchArgument('namespace', default_value='r100_0001'),
         DeclareLaunchArgument(
             'sim', default_value='gz', choices=['gz', 'isaac'],
             description='Deprecated compatibility alias for backend'),
@@ -283,11 +297,16 @@ def generate_launch_description():
             choices=['gz', 'isaac', 'hardware'],
             description='I/O provider for the shared autonomy stack'),
         DeclareLaunchArgument(
+            'namespace', default_value='',
+            description='ROS namespace override; empty selects r100_0001 in '
+                        'simulation and reads <setup_path>/robot.yaml on hardware'),
+        DeclareLaunchArgument(
             'use_sim_time', default_value=_backend_default('true', 'false')),
         DeclareLaunchArgument('setup_path',
                               default_value=_backend_default(
                                   os.path.expanduser('~/clearpath/'),
                                   '/etc/clearpath/')),
+        OpaqueFunction(function=resolve_launch_namespace),
         DeclareLaunchArgument('world', default_value='initial_test_world'),
         DeclareLaunchArgument(
             'sim_ready_timeout',
@@ -486,6 +505,7 @@ def generate_launch_description():
                     ),
                     launch_arguments={
                         'setup_path': setup_path,
+                        'namespace': namespace,
                         'use_sim_time': use_sim_time,
                         'slam_source': slam_source,
                     }.items(),

@@ -37,6 +37,50 @@ def test_external_mode_has_no_compute_or_health_process_and_needs_no_venv(monkey
     assert context.launch_configurations['autonomous_motion_enabled']=='false'
 
 
+def test_namespace_resolution_keeps_sim_identity_and_reads_hardware_config(tmp_path):
+    from ridgeback_autonomy.namespace_resolution import resolve_namespace
+
+    assert resolve_namespace(
+        backend='gz', requested='', setup_path='/not/read') == 'r100_0001'
+    (tmp_path / 'robot.yaml').write_text(
+        'system:\n  ros2:\n    namespace: r100_0160\n', encoding='utf-8')
+    assert resolve_namespace(
+        backend='hardware', requested='', setup_path=str(tmp_path)) == 'r100_0160'
+
+
+def test_explicit_namespace_override_does_not_require_robot_config():
+    from ridgeback_autonomy.namespace_resolution import resolve_namespace
+
+    assert resolve_namespace(
+        backend='hardware', requested='/test_robot/', setup_path='/missing') == (
+            'test_robot')
+
+
+def test_hardware_namespace_resolution_fails_closed(tmp_path):
+    from ridgeback_autonomy.namespace_resolution import resolve_namespace
+
+    with pytest.raises(RuntimeError, match='namespace:=<observed_namespace>'):
+        resolve_namespace(
+            backend='hardware', requested='', setup_path=str(tmp_path))
+
+
+def test_exploration_resolves_namespace_before_derived_defaults():
+    module = load('src/ridgeback_autonomy/launch/ridgeback_exploration.launch.py')
+    context = LaunchContext()
+    context.launch_configurations.update(
+        backend='gz', namespace='', setup_path='/not/read')
+
+    actions = module.resolve_launch_namespace(context)
+    actions[0].execute(context)
+    base_frame_argument = next(
+        entity for entity in module.generate_launch_description().entities
+        if isinstance(entity, DeclareLaunchArgument) and entity.name == 'base_frame')
+    base_frame_argument.execute(context)
+
+    assert context.launch_configurations['namespace'] == 'r100_0001'
+    assert context.launch_configurations['base_frame'] == 'r100_0001/robot/base_link'
+
+
 @pytest.mark.parametrize('backend', ['gz','isaac'])
 @pytest.mark.parametrize('profile', ['640x480','1280x720'])
 def test_simulator_local_mode_and_profiles_need_no_remote_host(backend,profile):
@@ -75,7 +119,9 @@ def test_localization_disabled_gates_the_whole_stack(backend,profile):
     module=load('src/ridgeback_autonomy/launch/ridgeback_exploration.launch.py')
     context=context_for(module,dict(backend=backend,camera_profile=profile,target_localization_enabled='false'))
     blocks=[x for x in module.generate_launch_description().entities if isinstance(x,OpaqueFunction)]
-    assert blocks and all(not block.condition.evaluate(context) for block in blocks)
+    conditioned_blocks = [block for block in blocks if block.condition is not None]
+    assert conditioned_blocks and all(
+        not block.condition.evaluate(context) for block in conditioned_blocks)
 
 
 def test_sweep_labels_are_shared_with_detector_and_recorded_config():

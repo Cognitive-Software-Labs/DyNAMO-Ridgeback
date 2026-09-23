@@ -195,7 +195,8 @@ def test_slam_launch_generated_yaml_contains_numeric_source_range(monkeypatch, s
     context = LaunchContext()
     repo = Path(__file__).resolve().parents[3]
     context.launch_configurations.update(
-        setup_path=str(repo / 'clearpath'), use_sim_time='true', slam_source=source)
+        setup_path=str(repo / 'clearpath'), namespace='r100_0001',
+        use_sim_time='true', slam_source=source)
     module.launch_setup(context)
     generated = Path(rewritten[0].perform(context))
     try:

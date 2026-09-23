@@ -379,7 +379,7 @@ Arguments:
 | `world` | `initial_test_world` | World to load (see table above) |
 | `backend` | value of `sim` (`gz`) | I/O provider: `gz`, `isaac`, or `hardware` |
 | `sim` | `gz` | Deprecated compatibility alias for `backend`; accepts `gz` or `isaac` |
-| `namespace` | `r100_0001` | ROS namespace for all nodes |
+| `namespace` | backend-derived | `r100_0001` in simulation; on hardware, read from `<setup_path>/robot.yaml`; an explicit value overrides either default |
 | `use_sim_time` | backend-derived | `true` in simulation; `false` on hardware |
 | `setup_path` | backend-derived | `~/clearpath/` in simulation; `/etc/clearpath/` on hardware |
 | `color_topic` | backend-derived | Simulation image or RealSense `color/image_raw` |
@@ -394,7 +394,7 @@ Arguments:
 | `detector_debug` | `false` | Log detector cadence, superseded frames, and bounded stage timings |
 | `depth_source` | `stereoscopic` | Aligned depth source for the mask rows — `stereoscopic` or `monocular` (Depth-Anything V2; downloads a checkpoint on first use) |
 | `mask_gate` | `box` | Mask front-end — `box` (no segmentation model) or `silhouette` (SlimSAM) |
-| `mppi_visualize` | `false` | Publish MPPI trajectory visualization topics (RViz already has `MPPI Optimal` and `MPPI Samples` displays subscribed to `/r100_0001/optimal_trajectory` and `/r100_0001/trajectories`) |
+| `mppi_visualize` | `false` | Publish MPPI trajectory visualization topics (RViz's namespaced `MPPI Optimal` and `MPPI Samples` displays already subscribe to the relative `optimal_trajectory` and `trajectories` topics) |
 | `coverage_overlay_enabled` | backend-derived | `true` in simulation; `false` on hardware, which has no packaged truth map |
 | `autonomous_motion_enabled` | backend-derived | `true` in simulation; `false` on hardware until the operator explicitly enables frontier goals |
 | `start_hardware_platform` | `false` | Hardware only: attach to existing Clearpath services by default; `true` explicitly includes platform bringup |
@@ -435,7 +435,10 @@ ros2 launch ridgeback_autonomy ridgeback_exploration.launch.py \
 The hardware adapter is intentionally attach-only by default. It does not start
 the Clearpath platform unless `start_hardware_platform:=true`, and the quick-start
 wrapper does not run broad process cleanup or force `ROS_DOMAIN_ID=42` on
-hardware. Before setting `autonomous_motion_enabled:=true`, validate the deployed
+hardware. With no `namespace` override, hardware reads the robot identity from
+`<setup_path>/robot.yaml` (normally `/etc/clearpath/robot.yaml`) and aborts if it
+cannot be read; simulation retains `r100_0001`. Before setting
+`autonomous_motion_enabled:=true`, validate the deployed
 command chain and confirm the controller's `Twist`/`TwistStamped` contract; the
 checked-in generated configuration is not proof of the live robot contract.
 The D455 section of
