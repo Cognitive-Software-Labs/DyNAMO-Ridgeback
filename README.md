@@ -26,7 +26,7 @@ This workspace supports 3 main human workflows:
 - [Robot geometry](docs/robot/geometry.md): shared mounts, dimensioned model reference, and validation limits
 - [Collision model](docs/robot/collision_model.md): physical envelope, navigation footprint, and backend representations
 
-Isaac Sim port (in progress, `feat/isaac-sim-6-port`):
+Isaac Sim backend:
 
 - [Project backlog](docs/BACKLOG.md): robot, exploration, deployment, and shared gaps
 - [Benchmarking backlog](docs/target_distance_benchmarking/BACKLOG.md): target-distance benchmarking and estimator evaluation
@@ -259,12 +259,13 @@ environment. Preserve observed sensor topics and the observed TF base frame:
 
 ```bash
 : "${ROS_DOMAIN_ID:?Set the deployment domain shared with Intel}"
+: "${ROBOT_NAMESPACE:?Set the observed ROS namespace}"
 : "${BASE_FRAME:?Set the observed base TF frame ID}"
 : "${COLOR_TOPIC:?Set the observed color image topic}"
 : "${DEPTH_TOPIC:?Set the observed aligned depth-to-color topic}"
 : "${CAMERA_INFO_TOPIC:?Set the observed color CameraInfo topic}"
 ros2 launch ridgeback_localization localization.launch.py \
-  namespace:=r100_0001 use_sim_time:=false base_frame:="$BASE_FRAME" \
+  namespace:="$ROBOT_NAMESPACE" use_sim_time:=false base_frame:="$BASE_FRAME" \
   color_topic:="$COLOR_TOPIC" depth_topic:="$DEPTH_TOPIC" camera_info_topic:="$CAMERA_INFO_TOPIC" \
   estimators:=projective_ranging,euclidean_reconstruction target_labels:="humanoid robot" \
   displays:=false
@@ -281,16 +282,18 @@ colcon --log-base artifacts/colcon/intel build \
   --build-base artifacts/colcon/intel-build --install-base artifacts/colcon/intel-install
 source artifacts/colcon/intel-install/local_setup.bash
 : "${ROS_DOMAIN_ID:?Set the deployment domain shared with Thor}"
+: "${ROBOT_NAMESPACE:?Set the observed ROS namespace}"
 : "${BASE_FRAME:?Set the observed base TF frame ID}"
 : "${COLOR_TOPIC:?Set the observed color image topic}"
 ros2 launch ridgeback_autonomy localization_observer.launch.py \
-  namespace:=r100_0001 use_sim_time:=false base_frame:="$BASE_FRAME" \
+  namespace:="$ROBOT_NAMESPACE" use_sim_time:=false base_frame:="$BASE_FRAME" \
   color_topic:="$COLOR_TOPIC" estimators:=projective_ranging,euclidean_reconstruction
 ```
 
 The observer attaches to existing topics and starts no navigation or compute.
-View health with `ros2 topic echo /r100_0001/localization/health` and the Intel
-summary with `ros2 topic echo /r100_0001/localization/status`. Displays publish
+View health with `ros2 topic echo "/${ROBOT_NAMESPACE}/localization/health"` and
+the Intel summary with
+`ros2 topic echo "/${ROBOT_NAMESPACE}/localization/status"`. Displays publish
 images/markers for an independently opened RViz; `displays:=false` keeps only
 the health consumer. For a person check, restart Thor with `target_labels:=person`
 and record that selection. Stop each launch with Ctrl-C in its own terminal;
@@ -323,15 +326,17 @@ cd /path/to/DyNAMO-Ridgeback
 source install/setup.bash
 ```
 
-The package has 5 top-level launch files. The first two are the normal human
-entrypoints; the benchmark environment/config pair are also public because the
-sweep supervisor invokes them as separate processes:
+The package has 6 top-level launch files. Exploration, the benchmark wrapper,
+and manual mapping are the normal human workflows. The localization observer is
+a public physical-deployment role; the benchmark environment/config pair are
+also public because the sweep supervisor invokes them as separate processes:
 
 - `ridgeback_exploration.launch.py`
 - `target_distance_benchmark.launch.py`
+- `manual_mapping.launch.py`
+- `localization_observer.launch.py`
 - `target_benchmark_env.launch.py`
 - `target_benchmark_config.launch.py`
-- `manual_mapping.launch.py`
 
 The lower-level dispatcher, SLAM, Nav2, and frontier-exploration launches live
 under `ridgeback_autonomy/launch/includes/`. Each backend package exposes an

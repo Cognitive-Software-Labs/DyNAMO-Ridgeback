@@ -195,12 +195,11 @@ not fully measured. Focused stationary/turn checks passed in both simulators;
 broader sensor/contact qualification and affected benchmark reruns remain required.
 The implemented shared definition alone does not close this item.
 
-**Completion criteria.** Establish the measured attachment geometry in one
-shared description or asset source consumed by Gazebo and Isaac. Remove the
-independent Isaac authoring after equivalence checks. Preserve the configured
-camera pose; compare rendered and collision geometry, TF, and sensor
-self-occlusion in both simulators, including motion. Record physical dimensions
-and measurement uncertainty. Rerun affected benchmarks before quoting results.
+**Completion criteria.** Record the remaining physical attachment dimensions
+and measurement uncertainty. Qualify rendered/collision geometry, TF, sensor
+self-occlusion and relevant contact behavior in both simulators, including
+motion; correct any discrepancy in the shared source. Rerun the benchmarks
+affected by the geometry change before quoting new results.
 
 **Context.** [Shared robot geometry](robot/geometry.md#known-representation-differences)
 and [Isaac additions](isaac/robot-model.md#hand-authored-parts). The
