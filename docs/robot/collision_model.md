@@ -103,9 +103,9 @@ being hidden by replacing the nominal polygon with the model union.
 
 ## Qualification ownership
 
-[Dimensional provenance](../BACKLOG.md#robot-geometry-and-drawing-audit) and the
+[Dimensional provenance](geometry.md#dimensioned-reference-drawing) and the
 remaining [physical envelope qualification](../BACKLOG.md#collision-envelope-and-navigation-footprint-validation)
-are separate completion gates. A geometry change that affects benchmark inputs
+have separate ownership. A geometry change that affects benchmark inputs
 or measured behavior requires rerunning the affected benchmarks before quoting
 results.
 

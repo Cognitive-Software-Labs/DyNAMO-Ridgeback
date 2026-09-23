@@ -103,11 +103,18 @@ This existing hand-plotted drawing describes the Isaac USD representation.
 Its dimensions retain that scope; the camera-mount annotation follows the
 shared YAML declaration. It is housed here alongside the
 shared geometry reference, but does not establish Gazebo or hardware parity.
-It does not update automatically when mounts or meshes change. The
-[geometry audit](../BACKLOG.md#robot-geometry-and-drawing-audit) must reconcile
-its annotations with generated geometry and physical measurements.
+It does not update automatically when mounts or meshes change.
 
-## Model-derived dimensions awaiting a shared audit
+Generating this drawing or conducting a full cross-backend dimensional survey
+is not active work. Reopen that work only when a mount or model changes, an
+unexplained calibration, self-occlusion, seating, collision, or clearance issue
+points to geometry, or a task specifically requires physical/backend parity.
+At that point compare frame and sensing origins, body and attachment bounds,
+and floor-contact references in one common frame; update this drawing from the
+authoritative sources where practical. Any geometry correction that changes a
+benchmark input or measured behavior requires the affected benchmark rerun.
+
+## Isaac model-derived dimensions
 
 The following dimensions were documented from the Isaac model. They are
 reference measurements, not verified equivalence across Gazebo, Isaac, and

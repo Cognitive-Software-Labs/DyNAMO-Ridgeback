@@ -209,24 +209,6 @@ supplies recorded offsets; mount photos were waived. Detailed
 attachment dimensions and qualifying the shared assets remain owned by
 this item, not prerequisites for the field visit.
 
-## Robot geometry and drawing audit
-
-**Gap.** The shared reference retains dimensions and a hand-plotted drawing
-from the Isaac USD. It does not establish agreement with the generated Gazebo
-model or physical hardware, and the drawing cannot detect configuration drift.
-
-**Completion criteria.** Compare frame origins, sensor emission/optical origins,
-body bounds, attachment bounds, and floor-contact references in a common frame.
-Record source revisions and physical measurement uncertainty; distinguish
-configured, model-derived, and measured values. Correct discrepancies at their
-source. Regenerate the drawing from authoritative geometry where practical,
-and add a repeatable check for its declared dimensions and mount annotations.
-Rerun any benchmarks affected by geometry corrections.
-
-**Context.** [Geometry and dimensional provenance](robot/geometry.md) and the
-[initial sensor-mount checks](plans/PHYSICAL_robot_measurements_and_validation.md#quick-measurements).
-The full dimensional audit here is separate from that limited field visit.
-
 ## Collision-envelope and navigation-footprint validation
 
 **Drive scope.** Retain the [Isaac planar drive](isaac/robot-model.md#why-this-abstraction-fits-the-current-work)

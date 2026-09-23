@@ -138,10 +138,10 @@ Photograph any obviously unexpected protrusion or loose/tilted mount. Measure
 overall width/length or an attachment only if the photos reveal a mismatch that
 matters to the current setup. Wheel/contact geometry, bracket thicknesses,
 fastenings, cable routing, and a full footprint outline are not required readings
-for this visit. Their [geometry](../BACKLOG.md#robot-geometry-and-drawing-audit),
+for this visit. The [geometry reference and its trigger boundary](../robot/geometry.md#dimensioned-reference-drawing),
 [shared-attachment](../BACKLOG.md#shared-camera-mast-and-bracket-geometry), and
 [collision-envelope](../BACKLOG.md#collision-envelope-and-navigation-footprint-validation)
-audits remain separate. Do not require people to redraw the robot or survey an
+work remain separate. Do not require people to redraw the robot or survey an
 outline before testing the sensors.
 
 ## D455 camera validation

@@ -1,6 +1,6 @@
 <svg viewBox="0 0 880 1040" xmlns="http://www.w3.org/2000/svg" width="880" height="1040" role="img">
 <title>Ridgeback R100 sensor geometry, as built in the Isaac robot USD</title>
-<desc>Hand-plotted Isaac-derived reference relative to base_link. Cross-backend and physical geometry audit remains open.</desc>
+<desc>Hand-plotted Isaac-derived reference relative to base_link; it is not a cross-backend or physical parity certification.</desc>
 <style>
   .bg{fill:#ffffff}
   .ttl{font:600 15px system-ui,sans-serif;fill:#16181d}
@@ -151,6 +151,6 @@
 <text class="sub" x="596" y="850">53.6 mm. The flared base plate is not</text>
 <text class="sub" x="596" y="866">modelled; measure physical clearance.</text>
 
-<text class="sub" x="596" y="884">Cross-backend geometry audit: open.</text>
+<text class="sub" x="596" y="884">Isaac-derived reference; parity not asserted.</text>
 </g>
 </svg>

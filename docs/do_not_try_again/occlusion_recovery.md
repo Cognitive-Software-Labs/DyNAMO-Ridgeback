@@ -90,7 +90,8 @@ Complete the backlog characterization in a qualified execution environment,
 using fixed inputs and current geometry. Preserve per-scene coverage, errors,
 and failure attribution for `objpartial_*`, `objocc_*`, `interocc_*`, and clear
 controls. Scenario-family labels are intended conditions; old visibility
-certifications must not substitute for the current geometry audit.
+certifications must not substitute for the current documented geometry and
+scenario evidence.
 
 Only then decide whether to select a cluster recipe, wrong-object guard,
 abstention rule, another approach, or no change. Any selected design needs a
