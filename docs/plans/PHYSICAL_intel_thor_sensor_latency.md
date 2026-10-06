@@ -1,6 +1,6 @@
 # PHYSICAL — Intel–Thor sensor latency and transport tuning
 
-Status: **tooling and clock installation implemented; baseline qualification pending.** Owner: an agent at the robot, with the
+Status: **tooling, clock sync and the raw VGA 30 Hz baseline done; the baseline meets the working targets; tuning candidates pending.** Owner: an agent at the robot, with the
 operator for every `sudo` step. Governing plan:
 [PHYSICAL — Intel–Thor deployment and transport qualification](PHYSICAL_intel_thor_deployment.md),
 whose sections 2 (time) and 3 (transfer cost) this plan executes for the
@@ -95,10 +95,27 @@ The operator installed faster LAN polling on Thor. All six full baseline
 observations passed their camera/scan contracts, but two of three Thor runs
 had unresolved cross-host timing under a constant whole-run correction.
 The collector now calibrates continuously using short adjacent intervals and
-retains the same 0.2 ms uncertainty limit; qualification with that method is pending.
-Steps 3–7 still require clock convergence, measured baselines and candidate runs.
-Compression, host power/coalescing changes and physically moving the camera
-remain measurement-dependent work; their outcomes are not presumed.
+retains the same 0.2 ms uncertainty limit.
+
+With that method (`artifacts/hardware/20261006-thor-latency-baseline-lan-calibration/`
+on Intel, tooling `5f9467e`), all three Thor observations resolved the clock,
+passed the camera/scan contracts and met every working target, with no frame
+missing against the Intel observer. Step 4 is complete for the deployed raw
+VGA 30 Hz configuration. Step 3 is met for measurement, since the offset is
+known within about 0.08 ms and corrected, but not for agreement: Thor ran
+0.20–0.24 ms ahead of Intel on average in those runs, just outside the
+0.2 ms exit while `chronyc` on Thor reported microseconds (see the reference's
+note on chrony's virtual clock). Find the residual's source before cross-host
+TF lookups rely on agreement rather than correction.
+
+The breakdown points the tuning: the network component is close to the wire
+time of each frame, while the driver component (stamp to Intel publish) is the
+largest and grows when Thor subscribes. That is consistent with publishing
+blocking on Intel's 212,992-byte send buffer, which O1 addresses, so O1 runs
+first. Since `camera_service` now restarts only the camera for camera-only
+changes, candidates no longer restart the platform. Compression, host
+power/coalescing changes and physically moving the camera remain
+measurement-dependent work; their outcomes are not presumed.
 
 ## Steps
 
