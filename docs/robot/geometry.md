@@ -49,13 +49,14 @@ Clearpath's services on `r100_0160` read the robot's own
 `/etc/clearpath/robot.yaml`, which the integrator (MyBotShop) maintains
 separately. It differs from the repository declaration in namespace,
 middleware and sensors. The table records the reported September 18 state,
-including the 18:58 rear correction. Inspect live TF before reuse.
+including the 18:58 rear correction, and the D455 declaration added on
+October 6. Inspect live TF before reuse.
 
 | Item | Robot-local declaration | Relation to the repository YAML |
 |---|---|---|
 | Front Hokuyo | `chassis_link`, `[0.3922, 0, 0.1856]` | Same x; z differs by 6.6 mm, below the resolution of the field tape readings |
 | Rear Hokuyo | `chassis_link`, `[-0.3922, 0, 0.1856]`, yaw π | Symmetric correction applied and live TF/merger values checked; independent target recheck pending; same z difference |
-| D455 | Not declared as of September 18; the vendor driver's frames are not connected to the robot tree. `camera_service apply` declares `camera_0` with the repository mount, description only ([robot-local deployment](../physical/robot_local_deployment.md#camera-service)) | Same mount once applied; unverified on hardware |
+| D455 | `default_mount`, `[0.2692, 0, 0.725]`, as `camera_0`, description only; declared by `camera_service apply` ([robot-local deployment](../physical/robot_local_deployment.md#camera-service)). Before October 6 it was not declared and the vendor driver's frames were disconnected from the robot tree | Same mount, applied and resolving `base_link → camera_0_color_optical_frame` on the robot; the mount itself is a configured value, not a calibration |
 
 The MyBotShop scan merger keeps its own copy of both LiDAR offsets for the
 merged `sensors/scan`. Change it together with the robot-local YAML.
@@ -198,3 +199,4 @@ retains effective footprint/padding and contact validation.
 
 - [September 18 static envelope audit](../../archive/engineering/2026-09-18-collision-envelope-audit.md) — measured backend differences and regenerated top-down/side comparisons; hardware and drawing reconciliation remain open.
 - [r100_0160 field readings and LiDAR box checks](../../archive/engineering/2026-09-18-r100-0160-field-measurements.md) — tape mount readings, LiDAR range/side checks, and the rear-offset correction's evidence.
+- [r100_0160 D455 camera service qualification](../../archive/engineering/2026-10-06-r100-0160-camera-service.md) — the robot-local `camera_0` declaration, its generated frame chain and live TF.

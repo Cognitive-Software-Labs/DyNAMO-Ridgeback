@@ -182,11 +182,15 @@ contains a Gazebo-, Isaac-, or RealSense-specific projection constant.
   [Isaac camera guide](../isaac/camera-depth.md#why-native-isaac-61-depth-is-not-used).
 - Gazebo's observed rate may fall below the authored 30 Hz under rendering
   load; that is a performance failure, not an alternate camera contract.
-- The hardware producer and its contract check are implemented; the on-robot
-  run is pending. Physical-camera validation is still pending. The
+- On `r100_0160` the hardware producer passes the contract check at both
+  profiles, after a cold boot, and after a rollback and reinstall: the three
+  topics, encodings, one grid, the colour optical frame, its TF path to
+  `base_link`, exact colour/depth stamp pairing and unchanged LiDAR continuity.
+  The stationary application smoke and a comparison of the factory calibration
+  with the nominal model remain. The
   [PHYSICAL — Robot measurements and stationary sensor validation](../plans/PHYSICAL_robot_measurements_and_validation.md#d455-camera-validation)
-  owns the device, profile, encoding, timestamp, and TF-ownership procedure;
-  organized-cloud qualification remains a separate optional gate.
+  owns that procedure; organized-cloud qualification remains a separate
+  optional gate.
 - Physical camera-to-LiDAR extrinsic and clock validation remains a deployment
   gate for polar profiling.
 - The committed benchmark scenarios carry visibility certifications generated
@@ -209,3 +213,7 @@ contains a Gazebo-, Isaac-, or RealSense-specific projection constant.
 - Isaac camera/depth implementation guide: `docs/isaac/camera-depth.md`
 - Backend-neutral topic contract: `ridgeback_common/camera_inputs.py`
 - Shared consumers: `ridgeback_localization/`
+
+## Archived evidence
+
+- [r100_0160 D455 camera service qualification](../../archive/engineering/2026-10-06-r100-0160-camera-service.md)

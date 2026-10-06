@@ -496,7 +496,8 @@ camera topics, frames and TF the simulators publish, so the exploration launch
 attaches to it exactly as it does to the LiDARs. The vendor camera units and its
 web camera view are retired. Install it after `intel_services_rmw apply`, with the
 robot stationary and the e-stop in reach: `apply` and `rollback` restart
-`clearpath-robot`, which briefly drops motor power.
+`clearpath-robot`, which drops motor power for about a minute while the platform
+stops. Let them finish; each step is printed.
 
 ```bash
 tools/intel_thor/camera_service status
@@ -506,8 +507,11 @@ tools/intel_thor/camera_service status
 sudo tools/intel_thor/camera_service apply --profile 640x480
 ```
 
+Check the running camera against the contract from a shell with the robot's
+environment:
+
 ```bash
-tools/camera_contract_check --backend hardware
+source /etc/clearpath/setup.bash && tools/camera_contract_check --backend hardware
 ```
 
 ```bash

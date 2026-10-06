@@ -1,7 +1,8 @@
 # PHYSICAL — Robot measurements and stationary sensor validation
 
-Status: **mount readings and LiDAR box checks recorded (2026-09-18); camera,
-alignment and target acceptance still open.** Owner:
+Status: **mount readings and LiDAR box checks recorded (2026-09-18); camera
+service qualified at both profiles (2026-10-06); alignment and target acceptance
+still open.** Owner:
 people at the robot, assisted by an agent. The
 [project backlog](../BACKLOG.md#physical-stationary-integration) owns the overall
 stationary milestone; its individual geometry, camera, calibration, and motion
@@ -36,8 +37,8 @@ is resolved. No new hardware tests were performed for this documentation update.
 | Part of this visit | Recorded progress | Evidence still needed |
 |---|---|---|
 | Mount readings and photos | **Complete for this visit.** [A–E readings and precision](../robot/geometry.md#physical-field-readings) recorded; camera reported centred and level; mount photos waived. | No repeat survey or retrospective photo requirement. Recheck only changed or disputed mounts. |
-| D455 profiles and timing | Fast DDS VGA alignment and HD cold-start with infra2 off reportedly passed checks 1–3. HD with both infrared streams failed. CycloneDDS camera delivery failed. | Preserve device/profile manifests from the captures; implement the chosen camera launch and repeat both profiles on the final middleware. |
-| Camera TF and application smoke | Camera frames were reported disconnected from the robot tree. | Establish one camera-to-base TF owner using observed frame IDs, then validate exact-depth localization smoke. |
+| D455 profiles and timing | **Checks 1–3 pass on the final middleware (2026-10-06).** The repository camera service (colour and aligned depth only, serial pinned) passes the contract check at VGA and HD, after a cold boot, and after a rollback and reinstall; see [archived evidence](#archived-evidence). | Compare the live factory calibration with the nominal simulation model. |
+| Camera TF and application smoke | **TF established:** the robot-local description owns `base_link → camera_0_link`, the driver owns the factory extrinsics below it, and `base_link → camera_0_color_optical_frame` resolves at image stamps. | Stationary projective/Euclidean localization smoke, which needs a perception environment on the robot. |
 | Front and rear LiDARs | **Box checks done 2026-09-18:** both pass near/far/side range and side checks; 40 Hz, ±135°, 0.25° scan timing and geometry recorded. The deployed rear x was ≈3.6 cm too far back and was corrected to the symmetric −0.3922 the same day; see the [backlog item](../BACKLOG.md#rear-lidar-mounting-offset). A timeout/reconnect incident is reported. | Merged-scan comparison, a saved scan overlay, a side-target recheck of the corrected rear offset, and stable recovery evidence. |
 | Camera–LiDAR alignment | No completed projection-overlay check is committed. | Near/farther/off-centre overlays and an independent placement after any correction. |
 | IMU, odometry and command-chain inspection | No completed stationary validation report is committed. | At-rest observations and configuration inspection, without base commands. |
@@ -51,8 +52,9 @@ not replace the outstanding independent side-target recheck.
 
 Continue in this order: resolve and validate the services transport fault;
 confirm stable individual and merged scans and recheck the rear correction;
-implement the selected camera launch and missing camera-to-base TF; repeat
-camera checks; then run camera–LiDAR overlays and G1/person integration.
+then run camera–LiDAR overlays, the localization smoke once a perception
+environment is installed, and G1/person integration. The camera service and its
+camera-to-base TF are in place and pass the contract check.
 
 ## Who does what
 
@@ -150,11 +152,14 @@ outline before testing the sensors.
 faulty services configuration. Controlled transport diagnosis belongs to the
 deployment owner; resume the procedure below after its validation.
 
-The recorded implementation choice is a repository-owned camera launch and
-parameter file, with the vendor service stopped during our sessions: aligned
-depth on, infra2 off, pinned serial, and an explicit camera-to-base transform.
-This launch is not implemented yet. Infra1 can create additional aligned streams;
-record its final setting and load instead of assuming those streams are free.
+The implemented camera owner is the repository's boot service,
+`dynamo-camera.service`, which replaced the vendor camera stack on 2026-10-06:
+colour and aligned depth only (both infrared streams and the pointcloud off),
+pinned serial, and the camera declared in the robot-local description so that
+the Clearpath description owns `base_link → camera_0_link`.
+[Robot-local deployment](../physical/robot_local_deployment.md#camera-service)
+owns its installation. The profile is fixed at install; a profile change is a
+re-install, which restarts the driver cold.
 HD must be tested by cold start: the vendor driver's runtime profile switch
 stopped colour delivery. The reason both infrared streams prevent HD colour
 is unresolved; the successful alternative is configuration-specific evidence.
@@ -393,3 +398,4 @@ or physical motion safety.
 ## Archived evidence
 
 - [r100_0160 field readings and LiDAR box checks](../../archive/engineering/2026-09-18-r100-0160-field-measurements.md)
+- [r100_0160 D455 camera service qualification](../../archive/engineering/2026-10-06-r100-0160-camera-service.md)

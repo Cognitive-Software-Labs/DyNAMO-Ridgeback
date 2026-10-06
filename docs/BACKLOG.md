@@ -140,11 +140,14 @@ Close only after both required profiles and the core checks pass, or after an
 explicit deployment-scope decision revises the required profile set. Pointcloud,
 camera–LiDAR calibration, calibrated accuracy, and motion validation are separate.
 
-**Progress.** The hardware producer is implemented: `dynamo-camera.service`
-owns the D455 from boot and publishes the simulators' topic names, frames and
-TF, installed by `tools/intel_thor/camera_service`, with
-`tools/camera_contract_check` freezing the acceptance criteria. It has not yet
-been applied or checked on the robot.
+**Progress.** `dynamo-camera.service` owns the D455 on `r100_0160` from boot
+and publishes the simulators' topic names, frames and TF. It passes
+`tools/camera_contract_check` at 640x480@30 and 1280x720@30, after a cold boot,
+and after a rollback and reinstall: device identity, effective profiles,
+encodings, exact colour/depth stamps and the camera-to-base TF chain are
+established. Remaining: the stationary projective/Euclidean application smoke,
+which needs a perception environment on the robot, and a comparison of the live
+factory calibration with the nominal simulation model.
 
 **Context.** [Camera stack](target_localization/camera_stack.md),
 [aligned depth](target_localization/aligned_depth.md), and
@@ -284,11 +287,11 @@ Resolve each one here or move it to the item that owns it.
   the offsets still needed live calibration. We changed it to the symmetric −0.3922
   ([rear LiDAR mounting offset](#rear-lidar-mounting-offset)). Confirm that their
   tooling will not restore the old value.
-- **`camera-web-ready.service`** fails at every boot because the RealSense topics
-  do not appear within its wait, observed after the 14:23 and 14:54 boots on
-  2026-09-18. Is it needed, and what should its wait be? `camera_service apply`
-  retires it with the rest of the vendor camera view, which settles both questions
-  once applied.
+- **Slow platform stop.** Five of six `clearpath-robot` restarts on 2026-10-06
+  took 60 s to stop `clearpath-platform`; one took 7 s and the stop during a
+  reboot took 10 s. A `proton_ros2_node` segmentation fault in `librcl.so` was
+  logged once during a stop. Which process ignores the stop request, and is the
+  fault known? Every Clearpath restart costs that minute of motor power.
 - **Unit files changed on disk.** On 2026-09-18 systemd reported that the
   `realsense-camera`, `camera-web-ready`, `clearpath-platform` and
   `clearpath-sensors` units had changed since they were loaded. Which edits are
@@ -302,3 +305,4 @@ Resolve each one here or move it to the item that owns it.
 - [removed D435 transform](../archive/engineering/operational_incidents.md#d435-static-camera-transform--removed-2026-08-31)
 - [Hokuyo reconnect lockout](../archive/engineering/operational_incidents.md#hokuyo-reconnect-lockout--2026-09-18)
 - [r100_0160 field readings and LiDAR box checks](../archive/engineering/2026-09-18-r100-0160-field-measurements.md)
+- [r100_0160 D455 camera service qualification](../archive/engineering/2026-10-06-r100-0160-camera-service.md)

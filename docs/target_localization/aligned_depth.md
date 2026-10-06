@@ -104,12 +104,13 @@ does not align. Consequences to design around:
   fine structure can shift by a pixel.
 - **Cost.** The align filter runs in the driver. It is the price of admission
   for every mask-based consumer, so for cost accounting it is a *sunk* cost.
-- **Configured but unverified hardware path.** The hardware camera service
-  enables `align_depth.enable` and `enable_sync`
-  (`ridgeback_autonomy_hardware/config/d455.yaml`). The robot still needs
-  validation that `sensors/camera_0/depth/image` arrives on the colour grid
-  with sensor-owned, synchronized headers; `tools/camera_contract_check`
-  checks exactly that.
+- **Hardware path.** The hardware camera service enables `align_depth.enable`
+  and `enable_sync` (`ridgeback_autonomy_hardware/config/d455.yaml`). On
+  `r100_0160`, `sensors/camera_0/depth/image` arrives on the colour grid in the
+  colour optical frame, with stamps that pair exactly with colour; occasional
+  single frames are lost. `tools/camera_contract_check` verifies this on each
+  install. Depth quality, hole density and range accuracy on hardware are not
+  yet characterized.
 
 ### 2.2 Simulation (gz `rgbd_camera`)
 
@@ -272,3 +273,4 @@ qualification remains a separate optional gate linked from that plan.
 - [aligned depth coverage](../../archive/engineering/aligned_depth_coverage.md)
 - [exact-stamp availability evidence](../../archive/engineering/exact_stamp_depth_availability.md)
 - [pointcloud provenance evaluation](../../archive/engineering/pointcloud_provenance_evaluation.md)
+- [r100_0160 D455 camera service qualification](../../archive/engineering/2026-10-06-r100-0160-camera-service.md)

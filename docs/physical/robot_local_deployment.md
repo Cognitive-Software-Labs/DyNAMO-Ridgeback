@@ -66,8 +66,11 @@ that contract; this section owns how the robot provides it.
 `apply` and `rollback` take `/run/lock/dynamo-local-dds-test.lock`, the lock the
 robot-side DDS experiment tools hold, and refuse while it is held. Any failure
 after the snapshot restores it. `apply` and `rollback` restart
-`clearpath-robot`, which briefly drops motor power and teleop: run them with the
-robot stationary and the e-stop in reach.
+`clearpath-robot`, which drops motor power and teleop until the platform is back:
+stopping `clearpath-platform` usually takes about a minute on `r100_0160`, and
+the tool prints nothing while it waits. Run them with the robot stationary and
+the e-stop in reach, and let them finish; an interrupted run can leave the
+vendor units disabled without the new service started, which `rollback` repairs.
 
 ### Installed files
 
@@ -122,10 +125,16 @@ target this layout rather than the vendor one.
 
 ```bash
 tools/intel_thor/camera_service status
+source /etc/clearpath/setup.bash
 tools/camera_contract_check --backend hardware --output artifacts/hardware/<run>/camera-contract.json
 ```
 
-The contract check subscribes to the three camera topics and the three scans for
-ten seconds of warm-up and sixty seconds of measurement, and passes only if every
-criterion it prints passes. It does not prove application accuracy, motion
-behaviour, or camera–LiDAR calibration.
+Source `/etc/clearpath/setup.bash` first so the check joins the robot graph with
+the services' domain, middleware and DDS profile. It subscribes to the three
+camera topics and the three scans for ten seconds of warm-up and sixty seconds
+of measurement, and passes only if every criterion it prints passes. It does not
+prove application accuracy, motion behaviour, or camera–LiDAR calibration.
+
+## Archived evidence
+
+- [r100_0160 D455 camera service qualification](../../archive/engineering/2026-10-06-r100-0160-camera-service.md)
