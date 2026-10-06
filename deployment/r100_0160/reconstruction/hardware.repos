@@ -1,0 +1,7 @@
+# Public source matching the deployed build-relevant scan-merger files.
+# This is a reconstruction dependency; do not import into the live vendor tree.
+repositories:
+  src/third_party/tools/ros2_laser_scan_merger:
+    type: git
+    url: https://github.com/mich1342/ros2_laser_scan_merger.git
+    version: 4110a4831c0976c018c7cdb6625f8a10ee4974fa

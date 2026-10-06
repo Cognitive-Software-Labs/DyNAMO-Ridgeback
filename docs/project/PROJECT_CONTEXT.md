@@ -55,6 +55,7 @@ building blocks unless a technical reference says otherwise.
 
 ## Architecture pointers
 
+- [Ridgeback host setup and SSD recovery](../physical/ridgeback_recovery.md)
 - [Shared robot geometry](../robot/geometry.md)
 - [Collision model and navigation footprint](../robot/collision_model.md)
 - [Exploration architecture](../exploration/architecture.md)

@@ -19,6 +19,7 @@
         <NetworkInterface name="br0"/>
         <NetworkInterface name="wlp3s0"/>
       </Interfaces>
+      <AllowMulticast>spdp</AllowMulticast>
     </General>
     <Discovery>
       <ParticipantIndex>auto</ParticipantIndex>

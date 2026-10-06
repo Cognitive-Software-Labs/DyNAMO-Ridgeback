@@ -1,0 +1,19 @@
+[Unit]
+Description=MYBOTSHOP Ridgeback Web Dashboard (robot_webserver)
+After=network-online.target clearpath-robot.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=robot
+Group=robot
+Environment=HOME=/home/robot
+Environment=ROBOT_NS=r100_0160
+Environment=ROS_DOMAIN_ID=0
+ExecStart=/bin/bash -lc 'source /opt/ros/jazzy/setup.bash && source /opt/mybotshop/install/setup.bash && exec ros2 launch robot_webserver webserver.launch.py'
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=15
+
+[Install]
+WantedBy=multi-user.target

@@ -54,7 +54,7 @@ including the 18:58 rear correction. Inspect live TF before reuse.
 | Item | Robot-local declaration | Relation to the repository YAML |
 |---|---|---|
 | Front Hokuyo | `chassis_link`, `[0.3922, 0, 0.1856]` | Same x; z differs by 6.6 mm, below the resolution of the field tape readings |
-| Rear Hokuyo | `chassis_link`, `[-0.3922, 0, 0.1856]`, yaw π | Symmetric correction applied and live TF/merger values checked; independent target recheck pending; same z difference |
+| Rear Hokuyo | `chassis_link`, `[-0.3922, 0, 0.1856]`, yaw π | Symmetric correction applied; September 24 independent stationary side-target checks support it; same z difference |
 | D455 | Not declared; the camera driver's frames are not connected to the robot tree | Repository mount unverified on hardware |
 
 The MyBotShop scan merger keeps its own copy of both LiDAR offsets for the
@@ -63,9 +63,12 @@ merged `sensors/scan`. Change it together with the robot-local YAML.
 Field readings match the model deck height and the configured forward camera
 setback, and show symmetric front/rear LiDAR mounts. The camera housing height
 agrees with the declared mount to within tape precision. These are
-integration checks, not a calibration or a dimensional audit. The
-[rear-offset acceptance item](../BACKLOG.md#rear-lidar-mounting-offset) retains
-the independent-placement check and the recorded yaw-error ambiguity.
+integration checks, not a calibration or a dimensional audit. September 24
+side-target checks at independent placements aligned the front and rear scans
+within about 8–10 mm without an added x shift; reinstating the former rear
+offset worsened the informative placements to about 29–33 mm. The small
+best-fit extra shift in those checks is not a basis for retuning the mount;
+formal extrinsic uncertainty and moving-robot validity remain separate.
 
 ## Physical field readings
 
@@ -198,3 +201,4 @@ retains effective footprint/padding and contact validation.
 
 - [September 18 static envelope audit](../../archive/engineering/2026-09-18-collision-envelope-audit.md) — measured backend differences and regenerated top-down/side comparisons; hardware and drawing reconciliation remain open.
 - [r100_0160 field readings and LiDAR box checks](../../archive/engineering/2026-09-18-r100-0160-field-measurements.md) — tape mount readings, LiDAR range/side checks, and the rear-offset correction's evidence.
+- [r100_0160 rear LiDAR side-target recheck](../../archive/engineering/2026-09-24-r100-0160-rear-lidar-recheck.md) — independent stationary placements after the correction, including a before/after corner overlay and limits.

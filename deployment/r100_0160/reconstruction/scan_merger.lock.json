@@ -1,0 +1,36 @@
+{
+  "repository": "https://github.com/mich1342/ros2_laser_scan_merger.git",
+  "revision": "4110a4831c0976c018c7cdb6625f8a10ee4974fa",
+  "observed_date": "2026-10-06",
+  "relationship": "all listed deployed build-relevant files match this public revision byte-for-byte",
+  "files": [
+    {
+      "path": "CMakeLists.txt",
+      "sha256": "588e014fd040dc27c22ab438f2af0b709cb74b2d64a35b9d039ef82db4befcc2"
+    },
+    {
+      "path": "package.xml",
+      "sha256": "79e5ab6023c85e3f5445d4729f2757ae0e9e9ceafe1cbb344963f876da599a86"
+    },
+    {
+      "path": "src/main.cpp",
+      "sha256": "d25baab49461fb3cb94f4643b65375cfb2f07f74d5a6aceba56b86d3b9f1ff20"
+    },
+    {
+      "path": "config/params.yaml",
+      "sha256": "efe688381e456213a5b78531af1d9281d2e79a1e9c2c39fa8b567ce2b3042db2"
+    },
+    {
+      "path": "launch/merge_2_scan.launch.py",
+      "sha256": "3aae787c4d584844e6f707070c325d091cedc0927fd64ccdcc4347be659b7465"
+    },
+    {
+      "path": "launch/visualize_merge_2_scan.launch.py",
+      "sha256": "e8014aa03b98a1dd5ace0a27e9303b0d79c74dc50e05403af20a37e7a98aeba3"
+    },
+    {
+      "path": "rviz/ros2_laser_scan_merge.rviz",
+      "sha256": "929a7aa9e4c912f2ac008ac3f38e3a62ba8c3e9b9af38efa1a61b797a5676a83"
+    }
+  ]
+}

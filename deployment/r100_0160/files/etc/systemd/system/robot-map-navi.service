@@ -1,0 +1,19 @@
+[Unit]
+Description=MMP Ridgeback Map Navigation (AMCL + Nav2 against saved map)
+After=network-online.target clearpath-scan-merger.service
+Wants=clearpath-scan-merger.service
+
+[Service]
+Type=simple
+User=robot
+Group=robot
+Environment=HOME=/home/robot
+Environment=MMP_NS=r100_0160
+Environment=ROS_DOMAIN_ID=0
+ExecStart=/bin/bash -lc 'source /opt/ros/jazzy/setup.bash && source /opt/mybotshop/install/setup.bash && exec ros2 launch mmp_nav2 map_navi.launch.py'
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=15
+
+[Install]
+WantedBy=multi-user.target

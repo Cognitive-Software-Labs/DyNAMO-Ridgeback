@@ -55,6 +55,14 @@ Isaac Sim port (in progress, `feat/isaac-sim-6-port`):
 
 ## Installation
 
+For rebuilding the physical robot host after SSD replacement, start with the
+[Ridgeback recovery runbook](docs/physical/ridgeback_recovery.md). It covers the
+additional host network, services and device setup, with
+[small deployed scripts/configs](deployment/r100_0160/README.md). The steps below
+install this project workspace.
+The selected [hardware/desktop recovery recipe](docs/physical/ridgeback_public_recovery.md)
+uses pinned public dependencies; the vendor dashboard is optional.
+
 ### 1. Install ROS 2 Jazzy
 
 ```bash
@@ -490,12 +498,19 @@ bash build_and_start_expl.sh office backend:=isaac headless:=true
 
 ### Intel-Thor link setup and pre-deploy check
 
-**Deployment blocker:** the September 18 handoffs report camera delivery
-failures and LiDAR lockouts when local readers use the installed CycloneDDS
-services configuration. Follow the
+**Hardware qualification remains open:** the September 18 handoffs report camera
+delivery failures and LiDAR lockouts with unrestricted multicast. October 5
+focused native tests passed with discovery-only multicast, which is now retained
+on Intel. Follow the
 [transport blocker and recovery procedure](docs/physical/intel_thor_transport.md#camera-subscriber-blocker)
-before routine camera/localization runs. The setup and synthetic check below
-do not establish that this fault has been fixed.
+for deployment state and remaining gates. These local tests do not qualify
+aligned streams, a soak, distributed localization or motion. The synthetic
+check below does not cover those gates.
+
+Use the [guarded hardware workflow](docs/physical/intel_dds_testing.md) to repair
+Intel desktop ownership/camera readiness or verify the retained DDS profile with
+`--verify-current` without changing it. Desktop repair needs one reconnect;
+current-profile verification needs no service reload.
 
 The distributed deployment runs ROS 2 on CycloneDDS on both the Intel PC and
 the Jetson Thor. Traffic between them uses the robot Ethernet only. The
@@ -545,6 +560,20 @@ services, the configurations, clock offset, and a 30 Hz camera-sized stream in
 both directions. It exits nonzero on any failure. Pass `--no-traffic` to skip
 the stream when the Ethernet segment must stay quiet.
 `tools/intel_thor/rmw_benchmark` repeats the Fast DDS/CycloneDDS comparison.
+
+For an explicitly supervised comparison of the **installed Intel services**
+configuration, use the [guarded local DDS procedure](docs/physical/intel_dds_testing.md).
+That procedure also separates VNC from the DDS webserver so subsequent service
+reloads can keep the operator's desktop connected.
+It compares current settings with discovery-only multicast using local camera
+readers, scan watchdogs, and packet-header captures. It requires a stationary
+robot, an operator present, and sudo for capture and service reloads; its report
+does not establish distributed localization or physical motion qualification.
+
+After the focused repeat passes, the procedure's explicit
+`--focused-native --retain-passing-native` option keeps discovery-only multicast
+on Intel after final verification. It restores the original profile on failure;
+alignment, soak and distributed qualification remain separate gates.
 
 ### `target_distance_benchmark.launch.py`
 

@@ -1,0 +1,13 @@
+[Unit]
+Description=Refresh web camera streams after RealSense topics are ready
+After=realsense-camera.service depth-to-mono8.service mbs-webserver.service
+Wants=realsense-camera.service depth-to-mono8.service mbs-webserver.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/camera-web-ready
+TimeoutStartSec=150
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

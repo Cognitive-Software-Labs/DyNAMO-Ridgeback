@@ -24,6 +24,11 @@ troubleshooting, planning, and historical documentation.
 
 ## Physical deployment
 
+- [Ridgeback host setup and SSD recovery](physical/ridgeback_recovery.md) —
+  reconstruction order, deployed scripts/configs, network and service ownership,
+  credentials recreated locally, and unverified recovery steps
+- [Recovery without the vendor dashboard](physical/ridgeback_public_recovery.md) —
+  input verification, pinned public source, inert host candidates and fresh-host build
 - [Intel–Thor DDS transport](physical/intel_thor_transport.md) — CycloneDDS on
   both hosts, Ethernet-only configurations, the Intel service switch, and the
   pre-deploy link check

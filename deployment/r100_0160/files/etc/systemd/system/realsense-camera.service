@@ -1,0 +1,14 @@
+[Unit]
+Description=Intel RealSense D455 ROS camera
+After=clearpath-robot.service
+Wants=clearpath-robot.service
+
+[Service]
+Type=simple
+User=robot
+ExecStart=/usr/local/sbin/realsense-camera-start
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

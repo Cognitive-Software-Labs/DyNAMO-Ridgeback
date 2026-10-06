@@ -1,0 +1,13 @@
+[Unit]
+Description=Reapply Ridgeback local persistent fixes before robot web/control services
+DefaultDependencies=no
+After=local-fs.target
+Before=clearpath-platform.service mbs-webserver.service robot-slam.service robot-map-navi.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/ridgeback-persistent-fixes
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

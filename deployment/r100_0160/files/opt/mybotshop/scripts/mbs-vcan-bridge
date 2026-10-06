@@ -1,0 +1,85 @@
+#!/bin/bash
+# Supervised replacement for Clearpath's /usr/sbin/clearpath-vcan-bridge
+# (virtual mode only, which is what the R100 uses).
+#
+# The stock script backgrounds socat and slcand, then exits. socat has no
+# retry, so a single "Network is unreachable" ends the CAN link for good:
+# the pty dies, the kernel unregisters vcan0, and slcand lingers as an orphan
+# holding a dead tty. systemd (Type=forking, main PID = slcand) sees a live
+# process and keeps reporting "active (running)" while the robot cannot move.
+#
+# This version keeps both processes under supervision and rebuilds the whole
+# pair whenever either one exits. It reproduces the stock start sequence
+# exactly (socat -> slcand -> txqueuelen -> link up -> cangen priming frame),
+# so behaviour on a healthy system is unchanged.
+#
+# Installed to /opt/mybotshop/scripts/mbs-vcan-bridge and wired in through
+# system/systemd/clearpath-vcan.service.d/override.conf.
+#
+# @copyright (c) 2026, MYBOTSHOP GmbH, Inc., All rights reserved.
+
+set -u
+
+MCU_IP="${MCU_IP:-192.168.131.2}"
+PORT="${PORT:-11412}"
+SERIAL_DEV="${SERIAL_DEV:-/dev/ttycan0}"
+CAN_DEV="${CAN_DEV:-vcan0}"
+BAUD="${BAUD:-s8}"
+PEER_RANGE="${PEER_RANGE:-192.168.131.1/24}"
+RETRY_SEC="${RETRY_SEC:-2}"
+
+socat_pid=""
+slcand_pid=""
+
+log() { echo "[mbs-vcan-bridge] $*"; }
+
+stop_pair() {
+    [ -n "$socat_pid" ] && kill "$socat_pid" 2>/dev/null
+    [ -n "$slcand_pid" ] && kill "$slcand_pid" 2>/dev/null
+    socat_pid=""
+    slcand_pid=""
+    # Reap them. Without this the killed jobs stay in the job table as
+    # unwaited entries and the `wait -n` below would return immediately on the
+    # next cycle, spinning the rebuild loop instead of blocking.
+    wait 2>/dev/null || true
+    # An slcand left over from an earlier cycle still owns the interface name
+    # and would block the next start. The bracket keeps the pattern from
+    # matching this script's own command line.
+    pkill -f "[s]lcand.*${CAN_DEV}" 2>/dev/null
+    sleep 1
+    return 0
+}
+
+trap 'log "got SIGTERM/SIGINT, shutting bridge down"; stop_pair; exit 0' TERM INT
+
+log "starting supervised bridge: ${MCU_IP}:${PORT} <-> ${SERIAL_DEV} <-> ${CAN_DEV} (${BAUD})"
+
+while true; do
+    stop_pair
+
+    socat "udp4-datagram:${MCU_IP}:${PORT},bind=:${PORT},range=${PEER_RANGE}" \
+          "pty,link=${SERIAL_DEV},echo=0" &
+    socat_pid=$!
+    sleep 1
+
+    slcand -o -c -F "-${BAUD}" "${SERIAL_DEV}" "${CAN_DEV}" &
+    slcand_pid=$!
+    sleep 1
+
+    if ip link show "${CAN_DEV}" >/dev/null 2>&1; then
+        ip link set "${CAN_DEV}" txqueuelen 1000
+        ip link set "${CAN_DEV}" up
+        # Priming frame - the stock script sends this to enable echoing on the
+        # serial device. Failure here is not fatal.
+        cangen "${CAN_DEV}" -n 1 -L 0 -I 0 >/dev/null 2>&1 || true
+        log "bridge up (socat=${socat_pid} slcand=${slcand_pid})"
+    else
+        log "WARNING: ${CAN_DEV} did not appear after start - will retry"
+    fi
+
+    # Block until either child exits, then rebuild both. Only these two run as
+    # background jobs, so a bare `wait -n` is unambiguous.
+    wait -n
+    log "a bridge process exited - rebuilding in ${RETRY_SEC}s"
+    sleep "${RETRY_SEC}"
+done

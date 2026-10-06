@@ -1,6 +1,6 @@
 # PHYSICAL — Robot measurements and stationary sensor validation
 
-Status: **mount readings and LiDAR box checks recorded (2026-09-18); camera,
+Status: **mount readings, LiDAR box checks, and rear-offset recheck recorded; camera,
 alignment and target acceptance still open.** Owner:
 people at the robot, assisted by an agent. The
 [project backlog](../BACKLOG.md#physical-stationary-integration) owns the overall
@@ -29,16 +29,18 @@ The September 18 field record names checkout
 robot-local services with ad-hoc probes, and raw captures remain on the robot.
 The later [camera handoff](handoffs/PHYSICAL_d455_camera_runs_agent1.md) reports
 VGA and HD aligned-depth tests on Fast DDS, followed by failures on CycloneDDS.
-Those passes apply to the recorded configurations; final deployment acceptance
-requires reruns after the [transport blocker](../physical/intel_thor_transport.md#camera-subscriber-blocker)
-is resolved. No new hardware tests were performed for this documentation update.
+Those camera passes apply to the recorded configurations; final deployment
+acceptance requires reruns after the
+[transport blocker](../physical/intel_thor_transport.md#camera-subscriber-blocker)
+is resolved. The September 24 stationary rear-offset recheck and subsequent
+merged-scan comparison do not clear the transport or recovery gates.
 
 | Part of this visit | Recorded progress | Evidence still needed |
 |---|---|---|
 | Mount readings and photos | **Complete for this visit.** [A–E readings and precision](../robot/geometry.md#physical-field-readings) recorded; camera reported centred and level; mount photos waived. | No repeat survey or retrospective photo requirement. Recheck only changed or disputed mounts. |
 | D455 profiles and timing | Fast DDS VGA alignment and HD cold-start with infra2 off reportedly passed checks 1–3. HD with both infrared streams failed. CycloneDDS camera delivery failed. | Preserve device/profile manifests from the captures; implement the chosen camera launch and repeat both profiles on the final middleware. |
 | Camera TF and application smoke | Camera frames were reported disconnected from the robot tree. | Establish one camera-to-base TF owner using observed frame IDs, then validate exact-depth localization smoke. |
-| Front and rear LiDARs | **Box checks done 2026-09-18:** both pass near/far/side range and side checks; 40 Hz, ±135°, 0.25° scan timing and geometry recorded. The deployed rear x was ≈3.6 cm too far back and was corrected to the symmetric −0.3922 the same day; see the [backlog item](../BACKLOG.md#rear-lidar-mounting-offset). A timeout/reconnect incident is reported. | Merged-scan comparison, a saved scan overlay, a side-target recheck of the corrected rear offset, and stable recovery evidence. |
+| Front and rear LiDARs | **Box checks done 2026-09-18; rear-offset recheck and stationary merged-scan comparison done 2026-09-24.** Both pass near/far/side checks; 40 Hz, ±135°, 0.25° individual-scan timing and geometry were recorded. The corrected rear x = −0.3922 m passes independent stationary side-target checks with about 8–10 mm median front/rear point agreement. The merged box returns match individual returns within 8.2 mm at the 95th percentile in a ten-second capture; see [archived evidence](#archived-evidence). A timeout/reconnect incident is reported. | Stable recovery evidence. The ten-second merged capture does not establish long-run reliability or timeout recovery. |
 | Camera–LiDAR alignment | No completed projection-overlay check is committed. | Near/farther/off-centre overlays and an independent placement after any correction. |
 | IMU, odometry and command-chain inspection | No completed stationary validation report is committed. | At-rest observations and configuration inspection, without base commands. |
 | G1/person integration | No completed distributed target runs are committed. | Both labels, required mask/depth modes, empty-scene behavior, and joint run evidence. |
@@ -46,11 +48,12 @@ is resolved. No new hardware tests were performed for this documentation update.
 The [geometry reference](../robot/geometry.md#deployed-hardware-mounts) separates
 physical readings, robot-local configuration, and nominal simulator geometry.
 The rear offset correction changed the robot YAML and vendor merger, not the
-repository's already symmetric declaration. Live parameter/TF verification does
-not replace the outstanding independent side-target recheck.
+repository's already symmetric declaration. Its independent stationary
+side-target recheck and stationary merged-output comparison are complete;
+driver recovery is not.
 
 Continue in this order: resolve and validate the services transport fault;
-confirm stable individual and merged scans and recheck the rear correction;
+confirm stable individual and merged scans;
 implement the selected camera launch and missing camera-to-base TF; repeat
 camera checks; then run camera–LiDAR overlays and G1/person integration.
 
@@ -269,11 +272,13 @@ required model modes after their GPU environment and inputs are qualified.
 ## Both LiDARs and stationary auxiliary sensors
 
 The September 18 near/far/side box checks and 60 s individual-scan timing
-capture are complete for their recorded setup. Continue with a new shared
-side-target placement after the rear-offset correction, a comparison of merged
-and individual scans, saved overlays, and recovery evidence. The procedure
-below is the reference for affected rechecks; do not repeat all field work
-solely because this plan remains open.
+capture are complete for their recorded setup. The September 24 independent
+side-target placements and saved individual-scan overlays support the corrected
+rear offset. A later ten-second capture of the same corrected box position
+confirmed that the installed merged output agrees with individual returns and
+remains live in that short window. Continue with timeout-recovery evidence.
+The procedure below is the reference for affected rechecks;
+do not repeat all field work solely because this plan remains open.
 
 The agent records each front/rear LiDAR's device identity, driver/configuration,
 publisher ownership, topic/type/QoS, frame and TF, angular bounds/increment,
@@ -393,3 +398,4 @@ or physical motion safety.
 ## Archived evidence
 
 - [r100_0160 field readings and LiDAR box checks](../../archive/engineering/2026-09-18-r100-0160-field-measurements.md)
+- [r100_0160 rear LiDAR side-target recheck](../../archive/engineering/2026-09-24-r100-0160-rear-lidar-recheck.md)
