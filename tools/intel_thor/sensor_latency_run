@@ -51,6 +51,24 @@ def clock_window(before, after):
             'limitation': 'Endpoint checks bound endpoint offset; an intervening clock step is not excluded.'}
 
 
+def delivery_loss(reference_samples, received_samples):
+    """Loss relative to the Intel observer, restricted to a shared stamp window.
+
+    This excludes subscription start/end skew. A frame missed by both observers
+    is unobservable, so the result is not a publisher-side packet-loss counter.
+    """
+    reference = {s['stamp_ns'] for s in reference_samples}
+    received = {s['stamp_ns'] for s in received_samples}
+    if not reference or not received:
+        return {'reference_count': 0, 'missing': None, 'fraction': None}
+    low, high = max(min(reference), min(received)), min(max(reference), max(received))
+    reference = {stamp for stamp in reference if low <= stamp <= high}
+    missing = len(reference - received)
+    return {'reference_count': len(reference), 'missing': missing,
+            'fraction': missing / len(reference) if reference else None,
+            'stamp_window_ns': [low, high]}
+
+
 def qualify(report):
     rows = []
     def row(name, passed):
@@ -65,9 +83,11 @@ def qualify(report):
             value = components[component]['p95_ms']
             row(f'{stream} {component} p95 <= {limit} ms', value is not None and 0 <= value <= limit)
         loss = report['timing'][stream]['dds_loss']['fraction']
-        # If RMW sequence numbers are absent, report only a cadence deficit estimate.
-        row(f'{stream} loss <= 1% (cadence estimate when RMW sequence unavailable)',
-            (loss if loss is not None else report['rate_loss_estimate'][stream]) <= .01)
+        # Compare with the simultaneous Intel reader if the RMW omits sequences.
+        observed = report.get('delivery_loss_vs_intel', {}).get(stream, {}).get('fraction')
+        value = loss if loss is not None else observed
+        row(f'{stream} loss <= 1% (Intel observer reference when RMW sequence unavailable)',
+            value is not None and value <= .01)
         row(f'{stream} exact pairing >= 99%', report['pairing'][stream] >= .99)
     report['working_targets'] = rows
     report['working_targets_passed'] = all(r['passed'] for r in rows)
@@ -138,7 +158,8 @@ def main(argv=None):
                     pidfile = str(remote_root / (label + '.pid'))
                     command = ('. /opt/ros/jazzy/setup.bash && . ' + shlex.quote(args.thor_worktree + '/src/ridgeback_autonomy_hardware/config/intel_thor/dds_env.sh') + ' thor && export ROS_DOMAIN_ID=0 && mkdir -p ' + shlex.quote(str(remote_root)) + ' && echo $$ > ' + shlex.quote(pidfile) + ' && exec ' + shlex.join(['python3', args.thor_worktree + '/tools/camera_contract_check', *base, '--host', 'thor', '--output', str(remote_output), '--samples-output', str(remote_samples)]))
                     with (root / f'{label}-guard.log').open('w') as guard_log, (root / f'{label}.log').open('w') as log:
-                        guard = subprocess.Popen([*local_args, '--output', str(root / f'{label}-guard.json')], stdout=guard_log, stderr=guard_log)
+                        guard = subprocess.Popen([*local_args, '--output', str(root / f'{label}-guard.json'),
+                                                  '--samples-output', str(root / f'{label}-guard-samples.json')], stdout=guard_log, stderr=guard_log)
                         remote_process = subprocess.Popen(['ssh', '-T', '-o', 'BatchMode=yes', args.peer, 'bash', '-c', shlex.quote(command)], stdout=log, stderr=log)
                         while remote_process.poll() is None:
                             if guard.poll() is not None and guard.returncode != 0:
@@ -159,6 +180,9 @@ def main(argv=None):
                 report['timing'] = {key: CONTRACT.timing_stats(value, report['clock']['offset_ms'],
                                    report['clock']['bound_ms'], same_host=host == 'intel') for key, value in raw.items()}
                 if host == 'thor':
+                    reference = json.loads((root / f'{label}-guard-samples.json').read_text())
+                    report['delivery_loss_vs_intel'] = {key: delivery_loss(reference[key], raw[key])
+                                                       for key in ('color', 'depth')}
                     qualify(report)
                 write(output, report)
                 if code:

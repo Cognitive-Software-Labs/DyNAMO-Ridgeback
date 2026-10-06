@@ -38,7 +38,12 @@ The caller must select the matching DDS environment and deployment domain.
 Reports include exact pairing in both directions, observed rate, an expected
 cadence deficit estimate, and RMW publication-sequence loss when supported.
 The installed Jazzy RMW may omit sequence numbers; cadence deficit does not
-prove network-only packet loss. CPU busy percentage is host-wide; NIC byte
+prove network-only packet loss. The collector additionally compares Thor's
+unique camera stamps with its simultaneous Intel observer within the common
+stamp window. This removes subscriber start/end skew; frames missed by both
+observers remain unobservable. Qualification uses this comparison when RMW
+sequence numbers are unavailable, and leaves loss unresolved if there is no
+common window. CPU busy percentage is host-wide; NIC byte
 rates cover all traffic on each interface, without subtracting other workloads.
 
 ## Qualification collector
