@@ -17,6 +17,8 @@ this page needs to be recreated by hand.
 |---|---|---|---|
 | 1 | `sudo tools/intel_thor/intel_services_rmw apply` | `/etc/clearpath/cyclonedds.xml`, `/etc/sysctl.d/60-dynamo-dds-buffers.conf`, the middleware and `CYCLONEDDS_URI` in `/etc/clearpath/robot.yaml`, and `60-dynamo-cyclonedds.conf` drop-ins for the MyBotShop units | `/etc/clearpath/dynamo-rmw-backup/` |
 | 2 | `sudo tools/intel_thor/camera_service apply` | the `camera_0` entry in `/etc/clearpath/robot.yaml`, `/etc/clearpath/dynamo-camera/`, `/etc/systemd/system/dynamo-camera.service`, and the enablement of the four vendor camera units | `/etc/clearpath/dynamo-camera-backup/` |
+| 3 | `sudo tools/intel_thor/time_sync apply --host intel` (Thor: `--host thor`, from its worktree) | chrony and `/etc/chrony/` on each host; Intel keeps internet upstreams, slews at most 500 ppm and serves the subnet | `/var/lib/dynamo-time-sync-backup/` |
+| 4 | `sudo tools/intel_thor/ptp_sync apply --host intel`, then `--host thor` on Thor | `linuxptp`, `/etc/linuxptp/dynamo-ptp4l.conf`, `dynamo-ptp4l.service` and `dynamo-phc2sys.service`; on Thor, chrony stopped and disabled while PTP owns the wall clock | `/var/lib/dynamo-ptp-sync-backup/` |
 
 The camera service depends on step 1: its unit sources `/etc/clearpath/setup.bash`
 for the middleware, and `apply` refuses unless the installed DDS profile restricts
@@ -164,6 +166,22 @@ and rollback to refuse before changing services. An installation failure keeps
 the snapshot for operator rollback. Package versions/cache are not snapshotted;
 rollback may require apt connectivity. Time changes can step wall clocks, so
 apply while the robot is stationary and no timing run holds the experiment lock.
+
+chrony serves an estimate of true time, while sensor stamps come from Intel's
+wall clock, so a chrony client follows Intel only to within Intel's pending
+internet correction. `tools/intel_thor/ptp_sync` (`status`, operator-run
+`apply --host intel|thor`, `rollback`) carries the wall clock itself. On Intel,
+`dynamo-phc2sys.service` copies the wall clock into `eno1`'s hardware clock and
+`dynamo-ptp4l.service` serves it over raw Ethernet (L2, hardware timestamps),
+since Intel's address is on `br0` rather than the port. On Thor, `ptp4l` follows
+on `enP2p1s0` and `phc2sys` sets the wall clock; chrony is stopped and disabled
+while PTP owns it, and its unit `Conflicts=` with chrony. Both hardware clocks
+hold UTC. Intel's chrony must first slew at most 500 ppm (`time_sync`), which
+`apply` checks, so internet corrections reach Thor smoothly. `apply` installs
+`linuxptp`, renders `config/intel_thor/ptp/`, and fails if either daemon does
+not stay running; `/var/lib/dynamo-ptp-sync-backup/` keeps the package choice
+and chrony's state for rollback. Thor's wall clock may step once at
+installation by the current offset.
 
 The camera installer adds `--fps 15|30`, `--dds-profile services|camera`, and
 `--max-message-size default|65500`. New installs keep `services` at 30 Hz;

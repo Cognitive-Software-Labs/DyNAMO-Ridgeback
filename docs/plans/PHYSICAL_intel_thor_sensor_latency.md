@@ -18,7 +18,8 @@ it starts from the configuration this one installs.
 
 | Decision | Choice |
 |---|---|
-| Clock sync | chrony: Intel keeps its internet servers and serves the robot subnet; Thor syncs only to Intel. PTP is a later option (both NICs have PTP clocks) |
+| Clock sync | chrony on Intel keeps UTC from its internet servers, slewed at most 500 ppm; PTP carries Intel's wall clock to Thor (both NICs timestamp in hardware), replacing Thor's chrony (user, 2026-10-06, after chrony alone left 0.2–1.9 ms disagreement) |
+| Frame rate | 30 Hz only; reduced-rate operation is not an option (user, 2026-10-06) |
 | Where tuning lives | A camera-only DDS profile rendered by `camera_service`. The services profile `/etc/clearpath/cyclonedds.xml` is not changed |
 | Tooling on Thor | Pushed to `origin` from Intel and pulled on Thor into a separate worktree; Thor's existing checkout stays untouched |
 | Working targets, VGA at 30 Hz | Network + DDS p95 ≤ 20 ms; sensor stamp to Thor callback p95 ≤ 40 ms; loss ≤ 1 %; exact colour/depth pairing ≥ 99 %; LiDAR continuity unchanged |
@@ -192,6 +193,29 @@ camera topics and the scans and passes its contract criteria in a short run.
 Exit: `chronyc tracking` on Thor reports an offset within 0.2 ms of Intel, and
 an independent direct-LAN round-trip check agrees within its own bound.
 
+The chrony stage was installed and measured: the clocks agreed only to within
+Intel's pending internet correction, because chrony serves an estimate of true
+time while sensor stamps use Intel's wall clock. PTP replaces Thor's chrony:
+
+- `chrony_intel.conf` adds `maxslewrate 500`, so a 1 ms internet correction
+  takes 2 s instead of tens of milliseconds; re-apply `time_sync` on Intel.
+- `config/intel_thor/ptp/` holds both hosts' `ptp4l` files and the
+  `dynamo-ptp4l`/`dynamo-phc2sys` unit templates. Intel's `phc2sys` copies its
+  wall clock into `eno1`'s hardware clock and `ptp4l` serves it over raw
+  Ethernet (Intel's address is on `br0`, not the port). Thor's `ptp4l` follows
+  on `enP2p1s0` and its `phc2sys` sets the wall clock, which may step once by
+  the current offset. Both hardware clocks hold UTC (`-O 0`).
+- `tools/intel_thor/ptp_sync` has `status`, `apply --host intel|thor` and
+  `rollback`, following `time_sync`: it snapshots the package choice and
+  chrony's state, refuses on Intel until the slow slew rate is installed,
+  stops chrony on Thor and restores it on rollback, takes the robot lock, and
+  fails if either daemon does not stay running.
+
+Order: `time_sync apply --host intel`, `ptp_sync apply --host intel`, then
+`ptp_sync apply --host thor` from Thor's worktree. Exit: `check_clock` from
+Intel bounds the wall-clock offset within 0.2 ms and keeps it there across an
+Intel internet correction.
+
 ### 4. Baseline (agent; deployed configuration unchanged)
 
 - Same-host run on Intel with the robot's environment
@@ -208,9 +232,9 @@ the baseline, and recorded even when it loses.
 
 | Option | Change | Where |
 |---|---|---|
-| O1 | Camera-only DDS profile: `br0` only, discovery-only multicast, `SocketSendBufferSize` 16 MiB, plus Intel `wmem_max` 16 MiB | New template `config/cyclonedds_camera.xml`, rendered by `camera_service`; the unit sets `CYCLONEDDS_URI` after sourcing `/etc/clearpath/setup.bash`; `wmem_max` added to the tracked sysctl file |
-| O2 | CycloneDDS `MaxMessageSize` 65500 against the default | Same profile |
-| O3 | 15 frames/s against 30 (the detector runs at most 10) | `camera_service apply --fps`; recorded as reduced-rate evidence |
+| O1 | Camera-only DDS profile: `br0` only, discovery-only multicast, `SocketSendBufferSize` 16 MiB, plus Intel `wmem_max` 16 MiB | New template `config/cyclonedds_camera.xml`, rendered by `camera_service`; the unit sets `CYCLONEDDS_URI` after sourcing `/etc/clearpath/setup.bash`; `wmem_max` added to the tracked sysctl file. **Measured, not adopted** |
+| O2 | CycloneDDS `MaxMessageSize` 65500 against the default | Same profile, so it includes O1's send buffer. **Skipped** pending a decision to test it without that buffer |
+| O3 | 15 frames/s against 30 | **Withdrawn**: reduced rate is not an option |
 | O4 | Colour H.264 through `ffmpeg_image_transport` (NVENC on the RTX 5060) or JPEG; depth `zstd` or RVL, lossless only | Driver parameters for the encoder; on Thor, install the matching plugins (operator `sudo apt`) and a republisher that restores raw `Image` topics under the contract names |
 | O5 | Thor power mode and CPU governor; NIC interrupt coalescing on both hosts | Recorded host settings; restored afterwards unless adopted |
 

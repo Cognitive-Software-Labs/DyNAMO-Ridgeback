@@ -555,6 +555,26 @@ chronyc tracking
 `tools/intel_thor/time_sync status` inspects the deployment;
 `sudo tools/intel_thor/time_sync rollback` restores the prior time service.
 Check the independent bound on Intel with `tools/intel_thor/check_clock`.
+
+chrony alone serves Thor an estimate of true time rather than Intel's wall clock,
+so the two clocks agree only to within Intel's pending internet correction. PTP
+carries the wall clock itself. With the robot stationary, re-apply `time_sync`
+on Intel first (it installs the slow slew rate PTP requires), then install PTP
+on each host:
+
+```bash
+# Intel, from this checkout
+sudo tools/intel_thor/time_sync apply --host intel
+sudo tools/intel_thor/ptp_sync apply --host intel
+# Thor, from ~/DyNAMO-Ridgeback-latency (stops Thor's chrony)
+sudo tools/intel_thor/ptp_sync apply --host thor
+```
+
+`tools/intel_thor/ptp_sync status` shows each host's daemons and their latest
+offsets; `sudo tools/intel_thor/ptp_sync rollback` removes PTP and restores
+chrony on Thor. Confirm the wall-clock agreement from Intel with
+`tools/intel_thor/check_clock`.
+
 Then collect the interleaved baseline from Intel:
 
 ```bash
@@ -584,13 +604,12 @@ collector with a new output directory:
 ```bash
 sudo tools/intel_thor/camera_service apply --dds-profile camera --fps 30 --max-message-size default
 # O2: change only --max-message-size to 65500
-# O3: change only --fps to 15; collector also requires --fps 15
 ```
 
 Return to the installed baseline with `camera_service apply --dds-profile
-services --fps 30 --max-message-size default`. Fifteen Hz evidence cannot pass
-the 30 Hz targets. Compression and host tuning are selected only after the
-measured baseline and raw transport candidates.
+services --fps 30 --max-message-size default`. The deployment runs at 30 Hz;
+reduced-rate runs are not a tuning option. Compression and host tuning are
+selected only after the measured baseline and raw transport candidates.
 
 ### Intel-Thor link setup and pre-deploy check
 
