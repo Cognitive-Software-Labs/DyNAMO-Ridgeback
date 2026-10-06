@@ -145,11 +145,36 @@ take per-stream transports and report encode, network, decode and delivery
 components; the
 [sensor timing reference](../physical/intel_thor_sensor_latency.md#compressed-transport-candidates)
 owns their semantics. NVENC low-latency H.264 settings are in `d455.yaml` and
-were checked with a command-line encode on the Intel GPU. Pending: the
-operator installs Thor's plugins and re-applies `camera_service` so the
-camera loads the H.264 settings, then the candidates run: colour JPEG and
-H.264 with depth raw, then depth `zstd`, PNG and RVL with colour raw, then the
-best of each combined.
+were checked with a command-line encode on the Intel GPU. The operator
+installed Thor's plugins and re-applied `camera_service` (camera restart only).
+
+**O4 measured, not adopted** (2026-10-06, tooling `1e72cc9`). Short 15-second
+diagnostics first ruled out three variants. zstd depth decodes without its
+header, and NVDEC H.264 holds four frames, adding about 137 ms (see the
+[reference](../physical/intel_thor_sensor_latency.md#compressed-transport-candidates)).
+PNG depth costs about 27 ms over raw. The best pair, H.264 from NVENC decoded
+in software on Thor with RVL depth, then ran exactly like the baseline
+(`artifacts/hardware/20261006T152253Z-thor-latency-o4-ffmpeg-compressedDepth/`).
+All three Thor observations passed the contract, resolved the clock and lost
+no frames against the Intel observer:
+
+| median / p95 ms | Raw baseline | O4 |
+|---|---|---|
+| Colour total | 29.7 / 33 | 33.9–35.1 / 48.3–49.9 |
+| Depth total | 21.7 / 25 | 27.9–29.0 / 31.1–32.9 |
+| Merged scan total | 1.1 / 2 | 0.9–1.1 / 1.7–1.9 |
+
+Compression removes most of the network time, about 9 ms for raw colour,
+but encoding and decoding cost more. Colour fails the 40 ms p95 target
+because every 15th frame is a keyframe that takes about 20 ms to decode in
+software; that is 6.6% of frames, above the p95 cut. A longer keyframe
+interval would move them past p95 but not p99, and colour's median would
+still trail raw. Scan delivery to Thor was unaffected either way. At VGA 30 Hz
+on the 1 Gb/s link, raw transport stays the fastest. Compression
+remains the option if bandwidth becomes the limit (higher resolution, more
+cameras or a slower link), and lossy colour would still need the detector
+comparison. The camera's runtime encoder parameters were restored after the
+run.
 
 ## Steps
 
@@ -257,7 +282,7 @@ the baseline, and recorded even when it loses.
 | O1 | Camera-only DDS profile: `br0` only, discovery-only multicast, `SocketSendBufferSize` 16 MiB, plus Intel `wmem_max` 16 MiB | New template `config/cyclonedds_camera.xml`, rendered by `camera_service`; the unit sets `CYCLONEDDS_URI` after sourcing `/etc/clearpath/setup.bash`; `wmem_max` added to the tracked sysctl file. **Measured, not adopted** |
 | O2 | CycloneDDS `MaxMessageSize` 65500 against the default | Same profile, so it includes O1's send buffer. **Skipped** (user, 2026-10-06): at most a CPU saving, since the wire time is unchanged; one lost packet discards a whole 64 KB datagram and so a best-effort frame; and larger bursts queue ahead of LiDAR traffic |
 | O3 | 15 frames/s against 30 | **Withdrawn**: reduced rate is not an option |
-| O4 | Colour H.264 through `ffmpeg_image_transport` (NVENC on the RTX 5060) or JPEG; depth `zstd` or RVL, lossless only | Driver parameters for the encoder; on Thor, install the matching plugins (operator `sudo apt`) and a republisher that restores raw `Image` topics under the contract names |
+| O4 | Colour H.264 through `ffmpeg_image_transport` (NVENC on the RTX 5060) or JPEG; depth `zstd` or RVL, lossless only | Driver parameters for the encoder; on Thor, install the matching plugins (operator `sudo apt`) and a republisher that restores raw `Image` topics under the contract names. **Measured, not adopted**: adds latency at VGA 30 Hz; JPEG not run |
 | O5 | Thor power mode and CPU governor; NIC interrupt coalescing on both hosts | Recorded host settings; restored afterwards unless adopted |
 
 No lossy colour option is adopted until the detector's output on Thor has been

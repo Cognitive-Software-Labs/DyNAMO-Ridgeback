@@ -142,6 +142,21 @@ begin with a dot and so cannot be set from a parameters file. The H.264
 settings live in `config/d455.yaml` (NVENC, no B-frames, 15-frame keyframe
 interval); the ffmpeg encoder reads them when its first subscriber appears.
 Runs are written to `<UTC>-thor-latency-o4-<colour>-<depth>/`.
+`--decoder-param NAME=VALUE` passes a parameter to the Thor republishers.
+
+Two decoder behaviours found on 2026-10-06 (Thor, `image_transport_plugins`
+4.0.7, `ffmpeg_image_transport` 3.0.4) decide which variants are usable:
+
+- **zstd loses the header.** Decoded depth arrives with stamp 0 and an empty
+  frame ID, although the compressed messages carry correct stamps, so the
+  contract check fails it on duplicate stamps and pairing. Use
+  `compressedDepth` for lossless depth.
+- **NVDEC holds four frames.** The default H.264 decoder on Thor is
+  `h264_cuvid`, which FFmpeg runs with a four-frame display delay unless the
+  codec context's `low_delay` flag is set. The plugin passes only the
+  decoder's own options, so that flag cannot be set (`Option not found`) and
+  decoding adds about 137 ms. The software decoder avoids it:
+  `--decoder-param in.ffmpeg.decoders.h264=h264`.
 
 ## Limits and pending adoption
 
