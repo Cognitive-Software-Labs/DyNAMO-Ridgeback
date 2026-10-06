@@ -222,3 +222,40 @@ def test_clock_series_brackets_clock_read_scheduling_delay():
     points[1]['intel_phase_min_ns'] += 1_000_000
     points[1]['intel_phase_max_ns'] += 1_000_000
     assert TOOL.clock_series_summary(points)['clock_step_detected']
+
+
+@pytest.mark.parametrize('kind', ['CompressedImage', 'FFMPEGPacket'])
+def test_encoded_stamp_is_read_from_any_header_first_message(kind):
+    from rclpy.serialization import serialize_message
+    if kind == 'FFMPEGPacket':
+        from ffmpeg_image_transport_msgs.msg import FFMPEGPacket as Message
+    else:
+        from sensor_msgs.msg import CompressedImage as Message
+    message = Message()
+    message.header.stamp.sec = 1791276509
+    message.header.stamp.nanosec = 289081623
+    message.header.frame_id = FRAME
+    assert TOOL.header_stamp(serialize_message(message)) == 1791276509_289081623
+
+
+def test_compressed_stream_splits_delay_across_hosts_by_stamp():
+    stamp = 1_000_000_000
+    # Intel publishes the compressed frame 10 ms after the stamp; Thor's clock runs
+    # 2 ms ahead, receives it 20 ms later, decodes in 4 ms and delivers in 1 ms.
+    encoded = [TOOL.timing_sample(stamp, {'source_timestamp': stamp + 10_000_000,
+                                          'received_timestamp': stamp + 32_000_000}, stamp + 32_500_000)]
+    decoded = [TOOL.timing_sample(stamp, {'source_timestamp': stamp + 36_000_000,
+                                          'received_timestamp': stamp + 36_500_000}, stamp + 37_000_000),
+               TOOL.timing_sample(stamp + PERIOD_NS, {'source_timestamp': stamp + PERIOD_NS + 36_000_000}, stamp + PERIOD_NS + 37_000_000)]
+    result = TOOL.transport_timing(encoded, decoded, offset_ms=2, bound_ms=.1)
+    medians = {key: value['median_ms'] for key, value in result['components'].items()}
+    counts = {key: value['count'] for key, value in result['components'].items()}
+    assert result['matched_encoded'] == 1
+    assert medians['encode'] == 10 and medians['network_dds'] == 20 and medians['decode'] == 4
+    assert medians['delivery'] == 1 and medians['total'] == 35
+    # A decoded frame without its compressed receipt still counts toward delivery and total.
+    assert counts == {'encode': 1, 'network_dds': 1, 'decode': 1, 'delivery': 2, 'total': 2}
+    unresolved = TOOL.transport_timing(encoded, decoded, offset_ms=2, bound_ms=.3)
+    assert unresolved['clock_resolved'] is False
+    assert unresolved['components']['network_dds']['count'] == unresolved['components']['total']['count'] == 0
+    assert unresolved['components']['decode']['count'] == 1
