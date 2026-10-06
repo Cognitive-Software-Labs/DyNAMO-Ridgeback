@@ -147,6 +147,9 @@ def test_apply_installs_the_contract_and_retires_the_vendor_camera(host):
     assert parameters['enable_infra1'] is False and parameters['enable_infra2'] is False
     assert parameters['align_depth.enable'] is True and parameters['pointcloud.enable'] is False
     assert parameters['rgb_camera.color_profile'] == parameters['depth_module.depth_profile'] == '640x480x30'
+    # Low-latency H.264 for the colour ffmpeg variant, with no B-frame reordering.
+    ffmpeg = parameters['camera_0']['color']['image_raw']['ffmpeg']
+    assert ffmpeg['encoder'] == 'h264_nvenc' and ffmpeg['max_b_frames'] == 0
     states = units_now()
     for unit in VENDOR:
         assert states[unit] == {'enabled': 'disabled', 'active': 'inactive'}

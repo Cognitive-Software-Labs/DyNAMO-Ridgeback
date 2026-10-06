@@ -26,3 +26,20 @@
     publish_tf: true
     tf_publish_rate: 0.0
     base_frame_id: link
+    # Low-latency H.264 on the Intel GPU for the colour `ffmpeg` variant (O4 in
+    # docs/plans/PHYSICAL_intel_thor_sensor_latency.md). image_transport encodes
+    # a variant only while something subscribes to it, so this costs nothing
+    # otherwise. Every frame is sent without reordering (no B-frames); a
+    # keyframe every 15 frames bounds recovery after loss to 0.5 s at 30 Hz.
+    # The JPEG/PNG/zstd encoder parameters start with a dot, which a parameters
+    # file cannot address; sensor_latency_run sets them at runtime instead.
+    camera_0:
+      color:
+        image_raw:
+          ffmpeg:
+            encoder: h264_nvenc
+            encoder_av_options: preset:p1,tune:ull,zerolatency:1,delay:0
+            pixel_format: yuv420p
+            gop_size: 15
+            max_b_frames: 0
+            bit_rate: 8000000

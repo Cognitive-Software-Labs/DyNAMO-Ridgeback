@@ -69,6 +69,61 @@ def delivery_loss(reference_samples, received_samples):
             'stamp_window_ns': [low, high]}
 
 
+def parse_value(text):
+    lowered = text.lower()
+    if lowered in ('true', 'false'):
+        return lowered == 'true'
+    for kind in (int, float):
+        try:
+            return kind(text)
+        except ValueError:
+            pass
+    return text
+
+
+def camera_parameters(namespace, assignments=None, restore=None):
+    """Set camera encoder parameters at runtime and return the previous values.
+
+    Some image_transport parameter names begin with a dot, which a parameters
+    file cannot express, so compression candidates set them on the running
+    driver and restore them afterwards. A camera restart also reverts them.
+    """
+    import rclpy
+    from rcl_interfaces.msg import Parameter
+    from rcl_interfaces.srv import GetParameters, SetParameters
+    from rclpy.parameter import Parameter as Value
+    service = f"/{namespace.strip('/')}/sensors/camera_0/"
+    rclpy.init()
+    node = rclpy.create_node('latency_camera_parameters')
+    try:
+        def call(kind, name, request):
+            client = node.create_client(kind, service + name)
+            if not client.wait_for_service(timeout_sec=10):
+                raise RuntimeError('camera parameter services unavailable')
+            future = client.call_async(request)
+            rclpy.spin_until_future_complete(node, future, timeout_sec=10)
+            if future.result() is None:
+                raise RuntimeError(f'camera {name} call did not complete')
+            return future.result()
+        if restore is not None:
+            parameters = [Parameter(name=name, value=value) for name, value in restore]
+            previous = None
+        else:
+            names = [name for name, _ in assignments]
+            previous = list(zip(names, call(GetParameters, 'get_parameters', GetParameters.Request(names=names)).values))
+            parameters = [Parameter(name=name, value=Value(name, value=value).get_parameter_value())
+                          for name, value in assignments]
+        failures = [result.reason for result in
+                    call(SetParameters, 'set_parameters', SetParameters.Request(parameters=parameters)).results
+                    if not result.successful]
+        if failures:
+            raise RuntimeError('camera rejected parameters: ' + '; '.join(failures))
+        return previous
+    finally:
+        node.destroy_node()
+        rclpy.shutdown()
+
+
 def qualify(report):
     rows = []
     def row(name, passed):
@@ -82,8 +137,14 @@ def qualify(report):
         for component, limit in (('network_dds', 20), ('total', 40)):
             value = components[component]['p95_ms']
             row(f'{stream} {component} p95 <= {limit} ms', value is not None and 0 <= value <= limit)
-        row(f'{stream} full clock coverage',
-            components['network_dds']['count'] == components['total']['count'] == report['streams'][stream]['unique'])
+        unique = report['streams'][stream]['unique']
+        if report.get('transports', {}).get(stream, 'raw') == 'raw':
+            covered = components['network_dds']['count'] == components['total']['count'] == unique
+        else:
+            # The compressed message is observed by a second Thor subscriber; allow it
+            # to miss a few that the decoder still delivered.
+            covered = components['total']['count'] == unique and components['network_dds']['count'] >= .99 * unique
+        row(f'{stream} full clock coverage', covered)
         loss = report['timing'][stream]['dds_loss']['fraction']
         # Compare with the simultaneous Intel reader if the RMW omits sequences.
         observed = report.get('delivery_loss_vs_intel', {}).get(stream, {}).get('fraction')
@@ -105,15 +166,28 @@ def main(argv=None):
     parser.add_argument('--warmup', type=float, default=10)
     parser.add_argument('--repeats', type=int, default=3)
     parser.add_argument('--fps', type=int, choices=(15, 30), default=30)
+    parser.add_argument('--color-transport', choices=CONTRACT.COLOR_TRANSPORTS, default='raw',
+                        help='O4: decode this colour variant on Thor (Intel observer stays raw)')
+    parser.add_argument('--depth-transport', choices=CONTRACT.DEPTH_TRANSPORTS, default='raw',
+                        help='O4: decode this aligned-depth variant on Thor')
+    parser.add_argument('--camera-param', action='append', default=[], metavar='NAME=VALUE',
+                        help='set a camera encoder parameter for this run and restore it afterwards')
     args = parser.parse_args(argv)
     if args.repeats < 1 or args.duration <= 0 or args.warmup < 0:
         parser.error('positive repeats/duration and nonnegative warmup required')
+    if any('=' not in item for item in args.camera_param):
+        parser.error('--camera-param takes NAME=VALUE')
+    assignments = [(name, parse_value(value)) for name, value in
+                   (item.split('=', 1) for item in args.camera_param)]
+    compressed = args.color_transport != 'raw' or args.depth_transport != 'raw'
     if os.environ.get('ROS_DOMAIN_ID') != '0':
         parser.error('source /etc/clearpath/setup.bash; deployment requires ROS_DOMAIN_ID=0')
     lock_path = Path('/run/lock/dynamo-local-dds-test.lock')
     lock = lock_path.open('r' if lock_path.exists() else 'a')
     fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-    root = args.output_dir or REPO / 'artifacts/hardware' / (time.strftime('%Y%m%dT%H%M%SZ', time.gmtime()) + '-thor-latency-baseline')
+    suffix = (f'-thor-latency-o4-{args.color_transport}-{args.depth_transport}' if compressed
+              else '-thor-latency-baseline')
+    root = args.output_dir or REPO / 'artifacts/hardware' / (time.strftime('%Y%m%dT%H%M%SZ', time.gmtime()) + suffix)
     root = root.resolve()
     root.mkdir(parents=True, exist_ok=False)
     local_revision = subprocess.check_output(['git', '-C', str(REPO), 'rev-parse', 'HEAD'], text=True).strip()
@@ -126,11 +200,42 @@ def main(argv=None):
         if dirty.strip():
             parser.error('Tracked changes exist: commit tooling/configuration before qualification')
     settings_command = 'uname -a; cat /proc/loadavg; if command -v nvidia-smi >/dev/null; then nvidia-smi --query-gpu=utilization.gpu,power.draw --format=csv,noheader; elif command -v tegrastats >/dev/null; then timeout 2s tegrastats --interval 1000; else echo GPU_load_unavailable; fi'
-    write(root / 'provenance.json', {'intel_revision': local_revision, 'thor_revision': remote_revision,
-                                    'arguments': vars(args) | {'output_dir': str(root)},
-                                    'guard': 'simultaneous Intel contract observer; adds a local camera reader'})
+    provenance = {'intel_revision': local_revision, 'thor_revision': remote_revision,
+                  'arguments': vars(args) | {'output_dir': str(root)},
+                  'guard': 'simultaneous Intel contract observer; adds a local camera reader',
+                  'transports': {'color': args.color_transport, 'depth': args.depth_transport}}
+    restore = None
+    if assignments:
+        restore = camera_parameters(args.namespace, assignments)
+        provenance['camera_parameters'] = {'set': dict(assignments),
+                                           'previous': {name: repr(value) for name, value in restore}}
+    write(root / 'provenance.json', provenance)
+    try:
+        run_repeats(args, root, compressed)
+    finally:
+        if restore is not None:
+            camera_parameters(args.namespace, restore=restore)
+            print('Camera parameters restored', flush=True)
+    print(root, flush=True)
+    return 0
+
+
+def thor_environment(worktree):
+    return ('. /opt/ros/jazzy/setup.bash && . ' + shlex.quote(worktree + '/src/ridgeback_autonomy_hardware/config/intel_thor/dds_env.sh')
+            + ' thor && export ROS_DOMAIN_ID=0')
+
+
+def stop_remote(peer, pidfile):
+    try:
+        ssh(peer, 'test ! -f ' + shlex.quote(pidfile) + ' || kill -TERM "$(cat ' + shlex.quote(pidfile) + ')"')
+    except subprocess.CalledProcessError:
+        pass
+
+
+def run_repeats(args, root, compressed):
     base = ['--backend', 'hardware', '--namespace', args.namespace, '--timing',
             '--warmup', str(args.warmup), '--duration', str(args.duration), '--fps', str(args.fps)]
+    transport_args = ['--color-transport', args.color_transport, '--depth-transport', args.depth_transport]
     for repeat in range(1, args.repeats + 1):
         for host in ('intel', 'thor'):
             label = f'{repeat:02d}-{host}'
@@ -148,6 +253,7 @@ def main(argv=None):
                           '--host', 'intel', '--guard']
             guard = None
             remote_process = None
+            decoder = None
             try:
                 if host == 'intel':
                     with (root / f'{label}.log').open('w') as log:
@@ -159,18 +265,36 @@ def main(argv=None):
                     remote_samples = remote_root / samples.name
                     # A unique PID file lets the guard terminate only this observer.
                     pidfile = str(remote_root / (label + '.pid'))
-                    command = ('. /opt/ros/jazzy/setup.bash && . ' + shlex.quote(args.thor_worktree + '/src/ridgeback_autonomy_hardware/config/intel_thor/dds_env.sh') + ' thor && export ROS_DOMAIN_ID=0 && mkdir -p ' + shlex.quote(str(remote_root)) + ' && echo $$ > ' + shlex.quote(pidfile) + ' && exec ' + shlex.join(['python3', args.thor_worktree + '/tools/camera_contract_check', *base, '--host', 'thor', '--output', str(remote_output), '--samples-output', str(remote_samples)]))
-                    with (root / f'{label}-guard.log').open('w') as guard_log, (root / f'{label}.log').open('w') as log:
+                    decoder_pidfile = str(remote_root / (label + '-decoder.pid'))
+                    prefix = thor_environment(args.thor_worktree) + ' && mkdir -p ' + shlex.quote(str(remote_root))
+                    command = (prefix + ' && echo $$ > ' + shlex.quote(pidfile) + ' && exec ' + shlex.join(['python3', args.thor_worktree + '/tools/camera_contract_check', *base, '--host', 'thor', *transport_args, '--output', str(remote_output), '--samples-output', str(remote_samples)]))
+                    with (root / f'{label}-guard.log').open('w') as guard_log, (root / f'{label}.log').open('w') as log, \
+                            (root / f'{label}-decoder.log').open('w') as decoder_log:
+                        if compressed:
+                            # Started first; the observer's warm-up covers decoder discovery.
+                            decoder_command = (prefix + ' && echo $$ > ' + shlex.quote(decoder_pidfile) + ' && exec '
+                                               + shlex.join(['python3', args.thor_worktree + '/tools/intel_thor/thor_decoder',
+                                                             '--namespace', args.namespace, *transport_args]))
+                            decoder = subprocess.Popen(['ssh', '-T', '-o', 'BatchMode=yes', args.peer, 'bash', '-c', shlex.quote(decoder_command)],
+                                                       stdout=decoder_log, stderr=decoder_log)
                         guard = subprocess.Popen([*local_args, '--output', str(root / f'{label}-guard.json'),
                                                   '--samples-output', str(root / f'{label}-guard-samples.json')], stdout=guard_log, stderr=guard_log)
                         remote_process = subprocess.Popen(['ssh', '-T', '-o', 'BatchMode=yes', args.peer, 'bash', '-c', shlex.quote(command)], stdout=log, stderr=log)
                         while remote_process.poll() is None:
                             if guard.poll() is not None and guard.returncode != 0:
-                                ssh(args.peer, 'test ! -f ' + shlex.quote(pidfile) + ' || kill -TERM "$(cat ' + shlex.quote(pidfile) + ')"')
+                                stop_remote(args.peer, pidfile)
                                 raise RuntimeError('Intel scan/service guard failed; Thor observer stopped')
+                            if decoder is not None and decoder.poll() is not None:
+                                stop_remote(args.peer, pidfile)
+                                raise RuntimeError('Thor decoder exited during the run; see decoder log')
                             time.sleep(.1)
                         code = remote_process.returncode
                         guard.wait(timeout=10)
+                        if decoder is not None:
+                            stop_remote(args.peer, decoder_pidfile)
+                            decoder.wait(timeout=10)
+                            if decoder.returncode:
+                                raise RuntimeError('Thor decoder failed; run invalid')
                     output.write_text(ssh(args.peer, 'cat ' + shlex.quote(str(remote_output))))
                     samples.write_text(ssh(args.peer, 'cat ' + shlex.quote(str(remote_samples))))
                     if guard.returncode:
@@ -189,6 +313,11 @@ def main(argv=None):
                 report['timing'] = {key: CONTRACT.timing_stats(value, report['clock']['offset_ms'],
                                    report['clock']['bound_ms'], same_host=host == 'intel',
                                    clock_series=series if not monitor.errors else []) for key, value in raw.items()}
+                for stream, transport in report.get('transports', {}).items():
+                    if transport != 'raw':
+                        report['timing'][stream] = CONTRACT.transport_timing(
+                            raw[stream + '_encoded'], raw[stream], report['clock']['offset_ms'],
+                            report['clock']['bound_ms'], clock_series=series if not monitor.errors else [])
                 if host == 'thor':
                     reference = json.loads((root / f'{label}-guard-samples.json').read_text())
                     report['delivery_loss_vs_intel'] = {key: delivery_loss(reference[key], raw[key])
@@ -199,21 +328,18 @@ def main(argv=None):
                     raise RuntimeError(f'{label} contract or scan guard failed; remaining runs stopped')
             finally:
                 monitor.stop()
-                for process in (guard, remote_process):
+                for process in (guard, remote_process, decoder):
                     if process is not None and process.poll() is None:
                         if process is remote_process:
-                            try:
-                                ssh(args.peer, 'test ! -f ' + shlex.quote(pidfile) + ' || kill -TERM "$(cat ' + shlex.quote(pidfile) + ')"')
-                            except subprocess.CalledProcessError:
-                                pass
+                            stop_remote(args.peer, pidfile)
+                        elif process is decoder:
+                            stop_remote(args.peer, decoder_pidfile)
                         process.terminate()
                         try:
                             process.wait(timeout=5)
                         except subprocess.TimeoutExpired:
                             process.kill()
                             process.wait()
-    print(root, flush=True)
-    return 0
 
 
 if __name__ == '__main__':

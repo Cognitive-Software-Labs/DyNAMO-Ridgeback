@@ -51,3 +51,42 @@ def test_delivery_loss_excludes_observer_window_boundaries():
 def test_unavailable_loss_is_not_a_qualification_pass():
     # An empty common window must remain unresolved, rather than imply zero loss.
     assert TOOL.delivery_loss([{'stamp_ns': 1}], [{'stamp_ns': 2}])['fraction'] is None
+
+
+def compressed_report(network_count):
+    report = {'streams': {key: {'unique': 1800} for key in ('color', 'depth')}, 'expected': {'grid': [640, 480]},
+              'fps': 30, 'duration_s': 60, 'clock': {'resolved': True}, 'passed': True, 'aborted': None,
+              'transports': {'color': 'ffmpeg', 'depth': 'raw'},
+              'timing': {key: {'components': {'network_dds': {'p95_ms': 15, 'count': 1800},
+                                              'total': {'p95_ms': 35, 'count': 1800}},
+                               'dds_loss': {'fraction': None}} for key in ('color', 'depth')},
+              'delivery_loss_vs_intel': {key: {'fraction': 0.} for key in ('color', 'depth')},
+              'pairing': {'color': 1., 'depth': 1.}}
+    report['timing']['color']['components']['network_dds']['count'] = network_count
+    return report
+
+
+def test_compressed_coverage_tolerates_a_few_missed_wire_receipts_only():
+    # The compressed message has its own Thor subscriber; the decoded total must be complete.
+    report = compressed_report(1790)
+    TOOL.qualify(report)
+    assert report['working_targets_passed'] is True
+    report = compressed_report(1700)
+    TOOL.qualify(report)
+    assert report['working_targets_passed'] is False
+    report = compressed_report(1790)
+    report['transports']['color'] = 'raw'
+    TOOL.qualify(report)
+    assert report['working_targets_passed'] is False
+
+
+def test_camera_parameter_values_are_typed():
+    assert [TOOL.parse_value(text) for text in ('80', '0.5', 'true', 'False', 'rvl', 'preset:p1')] == [
+        80, .5, True, False, 'rvl', 'preset:p1']
+
+
+def test_unknown_parameter_assignment_is_rejected(monkeypatch):
+    import pytest
+    monkeypatch.setenv('ROS_DOMAIN_ID', '0')
+    with pytest.raises(SystemExit):
+        TOOL.main(['--namespace', 'r100_0160', '--camera-param', 'jpeg_quality'])
