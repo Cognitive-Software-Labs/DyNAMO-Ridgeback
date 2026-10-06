@@ -253,3 +253,18 @@ def test_status_reports_a_reenabled_vendor_camera(host):
 
     assert result.returncode == 1
     assert 'DIFF  realsense-camera.service' in result.stdout
+
+
+def test_apply_waits_for_a_running_robot_experiment(host):
+    import fcntl
+    root, run, units_now, calls = host
+    lock_path = root / 'run/lock/dynamo-local-dds-test.lock'
+    lock_path.parent.mkdir(parents=True)
+    before = units_now()
+    with lock_path.open('a') as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        result = run('apply', '--yes')
+
+    assert result.returncode == 2
+    assert 'holds' in result.stderr
+    assert units_now() == before

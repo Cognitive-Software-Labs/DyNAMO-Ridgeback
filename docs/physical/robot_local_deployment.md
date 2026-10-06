@@ -63,7 +63,9 @@ that contract; this section owns how the robot provides it.
    regenerate the description (platform and sensors restart with it), and enables
    and starts the service.
 
-Any failure after the snapshot restores it. `apply` and `rollback` restart
+`apply` and `rollback` take `/run/lock/dynamo-local-dds-test.lock`, the lock the
+robot-side DDS experiment tools hold, and refuse while it is held. Any failure
+after the snapshot restores it. `apply` and `rollback` restart
 `clearpath-robot`, which briefly drops motor power and teleop: run them with the
 robot stationary and the e-stop in reach.
 

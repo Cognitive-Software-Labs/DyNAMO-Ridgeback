@@ -22,6 +22,7 @@ the DDS profile are never touched. See docs/physical/robot_local_deployment.md.
 """
 
 import argparse
+import fcntl
 import json
 import os
 from pathlib import Path
@@ -53,6 +54,8 @@ UNIT_NAME = 'dynamo-camera.service'
 UNIT = f'/etc/systemd/system/{UNIT_NAME}'
 BACKUP_DIR = '/etc/clearpath/dynamo-camera-backup'
 USB_DEVICES = '/sys/bus/usb/devices'
+# Shared with the robot-side DDS experiment tools: service changes never overlap.
+ROBOT_LOCK = '/run/lock/dynamo-local-dds-test.lock'
 
 # The vendor camera stack: the driver and the consumers that only exist for
 # its web view. mbs-webserver is deliberately absent: it also serves the
@@ -344,6 +347,14 @@ def main(argv=None):
             return status(host)
         if not confirm(args.command, args.yes):
             return 1
+        lock_path = host.path(ROBOT_LOCK)
+        lock_path.parent.mkdir(parents=True, exist_ok=True)
+        lock = lock_path.open('a')
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            raise Refused('a robot-side DDS experiment or service change holds '
+                          f'{ROBOT_LOCK}; wait for it to finish')
         if args.command == 'apply':
             apply(host, args.profile, args.serial)
         else:
