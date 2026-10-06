@@ -216,6 +216,14 @@ Order: `time_sync apply --host intel`, `ptp_sync apply --host intel`, then
 Intel bounds the wall-clock offset within 0.2 ms and keeps it there across an
 Intel internet correction.
 
+**Met on 2026-10-06** (`artifacts/hardware/20261006T145000Z-ptp-verification/`,
+tooling `de29c63`): the operator installed PTP on both hosts; Intel's `ptp4l`
+serves and Thor's follows, and Thor's chrony is disabled. Eighteen direct-LAN
+samples over three minutes measured Intel–Thor wall-clock offsets of −38 to
++1 µs, each with a 52–130 µs bound, through two Intel internet corrections of
++1.59 ms and −1.10 ms that slewed out over tens of seconds. Under chrony alone
+the offset had moved between +0.2 and −1.9 ms.
+
 ### 4. Baseline (agent; deployed configuration unchanged)
 
 - Same-host run on Intel with the robot's environment
