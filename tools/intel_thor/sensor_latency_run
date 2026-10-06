@@ -33,6 +33,8 @@ def load(name, path):
 CLOCK = load('latency_clock', REPO / 'tools/intel_thor/check_clock')
 CONTRACT = load('latency_contract', REPO / 'tools/camera_contract_check')
 
+SETTINGS_COMMAND = 'uname -a; cat /proc/loadavg; if command -v nvidia-smi >/dev/null; then nvidia-smi --query-gpu=utilization.gpu,power.draw --format=csv,noheader; elif command -v tegrastats >/dev/null; then timeout 2s tegrastats --interval 1000; else echo GPU_load_unavailable; fi'
+
 
 def ssh(peer, command):
     return subprocess.check_output(['ssh', '-T', '-o', 'BatchMode=yes', peer, command], text=True)
@@ -199,7 +201,6 @@ def main(argv=None):
         dirty = ssh(args.peer, shlex.join(command)) if remote else subprocess.check_output(command, text=True)
         if dirty.strip():
             parser.error('Tracked changes exist: commit tooling/configuration before qualification')
-    settings_command = 'uname -a; cat /proc/loadavg; if command -v nvidia-smi >/dev/null; then nvidia-smi --query-gpu=utilization.gpu,power.draw --format=csv,noheader; elif command -v tegrastats >/dev/null; then timeout 2s tegrastats --interval 1000; else echo GPU_load_unavailable; fi'
     provenance = {'intel_revision': local_revision, 'thor_revision': remote_revision,
                   'arguments': vars(args) | {'output_dir': str(root)},
                   'guard': 'simultaneous Intel contract observer; adds a local camera reader',
@@ -240,8 +241,8 @@ def run_repeats(args, root, compressed):
         for host in ('intel', 'thor'):
             label = f'{repeat:02d}-{host}'
             print(f'Starting {label}', flush=True)
-            write(root / f'{label}-host-load-before.json', {'intel': subprocess.run(['bash', '-c', settings_command], capture_output=True, text=True).stdout,
-                                                         'thor': ssh(args.peer, settings_command + '; true')})
+            write(root / f'{label}-host-load-before.json', {'intel': subprocess.run(['bash', '-c', SETTINGS_COMMAND], capture_output=True, text=True).stdout,
+                                                         'thor': ssh(args.peer, SETTINGS_COMMAND + '; true')})
             tracking = {'intel': subprocess.run(['timedatectl', 'show', '-p', 'NTPSynchronized'], capture_output=True, text=True).stdout,
                         'thor': ssh(args.peer, 'timedatectl show -p NTPSynchronized; if command -v chronyc >/dev/null; then chronyc tracking; fi')}
             write(root / f'{label}-time-service.json', tracking)
