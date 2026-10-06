@@ -57,7 +57,7 @@ PID or restart count, or a camera `[ERROR]` journal entry. The guard uses its
 own subscriptions and system counters; it does not poll the ROS graph.
 
 Before and after every observation, `check_clock` takes persistent SSH round
-trips. Its midpoint estimates the offset and half the round-trip duration
+trips (300 after three warm-up exchanges). Its midpoint estimates the offset and half the round-trip duration
 bounds asymmetry. The collector expands uncertainty by half the observed
 before/after offset drift and recomputes components from raw samples. If that
 bound exceeds 0.2 ms, cross-host components remain unresolved. Endpoint checks
@@ -77,6 +77,6 @@ No configuration is adopted automatically. Commands live in the
 
 As inspected on 2026-10-06, the running camera remains on the previously
 qualified VGA 30 Hz service profile. The new camera DDS profile is an opt-in
-candidate; chrony installation and measured transport selection require the
-operator. Raw/compressed comparisons, detector accuracy under lossy colour,
+candidate. Chrony was installed by the operator on both hosts on
+2026-10-06; live verification and measured transport selection are pending. Raw/compressed comparisons, detector accuracy under lossy colour,
 CPU/NIC tuning and a camera move to Thor remain in the active plan.

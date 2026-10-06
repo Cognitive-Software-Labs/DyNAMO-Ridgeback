@@ -12,7 +12,7 @@ import subprocess
 import time
 
 
-def measure(peer='robot@192.168.131.51', count=30):
+def measure(peer='robot@192.168.131.51', count=300):
     remote = "import sys,time; [print(time.time_ns(),flush=True) for line in sys.stdin]"
     process = subprocess.Popen(['ssh', '-T', '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=5',
                                 peer, 'python3', '-u', '-c', "'" + remote + "'"],
@@ -51,8 +51,11 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--peer', default='robot@192.168.131.51')
     parser.add_argument('--output', type=Path)
+    parser.add_argument('--count', type=int, default=300, help='round trips after three warm-up exchanges')
     args = parser.parse_args()
-    report = measure(args.peer)
+    if args.count < 1:
+        parser.error('--count must be positive')
+    report = measure(args.peer, args.count)
     print(json.dumps(report, indent=2))
     if args.output:
         args.output.parent.mkdir(parents=True, exist_ok=True)
