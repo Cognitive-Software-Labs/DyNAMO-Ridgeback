@@ -10,41 +10,105 @@ from pathlib import Path
 import select
 import subprocess
 import time
+import threading
+
+
+class ClockProbe:
+    """A persistent SSH peer; close it without leaving a remote process."""
+    def __init__(self, peer):
+        self.peer = peer
+        remote = "import sys,time; [print(time.time_ns(),time.monotonic_ns(),flush=True) for line in sys.stdin]"
+        self.process = subprocess.Popen(['ssh', '-T', '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=5',
+            peer, 'python3', '-u', '-c', "'" + remote + "'"],
+            stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
+
+    def exchange(self):
+        start, mono_start = time.time_ns(), time.monotonic_ns()
+        self.process.stdin.write('clock\n')
+        self.process.stdin.flush()
+        if not select.select([self.process.stdout], [], [], 5)[0]:
+            raise RuntimeError('SSH clock response timed out')
+        line = self.process.stdout.readline()
+        end, mono_end = time.time_ns(), time.monotonic_ns()
+        if not line:
+            raise RuntimeError('SSH clock process ended')
+        remote_ns, remote_mono = map(int, line.split())
+        if abs((end - start) - (mono_end - mono_start)) > 100_000:
+            raise RuntimeError('Local wall clock stepped during offset check')
+        return {'offset_ms': (2 * remote_ns - start - end) / 2e6,
+                'bound_ms': (end - start) / 2e6, 'intel_ns': (start + end) // 2,
+                'thor_ns': remote_ns, 'intel_mono_ns': (mono_start + mono_end) // 2,
+                'thor_mono_ns': remote_mono}
+
+    def sample(self, count=300):
+        samples = [self.exchange() for _ in range(count)]
+        best = min(samples, key=lambda sample: sample['bound_ms'])
+        return {**best, 'peer': self.peer, 'method': 'persistent SSH midpoint, half RTT bound',
+                'samples': samples, 'captured_utc': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())}
+
+    def close(self):
+        try:
+            self.process.stdin.close()
+        except BrokenPipeError:
+            pass
+        try:
+            self.process.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            self.process.kill()
+            self.process.wait()
+        self.process.stdout.close()
 
 
 def measure(peer='robot@192.168.131.51', count=300):
-    remote = "import sys,time; [print(time.time_ns(),flush=True) for line in sys.stdin]"
-    process = subprocess.Popen(['ssh', '-T', '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=5',
-                                peer, 'python3', '-u', '-c', "'" + remote + "'"],
-                               stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
-    samples = []
+    probe = ClockProbe(peer)
     try:
-        for index in range(count + 3):
-            start, monotonic = time.time_ns(), time.monotonic_ns()
-            process.stdin.write('clock\n')
-            process.stdin.flush()
-            if not select.select([process.stdout], [], [], 5)[0]:
-                raise RuntimeError('SSH clock response timed out')
-            line = process.stdout.readline()
-            end, elapsed = time.time_ns(), time.monotonic_ns() - monotonic
-            if not line:
-                raise RuntimeError('SSH clock process ended')
-            remote_ns = int(line)
-            if abs((end - start) - elapsed) > 100_000:
-                raise RuntimeError('Local wall clock stepped during offset check')
-            if index >= 3:
-                samples.append({'offset_ms': (2 * remote_ns - start - end) / 2e6,
-                                'bound_ms': (end - start) / 2e6})
+        for _ in range(3):
+            probe.exchange()
+        return probe.sample(count)
     finally:
-        process.stdin.close()
+        probe.close()
+
+
+class ClockMonitor:
+    """Calibrate while observers run, retaining every round-trip sample."""
+    def __init__(self, peer, interval=.5, count=300):
+        self.peer, self.interval, self.count = peer, interval, count
+        self.points, self.errors = [], []
+        self.stopped, self.ready = threading.Event(), threading.Event()
+        self.thread = threading.Thread(target=self.collect, daemon=True)
+
+    def collect(self):
+        probe = None
         try:
-            process.wait(timeout=5)
-        except subprocess.TimeoutExpired:
-            process.kill()
-            process.wait()
-    best = min(samples, key=lambda s: s['bound_ms'])
-    return {**best, 'peer': peer, 'method': 'persistent SSH midpoint, half RTT bound',
-            'samples': samples, 'captured_utc': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())}
+            probe = ClockProbe(self.peer)
+            for _ in range(3):
+                probe.exchange()
+            while True:
+                self.points.append(probe.sample(self.count))
+                self.ready.set()
+                if self.stopped.wait(self.interval):
+                    self.points.append(probe.sample(self.count))
+                    break
+        except Exception as error:
+            self.errors.append(str(error))
+            self.ready.set()
+        finally:
+            if probe is not None:
+                probe.close()
+
+    def start(self):
+        self.thread.start()
+        if not self.ready.wait(10) or self.errors:
+            self.stop()
+            raise RuntimeError('Clock monitor could not start: ' + ', '.join(self.errors))
+        return self
+
+    def stop(self):
+        self.stopped.set()
+        self.thread.join(timeout=15)
+        if self.thread.is_alive():
+            raise RuntimeError('Clock monitor did not stop')
+        return self.points
 
 
 if __name__ == '__main__':

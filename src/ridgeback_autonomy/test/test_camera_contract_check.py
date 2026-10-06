@@ -157,3 +157,48 @@ def test_sequence_loss_is_separate_per_publisher():
                for gid, seq in [(b'a', 4), (b'b', 10), (b'a', 7), (b'a', 7), (b'b', 11)]]
     stats = TOOL.timing_stats(samples)
     assert stats['dds_loss'] == {'missing': 2, 'observed_intervals': 2, 'fraction': .5}
+
+
+def clock_point(stamp, offset, bound=.03):
+    intel = stamp - int(offset * 1e6)
+    return {'thor_ns': stamp, 'intel_ns': intel, 'offset_ms': offset, 'bound_ms': bound,
+            'thor_mono_ns': stamp - 10**8, 'intel_mono_ns': intel - 2*10**8}
+
+
+def test_short_clock_intervals_resolve_slow_drift_without_relaxing_bound():
+    points = [clock_point((i+1)*10**9, i*.1) for i in range(7)]
+    summary = TOOL.clock_series_summary(points)
+    assert summary['resolved']
+    assert summary['bound_ms'] == pytest.approx(.08)
+    # A single correction over all six seconds would exceed the 0.2 ms limit.
+    assert .03 + (points[-1]['offset_ms'] - points[0]['offset_ms']) / 2 > .2
+
+
+def test_series_component_arithmetic_and_boundary_coverage():
+    points = [clock_point(1_000_000_000, .1), clock_point(2_000_000_000, .3)]
+    sample = TOOL.timing_sample(1_469_800_000, {'source_timestamp': 1_479_800_000,
+        'received_timestamp': 1_500_000_000}, 1_503_000_000)
+    stats = TOOL.timing_stats([sample], clock_series=points)
+    assert {key:value['median_ms'] for key,value in stats['components'].items()} == {
+        'driver': 10., 'network_dds': 20., 'executor': 3., 'total': 33.}
+    outside = {**sample, 'received_ns': 2_500_000_000, 'callback_ns': 2_503_000_000}
+    stats = TOOL.timing_stats([outside], clock_series=points)
+    assert stats['components']['network_dds']['count'] == 0
+    assert stats['components']['total']['count'] == 0
+
+
+@pytest.mark.parametrize('fault', ['step', 'gap', 'uncertainty', 'missing'])
+def test_bad_clock_series_keeps_cross_host_components_unresolved(fault):
+    points = [clock_point(1_000_000_000, .1), clock_point(2_000_000_000, .2)]
+    if fault == 'step': points[1]['thor_mono_ns'] -= 1_000_000
+    if fault == 'gap': points[1] = clock_point(4_000_000_000, .2)
+    if fault == 'uncertainty': points[1]['bound_ms'] = .21
+    if fault == 'missing': points = points[:1]
+    assert not TOOL.clock_series_summary(points)['resolved']
+    sample = TOOL.timing_sample(1_469_800_000, {'source_timestamp': 1_479_800_000,
+        'received_timestamp': 1_500_000_000}, 1_503_000_000)
+    stats = TOOL.timing_stats([sample], clock_series=points)
+    assert stats['components']['driver']['count'] == 1
+    assert stats['components']['executor']['count'] == 1
+    assert stats['components']['network_dds']['count'] == 0
+    assert stats['components']['total']['count'] == 0

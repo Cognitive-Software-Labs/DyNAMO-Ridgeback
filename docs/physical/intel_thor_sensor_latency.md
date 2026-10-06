@@ -61,12 +61,29 @@ contract failure, a scan receipt gap over 250 ms on Intel, changed sensor/camera
 PID or restart count, or a camera `[ERROR]` journal entry. The guard uses its
 own subscriptions and system counters; it does not poll the ROS graph.
 
-Before and after every observation, `check_clock` takes persistent SSH round
-trips (300 after three warm-up exchanges). Its midpoint estimates the offset and half the round-trip duration
-bounds asymmetry. The collector expands uncertainty by half the observed
-before/after offset drift and recomputes components from raw samples. If that
-bound exceeds 0.2 ms, cross-host components remain unresolved. Endpoint checks
-cannot exclude an intervening clock step; avoid service changes during runs.
+Before and after every observation, and continuously during it, `check_clock`
+takes bursts of 300 round trips over one persistent SSH connection. The sampler
+pauses 0.5 seconds between bursts. Its midpoint estimates the actual ROS
+wall-clock offset; half the round-trip duration bounds asymmetry. The collector
+uses the midpoint of adjacent offset measurements for each timestamp, with
+uncertainty equal to the larger round-trip bound plus half the adjacent offset
+change. It retains the complete clock series and every exchange.
+
+Cross-host components require every interval's bound to be at most 0.2 ms,
+calibration gaps no larger than two seconds, and no detected wall-clock step
+relative to monotonic time (100 µs detection threshold). Every received image
+must lie inside the calibrated range. This assumes the offset stays within the
+adjacent calibration envelopes; steps or excursions shorter than the sampling
+interval can still be unobserved. Same-clock components remain available when
+cross-host timing is unresolved. Clock calibration is part of the recorded
+CPU/network load and remains identical for candidate comparisons.
+
+Chrony's NTP time is a virtual clock and can differ from the system wall clock
+while a correction is being slewed. A small Thor `chronyc tracking` offset does
+not establish a small difference between Intel and Thor's ROS clocks; the
+SSH monitor measures those clocks directly. See
+[chrony's tracking documentation](https://chrony-project.org/doc/4.5/chronyc.html#tracking).
+
 Time-service status, host CPU/NIC counters, guard reports, logs, source revisions
 and raw samples stay under `artifacts/hardware/<UTC>-thor-latency-baseline/`.
 

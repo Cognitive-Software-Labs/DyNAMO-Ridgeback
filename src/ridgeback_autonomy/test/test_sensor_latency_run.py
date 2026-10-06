@@ -17,9 +17,9 @@ def test_drift_expands_clock_bound_and_invalidates_cross_host_timing():
 
 
 def test_reduced_rate_and_short_runs_cannot_pass_30hz_targets():
-    report = {'expected': {'grid': [640, 480]}, 'fps': 15, 'duration_s': 10, 'clock': {'resolved': True}, 'passed': True,
-              'aborted': None, 'timing': {key: {'components': {'network_dds': {'p95_ms': 15},
-                                                            'total': {'p95_ms': 35}},
+    report = {'streams': {key: {'unique': 1800} for key in ('color', 'depth')}, 'expected': {'grid': [640, 480]}, 'fps': 15, 'duration_s': 10, 'clock': {'resolved': True}, 'passed': True,
+              'aborted': None, 'timing': {key: {'components': {'network_dds': {'p95_ms': 15, 'count': 1800},
+                                                            'total': {'p95_ms': 35, 'count': 1800}},
                                             'dds_loss': {'fraction': None}} for key in ('color', 'depth')},
               'delivery_loss_vs_intel': {key: {'fraction': 0.} for key in ('color', 'depth')},
               'pairing': {'color': 1., 'depth': 1.}, 'rate_loss_estimate': {'color': 0., 'depth': 0.}}

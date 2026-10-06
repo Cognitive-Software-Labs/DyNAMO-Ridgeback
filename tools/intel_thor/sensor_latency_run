@@ -82,6 +82,8 @@ def qualify(report):
         for component, limit in (('network_dds', 20), ('total', 40)):
             value = components[component]['p95_ms']
             row(f'{stream} {component} p95 <= {limit} ms', value is not None and 0 <= value <= limit)
+        row(f'{stream} full clock coverage',
+            components['network_dds']['count'] == components['total']['count'] == report['streams'][stream]['unique'])
         loss = report['timing'][stream]['dds_loss']['fraction']
         # Compare with the simultaneous Intel reader if the RMW omits sequences.
         observed = report.get('delivery_loss_vs_intel', {}).get(stream, {}).get('fraction')
@@ -138,7 +140,8 @@ def main(argv=None):
             tracking = {'intel': subprocess.run(['timedatectl', 'show', '-p', 'NTPSynchronized'], capture_output=True, text=True).stdout,
                         'thor': ssh(args.peer, 'timedatectl show -p NTPSynchronized; if command -v chronyc >/dev/null; then chronyc tracking; fi')}
             write(root / f'{label}-time-service.json', tracking)
-            before = CLOCK.measure(args.peer)
+            monitor = CLOCK.ClockMonitor(args.peer).start()
+            before = monitor.points[0]
             write(root / f'{label}-clock-before.json', before)
             output, samples = root / f'{label}.json', root / f'{label}-samples.json'
             local_args = [sys.executable, str(REPO / 'tools/camera_contract_check'), *base,
@@ -172,13 +175,20 @@ def main(argv=None):
                     samples.write_text(ssh(args.peer, 'cat ' + shlex.quote(str(remote_samples))))
                     if guard.returncode:
                         raise RuntimeError('Intel guard failed; run invalid')
-                after = CLOCK.measure(args.peer)
+                points = monitor.stop()
+                after = points[-1]
                 write(root / f'{label}-clock-after.json', after)
+                write(root / f'{label}-clock-series.json', points)
                 report = json.loads(output.read_text())
-                report['clock'] = clock_window(before, after)
+                series = [{key: value for key, value in point.items() if key != 'samples'} for point in points]
+                report['clock'] = CONTRACT.clock_series_summary(series)
+                report['clock']['errors'] = monitor.errors
+                if monitor.errors:
+                    report['clock']['resolved'] = False
                 raw = json.loads(samples.read_text())
                 report['timing'] = {key: CONTRACT.timing_stats(value, report['clock']['offset_ms'],
-                                   report['clock']['bound_ms'], same_host=host == 'intel') for key, value in raw.items()}
+                                   report['clock']['bound_ms'], same_host=host == 'intel',
+                                   clock_series=series if not monitor.errors else []) for key, value in raw.items()}
                 if host == 'thor':
                     reference = json.loads((root / f'{label}-guard-samples.json').read_text())
                     report['delivery_loss_vs_intel'] = {key: delivery_loss(reference[key], raw[key])
@@ -188,6 +198,7 @@ def main(argv=None):
                 if code:
                     raise RuntimeError(f'{label} contract or scan guard failed; remaining runs stopped')
             finally:
+                monitor.stop()
                 for process in (guard, remote_process):
                     if process is not None and process.poll() is None:
                         if process is remote_process:

@@ -18,6 +18,7 @@ criterion passes.
 """
 
 import argparse
+from bisect import bisect_right
 import json
 import math
 import os
@@ -105,10 +106,41 @@ def percentiles(values):
             'p99_ms': at(.99), 'max_ms': ordered[-1]}
 
 
-def timing_stats(samples, offset_ms=None, bound_ms=None, same_host=False):
+def clock_series_summary(points):
+    """Bound each short interval; detect wall-clock steps against monotonic time."""
+    bounds, gaps = [], []
+    stepped = False
+    for left, right in zip(points, points[1:]):
+        gaps.append((right['thor_ns'] - left['thor_ns']) / 1e9)
+        bounds.append(max(left['bound_ms'], right['bound_ms']) +
+                      abs(left['offset_ms'] - right['offset_ms']) / 2)
+        for host in ('intel', 'thor'):
+            phase_left = left[host + '_ns'] - left[host + '_mono_ns']
+            phase_right = right[host + '_ns'] - right[host + '_mono_ns']
+            stepped |= abs(phase_right - phase_left) > 100_000
+    bound = max(bounds) if bounds else None
+    valid = all(math.isfinite(p['offset_ms']) and math.isfinite(p['bound_ms']) and p['bound_ms'] >= 0 for p in points)
+    resolved = bool(bounds) and valid and bound <= .2 and not stepped and all(0 < gap <= 2 for gap in gaps)
+    return {'resolved': resolved, 'bound_ms': bound, 'clock_step_detected': stepped,
+            'max_interval_s': max(gaps) if gaps else None, 'point_count': len(points),
+            'offset_ms': sum(point['offset_ms'] for point in points) / len(points) if points else None,
+            'method': 'midpoint correction per adjacent SSH calibration interval',
+            'limitation': 'Assumes offset remains inside adjacent calibration envelopes; sub-interval steps may be unobserved.'}
+
+
+def clock_offset_at(points, stamp_ns):
+    index = bisect_right([point['thor_ns'] for point in points], stamp_ns) - 1
+    if index < 0 or index >= len(points) - 1:
+        return None
+    return (points[index]['offset_ms'] + points[index + 1]['offset_ms']) / 2 * 1e6
+
+
+def timing_stats(samples, offset_ms=None, bound_ms=None, same_host=False, clock_series=None):
     resolved = same_host or (offset_ms is not None and bound_ms is not None
                             and math.isfinite(offset_ms) and math.isfinite(bound_ms)
                             and 0 <= bound_ms <= .2)
+    if clock_series is not None and not same_host:
+        resolved = clock_series_summary(clock_series)['resolved']
     correction = 0 if same_host else (offset_ms or 0) * 1e6
     values = {key: [] for key in ('driver', 'network_dds', 'executor', 'total')}
     previous, missing, deliveries = {}, 0, 0
@@ -120,10 +152,12 @@ def timing_stats(samples, offset_ms=None, bound_ms=None, same_host=False):
         if received > 0:
             values['executor'].append((callback - received) / 1e6)
         if resolved:
-            if source > 0 and received > 0:
-                values['network_dds'].append((received - source - correction) / 1e6)
-            if stamp > 0:
-                values['total'].append((callback - stamp - correction) / 1e6)
+            network_correction = clock_offset_at(clock_series, received) if clock_series is not None and not same_host else correction
+            total_correction = clock_offset_at(clock_series, callback) if clock_series is not None and not same_host else correction
+            if source > 0 and received > 0 and network_correction is not None:
+                values['network_dds'].append((received - source - network_correction) / 1e6)
+            if stamp > 0 and total_correction is not None:
+                values['total'].append((callback - stamp - total_correction) / 1e6)
         sequence = sample['sequence'] or 0
         # ROS uses zero or UINT64_MAX when the RMW cannot supply sequence numbers.
         if 0 < sequence < 2**64 - 1:

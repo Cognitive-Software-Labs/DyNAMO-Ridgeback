@@ -91,7 +91,11 @@ implemented report semantics and qualification commands. The tooling was pushed 
 worktree. A short guarded run passed the Intel and Thor camera/scan contracts;
 it remains preflight evidence, with the full baseline pending. Chrony was installed on both hosts, but default 64-second Thor polling did
 not hold the clocks within 0.2 ms during Intel's initial internet-clock slews.
-A faster LAN polling configuration is prepared for operator reapply on Thor.
+The operator installed faster LAN polling on Thor. All six full baseline
+observations passed their camera/scan contracts, but two of three Thor runs
+had unresolved cross-host timing under a constant whole-run correction.
+The collector now calibrates continuously using short adjacent intervals and
+retains the same 0.2 ms uncertainty limit; qualification with that method is pending.
 Steps 3–7 still require clock convergence, measured baselines and candidate runs.
 Compression, host power/coalescing changes and physically moving the camera
 remain measurement-dependent work; their outcomes are not presumed.
