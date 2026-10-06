@@ -134,3 +134,40 @@ def test_sweep_labels_are_shared_with_detector_and_recorded_config():
     with pytest.raises(ValueError):
         parse_sweep({'sweep':{'name':'labels'},'configs':[{'name':'projective',
             'estimators':'projective_ranging','target_labels':'person'}]},source='/tmp/labels.yaml')
+
+
+def gate_cmd(gate, context):
+    return [perform_substitutions(context, part) for part in gate.cmd]
+
+
+@pytest.mark.parametrize('backend, namespace', [('gz', 'r100_0001'), ('hardware', 'r100_0160')])
+def test_local_localization_waits_for_the_shared_camera_contract(monkeypatch, backend, namespace):
+    from launch.actions import ExecuteProcess, LogInfo, RegisterEventHandler
+    module = load('src/ridgeback_autonomy/launch/ridgeback_exploration.launch.py')
+    stack = [LogInfo(msg='localization stack')]
+    monkeypatch.setattr(module, 'build_target_localization_nodes', lambda context: stack)
+    context = context_for(module, dict(backend=backend, namespace=namespace, base_frame='base_link'))
+
+    gate, handler = module.build_gated_target_localization(context)
+
+    assert isinstance(gate, ExecuteProcess) and isinstance(handler, RegisterEventHandler)
+    cmd = gate_cmd(gate, context)
+    topics = [cmd[i + 1] for i, part in enumerate(cmd) if part == '--topic']
+    # Both backends gate on the same names: the hardware service publishes them.
+    assert topics == [f'/{namespace}/sensors/camera_0/color/image',
+                      f'/{namespace}/sensors/camera_0/color/camera_info',
+                      f'/{namespace}/sensors/camera_0/depth/image']
+    assert '--tf' not in cmd
+    # Private in launch: the actions an OnProcessExit fires.
+    assert handler.event_handler._OnActionEventBase__actions_on_event == stack
+
+
+def test_external_localization_is_not_gated_on_a_local_camera(monkeypatch):
+    monkeypatch.setenv('RIDGEBACK_PERCEPTION_VENV', '/nonexistent')
+    module = load('src/ridgeback_autonomy/launch/ridgeback_exploration.launch.py')
+    context = context_for(module, dict(backend='hardware', namespace='r100_0160',
+                                       localization_mode='external', base_frame='base_link'))
+
+    names = executables(module.build_gated_target_localization(context), context)
+
+    assert 'localization_status' in names
