@@ -1,0 +1,279 @@
+#!/usr/bin/env python3
+"""Check that a running camera publishes the shared camera_0 contract.
+
+Usage (ROS sourced, robot graph reachable):
+  tools/camera_contract_check --backend hardware [--duration 60] [--warmup 10] [--output report.json]
+  tools/camera_contract_check --backend gz --namespace r100_0001 --base-frame r100_0001/robot/base_link
+
+It subscribes to the colour image, colour CameraInfo and aligned depth that
+ridgeback_common.camera_inputs names for the backend, plus the three LiDAR
+scans on hardware, and reports PASS/FAIL per criterion. Images are received
+serialized and only their headers are decoded, so the observer does not copy
+pixels and its own load cannot masquerade as a camera fault. The criteria are
+frozen here, before any measurement.
+
+On hardware the namespace, expected profile and optical frame default to what
+tools/intel_thor/camera_service installed. Exit status is 0 only if every
+criterion passes.
+"""
+
+import argparse
+import json
+from pathlib import Path
+import struct
+import sys
+import time
+
+import yaml
+
+REPO = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO / 'src/ridgeback_common'))
+from ridgeback_common.camera_inputs import (  # noqa: E402
+    REALSENSE_BACKEND, SIMULATION_BACKEND, resolve_camera_inputs)
+from ridgeback_common.camera_profiles import CAMERA_PROFILES, DEFAULT_CAMERA_PROFILE  # noqa: E402
+
+COLOR_ENCODINGS = ('rgb8', 'bgr8', 'rgba8', 'bgra8')
+DEPTH_ENCODINGS = ('16UC1', 'mono16', '32FC1')
+MIN_IMAGE_HZ = 29.0
+MAX_STAMP_GAP_S = 0.150
+MIN_PAIRING = 0.99
+MIN_SCAN_HZ = 38.0
+MAX_SCAN_GAP_S = {'front': 0.25, 'rear': 0.25, 'merged': 0.5}
+SCAN_TOPICS = {'front': 'sensors/lidar2d_0/scan', 'rear': 'sensors/lidar2d_1/scan',
+               'merged': 'sensors/scan'}
+HARDWARE_OPTICAL_FRAME = 'camera_0_color_optical_frame'
+INSTALL_METADATA = Path('/etc/clearpath/dynamo-camera/install.json')
+ROBOT_YAML = Path('/etc/clearpath/robot.yaml')
+EXTRA_STREAMS = ('infra1', 'infra2', 'points', 'pointcloud', 'depth/color/points')
+
+
+def image_header(raw):
+    """Stamp, frame, grid and encoding from a serialized sensor_msgs/Image."""
+    endian = '<' if raw[1] & 1 else '>'
+    position = 4
+
+    def align(size):
+        nonlocal position
+        position += (-(position - 4)) % size
+
+    def unpack(code):
+        nonlocal position
+        align(struct.calcsize(code))
+        value, = struct.unpack_from(endian + code, raw, position)
+        position += struct.calcsize(code)
+        return value
+
+    def string():
+        nonlocal position
+        length = unpack('I')
+        value = raw[position:position + length - 1].decode('utf-8')
+        position += length
+        return value
+
+    sec, nanosec = unpack('i'), unpack('I')
+    frame = string()
+    height, width = unpack('I'), unpack('I')
+    return {'stamp_ns': sec * 1_000_000_000 + nanosec, 'frame': frame,
+            'width': width, 'height': height, 'encoding': string()}
+
+
+def stream_stats(stamps_ns, duration_s):
+    """Rate from unique stamps; duplicates, regressions and the largest stamp gap."""
+    duplicates = len(stamps_ns) - len(set(stamps_ns))
+    regressions = sum(later < earlier for earlier, later in zip(stamps_ns, stamps_ns[1:]))
+    ordered = sorted(set(stamps_ns))
+    gaps = [(b - a) / 1e9 for a, b in zip(ordered, ordered[1:])]
+    return {'unique': len(ordered), 'rate_hz': len(ordered) / duration_s if duration_s > 0 else 0.0,
+            'duplicates': duplicates, 'regressions': regressions,
+            'max_stamp_gap_s': max(gaps) if gaps else None}
+
+
+def evaluate(observation, expected):
+    """Rows of (criterion, passed, detail). Pure: no ROS, no clock."""
+    rows = []
+
+    def row(name, passed, detail):
+        rows.append((name, bool(passed), detail))
+
+    color, depth, info = observation['color'], observation['depth'], observation['info']
+    duration = observation['duration_s']
+    row('types', observation['types'] == expected['types'],
+        ', '.join(f'{k}={v}' for k, v in sorted(observation['types'].items())))
+    row('colour encoding', bool(color['encodings']) and color['encodings'] <= set(COLOR_ENCODINGS),
+        ', '.join(sorted(color['encodings'])) or 'no images')
+    row('depth encoding', bool(depth['encodings']) and depth['encodings'] <= set(DEPTH_ENCODINGS),
+        ', '.join(sorted(depth['encodings'])) or 'no images')
+    grid = {expected['grid']}
+    row('grids', color['sizes'] == info['sizes'] == depth['sizes'] == grid,
+        f"colour {sorted(color['sizes'])}, info {sorted(info['sizes'])}, depth {sorted(depth['sizes'])}, "
+        f"expected {expected['grid']}")
+    frames = color['frames'] | depth['frames']
+    wanted = expected.get('optical_frame')
+    row('frame ids', len(frames) == 1 and (wanted is None or frames == {wanted}),
+        ', '.join(sorted(frames)) or 'none')
+    row('TF base to optical', observation['tf_ok'], observation['tf_detail'])
+    for name, stream in (('colour', color), ('depth', depth)):
+        stats = stream_stats(stream['stamps'], duration)
+        stream['stats'] = stats
+        row(f'{name} rate', stats['rate_hz'] >= MIN_IMAGE_HZ, f"{stats['rate_hz']:.2f} Hz unique")
+        row(f'{name} stamps', stats['duplicates'] == 0 and stats['regressions'] == 0
+            and stats['max_stamp_gap_s'] is not None and stats['max_stamp_gap_s'] <= MAX_STAMP_GAP_S,
+            f"dup {stats['duplicates']}, regress {stats['regressions']}, max gap "
+            + (f"{stats['max_stamp_gap_s'] * 1000:.1f} ms" if stats['max_stamp_gap_s'] is not None else '-'))
+    colour_set, depth_set = set(color['stamps']), set(depth['stamps'])
+    matched = len(colour_set & depth_set)
+    forward = matched / len(colour_set) if colour_set else 0.0
+    backward = matched / len(depth_set) if depth_set else 0.0
+    row('colour/depth pairing', forward >= MIN_PAIRING and backward >= MIN_PAIRING,
+        f'{forward:.2%} colour matched, {backward:.2%} depth matched')
+    row('contract streams only', not observation['extra_topics'],
+        ', '.join(observation['extra_topics']) or 'none')
+    for name, scan in (observation.get('scans') or {}).items():
+        receipts = scan['receive_s']
+        gaps = [b - a for a, b in zip(receipts, receipts[1:])]
+        rate = len(receipts) / duration if duration > 0 else 0.0
+        largest = max(gaps) if gaps else None
+        row(f'{name} scan', rate >= MIN_SCAN_HZ and largest is not None
+            and largest <= MAX_SCAN_GAP_S[name],
+            f'{rate:.2f} Hz, max gap ' + (f'{largest * 1000:.1f} ms' if largest is not None else '-'))
+    return rows
+
+
+def hardware_defaults():
+    metadata = json.loads(INSTALL_METADATA.read_text()) if INSTALL_METADATA.exists() else {}
+    namespace = metadata.get('namespace')
+    if namespace is None and ROBOT_YAML.exists():
+        namespace = yaml.safe_load(ROBOT_YAML.read_text())['system']['ros2']['namespace']
+    return namespace, metadata.get('profile', DEFAULT_CAMERA_PROFILE)
+
+
+def observe(namespace, inputs, base_frame, warmup, duration, scans):
+    import rclpy
+    from rclpy.duration import Duration
+    from rclpy.qos import qos_profile_sensor_data
+    from rclpy.serialization import deserialize_message
+    from rclpy.time import Time
+    from sensor_msgs.msg import CameraInfo, Image, LaserScan
+    import tf2_ros
+
+    def absolute(topic):
+        return '/' + '/'.join(part for part in (namespace, topic) if part)
+
+    rclpy.init(args=['--ros-args', '-r', f'/tf:={absolute("tf")}',
+                     '-r', f'/tf_static:={absolute("tf_static")}'])
+    node = rclpy.create_node('camera_contract_check')
+    buffer = tf2_ros.Buffer()
+    tf2_ros.TransformListener(buffer, node)
+    start = time.monotonic()
+    measure_from = start + warmup
+    end = measure_from + duration
+    observation = {key: {'stamps': [], 'encodings': set(), 'sizes': set(), 'frames': set()}
+                   for key in ('color', 'depth')}
+    observation['info'] = {'sizes': set(), 'frames': set()}
+    scan_receipts = {name: [] for name in SCAN_TOPICS} if scans else {}
+
+    def image_callback(key):
+        def callback(raw):
+            if time.monotonic() < measure_from:
+                return
+            header = image_header(raw)
+            stream = observation[key]
+            stream['stamps'].append(header['stamp_ns'])
+            stream['encodings'].add(header['encoding'])
+            stream['sizes'].add((header['width'], header['height']))
+            stream['frames'].add(header['frame'])
+        return callback
+
+    def info_callback(raw):
+        if time.monotonic() >= measure_from:
+            message = deserialize_message(raw, CameraInfo)
+            observation['info']['sizes'].add((message.width, message.height))
+            observation['info']['frames'].add(message.header.frame_id)
+
+    node.create_subscription(Image, absolute(inputs.color_image_topic), image_callback('color'),
+                             qos_profile_sensor_data, raw=True)
+    node.create_subscription(Image, absolute(inputs.aligned_depth_topic), image_callback('depth'),
+                             qos_profile_sensor_data, raw=True)
+    node.create_subscription(CameraInfo, absolute(inputs.color_camera_info_topic), info_callback,
+                             qos_profile_sensor_data, raw=True)
+    for name, topic in SCAN_TOPICS.items() if scans else ():
+        node.create_subscription(
+            LaserScan, absolute(topic),
+            lambda _raw, name=name: scan_receipts[name].append(time.monotonic())
+            if time.monotonic() >= measure_from else None,
+            qos_profile_sensor_data, raw=True)
+    while time.monotonic() < end:
+        rclpy.spin_once(node, timeout_sec=0.05)
+
+    types = {}
+    topics = dict(node.get_topic_names_and_types())
+    for key, topic in (('color', inputs.color_image_topic), ('info', inputs.color_camera_info_topic),
+                       ('depth', inputs.aligned_depth_topic)):
+        types[key] = ','.join(topics.get(absolute(topic), [])) or 'absent'
+    prefix = absolute('sensors/camera_0') + '/'
+    extra = sorted(name for name in topics if name.startswith(prefix)
+                   and any(f'/{stream}' in name[len(prefix) - 1:] for stream in EXTRA_STREAMS))
+    frame = next(iter(observation['color']['frames']), None)
+    stamp = observation['color']['stamps'][-1] if observation['color']['stamps'] else None
+    tf_ok, tf_detail = False, 'no colour image received'
+    if frame and stamp is not None:
+        try:
+            buffer.lookup_transform(base_frame, frame, Time(nanoseconds=stamp), Duration(seconds=1.0))
+            tf_ok, tf_detail = True, f'{base_frame} -> {frame} at the last image stamp'
+        except Exception as error:  # tf2 raises several unrelated exception types
+            tf_detail = f'{base_frame} -> {frame}: {type(error).__name__}: {error}'
+    node.destroy_node()
+    rclpy.shutdown()
+    observation.update(types=types, duration_s=duration, tf_ok=tf_ok, tf_detail=tf_detail,
+                       extra_topics=extra, scans={name: {'receive_s': r} for name, r in scan_receipts.items()})
+    return observation
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument('--backend', choices=('hardware', 'gz', 'isaac'), required=True)
+    parser.add_argument('--namespace')
+    parser.add_argument('--base-frame')
+    parser.add_argument('--profile', choices=sorted(CAMERA_PROFILES))
+    parser.add_argument('--optical-frame', help='expected image frame_id; hardware default '
+                        f'{HARDWARE_OPTICAL_FRAME}, simulators only require one shared frame')
+    parser.add_argument('--warmup', type=float, default=10.0)
+    parser.add_argument('--duration', type=float, default=60.0)
+    parser.add_argument('--no-scans', action='store_true', help='skip LiDAR continuity (default on hardware)')
+    parser.add_argument('--output', type=Path)
+    args = parser.parse_args(argv)
+
+    hardware = args.backend == 'hardware'
+    namespace, installed_profile = hardware_defaults() if hardware else (None, DEFAULT_CAMERA_PROFILE)
+    namespace = (args.namespace or namespace or '').strip('/')
+    if not namespace:
+        parser.error('--namespace is required')
+    profile = CAMERA_PROFILES[args.profile or installed_profile]
+    base_frame = args.base_frame or ('base_link' if hardware else f'{namespace}/robot/base_link')
+    inputs = resolve_camera_inputs(REALSENSE_BACKEND if hardware else SIMULATION_BACKEND)
+    expected = {'grid': (profile.width, profile.height),
+                'optical_frame': args.optical_frame or (HARDWARE_OPTICAL_FRAME if hardware else None),
+                'types': {'color': 'sensor_msgs/msg/Image', 'info': 'sensor_msgs/msg/CameraInfo',
+                          'depth': 'sensor_msgs/msg/Image'}}
+    print(f'Observing /{namespace} for {args.warmup:.0f} s warm-up + {args.duration:.0f} s', flush=True)
+    observation = observe(namespace, inputs, base_frame, args.warmup, args.duration,
+                          scans=hardware and not args.no_scans)
+    if not hardware or args.no_scans:
+        observation['scans'] = {}
+    rows = evaluate(observation, expected)
+    for name, passed, detail in rows:
+        print(f"{'PASS' if passed else 'FAIL'}  {name:24} {detail}")
+    passed = all(ok for _, ok, _ in rows)
+    print('CONTRACT PASS' if passed else 'CONTRACT FAIL')
+    if args.output:
+        report = {'namespace': namespace, 'backend': args.backend, 'base_frame': base_frame,
+                  'expected': {**expected, 'grid': list(expected['grid'])},
+                  'rows': [{'criterion': n, 'passed': p, 'detail': d} for n, p, d in rows],
+                  'streams': {key: observation[key].get('stats') for key in ('color', 'depth')},
+                  'passed': passed}
+        args.output.write_text(json.dumps(report, indent=2) + '\n')
+    return 0 if passed else 1
+
+
+if __name__ == '__main__':
+    sys.exit(main())
