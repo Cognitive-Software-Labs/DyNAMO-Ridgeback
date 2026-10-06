@@ -35,6 +35,11 @@ CONTRACT = load('latency_contract', REPO / 'tools/camera_contract_check')
 
 SETTINGS_COMMAND = 'uname -a; cat /proc/loadavg; if command -v nvidia-smi >/dev/null; then nvidia-smi --query-gpu=utilization.gpu,power.draw --format=csv,noheader; elif command -v tegrastats >/dev/null; then timeout 2s tegrastats --interval 1000; else echo GPU_load_unavailable; fi'
 
+# A record only: chrony is stopped on Thor under PTP, so no step may fail the run.
+TIME_SERVICE_COMMAND = ('timedatectl show -p NTPSynchronized; '
+                        'systemctl is-active chrony.service dynamo-ptp4l.service dynamo-phc2sys.service; '
+                        'chronyc tracking 2>&1; true')
+
 
 def ssh(peer, command):
     return subprocess.check_output(['ssh', '-T', '-o', 'BatchMode=yes', peer, command], text=True)
@@ -243,8 +248,8 @@ def run_repeats(args, root, compressed):
             print(f'Starting {label}', flush=True)
             write(root / f'{label}-host-load-before.json', {'intel': subprocess.run(['bash', '-c', SETTINGS_COMMAND], capture_output=True, text=True).stdout,
                                                          'thor': ssh(args.peer, SETTINGS_COMMAND + '; true')})
-            tracking = {'intel': subprocess.run(['timedatectl', 'show', '-p', 'NTPSynchronized'], capture_output=True, text=True).stdout,
-                        'thor': ssh(args.peer, 'timedatectl show -p NTPSynchronized; if command -v chronyc >/dev/null; then chronyc tracking; fi')}
+            tracking = {'intel': subprocess.run(['bash', '-c', TIME_SERVICE_COMMAND], capture_output=True, text=True).stdout,
+                        'thor': ssh(args.peer, TIME_SERVICE_COMMAND)}
             write(root / f'{label}-time-service.json', tracking)
             monitor = CLOCK.ClockMonitor(args.peer).start()
             before = monitor.points[0]
