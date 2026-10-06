@@ -28,6 +28,7 @@ import os
 from pathlib import Path
 import re
 import shutil
+import signal
 import subprocess
 import sys
 import time
@@ -71,6 +72,10 @@ SPDP_ONLY = re.compile(r'<AllowMulticast>\s*spdp\s*</AllowMulticast>')
 
 class Refused(RuntimeError):
     """A precondition failed before anything was changed."""
+
+
+def step(message):
+    print(f"[{time.strftime('%H:%M:%S')}] {message}", flush=True)
 
 
 class Host:
@@ -237,14 +242,17 @@ def apply(host, profile, serial):
         # The driver can only be enumerated once the vendor driver releases it.
         for unit in VENDOR_UNITS:
             if unit_state(unit)['enabled'] != 'not-found':
+                step(f'disabling {unit}')
                 run('systemctl', 'disable', '--now', unit)
         if serial is None and existing is not None:
             serial = existing['ros_parameters']['intel_realsense']['serial_no']
         if serial is None:
+            step('reading the camera serial')
             serial = detect_serial()
         sensors = robot.setdefault('sensors', {}) or {}
         robot['sensors'] = sensors
         sensors['camera'] = [camera_entry(serial)]
+        step(f'declaring {CAMERA_NAME} in {ROBOT_YAML} and writing the service files')
         write(host.path(ROBOT_YAML), yaml.safe_dump(robot, sort_keys=False))
         write(host.path(PARAMS), render_params(serial, profile))
         write(host.path(UNIT), render_unit(ns))
@@ -253,15 +261,23 @@ def apply(host, profile, serial):
             'revision': revision(), 'installed': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()),
         }, indent=2) + '\n')
         run('systemctl', 'daemon-reload')
-        if unit_state(REGENERATE_UNIT)['active'] == 'active':
-            run('systemctl', 'restart', REGENERATE_UNIT)
+        regenerate()
+        step(f'starting {UNIT_NAME}')
         run('systemctl', 'enable', UNIT_NAME)
         run('systemctl', 'restart', UNIT_NAME)
+        step('done')
     except Exception:
         if fresh:
             print('apply failed; restoring the snapshot', file=sys.stderr)
             rollback(host)
         raise
+
+
+def regenerate():
+    if unit_state(REGENERATE_UNIT)['active'] == 'active':
+        step(f'restarting {REGENERATE_UNIT} to regenerate the robot description; the platform '
+             'takes about a minute to stop, and nothing is printed meanwhile')
+        run('systemctl', 'restart', REGENERATE_UNIT)
 
 
 def load_metadata(host):
@@ -273,14 +289,16 @@ def rollback(host):
     backup = host.path(BACKUP_DIR)
     if not (backup / 'complete').exists():
         raise Refused(f'No complete snapshot in {BACKUP_DIR}; nothing to roll back')
+    step(f'removing {UNIT_NAME} and restoring {ROBOT_YAML}')
     run('systemctl', 'disable', '--now', UNIT_NAME, check=False)
     host.path(UNIT).unlink(missing_ok=True)
     shutil.rmtree(host.path(INSTALL_DIR), ignore_errors=True)
     shutil.copy2(backup / 'robot.yaml', host.path(ROBOT_YAML))
     run('systemctl', 'daemon-reload')
-    if unit_state(REGENERATE_UNIT)['active'] == 'active':
-        run('systemctl', 'restart', REGENERATE_UNIT)
+    regenerate()
+    step('restoring the vendor camera units')
     restore_vendor(host)
+    step('done')
     # Only a complete restoration retires the snapshot; a failure keeps it for retry.
     shutil.rmtree(backup)
 
@@ -355,6 +373,12 @@ def main(argv=None):
         except BlockingIOError:
             raise Refused('a robot-side DDS experiment or service change holds '
                           f'{ROBOT_LOCK}; wait for it to finish')
+
+        def hold(signum, frame):
+            print(f'\n{args.command} is changing services; interrupting now would leave the robot '
+                  'half-changed. Let it finish (rollback afterwards if needed).', flush=True)
+        for signum in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP):
+            signal.signal(signum, hold)
         if args.command == 'apply':
             apply(host, args.profile, args.serial)
         else:
