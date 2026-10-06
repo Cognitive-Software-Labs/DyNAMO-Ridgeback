@@ -233,7 +233,7 @@ the baseline, and recorded even when it loses.
 | Option | Change | Where |
 |---|---|---|
 | O1 | Camera-only DDS profile: `br0` only, discovery-only multicast, `SocketSendBufferSize` 16 MiB, plus Intel `wmem_max` 16 MiB | New template `config/cyclonedds_camera.xml`, rendered by `camera_service`; the unit sets `CYCLONEDDS_URI` after sourcing `/etc/clearpath/setup.bash`; `wmem_max` added to the tracked sysctl file. **Measured, not adopted** |
-| O2 | CycloneDDS `MaxMessageSize` 65500 against the default | Same profile, so it includes O1's send buffer. **Skipped** pending a decision to test it without that buffer |
+| O2 | CycloneDDS `MaxMessageSize` 65500 against the default | Same profile, so it includes O1's send buffer. **Skipped** (user, 2026-10-06): at most a CPU saving, since the wire time is unchanged; one lost packet discards a whole 64 KB datagram and so a best-effort frame; and larger bursts queue ahead of LiDAR traffic |
 | O3 | 15 frames/s against 30 | **Withdrawn**: reduced rate is not an option |
 | O4 | Colour H.264 through `ffmpeg_image_transport` (NVENC on the RTX 5060) or JPEG; depth `zstd` or RVL, lossless only | Driver parameters for the encoder; on Thor, install the matching plugins (operator `sudo apt`) and a republisher that restores raw `Image` topics under the contract names |
 | O5 | Thor power mode and CPU governor; NIC interrupt coalescing on both hosts | Recorded host settings; restored afterwards unless adopted |
