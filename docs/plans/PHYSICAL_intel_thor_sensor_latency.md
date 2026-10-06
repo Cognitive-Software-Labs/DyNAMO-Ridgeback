@@ -20,7 +20,7 @@ it starts from the configuration this one installs.
 |---|---|
 | Clock sync | chrony: Intel keeps its internet servers and serves the robot subnet; Thor syncs only to Intel. PTP is a later option (both NICs have PTP clocks) |
 | Where tuning lives | A camera-only DDS profile rendered by `camera_service`. The services profile `/etc/clearpath/cyclonedds.xml` is not changed |
-| Tooling on Thor | A separate worktree on Thor; its existing checkout stays untouched |
+| Tooling on Thor | Pushed to `origin` from Intel and pulled on Thor into a separate worktree; Thor's existing checkout stays untouched |
 | Working targets, VGA at 30 Hz | Network + DDS p95 ≤ 20 ms; sensor stamp to Thor callback p95 ≤ 40 ms; loss ≤ 1 %; exact colour/depth pairing ≥ 99 %; LiDAR continuity unchanged |
 | If raw VGA misses the targets | Choose between compression and moving the D455 to Thor using the measurements; neither is pre-selected |
 
@@ -102,12 +102,17 @@ localhost discovery) produces all components.
 
 ### 2. Tooling on Thor (agent; Thor's existing checkout untouched)
 
-From Intel, transfer the branch into Thor's repository without checking it
-out: `git push robot@192.168.131.51:DyNAMO-Ridgeback feat/intel-thor-sensor-latency`.
-This writes a branch into Thor's local repository; it is not a push to the
-shared remote. On Thor:
-`git -C ~/DyNAMO-Ridgeback worktree add ~/DyNAMO-Ridgeback-latency feat/intel-thor-sensor-latency`.
-The tool runs from that worktree without a build.
+Code reaches Thor only through `origin`, so both hosts run a commit that
+exists on the shared remote. From Intel, push the branch:
+`git push -u origin feat/intel-thor-sensor-latency`. It carries the unmerged
+camera-branch commits beneath it. On Thor, fetch and check it out in a separate
+worktree:
+`git -C ~/DyNAMO-Ridgeback fetch origin feat/intel-thor-sensor-latency`, then
+`git -C ~/DyNAMO-Ridgeback worktree add --track -b feat/intel-thor-sensor-latency ~/DyNAMO-Ridgeback-latency origin/feat/intel-thor-sensor-latency`.
+Later changes follow the same path: commit and push on Intel, then
+`git -C ~/DyNAMO-Ridgeback-latency pull --ff-only` on Thor. Never edit code on
+Thor. The tool runs from that worktree without a build. Record the commit hash
+both hosts ran with each measurement.
 
 Exit: on Thor, under `dds_env.sh thor` and domain 0, the tool sees the three
 camera topics and the scans and passes its contract criteria in a short run.
