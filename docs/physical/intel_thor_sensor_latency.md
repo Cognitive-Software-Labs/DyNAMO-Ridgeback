@@ -144,7 +144,7 @@ interval); the ffmpeg encoder reads them when its first subscriber appears.
 Runs are written to `<UTC>-thor-latency-o4-<colour>-<depth>/`.
 `--decoder-param NAME=VALUE` passes a parameter to the Thor republishers.
 
-Two decoder behaviours found on 2026-10-06 (Thor, `image_transport_plugins`
+Two decoder behaviours of Thor's Jazzy plugins (`image_transport_plugins`
 4.0.7, `ffmpeg_image_transport` 3.0.4) decide which variants are usable:
 
 - **zstd loses the header.** Decoded depth arrives with stamp 0 and an empty
@@ -155,8 +155,11 @@ Two decoder behaviours found on 2026-10-06 (Thor, `image_transport_plugins`
   `h264_cuvid`, which FFmpeg runs with a four-frame display delay unless the
   codec context's `low_delay` flag is set. The plugin passes only the
   decoder's own options, so that flag cannot be set (`Option not found`) and
-  decoding adds about 137 ms. The software decoder avoids it:
+  each frame waits four frame periods. The software decoder avoids it:
   `--decoder-param in.ffmpeg.decoders.h264=h264`.
+
+Measured outcomes are in
+[Intel–Thor camera transport candidates](../do_not_try_again/intel_thor_camera_transport.md).
 
 ## Limits and pending adoption
 

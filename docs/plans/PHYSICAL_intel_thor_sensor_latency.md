@@ -116,17 +116,9 @@ blocking on Intel's 212,992-byte send buffer, which O1 addresses, so O1 runs
 first. Since `camera_service` now restarts only the camera for camera-only
 changes, candidates no longer restart the platform.
 
-**O1 measured, not adopted** (`artifacts/hardware/20261006T140904Z-thor-latency-o1/`,
-tooling `fbf730a`). All three Thor observations resolved the clock and met the
-targets, but colour and depth totals did not improve: the larger send buffer
-cut the driver component and raised the network component by about as much,
-because each frame's wire time is unchanged. The queue moved into the kernel's
-shared egress path, where camera bursts delayed the merged scan's p95 to Thor
-from about 2 ms to about 9 ms. O2 builds on the same profile and queueing, so
-it is skipped. Compression (O4) is the remaining transport lever, since it
-removes bytes from the wire; the largest single component, the driver time on
-Intel even without a remote reader, is camera-pipeline work rather than
-transport. Restore the services profile before further runs.
+O1 and O4 were measured and not adopted, O2 was skipped and O3 withdrawn;
+see [Intel–Thor camera transport candidates](../do_not_try_again/intel_thor_camera_transport.md).
+The raw services profile stays installed.
 
 Clock agreement varies with Intel's internet corrections: Thor was 0.20–0.24 ms
 ahead at the baseline and 1.5–1.9 ms behind during O1, because chrony serves
@@ -137,44 +129,11 @@ alternative to chrony. Compression, host
 power/coalescing changes and physically moving the camera remain
 measurement-dependent work; their outcomes are not presumed.
 
-**O4 tooling implemented.** `thor_decoder` restores raw `Image` topics on Thor
-from the camera's compressed variants. For measurement they are published
-under `sensors/camera_0/thor/`, not the contract names, so they cannot mix with
-Intel's raw publisher; adoption moves them. The contract check and collector
-take per-stream transports and report encode, network, decode and delivery
-components; the
+The O4 tooling (`thor_decoder`, the collector's transport, encoder and decoder
+options, and NVENC settings in `d455.yaml`) remains for a future
+bandwidth-limited case; the
 [sensor timing reference](../physical/intel_thor_sensor_latency.md#compressed-transport-candidates)
-owns their semantics. NVENC low-latency H.264 settings are in `d455.yaml` and
-were checked with a command-line encode on the Intel GPU. The operator
-installed Thor's plugins and re-applied `camera_service` (camera restart only).
-
-**O4 measured, not adopted** (2026-10-06, tooling `1e72cc9`). Short 15-second
-diagnostics first ruled out three variants. zstd depth decodes without its
-header, and NVDEC H.264 holds four frames, adding about 137 ms (see the
-[reference](../physical/intel_thor_sensor_latency.md#compressed-transport-candidates)).
-PNG depth costs about 27 ms over raw. The best pair, H.264 from NVENC decoded
-in software on Thor with RVL depth, then ran exactly like the baseline
-(`artifacts/hardware/20261006T152253Z-thor-latency-o4-ffmpeg-compressedDepth/`).
-All three Thor observations passed the contract, resolved the clock and lost
-no frames against the Intel observer:
-
-| median / p95 ms | Raw baseline | O4 |
-|---|---|---|
-| Colour total | 29.7 / 33 | 33.9–35.1 / 48.3–49.9 |
-| Depth total | 21.7 / 25 | 27.9–29.0 / 31.1–32.9 |
-| Merged scan total | 1.1 / 2 | 0.9–1.1 / 1.7–1.9 |
-
-Compression removes most of the network time, about 9 ms for raw colour,
-but encoding and decoding cost more. Colour fails the 40 ms p95 target
-because every 15th frame is a keyframe that takes about 20 ms to decode in
-software; that is 6.6% of frames, above the p95 cut. A longer keyframe
-interval would move them past p95 but not p99, and colour's median would
-still trail raw. Scan delivery to Thor was unaffected either way. At VGA 30 Hz
-on the 1 Gb/s link, raw transport stays the fastest. Compression
-remains the option if bandwidth becomes the limit (higher resolution, more
-cameras or a slower link), and lossy colour would still need the detector
-comparison. The camera's runtime encoder parameters were restored after the
-run.
+owns its semantics.
 
 ## Steps
 
@@ -280,9 +239,9 @@ the baseline, and recorded even when it loses.
 | Option | Change | Where |
 |---|---|---|
 | O1 | Camera-only DDS profile: `br0` only, discovery-only multicast, `SocketSendBufferSize` 16 MiB, plus Intel `wmem_max` 16 MiB | New template `config/cyclonedds_camera.xml`, rendered by `camera_service`; the unit sets `CYCLONEDDS_URI` after sourcing `/etc/clearpath/setup.bash`; `wmem_max` added to the tracked sysctl file. **Measured, not adopted** |
-| O2 | CycloneDDS `MaxMessageSize` 65500 against the default | Same profile, so it includes O1's send buffer. **Skipped** (user, 2026-10-06): at most a CPU saving, since the wire time is unchanged; one lost packet discards a whole 64 KB datagram and so a best-effort frame; and larger bursts queue ahead of LiDAR traffic |
+| O2 | CycloneDDS `MaxMessageSize` 65500 against the default | Same profile, so it includes O1's send buffer. **Skipped** (user, 2026-10-06) |
 | O3 | 15 frames/s against 30 | **Withdrawn**: reduced rate is not an option |
-| O4 | Colour H.264 through `ffmpeg_image_transport` (NVENC on the RTX 5060) or JPEG; depth `zstd` or RVL, lossless only | Driver parameters for the encoder; on Thor, install the matching plugins (operator `sudo apt`) and a republisher that restores raw `Image` topics under the contract names. **Measured, not adopted**: adds latency at VGA 30 Hz; JPEG not run |
+| O4 | Colour H.264 through `ffmpeg_image_transport` (NVENC on the RTX 5060) or JPEG; depth `zstd` or RVL, lossless only | Driver parameters for the encoder; on Thor, install the matching plugins (operator `sudo apt`) and a republisher that restores raw `Image` topics under the contract names. **Measured, not adopted** |
 | O5 | Thor power mode and CPU governor; NIC interrupt coalescing on both hosts | Recorded host settings; restored afterwards unless adopted |
 
 No lossy colour option is adopted until the detector's output on Thor has been

@@ -102,6 +102,7 @@ They are not supported implementations or automatic backlog commitments.
 - [Occlusion-recovery candidates](do_not_try_again/occlusion_recovery.md) — deferred until baseline characterization
 - [Exact-stamp depth-delivery experiments](do_not_try_again/exact_stamp_depth_delivery.md)
 - [Monocular-depth error](do_not_try_again/monocular_depth_error.md)
+- [Intel–Thor camera transport candidates](do_not_try_again/intel_thor_camera_transport.md)
 
 ## Archive
 

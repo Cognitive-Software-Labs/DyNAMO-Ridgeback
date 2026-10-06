@@ -36,6 +36,7 @@ are excluded from ordinary repository search and the generated knowledge graph.
 
 - [Physical mecanum drive investigation](2026-09-18-mecanum-drive-investigation.md)
 - [r100_0160 field readings and LiDAR box checks](2026-09-18-r100-0160-field-measurements.md) — tape mount readings, LiDAR range/side checks, and the rear-offset finding.
+- [r100_0160 Intel–Thor camera transport candidates](2026-10-06-r100-0160-thor-transport-candidates.md) — raw baseline against the larger send buffer (O1) and compression (O4), with the decoder findings.
 - [r100_0160 D455 camera service qualification](2026-10-06-r100-0160-camera-service.md) — contract checks at both profiles, after a cold boot and after a rollback and reinstall, with the platform-restart and serial findings.
 
 - [Isaac 6.0 first-drive snapshot](2026-07-11-isaac-first-drive.md)
