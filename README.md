@@ -607,7 +607,22 @@ sudo tools/intel_thor/camera_service apply --dds-profile camera --fps 30 --max-m
 ```
 
 Return to the installed baseline with `camera_service apply --dds-profile
-services --fps 30 --max-message-size default`. The deployment runs at 30 Hz;
+services --fps 30 --max-message-size default`.
+
+Compression candidates (O4) decode on Thor and need its image_transport
+plugins once, from the operator:
+
+```bash
+sudo apt install ros-jazzy-image-transport-plugins ros-jazzy-ffmpeg-image-transport
+```
+
+Then, on Intel, choose one variant per stream. Encoder parameters set with
+`--camera-param` apply to the whole run and are restored afterwards:
+
+```bash
+tools/intel_thor/sensor_latency_run --namespace r100_0160 --color-transport ffmpeg --depth-transport zstd
+tools/intel_thor/sensor_latency_run --namespace r100_0160 --color-transport compressed --depth-transport compressedDepth --camera-param .camera_0.aligned_depth_to_color.image_raw.compressedDepth.format=rvl
+``` The deployment runs at 30 Hz;
 reduced-rate runs are not a tuning option. Compression and host tuning are
 selected only after the measured baseline and raw transport candidates.
 

@@ -102,6 +102,47 @@ Short or 15 Hz runs are diagnostic evidence and cannot pass the 30 Hz targets.
 No configuration is adopted automatically. Commands live in the
 [README](../../README.md#intel-thor-sensor-latency).
 
+## Compressed transport candidates
+
+The driver advertises every installed image_transport variant of colour and
+aligned depth under the contract names, for example
+`sensors/camera_0/color/image/compressed`, and encodes one only while it has a
+subscriber. On Thor, `tools/intel_thor/thor_decoder` starts one Jazzy
+`image_transport` republisher per compressed stream and publishes the decoded
+`Image` under `sensors/camera_0/thor/<stream>/image`, so measured frames never
+share a topic with Intel's raw publisher. Decoded frames keep the source header.
+
+`camera_contract_check --host thor --color-transport T --depth-transport T`
+applies the contract checks and pairing to the decoded topics and additionally
+subscribes to each compressed variant. Colour offers `compressed` (JPEG) and
+`ffmpeg` (H.264); aligned depth offers the lossless `zstd` and
+`compressedDepth` (PNG, or RVL through its `format` parameter). Their timing
+splits by matching header stamps:
+
+| Component | Calculation |
+|---|---|
+| Encode | Intel publish of the compressed message minus header stamp |
+| Network + DDS | Thor receipt of the compressed message minus that publish minus offset |
+| Decode | decoder's publish minus the observer's receipt of the compressed message (Thor) |
+| Delivery | callback entry minus the decoder's publish (Thor) |
+| Total | callback entry minus header stamp minus offset |
+
+Decode approximates the decoder's own receipt with the observer's, since both
+Thor subscribers receive the same sample. The second subscriber also makes
+CycloneDDS send each compressed frame to Thor twice, which is small next to the
+raw frame it replaces. Coverage then requires a complete total and network
+samples for at least 99% of decoded frames.
+
+The collector's `--color-transport` and `--depth-transport` start the decoder
+over SSH before each Thor observation and stop it afterwards; a decoder exit
+during the run stops the sequence. `--camera-param NAME=VALUE` sets a camera
+encoder parameter once before the repeats and restores the previous values at
+the end. This is needed for the JPEG, PNG/RVL and zstd parameters, whose names
+begin with a dot and so cannot be set from a parameters file. The H.264
+settings live in `config/d455.yaml` (NVENC, no B-frames, 15-frame keyframe
+interval); the ffmpeg encoder reads them when its first subscriber appears.
+Runs are written to `<UTC>-thor-latency-o4-<colour>-<depth>/`.
+
 ## Limits and pending adoption
 
 As inspected on 2026-10-06, the running camera remains on the previously

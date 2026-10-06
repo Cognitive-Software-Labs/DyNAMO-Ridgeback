@@ -137,6 +137,20 @@ alternative to chrony. Compression, host
 power/coalescing changes and physically moving the camera remain
 measurement-dependent work; their outcomes are not presumed.
 
+**O4 tooling implemented.** `thor_decoder` restores raw `Image` topics on Thor
+from the camera's compressed variants. For measurement they are published
+under `sensors/camera_0/thor/`, not the contract names, so they cannot mix with
+Intel's raw publisher; adoption moves them. The contract check and collector
+take per-stream transports and report encode, network, decode and delivery
+components; the
+[sensor timing reference](../physical/intel_thor_sensor_latency.md#compressed-transport-candidates)
+owns their semantics. NVENC low-latency H.264 settings are in `d455.yaml` and
+were checked with a command-line encode on the Intel GPU. Pending: the
+operator installs Thor's plugins and re-applies `camera_service` so the
+camera loads the H.264 settings, then the candidates run: colour JPEG and
+H.264 with depth raw, then depth `zstd`, PNG and RVL with colour raw, then the
+best of each combined.
+
 ## Steps
 
 ### 1. Timing mode in the contract check (agent, no robot change)
