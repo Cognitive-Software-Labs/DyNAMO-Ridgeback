@@ -19,6 +19,7 @@ this page needs to be recreated by hand.
 | 2 | `sudo tools/intel_thor/camera_service apply` | the `camera_0` entry in `/etc/clearpath/robot.yaml`, `/etc/clearpath/dynamo-camera/`, `/etc/systemd/system/dynamo-camera.service`, and the enablement of the four vendor camera units | `/etc/clearpath/dynamo-camera-backup/` |
 | 3 | `sudo tools/intel_thor/time_sync apply --host intel` (Thor: `--host thor`, from its worktree) | chrony and `/etc/chrony/` on each host; Intel keeps internet upstreams, slews at most 500 ppm and serves the subnet | `/var/lib/dynamo-time-sync-backup/` |
 | 4 | `sudo tools/intel_thor/ptp_sync apply --host intel`, then `--host thor` on Thor | `linuxptp`, `/etc/linuxptp/dynamo-ptp4l.conf`, `dynamo-ptp4l.service` and `dynamo-phc2sys.service`; on Thor, chrony stopped and disabled while PTP owns the wall clock | `/var/lib/dynamo-ptp-sync-backup/` |
+| 5 | `sudo tools/intel_thor/host_performance apply --host intel`, then `--host thor` on Thor | `/usr/local/sbin/dynamo-host-performance` and `dynamo-host-performance.service`: the performance governor (and, on Intel, energy preference) on every CPU policy at boot; on Thor, nvpmodel's MAXN power mode, which nvpmodel restores itself. `check_link` fails while either host differs | `/var/lib/dynamo-host-performance-backup/` |
 
 The camera service depends on step 1: its unit sources `/etc/clearpath/setup.bash`
 for the middleware, and `apply` refuses unless the installed DDS profile restricts

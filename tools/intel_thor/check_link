@@ -76,6 +76,26 @@ check_buffers() {
     fi
 }
 
+# Performance-policy rows from host_performance status, as PASS or FAIL lines.
+check_performance() {
+    local host="$1" output
+    if [ "$host" = intel ]; then
+        output="$("$REPO_ROOT/tools/intel_thor/host_performance" status 2>&1)"
+    else
+        output="$(thor python3 - status < "$REPO_ROOT/tools/intel_thor/host_performance" 2>&1)"
+    fi
+    if ! printf '%s\n' "$output" | grep -qE '^(ok|DIFF) '; then
+        fail "$host performance policy unreadable: $(printf '%s' "$output" | tail -1)"
+        return
+    fi
+    while read -r verdict criterion; do
+        case "$verdict" in
+            ok) pass "$host $criterion" ;;
+            DIFF) fail "$host $criterion; sudo tools/intel_thor/host_performance apply --host $host" ;;
+        esac
+    done <<< "$(printf '%s\n' "$output" | grep -E '^(ok|DIFF) ')"
+}
+
 section "Intel ($(hostname))"
 if ip -4 -o addr show | grep -q " $INTEL_IP/"; then
     pass "robot Ethernet address $INTEL_IP present"
@@ -106,6 +126,7 @@ else
 fi
 
 check_buffers intel
+check_performance intel
 services_rmw="$(grep -h '^export RMW_IMPLEMENTATION' /etc/clearpath/setup.bash 2>/dev/null | cut -d'"' -f2)"
 if [ "$services_rmw" = rmw_cyclonedds_cpp ]; then
     pass "robot services configured for CycloneDDS (/etc/clearpath/setup.bash)"
@@ -142,6 +163,7 @@ else
 fi
 
 check_buffers thor
+check_performance thor
 if thor test -e /opt/ros/jazzy/lib/librmw_cyclonedds_cpp.so; then
     pass "rmw_cyclonedds_cpp installed"
 else

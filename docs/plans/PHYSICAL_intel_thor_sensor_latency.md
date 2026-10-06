@@ -242,7 +242,7 @@ the baseline, and recorded even when it loses.
 | O2 | CycloneDDS `MaxMessageSize` 65500 against the default | Same profile, so it includes O1's send buffer. **Skipped** (user, 2026-10-06) |
 | O3 | 15 frames/s against 30 | **Withdrawn**: reduced rate is not an option |
 | O4 | Colour H.264 through `ffmpeg_image_transport` (NVENC on the RTX 5060) or JPEG; depth `zstd` or RVL, lossless only | Driver parameters for the encoder; on Thor, install the matching plugins (operator `sudo apt`) and a republisher that restores raw `Image` topics under the contract names. **Measured, not adopted** |
-| O5 | Thor power mode and CPU governor; NIC interrupt coalescing on both hosts | Recorded host settings; restored afterwards unless adopted |
+| O5 | Thor power mode and CPU governor; NIC interrupt coalescing on both hosts | **Decided** (user, 2026-10-06): both hosts always at the performance governor and Thor in MAXN, enforced by `host_performance` and `check_link`; NIC tuning not pursued (at most ~1 ms above wire time). Original: | Recorded host settings; restored afterwards unless adopted |
 
 No lossy colour option is adopted until the detector's output on Thor has been
 compared with raw input on the same frames; that comparison belongs to the

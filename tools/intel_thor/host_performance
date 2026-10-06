@@ -1,0 +1,200 @@
+#!/usr/bin/env python3
+"""Keep Intel and Thor at full performance; the operator runs apply/rollback with sudo.
+
+Usage: tools/intel_thor/host_performance status
+       sudo tools/intel_thor/host_performance apply --host intel|thor [--yes]
+       sudo tools/intel_thor/host_performance rollback [--yes]
+
+Both hosts run every CPU frequency policy at the performance governor, with
+Intel's energy preference at performance, through a boot unit
+(dynamo-host-performance.service). Thor also runs nvpmodel's MAXN power mode,
+which nvpmodel itself restores at boot. thermald and Thor's fan control stay in
+charge of thermal protection. apply snapshots the previous governors,
+preferences and power mode; rollback restores them. status is read-only, needs
+no checkout, and is what check_link runs on both hosts.
+"""
+import argparse
+import json
+import os
+from pathlib import Path
+import shutil
+import subprocess
+import sys
+
+CPUFREQ = '/sys/devices/system/cpu/cpufreq'
+NO_TURBO = '/sys/devices/system/cpu/intel_pstate/no_turbo'
+NVPMODEL_CONF = '/etc/nvpmodel.conf'
+MAXN = 0
+SCRIPT = '/usr/local/sbin/dynamo-host-performance'
+UNIT = 'dynamo-host-performance.service'
+UNIT_DIR = '/etc/systemd/system'
+BACKUP = '/var/lib/dynamo-host-performance-backup'
+
+
+def run(*argv, check=True, input=None):
+    result = subprocess.run(argv, capture_output=True, text=True, input=input)
+    if check and result.returncode:
+        raise RuntimeError(f'{argv[0]} failed: {result.stderr.strip() or result.stdout.strip()}')
+    return result
+
+
+class Host:
+    def __init__(self, root='/'):
+        self.root = Path(root)
+
+    def path(self, absolute):
+        return self.root / absolute.lstrip('/')
+
+
+def read(path):
+    return path.read_text().strip() if path.exists() else None
+
+
+def detect(host):
+    return 'thor' if host.path(NVPMODEL_CONF).exists() else 'intel'
+
+
+def cpu_state(host):
+    return {policy.name: {'governor': read(policy / 'scaling_governor'),
+                          'epp': read(policy / 'energy_performance_preference')}
+            for policy in sorted(host.path(CPUFREQ).glob('policy*'))}
+
+
+def power_mode():
+    """nvpmodel prints the mode name, then its ID."""
+    lines = run('nvpmodel', '-q').stdout.split('\n')
+    name = next(line.split(':', 1)[1].strip() for line in lines if line.startswith('NV Power Mode'))
+    return name, int([line for line in lines if line.strip().isdigit()][-1])
+
+
+def unit_state(unit):
+    return {key: run('systemctl', 'is-' + key, unit, check=False).stdout.strip()
+            for key in ('enabled', 'active')}
+
+
+def checks(host, role):
+    """(passed, criterion, detail) rows for the performance policy."""
+    rows = []
+    cpus = cpu_state(host)
+    governors = sorted({state['governor'] for state in cpus.values()})
+    rows.append((bool(cpus) and governors == ['performance'], 'CPU governor',
+                 f"{', '.join(map(str, governors)) or 'no cpufreq policies'} on {len(cpus)} policies"))
+    preferences = sorted({state['epp'] for state in cpus.values() if state['epp'] is not None})
+    if preferences:
+        rows.append((preferences == ['performance'], 'energy preference', ', '.join(preferences)))
+    if role == 'intel' and read(host.path(NO_TURBO)) is not None:
+        rows.append((read(host.path(NO_TURBO)) == '0', 'turbo', 'enabled' if read(host.path(NO_TURBO)) == '0' else 'disabled'))
+    if role == 'thor':
+        name, mode = power_mode()
+        rows.append((mode == MAXN, 'power mode', f'{name} (ID {mode}); MAXN is ID {MAXN}'))
+    state = unit_state(UNIT)
+    rows.append((state['enabled'] == 'enabled', 'boot unit', f"{UNIT}: {state['enabled']}, {state['active']}"))
+    return rows
+
+
+def status(host):
+    role = detect(host)
+    rows = checks(host, role)
+    print(f'{role} performance policy')
+    for passed, criterion, detail in rows:
+        print(f"{'ok  ' if passed else 'DIFF'}  {criterion:18} {detail}")
+    return 0 if all(passed for passed, _, _ in rows) else 1
+
+
+def files():
+    config = Path(__file__).resolve().parents[2] / 'src/ridgeback_autonomy_hardware/config/intel_thor/performance'
+    return {SCRIPT: ((config / 'dynamo-host-performance.sh').read_text(), 0o755),
+            f'{UNIT_DIR}/{UNIT}': ((config / UNIT).read_text(), 0o644)}
+
+
+def write(path, text, mode):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_suffix(path.suffix + '.tmp')
+    temporary.write_text(text)
+    temporary.chmod(mode)
+    os.replace(temporary, path)
+
+
+def set_power_mode(mode):
+    # Decline nvpmodel's offer to reboot; status shows whether the mode took effect.
+    run('nvpmodel', '-m', str(mode), input='NO\n', check=False)
+    return power_mode()[1] == mode
+
+
+def apply(host, role):
+    if detect(host) != role:
+        raise RuntimeError(f'This is not the {role} host')
+    backup = host.path(BACKUP)
+    if not (backup / 'state.json').exists():
+        if any(host.path(path).exists() for path in files()):
+            raise RuntimeError('A file this tool manages already exists; inspect it first')
+        saved = {'role': role, 'cpu': cpu_state(host)}
+        if role == 'thor':
+            saved['power_mode'] = power_mode()[1]
+        backup.mkdir(parents=True, exist_ok=True)
+        write(backup / 'state.json', json.dumps(saved, indent=2) + '\n', 0o644)
+    for path, (text, mode) in files().items():
+        write(host.path(path), text, mode)
+    run('systemctl', 'daemon-reload')
+    run('systemctl', 'enable', UNIT)
+    run('systemctl', 'restart', UNIT)
+    if role == 'thor' and power_mode()[1] != MAXN and not set_power_mode(MAXN):
+        print('Thor needs a reboot to enter MAXN: sudo nvpmodel -m 0 --force (reboots Thor now).',
+              file=sys.stderr)
+    return status(host)
+
+
+def rollback(host):
+    backup = host.path(BACKUP)
+    if not (backup / 'state.json').exists():
+        raise RuntimeError('No performance-policy snapshot')
+    saved = json.loads((backup / 'state.json').read_text())
+    run('systemctl', 'disable', '--now', UNIT, check=False)
+    for path in files():
+        host.path(path).unlink(missing_ok=True)
+    run('systemctl', 'daemon-reload')
+    for policy, state in saved['cpu'].items():
+        directory = host.path(CPUFREQ) / policy
+        if state['governor'] is not None:
+            (directory / 'scaling_governor').write_text(state['governor'] + '\n')
+        if state['epp'] is not None:
+            try:
+                (directory / 'energy_performance_preference').write_text(state['epp'] + '\n')
+            except OSError:
+                pass  # refused while a governor implies it; the governor restore decides
+    if 'power_mode' in saved and not set_power_mode(saved['power_mode']):
+        print(f"Thor needs a reboot to return to power mode {saved['power_mode']}: "
+              f"sudo nvpmodel -m {saved['power_mode']} --force", file=sys.stderr)
+    shutil.rmtree(backup)
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument('command', choices=('status', 'apply', 'rollback'))
+    parser.add_argument('--host', choices=('intel', 'thor'))
+    parser.add_argument('--yes', action='store_true')
+    args = parser.parse_args(argv)
+    if args.command == 'apply' and not args.host:
+        parser.error('apply requires --host intel|thor')
+    host = Host()
+    try:
+        if args.command == 'status':
+            return status(host)
+        if os.geteuid() != 0:
+            parser.error('apply/rollback must be run by the operator with sudo')
+        if not args.yes and input('This changes the CPU performance policy'
+                                  + (' and power mode' if detect(host) == 'thor' else '')
+                                  + '. Continue? [y/N] ').lower() not in ('y', 'yes'):
+            return 1
+        if args.command == 'apply':
+            return apply(host, args.host)
+        rollback(host)
+        status(host)
+        return 0
+    except (RuntimeError, OSError) as error:
+        print(str(error), file=sys.stderr)
+        return 2
+
+
+if __name__ == '__main__':
+    sys.exit(main())

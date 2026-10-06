@@ -1,0 +1,14 @@
+# Installed by tools/intel_thor/host_performance; edit the repository copy.
+# Re-applies the CPU performance policy at every boot. On Thor it runs after
+# nvpmodel, which restores the selected power mode (MAXN) but not governors.
+[Unit]
+Description=DyNAMO CPU performance policy
+After=nvpmodel.service thermald.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/sbin/dynamo-host-performance
+
+[Install]
+WantedBy=multi-user.target

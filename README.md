@@ -655,6 +655,18 @@ services restart, so keep the robot stationary with the e-stop in reach:
 sudo tools/intel_thor/intel_services_rmw apply
 ```
 
+Both hosts run at full CPU performance, and Thor in MAXN; `check_link` fails
+otherwise. Install once per host (Thor from its worktree; switching to MAXN may
+ask for a reboot, which the tool reports):
+
+```bash
+sudo tools/intel_thor/host_performance apply --host intel
+sudo tools/intel_thor/host_performance apply --host thor
+```
+
+`tools/intel_thor/host_performance status` reports drift; `rollback` restores
+the previous governors and power mode.
+
 `tools/intel_thor/intel_services_rmw status` shows the RMW that each service
 actually runs, and `sudo tools/intel_thor/intel_services_rmw rollback` restores
 the saved middleware, DDS configuration, and service overrides. Backups from
