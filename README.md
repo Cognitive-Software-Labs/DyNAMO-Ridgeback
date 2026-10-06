@@ -524,6 +524,72 @@ installed files, the re-apply order after a reinstall, and the contract that
 robot-side diagnostics should target are in
 [robot-local deployment](docs/physical/robot_local_deployment.md).
 
+### Intel-Thor sensor latency
+
+Use the [sensor timing reference](docs/physical/intel_thor_sensor_latency.md)
+for report definitions and the [active tuning plan](docs/plans/PHYSICAL_intel_thor_sensor_latency.md)
+for live acceptance. Tools run directly from source; no workspace build is needed.
+
+Publish the latency branch through `origin` before qualifying it. On Thor,
+leave the existing checkout untouched and create the separate worktree once:
+
+```bash
+git -C ~/DyNAMO-Ridgeback fetch origin feat/intel-thor-sensor-latency
+git -C ~/DyNAMO-Ridgeback worktree add --track -b feat/intel-thor-sensor-latency ~/DyNAMO-Ridgeback-latency origin/feat/intel-thor-sensor-latency
+```
+
+For updates, fetch on the existing Thor checkout and run
+`git -C ~/DyNAMO-Ridgeback-latency pull --ff-only`. The operator installs clocks
+locally on each host while the robot is stationary:
+
+```bash
+# Intel, from this checkout
+sudo tools/intel_thor/time_sync apply --host intel
+# Thor, from ~/DyNAMO-Ridgeback-latency
+sudo tools/intel_thor/time_sync apply --host thor
+chronyc tracking
+```
+
+`tools/intel_thor/time_sync status` inspects the deployment;
+`sudo tools/intel_thor/time_sync rollback` restores the prior time service.
+Check the independent bound on Intel with `tools/intel_thor/check_clock`.
+Then collect the interleaved baseline from Intel:
+
+```bash
+tools/intel_thor/check_link
+source /etc/clearpath/setup.bash
+tools/intel_thor/sensor_latency_run --namespace r100_0160
+```
+
+The collector writes reports, raw timestamps, before/after clock checks, CPU
+and link rates under `artifacts/hardware/`. Use `--output-dir` to name a new
+run directory. Its Intel observer stops the run on scan gaps or sensor faults.
+
+For a short Thor contract diagnostic, from the Thor worktree:
+
+```bash
+source /opt/ros/jazzy/setup.bash
+source src/ridgeback_autonomy_hardware/config/intel_thor/dds_env.sh thor
+export ROS_DOMAIN_ID=0
+tools/camera_contract_check --backend hardware --host thor --namespace r100_0160 --timing --duration 10
+```
+
+Cross-host components are unresolved until a valid `--clock-offset-ms` and
+`--clock-bound-ms` are supplied. The collector handles those checks automatically.
+To measure O1/O2, the operator applies one candidate on Intel, then repeats the
+collector with a new output directory:
+
+```bash
+sudo tools/intel_thor/camera_service apply --dds-profile camera --fps 30 --max-message-size default
+# O2: change only --max-message-size to 65500
+# O3: change only --fps to 15; collector also requires --fps 15
+```
+
+Return to the installed baseline with `camera_service apply --dds-profile
+services --fps 30 --max-message-size default`. Fifteen Hz evidence cannot pass
+the 30 Hz targets. Compression and host tuning are selected only after the
+measured baseline and raw transport candidates.
+
 ### Intel-Thor link setup and pre-deploy check
 
 **Deployment blocker:** the September 18 handoffs report camera delivery

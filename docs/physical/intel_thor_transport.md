@@ -253,6 +253,15 @@ colour/depth pairing, round-trip time and CPU. It writes its results under
   do not prove camera-driver health, the real driver's timing, or the rate of
   the real perception pipeline.
 
+## Sensor timing and time synchronization
+
+Thor's opt-in chrony configuration uses Intel (`192.168.131.1`) as its only
+source. The [robot-local deployment reference](robot_local_deployment.md#clock-synchronization-and-camera-transport-candidates)
+owns its installer and rollback. The [sensor timing reference](intel_thor_sensor_latency.md)
+owns clock bounds, latency components and the qualification collector. The
+camera-only DDS profile is a tuning candidate; the service DDS contract above
+remains the installed baseline until measured adoption.
+
 ## Archived evidence
 
 - [Intel–Thor DDS transport diagnosis](../../archive/engineering/2026-09-18-intel-thor-dds-transport.md)

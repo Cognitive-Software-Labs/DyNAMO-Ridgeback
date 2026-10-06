@@ -15,7 +15,7 @@ Conflicts=realsense-camera.service
 [Service]
 Type=simple
 User=robot
-ExecStart=/bin/bash -c 'source /etc/clearpath/setup.bash && exec /opt/ros/jazzy/lib/realsense2_camera/realsense2_camera_node --ros-args -r __ns:=/@NAMESPACE@/sensors -r __node:=camera_0 --params-file @PARAMS@ -r /tf:=/@NAMESPACE@/tf -r /tf_static:=/@NAMESPACE@/tf_static -r /@NAMESPACE@/sensors/camera_0/color/image_raw:=/@NAMESPACE@/sensors/camera_0/color/image -r /@NAMESPACE@/sensors/camera_0/aligned_depth_to_color/image_raw:=/@NAMESPACE@/sensors/camera_0/depth/image'
+ExecStart=/bin/bash -c 'source /etc/clearpath/setup.bash && @DDS_OVERRIDE@exec /opt/ros/jazzy/lib/realsense2_camera/realsense2_camera_node --ros-args -r __ns:=/@NAMESPACE@/sensors -r __node:=camera_0 --params-file @PARAMS@ -r /tf:=/@NAMESPACE@/tf -r /tf_static:=/@NAMESPACE@/tf_static -r /@NAMESPACE@/sensors/camera_0/color/image_raw:=/@NAMESPACE@/sensors/camera_0/color/image -r /@NAMESPACE@/sensors/camera_0/aligned_depth_to_color/image_raw:=/@NAMESPACE@/sensors/camera_0/depth/image'
 Restart=always
 RestartSec=5
 

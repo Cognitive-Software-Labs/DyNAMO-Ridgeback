@@ -1,6 +1,6 @@
 # PHYSICAL — Intel–Thor sensor latency and transport tuning
 
-Status: **planned; no step executed.** Owner: an agent at the robot, with the
+Status: **tooling implemented; hardware clock installation and transport tuning pending.** Owner: an agent at the robot, with the
 operator for every `sudo` step. Governing plan:
 [PHYSICAL — Intel–Thor deployment and transport qualification](PHYSICAL_intel_thor_deployment.md),
 whose sections 2 (time) and 3 (transfer cost) this plan executes for the
@@ -77,6 +77,20 @@ Stop a run on any scan gap above 250 ms on Intel, a driver error, or a
 `clearpath-sensors` restart. Measure only through the tool's own
 subscriptions; do not run `ros2 topic hz` or `ros2 node list` loops on the
 robot during runs (they coincided with the 2026-09-18 Hokuyo lockout).
+
+## Implementation status (2026-10-06)
+
+The timing mode, Thor defaults, independent SSH clock check, interleaved run
+collector, chrony installer with rollback, and camera-only DDS/fps candidates
+are implemented. Unit tests and the isolated two-process localhost timing
+smoke pass. Installed robot services remain on the previously qualified VGA
+30 Hz configuration; no tuning candidate has been adopted.
+
+The [sensor timing reference](../physical/intel_thor_sensor_latency.md) owns
+implemented report semantics and qualification commands. Steps 3–7 still
+require operator clock installation, measured baselines and candidate runs.
+Compression, host power/coalescing changes and physically moving the camera
+remain measurement-dependent work; their outcomes are not presumed.
 
 ## Steps
 

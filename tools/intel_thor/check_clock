@@ -1,0 +1,59 @@
+#!/usr/bin/env python3
+"""Bound Thor-minus-Intel clock offset using a persistent SSH round trip.
+
+Run on Intel. The bound assumes the remote timestamp falls between local send
+and receive; asymmetry is not silently treated as zero. No remote files change.
+"""
+import argparse
+import json
+from pathlib import Path
+import select
+import subprocess
+import time
+
+
+def measure(peer='robot@192.168.131.51', count=30):
+    remote = "import sys,time; [print(time.time_ns(),flush=True) for line in sys.stdin]"
+    process = subprocess.Popen(['ssh', '-T', '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=5',
+                                peer, 'python3', '-u', '-c', "'" + remote + "'"],
+                               stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
+    samples = []
+    try:
+        for index in range(count + 3):
+            start, monotonic = time.time_ns(), time.monotonic_ns()
+            process.stdin.write('clock\n')
+            process.stdin.flush()
+            if not select.select([process.stdout], [], [], 5)[0]:
+                raise RuntimeError('SSH clock response timed out')
+            line = process.stdout.readline()
+            end, elapsed = time.time_ns(), time.monotonic_ns() - monotonic
+            if not line:
+                raise RuntimeError('SSH clock process ended')
+            remote_ns = int(line)
+            if abs((end - start) - elapsed) > 100_000:
+                raise RuntimeError('Local wall clock stepped during offset check')
+            if index >= 3:
+                samples.append({'offset_ms': (2 * remote_ns - start - end) / 2e6,
+                                'bound_ms': (end - start) / 2e6})
+    finally:
+        process.stdin.close()
+        try:
+            process.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            process.wait()
+    best = min(samples, key=lambda s: s['bound_ms'])
+    return {**best, 'peer': peer, 'method': 'persistent SSH midpoint, half RTT bound',
+            'samples': samples, 'captured_utc': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())}
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--peer', default='robot@192.168.131.51')
+    parser.add_argument('--output', type=Path)
+    args = parser.parse_args()
+    report = measure(args.peer)
+    print(json.dumps(report, indent=2))
+    if args.output:
+        args.output.parent.mkdir(parents=True, exist_ok=True)
+        args.output.write_text(json.dumps(report, indent=2) + '\n')

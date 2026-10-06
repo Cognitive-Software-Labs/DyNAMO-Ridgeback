@@ -1,0 +1,206 @@
+#!/usr/bin/env python3
+"""Manage robot clock synchronization locally; the operator runs apply/rollback with sudo.
+
+Intel serves the robot subnet while retaining its internet upstreams. Thor has
+only Intel as a source. status is read-only. Snapshot and restore the original
+chrony files, package choice and systemd time-service states.
+"""
+import argparse
+import fcntl
+import hashlib
+import json
+import os
+from pathlib import Path
+import shutil
+import subprocess
+import sys
+
+REPO = Path(__file__).resolve().parents[2]
+CONFIG = REPO / 'src/ridgeback_autonomy_hardware/config/intel_thor'
+BACKUP = '/var/lib/dynamo-time-sync-backup'
+MAIN = '/etc/chrony/chrony.conf'
+MANAGED = '/etc/chrony/conf.d/dynamo-time.conf'
+UNITS = ('systemd-timesyncd.service', 'chrony.service')
+
+
+def run(*argv, check=True):
+    result = subprocess.run(argv, capture_output=True, text=True)
+    if check and result.returncode:
+        raise RuntimeError(f'{argv[0]} failed: {result.stderr.strip()}')
+    return result
+
+
+class Host:
+    def __init__(self, root='/'):
+        self.root = Path(root)
+
+    def path(self, absolute):
+        return self.root / absolute.lstrip('/')
+
+
+def write(path, text):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_suffix(path.suffix + '.tmp')
+    temporary.write_text(text)
+    temporary.chmod(0o644)
+    os.replace(temporary, path)
+
+
+def installed(package):
+    return run('dpkg-query', '-W', '-f=${Status}', package, check=False).stdout.strip() == 'install ok installed'
+
+
+def state(unit):
+    return {key: run('systemctl', 'is-' + key, unit, check=False).stdout.strip()
+            for key in ('enabled', 'active')}
+
+
+def upstreams():
+    if installed('chrony'):
+        lines = run('chronyd', '-p').stdout.splitlines()
+        sources = [line.strip() for line in lines if line.split() and
+                   line.split()[0] in ('server', 'pool', 'peer')]
+        if not sources:
+            raise RuntimeError('Existing chrony has no readable upstreams; supply --upstream explicitly')
+        return '\n'.join(sources)
+    # Preserve the active timesyncd internet server; never use a numeric transient IP.
+    name = run('timedatectl', 'show-timesync', '-p', 'ServerName', '--value', check=False).stdout.strip()
+    if not name or any(c.isspace() for c in name):
+        raise RuntimeError('Cannot read the timesyncd upstream; supply --upstream explicitly')
+    return f'server {name} iburst'
+
+
+def desired(role, sources):
+    template = (CONFIG / f'chrony_{role}.conf').read_text()
+    return template.replace('@UPSTREAMS@', sources), (
+        '# Managed by tools/intel_thor/time_sync; no DHCP/other includes on Thor.\n'
+        'driftfile /var/lib/chrony/chrony.drift\n'
+        'rtcsync\nlogdir /var/log/chrony\n'
+        'include /etc/chrony/conf.d/dynamo-time.conf\n')
+
+
+def digest(path):
+    return hashlib.sha256(path.read_bytes()).hexdigest() if path.exists() else None
+
+
+def apply(host, role, upstream=None):
+    backup = host.path(BACKUP)
+    if backup.exists() and not (backup / 'complete').exists():
+        raise RuntimeError(f'Incomplete snapshot at {backup}; retained for recovery')
+    if (backup / 'complete').exists():
+        saved = json.loads((backup / 'state.json').read_text())
+        if saved['role'] != role:
+            raise RuntimeError('Rollback before changing the host role')
+        sources = saved['upstreams']
+        manifest = backup / 'installed.json'
+        if manifest.exists() and any(digest(host.path(p)) != h for p, h in json.loads(manifest.read_text()).items()):
+            raise RuntimeError('Managed clock files changed externally; original snapshot retained')
+    else:
+        sources = '\n'.join(f'server {name} iburst' for name in upstream) if upstream else (
+            upstreams() if role == 'intel' else '')
+        saved = {'role': role, 'upstreams': sources,
+                 'packages': {p: installed(p) for p in ('chrony', 'systemd-timesyncd')},
+                 'units': {unit: state(unit) for unit in UNITS}}
+        temporary = backup.with_name(backup.name + '.tmp')
+        temporary.mkdir(parents=True, exist_ok=False)
+        chrony = host.path('/etc/chrony')
+        if chrony.exists():
+            shutil.copytree(chrony, temporary / 'chrony', symlinks=True)
+        write(temporary / 'state.json', json.dumps(saved, indent=2) + '\n')
+        write(temporary / 'complete', 'original state captured\n')
+        os.replace(temporary, backup)
+    managed, main = desired(role, sources)
+    try:
+        # Ubuntu's package resolver removes the conflicting timesyncd package.
+        run('apt-get', 'install', '-y', 'chrony')
+        run('systemctl', 'disable', '--now', 'systemd-timesyncd.service', check=False)
+        write(host.path(MANAGED), managed)
+        write(host.path(MAIN), main)
+        write(backup / 'installed.json', json.dumps({p: digest(host.path(p)) for p in (MAIN, MANAGED)}))
+        run('chronyd', '-p', '-f', str(host.path(MAIN)))
+        run('systemctl', 'enable', 'chrony.service')
+        run('systemctl', 'restart', 'chrony.service')
+    except Exception:
+        print(f'Apply failed. Original state retained at {backup}; run rollback.', file=sys.stderr)
+        raise
+
+
+def rollback(host):
+    backup = host.path(BACKUP)
+    if not (backup / 'complete').exists():
+        raise RuntimeError('No complete time-sync snapshot')
+    manifest = backup / 'installed.json'
+    if manifest.exists():
+        for path, expected in json.loads(manifest.read_text()).items():
+            if digest(host.path(path)) != expected:
+                raise RuntimeError(f'{path} changed externally; snapshot retained, no service stopped')
+    saved = json.loads((backup / 'state.json').read_text())
+    run('systemctl', 'disable', '--now', 'chrony.service', check=False)
+    if saved['packages']['systemd-timesyncd']:
+        run('apt-get', 'install', '-y', 'systemd-timesyncd')
+    elif not saved['packages']['chrony']:
+        run('apt-get', 'remove', '-y', 'chrony')
+    chrony = host.path('/etc/chrony')
+    shutil.rmtree(chrony, ignore_errors=True)
+    if (backup / 'chrony').exists():
+        shutil.copytree(backup / 'chrony', chrony, symlinks=True)
+    for unit, original in saved['units'].items():
+        if original['enabled'] == 'enabled':
+            run('systemctl', 'enable', unit)
+        if original['active'] == 'active':
+            run('systemctl', 'restart', unit)
+    shutil.rmtree(backup)
+
+
+def status(host):
+    metadata = host.path(BACKUP) / 'state.json'
+    print('managed deployment: ' + (metadata.read_text() if metadata.exists() else 'not installed'))
+    drift = False
+    manifest = host.path(BACKUP) / 'installed.json'
+    if manifest.exists():
+        for path, expected in json.loads(manifest.read_text()).items():
+            ok = digest(host.path(path)) == expected
+            drift |= not ok
+            print(('ok ' if ok else 'DIFF ') + path)
+    for unit in UNITS:
+        print(unit, state(unit))
+    result = run('chronyc', 'tracking', check=False) if shutil.which('chronyc') else None
+    print(result.stdout if result else 'chronyc unavailable')
+    if result:
+        print(run('chronyc', 'sources', '-v', check=False).stdout)
+    return int(drift or result is None or result.returncode != 0)
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('command', choices=('status', 'apply', 'rollback'))
+    parser.add_argument('--host', choices=('intel', 'thor'))
+    parser.add_argument('--upstream', action='append', help='Intel internet NTP name; repeat to retain several')
+    parser.add_argument('--yes', action='store_true')
+    args = parser.parse_args(argv)
+    if args.command == 'apply' and not args.host:
+        parser.error('apply requires --host intel|thor')
+    if args.upstream and (args.host != 'intel' or any(not name or any(c.isspace() for c in name) for name in args.upstream)):
+        parser.error('--upstream is for Intel and accepts a single hostname per occurrence')
+    host = Host()
+    try:
+        if args.command == 'status':
+            return status(host)
+        if os.geteuid() != 0:
+            parser.error('apply/rollback must be run by the operator with sudo')
+        if not args.yes and input('This replaces the active time service and may step wall clocks. Robot stationary? [y/N] ').lower() not in ('y', 'yes'):
+            return 1
+        with host.path('/run/lock/dynamo-local-dds-test.lock').open('a') as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            if args.command == 'apply':
+                apply(host, args.host, args.upstream)
+            else:
+                rollback(host)
+        return 0
+    except (RuntimeError, OSError) as error:
+        print(str(error), file=sys.stderr)
+        return 2
+
+
+if __name__ == '__main__':
+    sys.exit(main())

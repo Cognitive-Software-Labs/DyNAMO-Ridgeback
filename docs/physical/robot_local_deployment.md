@@ -135,6 +135,44 @@ camera topics and the three scans for ten seconds of warm-up and sixty seconds
 of measurement, and passes only if every criterion it prints passes. It does not
 prove application accuracy, motion behaviour, or camera–LiDAR calibration.
 
+## Clock synchronization and camera transport candidates
+
+`tools/intel_thor/time_sync` supplies `status`, operator-run `apply --host
+intel|thor`, and `rollback`. It installs chrony, preserving Intel's existing
+configured chrony upstreams or the active timesyncd server. `--upstream` can
+explicitly retain several Intel internet servers. Intel allows the robot
+subnet and serves a local stratum-10 clock when upstreams are unavailable;
+Thor uses only `192.168.131.1`, with no DHCP or internet source includes.
+
+The managed main file `/etc/chrony/chrony.conf` includes only
+`/etc/chrony/conf.d/dynamo-time.conf`. Before package installation,
+`/var/lib/dynamo-time-sync-backup/` saves the original chrony directory,
+package selection, time-service activity/enablement and rendered upstreams.
+Rollback reinstalls systemd-timesyncd when it was originally installed and
+restores original files and active/enabled services. File drift causes reapply
+and rollback to refuse before changing services. An installation failure keeps
+the snapshot for operator rollback. Package versions/cache are not snapshotted;
+rollback may require apt connectivity. Time changes can step wall clocks, so
+apply while the robot is stationary and no timing run holds the experiment lock.
+
+The camera installer adds `--fps 15|30`, `--dds-profile services|camera`, and
+`--max-message-size default|65500`. New installs keep `services` at 30 Hz;
+reapply preserves installed options. `camera` renders
+`config/cyclonedds_camera.xml` to
+`/etc/clearpath/dynamo-camera/cyclonedds.xml`: `br0` only, discovery-only
+multicast, a Thor peer and 16 MB send/receive buffers. The unit overrides
+`CYCLONEDDS_URI` **after** sourcing the Clearpath environment. The services'
+`/etc/clearpath/cyclonedds.xml` stays intact.
+
+Camera mode also installs `/etc/sysctl.d/61-dynamo-camera-buffers.conf` and
+sets `net.core.wmem_max=16777216`. It extends older camera snapshots with the
+original sysctl file and runtime value before modifying them. Switching back
+to `services`, or rolling back, restores both. Metadata records fps, DDS mode
+and maximum-message-size selection; `status` checks the rendered profile and
+required send-buffer ceiling. These are tuning candidates, not adopted robot
+settings; use the [sensor timing reference](intel_thor_sensor_latency.md) and
+active plan to qualify them before adoption.
+
 ## Archived evidence
 
 - [r100_0160 D455 camera service qualification](../../archive/engineering/2026-10-06-r100-0160-camera-service.md)

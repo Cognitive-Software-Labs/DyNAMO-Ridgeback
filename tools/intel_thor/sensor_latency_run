@@ -1,0 +1,176 @@
+#!/usr/bin/env python3
+"""Intel-side interleaved sensor qualification with an Intel scan/service guard.
+
+Code must already be pushed to origin and pulled into the separate Thor
+worktree. Uses only its own subscriptions; no ROS graph polling loops. Does
+not install settings. Run check_link first. Artifacts include before/after
+clock bounds, raw timestamps, host CPU/link counters and source revisions.
+"""
+import argparse
+import fcntl
+from importlib.machinery import SourceFileLoader
+import importlib.util
+import json
+import os
+from pathlib import Path
+import shlex
+import signal
+import subprocess
+import sys
+import time
+
+REPO = Path(__file__).resolve().parents[2]
+
+
+def load(name, path):
+    loader = SourceFileLoader(name, str(path))
+    spec = importlib.util.spec_from_loader(name, loader)
+    module = importlib.util.module_from_spec(spec)
+    loader.exec_module(module)
+    return module
+
+
+CLOCK = load('latency_clock', REPO / 'tools/intel_thor/check_clock')
+CONTRACT = load('latency_contract', REPO / 'tools/camera_contract_check')
+
+
+def ssh(peer, command):
+    return subprocess.check_output(['ssh', '-T', '-o', 'BatchMode=yes', peer, command], text=True)
+
+
+def write(path, payload):
+    path.write_text(json.dumps(payload, indent=2) + '\n')
+
+
+def clock_window(before, after):
+    # Conservative union of both measured offset intervals around their midpoint.
+    offset = (before['offset_ms'] + after['offset_ms']) / 2
+    bound = max(before['bound_ms'], after['bound_ms']) + abs(before['offset_ms'] - after['offset_ms']) / 2
+    return {'offset_ms': offset, 'bound_ms': bound,
+            'resolved': bound <= .2, 'before': before, 'after': after,
+            'limitation': 'Endpoint checks bound endpoint offset; an intervening clock step is not excluded.'}
+
+
+def qualify(report):
+    rows = []
+    def row(name, passed):
+        rows.append({'criterion': name, 'passed': bool(passed)})
+    row('30 Hz evidence', report['fps'] == 30 and report['duration_s'] >= 59)
+    row('clock uncertainty <= 0.2 ms', report['clock']['resolved'])
+    row('camera and scan contract', report['passed'] and not report['aborted'])
+    for stream in ('color', 'depth'):
+        components = report['timing'][stream]['components']
+        for component, limit in (('network_dds', 20), ('total', 40)):
+            value = components[component]['p95_ms']
+            row(f'{stream} {component} p95 <= {limit} ms', value is not None and 0 <= value <= limit)
+        loss = report['timing'][stream]['dds_loss']['fraction']
+        # If RMW sequence numbers are absent, report only a cadence deficit estimate.
+        row(f'{stream} loss <= 1% (cadence estimate when RMW sequence unavailable)',
+            (loss if loss is not None else report['rate_loss_estimate'][stream]) <= .01)
+        row(f'{stream} exact pairing >= 99%', report['pairing'][stream] >= .99)
+    report['working_targets'] = rows
+    report['working_targets_passed'] = all(r['passed'] for r in rows)
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--peer', default='robot@192.168.131.51')
+    parser.add_argument('--thor-worktree', default='/home/robot/DyNAMO-Ridgeback-latency')
+    parser.add_argument('--namespace', required=True)
+    parser.add_argument('--output-dir', type=Path)
+    parser.add_argument('--duration', type=float, default=60)
+    parser.add_argument('--warmup', type=float, default=10)
+    parser.add_argument('--repeats', type=int, default=3)
+    parser.add_argument('--fps', type=int, choices=(15, 30), default=30)
+    args = parser.parse_args(argv)
+    if args.repeats < 1 or args.duration <= 0 or args.warmup < 0:
+        parser.error('positive repeats/duration and nonnegative warmup required')
+    if os.environ.get('ROS_DOMAIN_ID') != '0':
+        parser.error('source /etc/clearpath/setup.bash; deployment requires ROS_DOMAIN_ID=0')
+    lock_path = Path('/run/lock/dynamo-local-dds-test.lock')
+    lock = lock_path.open('r' if lock_path.exists() else 'a')
+    fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    root = args.output_dir or REPO / 'artifacts/hardware' / (time.strftime('%Y%m%dT%H%M%SZ', time.gmtime()) + '-thor-latency-baseline')
+    root = root.resolve()
+    root.mkdir(parents=True, exist_ok=False)
+    local_revision = subprocess.check_output(['git', '-C', str(REPO), 'rev-parse', 'HEAD'], text=True).strip()
+    remote_revision = ssh(args.peer, shlex.join(['git', '-C', args.thor_worktree, 'rev-parse', 'HEAD'])).strip()
+    if local_revision != remote_revision:
+        parser.error('Intel and Thor revisions differ; push/pull through origin first')
+    for revision_root, remote in ((str(REPO), False), (args.thor_worktree, True)):
+        command = ['git', '-C', revision_root, 'status', '--porcelain', '--untracked-files=no']
+        dirty = ssh(args.peer, shlex.join(command)) if remote else subprocess.check_output(command, text=True)
+        if dirty.strip():
+            parser.error('Tracked changes exist: commit tooling/configuration before qualification')
+    write(root / 'provenance.json', {'intel_revision': local_revision, 'thor_revision': remote_revision,
+                                    'arguments': vars(args) | {'output_dir': str(root)},
+                                    'guard': 'simultaneous Intel contract observer; adds a local camera reader'})
+    base = ['--backend', 'hardware', '--namespace', args.namespace, '--timing',
+            '--warmup', str(args.warmup), '--duration', str(args.duration), '--fps', str(args.fps)]
+    for repeat in range(1, args.repeats + 1):
+        for host in ('intel', 'thor'):
+            label = f'{repeat:02d}-{host}'
+            print(f'Starting {label}', flush=True)
+            tracking = {'intel': subprocess.run(['timedatectl', 'show', '-p', 'NTPSynchronized'], capture_output=True, text=True).stdout,
+                        'thor': ssh(args.peer, 'timedatectl show -p NTPSynchronized; if command -v chronyc >/dev/null; then chronyc tracking; fi')}
+            write(root / f'{label}-time-service.json', tracking)
+            before = CLOCK.measure(args.peer)
+            write(root / f'{label}-clock-before.json', before)
+            output, samples = root / f'{label}.json', root / f'{label}-samples.json'
+            local_args = [sys.executable, str(REPO / 'tools/camera_contract_check'), *base,
+                          '--host', 'intel', '--guard']
+            guard = None
+            remote_process = None
+            try:
+                if host == 'intel':
+                    with (root / f'{label}.log').open('w') as log:
+                        code = subprocess.run([*local_args, '--output', str(output),
+                                               '--samples-output', str(samples)], stdout=log, stderr=log).returncode
+                else:
+                    remote_root = Path(args.thor_worktree) / 'artifacts/hardware' / root.name
+                    remote_output = remote_root / output.name
+                    remote_samples = remote_root / samples.name
+                    # A unique PID file lets the guard terminate only this observer.
+                    pidfile = str(remote_root / (label + '.pid'))
+                    command = ('. /opt/ros/jazzy/setup.bash && . ' + shlex.quote(args.thor_worktree + '/src/ridgeback_autonomy_hardware/config/intel_thor/dds_env.sh') + ' thor && export ROS_DOMAIN_ID=0 && mkdir -p ' + shlex.quote(str(remote_root)) + ' && echo $$ > ' + shlex.quote(pidfile) + ' && exec ' + shlex.join(['python3', args.thor_worktree + '/tools/camera_contract_check', *base, '--host', 'thor', '--output', str(remote_output), '--samples-output', str(remote_samples)]))
+                    with (root / f'{label}-guard.log').open('w') as guard_log, (root / f'{label}.log').open('w') as log:
+                        guard = subprocess.Popen([*local_args, '--output', str(root / f'{label}-guard.json')], stdout=guard_log, stderr=guard_log)
+                        remote_process = subprocess.Popen(['ssh', '-T', '-o', 'BatchMode=yes', args.peer, 'bash', '-c', shlex.quote(command)], stdout=log, stderr=log)
+                        while remote_process.poll() is None:
+                            if guard.poll() is not None and guard.returncode != 0:
+                                ssh(args.peer, 'test ! -f ' + shlex.quote(pidfile) + ' || kill -TERM "$(cat ' + shlex.quote(pidfile) + ')"')
+                                raise RuntimeError('Intel scan/service guard failed; Thor observer stopped')
+                            time.sleep(.1)
+                        code = remote_process.returncode
+                        guard.wait(timeout=10)
+                    output.write_text(ssh(args.peer, 'cat ' + shlex.quote(str(remote_output))))
+                    samples.write_text(ssh(args.peer, 'cat ' + shlex.quote(str(remote_samples))))
+                    if guard.returncode:
+                        raise RuntimeError('Intel guard failed; run invalid')
+                after = CLOCK.measure(args.peer)
+                write(root / f'{label}-clock-after.json', after)
+                report = json.loads(output.read_text())
+                report['clock'] = clock_window(before, after)
+                raw = json.loads(samples.read_text())
+                report['timing'] = {key: CONTRACT.timing_stats(value, report['clock']['offset_ms'],
+                                   report['clock']['bound_ms'], same_host=host == 'intel') for key, value in raw.items()}
+                if host == 'thor':
+                    qualify(report)
+                write(output, report)
+                if code:
+                    raise RuntimeError(f'{label} contract or scan guard failed; remaining runs stopped')
+            finally:
+                for process in (guard, remote_process):
+                    if process is not None and process.poll() is None:
+                        process.terminate()
+                        try:
+                            process.wait(timeout=5)
+                        except subprocess.TimeoutExpired:
+                            process.kill()
+                            process.wait()
+    print(root, flush=True)
+    return 0
+
+
+if __name__ == '__main__':
+    sys.exit(main())

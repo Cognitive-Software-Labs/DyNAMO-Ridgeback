@@ -36,6 +36,12 @@ elif name == 'rs-enumerate-devices':
         sys.exit('No device detected')
     print('Device Name                   Serial Number       Firmware Version')
     print('Intel RealSense D455          %s        5.17.3.10' % os.environ['TEST_CAMERA_SERIAL'])
+elif name == 'sysctl':
+    path = root / 'wmem_max'
+    if args[0] == '-w':
+        path.write_text(args[1].split('=')[1])
+    else:
+        print(path.read_text() if path.exists() else '212992')
 elif name == 'systemctl':
     command, target = args[0], args[-1]
     state = units.get(target)
@@ -102,7 +108,7 @@ def host(tmp_path):
     fake = bin_dir / 'fake'
     fake.write_text(FAKE)
     fake.chmod(0o755)
-    for name in ('git', 'systemctl', 'rs-enumerate-devices'):
+    for name in ('git', 'systemctl', 'rs-enumerate-devices', 'sysctl'):
         (bin_dir / name).symlink_to(fake)
     env = dict(os.environ, PATH=f'{bin_dir}:/usr/bin:/bin', TEST_HOST=str(tmp_path),
                TEST_CAMERA_SERIAL=CAMERA_SERIAL)
@@ -268,3 +274,29 @@ def test_apply_waits_for_a_running_robot_experiment(host):
     assert result.returncode == 2
     assert 'holds' in result.stderr
     assert units_now() == before
+
+
+def test_camera_tuning_is_owned_and_rolled_back(host):
+    root, run, _, _ = host
+    services_profile = (root / 'etc/clearpath/cyclonedds.xml').read_bytes()
+    result = run('apply', '--yes', '--dds-profile', 'camera', '--fps', '15', '--max-message-size', '65500')
+    assert result.returncode == 0, result.stdout + result.stderr
+    unit = (root / 'etc/systemd/system/dynamo-camera.service').read_text()
+    assert 'source /etc/clearpath/setup.bash && export CYCLONEDDS_URI=file:///etc/clearpath/dynamo-camera/cyclonedds.xml && exec' in unit
+    assert '65500B' in (root / 'etc/clearpath/dynamo-camera/cyclonedds.xml').read_text()
+    params = yaml.safe_load((root / 'etc/clearpath/dynamo-camera/d455.yaml').read_text())
+    assert params['/**']['ros__parameters']['rgb_camera.color_profile'] == '640x480x15'
+    assert run('status').returncode == 0
+    assert (root / 'wmem_max').read_text() == '16777216'
+    assert run('rollback', '--yes').returncode == 0
+    assert (root / 'etc/clearpath/cyclonedds.xml').read_bytes() == services_profile
+    assert (root / 'wmem_max').read_text() == '212992'
+    assert not (root / 'etc/sysctl.d/61-dynamo-camera-buffers.conf').exists()
+
+
+def test_switching_back_to_services_restores_send_buffer(host):
+    root, run, _, _ = host
+    assert run('apply', '--yes', '--dds-profile', 'camera').returncode == 0
+    assert run('apply', '--yes', '--dds-profile', 'services').returncode == 0
+    assert (root / 'wmem_max').read_text() == '212992'
+    assert 'export CYCLONEDDS_URI=' not in (root / 'etc/systemd/system/dynamo-camera.service').read_text()

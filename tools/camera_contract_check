@@ -19,6 +19,10 @@ criterion passes.
 
 import argparse
 import json
+import math
+import os
+import socket
+import subprocess
 from pathlib import Path
 import struct
 import sys
@@ -77,6 +81,88 @@ def image_header(raw):
             'width': width, 'height': height, 'encoding': string()}
 
 
+def timing_sample(stamp_ns, info, callback_ns):
+    """Keep RMW timestamps at callback entry; zero means unavailable."""
+    def field(name):
+        return info.get(name, 0) if isinstance(info, dict) else getattr(info, name, 0)
+    return {'stamp_ns': stamp_ns, 'source_ns': field('source_timestamp'),
+            'received_ns': field('received_timestamp'), 'callback_ns': callback_ns,
+            'publisher_gid': list(field('publisher_gid') or []),
+            'sequence': field('publication_sequence_number')}
+
+
+def percentiles(values):
+    """Linear interpolation on sorted samples, in milliseconds."""
+    ordered = sorted(values)
+    if not ordered:
+        return {'count': 0, 'median_ms': None, 'p95_ms': None, 'p99_ms': None, 'max_ms': None}
+    def at(fraction):
+        position = (len(ordered) - 1) * fraction
+        low = int(position)
+        high = min(low + 1, len(ordered) - 1)
+        return ordered[low] + (ordered[high] - ordered[low]) * (position - low)
+    return {'count': len(ordered), 'median_ms': at(.5), 'p95_ms': at(.95),
+            'p99_ms': at(.99), 'max_ms': ordered[-1]}
+
+
+def timing_stats(samples, offset_ms=None, bound_ms=None, same_host=False):
+    resolved = same_host or (offset_ms is not None and bound_ms is not None
+                            and math.isfinite(offset_ms) and math.isfinite(bound_ms)
+                            and 0 <= bound_ms <= .2)
+    correction = 0 if same_host else (offset_ms or 0) * 1e6
+    values = {key: [] for key in ('driver', 'network_dds', 'executor', 'total')}
+    previous, missing, deliveries = {}, 0, 0
+    for sample in samples:
+        stamp, source, received, callback = (sample[k] for k in
+            ('stamp_ns', 'source_ns', 'received_ns', 'callback_ns'))
+        if stamp > 0 and source > 0:
+            values['driver'].append((source - stamp) / 1e6)
+        if received > 0:
+            values['executor'].append((callback - received) / 1e6)
+        if resolved:
+            if source > 0 and received > 0:
+                values['network_dds'].append((received - source - correction) / 1e6)
+            if stamp > 0:
+                values['total'].append((callback - stamp - correction) / 1e6)
+        sequence = sample['sequence'] or 0
+        # ROS uses zero or UINT64_MAX when the RMW cannot supply sequence numbers.
+        if 0 < sequence < 2**64 - 1:
+            gid = tuple(sample['publisher_gid'])
+            if gid in previous and sequence > previous[gid]:
+                missing += max(0, sequence - previous[gid] - 1)
+                deliveries += 1
+            previous[gid] = max(sequence, previous.get(gid, 0))
+    return {'clock_resolved': resolved, 'components': {k: percentiles(v) for k, v in values.items()},
+            'dds_loss': {'missing': missing, 'observed_intervals': deliveries,
+                         'fraction': missing / (missing + deliveries) if deliveries else None}}
+
+
+def host_counters():
+    """No graph polling: Linux counters for CPU and every non-loopback NIC."""
+    cpu = [int(v) for v in Path('/proc/stat').read_text().splitlines()[0].split()[1:]]
+    links = {}
+    for line in Path('/proc/net/dev').read_text().splitlines()[2:]:
+        name, counters = line.split(':', 1)
+        name = name.strip()
+        if name == 'lo':
+            continue
+        fields = counters.split()
+        links[name] = {'rx_bytes': int(fields[0]), 'tx_bytes': int(fields[8])}
+    return {'monotonic_s': time.monotonic(), 'cpu_total': sum(cpu),
+            'cpu_idle': sum(cpu[3:5]), 'links': links}
+
+
+def resource_delta(before, after):
+    seconds = after['monotonic_s'] - before['monotonic_s']
+    ticks = after['cpu_total'] - before['cpu_total']
+    return {'cpu_busy_percent': 100 * (1 - (after['cpu_idle'] - before['cpu_idle']) / ticks)
+            if ticks else None,
+            'links': {name: {direction + '_mbit_s':
+                (counts[direction + '_bytes'] - before['links'][name][direction + '_bytes']) * 8 / seconds / 1e6
+                for direction in ('rx', 'tx')}
+                for name, counts in after['links'].items() if name in before['links'] and seconds > 0}}
+
+
 def stream_stats(stamps_ns, duration_s):
     """Rate from unique stamps; duplicates, regressions and the largest stamp gap."""
     duplicates = len(stamps_ns) - len(set(stamps_ns))
@@ -115,7 +201,7 @@ def evaluate(observation, expected):
     for name, stream in (('colour', color), ('depth', depth)):
         stats = stream_stats(stream['stamps'], duration)
         stream['stats'] = stats
-        row(f'{name} rate', stats['rate_hz'] >= MIN_IMAGE_HZ, f"{stats['rate_hz']:.2f} Hz unique")
+        row(f'{name} rate', stats['rate_hz'] >= expected.get('fps', 30) - 1, f"{stats['rate_hz']:.2f} Hz unique")
         row(f'{name} stamps', stats['duplicates'] == 0 and stats['regressions'] == 0
             and stats['max_stamp_gap_s'] is not None and stats['max_stamp_gap_s'] <= MAX_STAMP_GAP_S,
             f"dup {stats['duplicates']}, regress {stats['regressions']}, max gap "
@@ -147,7 +233,7 @@ def hardware_defaults():
     return namespace, metadata.get('profile', DEFAULT_CAMERA_PROFILE)
 
 
-def observe(namespace, inputs, base_frame, warmup, duration, scans):
+def observe(namespace, inputs, base_frame, warmup, duration, scans, timing=False, guard=False):
     import rclpy
     from rclpy.duration import Duration
     from rclpy.qos import qos_profile_sensor_data
@@ -155,6 +241,7 @@ def observe(namespace, inputs, base_frame, warmup, duration, scans):
     from rclpy.time import Time
     from sensor_msgs.msg import CameraInfo, Image, LaserScan
     import tf2_ros
+    from tf2_msgs.msg import TFMessage
 
     def absolute(topic):
         return '/' + '/'.join(part for part in (namespace, topic) if part)
@@ -164,6 +251,7 @@ def observe(namespace, inputs, base_frame, warmup, duration, scans):
     node = rclpy.create_node('camera_contract_check')
     buffer = tf2_ros.Buffer()
     tf2_ros.TransformListener(buffer, node)
+    wall_start = time.time()
     start = time.monotonic()
     measure_from = start + warmup
     end = measure_from + duration
@@ -171,12 +259,33 @@ def observe(namespace, inputs, base_frame, warmup, duration, scans):
                    for key in ('color', 'depth')}
     observation['info'] = {'sizes': set(), 'frames': set()}
     scan_receipts = {name: [] for name in SCAN_TOPICS} if scans else {}
+    timed = {name: [] for name in ('color', 'depth', 'info', *scan_receipts, 'tf')}
+    resources_before = None
+    resources_after = None
+    last_scan = {name: start for name in scan_receipts}
+    abort = None
+    measured_end = end
+    service_state = None
+    def services():
+        result = subprocess.run(['systemctl', 'show', 'clearpath-sensors.service',
+                                 'dynamo-camera.service', '-p', 'NRestarts', '-p', 'MainPID',
+                                 '-p', 'ActiveState'], capture_output=True, text=True, check=True)
+        return result.stdout
+    if guard:
+        service_state = services()
+    next_check = start
+
+    def record(key, stamp, message_info, callback_ns):
+        if timing:
+            timed[key].append(timing_sample(stamp, message_info, callback_ns))
 
     def image_callback(key):
-        def callback(raw):
-            if time.monotonic() < measure_from:
+        def callback(raw, message_info):
+            callback_ns = time.time_ns()
+            if not measure_from <= time.monotonic() < end:
                 return
             header = image_header(raw)
+            record(key, header['stamp_ns'], message_info, callback_ns)
             stream = observation[key]
             stream['stamps'].append(header['stamp_ns'])
             stream['encodings'].add(header['encoding'])
@@ -184,9 +293,12 @@ def observe(namespace, inputs, base_frame, warmup, duration, scans):
             stream['frames'].add(header['frame'])
         return callback
 
-    def info_callback(raw):
-        if time.monotonic() >= measure_from:
+    def info_callback(raw, message_info):
+        callback_ns = time.time_ns()
+        if measure_from <= time.monotonic() < end:
             message = deserialize_message(raw, CameraInfo)
+            record('info', message.header.stamp.sec * 10**9 + message.header.stamp.nanosec,
+                   message_info, callback_ns)
             observation['info']['sizes'].add((message.width, message.height))
             observation['info']['frames'].add(message.header.frame_id)
 
@@ -196,14 +308,64 @@ def observe(namespace, inputs, base_frame, warmup, duration, scans):
                              qos_profile_sensor_data, raw=True)
     node.create_subscription(CameraInfo, absolute(inputs.color_camera_info_topic), info_callback,
                              qos_profile_sensor_data, raw=True)
+    def scan_callback(name):
+        def callback(raw, message_info):
+            nonlocal abort
+            callback_ns = time.time_ns()
+            now = time.monotonic()
+            if guard and now >= measure_from and now - last_scan[name] > .25:
+                abort = 'scan gap above 250 ms: ' + name
+            last_scan[name] = now
+            if measure_from <= now < end:
+                scan_receipts[name].append(now)
+                if timing:
+                    # LaserScan begins with Header, so reading its stamp needs no ranges copy.
+                    endian = '<' if raw[1] & 1 else '>'
+                    sec, nanosec = struct.unpack_from(endian + 'iI', raw, 4)
+                    record(name, sec * 10**9 + nanosec, message_info, callback_ns)
+        return callback
+
+    def tf_callback(message, message_info):
+        callback_ns = time.time_ns()
+        if measure_from <= time.monotonic() < end:
+            # A TFMessage can batch unrelated frames: retain every transform's stamp.
+            for transform in message.transforms:
+                stamp = transform.header.stamp
+                record('tf', stamp.sec * 10**9 + stamp.nanosec, message_info, callback_ns)
+
     for name, topic in SCAN_TOPICS.items() if scans else ():
-        node.create_subscription(
-            LaserScan, absolute(topic),
-            lambda _raw, name=name: scan_receipts[name].append(time.monotonic())
-            if time.monotonic() >= measure_from else None,
-            qos_profile_sensor_data, raw=True)
-    while time.monotonic() < end:
-        rclpy.spin_once(node, timeout_sec=0.05)
+        node.create_subscription(LaserScan, absolute(topic), scan_callback(name),
+                                 qos_profile_sensor_data, raw=True)
+    if timing:
+        node.create_subscription(TFMessage, absolute('tf'), tf_callback, qos_profile_sensor_data)
+    try:
+        while time.monotonic() < end and abort is None:
+            now = time.monotonic()
+            if now >= measure_from and resources_before is None:
+                resources_before = host_counters()
+            if guard and now >= measure_from:
+                stalled = [name for name, receipt in last_scan.items() if now - receipt > .25]
+                if stalled:
+                    abort = 'scan gap above 250 ms: ' + ', '.join(stalled)
+                    break
+                if now >= next_check:
+                    next_check = now + 1
+                    logs = subprocess.run(['journalctl', '-u', 'dynamo-camera.service',
+                                           '--since', '@' + str(wall_start), '--no-pager', '-o', 'cat'],
+                                          capture_output=True, text=True, check=True).stdout
+                    if '[ERROR]' in logs:
+                        abort = 'camera driver error in journal since run start'
+                        break
+                    if services() != service_state:
+                        abort = 'clearpath-sensors or dynamo-camera changed PID/state/restart count'
+                        break
+            rclpy.spin_once(node, timeout_sec=0.02)
+        measured_end = time.monotonic()
+        resources_after = host_counters()
+    except BaseException:
+        node.destroy_node()
+        rclpy.shutdown()
+        raise
 
     types = {}
     topics = dict(node.get_topic_names_and_types())
@@ -224,13 +386,21 @@ def observe(namespace, inputs, base_frame, warmup, duration, scans):
             tf_detail = f'{base_frame} -> {frame}: {type(error).__name__}: {error}'
     node.destroy_node()
     rclpy.shutdown()
-    observation.update(types=types, duration_s=duration, tf_ok=tf_ok, tf_detail=tf_detail,
+    observation.update(timing=timed, aborted=abort, resources=resource_delta(resources_before, resources_after)
+                       if resources_before else None,
+                       types=types, duration_s=min(duration, max(0, measured_end - measure_from)), tf_ok=tf_ok, tf_detail=tf_detail,
                        extra_topics=extra, scans={name: {'receive_s': r} for name, r in scan_receipts.items()})
     return observation
 
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument('--host', choices=('intel', 'thor'), default='intel')
+    parser.add_argument('--timing', action='store_true')
+    parser.add_argument('--clock-offset-ms', type=float, help='Thor minus Intel clock offset')
+    parser.add_argument('--clock-bound-ms', type=float, help='uncertainty of the clock offset, <= 0.2 ms to resolve cross-host timing')
+    parser.add_argument('--fps', type=int, choices=(15, 30), default=30, help='15 Hz is reduced-rate evidence only')
+    parser.add_argument('--guard', action='store_true', help='Intel: stop on scan gaps >250 ms or sensor service changes')
     parser.add_argument('--backend', choices=('hardware', 'gz', 'isaac'), required=True)
     parser.add_argument('--namespace')
     parser.add_argument('--base-frame')
@@ -241,36 +411,68 @@ def main(argv=None):
     parser.add_argument('--duration', type=float, default=60.0)
     parser.add_argument('--no-scans', action='store_true', help='skip LiDAR continuity (default on hardware)')
     parser.add_argument('--output', type=Path)
+    parser.add_argument('--samples-output', type=Path, help='raw timestamps for later clock validation')
     args = parser.parse_args(argv)
 
+    if args.duration <= 0 or args.warmup < 0 or not math.isfinite(args.duration + args.warmup):
+        parser.error('duration must be positive and warmup nonnegative and finite')
+    if args.clock_bound_ms is not None and (not math.isfinite(args.clock_bound_ms) or args.clock_bound_ms < 0):
+        parser.error('clock bound must be finite and nonnegative')
+    if args.clock_offset_ms is not None and not math.isfinite(args.clock_offset_ms):
+        parser.error('clock offset must be finite')
+    if args.guard and (args.host != 'intel' or args.no_scans or args.backend != 'hardware'):
+        parser.error('--guard requires hardware scans on Intel')
     hardware = args.backend == 'hardware'
-    namespace, installed_profile = hardware_defaults() if hardware else (None, DEFAULT_CAMERA_PROFILE)
+    namespace, installed_profile = hardware_defaults() if hardware and args.host == 'intel' else (None, DEFAULT_CAMERA_PROFILE)
     namespace = (args.namespace or namespace or '').strip('/')
     if not namespace:
         parser.error('--namespace is required')
     profile = CAMERA_PROFILES[args.profile or installed_profile]
     base_frame = args.base_frame or ('base_link' if hardware else f'{namespace}/robot/base_link')
     inputs = resolve_camera_inputs(REALSENSE_BACKEND if hardware else SIMULATION_BACKEND)
-    expected = {'grid': (profile.width, profile.height),
+    expected = {'fps': args.fps, 'grid': (profile.width, profile.height),
                 'optical_frame': args.optical_frame or (HARDWARE_OPTICAL_FRAME if hardware else None),
                 'types': {'color': 'sensor_msgs/msg/Image', 'info': 'sensor_msgs/msg/CameraInfo',
                           'depth': 'sensor_msgs/msg/Image'}}
     print(f'Observing /{namespace} for {args.warmup:.0f} s warm-up + {args.duration:.0f} s', flush=True)
     observation = observe(namespace, inputs, base_frame, args.warmup, args.duration,
-                          scans=hardware and not args.no_scans)
+                          scans=hardware and not args.no_scans, timing=args.timing, guard=args.guard)
     if not hardware or args.no_scans:
         observation['scans'] = {}
     rows = evaluate(observation, expected)
     for name, passed, detail in rows:
         print(f"{'PASS' if passed else 'FAIL'}  {name:24} {detail}")
+    if observation['aborted']:
+        rows.append(('run completed', False, observation['aborted']))
+        print('ABORT: ' + observation['aborted'])
+    timing = {key: timing_stats(samples, args.clock_offset_ms, args.clock_bound_ms,
+                               same_host=args.host == 'intel')
+              for key, samples in observation['timing'].items()} if args.timing else {}
+    for key, stats in timing.items():
+        print(f'TIMING {key}: ' + json.dumps(stats))
     passed = all(ok for _, ok, _ in rows)
     print('CONTRACT PASS' if passed else 'CONTRACT FAIL')
+    if args.samples_output:
+        args.samples_output.parent.mkdir(parents=True, exist_ok=True)
+        args.samples_output.write_text(json.dumps(observation['timing']) + '\n')
     if args.output:
-        report = {'namespace': namespace, 'backend': args.backend, 'base_frame': base_frame,
+        report = {'host': args.host, 'hostname': socket.gethostname(), 'fps': args.fps,
+                  'reduced_rate': args.fps != 30, 'timing': timing,
+                  'clock': {'offset_ms': args.clock_offset_ms, 'bound_ms': args.clock_bound_ms},
+                  'duration_s': observation['duration_s'], 'resources': observation['resources'], 'aborted': observation['aborted'],
+                  'pairing': {key: len(set(observation['color']['stamps']) & set(observation['depth']['stamps']))
+                              / len(set(observation[key]['stamps'])) if observation[key]['stamps'] else 0
+                              for key in ('color', 'depth')},
+                  'rate_loss_estimate': {key: max(0, 1 - len(set(observation[key]['stamps']))
+                                          / (observation['duration_s'] * args.fps))
+                                         for key in ('color', 'depth')}
+                                         if observation['duration_s'] else {},
+                  'namespace': namespace, 'backend': args.backend, 'base_frame': base_frame,
                   'expected': {**expected, 'grid': list(expected['grid'])},
                   'rows': [{'criterion': n, 'passed': p, 'detail': d} for n, p, d in rows],
                   'streams': {key: observation[key].get('stats') for key in ('color', 'depth')},
                   'passed': passed}
+        args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(json.dumps(report, indent=2) + '\n')
     return 0 if passed else 1
 

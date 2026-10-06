@@ -18,7 +18,7 @@ rollback restores the saved robot.yaml and each vendor unit's enablement and
 
 Restarting clearpath-robot briefly drops motor power and teleop: run apply and
 rollback with the robot stationary and the e-stop in reach. mbs-webserver and
-the DDS profile are never touched. See docs/physical/robot_local_deployment.md.
+the services DDS profile are never touched. See docs/physical/robot_local_deployment.md.
 """
 
 import argparse
@@ -42,6 +42,7 @@ from ridgeback_common.camera_profiles import CAMERA_PROFILES, DEFAULT_CAMERA_PRO
 CONFIG = REPO / 'src/ridgeback_autonomy_hardware/config'
 DRIVER_CONFIG = CONFIG / 'd455.yaml'
 UNIT_TEMPLATE = CONFIG / 'systemd/dynamo-camera.service.in'
+CAMERA_DDS_TEMPLATE = CONFIG / 'cyclonedds_camera.xml'
 REPO_ROBOT_YAML = REPO / 'clearpath/robot.yaml'
 
 # Absolute host paths. File I/O goes through Host so tests can redirect them.
@@ -50,6 +51,9 @@ SETUP_BASH = '/etc/clearpath/setup.bash'
 DDS_PROFILE = '/etc/clearpath/cyclonedds.xml'
 INSTALL_DIR = '/etc/clearpath/dynamo-camera'
 PARAMS = f'{INSTALL_DIR}/d455.yaml'
+CAMERA_DDS = f'{INSTALL_DIR}/cyclonedds.xml'
+CAMERA_SYSCTL = '/etc/sysctl.d/61-dynamo-camera-buffers.conf'
+SEND_BUFFER = 'net.core.wmem_max'
 METADATA = f'{INSTALL_DIR}/install.json'
 UNIT_NAME = 'dynamo-camera.service'
 UNIT = f'/etc/systemd/system/{UNIT_NAME}'
@@ -141,10 +145,10 @@ def camera_entry(serial):
     }
 
 
-def render_params(serial, profile):
+def render_params(serial, profile, fps=30):
     document = load_yaml(DRIVER_CONFIG)
     selected = CAMERA_PROFILES[profile]
-    mode = f'{selected.width}x{selected.height}x30'
+    mode = f'{selected.width}x{selected.height}x{fps}'
     document['/**']['ros__parameters'].update({
         'serial_no': str(serial),
         'rgb_camera.color_profile': mode,
@@ -155,9 +159,16 @@ def render_params(serial, profile):
     return header + yaml.safe_dump(document, sort_keys=False)
 
 
-def render_unit(ns):
+def render_dds(max_message_size='default'):
+    setting = '' if max_message_size == 'default' else '<MaxMessageSize>65500B</MaxMessageSize>'
+    return CAMERA_DDS_TEMPLATE.read_text().replace('@MAX_MESSAGE_SIZE@', setting)
+
+
+def render_unit(ns, dds_profile='services'):
     return (UNIT_TEMPLATE.read_text(encoding='utf-8')
-            .replace('@NAMESPACE@', ns).replace('@PARAMS@', PARAMS))
+            .replace('@NAMESPACE@', ns).replace('@PARAMS@', PARAMS)
+            .replace('@DDS_OVERRIDE@', f'export CYCLONEDDS_URI=file://{CAMERA_DDS} && '
+                     if dds_profile == 'camera' else ''))
 
 
 def attached_d455(host):
@@ -233,11 +244,20 @@ def restore_vendor(host):
             run('systemctl', 'start', unit)
 
 
-def apply(host, profile, serial):
+def apply(host, profile, serial, fps=None, dds_profile=None, max_message_size=None):
     robot, ns, existing = preconditions(host)
     installed = load_metadata(host)
     profile = profile or installed.get('profile') or DEFAULT_CAMERA_PROFILE
+    fps = fps or installed.get('fps', 30)
+    dds_profile = dds_profile or installed.get('dds_profile', 'services')
+    max_message_size = max_message_size or installed.get('max_message_size', 'default')
     fresh = snapshot(host)
+    # Extend an older camera snapshot before touching the new tuning state.
+    buffer_backup = host.path(BACKUP_DIR) / 'send-buffer.json'
+    if not buffer_backup.exists():
+        sysctl = host.path(CAMERA_SYSCTL)
+        write(buffer_backup, json.dumps({'file': sysctl.read_text() if sysctl.exists() else None,
+                                        'runtime': run('sysctl', '-n', SEND_BUFFER).stdout.strip()}))
     try:
         # The driver can only be enumerated once the vendor driver releases it.
         for unit in VENDOR_UNITS:
@@ -254,10 +274,18 @@ def apply(host, profile, serial):
         sensors['camera'] = [camera_entry(serial)]
         step(f'declaring {CAMERA_NAME} in {ROBOT_YAML} and writing the service files')
         write(host.path(ROBOT_YAML), yaml.safe_dump(robot, sort_keys=False))
-        write(host.path(PARAMS), render_params(serial, profile))
-        write(host.path(UNIT), render_unit(ns))
+        write(host.path(PARAMS), render_params(serial, profile, fps))
+        write(host.path(CAMERA_DDS), render_dds(max_message_size))
+        if dds_profile == 'camera':
+            write(host.path(CAMERA_SYSCTL), '# Installed by camera_service; rollback restores prior state.\n'
+                  + SEND_BUFFER + ' = 16777216\n')
+            run('sysctl', '-w', SEND_BUFFER + '=16777216')
+        elif installed.get('dds_profile') == 'camera':
+            restore_send_buffer(host)
+        write(host.path(UNIT), render_unit(ns, dds_profile))
         write(host.path(METADATA), json.dumps({
-            'profile': profile, 'serial': str(serial), 'namespace': ns,
+            'profile': profile, 'fps': fps, 'dds_profile': dds_profile,
+            'max_message_size': max_message_size, 'serial': str(serial), 'namespace': ns,
             'revision': revision(), 'installed': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()),
         }, indent=2) + '\n')
         run('systemctl', 'daemon-reload')
@@ -285,12 +313,25 @@ def load_metadata(host):
     return json.loads(path.read_text()) if path.exists() else {}
 
 
+def restore_send_buffer(host):
+    saved = host.path(BACKUP_DIR) / 'send-buffer.json'
+    if not saved.exists():
+        return
+    state = json.loads(saved.read_text())
+    if state['file'] is None:
+        host.path(CAMERA_SYSCTL).unlink(missing_ok=True)
+    else:
+        write(host.path(CAMERA_SYSCTL), state['file'])
+    run('sysctl', '-w', SEND_BUFFER + '=' + state['runtime'])
+
+
 def rollback(host):
     backup = host.path(BACKUP_DIR)
     if not (backup / 'complete').exists():
         raise Refused(f'No complete snapshot in {BACKUP_DIR}; nothing to roll back')
     step(f'removing {UNIT_NAME} and restoring {ROBOT_YAML}')
     run('systemctl', 'disable', '--now', UNIT_NAME, check=False)
+    restore_send_buffer(host)
     host.path(UNIT).unlink(missing_ok=True)
     shutil.rmtree(host.path(INSTALL_DIR), ignore_errors=True)
     shutil.copy2(backup / 'robot.yaml', host.path(ROBOT_YAML))
@@ -322,16 +363,23 @@ def status(host):
         'declared, description only' if cameras else 'absent')
     params = host.path(PARAMS)
     row('driver parameters', serial is not None and params.exists()
-        and params.read_text() == render_params(serial, metadata.get('profile', DEFAULT_CAMERA_PROFILE)),
+        and params.read_text() == render_params(serial, metadata.get('profile', DEFAULT_CAMERA_PROFILE), metadata.get('fps', 30)),
         f"profile {metadata.get('profile', '-')}, serial {serial or '-'}")
     unit = host.path(UNIT)
-    row('unit file', unit.exists() and unit.read_text() == render_unit(ns), str(UNIT))
+    row('unit file', unit.exists() and unit.read_text() == render_unit(ns, metadata.get('dds_profile', 'services')), str(UNIT))
     state = unit_state(UNIT_NAME)
     row(UNIT_NAME, state == {'enabled': 'enabled', 'active': 'active'}, f"{state['enabled']}, {state['active']}")
     for vendor in VENDOR_UNITS:
         vstate = unit_state(vendor)
         row(vendor, vstate['enabled'] in ('disabled', 'not-found') and vstate['active'] != 'active',
             f"{vstate['enabled']}, {vstate['active']}")
+    mode = metadata.get('dds_profile', 'services')
+    if mode == 'camera':
+        camera_dds = host.path(CAMERA_DDS)
+        row('camera DDS profile', camera_dds.exists() and camera_dds.read_text() ==
+            render_dds(metadata.get('max_message_size', 'default')), str(CAMERA_DDS))
+        row('camera send buffer', int(run('sysctl', '-n', SEND_BUFFER).stdout.strip()) >= 16777216,
+            'wmem_max >= 16 MiB')
     dds = host.path(DDS_PROFILE)
     row('DDS profile', dds.exists() and bool(SPDP_ONLY.search(dds.read_text())), 'AllowMulticast spdp')
     for name, ok, detail in rows:
@@ -355,6 +403,9 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('command', choices=('status', 'apply', 'rollback'))
     parser.add_argument('--profile', choices=sorted(CAMERA_PROFILES))
+    parser.add_argument('--fps', type=int, choices=(15, 30))
+    parser.add_argument('--dds-profile', choices=('services', 'camera'), help='camera selects the Ethernet-only tuning candidate')
+    parser.add_argument('--max-message-size', choices=('default', '65500'))
     parser.add_argument('--serial', help='camera serial as librealsense reports it (not the USB descriptor)')
     parser.add_argument('--yes', action='store_true')
     parser.add_argument('--root', default='/', help=argparse.SUPPRESS)
@@ -380,7 +431,7 @@ def main(argv=None):
         for signum in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP):
             signal.signal(signum, hold)
         if args.command == 'apply':
-            apply(host, args.profile, args.serial)
+            apply(host, args.profile, args.serial, args.fps, args.dds_profile, args.max_message_size)
         else:
             rollback(host)
         return status(host) if args.command == 'apply' else 0
