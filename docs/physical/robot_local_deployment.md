@@ -60,13 +60,16 @@ that contract; this section owns how the robot provides it.
 5. Renders the driver parameters from
    `src/ridgeback_autonomy_hardware/config/d455.yaml` and the unit from
    `config/systemd/dynamo-camera.service.in`, restarts `clearpath-robot` to
-   regenerate the description (platform and sensors restart with it), and enables
-   and starts the service.
+   regenerate the description (platform and sensors restart with it) only if the
+   `camera_0` declaration changed, and enables and restarts the service. A
+   re-apply that changes only the profile, rate or DDS tuning restarts the camera
+   alone.
 
 `apply` and `rollback` take `/run/lock/dynamo-local-dds-test.lock`, the lock the
 robot-side DDS experiment tools hold, and refuse while it is held. Any failure
-after the snapshot restores it. `apply` and `rollback` restart
-`clearpath-robot`, which drops motor power and teleop until the platform is back:
+after the snapshot restores it. `rollback`, and an `apply` that changes the
+declaration, restart `clearpath-robot`, which drops motor power and teleop
+until the platform is back:
 stopping `clearpath-platform` usually takes about a minute on `r100_0160`, and
 the tool prints nothing while it waits. Run them with the robot stationary and
 the e-stop in reach, and let them finish; an interrupted run can leave the

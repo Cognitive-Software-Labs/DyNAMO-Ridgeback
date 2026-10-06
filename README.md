@@ -495,9 +495,11 @@ On the robot, `dynamo-camera.service` owns the D455 from boot and publishes the
 camera topics, frames and TF the simulators publish, so the exploration launch
 attaches to it exactly as it does to the LiDARs. The vendor camera units and its
 web camera view are retired. Install it after `intel_services_rmw apply`, with the
-robot stationary and the e-stop in reach: `apply` and `rollback` restart
-`clearpath-robot`, which drops motor power for about a minute while the platform
-stops. Let them finish; each step is printed.
+robot stationary and the e-stop in reach: `rollback`, and an `apply` that
+changes the camera declaration, restart `clearpath-robot`, which drops motor
+power for about a minute while the platform stops. A re-apply that changes only
+the profile, rate or DDS tuning restarts the camera alone. Let them finish; each
+step is printed.
 
 ```bash
 tools/intel_thor/camera_service status

@@ -273,7 +273,12 @@ def apply(host, profile, serial, fps=None, dds_profile=None, max_message_size=No
         robot['sensors'] = sensors
         sensors['camera'] = [camera_entry(serial)]
         step(f'declaring {CAMERA_NAME} in {ROBOT_YAML} and writing the service files')
-        write(host.path(ROBOT_YAML), yaml.safe_dump(robot, sort_keys=False))
+        robot_text = yaml.safe_dump(robot, sort_keys=False)
+        # Only a changed declaration needs a regenerated description; camera-only
+        # changes (profile, rate, DDS tuning) restart the camera alone, never the
+        # platform.
+        description_changed = host.path(ROBOT_YAML).read_text(encoding='utf-8') != robot_text
+        write(host.path(ROBOT_YAML), robot_text)
         write(host.path(PARAMS), render_params(serial, profile, fps))
         write(host.path(CAMERA_DDS), render_dds(max_message_size))
         if dds_profile == 'camera':
@@ -289,7 +294,10 @@ def apply(host, profile, serial, fps=None, dds_profile=None, max_message_size=No
             'revision': revision(), 'installed': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()),
         }, indent=2) + '\n')
         run('systemctl', 'daemon-reload')
-        regenerate()
+        if description_changed:
+            regenerate()
+        else:
+            step(f'{ROBOT_YAML} unchanged; {REGENERATE_UNIT} and the platform keep running')
         step(f'starting {UNIT_NAME}')
         run('systemctl', 'enable', UNIT_NAME)
         run('systemctl', 'restart', UNIT_NAME)
@@ -392,7 +400,8 @@ def status(host):
 
 
 def confirm(action, assume_yes):
-    print(f'{action} restarts {REGENERATE_UNIT}: motor power and teleop drop briefly. '
+    when = 'always restarts' if action == 'rollback' else 'restarts, if the camera declaration changes,'
+    print(f'{action} {when} {REGENERATE_UNIT}: motor power and teleop drop for about a minute. '
           'The robot must be stationary with the e-stop in reach.')
     if assume_yes:
         return True

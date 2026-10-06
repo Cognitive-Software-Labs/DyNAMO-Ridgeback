@@ -191,6 +191,23 @@ def test_reapply_changes_profile_and_keeps_the_first_snapshot(host):
     assert sum(call[0] == 'rs-enumerate-devices' for call in calls()) == 1
 
 
+def test_camera_only_changes_never_restart_the_platform(host):
+    root, run, units_now, calls = host
+    assert run('apply', '--yes').returncode == 0
+    restart = ['systemctl', 'restart', 'clearpath-robot.service']
+    assert calls().count(restart) == 1
+
+    for options in (['--dds-profile', 'camera'], ['--max-message-size', '65500'],
+                    ['--fps', '15'], ['--profile', '1280x720']):
+        result = run('apply', '--yes', *options)
+        assert result.returncode == 0, result.stdout + result.stderr
+        assert 'platform keep running' in result.stdout
+
+    log = calls()
+    assert log.count(restart) == 1
+    assert log.count(['systemctl', 'restart', 'dynamo-camera.service']) == 5
+
+
 def test_rollback_restores_files_and_vendor_state(host):
     root, run, units_now, calls = host
     original = (root / 'etc/clearpath/robot.yaml').read_bytes()
