@@ -1,0 +1,28 @@
+# D455 driver parameters for the hardware camera service.
+#
+# tools/intel_thor/camera_service renders this file into
+# /etc/clearpath/dynamo-camera/d455.yaml, adding the deployment's camera serial
+# and the installed profile. Edit it here and re-run `camera_service apply`;
+# the rendered copy is not an editing target.
+#
+# Only colour and colour-aligned depth are streamed: the application consumes
+# nothing else, and at 1280x720 the second infrared stream starves colour on
+# the USB link. The infrared projector stays at its default (on) because it
+# serves the on-camera stereo depth, which is computed whether or not the
+# infrared images are sent.
+/**:
+  ros__parameters:
+    camera_name: camera_0
+    device_type: d455
+    enable_color: true
+    enable_depth: true
+    enable_infra1: false
+    enable_infra2: false
+    enable_gyro: false
+    enable_accel: false
+    align_depth.enable: true
+    enable_sync: true
+    pointcloud.enable: false
+    publish_tf: true
+    tf_publish_rate: 0.0
+    base_frame_id: link

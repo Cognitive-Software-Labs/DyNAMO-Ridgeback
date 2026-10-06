@@ -1,0 +1,358 @@
+#!/usr/bin/env python3
+"""Install the D455 as a boot service that publishes the simulator camera contract.
+
+Usage: tools/intel_thor/camera_service status
+       sudo tools/intel_thor/camera_service apply [--profile 640x480|1280x720] [--serial N] [--yes]
+       sudo tools/intel_thor/camera_service rollback [--yes]
+
+apply    declares camera_0 in /etc/clearpath/robot.yaml (description only; the
+         Clearpath generator does not launch it), renders the driver parameters
+         and dynamo-camera.service from the repository, disables the vendor
+         camera units, regenerates the robot description by restarting
+         clearpath-robot, and enables the new service. It is idempotent; the
+         first run snapshots everything it changes.
+status   compares the installed state with what apply would install now and
+         exits nonzero on any difference.
+rollback restores the saved robot.yaml and each vendor unit's enablement and
+         activity, and removes the service and its parameters.
+
+Restarting clearpath-robot briefly drops motor power and teleop: run apply and
+rollback with the robot stationary and the e-stop in reach. mbs-webserver and
+the DDS profile are never touched. See docs/physical/robot_local_deployment.md.
+"""
+
+import argparse
+import json
+import os
+from pathlib import Path
+import re
+import shutil
+import subprocess
+import sys
+import time
+
+import yaml
+
+REPO = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(REPO / 'src/ridgeback_common'))
+from ridgeback_common.camera_profiles import CAMERA_PROFILES, DEFAULT_CAMERA_PROFILE  # noqa: E402
+
+CONFIG = REPO / 'src/ridgeback_autonomy_hardware/config'
+DRIVER_CONFIG = CONFIG / 'd455.yaml'
+UNIT_TEMPLATE = CONFIG / 'systemd/dynamo-camera.service.in'
+REPO_ROBOT_YAML = REPO / 'clearpath/robot.yaml'
+
+# Absolute host paths. File I/O goes through Host so tests can redirect them.
+ROBOT_YAML = '/etc/clearpath/robot.yaml'
+SETUP_BASH = '/etc/clearpath/setup.bash'
+DDS_PROFILE = '/etc/clearpath/cyclonedds.xml'
+INSTALL_DIR = '/etc/clearpath/dynamo-camera'
+PARAMS = f'{INSTALL_DIR}/d455.yaml'
+METADATA = f'{INSTALL_DIR}/install.json'
+UNIT_NAME = 'dynamo-camera.service'
+UNIT = f'/etc/systemd/system/{UNIT_NAME}'
+BACKUP_DIR = '/etc/clearpath/dynamo-camera-backup'
+USB_DEVICES = '/sys/bus/usb/devices'
+
+# The vendor camera stack: the driver and the consumers that only exist for
+# its web view. mbs-webserver is deliberately absent: it also serves the
+# browser desktop proxy.
+VENDOR_UNITS = ('realsense-camera.service', 'depth-to-mono8.service',
+                'ridgeback-camera-mjpeg.service', 'camera-web-ready.service')
+# clearpath-robot regenerates the description from robot.yaml before it starts;
+# platform and sensors are PartOf it and restart with it.
+REGENERATE_UNIT = 'clearpath-robot.service'
+CAMERA_NAME = 'camera_0'
+SPDP_ONLY = re.compile(r'<AllowMulticast>\s*spdp\s*</AllowMulticast>')
+
+
+class Refused(RuntimeError):
+    """A precondition failed before anything was changed."""
+
+
+class Host:
+    def __init__(self, root='/'):
+        self.root = Path(root)
+
+    def path(self, absolute):
+        return self.root / str(absolute).lstrip('/')
+
+
+def run(*argv, check=True):
+    result = subprocess.run(argv, capture_output=True, text=True)
+    if check and result.returncode:
+        raise RuntimeError(f"{' '.join(argv)} failed: {result.stderr.strip()[-500:]}")
+    return result
+
+
+def unit_state(unit):
+    enabled = run('systemctl', 'is-enabled', unit, check=False).stdout.strip() or 'not-found'
+    active = run('systemctl', 'is-active', unit, check=False).stdout.strip() or 'inactive'
+    return {'enabled': enabled, 'active': active}
+
+
+def write(path, text, mode=0o644):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(path.name + '.tmp')
+    temporary.write_text(text, encoding='utf-8')
+    temporary.chmod(mode)
+    os.replace(temporary, path)
+
+
+def load_yaml(path):
+    return yaml.safe_load(path.read_text(encoding='utf-8')) or {}
+
+
+def namespace(robot):
+    try:
+        value = str(robot['system']['ros2']['namespace']).strip().strip('/')
+    except (KeyError, TypeError) as error:
+        raise Refused(f'{ROBOT_YAML} has no system.ros2.namespace') from error
+    if not value:
+        raise Refused(f'{ROBOT_YAML} has an empty namespace')
+    return value
+
+
+def managed(entry):
+    params = (entry.get('ros_parameters') or {}).get('intel_realsense') or {}
+    return entry.get('model') == 'intel_realsense' and params.get('camera_name') == CAMERA_NAME
+
+
+def camera_entry(serial):
+    """The robot-local declaration: the repository mount, described but not launched."""
+    mount = load_yaml(REPO_ROBOT_YAML)['sensors']['camera'][0]
+    return {
+        'model': mount['model'],
+        'urdf_enabled': True,
+        'launch_enabled': False,
+        'parent': mount['parent'],
+        'xyz': list(mount['xyz']),
+        'rpy': list(mount['rpy']),
+        'ros_parameters': {'intel_realsense': {
+            'camera_name': CAMERA_NAME, 'device_type': 'd455', 'serial_no': str(serial)}},
+    }
+
+
+def render_params(serial, profile):
+    document = load_yaml(DRIVER_CONFIG)
+    selected = CAMERA_PROFILES[profile]
+    mode = f'{selected.width}x{selected.height}x30'
+    document['/**']['ros__parameters'].update({
+        'serial_no': str(serial),
+        'rgb_camera.color_profile': mode,
+        'depth_module.depth_profile': mode,
+    })
+    header = ('# Rendered by tools/intel_thor/camera_service from\n'
+              '# src/ridgeback_autonomy_hardware/config/d455.yaml. Do not edit.\n')
+    return header + yaml.safe_dump(document, sort_keys=False)
+
+
+def render_unit(ns):
+    return (UNIT_TEMPLATE.read_text(encoding='utf-8')
+            .replace('@NAMESPACE@', ns).replace('@PARAMS@', PARAMS))
+
+
+def attached_d455(host):
+    """USB presence only. The USB descriptor serial is not the camera serial."""
+    found = []
+    for device in host.path(USB_DEVICES).glob('*'):
+        try:
+            product = (device / 'product').read_text().strip()
+        except OSError:
+            continue
+        if 'RealSense' in product and '455' in product:
+            found.append(device.name)
+    return found
+
+
+def detect_serial():
+    """Camera serial as librealsense and serial_no use it; the device must be free."""
+    output = run('rs-enumerate-devices', '-s').stdout
+    serials = [match.group(0) for line in output.splitlines() if 'D455' in line
+               for match in [re.search(r'\b\d{9,}\b', line)] if match]
+    if len(serials) != 1:
+        raise RuntimeError(f'Expected one D455 from rs-enumerate-devices, found {serials or "none"}')
+    return serials[0]
+
+
+def revision():
+    result = run('git', '-c', f'safe.directory={REPO}', '-C', str(REPO), 'rev-parse', 'HEAD', check=False)
+    return result.stdout.strip() or 'unknown'
+
+
+def preconditions(host):
+    if host.root == Path('/') and os.geteuid() != 0:
+        raise Refused('apply and rollback need root')
+    robot = load_yaml(host.path(ROBOT_YAML))
+    ns = namespace(robot)
+    setup = host.path(SETUP_BASH).read_text(encoding='utf-8')
+    if 'RMW_IMPLEMENTATION="rmw_cyclonedds_cpp"' not in setup or f'file://{DDS_PROFILE}' not in setup:
+        raise Refused(f'{SETUP_BASH} does not select CycloneDDS with {DDS_PROFILE}; '
+                      'run tools/intel_thor/intel_services_rmw apply first')
+    if not SPDP_ONLY.search(host.path(DDS_PROFILE).read_text(encoding='utf-8')):
+        raise Refused(f'{DDS_PROFILE} lacks <AllowMulticast>spdp</AllowMulticast>; local camera '
+                      'readers flood the bridge without it (docs/physical/intel_thor_transport.md)')
+    cameras = (robot.get('sensors') or {}).get('camera') or []
+    if any(not managed(entry) for entry in cameras) or len(cameras) > 1:
+        raise Refused(f'{ROBOT_YAML} already declares a camera this tool does not own')
+    unit = host.path(UNIT)
+    if unit.exists() and not host.path(METADATA).exists():
+        raise Refused(f'{UNIT} exists but was not installed by this tool')
+    devices = attached_d455(host)
+    if len(devices) != 1:
+        raise Refused(f'Expected exactly one attached D455, found {devices or "none"}')
+    return robot, ns, (cameras[0] if cameras else None)
+
+
+def snapshot(host):
+    backup = host.path(BACKUP_DIR)
+    if (backup / 'complete').exists():
+        return False
+    shutil.rmtree(backup, ignore_errors=True)
+    backup.mkdir(parents=True)
+    shutil.copy2(host.path(ROBOT_YAML), backup / 'robot.yaml')
+    write(backup / 'units.json', json.dumps({unit: unit_state(unit) for unit in VENDOR_UNITS}, indent=2) + '\n')
+    (backup / 'complete').touch()
+    return True
+
+
+def restore_vendor(host):
+    states = json.loads((host.path(BACKUP_DIR) / 'units.json').read_text())
+    for unit, state in states.items():
+        if state['enabled'] == 'enabled':
+            run('systemctl', 'enable', unit)
+        if state['active'] == 'active':
+            run('systemctl', 'start', unit)
+
+
+def apply(host, profile, serial):
+    robot, ns, existing = preconditions(host)
+    installed = load_metadata(host)
+    profile = profile or installed.get('profile') or DEFAULT_CAMERA_PROFILE
+    fresh = snapshot(host)
+    try:
+        # The driver can only be enumerated once the vendor driver releases it.
+        for unit in VENDOR_UNITS:
+            if unit_state(unit)['enabled'] != 'not-found':
+                run('systemctl', 'disable', '--now', unit)
+        if serial is None and existing is not None:
+            serial = existing['ros_parameters']['intel_realsense']['serial_no']
+        if serial is None:
+            serial = detect_serial()
+        sensors = robot.setdefault('sensors', {}) or {}
+        robot['sensors'] = sensors
+        sensors['camera'] = [camera_entry(serial)]
+        write(host.path(ROBOT_YAML), yaml.safe_dump(robot, sort_keys=False))
+        write(host.path(PARAMS), render_params(serial, profile))
+        write(host.path(UNIT), render_unit(ns))
+        write(host.path(METADATA), json.dumps({
+            'profile': profile, 'serial': str(serial), 'namespace': ns,
+            'revision': revision(), 'installed': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()),
+        }, indent=2) + '\n')
+        run('systemctl', 'daemon-reload')
+        if unit_state(REGENERATE_UNIT)['active'] == 'active':
+            run('systemctl', 'restart', REGENERATE_UNIT)
+        run('systemctl', 'enable', UNIT_NAME)
+        run('systemctl', 'restart', UNIT_NAME)
+    except Exception:
+        if fresh:
+            print('apply failed; restoring the snapshot', file=sys.stderr)
+            rollback(host)
+        raise
+
+
+def load_metadata(host):
+    path = host.path(METADATA)
+    return json.loads(path.read_text()) if path.exists() else {}
+
+
+def rollback(host):
+    backup = host.path(BACKUP_DIR)
+    if not (backup / 'complete').exists():
+        raise Refused(f'No complete snapshot in {BACKUP_DIR}; nothing to roll back')
+    run('systemctl', 'disable', '--now', UNIT_NAME, check=False)
+    host.path(UNIT).unlink(missing_ok=True)
+    shutil.rmtree(host.path(INSTALL_DIR), ignore_errors=True)
+    shutil.copy2(backup / 'robot.yaml', host.path(ROBOT_YAML))
+    run('systemctl', 'daemon-reload')
+    if unit_state(REGENERATE_UNIT)['active'] == 'active':
+        run('systemctl', 'restart', REGENERATE_UNIT)
+    restore_vendor(host)
+    # Only a complete restoration retires the snapshot; a failure keeps it for retry.
+    shutil.rmtree(backup)
+
+
+def status(host):
+    rows = []
+
+    def row(name, ok, detail):
+        rows.append((name, ok, detail))
+
+    try:
+        robot = load_yaml(host.path(ROBOT_YAML))
+        ns = namespace(robot)
+    except (OSError, Refused) as error:
+        print(f'robot.yaml: {error}')
+        return 1
+    metadata = load_metadata(host)
+    cameras = (robot.get('sensors') or {}).get('camera') or []
+    serial = metadata.get('serial')
+    row('robot.yaml camera_0', serial is not None and cameras == [camera_entry(serial)],
+        'declared, description only' if cameras else 'absent')
+    params = host.path(PARAMS)
+    row('driver parameters', serial is not None and params.exists()
+        and params.read_text() == render_params(serial, metadata.get('profile', DEFAULT_CAMERA_PROFILE)),
+        f"profile {metadata.get('profile', '-')}, serial {serial or '-'}")
+    unit = host.path(UNIT)
+    row('unit file', unit.exists() and unit.read_text() == render_unit(ns), str(UNIT))
+    state = unit_state(UNIT_NAME)
+    row(UNIT_NAME, state == {'enabled': 'enabled', 'active': 'active'}, f"{state['enabled']}, {state['active']}")
+    for vendor in VENDOR_UNITS:
+        vstate = unit_state(vendor)
+        row(vendor, vstate['enabled'] in ('disabled', 'not-found') and vstate['active'] != 'active',
+            f"{vstate['enabled']}, {vstate['active']}")
+    dds = host.path(DDS_PROFILE)
+    row('DDS profile', dds.exists() and bool(SPDP_ONLY.search(dds.read_text())), 'AllowMulticast spdp')
+    for name, ok, detail in rows:
+        print(f"{'ok  ' if ok else 'DIFF'}  {name:34} {detail}")
+    if metadata:
+        current = revision()
+        note = '' if current == metadata.get('revision') else f' (checkout now {current[:12]}; re-run apply to update)'
+        print(f"installed from {metadata.get('revision', 'unknown')[:12]} at {metadata.get('installed')}{note}")
+    return 0 if all(ok for _, ok, _ in rows) else 1
+
+
+def confirm(action, assume_yes):
+    print(f'{action} restarts {REGENERATE_UNIT}: motor power and teleop drop briefly. '
+          'The robot must be stationary with the e-stop in reach.')
+    if assume_yes:
+        return True
+    return input('Continue? [y/N] ').strip().lower() in ('y', 'yes')
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument('command', choices=('status', 'apply', 'rollback'))
+    parser.add_argument('--profile', choices=sorted(CAMERA_PROFILES))
+    parser.add_argument('--serial', help='camera serial as librealsense reports it (not the USB descriptor)')
+    parser.add_argument('--yes', action='store_true')
+    parser.add_argument('--root', default='/', help=argparse.SUPPRESS)
+    args = parser.parse_args(argv)
+    host = Host(args.root)
+    try:
+        if args.command == 'status':
+            return status(host)
+        if not confirm(args.command, args.yes):
+            return 1
+        if args.command == 'apply':
+            apply(host, args.profile, args.serial)
+        else:
+            rollback(host)
+        return status(host) if args.command == 'apply' else 0
+    except Refused as error:
+        print(f'Refused: {error}', file=sys.stderr)
+        return 2
+
+
+if __name__ == '__main__':
+    sys.exit(main())
