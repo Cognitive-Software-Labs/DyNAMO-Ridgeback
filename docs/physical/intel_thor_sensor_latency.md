@@ -65,9 +65,8 @@ Before and after every observation, and continuously during it, `check_clock`
 takes bursts of 300 round trips over one persistent SSH connection. The sampler
 pauses 0.5 seconds between bursts. Its midpoint estimates the actual ROS
 wall-clock offset; half the round-trip duration bounds asymmetry. The collector
-uses the midpoint of adjacent offset measurements for each timestamp, with
-uncertainty equal to the larger round-trip bound plus half the adjacent offset
-change. It retains the complete clock series and every exchange.
+takes the smallest interval covering both adjacent offset uncertainty ranges,
+uses its midpoint for each timestamp, and uses its half-width as uncertainty. It retains the complete clock series and every exchange.
 
 Cross-host components require every interval's bound to be at most 0.2 ms,
 calibration gaps no larger than two seconds, and no detected wall-clock step

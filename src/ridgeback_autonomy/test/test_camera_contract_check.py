@@ -202,3 +202,11 @@ def test_bad_clock_series_keeps_cross_host_components_unresolved(fault):
     assert stats['components']['executor']['count'] == 1
     assert stats['components']['network_dds']['count'] == 0
     assert stats['components']['total']['count'] == 0
+
+
+def test_clock_envelope_uses_the_smallest_centered_interval_covering_both_bounds():
+    points = [clock_point(10**9, .4, .19), clock_point(2*10**9, .45, .01)]
+    summary = TOOL.clock_series_summary(points)
+    assert summary['resolved']
+    assert summary['bound_ms'] == pytest.approx(.19)
+    assert TOOL.clock_offset_at(points, 1_500_000_000) == pytest.approx(.4 * 1e6)
