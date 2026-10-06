@@ -39,6 +39,8 @@ def test_apply_reapply_and_rollback_keep_original_state(tool, role):
     assert '@' not in managed
     if role == 'intel':
         assert 'ntp.ubuntu.com' in managed and 'allow 192.168.131.0/24' in managed
+        # Slow internet corrections keep sensor stamps and PTP smooth.
+        assert 'maxslewrate 500' in managed
     else:
         assert 'server 192.168.131.1 iburst prefer' in managed and 'ntp.ubuntu.com' not in managed
     assert 'sourcedir' not in host.path(module.MAIN).read_text()

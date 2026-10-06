@@ -1,0 +1,14 @@
+# Rendered by tools/intel_thor/ptp_sync; edit the template in the repository.
+[Unit]
+Description=DyNAMO PTP on the robot Ethernet (@ROLE@)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/sbin/ptp4l -f /etc/linuxptp/dynamo-ptp4l.conf -i @INTERFACE@ -m -q
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
