@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Bound Thor-minus-Intel clock offset using a persistent SSH round trip.
+"""Bound Thor-minus-Intel clock offset using direct LAN round trips (SSH controls the peer).
 
 Run on Intel. The bound assumes the remote timestamp falls between local send
 and receive; asymmetry is not silently treated as zero. No remote files change.
@@ -11,42 +11,128 @@ import select
 import subprocess
 import time
 import threading
+import socket
+import shlex
+
+
+def clock_read():
+    """Bracket realtime with monotonic reads to retain scheduling uncertainty."""
+    before = time.monotonic_ns()
+    realtime = time.time_ns()
+    after = time.monotonic_ns()
+    return realtime, before, after
+
+
+def phase_bounds(reading):
+    realtime, before, after = reading
+    return realtime - after, realtime - before
+
+
+def phase_gap(left, right):
+    """Minimum separation of two realtime-minus-monotonic intervals."""
+    return max(0, left[0] - right[1], right[0] - left[1])
+
+
+REMOTE = """
+import sys,time,socket,threading
+def reading():
+    before=time.monotonic_ns()
+    realtime=time.time_ns()
+    after=time.monotonic_ns()
+    return realtime,before,after
+if sys.argv[1] == 'udp':
+    sock=socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
+    sock.bind(('0.0.0.0',0))
+    print(sock.getsockname()[1],flush=True)
+    def serve():
+        while True:
+            data,address=sock.recvfrom(128)
+            values=reading()
+            sock.sendto(data.strip()+b' '+(' '.join(map(str,values))).encode(),address)
+    threading.Thread(target=serve,daemon=True).start()
+    sys.stdin.read()
+else:
+    for line in sys.stdin:
+        print(*reading(),flush=True)
+"""
 
 
 class ClockProbe:
-    """A persistent SSH peer; close it without leaving a remote process."""
-    def __init__(self, peer):
-        self.peer = peer
-        remote = "import sys,time; [print(time.time_ns(),time.monotonic_ns(),flush=True) for line in sys.stdin]"
+    """An ephemeral peer controlled by SSH; close it without remote files."""
+    def __init__(self, peer, transport='udp'):
+        self.peer, self.transport = peer, transport
+        self.socket, self.previous, self.sequence = None, {}, 0
         self.process = subprocess.Popen(['ssh', '-T', '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=5',
-            peer, 'python3', '-u', '-c', "'" + remote + "'"],
+            peer, 'python3', '-u', '-c', shlex.quote(REMOTE), transport],
             stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
+        if transport == 'udp':
+            try:
+                if not select.select([self.process.stdout], [], [], 5)[0]:
+                    raise RuntimeError('UDP clock peer did not start')
+                port = int(self.process.stdout.readline())
+                self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                self.socket.settimeout(5)
+                self.socket.connect((peer.rsplit('@', 1)[-1], port))
+            except Exception:
+                self.close()
+                raise
 
     def exchange(self):
-        start, mono_start = time.time_ns(), time.monotonic_ns()
-        self.process.stdin.write('clock\n')
-        self.process.stdin.flush()
-        if not select.select([self.process.stdout], [], [], 5)[0]:
-            raise RuntimeError('SSH clock response timed out')
-        line = self.process.stdout.readline()
-        end, mono_end = time.time_ns(), time.monotonic_ns()
+        start = clock_read()
+        if self.socket is not None:
+            self.sequence += 1
+            self.socket.send(str(self.sequence).encode())
+            while True:
+                fields = self.socket.recv(256).decode().split()
+                if fields[0] == str(self.sequence):
+                    line = ' '.join(fields[1:])
+                    break
+        else:
+            self.process.stdin.write('clock\n')
+            self.process.stdin.flush()
+            if not select.select([self.process.stdout], [], [], 5)[0]:
+                raise RuntimeError('SSH clock response timed out')
+            line = self.process.stdout.readline()
+        end = clock_read()
         if not line:
-            raise RuntimeError('SSH clock process ended')
-        remote_ns, remote_mono = map(int, line.split())
-        if abs((end - start) - (mono_end - mono_start)) > 100_000:
+            raise RuntimeError('Clock peer ended')
+        remote = tuple(map(int, line.split()))
+        initial_phase, final_phase = phase_bounds(start), phase_bounds(end)
+        if phase_gap(initial_phase, final_phase) > 100_000:
             raise RuntimeError('Local wall clock stepped during offset check')
-        return {'offset_ms': (2 * remote_ns - start - end) / 2e6,
-                'bound_ms': (end - start) / 2e6, 'intel_ns': (start + end) // 2,
-                'thor_ns': remote_ns, 'intel_mono_ns': (mono_start + mono_end) // 2,
-                'thor_mono_ns': remote_mono}
+        phases = {'intel': ((initial_phase[0] + final_phase[0]) // 2,
+                            (initial_phase[1] + final_phase[1]) // 2),
+                  'thor': phase_bounds(remote)}
+        for host, phase in phases.items():
+            if host in self.previous and phase_gap(self.previous[host], phase) > 100_000:
+                raise RuntimeError(host + ' wall clock stepped between offset checks')
+        self.previous = phases
+        return {'offset_ms': (2 * remote[0] - start[0] - end[0]) / 2e6,
+                'bound_ms': (end[0] - start[0]) / 2e6, 'intel_ns': (start[0] + end[0]) // 2,
+                'thor_ns': remote[0], 'intel_mono_ns': (start[1] + start[2] + end[1] + end[2]) // 4,
+                'thor_mono_ns': (remote[1] + remote[2]) // 2,
+                **{host + '_phase_' + side + '_ns': value
+                   for host, phase in phases.items() for side, value in zip(('min', 'max'), phase)}}
 
     def sample(self, count=300):
-        samples = [self.exchange() for _ in range(count)]
-        best = min(samples, key=lambda sample: sample['bound_ms'])
-        return {**best, 'peer': self.peer, 'method': 'persistent SSH midpoint, half RTT bound',
-                'samples': samples, 'captured_utc': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())}
+        samples = []
+        deadline = time.monotonic() + .75
+        best = None
+        # Keep the minimum count, then retry noisy exchanges within a fixed
+        # time budget. Selection uses uncertainty alone, never sensor latency.
+        while len(samples) < count or (best['bound_ms'] > .08 and time.monotonic() < deadline):
+            sample = self.exchange()
+            samples.append(sample)
+            if best is None or sample['bound_ms'] < best['bound_ms']:
+                best = sample
+        return {**best, 'peer': self.peer, 'transport': self.transport,
+                'method': self.transport.upper() + ' midpoint, half RTT bound',
+                'samples': samples, 'minimum_samples': count, 'target_bound_ms': .08,
+                'retry_budget_s': .75, 'captured_utc': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())}
 
     def close(self):
+        if self.socket is not None:
+            self.socket.close()
         try:
             self.process.stdin.close()
         except BrokenPipeError:
@@ -59,8 +145,8 @@ class ClockProbe:
         self.process.stdout.close()
 
 
-def measure(peer='robot@192.168.131.51', count=300):
-    probe = ClockProbe(peer)
+def measure(peer='robot@192.168.131.51', count=300, transport='udp'):
+    probe = ClockProbe(peer, transport)
     try:
         for _ in range(3):
             probe.exchange()
@@ -71,7 +157,7 @@ def measure(peer='robot@192.168.131.51', count=300):
 
 class ClockMonitor:
     """Calibrate while observers run, retaining every round-trip sample."""
-    def __init__(self, peer, interval=.5, count=300):
+    def __init__(self, peer, interval=.25, count=300):
         self.peer, self.interval, self.count = peer, interval, count
         self.points, self.errors = [], []
         self.stopped, self.ready = threading.Event(), threading.Event()
@@ -115,11 +201,12 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--peer', default='robot@192.168.131.51')
     parser.add_argument('--output', type=Path)
+    parser.add_argument('--transport', choices=('udp', 'ssh'), default='udp')
     parser.add_argument('--count', type=int, default=300, help='round trips after three warm-up exchanges')
     args = parser.parse_args()
     if args.count < 1:
         parser.error('--count must be positive')
-    report = measure(args.peer, args.count)
+    report = measure(args.peer, args.count, args.transport)
     print(json.dumps(report, indent=2))
     if args.output:
         args.output.parent.mkdir(parents=True, exist_ok=True)

@@ -1,6 +1,6 @@
 # PHYSICAL — Intel–Thor sensor latency and transport tuning
 
-Status: **tooling implemented; hardware clock installation and transport tuning pending.** Owner: an agent at the robot, with the
+Status: **tooling and clock installation implemented; baseline qualification pending.** Owner: an agent at the robot, with the
 operator for every `sudo` step. Governing plan:
 [PHYSICAL — Intel–Thor deployment and transport qualification](PHYSICAL_intel_thor_deployment.md),
 whose sections 2 (time) and 3 (transfer cost) this plan executes for the
@@ -80,7 +80,7 @@ robot during runs (they coincided with the 2026-09-18 Hokuyo lockout).
 
 ## Implementation status (2026-10-06)
 
-The timing mode, Thor defaults, independent SSH clock check, interleaved run
+The timing mode, Thor defaults, independent LAN clock check, interleaved run
 collector, chrony installer with rollback, and camera-only DDS/fps candidates
 are implemented. Unit tests and the isolated two-process localhost timing
 smoke pass. Installed robot services remain on the previously qualified VGA
@@ -154,7 +154,7 @@ camera topics and the scans and passes its contract criteria in a short run.
   transport reference.
 
 Exit: `chronyc tracking` on Thor reports an offset within 0.2 ms of Intel, and
-an independent round-trip check over SSH agrees within its own bound.
+an independent direct-LAN round-trip check agrees within its own bound.
 
 ### 4. Baseline (agent; deployed configuration unchanged)
 

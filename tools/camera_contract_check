@@ -118,14 +118,18 @@ def clock_series_summary(points):
         for host in ('intel', 'thor'):
             phase_left = left[host + '_ns'] - left[host + '_mono_ns']
             phase_right = right[host + '_ns'] - right[host + '_mono_ns']
-            stepped |= abs(phase_right - phase_left) > 100_000
+            left_bounds = (left.get(host + '_phase_min_ns', phase_left),
+                           left.get(host + '_phase_max_ns', phase_left))
+            right_bounds = (right.get(host + '_phase_min_ns', phase_right),
+                            right.get(host + '_phase_max_ns', phase_right))
+            stepped |= max(0, left_bounds[0] - right_bounds[1], right_bounds[0] - left_bounds[1]) > 100_000
     bound = max(bounds) if bounds else None
     valid = all(math.isfinite(p['offset_ms']) and math.isfinite(p['bound_ms']) and p['bound_ms'] >= 0 for p in points)
     resolved = bool(bounds) and valid and bound <= .2 and not stepped and all(0 < gap <= 2 for gap in gaps)
     return {'resolved': resolved, 'bound_ms': bound, 'clock_step_detected': stepped,
             'max_interval_s': max(gaps) if gaps else None, 'point_count': len(points),
             'offset_ms': sum(point['offset_ms'] for point in points) / len(points) if points else None,
-            'method': 'midpoint correction per adjacent SSH calibration interval',
+            'method': 'midpoint correction per adjacent LAN calibration interval',
             'limitation': 'Assumes offset remains inside adjacent calibration envelopes; sub-interval steps may be unobserved.'}
 
 

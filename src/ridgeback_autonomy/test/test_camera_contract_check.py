@@ -210,3 +210,15 @@ def test_clock_envelope_uses_the_smallest_centered_interval_covering_both_bounds
     assert summary['resolved']
     assert summary['bound_ms'] == pytest.approx(.19)
     assert TOOL.clock_offset_at(points, 1_500_000_000) == pytest.approx(.4 * 1e6)
+
+
+def test_clock_series_brackets_clock_read_scheduling_delay():
+    points = [clock_point(10**9, .1), clock_point(2*10**9, .1)]
+    points[1]['intel_mono_ns'] -= 200_000
+    for point in points:
+        point['intel_phase_min_ns'] = 2*10**8
+        point['intel_phase_max_ns'] = 2*10**8 + 400_000
+    assert TOOL.clock_series_summary(points)['resolved']
+    points[1]['intel_phase_min_ns'] += 1_000_000
+    points[1]['intel_phase_max_ns'] += 1_000_000
+    assert TOOL.clock_series_summary(points)['clock_step_detected']

@@ -62,15 +62,23 @@ PID or restart count, or a camera `[ERROR]` journal entry. The guard uses its
 own subscriptions and system counters; it does not poll the ROS graph.
 
 Before and after every observation, and continuously during it, `check_clock`
-takes bursts of 300 round trips over one persistent SSH connection. The sampler
-pauses 0.5 seconds between bursts. Its midpoint estimates the actual ROS
+starts an ephemeral UDP echo peer through a persistent SSH connection, without
+writing remote files. It takes at least 300 direct LAN round trips per burst,
+then retries until the best half-RTT bound is at most 0.08 ms or the 0.75-second
+retry budget expires. Selection depends only on clock uncertainty. The sampler
+pauses 0.25 seconds between bursts; SSH stdin closure ends the peer. Standalone
+`check_clock --transport ssh` retains the SSH echo method for diagnostics. Its midpoint estimates the actual ROS
 wall-clock offset; half the round-trip duration bounds asymmetry. The collector
 takes the smallest interval covering both adjacent offset uncertainty ranges,
 uses its midpoint for each timestamp, and uses its half-width as uncertainty. It retains the complete clock series and every exchange.
 
 Cross-host components require every interval's bound to be at most 0.2 ms,
 calibration gaps no larger than two seconds, and no detected wall-clock step
-relative to monotonic time (100 µs detection threshold). Every received image
+relative to monotonic time (100 µs detection threshold). Each realtime read
+is bracketed by monotonic reads; step detection uses the separation of the
+resulting phase intervals, accounting for scheduling delays between reads.
+The probe also checks every exchange for steps, including exchanges not selected
+as a calibration point. Every received image
 must lie inside the calibrated range. This assumes the offset stays within the
 adjacent calibration envelopes; steps or excursions shorter than the sampling
 interval can still be unobserved. Same-clock components remain available when
@@ -80,7 +88,7 @@ CPU/network load and remains identical for candidate comparisons.
 Chrony's NTP time is a virtual clock and can differ from the system wall clock
 while a correction is being slewed. A small Thor `chronyc tracking` offset does
 not establish a small difference between Intel and Thor's ROS clocks; the
-SSH monitor measures those clocks directly. See
+LAN monitor measures those clocks directly. See
 [chrony's tracking documentation](https://chrony-project.org/doc/4.5/chronyc.html#tracking).
 
 Time-service status, host CPU/NIC counters, guard reports, logs, source revisions
