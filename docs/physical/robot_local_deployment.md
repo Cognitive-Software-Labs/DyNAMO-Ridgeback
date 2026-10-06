@@ -121,6 +121,7 @@ target this layout rather than the vendor one.
 | Colour | `/<ns>/sensors/camera_0/color/image`, `sensor_msgs/Image`, colour optical frame |
 | Colour calibration | `/<ns>/sensors/camera_0/color/camera_info` |
 | Aligned depth | `/<ns>/sensors/camera_0/depth/image`, `16UC1` millimetres on the colour grid, colour optical frame, stamps identical to colour |
+| Compressed variants | `color/image/{compressed,compressedDepth,ffmpeg,theora,zstd}` and the same under `depth/image/`, encoded only while subscribed. Encoder parameters keep the driver's original names, e.g. `camera_0.color.image_raw.ffmpeg.encoder` and `.camera_0.color.image_raw.compressed.jpeg_quality` |
 | Other driver outputs | keep driver names, for example native depth `depth/image_rect_raw` |
 | Optical frame | `camera_0_color_optical_frame` |
 | TF | driver: `camera_0_link →` its frames on `/<ns>/tf_static`; Clearpath description: `base_link → camera_0_link` |

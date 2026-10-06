@@ -176,6 +176,20 @@ def test_unit_publishes_the_simulator_names_on_the_robot_tree():
     assert '@' not in unit
 
 
+@pytest.mark.parametrize('driver, contract', [
+    ('color/image_raw', 'color/image'),
+    ('aligned_depth_to_color/image_raw', 'depth/image'),
+])
+@pytest.mark.parametrize('transport', ['compressed', 'compressedDepth', 'ffmpeg', 'theora', 'zstd'])
+def test_every_image_transport_variant_follows_the_contract_name(driver, contract, transport):
+    unit = load_tool().render_unit('r100_0160')
+    base = '/r100_0160/sensors/camera_0/'
+
+    assert f'-r {base}{driver}/{transport}:={base}{contract}/{transport}' in unit
+    # Native depth is not part of the contract and keeps the driver's names.
+    assert 'depth/image_rect_raw' not in unit
+
+
 def test_reapply_changes_profile_and_keeps_the_first_snapshot(host):
     root, run, units_now, calls = host
     original = (root / 'etc/clearpath/robot.yaml').read_text()

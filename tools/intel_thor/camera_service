@@ -164,9 +164,25 @@ def render_dds(max_message_size='default'):
     return CAMERA_DDS_TEMPLATE.read_text().replace('@MAX_MESSAGE_SIZE@', setting)
 
 
+# image_transport names each variant after the driver's original topic, so every
+# variant needs its own exact-match rule to follow the contract name. Encoder
+# parameters keep the original names, e.g. camera_0.color.image_raw.ffmpeg.*.
+CONTRACT_STREAMS = {'color/image_raw': 'color/image',
+                    'aligned_depth_to_color/image_raw': 'depth/image'}
+IMAGE_TRANSPORTS = ('compressed', 'compressedDepth', 'ffmpeg', 'theora', 'zstd')
+
+
+def topic_remaps(ns):
+    base = f'/{ns}/sensors/camera_0/'
+    return ' '.join(f'-r {base}{driver}{suffix}:={base}{contract}{suffix}'
+                    for driver, contract in CONTRACT_STREAMS.items()
+                    for suffix in ('', *(f'/{transport}' for transport in IMAGE_TRANSPORTS)))
+
+
 def render_unit(ns, dds_profile='services'):
     return (UNIT_TEMPLATE.read_text(encoding='utf-8')
             .replace('@NAMESPACE@', ns).replace('@PARAMS@', PARAMS)
+            .replace('@TOPIC_REMAPS@', topic_remaps(ns))
             .replace('@DDS_OVERRIDE@', f'export CYCLONEDDS_URI=file://{CAMERA_DDS} && '
                      if dds_profile == 'camera' else ''))
 

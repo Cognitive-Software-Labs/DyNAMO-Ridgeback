@@ -91,7 +91,9 @@ All application defaults below are relative to the robot namespace
 
 The hardware service remaps the driver's `color/image_raw` and
 `aligned_depth_to_color/image_raw` onto the simulator names, so the three
-required topics are identical on every backend.
+required topics are identical on every backend. Their image_transport variants
+follow (`color/image/compressed`, `depth/image/zstd` and so on); the driver
+encodes a variant only while it has a subscriber.
 
 Gazebo's generated image bridges remap the simulator image and depth-image
 transport topics to this contract; its parameter bridge carries both
