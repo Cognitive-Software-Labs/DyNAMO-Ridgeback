@@ -89,8 +89,10 @@ smoke pass. Installed robot services remain on the previously qualified VGA
 The [sensor timing reference](../physical/intel_thor_sensor_latency.md) owns
 implemented report semantics and qualification commands. The tooling was pushed to `origin` and fetched into the separate Thor
 worktree. A short guarded run passed the Intel and Thor camera/scan contracts;
-it remains preflight evidence, with the full baseline pending. Steps 3–7 still
-require operator clock installation, measured baselines and candidate runs.
+it remains preflight evidence, with the full baseline pending. Chrony was installed on both hosts, but default 64-second Thor polling did
+not hold the clocks within 0.2 ms during Intel's initial internet-clock slews.
+A faster LAN polling configuration is prepared for operator reapply on Thor.
+Steps 3–7 still require clock convergence, measured baselines and candidate runs.
 Compression, host power/coalescing changes and physically moving the camera
 remain measurement-dependent work; their outcomes are not presumed.
 

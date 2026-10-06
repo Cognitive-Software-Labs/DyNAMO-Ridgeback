@@ -143,6 +143,13 @@ configured chrony upstreams or the active timesyncd server. `--upstream` can
 explicitly retain several Intel internet servers. Intel allows the robot
 subnet and serves a local stratum-10 clock when upstreams are unavailable;
 Thor uses only `192.168.131.1`, with no DHCP or internet source includes.
+Its LAN source uses `minpoll -4 maxpoll -4 xleave filter 4`: 16 requests per
+second with four-poll median filtering and interleaved server timestamps.
+This is a candidate repair for the several-millisecond startup drift observed
+with the default 64-second polling while Intel slewed to its internet source;
+verify the independent bound before accepting it. Sub-second polling is
+supported for reachable LAN servers with round trips below 10 ms by
+[chrony 4.5](https://chrony-project.org/doc/4.5/chrony.conf.html#server).
 
 The managed main file `/etc/chrony/chrony.conf` includes only
 `/etc/chrony/conf.d/dynamo-time.conf`. Before package installation,
