@@ -113,7 +113,26 @@ time of each frame, while the driver component (stamp to Intel publish) is the
 largest and grows when Thor subscribes. That is consistent with publishing
 blocking on Intel's 212,992-byte send buffer, which O1 addresses, so O1 runs
 first. Since `camera_service` now restarts only the camera for camera-only
-changes, candidates no longer restart the platform. Compression, host
+changes, candidates no longer restart the platform.
+
+**O1 measured, not adopted** (`artifacts/hardware/20261006T140904Z-thor-latency-o1/`,
+tooling `fbf730a`). All three Thor observations resolved the clock and met the
+targets, but colour and depth totals did not improve: the larger send buffer
+cut the driver component and raised the network component by about as much,
+because each frame's wire time is unchanged. The queue moved into the kernel's
+shared egress path, where camera bursts delayed the merged scan's p95 to Thor
+from about 2 ms to about 9 ms. O2 builds on the same profile and queueing, so
+it is skipped. Compression (O4) is the remaining transport lever, since it
+removes bytes from the wire; the largest single component, the driver time on
+Intel even without a remote reader, is camera-pipeline work rather than
+transport. Restore the services profile before further runs.
+
+Clock agreement varies with Intel's internet corrections: Thor was 0.20–0.24 ms
+ahead at the baseline and 1.5–1.9 ms behind during O1, because chrony serves
+Intel's estimate of true time while sensor stamps use Intel's actual wall
+clock. Continuous calibration still resolved every run. Distributing Intel's
+wall clock with PTP would make the clocks agree; that is the plan's listed
+alternative to chrony. Compression, host
 power/coalescing changes and physically moving the camera remain
 measurement-dependent work; their outcomes are not presumed.
 
