@@ -87,7 +87,9 @@ smoke pass. Installed robot services remain on the previously qualified VGA
 30 Hz configuration; no tuning candidate has been adopted.
 
 The [sensor timing reference](../physical/intel_thor_sensor_latency.md) owns
-implemented report semantics and qualification commands. Steps 3–7 still
+implemented report semantics and qualification commands. The tooling was pushed to `origin` and fetched into the separate Thor
+worktree. A short guarded run passed the Intel and Thor camera/scan contracts;
+it remains preflight evidence, with the full baseline pending. Steps 3–7 still
 require operator clock installation, measured baselines and candidate runs.
 Compression, host power/coalescing changes and physically moving the camera
 remain measurement-dependent work; their outcomes are not presumed.

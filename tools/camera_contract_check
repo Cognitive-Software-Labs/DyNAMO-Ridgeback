@@ -85,8 +85,8 @@ def timing_sample(stamp_ns, info, callback_ns):
     """Keep RMW timestamps at callback entry; zero means unavailable."""
     def field(name):
         return info.get(name, 0) if isinstance(info, dict) else getattr(info, name, 0)
-    return {'stamp_ns': stamp_ns, 'source_ns': field('source_timestamp'),
-            'received_ns': field('received_timestamp'), 'callback_ns': callback_ns,
+    return {'stamp_ns': stamp_ns, 'source_ns': field('source_timestamp') or 0,
+            'received_ns': field('received_timestamp') or 0, 'callback_ns': callback_ns,
             'publisher_gid': list(field('publisher_gid') or []),
             'sequence': field('publication_sequence_number')}
 

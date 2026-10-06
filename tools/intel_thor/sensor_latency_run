@@ -55,7 +55,8 @@ def qualify(report):
     rows = []
     def row(name, passed):
         rows.append({'criterion': name, 'passed': bool(passed)})
-    row('30 Hz evidence', report['fps'] == 30 and report['duration_s'] >= 59)
+    row('VGA 30 Hz evidence', report['fps'] == 30 and report['duration_s'] >= 59
+        and report['expected']['grid'] == [640, 480])
     row('clock uncertainty <= 0.2 ms', report['clock']['resolved'])
     row('camera and scan contract', report['passed'] and not report['aborted'])
     for stream in ('color', 'depth'):
@@ -102,6 +103,7 @@ def main(argv=None):
         dirty = ssh(args.peer, shlex.join(command)) if remote else subprocess.check_output(command, text=True)
         if dirty.strip():
             parser.error('Tracked changes exist: commit tooling/configuration before qualification')
+    settings_command = 'uname -a; cat /proc/loadavg; if command -v nvidia-smi >/dev/null; then nvidia-smi --query-gpu=utilization.gpu,power.draw --format=csv,noheader; elif command -v tegrastats >/dev/null; then timeout 2s tegrastats --interval 1000; else echo GPU_load_unavailable; fi'
     write(root / 'provenance.json', {'intel_revision': local_revision, 'thor_revision': remote_revision,
                                     'arguments': vars(args) | {'output_dir': str(root)},
                                     'guard': 'simultaneous Intel contract observer; adds a local camera reader'})
@@ -111,6 +113,8 @@ def main(argv=None):
         for host in ('intel', 'thor'):
             label = f'{repeat:02d}-{host}'
             print(f'Starting {label}', flush=True)
+            write(root / f'{label}-host-load-before.json', {'intel': subprocess.run(['bash', '-c', settings_command], capture_output=True, text=True).stdout,
+                                                         'thor': ssh(args.peer, settings_command + '; true')})
             tracking = {'intel': subprocess.run(['timedatectl', 'show', '-p', 'NTPSynchronized'], capture_output=True, text=True).stdout,
                         'thor': ssh(args.peer, 'timedatectl show -p NTPSynchronized; if command -v chronyc >/dev/null; then chronyc tracking; fi')}
             write(root / f'{label}-time-service.json', tracking)
@@ -162,6 +166,11 @@ def main(argv=None):
             finally:
                 for process in (guard, remote_process):
                     if process is not None and process.poll() is None:
+                        if process is remote_process:
+                            try:
+                                ssh(args.peer, 'test ! -f ' + shlex.quote(pidfile) + ' || kill -TERM "$(cat ' + shlex.quote(pidfile) + ')"')
+                            except subprocess.CalledProcessError:
+                                pass
                         process.terminate()
                         try:
                             process.wait(timeout=5)

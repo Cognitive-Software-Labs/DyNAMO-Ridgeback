@@ -112,14 +112,18 @@ def apply(host, role, upstream=None):
     managed, main = desired(role, sources)
     try:
         # Ubuntu's package resolver removes the conflicting timesyncd package.
+        print('Installing chrony; apt may take a few minutes...', flush=True)
         run('apt-get', 'install', '-y', 'chrony')
         run('systemctl', 'disable', '--now', 'systemd-timesyncd.service', check=False)
+        print('Writing the host clock configuration...', flush=True)
         write(host.path(MANAGED), managed)
         write(host.path(MAIN), main)
         write(backup / 'installed.json', json.dumps({p: digest(host.path(p)) for p in (MAIN, MANAGED)}))
         run('chronyd', '-p', '-f', str(host.path(MAIN)))
         run('systemctl', 'enable', 'chrony.service')
+        print('Starting chrony...', flush=True)
         run('systemctl', 'restart', 'chrony.service')
+        print('Installed. Check chronyc tracking and the independent SSH clock bound.', flush=True)
     except Exception:
         print(f'Apply failed. Original state retained at {backup}; run rollback.', file=sys.stderr)
         raise
@@ -135,6 +139,7 @@ def rollback(host):
             if digest(host.path(path)) != expected:
                 raise RuntimeError(f'{path} changed externally; snapshot retained, no service stopped')
     saved = json.loads((backup / 'state.json').read_text())
+    print('Restoring the original time service and configuration...', flush=True)
     run('systemctl', 'disable', '--now', 'chrony.service', check=False)
     if saved['packages']['systemd-timesyncd']:
         run('apt-get', 'install', '-y', 'systemd-timesyncd')
@@ -168,7 +173,7 @@ def status(host):
     print(result.stdout if result else 'chronyc unavailable')
     if result:
         print(run('chronyc', 'sources', '-v', check=False).stdout)
-    return int(drift or result is None or result.returncode != 0)
+    return int(not metadata.exists() or drift or result is None or result.returncode != 0)
 
 
 def main(argv=None):

@@ -1,7 +1,7 @@
 # Graph Report - /home/robot/DyNAMO-Ridgeback-camera  (2026-10-06)
 
 ## Corpus Check
-- 402 files · ~452,003 words
+- 402 files · ~452,174 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary

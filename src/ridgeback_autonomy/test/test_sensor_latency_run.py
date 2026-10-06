@@ -17,7 +17,7 @@ def test_drift_expands_clock_bound_and_invalidates_cross_host_timing():
 
 
 def test_reduced_rate_and_short_runs_cannot_pass_30hz_targets():
-    report = {'fps': 15, 'duration_s': 10, 'clock': {'resolved': True}, 'passed': True,
+    report = {'expected': {'grid': [640, 480]}, 'fps': 15, 'duration_s': 10, 'clock': {'resolved': True}, 'passed': True,
               'aborted': None, 'timing': {key: {'components': {'network_dds': {'p95_ms': 15},
                                                             'total': {'p95_ms': 35}},
                                             'dds_loss': {'fraction': None}} for key in ('color', 'depth')},
@@ -27,6 +27,10 @@ def test_reduced_rate_and_short_runs_cannot_pass_30hz_targets():
     report.update(fps=30, duration_s=60)
     TOOL.qualify(report)
     assert report['working_targets_passed'] is True
+    report['expected']['grid'] = [1280, 720]
+    TOOL.qualify(report)
+    assert report['working_targets_passed'] is False
+    report['expected']['grid'] = [640, 480]
     report['clock']['resolved'] = False
     TOOL.qualify(report)
     assert report['working_targets_passed'] is False
