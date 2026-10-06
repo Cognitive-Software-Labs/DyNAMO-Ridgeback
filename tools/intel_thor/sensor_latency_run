@@ -179,11 +179,13 @@ def main(argv=None):
                         help='O4: decode this aligned-depth variant on Thor')
     parser.add_argument('--camera-param', action='append', default=[], metavar='NAME=VALUE',
                         help='set a camera encoder parameter for this run and restore it afterwards')
+    parser.add_argument('--decoder-param', action='append', default=[], metavar='NAME=VALUE',
+                        help='pass a parameter to the Thor decoder, e.g. in.ffmpeg.decoder_av_options=flags:low_delay')
     args = parser.parse_args(argv)
     if args.repeats < 1 or args.duration <= 0 or args.warmup < 0:
         parser.error('positive repeats/duration and nonnegative warmup required')
-    if any('=' not in item for item in args.camera_param):
-        parser.error('--camera-param takes NAME=VALUE')
+    if any('=' not in item for item in args.camera_param + args.decoder_param):
+        parser.error('--camera-param and --decoder-param take NAME=VALUE')
     assignments = [(name, parse_value(value)) for name, value in
                    (item.split('=', 1) for item in args.camera_param)]
     compressed = args.color_transport != 'raw' or args.depth_transport != 'raw'
@@ -280,7 +282,9 @@ def run_repeats(args, root, compressed):
                             # Started first; the observer's warm-up covers decoder discovery.
                             decoder_command = (prefix + ' && echo $$ > ' + shlex.quote(decoder_pidfile) + ' && exec '
                                                + shlex.join(['python3', args.thor_worktree + '/tools/intel_thor/thor_decoder',
-                                                             '--namespace', args.namespace, *transport_args]))
+                                                             '--namespace', args.namespace, *transport_args,
+                                                             *(item for parameter in args.decoder_param
+                                                               for item in ('--decoder-param', parameter))]))
                             decoder = subprocess.Popen(['ssh', '-T', '-o', 'BatchMode=yes', args.peer, 'bash', '-c', shlex.quote(decoder_command)],
                                                        stdout=decoder_log, stderr=decoder_log)
                         guard = subprocess.Popen([*local_args, '--output', str(root / f'{label}-guard.json'),

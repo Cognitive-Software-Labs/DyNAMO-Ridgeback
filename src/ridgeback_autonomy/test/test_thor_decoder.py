@@ -37,3 +37,10 @@ def test_transport_choices_match_the_contract_check():
     contract_loader.exec_module(contract)
     assert TOOL.COLOR_TRANSPORTS == contract.COLOR_TRANSPORTS
     assert TOOL.DEPTH_TRANSPORTS == contract.DEPTH_TRANSPORTS
+
+
+def test_decoder_parameters_reach_every_republisher():
+    commands = TOOL.commands('r100_0160', 'ffmpeg', 'compressedDepth', ['in.ffmpeg.decoder_av_options:=flags:low_delay'])
+    assert all(command[-2:] == ['-p', 'in.ffmpeg.decoder_av_options:=flags:low_delay'] for command in commands)
+    with pytest.raises(SystemExit):
+        TOOL.main(['--namespace', 'r100_0160', '--color-transport', 'ffmpeg', '--decoder-param', 'low_delay'])
