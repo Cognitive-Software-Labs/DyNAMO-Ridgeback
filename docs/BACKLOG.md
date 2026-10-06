@@ -140,8 +140,15 @@ Close only after both required profiles and the core checks pass, or after an
 explicit deployment-scope decision revises the required profile set. Pointcloud,
 camera–LiDAR calibration, calibrated accuracy, and motion validation are separate.
 
-**Context.** [Camera stack](target_localization/camera_stack.md) and
-[aligned depth](target_localization/aligned_depth.md).
+**Progress.** The hardware producer is implemented: `dynamo-camera.service`
+owns the D455 from boot and publishes the simulators' topic names, frames and
+TF, installed by `tools/intel_thor/camera_service`, with
+`tools/camera_contract_check` freezing the acceptance criteria. It has not yet
+been applied or checked on the robot.
+
+**Context.** [Camera stack](target_localization/camera_stack.md),
+[aligned depth](target_localization/aligned_depth.md), and
+[robot-local deployment](physical/robot_local_deployment.md#camera-service).
 
 ## Optional physical organized-pointcloud qualification
 
@@ -279,7 +286,9 @@ Resolve each one here or move it to the item that owns it.
   tooling will not restore the old value.
 - **`camera-web-ready.service`** fails at every boot because the RealSense topics
   do not appear within its wait, observed after the 14:23 and 14:54 boots on
-  2026-09-18. Is it needed, and what should its wait be?
+  2026-09-18. Is it needed, and what should its wait be? `camera_service apply`
+  retires it with the rest of the vendor camera view, which settles both questions
+  once applied.
 - **Unit files changed on disk.** On 2026-09-18 systemd reported that the
   `realsense-camera`, `camera-web-ready`, `clearpath-platform` and
   `clearpath-sensors` units had changed since they were loaded. Which edits are

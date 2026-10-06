@@ -90,10 +90,11 @@ mismatch, not a small error.
 
 **Alignment** fixes this: reproject each depth pixel into 3D, transform by the
 depth→color extrinsics, and re-render onto the color grid. The RealSense
-driver does this on demand (`align_depth.enable: true` → the
-`aligned_depth_to_color` image topic). The stereo source's `depth_topic` must
-point at *that* topic on hardware: the source converts units, it does not
-align. Consequences to design around:
+driver does this on demand (`align_depth.enable: true` → its
+`aligned_depth_to_color` image, which the hardware camera service publishes as
+`sensors/camera_0/depth/image`). The stereo source's `depth_topic` must be that
+aligned stream, never the driver's native depth: the source converts units, it
+does not align. Consequences to design around:
 
 - **Occlusion holes.** Alignment is a reprojection from a different viewpoint;
   surfaces visible to the depth sensor but hidden from the color camera leave
@@ -103,12 +104,12 @@ align. Consequences to design around:
   fine structure can shift by a pixel.
 - **Cost.** The align filter runs in the driver. It is the price of admission
   for every mask-based consumer, so for cost accounting it is a *sunk* cost.
-- **Configured but unverified hardware path.** `clearpath/robot.yaml` now sets
-  `align_depth.enable: true` and `enable_sync: true`; the repository's
-  Clearpath parser test confirms both values survive into generated RealSense
-  parameters. The robot still needs validation that the driver publishes
-  `sensors/camera_0/aligned_depth_to_color/image_raw` on the color grid with
-  sensor-owned, synchronized headers.
+- **Configured but unverified hardware path.** The hardware camera service
+  enables `align_depth.enable` and `enable_sync`
+  (`ridgeback_autonomy_hardware/config/d455.yaml`). The robot still needs
+  validation that `sensors/camera_0/depth/image` arrives on the colour grid
+  with sensor-owned, synchronized headers; `tools/camera_contract_check`
+  checks exactly that.
 
 ### 2.2 Simulation (gz `rgbd_camera`)
 

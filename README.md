@@ -25,6 +25,7 @@ This workspace supports 3 main human workflows:
 
 - [Robot geometry](docs/robot/geometry.md): shared mounts, dimensioned model reference, and validation limits
 - [Collision model](docs/robot/collision_model.md): physical envelope, navigation footprint, and backend representations
+- [Robot-local deployment](docs/physical/robot_local_deployment.md): every startup change made on the robot, re-apply order, and the camera service
 
 Isaac Sim port (in progress, `feat/isaac-sim-6-port`):
 
@@ -382,9 +383,9 @@ Arguments:
 | `namespace` | backend-derived | `r100_0001` in simulation; on hardware, read from `<setup_path>/robot.yaml`; an explicit value overrides either default |
 | `use_sim_time` | backend-derived | `true` in simulation; `false` on hardware |
 | `setup_path` | backend-derived | `~/clearpath/` in simulation; `/etc/clearpath/` on hardware |
-| `color_topic` | backend-derived | Simulation image or RealSense `color/image_raw` |
+| `color_topic` | `sensors/camera_0/color/image` | Shared camera contract's colour image; the hardware camera service publishes the same name |
 | `camera_info_topic` | `sensors/camera_0/color/camera_info` | Compatibility override for color-grid camera intrinsics |
-| `depth_topic` | backend-derived | Simulation depth or RealSense `aligned_depth_to_color/image_raw` |
+| `depth_topic` | `sensors/camera_0/depth/image` | Colour-aligned depth; the same name on every backend |
 | `pointcloud_topic` | backend-derived | Simulation organized points; empty on hardware until its layout is validated |
 | `exploration_rviz` | `true` | Launch the custom exploration RViz config |
 | `target_localization_enabled` | `true` | Launch the target-localization stack |
@@ -487,6 +488,37 @@ bash build_and_start_expl.sh
 bash build_and_start_expl.sh office backend:=isaac
 bash build_and_start_expl.sh office backend:=isaac headless:=true
 ```
+
+### Hardware camera service
+
+On the robot, `dynamo-camera.service` owns the D455 from boot and publishes the
+camera topics, frames and TF the simulators publish, so the exploration launch
+attaches to it exactly as it does to the LiDARs. The vendor camera units and its
+web camera view are retired. Install it after `intel_services_rmw apply`, with the
+robot stationary and the e-stop in reach: `apply` and `rollback` restart
+`clearpath-robot`, which briefly drops motor power.
+
+```bash
+tools/intel_thor/camera_service status
+```
+
+```bash
+sudo tools/intel_thor/camera_service apply --profile 640x480
+```
+
+```bash
+tools/camera_contract_check --backend hardware
+```
+
+```bash
+sudo tools/intel_thor/camera_service rollback
+```
+
+`apply` is idempotent; re-run it with `--profile 1280x720` to change the
+resolution, or after editing the driver configuration in the repository. The
+installed files, the re-apply order after a reinstall, and the contract that
+robot-side diagnostics should target are in
+[robot-local deployment](docs/physical/robot_local_deployment.md).
 
 ### Intel-Thor link setup and pre-deploy check
 
@@ -649,7 +681,7 @@ Arguments:
 | `capture_timeout_sec` | `30.0` | Hard wall-time bound for obtaining the raw detector-batch quota; it is a stall guard, not the normal capture duration |
 | `record_video` | `true` | Best-effort RViz recording to `video/run.mp4`; disable for timing runs where screen capture would be unwanted load |
 | `color_topic` | `sensors/camera_0/color/image` | Compatibility override for the shared camera contract's color image; feeds detector, measurements, overlay, runner, and readiness gate |
-| `depth_topic` | `sensors/camera_0/depth/image` | Simulation's color-aligned depth. A hardware RealSense launch must override this to `sensors/camera_0/aligned_depth_to_color/image_raw` |
+| `depth_topic` | `sensors/camera_0/depth/image` | Colour-aligned depth of the shared camera contract; the hardware camera service publishes the same name |
 | `pointcloud_topic` | `sensors/camera_0/points` | Simulation's organized point cloud. It is optional on RealSense; omit the pointcloud estimator or override this only after confirming driver output |
 | `scan_topic` | `sensors/lidar2d_0/scan` | LaserScan topic used by polar profiling |
 | `base_frame` | `<namespace>/robot/base_link` | Vehicle frame used for point-cloud and scan projection |
@@ -960,7 +992,7 @@ exact matrices, assumptions, and pending hardware comparison.
   (`rmw_cyclonedds_cpp`), matching the measured exact-stamp delivery default.
   Deploy it to the robot only through an approved configuration diff.
 - **Hokuyo UST-10LX**: Mounted at front of chassis, provides 2D laser scan for SLAM and costmaps
-- **Intel RealSense D455**: Mounted on a riser bracket. `device_type: d455` selects both the driver's device filter and the URDF model, so it decides the camera's geometry as well as which device the driver binds to. Configured streams are RGB and depth with `align_depth.enable: true` and `enable_sync: true`; stream profiles are left unspecified so Clearpath's 640x480 @ 30 defaults apply. It supplies RGB and aligned depth to the target-localization stack. An organized point cloud is enabled in the checked-out Clearpath defaults but is **not** wired as an application input — its layout, frame, and timestamps are unverified on hardware. The D455 also has an IMU, which this stack neither enables nor consumes.
+- **Intel RealSense D455**: Mounted on a riser bracket. `device_type: d455` selects both the driver's device filter and the URDF model, so it decides the camera's geometry as well as which device the driver binds to. Configured streams are RGB and depth with `align_depth.enable: true` and `enable_sync: true`; stream profiles are left unspecified so Clearpath's 640x480 @ 30 defaults apply. It supplies RGB and aligned depth to the target-localization stack. An organized point cloud is enabled in the checked-out Clearpath defaults but is **not** wired as an application input — its layout, frame, and timestamps are unverified on hardware. These driver settings drive the simulators; on the robot the [hardware camera service](#hardware-camera-service) streams colour and aligned depth only, from the same mount. The D455 also has an IMU, which this stack neither enables nor consumes.
 
 ### Key parameters to tune
 

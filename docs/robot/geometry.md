@@ -55,7 +55,7 @@ including the 18:58 rear correction. Inspect live TF before reuse.
 |---|---|---|
 | Front Hokuyo | `chassis_link`, `[0.3922, 0, 0.1856]` | Same x; z differs by 6.6 mm, below the resolution of the field tape readings |
 | Rear Hokuyo | `chassis_link`, `[-0.3922, 0, 0.1856]`, yaw π | Symmetric correction applied and live TF/merger values checked; independent target recheck pending; same z difference |
-| D455 | Not declared; the camera driver's frames are not connected to the robot tree | Repository mount unverified on hardware |
+| D455 | Not declared as of September 18; the vendor driver's frames are not connected to the robot tree. `camera_service apply` declares `camera_0` with the repository mount, description only ([robot-local deployment](../physical/robot_local_deployment.md#camera-service)) | Same mount once applied; unverified on hardware |
 
 The MyBotShop scan merger keeps its own copy of both LiDAR offsets for the
 merged `sensors/scan`. Change it together with the robot-local YAML.

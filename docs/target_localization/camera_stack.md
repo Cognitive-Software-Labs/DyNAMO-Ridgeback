@@ -64,15 +64,15 @@ and the [librealsense per-stream intrinsics API](https://github.com/realsenseai/
 
 | Contract | Gazebo | Isaac Sim 6 | Physical D455 |
 |---|---|---|---|
-| Producer | Clearpath Gazebo `rgbd_camera` plus ROS-Gazebo bridges | generated USD colour camera plus Isaac ROS 2 helpers; `d455` mode adds a left-depth render and custom matched publisher | externally managed `realsense2_camera` service |
-| Profile | shared `640x480` default or `1280x720` | shared `640x480` default or `1280x720` | driver/device-selected; verify both requested modes live |
+| Producer | Clearpath Gazebo `rgbd_camera` plus ROS-Gazebo bridges | generated USD colour camera plus Isaac ROS 2 helpers; `d455` mode adds a left-depth render and custom matched publisher | `dynamo-camera.service`: the apt `realsense2_camera` driver, colour and aligned depth only |
+| Profile | shared `640x480` default or `1280x720` | shared `640x480` default or `1280x720` | chosen at install (`camera_service apply --profile`), checked by `camera_contract_check` |
 | Authored rate | 30 Hz | 30 Hz | verify live rate |
 | Intrinsics | selected nominal profile, published as `CameraInfo` | selected nominal profile, published as `CameraInfo` | factory calibration in live `CameraInfo` |
 | Clip/range model | 0.3-100 m render clip | 0.1-100 m render clip; `d455` additionally rejects below 0.32 m at VGA or 0.52 m at HD | physical stereo validity; no application hard cutoff |
 | Depth formation | clean GPU Z-buffer | selectable: clean colour-render depth (`ideal`) or geometric left-imager depth with nominal D455 disparity noise, quantization, and range masking (`d455`) | active-IR stereo depth |
 | RGB/depth registration | same render product, aligned by construction | `ideal`: same render product; `d455`: explicit 59 mm depth-to-colour reprojection with nearest-Z collision handling | driver align-to-colour filter (`align_depth.enable: true`) |
 | Distortion/noise | no D455 distortion, stereo, projector, or noise model | `ideal`: none; `d455`: nominal disparity-domain noise and holes, but no projector, material response, factory distortion, or temporal model | real calibrated optics, holes, noise, and occlusions |
-| Internal camera TF owner | `robot_state_publisher`, nominal URDF frames | `robot_state_publisher`, nominal URDF frames | RealSense driver, factory extrinsics |
+| Internal camera TF owner | `robot_state_publisher`, nominal URDF frames | `robot_state_publisher`, nominal URDF frames | RealSense driver below `camera_0_link`, factory extrinsics; the Clearpath description owns `base_link → camera_0_link` |
 
 Algorithms must consume each stream's `CameraInfo`; neither profile name nor a
 hard-coded FoV is an application projection input.
@@ -84,10 +84,14 @@ All application defaults below are relative to the robot namespace
 
 | Product | Gazebo and Isaac application topic | Physical D455 application topic |
 |---|---|---|
-| RGB | `sensors/camera_0/color/image` | `sensors/camera_0/color/image_raw` |
+| RGB | `sensors/camera_0/color/image` | `sensors/camera_0/color/image` |
 | Colour calibration | `sensors/camera_0/color/camera_info` | `sensors/camera_0/color/camera_info` |
-| Colour-aligned depth | `sensors/camera_0/depth/image` | `sensors/camera_0/aligned_depth_to_color/image_raw` |
-| Organized cloud | `sensors/camera_0/points` | deliberately unset until organization, frame, and stamps are verified |
+| Colour-aligned depth | `sensors/camera_0/depth/image` | `sensors/camera_0/depth/image` |
+| Organized cloud | `sensors/camera_0/points` | not published until organization, frame, and stamps are verified |
+
+The hardware service remaps the driver's `color/image_raw` and
+`aligned_depth_to_color/image_raw` onto the simulator names, so the three
+required topics are identical on every backend.
 
 Gazebo's generated image bridges remap the simulator image and depth-image
 transport topics to this contract; its parameter bridge carries both
@@ -103,11 +107,14 @@ emits `height x width` directly.
 
 Hardware is attach-first. The hardware adapter does not start the camera or
 sensor service, including when its optional platform bringup is enabled; it
-expects the Clearpath/RealSense services to be running externally. The YAML
-requests colour, depth, synchronization, and align-to-colour, but the live
-device identity, effective profiles, encodings, timestamps, and TF tree remain
-a deployment validation gate. `serial_no: "0"` also needs confirmation against
-the intended physical device.
+attaches to `dynamo-camera.service`, which owns the D455 from boot with colour,
+depth, synchronization and align-to-colour, both infrared streams and the
+pointcloud off, and the camera serial pinned. Depth arrives as `16UC1`
+millimetres rather than the simulators' `32FC1` metres; consumers normalize
+both. [Robot-local deployment](../physical/robot_local_deployment.md#camera-service)
+owns its installation and process layout. Device identity, effective profiles,
+encodings, timestamps and the TF tree remain a deployment validation gate,
+checked by `tools/camera_contract_check`.
 
 ## Launch and application flow
 
@@ -119,7 +126,7 @@ flowchart LR
 
     YAML --> GZ["Gazebo adapter<br/>URDF/SDF RGBD sensor + bridges"]
     YAML --> ISAAC["Isaac adapter<br/>generated URDF + baked USD camera"]
-    YAML --> HW["Hardware adapter<br/>attach to external RealSense service"]
+    YAML --> HW["Hardware adapter<br/>attach to dynamo-camera.service"]
     SELECT --> GZ
     SELECT --> ISAAC
     SELECT --> HW
@@ -175,7 +182,8 @@ contains a Gazebo-, Isaac-, or RealSense-specific projection constant.
   [Isaac camera guide](../isaac/camera-depth.md#why-native-isaac-61-depth-is-not-used).
 - Gazebo's observed rate may fall below the authored 30 Hz under rendering
   load; that is a performance failure, not an alternate camera contract.
-- Physical-camera validation is still pending. The
+- The hardware producer and its contract check are implemented; the on-robot
+  run is pending. Physical-camera validation is still pending. The
   [PHYSICAL — Robot measurements and stationary sensor validation](../plans/PHYSICAL_robot_measurements_and_validation.md#d455-camera-validation)
   owns the device, profile, encoding, timestamp, and TF-ownership procedure;
   organized-cloud qualification remains a separate optional gate.
@@ -196,6 +204,8 @@ contains a Gazebo-, Isaac-, or RealSense-specific projection constant.
   `clearpath/sensors/launch/camera_0.launch.py`
 - Shared simulation optics: `ridgeback_common/camera_profiles.py`
 - Isaac publishers: `ridgeback_autonomy_isaac/sim/isaac/sensors.py`
+- Hardware producer: `ridgeback_autonomy_hardware/config/d455.yaml`,
+  `config/systemd/dynamo-camera.service.in`, installed by `tools/intel_thor/camera_service`
 - Isaac camera/depth implementation guide: `docs/isaac/camera-depth.md`
 - Backend-neutral topic contract: `ridgeback_common/camera_inputs.py`
 - Shared consumers: `ridgeback_localization/`
