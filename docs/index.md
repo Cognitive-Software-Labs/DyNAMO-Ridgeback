@@ -81,6 +81,7 @@ troubleshooting, planning, and historical documentation.
 - [PHYSICAL — Package split for distributed deployment](plans/PHYSICAL_package_split.md) — workstation code restructuring, simulator compatibility, and tested handoff
 - [PHYSICAL — Intel–Thor deployment and transport qualification](plans/PHYSICAL_intel_thor_deployment.md) — robot-side installation, GPU offload, Ethernet measurements, and failure handling
   - Handoff: [Intel–Thor transport (agent 2)](plans/handoffs/PHYSICAL_intel_thor_transport_agent2.md) — CycloneDDS switch state, services-configuration flood behind the LiDAR lockouts, manual rollback, next steps
+  - [PHYSICAL — Intel–Thor sensor latency and transport tuning](plans/PHYSICAL_intel_thor_sensor_latency.md) — clock sync, per-stream latency of the real camera and LiDAR on Thor, and transport options before perception moves to Thor
 - [PHYSICAL — Robot measurements and stationary sensor validation](plans/PHYSICAL_robot_measurements_and_validation.md) — quick mount readings/photos, D455 and LiDAR checks, stationary alignment, and G1/person tests
   - Handoff: [D455 camera runs (agent 1)](plans/handoffs/PHYSICAL_d455_camera_runs_agent1.md) — P1/P2 results, CycloneDDS camera-transport and LiDAR-lockout findings, next steps
 
