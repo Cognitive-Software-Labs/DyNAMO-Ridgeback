@@ -3,6 +3,7 @@ from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, OpaqueFunction
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
+from ridgeback_common.camera_inputs import REALSENSE_BACKEND, resolve_camera_inputs
 from ridgeback_localization.environment import compute_environment
 from ridgeback_localization.estimator_registry import (
     parse_estimators, uses_mask_estimators, uses_pointcloud_estimators,
@@ -49,9 +50,10 @@ def build_nodes(context):
 
 
 def generate_launch_description():
+    camera = resolve_camera_inputs(REALSENSE_BACKEND)
     defaults = dict(namespace='r100_0001', use_sim_time='false',
-        color_topic='sensors/camera_0/color/image_raw', camera_info_topic='sensors/camera_0/color/camera_info',
-        depth_topic='sensors/camera_0/aligned_depth_to_color/image_raw', scan_topic='sensors/lidar2d_0/scan',
+        color_topic=camera.color_image_topic, camera_info_topic=camera.color_camera_info_topic,
+        depth_topic=camera.aligned_depth_topic, scan_topic='sensors/lidar2d_0/scan',
         pointcloud_topic='', estimators='projective_ranging,euclidean_reconstruction',
         depth_source='stereoscopic', mask_gate='box', target_labels='humanoid robot', detector_fps='10.0',
         displays='false', startup_timeout='120.0', input_timeout='3.0', progress_timeout='15.0', source_age='15.0')

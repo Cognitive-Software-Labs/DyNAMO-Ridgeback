@@ -3,6 +3,7 @@ from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, OpaqueFunction
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
+from ridgeback_common.camera_inputs import REALSENSE_BACKEND, resolve_camera_inputs
 from ridgeback_localization.launch_helpers import estimate_viz_node, overlay_node
 from ridgeback_localization.estimator_registry import parse_estimators
 
@@ -26,6 +27,6 @@ def build_nodes(context):
 def generate_launch_description():
     defaults=dict(namespace='r100_0001',use_sim_time='false',displays='true',
         estimators='projective_ranging,euclidean_reconstruction',
-        color_topic='sensors/camera_0/color/image_raw',depth_source='stereoscopic',mask_gate='box',health_timeout='3.0')
+        color_topic=resolve_camera_inputs(REALSENSE_BACKEND).color_image_topic,depth_source='stereoscopic',mask_gate='box',health_timeout='3.0')
     return LaunchDescription([DeclareLaunchArgument('base_frame',description='Observed base TF frame ID'),
         *[DeclareLaunchArgument(k,default_value=v) for k,v in defaults.items()],OpaqueFunction(function=build_nodes)])

@@ -22,12 +22,17 @@ def test_simulation_mapping_matches_existing_topics() -> None:
     assert inputs.backend == SIMULATION_BACKEND
 
 
-def test_realsense_mapping_uses_driver_owned_alignment() -> None:
+def test_realsense_mapping_publishes_the_simulator_names() -> None:
     inputs = resolve_camera_inputs(REALSENSE_BACKEND)
+    simulation = resolve_camera_inputs(SIMULATION_BACKEND)
 
-    assert inputs.color_image_topic == 'sensors/camera_0/color/image_raw'
+    assert inputs.color_image_topic == 'sensors/camera_0/color/image'
     assert inputs.color_camera_info_topic == 'sensors/camera_0/color/camera_info'
-    assert inputs.aligned_depth_topic == 'sensors/camera_0/aligned_depth_to_color/image_raw'
+    assert inputs.aligned_depth_topic == 'sensors/camera_0/depth/image'
+    assert (inputs.color_image_topic, inputs.color_camera_info_topic,
+            inputs.aligned_depth_topic) == (
+        simulation.color_image_topic, simulation.color_camera_info_topic,
+        simulation.aligned_depth_topic)
     assert inputs.organized_points_topic is None
 
 
