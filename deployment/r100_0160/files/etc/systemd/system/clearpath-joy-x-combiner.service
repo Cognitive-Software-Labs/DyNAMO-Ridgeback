@@ -1,0 +1,18 @@
+[Unit]
+Description=MMP Ridgeback F710 dual-stick linear.x combiner
+After=network-online.target clearpath-platform.service
+Wants=clearpath-platform.service
+
+[Service]
+Type=simple
+User=robot
+Group=robot
+Environment=HOME=/home/robot
+Environment=ROS_DOMAIN_ID=0
+ExecStart=/bin/bash -lc 'source /opt/ros/jazzy/setup.bash && exec python3 /opt/mybotshop/scripts/joy_x_combiner.py --ros-args -r __ns:=/r100_0160'
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=10
+
+[Install]
+WantedBy=multi-user.target

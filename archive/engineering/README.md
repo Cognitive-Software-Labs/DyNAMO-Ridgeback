@@ -28,6 +28,7 @@ are excluded from ordinary repository search and the generated knowledge graph.
 
 ## Simulation and operations
 
+- [Intel DDS local-reader screening](2026-10-05-intel-dds-screening.md) — scan interruption after a local color reader under the original profile, brief discovery-only multicast comparison, and verified restoration.
 - [Static collision-envelope audit](2026-09-18-collision-envelope-audit.md) — description/USD/Nav2 comparison with top-down and side views.
 - [Navigation footprint and simulator-contact qualification](2026-09-22-navigation-footprint-qualification.md) — effective Nav2 containment plus three-boot Gazebo and Isaac wall-contact matrices.
 
@@ -43,6 +44,7 @@ are excluded from ordinary repository search and the generated knowledge graph.
 - [urg_node reconnect lockout: leaked socket on a failed open](2026-10-13-urg-node-reconnect-leak.md) — source-level cause of the Hokuyo lockout, offline single-client reproduction, and the one-line close patch; not deployed.
 - [r100_0160 Intel–Thor camera transport candidates](2026-10-06-r100-0160-thor-transport-candidates.md) — raw baseline against the larger send buffer (O1) and compression (O4), with the decoder findings.
 - [r100_0160 D455 camera service qualification](2026-10-06-r100-0160-camera-service.md) — contract checks at both profiles, after a cold boot and after a rollback and reinstall, with the platform-restart and serial findings.
+- [r100_0160 rear LiDAR side-target recheck](2026-09-24-r100-0160-rear-lidar-recheck.md) — independent placements after the correction, with a before/after corner overlay.
 
 - [Isaac 6.0 first-drive snapshot](2026-07-11-isaac-first-drive.md)
 - [Invalidated July SLAM investigation](2026-07-12-isaac-slam-investigation.md)

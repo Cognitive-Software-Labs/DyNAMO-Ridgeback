@@ -1,0 +1,16 @@
+[Unit]
+Description=Power black box: MCU rails, motor drivers, stop state -> CSV (fsync per row)
+After=clearpath-robot.service
+Wants=clearpath-robot.service
+
+[Service]
+Type=simple
+User=robot
+ExecStart=/bin/bash -c 'source /opt/ros/jazzy/setup.bash && source /etc/clearpath/setup.bash && exec python3 -u /usr/local/bin/power_blackbox.py'
+KillSignal=SIGINT
+TimeoutStopSec=10
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

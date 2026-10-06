@@ -1,0 +1,53 @@
+#!/bin/bash
+# Second line of defence for the CAN-over-UDP bridge.
+#
+# mbs-vcan-bridge supervises socat and slcand, which covers process death.
+# This watchdog covers the remaining case: vcan0 is gone (or down) while
+# clearpath-vcan still claims to be running - e.g. the interface was
+# unregistered by the kernel without either process exiting, or somebody
+# tore it down by hand.
+#
+# Run every 15s by mbs-vcan-watchdog.timer.
+#
+# @copyright (c) 2026, MYBOTSHOP GmbH, Inc., All rights reserved.
+
+set -u
+
+CAN_DEV="${CAN_DEV:-vcan0}"
+# Restarting clearpath-platform re-arms the drive system. It is needed because
+# ros2_control's socket_can_receiver does not re-open a vanished interface on
+# its own. Set to 0 in /etc/mybotshop/mbs-vcan-watchdog.env if you would
+# rather repair CAN only and restart the platform by hand.
+RESTART_PLATFORM="${RESTART_PLATFORM:-1}"
+
+note() { logger -t mbs-vcan-watchdog "$*"; echo "[mbs-vcan-watchdog] $*"; }
+
+# Healthy: interface exists and is up. Nothing to do.
+if ip link show "${CAN_DEV}" 2>/dev/null | grep -q "state UP"; then
+    exit 0
+fi
+
+# Somebody stopped the bridge deliberately - do not fight them.
+if ! systemctl is-active --quiet clearpath-vcan; then
+    exit 0
+fi
+
+note "${CAN_DEV} missing or down while clearpath-vcan reports active - rebuilding CAN chain"
+
+systemctl stop clearpath-vcan
+pkill -f "[s]lcand" 2>/dev/null || true
+sleep 1
+systemctl start clearpath-vcan
+sleep 4
+
+if ip link show "${CAN_DEV}" 2>/dev/null | grep -q "state UP"; then
+    note "${CAN_DEV} restored"
+    if [ "${RESTART_PLATFORM}" = "1" ]; then
+        note "restarting clearpath-platform so ros2_control re-opens the CAN socket"
+        systemctl restart clearpath-platform
+    else
+        note "RESTART_PLATFORM=0 - clearpath-platform left alone, restart it manually to drive"
+    fi
+else
+    note "ERROR: ${CAN_DEV} still missing after rebuild - check the link to the MCU (${MCU_IP:-192.168.131.2})"
+fi

@@ -37,3 +37,8 @@ graphify-out/.graphify*
 graphify-out/manifest.json
 graphify-out/cost.json
 logs/
+
+# Curated recovery inputs may mirror an installed path; these are reviewed
+# configuration snapshots, not generated Colcon output.
+!/deployment/r100_0160/files/opt/mybotshop/install/
+!/deployment/r100_0160/files/opt/mybotshop/install/**

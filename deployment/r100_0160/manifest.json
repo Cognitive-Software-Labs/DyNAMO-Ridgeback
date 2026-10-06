@@ -1,0 +1,822 @@
+{
+  "host": "cpr-r100-0160",
+  "captured_utc": "2026-10-06T09:59:22.177076+00:00",
+  "repo_head": "2c866dcbdda5c8c8ddb274cce7f6c6356f95844a",
+  "working_tree": "dirty; deployed-file copies identify their own contents",
+  "files": [
+    {
+      "source": "/etc/apt/sources.list.d/clearpath-latest.list",
+      "repo_path": "files/etc/apt/sources.list.d/clearpath-latest.list",
+      "mode": "0o644",
+      "owner": "root",
+      "group": "root",
+      "sha256": "9ab0608dd7eaf7c64b735ddc40e4399aa4837155f0a5fde701146e3a4abb6e82",
+      "source_symlink": null,
+      "redacted_fields": []
+    },
+    {
+      "source": "/etc/battery-guard.conf",
+      "repo_path": "files/etc/battery-guard.conf",
+      "mode": "0o644",
+      "owner": "root",
+      "group": "root",
+      "sha256": "282dae9358739f7eb8de916aac1ee7b932ae7b450bf5dcc771fccf3ad93631f2",
+      "source_symlink": null,
+      "redacted_fields": []
+    },
+    {
+      "source": "/etc/clearpath/cyclonedds.xml",
+      "repo_path": "files/etc/clearpath/cyclonedds.xml",
+      "mode": "0o644",
+      "owner": "root",
+      "group": "root",
+      "sha256": "a8c8a60cb1e339f032dc59ebd63a71b8849911cc3c233b64fd2dac7cd8e5cf1d",
+      "source_symlink": null,
+      "redacted_fields": []
+    },
+    {
+      "source": "/etc/clearpath/robot.yaml",
+      "repo_path": "files/etc/clearpath/robot.yaml",
+      "mode": "0o644",
+      "owner": "robot",
+      "group": "robot",
+      "sha256": "ec2238d5e08ed7eb7876d3ca6037386d9fbefd77fd68be14fd720caddd8f3f1c",
+      "source_symlink": null,
+      "redacted_fields": []
+    },
+    {
+      "source": "/etc/ds4drv.conf",
+      "repo_path": "files/etc/ds4drv.conf",
+      "mode": "0o644",
+      "owner": "root",
+      "group": "root",
+      "sha256": "e5ccecb865dde82577dbe501f725c238cb5d67ec32de773d05eb432d91095da8",
+      "source_symlink": null,
+      "redacted_fields": []
+    },
+    {
+      "source": "/etc/modprobe.d/bluetooth.conf",
+      "repo_path": "files/etc/modprobe.d/bluetooth.conf",
+      "mode": "0o644",
+      "owner": "root",
+      "group": "root",
+      "sha256": "1cbde2e4bc24f1e83f8fc4701dc456f8893f8f16e841581676bd7f0475e23230",
+      "source_symlink": null,
+      "redacted_fields": []
+    },
+    {
+      "source": "/etc/modules-load.d/test_power.conf",
+      "repo_path": "files/etc/modules-load.d/test_power.conf",
+      "mode": "0o644",
+      "owner": "root",
+      "group": "root",
+      "sha256": "8ace7f72aecc54a33591537c8f41617f63fb9e8861a7897a0292a979981eb009",
+      "source_symlink": null,
+      "redacted_fields": []
+    },
+    {
+      "source": "/etc/sysctl.d/60-dynamo-dds-buffers.conf",
+      "repo_path": "files/etc/sysctl.d/60-dynamo-dds-buffers.conf",
+      "mode": "0o644",
+      "owner": "root",
+      "group": "root",
+      "sha256": "50458e19d80b80020d8eb81dd1ede3f5eabe6d3bded77b4517e78db296f30929",
+      "source_symlink": null,
+      "redacted_fields": []
+    },
+    {
+      "source": "/etc/sysctl.d/99-ridgeback-dual-homing.conf",
+      "repo_path": "files/etc/sysctl.d/99-ridgeback-dual-homing.conf",
+      "mode": "0o644",
+      "owner": "root",
+      "group": "root",
+      "sha256": "38ed6252b322080e57b6b1889f9189c738fe5c85fa0827218df67e3f441d4591",
+      "source_symlink": null,
+      "redacted_fields": []
+    },
+    {
+      "source": "/etc/systemd/logind.conf.d/10-ridgeback-no-suspend.conf",
+      "repo_path": "files/etc/systemd/logind.conf.d/10-ridgeback-no-suspend.conf",
+      "mode": "0o644",
+      "owner": "root",
+      "group": "root",
+      "sha256": "0b178d4f4bd79abf8dc52a8e6027735e6df13aceb49e503a999865b1c930ee1c",
+      "source_symlink": null,
+      "redacted_fields": []
+    },
+    {
+      "source": "/etc/systemd/system/battery-guard.service",
+      "repo_path": "files/etc/systemd/system/battery-guard.service",
+      "mode": "0o644",
+      "owner": "root",
+      "group": "root",
+      "sha256": "52378b13774020b4be739474c97a96d1df4654b298ca116c6a1164961be3312f",
+      "source_symlink": null,
+      "redacted_fields": []
+    },
+    {
+      "source": "/etc/systemd/system/battery-sysfs-bridge.service",
+      "repo_path": "files/etc/systemd/system/battery-sysfs-bridge.service",
+      "mode": "0o644",
+      "owner": "root",
+      "group": "root",
+      "sha256": "2f64eb88cadd4ce811a8cba17cb507863f36941651860833a3e21a772ee5e3cc",
+      "source_symlink": null,
+      "redacted_fields": []
+    },
+    {
+      "source": "/etc/systemd/system/camera-web-ready.service",
+      "repo_path": "files/etc/systemd/system/camera-web-ready.service",
+      "mode": "0o644",
+      "owner": "root",
+      "group": "root",
+      "sha256": "2f24857ab6704df27dce567c1e6abd0dfd4ff40cf83645561024b5c231d817d7",
+      "source_symlink": null,
+      "redacted_fields": []
+    },
+    {
+      "source": "/etc/systemd/system/camera-web-ready.service.d/60-dynamo-cyclonedds.conf",
+      "repo_path": "files/etc/systemd/system/camera-web-ready.service.d/60-dynamo-cyclonedds.conf",
+      "mode": "0o644",
+      "owner": "root",
+      "group": "root",
+      "sha256": "37353ed6e3bf45cdc27223d183ed85fd56e23e34c0927d25fc58160e8b698f58",
+      "source_symlink": null,
+      "redacted_fields": []
+    },
+    {
+      "source": "/etc/systemd/system/clearpath-joy-x-combiner.service",
+      "repo_path": "files/etc/systemd/system/clearpath-joy-x-combiner.service",
+      "mode": "0o644",
+      "owner": "root",
+      "group": "root",
+      "sha256": "d61fdcf931dd12bcd5138b1727926c64cd3af6d79aa78fb785a18e4f374e941b",
+      "source_symlink": null,
+      "redacted_fields": []
+    },
+    {
+      "source": "/etc/systemd/system/clearpath-joy-x-combiner.service.d/60-dynamo-cyclonedds.conf",
+      "repo_path": "files/etc/systemd/system/clearpath-joy-x-combiner.service.d/60-dynamo-cyclonedds.conf",
+      "mode": "0o644",
+      "owner": "root",
+      "group": "root",
+      "sha256": "37353ed6e3bf45cdc27223d183ed85fd56e23e34c0927d25fc58160e8b698f58",
+      "source_symlink": null,
+      "redacted_fields": []
+    },
+    {
+      "source": "/etc/systemd/system/clearpath-platform.service.d/00-persistent-fixes.conf",
+      "repo_path": "files/etc/systemd/system/clearpath-platform.service.d/00-persistent-fixes.conf",
+      "mode": "0o644",
+      "owner": "root",
+      "group": "root",
+      "sha256": "d4bb3d4a82b6ee433be326e9a2839721e60a6fc27cd269876db1851e3ed55841",
+      "source_symlink": null,
+      "redacted_fields": []
+    },
+    {
+      "source": "/etc/systemd/system/clearpath-platform.service.d/override.conf",
+      "repo_path": "files/etc/systemd/system/clearpath-platform.service.d/override.conf",
+      "mode": "0o644",
+      "owner": "root",
+      "group": "root",
+      "sha256": "cf4e09e17db9e5721446ca392a537308d3032f144e62a304ab293dd85925feb8",
+      "source_symlink": null,
+      "redacted_fields": []
+    },
+    {
+      "source": "/etc/systemd/system/clearpath-scan-merger.service",
+      "repo_path": "files/etc/systemd/system/clearpath-scan-merger.service",
+      "mode": "0o644",
+      "owner": "root",
+      "group": "root",
+      "sha256": "56338473ce5bc19c1b9bcadb72e351aca9755fb27d6e7ea8c80b1bab8c7db85e",
+      "source_symlink": null,
+      "redacted_fields": []
+    },
+    {
+      "source": "/etc/systemd/system/clearpath-scan-merger.service.d/60-dynamo-cyclonedds.conf",
+      "repo_path": "files/etc/systemd/system/clearpath-scan-merger.service.d/60-dynamo-cyclonedds.conf",
+      "mode": "0o644",
+      "owner": "root",
+      "group": "root",
+      "sha256": "37353ed6e3bf45cdc27223d183ed85fd56e23e34c0927d25fc58160e8b698f58",
+      "source_symlink": null,
+      "redacted_fields": []
+    },
+    {
+      "source": "/etc/systemd/system/controller-autoconnect.service",
+      "repo_path": "files/etc/systemd/system/controller-autoconnect.service",
+      "mode": "0o644",
+      "owner": "root",
+      "group": "root",
+      "sha256": "0ce7f8765e9661907842f036bd0fd7bacfa69233d811a5a68bdf837851f0508b",
+      "source_symlink": null,
+      "redacted_fields": []
+    },
+    {
+      "source": "/etc/systemd/system/depth-to-mono8.service",
+      "repo_path": "files/etc/systemd/system/depth-to-mono8.service",
+      "mode": "0o644",
+      "owner": "root",
+      "group": "root",
+      "sha256": "8a209eb659de807fb92b925b75f685334af933021235803f0f33c9101217f4f3",
+      "source_symlink": null,
+      "redacted_fields": []
+    },
+    {
+      "source": "/etc/systemd/system/depth-to-mono8.service.d/60-dynamo-cyclonedds.conf",
+      "repo_path": "files/etc/systemd/system/depth-to-mono8.service.d/60-dynamo-cyclonedds.conf",
+      "mode": "0o644",
+      "owner": "root",
+      "group": "root",
+      "sha256": "37353ed6e3bf45cdc27223d183ed85fd56e23e34c0927d25fc58160e8b698f58",
+      "source_symlink": null,
+      "redacted_fields": []
+    },
+    {
+      "source": "/etc/systemd/system/mbs-webserver.service",
+      "repo_path": "files/etc/systemd/system/mbs-webserver.service",
+      "mode": "0o644",
+      "owner": "root",
+      "group": "root",
+      "sha256": "92686a5a065448e680d966e76968ef6d49ef654344c578e08c3283554dbc3b20",
+      "source_symlink": null,
+      "redacted_fields": []
+    },
+    {
+      "source": "/etc/systemd/system/mbs-webserver.service.d/00-persistent-fixes.conf",
+      "repo_path": "files/etc/systemd/system/mbs-webserver.service.d/00-persistent-fixes.conf",
+      "mode": "0o644",
+      "owner": "root",
+      "group": "root",
+      "sha256": "d4bb3d4a82b6ee433be326e9a2839721e60a6fc27cd269876db1851e3ed55841",
+      "source_symlink": null,
+      "redacted_fields": []
+    },
+    {
+      "source": "/etc/systemd/system/mbs-webserver.service.d/10-camera-order.conf",
+      "repo_path": "files/etc/systemd/system/mbs-webserver.service.d/10-camera-order.conf",
+      "mode": "0o644",
+      "owner": "root",
+      "group": "root",
+      "sha256": "598946484f2bbbe7c24357cf74dd685801c7a1c0bfbc7ce3d85feb9637c54e61",
+      "source_symlink": null,
+      "redacted_fields": []
+    },
+    {
+      "source": "/etc/systemd/system/mbs-webserver.service.d/20-independent-vnc.conf",
+      "repo_path": "files/etc/systemd/system/mbs-webserver.service.d/20-independent-vnc.conf",
+      "mode": "0o644",
+      "owner": "root",
+      "group": "root",
+      "sha256": "0b1a1182da1f3889f4d1e33dc5deb9960b3b1eb1a3b7d2750bf2d70e71b13057",
+      "source_symlink": null,
+      "redacted_fields": []
+    },
+    {
+      "source": "/etc/systemd/system/mbs-webserver.service.d/60-dynamo-cyclonedds.conf",
+      "repo_path": "files/etc/systemd/system/mbs-webserver.service.d/60-dynamo-cyclonedds.conf",
+      "mode": "0o644",
+      "owner": "root",
+      "group": "root",
+      "sha256": "37353ed6e3bf45cdc27223d183ed85fd56e23e34c0927d25fc58160e8b698f58",
+      "source_symlink": null,
+      "redacted_fields": []
+    },
+    {
+      "source": "/etc/systemd/system/nvidia-persistenced.service.d/override.conf",
+      "repo_path": "files/etc/systemd/system/nvidia-persistenced.service.d/override.conf",
+      "mode": "0o644",
+      "owner": "root",
+      "group": "root",
+      "sha256": "99c603dd88e4dc6e3422bbc27f256638d2484de2bf8e4c75e9e1b6ed8a9e6239",
+      "source_symlink": null,
+      "redacted_fields": []
+    },
+    {
+      "source": "/etc/systemd/system/power-blackbox.service",
+      "repo_path": "files/etc/systemd/system/power-blackbox.service",
+      "mode": "0o644",
+      "owner": "root",
+      "group": "root",
+      "sha256": "6585c83b19ae7235c06947f0a7cee89c06621df07c1971010fed506da379c5c8",
+      "source_symlink": null,
+      "redacted_fields": []
+    },
+    {
+      "source": "/etc/systemd/system/realsense-camera.service",
+      "repo_path": "files/etc/systemd/system/realsense-camera.service",
+      "mode": "0o644",
+      "owner": "root",
+      "group": "root",
+      "sha256": "135f6620efcded6c87425d1bffa84eefe8fe5d489d00e68c5f809cef76786076",
+      "source_symlink": null,
+      "redacted_fields": []
+    },
+    {
+      "source": "/etc/systemd/system/realsense-camera.service.d/60-dynamo-cyclonedds.conf",
+      "repo_path": "files/etc/systemd/system/realsense-camera.service.d/60-dynamo-cyclonedds.conf",
+      "mode": "0o644",
+      "owner": "root",
+      "group": "root",
+      "sha256": "37353ed6e3bf45cdc27223d183ed85fd56e23e34c0927d25fc58160e8b698f58",
+      "source_symlink": null,
+      "redacted_fields": []
+    },
+    {
+      "source": "/etc/systemd/system/ridgeback-camera-mjpeg.service",
+      "repo_path": "files/etc/systemd/system/ridgeback-camera-mjpeg.service",
+      "mode": "0o644",
+      "owner": "root",
+      "group": "root",
+      "sha256": "cceeadc856ca107d66cb1ac64e7e37207e1da8bbe3a710104bc9c23101fbba98",
+      "source_symlink": null,
+      "redacted_fields": []
+    },
+    {
+      "source": "/etc/systemd/system/ridgeback-camera-mjpeg.service.d/60-dynamo-cyclonedds.conf",
+      "repo_path": "files/etc/systemd/system/ridgeback-camera-mjpeg.service.d/60-dynamo-cyclonedds.conf",
+      "mode": "0o644",
+      "owner": "root",
+      "group": "root",
+      "sha256": "37353ed6e3bf45cdc27223d183ed85fd56e23e34c0927d25fc58160e8b698f58",
+      "source_symlink": null,
+      "redacted_fields": []
+    },
+    {
+      "source": "/etc/systemd/system/ridgeback-persistent-fixes.service",
+      "repo_path": "files/etc/systemd/system/ridgeback-persistent-fixes.service",
+      "mode": "0o644",
+      "owner": "root",
+      "group": "root",
+      "sha256": "2f58d93a65cd0115b540c3e3856eb2188a56ed798d0ba7b3ffa8a4361ceaa09e",
+      "source_symlink": null,
+      "redacted_fields": []
+    },
+    {
+      "source": "/etc/systemd/system/ridgeback-remote-screen.service",
+      "repo_path": "files/etc/systemd/system/ridgeback-remote-screen.service",
+      "mode": "0o644",
+      "owner": "root",
+      "group": "root",
+      "sha256": "18a3616dc5ad67e49aa50ac70433667b9db3c571f70d08541721622ebcefdfd3",
+      "source_symlink": null,
+      "redacted_fields": []
+    },
+    {
+      "source": "/etc/systemd/system/ridgeback-startup-recover.service",
+      "repo_path": "files/etc/systemd/system/ridgeback-startup-recover.service",
+      "mode": "0o644",
+      "owner": "root",
+      "group": "root",
+      "sha256": "e34b1d56acc77bb2bc3f41648330480d44ff825a62810c99e09cb4db3dc9ac37",
+      "source_symlink": null,
+      "redacted_fields": []
+    },
+    {
+      "source": "/etc/systemd/system/ridgeback-startup-recover.service.d/60-dynamo-cyclonedds.conf",
+      "repo_path": "files/etc/systemd/system/ridgeback-startup-recover.service.d/60-dynamo-cyclonedds.conf",
+      "mode": "0o644",
+      "owner": "root",
+      "group": "root",
+      "sha256": "37353ed6e3bf45cdc27223d183ed85fd56e23e34c0927d25fc58160e8b698f58",
+      "source_symlink": null,
+      "redacted_fields": []
+    },
+    {
+      "source": "/etc/systemd/system/ridgeback-vnc-websockify.service",
+      "repo_path": "files/etc/systemd/system/ridgeback-vnc-websockify.service",
+      "mode": "0o644",
+      "owner": "root",
+      "group": "root",
+      "sha256": "0e4cae3599c49ebe1ce18d6b4cc6934d00eea442f33c9314cc6ea293f394695f",
+      "source_symlink": null,
+      "redacted_fields": []
+    },
+    {
+      "source": "/etc/systemd/system/ridgeback-vnc.service",
+      "repo_path": "files/etc/systemd/system/ridgeback-vnc.service",
+      "mode": "0o644",
+      "owner": "root",
+      "group": "root",
+      "sha256": "530b31b5c889e7960b3a1c182efc401b4261a40be20e591c368bfafefc71c9ca",
+      "source_symlink": null,
+      "redacted_fields": []
+    },
+    {
+      "source": "/etc/systemd/system/robot-gps-navi.service",
+      "repo_path": "files/etc/systemd/system/robot-gps-navi.service",
+      "mode": "0o644",
+      "owner": "root",
+      "group": "root",
+      "sha256": "31539e8a92cb5bf2f4740fcf903f93305b88df00d8546c67bf07dde174527e98",
+      "source_symlink": null,
+      "redacted_fields": []
+    },
+    {
+      "source": "/etc/systemd/system/robot-map-navi.service",
+      "repo_path": "files/etc/systemd/system/robot-map-navi.service",
+      "mode": "0o644",
+      "owner": "root",
+      "group": "root",
+      "sha256": "c51f792f08d074ff45b85f77e9b1c70ed4ce3286c47ae7142c9f47f79dcb64a4",
+      "source_symlink": null,
+      "redacted_fields": []
+    },
+    {
+      "source": "/etc/systemd/system/robot-map-navi.service.d/00-persistent-fixes.conf",
+      "repo_path": "files/etc/systemd/system/robot-map-navi.service.d/00-persistent-fixes.conf",
+      "mode": "0o644",
+      "owner": "root",
+      "group": "root",
+      "sha256": "d4bb3d4a82b6ee433be326e9a2839721e60a6fc27cd269876db1851e3ed55841",
+      "source_symlink": null,
+      "redacted_fields": []
+    },
+    {
+      "source": "/etc/systemd/system/robot-map-navi.service.d/60-dynamo-cyclonedds.conf",
+      "repo_path": "files/etc/systemd/system/robot-map-navi.service.d/60-dynamo-cyclonedds.conf",
+      "mode": "0o644",
+      "owner": "root",
+      "group": "root",
+      "sha256": "37353ed6e3bf45cdc27223d183ed85fd56e23e34c0927d25fc58160e8b698f58",
+      "source_symlink": null,
+      "redacted_fields": []
+    },
+    {
+      "source": "/etc/systemd/system/robot-slam.service",
+      "repo_path": "files/etc/systemd/system/robot-slam.service",
+      "mode": "0o644",
+      "owner": "root",
+      "group": "root",
+      "sha256": "e35717d7670dce60d2ede45e98df51b71b18b5c8c52fd48e0125e235b3d5e61a",
+      "source_symlink": null,
+      "redacted_fields": []
+    },
+    {
+      "source": "/etc/systemd/system/robot-slam.service.d/00-persistent-fixes.conf",
+      "repo_path": "files/etc/systemd/system/robot-slam.service.d/00-persistent-fixes.conf",
+      "mode": "0o644",
+      "owner": "root",
+      "group": "root",
+      "sha256": "d4bb3d4a82b6ee433be326e9a2839721e60a6fc27cd269876db1851e3ed55841",
+      "source_symlink": null,
+      "redacted_fields": []
+    },
+    {
+      "source": "/etc/systemd/system/robot-slam.service.d/60-dynamo-cyclonedds.conf",
+      "repo_path": "files/etc/systemd/system/robot-slam.service.d/60-dynamo-cyclonedds.conf",
+      "mode": "0o644",
+      "owner": "root",
+      "group": "root",
+      "sha256": "37353ed6e3bf45cdc27223d183ed85fd56e23e34c0927d25fc58160e8b698f58",
+      "source_symlink": null,
+      "redacted_fields": []
+    },
+    {
+      "source": "/etc/systemd/system/systemd-networkd-wait-online.service.d/override.conf",
+      "repo_path": "files/etc/systemd/system/systemd-networkd-wait-online.service.d/override.conf",
+      "mode": "0o644",
+      "owner": "root",
+      "group": "root",
+      "sha256": "8691d5cdd7cc2da9a88ff446178ef34a4c22d53d285cdd465f6e1b3dd03c19f7",
+      "source_symlink": null,
+      "redacted_fields": []
+    },
+    {
+      "source": "/etc/udev/rules.d/99-realsense-libusb.rules",
+      "repo_path": "files/etc/udev/rules.d/99-realsense-libusb.rules",
+      "mode": "0o664",
+      "owner": "robot",
+      "group": "robot",
+      "sha256": "be1e04b5d0f3505e0f15605c52074b3d7070aa76d8ef66c6b7cd49aa73634b57",
+      "source_symlink": "/home/robot/librealsense/config/99-realsense-libusb.rules",
+      "redacted_fields": []
+    },
+    {
+      "source": "/etc/udev/rules.d/99-ridgeback-ps4.rules",
+      "repo_path": "files/etc/udev/rules.d/99-ridgeback-ps4.rules",
+      "mode": "0o644",
+      "owner": "root",
+      "group": "root",
+      "sha256": "32ebf117d6cf4aee99b965021cbfffde9731c75dc2eb85970a9052222d35e106",
+      "source_symlink": null,
+      "redacted_fields": []
+    },
+    {
+      "source": "/home/robot/.vnc/xstartup",
+      "repo_path": "files/home/robot/.vnc/xstartup",
+      "mode": "0o775",
+      "owner": "robot",
+      "group": "robot",
+      "sha256": "87d9c3df441c2120826f6256ee60b672c94e9fa68d7de692e049621b0c01c3dc",
+      "source_symlink": null,
+      "redacted_fields": []
+    },
+    {
+      "source": "/home/robot/controllers.txt",
+      "repo_path": "files/home/robot/controllers.txt",
+      "mode": "0o664",
+      "owner": "robot",
+      "group": "robot",
+      "sha256": "4c315338b6859ab8f03cb8566b91d9e484e92498e051f89438dcdcffbb1314a0",
+      "source_symlink": null,
+      "redacted_fields": []
+    },
+    {
+      "source": "/home/robot/ridgeback-remote-screen/index.html",
+      "repo_path": "files/home/robot/ridgeback-remote-screen/index.html",
+      "mode": "0o664",
+      "owner": "robot",
+      "group": "robot",
+      "sha256": "e3d3a00a59099e4bed0cbf1791a5f92491d334cd0de0135efc89a816467b2ed1",
+      "source_symlink": null,
+      "redacted_fields": []
+    },
+    {
+      "source": "/home/robot/ridgeback-remote-screen/start-remote-screen.sh",
+      "repo_path": "files/home/robot/ridgeback-remote-screen/start-remote-screen.sh",
+      "mode": "0o775",
+      "owner": "robot",
+      "group": "robot",
+      "sha256": "a1852f911d140bd6ab10c194c2b7967714ff1fa354c53a6777193c4a72e0cb8d",
+      "source_symlink": null,
+      "redacted_fields": []
+    },
+    {
+      "source": "/opt/mybotshop/handover_ws/src/mybotshop/robot_webserver/launch/foxglove_whitelist.py",
+      "repo_path": "files/opt/mybotshop/handover_ws/src/mybotshop/robot_webserver/launch/foxglove_whitelist.py",
+      "mode": "0o664",
+      "owner": "robot",
+      "group": "robot",
+      "sha256": "52f9b010a92f60f23dd6ae6e82559c99a82902c8fbe57590a347182b0e036b25",
+      "source_symlink": null,
+      "redacted_fields": []
+    },
+    {
+      "source": "/opt/mybotshop/install/robot_webserver/share/robot_webserver/config/robot_webserver.yaml",
+      "repo_path": "files/opt/mybotshop/install/robot_webserver/share/robot_webserver/config/robot_webserver.yaml",
+      "mode": "0o600",
+      "owner": "robot",
+      "group": "robot",
+      "sha256": "47833a134e5ce459d84d634c587e5ecf0f5638867e9566504c9845c50094f03b",
+      "source_symlink": null,
+      "redacted_fields": [
+        "robot_password"
+      ]
+    },
+    {
+      "source": "/opt/mybotshop/mbs_webserver_start.sh",
+      "repo_path": "files/opt/mybotshop/mbs_webserver_start.sh",
+      "mode": "0o755",
+      "owner": "root",
+      "group": "root",
+      "sha256": "c87f5d81b77bdde4c4d81cf7781dee1faf1c45c7b1638b527676a39f12d72143",
+      "source_symlink": null,
+      "redacted_fields": []
+    },
+    {
+      "source": "/opt/mybotshop/scripts/joy_x_combiner.py",
+      "repo_path": "files/opt/mybotshop/scripts/joy_x_combiner.py",
+      "mode": "0o755",
+      "owner": "robot",
+      "group": "robot",
+      "sha256": "d3a4431a92e66cb671459cb52df089a4d2ec8874eca0358081ab5c22add40f7b",
+      "source_symlink": null,
+      "redacted_fields": []
+    },
+    {
+      "source": "/opt/mybotshop/scripts/mbs-vcan-bridge",
+      "repo_path": "files/opt/mybotshop/scripts/mbs-vcan-bridge",
+      "mode": "0o755",
+      "owner": "root",
+      "group": "root",
+      "sha256": "7a780097d374b7364478fa6c3f71c98ef430dec3b384a3c846644373b08ed59b",
+      "source_symlink": null,
+      "redacted_fields": []
+    },
+    {
+      "source": "/opt/mybotshop/scripts/mbs-vcan-watchdog",
+      "repo_path": "files/opt/mybotshop/scripts/mbs-vcan-watchdog",
+      "mode": "0o755",
+      "owner": "root",
+      "group": "root",
+      "sha256": "49a7825860a133a1a1484322e774a5b7e5baa328e4a3a65635eb607485414495",
+      "source_symlink": null,
+      "redacted_fields": []
+    },
+    {
+      "source": "/opt/mybotshop/src/mybotshop/mmp_nav2/param/localization.yaml",
+      "repo_path": "files/opt/mybotshop/src/mybotshop/mmp_nav2/param/localization.yaml",
+      "mode": "0o664",
+      "owner": "robot",
+      "group": "robot",
+      "sha256": "c27ca8a396b2858619f7af9f9b076ca1e02f108d7d0965d20e319e143881d1e5",
+      "source_symlink": null,
+      "redacted_fields": []
+    },
+    {
+      "source": "/opt/mybotshop/src/mybotshop/mmp_nav2/param/nav2_map.yaml",
+      "repo_path": "files/opt/mybotshop/src/mybotshop/mmp_nav2/param/nav2_map.yaml",
+      "mode": "0o664",
+      "owner": "robot",
+      "group": "robot",
+      "sha256": "ea29d8475847dd8085c9e5a21898dc0f66f6f91b01cc476b694b64f94414a164",
+      "source_symlink": null,
+      "redacted_fields": []
+    },
+    {
+      "source": "/opt/mybotshop/src/mybotshop/mmp_nav2/param/nav2_odom.yaml",
+      "repo_path": "files/opt/mybotshop/src/mybotshop/mmp_nav2/param/nav2_odom.yaml",
+      "mode": "0o664",
+      "owner": "robot",
+      "group": "robot",
+      "sha256": "85fc248318a354ff47a799646b8df0e2f715767fb0034e753b3341164f09cc44",
+      "source_symlink": null,
+      "redacted_fields": []
+    },
+    {
+      "source": "/opt/mybotshop/src/mybotshop/mmp_nav2/param/nav2_slam.yaml",
+      "repo_path": "files/opt/mybotshop/src/mybotshop/mmp_nav2/param/nav2_slam.yaml",
+      "mode": "0o664",
+      "owner": "robot",
+      "group": "robot",
+      "sha256": "0fb2859a1c032ba5afe21f1c5407d609f389f5a286ca30532be8d7e42b5dd307",
+      "source_symlink": null,
+      "redacted_fields": []
+    },
+    {
+      "source": "/opt/mybotshop/src/mybotshop/robot_webserver/config/robot_webrtc.yaml",
+      "repo_path": "files/opt/mybotshop/src/mybotshop/robot_webserver/config/robot_webrtc.yaml",
+      "mode": "0o664",
+      "owner": "robot",
+      "group": "robot",
+      "sha256": "c2d8b7b1991c1b043e0fb9dbe40638326f9c24b03cf86bb79337ba23af2b0e12",
+      "source_symlink": null,
+      "redacted_fields": []
+    },
+    {
+      "source": "/opt/mybotshop/src/mybotshop/robot_webserver/config/robot_webserver.yaml",
+      "repo_path": "files/opt/mybotshop/src/mybotshop/robot_webserver/config/robot_webserver.yaml",
+      "mode": "0o664",
+      "owner": "robot",
+      "group": "robot",
+      "sha256": "8c80c71996ae36a8753a310638a23b2190cc5d7e79aacc577b4c49ca63d6a389",
+      "source_symlink": null,
+      "redacted_fields": [
+        "robot_password"
+      ]
+    },
+    {
+      "source": "/opt/mybotshop/src/mybotshop/robot_webserver/launch/webserver.launch.py",
+      "repo_path": "files/opt/mybotshop/src/mybotshop/robot_webserver/launch/webserver.launch.py",
+      "mode": "0o664",
+      "owner": "robot",
+      "group": "robot",
+      "sha256": "6fc0049206b8a33742cc9e182f428af0172924ab65a63bec5f868a1f7bc36051",
+      "source_symlink": null,
+      "redacted_fields": []
+    },
+    {
+      "source": "/opt/mybotshop/src/third_party/tools/ros2_laser_scan_merger/config/params_ridgeback.yaml",
+      "repo_path": "files/opt/mybotshop/src/third_party/tools/ros2_laser_scan_merger/config/params_ridgeback.yaml",
+      "mode": "0o664",
+      "owner": "robot",
+      "group": "robot",
+      "sha256": "6dce8e0eaa922bafa271229c8544cddce73cdf582cf9b3feec9577930d2cb30e",
+      "source_symlink": null,
+      "redacted_fields": []
+    },
+    {
+      "source": "/opt/mybotshop/src/third_party/tools/ros2_laser_scan_merger/launch/merge_ridgeback.launch.py",
+      "repo_path": "files/opt/mybotshop/src/third_party/tools/ros2_laser_scan_merger/launch/merge_ridgeback.launch.py",
+      "mode": "0o775",
+      "owner": "robot",
+      "group": "robot",
+      "sha256": "628927acf51f3ebabe0586a477b71e618ff4f722b956015025dd9a481cdfe220",
+      "source_symlink": null,
+      "redacted_fields": []
+    },
+    {
+      "source": "/usr/local/bin/battery_guard.py",
+      "repo_path": "files/usr/local/bin/battery_guard.py",
+      "mode": "0o755",
+      "owner": "root",
+      "group": "root",
+      "sha256": "fd620eef489c0ac595a9e68132418bb13276f1ea03dc836cc76272079a492a6f",
+      "source_symlink": null,
+      "redacted_fields": []
+    },
+    {
+      "source": "/usr/local/bin/battery_sysfs_bridge.py",
+      "repo_path": "files/usr/local/bin/battery_sysfs_bridge.py",
+      "mode": "0o755",
+      "owner": "root",
+      "group": "root",
+      "sha256": "58ac08edcffd91e96bce21cb167f56fe57e9b2fbdf9ce89d48a931a28658cc76",
+      "source_symlink": null,
+      "redacted_fields": []
+    },
+    {
+      "source": "/usr/local/bin/controller-autoconnect.sh",
+      "repo_path": "files/usr/local/bin/controller-autoconnect.sh",
+      "mode": "0o755",
+      "owner": "root",
+      "group": "root",
+      "sha256": "73e20e2fb0d81327f1143deef1e42fdd44aed1ff1aba601d9866dcbb20333652",
+      "source_symlink": null,
+      "redacted_fields": []
+    },
+    {
+      "source": "/usr/local/bin/power_blackbox.py",
+      "repo_path": "files/usr/local/bin/power_blackbox.py",
+      "mode": "0o755",
+      "owner": "root",
+      "group": "root",
+      "sha256": "db7ea9b11010c7274c55939afdbcda0efc986a977e112c5c8bc9f999e8ac6862",
+      "source_symlink": null,
+      "redacted_fields": []
+    },
+    {
+      "source": "/usr/local/bin/power_report.py",
+      "repo_path": "files/usr/local/bin/power_report.py",
+      "mode": "0o755",
+      "owner": "root",
+      "group": "root",
+      "sha256": "c3a83c71259e638584545f0095afebc5ac322512e19f5a1e81ee66a12bd32ef3",
+      "source_symlink": null,
+      "redacted_fields": []
+    },
+    {
+      "source": "/usr/local/bin/ridgeback-camera-mjpeg-server.py",
+      "repo_path": "files/usr/local/bin/ridgeback-camera-mjpeg-server.py",
+      "mode": "0o755",
+      "owner": "root",
+      "group": "root",
+      "sha256": "6f99fb8accc1613fdbbdd71500513fc3e402096c8a12493c56731d9861de49d2",
+      "source_symlink": null,
+      "redacted_fields": []
+    },
+    {
+      "source": "/usr/local/sbin/camera-web-ready",
+      "repo_path": "files/usr/local/sbin/camera-web-ready",
+      "mode": "0o755",
+      "owner": "root",
+      "group": "root",
+      "sha256": "5e05965e4208bf78415173240a3ee5d8589dc843bcb2a38d18f2cebfe783e1a2",
+      "source_symlink": null,
+      "redacted_fields": []
+    },
+    {
+      "source": "/usr/local/sbin/depth_to_mono8.py",
+      "repo_path": "files/usr/local/sbin/depth_to_mono8.py",
+      "mode": "0o755",
+      "owner": "root",
+      "group": "root",
+      "sha256": "2e6f41ccea70fc31042550827c5abe5923385fcb3dbacc189fae5c8a3ed39eef",
+      "source_symlink": null,
+      "redacted_fields": []
+    },
+    {
+      "source": "/usr/local/sbin/realsense-camera-start",
+      "repo_path": "files/usr/local/sbin/realsense-camera-start",
+      "mode": "0o755",
+      "owner": "root",
+      "group": "root",
+      "sha256": "fd1dc2f1e69dce9c2313f94322e32b09814a5276d16e6bbc1bd82e298229459b",
+      "source_symlink": null,
+      "redacted_fields": []
+    },
+    {
+      "source": "/usr/local/sbin/ridgeback-persistent-fixes",
+      "repo_path": "files/usr/local/sbin/ridgeback-persistent-fixes",
+      "mode": "0o755",
+      "owner": "root",
+      "group": "root",
+      "sha256": "02037c28f1d28562b98cad269516cc0923752ce3b6d93ad0e88dd3f6fd8d8350",
+      "source_symlink": null,
+      "redacted_fields": []
+    },
+    {
+      "source": "/usr/local/sbin/ridgeback-startup-recover",
+      "repo_path": "files/usr/local/sbin/ridgeback-startup-recover",
+      "mode": "0o755",
+      "owner": "root",
+      "group": "root",
+      "sha256": "6cf4b26fb87d190b8af4ce351dc91847e8ac5cac5e6cb0cef383e21d278634a9",
+      "source_symlink": null,
+      "redacted_fields": []
+    },
+    {
+      "source": "/usr/local/share/battery-bridge/udp_only.xml",
+      "repo_path": "files/usr/local/share/battery-bridge/udp_only.xml",
+      "mode": "0o644",
+      "owner": "root",
+      "group": "root",
+      "sha256": "aa6925c27d40d4500ec23f3e90c746dc1eac6b90562abcebb942751186a6b579",
+      "source_symlink": null,
+      "redacted_fields": []
+    }
+  ]
+}

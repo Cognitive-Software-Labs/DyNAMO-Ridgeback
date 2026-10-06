@@ -1,0 +1,12 @@
+#!/bin/sh
+unset SESSION_MANAGER
+unset DBUS_SESSION_BUS_ADDRESS
+export XDG_SESSION_TYPE=x11
+if command -v startxfce4 >/dev/null 2>&1; then
+    exec dbus-launch startxfce4
+elif command -v openbox-session >/dev/null 2>&1; then
+    exec openbox-session
+else
+    xsetroot -solid grey
+    exec xterm
+fi

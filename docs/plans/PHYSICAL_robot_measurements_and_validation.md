@@ -30,9 +30,11 @@ The September 18 field record names checkout
 robot-local services with ad-hoc probes, and raw captures remain on the robot.
 The later [camera handoff](handoffs/PHYSICAL_d455_camera_runs_agent1.md) reports
 VGA and HD aligned-depth tests on Fast DDS, followed by failures on CycloneDDS.
-Those passes apply to the recorded configurations; final deployment acceptance
-requires reruns after the [transport blocker](../physical/intel_thor_transport.md#camera-subscriber-blocker)
-is resolved. No new hardware tests were performed for this documentation update.
+Those camera passes apply to the recorded configurations; final deployment
+acceptance requires reruns after the
+[transport blocker](../physical/intel_thor_transport.md#camera-subscriber-blocker)
+is resolved. The September 24 stationary rear-offset recheck and subsequent
+merged-scan comparison do not clear the transport or recovery gates.
 
 | Part of this visit | Recorded progress | Evidence still needed |
 |---|---|---|
@@ -47,8 +49,9 @@ is resolved. No new hardware tests were performed for this documentation update.
 The [geometry reference](../robot/geometry.md#deployed-hardware-mounts) separates
 physical readings, robot-local configuration, and nominal simulator geometry.
 The rear offset correction changed the robot YAML and vendor merger, not the
-repository's already symmetric declaration. Live parameter/TF verification does
-not replace the outstanding independent side-target recheck.
+repository's already symmetric declaration. Its independent stationary
+side-target recheck and stationary merged-output comparison are complete;
+driver recovery is not.
 
 Continue in this order: resolve and validate the services transport fault;
 confirm stable individual and merged scans and recheck the rear correction;
@@ -274,11 +277,13 @@ required model modes after their GPU environment and inputs are qualified.
 ## Both LiDARs and stationary auxiliary sensors
 
 The September 18 near/far/side box checks and 60 s individual-scan timing
-capture are complete for their recorded setup. Continue with a new shared
-side-target placement after the rear-offset correction, a comparison of merged
-and individual scans, saved overlays, and recovery evidence. The procedure
-below is the reference for affected rechecks; do not repeat all field work
-solely because this plan remains open.
+capture are complete for their recorded setup. The September 24 independent
+side-target placements and saved individual-scan overlays support the corrected
+rear offset. A later ten-second capture of the same corrected box position
+confirmed that the installed merged output agrees with individual returns and
+remains live in that short window. Continue with timeout-recovery evidence.
+The procedure below is the reference for affected rechecks;
+do not repeat all field work solely because this plan remains open.
 
 The agent records each front/rear LiDAR's device identity, driver/configuration,
 publisher ownership, topic/type/QoS, frame and TF, angular bounds/increment,
@@ -404,3 +409,4 @@ or physical motion safety.
 - [r100_0160 field readings and LiDAR box checks](../../archive/engineering/2026-09-18-r100-0160-field-measurements.md)
 - [r100_0160 D455 camera service qualification](../../archive/engineering/2026-10-06-r100-0160-camera-service.md)
 - [r100_0160 D455 factory calibration against the nominal simulator profiles](../../archive/engineering/2026-10-13-r100-0160-d455-calibration-vs-nominal.md)
+- [r100_0160 rear LiDAR side-target recheck](../../archive/engineering/2026-09-24-r100-0160-rear-lidar-recheck.md)

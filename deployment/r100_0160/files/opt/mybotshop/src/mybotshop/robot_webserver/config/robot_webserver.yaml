@@ -1,0 +1,83 @@
+#@author    Salman Omar Sohail <support@mybotshop.de>
+#@copyright (c) 2025, MYBOTSHOP GmbH, Inc., All rights reserved.
+# Ridgeback R100 (r100_0160) config for the shared robot_webserver framework
+# (ported from qre_g1, upgraded from the legacy mmp_webserver package)
+
+/**:
+  ros__parameters:
+    # --- Robot Description ---
+    robot_base_link: "base_link"
+    robot_description_package: "mmp_description"
+    robot_xacro_path: "robot.urdf.xacro"
+
+    # --- Teleop and Control ---
+    robot_cmd_vel: "cmd_vel"
+    robot_twist_stamped: true
+    robot_e_stop: "platform/emergency_stop"
+    robot_max_linear_velocity: 1.0
+    robot_max_angular_velocity: 1.5
+
+    # --- Sensor Topics ---
+    robot_odom_topic: "platform/odom/filtered"
+    robot_scan_topic: "sensors/scan"
+    robot_battery_topic: "platform/bms/state"
+    robot_joint_states_topic: "platform/joint_states"
+    robot_diagnostics_topic: "diagnostics_agg"
+
+    # --- GPS ---
+    robot_gps_topic: "fixposition/navsatfix"
+    robot_gps_lat: 50.95359
+    robot_gps_lon: 6.60174
+
+    # --- Navigation / Nav2 ---
+    nav_frame: "map"
+    robot_map_topic: "map"
+    robot_costmap_topic: "global_costmap/costmap"
+    robot_plan_topic: "plan"
+    nav2_action_name: "navigate_to_pose"
+    nav2_initial_pose_topic: "initialpose"
+    robot_navigation_package: "mmp_nav2"
+    robot_slam_launch: "slam.launch.py"
+    robot_map_navi_launch: "map_navi.launch.py"
+    robot_map_save_path: "/opt/mybotshop/src/mybotshop/mmp_nav2/maps/custom_map"
+
+    # --- Rosbag Recording ---
+    robot_rosbag_dir: "/opt/mybotshop/bags/"
+    robot_rosbag_storage: 1000000000
+    robot_rosbag_duration: 1800
+
+    # --- Manipulation (no arms on this unit) ---
+    manipulation_enabled: false
+
+    # --- LLM / Voice (not configured on this unit yet) ---
+    llm_tools_enabled: false
+
+    # --- Service Control ---
+    robot_password: "SET_LOCALLY_DURING_RECOVERY"
+    robot_home_dir: "/home/robot"
+    robot_webserver: "mbs-webserver"
+    robot_services:
+      [
+        "mbs-webserver",
+        "clearpath-robot",
+        "clearpath-platform",
+        "clearpath-sensors",
+        "clearpath-scan-merger",
+        "clearpath-joy-x-combiner",
+      ]
+    robot_exclusive_services:
+      [
+        "robot-slam",
+        "robot-map-navi",
+        "robot-gps-navi",
+      ]
+
+    # --- Web Server ---
+    web_security: true
+    web_user: "admin"
+    web_password: "mybotshop"
+    web_server_ip: "0.0.0.0"
+    web_server_port: 9000
+    web_server_threads: 6
+    web_max_clients: 6
+    web_debug_logging: false

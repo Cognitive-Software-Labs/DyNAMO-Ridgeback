@@ -1,0 +1,4 @@
+
+# Preserve captured recovery bytes, including vendor CRLF and whitespace.
+# Integrity is checked against manifest SHA-256 rather than reformatting inputs.
+deployment/r100_0160/files/** -text -whitespace

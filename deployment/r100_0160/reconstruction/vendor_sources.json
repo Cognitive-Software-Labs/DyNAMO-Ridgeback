@@ -1,0 +1,405 @@
+{
+  "observed_date": "2026-10-06",
+  "source_repository": "https://github.com/MYBOTSHOP/mbs_ridgeback",
+  "remote_access": "404 with current GitHub account; existence and permission state not distinguished",
+  "repo_head": "unknown: deployed source has no .git metadata",
+  "handover_bundle_head": "6f0701c3d41f737950c60590944caeee3bb5413d",
+  "handover_bundle_required_base": "ffa4d2457057e0ca0cb44cc2ddb1271258b34879",
+  "bundle_self_contained": false,
+  "local_handover_artifacts": [
+    {
+      "path": "/opt/mybotshop/handover/mbs_ridgeback-2026-08-12.bundle",
+      "size": 23283,
+      "sha256": "9a4bae55ae72863373065eabe5928ae97ae6732b09db1eaff9bce0fcecb752bd"
+    },
+    {
+      "path": "/opt/mybotshop/robot_webserver_handover_20260813_v2.tar.gz",
+      "size": 31968848,
+      "sha256": "7501cce38d2606b770003c4013f6ecd6c2941eda8dd232734ed10facb73b2e4c"
+    }
+  ],
+  "fingerprint_scope": "selected build/source files only; excludes credentials, config, assets, maps, binaries and private keys; not a complete source lock",
+  "packages": [
+    {
+      "name": "a2_interface",
+      "version": "0.1.0",
+      "license": "Apache-2.0",
+      "source_path": "/opt/mybotshop/src/mybotshop/a2_interface",
+      "build_source_files": [
+        {
+          "path": "CMakeLists.txt",
+          "sha256": "0862a0695ff2d4a3ace7a6cb65d1af5d3eca0456b7db03c1ea9e49f598e0d38c"
+        },
+        {
+          "path": "package.xml",
+          "sha256": "80aeeb9ec2f0590376fbb8595e4f1d6283e8dc8087dd8424ff182573f8c8881a"
+        }
+      ]
+    },
+    {
+      "name": "mmp_description",
+      "version": "1.0.0",
+      "license": "Proprietary",
+      "source_path": "/opt/mybotshop/src/mybotshop/mmp_description",
+      "build_source_files": [
+        {
+          "path": "CMakeLists.txt",
+          "sha256": "9e2dd58b7a59ecd8510f2417b2703d6d9d9209b58ad8b5fc25d6a2153c8f7daa"
+        },
+        {
+          "path": "package.xml",
+          "sha256": "9d6f627e218e25d78c74f80e5d39fd6f8c56f81193b1916a06e4fe397ab8d615"
+        }
+      ]
+    },
+    {
+      "name": "mmp_interface",
+      "version": "2.6.0",
+      "license": "Proprietary",
+      "source_path": "/opt/mybotshop/src/mybotshop/mmp_interface",
+      "build_source_files": [
+        {
+          "path": "CMakeLists.txt",
+          "sha256": "0e74ca09abc33aa89fb1b7efa2cd8a753bb249c4e87d3dbd87e2e1a4409bb543"
+        },
+        {
+          "path": "package.xml",
+          "sha256": "ebde7646d7971678b6afd2de99a5e39e3dfbd9e052352700550f144f41c17450"
+        }
+      ]
+    },
+    {
+      "name": "mmp_nav2",
+      "version": "2.6.0",
+      "license": "Proprietary",
+      "source_path": "/opt/mybotshop/src/mybotshop/mmp_nav2",
+      "build_source_files": [
+        {
+          "path": "CMakeLists.txt",
+          "sha256": "2bbf6c5fa3aca3877e5e13460f834f5c5cd2681f8ef42e64f9423e9d1075083a"
+        },
+        {
+          "path": "launch/include/localization.launch.py",
+          "sha256": "aba4803ed5215b33c1defad7b45862041824afff19c44d034e592d9d0784bb9f"
+        },
+        {
+          "path": "launch/include/navigation.launch.py",
+          "sha256": "0cc80f5cc090ea77f9c7efb2ba272131b1ca7035b1d435aadd63a03c7f6fcd72"
+        },
+        {
+          "path": "launch/map_navi.launch.py",
+          "sha256": "a87c24a1dac16aa8c13153a83d8d00d3d69d2838a79178e82445ec12086fa9a9"
+        },
+        {
+          "path": "launch/odom_navi.launch.py",
+          "sha256": "c3a5fc5be75c6a18465c5bfd69b265dd019ba5e1e175b114e1b94689b03db28f"
+        },
+        {
+          "path": "launch/slam.launch.py",
+          "sha256": "65802694f68b567c18a6a45b5c90a17c9477f821defe1df6080437260ce1e7eb"
+        },
+        {
+          "path": "package.xml",
+          "sha256": "f03a04c05c278db92e90b2363ff729022b0165d7357dd87a2f9af30546f4c2e1"
+        }
+      ]
+    },
+    {
+      "name": "mmp_webserver",
+      "version": "2.6.0",
+      "license": "Proprietary",
+      "source_path": "/opt/mybotshop/src/mybotshop/mmp_webserver",
+      "build_source_files": [
+        {
+          "path": "CMakeLists.txt",
+          "sha256": "b74e62cf27b044eeb4e75904ad4d4be01e4a14803c76a99f5e4574e50ffc7aa8"
+        },
+        {
+          "path": "launch/ros_test.launch.py",
+          "sha256": "3f8fa482f687c7659e1c2114c9bb1738dfa632ce711e4a585a53deb217130e9d"
+        },
+        {
+          "path": "launch/webserver.launch.py",
+          "sha256": "2b5045a973198b15b272bb82b6b720f931ceb78dbce0eca6a76a36a0b9fbb0b5"
+        },
+        {
+          "path": "mmp_webserver/__init__.py",
+          "sha256": "daf0f7069f265221a633cf28bd027ca307e20b6e1a40f5823f426da5d0d4696c"
+        },
+        {
+          "path": "mmp_webserver/libaudiogen.py",
+          "sha256": "95cab03fd055cf8f4926b1bd928c852a632f8b1895495126fa224980a042b68f"
+        },
+        {
+          "path": "mmp_webserver/libgpsconverter.py",
+          "sha256": "8e0cfe2a3c42e5fb1d52d23a47f92bfc0b0c7ef10d3e8e9e936218aade6aa3ee"
+        },
+        {
+          "path": "mmp_webserver/libllm.py",
+          "sha256": "1f229dda9ecfd0a1a1fec58a396b941ca057792cc8ba4746055a679ed2d686b1"
+        },
+        {
+          "path": "mmp_webserver/librealtimemic.py",
+          "sha256": "ef95b305af627b56166c503f3bd2b6608f79e47a99958064e4b5d9b3ddcf7c16"
+        },
+        {
+          "path": "mmp_webserver/libroscustom.py",
+          "sha256": "31d07e958a84ddd2a5267f191862fa4d01ce4b382ac8c06ea3024da7adad75e0"
+        },
+        {
+          "path": "mmp_webserver/librosnode.py",
+          "sha256": "e98245e9e20a4f7b291872144fefb3138a837fe8e0d7525ec521299eee80d003"
+        },
+        {
+          "path": "mmp_webserver/libwebserver.py",
+          "sha256": "3d4bd57ac2c8e26aae74fe3d2e489e5b4f9bf999529ce501ff1453306ba6d4c0"
+        },
+        {
+          "path": "package.xml",
+          "sha256": "8d07a921a2715b62d6445ed137a62e18d3119da21ae0b0cd070020a2abdf1c4d"
+        },
+        {
+          "path": "requirements.txt",
+          "sha256": "28abbf3a15a8112f9ae0072d6c6fdf0a45129bc63739c2d9c03f522c5912e777"
+        },
+        {
+          "path": "test/ros_test.py",
+          "sha256": "48a9da6e62e12b06bc6cc7c2e35ed0fbc9d5a53b09a93ad5da6f4d8e4020dbf8"
+        },
+        {
+          "path": "test/test_joint_diag.py",
+          "sha256": "c664ef04e081c387fab3d2b85df964a716a1721ea1df925f63c42fd6e36ae98d"
+        }
+      ]
+    },
+    {
+      "name": "robot_interface",
+      "version": "1.0.0",
+      "license": "Proprietary",
+      "source_path": "/opt/mybotshop/src/mybotshop/robot_interface",
+      "build_source_files": [
+        {
+          "path": "CMakeLists.txt",
+          "sha256": "92effd83c4ff32da4aebd8e1b1739ddd6b9c4616cc39fb3e29a7b8555b3c9637"
+        },
+        {
+          "path": "package.xml",
+          "sha256": "3f8e36926c21afa32a9cd69f33efb532892454613ff29899a9ec4b828de7b4dd"
+        }
+      ]
+    },
+    {
+      "name": "robot_webserver",
+      "version": "8.0.8",
+      "license": "Proprietary",
+      "source_path": "/opt/mybotshop/src/mybotshop/robot_webserver",
+      "build_source_files": [
+        {
+          "path": "CMakeLists.txt",
+          "sha256": "4afe15df2cf45438fd76a6dfdede10dcb7b25ac9e6cc03f13997e4c53e7c6b6c"
+        },
+        {
+          "path": "include/robot_webrtc/gst_raii.hpp",
+          "sha256": "f4192d166e7081bfdd9a723eed000d1527e124659ae412abc362863d7e1878ae"
+        },
+        {
+          "path": "include/robot_webrtc/json_util.hpp",
+          "sha256": "07aa072afc66645cef37497bfd0d3e5e03cc9f5510606b28a2f1d30ede938d1e"
+        },
+        {
+          "path": "include/robot_webrtc/node.hpp",
+          "sha256": "2c4c5a4e579ed0185fd5008d61b761299cbe34fa3b494e80a885faca4432ed14"
+        },
+        {
+          "path": "include/robot_webrtc/stream.hpp",
+          "sha256": "97ce0519dd7ab093317e32d2c9b884c876cb4556e7f24f1ef97fc266bbf5715e"
+        },
+        {
+          "path": "launch/webserver.launch.py",
+          "sha256": "6fc0049206b8a33742cc9e182f428af0172924ab65a63bec5f868a1f7bc36051"
+        },
+        {
+          "path": "package.xml",
+          "sha256": "7c8a0e7cb40c626d8f4d6730250af93a426ed5c17efe875331a55006e7596eef"
+        },
+        {
+          "path": "requirements.txt",
+          "sha256": "b730325965fa7f1386ec24009832ed35d7a3fe1f90b4d2dd4fbf38ad6fc25e3f"
+        },
+        {
+          "path": "robot_webserver/__init__.py",
+          "sha256": "cea8f09d2140ee8938d08a7de22bcfba4affa875743286242a987e6e0f7d6d73"
+        },
+        {
+          "path": "robot_webserver/annotate/__init__.py",
+          "sha256": "2a5fd7ca930fd5f0828beea9aeac5f0a127241c0aa8a3c1dc7d2991f181693c3"
+        },
+        {
+          "path": "robot_webserver/annotate/libannotate/__init__.py",
+          "sha256": "9aef5913b915928c4d3053bec8a1ff91e856e5689d54b40472cc5cb7e806ede9"
+        },
+        {
+          "path": "robot_webserver/annotate/libannotate/analyzer.py",
+          "sha256": "c97cb3197b4b3c98a0de8792175c49826763b01d7079b516379b4191eb0a253f"
+        },
+        {
+          "path": "robot_webserver/annotate/libannotate/skill.py",
+          "sha256": "880bdc12784a310174318e12020b4afc0109c8627dc5a5c0096d1d31716710df"
+        },
+        {
+          "path": "robot_webserver/annotate/libannotatenode.py",
+          "sha256": "1d3c2c9ff5a464213c73af1a51bca6d97994f3779e76ffd3089540528cb80575"
+        },
+        {
+          "path": "robot_webserver/llm/__init__.py",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "robot_webserver/llm/libllm/__init__.py",
+          "sha256": "b641f21e22a65189bd9533a1c4d7244a4387fe1da3fd207186ae74dfd2f001bd"
+        },
+        {
+          "path": "robot_webserver/llm/libllm/base.py",
+          "sha256": "376c6b1b622c6577e187cf1e153c68aac7b61dec9b84bb79138eb1e5cfb1fdd1"
+        },
+        {
+          "path": "robot_webserver/llm/libllm/claude.py",
+          "sha256": "48745341fdc8d3916aa3bf1d8b019cb1768efe7e00de863f633235c1b0795c9b"
+        },
+        {
+          "path": "robot_webserver/llm/libllm/gemini.py",
+          "sha256": "eb1bf53069ab021d315a3dcf1732ed1d7ffd24fc7dc5b3c1a73bd5d65422ab5e"
+        },
+        {
+          "path": "robot_webserver/llm/libllm/local.py",
+          "sha256": "4a9018237785e4d6a53dcfc4c6e40ea53b808a225010db58c501c46ce63763df"
+        },
+        {
+          "path": "robot_webserver/llm/libllm/openai_text.py",
+          "sha256": "91b14551acff84c34380d9300dadd4d7620890b54465ca713efed54adfe597ed"
+        },
+        {
+          "path": "robot_webserver/llm/libllm/realtime_session.py",
+          "sha256": "27dc56fbfe11e0864a5fcb5d26584a626fe753d1fcf81433d6d4566d129775d6"
+        },
+        {
+          "path": "robot_webserver/llm/libllmnode.py",
+          "sha256": "d04ab3a05ea851a88b7161221f199a3643525680a86168f016db38621fbdb6d5"
+        },
+        {
+          "path": "robot_webserver/llm/libllmtools/__init__.py",
+          "sha256": "5d6ab9b4922d61ce7b54e69db3ebb595778aed646afa779b4fab8b9f2fde9d56"
+        },
+        {
+          "path": "robot_webserver/llm/libllmtools/camera_tools.py",
+          "sha256": "f9270188525ebcd994b902d98bd158e26faae9504150f37737dc6cc11ea8758b"
+        },
+        {
+          "path": "robot_webserver/llm/libllmtools/control_tools.py",
+          "sha256": "fd003db0d1c54d78fd527313ded2766ee205432405e9f8065ddc99c76c8f9116"
+        },
+        {
+          "path": "robot_webserver/llm/libllmtools/errors.py",
+          "sha256": "84ee7385b35164490d6f4a54c772894f90708ae498ba73cef6d2922ad3c36cc2"
+        },
+        {
+          "path": "robot_webserver/llm/libllmtools/fillers.py",
+          "sha256": "5a59fd2a14054cc8eb70eb191a5462f926059eca75f0f511c3887cece9cbdb2a"
+        },
+        {
+          "path": "robot_webserver/llm/libllmtools/loader.py",
+          "sha256": "5132a3630778896dd90081ba9b678f9b529a066f65fbe438d140232646987444"
+        },
+        {
+          "path": "robot_webserver/llm/libllmtools/manipulation_tools.py",
+          "sha256": "1ce4a180da344c5fcc1ba1c9c89744facd5c646bc462f2c1eea882eb7bca195e"
+        },
+        {
+          "path": "robot_webserver/llm/libllmtools/navigation_tools.py",
+          "sha256": "cea6042ed7da352a07c3d50e4e1f45ec06c8ee95060c9c3e9afd7cf3290f9f04"
+        },
+        {
+          "path": "robot_webserver/llm/libllmtools/registry.py",
+          "sha256": "253738ebe347156dfcd4c0815d50e8241c98df58fc6775f7f0bc762e73c6bfe5"
+        },
+        {
+          "path": "robot_webserver/llm/libllmtools/task_registry.py",
+          "sha256": "459e5fdde317998c40e3ea3efb6c9b06adfa92d1fa68a67c7e07ff5682b7c89b"
+        },
+        {
+          "path": "robot_webserver/shared/__init__.py",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "robot_webserver/webserver/__init__.py",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "robot_webserver/webserver/blueprints/__init__.py",
+          "sha256": "e0e82fa80b6f57c89f8f77fa60e57ffc868be82eced80d5d00cb9f13271daf08"
+        },
+        {
+          "path": "robot_webserver/webserver/libaudio/__init__.py",
+          "sha256": "9e8a9564e46395798cf371a98dde781d3ed03bb3762fb7c17fc1fcc0624a1e33"
+        },
+        {
+          "path": "robot_webserver/webserver/libaudio/tts_backends/__init__.py",
+          "sha256": "89d1a7748f87c673e1bef39c170602036cbd4c604441f1bff37ae57512cd5f79"
+        },
+        {
+          "path": "robot_webserver/webserver/libdiagnostics/__init__.py",
+          "sha256": "a0f6087d7b2ea7b05153c70673d2d6c56b79e84d1ff39e11853a0b9360fe6665"
+        },
+        {
+          "path": "robot_webserver/webserver/libmanipulation/__init__.py",
+          "sha256": "19a8493142369ddb58a8332d87e15439d070ec20d5475c2eeb459c61f136b6ce"
+        },
+        {
+          "path": "robot_webserver/webserver/libnavigation/__init__.py",
+          "sha256": "a29b3de3e01fd59c037025f83901cbf8a5173de4c24bbdb4c949910ec2d1c6cb"
+        },
+        {
+          "path": "robot_webserver/webserver/librealtime/__init__.py",
+          "sha256": "b62a1ce4e35ac9194e7bcf5428ad5754232886fb73c8064ffd8d05f6408ded09"
+        },
+        {
+          "path": "robot_webserver/webserver/librosnode/__init__.py",
+          "sha256": "7e00dd3499bbc80f79d93a40445420faf2209a6f0b7dd832233234073bef2097"
+        },
+        {
+          "path": "robot_webserver/webserver/libskills/__init__.py",
+          "sha256": "07af8409f6f94a0ca9e55c61df8bcef56b29af6910c6fc1a163764a3d2c8788b"
+        },
+        {
+          "path": "robot_webserver/webserver/libskills/manager.py",
+          "sha256": "ddb6ef3d5343bec807de912474a2cd716761b760a068018fcc0384123a2c25b6"
+        },
+        {
+          "path": "robot_webserver/webserver/libtoastnotification/__init__.py",
+          "sha256": "3c0e142ee334f24021f9d160f8d01c15bc35edb8526dae0671f5e4b6e4352cec"
+        },
+        {
+          "path": "src/robot_webrtc/main.cpp",
+          "sha256": "b8f013cd795381ac2abb8df3e4d3869e8825831388d85b8f836d354a1b336dde"
+        },
+        {
+          "path": "src/robot_webrtc/node.cpp",
+          "sha256": "f196fe0878c7f9472f52f6e8ae026538e6910e88e977331a4b84dea6bd914910"
+        },
+        {
+          "path": "src/robot_webrtc/stream.cpp",
+          "sha256": "b375f8092780a089f8fdcaa16eaa852dd090d6b925f109279f91f775f5d5c011"
+        },
+        {
+          "path": "src/robot_webrtc/third_party/httplib.h",
+          "sha256": "a3347656c71c81c3fe510fdb1ff229d7db52eb7df04d3342d340eba0b6ad50ea"
+        }
+      ]
+    }
+  ],
+  "external_prerequisites": [
+    "Accessible complete MyBotShop source with permission to use it",
+    "Fresh robot_info configuration, TLS keys/certificates and credentials",
+    "Confirm current source fingerprints or explicitly qualify any differing vendor version"
+  ]
+}

@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ridgeback Remote Screen</title>
+  <style>
+    html, body {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #111;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    #screen {
+      width: 100vw;
+      height: 100vh;
+      background: #111;
+    }
+    #status {
+      position: fixed;
+      top: 12px;
+      right: 12px;
+      z-index: 10;
+      padding: 6px 10px;
+      border-radius: 4px;
+      color: #fff;
+      background: rgba(0, 0, 0, 0.65);
+      font-size: 13px;
+    }
+    #connectBox {
+      position: fixed;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 20;
+      display: flex;
+      gap: 8px;
+      padding: 12px;
+      background: rgba(20, 20, 20, 0.9);
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      border-radius: 6px;
+    }
+    input, button {
+      height: 34px;
+      box-sizing: border-box;
+      border-radius: 4px;
+      border: 1px solid #555;
+      font-size: 14px;
+    }
+    input {
+      width: 180px;
+      padding: 0 10px;
+      color: #fff;
+      background: #222;
+    }
+    button {
+      padding: 0 14px;
+      color: #111;
+      background: #f3f3f3;
+      cursor: pointer;
+    }
+    .connected #connectBox {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div id="screen"></div>
+  <div id="status">Disconnected</div>
+  <form id="connectBox">
+    <input id="password" type="password" placeholder="VNC password" autocomplete="current-password">
+    <button type="submit">Connect</button>
+  </form>
+  <script type="module">
+    import RFB from './noVNC1.3.0/core/rfb.js';
+
+    const screen = document.getElementById('screen');
+    const status = document.getElementById('status');
+    const form = document.getElementById('connectBox');
+    const password = document.getElementById('password');
+    let rfb = null;
+
+    function setStatus(text) {
+      status.textContent = text;
+    }
+
+    function connect() {
+      if (rfb) {
+        rfb.disconnect();
+        rfb = null;
+      }
+      const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+      const url = `${protocol}://${window.location.host}`;
+      setStatus('Connecting');
+      rfb = new RFB(screen, url, { credentials: { password: password.value } });
+      rfb.scaleViewport = true;
+      rfb.resizeSession = false;
+      rfb.addEventListener('connect', () => {
+        document.body.classList.add('connected');
+        setStatus('Connected');
+      });
+      rfb.addEventListener('disconnect', () => {
+        document.body.classList.remove('connected');
+        setStatus('Disconnected');
+        rfb = null;
+      });
+      rfb.addEventListener('credentialsrequired', () => setStatus('Password required'));
+      rfb.addEventListener('securityfailure', () => setStatus('Authentication failed'));
+    }
+
+    form.addEventListener('submit', (event) => {
+      event.preventDefault();
+      connect();
+    });
+  </script>
+</body>
+</html>

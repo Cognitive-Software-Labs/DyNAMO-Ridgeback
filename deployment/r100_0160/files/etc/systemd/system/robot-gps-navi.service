@@ -1,0 +1,11 @@
+[Unit]
+Description=MMP Ridgeback GPS Navigation placeholder (not configured on this robot)
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/bin/true
+RemainAfterExit=no
+
+[Install]
+WantedBy=multi-user.target

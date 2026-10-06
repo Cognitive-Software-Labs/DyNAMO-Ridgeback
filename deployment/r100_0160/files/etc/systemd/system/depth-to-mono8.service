@@ -1,0 +1,14 @@
+[Unit]
+Description=Convert RealSense depth image to mono8 for robot_webrtc
+After=realsense-camera.service
+Wants=realsense-camera.service
+
+[Service]
+Type=simple
+User=robot
+ExecStart=/bin/bash -lc 'source /opt/ros/jazzy/setup.bash && source /opt/mybotshop/install/setup.bash 2>/dev/null || true; exec /usr/local/sbin/depth_to_mono8.py'
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

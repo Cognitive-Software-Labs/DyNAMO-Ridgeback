@@ -15,6 +15,7 @@
       <Interfaces>
         <NetworkInterface address="192.168.131.1"/>
       </Interfaces>
+      <AllowMulticast>spdp</AllowMulticast>
     </General>
     <Discovery>
       <ParticipantIndex>auto</ParticipantIndex>

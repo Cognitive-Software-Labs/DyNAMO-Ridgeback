@@ -1,0 +1,18 @@
+[Unit]
+Description=Ridgeback RealSense MJPEG streams for web camera page
+After=network-online.target realsense-camera.service depth-to-mono8.service clearpath-platform.service
+Wants=network-online.target realsense-camera.service depth-to-mono8.service
+
+[Service]
+Type=simple
+User=robot
+Environment=ROS_DOMAIN_ID=0
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/bin/bash -lc 'source /opt/ros/jazzy/setup.bash; source /opt/mybotshop/install/setup.bash 2>/dev/null || true; exec /usr/local/bin/ridgeback-camera-mjpeg-server.py'
+Restart=always
+RestartSec=3
+TimeoutStopSec=5
+KillMode=mixed
+
+[Install]
+WantedBy=multi-user.target

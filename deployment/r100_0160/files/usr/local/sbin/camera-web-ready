@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+set -eo pipefail
+
+NS=/r100_0160
+TOPICS=(
+  "$NS/camera/color/image_raw"
+  "$NS/camera/depth/image_rect_mono8"
+  "$NS/camera/infra1/image_rect_raw"
+)
+
+log() { echo "[$(date -Is)] $*"; }
+
+source /opt/ros/jazzy/setup.bash
+source /opt/mybotshop/install/setup.bash 2>/dev/null || true
+
+log "waiting for RealSense ROS topics"
+deadline=$(( $(date +%s) + 90 ))
+while [ "$(date +%s)" -lt "$deadline" ]; do
+  topic_list="$(ros2 topic list 2>/dev/null || true)"
+  missing=0
+  for t in "${TOPICS[@]}"; do
+    if ! printf '%s\n' "$topic_list" | grep -qx "$t"; then
+      missing=1
+      break
+    fi
+  done
+  if [ "$missing" -eq 0 ]; then
+    log "camera topics are present"
+    break
+  fi
+  sleep 2
+done
+
+if [ "${missing:-1}" -ne 0 ]; then
+  log "camera topics did not appear in time"
+  exit 1
+fi
+
+# Give publishers and encoders a short stable window, then restart the web stack once.
+sleep 12
+log "refreshing mbs-webserver to clear stale WebRTC sessions"
+systemctl restart mbs-webserver.service
+sleep 10
+
+topics_json="$(curl -fsS --max-time 5 http://127.0.0.1:9003/topics || true)"
+for t in "${TOPICS[@]}"; do
+  if ! printf '%s' "$topics_json" | grep -q "$t"; then
+    log "robot_webrtc does not list $t"
+    exit 1
+  fi
+done
+
+log "camera web readiness check finished: OK"

@@ -1,0 +1,22 @@
+[Unit]
+Description=Independent Ridgeback VNC desktop
+After=network.target
+Before=mbs-webserver.service
+
+[Service]
+Type=forking
+User=robot
+Group=robot
+Environment=HOME=/home/robot
+WorkingDirectory=/home/robot
+PIDFile=/home/robot/.vnc/%H:1.pid
+ExecStartPre=/usr/bin/vncserver -list :1 -cleanstale
+ExecStart=/usr/bin/vncserver :1 -geometry 1920x1080 -depth 24 -localhost no
+ExecStop=/usr/bin/vncserver -kill :1
+Restart=on-failure
+RestartSec=3
+TimeoutStartSec=45
+TimeoutStopSec=20
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,17 @@
+[Unit]
+Description=ROS BMS -> /sys/class/power_supply battery bridge (test_power)
+After=clearpath-robot.service
+Wants=clearpath-robot.service
+
+[Service]
+Type=simple
+User=root
+ExecStartPre=/usr/sbin/modprobe test_power
+ExecStart=/bin/bash -c 'source /opt/ros/jazzy/setup.bash && source /etc/clearpath/setup.bash && export FASTRTPS_DEFAULT_PROFILES_FILE=/usr/local/share/battery-bridge/udp_only.xml && exec python3 /usr/local/bin/battery_sysfs_bridge.py'
+KillSignal=SIGINT
+TimeoutStopSec=10
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

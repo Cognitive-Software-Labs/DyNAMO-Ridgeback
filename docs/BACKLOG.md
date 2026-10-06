@@ -160,6 +160,30 @@ incident timeline is in the archived evidence below. The CycloneDDS deployment i
   with a recorded multi-hour soak under CycloneDDS with the Intel services,
   SLAM, and Nav2 running.
 
+## Remote desktop startup recovery
+
+**Gap.** The October 5 independent VNC installation survived vendor webserver
+reloads, but the October 6 cold boot recorded 37 VNC restarts, an NVIDIA EGL/GLX
+crash and repeated display conflicts. The independent browser proxy did not
+recover after its dependency failed; port 9005 reverted to a vendor-owned
+listener. Desktop user-session/runtime failures were also recorded. The retained
+DDS profile survived the boot, and a scan-only check passed; this is a desktop
+startup gap, separate from camera transport.
+
+**Context.** Read-only checks and ownership interpretation are in
+[desktop startup troubleshooting](troubleshooting.md#remote-desktop-startup-and-proxy-ownership).
+The maintained [workflow repair](physical/intel_dds_testing.md) addresses the
+competing port-9100 VNC launcher, proxy dependency failure, graphics selection,
+user runtime and daemon-dependent camera readiness. Its installation and boot
+behavior still need verification on the deployed robot.
+
+**Completion criteria.** Demonstrate clean cold boots with one owner for display
+:1 and port 9005, a valid robot user session/runtime directory, automatic proxy
+recovery after VNC failure, and browser/desktop continuity across vendor webserver
+reloads. Preserve DDS, camera startup, robot YAML and merger settings throughout.
+Resolve the graphics startup fault from captured evidence rather than accepting
+repeated retries as successful boot qualification.
+
 ## Physical camera validation
 
 **Gap.** The D455 input contract is implemented, but device identity, effective
@@ -301,28 +325,6 @@ or footprint correction changes their inputs or measured behavior.
 flags visible protrusions; it does not supply a surveyed outline or contact and
 stopping proof. Those are separate tasks under this gate.
 
-## Rear LiDAR mounting offset
-
-**Gap.** On `r100_0160` the deployed rear LiDAR was configured at x = −0.4278 m
-(parent `chassis_link`). The 2026-09-18 field visit found it about 3.6 cm too far back.
-A shared side target seen by both LiDARs needed a +3.5 cm rear shift to align,
-and the tape readings show symmetric mounts. The symmetric −0.3922 m used by
-Clearpath's dual-Hokuyo sample and the repository's `clearpath/robot.yaml`
-fits. The offset is duplicated in two robot files:
-`/etc/clearpath/robot.yaml` (TF, and therefore SLAM, costmaps and the collision
-monitor) and MyBotShop's scan-merger `params_ridgeback.yaml` (the merged
-`sensors/scan`). The user chose the symmetric value on 2026-09-18. It was applied
-at 18:58 UTC the same day: both files were edited (backups `*.bak-rear-lidar`) and
-`clearpath-robot` was restarted, which also restarted the merger. The live TF and
-the merger's `laser2XOff` read −0.3922, and all three scans resumed at 40 Hz.
-
-**Context.** Measurements, method and the yaw-error caveat are in the archived
-evidence below.
-
-**Completion criteria.**
-- The shared side-target check, repeated at a new placement, aligns the two
-  scanners without an extra shift.
-
 ## MyBotShop follow-ups
 
 Open questions for the next call with MyBotShop, the robot's integrator.
@@ -332,13 +334,16 @@ Resolve each one here or move it to the item that owns it.
   `/etc/clearpath/robot.yaml` (first seen 2026-08-06) and the scan-merger
   `params_ridgeback.yaml` (2026-08-10)? Was it measured? The merger comments say
   the offsets still needed live calibration. We changed it to the symmetric −0.3922
-  ([rear LiDAR mounting offset](#rear-lidar-mounting-offset)). Confirm that their
+  ([deployed hardware mounts](robot/geometry.md#deployed-hardware-mounts)). Confirm that their
   tooling will not restore the old value.
 - **Slow platform stop.** Five of six `clearpath-robot` restarts on 2026-10-06
   took 60 s to stop `clearpath-platform`; one took 7 s and the stop during a
   reboot took 10 s. A `proton_ros2_node` segmentation fault in `librcl.so` was
   logged once during a stop. Which process ignores the stop request, and is the
   fault known? Every Clearpath restart costs that minute of motor power.
+- **Camera web readiness.** Earlier boot waits failed despite subsequently
+  healthy camera topics. The direct discovery replacement and its deployment
+  verification belong to [desktop startup recovery](#remote-desktop-startup-recovery).
 - **Unit files changed on disk.** On 2026-09-18 systemd reported that the
   `realsense-camera`, `camera-web-ready`, `clearpath-platform` and
   `clearpath-sensors` units had changed since they were loaded. Which edits are
@@ -357,3 +362,4 @@ Resolve each one here or move it to the item that owns it.
 - [r100_0160 Nav2 command chain, stationary](../archive/engineering/2026-10-13-r100-0160-nav2-command-chain.md)
 - [r100_0160 D455 calibration vs the nominal model](../archive/engineering/2026-10-13-r100-0160-d455-calibration-vs-nominal.md)
 - [urg_node reconnect leak and recovery](../archive/engineering/2026-10-13-urg-node-reconnect-leak.md)
+- [r100_0160 rear LiDAR side-target recheck](../archive/engineering/2026-09-24-r100-0160-rear-lidar-recheck.md)

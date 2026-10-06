@@ -1,0 +1,16 @@
+[Unit]
+Description=Battery guard: low-voltage warning and clean shutdown (LiFePO4 packs, BMS trips)
+After=clearpath-robot.service
+Wants=clearpath-robot.service
+
+[Service]
+Type=simple
+User=root
+ExecStart=/bin/bash -c 'source /opt/ros/jazzy/setup.bash && source /etc/clearpath/setup.bash && exec python3 -u /usr/local/bin/battery_guard.py'
+KillSignal=SIGINT
+TimeoutStopSec=10
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

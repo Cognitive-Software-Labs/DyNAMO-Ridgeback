@@ -13,9 +13,21 @@ deployment work lives in the
 The September 18 [camera](../plans/handoffs/PHYSICAL_d455_camera_runs_agent1.md)
 and [transport](../plans/handoffs/PHYSICAL_intel_thor_transport_agent2.md)
 handoffs report repeated LiDAR lockouts associated with new local camera
-subscribers under the installed services configuration. No verified fix is
-recorded. Suspend routine camera subscribers and localization acceptance on
-that configuration; controlled diagnosis belongs to the transport owner.
+subscribers under the unrestricted services configuration. October 5 controlled
+tests observed a scan interruption when one local color reader started under
+that configuration. Two focused discovery-only multicast captures subsequently
+passed native image, scan and traffic gates with two independent reader pairs.
+Use the [guarded procedure](intel_dds_testing.md) to repeat and explicitly retain
+the candidate; check its recorded deployment state before routine camera runs.
+Alignment, soak, distributed localization and motion acceptance remain open.
+
+The October 5 repeat-and-keep run passed its native capture and final verification
+and retained discovery-only multicast in `/etc/clearpath/cyclonedds.xml` on Intel.
+Its deployment state is `candidate-retained` under local evidence directory
+`artifacts/hardware/20261005-intel-dds-retain/`. Camera startup, robot YAML and the
+merger override were preserved. The saved recovery command restores the exact
+pre-experiment XML. Thor was not updated. Dated measurements and limitations
+are indexed under [archived evidence](#archived-evidence).
 
 ```mermaid
 flowchart LR
@@ -29,13 +41,15 @@ The camera-only probe measured about 92 Mbit/s on `br0` and both physical
 ports. Three lockouts were reported after subscriber starts; the later two
 followed within 1–2 seconds. Data multicast is a working hypothesis, and the
 cause of the Hokuyo TCP stalls remains unproven. Do not generalize this result
-to all CycloneDDS configurations. The committed services XML still has no
-explicit `AllowMulticast` restriction.
+to all CycloneDDS configurations. The repository's Intel services and application
+profiles now set `AllowMulticast=spdp`. Updating a checkout does not reload
+running services or establish that the installed XML matches it.
 
-The proposed discovery-only multicast change and any Fast DDS recovery need
-robot-side verification: a controlled local-reader wire test, 60 s camera
-capture, and observation of sensor recovery, followed by the
+Discovery-only multicast has passed the focused local workload. Broader
+qualification still requires repeated captures, aligned-stream testing, and the
 [backlog's longer soak](../BACKLOG.md#hokuyo-driver-recovery-after-read-timeouts).
+The timeout/reconnect cause remains unverified; no captured Hokuyo timeout in
+these tests established the historical recovery bug's mechanism.
 The synthetic `check_link` traffic test does not exercise this failure: it
 uses Ethernet-only profiles, a separate domain, and one reader per probe topic.
 `check_link --camera-reader` adds the local-reader case on the robot graph under
@@ -44,6 +58,14 @@ for 20 s after a 10 s quiet baseline, failing on a contract failure, a wired TX
 rise above 5 Mbit/s or a new LiDAR grab/reconnect error. It passed on
 2026-10-21 (29.95 Hz, +0.64 Mbit/s on `eno1`, no LiDAR errors); it is one short
 reader, not the multi-hour soak.
+
+The [guarded local DDS comparison](intel_dds_testing.md) provides an explicit
+current-versus-candidate test on the Intel robot graph. It keeps the scan-merger
+middleware override fixed, records packet destinations and scan continuity,
+and reports the observed result separately from the historical hypothesis.
+Its focused retention option keeps a passing candidate after final verification,
+while preserving evidence and an exact-original recovery command. A focused
+pass does not clear broader hardware qualification gates.
 
 ## Topology
 
@@ -387,6 +409,7 @@ frames.
 
 ## Archived evidence
 
+- [Intel local DDS screening, timing and retained configuration](../../archive/engineering/2026-10-05-intel-dds-screening.md)
 - [Intel–Thor DDS transport diagnosis](../../archive/engineering/2026-09-18-intel-thor-dds-transport.md)
 - [Intel–Thor middleware benchmark](../../archive/engineering/2026-09-18-intel-thor-rmw-benchmark.md)
 - [r100_0160 Intel–Thor camera transport candidates](../../archive/engineering/2026-10-06-r100-0160-thor-transport-candidates.md)

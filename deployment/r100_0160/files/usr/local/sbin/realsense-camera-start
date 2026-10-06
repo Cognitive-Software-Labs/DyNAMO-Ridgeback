@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+set +u
+source /opt/ros/jazzy/setup.bash
+source /opt/mybotshop/install/setup.bash 2>/dev/null || true
+exec ros2 launch realsense2_camera rs_launch.py \
+  camera_name:=camera \
+  camera_namespace:=r100_0160 \
+  enable_color:=true \
+  enable_depth:=true \
+  enable_infra1:=true \
+  enable_infra2:=true \
+  pointcloud.enable:=true \
+  rgb_camera.color_profile:=640x480x30 \
+  depth_module.depth_profile:=640x480x30 \
+  depth_module.infra_profile:=640x480x30

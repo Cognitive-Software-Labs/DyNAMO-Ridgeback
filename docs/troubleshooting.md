@@ -333,6 +333,52 @@ Resolve and validate the transport configuration before routine camera tests
 resume. The reported rear-offset service restart later restored scans, but no
 camera-load retest is recorded. Do not treat restored idle scans as acceptance.
 
+## Remote desktop startup and proxy ownership
+
+The independent VNC service protects the desktop from vendor webserver reloads,
+but its October 6 cold boot showed 37 restarts. Logs included an Xtigervnc
+segmentation fault in NVIDIA EGL/GLX and repeated already-running-display errors.
+The independent port-9005 proxy failed its VNC dependency and remained inactive;
+the vendor webserver subsequently started the listener itself. A browser
+connection through that listener can therefore close on a webserver reload,
+even while the desktop remains in the independent VNC control group.
+
+Check ownership without restarting the desktop:
+
+```bash
+systemctl show ridgeback-vnc.service ridgeback-vnc-websockify.service \
+  -p ActiveState -p MainPID -p NRestarts
+ss -ltnp '( sport = :5901 or sport = :9005 )'
+journalctl -b -u ridgeback-vnc.service -u ridgeback-vnc-websockify.service
+```
+
+For each listener PID, read `/proc/PID/cgroup`: port 5901 should belong to
+`ridgeback-vnc.service`, and port 9005 to `ridgeback-vnc-websockify.service`.
+An active VNC unit alone does not establish proxy independence. Use an independent
+SSH session to investigate startup; restarting VNC closes the desktop. Preserve
+the journal before recovery. The graphics initialization failure, competing
+display ownership and proxy recovery need separate boot verification; they
+are not evidence that the retained DDS configuration failed.
+
+The existing port-9100 launcher also calls `vncserver`; running it alongside the
+independent desktop gives display :1 competing startup owners. The maintained
+[workflow repair](physical/intel_dds_testing.md) overrides that service to run
+only its browser proxy, uses foreground VNC supervision and keeps both proxies
+independent of backend failures. Its vendor startup gate checks actual listener
+ownership, preventing the vendor fallback from claiming the ports. The repair
+selects Mesa for the virtual X server while preserving application GPU selection.
+
+The same audit found an inactive robot user manager and no `/run/user/1000`,
+with desktop session/portal errors. Validate the user session and runtime
+directory as part of startup repair; do not create an arbitrary root-owned
+runtime directory to suppress those messages. Remaining work belongs to the
+[desktop startup backlog](BACKLOG.md#remote-desktop-startup-recovery).
+
+The replacement camera-ready gate uses direct publisher endpoints and the web
+topic list, with the deployed namespace and explicit domain/profile. A failed
+gate logs which publishers or web entries are missing; it does not restart the
+webserver. Publisher readiness is separate from measured image delivery.
+
 ## Camera optical-frame ownership
 
 Mask estimators require `camera_0_color_optical_frame` to the configured base

@@ -64,9 +64,12 @@ merged `sensors/scan`. Change it together with the robot-local YAML.
 Field readings match the model deck height and the configured forward camera
 setback, and show symmetric front/rear LiDAR mounts. The camera housing height
 agrees with the declared mount to within tape precision. These are
-integration checks, not a calibration or a dimensional audit. The
-[rear-offset acceptance item](../BACKLOG.md#rear-lidar-mounting-offset) retains
-the independent-placement check and the recorded yaw-error ambiguity.
+integration checks, not a calibration or a dimensional audit. September 24
+side-target checks at independent placements aligned the front and rear scans
+within about 8–10 mm without an added x shift; reinstating the former rear
+offset worsened the informative placements to about 29–33 mm. The small
+best-fit extra shift in those checks is not a basis for retuning the mount;
+formal extrinsic uncertainty and moving-robot validity remain separate.
 
 ## Physical field readings
 
@@ -200,3 +203,4 @@ retains effective footprint/padding and contact validation.
 - [September 18 static envelope audit](../../archive/engineering/2026-09-18-collision-envelope-audit.md) — measured backend differences and regenerated top-down/side comparisons; physical-envelope qualification remains open, while drawing parity is trigger-based rather than active work.
 - [r100_0160 field readings and LiDAR box checks](../../archive/engineering/2026-09-18-r100-0160-field-measurements.md) — tape mount readings, LiDAR range/side checks, and the rear-offset correction's evidence.
 - [r100_0160 D455 camera service qualification](../../archive/engineering/2026-10-06-r100-0160-camera-service.md) — the robot-local `camera_0` declaration, its generated frame chain and live TF.
+- [r100_0160 rear LiDAR side-target recheck](../../archive/engineering/2026-09-24-r100-0160-rear-lidar-recheck.md) — independent stationary placements after the correction, including a before/after corner overlay and limits.

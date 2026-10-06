@@ -1,0 +1,17 @@
+[Unit]
+Description=Ridgeback lightweight remote screen on port 9100
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=robot
+Group=robot
+Environment=HOME=/home/robot
+WorkingDirectory=/home/robot
+ExecStart=/home/robot/ridgeback-remote-screen/start-remote-screen.sh
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

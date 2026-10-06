@@ -1,0 +1,102 @@
+#!/usr/bin/env bash
+set +u
+
+NS="/r100_0160"
+MAX_WAIT_SEC=90
+
+log() { echo "[$(date -Is)] $*"; }
+ros_env() {
+    source /opt/ros/jazzy/setup.bash
+    source /opt/mybotshop/install/setup.bash 2>/dev/null || true
+}
+wait_for_ros_topic() {
+    local topic="$1"
+    local end=$(( $(date +%s) + MAX_WAIT_SEC ))
+    ros_env
+    while [ "$(date +%s)" -lt "$end" ]; do
+        ros2 topic list 2>/dev/null | grep -qx "$topic" && return 0
+        sleep 2
+    done
+    return 1
+}
+call_empty_service() {
+    local srv="$1"
+    ros_env
+    timeout 12 ros2 service call "$srv" std_srvs/srv/Empty {} >/dev/null 2>&1 || true
+}
+get_stop_status() {
+    ros_env
+    timeout 8 ros2 topic echo "$NS/platform/mcu/status/stop" --once 2>/dev/null || true
+}
+get_motor_status() {
+    ros_env
+    timeout 8 ros2 topic echo "$NS/platform/motors/status" --once 2>/dev/null || true
+}
+drive_healthy() {
+    local stop motors fault_count nonzero_fault_count
+    stop="$(get_stop_status)"
+    motors="$(get_motor_status)"
+    echo "$stop" | grep -q "needs_reset: false" || return 1
+    fault_count="$(echo "$motors" | grep -c "fault:" || true)"
+    [ "$fault_count" -ge 4 ] || return 1
+    nonzero_fault_count="$(echo "$motors" | awk '/fault:/ && $2 != "0" { c++ } END { print c+0 }')"
+    [ "$nonzero_fault_count" = "0" ] || return 1
+    return 0
+}
+restart_platform_stack() {
+    log "restarting Clearpath vcan/platform/joy stack"
+    /bin/systemctl restart clearpath-vcan.service || true
+    if ! timeout 35 /bin/systemctl restart clearpath-platform.service; then
+        log "clearpath-platform restart timed out; killing remaining unit processes"
+        /bin/systemctl kill --kill-whom=all --signal=SIGKILL clearpath-platform.service >/dev/null 2>&1 || true
+        sleep 2
+        /bin/systemctl reset-failed clearpath-platform.service >/dev/null 2>&1 || true
+        /bin/systemctl start clearpath-platform.service || true
+    fi
+    sleep 12
+    /bin/systemctl reset-failed clearpath-joy-x-combiner.service >/dev/null 2>&1 || true
+    /bin/systemctl restart clearpath-joy-x-combiner.service || true
+}
+
+log "startup recovery started"
+if [ -f /etc/clearpath/platform/config/teleop_joy.yaml ]; then
+    sed -i "s#dev: '/dev/input/[a-zA-Z0-9]*'#dev: '/dev/input/ps4'#" /etc/clearpath/platform/config/teleop_joy.yaml || true
+fi
+if [ -f /etc/clearpath/platform/config/twist_mux.yaml ]; then
+    sed -i "s#topic: 'joy_teleop/cmd_vel'#topic: 'joy_teleop/cmd_vel_combined'#" /etc/clearpath/platform/config/twist_mux.yaml || true
+fi
+wait_for_ros_topic "$NS/platform/mcu/status/stop" || log "MCU stop topic did not appear before timeout"
+call_empty_service "$NS/reset"
+sleep 1
+call_empty_service "$NS/enable"
+sleep 3
+if drive_healthy; then
+    log "drive stack healthy after reset/enable"
+else
+    log "drive stack unhealthy after reset/enable; forcing stack restart"
+    restart_platform_stack
+    call_empty_service "$NS/reset"
+    sleep 1
+    call_empty_service "$NS/enable"
+    sleep 3
+fi
+if drive_healthy; then
+    log "final drive stack health: OK"
+    /bin/systemctl reset-failed clearpath-joy-x-combiner.service >/dev/null 2>&1 || true
+    /bin/systemctl restart clearpath-joy-x-combiner.service || true
+    log "startup recovery finished"
+    exit 0
+fi
+for i in {1..30}; do
+    if drive_healthy; then
+        log "final drive stack health: OK after grace wait"
+        /bin/systemctl reset-failed clearpath-joy-x-combiner.service >/dev/null 2>&1 || true
+        /bin/systemctl restart clearpath-joy-x-combiner.service || true
+        log "startup recovery finished"
+        exit 0
+    fi
+    sleep 3
+done
+log "final drive stack health: STILL UNHEALTHY"
+log "startup recovery finished with unresolved drive fault"
+exit 1

@@ -1,0 +1,14 @@
+[Unit]
+Description=Auto-connect configured Bluetooth game controllers
+After=bluetooth.service clearpath-platform.service clearpath-joy-x-combiner.service
+Wants=bluetooth.service clearpath-platform.service clearpath-joy-x-combiner.service
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/controller-autoconnect.sh
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

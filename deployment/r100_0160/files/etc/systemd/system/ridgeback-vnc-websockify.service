@@ -1,0 +1,17 @@
+[Unit]
+Description=Independent Ridgeback VNC browser proxy
+Requires=ridgeback-vnc.service
+After=ridgeback-vnc.service
+PartOf=ridgeback-vnc.service
+Before=mbs-webserver.service
+
+[Service]
+Type=simple
+User=robot
+Group=robot
+ExecStart=/usr/bin/websockify 9005 127.0.0.1:5901
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

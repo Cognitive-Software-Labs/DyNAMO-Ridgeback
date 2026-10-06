@@ -1,0 +1,13 @@
+[Unit]
+Description=Recover Ridgeback drive and joystick stack after boot
+After=clearpath-robot.service clearpath-vcan.service clearpath-platform.service controller-autoconnect.service
+Wants=clearpath-robot.service clearpath-vcan.service clearpath-platform.service controller-autoconnect.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/ridgeback-startup-recover
+TimeoutStartSec=180
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

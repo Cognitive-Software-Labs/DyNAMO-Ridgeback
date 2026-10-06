@@ -8,6 +8,7 @@ Other pages summarize it only when useful and link back to that owner.
 | Information | Canonical home |
 |---|---|
 | Installation, public commands, launch arguments, operator workflow | root `README.md` |
+| Physical host reconstruction after reinstall or SSD failure | `docs/physical/ridgeback_recovery.md`, with small deployment inputs under `deployment/<robot>/` |
 | Short repository orientation | `docs/project/PROJECT_CONTEXT.md` |
 | Documentation policy and precedence | this page |
 | Cross-cutting repository conventions | `docs/project/conventions.md` |
@@ -57,6 +58,43 @@ rule it routes to — the graphify rules, in particular, are owned by
   one- or two-sentence summary and link to the topic owner.
 - Prefer relative Markdown links within current documentation or within the
   archive. Historical implementation sources use immutable commit links.
+
+## Host setup and reconstruction
+
+Host setup must be reconstructible by another agent from the repository, rather
+than depend on a remembered terminal session or files that exist only on the
+robot SSD. The root README routes normal installation to the detailed
+[Ridgeback recovery runbook](../physical/ridgeback_recovery.md); that runbook
+owns host-specific reconstruction. Store small necessary scripts, service units,
+drop-ins and non-secret configs under `deployment/<robot>/`, or link to their
+maintained repository source when one already owns them. Do not create a second
+independent implementation: deployed copies are labelled snapshots with origin
+and hashes; the maintained source stays authoritative.
+
+When changing host setup, update its reconstruction instructions and inputs in
+the same repository change. Cover the following as applicable:
+
+- OS/package/source versions, account/device permissions, network topology and
+  identity, dependency/build paths and prerequisite vendor source access.
+- Exact files/commands, owner and mode, service enablement and dependencies,
+  verification, rollback, and effects on camera, desktop or base ownership.
+- Installed state separately from a template, proposed repair or historical
+  claim. Record inspection date and content hashes; include known faults and
+  clean-install/cold-boot verification limits.
+- What is generated and how to regenerate it. Avoid using stale `build/`,
+  `install/` or generated Clearpath files as the configuration authority.
+- Fresh local entry/enrolment for passwords, private keys, Wi-Fi and device
+  credentials. Keep credential-bearing configs out of Git or preserve a clearly
+  labelled template with placeholders; never present a redacted hash as the
+  original installed file's hash.
+
+Make reconstruction actionable without requiring a backup service or disk-image
+workflow. An off-robot backup is a separate task only when requested. Identify
+external vendor sources that the repository cannot reconstruct, rather than
+claiming completeness from an installer or an old handover. Verification logs
+belong under `artifacts/`; durable setup instructions and necessary small inputs
+belong in tracked repository files. Changes must reach the intended Git remote
+through the normal review/publish workflow to survive loss of this checkout.
 
 ## Plan names and scope
 
