@@ -28,4 +28,13 @@ target_include_directories(SpawnG1 PRIVATE sim/gz_plugins)
 install(TARGETS SpawnG1 LIBRARY DESTINATION lib/${PROJECT_NAME})
 install(DIRECTORY launch sim DESTINATION share/${PROJECT_NAME})
 
+if(BUILD_TESTING)
+  find_package(ament_cmake_pytest REQUIRED)
+  ament_add_pytest_test(test_benchmark_assets test/test_benchmark_assets.py)
+  ament_add_pytest_test(test_gazebo_launch test/test_gazebo_launch.py)
+  # Starts a real gzserver on a physics-only world.
+  ament_add_pytest_test(test_scene_control_provider test/test_scene_control_provider.py
+    TIMEOUT 180)
+endif()
+
 ament_package()

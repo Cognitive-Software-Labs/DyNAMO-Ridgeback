@@ -1,0 +1,46 @@
+# Gazebo resources for the logical names used by target-distance benchmark
+# scenarios. Paths are relative to this file.
+#
+# No entry sets spawn_z_m, so every model spawns with its origin at world
+# z = 0, the height the Gazebo benchmark has always used. The calibration
+# floor's top surface is at z = 0.05, so models sit 5 cm into it; ground truth
+# is planar and unaffected, and changing the height would change what the
+# camera sees relative to earlier Gazebo runs.
+schema: ridgeback_benchmark_assets/1
+
+worlds:
+  target_distance_calibration:
+    native_name: target_distance_calibration
+    resource: worlds/target_distance_calibration.sdf
+    format: sdf
+
+targets:
+  g1:
+    resource: models/g1/model.sdf
+    format: sdf
+
+objects:
+  cabinet:
+    resource: models/cabinet/model.sdf
+    format: sdf
+  cabinet_tall:
+    resource: models/cabinet_tall/model.sdf
+    format: sdf
+  hospital_bed:
+    resource: models/hospital_bed/model.sdf
+    format: sdf
+  hospital_bed_high:
+    resource: models/hospital_bed_high/model.sdf
+    format: sdf
+  iv_pole:
+    resource: models/iv_pole/model.sdf
+    format: sdf
+  privacy_curtain:
+    resource: models/privacy_curtain/model.sdf
+    format: sdf
+  table:
+    resource: models/table/model.sdf
+    format: sdf
+  table_low:
+    resource: models/table_low/model.sdf
+    format: sdf

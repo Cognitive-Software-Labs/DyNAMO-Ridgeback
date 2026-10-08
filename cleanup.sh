@@ -61,6 +61,10 @@ sleep 0.5
 kill_matches "gz sim"
 kill_matches "ruby.*gz"
 kill_matches "gz-sim"
+# The Gazebo adapter runs its server as the ros_gz_sim node, whose command
+# line contains none of the patterns above. Anchored to the executable so a
+# shell or editor whose arguments mention the path is left alone.
+kill_matches "^[^ ]*/ros_gz_sim/gzserver( |$)"
 
 # Kill Isaac Sim for this user. Unlike repo-installed nodes, these command
 # lines do not expose a reliable checkout path, so this is intentionally
@@ -133,7 +137,7 @@ sleep 1
 # BOTH copies omitted this workspace's own install path, so an orphaned repo
 # node was neither killed nor reported -- the failure that hid a stray
 # scan_merger for 16 h. Keep REPO_NODES_RE first.
-LEFTOVER_RE="${REPO_NODES_RE}|ros2|gz sim|parameter_bridge|slam_toolbox|nav2|explore|ekf_node|tf_relay|robot_state_pub|joy_linux|teleop|marker_server|image_bridge|rviz|overlay_node|hud_node"
+LEFTOVER_RE="${REPO_NODES_RE}|ros2|gz sim|ros_gz_sim/gzserver|parameter_bridge|slam_toolbox|nav2|explore|ekf_node|tf_relay|robot_state_pub|joy_linux|teleop|marker_server|image_bridge|rviz|overlay_node|hud_node"
 
 leftovers() {
     ps -u "$CURRENT_USER" -o user=,pid=,pcpu=,pmem=,args= \
