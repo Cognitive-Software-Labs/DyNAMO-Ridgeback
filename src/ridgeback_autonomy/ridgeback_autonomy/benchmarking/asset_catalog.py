@@ -225,7 +225,8 @@ def _parse_spawnables(
     section: str,
     catalog_dir: str,
 ) -> dict[str, CatalogResource]:
-    entries = _require_mapping(document.get(section) or {}, f'"{section}"')
+    raw_entries = document[section] if section in document else {}
+    entries = _require_mapping(raw_entries, f'"{section}"')
     resources = {}
     for name, raw in entries.items():
         where = f'{section}.{name}'
@@ -253,7 +254,9 @@ def parse_asset_catalog(
     _require_fields(document, _TOP_LEVEL_FIELDS, f'Asset catalog {path}')
 
     worlds = {}
-    for name, raw in _require_mapping(document.get('worlds') or {}, '"worlds"').items():
+    raw_worlds = document['worlds'] if 'worlds' in document else {}
+    world_entries = _require_mapping(raw_worlds, '"worlds"')
+    for name, raw in world_entries.items():
         where = f'worlds.{name}'
         public_name = _logical_name(name, where)
         entry = _require_mapping(raw, where)

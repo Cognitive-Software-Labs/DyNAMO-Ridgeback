@@ -198,6 +198,17 @@ def test_unknown_top_level_section_and_empty_worlds_are_rejected(tmp_path, catal
         load_asset_catalog(str(write_catalog(tmp_path, document)))
 
 
+@pytest.mark.parametrize('section', ['worlds', 'targets', 'objects'])
+@pytest.mark.parametrize('value', [None, [], False, 0, ''])
+def test_falsey_non_mapping_catalog_sections_are_rejected(
+        tmp_path, catalog_path, section, value) -> None:
+    document = valid_document()
+    document[section] = value
+
+    with pytest.raises(AssetCatalogError, match=f'"{section}" must be a mapping'):
+        load_asset_catalog(str(write_catalog(tmp_path, document)))
+
+
 def test_invalid_yaml_is_a_catalog_error(tmp_path) -> None:
     path = tmp_path / 'broken.yaml'
     path.write_text('schema: [unclosed\n', encoding='utf-8')

@@ -127,12 +127,14 @@ class SceneControlError(RuntimeError):
         *,
         entity: str | None = None,
         result_code: int | None = None,
+        may_have_succeeded: bool = False,
     ) -> None:
         self.failure = failure
         self.operation = operation
         self.detail = detail
         self.entity = entity
         self.result_code = result_code
+        self.may_have_succeeded = may_have_succeeded
         target = f' "{entity}"' if entity else ''
         code = f' (result {result_code})' if result_code is not None else ''
         super().__init__(f'{operation}{target}: {failure.value}{code}: {detail}')
@@ -411,7 +413,13 @@ class SceneControlClient:
             request.initial_pose.pose.orientation.w,
         ) = _quaternion_from_yaw(float(spec.yaw))
 
-        response = self._call('spawn_entity', request, operation, spec.name)
+        try:
+            response = self._call('spawn_entity', request, operation, spec.name)
+        except SceneControlError as exc:
+            # The request was handed to the transport, so a missing or unusable
+            # response cannot prove that the provider did not create the entity.
+            exc.may_have_succeeded = True
+            raise
         _check_result(response.result, operation, spec.name, _SPAWN_RESULT_FAILURES)
         canonical = str(response.entity_name).strip()
         if not canonical:
@@ -420,8 +428,13 @@ class SceneControlClient:
                 operation,
                 'provider accepted the spawn but returned no entity name',
                 entity=spec.name,
+                may_have_succeeded=True,
             )
-        _require_benchmark_entity(canonical, operation)
+        try:
+            _require_benchmark_entity(canonical, operation)
+        except SceneControlError as exc:
+            exc.may_have_succeeded = True
+            raise
         return canonical
 
     def spawn_entities(self, specs: Sequence[SpawnSpec], spawned: list[str]) -> None:
@@ -437,7 +450,7 @@ class SceneControlClient:
             try:
                 name = self.spawn_entity(spec)
             except SceneControlError as exc:
-                if exc.failure is SceneControlFailure.TIMEOUT:
+                if exc.may_have_succeeded:
                     spawned.append(spec.name)
                 raise
             spawned.append(name)

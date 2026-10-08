@@ -486,6 +486,27 @@ def test_a_spawn_with_no_response_is_still_rolled_back(simulator) -> None:
     assert 'bench_run_t0_target_0' not in simulator.entities
 
 
+@pytest.mark.parametrize('response_failure', ['missing_name', 'transport_error'])
+def test_a_spawn_with_an_uncertain_response_is_still_rolled_back(
+        simulator, response_failure) -> None:
+    def commit_with_unusable_response(request):
+        simulator.commit_spawn(request)
+        if response_failure == 'transport_error':
+            return RuntimeError('response transport lost')
+        return _ok(SpawnEntity.Response())
+
+    simulator.overrides['spawn_entity'] = commit_with_unusable_response
+    client, _clients = make_client(simulator)
+    name = 'bench_run_t0_target_0'
+
+    with pytest.raises(SceneControlError):
+        with client.scene([spec(name)]):
+            pytest.fail('an uncertain spawn must not enter the scene body')
+
+    assert [request.entity for request in simulator.calls_to('delete_entity')] == [name]
+    assert name not in simulator.entities
+
+
 def test_each_spawn_waits_for_state_readiness_before_the_next(simulator) -> None:
     client, _clients = make_client(simulator, retry_sleep_sec=0.5)
     original_spawn = simulator.spawn_entity
