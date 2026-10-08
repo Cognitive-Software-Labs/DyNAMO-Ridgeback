@@ -635,9 +635,11 @@ class SceneControlClient:
     def find_benchmark_entities(self, prefix: str = BENCHMARK_ENTITY_PREFIX) -> tuple[str, ...]:
         """Entities whose names start with ``prefix``, a benchmark-owned prefix.
 
-        The anchored filter narrows the query, and the prefix is re-checked on
-        the response, so a provider with looser regular-expression semantics
-        still cannot hand back an unowned name for deletion.
+        The standard does not say whether a filter must match a whole name or
+        only part of it, and Gazebo requires the whole name, so the filter
+        spells out the rest of the name. The prefix is re-checked on the
+        response, so a provider with looser regular-expression semantics still
+        cannot hand back an unowned name for deletion.
         """
 
         if not prefix.startswith(BENCHMARK_ENTITY_PREFIX):
@@ -647,7 +649,7 @@ class SceneControlClient:
                 f'prefix must start with "{BENCHMARK_ENTITY_PREFIX}"',
                 entity=prefix,
             )
-        names = self._query_entities(f'^{posix_ere_literal(prefix)}')
+        names = self._query_entities(f'^{posix_ere_literal(prefix)}.*$')
         return tuple(sorted({name for name in names if name.startswith(prefix)}))
 
     def _query_entities(self, name_filter: str) -> list[str]:

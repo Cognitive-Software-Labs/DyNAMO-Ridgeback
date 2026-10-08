@@ -126,7 +126,9 @@ class FakeSimulator:
     """Serves the five standard services from a name -> pose dictionary.
 
     Behaves like the qualified Gazebo server where the standard leaves room:
-    deleting an absent entity is a generic failure, not NOT_FOUND.
+    deleting an absent entity is a generic failure, not NOT_FOUND, and a name
+    filter must match the whole name. ``filter_match`` switches to providers
+    that accept a match anywhere in the name.
     """
 
     def __init__(self, clock: FakeClock) -> None:
@@ -141,6 +143,7 @@ class FakeSimulator:
         self.frame_id = 'world'
         self.hidden_states = {}
         self.lingering = {}
+        self.filter_match = re.Pattern.fullmatch
 
     def handle(self, suffix: str, request):
         self.calls.append((suffix, request))
@@ -184,7 +187,10 @@ class FakeSimulator:
         names = [*self.entities, *(name for name, polls in self.lingering.items() if polls)]
         for name in self.lingering:
             self.lingering[name] = max(0, self.lingering[name] - 1)
-        response.entities = [name for name in names if pattern.search(name)]
+        response.entities = [
+            name for name in names
+            if not request.filters.filter or self.filter_match(pattern, name)
+        ]
         return _ok(response)
 
     def get_entities_states(self, request):
@@ -676,6 +682,23 @@ def test_cleanup_of_an_absent_entity_is_idempotent(simulator, code, message) -> 
     assert len(simulator.calls_to('delete_entity')) == 2
 
 
+@pytest.mark.parametrize('filter_match', [re.Pattern.fullmatch, re.Pattern.search])
+def test_prefix_discovery_finds_owned_names_whether_filters_match_whole_names_or_parts(
+        simulator, filter_match) -> None:
+    simulator.filter_match = filter_match
+    for name in ('bench_run1_t0_target_0', 'bench_run1_t0_obj_0', 'bench_run2_t0_target_0',
+                 'xbench_run1_t0', 'r100_0001/bench_run1_t0'):
+        simulator.entities[name] = (0.0, 0.0, 0.0, 0.0)
+    client, _clients = make_client(simulator)
+
+    assert client.find_benchmark_entities('bench_run1_') == (
+        'bench_run1_t0_obj_0', 'bench_run1_t0_target_0')
+    assert client.find_benchmark_entities() == (
+        'bench_run1_t0_obj_0', 'bench_run1_t0_target_0', 'bench_run2_t0_target_0')
+    assert client.entity_exists('bench_run1_t0_obj_0')
+    assert not client.entity_exists('bench_run1_t0')
+
+
 def test_prefix_discovery_cannot_return_unowned_names(simulator) -> None:
     for name in ('bench_run1_t0_target_0', 'bench_run1_t0_obj_0', 'bench_run2_t0_target_0',
                  'xbench_run1_t0', 'r100_0001/bench_run1_t0'):
@@ -684,7 +707,7 @@ def test_prefix_discovery_cannot_return_unowned_names(simulator) -> None:
 
     assert client.find_benchmark_entities('bench_run1_') == (
         'bench_run1_t0_obj_0', 'bench_run1_t0_target_0')
-    assert simulator.calls_to('get_entities')[-1].filters.filter == '^bench_run1_'
+    assert simulator.calls_to('get_entities')[-1].filters.filter == '^bench_run1_.*$'
 
     # A provider that ignores the filter still cannot leak another name.
     simulator.overrides['get_entities'] = lambda request: _ok(
