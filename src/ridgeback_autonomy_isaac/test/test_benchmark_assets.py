@@ -1,4 +1,4 @@
-"""The Isaac benchmark asset catalog serves the public world and G1."""
+"""The Isaac benchmark asset catalog serves every packaged scenario."""
 
 from __future__ import annotations
 
@@ -7,7 +7,6 @@ from pathlib import Path
 import pytest
 
 from ridgeback_autonomy.benchmarking.asset_catalog import (
-    AssetCatalogError,
     CATALOG_SCHEMA,
     DEFAULT_TARGET,
     load_asset_catalog,
@@ -52,18 +51,30 @@ def test_target_is_the_ground_origin_g1_in_an_advertised_format() -> None:
     assert scene_provider.resolve_resource_path(g1.uri) == g1.uri
 
 
-def test_scenes_placing_objects_are_refused_with_the_missing_names() -> None:
-    catalog = load_asset_catalog(str(CATALOG))
+def _packaged_object_models() -> frozenset[str]:
+    models = frozenset()
     for name in SCENARIO_FILES:
-        scenes = load_scenarios(str(SCENARIO_DIR / name))
-        object_models = scene_object_models(scenes)
-        assert object_models, name
+        models |= scene_object_models(load_scenarios(str(SCENARIO_DIR / name)))
+    return models
 
-        with pytest.raises(AssetCatalogError) as excinfo:
-            catalog.select(PUBLIC_WORLD, DEFAULT_TARGET, object_models)
 
-        for model in object_models:
-            assert f'object "{model}"' in str(excinfo.value)
-        for scene in scenes:
-            if not scene.objects:
-                catalog.select(PUBLIC_WORLD, DEFAULT_TARGET, [])
+def test_catalog_resolves_every_packaged_scenario() -> None:
+    catalog = load_asset_catalog(str(CATALOG))
+    object_models = _packaged_object_models()
+
+    selection = catalog.select(PUBLIC_WORLD, DEFAULT_TARGET, object_models)
+
+    assert set(selection.objects) == object_models
+    assert selection.spawn_formats == {'usd'}
+
+
+def test_catalog_lists_exactly_the_packaged_objects_and_generated_resources() -> None:
+    catalog = load_asset_catalog(str(CATALOG))
+
+    assert set(catalog.objects) == set(_packaged_object_models())
+    for name, resource in catalog.objects.items():
+        assert Path(resource.uri) == (
+            PACKAGE_ROOT / 'sim' / 'isaac' / 'usd' / 'models' / name / f'{name}.usda')
+        assert Path(resource.uri).is_file()
+        assert resource.resource_format in scene_provider.SPAWN_FORMATS
+        assert resource.spawn_z_m == 0.0

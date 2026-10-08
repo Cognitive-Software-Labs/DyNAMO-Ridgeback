@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Convert this repo's Gazebo SDF worlds to USD stages for Isaac Sim.
+"""Convert this repo's Gazebo SDF worlds or static models to USD for Isaac Sim.
 
-Handles exactly the SDF subset the in-repo worlds use (box/sphere geometry,
-static models, per-visual/collision poses, PreviewSurface-able materials,
+Handles exactly the SDF subset the in-repo assets use (box/sphere/cylinder
+geometry, static models, link-local and per-visual/collision poses,
+PreviewSurface-able materials,
 directional/point lights, ``model://`` includes) and refuses anything else,
 so a silent partial conversion can never masquerade as a ported world.
 The SDF files remain the source of truth; regenerate after editing them.
@@ -14,6 +15,9 @@ layers need pxr and run under isaac_venv:
         src/ridgeback_autonomy_gz/sim/worlds/initial_test_world.sdf \
         src/ridgeback_autonomy_isaac/sim/isaac/usd/worlds/initial_test_world.usda \
         --model-ref g1=../models/g1/g1.usda
+    isaac_venv/bin/python3 tools/isaac/sdf2usd.py \
+        src/ridgeback_autonomy_gz/sim/models/table/model.sdf \
+        src/ridgeback_autonomy_isaac/sim/isaac/usd/models/table/table.usda
     ... --check   # re-open output, assert per-model world AABBs vs SDF
 
 Geometry-to-lidar semantics match Gazebo: visuals are render geometry (RTX
@@ -44,8 +48,8 @@ class Material:
 class Geom:
     """One <visual> or <collision> entry."""
     name: str
-    kind: str                    # "box" | "sphere"
-    size: tuple                  # box: (sx,sy,sz); sphere: (r,)
+    kind: str                    # "box" | "sphere" | "cylinder"
+    size: tuple                  # box: (sx,sy,sz); sphere: (r,); cylinder: (r,l)
     pose: tuple                  # (x,y,z,roll,pitch,yaw) relative to link
     is_collision: bool
     material: Material | None
@@ -84,6 +88,7 @@ class World:
     models: list[Model]
     includes: list[Include]
     lights: list[Light]
+    standalone_model: bool = False
 
 
 def _floats(text, expect=None, pad=None):
@@ -119,11 +124,18 @@ def _material(el) -> Material | None:
 
 def _geom(el, is_collision: bool) -> Geom:
     g = el.find("geometry")
-    box, sphere = g.find("box"), g.find("sphere")
+    if g is None:
+        raise ValueError(f"missing geometry in {el.get('name')!r}")
+    box, sphere, cylinder = g.find("box"), g.find("sphere"), g.find("cylinder")
     if box is not None:
         kind, size = "box", _floats(box.find("size").text, expect=3)
     elif sphere is not None:
         kind, size = "sphere", (float(sphere.find("radius").text),)
+    elif cylinder is not None:
+        kind, size = "cylinder", (
+            float(cylinder.find("radius").text),
+            float(cylinder.find("length").text),
+        )
     else:
         unsupported = [c.tag for c in g]
         raise ValueError(f"unsupported geometry {unsupported} in {el.get('name')!r}")
@@ -137,25 +149,45 @@ def _geom(el, is_collision: bool) -> Geom:
     )
 
 
+def _parse_model(model_el) -> Model:
+    model = Model(
+        name=model_el.get("name"),
+        static=(model_el.findtext("static", "false").strip().lower() == "true"),
+        pose=_pose(model_el),
+    )
+    for link in model_el.findall("link"):
+        link_pose = _pose(link)
+        for visual in link.findall("visual"):
+            geom = _geom(visual, is_collision=False)
+            geom.pose = compose_pose(link_pose, geom.pose)
+            model.geoms.append(geom)
+        for collision in link.findall("collision"):
+            geom = _geom(collision, is_collision=True)
+            geom.pose = compose_pose(link_pose, geom.pose)
+            model.geoms.append(geom)
+    return model
+
+
+def parse_model(sdf_path) -> Model:
+    """Parse one standalone ``<model>`` document."""
+
+    root = ET.parse(sdf_path).getroot()
+    if root.tag == "world" or root.find("world") is not None:
+        raise ValueError(f"{sdf_path}: expected a standalone <model>")
+    models = [root] if root.tag == "model" else root.findall("model")
+    if len(models) != 1:
+        raise ValueError(f"{sdf_path}: expected exactly one standalone <model>")
+    return _parse_model(models[0])
+
+
 def parse_world(sdf_path) -> World:
     root = ET.parse(sdf_path).getroot()
-    world = root.find("world")
+    world = root if root.tag == "world" else root.find("world")
     if world is None:
         raise ValueError(f"{sdf_path}: no <world>")
 
-    models, includes, lights = [], [], []
-    for m in world.findall("model"):
-        static = (m.findtext("static", "false").strip().lower() == "true")
-        model = Model(name=m.get("name"), static=static, pose=_pose(m))
-        for link in m.findall("link"):
-            link_pose = _pose(link)
-            if link_pose != (0.0,) * 6:
-                raise ValueError(f"{model.name}: non-zero link pose unsupported")
-            for v in link.findall("visual"):
-                model.geoms.append(_geom(v, is_collision=False))
-            for c in link.findall("collision"):
-                model.geoms.append(_geom(c, is_collision=True))
-        models.append(model)
+    models = [_parse_model(model) for model in world.findall("model")]
+    includes, lights = [], []
 
     for inc in world.findall("include"):
         includes.append(Include(
@@ -188,6 +220,25 @@ def parse_world(sdf_path) -> World:
     )
 
 
+def parse_sdf(sdf_path) -> World:
+    """Parse a world, or wrap one standalone model as a one-model stage."""
+
+    root = ET.parse(sdf_path).getroot()
+    world = root if root.tag == "world" else root.find("world")
+    if world is not None:
+        return parse_world(sdf_path)
+    model = parse_model(sdf_path)
+    return World(
+        name=model.name,
+        gravity=(0.0, 0.0, -9.81),
+        ambient=(0.4, 0.4, 0.4, 1.0),
+        models=[model],
+        includes=[],
+        lights=[],
+        standalone_model=True,
+    )
+
+
 # ---- pose math (shared by emit + check) ------------------------------------
 
 def rpy_to_quat(roll, pitch, yaw):
@@ -212,6 +263,29 @@ def _rot_mat(q):
     )
 
 
+def _quat_mul(a, b):
+    aw, ax, ay, az = a
+    bw, bx, by, bz = b
+    return (
+        aw * bw - ax * bx - ay * by - az * bz,
+        aw * bx + ax * bw + ay * bz - az * by,
+        aw * by - ax * bz + ay * bw + az * bx,
+        aw * bz + ax * by - ay * bx + az * bw,
+    )
+
+
+def _quat_to_rpy(q):
+    r = _rot_mat(q)
+    pitch = math.asin(max(-1.0, min(1.0, -r[2][0])))
+    if abs(math.cos(pitch)) > 1e-12:
+        roll = math.atan2(r[2][1], r[2][2])
+        yaw = math.atan2(r[1][0], r[0][0])
+    else:
+        roll = math.atan2(-r[1][2], r[1][1])
+        yaw = 0.0
+    return roll, pitch, yaw
+
+
 def _apply(pose, point):
     q = rpy_to_quat(*pose[3:])
     r = _rot_mat(q)
@@ -219,8 +293,16 @@ def _apply(pose, point):
     return tuple(pose[i] + r[i][0] * x + r[i][1] * y + r[i][2] * z for i in range(3))
 
 
+def compose_pose(parent, child):
+    """Compose two SDF poses, preserving link-local geometry transforms."""
+
+    xyz = _apply(parent, child[:3])
+    q = _quat_mul(rpy_to_quat(*parent[3:]), rpy_to_quat(*child[3:]))
+    return (*xyz, *_quat_to_rpy(q))
+
+
 def model_world_aabb(model: Model, include_visual=True, include_collision=True):
-    """World-space AABB over the model's geoms (corners of each geom's OBB)."""
+    """World-space AABB over all selected model geometry."""
     lo = [math.inf] * 3
     hi = [-math.inf] * 3
     for g in model.geoms:
@@ -228,19 +310,31 @@ def model_world_aabb(model: Model, include_visual=True, include_collision=True):
             continue
         if not g.is_collision and not include_visual:
             continue
+        pose = compose_pose(model.pose, g.pose)
         if g.kind == "box":
             hx, hy, hz = (s / 2 for s in g.size)
             corners = [(sx * hx, sy * hy, sz * hz)
                        for sx in (-1, 1) for sy in (-1, 1) for sz in (-1, 1)]
-        else:
+            bounds = [_apply(pose, corner) for corner in corners]
+        elif g.kind == "sphere":
             r = g.size[0]
-            corners = [(sx * r, sy * r, sz * r)
-                       for sx in (-1, 1) for sy in (-1, 1) for sz in (-1, 1)]
-        for c in corners:
-            p = _apply(model.pose, _apply(g.pose, c))
+            bounds = [tuple(pose[i] - r for i in range(3)),
+                      tuple(pose[i] + r for i in range(3))]
+        else:
+            radius, length = g.size
+            rotation = _rot_mat(rpy_to_quat(*pose[3:]))
+            half = length / 2.0
+            extent = tuple(
+                radius * math.sqrt(rotation[i][0] ** 2 + rotation[i][1] ** 2)
+                + half * abs(rotation[i][2])
+                for i in range(3)
+            )
+            bounds = [tuple(pose[i] - extent[i] for i in range(3)),
+                      tuple(pose[i] + extent[i] for i in range(3))]
+        for point in bounds:
             for i in range(3):
-                lo[i] = min(lo[i], p[i])
-                hi[i] = max(hi[i], p[i])
+                lo[i] = min(lo[i], point[i])
+                hi[i] = max(hi[i], point[i])
     return tuple(lo), tuple(hi)
 
 
@@ -293,11 +387,12 @@ def emit_usd(world: World, out_path: Path, model_refs: dict[str, str]):
     stage.SetDefaultPrim(root.GetPrim())
     root_path = root.GetPath()
 
-    scene = UsdPhysics.Scene.Define(stage, root_path.AppendChild("physicsScene"))
-    g = Gf.Vec3f(*world.gravity)
-    mag = g.GetLength()
-    scene.CreateGravityDirectionAttr(g / mag if mag else Gf.Vec3f(0, 0, -1))
-    scene.CreateGravityMagnitudeAttr(mag)
+    if not world.standalone_model:
+        scene = UsdPhysics.Scene.Define(stage, root_path.AppendChild("physicsScene"))
+        g = Gf.Vec3f(*world.gravity)
+        mag = g.GetLength()
+        scene.CreateGravityDirectionAttr(g / mag if mag else Gf.Vec3f(0, 0, -1))
+        scene.CreateGravityMagnitudeAttr(mag)
 
     looks = stage.DefinePrim(root_path.AppendChild("Looks"), "Scope")
     material_cache = {}
@@ -336,9 +431,15 @@ def emit_usd(world: World, out_path: Path, model_refs: dict[str, str]):
             prim.CreateSizeAttr(1.0)
             set_pose(prim, geom.pose)
             prim.AddScaleOp().Set(Gf.Vec3f(*geom.size))
-        else:
+        elif geom.kind == "sphere":
             prim = UsdGeom.Sphere.Define(stage, gpath)
             prim.CreateRadiusAttr(float(geom.size[0]))
+            set_pose(prim, geom.pose)
+        else:
+            prim = UsdGeom.Cylinder.Define(stage, gpath)
+            prim.CreateAxisAttr(UsdGeom.Tokens.z)
+            prim.CreateRadiusAttr(float(geom.size[0]))
+            prim.CreateHeightAttr(float(geom.size[1]))
             set_pose(prim, geom.pose)
         if geom.is_collision:
             UsdPhysics.CollisionAPI.Apply(prim.GetPrim())
@@ -350,7 +451,19 @@ def emit_usd(world: World, out_path: Path, model_refs: dict[str, str]):
                 material_for(geom.material))
         return prim
 
-    for model in world.models:
+    models = world.models
+    if world.standalone_model:
+        if len(models) != 1:
+            raise ValueError("a standalone asset must contain exactly one model")
+        model = models[0]
+        if not model.static:
+            raise ValueError(f"non-static model {model.name!r} unsupported")
+        set_pose(root, model.pose)
+        for geom in model.geoms:
+            define_geom(root_path, geom)
+        models = []
+
+    for model in models:
         if not model.static:
             raise ValueError(f"non-static model {model.name!r} unsupported")
         mx = UsdGeom.Xform.Define(stage, root_path.AppendChild(_sanitize(model.name)))
@@ -397,12 +510,19 @@ def emit_usd(world: World, out_path: Path, model_refs: dict[str, str]):
             raise ValueError(f"unsupported light type {light.kind!r}")
         lp.CreateColorAttr(Gf.Vec3f(*light.diffuse[:3]))
 
-    # Match gz scene ambient so cameras see comparable base illumination
-    dome = UsdLux.DomeLight.Define(stage, root_path.AppendChild("ambient_dome"))
-    dome.CreateIntensityAttr(300.0)
-    dome.CreateColorAttr(Gf.Vec3f(*world.ambient[:3]))
+    if not world.standalone_model:
+        # Match gz scene ambient so cameras see comparable base illumination
+        dome = UsdLux.DomeLight.Define(stage, root_path.AppendChild("ambient_dome"))
+        dome.CreateIntensityAttr(300.0)
+        dome.CreateColorAttr(Gf.Vec3f(*world.ambient[:3]))
 
     stage.GetRootLayer().Save()
+    # Sdf writes a second trailing newline in text layers. Canonicalize USDA
+    # output so generated assets satisfy repository whitespace checks while
+    # remaining byte-stable; binary USD formats are left untouched.
+    if out_path.suffix.lower() == ".usda":
+        text = out_path.read_text(encoding="utf-8")
+        out_path.write_text(text.rstrip() + "\n", encoding="utf-8")
 
 
 # --------------------------------------------------------------------------
@@ -427,7 +547,8 @@ def check_usd(world: World, usd_path: Path, tol=1e-5) -> list[str]:
     expected_children = {(_sanitize(m.name)) for m in world.models}
     expected_children |= {(_sanitize(i.name)) for i in world.includes}
     for model in world.models:
-        prim = root.GetChild(_sanitize(model.name))
+        prim = (root if world.standalone_model
+                else root.GetChild(_sanitize(model.name)))
         if not prim:
             errors.append(f"missing model prim: {model.name}")
             continue
@@ -456,10 +577,11 @@ def check_usd(world: World, usd_path: Path, tol=1e-5) -> list[str]:
                 f"{inc.name}: subtree bottom z={feet_z:.4f}, expected "
                 f"pose z={inc.pose[2]:.4f} (wrapper xform masked?)")
 
-    got_children = {c.GetName() for c in root.GetChildren()}
-    missing = expected_children - got_children
-    if missing:
-        errors.append(f"missing prims: {sorted(missing)}")
+    if not world.standalone_model:
+        got_children = {c.GetName() for c in root.GetChildren()}
+        missing = expected_children - got_children
+        if missing:
+            errors.append(f"missing prims: {sorted(missing)}")
     return errors
 
 
@@ -476,7 +598,7 @@ def main():
                     help="only verify an existing output against the SDF")
     args = ap.parse_args()
 
-    world = parse_world(args.sdf)
+    world = parse_sdf(args.sdf)
     refs = dict(kv.split("=", 1) for kv in args.model_ref)
 
     if not args.check:
