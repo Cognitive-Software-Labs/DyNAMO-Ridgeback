@@ -5,7 +5,9 @@ Standalone SimulationApp process replacing the gz server: loads a world
 USD (worlds.py resolution), references the committed Ridgeback package,
 drives it kinematic-holonomically from cmd_vel (robot_rig.py), and
 publishes /clock, odometry+TF, and ground-truth pose (ros_io.py). GPU
-sensors attach in sensors.py (P4).
+sensors attach in sensors.py. Benchmark entities are spawned, read, and
+removed through the standard simulation_interfaces services
+(scene_provider.py, usd_scene.py).
 
 Run under isaac_venv with the workspace sourced (bridge then uses system
 rclpy/CycloneDDS):
@@ -143,6 +145,15 @@ def run(app, args) -> int:
 
     from robot_rig import RidgebackRig
     from ros_io import RosIO
+    from scene_provider import (
+        RobotState,
+        SceneControlService,
+        SceneEntities,
+        SimFrame,
+        robot_entity_name,
+        world_twist,
+    )
+    from usd_scene import UsdScene
     from worlds import (
         BASE_LINK_FLOOR_CLEARANCE,
         LIDAR_BASE_Z,
@@ -327,6 +338,14 @@ def run(app, args) -> int:
             g1_anim.append((tr, orq, t0, yaw0))
         print(f"animating {len(g1_anim)} g1 figure(s)", flush=True)
 
+    # standard simulation_interfaces scene control (benchmark targets and
+    # occluders): requests queue on their own executor thread and run below,
+    # once per update, so no ROS callback ever edits the stage
+    scene_control = SceneControlService(SceneEntities(
+        UsdScene(stage), robot_name=robot_entity_name(args.namespace)))
+    print(f"scene control services under {scene_control.service_namespace}",
+          flush=True)
+
     print("RUNNER READY", flush=True)
 
     stop = {"flag": False}
@@ -395,7 +414,12 @@ def run(app, args) -> int:
             + imu_rng.gauss(0.0, imu_sigma_accel),
         )
         last_body_twist = body_twist
-        ros.publish_ground_truth(sim_time, *rig.ground_truth())
+        gt_x, gt_y, gt_yaw = rig.ground_truth()
+        ros.publish_ground_truth(sim_time, gt_x, gt_y, gt_yaw)
+        # scene requests see exactly the update just published
+        scene_control.process_pending(SimFrame(sim_time, RobotState(
+            gt_x, gt_y, spawn_z, gt_yaw,
+            *world_twist(body_twist, gt_yaw))))
         ros.spin_once()
 
         if args.rtf > 0:
@@ -410,6 +434,7 @@ def run(app, args) -> int:
           f"achieved RTF {achieved:.2f}", flush=True)
     if depth_writer is not None:
         depth_writer.detach()
+    scene_control.shutdown()
     ros.shutdown()
     return 0
 
