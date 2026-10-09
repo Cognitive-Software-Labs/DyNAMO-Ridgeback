@@ -1,7 +1,7 @@
 # PHYSICAL — Thor perception environment and first live localization
 
-Status: **decisions confirmed (user, 2026-10-09); steps 1–2 done, step 3 next.** Owner: an agent at the
-robot, with the operator for any `sudo` step (none is expected on Thor).
+Status: **decisions confirmed (user, 2026-10-09); steps 1–3 done, step 4 next.** Owner: an agent at the
+robot, with the operator for any `sudo` step (one so far: `python3.12-venv` on Thor).
 Governing plan:
 [PHYSICAL — Intel–Thor deployment and transport qualification](PHYSICAL_intel_thor_deployment.md),
 whose section 1 (reproducible installation, proven GPU execution) this plan
@@ -95,6 +95,20 @@ README's subset builds include the vendored, message-only package.
 
 Stop rule: if any gate check fails, stop and bring the evidence back for the
 D3 alternative. Do not continue on CPU.
+
+**Done 2026-10-09** (`73a800c`; evidence on Thor under
+`artifacts/hardware/20261009T131223Z-thor-perception-env/`). Thor lacked
+`python3.12-venv`, which the starting-point inventory missed; the operator
+installed it with apt, which also moved the system Python from
+`3.12.3-1ubuntu0.13` to `0ubuntu0.17`. The requirements installed in 93 s.
+`tools/intel_thor/check_perception_env` passed: `torch 2.11.0+cu130` on the
+NVIDIA Thor (capability 11.0) with kernels for `sm_80`–`sm_120` including
+`sm_110`, cuDNN 9.19 from the wheels, and a matrix product, convolution and
+NMS on `cuda`. `pip check` reports two items outside the model stack: Ubuntu's
+`python3-nacl` without `python3-cffi` (pre-existing, visible through system
+site packages) and a platform-tag warning for `nvidia-cusparselt-cu13`, which
+PyTorch loads (cuSPARSELt 0.8.0 available). The venv's `rich` 15.0 shadows
+Ubuntu's 13.7.1 for venv processes only.
 
 ### 4. Models on the GPU (agent)
 
