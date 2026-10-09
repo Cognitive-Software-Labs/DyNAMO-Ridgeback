@@ -1,0 +1,203 @@
+#!/usr/bin/env python3
+"""Load the localization models on the GPU and time them on one real camera frame pair.
+
+Usage, with ROS and a localization install sourced, from the perception venv:
+  capture   one colour + aligned-depth pair with the same stamp, saved as .npz
+            (a single short-lived subscriber; no graph polling)
+  run       load OWLv2, SlimSAM and Depth-Anything through the repository's own
+            classes, then time them on the saved pair
+
+  .../python3 tools/intel_thor/probe_perception_models capture --namespace r100_0160 --output frames.npz
+  .../python3 tools/intel_thor/probe_perception_models run --frames frames.npz --output report.json
+
+`run` fails unless every model reports the cuda device. It records cold load
+time, first and warm inference times, peak GPU memory per model, and the
+Hugging Face snapshot each checkpoint resolved to. With no detection in the
+frame, SlimSAM is prompted with a fixed centre box so it still runs.
+"""
+import argparse
+import json
+import os
+from pathlib import Path
+import statistics
+import sys
+import time
+
+import numpy as np
+
+
+class Logger:
+    def __init__(self):
+        self.lines = []
+
+    def _log(self, level, message):
+        self.lines.append(f'{level}: {message}')
+        print(f'[{level}] {message}', flush=True)
+
+    def info(self, message):
+        self._log('info', message)
+
+    def warn(self, message):
+        self._log('warn', message)
+
+    warning = warn
+
+    def error(self, message):
+        self._log('error', message)
+
+
+def capture(namespace, output, timeout):
+    import rclpy
+    from rclpy.qos import qos_profile_sensor_data
+    from sensor_msgs.msg import Image
+    from ridgeback_localization.core.depth_sources import decode_depth_to_meters
+    from ridgeback_localization.core.image_utils import decode_color_to_rgb
+    from ridgeback_common.camera_inputs import REALSENSE_BACKEND, resolve_camera_inputs
+
+    inputs = resolve_camera_inputs(REALSENSE_BACKEND)
+    base = f"/{namespace.strip('/')}/"
+    rclpy.init()
+    node = rclpy.create_node('probe_perception_capture')
+    colour, depth = {}, {}
+
+    def stamp(message):
+        return message.header.stamp.sec * 10**9 + message.header.stamp.nanosec
+
+    node.create_subscription(Image, base + inputs.color_image_topic,
+                             lambda m: colour.__setitem__(stamp(m), m), qos_profile_sensor_data)
+    node.create_subscription(Image, base + inputs.aligned_depth_topic,
+                             lambda m: depth.__setitem__(stamp(m), m), qos_profile_sensor_data)
+    deadline = time.monotonic() + timeout
+    try:
+        while time.monotonic() < deadline and not colour.keys() & depth.keys():
+            rclpy.spin_once(node, timeout_sec=0.1)
+        shared = sorted(colour.keys() & depth.keys())
+        if not shared:
+            raise RuntimeError(f'no colour/depth pair with a shared stamp within {timeout} s')
+        key = shared[-1]
+        rgb = decode_color_to_rgb(colour[key])
+        depth_m = decode_depth_to_meters(depth[key])
+        np.savez_compressed(output, rgb=rgb, depth_m=depth_m, stamp_ns=key,
+                            frame_id=colour[key].header.frame_id)
+        print(f'saved {output}: rgb {rgb.shape}, depth {depth_m.shape}, stamp {key}')
+    finally:
+        node.destroy_node()
+        rclpy.shutdown()
+
+
+def snapshot(model_id):
+    hub = Path(os.environ.get('HF_HOME', Path.home() / '.cache/huggingface')) / 'hub'
+    ref = hub / ('models--' + model_id.replace('/', '--')) / 'refs/main'
+    return ref.read_text().strip() if ref.exists() else None
+
+
+def timed(function, warm):
+    import torch
+    torch.cuda.synchronize()
+    start = time.perf_counter()
+    result = function()
+    torch.cuda.synchronize()
+    first = (time.perf_counter() - start) * 1e3
+    samples = []
+    for _ in range(warm):
+        start = time.perf_counter()
+        function()
+        torch.cuda.synchronize()
+        samples.append((time.perf_counter() - start) * 1e3)
+    ordered = sorted(samples)
+    return result, {'first_ms': round(first, 1), 'warm_count': warm,
+                    'warm_median_ms': round(statistics.median(ordered), 1),
+                    'warm_p95_ms': round(ordered[min(len(ordered) - 1, int(.95 * len(ordered)))], 1),
+                    'warm_max_ms': round(ordered[-1], 1)}
+
+
+def run(frames, output, labels, warm):
+    import torch
+    from PIL import Image as PilImage
+    from ridgeback_localization.core.depth_sources import (
+        DEPTH_ANYTHING_MODEL_ID_DEFAULT, MonocularDepthSource)
+    from ridgeback_localization.core.detection import DETECTION_MODEL_DEFAULT, OwlV2Detector
+    from ridgeback_localization.core.segmentation import SEGMENTATION_MODEL_DEFAULT, SamBoxSegmenter
+
+    data = np.load(frames)
+    rgb = np.ascontiguousarray(data['rgb'])
+    logger = Logger()
+    report = {'frames': str(frames), 'stamp_ns': int(data['stamp_ns']), 'grid': list(rgb.shape[:2]),
+              'labels': labels, 'torch': torch.__version__, 'device_name': torch.cuda.get_device_name(0),
+              'models': {}}
+
+    def measure(key, model_id, load, infer, device_of):
+        torch.cuda.reset_peak_memory_stats()
+        start = time.perf_counter()
+        load()
+        load_s = time.perf_counter() - start
+        result, timing = timed(infer, warm)
+        report['models'][key] = {'model_id': model_id, 'snapshot': snapshot(model_id),
+                                 'device': device_of(), 'cold_load_s': round(load_s, 1), **timing,
+                                 'peak_memory_mb': round(torch.cuda.max_memory_allocated() / 2**20, 1)}
+        return result
+
+    detector = OwlV2Detector(DETECTION_MODEL_DEFAULT, logger)
+    image = PilImage.fromarray(rgb)
+    detections = measure('detector', DETECTION_MODEL_DEFAULT, detector.load,
+                         lambda: detector.detect(image, candidate_labels=labels),
+                         lambda: str(detector._pipeline.device))
+    report['detections'] = [{'label': d['label'], 'score': round(float(d['score']), 3),
+                             'box': [round(float(d['box'][k])) for k in ('xmin', 'ymin', 'xmax', 'ymax')]}
+                            for d in detections]
+    height, width = rgb.shape[:2]
+    boxes = [tuple(d['box']) for d in report['detections']] or [
+        (width * .35, height * .2, width * .65, height * .9)]
+    report['segmentation_prompt'] = 'detections' if report['detections'] else 'fixed centre box'
+
+    segmenter = SamBoxSegmenter(SEGMENTATION_MODEL_DEFAULT, logger)
+    masks = measure('segmenter', SEGMENTATION_MODEL_DEFAULT, segmenter.load,
+                    lambda: segmenter.segment_boxes(rgb, boxes),
+                    lambda: str(next(segmenter._model.parameters()).device))
+    report['masks'] = [None if mask is None else int(mask.sum()) for mask in masks]
+
+    depth = MonocularDepthSource(DEPTH_ANYTHING_MODEL_ID_DEFAULT, '', logger)
+
+    def load_depth():
+        if not depth.load():
+            raise RuntimeError('Depth-Anything failed to load; see the log lines')
+    produced = measure('monocular_depth', DEPTH_ANYTHING_MODEL_ID_DEFAULT, load_depth,
+                       lambda: depth.produce_from_rgb(rgb, None),
+                       lambda: str(depth._pipeline.device))
+    if produced is not None:
+        predicted, stereo = produced[0], data['depth_m']
+        valid = np.isfinite(stereo) & (stereo > 0) & np.isfinite(predicted)
+        report['monocular_vs_stereo'] = {
+            'valid_pixels': int(valid.sum()),
+            'median_stereo_m': round(float(np.median(stereo[valid])), 3) if valid.any() else None,
+            'median_monocular_m': round(float(np.median(predicted[valid])), 3) if valid.any() else None}
+    report['log'] = logger.lines
+    report['passed'] = all(model['device'].startswith('cuda') for model in report['models'].values())
+    text = json.dumps(report, indent=2)
+    print(text)
+    if output:
+        Path(output).write_text(text + '\n')
+    return 0 if report['passed'] else 1
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    commands = parser.add_subparsers(dest='command', required=True)
+    grab = commands.add_parser('capture')
+    grab.add_argument('--namespace', required=True)
+    grab.add_argument('--output', required=True)
+    grab.add_argument('--timeout', type=float, default=15)
+    probe = commands.add_parser('run')
+    probe.add_argument('--frames', required=True)
+    probe.add_argument('--output')
+    probe.add_argument('--labels', default='person,humanoid robot')
+    probe.add_argument('--warm', type=int, default=20)
+    args = parser.parse_args(argv)
+    if args.command == 'capture':
+        capture(args.namespace, args.output, args.timeout)
+        return 0
+    return run(args.frames, args.output, [x.strip() for x in args.labels.split(',') if x.strip()], args.warm)
+
+
+if __name__ == '__main__':
+    sys.exit(main())
