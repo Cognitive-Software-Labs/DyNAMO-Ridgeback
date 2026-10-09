@@ -3,8 +3,8 @@
 This reference owns the sensor timing tools and their report semantics.
 The [transport reference](intel_thor_transport.md) owns DDS settings and the
 [robot-local deployment](robot_local_deployment.md) owns camera/time-service
-installation. The [active plan](../plans/PHYSICAL_intel_thor_sensor_latency.md)
-owns remaining live tuning and adoption.
+installation. The transport reference records the
+[selected camera transport](intel_thor_transport.md#sensor-timing-and-time-synchronization).
 
 ## Measurement contract
 
@@ -168,10 +168,11 @@ Two decoder behaviours of Thor's Jazzy plugins (`image_transport_plugins`
 Measured outcomes are in
 [Intel–Thor camera transport candidates](../do_not_try_again/intel_thor_camera_transport.md).
 
-## Limits and pending adoption
+## Limits
 
-As inspected on 2026-10-06, the running camera remains on the previously
-qualified VGA 30 Hz service profile. The new camera DDS profile is an opt-in
-candidate. Chrony was installed by the operator on both hosts on
-2026-10-06; live verification and measured transport selection are pending. Raw/compressed comparisons, detector accuracy under lossy colour,
-CPU/NIC tuning and a camera move to Thor remain in the active plan.
+The tools measure the camera and LiDAR paths to Thor, not the perception
+pipeline's own latency or accuracy. Header stamps are the driver's estimates;
+the RealSense stamp falls near the end of exposure, so capture-to-stamp time is
+not included. Driver-split arrival times have 1 ms resolution. Measured
+outcomes and the rejected candidates are in
+[Intel–Thor camera transport candidates](../do_not_try_again/intel_thor_camera_transport.md).

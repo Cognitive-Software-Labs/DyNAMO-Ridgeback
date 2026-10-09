@@ -3,8 +3,8 @@
 Rejected or unselected ways to cut camera latency from Intel to Thor. Raw
 640×480 colour and aligned depth at 30 Hz, over Ethernet with the services DDS
 profile, met every working target in the
-[sensor latency plan](../plans/PHYSICAL_intel_thor_sensor_latency.md) and was
-faster than each candidate below. Measurements are in the archived record.
+[transport reference](../physical/intel_thor_transport.md#sensor-timing-and-time-synchronization)
+and was faster than each candidate below. Measurements are in the archived record.
 
 ## Do not enlarge the camera's DDS send buffer (O1)
 

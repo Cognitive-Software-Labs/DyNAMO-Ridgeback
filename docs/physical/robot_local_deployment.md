@@ -199,9 +199,10 @@ sets `net.core.wmem_max=16777216`. It extends older camera snapshots with the
 original sysctl file and runtime value before modifying them. Switching back
 to `services`, or rolling back, restores both. Metadata records fps, DDS mode
 and maximum-message-size selection; `status` checks the rendered profile and
-required send-buffer ceiling. These are tuning candidates, not adopted robot
-settings; use the [sensor timing reference](intel_thor_sensor_latency.md) and
-active plan to qualify them before adoption.
+required send-buffer ceiling. The `camera` profile and the larger message size
+were measured or considered and rejected; the installed default (`services`,
+30 Hz) is the selected transport. See
+[Intel–Thor camera transport candidates](../do_not_try_again/intel_thor_camera_transport.md).
 
 ## Archived evidence
 

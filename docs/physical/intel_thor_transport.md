@@ -208,6 +208,7 @@ It does not qualify the installed services configuration or clear the
 | Thor host | SSH fails, or `rmw_cyclonedds_cpp` is missing | Thor's checkout is missing or at a different revision |
 | Configurations | A file does not parse, or its interfaces differ from the table above | — |
 | Clock | Offset exceeds 10 ms | Offset exceeds 2 ms, or a host reports NTP unsynchronized |
+| Performance policy, each host | A CPU policy is not at the performance governor, Intel's energy preference is not performance, Thor is not in MAXN, or the boot unit is not enabled (from `host_performance status`) | — |
 | Traffic, each direction | The probe receives nothing or under 90% of 30 Hz, or Wi-Fi carries more than 20 Mbit/s during the stream | The largest frame gap exceeds 100 ms, or the probe's own sockets drop packets |
 
 The clock check measures the offset over one SSH channel and bounds its error
@@ -237,10 +238,14 @@ colour/depth pairing, round-trip time and CPU. It writes its results under
   server each drop UDP packets continuously (about 100 per second combined,
   recorded under Fast DDS). They are outside this repository and do not affect
   Thor, but they make Intel's host-wide drop counter useless as a link metric.
-- Both hosts take time from internet NTP over the lab Wi-Fi. The check measured
-  Thor between 0.75 ms and 4.2 ms ahead of Intel during one day. Hardening
-  time sync (Intel serving the robot subnet) is open work in the deployment
-  plan.
+- Raw 640×480 colour (921,600 B) and aligned depth (614,400 B) at 30 Hz need
+  369 Mbit/s, 37% of the link. One frame pair takes about 12.3 ms on the wire,
+  so no DDS setting brings raw VGA below that; only fewer bytes or no network
+  hop can.
+- The RealSense driver publishes aligned depth before colour. With a Thor
+  reader, depth's send occupies the link for about its wire time (~4.6 ms
+  measured) before colour is published, so colour carries that delay. Only a
+  patched driver changes the order; the deployment plan holds the decision.
 - Repeated subscriber-associated camera failures and Hokuyo lockouts are
   documented in the [camera subscriber blocker](#camera-subscriber-blocker).
   The Ethernet traffic was measured; the multicast explanation and the cause
@@ -255,14 +260,26 @@ colour/depth pairing, round-trip time and CPU. It writes its results under
 
 ## Sensor timing and time synchronization
 
-Thor's opt-in chrony configuration uses Intel (`192.168.131.1`) as its only
-source. The [robot-local deployment reference](robot_local_deployment.md#clock-synchronization-and-camera-transport-candidates)
-owns its installer and rollback. The [sensor timing reference](intel_thor_sensor_latency.md)
-owns clock bounds, latency components and the qualification collector. The
-camera-only DDS profile is a tuning candidate; the service DDS contract above
-remains the installed baseline until measured adoption.
+PTP carries Intel's wall clock to Thor, whose chrony is disabled; Intel keeps
+chrony for UTC with a 500 ppm slew limit. The
+[robot-local deployment reference](robot_local_deployment.md#clock-synchronization-and-camera-transport-candidates)
+owns the installers and rollback, and the
+[sensor timing reference](intel_thor_sensor_latency.md) owns clock bounds,
+latency components and the qualification collector.
+
+The selected camera transport is raw colour and aligned depth at 640×480 and
+30 Hz under the services DDS contract above, with both hosts at the
+performance governor and Thor in MAXN (`tools/intel_thor/host_performance`).
+It meets the working targets with margin: network + DDS p95 ≤ 20 ms, stamp to
+Thor callback p95 ≤ 40 ms, loss ≤ 1%, exact pairing ≥ 99%, LiDAR continuity
+unchanged. Larger send buffers, larger DDS messages, a lower rate and
+compression were measured or considered and rejected; see
+[Intel–Thor camera transport candidates](../do_not_try_again/intel_thor_camera_transport.md).
+Lossy colour would additionally need the detector compared on raw and decoded
+frames.
 
 ## Archived evidence
 
 - [Intel–Thor DDS transport diagnosis](../../archive/engineering/2026-09-18-intel-thor-dds-transport.md)
 - [Intel–Thor middleware benchmark](../../archive/engineering/2026-09-18-intel-thor-rmw-benchmark.md)
+- [r100_0160 Intel–Thor camera transport candidates](../../archive/engineering/2026-10-06-r100-0160-thor-transport-candidates.md)

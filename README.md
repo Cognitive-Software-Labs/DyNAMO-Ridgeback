@@ -529,8 +529,8 @@ robot-side diagnostics should target are in
 ### Intel-Thor sensor latency
 
 Use the [sensor timing reference](docs/physical/intel_thor_sensor_latency.md)
-for report definitions and the [active tuning plan](docs/plans/PHYSICAL_intel_thor_sensor_latency.md)
-for live acceptance. Tools run directly from source; no workspace build is needed.
+for report definitions and the [transport reference](docs/physical/intel_thor_transport.md#sensor-timing-and-time-synchronization)
+for the selected configuration. Tools run directly from source; no workspace build is needed.
 
 Publish the latency branch through `origin` before qualifying it. On Thor,
 leave the existing checkout untouched and create the separate worktree once:

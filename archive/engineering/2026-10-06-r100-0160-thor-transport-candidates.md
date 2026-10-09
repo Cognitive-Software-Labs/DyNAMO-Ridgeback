@@ -1,7 +1,7 @@
 # r100_0160 Intel–Thor camera transport candidates
 
 Recorded dates: 2026-10-06, 2026-10-09
-Tested revisions: `5f9467eb7f45dc81de872f5c1569d085de0e099e`, `fbf730ae98fc096e5dad288ef6fb1a25fe8a0942`, `c52384a2739994ba7268e2b42dfb8438c28b595f`, `1e72cc972e4e33f1c66cc6ad6c5c5baa8eede439`, `be224c69d94744ae00d4bb3b49a4be53419e0749`
+Tested revisions: `5f9467eb7f45dc81de872f5c1569d085de0e099e`, `fbf730ae98fc096e5dad288ef6fb1a25fe8a0942`, `c52384a2739994ba7268e2b42dfb8438c28b595f`, `1e72cc972e4e33f1c66cc6ad6c5c5baa8eede439`, `de29c637b6fb4a047017d9c5b660b19aa15ac009`, `be224c69d94744ae00d4bb3b49a4be53419e0749`
 Provenance: partial
 
 Raw artifacts stay on the Intel host under the `DyNAMO-Ridgeback-camera`
@@ -18,6 +18,28 @@ interleaved Intel/Thor repeats of 10 s warm-up and 60 s measurement, with a
 simultaneous Intel guard observer. Cross-host components use the continuous
 LAN clock calibration; O4 additionally ran under PTP (Intel wall clock
 distributed to Thor). Robot stationary.
+
+## Clock synchronization
+
+Before 2026-10-06 both hosts took internet NTP over Wi-Fi; Thor ran 2.01 ms
+ahead of Intel (bound ±0.18 ms) at inspection. chrony with Intel serving the
+subnet did not hold 0.2 ms during Intel's initial internet slews at Thor's
+default 64-second polling. With 16 polls per second, the baseline still had
+two of three Thor observations unresolved under a constant whole-run
+correction; continuous calibration over short adjacent intervals then resolved
+all three. Agreement, unlike measurement, followed Intel's internet
+corrections: Thor was 0.20–0.24 ms ahead during the baseline and 1.5–1.9 ms
+behind during O1, because chrony serves Intel's estimate of true time while
+sensor stamps use Intel's wall clock.
+
+PTP replaced Thor's chrony (`de29c637b6fb4a047017d9c5b660b19aa15ac009`,
+`artifacts/hardware/20261006T145000Z-ptp-verification/`): Intel serves its
+wall clock from `eno1`'s hardware clock over L2 and Thor follows on
+`enP2p1s0`. Eighteen direct-LAN samples over three minutes measured offsets of
+−38 to +1 µs, each bounded by 52–130 µs, through two Intel internet corrections
+of +1.59 ms and −1.10 ms that Intel's 500 ppm slew limit spread over tens of
+seconds. On 2026-10-09, after a Thor reboot, Thor's `phc2sys` reported 0.3–1 µs
+rms.
 
 ## Results (Thor observer, median / p95 ms per repeat)
 
