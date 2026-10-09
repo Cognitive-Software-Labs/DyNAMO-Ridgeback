@@ -82,6 +82,7 @@ troubleshooting, planning, and historical documentation.
 - [PHYSICAL — Intel–Thor deployment and transport qualification](plans/PHYSICAL_intel_thor_deployment.md) — robot-side installation, GPU offload, Ethernet measurements, and failure handling
   - Handoff: [Intel–Thor transport (agent 2)](plans/handoffs/PHYSICAL_intel_thor_transport_agent2.md) — CycloneDDS switch state, services-configuration flood behind the LiDAR lockouts, manual rollback, next steps
   - [Intel–Thor sensor latency tools](physical/intel_thor_sensor_latency.md) — report components, clock bounds and interleaved qualification
+  - [PHYSICAL — Thor perception environment and first live localization](plans/PHYSICAL_thor_perception_environment.md) — verified GPU inference environment on Thor, the localization build there, and one stationary live run
 - [PHYSICAL — Robot measurements and stationary sensor validation](plans/PHYSICAL_robot_measurements_and_validation.md) — quick mount readings/photos, D455 and LiDAR checks, stationary alignment, and G1/person tests
   - Handoff: [D455 camera runs (agent 1)](plans/handoffs/PHYSICAL_d455_camera_runs_agent1.md) — P1/P2 results, CycloneDDS camera-transport and LiDAR-lockout findings, next steps
 
