@@ -322,7 +322,11 @@ def run_repeats(args, root, compressed):
                 raw = json.loads(samples.read_text())
                 report['timing'] = {key: CONTRACT.timing_stats(value, report['clock']['offset_ms'],
                                    report['clock']['bound_ms'], same_host=host == 'intel',
-                                   clock_series=series if not monitor.errors else []) for key, value in raw.items()}
+                                   clock_series=series if not monitor.errors else []) for key, value in raw.items()
+                                   if not key.endswith('_metadata')}
+                for stream in ('color', 'depth'):
+                    if stream + '_metadata' in raw:
+                        report['timing'][stream]['driver_split'] = CONTRACT.driver_split(raw[stream], raw[stream + '_metadata'])
                 for stream, transport in report.get('transports', {}).items():
                     if transport != 'raw':
                         report['timing'][stream] = CONTRACT.transport_timing(

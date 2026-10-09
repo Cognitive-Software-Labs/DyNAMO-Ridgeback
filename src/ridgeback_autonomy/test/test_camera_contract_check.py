@@ -259,3 +259,14 @@ def test_compressed_stream_splits_delay_across_hosts_by_stamp():
     assert unresolved['clock_resolved'] is False
     assert unresolved['components']['network_dds']['count'] == unresolved['components']['total']['count'] == 0
     assert unresolved['components']['decode']['count'] == 1
+
+
+def test_driver_split_at_host_arrival():
+    stamp = 1_000_000_000
+    images = [TOOL.timing_sample(stamp, {'source_timestamp': stamp + 18_000_000}, stamp + 19_000_000),
+              TOOL.timing_sample(stamp + PERIOD_NS, {'source_timestamp': stamp + PERIOD_NS + 18_000_000}, 0)]
+    metadata = [{'stamp_ns': stamp, 'arrival_ms': (stamp + 12_000_000) // 1_000_000}]
+    result = TOOL.driver_split(images, metadata)
+    assert (result['matched'], result['images']) == (1, 2)
+    assert result['components']['camera_usb']['median_ms'] == 12
+    assert result['components']['host']['median_ms'] == 6

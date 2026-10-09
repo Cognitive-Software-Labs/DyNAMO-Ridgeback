@@ -238,6 +238,27 @@ def transport_timing(encoded, decoded, offset_ms=None, bound_ms=None, clock_seri
             'dds_loss': timing_stats(decoded, same_host=True)['dds_loss']}
 
 
+def driver_split(images, metadata):
+    """Split the driver component at librealsense's host arrival time (Intel clock).
+
+    camera_usb  arrival minus header stamp: sensor readout, camera processing and USB
+    host        driver publish minus arrival: conversion, alignment, pairing, publish
+    Arrival is whole milliseconds, so each value carries up to 1 ms of quantization.
+    """
+    arrival = {sample['stamp_ns']: sample['arrival_ms'] * 1_000_000 for sample in metadata
+               if sample['arrival_ms']}
+    values = {'camera_usb': [], 'host': []}
+    for sample in images:
+        at = arrival.get(sample['stamp_ns'])
+        if at is None:
+            continue
+        values['camera_usb'].append((at - sample['stamp_ns']) / 1e6)
+        if sample['source_ns'] > 0:
+            values['host'].append((sample['source_ns'] - at) / 1e6)
+    return {'matched': len(values['camera_usb']), 'images': len(images),
+            'components': {key: percentiles(value) for key, value in values.items()}}
+
+
 def host_counters():
     """No graph polling: Linux counters for CPU and every non-loopback NIC."""
     cpu = [int(v) for v in Path('/proc/stat').read_text().splitlines()[0].split()[1:]]
@@ -335,7 +356,7 @@ def hardware_defaults():
 
 
 def observe(namespace, inputs, base_frame, warmup, duration, scans, timing=False, guard=False,
-            transports=None):
+            transports=None, metadata=False):
     transports = transports or {'color': 'raw', 'depth': 'raw'}
     import rclpy
     from rclpy.duration import Duration
@@ -363,8 +384,10 @@ def observe(namespace, inputs, base_frame, warmup, duration, scans, timing=False
     observation['info'] = {'sizes': set(), 'frames': set()}
     scan_receipts = {name: [] for name in SCAN_TOPICS} if scans else {}
     compressed = [stream for stream in ('color', 'depth') if transports[stream] != 'raw']
+    metadata = metadata and timing
     timed = {name: [] for name in ('color', 'depth', 'info', *scan_receipts, 'tf',
-                                   *(stream + '_encoded' for stream in compressed))}
+                                   *(stream + '_encoded' for stream in compressed),
+                                   *(('color_metadata', 'depth_metadata') if metadata else ()))}
     # Contract checks and pairing apply to what consumers receive: decoded frames
     # for a compressed stream, the driver's raw topic otherwise.
     image_topics = {'color': inputs.color_image_topic, 'depth': inputs.aligned_depth_topic}
@@ -464,6 +487,24 @@ def observe(namespace, inputs, base_frame, warmup, duration, scans, timing=False
                                  qos_profile_sensor_data, raw=True)
     if timing:
         node.create_subscription(TFMessage, absolute('tf'), tf_callback, qos_profile_sensor_data)
+
+    def metadata_callback(key):
+        def callback(message):
+            if measure_from <= time.monotonic() < end:
+                fields = json.loads(message.json_data)
+                stamp = message.header.stamp
+                timed[key].append({'stamp_ns': stamp.sec * 10**9 + stamp.nanosec,
+                                   'arrival_ms': fields.get('time_of_arrival', 0),
+                                   'backend_ms': fields.get('backend_timestamp', 0),
+                                   'frame_timestamp_ms': fields.get('frame_timestamp', 0)})
+        return callback
+
+    if metadata:
+        # The RealSense driver's per-frame metadata; Intel only, it is not a contract topic.
+        from realsense2_camera_msgs.msg import Metadata
+        for stream in ('color', 'depth'):
+            node.create_subscription(Metadata, absolute(f'sensors/camera_0/{stream}/metadata'),
+                                     metadata_callback(stream + '_metadata'), qos_profile_sensor_data)
     try:
         while time.monotonic() < end and abort is None:
             now = time.monotonic()
@@ -570,7 +611,8 @@ def main(argv=None):
     print(f'Observing /{namespace} for {args.warmup:.0f} s warm-up + {args.duration:.0f} s', flush=True)
     observation = observe(namespace, inputs, base_frame, args.warmup, args.duration,
                           scans=hardware and not args.no_scans, timing=args.timing, guard=args.guard,
-                          transports=transports)
+                          transports=transports,
+                          metadata=hardware and args.host == 'intel')
     if not hardware or args.no_scans:
         observation['scans'] = {}
     rows = evaluate(observation, expected)
@@ -581,7 +623,12 @@ def main(argv=None):
         print('ABORT: ' + observation['aborted'])
     timing = {key: timing_stats(samples, args.clock_offset_ms, args.clock_bound_ms,
                                same_host=args.host == 'intel')
-              for key, samples in observation['timing'].items()} if args.timing else {}
+              for key, samples in observation['timing'].items()
+              if not key.endswith('_metadata')} if args.timing else {}
+    for stream in ('color', 'depth'):
+        if stream + '_metadata' in observation['timing']:
+            timing[stream]['driver_split'] = driver_split(observation['timing'][stream],
+                                                          observation['timing'][stream + '_metadata'])
     for stream, transport in transports.items():
         if args.timing and transport != 'raw':
             timing[stream] = transport_timing(observation['timing'][stream + '_encoded'],

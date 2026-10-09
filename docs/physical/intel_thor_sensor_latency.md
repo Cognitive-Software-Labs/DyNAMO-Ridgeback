@@ -21,6 +21,13 @@ transforms, including multiple stamps within a single TFMessage.
 | Executor | callback entry minus received timestamp |
 | Total | callback entry minus header stamp minus Thor–Intel offset |
 
+On hardware, the Intel observer also subscribes to the driver's per-frame
+`color/metadata` and `depth/metadata` and adds `driver_split` to each stream:
+camera+USB is librealsense's host arrival time minus the header stamp, and
+Intel is the driver's publish minus that arrival. Arrival is whole
+milliseconds, so both carry up to 1 ms of quantization. Both metadata topics
+carry the frameset stamp shared by colour and aligned depth.
+
 Components report sample count, median, p95, p99 and maximum in milliseconds,
 using linear interpolation. Missing/zero RMW timestamps leave the affected
 components empty. Negative samples are retained to expose timestamp faults.
