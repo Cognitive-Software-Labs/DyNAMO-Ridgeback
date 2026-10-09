@@ -240,14 +240,16 @@ not permission to drive the robot.
 
 **Thor — build only localization.** In a new shell, source ROS Jazzy and no old
 workspace overlay. The subset needs no imported Clearpath source repositories,
-Nav2, simulator, or RViz. Install the subset's ROS dependencies, then use a fresh
-prefix (choose another name for a later candidate):
+Nav2, simulator, or RViz; it includes the vendored, message-only
+`rviz_2d_overlay_msgs` that the optional display node imports. Install the
+subset's ROS dependencies, then use a fresh prefix (choose another name for a
+later candidate):
 
 ```bash
 source /opt/ros/jazzy/setup.bash
-rosdep install --from-paths src/ridgeback_interfaces src/ridgeback_common src/ridgeback_localization --ignore-src -r -y
+rosdep install --from-paths src/ridgeback_interfaces src/ridgeback_common src/ridgeback_localization src/rviz_2d_overlay_plugins/rviz_2d_overlay_msgs --ignore-src -r -y
 colcon --log-base artifacts/colcon/thor build \
-  --base-paths src/ridgeback_interfaces src/ridgeback_common src/ridgeback_localization \
+  --base-paths src/ridgeback_interfaces src/ridgeback_common src/ridgeback_localization src/rviz_2d_overlay_plugins/rviz_2d_overlay_msgs \
   --build-base artifacts/colcon/thor-build --install-base artifacts/colcon/thor-install
 source artifacts/colcon/thor-install/local_setup.bash
 python3 tools/check_localization_install
@@ -278,7 +280,7 @@ adapter required for the observer:
 ```bash
 source /opt/ros/jazzy/setup.bash
 colcon --log-base artifacts/colcon/intel build \
-  --base-paths src/ridgeback_interfaces src/ridgeback_common src/ridgeback_localization src/ridgeback_autonomy \
+  --base-paths src/ridgeback_interfaces src/ridgeback_common src/ridgeback_localization src/ridgeback_autonomy src/rviz_2d_overlay_plugins/rviz_2d_overlay_msgs \
   --build-base artifacts/colcon/intel-build --install-base artifacts/colcon/intel-install
 source artifacts/colcon/intel-install/local_setup.bash
 : "${ROS_DOMAIN_ID:?Set the deployment domain shared with Thor}"

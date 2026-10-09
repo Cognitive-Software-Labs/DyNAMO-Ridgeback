@@ -23,5 +23,7 @@
   <exec_depend>python3-numpy</exec_depend>
   <exec_depend>python3-opencv</exec_depend>
   <exec_depend>python3-pil</exec_depend>
+  <!-- Message-only package for the optional HUD display node; vendored in src/rviz_2d_overlay_plugins. -->
+  <exec_depend>rviz_2d_overlay_msgs</exec_depend>
   <export><build_type>ament_cmake</build_type></export>
 </package>
