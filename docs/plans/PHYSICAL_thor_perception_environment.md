@@ -1,6 +1,6 @@
 # PHYSICAL — Thor perception environment and first live localization
 
-Status: **proposed; decisions below await the user.** Owner: an agent at the
+Status: **decisions confirmed (user, 2026-10-09); step 1 in progress.** Owner: an agent at the
 robot, with the operator for any `sudo` step (none is expected on Thor).
 Governing plan:
 [PHYSICAL — Intel–Thor deployment and transport qualification](PHYSICAL_intel_thor_deployment.md),
@@ -18,7 +18,7 @@ stationary, with Intel observing the results. Measuring the four model modes
 (the governing plan's section 3) is the next plan; it starts from the
 environment installed here.
 
-## Decisions (proposed; user to confirm)
+## Decisions (user, 2026-10-09: all recommendations)
 
 | # | Decision | Recommendation | Alternative |
 |---|---|---|---|
