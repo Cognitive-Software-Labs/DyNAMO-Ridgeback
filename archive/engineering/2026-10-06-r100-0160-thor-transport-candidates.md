@@ -1,7 +1,7 @@
 # r100_0160 Intel–Thor camera transport candidates
 
-Recorded dates: 2026-10-06
-Tested revisions: `5f9467eb7f45dc81de872f5c1569d085de0e099e`, `fbf730ae98fc096e5dad288ef6fb1a25fe8a0942`, `c52384a2739994ba7268e2b42dfb8438c28b595f`, `1e72cc972e4e33f1c66cc6ad6c5c5baa8eede439`
+Recorded dates: 2026-10-06, 2026-10-09
+Tested revisions: `5f9467eb7f45dc81de872f5c1569d085de0e099e`, `fbf730ae98fc096e5dad288ef6fb1a25fe8a0942`, `c52384a2739994ba7268e2b42dfb8438c28b595f`, `1e72cc972e4e33f1c66cc6ad6c5c5baa8eede439`, `be224c69d94744ae00d4bb3b49a4be53419e0749`
 Provenance: partial
 
 Raw artifacts stay on the Intel host under the `DyNAMO-Ridgeback-camera`
@@ -56,6 +56,45 @@ Thor packages: `image_transport` 5.1.7, `image_transport_plugins` 4.0.7,
 `ffmpeg_image_transport` 3.0.4, `ffmpeg_encoder_decoder` 3.0.1. Intel encoder:
 `h264_nvenc` on an RTX 5060, `preset:p1,tune:ull,zerolatency:1,delay:0`,
 `gop_size` 15, no B-frames, 8 Mb/s.
+
+## O6 driver pipeline and performance policy
+
+Revision `be224c69d94744ae00d4bb3b49a4be53419e0749`, 2026-10-09, raw transport as in the baseline, PTP clock.
+Both hosts at the performance governor (Intel energy preference performance,
+turbo on), Thor in MAXN, installed by `host_performance`
+(`artifacts/hardware/20261009T123123Z-thor-latency-o6-performance/`). The
+2026-10-06 baseline ran with Intel's `powersave` governor
+(`balance_performance`) and Thor at 120W under schedutil.
+
+| median / p95 ms | Baseline (powersave) | Performance policy |
+|---|---|---|
+| Colour total on Thor | 29.5–29.8 / 32.9–34.6 | 27.8–28.3 / 30.5–31.6 |
+| Depth total on Thor | 21.4–21.8 / 24.9–25.7 | 19.8–20.3 / 22.5–23.6 |
+| Merged scan total on Thor | 1.1 / 2.0–2.1 | 0.5 / 1.6 |
+| Colour driver, Intel-only run | 20.4–20.9 / 24.1–25.2 | 14.6–15.1 / 16.6–17.3 |
+
+All nine observations passed the contract, resolved the clock, met every
+working target and lost no frame against the Intel observer. The driver split
+(host arrival in whole milliseconds) matched every frame:
+
+| median / p95 ms | Camera+USB | Intel, Intel-only run | Intel, with Thor reading |
+|---|---|---|---|
+| Colour | 11.7–12.1 / 13.7–14.4 | 3.0 / 3.4 | 7.1–7.2 / 7.7 |
+| Depth | 5.6–6.0 / 7.6–8.3 | 8.6 / 9.0 | 8.6 / 9.1 |
+
+A single 10-second Intel check under `powersave` earlier the same day gave
+colour Intel 5.9 / 7.9 ms, so the policy roughly halved Intel processing.
+Depth's Intel share includes about 6 ms waiting for colour, whose metadata
+stamps arrive later. Colour minus depth publish time (same stamp) was 0.48 ms
+median without a Thor reader and 4.6 ms (p5 4.4, p95 5.0) with one: the driver
+publishes aligned depth first, and that send to Thor occupies the 1 Gb/s link
+for about depth's wire time before colour is published.
+
+Two runs that day are not evidence for either condition:
+`20261009T122214Z-thor-latency-o6-startup-miss` received no camera or scan
+data during its first observer's warm-up while services and data were healthy
+(a later check passed), and `20261009T122329Z-thor-latency-o6-policy-switched-mid-run`
+spans the policy switch (Intel 12:24:38 UTC, Thor 12:28:59 UTC).
 
 ## Limits
 

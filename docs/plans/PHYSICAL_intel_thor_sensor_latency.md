@@ -242,31 +242,32 @@ the baseline, and recorded even when it loses.
 | O2 | CycloneDDS `MaxMessageSize` 65500 against the default | Same profile, so it includes O1's send buffer. **Skipped** (user, 2026-10-06) |
 | O3 | 15 frames/s against 30 | **Withdrawn**: reduced rate is not an option |
 | O4 | Colour H.264 through `ffmpeg_image_transport` (NVENC on the RTX 5060) or JPEG; depth `zstd` or RVL, lossless only | Driver parameters for the encoder; on Thor, install the matching plugins (operator `sudo apt`) and a republisher that restores raw `Image` topics under the contract names. **Measured, not adopted** |
-| O6 | Driver pipeline on Intel (the largest component): measure camera+USB against Intel processing per frame, then cut Intel processing | Contract check records the driver's per-frame metadata; candidates through `camera_service` or `host_performance`. See O6 below |
+| O6 | Driver pipeline on Intel (the largest component): measure camera+USB against Intel processing per frame, then cut Intel processing | Contract check records the driver's per-frame metadata. **Measured**: performance policy adopted; publish order left as an open decision. See O6 below |
 | O5 | Thor power mode and CPU governor; NIC interrupt coalescing on both hosts | **Decided** (user, 2026-10-06): both hosts always at the performance governor and Thor in MAXN, enforced by `host_performance` and `check_link`; NIC tuning not pursued (at most ~1 ms above wire time). Original: | Recorded host settings; restored afterwards unless adopted |
 
-**O6 driver pipeline.** The Intel observer subscribes to the driver's
-`color/metadata` and `depth/metadata` and splits each frame's driver time at
-librealsense's host arrival (whole milliseconds); the
+**O6 driver pipeline, measured.** The Intel observer splits each frame's
+driver time at librealsense's host arrival; the
 [timing reference](../physical/intel_thor_sensor_latency.md#measurement-contract)
-owns the arithmetic. A 10-second check on 2026-10-09 (Intel `powersave`)
-matched every frame. Colour: camera+USB 12.7 / 14.8 ms, Intel 5.9 / 7.9 ms
-(median / p95). Depth: 6.7 / 8.7 and 10.9 / 12.5. Both metadata streams carry
-the frameset stamp; depth arrives about 6 ms before colour and waits for it, so
-colour's arrival gates both. Turning off the driver's pairing (`enable_sync`)
-therefore cannot help colour, and alignment needs the colour frame, so it is
-dropped. Steps:
+owns the arithmetic. The performance policy (both hosts at the performance
+governor, Thor in MAXN, installed by `host_performance`) is adopted; its
+measured effect and the full split are in the
+[archived record](../../archive/engineering/2026-10-06-r100-0160-thor-transport-candidates.md#o6-driver-pipeline-and-performance-policy).
+With it, all three Thor observations met every target: colour 28 / 31 ms and
+depth 20 / 23 ms total (median / p95).
 
-1. Full baseline with the split before the performance policy (done when
-   recorded below).
-2. Same after `host_performance apply` on both hosts; the difference is the
-   performance policy's effect on the Intel share.
-3. If the Intel share remains material, profile it (conversion, alignment,
-   publish copy) before choosing a change; moving alignment to Thor's GPU
-   changes the camera contract and needs a separate decision.
-4. Colour's camera+USB share is sensor readout at the 30 Hz profile; a faster
-   sensor mode would change the published rate or pairing, so it is noted, not
-   planned.
+What remains is mostly fixed by the hardware. Colour arrives on Intel about
+12 ms after its stamp (sensor readout and USB), and depth waits for it. Intel
+then needs about 3 ms. The driver publishes aligned depth before colour, and
+with Thor reading, depth's send occupies the 1 Gb/s link for about 4.6 ms
+before colour is published. Turning off the driver's pairing (`enable_sync`)
+cannot help, since colour already arrives last and alignment needs it; see
+[do not try again](../do_not_try_again/intel_thor_camera_transport.md).
+
+Open decision: publishing colour before depth would let a detector start
+about 4.6 ms sooner while depth follows during inference. A consumer that
+needs both frames gains nothing, because both still cross the link in turn.
+This needs a patched driver (the apt `realsense2_camera` fixes the order), so
+it waits until the perception pipeline's consumption order is known.
 
 No lossy colour option is adopted until the detector's output on Thor has been
 compared with raw input on the same frames; that comparison belongs to the

@@ -47,6 +47,16 @@ higher resolution, more cameras, or a slower link. The tooling
 in place for that. JPEG colour was not measured, and any lossy colour option
 needs the detector compared on raw and decoded frames before adoption.
 
+## Do not turn off the driver's colour/depth pairing (O6)
+
+Considered, not measured. Per-frame driver metadata shows colour reaches
+Intel about 6 ms after depth, and depth waits for it, so colour's arrival
+already decides when both are published. Without pairing (`enable_sync`)
+colour would publish no sooner, and aligning depth to colour still needs the
+colour frame.
+
+Reconsider only for a consumer that uses unaligned depth on its own.
+
 ## Archived evidence
 
 - [r100_0160 Intel–Thor camera transport candidates](../../archive/engineering/2026-10-06-r100-0160-thor-transport-candidates.md)
