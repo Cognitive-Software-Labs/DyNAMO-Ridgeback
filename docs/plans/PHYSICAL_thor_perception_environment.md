@@ -1,6 +1,6 @@
 # PHYSICAL — Thor perception environment and first live localization
 
-Status: **decisions confirmed (user, 2026-10-09); step 1 in progress.** Owner: an agent at the
+Status: **decisions confirmed (user, 2026-10-09); steps 1–2 done, step 3 next.** Owner: an agent at the
 robot, with the operator for any `sudo` step (none is expected on Thor).
 Governing plan:
 [PHYSICAL — Intel–Thor deployment and transport qualification](PHYSICAL_intel_thor_deployment.md),
@@ -64,6 +64,8 @@ Later changes follow the same path through `origin`; never edit code on Thor.
 
 Exit: the Thor worktree is at the pushed commit and clean.
 
+**Done 2026-10-09**: `~/DyNAMO-Ridgeback-perception` at `343c00d`, clean.
+
 ### 2. Build the localization subset on Thor (agent, no `sudo`)
 
 From the Thor worktree, following the README's
@@ -73,6 +75,13 @@ into a fresh prefix under `artifacts/colcon/thor-*`, then run
 `tools/check_localization_install`.
 
 Exit: the build succeeds and the install check passes.
+
+**Done 2026-10-09** (`afcc6a4`): four packages built in 11 s with empty
+stderr, and the install check passes. The first clean subset build exposed a
+packaging gap: the display node imports `rviz_2d_overlay_msgs`, which only
+`ridgeback_autonomy` declared, so the full-workspace builds on Intel and the
+workstation had hidden it. `ridgeback_localization` now declares it and the
+README's subset builds include the vendored, message-only package.
 
 ### 3. Inference environment and GPU gate (agent, no `sudo`)
 
