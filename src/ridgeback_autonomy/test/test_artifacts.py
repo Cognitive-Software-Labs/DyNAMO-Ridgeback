@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 import shutil
 import subprocess
+from types import SimpleNamespace
 
 import pytest
 
@@ -22,11 +23,13 @@ from ridgeback_autonomy.benchmarking.sweep_report import collect_comparison_rows
 REPO_ROOT = Path(__file__).resolve().parents[3]
 
 
-def test_cleanup_preserves_the_gazebo_gui_in_every_kill_pass() -> None:
+def test_cleanup_preserves_only_the_reusable_combined_command_gui() -> None:
     cleanup = (REPO_ROOT / 'cleanup.sh').read_text(encoding='utf-8')
 
     assert '[[ "$command" == *"gz sim gui"* ]]' in cleanup
     assert '! is_gazebo_gui "$pid"' in cleanup
+    assert 'launch-owned standalone GUI is' in cleanup
+    assert 'reusable combined-command GUI preserved' in cleanup
     # One shared filter feeds both the pre-force-kill and final checks. Pin both
     # call sites so later cleanup edits cannot bypass the GUI exclusion.
     assert cleanup.count('grep -Fv "gz sim gui"') == 1
@@ -82,9 +85,23 @@ def test_standalone_runner_default_and_override(tmp_path, monkeypatch, override)
     monkeypatch.setattr(runner, 'get_package_share_directory', lambda _: str(share))
     scenario = tmp_path / 'scenes.yaml'
     scenario.write_text('scenes:\n  - id: one\n    robots: [{ x: 2.0, y: 0.0 }]\n')
+    target = tmp_path / 'g1.sdf'
+    target.write_text('<sdf version="1.9"/>\n')
+    catalog = tmp_path / 'benchmark_assets.yaml'
+    catalog.write_text(
+        'schema: ridgeback_benchmark_assets/1\n'
+        'worlds:\n'
+        '  target_distance_calibration:\n'
+        '    native_name: target_distance_calibration\n'
+        '    resource: g1.sdf\n'
+        '    format: sdf\n'
+        'targets:\n'
+        '  g1: {resource: g1.sdf, format: sdf}\n'
+    )
     expected = tmp_path / 'custom output' if override else tmp_path / 'artifacts/benchmarks'
     args = ['--ros-args', '-p', f'scenario:={scenario}', '-p', 'estimators:=pointcloud',
-            '-p', 'run_dir_name:=preserved_name']
+            '-p', 'run_dir_name:=preserved_name', '-p', f'asset_catalog:={catalog}',
+            '-p', 'scene_control_service_namespace:=/gzserver']
     if override:
         args += ['-p', f'output_dir:={expected}']
     rclpy.init(args=args)
@@ -143,6 +160,17 @@ def test_sweep_routes_output_and_child_logs_without_changing_commands(tmp_path, 
     monkeypatch.setattr(sweep, 'reap_orphan_benchmark_entities', lambda _: [])
     monkeypatch.setattr(sweep, 'sample_real_time_factor', lambda: 1.0)
     monkeypatch.setattr(sweep, '_wait_for_config', lambda *_: ('success', None))
+    scene_control = SimpleNamespace(
+        wait_for_services=lambda _timeout: None,
+        require_capabilities=lambda: None,
+    )
+    monkeypatch.setattr(sweep.rclpy, 'init', lambda: None)
+    monkeypatch.setattr(
+        sweep.rclpy, 'create_node',
+        lambda _name: SimpleNamespace(destroy_node=lambda: None),
+    )
+    monkeypatch.setattr(sweep.rclpy, 'ok', lambda: False)
+    monkeypatch.setattr(sweep, 'create_scene_control_client', lambda *_args: scene_control)
     monkeypatch.setenv('RIDGEBACK_WORKSPACE', str(tmp_path))
     share = tmp_path / 'install/ridgeback_autonomy/share/ridgeback_autonomy'
     sweep_dir, success = sweep.run_sweep(spec, spec.configs, package_share=str(share))

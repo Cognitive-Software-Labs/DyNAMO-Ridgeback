@@ -996,7 +996,7 @@ Existing runs were relocated without rewriting their contents: absolute paths re
 
 This project still relies on three local patches:
 
-1. `patches/clearpath_gz_customizations.patch` patches `src/clearpath_simulator/clearpath_gz` to add this repo's Gazebo worlds/models to the simulator search path and to expose the custom `SpawnG1` Gazebo GUI plugin.
+1. `patches/clearpath_gz_customizations.patch` patches `src/clearpath_simulator/clearpath_gz` to expose the custom `SpawnG1` Gazebo GUI plugin. The Gazebo adapter owns this repo's world/model search path.
 2. `patches/slam_toolbox_tf_namespace.patch` patches `src/slam_toolbox` so `slam_toolbox` respects namespaced TF remappings.
 3. `patches/clearpath_realsense_sim_frames.patch` patches `src/clearpath_common` so `intel_realsense.urdf.xacro` forwards `is_sim` into every supported camera macro as `use_nominal_extrinsics`, and so the Gazebo render sensor sits on the model's colour frame. Without it, simulation has no `camera_0_color_optical_frame` TF and the mask estimators report `TF_MISS_EXTRINSIC`.
 

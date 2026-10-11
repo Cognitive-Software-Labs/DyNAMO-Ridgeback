@@ -1,18 +1,14 @@
-"""Pure Gazebo command, pose, and benchmark ground-truth helpers."""
+"""Simulator-neutral pose normalization and benchmark ground-truth helpers."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-import os
 from typing import Any
 
 from ridgeback_localization.core.vehicle_frame import (
     planar_measurement_from_vehicle_front,
     yaw_from_quaternion,
 )
-
-
-TARGET_SPAWN_HEIGHT_M = 0.0
 
 
 @dataclass(frozen=True)
@@ -29,7 +25,7 @@ class GroundTruthInstance:
 
 
 def normalize_pose(pose: dict[str, Any]) -> dict[str, Any]:
-    """Normalize optional Gazebo pose components to concrete floats."""
+    """Normalize optional pose components to concrete floats."""
 
     position = pose.get('position') or {}
     orientation = pose.get('orientation') or {}
@@ -47,17 +43,6 @@ def normalize_pose(pose: dict[str, Any]) -> dict[str, Any]:
             'w': float(orientation.get('w', 1.0)),
         },
     }
-
-
-def pose_snapshot_from_payload(payload: dict[str, Any]) -> dict[str, dict[str, Any]]:
-    """Index one Gazebo pose-info JSON payload by entity name."""
-
-    return {
-        pose['name']: normalize_pose(pose)
-        for pose in payload.get('pose', [])
-        if isinstance(pose, dict) and pose.get('name')
-    }
-
 
 def compute_ground_truth_instances(
     snapshot: dict[str, dict[str, Any]],
@@ -92,54 +77,3 @@ def compute_ground_truth_instances(
             distance_m=distance_m,
         ))
     return instances
-
-
-def model_sdf_path(models_dir: str, model: str) -> str:
-    path = os.path.join(models_dir, model, 'model.sdf')
-    if not os.path.isfile(path):
-        raise RuntimeError(f'Object model "{model}" has no model.sdf at {path}')
-    return path
-
-
-def spawn_model_command(
-    world: str,
-    model_ref: str,
-    model_name: str,
-    x_m: float,
-    y_m: float,
-    z_m: float,
-    yaw_rad: float,
-) -> list[str]:
-    return [
-        '/opt/ros/jazzy/lib/ros_gz_sim/create',
-        '-world', world,
-        '-file', model_ref,
-        '-name', model_name,
-        '-x', f'{x_m:.6f}',
-        '-y', f'{y_m:.6f}',
-        '-z', f'{z_m:.6f}',
-        '-Y', f'{yaw_rad:.6f}',
-    ]
-
-
-def despawn_model_command(world: str, model_name: str) -> list[str]:
-    return [
-        'gz',
-        'service',
-        '-s', f'/world/{world}/remove/blocking',
-        '--reqtype', 'gz.msgs.Entity',
-        '--reptype', 'gz.msgs.Boolean',
-        '--timeout', '5000',
-        '--req', f'name: "{model_name}" type: MODEL',
-    ]
-
-
-def pose_snapshot_command(pose_info_topic: str) -> list[str]:
-    return [
-        'gz',
-        'topic',
-        '-e',
-        '-t', pose_info_topic,
-        '--json-output',
-        '-n', '1',
-    ]

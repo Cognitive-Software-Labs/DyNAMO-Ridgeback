@@ -2,12 +2,14 @@ from __future__ import annotations
 
 from pathlib import Path
 import subprocess
+from types import SimpleNamespace
 
 import pytest
 
 from ridgeback_autonomy.benchmarking.target_benchmark_sweep import (
     _parser,
     _launch_argument_tokens,
+    reap_orphan_benchmark_entities,
     run_preflight_cleanup,
 )
 from ridgeback_autonomy.benchmarking.sweep import load_sweep, parse_sweep
@@ -79,6 +81,39 @@ def test_sweep_cleanup_can_be_skipped_for_a_shared_process_session() -> None:
     args = _parser().parse_args(['sweep.yaml', '--skip-preflight-cleanup'])
 
     assert args.skip_preflight_cleanup is True
+
+
+def test_sweep_reaps_only_entities_returned_by_prefix_scoped_discovery() -> None:
+    class SceneControl:
+        def __init__(self):
+            self.discovery = [
+                ('bench_old_target_0', 'bench_old_obj_0'),
+                (),
+            ]
+            self.deleted = []
+
+        def find_benchmark_entities(self):
+            return self.discovery.pop(0)
+
+        def delete_entity(self, name):
+            self.deleted.append(name)
+
+    scene_control = SceneControl()
+
+    reaped = reap_orphan_benchmark_entities(scene_control)
+
+    assert reaped == ['bench_old_target_0', 'bench_old_obj_0']
+    assert scene_control.deleted == ['bench_old_target_0', 'bench_old_obj_0']
+
+
+def test_sweep_refuses_to_continue_when_orphan_removal_is_incomplete() -> None:
+    scene_control = SimpleNamespace(
+        find_benchmark_entities=lambda: ('bench_stuck_target_0',),
+        delete_entity=lambda _name: None,
+    )
+
+    with pytest.raises(RuntimeError, match='bench_stuck_target_0'):
+        reap_orphan_benchmark_entities(scene_control)
 
 
 def test_sweep_rejects_unknown_config_key(tmp_path) -> None:

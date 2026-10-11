@@ -15,18 +15,22 @@ import time
 from typing import Any
 
 from ament_index_python.packages import get_package_share_directory
+import rclpy
 
 from ridgeback_autonomy.localization_launch import (
     SHARED_BENCHMARK_ARGUMENT_DEFAULTS,
     workspace_root_from_package_share,
 )
 from ridgeback_autonomy.benchmarking.process_utils import (
-    extract_json_payload,
     git_provenance,
     gl_renderer_provenance,
     run_command,
     software_gl_warning,
     try_command,
+)
+from ridgeback_autonomy.benchmarking.scene_control import (
+    SceneControlClient,
+    create_scene_control_client,
 )
 from ridgeback_autonomy.benchmarking.report import markdown_table
 from ridgeback_autonomy.benchmarking.paths import (
@@ -45,8 +49,8 @@ from ridgeback_autonomy.benchmarking.sweep_report import load_json, write_sweep_
 
 
 COMMAND_TIMEOUT_SEC = 10.0
-DELETE_TIMEOUT_SEC = 15.0
-ENV_GAZEBO_WAIT_TIMEOUT_SEC = 300.0
+ENV_SCENE_CONTROL_WAIT_TIMEOUT_SEC = 300.0
+SCENE_CONTROL_SERVICE_NAMESPACE = '/gzserver'
 RTF_SAMPLE_WINDOW_SEC = 2.0
 PROCESS_POLL_SEC = 1.0
 PROCESS_INT_GRACE_SEC = 20.0
@@ -344,76 +348,15 @@ def _resume_manifest(
     return manifest
 
 
-def _pose_snapshot(world: str) -> dict[str, dict[str, Any]]:
-    topic = f'/world/{world}/pose/info'
-    result = run_command(
-        ['gz', 'topic', '-e', '-t', topic, '--json-output', '-n', '1'],
-        timeout_sec=COMMAND_TIMEOUT_SEC,
-        description=f'read {topic}',
-    )
-    payload = extract_json_payload(result.stdout)
-    poses = payload.get('pose') or []
-    if isinstance(poses, dict):
-        poses = [poses]
-    return {
-        str(pose['name']): pose
-        for pose in poses
-        if isinstance(pose, dict) and pose.get('name')
-    }
-
-
-def _pose_snapshot_with_retry(
-    world: str,
-    timeout_sec: float = ENV_GAZEBO_WAIT_TIMEOUT_SEC,
-) -> dict[str, dict[str, Any]]:
-    """Wait for the Gazebo pose stream needed by the pre-config orphan check."""
-
-    deadline = time.monotonic() + timeout_sec
-    last_error = None
-    while time.monotonic() < deadline:
-        try:
-            return _pose_snapshot(world)
-        except RuntimeError as exc:
-            last_error = exc
-            time.sleep(PROCESS_POLL_SEC)
-    raise RuntimeError(
-        f'Gazebo pose stream was unavailable for {timeout_sec:.0f}s: {last_error}'
-    )
-
-
-def _delete_entity(world: str, name: str) -> None:
-    deadline = time.monotonic() + DELETE_TIMEOUT_SEC
-    command = [
-        'gz', 'service',
-        '-s', f'/world/{world}/remove/blocking',
-        '--reqtype', 'gz.msgs.Entity',
-        '--reptype', 'gz.msgs.Boolean',
-        '--timeout', '5000',
-        '--req', f'name: "{name}" type: MODEL',
-    ]
-    last_error = None
-    while time.monotonic() < deadline:
-        try:
-            result = try_command(command, timeout_sec=COMMAND_TIMEOUT_SEC)
-            if result.returncode == 0:
-                return
-            last_error = f'exit {result.returncode}: {result.stderr.strip()}'
-        except RuntimeError as exc:
-            last_error = str(exc)
-        time.sleep(0.5)
-    raise RuntimeError(f'failed to remove orphan "{name}": {last_error}')
-
-
-def reap_orphan_benchmark_entities(world: str) -> list[str]:
-    snapshot = _pose_snapshot_with_retry(world)
-    orphans = sorted(name for name in snapshot if name.startswith('bench_'))
+def reap_orphan_benchmark_entities(scene_control: SceneControlClient) -> list[str]:
+    orphans = list(scene_control.find_benchmark_entities())
     if not orphans:
         return []
     _log(f'WARNING: found orphan benchmark entities from an unclean prior config: '
          f'{", ".join(orphans)}')
     for name in orphans:
-        _delete_entity(world, name)
-    remaining = [name for name in orphans if name in _pose_snapshot(world)]
+        scene_control.delete_entity(name)
+    remaining = list(scene_control.find_benchmark_entities())
     if remaining:
         raise RuntimeError(f'orphan entities remain after removal: {", ".join(remaining)}')
     return orphans
@@ -610,6 +553,7 @@ def run_sweep(
 
     environment: subprocess.Popen | None = None
     current_config_process: subprocess.Popen | None = None
+    scene_control_node = None
     interrupted = False
     try:
         if preflight_cleanup:
@@ -630,8 +574,12 @@ def run_sweep(
                 f'persistent environment exited immediately with code {environment.returncode}'
             )
 
-        shared = _shared_arguments(spec)
-        world = shared['world']
+        rclpy.init()
+        scene_control_node = rclpy.create_node('target_benchmark_sweep_scene_control')
+        scene_control = create_scene_control_client(
+            scene_control_node, SCENE_CONTROL_SERVICE_NAMESPACE)
+        scene_control.wait_for_services(ENV_SCENE_CONTROL_WAIT_TIMEOUT_SEC)
+        scene_control.require_capabilities()
         default_scenario_path = os.path.join(
             package_share, 'config', 'benchmark_scenarios_full.yaml')
 
@@ -656,7 +604,7 @@ def run_sweep(
 
             _archive_incomplete_output(output_path)
             try:
-                reaped = reap_orphan_benchmark_entities(world)
+                reaped = reap_orphan_benchmark_entities(scene_control)
                 entry['orphan_entities_reaped'] = reaped
             except RuntimeError as exc:
                 entry.update(status='failed', error=str(exc))
@@ -725,6 +673,10 @@ def run_sweep(
         _log(f'ERROR: {exc}')
     finally:
         stop_process_group(current_config_process, 'active benchmark config')
+        if scene_control_node is not None:
+            scene_control_node.destroy_node()
+        if rclpy.ok():
+            rclpy.shutdown()
         stop_process_group(environment, 'persistent benchmark environment')
 
     statuses = [entry.get('status') for entry in manifest['configs']]

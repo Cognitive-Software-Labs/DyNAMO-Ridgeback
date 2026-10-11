@@ -78,22 +78,22 @@ def test_internal_launch_includes_exist_and_are_referenced() -> None:
     assert 'includes' in benchmark_env_text
 
 
-def test_benchmark_default_world_is_allowed_by_clearpath_simulation() -> None:
+def test_benchmark_default_world_is_resolved_by_the_gazebo_adapter() -> None:
     repo_root = Path(__file__).resolve().parents[3]
     benchmark_env_text = (
         repo_root / 'src' / 'ridgeback_autonomy' / 'launch' / 'target_benchmark_env.launch.py'
     ).read_text(encoding='utf-8')
-    clearpath_simulation_text = (
-        repo_root
-        / 'src'
-        / 'clearpath_simulator'
-        / 'clearpath_gz'
-        / 'launch'
-        / 'simulation.launch.py'
+    gazebo_launch_text = (
+        repo_root / 'src' / 'ridgeback_autonomy_gz' / 'launch' / 'gazebo.launch.py'
     ).read_text(encoding='utf-8')
+    benchmark_world = (
+        repo_root / 'src' / 'ridgeback_autonomy_gz' / 'sim' / 'worlds'
+        / 'target_distance_calibration.sdf'
+    )
 
     assert "DeclareLaunchArgument('world', default_value='target_distance_calibration')" in benchmark_env_text
-    assert "'target_distance_calibration'" in clearpath_simulation_text
+    assert "get_package_share_directory('ridgeback_autonomy_gz'), 'sim', 'worlds'" in gazebo_launch_text
+    assert benchmark_world.is_file()
 
 
 def test_benchmark_forwards_gazebo_gui_choice_to_simulation() -> None:
@@ -115,13 +115,8 @@ def test_exploration_uses_unique_initial_test_world() -> None:
     exploration_text = (
         repo_root / 'src' / 'ridgeback_autonomy' / 'launch' / 'ridgeback_exploration.launch.py'
     ).read_text(encoding='utf-8')
-    clearpath_simulation_text = (
-        repo_root
-        / 'src'
-        / 'clearpath_simulator'
-        / 'clearpath_gz'
-        / 'launch'
-        / 'simulation.launch.py'
+    gazebo_launch_text = (
+        repo_root / 'src' / 'ridgeback_autonomy_gz' / 'launch' / 'gazebo.launch.py'
     ).read_text(encoding='utf-8')
     initial_test_world_world = (
         repo_root / 'src' / 'ridgeback_autonomy_gz' / 'sim' / 'worlds'
@@ -129,8 +124,7 @@ def test_exploration_uses_unique_initial_test_world() -> None:
     ).read_text(encoding='utf-8')
 
     assert "DeclareLaunchArgument('world', default_value='initial_test_world')" in exploration_text
-    assert "'initial_test_world'" in clearpath_simulation_text
-    assert "'hospital'" not in clearpath_simulation_text
+    assert 'resolve_world_sdf(world, _world_search_dirs())' in gazebo_launch_text
     assert '<world name="initial_test_world">' in initial_test_world_world
     assert not (
         repo_root / 'src' / 'ridgeback_autonomy_gz' / 'sim' / 'worlds' / 'hospital.sdf'

@@ -2,13 +2,14 @@
 # Kill stale ROS 2 processes and simulator servers from previous launches.
 # Usage: bash cleanup.sh
 #
-# This is aggressive, but deliberately preserves the Gazebo GUI so it can be
-# reused across server restarts. Never run this as hardware bringup cleanup;
+# This is aggressive. It preserves only the legacy combined-command Gazebo GUI
+# that can be reused across server restarts; the launch-owned standalone GUI is
+# stopped with its server. Never run this as hardware bringup cleanup;
 # start_exploration.sh skips it when backend:=hardware.
 
 set -e
 
-echo "=== Killing ROS/Gazebo processes (preserving Gazebo GUI) ==="
+echo "=== Killing ROS/Gazebo processes (preserving reusable combined-command GUI) ==="
 CURRENT_USER="$(id -un)"
 SELF_PID="$$"
 PARENT_PID="$PPID"
@@ -166,5 +167,5 @@ if [ -n "$STILL" ]; then
     echo "WARNING: Could not kill:"
     echo "$STILL"
 else
-    echo "All targeted ROS/Gazebo processes terminated; Gazebo GUI preserved."
+    echo "All targeted ROS/Gazebo processes terminated; reusable combined-command GUI preserved."
 fi

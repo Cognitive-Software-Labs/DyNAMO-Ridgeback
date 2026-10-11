@@ -18,8 +18,10 @@ from clearpath_config.clearpath_config import ClearpathConfig
 from launch import LaunchDescription
 from launch.actions import (
     DeclareLaunchArgument, ExecuteProcess, GroupAction, IncludeLaunchDescription,
-    OpaqueFunction, SetEnvironmentVariable, UnsetEnvironmentVariable,
+    OpaqueFunction, RegisterEventHandler, SetEnvironmentVariable,
+    UnsetEnvironmentVariable,
 )
+from launch.event_handlers import OnShutdown
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
@@ -55,7 +57,7 @@ def _gui_config(setup_path):
         get_package_share_directory('clearpath_gz'), 'config', 'gui.config')
     robot_yaml = os.path.join(setup_path, 'robot.yaml')
     if not os.path.isfile(robot_yaml):
-        return static_config
+        return static_config, None
     namespace = ClearpathConfig(robot_yaml).system.namespace
     topic = f'/{namespace}/cmd_vel' if namespace not in ('', '/') else '/cmd_vel'
     with open(static_config) as handle:
@@ -66,7 +68,17 @@ def _gui_config(setup_path):
     with tempfile.NamedTemporaryFile(
             prefix='ridgeback_gz_gui_', suffix='.config', mode='w', delete=False) as handle:
         handle.write(content)
-    return handle.name
+    return handle.name, handle.name
+
+
+def _remove_gui_config(_context, *, path):
+    """Remove the generated GUI layout after the owning launch shuts down."""
+
+    try:
+        os.unlink(path)
+    except FileNotFoundError:
+        pass
+    return []
 
 
 def _launch_gazebo(context):
@@ -81,13 +93,22 @@ def _launch_gazebo(context):
     if not headless:
         # Started directly rather than through a shell, so the stop signal
         # reaches the GUI itself; a shell wrapper exits and orphans the GUI.
+        gui_config, temporary_gui_config = _gui_config(setup_path)
         gui = ExecuteProcess(
             name='gazebo_gui',
             cmd=['gz', 'sim', '-g', '-v', GZ_VERBOSITY,
-                 '--gui-config', _gui_config(setup_path)],
+                 '--gui-config', gui_config],
             output='screen',
         )
-        return [server, gui]
+        actions = [server, gui]
+        if temporary_gui_config is not None:
+            actions.append(RegisterEventHandler(OnShutdown(
+                on_shutdown=[OpaqueFunction(
+                    function=_remove_gui_config,
+                    kwargs={'path': temporary_gui_config},
+                )],
+            )))
+        return actions
 
     # The server node has no headless-rendering switch. Without a display,
     # Gazebo's rendering engine falls back to EGL headless rendering, so the

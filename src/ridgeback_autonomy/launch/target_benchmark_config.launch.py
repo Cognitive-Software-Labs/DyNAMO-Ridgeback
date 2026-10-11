@@ -186,9 +186,9 @@ def build_benchmark_nodes(context, *args, **kwargs):
         parameters=[{
             'use_sim_time': use_sim_time,
             'world': world,
-            'target_model_sdf': os.path.join(
-                gz_share, 'sim', 'models', 'g1', 'model.sdf'),
-            'models_dir': os.path.join(gz_share, 'sim', 'models'),
+            'asset_catalog': os.path.join(
+                gz_share, 'sim', 'benchmark_assets.yaml'),
+            'scene_control_service_namespace': '/gzserver',
             'scenario': LaunchConfiguration('scenario'),
             'repeats': repeats,
             'output_dir': output_dir,

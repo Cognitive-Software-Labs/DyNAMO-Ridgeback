@@ -23,7 +23,7 @@ DEFAULT_OBJECT_YAW_RAD = 0.0
 
 @dataclass(frozen=True)
 class RobotSpec:
-    """One target instance, world-frame planar pose (z pinned to floor by the runner)."""
+    """One target instance with a world-frame planar pose."""
 
     x: float
     y: float
@@ -32,7 +32,7 @@ class RobotSpec:
 
 @dataclass(frozen=True)
 class ObjectSpec:
-    """One static object occluder spawned from ``model://<model>``."""
+    """One static object occluder resolved through the selected asset catalog."""
 
     model: str
     x: float

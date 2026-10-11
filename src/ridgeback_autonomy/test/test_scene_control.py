@@ -31,7 +31,6 @@ from ridgeback_autonomy.benchmarking.scene_control import (
 )
 from ridgeback_autonomy.benchmarking.simulation import (
     compute_ground_truth_instances,
-    pose_snapshot_from_payload,
 )
 
 
@@ -561,9 +560,6 @@ def test_one_snapshot_converts_into_the_ground_truth_pose_contract(simulator) ->
     assert len(simulator.calls_to('get_entities_states')) == 1
     targets = [(0, 'bench_run_t0_target_0', None), (1, 'bench_run_t0_target_1', None)]
     truth = compute_ground_truth_instances(snapshot.poses, ROBOT, targets)
-    legacy = compute_ground_truth_instances(
-        pose_snapshot_from_payload({'pose': list(snapshot.poses.values())}), ROBOT, targets)
-    assert truth == legacy
     assert truth[0].world_x == pytest.approx(3.75)
     assert truth[0].lateral_m == pytest.approx(0.0)
     assert truth[1].lateral_m == pytest.approx(1.25)

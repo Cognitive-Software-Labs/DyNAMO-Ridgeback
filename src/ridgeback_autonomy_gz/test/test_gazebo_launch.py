@@ -6,12 +6,18 @@ import importlib.util
 from pathlib import Path
 
 from launch import LaunchContext
-from launch.actions import ExecuteProcess, GroupAction, UnsetEnvironmentVariable
+from launch.actions import (
+    ExecuteProcess,
+    GroupAction,
+    RegisterEventHandler,
+    UnsetEnvironmentVariable,
+)
 import pytest
 from ros_gz_sim.actions import GzServer
 
 
 PACKAGE_ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = Path(__file__).resolve().parents[3]
 LAUNCH_DIR = PACKAGE_ROOT / 'launch'
 
 
@@ -92,6 +98,24 @@ def test_normal_rendering_adds_a_gui_client_of_the_same_server(gazebo_launch, tm
     assert not actions[1].shell
 
 
+def test_generated_gui_config_is_registered_for_shutdown_removal(gazebo_launch) -> None:
+    context = _context(REPO_ROOT / 'clearpath', 'false')
+    actions = gazebo_launch._launch_gazebo(context)
+    gui_config = [
+        ''.join(part.perform(LaunchContext()) for part in argument)
+        for argument in actions[1].cmd
+    ][-1]
+
+    try:
+        assert Path(gui_config).name.startswith('ridgeback_gz_gui_')
+        assert Path(gui_config).is_file()
+        assert isinstance(actions[-1], RegisterEventHandler)
+    finally:
+        gazebo_launch._remove_gui_config(None, path=gui_config)
+
+    assert not Path(gui_config).exists()
+
+
 def test_backend_starts_gazebo_through_the_scene_control_server() -> None:
     backend = (LAUNCH_DIR / 'backend.launch.py').read_text(encoding='utf-8')
     gazebo = (LAUNCH_DIR / 'gazebo.launch.py').read_text(encoding='utf-8')
@@ -100,3 +124,17 @@ def test_backend_starts_gazebo_through_the_scene_control_server() -> None:
     assert 'simulation.launch.py' not in backend
     assert 'GzServer(' in gazebo
     assert "'robot_spawn.launch.py'" in gazebo
+
+
+def test_clock_bridge_message_dependency_is_direct() -> None:
+    manifest = (PACKAGE_ROOT / 'package.xml').read_text(encoding='utf-8')
+
+    assert '<exec_depend>rosgraph_msgs</exec_depend>' in manifest
+
+
+def test_clearpath_patch_no_longer_changes_unused_launch_files() -> None:
+    patch = (REPO_ROOT / 'patches' / 'clearpath_gz_customizations.patch').read_text(
+        encoding='utf-8')
+
+    assert 'gz_sim.launch.py' not in patch
+    assert 'simulation.launch.py' not in patch

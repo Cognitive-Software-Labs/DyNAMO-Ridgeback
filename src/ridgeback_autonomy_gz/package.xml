@@ -21,6 +21,7 @@
   <exec_depend>launch</exec_depend>
   <exec_depend>launch_ros</exec_depend>
   <exec_depend>ridgeback_autonomy</exec_depend>
+  <exec_depend>rosgraph_msgs</exec_depend>
   <!-- gzserver serves the standard simulation_interfaces scene-control services. -->
   <exec_depend>ros_gz_bridge</exec_depend>
   <exec_depend>ros_gz_sim</exec_depend>
