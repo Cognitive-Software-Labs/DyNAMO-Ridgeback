@@ -23,9 +23,10 @@ def test_segments_split_at_marks_after_settling_and_shift_to_camera_face():
                measurement(5, 1.54), measurement(6, 1.56),
                {'kind': 'detection', 'received_ns': 6 * S, 'stamp_ns': int(5.4 * S), 'count': 1},
                {'kind': 'health', 'received_ns': 6 * S, 'state': 'processing'},
+               measurement(9, 7.0),                       # walking: after the 3 s + 4 s window
                measurement(12, 2.54)]
     marks = [{'label': '1.5', 'wall_ns': 0}, {'label': '2.5', 'wall_ns': 10 * S}]
-    report = TOOL.summarize(samples, marks, {'camera_x_in_base_m': .28, 'front_offset_m': .25})
+    report = TOOL.summarize(samples, marks, {'camera_x_in_base_m': .28, 'front_offset_m': .25}, window_s=4)
     first, second = report['segments']
     assert report['camera_forward_shift_m'] == .03
     assert first['projective_ranging']['forward_from_camera_m']['median'] == 1.52
