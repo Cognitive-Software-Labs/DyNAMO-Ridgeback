@@ -43,8 +43,74 @@ Ethernet-only profiles, a separate domain, and one reader per probe topic.
 
 | Host | Robot Ethernet | Also attached to |
 |---|---|---|
-| Intel (`cpr-r100-0160`) | `br0` 192.168.131.1; Thor is learned on bridge port `eno1` (1 Gb/s), the same port as both Hokuyo LiDARs | Lab Wi-Fi `wlp3s0` 192.168.123.0/24 (DHCP), Tailscale |
-| Thor (`nvidia-thor-r100-0160`) | `enP2p1s0` 192.168.131.51 (1 Gb/s, static) | Lab Wi-Fi 192.168.123.0/24 (default route) |
+| Intel (`cpr-r100-0160`) | `br0` 192.168.131.1, bridging `eno1` (1 Gb/s, to the switch with Thor and both Hokuyo LiDARs) and `enp2s0` (100 Mb/s, to the MCU at 192.168.131.2) | Lab Wi-Fi `wlp3s0` 192.168.123.14 (static), Tailscale; `br0` also carries 192.168.123.8/32 |
+| Thor (`nvidia-thor-r100-0160`) | `enP2p1s0` 192.168.131.51 (1 Gb/s, static), plus a route for 192.168.123.14 via 192.168.131.1 (`thor_lan_route`) | Lab Wi-Fi `wlP1p1s0` 192.168.123.152 (default route, internet only) |
+
+The lab access point (`ASUS_20`) does not pass traffic between its clients:
+Intel and Thor cannot reach each other over Wi-Fi (checked 2026-10-12).
+
+```mermaid
+flowchart LR
+    subgraph DEV["Devices"]
+        D455["RealSense D455"]
+        LIDAR["Hokuyo UST x2<br/>.21 front, .22 rear"]
+        MCU["Ridgeback MCU<br/>192.168.131.2"]
+    end
+    subgraph INTEL["Intel PC: br0 192.168.131.1, wlp3s0 192.168.123.14"]
+        CAM["dynamo-camera<br/>realsense2_camera_node"]
+        SENS["clearpath-sensors, clearpath-scan-merger<br/>urg_node x2, ros2_laser_scan_merger"]
+        ROBOT["clearpath-robot<br/>robot_state_publisher"]
+        PLAT["clearpath-platform<br/>proton_ros2, puma_control"]
+        PTPI["dynamo-ptp4l, dynamo-phc2sys<br/>PTP server on eno1"]
+        OBS["observer and recorder<br/>dds_env.sh intel"]
+        FOX["foxglove_bridge"]
+    end
+    BUS{{"CycloneDDS domain 0, namespace r100_0160<br/>1 Gb/s robot Ethernet"}}
+    subgraph THOR["Jetson Thor: enP2p1s0 192.168.131.51, wlP1p1s0 192.168.123.152"]
+        DET["target_detector_node<br/>OWLv2 on CUDA"]
+        MASK["target_mask_measurement<br/>projective, euclidean"]
+        HEALTH["localization_health"]
+        PTPT["dynamo-ptp4l, dynamo-phc2sys<br/>PTP client on enP2p1s0"]
+    end
+    WIFI[("Lab Wi-Fi ASUS_20<br/>client isolation")]
+    LAPTOP["Laptop<br/>Foxglove, RViz"]
+    NET["Internet"]
+    D455 -- "USB 3.2" --> CAM
+    LIDAR -- "TCP via switch" --> SENS
+    MCU <-- "UDP; CAN as vcan0" --> PLAT
+    CAM -- "color, depth, camera_info, 30 Hz" --> BUS
+    SENS -- "scans, 40 Hz" --> BUS
+    ROBOT -- "tf_static, robot_description" --> BUS
+    PLAT -- "tf, odom" --> BUS
+    BUS --> DET
+    BUS --> MASK
+    BUS --> HEALTH
+    DET -- "detections" --> BUS
+    MASK -- "measurements" --> BUS
+    HEALTH -- "health" --> BUS
+    BUS -- "results, health" --> OBS
+    BUS -- "any topic" --> FOX
+    PTPI -. "PTP, raw Ethernet frames" .-> PTPT
+    FOX -. "websocket" .-> WIFI
+    PTPT ~~~ WIFI
+    THOR -. "internet only" .-> WIFI
+    WIFI -.- LAPTOP
+    WIFI -.- NET
+```
+
+*Hosts, robot services and ROS nodes, and what crosses each link. Solid edges
+are wired; dotted edges use Wi-Fi or, for PTP, raw Ethernet outside DDS.*
+
+| Link | Carries | Contract |
+|---|---|---|
+| D455 → Intel, USB 3.2 | Colour and depth frames | 640×480 at 30 Hz |
+| MCU ↔ Intel, `enp2s0` | Power, e-stop, IMU, lights and fans over UDP; the wheel drivers' CAN bus, bridged to Intel as `vcan0` | Clearpath platform services |
+| Hokuyo LiDARs → Intel, `eno1` via the switch | Scans | About 40 Hz each; Intel publishes the merged `sensors/scan` |
+| Intel → Thor, DDS | `sensors/camera_0/color/image` (`rgb8`, 921,600 B) and `depth/image` (`16UC1`, 614,400 B) at 30 Hz, about 369 Mbit/s together, best effort; `camera_info`; scans; `tf`; `tf_static` and `robot_description` (reliable, transient local) | [Configuration contract](#configuration-contract); timing in the [sensor timing reference](intel_thor_sensor_latency.md) |
+| Thor → Intel, DDS | `detections/target/raw`, `measurements/target/mask`, `localization/health` and the worker states; DDS acknowledgements and discovery replies | [Distributed localization contract](../target_localization/distributed_deployment.md#topics-types-and-acquisition-semantics) |
+| Intel → Thor, PTP | Intel's wall clock as IEEE 1588 L2 frames, outside DDS | [Robot-local deployment](robot_local_deployment.md#clock-synchronization-and-camera-transport-candidates) |
+| Intel ↔ Wi-Fi | Internet; `foxglove_bridge` for laptops; the robot services also advertise 192.168.123.14 to DDS | Laptops need client isolation off on the access point |
+| Thor ↔ Wi-Fi | Internet only (git, pip, model downloads) | Thor's DDS is bound to Ethernet; replies to 192.168.123.14 use the cable |
 
 ## Middleware
 
