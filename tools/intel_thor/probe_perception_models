@@ -186,7 +186,8 @@ def main(argv=None):
     grab = commands.add_parser('capture')
     grab.add_argument('--namespace', required=True)
     grab.add_argument('--output', required=True)
-    grab.add_argument('--timeout', type=float, default=15)
+    # DDS discovery of the camera from Thor took over 15 s on 2026-10-12.
+    grab.add_argument('--timeout', type=float, default=45)
     probe = commands.add_parser('run')
     probe.add_argument('--frames', required=True)
     probe.add_argument('--output')

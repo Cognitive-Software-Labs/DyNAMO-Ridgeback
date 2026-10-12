@@ -1,6 +1,6 @@
 # PHYSICAL — Thor perception environment and first live localization
 
-Status: **decisions confirmed (user, 2026-10-09); steps 1–3 done, step 4 next.** Owner: an agent at the
+Status: **decisions confirmed (user, 2026-10-09); steps 1–4 done, step 5 next.** Owner: an agent at the
 robot, with the operator for any `sudo` step (one so far: `python3.12-venv` on Thor).
 Governing plan:
 [PHYSICAL — Intel–Thor deployment and transport qualification](PHYSICAL_intel_thor_deployment.md),
@@ -126,6 +126,37 @@ Ubuntu's 13.7.1 for venv processes only.
 Exit: all three models infer on `cuda`; the unit tests give the same results as
 on the workstation, plus any tests that need PyTorch.
 
+**Done 2026-10-12** (`211ed1c`; evidence on Thor under
+`artifacts/hardware/20261012T104641Z-thor-model-probe-120w/`, and the first
+MAXN run under `20261009T131626Z-thor-model-probe/`). All three models load
+through the repository's classes and run on `cuda`; snapshots: OWLv2
+`cfd3195ba4ea`, SlimSAM `d67c795ed0ca`, Depth-Anything `8078d68a9c75` (D5).
+The frame had no person, so SlimSAM was prompted with a fixed centre box.
+Warm timings on one 640×480 frame (median / p95, 20 runs; peak GPU memory):
+
+| Model | 120W | MAXN (2026-10-09) | Peak memory |
+|---|---|---|---|
+| OWLv2 detector, labels `person`, `humanoid robot` | 607 / 657 ms | 546 / 558 ms | 780 MB |
+| SlimSAM, one box | 196 / 215 ms | 186 / 200 ms | 2296 MB |
+| Depth-Anything V2 small | 57 / 59 ms | 55 / 56 ms | 1037 MB |
+
+At 120W Thor drew 68 W median and 89 W at most at its input during the run (GPU
+rail at most 44 W, junction at most 64.8 °C). The detector therefore limits the
+pipeline to about 1.6 frames/s on Thor, below the configured 10, and SlimSAM
+takes about seven times its archived workstation forward time (~29 ms). Both
+run in full 32-bit precision; whether lower precision helps on Thor is open and
+needs a detector change, so it is not part of this plan. The 27 localization
+unit-test files (439 tests) pass on Thor in the venv and on Intel; none needs
+PyTorch.
+
+Power loss on 2026-10-09: after the MAXN run, a diagnostic comparing the
+detector at several precisions was running when Thor stopped responding. All
+three USER POWER ports then read 0 V; Thor's logs kept nothing from that day,
+so the cause is unconfirmed. Thor came back on 2026-10-12 in 120W, which is now
+the policy (user, 2026-10-12; `host_performance` and `check_link` expect it).
+DDS discovery of the camera from Thor took more than 15 s that day, so the
+capture tool now waits up to 45 s.
+
 ### 5. Stationary live run (agent; robot stationary, motion off)
 
 - Before: `tools/camera_contract_check --backend hardware` on Intel passes, and
@@ -139,7 +170,8 @@ on the workstation, plus any tests that need PyTorch.
 - Intel: the stationary observer from the README, built in a fresh prefix in
   the worktree, sourced through `dds_env.sh intel` so Thor's output stays off
   Wi-Fi.
-- Scene (D6): empty for 30 s, then the person at each mark for 30 s.
+- Scene (D6): empty for 30 s, then the person at each mark for 30 s. With the
+  detector at about 1.6 frames/s on Thor, each 30 s mark yields about 45 detections.
 - Record throughout: health state and progress, detector rate (configured
   limit 10 frames/s), detection and measurement source stamps, the time from
   source stamp to measurement on Thor, Thor CPU/GPU load and temperature
