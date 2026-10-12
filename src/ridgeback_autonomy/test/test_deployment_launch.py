@@ -104,6 +104,18 @@ def test_standalone_default_is_headless_and_requires_explicit_frame():
     with pytest.raises(ValueError, match='observed'): module.build_nodes(context)
 
 
+def test_standalone_detection_threshold_defaults_to_the_detector_and_is_bounded():
+    from ridgeback_localization.core.detection import DETECTION_THRESHOLD
+    module=load('src/ridgeback_localization/launch/localization.launch.py')
+    context=context_for(module,dict(base_frame='observed_base'))
+    assert context.launch_configurations['detection_threshold']==str(DETECTION_THRESHOLD)
+    context.launch_configurations['detection_threshold']='0.4'
+    module.build_nodes(context)
+    for invalid in ('0','1.5'):
+        context.launch_configurations['detection_threshold']=invalid
+        with pytest.raises(ValueError, match='detection_threshold'): module.build_nodes(context)
+
+
 def test_stationary_intel_observer_starts_only_consumers(monkeypatch):
     monkeypatch.setenv('RIDGEBACK_PERCEPTION_VENV','/nonexistent')
     module=load('src/ridgeback_autonomy/launch/localization_observer.launch.py')
