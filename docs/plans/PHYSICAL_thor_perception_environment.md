@@ -191,7 +191,9 @@ the source stamp, and both estimators within 4–10% of the taped distance at
 A, B and C (+0.12 to +0.21 m, always long). Not met: the empty scene (a poster
 was detected at 0.22), the off-centre mark (measured on the centre line), and
 the simultaneous scan guard (not run; the contract check before and after
-passed). Details in the
+passed). A redo the same afternoon with `full body person` at 0.26 passed the
+empty scene (0 of 98) and the 600 s scan guard; the off-centre mark was again
+not captured. Details in the
 [archived record](../../archive/engineering/2026-10-12-r100-0160-thor-localization-smoke.md).
 
 Stop rule: any scan gap above 250 ms, a camera driver error, or a GPU memory

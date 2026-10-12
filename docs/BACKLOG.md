@@ -147,12 +147,12 @@ and after a rollback and reinstall: device identity, effective profiles,
 encodings, exact colour/depth stamps and the camera-to-base TF chain are
 established. A first stationary projective/Euclidean smoke ran on Thor on
 2026-10-12 at 640x480@30: both estimators measured a person within 4–10% of
-taped distances at three marks, but only with a person detection threshold of
-0.22, which also detects a poster in view, and without the off-centre or empty-scene
-checks ([record](../archive/engineering/2026-10-12-r100-0160-thor-localization-smoke.md)).
-Remaining: a detection setting that separates people from the scene, the
-off-centre and empty-scene checks, the 1280x720 smoke, and a comparison of the
-live factory calibration with the nominal simulation model.
+taped distances at three marks (`person` at threshold 0.22), and a redo with
+`full body person` at 0.26 passed the empty scene and a 600 s scan guard
+([record](../archive/engineering/2026-10-12-r100-0160-thor-localization-smoke.md)).
+Person scores stay near 0.3 in that room, so the setting has little margin.
+Remaining: an off-centre check against a taped mark, the 1280x720 smoke, and a
+comparison of the live factory calibration with the nominal simulation model.
 
 **Context.** [Camera stack](target_localization/camera_stack.md),
 [aligned depth](target_localization/aligned_depth.md), and

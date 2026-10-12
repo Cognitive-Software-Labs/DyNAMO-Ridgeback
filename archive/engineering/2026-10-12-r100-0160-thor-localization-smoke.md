@@ -109,6 +109,44 @@ detected), `20261012T112546Z-localization-smoke-intel` (marks A and A2 at
 0.22 before the route; NaN distances), `20261012T124534Z-localization-smoke-intel-person-0.22`
 (recorder stopped by a session restart before the run).
 
+## Redo of the open checks (2026-10-12, 14:26–14:42 UTC)
+
+Label selection first: 24 raw frames on Thor (6 each with the scene empty and
+the operator at A, C and D, poster in view) were scored per phrasing; margin is
+the operator's lowest score minus the empty scene's highest.
+
+| Label | Person lowest | Empty highest | Margin |
+|---|---|---|---|
+| `person` | 0.296 | 0.254 | +0.04 |
+| `standing person` | 0.311 | 0.261 | +0.05 |
+| `a standing person` | 0.249 | 0.190 | +0.06 |
+| `full body person` | 0.302 | 0.225 | +0.08 |
+| `man` | 0.334 | 0.130 | +0.20 |
+| `human`, `human body` | — | — | negative |
+
+The user chose `full body person` at `detection_threshold:=0.26` (neutral;
+`man` separated best but is not a general person label). Thor ran the launch
+at `9a48e01` with power logged; Intel ran the recorder and, simultaneously,
+`camera_contract_check --guard` for 600 s (`20261012T143120Z-localization-redo-intel/`).
+
+- Empty scene: 0 of 98 detection messages had a target over 30 s; the poster
+  was no longer detected. A second empty segment had 4 of 99, all the
+  operator leaving at about 0.7 m.
+- Person detected in every frame while in view, score about 0.33, 3.3 Hz,
+  result 364–374 ms after the source stamp (median), health `processing`.
+- Off-centre not captured: no segment had the operator still at the planned
+  0.6 m left. Positions measured (Euclidean forward from the camera face,
+  lateral): 1.76 m / +0.03 m, 2.13 m / −0.14 m, 2.42 m / +0.11 m,
+  2.32 m / −0.08 m; projective agreed within 1 cm each time. Lateral values on
+  both sides of the centre line were measured, but none against a taped
+  off-centre mark. The camera's view of the room appeared shifted against the
+  morning's frames (the poster nearer the image edge), so the robot or camera
+  may have turned after the marks were taped; not checked.
+- Scan guard: contract PASS over 600 s; front, rear and merged scans 39.9 Hz,
+  largest gap 102 ms; colour and depth 29.96 Hz.
+- Thor at 120W over the 684 s run: input 73 W median, 93 W at most, GPU rail
+  at most 45 W, junction at most 70.0 °C.
+
 ## Limits
 
 One operator, one indoor scene, stationary robot, box masks and stereo depth
