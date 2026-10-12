@@ -255,10 +255,16 @@ source artifacts/colcon/thor-install/local_setup.bash
 python3 tools/check_localization_install
 ```
 
-Prepare and verify a Thor-compatible inference environment separately; the
-workstation CUDA requirements are not a verified Thor environment. Set
-`RIDGEBACK_PERCEPTION_VENV` to that venv if inference is not in the active Python
-environment. Preserve observed sensor topics and the observed TF base frame:
+Thor's inference environment uses `requirements-perception-thor.txt` (PyTorch
+2.11 for CUDA 13.0 on aarch64); its header has the setup commands. It lives
+outside the checkout, so set
+`RIDGEBACK_PERCEPTION_VENV=~/venvs/dynamo-perception` for the launch, and check
+it with `~/venvs/dynamo-perception/bin/python3 tools/intel_thor/check_perception_env`
+(ROS sourced), which fails unless the models' operations run on the GPU.
+`tools/intel_thor/thor_lan_route` must be applied first, or Thor never receives
+static TF. For a person target, OWLv2 scores below the default
+`detection_threshold` of 0.55 on `r100_0160`; set `detection_threshold:=` explicitly
+and record it. Preserve observed sensor topics and the observed TF base frame:
 
 ```bash
 : "${ROS_DOMAIN_ID:?Set the deployment domain shared with Intel}"

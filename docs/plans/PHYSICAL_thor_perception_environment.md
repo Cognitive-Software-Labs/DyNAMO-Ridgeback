@@ -1,6 +1,6 @@
 # PHYSICAL — Thor perception environment and first live localization
 
-Status: **decisions confirmed (user, 2026-10-09); steps 1–4 done; step 5 in progress.** Owner: an agent at the
+Status: **steps 1–5 done and recorded 2026-10-12, with gaps; step 6 records written.** Owner: an agent at the
 robot, with the operator for any `sudo` step (one so far: `python3.12-venv` on Thor).
 Governing plan:
 [PHYSICAL — Intel–Thor deployment and transport qualification](PHYSICAL_intel_thor_deployment.md),
@@ -184,6 +184,16 @@ measurements carry the source image stamp; distances are within the D6 bound;
 the empty scene gives no sustained false measurement; scans have no gap above
 250 ms.
 
+**Ran 2026-10-12, recorded as it stands (user decision).** With `person` at
+`detection_threshold:=0.22` and Thor's LAN route in place: health
+`processing` throughout, the detector at 3.3 Hz, results 365 ms (median) after
+the source stamp, and both estimators within 4–10% of the taped distance at
+A, B and C (+0.12 to +0.21 m, always long). Not met: the empty scene (a poster
+was detected at 0.22), the off-centre mark (measured on the centre line), and
+the simultaneous scan guard (not run; the contract check before and after
+passed). Details in the
+[archived record](../../archive/engineering/2026-10-12-r100-0160-thor-localization-smoke.md).
+
 Stop rule: any scan gap above 250 ms, a camera driver error, or a GPU memory
 error stops the launch; record it.
 
@@ -204,7 +214,14 @@ on Intel and `20261012T110753Z-thor-localization-smoke/` on Thor.
 
 ### 6. Record (agent)
 
-Evidence under `artifacts/hardware/<UTC>-thor-perception-env/` and
+**Done 2026-10-12:** the archived record, the README's Thor environment
+paragraph, the governing plan's installation and timing rows, and the
+backlog's camera item. Open items, carried by the backlog's physical camera
+validation: a detection setting that separates people from the scene (label
+or threshold), the off-centre and empty-scene checks with the scan guard, the
+1280x720 smoke, and the detector's speed on Thor (full precision now).
+
+Original step text: evidence under `artifacts/hardware/<UTC>-thor-perception-env/` and
 `<UTC>-thor-localization-smoke/` with `pip freeze`, the gate output, snapshot
 hashes and timings. Add the Thor environment to the README's distributed
 localization section, write an archive record, update the governing plan's
