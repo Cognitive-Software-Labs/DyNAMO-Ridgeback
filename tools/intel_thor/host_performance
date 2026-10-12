@@ -7,8 +7,10 @@ Usage: tools/intel_thor/host_performance status
 
 Both hosts run every CPU frequency policy at the performance governor, with
 Intel's energy preference at performance, through a boot unit
-(dynamo-host-performance.service). Thor also runs nvpmodel's MAXN power mode,
-which nvpmodel itself restores at boot. thermald and Thor's fan control stay in
+(dynamo-host-performance.service). Thor runs nvpmodel's 120W power mode (its
+factory default), which nvpmodel itself restores at boot: on 2026-10-09 the
+Ridgeback's user power ports stopped supplying Thor during a heavy GPU load in
+MAXN, so MAXN stays off until that supply's capacity is confirmed. thermald and Thor's fan control stay in
 charge of thermal protection. apply snapshots the previous governors,
 preferences and power mode; rollback restores them. status is read-only, needs
 no checkout, and is what check_link runs on both hosts.
@@ -24,7 +26,8 @@ import sys
 CPUFREQ = '/sys/devices/system/cpu/cpufreq'
 NO_TURBO = '/sys/devices/system/cpu/intel_pstate/no_turbo'
 NVPMODEL_CONF = '/etc/nvpmodel.conf'
-MAXN = 0
+THOR_POWER_MODE = 1  # 120W; MAXN is 0
+THOR_POWER_MODE_NAME = '120W'
 SCRIPT = '/usr/local/sbin/dynamo-host-performance'
 UNIT = 'dynamo-host-performance.service'
 UNIT_DIR = '/etc/systemd/system'
@@ -86,7 +89,8 @@ def checks(host, role):
         rows.append((read(host.path(NO_TURBO)) == '0', 'turbo', 'enabled' if read(host.path(NO_TURBO)) == '0' else 'disabled'))
     if role == 'thor':
         name, mode = power_mode()
-        rows.append((mode == MAXN, 'power mode', f'{name} (ID {mode}); MAXN is ID {MAXN}'))
+        rows.append((mode == THOR_POWER_MODE, 'power mode',
+                     f'{name} (ID {mode}); expected {THOR_POWER_MODE_NAME} (ID {THOR_POWER_MODE})'))
     state = unit_state(UNIT)
     rows.append((state['enabled'] == 'enabled', 'boot unit', f"{UNIT}: {state['enabled']}, {state['active']}"))
     return rows
@@ -138,8 +142,9 @@ def apply(host, role):
     run('systemctl', 'daemon-reload')
     run('systemctl', 'enable', UNIT)
     run('systemctl', 'restart', UNIT)
-    if role == 'thor' and power_mode()[1] != MAXN and not set_power_mode(MAXN):
-        print('Thor needs a reboot to enter MAXN: sudo nvpmodel -m 0 --force (reboots Thor now).',
+    if role == 'thor' and power_mode()[1] != THOR_POWER_MODE and not set_power_mode(THOR_POWER_MODE):
+        print(f'Thor needs a reboot to enter {THOR_POWER_MODE_NAME}: '
+              f'sudo nvpmodel -m {THOR_POWER_MODE} --force (reboots Thor now).',
               file=sys.stderr)
     return status(host)
 

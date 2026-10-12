@@ -208,7 +208,7 @@ It does not qualify the installed services configuration or clear the
 | Thor host | SSH fails, or `rmw_cyclonedds_cpp` is missing | Thor's checkout is missing or at a different revision |
 | Configurations | A file does not parse, or its interfaces differ from the table above | — |
 | Clock | Offset exceeds 10 ms | Offset exceeds 2 ms, or a host reports NTP unsynchronized |
-| Performance policy, each host | A CPU policy is not at the performance governor, Intel's energy preference is not performance, Thor is not in MAXN, or the boot unit is not enabled (from `host_performance status`) | — |
+| Performance policy, each host | A CPU policy is not at the performance governor, Intel's energy preference is not performance, Thor is not in 120W, or the boot unit is not enabled (from `host_performance status`) | — |
 | Traffic, each direction | The probe receives nothing or under 90% of 30 Hz, or Wi-Fi carries more than 20 Mbit/s during the stream | The largest frame gap exceeds 100 ms, or the probe's own sockets drop packets |
 
 The clock check measures the offset over one SSH channel and bounds its error
@@ -231,6 +231,13 @@ colour/depth pairing, round-trip time and CPU. It writes its results under
 
 ## Known limits
 
+- Thor is powered from the Ridgeback's USER POWER panel (three ports, each
+  behind a 5 A fuse with a green indicator, beside a 20 A fuse). On 2026-10-09
+  Thor stopped responding during a heavy GPU load in MAXN, and afterwards all
+  three ports read 0 V at the pins with their indicators still green. Thor's
+  logs kept nothing from that day, so the cause is unconfirmed. Thor therefore
+  runs in 120W, not MAXN, until the panel's supply capacity is known; Thor's
+  dev kit can draw more than a 5 A port supplies at the lower port voltages.
 - The raw 1280×720 colour + depth stream is about 1.1 Gbit/s, which does not
   fit the 1 Gb/s link on either middleware. Senders fall behind, and frames
   arrive more than a second old.
@@ -269,7 +276,9 @@ latency components and the qualification collector.
 
 The selected camera transport is raw colour and aligned depth at 640×480 and
 30 Hz under the services DDS contract above, with both hosts at the
-performance governor and Thor in MAXN (`tools/intel_thor/host_performance`).
+performance governor and Thor in its 120W power mode (`tools/intel_thor/host_performance`).
+The latency figures were measured with Thor in MAXN; Thor's own share of each
+stream's delay (delivery to the callback) was under about 1 ms.
 It meets the working targets with margin: network + DDS p95 ≤ 20 ms, stamp to
 Thor callback p95 ≤ 40 ms, loss ≤ 1%, exact pairing ≥ 99%, LiDAR continuity
 unchanged. Larger send buffers, larger DDS messages, a lower rate and

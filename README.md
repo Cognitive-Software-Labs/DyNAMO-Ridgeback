@@ -657,9 +657,11 @@ services restart, so keep the robot stationary with the e-stop in reach:
 sudo tools/intel_thor/intel_services_rmw apply
 ```
 
-Both hosts run at full CPU performance, and Thor in MAXN; `check_link` fails
-otherwise. Install once per host (Thor from its worktree; switching to MAXN may
-ask for a reboot, which the tool reports):
+Both hosts run at full CPU performance, and Thor in its 120W power mode;
+`check_link` fails otherwise. Do not select MAXN: on 2026-10-09 the Ridgeback's
+user power ports stopped supplying Thor under a heavy GPU load in MAXN. Install
+once per host (Thor from its worktree; a power-mode change that needs a reboot
+is reported):
 
 ```bash
 sudo tools/intel_thor/host_performance apply --host intel

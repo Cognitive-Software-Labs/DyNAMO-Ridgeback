@@ -65,18 +65,19 @@ def test_intel_reports_each_difference_then_passes_after_apply(tool, monkeypatch
     assert not any(call[0] == 'nvpmodel' for call in calls)
 
 
-def test_thor_enters_maxn_and_rollback_restores_mode_and_governors(tool, monkeypatch):
+def test_thor_leaves_maxn_for_120w_and_rollback_restores_mode_and_governors(tool, monkeypatch):
     module, host, calls, mode, cpus = tool
+    mode['id'] = 0  # MAXN, as installed before 2026-10-09
     host.path(module.NVPMODEL_CONF).parent.mkdir(parents=True)
     host.path(module.NVPMODEL_CONF).write_text('< PM_CONFIG DEFAULT=1 >\n')
     cpus('schedutil')
     assert module.detect(host) == 'thor'
     monkeypatch.setattr(module, 'status', lambda host: performance(module, host) or 0)
     module.apply(host, 'thor')
-    assert mode['id'] == module.MAXN
+    assert mode['id'] == module.THOR_POWER_MODE == 1
     assert all(passed for passed, _, _ in module.checks(host, 'thor'))
     module.rollback(host)
-    assert mode['id'] == 1
+    assert mode['id'] == 0
     assert {state['governor'] for state in module.cpu_state(host).values()} == {'schedutil'}
     assert not host.path(module.SCRIPT).exists() and not host.path(module.BACKUP).exists()
 

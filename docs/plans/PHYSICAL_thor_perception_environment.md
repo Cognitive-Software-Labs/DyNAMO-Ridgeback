@@ -36,7 +36,7 @@ environment installed here.
 |---|---|
 | Platform | aarch64, L4T R38.2.2, JetPack 7.0, Ubuntu 24.04.4, 14 cores, 122 GB unified memory (119 GB available) |
 | GPU | NVIDIA Thor, compute capability 11.0 (`sm_110`), driver 580.00, CUDA 13.0 (`nvcc` 13.0.48), cuDNN 9.12, TensorRT 10.13 |
-| Power | MAXN, performance governor (`host_performance`) |
+| Power | MAXN at inspection; 120W since 2026-10-12 (user decision after the power loss in step 4), performance governor (`host_performance`) |
 | Python | system 3.12.3; NumPy 1.26.4, OpenCV 4.6.0, Pillow 10.2.0 from Ubuntu; no PyTorch for the system Python |
 | Other environments | `~/miniforge3` with `lerobot` (another project): PyTorch 2.10 on CUDA 13.0 with `sm_110` kernels, so CUDA PyTorch runs on this board |
 | ROS | Jazzy desktop, 406 packages; `colcon` and `rosdep`; `rosdep check` for the three localization packages: all system dependencies satisfied |
