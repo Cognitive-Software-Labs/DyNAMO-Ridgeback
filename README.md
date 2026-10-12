@@ -671,6 +671,15 @@ sudo tools/intel_thor/host_performance apply --host thor
 `tools/intel_thor/host_performance status` reports drift; `rollback` restores
 the previous governors and power mode.
 
+Thor must reach Intel's Wi-Fi address over the cable, or transient-local data
+such as `tf_static` never arrives (see
+[troubleshooting](docs/troubleshooting.md#thor-receives-sensor-streams-but-no-static-tf)).
+Once, on Thor, from its worktree:
+
+```bash
+sudo tools/intel_thor/thor_lan_route apply
+```
+
 `tools/intel_thor/intel_services_rmw status` shows the RMW that each service
 actually runs, and `sudo tools/intel_thor/intel_services_rmw rollback` restores
 the saved middleware, DDS configuration, and service overrides. Backups from

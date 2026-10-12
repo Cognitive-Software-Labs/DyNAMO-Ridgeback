@@ -228,6 +228,32 @@ from `/etc/clearpath/setup.bash`. The sender then also uses the lab Wi-Fi.
 CycloneDDS, and run `tools/intel_thor/check_link`. The
 [transport reference](physical/intel_thor_transport.md) owns the contract.
 
+## Thor receives sensor streams but no static TF
+
+**Symptom.** On Thor, camera images and scans arrive, but `tf_static`,
+`robot_description` and other transient-local topics from Intel never do.
+`tf2_echo base_link camera_0_color_optical_frame` waits indefinitely, the
+localization mask node reports `TF_MISS_EXTRINSIC` (status 4) with NaN
+distances, and `ros2 topic info -v` on Thor shows Intel's nodes as
+`_NODE_NAME_UNKNOWN_`. Topic matching from Thor can also be slow.
+
+**Cause.** Intel's robot services use the CycloneDDS profile on br0 and Wi-Fi,
+so they advertise Intel's Wi-Fi address (192.168.123.14) as well as
+192.168.131.1. Thor is on the same Wi-Fi subnet, so its kernel sends its DDS
+replies to that address over Thor's own Wi-Fi, and the lab access point does
+not deliver traffic between its clients (Thor and Intel cannot ping each other
+over Wi-Fi). Intel never sees Thor's readers or acknowledgements, so it never
+sends stored samples; data it streams continuously still arrives over the
+cable. Reproduced on 2026-10-12: a once-published transient-local message from
+the services profile never reached Thor in domain 0, and arrived within 3 s
+with Wi-Fi removed from the publisher's profile, with the Ethernet-only
+profile, or with the route below.
+
+**Fix.** On Thor, `sudo tools/intel_thor/thor_lan_route apply` routes
+192.168.123.14 over the robot Ethernet, persistently; `check_link` fails
+without it. Laptops on the same Wi-Fi meet the same isolation, so RViz over
+Wi-Fi needs client isolation disabled on the access point.
+
 ## Hokuyo drivers stuck reconnecting
 
 **Symptom.** No `sensors/lidar2d_*/scan` data, and the `clearpath-sensors`

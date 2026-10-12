@@ -164,6 +164,18 @@ fi
 
 check_buffers thor
 check_performance thor
+# Thor must reach Intel's Wi-Fi DDS locator over the cable; see thor_lan_route.
+route_output="$(thor python3 - status < "$REPO_ROOT/tools/intel_thor/thor_lan_route" 2>&1)"
+if ! printf '%s\n' "$route_output" | grep -qE '^(ok|DIFF) '; then
+    fail "thor LAN route unreadable: $(printf '%s' "$route_output" | tail -1)"
+else
+    while read -r verdict criterion; do
+        case "$verdict" in
+            ok) pass "thor LAN route: $criterion" ;;
+            DIFF) fail "thor LAN route: $criterion; sudo tools/intel_thor/thor_lan_route apply on Thor" ;;
+        esac
+    done <<< "$(printf '%s\n' "$route_output" | grep -E '^(ok|DIFF) ')"
+fi
 if thor test -e /opt/ros/jazzy/lib/librmw_cyclonedds_cpp.so; then
     pass "rmw_cyclonedds_cpp installed"
 else

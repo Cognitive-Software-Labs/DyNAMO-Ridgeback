@@ -231,6 +231,10 @@ colour/depth pairing, round-trip time and CPU. It writes its results under
 
 ## Known limits
 
+- Intel's robot services advertise Intel's Wi-Fi address to Thor. Thor reaches
+  it only through `tools/intel_thor/thor_lan_route`, which routes it over the
+  robot Ethernet; the lab access point does not pass traffic between Wi-Fi
+  clients. See [troubleshooting](../troubleshooting.md#thor-receives-sensor-streams-but-no-static-tf).
 - Thor is powered from the Ridgeback's USER POWER panel (three ports, each
   behind a 5 A fuse with a green indicator, beside a 20 A fuse). On 2026-10-09
   Thor stopped responding during a heavy GPU load in MAXN, and afterwards all

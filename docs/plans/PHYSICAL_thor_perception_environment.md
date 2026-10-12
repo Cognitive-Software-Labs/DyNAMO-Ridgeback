@@ -1,6 +1,6 @@
 # PHYSICAL — Thor perception environment and first live localization
 
-Status: **decisions confirmed (user, 2026-10-09); steps 1–4 done, step 5 next.** Owner: an agent at the
+Status: **decisions confirmed (user, 2026-10-09); steps 1–4 done; step 5 in progress.** Owner: an agent at the
 robot, with the operator for any `sudo` step (one so far: `python3.12-venv` on Thor).
 Governing plan:
 [PHYSICAL — Intel–Thor deployment and transport qualification](PHYSICAL_intel_thor_deployment.md),
@@ -186,6 +186,21 @@ the empty scene gives no sustained false measurement; scans have no gap above
 
 Stop rule: any scan gap above 250 ms, a camera driver error, or a GPU memory
 error stops the launch; record it.
+
+**Paused 2026-10-12, two findings.** (1) With the detector's default 0.55
+threshold no person is detected: OWLv2 scored the person facing the camera at
+0.44 (JPEG) and 0.31 on raw frames, against 0.16–0.28 for a skeleton poster in
+view. `localization.launch.py` now takes `detection_threshold` (default
+unchanged); the run uses `person` at 0.22 (user, deviation from defaults).
+(2) Thor received no static TF, so both estimators reported
+`TF_MISS_EXTRINSIC` with NaN distances: Thor's DDS replies to Intel's Wi-Fi
+address went out over Thor's Wi-Fi, which does not reach Intel (see
+[troubleshooting](../troubleshooting.md#thor-receives-sensor-streams-but-no-static-tf)).
+A temporary route fixed it; `thor_lan_route` makes it persistent. Restarted
+Thor localization processes also took up to about 2 minutes to connect, and
+the launch ignores SIGINT when started in the background, so stop it with
+SIGTERM. Evidence: `artifacts/hardware/20261012T113530Z-localization-smoke-intel-threshold-0.40/`
+on Intel and `20261012T110753Z-thor-localization-smoke/` on Thor.
 
 ### 6. Record (agent)
 
