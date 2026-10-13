@@ -210,3 +210,27 @@ def test_stationary_observer_overlay_reads_local_depth(monkeypatch):
     module=load('src/ridgeback_autonomy/launch/localization_observer.launch.py')
     context=context_for(module,dict(base_frame='observed_base'))
     assert overlay_parameters(module.build_nodes(context),context)['aligned_depth_topic']=='sensors/camera_0/depth/image'
+
+
+def rviz_layout_argument(module, overrides, tmp_path, monkeypatch):
+    from launch.actions import OpaqueFunction
+    monkeypatch.setattr('tempfile.tempdir', str(tmp_path))
+    context = context_for(module, overrides)
+    for entity in module.generate_launch_description().entities:
+        if isinstance(entity, OpaqueFunction):
+            nodes = entity.execute(context) or []
+            rviz = [n for n in nodes if isinstance(n, Node) and executables([n], context) == ['rviz2']]
+            if rviz:
+                args = [perform_substitutions(context, a) if isinstance(a, list) else a
+                        for a in rviz[0]._Node__arguments]
+                return args[args.index('-d') + 1]
+    raise AssertionError('no rviz2 node')
+
+
+def test_hardware_rviz_has_no_goal_tool_and_simulation_keeps_it(tmp_path, monkeypatch):
+    module = load('src/ridgeback_autonomy/launch/ridgeback_exploration.launch.py')
+    hardware = rviz_layout_argument(module, dict(backend='hardware', base_frame='base_link'), tmp_path, monkeypatch)
+    simulation = rviz_layout_argument(module, dict(backend='gz'), tmp_path, monkeypatch)
+    assert 'rviz_default_plugins/SetGoal' not in Path(hardware).read_text()
+    assert simulation.endswith('exploration.rviz')
+    assert 'rviz_default_plugins/SetGoal' in Path(simulation).read_text()

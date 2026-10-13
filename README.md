@@ -342,9 +342,11 @@ target rings and the camera overlay:
 Pass the same `estimators` and `mask_gate` that Thor runs. Without the patched
 `slam_toolbox` no map appears and Nav2 never starts.
 
-**Nav2 output reaches the robot's twist mux:** the RViz *2D Goal Pose* tool
-drives the robot even with frontier goals off. Keep the e-stop engaged, or leave
-that tool unused, until the command chain is qualified.
+**Nav2 output reaches the robot's twist mux.** With `backend:=hardware`, RViz
+opens a copy of the exploration layout without the *2D Goal Pose* tool, because
+one click would otherwise drive the robot even with frontier goals off. Any other
+Nav2 client can still send goals, so keep the e-stop engaged until the command
+chain is qualified.
 
 For later qualified mission integration, exploration supports
 `localization_mode:=external localization_required:=true`; keep
