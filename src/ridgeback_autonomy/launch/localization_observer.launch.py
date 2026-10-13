@@ -20,13 +20,17 @@ def build_nodes(context):
     if value('displays')=='true':
         nodes.extend([estimate_viz_node(**common,estimators=selected,base_frame=base,hud_layout='wide'),
             overlay_node(**common,estimators=selected,color_topic=value('color_topic'),
+                aligned_depth_topic=value('aligned_depth_topic'),
                 depth_source=value('depth_source'),mask_gate=value('mask_gate'))])
     return nodes
 
 
 def generate_launch_description():
+    camera=resolve_camera_inputs(REALSENSE_BACKEND)
+    # The depth panel reads this host's camera; only the mask crosses from compute.
     defaults=dict(namespace='r100_0001',use_sim_time='false',displays='true',
         estimators='projective_ranging,euclidean_reconstruction',
-        color_topic=resolve_camera_inputs(REALSENSE_BACKEND).color_image_topic,depth_source='stereoscopic',mask_gate='box',health_timeout='3.0')
+        color_topic=camera.color_image_topic,aligned_depth_topic=camera.aligned_depth_topic,
+        depth_source='stereoscopic',mask_gate='box',health_timeout='3.0')
     return LaunchDescription([DeclareLaunchArgument('base_frame',description='Observed base TF frame ID'),
         *[DeclareLaunchArgument(k,default_value=v) for k,v in defaults.items()],OpaqueFunction(function=build_nodes)])

@@ -236,7 +236,11 @@ def build_target_localization_nodes(context, *args, **kwargs):
 
     # The camera overlay picks its panels from the same set, so it grids one
     # frame per path that has a producer here. Labels stay on, unlike the
-    # benchmark: there is no collage carrying the numbers separately.
+    # benchmark: there is no collage carrying the numbers separately. In
+    # external mode the mask node runs on the compute host, so the depth panel
+    # reads this host's own aligned depth rather than pulling the remote
+    # republish back over the link; only the mask image still crosses.
+    overlay_depth = {'aligned_depth_topic': camera_inputs.aligned_depth_topic} if mode == 'external' else {}
     nodes.append(overlay_node(
         namespace=namespace,
         use_sim_time=use_sim_time,
@@ -244,6 +248,7 @@ def build_target_localization_nodes(context, *args, **kwargs):
         color_topic=camera_inputs.color_image_topic,
         depth_source=depth_source,
         mask_gate=mask_gate,
+        **overlay_depth,
     ))
 
     return nodes
