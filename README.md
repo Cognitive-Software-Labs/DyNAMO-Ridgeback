@@ -305,6 +305,44 @@ the health consumer. For a person check, restart Thor with `target_labels:=perso
 and record that selection. Stop each launch with Ctrl-C in its own terminal;
 leave platform/sensor services running. Do not run `cleanup.sh` on hardware.
 
+**Intel — RViz view with the SLAM map.** To watch Thor's results over a live
+map on the Intel desktop (VNC display `:1`), run hardware exploration in
+external mode instead of the observer. Build the full Intel set in a fresh
+prefix: the patched `slam_toolbox` (imported and patched by
+`tools/check_dependencies --apply --profile core`), `ridgeback_autonomy_hardware`
+and the HUD RViz plugin. Then source the Ethernet-only DDS profile so Thor's
+results reach the consumers:
+
+```bash
+source /opt/ros/jazzy/setup.bash
+colcon --log-base artifacts/colcon/intel-rviz build --symlink-install \
+  --base-paths src/ridgeback_interfaces src/ridgeback_common src/ridgeback_localization src/ridgeback_autonomy \
+    src/ridgeback_autonomy_hardware src/rviz_2d_overlay_plugins src/slam_toolbox \
+  --build-base artifacts/colcon/intel-rviz-build --install-base artifacts/colcon/intel-rviz-install
+source artifacts/colcon/intel-rviz-install/local_setup.bash
+source src/ridgeback_autonomy_hardware/config/intel_thor/dds_env.sh intel
+: "${ROS_DOMAIN_ID:?Set the deployment domain shared with Thor}"
+DISPLAY=:1 ros2 launch ridgeback_autonomy ridgeback_exploration.launch.py \
+  backend:=hardware localization_mode:=external autonomous_motion_enabled:=false \
+  base_frame:="${BASE_FRAME:?Set the observed base TF frame}" \
+  estimators:=projective_ranging,euclidean_reconstruction
+```
+
+Intel runs SLAM, Nav2 and RViz. RViz shows the map, both LiDAR scans, the
+target rings and the camera overlay:
+- **Colour panels:** Thor's measurements drawn onto Intel's own colour frames,
+  matched by source stamp.
+- **Depth panel:** Intel's local aligned depth. It shows the newest frame and is
+  not stamp-matched.
+- **Mask panel:** the only image Thor sends back, on detection frames.
+
+Pass the same `estimators` and `mask_gate` that Thor runs. Without the patched
+`slam_toolbox` no map appears and Nav2 never starts.
+
+**Nav2 output reaches the robot's twist mux:** the RViz *2D Goal Pose* tool
+drives the robot even with frontier goals off. Keep the e-stop engaged, or leave
+that tool unused, until the command chain is qualified.
+
 For later qualified mission integration, exploration supports
 `localization_mode:=external localization_required:=true`; keep
 `autonomous_motion_enabled:=false` throughout this stationary milestone.

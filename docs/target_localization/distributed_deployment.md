@@ -31,7 +31,12 @@ and a health consumer: no sensor bringup, Nav2, frontier goals, or inference.
 Exploration retains its public launch. `localization_mode:=local` starts one
 local detector and the selected estimator workers. `localization_mode:=external`
 starts result consumers without a detector, measurement worker, or duplicate
-health producer. `target_localization_enabled:=false` suppresses the whole
+health producer. In external mode and in the observer, the overlay's depth panel
+subscribes to this host's aligned depth topic. The compute host's republish is
+the frame it measured, but it would have to cross the link; the local stream is
+the latest frame instead, not stamp-matched. The mask panel still subscribes to
+the compute host's `debug/target/mask`. `target_localization_enabled:=false`
+suppresses the whole
 localization block. External mode defaults `localization_required:=true`;
 local mode retains optional localization unless explicitly required.
 
