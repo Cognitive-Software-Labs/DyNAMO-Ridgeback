@@ -20,6 +20,10 @@ bt_navigator:
 controller_server:
   ros__parameters:
     enable_stamped_cmd_vel: true
+    # Nav2's default "odom" has no publisher in any backend; the controller
+    # reads its current velocity from the same EKF output as bt_navigator and
+    # the velocity smoother.
+    odom_topic: platform/odom/filtered
     controller_frequency: 20.0
     min_x_velocity_threshold: 0.001
     min_y_velocity_threshold: 0.001

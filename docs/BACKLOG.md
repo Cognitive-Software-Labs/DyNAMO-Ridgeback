@@ -85,11 +85,15 @@ e-stop tests before enabling `autonomous_motion_enabled:=true`.
 **Progress.** On 2026-10-13 the Nav2 portion was observed on the live graph for
 the first time, stationary and with no goal sent. Every hop from Nav2 to the
 controller carries `TwistStamped`, and every publisher/subscriber pair delivers.
-It also found that `controller_server` subscribes `odom`, which has no publisher
+It also found that `controller_server` subscribed `odom`, which has no publisher
 on the robot. The platform publishes `platform/odom` and
-`platform/odom/filtered`, so the controller receives no velocity feedback; this
-is unresolved
+`platform/odom/filtered`, so the controller received no velocity feedback
 ([record](../archive/engineering/2026-10-13-r100-0160-nav2-command-chain.md)).
+`nav2_params.yaml` now sets the controller's `odom_topic` to
+`platform/odom/filtered`, the topic `bt_navigator` and the velocity smoother
+already use in every backend. Earlier simulator benchmarks ran the controller
+without that feedback, so rerun any benchmark before comparing it with results
+from after this change.
 
 **Context.** [Exploration architecture](exploration/architecture.md#hardware-safety-boundary)
 and the public hardware workflow in the [README](../README.md). The
