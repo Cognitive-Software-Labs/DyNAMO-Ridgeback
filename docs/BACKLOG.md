@@ -124,10 +124,19 @@ patch (`patches/urg_node_close_failed_open.patch`) was deployed on
 `r100_0160` the same day. It runs as an overlay at `/home/robot/ros_overlays/urg_node_fix`
 (upstream 1.1.2 plus the patch), which `/etc/clearpath/robot.yaml` lists under
 `system.ros2.workspaces`; `robot.yaml.bak-urg-node-fix` is the rollback copy.
-Both drivers run the patched binary and stream. The patch is not in
+Both drivers run the patched binary and stream. The first on-robot
+interruption (`ss -K` on the rear LiDAR's session) found a second defect.
+`urg_c` writes without `MSG_NOSIGNAL`, so the write after a reset raised
+SIGPIPE and killed the driver, and nothing respawned it.
+`patches/urg_node_ignore_sigpipe.patch` ignores SIGPIPE. With both patches, a
+repeat interruption reconnected the same driver process within 2.25 s, with no
+service restart
+([record](../archive/engineering/2026-10-13-urg-node-reconnect-leak.md)).
+That meets the interruption criterion for a reset session. The half-answering
+sensor case is proven only offline. The patches are not in
 `dependencies/core.repos`, and `deployment/r100_0160/` does not include the
-`robot.yaml` change. The on-robot interruption test and the
-initiating-mechanism criteria below remain open.
+`robot.yaml` change. The services-configuration and initiating-mechanism
+criteria below remain open.
 
 **Context.** Recovery steps are in
 [troubleshooting](troubleshooting.md#hokuyo-drivers-stuck-reconnecting). The

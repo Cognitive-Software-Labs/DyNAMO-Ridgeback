@@ -284,7 +284,9 @@ failed open leaks its socket: `urg_c`'s `urg_open` leaves it open, and
 `urg_node` 1.1.2's Ethernet constructor throws without closing it. A Hokuyo UST
 serves one client at a time, so the leaked connection holds the only slot and
 the driver never recovers on its own. `patches/urg_node_close_failed_open.patch`
-closes it. On `r100_0160` it is deployed as an overlay at
+closes it. A reset session (a power-cycled LiDAR) instead killed the stock
+driver with SIGPIPE, with no respawn; `patches/urg_node_ignore_sigpipe.patch`
+keeps it alive to reconnect. On `r100_0160` both are deployed as an overlay at
 `/home/robot/ros_overlays/urg_node_fix`, listed under
 `system.ros2.workspaces` in `/etc/clearpath/robot.yaml`. Check that the drivers
 use it with `readlink /proc/$(pgrep -f urg_node_driver | head -1)/exe`. Repeated local-camera-subscriber-associated failures
