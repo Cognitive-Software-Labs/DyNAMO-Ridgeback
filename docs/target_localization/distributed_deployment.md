@@ -31,7 +31,18 @@ and a health consumer: no sensor bringup, Nav2, frontier goals, or inference.
 Exploration retains its public launch. `localization_mode:=local` starts one
 local detector and the selected estimator workers. `localization_mode:=external`
 starts result consumers without a detector, measurement worker, or duplicate
-health producer. `target_localization_enabled:=false` suppresses the whole
+health producer. In external mode and in the observer, the overlay's depth panel
+subscribes to this host's aligned depth topic. The compute host's republish is
+the frame it measured, but it would have to cross the link. The local stream
+carries the same source stamps, because colour and aligned depth share them
+exactly. The overlay keeps its last 32 colour and depth frames by stamp and
+draws each measurement on the pair it was measured from. It falls back to the
+newest pair, with a warning, when the result is older than that buffer. The
+box gate's mask panel is derived
+from the detections message. Only the silhouette gate's panel subscribes to the
+compute host's `debug/target/mask`, the one image that then crosses the link.
+`target_localization_enabled:=false`
+suppresses the whole
 localization block. External mode defaults `localization_required:=true`;
 local mode retains optional localization unless explicitly required.
 
@@ -180,3 +191,4 @@ explicit conversion. Do not run simulator cleanup on the robot.
 ## Archived evidence
 
 - [Simulator runtime matrix and receive-buffer correction](../../archive/engineering/2026-09-18-package-split-runtime.md)
+- [Intel RViz view of Thor localization on r100_0160](../../archive/engineering/2026-10-13-r100-0160-intel-rviz-observer.md)

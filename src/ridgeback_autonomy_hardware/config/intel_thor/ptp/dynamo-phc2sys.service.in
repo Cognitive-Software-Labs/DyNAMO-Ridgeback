@@ -1,0 +1,14 @@
+# Rendered by tools/intel_thor/ptp_sync; edit the template in the repository.
+[Unit]
+Description=DyNAMO hardware/wall clock link (@ROLE@)
+Requires=dynamo-ptp4l.service
+After=dynamo-ptp4l.service
+@CONFLICTS@
+[Service]
+Type=simple
+ExecStart=/usr/sbin/phc2sys @ARGUMENTS@
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

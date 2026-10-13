@@ -1,0 +1,269 @@
+#!/usr/bin/env python3
+"""Distribute Intel's wall clock to Thor with PTP; the operator runs apply/rollback with sudo.
+
+Usage: tools/intel_thor/ptp_sync status
+       sudo tools/intel_thor/ptp_sync apply --host intel|thor [--yes]
+       sudo tools/intel_thor/ptp_sync rollback [--yes]
+
+chrony serves its estimate of true time, while sensor stamps come from Intel's
+wall clock, so a chrony client follows Intel only to within Intel's pending
+internet correction. PTP carries the wall clock itself:
+
+  Intel wall clock --phc2sys--> eno1 hardware clock --ptp4l (L2)--> Thor
+  enP2p1s0 hardware clock --phc2sys--> Thor wall clock
+
+Intel keeps chrony (managed by time_sync) for UTC and must have time_sync's
+slow slew rate installed first. On Thor, phc2sys takes the wall clock from
+chrony, which is stopped and restored by rollback. Snapshots and restores the
+original package choice and unit states; status is read-only.
+"""
+import argparse
+import fcntl
+import hashlib
+import json
+import os
+from pathlib import Path
+import shutil
+import subprocess
+import sys
+import time
+
+REPO = Path(__file__).resolve().parents[2]
+CONFIG = REPO / 'src/ridgeback_autonomy_hardware/config/intel_thor'
+TEMPLATES = CONFIG / 'ptp'
+BACKUP = '/var/lib/dynamo-ptp-sync-backup'
+PTP4L_CONF = '/etc/linuxptp/dynamo-ptp4l.conf'
+PTP4L_UNIT = 'dynamo-ptp4l.service'
+PHC2SYS_UNIT = 'dynamo-phc2sys.service'
+UNIT_DIR = '/etc/systemd/system'
+TIME_SYNC_BACKUP = '/var/lib/dynamo-time-sync-backup'
+CHRONY_MANAGED = '/etc/chrony/conf.d/dynamo-time.conf'
+CHRONY = 'chrony.service'
+LOCK = '/run/lock/dynamo-local-dds-test.lock'
+
+# Fixed robot Ethernet ports, as in check_link and the DDS profiles. Both NICs
+# timestamp PTP in hardware; the hardware clocks hold UTC on both ends (-O 0).
+ROLES = {
+    'intel': {
+        'interface': 'eno1',
+        'phc2sys': '-s CLOCK_REALTIME -c eno1 -O 0 -R 8 -u 64 -m -q',
+        'conflicts': '',
+    },
+    'thor': {
+        'interface': 'enP2p1s0',
+        'phc2sys': '-s enP2p1s0 -c CLOCK_REALTIME -O 0 -R 8 -u 64 -w -m -q',
+        'conflicts': 'Conflicts=chrony.service systemd-timesyncd.service\n',
+    },
+}
+
+
+def run(*argv, check=True):
+    result = subprocess.run(argv, capture_output=True, text=True)
+    if check and result.returncode:
+        raise RuntimeError(f'{argv[0]} failed: {result.stderr.strip()}')
+    return result
+
+
+class Host:
+    def __init__(self, root='/'):
+        self.root = Path(root)
+
+    def path(self, absolute):
+        return self.root / absolute.lstrip('/')
+
+
+def write(path, text):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_suffix(path.suffix + '.tmp')
+    temporary.write_text(text)
+    temporary.chmod(0o644)
+    os.replace(temporary, path)
+
+
+def digest(path):
+    return hashlib.sha256(path.read_bytes()).hexdigest() if path.exists() else None
+
+
+def installed(package):
+    return run('dpkg-query', '-W', '-f=${Status}', package, check=False).stdout.strip() == 'install ok installed'
+
+
+def state(unit):
+    return {key: run('systemctl', 'is-' + key, unit, check=False).stdout.strip()
+            for key in ('enabled', 'active')}
+
+
+def rendered(role):
+    """The three managed files for a host role, keyed by absolute path."""
+    settings = ROLES[role]
+
+    def unit(name):
+        return ((TEMPLATES / f'{name}.in').read_text()
+                .replace('@ROLE@', role).replace('@INTERFACE@', settings['interface'])
+                .replace('@ARGUMENTS@', settings['phc2sys'])
+                .replace('@CONFLICTS@', settings['conflicts']))
+
+    return {
+        PTP4L_CONF: (TEMPLATES / f'ptp4l_{role}.conf').read_text(),
+        f'{UNIT_DIR}/{PTP4L_UNIT}': unit(PTP4L_UNIT),
+        f'{UNIT_DIR}/{PHC2SYS_UNIT}': unit(PHC2SYS_UNIT),
+    }
+
+
+def preconditions(host, role):
+    if not host.path(f'/sys/class/net/{ROLES[role]["interface"]}').exists():
+        raise RuntimeError(f'{ROLES[role]["interface"]} is missing; this is not the {role} host')
+    if role == 'intel':
+        managed = host.path(CHRONY_MANAGED)
+        if not managed.exists() or 'maxslewrate 500' not in managed.read_text():
+            raise RuntimeError('Intel needs time_sync with the slow slew rate first: '
+                               'sudo tools/intel_thor/time_sync apply --host intel')
+
+
+def apply(host, role):
+    preconditions(host, role)
+    backup = host.path(BACKUP)
+    if backup.exists() and not (backup / 'complete').exists():
+        raise RuntimeError(f'Incomplete snapshot at {backup}; retained for recovery')
+    if (backup / 'complete').exists():
+        saved = json.loads((backup / 'state.json').read_text())
+        if saved['role'] != role:
+            raise RuntimeError('Rollback before changing the host role')
+        manifest = json.loads((backup / 'installed.json').read_text())
+        if any(digest(host.path(path)) != expected for path, expected in manifest.items()):
+            raise RuntimeError('Managed PTP files changed externally; original snapshot retained')
+    else:
+        files = rendered(role)
+        if any(host.path(path).exists() for path in files):
+            raise RuntimeError('A PTP file this tool manages already exists; inspect it first')
+        saved = {'role': role, 'linuxptp_installed': installed('linuxptp'),
+                 'units': {CHRONY: state(CHRONY)}}
+        temporary = backup.with_name(backup.name + '.tmp')
+        temporary.mkdir(parents=True, exist_ok=False)
+        write(temporary / 'state.json', json.dumps(saved, indent=2) + '\n')
+        write(temporary / 'installed.json', '{}\n')
+        write(temporary / 'complete', 'original state captured\n')
+        os.replace(temporary, backup)
+    try:
+        print('Installing linuxptp; apt may take a minute...', flush=True)
+        run('apt-get', 'install', '-y', 'linuxptp')
+        files = rendered(role)
+        print('Writing the PTP configuration and units...', flush=True)
+        for path, text in files.items():
+            write(host.path(path), text)
+        write(backup / 'installed.json', json.dumps({p: digest(host.path(p)) for p in files}, indent=2) + '\n')
+        run('systemctl', 'daemon-reload')
+        if role == 'thor':
+            print('Handing the wall clock from chrony to phc2sys; it may step once by the current offset.',
+                  flush=True)
+            run('systemctl', 'disable', '--now', CHRONY, check=False)
+        for unit in (PTP4L_UNIT, PHC2SYS_UNIT):
+            run('systemctl', 'enable', unit)
+            run('systemctl', 'restart', unit)
+        settle()
+        print('Installed. Check `ptp_sync status` here and `check_clock` from Intel.', flush=True)
+    except Exception:
+        print(f'Apply failed. Original state retained at {backup}; run rollback.', file=sys.stderr)
+        raise
+
+
+def settle(seconds=10.0, interval=1.0):
+    """Both daemons must still be running after start-up; a rejected setting exits at once."""
+    deadline = time.monotonic() + seconds
+    while True:
+        failed = [unit for unit in (PTP4L_UNIT, PHC2SYS_UNIT) if state(unit)['active'] != 'active']
+        if time.monotonic() >= deadline or failed:
+            break
+        time.sleep(interval)
+    if failed:
+        logs = '\n'.join(run('journalctl', '-u', unit, '-n', '15', '--no-pager', '-o', 'cat',
+                             check=False).stdout for unit in failed)
+        raise RuntimeError(f'{", ".join(failed)} did not stay active:\n{logs}')
+
+
+def rollback(host):
+    backup = host.path(BACKUP)
+    if not (backup / 'complete').exists():
+        raise RuntimeError('No complete PTP snapshot')
+    manifest = json.loads((backup / 'installed.json').read_text())
+    for path, expected in manifest.items():
+        if digest(host.path(path)) != expected:
+            raise RuntimeError(f'{path} changed externally; snapshot retained, no service stopped')
+    saved = json.loads((backup / 'state.json').read_text())
+    print('Removing PTP and restoring the previous clock owner...', flush=True)
+    for unit in (PHC2SYS_UNIT, PTP4L_UNIT):
+        run('systemctl', 'disable', '--now', unit, check=False)
+    for path in rendered(saved['role']):
+        host.path(path).unlink(missing_ok=True)
+    run('systemctl', 'daemon-reload')
+    if not saved['linuxptp_installed']:
+        run('apt-get', 'remove', '-y', 'linuxptp')
+    for unit, original in saved['units'].items():
+        if original['enabled'] == 'enabled':
+            run('systemctl', 'enable', unit)
+        if original['active'] == 'active':
+            run('systemctl', 'restart', unit)
+    shutil.rmtree(backup)
+
+
+def last_lines(unit, needle, count=1):
+    lines = run('journalctl', '-u', unit, '-n', '200', '--no-pager', '-o', 'cat', check=False).stdout.splitlines()
+    return [line for line in lines if needle in line][-count:]
+
+
+def status(host):
+    metadata = host.path(BACKUP) / 'state.json'
+    if not metadata.exists():
+        print('PTP: not installed')
+        return 1
+    role = json.loads(metadata.read_text())['role']
+    print(f'PTP role: {role}')
+    healthy = True
+    for path, expected in json.loads((host.path(BACKUP) / 'installed.json').read_text()).items():
+        ok = digest(host.path(path)) == expected
+        healthy &= ok
+        print(('ok   ' if ok else 'DIFF ') + path)
+    for unit in (PTP4L_UNIT, PHC2SYS_UNIT, CHRONY):
+        current = state(unit)
+        wanted = {'enabled': 'enabled', 'active': 'active'}
+        ok = current == wanted if unit != CHRONY else (
+            current['active'] == 'active' if role == 'intel' else current['active'] != 'active')
+        healthy &= ok
+        print(('ok   ' if ok else 'DIFF ') + f"{unit}: {current['enabled']}, {current['active']}")
+    for line in last_lines(PTP4L_UNIT, ' to ') + last_lines(PTP4L_UNIT, 'rms') + last_lines(PHC2SYS_UNIT, 'rms'):
+        print('     ' + line)
+    print('System-clock agreement is measured from Intel: tools/intel_thor/check_clock')
+    return 0 if healthy else 1
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument('command', choices=('status', 'apply', 'rollback'))
+    parser.add_argument('--host', choices=tuple(ROLES))
+    parser.add_argument('--yes', action='store_true')
+    args = parser.parse_args(argv)
+    if args.command == 'apply' and not args.host:
+        parser.error('apply requires --host intel|thor')
+    host = Host()
+    try:
+        if args.command == 'status':
+            return status(host)
+        if os.geteuid() != 0:
+            parser.error('apply/rollback must be run by the operator with sudo')
+        if not args.yes and input('This changes which daemon owns the wall clock and may step it once. '
+                                  'Robot stationary? [y/N] ').lower() not in ('y', 'yes'):
+            return 1
+        with host.path(LOCK).open('a') as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            if args.command == 'apply':
+                apply(host, args.host)
+            else:
+                rollback(host)
+        return 0
+    except (RuntimeError, OSError) as error:
+        print(str(error), file=sys.stderr)
+        return 2
+
+
+if __name__ == '__main__':
+    sys.exit(main())

@@ -36,21 +36,27 @@ class CameraInputs:
 
 
 # Gazebo renders these streams from one RGBD sensor, so depth is aligned to
-# color by construction.
+# color by construction. The hardware D455 service publishes the same three
+# names: the driver aligns depth to colour itself and the service remaps its
+# ``color/image_raw`` and ``aligned_depth_to_color/image_raw`` outputs onto
+# them. Only the optional organized cloud differs between the backends.
+_SIMULATION_TOPICS = dict(
+    color_image_topic='sensors/camera_0/color/image',
+    color_camera_info_topic='sensors/camera_0/color/camera_info',
+    aligned_depth_topic='sensors/camera_0/depth/image',
+)
+
 _BACKEND_DEFAULTS = {
     SIMULATION_BACKEND: CameraInputs(
-        color_image_topic='sensors/camera_0/color/image',
-        color_camera_info_topic='sensors/camera_0/color/camera_info',
-        aligned_depth_topic='sensors/camera_0/depth/image',
+        **_SIMULATION_TOPICS,
         organized_points_topic='sensors/camera_0/points',
         backend=SIMULATION_BACKEND,
     ),
     REALSENSE_BACKEND: CameraInputs(
-        color_image_topic='sensors/camera_0/color/image_raw',
-        color_camera_info_topic='sensors/camera_0/color/camera_info',
-        aligned_depth_topic='sensors/camera_0/aligned_depth_to_color/image_raw',
-        # ``pointcloud.enable`` is driver-configurable. Callers selecting the
-        # pointcloud estimator must provide and confirm this input on hardware.
+        **_SIMULATION_TOPICS,
+        # The hardware service leaves the driver's pointcloud off until an
+        # organized cloud is qualified. Callers selecting the pointcloud
+        # estimator must provide and confirm this input on hardware.
         organized_points_topic=None,
         backend=REALSENSE_BACKEND,
     ),

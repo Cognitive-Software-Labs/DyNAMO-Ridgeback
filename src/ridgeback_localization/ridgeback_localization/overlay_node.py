@@ -125,6 +125,14 @@ class TargetOverlayNode(Node):
         self.latest_aligned_depth_msg: Image | None = None
         self.latest_color_info: CameraInfo | None = None
         self.latest_truth_msg: PointStamped | None = None
+        # Frames kept by source stamp so a measurement is drawn on the image it
+        # was measured from. Results from a remote compute host arrive an
+        # inference latency after their frame, by when the newest image already
+        # shows the target somewhere else.
+        self.color_cache: OrderedDict[tuple[int, int], Image] = OrderedDict()
+        self.aligned_depth_cache: OrderedDict[tuple[int, int], Image] = OrderedDict()
+        self.last_color_match_warning: str | None = None
+        self.last_depth_match_warning: str | None = None
         self.pointcloud_cache: OrderedDict[tuple, TargetMeasurements] = OrderedDict()
         self.mask_cache: OrderedDict[tuple, TargetMeasurements] = OrderedDict()
         self.mask_debug_cache: OrderedDict[tuple[int, int], Image] = OrderedDict()
@@ -217,9 +225,33 @@ class TargetOverlayNode(Node):
 
     def color_callback(self, color_msg: Image) -> None:
         self.latest_color_msg = color_msg
+        self.cache_by_key(self.color_cache, stamp_key(color_msg.header.stamp), color_msg)
 
     def aligned_depth_callback(self, aligned_depth_msg: Image) -> None:
         self.latest_aligned_depth_msg = aligned_depth_msg
+        self.cache_by_key(
+            self.aligned_depth_cache, stamp_key(aligned_depth_msg.header.stamp),
+            aligned_depth_msg)
+
+    def frame_for(self, cache: OrderedDict, latest: Image | None, key, label: str,
+                  warning_attr: str):
+        """The frame with the measurement's source stamp, else the newest one.
+
+        The fallback keeps the panel live when the source frame has already
+        left the cache (a result older than CACHE_DEPTH frames) or never
+        arrived here, and says once that the panel is then not the measured
+        frame.
+        """
+
+        frame = cache.get(key)
+        if frame is not None:
+            return frame
+        if latest is not None:
+            self.log_warning_once(
+                warning_attr,
+                f'No cached {label} frame at the measurement stamp; drawing on the newest '
+                f'(results older than {self.CACHE_DEPTH} frames, or a frame not received)')
+        return latest
 
     def color_info_callback(self, info_msg: CameraInfo) -> None:
         self.latest_color_info = info_msg
@@ -277,17 +309,24 @@ class TargetOverlayNode(Node):
         if self.latest_measurements_msg is None or self.latest_color_msg is None:
             return
 
+        key = stamp_key(self.latest_measurements_msg.header.stamp)
+        color_msg = self.frame_for(
+            self.color_cache, self.latest_color_msg, key, 'colour', 'last_color_match_warning')
+        aligned_depth_msg = self.frame_for(
+            self.aligned_depth_cache, self.latest_aligned_depth_msg, key, 'aligned depth',
+            'last_depth_match_warning')
+
         try:
-            frame = convert_color_image_message(self.latest_color_msg)
+            frame = convert_color_image_message(color_msg)
             self.last_color_warning = None
         except ValueError as exc:
             self.log_warning_once(
                 'last_color_warning',
-                f'Cannot decode color image ({self.latest_color_msg.encoding}): {exc}')
+                f'Cannot decode color image ({color_msg.encoding}): {exc}')
             return
 
         aligned_depth_meters = self.decode_depth(
-            self.latest_aligned_depth_msg, 'last_aligned_depth_warning', 'aligned depth')
+            aligned_depth_msg, 'last_aligned_depth_warning', 'aligned depth')
 
         batch = batch_from_measurements_message(self.latest_measurements_msg)
         self.merge_measurements(batch)
@@ -304,7 +343,7 @@ class TargetOverlayNode(Node):
             truth=self.current_truth(),
         )
         self.overlay_pub.publish(
-            build_bgr8_image_message(annotated, self.latest_color_msg.header))
+            build_bgr8_image_message(annotated, color_msg.header))
 
     def decode_depth(self, depth_msg: Image | None, warning_attr: str, label: str):
         if depth_msg is None:

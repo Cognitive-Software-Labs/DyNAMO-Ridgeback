@@ -228,6 +228,71 @@ from `/etc/clearpath/setup.bash`. The sender then also uses the lab Wi-Fi.
 CycloneDDS, and run `tools/intel_thor/check_link`. The
 [transport reference](physical/intel_thor_transport.md) owns the contract.
 
+## Thor receives sensor streams but no static TF
+
+**Symptom.** On Thor, camera images and scans arrive, but `tf_static`,
+`robot_description` and other transient-local topics from Intel never do.
+`tf2_echo base_link camera_0_color_optical_frame` waits indefinitely, the
+localization mask node reports `TF_MISS_EXTRINSIC` (status 4) with NaN
+distances, and `ros2 topic info -v` on Thor shows Intel's nodes as
+`_NODE_NAME_UNKNOWN_`. Topic matching from Thor can also be slow.
+
+**Cause.** Intel's robot services use the CycloneDDS profile on br0 and Wi-Fi,
+so they advertise Intel's Wi-Fi address (192.168.123.14) as well as
+192.168.131.1. Thor is on the same Wi-Fi subnet, so its kernel sends its DDS
+replies to that address over Thor's own Wi-Fi, and the lab access point does
+not deliver traffic between its clients (Thor and Intel cannot ping each other
+over Wi-Fi). Intel never sees Thor's readers or acknowledgements, so it never
+sends stored samples; data it streams continuously still arrives over the
+cable. Reproduced on 2026-10-12: a once-published transient-local message from
+the services profile never reached Thor in domain 0, and arrived within 3 s
+with Wi-Fi removed from the publisher's profile, with the Ethernet-only
+profile, or with the route below.
+
+**Fix.** On Thor, `sudo tools/intel_thor/thor_lan_route apply` routes
+192.168.123.14 over the robot Ethernet, persistently; `check_link` fails
+without it. Laptops on the same Wi-Fi meet the same isolation, so RViz over
+Wi-Fi needs client isolation disabled on the access point.
+
+## Intel receives nothing from a restarted Thor for minutes
+
+**Symptom.** After Thor's localization restarts, Intel's `localization/status`
+stays `missing` and no health or measurements arrive for about 5–6 minutes,
+then everything resumes without any action. Thor-local echoes look healthy.
+Sometimes one early message gets through, and some publishers (for example
+the detector) appear on Intel while others never do.
+
+**Cause.** DDS discovery announcements are multicast. With no IGMP querier on
+the robot Ethernet, IGMP snooping stops forwarding the restarted processes'
+multicast to Intel until the membership entry ages out. Measured on
+2026-10-13: Intel heard Thor's own announcements stop within seconds of a
+restart and resume 313–381 s later, and delivery resumed at the same moment.
+Firewalls, ports and socket buffers were ruled out. Unicast DDS peers did not
+help Intel's already-running consumers.
+
+**Fix.** Make `br0` the querier. Live:
+`echo 1 | sudo tee /sys/class/net/br0/bridge/multicast_querier`. Persistently,
+install `src/ridgeback_autonomy_hardware/config/intel_thor/90-dynamo-multicast-querier.conf`
+as `/etc/systemd/network/10-netplan-br0.netdev.d/90-dynamo-multicast-querier.conf`.
+With it on, a restarted Thor's results reached Intel in 0.2 s.
+`tools/intel_thor/check_link` checks both.
+
+## CLI probes show no data although consumers are healthy
+
+**Symptom.** `timeout 10 ros2 topic echo|hz ... | grep ...` prints nothing for
+Thor's results, while `localization/status` reports `processing` and
+`ros2 topic info -v` lists the remote publisher. Or `ros2 topic hz` reports
+nothing for a best-effort 640×480 image stream that RViz displays.
+
+**Cause.** Piped ros2 CLI output is block-buffered, and `timeout`'s default
+SIGTERM ends the process before the buffer is flushed. Separately, the Python
+`hz` subscriber falls behind on large best-effort images.
+
+**Fix.** Use `PYTHONUNBUFFERED=1` and `timeout -s INT`, and write to a file
+before filtering. For image rates, count headers with
+`ros2 topic echo --qos-reliability best_effort <topic> --field header` over a
+fixed interval, or read the rate in RViz.
+
 ## Hokuyo drivers stuck reconnecting
 
 **Symptom.** No `sensors/lidar2d_*/scan` data, and the `clearpath-sensors`
@@ -236,9 +301,19 @@ limit, reconnecting`, then `Error connecting to Hokuyo: Could not open network
 Hokuyo` every 2.5 s. `ss -tn | grep 10940` shows an established connection to
 each LiDAR next to a pending new one.
 
-**Cause.** After a read timeout, `urg_node` opens a new TCP connection without
-closing the old one. A Hokuyo UST serves one client at a time, so the driver
-never recovers on its own. Repeated local-camera-subscriber-associated failures
+**Cause.** After read timeouts, `urg_node` reconnects. If the sensor accepts
+the TCP connection and answers the reset but not the parameter request, the
+failed open leaks its socket: `urg_c`'s `urg_open` leaves it open, and
+`urg_node` 1.1.2's Ethernet constructor throws without closing it. A Hokuyo UST
+serves one client at a time, so the leaked connection holds the only slot and
+the driver never recovers on its own. A reset session (a power-cycled LiDAR)
+instead killed the stock driver with SIGPIPE, with no respawn.
+`patches/urg_node_reconnect_recovery.patch` (`src/urg_node` in
+`dependencies/core.repos`) closes the failed socket and ignores SIGPIPE. On
+`r100_0160` it is deployed as an overlay at
+`/home/robot/ros_overlays/urg_node_fix`, listed under
+`system.ros2.workspaces` in `/etc/clearpath/robot.yaml`. Check that the drivers
+use it with `readlink /proc/$(pgrep -f urg_node_driver | head -1)/exe`. Repeated local-camera-subscriber-associated failures
 and Ethernet traffic spikes are recorded in the
 [transport blocker](physical/intel_thor_transport.md#camera-subscriber-blocker);
 the initiating mechanism remains unproven.

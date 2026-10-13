@@ -1,0 +1,40 @@
+diff --git a/src/urg_c_wrapper.cpp b/src/urg_c_wrapper.cpp
+index 10d2ed3..4d4013f 100644
+--- a/src/urg_c_wrapper.cpp
++++ b/src/urg_c_wrapper.cpp
+@@ -69,6 +69,11 @@ URGCWrapper::URGCWrapper(
+     ss << "Could not open network Hokuyo:\n";
+     ss << ip_address_ << ":" << ip_port_ << "\n";
+     ss << urg_error(&urg_);
++    // urg_open leaves the TCP socket open when the connection succeeds but
++    // the SCIP handshake or parameter read fails. The destructor never runs
++    // for a throwing constructor, so close it here: a Hokuyo UST serves one
++    // client, and a leaked socket refuses every later reconnect.
++    urg_close(&urg_);
+     throw std::runtime_error(ss.str());
+   }
+
+diff --git a/src/urg_node.cpp b/src/urg_node.cpp
+index 1159991..27a2551 100644
+--- a/src/urg_node.cpp
++++ b/src/urg_node.cpp
+@@ -33,6 +33,7 @@
+
+ #include "urg_node/urg_node.hpp"
+
++#include <csignal>
+ #include <memory>
+ #include <string>
+ #include <vector>
+@@ -74,6 +75,11 @@ UrgNode::UrgNode(const rclcpp::NodeOptions & node_options)
+   service_yield_(true)
+ {
+   (void) synchronize_time_;
++  // urg_c writes to the Hokuyo socket without MSG_NOSIGNAL. When the peer
++  // resets the connection, the next write raises SIGPIPE, whose default
++  // action kills the driver before its reconnect logic runs. Ignored, the
++  // write fails with EPIPE and the scan loop reconnects.
++  std::signal(SIGPIPE, SIG_IGN);
+   initSetup();
+ }
+

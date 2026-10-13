@@ -62,6 +62,7 @@ building blocks unless a technical reference says otherwise.
 - [Target-localization pipeline](../target_localization/target_localization_pipeline.md)
 - [Target-distance benchmarking](../target_distance_benchmarking/overview.md)
 - [External dependency management](dependencies.md)
+- [Robot-local deployment and camera service](../physical/robot_local_deployment.md)
 - [Troubleshooting](../troubleshooting.md)
 - [Project engineering gaps](../BACKLOG.md)
 - [Target-distance benchmarking gaps](../target_distance_benchmarking/BACKLOG.md)

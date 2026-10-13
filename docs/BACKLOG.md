@@ -82,6 +82,19 @@ Resolve any mismatch at the narrowest owning layer; then perform stationary,
 lifted/blocked-wheel where approved, low-speed clear-space, stop, timeout, and
 e-stop tests before enabling `autonomous_motion_enabled:=true`.
 
+**Progress.** On 2026-10-13 the Nav2 portion was observed on the live graph for
+the first time, stationary and with no goal sent. Every hop from Nav2 to the
+controller carries `TwistStamped`, and every publisher/subscriber pair delivers.
+It also found that `controller_server` subscribed `odom`, which has no publisher
+on the robot. The platform publishes `platform/odom` and
+`platform/odom/filtered`, so the controller received no velocity feedback
+([record](../archive/engineering/2026-10-13-r100-0160-nav2-command-chain.md)).
+`nav2_params.yaml` now sets the controller's `odom_topic` to
+`platform/odom/filtered`, the topic `bt_navigator` and the velocity smoother
+already use in every backend. Earlier simulator benchmarks ran the controller
+without that feedback, so rerun any benchmark before comparing it with results
+from after this change.
+
 **Context.** [Exploration architecture](exploration/architecture.md#hardware-safety-boundary)
 and the public hardware workflow in the [README](../README.md). The
 [stationary measurement plan](plans/PHYSICAL_robot_measurements_and_validation.md#both-lidars-and-stationary-auxiliary-sensors)
@@ -99,6 +112,33 @@ measured camera traffic leaving the bridge onto the sensor/MCU ports. The
 initiating mechanism remains unproven; the maintained
 [transport blocker](physical/intel_thor_transport.md#camera-subscriber-blocker)
 distinguishes observations from the multicast hypothesis.
+
+**Progress.** The lockout mechanism was found and reproduced offline on
+2026-10-13. When `urg_open` fails after the TCP connect, `urg_node` 1.1.2's
+Ethernet constructor throws without closing the socket. Against a simulated
+single-client UST that answers the reset but not the parameter request, the
+stock driver held one connection and was refused afterwards. The patched driver
+closed each failed attempt
+([record](../archive/engineering/2026-10-13-urg-node-reconnect-leak.md)). The
+fix was deployed on
+`r100_0160` the same day. It runs as an overlay at `/home/robot/ros_overlays/urg_node_fix`
+(upstream 1.1.2 plus the patch), which `/etc/clearpath/robot.yaml` lists under
+`system.ros2.workspaces`; `robot.yaml.bak-urg-node-fix` is the rollback copy.
+Both drivers run the patched binary and stream. The first on-robot
+interruption (`ss -K` on the rear LiDAR's session) found a second defect.
+`urg_c` writes without `MSG_NOSIGNAL`, so the write after a reset raised
+SIGPIPE and killed the driver, and nothing respawned it. The fix now also
+ignores SIGPIPE. With both changes, a
+repeat interruption reconnected the same driver process within 2.25 s, with no
+service restart
+([record](../archive/engineering/2026-10-13-urg-node-reconnect-leak.md)).
+That meets the interruption criterion for a reset session. The half-answering
+sensor case is proven only offline. Both changes are one recorded patch,
+`patches/urg_node_reconnect_recovery.patch`, on `src/urg_node` 1.1.2 in
+`dependencies/core.repos`; `tools/check_dependencies` applies and verifies it.
+The overlay's source is identical to that checkout. `deployment/r100_0160/`
+does not include the `robot.yaml` change. The services-configuration and initiating-mechanism
+criteria below remain open.
 
 **Context.** Recovery steps are in
 [troubleshooting](troubleshooting.md#hokuyo-drivers-stuck-reconnecting). The
@@ -140,8 +180,26 @@ Close only after both required profiles and the core checks pass, or after an
 explicit deployment-scope decision revises the required profile set. Pointcloud,
 camera–LiDAR calibration, calibrated accuracy, and motion validation are separate.
 
-**Context.** [Camera stack](target_localization/camera_stack.md) and
-[aligned depth](target_localization/aligned_depth.md).
+**Progress.** `dynamo-camera.service` owns the D455 on `r100_0160` from boot
+and publishes the simulators' topic names, frames and TF. It passes
+`tools/camera_contract_check` at 640x480@30 and 1280x720@30, after a cold boot,
+and after a rollback and reinstall: device identity, effective profiles,
+encodings, exact colour/depth stamps and the camera-to-base TF chain are
+established. A first stationary projective/Euclidean smoke ran on Thor on
+2026-10-12 at 640x480@30: both estimators measured a person within 4–10% of
+taped distances at three marks (`person` at threshold 0.22), and a redo with
+`full body person` at 0.26 passed the empty scene and a 600 s scan guard
+([record](../archive/engineering/2026-10-12-r100-0160-thor-localization-smoke.md)).
+Person scores stay near 0.3 in that room, so the setting has little margin.
+The live factory calibration was compared with the nominal simulation model on
+2026-10-13: the model was kept, and the pipeline ignoring distortion was
+recorded ([record](../archive/engineering/2026-10-13-r100-0160-d455-calibration-vs-nominal.md)).
+That record's HD values come from the earlier vendor service. Remaining: an
+off-centre check against a taped mark, and the 1280x720 smoke.
+
+**Context.** [Camera stack](target_localization/camera_stack.md),
+[aligned depth](target_localization/aligned_depth.md), and
+[robot-local deployment](physical/robot_local_deployment.md#camera-service).
 
 ## Optional physical organized-pointcloud qualification
 
@@ -276,9 +334,11 @@ Resolve each one here or move it to the item that owns it.
   the offsets still needed live calibration. We changed it to the symmetric −0.3922
   ([rear LiDAR mounting offset](#rear-lidar-mounting-offset)). Confirm that their
   tooling will not restore the old value.
-- **`camera-web-ready.service`** fails at every boot because the RealSense topics
-  do not appear within its wait, observed after the 14:23 and 14:54 boots on
-  2026-09-18. Is it needed, and what should its wait be?
+- **Slow platform stop.** Five of six `clearpath-robot` restarts on 2026-10-06
+  took 60 s to stop `clearpath-platform`; one took 7 s and the stop during a
+  reboot took 10 s. A `proton_ros2_node` segmentation fault in `librcl.so` was
+  logged once during a stop. Which process ignores the stop request, and is the
+  fault known? Every Clearpath restart costs that minute of motor power.
 - **Unit files changed on disk.** On 2026-09-18 systemd reported that the
   `realsense-camera`, `camera-web-ready`, `clearpath-platform` and
   `clearpath-sensors` units had changed since they were loaded. Which edits are
@@ -292,3 +352,4 @@ Resolve each one here or move it to the item that owns it.
 - [removed D435 transform](../archive/engineering/operational_incidents.md#d435-static-camera-transform--removed-2026-08-31)
 - [Hokuyo reconnect lockout](../archive/engineering/operational_incidents.md#hokuyo-reconnect-lockout--2026-09-18)
 - [r100_0160 field readings and LiDAR box checks](../archive/engineering/2026-09-18-r100-0160-field-measurements.md)
+- [r100_0160 D455 camera service qualification](../archive/engineering/2026-10-06-r100-0160-camera-service.md)

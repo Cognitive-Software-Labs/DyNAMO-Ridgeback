@@ -1,0 +1,26 @@
+# Target-localization model dependencies for the Jetson Thor inference venv.
+#
+# Thor (JetPack 7, CUDA 13.0, aarch64, GPU sm_110) cannot use the workstation's
+# cu128 x86 wheels in requirements-perception.txt. This file pins the same
+# torch/torchvision versions in their CUDA 13.0 aarch64 build and keeps the
+# model stack identical. Verified by the GPU gate in
+# docs/plans/PHYSICAL_thor_perception_environment.md (step 3).
+#
+# Setup on Thor (first time only; the venv lives outside every checkout and
+# launches select it with RIDGEBACK_PERCEPTION_VENV):
+#   python3 -m venv --system-site-packages ~/venvs/dynamo-perception
+#   echo "/opt/ros/jazzy/lib/python3.12/site-packages" \
+#     > ~/venvs/dynamo-perception/lib/python3.12/site-packages/ros2.pth
+#   ~/venvs/dynamo-perception/bin/python3 -m pip install -U pip
+#   ~/venvs/dynamo-perception/bin/python3 -m pip install -r requirements-perception-thor.txt
+#
+# The `+cu130` local-version pins force pip to fetch the CUDA builds from the
+# PyTorch index below; plain `torch` from PyPI would not use the GPU.
+--extra-index-url https://download.pytorch.org/whl/cu130
+torch==2.11.0+cu130
+torchvision==0.26.0+cu130
+
+# Detection (OWLv2) + Depth-Anything model stack, as on the workstation
+transformers==5.10.2
+accelerate==1.13.0
+Pillow>=10.0
