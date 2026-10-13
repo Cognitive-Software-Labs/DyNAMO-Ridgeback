@@ -16,6 +16,13 @@
       </Interfaces>
     </General>
     <Discovery>
+      <!-- Announce to Intel by unicast as well as multicast. After this host's
+           processes restart, the robot switch stops forwarding their SPDP
+           multicast to the other host for ~5-6 min (IGMP snooping without a
+           querier), so discovery must not depend on multicast alone. -->
+      <Peers>
+        <Peer Address="192.168.131.1"/>
+      </Peers>
       <ParticipantIndex>auto</ParticipantIndex>
       <MaxAutoParticipantIndex>250</MaxAutoParticipantIndex>
     </Discovery>
