@@ -152,10 +152,17 @@ The deployment files are in
 | `cyclonedds_intel_services.xml` | Intel robot services, installed as `/etc/clearpath/cyclonedds.xml` | `br0` and `wlp3s0` by name |
 | `dds_env.sh` | Sourced by operators and launches on either host. It selects `rmw_cyclonedds_cpp` and the host's Ethernet-only configuration (the role comes from the Ethernet address present, or `intel`/`thor` explicitly), and leaves `ROS_DOMAIN_ID` to the deployment. | — |
 | `60-dynamo-dds-buffers.conf` | `/etc/sysctl.d/` on both hosts | Raises only `net.core.rmem_max` to 16 MiB |
+| `90-dynamo-multicast-querier.conf` | Intel, `/etc/systemd/network/10-netplan-br0.netdev.d/` | Makes `br0` the IGMP querier of the robot Ethernet |
 | `fastdds_thor.xml`, `fastdds_intel.xml` | `rmw_benchmark` comparisons only | Ethernet address only |
 
 Rules:
 
+- **Intel's `br0` is the robot segment's IGMP querier.** DDS discovery uses
+  multicast (239.255.0.1). With no querier on the segment, IGMP snooping stops
+  delivering a restarted host's discovery multicast to the other host until
+  the membership entry ages out. Intel then cannot discover restarted Thor
+  processes, and receives no health or measurements, for about 5–6 minutes.
+  netplan cannot set the querier; the systemd-networkd drop-in does, at boot.
 - **Thor is Ethernet-only.** Every Thor reader therefore advertises only
   192.168.131.51, so Intel sends Thor's inputs over `br0` even from the
   robot services, which are also on Wi-Fi.
@@ -270,12 +277,12 @@ It does not qualify the installed services configuration or clear the
 |---|---|---|
 | Routing and link | Intel lacks 192.168.131.1, the route to Thor uses Wi-Fi, either Thor-facing port is below 1000 Mb/s full duplex, or ping loses packets | — |
 | Buffers, each host | `rmem_max` is below 16 MiB | The limit is not persisted in `/etc/sysctl.d` |
-| Intel services | — | `/etc/clearpath/setup.bash` does not select CycloneDDS, or a running robot service is still on Fast DDS |
-| Thor host | SSH fails, or `rmw_cyclonedds_cpp` is missing | Thor's checkout is missing or at a different revision |
+| Intel services | `br0` is not the IGMP querier | `/etc/clearpath/setup.bash` does not select CycloneDDS, a running robot service other than the scan merger (the documented exception) is still on Fast DDS, or the querier drop-in is not installed |
+| Thor host | SSH fails, or `rmw_cyclonedds_cpp` is missing | Thor's checkout of the same directory name (or `--thor-repo`) is missing or at a different revision |
 | Configurations | A file does not parse, or its interfaces differ from the table above | — |
 | Clock | Offset exceeds 10 ms | Offset exceeds 2 ms, or a host reports NTP unsynchronized |
 | Performance policy, each host | A CPU policy is not at the performance governor, Intel's energy preference is not performance, Thor is not in 120W, or the boot unit is not enabled (from `host_performance status`) | — |
-| Traffic, each direction | The probe receives nothing or under 90% of 30 Hz, or Wi-Fi carries more than 20 Mbit/s during the stream | The largest frame gap exceeds 100 ms, or the probe's own sockets drop packets |
+| Traffic, each direction | The probe receives nothing or under 90% of 30 Hz, or Wi-Fi carries more than 20 Mbit/s above the background measured just before the probes | The largest frame gap exceeds 100 ms, or the probe's own sockets drop packets |
 
 The clock check measures the offset over one SSH channel and bounds its error
 by half the smallest round trip. The traffic test uses

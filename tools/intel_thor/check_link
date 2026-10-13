@@ -160,6 +160,15 @@ fi
 if [ -n "$excepted" ]; then
     pass "documented Fast DDS exception still in place:$excepted"
 fi
+querier_dropin=/etc/systemd/network/10-netplan-br0.netdev.d/90-dynamo-multicast-querier.conf
+if [ "$(cat /sys/class/net/br0/bridge/multicast_querier 2>/dev/null)" = 1 ]; then
+    pass "br0 is the IGMP querier (Thor's discovery multicast survives restarts)"
+else
+    fail "br0 is not the IGMP querier; restarted Thor processes stay undiscovered for ~5 min. Install $querier_dropin"
+fi
+if ! cmp -s "$CONFIG_DIR/90-dynamo-multicast-querier.conf" "$querier_dropin"; then
+    warn "IGMP querier not persisted as $querier_dropin"
+fi
 
 ping_summary="$(ping -c 20 -i 0.2 -q "$THOR_IP" 2>&1)"
 loss="$(printf '%s\n' "$ping_summary" | grep -oE '[0-9.]+% packet loss' | cut -d% -f1)"

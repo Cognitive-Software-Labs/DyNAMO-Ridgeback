@@ -254,6 +254,29 @@ profile, or with the route below.
 without it. Laptops on the same Wi-Fi meet the same isolation, so RViz over
 Wi-Fi needs client isolation disabled on the access point.
 
+## Intel receives nothing from a restarted Thor for minutes
+
+**Symptom.** After Thor's localization restarts, Intel's `localization/status`
+stays `missing` and no health or measurements arrive for about 5–6 minutes,
+then everything resumes without any action. Thor-local echoes look healthy.
+Sometimes one early message gets through, and some publishers (for example
+the detector) appear on Intel while others never do.
+
+**Cause.** DDS discovery announcements are multicast. With no IGMP querier on
+the robot Ethernet, IGMP snooping stops forwarding the restarted processes'
+multicast to Intel until the membership entry ages out. Measured on
+2026-10-13: Intel heard Thor's own announcements stop within seconds of a
+restart and resume 313–381 s later, and delivery resumed at the same moment.
+Firewalls, ports and socket buffers were ruled out. Unicast DDS peers did not
+help Intel's already-running consumers.
+
+**Fix.** Make `br0` the querier. Live:
+`echo 1 | sudo tee /sys/class/net/br0/bridge/multicast_querier`. Persistently,
+install `src/ridgeback_autonomy_hardware/config/intel_thor/90-dynamo-multicast-querier.conf`
+as `/etc/systemd/network/10-netplan-br0.netdev.d/90-dynamo-multicast-querier.conf`.
+With it on, a restarted Thor's results reached Intel in 0.2 s.
+`tools/intel_thor/check_link` checks both.
+
 ## CLI probes show no data although consumers are healthy
 
 **Symptom.** `timeout 10 ros2 topic echo|hz ... | grep ...` prints nothing for
