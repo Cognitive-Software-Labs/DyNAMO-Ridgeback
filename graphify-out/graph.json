@@ -143,7 +143,7 @@
         "kind": "bash_entrypoint"
       },
       "_origin": "ast",
-      "id": "home_robot_dynamo_ridgeback_rviz_build_and_start_expl_sh__entry",
+      "id": "home_robot_dynamo_ridgeback_merge_build_and_start_expl_sh__entry",
       "community": 201,
       "norm_label": "build_and_start_expl.sh script"
     },
@@ -171,7 +171,7 @@
         "kind": "bash_entrypoint"
       },
       "_origin": "ast",
-      "id": "home_robot_dynamo_ridgeback_rviz_cleanup_sh__entry",
+      "id": "home_robot_dynamo_ridgeback_merge_cleanup_sh__entry",
       "community": 180,
       "norm_label": "cleanup.sh script"
     },
@@ -9691,7 +9691,7 @@
         "kind": "bash_entrypoint"
       },
       "_origin": "ast",
-      "id": "home_robot_dynamo_ridgeback_rviz_src_ridgeback_autonomy_sim_ground_truth_maps_capture_ground_truth_sh__entry",
+      "id": "home_robot_dynamo_ridgeback_merge_src_ridgeback_autonomy_sim_ground_truth_maps_capture_ground_truth_sh__entry",
       "community": 205,
       "norm_label": "capture_ground_truth.sh script"
     },
@@ -26949,7 +26949,7 @@
         "kind": "bash_entrypoint"
       },
       "_origin": "ast",
-      "id": "home_robot_dynamo_ridgeback_rviz_src_ridgeback_autonomy_hardware_config_intel_thor_dds_env_sh__entry",
+      "id": "home_robot_dynamo_ridgeback_merge_src_ridgeback_autonomy_hardware_config_intel_thor_dds_env_sh__entry",
       "community": 207,
       "norm_label": "dds_env.sh script"
     },
@@ -26977,7 +26977,7 @@
         "kind": "bash_entrypoint"
       },
       "_origin": "ast",
-      "id": "home_robot_dynamo_ridgeback_rviz_src_ridgeback_autonomy_hardware_config_intel_thor_performance_dynamo_host_performance_sh__entry",
+      "id": "home_robot_dynamo_ridgeback_merge_src_ridgeback_autonomy_hardware_config_intel_thor_performance_dynamo_host_performance_sh__entry",
       "community": 208,
       "norm_label": "dynamo-host-performance.sh script"
     },
@@ -38065,7 +38065,7 @@
         "kind": "bash_entrypoint"
       },
       "_origin": "ast",
-      "id": "home_robot_dynamo_ridgeback_rviz_start_exploration_sh__entry",
+      "id": "home_robot_dynamo_ridgeback_merge_start_exploration_sh__entry",
       "community": 183,
       "norm_label": "start_exploration.sh script"
     },
@@ -38485,7 +38485,7 @@
         "kind": "bash_entrypoint"
       },
       "_origin": "ast",
-      "id": "home_robot_dynamo_ridgeback_rviz_tools_diag_sh__entry",
+      "id": "home_robot_dynamo_ridgeback_merge_tools_diag_sh__entry",
       "community": 194,
       "norm_label": "diag.sh script"
     },
@@ -38757,7 +38757,7 @@
         "kind": "bash_entrypoint"
       },
       "_origin": "ast",
-      "id": "home_robot_dynamo_ridgeback_rviz_tools_install_isaac_venv_sh__entry",
+      "id": "home_robot_dynamo_ridgeback_merge_tools_install_isaac_venv_sh__entry",
       "community": 195,
       "norm_label": "install_isaac_venv.sh script"
     },
@@ -39479,7 +39479,7 @@
         "kind": "bash_entrypoint"
       },
       "_origin": "ast",
-      "id": "home_robot_dynamo_ridgeback_rviz_tools_isaac_capture_contract_sh__entry",
+      "id": "home_robot_dynamo_ridgeback_merge_tools_isaac_capture_contract_sh__entry",
       "community": 209,
       "norm_label": "capture_contract.sh script"
     },
@@ -41117,7 +41117,7 @@
         "kind": "bash_entrypoint"
       },
       "_origin": "ast",
-      "id": "home_robot_dynamo_ridgeback_rviz_tools_isaac_mcp_query_sh__entry",
+      "id": "home_robot_dynamo_ridgeback_merge_tools_isaac_mcp_query_sh__entry",
       "community": 188,
       "norm_label": "mcp_query.sh script"
     },
@@ -42918,7 +42918,7 @@
       "source_location": "L1",
       "weight": 1.0,
       "source": "build_and_start_expl",
-      "target": "home_robot_dynamo_ridgeback_rviz_build_and_start_expl_sh__entry",
+      "target": "home_robot_dynamo_ridgeback_merge_build_and_start_expl_sh__entry",
       "confidence_score": 1.0
     },
     {
@@ -42958,7 +42958,7 @@
       "source_location": "L1",
       "weight": 1.0,
       "source": "cleanup",
-      "target": "home_robot_dynamo_ridgeback_rviz_cleanup_sh__entry",
+      "target": "home_robot_dynamo_ridgeback_merge_cleanup_sh__entry",
       "confidence_score": 1.0
     },
     {
@@ -42968,7 +42968,7 @@
       "source_location": "L52",
       "weight": 1.0,
       "context": "call",
-      "source": "home_robot_dynamo_ridgeback_rviz_cleanup_sh__entry",
+      "source": "home_robot_dynamo_ridgeback_merge_cleanup_sh__entry",
       "target": "cleanup_kill_matches",
       "confidence_score": 1.0
     },
@@ -72167,7 +72167,7 @@
       "source_location": "L1",
       "weight": 1.0,
       "source": "ground_truth_maps_capture_ground_truth",
-      "target": "home_robot_dynamo_ridgeback_rviz_src_ridgeback_autonomy_sim_ground_truth_maps_capture_ground_truth_sh__entry",
+      "target": "home_robot_dynamo_ridgeback_merge_src_ridgeback_autonomy_sim_ground_truth_maps_capture_ground_truth_sh__entry",
       "confidence_score": 1.0
     },
     {
@@ -110959,7 +110959,7 @@
       "source_location": "L1",
       "weight": 1.0,
       "source": "intel_thor_dds_env",
-      "target": "home_robot_dynamo_ridgeback_rviz_src_ridgeback_autonomy_hardware_config_intel_thor_dds_env_sh__entry",
+      "target": "home_robot_dynamo_ridgeback_merge_src_ridgeback_autonomy_hardware_config_intel_thor_dds_env_sh__entry",
       "confidence_score": 1.0
     },
     {
@@ -110969,7 +110969,7 @@
       "source_location": "L1",
       "weight": 1.0,
       "source": "performance_dynamo_host_performance",
-      "target": "home_robot_dynamo_ridgeback_rviz_src_ridgeback_autonomy_hardware_config_intel_thor_performance_dynamo_host_performance_sh__entry",
+      "target": "home_robot_dynamo_ridgeback_merge_src_ridgeback_autonomy_hardware_config_intel_thor_performance_dynamo_host_performance_sh__entry",
       "confidence_score": 1.0
     },
     {
@@ -133154,7 +133154,7 @@
       "source_location": "L1",
       "weight": 1.0,
       "source": "start_exploration",
-      "target": "home_robot_dynamo_ridgeback_rviz_start_exploration_sh__entry",
+      "target": "home_robot_dynamo_ridgeback_merge_start_exploration_sh__entry",
       "confidence_score": 1.0
     },
     {
@@ -133194,7 +133194,7 @@
       "source_location": "L27",
       "weight": 1.0,
       "context": "call",
-      "source": "home_robot_dynamo_ridgeback_rviz_start_exploration_sh__entry",
+      "source": "home_robot_dynamo_ridgeback_merge_start_exploration_sh__entry",
       "target": "start_exploration_is_passthrough",
       "confidence_score": 1.0
     },
@@ -133855,7 +133855,7 @@
       "source_location": "L1",
       "weight": 1.0,
       "source": "tools_diag",
-      "target": "home_robot_dynamo_ridgeback_rviz_tools_diag_sh__entry",
+      "target": "home_robot_dynamo_ridgeback_merge_tools_diag_sh__entry",
       "confidence_score": 1.0
     },
     {
@@ -133875,7 +133875,7 @@
       "source_location": "L18",
       "weight": 1.0,
       "context": "call",
-      "source": "home_robot_dynamo_ridgeback_rviz_tools_diag_sh__entry",
+      "source": "home_robot_dynamo_ridgeback_merge_tools_diag_sh__entry",
       "target": "tools_diag_section",
       "confidence_score": 1.0
     },
@@ -134417,7 +134417,7 @@
       "source_location": "L1",
       "weight": 1.0,
       "source": "tools_install_isaac_venv",
-      "target": "home_robot_dynamo_ridgeback_rviz_tools_install_isaac_venv_sh__entry",
+      "target": "home_robot_dynamo_ridgeback_merge_tools_install_isaac_venv_sh__entry",
       "confidence_score": 1.0
     },
     {
@@ -134437,7 +134437,7 @@
       "source_location": "L41",
       "weight": 1.0,
       "context": "call",
-      "source": "home_robot_dynamo_ridgeback_rviz_tools_install_isaac_venv_sh__entry",
+      "source": "home_robot_dynamo_ridgeback_merge_tools_install_isaac_venv_sh__entry",
       "target": "tools_install_isaac_venv_usage",
       "confidence_score": 1.0
     },
@@ -135266,7 +135266,7 @@
       "source_location": "L1",
       "weight": 1.0,
       "source": "isaac_capture_contract",
-      "target": "home_robot_dynamo_ridgeback_rviz_tools_isaac_capture_contract_sh__entry",
+      "target": "home_robot_dynamo_ridgeback_merge_tools_isaac_capture_contract_sh__entry",
       "confidence_score": 1.0
     },
     {
@@ -138005,7 +138005,7 @@
       "source_location": "L1",
       "weight": 1.0,
       "source": "isaac_mcp_query",
-      "target": "home_robot_dynamo_ridgeback_rviz_tools_isaac_mcp_query_sh__entry",
+      "target": "home_robot_dynamo_ridgeback_merge_tools_isaac_mcp_query_sh__entry",
       "confidence_score": 1.0
     },
     {
@@ -138035,7 +138035,7 @@
       "source_location": "L40",
       "weight": 1.0,
       "context": "call",
-      "source": "home_robot_dynamo_ridgeback_rviz_tools_isaac_mcp_query_sh__entry",
+      "source": "home_robot_dynamo_ridgeback_merge_tools_isaac_mcp_query_sh__entry",
       "target": "isaac_mcp_query_data",
       "confidence_score": 1.0
     },
@@ -138046,7 +138046,7 @@
       "source_location": "L30",
       "weight": 1.0,
       "context": "call",
-      "source": "home_robot_dynamo_ridgeback_rviz_tools_isaac_mcp_query_sh__entry",
+      "source": "home_robot_dynamo_ridgeback_merge_tools_isaac_mcp_query_sh__entry",
       "target": "isaac_mcp_query_post",
       "confidence_score": 1.0
     },

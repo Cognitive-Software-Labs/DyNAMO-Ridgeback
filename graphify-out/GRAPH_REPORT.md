@@ -1,7 +1,7 @@
-# Graph Report - /home/robot/DyNAMO-Ridgeback-rviz  (2026-10-13)
+# Graph Report - /home/robot/DyNAMO-Ridgeback-merge  (2026-10-13)
 
 ## Corpus Check
-- 423 files · ~469,291 words
+- 423 files · ~469,782 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
