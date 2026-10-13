@@ -239,7 +239,8 @@ def build_target_localization_nodes(context, *args, **kwargs):
     # benchmark: there is no collage carrying the numbers separately. In
     # external mode the mask node runs on the compute host, so the depth panel
     # reads this host's own aligned depth rather than pulling the remote
-    # republish back over the link; only the mask image still crosses.
+    # republish back over the link. Only the silhouette gate's mask image
+    # still crosses; the box gate's mask comes from the detections.
     overlay_depth = {'aligned_depth_topic': camera_inputs.aligned_depth_topic} if mode == 'external' else {}
     nodes.append(overlay_node(
         namespace=namespace,

@@ -27,7 +27,7 @@ def build_nodes(context):
 
 def generate_launch_description():
     camera=resolve_camera_inputs(REALSENSE_BACKEND)
-    # The depth panel reads this host's camera; only the mask crosses from compute.
+    # The depth panel reads this host's camera, not the compute host's republish.
     defaults=dict(namespace='r100_0001',use_sim_time='false',displays='true',
         estimators='projective_ranging,euclidean_reconstruction',
         color_topic=camera.color_image_topic,aligned_depth_topic=camera.aligned_depth_topic,

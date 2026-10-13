@@ -254,6 +254,22 @@ profile, or with the route below.
 without it. Laptops on the same Wi-Fi meet the same isolation, so RViz over
 Wi-Fi needs client isolation disabled on the access point.
 
+## CLI probes show no data although consumers are healthy
+
+**Symptom.** `timeout 10 ros2 topic echo|hz ... | grep ...` prints nothing for
+Thor's results, while `localization/status` reports `processing` and
+`ros2 topic info -v` lists the remote publisher. Or `ros2 topic hz` reports
+nothing for a best-effort 640×480 image stream that RViz displays.
+
+**Cause.** Piped ros2 CLI output is block-buffered, and `timeout`'s default
+SIGTERM ends the process before the buffer is flushed. Separately, the Python
+`hz` subscriber falls behind on large best-effort images.
+
+**Fix.** Use `PYTHONUNBUFFERED=1` and `timeout -s INT`, and write to a file
+before filtering. For image rates, count headers with
+`ros2 topic echo --qos-reliability best_effort <topic> --field header` over a
+fixed interval, or read the rate in RViz.
+
 ## Hokuyo drivers stuck reconnecting
 
 **Symptom.** No `sensors/lidar2d_*/scan` data, and the `clearpath-sensors`
