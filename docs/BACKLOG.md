@@ -151,8 +151,11 @@ taped distances at three marks (`person` at threshold 0.22), and a redo with
 `full body person` at 0.26 passed the empty scene and a 600 s scan guard
 ([record](../archive/engineering/2026-10-12-r100-0160-thor-localization-smoke.md)).
 Person scores stay near 0.3 in that room, so the setting has little margin.
-Remaining: an off-centre check against a taped mark, the 1280x720 smoke, and a
-comparison of the live factory calibration with the nominal simulation model.
+The live factory calibration was compared with the nominal simulation model on
+2026-10-13: the model was kept, and the pipeline ignoring distortion was
+recorded ([record](../archive/engineering/2026-10-13-r100-0160-d455-calibration-vs-nominal.md)).
+That record's HD values come from the earlier vendor service. Remaining: an
+off-centre check against a taped mark, and the 1280x720 smoke.
 
 **Context.** [Camera stack](target_localization/camera_stack.md),
 [aligned depth](target_localization/aligned_depth.md), and

@@ -56,7 +56,14 @@ square pixels, and a centred principal point: the HD option is a centred
 The resulting native vertical FoV is about 64 degrees, consistent with the
 rounded 65-degree datasheet value. The datasheet does not publish the effective
 intrinsics for every stream mode; only live `CameraInfo` can establish those
-for the physical unit.
+for the physical unit. The `r100_0160` unit's factory calibration lies within
+about 1 % in focal length and a few pixels in principal point of both profiles.
+The profiles are therefore kept as they are; hardware runs read the live `K`.
+
+The estimators read only `K` from `CameraInfo` (`intrinsics_from_camera_info`).
+They ignore the distortion coefficients `D` and treat the unrectified D455
+colour image as an ideal pinhole. On `r100_0160` this costs a fraction of a
+degree of bearing toward the image edges.
 
 Manufacturer references: [D455 product specifications](https://www.realsenseai.com/products/real-sense-depth-camera-d455f/),
 the [D400 family datasheet](https://www.realsenseai.com/wp-content/uploads/2023/10/Intel-RealSense-D400-Series-Datasheet-September-2023.pdf),
