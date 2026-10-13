@@ -40,6 +40,7 @@ are excluded from ordinary repository search and the generated knowledge graph.
 - [r100_0160 Intel RViz view of Thor localization](2026-10-13-r100-0160-intel-rviz-observer.md) — SLAM map, scans and Thor's results drawn on Intel in RViz; no image crosses with the box gate; overlay draws on the newest colour frame; CLI probe pitfalls.
 - [r100_0160 D455 factory calibration against the nominal simulator profiles](2026-10-13-r100-0160-d455-calibration-vs-nominal.md) — live VGA and recorded HD intrinsics against the nominal profiles, factory extrinsics, and the cost of the pipeline ignoring distortion; nominal profiles kept.
 - [r100_0160 Nav2 command chain observed live](2026-10-13-r100-0160-nav2-command-chain.md) — first live Nav2-to-controller trace: TwistStamped throughout, mux remap in force; controller_server reads an unpublished `odom` topic.
+- [urg_node reconnect lockout: leaked socket on a failed open](2026-10-13-urg-node-reconnect-leak.md) — source-level cause of the Hokuyo lockout, offline single-client reproduction, and the one-line close patch; not deployed.
 - [r100_0160 Intel–Thor camera transport candidates](2026-10-06-r100-0160-thor-transport-candidates.md) — raw baseline against the larger send buffer (O1) and compression (O4), with the decoder findings.
 - [r100_0160 D455 camera service qualification](2026-10-06-r100-0160-camera-service.md) — contract checks at both profiles, after a cold boot and after a rollback and reinstall, with the platform-restart and serial findings.
 

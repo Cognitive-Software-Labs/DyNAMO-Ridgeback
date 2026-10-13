@@ -278,9 +278,13 @@ limit, reconnecting`, then `Error connecting to Hokuyo: Could not open network
 Hokuyo` every 2.5 s. `ss -tn | grep 10940` shows an established connection to
 each LiDAR next to a pending new one.
 
-**Cause.** After a read timeout, `urg_node` opens a new TCP connection without
-closing the old one. A Hokuyo UST serves one client at a time, so the driver
-never recovers on its own. Repeated local-camera-subscriber-associated failures
+**Cause.** After read timeouts, `urg_node` reconnects. If the sensor accepts
+the TCP connection and answers the reset but not the parameter request, the
+failed open leaks its socket: `urg_c`'s `urg_open` leaves it open, and
+`urg_node` 1.1.2's Ethernet constructor throws without closing it. A Hokuyo UST
+serves one client at a time, so the leaked connection holds the only slot and
+the driver never recovers on its own. `patches/urg_node_close_failed_open.patch`
+closes it; that patch is not deployed yet. Repeated local-camera-subscriber-associated failures
 and Ethernet traffic spikes are recorded in the
 [transport blocker](physical/intel_thor_transport.md#camera-subscriber-blocker);
 the initiating mechanism remains unproven.

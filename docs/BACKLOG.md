@@ -113,6 +113,18 @@ initiating mechanism remains unproven; the maintained
 [transport blocker](physical/intel_thor_transport.md#camera-subscriber-blocker)
 distinguishes observations from the multicast hypothesis.
 
+**Progress.** The lockout mechanism was found and reproduced offline on
+2026-10-13. When `urg_open` fails after the TCP connect, `urg_node` 1.1.2's
+Ethernet constructor throws without closing the socket. Against a simulated
+single-client UST that answers the reset but not the parameter request, the
+stock driver held one connection and was refused afterwards. The patched driver
+closed each failed attempt
+([record](../archive/engineering/2026-10-13-urg-node-reconnect-leak.md)). The
+patch (`patches/urg_node_close_failed_open.patch`) and the harness
+(`tools/urg_reconnect_check`) are not yet in `dependencies/core.repos` or the
+`clearpath-sensors` deployment. The on-robot interruption test and the
+initiating-mechanism criteria below remain open.
+
 **Context.** Recovery steps are in
 [troubleshooting](troubleshooting.md#hokuyo-drivers-stuck-reconnecting). The
 incident timeline is in the archived evidence below. The CycloneDDS deployment is described in the

@@ -84,5 +84,12 @@ the restart.
   kept, so it cannot be tied to a probe or to load. Intel had booted 12 minutes
   earlier. Evidence is in
   `artifacts/hardware/20261013T094559Z-taped-distance/guard.{json,log}`.
+- A second 900 s guard (10:31–10:46 UTC), with the whole stack up and no
+  probes from this session, failed the same way: a 467 ms maximum depth gap and
+  98.60 % colour/depth pairing, with colour, depth rate and scans passing. The
+  gap therefore comes with the full Intel stack, not with the probes. During the
+  run Intel's 8 cores carried a load average of about 10–15. RViz used one core
+  (software rendering on the VNC display) and SLAM about 0.8. Evidence is in
+  `artifacts/hardware/20261013T103141Z-quiet-guard/`.
 - This was not checked: distance accuracy against tape, ring placement in
   `map`, sustained rates, and the silhouette gate's mask transfer.
