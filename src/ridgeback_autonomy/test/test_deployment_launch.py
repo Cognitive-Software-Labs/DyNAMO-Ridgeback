@@ -1,6 +1,7 @@
 import importlib.util
 from pathlib import Path
 import pytest
+import yaml
 from launch import LaunchContext
 from launch.actions import DeclareLaunchArgument
 from launch_ros.actions import Node
@@ -183,3 +184,29 @@ def test_external_localization_is_not_gated_on_a_local_camera(monkeypatch):
     names = executables(module.build_gated_target_localization(context), context)
 
     assert 'localization_status' in names
+
+
+def overlay_parameters(nodes, context):
+    overlay=[n for n in nodes if isinstance(n,Node) and executables([n],context)==['target_overlay_node']]
+    assert len(overlay)==1
+    # launch_ros normalizes values to YAML-encoded substitutions.
+    resolve=lambda value: yaml.safe_load(perform_substitutions(context,value)) if isinstance(value,tuple) else value
+    return {resolve(k):resolve(v) for d in overlay[0]._Node__parameters for k,v in d.items()}
+
+
+def test_external_overlay_reads_local_depth_and_local_overlay_keeps_the_republish(monkeypatch):
+    from ridgeback_localization.contracts import ALIGNED_DEPTH_DEBUG_TOPIC
+    monkeypatch.setenv('RIDGEBACK_PERCEPTION_VENV','/nonexistent')
+    module=load('src/ridgeback_autonomy/launch/ridgeback_exploration.launch.py')
+    context=context_for(module,dict(backend='hardware',localization_mode='external',base_frame='observed_base'))
+    assert overlay_parameters(module.build_target_localization_nodes(context),context)['aligned_depth_topic']=='sensors/camera_0/depth/image'
+    monkeypatch.delenv('RIDGEBACK_PERCEPTION_VENV')
+    context=context_for(module,dict(backend='gz',localization_mode='local'))
+    assert overlay_parameters(module.build_target_localization_nodes(context),context)['aligned_depth_topic']==ALIGNED_DEPTH_DEBUG_TOPIC
+
+
+def test_stationary_observer_overlay_reads_local_depth(monkeypatch):
+    monkeypatch.setenv('RIDGEBACK_PERCEPTION_VENV','/nonexistent')
+    module=load('src/ridgeback_autonomy/launch/localization_observer.launch.py')
+    context=context_for(module,dict(base_frame='observed_base'))
+    assert overlay_parameters(module.build_nodes(context),context)['aligned_depth_topic']=='sensors/camera_0/depth/image'
