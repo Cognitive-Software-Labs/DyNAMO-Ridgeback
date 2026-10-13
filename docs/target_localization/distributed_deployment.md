@@ -33,9 +33,12 @@ local detector and the selected estimator workers. `localization_mode:=external`
 starts result consumers without a detector, measurement worker, or duplicate
 health producer. In external mode and in the observer, the overlay's depth panel
 subscribes to this host's aligned depth topic. The compute host's republish is
-the frame it measured, but it would have to cross the link; the local stream is
-the latest frame instead, not stamp-matched. The overlay also draws each
-measurement on its latest colour frame. The box gate's mask panel is derived
+the frame it measured, but it would have to cross the link. The local stream
+carries the same source stamps, because colour and aligned depth share them
+exactly. The overlay keeps its last 32 colour and depth frames by stamp and
+draws each measurement on the pair it was measured from. It falls back to the
+newest pair, with a warning, when the result is older than that buffer. The
+box gate's mask panel is derived
 from the detections message. Only the silhouette gate's panel subscribes to the
 compute host's `debug/target/mask`, the one image that then crosses the link.
 `target_localization_enabled:=false`

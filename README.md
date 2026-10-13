@@ -330,10 +330,11 @@ DISPLAY=:1 ros2 launch ridgeback_autonomy ridgeback_exploration.launch.py \
 
 Intel runs SLAM, Nav2 and RViz. RViz shows the map, both LiDAR scans, the
 target rings and the camera overlay:
-- **Colour panel:** Thor's latest measurement drawn on Intel. It is redrawn for
-  each measurement, on the newest colour frame Intel holds rather than the
-  measured one, so boxes trail a moving target by the inference latency.
-- **Depth panel:** Intel's local aligned depth, also the newest frame.
+- **Colour panel:** each of Thor's measurements, drawn on Intel's copy of the
+  colour frame it was measured from (matched by source stamp). The newest frame
+  is used only when that one has left the 32-frame buffer (about 1 s), and the
+  overlay logs a warning when that happens.
+- **Depth panel:** Intel's local aligned depth, from the same stamp.
 - **Mask panel:** with `mask_gate:=box`, built from the detections message, so
   no image crosses from Thor. With `silhouette`, Thor's `debug/target/mask`,
   on detection frames.

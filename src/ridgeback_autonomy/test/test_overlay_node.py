@@ -227,3 +227,52 @@ def test_scan_and_beam_caches_are_bounded(ros_context) -> None:
         assert len(node.polar_beams_cache) == node.CACHE_DEPTH
     finally:
         node.destroy_node()
+
+
+def solid_color_image(sec: int, value: int):
+    from sensor_msgs.msg import Image
+    msg = Image()
+    msg.header.frame_id = CAMERA_FRAME
+    msg.header.stamp.sec = sec
+    msg.height, msg.width, msg.encoding, msg.step = 48, 64, 'rgb8', 64 * 3
+    msg.data = bytes([value]) * (64 * 48 * 3)
+    return msg
+
+
+def capture_render(node, monkeypatch):
+    drawn, published = [], []
+
+    def render(frame, *args, **kwargs):
+        drawn.append(int(frame[0, 0, 0]))
+        return frame
+
+    monkeypatch.setattr(node.renderer, 'render', render)
+    monkeypatch.setattr(node.overlay_pub, 'publish', published.append)
+    return drawn, published
+
+
+def test_measurement_is_drawn_on_the_frame_it_was_measured_from(
+    ros_context, monkeypatch,
+) -> None:
+    # A remote result arrives an inference latency after its frame. Drawing it
+    # on the newest image would put the box where the target no longer is.
+    node = overlay_node()
+    drawn, published = capture_render(node, monkeypatch)
+    node.color_callback(solid_color_image(10, 40))
+    node.color_callback(solid_color_image(11, 200))
+    node.mask_measurement_callback(measurements(10))
+    assert drawn == [40]
+    assert published[-1].header.stamp.sec == 10
+    node.destroy_node()
+
+
+def test_measurement_without_its_frame_falls_back_to_the_newest(
+    ros_context, monkeypatch,
+) -> None:
+    node = overlay_node()
+    drawn, published = capture_render(node, monkeypatch)
+    node.color_callback(solid_color_image(11, 200))
+    node.mask_measurement_callback(measurements(5))
+    assert drawn == [200]
+    assert published[-1].header.stamp.sec == 11
+    node.destroy_node()
