@@ -120,9 +120,13 @@ single-client UST that answers the reset but not the parameter request, the
 stock driver held one connection and was refused afterwards. The patched driver
 closed each failed attempt
 ([record](../archive/engineering/2026-10-13-urg-node-reconnect-leak.md)). The
-patch (`patches/urg_node_close_failed_open.patch`) and the harness
-(`tools/urg_reconnect_check`) are not yet in `dependencies/core.repos` or the
-`clearpath-sensors` deployment. The on-robot interruption test and the
+patch (`patches/urg_node_close_failed_open.patch`) was deployed on
+`r100_0160` the same day. It runs as an overlay at `/home/robot/ros_overlays/urg_node_fix`
+(upstream 1.1.2 plus the patch), which `/etc/clearpath/robot.yaml` lists under
+`system.ros2.workspaces`; `robot.yaml.bak-urg-node-fix` is the rollback copy.
+Both drivers run the patched binary and stream. The patch is not in
+`dependencies/core.repos`, and `deployment/r100_0160/` does not include the
+`robot.yaml` change. The on-robot interruption test and the
 initiating-mechanism criteria below remain open.
 
 **Context.** Recovery steps are in
