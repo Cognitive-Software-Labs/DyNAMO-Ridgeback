@@ -54,6 +54,7 @@ FAILS=0
 WARNS=0
 pass() { printf '  PASS  %s\n' "$*"; }
 warn() { printf '  WARN  %s\n' "$*"; WARNS=$((WARNS + 1)); }
+info() { printf '  INFO  %s\n' "$*"; }
 fail() { printf '  FAIL  %s\n' "$*"; FAILS=$((FAILS + 1)); }
 section() { printf '\n%s\n' "$*"; }
 thor() { ssh -o BatchMode=yes -o ConnectTimeout=5 "$THOR" "$@"; }
@@ -65,8 +66,10 @@ finish() {
 
 # Bytes counters summed over the Wi-Fi interfaces (wl*) of a host.
 WIFI_BYTES="awk '{s += \$1} END {print s + 0}' /sys/class/net/wl*/statistics/rx_bytes /sys/class/net/wl*/statistics/tx_bytes 2>/dev/null"
-# The camera stream is ~220 Mbit/s; a duplicate Wi-Fi path shows up at that scale,
-# well above the background traffic of the robot's web and Foxglove services.
+# The camera stream is ~220 Mbit/s; a duplicate Wi-Fi path shows up at that scale.
+# Intel's Wi-Fi also carries its own background (desktop, web and remote-view
+# traffic: ~20 Mbit/s rx+tx was measured on 2026-10-13 with no probe running),
+# so the verdict uses the rate above a baseline taken just before the probes.
 WIFI_LIMIT_MBIT=20
 
 # Receive-buffer ceiling, live and persisted, on the named host.
@@ -305,9 +308,10 @@ publish_for=$((DURATION + 20))
 
 run_direction() {
     local label="$1" receiver="$2"
-    local wifi_intel0 wifi_thor0 result wifi_mbit received rate gap drops
+    local wifi_intel0 wifi_thor0 result wifi_mbit excess_mbit received rate gap drops t0
     wifi_intel0="$(eval "$WIFI_BYTES")"
     wifi_thor0="$(thor "$WIFI_BYTES")"
+    t0="$(date +%s.%N)"
     if [ "$receiver" = thor ]; then
         bash -c "$intel_env; python3 '$PROBE' pub --rate $RATE --duration $publish_for" > /dev/null 2>&1 &
         result="$(thor "$thor_env; python3 $REMOTE_DIR/dds_link_probe.py sub --duration $DURATION --wait 15" 2>/dev/null)"
@@ -315,8 +319,11 @@ run_direction() {
         thor "$thor_env; timeout $publish_for python3 $REMOTE_DIR/dds_link_probe.py pub --rate $RATE --duration $publish_for" > /dev/null 2>&1 &
         result="$(bash -c "$intel_env; python3 '$PROBE' sub --duration $DURATION --wait 15" 2>/dev/null)"
     fi
+    # Over the window actually measured, which includes probe matching.
     wifi_mbit="$(awk -v a="$(eval "$WIFI_BYTES")" -v a0="$wifi_intel0" -v b="$(thor "$WIFI_BYTES")" -v b0="$wifi_thor0" \
-        -v d="$DURATION" 'BEGIN {printf "%.1f", (a - a0 + b - b0) * 8 / 1e6 / d}')"
+        -v d="$(awk -v t0="$t0" -v t1="$(date +%s.%N)" 'BEGIN {print t1 - t0}')" \
+        'BEGIN {printf "%.1f", (a - a0 + b - b0) * 8 / 1e6 / d}')"
+    excess_mbit="$(awk -v w="$wifi_mbit" -v b="$WIFI_BASELINE_MBIT" 'BEGIN {e = w - b; printf "%.1f", e < 0 ? 0 : e}')"
     kill %1 2> /dev/null
     wait 2> /dev/null
     if [ "$receiver" = intel ]; then
@@ -342,13 +349,19 @@ print(r["received"], r["rate_hz"], r["max_gap_s"], r["udp_drops"])' 2> /dev/null
     else
         pass "$label: no UDP receive-buffer drops on the $receiver probe's sockets"
     fi
-    if awk "BEGIN {exit !($wifi_mbit > $WIFI_LIMIT_MBIT)}"; then
-        fail "$label: ${wifi_mbit} Mbit/s on Wi-Fi; DDS is duplicating over the lab network"
+    if awk "BEGIN {exit !($excess_mbit > $WIFI_LIMIT_MBIT)}"; then
+        fail "$label: ${wifi_mbit} Mbit/s on Wi-Fi, ${excess_mbit} above the ${WIFI_BASELINE_MBIT} baseline; DDS is duplicating over the lab network"
     else
-        pass "$label: ${wifi_mbit} Mbit/s on Wi-Fi (background only)"
+        pass "$label: ${wifi_mbit} Mbit/s on Wi-Fi, ${excess_mbit} above the ${WIFI_BASELINE_MBIT} baseline (background only)"
     fi
 }
 
+wifi_intel0="$(eval "$WIFI_BYTES")"
+wifi_thor0="$(thor "$WIFI_BYTES")"
+sleep "$DURATION"
+WIFI_BASELINE_MBIT="$(awk -v a="$(eval "$WIFI_BYTES")" -v a0="$wifi_intel0" -v b="$(thor "$WIFI_BYTES")" -v b0="$wifi_thor0" \
+    -v d="$DURATION" 'BEGIN {printf "%.1f", (a - a0 + b - b0) * 8 / 1e6 / d}')"
+info "Wi-Fi baseline before the probes: ${WIFI_BASELINE_MBIT} Mbit/s (both hosts, rx+tx)"
 run_direction "Intel -> Thor" thor
 run_direction "Thor -> Intel" intel
 finish
