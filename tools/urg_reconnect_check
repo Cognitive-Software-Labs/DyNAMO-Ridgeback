@@ -1,0 +1,118 @@
+#!/usr/bin/env python3
+"""Offline check that urg_node releases a Hokuyo connection whose handshake fails.
+
+A Hokuyo UST serves one TCP client at a time. This stands in for one that has
+stopped answering: it accepts a single client and refuses further connections
+until that client closes. `--mode silent` never replies, so the open fails in
+the driver's initialize step; `--mode qt-only` answers the QT reset as a SCIP 2.0
+sensor but not the PP parameter request, so urg_open itself fails after the
+TCP connect. A driver that leaks the
+socket of a failed open is left with one connection the server never sees
+close, and every later attempt is refused. A driver that closes it is seen
+closing, and the server accepts its next attempt.
+
+  tools/urg_reconnect_check --duration 30 --output result.json -- \\
+      ros2 run urg_node urg_node_driver --ros-args -p ip_address:=127.0.0.1 -p ip_port:=10941
+
+Run the driver on an isolated domain (the tool sets ROS_DOMAIN_ID=99 and
+localhost-only discovery for it); nothing touches the robot's LiDARs.
+"""
+import argparse
+import json
+import os
+from pathlib import Path
+import select
+import socket
+import subprocess
+import sys
+import time
+
+
+def serve(port, duration, driver_cmd, mode):
+    env = dict(os.environ, ROS_DOMAIN_ID='99', ROS_AUTOMATIC_DISCOVERY_RANGE='LOCALHOST')
+    accepted, closed = [], []
+    listener = None
+
+    def listen():
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        sock.bind(('127.0.0.1', port))
+        sock.listen(1)
+        return sock
+
+    listener = listen()
+    client = None
+    start = time.monotonic()
+    driver = subprocess.Popen(driver_cmd, env=env, stdout=subprocess.PIPE,
+                              stderr=subprocess.STDOUT, text=True)
+    log = []
+    try:
+        while time.monotonic() - start < duration:
+            readable = [s for s in (listener, client, driver.stdout) if s is not None]
+            ready, _, _ = select.select(readable, [], [], 0.1)
+            now = round(time.monotonic() - start, 3)
+            if driver.stdout in ready:
+                line = driver.stdout.readline()
+                if line:
+                    log.append(f'{now:8.3f} {line.rstrip()}')
+            if listener is not None and listener in ready:
+                client, _ = listener.accept()
+                accepted.append(now)
+                # One client at a time, as the UST does: stop listening, so
+                # further attempts are refused until this client closes.
+                listener.close()
+                listener = None
+            if client is not None and client in ready:
+                data = client.recv(4096)
+                if not data:
+                    closed.append(now)
+                    client.close()
+                    client = None
+                    listener = listen()
+                elif mode == 'qt-only':
+                    # SCIP 2.0 echo, status 00, checksum P, blank line.
+                    for _ in range(data.count(b'QT\n')):
+                        client.sendall(b'QT\n00P\n\n')
+    finally:
+        driver.terminate()
+        try:
+            driver.wait(timeout=10)
+        except subprocess.TimeoutExpired:
+            driver.kill()
+        for sock in (listener, client):
+            if sock is not None:
+                sock.close()
+    open_failures = sum('Could not open network Hokuyo' in line for line in log)
+    return {
+        'mode': mode,
+        'duration_s': duration,
+        'connections_accepted': len(accepted),
+        'connections_closed_by_driver': len(closed),
+        'connection_held_open_at_end': client is not None,
+        'accepted_at_s': accepted,
+        'closed_at_s': closed,
+        'driver_open_failures_logged': open_failures,
+        'leaked': client is not None and len(closed) == 0,
+    }, log
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__.split('\n')[0])
+    parser.add_argument('--port', type=int, default=10941)
+    parser.add_argument('--duration', type=float, default=30.0)
+    parser.add_argument('--mode', choices=('silent', 'qt-only'), default='silent')
+    parser.add_argument('--output', type=Path, required=True)
+    parser.add_argument('driver', nargs=argparse.REMAINDER)
+    args = parser.parse_args()
+    cmd = args.driver[1:] if args.driver[:1] == ['--'] else args.driver
+    if not cmd:
+        parser.error('give the driver command after --')
+    result, log = serve(args.port, args.duration, cmd, args.mode)
+    args.output.write_text(json.dumps(result, indent=2) + '\n')
+    args.output.with_suffix('.log').write_text('\n'.join(log) + '\n')
+    print(json.dumps(result, indent=2))
+    return 1 if result['leaked'] else 0
+
+
+if __name__ == '__main__':
+    sys.exit(main())
