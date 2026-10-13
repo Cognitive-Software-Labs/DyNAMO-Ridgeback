@@ -19,6 +19,7 @@ src/clearpath_common/
 src/clearpath_config/
 src/clearpath_msgs/
 src/slam_toolbox/
+src/urg_node/
 
 # Python virtual environments
 vlm_venv/

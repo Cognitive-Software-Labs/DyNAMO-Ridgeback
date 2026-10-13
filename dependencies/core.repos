@@ -30,3 +30,10 @@ repositories:
     url: https://github.com/SteveMacenski/slam_toolbox.git
     # jazzy @ 2.8.5
     version: 02afdde003313a10b8d21461a92d9e5f4f0bc5f2
+  src/urg_node:
+    type: git
+    url: https://github.com/ros-drivers/urg_node.git
+    # 1.1.2, the version Jazzy ships; patched so a Hokuyo connection that
+    # fails or resets is closed and reconnected instead of locking the driver
+    # out or killing it (patches/urg_node_reconnect_recovery.patch)
+    version: 1b3e5502ca162a2fa03c591b04ce97c9cdb695a6

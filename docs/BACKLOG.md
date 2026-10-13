@@ -120,22 +120,24 @@ single-client UST that answers the reset but not the parameter request, the
 stock driver held one connection and was refused afterwards. The patched driver
 closed each failed attempt
 ([record](../archive/engineering/2026-10-13-urg-node-reconnect-leak.md)). The
-patch (`patches/urg_node_close_failed_open.patch`) was deployed on
+fix was deployed on
 `r100_0160` the same day. It runs as an overlay at `/home/robot/ros_overlays/urg_node_fix`
 (upstream 1.1.2 plus the patch), which `/etc/clearpath/robot.yaml` lists under
 `system.ros2.workspaces`; `robot.yaml.bak-urg-node-fix` is the rollback copy.
 Both drivers run the patched binary and stream. The first on-robot
 interruption (`ss -K` on the rear LiDAR's session) found a second defect.
 `urg_c` writes without `MSG_NOSIGNAL`, so the write after a reset raised
-SIGPIPE and killed the driver, and nothing respawned it.
-`patches/urg_node_ignore_sigpipe.patch` ignores SIGPIPE. With both patches, a
+SIGPIPE and killed the driver, and nothing respawned it. The fix now also
+ignores SIGPIPE. With both changes, a
 repeat interruption reconnected the same driver process within 2.25 s, with no
 service restart
 ([record](../archive/engineering/2026-10-13-urg-node-reconnect-leak.md)).
 That meets the interruption criterion for a reset session. The half-answering
-sensor case is proven only offline. The patches are not in
-`dependencies/core.repos`, and `deployment/r100_0160/` does not include the
-`robot.yaml` change. The services-configuration and initiating-mechanism
+sensor case is proven only offline. Both changes are one recorded patch,
+`patches/urg_node_reconnect_recovery.patch`, on `src/urg_node` 1.1.2 in
+`dependencies/core.repos`; `tools/check_dependencies` applies and verifies it.
+The overlay's source is identical to that checkout. `deployment/r100_0160/`
+does not include the `robot.yaml` change. The services-configuration and initiating-mechanism
 criteria below remain open.
 
 **Context.** Recovery steps are in

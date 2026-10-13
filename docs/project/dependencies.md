@@ -7,7 +7,7 @@ keeps the public installation commands; dated refresh results belong in
 
 ## Model and ownership
 
-The dependencies under `src/clearpath_*` and `src/slam_toolbox` are standalone,
+The dependencies under `src/clearpath_*`, `src/slam_toolbox` and `src/urg_node` are standalone,
 Git-ignored repositories populated by `vcstool`. They are not Git submodules and
 are not stored in the root repository's history.
 
@@ -111,6 +111,7 @@ The maintained mappings are:
 | `src/clearpath_simulator` | `patches/clearpath_gz_customizations.patch` |
 | `src/clearpath_common` | `patches/clearpath_realsense_sim_frames.patch` |
 | `src/slam_toolbox` | `patches/slam_toolbox_tf_namespace.patch` |
+| `src/urg_node` | `patches/urg_node_reconnect_recovery.patch` |
 
 Update all affected manifest pins and patch files in the same root commit.
 

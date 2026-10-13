@@ -15,6 +15,11 @@ revision; the hash records the checkout they ran from. Raw evidence is on Intel
 under
 `/home/robot/DyNAMO-Ridgeback-rviz/artifacts/hardware/20261013T103430Z-urg-reconnect-offline/`.
 
+Later the same day, the two patches named below were combined into
+`patches/urg_node_reconnect_recovery.patch`, the single recorded patch for
+`src/urg_node` in `dependencies/core.repos`. Its content is the two diffs
+concatenated, and the deployed overlay's source is identical to it.
+
 ## Mechanism
 
 `urg_c`'s `urg_open` (`urg_sensor.c`) opens the TCP connection, then
