@@ -82,6 +82,15 @@ Resolve any mismatch at the narrowest owning layer; then perform stationary,
 lifted/blocked-wheel where approved, low-speed clear-space, stop, timeout, and
 e-stop tests before enabling `autonomous_motion_enabled:=true`.
 
+**Progress.** On 2026-10-13 the Nav2 portion was observed on the live graph for
+the first time, stationary and with no goal sent. Every hop from Nav2 to the
+controller carries `TwistStamped`, and every publisher/subscriber pair delivers.
+It also found that `controller_server` subscribes `odom`, which has no publisher
+on the robot. The platform publishes `platform/odom` and
+`platform/odom/filtered`, so the controller receives no velocity feedback; this
+is unresolved
+([record](../archive/engineering/2026-10-13-r100-0160-nav2-command-chain.md)).
+
 **Context.** [Exploration architecture](exploration/architecture.md#hardware-safety-boundary)
 and the public hardware workflow in the [README](../README.md). The
 [stationary measurement plan](plans/PHYSICAL_robot_measurements_and_validation.md#both-lidars-and-stationary-auxiliary-sensors)
