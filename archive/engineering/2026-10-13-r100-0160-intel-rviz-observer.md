@@ -76,5 +76,13 @@ the restart.
   warning compared Thor's main checkout (`950aacb`), not the deployed worktree.
 - Nav2 ran on hardware with its output connected to the twist mux. No goal was
   sent. The RViz *2D Goal Pose* tool would command motion.
+- A 900 s `camera_contract_check --guard` ran from 09:46 to 10:01 UTC, with the
+  whole Intel stack up and with ad-hoc probes during it. It **failed** on depth:
+  a 567 ms maximum depth gap and 98.65 % colour/depth pairing. Colour (29.9 Hz),
+  depth rate (29.5 Hz) and all three scans (39.9 Hz) passed. The 2026-10-12
+  guard passed without SLAM, Nav2 and RViz on Intel. The gap's time was not
+  kept, so it cannot be tied to a probe or to load. Intel had booted 12 minutes
+  earlier. Evidence is in
+  `artifacts/hardware/20261013T094559Z-taped-distance/guard.{json,log}`.
 - This was not checked: distance accuracy against tape, ring placement in
   `map`, sustained rates, and the silhouette gate's mask transfer.
