@@ -193,8 +193,8 @@ was detected at 0.22), the off-centre mark (measured on the centre line), and
 the simultaneous scan guard (not run; the contract check before and after
 passed). A redo the same afternoon with `full body person` at 0.26 passed the
 empty scene (0 of 98) and the 600 s scan guard; the off-centre mark was again
-not captured. Details in the
-[archived record](../../archive/engineering/2026-10-12-r100-0160-thor-localization-smoke.md).
+not captured. Details are in the archived record listed under
+[Archived evidence](#archived-evidence).
 
 Stop rule: any scan gap above 250 ms, a camera driver error, or a GPU memory
 error stops the launch; record it.
@@ -257,3 +257,7 @@ robot motion, and the colour-before-depth driver patch.
 2. `feat(localization): add the Thor perception requirements`
 3. `docs(physical): record the Thor perception environment`
 4. `docs(physical): record the first live localization run on Thor`
+
+## Archived evidence
+
+- [r100_0160 first Thor localization smoke](../../archive/engineering/2026-10-12-r100-0160-thor-localization-smoke.md)

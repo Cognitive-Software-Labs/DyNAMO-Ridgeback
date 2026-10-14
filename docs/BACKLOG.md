@@ -88,7 +88,7 @@ controller carries `TwistStamped`, and every publisher/subscriber pair delivers.
 It also found that `controller_server` subscribed `odom`, which has no publisher
 on the robot. The platform publishes `platform/odom` and
 `platform/odom/filtered`, so the controller received no velocity feedback
-([record](../archive/engineering/2026-10-13-r100-0160-nav2-command-chain.md)).
+(record under [Archived evidence](#archived-evidence)).
 `nav2_params.yaml` now sets the controller's `odom_topic` to
 `platform/odom/filtered`, the topic `bt_navigator` and the velocity smoother
 already use in every backend. Earlier simulator benchmarks ran the controller
@@ -119,7 +119,7 @@ Ethernet constructor throws without closing the socket. Against a simulated
 single-client UST that answers the reset but not the parameter request, the
 stock driver held one connection and was refused afterwards. The patched driver
 closed each failed attempt
-([record](../archive/engineering/2026-10-13-urg-node-reconnect-leak.md)). The
+(record under [Archived evidence](#archived-evidence)). The
 fix was deployed on
 `r100_0160` the same day. It runs as an overlay at `/home/robot/ros_overlays/urg_node_fix`
 (upstream 1.1.2 plus the patch), which `/etc/clearpath/robot.yaml` lists under
@@ -131,7 +131,7 @@ SIGPIPE and killed the driver, and nothing respawned it. The fix now also
 ignores SIGPIPE. With both changes, a
 repeat interruption reconnected the same driver process within 2.25 s, with no
 service restart
-([record](../archive/engineering/2026-10-13-urg-node-reconnect-leak.md)).
+(record under [Archived evidence](#archived-evidence)).
 That meets the interruption criterion for a reset session. The half-answering
 sensor case is proven only offline. Both changes are one recorded patch,
 `patches/urg_node_reconnect_recovery.patch`, on `src/urg_node` 1.1.2 in
@@ -189,11 +189,11 @@ established. A first stationary projective/Euclidean smoke ran on Thor on
 2026-10-12 at 640x480@30: both estimators measured a person within 4–10% of
 taped distances at three marks (`person` at threshold 0.22), and a redo with
 `full body person` at 0.26 passed the empty scene and a 600 s scan guard
-([record](../archive/engineering/2026-10-12-r100-0160-thor-localization-smoke.md)).
+(record under [Archived evidence](#archived-evidence)).
 Person scores stay near 0.3 in that room, so the setting has little margin.
 The live factory calibration was compared with the nominal simulation model on
 2026-10-13: the model was kept, and the pipeline ignoring distortion was
-recorded ([record](../archive/engineering/2026-10-13-r100-0160-d455-calibration-vs-nominal.md)).
+recorded (record under [Archived evidence](#archived-evidence)).
 That record's HD values come from the earlier vendor service. Remaining: an
 off-centre check against a taped mark, and the 1280x720 smoke.
 
@@ -353,3 +353,7 @@ Resolve each one here or move it to the item that owns it.
 - [Hokuyo reconnect lockout](../archive/engineering/operational_incidents.md#hokuyo-reconnect-lockout--2026-09-18)
 - [r100_0160 field readings and LiDAR box checks](../archive/engineering/2026-09-18-r100-0160-field-measurements.md)
 - [r100_0160 D455 camera service qualification](../archive/engineering/2026-10-06-r100-0160-camera-service.md)
+- [r100_0160 first Thor localization smoke](../archive/engineering/2026-10-12-r100-0160-thor-localization-smoke.md)
+- [r100_0160 Nav2 command chain, stationary](../archive/engineering/2026-10-13-r100-0160-nav2-command-chain.md)
+- [r100_0160 D455 calibration vs the nominal model](../archive/engineering/2026-10-13-r100-0160-d455-calibration-vs-nominal.md)
+- [urg_node reconnect leak and recovery](../archive/engineering/2026-10-13-urg-node-reconnect-leak.md)

@@ -62,7 +62,7 @@ Tracing showed Thor learning Intel's locators Wi-Fi first and Intel never
 seeing Thor's reader. Thor and Intel cannot reach each other over the lab
 Wi-Fi (`ASUS_20`, 100% ping loss both ways), so Thor's replies to
 192.168.123.14 were lost. A route for that address over the cable fixed it
-(`thor_lan_route`); see [troubleshooting](../../docs/troubleshooting.md#thor-receives-sensor-streams-but-no-static-tf).
+(`thor_lan_route`); see [troubleshooting as of this record](https://github.com/Cognitive-Software-Labs/DyNAMO-Ridgeback/blob/c0b5e6f5058e08dd457803bf5343bc48bbfcf979/docs/troubleshooting.md#thor-receives-sensor-streams-but-no-static-tf).
 
 Restarted Thor localization processes took up to about 2 minutes to connect
 to the camera before the route existed. A launch started in the background
