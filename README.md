@@ -348,6 +348,17 @@ one click would otherwise drive the robot even with frontier goals off. Any othe
 Nav2 client can still send goals, so keep the e-stop engaged until the command
 chain is qualified.
 
+**RViz on Intel is throttled so it cannot starve the camera.** Intel's VNC
+desktop renders RViz on the CPU (no GPU). At the layout's 30 fps it took a full
+core, and the camera contract check failed with 467–567 ms depth gaps. With
+`backend:=hardware` the launch therefore:
+- redraws at 10 fps;
+- runs RViz at `nice -n 19` on the last two CPU cores;
+- limits Mesa's software renderer to two threads (`LP_NUM_THREADS=2`).
+
+Then RViz uses about a quarter of a core and the check passes with RViz open.
+Viewing RViz from another computer avoids the load entirely.
+
 For later qualified mission integration, exploration supports
 `localization_mode:=external localization_required:=true`; keep
 `autonomous_motion_enabled:=false` throughout this stationary milestone.

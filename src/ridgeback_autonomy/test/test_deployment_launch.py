@@ -234,3 +234,27 @@ def test_hardware_rviz_has_no_goal_tool_and_simulation_keeps_it(tmp_path, monkey
     assert 'rviz_default_plugins/SetGoal' not in Path(hardware).read_text()
     assert simulation.endswith('exploration.rviz')
     assert 'rviz_default_plugins/SetGoal' in Path(simulation).read_text()
+
+
+def test_hardware_rviz_process_is_niced_and_thread_limited(tmp_path, monkeypatch):
+    from launch.actions import OpaqueFunction
+    monkeypatch.setattr('tempfile.tempdir', str(tmp_path))
+    module = load('src/ridgeback_autonomy/launch/ridgeback_exploration.launch.py')
+
+    def rviz_process(overrides):
+        context = context_for(module, overrides)
+        for entity in module.generate_launch_description().entities:
+            if isinstance(entity, OpaqueFunction):
+                for n in entity.execute(context) or []:
+                    if isinstance(n, Node) and executables([n], context) == ['rviz2']:
+                        d = n.process_description
+                        prefix = d._Executable__prefix
+                        prefix = perform_substitutions(context, prefix) if prefix else ''
+                        env = {perform_substitutions(context, k): perform_substitutions(context, v)
+                               for k, v in (d._Executable__additional_env or [])}
+                        return prefix, env
+        raise AssertionError('no rviz2 node')
+
+    prefix, env = rviz_process(dict(backend='hardware', base_frame='base_link'))
+    assert prefix.startswith('nice -n 19') and env == {'LP_NUM_THREADS': '2'}
+    assert rviz_process(dict(backend='gz')) == ('', {})

@@ -30,7 +30,7 @@ from ridgeback_localization.estimator_registry import (
     uses_mask_estimators,
     uses_pointcloud_estimators,
 )
-from ridgeback_autonomy.rviz_layouts import hardware_layout
+from ridgeback_autonomy.rviz_layouts import hardware_layout, hardware_rviz_process
 from ridgeback_autonomy.localization_launch import (
     cyclonedds_actions,
     distance_hud_node,
@@ -285,6 +285,24 @@ def generate_launch_description():
 
     rviz_config = os.path.join(pkg_this, 'sim', 'rviz', 'exploration.rviz')
 
+    def rviz_nodes(context):
+        hardware = (backend.perform(context) == 'hardware'
+                    and exploration_rviz.perform(context) == 'true')
+        prefix, environment = hardware_rviz_process(os.cpu_count()) if hardware else (None, {})
+        return [Node(
+            package='rviz2',
+            executable='rviz2',
+            name='rviz2',
+            namespace=namespace,
+            arguments=['-d', hardware_layout(rviz_config) if hardware else rviz_config],
+            parameters=[{'use_sim_time': use_sim_time}],
+            remappings=[('/tf', 'tf'), ('/tf_static', 'tf_static')],
+            prefix=prefix,
+            additional_env=environment,
+            output='screen',
+            condition=launch.conditions.IfCondition(exploration_rviz),
+        )]
+
     def _launch_wait(name, *conditions, timeout):
         # timeout may be an int (fixed gate) or a launch substitution (the
         # sim-dependent readiness window); pass substitutions through verbatim.
@@ -477,21 +495,9 @@ def generate_launch_description():
                                           'display (GPU rendering for SSH sessions; '
                                           'docs/troubleshooting.md)'),
 
-        # RViz2. On hardware the layout drops the goal tool: Nav2's output
-        # reaches the twist mux there, so a goal click would drive the robot.
-        OpaqueFunction(function=lambda context: [Node(
-            package='rviz2',
-            executable='rviz2',
-            name='rviz2',
-            namespace=namespace,
-            arguments=['-d', hardware_layout(rviz_config)
-                       if backend.perform(context) == 'hardware'
-                       and exploration_rviz.perform(context) == 'true' else rviz_config],
-            parameters=[{'use_sim_time': use_sim_time}],
-            remappings=[('/tf', 'tf'), ('/tf_static', 'tf_static')],
-            output='screen',
-            condition=launch.conditions.IfCondition(exploration_rviz),
-        )]),
+        # RViz2. On hardware it gets the derived layout (no goal tool, 10 fps)
+        # and runs at low priority on two cores; see rviz_layouts.
+        OpaqueFunction(function=rviz_nodes),
 
         # Detector, measurement nodes, rings, distance HUD and camera overlay
         # are gated as one unit: they are all downstream of detections, and in
