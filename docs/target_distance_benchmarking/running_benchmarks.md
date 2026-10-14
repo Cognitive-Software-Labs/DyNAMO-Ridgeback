@@ -47,10 +47,11 @@ Plus `target_distance_benchmark.launch.py` for a single live run — and for
 a separate capture tool, so the first offline experiment always begins with a
 live one.
 
-Live sweeps stay terminal-only because
-`target_benchmark_sweep` runs `cleanup.sh` before Gazebo starts, whose catch-all
-would kill the configurator and any run it started; see
-[troubleshooting](../troubleshooting.md). The configurator can still author,
+Live sweeps stay terminal-only until the page can supervise a live run's
+conflicts, progress and cancellation; the
+[live-sweep plan](../plans/BENCHMARKING_live_configurator_sweeps.md) owns that
+work. Preflight cleanup no longer kills the configurator
+([troubleshooting](../troubleshooting.md#what-cleanupsh-leaves-alone)). The configurator can still author,
 validate, and render a live sweep command — it just cannot press Start on one.
 
 `camera_profile` selects `640x480` (default) or `1280x720`, and is recorded in
