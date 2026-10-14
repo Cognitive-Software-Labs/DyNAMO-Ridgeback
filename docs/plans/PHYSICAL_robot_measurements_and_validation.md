@@ -308,7 +308,9 @@ its actuation, stop, timeout, and e-stop tests remain open.
 ## Stationary camera–LiDAR alignment
 
 Start with a practical alignment check using live camera calibration and the
-configured transforms, informed by the mount readings above. A full extrinsic
+configured transforms, informed by the mount readings above. The
+[camera and alignment session](PHYSICAL_camera_alignment_session.md) schedules
+it with its limits declared in advance. A full extrinsic
 calibration session is a follow-up if the check exposes a problem, not a
 prerequisite for collecting useful camera and LiDAR data.
 
