@@ -20,6 +20,11 @@ CONFIG = REPO / 'src/ridgeback_autonomy_hardware/config/intel_thor'
 BACKUP = '/var/lib/dynamo-time-sync-backup'
 MAIN = '/etc/chrony/chrony.conf'
 MANAGED = '/etc/chrony/conf.d/dynamo-time.conf'
+# Intel only, installed separately from the chrony profile: one step at boot,
+# before sensors, PTP and the platform stamp with the wall clock.
+BOOT_SCRIPT = '/usr/local/lib/dynamo-time/boot_clock_step.py'
+BOOT_UNIT = '/etc/systemd/system/dynamo-boot-clock.service'
+BOOT_SOURCES = {BOOT_SCRIPT: 'boot_clock_step.py', BOOT_UNIT: 'dynamo-boot-clock.service'}
 UNITS = ('systemd-timesyncd.service', 'chrony.service')
 
 
@@ -157,6 +162,28 @@ def rollback(host):
     shutil.rmtree(backup)
 
 
+def boot_step(host, install):
+    """Install or remove the boot clock step; never touches chrony or running services."""
+
+    if install:
+        for path, source in BOOT_SOURCES.items():
+            write(host.path(path), (CONFIG / source).read_text())
+        run('systemctl', 'daemon-reload')
+        # Enabled for the next boot only: started now it would find the
+        # consumers active and refuse to step anyway.
+        run('systemctl', 'enable', 'dynamo-boot-clock.service')
+        print('Installed for the next boot.', flush=True)
+        return
+    for path, source in BOOT_SOURCES.items():
+        if host.path(path).exists() and host.path(path).read_text() != (CONFIG / source).read_text():
+            raise RuntimeError(f'{path} differs from the repository copy; nothing removed')
+    run('systemctl', 'disable', 'dynamo-boot-clock.service', check=False)
+    for path in BOOT_SOURCES:
+        host.path(path).unlink(missing_ok=True)
+    run('systemctl', 'daemon-reload')
+    print('Removed; the next boot slews as before.', flush=True)
+
+
 def status(host):
     metadata = host.path(BACKUP) / 'state.json'
     print('managed deployment: ' + (metadata.read_text() if metadata.exists() else 'not installed'))
@@ -167,7 +194,7 @@ def status(host):
             ok = digest(host.path(path)) == expected
             drift |= not ok
             print(('ok ' if ok else 'DIFF ') + path)
-    for unit in UNITS:
+    for unit in UNITS + ('dynamo-boot-clock.service',):
         print(unit, state(unit))
     result = run('chronyc', 'tracking', check=False) if shutil.which('chronyc') else None
     print(result.stdout if result else 'chronyc unavailable')
@@ -178,13 +205,16 @@ def status(host):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('command', choices=('status', 'apply', 'rollback'))
+    parser.add_argument('command', choices=('status', 'apply', 'rollback', 'boot-step-install',
+                                            'boot-step-remove'))
     parser.add_argument('--host', choices=('intel', 'thor'))
     parser.add_argument('--upstream', action='append', help='Intel internet NTP name; repeat to retain several')
     parser.add_argument('--yes', action='store_true')
     args = parser.parse_args(argv)
     if args.command == 'apply' and not args.host:
         parser.error('apply requires --host intel|thor')
+    if args.command.startswith('boot-step') and args.host != 'intel':
+        parser.error('the boot step is for Intel: add --host intel')
     if args.upstream and (args.host != 'intel' or any(not name or any(c.isspace() for c in name) for name in args.upstream)):
         parser.error('--upstream is for Intel and accepts a single hostname per occurrence')
     host = Host()
@@ -199,6 +229,8 @@ def main(argv=None):
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
             if args.command == 'apply':
                 apply(host, args.host, args.upstream)
+            elif args.command.startswith('boot-step'):
+                boot_step(host, install=args.command == 'boot-step-install')
             else:
                 rollback(host)
         return 0
