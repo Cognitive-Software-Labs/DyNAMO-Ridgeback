@@ -1,6 +1,6 @@
 # r100_0160 Intel RViz view of Thor localization
 
-Recorded dates: 2026-10-13
+Recorded dates: 2026-10-13, 2026-10-14
 Tested revisions: `5751d96ba264f7456ddb3b3cbf44c9659d749708`
 Provenance: partial
 
@@ -93,3 +93,44 @@ the restart.
   `artifacts/hardware/20261013T103141Z-quiet-guard/`.
 - This was not checked: distance accuracy against tape, ring placement in
   `map`, sustained rates, and the silhouette gate's mask transfer.
+
+## Follow-up on 2026-10-14
+
+**RViz and camera timing.** A 900 s `camera_contract_check --guard` passed with
+RViz closed (13:09 UTC on 2026-10-13): 133.5 ms maximum depth gap and 99.45 %
+pairing, against 567 and 467 ms with RViz open. On 2026-10-14 (09:48–10:03 UTC)
+the guard passed **with** RViz open, using the light settings: a 10 fps layout,
+`nice -n 19`, cores 6–7 and `LP_NUM_THREADS=2`. It measured a 100.0 ms maximum
+depth gap, a 66.7 ms colour gap, 99.26 % pairing and scans at 39.9 Hz, with
+RViz at about 25 % of one core (about 95 % before). These settings are now the
+`backend:=hardware` default. A person was in view for about 2 minutes of that
+run.
+
+**Distance cross-check against the front LiDAR.** With the operator standing
+still in front of the robot, the camera estimate was compared with the nearest
+front-LiDAR return within ±2° of the same bearing. Both were measured from the
+pipeline's front point.
+
+| Position | Euclidean / projective | LiDAR nearest | Difference |
+|---|---|---|---|
+| ~2.0 m (210 pairs) | 2.023 / 2.031 m | 2.003 m | +2.2 cm (+1.1 %) |
+| ~1.5 m (271 pairs) | 1.708 / 1.716 m | 1.692 m | +1.5 cm (+0.9 %) |
+
+The estimators agree with this independent sensor to about 1 %. The +5–9 %
+measured against tape on 2026-10-12 therefore most likely reflects the tape
+reference, not the estimators. The operator's "1.5 m" mark read 1.69–1.71 m
+from the pipeline's front point. The LiDAR sees the legs at scan height while
+the camera sees the whole body, and the LiDAR pose is the nominal mount, not a
+formal calibration.
+
+**Disruptions.** The robot lost power at 14:36 UTC on 2026-10-13, at a 25.9 V
+battery warning. On 2026-10-14, `unattended-upgrades` (09:25–09:32 UTC), with
+`needrestart` set to restart automatically
+(`/etc/needrestart/conf.d/10-auto-cp.conf`), restarted the VNC desktop, the
+camera, sensor and scan-merger services, and the platform (three times). That
+stopped the test stack and invalidated two guard runs. The `br0` querier
+drop-in survived the reboot.
+
+Evidence is under `artifacts/hardware/` on Intel: `20261013T130903Z-guard-no-rviz`,
+`20261014T094759Z-guard-rviz-light`, `20261014T095217Z-camera-lidar-crosscheck`
+and `20261014T085439Z-rviz-light`.

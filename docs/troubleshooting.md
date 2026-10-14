@@ -277,6 +277,23 @@ as `/etc/systemd/network/10-netplan-br0.netdev.d/90-dynamo-multicast-querier.con
 With it on, a restarted Thor's results reached Intel in 0.2 s.
 `tools/intel_thor/check_link` checks both.
 
+## Camera frame gaps while RViz runs on Intel
+
+**Symptom.** `tools/camera_contract_check --guard` fails on depth stamps
+(gaps of several hundred ms) and on colour/depth pairing whenever RViz is open
+on Intel's VNC desktop, and passes with RViz closed.
+
+**Cause.** The VNC display has no GPU, so RViz renders in software. At 30 fps
+Mesa's renderer took a full core in per-frame bursts across every core. On
+2026-10-13 that gave 567 and 467 ms depth gaps and 98.6 % pairing. With RViz
+closed: 133 ms and 99.45 %.
+
+**Fix.** `backend:=hardware` already applies it: a 10 fps hardware layout,
+`nice -n 19` on the last two cores, and `LP_NUM_THREADS=2`. On 2026-10-14 that
+measured a 100 ms maximum depth gap and 99.26 % pairing with RViz open, with
+RViz at ~25 % of one core. If the check still fails, close RViz on Intel and
+view it from another computer.
+
 ## CLI probes show no data although consumers are healthy
 
 **Symptom.** `timeout 10 ros2 topic echo|hz ... | grep ...` prints nothing for
