@@ -224,3 +224,23 @@ def test_health_node_reports_selected_contract_and_dead_worker_without_inference
         assert 'Worker publisher missing' in messages[-1].detail
     finally:
         node.destroy_node();rclpy.shutdown()
+
+
+def test_health_watches_camera_info_not_the_image_payloads():
+    from sensor_msgs.msg import CameraInfo, Image
+    from ridgeback_localization.health_node import LocalizationHealthNode, liveness_input
+    assert liveness_input('sensors/camera_0/depth/image', '') == (
+        CameraInfo, 'sensors/camera_0/depth/camera_info')
+    assert liveness_input('custom/depth_raw', '') == (Image, 'custom/depth_raw')
+    rclpy.init()
+    node = LocalizationHealthNode(parameter_overrides=[
+        Parameter('estimators', value='projective_ranging,euclidean_reconstruction')])
+    try:
+        subscribed = {sub.topic_name: sub.msg_type for sub in node.subscriptions_}
+        assert Image not in subscribed.values()
+        assert subscribed['/sensors/camera_0/color/camera_info'] is CameraInfo
+        assert subscribed['/sensors/camera_0/depth/camera_info'] is CameraInfo
+        assert set(node.health.inputs) >= {'color', 'depth', 'camera_info'}
+    finally:
+        node.destroy_node()
+        rclpy.shutdown()

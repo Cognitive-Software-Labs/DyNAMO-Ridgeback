@@ -101,6 +101,21 @@ flowchart LR
 *Hosts, robot services and ROS nodes, and what crosses each link. Solid edges
 are wired; dotted edges use Wi-Fi or, for PTP, raw Ethernet outside DDS.*
 
+CycloneDDS sends each subscribing **process** its own unicast copy, so the image
+load is set by how many Thor processes take each image: the detector takes
+colour and the mask node takes depth. Until 2026-10-16 `localization_health`
+also subscribed to both images just to read their stamps. 2026-10-13 packet
+captures showed the camera socket sending to three Thor participants (unicast
+ports 7411, 7413 and 7415, carrying colour + depth, colour, and depth), about
+754 Mbit/s in total. Health now watches each stream's `camera_info` instead,
+which carries the same stamps. Measured on 2026-10-16 under the same Thor launch:
+763 Mbit/s Intel→Thor before, 382.6 Mbit/s steady after (Thor receiving 377),
+with a header capture showing one copy each of colour (226 Mbit/s) and depth
+(151 Mbit/s). Readings near 860 Mbit/s taken between those two were made while
+the camera was temporarily at 1280×720 for a separate HD check, so they are not
+VGA evidence. Adding an image subscriber in another Thor process adds another
+full copy.
+
 | Link | Carries | Contract |
 |---|---|---|
 | D455 → Intel, USB 3.2 | Colour and depth frames | 640×480 at 30 Hz |
