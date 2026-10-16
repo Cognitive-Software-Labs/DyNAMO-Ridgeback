@@ -43,15 +43,18 @@ LOCK = '/run/lock/dynamo-local-dds-test.lock'
 
 # Fixed robot Ethernet ports, as in check_link and the DDS profiles. Both NICs
 # timestamp PTP in hardware; the hardware clocks hold UTC on both ends (-O 0).
+# -S 0.001 steps a clock more than 1 ms off instead of slewing it at the servo
+# limit: after a link fault the PHC can jump by a second, and phc2sys otherwise
+# takes about 40 minutes to bring the wall clock (or Intel's PHC) back.
 ROLES = {
     'intel': {
         'interface': 'eno1',
-        'phc2sys': '-s CLOCK_REALTIME -c eno1 -O 0 -R 8 -u 64 -m -q',
+        'phc2sys': '-s CLOCK_REALTIME -c eno1 -O 0 -R 8 -u 64 -S 0.001 -m -q',
         'conflicts': '',
     },
     'thor': {
         'interface': 'enP2p1s0',
-        'phc2sys': '-s enP2p1s0 -c CLOCK_REALTIME -O 0 -R 8 -u 64 -w -m -q',
+        'phc2sys': '-s enP2p1s0 -c CLOCK_REALTIME -O 0 -R 8 -u 64 -S 0.001 -w -m -q',
         'conflicts': 'Conflicts=chrony.service systemd-timesyncd.service\n',
     },
 }

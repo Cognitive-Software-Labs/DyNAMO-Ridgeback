@@ -186,6 +186,15 @@ not stay running; `/var/lib/dynamo-ptp-sync-backup/` keeps the package choice
 and chrony's state for rollback. Thor's wall clock may step once at
 installation by the current offset.
 
+After start-up both `ptp4l` (Thor, `step_threshold 0.001`) and `phc2sys`
+(both hosts, `-S 0.001`) step a clock that is more than 1 ms off instead of
+slewing it at the servo limit. On 2026-10-16 a 30-second pull of Thor's
+Ethernet cable left Thor's hardware clock 1.16 s off when the link returned;
+with stepping disabled, `ptp4l` slewed at about 488 ppm, roughly 40 minutes in
+which Thor's wall clock ran over a second behind Intel and `localization_health`
+reported `stale_input` although images and results were flowing. Normal offsets
+are microseconds, so the threshold only acts after such a fault.
+
 The camera installer adds `--fps 15|30`, `--dds-profile services|camera`, and
 `--max-message-size default|65500`. New installs keep `services` at 30 Hz;
 reapply preserves installed options. `camera` renders
