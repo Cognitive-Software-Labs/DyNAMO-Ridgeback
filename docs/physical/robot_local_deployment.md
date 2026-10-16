@@ -193,7 +193,13 @@ Ethernet cable left Thor's hardware clock 1.16 s off when the link returned;
 with stepping disabled, `ptp4l` slewed at about 488 ppm, roughly 40 minutes in
 which Thor's wall clock ran over a second behind Intel and `localization_health`
 reported `stale_input` although images and results were flowing. Normal offsets
-are microseconds, so the threshold only acts after such a fault.
+are microseconds, so the threshold only acts after such a fault. Verified the same day after
+installation: a repeat cable pull left Thor 24.8 s off when the link returned,
+and the clock was back to +0.047 ms about three seconds later, with
+localization health `processing` two seconds after that and nothing restarted.
+While the cable is out, Thor's wall clock still drifts because `phc2sys` follows
+the stalled hardware clock; no data crosses the link then, so this only affects
+Thor's own log times during the outage.
 
 The camera installer adds `--fps 15|30`, `--dds-profile services|camera`, and
 `--max-message-size default|65500`. New installs keep `services` at 30 Hz;
