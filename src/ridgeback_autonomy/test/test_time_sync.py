@@ -68,3 +68,29 @@ def test_incomplete_snapshot_is_retained(tool):
     with pytest.raises(RuntimeError, match='Incomplete'):
         module.apply(host, 'thor')
     assert calls == []
+
+
+def test_boot_step_installs_beside_chrony_and_removes_only_its_own_files(tool):
+    module, host, calls = tool
+    managed = host.path(module.MANAGED)
+    managed.parent.mkdir(parents=True)
+    managed.write_text('pool ntp.ubuntu.com iburst maxsources 4 maxpoll 7\n')
+    module.boot_step(host, install=True)
+    assert 'Before=clearpath-robot.service' in host.path(module.BOOT_UNIT).read_text()
+    assert host.path(module.BOOT_SCRIPT).exists()
+    assert ('systemctl', 'enable', 'dynamo-boot-clock.service') in calls
+    # Neither chrony's profile nor any running service is touched.
+    assert managed.read_text() == 'pool ntp.ubuntu.com iburst maxsources 4 maxpoll 7\n'
+    assert not any(call[:2] in (('systemctl', 'restart'), ('systemctl', 'start')) for call in calls)
+    module.boot_step(host, install=False)
+    assert not host.path(module.BOOT_UNIT).exists() and not host.path(module.BOOT_SCRIPT).exists()
+    assert managed.exists()
+
+
+def test_boot_step_removal_refuses_an_edited_unit(tool):
+    module, host, calls = tool
+    module.boot_step(host, install=True)
+    host.path(module.BOOT_UNIT).write_text('edited\n')
+    with pytest.raises(RuntimeError, match='differs'):
+        module.boot_step(host, install=False)
+    assert host.path(module.BOOT_UNIT).exists()

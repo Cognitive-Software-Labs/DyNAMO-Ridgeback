@@ -186,6 +186,28 @@ not stay running; `/var/lib/dynamo-ptp-sync-backup/` keeps the package choice
 and chrony's state for rollback. Thor's wall clock may step once at
 installation by the current offset.
 
+### Boot clock step (candidate, not yet installed)
+
+Intel's RTC keeps whole seconds, so Intel boots up to a second off its NTP
+source, and `makestep 1 3` slews anything below a second at 500 ppm: on
+2026-10-14 a 344–357 ms boot offset would have taken about eleven minutes,
+holding the platform's 5 ms clock gate. On that boot `phc2sys` started at 7.7 s
+and the sensors and camera at 13.8 s, before chrony selected its first source
+at 16.3 s, so a step at that point would have jumped live sensor stamps.
+
+`time_sync boot-step-install --host intel` installs
+`dynamo-boot-clock.service`, a one-shot ordered after chrony and before
+`clearpath-robot`, `clearpath-sensors`, `clearpath-platform`, `dynamo-camera`,
+`dynamo-ptp4l` and `dynamo-phc2sys`. It waits up to 60 s for chrony to select an
+external source, then runs `chronyc makestep` once if the offset is above 5 ms.
+Without a source it exits successfully and leaves holdover, so a time-source
+loss delays those services by at most about a minute rather than blocking boot;
+the platform's own gate still decides whether the base starts. It refuses to
+step if any of those services is already active. Installation enables it for
+the next boot and touches neither chrony's profile nor running services;
+`boot-step-remove` undoes it and refuses an edited copy. Qualification is three
+supervised reboots plus one boot without the internet source.
+
 The camera installer adds `--fps 15|30`, `--dds-profile services|camera`, and
 `--max-message-size default|65500`. New installs keep `services` at 30 Hz;
 reapply preserves installed options. `camera` renders
