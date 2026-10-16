@@ -128,3 +128,15 @@ def test_apply_fails_loudly_when_a_daemon_exits(tool, monkeypatch):
         module.apply(host, 'intel')
     # The snapshot stays for rollback.
     assert host.path(module.BACKUP + '/complete').exists()
+
+
+@pytest.mark.parametrize('role', ['intel', 'thor'])
+def test_a_clock_more_than_a_millisecond_off_is_stepped_not_slewed(tool, role):
+    module, host, calls = tool
+    if role == 'intel':
+        host.path(module.CHRONY_MANAGED).parent.mkdir(parents=True, exist_ok=True)
+        host.path(module.CHRONY_MANAGED).write_text('maxslewrate 500\n')
+    module.apply(host, role)
+    assert ' -S 0.001 ' in text(module, host, module.PHC2SYS_UNIT)
+    if role == 'thor':
+        assert 'step_threshold          0.001' in host.path(module.PTP4L_CONF).read_text()

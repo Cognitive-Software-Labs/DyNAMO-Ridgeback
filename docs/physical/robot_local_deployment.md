@@ -186,7 +186,22 @@ not stay running; `/var/lib/dynamo-ptp-sync-backup/` keeps the package choice
 and chrony's state for rollback. Thor's wall clock may step once at
 installation by the current offset.
 
-### Boot clock step (candidate, not yet installed)
+After start-up both `ptp4l` (Thor, `step_threshold 0.001`) and `phc2sys`
+(both hosts, `-S 0.001`) step a clock that is more than 1 ms off instead of
+slewing it at the servo limit. On 2026-10-16 a 30-second pull of Thor's
+Ethernet cable left Thor's hardware clock 1.16 s off when the link returned;
+with stepping disabled, `ptp4l` slewed at about 488 ppm, roughly 40 minutes in
+which Thor's wall clock ran over a second behind Intel and `localization_health`
+reported `stale_input` although images and results were flowing. Normal offsets
+are microseconds, so the threshold only acts after such a fault. Verified the same day after
+installation: a repeat cable pull left Thor 24.8 s off when the link returned,
+and the clock was back to +0.047 ms about three seconds later, with
+localization health `processing` two seconds after that and nothing restarted.
+While the cable is out, Thor's wall clock still drifts because `phc2sys` follows
+the stalled hardware clock; no data crosses the link then, so this only affects
+Thor's own log times during the outage.
+
+### Boot clock step
 
 Intel's RTC keeps whole seconds, so Intel boots up to a second off its NTP
 source, and `makestep 1 3` slews anything below a second at 500 ppm: on
@@ -205,8 +220,12 @@ loss delays those services by at most about a minute rather than blocking boot;
 the platform's own gate still decides whether the base starts. It refuses to
 step if any of those services is already active. Installation enables it for
 the next boot and touches neither chrony's profile nor running services;
-`boot-step-remove` undoes it and refuses an edited copy. Qualification is three
-supervised reboots plus one boot without the internet source.
+`boot-step-remove` undoes it and refuses an edited copy. Installed on
+`r100_0160` on 2026-10-14; three supervised boots passed on 2026-10-14 and
+2026-10-16 (two steps of 55.5 and 15.3 ms, and one cold start where chrony's own
+step had already corrected 1.43 s), each before any consumer started, with the
+platform clock gate taking 0.1 s. A boot without the internet source was not
+tested (user decision).
 
 The camera installer adds `--fps 15|30`, `--dds-profile services|camera`, and
 `--max-message-size default|65500`. New installs keep `services` at 30 Hz;
