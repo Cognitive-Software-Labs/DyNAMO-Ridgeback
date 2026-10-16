@@ -15,6 +15,23 @@ An image of one does not establish the others.
 
 ## Configured navigation footprint
 
+**Measured hardware outline (2026-10-16).** A tape survey of `r100_0160`
+(`artifacts/hardware/20261016T125020Z-s8-outline-direct/` on Intel) gave 96.0 × 79.3 cm overall, 5.5 cm diagonal gaps at all four
+corners (a 13.3 cm corner rounding) and symmetric hubs 26.0 cm from each end, so
+`base_link` sits at the outline's centre. The former outline below failed that
+survey: the ends stuck out 2 mm past the padded polygon and the rounded corners
+42 mm past its chamfers. The configured polygon is now built from the survey:
+straight edges 12 mm (the tape uncertainty) outside each face and corner
+vertices on the rounding offset by 12 mm, with the 30° chord sag compensated.
+It is 99.4 × 82.7 cm, and every measured and rounding point lies at least
+12 mm inside it before padding (22 mm with the 10 mm padding).
+`test_nav2_footprint.py` pins both. The figures and simulator numbers in the
+rest of this section describe the **former** fitted outline; the new polygon is
+larger in every direction, so it still encloses both simulator envelopes, but
+the static comparison, the simulator contact matrices and any affected
+benchmarks must be rerun before their results are quoted with it. Physical
+clearance and stopping remain under the command-chain gate.
+
 ![Configured 16-point Nav2 body outline in the base_link plane, with forward and left axes.](assets/navigation-footprint.png)
 
 The figure plots the identical local/global costmap `footprint` entries from
