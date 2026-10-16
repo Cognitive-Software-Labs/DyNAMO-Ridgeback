@@ -258,8 +258,11 @@ python3 tools/check_localization_install
 Thor's inference environment uses `requirements-perception-thor.txt` (PyTorch
 2.11 for CUDA 13.0 on aarch64); its header has the setup commands. It lives
 outside the checkout, so set
-`RIDGEBACK_PERCEPTION_VENV=~/venvs/dynamo-perception` for the launch, and check
-it with `~/venvs/dynamo-perception/bin/python3 tools/intel_thor/check_perception_env`
+`RIDGEBACK_PERCEPTION_VENV=~/venvs/dynamo-perception` for the launch. Perception
+processes load models only from the local Hugging Face cache, so a Wi-Fi outage
+cannot stop startup; set `RIDGEBACK_MODEL_DOWNLOADS=1` for the first launch on a
+new host so the models are downloaded once. Check the environment
+with `~/venvs/dynamo-perception/bin/python3 tools/intel_thor/check_perception_env`
 (ROS sourced), which fails unless the models' operations run on the GPU.
 `tools/intel_thor/thor_lan_route` must be applied first, or Thor never receives
 static TF. For a person target, OWLv2 scores below the default
