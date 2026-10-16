@@ -111,10 +111,10 @@ ports 7411, 7413 and 7415, carrying colour + depth, colour, and depth), about
 which carries the same stamps. Measured on 2026-10-16 under the same Thor launch:
 763 Mbit/s Intel→Thor before, 382.6 Mbit/s steady after (Thor receiving 377),
 with a header capture showing one copy each of colour (226 Mbit/s) and depth
-(151 Mbit/s). For about ten minutes after the relaunch the load ran near
-860 Mbit/s and then fell to the steady value without intervention; that
-transient is not yet attributed. Adding an image subscriber in another Thor
-process adds another full copy.
+(151 Mbit/s). Readings near 860 Mbit/s taken between those two were made while
+the camera was temporarily at 1280×720 for a separate HD check, so they are not
+VGA evidence. Adding an image subscriber in another Thor process adds another
+full copy.
 
 | Link | Carries | Contract |
 |---|---|---|
