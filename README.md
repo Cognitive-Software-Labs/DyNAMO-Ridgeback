@@ -916,9 +916,10 @@ escalating SIGINT → SIGTERM → SIGKILL. Save a copy still downloads the job f
 archiving or hand-editing.
 
 **Live sweeps still start from a terminal.** They need a GPU-backed X session,
-and `target_benchmark_sweep` runs `cleanup.sh` before Gazebo starts, which would
-kill the page — see [docs/troubleshooting.md](docs/troubleshooting.md). Copy
-the command instead.
+and the page does not yet supervise a live run's conflicts, progress or
+cancellation. `cleanup.sh` no longer kills the page or a replay it started — see
+[docs/troubleshooting.md](docs/troubleshooting.md#what-cleanupsh-leaves-alone).
+Copy the command instead.
 
 The Results panel lists typed artifacts and run outputs, and can rename them.
 Rename is refused where the directory name is load-bearing — a sweep's config

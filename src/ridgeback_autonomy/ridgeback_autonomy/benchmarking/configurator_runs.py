@@ -269,17 +269,16 @@ class RunSupervisor:
     def ensure_startable(profile: str) -> None:
         """Refuse the profiles this page cannot own, before anything is written.
 
-        A live sweep needs a GPU-backed X session and runs ``cleanup.sh`` before
-        Gazebo starts, and that catch-all currently matches the configurator's
-        own command line -- so a sweep launched from here would kill this page
-        mid-click.
+        A live sweep needs a GPU-backed X session, and this page does not yet
+        detect conflicting runs or supervise a live run's progress and
+        cancellation. Preflight ``cleanup.sh`` no longer kills the page.
         """
 
         if profile == PROFILE_LIVE_SYSTEM:
             raise ConfiguratorError(
                 'profile', 'live_run_unsupported',
                 'A live sweep still starts from a terminal: it needs a GPU-backed '
-                'X session, and its preflight cleanup would kill this page.')
+                'X session, and this page cannot yet supervise a live run.')
 
     def start(self, job) -> dict:
         self.ensure_startable(job.profile)
