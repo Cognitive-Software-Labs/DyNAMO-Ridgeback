@@ -689,8 +689,9 @@ Then, on Intel, choose one variant per stream. Encoder parameters set with
 ```bash
 tools/intel_thor/sensor_latency_run --namespace r100_0160 --color-transport ffmpeg --depth-transport zstd
 tools/intel_thor/sensor_latency_run --namespace r100_0160 --color-transport compressed --depth-transport compressedDepth --camera-param .camera_0.aligned_depth_to_color.image_raw.compressedDepth.format=rvl
-``` The deployment runs at 30 Hz;
-reduced-rate runs are not a tuning option. Compression and host tuning are
+```
+
+The deployment runs at 30 Hz; reduced-rate runs are not a tuning option. Compression and host tuning are
 selected only after the measured baseline and raw transport candidates.
 
 ### Intel-Thor link setup and pre-deploy check
