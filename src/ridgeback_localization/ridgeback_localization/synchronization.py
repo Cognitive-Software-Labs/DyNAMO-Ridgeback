@@ -12,16 +12,19 @@ from sensor_msgs.msg import Image
 from ridgeback_common.stamps import stamp_key
 from ridgeback_localization.core.timing import TimingStats
 
-# ~0.5 s of color frames at 30 fps -- comfortably above the detector's
-# publish latency, so the exact-stamp lookup only misses when the pipeline is
-# genuinely stalled. The margin widens, never narrows, as the detector rate
-# rises: a faster detector reaches each frame sooner after it is buffered.
-COLOR_BUFFER_DEPTH_DEFAULT = 15
+# 1.5 s of color frames at 30 fps. A frame must survive detector latency plus
+# the time the mask worker spends on the previous batch: on r100_0160's Thor
+# (2026-10-16) detections arrived ~0.37 s after capture and SlimSAM took ~0.5 s
+# per mask, so a frame could be ~0.9 s old when looked up, and the former 0.5 s
+# buffer dropped 45-49 % of silhouette measurements as NO_COLOR_FRAME. At
+# 640x480 rgb8 the buffer holds about 41 MB.
+COLOR_BUFFER_DEPTH_DEFAULT = 45
 
-# Depth input and scans are buffered across detector latency plus jitter. Depth
-# shares the color stamp and is exact-matched; the scan free-runs at ~40 Hz and
-# is matched to the nearest stamp inside the tolerance.
-DEPTH_MATCH_BUFFER_DEPTH = 15
+# Depth input and scans are buffered across the same detector latency plus
+# worker time. Depth shares the color stamp and is exact-matched, so it needs
+# the same depth as the color buffer; the scan free-runs at ~40 Hz and is
+# matched to the nearest stamp inside the tolerance.
+DEPTH_MATCH_BUFFER_DEPTH = 45
 SCAN_MATCH_BUFFER_DEPTH = 20
 SCAN_MATCH_TOLERANCE_S_DEFAULT = 0.05
 DEPTH_MATCH_RECORD_LIMIT = 256
