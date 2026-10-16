@@ -1849,3 +1849,12 @@ def test_raised_min_valid_pixels_blames_the_floor_not_the_rect_recipe() -> None:
 
     assert batch.detections[0].projective_ranging_status == int(
         MissReason.TOO_FEW_VALID_PIXELS)
+
+
+def test_frame_buffers_outlast_detection_latency_plus_a_segmentation_batch():
+    # r100_0160 Thor, 2026-10-16: detections ~0.37 s after capture and ~0.5 s of
+    # SlimSAM per mask, so a silhouette frame can be ~0.9 s old when looked up.
+    from ridgeback_localization.synchronization import (
+        COLOR_BUFFER_DEPTH_DEFAULT, DEPTH_MATCH_BUFFER_DEPTH)
+    for depth in (COLOR_BUFFER_DEPTH_DEFAULT, DEPTH_MATCH_BUFFER_DEPTH):
+        assert depth / 30.0 >= 0.37 + 0.5 + 0.3

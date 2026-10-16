@@ -92,8 +92,10 @@ Consequences the wiring honors:
 - **Stamp-matched RGB, no gate fallback.** Segmentation needs the exact color
   frame the detections were made on. The detections message inherits the color
   frame's header, so the node (silhouette mode only) buffers recent color
-  frames in a stamp-keyed deque (`color_buffer_depth`, default 15 ≈ 0.5 s at
-  30 fps) and looks the frame up by exact stamp. A miss skips the frame's
+  frames in a stamp-keyed deque (`color_buffer_depth`, default 45 ≈ 1.5 s at
+  30 fps; 0.5 s aged out 45–49 % of silhouette frames on the Thor, where
+  detection latency plus ~0.5 s of SlimSAM per mask reaches ~0.9 s) and looks
+  the frame up by exact stamp. A miss skips the frame's
   paths — same convention as a missing depth frame
   or scan, never a downgrade to rect.
 - **The worker survives segmenter exceptions** per frame (the
