@@ -1,0 +1,259 @@
+#!/usr/bin/env python3
+"""Stationary camera-LiDAR alignment check: project a scan into the colour image.
+
+Usage (ROS sourced, robot graph reachable, base stationary):
+  tools/camera_lidar_overlay --output artifacts/hardware/<run>/near [--frames 5] [--scan front]
+
+For each captured colour frame it takes the scan nearest in time, looks up the
+LiDAR->colour-optical transform from TF at the image stamp, and projects the
+scan with the same functions polar profiling uses (``scan_points_optical`` and
+``project_scan_to_image``). It writes, per frame:
+
+- ``overlay_NN.png``: the colour image with projected beams coloured by range;
+- ``overlay_NN.json``: the beams' indices, ranges, pixels and optical depth,
+  and the aligned-depth residual at each beam's pixel.
+
+The residual is ``aligned depth at (u, v) - LiDAR optical Z``. Where a beam hits
+the same surface the camera sees at that pixel it is near zero, so its median
+and inlier fraction summarise the alignment over the whole scene. ``yaw_sweep``
+repeats that after rotating the scan about the camera's vertical axis; a best
+yaw well away from zero suggests a sideways extrinsic error. It is a stationary
+integration check for these placements, not a calibration. No commands are
+sent; the tool only subscribes, and exits after the requested frames.
+"""
+
+import argparse
+import json
+import math
+from pathlib import Path
+import sys
+import time
+
+import numpy as np
+import yaml
+
+REPO = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO / 'src/ridgeback_common'))
+sys.path.insert(0, str(REPO / 'src/ridgeback_localization'))
+from ridgeback_localization.core.intrinsics import intrinsics_from_camera_info  # noqa: E402
+from ridgeback_localization.core.polar_profiling import (  # noqa: E402
+    project_scan_to_image, scan_points_optical)
+
+ROBOT_YAML = Path('/etc/clearpath/robot.yaml')
+SCAN_TOPICS = {'front': 'sensors/lidar2d_0/scan', 'rear': 'sensors/lidar2d_1/scan'}
+COLOR_TOPIC = 'sensors/camera_0/color/image'
+INFO_TOPIC = 'sensors/camera_0/color/camera_info'
+DEPTH_TOPIC = 'sensors/camera_0/depth/image'
+INLIER_M = 0.05
+MAX_SCAN_SKEW_S = 0.05
+YAW_SWEEP_DEG = np.round(np.arange(-3.0, 3.01, 0.25), 2)
+
+
+def decode_color(encoding, height, width, step, data):
+    """Return an ``(H, W, 3)`` BGR array from a raw colour image."""
+
+    channels = {'rgb8': 3, 'bgr8': 3, 'rgba8': 4, 'bgra8': 4}.get(encoding)
+    if channels is None:
+        raise ValueError(f'unsupported colour encoding {encoding}')
+    rows = np.frombuffer(bytes(data), dtype=np.uint8).reshape(height, step)
+    image = rows[:, :width * channels].reshape(height, width, channels)[:, :, :3]
+    return image[:, :, ::-1].copy() if encoding.startswith('rgb') else image.copy()
+
+
+def decode_depth_m(encoding, height, width, step, data):
+    """Return an ``(H, W)`` float depth image in metres (0/NaN mean no depth)."""
+
+    if encoding == '16UC1':
+        rows = np.frombuffer(bytes(data), dtype=np.uint16).reshape(height, step // 2)
+        return rows[:, :width].astype(np.float64) / 1000.0
+    if encoding == '32FC1':
+        rows = np.frombuffer(bytes(data), dtype=np.float32).reshape(height, step // 4)
+        return rows[:, :width].astype(np.float64)
+    raise ValueError(f'unsupported depth encoding {encoding}')
+
+
+def yaw_about_optical_y(points, yaw_rad):
+    """Rotate optical-frame points about the camera's vertical (optical +Y) axis.
+
+    Positive yaw turns the scan towards the robot's left (image left), matching
+    a positive base_link yaw: optical +Y points down, so a left turn is a
+    negative rotation about it.
+    """
+
+    c, s = math.cos(-yaw_rad), math.sin(-yaw_rad)
+    rotation = np.array([[c, 0.0, s], [0.0, 1.0, 0.0], [-s, 0.0, c]])
+    return points @ rotation.T
+
+
+def depth_residuals(points_optical, valid, intrinsics, depth_m):
+    """Per in-view beam: ``(beam indices, u, v, lidar Z, aligned depth - lidar Z)``.
+
+    Beams whose pixel has no depth get a NaN residual rather than being dropped,
+    so callers can report depth coverage separately from agreement.
+    """
+
+    projection = project_scan_to_image(points_optical, valid, intrinsics)
+    beams = projection.beam_indices
+    z = points_optical[beams, 2]
+    sampled = depth_m[projection.v_px, projection.u_px]
+    residual = np.where(np.isfinite(sampled) & (sampled > 0.0), sampled - z, np.nan)
+    return beams, projection.u_px, projection.v_px, z, residual
+
+
+def residual_summary(residual, inlier_m=INLIER_M):
+    finite = residual[np.isfinite(residual)]
+    if finite.size == 0:
+        return {'beams': int(residual.size), 'with_depth': 0, 'median_m': None,
+                'inlier_fraction': None}
+    return {'beams': int(residual.size), 'with_depth': int(finite.size),
+            'median_m': round(float(np.median(finite)), 4),
+            'inlier_fraction': round(float(np.mean(np.abs(finite) <= inlier_m)), 4)}
+
+
+def yaw_sweep(points_optical, valid, intrinsics, depth_m, yaws_deg=YAW_SWEEP_DEG):
+    """Inlier fraction for each trial yaw, and the yaw that maximises it."""
+
+    rows = []
+    for yaw in yaws_deg:
+        rotated = yaw_about_optical_y(points_optical, math.radians(float(yaw)))
+        *_, residual = depth_residuals(rotated, valid, intrinsics, depth_m)
+        summary = residual_summary(residual)
+        rows.append({'yaw_deg': float(yaw), 'inlier_fraction': summary['inlier_fraction'],
+                     'with_depth': summary['with_depth']})
+    scored = [row for row in rows if row['inlier_fraction'] is not None]
+    best = max(scored, key=lambda row: (row['inlier_fraction'], -abs(row['yaw_deg'])),
+               default=None)
+    return {'best_yaw_deg': best['yaw_deg'] if best else None, 'rows': rows}
+
+
+def range_colour(range_m, near=0.5, far=6.0):
+    """BGR colour from red (near) to blue (far)."""
+
+    t = min(max((range_m - near) / (far - near), 0.0), 1.0)
+    return (int(255 * t), int(255 * (1.0 - abs(2 * t - 1))), int(255 * (1.0 - t)))
+
+
+def draw_overlay(image_bgr, u_px, v_px, ranges_m, title):
+    import cv2
+
+    out = image_bgr.copy()
+    for u, v, r in zip(u_px, v_px, ranges_m):
+        cv2.circle(out, (int(u), int(v)), 3, range_colour(float(r)), -1)
+    cv2.putText(out, title, (8, 22), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+    cv2.putText(out, title, (8, 22), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 1)
+    return out
+
+
+def default_namespace():
+    if ROBOT_YAML.exists():
+        return yaml.safe_load(ROBOT_YAML.read_text())['system']['ros2']['namespace']
+    return None
+
+
+def stamp_s(header):
+    return header.stamp.sec + header.stamp.nanosec * 1e-9
+
+
+def capture(namespace, scan_name, frames, output, interval_s, timeout_s):
+    import cv2
+    import rclpy
+    from rclpy.qos import qos_profile_sensor_data
+    from rclpy.time import Time
+    from sensor_msgs.msg import CameraInfo, Image, LaserScan
+    from tf2_ros import Buffer, TransformListener
+
+    from ridgeback_common.tf_utils import lookup_transform_components
+
+    rclpy.init()
+    node = rclpy.create_node('camera_lidar_overlay', namespace=namespace, cli_args=[
+        '--ros-args', '-r', '/tf:=tf', '-r', '/tf_static:=tf_static'])
+    tf_buffer = Buffer()
+    TransformListener(tf_buffer, node, spin_thread=False)
+    state = {'info': None, 'scans': [], 'depth': None, 'color': None}
+
+    def on_scan(msg):
+        state['scans'] = (state['scans'] + [msg])[-40:]
+
+    node.create_subscription(LaserScan, SCAN_TOPICS[scan_name], on_scan, qos_profile_sensor_data)
+    node.create_subscription(CameraInfo, INFO_TOPIC,
+                             lambda msg: state.update(info=msg), qos_profile_sensor_data)
+    node.create_subscription(Image, DEPTH_TOPIC,
+                             lambda msg: state.update(depth=msg), qos_profile_sensor_data)
+    node.create_subscription(Image, COLOR_TOPIC,
+                             lambda msg: state.update(color=msg), qos_profile_sensor_data)
+
+    output.mkdir(parents=True, exist_ok=True)
+    results, last_fallback = [], None
+    deadline = time.monotonic() + timeout_s
+    next_capture = time.monotonic() + 2.0  # let TF and the latest scans arrive
+    try:
+        while len(results) < frames and time.monotonic() < deadline:
+            rclpy.spin_once(node, timeout_sec=0.05)
+            color, depth, info = state['color'], state['depth'], state['info']
+            if time.monotonic() < next_capture or None in (color, depth, info) or not state['scans']:
+                continue
+            if depth.header.stamp != color.header.stamp:
+                continue  # wait for the depth frame paired with this colour frame
+            t_image = stamp_s(color.header)
+            scan = min(state['scans'], key=lambda s: abs(stamp_s(s.header) - t_image))
+            skew = stamp_s(scan.header) - t_image
+            if abs(skew) > MAX_SCAN_SKEW_S:
+                continue
+            rotation, translation, last_fallback = lookup_transform_components(
+                tf_buffer, color.header.frame_id, scan.header.frame_id,
+                Time.from_msg(color.header.stamp), node.get_logger(), last_fallback)
+            intrinsics = intrinsics_from_camera_info(info)
+            points, valid = scan_points_optical(scan, rotation, translation)
+            depth_m = decode_depth_m(depth.encoding, depth.height, depth.width, depth.step, depth.data)
+            beams, u, v, z, residual = depth_residuals(points, valid, intrinsics, depth_m)
+            ranges = np.asarray(scan.ranges, dtype=np.float64)[beams]
+            index = len(results)
+            summary = residual_summary(residual)
+            sweep = yaw_sweep(points, valid, intrinsics, depth_m)
+            image = decode_color(color.encoding, color.height, color.width, color.step, color.data)
+            title = (f'{scan_name} scan, {summary["beams"]} beams in view, '
+                     f'inliers {summary["inlier_fraction"]}, best yaw {sweep["best_yaw_deg"]} deg')
+            cv2.imwrite(str(output / f'overlay_{index:02d}.png'), draw_overlay(image, u, v, ranges, title))
+            record = {
+                'image_stamp_s': t_image, 'scan_skew_s': round(skew, 4),
+                'image_frame': color.header.frame_id, 'scan_frame': scan.header.frame_id,
+                'grid': [color.width, color.height], 'translation_m': np.round(translation, 4).tolist(),
+                'summary': summary, 'yaw_sweep': sweep,
+                'beams': [{'beam': int(b), 'range_m': round(float(r), 4), 'u': int(uu), 'v': int(vv),
+                           'lidar_z_m': round(float(zz), 4),
+                           'residual_m': None if not np.isfinite(e) else round(float(e), 4)}
+                          for b, r, uu, vv, zz, e in zip(beams, ranges, u, v, z, residual)],
+            }
+            (output / f'overlay_{index:02d}.json').write_text(json.dumps(record, indent=1))
+            results.append({'frame': index, 'summary': summary, 'best_yaw_deg': sweep['best_yaw_deg'],
+                            'scan_skew_s': round(skew, 4)})
+            print(f'frame {index}: {json.dumps(results[-1])}', flush=True)
+            next_capture = time.monotonic() + interval_s
+    finally:
+        node.destroy_node()
+        rclpy.shutdown()
+    return results
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__.split('\n\n')[0])
+    parser.add_argument('--output', type=Path, required=True)
+    parser.add_argument('--namespace')
+    parser.add_argument('--scan', choices=sorted(SCAN_TOPICS), default='front')
+    parser.add_argument('--frames', type=int, default=5)
+    parser.add_argument('--interval', type=float, default=1.0, help='seconds between captures')
+    parser.add_argument('--timeout', type=float, default=60.0)
+    args = parser.parse_args()
+    namespace = (args.namespace or default_namespace() or '').strip('/')
+    if not namespace:
+        parser.error('--namespace is required')
+    results = capture(namespace, args.scan, args.frames, args.output, args.interval, args.timeout)
+    (args.output / 'summary.json').write_text(json.dumps(results, indent=1))
+    if len(results) < args.frames:
+        print(f'captured {len(results)} of {args.frames} frames before the timeout', file=sys.stderr)
+        return 1
+    return 0
+
+
+if __name__ == '__main__':
+    sys.exit(main())

@@ -308,13 +308,17 @@ its actuation, stop, timeout, and e-stop tests remain open.
 ## Stationary camera–LiDAR alignment
 
 Start with a practical alignment check using live camera calibration and the
-configured transforms, informed by the mount readings above. A full extrinsic
+configured transforms, informed by the mount readings above. The
+[camera and alignment session](PHYSICAL_camera_alignment_session.md) schedules
+it with its limits declared in advance. A full extrinsic
 calibration session is a follow-up if the check exposes a problem, not a
 prerequisite for collecting useful camera and LiDAR data.
 
 1. Put an upright box/board in view of both the camera and the front scan plane.
-   The agent overlays the projected scan points on the image. Use a near,
-   farther, and off-centre placement; the base stays still.
+   The agent overlays the projected scan points on the image with
+   `tools/camera_lidar_overlay`, which uses polar profiling's own projection
+   and also reports each beam's aligned-depth residual and a ±3° yaw sweep.
+   Use a near, farther, and off-centre placement; the base stays still.
 2. Check whether points on the board/box land on that object in the image.
    Save the overlays and describe any consistent vertical/sideways mismatch.
    Distinguish a target outside the camera/scan overlap from bad projection.

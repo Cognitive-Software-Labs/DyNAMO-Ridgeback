@@ -84,6 +84,7 @@ troubleshooting, planning, and historical documentation.
   - [Intel–Thor sensor latency tools](physical/intel_thor_sensor_latency.md) — report components, clock bounds and interleaved qualification
   - [PHYSICAL — Thor perception environment and first live localization](plans/PHYSICAL_thor_perception_environment.md) — verified GPU inference environment on Thor, the localization build there, and one stationary live run
 - [PHYSICAL — Robot measurements and stationary sensor validation](plans/PHYSICAL_robot_measurements_and_validation.md) — quick mount readings/photos, D455 and LiDAR checks, stationary alignment, and G1/person tests
+  - [PHYSICAL — Camera and alignment robot session](plans/PHYSICAL_camera_alignment_session.md) — ordered blocks, commands and pre-declared limits for the alignment overlay, off-centre and HD person checks, and estimator modes
   - Handoff: [D455 camera runs (agent 1)](plans/handoffs/PHYSICAL_d455_camera_runs_agent1.md) — P1/P2 results, CycloneDDS camera-transport and LiDAR-lockout findings, next steps
 
 Dated handoff snapshots live in [plans/handoffs/](plans/handoffs/README.md).
