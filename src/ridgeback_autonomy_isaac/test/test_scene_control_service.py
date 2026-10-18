@@ -108,8 +108,10 @@ def node(ros):
 @pytest.fixture
 def client(provider, node):
     service, _loop = provider
+    # The provider runs without a simulation loop publishing /clock; these
+    # cases test its services, not the benchmark's readiness gate.
     client = create_scene_control_client(
-        node, service.service_namespace,
+        node, service.service_namespace, observe_clock=False,
         ready_timeout_sec=3.0, delete_timeout_sec=3.0, retry_sleep_sec=0.05)
     client.wait_for_services(WAIT_SEC)
     client.require_capabilities(['usd'])
@@ -147,7 +149,8 @@ def yaw_of(pose) -> float:
 
 def test_service_names_and_advertised_capabilities(provider, node) -> None:
     service, _loop = provider
-    client = create_scene_control_client(node, service.service_namespace)
+    client = create_scene_control_client(
+        node, service.service_namespace, observe_clock=False)
     client.wait_for_services(WAIT_SEC)
 
     capabilities = client.require_capabilities(['usd'])

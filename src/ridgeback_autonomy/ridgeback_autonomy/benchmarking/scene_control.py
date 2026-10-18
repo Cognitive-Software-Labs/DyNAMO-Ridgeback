@@ -10,6 +10,13 @@ bounded calls, normalized result codes, one coherent state snapshot per truth
 calculation, readiness after spawn, verified absence after delete, reverse
 rollback, and the ownership rule that confines every mutation to
 benchmark-named entities.
+
+Services appearing is not readiness. A provider may answer its services while
+the simulation has not yet stepped -- a renderer compiling shaders, say -- and
+one that runs scene operations on its simulation loop then queues them and
+withdraws them unanswered. The client therefore refuses every scene operation
+until ``/clock`` has been seen advancing, so nothing is ever sent to a stalled
+simulation, and a readiness timeout leaves no request behind to run later.
 """
 
 from __future__ import annotations
@@ -23,6 +30,8 @@ import time
 from typing import Any, Protocol
 
 import rclpy
+from rclpy.qos import QoSProfile, ReliabilityPolicy
+from rosgraph_msgs.msg import Clock
 from simulation_interfaces.msg import Result, SimulatorFeatures
 from simulation_interfaces.srv import (
     DeleteEntity,
@@ -42,6 +51,8 @@ from ridgeback_autonomy.benchmarking.simulation import normalize_pose
 # reach by construction.
 BENCHMARK_ENTITY_PREFIX = 'bench_'
 WORLD_FRAME_ID = 'world'
+# Global by ROS convention; every simulator publishes its time here.
+CLOCK_TOPIC = '/clock'
 
 # Default budgets are the benchmark's established command, pose-wait, and
 # delete windows.
@@ -62,6 +73,10 @@ SERVICE_TYPES = {
     'get_entities': GetEntities,
     'get_entities_states': GetEntitiesStates,
 }
+
+# Every operation on the simulated scene. Only feature discovery, which reads
+# no simulation state, may be answered before the simulation clock advances.
+SCENE_OPERATION_SERVICES = frozenset(SERVICE_TYPES) - {'get_simulator_features'}
 
 REQUIRED_FEATURES = {
     SimulatorFeatures.SPAWNING: 'SPAWNING',
@@ -158,6 +173,47 @@ class ServiceClient(Protocol):
     def call_async(self, request: Any) -> ServiceFuture: ...
 
     def remove_pending_request(self, future: ServiceFuture) -> None: ...
+
+
+class SimulationClockObserver:
+    """Simulation time as published on ``/clock``.
+
+    The clock counts as advancing once a stamp later than the first one seen
+    arrives; a simulation that publishes one stamp and then stalls never
+    passes. Wall times are recorded so a run can show how long the simulator
+    took to start stepping after its services appeared.
+    """
+
+    def __init__(self, wall_clock: Callable[[], float] = time.time) -> None:
+        self._wall_clock = wall_clock
+        self.messages = 0
+        self.first_stamp_ns: int | None = None
+        self.first_message_wall: float | None = None
+        self.latest_stamp_ns: int | None = None
+        self.advanced_stamp_ns: int | None = None
+        self.advanced_wall: float | None = None
+
+    @property
+    def advanced(self) -> bool:
+        return self.advanced_stamp_ns is not None
+
+    def observe(self, stamp_ns: int) -> None:
+        stamp_ns = int(stamp_ns)
+        self.messages += 1
+        if self.first_stamp_ns is None:
+            self.first_stamp_ns = stamp_ns
+            self.first_message_wall = self._wall_clock()
+        elif self.advanced_stamp_ns is None and stamp_ns > self.first_stamp_ns:
+            self.advanced_stamp_ns = stamp_ns
+            self.advanced_wall = self._wall_clock()
+        self.latest_stamp_ns = stamp_ns
+
+    def on_clock_message(self, message: Clock) -> None:
+        self.observe(int(message.clock.sec) * 1_000_000_000 + int(message.clock.nanosec))
+
+
+def _seconds(stamp_ns: int | None) -> float | None:
+    return None if stamp_ns is None else stamp_ns / 1_000_000_000.0
 
 
 @dataclass(frozen=True)
@@ -312,6 +368,8 @@ class SceneControlClient:
         retry_sleep_sec: float = RETRY_SLEEP_SEC,
         world_frame: str = WORLD_FRAME_ID,
         clock: Callable[[], float] = time.monotonic,
+        simulation_clock: SimulationClockObserver | None = None,
+        wall_clock: Callable[[], float] = time.time,
     ) -> None:
         missing = sorted(set(SERVICE_TYPES) - set(clients))
         if missing:
@@ -326,10 +384,46 @@ class SceneControlClient:
         self._world_frame = world_frame
         self._clock = clock
         self._capabilities: SimulatorCapabilities | None = None
+        # Without an observed clock (in-memory providers) nothing is gated.
+        self._simulation_clock = simulation_clock
+        self._clock_ready = simulation_clock is None
+        self._wall_clock = wall_clock
+        self._services_available_wall: float | None = None
+        self._first_spawn_requested_wall: float | None = None
 
     @property
     def capabilities(self) -> SimulatorCapabilities | None:
         return self._capabilities
+
+    def readiness_timeline(self) -> dict[str, Any]:
+        """When the services appeared, the clock advanced, and the first spawn left.
+
+        Recorded with every run so a long simulator start (a cold shader cache,
+        say) reads as a late clock rather than as a slow or failed provider.
+        """
+
+        observer = self._simulation_clock
+        services = self._services_available_wall
+        advanced = observer.advanced_wall if observer is not None else None
+        spawn = self._first_spawn_requested_wall
+
+        def delay(start: float | None, end: float | None) -> float | None:
+            return None if start is None or end is None else end - start
+
+        return {
+            'services_available_wall': services,
+            'clock_observed': observer is not None,
+            'clock_first_message_wall': (
+                observer.first_message_wall if observer is not None else None),
+            'clock_first_message_sim_sec': _seconds(
+                observer.first_stamp_ns if observer is not None else None),
+            'clock_advanced_wall': advanced,
+            'clock_advanced_sim_sec': _seconds(
+                observer.advanced_stamp_ns if observer is not None else None),
+            'first_spawn_requested_wall': spawn,
+            'clock_advance_after_services_sec': delay(services, advanced),
+            'first_spawn_after_clock_advance_sec': delay(advanced, spawn),
+        }
 
     def wait_for_services(self, timeout_sec: float) -> None:
         """Fail unless every standard service appears within one shared budget."""
@@ -346,6 +440,38 @@ class SceneControlClient:
                 'discover scene-control services',
                 f'not available within {timeout_sec:.1f} s: {", ".join(missing)}',
             )
+        if self._services_available_wall is None:
+            self._services_available_wall = self._wall_clock()
+
+    def wait_for_advancing_clock(self, timeout_sec: float) -> SimulationClockObserver:
+        """Block until ``/clock`` advances; until then no scene operation is sent.
+
+        Waiting dispatches nothing, so a timeout leaves no queued request that
+        a simulator could still run once it starts stepping; later scene
+        operations stay refused.
+        """
+
+        observer = self._simulation_clock
+        if observer is None:
+            raise ValueError('This scene-control client does not observe a simulation clock.')
+        deadline = self._clock() + timeout_sec
+        while not observer.advanced:
+            remaining = deadline - self._clock()
+            if remaining <= 0.0:
+                if observer.first_stamp_ns is None:
+                    detail = f'no {CLOCK_TOPIC} message within {timeout_sec:.1f} s'
+                else:
+                    detail = (
+                        f'{CLOCK_TOPIC} stayed at {_seconds(observer.latest_stamp_ns):.3f} s '
+                        f'across {observer.messages} message(s) for {timeout_sec:.1f} s')
+                raise SceneControlError(
+                    SceneControlFailure.TIMEOUT,
+                    'wait for the simulation clock to advance',
+                    f'{detail}; no scene operation was sent',
+                )
+            self._spin_once(min(remaining, SPIN_SLICE_SEC))
+        self._clock_ready = True
+        return observer
 
     def require_capabilities(
         self,
@@ -387,6 +513,7 @@ class SceneControlClient:
 
         operation = 'spawn entity'
         _require_benchmark_entity(spec.name, operation)
+        self._require_advancing_clock(operation, spec.name)
         resource_format = spec.resource_format.strip().lower()
         if (self._capabilities is not None
                 and resource_format not in self._capabilities.spawn_formats):
@@ -413,6 +540,8 @@ class SceneControlClient:
             request.initial_pose.pose.orientation.w,
         ) = _quaternion_from_yaw(float(spec.yaw))
 
+        if self._first_spawn_requested_wall is None:
+            self._first_spawn_requested_wall = self._wall_clock()
         try:
             response = self._call('spawn_entity', request, operation, spec.name)
         except SceneControlError as exc:
@@ -599,6 +728,7 @@ class SceneControlClient:
 
         operation = 'delete entity'
         _require_benchmark_entity(name, operation)
+        self._require_advancing_clock(operation, name)
         deadline = self._clock() + self._delete_timeout_sec
         deleted = False
         last_error: SceneControlError | None = None
@@ -660,6 +790,17 @@ class SceneControlClient:
         _check_result(response.result, operation)
         return [str(name) for name in response.entities]
 
+    def _require_advancing_clock(self, operation: str, entity: str | None = None) -> None:
+        if self._clock_ready:
+            return
+        raise SceneControlError(
+            SceneControlFailure.INCORRECT_STATE,
+            operation,
+            f'the simulation clock has not been seen advancing on {CLOCK_TOPIC}; '
+            'scene operations wait for it',
+            entity=entity,
+        )
+
     def _call(
         self,
         suffix: str,
@@ -667,6 +808,8 @@ class SceneControlClient:
         operation: str,
         entity: str | None = None,
     ) -> Any:
+        if suffix in SCENE_OPERATION_SERVICES:
+            self._require_advancing_clock(operation, entity)
         client = self._clients[suffix]
         future = client.call_async(request)
         deadline = self._clock() + self._call_timeout_sec
@@ -716,13 +859,17 @@ def create_scene_control_client(
     service_namespace: str,
     *,
     spin_once: Callable[[float], None] | None = None,
+    observe_clock: bool = True,
     **options: Any,
 ) -> SceneControlClient:
     """Build a client for the provider serving ``service_namespace``.
 
     The namespace is supplied by whoever selected the simulator; this module
     never chooses or derives it. ``spin_once`` defaults to spinning ``node``
-    alone.
+    alone. The client subscribes to ``/clock`` on ``node`` and refuses scene
+    operations until :meth:`SceneControlClient.wait_for_advancing_clock` has
+    seen it advance. ``observe_clock=False`` is only for exercising a provider
+    on its own, where nothing publishes simulation time.
     """
 
     names = scene_control_service_names(service_namespace)
@@ -730,7 +877,18 @@ def create_scene_control_client(
         suffix: node.create_client(SERVICE_TYPES[suffix], name)
         for suffix, name in names.items()
     }
+    observer = None
+    if observe_clock:
+        observer = SimulationClockObserver()
+        # Best effort accepts both reliable and best-effort publishers.
+        node.create_subscription(
+            Clock,
+            CLOCK_TOPIC,
+            observer.on_clock_message,
+            QoSProfile(depth=10, reliability=ReliabilityPolicy.BEST_EFFORT),
+        )
     if spin_once is None:
         def spin_once(timeout_sec: float) -> None:
             rclpy.spin_once(node, timeout_sec=timeout_sec)
-    return SceneControlClient(clients, spin_once, service_names=names, **options)
+    return SceneControlClient(
+        clients, spin_once, service_names=names, simulation_clock=observer, **options)

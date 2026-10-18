@@ -21,6 +21,15 @@ from ridgeback_autonomy.localization_launch import (
     SHARED_BENCHMARK_ARGUMENT_DEFAULTS,
     workspace_root_from_package_share,
 )
+from ridgeback_autonomy.benchmarking.asset_catalog import (
+    DEFAULT_TARGET,
+    scene_object_models,
+)
+from ridgeback_autonomy.benchmarking.backends import (
+    BenchmarkEnvironment,
+    resolve_benchmark_environment,
+    simulator_provenance,
+)
 from ridgeback_autonomy.benchmarking.process_utils import (
     git_provenance,
     gl_renderer_provenance,
@@ -37,6 +46,7 @@ from ridgeback_autonomy.benchmarking.paths import (
     default_output_directory,
     subprocess_log_environment,
 )
+from ridgeback_autonomy.benchmarking.scenarios import load_scenarios
 from ridgeback_autonomy.benchmarking.sweep import (
     ENVIRONMENT_ONLY_DEFAULT_NAMES,
     TRIAL_WALL_TIME_SEC,
@@ -50,7 +60,6 @@ from ridgeback_autonomy.benchmarking.sweep_report import load_json, write_sweep_
 
 COMMAND_TIMEOUT_SEC = 10.0
 ENV_SCENE_CONTROL_WAIT_TIMEOUT_SEC = 300.0
-SCENE_CONTROL_SERVICE_NAMESPACE = '/gzserver'
 RTF_SAMPLE_WINDOW_SEC = 2.0
 PROCESS_POLL_SEC = 1.0
 PROCESS_INT_GRACE_SEC = 20.0
@@ -114,7 +123,16 @@ def _format_hours(seconds: float) -> str:
     return f'{seconds / 3600.0:.2f} h'
 
 
-def print_dry_run(configs: tuple[SweepConfig, ...], default_scenario_path: str) -> None:
+def print_dry_run(
+    configs: tuple[SweepConfig, ...],
+    default_scenario_path: str,
+    environment: BenchmarkEnvironment,
+) -> None:
+    print(
+        f'Backend {environment.backend.name}: world "{environment.public_world}" '
+        f'runs as "{environment.native_world}"; asset catalog '
+        f'{environment.catalog.path} (sha256 {environment.catalog.sha256}); '
+        f'settings {_format_settings(environment.settings)}.\n')
     rows = []
     total_seconds = 0.0
     for config in configs:
@@ -141,11 +159,62 @@ def print_dry_run(configs: tuple[SweepConfig, ...], default_scenario_path: str) 
         print(f'\nWARNING: {warning}')
 
 
+def _format_settings(settings: dict[str, str]) -> str:
+    return ', '.join(f'{name}={value}' for name, value in settings.items()) or 'none'
+
+
+def resolve_sweep_environment(
+    spec: SweepSpec,
+    configs: tuple[SweepConfig, ...],
+    default_scenario_path: str,
+    *,
+    package_share=None,
+) -> BenchmarkEnvironment:
+    """The sweep's one environment, checked against every selected scenario.
+
+    Resolved before anything launches -- including for a dry run -- so a
+    world or asset the selected simulator's catalog lacks is reported up front
+    instead of as a failed configuration hours in.
+    """
+
+    environment = resolve_benchmark_environment(
+        spec.backend,
+        _shared_arguments(spec)['world'],
+        spec.backend_settings,
+        package_share=package_share,
+        owner=f'Sweep file {spec.source} field "defaults"',
+    )
+    for config in configs:
+        scenario = config.arguments.get('scenario', '').strip() or default_scenario_path
+        try:
+            environment.catalog.select(
+                environment.public_world,
+                DEFAULT_TARGET,
+                scene_object_models(load_scenarios(scenario)),
+            )
+        except ValueError as exc:
+            raise ValueError(f'Sweep config "{config.name}": {exc}') from exc
+    return environment
+
+
 def _shared_arguments(spec: SweepSpec) -> dict[str, str]:
     return {
         name: spec.defaults.get(name, default)
         for name, default in SHARED_BENCHMARK_ARGUMENT_DEFAULTS.items()
     }
+
+
+def _environment_arguments(spec: SweepSpec) -> dict[str, str]:
+    """Everything the persistent layer is started with, backend settings explicit."""
+
+    arguments = _shared_arguments(spec)
+    # Sorted so the recorded command is byte-identical between runs of the
+    # same sweep; a frozenset's iteration order is not stable across processes.
+    for name in sorted(ENVIRONMENT_ONLY_DEFAULT_NAMES | {'target_labels'}):
+        if name in spec.defaults:
+            arguments[name] = spec.defaults[name]
+    arguments.update(spec.backend_settings)
+    return arguments
 
 
 def _resolved_arguments(
@@ -155,6 +224,8 @@ def _resolved_arguments(
 ) -> dict[str, str]:
     arguments = dict(config.arguments)
     arguments.update(_shared_arguments(spec))
+    # Recorded by the config runner; the environment applied them.
+    arguments.update(spec.backend_settings)
     arguments['output_dir'] = sweep_dir
     arguments['run_dir_name'] = config.name
     arguments['shutdown_on_complete'] = 'true'
@@ -170,20 +241,14 @@ def _launch_argument_tokens(arguments: dict[str, str]) -> list[str]:
 
 
 def _environment_command(spec: SweepSpec) -> list[str]:
-    arguments = _shared_arguments(spec)
-    # Sorted so the recorded command is byte-identical between runs of the
-    # same sweep; a frozenset's iteration order is not stable across processes.
-    for name in sorted(ENVIRONMENT_ONLY_DEFAULT_NAMES | {'target_labels'}):
-        if name in spec.defaults:
-            arguments[name] = spec.defaults[name]
     return [
         'ros2', 'launch', 'ridgeback_autonomy', 'target_benchmark_env.launch.py',
-        *_launch_argument_tokens(arguments),
+        *_launch_argument_tokens(_environment_arguments(spec)),
     ]
 
 
 def run_preflight_cleanup(workspace_root: str) -> None:
-    """Clear stale ROS/Gazebo processes once before starting a sweep."""
+    """Clear stale ROS/simulator processes once before starting a sweep."""
 
     cleanup_script = os.path.join(workspace_root, 'cleanup.sh')
     if not os.path.isfile(cleanup_script):
@@ -220,17 +285,23 @@ def _valid_run_document(path: str) -> dict | None:
     return document
 
 
-def _resume_signature(spec: SweepSpec, configs: tuple[SweepConfig, ...]) -> dict:
-    """Stable sweep inputs, excluding supervisor-owned output/lifecycle args."""
+def _resume_signature(
+    spec: SweepSpec,
+    configs: tuple[SweepConfig, ...],
+    environment: BenchmarkEnvironment,
+) -> dict:
+    """Stable sweep inputs, excluding supervisor-owned output/lifecycle args.
+
+    The simulation part pins the resolved native world and the exact catalog
+    bytes as well as the normalized backend settings, so a sweep never resumes
+    under another simulator, world, depth mode, or asset catalog.
+    """
 
     ignored = {'output_dir', 'run_dir_name', 'shutdown_on_complete'}
-    environment = _shared_arguments(spec)
-    for name in sorted(ENVIRONMENT_ONLY_DEFAULT_NAMES | {'target_labels'}):
-        if name in spec.defaults:
-            environment[name] = spec.defaults[name]
     return {
         'sweep_source_sha256': _file_sha256(spec.source),
-        'environment': environment,
+        'environment': _environment_arguments(spec),
+        'simulation': environment.signature(),
         'configs': {
             config.name: {
                 **{
@@ -249,6 +320,7 @@ def _find_resumable_sweep(
     output_root: str,
     spec: SweepSpec,
     configs: tuple[SweepConfig, ...],
+    environment: BenchmarkEnvironment,
 ) -> str | None:
     if not os.path.isdir(output_root):
         return None
@@ -268,7 +340,7 @@ def _find_resumable_sweep(
             continue
         if manifest.get('selected_configs') != expected_names:
             continue
-        if manifest.get('resume_signature') != _resume_signature(spec, configs):
+        if manifest.get('resume_signature') != _resume_signature(spec, configs, environment):
             continue
         if sweep.get('status') == 'complete':
             continue
@@ -276,11 +348,19 @@ def _find_resumable_sweep(
     return max(candidates) if candidates else None
 
 
+def _simulation_manifest(environment: BenchmarkEnvironment) -> dict:
+    return {
+        **environment.provenance(),
+        **simulator_provenance(environment.backend),
+    }
+
+
 def _new_manifest(
     spec: SweepSpec,
     configs: tuple[SweepConfig, ...],
     sweep_dir: str,
     workspace_root: str,
+    environment: BenchmarkEnvironment,
 ) -> dict:
     return {
         'version': MANIFEST_VERSION,
@@ -298,9 +378,11 @@ def _new_manifest(
         # run that produced a fraction of its configured sensor rate is
         # indistinguishable, after the fact, from a healthy one.
         'gl': gl_renderer_provenance(),
+        'simulation': _simulation_manifest(environment),
+        'environment_readiness': None,
         'defaults': dict(spec.defaults),
         'selected_configs': [config.name for config in configs],
-        'resume_signature': _resume_signature(spec, configs),
+        'resume_signature': _resume_signature(spec, configs, environment),
         'configs': [
             {
                 'name': config.name,
@@ -323,6 +405,7 @@ def _resume_manifest(
     spec: SweepSpec,
     configs: tuple[SweepConfig, ...],
     sweep_dir: str,
+    environment: BenchmarkEnvironment,
 ) -> dict:
     existing = {entry.get('name'): entry for entry in manifest.get('configs', [])}
     entries = []
@@ -341,7 +424,9 @@ def _resume_manifest(
     manifest['configs'] = entries
     manifest['defaults'] = dict(spec.defaults)
     manifest['selected_configs'] = [config.name for config in configs]
-    manifest['resume_signature'] = _resume_signature(spec, configs)
+    manifest['resume_signature'] = _resume_signature(spec, configs, environment)
+    manifest['simulation'] = _simulation_manifest(environment)
+    manifest['environment_readiness'] = None
     manifest.setdefault('sweep', {})['status'] = 'running'
     manifest['sweep']['finished'] = None
     manifest['resume_count'] = int(manifest.get('resume_count', 0)) + 1
@@ -519,6 +604,7 @@ def run_sweep(
     configs: tuple[SweepConfig, ...],
     *,
     package_share: str,
+    simulation: BenchmarkEnvironment,
     preflight_cleanup: bool = True,
 ) -> tuple[str, bool]:
     workspace_root = workspace_root_from_package_share(package_share)
@@ -527,11 +613,11 @@ def run_sweep(
     output_root = os.path.abspath(os.path.expanduser(output_root))
     os.makedirs(output_root, exist_ok=True)
 
-    sweep_dir = _find_resumable_sweep(output_root, spec, configs)
+    sweep_dir = _find_resumable_sweep(output_root, spec, configs, simulation)
     if sweep_dir is None:
         sweep_dir = os.path.join(output_root, f'{_timestamp()}_{spec.name}')
         os.makedirs(sweep_dir, exist_ok=False)
-        manifest = _new_manifest(spec, configs, sweep_dir, workspace_root)
+        manifest = _new_manifest(spec, configs, sweep_dir, workspace_root, simulation)
         _log(f'Created sweep directory {sweep_dir}')
     else:
         manifest = _resume_manifest(
@@ -539,12 +625,18 @@ def run_sweep(
             spec,
             configs,
             sweep_dir,
+            simulation,
         )
         _log(f'Resuming incomplete sweep {sweep_dir}')
     _write_manifest(sweep_dir, manifest)
     write_sweep_report(sweep_dir, manifest)
 
-    # Last point before Gazebo starts. A software rasterizer does not fail the
+    _log(
+        f'Backend {simulation.backend.name}: world "{simulation.public_world}" '
+        f'runs as "{simulation.native_world}" '
+        f'(settings {_format_settings(simulation.settings)}).')
+
+    # Last point before the simulator starts. A software rasterizer does not fail the
     # run, it quietly reduces every rendered sensor, so say so loudly here as
     # well as recording it in the manifest.
     gl_warning = software_gl_warning(manifest.get('gl') or {})
@@ -560,7 +652,7 @@ def run_sweep(
             run_preflight_cleanup(workspace_root)
         else:
             _log(
-                'Skipping cleanup.sh by operator request; existing ROS/Gazebo '
+                'Skipping cleanup.sh by operator request; existing ROS/simulator '
                 'processes may collide with this sweep.')
         environment = subprocess.Popen(
             _environment_command(spec),
@@ -577,9 +669,19 @@ def run_sweep(
         rclpy.init()
         scene_control_node = rclpy.create_node('target_benchmark_sweep_scene_control')
         scene_control = create_scene_control_client(
-            scene_control_node, SCENE_CONTROL_SERVICE_NAMESPACE)
+            scene_control_node, simulation.backend.scene_control_service_namespace)
         scene_control.wait_for_services(ENV_SCENE_CONTROL_WAIT_TIMEOUT_SEC)
         scene_control.require_capabilities()
+        # Orphan reaping is the first scene operation; it waits until the
+        # simulator is stepping, not merely answering.
+        _log('Scene-control services are available; waiting for the simulation clock.')
+        scene_control.wait_for_advancing_clock(ENV_SCENE_CONTROL_WAIT_TIMEOUT_SEC)
+        manifest['environment_readiness'] = scene_control.readiness_timeline()
+        _log(
+            'Simulation clock advancing '
+            f'{manifest["environment_readiness"]["clock_advance_after_services_sec"]:.3f} s '
+            'after the scene-control services appeared.')
+        _write_manifest(sweep_dir, manifest)
         default_scenario_path = os.path.join(
             package_share, 'config', 'benchmark_scenarios_full.yaml')
 
@@ -695,7 +797,9 @@ def run_sweep(
 
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description='Run benchmark configurations against one Gazebo/RViz environment.')
+        description=(
+            'Run benchmark configurations against one persistent simulator/RViz '
+            'environment.'))
     parser.add_argument('sweep_yaml', nargs='?', help='Sweep YAML to validate and run')
     parser.add_argument('--only', help='Comma-separated configuration names to run')
     parser.add_argument('--dry-run', action='store_true', help='Validate and estimate without launching')
@@ -703,7 +807,7 @@ def _parser() -> argparse.ArgumentParser:
         '--skip-preflight-cleanup',
         action='store_true',
         help=(
-            'Do not run the aggressive same-user ROS/Gazebo cleanup before the '
+            'Do not run the aggressive same-user ROS/simulator cleanup before the '
             'sweep; use only when another session must remain alive'
         ),
     )
@@ -739,13 +843,15 @@ def main(argv: list[str] | None = None) -> int:
             default_scenario_path=default_scenario_path,
         )
         configs = _selected_configs(spec, args.only)
+        environment = resolve_sweep_environment(spec, configs, default_scenario_path)
         if args.dry_run:
-            print_dry_run(configs, default_scenario_path)
+            print_dry_run(configs, default_scenario_path, environment)
             return 0
         sweep_dir, success = run_sweep(
             spec,
             configs,
             package_share=package_share,
+            simulation=environment,
             preflight_cleanup=not args.skip_preflight_cleanup,
         )
     except (OSError, ValueError, RuntimeError) as exc:

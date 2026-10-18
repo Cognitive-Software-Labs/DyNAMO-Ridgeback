@@ -21,11 +21,15 @@ from simulation_interfaces.srv import (
 
 from ridgeback_autonomy.benchmarking.scene_control import (
     BENCHMARK_ENTITY_PREFIX,
+    CLOCK_TOPIC,
+    SCENE_OPERATION_SERVICES,
     SERVICE_TYPES,
     SceneControlClient,
     SceneControlError,
     SceneControlFailure,
+    SimulationClockObserver,
     SpawnSpec,
+    create_scene_control_client,
     posix_ere_literal,
     scene_control_service_names,
 )
@@ -803,3 +807,208 @@ def test_common_modules_never_reach_a_simulator_or_its_command_line() -> None:
                 for name in names if name.split('.')[0] in forbidden)
 
     assert not violations, violations
+
+
+class SteppingSimulation:
+    """Drives a fake executor slice: wall time passes, and /clock may publish.
+
+    ``stamps`` yields the simulation time published on each slice, or ``None``
+    for a slice without a message, standing in for a renderer that has not
+    started stepping yet.
+    """
+
+    def __init__(self, simulator: FakeSimulator, observer: SimulationClockObserver, stamps):
+        self.simulator = simulator
+        self.observer = observer
+        self.stamps = iter(stamps)
+
+    def __call__(self, seconds: float) -> None:
+        self.simulator.clock.advance(seconds)
+        stamp = next(self.stamps, None)
+        if stamp is not None:
+            self.observer.observe(stamp)
+
+
+def make_clocked_client(simulator: FakeSimulator, stamps, **options):
+    observer = SimulationClockObserver(wall_clock=simulator.clock)
+    clients = {suffix: FakeServiceClient(simulator, suffix) for suffix in SERVICE_TYPES}
+    client = SceneControlClient(
+        clients,
+        SteppingSimulation(simulator, observer, stamps),
+        service_names=scene_control_service_names('/sim'),
+        clock=simulator.clock,
+        simulation_clock=observer,
+        wall_clock=simulator.clock,
+        **options,
+    )
+    return client, observer
+
+
+def scene_operation_calls(simulator: FakeSimulator) -> list[str]:
+    return [suffix for suffix, _request in simulator.calls if suffix in SCENE_OPERATION_SERVICES]
+
+
+def test_feature_discovery_is_the_only_call_allowed_before_the_clock_advances(
+    simulator,
+) -> None:
+    client, _observer = make_clocked_client(simulator, [])
+    client.wait_for_services(1.0)
+    client.require_capabilities({'sdf'})
+
+    for attempt in (
+        lambda: client.spawn_entity(spec('bench_target_0')),
+        lambda: client.delete_entity('bench_target_0'),
+        lambda: client.find_benchmark_entities(),
+        lambda: client.get_scene_snapshot([ROBOT]),
+        lambda: client.wait_until_present([ROBOT]),
+    ):
+        with pytest.raises(SceneControlError) as raised:
+            attempt()
+        assert raised.value.failure is SceneControlFailure.INCORRECT_STATE
+        assert CLOCK_TOPIC in raised.value.detail
+
+    assert [suffix for suffix, _request in simulator.calls] == ['get_simulator_features']
+
+
+def test_services_with_a_stalled_clock_never_receive_the_first_spawn(simulator) -> None:
+    # One stamp, then the same stamp again: the clock is published but stalled.
+    stalled = 72_000_000_000
+    client, observer = make_clocked_client(simulator, [stalled] * 1000)
+    client.wait_for_services(1.0)
+
+    with pytest.raises(SceneControlError) as raised:
+        client.wait_for_advancing_clock(5.0)
+
+    assert raised.value.failure is SceneControlFailure.TIMEOUT
+    assert 'stayed at 72.000 s' in raised.value.detail
+    assert 'no scene operation was sent' in raised.value.detail
+    assert simulator.clock.now == pytest.approx(5.0)
+    assert observer.messages > 1 and not observer.advanced
+    with pytest.raises(SceneControlError, match='has not been seen advancing'):
+        client.spawn_entity(spec('bench_target_0'))
+    assert scene_operation_calls(simulator) == []
+    assert 'bench_target_0' not in simulator.entities
+
+
+def test_a_clock_that_never_publishes_times_out_diagnostically(simulator) -> None:
+    client, _observer = make_clocked_client(simulator, [])
+
+    with pytest.raises(SceneControlError, match=r'no /clock message within 2\.0 s'):
+        client.wait_for_advancing_clock(2.0)
+    assert scene_operation_calls(simulator) == []
+
+
+def test_a_readiness_timeout_leaves_no_delayed_operation_behind(simulator) -> None:
+    # The simulator starts stepping only after the gate gave up.
+    stamps = [None] * 12 + [i * 10_000_000 for i in range(1, 100)]
+    client, observer = make_clocked_client(simulator, stamps)
+
+    with pytest.raises(SceneControlError):
+        client.wait_for_advancing_clock(1.0)
+    # Simulation time now runs, but nothing was queued while it was stalled,
+    # so nothing can execute late: the provider has seen no scene operation.
+    for _slice in range(20):
+        client._spin_once(0.1)
+    assert observer.advanced
+    assert scene_operation_calls(simulator) == []
+    assert set(simulator.entities) == set(WORLD_ENTITIES)
+
+
+def test_an_advancing_clock_releases_scene_operations_in_order(simulator) -> None:
+    # Two slices with no message (a cold renderer), then a stalled first stamp,
+    # then simulation time advancing.
+    stamps = [None, None, 5_000_000, 5_000_000, 15_000_000, 25_000_000]
+    client, observer = make_clocked_client(simulator, stamps)
+    client.wait_for_services(1.0)
+    services_at = simulator.clock.now
+
+    advanced = client.wait_for_advancing_clock(5.0)
+    assert advanced is observer
+    assert observer.first_stamp_ns == 5_000_000
+    assert observer.advanced_stamp_ns == 15_000_000
+    client.wait_until_present([ROBOT])
+    with client.scene([spec('bench_target_0')]):
+        pass
+
+    timeline = client.readiness_timeline()
+    assert timeline['clock_observed'] is True
+    assert timeline['services_available_wall'] == services_at
+    assert timeline['clock_first_message_sim_sec'] == pytest.approx(0.005)
+    assert timeline['clock_advanced_sim_sec'] == pytest.approx(0.015)
+    assert (timeline['services_available_wall']
+            < timeline['clock_first_message_wall']
+            < timeline['clock_advanced_wall']
+            <= timeline['first_spawn_requested_wall'])
+    assert timeline['clock_advance_after_services_sec'] > 0.0
+    assert timeline['first_spawn_after_clock_advance_sec'] >= 0.0
+    assert scene_operation_calls(simulator)[0] == 'get_entities_states'
+    assert 'spawn_entity' in scene_operation_calls(simulator)
+
+
+def test_an_in_memory_client_without_an_observed_clock_is_not_gated(simulator) -> None:
+    client, _clients = make_client(simulator)
+
+    assert client.spawn_entity(spec('bench_target_0')) == 'bench_target_0'
+    assert client.readiness_timeline()['clock_observed'] is False
+    with pytest.raises(ValueError, match='does not observe a simulation clock'):
+        client.wait_for_advancing_clock(1.0)
+
+
+def test_a_ros_built_client_subscribes_to_the_simulation_clock_and_is_gated() -> None:
+    from rosgraph_msgs.msg import Clock
+
+    class Node:
+        def __init__(self):
+            self.clients = {}
+            self.subscriptions = []
+
+        def create_client(self, service_type, name):
+            client = SimpleClient()
+            self.clients[name] = (service_type, client)
+            return client
+
+        def create_subscription(self, message_type, topic, callback, qos):
+            self.subscriptions.append((message_type, topic, callback, qos))
+
+    class SimpleClient:
+        def wait_for_service(self, timeout_sec=None):
+            return True
+
+        def call_async(self, request):
+            raise AssertionError('no call may be dispatched in this test')
+
+        def remove_pending_request(self, future):
+            pass
+
+    node = Node()
+    client = create_scene_control_client(node, '/isaac_sim', spin_once=lambda _seconds: None)
+
+    assert sorted(node.clients) == sorted(scene_control_service_names('/isaac_sim').values())
+    [(message_type, topic, callback, _qos)] = node.subscriptions
+    assert (message_type, topic) == (Clock, CLOCK_TOPIC)
+    with pytest.raises(SceneControlError, match='has not been seen advancing'):
+        client.find_benchmark_entities()
+    for seconds in (3, 3, 4):
+        message = Clock()
+        message.clock.sec = seconds
+        callback(message)
+    assert client.wait_for_advancing_clock(0.0).advanced_stamp_ns == 4_000_000_000
+
+
+def test_a_provider_exercised_without_simulation_time_can_opt_out_of_the_gate() -> None:
+    class Node:
+        def __init__(self):
+            self.subscriptions = []
+
+        def create_client(self, _service_type, _name):
+            return object()
+
+        def create_subscription(self, *args):
+            self.subscriptions.append(args)
+
+    node = Node()
+    client = create_scene_control_client(
+        node, '/gzserver', spin_once=lambda _seconds: None, observe_clock=False)
+
+    assert node.subscriptions == []
+    assert client.readiness_timeline()['clock_observed'] is False

@@ -44,6 +44,7 @@ SIMULATION_CAMERA_INPUTS = resolve_camera_inputs(SIMULATION_BACKEND)
 REALSENSE_CAMERA_INPUTS = resolve_camera_inputs(REALSENSE_BACKEND)
 
 SHARED_BENCHMARK_ARGUMENT_DEFAULTS = {
+    'backend': 'gz',
     'namespace': 'r100_0001',
     'use_sim_time': 'true',
     'world': 'target_distance_calibration',
@@ -102,9 +103,27 @@ CONFIG_LAUNCH_ARGUMENT_NAMES = frozenset({
     'base_frame',
     'run_dir_name',
     'shutdown_on_complete',
+    # The simulator and its backend-only settings. Owned by the persistent
+    # environment; the config layer receives them only to find the same
+    # catalog and services and to record what the environment ran.
+    'backend',
+    'gz_gui',
+    'headless_rendering',
+    'headless',
+    'rtf',
+    'sim_mode',
+    'depth_fidelity',
 })
 
 ENV_LAYER_CONFIG_KEYS = frozenset({
+    # One simulator process serves a whole sweep, so the backend and every
+    # setting only it consumes are sweep-wide.
+    'backend',
+    'gz_gui',
+    'headless',
+    'rtf',
+    'sim_mode',
+    'depth_fidelity',
     'world',
     'camera_profile',
     'setup_path',

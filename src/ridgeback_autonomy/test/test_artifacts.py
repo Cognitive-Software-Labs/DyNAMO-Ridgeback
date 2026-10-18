@@ -11,6 +11,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from ridgeback_autonomy.benchmarking.backends import resolve_benchmark_environment
 from ridgeback_autonomy.benchmarking.paths import (
     default_output_directory,
     subprocess_log_environment,
@@ -21,6 +22,16 @@ from ridgeback_autonomy.benchmarking.sweep_report import collect_comparison_rows
 
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
+
+
+def _source_share(package: str) -> str:
+    return str(REPO_ROOT / 'src' / package)
+
+
+def _environment(spec):
+    return resolve_benchmark_environment(
+        spec.backend, 'target_distance_calibration', spec.backend_settings,
+        package_share=_source_share)
 
 
 def test_cleanup_preserves_only_the_reusable_combined_command_gui() -> None:
@@ -160,9 +171,12 @@ def test_sweep_routes_output_and_child_logs_without_changing_commands(tmp_path, 
     monkeypatch.setattr(sweep, 'reap_orphan_benchmark_entities', lambda _: [])
     monkeypatch.setattr(sweep, 'sample_real_time_factor', lambda: 1.0)
     monkeypatch.setattr(sweep, '_wait_for_config', lambda *_: ('success', None))
+    monkeypatch.setattr(sweep, 'simulator_provenance', lambda _backend: {})
     scene_control = SimpleNamespace(
         wait_for_services=lambda _timeout: None,
         require_capabilities=lambda: None,
+        wait_for_advancing_clock=lambda _timeout: None,
+        readiness_timeline=lambda: {'clock_advance_after_services_sec': 0.0},
     )
     monkeypatch.setattr(sweep.rclpy, 'init', lambda: None)
     monkeypatch.setattr(
@@ -173,7 +187,8 @@ def test_sweep_routes_output_and_child_logs_without_changing_commands(tmp_path, 
     monkeypatch.setattr(sweep, 'create_scene_control_client', lambda *_args: scene_control)
     monkeypatch.setenv('RIDGEBACK_WORKSPACE', str(tmp_path))
     share = tmp_path / 'install/ridgeback_autonomy/share/ridgeback_autonomy'
-    sweep_dir, success = sweep.run_sweep(spec, spec.configs, package_share=str(share))
+    sweep_dir, success = sweep.run_sweep(
+        spec, spec.configs, package_share=str(share), simulation=_environment(spec))
     assert success
     assert cleanup_calls == [str(tmp_path)]
     assert Path(sweep_dir).parent == expected
@@ -210,7 +225,9 @@ def test_relocated_sweep_keeps_resume_and_report_inputs(tmp_path, monkeypatch):
     # Probing the real GL stack would spawn a subprocess through the
     # patched Popen and land in the launch-command fake below.
     monkeypatch.setattr(sweep, 'gl_renderer_provenance', lambda: {})
-    manifest = sweep._new_manifest(spec, spec.configs, str(old), str(tmp_path))
+    monkeypatch.setattr(sweep, 'simulator_provenance', lambda _backend: {})
+    environment = _environment(spec)
+    manifest = sweep._new_manifest(spec, spec.configs, str(old), str(tmp_path), environment)
     assert manifest['sweep']['source_sha256'] == hashlib.sha256(
         sweep_source.read_bytes()).hexdigest()
     assert manifest['configs'][0]['scenario_sha256'] == hashlib.sha256(
@@ -225,11 +242,12 @@ def test_relocated_sweep_keeps_resume_and_report_inputs(tmp_path, monkeypatch):
     new_root.parent.mkdir()
     (tmp_path / 'benchmark-results').rename(new_root)
     new = new_root / old.name
-    assert sweep._find_resumable_sweep(str(new_root), spec, spec.configs) == str(new)
+    assert sweep._find_resumable_sweep(
+        str(new_root), spec, spec.configs, environment) == str(new)
     assert collect_comparison_rows(manifest, str(new)) == before_rows
     assert sweep._valid_run_document(str(new / 'pointcloud/run.json')) == document
     assert (new / 'pointcloud/run.json').read_bytes() == original_bytes
-    resumed = sweep._resume_manifest(manifest, spec, spec.configs, str(new))
+    resumed = sweep._resume_manifest(manifest, spec, spec.configs, str(new), environment)
     assert resumed['configs'][0]['arguments']['output_dir'] == str(new)
     assert resumed['configs'][0]['output_path'] == 'pointcloud'
 
@@ -245,16 +263,17 @@ def test_sweep_or_scenario_byte_change_invalidates_resume_signature(tmp_path):
         'configs': [{'name': 'pointcloud', 'estimators': 'pointcloud'}],
     }, source=str(source))
 
-    original = sweep._resume_signature(spec, spec.configs)
+    environment = _environment(spec)
+    original = sweep._resume_signature(spec, spec.configs, environment)
     source.write_text('version two\n')
-    source_changed = sweep._resume_signature(spec, spec.configs)
+    source_changed = sweep._resume_signature(spec, spec.configs, environment)
     assert source_changed != original
     assert source_changed['sweep_source_sha256'] != original['sweep_source_sha256']
 
     source.write_text('version one\n')
     scenario.write_text(
         'scenes:\n  - id: one\n    robots: [{ x: 3.0, y: 0.0 }]\n')
-    scenario_changed = sweep._resume_signature(spec, spec.configs)
+    scenario_changed = sweep._resume_signature(spec, spec.configs, environment)
     assert scenario_changed != original
     assert (
         scenario_changed['configs']['pointcloud']['scenario_sha256']
@@ -290,7 +309,7 @@ def test_environment_default_change_invalidates_resume_signature(
             },
             'configs': [{'name': 'pointcloud', 'estimators': 'pointcloud'}],
         }, source=str(source))
-        return sweep._resume_signature(spec, spec.configs)
+        return sweep._resume_signature(spec, spec.configs, _environment(spec))
 
     assert signature(before) != signature(after)
 

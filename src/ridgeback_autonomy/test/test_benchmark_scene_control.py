@@ -100,34 +100,89 @@ def _trial_runner(scene_control, *, truth=None, capture=None):
     return runner, logger
 
 
-def test_runner_checks_scene_services_and_robot_state_before_streams() -> None:
+def test_runner_waits_for_an_advancing_clock_before_its_first_scene_operation() -> None:
     events = []
     scene_control = SimpleNamespace(
         wait_for_services=lambda timeout: events.append(('services', timeout)),
         require_capabilities=lambda formats: events.append(('capabilities', formats)),
+        wait_for_advancing_clock=lambda timeout: events.append(('clock', timeout)) or (
+            SimpleNamespace(advanced_stamp_ns=1_500_000_000)),
+        readiness_timeline=lambda: {'clock_advance_after_services_sec': 0.25},
         wait_until_present=lambda names: events.append(('robot', tuple(names))),
     )
+    messages = []
     runner = SimpleNamespace(
         log_code_provenance=lambda: events.append(('provenance',)),
-        get_logger=lambda: SimpleNamespace(info=lambda _message: None),
+        get_logger=lambda: SimpleNamespace(info=messages.append),
         estimator_display_names={'pointcloud': 'Pointcloud'},
         selected_estimators=('pointcloud',),
         world='target_distance_calibration',
+        backend=SimpleNamespace(name='isaac'),
         robot_model_name='r100_0001/robot',
         scene_control=scene_control,
-        asset_selection=SimpleNamespace(spawn_formats=frozenset({'sdf'})),
+        asset_selection=SimpleNamespace(
+            spawn_formats=frozenset({'usd'}),
+            world=SimpleNamespace(native_name='g1_distance_calibration')),
         wait_for_required_streams=lambda: events.append(('streams',)),
         start_recording=lambda: events.append(('recording',)),
         run_trials=lambda: events.append(('trials',)),
         stop_recording=lambda: events.append(('stopped',)),
+        log_readiness_timeline=lambda: events.append(('timeline',)),
     )
 
     TargetDistanceBenchmarkRunner.run(runner)
 
     assert [event[0] for event in events] == [
-        'provenance', 'services', 'capabilities', 'robot', 'streams',
-        'recording', 'trials', 'stopped',
+        'provenance', 'services', 'capabilities', 'clock', 'robot', 'streams',
+        'recording', 'trials', 'stopped', 'timeline',
     ]
+    assert any('native world "g1_distance_calibration"' in message for message in messages)
+    assert any('Simulation clock advancing at 1.500 s' in message for message in messages)
+
+
+def test_runner_records_backend_world_catalog_and_readiness_provenance(monkeypatch) -> None:
+    from ridgeback_autonomy.benchmarking import target_distance_benchmark_runner_node as module
+    from ridgeback_autonomy.benchmarking.backends import BENCHMARK_BACKENDS
+    from ridgeback_autonomy.benchmarking.scene_control import SimulatorCapabilities
+
+    isaac_catalog = (
+        REPO_ROOT / 'src' / 'ridgeback_autonomy_isaac' / 'sim' / 'benchmark_assets.yaml')
+    selection = load_asset_catalog(str(isaac_catalog)).select(
+        'target_distance_calibration', 'g1', {'table'})
+    monkeypatch.setattr(
+        module, 'simulator_provenance',
+        lambda backend: {'adapter_package': backend.adapter_package,
+                         'simulator': {'name': 'isaacsim', 'version': '6.1.0.0'}})
+    timeline = {'services_available_wall': 1.0, 'clock_advanced_wall': 2.0,
+                'first_spawn_requested_wall': 3.0}
+    runner = SimpleNamespace(
+        backend=BENCHMARK_BACKENDS['isaac'],
+        world='target_distance_calibration',
+        backend_settings={'depth_fidelity': 'ideal', 'headless': 'true',
+                          'rtf': '1.0', 'sim_mode': 'realtime'},
+        get_parameter=lambda name: SimpleNamespace(value={'camera_profile': '640x480'}[name]),
+        scene_control_service_namespace='/isaac_sim',
+        scene_control=SimpleNamespace(
+            capabilities=SimulatorCapabilities(frozenset({10, 0, 1}), ('usd',), 'static'),
+            readiness_timeline=lambda: timeline),
+        asset_selection=selection,
+    )
+
+    simulation = TargetDistanceBenchmarkRunner.simulation_provenance(runner)
+
+    assert simulation['backend'] == 'isaac'
+    assert simulation['public_world'] == 'target_distance_calibration'
+    assert simulation['native_world'] == 'g1_distance_calibration'
+    assert simulation['settings']['depth_fidelity'] == 'ideal'
+    assert simulation['camera_profile'] == '640x480'
+    assert simulation['simulator'] == {'name': 'isaacsim', 'version': '6.1.0.0'}
+    assert simulation['features'] == {
+        'features': [0, 1, 10], 'spawn_formats': ['usd'], 'custom_info': 'static'}
+    assert simulation['asset_catalog']['schema'] == 'ridgeback_benchmark_assets/1'
+    assert simulation['asset_catalog']['sha256'] == selection.catalog.sha256
+    assert simulation['asset_catalog']['world']['native_name'] == 'g1_distance_calibration'
+    assert simulation['asset_catalog']['objects']['table']['format'] == 'usd'
+    assert simulation['readiness'] == timeline
 
 
 def test_catalog_resources_resolve_into_target_first_spawn_order() -> None:

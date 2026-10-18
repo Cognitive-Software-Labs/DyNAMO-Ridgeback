@@ -86,6 +86,12 @@ from ridgeback_autonomy.benchmarking.asset_catalog import (
     load_asset_catalog,
     scene_object_models,
 )
+from ridgeback_autonomy.benchmarking.backends import (
+    DEFAULT_BACKEND,
+    benchmark_backend,
+    decode_backend_settings,
+    simulator_provenance,
+)
 from ridgeback_autonomy.benchmarking.scene_control import (
     SpawnSpec,
     create_scene_control_client,
@@ -210,6 +216,10 @@ class TargetDistanceBenchmarkRunner(Node):
 
         self.declare_parameter('target_labels', 'humanoid robot')
         self.declare_parameter('world', 'target_distance_calibration')
+        self.declare_parameter('backend', DEFAULT_BACKEND)
+        # Recorded, not applied: the persistent environment's backend-only
+        # settings, as the launch encoded them.
+        self.declare_parameter('backend_settings', '')
         self.declare_parameter('asset_catalog', '')
         self.declare_parameter('scene_control_service_namespace', '')
         self.declare_parameter('scenario', '')
@@ -277,6 +287,9 @@ class TargetDistanceBenchmarkRunner(Node):
         self.declare_parameter('record_window_class', RECORD_WINDOW_CLASS_DEFAULT)
 
         self.world = str(self.get_parameter('world').value)
+        self.backend = benchmark_backend(self.get_parameter('backend').value)
+        self.backend_settings = decode_backend_settings(
+            str(self.get_parameter('backend_settings').value))
         scenario_param = str(self.get_parameter('scenario').value).strip()
         self.scenario_path = (
             os.path.abspath(os.path.expanduser(scenario_param))
@@ -939,10 +952,21 @@ class TargetDistanceBenchmarkRunner(Node):
         self.get_logger().info(
             'Starting multi-estimator distance benchmark '
             f'for {", ".join(self.estimator_display_names[est] for est in self.selected_estimators)} '
-            f'in world "{self.world}" for robot "{self.robot_model_name}".'
+            f'in world "{self.world}" for robot "{self.robot_model_name}" '
+            f'on backend {self.backend.name} '
+            f'(native world "{self.asset_selection.world.native_name}").'
         )
         self.scene_control.wait_for_services(STREAM_WAIT_TIMEOUT_SEC)
         self.scene_control.require_capabilities(self.asset_selection.spawn_formats)
+        self.get_logger().info(
+            'Scene-control services are available; waiting for the simulation '
+            'clock to advance before the first scene operation.')
+        clock = self.scene_control.wait_for_advancing_clock(STREAM_WAIT_TIMEOUT_SEC)
+        timeline = self.scene_control.readiness_timeline()
+        self.get_logger().info(
+            f'Simulation clock advancing at {clock.advanced_stamp_ns / 1e9:.3f} s, '
+            f'{timeline["clock_advance_after_services_sec"]:.3f} s after the '
+            'scene-control services appeared.')
         self.scene_control.wait_until_present([self.robot_model_name])
         self.wait_for_required_streams()
 
@@ -954,6 +978,25 @@ class TargetDistanceBenchmarkRunner(Node):
             self.run_trials()
         finally:
             self.stop_recording()
+        self.log_readiness_timeline()
+
+    def log_readiness_timeline(self) -> None:
+        """One line separating simulator start-up delay from provider readiness."""
+
+        timeline = self.scene_control.readiness_timeline()
+
+        def wall(name: str) -> str:
+            value = timeline[name]
+            if value is None:
+                return 'never'
+            milliseconds = int(value % 1 * 1000)
+            return f'{time.strftime("%H:%M:%S", time.localtime(value))}.{milliseconds:03d}'
+
+        self.get_logger().info(
+            f'Readiness: services {wall("services_available_wall")}, clock first seen '
+            f'{wall("clock_first_message_wall")}, clock advancing '
+            f'{wall("clock_advanced_wall")}, first spawn '
+            f'{wall("first_spawn_requested_wall")}.')
 
     def run_trials(self) -> None:
         estimator_rows = {estimator: [] for estimator in self.selected_estimators}
@@ -1066,12 +1109,20 @@ class TargetDistanceBenchmarkRunner(Node):
             for rows in estimator_rows.values() for row in rows
         })
 
+        simulation = self.simulation_provenance()
         metadata = {
             'Started': time.strftime('%Y-%m-%d %H:%M:%S', self.run_started_at),
             'Commit': format_commit(provenance),
             'Branch': provenance['branch'] or 'unknown',
             'Scenario': self.scenario_path,
             'Target labels': self.get_parameter('target_labels').value,
+            'Backend': self.backend.name,
+            'World': (
+                f'{self.world} (native {simulation["native_world"]})'
+                if simulation['native_world'] != self.world else self.world),
+            'Asset catalog': (
+                f'{simulation["asset_catalog"]["schema"]} '
+                f'sha256 {simulation["asset_catalog"]["sha256"]}'),
         }
         # Named while the recorder is still running (it is stopped after the
         # report is written), so this is the path, not a claim the file is ready.
@@ -1106,6 +1157,10 @@ class TargetDistanceBenchmarkRunner(Node):
                 'uncommitted_files': provenance['dirty_count'],
                 'scenario': self.scenario_path,
                 'target_labels': self.get_parameter('target_labels').value,
+                'backend': self.backend.name,
+                'world': self.world,
+                'native_world': simulation['native_world'],
+                'simulation': simulation,
                 'scenes': scenes,
                 'instances': instances,
                 'trials_included': included_trials,
@@ -1115,6 +1170,27 @@ class TargetDistanceBenchmarkRunner(Node):
             display_names=self.estimator_display_names,
             status_histograms=self.status_aggregate,
         ))
+
+    def simulation_provenance(self) -> dict[str, Any]:
+        """Which simulator, world, assets and settings produced this run."""
+
+        capabilities = self.scene_control.capabilities
+        return {
+            'backend': self.backend.name,
+            'public_world': self.world,
+            'native_world': self.asset_selection.world.native_name,
+            'settings': dict(self.backend_settings),
+            'camera_profile': str(self.get_parameter('camera_profile').value),
+            **simulator_provenance(self.backend),
+            'scene_control_service_namespace': self.scene_control_service_namespace,
+            'features': None if capabilities is None else {
+                'features': sorted(capabilities.features),
+                'spawn_formats': list(capabilities.spawn_formats),
+                'custom_info': capabilities.custom_info,
+            },
+            'asset_catalog': self.asset_selection.provenance(),
+            'readiness': self.scene_control.readiness_timeline(),
+        }
 
     def run_trial(self, trial: dict[str, Any]) -> dict[str, dict[str, Any]] | None:
         trial_id = trial['trial_id']

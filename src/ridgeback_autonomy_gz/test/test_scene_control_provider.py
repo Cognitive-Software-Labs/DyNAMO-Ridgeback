@@ -97,8 +97,11 @@ class GazeboProvider:
             f'scene_control_provider_test_{token}', context=self.context)
         self.executor = SingleThreadedExecutor(context=self.context)
         self.executor.add_node(self.node)
+        # A bare server publishes no ROS /clock; these cases test the
+        # provider's services, not the benchmark's readiness gate.
         self.client = create_scene_control_client(
-            self.node, self.service_namespace, spin_once=self.spin_once)
+            self.node, self.service_namespace, spin_once=self.spin_once,
+            observe_clock=False)
         self.raw_spawn = self.node.create_client(
             SpawnEntity, f'{self.service_namespace}/spawn_entity')
         self.raw_delete = self.node.create_client(

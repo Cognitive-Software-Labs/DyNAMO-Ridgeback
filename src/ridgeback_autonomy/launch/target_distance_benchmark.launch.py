@@ -22,11 +22,10 @@ def generate_launch_description():
             default_value='false',
             description='Shut the wrapper down when the benchmark runner exits',
         ),
-        IncludeLaunchDescription(
-            PythonLaunchDescriptionSource(
-                os.path.join(launch_dir, 'target_benchmark_env.launch.py')
-            ),
-        ),
+        # The config layer comes first so it reads the public world before the
+        # persistent layer hands the simulator its native name under the same
+        # launch argument. Order does not delay anything: the config layer's
+        # nodes wait on the environment's readiness gate either way.
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(
                 os.path.join(launch_dir, 'target_benchmark_config.launch.py')
@@ -34,5 +33,10 @@ def generate_launch_description():
             launch_arguments={
                 'shutdown_on_complete': shutdown_on_complete,
             }.items(),
+        ),
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(
+                os.path.join(launch_dir, 'target_benchmark_env.launch.py')
+            ),
         ),
     ])
