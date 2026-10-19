@@ -7,16 +7,16 @@ keeps the public installation commands; dated refresh results belong in
 
 ## Model and ownership
 
-The dependencies under `src/clearpath_*` and `src/slam_toolbox` are standalone,
+The dependencies under `src/clearpath_*`, `src/slam_toolbox`, and `src/gz-sim` are standalone,
 Git-ignored repositories populated by `vcstool`. They are not Git submodules and
 are not stored in the root repository's history.
 
-The compatibility unit has three root-owned parts:
+The compatibility unit has four root-owned parts:
 
 - [`dependencies/core.repos`](../../dependencies/core.repos) owns the source
   dependencies shared by every deployment.
 - [`dependencies/gz.repos`](../../dependencies/gz.repos) owns the optional
-  Gazebo-only `clearpath_simulator` pin.
+  Gazebo-only `clearpath_simulator` and `gz-sim` pins.
 - [`patches/`](../../patches/) owns intentional changes to those pinned sources.
 - [`tools/check_dependencies`](../../tools/check_dependencies) verifies that
   every checkout is at its pin and contains either no changes or exactly its
@@ -43,7 +43,7 @@ tools/check_dependencies --apply --profile all
 
 On an Isaac-only or hardware host, omit the Gazebo import and run
 `tools/check_dependencies --apply --profile core`. `--profile gz` checks only
-the optional simulator checkout. `vcs import` creates the nested repositories
+the optional Gazebo checkouts. `vcs import` creates the nested repositories
 at the exact manifest commits. The checker then applies missing maintained
 patches. Its `--apply` mode is idempotent: an exact already-applied patch is
 accepted.
@@ -111,6 +111,7 @@ The maintained mappings are:
 | `src/clearpath_simulator` | `patches/clearpath_gz_customizations.patch` |
 | `src/clearpath_common` | `patches/clearpath_realsense_sim_frames.patch` |
 | `src/slam_toolbox` | `patches/slam_toolbox_tf_namespace.patch` |
+| `src/gz-sim` | `patches/gz_sim_sensors_shutdown.patch` |
 
 Update all affected manifest pins and patch files in the same root commit.
 
@@ -184,3 +185,148 @@ Do not selectively combine an old dependency pin with a new patch. Restore a
 saved live-checkout stash only on the revision where it was created, inspect the
 result, and never discard it merely because the refreshed manifest no longer
 accepts it.
+
+## Gazebo Sensors shutdown patch
+
+The Gazebo profile imports gz-sim **8.15.0**, upstream tag `gz-sim8_8.15.0`,
+commit `446a44335a45b704b4d36dabcc5508ee34eeb3d8`. This matches the source selected
+by `gz_sim_vendor` 0.0.13; that vendor revision supplies no source patches. The
+local patch preserves the version and major-8 SONAMEs. It does not import
+`gz-common` or the abandoned signal self-pipe backport.
+
+### Synchronization boundary
+
+In `src/systems/sensors/Sensors.cc`, `PostUpdate` waits for pending ECM changes
+to reach the rendering scene before replacing them. Upstream's `updateTimeCv`
+predicate lacks a shutdown condition, and `Stop` notifies only `renderCv`.
+Consequently a pending update can leave a worker waiting after the render
+thread has stopped.
+
+The patch serializes each instance's complete `Stop` operation with `stopMutex`,
+including connection teardown and render-thread joining. It takes
+`renderUtilMutex` before `renderMutex` in `Stop`, changes
+`running` while holding both, notifies both condition variables, and releases
+both mutexes before joining the render thread. The `PostUpdate` predicate
+includes `!running` and returns on shutdown before `UpdateFromECM` and subsequent
+sensor work. Coordinating the transition with the wait mutex prevents a lost
+notification between predicate evaluation and wait entry; an atomic flag alone
+does not supply that coordination.
+
+`RunOnce` releases its `renderMutex` wait before taking `renderUtilMutex`, and
+releases `renderUtilMutex` before its later rendering section takes
+`renderMutex`. `PostUpdate` and `Reset` likewise do not hold these locks in the
+reverse nested order. `Run` is the configure-time transition to running.
+The time fields in the predicate are changed under `renderUtilMutex`; the
+existing `updateAvailable` flag remains atomic and coordinated with the render
+wait by `renderMutex`. The new shutdown wakeup is coordinated with both waits.
+
+The in-tree stop paths are the Stop-event callback and the Sensors destructor;
+neither enters holding a Sensors mutex. A server's signal callback and its
+destruction path can emit the Stop event concurrently for the same instance.
+Without the per-instance guard, both callers can attempt to join the same
+`std::thread`, which is undefined. The guard also makes sequential repeated
+stops safe without changing the public ABI. No other method takes `stopMutex`,
+and the render thread does not need it to exit.
+
+Rendering event callbacks can run while
+`renderMutex` is held. Calling server shutdown recursively from such a callback
+already risks locking/self-joining upstream and is not a supported extension of
+this fix. Repeated stops, same-instance concurrent stops, and independent
+instances are tested. Two log messages alone cannot identify their objects;
+the same-instance correction was justified by live debugger addresses, caller
+stacks, and a blocked join after render-thread exit. This patch does not redesign
+general concurrent access to Sensors or cancel all work already in flight.
+
+### Build and regression proof
+
+After the normal Gazebo import and checker application above:
+
+```bash
+source /opt/ros/jazzy/setup.bash
+source install/setup.bash
+export ROS_LOG_DIR="$PWD/artifacts/gz-sim-build/ros"
+mkdir -p "$ROS_LOG_DIR"
+tools/check_dependencies --profile all
+CMAKE_BUILD_PARALLEL_LEVEL=6 MAKEFLAGS=-j6 tools/gpu-run \
+  colcon build --symlink-install --packages-select gz-sim8 \
+  --cmake-args -DCMAKE_BUILD_TYPE=RelWithDebInfo -DBUILD_TESTING=ON \
+  -DBUILD_DOCS=OFF -DSKIP_PYBIND11=ON
+source install/setup.bash
+tools/gpu-run build/gz-sim8/bin/INTEGRATION_sensors_system \
+  --gtest_filter='SensorsTest.*' --gtest_death_test_style=threadsafe
+```
+
+`SKIP_PYBIND11` omits unused optional Python bindings; ROS `gzserver` uses the
+C++ libraries. The upstream integration target carries six bounded shutdown
+tests that include the actual Sensors implementation and access its private
+state through a friend fixture. They exercise an already blocked waiter,
+contention around entry, pre-entry shutdown, absence of update work after a
+shutdown wakeup, joining with locks released, repeated/concurrent stops, and independent
+instances. The wait-entry repetition is scheduling stress, not a deterministic
+interleaving. These tests use synthetic pending-update state; they do not
+construct a working rendering engine. Existing upstream rendering tests and
+live installed-launch qualification remain required.
+
+The supplemental protocol reproducer is tracked at
+[`tools/tests/gz_sim_sensors_shutdown_protocol_test.cc`](../../tools/tests/gz_sim_sensors_shutdown_protocol_test.cc):
+
+```bash
+g++ -std=c++17 -O2 -pthread -DWITH_SHUTDOWN_FIX \
+  tools/tests/gz_sim_sensors_shutdown_protocol_test.cc -o /tmp/sensors-protocol
+timeout 3 /tmp/sensors-protocol
+```
+
+Omit the define for the original protocol; use `WITH_NAIVE_SHUTDOWN_FIX` for
+predicate-plus-notify without wait-mutex coordination. The naive variant's
+failure rate depends on scheduling. This harness mirrors the protocol and
+cannot establish the cause of every historical Gazebo hang or qualify a live
+plugin.
+
+### Exact diff and installed loading
+
+Generate patches in a clean **full** clone at the pin, using the same Git
+settings and object population as a fresh `vcs import`. `git diff HEAD` includes
+index hashes whose automatic abbreviation changes with repository size. A
+shallow checkout's applicable patch may therefore fail the exact-diff contract.
+Preserve the complete diff, including index metadata; remove only the single
+space on blank context lines, as the checker already does. Do not relax that
+comparison to accommodate a differently generated patch.
+
+Build/install into the normal workspace, source its setup, and verify a live
+`ros_gz_sim/gzserver` process directly:
+
+```bash
+awk '/libgz-sim8(\.so|-sensors-system|-rendering)/ {print $NF}' /proc/<pid>/maps | sort -u
+```
+
+The core library, rendering library, and **Sensors plugin** must resolve to the
+workspace's `install/gz-sim8` (or its symlinked `build/gz-sim8` objects). Record
+the complete maps, selected search-path environment, object SHA-256 hashes,
+`readelf -d` SONAMEs, source pin, and patch hash. Search-path variables and a
+loaded core library alone do not prove the Sensors plugin selection. Check
+`gz-common` still resolves to the packaged vendor.
+
+Qualification uses a real foreground PTY and one byte `0x03` for Ctrl-C after
+sensor activity is verified. Parse every child exit and launch escalation:
+launcher exit 0 plus no process leaks is insufficient if `gzserver` exits -9.
+Use an isolated ROS domain, Gazebo partition, temporary Clearpath setup, writable
+ROS logs, and scoped shutdown on a shared host. Do not change escalation timing
+or benchmark signal policy. Sweep qualification uses `--skip-preflight-cleanup`
+after inspecting host ownership. Record standard `GetEntities` results for
+`^bench_.*$` and an independent unfiltered name check before shutdown.
+
+### Roll back this optional overlay
+
+First inspect and preserve root and nested changes. To disable the overlay
+without discarding work, stop only owned launches, move `src/gz-sim`,
+`build/gz-sim8`, and `install/gz-sim8` to a uniquely named location outside the
+workspace, and rebuild the workspace setup with the preceding dependency
+configuration restored. Start a fresh shell, source ROS and the rebuilt
+workspace, and verify maps resolve to `/opt/ros/jazzy/opt/gz_sim_vendor`.
+Restore this change's manifest/mapping/ignore/documentation edits as one reviewed
+set; do not reset a dirty nested repository or remove user files. Keep the
+preserved overlay and evidence until the rollback is accepted.
+
+## Archived evidence
+
+- [Gazebo Sensors shutdown races and qualification](../../archive/engineering/2026-10-18-gazebo-sensors-shutdown.md)

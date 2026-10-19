@@ -1,0 +1,293 @@
+diff --git a/src/systems/sensors/Sensors.cc b/src/systems/sensors/Sensors.cc
+index defd28c3c..b86901f33 100644
+--- a/src/systems/sensors/Sensors.cc
++++ b/src/systems/sensors/Sensors.cc
+@@ -195,6 +195,9 @@ class gz::sim::systems::SensorsPrivate
+   /// \brief Thread that rendering will occur in
+   public: std::thread renderThread;
+
++  /// \brief Serialize Stop callers, including connection teardown and join.
++  public: std::mutex stopMutex;
++
+   /// \brief Mutex to protect rendering data
+   public: std::mutex renderMutex;
+
+@@ -562,7 +565,13 @@ void SensorsPrivate::Run()
+ //////////////////////////////////////////////////
+ void SensorsPrivate::Stop()
+ {
++  // The signal callback and server destruction may stop the same instance.
++  // Joining a std::thread concurrently from two callers is undefined.
++  std::lock_guard<std::mutex> stopLock(this->stopMutex);
+   gzdbg << "SensorsPrivate::Stop" << std::endl;
++  // Quiesce PostUpdate before stopping the render thread and synchronize the
++  // shutdown predicate transition with its condition-variable wait.
++  std::unique_lock<std::mutex> updateLock(this->renderUtilMutex);
+   std::unique_lock<std::mutex> lock(this->renderMutex);
+   this->running = false;
+
+@@ -574,6 +583,8 @@ void SensorsPrivate::Stop()
+
+   lock.unlock();
+   this->renderCv.notify_all();
++  this->updateTimeCv.notify_all();
++  updateLock.unlock();
+
+   if (this->renderThread.joinable())
+   {
+@@ -967,11 +978,15 @@ void Sensors::PostUpdate(const UpdateInfo &_info,
+       std::unique_lock<std::mutex> lock(this->dataPtr->renderUtilMutex);
+       this->dataPtr->updateTimeCv.wait(lock, [this]()
+       {
+-        return !this->dataPtr->updateAvailable ||
++        return !this->dataPtr->running ||
++               !this->dataPtr->updateAvailable ||
+                (this->dataPtr->updateTimeToApply ==
+                this->dataPtr->updateTimeApplied);
+       });
+
++      if (!this->dataPtr->running)
++        return;
++
+       this->dataPtr->renderUtil.UpdateFromECM(_info, _ecm);
+       this->dataPtr->updateTime = _info.simTime;
+     }
+diff --git a/src/systems/sensors/Sensors.hh b/src/systems/sensors/Sensors.hh
+index 41a314e75..21824b139 100644
+--- a/src/systems/sensors/Sensors.hh
++++ b/src/systems/sensors/Sensors.hh
+@@ -99,6 +99,9 @@ namespace systems
+
+     /// \brief Private data pointer.
+     private: std::unique_ptr<SensorsPrivate> dataPtr;
++
++    /// \brief Access internal synchronization state in the shutdown tests.
++    friend class SensorsTest;
+   };
+   }
+ }
+diff --git a/test/integration/CMakeLists.txt b/test/integration/CMakeLists.txt
+index d891b3fce..1a8aa5739 100644
+--- a/test/integration/CMakeLists.txt
++++ b/test/integration/CMakeLists.txt
+@@ -249,7 +249,12 @@ endif()
+ if(VALID_DISPLAY AND VALID_DRI_DISPLAY AND TARGET INTEGRATION_sensors_system)
+   target_link_libraries(INTEGRATION_sensors_system
+     gz-rendering${GZ_RENDERING_VER}::gz-rendering${GZ_RENDERING_VER}
++    ${PROJECT_NAME}-sensors-system
+   )
++  # Death-test children exercise private shutdown state without inheriting a
++  # render context from another integration test in this executable.
++  set_property(TEST INTEGRATION_sensors_system APPEND PROPERTY ENVIRONMENT
++    "GTEST_DEATH_TEST_STYLE=threadsafe")
+   target_link_libraries(INTEGRATION_actor_trajectory
+     gz-rendering${GZ_RENDERING_VER}::gz-rendering${GZ_RENDERING_VER}
+   )
+diff --git a/test/integration/sensors_system.cc b/test/integration/sensors_system.cc
+index a116d54cf..ef7fdb255 100644
+--- a/test/integration/sensors_system.cc
++++ b/test/integration/sensors_system.cc
+@@ -293,3 +293,203 @@ TEST_F(SensorsFixture, HandleRemovedEntities)
+     }
+   }
+ }
++
++#ifndef _WIN32
++#include <gtest/gtest.h>
++
++#include <cstdlib>
++#include <unistd.h>
++#include <future>
++
++// Exercise the real Stop and PostUpdate implementations, including private
++// synchronization state, without adding a runtime test hook or render engine.
++#include "../../src/systems/sensors/Sensors.cc"
++
++using namespace std::chrono_literals;
++
++namespace gz
++{
++namespace sim
++{
++inline namespace GZ_SIM_VERSION_NAMESPACE
++{
++namespace systems
++{
++class SensorsTest : public ::testing::Test
++{
++  public: static void CheckWaiter(int _schedule, int _repeats)
++  {
++    alarm(15);
++    for (int i = 0; i < _repeats; ++i)
++    {
++      Sensors system;
++      auto &data = *system.dataPtr;
++      EventManager events;
++      EntityComponentManager ecm;
++      UpdateInfo info;
++      info.simTime = 19ms;
++      data.eventManager = &events;
++      data.running = true;
++      data.initialized = true;
++      data.updateAvailable = true;
++      data.updateTime = 7ms;
++      data.updateTimeToApply = 2ms;
++      data.updateTimeApplied = 1ms;
++
++      if (_schedule == 0)
++      {
++        data.Stop();
++        system.PostUpdate(info, ecm);
++      }
++      else
++      {
++        std::unique_lock<std::mutex> entry(data.renderUtilMutex,
++            std::defer_lock);
++        if (_schedule == 2)
++          entry.lock();
++        std::promise<void> entered;
++        auto waiter = std::async(std::launch::async, [&]
++        {
++          entered.set_value();
++          system.PostUpdate(info, ecm);
++        });
++        entered.get_future().wait();
++        if (_schedule == 1 && waiter.wait_for(30ms) !=
++            std::future_status::timeout)
++          std::_Exit(2);
++
++        auto stop = std::async(std::launch::async, [&] { data.Stop(); });
++        if (_schedule == 2)
++          entry.unlock();
++        if (stop.wait_for(500ms) != std::future_status::ready ||
++            waiter.wait_for(500ms) != std::future_status::ready)
++          std::_Exit(3);
++        stop.get();
++        waiter.get();
++      }
++      // UpdateFromECM is immediately followed by this assignment. A shutdown
++      // wakeup must return before either operation, even with a pending update.
++      if (data.updateTime != 7ms || data.running)
++        std::_Exit(4);
++      data.Stop();
++    }
++    std::_Exit(0);
++  }
++
++  public: static void CheckJoin()
++  {
++    alarm(5);
++    Sensors system;
++    auto &data = *system.dataPtr;
++    data.running = true;
++    data.renderThread = std::thread([&]
++    {
++      {
++        std::unique_lock<std::mutex> lock(data.renderMutex);
++        data.renderCv.wait(lock, [&] { return !data.running; });
++      }
++      // Stop must release both locks before joining this thread.
++      std::unique_lock<std::mutex> lock(data.renderUtilMutex);
++    });
++    data.Stop();
++    data.Stop();
++    std::_Exit(data.renderThread.joinable() ? 1 : 0);
++  }
++
++  public: static void CheckConcurrentStop()
++  {
++    alarm(5);
++    Sensors system;
++    auto &data = *system.dataPtr;
++    data.running = true;
++    std::promise<void> renderStopping;
++    std::promise<void> releaseRender;
++    auto released = releaseRender.get_future();
++    data.renderThread = std::thread([&]
++    {
++      {
++        std::unique_lock<std::mutex> lock(data.renderMutex);
++        data.renderCv.wait(lock, [&] { return !data.running; });
++      }
++      renderStopping.set_value();
++      released.wait();
++    });
++    auto first = std::async(std::launch::async, [&] { data.Stop(); });
++    renderStopping.get_future().wait();
++    std::promise<void> secondEntered;
++    auto second = std::async(std::launch::async, [&]
++    {
++      secondEntered.set_value();
++      data.Stop();
++    });
++    secondEntered.get_future().wait();
++    // Keep the render thread alive while both callers attempt Stop. With the
++    // old implementation they can both join the same std::thread (undefined).
++    std::this_thread::sleep_for(30ms);
++    releaseRender.set_value();
++    if (first.wait_for(500ms) != std::future_status::ready ||
++        second.wait_for(500ms) != std::future_status::ready)
++      std::_Exit(5);
++    first.get();
++    second.get();
++    std::_Exit(0);
++  }
++
++  public: static void CheckInstances()
++  {
++    alarm(5);
++    EventManager events;
++    Sensors first;
++    Sensors second;
++    first.dataPtr->eventManager = &events;
++    second.dataPtr->eventManager = &events;
++    // Real dormant rendering threads: no rendering sensors or engine needed.
++    first.dataPtr->Run();
++    second.dataPtr->Run();
++    auto stop = std::async(std::launch::async,
++        [&] { first.dataPtr->Stop(); });
++    second.dataPtr->Stop();
++    stop.get();
++    first.dataPtr->Stop();
++    second.dataPtr->Stop();
++    std::_Exit(0);
++  }
++};
++
++// Each child has a CTest timeout as a final bound; early failure uses _Exit so
++// an unfixed waiter cannot hang a future/thread destructor during red testing.
++TEST_F(SensorsTest, StopBeforePostUpdate)
++{
++  ASSERT_EXIT(CheckWaiter(0, 1), ::testing::ExitedWithCode(0), "");
++}
++
++TEST_F(SensorsTest, StopWakesSleepingPostUpdateWithoutUpdateWork)
++{
++  ASSERT_EXIT(CheckWaiter(1, 1), ::testing::ExitedWithCode(0), "");
++}
++
++TEST_F(SensorsTest, StopAroundPostUpdateWaitEntry)
++{
++  // Scheduling stress, not a deterministic lost-wakeup interleaving.
++  ASSERT_EXIT(CheckWaiter(2, 300), ::testing::ExitedWithCode(0), "");
++}
++
++TEST_F(SensorsTest, StopReleasesLocksBeforeJoinAndCanRepeat)
++{
++  ASSERT_EXIT(CheckJoin(), ::testing::ExitedWithCode(0), "");
++}
++
++TEST_F(SensorsTest, IndependentInstancesCanStopTogether)
++{
++  ASSERT_EXIT(CheckInstances(), ::testing::ExitedWithCode(0), "");
++}
++
++TEST_F(SensorsTest, ConcurrentStopsJoinOnlyOnce)
++{
++  ASSERT_EXIT(CheckConcurrentStop(), ::testing::ExitedWithCode(0), "");
++}
++}
++}
++}
++}
++#endif

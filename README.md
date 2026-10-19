@@ -99,7 +99,7 @@ cd /path/to/DyNAMO-Ridgeback
 # Clone the common source dependencies (all deployments)
 vcs import < dependencies/core.repos
 
-# Gazebo hosts only: add the simulator source dependency
+# Gazebo hosts only: add Clearpath simulation and the patched gz-sim8 source
 vcs import < dependencies/gz.repos
 
 # Verify every checkout is pinned and apply the recorded patches idempotently
@@ -994,11 +994,12 @@ Existing runs were relocated without rewriting their contents: absolute paths re
 
 ## Patches, troubleshooting, and history
 
-This project still relies on three local patches:
+This project relies on four maintained dependency patches:
 
 1. `patches/clearpath_gz_customizations.patch` patches `src/clearpath_simulator/clearpath_gz` to expose the custom `SpawnG1` Gazebo GUI plugin. The Gazebo adapter owns this repo's world/model search path.
 2. `patches/slam_toolbox_tf_namespace.patch` patches `src/slam_toolbox` so `slam_toolbox` respects namespaced TF remappings.
 3. `patches/clearpath_realsense_sim_frames.patch` patches `src/clearpath_common` so `intel_realsense.urdf.xacro` forwards `is_sim` into every supported camera macro as `use_nominal_extrinsics`, and so the Gazebo render sensor sits on the model's colour frame. Without it, simulation has no `camera_0_color_optical_frame` TF and the mask estimators report `TF_MISS_EXTRINSIC`.
+4. `patches/gz_sim_sensors_shutdown.patch` patches the pinned Gazebo Sim 8.15.0 Sensors shutdown waiter and adds upstream regression tests. The optional Gazebo source profile builds this compatible workspace overlay; see the [build, loader verification, and rollback instructions](docs/project/dependencies.md#gazebo-sensors-shutdown-patch).
 
 Because the patches are recorded against specific upstream revisions,
 `dependencies/core.repos` and `dependencies/gz.repos` pin every dependency to
