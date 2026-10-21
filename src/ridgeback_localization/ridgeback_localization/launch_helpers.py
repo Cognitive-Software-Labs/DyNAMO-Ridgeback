@@ -20,8 +20,15 @@ def _measurement_parameters(wiring: dict, tuning: dict) -> list:
     return [{**wiring, **{key: value for key, value in tuning.items() if value is not None}}]
 
 
+# A deployed worker that dies is restarted after this delay; health reports the
+# new worker epoch and exploration pauses until it resumes. Benchmarks leave
+# respawn off so a crash fails the run instead of being hidden.
+RESPAWN_DELAY_S = 5.0
+
+
 def pointcloud_measurement_node(
     *,
+    respawn=False,
     namespace,
     use_sim_time,
     enabled_estimators,
@@ -41,6 +48,8 @@ def pointcloud_measurement_node(
     return Node(
         package='ridgeback_localization',
         executable='target_pointcloud_measurement_node',
+        respawn=respawn,
+        respawn_delay=RESPAWN_DELAY_S if respawn else 0.0,
         additional_env=compute_environment(),
         name='target_pointcloud_measurement',
         namespace=namespace,
@@ -64,6 +73,7 @@ def pointcloud_measurement_node(
 
 def mask_measurement_node(
     *,
+    respawn=False,
     namespace,
     use_sim_time,
     enabled_estimators,
@@ -106,6 +116,8 @@ def mask_measurement_node(
     return Node(
         package='ridgeback_localization',
         executable='target_mask_measurement_node',
+        respawn=respawn,
+        respawn_delay=RESPAWN_DELAY_S if respawn else 0.0,
         additional_env=compute_environment(),
         name='target_mask_measurement',
         namespace=namespace,

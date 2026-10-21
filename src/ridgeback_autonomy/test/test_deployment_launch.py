@@ -258,3 +258,17 @@ def test_hardware_rviz_process_is_niced_and_thread_limited(tmp_path, monkeypatch
     prefix, env = rviz_process(dict(backend='hardware', base_frame='base_link'))
     assert prefix.startswith('nice -n 19') and env == {'LP_NUM_THREADS': '2'}
     assert rviz_process(dict(backend='gz')) == ('', {})
+
+
+def test_deployed_workers_respawn_but_benchmark_workers_do_not():
+    from ridgeback_localization.launch_helpers import RESPAWN_DELAY_S, mask_measurement_node
+    module=load('src/ridgeback_localization/launch/localization.launch.py')
+    context=context_for(module,dict(base_frame='observed_base'))
+    nodes=[n for n in module.build_nodes(context) if isinstance(n,Node)]
+    respawn={executables([n],context)[0]: (n._ExecuteLocal__respawn, n._ExecuteLocal__respawn_delay) for n in nodes}
+    assert respawn['target_detector_node']==(True, RESPAWN_DELAY_S)
+    assert respawn['target_mask_measurement_node']==(True, RESPAWN_DELAY_S)
+    # The shared helper defaults to no respawn, which the benchmarks rely on.
+    helper=mask_measurement_node(namespace='ns', use_sim_time=False, enabled_estimators='projective_ranging',
+                                 base_frame='base_link')
+    assert helper._ExecuteLocal__respawn is False

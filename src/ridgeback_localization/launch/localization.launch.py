@@ -10,7 +10,8 @@ from ridgeback_localization.estimator_registry import (
     parse_estimators, uses_mask_estimators, uses_pointcloud_estimators,
     selected_mask_estimators, selected_pointcloud_estimators,
 )
-from ridgeback_localization.launch_helpers import mask_measurement_node, pointcloud_measurement_node, overlay_node, estimate_viz_node
+from ridgeback_localization.launch_helpers import (
+    RESPAWN_DELAY_S, mask_measurement_node, pointcloud_measurement_node, overlay_node, estimate_viz_node)
 
 
 def build_nodes(context):
@@ -25,19 +26,22 @@ def build_nodes(context):
     threshold = float(value('detection_threshold'))
     if not 0 < threshold <= 1: raise ValueError('detection_threshold must be in (0, 1]')
     common = dict(namespace=namespace, use_sim_time=clock)
+    # Deployed workers restart after a crash (2026-10-16: a killed detector stayed
+    # dead until a manual relaunch); health reports the new worker epoch.
     nodes = [Node(package='ridgeback_localization', executable='target_detector_node',
+        respawn=True, respawn_delay=RESPAWN_DELAY_S,
         namespace=namespace, additional_env=compute_environment(), parameters=[dict(
             use_sim_time=clock, color_topic=value('color_topic'), target_labels=labels,
             detector_fps=float(value('detector_fps')), detection_threshold=threshold)], output='screen')]
     if uses_mask_estimators(estimators):
-        nodes.append(mask_measurement_node(**common, base_frame=base,
+        nodes.append(mask_measurement_node(**common, respawn=True, base_frame=base,
             enabled_estimators=','.join(selected_mask_estimators(estimators)),
             color_topic=value('color_topic'), depth_topic=value('depth_topic'),
             camera_info_topic=value('camera_info_topic'), scan_topic=value('scan_topic'),
             depth_source=value('depth_source'), mask_gate=value('mask_gate')))
     if uses_pointcloud_estimators(estimators):
         if not value('pointcloud_topic'): raise ValueError('pointcloud requires an observed organized pointcloud_topic')
-        nodes.append(pointcloud_measurement_node(**common, base_frame=base,
+        nodes.append(pointcloud_measurement_node(**common, respawn=True, base_frame=base,
             enabled_estimators=','.join(selected_pointcloud_estimators(estimators)),
             color_topic=value('color_topic'), pointcloud_topic=value('pointcloud_topic')))
     health_params = {name:value(name) for name in ('color_topic','depth_topic','camera_info_topic',
