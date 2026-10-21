@@ -257,7 +257,10 @@ def main(argv=None):
             return status(host)
         if os.geteuid() != 0:
             parser.error('apply/rollback must be run by the operator with sudo')
-        if not args.yes and input('This replaces the active time service and may step wall clocks. Robot stationary? [y/N] ').lower() not in ('y', 'yes'):
+        prompt = ('This records the installed upstream lines in the time-sync snapshot; no service changes. Continue? [y/N] '
+                  if args.command == 'adopt-upstreams' else
+                  'This replaces the active time service and may step wall clocks. Robot stationary? [y/N] ')
+        if not args.yes and input(prompt).lower() not in ('y', 'yes'):
             return 1
         with host.path('/run/lock/dynamo-local-dds-test.lock').open('a') as lock:
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
