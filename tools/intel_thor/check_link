@@ -4,7 +4,7 @@
 #
 # Usage: tools/intel_thor/check_link [--no-traffic] [--duration SECONDS]
 #                                    [--domain ID] [--thor USER@HOST]
-#                                    [--thor-repo PATH]
+#                                    [--thor-repo PATH] [--camera-reader]
 #
 # The revision check compares this checkout with the Thor checkout of the same
 # directory name (a worktree such as ~/DyNAMO-Ridgeback-rviz), falling back to
@@ -14,6 +14,12 @@
 # --duration seconds over CycloneDDS with the deployment configurations, in an
 # otherwise unused ROS domain. It never joins the robot graph, but it shares the
 # Ethernet segment with the LiDARs: run it with the robot stationary. See docs/physical/intel_thor_transport.md.
+#
+# --camera-reader adds one guarded local camera reader on the robot graph, under
+# the installed services configuration (/etc/clearpath/setup.bash), for 20 s
+# after a 10 s quiet baseline. It passes when tools/camera_contract_check
+# passes, wired TX rises by at most 5 Mbit/s on eno1 and enp2s0, and the
+# clearpath-sensors journal gains no LiDAR grab/reconnect errors.
 
 set -u
 
@@ -34,10 +40,12 @@ DOMAIN=87
 DURATION=10
 RATE=30
 TRAFFIC=true
+CAMERA_READER=false
 
 while [ "$#" -gt 0 ]; do
     case "$1" in
         --no-traffic) TRAFFIC=false ;;
+        --camera-reader) CAMERA_READER=true ;;
         --duration) shift; DURATION="${1:-}" ;;
         --domain) shift; DOMAIN="${1:-}" ;;
         --thor) shift; THOR="${1:-}" ;;
@@ -299,6 +307,52 @@ for side in intel thor; do
     fi
     [ "$synced" = yes ] && pass "$side NTP synchronized" || warn "$side NTP not synchronized"
 done
+
+tx_bytes() { cat "/sys/class/net/$1/statistics/tx_bytes"; }
+
+check_camera_reader() {
+    section "Local camera reader (services configuration)"
+    local since run eno1_0 enp_0 eno1_1 enp_1 eno1_2 enp_2 base_eno base_enp read_eno read_enp errors
+    since="$(date '+%Y-%m-%d %H:%M:%S')"
+    run="$(mktemp -d)"
+    eno1_0="$(tx_bytes eno1)"; enp_0="$(tx_bytes enp2s0)"; t0="$(date +%s.%N)"
+    sleep 10
+    eno1_1="$(tx_bytes eno1)"; enp_1="$(tx_bytes enp2s0)"; t1="$(date +%s.%N)"
+    (set +u; source /etc/clearpath/setup.bash; export ROS_LOG_DIR=/tmp
+     python3 "$REPO_ROOT/tools/camera_contract_check" --backend hardware --guard --warmup 5 --duration 20 \
+         --output "$run/contract.json" > "$run/contract.log" 2>&1)
+    eno1_2="$(tx_bytes eno1)"; enp_2="$(tx_bytes enp2s0)"; t2="$(date +%s.%N)"
+    if grep -q 'CONTRACT PASS' "$run/contract.log"; then
+        pass "camera contract with an extra local reader ($(grep -o 'colour rate *[0-9.]* Hz' "$run/contract.log" | tr -s ' '))"
+    else
+        fail "camera contract with an extra local reader: $(grep -E '^FAIL|ABORT' "$run/contract.log" | head -2 | tr '\n' ' ')"
+    fi
+    # Mean rates over the measured baseline and reader windows.
+    read -r rise_eno rise_enp < <(awk -v e0="$eno1_0" -v e1="$eno1_1" -v e2="$eno1_2" \
+        -v p0="$enp_0" -v p1="$enp_1" -v p2="$enp_2" -v t0="$t0" -v t1="$t1" -v t2="$t2" 'BEGIN {
+        b = t1 - t0; d = t2 - t1
+        printf "%.2f %.3f\n", (e2 - e1) * 8 / 1e6 / d - (e1 - e0) * 8 / 1e6 / b,
+                               (p2 - p1) * 8 / 1e6 / d - (p1 - p0) * 8 / 1e6 / b }')
+    if [ -z "${rise_eno:-}" ]; then
+        fail "port traffic: no reader report"
+    elif awk "BEGIN {exit !($rise_eno > 5 || $rise_enp > 5)}"; then
+        fail "port traffic with the reader: eno1 +${rise_eno}, enp2s0 +${rise_enp} Mbit/s (limit 5)"
+    else
+        pass "port traffic with the reader: eno1 +${rise_eno}, enp2s0 +${rise_enp} Mbit/s (limit 5)"
+    fi
+    errors="$(journalctl -u clearpath-sensors --since "$since" --no-pager 2> /dev/null \
+        | grep -cE 'Could not grab|reconnecting|Could not open network Hokuyo')"
+    if [ "$errors" -gt 0 ]; then
+        fail "clearpath-sensors logged $errors LiDAR grab/reconnect line(s) during the reader"
+    else
+        pass "no LiDAR grab/reconnect errors during the reader"
+    fi
+    rm -rf "$run"
+}
+
+if [ "$CAMERA_READER" = true ]; then
+    check_camera_reader
+fi
 
 if [ "$TRAFFIC" != true ]; then
     finish

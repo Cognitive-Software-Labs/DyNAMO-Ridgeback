@@ -36,8 +36,14 @@ The proposed discovery-only multicast change and any Fast DDS recovery need
 robot-side verification: a controlled local-reader wire test, 60 s camera
 capture, and observation of sensor recovery, followed by the
 [backlog's longer soak](../BACKLOG.md#hokuyo-driver-recovery-after-read-timeouts).
-The existing `check_link` pass does not exercise this failure: it uses
-Ethernet-only profiles, a separate domain, and one reader per probe topic.
+The synthetic `check_link` traffic test does not exercise this failure: it
+uses Ethernet-only profiles, a separate domain, and one reader per probe topic.
+`check_link --camera-reader` adds the local-reader case on the robot graph under
+the installed services configuration: one guarded `camera_contract_check` reader
+for 20 s after a 10 s quiet baseline, failing on a contract failure, a wired TX
+rise above 5 Mbit/s or a new LiDAR grab/reconnect error. It passed on
+2026-10-21 (29.95 Hz, +0.64 Mbit/s on `eno1`, no LiDAR errors); it is one short
+reader, not the multi-hour soak.
 
 ## Topology
 
