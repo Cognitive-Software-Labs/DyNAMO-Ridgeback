@@ -94,3 +94,25 @@ def test_boot_step_removal_refuses_an_edited_unit(tool):
     with pytest.raises(RuntimeError, match='differs'):
         module.boot_step(host, install=False)
     assert host.path(module.BOOT_UNIT).exists()
+
+
+def test_adopting_tuned_upstreams_keeps_them_across_reapply(tool):
+    module, host, calls = tool
+    module.apply(host, 'intel', ['ntp.ubuntu.com'])
+    managed = host.path(module.MANAGED)
+    tuned = managed.read_text().replace('server ntp.ubuntu.com iburst', 'pool ntp.ubuntu.com iburst maxsources 4 maxpoll 7')
+    managed.write_text(tuned)
+    with pytest.raises(RuntimeError, match='changed externally'):
+        module.apply(host, 'intel')
+    module.adopt_upstreams(host)
+    module.apply(host, 'intel')
+    assert managed.read_text() == tuned
+
+
+def test_adoption_refuses_edits_beyond_the_upstream_lines(tool):
+    module, host, calls = tool
+    module.apply(host, 'intel', ['ntp.ubuntu.com'])
+    managed = host.path(module.MANAGED)
+    managed.write_text(managed.read_text().replace('maxslewrate 500', 'maxslewrate 83333'))
+    with pytest.raises(RuntimeError, match='beyond its upstream lines'):
+        module.adopt_upstreams(host)

@@ -162,7 +162,12 @@ supported for reachable LAN servers with round trips below 10 ms by
 The managed main file `/etc/chrony/chrony.conf` includes only
 `/etc/chrony/conf.d/dynamo-time.conf`. Before package installation,
 `/var/lib/dynamo-time-sync-backup/` saves the original chrony directory,
-package selection, time-service activity/enablement and rendered upstreams.
+package selection, time-service activity/enablement and rendered upstreams. When
+another tool has tuned the Intel upstream lines in place (the 2026-10-13
+four-server pool with `maxpoll 7`), `sudo tools/intel_thor/time_sync
+adopt-upstreams` records them as the managed upstreams so a reapply keeps them;
+it refuses if the installed profile differs from the template in anything else
+and changes no service.
 Rollback reinstalls systemd-timesyncd when it was originally installed and
 restores original files and active/enabled services. File drift causes reapply
 and rollback to refuse before changing services. An installation failure keeps

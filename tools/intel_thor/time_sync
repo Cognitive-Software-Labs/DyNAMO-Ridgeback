@@ -184,6 +184,40 @@ def boot_step(host, install):
     print('Removed; the next boot slews as before.', flush=True)
 
 
+def upstream_lines(text):
+    return [line.strip() for line in text.splitlines()
+            if line.split() and line.split()[0] in ('server', 'pool', 'peer')]
+
+
+def adopt_upstreams(host):
+    """Record the installed profile's upstream lines as the managed upstreams.
+
+    Other tools tune the Intel upstreams in place (2026-10-13: a four-server
+    pool with maxpoll 7). Without this, reapply re-renders the original single
+    server and status reports drift. Refuses unless the installed profile
+    differs from a rendering only in its upstream lines; changes no service.
+    """
+
+    backup = host.path(BACKUP)
+    if not (backup / 'complete').exists():
+        raise RuntimeError('No complete time-sync snapshot')
+    saved = json.loads((backup / 'state.json').read_text())
+    installed = host.path(MANAGED).read_text()
+    sources = '\n'.join(upstream_lines(installed))
+    if not sources:
+        raise RuntimeError(f'{MANAGED} has no server or pool lines')
+    managed, _ = desired(saved['role'], sources)
+    if managed != installed:
+        raise RuntimeError(f'{MANAGED} differs from the template beyond its upstream lines; not adopted')
+    saved['upstreams'] = sources
+    write(backup / 'state.json', json.dumps(saved, indent=2) + '\n')
+    manifest = backup / 'installed.json'
+    digests = json.loads(manifest.read_text()) if manifest.exists() else {}
+    digests[MANAGED] = digest(host.path(MANAGED))
+    write(manifest, json.dumps(digests))
+    print('Adopted upstreams:\n' + sources, flush=True)
+
+
 def status(host):
     metadata = host.path(BACKUP) / 'state.json'
     print('managed deployment: ' + (metadata.read_text() if metadata.exists() else 'not installed'))
@@ -206,7 +240,7 @@ def status(host):
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('command', choices=('status', 'apply', 'rollback', 'boot-step-install',
-                                            'boot-step-remove'))
+                                            'boot-step-remove', 'adopt-upstreams'))
     parser.add_argument('--host', choices=('intel', 'thor'))
     parser.add_argument('--upstream', action='append', help='Intel internet NTP name; repeat to retain several')
     parser.add_argument('--yes', action='store_true')
@@ -229,6 +263,8 @@ def main(argv=None):
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
             if args.command == 'apply':
                 apply(host, args.host, args.upstream)
+            elif args.command == 'adopt-upstreams':
+                adopt_upstreams(host)
             elif args.command.startswith('boot-step'):
                 boot_step(host, install=args.command == 'boot-step-install')
             else:
