@@ -264,6 +264,20 @@ cannot stop startup; set `RIDGEBACK_MODEL_DOWNLOADS=1` for the first launch on a
 new host so the models are downloaded once. Check the environment
 with `~/venvs/dynamo-perception/bin/python3 tools/intel_thor/check_perception_env`
 (ROS sourced), which fails unless the models' operations run on the GPU.
+
+To run localization at every Thor boot, install the boot service from the Thor
+checkout that holds the build; it starts after Thor's PTP clock services:
+
+```bash
+sudo tools/intel_thor/localization_service apply
+```
+
+Settings (checkout, labels, threshold, mask and depth modes) live in
+`/etc/default/dynamo-localization`; edit them and run
+`sudo systemctl restart dynamo-localization`. `status` compares the installed
+unit with the template; `remove` uninstalls it and keeps the settings unless
+`--purge` is given. Stop any launch started by hand first; `apply` refuses
+while one runs.
 `tools/intel_thor/thor_lan_route` must be applied first, or Thor never receives
 static TF. For a person target, OWLv2 scores below the default
 `detection_threshold` of 0.55 on `r100_0160`; set `detection_threshold:=` explicitly

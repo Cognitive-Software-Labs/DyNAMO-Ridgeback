@@ -1,0 +1,139 @@
+#!/usr/bin/env python3
+"""Run Thor's target localization as a boot service.
+
+Usage: tools/intel_thor/localization_service status
+       sudo tools/intel_thor/localization_service apply [--checkout PATH] [--user robot] [--yes]
+       sudo tools/intel_thor/localization_service remove [--purge] [--yes]
+
+apply   renders dynamo-localization.service from this checkout's template, writes
+        /etc/default/dynamo-localization only if it does not exist yet (operator
+        edits there survive a reapply), and enables and starts the unit. It
+        refuses while a localization launch started by hand is running, so two
+        launches never compete for the same topics. The checkout must contain a
+        Thor build (artifacts/colcon/thor-install).
+status  compares the installed unit with the rendering and reports its state.
+remove  stops and disables the unit and deletes it; --purge also deletes the
+        settings file.
+"""
+import argparse
+import os
+from pathlib import Path
+import pwd
+import subprocess
+import sys
+
+REPO = Path(__file__).resolve().parents[2]
+CONFIG = REPO / 'src/ridgeback_autonomy_hardware/config/intel_thor/localization'
+UNIT = 'dynamo-localization.service'
+UNIT_PATH = '/etc/systemd/system/' + UNIT
+DEFAULTS_PATH = '/etc/default/dynamo-localization'
+
+
+def run(*argv, check=True):
+    result = subprocess.run(argv, capture_output=True, text=True)
+    if check and result.returncode:
+        raise RuntimeError(f'{argv[0]} failed: {result.stderr.strip()}')
+    return result
+
+
+class Host:
+    def __init__(self, root='/'):
+        self.root = Path(root)
+
+    def path(self, absolute):
+        return self.root / absolute.lstrip('/')
+
+
+def render(user):
+    return (CONFIG / 'dynamo-localization.service.in').read_text().replace('@USER@', user)
+
+
+def render_defaults(checkout, venv):
+    text = (CONFIG / 'dynamo-localization.default').read_text()
+    return text.replace('@CHECKOUT@', str(checkout)).replace('@VENV@', str(venv))
+
+
+def manual_launches():
+    """PIDs of localization launches that systemd did not start."""
+
+    out = run('ps', '-eo', 'pid,args', check=False).stdout.splitlines()
+    pids = [line.split()[0] for line in out
+            if 'ros2 launch ridgeback_localization' in line and line.split()[1].endswith('python3')]
+    owned = run('systemctl', 'show', UNIT, '-p', 'MainPID', '--value', check=False).stdout.strip()
+    return [pid for pid in pids if pid != owned]
+
+
+def write(path, text):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(path.name + '.tmp')
+    temporary.write_text(text)
+    temporary.chmod(0o644)
+    os.replace(temporary, path)
+
+
+def apply(host, checkout, user):
+    checkout = Path(checkout).expanduser().resolve()
+    if not (checkout / 'artifacts/colcon/thor-install/local_setup.bash').is_file():
+        raise RuntimeError(f'{checkout} has no Thor build (artifacts/colcon/thor-install)')
+    running = manual_launches()
+    if running:
+        raise RuntimeError('A localization launch started by hand is running (PID '
+                           + ', '.join(running) + '); stop it first')
+    home = Path(pwd.getpwnam(user).pw_dir)
+    write(host.path(UNIT_PATH), render(user))
+    defaults = host.path(DEFAULTS_PATH)
+    if not defaults.exists():
+        write(defaults, render_defaults(checkout, home / 'venvs/dynamo-perception'))
+    run('systemctl', 'daemon-reload')
+    run('systemctl', 'enable', '--now', UNIT)
+    print(f'Installed {UNIT} for {checkout}; settings in {DEFAULTS_PATH}.', flush=True)
+
+
+def remove(host, purge):
+    run('systemctl', 'disable', '--now', UNIT, check=False)
+    host.path(UNIT_PATH).unlink(missing_ok=True)
+    if purge:
+        host.path(DEFAULTS_PATH).unlink(missing_ok=True)
+    run('systemctl', 'daemon-reload')
+    print('Removed.' + (' Settings deleted.' if purge else f' Settings kept in {DEFAULTS_PATH}.'))
+
+
+def status(host, user):
+    unit = host.path(UNIT_PATH)
+    current = unit.exists() and unit.read_text() == render(user)
+    print(('ok    ' if current else 'DIFF  ') + UNIT_PATH)
+    defaults = host.path(DEFAULTS_PATH)
+    print(('ok    ' if defaults.exists() else 'MISS  ') + DEFAULTS_PATH)
+    for prop in ('is-enabled', 'is-active'):
+        print(f"{prop:10}{run('systemctl', prop, UNIT, check=False).stdout.strip()}")
+    return int(not (current and defaults.exists()))
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__.split('\n\n')[0])
+    parser.add_argument('command', choices=('status', 'apply', 'remove'))
+    parser.add_argument('--checkout', default=str(REPO))
+    parser.add_argument('--user', default=os.environ.get('SUDO_USER') or 'robot')
+    parser.add_argument('--purge', action='store_true')
+    parser.add_argument('--yes', action='store_true')
+    args = parser.parse_args(argv)
+    host = Host()
+    try:
+        if args.command == 'status':
+            return status(host, args.user)
+        if os.geteuid() != 0:
+            parser.error('apply/remove must be run with sudo')
+        if not args.yes and input('This starts or stops Thor localization. Continue? [y/N] ').lower() not in ('y', 'yes'):
+            return 1
+        if args.command == 'apply':
+            apply(host, args.checkout, args.user)
+        else:
+            remove(host, args.purge)
+        return 0
+    except (RuntimeError, OSError) as error:
+        print(str(error), file=sys.stderr)
+        return 2
+
+
+if __name__ == '__main__':
+    sys.exit(main())
