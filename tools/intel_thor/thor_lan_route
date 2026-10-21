@@ -14,9 +14,11 @@ transient-local data (tf_static, robot_description, node names) never reaches
 Thor. The route sends those packets to Intel over the cable instead; Intel
 accepts packets for any of its addresses on br0.
 
-The route is added to Thor's NetworkManager connection for the robot Ethernet,
-so it survives reboots. apply snapshots that connection's IPv4 routes;
-rollback restores them. status is read-only and needs no checkout (check_link
+The route is added to every NetworkManager connection bound to the robot
+Ethernet port, so it survives reboots whichever of them NetworkManager
+activates: on 2026-10-21 Thor came up on a second profile for the same port and
+the route was gone. apply snapshots each connection's IPv4 routes; rollback
+restores them. status is read-only and needs no checkout (check_link
 runs it from Intel).
 """
 import argparse
@@ -40,12 +42,19 @@ def run(*argv, check=True):
     return result
 
 
-def connection():
-    for line in run('nmcli', '-t', '-f', 'NAME,DEVICE', 'connection', 'show', '--active').stdout.splitlines():
-        name, _, device = line.rpartition(':')
-        if device == DEVICE:
-            return name.replace('\\:', ':')
-    raise RuntimeError(f'no active NetworkManager connection on {DEVICE}; this is not Thor')
+def connections():
+    """Every Ethernet connection bound to DEVICE, active or not."""
+
+    names = []
+    for line in run('nmcli', '-t', '-f', 'NAME,TYPE', 'connection', 'show').stdout.splitlines():
+        name, _, kind = line.rpartition(':')
+        name = name.replace('\\:', ':')
+        if kind == '802-3-ethernet' and run(
+                'nmcli', '-g', 'connection.interface-name', 'connection', 'show', name).stdout.strip() == DEVICE:
+            names.append(name)
+    if not names:
+        raise RuntimeError(f'no NetworkManager connection is bound to {DEVICE}; this is not Thor')
+    return names
 
 
 def routes(name):
@@ -68,8 +77,8 @@ def checks():
     device, via = kernel_path()
     rows = [(device == DEVICE and via == INTEL_ETHERNET, 'kernel route',
              f'{INTEL_WIFI} via {via or "direct"} dev {device}')]
-    name = connection()
-    rows.append((has_route(routes(name)), 'persistent route', f'NetworkManager connection "{name}"'))
+    for name in connections():
+        rows.append((has_route(routes(name)), 'persistent route', f'NetworkManager connection "{name}"'))
     return rows
 
 
@@ -81,14 +90,26 @@ def status():
     return 0 if all(passed for passed, _, _ in rows) else 1
 
 
+def saved_routes():
+    """Snapshot as {connection: routes}; reads the former single-connection form."""
+
+    path = BACKUP / 'state.json'
+    if not path.exists():
+        return {}
+    saved = json.loads(path.read_text())
+    return saved['connections'] if 'connections' in saved else {saved['connection']: saved['routes']}
+
+
 def apply():
-    name = connection()
-    current = routes(name)
-    if not (BACKUP / 'state.json').exists():
+    saved = saved_routes()
+    for name in connections():
+        current = routes(name)
+        # Snapshot each connection before its first change; never overwrite one.
+        saved.setdefault(name, current)
         BACKUP.mkdir(parents=True, exist_ok=True)
-        (BACKUP / 'state.json').write_text(json.dumps({'connection': name, 'routes': current}, indent=2) + '\n')
-    if not has_route(current):
-        run('nmcli', 'connection', 'modify', name, '+ipv4.routes', ROUTE)
+        (BACKUP / 'state.json').write_text(json.dumps({'connections': saved}, indent=2) + '\n')
+        if not has_route(current):
+            run('nmcli', 'connection', 'modify', name, '+ipv4.routes', ROUTE)
     # Reapply in place: the link and its address stay up.
     run('nmcli', 'device', 'reapply', DEVICE)
     return status()
@@ -97,8 +118,8 @@ def apply():
 def rollback():
     if not (BACKUP / 'state.json').exists():
         raise RuntimeError('No route snapshot')
-    saved = json.loads((BACKUP / 'state.json').read_text())
-    run('nmcli', 'connection', 'modify', saved['connection'], 'ipv4.routes', ', '.join(saved['routes']))
+    for name, entries in saved_routes().items():
+        run('nmcli', 'connection', 'modify', name, 'ipv4.routes', ', '.join(entries))
     run('nmcli', 'device', 'reapply', DEVICE)
     run('ip', 'route', 'del', f'{INTEL_WIFI}/32', check=False)
     (BACKUP / 'state.json').unlink()
