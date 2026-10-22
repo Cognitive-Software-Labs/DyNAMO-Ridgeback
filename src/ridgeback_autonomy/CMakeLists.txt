@@ -187,6 +187,7 @@ if(BUILD_TESTING)
   ament_add_pytest_test(test_sweep test/test_sweep.py)
   ament_add_pytest_test(test_sweep_report test/test_sweep_report.py)
   ament_add_pytest_test(test_hud_node test/test_hud_node.py)
+  ament_add_pytest_test(test_node_shutdown test/test_node_shutdown.py)
 endif()
 
 install(PROGRAMS ridgeback_autonomy/diagnostics/localization_status_node.py
