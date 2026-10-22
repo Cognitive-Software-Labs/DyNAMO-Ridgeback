@@ -1,256 +1,221 @@
 # Robot-local deployment
 
-This page owns the changes DyNAMO makes to a physical robot's startup
-configuration on the Intel PC, the order in which to re-apply them after a
-reinstall, and the camera service contract that robot-side diagnostics rely on.
-Operator commands live in the [README](../../README.md#hardware-camera-service);
-the DDS transport design lives in the [transport reference](intel_thor_transport.md).
+This reference owns the installed D455 service and its reconstruction inputs.
+Public commands live in the [README](../../README.md#hardware-camera-service).
+Host reconstruction and credentials belong to the
+[recovery runbook](ridgeback_recovery.md).
 
-Every change below is made by a tracked repository tool that snapshots what it
-replaces, reports drift with `status`, and restores its snapshot with
-`rollback`. Re-running the tools in order rebuilds the deployment; nothing on
-this page needs to be recreated by hand.
+## Camera owner and source
 
-## Re-apply order
+On 2026-10-12 `dynamo-camera.service` was active and enabled, with the vendor
+camera units disabled and inactive. The restored `tools/intel_thor/camera_service`
+matched the installed description-only camera declaration, driver parameters,
+unit and discovery-only multicast configuration. Its source and templates were
+recovered from the installed metadata's Git revision
+`4e5a9b5476ad9c502d90718709629e2f2052cccb`; no live service was changed.
 
-| Order | Tool | Robot-local state it owns | Snapshot |
-|---|---|---|---|
-| 1 | `sudo tools/intel_thor/intel_services_rmw apply` | `/etc/clearpath/cyclonedds.xml`, `/etc/sysctl.d/60-dynamo-dds-buffers.conf`, the middleware and `CYCLONEDDS_URI` in `/etc/clearpath/robot.yaml`, and `60-dynamo-cyclonedds.conf` drop-ins for the MyBotShop units | `/etc/clearpath/dynamo-rmw-backup/` |
-| 2 | `sudo tools/intel_thor/camera_service apply` | the `camera_0` entry in `/etc/clearpath/robot.yaml`, `/etc/clearpath/dynamo-camera/`, `/etc/systemd/system/dynamo-camera.service`, and the enablement of the four vendor camera units | `/etc/clearpath/dynamo-camera-backup/` |
-| 3 | `sudo tools/intel_thor/time_sync apply --host intel` (Thor: `--host thor`, from its worktree) | chrony and `/etc/chrony/` on each host; Intel keeps internet upstreams, slews at most 500 ppm and serves the subnet | `/var/lib/dynamo-time-sync-backup/` |
-| 4 | `sudo tools/intel_thor/ptp_sync apply --host intel`, then `--host thor` on Thor | `linuxptp`, `/etc/linuxptp/dynamo-ptp4l.conf`, `dynamo-ptp4l.service` and `dynamo-phc2sys.service`; on Thor, chrony stopped and disabled while PTP owns the wall clock | `/var/lib/dynamo-ptp-sync-backup/` |
-| 5 | `sudo tools/intel_thor/host_performance apply --host intel`, then `--host thor` on Thor | `/usr/local/sbin/dynamo-host-performance` and `dynamo-host-performance.service`: the performance governor (and, on Intel, energy preference) on every CPU policy at boot; on Thor, nvpmodel's 120W power mode (not MAXN; see the transport reference's known limits), which nvpmodel restores itself. `check_link` fails while either host differs | `/var/lib/dynamo-host-performance-backup/` |
-| 6 | `sudo tools/intel_thor/thor_lan_route apply` on Thor | A `192.168.123.14/32 via 192.168.131.1` route in Thor's NetworkManager connection for `enP2p1s0`, so Thor's DDS replies to Intel's Wi-Fi address use the cable; `check_link` fails without it | `/var/lib/dynamo-thor-lan-route-backup/` |
+The maintained sources are `tools/intel_thor/camera_service`, the D455 and DDS
+configs under `src/ridgeback_autonomy_hardware/config/`, and the systemd template
+there. The selected robot input is `deployment/r100_0160/camera.json`: D455
+serial 338522302134, 640×480 at 30 FPS, services DDS profile. The driver reads
+`/etc/clearpath/dynamo-camera/d455.yaml` and runs directly from the apt ROS
+installation rather than this checkout's build/install outputs. Metadata at
+`/etc/clearpath/dynamo-camera/install.json` records its installed profile and
+source revision. A different checkout revision alone does not imply file drift.
 
-The camera service depends on step 1: its unit sources `/etc/clearpath/setup.bash`
-for the middleware, and `apply` refuses unless the installed DDS profile restricts
-multicast to discovery (`<AllowMulticast>spdp</AllowMulticast>`). Without that
-restriction a single local camera reader floods both bridge ports and interrupts
-the LiDARs; see the [transport reference](intel_thor_transport.md#camera-subscriber-blocker).
+The camera service owns colour and colour-aligned depth, remapped to
+`/r100_0160/sensors/camera_0/color/image` and `…/depth/image`, with colour
+CameraInfo at `…/color/camera_info`. Infrared, IMU and pointcloud outputs are off.
+The robot declaration owns the camera mount; the driver owns its factory
+extrinsics and remaps TF to the namespaced tree. Installation conflicts with the
+vendor camera unit. Do not run the legacy vendor DDS/repair workflow against
+this service or re-enable its competing camera units.
 
-The desktop is a separate workstream. As of 2026-10-06 the VNC server runs from
-`ridgeback-vnc.service`, while the port-9005 browser proxy is still owned by
-`mbs-webserver.service`, so stopping the webserver can close a browser desktop.
-Its installer is not yet in the repository; record it here when it lands. The
-camera service never stops or restarts `mbs-webserver`.
+`tools/camera_contract_check` targets these installed names explicitly. On
+`origin/dev`, `ridgeback_common.camera_inputs` gives the RealSense backend the
+same three names as the simulators, so the localization launches already
+consume the installed service's topics; this checkout's older
+`camera_inputs.py` still names `image_raw` and `aligned_depth_to_color/image_raw`
+until it is merged with `origin/dev`. Do not launch localization from this
+checkout's source before that merge. Restoring the
+tooling and matching files does not qualify image timing, TF, target estimation
+or hardware performance.
 
-A Clearpath or MyBotShop reinstall can rewrite `/etc/clearpath/robot.yaml`,
-re-enable the vendor camera units, or replace their scripts. After one, run
-each tool's `status`; any `DIFF` row means that step must be re-applied.
+On 2026-10-13 a guarded local-reader screen measured 12 seconds after three
+seconds of warm-up. The 640×480 RGB/aligned-depth streams each received 359
+unique frames (29.92 Hz), with no duplicate/regressing stamps, a maximum stamp
+gap of 33.5 ms and 100% exact timestamp matching in both directions. Types,
+encodings, grids, optical frame and the base-to-optical TF lookup passed.
+Front/rear/merged scans stayed near 40 Hz with maximum receive gaps
+71.0/57.8/70.5 ms. The report is
+`artifacts/hardware/camera-screen-20261013T141447Z.json`. This is a short VGA
+contract screen, not repeated-profile, application or soak qualification.
 
-## Camera service
+That same report recorded total `eno1` TX near 98.2 Mbit/s. It contains no quiet
+baseline or packet destinations, so it cannot attribute that traffic to the
+test readers or close the physical-port traffic gate. The maintained
+`tools/hardware/screen_camera_port_traffic.py` compares five quiet seconds with
+a guarded reader trial and captures 96-byte packet prefixes on both wired ports
+and Wi-Fi. It sends no commands, restarts nothing and preserves evidence for
+packet destination/protocol analysis. Total port traffic alone does not prove
+multicast flooding or a LiDAR fault mechanism.
 
-`dynamo-camera.service` owns the D455 from boot and publishes the camera contract
-the simulators publish, so the same detector and estimator nodes run unchanged on
-every backend. The [camera stack](../target_localization/camera_stack.md) owns
-that contract; this section owns how the robot provides it.
+The subsequent `camera-port-screen-20261013T141921629818Z` trial passed its
+camera contract and stationary pre/post probes. Wired sysfs-counter TX was:
 
-`camera_service apply`:
+| Port | Before readers | Reader trial | Difference |
+|---|---:|---:|---:|
+| eno1 | 763.70 Mbit/s | 761.75 Mbit/s | −1.95 Mbit/s |
+| enp2s0 | 0.1294 Mbit/s | 0.1288 Mbit/s | −0.0006 Mbit/s |
 
-1. Refuses before changing anything unless the robot-local YAML has a namespace,
-   `/etc/clearpath/setup.bash` selects CycloneDDS with the installed profile, the
-   profile restricts multicast to discovery, exactly one D455 is attached, and no
-   other camera is declared.
-2. Snapshots `robot.yaml` and the enablement and activity of the vendor units,
-   once. A re-apply keeps the first snapshot.
-3. Disables and stops `realsense-camera`, `depth-to-mono8`,
-   `ridgeback-camera-mjpeg` and `camera-web-ready`, which exist only for the
-   vendor web camera view.
-4. Declares `camera_0` in `robot.yaml` with the repository mount
-   (`default_mount` + `[0.2692, 0, 0.725]`), `urdf_enabled: true` and
-   `launch_enabled: false`. The Clearpath description then owns
-   `base_link → … → camera_0_bottom_screw_frame → camera_0_link`, and the
-   Clearpath generator launches no camera of its own.
-5. Renders the driver parameters from
-   `src/ridgeback_autonomy_hardware/config/d455.yaml` and the unit from
-   `config/systemd/dynamo-camera.service.in`, restarts `clearpath-robot` to
-   regenerate the description (platform and sensors restart with it) only if the
-   `camera_0` declaration changed, and enables and restarts the service. A
-   re-apply that changes only the profile, rate or DDS tuning restarts the camera
-   alone.
+There was no wired traffic rise attributable to introducing these local
+readers in this short comparison. Color/depth delivery remained about 30 Hz,
+with 99.72%/100% exact pairing and all scan outputs around 39.92 Hz.
+Packet headers explain the large existing wired load: over 99% of captured
+`eno1` IPv4 bytes were UDP unicast from `192.168.131.1` to Thor
+`192.168.131.51`, approximately 754 Mbit/s before and 751 Mbit/s during readers.
+Dominant first-fragment destination ports were 7411, 7413 and 7415, with sender
+port 53708. This identifies the network flow, not its application/process or
+ROS topics. Fragmented packets were included in IP-byte totals; header captures
+and sysfs counters use slightly different measurement intervals.
 
-`apply` and `rollback` take `/run/lock/dynamo-local-dds-test.lock`, the lock the
-robot-side DDS experiment tools hold, and refuse while it is held. Any failure
-after the snapshot restores it. `rollback`, and an `apply` that changes the
-declaration, restart `clearpath-robot`, which drops motor power and teleop
-until the platform is back:
-stopping `clearpath-platform` usually takes about a minute on `r100_0160`, and
-the tool prints nothing while it waits. Run them with the robot stationary and
-the e-stop in reach, and let them finish; an interrupted run can leave the
-vendor units disabled without the new service started, which `rollback` repairs.
+Captured `eno1` IPv4 multicast totaled about 0.42/0.52 Mbit/s. The MCU-facing
+`enp2s0` capture consisted almost entirely of normal robot–MCU UDP exchanges,
+with no high-volume image-sized traffic. Tcpdump reported zero kernel drops in
+these captures. Analysis with capture hashes is under
+`artifacts/hardware/20261013-camera-port-analysis/packet-summary.json`.
+The active high-volume Thor flow means this was **not** the requested
+remote-streaming-off comparison. Identify its sender/subscribers and arrange a
+quiet repeat before claiming that full gate. These short windows neither
+reproduce the historical lockout nor qualify a long soak.
 
-### Installed files
+A second comparison (`camera-port-screen-20261013T142757522717Z`) again passed
+the camera and scan contract with safe stationary pre/post probes. Wired TX
+was 763.70 Mbit/s before and 762.73 Mbit/s during readers on `eno1`, with only
+0.00083 Mbit/s increase on `enp2s0`. Color/depth rates were 30.00/29.75 Hz;
+largest depth stamp gap was 66.7 ms, within the screen limit. Packet headers
+still show the camera socket `192.168.131.1:53708` sending to Thor. Socket
+inspection identified that sender as `realsense2_camera`, PID 3049. Therefore
+the remote-streaming-off condition was not achieved in this repeat; stopping
+one named localization launch cannot be assumed to remove all remote readers.
+Identify the remaining Thor subscriptions before another quiet comparison.
 
-| Path | Content |
-|---|---|
-| `/etc/clearpath/robot.yaml` | `sensors.camera[0]`: the `camera_0` declaration, including the camera serial |
-| `/etc/clearpath/dynamo-camera/d455.yaml` | rendered driver parameters (do not edit) |
-| `/etc/clearpath/dynamo-camera/install.json` | installed profile, serial, namespace and source revision |
-| `/etc/systemd/system/dynamo-camera.service` | rendered unit (do not edit) |
-| `/etc/clearpath/dynamo-camera-backup/` | `robot.yaml` and `units.json` from before the first apply |
+The October 14 quiet repeat finally removed those readers: the exact Thor
+localization launch and three perception children were stopped, and the launch
+was restored from private saved command/environment/cwd after capture.
+`camera-port-screen-20261014T093624119430Z` passed stationary pre/post probes,
+the complete short camera contract, and scan continuity. `eno1` TX was
+0.233 Mbit/s before readers and 0.196 Mbit/s during them; MCU-port TX was
+0.12866/0.12879 Mbit/s. Each image stream received 359 unique frames in twelve
+seconds (29.92 Hz), with 100% timestamp pairing, no duplicate/regressing stamps
+and maximum stamp gap 33.44 ms. Individual scans measured 40 Hz and merged
+39.92 Hz, with maximum receive gaps 46.1/35.5/45.6 ms. Packet headers show
+`eno1` multicast around 0.029/0.021 Mbit/s and no high-volume Thor flow; all six
+captures reported zero kernel drops. This passes the short quiet local-reader
+traffic screen. It does not qualify additional independent reader pairs,
+repeated profiles, a long soak or timeout recovery. The prior high wired load
+was dependent on active Thor perception subscribers; this comparison does not
+by itself resolve duplicate remote subscriptions or reduce their bandwidth.
 
-The unit runs only the apt `realsense2_camera` driver and the rendered files; it
-runs no workspace code. Rebuilding or switching the checkout therefore cannot
-change the camera at the next boot. Editing the repository configuration does
-nothing until `apply` is re-run; `status` shows the revision installed and
-flags rendered files that no longer match the checkout.
+**S2 VGA reader matrix (2026-10-14, 11:21–11:31 UTC).** With Thor perception
+running (its ~763 Mbit/s `eno1` flow present throughout) and the platform
+stationary, `artifacts/hardware/20261014T112047Z-s2-vga-reader-matrix/run.sh` took a 60-second wired-counter baseline, then ran
+`tools/camera_contract_check --guard` (10 s warm-up, 60 s measured) three times
+with one reader pair and three times with two independent pairs at once. All
+nine reader runs passed the full contract: about 30 Hz unique colour and depth,
+no duplicate or regressing stamps, 99.78–100 % exact pairing in both directions,
+the base-to-optical TF at the last image stamp, and front/rear/merged scans near
+39.9 Hz with gaps up to about 51 ms. Wired TX changed by −0.6 to 0.0 Mbit/s on
+`eno1` and under 0.001 Mbit/s on `enp2s0` against the baseline, within the
+5 Mbit/s limit (`summary.txt`). This passes S2 at 640×480; the HD profile and
+HD cross-host delivery remain separate gates.
 
-### Profile and serial
+**S4 reader-pair soak (2026-10-14, 11:48–12:20 UTC).** The same procedure with
+two independent reader pairs measured together for 1,800 s after 10 s of
+warm-up (`artifacts/hardware/20261014T114755Z-s4-reader-pair-soak/`; its summary line reuses the S2 script's label). Both passed the
+full contract: 29.96 Hz unique colour and depth, no duplicate or regressing
+stamps, maximum colour/depth stamp gaps 33/66 ms, 99.97 %/100 % exact pairing,
+the TF lookup, and front/rear/merged scans at 39.92–39.93 Hz with gaps up to
+62 ms. Wired TX rose 1.9 Mbit/s on `eno1` over its 761 Mbit/s baseline (Thor
+perception running), within the 5 Mbit/s limit, and `clearpath-sensors` logged
+no LiDAR grab or reconnect errors. This passes S4 at 640×480 with SLAM and Nav2
+absent; the loaded recurrence soak is S5.
 
-The profile is chosen at install (`apply --profile 640x480|1280x720`, default
-`640x480`), not per launch: a driver started at boot cannot change it for one
-run. Both infrared streams are off, which 1280x720 requires, and the pointcloud
-is off until an organized cloud is qualified.
+**S2 HD trial (2026-10-16).** The operator selected 1280×720 at 30 FPS with
+the maintained camera installer. The robot declaration did not change, so only
+the camera service restarted. A guarded five-second screen after three seconds
+of warm-up delivered 22.40 Hz for both images. A second guarded run after ten
+seconds of warm-up measured colour at 22.58 Hz and depth at 22.08 Hz over
+60 seconds; the largest depth stamp gap was 400.3 ms and colour-to-depth exact
+stamp pairing was 97.79%. Both failed the 29 Hz image gate; the front, rear
+and merged LiDAR scans stayed near 39.9 Hz. The evidence is under
+`artifacts/hardware/20261016-s2-hd-short.json` and
+`20261016-s2-hd-full.json`. During diagnosis `eno1` transmitted about
+865 Mbit/s with Thor localization active. That observation suggests a possible
+cross-host bandwidth limit but does not establish the cause; a quiet local HD
+comparison and HD cross-host delivery remain untested. At 1280×720,
+RGB8 plus Z16 at 30 FPS would require about 1.106 Gbit/s of image payload
+before DDS and Ethernet overhead if both raw streams crossed to Thor. The
+camera journal confirms that both HD sensor profiles opened at 30 FPS over
+USB 3.2, but it does not count frames produced at the sensor. Thor's
+localization launch was running from an abandoned interactive session rather
+than a restartable service, so its active consumer was left untouched.
+The original 640×480
+profile was restored and passed a guarded 12-second screen at 29.92/30.00 Hz
+colour/depth with all three scans near 39.92 Hz
+(`20261016-s2-vga-restored.json`).
 
-`serial_no` is the camera serial that librealsense reports (`Device Serial No`
-in the driver log, or `rs-enumerate-devices -s` while no driver holds the
-device). The USB descriptor serial in `/sys/bus/usb/devices/*/serial` is a
-different number and does not select the camera. `apply` enumerates the camera
-after the vendor driver releases it; `--serial` overrides that, and a re-apply
-reuses the serial already declared.
+**S2 HD diagnosis (2026-10-16, 09:55–10:00 UTC).** The cause is the 1 Gb/s
+robot Ethernet, not the camera or Intel. Raw 1280×720 colour (`rgb8`, 2,764,800 B)
+plus aligned depth (`16UC1`, 1,843,200 B) at 30 Hz is about 1,106 Mbit/s for a
+single remote copy. With the profile at 1280×720 and the same guarded 60-second
+check (`artifacts/hardware/20261016T095428Z-s2-hd-diagnosis/`):
 
-### Contract for diagnostics
+| Run | Thor localization | Colour / depth | Largest depth gap | `eno1` TX |
+|---|---|---|---|---|
+| A | stopped | 29.92 / 29.92 Hz, 100 % pairing | 66.9 ms | 0.3 Mbit/s |
+| B | running (one subscriber per image) | 22.45 / 22.37 Hz | 300.5 ms | 856.6 Mbit/s |
 
-Tools that observe or restart the camera, such as robot-side DDS tests, should
-target this layout rather than the vendor one.
+856.6 / 1,106 × 30 Hz ≈ 23 Hz, the observed rate. The driver itself publishes
+fewer frames while the link is saturated, so **local Intel readers also drop to
+about 22 Hz** whenever Thor pulls raw HD; the LiDAR scans were unaffected. Local
+HD is therefore a camera-and-host question that run A answers, while raw HD to
+Thor cannot meet 30 Hz on this link. **Decision (user, 2026-10-16): Thor stays at 640×480.** The deployment profile
+remains 640×480 at 30 Hz raw; 1280×720 is a local-only profile, selected only
+while Thor localization is stopped. Compressed or reduced-rate HD for Thor is not
+pursued.
 
-| Item | Value |
-|---|---|
-| Unit | `dynamo-camera.service`, `User=robot`, `Restart=always`, `Conflicts=realsense-camera.service` |
-| Process | one: the unit's main PID is `realsense2_camera_node` itself |
-| Environment | `/etc/clearpath/setup.bash`: domain, `RMW_IMPLEMENTATION`, `CYCLONEDDS_URI` identical to the Clearpath services |
-| Node | `/<ns>/sensors/camera_0` |
-| Colour | `/<ns>/sensors/camera_0/color/image`, `sensor_msgs/Image`, colour optical frame |
-| Colour calibration | `/<ns>/sensors/camera_0/color/camera_info` |
-| Aligned depth | `/<ns>/sensors/camera_0/depth/image`, `16UC1` millimetres on the colour grid, colour optical frame, stamps identical to colour |
-| Compressed variants | `color/image/{compressed,compressedDepth,ffmpeg,theora,zstd}` and the same under `depth/image/`, encoded only while subscribed. Encoder parameters keep the driver's original names, e.g. `camera_0.color.image_raw.ffmpeg.encoder` and `.camera_0.color.image_raw.compressed.jpeg_quality` |
-| Other driver outputs | keep driver names, for example native depth `depth/image_rect_raw` |
-| Optical frame | `camera_0_color_optical_frame` |
-| TF | driver: `camera_0_link →` its frames on `/<ns>/tf_static`; Clearpath description: `base_link → camera_0_link` |
-| Installed profile | `/etc/clearpath/dynamo-camera/install.json` |
+**S2 HD local reader matrix (2026-10-16, 10:22–10:33 UTC).** With 1280×720
+selected and Thor localization stopped, the same nine-run procedure as at VGA
+(`artifacts/hardware/20261016T101433Z-s2-hd-reader-matrix/`) passed eight runs: 29.4–30.0 Hz colour and depth, 99.77–100 % exact
+pairing, the TF lookup, all three scans near 39.9 Hz, and no wired traffic
+rise. Run `single_1` failed only its stamp-gap limit: one 166.8 ms gap (five
+frames) in colour and depth together, against 150 ms; other HD runs reached
+100–133 ms where VGA never exceeded 67 ms. The camera journal shows no error
+and the profile stayed at 1280×720 throughout, so these are source-side frame
+dropouts at HD. **HD local delivery is therefore not qualified** under the
+frozen criteria. HD is local-only and not the deployment profile, so this does
+not block VGA operation; qualifying HD would need the dropouts characterised
+in a longer HD capture.
 
-### Verify
+## Reconstruction and verification
 
-```bash
-tools/intel_thor/camera_service status
-source /etc/clearpath/setup.bash
-tools/camera_contract_check --backend hardware --output artifacts/hardware/<run>/camera-contract.json
-```
+The recovery preparer uses camera.json to regenerate the description-only
+camera entry, service and parameters from maintained sources. Installed unit,
+parameters, private DDS profile and metadata are labelled snapshots in the
+deployment manifest. They are evidence, not a substitute for rendering
+or fresh installation metadata. Select the camera service instead of the
+historical vendor wrapper; retain the merger's explicit Fast DDS exception.
 
-Source `/etc/clearpath/setup.bash` first so the check joins the robot graph with
-the services' domain, middleware and DDS profile. It subscribes to the three
-camera topics and the three scans for ten seconds of warm-up and sixty seconds
-of measurement, and passes only if every criterion it prints passes. It does not
-prove application accuracy, motion behaviour, or camera–LiDAR calibration.
+On a replacement host, establish ROS packages, interfaces, namespace and the
+services DDS profile first. Then use the maintained camera installer to render
+and record the actual installation, following the root workflow. Its apply and
+rollback operations can regenerate Clearpath state and restart services; they
+are not read-only checks and are not part of the current stationary desktop
+repair. Driver serial selection uses the RealSense camera serial, not its
+separate USB descriptor serial.
 
-## Clock synchronization and camera transport candidates
-
-`tools/intel_thor/time_sync` supplies `status`, operator-run `apply --host
-intel|thor`, and `rollback`. It installs chrony, preserving Intel's existing
-configured chrony upstreams or the active timesyncd server. `--upstream` can
-explicitly retain several Intel internet servers. Intel allows the robot
-subnet and serves a local stratum-10 clock when upstreams are unavailable;
-Thor uses only `192.168.131.1`, with no DHCP or internet source includes.
-Its LAN source uses `minpoll -4 maxpoll -4 xleave filter 4`: 16 requests per
-second with four-poll median filtering and interleaved server timestamps.
-This is a candidate repair for the several-millisecond startup drift observed
-with the default 64-second polling while Intel slewed to its internet source;
-verify the independent bound before accepting it. Sub-second polling is
-supported for reachable LAN servers with round trips below 10 ms by
-[chrony 4.5](https://chrony-project.org/doc/4.5/chrony.conf.html#server).
-
-The managed main file `/etc/chrony/chrony.conf` includes only
-`/etc/chrony/conf.d/dynamo-time.conf`. Before package installation,
-`/var/lib/dynamo-time-sync-backup/` saves the original chrony directory,
-package selection, time-service activity/enablement and rendered upstreams. When
-another tool has tuned the Intel upstream lines in place (the 2026-10-13
-four-server pool with `maxpoll 7`), `sudo tools/intel_thor/time_sync
-adopt-upstreams` records them as the managed upstreams so a reapply keeps them;
-it refuses if the installed profile differs from the template in anything else
-and changes no service.
-Rollback reinstalls systemd-timesyncd when it was originally installed and
-restores original files and active/enabled services. File drift causes reapply
-and rollback to refuse before changing services. An installation failure keeps
-the snapshot for operator rollback. Package versions/cache are not snapshotted;
-rollback may require apt connectivity. Time changes can step wall clocks, so
-apply while the robot is stationary and no timing run holds the experiment lock.
-
-chrony serves an estimate of true time, while sensor stamps come from Intel's
-wall clock, so a chrony client follows Intel only to within Intel's pending
-internet correction. `tools/intel_thor/ptp_sync` (`status`, operator-run
-`apply --host intel|thor`, `rollback`) carries the wall clock itself. On Intel,
-`dynamo-phc2sys.service` copies the wall clock into `eno1`'s hardware clock and
-`dynamo-ptp4l.service` serves it over raw Ethernet (L2, hardware timestamps),
-since Intel's address is on `br0` rather than the port. On Thor, `ptp4l` follows
-on `enP2p1s0` and `phc2sys` sets the wall clock; chrony is stopped and disabled
-while PTP owns it, and its unit `Conflicts=` with chrony. Both hardware clocks
-hold UTC. Intel's chrony must first slew at most 500 ppm (`time_sync`), which
-`apply` checks, so internet corrections reach Thor smoothly. `apply` installs
-`linuxptp`, renders `config/intel_thor/ptp/`, and fails if either daemon does
-not stay running; `/var/lib/dynamo-ptp-sync-backup/` keeps the package choice
-and chrony's state for rollback. Thor's wall clock may step once at
-installation by the current offset.
-
-After start-up both `ptp4l` (Thor, `step_threshold 0.001`) and `phc2sys`
-(both hosts, `-S 0.001`) step a clock that is more than 1 ms off instead of
-slewing it at the servo limit. On 2026-10-16 a 30-second pull of Thor's
-Ethernet cable left Thor's hardware clock 1.16 s off when the link returned;
-with stepping disabled, `ptp4l` slewed at about 488 ppm, roughly 40 minutes in
-which Thor's wall clock ran over a second behind Intel and `localization_health`
-reported `stale_input` although images and results were flowing. Normal offsets
-are microseconds, so the threshold only acts after such a fault. Verified the same day after
-installation: a repeat cable pull left Thor 24.8 s off when the link returned,
-and the clock was back to +0.047 ms about three seconds later, with
-localization health `processing` two seconds after that and nothing restarted.
-While the cable is out, Thor's wall clock still drifts because `phc2sys` follows
-the stalled hardware clock; no data crosses the link then, so this only affects
-Thor's own log times during the outage.
-
-### Boot clock step
-
-Intel's RTC keeps whole seconds, so Intel boots up to a second off its NTP
-source, and `makestep 1 3` slews anything below a second at 500 ppm: on
-2026-10-14 a 344–357 ms boot offset would have taken about eleven minutes,
-holding the platform's 5 ms clock gate. On that boot `phc2sys` started at 7.7 s
-and the sensors and camera at 13.8 s, before chrony selected its first source
-at 16.3 s, so a step at that point would have jumped live sensor stamps.
-
-`time_sync boot-step-install --host intel` installs
-`dynamo-boot-clock.service`, a one-shot ordered after chrony and before
-`clearpath-robot`, `clearpath-sensors`, `clearpath-platform`, `dynamo-camera`,
-`dynamo-ptp4l` and `dynamo-phc2sys`. It waits up to 60 s for chrony to select an
-external source, then runs `chronyc makestep` once if the offset is above 5 ms.
-Without a source it exits successfully and leaves holdover, so a time-source
-loss delays those services by at most about a minute rather than blocking boot;
-the platform's own gate still decides whether the base starts. It refuses to
-step if any of those services is already active. Installation enables it for
-the next boot and touches neither chrony's profile nor running services;
-`boot-step-remove` undoes it and refuses an edited copy. Installed on
-`r100_0160` on 2026-10-14; three supervised boots passed on 2026-10-14 and
-2026-10-16 (two steps of 55.5 and 15.3 ms, and one cold start where chrony's own
-step had already corrected 1.43 s), each before any consumer started, with the
-platform clock gate taking 0.1 s. A boot without the internet source was not
-tested (user decision).
-
-The camera installer adds `--fps 15|30`, `--dds-profile services|camera`, and
-`--max-message-size default|65500`. New installs keep `services` at 30 Hz;
-reapply preserves installed options. `camera` renders
-`config/cyclonedds_camera.xml` to
-`/etc/clearpath/dynamo-camera/cyclonedds.xml`: `br0` only, discovery-only
-multicast, a Thor peer and 16 MB send/receive buffers. The unit overrides
-`CYCLONEDDS_URI` **after** sourcing the Clearpath environment. The services'
-`/etc/clearpath/cyclonedds.xml` stays intact.
-
-Camera mode also installs `/etc/sysctl.d/61-dynamo-camera-buffers.conf` and
-sets `net.core.wmem_max=16777216`. It extends older camera snapshots with the
-original sysctl file and runtime value before modifying them. Switching back
-to `services`, or rolling back, restores both. Metadata records fps, DDS mode
-and maximum-message-size selection; `status` checks the rendered profile and
-required send-buffer ceiling. The `camera` profile and the larger message size
-were measured or considered and rejected; the installed default (`services`,
-30 Hz) is the selected transport. See
-[Intel–Thor camera transport candidates](../do_not_try_again/intel_thor_camera_transport.md).
-
-## Archived evidence
-
-- [r100_0160 D455 camera service qualification](../../archive/engineering/2026-10-06-r100-0160-camera-service.md)
+The public reconstruction recipe and camera tool tests verify offline rendering
+and failure/rollback behavior. Clean installation, cold boot and perception
+qualification remain separate evidence gates. Changes to profiles or middleware
+need a fresh guarded sensor test; Thor remains unchanged until needed.

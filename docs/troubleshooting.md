@@ -307,19 +307,15 @@ limit, reconnecting`, then `Error connecting to Hokuyo: Could not open network
 Hokuyo` every 2.5 s. `ss -tn | grep 10940` shows an established connection to
 each LiDAR next to a pending new one.
 
-**Cause.** After read timeouts, `urg_node` reconnects. If the sensor accepts
-the TCP connection and answers the reset but not the parameter request, the
-failed open leaks its socket: `urg_c`'s `urg_open` leaves it open, and
-`urg_node` 1.1.2's Ethernet constructor throws without closing it. A Hokuyo UST
-serves one client at a time, so the leaked connection holds the only slot and
-the driver never recovers on its own. A reset session (a power-cycled LiDAR)
-instead killed the stock driver with SIGPIPE, with no respawn.
-`patches/urg_node_reconnect_recovery.patch` (`src/urg_node` in
-`dependencies/core.repos`) closes the failed socket and ignores SIGPIPE. On
-`r100_0160` it is deployed as an overlay at
-`/home/robot/ros_overlays/urg_node_fix`, listed under
-`system.ros2.workspaces` in `/etc/clearpath/robot.yaml`. Check that the drivers
-use it with `readlink /proc/$(pgrep -f urg_node_driver | head -1)/exe`. Repeated local-camera-subscriber-associated failures
+**Cause.** Stock `urg_node` 1.1.2 leaves the socket open when an open fails
+after the TCP connect, and a reset session can kill it with SIGPIPE. A Hokuyo
+UST serves one client at a time, so the stock driver never recovers on its own.
+`r100_0160` runs the patched driver from `/home/robot/ros_overlays/urg_node_fix`
+(`patches/urg_node_reconnect_recovery.patch`): after a reset session each
+LiDAR's driver reconnects by itself in about 2.25 s (rear 2026-10-13, front
+2026-10-14). If this symptom returns, first check that `robot.yaml` still lists
+the overlay and that `pgrep -af urg_node_driver` shows its path; a reinstall or
+Clearpath regeneration that drops the overlay brings the lockout back. Repeated local-camera-subscriber-associated failures
 and Ethernet traffic spikes are recorded in the
 [transport blocker](physical/intel_thor_transport.md#camera-subscriber-blocker);
 the initiating mechanism remains unproven.
@@ -333,7 +329,39 @@ Resolve and validate the transport configuration before routine camera tests
 resume. The reported rear-offset service restart later restored scans, but no
 camera-load retest is recorded. Do not treat restored idle scans as acceptance.
 
+`tools/hardware/observe_lidar_interruption.py` reproduces the reset-session
+check read-only, with an operator running one `ss -K`. A candidate
+[recovery checker](../tools/hardware/hokuyo_recovery_watch.py) is kept only as a
+manual fallback for a driver that is not running the patch; it is **not
+installed or live-qualified**, and the patched driver does not need it. Its default is a bounded,
+read-only observation. Explicit stationary recovery requires root, an operator,
+fresh asserted e-stop and zero raw odometry. Both scans must previously have
+been seen; a 12-second missing stream plus both specific reconnect errors in the
+recent journal permits one `clearpath-sensors` restart. Success requires both
+streams to sustain at least 38 Hz for three seconds, with increasing stamps and
+no receive gap over 250 ms. There is no boot service or automatic restart loop.
+Offline tests do not prove interrupted-TCP recovery on the physical LiDAR.
+
 ## Remote desktop startup and proxy ownership
+
+For repeated disconnects during an otherwise running session, inspect
+`/var/log/unattended-upgrades/unattended-upgrades.log`, its `-dpkg.log`, and the
+desktop/platform journals before attributing the problem to VNC graphics or DDS.
+On 2026-10-14 unattended package updates ran from about 09:25 to 09:32 UTC.
+The installer logged repeated service-restart passes; the system journal
+recorded requested stops/restarts of VNC, proxies, networking and robot
+services. The boot ID remained unchanged, while VNC was replaced repeatedly,
+most recently at 09:31:34. Updates completed at 09:32:31; a subsequent passive
+health batch passed all 22 checks. This explains that incident's lost desktop
+sessions; it does not qualify future update-time continuity. `NRestarts=0`
+alone is insufficient: explicitly requested service restarts reset lifecycle
+state and need not appear as automatic failure retries.
+
+Evidence is under `artifacts/hardware/20261014-desktop-disconnect-diagnosis/`
+and `stationary-batch-20261014T093333Z-18bc1d/`. No maintenance-policy change or
+reboot was performed during diagnosis. The update installed a newer kernel and
+left a reboot-required marker; the running robot had not rebooted into it.
+Do not test motion during package installation or its service-restart phase.
 
 The independent VNC service protects the desktop from vendor webserver reloads,
 but its October 6 cold boot showed 37 restarts. Logs included an Xtigervnc
@@ -360,24 +388,20 @@ the journal before recovery. The graphics initialization failure, competing
 display ownership and proxy recovery need separate boot verification; they
 are not evidence that the retained DDS configuration failed.
 
-The existing port-9100 launcher also calls `vncserver`; running it alongside the
-independent desktop gives display :1 competing startup owners. The maintained
-[workflow repair](physical/intel_dds_testing.md) overrides that service to run
-only its browser proxy, uses foreground VNC supervision and keeps both proxies
-independent of backend failures. Its vendor startup gate checks actual listener
-ownership, preventing the vendor fallback from claiming the ports. The repair
-selects Mesa for the virtual X server while preserving application GPU selection.
+The six-file stationary setup repair was installed and independently verified
+on 2026-10-12. Its remote-screen drop-in bypasses the old launcher and runs
+only the port-9100 proxy. Foreground VNC supervision and independent proxy units
+replace the failed dependency arrangement. Mesa selection applies to the
+virtual X server; applications retain their own GPU selection. The desktop uses
+the real user runtime and an isolated session bus.
 
-The same audit found an inactive robot user manager and no `/run/user/1000`,
-with desktop session/portal errors. Validate the user session and runtime
-directory as part of startup repair; do not create an arbitrary root-owned
-runtime directory to suppress those messages. Remaining work belongs to the
-[desktop startup backlog](BACKLOG.md#remote-desktop-startup-recovery).
-
-The replacement camera-ready gate uses direct publisher endpoints and the web
-topic list, with the deployed namespace and explicit domain/profile. A failed
-gate logs which publishers or web entries are missing; it does not restart the
-webserver. Publisher readiness is separate from measured image delivery.
+Current listener ownership and stationary hardware preservation passed. Cold
+boot, backend failure/recovery and vendor-reload continuity remain open. Use the
+[root stationary repair workflow](../README.md#stationary-desktop-and-controller-setup-repair)
+for exact receipt-based rollback; restarting it closes remote access temporarily.
+The legacy combined vendor-camera repair is not the current installation path.
+The vendor camera-readiness unit is disabled with the replaced vendor camera
+stack and is not part of this desktop repair.
 
 ## Camera optical-frame ownership
 

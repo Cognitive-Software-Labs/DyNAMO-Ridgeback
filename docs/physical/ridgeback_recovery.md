@@ -174,13 +174,24 @@ Preserve that exception and both local respawn settings. Domain and topics
 still match the robot. Verify descendant environments after starts; inspecting
 only the unit's RMW setting misses the launch override.
 
+The candidate Hokuyo reconnect checker is maintained at
+[`tools/hardware/hokuyo_recovery_watch.py`](../../tools/hardware/hokuyo_recovery_watch.py),
+and is **not part of the verified installed state**. Before using its explicit
+stationary recovery mode, verify its namespace, topic names, journal signatures and
+CycloneDDS profile against the new installation, then demonstrate recovery from
+a bounded Hokuyo TCP interruption while the robot is physically stopped. The
+checker defaults to bounded read-only observation. Recovery permits at most one
+`clearpath-sensors` restart while fresh stop/odometry evidence remains safe.
+It is not an enabled boot watchdog and must not be installed as unattended
+supervision without separate qualification.
+
 ## 4. Rebuild the hardware and project workspaces
 
 Use [the public reconstruction recipe](ridgeback_public_recovery.md) to verify
 captured inputs, assemble the pinned scan merger and host-file candidates, then
 build the hardware overlay at `/opt/dynamo-hardware` on the replacement host.
-It sources that overlay in a merger unit drop-in and removes the camera wrapper's
-optional vendor dependency. The dashboard and its camera-readiness service are
+It sources that overlay in a merger unit drop-in and regenerates the direct camera
+service from camera.json and maintained templates. The dashboard and its camera-readiness service are
 excluded; packaged noVNC supplies the independent desktop's browser assets.
 Preparation never installs files or starts services on the current host.
 
@@ -206,7 +217,7 @@ code that is disabled, pending replacement or known to fail at boot.
 | USB / camera | Restore RealSense udev rule as a real file; captured origin was a symlink into `~/librealsense`. Preserve existing GRUB options and add `usbcore.usbfs_memory_mb=2048`, run `update-grub`, verify after reboot |
 | PS4 controller | Restore `ds4drv.conf`, Bluetooth `disable_ertm=1`, PS4 udev rule, pair/trust actual controller and recreate `controllers.txt`; verify `/dev/input/ps4` |
 | Joystick combiner | Restore `joy_x_combiner.py`, its unit, and platform overrides routing twist_mux to `joy_teleop/cmd_vel_combined` |
-| Controller autoconnect | It can restart platform and combiner on connection; keep stopped until deliberate controller/base commissioning |
+| Controller autoconnect | Use the maintained stationary-setup helper/drop-in: paired/trusted reconnect only, no ROS/base service restarts. Pair locally and verify real input with the stop pressed |
 | Persistent fixes | Root boot script edits vendor WebRTC, webserver, SLAM and generated joystick config; review its paths and effects before enabling, especially after camera migration |
 | CAN bridge | Current packaged bridge backgrounds `socat`/`slcand`; custom supervised scripts exist but no active override or watchdog timer was found. Do not claim them installed or enable them incidentally |
 | Base startup recovery | `ridgeback-startup-recover.service` is disabled; script calls robot reset/enable and can restart base services. Keep disabled during sensor reconstruction |
@@ -247,8 +258,9 @@ and `rollback` restores the vendor state it snapshotted. After a
 reconstruction, re-apply the DDS services configuration first and the camera
 service second. `docs/physical/robot_local_deployment.md` (added with the camera
 service) owns its files, re-apply order and the contract diagnostics should
-target. Re-capture `deployment/r100_0160` to include `/etc/clearpath/dynamo-camera/`,
-`/etc/systemd/system/dynamo-camera.service` and the `camera_0` entry.
+target. The deployment manifest includes labelled camera snapshots, and `camera.json`
+regenerates the `camera_0` declaration, unit and parameters. Apply the camera
+installer on a replacement host to create fresh actual installation metadata.
 
 `run_local_dds_test.py` still requires the old vendor units and topics: adapt it
 to the contract above before using it. Its `d455_serial()` reads the USB
@@ -256,24 +268,50 @@ descriptor serial, which would not select the camera in its aligned stage. The
 combined hardware repair runner is staged for the vendor stack and must not be
 run while the camera service is installed.
 
-Desktop baseline has three competing pieces: `ridgeback-vnc` creates display
-`:1` on 5901; a websockify proxy uses 9005; `ridgeback-remote-screen` serves 9100
-and can also attempt to create the same display. The VNC display currently has
-its own unit, but the active 9005 proxy can belong to `mbs-webserver`. Restarting
-that vendor unit can close browser access. The old VNC startup also showed
-NVIDIA GLX/user-runtime failures; the independent proxy unit was enabled but
-inactive at inspection. These are documented faults, not a known-good target.
+The current desktop repair was installed and independently verified stationary
+on 2026-10-12. `ridgeback-vnc.service` exclusively owns display :1/5901;
+`ridgeback-vnc-websockify.service` owns 9005; the remote-screen override owns
+9100 and runs only a proxy. Foreground VNC supervision, Mesa selection for the
+virtual X server, a valid user runtime and a private session bus replace the
+older startup arrangement. Applications retain their own GPU selection.
+Platform, guard, camera, sensor and merger process IDs were unchanged.
 
-For a fresh reconstruction use the desktop candidates and packaged noVNC in
-[the public recipe](ridgeback_public_recovery.md#independent-desktop-and-fresh-credentials),
-then recreate credentials with `vncpasswd` as `robot`. For diagnosis of the
-observed host and its staged foreground/Mesa/private D-Bus repair, follow [desktop troubleshooting](../troubleshooting.md#remote-desktop-startup-and-proxy-ownership)
-and the owning [backlog](../BACKLOG.md#remote-desktop-startup-recovery).
-It has not passed a repaired cold boot on this host. Verify display and proxy
-ownership separately; do not assume that an open port proves the intended unit
-owns it. Tailscale remains the transport whichever desktop owner is chosen.
+For reconstruction use the maintained stationary setup renderer and packaged
+noVNC from [the public recipe](ridgeback_public_recovery.md#independent-desktop-and-fresh-credentials),
+then recreate credentials locally with `vncpasswd` as `robot`. Public stage,
+installation and receipt-based rollback commands are in the root README.
+See [desktop troubleshooting](../troubleshooting.md#remote-desktop-startup-and-proxy-ownership)
+for listener/cgroup inspection. A read-only inspection of the 2026-10-13 boot (08:50:45 UTC) found all three
+desktop services active with zero reported restarts, correct listener cgroups
+and all six repaired files matching maintained sources. The selected boot
+journals show no repeated VNC/guard startup failure. The guard DDS readiness
+helper completed and the platform started without reported restarts. This is
+one observed boot; power-cycle conditions and operator browser continuity were
+not recorded at that checkpoint. Tailscale remains the network transport.
+
+On 2026-10-16 a detached recovery check deliberately killed the main process
+of each desktop unit in turn. `ridgeback-vnc.service`,
+`ridgeback-vnc-websockify.service` and `ridgeback-remote-screen.service` each
+restarted with a new PID and restored its RFB or WebSocket listener on
+5901, 9005 and 9100 respectively. The operator reconnected to the desktop;
+SSH socket activation stayed available on port 22. The independent fallback
+restart timer was cancelled after all three listeners recovered. The report is
+`artifacts/hardware/20261016-s7-desktop-recovery/result.json`. This qualifies
+supervised backend and proxy process-failure recovery for the installed
+services; it does not test network loss, display corruption or browser-side
+session persistence.
 
 ## 7. Start and verify, without driving
+
+Finish package maintenance before a physical test session and verify that no
+upgrade job is active. October 14 unattended updates repeatedly restarted the
+desktop, networking and Clearpath services during testing. The
+[desktop troubleshooting reference](../troubleshooting.md#remote-desktop-startup-and-proxy-ownership)
+owns that incident and diagnostic commands. Record package changes, recheck
+installed overlays and stationary health, and qualify a requested kernel reboot
+with the operator and physical stop engaged. An update-time restart policy and
+planned maintenance window still need selection; this runbook does not silently
+disable security updates or authorize automatic mid-session reboots.
 
 With the robot stationary and an operator present, start reviewed services in
 stages: network/access, Clearpath generation and sensors, merger, selected
@@ -333,3 +371,66 @@ Document what generated the files, how services are enabled, how to verify and
 how to undo the change. Keep secrets local and name the fresh-entry step.
 The [documentation policy](../project/documentation.md#host-setup-and-reconstruction)
 owns this requirement. This task added no backup job and changed no live services.
+
+
+## Installed auxiliary repair
+
+`tools/hardware/install_auxiliary_repairs.py` was installed and independently
+verified stationary on 2026-10-13. Rebuild its candidates from maintained code
+on the target host; do not use artifact copies as configuration authority.
+It requires the verified capped platform and pinned Puma repair, copies the
+matching installed battery Python implementation into a root-controlled overlay
+and changes only its unknown-cell semantics. It adds a selector-corrected IMU
+configuration and read-only chrony readiness gate before platform startup.
+Compiled Puma/controller libraries, camera, sensor and desktop services are
+preserved. The original Clearpath package and generated files are not edited.
+
+After reconstructing the capped platform and Puma repair, use the root README's
+stage/apply/verify workflow with fresh evidence and an engaged physical stop.
+The maintained installer regenerates its seven scoped files, rejects mismatched
+baseline inputs and records exact rollback ownership. The live receipt is
+`artifacts/hardware/20261013-auxiliary-repair-install/`; seven installed snapshots
+are labelled in the deployment manifest, which now contains 96 entries. A fresh
+host installation needs its own receipt; historical receipts are not deployable
+state. Rollback removes only these additions and returns to the prior integration.
+
+Final verification confirmed intended filter settings, unknown individual battery
+voltages, finite pack voltage, local clock convergence, asserted stop, stationary
+raw odometry and guarded routing. No battery-temperature/per-cell hardware or
+full IMU calibration is claimed. The new clock gate passed one supervised reboot on 2026-10-13: it waited
+about 38 seconds, exited successfully, and then allowed platform startup.
+Post-boot file/service/listener/data checks all passed. This does not qualify
+repeated cold power cycles or time-source loss; offline operation without an
+external time source will keep the platform
+from starting until its readiness policy is deliberately revised and qualified.
+
+
+## Puma feedback plugin
+
+The feedback-consumer repair was installed and verified stationary on
+2026-10-13. An initial live attempt failed package executable resolution and
+rolled back; its original-service recovery has a separate stationary audit.
+The corrected stage-5 package then passed the local clock gate, restarted the
+platform and mapped its exact pinned library in the running controller manager.
+Its maintained
+builder, minimal plugin stager and guarded installer are
+`tools/hardware/build_puma_feedback_candidate.py`,
+`tools/hardware/stage_puma_plugin_prefix.py` and
+`tools/hardware/install_puma_feedback_plugin.py`. The builder requires the
+pinned official Clearpath 2.9.4 archive; the installer additionally requires
+the installed commissioning test lock, pinned Puma driver and auxiliary launch.
+The root README owns stage/apply/restore commands. The deployment manifest
+captures the installed platform 95 drop-in; its exact bytes identify the
+selected prefix, whose package manifest and loaded process path are preserved
+in `artifacts/hardware/20261013-puma-feedback-install-stage-5/result.json`.
+The 6 MB plugin library and companion symlinks are generated by the maintained
+builder and stager from the pinned Clearpath archive and repository patch, then
+installed by the guarded installer. Rebuild and verify that package when
+reconstructing an SSD; copying the 95 drop-in alone would reference a missing
+prefix. The post-install reboot check under
+`artifacts/hardware/20261013-feedback-clock-postboot-2/` passed the clock gate,
+service and stationary probes and exact plugin-path check. A separate
+e-stop-held real ROS feedback interruption deactivated the controller with
+zero wheel commands around 290 ms, followed by a successful stationary
+platform restart and recovery check. These observations do not qualify
+physical braking under movement or electrical CAN loss.

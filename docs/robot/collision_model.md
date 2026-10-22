@@ -62,6 +62,21 @@ Inflation remains an obstacle-cost policy and does not count toward either
 geometric margin. Physical hardware requires a separately measured outline and
 clearance qualification.
 
+An operator's preliminary stationary tape survey on 2026-10-16 measured the
+widest body at approximately 0.92 m long and 0.80 m wide, with ±0.01 m
+measurement uncertainty. The operator reported no attachments outside that
+outline and approximately 0.06 m rounding at all four corners. The
+read-only comparison under
+`artifacts/hardware/20261016-s8-outline/analysis.json` found 7 mm side-face
+clearance inside the padded footprint, less than the 12.2 mm combined
+uncertainty. If each corner is approximated as a 60 mm quarter-circle, its
+derived 45-degree point lies about 55.5 mm outside the padded footprint.
+Those 45-degree points were calculated from an approximate radius, not taped
+individually; the physical `base_link` centre and mast/bracket dimensions were
+also not surveyed. This is a failed preliminary containment screen, not a
+calibrated final outline. Verify the corner points and frame origin, then
+review the footprint before using it for physical navigation clearance.
+
 Live Gazebo and Isaac launches of the initial outline both reported the expected
 10 mm padding. After the refinement, a fresh Gazebo launch loaded the exact
 16-point polygon in both costmaps and published all 16 padded points. Nav2's
