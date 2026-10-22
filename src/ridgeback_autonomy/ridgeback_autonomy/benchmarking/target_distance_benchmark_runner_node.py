@@ -29,6 +29,7 @@ from ridgeback_autonomy.benchmarking.alignment import (
     update_measurement_event,
 )
 from ridgeback_common.camera_profiles import DEFAULT_CAMERA_PROFILE
+from ridgeback_common.ros_signals import init_owned, shielded, spin_step
 from ridgeback_localization.estimator_registry import (
     MASK_GATE_DEFAULT,
     parse_estimators,
@@ -1301,7 +1302,7 @@ class TargetDistanceBenchmarkRunner(Node):
                 deadline = time.monotonic() + self.capture_timeout_sec
                 while (rclpy.ok() and time.monotonic() < deadline
                        and len(self.replay_capture_events) < self.capture_batches):
-                    rclpy.spin_once(self, timeout_sec=0.1)
+                    spin_step(self, timeout_sec=0.1)
                     self.publish_active_truth()
                 if len(self.replay_capture_events) < self.capture_batches:
                     raise RuntimeError(
@@ -1316,7 +1317,7 @@ class TargetDistanceBenchmarkRunner(Node):
                 while (rclpy.ok() and time.monotonic() < drain_deadline
                        and not (self.replay_capture_is_complete()
                                 and self.replay_scan_capture_is_complete())):
-                    rclpy.spin_once(self, timeout_sec=min(
+                    spin_step(self, timeout_sec=min(
                         0.1, max(0.0, drain_deadline - time.monotonic())))
                     self.backfill_replay_capture_context()
                     self.publish_active_truth()
@@ -1460,7 +1461,7 @@ class TargetDistanceBenchmarkRunner(Node):
         self.get_logger().info(f'Waiting for {description}.')
         deadline = time.monotonic() + STREAM_WAIT_TIMEOUT_SEC
         while rclpy.ok() and time.monotonic() < deadline:
-            rclpy.spin_once(self, timeout_sec=0.2)
+            spin_step(self, timeout_sec=0.2)
             if condition():
                 return
         raise RuntimeError(f'Timed out waiting for {description}')
@@ -1521,7 +1522,7 @@ class TargetDistanceBenchmarkRunner(Node):
             if remaining <= 0.0:
                 return
             self.publish_active_truth()
-            rclpy.spin_once(self, timeout_sec=min(0.1, remaining))
+            spin_step(self, timeout_sec=min(0.1, remaining))
 
     def publish_active_truth(self) -> None:
         """Republish the trial ground truth during capture.
@@ -1588,21 +1589,28 @@ class TargetDistanceBenchmarkRunner(Node):
 
 
 def main() -> int:
-    rclpy.init()
+    # Owned signals keep the context valid after Ctrl-C, so an interrupted
+    # trial can still delete the entities it spawned.
+    init_owned()
     node = TargetDistanceBenchmarkRunner()
 
     try:
         node.run()
         return 0
-    except (KeyboardInterrupt, ExternalShutdownException):
+    except (KeyboardInterrupt, ExternalShutdownException) as exc:
+        logger = node.get_logger()
+        logger.warning('Benchmark interrupted.')
+        # A failed or skipped removal of the interrupted scene, entity by entity.
+        for note in getattr(exc, '__notes__', ()):
+            logger.warning(note)
         return 130
     except Exception as exc:  # pragma: no cover - surfaced in logs for runtime debugging
         node.get_logger().error(str(exc))
         return 1
     finally:
-        node.destroy_node()
-        if rclpy.ok():
-            rclpy.shutdown()
+        with shielded(final=True):
+            node.destroy_node()
+            rclpy.try_shutdown()
 
 
 if __name__ == '__main__':

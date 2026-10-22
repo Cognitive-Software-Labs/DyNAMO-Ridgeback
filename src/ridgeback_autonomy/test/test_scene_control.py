@@ -22,6 +22,8 @@ from simulation_interfaces.srv import (
 from ridgeback_autonomy.benchmarking.scene_control import (
     BENCHMARK_ENTITY_PREFIX,
     CLOCK_TOPIC,
+    ROLLBACK_INTERRUPT_BUDGET_SEC,
+    ROLLBACK_INTERRUPT_CALL_SEC,
     SCENE_OPERATION_SERVICES,
     SERVICE_TYPES,
     SceneControlClient,
@@ -73,6 +75,12 @@ class FakeClock:
         self.now += seconds
 
 
+class TickingClock(FakeClock):
+    def __call__(self) -> float:
+        self.now += 1e-6
+        return self.now
+
+
 class FakeFuture:
     def __init__(self, response=None, error=None, pending=False) -> None:
         self._response = response
@@ -100,6 +108,9 @@ class FakeServiceClient:
         self.removed = []
 
     def wait_for_service(self, timeout_sec=None) -> bool:
+        return self.suffix in self.simulator.available
+
+    def service_is_ready(self) -> bool:
         return self.suffix in self.simulator.available
 
     def call_async(self, request) -> FakeFuture:
@@ -514,6 +525,115 @@ def test_a_spawn_with_an_uncertain_response_is_still_rolled_back(
 
     assert [request.entity for request in simulator.calls_to('delete_entity')] == [name]
     assert name not in simulator.entities
+
+
+def test_an_unexpected_delete_error_does_not_strand_the_remaining_entities(simulator) -> None:
+    # After an interrupt the transport itself can fail -- an invalid context
+    # raises from call_async, not as a scene-control result.
+    def fail_first(request):
+        if request.entity.endswith('obj_1'):
+            raise RuntimeError('publisher context is invalid')
+        return FakeSimulator.delete_entity(simulator, request)
+
+    names = ['bench_run_t0_target_0', 'bench_run_t0_obj_0', 'bench_run_t0_obj_1']
+    for name in names:
+        simulator.entities[name] = (1.0, 0.0, 0.0, 0.0)
+    simulator.overrides['delete_entity'] = fail_first
+    client, _clients = make_client(simulator)
+
+    failures = client.rollback(names)
+
+    assert [str(failure) for failure in failures] == ['publisher context is invalid']
+    assert [r.entity for r in simulator.calls_to('delete_entity')] == list(reversed(names))
+    assert 'bench_run_t0_target_0' not in simulator.entities
+    assert 'bench_run_t0_obj_0' not in simulator.entities
+
+
+def test_an_interrupted_rollback_skips_entities_whose_services_are_not_ready(simulator) -> None:
+    names = ['bench_run_t0_target_0', 'bench_run_t0_obj_0']
+    for name in names:
+        simulator.entities[name] = (1.0, 0.0, 0.0, 0.0)
+    simulator.available.discard('delete_entity')
+    client, _clients = make_client(simulator)
+
+    failures = client.rollback(names, deadline=simulator.clock() + 4.0)
+
+    assert simulator.calls_to('delete_entity') == []
+    assert [failure.entity for failure in failures] == list(reversed(names))
+    assert all(failure.failure is SceneControlFailure.UNAVAILABLE for failure in failures)
+    assert all('/sim/delete_entity' in str(failure) for failure in failures)
+    assert simulator.clock.now == 0.0
+
+
+def test_an_interrupted_rollback_shares_one_deadline_across_entities(simulator) -> None:
+    names = ['bench_run_t0_target_0', 'bench_run_t0_obj_0', 'bench_run_t0_obj_1']
+    for name in names:
+        simulator.entities[name] = (1.0, 0.0, 0.0, 0.0)
+    # Accepted but never applied, so every absence wait would run its full
+    # delete budget without the deadline.
+    simulator.overrides['delete_entity'] = lambda request: _ok(DeleteEntity.Response())
+    client, _clients = make_client(simulator, delete_timeout_sec=15.0)
+
+    failures = client.rollback(names, deadline=simulator.clock() + 4.0)
+
+    assert 4.0 <= simulator.clock.now <= 4.0 + 0.11
+    assert [failure.entity for failure in failures] == list(reversed(names))
+    assert failures[0].failure is SceneControlFailure.CLEANUP_INCOMPLETE
+    assert [failure.failure for failure in failures[1:]] == [SceneControlFailure.TIMEOUT] * 2
+
+
+def test_an_interrupted_rollback_gives_up_once_the_provider_stops_answering(
+        simulator) -> None:
+    names = ['bench_run_t0_target_0', 'bench_run_t0_obj_0', 'bench_run_t0_obj_1']
+    for name in names:
+        simulator.entities[name] = (1.0, 0.0, 0.0, 0.0)
+    # Going down with the launch: the services are still discovered, but
+    # nothing answers.
+    for suffix in ('delete_entity', 'get_entities'):
+        simulator.overrides[suffix] = lambda request: PENDING
+    # A real clock moves between any two reads; a deadline comparison that
+    # only holds for a frozen clock would spin forever here.
+    simulator.clock = TickingClock()
+    client, _clients = make_client(simulator)
+
+    failures = client.rollback(names, deadline=simulator.clock() + ROLLBACK_INTERRUPT_BUDGET_SEC)
+
+    assert ROLLBACK_INTERRUPT_CALL_SEC <= simulator.clock.now <= ROLLBACK_INTERRUPT_CALL_SEC + 0.11
+    assert len(simulator.calls_to('delete_entity')) == 1
+    assert simulator.calls_to('get_entities') == []
+    assert [failure.entity for failure in failures] == list(reversed(names))
+    assert [failure.failure for failure in failures] == (
+        [SceneControlFailure.CLEANUP_INCOMPLETE] + [SceneControlFailure.UNAVAILABLE] * 2)
+
+
+def test_an_interrupt_while_a_spawn_is_unanswered_still_rolls_it_back(simulator) -> None:
+    held = []
+
+    def commit_and_hold(request):
+        simulator.commit_spawn(request)
+        held.append(request.name)
+        return PENDING
+
+    def spin_once(seconds):
+        simulator.clock.advance(seconds)
+        if held and not interrupted:
+            interrupted.append(True)
+            raise KeyboardInterrupt
+
+    interrupted = []
+    clients = {suffix: FakeServiceClient(simulator, suffix) for suffix in SERVICE_TYPES}
+    client = SceneControlClient(
+        clients, spin_once, service_names=scene_control_service_names('/sim'),
+        clock=simulator.clock)
+    simulator.overrides['spawn_entity'] = commit_and_hold
+
+    with pytest.raises(KeyboardInterrupt):
+        with client.scene([spec('bench_run_t0_target_0')]):
+            pytest.fail('an interrupted spawn must not enter the scene body')
+
+    assert [r.entity for r in simulator.calls_to('delete_entity')] == ['bench_run_t0_target_0']
+    assert 'bench_run_t0_target_0' not in simulator.entities
+    assert simulator.clock.now <= ROLLBACK_INTERRUPT_BUDGET_SEC + 0.11
 
 
 def test_each_spawn_waits_for_state_readiness_before_the_next(simulator) -> None:

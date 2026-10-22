@@ -49,7 +49,7 @@ def respond(_request, response):
     return response
 
 
-if mode == 'default':
+if mode in ('default', 'default_shield'):
     rclpy.init()
 else:
     init_owned()
@@ -106,6 +106,16 @@ elif mode == 'storm':
     say('CALLS', calls)
     say('CALL', call(node, client))
 
+elif mode == 'default_shield':
+    with shielded() as received:
+        pass
+    say('READY')
+    try:
+        while True:
+            rclpy.spin_once(node, timeout_sec=0.1)
+    except KeyboardInterrupt:
+        say('CONTEXT', rclpy.ok())
+
 elif mode == 'default':
     say('READY')
     try:
@@ -156,11 +166,14 @@ class Child:
         return sent
 
     def finish(self, timeout_sec: float = 15.0) -> tuple[int, str]:
+        # Not communicate(): with a timeout it reads the raw pipe and drops
+        # whatever readline() has already buffered.
         try:
-            rest, _ = self.process.communicate(timeout=timeout_sec)
+            self.process.wait(timeout=timeout_sec)
         except subprocess.TimeoutExpired:
             self.kill()
-            rest, _ = self.process.communicate()
+            self.process.wait()
+        rest = self.process.stdout.read()
         self.lines.extend(rest.splitlines())
         return self.process.returncode, '\n'.join(self.lines)
 
@@ -229,4 +242,15 @@ def test_default_rclpy_handlers_invalidate_the_context_before_cleanup(tmp_path) 
     error = child.expect('ERROR')
     assert error[1] == 'RCLError'
     assert 'context is not valid' in ' '.join(error)
+    child.finish()
+
+
+def test_shielding_under_default_handlers_leaves_rclpy_in_charge(tmp_path) -> None:
+    # Swapping rclpy's handlers out from Python would drop them for good, and
+    # a later Ctrl-C would no longer shut the context down.
+    child = Child(tmp_path, 176, 'default_shield')
+    child.expect('READY')
+    time.sleep(0.3)
+    child.signal(signal.SIGINT)
+    assert child.expect('CONTEXT') == ['CONTEXT', 'False']
     child.finish()

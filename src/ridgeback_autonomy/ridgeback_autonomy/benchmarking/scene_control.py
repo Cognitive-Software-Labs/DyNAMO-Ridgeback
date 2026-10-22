@@ -29,7 +29,6 @@ import math
 import time
 from typing import Any, Protocol
 
-import rclpy
 from rclpy.qos import QoSProfile, ReliabilityPolicy
 from rosgraph_msgs.msg import Clock
 from simulation_interfaces.msg import Result, SimulatorFeatures
@@ -43,6 +42,7 @@ from simulation_interfaces.srv import (
 
 from ridgeback_autonomy.benchmarking.asset_catalog import CatalogResource
 from ridgeback_autonomy.benchmarking.simulation import normalize_pose
+from ridgeback_common.ros_signals import shielded, signals_held, spin_step
 
 
 # Every entity the benchmark creates carries this prefix, and the client
@@ -63,6 +63,13 @@ RETRY_SLEEP_SEC = 0.5
 # Upper bound on one executor slice while waiting, so a deadline is overshot by
 # at most this much.
 SPIN_SLICE_SEC = 0.1
+# Rollback after an interrupt must finish before the launch system escalates
+# to SIGTERM, five seconds after the SIGINT it forwarded.
+ROLLBACK_INTERRUPT_BUDGET_SEC = 4.0
+# Within that budget, one unanswered call means the provider is going down with
+# the rest of the launch; the remaining removals are skipped rather than each
+# waiting for it. A live provider answers in a simulation step or two.
+ROLLBACK_INTERRUPT_CALL_SEC = 2.0
 
 # Service name suffixes under the provider's namespace, as the standard names
 # them.
@@ -169,6 +176,8 @@ class ServiceClient(Protocol):
     """The subset of ``rclpy.client.Client`` the scene-control client uses."""
 
     def wait_for_service(self, timeout_sec: float | None = None) -> bool: ...
+
+    def service_is_ready(self) -> bool: ...
 
     def call_async(self, request: Any) -> ServiceFuture: ...
 
@@ -390,6 +399,10 @@ class SceneControlClient:
         self._wall_clock = wall_clock
         self._services_available_wall: float | None = None
         self._first_spawn_requested_wall: float | None = None
+        # Set only while a rollback runs under an interrupt budget.
+        self._rollback_deadline: float | None = None
+        self._rollback_signals: list[int] | None = None
+        self._rollback_provider_silent = False
 
     @property
     def capabilities(self) -> SimulatorCapabilities | None:
@@ -582,22 +595,47 @@ class SceneControlClient:
                 if exc.may_have_succeeded:
                     spawned.append(spec.name)
                 raise
+            except BaseException:
+                # Interrupted, perhaps after the request left: unknown outcome.
+                spawned.append(spec.name)
+                raise
             spawned.append(name)
             self.wait_until_present([name])
 
-    def rollback(self, names: Sequence[str]) -> list[SceneControlError]:
+    def rollback(
+        self,
+        names: Sequence[str],
+        *,
+        deadline: float | None = None,
+        signals: list[int] | None = None,
+    ) -> list[Exception]:
         """Delete ``names`` in reverse spawn order; return failures, never raise.
 
         Every name is attempted even after one fails, so a single stuck entity
-        cannot strand the rest.
+        cannot strand the rest. Under ``deadline`` -- the run was interrupted
+        and the launch system will soon escalate -- every wait is cut to the
+        time left and an entity whose services are not ready is skipped rather
+        than waited for. ``signals`` is the list a :func:`shielded` block
+        fills; the first signal recorded there starts such a deadline.
         """
 
-        failures = []
-        for name in reversed(names):
-            try:
-                self.delete_entity(name)
-            except SceneControlError as exc:
-                failures.append(exc)
+        self._rollback_deadline = deadline
+        self._rollback_signals = signals
+        failures: list[Exception] = []
+        try:
+            for name in reversed(names):
+                skipped = self._rollback_skip(name)
+                if skipped is not None:
+                    failures.append(skipped)
+                    continue
+                try:
+                    self.delete_entity(name)
+                except Exception as exc:
+                    failures.append(exc)
+        finally:
+            self._rollback_deadline = None
+            self._rollback_signals = None
+            self._rollback_provider_silent = False
         return failures
 
     @contextlib.contextmanager
@@ -607,7 +645,9 @@ class SceneControlClient:
         A failure while spawning or inside the body -- including an interrupt
         -- rolls back every recorded spawn before the original error
         propagates; rollback failures are attached to it as notes. After a
-        clean body, a failed removal raises.
+        clean body, a failed removal raises. Removal is shielded from further
+        signals; an interrupt bounds it by ``ROLLBACK_INTERRUPT_BUDGET_SEC``,
+        and one received during a clean removal is raised once it finishes.
         """
 
         spawned: list[str] = []
@@ -615,10 +655,21 @@ class SceneControlClient:
             self.spawn_entities(specs, spawned)
             yield tuple(spawned)
         except BaseException as exc:
-            for failure in self.rollback(spawned):
+            deadline = None
+            if isinstance(exc, KeyboardInterrupt):
+                deadline = self._clock() + ROLLBACK_INTERRUPT_BUDGET_SEC
+            with shielded() as received:
+                failures = self.rollback(spawned, deadline=deadline, signals=received)
+            for failure in failures:
                 exc.add_note(f'rollback: {failure}')
             raise
-        failures = self.rollback(spawned)
+        with shielded() as received:
+            failures = self.rollback(spawned, signals=received)
+        if received:
+            interrupt = KeyboardInterrupt()
+            for failure in failures:
+                interrupt.add_note(f'rollback: {failure}')
+            raise interrupt
         if failures:
             raise SceneControlError(
                 SceneControlFailure.CLEANUP_INCOMPLETE,
@@ -729,7 +780,8 @@ class SceneControlClient:
         operation = 'delete entity'
         _require_benchmark_entity(name, operation)
         self._require_advancing_clock(operation, name)
-        deadline = self._clock() + self._delete_timeout_sec
+        started = self._clock()
+        deadline = started + self._delete_timeout_sec
         deleted = False
         last_error: SceneControlError | None = None
         while True:
@@ -747,8 +799,8 @@ class SceneControlClient:
                     return
             except SceneControlError as exc:
                 last_error = exc
-            if self._clock() >= deadline:
-                detail = f'still present after {self._delete_timeout_sec:.1f} s'
+            if self._clock() >= self._bounded(deadline):
+                detail = f'still present after {self._clock() - started:.1f} s'
                 if last_error is not None:
                     detail = f'{detail}; last error: {last_error}'
                 raise SceneControlError(
@@ -790,6 +842,55 @@ class SceneControlClient:
         _check_result(response.result, operation)
         return [str(name) for name in response.entities]
 
+    def _interrupt_deadline(self) -> float | None:
+        """The rollback's interrupt deadline, started by the first shielded signal."""
+
+        if self._rollback_deadline is None and self._rollback_signals:
+            self._rollback_deadline = self._clock() + ROLLBACK_INTERRUPT_BUDGET_SEC
+        return self._rollback_deadline
+
+    def _bounded(self, deadline: float) -> float:
+        interrupt_deadline = self._interrupt_deadline()
+        if interrupt_deadline is None:
+            return deadline
+        if self._rollback_provider_silent:
+            return -math.inf
+        return min(deadline, interrupt_deadline)
+
+    def _rollback_skip(self, name: str) -> SceneControlError | None:
+        """Why an interrupted rollback must not wait on ``name``, or None."""
+
+        operation = 'delete entity'
+        deadline = self._interrupt_deadline()
+        if deadline is None:
+            return None
+        if self._rollback_provider_silent:
+            return SceneControlError(
+                SceneControlFailure.UNAVAILABLE,
+                operation,
+                'skipped: the provider stopped answering during the interrupt',
+                entity=name,
+            )
+        if self._clock() >= deadline:
+            return SceneControlError(
+                SceneControlFailure.TIMEOUT,
+                operation,
+                f'skipped: the {ROLLBACK_INTERRUPT_BUDGET_SEC:.1f} s interrupt budget is spent',
+                entity=name,
+            )
+        unready = [
+            self._service_names[suffix] for suffix in ('delete_entity', 'get_entities')
+            if not self._clients[suffix].service_is_ready()
+        ]
+        if unready:
+            return SceneControlError(
+                SceneControlFailure.UNAVAILABLE,
+                operation,
+                f'skipped: {", ".join(unready)} not ready',
+                entity=name,
+            )
+        return None
+
     def _require_advancing_clock(self, operation: str, entity: str | None = None) -> None:
         if self._clock_ready:
             return
@@ -810,19 +911,34 @@ class SceneControlClient:
     ) -> Any:
         if suffix in SCENE_OPERATION_SERVICES:
             self._require_advancing_clock(operation, entity)
+        if self._rollback_provider_silent:
+            raise SceneControlError(
+                SceneControlFailure.UNAVAILABLE,
+                operation,
+                f'not sent: {self._service_names[suffix]} stopped answering during the interrupt',
+                entity=entity,
+            )
         client = self._clients[suffix]
-        future = client.call_async(request)
-        deadline = self._clock() + self._call_timeout_sec
+        with signals_held():
+            future = client.call_async(request)
+        started = self._clock()
+        deadline = started + self._call_timeout_sec
+        if self._interrupt_deadline() is not None:
+            deadline = min(deadline, started + ROLLBACK_INTERRUPT_CALL_SEC)
         while not future.done():
-            remaining = deadline - self._clock()
+            remaining = self._bounded(deadline) - self._clock()
             if remaining <= 0.0:
                 future.cancel()
                 client.remove_pending_request(future)
+                interrupt_deadline = self._interrupt_deadline()
+                if interrupt_deadline is not None and self._clock() < interrupt_deadline:
+                    # The call's own cap ran out, not the budget.
+                    self._rollback_provider_silent = True
                 raise SceneControlError(
                     SceneControlFailure.TIMEOUT,
                     operation,
                     f'{self._service_names[suffix]} did not answer within '
-                    f'{self._call_timeout_sec:.1f} s',
+                    f'{self._clock() - started:.1f} s',
                     entity=entity,
                 )
             self._spin_once(min(remaining, SPIN_SLICE_SEC))
@@ -848,7 +964,7 @@ class SceneControlClient:
     def _pause(self, duration_sec: float) -> None:
         deadline = self._clock() + duration_sec
         while True:
-            remaining = deadline - self._clock()
+            remaining = self._bounded(deadline) - self._clock()
             if remaining <= 0.0:
                 return
             self._spin_once(min(remaining, SPIN_SLICE_SEC))
@@ -889,6 +1005,6 @@ def create_scene_control_client(
         )
     if spin_once is None:
         def spin_once(timeout_sec: float) -> None:
-            rclpy.spin_once(node, timeout_sec=timeout_sec)
+            spin_step(node, timeout_sec=timeout_sec)
     return SceneControlClient(
         clients, spin_once, service_names=names, simulation_clock=observer, **options)

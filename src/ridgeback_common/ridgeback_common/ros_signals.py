@@ -105,18 +105,42 @@ def _stderr(message: str) -> None:
     print(message, file=sys.stderr, flush=True)
 
 
+def _rclpy_handles_signals() -> bool:
+    """Whether rclpy's own handlers are installed, without importing rclpy.
+
+    ``signal.getsignal()`` cannot tell: rclpy installs below Python, which
+    still reports its own previous handler.
+    """
+    signals_module = sys.modules.get('rclpy.signals')
+    if signals_module is None:
+        return False
+    options = signals_module.get_current_signal_handlers_options()
+    return options != signals_module.SignalHandlerOptions.NO
+
+
 @contextmanager
-def shielded(log: Callable[[str], None] | None = None) -> Iterator[list[int]]:
+def shielded(
+    log: Callable[[str], None] | None = None,
+    *,
+    final: bool = False,
+) -> Iterator[list[int]]:
     """Record SIGINT and SIGTERM instead of raising them until the block exits.
 
     Yields the list of signal numbers received meanwhile. The first one is
     logged; none is re-raised afterwards, because the caller is already
-    shutting down. Handlers that Python does not own (rclpy's default ones)
-    are left in place, so under a default ``rclpy.init()`` this shields
-    nothing. Off the main thread it is a no-op.
+    shutting down. ``final`` marks the cleanup the process exits after: both
+    signals then stay ignored instead of being restored, because one arriving
+    later -- the second half of a group signal plus a launch relay -- would
+    otherwise raise outside any handler, or land during interpreter
+    finalization, which resets the handlers and turns a clean exit into a
+    death by signal. Under rclpy's own handlers it shields nothing and leaves
+    them installed: replacing them from Python would drop them for good, and
+    they have shut the context down already. Off the main thread it is a
+    no-op too.
     """
     received: list[int] = []
-    if threading.current_thread() is not threading.main_thread():
+    if (threading.current_thread() is not threading.main_thread()
+            or _rclpy_handles_signals()):
         yield received
         return
 
@@ -129,15 +153,15 @@ def shielded(log: Callable[[str], None] | None = None) -> Iterator[list[int]]:
                 'finishing cleanup before exiting.')
         received.append(signum)
 
-    previous = {}
-    for signum in OWNED_SIGNALS:
-        handler = signal.getsignal(signum)
-        if handler is None:
-            continue
-        previous[signum] = handler
+    # None marks a handler installed outside Python, which cannot be restored.
+    previous = {
+        signum: handler for signum in OWNED_SIGNALS
+        if (handler := signal.getsignal(signum)) is not None
+    }
+    for signum in previous:
         signal.signal(signum, record)
     try:
         yield received
     finally:
         for signum, handler in previous.items():
-            signal.signal(signum, handler)
+            signal.signal(signum, signal.SIG_IGN if final else handler)
