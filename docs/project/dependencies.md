@@ -65,6 +65,28 @@ The checker rejects:
 Do not respond to a failure by resetting the nested checkout. Inspect it first;
 it may contain intentional work that the root repository cannot see.
 
+## Partial overlays
+
+Some patched repositories hold many packages, of which only the patched ones
+need a source build; the rest should keep resolving to the installed binaries.
+The checker's `BUILD_ONLY` map names, per checkout, the top-level package
+directories to build. Every other top-level directory with a `package.xml`
+receives an empty, untracked `COLCON_IGNORE`, so `colcon build --base-paths src`
+skips it. A directory upstream already ignores with a tracked `COLCON_IGNORE`,
+`AMENT_IGNORE`, or `CATKIN_IGNORE` needs no marker.
+
+For such a checkout the checker additionally:
+
+- accepts exactly that set of markers as untracked files, and rejects any other
+  untracked file;
+- fails in read-only mode when a marker is missing; `--apply` creates it;
+- fails when a kept package is missing or carries an ignore marker of its own.
+
+The markers are untracked, so they never appear in `git diff HEAD`, and the
+recorded-patch comparison is the same as for any other checkout. Removing a
+package from `BUILD_ONLY` therefore takes a marker the checker will demand on
+the next run; adding one requires deleting that package's marker first.
+
 ## Refreshing upstream revisions
 
 Refresh all dependencies as one compatibility change. Do not advance a single
