@@ -1,0 +1,31 @@
+# Rendered by tools/intel_thor/camera_service from
+# src/ridgeback_autonomy_hardware/config/d455.yaml. Do not edit.
+/**:
+  ros__parameters:
+    camera_name: camera_0
+    device_type: d455
+    enable_color: true
+    enable_depth: true
+    enable_infra1: false
+    enable_infra2: false
+    enable_gyro: false
+    enable_accel: false
+    align_depth.enable: true
+    enable_sync: true
+    pointcloud.enable: false
+    publish_tf: true
+    tf_publish_rate: 0.0
+    base_frame_id: link
+    camera_0:
+      color:
+        image_raw:
+          ffmpeg:
+            encoder: h264_nvenc
+            encoder_av_options: preset:p1,tune:ull,zerolatency:1,delay:0
+            pixel_format: yuv420p
+            gop_size: 15
+            max_b_frames: 0
+            bit_rate: 8000000
+    serial_no: '338522302134'
+    rgb_camera.color_profile: 640x480x30
+    depth_module.depth_profile: 640x480x30

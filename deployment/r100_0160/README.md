@@ -5,7 +5,7 @@ owns the reconstruction order and the meaning of these files. Captured from
 `cpr-r100-0160` on 2026-10-06; this is the observed vendor-camera deployment,
 including known desktop startup faults. It has not been restored onto a blank SSD.
 
-- `files/` mirrors the absolute paths of 81 curated small configuration files,
+- `files/` mirrors the absolute paths of 99 curated small configuration files,
   service units, drop-ins and local scripts. These are readable deployment inputs,
   not a filesystem backup or an instruction to install every file.
 - `manifest.json` records each origin, content SHA-256, original owner/group,
@@ -24,6 +24,13 @@ including known desktop startup faults. It has not been restored onto a blank SS
 The selected recovery scope excludes the vendor dashboard. The
 [public reconstruction recipe](../../docs/physical/ridgeback_public_recovery.md)
 owns source preparation, selected host candidates and fresh-host build commands.
+
+The captured joystick/base files describe the original uncapped baseline.
+The current [commissioning caps](../../docs/physical/driving_readiness.md#commissioning-caps)
+are maintained in `tools/hardware/commissioning_speed_guard.py` and rendered by
+`tools/hardware/install_commissioning_caps.py`. Recovery preparation includes
+these newer candidates with explicit provenance rather than rewriting the
+baseline snapshots.
 `reconstruction/` contains the pinned public manifest, matched scan-merger hashes
 and a metadata-only vendor source inventory. The captured baseline remains intact. A narrow `.gitignore` exception includes
 the curated installed webserver config; it does not track normal build output.
@@ -63,9 +70,10 @@ silently edit a copy and claim it was deployed.
 `mbs-vcan-bridge` and `mbs-vcan-watchdog` exist as files but are **not wired into
 the captured live services**. `ridgeback-startup-recover` is disabled and can
 reset/enable the base; preserve that disabled state. Navigation units remain
-disabled. Old camera helpers must be reviewed when the replacement camera
-service lands. The foreground/Mesa desktop repair in `tools/intel_thor/` is
-staged separately and is not represented as installed here.
+disabled. Historical camera helpers remain captured but are not selected when camera.json
+is present. The foreground/Mesa desktop and non-restarting autoconnect repair
+was installed on 2026-10-12; refreshed entries carry their own capture dates
+and reference the maintained stationary setup renderer.
 
 The installed `robot_webserver.yaml` differs from its source copy; both are
 preserved with password placeholders. Reconcile the installed overrides into
@@ -87,3 +95,57 @@ python3 tools/hardware/verify_recovery.py
 This checks coverage, safe paths, hashes, syntax and credential placeholders.
 It reports the captured navigation file's identical duplicate key as a warning;
 that navigation file is not selected for the public recovery.
+
+
+The 2026-10-12 camera additions are labelled snapshots of the installed
+`dynamo-camera.service` and its parameter/DDS/metadata files. They add four
+manifest entries to the original 81. `camera.json` is the explicit serial/profile
+input for regenerating current camera setup from the restored maintained tool,
+not a historical install receipt. Recovery preparation selects the direct camera
+service and the maintained desktop/Bluetooth repair; those desktop/controller
+repair was installed and independently verified stationary on 2026-10-12.
+The manifest now has 89 entries: original entries are retained or explicitly
+refreshed, and four new stationary-setup paths are captured. The exact prior
+files/activity remain in the local installer receipt for rollback; cold boot
+and physical input/reconnect qualification are still open.
+
+
+Seven auxiliary-repair files were installed and independently verified on
+2026-10-13, bringing the manifest at that time to 96 entries. Their per-entry capture dates
+and hashes identify installed state; `install_auxiliary_repairs.py` regenerates
+them from the verified target package/parameters and owns narrow rollback.
+These snapshots do not establish IMU calibration, new battery sensing or the
+clock gate's next-boot behavior. See the recovery runbook for installation order.
+
+
+The October 13 chrony snapshots preserve Intel's main configuration and the
+installed Ubuntu pool profile (four sources), including subnet serving and the
+500 ppm slew policy. Source expansion requires no chrony restart; its maintained
+installer and exact rollback are `tools/hardware/expand_clock_sources.py`.
+Reconstruction needs the `chrony` package, these root-owned 0644 files and an
+enabled `chrony.service`, followed by `tools/hardware/check_clock_ready.py`.
+The expanded profile and poll bound passed a local convergence check on
+2026-10-13; reboot and source-loss behavior remain unqualified;
+see [auxiliary checks](../../docs/physical/stationary_auxiliary_checks.md#intel-clock-source-expansion).
+
+
+On 2026-10-13 the Intel pool profile was updated to `maxpoll 7` so its
+128-second source interval fits the platform's 180-second reference-age gate.
+Reconstruct the installed bytes from the labelled snapshot above, or apply the
+maintained `tools/hardware/bound_clock_poll.py` to a matching pre-change pool
+profile. The change does not restart chrony or alter its slew policy. Initial
+runtime poll values can remain high until a fresh measurement; confirm source
+poll levels and the read-only clock gate after reconstruction.
+
+The 2026-10-13 installed Puma feedback plugin adds the captured platform
+`95-dynamo-puma-feedback.conf` drop-in, bringing this manifest to 99 entries.
+That file selects a generated, package-hash-named prefix under
+`/opt/dynamo-puma-feedback/`. It cannot start the platform by itself on a new
+SSD: first rebuild the plugin from the pinned Clearpath source and maintained
+patch with `tools/hardware/build_puma_feedback_candidate.py`, stage it with
+`tools/hardware/stage_puma_plugin_prefix.py`, and use the guarded
+`tools/hardware/install_puma_feedback_plugin.py` workflow from the root README.
+The local stage-5 receipt records the installed package manifest and mapped
+library path; it is experiment evidence, not a substitute for the maintained
+builder. The live check verified only stationary startup with the physical
+e-stop engaged.
