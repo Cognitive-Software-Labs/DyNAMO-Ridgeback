@@ -277,3 +277,49 @@ def test_configured_labels_reach_detector_without_threshold_changes(ros_context,
         assert seen[0]['threshold'] == node.detection_threshold
     finally:
         node.destroy_node()
+
+
+def test_teardown_waits_for_an_inference_call_and_publishes_nothing_after_stop(
+    ros_context, monkeypatch,
+) -> None:
+    import threading
+
+    from rclpy.node import Node
+
+    detector = _StubDetector()
+    entered = threading.Event()
+    release = threading.Event()
+
+    def blocking_detect(image, **kwargs):
+        entered.set()
+        assert release.wait(timeout=5.0)
+        return []
+
+    detector.detect = blocking_detect
+    node = _make_node(detector)
+    published: list = []
+    node.detections_pub.publish = published.append
+    states: list = []
+    node.worker_state.pub.publish = states.append
+    alive_at_destroy: list[bool] = []
+    original_destroy = Node.destroy_node
+
+    def recording_destroy(self):
+        alive_at_destroy.append(self.worker_thread.is_alive())
+        return original_destroy(self)
+
+    monkeypatch.setattr(Node, 'destroy_node', recording_destroy)
+
+    node.on_color_image(_color_message())
+    assert entered.wait(timeout=2.0), 'worker never entered inference'
+    teardown = threading.Thread(target=node.destroy_node)
+    teardown.start()
+    assert _wait_for(node.stop_event.is_set)
+    release.set()
+    teardown.join(timeout=5.0)
+
+    assert not teardown.is_alive()
+    assert alive_at_destroy == [False]
+    assert published == []
+    assert states == []
+    assert not node.worker_thread.daemon

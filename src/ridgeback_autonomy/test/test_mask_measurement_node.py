@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+import time
 
 import numpy as np
 import pytest
@@ -1849,3 +1850,52 @@ def test_raised_min_valid_pixels_blames_the_floor_not_the_rect_recipe() -> None:
 
     assert batch.detections[0].projective_ranging_status == int(
         MissReason.TOO_FEW_VALID_PIXELS)
+
+
+def test_teardown_waits_for_a_frame_in_progress_and_publishes_nothing_after_stop(
+    ros_context, monkeypatch,
+) -> None:
+    import threading
+
+    from rclpy.node import Node
+    import ridgeback_localization.mask_measurement_node as mask_module
+
+    entered = threading.Event()
+    release = threading.Event()
+    original_batch = mask_module.batch_from_detections_message
+
+    def blocking_batch(message):
+        entered.set()
+        assert release.wait(timeout=5.0)
+        return original_batch(message)
+
+    monkeypatch.setattr(mask_module, 'batch_from_detections_message', blocking_batch)
+    node = _mask_node(_StubDepthSource('depth'))
+    published: list = []
+    node.measurement_pub.publish = published.append
+    states: list = []
+    node.worker_state.pub.publish = states.append
+    alive_at_destroy: list[bool] = []
+    original_destroy = Node.destroy_node
+
+    def recording_destroy(self):
+        alive_at_destroy.append(self.worker_thread.is_alive())
+        return original_destroy(self)
+
+    monkeypatch.setattr(Node, 'destroy_node', recording_destroy)
+
+    node.detections_callback(fill_detections_message(5, 0))
+    assert entered.wait(timeout=2.0), 'worker never started the frame'
+    teardown = threading.Thread(target=node.destroy_node)
+    teardown.start()
+    deadline = time.monotonic() + 2.0
+    while not node.stop_event.is_set() and time.monotonic() < deadline:
+        time.sleep(0.005)
+    release.set()
+    teardown.join(timeout=5.0)
+
+    assert not teardown.is_alive()
+    assert alive_at_destroy == [False]
+    assert published == []
+    assert states == []
+    assert not node.worker_thread.daemon
