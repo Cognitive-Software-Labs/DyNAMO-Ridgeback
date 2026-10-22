@@ -103,6 +103,10 @@ vcs import < dependencies/core.repos
 # and ros_gz (only its patched bridge packages are built)
 vcs import < dependencies/gz.repos
 
+# Hosts that run RViz (both simulators launch it by default): add the patched
+# RViz default plugins; `--profile all` below expects this checkout
+vcs import < dependencies/viz.repos
+
 # Verify every checkout is pinned and apply the recorded patches idempotently
 tools/check_dependencies --apply --profile all
 
@@ -115,7 +119,8 @@ source install/setup.bash
 ```
 
 For Isaac-only or hardware hosts, omit `dependencies/gz.repos` and use
-`tools/check_dependencies --apply --profile core`. The core dependency closure
+`tools/check_dependencies --apply --profile core` (plus `--profile viz` after
+importing `dependencies/viz.repos` where RViz runs). The core dependency closure
 does not import or build Gazebo. If you rename or move the workspace directory
 later, regenerate `build/` and `install/` before rebuilding so the generated
 setup files do not keep stale absolute paths. Preserve `artifacts/`: its logs
@@ -999,13 +1004,14 @@ Existing runs were relocated without rewriting their contents: absolute paths re
 
 ## Patches, troubleshooting, and history
 
-This project relies on five maintained dependency patches:
+This project relies on six maintained dependency patches:
 
 1. `patches/clearpath_gz_customizations.patch` patches `src/clearpath_simulator/clearpath_gz` to expose the custom `SpawnG1` Gazebo GUI plugin. The Gazebo adapter owns this repo's world/model search path.
 2. `patches/slam_toolbox_tf_namespace.patch` patches `src/slam_toolbox` so `slam_toolbox` respects namespaced TF remappings.
 3. `patches/clearpath_realsense_sim_frames.patch` patches `src/clearpath_common` so `intel_realsense.urdf.xacro` forwards `is_sim` into every supported camera macro as `use_nominal_extrinsics`, and so the Gazebo render sensor sits on the model's colour frame. Without it, simulation has no `camera_0_color_optical_frame` TF and the mask estimators report `TF_MISS_EXTRINSIC`.
 4. `patches/gz_sim_sensors_shutdown.patch` patches the pinned Gazebo Sim 8.15.0 Sensors shutdown waiter and adds upstream regression tests. The optional Gazebo source profile builds this compatible workspace overlay; see the [build, loader verification, and rollback instructions](docs/project/dependencies.md#gazebo-sensors-shutdown-patch).
 5. `patches/ros_gz_bridge_shutdown.patch` backports upstream ros_gz #955 and #991 and hand-backports #981 to the pinned ros_gz 1.0.24, so `parameter_bridge` no longer keeps its node alive past `main()` and `image_bridge` no longer receives frames into a destroyed handler; bridges stop on Ctrl-C without SIGSEGV or heap corruption. Only `ros_gz_bridge` and `ros_gz_image` are built from this checkout; see the [build, loader verification, and rollback instructions](docs/project/dependencies.md#ros_gz-shutdown-patch).
+6. `patches/rviz_image_display_unsubscribe.patch` patches the pinned RViz 14.1.23 Image display so a repeated unsubscribe no longer reaches a destroyed subscriber filter, the `std::system_error` abort RViz hit on Ctrl-C. The optional `viz` profile builds only `rviz_default_plugins` (and the test framework it needs); see the [build, loader verification, and rollback instructions](docs/project/dependencies.md#rviz-image-display-teardown-patch).
 
 Because the patches are recorded against specific upstream revisions,
 `dependencies/core.repos` and `dependencies/gz.repos` pin every dependency to

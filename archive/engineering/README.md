@@ -30,6 +30,7 @@ are excluded from ordinary repository search and the generated knowledge graph.
 
 - [Gazebo Sensors shutdown races](2026-10-18-gazebo-sensors-shutdown.md) — waiter wakeup, observed same-instance concurrent joins, and separate diagnostic/qualification populations.
 - [ros_gz bridge ownership cycles and image_bridge teardown](2026-10-22-ros-gz-bridge-shutdown.md) — two bridge-node ownership cycles, the image_bridge in-flight callback race, and stock/partial/final crash populations.
+- [RViz Image display teardown abort](2026-10-22-rviz-image-display-teardown.md) — stale message-filter connection after unsubscribe, stock/patched signal populations, and the separate process-exit SIGSEGV still open.
 
 - [Static collision-envelope audit](2026-09-18-collision-envelope-audit.md) — description/USD/Nav2 comparison with top-down and side views.
 - [Navigation footprint and simulator-contact qualification](2026-09-22-navigation-footprint-qualification.md) — effective Nav2 containment plus three-boot Gazebo and Isaac wall-contact matrices.

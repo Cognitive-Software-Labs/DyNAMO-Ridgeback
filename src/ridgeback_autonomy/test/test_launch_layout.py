@@ -771,7 +771,29 @@ def test_dependency_profiles_keep_gazebo_out_of_the_common_closure() -> None:
     assert gazebo['src/ros_gz']['version'] == '5912bfe7976a79d2cc9f373b2d40a8a3a3e33da2'
     assert '[src/ros_gz]="patches/ros_gz_bridge_shutdown.patch"' in checker
     assert '[src/ros_gz]="ros_gz_bridge ros_gz_image"' in checker
-    assert 'core|gz|all' in checker
+    assert 'core|gz|viz|all' in checker
+
+
+def test_viz_profile_overlays_only_the_patched_rviz_plugins() -> None:
+    repo_root = _package_root().parents[1]
+    manifests = {
+        name: yaml.safe_load(
+            (repo_root / f'dependencies/{name}.repos').read_text(encoding='utf-8'))[
+                'repositories']
+        for name in ('core', 'gz', 'viz')
+    }
+    checker = (repo_root / 'tools/check_dependencies').read_text(encoding='utf-8')
+
+    assert set(manifests['viz']) == {'src/rviz'}
+    assert set(manifests['viz']).isdisjoint(manifests['core'])
+    assert set(manifests['viz']).isdisjoint(manifests['gz'])
+    # rviz 14.1.23, the tag the installed RViz binaries were built from.
+    assert manifests['viz']['src/rviz']['version'] == (
+        'feb01669f1297df2af755ce9cd2ed18083e7a8b2')
+    assert '[src/rviz]="patches/rviz_image_display_unsubscribe.patch"' in checker
+    assert '[src/rviz]="rviz_default_plugins rviz_visual_testing_framework"' in checker
+    assert 'viz) MANIFESTS=("$REPO_ROOT/dependencies/viz.repos")' in checker
+    assert '"$REPO_ROOT/dependencies/viz.repos") ;;' in checker
 
 
 def test_hardware_backend_is_attach_only_and_uses_real_sensor_defaults() -> None:

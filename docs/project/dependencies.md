@@ -7,8 +7,8 @@ keeps the public installation commands; dated refresh results belong in
 
 ## Model and ownership
 
-The dependencies under `src/clearpath_*`, `src/slam_toolbox`, `src/gz-sim`, and
-`src/ros_gz` are standalone,
+The dependencies under `src/clearpath_*`, `src/slam_toolbox`, `src/gz-sim`,
+`src/ros_gz`, and `src/rviz` are standalone,
 Git-ignored repositories populated by `vcstool`. They are not Git submodules and
 are not stored in the root repository's history.
 
@@ -18,6 +18,8 @@ The compatibility unit has four root-owned parts:
   dependencies shared by every deployment.
 - [`dependencies/gz.repos`](../../dependencies/gz.repos) owns the optional
   Gazebo-only `clearpath_simulator`, `gz-sim`, and `ros_gz` pins.
+- [`dependencies/viz.repos`](../../dependencies/viz.repos) owns the optional
+  `rviz` pin for hosts that run RViz.
 - [`patches/`](../../patches/) owns intentional changes to those pinned sources.
 - [`tools/check_dependencies`](../../tools/check_dependencies) verifies that
   every checkout is at its pin and contains either no changes or exactly its
@@ -38,13 +40,17 @@ vcs import < dependencies/core.repos
 # Gazebo development only
 vcs import < dependencies/gz.repos
 
+# Hosts that run RViz
+vcs import < dependencies/viz.repos
+
 # Verify both profiles after a Gazebo import
 tools/check_dependencies --apply --profile all
 ```
 
 On an Isaac-only or hardware host, omit the Gazebo import and run
 `tools/check_dependencies --apply --profile core`. `--profile gz` checks only
-the optional Gazebo checkouts. `vcs import` creates the nested repositories
+the optional Gazebo checkouts and `--profile viz` the optional RViz checkout;
+`all` covers every profile. `vcs import` creates the nested repositories
 at the exact manifest commits. The checker then applies missing maintained
 patches. Its `--apply` mode is idempotent: an exact already-applied patch is
 accepted.
@@ -136,6 +142,7 @@ The maintained mappings are:
 | `src/slam_toolbox` | `patches/slam_toolbox_tf_namespace.patch` |
 | `src/gz-sim` | `patches/gz_sim_sensors_shutdown.patch` |
 | `src/ros_gz` | `patches/ros_gz_bridge_shutdown.patch` |
+| `src/rviz` | `patches/rviz_image_display_unsubscribe.patch` |
 
 Update all affected manifest pins and patch files in the same root commit.
 
@@ -447,7 +454,69 @@ named location outside the workspace, restore this change's manifest, mapping,
 ignore, and documentation edits as one reviewed set, rebuild, and start a fresh
 shell. Do not reset a dirty nested checkout.
 
+## RViz Image display teardown patch
+
+The optional `viz` profile imports RViz **14.1.23**, upstream tag `14.1.23`,
+commit `feb01669f1297df2af755ce9cd2ed18083e7a8b2`, matching the installed
+`ros-jazzy-rviz-*` 14.1.23 binaries. It is a partial overlay: only
+`rviz_default_plugins` and `rviz_visual_testing_framework` are built. The second
+is built only because `rviz_default_plugins` requires it when `BUILD_TESTING` is
+on, as it is in the normal workspace build; the visual tests themselves stay off
+(`EnableVisualTests` unset). `rviz2`, `rviz_common`, and `rviz_rendering` keep
+resolving to `/opt/ros/jazzy`; pluginlib loads the overlay's
+`librviz_default_plugins.so` through the ament index.
+
+### Defect
+
+`ImageTransportDisplay::unsubscribe()` disconnected its
+`message_filters::Connection` and then destroyed the `SubscriberFilter`, but kept
+the connection. The connection's disconnect closure holds the raw address of
+the filter's `Signal1`, so a second `unsubscribe()` -- `onDisable()` followed by
+the destructor -- locks a mutex inside the destroyed filter. The lock fails with
+`EINVAL` or `EOWNERDEAD`, `std::system_error` escapes the destructor, and RViz
+aborts (SIGABRT) on shutdown. The 2026-10-19 diagnosis traced the throw to
+`Signal1<Image>::removeCallback` under `~ImageDisplay`; on 2026-10-22 one
+SIGINT aborted stock RViz in 6 of 20 starts with `benchmark.rviz` and 10 of 20
+with `exploration.rviz`. The defect entered in 14.1.21 (backport #1745); the
+apt candidate 14.1.24 still has it.
+
+`patches/rviz_image_display_unsubscribe.patch` disconnects only while the
+filter exists and replaces the connection with an empty one before the filter
+is reset, so a repeated `unsubscribe()` does nothing. It changes one inline
+method in an installed header that only `rviz_default_plugins` compiles.
+
+### Build and loading proof
+
+After `vcs import < dependencies/viz.repos` and
+`tools/check_dependencies --apply --profile all`:
+
+```bash
+source /opt/ros/jazzy/setup.bash
+source install/setup.bash
+colcon build --symlink-install --base-paths src \
+  --packages-select rviz_visual_testing_framework rviz_default_plugins
+source install/setup.bash
+```
+
+With RViz running, its maps must show the overlay plugin library:
+
+```bash
+awk '/librviz_default_plugins\.so/ {print $NF}' /proc/$(pgrep -x rviz2)/maps | sort -u
+```
+
+The line must resolve to `install/rviz_default_plugins/lib/`.
+
+### Coupling and rollback
+
+The pin must match the installed RViz binaries: an apt upgrade to 14.1.24
+requires moving the pin and rebasing the patch through the refresh procedure
+above, in the same change. To roll back, stop only owned RViz processes, move
+`src/rviz`, `build/rviz_*`, and `install/rviz_*` outside the workspace, restore
+this change's manifest, mapping, ignore, and documentation edits as one reviewed
+set, rebuild, and start a fresh shell.
+
 ## Archived evidence
 
 - [Gazebo Sensors shutdown races and qualification](../../archive/engineering/2026-10-18-gazebo-sensors-shutdown.md)
 - [ros_gz bridge ownership cycles and image_bridge teardown](../../archive/engineering/2026-10-22-ros-gz-bridge-shutdown.md)
+- [RViz Image display teardown abort](../../archive/engineering/2026-10-22-rviz-image-display-teardown.md)

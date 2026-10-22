@@ -74,7 +74,7 @@ behavior stays in the relevant technical reference.
 ## Dependencies and patches
 
 External ROS repositories are declared in `dependencies/core.repos` and the
-optional `dependencies/gz.repos`. When a dependency changes,
+optional `dependencies/gz.repos` and `dependencies/viz.repos`. When a dependency changes,
 check the root installation instructions, local patches, and any operational
 notes affected by that change. If a simulation asset referenced by a Clearpath
 patch moves, update the patch in the same change.
@@ -82,10 +82,9 @@ patch moves, update the patch in the same change.
 The [dependency runbook](dependencies.md) owns the import, verification, refresh,
 live-checkout migration, and rollback procedure. Run `tools/check_dependencies`
 before builds and do not discard a nested-repository change to satisfy it.
-`src/ros_gz` is a partial overlay: only its patched `ros_gz_bridge` and
-`ros_gz_image` are built, and the checker's untracked `COLCON_IGNORE` markers
-keep the rest on the installed binaries; never delete them to build the whole
-repository.
+`src/ros_gz` and `src/rviz` are partial overlays: only their patched packages
+are built, and the checker's untracked `COLCON_IGNORE` markers keep the rest on
+the installed binaries; never delete them to build a whole repository.
 
 The `slam_toolbox` namespace patch is required by this stack; its rationale and
 failure signature live in [troubleshooting](../troubleshooting.md).

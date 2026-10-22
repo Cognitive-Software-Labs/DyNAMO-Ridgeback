@@ -1,0 +1,20 @@
+diff --git a/rviz_default_plugins/include/rviz_default_plugins/displays/image/image_transport_display.hpp b/rviz_default_plugins/include/rviz_default_plugins/displays/image/image_transport_display.hpp
+index d6b8e431..639a2567 100644
+--- a/rviz_default_plugins/include/rviz_default_plugins/displays/image/image_transport_display.hpp
++++ b/rviz_default_plugins/include/rviz_default_plugins/displays/image/image_transport_display.hpp
+@@ -148,7 +148,14 @@ protected:
+
+   virtual void unsubscribe()
+   {
+-    subscription_callback_.disconnect();
++    // The connection holds the raw address of the subscriber filter's
++    // signal. Disconnect only while that filter is alive, and forget the
++    // connection before the filter goes, so a second unsubscribe -- onDisable
++    // and then the destructor -- cannot reach a destroyed filter.
++    if (subscription_) {
++      subscription_callback_.disconnect();
++    }
++    subscription_callback_ = message_filters::Connection();
+     subscription_.reset();
+   }
+

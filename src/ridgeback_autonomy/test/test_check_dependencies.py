@@ -71,6 +71,7 @@ def workspace(tmp_path):
         f'repositories:\n  src/plain:\n    type: git\n    url: x\n    version: {plain}\n')
     (root / 'dependencies/gz.repos').write_text(
         f'repositories:\n  src/overlay:\n    type: git\n    url: x\n    version: {overlay}\n')
+    (root / 'dependencies/viz.repos').write_text('repositories: {}\n')
 
     text = CHECKER.read_text(encoding='utf-8')
     for old, new in (
