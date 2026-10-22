@@ -1,0 +1,26 @@
+# S8 tape survey of r100_0160 for tools/hardware/compare_measured_outline.py.
+# Copy into artifacts/hardware/<UTC>-s8-outline/survey.yaml and fill in metres.
+# Robot stationary, e-stop pressed. Hold a carpenter's square against the
+# front face or the left face (the robot's left, standing behind it facing
+# forward) and read the horizontal distance to the point:
+#   from_front_m: back from the front face (positive into the robot)
+#   from_left_m:  in from the left face (negative when the point sticks out)
+# uncertainty_m: your honest tape/squaring uncertainty for that reading.
+surveyor: ''
+date_utc: ''
+hull:
+  length_m: null      # front face to rear face, at deck height
+  width_m: null       # left face to right face, at deck height
+  uncertainty_m: 0.005
+points:
+  # The rounded hull corners, measured where the curve is furthest out at 45°.
+  - {name: corner front-left,  from_front_m: null, from_left_m: null, height_m: null, uncertainty_m: 0.01}
+  - {name: corner front-right, from_front_m: null, from_left_m: null, height_m: null, uncertainty_m: 0.01}
+  - {name: corner rear-left,   from_front_m: null, from_left_m: null, height_m: null, uncertainty_m: 0.01}
+  - {name: corner rear-right,  from_front_m: null, from_left_m: null, height_m: null, uncertainty_m: 0.01}
+  # Anything that sticks out beyond the deck outline, at any height: bumpers,
+  # LiDAR housings, the camera mast and its bracket, handles, antennas, cables.
+  - {name: front lidar housing, from_front_m: null, from_left_m: null, height_m: null, uncertainty_m: 0.005}
+  - {name: rear lidar housing,  from_front_m: null, from_left_m: null, height_m: null, uncertainty_m: 0.005}
+  - {name: camera mast front,   from_front_m: null, from_left_m: null, height_m: null, uncertainty_m: 0.005}
+  - {name: camera bracket,      from_front_m: null, from_left_m: null, height_m: null, uncertainty_m: 0.005}

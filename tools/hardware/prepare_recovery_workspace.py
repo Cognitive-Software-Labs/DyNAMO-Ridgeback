@@ -74,18 +74,10 @@ def unpack_public_source(archive: bytes, destination: Path) -> None:
 
 
 def desktop_candidates() -> dict:
-    # Reuse the maintained desktop repair renderer, without calling its installer
-    # or selecting vendor camera/web readiness files.
-    sys.path.insert(0, str(REPO / 'tools/intel_thor'))
-    from repair_hardware_workflow import desired_files
-    paths = {
-        Path('/etc/systemd/system/ridgeback-vnc.service'),
-        Path('/etc/systemd/system/ridgeback-vnc-websockify.service'),
-        Path('/etc/systemd/system/ridgeback-remote-screen.service.d/20-independent-vnc.conf'),
-        Path('/usr/local/lib/dynamo-hardware/vnc-xstartup'),
-    }
-    rendered = desired_files()
-    return {str(p): rendered[p] for p in paths}
+    # Reuse the maintained stationary desktop/Bluetooth renderer. No installer
+    # execution or vendor camera/web readiness files are selected.
+    from install_stationary_setup import desired_files
+    return desired_files()
 
 
 def prepare(upstream: Path, output: Path, deployment: Path = DEFAULT_ROOT) -> dict:
@@ -119,23 +111,50 @@ def prepare(upstream: Path, output: Path, deployment: Path = DEFAULT_ROOT) -> di
     manifest = json.loads((deployment / 'manifest.json').read_text())
     entries = {e['source']: e for e in manifest['files']}
     candidates = {}
-    for origin in CAPTURED:
+    camera_config = deployment / 'camera.json'
+    selected = CAPTURED
+    if camera_config.exists():
+        selected = [p for p in CAPTURED if p not in (
+            '/etc/systemd/system/realsense-camera.service',
+            '/etc/systemd/system/realsense-camera.service.d/60-dynamo-cyclonedds.conf')]
+    for origin in selected:
         entry = entries[origin]
         candidates[origin] = {
             'content': (deployment / entry['repo_path']).read_text(),
             'mode': int(entry['mode'], 8), 'owner': entry['owner'], 'group': entry['group'],
             'provenance': entry['repo_path'],
         }
-    camera_entry = entries['/usr/local/sbin/realsense-camera-start']
-    camera = (deployment / camera_entry['repo_path']).read_text()
-    old_source = 'source /opt/mybotshop/install/setup.bash 2>/dev/null || true'
-    if camera.count(old_source) != 1:
-        raise ValueError('Unexpected captured camera wrapper; review recovery adaptation')
-    candidates['/usr/local/sbin/realsense-camera-start'] = {
-        'content': camera.replace(old_source, 'source /etc/clearpath/setup.bash'),
-        'mode': 0o755, 'owner': 'root', 'group': 'root',
-        'provenance': 'captured camera wrapper; optional vendor source replaced by Clearpath setup',
-    }
+    if camera_config.exists():
+        import importlib.util
+        from importlib.machinery import SourceFileLoader
+        loader = SourceFileLoader('recovery_camera_service', str(REPO / 'tools/intel_thor/camera_service'))
+        spec = importlib.util.spec_from_loader(loader.name, loader)
+        camera_tool = importlib.util.module_from_spec(spec)
+        loader.exec_module(camera_tool)
+        import yaml
+        settings = json.loads(camera_config.read_text())
+        robot = yaml.safe_load(candidates['/etc/clearpath/robot.yaml']['content'])
+        robot.setdefault('sensors', {})['camera'] = [camera_tool.camera_entry(settings['serial'])]
+        candidates['/etc/clearpath/robot.yaml']['content'] = yaml.safe_dump(robot, sort_keys=False)
+        candidates['/etc/clearpath/robot.yaml']['provenance'] += '; camera.json + maintained description-only camera_entry'
+        ns = camera_tool.namespace(robot)
+        for origin, content in {
+            '/etc/systemd/system/dynamo-camera.service': camera_tool.render_unit(ns, settings['dds_profile']),
+            '/etc/clearpath/dynamo-camera/d455.yaml': camera_tool.render_params(settings['serial'], settings['profile'], settings['fps']),
+        }.items():
+            candidates[origin] = dict(content=content, mode=0o644, owner='root', group='root',
+                provenance='camera.json + tools/intel_thor/camera_service renderer; no service activation')
+    else:
+        camera_entry = entries['/usr/local/sbin/realsense-camera-start']
+        camera = (deployment / camera_entry['repo_path']).read_text()
+        old_source = 'source /opt/mybotshop/install/setup.bash 2>/dev/null || true'
+        if camera.count(old_source) != 1:
+            raise ValueError('Unexpected captured camera wrapper; review recovery adaptation')
+        candidates['/usr/local/sbin/realsense-camera-start'] = {
+            'content': camera.replace(old_source, 'source /etc/clearpath/setup.bash'),
+            'mode': 0o755, 'owner': 'root', 'group': 'root',
+            'provenance': 'captured camera wrapper; optional vendor source replaced by Clearpath setup',
+        }
     candidates['/etc/systemd/system/clearpath-scan-merger.service.d/30-recovery-workspace.conf'] = {
         'content': """[Service]
 ExecStart=
@@ -145,7 +164,14 @@ ExecStart=/bin/bash -c 'source /opt/ros/jazzy/setup.bash && source /etc/clearpat
     }
     for origin, data in desktop_candidates().items():
         candidates[origin] = dict(data, owner='root', group='root',
-                                  provenance='tools/intel_thor/repair_hardware_workflow.py desired_files; desktop subset')
+                                  provenance='tools/hardware/install_stationary_setup.py desired_files; desktop and Bluetooth only')
+    from install_commissioning_caps import desired_files as commissioning_files
+    import yaml
+    robot_candidate = yaml.safe_load(candidates['/etc/clearpath/robot.yaml']['content'])
+    for origin, content in commissioning_files(robot_candidate['system']['ros2']['namespace']).items():
+        candidates[str(origin)] = dict(content=content.decode(), mode=0o644,
+            owner='root', group='root',
+            provenance='tools/hardware/install_commissioning_caps.py desired_files; fixed commissioning caps')
     # New output only. Partial preparation is left for inspection on failure.
     resolved.mkdir(parents=True)
     unpack_public_source(archive, resolved / MERGER)
@@ -169,6 +195,7 @@ ExecStart=/bin/bash -c 'source /opt/ros/jazzy/setup.bash && source /etc/clearpat
         'status': 'prepared-not-installed', 'vendor_dashboard_required': False,
         'public_source': lock['repository'], 'public_revision': revision,
         'input_manifest_sha256': hashlib.sha256((deployment / 'manifest.json').read_bytes()).hexdigest(),
+        'camera_input_sha256': hashlib.sha256(camera_config.read_bytes()).hexdigest() if camera_config.exists() else None,
         'warnings': report.warnings, 'host_files': installed,
         'fresh_local_steps': ['Wi-Fi/SSH/Tailscale credentials', 'vncpasswd as robot',
                               'symlink noVNC1.3.0 to /usr/share/novnc',
