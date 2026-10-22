@@ -1,0 +1,54 @@
+--- a/clearpath_motor_drivers/puma_motor_driver/include/puma_motor_driver/multi_puma_node.hpp
++++ b/clearpath_motor_drivers/puma_motor_driver/include/puma_motor_driver/multi_puma_node.hpp
+@@ -161,6 +161,12 @@
+   };
+   std::queue<ReceivedFrame> recv_msg_queue_;
+   std::mutex recv_msg_mutex_;
++  // Five-second diagnostic buckets; only the timer thread updates these.
++  int64_t queue_timing_started_ns_ = 0;
++  int64_t queue_age_max_ns_ = 0;
++  int64_t queue_age_sum_ns_ = 0;
++  uint64_t queue_age_count_ = 0;
++  uint64_t queue_age_over_100ms_ = 0;
+ 
+   clearpath_motor_msgs::msg::PumaMultiStatus status_msg_;
+   clearpath_motor_msgs::msg::PumaMultiFeedback feedback_msg_;
+--- a/clearpath_motor_drivers/puma_motor_driver/src/multi_puma_node.cpp
++++ b/clearpath_motor_drivers/puma_motor_driver/src/multi_puma_node.cpp
+@@ -302,9 +302,36 @@
+       received = std::move(recv_msg_queue_.front());
+       recv_msg_queue_.pop();
+     }
++    const auto dequeue_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
++      std::chrono::steady_clock::now().time_since_epoch()).count();
++    const auto queue_age_ns = dequeue_ns - received.ingress_ns;
++    if (queue_age_ns >= 0) {
++      if (queue_timing_started_ns_ == 0) queue_timing_started_ns_ = dequeue_ns;
++      queue_age_count_++;
++      queue_age_sum_ns_ += queue_age_ns;
++      if (queue_age_ns > queue_age_max_ns_) queue_age_max_ns_ = queue_age_ns;
++      if (queue_age_ns > 100000000) queue_age_over_100ms_++;
++    }
+     for (auto & driver : drivers_) {
+       driver.processMessage(received.frame, received.ingress_ns);
+     }
++  }
++  const auto report_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
++    std::chrono::steady_clock::now().time_since_epoch()).count();
++  if (queue_timing_started_ns_ != 0 && report_ns - queue_timing_started_ns_ >= 5000000000LL) {
++    if (queue_age_count_ != 0) {
++      RCLCPP_INFO(this->get_logger(),
++        "DYNAMO_PUMA_QUEUE_TIME frames=%llu mean_ms=%.3f max_ms=%.3f over_100ms=%llu",
++        static_cast<unsigned long long>(queue_age_count_),
++        static_cast<double>(queue_age_sum_ns_) / queue_age_count_ / 1e6,
++        static_cast<double>(queue_age_max_ns_) / 1e6,
++        static_cast<unsigned long long>(queue_age_over_100ms_));
++    }
++    queue_timing_started_ns_ = report_ns;
++    queue_age_count_ = 0;
++    queue_age_sum_ns_ = 0;
++    queue_age_max_ns_ = 0;
++    queue_age_over_100ms_ = 0;
+   }
+ }
+ 

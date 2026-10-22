@@ -1,0 +1,57 @@
+--- a/clearpath_motor_drivers/puma_motor_driver/src/multi_puma_node.cpp
++++ b/clearpath_motor_drivers/puma_motor_driver/src/multi_puma_node.cpp
+@@ -133,17 +133,16 @@
+ bool MultiPumaNode::getFeedback()
+ {
+   // Check All Fields Received
+-  uint8_t received = 0;
+-  for (auto & driver : drivers_) {
++  for (auto & driver : drivers_) {
++    uint8_t received = 0;
+     received |= driver.receivedDutyCycle() << FeedbackBit::DutyCycle;
+     received |= driver.receivedCurrent() << FeedbackBit::Current;
+     received |= driver.receivedPosition() << FeedbackBit::Position;
+     received |= driver.receivedSpeed() << FeedbackBit::Speed;
+     received |= driver.receivedSetpoint() << FeedbackBit::Setpoint;
+-  }
+-
+-  if (received != (1 << FeedbackBit::Count) - 1) {
+-    return false;
++    if (received != (1 << FeedbackBit::Count) - 1) {
++      return false;
++    }
+   }
+ 
+   uint8_t feedback_index = 0;
+@@ -167,9 +166,9 @@
+ {
+   // Check All Fields Received
+   uint8_t status_index = 0;
+-  uint8_t received_fields = 0;
+   uint8_t received_status = 0;
+   for (auto & driver : drivers_) {
++    uint8_t received_fields = 0;
+     received_fields |= driver.receivedBusVoltage() << StatusBit::BusVoltage;
+     received_fields |= driver.receivedOutVoltage() << StatusBit::OutVoltage;
+     received_fields |= driver.receivedAnalogInput() << StatusBit::AnalogInput;
+--- a/clearpath_motor_drivers/puma_motor_driver/src/driver.cpp
++++ b/clearpath_motor_drivers/puma_motor_driver/src/driver.cpp
+@@ -1049,11 +1049,13 @@
+ {
+   can_feedback_freq_status_->run(stat);
+ 
+-  stat.add("Duty cycle", lastDutyCycle());
+-  stat.add("Current (A)", lastCurrent());
+-  stat.add("Speed (rad/s)", lastSpeed());
+-  stat.add("Position", lastPosition());
+-  stat.add("Setpoint", lastSetpoint());
++  // Diagnostics inspect a value copy so they do not consume publish flags.
++  Driver cached = *this;
++  stat.add("Duty cycle", cached.lastDutyCycle());
++  stat.add("Current (A)", cached.lastCurrent());
++  stat.add("Speed (rad/s)", cached.lastSpeed());
++  stat.add("Position", cached.lastPosition());
++  stat.add("Setpoint", cached.lastSetpoint());
+ }
+ 
+ }  // namespace puma_motor_driver

@@ -1,0 +1,353 @@
+--- a/clearpath_hardware_interfaces/src/puma/hardware.cpp
++++ b/clearpath_hardware_interfaces/src/puma/hardware.cpp
+@@ -29,8 +29,27 @@
+ */
+ #include "clearpath_hardware_interfaces/puma/hardware.hpp"
+ 
++#include <algorithm>
++#include <thread>
++
+ namespace clearpath_hardware_interfaces
+ {
++namespace {
++double monotonicSeconds(std::chrono::steady_clock::time_point value = std::chrono::steady_clock::now())
++{
++  return std::chrono::duration<double>(value.time_since_epoch()).count();
++}
++std::vector<FeedbackWheelSample> samples(const clearpath_motor_msgs::msg::PumaMultiFeedback & msg)
++{
++  std::vector<FeedbackWheelSample> batch;
++  for (const auto & wheel : msg.drivers_feedback) {
++    batch.push_back({wheel.device_name, wheel.device_number, wheel.speed,
++      wheel.travel, wheel.duty_cycle, wheel.current, wheel.setpoint});
++  }
++  return batch;
++}
++}  // namespace
++
+ 
+ /**
+  * @brief Initialize hardware interface object
+@@ -50,6 +69,12 @@
+ /**
+  * @brief Write commands to the hardware
+ */
++void PumaHardware::inhibitCommands()
++{
++  std::fill(hw_commands_.begin(), hw_commands_.end(), 0.0);
++  writeCommandsToHardware(); // Explicit zero command, never fake zero feedback.
++}
++
+ void PumaHardware::writeCommandsToHardware()
+ {
+   sensor_msgs::msg::JointState joint_state;
+@@ -74,18 +99,26 @@
+ */
+ void PumaHardware::updateJointsFromHardware()
+ {
+-  rclcpp::spin_some(node_);
+-
+-  if (node_->has_new_feedback())
+-  {
+-
+-    auto msg = node_->get_feedback();
+-
+-    for (auto& puma : msg.drivers_feedback)
+-    {
+-      hw_states_velocity_[wheel_joints_[puma.device_name]] = puma.speed;
+-      hw_states_position_[wheel_joints_[puma.device_name]] = puma.travel; // * 0.049;
+-    }
++  // spin_some collects one middleware sample per subscription per call.
++  // Drain available samples with a bounded number of collections so 25 Hz
++  // input cannot accumulate behind a 20 Hz controller cycle.
++  for (unsigned collection = 0; collection < 32; ++collection) {
++    rclcpp::spin_some(node_);
++    clearpath_motor_msgs::msg::PumaMultiFeedback msg;
++    std::chrono::steady_clock::time_point receipt;
++    bool header_valid = false, received = false;
++    while (node_->take_feedback(msg, receipt, header_valid)) {
++      received = true;
++      if (!header_valid) { if (feedback_safety_) feedback_safety_->fail(); return; }
++      if (!feedback_safety_ || !feedback_safety_->accept(samples(msg),
++          monotonicSeconds(receipt), monotonicSeconds())) return;
++      for (const auto & wheel : msg.drivers_feedback) {
++        const auto index = wheel_joints_.at(wheel.device_name);
++        hw_states_velocity_[index] = wheel.speed;
++        hw_states_position_[index] = wheel.travel;
++      }
++    }
++    if (!received) return;
+   }
+ }
+ 
+@@ -250,50 +283,87 @@
+ */
+ hardware_interface::CallbackReturn PumaHardware::on_activate(const rclcpp_lifecycle::State & /*previous_state*/)
+ {
+-  RCLCPP_INFO(rclcpp::get_logger(hw_name_), "Starting ...please wait...");
+-
+-  // set some default values
+-  for (auto i = 0u; i < hw_states_position_.size(); i++)
+-  {
+-    if (std::isnan(hw_states_position_[i]))
+-    {
+-      hw_states_position_[i] = 0;
+-      hw_states_position_offset_[i] = 0;
+-      hw_states_velocity_[i] = 0;
+-      hw_commands_[i] = 0;
+-    }
+-  }
+-
+-  RCLCPP_INFO(rclcpp::get_logger(hw_name_), "System Successfully started!");
+-
++  feedback_active_ = false;
++  std::vector<std::string> names;
++  for (const auto & joint : wheel_joints_) names.push_back(joint.first);
++  feedback_safety_.reset(new FeedbackSafety(names));
++  inhibitCommands();
++  // Event-driven readiness with a bounded wait, never permit blind startup.
++  const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
++  while (std::chrono::steady_clock::now() < deadline) {
++    rclcpp::spin_some(node_);
++    clearpath_motor_msgs::msg::PumaMultiFeedback msg;
++    std::chrono::steady_clock::time_point receipt;
++    bool header_valid = false;
++    if (node_->take_feedback(msg, receipt, header_valid)) {
++      if (!header_valid) { feedback_safety_->fail(); inhibitCommands();
++        return hardware_interface::CallbackReturn::ERROR; }
++      if (!feedback_safety_->activate(samples(msg), monotonicSeconds(receipt), monotonicSeconds())) {
++        inhibitCommands();
++        return hardware_interface::CallbackReturn::ERROR;
++      }
++      for (const auto & wheel : msg.drivers_feedback) {
++        if (std::abs(wheel.speed) > .001) {
++          feedback_safety_->fail(); inhibitCommands();
++          return hardware_interface::CallbackReturn::ERROR;
++        }
++      }
++      for (const auto & wheel : msg.drivers_feedback) {
++        const auto index = wheel_joints_.at(wheel.device_name);
++        hw_states_velocity_[index] = wheel.speed;
++        hw_states_position_[index] = wheel.travel;
++        hw_states_position_offset_[index] = 0;
++      }
++      feedback_active_ = true;
++      return hardware_interface::CallbackReturn::SUCCESS;
++    }
++    inhibitCommands();
++    std::this_thread::sleep_for(std::chrono::milliseconds(10));
++  }
++  feedback_safety_->fail(); inhibitCommands();
++  return hardware_interface::CallbackReturn::ERROR;
++}
++
++/**
++ * @brief Deactivate
++*/
++hardware_interface::CallbackReturn PumaHardware::on_deactivate(const rclcpp_lifecycle::State & /*previous_state*/)
++{
++  feedback_active_ = false;
++  if (feedback_safety_) feedback_safety_->deactivate();
++  inhibitCommands();
+   return hardware_interface::CallbackReturn::SUCCESS;
+ }
+ 
+-/**
+- * @brief Deactivate
+-*/
+-hardware_interface::CallbackReturn PumaHardware::on_deactivate(const rclcpp_lifecycle::State & /*previous_state*/)
+-{
+-  RCLCPP_INFO(rclcpp::get_logger(hw_name_), "Stopping ...please wait...");
+-
+-  RCLCPP_INFO(rclcpp::get_logger(hw_name_), "System successfully stopped!");
+-
+-  return hardware_interface::CallbackReturn::SUCCESS;
++hardware_interface::CallbackReturn PumaHardware::on_error(const rclcpp_lifecycle::State & previous_state)
++{
++  return on_deactivate(previous_state);
+ }
+ 
+ /**
+  * @brief Read joint feedback from hardware interface
+ */
+-hardware_interface::return_type PumaHardware::read(const rclcpp::Time & /*time*/, const rclcpp::Duration & period)
+-{
+-  RCLCPP_DEBUG(rclcpp::get_logger(hw_name_), "Reading from hardware");
+-
+-  RCLCPP_DEBUG(rclcpp::get_logger(hw_name_), "Duration %f", period.seconds());
+-
++hardware_interface::return_type PumaHardware::read(const rclcpp::Time & /*time*/, const rclcpp::Duration & /*period*/)
++{
++  if (!feedback_active_) {
++    // Inactive components are still read by controller manager. Drain old input,
++    // preserve measured states and keep commands zero without a startup error.
++    for (unsigned collection = 0; collection < 32; ++collection) {
++      rclcpp::spin_some(node_);
++      clearpath_motor_msgs::msg::PumaMultiFeedback msg;
++      std::chrono::steady_clock::time_point receipt;
++      bool header_valid, received = false;
++      while (node_->take_feedback(msg, receipt, header_valid)) received = true;
++      if (!received) break;
++    }
++    inhibitCommands();
++    return hardware_interface::return_type::OK;
++  }
+   updateJointsFromHardware();
+-
+-  RCLCPP_DEBUG(rclcpp::get_logger(hw_name_), "Joints successfully read!");
+-
++  if (!feedback_safety_ || !feedback_safety_->safe(monotonicSeconds())) {
++    inhibitCommands();
++    return hardware_interface::return_type::ERROR;
++  }
+   return hardware_interface::return_type::OK;
+ }
+ 
+@@ -302,12 +372,18 @@
+ */
+ hardware_interface::return_type PumaHardware::write(const rclcpp::Time & /*time*/, const rclcpp::Duration & /*period*/)
+ {
+-  RCLCPP_DEBUG(rclcpp::get_logger(hw_name_), "Writing to hardware");
+-
++  if (!feedback_active_) { inhibitCommands(); return hardware_interface::return_type::OK; }
++  if (!feedback_safety_ || !feedback_safety_->safe(monotonicSeconds())) {
++    inhibitCommands();
++    return hardware_interface::return_type::ERROR;
++  }
++  for (const auto value : hw_commands_) {
++    if (!std::isfinite(value)) {
++      feedback_safety_->fail(); inhibitCommands();
++      return hardware_interface::return_type::ERROR;
++    }
++  }
+   writeCommandsToHardware();
+-
+-  RCLCPP_DEBUG(rclcpp::get_logger(hw_name_), "Joints successfully written!");
+-
+   return hardware_interface::return_type::OK;
+ }
+ 
+--- a/clearpath_hardware_interfaces/src/puma/hardware_interface.cpp
++++ b/clearpath_hardware_interfaces/src/puma/hardware_interface.cpp
+@@ -28,6 +28,7 @@
+ POSSIBILITY OF SUCH DAMAGE.
+ */
+ #include "clearpath_hardware_interfaces/puma/hardware_interface.hpp"
++#include <algorithm>
+ 
+ using clearpath_hardware_interfaces::PumaHardwareInterface;
+ 
+@@ -54,7 +55,22 @@
+ */
+ void PumaHardwareInterface::feedback_callback(const clearpath_motor_msgs::msg::PumaMultiFeedback::SharedPtr msg)
+ {
++  std::lock_guard<std::mutex> lock(feedback_mutex_);
++  const double age = get_clock()->now().seconds() - rclcpp::Time(msg->header.stamp).seconds();
++  if (rclcpp::Time(msg->header.stamp).nanoseconds() <= 0 || age < -.005 || age > .25) {
++    invalid_header_pending_ = true;
++  }
+   feedback_ = *msg;
++  // Spend the age already accumulated before callback delivery from the same
++  // monotonic freshness budget; otherwise a 240 ms old packet gains 250 ms more.
++  feedback_receipt_ = std::chrono::steady_clock::now() -
++    std::chrono::duration_cast<std::chrono::steady_clock::duration>(
++      std::chrono::duration<double>(std::max(0.0, age)));
++  if (pending_feedback_.size() >= 32) {
++    invalid_header_pending_ = true; // Overflow is a fault, never silently discard evidence.
++    pending_feedback_.pop_front();
++  }
++  pending_feedback_.push_back({feedback_, feedback_receipt_});
+   has_feedback_ = true;
+ }
+ 
+@@ -87,6 +103,24 @@
+ */
+ clearpath_motor_msgs::msg::PumaMultiFeedback PumaHardwareInterface::get_feedback()
+ {
++  std::lock_guard<std::mutex> lock(feedback_mutex_);
+   has_feedback_ = false;
+   return feedback_;
+ }
++
++// Snapshot message and monotonic callback receipt together; no check/get race.
++bool PumaHardwareInterface::take_feedback(
++  clearpath_motor_msgs::msg::PumaMultiFeedback & msg,
++  std::chrono::steady_clock::time_point & receipt, bool & header_valid)
++{
++  std::lock_guard<std::mutex> lock(feedback_mutex_);
++  if (pending_feedback_.empty()) return false;
++  msg = pending_feedback_.front().msg;
++  receipt = pending_feedback_.front().receipt;
++  pending_feedback_.pop_front();
++  const double age = get_clock()->now().seconds() - rclcpp::Time(msg.header.stamp).seconds();
++  header_valid = !invalid_header_pending_ && age >= -.005 && age <= .25;
++  invalid_header_pending_ = false;
++  has_feedback_ = !pending_feedback_.empty();
++  return true;
++}
+--- a/clearpath_hardware_interfaces/include/clearpath_hardware_interfaces/puma/hardware.hpp
++++ b/clearpath_hardware_interfaces/include/clearpath_hardware_interfaces/puma/hardware.hpp
+@@ -45,6 +45,7 @@
+ #include "hardware_interface/types/hardware_interface_type_values.hpp"
+ 
+ #include "clearpath_hardware_interfaces/puma/hardware_interface.hpp"
++#include "clearpath_hardware_interfaces/puma/feedback_safety.hpp"
+ #include "clearpath_hardware_interfaces/visibility_control.h"
+ 
+ 
+@@ -65,6 +66,8 @@
+   hardware_interface::CallbackReturn on_init(const hardware_interface::HardwareComponentInterfaceParams & params) override;
+ 
+   HARDWARE_INTERFACE_PUBLIC
++  hardware_interface::CallbackReturn on_error(const rclcpp_lifecycle::State & previous_state) override;
++
+   std::vector<hardware_interface::StateInterface> export_state_interfaces() override;
+ 
+   HARDWARE_INTERFACE_PUBLIC
+@@ -84,6 +87,9 @@
+ protected:
+   void writeCommandsToHardware();
+   void updateJointsFromHardware();
++  void inhibitCommands();
++  std::unique_ptr<FeedbackSafety> feedback_safety_;
++  bool feedback_active_{false};
+   virtual hardware_interface::CallbackReturn getHardwareInfo(const hardware_interface::HardwareComponentInterfaceParams & params);
+   virtual hardware_interface::CallbackReturn validateJoints();
+   virtual hardware_interface::CallbackReturn initHardwareInterface();
+--- a/clearpath_hardware_interfaces/include/clearpath_hardware_interfaces/puma/hardware_interface.hpp
++++ b/clearpath_hardware_interfaces/include/clearpath_hardware_interfaces/puma/hardware_interface.hpp
+@@ -33,6 +33,9 @@
+ #ifndef CLEARPATH_HARDWARE_INTERFACES__PUMA_DRIVE_HARDWARE_INTERFACE_HPP_
+ #define CLEARPATH_HARDWARE_INTERFACES__PUMA_DRIVE_HARDWARE_INTERFACE_HPP_
+ 
++#include <chrono>
++#include <mutex>
++#include <deque>
+ #include "rclcpp/rclcpp.hpp"
+ #include "sensor_msgs/msg/joint_state.hpp"
+ 
+@@ -53,13 +56,23 @@
+   bool has_new_feedback();
+   void feedback_callback(const clearpath_motor_msgs::msg::PumaMultiFeedback::SharedPtr msg);
+   clearpath_motor_msgs::msg::PumaMultiFeedback get_feedback();
++  bool take_feedback(clearpath_motor_msgs::msg::PumaMultiFeedback & msg,
++    std::chrono::steady_clock::time_point & receipt, bool & header_valid);
+ 
+   private:
+   rclcpp::Publisher<sensor_msgs::msg::JointState>::SharedPtr pub_cmd_;
+   rclcpp::Subscription<clearpath_motor_msgs::msg::PumaMultiFeedback>::SharedPtr sub_feedback_;
+ 
+   clearpath_motor_msgs::msg::PumaMultiFeedback feedback_;
+-  std::atomic_bool has_feedback_;
++  std::atomic_bool has_feedback_{false};
++  std::mutex feedback_mutex_;
++  std::chrono::steady_clock::time_point feedback_receipt_;
++  bool invalid_header_pending_{false};
++  struct PendingFeedback {
++    clearpath_motor_msgs::msg::PumaMultiFeedback msg;
++    std::chrono::steady_clock::time_point receipt;
++  };
++  std::deque<PendingFeedback> pending_feedback_;
+ };
+ 
+ } // namespace clearpath_hardware_interfaces

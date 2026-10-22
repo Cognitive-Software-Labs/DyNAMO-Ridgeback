@@ -1,0 +1,11 @@
+--- a/clearpath_generator_robot/clearpath_generator_robot/launch/generator.py
++++ b/clearpath_generator_robot/clearpath_generator_robot/launch/generator.py
+@@ -65,7 +65,7 @@
+         self.imu_0_filter_node = LaunchFile.Node(
+             package='imu_filter_madgwick',
+             executable='imu_filter_madgwick_node',
+-            name='imu_filter_madgwick',
++            name='imu_filter_node',  # Match generated clearpath_control parameter selector.
+             namespace=self.namespace,
+             parameters=[LaunchFile.Variable('imu_filter')],
+             remappings=[
