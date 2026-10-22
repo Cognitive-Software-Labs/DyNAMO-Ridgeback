@@ -58,7 +58,15 @@ def main() -> int:
     # commit containing it is created. An empty override intentionally omits
     # that circular, volatile provenance field.
     to_json(graph, communities, str(OUT_DIR / 'graph.json'), built_at_commit='')
-    to_html(graph, communities, str(OUT_DIR / 'graph.html'), community_labels=labels)
+    # Keep the HTML useful as the repository grows: Graphify renders a
+    # community view above this threshold while graph.json keeps every node.
+    to_html(
+        graph,
+        communities,
+        str(OUT_DIR / 'graph.html'),
+        community_labels=labels,
+        node_limit=5000,
+    )
     save_manifest(detection['files'], str(OUT_DIR / 'manifest.json'))
 
     print(

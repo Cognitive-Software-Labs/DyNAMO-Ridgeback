@@ -25,6 +25,19 @@ EXPECTED = {'grid': (640, 480), 'optical_frame': FRAME,
                       'depth': 'sensor_msgs/msg/Image'}}
 
 
+def test_installed_camera_topic_resolution_uses_mapping_api():
+    inputs = TOOL.selected_inputs(True)
+    assert inputs.color_image_topic == 'sensors/camera_0/color/image'
+    assert inputs.aligned_depth_topic == 'sensors/camera_0/depth/image'
+
+
+def test_scan_guard_requires_discovery_and_uses_individual_limits():
+    assert TOOL.scan_guard_reason({'front': None, 'rear': 1, 'merged': 1}, 1)
+    assert TOOL.scan_guard_reason({'front': 1, 'rear': 1, 'merged': .7}, 1.1) is None
+    assert 'front' in TOOL.scan_guard_reason({'front': .7, 'rear': 1, 'merged': 1}, 1.1)
+    assert 'merged' in TOOL.scan_guard_reason({'front': 1, 'rear': 1, 'merged': .4}, 1.1)
+
+
 def stream(encoding, count=1800):
     return {'stamps': [1_000_000_000_000 + i * PERIOD_NS for i in range(count)],
             'encodings': {encoding}, 'sizes': {(640, 480)}, 'frames': {FRAME}}
@@ -259,14 +272,3 @@ def test_compressed_stream_splits_delay_across_hosts_by_stamp():
     assert unresolved['clock_resolved'] is False
     assert unresolved['components']['network_dds']['count'] == unresolved['components']['total']['count'] == 0
     assert unresolved['components']['decode']['count'] == 1
-
-
-def test_driver_split_at_host_arrival():
-    stamp = 1_000_000_000
-    images = [TOOL.timing_sample(stamp, {'source_timestamp': stamp + 18_000_000}, stamp + 19_000_000),
-              TOOL.timing_sample(stamp + PERIOD_NS, {'source_timestamp': stamp + PERIOD_NS + 18_000_000}, 0)]
-    metadata = [{'stamp_ns': stamp, 'arrival_ms': (stamp + 12_000_000) // 1_000_000}]
-    result = TOOL.driver_split(images, metadata)
-    assert (result['matched'], result['images']) == (1, 2)
-    assert result['components']['camera_usb']['median_ms'] == 12
-    assert result['components']['host']['median_ms'] == 6
