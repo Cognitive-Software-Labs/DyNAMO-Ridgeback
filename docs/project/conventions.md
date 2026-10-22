@@ -82,6 +82,10 @@ patch moves, update the patch in the same change.
 The [dependency runbook](dependencies.md) owns the import, verification, refresh,
 live-checkout migration, and rollback procedure. Run `tools/check_dependencies`
 before builds and do not discard a nested-repository change to satisfy it.
+`src/ros_gz` is a partial overlay: only its patched `ros_gz_bridge` and
+`ros_gz_image` are built, and the checker's untracked `COLCON_IGNORE` markers
+keep the rest on the installed binaries; never delete them to build the whole
+repository.
 
 The `slam_toolbox` namespace patch is required by this stack; its rationale and
 failure signature live in [troubleshooting](../troubleshooting.md).

@@ -53,13 +53,18 @@ def workspace(tmp_path):
         ignored=('pkg_upstream_ignored',))
     plain = _nested_repository(root / 'src/plain', ('pkg_plain',))
 
-    # The recorded patch, generated the way the runbook prescribes.
+    # The recorded patch, generated the way the runbook prescribes. It also
+    # creates a file, as an upstream backport that adds a test does.
     source = root / 'src/overlay/pkg_kept/source.txt'
     source.write_text('patched\n')
+    (root / 'src/overlay/pkg_kept/added_test.txt').write_text('new\n')
+    _git(root / 'src/overlay', 'add', '-N', 'pkg_kept/added_test.txt')
     (root / 'patches').mkdir()
     (root / 'patches/overlay.patch').write_text(
         _git(root / 'src/overlay', 'diff', '--no-ext-diff', 'HEAD') + '\n')
+    _git(root / 'src/overlay', 'reset', '-q')
     _git(root / 'src/overlay', 'checkout', '-q', '--', '.')
+    (root / 'src/overlay/pkg_kept/added_test.txt').unlink()
 
     (root / 'dependencies').mkdir()
     (root / 'dependencies/core.repos').write_text(
@@ -69,7 +74,7 @@ def workspace(tmp_path):
 
     text = CHECKER.read_text(encoding='utf-8')
     for old, new in (
-        ('declare -A BUILD_ONLY=()', 'declare -A BUILD_ONLY=([src/overlay]="pkg_kept")'),
+        ('declare -A BUILD_ONLY=(', 'declare -A BUILD_ONLY=(\n    [src/overlay]="pkg_kept"'),
         ('declare -A PATCHES=(', 'declare -A PATCHES=(\n    [src/overlay]="patches/overlay.patch"'),
     ):
         assert text.count(old) == 1
@@ -97,6 +102,8 @@ def test_missing_markers_fail_read_only_and_apply_creates_exactly_them(workspace
     overlay = workspace / 'src/overlay'
     assert (overlay / 'pkg_other/COLCON_IGNORE').read_bytes() == b''
     assert not (overlay / 'pkg_kept/COLCON_IGNORE').exists()
+
+    assert (overlay / 'pkg_kept/added_test.txt').read_text() == 'new\n'
 
     rerun = _check(workspace, '--profile', 'all')
     assert rerun.returncode == 0, rerun.stderr

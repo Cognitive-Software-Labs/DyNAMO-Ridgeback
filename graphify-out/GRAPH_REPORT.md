@@ -1,7 +1,7 @@
 # Graph Report - /tmp/claude-1009/-home-stefi-DyNAMO-DyNAMO-Ridgeback/1df778a4-08a4-44ff-ba3b-03e92bced511/scratchpad/graphclone  (2026-10-22)
 
 ## Corpus Check
-- 418 files · ~468,624 words
+- 418 files · ~469,470 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary

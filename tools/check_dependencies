@@ -42,13 +42,16 @@ declare -A PATCHES=(
     [src/clearpath_common]="patches/clearpath_realsense_sim_frames.patch"
     [src/slam_toolbox]="patches/slam_toolbox_tf_namespace.patch"
     [src/gz-sim]="patches/gz_sim_sensors_shutdown.patch"
+    [src/ros_gz]="patches/ros_gz_bridge_shutdown.patch"
 )
 
 # Partial overlays: checkouts of which only the listed top-level packages are
 # built. Every other package directory carries an untracked, empty
 # COLCON_IGNORE, so the overlay replaces exactly the patched packages and the
 # rest keep resolving to the installed binaries.
-declare -A BUILD_ONLY=()
+declare -A BUILD_ONLY=(
+    [src/ros_gz]="ros_gz_bridge ros_gz_image"
+)
 
 if ! dependency_text="$(python3 - "${MANIFESTS[@]}" <<'PY'
 import sys
@@ -160,6 +163,20 @@ check_build_markers() {
     return 0
 }
 
+# Record the files a patch creates as intent-to-add, so they are part of
+# `git diff HEAD` instead of untracked files. (`git apply --intent-to-add`
+# itself empties the index in Git before 2.44.)
+mark_created_files() {
+    local patch="$1"
+    local checkout="$2"
+    local -a created=()
+    local line
+    while IFS= read -r line; do
+        created+=("${line##* create mode * }")
+    done < <(git -C "$checkout" apply --summary "$patch" | grep '^ create mode ')
+    [ "${#created[@]}" -eq 0 ] || git -C "$checkout" add --intent-to-add -- "${created[@]}"
+}
+
 patch_matches_checkout() {
     local patch="$1"
     local checkout="$2"
@@ -229,6 +246,7 @@ for dependency in "${DEPENDENCIES[@]}"; do
     fi
 
     if git -C "$checkout" apply "$patch" &&
+       mark_created_files "$patch" "$checkout" &&
        patch_matches_checkout "$patch" "$checkout"; then
         echo "APPLIED: $patch_relative to $relative_path @ ${expected_revision:0:8}"
     else

@@ -7,7 +7,8 @@ keeps the public installation commands; dated refresh results belong in
 
 ## Model and ownership
 
-The dependencies under `src/clearpath_*`, `src/slam_toolbox`, and `src/gz-sim` are standalone,
+The dependencies under `src/clearpath_*`, `src/slam_toolbox`, `src/gz-sim`, and
+`src/ros_gz` are standalone,
 Git-ignored repositories populated by `vcstool`. They are not Git submodules and
 are not stored in the root repository's history.
 
@@ -16,7 +17,7 @@ The compatibility unit has four root-owned parts:
 - [`dependencies/core.repos`](../../dependencies/core.repos) owns the source
   dependencies shared by every deployment.
 - [`dependencies/gz.repos`](../../dependencies/gz.repos) owns the optional
-  Gazebo-only `clearpath_simulator` and `gz-sim` pins.
+  Gazebo-only `clearpath_simulator`, `gz-sim`, and `ros_gz` pins.
 - [`patches/`](../../patches/) owns intentional changes to those pinned sources.
 - [`tools/check_dependencies`](../../tools/check_dependencies) verifies that
   every checkout is at its pin and contains either no changes or exactly its
@@ -134,6 +135,7 @@ The maintained mappings are:
 | `src/clearpath_common` | `patches/clearpath_realsense_sim_frames.patch` |
 | `src/slam_toolbox` | `patches/slam_toolbox_tf_namespace.patch` |
 | `src/gz-sim` | `patches/gz_sim_sensors_shutdown.patch` |
+| `src/ros_gz` | `patches/ros_gz_bridge_shutdown.patch` |
 
 Update all affected manifest pins and patch files in the same root commit.
 
@@ -349,6 +351,103 @@ Restore this change's manifest/mapping/ignore/documentation edits as one reviewe
 set; do not reset a dirty nested repository or remove user files. Keep the
 preserved overlay and evidence until the rollback is accepted.
 
+## ros_gz shutdown patch
+
+The Gazebo profile also imports ros_gz **1.0.24**, upstream tag `1.0.24`, commit
+`5912bfe7976a79d2cc9f373b2d40a8a3a3e33da2`, matching the installed
+`ros-jazzy-ros-gz-*` 1.0.24 binaries. It is a partial overlay: only
+`ros_gz_bridge` and `ros_gz_image` are built; every other ros_gz package keeps
+resolving to `/opt/ros/jazzy`.
+
+### Defect
+
+In 1.0.24 the bridge node outlives `main()` through two ownership cycles:
+
+- `RosGzBridge` owns its `BridgeHandle`s through `handles_`, and every handle
+  owns the node back through a `rclcpp::Node::SharedPtr`;
+- every ROS-to-Gazebo subscription callback captures that `SharedPtr` too, so a
+  subscription keeps its own node alive.
+
+The node and its middleware endpoints are then destroyed during process and
+shared-library finalization, racing logger teardown, and an active
+`parameter_bridge` intermittently dies on Ctrl-C with SIGSEGV or `corrupted
+double-linked list` (SIGABRT)
+([upstream issue #951](https://github.com/gazebosim/ros_gz/issues/951)).
+On 2026-10-22 stock bridges crashed in 7 of 19 Gazebo stops; with the first
+cycle alone removed, the bidirectional `cmd_vel_bridge` still crashed in 1 of 10.
+
+Separately, `ros_gz_image`'s `image_bridge` subscribes with a raw `this`, and
+Gazebo transport does not wait for a callback already in flight when a
+subscription or node is destroyed: a frame arriving during teardown reaches a
+destroyed handler and the bridge dies with SIGSEGV
+([upstream issue #979](https://github.com/gazebosim/ros_gz/issues/979)).
+
+`patches/ros_gz_bridge_shutdown.patch` holds three upstream changes, in order:
+
+1. [#955](https://github.com/gazebosim/ros_gz/pull/955), backport of #952, commit
+   `97a4d64f7907ce1aea01cc1bcc525f4ef2b97952` (released in 1.0.25): the handle's
+   back-reference becomes `rclcpp::Node::WeakPtr`, and a protected `RosNode()`
+   locks it and throws once the node has expired;
+2. [#991](https://github.com/gazebosim/ros_gz/pull/991), backport of #977, commit
+   `95e6fdea72fb57ef55a4136292dfa62370ab3fb9` (on `jazzy`, not yet in a release):
+   subscription callbacks capture the node's logger instead of the node,
+   `parameter_bridge` calls `rclcpp::shutdown()` before returning, and the new
+   `test_node_lifetime` gtest checks the node is released for every bridge
+   direction;
+3. a hand backport of [#981](https://github.com/gazebosim/ros_gz/pull/981),
+   commit `43ff7ce1292d37dda2e79ff3c7906508334b0f29`, fixed upstream only on
+   `ros2` and not applicable to 1.0.24 as-is: `image_bridge`'s Gazebo callback
+   co-owns a guard that `~Handler` closes under its mutex, `main()` destroys
+   the handlers before the Gazebo node, and the upstream
+   `test_image_bridge_teardown` gtest is carried unchanged.
+
+In `ros_gz_bridge` only private sources change; no installed header or
+exported symbol does. The patch creates two test files; the checker records
+created files as intent-to-add, so they are part of `git diff HEAD` rather
+than untracked.
+
+### Build and loading proof
+
+After the Gazebo import and `tools/check_dependencies --apply --profile all`
+(which also writes the `COLCON_IGNORE` markers, see
+[Partial overlays](#partial-overlays)):
+
+```bash
+source /opt/ros/jazzy/setup.bash
+source install/setup.bash
+colcon build --symlink-install --base-paths src \
+  --packages-select ros_gz_bridge ros_gz_image
+source install/setup.bash
+```
+
+With a benchmark or exploration environment running, every bridge process must
+map the overlay library:
+
+```bash
+for pid in $(pgrep -f 'ros_gz_bridge/parameter_bridge|ros_gz_image/image_bridge'); do
+  awk '/libros_gz_bridge\.so/ {print $NF}' /proc/$pid/maps | sort -u
+done
+```
+
+Each line must resolve to `install/ros_gz_bridge/lib/libros_gz_bridge.so`, and
+the `image_bridge` processes must run `install/ros_gz_image/lib/ros_gz_image/image_bridge`;
+the camera must still stream at its configured rate.
+
+### Exit route and rollback
+
+Once apt ships Jazzy ros_gz releases containing all three changes (1.0.25 has
+only the first; #981 has no Jazzy backport yet), retire the overlay:
+check first that `apt-get -s upgrade` keeps `gz_sim_vendor` at 0.0.13, upgrade,
+then roll back as below and verify `/proc/<pid>/maps` resolves
+`libros_gz_bridge.so` to `/opt/ros/jazzy`.
+
+To roll back without discarding work, stop only owned launches, move
+`src/ros_gz`, `build/ros_gz_{bridge,image}`, and `install/ros_gz_{bridge,image}` to a uniquely
+named location outside the workspace, restore this change's manifest, mapping,
+ignore, and documentation edits as one reviewed set, rebuild, and start a fresh
+shell. Do not reset a dirty nested checkout.
+
 ## Archived evidence
 
 - [Gazebo Sensors shutdown races and qualification](../../archive/engineering/2026-10-18-gazebo-sensors-shutdown.md)
+- [ros_gz bridge ownership cycles and image_bridge teardown](../../archive/engineering/2026-10-22-ros-gz-bridge-shutdown.md)

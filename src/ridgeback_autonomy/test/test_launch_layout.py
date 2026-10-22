@@ -762,10 +762,15 @@ def test_dependency_profiles_keep_gazebo_out_of_the_common_closure() -> None:
     checker = (repo_root / 'tools/check_dependencies').read_text(encoding='utf-8')
 
     assert set(core).isdisjoint(gazebo)
-    assert set(gazebo) == {'src/clearpath_simulator', 'src/gz-sim'}
+    assert set(gazebo) == {'src/clearpath_simulator', 'src/gz-sim', 'src/ros_gz'}
     assert 'src/clearpath_simulator' not in core and 'src/gz-sim' not in core
     assert gazebo['src/gz-sim']['version'] == '446a44335a45b704b4d36dabcc5508ee34eeb3d8'
     assert '[src/gz-sim]="patches/gz_sim_sensors_shutdown.patch"' in checker
+    # ros_gz 1.0.24, the tag the installed binaries were built from, overlaid
+    # by its bridge alone.
+    assert gazebo['src/ros_gz']['version'] == '5912bfe7976a79d2cc9f373b2d40a8a3a3e33da2'
+    assert '[src/ros_gz]="patches/ros_gz_bridge_shutdown.patch"' in checker
+    assert '[src/ros_gz]="ros_gz_bridge ros_gz_image"' in checker
     assert 'core|gz|all' in checker
 
 

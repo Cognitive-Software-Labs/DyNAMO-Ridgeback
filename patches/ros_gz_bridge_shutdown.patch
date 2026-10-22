@@ -1,0 +1,487 @@
+diff --git a/ros_gz_bridge/CMakeLists.txt b/ros_gz_bridge/CMakeLists.txt
+index 03e3d83..9b47c6f 100644
+--- a/ros_gz_bridge/CMakeLists.txt
++++ b/ros_gz_bridge/CMakeLists.txt
+@@ -351,6 +351,9 @@ if(BUILD_TESTING)
+     rclcpp::rclcpp
+     ${std_msgs_TARGETS}
+   )
++
++  ament_add_gtest(${PROJECT_NAME}_node_lifetime test/test_node_lifetime.cpp)
++  target_link_libraries(${PROJECT_NAME}_node_lifetime ${bridge_lib} rclcpp::rclcpp)
+ endif()
+
+ # Export old-style CMake variables
+diff --git a/ros_gz_bridge/src/bridge_handle.cpp b/ros_gz_bridge/src/bridge_handle.cpp
+index c785150..963b56d 100644
+--- a/ros_gz_bridge/src/bridge_handle.cpp
++++ b/ros_gz_bridge/src/bridge_handle.cpp
+@@ -14,6 +14,8 @@
+ //
+ #include "bridge_handle.hpp"
+
++#include <stdexcept>
++
+ #include <memory>
+ #include <string>
+
+@@ -34,6 +36,15 @@ BridgeHandle::BridgeHandle(
+
+ BridgeHandle::~BridgeHandle() = default;
+
++rclcpp::Node::SharedPtr BridgeHandle::RosNode() const
++{
++  auto node = this->ros_node_.lock();
++  if (!node) {
++    throw std::runtime_error("ROS node expired while bridge handle was active");
++  }
++  return node;
++}
++
+ bool BridgeHandle::IsLazy() const
+ {
+   return config_.is_lazy;
+@@ -58,13 +69,13 @@ void BridgeHandle::Spin()
+
+   if (this->HasSubscriber() && this->NumSubscriptions() == 0) {
+     RCLCPP_DEBUG(
+-      this->ros_node_->get_logger(),
++      this->RosNode()->get_logger(),
+       "Bridge [%s] - No subscriptions found, stopping bridge",
+       config_.ros_topic_name.c_str());
+     this->StopSubscriber();
+   } else if (!this->HasSubscriber() && this->NumSubscriptions() > 0) {
+     RCLCPP_DEBUG(
+-      this->ros_node_->get_logger(),
++      this->RosNode()->get_logger(),
+       "Bridge [%s] - Subscriptions found, starting bridge",
+       config_.ros_topic_name.c_str());
+     this->StartSubscriber();
+diff --git a/ros_gz_bridge/src/bridge_handle.hpp b/ros_gz_bridge/src/bridge_handle.hpp
+index 6ba1261..9dc01c0 100644
+--- a/ros_gz_bridge/src/bridge_handle.hpp
++++ b/ros_gz_bridge/src/bridge_handle.hpp
+@@ -91,7 +91,11 @@ protected:
+
+ protected:
+   /// \brief The ROS node used to create publishers/subscriptions
+-  rclcpp::Node::SharedPtr ros_node_;
++  rclcpp::Node::SharedPtr RosNode() const;
++
++  // RosGzBridge owns its bridge handles. Keep the back-reference weak so the
++  // handle vector does not form a reference cycle with the owning node.
++  rclcpp::Node::WeakPtr ros_node_;
+
+   /// \brief The Gazebo node used to create publishers/subscriptions
+   std::shared_ptr<gz::transport::Node> gz_node_;
+diff --git a/ros_gz_bridge/src/bridge_handle_gz_to_ros.cpp b/ros_gz_bridge/src/bridge_handle_gz_to_ros.cpp
+index cde4e95..61352b7 100644
+--- a/ros_gz_bridge/src/bridge_handle_gz_to_ros.cpp
++++ b/ros_gz_bridge/src/bridge_handle_gz_to_ros.cpp
+@@ -25,11 +25,13 @@ BridgeHandleGzToRos::BridgeHandleGzToRos(
+   const BridgeConfig & config)
+ : BridgeHandle(ros_node, gz_node, config)
+ {
+-  ros_node_->get_parameter("override_timestamps_with_wall_time",
+-      gz_to_ros_parameters_.override_timestamps_with_wall_time);
+-
+-  ros_node_->get_parameter("override_frame_id",
+-      gz_to_ros_parameters_.override_frame_id);
++  auto node = this->RosNode();
++  node->get_parameter(
++    "override_timestamps_with_wall_time",
++    gz_to_ros_parameters_.override_timestamps_with_wall_time);
++  node->get_parameter(
++    "override_frame_id",
++    gz_to_ros_parameters_.override_frame_id);
+ }
+
+ BridgeHandleGzToRos::~BridgeHandleGzToRos() = default;
+@@ -42,11 +44,12 @@ size_t BridgeHandleGzToRos::NumSubscriptions() const
+   if (this->ros_publisher_ != nullptr) {
+     // Use info_by_topic rather than get_subscription_count
+     // to filter out potential bidirectional bridge
+-    auto topic_info = this->ros_node_->get_subscriptions_info_by_topic(
++    auto node = this->RosNode();
++    auto topic_info = node->get_subscriptions_info_by_topic(
+       this->config_.ros_topic_name);
+
+     for (auto & topic : topic_info) {
+-      if (topic.node_name() == this->ros_node_->get_name()) {
++      if (topic.node_name() == node->get_name()) {
+         continue;
+       }
+       valid_subscriptions++;
+@@ -65,7 +68,7 @@ void BridgeHandleGzToRos::StartPublisher()
+ {
+   // Start ROS publisher
+   this->ros_publisher_ = this->factory_->create_ros_publisher(
+-    this->ros_node_,
++    this->RosNode(),
+     this->config_.ros_topic_name,
+     this->config_.PublisherQoS());
+ }
+diff --git a/ros_gz_bridge/src/bridge_handle_ros_to_gz.cpp b/ros_gz_bridge/src/bridge_handle_ros_to_gz.cpp
+index bc3ed38..19606ce 100644
+--- a/ros_gz_bridge/src/bridge_handle_ros_to_gz.cpp
++++ b/ros_gz_bridge/src/bridge_handle_ros_to_gz.cpp
+@@ -61,7 +61,7 @@ void BridgeHandleRosToGz::StartSubscriber()
+ {
+   // Start ROS subscriber
+   this->ros_subscriber_ = this->factory_->create_ros_subscriber(
+-    this->ros_node_,
++    this->RosNode(),
+     this->config_.ros_topic_name,
+     this->config_.SubscriberQoS(),
+     this->gz_publisher_);
+diff --git a/ros_gz_bridge/src/factory.hpp b/ros_gz_bridge/src/factory.hpp
+index de81f2d..3ad62c9 100644
+--- a/ros_gz_bridge/src/factory.hpp
++++ b/ros_gz_bridge/src/factory.hpp
+@@ -114,8 +114,9 @@ public:
+
+     auto ros_type = ros_type_name_;
+     auto gz_type = gz_type_name_;
++    auto logger = ros_node->get_logger();
+     std::function<void(std::shared_ptr<const ROS_T>, const rclcpp::MessageInfo &)> fn =
+-      [self_pub_gids, gz_pub, ros_type, gz_type, ros_node](
++      [self_pub_gids, gz_pub, ros_type, gz_type, logger](
+       std::shared_ptr<const ROS_T> ros_msg,
+       const rclcpp::MessageInfo & msg_info) mutable
+       {
+@@ -126,7 +127,7 @@ public:
+             return;
+           }
+         }
+-        ros_callback(ros_msg, gz_pub, ros_type, gz_type, ros_node);
++        ros_callback(ros_msg, gz_pub, ros_type, gz_type, logger);
+       };
+
+     auto options = rclcpp::SubscriptionOptions();
+@@ -169,13 +170,13 @@ protected:
+     gz::transport::Node::Publisher & gz_pub,
+     const std::string & ros_type_name,
+     const std::string & gz_type_name,
+-    rclcpp::Node::SharedPtr ros_node)
++    const rclcpp::Logger & logger)
+   {
+     GZ_T gz_msg;
+     convert_ros_to_gz(*ros_msg, gz_msg);
+     gz_pub.Publish(gz_msg);
+     RCLCPP_INFO_ONCE(
+-      ros_node->get_logger(),
++      logger,
+       "Passing message from ROS %s to Gazebo %s (showing msg only once per type)",
+       ros_type_name.c_str(), gz_type_name.c_str());
+   }
+diff --git a/ros_gz_bridge/src/parameter_bridge.cpp b/ros_gz_bridge/src/parameter_bridge.cpp
+index 2acddf4..d6272ea 100644
+--- a/ros_gz_bridge/src/parameter_bridge.cpp
++++ b/ros_gz_bridge/src/parameter_bridge.cpp
+@@ -171,6 +171,7 @@ int main(int argc, char * argv[])
+
+   // ROS 2 spinner
+   rclcpp::spin(bridge_node);
++  rclcpp::shutdown();
+
+   return 0;
+ }
+diff --git a/ros_gz_bridge/test/test_node_lifetime.cpp b/ros_gz_bridge/test/test_node_lifetime.cpp
+new file mode 100644
+index 0000000..abb29ae
+--- /dev/null
++++ b/ros_gz_bridge/test/test_node_lifetime.cpp
+@@ -0,0 +1,64 @@
++// Copyright 2026 Open Source Robotics Foundation, Inc.
++//
++// Licensed under the Apache License, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// You may obtain a copy of the License at
++//
++//     http://www.apache.org/licenses/LICENSE-2.0
++//
++// Unless required by applicable law or agreed to in writing, software
++// distributed under the License is distributed on an "AS IS" BASIS,
++// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++// See the License for the specific language governing permissions and
++// limitations under the License.
++
++#include <gtest/gtest.h>
++
++#include <memory>
++
++#include <rclcpp/rclcpp.hpp>
++#include <ros_gz_bridge/ros_gz_bridge.hpp>
++
++namespace
++{
++class TestBridge : public ros_gz_bridge::RosGzBridge
++{
++public:
++  // Release a leaked node after a failed assertion so the test still tears down safely.
++  void ClearForCleanup() {handles_.clear();}
++};
++}  // namespace
++
++class NodeLifetimeTest : public ::testing::TestWithParam<ros_gz_bridge::BridgeDirection>
++{
++protected:
++  void SetUp() override {rclcpp::init(0, nullptr);}
++  void TearDown() override {rclcpp::shutdown();}
++};
++
++TEST_P(NodeLifetimeTest, ReleasesNodeWithActiveSubscriber)
++{
++  auto bridge = std::make_shared<TestBridge>();
++  ros_gz_bridge::BridgeConfig config;
++  config.ros_topic_name = "/node_lifetime";
++  config.gz_topic_name = "/node_lifetime";
++  config.ros_type_name = "std_msgs/msg/String";
++  config.gz_type_name = "gz.msgs.StringMsg";
++  config.direction = GetParam();
++  config.is_lazy = false;
++  bridge->add_bridge(config);
++
++  std::weak_ptr<TestBridge> lifetime = bridge;
++  bridge.reset();
++  EXPECT_TRUE(lifetime.expired()) << "Subscription callback retained the bridge node";
++  if (auto leaked = lifetime.lock()) {
++    leaked->ClearForCleanup();
++  }
++}
++
++INSTANTIATE_TEST_SUITE_P(
++  SubscriberDirections, NodeLifetimeTest,
++  ::testing::Values(
++    ros_gz_bridge::BridgeDirection::GZ_TO_ROS,
++    ros_gz_bridge::BridgeDirection::ROS_TO_GZ,
++    ros_gz_bridge::BridgeDirection::BIDIRECTIONAL));
+diff --git a/ros_gz_image/CMakeLists.txt b/ros_gz_image/CMakeLists.txt
+index e6e8de2..bedb767 100644
+--- a/ros_gz_image/CMakeLists.txt
++++ b/ros_gz_image/CMakeLists.txt
+@@ -52,6 +52,22 @@ if(BUILD_TESTING)
+   find_package(ament_lint_auto REQUIRED)
+   ament_lint_auto_find_test_dependencies()
+
++  if(UNIX)
++    find_package(ament_cmake_gtest REQUIRED)
++    ament_add_gtest(test_image_bridge_teardown
++      test/test_image_bridge_teardown.cpp
++      TIMEOUT 120
++    )
++    target_compile_definitions(test_image_bridge_teardown PRIVATE
++      IMAGE_BRIDGE_EXECUTABLE="$<TARGET_FILE:${executable}>"
++    )
++    target_link_libraries(test_image_bridge_teardown
++      gz-msgs::core
++      gz-transport::core
++    )
++    add_dependencies(test_image_bridge_teardown ${executable})
++  endif()
++
+   # find_package(rostest REQUIRED)
+   #
+   # set(test_publishers
+diff --git a/ros_gz_image/package.xml b/ros_gz_image/package.xml
+index f6b301e..03b5b73 100644
+--- a/ros_gz_image/package.xml
++++ b/ros_gz_image/package.xml
+@@ -19,6 +19,7 @@
+   <depend>gz_msgs_vendor</depend>
+   <depend>gz_transport_vendor</depend>
+
++  <test_depend>ament_cmake_gtest</test_depend>
+   <test_depend>ament_lint_auto</test_depend>
+   <test_depend>ament_lint_common</test_depend>
+   <export>
+diff --git a/ros_gz_image/src/image_bridge.cpp b/ros_gz_image/src/image_bridge.cpp
+index 5cb9131..f132e81 100644
+--- a/ros_gz_image/src/image_bridge.cpp
++++ b/ros_gz_image/src/image_bridge.cpp
+@@ -14,8 +14,10 @@
+
+ #include <rmw/qos_profiles.h>
+
++#include <functional>
+ #include <iostream>
+ #include <memory>
++#include <mutex>
+ #include <string>
+ #include <vector>
+
+@@ -57,7 +59,29 @@ public:
+     this->ros_pub = image_transport::create_publisher(
+       _node.get(), _topic, qos_profile);
+
+-    _gz_node->Subscribe(_topic, &Handler::OnImage, this);
++    // Gazebo transport does not wait for in-flight callbacks on Unsubscribe or
++    // ~Node, so a callback can still run after this handler is destroyed. The
++    // callback co-owns the guard, which therefore outlives the handler.
++    auto guard = guard_;
++    std::function<void(const gz::msgs::Image &)> cb =
++      [this, guard](const gz::msgs::Image & _gz_msg)
++      {
++        std::lock_guard<std::mutex> lock(guard->mutex);
++        if (guard->closed) {
++          return;
++        }
++        // The handler is alive here: ~Handler blocks on guard->mutex.
++        this->OnImage(_gz_msg);
++      };
++    _gz_node->Subscribe(_topic, cb);
++  }
++
++  /// \brief Destructor. Blocks until any in-flight OnImage call finishes,
++  /// then prevents later callbacks from touching this handler.
++  ~Handler()
++  {
++    std::lock_guard<std::mutex> lock(guard_->mutex);
++    guard_->closed = true;
+   }
+
+ private:
+@@ -70,6 +94,19 @@ private:
+     this->ros_pub.publish(ros_msg);
+   }
+
++  /// \brief State shared between the handler and its Gazebo callback.
++  struct CallbackGuard
++  {
++    /// \brief Held while a callback runs and in ~Handler.
++    std::mutex mutex;
++
++    /// \brief Set in ~Handler; callbacks no-op once teardown has started.
++    bool closed{false};
++  };
++
++  /// \brief Guard co-owned by the Gazebo callback so it outlives the handler.
++  std::shared_ptr<CallbackGuard> guard_{std::make_shared<CallbackGuard>()};
++
+   /// \brief ROS image publisher
+   image_transport::Publisher ros_pub;
+ };
+@@ -115,5 +152,10 @@ int main(int argc, char * argv[])
+   // Spin ROS and Gz until shutdown
+   rclcpp::spin(node_);
+
++  // Tear down explicitly: destroy the handlers, which stops their callbacks,
++  // before the Gazebo node that delivers them.
++  handlers.clear();
++  gz_node.reset();
++
+   return 0;
+ }
+diff --git a/ros_gz_image/test/test_image_bridge_teardown.cpp b/ros_gz_image/test/test_image_bridge_teardown.cpp
+new file mode 100644
+index 0000000..7358c84
+--- /dev/null
++++ b/ros_gz_image/test/test_image_bridge_teardown.cpp
+@@ -0,0 +1,107 @@
++// Copyright 2026 Open Source Robotics Foundation, Inc.
++//
++// Licensed under the Apache License, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// You may obtain a copy of the License at
++//
++//     http://www.apache.org/licenses/LICENSE-2.0
++//
++// Unless required by applicable law or agreed to in writing, software
++// distributed under the License is distributed on an "AS IS" BASIS,
++// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++// See the License for the specific language governing permissions and
++// limitations under the License.
++
++// Regression test for gazebosim/ros_gz#979: image_bridge must exit cleanly on
++// SIGINT while Gazebo image frames are still arriving. Gazebo transport does
++// not wait for in-flight callbacks when a subscription or node is destroyed,
++// so a frame delivered during teardown used to reach a destroyed Handler.
++
++#include <gtest/gtest.h>
++
++#include <signal.h>
++#include <spawn.h>
++#include <sys/wait.h>
++#include <unistd.h>
++
++#include <atomic>
++#include <chrono>
++#include <cstdlib>
++#include <string>
++#include <thread>
++
++#include <gz/msgs/image.pb.h>
++#include <gz/transport/Node.hh>
++
++extern char ** environ;
++
++namespace
++{
++constexpr int kTrials = 20;
++constexpr auto kRunTime = std::chrono::milliseconds(1000);
++constexpr auto kPublishPeriod = std::chrono::microseconds(3333);  // ~300 Hz
++
++/// \brief Publishes 640x480 RGB frames on two topics until stopped.
++class FramePublisher
++{
++public:
++  FramePublisher()
++  {
++    auto pub_a = node_.Advertise<gz::msgs::Image>("/teardown_cam_a");
++    auto pub_b = node_.Advertise<gz::msgs::Image>("/teardown_cam_b");
++    thread_ = std::thread([this, pub_a, pub_b]() mutable {
++          gz::msgs::Image img;
++          img.set_width(640);
++          img.set_height(480);
++          img.set_step(640 * 3);
++          img.set_pixel_format_type(gz::msgs::PixelFormatType::RGB_INT8);
++          img.set_data(std::string(640 * 480 * 3, '\x7f'));
++          while (running_) {
++            pub_a.Publish(img);
++            pub_b.Publish(img);
++            std::this_thread::sleep_for(kPublishPeriod);
++          }
++        });
++  }
++
++  ~FramePublisher()
++  {
++    running_ = false;
++    thread_.join();
++  }
++
++private:
++  gz::transport::Node node_;
++  std::atomic<bool> running_{true};
++  std::thread thread_;
++};
++}  // namespace
++
++TEST(ImageBridgeTeardown, ExitsCleanlyOnSigintWhileFramesArrive)
++{
++  // Isolate this test's Gazebo traffic. The bridge inherits the environment.
++  const std::string partition = "image_bridge_teardown_" + std::to_string(getpid());
++  ASSERT_EQ(0, setenv("GZ_PARTITION", partition.c_str(), 1));
++
++  FramePublisher publisher;
++
++  for (int trial = 0; trial < kTrials; ++trial) {
++    char arg0[] = IMAGE_BRIDGE_EXECUTABLE;
++    char arg1[] = "/teardown_cam_a";
++    char arg2[] = "/teardown_cam_b";
++    char * argv[] = {arg0, arg1, arg2, nullptr};
++
++    pid_t pid;
++    ASSERT_EQ(0, posix_spawn(&pid, IMAGE_BRIDGE_EXECUTABLE, nullptr, nullptr, argv, environ));
++
++    std::this_thread::sleep_for(kRunTime);
++    ASSERT_EQ(0, kill(pid, SIGINT));
++
++    int status = 0;
++    ASSERT_EQ(pid, waitpid(pid, &status, 0));
++    ASSERT_FALSE(WIFSIGNALED(status)) <<
++      "image_bridge was killed by signal " << WTERMSIG(status) << " in trial " << trial;
++    ASSERT_TRUE(WIFEXITED(status));
++    EXPECT_EQ(0, WEXITSTATUS(status)) << "in trial " << trial;
++  }
++}
