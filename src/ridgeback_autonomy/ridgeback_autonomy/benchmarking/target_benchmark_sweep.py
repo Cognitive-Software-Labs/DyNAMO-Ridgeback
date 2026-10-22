@@ -240,11 +240,22 @@ def _launch_argument_tokens(arguments: dict[str, str]) -> list[str]:
     ]
 
 
-def _environment_command(spec: SweepSpec) -> list[str]:
+def _launch_command(launch_file: str, arguments: dict[str, str]) -> list[str]:
+    """``ros2 launch ridgeback_autonomy <launch_file>``, in terminal mode.
+
+    stop_process_group() signals the whole group, as a terminal's Ctrl-C does,
+    so launch must not forward its own SIGINT to every child as well; plain
+    ``ros2 launch`` would, because the supervisor's stdin is not a terminal.
+    """
+
     return [
-        'ros2', 'launch', 'ridgeback_autonomy', 'target_benchmark_env.launch.py',
-        *_launch_argument_tokens(_environment_arguments(spec)),
+        sys.executable, '-m', 'ridgeback_autonomy.benchmarking.interactive_launch',
+        'ridgeback_autonomy', launch_file, *_launch_argument_tokens(arguments),
     ]
+
+
+def _environment_command(spec: SweepSpec) -> list[str]:
+    return _launch_command('target_benchmark_env.launch.py', _environment_arguments(spec))
 
 
 def run_preflight_cleanup(workspace_root: str) -> None:
@@ -263,10 +274,7 @@ def run_preflight_cleanup(workspace_root: str) -> None:
 
 
 def _config_command(arguments: dict[str, str]) -> list[str]:
-    return [
-        'ros2', 'launch', 'ridgeback_autonomy', 'target_benchmark_config.launch.py',
-        *_launch_argument_tokens(arguments),
-    ]
+    return _launch_command('target_benchmark_config.launch.py', arguments)
 
 
 def _valid_run_document(path: str) -> dict | None:
@@ -513,6 +521,9 @@ def stop_process_group(process: subprocess.Popen | None, label: str) -> None:
     process_group = process.pid
     if process.poll() is None:
         _log(f'Stopping {label}...')
+        # One SIGINT to every process, as a terminal's Ctrl-C delivers it. The
+        # launch runs in terminal mode (_launch_command), so it forwards none
+        # of its own; each child receives exactly this one.
         try:
             os.killpg(process_group, signal.SIGINT)
         except ProcessLookupError:

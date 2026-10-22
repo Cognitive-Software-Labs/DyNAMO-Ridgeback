@@ -746,7 +746,11 @@ and RViz, which are deliberately persistent, although it leaves `gz sim gui`
 running. The supervisor runs it once, immediately before starting that
 environment. It then owns each config process group, removes any orphan
 `bench_*` entities after an unclean exit, and shuts the environment down at the
-end. If a sweep is interrupted, rerun the same command:
+end. Both layers run through `ridgeback_autonomy.benchmarking.interactive_launch`,
+`ros2 launch` in its terminal mode, so stopping one delivers a single SIGINT to
+every process in it, exactly as Ctrl-C in a terminal does; plain `ros2 launch`
+without a terminal would forward a second one to each child.
+If a sweep is interrupted, rerun the same command:
 the latest incomplete sweep with the same YAML and `--only` selection is resumed,
 valid `run.json` configurations are skipped, and partial config folders are
 preserved with an `.incomplete_<timestamp>` suffix before retry.

@@ -150,8 +150,8 @@ def test_sweep_routes_output_and_child_logs_without_changing_commands(tmp_path, 
 
         def __init__(self, command, **kwargs):
             calls.append((command, kwargs))
-            if command[3] == 'target_benchmark_config.launch.py':
-                arguments = dict(token.split(':=', 1) for token in command[4:])
+            if command[4] == 'target_benchmark_config.launch.py':
+                arguments = dict(token.split(':=', 1) for token in command[5:])
                 run = Path(arguments['output_dir']) / arguments['run_dir_name']
                 (run / 'images').mkdir(parents=True)
                 (run / 'run.json').write_text(json.dumps({

@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 import subprocess
+import sys
 from types import SimpleNamespace
 
 import pytest
@@ -694,10 +695,12 @@ def _run_sweep_harness(tmp_path, monkeypatch, scene_control, events, backend='is
 
         def __init__(self, command, **_kwargs):
             commands.append(command)
-            if command[3] == 'target_benchmark_config.launch.py':
-                arguments = dict(token.split(':=', 1) for token in command[4:])
+            if command[4] == 'target_benchmark_config.launch.py':
+                arguments = dict(token.split(':=', 1) for token in command[5:])
                 run = Path(arguments['output_dir']) / arguments['run_dir_name']
-                run.mkdir(parents=True)
+                # The sweep has already created it for the child's ROS logs
+                # unless ROS_LOG_DIR overrides that.
+                run.mkdir(parents=True, exist_ok=True)
                 (run / 'run.json').write_text(
                     '{"run": {}, "parameters": {}, "estimators": []}', encoding='utf-8')
 
@@ -750,7 +753,7 @@ def test_sweep_waits_for_the_simulation_clock_before_reaping(tmp_path, monkeypat
     assert simulation['settings'] == ISAAC_SETTINGS
     assert manifest['resume_signature']['simulation']['native_world'] == (
         'g1_distance_calibration')
-    assert [command[3] for command in commands] == [
+    assert [command[4] for command in commands] == [
         'target_benchmark_env.launch.py', 'target_benchmark_config.launch.py']
 
 
@@ -769,4 +772,113 @@ def test_a_stalled_clock_fails_the_sweep_before_any_scene_operation(
     assert events == ['services', 'capabilities', 'clock']
     assert manifest['sweep']['status'] == 'failed'
     assert 'no scene operation was sent' in manifest['sweep']['error']
-    assert [command[3] for command in commands] == ['target_benchmark_env.launch.py']
+    assert [command[4] for command in commands] == ['target_benchmark_env.launch.py']
+
+
+_RECORDER = r'''
+import signal, sys, time
+
+log, mode = sys.argv[1], sys.argv[2]
+stop_at = None
+
+
+def record(signum, _frame):
+    global stop_at
+    with open(log, 'a', encoding='utf-8') as handle:
+        handle.write(signal.Signals(signum).name + '\n')
+    if mode == 'graceful' or signum == signal.SIGTERM:
+        # Linger, so a duplicate signal arriving shortly after is recorded too.
+        stop_at = stop_at or time.monotonic() + 1.0
+
+
+signal.signal(signal.SIGINT, record)
+signal.signal(signal.SIGTERM, record)
+open(log + '.ready', 'w').close()
+while stop_at is None or time.monotonic() < stop_at:
+    time.sleep(0.02)
+'''
+
+# Starts a recorder and survives SIGINT itself, the way ``ros2 run`` does.
+_WRAPPER = r'''
+import signal, subprocess, sys
+
+log, recorder = sys.argv[1], sys.argv[2]
+
+
+def record(signum, _frame):
+    with open(log, 'a', encoding='utf-8') as handle:
+        handle.write(signal.Signals(signum).name + '\n')
+
+
+signal.signal(signal.SIGINT, record)
+child = subprocess.Popen([sys.executable, recorder, log + '.child', 'graceful'])
+child.wait()
+'''
+
+
+def _signal_fixture(tmp_path) -> tuple[dict[str, str], Path]:
+    """A launch file, found as ridgeback_autonomy's, whose children record signals."""
+
+    import os
+
+    prefix = tmp_path / 'prefix'
+    share = prefix / 'share/ridgeback_autonomy'
+    share.mkdir(parents=True)
+    marker = prefix / 'share/ament_index/resource_index/packages/ridgeback_autonomy'
+    marker.parent.mkdir(parents=True)
+    marker.write_text('')
+    logs = tmp_path / 'signals'
+    logs.mkdir()
+    recorder = tmp_path / 'recorder.py'
+    recorder.write_text(_RECORDER)
+    wrapper = tmp_path / 'wrapper.py'
+    wrapper.write_text(_WRAPPER)
+    python = sys.executable
+    (share / 'signal_fixture.launch.py').write_text(f'''
+from launch import LaunchDescription
+from launch.actions import ExecuteProcess
+
+
+def generate_launch_description():
+    return LaunchDescription([
+        ExecuteProcess(cmd=[{python!r}, {str(recorder)!r}, {str(logs / 'direct')!r}, 'graceful']),
+        ExecuteProcess(cmd=[{python!r}, {str(wrapper)!r}, {str(logs / 'wrapper')!r},
+                            {str(recorder)!r}]),
+        ExecuteProcess(cmd=[{python!r}, {str(recorder)!r}, {str(logs / 'stuck')!r}, 'stuck']),
+    ])
+''')
+    env = os.environ.copy()
+    env['AMENT_PREFIX_PATH'] = os.pathsep.join(
+        filter(None, [str(prefix), env.get('AMENT_PREFIX_PATH', '')]))
+    env['ROS_LOG_DIR'] = str(tmp_path / 'ros_logs')
+    return env, logs
+
+
+def test_stopping_a_sweep_launch_delivers_one_sigint_to_every_process(tmp_path) -> None:
+    import time
+
+    env, logs = _signal_fixture(tmp_path)
+    process = subprocess.Popen(
+        sweep_module._launch_command('signal_fixture.launch.py', {}),
+        stdin=subprocess.DEVNULL,
+        start_new_session=True,
+        env=env,
+    )
+    ready = [logs / f'{name}.ready' for name in ('direct', 'wrapper.child', 'stuck')]
+    deadline = time.monotonic() + 20.0
+    while not all(path.exists() for path in ready) and time.monotonic() < deadline:
+        assert process.poll() is None, 'fixture launch exited early'
+        time.sleep(0.05)
+    assert all(path.exists() for path in ready)
+
+    sweep_module.stop_process_group(process, 'signal fixture')
+
+    def received(name):
+        return (logs / name).read_text(encoding='utf-8').split()
+
+    assert process.returncode == 0
+    assert received('direct') == ['SIGINT']
+    assert received('wrapper') == ['SIGINT']
+    assert received('wrapper.child') == ['SIGINT']
+    # A child that ignores SIGINT is still escalated, by launch itself.
+    assert received('stuck') == ['SIGINT', 'SIGTERM']
