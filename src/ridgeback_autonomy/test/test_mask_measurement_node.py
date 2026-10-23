@@ -1858,3 +1858,29 @@ def test_frame_buffers_outlast_detection_latency_plus_a_segmentation_batch():
         COLOR_BUFFER_DEPTH_DEFAULT, DEPTH_MATCH_BUFFER_DEPTH)
     for depth in (COLOR_BUFFER_DEPTH_DEFAULT, DEPTH_MATCH_BUFFER_DEPTH):
         assert depth / 30.0 >= 0.37 + 0.5 + 0.3
+
+
+@pytest.mark.parametrize('detection_age_s', [0.61, 1.11])
+def test_scan_history_retains_a_match_through_silhouette_latency(
+    detection_age_s: float,
+) -> None:
+    # A 40 Hz scan must survive the observed ~0.61 s detector latency, plus
+    # optionally ~0.5 s spent on the previous SlimSAM batch. Keep the original
+    # 50 ms matching window; a recent scan cannot substitute for the old one.
+    from ridgeback_localization.synchronization import (
+        SCAN_MATCH_BUFFER_DEPTH, SCAN_MATCH_TOLERANCE_S_DEFAULT)
+
+    buffer = StampedMessageBuffer(SCAN_MATCH_BUFFER_DEPTH)
+    scans = []
+    for index in range(121):
+        sec, nanosec = divmod(index * 25_000_000, 1_000_000_000)
+        scan = LaserScan(header=Header(stamp=stamp(10 + sec, nanosec)))
+        scans.append(scan)
+        buffer.store(scan)
+
+    target_ns = 3_000_000_000 - round(detection_age_s * 1_000_000_000)
+    sec, nanosec = divmod(target_ns, 1_000_000_000)
+    target = stamp(10 + sec, nanosec)
+    expected = scans[round(target_ns / 25_000_000)]
+    assert buffer.lookup_nearest(target, SCAN_MATCH_TOLERANCE_S_DEFAULT) is expected
+    assert buffer.lookup_nearest(stamp(10, 0), SCAN_MATCH_TOLERANCE_S_DEFAULT) is None

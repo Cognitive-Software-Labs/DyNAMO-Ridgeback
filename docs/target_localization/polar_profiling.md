@@ -35,6 +35,14 @@ architecture-level view of polar profiling is `docs/target_localization/target_l
   (`docs/target_localization/aligned_depth.md` §2.3): use the grid's `camera_info`, not the FoV
   constants any static config might carry.
 
+The mask node retains **80 scans** (about 2 s at 40 Hz) and selects the nearest
+scan to the detection image's timestamp within **50 ms**. Both `box` and
+`silhouette` use this history and matching rule. The history covers detector
+latency plus time spent processing the previous segmentation batch; retaining
+only 20 scans (about 0.5 s) can discard the matching scan before a silhouette
+detection reaches the worker, yielding `NO_SCAN` despite a healthy scan stream.
+Increasing retention preserves the timestamp tolerance.
+
 **Output**
 
 - One planar coordinate `(X, Z)` in the **camera optical frame**, per mask

@@ -20,12 +20,15 @@ from ridgeback_localization.core.timing import TimingStats
 # 640x480 rgb8 the buffer holds about 41 MB.
 COLOR_BUFFER_DEPTH_DEFAULT = 45
 
-# Depth input and scans are buffered across the same detector latency plus
-# worker time. Depth shares the color stamp and is exact-matched, so it needs
-# the same depth as the color buffer; the scan free-runs at ~40 Hz and is
-# matched to the nearest stamp inside the tolerance.
+# Depth shares the color stamp and is exact-matched, so it needs the same
+# history as the color buffer.
 DEPTH_MATCH_BUFFER_DEPTH = 45
-SCAN_MATCH_BUFFER_DEPTH = 20
+
+# ~2 s at 40 Hz, covering detector latency plus a previous segmentation batch.
+# On r100_0160's Thor, silhouette detections reached lookup ~0.61 s after
+# capture, beyond the former 20-scan (~0.5 s) history. Retain older scans rather
+# than widening the timestamp tolerance: box and silhouette use the same match.
+SCAN_MATCH_BUFFER_DEPTH = 80
 SCAN_MATCH_TOLERANCE_S_DEFAULT = 0.05
 DEPTH_MATCH_RECORD_LIMIT = 256
 TIMING_STAGE_NAMES = (
