@@ -19,6 +19,24 @@ from ridgeback_localization.estimator_registry import parse_estimators, uses_mas
 from ridgeback_localization.health import PipelineHealth
 
 
+def liveness_input(image_topic, info_topic):
+    """(type, topic) that proves an image stream is advancing, without its payload.
+
+    Health only needs each frame's stamp. On every backend a camera image
+    ``.../image`` is published beside ``.../camera_info`` with the same stamps, so
+    watching the info keeps a full copy of colour and depth off the network:
+    on r100_0160 the image subscriptions alone carried about 370 Mbit/s from
+    Intel to Thor. A worker that stops receiving its images still shows up as a
+    stalled output. A topic without that sibling keeps the image subscription.
+    """
+
+    if info_topic:
+        return CameraInfo, info_topic
+    if image_topic.endswith('/image'):
+        return CameraInfo, image_topic[:-len('image')] + 'camera_info'
+    return Image, image_topic
+
+
 class LocalizationHealthNode(Node):
     def __init__(self, **kwargs):
         super().__init__('localization_health', **kwargs)
@@ -32,14 +50,14 @@ class LocalizationHealthNode(Node):
         self.mode, self.labels = p('mode'), [v.strip() for v in p('target_labels').split(',') if v.strip()]
         selected = parse_estimators(p('estimators'))
         self.estimators, self.depth_source, self.mask_gate = list(selected), p('depth_source'), p('mask_gate')
-        inputs = {'color': (Image, p('color_topic'))}
+        inputs = {'color': liveness_input(p('color_topic'), p('camera_info_topic'))}
         outputs = {'detections': (TargetDetections, RAW_DETECTIONS_TOPIC)}
         components = ['detector']
         if uses_mask_estimators(selected):
             inputs['camera_info'] = (CameraInfo, p('camera_info_topic'))
             if 'polar_profiling' in selected: inputs['scan'] = (LaserScan, p('scan_topic'))
             if any(x in selected for x in ('projective_ranging', 'euclidean_reconstruction')) and p('depth_source') == 'stereoscopic':
-                inputs['depth'] = (Image, p('depth_topic'))
+                inputs['depth'] = liveness_input(p('depth_topic'), '')
             outputs['mask'] = (TargetMeasurements, MASK_MEASUREMENTS_TOPIC)
             components.append('mask')
         if uses_pointcloud_estimators(selected):

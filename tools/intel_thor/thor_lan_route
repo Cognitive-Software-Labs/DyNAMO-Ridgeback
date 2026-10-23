@@ -1,0 +1,152 @@
+#!/usr/bin/env python3
+"""Route Thor's traffic for Intel's Wi-Fi address over the robot Ethernet; the operator runs apply/rollback with sudo.
+
+Usage, on Thor:  tools/intel_thor/thor_lan_route status
+                 sudo tools/intel_thor/thor_lan_route apply [--yes]
+                 sudo tools/intel_thor/thor_lan_route rollback [--yes]
+
+Intel's robot services use a CycloneDDS profile on both br0 and Wi-Fi, so they
+advertise Intel's Wi-Fi address (192.168.123.14) as well as 192.168.131.1.
+Thor is on the same Wi-Fi subnet, so without this route its kernel sends DDS
+replies for that address over Thor's own Wi-Fi, which the lab access point
+does not deliver between clients. Anything needing Thor's answer then fails:
+transient-local data (tf_static, robot_description, node names) never reaches
+Thor. The route sends those packets to Intel over the cable instead; Intel
+accepts packets for any of its addresses on br0.
+
+The route is added to every NetworkManager connection bound to the robot
+Ethernet port, so it survives reboots whichever of them NetworkManager
+activates: on 2026-10-21 Thor came up on a second profile for the same port and
+the route was gone. apply snapshots each connection's IPv4 routes; rollback
+restores them. status is read-only and needs no checkout (check_link
+runs it from Intel).
+"""
+import argparse
+import json
+import os
+from pathlib import Path
+import subprocess
+import sys
+
+INTEL_WIFI = '192.168.123.14'
+INTEL_ETHERNET = '192.168.131.1'
+DEVICE = 'enP2p1s0'
+ROUTE = f'{INTEL_WIFI}/32 {INTEL_ETHERNET}'
+BACKUP = Path('/var/lib/dynamo-thor-lan-route-backup')
+
+
+def run(*argv, check=True):
+    result = subprocess.run(argv, capture_output=True, text=True)
+    if check and result.returncode:
+        raise RuntimeError(f'{" ".join(argv[:3])} failed: {result.stderr.strip() or result.stdout.strip()}')
+    return result
+
+
+def connections():
+    """Every Ethernet connection bound to DEVICE, active or not."""
+
+    names = []
+    for line in run('nmcli', '-t', '-f', 'NAME,TYPE', 'connection', 'show').stdout.splitlines():
+        name, _, kind = line.rpartition(':')
+        name = name.replace('\\:', ':')
+        if kind == '802-3-ethernet' and run(
+                'nmcli', '-g', 'connection.interface-name', 'connection', 'show', name).stdout.strip() == DEVICE:
+            names.append(name)
+    if not names:
+        raise RuntimeError(f'no NetworkManager connection is bound to {DEVICE}; this is not Thor')
+    return names
+
+
+def routes(name):
+    value = run('nmcli', '-g', 'ipv4.routes', 'connection', 'show', name).stdout.strip()
+    return [r.strip() for r in value.replace('\\,', ',').split(',') if r.strip()]
+
+
+def has_route(entries):
+    return any(entry.split()[:2] == ROUTE.split() for entry in entries)
+
+
+def kernel_path():
+    words = run('ip', 'route', 'get', INTEL_WIFI).stdout.split()
+    field = lambda key: words[words.index(key) + 1] if key in words else None
+    return field('dev'), field('via')
+
+
+def checks():
+    """(passed, criterion, detail) rows."""
+    device, via = kernel_path()
+    rows = [(device == DEVICE and via == INTEL_ETHERNET, 'kernel route',
+             f'{INTEL_WIFI} via {via or "direct"} dev {device}')]
+    for name in connections():
+        rows.append((has_route(routes(name)), 'persistent route', f'NetworkManager connection "{name}"'))
+    return rows
+
+
+def status():
+    rows = checks()
+    print('thor LAN route to Intel Wi-Fi')
+    for passed, criterion, detail in rows:
+        print(f"{'ok  ' if passed else 'DIFF'}  {criterion:18} {detail}")
+    return 0 if all(passed for passed, _, _ in rows) else 1
+
+
+def saved_routes():
+    """Snapshot as {connection: routes}; reads the former single-connection form."""
+
+    path = BACKUP / 'state.json'
+    if not path.exists():
+        return {}
+    saved = json.loads(path.read_text())
+    return saved['connections'] if 'connections' in saved else {saved['connection']: saved['routes']}
+
+
+def apply():
+    saved = saved_routes()
+    for name in connections():
+        current = routes(name)
+        # Snapshot each connection before its first change; never overwrite one.
+        saved.setdefault(name, current)
+        BACKUP.mkdir(parents=True, exist_ok=True)
+        (BACKUP / 'state.json').write_text(json.dumps({'connections': saved}, indent=2) + '\n')
+        if not has_route(current):
+            run('nmcli', 'connection', 'modify', name, '+ipv4.routes', ROUTE)
+    # Reapply in place: the link and its address stay up.
+    run('nmcli', 'device', 'reapply', DEVICE)
+    return status()
+
+
+def rollback():
+    if not (BACKUP / 'state.json').exists():
+        raise RuntimeError('No route snapshot')
+    for name, entries in saved_routes().items():
+        run('nmcli', 'connection', 'modify', name, 'ipv4.routes', ', '.join(entries))
+    run('nmcli', 'device', 'reapply', DEVICE)
+    run('ip', 'route', 'del', f'{INTEL_WIFI}/32', check=False)
+    (BACKUP / 'state.json').unlink()
+    BACKUP.rmdir()
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument('command', choices=('status', 'apply', 'rollback'))
+    parser.add_argument('--yes', action='store_true')
+    args = parser.parse_args(argv)
+    try:
+        if args.command == 'status':
+            return status()
+        if os.geteuid() != 0:
+            parser.error('apply/rollback must be run by the operator with sudo')
+        if not args.yes and input(f'This changes Thor\'s route to {INTEL_WIFI}. Continue? [y/N] ').lower() not in ('y', 'yes'):
+            return 1
+        if args.command == 'apply':
+            return apply()
+        rollback()
+        status()
+        return 0
+    except (RuntimeError, OSError) as error:
+        print(str(error), file=sys.stderr)
+        return 2
+
+
+if __name__ == '__main__':
+    sys.exit(main())

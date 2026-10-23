@@ -141,16 +141,16 @@ no production architecture change is included here.
 
 ## Live sweeps from the configurator
 
-**Status and priority.** Blocked on cleanup/process ownership; prioritize
+**Status and priority.** Cleanup ownership is fixed; live start, conflict
+detection and supervision remain. Prioritize
 [execution-environment qualification](#benchmark-execution-environment-qualification)
 before this convenience feature. Qualification can use the terminal workflow.
 
-**Gap.** The configurator authors live sweeps but cannot start them. Sweep
-preflight cleanup can kill the configurator through two broad install-path
-matches, and live process ownership/conflict handling is not qualified.
+**Gap.** The configurator authors live sweeps but cannot start them. Live
+conflict handling, progress and cancellation are not implemented or qualified.
 
 **Remaining work.** Follow the [BENCHMARKING — Live configurator sweeps](../plans/BENCHMARKING_live_configurator_sweeps.md):
-fix owned-process cleanup; reuse the CLI dry-run estimate; show the actual child
+reuse the CLI dry-run estimate; show the actual child
 renderer and qualification status; detect genuine conflicting runs; support live
 start, progress, cancellation, and restart/reattachment through existing records.
 

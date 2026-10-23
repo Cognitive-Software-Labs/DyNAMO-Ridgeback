@@ -40,7 +40,11 @@ def test_a_protrusion_past_the_side_fails():
 
 
 def test_uncertainty_can_turn_a_marginal_point_into_a_fail():
-    near_edge = {'name': 'edge', 'from_front_m': 0.4, 'from_left_m': -0.0005}
+    # Place the point 10 mm inside the effective left edge instead of assuming
+    # a particular deployed footprint width, which can change after a survey.
+    left_edge = max(y for _, y in POLYGON)
+    near_edge = {'name': 'edge', 'from_front_m': HULL['length_m'] / 2,
+                 'from_left_m': HULL['width_m'] / 2 - (left_edge + PADDING - 0.01)}
     assert rows([dict(near_edge, uncertainty_m=0.0)])['edge']['passed']
     assert not rows([dict(near_edge, uncertainty_m=0.02)])['edge']['passed']
 

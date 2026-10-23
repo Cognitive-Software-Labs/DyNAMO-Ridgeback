@@ -23,7 +23,7 @@ cp tools/benchmark/robot_no_camera.yaml /tmp/bench-clearpath/robot.yaml
 
 # 3. Launch through the measured NVIDIA GLX path. This retains Gazebo's GUI;
 #    omit exploration_rviz only when the probe is the sole output you need.
-setsid nohup tools/gpu-run bash start_exploration.sh warehouse \
+setsid nohup tools/gpu-run bash start_exploration.sh depot \
     target_localization_enabled:=false exploration_rviz:=false \
     setup_path:=/tmp/bench-clearpath/ \
     >/dev/null 2>&1 &
@@ -39,7 +39,7 @@ launch command with:
 
 ```bash
 export __EGL_VENDOR_LIBRARY_FILENAMES=/usr/share/glvnd/egl_vendor.d/10_nvidia.json
-setsid nohup bash start_exploration.sh warehouse \
+setsid nohup bash start_exploration.sh depot \
     target_localization_enabled:=false exploration_rviz:=false \
     headless_rendering:=true setup_path:=/tmp/bench-clearpath/ \
     >/dev/null 2>&1 &

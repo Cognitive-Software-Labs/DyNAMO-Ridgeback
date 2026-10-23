@@ -1,0 +1,161 @@
+#!/usr/bin/env python3
+"""Record a stationary localization run from Intel, then summarize it per scene mark.
+
+Usage, on Intel with the robot's environment and dds_env.sh intel sourced:
+  record     subscribe to detections, mask measurements and health for --duration s
+  mark       append a timestamped scene mark (e.g. "empty", "1.5", "2.5L")
+  summarize  split the recording at the marks and report each segment
+
+  tools/intel_thor/record_localization_run record --namespace r100_0160 --duration 420 --output run/
+  tools/intel_thor/record_localization_run mark --output run/ 1.5
+  tools/intel_thor/record_localization_run summarize --output run/
+
+Only this tool's own subscriptions; no graph polling. Measurements report
+forward from a point front_offset_m ahead of base_link (the pipeline's robot
+front), so the camera's own base-frame X, looked up once from TF, converts them
+to distances from the camera front face for comparison with a taped mark.
+Delay is Intel receipt minus the source image stamp, so it spans Thor's
+processing and the Thor->Intel hop (PTP keeps the clocks within microseconds).
+"""
+import argparse
+import json
+from pathlib import Path
+import statistics
+import sys
+import time
+
+ESTIMATORS = ('projective_ranging', 'euclidean_reconstruction')
+FRONT_OFFSET_M = 0.25  # ridgeback_common ROBOT_FRONT_OFFSET_M, recorded with the run
+CAMERA_FRAME = 'camera_0_color_optical_frame'
+
+
+def stamp_ns(header):
+    return header.stamp.sec * 1_000_000_000 + header.stamp.nanosec
+
+
+def record(namespace, duration, output):
+    import rclpy
+    from rclpy.qos import QoSProfile, ReliabilityPolicy
+    from rclpy.time import Time
+    import tf2_ros
+    from ridgeback_interfaces.msg import LocalizationHealth, TargetDetections, TargetMeasurements
+
+    base = f"/{namespace.strip('/')}/"
+    rclpy.init(args=['--ros-args', '-r', f'/tf:={base}tf', '-r', f'/tf_static:={base}tf_static'])
+    node = rclpy.create_node('record_localization_run')
+    buffer = tf2_ros.Buffer()
+    tf2_ros.TransformListener(buffer, node)
+    output.mkdir(parents=True, exist_ok=True)
+    samples = (output / 'samples.jsonl').open('w')
+    reliable = QoSProfile(depth=10, reliability=ReliabilityPolicy.RELIABLE)
+
+    def write(kind, entry):
+        samples.write(json.dumps({'kind': kind, 'received_ns': time.time_ns(), **entry}) + '\n')
+
+    node.create_subscription(TargetDetections, base + 'detections/target/raw', lambda m: write('detection', {
+        'stamp_ns': stamp_ns(m.header), 'count': m.count, 'labels': list(m.labels),
+        'scores': [round(float(s), 3) for s in m.scores]}), reliable)
+    node.create_subscription(TargetMeasurements, base + 'measurements/target/mask', lambda m: write('measurement', {
+        'stamp_ns': stamp_ns(m.header), 'count': m.count, 'labels': list(m.labels),
+        **{f'{name}_{field}': [round(float(v), 4) for v in getattr(m, f'{name}_{field}')]
+           for name in ESTIMATORS for field in ('distance_m', 'forward_m', 'lateral_m')},
+        **{f'{name}_status': list(getattr(m, f'{name}_status')) for name in ESTIMATORS}}), reliable)
+    node.create_subscription(LocalizationHealth, base + 'localization/health', lambda m: write('health', {
+        'state': m.state, 'detail': m.detail, 'mode': m.mode, 'session_id': m.session_id,
+        'streams': list(m.streams), 'progress': [int(p) for p in m.progress]}), reliable)
+    camera_x, end = None, time.monotonic() + duration
+    print(f'recording {duration:.0f} s to {output}', flush=True)
+    try:
+        while time.monotonic() < end:
+            rclpy.spin_once(node, timeout_sec=0.1)
+            if camera_x is None and buffer.can_transform('base_link', CAMERA_FRAME, Time()):
+                camera_x = buffer.lookup_transform('base_link', CAMERA_FRAME, Time()).transform.translation.x
+                (output / 'geometry.json').write_text(json.dumps(
+                    {'camera_x_in_base_m': camera_x, 'front_offset_m': FRONT_OFFSET_M}) + '\n')
+    finally:
+        samples.close()
+        node.destroy_node()
+        rclpy.shutdown()
+    print('done', flush=True)
+
+
+def mark(output, label):
+    with (Path(output) / 'marks.jsonl').open('a') as handle:
+        handle.write(json.dumps({'label': label, 'wall_ns': time.time_ns()}) + '\n')
+    print(f'marked {label}')
+
+
+def percentiles(values):
+    if not values:
+        return None
+    ordered = sorted(values)
+    pick = lambda q: ordered[min(len(ordered) - 1, int(q * (len(ordered) - 1) + .5))]
+    return {'count': len(ordered), 'median': round(statistics.median(ordered), 3),
+            'p95': round(pick(.95), 3), 'max': round(ordered[-1], 3)}
+
+
+def summarize(samples, marks, geometry, settle_s=3.0, window_s=30.0):
+    """Per mark segment: detection rate, health, delay and camera-relative distances.
+
+    A segment runs from its mark plus settle_s (time to stand still) for at most
+    window_s, ending earlier at the next mark, so walking to the next mark is
+    excluded. Distances use the first target in each message (the nearest-ranked one
+    the pipeline published); with one person in the scene that is the person.
+    """
+    shift = geometry['camera_x_in_base_m'] - geometry['front_offset_m']
+    bounds = [(m['label'], m['wall_ns'] + settle_s * 1e9,
+               min(m['wall_ns'] + (settle_s + window_s) * 1e9, nxt['wall_ns'] if nxt else float('inf')))
+              for m, nxt in zip(marks, [*marks[1:], None])]
+    report = {'camera_forward_shift_m': round(shift, 4), 'segments': []}
+    for label, start, stop in bounds:
+        inside = [s for s in samples if start <= s['received_ns'] < stop]
+        detections = [s for s in inside if s['kind'] == 'detection']
+        measurements = [s for s in inside if s['kind'] == 'measurement']
+        health = [s['state'] for s in inside if s['kind'] == 'health']
+        seconds = ((min(stop, max((s['received_ns'] for s in inside), default=start)) - start) / 1e9) or None
+        segment = {'label': label, 'seconds': round(seconds, 1) if seconds else 0,
+                   'detection_messages': len(detections),
+                   'detection_rate_hz': round(len(detections) / seconds, 2) if seconds else None,
+                   'messages_with_target': sum(1 for d in detections if d['count'] > 0),
+                   'health_states': {state: health.count(state) for state in sorted(set(health))},
+                   'detection_delay_ms': percentiles([(d['received_ns'] - d['stamp_ns']) / 1e6 for d in detections]),
+                   'measurement_delay_ms': percentiles([(m['received_ns'] - m['stamp_ns']) / 1e6 for m in measurements])}
+        for name in ESTIMATORS:
+            forward = [m[f'{name}_forward_m'][0] - shift for m in measurements
+                       if m['count'] > 0 and m[f'{name}_forward_m'] and m[f'{name}_forward_m'][0] == m[f'{name}_forward_m'][0]]
+            lateral = [m[f'{name}_lateral_m'][0] for m in measurements
+                       if m['count'] > 0 and m[f'{name}_lateral_m'] and m[f'{name}_lateral_m'][0] == m[f'{name}_lateral_m'][0]]
+            segment[name] = {'forward_from_camera_m': percentiles(forward), 'lateral_m': percentiles(lateral)}
+        report['segments'].append(segment)
+    return report
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    commands = parser.add_subparsers(dest='command', required=True)
+    rec = commands.add_parser('record')
+    rec.add_argument('--namespace', required=True)
+    rec.add_argument('--duration', type=float, required=True)
+    rec.add_argument('--output', type=Path, required=True)
+    add = commands.add_parser('mark')
+    add.add_argument('--output', type=Path, required=True)
+    add.add_argument('label')
+    summary = commands.add_parser('summarize')
+    summary.add_argument('--output', type=Path, required=True)
+    args = parser.parse_args(argv)
+    if args.command == 'record':
+        record(args.namespace, args.duration, args.output)
+    elif args.command == 'mark':
+        mark(args.output, args.label)
+    else:
+        samples = [json.loads(line) for line in (args.output / 'samples.jsonl').open()]
+        marks = [json.loads(line) for line in (args.output / 'marks.jsonl').open()]
+        geometry = json.loads((args.output / 'geometry.json').read_text())
+        report = summarize(samples, marks, geometry)
+        (args.output / 'summary.json').write_text(json.dumps(report, indent=2) + '\n')
+        print(json.dumps(report, indent=2))
+    return 0
+
+
+if __name__ == '__main__':
+    sys.exit(main())

@@ -25,8 +25,9 @@ This workspace supports 3 main human workflows:
 
 - [Robot geometry](docs/robot/geometry.md): shared mounts, dimensioned model reference, and validation limits
 - [Collision model](docs/robot/collision_model.md): physical envelope, navigation footprint, and backend representations
+- [Robot-local deployment](docs/physical/robot_local_deployment.md): every startup change made on the robot, re-apply order, and the camera service
 
-Isaac Sim port (in progress, `feat/isaac-sim-6-port`):
+Isaac Sim backend:
 
 - [Project backlog](docs/BACKLOG.md): robot, exploration, deployment, and shared gaps
 - [Benchmarking backlog](docs/target_distance_benchmarking/BACKLOG.md): target-distance benchmarking and estimator evaluation
@@ -247,32 +248,58 @@ not permission to drive the robot.
 
 **Thor — build only localization.** In a new shell, source ROS Jazzy and no old
 workspace overlay. The subset needs no imported Clearpath source repositories,
-Nav2, simulator, or RViz. Install the subset's ROS dependencies, then use a fresh
-prefix (choose another name for a later candidate):
+Nav2, simulator, or RViz; it includes the vendored, message-only
+`rviz_2d_overlay_msgs` that the optional display node imports. Install the
+subset's ROS dependencies, then use a fresh prefix (choose another name for a
+later candidate):
 
 ```bash
 source /opt/ros/jazzy/setup.bash
-rosdep install --from-paths src/ridgeback_interfaces src/ridgeback_common src/ridgeback_localization --ignore-src -r -y
+rosdep install --from-paths src/ridgeback_interfaces src/ridgeback_common src/ridgeback_localization src/rviz_2d_overlay_plugins/rviz_2d_overlay_msgs --ignore-src -r -y
 colcon --log-base artifacts/colcon/thor build \
-  --base-paths src/ridgeback_interfaces src/ridgeback_common src/ridgeback_localization \
+  --base-paths src/ridgeback_interfaces src/ridgeback_common src/ridgeback_localization src/rviz_2d_overlay_plugins/rviz_2d_overlay_msgs \
   --build-base artifacts/colcon/thor-build --install-base artifacts/colcon/thor-install
 source artifacts/colcon/thor-install/local_setup.bash
 python3 tools/check_localization_install
 ```
 
-Prepare and verify a Thor-compatible inference environment separately; the
-workstation CUDA requirements are not a verified Thor environment. Set
-`RIDGEBACK_PERCEPTION_VENV` to that venv if inference is not in the active Python
-environment. Preserve observed sensor topics and the observed TF base frame:
+Thor's inference environment uses `requirements-perception-thor.txt` (PyTorch
+2.11 for CUDA 13.0 on aarch64); its header has the setup commands. It lives
+outside the checkout, so set
+`RIDGEBACK_PERCEPTION_VENV=~/venvs/dynamo-perception` for the launch. Perception
+processes load models only from the local Hugging Face cache, so a Wi-Fi outage
+cannot stop startup; set `RIDGEBACK_MODEL_DOWNLOADS=1` for the first launch on a
+new host so the models are downloaded once. Check the environment
+with `~/venvs/dynamo-perception/bin/python3 tools/intel_thor/check_perception_env`
+(ROS sourced), which fails unless the models' operations run on the GPU.
+
+To run localization at every Thor boot, install the boot service from the Thor
+checkout that holds the build; it starts after Thor's PTP clock services:
+
+```bash
+sudo tools/intel_thor/localization_service apply
+```
+
+Settings (checkout, labels, threshold, mask and depth modes) live in
+`/etc/default/dynamo-localization`; edit them and run
+`sudo systemctl restart dynamo-localization`. `status` compares the installed
+unit with the template; `remove` uninstalls it and keeps the settings unless
+`--purge` is given. Stop any launch started by hand first; `apply` refuses
+while one runs.
+`tools/intel_thor/thor_lan_route` must be applied first, or Thor never receives
+static TF. For a person target, OWLv2 scores below the default
+`detection_threshold` of 0.55 on `r100_0160`; set `detection_threshold:=` explicitly
+and record it. Preserve observed sensor topics and the observed TF base frame:
 
 ```bash
 : "${ROS_DOMAIN_ID:?Set the deployment domain shared with Intel}"
+: "${ROBOT_NAMESPACE:?Set the observed ROS namespace}"
 : "${BASE_FRAME:?Set the observed base TF frame ID}"
 : "${COLOR_TOPIC:?Set the observed color image topic}"
 : "${DEPTH_TOPIC:?Set the observed aligned depth-to-color topic}"
 : "${CAMERA_INFO_TOPIC:?Set the observed color CameraInfo topic}"
 ros2 launch ridgeback_localization localization.launch.py \
-  namespace:=r100_0001 use_sim_time:=false base_frame:="$BASE_FRAME" \
+  namespace:="$ROBOT_NAMESPACE" use_sim_time:=false base_frame:="$BASE_FRAME" \
   color_topic:="$COLOR_TOPIC" depth_topic:="$DEPTH_TOPIC" camera_info_topic:="$CAMERA_INFO_TOPIC" \
   estimators:=projective_ranging,euclidean_reconstruction target_labels:="humanoid robot" \
   displays:=false
@@ -285,24 +312,80 @@ adapter required for the observer:
 ```bash
 source /opt/ros/jazzy/setup.bash
 colcon --log-base artifacts/colcon/intel build \
-  --base-paths src/ridgeback_interfaces src/ridgeback_common src/ridgeback_localization src/ridgeback_autonomy \
+  --base-paths src/ridgeback_interfaces src/ridgeback_common src/ridgeback_localization src/ridgeback_autonomy src/rviz_2d_overlay_plugins/rviz_2d_overlay_msgs \
   --build-base artifacts/colcon/intel-build --install-base artifacts/colcon/intel-install
 source artifacts/colcon/intel-install/local_setup.bash
 : "${ROS_DOMAIN_ID:?Set the deployment domain shared with Thor}"
+: "${ROBOT_NAMESPACE:?Set the observed ROS namespace}"
 : "${BASE_FRAME:?Set the observed base TF frame ID}"
 : "${COLOR_TOPIC:?Set the observed color image topic}"
 ros2 launch ridgeback_autonomy localization_observer.launch.py \
-  namespace:=r100_0001 use_sim_time:=false base_frame:="$BASE_FRAME" \
+  namespace:="$ROBOT_NAMESPACE" use_sim_time:=false base_frame:="$BASE_FRAME" \
   color_topic:="$COLOR_TOPIC" estimators:=projective_ranging,euclidean_reconstruction
 ```
 
 The observer attaches to existing topics and starts no navigation or compute.
-View health with `ros2 topic echo /r100_0001/localization/health` and the Intel
-summary with `ros2 topic echo /r100_0001/localization/status`. Displays publish
+View health with `ros2 topic echo "/${ROBOT_NAMESPACE}/localization/health"` and
+the Intel summary with
+`ros2 topic echo "/${ROBOT_NAMESPACE}/localization/status"`. Displays publish
 images/markers for an independently opened RViz; `displays:=false` keeps only
 the health consumer. For a person check, restart Thor with `target_labels:=person`
 and record that selection. Stop each launch with Ctrl-C in its own terminal;
 leave platform/sensor services running. Do not run `cleanup.sh` on hardware.
+
+**Intel — RViz view with the SLAM map.** To watch Thor's results over a live
+map on the Intel desktop (VNC display `:1`), run hardware exploration in
+external mode instead of the observer. Build the full Intel set in a fresh
+prefix: the patched `slam_toolbox` (imported and patched by
+`tools/check_dependencies --apply --profile core`), `ridgeback_autonomy_hardware`
+and the HUD RViz plugin. Then source the Ethernet-only DDS profile so Thor's
+results reach the consumers:
+
+```bash
+source /opt/ros/jazzy/setup.bash
+colcon --log-base artifacts/colcon/intel-rviz build --symlink-install \
+  --base-paths src/ridgeback_interfaces src/ridgeback_common src/ridgeback_localization src/ridgeback_autonomy \
+    src/ridgeback_autonomy_hardware src/rviz_2d_overlay_plugins src/slam_toolbox \
+  --build-base artifacts/colcon/intel-rviz-build --install-base artifacts/colcon/intel-rviz-install
+source artifacts/colcon/intel-rviz-install/local_setup.bash
+source src/ridgeback_autonomy_hardware/config/intel_thor/dds_env.sh intel
+: "${ROS_DOMAIN_ID:?Set the deployment domain shared with Thor}"
+DISPLAY=:1 ros2 launch ridgeback_autonomy ridgeback_exploration.launch.py \
+  backend:=hardware localization_mode:=external autonomous_motion_enabled:=false \
+  base_frame:="${BASE_FRAME:?Set the observed base TF frame}" \
+  estimators:=projective_ranging,euclidean_reconstruction
+```
+
+Intel runs SLAM, Nav2 and RViz. RViz shows the map, both LiDAR scans, the
+target rings and the camera overlay:
+- **Colour panel:** each of Thor's measurements, drawn on Intel's copy of the
+  colour frame it was measured from (matched by source stamp). The newest frame
+  is used only when that one has left the 32-frame buffer (about 1 s), and the
+  overlay logs a warning when that happens.
+- **Depth panel:** Intel's local aligned depth, from the same stamp.
+- **Mask panel:** with `mask_gate:=box`, built from the detections message, so
+  no image crosses from Thor. With `silhouette`, Thor's `debug/target/mask`,
+  on detection frames.
+
+Pass the same `estimators` and `mask_gate` that Thor runs. Without the patched
+`slam_toolbox` no map appears and Nav2 never starts.
+
+**Nav2 output reaches the robot's twist mux.** With `backend:=hardware`, RViz
+opens a copy of the exploration layout without the *2D Goal Pose* tool, because
+one click would otherwise drive the robot even with frontier goals off. Any other
+Nav2 client can still send goals, so keep the e-stop engaged until the command
+chain is qualified.
+
+**RViz on Intel is throttled so it cannot starve the camera.** Intel's VNC
+desktop renders RViz on the CPU (no GPU). At the layout's 30 fps it took a full
+core, and the camera contract check failed with 467–567 ms depth gaps. With
+`backend:=hardware` the launch therefore:
+- redraws at 10 fps;
+- runs RViz at `nice -n 19` on the last two CPU cores;
+- limits Mesa's software renderer to two threads (`LP_NUM_THREADS=2`).
+
+Then RViz uses about a quarter of a core and the check passes with RViz open.
+Viewing RViz from another computer avoids the load entirely.
 
 For later qualified mission integration, exploration supports
 `localization_mode:=external localization_required:=true`; keep
@@ -331,15 +414,17 @@ cd /path/to/DyNAMO-Ridgeback
 source install/setup.bash
 ```
 
-The package has 5 top-level launch files. The first two are the normal human
-entrypoints; the benchmark environment/config pair are also public because the
-sweep supervisor invokes them as separate processes:
+The package has 6 top-level launch files. Exploration, the benchmark wrapper,
+and manual mapping are the normal human workflows. The localization observer is
+a public physical-deployment role; the benchmark environment/config pair are
+also public because the sweep supervisor invokes them as separate processes:
 
 - `ridgeback_exploration.launch.py`
 - `target_distance_benchmark.launch.py`
+- `manual_mapping.launch.py`
+- `localization_observer.launch.py`
 - `target_benchmark_env.launch.py`
 - `target_benchmark_config.launch.py`
-- `manual_mapping.launch.py`
 
 The lower-level dispatcher, SLAM, Nav2, and frontier-exploration launches live
 under `ridgeback_autonomy/launch/includes/`. Each backend package exposes an
@@ -390,9 +475,9 @@ Arguments:
 | `namespace` | backend-derived | `r100_0001` in simulation; on hardware, read from `<setup_path>/robot.yaml`; an explicit value overrides either default |
 | `use_sim_time` | backend-derived | `true` in simulation; `false` on hardware |
 | `setup_path` | backend-derived | `~/clearpath/` in simulation; `/etc/clearpath/` on hardware |
-| `color_topic` | backend-derived | Simulation image or RealSense `color/image_raw` |
+| `color_topic` | `sensors/camera_0/color/image` | Shared camera contract's colour image; the hardware camera service publishes the same name |
 | `camera_info_topic` | `sensors/camera_0/color/camera_info` | Compatibility override for color-grid camera intrinsics |
-| `depth_topic` | backend-derived | Simulation depth or RealSense `aligned_depth_to_color/image_raw` |
+| `depth_topic` | `sensors/camera_0/depth/image` | Colour-aligned depth; the same name on every backend |
 | `pointcloud_topic` | backend-derived | Simulation organized points; empty on hardware until its layout is validated |
 | `exploration_rviz` | `true` | Launch the custom exploration RViz config |
 | `target_localization_enabled` | `true` | Launch the target-localization stack |
@@ -812,6 +897,144 @@ bash build_and_start_expl.sh office backend:=isaac
 bash build_and_start_expl.sh office backend:=isaac headless:=true
 ```
 
+### Hardware camera service
+
+On the robot, `dynamo-camera.service` owns the D455 from boot and publishes the
+camera topics, frames and TF the simulators publish, so the exploration launch
+attaches to it exactly as it does to the LiDARs. The vendor camera units and its
+web camera view are retired. Install it after `intel_services_rmw apply`, with the
+robot stationary and the e-stop in reach: `rollback`, and an `apply` that
+changes the camera declaration, restart `clearpath-robot`, which drops motor
+power for about a minute while the platform stops. A re-apply that changes only
+the profile, rate or DDS tuning restarts the camera alone. Let them finish; each
+step is printed.
+
+```bash
+tools/intel_thor/camera_service status
+```
+
+```bash
+sudo tools/intel_thor/camera_service apply --profile 640x480
+```
+
+Check the running camera against the contract from a shell with the robot's
+environment:
+
+```bash
+source /etc/clearpath/setup.bash && tools/camera_contract_check --backend hardware
+```
+
+```bash
+sudo tools/intel_thor/camera_service rollback
+```
+
+`apply` is idempotent; re-run it with `--profile 1280x720` to change the
+resolution, or after editing the driver configuration in the repository. The
+installed files, the re-apply order after a reinstall, and the contract that
+robot-side diagnostics should target are in
+[robot-local deployment](docs/physical/robot_local_deployment.md).
+
+### Intel-Thor sensor latency
+
+Use the [sensor timing reference](docs/physical/intel_thor_sensor_latency.md)
+for report definitions and the [transport reference](docs/physical/intel_thor_transport.md#sensor-timing-and-time-synchronization)
+for the selected configuration. Tools run directly from source; no workspace build is needed.
+
+Publish the latency branch through `origin` before qualifying it. On Thor,
+leave the existing checkout untouched and create the separate worktree once:
+
+```bash
+git -C ~/DyNAMO-Ridgeback fetch origin feat/intel-thor-sensor-latency
+git -C ~/DyNAMO-Ridgeback worktree add --track -b feat/intel-thor-sensor-latency ~/DyNAMO-Ridgeback-latency origin/feat/intel-thor-sensor-latency
+```
+
+For updates, fetch on the existing Thor checkout and run
+`git -C ~/DyNAMO-Ridgeback-latency pull --ff-only`. The operator installs clocks
+locally on each host while the robot is stationary:
+
+```bash
+# Intel, from this checkout
+sudo tools/intel_thor/time_sync apply --host intel
+# Thor, from ~/DyNAMO-Ridgeback-latency
+sudo tools/intel_thor/time_sync apply --host thor
+chronyc tracking
+```
+
+`tools/intel_thor/time_sync status` inspects the deployment;
+`sudo tools/intel_thor/time_sync rollback` restores the prior time service.
+Check the independent bound on Intel with `tools/intel_thor/check_clock`.
+
+chrony alone serves Thor an estimate of true time rather than Intel's wall clock,
+so the two clocks agree only to within Intel's pending internet correction. PTP
+carries the wall clock itself. With the robot stationary, re-apply `time_sync`
+on Intel first (it installs the slow slew rate PTP requires), then install PTP
+on each host:
+
+```bash
+# Intel, from this checkout
+sudo tools/intel_thor/time_sync apply --host intel
+sudo tools/intel_thor/ptp_sync apply --host intel
+# Thor, from ~/DyNAMO-Ridgeback-latency (stops Thor's chrony)
+sudo tools/intel_thor/ptp_sync apply --host thor
+```
+
+`tools/intel_thor/ptp_sync status` shows each host's daemons and their latest
+offsets; `sudo tools/intel_thor/ptp_sync rollback` removes PTP and restores
+chrony on Thor. Confirm the wall-clock agreement from Intel with
+`tools/intel_thor/check_clock`.
+
+Then collect the interleaved baseline from Intel:
+
+```bash
+tools/intel_thor/check_link
+source /etc/clearpath/setup.bash
+tools/intel_thor/sensor_latency_run --namespace r100_0160
+```
+
+The collector writes reports, raw timestamps, before/after clock checks, CPU
+and link rates under `artifacts/hardware/`. Use `--output-dir` to name a new
+run directory. Its Intel observer stops the run on scan gaps or sensor faults.
+
+For a short Thor contract diagnostic, from the Thor worktree:
+
+```bash
+source /opt/ros/jazzy/setup.bash
+source src/ridgeback_autonomy_hardware/config/intel_thor/dds_env.sh thor
+export ROS_DOMAIN_ID=0
+tools/camera_contract_check --backend hardware --host thor --namespace r100_0160 --timing --duration 10
+```
+
+Cross-host components are unresolved until a valid `--clock-offset-ms` and
+`--clock-bound-ms` are supplied. The collector handles those checks automatically.
+To measure O1/O2, the operator applies one candidate on Intel, then repeats the
+collector with a new output directory:
+
+```bash
+sudo tools/intel_thor/camera_service apply --dds-profile camera --fps 30 --max-message-size default
+# O2: change only --max-message-size to 65500
+```
+
+Return to the installed baseline with `camera_service apply --dds-profile
+services --fps 30 --max-message-size default`.
+
+Compression candidates (O4) decode on Thor and need its image_transport
+plugins once, from the operator:
+
+```bash
+sudo apt install ros-jazzy-image-transport-plugins ros-jazzy-ffmpeg-image-transport
+```
+
+Then, on Intel, choose one variant per stream. Encoder parameters set with
+`--camera-param` apply to the whole run and are restored afterwards:
+
+```bash
+tools/intel_thor/sensor_latency_run --namespace r100_0160 --color-transport ffmpeg --depth-transport zstd
+tools/intel_thor/sensor_latency_run --namespace r100_0160 --color-transport compressed --depth-transport compressedDepth --camera-param .camera_0.aligned_depth_to_color.image_raw.compressedDepth.format=rvl
+```
+
+The deployment runs at 30 Hz; reduced-rate runs are not a tuning option. Compression and host tuning are
+selected only after the measured baseline and raw transport candidates.
+
 ### Intel-Thor link setup and pre-deploy check
 
 **Hardware qualification remains open:** the September 18 handoffs report camera
@@ -846,6 +1069,29 @@ services restart, so keep the robot stationary with the e-stop in reach:
 
 ```bash
 sudo tools/intel_thor/intel_services_rmw apply
+```
+
+Both hosts run at full CPU performance, and Thor in its 120W power mode;
+`check_link` fails otherwise. Do not select MAXN: on 2026-10-09 the Ridgeback's
+user power ports stopped supplying Thor under a heavy GPU load in MAXN. Install
+once per host (Thor from its worktree; a power-mode change that needs a reboot
+is reported):
+
+```bash
+sudo tools/intel_thor/host_performance apply --host intel
+sudo tools/intel_thor/host_performance apply --host thor
+```
+
+`tools/intel_thor/host_performance status` reports drift; `rollback` restores
+the previous governors and power mode.
+
+Thor must reach Intel's Wi-Fi address over the cable, or transient-local data
+such as `tf_static` never arrives (see
+[troubleshooting](docs/troubleshooting.md#thor-receives-sensor-streams-but-no-static-tf)).
+Once, on Thor, from its worktree:
+
+```bash
+sudo tools/intel_thor/thor_lan_route apply
 ```
 
 `tools/intel_thor/intel_services_rmw status` shows the RMW that each service
@@ -994,7 +1240,7 @@ Arguments:
 | `capture_timeout_sec` | `30.0` | Hard wall-time bound for obtaining the raw detector-batch quota; it is a stall guard, not the normal capture duration |
 | `record_video` | `true` | Best-effort RViz recording to `video/run.mp4`; disable for timing runs where screen capture would be unwanted load |
 | `color_topic` | `sensors/camera_0/color/image` | Compatibility override for the shared camera contract's color image; feeds detector, measurements, overlay, runner, and readiness gate |
-| `depth_topic` | `sensors/camera_0/depth/image` | Simulation's color-aligned depth. A hardware RealSense launch must override this to `sensors/camera_0/aligned_depth_to_color/image_raw` |
+| `depth_topic` | `sensors/camera_0/depth/image` | Colour-aligned depth of the shared camera contract; the hardware camera service publishes the same name |
 | `pointcloud_topic` | `sensors/camera_0/points` | Simulation's organized point cloud. It is optional on RealSense; omit the pointcloud estimator or override this only after confirming driver output |
 | `scan_topic` | `sensors/lidar2d_0/scan` | LaserScan topic used by polar profiling |
 | `base_frame` | `<namespace>/robot/base_link` | Vehicle frame used for point-cloud and scan projection |
@@ -1033,9 +1279,10 @@ escalating SIGINT → SIGTERM → SIGKILL. Save a copy still downloads the job f
 archiving or hand-editing.
 
 **Live sweeps still start from a terminal.** They need a GPU-backed X session,
-and `target_benchmark_sweep` runs `cleanup.sh` before Gazebo starts, which would
-kill the page — see [docs/troubleshooting.md](docs/troubleshooting.md). Copy
-the command instead.
+and the page does not yet supervise a live run's conflicts, progress or
+cancellation. `cleanup.sh` no longer kills the page or a replay it started — see
+[docs/troubleshooting.md](docs/troubleshooting.md#what-cleanupsh-leaves-alone).
+Copy the command instead.
 
 The Results panel lists typed artifacts and run outputs, and can rename them.
 Rename is refused where the directory name is load-bearing — a sweep's config
@@ -1305,7 +1552,7 @@ exact matrices, assumptions, and pending hardware comparison.
   (`rmw_cyclonedds_cpp`), matching the measured exact-stamp delivery default.
   Deploy it to the robot only through an approved configuration diff.
 - **Hokuyo UST-10LX**: Mounted at front of chassis, provides 2D laser scan for SLAM and costmaps
-- **Intel RealSense D455**: Mounted on a riser bracket. `device_type: d455` selects both the driver's device filter and the URDF model, so it decides the camera's geometry as well as which device the driver binds to. Configured streams are RGB and depth with `align_depth.enable: true` and `enable_sync: true`; stream profiles are left unspecified so Clearpath's 640x480 @ 30 defaults apply. It supplies RGB and aligned depth to the target-localization stack. An organized point cloud is enabled in the checked-out Clearpath defaults but is **not** wired as an application input — its layout, frame, and timestamps are unverified on hardware. The D455 also has an IMU, which this stack neither enables nor consumes.
+- **Intel RealSense D455**: Mounted on a riser bracket. `device_type: d455` selects both the driver's device filter and the URDF model, so it decides the camera's geometry as well as which device the driver binds to. Configured streams are RGB and depth with `align_depth.enable: true` and `enable_sync: true`; stream profiles are left unspecified so Clearpath's 640x480 @ 30 defaults apply. It supplies RGB and aligned depth to the target-localization stack. An organized point cloud is enabled in the checked-out Clearpath defaults but is **not** wired as an application input — its layout, frame, and timestamps are unverified on hardware. These driver settings drive the simulators; on the robot the [hardware camera service](#hardware-camera-service) streams colour and aligned depth only, from the same mount. The D455 also has an IMU, which this stack neither enables nor consumes.
 
 ### Key parameters to tune
 

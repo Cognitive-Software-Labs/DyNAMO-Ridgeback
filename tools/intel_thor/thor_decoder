@@ -1,0 +1,72 @@
+#!/usr/bin/env python3
+"""Decode the camera's compressed variants on Thor for the compression candidate (O4).
+
+Usage, on Thor under dds_env.sh thor and ROS_DOMAIN_ID=0:
+  tools/intel_thor/thor_decoder --namespace r100_0160 --color-transport compressed --depth-transport zstd
+
+One image_transport republisher per compressed stream subscribes to the
+contract variant (e.g. sensors/camera_0/color/image/compressed) and publishes a
+raw Image under sensors/camera_0/thor/<stream>/image. Decoded frames keep the
+source header, so stamps and frame ids are unchanged, and never share a topic
+with Intel's raw publisher. A raw stream needs no decoder. Runs until SIGINT or
+SIGTERM, then stops its republishers. Needs the image_transport plugins on Thor.
+
+--decoder-param NAME=VALUE passes a parameter to every republisher; a plugin
+reads only its own, e.g. in.ffmpeg.decoder_av_options=flags:low_delay, which
+stops FFmpeg's NVDEC decoder holding back four frames for display reordering.
+"""
+import argparse
+import signal
+import subprocess
+import sys
+
+COLOR_TRANSPORTS = ('raw', 'compressed', 'ffmpeg')
+DEPTH_TRANSPORTS = ('raw', 'zstd', 'compressedDepth')
+CONTRACT = {'color': 'color/image', 'depth': 'depth/image'}
+REPUBLISH = '/opt/ros/jazzy/lib/image_transport/republish'
+
+
+def commands(namespace, color, depth, parameters=()):
+    base = f"/{namespace.strip('/')}/sensors/camera_0/"
+    result = []
+    for stream, transport in (('color', color), ('depth', depth)):
+        if transport == 'raw':
+            continue
+        # The binary itself, not `ros2 run`, so stop signals reach the republisher.
+        result.append([REPUBLISH, '--ros-args',
+                       '-r', f'__node:=thor_{stream}_decoder',
+                       '-p', f'in_transport:={transport}', '-p', 'out_transport:=raw',
+                       '-r', f'in/{transport}:={base}{CONTRACT[stream]}/{transport}',
+                       '-r', f'out:={base}thor/{stream}/image',
+                       *(item for parameter in parameters for item in ('-p', parameter))])
+    return result
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument('--namespace', required=True)
+    parser.add_argument('--color-transport', choices=COLOR_TRANSPORTS, default='raw')
+    parser.add_argument('--depth-transport', choices=DEPTH_TRANSPORTS, default='raw')
+    parser.add_argument('--decoder-param', action='append', default=[], metavar='NAME=VALUE')
+    args = parser.parse_args(argv)
+    if any('=' not in item for item in args.decoder_param):
+        parser.error('--decoder-param takes NAME=VALUE')
+    planned = commands(args.namespace, args.color_transport, args.depth_transport,
+                       [item.replace('=', ':=', 1) for item in args.decoder_param])
+    if not planned:
+        parser.error('both streams are raw; nothing to decode')
+    children = [subprocess.Popen(command) for command in planned]
+
+    def stop(signum, frame):
+        for child in children:
+            if child.poll() is None:
+                child.send_signal(signal.SIGINT)
+    signal.signal(signal.SIGINT, stop)
+    signal.signal(signal.SIGTERM, stop)
+    codes = [child.wait() for child in children]
+    # A republisher that exits on its own is a failure; one stopped on request is not.
+    return 0 if all(code in (0, -signal.SIGINT, 130) for code in codes) else 1
+
+
+if __name__ == '__main__':
+    sys.exit(main())

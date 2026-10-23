@@ -1,0 +1,17 @@
+# Installed by tools/intel_thor/time_sync on Intel; edit the repository copy.
+# Steps the wall clock once at boot, before anything stamps with it. Without an
+# external source it exits successfully after --wait and leaves holdover.
+[Unit]
+Description=DyNAMO boot clock step before sensors, PTP and the platform
+Wants=network-online.target
+After=chrony.service network-online.target
+Before=clearpath-robot.service clearpath-sensors.service clearpath-platform.service dynamo-camera.service dynamo-ptp4l.service dynamo-phc2sys.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/bin/python3 /usr/local/lib/dynamo-time/boot_clock_step.py --wait 60 --max-offset 0.005
+TimeoutStartSec=90
+
+[Install]
+WantedBy=multi-user.target

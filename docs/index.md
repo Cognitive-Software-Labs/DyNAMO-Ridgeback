@@ -88,7 +88,10 @@ troubleshooting, planning, and historical documentation.
 - [PHYSICAL — Package split for distributed deployment](plans/PHYSICAL_package_split.md) — workstation code restructuring, simulator compatibility, and tested handoff
 - [PHYSICAL — Intel–Thor deployment and transport qualification](plans/PHYSICAL_intel_thor_deployment.md) — robot-side installation, GPU offload, Ethernet measurements, and failure handling
   - Handoff: [Intel–Thor transport (agent 2)](plans/handoffs/PHYSICAL_intel_thor_transport_agent2.md) — CycloneDDS switch state, services-configuration flood behind the LiDAR lockouts, manual rollback, next steps
+  - [Intel–Thor sensor latency tools](physical/intel_thor_sensor_latency.md) — report components, clock bounds and interleaved qualification
+  - [PHYSICAL — Thor perception environment and first live localization](plans/PHYSICAL_thor_perception_environment.md) — verified GPU inference environment on Thor, the localization build there, and one stationary live run
 - [PHYSICAL — Robot measurements and stationary sensor validation](plans/PHYSICAL_robot_measurements_and_validation.md) — quick mount readings/photos, D455 and LiDAR checks, stationary alignment, and G1/person tests
+  - [PHYSICAL — Camera and alignment robot session](plans/PHYSICAL_camera_alignment_session.md) — ordered blocks, commands and pre-declared limits for the alignment overlay, off-centre and HD person checks, and estimator modes
   - Handoff: [D455 camera runs (agent 1)](plans/handoffs/PHYSICAL_d455_camera_runs_agent1.md) — P1/P2 results, CycloneDDS camera-transport and LiDAR-lockout findings, next steps
 - [PHYSICAL — Checks without movement or a controller](plans/PHYSICAL_stationary_checks.md) — evidence audit, passive commands, and separately controlled stationary disruptions
 - [PHYSICAL — Remaining qualification and time estimates](plans/PHYSICAL_remaining_qualification.md) — October 14 checkpoint, prerequisites, test durations and preparation allowances
@@ -109,6 +112,7 @@ They are not supported implementations or automatic backlog commitments.
 - [Occlusion-recovery candidates](do_not_try_again/occlusion_recovery.md) — deferred until baseline characterization
 - [Exact-stamp depth-delivery experiments](do_not_try_again/exact_stamp_depth_delivery.md)
 - [Monocular-depth error](do_not_try_again/monocular_depth_error.md)
+- [Intel–Thor camera transport candidates](do_not_try_again/intel_thor_camera_transport.md)
 
 ## Archive
 

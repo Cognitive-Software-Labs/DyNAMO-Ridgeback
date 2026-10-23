@@ -5,6 +5,8 @@ Public commands live in the [README](../../README.md#hardware-camera-service).
 Host reconstruction and credentials belong to the
 [recovery runbook](ridgeback_recovery.md).
 
+<a id="camera-service"></a>
+
 ## Camera owner and source
 
 On 2026-10-12 `dynamo-camera.service` was active and enabled, with the vendor
@@ -31,13 +33,10 @@ extrinsics and remaps TF to the namespaced tree. Installation conflicts with the
 vendor camera unit. Do not run the legacy vendor DDS/repair workflow against
 this service or re-enable its competing camera units.
 
-`tools/camera_contract_check` targets these installed names explicitly. On
-`origin/dev`, `ridgeback_common.camera_inputs` gives the RealSense backend the
-same three names as the simulators, so the localization launches already
-consume the installed service's topics; this checkout's older
-`camera_inputs.py` still names `image_raw` and `aligned_depth_to_color/image_raw`
-until it is merged with `origin/dev`. Do not launch localization from this
-checkout's source before that merge. Restoring the
+`tools/camera_contract_check` targets these installed names explicitly.
+`ridgeback_common.camera_inputs` gives the RealSense backend the same three
+names as the simulators, so localization launches consume the installed
+service's topics. Restoring the
 tooling and matching files does not qualify image timing, TF, target estimation
 or hardware performance.
 
@@ -197,6 +196,16 @@ dropouts at HD. **HD local delivery is therefore not qualified** under the
 frozen criteria. HD is local-only and not the deployment profile, so this does
 not block VGA operation; qualifying HD would need the dropouts characterised
 in a longer HD capture.
+
+## Clock synchronization and camera transport candidates
+
+Intel–Thor clock synchronization and latency qualification are owned by the
+[sensor timing reference](intel_thor_sensor_latency.md). The root README owns
+the public `tools/intel_thor/time_sync` and `tools/intel_thor/ptp_sync`
+installation and rollback commands. Use those maintained tools rather than
+temporary session scripts. The
+[transport reference](intel_thor_transport.md#sensor-timing-and-time-synchronization)
+describes PTP ownership; camera traffic and reader evidence are recorded above.
 
 ## Reconstruction and verification
 

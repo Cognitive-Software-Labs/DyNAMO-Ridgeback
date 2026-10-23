@@ -4,11 +4,22 @@
 #
 # Usage: tools/intel_thor/check_link [--no-traffic] [--duration SECONDS]
 #                                    [--domain ID] [--thor USER@HOST]
+#                                    [--thor-repo PATH] [--camera-reader]
+#
+# The revision check compares this checkout with the Thor checkout of the same
+# directory name (a worktree such as ~/DyNAMO-Ridgeback-rviz), falling back to
+# ~/DyNAMO-Ridgeback; --thor-repo names it explicitly.
 #
 # The traffic test streams ~220 Mbit/s of synthetic camera frames each way for
 # --duration seconds over CycloneDDS with the deployment configurations, in an
 # otherwise unused ROS domain. It never joins the robot graph, but it shares the
 # Ethernet segment with the LiDARs: run it with the robot stationary. See docs/physical/intel_thor_transport.md.
+#
+# --camera-reader adds one guarded local camera reader on the robot graph, under
+# the installed services configuration (/etc/clearpath/setup.bash), for 20 s
+# after a 10 s quiet baseline. It passes when tools/camera_contract_check
+# passes, wired TX rises by at most 5 Mbit/s on eno1 and enp2s0, and the
+# clearpath-sensors journal gains no LiDAR grab/reconnect errors.
 
 set -u
 
@@ -18,20 +29,27 @@ PROBE="$REPO_ROOT/tools/intel_thor/dds_link_probe.py"
 INTEL_IP=192.168.131.1
 THOR_IP=192.168.131.51
 THOR="robot@$THOR_IP"
-THOR_REPO='~/DyNAMO-Ridgeback'
+THOR_REPO=''
+# Intel services that run Fast DDS by design; reported, not warned about.
+# The scan merger's launch pins rmw_fastrtps_cpp for its child nodes; see
+# docs/physical/robot_local_deployment.md.
+FAST_DDS_EXCEPTIONS='clearpath-scan-merger'
 REMOTE_DIR='.cache/dynamo_check_link'
 REQUIRED_RMEM=16777216
 DOMAIN=87
 DURATION=10
 RATE=30
 TRAFFIC=true
+CAMERA_READER=false
 
 while [ "$#" -gt 0 ]; do
     case "$1" in
         --no-traffic) TRAFFIC=false ;;
+        --camera-reader) CAMERA_READER=true ;;
         --duration) shift; DURATION="${1:-}" ;;
         --domain) shift; DOMAIN="${1:-}" ;;
         --thor) shift; THOR="${1:-}" ;;
+        --thor-repo) shift; THOR_REPO="${1:-}" ;;
         *)
             sed -n '5,6p' "$0" | sed 's/^# //' >&2
             exit 2
@@ -44,6 +62,7 @@ FAILS=0
 WARNS=0
 pass() { printf '  PASS  %s\n' "$*"; }
 warn() { printf '  WARN  %s\n' "$*"; WARNS=$((WARNS + 1)); }
+info() { printf '  INFO  %s\n' "$*"; }
 fail() { printf '  FAIL  %s\n' "$*"; FAILS=$((FAILS + 1)); }
 section() { printf '\n%s\n' "$*"; }
 thor() { ssh -o BatchMode=yes -o ConnectTimeout=5 "$THOR" "$@"; }
@@ -55,8 +74,10 @@ finish() {
 
 # Bytes counters summed over the Wi-Fi interfaces (wl*) of a host.
 WIFI_BYTES="awk '{s += \$1} END {print s + 0}' /sys/class/net/wl*/statistics/rx_bytes /sys/class/net/wl*/statistics/tx_bytes 2>/dev/null"
-# The camera stream is ~220 Mbit/s; a duplicate Wi-Fi path shows up at that scale,
-# well above the background traffic of the robot's web and Foxglove services.
+# The camera stream is ~220 Mbit/s; a duplicate Wi-Fi path shows up at that scale.
+# Intel's Wi-Fi also carries its own background (desktop, web and remote-view
+# traffic: ~20 Mbit/s rx+tx was measured on 2026-10-13 with no probe running),
+# so the verdict uses the rate above a baseline taken just before the probes.
 WIFI_LIMIT_MBIT=20
 
 # Receive-buffer ceiling, live and persisted, on the named host.
@@ -74,6 +95,26 @@ check_buffers() {
     else
         warn "$host buffer limit not persisted in /etc/sysctl.d; it resets on reboot"
     fi
+}
+
+# Performance-policy rows from host_performance status, as PASS or FAIL lines.
+check_performance() {
+    local host="$1" output
+    if [ "$host" = intel ]; then
+        output="$("$REPO_ROOT/tools/intel_thor/host_performance" status 2>&1)"
+    else
+        output="$(thor python3 - status < "$REPO_ROOT/tools/intel_thor/host_performance" 2>&1)"
+    fi
+    if ! printf '%s\n' "$output" | grep -qE '^(ok|DIFF) '; then
+        fail "$host performance policy unreadable: $(printf '%s' "$output" | tail -1)"
+        return
+    fi
+    while read -r verdict criterion; do
+        case "$verdict" in
+            ok) pass "$host $criterion" ;;
+            DIFF) fail "$host $criterion; sudo tools/intel_thor/host_performance apply --host $host" ;;
+        esac
+    done <<< "$(printf '%s\n' "$output" | grep -E '^(ok|DIFF) ')"
 }
 
 section "Intel ($(hostname))"
@@ -106,15 +147,35 @@ else
 fi
 
 check_buffers intel
+check_performance intel
 services_rmw="$(grep -h '^export RMW_IMPLEMENTATION' /etc/clearpath/setup.bash 2>/dev/null | cut -d'"' -f2)"
 if [ "$services_rmw" = rmw_cyclonedds_cpp ]; then
     pass "robot services configured for CycloneDDS (/etc/clearpath/setup.bash)"
 else
     warn "robot services use ${services_rmw:-unknown}; switch with sudo tools/intel_thor/intel_services_rmw apply"
 fi
-leftover="$("$REPO_ROOT/tools/intel_thor/intel_services_rmw" status | awk '/active/ && /fastrtps|Fast DDS default/ {print $1}' | paste -sd' ')"
+fast_dds="$("$REPO_ROOT/tools/intel_thor/intel_services_rmw" status | awk '/active/ && /fastrtps|Fast DDS default/ {print $1}')"
+leftover="" excepted=""
+for unit in $fast_dds; do
+    case " $FAST_DDS_EXCEPTIONS " in
+        *" $unit "*) excepted="$excepted $unit" ;;
+        *) leftover="$leftover $unit" ;;
+    esac
+done
 if [ -n "$leftover" ]; then
-    warn "services still running Fast DDS: $leftover"
+    warn "services still running Fast DDS:$leftover"
+fi
+if [ -n "$excepted" ]; then
+    pass "documented Fast DDS exception still in place:$excepted"
+fi
+querier_dropin=/etc/systemd/network/10-netplan-br0.netdev.d/90-dynamo-multicast-querier.conf
+if [ "$(cat /sys/class/net/br0/bridge/multicast_querier 2>/dev/null)" = 1 ]; then
+    pass "br0 is the IGMP querier (Thor's discovery multicast survives restarts)"
+else
+    fail "br0 is not the IGMP querier; restarted Thor processes stay undiscovered for ~5 min. Install $querier_dropin"
+fi
+if ! cmp -s "$CONFIG_DIR/90-dynamo-multicast-querier.conf" "$querier_dropin"; then
+    warn "IGMP querier not persisted as $querier_dropin"
 fi
 
 ping_summary="$(ping -c 20 -i 0.2 -q "$THOR_IP" 2>&1)"
@@ -142,6 +203,19 @@ else
 fi
 
 check_buffers thor
+check_performance thor
+# Thor must reach Intel's Wi-Fi DDS locator over the cable; see thor_lan_route.
+route_output="$(thor python3 - status < "$REPO_ROOT/tools/intel_thor/thor_lan_route" 2>&1)"
+if ! printf '%s\n' "$route_output" | grep -qE '^(ok|DIFF) '; then
+    fail "thor LAN route unreadable: $(printf '%s' "$route_output" | tail -1)"
+else
+    while read -r verdict criterion; do
+        case "$verdict" in
+            ok) pass "thor LAN route: $criterion" ;;
+            DIFF) fail "thor LAN route: $criterion; sudo tools/intel_thor/thor_lan_route apply on Thor" ;;
+        esac
+    done <<< "$(printf '%s\n' "$route_output" | grep -E '^(ok|DIFF) ')"
+fi
 if thor test -e /opt/ros/jazzy/lib/librmw_cyclonedds_cpp.so; then
     pass "rmw_cyclonedds_cpp installed"
 else
@@ -149,13 +223,17 @@ else
 fi
 
 local_rev="$(git -C "$REPO_ROOT" rev-parse HEAD)"
+if [ -z "$THOR_REPO" ]; then
+    THOR_REPO="~/$(basename "$REPO_ROOT")"
+    thor "test -d $THOR_REPO" || THOR_REPO='~/DyNAMO-Ridgeback'
+fi
 thor_rev="$(thor "git -C $THOR_REPO rev-parse HEAD 2>/dev/null")"
 if [ -z "$thor_rev" ]; then
     warn "no checkout at $THOR_REPO on Thor"
 elif [ "$thor_rev" = "$local_rev" ]; then
-    pass "checkout revision matches Intel (${local_rev:0:7})"
+    pass "checkout revision matches Intel (${local_rev:0:7}, Thor $THOR_REPO)"
 else
-    warn "checkout revision ${thor_rev:0:7} differs from Intel ${local_rev:0:7}"
+    warn "checkout revision ${thor_rev:0:7} at Thor $THOR_REPO differs from Intel ${local_rev:0:7} at $REPO_ROOT"
 fi
 
 section "DDS configuration (this checkout)"
@@ -230,6 +308,52 @@ for side in intel thor; do
     [ "$synced" = yes ] && pass "$side NTP synchronized" || warn "$side NTP not synchronized"
 done
 
+tx_bytes() { cat "/sys/class/net/$1/statistics/tx_bytes"; }
+
+check_camera_reader() {
+    section "Local camera reader (services configuration)"
+    local since run eno1_0 enp_0 eno1_1 enp_1 eno1_2 enp_2 base_eno base_enp read_eno read_enp errors
+    since="$(date '+%Y-%m-%d %H:%M:%S')"
+    run="$(mktemp -d)"
+    eno1_0="$(tx_bytes eno1)"; enp_0="$(tx_bytes enp2s0)"; t0="$(date +%s.%N)"
+    sleep 10
+    eno1_1="$(tx_bytes eno1)"; enp_1="$(tx_bytes enp2s0)"; t1="$(date +%s.%N)"
+    (set +u; source /etc/clearpath/setup.bash; export ROS_LOG_DIR=/tmp
+     python3 "$REPO_ROOT/tools/camera_contract_check" --backend hardware --guard --warmup 5 --duration 20 \
+         --output "$run/contract.json" > "$run/contract.log" 2>&1)
+    eno1_2="$(tx_bytes eno1)"; enp_2="$(tx_bytes enp2s0)"; t2="$(date +%s.%N)"
+    if grep -q 'CONTRACT PASS' "$run/contract.log"; then
+        pass "camera contract with an extra local reader ($(grep -o 'colour rate *[0-9.]* Hz' "$run/contract.log" | tr -s ' '))"
+    else
+        fail "camera contract with an extra local reader: $(grep -E '^FAIL|ABORT' "$run/contract.log" | head -2 | tr '\n' ' ')"
+    fi
+    # Mean rates over the measured baseline and reader windows.
+    read -r rise_eno rise_enp < <(awk -v e0="$eno1_0" -v e1="$eno1_1" -v e2="$eno1_2" \
+        -v p0="$enp_0" -v p1="$enp_1" -v p2="$enp_2" -v t0="$t0" -v t1="$t1" -v t2="$t2" 'BEGIN {
+        b = t1 - t0; d = t2 - t1
+        printf "%.2f %.3f\n", (e2 - e1) * 8 / 1e6 / d - (e1 - e0) * 8 / 1e6 / b,
+                               (p2 - p1) * 8 / 1e6 / d - (p1 - p0) * 8 / 1e6 / b }')
+    if [ -z "${rise_eno:-}" ]; then
+        fail "port traffic: no reader report"
+    elif awk "BEGIN {exit !($rise_eno > 5 || $rise_enp > 5)}"; then
+        fail "port traffic with the reader: eno1 +${rise_eno}, enp2s0 +${rise_enp} Mbit/s (limit 5)"
+    else
+        pass "port traffic with the reader: eno1 +${rise_eno}, enp2s0 +${rise_enp} Mbit/s (limit 5)"
+    fi
+    errors="$(journalctl -u clearpath-sensors --since "$since" --no-pager 2> /dev/null \
+        | grep -cE 'Could not grab|reconnecting|Could not open network Hokuyo')"
+    if [ "$errors" -gt 0 ]; then
+        fail "clearpath-sensors logged $errors LiDAR grab/reconnect line(s) during the reader"
+    else
+        pass "no LiDAR grab/reconnect errors during the reader"
+    fi
+    rm -rf "$run"
+}
+
+if [ "$CAMERA_READER" = true ]; then
+    check_camera_reader
+fi
+
 if [ "$TRAFFIC" != true ]; then
     finish
 fi
@@ -247,9 +371,10 @@ publish_for=$((DURATION + 20))
 
 run_direction() {
     local label="$1" receiver="$2"
-    local wifi_intel0 wifi_thor0 result wifi_mbit received rate gap drops
+    local wifi_intel0 wifi_thor0 result wifi_mbit excess_mbit received rate gap drops t0
     wifi_intel0="$(eval "$WIFI_BYTES")"
     wifi_thor0="$(thor "$WIFI_BYTES")"
+    t0="$(date +%s.%N)"
     if [ "$receiver" = thor ]; then
         bash -c "$intel_env; python3 '$PROBE' pub --rate $RATE --duration $publish_for" > /dev/null 2>&1 &
         result="$(thor "$thor_env; python3 $REMOTE_DIR/dds_link_probe.py sub --duration $DURATION --wait 15" 2>/dev/null)"
@@ -257,8 +382,11 @@ run_direction() {
         thor "$thor_env; timeout $publish_for python3 $REMOTE_DIR/dds_link_probe.py pub --rate $RATE --duration $publish_for" > /dev/null 2>&1 &
         result="$(bash -c "$intel_env; python3 '$PROBE' sub --duration $DURATION --wait 15" 2>/dev/null)"
     fi
+    # Over the window actually measured, which includes probe matching.
     wifi_mbit="$(awk -v a="$(eval "$WIFI_BYTES")" -v a0="$wifi_intel0" -v b="$(thor "$WIFI_BYTES")" -v b0="$wifi_thor0" \
-        -v d="$DURATION" 'BEGIN {printf "%.1f", (a - a0 + b - b0) * 8 / 1e6 / d}')"
+        -v d="$(awk -v t0="$t0" -v t1="$(date +%s.%N)" 'BEGIN {print t1 - t0}')" \
+        'BEGIN {printf "%.1f", (a - a0 + b - b0) * 8 / 1e6 / d}')"
+    excess_mbit="$(awk -v w="$wifi_mbit" -v b="$WIFI_BASELINE_MBIT" 'BEGIN {e = w - b; printf "%.1f", e < 0 ? 0 : e}')"
     kill %1 2> /dev/null
     wait 2> /dev/null
     if [ "$receiver" = intel ]; then
@@ -284,13 +412,19 @@ print(r["received"], r["rate_hz"], r["max_gap_s"], r["udp_drops"])' 2> /dev/null
     else
         pass "$label: no UDP receive-buffer drops on the $receiver probe's sockets"
     fi
-    if awk "BEGIN {exit !($wifi_mbit > $WIFI_LIMIT_MBIT)}"; then
-        fail "$label: ${wifi_mbit} Mbit/s on Wi-Fi; DDS is duplicating over the lab network"
+    if awk "BEGIN {exit !($excess_mbit > $WIFI_LIMIT_MBIT)}"; then
+        fail "$label: ${wifi_mbit} Mbit/s on Wi-Fi, ${excess_mbit} above the ${WIFI_BASELINE_MBIT} baseline; DDS is duplicating over the lab network"
     else
-        pass "$label: ${wifi_mbit} Mbit/s on Wi-Fi (background only)"
+        pass "$label: ${wifi_mbit} Mbit/s on Wi-Fi, ${excess_mbit} above the ${WIFI_BASELINE_MBIT} baseline (background only)"
     fi
 }
 
+wifi_intel0="$(eval "$WIFI_BYTES")"
+wifi_thor0="$(thor "$WIFI_BYTES")"
+sleep "$DURATION"
+WIFI_BASELINE_MBIT="$(awk -v a="$(eval "$WIFI_BYTES")" -v a0="$wifi_intel0" -v b="$(thor "$WIFI_BYTES")" -v b0="$wifi_thor0" \
+    -v d="$DURATION" 'BEGIN {printf "%.1f", (a - a0 + b - b0) * 8 / 1e6 / d}')"
+info "Wi-Fi baseline before the probes: ${WIFI_BASELINE_MBIT} Mbit/s (both hosts, rx+tx)"
 run_direction "Intel -> Thor" thor
 run_direction "Thor -> Intel" intel
 finish

@@ -20,8 +20,15 @@ def _measurement_parameters(wiring: dict, tuning: dict) -> list:
     return [{**wiring, **{key: value for key, value in tuning.items() if value is not None}}]
 
 
+# A deployed worker that dies is restarted after this delay; health reports the
+# new worker epoch and exploration pauses until it resumes. Benchmarks leave
+# respawn off so a crash fails the run instead of being hidden.
+RESPAWN_DELAY_S = 5.0
+
+
 def pointcloud_measurement_node(
     *,
+    respawn=False,
     namespace,
     use_sim_time,
     enabled_estimators,
@@ -41,6 +48,8 @@ def pointcloud_measurement_node(
     return Node(
         package='ridgeback_localization',
         executable='target_pointcloud_measurement_node',
+        respawn=respawn,
+        respawn_delay=RESPAWN_DELAY_S if respawn else 0.0,
         additional_env=compute_environment(),
         name='target_pointcloud_measurement',
         namespace=namespace,
@@ -64,6 +73,7 @@ def pointcloud_measurement_node(
 
 def mask_measurement_node(
     *,
+    respawn=False,
     namespace,
     use_sim_time,
     enabled_estimators,
@@ -106,6 +116,8 @@ def mask_measurement_node(
     return Node(
         package='ridgeback_localization',
         executable='target_mask_measurement_node',
+        respawn=respawn,
+        respawn_delay=RESPAWN_DELAY_S if respawn else 0.0,
         additional_env=compute_environment(),
         name='target_mask_measurement',
         namespace=namespace,
@@ -221,6 +233,7 @@ def overlay_node(
     depth_source=None,
     mask_gate=None,
     rgb_panel_labels=None,
+    aligned_depth_topic=ALIGNED_DEPTH_DEBUG_TOPIC,
     condition=None,
 ):
     """The camera overlay, one panel per selected path, packed into one row.
@@ -228,6 +241,10 @@ def overlay_node(
     ``max_cols`` is fixed rather than optional: both entrypoints dock this as a
     wide, short strip, and the node's own 3-column default wraps a four-panel
     run onto a second row and halves the height every panel gets.
+
+    ``aligned_depth_topic`` defaults to the mask node's republish of the frame
+    it measured. A consumer without a local mask node passes its own camera's
+    aligned depth instead, so no depth image has to cross from the compute host.
     """
 
     from launch_ros.actions import Node
@@ -243,7 +260,7 @@ def overlay_node(
                 'estimators': estimators,
                 'measurement_topic': POINTCLOUD_MEASUREMENTS_TOPIC,
                 'mask_measurement_topic': MASK_MEASUREMENTS_TOPIC,
-                'aligned_depth_topic': ALIGNED_DEPTH_DEBUG_TOPIC,
+                'aligned_depth_topic': aligned_depth_topic,
                 'color_topic': color_topic,
                 'max_cols': OVERLAY_SINGLE_ROW,
             },

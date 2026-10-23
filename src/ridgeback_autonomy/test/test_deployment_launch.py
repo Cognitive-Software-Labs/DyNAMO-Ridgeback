@@ -1,6 +1,7 @@
 import importlib.util
 from pathlib import Path
 import pytest
+import yaml
 from launch import LaunchContext
 from launch.actions import DeclareLaunchArgument
 from launch_ros.actions import Node
@@ -104,6 +105,18 @@ def test_standalone_default_is_headless_and_requires_explicit_frame():
     with pytest.raises(ValueError, match='observed'): module.build_nodes(context)
 
 
+def test_standalone_detection_threshold_defaults_to_the_detector_and_is_bounded():
+    from ridgeback_localization.core.detection import DETECTION_THRESHOLD
+    module=load('src/ridgeback_localization/launch/localization.launch.py')
+    context=context_for(module,dict(base_frame='observed_base'))
+    assert context.launch_configurations['detection_threshold']==str(DETECTION_THRESHOLD)
+    context.launch_configurations['detection_threshold']='0.4'
+    module.build_nodes(context)
+    for invalid in ('0','1.5'):
+        context.launch_configurations['detection_threshold']=invalid
+        with pytest.raises(ValueError, match='detection_threshold'): module.build_nodes(context)
+
+
 def test_stationary_intel_observer_starts_only_consumers(monkeypatch):
     monkeypatch.setenv('RIDGEBACK_PERCEPTION_VENV','/nonexistent')
     module=load('src/ridgeback_autonomy/launch/localization_observer.launch.py')
@@ -134,3 +147,128 @@ def test_sweep_labels_are_shared_with_detector_and_recorded_config():
     with pytest.raises(ValueError):
         parse_sweep({'sweep':{'name':'labels'},'configs':[{'name':'projective',
             'estimators':'projective_ranging','target_labels':'person'}]},source='/tmp/labels.yaml')
+
+
+def gate_cmd(gate, context):
+    return [perform_substitutions(context, part) for part in gate.cmd]
+
+
+@pytest.mark.parametrize('backend, namespace', [('gz', 'r100_0001'), ('hardware', 'r100_0160')])
+def test_local_localization_waits_for_the_shared_camera_contract(monkeypatch, backend, namespace):
+    from launch.actions import ExecuteProcess, LogInfo, RegisterEventHandler
+    module = load('src/ridgeback_autonomy/launch/ridgeback_exploration.launch.py')
+    stack = [LogInfo(msg='localization stack')]
+    monkeypatch.setattr(module, 'build_target_localization_nodes', lambda context: stack)
+    context = context_for(module, dict(backend=backend, namespace=namespace, base_frame='base_link'))
+
+    gate, handler = module.build_gated_target_localization(context)
+
+    assert isinstance(gate, ExecuteProcess) and isinstance(handler, RegisterEventHandler)
+    cmd = gate_cmd(gate, context)
+    topics = [cmd[i + 1] for i, part in enumerate(cmd) if part == '--topic']
+    # Both backends gate on the same names: the hardware service publishes them.
+    assert topics == [f'/{namespace}/sensors/camera_0/color/image',
+                      f'/{namespace}/sensors/camera_0/color/camera_info',
+                      f'/{namespace}/sensors/camera_0/depth/image']
+    assert '--tf' not in cmd
+    # Private in launch: the actions an OnProcessExit fires.
+    assert handler.event_handler._OnActionEventBase__actions_on_event == stack
+
+
+def test_external_localization_is_not_gated_on_a_local_camera(monkeypatch):
+    monkeypatch.setenv('RIDGEBACK_PERCEPTION_VENV', '/nonexistent')
+    module = load('src/ridgeback_autonomy/launch/ridgeback_exploration.launch.py')
+    context = context_for(module, dict(backend='hardware', namespace='r100_0160',
+                                       localization_mode='external', base_frame='base_link'))
+
+    names = executables(module.build_gated_target_localization(context), context)
+
+    assert 'localization_status' in names
+
+
+def overlay_parameters(nodes, context):
+    overlay=[n for n in nodes if isinstance(n,Node) and executables([n],context)==['target_overlay_node']]
+    assert len(overlay)==1
+    # launch_ros normalizes values to YAML-encoded substitutions.
+    resolve=lambda value: yaml.safe_load(perform_substitutions(context,value)) if isinstance(value,tuple) else value
+    return {resolve(k):resolve(v) for d in overlay[0]._Node__parameters for k,v in d.items()}
+
+
+def test_external_overlay_reads_local_depth_and_local_overlay_keeps_the_republish(monkeypatch):
+    from ridgeback_localization.contracts import ALIGNED_DEPTH_DEBUG_TOPIC
+    monkeypatch.setenv('RIDGEBACK_PERCEPTION_VENV','/nonexistent')
+    module=load('src/ridgeback_autonomy/launch/ridgeback_exploration.launch.py')
+    context=context_for(module,dict(backend='hardware',localization_mode='external',base_frame='observed_base'))
+    assert overlay_parameters(module.build_target_localization_nodes(context),context)['aligned_depth_topic']=='sensors/camera_0/depth/image'
+    monkeypatch.delenv('RIDGEBACK_PERCEPTION_VENV')
+    context=context_for(module,dict(backend='gz',localization_mode='local'))
+    assert overlay_parameters(module.build_target_localization_nodes(context),context)['aligned_depth_topic']==ALIGNED_DEPTH_DEBUG_TOPIC
+
+
+def test_stationary_observer_overlay_reads_local_depth(monkeypatch):
+    monkeypatch.setenv('RIDGEBACK_PERCEPTION_VENV','/nonexistent')
+    module=load('src/ridgeback_autonomy/launch/localization_observer.launch.py')
+    context=context_for(module,dict(base_frame='observed_base'))
+    assert overlay_parameters(module.build_nodes(context),context)['aligned_depth_topic']=='sensors/camera_0/depth/image'
+
+
+def rviz_layout_argument(module, overrides, tmp_path, monkeypatch):
+    from launch.actions import OpaqueFunction
+    monkeypatch.setattr('tempfile.tempdir', str(tmp_path))
+    context = context_for(module, overrides)
+    for entity in module.generate_launch_description().entities:
+        if isinstance(entity, OpaqueFunction):
+            nodes = entity.execute(context) or []
+            rviz = [n for n in nodes if isinstance(n, Node) and executables([n], context) == ['rviz2']]
+            if rviz:
+                args = [perform_substitutions(context, a) if isinstance(a, list) else a
+                        for a in rviz[0]._Node__arguments]
+                return args[args.index('-d') + 1]
+    raise AssertionError('no rviz2 node')
+
+
+def test_hardware_rviz_has_no_goal_tool_and_simulation_keeps_it(tmp_path, monkeypatch):
+    module = load('src/ridgeback_autonomy/launch/ridgeback_exploration.launch.py')
+    hardware = rviz_layout_argument(module, dict(backend='hardware', base_frame='base_link'), tmp_path, monkeypatch)
+    simulation = rviz_layout_argument(module, dict(backend='gz'), tmp_path, monkeypatch)
+    assert 'rviz_default_plugins/SetGoal' not in Path(hardware).read_text()
+    assert simulation.endswith('exploration.rviz')
+    assert 'rviz_default_plugins/SetGoal' in Path(simulation).read_text()
+
+
+def test_hardware_rviz_process_is_niced_and_thread_limited(tmp_path, monkeypatch):
+    from launch.actions import OpaqueFunction
+    monkeypatch.setattr('tempfile.tempdir', str(tmp_path))
+    module = load('src/ridgeback_autonomy/launch/ridgeback_exploration.launch.py')
+
+    def rviz_process(overrides):
+        context = context_for(module, overrides)
+        for entity in module.generate_launch_description().entities:
+            if isinstance(entity, OpaqueFunction):
+                for n in entity.execute(context) or []:
+                    if isinstance(n, Node) and executables([n], context) == ['rviz2']:
+                        d = n.process_description
+                        prefix = d._Executable__prefix
+                        prefix = perform_substitutions(context, prefix) if prefix else ''
+                        env = {perform_substitutions(context, k): perform_substitutions(context, v)
+                               for k, v in (d._Executable__additional_env or [])}
+                        return prefix, env
+        raise AssertionError('no rviz2 node')
+
+    prefix, env = rviz_process(dict(backend='hardware', base_frame='base_link'))
+    assert prefix.startswith('nice -n 19') and env == {'LP_NUM_THREADS': '2'}
+    assert rviz_process(dict(backend='gz')) == ('', {})
+
+
+def test_deployed_workers_respawn_but_benchmark_workers_do_not():
+    from ridgeback_localization.launch_helpers import RESPAWN_DELAY_S, mask_measurement_node
+    module=load('src/ridgeback_localization/launch/localization.launch.py')
+    context=context_for(module,dict(base_frame='observed_base'))
+    nodes=[n for n in module.build_nodes(context) if isinstance(n,Node)]
+    respawn={executables([n],context)[0]: (n._ExecuteLocal__respawn, n._ExecuteLocal__respawn_delay) for n in nodes}
+    assert respawn['target_detector_node']==(True, RESPAWN_DELAY_S)
+    assert respawn['target_mask_measurement_node']==(True, RESPAWN_DELAY_S)
+    # The shared helper defaults to no respawn, which the benchmarks rely on.
+    helper=mask_measurement_node(namespace='ns', use_sim_time=False, enabled_estimators='projective_ranging',
+                                 base_frame='base_link')
+    assert helper._ExecuteLocal__respawn is False

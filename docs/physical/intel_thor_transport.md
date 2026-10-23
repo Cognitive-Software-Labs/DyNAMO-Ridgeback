@@ -50,8 +50,14 @@ qualification still requires repeated captures, aligned-stream testing, and the
 [backlog's longer soak](../BACKLOG.md#hokuyo-driver-recovery-after-read-timeouts).
 The timeout/reconnect cause remains unverified; no captured Hokuyo timeout in
 these tests established the historical recovery bug's mechanism.
-The existing `check_link` pass does not exercise this failure: it uses
-Ethernet-only profiles, a separate domain, and one reader per probe topic.
+The synthetic `check_link` traffic test does not exercise this failure: it
+uses Ethernet-only profiles, a separate domain, and one reader per probe topic.
+`check_link --camera-reader` adds the local-reader case on the robot graph under
+the installed services configuration: one guarded `camera_contract_check` reader
+for 20 s after a 10 s quiet baseline, failing on a contract failure, a wired TX
+rise above 5 Mbit/s or a new LiDAR grab/reconnect error. It passed on
+2026-10-21 (29.95 Hz, +0.64 Mbit/s on `eno1`, no LiDAR errors); it is one short
+reader, not the multi-hour soak.
 
 The [guarded local DDS comparison](intel_dds_testing.md) provides an explicit
 current-versus-candidate test on the Intel robot graph. It keeps the scan-merger
@@ -65,8 +71,89 @@ pass does not clear broader hardware qualification gates.
 
 | Host | Robot Ethernet | Also attached to |
 |---|---|---|
-| Intel (`cpr-r100-0160`) | `br0` 192.168.131.1; Thor is learned on bridge port `eno1` (1 Gb/s), the same port as both Hokuyo LiDARs | Lab Wi-Fi `wlp3s0` 192.168.123.0/24 (DHCP), Tailscale |
-| Thor (`nvidia-thor-r100-0160`) | `enP2p1s0` 192.168.131.51 (1 Gb/s, static) | Lab Wi-Fi 192.168.123.0/24 (default route) |
+| Intel (`cpr-r100-0160`) | `br0` 192.168.131.1, bridging `eno1` (1 Gb/s, to the switch with Thor and both Hokuyo LiDARs) and `enp2s0` (100 Mb/s, to the MCU at 192.168.131.2) | Lab Wi-Fi `wlp3s0` 192.168.123.14 (static), Tailscale; `br0` also carries 192.168.123.8/32 |
+| Thor (`nvidia-thor-r100-0160`) | `enP2p1s0` 192.168.131.51 (1 Gb/s, static), plus a route for 192.168.123.14 via 192.168.131.1 (`thor_lan_route`) | Lab Wi-Fi `wlP1p1s0` 192.168.123.152 (default route, internet only) |
+
+The lab access point (`ASUS_20`) does not pass traffic between its clients:
+Intel and Thor cannot reach each other over Wi-Fi (checked 2026-10-12).
+
+```mermaid
+flowchart LR
+    subgraph DEV["Devices"]
+        D455["RealSense D455"]
+        LIDAR["Hokuyo UST x2<br/>.21 front, .22 rear"]
+        MCU["Ridgeback MCU<br/>192.168.131.2"]
+    end
+    subgraph INTEL["Intel PC: br0 192.168.131.1, wlp3s0 192.168.123.14"]
+        CAM["dynamo-camera<br/>realsense2_camera_node"]
+        SENS["clearpath-sensors, clearpath-scan-merger<br/>urg_node x2, ros2_laser_scan_merger"]
+        ROBOT["clearpath-robot<br/>robot_state_publisher"]
+        PLAT["clearpath-platform<br/>proton_ros2, puma_control"]
+        PTPI["dynamo-ptp4l, dynamo-phc2sys<br/>PTP server on eno1"]
+        OBS["observer and recorder<br/>dds_env.sh intel"]
+        FOX["foxglove_bridge"]
+    end
+    BUS{{"CycloneDDS domain 0, namespace r100_0160<br/>1 Gb/s robot Ethernet"}}
+    subgraph THOR["Jetson Thor: enP2p1s0 192.168.131.51, wlP1p1s0 192.168.123.152"]
+        DET["target_detector_node<br/>OWLv2 on CUDA"]
+        MASK["target_mask_measurement<br/>projective, euclidean"]
+        HEALTH["localization_health"]
+        PTPT["dynamo-ptp4l, dynamo-phc2sys<br/>PTP client on enP2p1s0"]
+    end
+    WIFI[("Lab Wi-Fi ASUS_20<br/>client isolation")]
+    LAPTOP["Laptop<br/>Foxglove, RViz"]
+    NET["Internet"]
+    D455 -- "USB 3.2" --> CAM
+    LIDAR -- "TCP via switch" --> SENS
+    MCU <-- "UDP; CAN as vcan0" --> PLAT
+    CAM -- "color, depth, camera_info, 30 Hz" --> BUS
+    SENS -- "scans, 40 Hz" --> BUS
+    ROBOT -- "tf_static, robot_description" --> BUS
+    PLAT -- "tf, odom" --> BUS
+    BUS --> DET
+    BUS --> MASK
+    BUS --> HEALTH
+    DET -- "detections" --> BUS
+    MASK -- "measurements" --> BUS
+    HEALTH -- "health" --> BUS
+    BUS -- "results, health" --> OBS
+    BUS -- "any topic" --> FOX
+    PTPI -. "PTP, raw Ethernet frames" .-> PTPT
+    FOX -. "websocket" .-> WIFI
+    PTPT ~~~ WIFI
+    THOR -. "internet only" .-> WIFI
+    WIFI -.- LAPTOP
+    WIFI -.- NET
+```
+
+*Hosts, robot services and ROS nodes, and what crosses each link. Solid edges
+are wired; dotted edges use Wi-Fi or, for PTP, raw Ethernet outside DDS.*
+
+CycloneDDS sends each subscribing **process** its own unicast copy, so the image
+load is set by how many Thor processes take each image: the detector takes
+colour and the mask node takes depth. Until 2026-10-16 `localization_health`
+also subscribed to both images just to read their stamps. 2026-10-13 packet
+captures showed the camera socket sending to three Thor participants (unicast
+ports 7411, 7413 and 7415, carrying colour + depth, colour, and depth), about
+754 Mbit/s in total. Health now watches each stream's `camera_info` instead,
+which carries the same stamps. Measured on 2026-10-16 under the same Thor launch:
+763 Mbit/s Intel→Thor before, 382.6 Mbit/s steady after (Thor receiving 377),
+with a header capture showing one copy each of colour (226 Mbit/s) and depth
+(151 Mbit/s). Readings near 860 Mbit/s taken between those two were made while
+the camera was temporarily at 1280×720 for a separate HD check, so they are not
+VGA evidence. Adding an image subscriber in another Thor process adds another
+full copy.
+
+| Link | Carries | Contract |
+|---|---|---|
+| D455 → Intel, USB 3.2 | Colour and depth frames | 640×480 at 30 Hz |
+| MCU ↔ Intel, `enp2s0` | Power, e-stop, IMU, lights and fans over UDP; the wheel drivers' CAN bus, bridged to Intel as `vcan0` | Clearpath platform services |
+| Hokuyo LiDARs → Intel, `eno1` via the switch | Scans | About 40 Hz each; Intel publishes the merged `sensors/scan` |
+| Intel → Thor, DDS | `sensors/camera_0/color/image` (`rgb8`, 921,600 B) and `depth/image` (`16UC1`, 614,400 B) at 30 Hz, about 369 Mbit/s together, best effort; `camera_info`; scans; `tf`; `tf_static` and `robot_description` (reliable, transient local) | [Configuration contract](#configuration-contract); timing in the [sensor timing reference](intel_thor_sensor_latency.md) |
+| Thor → Intel, DDS | `detections/target/raw`, `measurements/target/mask`, `localization/health` and the worker states; DDS acknowledgements and discovery replies | [Distributed localization contract](../target_localization/distributed_deployment.md#topics-types-and-acquisition-semantics) |
+| Intel → Thor, PTP | Intel's wall clock as IEEE 1588 L2 frames, outside DDS | [Robot-local deployment](robot_local_deployment.md#clock-synchronization-and-camera-transport-candidates) |
+| Intel ↔ Wi-Fi | Internet; `foxglove_bridge` for laptops; the robot services also advertise 192.168.123.14 to DDS | Laptops need client isolation off on the access point |
+| Thor ↔ Wi-Fi | Internet only (git, pip, model downloads) | Thor's DDS is bound to Ethernet; replies to 192.168.123.14 use the cable |
 
 ## Middleware
 
@@ -108,10 +195,17 @@ The deployment files are in
 | `cyclonedds_intel_services.xml` | Intel robot services, installed as `/etc/clearpath/cyclonedds.xml` | `br0` and `wlp3s0` by name |
 | `dds_env.sh` | Sourced by operators and launches on either host. It selects `rmw_cyclonedds_cpp` and the host's Ethernet-only configuration (the role comes from the Ethernet address present, or `intel`/`thor` explicitly), and leaves `ROS_DOMAIN_ID` to the deployment. | — |
 | `60-dynamo-dds-buffers.conf` | `/etc/sysctl.d/` on both hosts | Raises only `net.core.rmem_max` to 16 MiB |
+| `90-dynamo-multicast-querier.conf` | Intel, `/etc/systemd/network/10-netplan-br0.netdev.d/` | Makes `br0` the IGMP querier of the robot Ethernet |
 | `fastdds_thor.xml`, `fastdds_intel.xml` | `rmw_benchmark` comparisons only | Ethernet address only |
 
 Rules:
 
+- **Intel's `br0` is the robot segment's IGMP querier.** DDS discovery uses
+  multicast (239.255.0.1). With no querier on the segment, IGMP snooping stops
+  delivering a restarted host's discovery multicast to the other host until
+  the membership entry ages out. Intel then cannot discover restarted Thor
+  processes, and receives no health or measurements, for about 5–6 minutes.
+  netplan cannot set the querier; the systemd-networkd drop-in does, at boot.
 - **Thor is Ethernet-only.** Every Thor reader therefore advertises only
   192.168.131.51, so Intel sends Thor's inputs over `br0` even from the
   robot services, which are also on Wi-Fi.
@@ -226,11 +320,12 @@ It does not qualify the installed services configuration or clear the
 |---|---|---|
 | Routing and link | Intel lacks 192.168.131.1, the route to Thor uses Wi-Fi, either Thor-facing port is below 1000 Mb/s full duplex, or ping loses packets | — |
 | Buffers, each host | `rmem_max` is below 16 MiB | The limit is not persisted in `/etc/sysctl.d` |
-| Intel services | — | `/etc/clearpath/setup.bash` does not select CycloneDDS, or a running robot service is still on Fast DDS |
-| Thor host | SSH fails, or `rmw_cyclonedds_cpp` is missing | Thor's checkout is missing or at a different revision |
+| Intel services | `br0` is not the IGMP querier | `/etc/clearpath/setup.bash` does not select CycloneDDS, a running robot service other than the scan merger (the documented exception) is still on Fast DDS, or the querier drop-in is not installed |
+| Thor host | SSH fails, or `rmw_cyclonedds_cpp` is missing | Thor's checkout of the same directory name (or `--thor-repo`) is missing or at a different revision |
 | Configurations | A file does not parse, or its interfaces differ from the table above | — |
 | Clock | Offset exceeds 10 ms | Offset exceeds 2 ms, or a host reports NTP unsynchronized |
-| Traffic, each direction | The probe receives nothing or under 90% of 30 Hz, or Wi-Fi carries more than 20 Mbit/s during the stream | The largest frame gap exceeds 100 ms, or the probe's own sockets drop packets |
+| Performance policy, each host | A CPU policy is not at the performance governor, Intel's energy preference is not performance, Thor is not in 120W, or the boot unit is not enabled (from `host_performance status`) | — |
+| Traffic, each direction | The probe receives nothing or under 90% of 30 Hz, or Wi-Fi carries more than 20 Mbit/s above the background measured just before the probes | The largest frame gap exceeds 100 ms, or the probe's own sockets drop packets |
 
 The clock check measures the offset over one SSH channel and bounds its error
 by half the smallest round trip. The traffic test uses
@@ -252,6 +347,17 @@ colour/depth pairing, round-trip time and CPU. It writes its results under
 
 ## Known limits
 
+- Intel's robot services advertise Intel's Wi-Fi address to Thor. Thor reaches
+  it only through `tools/intel_thor/thor_lan_route`, which routes it over the
+  robot Ethernet; the lab access point does not pass traffic between Wi-Fi
+  clients. See [troubleshooting](../troubleshooting.md#thor-receives-sensor-streams-but-no-static-tf).
+- Thor is powered from the Ridgeback's USER POWER panel (three ports, each
+  behind a 5 A fuse with a green indicator, beside a 20 A fuse). On 2026-10-09
+  Thor stopped responding during a heavy GPU load in MAXN, and afterwards all
+  three ports read 0 V at the pins with their indicators still green. Thor's
+  logs kept nothing from that day, so the cause is unconfirmed. Thor therefore
+  runs in 120W, not MAXN, until the panel's supply capacity is known; Thor's
+  dev kit can draw more than a 5 A port supplies at the lower port voltages.
 - The raw 1280×720 colour + depth stream is about 1.1 Gbit/s, which does not
   fit the 1 Gb/s link on either middleware. Senders fall behind, and frames
   arrive more than a second old.
@@ -259,10 +365,14 @@ colour/depth pairing, round-trip time and CPU. It writes its results under
   server each drop UDP packets continuously (about 100 per second combined,
   recorded under Fast DDS). They are outside this repository and do not affect
   Thor, but they make Intel's host-wide drop counter useless as a link metric.
-- Both hosts take time from internet NTP over the lab Wi-Fi. The check measured
-  Thor between 0.75 ms and 4.2 ms ahead of Intel during one day. Hardening
-  time sync (Intel serving the robot subnet) is open work in the deployment
-  plan.
+- Raw 640×480 colour (921,600 B) and aligned depth (614,400 B) at 30 Hz need
+  369 Mbit/s, 37% of the link. One frame pair takes about 12.3 ms on the wire,
+  so no DDS setting brings raw VGA below that; only fewer bytes or no network
+  hop can.
+- The RealSense driver publishes aligned depth before colour. With a Thor
+  reader, depth's send occupies the link for about its wire time (~4.6 ms
+  measured) before colour is published, so colour carries that delay. Only a
+  patched driver changes the order; the deployment plan holds the decision.
 - Repeated subscriber-associated camera failures and Hokuyo lockouts are
   documented in the [camera subscriber blocker](#camera-subscriber-blocker).
   The Ethernet traffic was measured; the multicast explanation and the cause
@@ -275,8 +385,31 @@ colour/depth pairing, round-trip time and CPU. It writes its results under
   do not prove camera-driver health, the real driver's timing, or the rate of
   the real perception pipeline.
 
+## Sensor timing and time synchronization
+
+PTP carries Intel's wall clock to Thor, whose chrony is disabled; Intel keeps
+chrony for UTC with a 500 ppm slew limit. The
+[robot-local deployment reference](robot_local_deployment.md#clock-synchronization-and-camera-transport-candidates)
+owns the installers and rollback, and the
+[sensor timing reference](intel_thor_sensor_latency.md) owns clock bounds,
+latency components and the qualification collector.
+
+The selected camera transport is raw colour and aligned depth at 640×480 and
+30 Hz under the services DDS contract above, with both hosts at the
+performance governor and Thor in its 120W power mode (`tools/intel_thor/host_performance`).
+The latency figures were measured with Thor in MAXN; Thor's own share of each
+stream's delay (delivery to the callback) was under about 1 ms.
+It meets the working targets with margin: network + DDS p95 ≤ 20 ms, stamp to
+Thor callback p95 ≤ 40 ms, loss ≤ 1%, exact pairing ≥ 99%, LiDAR continuity
+unchanged. Larger send buffers, larger DDS messages, a lower rate and
+compression were measured or considered and rejected; see
+[Intel–Thor camera transport candidates](../do_not_try_again/intel_thor_camera_transport.md).
+Lossy colour would additionally need the detector compared on raw and decoded
+frames.
+
 ## Archived evidence
 
 - [Intel local DDS screening, timing and retained configuration](../../archive/engineering/2026-10-05-intel-dds-screening.md)
 - [Intel–Thor DDS transport diagnosis](../../archive/engineering/2026-09-18-intel-thor-dds-transport.md)
 - [Intel–Thor middleware benchmark](../../archive/engineering/2026-09-18-intel-thor-rmw-benchmark.md)
+- [r100_0160 Intel–Thor camera transport candidates](../../archive/engineering/2026-10-06-r100-0160-thor-transport-candidates.md)

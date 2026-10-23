@@ -170,6 +170,19 @@ reporting. Resolve any mismatch at the narrowest owning layer; then perform stat
 lifted/blocked-wheel where approved, low-speed clear-space, stop, timeout, and
 e-stop tests before enabling `autonomous_motion_enabled:=true`.
 
+**Progress.** On 2026-10-13 the Nav2 portion was observed on the live graph for
+the first time, stationary and with no goal sent. Every hop from Nav2 to the
+controller carries `TwistStamped`, and every publisher/subscriber pair delivers.
+It also found that `controller_server` subscribed `odom`, which has no publisher
+on the robot. The platform publishes `platform/odom` and
+`platform/odom/filtered`, so the controller received no velocity feedback
+(record under [Archived evidence](#archived-evidence)).
+`nav2_params.yaml` now sets the controller's `odom_topic` to
+`platform/odom/filtered`, the topic `bt_navigator` and the velocity smoother
+already use in every backend. Earlier simulator benchmarks ran the controller
+without that feedback, so rerun any benchmark before comparing it with results
+from after this change.
+
 **Context.** [Exploration architecture](exploration/architecture.md#hardware-safety-boundary)
 and the public hardware workflow in the [README](../README.md). The
 [stationary measurement plan](plans/PHYSICAL_robot_measurements_and_validation.md#both-lidars-and-stationary-auxiliary-sensors)
@@ -279,8 +292,26 @@ Close only after both required profiles and the core checks pass, or after an
 explicit deployment-scope decision revises the required profile set. Pointcloud,
 camera–LiDAR calibration, calibrated accuracy, and motion validation are separate.
 
-**Context.** [Camera stack](target_localization/camera_stack.md) and
-[aligned depth](target_localization/aligned_depth.md).
+**Progress.** `dynamo-camera.service` owns the D455 on `r100_0160` from boot
+and publishes the simulators' topic names, frames and TF. It passes
+`tools/camera_contract_check` at 640x480@30 and 1280x720@30, after a cold boot,
+and after a rollback and reinstall: device identity, effective profiles,
+encodings, exact colour/depth stamps and the camera-to-base TF chain are
+established. A first stationary projective/Euclidean smoke ran on Thor on
+2026-10-12 at 640x480@30: both estimators measured a person within 4–10% of
+taped distances at three marks (`person` at threshold 0.22), and a redo with
+`full body person` at 0.26 passed the empty scene and a 600 s scan guard
+(record under [Archived evidence](#archived-evidence)).
+Person scores stay near 0.3 in that room, so the setting has little margin.
+The live factory calibration was compared with the nominal simulation model on
+2026-10-13: the model was kept, and the pipeline ignoring distortion was
+recorded (record under [Archived evidence](#archived-evidence)).
+That record's HD values come from the earlier vendor service. Remaining: an
+off-centre check against a taped mark, and the 1280x720 smoke.
+
+**Context.** [Camera stack](target_localization/camera_stack.md),
+[aligned depth](target_localization/aligned_depth.md), and
+[robot-local deployment](physical/robot_local_deployment.md#camera-service).
 
 ## Optional physical organized-pointcloud qualification
 
@@ -334,12 +365,11 @@ not fully measured. Focused stationary/turn checks passed in both simulators;
 broader sensor/contact qualification and affected benchmark reruns remain required.
 The implemented shared definition alone does not close this item.
 
-**Completion criteria.** Establish the measured attachment geometry in one
-shared description or asset source consumed by Gazebo and Isaac. Remove the
-independent Isaac authoring after equivalence checks. Preserve the configured
-camera pose; compare rendered and collision geometry, TF, and sensor
-self-occlusion in both simulators, including motion. Record physical dimensions
-and measurement uncertainty. Rerun affected benchmarks before quoting results.
+**Completion criteria.** Record the remaining physical attachment dimensions
+and measurement uncertainty. Qualify rendered/collision geometry, TF, sensor
+self-occlusion and relevant contact behavior in both simulators, including
+motion; correct any discrepancy in the shared source. Rerun the benchmarks
+affected by the geometry change before quoting new results.
 
 **Context.** [Shared robot geometry](robot/geometry.md#known-representation-differences)
 and [Isaac additions](isaac/robot-model.md#hand-authored-parts). The
@@ -394,6 +424,11 @@ Resolve each one here or move it to the item that owns it.
   the offsets still needed live calibration. We changed it to the symmetric −0.3922
   ([deployed hardware mounts](robot/geometry.md#deployed-hardware-mounts)). Confirm that their
   tooling will not restore the old value.
+- **Slow platform stop.** Five of six `clearpath-robot` restarts on 2026-10-06
+  took 60 s to stop `clearpath-platform`; one took 7 s and the stop during a
+  reboot took 10 s. A `proton_ros2_node` segmentation fault in `librcl.so` was
+  logged once during a stop. Which process ignores the stop request, and is the
+  fault known? Every Clearpath restart costs that minute of motor power.
 - **Camera web readiness.** Earlier boot waits failed despite subsequently
   healthy camera topics. The direct discovery replacement and its deployment
   verification belong to [desktop startup recovery](#remote-desktop-startup-recovery).
@@ -410,4 +445,9 @@ Resolve each one here or move it to the item that owns it.
 - [removed D435 transform](../archive/engineering/operational_incidents.md#d435-static-camera-transform--removed-2026-08-31)
 - [Hokuyo reconnect lockout](../archive/engineering/operational_incidents.md#hokuyo-reconnect-lockout--2026-09-18)
 - [r100_0160 field readings and LiDAR box checks](../archive/engineering/2026-09-18-r100-0160-field-measurements.md)
+- [r100_0160 D455 camera service qualification](../archive/engineering/2026-10-06-r100-0160-camera-service.md)
+- [r100_0160 first Thor localization smoke](../archive/engineering/2026-10-12-r100-0160-thor-localization-smoke.md)
+- [r100_0160 Nav2 command chain, stationary](../archive/engineering/2026-10-13-r100-0160-nav2-command-chain.md)
+- [r100_0160 D455 calibration vs the nominal model](../archive/engineering/2026-10-13-r100-0160-d455-calibration-vs-nominal.md)
+- [urg_node reconnect leak and recovery](../archive/engineering/2026-10-13-urg-node-reconnect-leak.md)
 - [r100_0160 rear LiDAR side-target recheck](../archive/engineering/2026-09-24-r100-0160-rear-lidar-recheck.md)

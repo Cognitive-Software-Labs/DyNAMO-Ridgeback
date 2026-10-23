@@ -51,28 +51,17 @@ its pose from the other, producing a misleading `Target pose ... not present`
 failure. Clean once and restart the sweep. A valid `run.json` lets the supervisor
 resume completed configurations.
 
-## `cleanup.sh` kills the configurator and any run it started
+### What `cleanup.sh` leaves alone
 
-The catch-all at the end of `cleanup.sh` is a `pgrep -f` substring match on
-`lib/ridgeback_autonomy/`, and `kill_matches` is `kill -9` excluding only `$$`
-and `$PPID`. Every node is installed there, but so are at least eight
-executables that are not nodes: the configurator, both sweep orchestrators, the
-four replay CLIs, and `launch_wait`. `target_benchmark_sweep` survives only
-because it happens to be cleanup's `$PPID`.
-
-- An open `target_benchmark_configurator` dies whenever anyone runs
-  `cleanup.sh`, including the automatic run inside `start_exploration.sh`.
-- A `target_replay_benchmark` started from that page dies the same way and
-  leaves a `.<name>.partial-<pid>-<uuid>` staging directory, which is safe to
-  delete; the run published nothing.
-
-Check with `pgrep -u "$USER" -af "lib/ridgeback_autonomy/"` before running
-cleanup. This is also why the configurator cannot start a `live-system` sweep:
-`target_benchmark_sweep` runs `run_preflight_cleanup` before Gazebo starts, so a
-sweep launched from the page would `kill -9` the page mid-click. Do not work
-around it with `--skip-preflight-cleanup`; that produces the two-`gz sim`
-failure above. Start live sweeps from a terminal until the catch-all is narrowed
-to actual nodes.
+Every kill pass and the final leftover check share one ownership filter. It
+skips cleanup's own ancestors (so a configurator-started sweep cannot kill the
+configurator), the Gazebo GUI, `target_benchmark_configurator` and the offline
+replay CLIs, and any process whose `AMENT_PREFIX_PATH` names another colcon
+workspace, such as another worktree or the robot's vendor overlays. Node names
+match whole path components, so `less notes/explore.md` is not a target.
+`CLEANUP_DRY_RUN=1 bash cleanup.sh` lists what a real run would kill. A real run
+refuses while `clearpath-platform.service` is active, because the robot's
+Clearpath services run as the same user.
 
 ## Editing a CLI module changes nothing until you rebuild
 
@@ -227,6 +216,88 @@ from `/etc/clearpath/setup.bash`. The sender then also uses the lab Wi-Fi.
 `tools/intel_thor/intel_services_rmw status` that Intel's services run
 CycloneDDS, and run `tools/intel_thor/check_link`. The
 [transport reference](physical/intel_thor_transport.md) owns the contract.
+
+## Thor receives sensor streams but no static TF
+
+**Symptom.** On Thor, camera images and scans arrive, but `tf_static`,
+`robot_description` and other transient-local topics from Intel never do.
+`tf2_echo base_link camera_0_color_optical_frame` waits indefinitely, the
+localization mask node reports `TF_MISS_EXTRINSIC` (status 4) with NaN
+distances, and `ros2 topic info -v` on Thor shows Intel's nodes as
+`_NODE_NAME_UNKNOWN_`. Topic matching from Thor can also be slow.
+
+**Cause.** Intel's robot services use the CycloneDDS profile on br0 and Wi-Fi,
+so they advertise Intel's Wi-Fi address (192.168.123.14) as well as
+192.168.131.1. Thor is on the same Wi-Fi subnet, so its kernel sends its DDS
+replies to that address over Thor's own Wi-Fi, and the lab access point does
+not deliver traffic between its clients (Thor and Intel cannot ping each other
+over Wi-Fi). Intel never sees Thor's readers or acknowledgements, so it never
+sends stored samples; data it streams continuously still arrives over the
+cable. Reproduced on 2026-10-12: a once-published transient-local message from
+the services profile never reached Thor in domain 0, and arrived within 3 s
+with Wi-Fi removed from the publisher's profile, with the Ethernet-only
+profile, or with the route below.
+
+**Fix.** On Thor, `sudo tools/intel_thor/thor_lan_route apply` routes
+192.168.123.14 over the robot Ethernet, persistently; `check_link` fails
+without it. Laptops on the same Wi-Fi meet the same isolation, so RViz over
+Wi-Fi needs client isolation disabled on the access point.
+
+## Intel receives nothing from a restarted Thor for minutes
+
+**Symptom.** After Thor's localization restarts, Intel's `localization/status`
+stays `missing` and no health or measurements arrive for about 5–6 minutes,
+then everything resumes without any action. Thor-local echoes look healthy.
+Sometimes one early message gets through, and some publishers (for example
+the detector) appear on Intel while others never do.
+
+**Cause.** DDS discovery announcements are multicast. With no IGMP querier on
+the robot Ethernet, IGMP snooping stops forwarding the restarted processes'
+multicast to Intel until the membership entry ages out. Measured on
+2026-10-13: Intel heard Thor's own announcements stop within seconds of a
+restart and resume 313–381 s later, and delivery resumed at the same moment.
+Firewalls, ports and socket buffers were ruled out. Unicast DDS peers did not
+help Intel's already-running consumers.
+
+**Fix.** Make `br0` the querier. Live:
+`echo 1 | sudo tee /sys/class/net/br0/bridge/multicast_querier`. Persistently,
+install `src/ridgeback_autonomy_hardware/config/intel_thor/90-dynamo-multicast-querier.conf`
+as `/etc/systemd/network/10-netplan-br0.netdev.d/90-dynamo-multicast-querier.conf`.
+With it on, a restarted Thor's results reached Intel in 0.2 s.
+`tools/intel_thor/check_link` checks both.
+
+## Camera frame gaps while RViz runs on Intel
+
+**Symptom.** `tools/camera_contract_check --guard` fails on depth stamps
+(gaps of several hundred ms) and on colour/depth pairing whenever RViz is open
+on Intel's VNC desktop, and passes with RViz closed.
+
+**Cause.** The VNC display has no GPU, so RViz renders in software. At 30 fps
+Mesa's renderer took a full core in per-frame bursts across every core. On
+2026-10-13 that gave 567 and 467 ms depth gaps and 98.6 % pairing. With RViz
+closed: 133 ms and 99.45 %.
+
+**Fix.** `backend:=hardware` already applies it: a 10 fps hardware layout,
+`nice -n 19` on the last two cores, and `LP_NUM_THREADS=2`. On 2026-10-14 that
+measured a 100 ms maximum depth gap and 99.26 % pairing with RViz open, with
+RViz at ~25 % of one core. If the check still fails, close RViz on Intel and
+view it from another computer.
+
+## CLI probes show no data although consumers are healthy
+
+**Symptom.** `timeout 10 ros2 topic echo|hz ... | grep ...` prints nothing for
+Thor's results, while `localization/status` reports `processing` and
+`ros2 topic info -v` lists the remote publisher. Or `ros2 topic hz` reports
+nothing for a best-effort 640×480 image stream that RViz displays.
+
+**Cause.** Piped ros2 CLI output is block-buffered, and `timeout`'s default
+SIGTERM ends the process before the buffer is flushed. Separately, the Python
+`hz` subscriber falls behind on large best-effort images.
+
+**Fix.** Use `PYTHONUNBUFFERED=1` and `timeout -s INT`, and write to a file
+before filtering. For image rates, count headers with
+`ros2 topic echo --qos-reliability best_effort <topic> --field header` over a
+fixed interval, or read the rate in RViz.
 
 ## Hokuyo drivers stuck reconnecting
 

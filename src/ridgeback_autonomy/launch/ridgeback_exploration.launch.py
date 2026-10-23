@@ -30,6 +30,7 @@ from ridgeback_localization.estimator_registry import (
     uses_mask_estimators,
     uses_pointcloud_estimators,
 )
+from ridgeback_autonomy.rviz_layouts import hardware_layout, hardware_rviz_process
 from ridgeback_autonomy.localization_launch import (
     cyclonedds_actions,
     distance_hud_node,
@@ -75,6 +76,40 @@ def resolve_launch_namespace(context, *args, **kwargs):
     ]
 
 
+def _camera_inputs(context):
+    backend = ('realsense' if LaunchConfiguration('backend').perform(context) == 'hardware'
+               else 'simulation')
+    return resolved_camera_inputs(
+        context, 'color_topic', 'camera_info_topic',
+        'depth_topic', 'pointcloud_topic', backend=backend)
+
+
+def build_gated_target_localization(context, *args, **kwargs):
+    """Start the localization stack once the camera contract has publishers.
+
+    External mode consumes no camera on this host, so it starts at once. The
+    gate only counts publishers, so it adds no image reader to the robot graph.
+    It leaves TF to the consumers: the optical frame name is backend-specific
+    (the simulators scope it under the robot), and on hardware the camera
+    contract check verifies the base-to-optical path.
+    """
+    nodes = build_target_localization_nodes(context)
+    if LaunchConfiguration('localization_mode').perform(context) != 'local':
+        return nodes
+    namespace = LaunchConfiguration('namespace').perform(context).strip('/')
+    camera = _camera_inputs(context)
+    conditions = []
+    for topic in (camera.color_image_topic, camera.color_camera_info_topic,
+                  camera.aligned_depth_topic):
+        conditions += ['--topic', '/' + '/'.join(part for part in (namespace, topic) if part)]
+    gate = ExecuteProcess(
+        cmd=['ros2', 'run', 'ridgeback_autonomy', 'launch_wait', *conditions,
+             '--timeout', LaunchConfiguration('sim_ready_timeout')],
+        name='gate_camera', output='screen',
+    )
+    return [gate, RegisterEventHandler(OnProcessExit(target_action=gate, on_exit=nodes))]
+
+
 def build_target_localization_nodes(context, *args, **kwargs):
     """The measurement and display stack for the estimator rows this run selected.
 
@@ -88,14 +123,7 @@ def build_target_localization_nodes(context, *args, **kwargs):
     depth_source = LaunchConfiguration('depth_source')
     mask_gate = LaunchConfiguration('mask_gate')
     estimate_viz = LaunchConfiguration('estimate_viz')
-    camera_backend = (
-        'realsense'
-        if LaunchConfiguration('backend').perform(context) == 'hardware'
-        else 'simulation'
-    )
-    camera_inputs = resolved_camera_inputs(
-        context, 'color_topic', 'camera_info_topic',
-        'depth_topic', 'pointcloud_topic', backend=camera_backend)
+    camera_inputs = _camera_inputs(context)
 
     # The mask node's own base_frame default is the bare string "base_link",
     # unlike the pointcloud and viz nodes which derive a namespaced frame from
@@ -209,7 +237,12 @@ def build_target_localization_nodes(context, *args, **kwargs):
 
     # The camera overlay picks its panels from the same set, so it grids one
     # frame per path that has a producer here. Labels stay on, unlike the
-    # benchmark: there is no collage carrying the numbers separately.
+    # benchmark: there is no collage carrying the numbers separately. In
+    # external mode the mask node runs on the compute host, so the depth panel
+    # reads this host's own aligned depth rather than pulling the remote
+    # republish back over the link. Only the silhouette gate's mask image
+    # still crosses; the box gate's mask comes from the detections.
+    overlay_depth = {'aligned_depth_topic': camera_inputs.aligned_depth_topic} if mode == 'external' else {}
     nodes.append(overlay_node(
         namespace=namespace,
         use_sim_time=use_sim_time,
@@ -217,6 +250,7 @@ def build_target_localization_nodes(context, *args, **kwargs):
         color_topic=camera_inputs.color_image_topic,
         depth_source=depth_source,
         mask_gate=mask_gate,
+        **overlay_depth,
     ))
 
     return nodes
@@ -250,6 +284,24 @@ def generate_launch_description():
     slam_source = LaunchConfiguration('slam_source')
 
     rviz_config = os.path.join(pkg_this, 'sim', 'rviz', 'exploration.rviz')
+
+    def rviz_nodes(context):
+        hardware = (backend.perform(context) == 'hardware'
+                    and exploration_rviz.perform(context) == 'true')
+        prefix, environment = hardware_rviz_process(os.cpu_count()) if hardware else (None, {})
+        return [Node(
+            package='rviz2',
+            executable='rviz2',
+            name='rviz2',
+            namespace=namespace,
+            arguments=['-d', hardware_layout(rviz_config) if hardware else rviz_config],
+            parameters=[{'use_sim_time': use_sim_time}],
+            remappings=[('/tf', 'tf'), ('/tf_static', 'tf_static')],
+            prefix=prefix,
+            additional_env=environment,
+            output='screen',
+            condition=launch.conditions.IfCondition(exploration_rviz),
+        )]
 
     def _launch_wait(name, *conditions, timeout):
         # timeout may be an int (fixed gate) or a launch substitution (the
@@ -443,23 +495,15 @@ def generate_launch_description():
                                           'display (GPU rendering for SSH sessions; '
                                           'docs/troubleshooting.md)'),
 
-        # RViz2
-        Node(
-            package='rviz2',
-            executable='rviz2',
-            name='rviz2',
-            namespace=namespace,
-            arguments=['-d', rviz_config],
-            parameters=[{'use_sim_time': use_sim_time}],
-            remappings=[('/tf', 'tf'), ('/tf_static', 'tf_static')],
-            output='screen',
-            condition=launch.conditions.IfCondition(exploration_rviz),
-        ),
+        # RViz2. On hardware it gets the derived layout (no goal tool, 10 fps)
+        # and runs at low priority on two cores; see rviz_layouts.
+        OpaqueFunction(function=rviz_nodes),
 
         # Detector, measurement nodes, rings, distance HUD and camera overlay
-        # are gated as one unit: they are all downstream of detections.
+        # are gated as one unit: they are all downstream of detections, and in
+        # local mode they start when the camera contract has publishers.
         OpaqueFunction(
-            function=build_target_localization_nodes,
+            function=build_gated_target_localization,
             condition=launch.conditions.IfCondition(target_localization_enabled),
         ),
 

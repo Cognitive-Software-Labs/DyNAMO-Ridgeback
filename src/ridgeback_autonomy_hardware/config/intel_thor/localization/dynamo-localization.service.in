@@ -1,0 +1,20 @@
+# Rendered by tools/intel_thor/localization_service on Thor; edit the repository template.
+# Runs target localization at boot once Thor follows Intel's PTP clock.
+[Unit]
+Description=DyNAMO target localization (Thor)
+Wants=network-online.target
+After=network-online.target dynamo-ptp4l.service dynamo-phc2sys.service
+
+[Service]
+Type=simple
+User=@USER@
+EnvironmentFile=/etc/default/dynamo-localization
+ExecStart=/bin/bash -c 'source /opt/ros/jazzy/setup.bash && source "$CHECKOUT/artifacts/colcon/thor-install/local_setup.bash" && source "$CHECKOUT/src/ridgeback_autonomy_hardware/config/intel_thor/dds_env.sh" thor && exec ros2 launch ridgeback_localization localization.launch.py namespace:="$NAMESPACE" base_frame:="$BASE_FRAME" estimators:="$ESTIMATORS" depth_source:="$DEPTH_SOURCE" mask_gate:="$MASK_GATE" target_labels:="$TARGET_LABELS" detection_threshold:="$DETECTION_THRESHOLD" displays:=false'
+# SIGINT does not always stop the launch (2026-10-16); SIGTERM does.
+KillSignal=SIGTERM
+TimeoutStopSec=20
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

@@ -41,6 +41,7 @@ declare -A PATCHES=(
     [src/clearpath_simulator]="patches/clearpath_gz_customizations.patch"
     [src/clearpath_common]="patches/clearpath_realsense_sim_frames.patch"
     [src/slam_toolbox]="patches/slam_toolbox_tf_namespace.patch"
+    [src/urg_node]="patches/urg_node_reconnect_recovery.patch"
 )
 
 if ! dependency_text="$(python3 - "${MANIFESTS[@]}" <<'PY'

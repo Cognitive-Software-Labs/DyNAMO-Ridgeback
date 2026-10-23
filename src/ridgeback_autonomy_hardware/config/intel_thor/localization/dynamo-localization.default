@@ -1,0 +1,13 @@
+# /etc/default/dynamo-localization, rendered by tools/intel_thor/localization_service.
+# Edit here to change the running configuration, then: sudo systemctl restart dynamo-localization
+CHECKOUT=@CHECKOUT@
+ROS_DOMAIN_ID=0
+ROS_LOG_DIR=/tmp
+RIDGEBACK_PERCEPTION_VENV=@VENV@
+NAMESPACE=r100_0160
+BASE_FRAME=base_link
+ESTIMATORS=projective_ranging,euclidean_reconstruction
+DEPTH_SOURCE=stereoscopic
+MASK_GATE=box
+TARGET_LABELS=full body person
+DETECTION_THRESHOLD=0.26

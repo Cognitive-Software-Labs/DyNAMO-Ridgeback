@@ -1,45 +1,32 @@
 # BENCHMARKING — Live configurator sweeps
 
-Status: **blocked on process cleanup and ownership.** The
+Status: **cleanup ownership done (2026-10-14); live start, conflicts and
+supervision remain.** The
 [benchmarking backlog](../target_distance_benchmarking/BACKLOG.md#live-sweeps-from-the-configurator)
 owns this feature and its priority. Environment qualification takes priority;
 it can run through the existing terminal workflow without waiting for this UI.
 This plan covers the remaining live-run implementation, not the completed
 [offline run infrastructure](../target_distance_benchmarking/configurator.md).
 
-## Current blocker
+## Cleanup ownership (done)
 
-The UI disables Start for `live-system`, and `RunSupervisor.ensure_startable`
-rejects it server-side. A sweep calls preflight cleanup before starting Gazebo.
-Two patterns in [`cleanup.sh`](../../cleanup.sh) can match the installed
-configurator process:
+The UI still disables Start for `live-system`, and
+`RunSupervisor.ensure_startable` still rejects it server-side, but preflight
+cleanup no longer kills the configurator. [`cleanup.sh`](../../cleanup.sh) now
+applies one ownership filter to every kill pass and to the leftover check. It
+skips cleanup's ancestors, the GUI, the configurator and offline replay CLIs, and
+processes started from another colcon workspace, and it matches node names as
+whole path components. The
+[troubleshooting entry](../troubleshooting.md#what-cleanupsh-leaves-alone)
+describes the behaviour; `test_cleanup_ownership.py` checks it on sentinel
+processes in a dry run (`CLEANUP_DRY_RUN=1`), which kills nothing.
 
-- `REPO_NODES_RE`, which matches executables under this checkout's installed
-  package `lib/` directories;
-- the later `lib/ridgeback_autonomy/` catch-all.
-
-```mermaid
-flowchart LR
-    C["Configurator starts sweep"] --> P["Sweep preflight cleanup"]
-    P --> N["Installed-executable match"]
-    P --> A["Package catch-all match"]
-    N --> K["Configurator process is killed"]
-    A --> K
-```
-
-Cleanup also has broad process-name matches. Correcting only one pattern or
-simply exempting the configurator does not establish isolation from unrelated
-runs. Do not enable Start by bypassing preflight cleanup.
+Not covered: two runs from the **same** checkout are not isolated from each
+other, so preflight still stops a concurrent terminal-started sweep's nodes. That
+belongs to conflict detection below. Do not enable Start by bypassing preflight
+cleanup.
 
 ## Remaining implementation
-
-### Process ownership and cleanup
-
-Establish which processes belong to a sweep and which stale processes it may
-clean up. Preserve the configurator, unrelated sessions, and other checkouts.
-Apply that ownership consistently to preflight, cancellation, and leftover
-checks. Audit both install-path patterns and broad simulator/node matches.
-Keep live Start disabled until the cleanup and ownership checks pass.
 
 ### Dry-run estimate and execution environment
 

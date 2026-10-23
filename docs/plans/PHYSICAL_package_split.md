@@ -39,8 +39,8 @@ complete; this plan now tracks qualification and acceptance only.
 
 ## Qualification checkpoint and remaining work
 
-Current handoff candidate: `eaacd24b2504e05a3d96c10e63c1f3d3b8d86ee3` on
-`feat/real-hardware-exploration`. This includes all four package-split commits,
+Current handoff candidate: `eaacd24b2504e05a3d96c10e63c1f3d3b8d86ee3`,
+now an ancestor of `dev`. This includes all four package-split commits,
 the Intel–Thor transport tools, and the DDS rollback/environment fixes. The
 combined tree passed 1,037 tests, the autonomy and hardware packages rebuilt,
 dependency pins/patches matched, and documentation checks passed. The new
@@ -48,10 +48,10 @@ transport regression tests use temporary files and mocked services; they do
 not qualify the installed robot services. Local integration evidence is under
 `artifacts/package-split/integration-eaacd24b/`.
 
-The branch is available for deployment; neither host's installation or acceptance
-of this candidate has been recorded. Existing simulator runtime evidence below
-retains its original tested scope; the integration rerun did not repeat live
-Gazebo/Isaac performance measurements or physical tests.
+The exact candidate revision is available for deployment; neither host's
+installation or acceptance of it has been recorded. Existing simulator runtime
+evidence below retains its original tested scope; the integration rerun did not
+repeat live Gazebo/Isaac performance measurements or physical tests.
 
 The interfaces extraction is commit `2e52712b`; the separately verified common/
 localization extraction is `3330cc2d`. Deployment roles, configurable labels,
