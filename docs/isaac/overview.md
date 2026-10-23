@@ -4,8 +4,9 @@ Isaac Sim 6.1 is one of the shared autonomy stack's three backends, alongside
 Gazebo and physical hardware. The bounded migration compatibility gate passed;
 statistical exploration qualification remains open. The
 [project backlog](../BACKLOG.md) owns exploration and robot work; the
-[benchmarking backlog](../target_distance_benchmarking/BACKLOG.md#deferred-isaac-target-distance-benchmark-port)
-owns deferred target-distance benchmark support. Historical controls are not current performance baselines.
+[benchmarking backlog](../target_distance_benchmarking/BACKLOG.md#gazeboisaac-target-distance-benchmark-qualification)
+owns the remaining qualification of implemented target-distance benchmark support.
+Historical controls are not current performance baselines.
 
 ## Current references
 

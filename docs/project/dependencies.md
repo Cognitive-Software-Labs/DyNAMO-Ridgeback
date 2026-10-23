@@ -142,7 +142,7 @@ The maintained mappings are:
 | `src/slam_toolbox` | `patches/slam_toolbox_tf_namespace.patch` |
 | `src/gz-sim` | `patches/gz_sim_sensors_shutdown.patch` |
 | `src/ros_gz` | `patches/ros_gz_bridge_shutdown.patch` |
-| `src/rviz` | `patches/rviz_image_display_unsubscribe.patch` |
+| `src/rviz` | `patches/rviz_shutdown.patch` |
 
 Update all affected manifest pins and patch files in the same root commit.
 
@@ -454,17 +454,18 @@ named location outside the workspace, restore this change's manifest, mapping,
 ignore, and documentation edits as one reviewed set, rebuild, and start a fresh
 shell. Do not reset a dirty nested checkout.
 
-## RViz Image display teardown patch
+## RViz shutdown ownership patch
 
 The optional `viz` profile imports RViz **14.1.23**, upstream tag `14.1.23`,
 commit `feb01669f1297df2af755ce9cd2ed18083e7a8b2`, matching the installed
 `ros-jazzy-rviz-*` 14.1.23 binaries. It is a partial overlay: only
-`rviz_default_plugins` and `rviz_visual_testing_framework` are built. The second
-is built only because `rviz_default_plugins` requires it when `BUILD_TESTING` is
+`rviz_common`, `rviz_default_plugins`, and `rviz_visual_testing_framework` are built. The last
+is built because `rviz_default_plugins` requires it when `BUILD_TESTING` is
 on, as it is in the normal workspace build; the visual tests themselves stay off
-(`EnableVisualTests` unset). `rviz2`, `rviz_common`, and `rviz_rendering` keep
-resolving to `/opt/ros/jazzy`; pluginlib loads the overlay's
-`librviz_default_plugins.so` through the ament index.
+(`EnableVisualTests` unset). `rviz2` and `rviz_rendering` keep
+resolving to `/opt/ros/jazzy`. The dynamic loader loads the overlay's
+`librviz_common.so`; pluginlib loads its `librviz_default_plugins.so` through the
+ament index. The root patch records both corrections and their regression tests.
 
 ### Defect
 
@@ -480,10 +481,33 @@ SIGINT aborted stock RViz in 6 of 20 starts with `benchmark.rviz` and 10 of 20
 with `exploration.rviz`. The defect entered in 14.1.21 (backport #1745); the
 apt candidate 14.1.24 still has it.
 
-`patches/rviz_image_display_unsubscribe.patch` disconnects only while the
+`patches/rviz_shutdown.patch` disconnects only while the
 filter exists and replaces the connection with an empty one before the filter
 is reset, so a repeated `unsubscribe()` does nothing. It changes one inline
 method in an installed header that only `rviz_default_plugins` compiles.
+
+`VisualizationManager` also allocated a `ViewManager` without deleting it or
+assigning a Qt parent. Its property model owns the current and saved view
+controllers. Each controller's reset-time service holds an aliasing shared
+pointer to the ROS `NodeBase`; leaking the controller therefore retains the
+RCL node even after its outer C++ `Node` is destroyed. CycloneDDS deletes the
+participant when its last node is released, so the leak can leave DDS threads
+alive during process-level library finalization. The correction destroys the
+view manager while its display context and scene are still available.
+
+```mermaid
+flowchart LR
+    M[Visualization manager] --> V[View manager]
+    V --> P[Property model]
+    P --> C[Current and saved controllers]
+    C --> S[Reset-time service]
+    S --> N[ROS NodeBase]
+    N --> D[DDS participant and threads]
+```
+
+Destroying the manager must release this ownership chain before the process
+unloads middleware libraries. The controller destructor also uses the scene,
+which determines where deletion belongs in manager teardown.
 
 ### Build and loading proof
 
@@ -494,17 +518,19 @@ After `vcs import < dependencies/viz.repos` and
 source /opt/ros/jazzy/setup.bash
 source install/setup.bash
 colcon build --symlink-install --base-paths src \
-  --packages-select rviz_visual_testing_framework rviz_default_plugins
+  --packages-select rviz_common rviz_visual_testing_framework rviz_default_plugins
 source install/setup.bash
 ```
 
-With RViz running, its maps must show the overlay plugin library:
+With the owned RViz instance running, inspect its exact PID:
 
 ```bash
-awk '/librviz_default_plugins\.so/ {print $NF}' /proc/$(pgrep -x rviz2)/maps | sort -u
+awk '/librviz_(common|default_plugins)\.so/ {print $NF}' /proc/<rviz-pid>/maps | sort -u
 ```
 
-The line must resolve to `install/rviz_default_plugins/lib/`.
+The paths must resolve to `install/rviz_common/lib/` and
+`install/rviz_default_plugins/lib/`. A successful build alone does not prove the
+running process loaded either correction.
 
 ### Coupling and rollback
 
@@ -520,3 +546,4 @@ set, rebuild, and start a fresh shell.
 - [Gazebo Sensors shutdown races and qualification](../../archive/engineering/2026-10-18-gazebo-sensors-shutdown.md)
 - [ros_gz bridge ownership cycles and image_bridge teardown](../../archive/engineering/2026-10-22-ros-gz-bridge-shutdown.md)
 - [RViz Image display teardown abort](../../archive/engineering/2026-10-22-rviz-image-display-teardown.md)
+- [Benchmark shutdown ordering and RViz node ownership](../../archive/engineering/2026-10-23-benchmark-shutdown-ownership.md)

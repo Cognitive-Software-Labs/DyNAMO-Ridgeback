@@ -16,6 +16,7 @@ from typing import Any
 
 from ament_index_python.packages import get_package_share_directory
 import rclpy
+from ridgeback_common.ros_signals import init_owned, shielded, signals_held
 
 from ridgeback_autonomy.localization_launch import (
     SHARED_BENCHMARK_ARGUMENT_DEFAULTS,
@@ -65,6 +66,12 @@ PROCESS_POLL_SEC = 1.0
 PROCESS_INT_GRACE_SEC = 20.0
 FFMPEG_INT_GRACE_SEC = 10.0
 PROCESS_TERM_GRACE_SEC = 5.0
+# Two ordered groups need separate grace windows. The extra command window
+# covers process inspection around the waits; it is not a longer node timeout.
+PROCESS_GROUP_STOP_BUDGET_SEC = (
+    PROCESS_INT_GRACE_SEC + FFMPEG_INT_GRACE_SEC
+    + 4 * PROCESS_TERM_GRACE_SEC + COMMAND_TIMEOUT_SEC
+)
 MANIFEST_VERSION = 1
 
 
@@ -293,6 +300,17 @@ def _valid_run_document(path: str) -> dict | None:
     return document
 
 
+def _reusable_configuration(entry: dict) -> bool:
+    """Keep legacy output reuse, but never erase a recorded lifecycle failure."""
+    if entry.get('launch_returncode', 0) != 0:
+        return False
+    shutdown = entry.get('shutdown')
+    if shutdown is None:
+        return True
+    return (shutdown.get('group_empty') is True and not shutdown.get('escalated')
+            and shutdown.get('returncode') == 0 and not shutdown.get('error'))
+
+
 def _resume_signature(
     spec: SweepSpec,
     configs: tuple[SweepConfig, ...],
@@ -486,7 +504,7 @@ def sample_real_time_factor() -> float | None:
 def _process_group_ffmpeg_pids(process_group: int) -> list[int]:
     try:
         result = try_command(
-            ['pgrep', '-g', str(process_group), '-f', 'ffmpeg.*x11grab'],
+            ['pgrep', '-s', str(process_group), '-f', 'ffmpeg.*x11grab'],
             timeout_sec=5.0,
         )
     except RuntimeError:
@@ -513,30 +531,94 @@ def _wait_until(predicate, timeout_sec: float) -> bool:
     return predicate()
 
 
-def stop_process_group(process: subprocess.Popen | None, label: str) -> None:
+def _owned_process_groups(process_group: int) -> dict[int, list[int]]:
+    """Find the groups in the session this launch created and owns.
+
+    All callers start their launch with ``start_new_session=True``. SDK helpers
+    can create a different process group while retaining that session; they
+    remain owned after the original launch group disappears.
+
+    Zombies cannot do cleanup or hold a live ROS participant. Their parent is
+    responsible for reaping them; counting them here would force escalation
+    against an already stopped group.
+    """
+
+    result = try_command(['ps', '-eo', 'pid=,pgid=,sid=,stat='], timeout_sec=5.0)
+    if result.returncode != 0:
+        raise RuntimeError(f'Cannot inspect owned process group {process_group}.')
+    groups = {}
+    for line in result.stdout.splitlines():
+        fields = line.split()
+        if (len(fields) == 4 and fields[2] == str(process_group)
+                and not fields[3].startswith(('Z', 'X'))):
+            groups.setdefault(int(fields[1]), []).append(int(fields[0]))
+    return groups
+
+
+def _live_process_group_pids(process_group: int) -> list[int]:
+    """Living members of all groups in the owned launch session."""
+    return [pid for members in _owned_process_groups(process_group).values() for pid in members]
+
+
+def stop_process_group(process: subprocess.Popen | None, label: str) -> dict | None:
     """Gracefully stop a launch group, finalizing ffmpeg before escalation."""
 
     if process is None:
         return
     process_group = process.pid
-    if process.poll() is None:
+    signals_sent = []
+    recorder_signals = []
+    interrupted_pids = set()
+    interrupting = False
+
+    def interrupt_new_members(members) -> None:
+        new_members = sorted(set(members) - interrupted_pids)
+        if new_members:
+            # SDKs can create helpers during teardown, even in an existing
+            # process group. Signal each newly observed PID once, without
+            # interrupting siblings that are already unwinding cleanup.
+            _signal_pids(new_members, signal.SIGINT)
+            interrupted_pids.update(new_members)
+            if 'SIGINT' not in signals_sent:
+                signals_sent.append('SIGINT')
+
+    def stopped() -> bool:
+        # Reap the leader before inspecting the group. A wrapper can exit
+        # before its children, so its return code alone is not a stop barrier.
+        process.poll()
+        members = _live_process_group_pids(process_group)
+        if interrupting:
+            interrupt_new_members(members)
+        return not members
+
+    def signal_group(signum) -> None:
+        sent = False
+        for owned_group in _owned_process_groups(process_group):
+            try:
+                os.killpg(owned_group, signum)
+                sent = True
+            except ProcessLookupError:
+                pass
+        if sent:
+            signals_sent.append(signal.Signals(signum).name)
+
+    if not stopped():
         _log(f'Stopping {label}...')
         # One SIGINT to every process, as a terminal's Ctrl-C delivers it. The
         # launch runs in terminal mode (_launch_command), so it forwards none
         # of its own; each child receives exactly this one.
-        try:
-            os.killpg(process_group, signal.SIGINT)
-        except ProcessLookupError:
-            pass
-        try:
-            process.wait(timeout=PROCESS_INT_GRACE_SEC)
-        except subprocess.TimeoutExpired:
-            pass
+        interrupting = True
+        interrupt_new_members(_live_process_group_pids(process_group))
+        _wait_until(stopped, PROCESS_INT_GRACE_SEC)
+        interrupting = False
 
     ffmpeg_pids = _process_group_ffmpeg_pids(process_group)
     if ffmpeg_pids:
         _log(f'Waiting for {len(ffmpeg_pids)} screen recorder(s) to finalize...')
-        _signal_pids(ffmpeg_pids, signal.SIGINT)
+        new_recorders = set(ffmpeg_pids) - interrupted_pids
+        if new_recorders:
+            interrupt_new_members(new_recorders)
+            recorder_signals.append('SIGINT')
         _wait_until(
             lambda: not _process_group_ffmpeg_pids(process_group),
             FFMPEG_INT_GRACE_SEC,
@@ -544,6 +626,7 @@ def stop_process_group(process: subprocess.Popen | None, label: str) -> None:
     ffmpeg_pids = _process_group_ffmpeg_pids(process_group)
     if ffmpeg_pids:
         _signal_pids(ffmpeg_pids, signal.SIGTERM)
+        recorder_signals.append('SIGTERM')
         _wait_until(
             lambda: not _process_group_ffmpeg_pids(process_group),
             PROCESS_TERM_GRACE_SEC,
@@ -552,34 +635,39 @@ def stop_process_group(process: subprocess.Popen | None, label: str) -> None:
     if ffmpeg_pids:
         _log('WARNING: screen recorder ignored graceful shutdown; forcing recorder exit.')
         _signal_pids(ffmpeg_pids, signal.SIGKILL)
+        recorder_signals.append('SIGKILL')
         _wait_until(
             lambda: not _process_group_ffmpeg_pids(process_group),
             PROCESS_TERM_GRACE_SEC,
         )
 
     # Only escalate the whole process group after no x11grab recorder remains.
-    if process.poll() is None:
-        try:
-            os.killpg(process_group, signal.SIGTERM)
-        except ProcessLookupError:
-            pass
-        try:
-            process.wait(timeout=PROCESS_TERM_GRACE_SEC)
-        except subprocess.TimeoutExpired:
+    if not stopped():
+        signal_group(signal.SIGTERM)
+        if not _wait_until(stopped, PROCESS_TERM_GRACE_SEC):
             if _process_group_ffmpeg_pids(process_group):
                 raise RuntimeError(f'Refusing to SIGKILL {label} while ffmpeg is active.')
-            try:
-                os.killpg(process_group, signal.SIGKILL)
-            except ProcessLookupError:
-                pass
-            process.wait(timeout=PROCESS_TERM_GRACE_SEC)
+            signal_group(signal.SIGKILL)
+            if not _wait_until(stopped, PROCESS_TERM_GRACE_SEC):
+                raise RuntimeError(
+                    f'{label} still has owned processes after SIGKILL: '
+                    f'{_live_process_group_pids(process_group)}')
+    process.poll()
+    return {
+        'returncode': process.returncode,
+        'signals': signals_sent,
+        'sigint_attempted_pids': sorted(interrupted_pids),
+        'recorder_signals': recorder_signals,
+        'escalated': any(name != 'SIGINT' for name in signals_sent + recorder_signals),
+        'group_empty': True,
+    }
 
 
-def _archive_incomplete_output(output_path: str) -> str | None:
+def _archive_incomplete_output(output_path: str, *, include_valid: bool = False) -> str | None:
     if not os.path.exists(output_path):
         return None
     run_json = os.path.join(output_path, 'run.json')
-    if _valid_run_document(run_json) is not None:
+    if not include_valid and _valid_run_document(run_json) is not None:
         return None
     archived = f'{output_path}.incomplete_{_timestamp()}'
     counter = 1
@@ -587,7 +675,7 @@ def _archive_incomplete_output(output_path: str) -> str | None:
         archived = f'{output_path}.incomplete_{_timestamp()}_{counter}'
         counter += 1
     os.rename(output_path, archived)
-    _log(f'Preserved incomplete output as {archived}')
+    _log(f'Preserved previous attempt as {archived}')
     return archived
 
 
@@ -658,6 +746,9 @@ def run_sweep(
     current_config_process: subprocess.Popen | None = None
     scene_control_node = None
     interrupted = False
+    previous_handlers = {
+        signum: signal.getsignal(signum) for signum in (signal.SIGINT, signal.SIGTERM)
+    }
     try:
         if preflight_cleanup:
             run_preflight_cleanup(workspace_root)
@@ -665,19 +756,22 @@ def run_sweep(
             _log(
                 'Skipping cleanup.sh by operator request; existing ROS/simulator '
                 'processes may collide with this sweep.')
-        environment = subprocess.Popen(
-            _environment_command(spec),
-            stdin=subprocess.DEVNULL,
-            start_new_session=True,
-            env=subprocess_log_environment(os.path.join(sweep_dir, 'environment')),
-        )
+        init_owned()
+        # A deferred interrupt cannot leave a created session unassigned to
+        # the owner responsible for stopping it.
+        with signals_held():
+            environment = subprocess.Popen(
+                _environment_command(spec),
+                stdin=subprocess.DEVNULL,
+                start_new_session=True,
+                env=subprocess_log_environment(os.path.join(sweep_dir, 'environment')),
+            )
         time.sleep(1.0)
         if environment.poll() is not None:
             raise RuntimeError(
                 f'persistent environment exited immediately with code {environment.returncode}'
             )
 
-        rclpy.init()
         scene_control_node = rclpy.create_node('target_benchmark_sweep_scene_control')
         scene_control = create_scene_control_client(
             scene_control_node, simulation.backend.scene_control_service_namespace)
@@ -700,7 +794,8 @@ def run_sweep(
             entry = _entry_by_name(manifest, config.name)
             output_path = os.path.join(sweep_dir, config.name)
             existing_run = _valid_run_document(os.path.join(output_path, 'run.json'))
-            if existing_run is not None:
+            reusable = _reusable_configuration(entry)
+            if existing_run is not None and reusable:
                 entry.update(status='skipped', error=None)
                 _log(f'{config.name}: existing run.json is valid; skipping.')
                 _write_manifest(sweep_dir, manifest)
@@ -715,7 +810,8 @@ def run_sweep(
                 _write_manifest(sweep_dir, manifest)
                 break
 
-            _archive_incomplete_output(output_path)
+            _archive_incomplete_output(
+                output_path, include_valid=not reusable)
             try:
                 reaped = reap_orphan_benchmark_entities(scene_control)
                 entry['orphan_entities_reaped'] = reaped
@@ -738,12 +834,13 @@ def run_sweep(
             _log(f'{config.name}: starting {arguments["estimators"]}')
 
             started = time.monotonic()
-            current_config_process = subprocess.Popen(
-                _config_command(arguments),
-                stdin=subprocess.DEVNULL,
-                start_new_session=True,
-                env=subprocess_log_environment(output_path),
-            )
+            with signals_held():
+                current_config_process = subprocess.Popen(
+                    _config_command(arguments),
+                    stdin=subprocess.DEVNULL,
+                    start_new_session=True,
+                    env=subprocess_log_environment(output_path),
+                )
             trials = estimate_trials(config, default_scenario_path)
             timeout_sec = max(30.0 * 60.0, trials * TRIAL_WALL_TIME_SEC * 2.0 + 600.0)
             wait_status, wait_error = _wait_for_config(
@@ -751,18 +848,36 @@ def run_sweep(
                 environment,
                 timeout_sec,
             )
-            if wait_status in {'timeout', 'failed'}:
-                stop_process_group(current_config_process, f'config {config.name}')
+            stop_error = None
+            with shielded() as cleanup_signals:
+                try:
+                    # Validate descendants even when the launch leader exited
+                    # naturally. Ownership ends at an empty group, not at wait().
+                    entry['shutdown'] = stop_process_group(
+                        current_config_process, f'config {config.name}')
+                except Exception as exc:
+                    entry['shutdown'] = {'group_empty': False, 'error': str(exc)}
+                    stop_error = str(exc)
+            shutdown = entry['shutdown']
+            shutdown_clean = shutdown is None or (
+                shutdown.get('group_empty') and not shutdown.get('escalated')
+                and shutdown.get('returncode') == 0)
             wall_time = time.monotonic() - started
             entry['wall_time_sec'] = wall_time
             entry['finished'] = _wall_timestamp()
 
             run_document = _valid_run_document(os.path.join(output_path, 'run.json'))
-            if run_document is not None:
+            # Saved measurements remain useful evidence after a teardown
+            # failure, but their existence must not hide a failed process.
+            entry['output_valid'] = run_document is not None
+            entry['launch_returncode'] = current_config_process.returncode
+            if (run_document is not None and wait_status == 'exited'
+                    and current_config_process.returncode == 0 and shutdown_clean):
                 entry.update(status='success', error=None)
                 _log(f'{config.name}: completed in {_format_hours(wall_time)}')
             else:
-                error = wait_error or (
+                error = stop_error or wait_error or (
+                    f'configuration shutdown failed: {shutdown}' if not shutdown_clean else
                     f'launch exited with code {current_config_process.returncode}; '
                     'run.json is missing or invalid'
                 )
@@ -771,29 +886,73 @@ def run_sweep(
                     error=error,
                 )
                 _log(f'{config.name}: {entry["status"]}: {error}')
-            current_config_process = None
+            if stop_error is None:
+                current_config_process = None
             _write_manifest(sweep_dir, manifest)
             write_sweep_report(sweep_dir, manifest)
+            if cleanup_signals:
+                interrupted = True
+                manifest['sweep']['status'] = 'interrupted'
+            if stop_error is not None or interrupted:
+                # Keep the reference for the final bounded cleanup attempt;
+                # never start another configuration beside unknown leftovers.
+                break
 
     except KeyboardInterrupt:
         interrupted = True
         manifest['sweep']['status'] = 'interrupted'
         _log('Interrupted; preserving completed configuration outputs for resume.')
-        stop_process_group(current_config_process, 'active benchmark config')
     except Exception as exc:  # keep the manifest useful for report-only/resume
         manifest['sweep']['status'] = 'failed'
         manifest['sweep']['error'] = str(exc)
         _log(f'ERROR: {exc}')
     finally:
-        stop_process_group(current_config_process, 'active benchmark config')
+        try:
+            with shielded():
+                result = _finish_sweep(
+                    sweep_dir, manifest, current_config_process, environment,
+                    scene_control_node, interrupted)
+        finally:
+            for signum, handler in previous_handlers.items():
+                signal.signal(signum, handler)
+    return result
+
+
+def _finish_sweep(sweep_dir, manifest, current_config_process, environment,
+                  scene_control_node, interrupted):
+    """Finish ordered cleanup and persist its outcome while signals are held."""
+    lifecycle = manifest['lifecycle'] = {'groups': {}, 'errors': []}
+
+    def finish_group(process, label):
+        try:
+            report = stop_process_group(process, label)
+            lifecycle['groups'][label] = report
+            if report is not None:
+                expected = report['returncode'] == 0 or (
+                    'SIGINT' in report['signals']
+                    and report['returncode'] in {-2, 130})
+                if report['escalated'] or not report['group_empty'] or not expected:
+                    lifecycle['errors'].append(f'{label}: {report}')
+        except Exception as exc:
+            lifecycle['errors'].append(f'{label}: {exc}')
+
+    finish_group(current_config_process, 'active benchmark config')
+    try:
         if scene_control_node is not None:
             scene_control_node.destroy_node()
         if rclpy.ok():
             rclpy.shutdown()
-        stop_process_group(environment, 'persistent benchmark environment')
+    except Exception as exc:
+        lifecycle['errors'].append(f'scene-control client: {exc}')
+    finally:
+        finish_group(environment, 'persistent benchmark environment')
+    lifecycle['clean'] = not lifecycle['errors']
+    for error in lifecycle['errors']:
+        _log(f'ERROR: shutdown incomplete: {error}')
 
     statuses = [entry.get('status') for entry in manifest['configs']]
-    success = all(status in {'success', 'skipped'} for status in statuses)
+    success = (not interrupted and all(status in {'success', 'skipped'} for status in statuses)
+               and manifest['lifecycle']['clean'])
     if interrupted:
         manifest['sweep']['status'] = 'interrupted'
     elif success:

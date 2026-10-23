@@ -1,0 +1,177 @@
+diff --git a/rviz_common/CMakeLists.txt b/rviz_common/CMakeLists.txt
+index a1ac6f0a..9136478a 100644
+--- a/rviz_common/CMakeLists.txt
++++ b/rviz_common/CMakeLists.txt
+@@ -396,6 +396,17 @@ if(BUILD_TESTING)
+     target_link_libraries(rviz_common_visualizer_app_test rviz_common)
+   endif()
+ 
++  ament_add_gtest(visualization_manager_lifecycle_test
++    test/visualization_manager_lifecycle_test.cpp
++    test/ogre_testing_environment.cpp
++    ${SKIP_DISPLAY_TESTS})
++  if(TARGET visualization_manager_lifecycle_test)
++    target_link_libraries(visualization_manager_lifecycle_test
++      rviz_common Qt5::Widgets
++      rviz_ogre_vendor::OgreMain
++      rviz_ogre_vendor::OgreOverlay)
++  endif()
++
+   ament_add_gmock(rviz_common_ros_node_abstraction_test
+     test/ros_node_abstraction_test.cpp
+   )
+diff --git a/rviz_common/src/rviz_common/view_manager.cpp b/rviz_common/src/rviz_common/view_manager.cpp
+index 4a83baa2..e3906afe 100644
+--- a/rviz_common/src/rviz_common/view_manager.cpp
++++ b/rviz_common/src/rviz_common/view_manager.cpp
+@@ -77,7 +77,14 @@ ViewManager::ViewManager(DisplayContext * context)
+ }
+ 
+ ViewManager::~ViewManager()
+-{}
++{
++  if (impl_->render_panel) {
++    impl_->render_panel->setViewController(nullptr);
++  }
++  // Destroy current and saved controllers while their plugin factory and
++  // the implementation used by onCurrentDestroyed() are still alive.
++  impl_->property_model.reset();
++}
+ 
+ void ViewManager::initialize()
+ {
+diff --git a/rviz_common/src/rviz_common/visualization_manager.cpp b/rviz_common/src/rviz_common/visualization_manager.cpp
+index d4ef45ae..20039450 100644
+--- a/rviz_common/src/rviz_common/visualization_manager.cpp
++++ b/rviz_common/src/rviz_common/visualization_manager.cpp
+@@ -242,6 +242,9 @@ VisualizationManager::~VisualizationManager()
+ 
+   delete display_property_tree_model_;
+   delete tool_manager_;
++  // View controllers use the scene and frame managers during destruction.
++  delete view_manager_;
++  view_manager_ = nullptr;
+   delete display_factory_;
+   delete frame_manager_;
+   delete private_;
+diff --git a/rviz_common/test/visualization_manager_lifecycle_test.cpp b/rviz_common/test/visualization_manager_lifecycle_test.cpp
+new file mode 100644
+index 00000000..25e92647
+--- /dev/null
++++ b/rviz_common/test/visualization_manager_lifecycle_test.cpp
+@@ -0,0 +1,95 @@
++/*
++ * Copyright (c) 2017, Bosch Software Innovations GmbH.
++ * All rights reserved.
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions are met:
++ *
++ *     * Redistributions of source code must retain the above copyright
++ *       notice, this list of conditions and the following disclaimer.
++ *     * Redistributions in binary form must reproduce the above copyright
++ *       notice, this list of conditions and the following disclaimer in the
++ *       documentation and/or other materials provided with the distribution.
++ *     * Neither the name of the Willow Garage, Inc. nor the names of its
++ *       contributors may be used to endorse or promote products derived from
++ *       this software without specific prior written permission.
++ *
++ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
++ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
++ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
++ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
++ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
++ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
++ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
++ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
++ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
++ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
++ * POSSIBILITY OF SUCH DAMAGE.
++ */
++
++#include <gtest/gtest.h>
++
++#include <QApplication>  // NOLINT: cpplint cannot handle the Qt include order
++#include <QPointer>  // NOLINT: cpplint cannot handle the Qt include order
++
++#include <memory>
++
++#include "rclcpp/rclcpp.hpp"
++#include "rviz_common/render_panel.hpp"
++#include "rviz_common/ros_integration/ros_node_abstraction.hpp"
++#include "rviz_common/view_controller.hpp"
++#include "rviz_common/view_manager.hpp"
++#include "rviz_common/visualization_manager.hpp"
++#include "rviz_rendering/render_window.hpp"
++
++#include "ogre_testing_environment.hpp"
++
++TEST(VisualizationManager, releasesCurrentAndSavedViewsBeforeRosNode)
++{
++  int argc = 1;
++  char name[] = "visualization_manager_lifecycle_test";
++  char * argv[] = {name, nullptr};
++  QApplication application(argc, argv);
++  rclcpp::init(argc, argv);
++  rviz_common::OgreTestingEnvironment rendering;
++  rendering.setUpOgreTestEnvironment();
++
++  auto abstraction =
++    std::make_shared<rviz_common::ros_integration::RosNodeAbstraction>(name);
++  auto node = abstraction->get_raw_node();
++  node->set_parameter(rclcpp::Parameter("use_sim_time", true));
++  std::weak_ptr<rclcpp::node_interfaces::NodeBaseInterface> node_base =
++    node->get_node_base_interface();
++
++  auto panel = std::make_unique<rviz_common::RenderPanel>();
++  // Expose the window before creating view meshes so Ogre has a current GL context.
++  panel->resize(320, 240);
++  panel->show();
++  QApplication::processEvents();
++  panel->getRenderWindow()->initialize();
++  QApplication::processEvents();
++  auto manager = std::make_unique<rviz_common::VisualizationManager>(
++    panel.get(), abstraction, nullptr, node->get_clock());
++  panel->initialize(manager.get());
++  QPointer<rviz_common::ViewManager> views = manager->getViewManager();
++  manager->initialize();
++  QPointer<rviz_common::ViewController> current = views->getCurrent();
++  ASSERT_NE(current, nullptr);
++  views->copyCurrentToList();
++  ASSERT_EQ(views->getNumViews(), 1);
++  QPointer<rviz_common::ViewController> saved = views->getViewAt(0);
++  ASSERT_NE(saved, nullptr);
++  ASSERT_NE(saved, current);
++
++  manager.reset();
++
++  EXPECT_TRUE(views.isNull()) << "VisualizationManager must own its ViewManager";
++  EXPECT_TRUE(current.isNull()) << "Current view must be released before its scene/context";
++  EXPECT_TRUE(saved.isNull()) << "Saved views must be released with their property model";
++  abstraction.reset();
++  node.reset();
++  EXPECT_TRUE(node_base.expired()) << "View reset-time services must release their NodeBase owner";
++
++  panel.reset();
++  rclcpp::shutdown();
++}
+diff --git a/rviz_default_plugins/include/rviz_default_plugins/displays/image/image_transport_display.hpp b/rviz_default_plugins/include/rviz_default_plugins/displays/image/image_transport_display.hpp
+index d6b8e431..639a2567 100644
+--- a/rviz_default_plugins/include/rviz_default_plugins/displays/image/image_transport_display.hpp
++++ b/rviz_default_plugins/include/rviz_default_plugins/displays/image/image_transport_display.hpp
+@@ -148,7 +148,14 @@ protected:
+ 
+   virtual void unsubscribe()
+   {
+-    subscription_callback_.disconnect();
++    // The connection holds the raw address of the subscriber filter's
++    // signal. Disconnect only while that filter is alive, and forget the
++    // connection before the filter goes, so a second unsubscribe -- onDisable
++    // and then the destructor -- cannot reach a destroyed filter.
++    if (subscription_) {
++      subscription_callback_.disconnect();
++    }
++    subscription_callback_ = message_filters::Connection();
+     subscription_.reset();
+   }
+ 

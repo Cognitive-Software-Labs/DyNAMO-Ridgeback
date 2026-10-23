@@ -34,6 +34,41 @@ estimators it may select depends on the profile and on the evidence named — se
 The root README owns complete build/run instructions. Main launch:
 [`target_distance_benchmark.launch.py`](../../src/ridgeback_autonomy/launch/target_distance_benchmark.launch.py).
 
+## Shutdown lifecycle
+
+The single-run wrapper and sweep own configuration and environment launches in
+separate sessions. The configuration must settle scene requests and attempt
+rollback before its environment is stopped; keeping only the client's ROS
+context alive is insufficient if the provider has already stopped stepping.
+
+```mermaid
+flowchart LR
+    A[Cancel received by owner] --> B[Stop configuration]
+    B --> C[Settle requests and clean scene while provider runs]
+    C --> D[Record outcome and finish workers or recording]
+    D --> E[Stop environment and its SDK helpers]
+    E --> F[Verify owned session has no living processes]
+```
+
+Normal completion retains the configuration and environment for inspection when
+`shutdown_on_complete=false`. With `true`, configuration completion closes the
+environment. Existing layer readiness gates still control startup. Repeated
+interrupts during cleanup are coalesced; cleanup failure remains a failure, and
+the owner still attempts bounded environment cleanup.
+
+Ownership covers all process groups within each newly created session, including
+SDK helpers that change process group. It does not use user-wide process-name
+matches. Recorder finalization precedes forced termination. Crashed children and
+launch-internal SIGTERM/SIGKILL escalation propagate a nonzero status through the
+inner launch, supervisor, and public wrapper. Saved measurements remain separate
+from these lifecycle outcomes; see [output provenance](outputs.md#sweep-outputs).
+
+Ordered benchmark shutdown prevents the application from intentionally tearing
+down a provider during rollback. Providers must independently tolerate direct
+shutdown with outstanding requests; that dependency investigation and remaining
+RViz/bridge qualification live in the
+[shutdown plan](../plans/BENCHMARKING_shutdown_lifecycle.md).
+
 ## Exploration evaluation
 
 `tools/benchmark/` is the instrumented **exploration** harness — a probe and a
@@ -55,3 +90,7 @@ camera-less robot profile for measuring frontier exploration. It is a separate w
   substrate
 - [scenario gallery](benchmark_scenarios_v2_gallery.html) — visual reference for
   the packaged scene set
+
+## Archived evidence
+
+- [Benchmark shutdown ordering and RViz node ownership](../../archive/engineering/2026-10-23-benchmark-shutdown-ownership.md)
