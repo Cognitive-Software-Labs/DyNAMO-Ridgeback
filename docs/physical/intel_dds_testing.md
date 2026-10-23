@@ -1,5 +1,13 @@
 # Intel local DDS comparison
 
+**Retired with the vendor camera unit (2026-10-16).** This runner restarts
+`realsense-camera.service` and rewrites its start script; since
+`dynamo-camera.service` owns the D455 it refuses to start (except `--recover`
+for old runs). Its current-profile check is replaced by
+`tools/camera_contract_check` reader runs, which need no root: the S2 matrix and
+S4 soak in the [camera deployment reference](robot_local_deployment.md). The
+A/B comparison below is historical; the passing profile was retained.
+
 This procedure tests local camera delivery, physical-port traffic, and LiDAR
 continuity on `r100_0160`. It compares the installed services configuration
 with discovery-only multicast. The [transport reference](intel_thor_transport.md)

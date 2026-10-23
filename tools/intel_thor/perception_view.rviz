@@ -1,0 +1,156 @@
+# Read-only Thor perception view. Camera, overlays, robot and laser context.
+# Box gating has no standalone person-mask image publisher.
+Panels:
+- Class: rviz_common/Displays
+  Name: Displays
+- Class: rviz_common/Views
+  Name: Views
+Visualization Manager:
+  Class: ''
+  Displays:
+  - Class: rviz_default_plugins/Grid
+    Enabled: true
+    Name: Grid
+    Plane Cell Count: 10
+    Cell Size: 1
+    Value: true
+  - Class: rviz_default_plugins/Image
+    Enabled: true
+    Name: Perception overlay
+    Normalize Range: true
+    Queue Size: 5
+    Topic:
+      Depth: 5
+      Durability Policy: Volatile
+      History Policy: Keep Last
+      Reliability Policy: Best Effort
+      Value: debug/target/overlay
+    Value: true
+  - Class: rviz_default_plugins/Image
+    Enabled: true
+    Name: Camera colour
+    Normalize Range: true
+    Queue Size: 5
+    Topic:
+      Depth: 5
+      Durability Policy: Volatile
+      History Policy: Keep Last
+      Reliability Policy: Best Effort
+      Value: sensors/camera_0/color/image
+    Value: true
+  - Class: rviz_default_plugins/MarkerArray
+    Enabled: true
+    Name: Target estimates
+    Namespaces:
+      target_estimates/projective_ranging: true
+      target_estimates/euclidean_reconstruction: true
+    Topic:
+      Depth: 5
+      Durability Policy: Volatile
+      History Policy: Keep Last
+      Reliability Policy: Reliable
+      Value: visualization/target/estimates
+    Value: true
+  - Class: rviz_2d_overlay_plugins/TextOverlay
+    Enabled: true
+    Name: Target distances
+    Topic:
+      Depth: 10
+      Durability Policy: Volatile
+      History Policy: Keep Last
+      Reliability Policy: Reliable
+      Value: hud/target_distances
+    Value: true
+    Overtake Position Properties: true
+    Overtake FG Color Properties: true
+    Overtake BG Color Properties: true
+    width: 640
+    height: 160
+    text size: 20
+    hor_dist: 20
+    ver_dist: 20
+    hor_alignment: left
+    ver_alignment: top
+    Foreground Color: 255; 255; 255
+    Foreground Alpha: 1.0
+    Background Color: 0; 0; 0
+    Background Alpha: 0.6
+  - Class: rviz_default_plugins/RobotModel
+    Name: Ridgeback
+    Enabled: true
+    Value: true
+    Description Source: Topic
+    Description Topic:
+      Depth: 1
+      Durability Policy: Transient Local
+      History Policy: Keep Last
+      Reliability Policy: Reliable
+      Value: robot_description
+  - Class: rviz_default_plugins/LaserScan
+    Name: Front laser
+    Enabled: true
+    Value: true
+    Topic:
+      Depth: 5
+      Durability Policy: Volatile
+      History Policy: Keep Last
+      Reliability Policy: Best Effort
+      Value: sensors/lidar2d_0/scan
+    Style: Points
+    Size (m): 0.025
+    Color Transformer: FlatColor
+    Color: 255; 120; 50
+  - Class: rviz_default_plugins/LaserScan
+    Name: Rear laser
+    Enabled: true
+    Value: true
+    Topic:
+      Depth: 5
+      Durability Policy: Volatile
+      History Policy: Keep Last
+      Reliability Policy: Best Effort
+      Value: sensors/lidar2d_1/scan
+    Style: Points
+    Size (m): 0.025
+    Color Transformer: FlatColor
+    Color: 80; 180; 255
+  Enabled: true
+  Global Options:
+    Background Color: 48; 48; 48
+    Fixed Frame: base_link
+    Frame Rate: 30
+  Name: root
+  Tools:
+  - Class: rviz_default_plugins/MoveCamera
+  Value: true
+  Views:
+    Current:
+      Class: rviz_default_plugins/Orbit
+      Distance: 6
+      Focal Point:
+        X: 2
+        Y: 0
+        Z: 0
+      Name: Current View
+      Pitch: 0.9
+      Value: Orbit (rviz)
+      Yaw: 3.14
+    Saved: null
+Window Geometry:
+  Displays:
+    collapsed: false
+  Height: 1020
+  Hide Left Dock: false
+  Hide Right Dock: false
+  Perception overlay:
+    collapsed: false
+  QMainWindow State: 000000ff00000000fd00000002000000000000017c000002a5fc0200000004fb000000100044006900730070006c0061007900730100000011000000a50000001a00fffffffb0000001200530065006c0065006300740069006f006e01000000bc000000a50000001a00fffffffb0000001e0054006f006f006c002000500072006f00700065007200740069006500730100000167000000a40000001a00fffffffb0000000a005600690065007700730100000211000000a50000001a00ffffff00000003000007800000012cfc0100000001fb0000002400500065007200630065007000740069006f006e0020006f007600650072006c006100790100000000000007800000004100ffffff000005fe000002a500000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
+  Selection:
+    collapsed: false
+  Tool Properties:
+    collapsed: false
+  Views:
+    collapsed: false
+  Width: 1920
+  X: 0
+  Y: 30

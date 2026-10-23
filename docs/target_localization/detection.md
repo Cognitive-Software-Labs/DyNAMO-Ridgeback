@@ -32,6 +32,18 @@ latest available frame. Frames superseded before processing are intentionally
 dropped. This bounds queued work when inference is slower than the camera and
 prevents latency from growing without limit.
 
+The detector's RGB subscription uses best-effort, volatile, keep-last QoS
+with depth **1**. This bounds the pending middleware queue as well as the
+worker's single pending slot. It does not cancel inference already in progress
+or bound camera/transport delay. Other consumers keep their own QoS.
+
+Depth and LiDAR measurement inputs deliberately retain history: the mask worker
+uses the exact depth timestamp of the detected RGB image and the nearest scan
+within the configured tolerance (default 50 ms). Their sensor-data subscription
+depth is 5; separate timestamp buffers retain 15 depth frames and 20 scans.
+These are lookup histories, not a FIFO inference backlog. Replacing them with
+only the newest sample would mix acquisition times or cause lookup misses.
+
 The detector loads its model during node construction before creating the
 publisher. Consequently, the raw-detections publisher is also the launch layer's
 warm-model readiness signal. Starting target localization without the required
@@ -114,3 +126,32 @@ label separation, and input immutability.
 checks model injection, configured-threshold forwarding, and worker survival
 after inference failure. End-to-end hardware imagery and target-class expansion
 remain separate validation questions.
+
+## Timing interpretation
+
+Result headers preserve source-image time. Subtracting that timestamp from
+observer receipt time measures image age at that observer, including upstream
+work and delivery. Cross-host differences require synchronized clocks; the
+header alone does not establish physical exposure time. Output frequency is
+not latency, and receipt of an overlay is not its appearance on a screen.
+
+The constructor-only `detector_debug` switch enables bounded cold/warm stage
+statistics: cadence wait, pending-slot age, image decode/preparation, the
+detector adapter call (`inference`), parsing, publication, and total worker step.
+The inference call includes adapter preprocessing/postprocessing, not only GPU
+kernels. Diagnostic CUDA synchronization changes execution slightly, so keep
+it off for ordinary operation. `depth_match_debug` on the mask worker reports
+exact-depth availability, detection queue wait, depth preparation and estimator
+reduction. Its `publication_age_ms` is elapsed time since detection receipt,
+not age since the camera timestamp. Counters for stage execution and whole
+batches can describe different populations, especially with no target present.
+The first five samples of each timing statistic are excluded from warm figures.
+
+Compare matched frames and equivalent scenes/configurations before attributing
+an improvement. Do not sum independent stage medians as an exact frame trace.
+Internal model time, camera/transport age, result delivery, and display delay
+need separate measurements.
+
+## Archived evidence
+
+- [October 22 Intel–Thor frame timing and depth-one deployment](../../archive/engineering/2026-10-22-perception-frame-timing.md)

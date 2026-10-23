@@ -67,7 +67,7 @@ source, a wrong pin, unsafe archive entries and failed input verification.
 Outputs must be below repository `artifacts/` or `/tmp/`; it cannot prepare into
 an installed host path.
 
-The output contains source under `src/`, 38 inert candidates under
+The output contains source under `src/`, inert candidates under
 `host-files/`, and `RECOVERY_PREPARATION.json` with destinations, required owner,
 mode, hashes and provenance. Candidate files remain mode 0644 until deliberately
 installed. Nothing under `/etc`, `/usr/local`, `/opt` or `/home/robot` is changed.
@@ -105,6 +105,26 @@ unit still carries the original command as capture evidence, but the drop-in
 replaces that command. Confirm the resulting effective `ExecStart` before use.
 The historical `/opt/mybotshop/scripts/joy_x_combiner.py` path is retained for
 compatibility; this is a standalone preserved script, not a vendor workspace.
+
+Four additional candidates implement the maintained
+[commissioning caps](driving_readiness.md#commissioning-caps): a pinned Python
+guard, a launch wrapper, its unit and a platform drop-in. Their source is
+`tools/hardware/install_commissioning_caps.py`, not the captured baseline.
+Install them before qualifying the recovered base. The wrapper includes the
+generated platform job and applies the controller remap without editing
+generated Clearpath files. Keep the physical stop engaged until command routing
+and the guarded motion checks pass; these candidates do not certify recovery.
+The maintained candidate includes a reliable e-stop relay and a mux-only remap
+for the native firmware/mux QoS mismatch. The
+[stop-delivery reference](driving_readiness.md#e-stop-delivery-to-the-mux) owns
+deployment status and verification. Keep the original firmware stop topic
+for the guard and other consumers; do not apply a global e-stop-topic remap.
+
+The official Puma 2.9.4 package has a confirmed diagnostic fault-decoding
+defect. The [wheel-feedback reference](drive_feedback_diagnostics.md) owns its
+maintained source patch and verification. That patch is prepared, not included
+in the installed/candidate base package here; fresh-host qualification must
+check raw fault masks and must not trust the affected human-readable flags.
 
 ## Install selected host candidates on the replacement host
 
@@ -181,6 +201,25 @@ was inspected without executing nodes. No ROS subscribers, base commands,
 service restarts, desktop transitions or host-file installations were performed
 for this reconstruction check.
 
+The 2026-10-12 stationary audit rechecked the original captured-input manifest.
+The missing camera tools/templates were recovered from the installed camera's
+recorded Git revision and verified against installed state. The manifest now
+contains labelled camera and stationary-setup snapshots;
+`camera.json` selects serial/profile and the preparer regenerates the direct
+camera service instead of the vendor camera wrapper. Camera setup ownership and
+remaining application-topic reconciliation live in
+[robot-local deployment](robot_local_deployment.md).
+
+The preparer also uses the maintained stationary desktop/Bluetooth renderer.
+Its autoconnect helper no longer restarts platform services. The six-file
+desktop/Bluetooth repair was installed and independently verified stationary
+on 2026-10-12; all protected hardware process IDs were unchanged. Its exact
+receipt is under `artifacts/hardware/20261012-stationary-setup-install/`.
+The deployment manifest now includes 89 files with per-entry capture dates;
+maintained renderers remain authoritative. Cold boot and live reconnect
+qualification remain open. Public stage,
+apply and receipt-based rollback commands are in the root README.
+
 A full recovery has not been demonstrated. On 2026-10-06 the user chose to
 preserve the instructions and commit the inputs without performing a spare-SSD
 restoration. No separate recovery rehearsal is scheduled. During an actual
@@ -205,3 +244,27 @@ webserver overrides into source before rebuilding and verifying its imports.
 These repository changes still require normal review/commit/publication to
 survive loss of this checkout. The project remote is public: do not publish
 private vendor archives, sources, credentials or keys as part of that step.
+
+The commissioning guard additionally has an optional temporary test lock,
+selected by the caps installer’s `--test-interlock`. Do not enable it for normal
+manual operation: it blocks all motion without a fresh bounded test permit.
+Its source, installation and exact receipt-based rollback are maintained in the
+[root operator workflow](../../README.md) and
+[test-lock contract](driving_readiness.md#temporary-commissioning-test-interlock).
+Recovery defaults to the normal capped guard. The temporary mode was installed
+and verified stationary on 2026-10-09; its receipt is under
+`artifacts/hardware/20261009-test-interlock-install/`. Recreate that temporary
+state explicitly with `--test-interlock` only when resuming commissioning tests.
+
+The optional pinned Puma repair is reconstructed by the maintained
+`tools/hardware/build_puma_repair.py` and `install_puma_repair.py`, using the
+official 2.9.4 source archive and tracked fault/cache patches. Follow the
+[root build/install/rollback workflow](../../README.md). The installer recreates
+a root-controlled package prefix plus DDS interface-readiness and scoped platform
+overlay drop-ins, preserving the exact normal/test-interlocked capped guard.
+The corrected repair was installed and verified stationary on 2026-10-12; its
+receipt is under `artifacts/hardware/20261012-puma-repair-install/`. The older
+October 9 compiled candidate was unpatched and is withdrawn. Do not reuse artifacts as the recovery
+configuration authority: rebuild, verify actual applied patches and dependencies,
+and create a fresh deployment receipt. Cold boot and per-wheel freshness remain
+unqualified even after a successful stationary installation.

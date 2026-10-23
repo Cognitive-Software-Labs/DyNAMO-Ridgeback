@@ -1,21 +1,26 @@
 [Unit]
 Description=Independent Ridgeback VNC desktop
-After=network.target
+Wants=network.target
+Requires=user@1000.service
+After=network.target user@1000.service
 Before=mbs-webserver.service
+StartLimitIntervalSec=0
 
 [Service]
-Type=forking
+Type=exec
 User=robot
 Group=robot
 Environment=HOME=/home/robot
+Environment=XDG_RUNTIME_DIR=/run/user/1000
+Environment=DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus
+Environment=__EGL_VENDOR_LIBRARY_FILENAMES=/usr/share/glvnd/egl_vendor.d/50_mesa.json
+Environment=LIBGL_ALWAYS_SOFTWARE=1
 WorkingDirectory=/home/robot
-PIDFile=/home/robot/.vnc/%H:1.pid
 ExecStartPre=/usr/bin/vncserver -list :1 -cleanstale
-ExecStart=/usr/bin/vncserver :1 -geometry 1920x1080 -depth 24 -localhost no
+ExecStart=/usr/bin/vncserver :1 -fg -geometry 1920x1080 -depth 24 -localhost no -xstartup /usr/local/lib/dynamo-hardware/vnc-xstartup
 ExecStop=/usr/bin/vncserver -kill :1
-Restart=on-failure
+Restart=always
 RestartSec=3
-TimeoutStartSec=45
 TimeoutStopSec=20
 
 [Install]

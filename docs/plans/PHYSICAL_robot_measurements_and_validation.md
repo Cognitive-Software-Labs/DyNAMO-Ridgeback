@@ -42,7 +42,7 @@ merged-scan comparison do not clear the transport or recovery gates.
 | Camera TF and application smoke | Camera frames were reported disconnected from the robot tree. | Establish one camera-to-base TF owner using observed frame IDs, then validate exact-depth localization smoke. |
 | Front and rear LiDARs | **Box checks done 2026-09-18; rear-offset recheck and stationary merged-scan comparison done 2026-09-24.** Both pass near/far/side checks; 40 Hz, ±135°, 0.25° individual-scan timing and geometry were recorded. The corrected rear x = −0.3922 m passes independent stationary side-target checks with about 8–10 mm median front/rear point agreement. The merged box returns match individual returns within 8.2 mm at the 95th percentile in a ten-second capture; see [archived evidence](#archived-evidence). A timeout/reconnect incident is reported. | Stable recovery evidence. The ten-second merged capture does not establish long-run reliability or timeout recovery. |
 | Camera–LiDAR alignment | No completed projection-overlay check is committed. | Near/farther/off-centre overlays and an independent placement after any correction. |
-| IMU, odometry and command-chain inspection | No completed stationary validation report is committed. | At-rest observations and configuration inspection, without base commands. |
+| IMU, odometry and command-chain inspection | A 2026-10-13 passive at-rest capture observed raw/processed IMU near 50 Hz and zero raw odometry near 20 Hz; command-chain findings are owned by the driving reference. | IMU orientation uncertainty, calibration and longer bias/drift qualification; dynamic wheel/odometry validation is separate. |
 | G1/person integration | No completed distributed target runs are committed. | Both labels, required mask/depth modes, empty-scene behavior, and joint run evidence. |
 
 The [geometry reference](../robot/geometry.md#deployed-hardware-mounts) separates
@@ -270,6 +270,10 @@ an accuracy benchmark. The joint tests below extend this initial smoke to the
 required model modes after their GPU environment and inputs are qualified.
 
 ## Both LiDARs and stationary auxiliary sensors
+
+The [at-rest auxiliary capture](../physical/stationary_auxiliary_checks.md)
+records the October 13 rates, battery-field limitations, IMU covariance and
+clock-correction findings; these do not close calibration or dynamic gates.
 
 The September 18 near/far/side box checks and 60 s individual-scan timing
 capture are complete for their recorded setup. The September 24 independent

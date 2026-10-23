@@ -1,0 +1,16 @@
+#!/bin/sh
+unset SESSION_MANAGER DBUS_SESSION_BUS_ADDRESS
+export XDG_SESSION_TYPE=x11
+# Graphics selection applies to the virtual X server only. Applications keep
+# their own GPU selection, including ROS processes launched from this desktop.
+unset __EGL_VENDOR_LIBRARY_FILENAMES LIBGL_ALWAYS_SOFTWARE
+# Isolate XFCE's session bus from any physical-console desktop. Keep the valid
+# per-user runtime directory without overwriting the user manager's DISPLAY.
+if command -v startxfce4 >/dev/null 2>&1; then
+    exec dbus-run-session -- startxfce4
+elif command -v openbox-session >/dev/null 2>&1; then
+    exec dbus-run-session -- openbox-session
+else
+    xsetroot -solid grey
+    exec xterm
+fi

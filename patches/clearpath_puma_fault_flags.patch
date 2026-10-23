@@ -1,0 +1,12 @@
+diff --git a/clearpath_motor_drivers/puma_motor_driver/src/multi_puma_node.cpp b/clearpath_motor_drivers/puma_motor_driver/src/multi_puma_node.cpp
+--- a/clearpath_motor_drivers/puma_motor_driver/src/multi_puma_node.cpp
++++ b/clearpath_motor_drivers/puma_motor_driver/src/multi_puma_node.cpp
+@@ -248,7 +248,7 @@
+ 
+   // fault flags; these are a bit field
+   for (auto label : FAULT_FLAG_LABELS_) {
+-    bool flag = (status_msg_.drivers[i].fault >> label.first) & 0x01;
++    bool flag = (status_msg_.drivers[i].fault & label.first) != 0;
+     stat.add(label.second, flag ? "True" : "False");
+     if (flag) {
+       // raise a warning if there's a fault

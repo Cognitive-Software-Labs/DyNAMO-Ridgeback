@@ -79,7 +79,10 @@ shared types live in `ridgeback_interfaces`. See the
 | `mission/status` | `std_msgs/msg/String` JSON | Frontier owner; required, paused, healthy, reason, cancellation, goal_pending |
 | `mission/resume` | `std_srvs/srv/Trigger` | Explicit resume on the frontier owner; unavailable when frontier is not launched |
 
-Sensor subscriptions use ROS sensor-data QoS. Health observes color and selected
+Sensor subscriptions generally use ROS sensor-data QoS; the detector's RGB
+subscription uses best-effort keep-last depth 1, as described in
+[detection scheduling](detection.md#frame-and-scheduling-behavior).
+Health observes color and selected
 sensor streams (CameraInfo, stereo depth, scan, or organized pointcloud), raw
 detections, and every selected measurement output. Configure those topics to
 match the actual producers; optional pointcloud requires explicit hardware

@@ -650,3 +650,12 @@ def test_restart_guard_tracks_ros_workers_but_not_temporary_helpers(tmp_path, mo
     monkeypatch.setattr(runner, 'Path', lambda value: proc if value == '/proc' else original_path(value))
     monkeypatch.setattr(runner, 'process_tree', lambda pid: {str(i): i * 100 for i in range(1, 6)})
     assert runner.persistent_ros_tree(1) == {'1': 100, '2': 200, '3': 300}
+
+
+def test_refuses_before_anything_when_the_camera_service_owns_the_camera(monkeypatch, tmp_path, capsys):
+    monkeypatch.setattr(runner, 'vendor_camera_retired', lambda: True)
+    monkeypatch.setattr(runner.sys, 'argv', ['run_local_dds_test.py', '--operator-confirmed',
+                                              '--verify-current', '--run-dir', str(tmp_path / 'run')])
+    assert runner.main() == 2
+    assert 'dynamo-camera.service owns the camera' in capsys.readouterr().err
+    assert not (tmp_path / 'run').exists()

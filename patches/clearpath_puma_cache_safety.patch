@@ -1,0 +1,106 @@
+diff --git a/clearpath_motor_drivers/puma_motor_driver/include/puma_motor_driver/driver.hpp b/clearpath_motor_drivers/puma_motor_driver/include/puma_motor_driver/driver.hpp
+--- a/clearpath_motor_drivers/puma_motor_driver/include/puma_motor_driver/driver.hpp
++++ b/clearpath_motor_drivers/puma_motor_driver/include/puma_motor_driver/driver.hpp
+@@ -26,6 +26,7 @@
+ 
+ #include <stdint.h>
+ #include <string>
++#include <cstring>
+ 
+ #include <rclcpp/rclcpp.hpp>
+ 
+@@ -455,12 +456,16 @@
+ 
+     float interpretFixed8x8()
+     {
+-      return *(reinterpret_cast<int16_t *>(data)) / static_cast<float>(1 << 8);
++      int16_t value;
++      std::memcpy(&value, data, sizeof(value));
++      return value / static_cast<float>(1 << 8);
+     }
+ 
+     double interpretFixed16x16()
+     {
+-      return *(reinterpret_cast<int32_t *>(data)) / static_cast<double>(1 << 16);
++      int32_t value;
++      std::memcpy(&value, data, sizeof(value));
++      return value / static_cast<double>(1 << 16);
+     }
+   };
+ 
+@@ -513,13 +518,16 @@
+    */
+   bool verifyRaw8x8(const uint8_t * received, const float expected);
+ 
+-  Field voltage_fields_[4];
+-  Field spd_fields_[7];
+-  Field vcomp_fields_[5];
+-  Field pos_fields_[7];
+-  Field ictrl_fields_[6];
+-  Field status_fields_[15];
+-  Field cfg_fields_[15];
++  // The protocol encodes a four-bit field index, including status analog input 15.
++  static constexpr uint32_t CACHE_FIELD_COUNT =
++    (CAN_MSGID_API_ID_M >> CAN_MSGID_API_S) + 1;
++  Field voltage_fields_[CACHE_FIELD_COUNT];
++  Field spd_fields_[CACHE_FIELD_COUNT];
++  Field vcomp_fields_[CACHE_FIELD_COUNT];
++  Field pos_fields_[CACHE_FIELD_COUNT];
++  Field ictrl_fields_[CACHE_FIELD_COUNT];
++  Field status_fields_[CACHE_FIELD_COUNT];
++  Field cfg_fields_[CACHE_FIELD_COUNT];
+ 
+   Field * voltageFieldForMessage(uint32_t api);
+   Field * spdFieldForMessage(uint32_t api);
+diff --git a/clearpath_motor_drivers/puma_motor_driver/src/driver.cpp b/clearpath_motor_drivers/puma_motor_driver/src/driver.cpp
+--- a/clearpath_motor_drivers/puma_motor_driver/src/driver.cpp
++++ b/clearpath_motor_drivers/puma_motor_driver/src/driver.cpp
+@@ -95,29 +95,29 @@
+   }
+ 
+   // If there's no data then this is a request message, jump out.
+-  if (received_msg.dlc == 0) {
++  if (received_msg.dlc == 0 || received_msg.dlc > received_msg.data.size()) {
+     return;
+   }
+ 
+   Field * field = nullptr;
+   uint32_t received_api = getApi(received_msg);
+-  if ((received_api & CAN_MSGID_API_M & CAN_API_MC_CFG) == CAN_API_MC_CFG) {
++  if ((received_api & CAN_MSGID_API_CLASS_M) == CAN_API_MC_CFG) {
+     field = cfgFieldForMessage(received_api);
+-  } else if ((received_api & CAN_MSGID_API_M & CAN_API_MC_STATUS) == CAN_API_MC_STATUS) {
++  } else if ((received_api & CAN_MSGID_API_CLASS_M) == CAN_API_MC_STATUS) {
+     field = statusFieldForMessage(received_api);
+-  } else if ((received_api & CAN_MSGID_API_M & CAN_API_MC_ICTRL) == CAN_API_MC_ICTRL) {
++  } else if ((received_api & CAN_MSGID_API_CLASS_M) == CAN_API_MC_ICTRL) {
+     field = ictrlFieldForMessage(received_api);
+     can_feedback_freq_status_->tick();
+-  } else if ((received_api & CAN_MSGID_API_M & CAN_API_MC_POS) == CAN_API_MC_POS) {
++  } else if ((received_api & CAN_MSGID_API_CLASS_M) == CAN_API_MC_POS) {
+     field = posFieldForMessage(received_api);
+     can_feedback_freq_status_->tick();
+-  } else if ((received_api & CAN_MSGID_API_M & CAN_API_MC_VCOMP) == CAN_API_MC_VCOMP) {
++  } else if ((received_api & CAN_MSGID_API_CLASS_M) == CAN_API_MC_VCOMP) {
+     field = vcompFieldForMessage(received_api);
+     can_feedback_freq_status_->tick();
+-  } else if ((received_api & CAN_MSGID_API_M & CAN_API_MC_SPD) == CAN_API_MC_SPD) {
++  } else if ((received_api & CAN_MSGID_API_CLASS_M) == CAN_API_MC_SPD) {
+     field = spdFieldForMessage(received_api);
+     can_feedback_freq_status_->tick();
+-  } else if ((received_api & CAN_MSGID_API_M & CAN_API_MC_VOLTAGE) == CAN_API_MC_VOLTAGE) {
++  } else if ((received_api & CAN_MSGID_API_CLASS_M) == CAN_API_MC_VOLTAGE) {
+     field = voltageFieldForMessage(received_api);
+     can_feedback_freq_status_->tick();
+   }
+@@ -127,7 +127,9 @@
+   }
+ 
+   // Copy the received data and mark that field as received.
+-  std::copy_n(std::begin(received_msg.data), Field::FIELD_STRUCT_DATA_SIZE,
++  std::fill(std::begin(field->data), std::end(field->data), 0);
++  std::copy_n(std::begin(received_msg.data),
++    std::min<size_t>(received_msg.dlc, Field::FIELD_STRUCT_DATA_SIZE),
+     std::begin(field->data));
+   field->received = true;
+ }

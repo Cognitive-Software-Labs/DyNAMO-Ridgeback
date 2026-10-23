@@ -1,0 +1,222 @@
+--- a/clearpath_motor_drivers/puma_motor_driver/include/puma_motor_driver/driver.hpp
++++ b/clearpath_motor_drivers/puma_motor_driver/include/puma_motor_driver/driver.hpp
+@@ -38,6 +38,7 @@
+ #include "diagnostic_updater/update_functions.hpp"
+ 
+ #include "puma_motor_driver/can_proto.hpp"
++#include "puma_motor_driver/puma_field_freshness.hpp"
+ 
+ namespace puma_motor_driver
+ {
+@@ -51,7 +52,14 @@
+     const uint8_t & device_number,
+     const std::string & device_name);
+ 
+-  void processMessage(const can_hardware::Frame & frame);
++  void processMessage(const can_hardware::Frame & frame, int64_t ingress_ns);
++
++  bool feedbackReady(int64_t now_ns) const
++  {
++    return control_mode_ == clearpath_motor_msgs::msg::PumaStatus::MODE_SPEED &&
++           feedback_fields_.ready(now_ns);
++  }
++  void feedbackPublished() {feedback_fields_.published();}
+ 
+   double radPerSecToRpm() const;
+ 
+@@ -479,6 +487,8 @@
+   uint8_t device_number_;
+   std::string device_name_;
+ 
++  // Candidate bounds (motion 150 ms, auxiliary 500 ms); live qualification pending.
++  dynamo::PumaFieldFreshness feedback_fields_{150000000, 500000000};
+   bool configured_;
+   uint8_t state_;
+   double last_power_clear_ts_;
+--- a/clearpath_motor_drivers/puma_motor_driver/include/puma_motor_driver/multi_puma_node.hpp
++++ b/clearpath_motor_drivers/puma_motor_driver/include/puma_motor_driver/multi_puma_node.hpp
+@@ -133,6 +133,7 @@
+    * and status messages.
+   */
+   void run();
++  void processQueuedFrames();
+ 
+ private:
+   using DiagnosticStatusWrapper = diagnostic_updater::DiagnosticStatusWrapper;
+@@ -153,7 +154,12 @@
+   std::vector<int64_t> joint_can_ids_;
+   std::vector<int64_t> joint_directions_;
+ 
+-  std::queue<can_hardware::Frame> recv_msg_queue_;
++  struct ReceivedFrame
++  {
++    can_hardware::Frame frame;
++    int64_t ingress_ns = 0;
++  };
++  std::queue<ReceivedFrame> recv_msg_queue_;
+   std::mutex recv_msg_mutex_;
+ 
+   clearpath_motor_msgs::msg::PumaMultiStatus status_msg_;
+--- a/clearpath_motor_drivers/puma_motor_driver/src/driver.cpp
++++ b/clearpath_motor_drivers/puma_motor_driver/src/driver.cpp
+@@ -26,6 +26,7 @@
+ #include "puma_motor_driver/driver.hpp"
+ 
+ #include <string>
++#include <chrono>
+ #include <cstring>
+ #include <math.h>
+ #include "rclcpp/rclcpp.hpp"
+@@ -87,8 +88,11 @@
+   );
+ }
+ 
+-void Driver::processMessage(const can_hardware::Frame & received_msg)
+-{
++void Driver::processMessage(const can_hardware::Frame & received_msg, int64_t ingress_ns)
++{
++  if (received_msg.is_error || received_msg.is_rtr || !received_msg.is_extended) {
++    return;
++  }
+   // If it's not our message, jump out.
+   if (getDeviceNumber(received_msg) != device_number_) {
+     return;
+@@ -126,6 +130,20 @@
+     return;
+   }
+ 
++  // Receipt metadata uses callback ingress time, never dequeue/publication time.
++  // Only speed-mode setpoint layout is supported by this offline candidate.
++  int feedback_field = -1;
++  if (received_api == getApi(getMsg(LM_API_STATUS_VOLTOUT))) feedback_field = 0;
++  if (received_api == getApi(getMsg(LM_API_STATUS_CURRENT))) feedback_field = 1;
++  if (received_api == getApi(getMsg(LM_API_STATUS_POS))) feedback_field = 2;
++  if (received_api == getApi(getMsg(LM_API_STATUS_SPD))) feedback_field = 3;
++  if (received_api == getApi(getMsg(LM_API_SPD_SET))) feedback_field = 4;
++  if (feedback_field >= 0 && !feedback_fields_.receive(
++      static_cast<dynamo::PumaFieldFreshness::Field>(feedback_field), ingress_ns,
++      received_msg.dlc)) {
++    return;
++  }
++
+   // Copy the received data and mark that field as received.
+   std::fill(std::begin(field->data), std::end(field->data), 0);
+   std::copy_n(std::begin(received_msg.data),
+@@ -565,6 +583,7 @@
+ 
+ void Driver::clearMsgCache()
+ {
++  feedback_fields_.clear();
+   // Set it all to zero, which will in part clear
+   // the boolean flags to be false.
+   memset(voltage_fields_, 0, sizeof(voltage_fields_));
+@@ -634,6 +653,7 @@
+ 
+ void Driver::resetConfiguration()
+ {
++  feedback_fields_.clear();
+   configured_ = false;
+   state_ = ConfigurationState::Initializing;
+ }
+@@ -1048,6 +1068,12 @@
+ void Driver::runFreqStatus(diagnostic_updater::DiagnosticStatusWrapper & stat)
+ {
+   can_feedback_freq_status_->run(stat);
++  const auto now_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
++    std::chrono::steady_clock::now().time_since_epoch()).count();
++  const auto motion_ns = feedback_fields_.motion_age_ns(now_ns);
++  const auto auxiliary_ns = feedback_fields_.auxiliary_age_ns(now_ns);
++  stat.add("Oldest motion field age (ms)", motion_ns < 0 ? -1.0 : motion_ns / 1e6);
++  stat.add("Oldest auxiliary field age (ms)", auxiliary_ns < 0 ? -1.0 : auxiliary_ns / 1e6);
+ 
+   // Diagnostics inspect a value copy so they do not consume publish flags.
+   Driver cached = *this;
+--- a/clearpath_motor_drivers/puma_motor_driver/src/multi_puma_node.cpp
++++ b/clearpath_motor_drivers/puma_motor_driver/src/multi_puma_node.cpp
+@@ -22,6 +22,7 @@
+ ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+ #include <string>
++#include <chrono>
+ 
+ #include "puma_motor_driver/multi_puma_node.hpp"
+ 
+@@ -132,15 +133,10 @@
+ 
+ bool MultiPumaNode::getFeedback()
+ {
+-  // Check All Fields Received
+-  for (auto & driver : drivers_) {
+-    uint8_t received = 0;
+-    received |= driver.receivedDutyCycle() << FeedbackBit::DutyCycle;
+-    received |= driver.receivedCurrent() << FeedbackBit::Current;
+-    received |= driver.receivedPosition() << FeedbackBit::Position;
+-    received |= driver.receivedSpeed() << FeedbackBit::Speed;
+-    received |= driver.receivedSetpoint() << FeedbackBit::Setpoint;
+-    if (received != (1 << FeedbackBit::Count) - 1) {
++  const auto now_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
++    std::chrono::steady_clock::now().time_since_epoch()).count();
++  for (const auto & driver : drivers_) {
++    if (!driver.feedbackReady(now_ns)) {
+       return false;
+     }
+   }
+@@ -212,6 +208,9 @@
+ {
+   if (getFeedback()) {
+     feedback_pub_->publish(feedback_msg_);
++    for (auto & driver : drivers_) {
++      driver.feedbackPublished();
++    }
+   }
+ }
+ 
+@@ -285,8 +284,28 @@
+ 
+ void MultiPumaNode::frameCallback(const can_hardware::Frame& frame)
+ {
++  const auto ingress_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
++    std::chrono::steady_clock::now().time_since_epoch()).count();
+   std::lock_guard<std::mutex> lock(recv_msg_mutex_);
+-  recv_msg_queue_.push(frame);
++  recv_msg_queue_.push(ReceivedFrame{frame, ingress_ns});
++}
++
++void MultiPumaNode::processQueuedFrames()
++{
++  while (true) {
++    ReceivedFrame received;
++    {
++      std::lock_guard<std::mutex> lock(recv_msg_mutex_);
++      if (recv_msg_queue_.empty()) {
++        break;
++      }
++      received = std::move(recv_msg_queue_.front());
++      recv_msg_queue_.pop();
++    }
++    for (auto & driver : drivers_) {
++      driver.processMessage(received.frame, received.ingress_ns);
++    }
++  }
+ }
+ 
+ void MultiPumaNode::run()
+@@ -316,17 +335,7 @@
+     }
+   }
+ 
+-  while (!recv_msg_queue_.empty()) {
+-    can_hardware::Frame frame;
+-    {
+-      std::lock_guard<std::mutex> lock(recv_msg_mutex_);
+-      frame = std::move(recv_msg_queue_.front());
+-      recv_msg_queue_.pop();
+-    }
+-    for (auto & driver : drivers_) {
+-      driver.processMessage(frame);
+-    }
+-  }
++  processQueuedFrames();
+ 
+   // Check parameters of each driver instance.
+   if (!active_) {

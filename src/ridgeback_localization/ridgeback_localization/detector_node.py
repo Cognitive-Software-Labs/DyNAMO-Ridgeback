@@ -11,7 +11,7 @@ import rclpy
 from rclpy.executors import ExternalShutdownException
 from rclpy.logging import get_logger
 from rclpy.node import Node
-from rclpy.qos import qos_profile_sensor_data
+from rclpy.qos import QoSProfile, ReliabilityPolicy
 from sensor_msgs.msg import Image
 
 from ridgeback_common.messages import build_detections_message
@@ -176,7 +176,8 @@ class TargetDetectorNode(Node):
             Image,
             self.color_topic,
             self.on_color_image,
-            qos_profile_sensor_data,
+            # Keep only the newest image upstream of the latest-frame slot.
+            QoSProfile(depth=1, reliability=ReliabilityPolicy.BEST_EFFORT),
         )
         # The timer runs on the executor, so a report still arrives while the
         # worker thread is inside a model call.

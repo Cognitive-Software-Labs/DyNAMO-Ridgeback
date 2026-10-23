@@ -447,7 +447,8 @@ hardware. With no `namespace` override, hardware reads the robot identity from
 `<setup_path>/robot.yaml` (normally `/etc/clearpath/robot.yaml`) and aborts if it
 cannot be read; simulation retains `r100_0001`. Before setting
 `autonomous_motion_enabled:=true`, validate the deployed
-command chain and confirm the controller's `Twist`/`TwistStamped` contract; the
+command chain, stop behaviour and speed limits using the
+[driving qualification reference](docs/physical/driving_readiness.md); the
 checked-in generated configuration is not proof of the live robot contract.
 The D455 section of
 [PHYSICAL — Robot measurements and stationary sensor validation](docs/plans/PHYSICAL_robot_measurements_and_validation.md#d455-camera-validation)
@@ -457,6 +458,321 @@ cover revision handoff, Intel–Thor deployment, and robot
 measurements; they do not describe an already qualified distributed deployment.
 
 The explorer is the in-repo `frontier_explorer_node` (sources under `src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer/`). It consumes the Nav2 global costmap and sends goals via `NavigateToPose`. The component boundary and readiness sequence are documented in [exploration architecture](docs/exploration/architecture.md).
+
+#### Stationary driving readiness checks
+
+These commands collect graph/parameter evidence and test a separate mux;
+they do not send commands to the robot or restart its services. Run on Intel
+from the workspace root. Neither establishes physical driving readiness.
+
+```bash
+source /opt/ros/jazzy/setup.bash
+export ROS_LOG_DIR="$PWD/artifacts/hardware/driving-readiness/ros"
+python3 tools/hardware/audit_driving_readiness.py \
+  --output "$PWD/artifacts/hardware/driving-readiness/audit.json"
+# Synthetic inputs confined to loopback, domain 213 and a private namespace:
+python3 tools/hardware/check_driving_mux.py
+```
+
+The auditor deliberately selects deployed domain 0 and
+`/etc/clearpath/cyclonedds.xml`; its output labels missing evidence. Physical
+e-stop, low-speed, timeout and deadman checks require the supervised procedure
+in the [driving reference](docs/physical/driving_readiness.md#remaining-physical-verification).
+
+To apply the fixed commissioning caps, keep the robot stationary with the
+physical stop engaged and an operator beside it. The installer observes that
+state before restarting only the platform and new guard; it sends no motion
+commands and requests no camera, sensor or desktop restarts. Choose a fresh
+evidence directory:
+
+```bash
+sudo python3 tools/hardware/install_commissioning_caps.py \
+  --apply --operator-confirmed \
+  --run-dir "$PWD/artifacts/hardware/20261006-commissioning-caps-install"
+```
+
+It limits all mux inputs to a planar magnitude of 0.05 m/s and yaw of 0.1 rad/s.
+See the [guard contract](docs/physical/driving_readiness.md#commissioning-caps).
+An unsuccessful install leaves the platform stopped. An explicitly requested
+rollback restores only the saved files; with the physical stop still engaged,
+use the same evidence directory with `--restore --operator-confirmed` instead
+of `--apply`. For a first installation this removes the caps and is not
+permission to drive.
+
+To upgrade an existing verified capped installation with the e-stop
+QoS repair, retain that prior install directory and keep the physical stop
+engaged, controller controls centred and an operator present:
+
+```bash
+sudo python3 tools/hardware/install_commissioning_caps.py \
+  --apply --operator-confirmed \
+  --upgrade-from-run-dir "$PWD/artifacts/hardware/20261006-commissioning-caps-install" \
+  --run-dir "$PWD/artifacts/hardware/20261009-stop-qos-install"
+```
+
+The upgrade requires exact prior installed file hashes, replaces only the same
+four owned files and verifies the reliable stop relay/mux remap as well as the
+capped controller. It restarts only the platform and guard. Use the new evidence
+directory for an explicitly requested `--restore --operator-confirmed`; an
+upgrade rollback restores the previous capped installation. An original first
+installation rollback removes caps. The
+[stop-delivery reference](docs/physical/driving_readiness.md#e-stop-delivery-to-the-mux)
+records deployment state. The repair was installed and verified stationary on
+`r100_0160` on 2026-10-09; physical disconnection qualification remains open.
+For another upgrade, choose a fresh output directory and the record matching
+the current installed files.
+
+A temporary commissioning-test lock can be staged by adding `--test-interlock`
+to the caps installer. In that mode ordinary driving is blocked unless a fresh
+bounded test permit is present; it is not normal manual-driving mode. Stage it
+with a fresh evidence directory and the exact currently installed receipt:
+
+```bash
+python3 tools/hardware/install_commissioning_caps.py --test-interlock \
+  --upgrade-from-run-dir "$PWD/artifacts/hardware/20261009-stop-qos-install" \
+  --run-dir "$PWD/artifacts/hardware/test-interlock-stage"
+```
+
+For operator-confirmed stationary installation with the physical stop pressed,
+add `--apply --operator-confirmed` and use another fresh output directory.
+It restarts only the platform and guard. Use `observe_driving_stop.py --test stationary --test-interlock` with a fresh `--run-dir` to inspect it afterward.
+Restore the previous capped installation using the new installation receipt:
+`sudo python3 tools/hardware/install_commissioning_caps.py --restore
+--operator-confirmed --run-dir <new-install-directory>`, keeping the physical
+stop pressed. Moving interlock trials are not yet enabled. See the
+[test-lock contract](docs/physical/driving_readiness.md#temporary-commissioning-test-interlock).
+
+To observe a held joystick command against the installed software test lock,
+start with the physical stop pressed, controller neutral, clear floor and an
+operator beside the reachable stop:
+
+```bash
+source /opt/ros/jazzy/setup.bash
+python3 tools/hardware/observe_driving_stop.py \
+  --test interlock-held --test-interlock --operator-confirmed \
+  --run-dir "$PWD/artifacts/hardware/interlock-held-check"
+```
+
+After READY, release only the physical stop with controls centred. Wait for
+PHYSICAL RELEASE RECORDED, then gently hold driving-enable and forward for at
+most one second. Release the controls and press the physical stop again. The
+robot should stay still throughout. Press the stop immediately for unexpected
+movement. The observer requires fresh asserted software-lock reports, no test
+permit publishers, zero mux/limited/wheel commands and stationary raw odometry.
+It sends neither commands nor permits; successful recording needs analysis and
+operator confirmation. Moving-disconnect testing remains disabled.
+
+A separately authorized bounded-permit trial uses the explicitly interlocked
+installation. It allows one gentle forward request at the existing 0.05 m/s cap:
+
+```bash
+python3 tools/hardware/observe_driving_stop.py \
+  --test interlock-permit --test-interlock --operator-confirmed \
+  --permit-motion-confirmed \
+  --run-dir "$PWD/artifacts/hardware/interlock-permit-check"
+```
+
+For a separately approved **backward** trial, add `--direction backward` to
+that `interlock-permit` command and use a fresh run directory. Keep the physical
+stop pressed until `RECORDING READY`, release with controls centred, then use
+backward input only after `PHYSICAL RELEASE RECORDED`. At the stop prompt,
+release controls and press the physical stop. This selects the recorder's
+expected direction; it does not change the installed one-second/0.05 m/s guard.
+Other fault/disconnect modes remain forward-only.
+
+For a **stationary right-stick mapping check**, use `--test stationary
+--test-interlock --operator-confirmed --mapping-axis 3` with a fresh `--run-dir`.
+Keep the physical stop pressed and driving-enable released throughout. At
+`MAPPING READY`, move only the right thumbstick left for one second and let go.
+The recorder waits up to 60 seconds, prints when input is received, then requires
+one second of neutral input. If driving-enable is held, it waits for its release
+and ignores that input rather than immediately aborting. Releasing the physical
+e-stop or observing nonzero wheel commands/motion still aborts immediately.
+It records the observed axes without issuing
+commands or permits; a mapping mismatch is not permission to try movement.
+
+The same plain permit trial supports `--direction left`, `right`, `turn-left`
+or `turn-right`, one separately approved trial at a time with a fresh evidence
+directory. On the inspected controller mapping, **right-stick horizontal moves
+sideways**, while **left-stick horizontal turns**; keep the other stick centred.
+Planar commands remain capped at 0.05 m/s and yaw at 0.1 rad/s. Follow the
+selected-direction prompts and press the physical stop immediately if movement
+does not match the requested direction.
+
+Start with the physical stop pressed, controller neutral and an operator beside
+the robot with clear floor and reachable stop. After READY, release only the
+physical stop; wait for PHYSICAL RELEASE RECORDED before gently holding forward
+and driving-enable. Hold until the stop prompt, about 1.25 seconds after first
+input. The guard must block commands after at most one second even while permit
+heartbeats continue briefly. At the prompt, release controls and press the
+physical stop. Press the stop immediately for unexpected movement, or if the
+robot is still moving at the prompt. Do one movement. The observer publishes
+only permits, retains their transmit times, cancels when controller input is
+released, and rejects stale observations or unexpected command/odometry bounds.
+Controller neutrality follows the deployed driving mapping (axes 0, 1, 3, 4),
+with both driving-enable buttons released; unused axes may rest at nonzero values.
+The forward trial accepts up to 0.005 rad/s command yaw for small stick drift;
+its installed speed caps and wheel-feedback abort bounds are unchanged.
+It cannot physically inhibit the motors itself; rely on the reachable stop for
+unexpected behavior. Review source input, permit receipts/lock state, wheel
+commands and actual operator observations before accepting this gate. This mode
+does not disconnect the controller or enable the disabled moving-disconnect
+workflow.
+
+For a **wheels-raised** check of the installed feedback plugin's response to
+an invalid ROS feedback batch while the motor command path stays running, use
+the same one-shot interlock. A qualified helper must first secure all four
+wheels clear of the floor on rated stands. Keep an operator at the reachable
+physical e-stop. This check does not interrupt electrical CAN or measure
+loaded stopping distance:
+
+```bash
+cd /home/robot/DyNAMO-Ridgeback
+source /opt/ros/jazzy/setup.bash
+python3 tools/hardware/observe_driving_stop.py \
+  --test interlock-feedback-fault --test-interlock --operator-confirmed \
+  --permit-motion-confirmed --feedback-fault-confirmed \
+  --run-dir "$PWD/artifacts/hardware/interlock-feedback-fault"
+```
+
+Begin with the e-stop pressed and controller neutral. After READY, release the
+stop, wait for PHYSICAL RELEASE RECORDED, then gently hold driving-enable and
+forward until the stop prompt. After measured forward wheel motion, the
+recorder publishes one deliberately empty feedback batch. Observe whether the
+wheels stop by themselves before pressing the physical stop at the prompt.
+Press the stop immediately for any unexpected motion. The result is evidence
+to analyze, never an automatic pass; restore the controller with a supervised
+platform restart and stationary recovery verification while the stop is
+pressed. Use a fresh directory for each run.
+
+After bounded-permit stopping is qualified, a separately authorized moving
+controller-disconnect trial uses `--test interlock-disconnect`,
+`--test-interlock`, `--operator-confirmed`, `--permit-motion-confirmed`,
+`--moving-disconnect-confirmed` and `--disconnect-device <controller-MAC>` with a
+fresh `--run-dir`. Start with the physical stop pressed and controller neutral.
+The recorder checks the installed interlock and connected device before READY.
+After physical release is recorded, gently hold forward and driving-enable.
+It requests one device-specific Bluetooth disconnect half a second after the
+first nonzero mux command. Keep controls held until disconnect, then release
+them. At the stop prompt, press the physical stop; press it immediately for
+unexpected movement or continued motion. Do one movement and do not reconnect.
+Permits continue briefly after input reset so source-loss stopping can be
+identified before the independent one-second guard budget expires. A stop only
+at that budget boundary does not qualify disconnect handling. Review driver
+logs, transport status, input reset, wheel commands and physical observations.
+The device-specific client runs with closed stdin and a one-second CLI timeout;
+its exit status is supporting evidence, not proof of actual link loss.
+The old un-interlocked `--test disconnect --disconnect-device ...` remains
+blocked. This deliberate disconnect does not simulate silent radio loss.
+
+For a supervised first forward movement, use the fixed pulse helper only after
+an operator confirms a clear level floor, nobody in the path and the physical
+stop within reach. Leave joystick/RC controls untouched. First run its default
+passive mode with the stop engaged and a fresh evidence directory:
+
+```bash
+source /opt/ros/jazzy/setup.bash
+python3 tools/hardware/commissioning_forward_pulse.py \
+  --run-dir "$PWD/artifacts/hardware/forward-pulse-passive"
+```
+
+After that succeeds, the operator may release the stop using the normal
+physical procedure and explicitly approve one forward test. Run:
+
+```bash
+python3 tools/hardware/commissioning_forward_pulse.py \
+  --execute --operator-confirmed \
+  --run-dir "$PWD/artifacts/hardware/forward-pulse-live"
+```
+
+After five seconds of passive checks, it requests 0.05 m/s forward for at most
+one second through the external mux input, then sends zeros. It records the
+command path, raw odometry and stop state, aborts on missing feedback or
+unexpected commands, and never resets/enables the base or restarts services.
+The nominal displacement is 5 cm; actual travel and stopping are unqualified.
+Press the physical stop for unexpected movement, re-engage it after the test,
+and record the observed direction and stop separately from odometry.
+
+The same helper accepts `--axis backward|left|right|turn-left|turn-right` for
+one separately approved direction at a time. Turning peaks at 0.1 rad/s.
+Optional `--ramp` adds 250 ms rise/fall within the one-second pulse; the peak
+and abort limits remain fixed. Do not repeat a motion-abort merely to obtain
+a pass: preserve its recording and examine
+[wheel feedback](docs/physical/drive_feedback_diagnostics.md) first.
+
+To measure stopping after command publication disappears, use a separately
+approved forward pulse with `--ramp --stop-mode timeout`. It ramps up, ends
+publication at the peak after one second, observes silence for one second,
+and then sends cleanup zeros. This qualifies publishing loss separately from
+an explicit zero; it does not simulate physical joystick disconnection.
+
+Physical controller checks use a separate observer that publishes no commands.
+Run it in the operator's terminal with the physical stop initially engaged:
+
+```bash
+source /opt/ros/jazzy/setup.bash
+python3 tools/hardware/observe_driving_stop.py \
+  --test stationary --run-dir "$PWD/artifacts/hardware/drive-stop-stationary"
+```
+
+Only after separately approving the physical action, choose `--test deadman`,
+`--test disconnect` or `--test e-stop`, add `--operator-confirmed`, and use a
+fresh directory. The observer checks the engaged stop and capped routing,
+then prints the action instructions. It waits up to 60 seconds for the first
+nonzero mux command and records ten more seconds after that command, so a late
+start does not truncate the stopping observation. Gently request forward with
+the joystick for at most one second and perform the selected stop action; keep
+a clear floor and reachable stop. For deadman release, release the button first,
+then centre the stick: centring alone tests a zero command, not deadman release. It cannot stop
+the robot itself. Re-engage the physical stop afterward; reconnect a controller
+only with that stop engaged. Record what physically happened separately from
+the captured command, wheel and stop-state data. A completed recording is not
+an automatic readiness pass.
+
+
+For neutral physical stop release, use `--test e-stop-release` with
+`--operator-confirmed` and a fresh evidence directory. Start with the stop
+pressed, both driving-enable buttons released and all sticks centred. After
+RECORDING READY, release only the physical stop and leave the controller
+untouched. The observer records ten seconds after the released firmware report,
+then prompts you to press the stop again and waits for two asserted reports.
+It aborts on nonzero commands, wheel movement, non-neutral/stale controller
+input, stale stop/odometry observations, or early stop re-engagement. Press the
+physical stop immediately for unexpected movement: the observer cannot stop
+the robot. A successful recording still requires analysis and operator
+confirmation. This checks neutral release; deliberate held-input release and
+wireless reconnection are separate tests.
+
+For a wireless controller, first check disconnect propagation while the physical
+e-stop stays pressed:
+
+```bash
+python3 tools/hardware/observe_driving_stop.py \
+  --test disconnect-stationary --operator-confirmed \
+  --run-dir "$PWD/artifacts/hardware/drive-disconnect-stationary"
+```
+
+Keep the physical stop engaged for the entire check. When ready, hold the deadman
+and a small forward stick input, switch off/disconnect the controller while
+holding that input, then release its controls. The observer waits up to 60 seconds
+for joystick input and records 20 more seconds. It aborts if the reported stop
+becomes released or a nonzero mux command appears. Reconnect afterward with the
+stop engaged and controls centred. This checks stale-input propagation without
+qualifying physical stopping during a moving disconnection trial.
+
+For a reproducible stationary device-specific disconnect, add
+`--disconnect-device <controller-MAC>` to the command above. Reconnect the
+controller first with the physical stop pressed and controls neutral. At READY,
+hold driving-enable and small forward input until the recorder disconnects the
+selected device, then release controls. Keep the physical stop pressed; do not
+reconnect until analysis. Automatic moving disconnection is disabled pending a preflight motion interlock.
+Do not run the moving variant. A failed trial never armed because it received
+only released stop reports during startup; commands appeared before READY, so
+no disconnect request was scheduled. The observer now aborts immediately on
+commands or wheel motion during preflight, but cannot itself inhibit the robot.
+Stationary automatic disconnect remains available with the physical stop held.
+The PS+Triangle binding in the captured config belongs to
+an optional keyboard/mouse profile and is not enabled for the driving profile.
 
 #### Quick-start script
 
@@ -1061,3 +1377,530 @@ Current recovery steps live in [troubleshooting](docs/troubleshooting.md), while
 - [dependency refresh history](archive/engineering/dependency_refresh.md)
 - [operational incident history](archive/engineering/operational_incidents.md)
 - [port history](archive/engineering/port-history.md)
+
+The stationary `interlock-reconnect` observer requires the installed test lock,
+operator confirmation and `--reconnect-device <controller-MAC>`. Start with the
+physical e-stop pressed and the controller disconnected. It records ten seconds
+of disconnected state, then prompts for manual PS-button reconnection with all
+driving controls centred/released. It records thirty more seconds, confirms the
+selected device connected, and verifies fresh neutral joystick and asserted
+physical stop reports afterward. It sends no commands, permits, connect or
+disconnect requests. Stop release, software unlock, non-neutral driving input,
+unexpected commands/wheel motion, stale stop/wheel observations or a competing
+permit publisher abort. Preserve driver journals to establish actual disconnect
+and reconnect times. This does not simulate silent radio loss, test reconnection
+with the physical stop released, or establish multi-minute outage recovery.
+
+For a controller that is Bluetooth-connected but has no physical reports or ROS
+input, keep the physical stop pressed and gather a read-only process diagnostic:
+
+```bash
+sudo python3 tools/hardware/diagnose_controller_input.py \
+  --run-dir "$PWD/artifacts/hardware/controller-input-diagnostic"
+```
+
+Use a fresh directory. It snapshots controller/joystick threads, device handles,
+input inventory, service state and driver logs without reading input-device data,
+restarting services or publishing commands. Root access is needed for the driver
+process inspection. Review recorded permission errors and report delivery before
+claiming recovery; see the [driving reference](docs/physical/driving_readiness.md).
+
+The controller diagnostic additionally supports `--sample-states
+--operator-confirmed`. With the physical stop pressed and the exact temporary
+interlock installed, it verifies stationary stop/routing before and after a
+20-second operator input window. It compares cached absolute-axis and button
+state using read-only input ioctls for the kernel physical controller and managed
+virtual controller. It never consumes event queues, grabs devices, publishes
+commands/permits or alters mapping. Require exactly one physical device with the
+configured controller MAC and one managed virtual device; ambiguity aborts.
+Inspect `input-states.jsonl` to distinguish physical-report reception from
+virtual-device forwarding. Keep the physical stop pressed during all actions;
+this is input diagnosis, not driving qualification.
+
+For the observed Bluetooth-connected-but-no-input controller fault, keep the
+physical stop pressed and software test lock active. Preserve diagnostics before
+recovery. Disconnect only the identified controller:
+
+```bash
+bluetoothctl --timeout 2 disconnect AC:36:1B:89:A1:0A
+bluetoothctl --timeout 1 info AC:36:1B:89:A1:0A
+```
+
+Confirm `Connected: no`, then manually press PS once with controls centred and
+both driving-enable buttons released. Verify actual button/stick input and its
+return to neutral with a fresh stationary recorder; keep the physical stop held.
+This restored input in one recorded recovery and is not an automatic-reconnect
+qualification. Do not infer live input from Bluetooth connection or zero ROS
+messages alone. The [driving reference](docs/physical/driving_readiness.md) owns
+failure evidence and the unresolved cause.
+
+A verified pinned motor-driver repair can be rebuilt without changing the live
+robot. Download the official Clearpath 2.9.4 archive first; the builder verifies
+its SHA-256 `49d0ef5bcc6421856d6a4644aa4bd0dd117b1052d569d5b3a3238385184206df`.
+Build and stage into fresh directories:
+
+```bash
+python3 tools/hardware/build_puma_repair.py \
+  --archive <downloaded-clearpath-2.9.4.tar.gz> \
+  --output "$PWD/artifacts/hardware/puma-repair-candidate"
+python3 tools/hardware/install_puma_repair.py \
+  --candidate "$PWD/artifacts/hardware/puma-repair-candidate" \
+  --run-dir "$PWD/artifacts/hardware/puma-repair-install"
+```
+
+Inspect the applied-patch provenance, sanitizer results, full-package compiler
+output and staged receipt before installation. The October 9 candidate is
+withdrawn and rejected by the corrected installer. Apply a verified frozen stage
+only with an operator present, physical stop pressed and controls centred:
+
+```bash
+sudo python3 tools/hardware/install_puma_repair.py \
+  --apply --operator-confirmed \
+  --run-dir "$PWD/artifacts/hardware/puma-repair-install"
+```
+
+Only the platform and guard are restarted; current exact caps/test-lock files
+are preserved. The patched Puma package is copied into a root-controlled
+`/opt/dynamo-puma/<package-hash>` prefix, not a mutable workspace build. The
+three owned additions provide DDS-interface readiness and a scoped platform
+package overlay. Failure after platform shutdown leaves the platform stopped.
+Restore only those exact additions, with physical stop held, using the same
+receipt and `--restore --operator-confirmed` instead of `--apply`. The previous
+capped platform is restored; the unused pinned prefix remains. Actual cold boot,
+feedback freshness and driver reconnect behavior need separate qualification.
+See the [driver reference](docs/physical/drive_feedback_diagnostics.md).
+
+The corrected 2026-10-12 Puma repair is installed and independently verified
+stationary; its receipt is under
+`artifacts/hardware/20261012-puma-repair-install/`. It preserves the temporary
+test lock. Fault-mask decoding now matches raw status; the feedback-rate and
+per-wheel freshness investigation remains open. Recreate this state using the
+maintained build/stage/install procedure, not the withdrawn October 9 candidate.
+
+The proposed Puma freshness repair is offline only. Verify its extracted routines
+and project publication timing without touching ROS, CAN or the installed driver:
+
+```bash
+python3 tools/hardware/verify_puma_freshness_patch.py \
+  --package <verified-two-patch-source-package> \
+  --output "$PWD/artifacts/hardware/freshness-routine-check"
+python3 tools/hardware/replay_puma_freshness.py \
+  --capture <saved-passive-candump-log> \
+  --output "$PWD/artifacts/hardware/freshness-flag-replay.json"
+```
+
+Both outputs must be fresh. The replay is a flag/scheduling model, not a live
+patched-driver test. It predicts lower output rates and longer publication gaps
+when every wheel must provide fresh fields. Do not add the candidate to the
+installed repair without qualifying stale-feedback handling in the hardware
+consumer. See the [freshness deployment boundary](docs/physical/drive_feedback_diagnostics.md#offline-freshness-candidate-and-deployment-boundary).
+
+To reproduce the Puma hardware consumer’s current behavior offline, with no ROS
+or hardware access:
+
+```bash
+python3 tools/hardware/verify_puma_feedback_consumer.py \
+  --source <matching-clearpath-2.9.4>/clearpath_hardware_interfaces/src/puma/hardware.cpp \
+  --output "$PWD/artifacts/hardware/feedback-consumer-check"
+```
+
+Use a fresh output directory. It exercises actual extracted method bodies with
+inert input/output; it does not interrupt live feedback or establish physical
+stopping. The [consumer reference](docs/physical/drive_feedback_diagnostics.md#hardware-consumer-missing-feedback-behavior)
+owns findings and the pending age/batch-validation deployment gate.
+
+
+Build and check the proposed feedback-consumer repair offline:
+
+```bash
+python3 tools/hardware/build_puma_feedback_candidate.py \
+  --source-archive <official-clearpath-robot-2.9.4-tar.gz> \
+  --output "$PWD/artifacts/hardware/feedback-consumer-candidate"
+```
+
+Use a fresh output directory. The builder accepts only the pinned archive,
+checks the policy and actual adapter/lifecycle bodies, compiles the package and
+saves provenance. It does not install or access the live robot. The candidate
+is not qualified for deployment; see the
+[consumer safety boundary](docs/physical/drive_feedback_diagnostics.md#offline-feedback-consumer-safety-candidate).
+
+
+Check that compiled candidate using fake wheel publishers and a command sink:
+
+```bash
+source /opt/ros/jazzy/setup.bash
+python3 tools/hardware/check_puma_feedback_ros.py \
+  --candidate "$PWD/artifacts/hardware/feedback-consumer-candidate" \
+  --output "$PWD/artifacts/hardware/feedback-consumer-ros-check"
+```
+
+This joins only loopback ROS domain 214 in an isolated namespace, verifies the
+loaded library is the candidate and starts no motor driver. It checks compiled
+activation, stale-feedback inhibition, latched recovery and deactivation through
+real ROS messaging. Controller-manager integration and physical braking still
+require separate tests. Use a fresh output directory.
+
+
+Test controller-manager initialization, feedback-loss inhibition and explicit
+neutral recovery with the candidate and fake wheels:
+
+```bash
+source /opt/ros/jazzy/setup.bash
+python3 tools/hardware/check_puma_feedback_manager.py \
+  --candidate "$PWD/artifacts/hardware/feedback-consumer-candidate" \
+  --output "$PWD/artifacts/hardware/feedback-manager-check"
+```
+
+Use a fresh output directory. This starts an isolated controller manager on
+loopback-only ROS domain 215 with the candidate plugin, fake feedback and a
+command sink. It does not start the real motor driver or access CAN. Its recovery
+service calls apply only to this fake component; they are not a robot recovery
+procedure. Successful software tests do not qualify physical braking.
+
+## Puma feedback plugin installation (stationary)
+
+`tools/hardware/install_puma_feedback_plugin.py` stages a root-pinned plugin
+from a verified offline candidate. It preserves the commissioned speed guard,
+Puma motor driver, auxiliary launch and other hardware plugin descriptors. A
+new platform drop-in selects only the pinned Puma feedback library. The install
+requires the temporary commissioning test interlock and an engaged physical
+stop. It restarts the platform/guard only; camera, sensors and desktop are
+checked for unchanged service state.
+
+Stage from the successful candidate with a fresh directory:
+
+```bash
+cd /home/robot/DyNAMO-Ridgeback
+python3 tools/hardware/install_puma_feedback_plugin.py --stage \
+  --candidate "$PWD/artifacts/hardware/20261012-feedback-consumer-reproducible-5" \
+  --run-dir "$PWD/artifacts/hardware/puma-feedback-install"
+```
+
+With an operator beside the stationary robot and the physical e-stop pressed:
+
+```bash
+sudo python3 tools/hardware/install_puma_feedback_plugin.py --apply \
+  --operator-confirmed \
+  --run-dir "$PWD/artifacts/hardware/puma-feedback-install"
+```
+
+Success checks the loaded library in the real controller manager, stop state,
+stationary odometry, capped routing and unchanged independent services. A failed
+installation attempts to restore the original platform; inspect its saved
+`result.json`. Rollback uses the same receipt and conditions:
+
+```bash
+sudo python3 tools/hardware/install_puma_feedback_plugin.py --restore \
+  --operator-confirmed \
+  --run-dir "$PWD/artifacts/hardware/puma-feedback-install"
+```
+
+If interrupted during apply, restore from that receipt. The pinned package is
+retained as evidence after rollback. This verifies startup while stopped; it
+does not qualify actual braking, missing CAN feedback under movement or long
+runs. The installed library and service drop-in are reconstructed from this
+maintained script and the pinned source archive, not from an artifact alone.
+
+After an installed plugin or clock-profile change, prepare a one-reboot check
+while stopped, then verify after the desktop reconnects:
+
+```bash
+python3 tools/hardware/verify_feedback_boot.py --prepare \
+  --run-dir "$PWD/artifacts/hardware/feedback-clock-postboot"
+sudo systemctl reboot
+# After reconnecting, with the physical e-stop still pressed:
+cd /home/robot/DyNAMO-Ridgeback
+sudo python3 tools/hardware/verify_feedback_boot.py --verify \
+  --run-dir "$PWD/artifacts/hardware/feedback-clock-postboot"
+```
+
+The verifier requires a changed boot ID, a successful platform clock gate,
+stationary e-stop and service checks, and the exact pinned plugin mapped by the
+new controller manager. Its result covers this boot only.
+
+For a supervised stationary check of **real ROS wheel-feedback interruption**,
+keep the physical e-stop pressed, red lights flashing, controller centred and
+an operator beside the robot. The guarded checker sends no movement or permit;
+it pauses only the Puma driver for 0.8 seconds and schedules an independent
+one-second resume timer before the pause:
+
+```bash
+cd /home/robot/DyNAMO-Ridgeback
+sudo python3 tools/hardware/check_live_feedback_outage.py --operator-confirmed \
+  --run-dir "$PWD/artifacts/hardware/live-feedback-outage"
+```
+
+If the controller faults as intended, leave the physical stop pressed and
+recover it only after saving the evidence:
+
+```bash
+cd /home/robot/DyNAMO-Ridgeback
+sudo systemctl restart clearpath-platform.service
+sudo python3 tools/hardware/check_live_feedback_outage.py --verify-recovery \
+  --operator-confirmed --run-dir "$PWD/artifacts/hardware/live-feedback-recovery"
+```
+
+Use fresh run directories. The recovery check waits for platform startup and
+requires fresh feedback, zero wheel commands, stationary odometry and an active
+controller. This check does not prove braking while moving or an electrical
+CAN-wire failure.
+
+To inspect the actual MCU-to-PC motor-CAN ingress while **stationary**, keep
+the physical stop pressed, controller centred and an operator beside the
+robot. This separate checker drops only incoming UDP from the motor MCU on
+port 11412 for 0.8 seconds. It schedules an independent three-second firewall
+rollback before adding the rule, records real feedback and wheel commands, and
+sends no movement command:
+
+```bash
+cd /home/robot/DyNAMO-Ridgeback
+sudo python3 tools/hardware/check_motor_can_ingress.py --operator-confirmed \
+  --run-dir "$PWD/artifacts/hardware/stationary-can-ingress"
+```
+
+Use a fresh run directory. Leave the stop pressed while reviewing its
+`result.json`; if the controller faults, use the stationary recovery command
+above and a new recovery directory. This incoming-only software interruption
+does not prove physical braking or the motor controllers' response to a full
+electrical link failure. The [feedback reference](docs/physical/drive_feedback_diagnostics.md#remaining-moving-and-motor-link-qualification)
+owns those boundaries.
+
+## Stationary desktop and controller setup repair
+
+`tools/hardware/install_stationary_setup.py` stages a six-file repair: one VNC
+owner, independent 9005/9100 proxies, a foreground software-rendered desktop with
+its own session bus, and a root-pinned controller autoconnect helper. The helper
+connects only configured paired/trusted devices; it never restarts ROS or base
+services. Bluetooth connection alone does not prove fresh joystick input.
+
+Stage without changing services:
+
+```bash
+python3 tools/hardware/install_stationary_setup.py --stage \
+  --run-dir "$PWD/artifacts/hardware/stationary-setup-install"
+```
+
+Apply only with the robot stationary, an operator present, and physical e-stop
+pressed. Sudo authentication belongs to your terminal. The detached installer
+survives the planned desktop reconnect:
+
+```bash
+sudo python3 tools/hardware/install_stationary_setup.py --apply --detach \
+  --operator-confirmed \
+  --run-dir "$PWD/artifacts/hardware/stationary-setup-install"
+```
+
+Read `result.json` after reconnecting. It verifies listener ownership, stationary
+state and unchanged hardware service activity. Preflight drift prevents changes;
+an installation failure restores original files and prior service activity.
+Only desktop/proxy/autoconnect units are stopped or started. This does not deploy
+the feedback-consumer candidate or qualify cold boot, joystick reconnection or
+physical stopping. Never use the legacy combined vendor-camera repair here.
+
+Exact receipt-based rollback, with the same stationary conditions:
+
+```bash
+sudo python3 tools/hardware/install_stationary_setup.py --restore --detach \
+  --operator-confirmed \
+  --run-dir "$PWD/artifacts/hardware/stationary-setup-install"
+```
+
+Rollback refuses changed managed files. The stage must use a fresh directory;
+application also refuses files or service state changed since staging.
+
+## Hardware camera service
+
+The maintained boot-service sources are restored from the installed camera's
+recorded Git revision; its current contract and recovery inputs live in
+[robot-local deployment](docs/physical/robot_local_deployment.md).
+Inspect installed state without camera subscriptions or restarts:
+
+```bash
+tools/intel_thor/camera_service status
+```
+
+For a replacement host, after setting up Clearpath and discovery-only DDS,
+install the serial-pinned service using:
+
+```bash
+sudo tools/intel_thor/camera_service apply --profile 640x480 --serial 338522302134
+```
+
+This changes the robot declaration, disables competing vendor camera units,
+regenerates Clearpath state and starts the camera. It is a reconstruction step,
+not part of the stationary desktop repair. Do not reapply it merely because the
+checkout revision differs when all status checks match. Its `rollback` restores
+its prior snapshot and may restart services; review the resulting ownership first.
+
+When coordinated with perception, verify actual image delivery with:
+
+```bash
+source /opt/ros/jazzy/setup.bash
+source /etc/clearpath/setup.bash
+tools/camera_contract_check --backend hardware --guard \
+  --output "$PWD/artifacts/hardware/camera-contract.json"
+```
+
+This creates image and scan subscribers. Use the stationary/operator conditions
+and transport-monitoring precautions from the DDS test workflow. Source
+restoration alone does not qualify camera performance or application integration.
+
+## Stationary auxiliary repairs
+
+The IMU/battery/clock repair preserves the commissioning guard and pinned Puma
+motor driver. It corrects the MCU filter's mismatched YAML selector, marks
+unmeasured individual cell voltages unknown, and adds a read-only platform
+startup clock-convergence gate. It does not step the clock, invent calibration
+values or add temperature hardware. Battery pack voltage/current/charge estimates
+remain unchanged. The Python overlay affects only the battery helper package;
+the compiled Puma plugin and other installed hardware libraries are unchanged.
+
+Stage with a fresh directory:
+
+```bash
+python3 tools/hardware/install_auxiliary_repairs.py --stage \
+  --run-dir "$PWD/artifacts/hardware/auxiliary-repair-install"
+```
+
+With the robot stationary, physical e-stop pressed and an operator present:
+
+```bash
+sudo python3 tools/hardware/install_auxiliary_repairs.py --apply \
+  --operator-confirmed \
+  --run-dir "$PWD/artifacts/hardware/auxiliary-repair-install"
+```
+
+Only the platform is deliberately restarted (its guard follows its normal
+service dependency). Camera, sensors, merger and desktop units are preserved and
+checked. The installer refuses changed inputs/service state, saves write-ahead
+ownership and exact rollback, and restores its prior platform integration on
+failed installation. Success requires separate live IMU/battery data verification
+before marking the receipt verified. An unknown or changed managed file prevents
+rollback overwrite:
+
+```bash
+sudo python3 tools/hardware/install_auxiliary_repairs.py --restore \
+  --operator-confirmed \
+  --run-dir "$PWD/artifacts/hardware/auxiliary-repair-install"
+```
+
+If an interrupted run leaves the receipt at `applying` but all files/services
+are already installed, do not reapply into the same directory. Finalize using
+verification only, with the stop pressed:
+
+```bash
+sudo python3 tools/hardware/install_auxiliary_repairs.py --verify \
+  --operator-confirmed \
+  --run-dir "$PWD/artifacts/hardware/auxiliary-repair-install"
+```
+
+This checks exact root-owned files, unchanged independent services, stationary
+routing, clock readiness and live IMU/battery fields, then finalizes the receipt.
+It does not restart services. Partial/mismatched installations are refused;
+use the exact-file restore path after inspection rather than overwriting them.
+
+The platform gate allows up to 900 seconds for an external normal chrony source,
+remaining system-clock correction at most 5 ms, frequency skew at most 10 ppm,
+and a reference at most 180 seconds old. Failure prevents this platform start;
+it never resets/releases the physical stop. These provisional local readiness
+bounds do not qualify cross-host timing or absolute UTC accuracy. Inspect them
+without sudo or clock changes:
+
+```bash
+python3 tools/hardware/check_clock_ready.py --timeout 30
+```
+
+Stationary IMU characterization, with the physical e-stop pressed:
+
+```bash
+source /opt/ros/jazzy/setup.bash
+python3 tools/hardware/characterize_stationary_imu.py --duration 60 \
+  --run-dir "$PWD/artifacts/hardware/imu-stationary-characterization"
+```
+
+Use a fresh directory. The recorder subscribes to raw IMU, stop, raw odometry,
+MCU power and MCU/PCB temperatures. It aborts on released/stale stop, wheel
+motion or insufficient data, publishes no commands and applies no calibration.
+A single-pose mean cannot separate accelerometer bias from gravity/mount tilt
+or establish gyro scale, axis misalignment or thermal calibration.
+
+After the auxiliary repair is installed, record a pre-reboot boot ID in its
+receipt directory as `boot-baseline.json`, then reboot only with an operator,
+physical e-stop pressed and controller neutral. Reconnect and verify:
+
+```bash
+source /opt/ros/jazzy/setup.bash
+python3 tools/hardware/verify_auxiliary_boot.py \
+  --receipt "$PWD/artifacts/hardware/auxiliary-repair-install" \
+  --output "$PWD/artifacts/hardware/auxiliary-after-reboot"
+```
+
+The read-only verifier checks a changed boot ID, repaired file contents, clock
+gate success before platform startup, service state/restarts, desktop listener
+ownership, asserted-stop stationary routing and actual IMU/battery fields. It
+never restarts services or changes the clock. Platform may remain activating
+while the bounded clock gate waits up to 15 minutes; inspect its journal rather
+than bypassing the gate or assuming it failed immediately. A new boot passing
+this check does not qualify prolonged time-source loss or full cold power cycles.
+
+## Fast stationary health batch
+
+Use one command for the current installed stationary checks instead of repeating
+separate probes. Keep the physical e-stop pressed; no controller action is needed:
+
+```bash
+source /opt/ros/jazzy/setup.bash
+python3 tools/hardware/fast_stationary_check.py
+```
+
+The batch observes 16 seconds of IMU, battery, three scans, stop/relay and raw
+odometry, then checks guarded graph routing, service health and local clock
+readiness. It creates a unique `artifacts/hardware/stationary-batch-*` directory
+and prints one report with only failed check names and explicit remaining gates.
+It publishes no commands, subscribes to no camera images, performs no Bluetooth
+transitions and restarts no services. Healthy current delivery is not a full
+calibration, physical stopping, long-run recovery or camera/perception pass.
+Existing reboot evidence is reused; no new reboot is requested by this batch.
+
+
+If the fast batch reports only clock readiness failure, its `failure_details`
+identifies the failed condition and measurements. Keep the passed sensor/route
+checks as evidence; inspect/retry only the clock with `check_clock_ready.py`.
+
+For the staged Intel source expansion, keep the physical e-stop pressed and an
+operator present. This adds sources without restarting chrony or the desktop:
+
+```bash
+cd /home/robot/DyNAMO-Ridgeback
+sudo python3 tools/hardware/expand_clock_sources.py --apply --operator-confirmed --run-dir "$PWD/artifacts/hardware/clock-sources-$(date -u +%Y%m%dT%H%M%SZ)"
+python3 tools/hardware/check_clock_ready.py --timeout 30
+```
+
+An installed result still requires clock qualification. Source scope, recovery
+and reconstruction are documented in
+[stationary auxiliary checks](docs/physical/stationary_auxiliary_checks.md#intel-clock-source-expansion).
+
+A small remaining clock correction can coexist with large frequency uncertainty;
+a noisy NTP source must not be relabelled a timing pass by raising thresholds.
+
+
+## Intel clock poll bound
+
+If the installed 180-second platform clock gate fails only because chrony's
+selected source is older than 180 seconds while still reachable, stage and apply
+the 128-second maximum polling interval. The tool changes no clock value and
+restarts no service:
+
+```bash
+cd /home/robot/DyNAMO-Ridgeback
+python3 tools/hardware/bound_clock_poll.py --stage --run-dir "$PWD/artifacts/hardware/clock-poll-install"
+sudo python3 tools/hardware/bound_clock_poll.py --apply --operator-confirmed --run-dir "$PWD/artifacts/hardware/clock-poll-install"
+```
+
+Use a fresh run directory and an operator beside the stationary robot. Check
+`chronyc -n sources` and `python3 tools/hardware/check_clock_ready.py --timeout
+30` after the next source measurement. Exact rollback is
+`sudo python3 tools/hardware/bound_clock_poll.py --restore --operator-confirmed
+--run-dir <same-run-directory>`. The
+[clock reference](docs/physical/stationary_auxiliary_checks.md#poll-interval-and-clock-startup-gate)
+explains the gate and evidence.

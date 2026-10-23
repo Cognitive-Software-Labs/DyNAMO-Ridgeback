@@ -61,6 +61,10 @@ sending goals while still allowing sensor, SLAM, Nav2, perception, and TF
 validation. The quick-start wrapper skips broad simulator cleanup and does not
 invent a ROS domain for hardware.
 
+This flag does not disable goals sent by other clients to an active Nav2 server.
+The [driving reference](../physical/driving_readiness.md) owns deployed mux,
+controller, manual-input and physical-stop qualification boundaries.
+
 These defaults reduce accidental actuation; they do not certify a deployment.
 The live velocity message type, controller configuration, e-stop, footprint,
 sensor topics, TF ownership, and camera behavior must pass their physical

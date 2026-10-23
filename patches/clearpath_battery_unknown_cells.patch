@@ -1,0 +1,13 @@
+--- a/clearpath_hardware_interfaces/clearpath_hardware_interfaces/battery_state/battery.py
++++ b/clearpath_hardware_interfaces/clearpath_hardware_interfaces/battery_state/battery.py
+@@ -184,7 +184,9 @@
+             self._msg.charge = self._msg.capacity * self._msg.percentage
+ 
+         def update_cells(self):
+-            self._msg.cell_voltage = [self._msg.voltage / self.series] * self.cell_count
++            # Power telemetry provides aggregate pack voltage, not independent
++            # cell measurements. Preserve unknown values per BatteryState.msg.
++            self._msg.cell_voltage = [nan] * self.cell_count
+             self._msg.cell_temperature = [nan] * self.cell_count
+ 
+     # Battery Types

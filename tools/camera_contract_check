@@ -1,0 +1,655 @@
+#!/usr/bin/env python3
+"""Check that a running camera publishes the shared camera_0 contract.
+
+Usage (ROS sourced, robot graph reachable):
+  tools/camera_contract_check --backend hardware [--duration 60] [--warmup 10] [--output report.json]
+  tools/camera_contract_check --backend gz --namespace r100_0001 --base-frame r100_0001/robot/base_link
+
+It subscribes to the colour image, colour CameraInfo and aligned depth that
+ridgeback_common.camera_inputs names for the backend, plus the three LiDAR
+scans on hardware, and reports PASS/FAIL per criterion. Images are received
+serialized and only their headers are decoded, so the observer does not copy
+pixels and its own load cannot masquerade as a camera fault. The criteria are
+frozen here, before any measurement.
+
+On hardware the namespace, expected profile and optical frame default to what
+tools/intel_thor/camera_service installed. Exit status is 0 only if every
+criterion passes.
+"""
+
+import argparse
+from bisect import bisect_right
+import json
+import math
+import os
+import socket
+import subprocess
+from pathlib import Path
+import struct
+import sys
+import time
+
+import yaml
+
+REPO = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO / 'src/ridgeback_common'))
+from ridgeback_common.camera_inputs import (  # noqa: E402
+    REALSENSE_BACKEND, SIMULATION_BACKEND, resolve_camera_inputs)
+from ridgeback_common.camera_profiles import CAMERA_PROFILES, DEFAULT_CAMERA_PROFILE  # noqa: E402
+
+COLOR_ENCODINGS = ('rgb8', 'bgr8', 'rgba8', 'bgra8')
+DEPTH_ENCODINGS = ('16UC1', 'mono16', '32FC1')
+MIN_IMAGE_HZ = 29.0
+MAX_STAMP_GAP_S = 0.150
+MIN_PAIRING = 0.99
+MIN_SCAN_HZ = 38.0
+MAX_SCAN_GAP_S = {'front': 0.25, 'rear': 0.25, 'merged': 0.5}
+SCAN_TOPICS = {'front': 'sensors/lidar2d_0/scan', 'rear': 'sensors/lidar2d_1/scan',
+               'merged': 'sensors/scan'}
+HARDWARE_OPTICAL_FRAME = 'camera_0_color_optical_frame'
+INSTALL_METADATA = Path('/etc/clearpath/dynamo-camera/install.json')
+ROBOT_YAML = Path('/etc/clearpath/robot.yaml')
+EXTRA_STREAMS = ('infra1', 'infra2', 'points', 'pointcloud', 'depth/color/points')
+# Compression candidates (O4). tools/intel_thor/thor_decoder republishes each
+# compressed variant as a raw Image under these Thor-local names, so decoded
+# frames never share a topic with Intel's raw publisher.
+COLOR_TRANSPORTS = ('raw', 'compressed', 'ffmpeg')
+DEPTH_TRANSPORTS = ('raw', 'zstd', 'compressedDepth')
+DECODED_TOPICS = {'color': 'sensors/camera_0/thor/color/image',
+                  'depth': 'sensors/camera_0/thor/depth/image'}
+
+
+def selected_inputs(hardware):
+    # The installed boot service remaps images to camera_0 contract names;
+    # direct RealSense launches use the generic backend defaults.
+    overrides = dict(color_image_topic='sensors/camera_0/color/image',
+                     aligned_depth_topic='sensors/camera_0/depth/image') if hardware else None
+    return resolve_camera_inputs(REALSENSE_BACKEND if hardware else SIMULATION_BACKEND,
+                                 overrides)
+
+
+def scan_guard_reason(last_scan, now):
+    missing = [name for name, receipt in last_scan.items() if receipt is None]
+    stalled = [name for name, receipt in last_scan.items()
+               if receipt is not None and now - receipt > MAX_SCAN_GAP_S[name]]
+    if missing:
+        return 'scan not discovered: ' + ', '.join(missing)
+    if stalled:
+        return 'scan gap above limit: ' + ', '.join(stalled)
+    return None
+
+
+def header_stamp(raw):
+    """Stamp of any serialized message that begins with std_msgs/Header."""
+    sec, nanosec = struct.unpack_from(('<' if raw[1] & 1 else '>') + 'iI', raw, 4)
+    return sec * 1_000_000_000 + nanosec
+
+
+def image_header(raw):
+    """Stamp, frame, grid and encoding from a serialized sensor_msgs/Image."""
+    endian = '<' if raw[1] & 1 else '>'
+    position = 4
+
+    def align(size):
+        nonlocal position
+        position += (-(position - 4)) % size
+
+    def unpack(code):
+        nonlocal position
+        align(struct.calcsize(code))
+        value, = struct.unpack_from(endian + code, raw, position)
+        position += struct.calcsize(code)
+        return value
+
+    def string():
+        nonlocal position
+        length = unpack('I')
+        value = raw[position:position + length - 1].decode('utf-8')
+        position += length
+        return value
+
+    sec, nanosec = unpack('i'), unpack('I')
+    frame = string()
+    height, width = unpack('I'), unpack('I')
+    return {'stamp_ns': sec * 1_000_000_000 + nanosec, 'frame': frame,
+            'width': width, 'height': height, 'encoding': string()}
+
+
+def timing_sample(stamp_ns, info, callback_ns):
+    """Keep RMW timestamps at callback entry; zero means unavailable."""
+    def field(name):
+        return info.get(name, 0) if isinstance(info, dict) else getattr(info, name, 0)
+    return {'stamp_ns': stamp_ns, 'source_ns': field('source_timestamp') or 0,
+            'received_ns': field('received_timestamp') or 0, 'callback_ns': callback_ns,
+            'publisher_gid': list(field('publisher_gid') or []),
+            'sequence': field('publication_sequence_number')}
+
+
+def percentiles(values):
+    """Linear interpolation on sorted samples, in milliseconds."""
+    ordered = sorted(values)
+    if not ordered:
+        return {'count': 0, 'median_ms': None, 'p95_ms': None, 'p99_ms': None, 'max_ms': None}
+    def at(fraction):
+        position = (len(ordered) - 1) * fraction
+        low = int(position)
+        high = min(low + 1, len(ordered) - 1)
+        return ordered[low] + (ordered[high] - ordered[low]) * (position - low)
+    return {'count': len(ordered), 'median_ms': at(.5), 'p95_ms': at(.95),
+            'p99_ms': at(.99), 'max_ms': ordered[-1]}
+
+
+def clock_series_summary(points):
+    """Bound each short interval; detect wall-clock steps against monotonic time."""
+    bounds, gaps = [], []
+    stepped = False
+    for left, right in zip(points, points[1:]):
+        gaps.append((right['thor_ns'] - left['thor_ns']) / 1e9)
+        low = min(left['offset_ms'] - left['bound_ms'], right['offset_ms'] - right['bound_ms'])
+        high = max(left['offset_ms'] + left['bound_ms'], right['offset_ms'] + right['bound_ms'])
+        bounds.append((high - low) / 2)
+        for host in ('intel', 'thor'):
+            phase_left = left[host + '_ns'] - left[host + '_mono_ns']
+            phase_right = right[host + '_ns'] - right[host + '_mono_ns']
+            left_bounds = (left.get(host + '_phase_min_ns', phase_left),
+                           left.get(host + '_phase_max_ns', phase_left))
+            right_bounds = (right.get(host + '_phase_min_ns', phase_right),
+                            right.get(host + '_phase_max_ns', phase_right))
+            stepped |= max(0, left_bounds[0] - right_bounds[1], right_bounds[0] - left_bounds[1]) > 100_000
+    bound = max(bounds) if bounds else None
+    valid = all(math.isfinite(p['offset_ms']) and math.isfinite(p['bound_ms']) and p['bound_ms'] >= 0 for p in points)
+    resolved = bool(bounds) and valid and bound <= .2 and not stepped and all(0 < gap <= 2 for gap in gaps)
+    return {'resolved': resolved, 'bound_ms': bound, 'clock_step_detected': stepped,
+            'max_interval_s': max(gaps) if gaps else None, 'point_count': len(points),
+            'offset_ms': sum(point['offset_ms'] for point in points) / len(points) if points else None,
+            'method': 'midpoint correction per adjacent LAN calibration interval',
+            'limitation': 'Assumes offset remains inside adjacent calibration envelopes; sub-interval steps may be unobserved.'}
+
+
+def clock_offset_at(points, stamp_ns):
+    index = bisect_right([point['thor_ns'] for point in points], stamp_ns) - 1
+    if index < 0 or index >= len(points) - 1:
+        return None
+    left, right = points[index:index + 2]
+    low = min(left['offset_ms'] - left['bound_ms'], right['offset_ms'] - right['bound_ms'])
+    high = max(left['offset_ms'] + left['bound_ms'], right['offset_ms'] + right['bound_ms'])
+    return (low + high) / 2 * 1e6
+
+
+def timing_stats(samples, offset_ms=None, bound_ms=None, same_host=False, clock_series=None):
+    resolved = same_host or (offset_ms is not None and bound_ms is not None
+                            and math.isfinite(offset_ms) and math.isfinite(bound_ms)
+                            and 0 <= bound_ms <= .2)
+    if clock_series is not None and not same_host:
+        resolved = clock_series_summary(clock_series)['resolved']
+    correction = 0 if same_host else (offset_ms or 0) * 1e6
+    values = {key: [] for key in ('driver', 'network_dds', 'executor', 'total')}
+    previous, missing, deliveries = {}, 0, 0
+    for sample in samples:
+        stamp, source, received, callback = (sample[k] for k in
+            ('stamp_ns', 'source_ns', 'received_ns', 'callback_ns'))
+        if stamp > 0 and source > 0:
+            values['driver'].append((source - stamp) / 1e6)
+        if received > 0:
+            values['executor'].append((callback - received) / 1e6)
+        if resolved:
+            network_correction = clock_offset_at(clock_series, received) if clock_series is not None and not same_host else correction
+            total_correction = clock_offset_at(clock_series, callback) if clock_series is not None and not same_host else correction
+            if source > 0 and received > 0 and network_correction is not None:
+                values['network_dds'].append((received - source - network_correction) / 1e6)
+            if stamp > 0 and total_correction is not None:
+                values['total'].append((callback - stamp - total_correction) / 1e6)
+        sequence = sample['sequence'] or 0
+        # ROS uses zero or UINT64_MAX when the RMW cannot supply sequence numbers.
+        if 0 < sequence < 2**64 - 1:
+            gid = tuple(sample['publisher_gid'])
+            if gid in previous and sequence > previous[gid]:
+                missing += max(0, sequence - previous[gid] - 1)
+                deliveries += 1
+            previous[gid] = max(sequence, previous.get(gid, 0))
+    return {'clock_resolved': resolved, 'components': {k: percentiles(v) for k, v in values.items()},
+            'dds_loss': {'missing': missing, 'observed_intervals': deliveries,
+                         'fraction': missing / (missing + deliveries) if deliveries else None}}
+
+
+def transport_timing(encoded, decoded, offset_ms=None, bound_ms=None, clock_series=None):
+    """Split a compressed stream's delay per stamp across the two hosts.
+
+    encode      Intel publish of the compressed message minus header stamp (Intel clock)
+    network_dds Thor receipt of the compressed message minus that publish (cross-host)
+    decode      decoder's publish of the raw image minus this observer's receipt of
+                the compressed message (Thor clock; both Thor subscribers receive the
+                same sample, so this approximates the decoder's own receipt)
+    delivery    callback minus the decoder's publish (Thor clock)
+    total       callback minus header stamp (cross-host)
+    """
+    resolved = (clock_series_summary(clock_series)['resolved'] if clock_series is not None
+                else offset_ms is not None and bound_ms is not None
+                and math.isfinite(offset_ms) and math.isfinite(bound_ms) and 0 <= bound_ms <= .2)
+
+    def correction(at_ns):
+        return clock_offset_at(clock_series, at_ns) if clock_series is not None else (offset_ms or 0) * 1e6
+
+    wire = {sample['stamp_ns']: sample for sample in encoded}
+    values = {key: [] for key in ('encode', 'network_dds', 'decode', 'delivery', 'total')}
+    matched = 0
+    for sample in decoded:
+        stamp = sample['stamp_ns']
+        message = wire.get(stamp)
+        matched += message is not None
+        if message and message['source_ns'] > 0 and stamp > 0:
+            values['encode'].append((message['source_ns'] - stamp) / 1e6)
+        if message and message['received_ns'] > 0 and sample['source_ns'] > 0:
+            values['decode'].append((sample['source_ns'] - message['received_ns']) / 1e6)
+        if sample['source_ns'] > 0:
+            values['delivery'].append((sample['callback_ns'] - sample['source_ns']) / 1e6)
+        if not resolved:
+            continue
+        total_correction = correction(sample['callback_ns'])
+        if stamp > 0 and total_correction is not None:
+            values['total'].append((sample['callback_ns'] - stamp - total_correction) / 1e6)
+        if message and message['source_ns'] > 0 and message['received_ns'] > 0:
+            network_correction = correction(message['received_ns'])
+            if network_correction is not None:
+                values['network_dds'].append(
+                    (message['received_ns'] - message['source_ns'] - network_correction) / 1e6)
+    return {'clock_resolved': resolved, 'matched_encoded': matched,
+            'components': {key: percentiles(value) for key, value in values.items()},
+            'dds_loss': timing_stats(decoded, same_host=True)['dds_loss']}
+
+
+def host_counters():
+    """No graph polling: Linux counters for CPU and every non-loopback NIC."""
+    cpu = [int(v) for v in Path('/proc/stat').read_text().splitlines()[0].split()[1:]]
+    links = {}
+    for line in Path('/proc/net/dev').read_text().splitlines()[2:]:
+        name, counters = line.split(':', 1)
+        name = name.strip()
+        if name == 'lo':
+            continue
+        fields = counters.split()
+        links[name] = {'rx_bytes': int(fields[0]), 'tx_bytes': int(fields[8])}
+    return {'monotonic_s': time.monotonic(), 'cpu_total': sum(cpu),
+            'cpu_idle': sum(cpu[3:5]), 'links': links}
+
+
+def resource_delta(before, after):
+    seconds = after['monotonic_s'] - before['monotonic_s']
+    ticks = after['cpu_total'] - before['cpu_total']
+    return {'cpu_busy_percent': 100 * (1 - (after['cpu_idle'] - before['cpu_idle']) / ticks)
+            if ticks else None,
+            'links': {name: {direction + '_mbit_s':
+                (counts[direction + '_bytes'] - before['links'][name][direction + '_bytes']) * 8 / seconds / 1e6
+                for direction in ('rx', 'tx')}
+                for name, counts in after['links'].items() if name in before['links'] and seconds > 0}}
+
+
+def stream_stats(stamps_ns, duration_s):
+    """Rate from unique stamps; duplicates, regressions and the largest stamp gap."""
+    duplicates = len(stamps_ns) - len(set(stamps_ns))
+    regressions = sum(later < earlier for earlier, later in zip(stamps_ns, stamps_ns[1:]))
+    ordered = sorted(set(stamps_ns))
+    gaps = [(b - a) / 1e9 for a, b in zip(ordered, ordered[1:])]
+    return {'unique': len(ordered), 'rate_hz': len(ordered) / duration_s if duration_s > 0 else 0.0,
+            'duplicates': duplicates, 'regressions': regressions,
+            'max_stamp_gap_s': max(gaps) if gaps else None}
+
+
+def evaluate(observation, expected):
+    """Rows of (criterion, passed, detail). Pure: no ROS, no clock."""
+    rows = []
+
+    def row(name, passed, detail):
+        rows.append((name, bool(passed), detail))
+
+    color, depth, info = observation['color'], observation['depth'], observation['info']
+    duration = observation['duration_s']
+    row('types', observation['types'] == expected['types'],
+        ', '.join(f'{k}={v}' for k, v in sorted(observation['types'].items())))
+    row('colour encoding', bool(color['encodings']) and color['encodings'] <= set(COLOR_ENCODINGS),
+        ', '.join(sorted(color['encodings'])) or 'no images')
+    row('depth encoding', bool(depth['encodings']) and depth['encodings'] <= set(DEPTH_ENCODINGS),
+        ', '.join(sorted(depth['encodings'])) or 'no images')
+    grid = {expected['grid']}
+    row('grids', color['sizes'] == info['sizes'] == depth['sizes'] == grid,
+        f"colour {sorted(color['sizes'])}, info {sorted(info['sizes'])}, depth {sorted(depth['sizes'])}, "
+        f"expected {expected['grid']}")
+    frames = color['frames'] | depth['frames']
+    wanted = expected.get('optical_frame')
+    row('frame ids', len(frames) == 1 and (wanted is None or frames == {wanted}),
+        ', '.join(sorted(frames)) or 'none')
+    row('TF base to optical', observation['tf_ok'], observation['tf_detail'])
+    for name, stream in (('colour', color), ('depth', depth)):
+        stats = stream_stats(stream['stamps'], duration)
+        stream['stats'] = stats
+        row(f'{name} rate', stats['rate_hz'] >= expected.get('fps', 30) - 1, f"{stats['rate_hz']:.2f} Hz unique")
+        row(f'{name} stamps', stats['duplicates'] == 0 and stats['regressions'] == 0
+            and stats['max_stamp_gap_s'] is not None and stats['max_stamp_gap_s'] <= MAX_STAMP_GAP_S,
+            f"dup {stats['duplicates']}, regress {stats['regressions']}, max gap "
+            + (f"{stats['max_stamp_gap_s'] * 1000:.1f} ms" if stats['max_stamp_gap_s'] is not None else '-'))
+    colour_set, depth_set = set(color['stamps']), set(depth['stamps'])
+    matched = len(colour_set & depth_set)
+    forward = matched / len(colour_set) if colour_set else 0.0
+    backward = matched / len(depth_set) if depth_set else 0.0
+    row('colour/depth pairing', forward >= MIN_PAIRING and backward >= MIN_PAIRING,
+        f'{forward:.2%} colour matched, {backward:.2%} depth matched')
+    row('contract streams only', not observation['extra_topics'],
+        ', '.join(observation['extra_topics']) or 'none')
+    for name, scan in (observation.get('scans') or {}).items():
+        receipts = scan['receive_s']
+        gaps = [b - a for a, b in zip(receipts, receipts[1:])]
+        rate = len(receipts) / duration if duration > 0 else 0.0
+        largest = max(gaps) if gaps else None
+        row(f'{name} scan', rate >= MIN_SCAN_HZ and largest is not None
+            and largest <= MAX_SCAN_GAP_S[name],
+            f'{rate:.2f} Hz, max gap ' + (f'{largest * 1000:.1f} ms' if largest is not None else '-'))
+    return rows
+
+
+def hardware_defaults():
+    metadata = json.loads(INSTALL_METADATA.read_text()) if INSTALL_METADATA.exists() else {}
+    namespace = metadata.get('namespace')
+    if namespace is None and ROBOT_YAML.exists():
+        namespace = yaml.safe_load(ROBOT_YAML.read_text())['system']['ros2']['namespace']
+    return namespace, metadata.get('profile', DEFAULT_CAMERA_PROFILE)
+
+
+def observe(namespace, inputs, base_frame, warmup, duration, scans, timing=False, guard=False,
+            transports=None):
+    transports = transports or {'color': 'raw', 'depth': 'raw'}
+    import rclpy
+    from rclpy.duration import Duration
+    from rclpy.qos import qos_profile_sensor_data
+    from rclpy.serialization import deserialize_message
+    from rclpy.time import Time
+    from sensor_msgs.msg import CameraInfo, Image, LaserScan
+    import tf2_ros
+    from tf2_msgs.msg import TFMessage
+
+    def absolute(topic):
+        return '/' + '/'.join(part for part in (namespace, topic) if part)
+
+    rclpy.init(args=['--ros-args', '-r', f'/tf:={absolute("tf")}',
+                     '-r', f'/tf_static:={absolute("tf_static")}'])
+    node = rclpy.create_node('camera_contract_check')
+    buffer = tf2_ros.Buffer()
+    tf2_ros.TransformListener(buffer, node)
+    wall_start = time.time()
+    start = time.monotonic()
+    measure_from = float('inf') if guard else start + warmup
+    end = measure_from + duration
+    observation = {key: {'stamps': [], 'encodings': set(), 'sizes': set(), 'frames': set()}
+                   for key in ('color', 'depth')}
+    observation['info'] = {'sizes': set(), 'frames': set()}
+    scan_receipts = {name: [] for name in SCAN_TOPICS} if scans else {}
+    compressed = [stream for stream in ('color', 'depth') if transports[stream] != 'raw']
+    timed = {name: [] for name in ('color', 'depth', 'info', *scan_receipts, 'tf',
+                                   *(stream + '_encoded' for stream in compressed))}
+    # Contract checks and pairing apply to what consumers receive: decoded frames
+    # for a compressed stream, the driver's raw topic otherwise.
+    image_topics = {'color': inputs.color_image_topic, 'depth': inputs.aligned_depth_topic}
+    for stream in compressed:
+        image_topics[stream] = DECODED_TOPICS[stream]
+    resources_before = None
+    resources_after = None
+    last_scan = {name: None for name in scan_receipts}
+    abort = None
+    measured_end = end
+    service_state = None
+    def services():
+        result = subprocess.run(['systemctl', 'show', 'clearpath-sensors.service',
+                                 'dynamo-camera.service', '-p', 'NRestarts', '-p', 'MainPID',
+                                 '-p', 'ActiveState'], capture_output=True, text=True, check=True)
+        return result.stdout
+    if guard:
+        service_state = services()
+    next_check = start
+
+    def record(key, stamp, message_info, callback_ns):
+        if timing:
+            timed[key].append(timing_sample(stamp, message_info, callback_ns))
+
+    def image_callback(key):
+        def callback(raw, message_info):
+            callback_ns = time.time_ns()
+            if not measure_from <= time.monotonic() < end:
+                return
+            header = image_header(raw)
+            record(key, header['stamp_ns'], message_info, callback_ns)
+            stream = observation[key]
+            stream['stamps'].append(header['stamp_ns'])
+            stream['encodings'].add(header['encoding'])
+            stream['sizes'].add((header['width'], header['height']))
+            stream['frames'].add(header['frame'])
+        return callback
+
+    def info_callback(raw, message_info):
+        callback_ns = time.time_ns()
+        if measure_from <= time.monotonic() < end:
+            message = deserialize_message(raw, CameraInfo)
+            record('info', message.header.stamp.sec * 10**9 + message.header.stamp.nanosec,
+                   message_info, callback_ns)
+            observation['info']['sizes'].add((message.width, message.height))
+            observation['info']['frames'].add(message.header.frame_id)
+
+    def encoded_callback(key):
+        def callback(raw, message_info):
+            callback_ns = time.time_ns()
+            if timing and measure_from <= time.monotonic() < end:
+                record(key, header_stamp(raw), message_info, callback_ns)
+        return callback
+
+    def scan_callback(name):
+        def callback(raw, message_info):
+            nonlocal abort
+            callback_ns = time.time_ns()
+            now = time.monotonic()
+            if (guard and last_scan[name] is not None
+                    and now - last_scan[name] > MAX_SCAN_GAP_S[name]):
+                abort = 'scan gap above limit: ' + name
+            last_scan[name] = now
+            if measure_from <= now < end:
+                scan_receipts[name].append(now)
+                if timing:
+                    # LaserScan begins with Header, so reading its stamp needs no ranges copy.
+                    endian = '<' if raw[1] & 1 else '>'
+                    sec, nanosec = struct.unpack_from(endian + 'iI', raw, 4)
+                    record(name, sec * 10**9 + nanosec, message_info, callback_ns)
+        return callback
+
+    def tf_callback(message, message_info):
+        callback_ns = time.time_ns()
+        if measure_from <= time.monotonic() < end:
+            # A TFMessage can batch unrelated frames: retain every transform's stamp.
+            for transform in message.transforms:
+                stamp = transform.header.stamp
+                record('tf', stamp.sec * 10**9 + stamp.nanosec, message_info, callback_ns)
+
+    for name, topic in SCAN_TOPICS.items() if scans else ():
+        node.create_subscription(LaserScan, absolute(topic), scan_callback(name),
+                                 qos_profile_sensor_data, raw=True)
+    if guard:
+        # Establish scan discovery before introducing any camera reader.
+        discovery_end = time.monotonic() + 5
+        while any(t is None for t in last_scan.values()) and abort is None:
+            if time.monotonic() >= discovery_end:
+                abort = scan_guard_reason(last_scan, time.monotonic())
+                break
+            rclpy.spin_once(node, timeout_sec=.02)
+        if abort is None:
+            abort = scan_guard_reason(last_scan, time.monotonic())
+        start = time.monotonic()
+        measure_from = start + warmup
+        end = measure_from + duration
+    if abort is None:
+        node.create_subscription(Image, absolute(image_topics['color']), image_callback('color'),
+                                 qos_profile_sensor_data, raw=True)
+        node.create_subscription(Image, absolute(image_topics['depth']), image_callback('depth'),
+                                 qos_profile_sensor_data, raw=True)
+        node.create_subscription(CameraInfo, absolute(inputs.color_camera_info_topic), info_callback,
+                                 qos_profile_sensor_data, raw=True)
+        for stream in compressed:
+            if transports[stream] == 'ffmpeg':
+                from ffmpeg_image_transport_msgs.msg import FFMPEGPacket as Encoded
+            else:
+                from sensor_msgs.msg import CompressedImage as Encoded
+            contract_topic = inputs.color_image_topic if stream == 'color' else inputs.aligned_depth_topic
+            node.create_subscription(Encoded, absolute(f'{contract_topic}/{transports[stream]}'),
+                                     encoded_callback(stream + '_encoded'), qos_profile_sensor_data, raw=True)
+    if timing:
+        node.create_subscription(TFMessage, absolute('tf'), tf_callback, qos_profile_sensor_data)
+    try:
+        while time.monotonic() < end and abort is None:
+            now = time.monotonic()
+            if now >= measure_from and resources_before is None:
+                resources_before = host_counters()
+            if guard:
+                reason = scan_guard_reason(last_scan, now)
+                if reason:
+                    abort = reason
+                    break
+                if now >= next_check:
+                    next_check = now + 1
+                    logs = subprocess.run(['journalctl', '-u', 'dynamo-camera.service',
+                                           '--since', '@' + str(wall_start), '--no-pager', '-o', 'cat'],
+                                          capture_output=True, text=True, check=True).stdout
+                    if '[ERROR]' in logs:
+                        abort = 'camera driver error in journal since run start'
+                        break
+                    if services() != service_state:
+                        abort = 'clearpath-sensors or dynamo-camera changed PID/state/restart count'
+                        break
+            rclpy.spin_once(node, timeout_sec=0.02)
+        measured_end = time.monotonic()
+        resources_after = host_counters()
+    except BaseException:
+        node.destroy_node()
+        rclpy.shutdown()
+        raise
+
+    types = {}
+    topics = dict(node.get_topic_names_and_types())
+    for key, topic in (('color', image_topics['color']), ('info', inputs.color_camera_info_topic),
+                       ('depth', image_topics['depth'])):
+        types[key] = ','.join(topics.get(absolute(topic), [])) or 'absent'
+    prefix = absolute('sensors/camera_0') + '/'
+    extra = sorted(name for name in topics if name.startswith(prefix)
+                   and any(f'/{stream}' in name[len(prefix) - 1:] for stream in EXTRA_STREAMS))
+    frame = next(iter(observation['color']['frames']), None)
+    stamp = observation['color']['stamps'][-1] if observation['color']['stamps'] else None
+    tf_ok, tf_detail = False, 'no colour image received'
+    if frame and stamp is not None:
+        try:
+            buffer.lookup_transform(base_frame, frame, Time(nanoseconds=stamp), Duration(seconds=1.0))
+            tf_ok, tf_detail = True, f'{base_frame} -> {frame} at the last image stamp'
+        except Exception as error:  # tf2 raises several unrelated exception types
+            tf_detail = f'{base_frame} -> {frame}: {type(error).__name__}: {error}'
+    node.destroy_node()
+    rclpy.shutdown()
+    observation.update(timing=timed, aborted=abort, resources=resource_delta(resources_before, resources_after)
+                       if resources_before else None,
+                       types=types, duration_s=min(duration, max(0, measured_end - measure_from)), tf_ok=tf_ok, tf_detail=tf_detail,
+                       extra_topics=extra, scans={name: {'receive_s': r} for name, r in scan_receipts.items()})
+    return observation
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument('--host', choices=('intel', 'thor'), default='intel')
+    parser.add_argument('--timing', action='store_true')
+    parser.add_argument('--clock-offset-ms', type=float, help='Thor minus Intel clock offset')
+    parser.add_argument('--clock-bound-ms', type=float, help='uncertainty of the clock offset, <= 0.2 ms to resolve cross-host timing')
+    parser.add_argument('--fps', type=int, choices=(15, 30), default=30, help='15 Hz is reduced-rate evidence only')
+    parser.add_argument('--guard', action='store_true', help='Intel: discover scans before readers; monitor warm-up and measurement (individual 250 ms, merged 500 ms)')
+    parser.add_argument('--backend', choices=('hardware', 'gz', 'isaac'), required=True)
+    parser.add_argument('--namespace')
+    parser.add_argument('--base-frame')
+    parser.add_argument('--profile', choices=sorted(CAMERA_PROFILES))
+    parser.add_argument('--optical-frame', help='expected image frame_id; hardware default '
+                        f'{HARDWARE_OPTICAL_FRAME}, simulators only require one shared frame')
+    parser.add_argument('--warmup', type=float, default=10.0)
+    parser.add_argument('--duration', type=float, default=60.0)
+    parser.add_argument('--no-scans', action='store_true', help='skip LiDAR continuity (default on hardware)')
+    parser.add_argument('--output', type=Path)
+    parser.add_argument('--samples-output', type=Path, help='raw timestamps for later clock validation')
+    parser.add_argument('--color-transport', choices=COLOR_TRANSPORTS, default='raw',
+                        help='Thor: observe colour decoded by thor_decoder from this variant')
+    parser.add_argument('--depth-transport', choices=DEPTH_TRANSPORTS, default='raw',
+                        help='Thor: observe aligned depth decoded by thor_decoder from this variant')
+    args = parser.parse_args(argv)
+    transports = {'color': args.color_transport, 'depth': args.depth_transport}
+    if args.host != 'thor' and set(transports.values()) != {'raw'}:
+        parser.error('compressed transports are decoded on Thor; use --host thor')
+
+    if args.duration <= 0 or args.warmup < 0 or not math.isfinite(args.duration + args.warmup):
+        parser.error('duration must be positive and warmup nonnegative and finite')
+    if args.clock_bound_ms is not None and (not math.isfinite(args.clock_bound_ms) or args.clock_bound_ms < 0):
+        parser.error('clock bound must be finite and nonnegative')
+    if args.clock_offset_ms is not None and not math.isfinite(args.clock_offset_ms):
+        parser.error('clock offset must be finite')
+    if args.guard and (args.host != 'intel' or args.no_scans or args.backend != 'hardware'):
+        parser.error('--guard requires hardware scans on Intel')
+    hardware = args.backend == 'hardware'
+    namespace, installed_profile = hardware_defaults() if hardware and args.host == 'intel' else (None, DEFAULT_CAMERA_PROFILE)
+    namespace = (args.namespace or namespace or '').strip('/')
+    if not namespace:
+        parser.error('--namespace is required')
+    profile = CAMERA_PROFILES[args.profile or installed_profile]
+    base_frame = args.base_frame or ('base_link' if hardware else f'{namespace}/robot/base_link')
+    inputs = selected_inputs(hardware)
+    expected = {'fps': args.fps, 'grid': (profile.width, profile.height),
+                'optical_frame': args.optical_frame or (HARDWARE_OPTICAL_FRAME if hardware else None),
+                'types': {'color': 'sensor_msgs/msg/Image', 'info': 'sensor_msgs/msg/CameraInfo',
+                          'depth': 'sensor_msgs/msg/Image'}}
+    print(f'Observing /{namespace} for {args.warmup:.0f} s warm-up + {args.duration:.0f} s', flush=True)
+    observation = observe(namespace, inputs, base_frame, args.warmup, args.duration,
+                          scans=hardware and not args.no_scans, timing=args.timing, guard=args.guard,
+                          transports=transports)
+    if not hardware or args.no_scans:
+        observation['scans'] = {}
+    rows = evaluate(observation, expected)
+    for name, passed, detail in rows:
+        print(f"{'PASS' if passed else 'FAIL'}  {name:24} {detail}")
+    if observation['aborted']:
+        rows.append(('run completed', False, observation['aborted']))
+        print('ABORT: ' + observation['aborted'])
+    timing = {key: timing_stats(samples, args.clock_offset_ms, args.clock_bound_ms,
+                               same_host=args.host == 'intel')
+              for key, samples in observation['timing'].items()} if args.timing else {}
+    for stream, transport in transports.items():
+        if args.timing and transport != 'raw':
+            timing[stream] = transport_timing(observation['timing'][stream + '_encoded'],
+                                              observation['timing'][stream],
+                                              args.clock_offset_ms, args.clock_bound_ms)
+    for key, stats in timing.items():
+        print(f'TIMING {key}: ' + json.dumps(stats))
+    passed = all(ok for _, ok, _ in rows)
+    print('CONTRACT PASS' if passed else 'CONTRACT FAIL')
+    if args.samples_output:
+        args.samples_output.parent.mkdir(parents=True, exist_ok=True)
+        args.samples_output.write_text(json.dumps(observation['timing']) + '\n')
+    if args.output:
+        report = {'host': args.host, 'hostname': socket.gethostname(), 'fps': args.fps,
+                  'transports': transports,
+                  'reduced_rate': args.fps != 30, 'timing': timing,
+                  'clock': {'offset_ms': args.clock_offset_ms, 'bound_ms': args.clock_bound_ms},
+                  'duration_s': observation['duration_s'], 'resources': observation['resources'], 'aborted': observation['aborted'],
+                  'pairing': {key: len(set(observation['color']['stamps']) & set(observation['depth']['stamps']))
+                              / len(set(observation[key]['stamps'])) if observation[key]['stamps'] else 0
+                              for key in ('color', 'depth')},
+                  'rate_loss_estimate': {key: max(0, 1 - len(set(observation[key]['stamps']))
+                                          / (observation['duration_s'] * args.fps))
+                                         for key in ('color', 'depth')}
+                                         if observation['duration_s'] else {},
+                  'namespace': namespace, 'backend': args.backend, 'base_frame': base_frame,
+                  'expected': {**expected, 'grid': list(expected['grid'])},
+                  'rows': [{'criterion': n, 'passed': p, 'detail': d} for n, p, d in rows],
+                  'streams': {key: observation[key].get('stats') for key in ('color', 'depth')},
+                  'passed': passed}
+        args.output.parent.mkdir(parents=True, exist_ok=True)
+        args.output.write_text(json.dumps(report, indent=2) + '\n')
+    return 0 if passed else 1
+
+
+if __name__ == '__main__':
+    sys.exit(main())

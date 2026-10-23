@@ -7,6 +7,7 @@ are excluded from ordinary repository search and the generated knowledge graph.
 
 ## Localization and perception
 
+- [Intel–Thor perception frame timing and depth-one deployment](2026-10-22-perception-frame-timing.md) — warm detector cost, matched-frame delivery, population limits, and queue-change verification.
 - [Package split simulator runtime qualification](2026-09-18-package-split-runtime.md)
 
 - [Depth producer sampling and monocular scale](aligned_depth_coverage.md)

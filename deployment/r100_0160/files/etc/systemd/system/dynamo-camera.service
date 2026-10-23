@@ -1,0 +1,24 @@
+# Template for /etc/systemd/system/dynamo-camera.service, rendered by
+# tools/intel_thor/camera_service. Edit it here and re-run `apply`.
+#
+# The driver owns the D455 from boot and publishes the camera_0 contract the
+# simulators publish: it runs in /<ns>/sensors as camera_0, its TF goes to the
+# robot's namespaced tree, and its colour and aligned-depth outputs, with each
+# image_transport variant, are remapped onto the simulator topic names.
+# /etc/clearpath/setup.bash supplies the same middleware, domain and DDS profile
+# as the Clearpath services.
+[Unit]
+Description=DyNAMO D455 on the camera_0 contract
+After=clearpath-robot.service network-online.target
+Wants=clearpath-robot.service network-online.target
+Conflicts=realsense-camera.service
+
+[Service]
+Type=simple
+User=robot
+ExecStart=/bin/bash -c 'source /etc/clearpath/setup.bash && exec /opt/ros/jazzy/lib/realsense2_camera/realsense2_camera_node --ros-args -r __ns:=/r100_0160/sensors -r __node:=camera_0 --params-file /etc/clearpath/dynamo-camera/d455.yaml -r /tf:=/r100_0160/tf -r /tf_static:=/r100_0160/tf_static -r /r100_0160/sensors/camera_0/color/image_raw:=/r100_0160/sensors/camera_0/color/image -r /r100_0160/sensors/camera_0/color/image_raw/compressed:=/r100_0160/sensors/camera_0/color/image/compressed -r /r100_0160/sensors/camera_0/color/image_raw/compressedDepth:=/r100_0160/sensors/camera_0/color/image/compressedDepth -r /r100_0160/sensors/camera_0/color/image_raw/ffmpeg:=/r100_0160/sensors/camera_0/color/image/ffmpeg -r /r100_0160/sensors/camera_0/color/image_raw/theora:=/r100_0160/sensors/camera_0/color/image/theora -r /r100_0160/sensors/camera_0/color/image_raw/zstd:=/r100_0160/sensors/camera_0/color/image/zstd -r /r100_0160/sensors/camera_0/aligned_depth_to_color/image_raw:=/r100_0160/sensors/camera_0/depth/image -r /r100_0160/sensors/camera_0/aligned_depth_to_color/image_raw/compressed:=/r100_0160/sensors/camera_0/depth/image/compressed -r /r100_0160/sensors/camera_0/aligned_depth_to_color/image_raw/compressedDepth:=/r100_0160/sensors/camera_0/depth/image/compressedDepth -r /r100_0160/sensors/camera_0/aligned_depth_to_color/image_raw/ffmpeg:=/r100_0160/sensors/camera_0/depth/image/ffmpeg -r /r100_0160/sensors/camera_0/aligned_depth_to_color/image_raw/theora:=/r100_0160/sensors/camera_0/depth/image/theora -r /r100_0160/sensors/camera_0/aligned_depth_to_color/image_raw/zstd:=/r100_0160/sensors/camera_0/depth/image/zstd'
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

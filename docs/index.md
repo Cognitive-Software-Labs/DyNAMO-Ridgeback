@@ -24,6 +24,8 @@ troubleshooting, planning, and historical documentation.
 
 ## Physical deployment
 
+- [Driving readiness](physical/driving_readiness.md) — command ownership,
+  stop/stamp/speed semantics, stationary diagnostics and physical qualification
 - [Ridgeback host setup and SSD recovery](physical/ridgeback_recovery.md) —
   reconstruction order, deployed scripts/configs, network and service ownership,
   credentials recreated locally, and unverified recovery steps
@@ -88,6 +90,8 @@ troubleshooting, planning, and historical documentation.
   - Handoff: [Intel–Thor transport (agent 2)](plans/handoffs/PHYSICAL_intel_thor_transport_agent2.md) — CycloneDDS switch state, services-configuration flood behind the LiDAR lockouts, manual rollback, next steps
 - [PHYSICAL — Robot measurements and stationary sensor validation](plans/PHYSICAL_robot_measurements_and_validation.md) — quick mount readings/photos, D455 and LiDAR checks, stationary alignment, and G1/person tests
   - Handoff: [D455 camera runs (agent 1)](plans/handoffs/PHYSICAL_d455_camera_runs_agent1.md) — P1/P2 results, CycloneDDS camera-transport and LiDAR-lockout findings, next steps
+- [PHYSICAL — Checks without movement or a controller](plans/PHYSICAL_stationary_checks.md) — evidence audit, passive commands, and separately controlled stationary disruptions
+- [PHYSICAL — Remaining qualification and time estimates](plans/PHYSICAL_remaining_qualification.md) — October 14 checkpoint, prerequisites, test durations and preparation allowances
 
 Dated handoff snapshots live in [plans/handoffs/](plans/handoffs/README.md).
 

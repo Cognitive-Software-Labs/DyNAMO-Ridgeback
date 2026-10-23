@@ -1354,8 +1354,26 @@ def detached_command(directory, recovery=False, screening=False, focused_native=
     return unit + '.service', command
 
 
+def vendor_camera_retired():
+    """True when dynamo-camera.service owns the D455 instead of the vendor unit.
+
+    This runner restarts realsense-camera.service and rewrites its start script
+    to toggle alignment; under the camera service neither exists in that form.
+    """
+
+    def active(unit):
+        return subprocess.run(['systemctl', 'is-active', '--quiet', unit], check=False).returncode == 0
+
+    return active('dynamo-camera.service') or not active('realsense-camera.service')
+
+
 def main():
     args = parse_args()
+    if not args.recover and vendor_camera_retired():
+        print('dynamo-camera.service owns the camera; this runner only drives the retired vendor '
+              'realsense-camera unit. Use tools/camera_contract_check (see the S2/S4 reader runs in '
+              'docs/physical/robot_local_deployment.md). --recover still restores old runs.', file=sys.stderr)
+        return 2
     if os.geteuid() != 0:
         print('Run with sudo: packet capture and service reloads require root.', file=sys.stderr)
         return 2

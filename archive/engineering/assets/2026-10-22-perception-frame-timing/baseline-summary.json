@@ -1,0 +1,86 @@
+{
+  "matched_frames": 73,
+  "ages": {
+    "camera_publish": {
+      "n": 73,
+      "median": 18.464,
+      "min": 15.002,
+      "max": 44.463,
+      "p95": 21.121
+    },
+    "thor_color_callback": {
+      "n": 73,
+      "median": 35.57,
+      "min": 31.995,
+      "max": 63.626,
+      "p95": 38.314
+    },
+    "detection_publish": {
+      "n": 73,
+      "median": 359.546,
+      "min": 341.584,
+      "max": 402.556,
+      "p95": 376.528
+    },
+    "measurement_publish": {
+      "n": 73,
+      "median": 360.206,
+      "min": 342.821,
+      "max": 403.19,
+      "p95": 377.239
+    },
+    "intel_measurement_callback": {
+      "n": 73,
+      "median": 361.066,
+      "min": 343.169,
+      "max": 403.609,
+      "p95": 377.598
+    }
+  },
+  "stages": {
+    "camera_publish_to_thor_observer": {
+      "n": 73,
+      "median": 16.904,
+      "min": 16.322,
+      "max": 23.074,
+      "p95": 18.029
+    },
+    "thor_observer_to_detection_publish": {
+      "n": 73,
+      "median": 324.127,
+      "min": 309.033,
+      "max": 341.261,
+      "p95": 339.675
+    },
+    "detection_to_measurement_publish": {
+      "n": 73,
+      "median": 0.682,
+      "min": 0.502,
+      "max": 1.457,
+      "p95": 1.236
+    },
+    "measurement_publish_to_intel_observer": {
+      "n": 73,
+      "median": 0.495,
+      "min": 0.348,
+      "max": 3.847,
+      "p95": 1.745
+    }
+  },
+  "representative_frame": {
+    "stamp_ns": 1792680726636019043,
+    "ages": {
+      "camera_publish": 19.017041,
+      "thor_color_callback": 35.8821,
+      "detection_publish": 359.545913,
+      "measurement_publish": 360.124958,
+      "intel_measurement_callback": 361.06621
+    },
+    "stages": {
+      "camera_publish_to_thor_observer": 16.865059,
+      "thor_observer_to_detection_publish": 323.663813,
+      "detection_to_measurement_publish": 0.579045,
+      "measurement_publish_to_intel_observer": 0.941252
+    }
+  }
+}

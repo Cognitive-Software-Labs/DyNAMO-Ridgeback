@@ -61,6 +61,18 @@ configuration and physical evidence. Start with the D455 on Intel and explicit
 per-host commands; camera relocation is an evidence-led alternative. One-command
 remote startup and boot services are optional later stages.
 
+**Auxiliary findings.** The [October 13 at-rest check](physical/stationary_auxiliary_checks.md)
+observed healthy short-window sensor delivery, but IMU covariance/calibration,
+battery field accuracy and startup timing remain unqualified. Source diagnosis
+found an IMU parameter-selector mismatch and synthesized cell-voltage fields;
+the rollback-capable platform-only repair was installed and independently
+verified stationary on October 13. Zero IMU covariance
+and NaN temperature are valid unknown/unmeasured semantics, not calibration
+values to fabricate. The clock converged and the bounded platform startup gate is installed;
+one supervised post-install reboot now verifies about 38 seconds of clock-gate
+waiting before successful platform startup and preserved sensor/desktop/data
+contracts. Repeated cold boots and external-source loss remain unqualified.
+
 **Completion criteria.** All three plans pass their stationary boundaries on
 the recorded configuration. Apply the existing camera, geometry, calibration,
 and command-chain criteria independently: stationary success does not close
@@ -70,15 +82,91 @@ autonomous-mission work. Pointcloud qualification remains optional.
 ## Physical command-chain validation
 
 **Deployment gate.** The hardware adapter is attach-only and autonomous motion
-defaults off, but the repository has not proven the deployed base controller's
-velocity message contract. The generated setup currently mixes stamped Nav2,
-velocity-smoother, collision-monitor, and mux commands with a generated R100
-mecanum controller setting that reports `use_stamped_vel: false`.
+defaults off. Stationary live inspection confirmed a compatible stamped
+mux/controller interface and an active four-wheel mecanum controller. Legacy
+generated `use_stamped_vel: false` is not the installed controller's interface
+selector. A commissioning guard is installed with 0.05 m/s planar and 0.1 rad/s
+yaw command caps; stationary routing verification passed. Physical stopping
+remains partially qualified: bounded command loss and gently ramped motion in
+all six directions recorded clean stops with operator confirmation. A low-speed
+deadman release also stopped with operator confirmation, with trial deviations
+preserved in the driving reference. Physical e-stop stopping was observed with
+forward still held, and neutral e-stop release produced no movement; the e-stop
+trial exceeded its requested one-second exposure. A deliberate controller disconnect during motion now recorded automatic
+stopping before the bounded-permit backstop, with operator confirmation.
+Silent radio loss/reconnection, takeover and cold boot remain open. Reconnection
+is now a reproduced failed gate: Bluetooth reconnects but the driver reports
+zero physical reports and ROS input stays neutral despite operator input.
+A verified device-specific disconnect and manual reconnect restored live input
+while the stop remained pressed. The root cause, neutral-return evidence and
+automatic reconnect reliability remain open; manual recovery is not a gate pass.
+On 2026-10-12 the platform-restarting autoconnect handler was replaced by a
+root-pinned paired/trusted-device helper that makes no ROS/base service calls.
+Its installation preserved platform/guard/sensor/camera process IDs and verified
+asserted-stop stationary state. A subsequent cached-state recording observed changing physical and virtual
+input and return to neutral, with asserted-stop/stationary probes before and
+after. A subsequent stationary ROS capture also verified changing joystick/combiner
+input and neutral return, with asserted-stop suppression and zero limited/wheel
+commands and raw odometry. One post-repair neutral reconnect plus companion live ROS input/neutral-return
+recording now passes with stop suppression and no platform restart. Repeated
+reconnect reliability and silent radio loss remain open; link-connected status
+alone is insufficient.
+Abrupt direction tests encountered repeatable startup-transient
+aborts; resolve physical versus feedback-timing causes before qualifying those
+profiles. The diagnostic fault-mask and cache-memory repair is installed and verified
+stationary from a root-pinned package, preserving the test lock. The old
+unpatched build was withdrawn;
+the CAN-rate/freshness investigation remains
+open. A stationary paired capture separates steady status-speed reception on
+all wheels from rear setpoint-response count asymmetry; loss location and
+per-field freshness are unqualified. An offline completeness/diagnostic-read
+patch passes extracted-routine checks and full compilation, but timing replay
+predicts about 16.5 Hz and 200 ms publication gaps. Consumer inspection/offline reproduction shows stale states retained and
+commands continuing without an age check. An offline consumer candidate adds age/batch validation, latched command
+inhibition and stationary lifecycle activation; extracted-body checks pass and
+the package compiles and a direct compiled-plugin fixture passes loopback
+ROS messaging checks. The corrected candidate also passes controller-manager initialization,
+feedback-loss inhibition and explicit neutral recovery with fake wheels. The
+plugin-only deployment now passes stationary install and reboot checks. A
+supervised interruption of the real ROS feedback stream with the physical stop
+engaged produced zero wheel commands at about 290 ms and deactivated the
+controller; a stationary platform restart restored active, zero-command
+operation. Qualify braking under movement, electrical CAN loss and repeated
+fault recovery before deploying the driver-completeness candidate. Details are in the [wheel-feedback reference](physical/drive_feedback_diagnostics.md).
+An incoming-only motor-CAN/UDP interruption with the physical stop pressed
+also removed aggregate feedback and faulted the controller about 290 ms later.
+The corrected stationary repeat observed feedback return after the exact rule
+was removed, but control remained inactive until a supervised platform restart;
+stationary recovery passed. This is not a passed moving gate.
+The separate bounded invalid-feedback trial is prepared for securely raised
+wheels; full bidirectional electrical-link loss and per-wheel field freshness
+remain open.
+The native e-stop publisher/mux subscription had incompatible QoS. A reliable
+guard stop relay and mux-only remap passed isolated mock checks and were
+installed and verified stationary on 2026-10-09. A deliberate wireless
+controller power-off and a device-specific automatic disconnect both reset held
+input to neutral while the physical stop was held; the automatic trial retained
+twenty seconds of neutral input and zero commands/wheel motion.
+Silent radio-loss/reconnection qualification remains open. The [stop-delivery reference](physical/driving_readiness.md#e-stop-delivery-to-the-mux)
+owns its deployment state.
+Automatic moving-disconnect testing is disabled after a preflight-unarmed
+trial contained prolonged commands without triggering disconnection. A bounded test-permit interlock is now installed and verified stationary;
+Neutral release and held-command suppression with the physical stop released
+are now verified, including operator confirmation of no movement. The bounded-permit workflow now cut commands despite ongoing source input and
+permits, and the operator confirmed stopping while forward remained held.
+A repeat interlocked deliberate moving-disconnect trial now passed its recorded
+command-stop gate and operator physical stopping observation. Sustained/silent
+radio loss and reconnection remain unqualified.
+Manual mux inputs bypass the Nav2 collision monitor; optional software stop
+locks had no publishers during inspection. The maintained
+[driving reference](physical/driving_readiness.md) owns findings and the
+remaining test sequence.
 
 **Completion criteria.** On the exact approved robot configuration, trace the
 message type, topic, QoS, frame/timeout semantics, mux ownership, collision
 monitor, controller input, e-stop, and deadman behavior from Nav2 to the base.
-Resolve any mismatch at the narrowest owning layer; then perform stationary,
+Reconcile drive feedback frequency targets and direct/aggregated fault
+reporting. Resolve any mismatch at the narrowest owning layer; then perform stationary,
 lifted/blocked-wheel where approved, low-speed clear-space, stop, timeout, and
 e-stop tests before enabling `autonomous_motion_enabled:=true`.
 
@@ -100,6 +188,25 @@ initiating mechanism remains unproven; the maintained
 [transport blocker](physical/intel_thor_transport.md#camera-subscriber-blocker)
 distinguishes observations from the multicast hypothesis.
 
+**Progress.** The lockout mechanism was found and fixed on 2026-10-13: when
+`urg_open` fails after the TCP connect, `urg_node` 1.1.2 throws without closing
+the socket, and `urg_c` writes without `MSG_NOSIGNAL`, so a reset session killed
+the driver with SIGPIPE. One recorded patch,
+`patches/urg_node_reconnect_recovery.patch` on `src/urg_node` 1.1.2 (pinned in
+`dependencies/core.repos` on `origin/dev`), closes the failed socket and ignores
+SIGPIPE. It runs on `r100_0160` as the overlay
+`/home/robot/ros_overlays/urg_node_fix`, listed under `system.ros2.workspaces`
+in `/etc/clearpath/robot.yaml` (rollback copy `robot.yaml.bak-urg-node-fix`).
+A rear-LiDAR session reset on 2026-10-13 reconnected the same driver process
+after a 2.25 s scan gap. On 2026-10-14 (S3) `tools/hardware/observe_lidar_interruption.py`
+reset the **front** session with the base e-stopped: the same driver process
+reconnected after 2.25 s with no service or merger restart, the rear scan never
+gapped more than 42 ms, and over the 30 s after recovery front, rear and merged
+scans each held 39.93 Hz with gaps up to 43 ms (`artifacts/hardware/20261014T114600Z-s3-front-lidar-interruption/`). An earlier attempt
+the same day is kept as `…-INVALID-settle-window`: its recovery was identical
+but the tool's settle window overlapped the outage. The half-answering-sensor
+case is shown only offline.
+
 **Context.** Recovery steps are in
 [troubleshooting](troubleshooting.md#hokuyo-drivers-stuck-reconnecting). The
 incident timeline is in the archived evidence below. The CycloneDDS deployment is described in the
@@ -115,7 +222,8 @@ incident timeline is in the archived evidence below. The CycloneDDS deployment i
   manual intervention. Achieve this with a maintained `urg_node` patch under
   `patches/` that closes the old session before reconnecting, or with a
   documented supervisor that restarts only the sensor drivers. Demonstrate it
-  by interrupting a LiDAR's TCP session on the robot.
+  by interrupting a LiDAR's TCP session on the robot. **Met** for a reset
+  session on both LiDARs (see Progress); no supervisor is needed for that case.
 - Either explain the 2026-09-18 simultaneous timeout, or bound its recurrence
   with a recorded multi-hour soak under CycloneDDS with the Intel services,
   SLAM, and Nav2 running.
@@ -132,10 +240,17 @@ startup gap, separate from camera transport.
 
 **Context.** Read-only checks and ownership interpretation are in
 [desktop startup troubleshooting](troubleshooting.md#remote-desktop-startup-and-proxy-ownership).
-The maintained [workflow repair](physical/intel_dds_testing.md) addresses the
-competing port-9100 VNC launcher, proxy dependency failure, graphics selection,
-user runtime and daemon-dependent camera readiness. Its installation and boot
-behavior still need verification on the deployed robot.
+The camera-independent stationary setup repair was installed and independently
+verified on 2026-10-12. The foreground VNC service owns display :1/5901;
+independent units own 9005 and 9100, and the remote-screen override removes its
+competing display launcher. All six root-owned file hashes/modes match maintained
+sources; platform, guard, camera, sensors and merger kept their process IDs.
+The vendor webserver remained inactive. Public installation and exact-file
+rollback commands are in the [README](../README.md#stationary-desktop-and-controller-setup-repair).
+The 2026-10-13 boot inspection now shows correct desktop listener ownership,
+matching repaired files and zero reported desktop/guard restarts. One observed
+boot does not establish repeated cold boots or browser continuity; backend-failure
+recovery and vendor-reload continuity remain unqualified.
 
 **Completion criteria.** Demonstrate clean cold boots with one owner for display
 :1 and port 9005, a valid robot user session/runtime directory, automatic proxy
