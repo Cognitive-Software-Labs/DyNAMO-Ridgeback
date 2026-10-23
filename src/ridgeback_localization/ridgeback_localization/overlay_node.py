@@ -52,6 +52,7 @@ from ridgeback_localization.contracts import (
     POLAR_BEAMS_TOPIC,
 )
 from ridgeback_localization.ground_truth import truth_reading
+from ridgeback_localization.synchronization import SCAN_MATCH_BUFFER_DEPTH
 
 
 # The mask node's debug republish of the depth frame its paths read. It only
@@ -211,34 +212,42 @@ class TargetOverlayNode(Node):
     def cache_measurement(self, cache: OrderedDict, msg: TargetMeasurements) -> None:
         self.cache_by_key(cache, self.measurement_message_key(msg), msg)
 
-    # Deep enough to cover the lag between a measurement and the artifacts that
-    # explain it, shallow enough that a stalled consumer cannot grow unbounded.
+    # Low-rate measurements and their debug artifacts need a bounded history.
     CACHE_DEPTH = 32
+    # Raw sensor frames must survive the full detector + segmentation latency,
+    # including the batch being rendered: ~2 s at 30 Hz for images and 40 Hz
+    # for scans. A 32-scan history expires after ~0.8 s, before silhouette
+    # results arrive, even when the estimator retained its own matching scan.
+    IMAGE_CACHE_DEPTH = 60
+    SCAN_CACHE_DEPTH = SCAN_MATCH_BUFFER_DEPTH
 
-    def cache_by_key(self, cache: OrderedDict, key, msg) -> None:
+    def cache_by_key(self, cache: OrderedDict, key, msg, *, depth: int | None = None) -> None:
         cache[key] = msg
         cache.move_to_end(key)
-        while len(cache) > self.CACHE_DEPTH:
+        limit = self.CACHE_DEPTH if depth is None else depth
+        while len(cache) > limit:
             cache.popitem(last=False)
 
     # -- image / scan inputs --
 
     def color_callback(self, color_msg: Image) -> None:
         self.latest_color_msg = color_msg
-        self.cache_by_key(self.color_cache, stamp_key(color_msg.header.stamp), color_msg)
+        self.cache_by_key(
+            self.color_cache, stamp_key(color_msg.header.stamp), color_msg,
+            depth=self.IMAGE_CACHE_DEPTH)
 
     def aligned_depth_callback(self, aligned_depth_msg: Image) -> None:
         self.latest_aligned_depth_msg = aligned_depth_msg
         self.cache_by_key(
             self.aligned_depth_cache, stamp_key(aligned_depth_msg.header.stamp),
-            aligned_depth_msg)
+            aligned_depth_msg, depth=self.IMAGE_CACHE_DEPTH)
 
     def frame_for(self, cache: OrderedDict, latest: Image | None, key, label: str,
                   warning_attr: str):
         """The frame with the measurement's source stamp, else the newest one.
 
         The fallback keeps the panel live when the source frame has already
-        left the cache (a result older than CACHE_DEPTH frames) or never
+        left the bounded sensor cache or never
         arrived here, and says once that the panel is then not the measured
         frame.
         """
@@ -250,7 +259,7 @@ class TargetOverlayNode(Node):
             self.log_warning_once(
                 warning_attr,
                 f'No cached {label} frame at the measurement stamp; drawing on the newest '
-                f'(results older than {self.CACHE_DEPTH} frames, or a frame not received)')
+                '(source frame aged out or was not received)')
         return latest
 
     def color_info_callback(self, info_msg: CameraInfo) -> None:
@@ -258,7 +267,8 @@ class TargetOverlayNode(Node):
 
     def scan_callback(self, scan_msg: LaserScan) -> None:
         self.cache_by_key(
-            self.scan_cache, self.scan_key(scan_msg.header), scan_msg)
+            self.scan_cache, self.scan_key(scan_msg.header), scan_msg,
+            depth=self.SCAN_CACHE_DEPTH)
 
     def ground_truth_callback(self, msg: PointStamped) -> None:
         self.latest_truth_msg = msg

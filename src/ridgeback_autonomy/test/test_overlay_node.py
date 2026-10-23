@@ -216,15 +216,20 @@ def test_beams_arriving_after_their_measurement_trigger_a_re_render(
         node.destroy_node()
 
 
-def test_scan_and_beam_caches_are_bounded(ros_context) -> None:
+def test_sensor_and_beam_caches_are_bounded(ros_context) -> None:
     node = overlay_node()
     try:
-        for index in range(node.CACHE_DEPTH + 10):
+        for index in range(max(node.SCAN_CACHE_DEPTH, node.IMAGE_CACHE_DEPTH) + 10):
             node.scan_callback(scan(8, sec=index))
             node.polar_beams_callback(beams_message(scan(8, sec=index), index, [], []))
+            frame = solid_color_image(index, 40)
+            node.color_callback(frame)
+            node.aligned_depth_callback(frame)
 
-        assert len(node.scan_cache) == node.CACHE_DEPTH
+        assert len(node.scan_cache) == node.SCAN_CACHE_DEPTH
         assert len(node.polar_beams_cache) == node.CACHE_DEPTH
+        assert len(node.color_cache) == node.IMAGE_CACHE_DEPTH
+        assert len(node.aligned_depth_cache) == node.IMAGE_CACHE_DEPTH
     finally:
         node.destroy_node()
 
@@ -264,6 +269,50 @@ def test_measurement_is_drawn_on_the_frame_it_was_measured_from(
     assert drawn == [40]
     assert published[-1].header.stamp.sec == 10
     node.destroy_node()
+
+
+def test_delayed_silhouette_result_keeps_its_scan_highlight_and_color_frame(
+    ros_context, monkeypatch,
+) -> None:
+    # Full detector + segmentation latency is ~1.1 s. At 40 Hz the overlay's
+    # former 32 scans had expired; its 32 images at 30 Hz also lost the source
+    # frame and silently fell back to a newer image.
+    stub_transform(monkeypatch)
+    node = overlay_node()
+    drawn, published = [], []
+
+    def capture(frame, *args, **kwargs):
+        drawn.append((int(frame[0, 0, 0]), kwargs))
+        return frame
+
+    monkeypatch.setattr(node.renderer, 'render', capture)
+    monkeypatch.setattr(node.overlay_pub, 'publish', published.append)
+    try:
+        matched_scan = scan(8, sec=5)
+        node.scan_callback(matched_scan)
+        node.color_callback(solid_color_image(5, 40))
+        for index in range(1, 49):
+            sec, nanosec = divmod(index * 25_000_000, 1_000_000_000)
+            node.scan_callback(scan(8, 5 + sec, nanosec))
+        for index in range(1, 37):
+            frame = solid_color_image(5, 200)
+            sec, nanosec = divmod(round(index * 1e9 / 30), 1_000_000_000)
+            frame.header.stamp.sec += sec
+            frame.header.stamp.nanosec = nanosec
+            node.color_callback(frame)
+        node.latest_color_info = camera_info()
+        node.polar_beams_callback(beams_message(matched_scan, 5, [2, 3, 4], [3, 4]))
+        node.mask_measurement_callback(measurements(5))
+
+        color, rendered = drawn[-1]
+        assert color == 40
+        assert rendered['scan_uv'] is not None
+        assert list(np.flatnonzero(rendered['scan_highlight'].used)) == [3, 4]
+        assert list(np.flatnonzero(rendered['scan_highlight'].dropped)) == [2]
+        assert published[-1].header.stamp.sec == 5
+        assert published[-1].header.stamp.nanosec == 0
+    finally:
+        node.destroy_node()
 
 
 def test_measurement_without_its_frame_falls_back_to_the_newest(

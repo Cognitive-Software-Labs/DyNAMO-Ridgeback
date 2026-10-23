@@ -367,6 +367,13 @@ scan plain. Every failure here — no beams message yet, a scan aged out of the
 cache, a length mismatch — degrades to a *missing* highlight, never a misaligned
 one.
 
+The overlay has its own sensor caches: **80 scans** (about 2 s at 40 Hz) and
+**60 color/aligned-depth images** (about 2 s at 30 Hz). They cover the full
+capture-to-result latency, including the current segmentation batch. Keeping
+only 32 scans expires after about 0.8 s and hides the dots for silhouette
+results arriving about 1.1 s after capture, even when the estimator successfully
+matched its scan. Measurement and debug-artifact caches remain at 32 messages.
+
 **Known divergence.** This node ranks the nearest instance from its own three
 estimators, because nothing else has filled the batch by the time the rays are
 published, while `target_visualization_node` ranks the merged measurement topics and

@@ -360,7 +360,7 @@ Intel runs SLAM, Nav2 and RViz. RViz shows the map, both LiDAR scans, the
 target rings and the camera overlay:
 - **Colour panel:** each of Thor's measurements, drawn on Intel's copy of the
   colour frame it was measured from (matched by source stamp). The newest frame
-  is used only when that one has left the 32-frame buffer (about 1 s), and the
+  is used only when that one has left the 60-frame buffer (about 2 s), and the
   overlay logs a warning when that happens.
 - **Depth panel:** Intel's local aligned depth, from the same stamp.
 - **Mask panel:** with `mask_gate:=box`, built from the detections message, so
