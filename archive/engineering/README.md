@@ -29,6 +29,7 @@ are excluded from ordinary repository search and the generated knowledge graph.
 
 ## Simulation and operations
 
+- [r100_0160 front LiDAR stationary field screening](2026-10-23-r100-0160-front-lidar-field-screen.md) — 0.5–2 m target screens, material detection, front-to-merged contribution, five-minute continuity, and explicit accuracy/reliability limits.
 - [Intel DDS local-reader screening](2026-10-05-intel-dds-screening.md) — scan interruption after a local color reader under the original profile, brief discovery-only multicast comparison, and verified restoration.
 - [Static collision-envelope audit](2026-09-18-collision-envelope-audit.md) — description/USD/Nav2 comparison with top-down and side views.
 - [Navigation footprint and simulator-contact qualification](2026-09-22-navigation-footprint-qualification.md) — effective Nav2 containment plus three-boot Gazebo and Isaac wall-contact matrices.
