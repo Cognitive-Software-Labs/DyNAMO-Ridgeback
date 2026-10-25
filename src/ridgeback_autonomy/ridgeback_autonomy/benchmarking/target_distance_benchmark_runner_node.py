@@ -15,6 +15,12 @@ from ament_index_python.packages import get_package_share_directory
 from geometry_msgs.msg import PointStamped
 from rclpy.executors import ExternalShutdownException
 from rclpy.node import Node
+from rclpy.parameter import parameter_value_to_python
+from rcl_interfaces.srv import GetParameters
+from ridgeback_common.detector_config import (
+    DETECTOR_ENVIRONMENT_KEYS, require_matching_detector_settings,
+    resolve_detector_settings,
+)
 from rclpy.qos import qos_profile_sensor_data
 from sensor_msgs.msg import Image
 from sensor_msgs.msg import CameraInfo
@@ -214,7 +220,17 @@ class TargetDistanceBenchmarkRunner(Node):
             os.path.join(pkg_share, '..', '..', '..', '..'))
         default_output_dir = default_output_directory(self.workspace_root)
 
-        self.declare_parameter('target_labels', 'humanoid robot')
+        from ridgeback_common.detector_config import (
+            DETECTOR_DEFAULT, DETECTION_MODEL_DEFAULT, DETECTION_THRESHOLD_DEFAULT,
+            TARGET_LABELS_DEFAULT,
+        )
+        self.declare_parameter('detector', DETECTOR_DEFAULT)
+        self.declare_parameter('detection_model', DETECTION_MODEL_DEFAULT)
+        self.declare_parameter('target_labels', TARGET_LABELS_DEFAULT)
+        self.declare_parameter('detection_threshold', DETECTION_THRESHOLD_DEFAULT)
+        self.declare_parameter('detector_fps', 10.0)
+        self.declare_parameter('detector_debug', False)
+        self.declare_parameter('verify_detector_identity', False)
         self.declare_parameter('world', 'target_distance_calibration')
         # The runner stays target/provider-neutral. The Gazebo benchmark launch
         # supplies its concrete asset roots; a future Isaac benchmark can
@@ -285,6 +301,19 @@ class TargetDistanceBenchmarkRunner(Node):
         self.declare_parameter('record_max_sec', DEFAULT_MAX_SECONDS)
         self.declare_parameter('record_window_class', RECORD_WINDOW_CLASS_DEFAULT)
 
+        # The configuration layer starts after the raw-detection readiness
+        # gate. Query that live producer before creating any run output so a
+        # direct split launch cannot record a checkpoint it did not run.
+        requested_detector_settings = {
+            name: self.get_parameter(name).value
+            for name in DETECTOR_ENVIRONMENT_KEYS}
+        self.detector_identity_verified = bool(
+            self.get_parameter('verify_detector_identity').value)
+        self.effective_detector_settings = (
+            require_matching_detector_settings(
+                requested_detector_settings, self.read_running_detector_settings())
+            if self.detector_identity_verified else
+            resolve_detector_settings(requested_detector_settings))
         self.world = str(self.get_parameter('world').value)
         self.target_model_sdf = str(
             self.get_parameter('target_model_sdf').value)
@@ -1032,6 +1061,29 @@ class TargetDistanceBenchmarkRunner(Node):
         if self.recorder.active:
             self.recorder.stop()
 
+    def read_running_detector_settings(self) -> dict:
+        """Read the warm detector's declared startup identity over ROS."""
+        namespace = self.get_namespace().rstrip('/')
+        service = f'{namespace}/target_detector/get_parameters'
+        client = self.create_client(GetParameters, service)
+        try:
+            if not client.wait_for_service(timeout_sec=10.0):
+                raise RuntimeError(f'Running detector parameters unavailable: {service}')
+            names = sorted(DETECTOR_ENVIRONMENT_KEYS)
+            request = GetParameters.Request()
+            request.names = names
+            future = client.call_async(request)
+            rclpy.spin_until_future_complete(self, future, timeout_sec=10.0)
+            if not future.done() or future.exception() is not None:
+                raise RuntimeError(f'Cannot read running detector parameters: {service}')
+            values = future.result().values
+            if len(values) != len(names):
+                raise RuntimeError(f'Incomplete running detector parameters: {service}')
+            return {name: parameter_value_to_python(value)
+                    for name, value in zip(names, values)}
+        finally:
+            self.destroy_client(client)
+
     def declared_parameters(self) -> dict[str, str]:
         """Every ROS parameter this node declared, as text.
 
@@ -1041,11 +1093,15 @@ class TargetDistanceBenchmarkRunner(Node):
         affect measurement (rviz, overlay) never become parameters here.
         """
 
-        return {
+        parameters = {
             name: str(parameter.value)
             for name, parameter in sorted(self.get_parameters_by_prefix('').items())
             if name not in RCLPY_INTERNAL_PARAMETERS
         }
+        if hasattr(self, 'effective_detector_settings'):
+            parameters.update({name: str(value)
+                               for name, value in self.effective_detector_settings.items()})
+        return parameters
 
     def write_run_outputs(
         self,
@@ -1075,7 +1131,12 @@ class TargetDistanceBenchmarkRunner(Node):
             'Commit': format_commit(provenance),
             'Branch': provenance['branch'] or 'unknown',
             'Scenario': self.scenario_path,
-            'Target labels': self.get_parameter('target_labels').value,
+            'Target labels': self.effective_detector_settings['target_labels'],
+            'Detector': self.effective_detector_settings['detector'],
+            'Detection model': self.effective_detector_settings['detection_model'],
+            'Detection threshold': self.effective_detector_settings['detection_threshold'],
+            'Detector FPS': self.effective_detector_settings['detector_fps'],
+            'Detector identity verified': self.detector_identity_verified,
         }
         # Named while the recorder is still running (it is stopped after the
         # report is written), so this is the path, not a claim the file is ready.
@@ -1109,7 +1170,12 @@ class TargetDistanceBenchmarkRunner(Node):
                 'branch': provenance['branch'],
                 'uncommitted_files': provenance['dirty_count'],
                 'scenario': self.scenario_path,
-                'target_labels': self.get_parameter('target_labels').value,
+                'target_labels': self.effective_detector_settings['target_labels'],
+                'detector': self.effective_detector_settings['detector'],
+                'detection_model': self.effective_detector_settings['detection_model'],
+                'detection_threshold': self.effective_detector_settings['detection_threshold'],
+                'detector_fps': self.effective_detector_settings['detector_fps'],
+                'detector_identity_verified': self.detector_identity_verified,
                 'scenes': scenes,
                 'instances': instances,
                 'trials_included': included_trials,

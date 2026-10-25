@@ -250,7 +250,7 @@ def test_every_shipped_sweep_yaml_is_referenceable_from_the_live_profile(tmp_pat
     # baseline included: a live job carrying leftovers from the authoring panel
     # is the normal case, since one draft outlives every profile switch.
     rendered = {
-        path.name: render_job(_live_draft(sweep_path=str(path)), tmp_path)
+        path.name: render_job(_live_draft(sweep_path=str(path), sweep_defaults={}), tmp_path)
         for path in SHIPPED_SWEEPS
     }
 
@@ -284,7 +284,15 @@ def test_an_authored_live_sweep_carries_the_polar_settings(tmp_path):
     assert rendered['job']['sweep'] == str(written)
 
     document = yaml.safe_load(written.read_text())
-    assert document['defaults'] == {'scenario': '', 'repeats': 1}
+    assert document['defaults'] == {
+        'scenario': '', 'repeats': 1,
+        'detector': 'owlv2',
+        'detection_model': 'google/owlv2-base-patch16-ensemble',
+        'target_labels': 'humanoid robot',
+        'detection_threshold': 0.55,
+        'detector_fps': 5.0,
+        'detector_debug': False,
+    }
     assert document['configs'][0]['estimators'] == 'polar_profiling'
     assert document['configs'][0]['polar_range_band_m'] == 0.4
     # An input element only ever yields text. Written back as text, the authored
@@ -301,7 +309,7 @@ def test_an_authored_live_sweep_carries_the_polar_settings(tmp_path):
 def test_naming_a_live_sweep_runs_that_file_rather_than_the_draft(tmp_path):
     referenced = SHIPPED_SWEEPS[0]
 
-    rendered = render_job(_live_draft(sweep_path=str(referenced)), tmp_path)
+    rendered = render_job(_live_draft(sweep_path=str(referenced), sweep_defaults={}), tmp_path)
 
     # A referenced sweep is already validated and already says what it runs, so
     # the variants on the page are not merged into it.
@@ -958,3 +966,92 @@ def test_renaming_onto_an_existing_name_is_refused(tmp_path):
         rename_result(tmp_path, str(output), 'taken')
 
     assert raised.value.code == 'name_taken'
+
+
+def test_live_gui_renders_detector_controls_and_round_trips_effective_defaults(tmp_path) -> None:
+    from ridgeback_autonomy.benchmarking.target_benchmark_sweep import _environment_command
+    from ridgeback_autonomy.benchmarking.sweep import load_sweep
+
+    fields = capabilities()['profiles']['live-system']['sweep_defaults_fields']
+    by_key = {field['key']: field for field in fields}
+    assert set(by_key) >= {
+        'detector', 'detection_model', 'target_labels',
+        'detection_threshold', 'detector_fps', 'detector_debug'}
+    assert by_key['detector']['type'] == 'select'
+    assert by_key['detector']['options'] == ['owlv2']
+    asset = (REPO_ROOT / 'src/ridgeback_autonomy/ridgeback_autonomy/'
+             'benchmarking/configurator_assets/app.js').read_text()
+    assert 'sweep_defaults_fields' in asset and 'data-sweep-default' in asset
+
+    draft = _live_draft(sweep_defaults={
+        'scenario': '', 'repeats': 1, 'detector': 'owlv2',
+        'detection_model': 'sentinel-checkpoint',
+        'target_labels': 'robot, person', 'detection_threshold': '0.7',
+        'detector_fps': '4', 'detector_debug': 'true',
+    })
+    result = render_job(draft, tmp_path)
+    assert result['valid'] is True
+    sweep_path = Path(result['command'].split()[-1])
+    written = yaml.safe_load(sweep_path.read_text())
+    assert written['defaults']['detection_model'] == 'sentinel-checkpoint'
+    assert written['defaults']['detection_threshold'] == 0.7
+    assert written['defaults']['detector_fps'] == 4.0
+    command = _environment_command(load_sweep(str(sweep_path)))
+    assert 'detection_model:=sentinel-checkpoint' in command
+    assert 'target_labels:=robot, person' in command
+    assert 'detection_threshold:=0.7' in command
+    assert 'detector_fps:=4.0' in command
+    assert validate_job(import_job(result['yaml'], tmp_path)['job'], tmp_path)['effective_detector_settings']['detector'] == 'owlv2'
+
+
+
+def test_live_gui_render_api_saves_effective_detector_settings(tmp_path) -> None:
+    draft = _live_draft(sweep_defaults={
+        'scenario': '', 'repeats': 1, 'detector': 'owlv2',
+        'detection_model': 'sentinel-checkpoint',
+        'target_labels': 'robot, person', 'detection_threshold': '0.7',
+        'detector_fps': '4', 'detector_debug': 'true',
+    })
+    server = make_server(token='test-token', workspace_root=tmp_path)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        host, port = server.server_address[:2]
+        connection = http.client.HTTPConnection(host, port)
+        connection.request(
+            'POST', '/api/render', body=json.dumps({'job': draft}),
+            headers={'X-Configurator-Token': 'test-token',
+                     'Content-Type': 'application/json'})
+        response = connection.getresponse()
+        payload = json.loads(response.read())
+        connection.close()
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
+
+    assert response.status == 200 and payload['valid'] is True
+    assert payload['effective_detector_settings']['detection_model'] == 'sentinel-checkpoint'
+    saved = Path(payload['job']['sweep'])
+    assert saved.is_file()
+    assert yaml.safe_load(saved.read_text())['defaults']['detector_fps'] == 4.0
+    assert payload['command'].endswith(str(saved))
+
+
+def test_frozen_gui_rejects_detector_override_instead_of_dropping_it(tmp_path) -> None:
+    draft = _job(_dataset(tmp_path))
+    draft['sweep_defaults'] = {'detector': 'owlv2'}
+    issue = validate_job(draft, tmp_path)['issues'][0]
+    assert issue['code'] == 'upstream_stage_frozen'
+
+    draft = _job(tmp_path / 'replay')
+    draft['variants'][0]['arguments']['detection_model'] = 'new-checkpoint'
+    issue = validate_job(draft, tmp_path)['issues'][0]
+    assert issue['code'] == 'persistent_detector_setting'
+
+
+def test_referenced_live_sweep_refuses_hidden_detector_defaults(tmp_path) -> None:
+    draft = _live_draft(sweep_path=str(SHIPPED_SWEEPS[0]),
+                        sweep_defaults={'detection_model': 'sentinel'})
+    issue = validate_job(draft, tmp_path)['issues'][0]
+    assert issue['code'] == 'unconsumed_override'

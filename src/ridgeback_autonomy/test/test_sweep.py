@@ -324,3 +324,64 @@ def test_model_concurrency_sweep_is_the_ordered_factorial_contract() -> None:
         config.arguments['depth_match_debug'] == 'true'
         for config in spec.configs[2:]
     )
+
+
+def test_detector_defaults_reach_persistent_environment_and_resume_identity(tmp_path) -> None:
+    from ridgeback_autonomy.benchmarking.target_benchmark_sweep import (
+        _environment_command, _resolved_arguments, _resume_signature,
+    )
+
+    document = _document(tmp_path)
+    document['defaults'].update({
+        'detector': 'owlv2', 'detection_model': 'sentinel-checkpoint',
+        'target_labels': 'robot, person', 'detection_threshold': 0.7,
+        'detector_fps': 4.0,
+    })
+    spec = parse_sweep(document)
+    command = _environment_command(spec)
+    assert 'detector:=owlv2' in command
+    assert 'detection_model:=sentinel-checkpoint' in command
+    assert 'target_labels:=robot, person' in command
+    assert 'detection_threshold:=0.7' in command
+    assert 'detector_fps:=4.0' in command
+    args = _resolved_arguments(spec, spec.configs[0], str(tmp_path))
+    assert args['detection_model'] == 'sentinel-checkpoint'
+    assert args['detection_threshold'] == '0.7'
+    changed = _document(tmp_path)
+    changed['defaults'].update(document['defaults'])
+    changed['defaults']['detection_model'] = 'other-checkpoint'
+    other = parse_sweep(changed)
+    assert _resume_signature(spec, spec.configs) != _resume_signature(other, other.configs)
+
+
+def test_persistent_sweep_rejects_per_config_detector_changes(tmp_path) -> None:
+    for name in ('detector', 'detection_model', 'target_labels',
+                 'detection_threshold', 'detector_fps', 'detector_debug'):
+        document = _document(tmp_path)
+        document['configs'][0][name] = 'changed'
+        with pytest.raises(ValueError, match='persistent environment'):
+            parse_sweep(document)
+
+
+def test_dry_run_prints_effective_persistent_detector_command(tmp_path, monkeypatch, capsys) -> None:
+    from ridgeback_autonomy.benchmarking import target_benchmark_sweep as runner
+
+    document = _document(tmp_path)
+    document['defaults'].update({
+        'detection_model': 'sentinel-checkpoint',
+        'target_labels': 'robot, person',
+        'detection_threshold': 0.7,
+        'detector_fps': 4.0,
+    })
+    spec = parse_sweep(document)
+    monkeypatch.setattr(runner, 'estimate_trials', lambda *_: 1)
+    monkeypatch.setattr(runner, 'gl_renderer_provenance', lambda: {})
+    monkeypatch.setattr(runner, 'software_gl_warning', lambda *_: None)
+    runner.print_dry_run(spec, spec.configs, '')
+    output = capsys.readouterr().out
+    assert 'Persistent environment command:' in output
+    assert 'detector:=owlv2' in output
+    assert 'detection_model:=sentinel-checkpoint' in output
+    assert 'target_labels:=robot, person' in output
+    assert 'detection_threshold:=0.7' in output
+    assert 'detector_fps:=4.0' in output

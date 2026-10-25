@@ -8,6 +8,7 @@ import hashlib
 import json
 import os
 import re
+import shlex
 import signal
 import subprocess
 import sys
@@ -110,7 +111,7 @@ def _format_hours(seconds: float) -> str:
     return f'{seconds / 3600.0:.2f} h'
 
 
-def print_dry_run(configs: tuple[SweepConfig, ...], default_scenario_path: str) -> None:
+def print_dry_run(spec: SweepSpec, configs: tuple[SweepConfig, ...], default_scenario_path: str) -> None:
     rows = []
     total_seconds = 0.0
     for config in configs:
@@ -130,6 +131,8 @@ def print_dry_run(configs: tuple[SweepConfig, ...], default_scenario_path: str) 
     ))
     print(f'\n{len(configs)} configs resolved; estimated sweep wall time: '
           f'{_format_hours(total_seconds)} ({TRIAL_WALL_TIME_SEC:.1f} s/trial).')
+    print('\nPersistent environment command:')
+    print(shlex.join(_environment_command(spec)))
     # Reported on the dry run too, so the renderer can be corrected before
     # committing hours to a sweep whose sensor rates would be invalid.
     warning = software_gl_warning(gl_renderer_provenance())
@@ -169,7 +172,7 @@ def _environment_command(spec: SweepSpec) -> list[str]:
     arguments = _shared_arguments(spec)
     # Sorted so the recorded command is byte-identical between runs of the
     # same sweep; a frozenset's iteration order is not stable across processes.
-    for name in sorted(ENVIRONMENT_ONLY_DEFAULT_NAMES | {'target_labels'}):
+    for name in sorted(ENVIRONMENT_ONLY_DEFAULT_NAMES):
         if name in spec.defaults:
             arguments[name] = spec.defaults[name]
     return [
@@ -221,7 +224,7 @@ def _resume_signature(spec: SweepSpec, configs: tuple[SweepConfig, ...]) -> dict
 
     ignored = {'output_dir', 'run_dir_name', 'shutdown_on_complete'}
     environment = _shared_arguments(spec)
-    for name in sorted(ENVIRONMENT_ONLY_DEFAULT_NAMES | {'target_labels'}):
+    for name in sorted(ENVIRONMENT_ONLY_DEFAULT_NAMES):
         if name in spec.defaults:
             environment[name] = spec.defaults[name]
     return {
@@ -788,7 +791,7 @@ def main(argv: list[str] | None = None) -> int:
         )
         configs = _selected_configs(spec, args.only)
         if args.dry_run:
-            print_dry_run(configs, default_scenario_path)
+            print_dry_run(spec, configs, default_scenario_path)
             return 0
         sweep_dir, success = run_sweep(
             spec,

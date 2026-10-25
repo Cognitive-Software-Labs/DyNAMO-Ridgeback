@@ -272,3 +272,108 @@ def test_deployed_workers_respawn_but_benchmark_workers_do_not():
     helper=mask_measurement_node(namespace='ns', use_sim_time=False, enabled_estimators='projective_ranging',
                                  base_frame='base_link')
     assert helper._ExecuteLocal__respawn is False
+
+
+def _node_parameters(nodes, executable, context):
+    from launch.utilities import perform_substitutions
+
+    selected = [node for node in nodes if isinstance(node, Node)
+                and node.node_executable == executable]
+    assert len(selected) == 1
+
+    def resolve(value):
+        if isinstance(value, (tuple, list)):
+            return yaml.safe_load(perform_substitutions(context, value))
+        return value
+
+    return {resolve(key): resolve(value)
+            for parameters in selected[0]._Node__parameters
+            for key, value in parameters.items()}
+
+
+@pytest.mark.parametrize('backend', ['gz', 'isaac', 'hardware'])
+def test_detector_settings_reach_final_local_exploration_node(backend):
+    module = load('src/ridgeback_autonomy/launch/ridgeback_exploration.launch.py')
+    context = context_for(module, dict(
+        backend=backend, namespace='r100_0160', base_frame='base_link',
+        detector='owlv2', detection_model='sentinel-checkpoint',
+        target_labels='robot, person', detection_threshold='0.7',
+        detector_fps='4', detector_debug='true'))
+    params = _node_parameters(
+        module.build_target_localization_nodes(context), 'target_detector_node', context)
+    assert {key: params[key] for key in (
+        'detector', 'detection_model', 'target_labels',
+        'detection_threshold', 'detector_fps', 'detector_debug')} == {
+            'detector': 'owlv2', 'detection_model': 'sentinel-checkpoint',
+            'target_labels': 'robot,person', 'detection_threshold': 0.7,
+            'detector_fps': 4.0, 'detector_debug': True,
+        }
+
+
+def test_detector_settings_reach_standalone_and_benchmark_layers():
+    overrides = dict(base_frame='base_link', detector='owlv2',
+                     detection_model='sentinel-checkpoint',
+                     target_labels='robot, person', detection_threshold='0.7',
+                     detector_fps='4', detector_debug='true')
+    for path, builder, executable in [
+        ('src/ridgeback_localization/launch/localization.launch.py',
+         'build_nodes', 'target_detector_node'),
+        ('src/ridgeback_autonomy/launch/target_benchmark_env.launch.py',
+         'build_detector', 'target_detector_node'),
+        ('src/ridgeback_autonomy/launch/target_benchmark_config.launch.py',
+         'build_benchmark_nodes', 'target_distance_benchmark_runner'),
+    ]:
+        module = load(path)
+        context = context_for(module, overrides)
+        params = _node_parameters(getattr(module, builder)(context), executable, context)
+        assert params['detector'] == 'owlv2', path
+        assert params['detection_model'] == 'sentinel-checkpoint', path
+        assert params['target_labels'] == 'robot,person', path
+        assert params['detection_threshold'] == 0.7, path
+        assert params['detector_fps'] == 4.0, path
+        assert params['detector_debug'] is True, path
+
+
+
+def test_compatibility_benchmark_wrapper_inherits_detector_settings_in_both_includes():
+    from launch import LaunchDescription
+    from launch.actions import IncludeLaunchDescription
+
+    wrapper = load('src/ridgeback_autonomy/launch/target_distance_benchmark.launch.py')
+    includes = [action for action in wrapper.generate_launch_description().entities
+                if isinstance(action, IncludeLaunchDescription)]
+    assert len(includes) == 2
+    context = LaunchContext()
+    context.launch_configurations.update({
+        'detector': 'owlv2', 'detection_model': 'sentinel-checkpoint',
+        'target_labels': 'robot, person', 'detection_threshold': '0.7',
+        'detector_fps': '4', 'detector_debug': 'true',
+    })
+    for include, name, builder, executable in zip(
+            includes,
+            ('target_benchmark_env.launch.py', 'target_benchmark_config.launch.py'),
+            ('build_detector', 'build_benchmark_nodes'),
+            ('target_detector_node', 'target_distance_benchmark_runner')):
+        description = next(action for action in include.execute(context)
+                           if isinstance(action, LaunchDescription))
+        assert Path(include.launch_description_source.location).name == name
+        for action in description.entities:
+            if isinstance(action, DeclareLaunchArgument):
+                action.execute(context)
+        module = load(f'src/ridgeback_autonomy/launch/{name}')
+        params = _node_parameters(getattr(module, builder)(context), executable, context)
+        assert params['detector'] == 'owlv2'
+        assert params['detection_model'] == 'sentinel-checkpoint'
+        assert params['target_labels'] == 'robot,person'
+        assert params['detection_threshold'] == 0.7
+        assert params['detector_fps'] == 4.0
+        assert params['detector_debug'] is True
+
+
+def test_external_exploration_rejects_local_detector_override():
+    module = load('src/ridgeback_autonomy/launch/ridgeback_exploration.launch.py')
+    context = context_for(module, dict(
+        backend='hardware', namespace='r100_0160', base_frame='base_link',
+        localization_mode='external', detection_model='sentinel-checkpoint'))
+    with pytest.raises(ValueError, match='External localization cannot apply local detector'):
+        module.build_target_localization_nodes(context)

@@ -7,13 +7,16 @@ track, associate across time, estimate distance, or choose a fallback estimator.
 
 ## Current implementation
 
-`target_detector_node` subscribes to the configured colour image and runs the
-ROS-free `OwlV2Detector` adapter from `core/detection.py`. The current defaults
-are:
+`target_detector_node` subscribes to the configured colour image. Its
+startup-only `detector` selector chooses a backend through
+`core/detection.py`; `owlv2` is the only registered production value.
+`detection_model` is a separate checkpoint identifier, passed to that backend.
+The current defaults are:
 
 | Setting | Default |
 |---|---|
-| Model | `google/owlv2-base-patch16-ensemble` |
+| Detector implementation (`detector`) | `owlv2` |
+| Checkpoint (`detection_model`) | `google/owlv2-base-patch16-ensemble` |
 | Candidate label | `humanoid robot` |
 | Confidence threshold | `0.55` |
 | Maximum inference cadence | `10 Hz` |
@@ -22,7 +25,32 @@ are:
 
 OWLv2 is an implementation choice, not a downstream dependency. Consumers use
 only the published image grid, boxes, labels, scores, and original image header.
-A replacement detector must preserve that boundary or change it explicitly.
+The ROS-free `ridgeback_common.detector_config` module owns supported names,
+defaults, and validation. It rejects empty/unknown selectors, blank checkpoints
+or labels, nonfinite or out-of-range thresholds, and nonpositive or nonfinite
+rates before any model is constructed. Comma-separated labels are stripped and
+empty parts ignored. Changes to detector settings through ROS parameters are
+rejected after startup; select a different configuration by restarting the node.
+
+The factory in `ridgeback_localization.core.detection.create_detector_backend`
+is the one registration point for a future implementation. A backend implements
+`load`, `infer`, and `normalize`; `normalize` returns the existing
+`DetectionBatch`. `OwlV2Backend` alone interprets OWLv2 pipeline dictionaries
+and applies the existing clipping and duplicate-suppression policy. A new
+backend must explicitly produce the same image-grid boxes, labels and scores;
+it need not imitate OWLv2's private output shape. The factory accepts an
+injected registry for tests, but the production registry contains only `owlv2`.
+A direct ROS-parameter start of that baseline is:
+
+```bash
+# The direct executable inherits this shell's Python environment.
+source perception_venv/bin/activate
+ros2 run ridgeback_localization target_detector_node --ros-args \
+  -p detector:=owlv2 \
+  -p detection_model:=google/owlv2-base-patch16-ensemble \
+  -p target_labels:="humanoid robot" -p detection_threshold:=0.55 \
+  -p detector_fps:=10.0
+```
 
 ## Frame and scheduling behavior
 

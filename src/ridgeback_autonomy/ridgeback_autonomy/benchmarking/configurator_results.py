@@ -85,8 +85,14 @@ def _sweep_summary(path: Path) -> dict:
     manifest = _load_json(path / 'sweep.json')
     configs = manifest.get('configs') or []
     sweep = manifest.get('sweep') or {}
+    environment = (manifest.get('resume_signature') or {}).get('environment') or {}
     return {
         'name': sweep.get('name'),
+        'detector': environment.get('detector', 'unknown'),
+        'detection_model': environment.get('detection_model', 'unknown'),
+        'target_labels': environment.get('target_labels', 'unknown'),
+        'detection_threshold': environment.get('detection_threshold', 'unknown'),
+        'detector_fps': environment.get('detector_fps', 'unknown'),
         'status': sweep.get('status'),
         'started': sweep.get('started'),
         'finished': sweep.get('finished'),
@@ -111,6 +117,11 @@ def _trial_summary(path: Path) -> dict:
     run = _load_json(path / 'run.json').get('run') or {}
     return {
         'label': run.get('label'),
+        'detector': run.get('detector', 'unknown'),
+        'detection_model': run.get('detection_model', 'unknown'),
+        'target_labels': run.get('target_labels', 'unknown'),
+        'detection_threshold': run.get('detection_threshold', 'unknown'),
+        'detector_fps': run.get('detector_fps', 'unknown'),
         'started': run.get('started'),
         'commit': run.get('commit'),
         'trials': run.get('trials_included'),

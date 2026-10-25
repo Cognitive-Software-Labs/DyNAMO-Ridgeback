@@ -1322,3 +1322,56 @@ def test_representative_event_chosen_from_union_without_common_event() -> None:
         union, ('pointcloud', 'polar_profiling'), medians)
 
     assert chosen.key == ('both',)
+
+
+@pytest.mark.parametrize('running_checkpoint,should_match', [
+    ('sentinel-checkpoint', True), ('different-checkpoint', False),
+])
+def test_benchmark_runner_checks_warm_detector_identity_before_output(
+    tmp_path, running_checkpoint, should_match,
+) -> None:
+    import threading
+    import rclpy
+    from rclpy.executors import SingleThreadedExecutor
+    from rclpy.node import Node
+    from ridgeback_common.detector_config import resolve_detector_settings
+    from ridgeback_autonomy.benchmarking.target_distance_benchmark_runner_node import (
+        TargetDistanceBenchmarkRunner,
+    )
+
+    scenario = tmp_path / 'scenes.yaml'
+    scenario.write_text('scenes:\n  - id: s1\n    robots: [{ x: 2.0, y: 0.0 }]\n')
+    output_dir = tmp_path / 'out'
+    rclpy.init(args=[
+        '--ros-args', '-r', '__ns:=/r100_0001',
+        '-p', f'scenario:={scenario}',
+        '-p', f'output_dir:={output_dir}', '-p', 'estimators:=pointcloud',
+        '-p', 'verify_detector_identity:=true',
+        '-p', 'detection_model:=sentinel-checkpoint',
+    ])
+    detector = Node('target_detector')
+    settings = resolve_detector_settings({'detection_model': running_checkpoint})
+    for name, value in settings.items():
+        detector.declare_parameter(name, value, ignore_override=True)
+    executor = SingleThreadedExecutor()
+    executor.add_node(detector)
+    thread = threading.Thread(target=executor.spin, daemon=True)
+    thread.start()
+    runner = None
+    try:
+        if should_match:
+            runner = TargetDistanceBenchmarkRunner()
+            assert runner.detector_identity_verified is True
+            assert runner.effective_detector_settings['detection_model'] == running_checkpoint
+            assert runner.declared_parameters()['detection_model'] == running_checkpoint
+        else:
+            with pytest.raises(ValueError, match='does not match the running'):
+                TargetDistanceBenchmarkRunner()
+            assert not output_dir.exists()
+    finally:
+        if runner is not None:
+            runner.destroy_node()
+        executor.shutdown()
+        thread.join(timeout=2.0)
+        detector.destroy_node()
+        rclpy.shutdown()

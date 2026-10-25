@@ -1,11 +1,22 @@
 """Reusable localization launch wiring; no autonomy or simulator imports."""
 from ridgeback_common.camera_inputs import SIMULATION_BACKEND, resolve_camera_inputs
+from ridgeback_common.detector_config import resolve_detector_settings
 from ridgeback_localization.contracts import (
     ALIGNED_DEPTH_DEBUG_TOPIC, MASK_MEASUREMENTS_TOPIC, POINTCLOUD_MEASUREMENTS_TOPIC,
     RAW_DETECTIONS_TOPIC,
 )
 from ridgeback_localization.environment import compute_environment
 OVERLAY_SINGLE_ROW = 99
+
+
+def detector_launch_parameters(context) -> dict:
+    """Resolve and validate the shared detector contract before Node creation."""
+    from launch.substitutions import LaunchConfiguration
+
+    names = ('detector', 'detection_model', 'target_labels',
+             'detection_threshold', 'detector_fps', 'detector_debug')
+    values = {name: LaunchConfiguration(name).perform(context) for name in names}
+    return resolve_detector_settings(values)
 
 def _measurement_parameters(wiring: dict, tuning: dict) -> list:
     """Fixed topic wiring plus whichever tuning values the caller supplied.
