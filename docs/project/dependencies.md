@@ -23,7 +23,7 @@ The compatibility unit has four root-owned parts:
 - [`patches/`](../../patches/) owns intentional changes to those pinned sources.
 - [`tools/check_dependencies`](../../tools/check_dependencies) verifies that
   every checkout is at its pin and contains either no changes or exactly its
-  recorded patch.
+  recorded patches.
 
 Consequently, root `git status` cannot reveal changes inside the nested
 repositories. Use the checker for the workspace-wide contract and `git -C
@@ -67,10 +67,40 @@ The checker rejects:
 - untracked files inside a dependency;
 - tracked modifications in an unpatched dependency;
 - a missing maintained patch in read-only mode;
-- patch conflicts or any changes beyond the recorded patch.
+- patch conflicts or any changes beyond the recorded patches;
+- a recorded patch that is not exactly the diff Git generates for its change.
 
 Do not respond to a failure by resetting the nested checkout. Inspect it first;
 it may contain intentional work that the root repository cannot see.
+
+## Stacked patches
+
+A checkout may carry more than one recorded patch when the changes are
+unrelated: each keeps its own file, name and runbook section. The checker's
+`PATCHES` map lists them per checkout, in order and separated by spaces. Each
+patch is recorded against the tree its predecessors produce. The checker
+applies the list in order to a temporary index built from the pinned commit,
+never to the working tree, and requires:
+
+- every patch to apply on top of the ones before it;
+- every patch file to equal the diff Git generates for its own step, apart from
+  the blank-context-line normalisation the checker documents;
+- the checkout's complete `git diff HEAD` to equal the combined result.
+
+A checkout that holds only a leading part of the list, for example one patched
+before a later entry was added, fails in read-only mode naming the missing
+patches; `--apply` applies exactly those, in order. To record a new entry,
+start from a checkout carrying the earlier patches and write only the new
+change, so the patch file holds that change alone:
+
+```bash
+git -C src/<repository> diff --no-ext-diff HEAD -- <changed files> \
+  | sed 's/^ $//' > patches/<name>.patch
+```
+
+This command records the whole change only when no earlier patch touches the
+same files. Otherwise, diff against a tree with only the earlier patches
+applied.
 
 ## Partial overlays
 
@@ -131,14 +161,16 @@ an explicit reason in the archived refresh record.
 
 Apply each maintained patch to a clean checkout at its candidate pin. If it
 conflicts, reproduce the intended behavior against the new upstream structure,
-then generate the root patch from the complete nested-repository diff.
+then generate the root patch from the complete nested-repository diff. For
+[stacked patches](#stacked-patches), rebase them in order and record each one
+against its predecessors.
 
 The maintained mappings are:
 
-| Dependency checkout | Root patch |
+| Dependency checkout | Root patches, in order |
 |---|---|
 | `src/clearpath_simulator` | `patches/clearpath_gz_customizations.patch` |
-| `src/clearpath_common` | `patches/clearpath_realsense_sim_frames.patch` |
+| `src/clearpath_common` | `patches/clearpath_realsense_sim_frames.patch`, `patches/clearpath_ust10lx_sim_lidar.patch` |
 | `src/slam_toolbox` | `patches/slam_toolbox_tf_namespace.patch` |
 | `src/gz-sim` | `patches/gz_sim_sensors_shutdown.patch` |
 | `src/ros_gz` | `patches/ros_gz_bridge_shutdown.patch` |
@@ -154,7 +186,7 @@ Against clean checkouts at the proposed pins:
 - run `tools/check_dependencies --apply --profile all`;
 - rerun `tools/check_dependencies --profile all` and require a clean result;
 - confirm each patched checkout's complete `git diff HEAD` exactly equals its
-  recorded root patch;
+  recorded root patch, or the combined result of its stacked patches;
 - remove and reapply at least one patch to exercise the missing-patch and
   idempotence paths.
 
@@ -515,8 +547,70 @@ above, in the same change. To roll back, stop only owned RViz processes, move
 this change's manifest, mapping, ignore, and documentation edits as one reviewed
 set, rebuild, and start a fresh shell.
 
+## UST-10LX Gazebo LiDAR patch
+
+`patches/clearpath_ust10lx_sim_lidar.patch` is the second
+[stacked patch](#stacked-patches) on `src/clearpath_common`
+(`33e4b311dd9a2dcaa8e8d262ae75fab2c53e560b`). It applies after
+`clearpath_realsense_sim_frames.patch` and touches different files. It changes
+only the `<gazebo>` sensor block of the `hokuyo_ust` macro.
+
+### Defect
+
+Clearpath's description generator gives every simulated 2D LiDAR the same
+hardcoded `Lidar2dDescription` values: 0.5° steps, 0.05–25 m, 40 Hz. Nothing in
+`robot.yaml` overrides them. The macro then computed
+`samples = round((max_ang - min_ang) / ang_res)`, which omits one end ray: the
+±135° window became 540 rays at 0.50093°, where 0.25° would have given 1080.
+Gazebo therefore published a different scan from the Isaac assembler and the
+hardware UST-10LX (1081 bins at 0.25°, 0.06–10 m). The 25 m range let the
+polar estimator latch walls that Isaac, limited to 10 m, reports as `no_value`.
+
+### Change
+
+- `HokuyoUSTDescription` gives `hokuyo_ust` 0.25°, 0.06–10 m, 40 Hz and a
+  `noise_stddev` of 0.036 m. `SickLMS1XX` and every other model keep the
+  generic description.
+- The macro counts both end rays (`+ 1`) and takes `noise_stddev`, default 0.
+  Only when it is positive does the macro emit
+  `<noise type="gaussian"><mean>0</mean><stddev>…</stddev></noise>`. The macro
+  also sets `<range><resolution>` to 0.001, matching the Isaac spec. Gazebo
+  does not quantise published ranges with it.
+
+Clearpath cannot import `ridgeback_common`, so the values are literals.
+`test_lidar_description.py` ties them to `ridgeback_common.lidar_contract`
+(including `GAZEBO_RANGE_NOISE_STDDEV`) and to `ust10lx_2d.json`. The stddev is
+a single constant because Gazebo's lidar noise cannot depend on range. Its
+derivation and the Isaac/Gazebo noise difference are owned by
+[the LiDAR pipeline](../isaac/lidar-pipeline.md#gazebo-parity).
+
+### Build and loading proof
+
+The generator module and the macro are symlinked into `install/` by
+`--symlink-install`, so the edit is live without a rebuild; on a copy install,
+rebuild `clearpath_generator_common` and `clearpath_sensors_description`. Every
+Gazebo launch regenerates `<setup_path>/robot.urdf.xacro` (normally
+`~/clearpath`). Its two `hokuyo_ust` lines must carry `ang_res="0.25"`,
+`min_range="0.06"`, `max_range="10.0"` and `noise_stddev="0.036"`. On the
+running simulator, every `sensors/lidar2d_*/scan` message must have 1081
+ranges and `angle_increment` 0.25°.
+
+### Coupling and rollback
+
+Isaac is unaffected: it builds its LiDARs from `ust10lx_2d.json` and the baked
+robot USD. The hardware description changes only inside the `<gazebo>` block,
+which hardware ignores; its LiDAR links and joints are unchanged. Changing the
+Gazebo scan changes Gazebo benchmark provenance: never compare runs from
+before and after this patch as a matched pair. The noise is unseeded, so
+Gazebo's LiDAR path is no longer bit-reproducible between runs. To roll back, remove the entry
+from the checker's `PATCHES` list, reverse the patch in `src/clearpath_common`
+(`git -C src/clearpath_common apply -R "$PWD/patches/clearpath_ust10lx_sim_lidar.patch"`
+from the workspace root),
+and restore this change's test, contract and documentation edits as one set.
+
 ## Archived evidence
 
+- [UST-10LX Gazebo LiDAR parity and Isaac noise measurement](../../archive/engineering/2026-10-25-gazebo-ust10lx-lidar.md)
 - [Gazebo Sensors shutdown races and qualification](../../archive/engineering/2026-10-18-gazebo-sensors-shutdown.md)
 - [ros_gz bridge ownership cycles and image_bridge teardown](../../archive/engineering/2026-10-22-ros-gz-bridge-shutdown.md)
 - [RViz Image display teardown abort](../../archive/engineering/2026-10-22-rviz-image-display-teardown.md)

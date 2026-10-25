@@ -121,6 +121,7 @@ if(BUILD_TESTING)
   ament_add_pytest_test(test_doc_links test/test_doc_links.py)
 
   ament_add_pytest_test(test_camera_description test/test_camera_description.py)
+  ament_add_pytest_test(test_lidar_description test/test_lidar_description.py)
   ament_add_pytest_test(test_camera_profiles test/test_camera_profiles.py)
   ament_add_pytest_test(test_isaac_camera_spec test/test_isaac_camera_spec.py)
   ament_add_pytest_test(test_isaac_6_1_migration test/test_isaac_6_1_migration.py)

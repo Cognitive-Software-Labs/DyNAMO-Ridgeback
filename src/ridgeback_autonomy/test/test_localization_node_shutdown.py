@@ -77,6 +77,9 @@ except KeyboardInterrupt:
 '''
 
 FORBIDDEN = ('Traceback', 'context is invalid', 'terminate called')
+# DDS discovery ports are 7400 + 250 * domain. Keep these test domains below
+# Linux's ephemeral ports: domain 167 uses 49150, which another process can own.
+TEST_DOMAIN_BASE = 90
 
 
 class Child:
@@ -138,7 +141,7 @@ def _assert_clean_exit(child: Child) -> None:
 
 @pytest.mark.parametrize('signals', [1, 2])
 def test_detector_interrupted_during_inference_exits_cleanly(tmp_path, signals) -> None:
-    env = _env(tmp_path, 160 + signals)
+    env = _env(tmp_path, TEST_DOMAIN_BASE + signals)
     feeder = Child(env, FEEDER)
     try:
         child = Child(env, DETECTOR_CHILD)
@@ -158,7 +161,7 @@ def test_detector_interrupted_during_inference_exits_cleanly(tmp_path, signals) 
 def test_measurement_node_interrupted_while_spinning_exits_cleanly(
     tmp_path, module, signals,
 ) -> None:
-    domain = 163 + 2 * ('pointcloud' in module) + signals
+    domain = TEST_DOMAIN_BASE + 3 + 2 * ('pointcloud' in module) + signals
     child = Child(_env(tmp_path, domain), IDLE_CHILD, module)
     child.expect('SPINNING')
     time.sleep(0.3)

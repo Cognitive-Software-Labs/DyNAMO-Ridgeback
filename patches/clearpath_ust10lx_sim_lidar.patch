@@ -1,0 +1,79 @@
+diff --git a/clearpath_generator_common/clearpath_generator_common/description/sensors.py b/clearpath_generator_common/clearpath_generator_common/description/sensors.py
+index 01401ef..2f43ad9 100644
+--- a/clearpath_generator_common/clearpath_generator_common/description/sensors.py
++++ b/clearpath_generator_common/clearpath_generator_common/description/sensors.py
+@@ -116,6 +116,25 @@ class SensorDescription:
+                 }
+             )
+
++    class HokuyoUSTDescription(Lidar2dDescription):
++        """Simulate the UST-10LX: 0.25 deg steps, 0.06-10 m, 40 Hz, and a
++        constant Gaussian range noise (stddev in metres)."""
++
++        NOISE_STDDEV = 'noise_stddev'
++
++        def __init__(self, sensor: HokuyoUST) -> None:
++            super().__init__(sensor)
++
++            self.parameters.update(
++                {
++                    self.ANGULAR_RESOLUTION: 0.25,
++                    self.MINIMUM_RANGE: 0.06,
++                    self.MAXIMUM_RANGE: 10.0,
++                    self.UPDATE_RATE: 40,
++                    self.NOISE_STDDEV: 0.036,
++                }
++            )
++
+     class Lidar3dDescription(BaseDescription):
+         ANGULAR_RESOLUTION_H = 'ang_res_h'
+         ANGULAR_RESOLUTION_V = 'ang_res_v'
+@@ -333,7 +352,7 @@ class SensorDescription:
+             )
+
+     MODEL = {
+-        HokuyoUST.SENSOR_MODEL: Lidar2dDescription,
++        HokuyoUST.SENSOR_MODEL: HokuyoUSTDescription,
+         SickLMS1XX.SENSOR_MODEL: Lidar2dDescription,
+         IntelRealsense.SENSOR_MODEL: IntelRealsenseDescription,
+         FlirBlackfly.SENSOR_MODEL: CameraDescription,
+diff --git a/clearpath_sensors_description/urdf/hokuyo_ust.urdf.xacro b/clearpath_sensors_description/urdf/hokuyo_ust.urdf.xacro
+index c1a4359..6c51517 100644
+--- a/clearpath_sensors_description/urdf/hokuyo_ust.urdf.xacro
++++ b/clearpath_sensors_description/urdf/hokuyo_ust.urdf.xacro
+@@ -2,7 +2,8 @@
+ <robot xmlns:xacro="http://ros.org/wiki/xacro">
+   <xacro:macro name="hokuyo_ust" params="name parent_link *origin
+                                           ang_res:=0.25 min_ang:=-2.35619 max_ang:=2.35619
+-                                          update_rate:=40 min_range:=0.06 max_range:=30.0">
++                                          update_rate:=40 min_range:=0.06 max_range:=30.0
++                                          noise_stddev:=0">
+     <link name="${name}_link">
+       <visual>
+         <origin xyz="0 0 0" rpy="0 0 0" />
+@@ -43,7 +44,8 @@
+       <child link="${name}_laser" />
+     </joint>
+
+-    <xacro:property name="samples" value="${round((max_ang - min_ang) * 180 / (ang_res * pi))}"/>
++    <!-- Both end angles are rays, so a scan has one more sample than steps. -->
++    <xacro:property name="samples" value="${round((max_ang - min_ang) * 180 / (ang_res * pi)) + 1}"/>
+
+     <gazebo reference="${name}_laser">
+       <sensor name="${name}" type="gpu_lidar">
+@@ -70,8 +72,14 @@
+           <range>
+             <min>${min_range}</min>
+             <max>${max_range}</max>
+-            <resolution>0.01</resolution>
++            <resolution>0.001</resolution>
+           </range>
++          <xacro:if value="${noise_stddev > 0}">
++            <noise type="gaussian">
++              <mean>0</mean>
++              <stddev>${noise_stddev}</stddev>
++            </noise>
++          </xacro:if>
+         </lidar>
+       </sensor>
+     </gazebo>

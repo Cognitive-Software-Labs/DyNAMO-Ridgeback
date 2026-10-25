@@ -38,6 +38,21 @@ measurement differences or inconclusive evidence keep the affected use blocked.
 Gazebo GLX qualification does not establish Isaac, EGL, hardware, or untested
 workload/profile equivalence. Record the qualified conditions in run guidance.
 
+## Isaac benchmark environment teardown
+
+**Gap.** In two independent stationary scan captures on 2026-10-25, the
+Isaac runner reached `RUNNER EXIT` and `Simulation App Shutting Down`, but
+launch escalated to SIGTERM after five seconds; the second stop also logged
+SIGKILL. Both launches returned 0, so launcher status alone cannot establish
+clean teardown. The LiDAR change leaves the Isaac runner and installed
+SimulationApp unchanged; the teardown mechanism still needs diagnosis.
+Evidence: `artifacts/benchmarks/ust10lx_review_20261025_base_39fb8c1/`.
+
+**Completion criteria.** Identify the delayed teardown boundary, qualify the
+repair with repeated attached-PTY Ctrl-C stops after clock and sensor
+readiness, and require every child to exit without escalation or leftover
+processes. Keep this separate from scan-contract and estimator acceptance.
+
 ## Layered replay validation
 
 **Gap.** Layered replay is implemented; fresh live parity, real segmentation

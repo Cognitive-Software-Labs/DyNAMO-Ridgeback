@@ -149,3 +149,99 @@ def test_dependencies_without_an_overlay_entry_keep_the_strict_untracked_rule(
     result = _check(workspace, '--profile', 'core')
     assert result.returncode == 1
     assert 'ERROR: src/plain has untracked files: pkg_plain/COLCON_IGNORE' in result.stderr
+
+
+@pytest.fixture
+def stacked(workspace):
+    """src/plain carries two recorded patches; the second rewrites the line the
+    first one changed, so it applies only on top of it."""
+    plain = workspace / 'src/plain'
+    source = plain / 'pkg_plain/source.txt'
+    source.write_text('first\n')
+    (workspace / 'patches/plain_first.patch').write_text(
+        _git(plain, 'diff', '--no-ext-diff', 'HEAD') + '\n')
+    _git(plain, 'add', '-A')
+    source.write_text('second\n')
+    (workspace / 'patches/plain_second.patch').write_text(
+        _git(plain, 'diff', '--no-ext-diff') + '\n')
+    _git(plain, 'reset', '-q', '--hard')
+
+    checker = workspace / 'tools/check_dependencies'
+    checker.write_text(checker.read_text().replace(
+        'declare -A PATCHES=(',
+        'declare -A PATCHES=(\n'
+        '    [src/plain]="patches/plain_first.patch patches/plain_second.patch"', 1))
+    return workspace
+
+
+def test_stacked_patches_apply_in_order_and_verify_together(stacked) -> None:
+    first = _check(stacked, '--profile', 'core')
+    assert first.returncode == 1
+    assert ('patches/plain_first.patch, patches/plain_second.patch are not applied; '
+            'rerun with --apply') in first.stderr
+
+    applied = _check(stacked, '--apply', '--profile', 'core')
+    assert applied.returncode == 0, applied.stderr
+    lines = applied.stdout.splitlines()
+    assert lines.index('APPLIED: patches/plain_first.patch to src/plain @ '
+                       + _git(stacked / 'src/plain', 'rev-parse', '--short=8', 'HEAD')) < \
+        lines.index('APPLIED: patches/plain_second.patch to src/plain @ '
+                    + _git(stacked / 'src/plain', 'rev-parse', '--short=8', 'HEAD'))
+    assert (stacked / 'src/plain/pkg_plain/source.txt').read_text() == 'second\n'
+
+    rerun = _check(stacked, '--profile', 'core')
+    assert rerun.returncode == 0, rerun.stderr
+    assert ('(patches/plain_first.patch, patches/plain_second.patch applied)'
+            in rerun.stdout)
+
+
+def test_only_the_missing_later_patch_is_applied(stacked) -> None:
+    _git(stacked / 'src/plain', 'apply', str(stacked / 'patches/plain_first.patch'))
+
+    result = _check(stacked, '--profile', 'core')
+    assert result.returncode == 1
+    assert 'patches/plain_second.patch is not applied; rerun with --apply' in result.stderr
+
+    applied = _check(stacked, '--apply', '--profile', 'core')
+    assert applied.returncode == 0, applied.stderr
+    assert 'APPLIED: patches/plain_second.patch' in applied.stdout
+    assert 'APPLIED: patches/plain_first.patch' not in applied.stdout
+
+
+def test_a_later_patch_must_apply_on_top_of_its_predecessor(stacked) -> None:
+    plain = stacked / 'src/plain'
+    (plain / 'pkg_plain/source.txt').write_text('second\n')
+    (stacked / 'patches/plain_second.patch').write_text(
+        _git(plain, 'diff', '--no-ext-diff', 'HEAD') + '\n')
+    _git(plain, 'checkout', '-q', '--', '.')
+
+    result = _check(stacked, '--apply', '--profile', 'core')
+    assert result.returncode == 1
+    assert ('patches/plain_second.patch does not apply on top of '
+            'patches/plain_first.patch') in result.stderr
+    assert (plain / 'pkg_plain/source.txt').read_text() == 'upstream\n'
+
+
+def test_changes_beyond_stacked_patches_fail(stacked) -> None:
+    assert _check(stacked, '--apply', '--profile', 'core').returncode == 0
+    (stacked / 'src/plain/pkg_plain/package.xml').write_text('<package>local</package>\n')
+
+    for args in (('--profile', 'core'), ('--apply', '--profile', 'core')):
+        result = _check(stacked, *args)
+        assert result.returncode == 1
+        assert ('src/plain contains changes beyond patches/plain_first.patch, '
+                'patches/plain_second.patch') in result.stderr
+
+
+def test_a_patch_must_be_the_diff_git_generates(stacked) -> None:
+    plain = stacked / 'src/plain'
+    (plain / 'pkg_plain/source.txt').write_text('first\n')
+    (stacked / 'patches/plain_first.patch').write_text(
+        _git(plain, 'diff', '--no-ext-diff', '--full-index', 'HEAD') + '\n')
+    _git(plain, 'checkout', '-q', '--', '.')
+
+    result = _check(stacked, '--apply', '--profile', 'core')
+    assert result.returncode == 1
+    assert ('patches/plain_first.patch is not the diff Git generates for its change; '
+            're-record it') in result.stderr
+    assert (plain / 'pkg_plain/source.txt').read_text() == 'upstream\n'

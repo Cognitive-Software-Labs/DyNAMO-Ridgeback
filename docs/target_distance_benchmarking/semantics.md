@@ -17,6 +17,19 @@ scenes; the [gallery](benchmark_scenarios_v2_gallery.html) is a visual reference
   `repeats_override: 8` to collect its intended within-pose sample.
 - Record current parameters and code provenance; an older scene/model/render
   configuration is not directly interchangeable with a current run.
+- Gazebo and Isaac publish the same UST-10LX scan contract: 1081 bins at
+  0.25°, 0.06–10 m, 40 Hz. Neither simulator lets `polar_profiling` reach a
+  surface beyond 10 m; such a ray is `+inf`, and the row reports `no_value`
+  instead of latching a far wall. A Gazebo run from before the
+  [UST-10LX patch](../project/dependencies.md#ust-10lx-gazebo-lidar-patch),
+  with 540 bins out to 25 m, is a different population and cannot serve as a
+  polar baseline.
+- Both simulators add LiDAR range noise, and neither is bit-reproducible on
+  the LiDAR path. A/B comparisons of `polar_profiling` need repeats.
+  LiDAR noise does not change the camera inputs; the two examples runs used
+  to measure this effect do not establish general camera-path determinism.
+  How the two noise models differ is described in
+  [the LiDAR pipeline](../isaac/lidar-pipeline.md#gazebo-parity).
 - Never run `cleanup.sh` between persistent sweep configurations. A sweep owns
   one simulator/RViz/detector environment and restarts the per-config layer.
 

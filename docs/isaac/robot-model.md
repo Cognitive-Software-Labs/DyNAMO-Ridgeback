@@ -81,7 +81,8 @@ skipping the moving case.
 Gazebo's pre-profile live proof was repeated after the shared config explicitly supplied
 the physical ±135° UST window. Without it, Clearpath's generic parser expanded
 the Gazebo sensor to 360° and both units produced 140 false near bins down to
-5.05 cm. With it, each sensor published 540/540 finite bins at 40 Hz and zero
+5.05 cm. With it, each sensor published 540/540 finite bins (the generic
+Clearpath sensor's count before the UST-10LX simulation patch) at 40 Hz and zero
 returns below 0.8 m while stationary. During a commanded turn the robot yaw
 changed by 0.390 rad and both scans again had 540/540 finite bins, zero below
 0.8 m; the nearest obstacle was 1.19 m. The camera simultaneously published
