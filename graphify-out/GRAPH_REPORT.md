@@ -1,7 +1,7 @@
-# Graph Report - /tmp/claude-1009/-home-stefi-DyNAMO-DyNAMO-Ridgeback/9087cb27-729a-45d9-a9eb-09ccd616b9c6/scratchpad/merge-graphify  (2026-10-26)
+# Graph Report - /tmp/claude-1009/-home-stefi-DyNAMO-DyNAMO-Ridgeback/9087cb27-729a-45d9-a9eb-09ccd616b9c6/scratchpad/testfix-graphify  (2026-10-26)
 
 ## Corpus Check
-- 425 files · ~481,871 words
+- 425 files · ~481,872 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary

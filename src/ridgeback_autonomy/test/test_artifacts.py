@@ -170,7 +170,7 @@ def test_sweep_routes_output_and_child_logs_without_changing_commands(tmp_path, 
     monkeypatch.setattr(sweep, 'run_preflight_cleanup', cleanup_calls.append)
     monkeypatch.setattr(sweep, 'reap_orphan_benchmark_entities', lambda _: [])
     monkeypatch.setattr(sweep, 'sample_real_time_factor', lambda: 1.0)
-    monkeypatch.setattr(sweep, '_wait_for_config', lambda *_: ('success', None))
+    monkeypatch.setattr(sweep, '_wait_for_config', lambda *_: ('exited', None))
     monkeypatch.setattr(sweep, 'simulator_provenance', lambda _backend: {})
     scene_control = SimpleNamespace(
         wait_for_services=lambda _timeout: None,
@@ -178,7 +178,7 @@ def test_sweep_routes_output_and_child_logs_without_changing_commands(tmp_path, 
         wait_for_advancing_clock=lambda _timeout: None,
         readiness_timeline=lambda: {'clock_advance_after_services_sec': 0.0},
     )
-    monkeypatch.setattr(sweep.rclpy, 'init', lambda: None)
+    monkeypatch.setattr(sweep.rclpy, 'init', lambda **_kwargs: None)
     monkeypatch.setattr(
         sweep.rclpy, 'create_node',
         lambda _name: SimpleNamespace(destroy_node=lambda: None),
