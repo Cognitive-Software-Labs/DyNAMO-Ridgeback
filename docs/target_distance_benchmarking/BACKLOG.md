@@ -48,10 +48,34 @@ clean teardown. The LiDAR change leaves the Isaac runner and installed
 SimulationApp unchanged; the teardown mechanism still needs diagnosis.
 Evidence: `artifacts/benchmarks/ust10lx_review_20261025_base_39fb8c1/`.
 
+The full benchmark launch on `854c34c` did not reproduce it. It stopped on
+Ctrl-C without escalation 4 times out of 4 (one full run and three interrupted
+cycles, 2026-10-25/26), so the escalation is so far confined to the
+environment-only scan captures.
+
 **Completion criteria.** Identify the delayed teardown boundary, qualify the
 repair with repeated attached-PTY Ctrl-C stops after clock and sensor
 readiness, and require every child to exit without escalation or leftover
 processes. Keep this separate from scan-contract and estimator acceptance.
+
+## Interrupted benchmark stops
+
+**Gap.** A Ctrl-C during a trial leaves no process or entity behind on either
+backend, but it does not stop cleanly. Seen in 3 of 3 cycles per backend on
+2026-10-26:
+- The runner exits 130, and its rollback delete cannot reach the simulator,
+  which is already stopping.
+- On Gazebo, that pending delete makes `gzserver` abort with
+  `std::future_error: Broken promise` (exit -6). This is the gz-sim
+  `UserCommands` blocking-handler defect already diagnosed during the ros_gz
+  bridge work.
+- The known `target_overlay_node` exit 1 and RViz exit SIGSEGV also appear.
+
+A stop after a completed run is clean on both backends.
+
+**Completion criteria.** Every child exits cleanly on Ctrl-C during a trial on
+both backends, repeated over at least three attached-PTY cycles each. Fix
+external defects as recorded dependency patches.
 
 ## Layered replay validation
 
@@ -176,24 +200,7 @@ dry run has no launch/cleanup side effects and existing offline workflows remain
 intact. Record the lifecycle evidence in the qualified environment and update
 operator guidance. UI availability does not itself qualify benchmark results.
 
-## Deferred: Isaac target-distance benchmark port
-
-**Status.** Deferred (former P6); this records scope, not approval to implement.
-The target-distance benchmark still requires Gazebo-specific entity control.
-
-**Scope if resumed.** Replace Gazebo CLI spawn/remove/pose plumbing with a
-backend interface and Isaac simulation-control services. Preserve the current
-scenario schema, registered estimators, layered replay and configurator.
-Forward backend selection and Isaac arguments through the benchmark environment
-launch; cover process startup and teardown for both backends.
-
-**Acceptance.** An Isaac run with all registered estimators and one repeat
-completes the configured scenes, comparison report and collages; estimates are
-compared against a current matching Gazebo baseline, and repeated cleanup leaves
-no residual prims. Historical geometry-dependent numbers are not acceptance evidence.
-
-**Context.** [Target-distance benchmarking](overview.md).
-
 ## Archived evidence
 
+- [Gazebo and Isaac backend qualification](../../archive/engineering/2026-10-26-benchmark-gazebo-isaac-qualification.md)
 - [Layered replay implementation and preliminary storage evidence](../../archive/engineering/layered_replay_implementation_validation.md)

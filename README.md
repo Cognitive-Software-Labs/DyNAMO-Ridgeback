@@ -559,13 +559,24 @@ complete the [execution-environment qualification gate](docs/target_distance_ben
 Qualification and diagnostic runs establish that evidence; the CLI does not
 block unqualified runs. Replay tuning also depends on qualified capture provenance.
 
-The live target-distance benchmark currently requires the Gazebo adapter and
-`dependencies/gz.repos`; its measurement and report code remains target-generic,
-but Isaac entity-control plumbing is still P6 of the Isaac plan.
+`backend:=gz` (the default) runs the benchmark on Gazebo and needs
+`dependencies/gz.repos`. `backend:=isaac` runs the same scenario file, runner,
+estimators, and reports on Isaac Sim 6.1. It needs the
+[Isaac Sim setup](#4-optional-set-up-isaac-sim-61), and must start from the
+workspace root, where it finds `isaac_venv` (or set `ISAAC_PYTHON`). The backend
+belongs to the persistent environment. It selects the simulator adapter, that
+adapter's asset catalog, and its scene-control services, and every `run.json`
+records it. `backend:=hardware` is refused before any process starts, because
+hardware has no scene-control services or ground truth. What may and may not be
+compared across the two simulators is in
+[benchmark semantics](docs/target_distance_benchmarking/semantics.md#scenario-and-comparison-discipline).
 
 ```bash
-# Default run: compare all four estimators
+# Default run: compare all four estimators on Gazebo
 ros2 launch ridgeback_autonomy target_distance_benchmark.launch.py
+
+# The same run on Isaac Sim, with its viewport (from the workspace root)
+ros2 launch ridgeback_autonomy target_distance_benchmark.launch.py backend:=isaac headless:=false
 
 # Point cloud only
 ros2 launch ridgeback_autonomy target_distance_benchmark.launch.py estimators:=pointcloud
@@ -608,11 +619,16 @@ Arguments:
 
 | Argument | Default | Meaning |
 |----------|---------|---------|
+| `backend` | `gz` | Simulator of the persistent environment: `gz` or `isaac`. Selects the adapter, its asset catalog and scene-control services, and is recorded in every run. In a sweep it is a `defaults` key |
 | `namespace` | `r100_0001` | Namespace for simulation, detector, measurement node, and benchmark runner |
-| `use_sim_time` | `true` | Use Gazebo `/clock` |
+| `use_sim_time` | `true` | Use the simulator's `/clock` |
 | `setup_path` | `~/clearpath/` | Directory containing `robot.yaml` and generated Clearpath files |
-| `world` | `target_distance_calibration` | Gazebo world used for the benchmark run |
-| `gz_gui` | `true` | Launch Gazebo's GUI; set `false` for unattended benchmark runs |
+| `world` | `target_distance_calibration` | Public benchmark world. Each backend's asset catalog maps it to that simulator's own world (Isaac: `g1_distance_calibration`, same geometry) |
+| `gz_gui` | `true` | Gazebo only: launch Gazebo's GUI; set `false` for unattended benchmark runs |
+| `headless` | `true` | Isaac only: run Isaac Sim without its viewport window |
+| `rtf` | `1.0` | Isaac only: real-time factor; `0` is unthrottled |
+| `sim_mode` | `realtime` | Isaac only: `realtime` or fixed-step `deterministic` stepping |
+| `depth_fidelity` | `ideal` | Isaac only: `ideal` renderer depth or D455-like `d455` stereo depth; see [camera depth](docs/isaac/camera-depth.md) |
 | `exploration_rviz` | `true` | Launch the persistent benchmark RViz window |
 | `estimate_viz` | `true` | Publish estimator rings and the benchmark distance HUD |
 | `overlay` | `true` | Publish the camera overlay with selected estimator panels |
@@ -623,8 +639,8 @@ Arguments:
 | `depth_match_debug` | `false` | Default-off mask-worker evidence logging: exact-depth delivery, pending replacements, batch completion/publication age, and bounded cold/warm percentiles for RGB, SlimSAM, depth production, mask preparation, estimator reduction, worker, lock, and CUDA-synchronization timing |
 | `detector_fps` | `10.0` | Upper bound on the detection rate every measurement row inherits. Belongs to the persistent environment layer, so in a sweep it is a `defaults` key and cannot vary per configuration |
 | `detector_debug` | `false` | Default-off detector evidence logging: achieved cadence, superseded frames, and bounded cold/warm percentiles for the throttle wait, decode, inference, parse, publish and CUDA synchronization. Environment-layer, like `detector_fps` |
-| `headless_rendering` | `false` | Optional default-off server-only EGL sensor rendering. In sweeps this is a persistent-environment `defaults` key and cannot vary per configuration; `tools/gpu-run` remains the GUI-capable NVIDIA GLX path |
-| `camera_profile` | `640x480` | Gazebo camera profile (`640x480` or `1280x720`). It is a persistent-environment `defaults` key, is recorded in each run, and cannot vary per configuration without restarting Gazebo |
+| `headless_rendering` | `false` | Gazebo only: optional default-off server-only EGL sensor rendering. In sweeps this is a persistent-environment `defaults` key and cannot vary per configuration; `tools/gpu-run` remains the GUI-capable NVIDIA GLX path |
+| `camera_profile` | `640x480` | Simulator camera profile (`640x480` or `1280x720`). It is a persistent-environment `defaults` key, is recorded in each run, and cannot vary per configuration without restarting the simulator |
 | `isolation_2d` | `nearest_mode_histogram` | Projective-ranging box-gate foreground recipe: `nearest_mode_histogram` or `otsu` |
 | `isolation_3d` | `height_crop_nearest_mode_band` | Euclidean-reconstruction box-gate foreground recipe: `height_crop_nearest_mode_band`, `height_crop_range_band`, `height_crop`, `nearest_mode_band`, or `range_band`. The two chains differ only in how the background separator anchors — nearest mode vs. percentile; the percentile one slides as background grows and is what the `pointcloud` row does |
 | `isolation_3d_floor_margin_m` | `0.05` | Height above the floor a point must clear in Euclidean recipes containing `height_crop` |
@@ -694,9 +710,10 @@ escalating SIGINT → SIGTERM → SIGKILL. Save a copy still downloads the job f
 archiving or hand-editing.
 
 **Live sweeps still start from a terminal.** They need a GPU-backed X session,
-and `target_benchmark_sweep` runs `cleanup.sh` before Gazebo starts, which would
+and `target_benchmark_sweep` runs `cleanup.sh` before the simulator starts, which would
 kill the page — see [docs/troubleshooting.md](docs/troubleshooting.md). Copy
-the command instead.
+the command instead. A sweep the configurator authors carries no `backend`, so it
+runs on Gazebo. For Isaac, name a sweep YAML whose `defaults` set `backend: isaac`.
 
 The Results panel lists typed artifacts and run outputs, and can rename them.
 Rename is refused where the directory name is load-bearing — a sweep's config
@@ -708,8 +725,8 @@ the configurator and the command line.
 
 ### Benchmark sweeps
 
-Use the sweep supervisor when comparing configurations. It starts Gazebo,
-RViz, the Ridgeback, camera TF, and the detector once, then restarts only the
+Use the sweep supervisor when comparing configurations. It starts the simulator
+selected by `backend`, RViz, the Ridgeback, camera TF, and the detector once, then restarts only the
 measurement/configuration layer for each entry. The detector therefore loads
 OWLv2 once per sweep; silhouette configurations still load their segmentation
 model inside their per-config mask node.
@@ -747,12 +764,12 @@ ranging tuning constant at a time — `isolation_2d_band_m`,
 configuration twice as an in-sweep noise control. See the Archived evidence section below
 for what is already settled and what those runs are meant to answer.
 
-Do **not** run `cleanup.sh` between configurations: it kills the Gazebo server
-and RViz, which are deliberately persistent, although it leaves `gz sim gui`
+Do **not** run `cleanup.sh` between configurations: it kills the simulator
+and RViz, which are deliberately persistent, although on Gazebo it leaves `gz sim gui`
 running. The supervisor runs it once, immediately before starting that
 environment. It then owns each config process group, removes any orphan
-`bench_*` entities after an unclean exit, and shuts the environment down at the
-end. Both layers run through `ridgeback_autonomy.benchmarking.interactive_launch`,
+`bench_*` entities after an unclean exit through the same scene-control
+services the runner uses, and shuts the environment down at the end. Both layers run through `ridgeback_autonomy.benchmarking.interactive_launch`,
 `ros2 launch` in its terminal mode, so stopping one delivers a single SIGINT to
 every process in it, exactly as Ctrl-C in a terminal does; plain `ros2 launch`
 without a terminal would forward a second one to each child.
@@ -769,6 +786,7 @@ sweep:
   description: Every estimator once at its defaults.
 
 defaults:
+  backend: gz        # persistent; gz or isaac, one simulator per sweep
   scenario: ''       # packaged benchmark_scenarios_full.yaml
   repeats: 1
   camera_profile: 640x480  # persistent; 1280x720 requires a new environment
@@ -783,12 +801,15 @@ configs:
     isolation_2d: nearest_mode_histogram
 ```
 
-Config values override `defaults`. Validation happens before Gazebo starts:
+Config values override `defaults`. Validation happens before the simulator starts:
 unknown arguments, duplicate/unsafe names, bad estimators, missing scenario
 files, environment keys on individual configs, and estimator-inapplicable
-knobs are rejected. `world`, `setup_path`, `namespace`, `use_sim_time`,
+knobs are rejected. `backend`, `world`, `setup_path`, `namespace`, `use_sim_time`,
 `color_topic`, and `camera_profile` may be set only in `defaults` because the
-environment cannot change mid-sweep.
+environment cannot change mid-sweep. So may the backend-only settings
+(`gz_gui` and `headless_rendering` for Gazebo; `headless`, `rtf`, `sim_mode`, and
+`depth_fidelity` for Isaac), and a setting of the other backend is refused.
+`backend: hardware` is refused outright.
 
 Use `--skip-preflight-cleanup` only when another same-user ROS/Gazebo session
 must remain alive. The sweep then skips the aggressive repository cleanup and

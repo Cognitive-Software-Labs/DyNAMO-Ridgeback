@@ -6,10 +6,13 @@ To start a run, see [running benchmarks](running_benchmarks.md).
 ## Purpose and scope
 
 The benchmark compares independent target-localization estimators on fixed
-spawned target instances in `target_distance_calibration`. Unitree G1 is the
-current scenario asset; reusable perception and benchmark APIs use target names.
-It measures simulator ground-truth accuracy, misses/coverage, and run provenance.
-It is not hardware validation and never substitutes one estimator for another.
+spawned target instances in `target_distance_calibration`. It runs on Gazebo or
+Isaac Sim, selected with `backend:=gz|isaac`, from the same scenario file.
+Unitree G1 is the current scenario asset; reusable perception and benchmark
+APIs use target names. It measures simulator ground-truth accuracy,
+misses/coverage, and run provenance. It is not hardware validation, it never
+substitutes one estimator for another, and one simulator's results do not stand
+in for the other's (see [semantics](semantics.md#simulator-assets-and-cross-simulator-comparison)).
 
 ## Supported estimators and axes
 

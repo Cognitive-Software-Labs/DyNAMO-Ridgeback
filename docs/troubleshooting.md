@@ -68,7 +68,7 @@ because it happens to be cleanup's `$PPID`.
 
 Check with `pgrep -u "$USER" -af "lib/ridgeback_autonomy/"` before running
 cleanup. This is also why the configurator cannot start a `live-system` sweep:
-`target_benchmark_sweep` runs `run_preflight_cleanup` before Gazebo starts, so a
+`target_benchmark_sweep` runs `run_preflight_cleanup` before the simulator starts, so a
 sweep launched from the page would `kill -9` the page mid-click. Do not work
 around it with `--skip-preflight-cleanup`; that produces the two-`gz sim`
 failure above. Start live sweeps from a terminal until the catch-all is narrowed

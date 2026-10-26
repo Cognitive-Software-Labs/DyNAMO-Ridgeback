@@ -3,9 +3,12 @@
 Isaac Sim 6.1 is one of the shared autonomy stack's three backends, alongside
 Gazebo and physical hardware. The bounded migration compatibility gate passed;
 statistical exploration qualification remains open. The
-[project backlog](../BACKLOG.md) owns exploration and robot work; the
-[benchmarking backlog](../target_distance_benchmarking/BACKLOG.md#deferred-isaac-target-distance-benchmark-port)
-owns deferred target-distance benchmark support. Historical controls are not current performance baselines.
+[project backlog](../BACKLOG.md) owns exploration and robot work. The
+target-distance benchmark runs on Isaac with `backend:=isaac`. Its semantics are
+in [target-distance benchmarking](../target_distance_benchmarking/overview.md),
+and its open Isaac work is in the
+[benchmarking backlog](../target_distance_benchmarking/BACKLOG.md#isaac-benchmark-environment-teardown).
+Historical controls are not current performance baselines.
 
 ## Current references
 
