@@ -23,6 +23,9 @@ import webbrowser
 import yaml
 
 from ridgeback_autonomy.benchmarking.configurator_errors import ConfiguratorError
+from ridgeback_common.detector_config import (
+    DETECTOR_ENVIRONMENT_KEYS, resolve_detector_settings,
+)
 from ridgeback_autonomy.benchmarking.configurator_results import (
     artifact_summary,
     discover_artifacts,
@@ -106,6 +109,8 @@ def capabilities() -> dict:
             axis = axes[name]
             if axis['stage'] not in {'measurement', 'mask-production'}:
                 continue
+            if profile['id'] == 'live-system' and name in DETECTOR_ENVIRONMENT_KEYS:
+                continue  # Persistent detector settings render once above configs.
             rendered = _rendered_field(axis, profile)
             # A live run rebuilds every stage per config, so its mask settings
             # belong on the variant card: a separate materialization is a
@@ -178,6 +183,16 @@ def _sweep_defaults(raw: dict, descriptor: dict, root: Path) -> dict:
     if not isinstance(supplied, dict):
         raise ConfiguratorError(
             'sweep_defaults', 'invalid_defaults', 'Sweep defaults must be an object.')
+    if not descriptor.get('sweep_defaults_fields') and supplied:
+        raise ConfiguratorError(
+            'sweep_defaults', 'upstream_stage_frozen',
+            'Frozen replay cannot change detector or environment settings.')
+    allowed = {field['key'] for field in descriptor.get('sweep_defaults_fields', [])}
+    unsupported = sorted(set(supplied) - allowed)
+    if unsupported:
+        raise ConfiguratorError(
+            f'sweep_defaults.{unsupported[0]}', 'unknown_field',
+            f'Sweep default "{unsupported[0]}" is not available for this profile.')
     defaults = {}
     for field in descriptor.get('sweep_defaults_fields', []):
         key = field['key']
@@ -197,6 +212,22 @@ def _ui_sweep(raw: dict, profile: str, root: Path) -> dict | str:
     # validated and already describes what it runs, so regenerating it from the
     # page's draft would run something other than what the command names.
     if profile == 'live-system' and referenced:
+        if raw.get('sweep_defaults'):
+            raise ConfiguratorError(
+                'sweep_defaults', 'unconsumed_override',
+                'A referenced live sweep owns its defaults; clear draft defaults.')
+        for index, variant in enumerate(raw.get('variants') or []):
+            if not isinstance(variant, dict):
+                raise ConfiguratorError('variants', 'invalid_variant', 'Every variant must be an object.')
+            arguments = variant.get('arguments') or {}
+            if not isinstance(arguments, dict):
+                raise ConfiguratorError('variants', 'invalid_variant', 'Variant arguments must be an object.')
+            keys = set(arguments) & DETECTOR_ENVIRONMENT_KEYS
+            if keys:
+                name = sorted(keys)[0]
+                raise ConfiguratorError(
+                    f'variants.{index}.{name}', 'unconsumed_override',
+                    f'A referenced live sweep owns detector setting "{name}".')
         return anchored_path(str(root), referenced)
     descriptor = capabilities()['profiles'][profile]
     variants = raw.get('variants') or [{'name': 'baseline', 'arguments': {}}]
@@ -208,6 +239,12 @@ def _ui_sweep(raw: dict, profile: str, root: Path) -> dict | str:
         supplied = item.get('arguments') or {}
         if not isinstance(supplied, dict):
             raise ConfiguratorError('variants', 'invalid_variant', 'Variant arguments must be an object.')
+        forbidden = sorted(set(supplied) & DETECTOR_ENVIRONMENT_KEYS)
+        if forbidden:
+            raise ConfiguratorError(
+                f'variants.{index}.{forbidden[0]}', 'persistent_detector_setting',
+                f'Detector setting "{forbidden[0]}" belongs in live sweep defaults; '
+                'frozen replay cannot change it.')
         arguments = {}
         for field in descriptor['variant_fields']:
             key = field['key']
@@ -434,7 +471,10 @@ def validate_job(raw: object, workspace_root: Path | None = None) -> dict:
         issues.append({'field': 'inputs', 'code': 'invalid_artifact', 'message': str(exc)})
     issues.extend(_evidence_issues(job, artifacts))
     return {'job': job.document, 'issues': issues, 'artifacts': artifacts, 'valid': not issues,
-            'estimates': _estimate(job, artifacts)}
+            'estimates': _estimate(job, artifacts),
+            'effective_detector_settings': (
+                resolve_detector_settings(job.sweep.defaults)
+                if job.profile == 'live-system' else None)}
 
 
 def render_job(raw: object, workspace_root: Path | None = None) -> dict:
@@ -490,7 +530,11 @@ def _ui_draft(document: dict) -> dict:
         'model_workers': job.model_workers, 'output_dir': job.output_dir,
         'baseline': job.comparison_baseline,
         'variants': [
-            {'name': item.name, 'arguments': ui_arguments(item.arguments)}
+            {'name': item.name, 'arguments': ui_arguments({
+                key: value for key, value in item.arguments.items()
+                if not (job.profile == 'live-system' and isinstance(document['sweep'], str)
+                        and key in DETECTOR_ENVIRONMENT_KEYS)
+            })}
             for item in job.sweep.configs
         ],
     }

@@ -9,6 +9,9 @@ import re
 import yaml
 
 from ridgeback_common.camera_profiles import resolve_camera_profile
+from ridgeback_common.detector_config import (
+    DETECTOR_ENVIRONMENT_KEYS, resolve_detector_settings,
+)
 from ridgeback_localization.estimator_registry import (
     DEPTH_PATH_ESTIMATORS,
     MASK_ESTIMATORS,
@@ -35,15 +38,14 @@ TOP_LEVEL_KEYS = frozenset({'sweep', 'defaults', 'configs'})
 SWEEP_METADATA_KEYS = frozenset({'name', 'description'})
 # These belong only to the environment launch, but are legal as sweep-wide
 # defaults: an installation selects its Clearpath setup and camera profile once,
-# and the detector rate and its diagnostic are fixed for the persistent layer.
+# and the detector and all its settings are fixed for the persistent layer.
 # The backend and its own rendering and stepping settings are environment
 # properties too; they are validated and forwarded with the backend instead.
-ENVIRONMENT_ONLY_DEFAULT_NAMES = frozenset({
-    'setup_path',
-    'camera_profile',
-    'detector_fps',
-    'detector_debug',
-})
+ENVIRONMENT_ONLY_DEFAULT_NAMES = (
+    DETECTOR_ENVIRONMENT_KEYS | frozenset({
+        'setup_path', 'camera_profile',
+    })
+)
 SWEEP_DEFAULT_ARGUMENT_NAMES = (
     CONFIG_LAUNCH_ARGUMENT_NAMES | ENVIRONMENT_ONLY_DEFAULT_NAMES)
 
@@ -232,6 +234,10 @@ def parse_sweep(
         key: _launch_value(value, owner=f'Sweep file {source} field "defaults"', field=key)
         for key, value in defaults_raw.items()
     }
+    # Validate the whole environment identity, including inherited defaults.
+    # The returned values are not substituted into legacy documents: omitted
+    # fields still mean the documented launch defaults.
+    resolve_detector_settings(defaults)
     if 'camera_profile' in defaults:
         try:
             resolve_camera_profile(defaults['camera_profile'])
@@ -289,6 +295,8 @@ def parse_sweep(
         merged = {
             key: value for key, value in defaults.items()
             if key in CONFIG_LAUNCH_ARGUMENT_NAMES
+            and (key not in DETECTOR_ENVIRONMENT_KEYS
+                 or key == 'target_labels')
         }
         merged.update(explicit)
         resolved = _validate_config(

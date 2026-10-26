@@ -854,6 +854,36 @@ def test_canonical_job_validates_profiles_resources_and_baseline(tmp_path):
     assert caught.value.code == 'live_sweep_requires_path'
 
 
+
+def test_live_job_command_uses_its_persistent_detector_sweep(tmp_path):
+    from ridgeback_autonomy.benchmarking.replay_jobs import command_argv, load_job
+    from ridgeback_autonomy.benchmarking.target_benchmark_sweep import _environment_command
+
+    sweep_path = tmp_path / 'live-sweep.yaml'
+    sweep_path.write_text(yaml.safe_dump({
+        'sweep': {'name': 'detector_identity'},
+        'defaults': {
+            'detector': 'owlv2', 'detection_model': 'sentinel-checkpoint',
+            'target_labels': 'robot, person', 'detection_threshold': 0.7,
+            'detector_fps': 4.0,
+        },
+        'configs': [{'name': 'baseline', 'estimators': 'projective_ranging'}],
+    }))
+    job_path = tmp_path / 'live-job.yaml'
+    job_path.write_text(yaml.safe_dump({
+        'job_version': 1, 'profile': 'live-system', 'inputs': {},
+        'sweep': str(sweep_path), 'comparison_baseline': 'baseline',
+    }))
+    job = load_job(job_path)
+    assert command_argv(str(job_path), job) == [
+        'ros2', 'run', 'ridgeback_autonomy', 'target_benchmark_sweep', str(sweep_path)]
+    command = _environment_command(job.sweep)
+    assert 'detection_model:=sentinel-checkpoint' in command
+    assert 'target_labels:=robot, person' in command
+    assert 'detection_threshold:=0.7' in command
+    assert 'detector_fps:=4.0' in command
+
+
 def test_mask_output_job_runs_atomically_and_labels_claim_boundary(tmp_path):
     sensor = _sensor(tmp_path)
     box = materialize_masks(

@@ -61,14 +61,19 @@ An explicit invalid venv is rejected; Intel external/observer mode does not
 inspect it. `RIDGEBACK_WORKSPACE` explicitly selects checkout resources;
 otherwise checkout markers are discovered without assuming install depth.
 
-`target_labels` is a comma-separated list, default `humanoid robot`. Use
-`person`, `humanoid robot`, or both for separately recorded checks. These are
-language queries, not a new trained G1 class. Detection threshold, checkpoint,
-NMS, segmentation, and estimator defaults are unchanged. Labels are logged by
-the detector, published in health, and recorded in benchmark parameters and run
-evidence. Benchmark sweeps set labels in `defaults`, since their detector is
-persistent; per-config changes are rejected. Existing replay payloads retain
-their recorded detections and cannot change detector queries after capture.
+`detector:=owlv2` selects the only production detector. `detection_model`
+identifies its checkpoint; the default remains
+`google/owlv2-base-patch16-ensemble`. `target_labels` is a comma-separated list,
+default `humanoid robot`. These are language queries, not a new trained G1 class.
+`detection_threshold` defaults to `0.55` and `detector_fps` to `10.0` on these
+local launches. All five settings are startup-only. Restart the compute process
+to change them; Intel's observer and `localization_mode:=external` consume the
+already-running detector and reject local detector overrides. Disabled target
+localization starts no detector. Benchmark sweeps set detector settings in
+`defaults`, since their detector is persistent; per-config changes are rejected.
+Existing replay payloads retain their recorded detections and cannot change
+detector queries after capture. Historical captures without detector identity
+remain unknown rather than being assigned today's defaults.
 
 ## Topics, types, and acquisition semantics
 

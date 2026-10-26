@@ -21,6 +21,10 @@ from ridgeback_common.camera_inputs import (
     resolve_camera_inputs,
 )
 from ridgeback_common.camera_profiles import DEFAULT_CAMERA_PROFILE
+from ridgeback_common.detector_config import (
+    DETECTOR_DEFAULT, DETECTION_MODEL_DEFAULT, DETECTION_THRESHOLD_DEFAULT,
+    DETECTOR_ENVIRONMENT_KEYS, TARGET_LABELS_DEFAULT,
+)
 from ridgeback_localization.contracts import (
     ALIGNED_DEPTH_DEBUG_TOPIC,
     HUD_DISTANCES_PANEL_TOPIC,
@@ -50,6 +54,12 @@ SHARED_BENCHMARK_ARGUMENT_DEFAULTS = {
     'world': 'target_distance_calibration',
     'camera_profile': DEFAULT_CAMERA_PROFILE,
     'color_topic': 'sensors/camera_0/color/image',
+    'detector': DETECTOR_DEFAULT,
+    'detection_model': DETECTION_MODEL_DEFAULT,
+    'target_labels': TARGET_LABELS_DEFAULT,
+    'detection_threshold': str(DETECTION_THRESHOLD_DEFAULT),
+    'detector_fps': '10.0',
+    'detector_debug': 'false',
 }
 
 # The source launch writes every declaration out explicitly so ``--show-args``
@@ -57,7 +67,7 @@ SHARED_BENCHMARK_ARGUMENT_DEFAULTS = {
 # matching public launch contract; replay profile stage ownership lives in the
 # ROS-free benchmarking registry.
 CONFIG_LAUNCH_ARGUMENT_NAMES = frozenset({
-    'target_labels',
+    *DETECTOR_ENVIRONMENT_KEYS,
     'namespace',
     'use_sim_time',
     'world',
@@ -124,6 +134,10 @@ ENV_LAYER_CONFIG_KEYS = frozenset({
     'rtf',
     'sim_mode',
     'depth_fidelity',
+    # The detector lives in the persistent layer, so its selection and settings
+    # are properties of a whole sweep. A per-config value would silently apply
+    # to every other config too.
+    *DETECTOR_ENVIRONMENT_KEYS,
     'world',
     'camera_profile',
     'setup_path',
@@ -131,12 +145,6 @@ ENV_LAYER_CONFIG_KEYS = frozenset({
     'use_sim_time',
     'color_topic',
     'headless_rendering',
-    # The detector lives in the persistent layer, so its rate and diagnostic
-    # are properties of a whole sweep. A per-config value would silently apply
-    # to every other config too.
-    'detector_fps',
-    'detector_debug',
-    'target_labels',
 })
 
 def workspace_root_from_package_share(package_share: str) -> str:
@@ -229,6 +237,6 @@ def distance_hud_node(
     )
 
 from ridgeback_localization.launch_helpers import (
-    _measurement_parameters, pointcloud_measurement_node, mask_measurement_node,
+    _measurement_parameters, detector_launch_parameters, pointcloud_measurement_node, mask_measurement_node,
     resolved_camera_inputs, estimate_viz_node, overlay_node,
 )

@@ -16,6 +16,10 @@ from launch.substitutions import (
 from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
 
+from ridgeback_common.detector_config import (
+    DETECTOR_DEFAULT, DETECTION_MODEL_DEFAULT, DETECTION_THRESHOLD_DEFAULT,
+    TARGET_LABELS_DEFAULT, resolve_detector_settings,
+)
 from ridgeback_common.camera_profiles import (
     CAMERA_PROFILE_CHOICES,
     DEFAULT_CAMERA_PROFILE,
@@ -33,6 +37,7 @@ from ridgeback_localization.estimator_registry import (
 from ridgeback_autonomy.rviz_layouts import hardware_layout, hardware_rviz_process
 from ridgeback_autonomy.localization_launch import (
     cyclonedds_actions,
+    detector_launch_parameters,
     distance_hud_node,
     estimate_viz_node,
     mask_measurement_node,
@@ -141,6 +146,18 @@ def build_target_localization_nodes(context, *args, **kwargs):
     estimators = ','.join(selected_estimators)
 
     nodes = []
+    if mode == 'external':
+        requested = {name: LaunchConfiguration(name).perform(context)
+                     for name in ('detector', 'detection_model', 'target_labels',
+                                  'detection_threshold', 'detector_fps',
+                                  'detector_debug')}
+        baseline = resolve_detector_settings({})
+        effective = resolve_detector_settings(requested)
+        changed = [name for name in requested if effective[name] != baseline[name]]
+        if changed:
+            raise ValueError(
+                'External localization cannot apply local detector override(s): '
+                + ', '.join(changed))
     if mode == 'local':
         nodes = [Node(
             package='ridgeback_localization',
@@ -151,12 +168,7 @@ def build_target_localization_nodes(context, *args, **kwargs):
             parameters=[{
                 'use_sim_time': use_sim_time,
                 'color_topic': camera_inputs.color_image_topic,
-                'target_labels': ParameterValue(LaunchConfiguration('target_labels'), value_type=str),
-                # Typed explicitly: the node declares a double, so an integer
-                # spelling like ``detector_fps:=10`` would otherwise be rejected.
-                'detector_fps': ParameterValue(
-                    LaunchConfiguration('detector_fps'), value_type=float),
-                'detector_debug': LaunchConfiguration('detector_debug'),
+                **detector_launch_parameters(context),
             }],
             remappings=[('/tf', 'tf'), ('/tf_static', 'tf_static')],
             output='screen',
@@ -444,7 +456,10 @@ def generate_launch_description():
             "'true' if '", LaunchConfiguration('localization_mode'), "' == 'external' else 'false'"])),
         DeclareLaunchArgument('base_frame', default_value=PythonExpression(["'' if '", backend, "' == 'hardware' else '", namespace, "/robot/base_link'"])),
         DeclareLaunchArgument('scan_topic', default_value='sensors/lidar2d_0/scan'),
-        DeclareLaunchArgument('target_labels', default_value='humanoid robot'),
+        DeclareLaunchArgument('detector', default_value=DETECTOR_DEFAULT),
+        DeclareLaunchArgument('detection_model', default_value=DETECTION_MODEL_DEFAULT),
+        DeclareLaunchArgument('detection_threshold', default_value=str(DETECTION_THRESHOLD_DEFAULT)),
+        DeclareLaunchArgument('target_labels', default_value=TARGET_LABELS_DEFAULT),
         *[DeclareLaunchArgument(name, default_value=value) for name, value in {
             'startup_timeout':'120.0', 'input_timeout':'3.0', 'progress_timeout':'15.0',
             'source_age':'15.0', 'health_timeout':'3.0', 'cancellation_timeout':'5.0'}.items()],

@@ -4,14 +4,17 @@ from launch.actions import DeclareLaunchArgument, OpaqueFunction
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 from ridgeback_common.camera_inputs import REALSENSE_BACKEND, resolve_camera_inputs
-from ridgeback_localization.core.detection import DETECTION_THRESHOLD
+from ridgeback_common.detector_config import (
+    DETECTOR_DEFAULT, DETECTION_MODEL_DEFAULT, DETECTION_THRESHOLD_DEFAULT,
+    TARGET_LABELS_DEFAULT,
+)
 from ridgeback_localization.environment import compute_environment
 from ridgeback_localization.estimator_registry import (
     parse_estimators, uses_mask_estimators, uses_pointcloud_estimators,
     selected_mask_estimators, selected_pointcloud_estimators,
 )
 from ridgeback_localization.launch_helpers import (
-    RESPAWN_DELAY_S, mask_measurement_node, pointcloud_measurement_node, overlay_node, estimate_viz_node)
+    RESPAWN_DELAY_S, detector_launch_parameters, mask_measurement_node, pointcloud_measurement_node, overlay_node, estimate_viz_node)
 
 
 def build_nodes(context):
@@ -21,18 +24,14 @@ def build_nodes(context):
     base = value('base_frame').strip()
     if not base: raise ValueError('base_frame must be the observed TF frame ID')
     estimators = parse_estimators(value('estimators'))
-    labels = value('target_labels')
-    if not any(x.strip() for x in labels.split(',')): raise ValueError('target_labels must not be empty')
-    threshold = float(value('detection_threshold'))
-    if not 0 < threshold <= 1: raise ValueError('detection_threshold must be in (0, 1]')
+    detector_settings = detector_launch_parameters(context)
     common = dict(namespace=namespace, use_sim_time=clock)
     # Deployed workers restart after a crash (2026-10-16: a killed detector stayed
     # dead until a manual relaunch); health reports the new worker epoch.
     nodes = [Node(package='ridgeback_localization', executable='target_detector_node',
         respawn=True, respawn_delay=RESPAWN_DELAY_S,
         namespace=namespace, additional_env=compute_environment(), parameters=[dict(
-            use_sim_time=clock, color_topic=value('color_topic'), target_labels=labels,
-            detector_fps=float(value('detector_fps')), detection_threshold=threshold)], output='screen')]
+            use_sim_time=clock, color_topic=value('color_topic'), **detector_settings)], output='screen')]
     if uses_mask_estimators(estimators):
         nodes.append(mask_measurement_node(**common, respawn=True, base_frame=base,
             enabled_estimators=','.join(selected_mask_estimators(estimators)),
@@ -62,8 +61,10 @@ def generate_launch_description():
         color_topic=camera.color_image_topic, camera_info_topic=camera.color_camera_info_topic,
         depth_topic=camera.aligned_depth_topic, scan_topic='sensors/lidar2d_0/scan',
         pointcloud_topic='', estimators='projective_ranging,euclidean_reconstruction',
-        depth_source='stereoscopic', mask_gate='box', target_labels='humanoid robot', detector_fps='10.0',
-        detection_threshold=str(DETECTION_THRESHOLD),
+        depth_source='stereoscopic', mask_gate='box',
+        detector=DETECTOR_DEFAULT, detection_model=DETECTION_MODEL_DEFAULT,
+        target_labels=TARGET_LABELS_DEFAULT, detector_fps='10.0', detector_debug='false',
+        detection_threshold=str(DETECTION_THRESHOLD_DEFAULT),
         displays='false', startup_timeout='120.0', input_timeout='3.0', progress_timeout='15.0', source_age='15.0')
     return LaunchDescription([DeclareLaunchArgument('base_frame', description='Observed base TF frame ID'),
         *[DeclareLaunchArgument(key, default_value=value) for key,value in defaults.items()],

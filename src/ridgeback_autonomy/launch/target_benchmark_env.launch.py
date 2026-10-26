@@ -17,6 +17,10 @@ from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
 
+from ridgeback_common.detector_config import (
+    DETECTOR_DEFAULT, DETECTION_MODEL_DEFAULT, DETECTION_THRESHOLD_DEFAULT,
+    TARGET_LABELS_DEFAULT,
+)
 from ridgeback_common.camera_profiles import (
     CAMERA_PROFILE_CHOICES,
     DEFAULT_CAMERA_PROFILE,
@@ -32,6 +36,7 @@ from ridgeback_autonomy.localization_launch import (
     RAW_DETECTIONS_TOPIC,
     SIMULATION_CAMERA_INPUTS,
     cyclonedds_actions,
+    detector_launch_parameters,
     resolved_camera_inputs,
 )
 
@@ -50,12 +55,7 @@ def build_detector(context, *args, **kwargs):
             'use_sim_time': LaunchConfiguration('use_sim_time'),
             'color_topic': inputs.color_image_topic,
             'detections_topic': RAW_DETECTIONS_TOPIC,
-            'target_labels': ParameterValue(LaunchConfiguration('target_labels'), value_type=str),
-            # Typed explicitly: the node declares a double, so an integer
-            # spelling like ``detector_fps:=10`` would otherwise be rejected.
-            'detector_fps': ParameterValue(
-                LaunchConfiguration('detector_fps'), value_type=float),
-            'detector_debug': LaunchConfiguration('detector_debug'),
+            **detector_launch_parameters(context),
         }],
         remappings=[('/tf', 'tf'), ('/tf_static', 'tf_static')],
         output='screen',
@@ -123,7 +123,10 @@ def generate_launch_description():
         *cyclonedds_actions(pkg_this),
         # Shared with target_benchmark_config.launch.py. Keep these defaults
         # byte-identical: the first declaration inherited by a wrapper wins.
-        DeclareLaunchArgument('target_labels', default_value='humanoid robot'),
+        DeclareLaunchArgument('detector', default_value=DETECTOR_DEFAULT),
+        DeclareLaunchArgument('detection_model', default_value=DETECTION_MODEL_DEFAULT),
+        DeclareLaunchArgument('detection_threshold', default_value=str(DETECTION_THRESHOLD_DEFAULT)),
+        DeclareLaunchArgument('target_labels', default_value=TARGET_LABELS_DEFAULT),
         DeclareLaunchArgument(
             'backend', default_value=DEFAULT_BACKEND,
             description='Benchmark simulator, fixed for the persistent environment: gz or isaac'),

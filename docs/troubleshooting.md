@@ -15,6 +15,7 @@ investigations and measurements live in the Archived evidence section below.
 | All mask rows blank, pointcloud works | Inspect startup logs for an unavailable configured `base_frame` |
 | Explorer finds no frontiers | Confirm the global costmap has `track_unknown_space: true` |
 | Startup stage stalls | Read the matching `gate_*` process's `unmet:` list; do not add a fixed timer |
+| Benchmark opens Gazebo/RViz but its first trial stalls | If the config gate has the camera image but lists `detections/target/raw` as unmet, inspect the environment launch's `target_detector_node` log and check the perception venv; see [Missing benchmark detections](#missing-benchmark-detections) |
 | Stale simulator processes | Run `bash cleanup.sh` before a simulation launch or once before a sweep; never use it as hardware bringup cleanup |
 | Need a log summary | Run `bash tools/diag.sh <console.log> <world> [namespace]`; the namespace defaults to `RIDGEBACK_NAMESPACE`, then `r100_0001` |
 | Images on Thor stall or lag although ping is fast | See [Intel–Thor stream stalls](#intelthor-stream-stalls) |
@@ -36,6 +37,22 @@ not bypass the gate by switching to a simulator profile or enable platform
 bringup/motion just to make a topic appear. The physical command-chain and D455
 validation gates remain in the [backlog](BACKLOG.md) and
 [PHYSICAL — Robot measurements and stationary sensor validation](plans/PHYSICAL_robot_measurements_and_validation.md#d455-camera-validation).
+
+## Missing benchmark detections
+
+The persistent benchmark environment starts the detector before the first
+configuration. If its Python environment lacks Torch or Transformers, the
+detector logs a fatal message and exits without advertising
+`/<namespace>/detections/target/raw`. The configuration gate may then wait its
+full 300 seconds and proceed even though the topic remains absent; a clean gate
+exit is not proof that the detector became ready. Check the detector log under
+the sweep's `environment/logs/ros/` and the gate log under
+`<config>/logs/ros/`.
+
+Set up the [perception venv](../README.md#3-optional-set-up-target-localization-venv)
+in the sweep's checkout, or set `RIDGEBACK_PERCEPTION_VENV` to an existing venv
+before starting the sweep or configurator. Restart the configurator if it was
+already running. Stop the failed sweep from its terminal before retrying.
 
 ## Benchmark sweep cleanup
 

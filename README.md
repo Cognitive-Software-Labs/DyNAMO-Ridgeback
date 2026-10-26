@@ -185,7 +185,19 @@ perception_venv/bin/python3 -m pip install -r requirements-perception.txt
 > and silently runs Depth-Anything / OWLv2 on the CPU. For a different
 > GPU/CUDA, change the index URL + torch pins in that file.
 
-The exploration and benchmark-environment launches automatically prepend `perception_venv/bin` to `PATH` and set `VIRTUAL_ENV` for the perception nodes. When you launch with `target_localization_enabled:=true`, the first run will download the OWLv2 detector from Hugging Face. A benchmark run with `depth_source:=monocular` downloads the Depth-Anything V2 metric checkpoint on first use, and one with `mask_gate:=silhouette` the SlimSAM segmentation checkpoint.
+The exploration and benchmark-environment launches use this checkout's
+`perception_venv` for inference processes when it exists. If the venv lives
+elsewhere, set `RIDGEBACK_PERCEPTION_VENV` to its absolute path in the shell
+that starts the launch, sweep, or configurator. Restart an already-running
+configurator after setting it; child runs inherit the server's environment.
+Direct `ros2 run ridgeback_localization target_detector_node` does not use the
+launch helper, so activate the venv in that shell first.
+
+Inference launches load checkpoints from the local Hugging Face cache by
+default. For a first launch that needs to download uncached weights, set
+`RIDGEBACK_MODEL_DOWNLOADS=1` in the launching shell. OWLv2 uses the configured
+`detection_model`; `depth_source:=monocular` also needs the Depth-Anything V2
+metric checkpoint, and `mask_gate:=silhouette` needs the SlimSAM checkpoint.
 
 ### 4. (Optional) Set up Isaac Sim 6.1
 
@@ -307,7 +319,9 @@ and record it. Preserve observed sensor topics and the observed TF base frame:
 ros2 launch ridgeback_localization localization.launch.py \
   namespace:="$ROBOT_NAMESPACE" use_sim_time:=false base_frame:="$BASE_FRAME" \
   color_topic:="$COLOR_TOPIC" depth_topic:="$DEPTH_TOPIC" camera_info_topic:="$CAMERA_INFO_TOPIC" \
-  estimators:=projective_ranging,euclidean_reconstruction target_labels:="humanoid robot" \
+  estimators:=projective_ranging,euclidean_reconstruction \
+  detector:=owlv2 detection_model:=google/owlv2-base-patch16-ensemble \
+  target_labels:="humanoid robot" detection_threshold:=0.55 detector_fps:=10.0 \
   displays:=false
 ```
 
@@ -452,6 +466,17 @@ the target-localization stack in sequence:
 All four distance estimator rows run by default, the same set the benchmark compares — one RViz ring per row, each with its own bearing, plus a wide distance HUD top-right (`hud_target_overlay`) listing the four side by side with the age of each reading. There is no ground truth in exploration, so that panel carries no truth line and no error column. Per-row visibility is an RViz Displays checkbox under `Target Estimates`, one per estimator.
 
 The perception overlay is published on `debug/target/overlay` and shown by the configured RViz Image display.
+For an explicit baseline selection, the quick-start wrappers forward the same
+launch arguments untouched (the build wrapper forwards to the start wrapper):
+
+```bash
+bash start_exploration.sh initial_test_world detector:=owlv2 \
+  detection_model:=google/owlv2-base-patch16-ensemble \
+  target_labels:="humanoid robot" detection_threshold:=0.55 detector_fps:=10.0
+```
+
+`localization_mode:=external` consumes an already-running detector and rejects
+local detector overrides. `target_localization_enabled:=false` starts none.
 
 Bringup is **event-driven** (readiness gates), not fixed timers — each stage starts when its prerequisite exists, with a `--timeout` fallback. See [troubleshooting](docs/troubleshooting.md#event-driven-startup).
 
@@ -489,9 +514,13 @@ Arguments:
 | `target_localization_enabled` | `true` | Launch the target-localization stack |
 | `estimators` | backend-derived | `all` in simulation; aligned-depth-only `projective_ranging,euclidean_reconstruction` on hardware |
 | `estimate_viz` | `true` | Publish the estimator rings and the wide distance HUD |
+| `detector` | `owlv2` | Startup-only implementation selector; only `owlv2` is supported |
+| `detection_model` | `google/owlv2-base-patch16-ensemble` | Checkpoint identifier for the selected detector |
+| `target_labels` | `humanoid robot` | Comma-separated detection queries |
+| `detection_threshold` | `0.55` | Confidence floor in `(0, 1]` |
 | `detector_fps` | `10.0` | Upper bound on detection step starts; every selected measurement row inherits this cadence |
 | `detector_debug` | `false` | Log detector cadence, superseded frames, and bounded stage timings |
-| `depth_source` | `stereoscopic` | Aligned depth source for the mask rows — `stereoscopic` or `monocular` (Depth-Anything V2; downloads a checkpoint on first use) |
+| `depth_source` | `stereoscopic` | Aligned depth source for the mask rows — `stereoscopic` or `monocular` (Depth-Anything V2; its checkpoint must be cached or downloads enabled) |
 | `mask_gate` | `box` | Mask front-end — `box` (no segmentation model) or `silhouette` (SlimSAM) |
 | `mppi_visualize` | `false` | Publish MPPI trajectory visualization topics (RViz's namespaced `MPPI Optimal` and `MPPI Samples` displays already subscribe to the relative `optimal_trajectory` and `trajectories` topics) |
 | `coverage_overlay_enabled` | backend-derived | `true` in simulation; `false` on hardware, which has no packaged truth map |
@@ -1175,6 +1204,11 @@ ros2 launch ridgeback_autonomy target_distance_benchmark.launch.py
 # The same run on Isaac Sim, with its viewport (from the workspace root)
 ros2 launch ridgeback_autonomy target_distance_benchmark.launch.py backend:=isaac headless:=false
 
+# The same production baseline, with the detector settings explicit
+ros2 launch ridgeback_autonomy target_distance_benchmark.launch.py \
+  detector:=owlv2 detection_model:=google/owlv2-base-patch16-ensemble \
+  target_labels:="humanoid robot" detection_threshold:=0.55 detector_fps:=10.0
+
 # Point cloud only
 ros2 launch ridgeback_autonomy target_distance_benchmark.launch.py estimators:=pointcloud
 
@@ -1234,6 +1268,10 @@ Arguments:
 | `depth_source` | `stereoscopic` | Aligned-depth producer for the `projective_ranging`/`euclidean_reconstruction` rows: `stereoscopic` or `monocular`; comparing sources = two runs |
 | `mask_gate` | `box` | Mask front-end for the mask-based rows: `box` (rasterized detection box, no model) or `silhouette` (segmentation model prompted with the boxes; needs `perception_venv`); comparing gates = two runs |
 | `depth_match_debug` | `false` | Default-off mask-worker evidence logging: exact-depth delivery, pending replacements, batch completion/publication age, and bounded cold/warm percentiles for RGB, SlimSAM, depth production, mask preparation, estimator reduction, worker, lock, and CUDA-synchronization timing |
+| `detector` | `owlv2` | Startup-only detector implementation; only `owlv2` is registered. Persistent environment `defaults` in a sweep |
+| `detection_model` | `google/owlv2-base-patch16-ensemble` | Checkpoint identifier, distinct from `detector`; persistent environment `defaults` in a sweep |
+| `target_labels` | `humanoid robot` | Comma-separated detection queries; persistent environment `defaults` in a sweep |
+| `detection_threshold` | `0.55` | Finite confidence floor in `(0, 1]`; persistent environment `defaults` in a sweep |
 | `detector_fps` | `10.0` | Upper bound on the detection rate every measurement row inherits. Belongs to the persistent environment layer, so in a sweep it is a `defaults` key and cannot vary per configuration |
 | `detector_debug` | `false` | Default-off detector evidence logging: achieved cadence, superseded frames, and bounded cold/warm percentiles for the throttle wait, decode, inference, parse, publish and CUDA synchronization. Environment-layer, like `detector_fps` |
 | `headless_rendering` | `false` | Gazebo only: optional default-off server-only EGL sensor rendering. In sweeps this is a persistent-environment `defaults` key and cannot vary per configuration; `tools/gpu-run` remains the GUI-capable NVIDIA GLX path |
@@ -1312,6 +1350,14 @@ cancellation. `cleanup.sh` no longer kills the page or a replay it started — s
 [docs/troubleshooting.md](docs/troubleshooting.md#what-cleanupsh-leaves-alone).
 Copy the command instead. A sweep the configurator authors carries no `backend`, so it
 runs on Gazebo. For Isaac, name a sweep YAML whose `defaults` set `backend: isaac`.
+The live-system form shows the supported `owlv2`
+choice, checkpoint, labels, threshold, rate and diagnostics once above the
+config cards. A referenced sweep owns these settings; the page shows its
+resolved values and rejects hidden overrides. Saving the job and copying its
+command preserve the same environment settings. The live form retains its
+existing `detector_fps` field default of `5.0`; the direct launch and sweep
+launch defaults remain `10.0` when unset. Offline profiles reuse frozen
+detections and cannot select a new detector.
 
 The Results panel lists typed artifacts and run outputs, and can rename them.
 Rename is refused where the directory name is load-bearing — a sweep's config
@@ -1388,6 +1434,11 @@ defaults:
   scenario: ''       # packaged benchmark_scenarios_full.yaml
   repeats: 1
   camera_profile: 640x480  # persistent; 1280x720 requires a new environment
+  detector: owlv2
+  detection_model: google/owlv2-base-patch16-ensemble
+  target_labels: humanoid robot
+  detection_threshold: 0.55
+  detector_fps: 10.0
 
 configs:
   - name: pointcloud
@@ -1403,11 +1454,17 @@ Config values override `defaults`. Validation happens before the simulator start
 unknown arguments, duplicate/unsafe names, bad estimators, missing scenario
 files, environment keys on individual configs, and estimator-inapplicable
 knobs are rejected. `backend`, `world`, `setup_path`, `namespace`, `use_sim_time`,
-`color_topic`, and `camera_profile` may be set only in `defaults` because the
-environment cannot change mid-sweep. So may the backend-only settings
+`color_topic`, `camera_profile`, `detector`, `detection_model`,
+`target_labels`, `detection_threshold`, `detector_fps`, and `detector_debug`
+may be set only in `defaults` because the environment cannot change mid-sweep.
+So may the backend-only settings
 (`gz_gui` and `headless_rendering` for Gazebo; `headless`, `rtf`, `sim_mode`, and
 `depth_fidelity` for Isaac), and a setting of the other backend is refused.
 `backend: hardware` is refused outright.
+The dry run prints the persistent environment command. Resume identity includes
+the resolved detector settings; a different checkpoint starts a different sweep.
+The configuration layer checks its recorded settings against the warm detector
+before writing run evidence.
 
 Use `--skip-preflight-cleanup` only when another same-user ROS/Gazebo session
 must remain alive. The sweep then skips the aggressive repository cleanup and
@@ -1564,7 +1621,7 @@ or integration claims.
 
 | Node | Output topic | Key params |
 |------|--------------|------------|
-| `target_detector_node` | `detections/target/raw` | `color_topic`, `detection_model`, `detection_threshold`, `detector_fps` (default `10.0`; an upper bound on *step starts*, so the achieved rate matches the setpoint until inference alone exceeds the period), `detector_debug` |
+| `target_detector_node` | `detections/target/raw` | `color_topic`, `detector` (`owlv2` only), `detection_model` (checkpoint), `target_labels`, `detection_threshold`, `detector_fps` (default `10.0`; an upper bound on *step starts*), `detector_debug` |
 | `target_pointcloud_measurement_node` | `measurements/target/pointcloud` | `color_topic`, `pointcloud_topic`, `base_frame`, `enabled_estimators` |
 | `target_mask_measurement_node` | `measurements/target/mask` (+ subscriber-gated mask/aligned-depth debug images, `visualization/target/polar_rays`, and `debug/target/polar_beams` as selected) | `enabled_estimators`, `depth_source`, `depth_topic`, `camera_info_topic`, `scan_topic`, `base_frame` (**must be passed** — its own default is the bare `base_link`, unlike the other nodes', which are namespace-derived), `pitch_deg`, `front_offset_m`, `isolation_2d` and its three numeric settings, `min_valid_pixels`, `isolation_3d` and its six numeric settings, polar-isolation settings, `mask_gate`, `segmentation_model`, `color_topic`, `ray_marker_topic` |
 | `target_overlay_node` | `debug/target/overlay` | `measurement_topic`, `mask_measurement_topic`, `color_topic`, `aligned_depth_topic`, `estimators`, `max_cols`, `rgb_panel_labels` |

@@ -14,7 +14,11 @@ explicit missing matches; it never stores isolated foreground pixels or final
 measurements.
 
 The offline executor loads one trial per worker task and applies every variant
-while that trial's arrays are resident. It reuses the live capture reduction,
+while that trial's arrays are resident. The detector implementation, checkpoint,
+labels, threshold and cadence were fixed when the evidence was captured; offline
+profiles reject overrides and preserve that provenance when present. A legacy
+capture with missing identity is reported as unknown, not inferred from current
+launch defaults. It reuses the live capture reduction,
 association, scoring, trial-row, JSON/CSV, and sweep-report code. Per-config
 keys that do not affect projective ranging are rejected; live-only sweep
 defaults are removed from variant provenance.

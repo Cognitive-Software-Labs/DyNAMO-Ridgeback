@@ -8,6 +8,7 @@ import hashlib
 import json
 import os
 import re
+import shlex
 import signal
 import subprocess
 import sys
@@ -131,6 +132,7 @@ def _format_hours(seconds: float) -> str:
 
 
 def print_dry_run(
+    spec: SweepSpec,
     configs: tuple[SweepConfig, ...],
     default_scenario_path: str,
     environment: BenchmarkEnvironment,
@@ -159,6 +161,8 @@ def print_dry_run(
     ))
     print(f'\n{len(configs)} configs resolved; estimated sweep wall time: '
           f'{_format_hours(total_seconds)} ({TRIAL_WALL_TIME_SEC:.1f} s/trial).')
+    print('\nPersistent environment command:')
+    print(shlex.join(_environment_command(spec)))
     # Reported on the dry run too, so the renderer can be corrected before
     # committing hours to a sweep whose sensor rates would be invalid.
     warning = software_gl_warning(gl_renderer_provenance())
@@ -217,7 +221,7 @@ def _environment_arguments(spec: SweepSpec) -> dict[str, str]:
     arguments = _shared_arguments(spec)
     # Sorted so the recorded command is byte-identical between runs of the
     # same sweep; a frozenset's iteration order is not stable across processes.
-    for name in sorted(ENVIRONMENT_ONLY_DEFAULT_NAMES | {'target_labels'}):
+    for name in sorted(ENVIRONMENT_ONLY_DEFAULT_NAMES):
         if name in spec.defaults:
             arguments[name] = spec.defaults[name]
     arguments.update(spec.backend_settings)
@@ -1015,7 +1019,7 @@ def main(argv: list[str] | None = None) -> int:
         configs = _selected_configs(spec, args.only)
         environment = resolve_sweep_environment(spec, configs, default_scenario_path)
         if args.dry_run:
-            print_dry_run(configs, default_scenario_path, environment)
+            print_dry_run(spec, configs, default_scenario_path, environment)
             return 0
         sweep_dir, success = run_sweep(
             spec,

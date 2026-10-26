@@ -23,6 +23,7 @@ DETECTOR_CHILD = r'''
 import time
 
 from ridgeback_localization import detector_node
+from ridgeback_localization.core import detection
 
 
 class SlowDetector:
@@ -35,7 +36,8 @@ class SlowDetector:
         return []
 
 
-detector_node.OwlV2Detector = lambda *args, **kwargs: SlowDetector()
+# The production owlv2 backend builds its engine through this name.
+detection.OwlV2Detector = lambda *args, **kwargs: SlowDetector()
 detector_node.main()
 print('EXIT', flush=True)
 '''

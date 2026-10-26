@@ -17,6 +17,10 @@ from launch.events import Shutdown
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
+from ridgeback_common.detector_config import (
+    DETECTOR_DEFAULT, DETECTION_MODEL_DEFAULT, DETECTION_THRESHOLD_DEFAULT,
+    TARGET_LABELS_DEFAULT,
+)
 from ridgeback_common.camera_profiles import (
     CAMERA_PROFILE_CHOICES,
     DEFAULT_CAMERA_PROFILE,
@@ -47,6 +51,7 @@ from ridgeback_autonomy.localization_launch import (
     RAW_DETECTIONS_TOPIC,
     SIMULATION_CAMERA_INPUTS,
     cyclonedds_actions,
+    detector_launch_parameters,
     distance_hud_node,
     estimate_viz_node,
     mask_measurement_node,
@@ -233,7 +238,8 @@ def build_benchmark_nodes(context, *args, environment: BenchmarkEnvironment, **k
             # freezes the beams the live polar row actually used.
             'scan_topic': scan_topic,
             'base_frame': base_frame,
-            'target_labels': LaunchConfiguration('target_labels'),
+            **detector_launch_parameters(context),
+            'verify_detector_identity': True,
             'estimators': ','.join(selected_estimators),
             'pointcloud_measurement_topic': POINTCLOUD_MEASUREMENTS_TOPIC,
             'mask_measurement_topic': MASK_MEASUREMENTS_TOPIC,
@@ -338,7 +344,12 @@ def generate_launch_description():
     arguments = [
         # Shared with target_benchmark_env.launch.py. Keep these defaults
         # byte-identical: the first declaration inherited by a wrapper wins.
-        DeclareLaunchArgument('target_labels', default_value='humanoid robot'),
+        DeclareLaunchArgument('detector', default_value=DETECTOR_DEFAULT),
+        DeclareLaunchArgument('detection_model', default_value=DETECTION_MODEL_DEFAULT),
+        DeclareLaunchArgument('detection_threshold', default_value=str(DETECTION_THRESHOLD_DEFAULT)),
+        DeclareLaunchArgument('target_labels', default_value=TARGET_LABELS_DEFAULT),
+        DeclareLaunchArgument('detector_fps', default_value='10.0'),
+        DeclareLaunchArgument('detector_debug', default_value='false'),
         DeclareLaunchArgument(
             'backend', default_value=DEFAULT_BACKEND,
             description=(

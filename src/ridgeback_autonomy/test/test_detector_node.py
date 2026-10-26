@@ -323,3 +323,82 @@ def test_teardown_waits_for_an_inference_call_and_publishes_nothing_after_stop(
     assert published == []
     assert states == []
     assert not node.worker_thread.daemon
+
+
+def test_unknown_selector_fails_before_stub_or_model_load(ros_context) -> None:
+    from rclpy.parameter import Parameter
+    from ridgeback_localization.detector_node import TargetDetectorNode
+
+    detector = _StubDetector()
+    with pytest.raises(ValueError, match='detector must be one of'):
+        TargetDetectorNode(
+            detector=detector,
+            parameter_overrides=[Parameter('detector', value='future')],
+        )
+    assert detector.load_calls == 0
+
+
+def test_test_only_backend_traverses_node_factory_and_normalization(ros_context) -> None:
+    from rclpy.parameter import Parameter
+    from ridgeback_common.models import Detection, DetectionBatch
+    from ridgeback_localization.detector_node import TargetDetectorNode
+
+    instances = []
+
+    class FakeBackend:
+        def __init__(self, checkpoint, logger):
+            self.checkpoint = checkpoint
+            self.loaded = False
+            instances.append(self)
+
+        def load(self):
+            self.loaded = True
+
+        def infer(self, image, *, candidate_labels, threshold):
+            self.settings = (candidate_labels, threshold)
+            return object()  # Deliberately no OWL dictionary shape.
+
+        def normalize(self, opaque, width, height, threshold):
+            return DetectionBatch(width, height, [Detection((1, 1, 3, 3), 'fake', 0.8)])
+
+    node = TargetDetectorNode(
+        backend_factories={'fake': FakeBackend},
+        parameter_overrides=[
+            Parameter('detector', value='fake'),
+            Parameter('detection_model', value='sentinel-checkpoint'),
+            Parameter('target_labels', value='robot, person'),
+            Parameter('detection_threshold', value=0.7),
+        ],
+    )
+    published = []
+    node.detections_pub.publish = published.append
+    try:
+        node.run_detection_step(_color_message())
+        assert len(instances) == 1
+        assert instances[0].loaded
+        assert instances[0].checkpoint == 'sentinel-checkpoint'
+        assert instances[0].settings == (['robot', 'person'], 0.7)
+        assert len(published) == 1
+        assert published[0].labels == ['fake']
+        assert list(published[0].bbox_xyxy) == [1, 1, 3, 3]
+    finally:
+        node.destroy_node()
+
+
+@pytest.mark.parametrize('name, value', [
+    ('detector', 'future'), ('detection_model', 'other-checkpoint'),
+    ('target_labels', 'person'), ('detection_threshold', 0.7),
+    ('detector_fps', 4.0), ('detector_debug', True),
+])
+def test_runtime_detector_setting_update_is_rejected(ros_context, name, value) -> None:
+    from rclpy.parameter import Parameter
+
+    node = _make_node(_StubDetector())
+    try:
+        original = node.get_parameter(name).value
+        result = node.set_parameters([Parameter(name, value=value)])[0]
+        assert result.successful is False
+        assert 'startup-only' in result.reason
+        assert node.get_parameter(name).value == original
+    finally:
+        node.destroy_node()
