@@ -56,9 +56,11 @@ Use `ISSUES.md` when the task touches:
 
 ## Repo Mental Model
 
-- This repo centers on 2 public launch entrypoints:
+- This repo centers on these public launch entrypoints:
+  - `ridgeback_mission.launch.py` (authoritative complete thesis mission)
   - `ridgeback_exploration.launch.py`
   - `g1_distance_benchmark.launch.py`
+  - `manual_mapping.launch.py`
 - Lower-level launches in `src/ridgeback_autonomy/launch/includes/` are internal building blocks
 - Bringup is **event-driven**: stages are sequenced by readiness gates (`ros2 run ridgeback_autonomy launch_wait`, in `common/launch_wait.py`) chained via `OnProcessExit`, not fixed `TimerAction` delays — each stage starts when its prerequisite topic/service exists, with a `--timeout` fallback. See ISSUES.md "Event-Driven Startup". Don't reintroduce timer delays
 - The ROS package is `ridgeback_autonomy`
@@ -83,6 +85,11 @@ G1 perception stack (on by default — `g1_perception_enabled` defaults to `true
 - `g1_camera_measurement_node` publishes camera-based measurements on `measurements/g1/camera`
 - `g1_lidar_measurement_node` publishes LiDAR-based measurements on `measurements/g1/lidar`
 - `g1_overlay_node` renders the separate OpenCV perception window
+- Camera measurements use bounded timestamp buffers and match depth/organized
+  clouds to the detector's RGB acquisition stamp; do not reintroduce
+  latest-message pairing. In the canonical mission, a committed G1 is centered
+  with bounded in-place yaw goals before fresh localization samples are accepted.
+  Translating A/B observation poses are experimental and disabled by default.
 
 Benchmark stack:
 - simulator
@@ -123,6 +130,7 @@ Benchmark stack:
 
 - `clearpath/robot.yaml`: robot platform, namespace, and sensor declarations
 - `src/ridgeback_autonomy/launch/ridgeback_exploration.launch.py`: main public exploration launch
+- `src/ridgeback_autonomy/launch/ridgeback_mission.launch.py`: authoritative complete mission launch
 - `src/ridgeback_autonomy/launch/g1_distance_benchmark.launch.py`: public benchmark launch
 - `start_exploration.sh`: canonical exploration quick-start (cleanup + launch + arg/env forwarding)
 - `build_and_start_expl.sh`: rebuild then forward to `start_exploration.sh`

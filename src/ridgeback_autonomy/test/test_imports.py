@@ -17,6 +17,7 @@ def test_packaged_modules_import() -> None:
         'ridgeback_autonomy.perception.core.geometry',
         'ridgeback_autonomy.perception.core.image_utils',
         'ridgeback_autonomy.perception.core.rendering',
+        'ridgeback_autonomy.perception.core.time_sync',
         'ridgeback_autonomy.benchmarking.metrics',
         'ridgeback_autonomy.benchmarking.reduction',
         'ridgeback_autonomy.benchmarking.rendering',

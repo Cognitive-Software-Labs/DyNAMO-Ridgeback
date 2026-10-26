@@ -92,6 +92,12 @@ install(PROGRAMS
 )
 
 install(PROGRAMS
+  ridgeback_autonomy/mission/mission_manager_node.py
+  DESTINATION lib/${PROJECT_NAME}
+  RENAME mission_manager_node
+)
+
+install(PROGRAMS
   ridgeback_autonomy/diagnostics/velocity_overlay_node.py
   DESTINATION lib/${PROJECT_NAME}
   RENAME velocity_overlay_node
@@ -115,6 +121,14 @@ install(PROGRAMS
   RENAME coverage_overlay_node
 )
 
+install(PROGRAMS
+  ridgeback_autonomy/diagnostics/camera1_pointcloud_frame_node.py
+  DESTINATION lib/${PROJECT_NAME}
+  RENAME camera1_pointcloud_frame_node
+)
+
+# Historical/debug executable only. No public launch starts this node; the
+# authoritative parking implementation is mission/mission_manager_node.py.
 install(PROGRAMS
   ridgeback_autonomy/parking/humanoid_parking_node.py
   DESTINATION lib/${PROJECT_NAME}
@@ -140,6 +154,8 @@ if(BUILD_TESTING)
   ament_add_pytest_test(test_launch_layout test/test_launch_layout.py)
   ament_add_pytest_test(test_messages test/test_messages.py)
   ament_add_pytest_test(test_benchmark_runner test/test_benchmark_runner.py)
+  ament_add_pytest_test(test_mission_geometry test/test_mission_geometry.py)
+  ament_add_pytest_test(test_time_sync test/test_time_sync.py)
 endif()
 
 ament_package()

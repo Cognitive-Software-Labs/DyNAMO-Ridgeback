@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import os
 import threading
+import time
+from collections import deque
 
 import numpy as np
 import rclpy
@@ -41,6 +43,11 @@ from ridgeback_autonomy.perception.core.image_utils import (
     convert_color_image_message,
     convert_depth_to_meters_message,
 )
+from ridgeback_autonomy.perception.core.time_sync import (
+    prune_timestamped_buffer,
+    select_closest_timestamped,
+    stamp_seconds,
+)
 
 
 RAW_DETECTIONS_TOPIC = 'detections/g1/raw'
@@ -71,6 +78,9 @@ class G1CameraMeasurementNode(Node):
         self.declare_parameter('depth_anything_enabled', DEPTH_ANYTHING_ENABLED_DEFAULT)
         self.declare_parameter('depth_anything_model_id', DEPTH_ANYTHING_MODEL_ID_DEFAULT)
         self.declare_parameter('depth_anything_device', default_depth_anything_device)
+        self.declare_parameter('sensor_sync_tolerance_s', 0.10)
+        self.declare_parameter('sensor_buffer_size', 30)
+        self.declare_parameter('sensor_buffer_max_age_s', 2.0)
 
         self.camera_config_path = self.get_parameter('camera_config_path').value
         self.detections_topic = self.get_parameter('detections_topic').value
@@ -85,6 +95,18 @@ class G1CameraMeasurementNode(Node):
         self.depth_anything_enabled = bool(self.get_parameter('depth_anything_enabled').value)
         self.depth_anything_model_id = self.get_parameter('depth_anything_model_id').value
         self.depth_anything_device = self.get_parameter('depth_anything_device').value
+        self.sensor_sync_tolerance_s = max(
+            0.0,
+            float(self.get_parameter('sensor_sync_tolerance_s').value),
+        )
+        self.sensor_buffer_size = max(
+            2,
+            int(self.get_parameter('sensor_buffer_size').value),
+        )
+        self.sensor_buffer_max_age_s = max(
+            self.sensor_sync_tolerance_s,
+            float(self.get_parameter('sensor_buffer_max_age_s').value),
+        )
 
         self.camera_config = load_camera_config(self.camera_config_path)
         self.last_pointcloud_warning = None
@@ -107,12 +129,11 @@ class G1CameraMeasurementNode(Node):
 
         self.latest_detections_msg: G1Detections | None = None
         self.latest_color_msg: Image | None = None
-        self.latest_depth_msg: Image | None = None
-        self.latest_depth_meters: np.ndarray | None = None
-        self.latest_pointcloud_msg: PointCloud2 | None = None
-        self.latest_pointcloud_xyz: np.ndarray | None = None
-        self.latest_pointcloud_rotation: np.ndarray | None = None
-        self.latest_pointcloud_translation: np.ndarray | None = None
+        self.pending_depth_messages = deque(maxlen=self.sensor_buffer_size)
+        self.pending_pointcloud_messages = deque(maxlen=self.sensor_buffer_size)
+        self.depth_buffer = deque(maxlen=self.sensor_buffer_size)
+        self.pointcloud_buffer = deque(maxlen=self.sensor_buffer_size)
+        self.last_sync_log_monotonic = {'depth': 0.0, 'cloud': 0.0}
         self.processing_lock = threading.Lock()
         self.process_event = threading.Event()
         self.depth_process_event = threading.Event()
@@ -179,12 +200,12 @@ class G1CameraMeasurementNode(Node):
 
     def depth_callback(self, depth_msg: Image) -> None:
         with self.processing_lock:
-            self.latest_depth_msg = depth_msg
+            self.pending_depth_messages.append(depth_msg)
         self.depth_process_event.set()
 
     def pointcloud_callback(self, pointcloud_msg: PointCloud2) -> None:
         with self.processing_lock:
-            self.latest_pointcloud_msg = pointcloud_msg
+            self.pending_pointcloud_messages.append(pointcloud_msg)
         self.pointcloud_process_event.set()
 
     def depth_processing_loop(self) -> None:
@@ -195,8 +216,11 @@ class G1CameraMeasurementNode(Node):
 
             while not self.stop_event.is_set():
                 with self.processing_lock:
-                    depth_msg = self.latest_depth_msg
-                    self.latest_depth_msg = None
+                    depth_msg = (
+                        self.pending_depth_messages.popleft()
+                        if self.pending_depth_messages
+                        else None
+                    )
 
                 if depth_msg is None:
                     break
@@ -212,9 +236,20 @@ class G1CameraMeasurementNode(Node):
                     )
 
                 with self.processing_lock:
-                    self.latest_depth_meters = depth_meters
+                    if depth_meters is not None:
+                        stamp_s = stamp_seconds(depth_msg.header.stamp)
+                        self.depth_buffer.append(
+                            (stamp_s, (depth_msg, depth_meters))
+                        )
+                        prune_timestamped_buffer(
+                            self.depth_buffer,
+                            stamp_s,
+                            self.sensor_buffer_max_age_s,
+                        )
 
-                if not self.depth_process_event.is_set():
+                with self.processing_lock:
+                    has_pending = bool(self.pending_depth_messages)
+                if not has_pending and not self.depth_process_event.is_set():
                     break
                 self.depth_process_event.clear()
 
@@ -226,8 +261,11 @@ class G1CameraMeasurementNode(Node):
 
             while not self.stop_event.is_set():
                 with self.processing_lock:
-                    pointcloud_msg = self.latest_pointcloud_msg
-                    self.latest_pointcloud_msg = None
+                    pointcloud_msg = (
+                        self.pending_pointcloud_messages.popleft()
+                        if self.pending_pointcloud_messages
+                        else None
+                    )
 
                 if pointcloud_msg is None:
                     break
@@ -252,11 +290,28 @@ class G1CameraMeasurementNode(Node):
                     self.log_warning_once('last_pointcloud_warning', str(exc))
 
                 with self.processing_lock:
-                    self.latest_pointcloud_xyz = pointcloud_xyz
-                    self.latest_pointcloud_rotation = rotation
-                    self.latest_pointcloud_translation = translation
+                    if pointcloud_xyz is not None:
+                        stamp_s = stamp_seconds(pointcloud_msg.header.stamp)
+                        self.pointcloud_buffer.append(
+                            (
+                                stamp_s,
+                                (
+                                    pointcloud_msg,
+                                    pointcloud_xyz,
+                                    rotation,
+                                    translation,
+                                ),
+                            )
+                        )
+                        prune_timestamped_buffer(
+                            self.pointcloud_buffer,
+                            stamp_s,
+                            self.sensor_buffer_max_age_s,
+                        )
 
-                if not self.pointcloud_process_event.is_set():
+                with self.processing_lock:
+                    has_pending = bool(self.pending_pointcloud_messages)
+                if not has_pending and not self.pointcloud_process_event.is_set():
                     break
                 self.pointcloud_process_event.clear()
 
@@ -270,13 +325,44 @@ class G1CameraMeasurementNode(Node):
                 with self.processing_lock:
                     detections_msg = self.latest_detections_msg
                     color_msg = self.latest_color_msg
-                    depth_meters = self.latest_depth_meters
-                    pointcloud_xyz = self.latest_pointcloud_xyz
-                    pointcloud_rotation = self.latest_pointcloud_rotation
-                    pointcloud_translation = self.latest_pointcloud_translation
+                    depth_buffer = list(self.depth_buffer)
+                    pointcloud_buffer = list(self.pointcloud_buffer)
 
                 if detections_msg is None:
                     break
+
+                detection_stamp_s = stamp_seconds(detections_msg.header.stamp)
+                depth_match = select_closest_timestamped(
+                    depth_buffer,
+                    detection_stamp_s,
+                    self.sensor_sync_tolerance_s,
+                )
+                cloud_match = select_closest_timestamped(
+                    pointcloud_buffer,
+                    detection_stamp_s,
+                    self.sensor_sync_tolerance_s,
+                )
+                depth_meters = None
+                if depth_match is not None:
+                    (_, depth_meters), depth_dt_s = depth_match
+                    self._log_sync_match('depth', detection_stamp_s, depth_dt_s)
+                else:
+                    self._log_sync_miss('depth', detection_stamp_s, depth_buffer)
+
+                pointcloud_xyz = None
+                pointcloud_rotation = None
+                pointcloud_translation = None
+                if cloud_match is not None:
+                    cloud_data, cloud_dt_s = cloud_match
+                    (
+                        _,
+                        pointcloud_xyz,
+                        pointcloud_rotation,
+                        pointcloud_translation,
+                    ) = cloud_data
+                    self._log_sync_match('cloud', detection_stamp_s, cloud_dt_s)
+                else:
+                    self._log_sync_miss('cloud', detection_stamp_s, pointcloud_buffer)
 
                 self.process_measurements(
                     detections_msg,
@@ -290,6 +376,46 @@ class G1CameraMeasurementNode(Node):
                 if not self.process_event.is_set():
                     break
                 self.process_event.clear()
+
+    def _sync_log_due(self, source: str) -> bool:
+        now = time.monotonic()
+        if now - self.last_sync_log_monotonic[source] < 2.0:
+            return False
+        self.last_sync_log_monotonic[source] = now
+        return True
+
+    def _log_sync_match(
+        self,
+        source: str,
+        detection_stamp_s: float,
+        dt_s: float,
+    ) -> None:
+        if not self._sync_log_due(source):
+            return
+        sensor_stamp_s = detection_stamp_s + dt_s
+        self.get_logger().info(
+            f'G1 sync: detection_stamp={detection_stamp_s:.3f}, '
+            f'{source}_stamp={sensor_stamp_s:.3f}, dt={dt_s:+.3f} s'
+        )
+
+    def _log_sync_miss(
+        self,
+        source: str,
+        detection_stamp_s: float,
+        samples,
+    ) -> None:
+        if not self._sync_log_due(source):
+            return
+        nearest_dt = (
+            min((abs(stamp_s - detection_stamp_s) for stamp_s, _ in samples), default=None)
+        )
+        nearest_text = 'none' if nearest_dt is None else f'{nearest_dt:.3f} s'
+        self.get_logger().warn(
+            f'G1 sync: no matched {source} frame for '
+            f'detection_stamp={detection_stamp_s:.3f}; '
+            f'nearest_dt={nearest_text}, '
+            f'tolerance={self.sensor_sync_tolerance_s:.3f} s'
+        )
 
     def process_measurements(
         self,

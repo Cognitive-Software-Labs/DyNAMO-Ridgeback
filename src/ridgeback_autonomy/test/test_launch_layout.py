@@ -14,6 +14,7 @@ def test_public_launch_surface_is_limited_to_known_entrypoints() -> None:
         'g1_distance_benchmark.launch.py',
         'manual_mapping.launch.py',
         'ridgeback_exploration.launch.py',
+        'ridgeback_mission.launch.py',
     ]
 
 
@@ -22,6 +23,7 @@ def test_internal_launch_includes_exist_and_are_referenced() -> None:
     includes_dir = launch_dir / 'includes'
 
     expected_includes = [
+        'camera_optical_tf.launch.py',
         'explore.launch.py',
         'nav2.launch.py',
         'simulation.launch.py',
@@ -30,10 +32,22 @@ def test_internal_launch_includes_exist_and_are_referenced() -> None:
     assert sorted(path.name for path in includes_dir.glob('*.launch.py')) == expected_includes
 
     exploration_text = (launch_dir / 'ridgeback_exploration.launch.py').read_text(encoding='utf-8')
+    mission_text = (launch_dir / 'ridgeback_mission.launch.py').read_text(encoding='utf-8')
     benchmark_text = (launch_dir / 'g1_distance_benchmark.launch.py').read_text(encoding='utf-8')
 
     assert 'includes' in exploration_text
+    assert 'includes' in mission_text
     assert 'includes' in benchmark_text
+
+
+def test_authoritative_launches_do_not_start_legacy_parking() -> None:
+    launch_dir = Path(__file__).resolve().parents[1] / 'launch'
+    mission_text = (launch_dir / 'ridgeback_mission.launch.py').read_text(encoding='utf-8')
+    exploration_text = (launch_dir / 'ridgeback_exploration.launch.py').read_text(encoding='utf-8')
+
+    assert "executable='mission_manager_node'" in mission_text
+    assert 'humanoid_parking_node' not in mission_text
+    assert 'humanoid_parking_node' not in exploration_text
 
 
 def test_benchmark_default_world_is_allowed_by_clearpath_simulation() -> None:
@@ -106,11 +120,11 @@ def test_slam_lifecycle_configure_and_activate_are_event_driven() -> None:
         repo_root / 'src' / 'ridgeback_autonomy' / 'launch' / 'includes' / 'slam.launch.py'
     ).read_text(encoding='utf-8')
 
-    assert 'Transition.TRANSITION_CONFIGURE' in slam_text
-    assert 'Transition.TRANSITION_ACTIVATE' in slam_text
-    # Configure is gated on the lifecycle change_state service; activate fires on
-    # the configured-state transition -- no fixed timer periods.
-    assert 'OnStateTransition' in slam_text
+    # Configure is gated on the lifecycle change_state service and activate is
+    # chained from the configure process exit. There are no fixed startup delays.
     assert 'change_state' in slam_text
+    assert "'{transition: {id: 1}}'" in slam_text
+    assert "'{transition: {id: 3}}'" in slam_text
+    assert 'target_action=configure' in slam_text
     assert 'period=2.0' not in slam_text
     assert 'period=8.0' not in slam_text

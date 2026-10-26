@@ -35,4 +35,21 @@ def generate_launch_description():
             remappings=[('/tf', 'tf'), ('/tf_static', 'tf_static')],
             condition=launch.conditions.IfCondition(use_sim_time),
         ),
+
+        Node(
+            package='tf2_ros',
+            executable='static_transform_publisher',
+            name='camera_1_color_optical_tf',
+            namespace=namespace,
+            arguments=[
+                '--x', '0.0', '--y', '0.015', '--z', '0.0',
+                '--roll', '-1.5707963267948966',
+                '--pitch', '0.0',
+                '--yaw', '-1.5707963267948966',
+                '--frame-id', 'camera_1_link',
+                '--child-frame-id', 'camera_1_color_optical_frame',
+            ],
+            remappings=[('/tf', 'tf'), ('/tf_static', 'tf_static')],
+            condition=launch.conditions.IfCondition(use_sim_time),
+        ),
     ])

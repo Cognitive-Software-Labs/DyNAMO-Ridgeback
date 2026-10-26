@@ -198,18 +198,28 @@
       </link>
     </model>
 
-    <model name="room_back_marker">
+    <model name="g1_front_table">
       <static>true</static>
-      <pose>6.9 -5.7 0.15 0 0 0</pose>
+      <pose>6.70 -3.76 0 0 0 0</pose>
       <link name="link">
-        <collision name="collision">
-          <geometry><box><size>0.7 0.7 0.3</size></box></geometry>
+        <collision name="coffee_table_c">
+          <pose>0 0 0.25 0 0 0</pose>
+          <geometry><box><size>0.85 0.55 0.50</size></box></geometry>
         </collision>
-        <visual name="visual">
-          <geometry><box><size>0.7 0.7 0.3</size></box></geometry>
+        <visual name="coffee_table_top">
+          <pose>0 0 0.52 0 0 0</pose>
+          <geometry><box><size>0.95 0.65 0.08</size></box></geometry>
           <material>
-            <ambient>0.25 0.45 0.70 1</ambient>
-            <diffuse>0.25 0.45 0.70 1</diffuse>
+            <ambient>0.74 0.70 0.64 1</ambient>
+            <diffuse>0.74 0.70 0.64 1</diffuse>
+          </material>
+        </visual>
+        <visual name="coffee_table_base">
+          <pose>0 0 0.27 0 0 0</pose>
+          <geometry><box><size>0.55 0.35 0.42</size></box></geometry>
+          <material>
+            <ambient>0.50 0.48 0.44 1</ambient>
+            <diffuse>0.50 0.48 0.44 1</diffuse>
           </material>
         </visual>
       </link>

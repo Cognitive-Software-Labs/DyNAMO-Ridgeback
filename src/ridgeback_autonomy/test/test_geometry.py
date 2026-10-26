@@ -73,7 +73,7 @@ def test_add_depth_measurements_falls_back_to_full_bbox_when_focus_has_no_depth(
     assert batch.detections[0].sensor_depth_distance_m is not None
 
 
-def test_compute_lidar_measurement_returns_vehicle_frame_distance() -> None:
+def test_compute_lidar_measurement_requires_camera_transform() -> None:
     forward = np.array([2.0, 2.1, 1.9], dtype=np.float32)
     lateral = np.array([-0.1, 0.0, 0.1], dtype=np.float32)
     planar = np.hypot(forward, lateral)
@@ -93,11 +93,7 @@ def test_compute_lidar_measurement_returns_vehicle_frame_distance() -> None:
         camera_hfov_rad=math.radians(90.0),
     )
 
-    assert measurement is not None
-    lateral_m, forward_m, distance_m = measurement
-    assert abs(lateral_m) < 0.11
-    assert math.isclose(forward_m, 1.75, rel_tol=1e-5)
-    assert math.isclose(distance_m, math.hypot(lateral_m, forward_m), rel_tol=1e-6)
+    assert measurement is None
 
 
 def test_compute_lidar_measurement_supports_camera_frame_transformations() -> None:

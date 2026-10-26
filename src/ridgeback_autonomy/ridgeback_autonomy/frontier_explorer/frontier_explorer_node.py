@@ -7,6 +7,7 @@ from rclpy.node import Node
 from rclpy.action import ActionClient
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.callback_groups import MutuallyExclusiveCallbackGroup
+from rclpy.qos import DurabilityPolicy, QoSProfile
 
 import numpy as np
 from nav_msgs.msg import OccupancyGrid
@@ -15,7 +16,9 @@ from nav2_msgs.action import NavigateToPose
 from tf2_ros import TransformListener, Buffer
 
 from visualization_msgs.msg import Marker, MarkerArray
+from std_msgs.msg import Bool
 from std_msgs.msg import ColorRGBA
+from std_srvs.srv import SetBool
 from ridgeback_autonomy.frontier_explorer.navigator import (
     get_best_frontier, get_frontier_clusters, update_robot_awareness_from_costmap,
 )
@@ -91,14 +94,7 @@ class FrontierExplorerNode(Node):
         
         # Action client for Nav2 NavigateToPose
         self.nav_client = ActionClient(self, NavigateToPose, 'navigate_to_pose')
-        
-        # Timer for exploration loop
-        self.exploration_timer = self.create_timer(
-            1.0 / self.planner_frequency,
-            self.exploration_callback,
-            callback_group=callback_group_2
-        )
-        
+
         # State variables
         self.robot_awareness_map = None
         self.current_costmap = None
@@ -107,6 +103,10 @@ class FrontierExplorerNode(Node):
         self.current_goal = None
         self.goal_start_time = None
         self._current_goal_handle = None
+        self._exploration_enabled = True
+        self._exploration_active = False
+        self._stop_cancel_in_progress = False
+        self._goal_request_in_flight = False
         # Startup and retry timing (wall clock so it's immune to sim-time jumps)
         self._start_wall_time = _time.time()
         self._retry_after_wall_time = 0.0
@@ -114,12 +114,113 @@ class FrontierExplorerNode(Node):
         self._visited_goals = []
         # Per-goal abort counter: dict of grid_pos -> abort count
         self._abort_counts = {}
+
+        status_qos = QoSProfile(depth=1)
+        status_qos.durability = DurabilityPolicy.TRANSIENT_LOCAL
+        self.exploration_active_publisher = self.create_publisher(
+            Bool,
+            'explore/active',
+            status_qos,
+            callback_group=callback_group_2,
+        )
+        self.exploration_control_service = self.create_service(
+            SetBool,
+            'explore/set_enabled',
+            self._set_exploration_enabled,
+            callback_group=callback_group_2,
+        )
+
+        # Timer for exploration loop
+        self.exploration_timer = self.create_timer(
+            1.0 / self.planner_frequency,
+            self.exploration_callback,
+            callback_group=callback_group_2
+        )
         
         self.get_logger().info(f'Frontier Explorer Node initialized')
         self.get_logger().info(f'  Robot Base Frame: {self.robot_base_frame}')
         self.get_logger().info(f'  Costmap Topic: {self.costmap_topic}')
         self.get_logger().info(f'  Planner Frequency: {self.planner_frequency} Hz')
-        
+        self._publish_exploration_active(False)
+
+    def _publish_exploration_active(self, active: bool) -> None:
+        self._exploration_active = bool(active)
+        msg = Bool()
+        msg.data = bool(active)
+        self.exploration_active_publisher.publish(msg)
+
+    def _exploration_goal_owned(self) -> bool:
+        return (
+            self._current_goal_handle is not None
+            or self._goal_request_in_flight
+            or self._stop_cancel_in_progress
+        )
+
+    def _set_exploration_enabled(
+        self,
+        request: SetBool.Request,
+        response: SetBool.Response,
+    ) -> SetBool.Response:
+        if request.data:
+            self._exploration_enabled = True
+            self._start_wall_time = _time.time()
+            response.success = True
+            response.message = 'Exploration enabled'
+            self.get_logger().info('Exploration enabled')
+            if self._current_goal_handle is None and not self._goal_request_in_flight:
+                self._stop_cancel_in_progress = False
+            self._publish_exploration_active(self._exploration_goal_owned())
+            return response
+
+        self._exploration_enabled = False
+        self.current_goal = None
+        self._retry_after_wall_time = 0.0
+        self.get_logger().info('Stopping exploration')
+
+        if not self._exploration_goal_owned():
+            self._stop_cancel_in_progress = False
+            self._publish_exploration_active(False)
+            response.success = True
+            response.message = 'Exploration stopped'
+            return response
+
+        if self._goal_request_in_flight:
+            response.success = True
+            response.message = 'Exploration stop requested'
+            self.get_logger().info(
+                'Exploration stop requested; waiting for active Nav2 goal to terminate'
+            )
+            self._publish_exploration_active(True)
+            return response
+
+        if not self._stop_cancel_in_progress:
+            self._stop_cancel_in_progress = True
+            goal_handle = self._current_goal_handle
+            self.get_logger().info('Exploration goal cancellation pending')
+            self._publish_exploration_active(True)
+            cancel_future = goal_handle.cancel_goal_async()
+            cancel_future.add_done_callback(
+                lambda future, gh=goal_handle: self._on_stop_cancel_complete(future, gh)
+            )
+
+        response.success = True
+        response.message = 'Exploration stop requested'
+        return response
+
+    def _on_stop_cancel_complete(self, future, goal_handle) -> None:
+        if goal_handle is not self._current_goal_handle:
+            return
+        try:
+            cancel_response = future.result()
+            if cancel_response.goals_canceling:
+                self.get_logger().info(
+                    'Exploration stop requested; waiting for active Nav2 goal to terminate'
+                )
+            else:
+                self.get_logger().info('Exploration navigation goal already inactive')
+        except Exception as error:
+            self.get_logger().warn(f'Exploration goal cancel failed: {error}')
+
     def costmap_callback(self, msg: OccupancyGrid):
         """Receive and process occupancy grid (costmap)."""
         self.current_costmap = msg
@@ -192,6 +293,9 @@ class FrontierExplorerNode(Node):
     
     def exploration_callback(self):
         """Main exploration loop."""
+        if not self._exploration_enabled:
+            self._publish_exploration_active(self._exploration_goal_owned())
+            return
         if self.current_costmap is None or self.robot_awareness_map is None:
             return
         
@@ -254,6 +358,9 @@ class FrontierExplorerNode(Node):
 
     def select_new_frontier_goal(self, robot_pos):
         """Select a new frontier goal."""
+        if not self._exploration_enabled:
+            return
+
         clusters = get_frontier_clusters(self.robot_awareness_map)
         self._publish_frontier_markers(clusters, robot_pos)
 
@@ -444,6 +551,9 @@ class FrontierExplorerNode(Node):
     
     def send_goal_to_nav2(self, target_position):
         """Send goal to Nav2 NavigateToPose action."""
+        if not self._exploration_enabled:
+            return
+
         goal_msg = NavigateToPose.Goal()
         goal_msg.pose = PoseStamped()
         goal_msg.pose.header.frame_id = self.current_costmap.header.frame_id
@@ -459,18 +569,46 @@ class FrontierExplorerNode(Node):
         if not self.nav_client.wait_for_server(timeout_sec=1.0):
             self.get_logger().warn('NavigateToPose action server not available')
             return
-        
+
+        self._goal_request_in_flight = True
+        self._exploration_active = True
+        self._publish_exploration_active(True)
         send_future = self.nav_client.send_goal_async(goal_msg)
         send_future.add_done_callback(self._goal_response_callback)
 
     def _goal_response_callback(self, future):
         """Handle goal acceptance; attach result callback."""
-        goal_handle = future.result()
+        self._goal_request_in_flight = False
+        try:
+            goal_handle = future.result()
+        except Exception as error:
+            self.get_logger().warn(f'Goal request failed: {error}')
+            self.current_goal = None
+            self._exploration_active = False
+            self._publish_exploration_active(False)
+            return
         if not goal_handle.accepted:
             self.get_logger().warn('Goal rejected by Nav2, will retry.')
             self.current_goal = None
+            self._exploration_active = False
+            self._publish_exploration_active(False)
             return
+
+        if not self._exploration_enabled:
+            self._current_goal_handle = goal_handle
+            self._stop_cancel_in_progress = True
+            self._publish_exploration_active(True)
+            goal_handle.get_result_async().add_done_callback(
+                lambda f, gh=goal_handle: self._goal_result_callback(f, gh)
+            )
+            cancel_future = goal_handle.cancel_goal_async()
+            cancel_future.add_done_callback(
+                lambda f, gh=goal_handle: self._on_stop_cancel_complete(f, gh)
+            )
+            return
+
         self._current_goal_handle = goal_handle
+        self._publish_exploration_active(True)
         # Pass the handle through the closure so result callback can ignore stale results
         goal_handle.get_result_async().add_done_callback(
             lambda f, gh=goal_handle: self._goal_result_callback(f, gh)
@@ -483,6 +621,20 @@ class FrontierExplorerNode(Node):
             return
         from action_msgs.msg import GoalStatus
         status = future.result().status
+        status_name = self._goal_status_name(status)
+        if not self._exploration_enabled:
+            self.get_logger().info(
+                f'Exploration goal reached terminal state: {status_name}'
+            )
+            self.current_goal = None
+            self._current_goal_handle = None
+            self._stop_cancel_in_progress = False
+            self._publish_exploration_active(False)
+            self.get_logger().info('Exploration Nav2 goal fully settled; explorer inactive')
+            return
+
+        self._publish_exploration_active(False)
+
         if status == GoalStatus.STATUS_SUCCEEDED:
             self.get_logger().info('Goal succeeded, selecting next frontier.')
             if self.current_goal is not None:
@@ -502,6 +654,19 @@ class FrontierExplorerNode(Node):
                     self._abort_counts.pop(key, None)
         self.current_goal = None
         self._current_goal_handle = None
+
+    def _goal_status_name(self, status: int) -> str:
+        from action_msgs.msg import GoalStatus
+        names = {
+            GoalStatus.STATUS_UNKNOWN: 'UNKNOWN',
+            GoalStatus.STATUS_ACCEPTED: 'ACCEPTED',
+            GoalStatus.STATUS_EXECUTING: 'EXECUTING',
+            GoalStatus.STATUS_CANCELING: 'CANCELING',
+            GoalStatus.STATUS_SUCCEEDED: 'SUCCEEDED',
+            GoalStatus.STATUS_CANCELED: 'CANCELED',
+            GoalStatus.STATUS_ABORTED: 'ABORTED',
+        }
+        return names.get(status, str(status))
 
 
 def main(args=None):

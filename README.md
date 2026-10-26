@@ -122,7 +122,11 @@ perception_venv/bin/python3 -m pip install -r requirements-perception.txt
 > and silently runs Depth-Anything / OWLv2 on the CPU. For a different
 > GPU/CUDA, change the index URL + torch pins in that file.
 
-Both public launch files automatically prepend `perception_venv/bin` to `PATH` and set `VIRTUAL_ENV` for the perception nodes. When you launch with `g1_perception_enabled:=true`, the first run will download the OWLv2 detector from Hugging Face. If you also pass `depth_anything_enabled:=true`, the first run will download the Depth-Anything V2 metric checkpoint.
+The public launches that use perception automatically prepend
+`perception_venv/bin` to `PATH` and set `VIRTUAL_ENV` for the perception nodes.
+The first OWLv2 run downloads the detector from Hugging Face. If you also pass
+`depth_anything_enabled:=true`, the first run downloads the Depth-Anything V2
+metric checkpoint.
 
 ### 4. (Optional) Install graphify post-commit hook
 
@@ -154,15 +158,57 @@ cd /path/to/DyNAMO-Ridgeback
 source install/setup.bash
 ```
 
-The package now exposes 2 public launch entrypoints:
+The package exposes these public launch entrypoints:
+- `ridgeback_mission.launch.py` — authoritative thesis mission
 - `ridgeback_exploration.launch.py`
 - `g1_distance_benchmark.launch.py`
+- `manual_mapping.launch.py`
 
 The lower-level simulation, SLAM, Nav2, and frontier-exploration launches live under `launch/includes/` and are treated as internal launch building blocks rather than public entrypoints.
 
+### `ridgeback_mission.launch.py`
+
+This is the canonical complete thesis mission. It launches the `park_robot`
+world by default, live SLAM, Nav2, the custom frontier explorer, OWLv2 and
+RGB-D G1 perception, `mission_manager_node`, and the clean thesis RViz view.
+The mission manager is the only parking owner.
+
+```bash
+cd /path/to/DyNAMO-Ridgeback
+bash cleanup.sh
+source /opt/ros/jazzy/setup.bash
+source install/setup.bash
+ros2 launch ridgeback_autonomy ridgeback_mission.launch.py
+```
+
+The canonical mission centers G1 with bounded in-place yaw corrections before
+metric localization. The older translating A/B observation experiment is off
+by default and can be enabled explicitly with
+`enable_translating_g1_observation:=true` for diagnostics.
+
+The thesis RViz view shows parking-candidate decisions on
+`/r100_0001/visualization/parking_pose_candidates`: gray is awaiting Nav2
+evaluation, green is feasible, red is a footprint/path collision, yellow is
+another rejection, and the selected pose is a larger blue arrow. Candidate
+labels and the real lexicographic ranking metrics are off by default:
+
+```bash
+ros2 launch ridgeback_autonomy ridgeback_mission.launch.py \
+  parking_candidate_labels_enabled:=true \
+  parking_candidate_scores_enabled:=true
+```
+
+Set `parking_candidate_arrows_enabled:=false` to clear and hide the candidate
+decision markers while retaining the rest of the thesis view.
+
+Specialized historical and diagnostic mission launches are kept under
+`launch/experimental/`; they are not the supported full-mission entrypoint.
+
 ### `ridgeback_exploration.launch.py`
 
-Launches Gazebo, SLAM, Nav2, frontier exploration, and the G1 perception stack in sequence:
+Launches Gazebo, SLAM, Nav2, frontier exploration, and the G1 perception stack
+without starting any parking controller. Use it for exploration/perception
+development; use `ridgeback_mission.launch.py` for the complete mission.
 
 1. Gazebo + Ridgeback spawn
 2. Exploration RViz config

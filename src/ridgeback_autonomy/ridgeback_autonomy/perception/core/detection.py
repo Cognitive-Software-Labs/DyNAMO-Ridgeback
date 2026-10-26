@@ -8,7 +8,7 @@ from ridgeback_autonomy.common.models import Detection, DetectionBatch
 
 DETECTION_MODEL_DEFAULT = 'google/owlv2-base-patch16-ensemble'
 DETECTION_LABELS = ['humanoid robot']
-DETECTION_THRESHOLD = 0.55
+DETECTION_THRESHOLD = 0.50
 NMS_IOU_THRESHOLD = 0.5
 
 

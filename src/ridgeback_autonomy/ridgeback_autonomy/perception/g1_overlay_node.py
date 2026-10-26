@@ -36,6 +36,7 @@ class G1OverlayNode(Node):
         self.declare_parameter('color_topic', 'sensors/camera_0/color/image')
         self.declare_parameter('depth_topic', 'sensors/camera_0/depth/image')
         self.declare_parameter('mono_depth_debug_topic', MONO_DEPTH_DEBUG_TOPIC)
+        self.declare_parameter('overlay_image_topic', 'visualization/g1/overlay_image')
         self.declare_parameter('depth_max_meters', DEPTH_MAX_METERS_DEFAULT)
         self.declare_parameter('render_fps', RENDER_FPS_DEFAULT)
         self.declare_parameter('window_name', 'G1 Perception')
@@ -45,6 +46,7 @@ class G1OverlayNode(Node):
         self.color_topic = self.get_parameter('color_topic').value
         self.depth_topic = self.get_parameter('depth_topic').value
         self.mono_depth_debug_topic = self.get_parameter('mono_depth_debug_topic').value
+        self.overlay_image_topic = self.get_parameter('overlay_image_topic').value
         self.depth_max_meters = float(self.get_parameter('depth_max_meters').value)
         self.render_fps = max(1.0, float(self.get_parameter('render_fps').value))
         self.window_name = self.get_parameter('window_name').value
@@ -88,6 +90,11 @@ class G1OverlayNode(Node):
             self.mono_depth_debug_topic,
             self.mono_depth_callback,
             qos_profile=qos_profile_sensor_data,
+        )
+        self.overlay_image_pub = self.create_publisher(
+            Image,
+            self.overlay_image_topic,
+            10,
         )
         self.render_timer = self.create_timer(1.0 / self.render_fps, self.render_callback)
 
@@ -158,8 +165,20 @@ class G1OverlayNode(Node):
             None,
             None,
         )
+        self.publish_overlay_image(annotated, self.latest_color_msg)
         cv2.imshow(self.window_name, annotated)
         cv2.waitKey(1)
+
+    def publish_overlay_image(self, image, source_msg: Image) -> None:
+        overlay_msg = Image()
+        overlay_msg.header = source_msg.header
+        overlay_msg.height = image.shape[0]
+        overlay_msg.width = image.shape[1]
+        overlay_msg.encoding = 'bgr8'
+        overlay_msg.is_bigendian = 0
+        overlay_msg.step = image.shape[1] * image.shape[2]
+        overlay_msg.data = image.tobytes()
+        self.overlay_image_pub.publish(overlay_msg)
 
     # Camera and lidar measurements come from independent pipelines running at
     # different rates, so they almost never share the exact same detection

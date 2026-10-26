@@ -7,9 +7,7 @@ from launch.actions import (
 )
 from launch.event_handlers import OnProcessExit
 from launch.substitutions import LaunchConfiguration
-from launch_ros.actions import LifecycleNode, LifecycleTransition
-from launch_ros.event_handlers import OnStateTransition
-from lifecycle_msgs.msg import Transition
+from launch_ros.actions import LifecycleNode
 
 from clearpath_config.clearpath_config import ClearpathConfig
 from clearpath_config.common.utils.yaml import read_yaml
@@ -57,21 +55,35 @@ def launch_setup(context, *args, **kwargs):
     )
 
     # Event-driven lifecycle (replaces fixed 2s/8s timers): configure once the
-    # node's change_state service is up, then activate as soon as it reports
-    # 'inactive' (i.e. configured).
+    # node's change_state service is up, then activate after configure returns.
+    # Chaining explicit ChangeState service calls avoids a startup race where
+    # the configure transition can complete under load without the launch event
+    # handler reliably observing the transient inactive state.
     gate_configure = ExecuteProcess(
         cmd=['ros2', 'run', 'ridgeback_autonomy', 'launch_wait',
              '--service', f'/{namespace}/slam_toolbox/change_state',
              '--timeout', '30'],
         name='gate_slam_configure', output='screen',
     )
-    configure = LifecycleTransition(
-        lifecycle_node_names=[f'/{namespace}/slam_toolbox'],
-        transition_ids=[Transition.TRANSITION_CONFIGURE],
+    configure = ExecuteProcess(
+        cmd=[
+            'ros2', 'service', 'call',
+            f'/{namespace}/slam_toolbox/change_state',
+            'lifecycle_msgs/srv/ChangeState',
+            '{transition: {id: 1}}',
+        ],
+        name='configure_slam_toolbox',
+        output='screen',
     )
-    activate = LifecycleTransition(
-        lifecycle_node_names=[f'/{namespace}/slam_toolbox'],
-        transition_ids=[Transition.TRANSITION_ACTIVATE],
+    activate = ExecuteProcess(
+        cmd=[
+            'ros2', 'service', 'call',
+            f'/{namespace}/slam_toolbox/change_state',
+            'lifecycle_msgs/srv/ChangeState',
+            '{transition: {id: 3}}',
+        ],
+        name='activate_slam_toolbox',
+        output='screen',
     )
 
     return [
@@ -80,9 +92,8 @@ def launch_setup(context, *args, **kwargs):
         RegisterEventHandler(OnProcessExit(
             target_action=gate_configure, on_exit=[configure],
         )),
-        RegisterEventHandler(OnStateTransition(
-            target_lifecycle_node=slam_node, goal_state='inactive',
-            entities=[activate],
+        RegisterEventHandler(OnProcessExit(
+            target_action=configure, on_exit=[activate],
         )),
     ]
 
