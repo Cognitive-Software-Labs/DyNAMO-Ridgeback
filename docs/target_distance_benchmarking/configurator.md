@@ -33,7 +33,9 @@ defaults block above them holds the two axes a live sweep states once rather
 than per config — `scenario` and `repeats` — because a sweep authored without
 them silently inherits the packaged 88-scene set at five repeats. Browser inputs
 yield text, so the authored document is typed before it is written; the file
-sits beside hand-written sweeps and has to read like them.
+sits beside hand-written sweeps and has to read like them. The page offers no
+`backend`, so an authored sweep runs on the default `gz`. An Isaac sweep has to
+be a named file whose `defaults` set `backend: isaac`.
 
 Authoring changes the job contract: `parse_job` accepts an inline sweep document
 for `live-system`, where it previously demanded a path. The inline form exists so

@@ -1,6 +1,6 @@
 #!/bin/bash
 # Verify pinned dependency revisions and optionally apply the recorded patches.
-# Usage: tools/check_dependencies [--apply] [--profile core|gz|all]
+# Usage: tools/check_dependencies [--apply] [--profile core|gz|viz|all]
 
 set -u
 
@@ -19,7 +19,7 @@ while [ "$#" -gt 0 ]; do
             PROFILE="${1:-}"
             ;;
         *)
-            echo "Usage: tools/check_dependencies [--apply] [--profile core|gz|all]" >&2
+            echo "Usage: tools/check_dependencies [--apply] [--profile core|gz|viz|all]" >&2
             exit 2
             ;;
     esac
@@ -29,19 +29,37 @@ done
 case "$PROFILE" in
     core) MANIFESTS=("$REPO_ROOT/dependencies/core.repos") ;;
     gz) MANIFESTS=("$REPO_ROOT/dependencies/gz.repos") ;;
+    viz) MANIFESTS=("$REPO_ROOT/dependencies/viz.repos") ;;
     all) MANIFESTS=("$REPO_ROOT/dependencies/core.repos"
-                    "$REPO_ROOT/dependencies/gz.repos") ;;
+                    "$REPO_ROOT/dependencies/gz.repos"
+                    "$REPO_ROOT/dependencies/viz.repos") ;;
     *)
         echo "Unknown dependency profile: $PROFILE" >&2
         exit 2
         ;;
 esac
 
+# Recorded patches per checkout, as an ordered, whitespace-separated list. Each
+# patch applies on top of the ones before it; the checkout must contain exactly
+# their combined change.
 declare -A PATCHES=(
     [src/clearpath_simulator]="patches/clearpath_gz_customizations.patch"
-    [src/clearpath_common]="patches/clearpath_realsense_sim_frames.patch"
+    [src/clearpath_common]="patches/clearpath_realsense_sim_frames.patch patches/clearpath_ust10lx_sim_lidar.patch"
     [src/slam_toolbox]="patches/slam_toolbox_tf_namespace.patch"
     [src/urg_node]="patches/urg_node_reconnect_recovery.patch"
+    [src/gz-sim]="patches/gz_sim_sensors_shutdown.patch"
+    [src/ros_gz]="patches/ros_gz_bridge_shutdown.patch"
+    [src/rviz]="patches/rviz_shutdown.patch"
+)
+
+# Partial overlays: checkouts of which only the listed top-level packages are
+# built. Every other package directory carries an untracked, empty
+# COLCON_IGNORE, so the overlay replaces exactly the patched packages and the
+# rest keep resolving to the installed binaries.
+declare -A BUILD_ONLY=(
+    [src/ros_gz]="ros_gz_bridge ros_gz_image"
+    # rviz_default_plugins requires the testing framework when BUILD_TESTING is on.
+    [src/rviz]="rviz_common rviz_default_plugins rviz_visual_testing_framework"
 )
 
 if ! dependency_text="$(python3 - "${MANIFESTS[@]}" <<'PY'
@@ -77,23 +95,204 @@ fail() {
     failures=$((failures + 1))
 }
 
-patch_matches_checkout() {
+# The COLCON_IGNORE markers a partial overlay needs: one for every top-level
+# package directory that is not kept, unless upstream already ignores it.
+expected_build_markers() {
+    local checkout="$1"
+    shift
+    local -A kept=()
+    local package manifest directory
+    for package in "$@"; do
+        kept["$package"]=1
+    done
+    for manifest in "$checkout"/*/package.xml; do
+        [ -e "$manifest" ] || continue
+        directory="$(basename "$(dirname "$manifest")")"
+        [ -n "${kept[$directory]:-}" ] && continue
+        if [ -n "$(git -C "$checkout" ls-files -- "$directory/COLCON_IGNORE" \
+                "$directory/AMENT_IGNORE" "$directory/CATKIN_IGNORE")" ]; then
+            continue
+        fi
+        echo "$directory/COLCON_IGNORE"
+    done
+}
+
+# Check, and with --apply complete, a partial overlay's build markers. Prints
+# nothing and returns 0 when the checkout builds exactly its kept packages.
+check_build_markers() {
+    local relative_path="$1"
+    local checkout="$2"
+    local -a kept
+    read -r -a kept <<< "${BUILD_ONLY[$relative_path]}"
+    local package marker problems=0
+    for package in "${kept[@]}"; do
+        if [ ! -f "$checkout/$package/package.xml" ]; then
+            fail "$relative_path has no package $package to build"
+            problems=1
+        fi
+        for marker in COLCON_IGNORE AMENT_IGNORE CATKIN_IGNORE; do
+            if [ -e "$checkout/$package/$marker" ]; then
+                fail "$relative_path/$package must be built but contains $marker"
+                problems=1
+            fi
+        done
+    done
+    [ "$problems" -eq 0 ] || return 1
+
+    local -A expected=()
+    local -a missing=()
+    while IFS= read -r marker; do
+        [ -n "$marker" ] || continue
+        expected["$marker"]=1
+        [ -e "$checkout/$marker" ] || missing+=("$marker")
+    done < <(expected_build_markers "$checkout" "${kept[@]}")
+
+    local untracked unexpected=()
+    while IFS= read -r untracked; do
+        [ -n "$untracked" ] || continue
+        [ -n "${expected[$untracked]:-}" ] || unexpected+=("$untracked")
+    done < <(git -C "$checkout" ls-files --others --exclude-standard)
+    if [ "${#unexpected[@]}" -ne 0 ]; then
+        local joined
+        joined="$(printf '%s, ' "${unexpected[@]}")"
+        fail "$relative_path has untracked files: ${joined%, }"
+        return 1
+    fi
+
+    if [ "${#missing[@]}" -ne 0 ]; then
+        if [ "$APPLY_PATCHES" = false ]; then
+            fail "$relative_path is missing ${#missing[@]} COLCON_IGNORE marker(s); rerun with --apply"
+            return 1
+        fi
+        for marker in "${missing[@]}"; do
+            : > "$checkout/$marker"
+        done
+        echo "MARKED: ${#missing[@]} package(s) of $relative_path skipped by colcon"
+    fi
+    return 0
+}
+
+# Record the files a patch creates as intent-to-add, so they are part of
+# `git diff HEAD` instead of untracked files. (`git apply --intent-to-add`
+# itself empties the index in Git before 2.44.)
+mark_created_files() {
     local patch="$1"
     local checkout="$2"
-    # Git-generated diffs prefix a blank context line with one space. Recorded
-    # patch files omit that otherwise-trailing byte so the root repository's
-    # own `git diff --check` stays clean. Normalize only this no-content case;
-    # every behavior-bearing byte must still match exactly.
-    diff -q \
-        <(sed 's/^ $//' "$patch") \
-        <(git -C "$checkout" diff --no-ext-diff HEAD -- | sed 's/^ $//') \
-        >/dev/null
+    local -a created=()
+    local line
+    while IFS= read -r line; do
+        created+=("${line##* create mode * }")
+    done < <(git -C "$checkout" apply --summary "$patch" | grep '^ create mode ')
+    [ "${#created[@]}" -eq 0 ] || git -C "$checkout" add --intent-to-add -- "${created[@]}"
+}
+
+# Git-generated diffs prefix a blank context line with one space. Recorded
+# patch files omit that otherwise-trailing byte so the root repository's own
+# `git diff --check` stays clean. Normalize only this no-content case; every
+# behavior-bearing byte must still match exactly.
+normalized_diff() {
+    sed 's/^ $//'
+}
+
+# Write into WORK the diff the checkout must show with its first k recorded
+# patches applied, as expected_<k> (normalized) for every k, plus the raw
+# combined diff as combined.patch. The patches are applied in order to a
+# temporary index, never the working tree. Each must apply on top of the ones
+# before it and be exactly the diff Git generates for its own step.
+expected_patch_diffs() {
+    local checkout="$1"
+    local work="$2"
+    shift 2
+    local -a patches=("$@")
+    local index="$work/index" base previous tree k=0 patch
+    base="$(git -C "$checkout" rev-parse 'HEAD^{tree}')" || return 1
+    GIT_INDEX_FILE="$index" git -C "$checkout" read-tree "$base" || return 1
+    : > "$work/expected_0"
+    previous="$base"
+    for patch in "${patches[@]}"; do
+        k=$((k + 1))
+        if ! GIT_INDEX_FILE="$index" \
+                git -C "$checkout" apply --cached "$REPO_ROOT/$patch" 2>/dev/null; then
+            if [ "$k" -eq 1 ]; then
+                fail "$patch is neither cleanly applied nor cleanly applicable"
+            else
+                fail "$patch does not apply on top of ${patches[k - 2]}"
+            fi
+            return 1
+        fi
+        tree="$(GIT_INDEX_FILE="$index" git -C "$checkout" write-tree)" || return 1
+        if ! cmp -s <(normalized_diff < "$REPO_ROOT/$patch") \
+                <(git -C "$checkout" diff --no-ext-diff "$previous" "$tree" -- | normalized_diff); then
+            fail "$patch is not the diff Git generates for its change; re-record it"
+            return 1
+        fi
+        git -C "$checkout" diff --no-ext-diff "$base" "$tree" -- > "$work/combined.patch"
+        normalized_diff < "$work/combined.patch" > "$work/expected_$k"
+        previous="$tree"
+    done
+}
+
+# Verify, and with --apply complete, a checkout's ordered recorded patches.
+check_patches() {
+    local relative_path="$1"
+    local checkout="$2"
+    local revision="$3"
+    shift 3
+    local -a patches=("$@")
+    local count="${#patches[@]}"
+    local label work applied=-1 k
+    label="$(printf '%s, ' "${patches[@]}")"
+    label="${label%, }"
+    work="$(mktemp -d)" || return 1
+
+    if ! expected_patch_diffs "$checkout" "$work" "${patches[@]}"; then
+        rm -rf "$work"
+        return 1
+    fi
+    git -C "$checkout" diff --no-ext-diff HEAD -- | normalized_diff > "$work/actual"
+    for ((k = count; k >= 0; k--)); do
+        if cmp -s "$work/expected_$k" "$work/actual"; then
+            applied="$k"
+            break
+        fi
+    done
+
+    if [ "$applied" -eq "$count" ]; then
+        echo "OK: $relative_path @ ${revision:0:8} ($label applied)"
+    elif [ "$applied" -lt 0 ]; then
+        if git -C "$checkout" apply --reverse --check "$work/combined.patch" >/dev/null 2>&1; then
+            fail "$relative_path contains changes beyond $label"
+        else
+            fail "$label is neither cleanly applied nor cleanly applicable"
+        fi
+    elif [ "$APPLY_PATCHES" = false ]; then
+        local missing verb=is
+        missing="$(printf '%s, ' "${patches[@]:applied}")"
+        [ $((count - applied)) -eq 1 ] || verb=are
+        fail "${missing%, } $verb not applied; rerun with --apply"
+    else
+        local patch
+        for patch in "${patches[@]:applied}"; do
+            if ! git -C "$checkout" apply "$REPO_ROOT/$patch" ||
+               ! mark_created_files "$REPO_ROOT/$patch" "$checkout"; then
+                fail "$patch did not apply to $relative_path"
+                rm -rf "$work"
+                return 1
+            fi
+            echo "APPLIED: $patch to $relative_path @ ${revision:0:8}"
+        done
+        git -C "$checkout" diff --no-ext-diff HEAD -- | normalized_diff > "$work/actual"
+        if ! cmp -s "$work/expected_$count" "$work/actual"; then
+            fail "$label did not produce the recorded dependency diff"
+        fi
+    fi
+    rm -rf "$work"
 }
 
 for dependency in "${DEPENDENCIES[@]}"; do
     IFS=$'\t' read -r relative_path expected_revision <<< "$dependency"
     checkout="$CHECKOUT_ROOT/$relative_path"
-    patch_relative="${PATCHES[$relative_path]:-}"
+    read -r -a patch_list <<< "${PATCHES[$relative_path]:-}"
 
     if [ ! -e "$checkout/.git" ]; then
         fail "$relative_path is missing; import the $PROFILE dependency profile"
@@ -106,13 +305,17 @@ for dependency in "${DEPENDENCIES[@]}"; do
         continue
     fi
 
-    untracked="$(git -C "$checkout" ls-files --others --exclude-standard)"
-    if [ -n "$untracked" ]; then
-        fail "$relative_path has untracked files: ${untracked//$'\n'/, }"
-        continue
+    if [ -n "${BUILD_ONLY[$relative_path]:-}" ]; then
+        check_build_markers "$relative_path" "$checkout" || continue
+    else
+        untracked="$(git -C "$checkout" ls-files --others --exclude-standard)"
+        if [ -n "$untracked" ]; then
+            fail "$relative_path has untracked files: ${untracked//$'\n'/, }"
+            continue
+        fi
     fi
 
-    if [ -z "$patch_relative" ]; then
+    if [ "${#patch_list[@]}" -eq 0 ]; then
         if git -C "$checkout" diff --quiet HEAD --; then
             echo "OK: $relative_path @ ${expected_revision:0:8} (clean)"
         else
@@ -121,32 +324,7 @@ for dependency in "${DEPENDENCIES[@]}"; do
         continue
     fi
 
-    patch="$REPO_ROOT/$patch_relative"
-    if git -C "$checkout" apply --reverse --check "$patch" >/dev/null 2>&1; then
-        if patch_matches_checkout "$patch" "$checkout"; then
-            echo "OK: $relative_path @ ${expected_revision:0:8} ($patch_relative applied)"
-        else
-            fail "$relative_path contains changes beyond $patch_relative"
-        fi
-        continue
-    fi
-
-    if ! git -C "$checkout" apply --check "$patch" >/dev/null 2>&1; then
-        fail "$patch_relative is neither cleanly applied nor cleanly applicable"
-        continue
-    fi
-
-    if [ "$APPLY_PATCHES" = false ]; then
-        fail "$patch_relative is not applied; rerun with --apply"
-        continue
-    fi
-
-    if git -C "$checkout" apply "$patch" &&
-       patch_matches_checkout "$patch" "$checkout"; then
-        echo "APPLIED: $patch_relative to $relative_path @ ${expected_revision:0:8}"
-    else
-        fail "$patch_relative did not produce the recorded dependency diff"
-    fi
+    check_patches "$relative_path" "$checkout" "$expected_revision" "${patch_list[@]}"
 done
 
 if [ "$failures" -ne 0 ]; then

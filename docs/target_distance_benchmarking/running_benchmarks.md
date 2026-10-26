@@ -54,6 +54,22 @@ work. Preflight cleanup no longer kills the configurator
 ([troubleshooting](../troubleshooting.md#what-cleanupsh-leaves-alone)). The configurator can still author,
 validate, and render a live sweep command — it just cannot press Start on one.
 
+## Which simulator
+
+`backend` selects Gazebo (`gz`, the default) or Isaac Sim (`isaac`) for a live run
+or for a sweep's persistent environment. Everything downstream of the simulator
+is the same on both: scenario file, runner, estimators, scoring, and reports.
+- **One simulator per run.** A sweep may set `backend` and its backend-only
+  settings only under `defaults`. Setting the other backend's options (for
+  example `gz_gui` on Isaac) is refused, and so is `hardware`, which has no
+  scene control and no ground truth.
+- **What each run records.** Every run records which simulator, which native
+  world, and which asset catalog produced it.
+- **Offline replay.** It reads captures and does not care which simulator made
+  them. The capture manifest itself does not name the simulator, though: only
+  the `run.json` of the live run that wrote it does, so keep the two together.
+- **Comparing the two simulators:** see [semantics](semantics.md#scenario-and-comparison-discipline).
+
 `camera_profile` selects `640x480` (default) or `1280x720`, and is recorded in
 every run. A sweep may set it only under top-level `defaults`; it cannot vary
 per configuration, because changing the render grid requires restarting the

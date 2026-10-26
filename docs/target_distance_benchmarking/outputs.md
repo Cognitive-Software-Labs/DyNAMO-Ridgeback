@@ -21,6 +21,21 @@ detector/gate/no-value misses; extra detections; observation totals/OK/coverage;
 and `reason_histogram`. A nonzero `uncommitted_files` means the commit alone does
 not reproduce the run.
 
+The run also names its simulator:
+- `run.backend`, `run.world` (the public name) and `run.native_world`.
+- `run.simulation`:
+  - the backend and both world names;
+  - the normalized backend-only `settings`, and the camera profile;
+  - the adapter package and version;
+  - the simulator name and version (and, for Isaac, its interpreter);
+  - the scene-control service namespace and its reported features;
+  - the asset catalog's schema, path and SHA-256, with every resolved resource;
+  - a readiness timeline: services available, first clock, clock advancing,
+    and first spawn.
+- `parameters` repeats `backend` and `backend_settings`.
+- `summary.md` names the backend, the world (with its native name when it
+  differs) and the catalog.
+
 CSV rows include trial/scene/instance and spawn truth; estimator/outcome/reason;
 estimate and absolute/relative error; usable events and captured frames; and
 collage path. Read `run.json` for run-level statistics and CSVs for instance rows.
@@ -45,10 +60,31 @@ does not fail a trial. Collages are evidence aids, not machine-readable truth.
 ## Sweep outputs
 
 `target_benchmark_sweep` validates YAML, starts one persistent environment,
-runs one restartable config at a time, resumes configs only from valid `run.json`,
+runs one restartable config at a time, resumes configs only from valid `run.json`
+without a recorded launch or configuration-shutdown failure,
 records real-time factor plus sweep/scenario SHA-256 provenance, and emits
-`sweep.json` plus `summary.md`. Do not replace process restarts with runtime
+`sweep.json` plus `summary.md`. `sweep.json` carries the same `simulation`
+record as each run. Its resume signature includes the backend, the normalized
+backend settings, the native world, and the catalog bytes, so a sweep never
+resumes onto a different simulator or catalog. Do not replace process restarts with runtime
 estimator mutation: selected rows determine node existence.
+
+Each configuration records `output_valid`, `launch_returncode`, and `shutdown`.
+A valid `run.json` remains available after a process or shutdown failure, but
+does not make that configuration successful or eligible for automatic reuse
+after a recorded nonzero launch status, escalation, incomplete session cleanup,
+or cleanup error. Retrying preserves those measurements in a sibling
+`.incomplete_*` directory. Older records without lifecycle fields retain their
+existing compatibility behavior; absence is not new lifecycle proof.
+
+`lifecycle.groups` records the final owned-group stop results; `lifecycle.errors`
+retains cleanup failures and `lifecycle.clean` describes that final cleanup.
+Each stop result records leader status, signals, recorder-specific signals,
+escalation, and whether living group members remain. A configuration can fail
+before a later clean final cleanup, so inspect both its status and the lifecycle.
+The human-readable sweep summary surfaces shutdown failures alongside retained
+comparison rows. Neither saved measurements nor launcher exit zero establishes
+that every child stopped cleanly.
 
 For model-throughput investigations, `depth_match_debug:=true` also emits a
 bounded mask-worker timing summary. Each distribution retains the first five
@@ -97,6 +133,12 @@ old name is reported.
 - `reduction.py`: usable-event and status-histogram reduction;
 - `trial_results.py`: instance rows and annotations;
 - `summary.py`: reports; `rendering.py`: collages;
+- `backends.py`: the registered simulators, their adapter packages and
+  backend-only settings, and refusal of `hardware`;
+- `asset_catalog.py`: logical-name-to-resource catalogs and native worlds;
+- `scene_control.py`: the simulator-neutral `simulation_interfaces` client
+  (bounded calls, ownership of `bench_*` names, readiness, rollback);
+- `simulation.py`: pose normalization and ground-truth instances;
 - `target_distance_benchmark_runner_node.py`: ROS orchestration and lifecycle;
 - `sweep.py`, `target_benchmark_sweep.py`, `sweep_report.py`: sweep domain,
 supervisor, and reporting.

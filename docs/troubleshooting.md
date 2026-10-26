@@ -48,8 +48,35 @@ it restarts only the configuration layer.
 Two `gz sim server` processes indicate that a stale single-run environment was
 not cleaned. Gazebo transport may then spawn a target in one server and query
 its pose from the other, producing a misleading `Target pose ... not present`
-failure. Clean once and restart the sweep. A valid `run.json` lets the supervisor
-resume completed configurations.
+failure. Clean once and restart the sweep. The supervisor reuses valid `run.json`
+only when no recorded launch or configuration-shutdown failure disqualifies it;
+see [lifecycle provenance](target_distance_benchmarking/outputs.md#sweep-outputs).
+
+## Benchmark shutdown failures
+
+Use the public single-run wrapper or sweep so configuration rollback finishes
+before its simulator stops. Interrupt the owner once; it owns bounded cleanup
+and coalesces further cleanup signals. A saved result does not establish a clean
+exit: inspect the child failure and lifecycle fields before resuming.
+
+For an RViz unsubscribe abort or a late process-exit SIGSEGV, verify that the
+[RViz shutdown overlay](project/dependencies.md#rviz-shutdown-ownership-patch)
+is applied and that the exact RViz PID loaded both patched libraries. The Image
+subscription and view-controller ownership defects are separate mechanisms.
+
+Two bounded probes help isolate the failing boundary from a sourced workspace:
+
+```bash
+python3 tools/diagnostics/scene_shutdown_probe.py --supervised --repetitions 3 \
+  --output artifacts/benchmarks/scene_shutdown_probe
+python3 tools/diagnostics/rviz_shutdown_probe.py --configs empty tf image
+```
+
+The scene probe uses real Gazebo physics and scene services without sensors.
+The RViz probe uses an owned virtual display and software rendering; it tests
+process lifetime, not the native GPU workload. Both need host DDS access and
+record readiness, process status, escalation, and loaded-library evidence.
+Full benchmark traffic remains a separate qualification population.
 
 ### What `cleanup.sh` leaves alone
 

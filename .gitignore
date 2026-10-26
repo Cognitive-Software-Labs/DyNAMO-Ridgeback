@@ -20,6 +20,9 @@ src/clearpath_config/
 src/clearpath_msgs/
 src/slam_toolbox/
 src/urg_node/
+src/gz-sim/
+src/ros_gz/
+src/rviz/
 
 # Python virtual environments
 vlm_venv/

@@ -27,7 +27,6 @@ from ridgeback_autonomy.benchmarking.naming import (
     benchmark_output_name,
 )
 from ridgeback_autonomy.benchmarking.process_utils import (
-    extract_json_payload,
     format_commit,
     git_provenance,
     parse_gl_renderer,
@@ -48,6 +47,26 @@ from ridgeback_autonomy.benchmarking.rendering import BenchmarkCollageRenderer
 from ridgeback_autonomy.benchmarking.summary import build_summary_rows
 from ridgeback_common.models import Detection
 from ridgeback_interfaces.msg import TargetMeasurements
+
+
+def _asset_catalog(tmp_path):
+    resource = tmp_path / 'g1.sdf'
+    resource.write_text('<sdf version="1.9"/>\n', encoding='utf-8')
+    catalog = tmp_path / 'benchmark_assets.yaml'
+    catalog.write_text(
+        'schema: ridgeback_benchmark_assets/1\n'
+        'worlds:\n'
+        '  target_distance_calibration:\n'
+        '    native_name: target_distance_calibration\n'
+        '    resource: g1.sdf\n'
+        '    format: sdf\n'
+        'targets:\n'
+        '  g1:\n'
+        '    resource: g1.sdf\n'
+        '    format: sdf\n',
+        encoding='utf-8',
+    )
+    return catalog
 
 
 def test_replay_capture_restricts_live_scoring_to_frozen_detector_batches() -> None:
@@ -558,11 +577,14 @@ def test_runner_node_constructs_and_its_provenance_methods_run(tmp_path) -> None
     scenario = tmp_path / 'scenes.yaml'
     scenario.write_text('scenes:\n  - id: s1\n    robots: [{ x: 2.0, y: 0.0 }]\n')
     output_dir = tmp_path / 'out'
+    catalog = _asset_catalog(tmp_path)
 
     rclpy.init(args=[
         '--ros-args',
         '-p', f'scenario:={scenario}',
         '-p', f'output_dir:={output_dir}',
+        '-p', f'asset_catalog:={catalog}',
+        '-p', 'scene_control_service_namespace:=/gzserver',
         '-p', 'estimators:=pointcloud',
     ])
     node = None
@@ -593,11 +615,14 @@ def test_runner_uses_explicit_run_dir_name_verbatim(tmp_path) -> None:
     scenario = tmp_path / 'scenes.yaml'
     scenario.write_text('scenes:\n  - id: s1\n    robots: [{ x: 2.0, y: 0.0 }]\n')
     output_dir = tmp_path / 'out'
+    catalog = _asset_catalog(tmp_path)
 
     rclpy.init(args=[
         '--ros-args',
         '-p', f'scenario:={scenario}',
         '-p', f'output_dir:={output_dir}',
+        '-p', f'asset_catalog:={catalog}',
+        '-p', 'scene_control_service_namespace:=/gzserver',
         '-p', 'run_dir_name:=pinned_name',
         '-p', 'estimators:=pointcloud',
     ])
@@ -700,16 +725,6 @@ def test_git_provenance_survives_a_non_repository() -> None:
 
 def format_commit_is_unknown(provenance) -> bool:
     return format_commit(provenance) == 'unknown'
-
-
-def test_extract_json_payload_accepts_multiple_gz_json_messages() -> None:
-    payload = extract_json_payload(
-        'noise before\n'
-        '{"pose":[{"name":"first","position":{"x":1}}]}\n'
-        '{"pose":[{"name":"second","position":{"x":2}}]}\n'
-    )
-
-    assert payload == {'pose': [{'name': 'first', 'position': {'x': 1}}]}
 
 
 def test_alignment_updates_public_estimator_values_from_message_fields() -> None:
@@ -818,21 +833,21 @@ def test_preview_buffer_is_bounded_without_weakening_exact_stamp_matching() -> N
 def test_simulation_truth_uses_one_normalized_pose_snapshot() -> None:
     from ridgeback_autonomy.benchmarking.simulation import (
         compute_ground_truth_instances,
-        pose_snapshot_from_payload,
+        normalize_pose,
     )
 
-    snapshot = pose_snapshot_from_payload({'pose': [
-        {
+    snapshot = {
+        'robot': normalize_pose({
             'name': 'robot',
             'position': {},
             'orientation': {'w': 1},
-        },
-        {
+        }),
+        'target': normalize_pose({
             'name': 'target',
             'position': {'x': 3.25},
             'orientation': {'w': 1},
-        },
-    ]})
+        }),
+    }
     truth = compute_ground_truth_instances(
         snapshot, 'robot', [(0, 'target', object())])[0]
 

@@ -3,22 +3,23 @@
 # Usage: bash cleanup.sh
 #        CLEANUP_DRY_RUN=1 bash cleanup.sh   # list what would be killed, kill nothing
 #
-# This is aggressive, but deliberately preserves the Gazebo GUI so it can be
-# reused across server restarts. Never run this as hardware bringup cleanup;
+# This is aggressive. It preserves only the legacy combined-command Gazebo GUI
+# that can be reused across server restarts; the launch-owned standalone GUI is
+# stopped with its server. Never run this as hardware bringup cleanup;
 # start_exploration.sh skips it when backend:=hardware, and the script refuses
 # to kill anything while the Clearpath platform service is active.
 #
 # Every kill pass and the leftover check share one ownership filter, may_kill.
 # It never touches this script's own ancestors (the sweep, the configurator
-# that started it, the terminal), the Gazebo GUI, the configurator or the
-# offline replay CLIs, and it leaves processes started from another colcon
-# workspace alone: a process is this checkout's when its AMENT_PREFIX_PATH
-# names this checkout's install/, or names nothing beyond /opt/ros (a bare ROS
-# shell, the historical case).
+# that started it, the terminal), the combined-command Gazebo GUI, the
+# configurator or the offline replay CLIs, and it leaves processes started from
+# another colcon workspace alone: a process is this checkout's when its
+# AMENT_PREFIX_PATH names this checkout's install/, or names nothing beyond
+# /opt/ros (a bare ROS shell, the historical case).
 
 set -e
 
-echo "=== Killing ROS/Gazebo processes (preserving Gazebo GUI) ==="
+echo "=== Killing ROS/Gazebo processes (preserving reusable combined-command GUI) ==="
 CURRENT_USER="$(id -un)"
 SELF_PID="$$"
 PARENT_PID="$PPID"
@@ -135,6 +136,10 @@ pause 0.5
 kill_matches "gz sim"
 kill_matches "ruby.*gz"
 kill_matches "gz-sim"
+# The Gazebo adapter runs its server as the ros_gz_sim node, whose command
+# line contains none of the patterns above. Anchored to the executable so a
+# shell or editor whose arguments mention the path is left alone.
+kill_matches "^[^ ]*/ros_gz_sim/gzserver( |$)"
 
 # Kill Isaac Sim for this user. Unlike repo-installed nodes, these command
 # lines do not expose a reliable checkout path, so this is intentionally
@@ -212,7 +217,7 @@ pause 1
 # Names are anchored on a path separator or space, like the kill passes, so a
 # command line that merely mentions one (`less notes/explore.md`) is not
 # force-killed here.
-LEFTOVER_RE="${REPO_NODES_RE}|[/ ]ros2( |$)|[/ ]gz sim|/(parameter_bridge|slam_toolbox|nav2|ekf_node|tf_relay|robot_state_pub|joy_linux|teleop|marker_server|image_bridge|rviz)|/explore( |$)|overlay_node|hud_node"
+LEFTOVER_RE="${REPO_NODES_RE}|[/ ]ros2( |$)|[/ ]gz sim|/ros_gz_sim/gzserver( |$)|/(parameter_bridge|slam_toolbox|nav2|ekf_node|tf_relay|robot_state_pub|joy_linux|teleop|marker_server|image_bridge|rviz)|/explore( |$)|overlay_node|hud_node"
 
 leftovers() {
     ps -u "$CURRENT_USER" -o user=,pid=,pcpu=,pmem=,args= \
@@ -252,5 +257,5 @@ if [ -n "$STILL" ]; then
     echo "WARNING: Could not kill:"
     echo "$STILL"
 else
-    echo "All targeted ROS/Gazebo processes terminated; Gazebo GUI preserved."
+    echo "All targeted ROS/Gazebo processes terminated; reusable combined-command GUI preserved."
 fi

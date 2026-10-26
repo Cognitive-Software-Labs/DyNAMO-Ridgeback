@@ -28,31 +28,51 @@ ADAPTER_PACKAGES = {
     'hardware': 'ridgeback_autonomy_hardware',
 }
 
+# Adapter argument names map to their public compatibility-launch names. Most
+# are identical; hardware deliberately exposes ``start_hardware_platform`` to
+# callers while its adapter retains the shorter ``start_platform`` name.
+ADAPTER_LAUNCH_ARGUMENTS = {
+    'gz': {
+        'setup_path': 'setup_path',
+        'world': 'world',
+        'namespace': 'namespace',
+        'clearpath_rviz': 'clearpath_rviz',
+        'gz_gui': 'gz_gui',
+        'headless_rendering': 'headless_rendering',
+        'camera_profile': 'camera_profile',
+    },
+    'isaac': {
+        'setup_path': 'setup_path',
+        'world': 'world',
+        'namespace': 'namespace',
+        'rtf': 'rtf',
+        'headless': 'headless',
+        'livestream': 'livestream',
+        'odom_noise': 'odom_noise',
+        'noise_seed': 'noise_seed',
+        'camera': 'camera',
+        'sim_mode': 'sim_mode',
+        'sensor_hz': 'sensor_hz',
+        'camera_profile': 'camera_profile',
+        'depth_fidelity': 'depth_fidelity',
+    },
+    'hardware': {
+        'setup_path': 'setup_path',
+        'namespace': 'namespace',
+        'start_platform': 'start_hardware_platform',
+    },
+}
+
 
 def _include_selected_backend(context):
     backend = LaunchConfiguration('backend').perform(context)
     package = ADAPTER_PACKAGES[backend]
     adapter_launch = os.path.join(
         get_package_share_directory(package), 'launch', 'backend.launch.py')
-    argument_names = (
-        'setup_path', 'world', 'namespace', 'clearpath_rviz', 'gz_gui',
-        'headless_rendering', 'rtf', 'headless', 'livestream', 'odom_noise',
-        'noise_seed', 'camera', 'sim_mode', 'sensor_hz',
-        'start_hardware_platform',
-        'camera_profile',
-        'depth_fidelity',
-    )
-    arguments = {name: LaunchConfiguration(name) for name in argument_names}
-    # The hardware adapter deliberately calls this option ``start_platform``;
-    # the public name makes its hardware-only scope explicit.
-    arguments['start_platform'] = arguments.pop('start_hardware_platform')
-    # Hardware is attach-only: selecting a simulation render profile must not
-    # attempt to reconfigure an externally managed RealSense driver.
-    if backend == 'hardware':
-        arguments.pop('camera_profile')
-    if backend != 'isaac':
-        arguments.pop('depth_fidelity')
-        arguments.pop('noise_seed')
+    arguments = {
+        adapter_name: LaunchConfiguration(public_name)
+        for adapter_name, public_name in ADAPTER_LAUNCH_ARGUMENTS[backend].items()
+    }
     return [IncludeLaunchDescription(
         PythonLaunchDescriptionSource(adapter_launch),
         launch_arguments=arguments.items(),

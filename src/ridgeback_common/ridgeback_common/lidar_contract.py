@@ -1,8 +1,9 @@
 """Shared Ridgeback 2D LiDAR and merged-scan geometry.
 
 The raw values are the UST-10LX ROS contract emitted by the Isaac point-cloud
-assembler.  The merged range is measured from ``base_link``, so it includes
-the largest planar sensor offset in addition to the sensor-frame range.
+assembler and by Gazebo's patched Clearpath description.  The merged range is
+measured from ``base_link``, so it includes the largest planar sensor offset
+in addition to the sensor-frame range.
 """
 from __future__ import annotations
 
@@ -15,6 +16,14 @@ RAW_ANGLE_INCREMENT = math.radians(0.25)
 RAW_RANGE_MIN = 0.06
 RAW_RANGE_MAX = 10.0
 RAW_SCAN_PERIOD = 1.0 / 40.0
+
+# Gazebo's constant Gaussian range stddev, in metres. Isaac's UST-10LX noise is
+# Gaussian, unbiased and independent per bin, but its stddev grows with range
+# (about 0.0126 * r**0.80: 13 mm at 1 m, 38 mm at 4 m, 67 mm at 8 m), and
+# Gazebo's lidar noise can only be constant. This is Isaac's value at the
+# benchmark's median target distance, 3.7 m. Measured 2026-10-25; see
+# archive/engineering/2026-10-25-gazebo-ust10lx-lidar.md.
+GAZEBO_RANGE_NOISE_STDDEV = 0.036
 
 FRONT_LIDAR_XY_YAW = (0.3922, 0.0, 0.0)
 REAR_LIDAR_XY_YAW = (-0.3922, 0.0, math.pi)

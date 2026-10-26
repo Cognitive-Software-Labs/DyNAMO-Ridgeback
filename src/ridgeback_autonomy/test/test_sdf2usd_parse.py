@@ -13,7 +13,9 @@ import pytest
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 _SDF2USD = _REPO_ROOT / "tools" / "isaac" / "sdf2usd.py"
-_WORLDS = _REPO_ROOT / "src" / "ridgeback_autonomy_gz" / "sim" / "worlds"
+_GZ_SIM = _REPO_ROOT / "src" / "ridgeback_autonomy_gz" / "sim"
+_WORLDS = _GZ_SIM / "worlds"
+_MODELS = _GZ_SIM / "models"
 
 spec = importlib.util.spec_from_file_location("sdf2usd", _SDF2USD)
 sdf2usd = importlib.util.module_from_spec(spec)
@@ -110,3 +112,77 @@ def test_calibration_world_parses():
     world = sdf2usd.parse_world(_WORLDS / "target_distance_calibration.sdf")
     assert len(world.models) == 5
     assert all(m.static for m in world.models)
+
+
+def test_standalone_static_model_parses_with_material_and_ground_origin():
+    model = sdf2usd.parse_model(_MODELS / "hospital_bed" / "model.sdf")
+
+    assert model.name == "hospital_bed"
+    assert model.static
+    assert len(model.geoms) == 2
+    visual = next(geom for geom in model.geoms if not geom.is_collision)
+    collision = next(geom for geom in model.geoms if geom.is_collision)
+    assert visual.kind == collision.kind == "box"
+    assert visual.material.diffuse == (0.78, 0.88, 0.95, 1.0)
+    assert collision.material is None
+    lo, hi = sdf2usd.model_world_aabb(model)
+    assert lo == pytest.approx((-0.9, -0.45, 0.0))
+    assert hi == pytest.approx((0.9, 0.45, 0.5))
+
+
+def test_cylinders_parse_and_bound_the_iv_pole_at_ground_origin():
+    model = sdf2usd.parse_model(_MODELS / "iv_pole" / "model.sdf")
+
+    assert len(model.geoms) == 4
+    assert all(geom.kind == "cylinder" for geom in model.geoms)
+    assert {geom.size for geom in model.geoms} == {(0.025, 1.75), (0.225, 0.05)}
+    lo, hi = sdf2usd.model_world_aabb(model)
+    assert lo == pytest.approx((-0.225, -0.225, 0.0))
+    assert hi == pytest.approx((0.225, 0.225, 1.8))
+
+
+def test_link_local_transform_is_composed_with_geometry_pose(tmp_path):
+    sdf = tmp_path / "local_transform.sdf"
+    sdf.write_text(
+        """<sdf version=\"1.9\"><model name=\"local\"><static>true</static>
+        <link name=\"link\"><pose>1 2 3 0 0 1.5707963267948966</pose>
+        <visual name=\"visual\"><pose>1 0 0.5 0 0 0</pose>
+        <geometry><box><size>2 4 1</size></box></geometry></visual>
+        </link></model></sdf>""",
+        encoding="utf-8",
+    )
+
+    model = sdf2usd.parse_model(sdf)
+    assert model.geoms[0].pose == pytest.approx(
+        (1.0, 3.0, 3.5, 0.0, 0.0, math.pi / 2))
+    lo, hi = sdf2usd.model_world_aabb(model)
+    assert lo == pytest.approx((-1.0, 2.0, 3.0))
+    assert hi == pytest.approx((3.0, 4.0, 4.0))
+
+
+def test_parse_sdf_wraps_standalone_model_as_one_model_stage():
+    world = sdf2usd.parse_sdf(_MODELS / "cabinet" / "model.sdf")
+
+    assert world.name == "cabinet"
+    assert [model.name for model in world.models] == ["cabinet"]
+    assert world.includes == []
+    assert world.lights == []
+
+
+def test_standalone_parser_refuses_a_world_document():
+    with pytest.raises(ValueError, match="expected a standalone"):
+        sdf2usd.parse_model(_WORLDS / "target_distance_calibration.sdf")
+
+
+def test_unsupported_geometry_is_refused(tmp_path):
+    sdf = tmp_path / "unsupported.sdf"
+    sdf.write_text(
+        """<sdf version=\"1.9\"><model name=\"unsupported\"><static>true</static>
+        <link name=\"link\"><visual name=\"visual\"><geometry>
+        <mesh><uri>model://mesh/file.dae</uri></mesh>
+        </geometry></visual></link></model></sdf>""",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="unsupported geometry.*mesh"):
+        sdf2usd.parse_model(sdf)

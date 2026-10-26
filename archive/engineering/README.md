@@ -22,12 +22,19 @@ are excluded from ordinary repository search and the generated knowledge graph.
 
 ## Benchmarking and execution
 
+- [Gazebo and Isaac backend qualification](2026-10-26-benchmark-gazebo-isaac-qualification.md) — the first and accepted matched full runs, cross-simulator detector and ranking differences, reproducibility of each simulator, interrupted-stop cycles and installed-launch smokes.
+- [Benchmark shutdown ordering and RViz node ownership](2026-10-23-benchmark-shutdown-ownership.md) — client-before-provider rollback, retained view-controller services, native DDS unload evidence, and distinct qualification populations.
 - [Benchmark population and scoring transitions](benchmark_evolution.md)
 - [Offline measurement replay parity and scaling](offline_measurement_replay_validation.md)
 - [Preliminary layered-replay storage experiment](layered_replay_implementation_validation.md)
 - [GUI execution and cancellation decisions](benchmark_gui_direct_run.md)
 
 ## Simulation and operations
+
+- [Gazebo Sensors shutdown races](2026-10-18-gazebo-sensors-shutdown.md) — waiter wakeup, observed same-instance concurrent joins, and separate diagnostic/qualification populations.
+- [ros_gz bridge ownership cycles and image_bridge teardown](2026-10-22-ros-gz-bridge-shutdown.md) — two bridge-node ownership cycles, the image_bridge in-flight callback race, and stock/partial/final crash populations.
+- [RViz Image display teardown abort](2026-10-22-rviz-image-display-teardown.md) — stale message-filter connection after unsubscribe, stock/patched signal populations, and the separate process-exit SIGSEGV still open.
+- [UST-10LX Gazebo LiDAR parity and Isaac noise](2026-10-25-gazebo-ust10lx-lidar.md) — the Clearpath hardcode and end-ray off-by-one, Isaac's range-dependent Gaussian noise, the constant-stddev choice, and both simulators' determinism.
 
 - [r100_0160 front LiDAR stationary field screening](2026-10-23-r100-0160-front-lidar-field-screen.md) — 0.5–2 m target screens, material detection, front-to-merged contribution, five-minute continuity, and explicit accuracy/reliability limits.
 - [Intel DDS local-reader screening](2026-10-05-intel-dds-screening.md) — scan interruption after a local color reader under the original profile, brief discovery-only multicast comparison, and verified restoration.

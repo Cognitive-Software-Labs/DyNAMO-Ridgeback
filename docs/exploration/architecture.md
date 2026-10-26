@@ -24,14 +24,16 @@ owns the high-level component and dependency boundary.
 | Package | Owns | Must not own |
 |---|---|---|
 | `ridgeback_autonomy` | Common nodes, messages, configuration, readiness gates, and public workflows | Gazebo/Qt build dependencies, Isaac runtime, or a hardware driver |
-| `ridgeback_autonomy_gz` | Gazebo launch adapter, worlds, models, and `SpawnG1` plugin | SLAM/Nav2/perception behavior |
-| `ridgeback_autonomy_isaac` | Isaac launch adapter, runner, sensor specs, and USD assets | Common autonomy policy |
+| `ridgeback_autonomy_gz` | Gazebo launch adapter, worlds, models, `SpawnG1` plugin, and the benchmark asset catalog; its `gzserver` serves the standard scene-control services | SLAM/Nav2/perception behavior, benchmark logic |
+| `ridgeback_autonomy_isaac` | Isaac launch adapter, runner (which serves the standard scene-control services), sensor specs, USD assets, and the benchmark asset catalog | Common autonomy policy, benchmark logic |
 | `ridgeback_autonomy_hardware` | Hardware-safe Clearpath adapter | Simulation packages or autonomous-motion policy |
 
 `dependencies/core.repos` is the common source closure.
-`dependencies/gz.repos` adds only `clearpath_simulator`. Package lookup in the
-dispatcher is lazy, so an Isaac or hardware install does not need the Gazebo
-adapter merely to load the common launch.
+`dependencies/gz.repos` adds the Gazebo-only `clearpath_simulator`, `gz-sim`,
+and `ros_gz` checkouts (see the [dependency runbook](../project/dependencies.md)).
+Package lookup in the dispatcher is lazy, so an Isaac or hardware install does
+not need the Gazebo adapter merely to load the common launch, and the
+target-distance benchmark resolves only the selected backend's adapter.
 
 The public selector is `backend:=gz|isaac|hardware`. `sim:=gz|isaac` remains a
 deprecated compatibility alias. The adapters normalize deployment differences;

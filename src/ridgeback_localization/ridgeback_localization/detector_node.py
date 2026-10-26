@@ -15,6 +15,7 @@ from rclpy.qos import QoSProfile, ReliabilityPolicy
 from sensor_msgs.msg import Image
 
 from ridgeback_common.messages import build_detections_message
+from ridgeback_common.ros_signals import init_owned, shielded, spin_until_interrupted
 from ridgeback_interfaces.msg import TargetDetections
 from ridgeback_localization.contracts import RAW_DETECTIONS_TOPIC
 from ridgeback_localization.core.detection import (
@@ -28,7 +29,7 @@ from ridgeback_localization.core.image_utils import (
     convert_color_image_message,
 )
 from ridgeback_localization.core.timing import TimingStats
-from ridgeback_localization.worker_state import WorkerState
+from ridgeback_localization.worker_state import WorkerState, join_workers
 
 
 DETECTOR_FPS_DEFAULT = 10.0
@@ -186,12 +187,16 @@ class TargetDetectorNode(Node):
                 float(self.get_parameter('detector_debug_period_s').value),
                 self.log_detector_diagnostics)
 
-        self.worker_thread = threading.Thread(target=self.processing_loop, daemon=True)
-        self.worker_thread.start()
-
         self.get_logger().info(f'Subscribed to color stream: {self.color_topic}')
         self.get_logger().info(f'Publishing raw detections on: {self.detections_topic}')
         self.get_logger().info(f'Running detector at up to {self.detector_fps:.1f} FPS')
+
+        # Not a daemon: teardown waits for it, so the interpreter never
+        # finalizes underneath an inference call still running native code.
+        # Started last, so a constructor that raises leaves no worker behind.
+        self.worker_thread = threading.Thread(
+            target=self.processing_loop, name='detector_worker')
+        self.worker_thread.start()
 
     def log_detector_diagnostics(self) -> None:
         with self.processing_lock:
@@ -292,6 +297,9 @@ class TargetDetectorNode(Node):
         try:
             self.process_color_image(color_msg)
         except Exception as exc:  # noqa: BLE001 - worker must survive any frame
+            if self.stop_event.is_set():
+                # Teardown is under way; this is not a frame failure to report.
+                return
             failed = True
             self.worker_state.set('failure', str(exc))
             self.log_detection_error(exc)
@@ -330,6 +338,8 @@ class TargetDetectorNode(Node):
                 frame.shape[0],
                 self.detection_threshold,
             )
+        if self.stop_event.is_set():
+            return
         with self.timed_stage('publish'):
             self.detections_pub.publish(build_detections_message(batch, color_msg.header))
             self.worker_state.set('processing')
@@ -338,32 +348,36 @@ class TargetDetectorNode(Node):
                 self.diagnostics.record_publication()
 
     def destroy_node(self) -> bool:
+        self.worker_state.close()
         self.stop_event.set()
         self.process_event.set()
-        if hasattr(self, 'worker_thread') and self.worker_thread.is_alive():
-            self.worker_thread.join(timeout=1.0)
+        if hasattr(self, 'worker_thread'):
+            join_workers([self.worker_thread], self.get_logger())
         return super().destroy_node()
 
 
 def main() -> None:
-    rclpy.init()
+    init_owned()
     try:
         node = TargetDetectorNode()
     except RuntimeError as exc:
         # Perception enabled without the venv (no transformers/torch). Fail
         # cleanly with a clear message instead of dumping a traceback.
         get_logger('target_detector').fatal(str(exc))
-        if rclpy.ok():
-            rclpy.shutdown()
+        rclpy.try_shutdown()
+        return
+    except KeyboardInterrupt:
+        # Interrupted while the model was still loading; no worker exists yet.
+        rclpy.try_shutdown()
         return
     try:
-        rclpy.spin(node)
+        spin_until_interrupted(node)
     except (KeyboardInterrupt, ExternalShutdownException):
         pass
     finally:
-        node.destroy_node()
-        if rclpy.ok():
-            rclpy.shutdown()
+        with shielded(final=True):
+            node.destroy_node()
+            rclpy.try_shutdown()
 
 
 if __name__ == '__main__':

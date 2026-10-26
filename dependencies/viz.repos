@@ -1,0 +1,8 @@
+# Optional source dependencies for hosts that run RViz. Import these in addition
+# to core.repos (and gz.repos on Gazebo hosts).
+repositories:
+  src/rviz:
+    type: git
+    url: https://github.com/ros2/rviz.git
+    # jazzy @ 14.1.23, matching the installed rviz binaries
+    version: feb01669f1297df2af755ce9cd2ed18083e7a8b2

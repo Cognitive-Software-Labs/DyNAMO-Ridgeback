@@ -1,4 +1,4 @@
-# Gazebo-only source dependency. Import this in addition to core.repos when the
+# Gazebo-only source dependencies. Import these in addition to core.repos when the
 # ridgeback_autonomy_gz adapter is required.
 repositories:
   src/clearpath_simulator:
@@ -6,3 +6,13 @@ repositories:
     url: https://github.com/clearpathrobotics/clearpath_simulator.git
     # jazzy @ 2.9.4
     version: 590a45118c599c08abdf3bd3d02d5fa7a8af9a49
+  src/gz-sim:
+    type: git
+    url: https://github.com/gazebosim/gz-sim.git
+    # gz-sim8_8.15.0, matching gz_sim_vendor 0.0.13 (no upstream vendor patches)
+    version: 446a44335a45b704b4d36dabcc5508ee34eeb3d8
+  src/ros_gz:
+    type: git
+    url: https://github.com/gazebosim/ros_gz.git
+    # jazzy @ 1.0.24, matching the installed ros-jazzy-ros-gz binaries
+    version: 5912bfe7976a79d2cc9f373b2d40a8a3a3e33da2

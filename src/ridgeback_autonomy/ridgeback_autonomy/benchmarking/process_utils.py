@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import shutil
 import subprocess
 from typing import Any
@@ -13,25 +12,6 @@ GLXINFO_TIMEOUT_SEC = 10.0
 # Mesa's CPU rasterizers. A remote display session (xrdp, VNC, Xvfb) has no
 # GPU attached to its X server and resolves GL to one of these.
 SOFTWARE_GL_RENDERERS = ('llvmpipe', 'softpipe', 'swrast', 'lavapipe')
-
-
-def extract_json_payload(text: str) -> dict[str, Any]:
-    """Extract the first JSON object from command output with leading noise."""
-
-    decoder = json.JSONDecoder()
-    search_from = 0
-    while True:
-        start = text.find('{', search_from)
-        if start == -1:
-            raise RuntimeError(f'Failed to parse Gazebo JSON payload: {text.strip()}')
-        try:
-            payload, _ = decoder.raw_decode(text[start:])
-        except json.JSONDecodeError:
-            search_from = start + 1
-            continue
-        if isinstance(payload, dict):
-            return payload
-        search_from = start + 1
 
 
 def try_command(

@@ -22,6 +22,14 @@ from ridgeback_common.camera_profiles import (
     DEFAULT_CAMERA_PROFILE,
 )
 
+from ridgeback_autonomy.benchmarking.backends import (
+    BENCHMARK_BACKENDS,
+    DEFAULT_BACKEND,
+    BenchmarkEnvironment,
+    benchmark_backend,
+    encode_backend_settings,
+    resolve_benchmark_environment,
+)
 from ridgeback_autonomy.benchmarking.paths import default_output_directory
 from ridgeback_autonomy.benchmarking.replay import REPLAY_CAPTURE_BATCHES_DEFAULT
 from ridgeback_localization.estimator_registry import (
@@ -75,11 +83,25 @@ from ridgeback_localization.core.ranging_defaults import (
 ENV_READY_TIMEOUT_SEC = 300.0
 
 
-def build_benchmark_nodes(context, *args, **kwargs):
-    gz_share = get_package_share_directory('ridgeback_autonomy_gz')
+def resolve_environment(context) -> BenchmarkEnvironment:
+    """The persistent environment this layer measures in, resolved once.
+
+    Read when this layer is first visited, before the persistent layer of a
+    single-process launch replaces ``world`` with the simulator's native name:
+    the runner works in public scenario names.
+    """
+
+    backend = benchmark_backend(LaunchConfiguration('backend').perform(context))
+    return resolve_benchmark_environment(
+        backend.name,
+        LaunchConfiguration('world').perform(context),
+        {name: LaunchConfiguration(name).perform(context) for name in backend.settings},
+    )
+
+
+def build_benchmark_nodes(context, *args, environment: BenchmarkEnvironment, **kwargs):
     namespace = LaunchConfiguration('namespace')
     use_sim_time = LaunchConfiguration('use_sim_time')
-    world = LaunchConfiguration('world')
     repeats = LaunchConfiguration('repeats')
     output_dir = LaunchConfiguration('output_dir')
     settle_sec = LaunchConfiguration('settle_sec')
@@ -185,10 +207,13 @@ def build_benchmark_nodes(context, *args, **kwargs):
         namespace=namespace,
         parameters=[{
             'use_sim_time': use_sim_time,
-            'world': world,
-            'target_model_sdf': os.path.join(
-                gz_share, 'sim', 'models', 'g1', 'model.sdf'),
-            'models_dir': os.path.join(gz_share, 'sim', 'models'),
+            'world': environment.public_world,
+            'backend': environment.backend.name,
+            # Recorded, not applied: the persistent environment ran with these.
+            'backend_settings': encode_backend_settings(environment.settings),
+            'asset_catalog': environment.catalog.path,
+            'scene_control_service_namespace': (
+                environment.backend.scene_control_service_namespace),
             'scenario': LaunchConfiguration('scenario'),
             'repeats': repeats,
             'output_dir': output_dir,
@@ -270,8 +295,13 @@ def _resolved_topic(namespace: str, topic: str) -> str:
 
 
 def build_readiness_gate(context, *args, **kwargs):
-    """Start the config stack only after the persistent layer is genuinely ready."""
+    """Start the config stack only after the persistent layer is genuinely ready.
 
+    The environment is resolved first, so an unsupported backend or world fails
+    before the gate (or anything else) starts.
+    """
+
+    environment = resolve_environment(context)
     namespace = LaunchConfiguration('namespace').perform(context)
     camera_inputs = resolved_camera_inputs(
         context, 'color_topic', 'camera_info_topic',
@@ -290,7 +320,8 @@ def build_readiness_gate(context, *args, **kwargs):
         gate,
         RegisterEventHandler(OnProcessExit(
             target_action=gate,
-            on_exit=[OpaqueFunction(function=build_benchmark_nodes)],
+            on_exit=[OpaqueFunction(
+                function=build_benchmark_nodes, kwargs={'environment': environment})],
         )),
     ]
 
@@ -301,10 +332,39 @@ def generate_launch_description():
     benchmark_output_dir = default_output_directory(workspace_root)
     namespace = LaunchConfiguration('namespace')
 
+    gz = BENCHMARK_BACKENDS['gz'].settings
+    isaac = BENCHMARK_BACKENDS['isaac'].settings
+
     arguments = [
         # Shared with target_benchmark_env.launch.py. Keep these defaults
         # byte-identical: the first declaration inherited by a wrapper wins.
         DeclareLaunchArgument('target_labels', default_value='humanoid robot'),
+        DeclareLaunchArgument(
+            'backend', default_value=DEFAULT_BACKEND,
+            description=(
+                'Simulator of the persistent environment: selects its asset '
+                'catalog and scene-control services, and is recorded'),
+        ),
+        # Recorded, not applied: the persistent environment owns these
+        # backend-only settings; run.json records the selected backend's.
+        DeclareLaunchArgument(
+            'gz_gui', default_value=gz['gz_gui'].default,
+            description=gz['gz_gui'].description),
+        DeclareLaunchArgument(
+            'headless_rendering', default_value=gz['headless_rendering'].default,
+            description=gz['headless_rendering'].description),
+        DeclareLaunchArgument(
+            'headless', default_value=isaac['headless'].default,
+            description=isaac['headless'].description),
+        DeclareLaunchArgument(
+            'rtf', default_value=isaac['rtf'].default,
+            description=isaac['rtf'].description),
+        DeclareLaunchArgument(
+            'sim_mode', default_value=isaac['sim_mode'].default,
+            description=isaac['sim_mode'].description),
+        DeclareLaunchArgument(
+            'depth_fidelity', default_value=isaac['depth_fidelity'].default,
+            description=isaac['depth_fidelity'].description),
         DeclareLaunchArgument('namespace', default_value='r100_0001'),
         DeclareLaunchArgument('use_sim_time', default_value='true'),
         DeclareLaunchArgument('world', default_value='target_distance_calibration'),
