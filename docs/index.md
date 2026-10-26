@@ -94,6 +94,7 @@ troubleshooting, planning, and historical documentation.
   - [PHYSICAL — Camera and alignment robot session](plans/PHYSICAL_camera_alignment_session.md) — ordered blocks, commands and pre-declared limits for the alignment overlay, off-centre and HD person checks, and estimator modes
   - Handoff: [D455 camera runs (agent 1)](plans/handoffs/PHYSICAL_d455_camera_runs_agent1.md) — P1/P2 results, CycloneDDS camera-transport and LiDAR-lockout findings, next steps
 - [PHYSICAL — Checks without movement or a controller](plans/PHYSICAL_stationary_checks.md) — evidence audit, passive commands, and separately controlled stationary disruptions
+- [PHYSICAL — Real-hardware LiDAR validation](plans/PHYSICAL_lidar_validation.md) — front/rear range and coverage, merged geometry, loaded continuity, recovery and conditional motion tests
 - [PHYSICAL — Remaining qualification and time estimates](plans/PHYSICAL_remaining_qualification.md) — October 14 checkpoint, prerequisites, test durations and preparation allowances
 
 Dated handoff snapshots live in [plans/handoffs/](plans/handoffs/README.md).
