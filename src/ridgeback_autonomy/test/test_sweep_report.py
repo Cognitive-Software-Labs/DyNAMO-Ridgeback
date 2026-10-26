@@ -55,6 +55,19 @@ def _manifest():
     }
 
 
+def test_shutdown_failure_is_visible_beside_saved_comparison_rows(tmp_path) -> None:
+    _write_run(tmp_path / 'single', [_estimator('polar_profiling', 0.25)])
+    manifest = _manifest()
+    manifest['lifecycle'] = {
+        'clean': False, 'errors': ['environment: RViz exited -11']}
+
+    report = render_sweep_report(manifest, str(tmp_path))
+
+    assert 'Polar Profiling' in report
+    assert 'Shutdown failed.' in report
+    assert 'RViz exited -11' in report
+
+
 def test_sweep_rollup_handles_multi_estimator_and_missing_run(tmp_path) -> None:
     _write_run(tmp_path / 'single', [_estimator('polar_profiling', 0.25)])
     _write_run(tmp_path / 'multi', [

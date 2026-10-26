@@ -330,38 +330,33 @@ def test_benchmark_runner_uses_the_selected_catalog_services_and_public_world(
     assert json.loads(parameters['backend_settings']) == settings
 
 
-def test_single_launch_runner_keeps_the_public_world_after_the_simulator_gets_its_native_one(
-    adapter_lookups,
+@pytest.mark.parametrize('backend', ['gz', 'isaac'])
+def test_single_launch_runner_keeps_public_world_in_both_child_commands(
+    adapter_lookups, monkeypatch, backend,
 ) -> None:
-    """One launch process shares ``world`` between both layers.
+    """Child launch contexts receive the same public world independently."""
+    from types import SimpleNamespace
 
-    The persistent layer replaces it with the native name for an adapter that
-    reads it late; the config layer, visited first, already captured the public
-    name its runner and catalog use.
-    """
+    wrapper = _load_launch('target_distance_benchmark.launch.py')
+    monkeypatch.setattr(wrapper, 'get_package_share_directory', lambda _package: str(_package_root()))
+    monkeypatch.setattr(wrapper, 'ExecuteProcess', lambda **kwargs: SimpleNamespace(**kwargs))
+    monkeypatch.setattr(wrapper, 'OnProcessExit', lambda **kwargs: SimpleNamespace(**kwargs))
+    monkeypatch.setattr(wrapper, 'RegisterEventHandler', lambda event: event)
+    context = _declared_context(wrapper, backend=backend, estimators='pointcloud',
+                                world='target_distance_calibration')
+    supervisor = wrapper.build_supervisor(context, layers=wrapper.layer_arguments())[-1]
+    environment = json.loads(supervisor.cmd[supervisor.cmd.index('--environment-command') + 1])
+    configuration = json.loads(supervisor.cmd[supervisor.cmd.index('--configuration-command') + 1])
 
-    wrapper = (_package_root() / 'launch' / 'target_distance_benchmark.launch.py').read_text(
-        encoding='utf-8')
-    assert wrapper.index('target_benchmark_config.launch.py') < wrapper.index(
-        'target_benchmark_env.launch.py')
-
-    config = _load_launch('target_benchmark_config.launch.py')
-    env = _load_launch('target_benchmark_env.launch.py')
-    context = _declared_context(config, env, backend='isaac', estimators='pointcloud')
-    environment = config.resolve_environment(context)
-    include = env.build_simulation(context)[-1]
-    # What visiting the include does to the shared launch configuration.
-    for name, value in include.launch_arguments:
-        context.launch_configurations[name] = _text(context, value)
-    assert context.launch_configurations['world'] == 'g1_distance_calibration'
-
-    parameters = _runner_parameters(
-        context, config.build_benchmark_nodes(context, environment=environment))
-
-    assert parameters['world'] == 'target_distance_calibration'
-    assert "kwargs={'environment': environment}" in (
-        _package_root() / 'launch' / 'target_benchmark_config.launch.py').read_text(
-            encoding='utf-8')
+    for command in (environment, configuration):
+        assert 'world:=target_distance_calibration' in command
+        assert f'backend:={backend}' in command
+        assert 'g1_distance_calibration' not in command
+    assert 'estimators:=pointcloud' in configuration
+    assert not any(token.startswith('estimators:=') for token in environment)
+    assert 'shutdown_on_complete:=false' in configuration
+    assert supervisor.sigterm_timeout == str(
+        2 * wrapper.PROCESS_GROUP_STOP_BUDGET_SEC + wrapper.PROCESS_POLL_SEC)
 
 
 def test_isaac_benchmark_bringup_never_resolves_the_gazebo_adapter(monkeypatch) -> None:
@@ -661,14 +656,21 @@ def test_benchmark_layers_declare_identical_shared_arguments() -> None:
     assert declared_config_names == CONFIG_LAUNCH_ARGUMENT_NAMES
 
 
-def test_benchmark_wrapper_only_composes_the_two_layers() -> None:
-    launch_dir = Path(__file__).resolve().parents[1] / 'launch'
-    wrapper_text = (launch_dir / 'target_distance_benchmark.launch.py').read_text(encoding='utf-8')
+def test_benchmark_wrapper_exposes_merged_layer_arguments(monkeypatch) -> None:
+    wrapper = _load_launch('target_distance_benchmark.launch.py')
+    monkeypatch.setattr(wrapper, 'get_package_share_directory', lambda _package: str(_package_root()))
+    layers = wrapper.layer_arguments()
+    arguments = wrapper.generate_launch_description().get_launch_arguments()
+    config = layers[wrapper.CONFIG_LAUNCH]
+    environment = layers[wrapper.ENVIRONMENT_LAUNCH]
+    expected = list(dict.fromkeys(argument.name for argument in [*config, *environment]))
 
-    assert 'target_benchmark_env.launch.py' in wrapper_text
-    assert 'target_benchmark_config.launch.py' in wrapper_text
-    assert wrapper_text.count('DeclareLaunchArgument(') == 1
-    assert "'shutdown_on_complete'" in wrapper_text
+    assert [argument.name for argument in arguments] == expected
+    assert len(arguments) == len({argument.name for argument in arguments})
+    context = _declared_context(wrapper, namespace='test_robot', shutdown_on_complete='true')
+    assert context.launch_configurations['base_frame'] == 'test_robot/robot/base_link'
+    assert context.launch_configurations['shutdown_on_complete'] == 'true'
+    assert CONFIG_LAUNCH_ARGUMENT_NAMES <= set(expected)
 
 
 def test_headless_rendering_is_optional_and_owned_by_the_environment() -> None:
@@ -774,7 +776,7 @@ def test_dependency_profiles_keep_gazebo_out_of_the_common_closure() -> None:
     assert 'core|gz|viz|all' in checker
 
 
-def test_viz_profile_overlays_only_the_patched_rviz_plugins() -> None:
+def test_viz_profile_overlays_only_the_patched_rviz_packages() -> None:
     repo_root = _package_root().parents[1]
     manifests = {
         name: yaml.safe_load(
@@ -790,8 +792,8 @@ def test_viz_profile_overlays_only_the_patched_rviz_plugins() -> None:
     # rviz 14.1.23, the tag the installed RViz binaries were built from.
     assert manifests['viz']['src/rviz']['version'] == (
         'feb01669f1297df2af755ce9cd2ed18083e7a8b2')
-    assert '[src/rviz]="patches/rviz_image_display_unsubscribe.patch"' in checker
-    assert '[src/rviz]="rviz_default_plugins rviz_visual_testing_framework"' in checker
+    assert '[src/rviz]="patches/rviz_shutdown.patch"' in checker
+    assert '[src/rviz]="rviz_common rviz_default_plugins rviz_visual_testing_framework"' in checker
     assert 'viz) MANIFESTS=("$REPO_ROOT/dependencies/viz.repos")' in checker
     assert '"$REPO_ROOT/dependencies/viz.repos") ;;' in checker
 

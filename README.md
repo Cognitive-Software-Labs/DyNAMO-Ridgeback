@@ -571,6 +571,12 @@ hardware has no scene-control services or ground truth. What may and may not be
 compared across the two simulators is in
 [benchmark semantics](docs/target_distance_benchmarking/semantics.md#scenario-and-comparison-discipline).
 
+The single-run entrypoint owns separate configuration and environment processes.
+Ctrl-C finishes configuration cleanup while the simulator still answers, then
+stops the environment. The default `shutdown_on_complete:=false` retains both
+layers for inspection after the runner finishes; `true` closes them in order.
+See the [shutdown contract](docs/target_distance_benchmarking/overview.md#shutdown-lifecycle).
+
 ```bash
 # Default run: compare all four estimators on Gazebo
 ros2 launch ridgeback_autonomy target_distance_benchmark.launch.py
@@ -1032,7 +1038,7 @@ This project relies on seven maintained dependency patches:
 3. `patches/clearpath_realsense_sim_frames.patch` patches `src/clearpath_common` so `intel_realsense.urdf.xacro` forwards `is_sim` into every supported camera macro as `use_nominal_extrinsics`, and so the Gazebo render sensor sits on the model's colour frame. Without it, simulation has no `camera_0_color_optical_frame` TF and the mask estimators report `TF_MISS_EXTRINSIC`.
 4. `patches/gz_sim_sensors_shutdown.patch` patches the pinned Gazebo Sim 8.15.0 Sensors shutdown waiter and adds upstream regression tests. The optional Gazebo source profile builds this compatible workspace overlay; see the [build, loader verification, and rollback instructions](docs/project/dependencies.md#gazebo-sensors-shutdown-patch).
 5. `patches/ros_gz_bridge_shutdown.patch` backports upstream ros_gz #955 and #991 and hand-backports #981 to the pinned ros_gz 1.0.24, so `parameter_bridge` no longer keeps its node alive past `main()` and `image_bridge` no longer receives frames into a destroyed handler; bridges stop on Ctrl-C without SIGSEGV or heap corruption. Only `ros_gz_bridge` and `ros_gz_image` are built from this checkout; see the [build, loader verification, and rollback instructions](docs/project/dependencies.md#ros_gz-shutdown-patch).
-6. `patches/rviz_image_display_unsubscribe.patch` patches the pinned RViz 14.1.23 Image display so a repeated unsubscribe no longer reaches a destroyed subscriber filter, the `std::system_error` abort RViz hit on Ctrl-C. The optional `viz` profile builds only `rviz_default_plugins` (and the test framework it needs); see the [build, loader verification, and rollback instructions](docs/project/dependencies.md#rviz-image-display-teardown-patch).
+6. `patches/rviz_shutdown.patch` patches the pinned RViz 14.1.23 Image subscription and view-manager ownership during teardown. The optional `viz` profile builds `rviz_common`, `rviz_default_plugins`, and their test framework; see the [mechanisms, build, loader verification, and rollback instructions](docs/project/dependencies.md#rviz-shutdown-ownership-patch).
 7. `patches/clearpath_ust10lx_sim_lidar.patch` patches `src/clearpath_common`, on top of patch 3, so Gazebo simulates each `hokuyo_ust` as the UST-10LX: 1081 bins over ±135° at 0.25°, 0.06–10 m at 40 Hz, with Gaussian range noise. Without it Gazebo publishes Clearpath's generic 540 bins at 0.5° and returns out to 25 m. Hardware frames are unchanged; see [the patch section](docs/project/dependencies.md#ust-10lx-gazebo-lidar-patch).
 
 Because the patches are recorded against specific upstream revisions,

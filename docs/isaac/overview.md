@@ -7,7 +7,7 @@ statistical exploration qualification remains open. The
 target-distance benchmark runs on Isaac with `backend:=isaac`. Its semantics are
 in [target-distance benchmarking](../target_distance_benchmarking/overview.md),
 and its open Isaac work is in the
-[benchmarking backlog](../target_distance_benchmarking/BACKLOG.md#isaac-benchmark-environment-teardown).
+[benchmarking backlog](../target_distance_benchmarking/BACKLOG.md#benchmark-shutdown-qualification).
 Historical controls are not current performance baselines.
 
 ## Current references

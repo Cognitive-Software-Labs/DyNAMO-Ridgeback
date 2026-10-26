@@ -194,6 +194,18 @@ def render_sweep_report(manifest: dict, sweep_dir: str) -> str:
         )
 
     notes_text = '\n'.join(notes) if notes else 'Every selected configuration completed in this sweep.'
+    lifecycle = manifest.get('lifecycle')
+    shutdown_lines = []
+    if lifecycle is not None:
+        errors = lifecycle.get('errors') or []
+        shutdown_lines = [
+            '## Shutdown', '',
+            ('Owned processes stopped cleanly.' if lifecycle.get('clean') else
+             'Shutdown failed. Saved measurements do not establish a clean lifecycle.'),
+            '',
+            *[f'- {error}' for error in errors],
+            '',
+        ]
     return '\n'.join([
         f'# Benchmark sweep {metadata["Name"]}',
         '',
@@ -205,6 +217,7 @@ def render_sweep_report(manifest: dict, sweep_dir: str) -> str:
         '',
         comparison_note,
         '',
+        *shutdown_lines,
         '## Failed and skipped configurations',
         '',
         notes_text,

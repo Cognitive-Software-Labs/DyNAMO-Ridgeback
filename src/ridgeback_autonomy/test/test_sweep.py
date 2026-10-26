@@ -682,7 +682,10 @@ class _SweepSceneControl:
         return {'clock_advance_after_services_sec': 1.5, 'clock_advanced_wall': 2.0}
 
 
-def _run_sweep_harness(tmp_path, monkeypatch, scene_control, events, backend='isaac'):
+def _run_sweep_harness(
+    tmp_path, monkeypatch, scene_control, events, backend='isaac',
+    *, config_returncode=0, stop_group=None, wait_for_config=None,
+):
     from types import SimpleNamespace as Namespace
 
     document = _document(tmp_path)
@@ -695,7 +698,9 @@ def _run_sweep_harness(tmp_path, monkeypatch, scene_control, events, backend='is
 
         def __init__(self, command, **_kwargs):
             commands.append(command)
+            self.returncode = 0
             if command[4] == 'target_benchmark_config.launch.py':
+                self.returncode = config_returncode
                 arguments = dict(token.split(':=', 1) for token in command[5:])
                 run = Path(arguments['output_dir']) / arguments['run_dir_name']
                 # The sweep has already created it for the child's ROS logs
@@ -713,14 +718,15 @@ def _run_sweep_harness(tmp_path, monkeypatch, scene_control, events, backend='is
     monkeypatch.setattr(sweep_module, 'git_provenance', lambda _: {})
     monkeypatch.setattr(sweep_module, 'gl_renderer_provenance', lambda: {})
     monkeypatch.setattr(sweep_module, 'simulator_provenance', lambda _backend: {})
-    monkeypatch.setattr(sweep_module, 'stop_process_group', lambda *_: None)
+    monkeypatch.setattr(sweep_module, 'stop_process_group', stop_group or (lambda *_: None))
     monkeypatch.setattr(sweep_module, 'run_preflight_cleanup', lambda _root: None)
     monkeypatch.setattr(
         sweep_module, 'reap_orphan_benchmark_entities',
         lambda _client: events.append('reap') or [])
     monkeypatch.setattr(sweep_module, 'sample_real_time_factor', lambda: 1.0)
-    monkeypatch.setattr(sweep_module, '_wait_for_config', lambda *_: ('exited', None))
-    monkeypatch.setattr(sweep_module.rclpy, 'init', lambda: None)
+    monkeypatch.setattr(sweep_module, '_wait_for_config',
+                        wait_for_config or (lambda *_: ('exited', None)))
+    monkeypatch.setattr(sweep_module.rclpy, 'init', lambda **_kwargs: None)
     monkeypatch.setattr(
         sweep_module.rclpy, 'create_node', lambda _name: Namespace(destroy_node=lambda: None))
     monkeypatch.setattr(sweep_module.rclpy, 'ok', lambda: False)
@@ -773,6 +779,157 @@ def test_a_stalled_clock_fails_the_sweep_before_any_scene_operation(
     assert manifest['sweep']['status'] == 'failed'
     assert 'no scene operation was sent' in manifest['sweep']['error']
     assert [command[4] for command in commands] == ['target_benchmark_env.launch.py']
+
+
+def test_valid_measurements_do_not_hide_a_failed_configuration_process(
+    tmp_path, monkeypatch,
+) -> None:
+    events = []
+    manifest, success, _commands, _namespaces = _run_sweep_harness(
+        tmp_path, monkeypatch, _SweepSceneControl(events), events,
+        config_returncode=1)
+
+    assert not success
+    entry = manifest['configs'][0]
+    assert entry['status'] == 'failed'
+    assert entry['output_valid'] is True
+    assert entry['launch_returncode'] == 1
+    assert 'launch exited with code 1' in entry['error']
+
+
+def test_environment_shutdown_failure_keeps_saved_output_and_fails_the_sweep(
+    tmp_path, monkeypatch,
+) -> None:
+    events = []
+
+    def stop_group(process, label):
+        if label == 'persistent benchmark environment':
+            raise RuntimeError('owned descendant remains')
+        return None
+
+    manifest, success, _commands, _namespaces = _run_sweep_harness(
+        tmp_path, monkeypatch, _SweepSceneControl(events), events,
+        stop_group=stop_group)
+
+    assert not success
+    assert manifest['configs'][0]['output_valid'] is True
+    assert manifest['lifecycle']['clean'] is False
+    assert 'owned descendant remains' in manifest['lifecycle']['errors'][0]
+
+
+def test_a_naturally_exited_configuration_still_has_its_group_checked(
+    tmp_path, monkeypatch,
+) -> None:
+    events = []
+    stopped = []
+
+    def stop_group(process, label):
+        if label.startswith('config '):
+            stopped.append(label)
+            return {'returncode': 0, 'signals': ['SIGTERM'],
+                    'escalated': True, 'group_empty': True}
+        return None
+
+    manifest, success, _commands, _namespaces = _run_sweep_harness(
+        tmp_path, monkeypatch, _SweepSceneControl(events), events,
+        stop_group=stop_group)
+
+    assert stopped
+    assert not success
+    entry = manifest['configs'][0]
+    assert entry['output_valid'] is True
+    assert entry['shutdown']['escalated'] is True
+    assert entry['status'] == 'failed'
+
+
+@pytest.mark.parametrize('failure', ['escalated', 'remaining', 'exception'])
+def test_resume_reruns_and_archives_output_from_a_failed_shutdown(
+    tmp_path, monkeypatch, failure,
+) -> None:
+    events = []
+
+    def stop_group(process, label):
+        if label.startswith('config '):
+            if failure == 'exception':
+                raise RuntimeError('cleanup inspection failed')
+            return {'returncode': 0, 'signals': [],
+                    'escalated': failure == 'escalated',
+                    'group_empty': failure != 'remaining'}
+        return None
+
+    first, success, _commands, _ = _run_sweep_harness(
+        tmp_path, monkeypatch, _SweepSceneControl(events), events, stop_group=stop_group)
+    assert not success
+    entry = first['configs'][0]
+    assert entry['launch_returncode'] == 0
+    assert entry['output_valid'] is True
+    output = Path(entry['arguments']['output_dir']) / entry['output_path']
+    saved = (output / 'run.json').read_bytes()
+
+    resumed, success, commands, _ = _run_sweep_harness(
+        tmp_path, monkeypatch, _SweepSceneControl(events), events)
+    assert success
+    assert resumed['configs'][0]['status'] == 'success'
+    assert any(command[4] == 'target_benchmark_config.launch.py' for command in commands)
+    archived = list(output.parent.glob(output.name + '.incomplete_*'))
+    assert len(archived) == 1
+    assert (archived[0] / 'run.json').read_bytes() == saved
+
+
+@pytest.mark.parametrize('initial_interrupt', [False, True])
+def test_sweep_finishes_ordered_cleanup_despite_repeated_signals(
+    tmp_path, monkeypatch, initial_interrupt,
+) -> None:
+    import os
+    import signal
+
+    events = []
+    stops = []
+    previous = {signum: signal.getsignal(signum) for signum in (signal.SIGINT, signal.SIGTERM)}
+
+    def stop_group(process, label):
+        if process is None:
+            return None
+        stops.append(label)
+        if 'config' in label:
+            os.kill(os.getpid(), signal.SIGINT)
+            os.kill(os.getpid(), signal.SIGTERM)
+        return None
+
+    def wait(*_args):
+        if initial_interrupt:
+            raise KeyboardInterrupt
+        return 'exited', None
+
+    try:
+        manifest, success, _commands, _ = _run_sweep_harness(
+            tmp_path, monkeypatch, _SweepSceneControl(events), events,
+            stop_group=stop_group, wait_for_config=wait)
+    except KeyboardInterrupt:
+        pytest.fail('a cleanup interrupt escaped before the environment stopped')
+
+    assert not success
+    assert manifest['sweep']['status'] == 'interrupted'
+    assert manifest['lifecycle']['clean'] is True
+    assert len(stops) == 2
+    assert 'config' in stops[0]
+    assert stops[1] == 'persistent benchmark environment'
+    assert {signum: signal.getsignal(signum) for signum in previous} == previous
+
+
+def test_forced_recorder_shutdown_is_reported_as_escalation(monkeypatch) -> None:
+    from types import SimpleNamespace
+    process = SimpleNamespace(pid=42, returncode=0, poll=lambda: 0)
+    remaining = iter([[51], [51], []])
+    monkeypatch.setattr(sweep_module, '_live_process_group_pids', lambda _pgid: [])
+    monkeypatch.setattr(sweep_module, '_process_group_ffmpeg_pids', lambda _pgid: next(remaining))
+    monkeypatch.setattr(sweep_module, '_wait_until', lambda *_args: True)
+    monkeypatch.setattr(sweep_module, '_signal_pids', lambda *_args: None)
+
+    report = sweep_module.stop_process_group(process, 'recorder fixture')
+
+    assert report['escalated'] is True
+    assert report['recorder_signals'] == ['SIGINT', 'SIGTERM']
 
 
 _RECORDER = r'''
@@ -876,9 +1033,175 @@ def test_stopping_a_sweep_launch_delivers_one_sigint_to_every_process(tmp_path) 
     def received(name):
         return (logs / name).read_text(encoding='utf-8').split()
 
-    assert process.returncode == 0
+    # The intentionally stuck child required launch's SIGTERM escalation,
+    # which must remain visible even though the child then exited zero.
+    assert process.returncode == 1
     assert received('direct') == ['SIGINT']
     assert received('wrapper') == ['SIGINT']
     assert received('wrapper.child') == ['SIGINT']
     # A child that ignores SIGINT is still escalated, by launch itself.
     assert received('stuck') == ['SIGINT', 'SIGTERM']
+
+
+def test_a_crashed_child_makes_the_launch_fail(tmp_path) -> None:
+    env, _logs = _signal_fixture(tmp_path)
+    share = Path(env['AMENT_PREFIX_PATH'].split(':')[0]) / 'share/ridgeback_autonomy'
+    (share / 'failure.launch.py').write_text(
+        'from launch import LaunchDescription\n'
+        'from launch.actions import ExecuteProcess\n'
+        'def generate_launch_description():\n'
+        f'    return LaunchDescription([ExecuteProcess(cmd=[{sys.executable!r}, '
+        '"-c", "import time; time.sleep(.2); raise SystemExit(7)"]), '
+        f'ExecuteProcess(cmd=[{sys.executable!r}, "-c", '
+        '"import time; time.sleep(60)"])])\n', encoding='utf-8')
+
+    result = subprocess.run(
+        sweep_module._launch_command('failure.launch.py', {}),
+        env=env, capture_output=True, text=True, timeout=15.0)
+
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert 'failed with exit 7' in result.stderr
+
+
+@pytest.mark.parametrize('separate_group', [False, True])
+def test_group_cleanup_does_not_stop_at_a_dead_launch_leader(
+    tmp_path, monkeypatch, separate_group,
+) -> None:
+    import os
+    import signal
+    import time
+
+    ready = tmp_path / 'descendant.ready'
+    child = tmp_path / 'descendant.py'
+    child.write_text(
+        'import signal, time\n'
+        'signal.signal(signal.SIGINT, signal.SIG_IGN)\n'
+        f'open({str(ready)!r}, "w").close()\n'
+        'while True: time.sleep(0.02)\n', encoding='utf-8')
+    leader = subprocess.Popen(
+        [sys.executable, '-c',
+         f'import subprocess; subprocess.Popen([{sys.executable!r}, {str(child)!r}], '
+         f'process_group={0 if separate_group else None!r})'],
+        start_new_session=True,
+    )
+    monkeypatch.setattr(sweep_module, 'PROCESS_INT_GRACE_SEC', 0.2)
+    monkeypatch.setattr(sweep_module, 'PROCESS_TERM_GRACE_SEC', 1.0)
+    try:
+        leader.wait(timeout=5.0)
+        deadline = time.monotonic() + 5.0
+        while not ready.exists() and time.monotonic() < deadline:
+            time.sleep(0.02)
+        assert ready.exists()
+
+        report = sweep_module.stop_process_group(leader, 'orphan fixture')
+
+        assert report['group_empty'] is True
+        assert report['escalated'] is True
+        assert report['signals'] == ['SIGINT', 'SIGTERM']
+        assert sweep_module._live_process_group_pids(leader.pid) == []
+    finally:
+        try:
+            os.killpg(leader.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+
+
+def test_a_helper_created_during_shutdown_receives_its_first_interrupt(tmp_path, monkeypatch):
+    import os
+    import signal
+    import time
+
+    ready = tmp_path / 'parent.ready'
+    signals = tmp_path / 'late.signals'
+    child = tmp_path / 'late.py'
+    child.write_text(
+        'import signal, time\n'
+        'def stop(sig, frame):\n'
+        f'    open({str(signals)!r}, "a").write(signal.Signals(sig).name + "\\n")\n'
+        '    raise SystemExit(0)\n'
+        'signal.signal(signal.SIGINT, stop)\n'
+        'signal.signal(signal.SIGTERM, stop)\n'
+        'signal.pthread_sigmask(signal.SIG_UNBLOCK, {signal.SIGINT})\n'
+        'while True: time.sleep(.01)\n', encoding='utf-8')
+    code = (
+        'import signal, subprocess, sys, time\n'
+        'def stop(sig, frame):\n'
+        f'    subprocess.Popen([{sys.executable!r}, {str(child)!r}], process_group=0, '
+        'preexec_fn=lambda: signal.pthread_sigmask(signal.SIG_BLOCK, {signal.SIGINT}))\n'
+        '    raise SystemExit(0)\n'
+        'signal.signal(signal.SIGINT, stop)\n'
+        f'open({str(ready)!r}, "w").close()\n'
+        'while True: time.sleep(.01)\n')
+    parent = subprocess.Popen([sys.executable, '-c', code], start_new_session=True)
+    monkeypatch.setattr(sweep_module, 'PROCESS_INT_GRACE_SEC', 1.0)
+    monkeypatch.setattr(sweep_module, 'PROCESS_TERM_GRACE_SEC', 1.0)
+    try:
+        deadline = time.monotonic() + 5.0
+        while not ready.exists() and time.monotonic() < deadline:
+            time.sleep(.01)
+        assert ready.exists()
+
+        report = sweep_module.stop_process_group(parent, 'late helper fixture')
+
+        assert report['escalated'] is False
+        assert report['group_empty'] is True
+        assert signals.read_text().splitlines() == ['SIGINT']
+    finally:
+        for group in sweep_module._owned_process_groups(parent.pid):
+            try:
+                os.killpg(group, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+        parent.wait(timeout=5.0)
+
+
+def test_a_slow_recorder_receives_only_one_interrupt(tmp_path, monkeypatch):
+    import os
+    import signal
+    import time
+
+    ready = tmp_path / 'recorder.ready'
+    signals = tmp_path / 'recorder.signals'
+    script = tmp_path / 'ffmpeg_probe.py'
+    script.write_text(
+        'import signal, time\n'
+        'def stop(sig, frame):\n'
+        f'    open({str(signals)!r}, "a").write(signal.Signals(sig).name + "\\n")\n'
+        '    if sig == signal.SIGTERM: raise SystemExit(0)\n'
+        'signal.signal(signal.SIGINT, stop)\n'
+        'signal.signal(signal.SIGTERM, stop)\n'
+        f'open({str(ready)!r}, "w").close()\n'
+        'while True: time.sleep(.01)\n', encoding='utf-8')
+    recorder = subprocess.Popen(
+        [sys.executable, str(script), 'x11grab'], start_new_session=True)
+    monkeypatch.setattr(sweep_module, 'PROCESS_INT_GRACE_SEC', .2)
+    monkeypatch.setattr(sweep_module, 'FFMPEG_INT_GRACE_SEC', .2)
+    monkeypatch.setattr(sweep_module, 'PROCESS_TERM_GRACE_SEC', 1.0)
+    try:
+        deadline = time.monotonic() + 5.0
+        while not ready.exists() and time.monotonic() < deadline:
+            time.sleep(.01)
+        assert ready.exists()
+
+        report = sweep_module.stop_process_group(recorder, 'slow recorder fixture')
+
+        assert signals.read_text().splitlines() == ['SIGINT', 'SIGTERM']
+        assert report['recorder_signals'] == ['SIGTERM']
+        assert report['escalated'] is True
+        assert report['group_empty'] is True
+    finally:
+        if recorder.poll() is None:
+            os.killpg(recorder.pid, signal.SIGKILL)
+        recorder.wait(timeout=5.0)
+
+
+def test_retrying_a_failed_launch_preserves_its_valid_measurements(tmp_path):
+    output = tmp_path / 'attempt'
+    output.mkdir()
+    payload = '{"run": {}, "parameters": {}, "estimators": []}'
+    (output / 'run.json').write_text(payload)
+
+    archived = sweep_module._archive_incomplete_output(str(output), include_valid=True)
+
+    assert not output.exists()
+    assert (Path(archived) / 'run.json').read_text() == payload

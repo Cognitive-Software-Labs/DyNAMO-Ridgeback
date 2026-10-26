@@ -38,45 +38,6 @@ measurement differences or inconclusive evidence keep the affected use blocked.
 Gazebo GLX qualification does not establish Isaac, EGL, hardware, or untested
 workload/profile equivalence. Record the qualified conditions in run guidance.
 
-## Isaac benchmark environment teardown
-
-**Gap.** In two independent stationary scan captures on 2026-10-25, the
-Isaac runner reached `RUNNER EXIT` and `Simulation App Shutting Down`, but
-launch escalated to SIGTERM after five seconds; the second stop also logged
-SIGKILL. Both launches returned 0, so launcher status alone cannot establish
-clean teardown. The LiDAR change leaves the Isaac runner and installed
-SimulationApp unchanged; the teardown mechanism still needs diagnosis.
-Evidence: `artifacts/benchmarks/ust10lx_review_20261025_base_39fb8c1/`.
-
-The full benchmark launch on `854c34c` did not reproduce it. It stopped on
-Ctrl-C without escalation 4 times out of 4 (one full run and three interrupted
-cycles, 2026-10-25/26), so the escalation is so far confined to the
-environment-only scan captures.
-
-**Completion criteria.** Identify the delayed teardown boundary, qualify the
-repair with repeated attached-PTY Ctrl-C stops after clock and sensor
-readiness, and require every child to exit without escalation or leftover
-processes. Keep this separate from scan-contract and estimator acceptance.
-
-## Interrupted benchmark stops
-
-**Gap.** A Ctrl-C during a trial leaves no process or entity behind on either
-backend, but it does not stop cleanly. Seen in 3 of 3 cycles per backend on
-2026-10-26:
-- The runner exits 130, and its rollback delete cannot reach the simulator,
-  which is already stopping.
-- On Gazebo, that pending delete makes `gzserver` abort with
-  `std::future_error: Broken promise` (exit -6). This is the gz-sim
-  `UserCommands` blocking-handler defect already diagnosed during the ros_gz
-  bridge work.
-- The known `target_overlay_node` exit 1 and RViz exit SIGSEGV also appear.
-
-A stop after a completed run is clean on both backends.
-
-**Completion criteria.** Every child exits cleanly on Ctrl-C during a trial on
-both backends, repeated over at least three attached-PTY cycles each. Fix
-external defects as recorded dependency patches.
-
 ## Layered replay validation
 
 **Gap.** Layered replay is implemented; fresh live parity, real segmentation
@@ -199,6 +160,28 @@ after browser/server restart, and cancels its owned processes cleanly. Verify
 dry run has no launch/cleanup side effects and existing offline workflows remain
 intact. Record the lifecycle evidence in the qualified environment and update
 operator guidance. UI availability does not itself qualify benchmark results.
+
+## Benchmark shutdown qualification
+
+**Status.** Configuration-first ownership is implemented for single runs and
+sweeps. The [shutdown plan](../plans/BENCHMARKING_shutdown_lifecycle.md) owns the
+remaining qualification and dependency investigations.
+
+**Gap.** The RViz DDS unload crash has a reproduced view-controller ownership
+defect and passing ownership regression. Its first traced active Isaac stop is
+clean at the application boundary; the strict whole-process matrix stopped on
+unexplained SDK startup exit/termination outcomes; environment-only Isaac
+scan captures on 2026-10-25 also escalated to SIGTERM/SIGKILL after
+`RUNNER EXIT` (`artifacts/benchmarks/ust10lx_review_20261025_base_39fb8c1/`).
+The rare image-bridge teardown failure and safe provider destruction with
+outstanding blocking scene requests also remain open. Application shutdown and complete SDK qualification are
+separate outcomes.
+
+**Completion criteria.** Preserve reproducible failing schedules and corrected
+behavior for each remaining signature, then exercise startup, normal completion,
+mid-trial cancellation, pending scene requests, repeated interrupts, and child
+failure on both backends. Record child exits, escalation, cleanup outcomes, and
+owned leftovers separately from saved measurements.
 
 ## Archived evidence
 

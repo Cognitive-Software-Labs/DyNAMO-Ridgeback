@@ -48,7 +48,7 @@ declare -A PATCHES=(
     [src/slam_toolbox]="patches/slam_toolbox_tf_namespace.patch"
     [src/gz-sim]="patches/gz_sim_sensors_shutdown.patch"
     [src/ros_gz]="patches/ros_gz_bridge_shutdown.patch"
-    [src/rviz]="patches/rviz_image_display_unsubscribe.patch"
+    [src/rviz]="patches/rviz_shutdown.patch"
 )
 
 # Partial overlays: checkouts of which only the listed top-level packages are
@@ -58,7 +58,7 @@ declare -A PATCHES=(
 declare -A BUILD_ONLY=(
     [src/ros_gz]="ros_gz_bridge ros_gz_image"
     # rviz_default_plugins requires the testing framework when BUILD_TESTING is on.
-    [src/rviz]="rviz_default_plugins rviz_visual_testing_framework"
+    [src/rviz]="rviz_common rviz_default_plugins rviz_visual_testing_framework"
 )
 
 if ! dependency_text="$(python3 - "${MANIFESTS[@]}" <<'PY'
