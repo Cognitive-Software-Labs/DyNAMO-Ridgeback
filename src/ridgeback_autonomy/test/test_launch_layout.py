@@ -43,10 +43,41 @@ def test_public_launch_surface_is_limited_to_known_entrypoints() -> None:
         'localization_observer.launch.py',
         'manual_mapping.launch.py',
         'ridgeback_exploration.launch.py',
+        'ridgeback_mission.launch.py',
         'target_benchmark_config.launch.py',
         'target_benchmark_env.launch.py',
         'target_distance_benchmark.launch.py',
     ]
+
+
+def test_mission_launch_is_opt_in_and_stationary() -> None:
+    mission_text = (
+        _package_root() / 'launch' / 'ridgeback_mission.launch.py'
+    ).read_text(encoding='utf-8')
+
+    assert "'mission_management_enabled', default_value='false'" in mission_text
+    assert "'stationary_mock_handoff_enabled', default_value='false'" in mission_text
+    assert "'autonomous_motion_enabled': 'false'" in mission_text
+    assert "'robot_base_frame', default_value='base_link'" in mission_text
+    assert "'base_frame': LaunchConfiguration('robot_base_frame')" in mission_text
+    assert mission_text.count("executable='mission_manager_node.py'") == 1
+    assert mission_text.count("executable='stationary_mission_guard'") == 1
+    assert 'NavigateToPose' not in mission_text
+    assert 'ComputePathToPose' not in mission_text
+
+
+def test_stationary_handoff_is_explicitly_not_the_production_guard() -> None:
+    guard_text = (
+        _package_root()
+        / 'ridgeback_autonomy'
+        / 'mission'
+        / 'stationary_mission_guard_node.py'
+    ).read_text(encoding='utf-8')
+
+    assert 'not a replacement for MissionGuard' in guard_text
+    assert "'ownership_mode': 'stationary_mock'" in guard_text
+    assert 'ActionClient' not in guard_text
+    assert 'cancel_goal_async' not in guard_text
 
 
 def test_manual_mapping_does_not_force_a_dds_profile() -> None:

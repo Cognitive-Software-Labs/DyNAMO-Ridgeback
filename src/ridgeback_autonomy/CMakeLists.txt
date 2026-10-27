@@ -72,6 +72,12 @@ install(PROGRAMS
 )
 
 install(PROGRAMS
+  ridgeback_autonomy/mission/stationary_mission_guard_node.py
+  DESTINATION lib/${PROJECT_NAME}
+  RENAME stationary_mission_guard
+)
+
+install(PROGRAMS
   ridgeback_autonomy/diagnostics/velocity_overlay_node.py
   DESTINATION lib/${PROJECT_NAME}
   RENAME velocity_overlay_node

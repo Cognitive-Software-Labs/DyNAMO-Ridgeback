@@ -211,6 +211,89 @@ can be inserted after `G1_LOCALIZED`, using a separately specified scoped
 ownership/resume contract and coverage completion criterion. It is not
 implemented here.
 
+## Phase 2D.5 stationary integration launch
+
+`ridgeback_mission.launch.py` is a thin simulation-only wrapper around
+`ridgeback_exploration.launch.py`. It forwards the backend, world, namespace,
+simulated clock, localization selection, and configured map/base frames while
+forcing `autonomous_motion_enabled=false`. Mission management is opt-in through
+`mission_management_enabled`; the wrapper starts exactly one non-driving
+`mission_manager_node.py` and does not add another detector, measurement stack,
+SLAM instance, Nav2 instance, or robot publisher.
+
+The production explorer is absent in this stationary mode, so its real
+`MissionGuard` services are absent as well. Two deliberately distinct tests are
+required:
+
+1. `stationary_mock_handoff_enabled=true` starts
+   `stationary_mission_guard`, an idle test double that owns no Nav2 client and
+   acknowledges only the no-explorer-goal case. Its status includes
+   `ownership_mode=stationary_mock`. This permits non-driving verification of
+   `SEARCH_G1 -> STOPPING_EXPLORATION -> LOCALIZE_G1 -> G1_LOCALIZED`.
+2. The production handoff test must run the real explorer/MissionGuard with an
+   explorer-owned action goal. Its acceptance criterion remains terminal action
+   settlement followed by `handoff_safe=true`; the stationary test does not
+   replace or weaken that contract.
+
+Both mission and mock are default-off. With mission enabled but the mock off, a
+confirmed target correctly exposes the missing production pause service as
+`pause_service_unavailable` after the bounded handoff timeout.
+
+The bounded Gazebo check observed bare TF frame IDs (`map`, `odom`, and
+`base_link`) on namespaced `/tf` topics. Camera products identify their source
+as `camera_0_color_optical_frame`, but that optical frame was not present in
+the live TF tree; this is a localization blocker documented below. The wrapper
+therefore defaults `robot_base_frame=base_link` and forwards that same value to
+both the shared localization launch (`base_frame`) and mission manager. ROS
+namespace `r100_0001` remains a topic/node scope and is not prepended to TF
+frame IDs.
+
+The wrapper defaults to the already supported public Gazebo `depot` world,
+which maps to Clearpath's `warehouse` and does not contain a G1 model. The
+repository-authored `initial_test_world` does contain
+`default_g1_far_right_room` at `(13.2, 4.65)`, but the currently installed
+Clearpath simulator rejects that custom world before launch because its public
+world argument only permits stock worlds. Consequently the stationary launch
+can validate bringup, topics, TF, start-pose capture, and `SEARCH_G1` in
+`depot`, but it cannot honestly claim live detection/localization without a
+separate controlled target placement that is accepted by this simulator
+installation. The existing target-distance benchmark is the authoritative
+controlled Gazebo mechanism for detector/localizer accuracy; it moves/spawns
+models for trials and therefore is not silently included in this non-driving
+mission wrapper.
+
+The October 2026 bounded Gazebo check on `depot` verified camera publication,
+the detector's `humanoid robot` configuration, 640x480 detection and
+measurement messages, start-pose capture, and the transition to `SEARCH_G1`.
+As expected for a world with no G1, both messages carried `detected=false` and
+empty target arrays, so `STOPPING_EXPLORATION`, `LOCALIZE_G1`, and
+`G1_LOCALIZED` were not exercised and no accuracy number was produced. The
+detector requires a perception environment; this checkout has none, while the
+bounded check used the existing read-only environment selected with
+`RIDGEBACK_PERCEPTION_VENV`. No explorer process or NavigateToPose action status
+appeared during the observation interval.
+
+A second stationary check spawned the repository's existing G1 model at the
+known evaluation-only Gazebo pose `(3.0, 0.0)` without changing any world or
+launch file. OWLv2 published one `humanoid robot` detection with score `0.682`
+and bbox `(288, 209, 357, 444)`. The adapter confirmed three positives in its
+five-observation window, the manager requested the stationary mock pause, and
+the immediate idle handoff produced the expected sequence
+`SEARCH_G1 -> STOPPING_EXPLORATION -> LOCALIZE_G1`. No navigation action was
+sent.
+
+Localization did not produce a finite sample. The camera messages used
+`camera_0_color_optical_frame`, while the generated Clearpath static TF launch
+published `camera_0_link -> r100_0001/robot/base_link/camera_0` and no optical
+frame. The mask localizer consequently logged `Camera -> base extrinsic
+unavailable`, published status `4` with NaN estimator fields, and the manager
+correctly transitioned `LOCALIZE_G1 -> MISSION_FAILED` after its 5 s deadline.
+`G1_LOCALIZED` was not reached, so no localization error can be reported. The
+repository already carries `patches/clearpath_realsense_sim_frames.patch` for
+this dependency issue; the correct next integration step is applying that
+patch to a source-built `clearpath_common`, not adding an approximate mission
+TF or changing estimator validation.
+
 ## Compatibility matrix
 
 | Area | Original mission contract | Current dev contract | Phase 2 adaptation |
