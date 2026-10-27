@@ -1,9 +1,9 @@
 # EXPLORATION - Parking mission migration
 
-Status: **Phase 1 geometry foundation implemented; mission manager migration
-pending.** This plan covers adapting the existing Ridgeback-G1 parking mission
-to the current package-split architecture without duplicating localization or
-changing Nav2 safety configuration.
+Status: **Phase 1 geometry foundation and target-detection adapter implemented;
+mission manager migration pending.** This plan covers adapting the existing
+Ridgeback-G1 parking mission to the current package-split architecture without
+duplicating localization or changing Nav2 safety configuration.
 
 ## Phase 1 foundation
 
@@ -20,6 +20,19 @@ mission commitment, start-pose capture, and localization fallback. Those are
 mission-manager integration tests rather than parking-geometry tests. They are
 deferred to Phase 2 and must be migrated with their assertions intact once the
 new manager exists.
+
+The target-detection input is now isolated in
+`ridgeback_autonomy.mission.target_detection`. It validates generic
+`TargetDetections` batches, selects the highest-scoring configured humanoid
+label, preserves the original rolling five-result/three-positive confirmation
+policy, and exposes the original five-negative localization-reset signal. The
+original search path had no wall-age timeout, so the adapter does not invent
+one. For stale traffic, it rejects messages older than the last accepted source
+timestamp.
+The original G1 detector filtered at `0.50`, while the current generic detector
+defaults to `0.55`. The adapter retains the original `0.50` floor but does not
+alter the upstream detector, so the current live pipeline remains effectively
+`0.55` until launch configuration is considered in a later integration phase.
 
 ## Compatibility matrix
 
