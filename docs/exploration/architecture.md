@@ -75,6 +75,23 @@ validation gates before motion is enabled.
 `frontier_explorer_node` reads the Nav2 global costmap, chooses frontiers, and
 sends `NavigateToPose` goals. It is the only supported explorer.
 
+### Navigation ownership handoff
+
+The explorer owns its Nav2 goal until a matching action result is terminal. An
+external mission requests a pause through relative service `mission/pause`
+(`std_srvs/srv/Trigger`). The request immediately prevents new frontier goals
+and requests cancellation of an active goal, but cancel acceptance does not
+release ownership. The transient-local `mission/status` JSON is authoritative:
+only `pause_requested=true` together with `handoff_safe=true` permits another
+mission component to send a Nav2 goal. Pending acceptance, an active handle, or
+any pending/rejected/failed/overdue cancellation keeps `handoff_safe=false`.
+
+`mission/resume` is also explicit. It succeeds only after explorer ownership is
+settled and, when configured as required, localization health is current and
+advancing. The explorer does not automatically resume after an external pause.
+`explore/status` reports exploration progress, not Nav2 ownership, and must not
+be used as the handoff acknowledgment.
+
 The HUD is an aggregator. Independent producers publish text panels such as
 velocity and coverage, and `hud_node` combines them for one RViz overlay.
 In simulation, coverage compares the live SLAM map with the selected world's

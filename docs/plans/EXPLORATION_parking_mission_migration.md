@@ -1,7 +1,8 @@
 # EXPLORATION - Parking mission migration
 
-Status: **Phase 1 geometry foundation plus target-detection and target-localization
-adapters implemented; mission manager migration pending.** This plan covers adapting the existing
+Status: **Phase 1 geometry foundation, target-detection/localization adapters,
+and the explorer ownership handoff are implemented; mission manager migration
+is pending.** This plan covers adapting the existing
 Ridgeback-G1 parking mission to the current package-split architecture without
 duplicating localization or changing Nav2 safety configuration.
 
@@ -85,6 +86,41 @@ that gap matters, is one quality-gated G1 ground-center/foot estimator inside
 infrastructure, exposed with explicit reference semantics and status. Raw RGB-D
 processing must not be rebuilt inside the mission manager.
 
+## Phase 2 exploration ownership handoff
+
+The original mission entered `STOPPING_EXPLORATION`, called the explorer's
+`explore/set_enabled` service with `false`, and polled until both the service
+request had completed and `explore/active` reported false. Only then did it
+continue to localization and parking. Its resume path called the same service
+with `true`. The old manager did not impose a separate bounded handoff timeout;
+it relied on the explorer retaining ownership until the action result callback
+reported a terminal result.
+
+The current explorer now exposes the equivalent ownership contract through two
+relative services and one transient-local status topic:
+
+| Interface | Type | Contract |
+|---|---|---|
+| `mission/pause` | `std_srvs/srv/Trigger` | Latches an explicit pause and immediately stops new frontier scheduling. `success=true` means the explorer has no pending goal acceptance, active goal handle, or cancellation state. `success=false` means ownership is still unresolved, including pending, rejected, failed, or overdue cancellation; it is not permission for another Nav2 owner to start. |
+| `mission/status` | `std_msgs/msg/String` JSON | `pause_requested=true` and `handoff_safe=true` are the authoritative asynchronous handoff acknowledgment. `goal_pending`, `goal_active`, `cancellation`, and `cancellation_overdue` explain an incomplete handoff. |
+| `mission/resume` | `std_srvs/srv/Trigger` | Clears an explicit pause only when no explorer-owned goal/cancellation remains and, when required, localization health is current and advancing. Resume is never automatic. |
+
+A pause received while idle is immediately safe. A pause received while goal
+acceptance is pending remains unsafe; if that goal is accepted later it is
+immediately canceled. An active goal remains owned by the explorer while cancel
+acceptance is pending and until its result is `SUCCEEDED`, `CANCELED`, or
+`ABORTED`. Cancel rejection, transport failure, result failure, and timeout all
+remain unsafe. The timeout is diagnostic only and never releases ownership.
+Repeated pause requests are idempotent and cannot send duplicate cancellation
+requests.
+
+The future parking manager must call `mission/pause`, observe
+`mission/status`, and wait for `handoff_safe=true` before sending any Nav2 goal.
+Before requesting `mission/resume`, that manager must first settle its own Nav2
+goal; the Trigger service cannot identify arbitrary external Nav2 clients.
+`explore/status` remains an exploration-progress topic and is not an ownership
+proof.
+
 ## Compatibility matrix
 
 | Area | Original mission contract | Current dev contract | Phase 2 adaptation |
@@ -95,8 +131,8 @@ processing must not be rebuilt inside the mission manager.
 | Planar reference | Legacy mission reconstructed camera/base positions itself | Shared estimators publish lateral as base +Y left-positive and forward from the robot-front reference | Call `remove_vehicle_front_offset()` before map projection, then transform the base-origin-relative point with the measurement-time `map -> base` transform. |
 | Time/synchronization | Mission cached raw RGB/depth/cloud and used legacy matching helpers | Localization workers own sensor matching and publish source-stamped batches; shared stamp/buffer helpers replace old utilities | Treat the localization output stamp as authoritative. Do not add a second raw-sensor synchronization path in autonomy. |
 | TF | Mission assumed `map` and bare `base_link` under namespaced TF topics | Topic namespace and TF frame IDs are deliberately independent; simulation localization currently receives `r100_0001/robot/base_link`, while Nav2 uses `base_link` | Make map and observed base frame explicit launch parameters and verify the live TF chain. Never derive frame IDs from the ROS namespace. |
-| Exploration ownership | `explore/set_enabled` (`SetBool`) plus `explore/active` (`Bool`) | No equivalent stop/active pair. `MissionGuard` owns the explorer goal, exposes latched JSON on `mission/status`, and `mission/resume` only resumes a healthy, settled owner | Add an explicit, terminally acknowledged mission pause/stop contract to the existing guard or a narrowly scoped owner API. Reuse its handle identity and cancellation-settling rules; do not add sleeps or a second Nav2 owner. |
-| Exploration status | Active Boolean represented an in-flight goal | `explore/status` reports `exploration_started` or `exploration_complete`; `mission/status` reports paused, health, cancellation, and goal-pending state | Use `mission/status` for ownership settlement. `explore/status` alone does not prove an action goal is terminal. |
+| Exploration ownership | `explore/set_enabled` (`SetBool`) plus `explore/active` (`Bool`) | `mission/pause` latches a pause in `MissionGuard`; `mission/resume` restores scheduling only after settlement and required health | Wait for the terminally acknowledged `mission/status.handoff_safe` contract. No sleeps or second explorer owner are needed. |
+| Exploration status | Active Boolean represented an in-flight goal | `explore/status` reports `exploration_started` or `exploration_complete`; `mission/status` reports pause request, handoff safety, health, pending/active goal, and cancellation state | Use `mission/status` for ownership settlement. `explore/status` alone does not prove an action goal is terminal. |
 | Nav2 actions | Relative `compute_path_to_pose` and `navigate_to_pose`, planner loaded from YAML | Same namespaced actions and `GridBased` planner remain | Preserve action code, error-code checks, non-empty-path requirement, and sequential ownership after explorer settlement. |
 | Footprint | Mission loaded the global-costmap footprint from Nav2 YAML | YAML now contains the authoritative 16-point Ridgeback envelope with padding | Continue loading current configuration; do not copy the old rectangular test footprint into runtime code. Retest complete-footprint and path sampling against the new polygon. |
 | Costmaps/map | Occupancy map plus mission-side unknown/occupied/path checks | SLAM/Nav2 still publish map and costmaps, with global planning allowed through unknown for exploration | Preserve stricter mission candidate/path rejection of unknown space. Do not change Nav2 parameters. |
@@ -143,10 +179,9 @@ processing must not be rebuilt inside the mission manager.
    outputs cannot supply the required stable planar target center, extend
    `ridgeback_localization` once rather than rebuilding perception in the
    mission manager.
-3. **Add an explicit explorer ownership handoff.** Extend `MissionGuard` with a
-   deliberate pause/stop request whose completion is reported only after the
-   owned Nav2 goal reaches a terminal result. Keep health-fault pause and
-   operator resume semantics intact.
+3. **Implemented: explicit explorer ownership handoff.** `MissionGuard` now
+   exposes `mission/pause`, terminal `handoff_safe` status, and guarded
+   `mission/resume`, retaining goal identity through cancellation settlement.
 4. **Port the mission skeleton.** Restore start-pose capture, search,
    commitment, stop settlement, localization, safe-failure, return, and terminal
    states with state-transition unit tests before parking actions are enabled.

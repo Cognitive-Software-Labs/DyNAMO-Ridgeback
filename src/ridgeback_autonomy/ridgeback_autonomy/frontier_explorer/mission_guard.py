@@ -1,4 +1,4 @@
-"""Latched localization interlock around the mission owner's Nav2 action client."""
+"""Latched safety and ownership interlock around the explorer's Nav2 client."""
 import json
 import math
 import threading
@@ -34,9 +34,13 @@ class MissionGuard:
         self.goal_pending = False
         self.cancel_state = 'none'
         self.cancel_started = 0.0
+        self.cancel_overdue = False
+        self.pause_requested = False
+        self.pause_started = 0.0
         self.subscription = node.create_subscription(LocalizationHealth, HEALTH_TOPIC, self.observe, 10)
         self.publisher = node.create_publisher(String, 'mission/status', QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL))
-        self.service = node.create_service(Trigger, 'mission/resume', self.resume)
+        self.pause_service = node.create_service(Trigger, 'mission/pause', self.request_pause)
+        self.resume_service = node.create_service(Trigger, 'mission/resume', self.resume)
         self.timer = node.create_timer(0.2, self.tick, clock=Clock(clock_type=ClockType.STEADY_TIME))
 
     def observe(self, msg):
@@ -75,8 +79,19 @@ class MissionGuard:
                 and all(value[3] and now-value[2] <= self.progress_timeout for value in self.progress.values()))
 
     def allowed(self):
-        return not self.required or (not self.paused and self.healthy()
-            and not self.goal_pending and self.cancel_state == 'none')
+        return (not self.paused and not self.goal_pending
+            and self.cancel_state == 'none'
+            and (not self.required or self.healthy()))
+
+    def handoff_safe(self):
+        """Whether an explicit requester may take over Nav2 ownership."""
+        with self.lock:
+            return self._handoff_safe_locked()
+
+    def _handoff_safe_locked(self):
+        return (self.pause_requested and self.paused
+            and not self.goal_pending and self.handle is None
+            and self.cancel_state == 'none')
 
     def pause(self, reason):
         if not self.required: return
@@ -92,6 +107,7 @@ class MissionGuard:
         if self.handle is None or self.cancel_state != 'none': return
         self.cancel_state = 'request_pending'
         self.cancel_started = time.monotonic()
+        self.cancel_overdue = False
         try:
             future = self.handle.cancel_goal_async()
             handle = self.handle
@@ -106,23 +122,60 @@ class MissionGuard:
             try:
                 result = future.result()
                 self.cancel_state = 'awaiting_result' if result.goals_canceling else 'rejected'
+                if self.cancel_state == 'rejected':
+                    self.reason = 'Cancellation rejected; awaiting terminal result'
             except Exception as exc:
                 self.cancel_state = 'failed'
                 self.reason = 'Cancellation failed: ' + str(exc)
             if self.cancel_state in ('failed', 'rejected'): self.paused = True
+            self._publish_status_locked()
 
     def accepted(self, handle):
         with self.lock:
             self.goal_pending = False
             self.handle = handle
-            if self.required and (self.paused or not self.healthy()):
+            if self.paused:
+                self._cancel_locked()
+            elif self.required and not self.healthy():
                 self.pause('Localization unavailable when goal accepted')
+            self._publish_status_locked()
 
     def finished(self, handle):
         with self.lock:
             if self.handle is handle:
                 self.handle = None
                 self.cancel_state = 'none'
+                self.cancel_overdue = False
+                self._publish_status_locked()
+
+    def request_pause(self, request, response):
+        """Latch an external pause and report success only after settlement.
+
+        The service callback never waits for Nav2.  A false response means the
+        request is latched but the explorer still owns an unresolved goal; the
+        caller waits for ``handoff_safe`` on the transient-local status topic or
+        repeats the idempotent request.  A true response is a terminal ownership
+        acknowledgment, not merely acceptance of ``cancel_goal_async``.
+        """
+        del request
+        with self.lock:
+            new_request = not self.pause_requested
+            if new_request:
+                self.pause_started = time.monotonic()
+            self.pause_requested = True
+            self.paused = True
+            if new_request:
+                self.reason = 'External mission pause requested'
+            self._cancel_locked()
+            safe = self._handoff_safe_locked()
+            response.success = safe
+            response.message = (
+                'Exploration safely paused; Nav2 ownership released'
+                if safe else
+                'Exploration pause latched; waiting for owned Nav2 goal to terminate'
+            )
+            self._publish_status_locked()
+            return response
 
     def resume(self, request, response):
         with self.lock:
@@ -131,9 +184,13 @@ class MissionGuard:
             elif self.goal_pending or self.handle is not None or self.cancel_state != 'none':
                 response.success, response.message = False, 'Previous goal must reach a terminal result'
             else:
+                self.pause_requested = False
+                self.pause_started = 0.0
+                self.cancel_overdue = False
                 self.paused = False
                 self.reason = 'Explicitly resumed'
                 response.success, response.message = True, self.reason
+            self._publish_status_locked()
             return response
 
     def tick(self):
@@ -141,7 +198,25 @@ class MissionGuard:
             if self.required and not self.healthy(): self.pause('Localization missing, unhealthy, or progress frozen')
             if self.cancel_state in ('request_pending', 'awaiting_result') and time.monotonic()-self.cancel_started > self.cancel_timeout:
                 self.paused = True
+                self.cancel_overdue = True
                 self.reason = 'Cancellation overdue; awaiting terminal result'
-            self.publisher.publish(String(data=json.dumps(dict(required=self.required,
-                paused=self.paused, healthy=self.healthy(), reason=self.reason,
-                cancellation=self.cancel_state, goal_pending=self.goal_pending))))
+            elif (self.pause_requested and self.goal_pending
+                    and time.monotonic()-self.pause_started > self.cancel_timeout):
+                self.paused = True
+                self.cancel_overdue = True
+                self.reason = 'Pause handoff overdue; goal acceptance unresolved'
+            self._publish_status_locked()
+
+    def _publish_status_locked(self):
+        self.publisher.publish(String(data=json.dumps(dict(
+            required=self.required,
+            paused=self.paused,
+            healthy=self.healthy(),
+            reason=self.reason,
+            pause_requested=self.pause_requested,
+            handoff_safe=self._handoff_safe_locked(),
+            cancellation=self.cancel_state,
+            cancellation_overdue=self.cancel_overdue,
+            goal_pending=self.goal_pending,
+            goal_active=self.handle is not None,
+        ))))

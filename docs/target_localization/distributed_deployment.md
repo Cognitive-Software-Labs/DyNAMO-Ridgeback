@@ -87,8 +87,9 @@ shared types live in `ridgeback_interfaces`. See the
 | `localization/health` | `ridgeback_interfaces/msg/LocalizationHealth` | Separate health process; reliable, volatile, depth 10, every 0.5 wall seconds |
 | `localization/workers/{detector,mask,pointcloud}` | `std_msgs/msg/String` JSON | Selected workers; reliable, transient-local, depth 1; state transitions |
 | `localization/status` | `std_msgs/msg/String` JSON | Intel consumer; external mode, reported state/detail or missing health |
-| `mission/status` | `std_msgs/msg/String` JSON | Frontier owner; required, paused, healthy, reason, cancellation, goal_pending |
-| `mission/resume` | `std_srvs/srv/Trigger` | Explicit resume on the frontier owner; unavailable when frontier is not launched |
+| `mission/status` | `std_msgs/msg/String` JSON | Transient-local frontier ownership state: required, paused, healthy, reason, pause_requested, handoff_safe, cancellation, cancellation_overdue, goal_pending, goal_active |
+| `mission/pause` | `std_srvs/srv/Trigger` | Latch an external pause; success only when explorer Nav2 ownership is already fully released |
+| `mission/resume` | `std_srvs/srv/Trigger` | Explicit settled and health-gated resume on the frontier owner; unavailable when frontier is not launched |
 
 Sensor subscriptions generally use ROS sensor-data QoS; the detector's RGB
 subscription uses best-effort keep-last depth 1, as described in
@@ -145,6 +146,7 @@ stateDiagram-v2
     [*] --> Paused: Localization required
     Paused --> Running: Current progress + explicit resume + no unresolved goal
     Running --> Paused: Health loss / frozen progress / restart
+    Running --> Paused: Explicit mission/pause
     Paused --> Cancelling: Active goal or late goal acceptance
     Cancelling --> Paused: Terminal action result
     Cancelling --> Cancelling: Pending / rejected / failed / overdue cancellation
@@ -163,6 +165,16 @@ reports the cancellation outcome. This supervises this application's frontier
 goals, not arbitrary Nav2 clients, teleoperation, or a physical emergency stop.
 Hardware autonomous motion remains off by default; do not enable it for the
 stationary milestone.
+
+An external mission uses `mission/pause` before taking Nav2 ownership. The
+request latches even when its Trigger response has `success=false`; that value
+means explorer ownership is still unresolved. Ownership transfers only
+when transient-local `mission/status` reports both `pause_requested=true` and
+`handoff_safe=true`. The explorer keeps an active handle throughout cancellation
+and clears it only for a matching terminal action result. Rejected, failed, or
+overdue cancellation never produces a safe handoff. Repeated pause calls are
+idempotent. Resume is explicit, preserves localization-health checks, and is
+refused while any explorer acceptance, goal, or cancellation remains unresolved.
 
 ## Qualification and paired rollback
 

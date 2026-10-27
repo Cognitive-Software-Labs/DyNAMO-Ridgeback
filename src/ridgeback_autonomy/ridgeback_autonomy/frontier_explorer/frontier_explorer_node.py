@@ -450,23 +450,7 @@ class FrontierExplorerNode(Node):
     
     def _cancel_current_goal(self):
         """Cancel the active Nav2 goal, if any."""
-        if self.mission_guard.required:
-            self.mission_guard.cancel()
-            return
-        if self._current_goal_handle is not None:
-            cancel_future = self._current_goal_handle.cancel_goal_async()
-            cancel_future.add_done_callback(self._cancel_done_callback)
-            self._current_goal_handle = None
-
-    def _cancel_done_callback(self, future):
-        try:
-            response = future.result()
-        except Exception as e:
-            self.get_logger().warn(f'Goal cancel request failed: {e}')
-            return
-        if not response.goals_canceling:
-            self.get_logger().warn(
-                'Nav2 rejected the cancel request; previous goal may still be active.')
+        self.mission_guard.cancel()
 
     def _clear_costmaps(self):
         """Best-effort clear of both costmaps (fire-and-forget) on a stall."""
@@ -558,7 +542,7 @@ class FrontierExplorerNode(Node):
     
     def send_goal_to_nav2(self, target_position):
         with self.mission_guard.lock:
-            if not self.mission_guard.allowed() or (self.mission_guard.required and self.mission_guard.handle is not None):
+            if not self.mission_guard.allowed() or self.mission_guard.handle is not None:
                 return False
             self.mission_guard.goal_pending = True
             try:
@@ -604,15 +588,18 @@ class FrontierExplorerNode(Node):
     def _handle_goal_response(self, future):
         """Handle goal acceptance; attach result callback."""
         self.mission_guard.goal_pending = False
+        self.mission_guard.cancel_overdue = False
         try:
             goal_handle = future.result()
         except Exception as exc:
             self.current_goal = None
             self.mission_guard.pause('Goal acceptance failed: ' + str(exc))
+            self.mission_guard._publish_status_locked()
             return
         if not goal_handle.accepted:
             self.get_logger().warn('Goal rejected by Nav2, will retry.')
             self.current_goal = None
+            self.mission_guard._publish_status_locked()
             return
         self._current_goal_handle = goal_handle
         self.mission_guard.accepted(goal_handle)
