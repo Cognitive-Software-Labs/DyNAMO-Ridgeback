@@ -1,8 +1,8 @@
 # EXPLORATION - Parking mission migration
 
-Status: **Phase 1 geometry foundation, target-detection/localization adapters,
-and the explorer ownership handoff are implemented; mission manager migration
-is pending.** This plan covers adapting the existing
+Status: **Phase 1 geometry foundation and Phase 2 detection, localization,
+explorer handoff, and non-driving mission coordination are implemented; parking
+execution remains pending.** This plan covers adapting the existing
 Ridgeback-G1 parking mission to the current package-split architecture without
 duplicating localization or changing Nav2 safety configuration.
 
@@ -121,6 +121,96 @@ goal; the Trigger service cannot identify arbitrary external Nav2 clients.
 `explore/status` remains an exploration-progress topic and is not an ownership
 proof.
 
+## Phase 2D non-driving mission coordinator
+
+`ridgeback_autonomy.mission.mission_manager_node` now connects the migrated
+detection and localization adapters to the explorer ownership contract. It has
+no Nav2 action client and deliberately stops in `G1_LOCALIZED`; this state means
+the Phase 2D target-localization prefix completed, not that parking or the whole
+mission succeeded.
+
+```mermaid
+stateDiagram-v2
+    [*] --> WAITING_FOR_START_POSE
+    WAITING_FOR_START_POSE --> SEARCH_G1: Valid map-to-base TF captured once
+    SEARCH_G1 --> STOPPING_EXPLORATION: Detection adapter confirms 3 of 5
+    STOPPING_EXPLORATION --> LOCALIZE_G1: Fresh pause acknowledgment proves handoff safe
+    LOCALIZE_G1 --> G1_LOCALIZED: Five qualified map-frame samples stabilize
+    WAITING_FOR_START_POSE --> MISSION_FAILED: Unrecoverable coordinator error
+    SEARCH_G1 --> MISSION_FAILED: Unrecoverable coordinator error
+    STOPPING_EXPLORATION --> MISSION_FAILED: Missing/failed/timed-out handoff
+    LOCALIZE_G1 --> MISSION_FAILED: Localization timeout
+    WAITING_FOR_START_POSE --> MISSION_CANCELED: Explicit operator cancellation
+    SEARCH_G1 --> MISSION_CANCELED: Explicit operator cancellation
+    STOPPING_EXPLORATION --> MISSION_CANCELED: Explicit operator cancellation
+    LOCALIZE_G1 --> MISSION_CANCELED: Explicit operator cancellation
+```
+
+The manager captures the configured `map -> robot_base_frame` transform only
+after it exists and contains finite translation plus a valid quaternion. The
+resulting start pose is immutable for that mission attempt. A manager reset
+clears it by default and does not implicitly resume MissionGuard; explorer
+resume remains a separate explicit ownership operation.
+
+Only `TargetDetectionAdapter` performs detection validation and voting. On
+confirmation, the manager commits the selected label/bbox, calls relative
+`mission/pause`, and enters `STOPPING_EXPLORATION`. A successful service response
+is an immediate fresh acknowledgment. A false response means the pause is
+latched but still settling. The manager then requires a status received after
+that response with `pause_requested=true`, `handoff_safe=true`, no pending or
+active goal, and `cancellation=none`. Because transient-local data can be
+delivered late, even that status is verified with one fresh idempotent pause
+request; only its successful response transfers ownership. Missing services,
+failed service requests, and unsettled handoffs are bounded by
+`handoff_timeout_s` (10 s default) and retain distinct failure codes:
+`pause_service_unavailable`, `pause_request_failed`, and
+`exploration_handoff_timeout`. Rejected, failed, or overdue cancellation must
+repeat in fresh status before producing a terminal failure, so one delayed
+latched sample cannot fail a new attempt.
+
+After commitment, valid detections continue to populate a bounded, exact
+timestamp/label/bbox association history without causing another target-found
+transition. `TargetMeasurements` is passed unchanged to
+`TargetLocalizationAdapter` only when an exact same-frame association exists.
+The adapter remains solely responsible for estimator status, stale data,
+vehicle-front compensation, source-time TF, jump rejection, and five-sample
+median stabilization. The final value retains
+`reference=generic_target_position` and `is_foot_midpoint=false`; Phase 2D does
+not promote it to a verified G1 ground center and cannot use it for parking.
+
+Transient invalid detections, missing associations, invalid estimator values,
+and source-time TF misses are recoverable while localization remains within its
+5 s default deadline. Missing/failed ownership transfer and localization timeout
+are terminal technical failures. Explicit cancellation is separately classified
+as `operator_canceled`. None of these paths initiates return navigation or
+reports `MISSION_COMPLETE`.
+
+Recoverable diagnostics describe the current blocked attempt rather than
+permanent mission failure. They are cleared when the corresponding guard later
+succeeds, so a successful start capture, ownership handoff, or stabilized target
+snapshot cannot retain a stale failure classification.
+
+Current state and event diagnostics are transient-local JSON on relative topic
+`parking_mission/state`. They include state, reason, event, target commitment,
+start-pose availability, failure class/code, target reference/source, and the
+constant `parking_navigation_enabled=false`. Every transition is logged with
+its reason; rejected guards and recoverable issues publish diagnostic events.
+
+The original manager's committed branch returned home after exhausted focused
+localization, observation failure, missing candidate prerequisites,
+pre-parking/path failure, or parking navigation failure. Its non-committed
+localization timeout resumed exploration. Successful completion was only
+`PARKED -> wait -> RETURNING_TO_START -> MISSION_COMPLETE`; hard internal paths
+used `MISSION_FAILED`. Phase 2D does not reproduce the premature return-home
+behavior: it classifies localization inability as a technical terminal failure
+and remains stationary.
+
+Future G1-centered exploration belongs after a trustworthy target position is
+available and before parking candidate generation. An `EXPLORE_G1_REGION` state
+can be inserted after `G1_LOCALIZED`, using a separately specified scoped
+ownership/resume contract and coverage completion criterion. It is not
+implemented here.
+
 ## Compatibility matrix
 
 | Area | Original mission contract | Current dev contract | Phase 2 adaptation |
@@ -182,9 +272,10 @@ proof.
 3. **Implemented: explicit explorer ownership handoff.** `MissionGuard` now
    exposes `mission/pause`, terminal `handoff_safe` status, and guarded
    `mission/resume`, retaining goal identity through cancellation settlement.
-4. **Port the mission skeleton.** Restore start-pose capture, search,
-   commitment, stop settlement, localization, safe-failure, return, and terminal
-   states with state-transition unit tests before parking actions are enabled.
+4. **Implemented: port the non-driving mission skeleton.** Start-pose capture,
+   search, target commitment, terminal stop settlement, source-associated
+   localization, diagnostics, reset, cancellation, and technical-failure states
+   are restored. Return and parking actions remain intentionally absent.
 5. **Port candidate generation and map safety.** Load the current Nav2
    footprint/planner configuration, then migrate occupancy, rotated-footprint,
    clearance, and sampled-path checks. Restore the deferred safety assertions.

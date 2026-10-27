@@ -92,6 +92,27 @@ advancing. The explorer does not automatically resume after an external pause.
 `explore/status` reports exploration progress, not Nav2 ownership, and must not
 be used as the handoff acknowledgment.
 
+### Parking mission coordination
+
+The Phase 2D `mission_manager_node.py` is a non-driving coordinator. It captures
+one start pose from the configured TF frames, consumes the shared target
+detection/localization interfaces, pauses the frontier owner through the
+terminal handoff above, and publishes transient-local JSON state on
+`parking_mission/state`. It owns no Nav2 action client. Its successful terminal
+state is `G1_LOCALIZED`, explicitly meaning that a generic target estimate has
+stabilized while parking execution remains deferred.
+
+The estimate retains its `generic_target_position` reference and false
+`is_foot_midpoint` flag. It is not yet qualified as the G1 ground center needed
+by the migrated parking geometry. Invalid samples and source-time TF misses are
+recoverable until the localization deadline; ownership or localization timeout
+is a technical `MISSION_FAILED`, not successful completion or an automatic
+return-home command. Missing pause service, failed pause transport, and an
+unsettled explorer goal are reported as distinct failures. The detailed
+migration state flow and future insertion
+point for G1-region exploration are maintained in the
+[parking mission migration plan](../plans/EXPLORATION_parking_mission_migration.md#phase-2d-non-driving-mission-coordinator).
+
 The HUD is an aggregator. Independent producers publish text panels such as
 velocity and coverage, and `hud_node` combines them for one RViz overlay.
 In simulation, coverage compares the live SLAM map with the selected world's

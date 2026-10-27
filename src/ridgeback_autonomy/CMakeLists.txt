@@ -66,6 +66,12 @@ install(PROGRAMS
 )
 
 install(PROGRAMS
+  ridgeback_autonomy/mission/mission_manager_node.py
+  DESTINATION lib/${PROJECT_NAME}
+  RENAME mission_manager_node.py
+)
+
+install(PROGRAMS
   ridgeback_autonomy/diagnostics/velocity_overlay_node.py
   DESTINATION lib/${PROJECT_NAME}
   RENAME velocity_overlay_node
@@ -147,6 +153,7 @@ if(BUILD_TESTING)
   ament_add_pytest_test(test_detector_node test/test_detector_node.py)
   ament_add_pytest_test(test_frontier_explorer test/test_frontier_explorer.py)
   ament_add_pytest_test(test_mission_handoff test/test_mission_handoff.py)
+  ament_add_pytest_test(test_mission_manager test/test_mission_manager.py)
   ament_add_pytest_test(test_image_utils test/test_image_utils.py)
   ament_add_pytest_test(test_imports test/test_imports.py)
   ament_add_pytest_test(test_package_split test/test_package_split.py)
