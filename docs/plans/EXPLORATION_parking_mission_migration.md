@@ -1,7 +1,7 @@
 # EXPLORATION - Parking mission migration
 
-Status: **Phase 1 geometry foundation and target-detection adapter implemented;
-mission manager migration pending.** This plan covers adapting the existing
+Status: **Phase 1 geometry foundation plus target-detection and target-localization
+adapters implemented; mission manager migration pending.** This plan covers adapting the existing
 Ridgeback-G1 parking mission to the current package-split architecture without
 duplicating localization or changing Nav2 safety configuration.
 
@@ -33,6 +33,57 @@ The original G1 detector filtered at `0.50`, while the current generic detector
 defaults to `0.55`. The adapter retains the original `0.50` floor but does not
 alter the upstream detector, so the current live pipeline remains effectively
 `0.55` until launch configuration is considered in a later integration phase.
+
+## Phase 2 localization input
+
+`ridgeback_autonomy.mission.target_localization` now owns the measurement-side
+mission boundary. The default contract consumes `measurements/target/mask` and
+selects `euclidean_reconstruction` first, with `projective_ranging` as an
+explicit deterministic fallback. Both provide forward and lateral coordinates,
+an estimator status, and detection-stamped mask/depth synchronization in the
+current Gazebo pipeline. It never averages estimator families. Pointcloud
+measurements remain supported when explicitly configured, but are not a default
+fallback: their message schema has no per-estimator status, and the current
+pointcloud worker can pair a detection-stamped batch with the latest processed
+cloud rather than an exact stamp match. Polar profiling is likewise excluded
+from the mission default because its single LiDAR plane supplies a target
+surface position, not a ground-center or foot reference.
+
+Each observation is associated to one detection by the same source timestamp,
+normalized label, and exact bbox. This is intentionally stricter than array
+index matching: `TargetMeasurements` has no persistent object identifier, so a
+future manager must retain the corresponding current detection association and
+cannot safely carry an index between frames. The adapter validates the
+detection score, estimator fields, finite positive range, and `MissReason.OK`
+for mask estimators. Pointcloud validity is inferred from finite fields because
+the interface deliberately has no pointcloud status array.
+
+All estimator coordinates are relative to Ridgeback's front reference:
+forward is +X and lateral is base +Y (left-positive). The adapter calls the
+shared `remove_vehicle_front_offset()` exactly once, yielding base-origin
+`x=forward` and `y=lateral`, then requests `map -> configured_base_frame` from
+tf2 at the measurement header stamp. It does not interpret the detection
+header's camera frame as the numeric measurement frame and does not fall back
+to latest TF. Five qualified, already-map-frame observations from one estimator
+are stabilized with an x/y median. A sample farther than the original body
+fallback's 0.75 m jump threshold is rejected; samples from different estimator
+families are retained in separate buffers and never combined.
+
+### Scientific limitation
+
+No current generic estimator reproduces the original G1 foot-midpoint
+semantics. Pointcloud deliberately crops the upper-central bbox; projective
+ranging reduces a masked foreground around a representative body pixel;
+euclidean reconstruction reduces foreground 3D points to a centroid; and polar
+profiling reduces scan-plane target returns. The adapter therefore labels every
+output `generic_target_position` with `is_foot_midpoint=false`. Synthetic tests
+validate interface, frame, timestamp, and stabilization behavior only; they do
+not establish that this generic position is accurate enough to center the G1
+parking donut. The smallest compatible extension, if runtime evaluation shows
+that gap matters, is one quality-gated G1 ground-center/foot estimator inside
+`ridgeback_localization` using its existing synchronized detection/depth
+infrastructure, exposed with explicit reference semantics and status. Raw RGB-D
+processing must not be rebuilt inside the mission manager.
 
 ## Compatibility matrix
 
