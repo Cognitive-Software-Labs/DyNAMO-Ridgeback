@@ -5,6 +5,8 @@ find_package(ament_cmake REQUIRED)
 find_package(gz-gui8 REQUIRED)
 find_package(gz-plugin2 REQUIRED)
 find_package(gz-common5 REQUIRED)
+find_package(gz-msgs10 REQUIRED)
+find_package(gz-transport13 REQUIRED)
 find_package(Qt5 REQUIRED COMPONENTS Core Quick)
 
 set(CMAKE_AUTOMOC ON)
@@ -20,6 +22,8 @@ target_link_libraries(SpawnG1
   gz-gui8::gz-gui8
   gz-plugin2::gz-plugin2
   gz-common5::gz-common5
+  gz-msgs10::gz-msgs10
+  gz-transport13::gz-transport13
   Qt5::Core
   Qt5::Quick
 )

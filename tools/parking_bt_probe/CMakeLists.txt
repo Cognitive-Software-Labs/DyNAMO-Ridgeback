@@ -1,0 +1,8 @@
+cmake_minimum_required(VERSION 3.16)
+project(parking_bt_probe)
+find_package(ament_cmake REQUIRED)
+find_package(rclcpp REQUIRED)
+find_package(nav2_behavior_tree REQUIRED)
+add_executable(parking_bt_probe main.cpp)
+target_compile_features(parking_bt_probe PRIVATE cxx_std_17)
+ament_target_dependencies(parking_bt_probe rclcpp nav2_behavior_tree)

@@ -1,0 +1,11 @@
+# STAGED ONLY: not loaded by the shared launch. When enabled in a future
+# reviewed profile, ALL non-parking BT FollowPath nodes must explicitly select
+# general_goal_checker; an empty ID is ambiguous with two checker plugins.
+controller_server:
+  ros__parameters:
+    goal_checker_plugins: [general_goal_checker, parking_goal_checker]
+    parking_goal_checker:
+      plugin: nav2_controller::SimpleGoalChecker
+      stateful: false
+      xy_goal_tolerance: 0.08
+      yaw_goal_tolerance: 0.12

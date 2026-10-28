@@ -8,12 +8,21 @@
 
 #include <gz/gui/Application.hh>
 #include <gz/gui/GuiEvents.hh>
+#include <gz/gui/Helpers.hh>
 #include <gz/gui/MainWindow.hh>
+#include <gz/msgs/empty.pb.h>
+#include <gz/msgs/scene.pb.h>
 #include <gz/plugin/Register.hh>
 #include <gz/common/Filesystem.hh>
 
 namespace spawn_g1
 {
+
+namespace
+{
+// Short enough not to stall the GUI noticeably on a button click.
+constexpr unsigned int kSceneQueryTimeoutMs = 1000;
+}
 
 SpawnG1::SpawnG1() = default;
 
@@ -111,6 +120,10 @@ void SpawnG1::LoadConfig(const tinyxml2::XMLElement *_pluginElem)
           "<uri>" + modelDir + "meshes/");
     }
 
+    std::smatch match;
+    if (std::regex_search(sdfString_, match, std::regex("<model\\s+name=\"([^\"]+)\"")))
+      modelName_ = match[1];
+
     gzmsg << "SpawnG1: Loaded SDF from " << sdfPath << std::endl;
   }
   else
@@ -119,11 +132,46 @@ void SpawnG1::LoadConfig(const tinyxml2::XMLElement *_pluginElem)
   }
 }
 
+bool SpawnG1::G1AlreadyInWorld()
+{
+  const auto worlds = gz::gui::worldNames();
+  if (worlds.isEmpty())
+    return false;
+  const std::string service = "/world/" + worlds.front().toStdString() + "/scene/info";
+  gz::msgs::Scene scene;
+  bool result = false;
+  if (!node_.Request(service, gz::msgs::Empty(), kSceneQueryTimeoutMs, scene, result) || !result)
+  {
+    // Fail open: the duplicate check must not take away manual placement.
+    gzwarn << "SpawnG1: " << service << " unavailable; skipping duplicate check." << std::endl;
+    return false;
+  }
+  // The GUI spawner keeps the SDF name (renaming a second copy), and scripts
+  // use prefixed names such as g1_stationary_eval; both count as present.
+  for (const auto &model : scene.model())
+  {
+    const auto &name = model.name();
+    if (name == modelName_ || name.rfind(modelName_ + "_", 0) == 0)
+    {
+      gzmsg << "SpawnG1: [" << name << "] already exists; remove it before placing "
+            << "another G1." << std::endl;
+      return true;
+    }
+  }
+  return false;
+}
+
 void SpawnG1::OnSpawn()
 {
   if (sdfString_.empty())
   {
     gzerr << "SpawnG1: No SDF loaded, cannot spawn." << std::endl;
+    return;
+  }
+
+  if (this->G1AlreadyInWorld())
+  {
+    emit this->spawnRefused();
     return;
   }
 

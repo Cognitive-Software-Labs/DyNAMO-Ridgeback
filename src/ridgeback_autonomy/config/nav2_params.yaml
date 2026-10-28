@@ -322,6 +322,13 @@ velocity_smoother:
     odom_duration: 0.1
     deadband_velocity: [0.0, 0.0, 0.0]
     velocity_timeout: 1.0
+    # Stamp each smoothed command when it is produced. Otherwise the decel ramp
+    # after a cancelled goal reuses the last input's stamp, ages past the
+    # platform controller's reference_timeout (0.1 s) and is rejected, so the
+    # final zeros never reach the wheels. mecanum_drive_controller 4.42.1 then
+    # zeroes only the front-left wheel (fixed upstream in 92d148a8) and the
+    # robot keeps driving on the other three.
+    stamp_smoothed_velocity_with_smoothing_time: true
 
 collision_monitor:
   ros__parameters:

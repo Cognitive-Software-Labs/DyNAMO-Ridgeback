@@ -1,20 +1,58 @@
-"""Non-driving Gazebo/Isaac integration launch for the parking mission prefix.
+"""Gazebo/Isaac integration launch for the parking mission prefix.
 
-This wrapper deliberately forces frontier motion off.  It reuses the complete
-exploration bringup and adds exactly one Phase 2D mission manager when enabled.
-The optional stationary handoff stub represents an idle explorer only; active
-goal cancellation remains the responsibility of the production MissionGuard.
+Frontier motion is off unless ``exploration_enabled`` is set; the mission
+manager itself never drives. The wrapper reuses the complete exploration
+bringup and adds exactly one Phase 2D mission manager when enabled.
+Exploration starts the production explorer and its MissionGuard, which own
+``mission/pause`` and active-goal cancellation. The optional stationary
+handoff stub represents an idle explorer only, so the two are mutually
+exclusive: requesting both fails the launch.
 """
 
 import os
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
+from launch.actions import (
+    DeclareLaunchArgument, IncludeLaunchDescription, OpaqueFunction,
+)
 from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration, PythonExpression
 from launch_ros.actions import Node
+
+from ridgeback_autonomy.mission.parking_rviz import parking_layout
+
+
+def _reject_conflicting_handoff(context):
+    exploration = LaunchConfiguration('exploration_enabled').perform(context)
+    mock = LaunchConfiguration('stationary_mock_handoff_enabled').perform(context)
+    if exploration == 'true' and mock == 'true':
+        # Both would serve mission/pause; the mock would also claim an idle
+        # explorer while the real one owns a Nav2 goal.
+        raise RuntimeError(
+            'exploration_enabled:=true and stationary_mock_handoff_enabled:=true '
+            'are mutually exclusive; the real explorer provides mission/pause')
+    return []
+
+
+def _parking_rviz(context):
+    """One RViz with the shared exploration layout plus the parking plan display."""
+
+    if LaunchConfiguration('exploration_rviz').perform(context) != 'true':
+        return []
+    source = os.path.join(
+        get_package_share_directory('ridgeback_autonomy'), 'sim', 'rviz', 'exploration.rviz')
+    return [Node(
+        package='rviz2',
+        executable='rviz2',
+        name='rviz2',
+        namespace=LaunchConfiguration('namespace'),
+        arguments=['-d', parking_layout(source, 'parking/visualization')],
+        parameters=[{'use_sim_time': LaunchConfiguration('use_sim_time')}],
+        remappings=[('/tf', 'tf'), ('/tf_static', 'tf_static')],
+        output='screen',
+    )]
 
 
 def generate_launch_description():
@@ -27,6 +65,7 @@ def generate_launch_description():
     use_sim_time = LaunchConfiguration('use_sim_time')
     mission_enabled = LaunchConfiguration('mission_management_enabled')
     mock_handoff_enabled = LaunchConfiguration('stationary_mock_handoff_enabled')
+    exploration_enabled = LaunchConfiguration('exploration_enabled')
 
     return LaunchDescription([
         DeclareLaunchArgument(
@@ -55,12 +94,23 @@ def generate_launch_description():
             description=(
                 'Provide an idle test-only mission/pause acknowledgment when the '
                 'production explorer is intentionally absent')),
+        DeclareLaunchArgument(
+            'exploration_enabled', default_value='false',
+            choices=['true', 'false'],
+            description=(
+                'Start the production frontier explorer and its MissionGuard; '
+                'mutually exclusive with stationary_mock_handoff_enabled')),
+        OpaqueFunction(function=_reject_conflicting_handoff),
         DeclareLaunchArgument('map_frame', default_value='map'),
         DeclareLaunchArgument(
             'robot_base_frame', default_value='base_link',
             description='Observed TF base frame; independent of ROS namespace'),
         DeclareLaunchArgument('handoff_timeout_s', default_value='10.0'),
         DeclareLaunchArgument('target_localization_timeout_s', default_value='5.0'),
+
+        # Evaluated before the include: its launch arguments are set in this
+        # context, so afterwards exploration_rviz would always read 'false'.
+        OpaqueFunction(function=_parking_rviz),
 
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(exploration_launch),
@@ -70,7 +120,8 @@ def generate_launch_description():
                 'namespace': namespace,
                 'use_sim_time': use_sim_time,
                 'setup_path': LaunchConfiguration('setup_path'),
-                'exploration_rviz': LaunchConfiguration('exploration_rviz'),
+                # RViz is started below with the parking display added.
+                'exploration_rviz': 'false',
                 'target_localization_enabled': LaunchConfiguration(
                     'target_localization_enabled'),
                 'localization_mode': LaunchConfiguration('localization_mode'),
@@ -79,9 +130,9 @@ def generate_launch_description():
                 'detector_debug': LaunchConfiguration('detector_debug'),
                 'gz_gui': LaunchConfiguration('gz_gui'),
                 'headless_rendering': LaunchConfiguration('headless_rendering'),
-                # Phase 2D.5 is stationary by construction.  This is not a
-                # caller-controlled argument in this wrapper.
-                'autonomous_motion_enabled': 'false',
+                # Stationary unless exploration is requested explicitly; the
+                # explorer is then gated by its own MissionGuard.
+                'autonomous_motion_enabled': exploration_enabled,
             }.items(),
         ),
 
@@ -94,7 +145,8 @@ def generate_launch_description():
             output='screen',
             condition=IfCondition(PythonExpression([
                 "'", mission_enabled, "' == 'true' and '",
-                mock_handoff_enabled, "' == 'true'",
+                mock_handoff_enabled, "' == 'true' and '",
+                exploration_enabled, "' != 'true'",
             ])),
         ),
 

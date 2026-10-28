@@ -1,0 +1,15 @@
+<!-- Staged, non-replanning parking tree. No spin/back-up/recovery motion.
+     Requires parking_goal_checker and qualified controller-side G1 keep-out.
+     The computed execution path also requires runtime safety qualification;
+     this file's presence is not authorization to drive. -->
+<root BTCPP_format="4" main_tree_to_execute="MainTree">
+  <BehaviorTree ID="MainTree">
+    <Sequence>
+      <ComputePathToPose goal="{goal}" path="{path}" planner_id="GridBased"
+                         error_code_id="{compute_path_error_code}"/>
+      <FollowPath path="{path}" controller_id="FollowPath"
+                  goal_checker_id="parking_goal_checker"
+                  error_code_id="{follow_path_error_code}"/>
+    </Sequence>
+  </BehaviorTree>
+</root>

@@ -11,6 +11,8 @@
   <build_depend>gz-gui-vendor</build_depend>
   <build_depend>gz-plugin-vendor</build_depend>
   <build_depend>gz-common-vendor</build_depend>
+  <build_depend>gz-msgs-vendor</build_depend>
+  <build_depend>gz-transport-vendor</build_depend>
   <build_depend>qtbase5-dev</build_depend>
   <build_depend>qtdeclarative5-dev</build_depend>
 

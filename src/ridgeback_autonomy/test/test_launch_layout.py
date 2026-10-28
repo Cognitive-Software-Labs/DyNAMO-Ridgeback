@@ -57,13 +57,56 @@ def test_mission_launch_is_opt_in_and_stationary() -> None:
 
     assert "'mission_management_enabled', default_value='false'" in mission_text
     assert "'stationary_mock_handoff_enabled', default_value='false'" in mission_text
-    assert "'autonomous_motion_enabled': 'false'" in mission_text
+    # Motion is only ever the explicit exploration switch, stationary by default.
+    assert "'exploration_enabled', default_value='false'" in mission_text
+    assert "'autonomous_motion_enabled': exploration_enabled" in mission_text
+    assert mission_text.count('autonomous_motion_enabled') == 1
     assert "'robot_base_frame', default_value='base_link'" in mission_text
     assert "'base_frame': LaunchConfiguration('robot_base_frame')" in mission_text
     assert mission_text.count("executable='mission_manager_node.py'") == 1
     assert mission_text.count("executable='stationary_mission_guard'") == 1
     assert 'NavigateToPose' not in mission_text
     assert 'ComputePathToPose' not in mission_text
+
+
+def _mission_launch_module():
+    import importlib.util
+
+    path = _package_root() / 'launch' / 'ridgeback_mission.launch.py'
+    spec = importlib.util.spec_from_file_location('ridgeback_mission_launch', path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _launch_context(**configurations):
+    from launch import LaunchContext
+
+    context = LaunchContext()
+    context.launch_configurations.update(configurations)
+    return context
+
+
+def test_exploration_and_stationary_mock_cannot_run_together() -> None:
+    import pytest
+
+    module = _mission_launch_module()
+    for exploration, mock in (('false', 'false'), ('false', 'true'), ('true', 'false')):
+        assert module._reject_conflicting_handoff(_launch_context(
+            exploration_enabled=exploration,
+            stationary_mock_handoff_enabled=mock)) == []
+    with pytest.raises(RuntimeError, match='mutually exclusive'):
+        module._reject_conflicting_handoff(_launch_context(
+            exploration_enabled='true', stationary_mock_handoff_enabled='true'))
+
+
+def test_stationary_mock_condition_excludes_exploration() -> None:
+    mission_text = (
+        _package_root() / 'launch' / 'ridgeback_mission.launch.py'
+    ).read_text(encoding='utf-8')
+    mock_node = mission_text[mission_text.index("executable='stationary_mission_guard'"):]
+    mock_node = mock_node[:mock_node.index('Node(')]
+    assert "exploration_enabled, \"' != 'true'\"" in mock_node
 
 
 def test_stationary_handoff_is_explicitly_not_the_production_guard() -> None:
@@ -626,3 +669,34 @@ def test_async_slam_does_not_publish_scan_lag_into_nav2_tf() -> None:
     # Keep map->odom current and do not retain stale scans in async mapping.
     assert params['restamp_tf'] is True
     assert params['scan_queue_size'] == 1
+
+
+def test_parking_rviz_layout_adds_one_latched_display_without_touching_the_shared_file() -> None:
+    from ridgeback_autonomy.mission.parking_rviz import PARKING_DISPLAY_NAME, parking_layout
+
+    source = _package_root() / 'sim' / 'rviz' / 'exploration.rviz'
+    before = source.read_text(encoding='utf-8')
+    derived = yaml.safe_load(Path(parking_layout(str(source), 'parking/visualization')).read_text())
+
+    assert source.read_text(encoding='utf-8') == before
+    original_displays = yaml.safe_load(before)['Visualization Manager']['Displays']
+    displays = derived['Visualization Manager']['Displays']
+    assert displays[:-1] == original_displays
+    parking = displays[-1]
+    assert parking['Name'] == PARKING_DISPLAY_NAME
+    assert parking['Class'] == 'rviz_default_plugins/MarkerArray'
+    assert parking['Topic']['Value'] == 'parking/visualization'
+    assert parking['Topic']['Durability Policy'] == 'Transient Local'
+
+
+def test_mission_launch_owns_the_single_rviz_instance() -> None:
+    mission_text = (
+        _package_root() / 'launch' / 'ridgeback_mission.launch.py'
+    ).read_text(encoding='utf-8')
+
+    assert "'exploration_rviz': 'false'" in mission_text
+    assert "parking_layout(source, 'parking/visualization')" in mission_text
+    assert mission_text.count("executable='rviz2'") == 1
+    # The include overwrites exploration_rviz in the shared launch context.
+    assert (mission_text.index('OpaqueFunction(function=_parking_rviz)')
+            < mission_text.index('IncludeLaunchDescription('))

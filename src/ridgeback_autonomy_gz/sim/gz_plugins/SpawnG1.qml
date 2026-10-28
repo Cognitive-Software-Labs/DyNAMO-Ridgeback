@@ -30,4 +30,19 @@ ToolBar {
       SpawnG1.OnSpawn();
     }
   }
+
+  // A G1 is already in the world: say so briefly instead of placing another.
+  Connections {
+    target: SpawnG1
+    onSpawnRefused: {
+      spawnBtn.text = "G1 present";
+      resetLabel.restart();
+    }
+  }
+
+  Timer {
+    id: resetLabel
+    interval: 2500
+    onTriggered: spawnBtn.text = "Spawn G1"
+  }
 }

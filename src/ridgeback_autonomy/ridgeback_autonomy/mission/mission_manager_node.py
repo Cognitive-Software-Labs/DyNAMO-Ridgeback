@@ -1,29 +1,48 @@
 #!/usr/bin/env python3
-"""Non-driving mission coordinator for detection, handoff, and localization.
+"""Non-driving mission coordinator: detection, handoff, localization, parking plan.
 
-Phase 2D deliberately stops in ``G1_LOCALIZED``.  This node owns no Nav2 action
-client and cannot start parking or return-to-start motion.
+After physical settlement and localization, the manager evaluates a bounded
+set of global paths and stops in ``PARKING_PATH_FEASIBLE`` or a failure state.
+Parking execution preparation is opt-in and fails closed without externally
+verified safety interlocks and separate stage paths. No automatic navigation
+or return motion is started by this node.
 """
 
 from __future__ import annotations
 
+import ast
 from collections import OrderedDict
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import Enum
 import json
 import math
+import os
 import threading
 import time
 
+from ament_index_python.packages import get_package_share_directory
 import rclpy
-from geometry_msgs.msg import PoseStamped
+import yaml
+from geometry_msgs.msg import PoseStamped, TwistStamped
+from nav_msgs.msg import OccupancyGrid, Odometry
+from nav2_msgs.action import ComputePathToPose, NavigateToPose
+from nav2_msgs.msg import CollisionMonitorState, CostmapFilterInfo
+from action_msgs.msg import GoalStatus, GoalStatusArray
+from clearpath_platform_msgs.msg import StopStatus
+from controller_manager_msgs.srv import ListControllers
+from lifecycle_msgs.srv import GetState
+from rcl_interfaces.srv import GetParameters
+from rclpy.action import ActionClient
+from rclpy.clock import Clock, ClockType
 from rclpy.executors import ExternalShutdownException
 from rclpy.node import Node
-from rclpy.qos import DurabilityPolicy, QoSProfile
+from rclpy.qos import DurabilityPolicy, QoSProfile, qos_profile_sensor_data
 from rclpy.time import Time
-from std_msgs.msg import String
+from std_msgs.msg import String, Bool
+from rclpy.parameter import parameter_value_to_python
 from std_srvs.srv import Trigger
 from tf2_ros import Buffer, TransformException, TransformListener
+from visualization_msgs.msg import MarkerArray
 
 from ridgeback_interfaces.msg import TargetDetections, TargetMeasurements
 from ridgeback_localization.contracts import (
@@ -39,14 +58,46 @@ from ridgeback_autonomy.mission.target_localization import (
     TargetAssociation,
     TargetLocalizationAdapter,
 )
+from ridgeback_autonomy.mission.parking_planner import (
+    GridSnapshot,
+    ParkingPlan,
+    PlannerConfig,
+    TargetReference,
+    plan_parking,
+    validate_inputs,
+)
+from ridgeback_autonomy.mission.parking_visualization import clear_markers, plan_markers
+from ridgeback_autonomy.mission.motion_settlement import MotionSettlement
+from ridgeback_autonomy.mission.parking_feasibility import (
+    PlanningSnapshot, candidate_groups, path_rejection, path_length,
+    select_path_candidate,
+)
+from ridgeback_autonomy.mission.parking_execution import (
+    ExecutionContext, ExecutionLimits, ExecutionState, ParkingExecutor,
+)
+from ridgeback_autonomy.mission.parking_safety import (
+    ParkingSafetyMonitor, LOCK_TOPICS, MANUAL_TOPICS, COMMAND_TOPICS, keepout_mask,
+    target_execution_reason,
+)
+from ridgeback_autonomy.mission.parking_stage_paths import ParkingStagePaths
+from ridgeback_autonomy.mission.parking_nav2_profile import (
+    GOAL_CHECKER_PARAMETERS, goal_checker_reason, parking_tree_identity,
+)
 
 
 class MissionState(Enum):
     WAITING_FOR_START_POSE = 'waiting_for_start_pose'
     SEARCH_G1 = 'search_g1'
     STOPPING_EXPLORATION = 'stopping_exploration'
+    SETTLING_MOTION = 'settling_motion'
+    MOTION_SETTLEMENT_FAILED = 'motion_settlement_failed'
     LOCALIZE_G1 = 'localize_g1'
     G1_LOCALIZED = 'g1_localized'
+    PARKING_CANDIDATES_READY = 'parking_candidates_ready'
+    EVALUATING_PARKING_PATHS = 'evaluating_parking_paths'
+    PARKING_PATH_FEASIBLE = 'parking_path_feasible'
+    PARKING_PLANNING_FAILED = 'parking_planning_failed'
+    PARKING_EXECUTION_FAILED = 'parking_execution_failed'
     MISSION_FAILED = 'mission_failed'
     MISSION_CANCELED = 'mission_canceled'
 
@@ -84,16 +135,38 @@ _ALLOWED_TRANSITIONS = {
         MissionState.MISSION_CANCELED,
     },
     MissionState.STOPPING_EXPLORATION: {
-        MissionState.LOCALIZE_G1,
+        MissionState.SETTLING_MOTION,
         MissionState.MISSION_FAILED,
         MissionState.MISSION_CANCELED,
     },
+    MissionState.SETTLING_MOTION: {
+        MissionState.LOCALIZE_G1,
+        MissionState.MOTION_SETTLEMENT_FAILED,
+        MissionState.MISSION_FAILED,
+        MissionState.MISSION_CANCELED,
+    },
+    MissionState.MOTION_SETTLEMENT_FAILED: set(),
     MissionState.LOCALIZE_G1: {
         MissionState.G1_LOCALIZED,
         MissionState.MISSION_FAILED,
         MissionState.MISSION_CANCELED,
     },
-    MissionState.G1_LOCALIZED: {MissionState.MISSION_CANCELED},
+    MissionState.G1_LOCALIZED: {
+        MissionState.PARKING_CANDIDATES_READY,
+        MissionState.PARKING_PLANNING_FAILED,
+        MissionState.MISSION_CANCELED,
+    },
+    MissionState.PARKING_CANDIDATES_READY: {
+        MissionState.EVALUATING_PARKING_PATHS, MissionState.PARKING_PLANNING_FAILED,
+        MissionState.MISSION_CANCELED},
+    MissionState.EVALUATING_PARKING_PATHS: {
+        MissionState.PARKING_PATH_FEASIBLE, MissionState.PARKING_PLANNING_FAILED,
+        MissionState.MISSION_CANCELED},
+    MissionState.PARKING_PATH_FEASIBLE: {
+        MissionState.PARKING_PLANNING_FAILED, MissionState.PARKING_EXECUTION_FAILED,
+        MissionState.MISSION_CANCELED},
+    MissionState.PARKING_PLANNING_FAILED: set(),
+    MissionState.PARKING_EXECUTION_FAILED: {MissionState.MISSION_CANCELED},
     MissionState.MISSION_FAILED: set(),
     MissionState.MISSION_CANCELED: set(),
 }
@@ -107,6 +180,8 @@ class MissionManagerNode(Node):
         *,
         tf_buffer=None,
         pause_client=None,
+        compute_path_client=None,
+        navigation_client=None,
         monotonic=time.monotonic,
         parameter_overrides=None,
     ) -> None:
@@ -128,6 +203,36 @@ class MissionManagerNode(Node):
         self.declare_parameter('target_localization_timeout_s', 5.0)
         self.declare_parameter('association_history_size', 32)
         self.declare_parameter('control_period_s', 0.2)
+        self.declare_parameter('parking_planning_enabled', True)
+        self.declare_parameter('map_topic', 'map')
+        self.declare_parameter('parking_visualization_topic', 'parking/visualization')
+        self.declare_parameter(
+            'nav2_params_path',
+            os.path.join(get_package_share_directory('ridgeback_autonomy'),
+                         'config', 'nav2_params.yaml'))
+        # Timestamp age and explicit map-to-odom drift are checked separately.
+        self.declare_parameter('parking_max_target_age_s', 5.0)
+        self.declare_parameter('parking_max_map_age_s', 5.0)
+        self.declare_parameter('parking_max_pose_age_s', 1.0)
+        self.declare_parameter('parking_input_timeout_s', 10.0)
+        self.declare_parameter('odom_frame', 'odom')
+        self.declare_parameter('odometry_topic', 'platform/odom/filtered')
+        self.declare_parameter('motion_linear_limit_mps', 0.005)
+        self.declare_parameter('motion_angular_limit_radps', 0.005)
+        self.declare_parameter('motion_stable_s', 2.0)
+        self.declare_parameter('motion_max_odom_age_s', 0.5)
+        self.declare_parameter('motion_settlement_timeout_s', 10.0)
+        self.declare_parameter('parking_path_timeout_s', 3.0)
+        self.declare_parameter('parking_path_batch_timeout_s', 10.0)
+        self.declare_parameter('parking_path_candidates_per_class', 6)
+        self.declare_parameter('parking_max_frame_shift_m', 0.05)
+        self.declare_parameter('parking_max_frame_yaw_rad', 0.03)
+        self.declare_parameter('parking_execution_enabled', False)
+        self.declare_parameter('parking_xy_tolerance_m', 0.08)
+        self.declare_parameter('parking_yaw_tolerance_rad', 0.12)
+        self.declare_parameter('preparking_offset_m', 0.50)
+        self.declare_parameter('parking_navigation_timeout_s', 90.0)
+        self.declare_parameter('parking_progress_timeout_s', 20.0)
 
         self.map_frame = str(self.get_parameter('map_frame').value).strip()
         self.base_frame = str(self.get_parameter('robot_base_frame').value).strip()
@@ -167,6 +272,43 @@ class MissionManagerNode(Node):
             raise ValueError('mission timeouts and control period must be positive')
         if self.association_history_size < 1:
             raise ValueError('association_history_size must be positive')
+        self.parking_planning_enabled = bool(
+            self.get_parameter('parking_planning_enabled').value)
+        self.parking_max_target_age_s = float(
+            self.get_parameter('parking_max_target_age_s').value)
+        self.parking_max_map_age_s = float(self.get_parameter('parking_max_map_age_s').value)
+        self.parking_max_pose_age_s = float(self.get_parameter('parking_max_pose_age_s').value)
+        self.parking_input_timeout_s = float(
+            self.get_parameter('parking_input_timeout_s').value)
+        if any(not math.isfinite(value) or value <= 0.0 for value in (
+            self.parking_max_target_age_s, self.parking_max_map_age_s,
+            self.parking_max_pose_age_s, self.parking_input_timeout_s,
+        )):
+            raise ValueError('parking freshness limits and input timeout must be finite and positive')
+        self.planner_config = PlannerConfig(footprint=tuple(load_nav2_footprint(
+            str(self.get_parameter('nav2_params_path').value))))
+        self.odom_frame = str(self.get_parameter('odom_frame').value)
+        self.motion = MotionSettlement(
+            *[float(self.get_parameter(n).value) for n in (
+                'motion_linear_limit_mps', 'motion_angular_limit_radps',
+                'motion_stable_s', 'motion_max_odom_age_s')])
+        for name in ('motion_settlement_timeout_s', 'parking_path_timeout_s',
+                     'parking_path_batch_timeout_s', 'parking_max_frame_shift_m',
+                     'parking_max_frame_yaw_rad'):
+            value = float(self.get_parameter(name).value)
+            if not math.isfinite(value) or value <= 0.0:
+                raise ValueError(f'{name} must be finite and positive')
+            setattr(self, name, value)
+        if any(not math.isfinite(v) or v <= 0 for v in (
+            self.motion.linear_limit, self.motion.angular_limit, self.motion.stable_s,
+            self.motion.max_age_s)):
+            raise ValueError('motion thresholds must be finite and positive')
+        self.path_candidates_per_class = int(self.get_parameter('parking_path_candidates_per_class').value)
+        if not 1 <= self.path_candidates_per_class <= 12:
+            raise ValueError('parking_path_candidates_per_class must be within [1, 12]')
+        with open(str(self.get_parameter('nav2_params_path').value), encoding='utf-8') as stream:
+            planner_params = yaml.safe_load(stream)['planner_server']['ros__parameters']
+        self.planner_id = planner_params['planner_plugins'][0]
 
         self.tf_buffer = tf_buffer if tf_buffer is not None else Buffer(node=self)
         self.tf_listener = (
@@ -206,17 +348,51 @@ class MissionManagerNode(Node):
             self._on_guard_status,
             status_qos,
         )
+        map_qos = QoSProfile(depth=1)
+        map_qos.durability = DurabilityPolicy.TRANSIENT_LOCAL
+        self.map_subscription = self.create_subscription(
+            OccupancyGrid,
+            str(self.get_parameter('map_topic').value),
+            self._on_map,
+            map_qos,
+        )
+        self.parking_marker_publisher = self.create_publisher(
+            MarkerArray,
+            str(self.get_parameter('parking_visualization_topic').value),
+            status_qos,
+        )
         self.pause_client = (
             pause_client
             if pause_client is not None
             else self.create_client(Trigger, self.pause_service_name)
         )
+        self.compute_path_client = (compute_path_client if compute_path_client is not None else
+                                    ActionClient(self, ComputePathToPose, 'compute_path_to_pose'))
+        self.odom_subscription = self.create_subscription(
+            Odometry, str(self.get_parameter('odometry_topic').value), self._on_odometry, 10)
 
         self.state = MissionState.WAITING_FOR_START_POSE
         self.start_pose: PoseStamped | None = None
         self.confirmed_detection: TargetDetectionCandidate | None = None
         self.target_committed = False
         self.target_position: StabilizedTargetPosition | None = None
+        self.latest_map: OccupancyGrid | None = None
+        self.approach_pose: tuple[float, float, float] | None = None
+        self.parking_plan: ParkingPlan | None = None
+        self._planning_deadline_s: float | None = None
+        self._motion_deadline_s = None
+        self._path_generation = 0
+        self._path_busy = False
+        self._path_handle = None
+        self._path_cancel_requested = False
+        self._path_request_deadline = None
+        self._path_batch_deadline = None
+        self._path_groups = []
+        self._path_valid = []
+        self._path_queue = []
+        self._paths = {}
+        self._planning_snapshot = None
+        self._target_map_odom = None
         self.last_issue: MissionIssue | None = None
         self.transition_history: list[StateTransition] = []
         self._associations: OrderedDict[int, TargetAssociation] = OrderedDict()
@@ -234,7 +410,64 @@ class MissionManagerNode(Node):
         self._guard_failure_count = 0
         self._localization_deadline_s: float | None = None
 
-        self.control_timer = self.create_timer(control_period_s, self.tick)
+        # No parameter or topic substitutes for verified platform/ownership
+        # interlocks. Their production adapter is deliberately deferred.
+        self.execution_safety = None
+        self.safety_monitor = ParkingSafetyMonitor()
+        self._execution_odometry = None
+        self._execution_odom_received_s = None
+        self.navigation_client = (navigation_client if navigation_client is not None else
+            ActionClient(self, NavigateToPose, 'navigate_to_pose'))
+        self.execution = ParkingExecutor(
+            self.navigation_client, self._execution_context, self.planner_config,
+            os.path.join(get_package_share_directory('ridgeback_autonomy'),
+                         'config', 'parking_navigate_to_pose.xml'),
+            enabled=bool(self.get_parameter('parking_execution_enabled').value),
+            limits=ExecutionLimits(
+                xy_tolerance_m=float(self.get_parameter('parking_xy_tolerance_m').value),
+                yaw_tolerance_rad=float(self.get_parameter('parking_yaw_tolerance_rad').value),
+                preparking_offset_m=float(self.get_parameter('preparking_offset_m').value),
+                navigation_timeout_s=float(self.get_parameter('parking_navigation_timeout_s').value),
+                progress_timeout_s=float(self.get_parameter('parking_progress_timeout_s').value),
+                settlement_timeout_s=self.motion_settlement_timeout_s,
+                max_target_age_s=self.parking_max_target_age_s,
+                max_map_age_s=self.parking_max_map_age_s,
+                max_pose_age_s=self.parking_max_pose_age_s,
+                frame_shift_m=self.parking_max_frame_shift_m,
+                frame_yaw_rad=self.parking_max_frame_yaw_rad),
+            on_change=self._execution_changed, safety_check=self._execution_safety_check)
+        self._parking_bt_identity, _ = parking_tree_identity(self.execution.behavior_tree, self.planner_id)
+        self.stage_paths = ParkingStagePaths(self.compute_path_client, self.execution,
+            lambda: replace(self._execution_context(), path_request_unresolved=self._path_busy),
+            self.planner_id, timeout_s=self.parking_path_timeout_s)
+        self._stage_last_published = self.stage_paths.reason
+        self.stage_service = self.create_service(Trigger, 'parking_mission/prepare_stage', self._prepare_stage)
+        self.mask_publisher = self.create_publisher(OccupancyGrid, 'parking/g1_keepout_mask', status_qos)
+        self.mask_info_publisher = self.create_publisher(CostmapFilterInfo, 'parking/g1_keepout_info', status_qos)
+        self._mask_key = None
+        self._safety_subscriptions = []
+        for topic in LOCK_TOPICS:
+            self._safety_subscriptions.append(self.create_subscription(Bool, topic,
+                lambda msg, t=topic: self._on_stop_lock(t, msg), qos_profile_sensor_data))
+        for topic in MANUAL_TOPICS + COMMAND_TOPICS:
+            self._safety_subscriptions.append(self.create_subscription(TwistStamped, topic,
+                lambda msg, t=topic: self._on_command_evidence(t, msg), 10))
+        self._safety_subscriptions.append(self.create_subscription(StopStatus,
+            'platform/mcu/status/stop', self._on_platform_stop, qos_profile_sensor_data))
+        for topic in ('navigate_to_pose/_action/status', 'navigate_through_poses/_action/status'):
+            self._safety_subscriptions.append(self.create_subscription(GoalStatusArray, topic,
+                lambda msg, t=topic: self._on_navigation_status(t, msg), status_qos))
+        self._platform_client = self.create_client(ListControllers, 'controller_manager/list_controllers')
+        self._checker_client = self.create_client(GetParameters, 'controller_server/get_parameters')
+        self._checker_lifecycle_client = self.create_client(GetState, 'controller_server/get_state')
+        self._probe_inflight, self._probe_values = {}, {}
+        self._last_probe_s = -math.inf
+        self.collision_subscription = self.create_subscription(
+            CollisionMonitorState, 'collision_monitor_state', self._on_collision_state, 10)
+
+        # Safety deadlines must still be polled if /clock pauses or stops.
+        self.control_timer = self.create_timer(
+            control_period_s, self.tick, clock=Clock(clock_type=ClockType.STEADY_TIME))
         self._publish_state('mission manager initialized', event='snapshot')
 
     def tick(self, now_s: float | None = None) -> None:
@@ -242,6 +475,52 @@ class MissionManagerNode(Node):
 
         with self._lock:
             now_s = self._monotonic() if now_s is None else float(now_s)
+            self._poll_safety_evidence(now_s)
+            self._publish_keepout_mask()
+            stage_was_busy = self.stage_paths.busy
+            if stage_was_busy:
+                self.stage_paths.poll()
+            if self.stage_paths.reason != self._stage_last_published:
+                self._stage_last_published = self.stage_paths.reason
+                self._publish_state(self.stage_paths.reason, event='stage_path_preparation')
+            if stage_was_busy:
+                return
+            if self.execution.state not in (ExecutionState.IDLE, ExecutionState.FAILED):
+                self.execution.poll()
+                # Robot movement is expected during navigation, not frame drift.
+                return
+            if self.state == MissionState.SETTLING_MOTION:
+                now_ns = self.get_clock().now().nanoseconds
+                if self.motion.ready(now_ns, now_s):
+                    self.get_logger().info('Physical motion settled; starting fresh target localization')
+                    self._start_localization('fresh odometry confirms physical motion settled')
+                elif now_s >= self._motion_deadline_s:
+                    self.last_issue = MissionIssue(FailureClass.TERMINAL,
+                        'motion_settlement_timeout', self.motion.reason)
+                    self._transition(MissionState.MOTION_SETTLEMENT_FAILED, self.motion.reason)
+                return
+            if self.state == MissionState.PARKING_CANDIDATES_READY:
+                if self.motion.ready(self.get_clock().now().nanoseconds, now_s):
+                    self._motion_deadline_s = None
+                    self._path_batch_deadline = now_s + self.parking_path_batch_timeout_s
+                    self._transition(MissionState.EVALUATING_PARKING_PATHS,
+                                     'fresh post-planning odometry confirms motion settled')
+                    self._next_path()
+                elif now_s >= self._motion_deadline_s:
+                    self._fail_planning('motion_settlement_timeout',
+                        f'post-planning motion evidence unavailable: {self.motion.reason}')
+                return
+            if self.state in (MissionState.EVALUATING_PARKING_PATHS, MissionState.PARKING_PATH_FEASIBLE):
+                reason = self._plan_invalid_reason()
+                if reason:
+                    self._fail_planning('parking_plan_invalidated', reason)
+                elif self.state == MissionState.EVALUATING_PARKING_PATHS:
+                    if (now_s >= self._path_batch_deadline or
+                            self._path_busy and now_s >= self._path_request_deadline):
+                        self._fail_planning('planner_timeout', 'ComputePathToPose deadline expired')
+                    elif not self._path_busy:
+                        self._next_path()
+                return
             if self.state == MissionState.WAITING_FOR_START_POSE:
                 self._try_capture_start_pose()
                 return
@@ -272,12 +551,16 @@ class MissionManagerNode(Node):
                     'target_localization_timeout',
                     'Target localization did not stabilize before the timeout',
                 )
+                return
+            if self.state == MissionState.G1_LOCALIZED:
+                self.try_plan_parking(now_s)
 
     def process_detection(self, msg: TargetDetections) -> None:
         with self._lock:
             if self.state not in (
                 MissionState.SEARCH_G1,
                 MissionState.STOPPING_EXPLORATION,
+                MissionState.SETTLING_MOTION,
                 MissionState.LOCALIZE_G1,
             ):
                 self._guard_failed(
@@ -306,6 +589,8 @@ class MissionManagerNode(Node):
 
             self.confirmed_detection = result.selected
             self.target_committed = True
+            # The original ranked parking sides against the robot pose at commit.
+            self.approach_pose = self._current_robot_pose()
             self.get_logger().info(
                 'Target confirmed by detection adapter: '
                 f'positives={result.positive_votes}/{len(result.vote_window)}, '
@@ -399,6 +684,7 @@ class MissionManagerNode(Node):
                 return
 
             self.target_position = result.stabilized
+            self._target_map_odom = self._map_odom(Time.from_msg(msg.header.stamp))
             self._localization_deadline_s = None
             self._clear_recoverable_issue()
             self.get_logger().info(
@@ -414,21 +700,46 @@ class MissionManagerNode(Node):
                 'generic target position stabilized; parking execution deferred',
             ):
                 self.get_logger().warn(
-                    'Phase 2D terminal reached: generic target position is not a '
-                    'validated G1 foot midpoint; no parking or return goal will be sent'
+                    'Generic target position is not a validated G1 foot midpoint; '
+                    'planning uses the larger keep-out margin and no parking or '
+                    'return goal will be sent'
                 )
+                self._planning_deadline_s = self._monotonic() + self.parking_input_timeout_s
+                self.try_plan_parking(self._monotonic(), now_ns=now_ns)
 
     def reset_mission(self, *, clear_start_pose: bool = True) -> None:
         """Reset manager-local state; MissionGuard resume remains explicit."""
 
         with self._lock:
+            if self.stage_paths.busy:
+                self.stage_paths.cancel('mission_reset_requested')
+                self._guard_failed('mission reset', 'stage path termination pending')
+                return
+            if self.execution.busy or self.execution.state == ExecutionState.SETTLING:
+                self.execution.cancel('operator_reset_requested')
+                self._guard_failed('mission reset', 'navigation termination/physical settlement pending')
+                return
+            if not self.execution.reset():
+                self._guard_failed('mission reset', 'fresh physical stop evidence required')
+                return
+            self.stage_paths.reset()
+            self.execution_safety = None
+            self._execution_odometry = self._execution_odom_received_s = None
             previous = self.state
             self._handoff_generation += 1
+            self._invalidate_path_requests()
+            self.motion.reset()
+            self._motion_deadline_s = None
+            self._planning_snapshot = self._target_map_odom = None
             self.detection_adapter.reset()
             self.localization_adapter.reset()
             self.confirmed_detection = None
             self.target_committed = False
             self.target_position = None
+            self.approach_pose = None
+            self.parking_plan = None
+            self._planning_deadline_s = None
+            self.parking_marker_publisher.publish(clear_markers())
             self.last_issue = None
             self._associations.clear()
             self._clear_handoff_state()
@@ -454,6 +765,7 @@ class MissionManagerNode(Node):
 
     def cancel_mission(self, reason: str = 'explicit operator cancellation') -> None:
         with self._lock:
+            self.stage_paths.cancel(reason)
             if self.state in (
                 MissionState.MISSION_FAILED,
                 MissionState.MISSION_CANCELED,
@@ -464,7 +776,10 @@ class MissionManagerNode(Node):
                 'operator_canceled',
                 reason,
             )
+            self._invalidate_path_requests()
+            self.parking_marker_publisher.publish(clear_markers())
             self._transition(MissionState.MISSION_CANCELED, reason)
+            self.execution.cancel(reason)
 
     def _try_capture_start_pose(self) -> bool:
         if self.start_pose is not None:
@@ -648,6 +963,15 @@ class MissionManagerNode(Node):
             self._guard_failed('localization transition', reason)
             return
         self._clear_handoff_state()
+        self.motion.reset()
+        self._motion_deadline_s = self._monotonic() + self.motion_settlement_timeout_s
+        self._transition(MissionState.SETTLING_MOTION,
+                         f'{reason}; waiting for physical motion settlement')
+
+    def _start_localization(self, reason: str) -> None:
+        if self.state != MissionState.SETTLING_MOTION:
+            return
+        self._motion_deadline_s = None
         self.localization_adapter.reset()
         self._clear_recoverable_issue()
         self._localization_deadline_s = self._monotonic() + self.localization_timeout_s
@@ -751,12 +1075,22 @@ class MissionManagerNode(Node):
             'reason': reason,
             'target_committed': self.target_committed,
             'start_pose_saved': self.start_pose is not None,
-            'parking_navigation_enabled': False,
+            'parking_navigation_enabled': self.execution.enabled,
+            'parking_execution': self.execution.summary(),
+            'parking_safety': self.safety_monitor.summary(),
+            'parking_stage_path': self.stage_paths.reason,
+            'parking_goal_checker': self._goal_checker_diagnostic(),
+            'parking_behavior_tree': self._parking_bt_diagnostic(),
+            'parking_target_admission': target_execution_reason(
+                self.parking_plan.target if self.parking_plan is not None else None),
             'failure_class': None if issue is None else issue.classification.value,
             'failure_code': None if issue is None else issue.code,
             'target_reference': None if position is None else position.reference,
             'target_source': None if position is None else position.source,
             'is_foot_midpoint': None if position is None else position.is_foot_midpoint,
+            'parking_plan': self._plan_summary(),
+            'motion_status': self.motion.reason,
+            'path_request_unresolved': self._path_busy,
         }
         self.state_publisher.publish(String(data=json.dumps(payload, sort_keys=True)))
 
@@ -776,6 +1110,556 @@ class MissionManagerNode(Node):
             and isinstance(payload.get('cancellation'), str)
         )
 
+    def try_plan_parking(self, now_s: float, *, now_ns: int | None = None) -> None:
+        """Plan once from fresh inputs; wait for missing inputs up to a bounded timeout."""
+
+        with self._lock:
+            if self.state != MissionState.G1_LOCALIZED or not self.parking_planning_enabled:
+                return
+            now_ns = self.get_clock().now().nanoseconds if now_ns is None else int(now_ns)
+            position = self.target_position
+            target = None if position is None else TargetReference(
+                x=position.map_x_m, y=position.map_y_m, frame_id=self.map_frame,
+                stamp_ns=position.last_stamp_ns, reference=position.reference,
+                is_foot_midpoint=position.is_foot_midpoint, source=position.source)
+            try:
+                grid = None if self.latest_map is None else GridSnapshot.from_msg(self.latest_map)
+            except ValueError as exc:
+                self._fail_planning('parking_inputs_invalid', f'map_invalid: {exc}')
+                return
+            robot = self._current_robot_pose(with_stamp=True)
+            reasons = validate_inputs(
+                target, grid, robot, now_ns=now_ns, map_frame=self.map_frame,
+                max_target_age_s=self.parking_max_target_age_s,
+                max_map_age_s=self.parking_max_map_age_s,
+                max_pose_age_s=self.parking_max_pose_age_s)
+            if reasons:
+                # A stale or wrong-frame target cannot improve by waiting.
+                waitable = {'map_unavailable', 'map_stale', 'robot_pose_unavailable',
+                            'robot_pose_stale'}
+                expired = (self._planning_deadline_s is not None
+                           and now_s >= self._planning_deadline_s)
+                if set(reasons) <= waitable and not expired:
+                    # Waiting is not an error; report it without raising an issue.
+                    self.get_logger().debug(f'Parking inputs pending: {reasons}')
+                    self._publish_state(', '.join(reasons), event='planning_pending')
+                    return
+                self._fail_planning('parking_inputs_invalid', ', '.join(reasons))
+                return
+
+            approach = self.approach_pose or robot[:3]
+            plan = plan_parking(grid, target, self.planner_config, approach)
+            self.parking_plan = plan
+            self._planning_deadline_s = None
+            counts = plan.counts()
+            if not plan.ok:
+                self._fail_planning(plan.failure_reason, f'no feasible parking pose: {counts}')
+                return
+            # The geometric selection is provisional, not a path-feasible selection.
+            plan.selected.status = 'valid'
+            plan.selected = None
+            plan.ok = False
+            self._planning_snapshot = PlanningSnapshot(robot, self._target_map_odom)
+            if self._target_map_odom is None:
+                self._fail_planning('parking_tf_unavailable', 'source-time map-to-odom unavailable')
+                return
+            self._path_groups = candidate_groups(plan, approach, self.path_candidates_per_class)
+            self._path_queue = []
+            self._path_valid = []
+            self._paths = {}
+            self._path_batch_deadline = now_s + self.parking_path_batch_timeout_s
+            self._clear_recoverable_issue()
+            self.get_logger().info(f'Geometric parking candidates ready: {counts}')
+            self._publish_parking_markers()
+            self._transition(
+                MissionState.PARKING_CANDIDATES_READY,
+                'geometric candidates generated; path feasibility pending')
+            # Geometry runs synchronously: odometry may be queued while this
+            # callback works. Yield and require new real stop evidence if stale.
+            if not self.motion.ready(self.get_clock().now().nanoseconds, self._monotonic()):
+                self._motion_deadline_s = self._monotonic() + self.motion_settlement_timeout_s
+                self.get_logger().info(
+                    'Waiting for fresh post-planning odometry before path evaluation')
+                return
+            self._transition(MissionState.EVALUATING_PARKING_PATHS,
+                             'bounded sequential ComputePathToPose evaluation; no driving')
+            self._next_path(now_ns=now_ns)
+
+    def _fail_planning(self, code: str, reason: str) -> None:
+        self.last_issue = MissionIssue(FailureClass.TERMINAL, code, reason)
+        self._invalidate_path_requests()
+        self._planning_deadline_s = None
+        if self.parking_plan is not None:
+            self.parking_plan.ok = False
+            self.parking_plan.selected = None
+            self.parking_plan.selected_path = None
+            self.parking_plan.failure_reason = code
+        if code in ('no_free_donut_cells', 'no_valid_candidate', 'bounded_search_exhausted') and self.parking_plan is not None:
+            self._publish_parking_markers()
+        else:
+            self.parking_marker_publisher.publish(clear_markers())
+        self.get_logger().error(f'Parking planning failed [{code}]: {reason}')
+        self._transition(MissionState.PARKING_PLANNING_FAILED, reason)
+
+    def _current_robot_pose(self, *, with_stamp: bool = False):
+        pose = self._frame_pose(self.base_frame, Time())
+        return pose if with_stamp or pose is None else pose[:3]
+
+    def _map_odom(self, stamp=None):
+        return self._frame_pose(self.odom_frame, stamp if stamp is not None else
+                                Time(nanoseconds=self.get_clock().now().nanoseconds))
+
+    def _frame_pose(self, frame, stamp):
+        try:
+            transform = self.tf_buffer.lookup_transform(self.map_frame, frame, stamp)
+        except TransformException:
+            return None
+        t, q = transform.transform.translation, transform.transform.rotation
+        values = (t.x, t.y, t.z, q.x, q.y, q.z, q.w)
+        norm = math.hypot(q.x, q.y, q.z, q.w)
+        if not all(math.isfinite(v) for v in values) or norm < 1e-9:
+            return None
+        x, y, z, w = (v / norm for v in (q.x, q.y, q.z, q.w))
+        yaw = math.atan2(2.0 * (w * z + x * y), 1.0 - 2.0 * (y * y + z * z))
+        pose = (float(t.x), float(t.y), yaw)
+        stamp = transform.header.stamp
+        return pose + (int(stamp.sec) * 1_000_000_000 + int(stamp.nanosec),)
+
+    def _on_odometry(self, msg):
+        with self._lock:
+            self._execution_odometry = msg
+            self._execution_odom_received_s = self._monotonic()
+            if self.execution.state == ExecutionState.IDLE and self.state not in (
+                                  MissionState.SETTLING_MOTION, MissionState.LOCALIZE_G1,
+                                  MissionState.G1_LOCALIZED, MissionState.PARKING_CANDIDATES_READY,
+                                  MissionState.EVALUATING_PARKING_PATHS,
+                                  MissionState.PARKING_PATH_FEASIBLE):
+                return
+            t = msg.twist.twist
+            self.motion.observe((t.linear.x, t.linear.y, t.linear.z,
+                                 t.angular.x, t.angular.y, t.angular.z),
+                                Time.from_msg(msg.header.stamp).nanoseconds,
+                                self.get_clock().now().nanoseconds, self._monotonic(),
+                                frame_valid=(msg.child_frame_id == self.base_frame and
+                                             msg.header.frame_id == self.odom_frame))
+
+    def _prepare_stage(self, request, response):
+        with self._lock:
+            if self.state != MissionState.PARKING_PATH_FEASIBLE:
+                response.success, response.message = False, 'no current path-feasible parking selection'
+                return response
+            final = self.execution.state == ExecutionState.READY_FOR_FINAL
+            response.success = self.stage_paths.request(final=final)
+            response.message = self.stage_paths.reason
+            self._publish_state(response.message, event='stage_path_preparation')
+            return response
+
+    def _safety_intervention(self):
+        reason = self.safety_monitor.intervention(self.get_clock().now().nanoseconds,
+            self._monotonic(), self.execution.goal_uuid if self.execution.busy else None)
+        if reason:
+            if self.execution.busy or self.execution.state == ExecutionState.PREPARED:
+                self.execution.cancel(reason)
+            if self.stage_paths.busy:
+                self.stage_paths.cancel(reason)
+
+    def _on_stop_lock(self, topic, msg):
+        with self._lock:
+            self.safety_monitor.observe_lock(topic, msg.data,
+                self.get_clock().now().nanoseconds, self._monotonic())
+            self._safety_intervention()
+
+    def _on_command_evidence(self, topic, msg):
+        with self._lock:
+            self.safety_monitor.observe_command(topic, msg,
+                self.get_clock().now().nanoseconds, self._monotonic())
+            self._safety_intervention()
+
+    def _on_platform_stop(self, msg):
+        with self._lock:
+            self.safety_monitor.observe_stop_status(msg, self._monotonic())
+            if (msg.needs_reset or not msg.stop_power_status) and self.execution.busy:
+                self.execution.cancel('stop_loop_fault')
+
+    def _on_navigation_status(self, topic, msg):
+        with self._lock:
+            self.safety_monitor.observe_action_status(topic, msg,
+                self.get_clock().now().nanoseconds, self._monotonic())
+            self._safety_intervention()
+
+    def _read_safety_service(self, name, client, request, decode):
+        if self._probe_inflight.get(name) or not client.service_is_ready():
+            return
+        deadline = self._monotonic() + 2.0
+        self._probe_inflight[name] = True
+        try:
+            future = client.call_async(request)
+        except Exception:
+            self._probe_inflight[name] = False
+            self._probe_values.pop(name, None)
+            return
+
+        def done(f):
+            with self._lock:
+                self._probe_inflight[name] = False
+                try:
+                    value = decode(f.result()) if self._monotonic() < deadline else None
+                except Exception:
+                    value = None
+                now_ns, wall_s = self.get_clock().now().nanoseconds, self._monotonic()
+                self._probe_values[name] = (value, now_ns, wall_s)
+                if name == 'platform':
+                    self.safety_monitor.observe_controller(value is True, now_ns, wall_s)
+                    if value is not True and self.execution.busy:
+                        self.execution.cancel('platform_controller_fault_or_unavailable')
+                self._publish_state('read-only safety evidence updated', event='safety_probe')
+        future.add_done_callback(done)
+
+    def _poll_safety_evidence(self, wall_s):
+        if wall_s - self._last_probe_s < 1.0:
+            return
+        self._last_probe_s = wall_s
+        self._read_safety_service('platform', self._platform_client, ListControllers.Request(),
+            lambda r: any(c.name == 'platform_velocity_controller' and c.state == 'active'
+                          for c in r.controller))
+        req = GetParameters.Request(names=list(GOAL_CHECKER_PARAMETERS))
+        self._read_safety_service('checker', self._checker_client, req,
+            lambda r: dict(zip(GOAL_CHECKER_PARAMETERS,
+                              (parameter_value_to_python(v) for v in r.values))))
+        self._read_safety_service('checker_lifecycle', self._checker_lifecycle_client,
+            GetState.Request(), lambda r: r.current_state.id == 3)
+
+    def _goal_checker_diagnostic(self):
+        now_ns, wall_s = self.get_clock().now().nanoseconds, self._monotonic()
+        for key in ('checker', 'checker_lifecycle'):
+            item = self._probe_values.get(key)
+            if (item is None or not 0 <= wall_s - item[2] <= 1.5
+                    or not 0 <= (now_ns - item[1])*1e-9 <= 1.5):
+                return 'parking_goal_checker_evidence_unknown_or_stale'
+        if self._probe_values['checker_lifecycle'][0] is not True:
+            return 'parking_controller_not_active'
+        values = self._probe_values['checker'][0]
+        return goal_checker_reason(values or {}, self.execution.limits.xy_tolerance_m,
+                                    self.execution.limits.yaw_tolerance_rad)
+
+    def _execution_safety_check(self, ctx, moving):
+        reason = target_execution_reason(ctx.plan.target) or self._parking_bt_diagnostic()
+        if reason:
+            return reason
+        reason = self.safety_monitor.check(ctx, self.planner_config, moving=moving,
+            own_goal=self.execution.goal_uuid if self.execution.busy else None)
+        return reason or self._goal_checker_diagnostic()
+
+    def _parking_bt_diagnostic(self):
+        identity, reason = parking_tree_identity(self.execution.behavior_tree, self.planner_id)
+        if reason:
+            return reason
+        if self._parking_bt_identity is None or identity != self._parking_bt_identity:
+            return 'parking_bt_changed_restart_and_requalify'
+        return None
+
+    def _publish_keepout_mask(self):
+        if self.parking_plan is None or self.latest_map is None:
+            return
+        plan = self.parking_plan
+        if plan.target is None or not 0 <= (self.get_clock().now().nanoseconds - plan.target.stamp_ns)*1e-9 <= self.parking_max_target_age_s:
+            return  # Retain the last mask; never clear protection on target loss.
+        try:
+            grid = GridSnapshot.from_msg(self.latest_map)
+            if grid.frame_id != self.map_frame:
+                return
+            key = (plan.target, grid.origin_x, grid.origin_y, grid.origin_yaw,
+                   grid.resolution, grid.width, grid.height, plan.keepout_radius_m)
+            if key == self._mask_key:
+                return
+            msg = keepout_mask(grid, plan.target, plan.keepout_radius_m)
+        except ValueError:
+            return
+        info = CostmapFilterInfo()
+        info.header = msg.header
+        info.type, info.base, info.multiplier = 0, 0.0, 1.0
+        info.filter_mask_topic = self.resolve_topic_name('parking/g1_keepout_mask')
+        self.mask_publisher.publish(msg)
+        self.mask_info_publisher.publish(info)
+        self._mask_key = key
+
+    def _execution_context(self):
+        try:
+            grid = None if self.latest_map is None else GridSnapshot.from_msg(self.latest_map)
+        except ValueError:
+            grid = None
+        now_ns = self.get_clock().now().nanoseconds
+        target_robot = None
+        if self.parking_plan is not None and self.parking_plan.target is not None:
+            target_robot = self._frame_pose(self.base_frame,
+                Time(nanoseconds=self.parking_plan.target.stamp_ns))
+        return ExecutionContext(
+            plan=self.parking_plan, grid=grid,
+            robot=self._current_robot_pose(with_stamp=True),
+            map_odom=self._map_odom(Time(nanoseconds=now_ns)),
+            snapshot=self._planning_snapshot, motion=self.motion,
+            now_ns=now_ns, wall_s=self._monotonic(), safety=self.execution_safety,
+            path_request_unresolved=self._path_busy or bool(getattr(self, 'stage_paths', None)
+                and self.stage_paths.busy), map_frame=self.map_frame,
+            odom_frame=self.odom_frame, base_frame=self.base_frame,
+            odometry=self._execution_odometry,
+            odometry_received_s=self._execution_odom_received_s, target_robot=target_robot)
+
+    def prepare_parking_navigation(self, path_result=None, *, final=False):
+        """Accept a terminal stage ComputePathToPose result; never invent a route."""
+        with self._lock:
+            if self.state != MissionState.PARKING_PATH_FEASIBLE:
+                return False
+            ready = self.execution.prepare(path_result, final=final)
+            self.get_logger().info(
+                f'Parking execution preparation: {self.execution.reason}; no goal sent')
+            self._publish_state(self.execution.reason, event='execution_preparation')
+            return ready
+
+    def request_parking_navigation(self):
+        """Explicit internal request, never called by a timer or launch action.
+
+        A future trusted safety adapter and separately qualified stage path are
+        mandatory even when the execution parameter is enabled.
+        """
+        with self._lock:
+            if self.state != MissionState.PARKING_PATH_FEASIBLE:
+                return False
+            return self.execution.start()
+
+    def _execution_changed(self):
+        self.get_logger().info(
+            f'Parking execution: {self.execution.state.name}; {self.execution.reason}')
+        if (self.execution.state == ExecutionState.FAILED
+                and self.state == MissionState.PARKING_PATH_FEASIBLE):
+            self.last_issue = MissionIssue(FailureClass.TERMINAL,
+                'parking_execution_failed', self.execution.reason)
+            if self.parking_plan is not None:
+                self.parking_plan.ok = False
+                self.parking_plan.selected = None
+                self.parking_plan.selected_path = None
+                self.parking_plan.failure_reason = 'parking_execution_failed'
+            self.parking_marker_publisher.publish(clear_markers())
+            self._transition(MissionState.PARKING_EXECUTION_FAILED, self.execution.reason)
+        self._publish_state(self.execution.reason, event='parking_execution')
+
+    def _on_collision_state(self, msg):
+        with self._lock:
+            self.execution.collision_state(msg.action_type,
+                self.get_clock().now().nanoseconds, self._monotonic())
+
+    def _plan_invalid_reason(self, now_ns=None):
+        now_ns = self.get_clock().now().nanoseconds if now_ns is None else now_ns
+        if not self.motion.ready(now_ns, self._monotonic()):
+            return f'motion_evidence_lost: {self.motion.reason}'
+        plan = self.parking_plan
+        if plan is None:
+            return 'plan_unavailable'
+        try:
+            grid = None if self.latest_map is None else GridSnapshot.from_msg(self.latest_map)
+        except ValueError as exc:
+            return f'map_invalid: {exc}'
+        robot = self._current_robot_pose(with_stamp=True)
+        reasons = validate_inputs(plan.target, grid, robot, now_ns=now_ns,
+                                  map_frame=self.map_frame, max_target_age_s=self.parking_max_target_age_s,
+                                  max_map_age_s=self.parking_max_map_age_s,
+                                  max_pose_age_s=self.parking_max_pose_age_s)
+        if reasons:
+            return ', '.join(reasons)
+        reason = self._planning_snapshot.changed(
+            robot, self._map_odom(Time(nanoseconds=now_ns)),
+            self.parking_max_frame_shift_m, self.parking_max_frame_yaw_rad)
+        if reason:
+            return reason
+        # Revalidate the selected route against the latest map, including same-stamp changes.
+        if plan.selected is not None and plan.selected_path is not None:
+            return path_rejection(plan.selected_path, plan.selected, robot, grid, plan.target,
+                                  self.planner_config, plan.keepout_radius_m)
+        return None
+
+    def _publish_parking_markers(self):
+        self.parking_marker_publisher.publish(plan_markers(
+            self.parking_plan, self.planner_config, self.get_clock().now().to_msg()))
+
+    def _next_path(self, now_ns=None):
+        if self.state != MissionState.EVALUATING_PARKING_PATHS or self._path_busy:
+            return
+        reason = self._plan_invalid_reason(now_ns)
+        if reason:
+            self._fail_planning('parking_plan_invalidated', reason)
+            return
+        if not self._path_queue:
+            if self._path_valid:
+                selected = select_path_candidate(self._path_valid, self.parking_plan.resolution_m)
+                plan = self.parking_plan
+                plan.selected, plan.selected_path, plan.ok = selected, self._paths[id(selected)], True
+                selected.status = 'selected'
+                reason = self._plan_invalid_reason(now_ns)
+                if reason:
+                    self._fail_planning('parking_plan_invalidated', reason)
+                    return
+                self._publish_parking_markers()
+                self.get_logger().info(
+                    f'Path-feasible parking pose selected: x={selected.base_x:.3f}, '
+                    f'y={selected.base_y:.3f}, yaw={selected.yaw:.3f}, '
+                    f'path_length={selected.path_length_m:.3f} m; no navigation goal sent')
+                self._transition(MissionState.PARKING_PATH_FEASIBLE,
+                                 'path-feasible snapshot selected; parking execution disabled')
+                self.prepare_parking_navigation()
+                return
+            if not self._path_groups:
+                self._fail_planning('bounded_search_exhausted',
+                    'No safe path among bounded candidates; untested poses may remain')
+                return
+            self._path_queue = list(self._path_groups.pop(0))
+        if not self.compute_path_client.server_is_ready():
+            return
+        candidate = self._path_queue.pop(0)
+        robot = self._current_robot_pose(with_stamp=True)
+        request = ComputePathToPose.Goal()
+        request.goal = self._pose_stamped(candidate.base_x, candidate.base_y, candidate.yaw)
+        request.start = self._pose_stamped(*robot[:3])
+        request.use_start = True
+        request.planner_id = self.planner_id
+        self._path_busy = True
+        self._path_request_deadline = self._monotonic() + self.parking_path_timeout_s
+        generation = self._path_generation
+        self.parking_plan.paths_checked += 1
+        self.get_logger().info(f'Checking parking path {self.parking_plan.paths_checked}: '
+                               f'x={candidate.base_x:.3f}, y={candidate.base_y:.3f}')
+        try:
+            future = self.compute_path_client.send_goal_async(request)
+        except Exception as exc:
+            self._path_busy = False
+            self._fail_planning('planner_transport', str(exc))
+            return
+        future.add_done_callback(lambda f: self._path_goal_response(f, generation, candidate, robot))
+
+    def _pose_stamped(self, x, y, yaw):
+        msg = PoseStamped()
+        msg.header.frame_id = self.map_frame
+        msg.header.stamp = self.get_clock().now().to_msg()
+        msg.pose.position.x, msg.pose.position.y = float(x), float(y)
+        msg.pose.orientation.z, msg.pose.orientation.w = math.sin(yaw / 2), math.cos(yaw / 2)
+        return msg
+
+    def _path_goal_response(self, future, generation, candidate, robot):
+        with self._lock:
+            try:
+                handle = future.result()
+            except Exception as exc:
+                # Acceptance is unknown: retain unresolved ownership, do not send another request.
+                if generation == self._path_generation:
+                    self._fail_planning('planner_acceptance_unknown', str(exc))
+                return
+            if not handle.accepted:
+                self._path_busy = False
+                if generation == self._path_generation:
+                    candidate.path_status, candidate.path_reason = 'rejected', 'goal_rejected'
+                    self._publish_parking_markers()
+                return
+            self._path_handle = handle
+            try:
+                result_future = handle.get_result_async()
+                result_future.add_done_callback(
+                    lambda f: self._path_result(f, generation, candidate, robot, handle))
+            except Exception as exc:
+                if generation == self._path_generation:
+                    self._fail_planning('planner_result_unavailable', str(exc))
+                return
+            if generation != self._path_generation or self.state != MissionState.EVALUATING_PARKING_PATHS:
+                self._cancel_path_request()
+
+    def _path_result(self, future, generation, candidate, robot, handle):
+        with self._lock:
+            if handle is not self._path_handle:
+                return
+            try:
+                wrapped = future.result()
+                if wrapped.status not in (GoalStatus.STATUS_SUCCEEDED, GoalStatus.STATUS_ABORTED,
+                                           GoalStatus.STATUS_CANCELED):
+                    raise ValueError('nonterminal path result')
+            except Exception as exc:
+                if generation == self._path_generation:
+                    self._fail_planning('planner_result_unknown', str(exc))
+                return
+            self._path_handle = None
+            self._path_busy = self._path_cancel_requested = False
+            if generation != self._path_generation or self.state != MissionState.EVALUATING_PARKING_PATHS:
+                return
+            if (self._monotonic() >= self._path_request_deadline or
+                    self._monotonic() >= self._path_batch_deadline):
+                self._fail_planning('planner_timeout', 'late ComputePathToPose result discarded')
+                return
+            reason = self._plan_invalid_reason()
+            if reason:
+                self._fail_planning('parking_plan_invalidated', reason)
+                return
+            result = wrapped.result
+            reason = None
+            if wrapped.status != GoalStatus.STATUS_SUCCEEDED or result.error_code != 0:
+                reason = f'nav2_status_{wrapped.status}_error_{result.error_code}: {result.error_msg}'
+            else:
+                grid = GridSnapshot.from_msg(self.latest_map)
+                path_stamp = Time.from_msg(result.path.header.stamp).nanoseconds
+                now = self.get_clock().now().nanoseconds
+                if path_stamp > now or now - path_stamp > int(self.parking_max_pose_age_s * 1e9):
+                    reason = 'path_timestamp'
+                else:
+                    reason = path_rejection(result.path, candidate, robot, grid, self.parking_plan.target,
+                                            self.planner_config, self.parking_plan.keepout_radius_m)
+            candidate.path_status = 'rejected' if reason else 'valid'
+            candidate.path_reason = reason
+            if reason:
+                self.get_logger().info(f'Parking path rejected: {reason}')
+            else:
+                candidate.path_length_m = path_length(result.path)
+                self._path_valid.append(candidate)
+                self._paths[id(candidate)] = result.path
+            self._publish_parking_markers()
+            # The existing control timer sends the next request: no callback recursion.
+
+    def _cancel_path_request(self):
+        if self._path_handle is not None and not self._path_cancel_requested:
+            self._path_cancel_requested = True
+            try:
+                self._path_handle.cancel_goal_async()
+            except Exception as exc:
+                self.get_logger().error(f'Path cancellation unresolved: {exc}')
+
+    def _invalidate_path_requests(self):
+        self._path_generation += 1
+        self._cancel_path_request()
+        self._path_groups, self._path_queue, self._path_valid = [], [], []
+
+    def destroy_node(self):
+        self._invalidate_path_requests()
+        self.stage_paths.cancel('manager_shutdown')
+        if self.execution.busy:
+            self.execution.cancel('manager_shutdown')
+        return super().destroy_node()
+
+    def _plan_summary(self):
+        plan = self.parking_plan
+        if plan is None:
+            return None
+        summary = {'ok': plan.ok, 'failure_reason': plan.failure_reason,
+                   'keepout_radius_m': round(plan.keepout_radius_m, 3),
+                   'target': [round(plan.target.x, 3), round(plan.target.y, 3)],
+                   'target_reference': plan.target.reference, 'counts': plan.counts()}
+        if plan.selected is not None:
+            sel = plan.selected
+            summary['selected'] = {
+                'base': [round(sel.base_x, 3), round(sel.base_y, 3), round(sel.yaw, 4)],
+                'task': [round(sel.task_x, 3), round(sel.task_y, 3)],
+                'reach_m': round(sel.reach_m, 3), 'clearance_m': round(sel.clearance_m, 3),
+                'preference': sel.preference_label, 'path_length_m': sel.path_length_m}
+        return summary
+
+    def _on_map(self, msg: OccupancyGrid) -> None:
+        with self._lock:
+            self.latest_map = msg
+
     def _on_detections(self, msg: TargetDetections) -> None:
         self.process_detection(msg)
 
@@ -784,6 +1668,18 @@ class MissionManagerNode(Node):
 
     def _on_guard_status(self, msg: String) -> None:
         self.process_guard_status(msg)
+
+
+def load_nav2_footprint(nav2_params_path: str) -> list[tuple[float, float]]:
+    """The global costmap footprint, as the original mission loaded it (padding not applied)."""
+
+    with open(nav2_params_path, encoding='utf-8') as config_file:
+        config = yaml.safe_load(config_file)
+    footprint = config['global_costmap']['global_costmap']['ros__parameters']['footprint']
+    points = [(float(p[0]), float(p[1])) for p in ast.literal_eval(str(footprint))]
+    if len(points) < 3 or not all(math.isfinite(v) for p in points for v in p):
+        raise ValueError('Nav2 footprint must contain at least 3 finite points')
+    return points
 
 
 def main(args=None) -> None:
