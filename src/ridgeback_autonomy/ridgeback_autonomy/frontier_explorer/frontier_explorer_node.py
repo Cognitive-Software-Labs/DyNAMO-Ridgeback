@@ -11,7 +11,7 @@ from rclpy.callback_groups import MutuallyExclusiveCallbackGroup
 
 import numpy as np
 from nav_msgs.msg import OccupancyGrid
-from geometry_msgs.msg import PoseStamped, Point
+from geometry_msgs.msg import PoseStamped, Point, PointStamped
 from nav2_msgs.action import NavigateToPose
 from nav2_msgs.srv import ClearEntireCostmap
 from tf2_ros import TransformListener, Buffer
@@ -47,6 +47,10 @@ class FrontierExplorerNode(Node):
         self.declare_parameter('abort_blacklist_threshold', 3)
         self.declare_parameter('visited_goal_radius', 25)
         self.declare_parameter('max_effective_frontier_size', 80)
+        # Optional focus region set on explore/focus (e.g. around a target the
+        # mission must map before parking); unset, exploration is global.
+        self.declare_parameter('focus_radius_m', 2.5)
+        self.declare_parameter('focus_keepout_m', 1.0)
         
         # Get parameters
         self.robot_base_frame = self.get_parameter('robot_base_frame').value
@@ -67,6 +71,9 @@ class FrontierExplorerNode(Node):
         self._abort_blacklist_threshold = self.get_parameter('abort_blacklist_threshold').value
         self._visited_goal_radius = self.get_parameter('visited_goal_radius').value
         self._max_effective_frontier_size = self.get_parameter('max_effective_frontier_size').value
+        self._focus_radius = float(self.get_parameter('focus_radius_m').value)
+        self._focus_keepout = float(self.get_parameter('focus_keepout_m').value)
+        self._focus = None
         
         # TF2 setup
         self.tf_buffer = Buffer()
@@ -100,6 +107,10 @@ class FrontierExplorerNode(Node):
             callback_group=callback_group_1
         )
         
+        self.focus_subscription = self.create_subscription(
+            PointStamped, 'explore/focus', self._focus_callback, status_qos,
+            callback_group=callback_group_2)
+
         # Action client for Nav2 NavigateToPose
         self.nav_client = ActionClient(self, NavigateToPose, 'navigate_to_pose')
         # Costmap-clear services, called on a progress stall: the local costmap
@@ -333,6 +344,9 @@ class FrontierExplorerNode(Node):
                 self._abort_counts.clear()
                 best_frontier = self.find_safe_frontier(robot_pos, clusters)
             if best_frontier is None:
+                if self._focus is not None:
+                    self._publish_status('focus_exploration_complete')
+                    return
                 self.get_logger().info('No frontier found - exploration complete!')
                 # Signal completion for benchmark tooling; keep the timer
                 # alive — new frontiers may still appear as the map grows
@@ -409,9 +423,15 @@ class FrontierExplorerNode(Node):
         cap = self._max_effective_frontier_size
 
         for cluster in clusters:
+            if self._focus is not None:
+                # Only the part of a frontier inside the focus region counts;
+                # its goal may lie beyond it but never in the protected radius.
+                cluster = [p for p in cluster if self._in_focus(p)]
             if len(cluster) < self.min_frontier_size:
                 continue
             target, dist = self._make_goal_for_cluster(cluster, robot_pos)
+            if not self._in_focus(target, outer=False):
+                continue
             entry = (cluster, target, dist, len(cluster))
             if dist <= self._near_frontier_radius:
                 near.append(entry)
@@ -448,6 +468,32 @@ class FrontierExplorerNode(Node):
 
         return None
     
+    def _focus_callback(self, msg: PointStamped):
+        """Restrict goals to an annulus around msg.point; an empty frame_id clears it."""
+        if not msg.header.frame_id:
+            self._focus = None
+            self.get_logger().info('Exploration focus cleared')
+            return
+        if msg.header.frame_id != self.current_costmap_frame():
+            self.get_logger().warn(
+                f'Ignoring exploration focus in frame {msg.header.frame_id!r}; '
+                f'frontiers are in {self.current_costmap_frame()!r}')
+            return
+        self._focus = (msg.point.x, msg.point.y)
+        self.get_logger().info(
+            f'Exploration focus: ({msg.point.x:.2f}, {msg.point.y:.2f}), goals '
+            f'{self._focus_keepout:.2f}-{self._focus_radius:.2f} m from it')
+
+    def current_costmap_frame(self):
+        return self.current_costmap.header.frame_id if self.current_costmap is not None else 'map'
+
+    def _in_focus(self, grid_pos, *, outer=True):
+        if self._focus is None:
+            return True
+        x, y = self.grid_to_world(grid_pos)
+        d = np.hypot(x - self._focus[0], y - self._focus[1])
+        return self._focus_keepout <= d and (not outer or d <= self._focus_radius)
+
     def _cancel_current_goal(self):
         """Cancel the active Nav2 goal, if any."""
         self.mission_guard.cancel()

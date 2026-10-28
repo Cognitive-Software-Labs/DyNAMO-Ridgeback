@@ -4,6 +4,10 @@ from dataclasses import dataclass
 import math
 
 
+FAULT_REASONS = frozenset({'odometry_frame', 'odometry_nonfinite', 'odometry_timestamp',
+                           'odometry_not_advancing', 'robot_moving'})
+
+
 @dataclass
 class MotionSettlement:
     linear_limit: float = 0.005
@@ -16,6 +20,9 @@ class MotionSettlement:
     reason: str = 'odometry_missing'
 
     def __post_init__(self):
+        # Evidence of motion or invalid odometry, as opposed to the stationary
+        # interval merely restarting after delayed or late samples.
+        self.faults = 0
         self.reset()
 
     def reset(self):
@@ -39,6 +46,8 @@ class MotionSettlement:
         elif math.hypot(*velocities[:3]) >= self.linear_limit or math.hypot(*velocities[3:]) >= self.angular_limit:
             reason = 'robot_moving'
         if reason:
+            if reason in FAULT_REASONS:
+                self.faults += 1
             self.reset()
             self.reason = reason
             return

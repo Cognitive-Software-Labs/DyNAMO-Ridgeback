@@ -448,3 +448,15 @@ def test_sim_clock_lagging_odometry_by_a_few_ms_keeps_evidence():
     ns, wall = stopped(m)
     m.observe((0.,) * 6, ns + 100_000_000, ns + 95_000_000, wall + .1)
     assert m.ready(ns + 95_000_000, wall + .1)
+
+
+def test_unknown_cells_under_the_robot_itself_do_not_block_its_route():
+    g, c, start, p = path_fixture()
+    g.data[80:89, 15:26] = -1           # unseen floor beneath the start footprint
+    assert path_rejection(p, c, start, g, target(), CONFIG, .29) is None
+    assert (g.data[80:89, 15:26] == -1).all()   # the caller's grid is not modified
+    g.data[84, 20] = 100                # a real obstacle there still rejects
+    assert path_rejection(p, c, start, g, target(), CONFIG, .29) == 'path_footprint_occupied'
+    g.data[84, 20] = -1
+    g.data[84, 40] = -1                 # unknown beyond the robot still rejects
+    assert path_rejection(p, c, start, g, target(), CONFIG, .29) == 'path_footprint_unknown'

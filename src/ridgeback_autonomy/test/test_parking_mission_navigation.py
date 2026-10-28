@@ -204,3 +204,43 @@ def test_feasibility_checks_the_driven_route_through_preparking(manager_factory,
 def test_manager_budgets_final_tolerance_and_reference_out_of_the_reach_limit(manager_factory):
     m = manager_factory()
     assert m.planner_config.reach_allowance_m == pytest.approx(0.06)
+
+
+def _delayed_sample(m, *, velocity=0.0, wall_gap=0.7):
+    """One odometry sample arriving after a callback delay longer than the evidence window."""
+    ns, wall = m.motion.last_ns + 100_000_000, m.motion.last_wall + wall_gap
+    m.test_ros_ns, m._monotonic.value = ns, wall
+    m.motion.observe((velocity,) + (0.,) * 5, ns, ns, wall)
+
+
+def test_delayed_odometry_restart_keeps_a_feasible_plan_and_waits_to_drive(manager_factory, monkeypatch):
+    m, _ = feasible(manager_factory, monkeypatch, enabled=False)
+    m.parking_navigation_enabled = True
+    _delayed_sample(m)
+    assert m.motion.reason == 'collecting_stationary_interval'
+    m.tick()
+    assert m.state == MissionState.PARKING_PATH_FEASIBLE   # plan kept, not driven yet
+    assert m._goal_checker_set_client.calls == []
+    hold_still(m)
+    m.tf_buffer.stamp_ns = m.test_ros_ns   # TF keeps publishing while the robot stands
+    m.tick()
+    assert m.state == MissionState.NAVIGATING_TO_PREPARKING
+
+
+def test_motion_after_planning_still_invalidates_the_plan(manager_factory, monkeypatch):
+    m, _ = feasible(manager_factory, monkeypatch, enabled=False)
+    _delayed_sample(m, velocity=0.05, wall_gap=0.1)
+    m.tick()
+    assert m.state == MissionState.PARKING_PLANNING_FAILED
+    assert m.last_issue.reason == 'motion_evidence_lost: robot_moving'
+
+
+def test_restarted_evidence_must_complete_within_the_settlement_timeout(manager_factory, monkeypatch):
+    m, _ = feasible(manager_factory, monkeypatch, enabled=False)
+    _delayed_sample(m)
+    m.tick()
+    assert m.state == MissionState.PARKING_PATH_FEASIBLE
+    m._monotonic.value += 10.5   # odometry stops entirely
+    m.tick()
+    assert m.state == MissionState.PARKING_PLANNING_FAILED
+    assert m.last_issue.reason.startswith('motion_evidence_lost')

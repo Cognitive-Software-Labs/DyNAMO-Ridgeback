@@ -70,6 +70,9 @@ def test_mission_launch_is_opt_in_and_stationary() -> None:
     assert mission_text.count('autonomous_motion_enabled') == 1
     assert "'robot_base_frame', default_value='base_link'" in mission_text
     assert "'base_frame': LaunchConfiguration('robot_base_frame')" in mission_text
+    # The Isaac window is opt-in, as in the exploration launch.
+    assert "'headless', default_value='true'" in mission_text
+    assert "'headless': LaunchConfiguration('headless')" in mission_text
     assert mission_text.count("executable='mission_manager_node.py'") == 1
     assert mission_text.count("executable='stationary_mission_guard'") == 1
     assert 'NavigateToPose' not in mission_text

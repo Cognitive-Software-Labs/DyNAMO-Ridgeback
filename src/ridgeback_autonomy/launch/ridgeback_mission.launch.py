@@ -85,6 +85,9 @@ def generate_launch_description():
         DeclareLaunchArgument('gz_gui', default_value='true'),
         DeclareLaunchArgument('headless_rendering', default_value='false'),
         DeclareLaunchArgument(
+            'headless', default_value='true',
+            description='Isaac: run without the sim GUI window (gz ignores)'),
+        DeclareLaunchArgument(
             'mission_management_enabled', default_value='false',
             choices=['true', 'false'],
             description='Start one non-driving mission manager'),
@@ -136,6 +139,7 @@ def generate_launch_description():
                 'detector_debug': LaunchConfiguration('detector_debug'),
                 'gz_gui': LaunchConfiguration('gz_gui'),
                 'headless_rendering': LaunchConfiguration('headless_rendering'),
+                'headless': LaunchConfiguration('headless'),
                 # Stationary unless exploration is requested explicitly; the
                 # explorer is then gated by its own MissionGuard.
                 'autonomous_motion_enabled': exploration_enabled,

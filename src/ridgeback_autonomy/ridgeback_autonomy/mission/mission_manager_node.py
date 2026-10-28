@@ -24,9 +24,10 @@ import threading
 import time
 
 from ament_index_python.packages import get_package_share_directory
+import numpy as np
 import rclpy
 import yaml
-from geometry_msgs.msg import PoseStamped, TwistStamped
+from geometry_msgs.msg import PointStamped, PoseStamped, TwistStamped
 from nav_msgs.msg import OccupancyGrid, Odometry
 from nav2_msgs.action import ComputePathToPose, NavigateToPose
 from nav2_msgs.msg import CollisionMonitorState, CostmapFilterInfo
@@ -68,6 +69,7 @@ from ridgeback_autonomy.mission.parking_planner import (
     PlannerConfig,
     TargetReference,
     footprint_rejection_reason,
+    keepout_radius_m,
     plan_parking,
     points_to_polygon_distance,
     validate_inputs,
@@ -100,6 +102,8 @@ class MissionState(Enum):
     MOTION_SETTLEMENT_FAILED = 'motion_settlement_failed'
     LOCALIZE_G1 = 'localize_g1'
     G1_LOCALIZED = 'g1_localized'
+    EXPLORING_AROUND_G1 = 'exploring_around_g1'
+    RETURNING_TO_OBSERVATION = 'returning_to_observation'
     PARKING_CANDIDATES_READY = 'parking_candidates_ready'
     EVALUATING_PARKING_PATHS = 'evaluating_parking_paths'
     PARKING_PATH_FEASIBLE = 'parking_path_feasible'
@@ -157,6 +161,7 @@ _ALLOWED_TRANSITIONS = {
     },
     MissionState.STOPPING_EXPLORATION: {
         MissionState.SETTLING_MOTION,
+        MissionState.RETURNING_TO_OBSERVATION,
         MissionState.MISSION_FAILED,
         MissionState.MISSION_CANCELED,
     },
@@ -172,7 +177,12 @@ _ALLOWED_TRANSITIONS = {
         MissionState.MISSION_FAILED,
         MissionState.MISSION_CANCELED,
     },
+    MissionState.EXPLORING_AROUND_G1: {
+        MissionState.STOPPING_EXPLORATION, MissionState.MISSION_CANCELED},
+    MissionState.RETURNING_TO_OBSERVATION: {
+        MissionState.SETTLING_MOTION, MissionState.MISSION_FAILED, MissionState.MISSION_CANCELED},
     MissionState.G1_LOCALIZED: {
+        MissionState.EXPLORING_AROUND_G1,
         MissionState.PARKING_CANDIDATES_READY,
         MissionState.PARKING_PLANNING_FAILED,
         MissionState.MISSION_CANCELED,
@@ -214,6 +224,7 @@ class MissionManagerNode(Node):
         compute_path_client=None,
         navigation_client=None,
         goal_checker_client=None,
+        resume_client=None,
         monotonic=time.monotonic,
         parameter_overrides=None,
     ) -> None:
@@ -247,6 +258,13 @@ class MissionManagerNode(Node):
         self.declare_parameter('parking_max_map_age_s', 5.0)
         self.declare_parameter('parking_max_pose_age_s', 1.0)
         self.declare_parameter('parking_input_timeout_s', 10.0)
+        # G1-centred mapping with the shared explorer before parking planning.
+        self.declare_parameter('g1_exploration_enabled', True)
+        self.declare_parameter('g1_coverage_radius_m', 1.4)
+        self.declare_parameter('g1_coverage_max_unknown_fraction', 0.02)
+        self.declare_parameter('g1_exploration_timeout_s', 240.0)
+        self.declare_parameter('g1_exploration_protected_margin_m', 0.15)
+        self.declare_parameter('exploration_resume_service', 'mission/resume')
         self.declare_parameter('odom_frame', 'odom')
         self.declare_parameter('odometry_topic', 'platform/odom/filtered')
         self.declare_parameter('motion_linear_limit_mps', 0.005)
@@ -428,6 +446,20 @@ class MissionManagerNode(Node):
             if pause_client is not None
             else self.create_client(Trigger, self.pause_service_name)
         )
+        self.resume_client = (
+            resume_client if resume_client is not None else self.create_client(
+                Trigger, str(self.get_parameter('exploration_resume_service').value)))
+        self.focus_publisher = self.create_publisher(PointStamped, 'explore/focus', status_qos)
+        self.g1_exploration_enabled = bool(self.get_parameter('g1_exploration_enabled').value)
+        self.g1_coverage_radius_m = float(self.get_parameter('g1_coverage_radius_m').value)
+        self.g1_coverage_max_unknown = float(
+            self.get_parameter('g1_coverage_max_unknown_fraction').value)
+        self.g1_exploration_timeout_s = float(self.get_parameter('g1_exploration_timeout_s').value)
+        self.g1_protected_margin_m = float(
+            self.get_parameter('g1_exploration_protected_margin_m').value)
+        self._g1_explored = False
+        self._observation_pose = None
+        self._g1_exploration_deadline_s = None
         self.compute_path_client = (compute_path_client if compute_path_client is not None else
                                     ActionClient(self, ComputePathToPose, 'compute_path_to_pose'))
         self.odom_subscription = self.create_subscription(
@@ -536,6 +568,8 @@ class MissionManagerNode(Node):
         self._parked_settled_ns = None
         self._parking_failure = None
         self._arrival_errors = {}
+        self._motion_fault_mark = 0
+        self._motion_restart_s = None
 
         # Safety deadlines must still be polled if /clock pauses or stops.
         self.control_timer = self.create_timer(
@@ -564,6 +598,14 @@ class MissionManagerNode(Node):
             if self.state in _PARKING_DRIVE_STATES:
                 self._poll_parking_navigation(now_s)
                 return
+            if self.state == MissionState.EXPLORING_AROUND_G1:
+                self._poll_g1_exploration(now_s)
+                return
+            if self.state == MissionState.RETURNING_TO_OBSERVATION:
+                if self._nav_deadline_s is not None and now_s >= self._nav_deadline_s:
+                    self._cancel_navigation_goal()
+                    self._navigation_finished(False, 'observation pose deadline expired')
+                return
             if self.state == MissionState.SETTLING_MOTION:
                 now_ns = self.get_clock().now().nanoseconds
                 if self.motion.ready(now_ns, now_s):
@@ -578,6 +620,7 @@ class MissionManagerNode(Node):
                 if self.motion.ready(self.get_clock().now().nanoseconds, now_s):
                     self._motion_deadline_s = None
                     self._path_batch_deadline = now_s + self.parking_path_batch_timeout_s
+                    self._mark_motion_evidence()
                     self._transition(MissionState.EVALUATING_PARKING_PATHS,
                                      'fresh post-planning odometry confirms motion settled')
                     self._next_path()
@@ -589,6 +632,9 @@ class MissionManagerNode(Node):
                 reason = self._plan_invalid_reason()
                 if reason:
                     self._fail_planning('parking_plan_invalidated', reason)
+                elif self.state == MissionState.PARKING_PATH_FEASIBLE:
+                    if self.parking_navigation_enabled:
+                        self._begin_parking_when_stationary()
                 elif self.state == MissionState.EVALUATING_PARKING_PATHS:
                     if (now_s >= self._path_batch_deadline or
                             self._path_busy and now_s >= self._path_request_deadline):
@@ -779,7 +825,8 @@ class MissionManagerNode(Node):
                     'planning uses the larger keep-out margin'
                 )
                 self._planning_deadline_s = self._monotonic() + self.parking_input_timeout_s
-                self.try_plan_parking(self._monotonic(), now_ns=now_ns)
+                if not self._maybe_explore_around_g1():
+                    self.try_plan_parking(self._monotonic(), now_ns=now_ns)
 
     def reset_mission(self, *, clear_start_pose: bool = True) -> None:
         """Reset manager-local state; MissionGuard resume remains explicit."""
@@ -796,8 +843,13 @@ class MissionManagerNode(Node):
             if not self.execution.reset():
                 self._guard_failed('mission reset', 'fresh physical stop evidence required')
                 return
-            if self.state in _PARKING_DRIVE_STATES:
+            if self.state in _PARKING_DRIVE_STATES + (MissionState.RETURNING_TO_OBSERVATION,):
                 self._stop_parking_navigation()
+            if self.state == MissionState.EXPLORING_AROUND_G1:
+                self._stop_g1_exploration()
+            self._g1_explored = False
+            self._observation_pose = None
+            self._g1_exploration_deadline_s = None
             self._parking_failure = None
             self._arrival_errors = {}
             self.stage_paths.reset()
@@ -850,8 +902,10 @@ class MissionManagerNode(Node):
                 MissionState.MISSION_COMPLETE,
             ):
                 return
-            if self.state in _PARKING_DRIVE_STATES:
+            if self.state in _PARKING_DRIVE_STATES + (MissionState.RETURNING_TO_OBSERVATION,):
                 self._stop_parking_navigation()
+            if self.state == MissionState.EXPLORING_AROUND_G1:
+                self._stop_g1_exploration()
             self.last_issue = MissionIssue(
                 FailureClass.OPERATOR_CANCELED,
                 'operator_canceled',
@@ -1044,6 +1098,12 @@ class MissionManagerNode(Node):
             self._guard_failed('localization transition', reason)
             return
         self._clear_handoff_state()
+        if self._g1_explored and self._observation_pose is not None:
+            # G1 must be in view again for the fresh localization.
+            if self._transition(MissionState.RETURNING_TO_OBSERVATION,
+                                f'{reason}; returning to the G1 observation pose'):
+                self._send_navigation_goal(self._observation_pose, self.parking_navigation_timeout_s)
+            return
         self.motion.reset()
         self._motion_deadline_s = self._monotonic() + self.motion_settlement_timeout_s
         self._transition(MissionState.SETTLING_MOTION,
@@ -1267,6 +1327,7 @@ class MissionManagerNode(Node):
                 self.get_logger().info(
                     'Waiting for fresh post-planning odometry before path evaluation')
                 return
+            self._mark_motion_evidence()
             self._transition(MissionState.EVALUATING_PARKING_PATHS,
                              'bounded sequential ComputePathToPose evaluation; no driving')
             self._next_path(now_ns=now_ns)
@@ -1547,10 +1608,32 @@ class MissionManagerNode(Node):
             self.execution.collision_state(msg.action_type,
                 self.get_clock().now().nanoseconds, self._monotonic())
 
+    def _mark_motion_evidence(self):
+        """A plan stays valid only while no motion fault follows this point."""
+        self._motion_fault_mark = self.motion.faults
+        self._motion_restart_s = None
+
+    def _begin_parking_when_stationary(self, now_ns=None):
+        # Driving needs complete stationary evidence, not just an unfaulted restart.
+        now_ns = self.get_clock().now().nanoseconds if now_ns is None else now_ns
+        if self.motion.ready(now_ns, self._monotonic()):
+            self._begin_parking_navigation()
+
     def _plan_invalid_reason(self, now_ns=None):
         now_ns = self.get_clock().now().nanoseconds if now_ns is None else now_ns
-        if not self.motion.ready(now_ns, self._monotonic()):
+        wall_s = self._monotonic()
+        if self.motion.ready(now_ns, wall_s):
+            self._motion_restart_s = None
+        elif self.motion.faults != self._motion_fault_mark:
             return f'motion_evidence_lost: {self.motion.reason}'
+        else:
+            # Synchronous path checks can delay odometry callbacks past the
+            # evidence window; the interval then restarts without any motion.
+            # Wait a bounded time for it to complete instead of discarding the plan.
+            if self._motion_restart_s is None:
+                self._motion_restart_s = wall_s
+            elif wall_s - self._motion_restart_s > self.motion_settlement_timeout_s:
+                return f'motion_evidence_lost: {self.motion.reason}'
         plan = self.parking_plan
         if plan is None:
             return 'plan_unavailable'
@@ -1604,10 +1687,10 @@ class MissionManagerNode(Node):
                     f'path_length={selected.path_length_m:.3f} m')
                 self._transition(MissionState.PARKING_PATH_FEASIBLE,
                                  'path-feasible snapshot selected')
-                if self.parking_navigation_enabled:
-                    self._begin_parking_navigation()
-                else:
+                if not self.parking_navigation_enabled:
                     self.prepare_parking_navigation()
+                else:
+                    self._begin_parking_when_stationary(now_ns)
                 return
             if not self._path_groups:
                 self._fail_planning('bounded_search_exhausted',
@@ -1863,6 +1946,18 @@ class MissionManagerNode(Node):
 
     def _navigation_finished(self, ok, detail):
         sel = self.parking_plan.selected if self.parking_plan is not None else None
+        if self.state == MissionState.RETURNING_TO_OBSERVATION:
+            if not ok:
+                self.last_issue = MissionIssue(FailureClass.TERMINAL,
+                                               'observation_return_failed', detail)
+                self._transition(MissionState.MISSION_FAILED,
+                                 f'could not return to the G1 observation pose: {detail}')
+                return
+            self.motion.reset()
+            self._motion_deadline_s = self._monotonic() + self.motion_settlement_timeout_s
+            self._transition(MissionState.SETTLING_MOTION,
+                             'observation pose reached; waiting for physical motion settlement')
+            return
         if self.state == MissionState.NAVIGATING_TO_PREPARKING:
             if not ok:
                 self._parking_navigation_failed(f'preparking_navigation_failed: {detail}')
@@ -2003,6 +2098,96 @@ class MissionManagerNode(Node):
         yaw = abs(math.atan2(math.sin(robot[2] - goal[2]), math.cos(robot[2] - goal[2])))
         self._arrival_errors[label] = {'xy_m': round(xy, 3), 'yaw_rad': round(yaw, 3)}
         self.get_logger().info(f'Arrived at {label}: error xy={xy:.3f} m, yaw={yaw:.3f} rad')
+
+    # G1-centred mapping: the shared explorer, focused on G1 through explore/focus.
+
+    def _g1_unknown_fraction(self):
+        """Unknown share of the cells a parking footprint can occupy around G1."""
+        position = self.target_position
+        if position is None or self.latest_map is None:
+            return None
+        try:
+            grid = GridSnapshot.from_msg(self.latest_map)
+        except ValueError:
+            return None
+        rows, cols = np.mgrid[0:grid.height, 0:grid.width]
+        x, y = grid.cell_centers(cols, rows)
+        d = np.hypot(x - position.map_x_m, y - position.map_y_m)
+        region = (d >= self.planner_config.reach_min_m) & (d <= self.g1_coverage_radius_m)
+        if not region.any():
+            return None
+        return float(np.count_nonzero(grid.data[region] < 0)) / float(np.count_nonzero(region))
+
+    def _maybe_explore_around_g1(self):
+        """Resume the explorer around G1 when the parking area is not yet mapped."""
+        if not self.g1_exploration_enabled or self._g1_explored:
+            return False
+        unknown = self._g1_unknown_fraction()
+        if unknown is None or unknown <= self.g1_coverage_max_unknown:
+            return False
+        if not self.resume_client.service_is_ready():
+            self.get_logger().warning(
+                f'Parking area {unknown:.0%} unknown, but no explorer resume service; '
+                'planning with the current map')
+            return False
+        self._g1_explored = True
+        self._observation_pose = self._current_robot_pose()
+        self._g1_exploration_deadline_s = self._monotonic() + self.g1_exploration_timeout_s
+        focus = PointStamped()
+        focus.header.frame_id = self.map_frame
+        focus.header.stamp = self.get_clock().now().to_msg()
+        focus.point.x, focus.point.y = self.target_position.map_x_m, self.target_position.map_y_m
+        self.focus_publisher.publish(focus)
+        self._transition(MissionState.EXPLORING_AROUND_G1,
+                         f'parking area {unknown:.0%} unknown; exploring around G1')
+        self.resume_client.call_async(Trigger.Request()).add_done_callback(self._on_resume_response)
+        return True
+
+    def _on_resume_response(self, future):
+        with self._lock:
+            if self.state != MissionState.EXPLORING_AROUND_G1:
+                return
+            try:
+                response = future.result()
+                ok, message = response.success, response.message
+            except Exception as exc:
+                ok, message = False, str(exc)
+            if not ok:
+                self._finish_g1_exploration(f'explorer did not resume: {message}')
+
+    def _poll_g1_exploration(self, now_s):
+        unknown = self._g1_unknown_fraction()
+        robot = self._current_robot_pose()
+        if robot is not None and self.target_position is not None:
+            polygon = rotated_footprint_vertices(self.planner_config.footprint, *robot)
+            target = TargetReference(self.target_position.map_x_m, self.target_position.map_y_m,
+                                     self.map_frame, 0, self.target_position.reference,
+                                     self.target_position.is_foot_midpoint, '')
+            protected = keepout_radius_m(target, self.planner_config) + self.g1_protected_margin_m
+            gap = points_to_polygon_distance([target.x], [target.y], polygon)[0]
+            if gap < protected:
+                self._finish_g1_exploration(
+                    f'footprint {gap:.2f} m from G1 inside the protected {protected:.2f} m')
+                return
+        if unknown is not None and unknown <= self.g1_coverage_max_unknown:
+            self._finish_g1_exploration(f'parking area mapped ({unknown:.1%} unknown)')
+        elif now_s >= self._g1_exploration_deadline_s:
+            self._finish_g1_exploration(
+                f'G1 exploration timeout with {unknown if unknown is not None else 1:.0%} unknown')
+
+    def _finish_g1_exploration(self, reason):
+        self.focus_publisher.publish(PointStamped())   # empty frame clears the focus
+        self._g1_exploration_deadline_s = None
+        self.get_logger().info(f'G1 exploration finished: {reason}')
+        if self._transition(MissionState.STOPPING_EXPLORATION, f'{reason}; pausing explorer'):
+            self._begin_exploration_handoff()
+
+    def _stop_g1_exploration(self):
+        self.focus_publisher.publish(PointStamped())
+        try:
+            self.pause_client.call_async(Trigger.Request())
+        except Exception as exc:
+            self.get_logger().error(f'Explorer pause on cancel unresolved: {exc}')
 
     def _plan_summary(self):
         plan = self.parking_plan

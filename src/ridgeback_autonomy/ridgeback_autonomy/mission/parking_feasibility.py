@@ -4,8 +4,10 @@ These checks veto a global path; they never execute it or relax geometric
 parking checks. NavFn's exploration tolerance/unknown policy is not trusted.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 import math
+
+import numpy as np
 
 from ridgeback_autonomy.mission.parking_geometry import (
     normalize_angle, planar_path_length, rotated_footprint_vertices,
@@ -88,6 +90,7 @@ def path_rejection(path, candidate, start, grid, target, config, keepout):
         return 'path_goal_mismatch'
     if abs(normalize_angle(end[2] - candidate.yaw)) > 0.12:
         return 'path_goal_yaw_mismatch'
+    grid = _start_footprint_known(grid, start, config)
     # Include the short start/goal connectors, rather than trusting endpoint tolerance.
     poses = [tuple(start[:3])] + poses + [(candidate.base_x, candidate.base_y, candidate.yaw)]
     budget = 2000
@@ -108,6 +111,32 @@ def path_rejection(path, candidate, start, grid, target, config, keepout):
             if points_to_polygon_distance([target.x], [target.y], polygon)[0] < keepout:
                 return 'path_g1_keepout'
     return None
+
+
+def _start_footprint_known(grid, start, config):
+    """The grid with unknown cells under the robot's own start footprint treated as free.
+
+    The LiDARs cannot see beneath the chassis, so a pose the robot never left
+    (e.g. its spawn pose) stays unknown although the robot stands on it.
+    Occupied cells and unknown cells elsewhere on the route still reject.
+    """
+    polygon = rotated_footprint_vertices(config.footprint, *start[:3])
+    lx, ly = grid.map_to_local([p[0] for p in polygon], [p[1] for p in polygon])
+    res = grid.resolution
+    c0, c1 = max(0, int(lx.min() // res) - 1), min(grid.width - 1, int(lx.max() // res) + 1)
+    r0, r1 = max(0, int(ly.min() // res) - 1), min(grid.height - 1, int(ly.max() // res) + 1)
+    if c0 > c1 or r0 > r1:
+        return grid
+    cols, rows = np.meshgrid(np.arange(c0, c1 + 1), np.arange(r0, r1 + 1))
+    cx, cy = grid.cell_centers(cols, rows)
+    under = points_to_polygon_distance(cx, cy, polygon) <= math.sqrt(2.0) * res * 0.5
+    window = grid.data[r0:r1 + 1, c0:c1 + 1]
+    unknown = under & (window == -1)
+    if not unknown.any():
+        return grid
+    data = grid.data.copy()
+    data[r0:r1 + 1, c0:c1 + 1][unknown] = 0
+    return replace(grid, data=data)
 
 
 def path_length(path):
