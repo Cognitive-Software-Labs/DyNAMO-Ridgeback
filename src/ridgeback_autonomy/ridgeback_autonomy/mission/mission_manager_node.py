@@ -270,6 +270,8 @@ class MissionManagerNode(Node):
         self.declare_parameter('parking_wait_s', 5.0)
         self.declare_parameter('return_navigation_timeout_s', 300.0)
         self.declare_parameter('goal_checker_plugin', 'general_goal_checker')
+        self.declare_parameter('parking_final_xy_tolerance_m', 0.03)
+        self.declare_parameter('parking_target_reach_allowance_m', 0.03)
 
         self.map_frame = str(self.get_parameter('map_frame').value).strip()
         self.base_frame = str(self.get_parameter('robot_base_frame').value).strip()
@@ -322,8 +324,18 @@ class MissionManagerNode(Node):
             self.parking_max_pose_age_s, self.parking_input_timeout_s,
         )):
             raise ValueError('parking freshness limits and input timeout must be finite and positive')
-        self.planner_config = PlannerConfig(footprint=tuple(load_nav2_footprint(
-            str(self.get_parameter('nav2_params_path').value))))
+        # The final leg stops as soon as it is inside this tolerance, approaching
+        # from outside, so the error lengthens the reach; the reference allowance
+        # covers the measured 2-4 cm offset of the camera-facing G1 estimate from
+        # the true foot midpoint. Both are budgeted out of the 0.60 m reach limit.
+        self.final_xy_tolerance_m = float(self.get_parameter('parking_final_xy_tolerance_m').value)
+        reference_allowance_m = float(
+            self.get_parameter('parking_target_reach_allowance_m').value)
+        if not (0.0 < self.final_xy_tolerance_m <= 0.08 and 0.0 <= reference_allowance_m < 0.1):
+            raise ValueError('parking final tolerance / reach allowance out of range')
+        self.planner_config = PlannerConfig(
+            footprint=tuple(load_nav2_footprint(str(self.get_parameter('nav2_params_path').value))),
+            reach_allowance_m=self.final_xy_tolerance_m + reference_allowance_m)
         self.odom_frame = str(self.get_parameter('odom_frame').value)
         self.motion = MotionSettlement(
             *[float(self.get_parameter(n).value) for n in (
@@ -1144,7 +1156,7 @@ class MissionManagerNode(Node):
             'reason': reason,
             'target_committed': self.target_committed,
             'start_pose_saved': self.start_pose is not None,
-            'parking_navigation_enabled': self.execution.enabled,
+            'parking_navigation_enabled': self.execution.enabled or self.parking_navigation_enabled,
             'parking_execution': self.execution.summary(),
             'parking_safety': self.safety_monitor.summary(),
             'parking_stage_path': self.stage_paths.reason,
@@ -1762,6 +1774,14 @@ class MissionManagerNode(Node):
                                self.execution.limits.preparking_offset_m)
         self._send_navigation_goal(pose, self.parking_navigation_timeout_s)
 
+    def _send_final_goal(self, ok):
+        if not ok:
+            self._parking_navigation_failed('final_goal_tolerance_not_applied')
+            return
+        sel = self.parking_plan.selected
+        self._send_navigation_goal((sel.base_x, sel.base_y, sel.yaw),
+                                   self.parking_navigation_timeout_s)
+
     def _set_goal_tolerance(self, tolerance, on_done):
         """Set the controller's goal checker; ``on_done(ok)`` runs for the current request only."""
         self._nav_generation += 1
@@ -1854,8 +1874,9 @@ class MissionManagerNode(Node):
                 self._parking_navigation_failed(f'final_pose_invalid: {reason}')
                 return
             self._transition(MissionState.NAVIGATING_TO_PARKING, 'pre-parking pose reached')
-            self._send_navigation_goal((sel.base_x, sel.base_y, sel.yaw),
-                                       self.parking_navigation_timeout_s)
+            self._set_goal_tolerance(
+                (self.final_xy_tolerance_m, self.execution.limits.yaw_tolerance_rad),
+                self._send_final_goal)
         elif self.state == MissionState.NAVIGATING_TO_PARKING:
             if not ok:
                 self._parking_navigation_failed(f'parking_navigation_failed: {detail}')

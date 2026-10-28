@@ -149,6 +149,9 @@ class PlannerConfig:
     occupied_threshold: int = ORIGINAL_OCCUPIED_THRESHOLD
     g1_lower_body_radius_m: float = G1_LOWER_BODY_RADIUS_M
     clearance_cap_m: float = CLEARANCE_CAP_M
+    # Planned reach is capped at reach_max_m - reach_allowance_m so the actual
+    # reach stays inside the band after final-pose and target-reference error.
+    reach_allowance_m: float = 0.0
 
 
 @dataclass
@@ -454,6 +457,8 @@ def plan_parking(
                 decision.reason = f'footprint_{rejection}'
             elif float(points_to_polygon_distance([target.x], [target.y], polygon)[0]) < keepout:
                 decision.status, decision.reason = 'collision', 'g1_keepout'
+            elif reach > config.reach_max_m - config.reach_allowance_m:
+                decision.status, decision.reason = 'rejected', 'reach_budget'
         if decision.status == 'valid':
             decision.clearance_m = footprint_clearance_m(polygon, grid, unsafe_xy, config.clearance_cap_m)
         plan.candidates.append(decision)

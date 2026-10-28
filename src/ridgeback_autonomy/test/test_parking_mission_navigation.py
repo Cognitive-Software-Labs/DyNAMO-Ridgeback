@@ -85,6 +85,9 @@ def test_full_mission_parks_waits_and_returns_to_start(manager_factory, monkeypa
     goal = navigation_result(nav)
     assert goal == pytest.approx(preparking_pose(sel.base_x, sel.base_y, sel.yaw, 0.5))
     assert m.state == MissionState.NAVIGATING_TO_PARKING
+    assert len(nav.calls) == 1   # the final leg waits for its tighter tolerance
+    assert answer(params) == {'general_goal_checker.xy_goal_tolerance': 0.03,
+                              'general_goal_checker.yaw_goal_tolerance': 0.12}
 
     assert navigation_result(nav) == pytest.approx((sel.base_x, sel.base_y, sel.yaw))
     assert m.state == MissionState.PARKED
@@ -105,6 +108,7 @@ def test_full_mission_parks_waits_and_returns_to_start(manager_factory, monkeypa
     assert m.state == MissionState.MISSION_COMPLETE
     assert m.last_issue is None
     payload = json.loads(published['state'][-1].data)
+    assert payload['parking_navigation_enabled'] is True
     assert set(payload['parking_mission_navigation']['arrival_errors']) == {
         'preparking', 'parking', 'start'}
 
@@ -195,3 +199,8 @@ def test_feasibility_checks_the_driven_route_through_preparking(manager_factory,
     assert (final.pose.position.x, final.pose.position.y) == pytest.approx((sel.base_x, sel.base_y))
     assert sel.path_length_m == pytest.approx(
         math.hypot(1.0 - pre[0], 2.0 - pre[1]) + 0.5)   # fake Nav2 path is start->goal
+
+
+def test_manager_budgets_final_tolerance_and_reference_out_of_the_reach_limit(manager_factory):
+    m = manager_factory()
+    assert m.planner_config.reach_allowance_m == pytest.approx(0.06)

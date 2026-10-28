@@ -362,3 +362,13 @@ def test_markers_clear_first_and_show_plan_semantics():
     assert occupied.points and occupied.color.r > 0.9 and occupied.color.g < 0.1   # red = unsafe
     cleared = clear_markers().markers
     assert len(cleared) == 1 and cleared[0].action == Marker.DELETEALL
+
+
+def test_reach_budget_rejects_candidates_beyond_the_allowed_planned_reach():
+    from dataclasses import replace
+    budget = replace(CONFIG, reach_allowance_m=0.06)
+    plan = plan_parking(grid(), target(), budget, APPROACH_FROM_WEST)
+    assert plan.ok
+    assert all(c.reach_m <= 0.54 for c in plan.candidates if c.status in ('valid', 'selected'))
+    assert any(c.reason == 'reach_budget' for c in plan.candidates)
+    assert plan.selected.reach_m <= 0.54
