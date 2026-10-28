@@ -35,6 +35,14 @@ architecture-level view of polar profiling is `docs/target_localization/target_l
   (`docs/target_localization/aligned_depth.md` §2.3): use the grid's `camera_info`, not the FoV
   constants any static config might carry.
 
+The mask node retains **80 scans** (about 2 s at 40 Hz) and selects the nearest
+scan to the detection image's timestamp within **50 ms**. Both `box` and
+`silhouette` use this history and matching rule. The history covers detector
+latency plus time spent processing the previous segmentation batch; retaining
+only 20 scans (about 0.5 s) can discard the matching scan before a silhouette
+detection reaches the worker, yielding `NO_SCAN` despite a healthy scan stream.
+Increasing retention preserves the timestamp tolerance.
+
 **Output**
 
 - One planar coordinate `(X, Z)` in the **camera optical frame**, per mask
@@ -358,6 +366,13 @@ beams the estimator never touched, so the panel drops the highlight and draws th
 scan plain. Every failure here — no beams message yet, a scan aged out of the
 cache, a length mismatch — degrades to a *missing* highlight, never a misaligned
 one.
+
+The overlay has its own sensor caches: **80 scans** (about 2 s at 40 Hz) and
+**60 color/aligned-depth images** (about 2 s at 30 Hz). They cover the full
+capture-to-result latency, including the current segmentation batch. Keeping
+only 32 scans expires after about 0.8 s and hides the dots for silhouette
+results arriving about 1.1 s after capture, even when the estimator successfully
+matched its scan. Measurement and debug-artifact caches remain at 32 messages.
 
 **Known divergence.** This node ranks the nearest instance from its own three
 estimators, because nothing else has filled the batch by the time the rays are

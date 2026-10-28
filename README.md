@@ -108,8 +108,13 @@ cd /path/to/DyNAMO-Ridgeback
 # Clone the common source dependencies (all deployments)
 vcs import < dependencies/core.repos
 
-# Gazebo hosts only: add the simulator source dependency
+# Gazebo hosts only: add Clearpath simulation, the patched gz-sim8 source,
+# and ros_gz (only its patched bridge packages are built)
 vcs import < dependencies/gz.repos
+
+# Hosts that run RViz (both simulators launch it by default): add the patched
+# RViz default plugins; `--profile all` below expects this checkout
+vcs import < dependencies/viz.repos
 
 # Verify every checkout is pinned and apply the recorded patches idempotently
 tools/check_dependencies --apply --profile all
@@ -123,7 +128,8 @@ source install/setup.bash
 ```
 
 For Isaac-only or hardware hosts, omit `dependencies/gz.repos` and use
-`tools/check_dependencies --apply --profile core`. The core dependency closure
+`tools/check_dependencies --apply --profile core` (plus `--profile viz` after
+importing `dependencies/viz.repos` where RViz runs). The core dependency closure
 does not import or build Gazebo. If you rename or move the workspace directory
 later, regenerate `build/` and `install/` before rebuilding so the generated
 setup files do not keep stale absolute paths. Preserve `artifacts/`: its logs
@@ -179,7 +185,19 @@ perception_venv/bin/python3 -m pip install -r requirements-perception.txt
 > and silently runs Depth-Anything / OWLv2 on the CPU. For a different
 > GPU/CUDA, change the index URL + torch pins in that file.
 
-The exploration and benchmark-environment launches automatically prepend `perception_venv/bin` to `PATH` and set `VIRTUAL_ENV` for the perception nodes. When you launch with `target_localization_enabled:=true`, the first run will download the OWLv2 detector from Hugging Face. A benchmark run with `depth_source:=monocular` downloads the Depth-Anything V2 metric checkpoint on first use, and one with `mask_gate:=silhouette` the SlimSAM segmentation checkpoint.
+The exploration and benchmark-environment launches use this checkout's
+`perception_venv` for inference processes when it exists. If the venv lives
+elsewhere, set `RIDGEBACK_PERCEPTION_VENV` to its absolute path in the shell
+that starts the launch, sweep, or configurator. Restart an already-running
+configurator after setting it; child runs inherit the server's environment.
+Direct `ros2 run ridgeback_localization target_detector_node` does not use the
+launch helper, so activate the venv in that shell first.
+
+Inference launches load checkpoints from the local Hugging Face cache by
+default. For a first launch that needs to download uncached weights, set
+`RIDGEBACK_MODEL_DOWNLOADS=1` in the launching shell. OWLv2 uses the configured
+`detection_model`; `depth_source:=monocular` also needs the Depth-Anything V2
+metric checkpoint, and `mask_gate:=silhouette` needs the SlimSAM checkpoint.
 
 ### 4. (Optional) Set up Isaac Sim 6.1
 
@@ -301,7 +319,9 @@ and record it. Preserve observed sensor topics and the observed TF base frame:
 ros2 launch ridgeback_localization localization.launch.py \
   namespace:="$ROBOT_NAMESPACE" use_sim_time:=false base_frame:="$BASE_FRAME" \
   color_topic:="$COLOR_TOPIC" depth_topic:="$DEPTH_TOPIC" camera_info_topic:="$CAMERA_INFO_TOPIC" \
-  estimators:=projective_ranging,euclidean_reconstruction target_labels:="humanoid robot" \
+  estimators:=projective_ranging,euclidean_reconstruction \
+  detector:=owlv2 detection_model:=google/owlv2-base-patch16-ensemble \
+  target_labels:="humanoid robot" detection_threshold:=0.55 detector_fps:=10.0 \
   displays:=false
 ```
 
@@ -360,7 +380,7 @@ Intel runs SLAM, Nav2 and RViz. RViz shows the map, both LiDAR scans, the
 target rings and the camera overlay:
 - **Colour panel:** each of Thor's measurements, drawn on Intel's copy of the
   colour frame it was measured from (matched by source stamp). The newest frame
-  is used only when that one has left the 32-frame buffer (about 1 s), and the
+  is used only when that one has left the 60-frame buffer (about 2 s), and the
   overlay logs a warning when that happens.
 - **Depth panel:** Intel's local aligned depth, from the same stamp.
 - **Mask panel:** with `mask_gate:=box`, built from the detections message, so
@@ -446,6 +466,17 @@ the target-localization stack in sequence:
 All four distance estimator rows run by default, the same set the benchmark compares — one RViz ring per row, each with its own bearing, plus a wide distance HUD top-right (`hud_target_overlay`) listing the four side by side with the age of each reading. There is no ground truth in exploration, so that panel carries no truth line and no error column. Per-row visibility is an RViz Displays checkbox under `Target Estimates`, one per estimator.
 
 The perception overlay is published on `debug/target/overlay` and shown by the configured RViz Image display.
+For an explicit baseline selection, the quick-start wrappers forward the same
+launch arguments untouched (the build wrapper forwards to the start wrapper):
+
+```bash
+bash start_exploration.sh initial_test_world detector:=owlv2 \
+  detection_model:=google/owlv2-base-patch16-ensemble \
+  target_labels:="humanoid robot" detection_threshold:=0.55 detector_fps:=10.0
+```
+
+`localization_mode:=external` consumes an already-running detector and rejects
+local detector overrides. `target_localization_enabled:=false` starts none.
 
 Bringup is **event-driven** (readiness gates), not fixed timers — each stage starts when its prerequisite exists, with a `--timeout` fallback. See [troubleshooting](docs/troubleshooting.md#event-driven-startup).
 
@@ -483,9 +514,13 @@ Arguments:
 | `target_localization_enabled` | `true` | Launch the target-localization stack |
 | `estimators` | backend-derived | `all` in simulation; aligned-depth-only `projective_ranging,euclidean_reconstruction` on hardware |
 | `estimate_viz` | `true` | Publish the estimator rings and the wide distance HUD |
+| `detector` | `owlv2` | Startup-only implementation selector; only `owlv2` is supported |
+| `detection_model` | `google/owlv2-base-patch16-ensemble` | Checkpoint identifier for the selected detector |
+| `target_labels` | `humanoid robot` | Comma-separated detection queries |
+| `detection_threshold` | `0.55` | Confidence floor in `(0, 1]` |
 | `detector_fps` | `10.0` | Upper bound on detection step starts; every selected measurement row inherits this cadence |
 | `detector_debug` | `false` | Log detector cadence, superseded frames, and bounded stage timings |
-| `depth_source` | `stereoscopic` | Aligned depth source for the mask rows — `stereoscopic` or `monocular` (Depth-Anything V2; downloads a checkpoint on first use) |
+| `depth_source` | `stereoscopic` | Aligned depth source for the mask rows — `stereoscopic` or `monocular` (Depth-Anything V2; its checkpoint must be cached or downloads enabled) |
 | `mask_gate` | `box` | Mask front-end — `box` (no segmentation model) or `silhouette` (SlimSAM) |
 | `mppi_visualize` | `false` | Publish MPPI trajectory visualization topics (RViz's namespaced `MPPI Optimal` and `MPPI Samples` displays already subscribe to the relative `optimal_trajectory` and `trajectories` topics) |
 | `coverage_overlay_enabled` | backend-derived | `true` in simulation; `false` on hardware, which has no packaged truth map |
@@ -1144,13 +1179,35 @@ complete the [execution-environment qualification gate](docs/target_distance_ben
 Qualification and diagnostic runs establish that evidence; the CLI does not
 block unqualified runs. Replay tuning also depends on qualified capture provenance.
 
-The live target-distance benchmark currently requires the Gazebo adapter and
-`dependencies/gz.repos`; its measurement and report code remains target-generic,
-but Isaac entity-control plumbing is still P6 of the Isaac plan.
+`backend:=gz` (the default) runs the benchmark on Gazebo and needs
+`dependencies/gz.repos`. `backend:=isaac` runs the same scenario file, runner,
+estimators, and reports on Isaac Sim 6.1. It needs the
+[Isaac Sim setup](#4-optional-set-up-isaac-sim-61), and must start from the
+workspace root, where it finds `isaac_venv` (or set `ISAAC_PYTHON`). The backend
+belongs to the persistent environment. It selects the simulator adapter, that
+adapter's asset catalog, and its scene-control services, and every `run.json`
+records it. `backend:=hardware` is refused before any process starts, because
+hardware has no scene-control services or ground truth. What may and may not be
+compared across the two simulators is in
+[benchmark semantics](docs/target_distance_benchmarking/semantics.md#scenario-and-comparison-discipline).
+
+The single-run entrypoint owns separate configuration and environment processes.
+Ctrl-C finishes configuration cleanup while the simulator still answers, then
+stops the environment. The default `shutdown_on_complete:=false` retains both
+layers for inspection after the runner finishes; `true` closes them in order.
+See the [shutdown contract](docs/target_distance_benchmarking/overview.md#shutdown-lifecycle).
 
 ```bash
-# Default run: compare all four estimators
+# Default run: compare all four estimators on Gazebo
 ros2 launch ridgeback_autonomy target_distance_benchmark.launch.py
+
+# The same run on Isaac Sim, with its viewport (from the workspace root)
+ros2 launch ridgeback_autonomy target_distance_benchmark.launch.py backend:=isaac headless:=false
+
+# The same production baseline, with the detector settings explicit
+ros2 launch ridgeback_autonomy target_distance_benchmark.launch.py \
+  detector:=owlv2 detection_model:=google/owlv2-base-patch16-ensemble \
+  target_labels:="humanoid robot" detection_threshold:=0.55 detector_fps:=10.0
 
 # Point cloud only
 ros2 launch ridgeback_autonomy target_distance_benchmark.launch.py estimators:=pointcloud
@@ -1193,11 +1250,16 @@ Arguments:
 
 | Argument | Default | Meaning |
 |----------|---------|---------|
+| `backend` | `gz` | Simulator of the persistent environment: `gz` or `isaac`. Selects the adapter, its asset catalog and scene-control services, and is recorded in every run. In a sweep it is a `defaults` key |
 | `namespace` | `r100_0001` | Namespace for simulation, detector, measurement node, and benchmark runner |
-| `use_sim_time` | `true` | Use Gazebo `/clock` |
+| `use_sim_time` | `true` | Use the simulator's `/clock` |
 | `setup_path` | `~/clearpath/` | Directory containing `robot.yaml` and generated Clearpath files |
-| `world` | `target_distance_calibration` | Gazebo world used for the benchmark run |
-| `gz_gui` | `true` | Launch Gazebo's GUI; set `false` for unattended benchmark runs |
+| `world` | `target_distance_calibration` | Public benchmark world. Each backend's asset catalog maps it to that simulator's own world (Isaac: `g1_distance_calibration`, same geometry) |
+| `gz_gui` | `true` | Gazebo only: launch Gazebo's GUI; set `false` for unattended benchmark runs |
+| `headless` | `true` | Isaac only: run Isaac Sim without its viewport window |
+| `rtf` | `1.0` | Isaac only: real-time factor; `0` is unthrottled |
+| `sim_mode` | `realtime` | Isaac only: `realtime` or fixed-step `deterministic` stepping |
+| `depth_fidelity` | `ideal` | Isaac only: `ideal` renderer depth or D455-like `d455` stereo depth; see [camera depth](docs/isaac/camera-depth.md) |
 | `exploration_rviz` | `true` | Launch the persistent benchmark RViz window |
 | `estimate_viz` | `true` | Publish estimator rings and the benchmark distance HUD |
 | `overlay` | `true` | Publish the camera overlay with selected estimator panels |
@@ -1206,10 +1268,14 @@ Arguments:
 | `depth_source` | `stereoscopic` | Aligned-depth producer for the `projective_ranging`/`euclidean_reconstruction` rows: `stereoscopic` or `monocular`; comparing sources = two runs |
 | `mask_gate` | `box` | Mask front-end for the mask-based rows: `box` (rasterized detection box, no model) or `silhouette` (segmentation model prompted with the boxes; needs `perception_venv`); comparing gates = two runs |
 | `depth_match_debug` | `false` | Default-off mask-worker evidence logging: exact-depth delivery, pending replacements, batch completion/publication age, and bounded cold/warm percentiles for RGB, SlimSAM, depth production, mask preparation, estimator reduction, worker, lock, and CUDA-synchronization timing |
+| `detector` | `owlv2` | Startup-only detector implementation; only `owlv2` is registered. Persistent environment `defaults` in a sweep |
+| `detection_model` | `google/owlv2-base-patch16-ensemble` | Checkpoint identifier, distinct from `detector`; persistent environment `defaults` in a sweep |
+| `target_labels` | `humanoid robot` | Comma-separated detection queries; persistent environment `defaults` in a sweep |
+| `detection_threshold` | `0.55` | Finite confidence floor in `(0, 1]`; persistent environment `defaults` in a sweep |
 | `detector_fps` | `10.0` | Upper bound on the detection rate every measurement row inherits. Belongs to the persistent environment layer, so in a sweep it is a `defaults` key and cannot vary per configuration |
 | `detector_debug` | `false` | Default-off detector evidence logging: achieved cadence, superseded frames, and bounded cold/warm percentiles for the throttle wait, decode, inference, parse, publish and CUDA synchronization. Environment-layer, like `detector_fps` |
-| `headless_rendering` | `false` | Optional default-off server-only EGL sensor rendering. In sweeps this is a persistent-environment `defaults` key and cannot vary per configuration; `tools/gpu-run` remains the GUI-capable NVIDIA GLX path |
-| `camera_profile` | `640x480` | Gazebo camera profile (`640x480` or `1280x720`). It is a persistent-environment `defaults` key, is recorded in each run, and cannot vary per configuration without restarting Gazebo |
+| `headless_rendering` | `false` | Gazebo only: optional default-off server-only EGL sensor rendering. In sweeps this is a persistent-environment `defaults` key and cannot vary per configuration; `tools/gpu-run` remains the GUI-capable NVIDIA GLX path |
+| `camera_profile` | `640x480` | Simulator camera profile (`640x480` or `1280x720`). It is a persistent-environment `defaults` key, is recorded in each run, and cannot vary per configuration without restarting the simulator |
 | `isolation_2d` | `nearest_mode_histogram` | Projective-ranging box-gate foreground recipe: `nearest_mode_histogram` or `otsu` |
 | `isolation_3d` | `height_crop_nearest_mode_band` | Euclidean-reconstruction box-gate foreground recipe: `height_crop_nearest_mode_band`, `height_crop_range_band`, `height_crop`, `nearest_mode_band`, or `range_band`. The two chains differ only in how the background separator anchors — nearest mode vs. percentile; the percentile one slides as background grows and is what the `pointcloud` row does |
 | `isolation_3d_floor_margin_m` | `0.05` | Height above the floor a point must clear in Euclidean recipes containing `height_crop` |
@@ -1282,7 +1348,16 @@ archiving or hand-editing.
 and the page does not yet supervise a live run's conflicts, progress or
 cancellation. `cleanup.sh` no longer kills the page or a replay it started — see
 [docs/troubleshooting.md](docs/troubleshooting.md#what-cleanupsh-leaves-alone).
-Copy the command instead.
+Copy the command instead. A sweep the configurator authors carries no `backend`, so it
+runs on Gazebo. For Isaac, name a sweep YAML whose `defaults` set `backend: isaac`.
+The live-system form shows the supported `owlv2`
+choice, checkpoint, labels, threshold, rate and diagnostics once above the
+config cards. A referenced sweep owns these settings; the page shows its
+resolved values and rejects hidden overrides. Saving the job and copying its
+command preserve the same environment settings. The live form retains its
+existing `detector_fps` field default of `5.0`; the direct launch and sweep
+launch defaults remain `10.0` when unset. Offline profiles reuse frozen
+detections and cannot select a new detector.
 
 The Results panel lists typed artifacts and run outputs, and can rename them.
 Rename is refused where the directory name is load-bearing — a sweep's config
@@ -1294,8 +1369,8 @@ the configurator and the command line.
 
 ### Benchmark sweeps
 
-Use the sweep supervisor when comparing configurations. It starts Gazebo,
-RViz, the Ridgeback, camera TF, and the detector once, then restarts only the
+Use the sweep supervisor when comparing configurations. It starts the simulator
+selected by `backend`, RViz, the Ridgeback, camera TF, and the detector once, then restarts only the
 measurement/configuration layer for each entry. The detector therefore loads
 OWLv2 once per sweep; silhouette configurations still load their segmentation
 model inside their per-config mask node.
@@ -1333,12 +1408,16 @@ ranging tuning constant at a time — `isolation_2d_band_m`,
 configuration twice as an in-sweep noise control. See the Archived evidence section below
 for what is already settled and what those runs are meant to answer.
 
-Do **not** run `cleanup.sh` between configurations: it kills the Gazebo server
-and RViz, which are deliberately persistent, although it leaves `gz sim gui`
+Do **not** run `cleanup.sh` between configurations: it kills the simulator
+and RViz, which are deliberately persistent, although on Gazebo it leaves `gz sim gui`
 running. The supervisor runs it once, immediately before starting that
 environment. It then owns each config process group, removes any orphan
-`bench_*` entities after an unclean exit, and shuts the environment down at the
-end. If a sweep is interrupted, rerun the same command:
+`bench_*` entities after an unclean exit through the same scene-control
+services the runner uses, and shuts the environment down at the end. Both layers run through `ridgeback_autonomy.benchmarking.interactive_launch`,
+`ros2 launch` in its terminal mode, so stopping one delivers a single SIGINT to
+every process in it, exactly as Ctrl-C in a terminal does; plain `ros2 launch`
+without a terminal would forward a second one to each child.
+If a sweep is interrupted, rerun the same command:
 the latest incomplete sweep with the same YAML and `--only` selection is resumed,
 valid `run.json` configurations are skipped, and partial config folders are
 preserved with an `.incomplete_<timestamp>` suffix before retry.
@@ -1351,9 +1430,15 @@ sweep:
   description: Every estimator once at its defaults.
 
 defaults:
+  backend: gz        # persistent; gz or isaac, one simulator per sweep
   scenario: ''       # packaged benchmark_scenarios_full.yaml
   repeats: 1
   camera_profile: 640x480  # persistent; 1280x720 requires a new environment
+  detector: owlv2
+  detection_model: google/owlv2-base-patch16-ensemble
+  target_labels: humanoid robot
+  detection_threshold: 0.55
+  detector_fps: 10.0
 
 configs:
   - name: pointcloud
@@ -1365,12 +1450,21 @@ configs:
     isolation_2d: nearest_mode_histogram
 ```
 
-Config values override `defaults`. Validation happens before Gazebo starts:
+Config values override `defaults`. Validation happens before the simulator starts:
 unknown arguments, duplicate/unsafe names, bad estimators, missing scenario
 files, environment keys on individual configs, and estimator-inapplicable
-knobs are rejected. `world`, `setup_path`, `namespace`, `use_sim_time`,
-`color_topic`, and `camera_profile` may be set only in `defaults` because the
-environment cannot change mid-sweep.
+knobs are rejected. `backend`, `world`, `setup_path`, `namespace`, `use_sim_time`,
+`color_topic`, `camera_profile`, `detector`, `detection_model`,
+`target_labels`, `detection_threshold`, `detector_fps`, and `detector_debug`
+may be set only in `defaults` because the environment cannot change mid-sweep.
+So may the backend-only settings
+(`gz_gui` and `headless_rendering` for Gazebo; `headless`, `rtf`, `sim_mode`, and
+`depth_fidelity` for Isaac), and a setting of the other backend is refused.
+`backend: hardware` is refused outright.
+The dry run prints the persistent environment command. Resume identity includes
+the resolved detector settings; a different checkpoint starts a different sweep.
+The configuration layer checks its recorded settings against the warm detector
+before writing run evidence.
 
 Use `--skip-preflight-cleanup` only when another same-user ROS/Gazebo session
 must remain alive. The sweep then skips the aggressive repository cleanup and
@@ -1527,7 +1621,7 @@ or integration claims.
 
 | Node | Output topic | Key params |
 |------|--------------|------------|
-| `target_detector_node` | `detections/target/raw` | `color_topic`, `detection_model`, `detection_threshold`, `detector_fps` (default `10.0`; an upper bound on *step starts*, so the achieved rate matches the setpoint until inference alone exceeds the period), `detector_debug` |
+| `target_detector_node` | `detections/target/raw` | `color_topic`, `detector` (`owlv2` only), `detection_model` (checkpoint), `target_labels`, `detection_threshold`, `detector_fps` (default `10.0`; an upper bound on *step starts*), `detector_debug` |
 | `target_pointcloud_measurement_node` | `measurements/target/pointcloud` | `color_topic`, `pointcloud_topic`, `base_frame`, `enabled_estimators` |
 | `target_mask_measurement_node` | `measurements/target/mask` (+ subscriber-gated mask/aligned-depth debug images, `visualization/target/polar_rays`, and `debug/target/polar_beams` as selected) | `enabled_estimators`, `depth_source`, `depth_topic`, `camera_info_topic`, `scan_topic`, `base_frame` (**must be passed** — its own default is the bare `base_link`, unlike the other nodes', which are namespace-derived), `pitch_deg`, `front_offset_m`, `isolation_2d` and its three numeric settings, `min_valid_pixels`, `isolation_3d` and its six numeric settings, polar-isolation settings, `mask_gate`, `segmentation_model`, `color_topic`, `ray_marker_topic` |
 | `target_overlay_node` | `debug/target/overlay` | `measurement_topic`, `mask_measurement_topic`, `color_topic`, `aligned_depth_topic`, `estimators`, `max_cols`, `rgb_panel_labels` |
@@ -1586,11 +1680,15 @@ Existing runs were relocated without rewriting their contents: absolute paths re
 
 ## Patches, troubleshooting, and history
 
-This project still relies on three local patches:
+This project relies on seven maintained dependency patches:
 
-1. `patches/clearpath_gz_customizations.patch` patches `src/clearpath_simulator/clearpath_gz` to add this repo's Gazebo worlds/models to the simulator search path and to expose the custom `SpawnG1` Gazebo GUI plugin.
+1. `patches/clearpath_gz_customizations.patch` patches `src/clearpath_simulator/clearpath_gz` to expose the custom `SpawnG1` Gazebo GUI plugin. The Gazebo adapter owns this repo's world/model search path.
 2. `patches/slam_toolbox_tf_namespace.patch` patches `src/slam_toolbox` so `slam_toolbox` respects namespaced TF remappings.
 3. `patches/clearpath_realsense_sim_frames.patch` patches `src/clearpath_common` so `intel_realsense.urdf.xacro` forwards `is_sim` into every supported camera macro as `use_nominal_extrinsics`, and so the Gazebo render sensor sits on the model's colour frame. Without it, simulation has no `camera_0_color_optical_frame` TF and the mask estimators report `TF_MISS_EXTRINSIC`.
+4. `patches/gz_sim_sensors_shutdown.patch` patches the pinned Gazebo Sim 8.15.0 Sensors shutdown waiter and adds upstream regression tests. The optional Gazebo source profile builds this compatible workspace overlay; see the [build, loader verification, and rollback instructions](docs/project/dependencies.md#gazebo-sensors-shutdown-patch).
+5. `patches/ros_gz_bridge_shutdown.patch` backports upstream ros_gz #955 and #991 and hand-backports #981 to the pinned ros_gz 1.0.24, so `parameter_bridge` no longer keeps its node alive past `main()` and `image_bridge` no longer receives frames into a destroyed handler; bridges stop on Ctrl-C without SIGSEGV or heap corruption. Only `ros_gz_bridge` and `ros_gz_image` are built from this checkout; see the [build, loader verification, and rollback instructions](docs/project/dependencies.md#ros_gz-shutdown-patch).
+6. `patches/rviz_shutdown.patch` patches the pinned RViz 14.1.23 Image subscription and view-manager ownership during teardown. The optional `viz` profile builds `rviz_common`, `rviz_default_plugins`, and their test framework; see the [mechanisms, build, loader verification, and rollback instructions](docs/project/dependencies.md#rviz-shutdown-ownership-patch).
+7. `patches/clearpath_ust10lx_sim_lidar.patch` patches `src/clearpath_common`, on top of patch 3, so Gazebo simulates each `hokuyo_ust` as the UST-10LX: 1081 bins over ±135° at 0.25°, 0.06–10 m at 40 Hz, with Gaussian range noise. Without it Gazebo publishes Clearpath's generic 540 bins at 0.5° and returns out to 25 m. Hardware frames are unchanged; see [the patch section](docs/project/dependencies.md#ust-10lx-gazebo-lidar-patch).
 
 Because the patches are recorded against specific upstream revisions,
 `dependencies/core.repos` and `dependencies/gz.repos` pin every dependency to

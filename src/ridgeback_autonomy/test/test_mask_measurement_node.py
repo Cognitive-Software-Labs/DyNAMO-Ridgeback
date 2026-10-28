@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+import time
 
 import numpy as np
 import pytest
@@ -1858,3 +1859,78 @@ def test_frame_buffers_outlast_detection_latency_plus_a_segmentation_batch():
         COLOR_BUFFER_DEPTH_DEFAULT, DEPTH_MATCH_BUFFER_DEPTH)
     for depth in (COLOR_BUFFER_DEPTH_DEFAULT, DEPTH_MATCH_BUFFER_DEPTH):
         assert depth / 30.0 >= 0.37 + 0.5 + 0.3
+
+
+@pytest.mark.parametrize('detection_age_s', [0.61, 1.11])
+def test_scan_history_retains_a_match_through_silhouette_latency(
+    detection_age_s: float,
+) -> None:
+    # A 40 Hz scan must survive the observed ~0.61 s detector latency, plus
+    # optionally ~0.5 s spent on the previous SlimSAM batch. Keep the original
+    # 50 ms matching window; a recent scan cannot substitute for the old one.
+    from ridgeback_localization.synchronization import (
+        SCAN_MATCH_BUFFER_DEPTH, SCAN_MATCH_TOLERANCE_S_DEFAULT)
+
+    buffer = StampedMessageBuffer(SCAN_MATCH_BUFFER_DEPTH)
+    scans = []
+    for index in range(121):
+        sec, nanosec = divmod(index * 25_000_000, 1_000_000_000)
+        scan = LaserScan(header=Header(stamp=stamp(10 + sec, nanosec)))
+        scans.append(scan)
+        buffer.store(scan)
+
+    target_ns = 3_000_000_000 - round(detection_age_s * 1_000_000_000)
+    sec, nanosec = divmod(target_ns, 1_000_000_000)
+    target = stamp(10 + sec, nanosec)
+    expected = scans[round(target_ns / 25_000_000)]
+    assert buffer.lookup_nearest(target, SCAN_MATCH_TOLERANCE_S_DEFAULT) is expected
+    assert buffer.lookup_nearest(stamp(10, 0), SCAN_MATCH_TOLERANCE_S_DEFAULT) is None
+
+
+def test_teardown_waits_for_a_frame_in_progress_and_publishes_nothing_after_stop(
+    ros_context, monkeypatch,
+) -> None:
+    import threading
+
+    from rclpy.node import Node
+    import ridgeback_localization.mask_measurement_node as mask_module
+
+    entered = threading.Event()
+    release = threading.Event()
+    original_batch = mask_module.batch_from_detections_message
+
+    def blocking_batch(message):
+        entered.set()
+        assert release.wait(timeout=5.0)
+        return original_batch(message)
+
+    monkeypatch.setattr(mask_module, 'batch_from_detections_message', blocking_batch)
+    node = _mask_node(_StubDepthSource('depth'))
+    published: list = []
+    node.measurement_pub.publish = published.append
+    states: list = []
+    node.worker_state.pub.publish = states.append
+    alive_at_destroy: list[bool] = []
+    original_destroy = Node.destroy_node
+
+    def recording_destroy(self):
+        alive_at_destroy.append(self.worker_thread.is_alive())
+        return original_destroy(self)
+
+    monkeypatch.setattr(Node, 'destroy_node', recording_destroy)
+
+    node.detections_callback(fill_detections_message(5, 0))
+    assert entered.wait(timeout=2.0), 'worker never started the frame'
+    teardown = threading.Thread(target=node.destroy_node)
+    teardown.start()
+    deadline = time.monotonic() + 2.0
+    while not node.stop_event.is_set() and time.monotonic() < deadline:
+        time.sleep(0.005)
+    release.set()
+    teardown.join(timeout=5.0)
+
+    assert not teardown.is_alive()
+    assert alive_at_destroy == [False]
+    assert published == []
+    assert states == []
+    assert not node.worker_thread.daemon

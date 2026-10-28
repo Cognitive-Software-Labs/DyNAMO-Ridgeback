@@ -78,9 +78,10 @@ from ridgeback_common.messages import (
     build_polar_beams_message,
 )
 from ridgeback_common.miss_reason import MissReason
+from ridgeback_common.ros_signals import init_owned, shielded, spin_until_interrupted
 from ridgeback_common.stamps import stamp_key
 from ridgeback_common.tf_utils import lookup_transform_components
-from ridgeback_localization.worker_state import WorkerState
+from ridgeback_localization.worker_state import WorkerState, join_workers
 from ridgeback_interfaces.msg import PolarBeams, TargetDetections, TargetMeasurements
 from ridgeback_localization.core.depth_common import (
     DEPTH_GATE_DISABLED,
@@ -544,7 +545,10 @@ class TargetMaskMeasurementNode(Node):
                 float(self.get_parameter('depth_match_debug_period_s').value),
                 self.log_depth_match_diagnostics)
 
-        self.worker_thread = threading.Thread(target=self.processing_loop, daemon=True)
+        # Not a daemon, and started last: teardown waits for it, and a
+        # constructor that raises leaves no worker behind.
+        self.worker_thread = threading.Thread(
+            target=self.processing_loop, name='mask_worker')
         self.worker_thread.start()
 
     def log_depth_match_diagnostics(self) -> None:
@@ -726,6 +730,9 @@ class TargetMaskMeasurementNode(Node):
                                 completed_ns - received_ns,
                             )
                 except Exception as exc:  # noqa: BLE001 - worker must survive any frame
+                    if self.stop_event.is_set():
+                        # Teardown is under way; not a frame failure to report.
+                        continue
                     self.worker_state.set('failure', str(exc))
                     if diagnostics is not None:
                         with self.processing_lock:
@@ -850,6 +857,8 @@ class TargetMaskMeasurementNode(Node):
             )
             self.stamp_frame_reason(batch, MissReason.NO_CAMERA_INFO)
 
+        if self.stop_event.is_set():
+            return
         self.measurement_pub.publish(
             build_measurements_message(batch, detections_msg.header))
         self.worker_state.set('processing')
@@ -876,7 +885,8 @@ class TargetMaskMeasurementNode(Node):
         ``scan_match_tolerance_s`` and RViz interpolates the transform.
         """
 
-        if self.ray_marker_pub is None or scan_msg is None or beam_record is None:
+        if (self.ray_marker_pub is None or scan_msg is None or beam_record is None
+                or self.stop_event.is_set()):
             return
         if self.ray_marker_pub.get_subscription_count() <= 0:
             return
@@ -897,7 +907,7 @@ class TargetMaskMeasurementNode(Node):
         scan in the payload instead.
         """
 
-        if self.polar_beams_pub is None or scan_msg is None:
+        if self.polar_beams_pub is None or scan_msg is None or self.stop_event.is_set():
             return
         if self.polar_beams_pub.get_subscription_count() <= 0:
             return
@@ -1132,7 +1142,7 @@ class TargetMaskMeasurementNode(Node):
     ) -> None:
         """Publish the consumed mask union only when something subscribes."""
 
-        if self.mask_debug_pub is None:
+        if self.mask_debug_pub is None or self.stop_event.is_set():
             return
         if self.mask_debug_pub.get_subscription_count() <= 0:
             return
@@ -1147,7 +1157,8 @@ class TargetMaskMeasurementNode(Node):
         headless benchmark run pays nothing for it.
         """
 
-        if depth_m is None or self.aligned_depth_debug_pub is None:
+        if (depth_m is None or self.aligned_depth_debug_pub is None
+                or self.stop_event.is_set()):
             return
         if self.aligned_depth_debug_pub.get_subscription_count() <= 0:
             return
@@ -1214,10 +1225,10 @@ class TargetMaskMeasurementNode(Node):
         self.get_logger().warn(warning)
 
     def destroy_node(self) -> bool:
+        self.worker_state.close()
         self.stop_event.set()
         self.process_event.set()
-        if self.worker_thread.is_alive():
-            self.worker_thread.join(timeout=1.0)
+        join_workers([self.worker_thread], self.get_logger())
         if self.depth_match_diagnostics is not None and rclpy.ok():
             with self.processing_lock:
                 summary = self.depth_match_diagnostics.summary()
@@ -1226,7 +1237,7 @@ class TargetMaskMeasurementNode(Node):
 
 
 def main() -> None:
-    rclpy.init()
+    init_owned()
     try:
         node = TargetMaskMeasurementNode()
     except RuntimeError as exc:
@@ -1234,17 +1245,20 @@ def main() -> None:
         # cleanly with a clear message instead of dumping a traceback --
         # same pattern as target_detector_node.
         get_logger('target_mask_measurement').fatal(str(exc))
-        if rclpy.ok():
-            rclpy.shutdown()
+        rclpy.try_shutdown()
+        return
+    except KeyboardInterrupt:
+        # Interrupted while a model was still loading; no worker exists yet.
+        rclpy.try_shutdown()
         return
     try:
-        rclpy.spin(node)
+        spin_until_interrupted(node)
     except (KeyboardInterrupt, ExternalShutdownException):
         pass
     finally:
-        node.destroy_node()
-        if rclpy.ok():
-            rclpy.shutdown()
+        with shielded(final=True):
+            node.destroy_node()
+            rclpy.try_shutdown()
 
 
 if __name__ == '__main__':

@@ -4,11 +4,14 @@ import importlib
 import math
 
 from ridgeback_common.models import Detection, DetectionBatch
+from ridgeback_common.detector_config import (
+    DETECTION_MODEL_DEFAULT, DETECTION_THRESHOLD_DEFAULT, TARGET_LABELS_DEFAULT,
+    validate_detector,
+)
 
 
-DETECTION_MODEL_DEFAULT = 'google/owlv2-base-patch16-ensemble'
-DETECTION_LABELS = ['humanoid robot']
-DETECTION_THRESHOLD = 0.55
+DETECTION_LABELS = [TARGET_LABELS_DEFAULT]
+DETECTION_THRESHOLD = DETECTION_THRESHOLD_DEFAULT
 NMS_IOU_THRESHOLD = 0.5
 # A candidate almost entirely inside a kept box (high intersection-over-smaller)
 # is suppressed even when its IoU is low -- the near-full-frame box overlapping a
@@ -153,3 +156,30 @@ def parse_owl_detections(
         detections=non_maximum_suppression(detections, NMS_IOU_THRESHOLD),
     )
     return batch
+
+
+class OwlV2Backend:
+    """Adapt OWLv2's private pipeline dictionaries to shared DetectionBatch."""
+
+    def __init__(self, checkpoint: str, logger, *, engine=None) -> None:
+        self.engine = engine if engine is not None else OwlV2Detector(checkpoint, logger)
+
+    def load(self) -> None:
+        self.engine.load()
+
+    def infer(self, image, *, candidate_labels: list[str], threshold: float):
+        return self.engine.detect(
+            image, candidate_labels=candidate_labels, threshold=threshold)
+
+    def normalize(self, outputs, width: int, height: int, threshold: float) -> DetectionBatch:
+        return parse_owl_detections(outputs, width, height, threshold)
+
+
+_PRODUCTION_BACKENDS = {'owlv2': OwlV2Backend}
+
+
+def create_detector_backend(name: str, checkpoint: str, logger, *, factories=None):
+    """The single registration point. ``factories`` permits model-free test backends."""
+    registry = _PRODUCTION_BACKENDS if factories is None else factories
+    selected = validate_detector(name, allowed=tuple(registry))
+    return registry[selected](checkpoint, logger)

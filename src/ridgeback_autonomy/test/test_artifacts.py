@@ -7,9 +7,11 @@ import os
 from pathlib import Path
 import shutil
 import subprocess
+from types import SimpleNamespace
 
 import pytest
 
+from ridgeback_autonomy.benchmarking.backends import resolve_benchmark_environment
 from ridgeback_autonomy.benchmarking.paths import (
     default_output_directory,
     subprocess_log_environment,
@@ -22,11 +24,23 @@ from ridgeback_autonomy.benchmarking.sweep_report import collect_comparison_rows
 REPO_ROOT = Path(__file__).resolve().parents[3]
 
 
-def test_cleanup_preserves_the_gazebo_gui_in_every_kill_pass() -> None:
+def _source_share(package: str) -> str:
+    return str(REPO_ROOT / 'src' / package)
+
+
+def _environment(spec):
+    return resolve_benchmark_environment(
+        spec.backend, 'target_distance_calibration', spec.backend_settings,
+        package_share=_source_share)
+
+
+def test_cleanup_preserves_only_the_reusable_combined_command_gui() -> None:
     cleanup = (REPO_ROOT / 'cleanup.sh').read_text(encoding='utf-8')
 
     assert '[[ "$command" == *"gz sim gui"* ]]' in cleanup
     assert '! is_gazebo_gui "$pid"' in cleanup
+    assert 'launch-owned standalone GUI is' in cleanup
+    assert 'reusable combined-command GUI preserved' in cleanup
     # One shared filter feeds both the pre-force-kill and final checks. Pin both
     # call sites so later cleanup edits cannot bypass the GUI exclusion.
     assert cleanup.count('grep -Fv "gz sim gui"') == 1
@@ -82,9 +96,23 @@ def test_standalone_runner_default_and_override(tmp_path, monkeypatch, override)
     monkeypatch.setattr(runner, 'get_package_share_directory', lambda _: str(share))
     scenario = tmp_path / 'scenes.yaml'
     scenario.write_text('scenes:\n  - id: one\n    robots: [{ x: 2.0, y: 0.0 }]\n')
+    target = tmp_path / 'g1.sdf'
+    target.write_text('<sdf version="1.9"/>\n')
+    catalog = tmp_path / 'benchmark_assets.yaml'
+    catalog.write_text(
+        'schema: ridgeback_benchmark_assets/1\n'
+        'worlds:\n'
+        '  target_distance_calibration:\n'
+        '    native_name: target_distance_calibration\n'
+        '    resource: g1.sdf\n'
+        '    format: sdf\n'
+        'targets:\n'
+        '  g1: {resource: g1.sdf, format: sdf}\n'
+    )
     expected = tmp_path / 'custom output' if override else tmp_path / 'artifacts/benchmarks'
     args = ['--ros-args', '-p', f'scenario:={scenario}', '-p', 'estimators:=pointcloud',
-            '-p', 'run_dir_name:=preserved_name']
+            '-p', 'run_dir_name:=preserved_name', '-p', f'asset_catalog:={catalog}',
+            '-p', 'scene_control_service_namespace:=/gzserver']
     if override:
         args += ['-p', f'output_dir:={expected}']
     rclpy.init(args=args)
@@ -122,8 +150,8 @@ def test_sweep_routes_output_and_child_logs_without_changing_commands(tmp_path, 
 
         def __init__(self, command, **kwargs):
             calls.append((command, kwargs))
-            if command[3] == 'target_benchmark_config.launch.py':
-                arguments = dict(token.split(':=', 1) for token in command[4:])
+            if command[4] == 'target_benchmark_config.launch.py':
+                arguments = dict(token.split(':=', 1) for token in command[5:])
                 run = Path(arguments['output_dir']) / arguments['run_dir_name']
                 (run / 'images').mkdir(parents=True)
                 (run / 'run.json').write_text(json.dumps({
@@ -142,10 +170,25 @@ def test_sweep_routes_output_and_child_logs_without_changing_commands(tmp_path, 
     monkeypatch.setattr(sweep, 'run_preflight_cleanup', cleanup_calls.append)
     monkeypatch.setattr(sweep, 'reap_orphan_benchmark_entities', lambda _: [])
     monkeypatch.setattr(sweep, 'sample_real_time_factor', lambda: 1.0)
-    monkeypatch.setattr(sweep, '_wait_for_config', lambda *_: ('success', None))
+    monkeypatch.setattr(sweep, '_wait_for_config', lambda *_: ('exited', None))
+    monkeypatch.setattr(sweep, 'simulator_provenance', lambda _backend: {})
+    scene_control = SimpleNamespace(
+        wait_for_services=lambda _timeout: None,
+        require_capabilities=lambda: None,
+        wait_for_advancing_clock=lambda _timeout: None,
+        readiness_timeline=lambda: {'clock_advance_after_services_sec': 0.0},
+    )
+    monkeypatch.setattr(sweep.rclpy, 'init', lambda **_kwargs: None)
+    monkeypatch.setattr(
+        sweep.rclpy, 'create_node',
+        lambda _name: SimpleNamespace(destroy_node=lambda: None),
+    )
+    monkeypatch.setattr(sweep.rclpy, 'ok', lambda: False)
+    monkeypatch.setattr(sweep, 'create_scene_control_client', lambda *_args: scene_control)
     monkeypatch.setenv('RIDGEBACK_WORKSPACE', str(tmp_path))
     share = tmp_path / 'install/ridgeback_autonomy/share/ridgeback_autonomy'
-    sweep_dir, success = sweep.run_sweep(spec, spec.configs, package_share=str(share))
+    sweep_dir, success = sweep.run_sweep(
+        spec, spec.configs, package_share=str(share), simulation=_environment(spec))
     assert success
     assert cleanup_calls == [str(tmp_path)]
     assert Path(sweep_dir).parent == expected
@@ -182,7 +225,9 @@ def test_relocated_sweep_keeps_resume_and_report_inputs(tmp_path, monkeypatch):
     # Probing the real GL stack would spawn a subprocess through the
     # patched Popen and land in the launch-command fake below.
     monkeypatch.setattr(sweep, 'gl_renderer_provenance', lambda: {})
-    manifest = sweep._new_manifest(spec, spec.configs, str(old), str(tmp_path))
+    monkeypatch.setattr(sweep, 'simulator_provenance', lambda _backend: {})
+    environment = _environment(spec)
+    manifest = sweep._new_manifest(spec, spec.configs, str(old), str(tmp_path), environment)
     assert manifest['sweep']['source_sha256'] == hashlib.sha256(
         sweep_source.read_bytes()).hexdigest()
     assert manifest['configs'][0]['scenario_sha256'] == hashlib.sha256(
@@ -197,11 +242,12 @@ def test_relocated_sweep_keeps_resume_and_report_inputs(tmp_path, monkeypatch):
     new_root.parent.mkdir()
     (tmp_path / 'benchmark-results').rename(new_root)
     new = new_root / old.name
-    assert sweep._find_resumable_sweep(str(new_root), spec, spec.configs) == str(new)
+    assert sweep._find_resumable_sweep(
+        str(new_root), spec, spec.configs, environment) == str(new)
     assert collect_comparison_rows(manifest, str(new)) == before_rows
     assert sweep._valid_run_document(str(new / 'pointcloud/run.json')) == document
     assert (new / 'pointcloud/run.json').read_bytes() == original_bytes
-    resumed = sweep._resume_manifest(manifest, spec, spec.configs, str(new))
+    resumed = sweep._resume_manifest(manifest, spec, spec.configs, str(new), environment)
     assert resumed['configs'][0]['arguments']['output_dir'] == str(new)
     assert resumed['configs'][0]['output_path'] == 'pointcloud'
 
@@ -217,16 +263,17 @@ def test_sweep_or_scenario_byte_change_invalidates_resume_signature(tmp_path):
         'configs': [{'name': 'pointcloud', 'estimators': 'pointcloud'}],
     }, source=str(source))
 
-    original = sweep._resume_signature(spec, spec.configs)
+    environment = _environment(spec)
+    original = sweep._resume_signature(spec, spec.configs, environment)
     source.write_text('version two\n')
-    source_changed = sweep._resume_signature(spec, spec.configs)
+    source_changed = sweep._resume_signature(spec, spec.configs, environment)
     assert source_changed != original
     assert source_changed['sweep_source_sha256'] != original['sweep_source_sha256']
 
     source.write_text('version one\n')
     scenario.write_text(
         'scenes:\n  - id: one\n    robots: [{ x: 3.0, y: 0.0 }]\n')
-    scenario_changed = sweep._resume_signature(spec, spec.configs)
+    scenario_changed = sweep._resume_signature(spec, spec.configs, environment)
     assert scenario_changed != original
     assert (
         scenario_changed['configs']['pointcloud']['scenario_sha256']
@@ -262,7 +309,7 @@ def test_environment_default_change_invalidates_resume_signature(
             },
             'configs': [{'name': 'pointcloud', 'estimators': 'pointcloud'}],
         }, source=str(source))
-        return sweep._resume_signature(spec, spec.configs)
+        return sweep._resume_signature(spec, spec.configs, _environment(spec))
 
     assert signature(before) != signature(after)
 

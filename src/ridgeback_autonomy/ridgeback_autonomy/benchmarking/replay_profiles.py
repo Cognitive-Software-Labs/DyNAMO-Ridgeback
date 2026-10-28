@@ -19,6 +19,11 @@ from ridgeback_localization.estimator_registry import (
     PUBLIC_ESTIMATOR_ORDER,
     parse_estimators,
 )
+from ridgeback_common.detector_config import (
+    DETECTOR_DEFAULT, DETECTION_MODEL_DEFAULT, DETECTION_THRESHOLD_DEFAULT,
+    DETECTOR_ENVIRONMENT_KEYS, SUPPORTED_DETECTORS, TARGET_LABELS_DEFAULT,
+    resolve_detector_settings,
+)
 from ridgeback_autonomy.localization_launch import (
     CONFIG_LAUNCH_ARGUMENT_NAMES,
     ENV_LAYER_CONFIG_KEYS,
@@ -346,8 +351,18 @@ AXES: dict[str, AxisSpec] = {
     'mask_gate': _axis(
         'mask_gate', 'choice', 'box', STAGE_MASK, 'Live mask gate',
         choices=('box', 'silhouette'), estimators=_MASK_ESTIMATORS),
+    'detector': _axis(
+        'detector', 'choice', DETECTOR_DEFAULT, STAGE_DETECTOR,
+        'Detector implementation', choices=SUPPORTED_DETECTORS),
+    'detection_model': _axis(
+        'detection_model', 'string', DETECTION_MODEL_DEFAULT, STAGE_DETECTOR,
+        'Detector checkpoint'),
     'target_labels': _axis(
-        'target_labels', 'string', 'humanoid robot', STAGE_DETECTOR, 'Target labels'),
+        'target_labels', 'string', TARGET_LABELS_DEFAULT, STAGE_DETECTOR,
+        'Target labels'),
+    'detection_threshold': _axis(
+        'detection_threshold', 'number', DETECTION_THRESHOLD_DEFAULT,
+        STAGE_DETECTOR, 'Detection threshold', minimum=0.0, maximum=1.0),
     'detector_fps': _axis(
         'detector_fps', 'number', 5.0, STAGE_DETECTOR, 'Detector rate', minimum=0.0),
     'detector_debug': _axis(
@@ -461,7 +476,10 @@ MASK_AXES = frozenset(
 # packaged 88-scene set at five repeats -- hours of simulation nothing on the
 # page would have shown. Every other live argument is an installation constant
 # (topics, namespace, world, the viz toggles) that no shipped sweep varies.
-LIVE_SWEEP_DEFAULT_AXES = ('scenario', 'repeats')
+LIVE_SWEEP_DEFAULT_AXES = (
+    'scenario', 'repeats', 'detector', 'detection_model', 'target_labels',
+    'detection_threshold', 'detector_fps', 'detector_debug',
+)
 
 _OFFLINE_LIMITS = (
     'Does not establish ROS scheduling, camera delivery, end-to-end latency, '
@@ -706,6 +724,14 @@ def validate_estimator_selection(profile_id: str, raw: Any) -> tuple[str, ...]:
 
 def validate_axis_values(values: dict[str, Any], profile_id: str | None = None) -> None:
     """Validate values against the same type/range contract the UI renders."""
+
+    if DETECTOR_ENVIRONMENT_KEYS.intersection(values):
+        try:
+            resolve_detector_settings(values, fps_default=AXES['detector_fps'].default)
+        except ValueError as exc:
+            name = str(exc).split(' ', 1)[0]
+            raise ProfileValidationError(
+                field=name, code='invalid_detector_setting', message=str(exc)) from exc
 
     for name, raw in values.items():
         spec = AXES.get(name)

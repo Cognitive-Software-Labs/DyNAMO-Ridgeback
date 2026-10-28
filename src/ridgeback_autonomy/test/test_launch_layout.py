@@ -1,15 +1,22 @@
 from __future__ import annotations
 
 import hashlib
+import importlib.util
 import json
 from pathlib import Path
 import re
 
+import pytest
 import yaml
 
+from ridgeback_autonomy.benchmarking import backends
+from ridgeback_autonomy.benchmarking.backends import BACKEND_SETTING_NAMES
 from ridgeback_autonomy.benchmarking.replay import REPLAY_CAPTURE_BATCHES_DEFAULT
 from ridgeback_localization.estimator_registry import PUBLIC_ESTIMATOR_ORDER
-from ridgeback_autonomy.localization_launch import CONFIG_LAUNCH_ARGUMENT_NAMES
+from ridgeback_autonomy.localization_launch import (
+    CONFIG_LAUNCH_ARGUMENT_NAMES,
+    ENV_LAYER_CONFIG_KEYS,
+)
 
 
 def _package_root() -> Path:
@@ -152,36 +159,320 @@ def test_internal_launch_includes_exist_and_are_referenced() -> None:
     assert 'includes' in benchmark_env_text
 
 
-def test_benchmark_default_world_is_allowed_by_clearpath_simulation() -> None:
+def test_benchmark_default_world_is_resolved_by_the_gazebo_adapter() -> None:
     repo_root = Path(__file__).resolve().parents[3]
     benchmark_env_text = (
         repo_root / 'src' / 'ridgeback_autonomy' / 'launch' / 'target_benchmark_env.launch.py'
     ).read_text(encoding='utf-8')
-    clearpath_simulation_text = (
-        repo_root
-        / 'src'
-        / 'clearpath_simulator'
-        / 'clearpath_gz'
-        / 'launch'
-        / 'simulation.launch.py'
+    gazebo_launch_text = (
+        repo_root / 'src' / 'ridgeback_autonomy_gz' / 'launch' / 'gazebo.launch.py'
     ).read_text(encoding='utf-8')
+    benchmark_world = (
+        repo_root / 'src' / 'ridgeback_autonomy_gz' / 'sim' / 'worlds'
+        / 'target_distance_calibration.sdf'
+    )
 
     assert "DeclareLaunchArgument('world', default_value='target_distance_calibration')" in benchmark_env_text
-    assert "'target_distance_calibration'" in clearpath_simulation_text
+    assert "get_package_share_directory('ridgeback_autonomy_gz'), 'sim', 'worlds'" in gazebo_launch_text
+    assert benchmark_world.is_file()
 
 
-def test_benchmark_forwards_gazebo_gui_choice_to_simulation() -> None:
-    benchmark_env_text = (
-        _package_root() / 'launch' / 'target_benchmark_env.launch.py'
-    ).read_text(encoding='utf-8')
-    gazebo_adapter_text = (
-        _package_root().parent / 'ridgeback_autonomy_gz' / 'launch' / 'backend.launch.py'
-    ).read_text(encoding='utf-8')
+def _load_launch(relative_path: str):
+    path = _package_root() / 'launch' / relative_path
+    spec = importlib.util.spec_from_file_location(
+        'layout_' + re.sub(r'\W', '_', relative_path), path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
-    assert "DeclareLaunchArgument(\n            'gz_gui'" in benchmark_env_text
-    assert "'gz_gui': gz_gui" in benchmark_env_text
-    assert "'headless_rendering': PythonExpression(" in gazebo_adapter_text
-    assert "'false' if '" in gazebo_adapter_text
+
+def _text(context, value) -> str:
+    from launch.utilities import normalize_to_list_of_substitutions, perform_substitutions
+    return perform_substitutions(context, normalize_to_list_of_substitutions(value))
+
+
+def _declared_context(*modules, **configurations):
+    """A launch context holding the launch files' declared defaults, then overrides.
+
+    As in one launch process, the first module to declare an argument sets it.
+    """
+
+    from launch import LaunchContext
+    from launch.actions import DeclareLaunchArgument
+
+    context = LaunchContext()
+    context.launch_configurations.update(configurations)
+    for module in modules:
+        for action in module.generate_launch_description().entities:
+            if (isinstance(action, DeclareLaunchArgument)
+                    and action.name not in context.launch_configurations):
+                context.launch_configurations[action.name] = _text(
+                    context, action.default_value)
+    return context
+
+
+@pytest.fixture
+def adapter_lookups(monkeypatch):
+    """Serve adapter catalogs from the source tree and record every lookup."""
+
+    looked_up = []
+
+    def share(package):
+        looked_up.append(package)
+        return str(_package_root().parent / package)
+
+    monkeypatch.setattr(backends, '_default_package_share', share)
+    return looked_up
+
+
+def _include_arguments(context, include) -> dict[str, str]:
+    return {name: _text(context, value) for name, value in include.launch_arguments}
+
+
+_DISPATCHER_ARGUMENT_NAMES = {
+    'gz': {
+        'setup_path', 'world', 'namespace', 'clearpath_rviz', 'gz_gui',
+        'headless_rendering', 'camera_profile',
+    },
+    'isaac': {
+        'setup_path', 'world', 'namespace', 'rtf', 'headless', 'livestream',
+        'odom_noise', 'noise_seed', 'camera', 'sim_mode', 'sensor_hz',
+        'camera_profile', 'depth_fidelity',
+    },
+    'hardware': {'setup_path', 'namespace', 'start_platform'},
+}
+
+
+@pytest.mark.parametrize(
+    ('backend', 'adapter_package'),
+    [
+        ('gz', 'ridgeback_autonomy_gz'),
+        ('isaac', 'ridgeback_autonomy_isaac'),
+        ('hardware', 'ridgeback_autonomy_hardware'),
+    ],
+)
+def test_simulation_dispatcher_forwards_exact_adapter_arguments(
+    monkeypatch, backend, adapter_package,
+) -> None:
+    dispatcher = _load_launch('includes/simulation.launch.py')
+    looked_up = []
+
+    def share(package):
+        looked_up.append(package)
+        return str(_package_root().parent / package)
+
+    monkeypatch.setattr(dispatcher, 'get_package_share_directory', share)
+    context = _declared_context(
+        dispatcher, backend=backend, start_hardware_platform='true')
+
+    [include] = dispatcher._include_selected_backend(context)
+    arguments = _include_arguments(context, include)
+
+    assert set(arguments) == _DISPATCHER_ARGUMENT_NAMES[backend]
+    assert looked_up == [adapter_package]
+    if backend == 'hardware':
+        assert arguments['start_platform'] == 'true'
+
+
+@pytest.mark.parametrize(
+    ('backend', 'native_world', 'adapter', 'settings'),
+    [
+        ('gz', 'target_distance_calibration', 'ridgeback_autonomy_gz',
+         {'gz_gui': 'true', 'headless_rendering': 'false'}),
+        ('isaac', 'g1_distance_calibration', 'ridgeback_autonomy_isaac',
+         {'headless': 'true', 'rtf': '1.0', 'sim_mode': 'realtime',
+          'depth_fidelity': 'ideal'}),
+    ],
+)
+def test_benchmark_environment_starts_only_the_selected_simulator(
+    adapter_lookups, backend, native_world, adapter, settings,
+) -> None:
+    module = _load_launch('target_benchmark_env.launch.py')
+    context = _declared_context(module, backend=backend)
+
+    include = module.build_simulation(context)[-1]
+    arguments = _include_arguments(context, include)
+
+    assert arguments['backend'] == backend
+    # The adapter receives the catalog's native world; the operator never
+    # spells it.
+    assert arguments['world'] == native_world
+    assert {name: arguments[name] for name in arguments if name in BACKEND_SETTING_NAMES} == (
+        settings)
+    assert arguments['camera_profile'] == '640x480'
+    assert adapter_lookups == [adapter]
+
+
+def test_benchmark_environment_defaults_to_gazebo(adapter_lookups) -> None:
+    module = _load_launch('target_benchmark_env.launch.py')
+    context = _declared_context(module)
+
+    arguments = _include_arguments(context, module.build_simulation(context)[-1])
+
+    assert arguments['backend'] == 'gz'
+    assert adapter_lookups == ['ridgeback_autonomy_gz']
+
+
+def test_benchmark_environment_forwards_the_gazebo_gui_and_rendering_choice(
+    adapter_lookups,
+) -> None:
+    module = _load_launch('target_benchmark_env.launch.py')
+    context = _declared_context(module, gz_gui='false', headless_rendering='True')
+
+    arguments = _include_arguments(context, module.build_simulation(context)[-1])
+
+    assert arguments['gz_gui'] == 'false'
+    assert arguments['headless_rendering'] == 'true'
+
+
+@pytest.mark.parametrize(
+    ('backend', 'message'),
+    [('hardware', 'cannot run the target-distance benchmark'),
+     ('webots', 'Unknown benchmark backend')],
+)
+def test_benchmark_layers_reject_non_simulation_backends_before_starting_anything(
+    adapter_lookups, backend, message,
+) -> None:
+    env = _load_launch('target_benchmark_env.launch.py')
+    config = _load_launch('target_benchmark_config.launch.py')
+
+    with pytest.raises(ValueError, match=message):
+        env.build_simulation(_declared_context(env, backend=backend))
+    with pytest.raises(ValueError, match=message):
+        config.build_readiness_gate(_declared_context(config, backend=backend))
+    assert adapter_lookups == []
+
+    # Selection happens before the environment's first process is declared.
+    entities = env.generate_launch_description().entities
+    functions = [
+        getattr(entity, '_OpaqueFunction__function', None) for entity in entities]
+    selection = functions.index(env.build_simulation)
+    rviz = next(index for index, entity in enumerate(entities)
+                if getattr(entity, 'node_executable', None) == 'rviz2')
+    detector = functions.index(env.build_detector)
+    assert selection < rviz < detector
+
+
+def test_benchmark_environment_rejects_a_world_the_selected_catalog_lacks(
+    adapter_lookups,
+) -> None:
+    module = _load_launch('target_benchmark_env.launch.py')
+
+    with pytest.raises(ValueError, match='no benchmark world "g1_distance_calibration"'):
+        module.build_simulation(_declared_context(
+            module, backend='isaac', world='g1_distance_calibration'))
+
+
+def _runner_parameters(context, nodes) -> dict:
+    from launch_ros.utilities import evaluate_parameters
+
+    [runner] = [
+        node for node in nodes
+        if getattr(node, 'node_executable', None) == 'target_distance_benchmark_runner']
+    merged = {}
+    for parameters in evaluate_parameters(context, runner._Node__parameters):
+        merged.update(parameters)
+    return merged
+
+
+@pytest.mark.parametrize(
+    ('backend', 'catalog_package', 'namespace', 'settings'),
+    [
+        ('gz', 'ridgeback_autonomy_gz', '/gzserver',
+         {'gz_gui': 'true', 'headless_rendering': 'false'}),
+        ('isaac', 'ridgeback_autonomy_isaac', '/isaac_sim',
+         {'depth_fidelity': 'ideal', 'headless': 'true', 'rtf': '1.0',
+          'sim_mode': 'realtime'}),
+    ],
+)
+def test_benchmark_runner_uses_the_selected_catalog_services_and_public_world(
+    adapter_lookups, backend, catalog_package, namespace, settings,
+) -> None:
+    module = _load_launch('target_benchmark_config.launch.py')
+    context = _declared_context(module, backend=backend, estimators='pointcloud')
+
+    environment = module.resolve_environment(context)
+    parameters = _runner_parameters(
+        context, module.build_benchmark_nodes(context, environment=environment))
+
+    assert adapter_lookups == [catalog_package]
+    assert parameters['world'] == 'target_distance_calibration'
+    assert parameters['backend'] == backend
+    assert parameters['scene_control_service_namespace'] == namespace
+    assert parameters['asset_catalog'] == str(
+        _package_root().parent / catalog_package / 'sim' / 'benchmark_assets.yaml')
+    assert json.loads(parameters['backend_settings']) == settings
+
+
+@pytest.mark.parametrize('backend', ['gz', 'isaac'])
+def test_single_launch_runner_keeps_public_world_in_both_child_commands(
+    adapter_lookups, monkeypatch, backend,
+) -> None:
+    """Child launch contexts receive the same public world independently."""
+    from types import SimpleNamespace
+
+    wrapper = _load_launch('target_distance_benchmark.launch.py')
+    monkeypatch.setattr(wrapper, 'get_package_share_directory', lambda _package: str(_package_root()))
+    monkeypatch.setattr(wrapper, 'ExecuteProcess', lambda **kwargs: SimpleNamespace(**kwargs))
+    monkeypatch.setattr(wrapper, 'OnProcessExit', lambda **kwargs: SimpleNamespace(**kwargs))
+    monkeypatch.setattr(wrapper, 'RegisterEventHandler', lambda event: event)
+    context = _declared_context(wrapper, backend=backend, estimators='pointcloud',
+                                world='target_distance_calibration')
+    supervisor = wrapper.build_supervisor(context, layers=wrapper.layer_arguments())[-1]
+    environment = json.loads(supervisor.cmd[supervisor.cmd.index('--environment-command') + 1])
+    configuration = json.loads(supervisor.cmd[supervisor.cmd.index('--configuration-command') + 1])
+
+    for command in (environment, configuration):
+        assert 'world:=target_distance_calibration' in command
+        assert f'backend:={backend}' in command
+        assert 'g1_distance_calibration' not in command
+    assert 'estimators:=pointcloud' in configuration
+    assert not any(token.startswith('estimators:=') for token in environment)
+    assert 'shutdown_on_complete:=false' in configuration
+    assert supervisor.sigterm_timeout == str(
+        2 * wrapper.PROCESS_GROUP_STOP_BUDGET_SEC + wrapper.PROCESS_POLL_SEC)
+
+
+def test_isaac_benchmark_bringup_never_resolves_the_gazebo_adapter(monkeypatch) -> None:
+    """Every package lookup an Isaac benchmark's launch descriptions make."""
+
+    source_root = _package_root().parent
+    looked_up = []
+
+    def share(package):
+        looked_up.append(package)
+        if package == 'ridgeback_autonomy_gz':
+            raise AssertionError('the Gazebo adapter was resolved for an Isaac benchmark')
+        return str(source_root / package)
+
+    monkeypatch.setattr(backends, '_default_package_share', share)
+    env = _load_launch('target_benchmark_env.launch.py')
+    config = _load_launch('target_benchmark_config.launch.py')
+    dispatcher = _load_launch('includes/simulation.launch.py')
+    for module in (env, config, dispatcher):
+        monkeypatch.setattr(module, 'get_package_share_directory', share)
+    isaac_path = source_root / 'ridgeback_autonomy_isaac/launch/backend.launch.py'
+    isaac_spec = importlib.util.spec_from_file_location('layout_isaac_backend', isaac_path)
+    isaac = importlib.util.module_from_spec(isaac_spec)
+    isaac_spec.loader.exec_module(isaac)
+    monkeypatch.setattr(isaac, 'get_package_share_directory', share)
+
+    context = _declared_context(config, env, backend='isaac', estimators='pointcloud')
+    config.build_benchmark_nodes(context, environment=config.resolve_environment(context))
+    include = env.build_simulation(context)[-1]
+    for name, value in include.launch_arguments:
+        context.launch_configurations[name] = _text(context, value)
+    [adapter_include] = dispatcher._include_selected_backend(context)
+    isaac.generate_launch_description()
+
+    assert set(dict(adapter_include.launch_arguments)) == _DISPATCHER_ARGUMENT_NAMES['isaac']
+    assert 'ridgeback_autonomy_isaac' in looked_up
+    assert 'ridgeback_autonomy_gz' not in looked_up
+
+
+def test_backend_settings_are_environment_owned_and_recorded_by_the_config_layer() -> None:
+    assert 'backend' in CONFIG_LAUNCH_ARGUMENT_NAMES & ENV_LAYER_CONFIG_KEYS
+    assert BACKEND_SETTING_NAMES <= CONFIG_LAUNCH_ARGUMENT_NAMES & ENV_LAYER_CONFIG_KEYS
 
 
 def test_exploration_uses_unique_initial_test_world() -> None:
@@ -189,13 +480,8 @@ def test_exploration_uses_unique_initial_test_world() -> None:
     exploration_text = (
         repo_root / 'src' / 'ridgeback_autonomy' / 'launch' / 'ridgeback_exploration.launch.py'
     ).read_text(encoding='utf-8')
-    clearpath_simulation_text = (
-        repo_root
-        / 'src'
-        / 'clearpath_simulator'
-        / 'clearpath_gz'
-        / 'launch'
-        / 'simulation.launch.py'
+    gazebo_launch_text = (
+        repo_root / 'src' / 'ridgeback_autonomy_gz' / 'launch' / 'gazebo.launch.py'
     ).read_text(encoding='utf-8')
     initial_test_world_world = (
         repo_root / 'src' / 'ridgeback_autonomy_gz' / 'sim' / 'worlds'
@@ -203,8 +489,7 @@ def test_exploration_uses_unique_initial_test_world() -> None:
     ).read_text(encoding='utf-8')
 
     assert "DeclareLaunchArgument('world', default_value='initial_test_world')" in exploration_text
-    assert "'initial_test_world'" in clearpath_simulation_text
-    assert "'hospital'" not in clearpath_simulation_text
+    assert 'resolve_world_sdf(world, _world_search_dirs())' in gazebo_launch_text
     assert '<world name="initial_test_world">' in initial_test_world_world
     assert not (
         repo_root / 'src' / 'ridgeback_autonomy_gz' / 'sim' / 'worlds' / 'hospital.sdf'
@@ -445,42 +730,51 @@ def test_benchmark_layers_declare_identical_shared_arguments() -> None:
     assert declared_config_names == CONFIG_LAUNCH_ARGUMENT_NAMES
 
 
-def test_benchmark_wrapper_only_composes_the_two_layers() -> None:
-    launch_dir = Path(__file__).resolve().parents[1] / 'launch'
-    wrapper_text = (launch_dir / 'target_distance_benchmark.launch.py').read_text(encoding='utf-8')
+def test_benchmark_wrapper_exposes_merged_layer_arguments(monkeypatch) -> None:
+    wrapper = _load_launch('target_distance_benchmark.launch.py')
+    monkeypatch.setattr(wrapper, 'get_package_share_directory', lambda _package: str(_package_root()))
+    layers = wrapper.layer_arguments()
+    arguments = wrapper.generate_launch_description().get_launch_arguments()
+    config = layers[wrapper.CONFIG_LAUNCH]
+    environment = layers[wrapper.ENVIRONMENT_LAUNCH]
+    expected = list(dict.fromkeys(argument.name for argument in [*config, *environment]))
 
-    assert 'target_benchmark_env.launch.py' in wrapper_text
-    assert 'target_benchmark_config.launch.py' in wrapper_text
-    assert wrapper_text.count('DeclareLaunchArgument(') == 1
-    assert "'shutdown_on_complete'" in wrapper_text
+    assert [argument.name for argument in arguments] == expected
+    assert len(arguments) == len({argument.name for argument in arguments})
+    context = _declared_context(wrapper, namespace='test_robot', shutdown_on_complete='true')
+    assert context.launch_configurations['base_frame'] == 'test_robot/robot/base_link'
+    assert context.launch_configurations['shutdown_on_complete'] == 'true'
+    assert CONFIG_LAUNCH_ARGUMENT_NAMES <= set(expected)
 
 
 def test_headless_rendering_is_optional_and_owned_by_the_environment() -> None:
-    launch_dir = Path(__file__).resolve().parents[1] / 'launch'
-    env_text = (launch_dir / 'target_benchmark_env.launch.py').read_text(encoding='utf-8')
-    config_text = (launch_dir / 'target_benchmark_config.launch.py').read_text(encoding='utf-8')
     gazebo_adapter_text = (
         _package_root().parent / 'ridgeback_autonomy_gz' / 'launch' / 'backend.launch.py'
     ).read_text(encoding='utf-8')
+    gazebo = backends.BENCHMARK_BACKENDS['gz'].settings
 
-    assert "'headless_rendering',\n            default_value='false'" in env_text
-    assert "'headless_rendering': headless_rendering" in env_text
-    assert "'headless_rendering'" not in config_text
+    assert gazebo['headless_rendering'].default == 'false'
+    assert gazebo['gz_gui'].default == 'true'
+    # The environment forwards it (see the selected-simulator test); the config
+    # layer declares it only to record it, and the sweep refuses it per config.
+    assert 'headless_rendering' in ENV_LAYER_CONFIG_KEYS
     assert "DeclareLaunchArgument('headless_rendering', default_value='false')" in (
         gazebo_adapter_text)
+    assert "'headless_rendering': PythonExpression(" in gazebo_adapter_text
+    assert "'false' if '" in gazebo_adapter_text
 
 
 def test_camera_profile_reaches_both_simulators_but_not_hardware() -> None:
     source_root = _package_root().parent
-    dispatcher = (_package_root() / 'launch/includes/simulation.launch.py').read_text(
-        encoding='utf-8')
     exploration = _exploration_text()
     gazebo = (source_root / 'ridgeback_autonomy_gz/launch/backend.launch.py').read_text(
         encoding='utf-8')
     isaac = (source_root / 'ridgeback_autonomy_isaac/launch/backend.launch.py').read_text(
         encoding='utf-8')
 
-    assert "arguments.pop('camera_profile')" in dispatcher
+    assert 'camera_profile' in _DISPATCHER_ARGUMENT_NAMES['gz']
+    assert 'camera_profile' in _DISPATCHER_ARGUMENT_NAMES['isaac']
+    assert 'camera_profile' not in _DISPATCHER_ARGUMENT_NAMES['hardware']
     assert "'camera_profile': LaunchConfiguration('camera_profile')" in exploration
     assert "LaunchConfiguration('camera_profile')" in gazebo
     assert "'sim_camera_horizontal_fov'" in gazebo
@@ -489,8 +783,6 @@ def test_camera_profile_reaches_both_simulators_but_not_hardware() -> None:
 
 def test_depth_fidelity_reaches_only_isaac() -> None:
     source_root = _package_root().parent
-    dispatcher = (_package_root() / 'launch/includes/simulation.launch.py').read_text(
-        encoding='utf-8')
     exploration = _exploration_text()
     gazebo = (source_root / 'ridgeback_autonomy_gz/launch/backend.launch.py').read_text(
         encoding='utf-8')
@@ -500,8 +792,9 @@ def test_depth_fidelity_reaches_only_isaac() -> None:
     isaac = (source_root / 'ridgeback_autonomy_isaac/launch/backend.launch.py').read_text(
         encoding='utf-8')
 
-    assert "if backend != 'isaac':" in dispatcher
-    assert "arguments.pop('depth_fidelity')" in dispatcher
+    assert 'depth_fidelity' not in _DISPATCHER_ARGUMENT_NAMES['gz']
+    assert 'depth_fidelity' in _DISPATCHER_ARGUMENT_NAMES['isaac']
+    assert 'depth_fidelity' not in _DISPATCHER_ARGUMENT_NAMES['hardware']
     assert "'depth_fidelity': LaunchConfiguration('depth_fidelity')" in exploration
     assert "'--depth-fidelity', depth_fidelity" in isaac
     assert 'depth_fidelity' not in gazebo
@@ -545,9 +838,38 @@ def test_dependency_profiles_keep_gazebo_out_of_the_common_closure() -> None:
     checker = (repo_root / 'tools/check_dependencies').read_text(encoding='utf-8')
 
     assert set(core).isdisjoint(gazebo)
-    assert set(gazebo) == {'src/clearpath_simulator'}
-    assert 'src/clearpath_simulator' not in core
-    assert 'core|gz|all' in checker
+    assert set(gazebo) == {'src/clearpath_simulator', 'src/gz-sim', 'src/ros_gz'}
+    assert 'src/clearpath_simulator' not in core and 'src/gz-sim' not in core
+    assert gazebo['src/gz-sim']['version'] == '446a44335a45b704b4d36dabcc5508ee34eeb3d8'
+    assert '[src/gz-sim]="patches/gz_sim_sensors_shutdown.patch"' in checker
+    # ros_gz 1.0.24, the tag the installed binaries were built from, overlaid
+    # by its bridge alone.
+    assert gazebo['src/ros_gz']['version'] == '5912bfe7976a79d2cc9f373b2d40a8a3a3e33da2'
+    assert '[src/ros_gz]="patches/ros_gz_bridge_shutdown.patch"' in checker
+    assert '[src/ros_gz]="ros_gz_bridge ros_gz_image"' in checker
+    assert 'core|gz|viz|all' in checker
+
+
+def test_viz_profile_overlays_only_the_patched_rviz_packages() -> None:
+    repo_root = _package_root().parents[1]
+    manifests = {
+        name: yaml.safe_load(
+            (repo_root / f'dependencies/{name}.repos').read_text(encoding='utf-8'))[
+                'repositories']
+        for name in ('core', 'gz', 'viz')
+    }
+    checker = (repo_root / 'tools/check_dependencies').read_text(encoding='utf-8')
+
+    assert set(manifests['viz']) == {'src/rviz'}
+    assert set(manifests['viz']).isdisjoint(manifests['core'])
+    assert set(manifests['viz']).isdisjoint(manifests['gz'])
+    # rviz 14.1.23, the tag the installed RViz binaries were built from.
+    assert manifests['viz']['src/rviz']['version'] == (
+        'feb01669f1297df2af755ce9cd2ed18083e7a8b2')
+    assert '[src/rviz]="patches/rviz_shutdown.patch"' in checker
+    assert '[src/rviz]="rviz_common rviz_default_plugins rviz_visual_testing_framework"' in checker
+    assert 'viz) MANIFESTS=("$REPO_ROOT/dependencies/viz.repos")' in checker
+    assert '"$REPO_ROOT/dependencies/viz.repos") ;;' in checker
 
 
 def test_hardware_backend_is_attach_only_and_uses_real_sensor_defaults() -> None:

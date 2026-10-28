@@ -1,12 +1,17 @@
-"""Gazebo provider for the backend-neutral Ridgeback autonomy stack."""
+"""Gazebo provider for the backend-neutral Ridgeback autonomy stack.
+
+Besides the shared sensor, odometry, TF, and clock contract, the Gazebo server
+serves the standard ``simulation_interfaces`` scene-control services under
+``/gzserver``; see ``gazebo.launch.py``.
+"""
 
 import os
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import (
-    AppendEnvironmentVariable, DeclareLaunchArgument, IncludeLaunchDescription,
-    OpaqueFunction, SetLaunchConfiguration,
+    DeclareLaunchArgument, IncludeLaunchDescription, OpaqueFunction,
+    SetLaunchConfiguration,
 )
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration, PythonExpression
@@ -57,7 +62,6 @@ def _configure_camera_profile(context):
 
 def generate_launch_description():
     pkg_adapter = get_package_share_directory('ridgeback_autonomy_gz')
-    pkg_clearpath_gz = get_package_share_directory('clearpath_gz')
 
     setup_path = LaunchConfiguration('setup_path')
     world = LaunchConfiguration('world')
@@ -78,17 +82,9 @@ def generate_launch_description():
             description='Nominal D455 simulation profile'),
         OpaqueFunction(function=_configure_world),
         OpaqueFunction(function=_configure_camera_profile),
-        AppendEnvironmentVariable(
-            'GZ_SIM_RESOURCE_PATH', os.path.join(pkg_adapter, 'sim', 'worlds')),
-        AppendEnvironmentVariable(
-            'GZ_SIM_RESOURCE_PATH', os.path.join(pkg_adapter, 'sim', 'models')),
-        AppendEnvironmentVariable(
-            'GZ_GUI_PLUGIN_PATH',
-            os.path.join(os.path.abspath(os.path.join(pkg_adapter, '..', '..')),
-                         'lib', 'ridgeback_autonomy_gz')),
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(
-                os.path.join(pkg_clearpath_gz, 'launch', 'simulation.launch.py')),
+                os.path.join(pkg_adapter, 'launch', 'gazebo.launch.py')),
             launch_arguments={
                 'setup_path': setup_path,
                 'world': clearpath_world,

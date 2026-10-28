@@ -1,0 +1,84 @@
+#usda 1.0
+(
+    defaultPrim = "iv_pole"
+    metersPerUnit = 1
+    upAxis = "Z"
+)
+
+def Xform "iv_pole"
+{
+    quatf xformOp:orient = (1, 0, 0, 0)
+    double3 xformOp:translate = (0, 0, 0)
+    uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient"]
+
+    def Scope "Looks"
+    {
+        def Material "mat_000"
+        {
+            token outputs:surface.connect = </iv_pole/Looks/mat_000/shader.outputs:surface>
+
+            def Shader "shader"
+            {
+                uniform token info:id = "UsdPreviewSurface"
+                color3f inputs:diffuseColor = (0.55, 0.57, 0.6)
+                color3f inputs:emissiveColor = (0, 0, 0)
+                float inputs:roughness = 1
+                token outputs:surface
+            }
+        }
+    }
+
+    def Cylinder "visual_0" (
+        prepend apiSchemas = ["MaterialBindingAPI"]
+    )
+    {
+        uniform token axis = "Z"
+        double height = 1.75
+        rel material:binding = </iv_pole/Looks/mat_000>
+        double radius = 0.025
+        quatf xformOp:orient = (1, 0, 0, 0)
+        double3 xformOp:translate = (0, 0, 0.925)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient"]
+    }
+
+    def Cylinder "visual_1" (
+        prepend apiSchemas = ["MaterialBindingAPI"]
+    )
+    {
+        uniform token axis = "Z"
+        double height = 0.05
+        rel material:binding = </iv_pole/Looks/mat_000>
+        double radius = 0.225
+        quatf xformOp:orient = (1, 0, 0, 0)
+        double3 xformOp:translate = (0, 0, 0.025)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient"]
+    }
+
+    def Cylinder "collision_0" (
+        prepend apiSchemas = ["PhysicsCollisionAPI"]
+    )
+    {
+        uniform token axis = "Z"
+        double height = 1.75
+        uniform token purpose = "guide"
+        double radius = 0.025
+        token visibility = "invisible"
+        quatf xformOp:orient = (1, 0, 0, 0)
+        double3 xformOp:translate = (0, 0, 0.925)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient"]
+    }
+
+    def Cylinder "collision_1" (
+        prepend apiSchemas = ["PhysicsCollisionAPI"]
+    )
+    {
+        uniform token axis = "Z"
+        double height = 0.05
+        uniform token purpose = "guide"
+        double radius = 0.225
+        token visibility = "invisible"
+        quatf xformOp:orient = (1, 0, 0, 0)
+        double3 xformOp:translate = (0, 0, 0.025)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient"]
+    }
+}

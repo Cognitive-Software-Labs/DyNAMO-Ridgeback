@@ -12,26 +12,32 @@ from rclpy.executors import ExternalShutdownException
 from rclpy.logging import get_logger
 from rclpy.node import Node
 from rclpy.qos import QoSProfile, ReliabilityPolicy
+from rcl_interfaces.msg import SetParametersResult
 from sensor_msgs.msg import Image
 
 from ridgeback_common.messages import build_detections_message
+from ridgeback_common.models import DetectionBatch
+from ridgeback_common.detector_config import (
+    DETECTOR_DEFAULT, DETECTOR_FPS_DEFAULT, DETECTION_MODEL_DEFAULT,
+    SUPPORTED_DETECTORS,
+    DETECTION_THRESHOLD_DEFAULT, TARGET_LABELS_DEFAULT,
+    parse_target_labels, validate_detection_model, validate_detection_threshold,
+    validate_detector, validate_detector_fps,
+)
+from ridgeback_common.ros_signals import init_owned, shielded, spin_until_interrupted
 from ridgeback_interfaces.msg import TargetDetections
 from ridgeback_localization.contracts import RAW_DETECTIONS_TOPIC
 from ridgeback_localization.core.detection import (
-    DETECTION_MODEL_DEFAULT,
-    DETECTION_THRESHOLD,
-    OwlV2Detector,
-    parse_owl_detections,
+    OwlV2Backend, create_detector_backend,
 )
 from ridgeback_localization.core.image_utils import (
     bgr_frame_to_pil,
     convert_color_image_message,
 )
 from ridgeback_localization.core.timing import TimingStats
-from ridgeback_localization.worker_state import WorkerState
+from ridgeback_localization.worker_state import WorkerState, join_workers
 
 
-DETECTOR_FPS_DEFAULT = 10.0
 
 DETECTOR_TIMING_STAGE_NAMES = (
     'gate_wait',
@@ -118,20 +124,17 @@ class DetectorDiagnostics:
 
 
 class TargetDetectorNode(Node):
-    def __init__(self, detector=None, **node_kwargs) -> None:
+    def __init__(self, detector=None, *, backend_factories=None, **node_kwargs) -> None:
         # ``node_kwargs`` reaches rclpy's Node: tests pass
         # ``parameter_overrides`` to stand the node up on a chosen
         # configuration without a launch file or CLI arguments.
         super().__init__('target_detector_node', **node_kwargs)
 
         self.worker_state = WorkerState(self, 'detector')
-        self.declare_parameter('target_labels', 'humanoid robot')
-        self.target_labels = [v.strip() for v in self.get_parameter('target_labels').value.split(',') if v.strip()]
-        if not self.target_labels:
-            raise ValueError('target_labels must contain at least one label')
-        self.get_logger().info(f'Target labels: {self.target_labels}')
+        self.declare_parameter('detector', DETECTOR_DEFAULT)
+        self.declare_parameter('target_labels', TARGET_LABELS_DEFAULT)
         self.declare_parameter('detection_model', DETECTION_MODEL_DEFAULT)
-        self.declare_parameter('detection_threshold', DETECTION_THRESHOLD)
+        self.declare_parameter('detection_threshold', DETECTION_THRESHOLD_DEFAULT)
         self.declare_parameter('detector_fps', DETECTOR_FPS_DEFAULT)
         self.declare_parameter('color_topic', 'sensors/camera_0/color/image')
         self.declare_parameter('detections_topic', RAW_DETECTIONS_TOPIC)
@@ -141,9 +144,19 @@ class TargetDetectorNode(Node):
         self.declare_parameter('detector_debug', False)
         self.declare_parameter('detector_debug_period_s', 5.0)
 
-        self.detection_model = self.get_parameter('detection_model').value
-        self.detection_threshold = float(self.get_parameter('detection_threshold').value)
-        self.detector_fps = max(0.1, float(self.get_parameter('detector_fps').value))
+        self.detector_name = validate_detector(
+            self.get_parameter('detector').value,
+            allowed=tuple(backend_factories) if backend_factories is not None else SUPPORTED_DETECTORS)
+        self.detection_model = validate_detection_model(
+            self.get_parameter('detection_model').value)
+        self.target_labels = parse_target_labels(
+            self.get_parameter('target_labels').value)
+        self.detection_threshold = validate_detection_threshold(
+            self.get_parameter('detection_threshold').value)
+        self.detector_fps = validate_detector_fps(
+            self.get_parameter('detector_fps').value)
+        self.get_logger().info(f'Target labels: {self.target_labels}')
+        self.add_on_set_parameters_callback(self._reject_startup_parameter_updates)
         self.detector_period = 1.0 / self.detector_fps
         self.color_topic = self.get_parameter('color_topic').value
         self.detections_topic = self.get_parameter('detections_topic').value
@@ -151,11 +164,16 @@ class TargetDetectorNode(Node):
             DetectorDiagnostics()
             if bool(self.get_parameter('detector_debug').value) else None)
 
-        # Seam: tests inject a stub detector (whose load() is a no-op) so the
-        # node stands up without pulling in OWLv2/torch.
-        self.detector = detector or OwlV2Detector(self.detection_model, self.get_logger())
+        # Existing tests can inject an OWL-shaped engine. New backend tests
+        # inject a factory whose infer/normalize contract returns DetectionBatch.
+        self.backend = (
+            OwlV2Backend(self.detection_model, self.get_logger(), engine=detector)
+            if detector is not None else create_detector_backend(
+                self.detector_name, self.detection_model, self.get_logger(),
+                factories=backend_factories))
+        self.detector = detector if detector is not None else self.backend
         try:
-            self.detector.load()
+            self.backend.load()
         except Exception as exc:
             self.worker_state.set('failure', str(exc))
             raise
@@ -186,12 +204,27 @@ class TargetDetectorNode(Node):
                 float(self.get_parameter('detector_debug_period_s').value),
                 self.log_detector_diagnostics)
 
-        self.worker_thread = threading.Thread(target=self.processing_loop, daemon=True)
-        self.worker_thread.start()
-
         self.get_logger().info(f'Subscribed to color stream: {self.color_topic}')
         self.get_logger().info(f'Publishing raw detections on: {self.detections_topic}')
         self.get_logger().info(f'Running detector at up to {self.detector_fps:.1f} FPS')
+
+        # Not a daemon: teardown waits for it, so the interpreter never
+        # finalizes underneath an inference call still running native code.
+        # Started last, so a constructor that raises leaves no worker behind.
+        self.worker_thread = threading.Thread(
+            target=self.processing_loop, name='detector_worker')
+        self.worker_thread.start()
+
+    @staticmethod
+    def _reject_startup_parameter_updates(parameters):
+        startup = {'detector', 'detection_model', 'target_labels',
+                   'detection_threshold', 'detector_fps', 'detector_debug'}
+        changed = sorted(parameter.name for parameter in parameters
+                         if parameter.name in startup)
+        return SetParametersResult(
+            successful=not changed,
+            reason=('Detector settings are startup-only: ' + ', '.join(changed))
+            if changed else '')
 
     def log_detector_diagnostics(self) -> None:
         with self.processing_lock:
@@ -292,6 +325,9 @@ class TargetDetectorNode(Node):
         try:
             self.process_color_image(color_msg)
         except Exception as exc:  # noqa: BLE001 - worker must survive any frame
+            if self.stop_event.is_set():
+                # Teardown is under way; this is not a frame failure to report.
+                return
             failed = True
             self.worker_state.set('failure', str(exc))
             self.log_detection_error(exc)
@@ -320,16 +356,16 @@ class TargetDetectorNode(Node):
 
         self.synchronize_cuda_for_timing()
         with self.timed_stage('inference'):
-            outputs = self.detector.detect(image, candidate_labels=self.target_labels, threshold=self.detection_threshold)
+            outputs = self.backend.infer(image, candidate_labels=self.target_labels, threshold=self.detection_threshold)
             self.synchronize_cuda_for_timing()
 
         with self.timed_stage('parse'):
-            batch = parse_owl_detections(
-                outputs,
-                frame.shape[1],
-                frame.shape[0],
-                self.detection_threshold,
-            )
+            batch = self.backend.normalize(
+                outputs, frame.shape[1], frame.shape[0], self.detection_threshold)
+            if not isinstance(batch, DetectionBatch):
+                raise TypeError('Detector backend must normalize to DetectionBatch')
+        if self.stop_event.is_set():
+            return
         with self.timed_stage('publish'):
             self.detections_pub.publish(build_detections_message(batch, color_msg.header))
             self.worker_state.set('processing')
@@ -338,32 +374,36 @@ class TargetDetectorNode(Node):
                 self.diagnostics.record_publication()
 
     def destroy_node(self) -> bool:
+        self.worker_state.close()
         self.stop_event.set()
         self.process_event.set()
-        if hasattr(self, 'worker_thread') and self.worker_thread.is_alive():
-            self.worker_thread.join(timeout=1.0)
+        if hasattr(self, 'worker_thread'):
+            join_workers([self.worker_thread], self.get_logger())
         return super().destroy_node()
 
 
 def main() -> None:
-    rclpy.init()
+    init_owned()
     try:
         node = TargetDetectorNode()
-    except RuntimeError as exc:
-        # Perception enabled without the venv (no transformers/torch). Fail
+    except (RuntimeError, ValueError) as exc:
+        # Invalid startup settings or missing perception dependencies. Fail
         # cleanly with a clear message instead of dumping a traceback.
         get_logger('target_detector').fatal(str(exc))
-        if rclpy.ok():
-            rclpy.shutdown()
+        rclpy.try_shutdown()
+        return
+    except KeyboardInterrupt:
+        # Interrupted while the model was still loading; no worker exists yet.
+        rclpy.try_shutdown()
         return
     try:
-        rclpy.spin(node)
+        spin_until_interrupted(node)
     except (KeyboardInterrupt, ExternalShutdownException):
         pass
     finally:
-        node.destroy_node()
-        if rclpy.ok():
-            rclpy.shutdown()
+        with shielded(final=True):
+            node.destroy_node()
+            rclpy.try_shutdown()
 
 
 if __name__ == '__main__':

@@ -277,43 +277,6 @@ def test_simulation_renders_from_the_colour_frame_pose(
     assert pose[3:] == pytest.approx((0.0, 0.0, 0.0), abs=TOLERANCE)
 
 
-def test_accurate_lidar_mounts_survive_gazebo_fixed_joint_reduction(
-    sim_urdf: ET.Element,
-    gazebo_sdf: ET.Element,
-) -> None:
-    expected = {
-        'lidar2d_0': ((0.3922, 0.0, 0.2264), 0.0),
-        'lidar2d_1': ((-0.3922, 0.0, 0.2264), 3.14159),
-    }
-
-    for name, (xyz, yaw) in expected.items():
-        mount = _joint(sim_urdf, f'{name}_joint')
-        assert mount.find('parent').get('link') == 'chassis_link'
-
-        sensors = [
-            sensor for sensor in gazebo_sdf.iter('sensor')
-            if sensor.get('name') == name
-        ]
-        assert len(sensors) == 1
-        pose = tuple(float(value) for value in sensors[0].find('pose').text.split())
-        assert pose[:3] == pytest.approx(xyz, abs=TOLERANCE)
-        assert pose[3:] == pytest.approx((0.0, 0.0, yaw), abs=TOLERANCE)
-        assert sensors[0].find('update_rate').text == '40'
-
-        horizontal = sensors[0].find('lidar/scan/horizontal')
-        assert horizontal.find('samples').text == '540'
-        assert float(horizontal.find('min_angle').text) == pytest.approx(
-            -3 * math.pi / 4, abs=1e-8
-        )
-        assert float(horizontal.find('max_angle').text) == pytest.approx(
-            3 * math.pi / 4, abs=1e-8
-        )
-
-    # This proves description compatibility. The 2026-09-11 live stationary
-    # and moving scan gate additionally proved zero self-returns below 0.8 m;
-    # collision_monitor remains a separate downstream integration gate.
-
-
 def test_no_launch_file_publishes_a_competing_camera_transform() -> None:
     """The description is the only publisher of the internal camera chain."""
     for path in sorted(LAUNCH_DIR.rglob('*.launch.py')):

@@ -138,3 +138,94 @@ def test_parse_owl_detections_applies_threshold_and_nms() -> None:
     assert batch.count == 1
     assert batch.detections[0].bbox_xyxy == (10, 20, 50, 80)
     assert batch.detections[0].score == 0.95
+
+
+def test_detector_settings_are_ros_free_and_validate_effective_values() -> None:
+    from ridgeback_common.detector_config import (
+        DETECTION_MODEL_DEFAULT, resolve_detector_settings,
+        require_matching_detector_settings,
+    )
+
+    baseline = resolve_detector_settings({})
+    assert baseline == {
+        'detector': 'owlv2', 'detection_model': DETECTION_MODEL_DEFAULT,
+        'target_labels': 'humanoid robot', 'detection_threshold': 0.55,
+        'detector_fps': 10.0, 'detector_debug': False,
+    }
+    explicit = resolve_detector_settings({
+        'detector': ' owlv2 ', 'detection_model': ' checkpoint ',
+        'target_labels': ' robot, person , ', 'detection_threshold': '0.7',
+        'detector_fps': '4', 'detector_debug': 'true',
+    })
+    assert explicit['target_labels'] == 'robot,person'
+    assert require_matching_detector_settings(explicit, {**explicit, 'detector_fps': 4.0}) == explicit
+    with __import__('pytest').raises(ValueError, match='detection_model'):
+        require_matching_detector_settings(explicit, {**explicit, 'detection_model': 'other'})
+
+
+def test_detector_settings_reject_invalid_values_before_any_model_import() -> None:
+    import pytest
+    from ridgeback_common.detector_config import resolve_detector_settings
+
+    for values, field in [
+        ({'detector': ''}, 'detector'), ({'detector': 'future'}, 'detector'),
+        ({'detection_model': '  '}, 'detection_model'),
+        ({'target_labels': ' ,  '}, 'target_labels'),
+        ({'detection_threshold': 'nan'}, 'detection_threshold'),
+        ({'detection_threshold': 0}, 'detection_threshold'),
+        ({'detector_fps': 'inf'}, 'detector_fps'),
+        ({'detector_fps': 0}, 'detector_fps'),
+        ({'detector_debug': 'maybe'}, 'detector_debug'),
+    ]:
+        with pytest.raises(ValueError, match=field):
+            resolve_detector_settings(values)
+
+
+def test_factory_preserves_owl_output_and_accepts_test_only_backend() -> None:
+    from ridgeback_common.models import DetectionBatch, Detection
+    from ridgeback_localization.core.detection import create_detector_backend
+    import pytest
+
+    class Engine:
+        def load(self):
+            self.loaded = True
+
+        def detect(self, image, **kwargs):
+            self.call = kwargs
+            return [
+                {'score': 0.9, 'label': 'humanoid robot',
+                 'box': {'xmin': -1.0, 'ymin': 2.0, 'xmax': 5.1, 'ymax': 9.0}},
+                {'score': 0.7, 'label': 'humanoid robot',
+                 'box': {'xmin': 0.0, 'ymin': 2.0, 'xmax': 5.0, 'ymax': 9.0}},
+            ]
+
+    engine = Engine()
+    from ridgeback_localization.core.detection import OwlV2Backend
+    owl = OwlV2Backend('checkpoint', _NullLogger(), engine=engine)
+    owl.load()
+    batch = owl.normalize(
+        owl.infer('image', candidate_labels=['humanoid robot'], threshold=0.55),
+        8, 6, 0.55)
+    assert engine.loaded and engine.call['threshold'] == 0.55
+    assert batch.detections == [Detection((0, 2, 6, 6), 'humanoid robot', 0.9)]
+
+    class FakeBackend:
+        def __init__(self, checkpoint, logger):
+            self.checkpoint = checkpoint
+
+        def load(self):
+            pass
+
+        def infer(self, image, *, candidate_labels, threshold):
+            return (image, candidate_labels, threshold)
+
+        def normalize(self, outputs, width, height, threshold):
+            return DetectionBatch(width, height, [Detection((0, 0, 1, 1), 'fake', 1.0)])
+
+    fake = create_detector_backend('fake', 'sentinel', _NullLogger(),
+                                   factories={'fake': FakeBackend})
+    assert fake.checkpoint == 'sentinel'
+    assert fake.normalize(fake.infer('image', candidate_labels=['fake'], threshold=0.8),
+                          8, 6, 0.8).detections[0].label == 'fake'
+    with pytest.raises(ValueError, match='detector'):
+        create_detector_backend('fake', 'sentinel', _NullLogger())

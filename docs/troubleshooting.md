@@ -15,6 +15,7 @@ investigations and measurements live in the Archived evidence section below.
 | All mask rows blank, pointcloud works | Inspect startup logs for an unavailable configured `base_frame` |
 | Explorer finds no frontiers | Confirm the global costmap has `track_unknown_space: true` |
 | Startup stage stalls | Read the matching `gate_*` process's `unmet:` list; do not add a fixed timer |
+| Benchmark opens Gazebo/RViz but its first trial stalls | If the config gate has the camera image but lists `detections/target/raw` as unmet, inspect the environment launch's `target_detector_node` log and check the perception venv; see [Missing benchmark detections](#missing-benchmark-detections) |
 | Stale simulator processes | Run `bash cleanup.sh` before a simulation launch or once before a sweep; never use it as hardware bringup cleanup |
 | Need a log summary | Run `bash tools/diag.sh <console.log> <world> [namespace]`; the namespace defaults to `RIDGEBACK_NAMESPACE`, then `r100_0001` |
 | Images on Thor stall or lag although ping is fast | See [Intel–Thor stream stalls](#intelthor-stream-stalls) |
@@ -37,6 +38,22 @@ bringup/motion just to make a topic appear. The physical command-chain and D455
 validation gates remain in the [backlog](BACKLOG.md) and
 [PHYSICAL — Robot measurements and stationary sensor validation](plans/PHYSICAL_robot_measurements_and_validation.md#d455-camera-validation).
 
+## Missing benchmark detections
+
+The persistent benchmark environment starts the detector before the first
+configuration. If its Python environment lacks Torch or Transformers, the
+detector logs a fatal message and exits without advertising
+`/<namespace>/detections/target/raw`. The configuration gate may then wait its
+full 300 seconds and proceed even though the topic remains absent; a clean gate
+exit is not proof that the detector became ready. Check the detector log under
+the sweep's `environment/logs/ros/` and the gate log under
+`<config>/logs/ros/`.
+
+Set up the [perception venv](../README.md#3-optional-set-up-target-localization-venv)
+in the sweep's checkout, or set `RIDGEBACK_PERCEPTION_VENV` to an existing venv
+before starting the sweep or configurator. Restart the configurator if it was
+already running. Stop the failed sweep from its terminal before retrying.
+
 ## Benchmark sweep cleanup
 
 `cleanup.sh` intentionally kills Gazebo servers, RViz, ROS launches, and package
@@ -48,8 +65,35 @@ it restarts only the configuration layer.
 Two `gz sim server` processes indicate that a stale single-run environment was
 not cleaned. Gazebo transport may then spawn a target in one server and query
 its pose from the other, producing a misleading `Target pose ... not present`
-failure. Clean once and restart the sweep. A valid `run.json` lets the supervisor
-resume completed configurations.
+failure. Clean once and restart the sweep. The supervisor reuses valid `run.json`
+only when no recorded launch or configuration-shutdown failure disqualifies it;
+see [lifecycle provenance](target_distance_benchmarking/outputs.md#sweep-outputs).
+
+## Benchmark shutdown failures
+
+Use the public single-run wrapper or sweep so configuration rollback finishes
+before its simulator stops. Interrupt the owner once; it owns bounded cleanup
+and coalesces further cleanup signals. A saved result does not establish a clean
+exit: inspect the child failure and lifecycle fields before resuming.
+
+For an RViz unsubscribe abort or a late process-exit SIGSEGV, verify that the
+[RViz shutdown overlay](project/dependencies.md#rviz-shutdown-ownership-patch)
+is applied and that the exact RViz PID loaded both patched libraries. The Image
+subscription and view-controller ownership defects are separate mechanisms.
+
+Two bounded probes help isolate the failing boundary from a sourced workspace:
+
+```bash
+python3 tools/diagnostics/scene_shutdown_probe.py --supervised --repetitions 3 \
+  --output artifacts/benchmarks/scene_shutdown_probe
+python3 tools/diagnostics/rviz_shutdown_probe.py --configs empty tf image
+```
+
+The scene probe uses real Gazebo physics and scene services without sensors.
+The RViz probe uses an owned virtual display and software rendering; it tests
+process lifetime, not the native GPU workload. Both need host DDS access and
+record readiness, process status, escalation, and loaded-library evidence.
+Full benchmark traffic remains a separate qualification population.
 
 ### What `cleanup.sh` leaves alone
 

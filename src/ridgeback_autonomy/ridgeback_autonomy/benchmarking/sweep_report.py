@@ -128,6 +128,16 @@ def render_sweep_report(manifest: dict, sweep_dir: str) -> str:
         'Commit': str(commit),
         'Branch': str(provenance.get('branch') or 'unknown'),
     }
+    if not manifest.get('replay'):
+        # Old manifests with no runtime identity remain unknown. A missing field
+        # does not establish that they used today's default checkpoint.
+        environment = (manifest.get('resume_signature') or {}).get('environment') or {}
+        for name, label in (
+            ('detector', 'Detector'), ('detection_model', 'Detection checkpoint'),
+            ('target_labels', 'Target labels'),
+            ('detection_threshold', 'Detection threshold'),
+            ('detector_fps', 'Detector FPS')):
+            metadata[label] = str(environment.get(name, 'unknown'))
     if sweep.get('wall_time_sec') is not None:
         metadata['Evaluation wall time'] = _format_duration(sweep['wall_time_sec'])
     # Only surfaced when it invalidates the numbers below it. A run rendered in
@@ -194,6 +204,18 @@ def render_sweep_report(manifest: dict, sweep_dir: str) -> str:
         )
 
     notes_text = '\n'.join(notes) if notes else 'Every selected configuration completed in this sweep.'
+    lifecycle = manifest.get('lifecycle')
+    shutdown_lines = []
+    if lifecycle is not None:
+        errors = lifecycle.get('errors') or []
+        shutdown_lines = [
+            '## Shutdown', '',
+            ('Owned processes stopped cleanly.' if lifecycle.get('clean') else
+             'Shutdown failed. Saved measurements do not establish a clean lifecycle.'),
+            '',
+            *[f'- {error}' for error in errors],
+            '',
+        ]
     return '\n'.join([
         f'# Benchmark sweep {metadata["Name"]}',
         '',
@@ -205,6 +227,7 @@ def render_sweep_report(manifest: dict, sweep_dir: str) -> str:
         '',
         comparison_note,
         '',
+        *shutdown_lines,
         '## Failed and skipped configurations',
         '',
         notes_text,

@@ -2,17 +2,26 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import os
 import re
 
 import yaml
 
 from ridgeback_common.camera_profiles import resolve_camera_profile
+from ridgeback_common.detector_config import (
+    DETECTOR_ENVIRONMENT_KEYS, resolve_detector_settings,
+)
 from ridgeback_localization.estimator_registry import (
     DEPTH_PATH_ESTIMATORS,
     MASK_ESTIMATORS,
     parse_estimators,
+)
+from ridgeback_autonomy.benchmarking.backends import (
+    BACKEND_SETTING_NAMES,
+    DEFAULT_BACKEND,
+    benchmark_backend,
+    normalize_backend_settings,
 )
 from ridgeback_autonomy.benchmarking.replay_profiles import (
     CONFIG_LAUNCH_ARGUMENT_NAMES,
@@ -28,15 +37,15 @@ TRIAL_WALL_TIME_SEC = 15.4
 TOP_LEVEL_KEYS = frozenset({'sweep', 'defaults', 'configs'})
 SWEEP_METADATA_KEYS = frozenset({'name', 'description'})
 # These belong only to the environment launch, but are legal as sweep-wide
-# defaults: an installation selects its Clearpath setup and rendering mode once,
-# and the detector rate and its diagnostic are fixed for the persistent layer.
-ENVIRONMENT_ONLY_DEFAULT_NAMES = frozenset({
-    'setup_path',
-    'headless_rendering',
-    'camera_profile',
-    'detector_fps',
-    'detector_debug',
-})
+# defaults: an installation selects its Clearpath setup and camera profile once,
+# and the detector and all its settings are fixed for the persistent layer.
+# The backend and its own rendering and stepping settings are environment
+# properties too; they are validated and forwarded with the backend instead.
+ENVIRONMENT_ONLY_DEFAULT_NAMES = (
+    DETECTOR_ENVIRONMENT_KEYS | frozenset({
+        'setup_path', 'camera_profile',
+    })
+)
 SWEEP_DEFAULT_ARGUMENT_NAMES = (
     CONFIG_LAUNCH_ARGUMENT_NAMES | ENVIRONMENT_ONLY_DEFAULT_NAMES)
 
@@ -78,6 +87,9 @@ class SweepSpec:
     defaults: dict[str, str]
     configs: tuple[SweepConfig, ...]
     source: str
+    backend: str = DEFAULT_BACKEND
+    # Every setting the backend consumes, defaults filled in, normalized.
+    backend_settings: dict[str, str] = field(default_factory=dict)
 
 
 def _path_safe_name(value, *, field: str, source: str) -> str:
@@ -222,6 +234,10 @@ def parse_sweep(
         key: _launch_value(value, owner=f'Sweep file {source} field "defaults"', field=key)
         for key, value in defaults_raw.items()
     }
+    # Validate the whole environment identity, including inherited defaults.
+    # The returned values are not substituted into legacy documents: omitted
+    # fields still mean the documented launch defaults.
+    resolve_detector_settings(defaults)
     if 'camera_profile' in defaults:
         try:
             resolve_camera_profile(defaults['camera_profile'])
@@ -229,6 +245,22 @@ def parse_sweep(
             raise ValueError(
                 f'Sweep file {source} field "defaults": {exc}'
             ) from exc
+    # Validated before any configuration: a hardware or unknown backend, or a
+    # setting the selected simulator does not consume, is a whole-sweep error.
+    owner = f'Sweep file {source} field "defaults"'
+    try:
+        backend = benchmark_backend(defaults.get('backend', DEFAULT_BACKEND))
+    except ValueError as exc:
+        raise ValueError(f'{owner}: field "backend": {exc}') from exc
+    backend_settings = normalize_backend_settings(
+        backend,
+        {key: value for key, value in defaults.items() if key in BACKEND_SETTING_NAMES},
+        owner=owner,
+    )
+    if 'backend' in defaults:
+        defaults['backend'] = backend.name
+    for setting in BACKEND_SETTING_NAMES & set(defaults):
+        defaults[setting] = backend_settings[setting]
 
     configs_raw = document.get('configs')
     if not isinstance(configs_raw, list) or not configs_raw:
@@ -263,6 +295,8 @@ def parse_sweep(
         merged = {
             key: value for key, value in defaults.items()
             if key in CONFIG_LAUNCH_ARGUMENT_NAMES
+            and (key not in DETECTOR_ENVIRONMENT_KEYS
+                 or key == 'target_labels')
         }
         merged.update(explicit)
         resolved = _validate_config(
@@ -284,6 +318,8 @@ def parse_sweep(
         defaults=defaults,
         configs=tuple(configs),
         source=source,
+        backend=backend.name,
+        backend_settings=backend_settings,
     )
 
 

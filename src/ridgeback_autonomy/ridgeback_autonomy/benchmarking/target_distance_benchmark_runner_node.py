@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from collections import OrderedDict
 import os
-import subprocess
 import time
 from typing import Any
 
@@ -15,6 +14,12 @@ from ament_index_python.packages import get_package_share_directory
 from geometry_msgs.msg import PointStamped
 from rclpy.executors import ExternalShutdownException
 from rclpy.node import Node
+from rclpy.parameter import parameter_value_to_python
+from rcl_interfaces.srv import GetParameters
+from ridgeback_common.detector_config import (
+    DETECTOR_ENVIRONMENT_KEYS, require_matching_detector_settings,
+    resolve_detector_settings,
+)
 from rclpy.qos import qos_profile_sensor_data
 from sensor_msgs.msg import Image
 from sensor_msgs.msg import CameraInfo
@@ -30,6 +35,7 @@ from ridgeback_autonomy.benchmarking.alignment import (
     update_measurement_event,
 )
 from ridgeback_common.camera_profiles import DEFAULT_CAMERA_PROFILE
+from ridgeback_common.ros_signals import init_owned, shielded, spin_step
 from ridgeback_localization.estimator_registry import (
     MASK_GATE_DEFAULT,
     parse_estimators,
@@ -51,7 +57,6 @@ from ridgeback_autonomy.benchmarking.naming import (
 )
 from ridgeback_autonomy.benchmarking.paths import (
     default_output_directory,
-    subprocess_log_environment,
 )
 from ridgeback_autonomy.benchmarking.reduction import (
     choose_representative_event,
@@ -78,27 +83,33 @@ from ridgeback_autonomy.benchmarking.replay_artifacts import (
     dependency_versions,
 )
 from ridgeback_autonomy.benchmarking.process_utils import (
-    extract_json_payload,
     format_commit,
     git_provenance,
-    run_command,
-    try_command,
 )
 from ridgeback_autonomy.benchmarking.report import render_run_report
 from ridgeback_autonomy.benchmarking.scenarios import Scene, load_scenarios
+from ridgeback_autonomy.benchmarking.asset_catalog import (
+    DEFAULT_TARGET,
+    load_asset_catalog,
+    scene_object_models,
+)
+from ridgeback_autonomy.benchmarking.backends import (
+    DEFAULT_BACKEND,
+    benchmark_backend,
+    decode_backend_settings,
+    simulator_provenance,
+)
+from ridgeback_autonomy.benchmarking.scene_control import (
+    SpawnSpec,
+    create_scene_control_client,
+)
 from ridgeback_autonomy.benchmarking.scoring import (
     MISS_OUTCOMES,
     score_scene,
 )
 from ridgeback_autonomy.benchmarking.simulation import (
-    TARGET_SPAWN_HEIGHT_M,
     GroundTruthInstance,
     compute_ground_truth_instances,
-    despawn_model_command,
-    model_sdf_path,
-    pose_snapshot_command,
-    pose_snapshot_from_payload,
-    spawn_model_command,
 )
 from ridgeback_autonomy.benchmarking.summary import (
     build_run_document,
@@ -160,11 +171,7 @@ from ridgeback_localization.ground_truth import (
 )
 
 
-COMMAND_TIMEOUT_SEC = 10.0
-COMMAND_RETRY_SLEEP_SEC = 0.5
 STREAM_WAIT_TIMEOUT_SEC = 300.0
-POSE_WAIT_TIMEOUT_SEC = 120.0
-DELETE_TIMEOUT_SEC = 15.0
 # Republish period for the trial truth, well inside the consumers'
 # ``TRUTH_MAX_AGE_S`` so the line survives a dropped message and is never much
 # older than the scene it describes.
@@ -214,13 +221,24 @@ class TargetDistanceBenchmarkRunner(Node):
             os.path.join(pkg_share, '..', '..', '..', '..'))
         default_output_dir = default_output_directory(self.workspace_root)
 
-        self.declare_parameter('target_labels', 'humanoid robot')
+        from ridgeback_common.detector_config import (
+            DETECTOR_DEFAULT, DETECTION_MODEL_DEFAULT, DETECTION_THRESHOLD_DEFAULT,
+            TARGET_LABELS_DEFAULT,
+        )
+        self.declare_parameter('detector', DETECTOR_DEFAULT)
+        self.declare_parameter('detection_model', DETECTION_MODEL_DEFAULT)
+        self.declare_parameter('target_labels', TARGET_LABELS_DEFAULT)
+        self.declare_parameter('detection_threshold', DETECTION_THRESHOLD_DEFAULT)
+        self.declare_parameter('detector_fps', 10.0)
+        self.declare_parameter('detector_debug', False)
+        self.declare_parameter('verify_detector_identity', False)
         self.declare_parameter('world', 'target_distance_calibration')
-        # The runner stays target/provider-neutral. The Gazebo benchmark launch
-        # supplies its concrete asset roots; a future Isaac benchmark can
-        # supply a different implementation without importing Gazebo here.
-        self.declare_parameter('target_model_sdf', '')
-        self.declare_parameter('models_dir', '')
+        self.declare_parameter('backend', DEFAULT_BACKEND)
+        # Recorded, not applied: the persistent environment's backend-only
+        # settings, as the launch encoded them.
+        self.declare_parameter('backend_settings', '')
+        self.declare_parameter('asset_catalog', '')
+        self.declare_parameter('scene_control_service_namespace', '')
         self.declare_parameter('scenario', '')
         self.declare_parameter('repeats', 5)
         self.declare_parameter('output_dir', default_output_dir)
@@ -285,16 +303,38 @@ class TargetDistanceBenchmarkRunner(Node):
         self.declare_parameter('record_max_sec', DEFAULT_MAX_SECONDS)
         self.declare_parameter('record_window_class', RECORD_WINDOW_CLASS_DEFAULT)
 
+        # The configuration layer starts after the raw-detection readiness
+        # gate. Query that live producer before creating any run output so a
+        # direct split launch cannot record a checkpoint it did not run.
+        requested_detector_settings = {
+            name: self.get_parameter(name).value
+            for name in DETECTOR_ENVIRONMENT_KEYS}
+        self.detector_identity_verified = bool(
+            self.get_parameter('verify_detector_identity').value)
+        self.effective_detector_settings = (
+            require_matching_detector_settings(
+                requested_detector_settings, self.read_running_detector_settings())
+            if self.detector_identity_verified else
+            resolve_detector_settings(requested_detector_settings))
         self.world = str(self.get_parameter('world').value)
-        self.target_model_sdf = str(
-            self.get_parameter('target_model_sdf').value)
-        self.models_dir = str(self.get_parameter('models_dir').value)
+        self.backend = benchmark_backend(self.get_parameter('backend').value)
+        self.backend_settings = decode_backend_settings(
+            str(self.get_parameter('backend_settings').value))
         scenario_param = str(self.get_parameter('scenario').value).strip()
         self.scenario_path = (
             os.path.abspath(os.path.expanduser(scenario_param))
             if scenario_param else default_scenario
         )
         self.scenes = load_scenarios(self.scenario_path)
+        self.asset_catalog_path = os.path.abspath(os.path.expanduser(
+            str(self.get_parameter('asset_catalog').value).strip()))
+        self.scene_control_service_namespace = str(
+            self.get_parameter('scene_control_service_namespace').value).strip()
+        catalog = load_asset_catalog(self.asset_catalog_path)
+        self.asset_selection = catalog.select(
+            self.world, DEFAULT_TARGET, scene_object_models(self.scenes))
+        self.scene_control = create_scene_control_client(
+            self, self.scene_control_service_namespace)
         self.repeats = int(self.get_parameter('repeats').value)
         self.output_dir = os.path.abspath(os.path.expanduser(str(self.get_parameter('output_dir').value)))
         self.run_dir_name = str(self.get_parameter('run_dir_name').value).strip()
@@ -333,7 +373,6 @@ class TargetDistanceBenchmarkRunner(Node):
         self.robot_model_name = (
             f'{self.namespace_name}/robot' if self.namespace_name else 'robot'
         )
-        self.pose_info_topic = f'/world/{self.world}/pose/info'
         self.run_started_at = time.localtime()
         self.run_started_monotonic = time.monotonic()
         self.run_label = time.strftime('%Y%m%d_%H%M%S', self.run_started_at)
@@ -426,8 +465,6 @@ class TargetDistanceBenchmarkRunner(Node):
         # whole run (misses included, unlike the usable-aligned rows). Feeds the
         # summary's observation columns.
         self.status_aggregate: dict[str, dict[int, int]] = {}
-
-        self.command_env = subprocess_log_environment(self.run_output_dir)
 
         self.collage_renderer = BenchmarkCollageRenderer()
 
@@ -945,10 +982,23 @@ class TargetDistanceBenchmarkRunner(Node):
         self.get_logger().info(
             'Starting multi-estimator distance benchmark '
             f'for {", ".join(self.estimator_display_names[est] for est in self.selected_estimators)} '
-            f'in world "{self.world}" for robot "{self.robot_model_name}".'
+            f'in world "{self.world}" for robot "{self.robot_model_name}" '
+            f'on backend {self.backend.name} '
+            f'(native world "{self.asset_selection.world.native_name}").'
         )
+        self.scene_control.wait_for_services(STREAM_WAIT_TIMEOUT_SEC)
+        self.scene_control.require_capabilities(self.asset_selection.spawn_formats)
+        self.get_logger().info(
+            'Scene-control services are available; waiting for the simulation '
+            'clock to advance before the first scene operation.')
+        clock = self.scene_control.wait_for_advancing_clock(STREAM_WAIT_TIMEOUT_SEC)
+        timeline = self.scene_control.readiness_timeline()
+        self.get_logger().info(
+            f'Simulation clock advancing at {clock.advanced_stamp_ns / 1e9:.3f} s, '
+            f'{timeline["clock_advance_after_services_sec"]:.3f} s after the '
+            'scene-control services appeared.')
+        self.scene_control.wait_until_present([self.robot_model_name])
         self.wait_for_required_streams()
-        self.wait_for_entity_pose(self.robot_model_name, POSE_WAIT_TIMEOUT_SEC)
 
         # Started once the streams are up, so RViz is certain to exist by now,
         # and stopped in the finally below so an exception or a Ctrl-C still
@@ -958,6 +1008,25 @@ class TargetDistanceBenchmarkRunner(Node):
             self.run_trials()
         finally:
             self.stop_recording()
+        self.log_readiness_timeline()
+
+    def log_readiness_timeline(self) -> None:
+        """One line separating simulator start-up delay from provider readiness."""
+
+        timeline = self.scene_control.readiness_timeline()
+
+        def wall(name: str) -> str:
+            value = timeline[name]
+            if value is None:
+                return 'never'
+            milliseconds = int(value % 1 * 1000)
+            return f'{time.strftime("%H:%M:%S", time.localtime(value))}.{milliseconds:03d}'
+
+        self.get_logger().info(
+            f'Readiness: services {wall("services_available_wall")}, clock first seen '
+            f'{wall("clock_first_message_wall")}, clock advancing '
+            f'{wall("clock_advanced_wall")}, first spawn '
+            f'{wall("first_spawn_requested_wall")}.')
 
     def run_trials(self) -> None:
         estimator_rows = {estimator: [] for estimator in self.selected_estimators}
@@ -1032,6 +1101,36 @@ class TargetDistanceBenchmarkRunner(Node):
         if self.recorder.active:
             self.recorder.stop()
 
+    def read_running_detector_settings(self) -> dict:
+        """Read the warm detector's declared startup identity over ROS."""
+        namespace = self.get_namespace().rstrip('/')
+        service = f'{namespace}/target_detector/get_parameters'
+        client = self.create_client(GetParameters, service)
+        try:
+            if not client.wait_for_service(timeout_sec=10.0):
+                raise RuntimeError(f'Running detector parameters unavailable: {service}')
+            names = sorted(DETECTOR_ENVIRONMENT_KEYS)
+            request = GetParameters.Request()
+            request.names = names
+            future = client.call_async(request)
+            # spin_step, like every other wait here, so an owned signal that
+            # arrives during the query is raised after the step, not inside it.
+            deadline = time.monotonic() + 10.0
+            while not future.done() and rclpy.ok():
+                remaining = deadline - time.monotonic()
+                if remaining <= 0.0:
+                    break
+                spin_step(self, timeout_sec=min(0.1, remaining))
+            if not future.done() or future.exception() is not None:
+                raise RuntimeError(f'Cannot read running detector parameters: {service}')
+            values = future.result().values
+            if len(values) != len(names):
+                raise RuntimeError(f'Incomplete running detector parameters: {service}')
+            return {name: parameter_value_to_python(value)
+                    for name, value in zip(names, values)}
+        finally:
+            self.destroy_client(client)
+
     def declared_parameters(self) -> dict[str, str]:
         """Every ROS parameter this node declared, as text.
 
@@ -1041,11 +1140,15 @@ class TargetDistanceBenchmarkRunner(Node):
         affect measurement (rviz, overlay) never become parameters here.
         """
 
-        return {
+        parameters = {
             name: str(parameter.value)
             for name, parameter in sorted(self.get_parameters_by_prefix('').items())
             if name not in RCLPY_INTERNAL_PARAMETERS
         }
+        if hasattr(self, 'effective_detector_settings'):
+            parameters.update({name: str(value)
+                               for name, value in self.effective_detector_settings.items()})
+        return parameters
 
     def write_run_outputs(
         self,
@@ -1070,12 +1173,25 @@ class TargetDistanceBenchmarkRunner(Node):
             for rows in estimator_rows.values() for row in rows
         })
 
+        simulation = self.simulation_provenance()
         metadata = {
             'Started': time.strftime('%Y-%m-%d %H:%M:%S', self.run_started_at),
             'Commit': format_commit(provenance),
             'Branch': provenance['branch'] or 'unknown',
             'Scenario': self.scenario_path,
-            'Target labels': self.get_parameter('target_labels').value,
+            'Target labels': self.effective_detector_settings['target_labels'],
+            'Detector': self.effective_detector_settings['detector'],
+            'Detection model': self.effective_detector_settings['detection_model'],
+            'Detection threshold': self.effective_detector_settings['detection_threshold'],
+            'Detector FPS': self.effective_detector_settings['detector_fps'],
+            'Detector identity verified': self.detector_identity_verified,
+            'Backend': self.backend.name,
+            'World': (
+                f'{self.world} (native {simulation["native_world"]})'
+                if simulation['native_world'] != self.world else self.world),
+            'Asset catalog': (
+                f'{simulation["asset_catalog"]["schema"]} '
+                f'sha256 {simulation["asset_catalog"]["sha256"]}'),
         }
         # Named while the recorder is still running (it is stopped after the
         # report is written), so this is the path, not a claim the file is ready.
@@ -1109,7 +1225,16 @@ class TargetDistanceBenchmarkRunner(Node):
                 'branch': provenance['branch'],
                 'uncommitted_files': provenance['dirty_count'],
                 'scenario': self.scenario_path,
-                'target_labels': self.get_parameter('target_labels').value,
+                'target_labels': self.effective_detector_settings['target_labels'],
+                'detector': self.effective_detector_settings['detector'],
+                'detection_model': self.effective_detector_settings['detection_model'],
+                'detection_threshold': self.effective_detector_settings['detection_threshold'],
+                'detector_fps': self.effective_detector_settings['detector_fps'],
+                'detector_identity_verified': self.detector_identity_verified,
+                'backend': self.backend.name,
+                'world': self.world,
+                'native_world': simulation['native_world'],
+                'simulation': simulation,
                 'scenes': scenes,
                 'instances': instances,
                 'trials_included': included_trials,
@@ -1120,103 +1245,118 @@ class TargetDistanceBenchmarkRunner(Node):
             status_histograms=self.status_aggregate,
         ))
 
+    def simulation_provenance(self) -> dict[str, Any]:
+        """Which simulator, world, assets and settings produced this run."""
+
+        capabilities = self.scene_control.capabilities
+        return {
+            'backend': self.backend.name,
+            'public_world': self.world,
+            'native_world': self.asset_selection.world.native_name,
+            'settings': dict(self.backend_settings),
+            'camera_profile': str(self.get_parameter('camera_profile').value),
+            **simulator_provenance(self.backend),
+            'scene_control_service_namespace': self.scene_control_service_namespace,
+            'features': None if capabilities is None else {
+                'features': sorted(capabilities.features),
+                'spawn_formats': list(capabilities.spawn_formats),
+                'custom_info': capabilities.custom_info,
+            },
+            'asset_catalog': self.asset_selection.provenance(),
+            'readiness': self.scene_control.readiness_timeline(),
+        }
+
     def run_trial(self, trial: dict[str, Any]) -> dict[str, dict[str, Any]] | None:
         trial_id = trial['trial_id']
         scene: Scene = trial['scene']
         entity_prefix = f'bench_{self.run_label}_{trial_id}'
 
-        spawned_names: list[str] = []
+        specs, robot_models = self.scene_spawn_specs(scene, entity_prefix)
         try:
-            robot_models = self.spawn_scene(scene, entity_prefix, spawned_names)
-            self.spin_for(self.settle_sec)
+            with self.scene_control.scene(specs):
+                self.spin_for(self.settle_sec)
 
-            gt_instances = self.compute_scene_ground_truth(robot_models)
-            # Overlay truth line is a single reference: republish the nearest
-            # instance's planar truth (multi-robot scenes pick the closest).
-            nearest = min(gt_instances, key=lambda gt: gt.distance_m)
-            self.active_truth = {
-                'lateral_m': nearest.lateral_m,
-                'forward_m': nearest.forward_m,
-                'distance_m': nearest.distance_m,
-            }
-            self.active_trial_id = trial_id
-            capture = self.capture_measurement_window(self.capture_sec)
-            if self.capture_artifact_enabled():
-                self.write_replay_trial(trial, gt_instances, capture['replay_events'])
-            merge_status_histograms(self.status_aggregate, capture['status_histogram'])
-            usable_by_estimator = capture['usable_by_estimator']
-            usable_events = capture['usable_events']
-            if not usable_events:
-                # Union empty: the detector never yielded a usable frame for ANY
-                # estimator. The trial ran and found nothing, so every GT
-                # instance counts as missed by every estimator — a skip
-                # (return None) is reserved for infrastructure failures. There
-                # is no frame to render, so the rows carry no collage path.
-                self.get_logger().info(
-                    f'{trial_id} all_instances_missed | no_usable_detections | '
-                    f'raw_events={capture["total_events"]} | '
-                    f'{format_status_tally(capture["status_histogram"], self.selected_estimators)}'
-                )
+                gt_instances = self.compute_scene_ground_truth(robot_models)
+                # Overlay truth line is a single reference: republish the nearest
+                # instance's planar truth (multi-robot scenes pick the closest).
+                nearest = min(gt_instances, key=lambda gt: gt.distance_m)
+                self.active_truth = {
+                    'lateral_m': nearest.lateral_m,
+                    'forward_m': nearest.forward_m,
+                    'distance_m': nearest.distance_m,
+                }
+                self.active_trial_id = trial_id
+                capture = self.capture_measurement_window(self.capture_sec)
+                if self.capture_artifact_enabled():
+                    self.write_replay_trial(trial, gt_instances, capture['replay_events'])
+                merge_status_histograms(self.status_aggregate, capture['status_histogram'])
+                usable_by_estimator = capture['usable_by_estimator']
+                usable_events = capture['usable_events']
+                if not usable_events:
+                    # Union empty: the detector never yielded a usable frame for ANY
+                    # estimator. The trial ran and found nothing, so every GT
+                    # instance counts as missed by every estimator — a skip
+                    # (return None) is reserved for infrastructure failures. There
+                    # is no frame to render, so the rows carry no collage path.
+                    self.get_logger().info(
+                        f'{trial_id} all_instances_missed | no_usable_detections | '
+                        f'raw_events={capture["total_events"]} | '
+                        f'{format_status_tally(capture["status_histogram"], self.selected_estimators)}'
+                    )
+                    scene_score = score_scene(
+                        usable_by_estimator, gt_instances, self.selected_estimators,
+                        detector_fired=capture['any_detected'])
+                    return build_trial_result(
+                        trial, scene, gt_instances, scene_score,
+                        self.selected_estimators, self.estimator_display_names,
+                        usable_by_estimator, '', capture['total_events'],
+                        captured_events=tuple(self.capture_events.values()))
+
+                # Frame-level scalar medians drive the representative-frame choice
+                # and the collage only. Partial by design: an estimator with no
+                # usable events simply has no key here. The scored rows come from
+                # the per-instance medians below.
+                scalar_medians = compute_trial_medians(usable_by_estimator)
+                # One scoring path for every scene size: each estimator associates
+                # its own estimates to the ground-truth robots, so one estimator's
+                # gross error can no longer erase the instance for the rest.
                 scene_score = score_scene(
                     usable_by_estimator, gt_instances, self.selected_estimators,
                     detector_fired=capture['any_detected'])
+
+                representative_event = choose_representative_event(
+                    usable_events,
+                    self.selected_estimators,
+                    scalar_medians,
+                )
+                box_annotations = build_box_annotations(
+                    representative_event, gt_instances, self.selected_estimators)
+                image_path = self.save_trial_collage(
+                    trial_id,
+                    representative_event,
+                    scalar_medians,
+                    gt_instances[0].distance_m,
+                    box_annotations,
+                    len(scene_score.detector_missed),
+                    dominant_miss_reasons(
+                        self.selected_estimators,
+                        capture['status_histogram'],
+                        scalar_medians,
+                    ),
+                )
+
+                self.log_trial(
+                    trial_id, scalar_medians, gt_instances[0].distance_m,
+                    len(usable_events), image_path,
+                    len(scene_score.detector_missed), scene_score.extra_count)
                 return build_trial_result(
                     trial, scene, gt_instances, scene_score,
                     self.selected_estimators, self.estimator_display_names,
-                    usable_by_estimator, '', capture['total_events'],
+                    usable_by_estimator, image_path, capture['total_events'],
                     captured_events=tuple(self.capture_events.values()))
-
-            # Frame-level scalar medians drive the representative-frame choice
-            # and the collage only. Partial by design: an estimator with no
-            # usable events simply has no key here. The scored rows come from
-            # the per-instance medians below.
-            scalar_medians = compute_trial_medians(usable_by_estimator)
-            # One scoring path for every scene size: each estimator associates
-            # its own estimates to the ground-truth robots, so one estimator's
-            # gross error can no longer erase the instance for the rest.
-            scene_score = score_scene(
-                usable_by_estimator, gt_instances, self.selected_estimators,
-                detector_fired=capture['any_detected'])
-
-            representative_event = choose_representative_event(
-                usable_events,
-                self.selected_estimators,
-                scalar_medians,
-            )
-            box_annotations = build_box_annotations(
-                representative_event, gt_instances, self.selected_estimators)
-            image_path = self.save_trial_collage(
-                trial_id,
-                representative_event,
-                scalar_medians,
-                gt_instances[0].distance_m,
-                box_annotations,
-                len(scene_score.detector_missed),
-                dominant_miss_reasons(
-                    self.selected_estimators,
-                    capture['status_histogram'],
-                    scalar_medians,
-                ),
-            )
-
-            self.log_trial(
-                trial_id, scalar_medians, gt_instances[0].distance_m,
-                len(usable_events), image_path,
-                len(scene_score.detector_missed), scene_score.extra_count)
-            return build_trial_result(
-                trial, scene, gt_instances, scene_score,
-                self.selected_estimators, self.estimator_display_names,
-                usable_by_estimator, image_path, capture['total_events'],
-                captured_events=tuple(self.capture_events.values()))
         except Exception as exc:
             self.get_logger().error(f'{trial_id} failed: {exc}')
             return None
-        finally:
-            for model_name in spawned_names:
-                try:
-                    self.despawn_model(model_name)
-                except Exception as exc:
-                    self.get_logger().warn(f'Cleanup failed for "{model_name}": {exc}')
 
     def capture_measurement_window(self, duration_sec: float) -> dict[str, Any]:
         self.capture_events = {}
@@ -1235,7 +1375,7 @@ class TargetDistanceBenchmarkRunner(Node):
                 deadline = time.monotonic() + self.capture_timeout_sec
                 while (rclpy.ok() and time.monotonic() < deadline
                        and len(self.replay_capture_events) < self.capture_batches):
-                    rclpy.spin_once(self, timeout_sec=0.1)
+                    spin_step(self, timeout_sec=0.1)
                     self.publish_active_truth()
                 if len(self.replay_capture_events) < self.capture_batches:
                     raise RuntimeError(
@@ -1250,7 +1390,7 @@ class TargetDistanceBenchmarkRunner(Node):
                 while (rclpy.ok() and time.monotonic() < drain_deadline
                        and not (self.replay_capture_is_complete()
                                 and self.replay_scan_capture_is_complete())):
-                    rclpy.spin_once(self, timeout_sec=min(
+                    spin_step(self, timeout_sec=min(
                         0.1, max(0.0, drain_deadline - time.monotonic())))
                     self.backfill_replay_capture_context()
                     self.publish_active_truth()
@@ -1394,24 +1534,10 @@ class TargetDistanceBenchmarkRunner(Node):
         self.get_logger().info(f'Waiting for {description}.')
         deadline = time.monotonic() + STREAM_WAIT_TIMEOUT_SEC
         while rclpy.ok() and time.monotonic() < deadline:
-            rclpy.spin_once(self, timeout_sec=0.2)
+            spin_step(self, timeout_sec=0.2)
             if condition():
                 return
         raise RuntimeError(f'Timed out waiting for {description}')
-
-    def wait_for_entity_pose(self, model_name: str, timeout_sec: float) -> dict[str, Any]:
-        deadline = time.monotonic() + timeout_sec
-        while time.monotonic() < deadline:
-            try:
-                snapshot = self.get_pose_snapshot()
-            except RuntimeError:
-                time.sleep(COMMAND_RETRY_SLEEP_SEC)
-                continue
-            pose = snapshot.get(model_name)
-            if pose is not None:
-                return pose
-            time.sleep(COMMAND_RETRY_SLEEP_SEC)
-        raise RuntimeError(f'Timed out waiting for Gazebo pose of "{model_name}"')
 
     def compute_scene_ground_truth(
         self,
@@ -1423,133 +1549,37 @@ class TargetDistanceBenchmarkRunner(Node):
         scoring assignment); it never reaches the estimators.
         """
 
-        try:
-            return compute_ground_truth_instances(
-                self.get_pose_snapshot(), self.robot_model_name, robot_models)
-        except RuntimeError as exc:
-            raise RuntimeError(f'{exc} on {self.pose_info_topic}') from exc
+        names = [self.robot_model_name, *(name for _index, name, _robot in robot_models)]
+        snapshot = self.scene_control.get_scene_snapshot(names)
+        return compute_ground_truth_instances(
+            snapshot.poses, self.robot_model_name, robot_models)
 
-    def object_model_sdf(self, model: str) -> str:
-        return model_sdf_path(self.models_dir, model)
-
-    def spawn_scene(
+    def scene_spawn_specs(
         self,
         scene: Scene,
         entity_prefix: str,
-        spawned_names: list[str],
-    ) -> list[tuple[int, str, Any]]:
-        """Spawn every robot + object in a scene; record names for teardown.
+    ) -> tuple[list[SpawnSpec], list[tuple[int, str, Any]]]:
+        """Resolve targets first, then objects, preserving deterministic order."""
 
-        Names are appended to ``spawned_names`` before the pose wait so a spawn
-        that never settles is still despawned by the caller's ``finally``.
-        Returns ``(index, model_name, RobotSpec)`` per robot for ground truth.
-        """
-
+        specs = []
         robot_models: list[tuple[int, str, Any]] = []
         for index, robot in enumerate(scene.robots):
             model_name = f'{entity_prefix}_target_{index}'
-            spawned_names.append(model_name)
-            self.spawn_model(
-                self.target_model_sdf, model_name, robot.x, robot.y,
-                TARGET_SPAWN_HEIGHT_M, robot.yaw)
-            self.wait_for_entity_pose(model_name, POSE_WAIT_TIMEOUT_SEC)
+            specs.append(SpawnSpec.for_resource(
+                self.asset_selection.target, model_name, robot.x, robot.y, robot.yaw))
             robot_models.append((index, model_name, robot))
 
         for index, obj in enumerate(scene.objects):
             model_name = f'{entity_prefix}_obj_{index}'
-            spawned_names.append(model_name)
-            self.spawn_model(
-                self.object_model_sdf(obj.model), model_name, obj.x, obj.y,
-                TARGET_SPAWN_HEIGHT_M, obj.yaw)
-            self.wait_for_entity_pose(model_name, POSE_WAIT_TIMEOUT_SEC)
+            specs.append(SpawnSpec.for_resource(
+                self.asset_selection.objects[obj.model],
+                model_name,
+                obj.x,
+                obj.y,
+                obj.yaw,
+            ))
 
-        return robot_models
-
-    def spawn_model(
-        self,
-        model_ref: str,
-        model_name: str,
-        x_m: float,
-        y_m: float,
-        z_m: float,
-        yaw_rad: float,
-    ) -> None:
-        command = spawn_model_command(
-            self.world, model_ref, model_name, x_m, y_m, z_m, yaw_rad)
-        deadline = time.monotonic() + POSE_WAIT_TIMEOUT_SEC
-        last_error = None
-        while time.monotonic() < deadline:
-            try:
-                self.run_command(
-                    command,
-                    timeout_sec=COMMAND_TIMEOUT_SEC,
-                    description=f'spawn {model_name}',
-                )
-                return
-            except RuntimeError as exc:
-                last_error = exc
-                time.sleep(COMMAND_RETRY_SLEEP_SEC)
-        raise RuntimeError(f'Failed to spawn "{model_name}": {last_error}')
-
-    def despawn_model(self, model_name: str) -> None:
-        deadline = time.monotonic() + DELETE_TIMEOUT_SEC
-        command = despawn_model_command(self.world, model_name)
-
-        while time.monotonic() < deadline:
-            try:
-                result = self.try_command(command, timeout_sec=COMMAND_TIMEOUT_SEC)
-            except RuntimeError:
-                time.sleep(COMMAND_RETRY_SLEEP_SEC)
-                continue
-            if result.returncode == 0:
-                break
-            time.sleep(COMMAND_RETRY_SLEEP_SEC)
-
-        absence_deadline = time.monotonic() + DELETE_TIMEOUT_SEC
-        while time.monotonic() < absence_deadline:
-            try:
-                snapshot = self.get_pose_snapshot()
-            except RuntimeError:
-                time.sleep(COMMAND_RETRY_SLEEP_SEC)
-                continue
-            if model_name not in snapshot:
-                return
-            time.sleep(COMMAND_RETRY_SLEEP_SEC)
-
-        self.get_logger().warn(f'Entity "{model_name}" was not removed before timeout.')
-
-    def get_pose_snapshot(self) -> dict[str, dict[str, Any]]:
-        command = pose_snapshot_command(self.pose_info_topic)
-        result = self.run_command(
-            command,
-            timeout_sec=COMMAND_TIMEOUT_SEC,
-            description=f'read {self.pose_info_topic}',
-        )
-        return pose_snapshot_from_payload(extract_json_payload(result.stdout))
-
-    def run_command(
-        self,
-        command: list[str],
-        timeout_sec: float,
-        description: str,
-    ) -> subprocess.CompletedProcess[str]:
-        return run_command(
-            command,
-            timeout_sec=timeout_sec,
-            description=description,
-            env=self.command_env,
-        )
-
-    def try_command(
-        self,
-        command: list[str],
-        timeout_sec: float,
-    ) -> subprocess.CompletedProcess[str]:
-        return try_command(
-            command,
-            timeout_sec=timeout_sec,
-            env=self.command_env,
-        )
+        return specs, robot_models
 
     def resolved_topic(self, topic: str) -> str:
         if topic.startswith('/'):
@@ -1565,7 +1595,7 @@ class TargetDistanceBenchmarkRunner(Node):
             if remaining <= 0.0:
                 return
             self.publish_active_truth()
-            rclpy.spin_once(self, timeout_sec=min(0.1, remaining))
+            spin_step(self, timeout_sec=min(0.1, remaining))
 
     def publish_active_truth(self) -> None:
         """Republish the trial ground truth during capture.
@@ -1632,21 +1662,28 @@ class TargetDistanceBenchmarkRunner(Node):
 
 
 def main() -> int:
-    rclpy.init()
+    # Owned signals keep the context valid after Ctrl-C, so an interrupted
+    # trial can still delete the entities it spawned.
+    init_owned()
     node = TargetDistanceBenchmarkRunner()
 
     try:
         node.run()
         return 0
-    except (KeyboardInterrupt, ExternalShutdownException):
+    except (KeyboardInterrupt, ExternalShutdownException) as exc:
+        logger = node.get_logger()
+        logger.warning('Benchmark interrupted.')
+        # A failed or skipped removal of the interrupted scene, entity by entity.
+        for note in getattr(exc, '__notes__', ()):
+            logger.warning(note)
         return 130
     except Exception as exc:  # pragma: no cover - surfaced in logs for runtime debugging
         node.get_logger().error(str(exc))
         return 1
     finally:
-        node.destroy_node()
-        if rclpy.ok():
-            rclpy.shutdown()
+        with shielded(final=True):
+            node.destroy_node()
+            rclpy.try_shutdown()
 
 
 if __name__ == '__main__':

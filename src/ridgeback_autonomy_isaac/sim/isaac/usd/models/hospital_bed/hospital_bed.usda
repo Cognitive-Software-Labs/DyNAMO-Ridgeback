@@ -1,0 +1,55 @@
+#usda 1.0
+(
+    defaultPrim = "hospital_bed"
+    metersPerUnit = 1
+    upAxis = "Z"
+)
+
+def Xform "hospital_bed"
+{
+    quatf xformOp:orient = (1, 0, 0, 0)
+    double3 xformOp:translate = (0, 0, 0)
+    uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient"]
+
+    def Scope "Looks"
+    {
+        def Material "mat_000"
+        {
+            token outputs:surface.connect = </hospital_bed/Looks/mat_000/shader.outputs:surface>
+
+            def Shader "shader"
+            {
+                uniform token info:id = "UsdPreviewSurface"
+                color3f inputs:diffuseColor = (0.78, 0.88, 0.95)
+                color3f inputs:emissiveColor = (0, 0, 0)
+                float inputs:roughness = 1
+                token outputs:surface
+            }
+        }
+    }
+
+    def Cube "visual" (
+        prepend apiSchemas = ["MaterialBindingAPI"]
+    )
+    {
+        rel material:binding = </hospital_bed/Looks/mat_000>
+        double size = 1
+        quatf xformOp:orient = (1, 0, 0, 0)
+        float3 xformOp:scale = (1.8, 0.9, 0.5)
+        double3 xformOp:translate = (0, 0, 0.25)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient", "xformOp:scale"]
+    }
+
+    def Cube "collision" (
+        prepend apiSchemas = ["PhysicsCollisionAPI"]
+    )
+    {
+        uniform token purpose = "guide"
+        double size = 1
+        token visibility = "invisible"
+        quatf xformOp:orient = (1, 0, 0, 0)
+        float3 xformOp:scale = (1.8, 0.9, 0.5)
+        double3 xformOp:translate = (0, 0, 0.25)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient", "xformOp:scale"]
+    }
+}

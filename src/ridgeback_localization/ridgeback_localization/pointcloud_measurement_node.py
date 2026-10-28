@@ -17,8 +17,9 @@ from ridgeback_common.messages import (
     batch_from_detections_message,
     build_measurements_message,
 )
+from ridgeback_common.ros_signals import init_owned, shielded, spin_until_interrupted
 from ridgeback_common.tf_utils import lookup_transform_components
-from ridgeback_localization.worker_state import WorkerState
+from ridgeback_localization.worker_state import WorkerState, join_workers
 from ridgeback_interfaces.msg import TargetDetections, TargetMeasurements
 from ridgeback_localization.contracts import (
     POINTCLOUD_MEASUREMENTS_TOPIC,
@@ -98,11 +99,12 @@ class TargetPointcloudMeasurementNode(Node):
             10,
         )
 
-        self.worker_thread = threading.Thread(target=self.processing_loop, daemon=True)
+        # Not daemons, and started last: teardown waits for them, and a
+        # constructor that raises leaves no worker behind.
+        self.worker_thread = threading.Thread(
+            target=self.processing_loop, name='pointcloud_measurement_worker')
         self.pointcloud_worker_thread = threading.Thread(
-            target=self.pointcloud_processing_loop,
-            daemon=True,
-        )
+            target=self.pointcloud_processing_loop, name='pointcloud_cache_worker')
         self.worker_thread.start()
         self.pointcloud_worker_thread.start()
 
@@ -200,6 +202,9 @@ class TargetPointcloudMeasurementNode(Node):
                         pointcloud_translation,
                     )
                 except Exception as exc:
+                    if self.stop_event.is_set():
+                        # Teardown is under way; not a measurement failure.
+                        break
                     self.worker_state.set('failure', str(exc))
                     self.get_logger().error(f'Pointcloud measurement failed: {exc}')
 
@@ -242,6 +247,8 @@ class TargetPointcloudMeasurementNode(Node):
             else:
                 add_pointcloud_measurements(batch, None, None, None)
 
+        if self.stop_event.is_set():
+            return
         self.measurement_pub.publish(build_measurements_message(batch, detections_msg.header))
         self.worker_state.set('processing')
 
@@ -263,27 +270,33 @@ class TargetPointcloudMeasurementNode(Node):
         self.get_logger().warn(warning)
 
     def destroy_node(self) -> bool:
+        self.worker_state.close()
         self.stop_event.set()
         self.process_event.set()
         self.pointcloud_process_event.set()
-        for thread_name in ('worker_thread', 'pointcloud_worker_thread'):
-            thread = getattr(self, thread_name, None)
-            if thread is not None and thread.is_alive():
-                thread.join(timeout=1.0)
+        threads = [
+            thread for thread_name in ('worker_thread', 'pointcloud_worker_thread')
+            if (thread := getattr(self, thread_name, None)) is not None
+        ]
+        join_workers(threads, self.get_logger())
         return super().destroy_node()
 
 
 def main() -> None:
-    rclpy.init()
-    node = TargetPointcloudMeasurementNode()
+    init_owned()
     try:
-        rclpy.spin(node)
+        node = TargetPointcloudMeasurementNode()
+    except KeyboardInterrupt:
+        rclpy.try_shutdown()
+        return
+    try:
+        spin_until_interrupted(node)
     except (KeyboardInterrupt, ExternalShutdownException):
         pass
     finally:
-        node.destroy_node()
-        if rclpy.ok():
-            rclpy.shutdown()
+        with shielded(final=True):
+            node.destroy_node()
+            rclpy.try_shutdown()
 
 
 if __name__ == '__main__':

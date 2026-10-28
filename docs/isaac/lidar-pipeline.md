@@ -48,6 +48,43 @@ the JSON alone does not change the runtime asset.
 The raw scan contract applies after assembly; diagnostic `points` topics
 contain full-circle renderer output and are not navigation scan inputs.
 
+## Gazebo parity
+
+Gazebo publishes the same two raw scans directly from `gpu_lidar` sensors in
+the Clearpath description. Its geometry, range, rate and frames match the
+table above. `patches/clearpath_ust10lx_sim_lidar.patch` supplies the
+UST-10LX values; the [dependency runbook](../project/dependencies.md#ust-10lx-gazebo-lidar-patch)
+owns that patch. The two simulators still differ in three ways:
+
+- **Range noise.** Isaac's RTX noise is Gaussian, unbiased and independent
+  per bin, but its stddev grows with range, about `0.0126 m * r^0.80`
+  (13 mm at 1 m, 38 mm at 4 m, 67 mm at 8 m). The authored
+  `rangeAccuracyM` 0.04 is a scale, not a constant 1-sigma: it is matched only
+  near 4.2 m. Gazebo's lidar noise is a single constant Gaussian stddev,
+  `GAZEBO_RANGE_NOISE_STDDEV` in `ridgeback_common.lidar_contract` (0.036 m,
+  Isaac's value at the benchmark's 3.7 m median target distance). Gazebo is
+  therefore noisier than Isaac below about 3.7 m and quieter beyond.
+- **Azimuth noise.** Gazebo has none, against Isaac's authored 0.01°. Its
+  range-equivalent effect, `r * tan(incidence) * 0.01°`, is below 2 mm on the
+  calibration walls, which is under 1% of the range variance.
+- **The 10 m edge.** Isaac drops a return whose noisy range exceeds 10 m, so the
+  bin reads `+inf`. Gazebo clamps a noisy finite return into
+  `[range_min, range_max]`, so a surface just inside 10 m can read exactly
+  10.0 m. Beams with no return stay `+inf` on both.
+
+Neither simulator quantises published ranges to `rangeResolutionM`. Gazebo's
+bridge leaves `scan_time` at 0, while the Isaac assembler sets it to 0.025 s.
+No consumer in this repository reads that field; the merger only copies it
+through.
+
+Noise changes reproducibility. This launch path sets no explicit Gazebo
+random seed, and both noisy scans and LiDAR-dependent estimates differed
+between identical examples runs. Two stationary Isaac sessions had strongly
+correlated noise at matching simulation times, but their scans were still
+different; Isaac's full benchmark determinism remains unqualified. Neither
+measured LiDAR path was bit-reproducible, so LiDAR-dependent A/B comparisons
+need repeats.
+
 ## Merger and range limits
 
 The front scan supplies the output timestamp. Static sensor poses are
@@ -123,5 +160,6 @@ hardware. Public invocation details are owned by the [README](../../README.md).
 
 ## Archived evidence
 
+- [October 25, 2026 UST-10LX noise measurement and Gazebo parity](../../archive/engineering/2026-10-25-gazebo-ust10lx-lidar.md)
 - [September 17–18, 2026 lidar and SLAM qualification](../../archive/engineering/2026-09-17-isaac-lidar-qualification.md)
 - [Invalidated July 2026 investigation](../../archive/engineering/2026-07-12-isaac-slam-investigation.md)

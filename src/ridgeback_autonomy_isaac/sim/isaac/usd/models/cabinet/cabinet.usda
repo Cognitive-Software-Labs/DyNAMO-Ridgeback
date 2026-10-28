@@ -1,0 +1,55 @@
+#usda 1.0
+(
+    defaultPrim = "cabinet"
+    metersPerUnit = 1
+    upAxis = "Z"
+)
+
+def Xform "cabinet"
+{
+    quatf xformOp:orient = (1, 0, 0, 0)
+    double3 xformOp:translate = (0, 0, 0)
+    uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient"]
+
+    def Scope "Looks"
+    {
+        def Material "mat_000"
+        {
+            token outputs:surface.connect = </cabinet/Looks/mat_000/shader.outputs:surface>
+
+            def Shader "shader"
+            {
+                uniform token info:id = "UsdPreviewSurface"
+                color3f inputs:diffuseColor = (0.62, 0.66, 0.72)
+                color3f inputs:emissiveColor = (0, 0, 0)
+                float inputs:roughness = 1
+                token outputs:surface
+            }
+        }
+    }
+
+    def Cube "visual_0" (
+        prepend apiSchemas = ["MaterialBindingAPI"]
+    )
+    {
+        rel material:binding = </cabinet/Looks/mat_000>
+        double size = 1
+        quatf xformOp:orient = (1, 0, 0, 0)
+        float3 xformOp:scale = (0.5, 0.9, 1.2)
+        double3 xformOp:translate = (0, 0, 0.6)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient", "xformOp:scale"]
+    }
+
+    def Cube "collision_0" (
+        prepend apiSchemas = ["PhysicsCollisionAPI"]
+    )
+    {
+        uniform token purpose = "guide"
+        double size = 1
+        token visibility = "invisible"
+        quatf xformOp:orient = (1, 0, 0, 0)
+        float3 xformOp:scale = (0.5, 0.9, 1.2)
+        double3 xformOp:translate = (0, 0, 0.6)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient", "xformOp:scale"]
+    }
+}

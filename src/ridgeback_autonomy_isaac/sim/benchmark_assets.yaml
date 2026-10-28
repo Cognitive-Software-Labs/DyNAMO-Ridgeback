@@ -1,0 +1,47 @@
+# Isaac resources for the logical names used by target-distance benchmark
+# scenarios. Paths are relative to this file.
+#
+# The public world keeps its Gazebo name; g1_distance_calibration is Isaac's
+# stage of the same geometry. Resources spawn at the literal requested height,
+# as in Gazebo: g1.usda puts its origin at ground contact, and the default
+# spawn_z_m of 0.0 leaves it 5 cm into the 0.05 m floor exactly where the
+# Gazebo model stands.
+#
+schema: ridgeback_benchmark_assets/1
+
+worlds:
+  target_distance_calibration:
+    native_name: g1_distance_calibration
+    resource: isaac/usd/worlds/g1_distance_calibration.usda
+    format: usd
+
+targets:
+  g1:
+    resource: isaac/usd/models/g1/g1.usda
+    format: usd
+
+objects:
+  cabinet:
+    resource: isaac/usd/models/cabinet/cabinet.usda
+    format: usd
+  cabinet_tall:
+    resource: isaac/usd/models/cabinet_tall/cabinet_tall.usda
+    format: usd
+  hospital_bed:
+    resource: isaac/usd/models/hospital_bed/hospital_bed.usda
+    format: usd
+  hospital_bed_high:
+    resource: isaac/usd/models/hospital_bed_high/hospital_bed_high.usda
+    format: usd
+  iv_pole:
+    resource: isaac/usd/models/iv_pole/iv_pole.usda
+    format: usd
+  privacy_curtain:
+    resource: isaac/usd/models/privacy_curtain/privacy_curtain.usda
+    format: usd
+  table:
+    resource: isaac/usd/models/table/table.usda
+    format: usd
+  table_low:
+    resource: isaac/usd/models/table_low/table_low.usda
+    format: usd

@@ -35,6 +35,9 @@ src/clearpath_msgs/
 src/clearpath_simulator/
 src/slam_toolbox/
 src/urg_node/
+src/gz-sim/
+src/ros_gz/
+src/rviz/
 
 # patches directory contains upstream diffs, not project code
 patches/

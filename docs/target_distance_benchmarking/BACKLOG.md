@@ -161,24 +161,29 @@ dry run has no launch/cleanup side effects and existing offline workflows remain
 intact. Record the lifecycle evidence in the qualified environment and update
 operator guidance. UI availability does not itself qualify benchmark results.
 
-## Deferred: Isaac target-distance benchmark port
+## Benchmark shutdown qualification
 
-**Status.** Deferred (former P6); this records scope, not approval to implement.
-The target-distance benchmark still requires Gazebo-specific entity control.
+**Status.** Configuration-first ownership is implemented for single runs and
+sweeps. The [shutdown plan](../plans/BENCHMARKING_shutdown_lifecycle.md) owns the
+remaining qualification and dependency investigations.
 
-**Scope if resumed.** Replace Gazebo CLI spawn/remove/pose plumbing with a
-backend interface and Isaac simulation-control services. Preserve the current
-scenario schema, registered estimators, layered replay and configurator.
-Forward backend selection and Isaac arguments through the benchmark environment
-launch; cover process startup and teardown for both backends.
+**Gap.** The RViz DDS unload crash has a reproduced view-controller ownership
+defect and passing ownership regression. Its first traced active Isaac stop is
+clean at the application boundary; the strict whole-process matrix stopped on
+unexplained SDK startup exit/termination outcomes; environment-only Isaac
+scan captures on 2026-10-25 also escalated to SIGTERM/SIGKILL after
+`RUNNER EXIT` (`artifacts/benchmarks/ust10lx_review_20261025_base_39fb8c1/`).
+The rare image-bridge teardown failure and safe provider destruction with
+outstanding blocking scene requests also remain open. Application shutdown and complete SDK qualification are
+separate outcomes.
 
-**Acceptance.** An Isaac run with all registered estimators and one repeat
-completes the configured scenes, comparison report and collages; estimates are
-compared against a current matching Gazebo baseline, and repeated cleanup leaves
-no residual prims. Historical geometry-dependent numbers are not acceptance evidence.
-
-**Context.** [Target-distance benchmarking](overview.md).
+**Completion criteria.** Preserve reproducible failing schedules and corrected
+behavior for each remaining signature, then exercise startup, normal completion,
+mid-trial cancellation, pending scene requests, repeated interrupts, and child
+failure on both backends. Record child exits, escalation, cleanup outcomes, and
+owned leftovers separately from saved measurements.
 
 ## Archived evidence
 
+- [Gazebo and Isaac backend qualification](../../archive/engineering/2026-10-26-benchmark-gazebo-isaac-qualification.md)
 - [Layered replay implementation and preliminary storage evidence](../../archive/engineering/layered_replay_implementation_validation.md)
