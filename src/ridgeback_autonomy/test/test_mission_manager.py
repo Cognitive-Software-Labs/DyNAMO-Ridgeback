@@ -603,9 +603,10 @@ def test_state_diagnostics_identify_non_driving_phase(manager_factory):
     assert payload['start_pose_saved'] is True
 
 
-def test_no_return_or_mission_complete_states_exist_in_phase_2d():
-    assert 'RETURNING_TO_START' not in MissionState.__members__
-    assert 'MISSION_COMPLETE' not in MissionState.__members__
+def test_parking_navigation_and_return_are_opt_in(manager_factory):
+    manager = manager_factory()
+    assert manager.parking_navigation_enabled is False
+    assert manager.execution.enabled is False
 
 
 # Final localization sample time; map/TF must not be dated after planning.

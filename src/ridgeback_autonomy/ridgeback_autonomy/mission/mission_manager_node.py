@@ -1,17 +1,20 @@
 #!/usr/bin/env python3
-"""Non-driving mission coordinator: detection, handoff, localization, parking plan.
+"""Mission coordinator: detection, handoff, localization, parking plan and drive.
 
 After physical settlement and localization, the manager evaluates a bounded
 set of global paths and stops in ``PARKING_PATH_FEASIBLE`` or a failure state.
-Parking execution preparation is opt-in and fails closed without externally
-verified safety interlocks and separate stage paths. No automatic navigation
-or return motion is started by this node.
+With ``parking_navigation_enabled`` (off by default; simulation launch only) it
+then completes the original mission: pre-parking pose, final parking pose,
+stop and wait, return to the saved start pose. Navigation failures return the
+robot to the start pose, as the original mission did. The guarded
+``ParkingExecutor`` remains a separate, disabled hardware path.
 """
 
 from __future__ import annotations
 
 import ast
 from collections import OrderedDict
+from copy import deepcopy
 from dataclasses import dataclass, replace
 from enum import Enum
 import json
@@ -31,7 +34,8 @@ from action_msgs.msg import GoalStatus, GoalStatusArray
 from clearpath_platform_msgs.msg import StopStatus
 from controller_manager_msgs.srv import ListControllers
 from lifecycle_msgs.srv import GetState
-from rcl_interfaces.srv import GetParameters
+from rcl_interfaces.msg import Parameter, ParameterType, ParameterValue
+from rcl_interfaces.srv import GetParameters, SetParameters
 from rclpy.action import ActionClient
 from rclpy.clock import Clock, ClockType
 from rclpy.executors import ExternalShutdownException
@@ -63,9 +67,12 @@ from ridgeback_autonomy.mission.parking_planner import (
     ParkingPlan,
     PlannerConfig,
     TargetReference,
+    footprint_rejection_reason,
     plan_parking,
+    points_to_polygon_distance,
     validate_inputs,
 )
+from ridgeback_autonomy.mission.parking_geometry import preparking_pose, rotated_footprint_vertices
 from ridgeback_autonomy.mission.parking_visualization import clear_markers, plan_markers
 from ridgeback_autonomy.mission.motion_settlement import MotionSettlement
 from ridgeback_autonomy.mission.parking_feasibility import (
@@ -98,8 +105,22 @@ class MissionState(Enum):
     PARKING_PATH_FEASIBLE = 'parking_path_feasible'
     PARKING_PLANNING_FAILED = 'parking_planning_failed'
     PARKING_EXECUTION_FAILED = 'parking_execution_failed'
+    NAVIGATING_TO_PREPARKING = 'navigating_to_preparking'
+    NAVIGATING_TO_PARKING = 'navigating_to_parking'
+    PARKED = 'parked'
+    RETURNING_TO_START = 'returning_to_start'
+    MISSION_COMPLETE = 'mission_complete'
     MISSION_FAILED = 'mission_failed'
     MISSION_CANCELED = 'mission_canceled'
+
+
+# States in which the manager owns a NavigateToPose goal or a parked stop.
+_PARKING_DRIVE_STATES = (
+    MissionState.NAVIGATING_TO_PREPARKING,
+    MissionState.NAVIGATING_TO_PARKING,
+    MissionState.PARKED,
+    MissionState.RETURNING_TO_START,
+)
 
 
 class FailureClass(Enum):
@@ -164,9 +185,19 @@ _ALLOWED_TRANSITIONS = {
         MissionState.MISSION_CANCELED},
     MissionState.PARKING_PATH_FEASIBLE: {
         MissionState.PARKING_PLANNING_FAILED, MissionState.PARKING_EXECUTION_FAILED,
-        MissionState.MISSION_CANCELED},
+        MissionState.NAVIGATING_TO_PREPARKING, MissionState.MISSION_CANCELED},
     MissionState.PARKING_PLANNING_FAILED: set(),
     MissionState.PARKING_EXECUTION_FAILED: {MissionState.MISSION_CANCELED},
+    MissionState.NAVIGATING_TO_PREPARKING: {
+        MissionState.NAVIGATING_TO_PARKING, MissionState.RETURNING_TO_START,
+        MissionState.MISSION_CANCELED},
+    MissionState.NAVIGATING_TO_PARKING: {
+        MissionState.PARKED, MissionState.RETURNING_TO_START, MissionState.MISSION_CANCELED},
+    MissionState.PARKED: {MissionState.RETURNING_TO_START, MissionState.MISSION_CANCELED},
+    MissionState.RETURNING_TO_START: {
+        MissionState.MISSION_COMPLETE, MissionState.MISSION_FAILED,
+        MissionState.MISSION_CANCELED},
+    MissionState.MISSION_COMPLETE: set(),
     MissionState.MISSION_FAILED: set(),
     MissionState.MISSION_CANCELED: set(),
 }
@@ -182,6 +213,7 @@ class MissionManagerNode(Node):
         pause_client=None,
         compute_path_client=None,
         navigation_client=None,
+        goal_checker_client=None,
         monotonic=time.monotonic,
         parameter_overrides=None,
     ) -> None:
@@ -233,6 +265,11 @@ class MissionManagerNode(Node):
         self.declare_parameter('preparking_offset_m', 0.50)
         self.declare_parameter('parking_navigation_timeout_s', 90.0)
         self.declare_parameter('parking_progress_timeout_s', 20.0)
+        # Original mission tail: pre-parking, final pose, wait, return to start.
+        self.declare_parameter('parking_navigation_enabled', False)
+        self.declare_parameter('parking_wait_s', 5.0)
+        self.declare_parameter('return_navigation_timeout_s', 300.0)
+        self.declare_parameter('goal_checker_plugin', 'general_goal_checker')
 
         self.map_frame = str(self.get_parameter('map_frame').value).strip()
         self.base_frame = str(self.get_parameter('robot_base_frame').value).strip()
@@ -307,8 +344,21 @@ class MissionManagerNode(Node):
         if not 1 <= self.path_candidates_per_class <= 12:
             raise ValueError('parking_path_candidates_per_class must be within [1, 12]')
         with open(str(self.get_parameter('nav2_params_path').value), encoding='utf-8') as stream:
-            planner_params = yaml.safe_load(stream)['planner_server']['ros__parameters']
-        self.planner_id = planner_params['planner_plugins'][0]
+            nav2_params = yaml.safe_load(stream)
+        self.planner_id = nav2_params['planner_server']['ros__parameters']['planner_plugins'][0]
+        self.parking_navigation_enabled = bool(
+            self.get_parameter('parking_navigation_enabled').value)
+        self.goal_checker_plugin = str(self.get_parameter('goal_checker_plugin').value)
+        shared_checker = nav2_params['controller_server']['ros__parameters'][self.goal_checker_plugin]
+        # Restored after the parking legs so exploration/return keep the shared tuning.
+        self._shared_goal_tolerance = (float(shared_checker['xy_goal_tolerance']),
+                                       float(shared_checker['yaw_goal_tolerance']))
+        for name in ('parking_wait_s', 'return_navigation_timeout_s',
+                     'parking_navigation_timeout_s'):
+            value = float(self.get_parameter(name).value)
+            if not math.isfinite(value) or value <= 0.0:
+                raise ValueError(f'{name} must be finite and positive')
+            setattr(self, name, value)
 
         self.tf_buffer = tf_buffer if tf_buffer is not None else Buffer(node=self)
         self.tf_listener = (
@@ -464,6 +514,16 @@ class MissionManagerNode(Node):
         self._last_probe_s = -math.inf
         self.collision_subscription = self.create_subscription(
             CollisionMonitorState, 'collision_monitor_state', self._on_collision_state, 10)
+        self._goal_checker_set_client = (
+            goal_checker_client if goal_checker_client is not None
+            else self.create_client(SetParameters, 'controller_server/set_parameters'))
+        self._nav_generation = 0
+        self._nav_handle = None
+        self._nav_deadline_s = None
+        self._nav_pending_tolerance = None
+        self._parked_settled_ns = None
+        self._parking_failure = None
+        self._arrival_errors = {}
 
         # Safety deadlines must still be polled if /clock pauses or stops.
         self.control_timer = self.create_timer(
@@ -488,6 +548,9 @@ class MissionManagerNode(Node):
             if self.execution.state not in (ExecutionState.IDLE, ExecutionState.FAILED):
                 self.execution.poll()
                 # Robot movement is expected during navigation, not frame drift.
+                return
+            if self.state in _PARKING_DRIVE_STATES:
+                self._poll_parking_navigation(now_s)
                 return
             if self.state == MissionState.SETTLING_MOTION:
                 now_ns = self.get_clock().now().nanoseconds
@@ -697,12 +760,11 @@ class MissionManagerNode(Node):
             )
             if self._transition(
                 MissionState.G1_LOCALIZED,
-                'generic target position stabilized; parking execution deferred',
+                'generic target position stabilized',
             ):
                 self.get_logger().warn(
                     'Generic target position is not a validated G1 foot midpoint; '
-                    'planning uses the larger keep-out margin and no parking or '
-                    'return goal will be sent'
+                    'planning uses the larger keep-out margin'
                 )
                 self._planning_deadline_s = self._monotonic() + self.parking_input_timeout_s
                 self.try_plan_parking(self._monotonic(), now_ns=now_ns)
@@ -722,6 +784,10 @@ class MissionManagerNode(Node):
             if not self.execution.reset():
                 self._guard_failed('mission reset', 'fresh physical stop evidence required')
                 return
+            if self.state in _PARKING_DRIVE_STATES:
+                self._stop_parking_navigation()
+            self._parking_failure = None
+            self._arrival_errors = {}
             self.stage_paths.reset()
             self.execution_safety = None
             self._execution_odometry = self._execution_odom_received_s = None
@@ -769,8 +835,11 @@ class MissionManagerNode(Node):
             if self.state in (
                 MissionState.MISSION_FAILED,
                 MissionState.MISSION_CANCELED,
+                MissionState.MISSION_COMPLETE,
             ):
                 return
+            if self.state in _PARKING_DRIVE_STATES:
+                self._stop_parking_navigation()
             self.last_issue = MissionIssue(
                 FailureClass.OPERATOR_CANCELED,
                 'operator_canceled',
@@ -1089,6 +1158,11 @@ class MissionManagerNode(Node):
             'target_source': None if position is None else position.source,
             'is_foot_midpoint': None if position is None else position.is_foot_midpoint,
             'parking_plan': self._plan_summary(),
+            'parking_mission_navigation': {
+                'enabled': self.parking_navigation_enabled,
+                'failure': self._parking_failure,
+                'arrival_errors': self._arrival_errors,
+            },
             'motion_status': self.motion.reason,
             'path_request_unresolved': self._path_busy,
         }
@@ -1209,6 +1283,19 @@ class MissionManagerNode(Node):
         return self._frame_pose(self.odom_frame, stamp if stamp is not None else
                                 Time(nanoseconds=self.get_clock().now().nanoseconds))
 
+    def _recent_map_odom(self, now_ns):
+        """map->odom at ``now_ns``, else the newest transform within the pose-age bound.
+
+        slam_toolbox may not have published a transform for the exact current
+        time yet; one such miss must not abort an otherwise valid plan.
+        """
+        pose = self._map_odom(Time(nanoseconds=now_ns))
+        if pose is None:
+            pose = self._frame_pose(self.odom_frame, Time())
+            if pose is not None and not 0 <= (now_ns - pose[3]) * 1e-9 <= self.parking_max_pose_age_s:
+                pose = None
+        return pose
+
     def _frame_pose(self, frame, stamp):
         try:
             transform = self.tf_buffer.lookup_transform(self.map_frame, frame, stamp)
@@ -1233,7 +1320,7 @@ class MissionManagerNode(Node):
                                   MissionState.SETTLING_MOTION, MissionState.LOCALIZE_G1,
                                   MissionState.G1_LOCALIZED, MissionState.PARKING_CANDIDATES_READY,
                                   MissionState.EVALUATING_PARKING_PATHS,
-                                  MissionState.PARKING_PATH_FEASIBLE):
+                                  MissionState.PARKING_PATH_FEASIBLE) + _PARKING_DRIVE_STATES:
                 return
             t = msg.twist.twist
             self.motion.observe((t.linear.x, t.linear.y, t.linear.z,
@@ -1467,7 +1554,7 @@ class MissionManagerNode(Node):
         if reasons:
             return ', '.join(reasons)
         reason = self._planning_snapshot.changed(
-            robot, self._map_odom(Time(nanoseconds=now_ns)),
+            robot, self._recent_map_odom(now_ns),
             self.parking_max_frame_shift_m, self.parking_max_frame_yaw_rad)
         if reason:
             return reason
@@ -1502,10 +1589,13 @@ class MissionManagerNode(Node):
                 self.get_logger().info(
                     f'Path-feasible parking pose selected: x={selected.base_x:.3f}, '
                     f'y={selected.base_y:.3f}, yaw={selected.yaw:.3f}, '
-                    f'path_length={selected.path_length_m:.3f} m; no navigation goal sent')
+                    f'path_length={selected.path_length_m:.3f} m')
                 self._transition(MissionState.PARKING_PATH_FEASIBLE,
-                                 'path-feasible snapshot selected; parking execution disabled')
-                self.prepare_parking_navigation()
+                                 'path-feasible snapshot selected')
+                if self.parking_navigation_enabled:
+                    self._begin_parking_navigation()
+                else:
+                    self.prepare_parking_navigation()
                 return
             if not self._path_groups:
                 self._fail_planning('bounded_search_exhausted',
@@ -1517,7 +1607,10 @@ class MissionManagerNode(Node):
         candidate = self._path_queue.pop(0)
         robot = self._current_robot_pose(with_stamp=True)
         request = ComputePathToPose.Goal()
-        request.goal = self._pose_stamped(candidate.base_x, candidate.base_y, candidate.yaw)
+        # Plan the route actually driven: Nav2 to pre-parking, then straight in.
+        request.goal = self._pose_stamped(*preparking_pose(
+            candidate.base_x, candidate.base_y, candidate.yaw,
+            self.execution.limits.preparking_offset_m))
         request.start = self._pose_stamped(*robot[:3])
         request.use_start = True
         request.planner_id = self.planner_id
@@ -1597,25 +1690,33 @@ class MissionManagerNode(Node):
                 return
             result = wrapped.result
             reason = None
+            route = None
             if wrapped.status != GoalStatus.STATUS_SUCCEEDED or result.error_code != 0:
                 reason = f'nav2_status_{wrapped.status}_error_{result.error_code}: {result.error_msg}'
+            elif not result.path.poses:
+                reason = 'empty_path'
             else:
+                # Append the straight final approach so the swept-footprint and
+                # keep-out checks cover the whole driven route to the parking pose.
+                route = deepcopy(result.path)
+                route.poses.append(self._pose_stamped(candidate.base_x, candidate.base_y,
+                                                      candidate.yaw))
                 grid = GridSnapshot.from_msg(self.latest_map)
                 path_stamp = Time.from_msg(result.path.header.stamp).nanoseconds
                 now = self.get_clock().now().nanoseconds
                 if path_stamp > now or now - path_stamp > int(self.parking_max_pose_age_s * 1e9):
                     reason = 'path_timestamp'
                 else:
-                    reason = path_rejection(result.path, candidate, robot, grid, self.parking_plan.target,
+                    reason = path_rejection(route, candidate, robot, grid, self.parking_plan.target,
                                             self.planner_config, self.parking_plan.keepout_radius_m)
             candidate.path_status = 'rejected' if reason else 'valid'
             candidate.path_reason = reason
             if reason:
                 self.get_logger().info(f'Parking path rejected: {reason}')
             else:
-                candidate.path_length_m = path_length(result.path)
+                candidate.path_length_m = path_length(route)
                 self._path_valid.append(candidate)
-                self._paths[id(candidate)] = result.path
+                self._paths[id(candidate)] = route
             self._publish_parking_markers()
             # The existing control timer sends the next request: no callback recursion.
 
@@ -1634,10 +1735,253 @@ class MissionManagerNode(Node):
 
     def destroy_node(self):
         self._invalidate_path_requests()
+        if self.state in _PARKING_DRIVE_STATES:
+            self._stop_parking_navigation()
         self.stage_paths.cancel('manager_shutdown')
         if self.execution.busy:
             self.execution.cancel('manager_shutdown')
         return super().destroy_node()
+
+    # Original mission tail: pre-parking -> final -> stop and wait -> return to start.
+
+    def _begin_parking_navigation(self):
+        self._transition(MissionState.NAVIGATING_TO_PREPARKING,
+                         'path-feasible parking pose selected; parking navigation enabled')
+        # The original parked with a 0.08 m / 0.12 rad goal checker; the shared
+        # profile is far looser, so tighten it for the two parking legs only.
+        limits = self.execution.limits
+        self._set_goal_tolerance((limits.xy_tolerance_m, limits.yaw_tolerance_rad),
+                                 self._send_preparking_goal)
+
+    def _send_preparking_goal(self, ok):
+        if not ok:
+            self._parking_navigation_failed('goal_checker_tolerance_not_applied')
+            return
+        sel = self.parking_plan.selected
+        pose = preparking_pose(sel.base_x, sel.base_y, sel.yaw,
+                               self.execution.limits.preparking_offset_m)
+        self._send_navigation_goal(pose, self.parking_navigation_timeout_s)
+
+    def _set_goal_tolerance(self, tolerance, on_done):
+        """Set the controller's goal checker; ``on_done(ok)`` runs for the current request only."""
+        self._nav_generation += 1
+        generation, state = self._nav_generation, self.state
+        if not self._goal_checker_set_client.service_is_ready():
+            on_done(False)
+            return
+        request = SetParameters.Request()
+        request.parameters = [
+            Parameter(name=f'{self.goal_checker_plugin}.{name}', value=ParameterValue(
+                type=ParameterType.PARAMETER_DOUBLE, double_value=float(value)))
+            for name, value in zip(('xy_goal_tolerance', 'yaw_goal_tolerance'), tolerance)]
+        self._nav_deadline_s = self._monotonic() + 5.0
+        self._nav_pending_tolerance = on_done
+
+        def done(future):
+            with self._lock:
+                if generation != self._nav_generation or self.state != state:
+                    return
+                self._nav_pending_tolerance = None
+                try:
+                    ok = all(result.successful for result in future.result().results)
+                except Exception:
+                    ok = False
+                on_done(ok)
+
+        self._goal_checker_set_client.call_async(request).add_done_callback(done)
+
+    def _send_navigation_goal(self, pose, timeout_s):
+        if not self.navigation_client.server_is_ready():
+            self._navigation_finished(False, 'navigate_to_pose server unavailable')
+            return
+        goal = NavigateToPose.Goal()
+        goal.pose = self._pose_stamped(*pose)
+        self._nav_generation += 1
+        generation = self._nav_generation
+        self._nav_handle = None
+        self._nav_deadline_s = self._monotonic() + timeout_s
+        self.get_logger().info(f'{self.state.name}: NavigateToPose x={pose[0]:.3f}, '
+                               f'y={pose[1]:.3f}, yaw={pose[2]:.3f}')
+        try:
+            future = self.navigation_client.send_goal_async(goal)
+        except Exception as exc:
+            self._navigation_finished(False, f'goal transport failed: {exc}')
+            return
+        future.add_done_callback(lambda f: self._navigation_accepted(f, generation))
+
+    def _navigation_accepted(self, future, generation):
+        with self._lock:
+            try:
+                handle = future.result()
+            except Exception:
+                handle = None
+            if generation != self._nav_generation:
+                if handle is not None and handle.accepted:
+                    handle.cancel_goal_async()   # superseded while acceptance was pending
+                return
+            if handle is None or not handle.accepted:
+                self._navigation_finished(False, 'goal rejected')
+                return
+            self._nav_handle = handle
+            handle.get_result_async().add_done_callback(
+                lambda f: self._navigation_result(f, generation))
+
+    def _navigation_result(self, future, generation):
+        with self._lock:
+            if generation != self._nav_generation:
+                return
+            self._nav_handle = self._nav_deadline_s = None
+            try:
+                wrapped = future.result()
+                ok = (wrapped.status == GoalStatus.STATUS_SUCCEEDED
+                      and wrapped.result.error_code == 0)
+                detail = (f'status={wrapped.status}, error_code={wrapped.result.error_code}, '
+                          f'{wrapped.result.error_msg}')
+            except Exception as exc:
+                ok, detail = False, f'result unavailable: {exc}'
+            self._navigation_finished(ok, detail)
+
+    def _navigation_finished(self, ok, detail):
+        sel = self.parking_plan.selected if self.parking_plan is not None else None
+        if self.state == MissionState.NAVIGATING_TO_PREPARKING:
+            if not ok:
+                self._parking_navigation_failed(f'preparking_navigation_failed: {detail}')
+                return
+            self._record_arrival('preparking', preparking_pose(
+                sel.base_x, sel.base_y, sel.yaw, self.execution.limits.preparking_offset_m))
+            reason = self._final_pose_reason()
+            if reason:
+                self._parking_navigation_failed(f'final_pose_invalid: {reason}')
+                return
+            self._transition(MissionState.NAVIGATING_TO_PARKING, 'pre-parking pose reached')
+            self._send_navigation_goal((sel.base_x, sel.base_y, sel.yaw),
+                                       self.parking_navigation_timeout_s)
+        elif self.state == MissionState.NAVIGATING_TO_PARKING:
+            if not ok:
+                self._parking_navigation_failed(f'parking_navigation_failed: {detail}')
+                return
+            self._record_arrival('parking', (sel.base_x, sel.base_y, sel.yaw))
+            # Require fresh evidence that the robot has stopped before the wait.
+            self.motion.reset()
+            self._parked_settled_ns = None
+            self._nav_deadline_s = self._monotonic() + self.motion_settlement_timeout_s
+            self._transition(MissionState.PARKED, 'final parking pose reached; waiting for stop')
+        elif self.state == MissionState.RETURNING_TO_START:
+            if ok:
+                start = self.start_pose.pose
+                self._record_arrival('start', (start.position.x, start.position.y,
+                                               _yaw(start.orientation)))
+                if self._parking_failure is None:
+                    self._transition(MissionState.MISSION_COMPLETE, 'returned to start pose')
+                    return
+                self.last_issue = MissionIssue(FailureClass.TERMINAL, 'parking_failed',
+                                               self._parking_failure)
+                self._transition(MissionState.MISSION_FAILED,
+                                 f'returned to start after: {self._parking_failure}')
+            else:
+                self.last_issue = MissionIssue(FailureClass.TERMINAL,
+                                               'return_navigation_failed', detail)
+                self._transition(MissionState.MISSION_FAILED, f'return to start failed: {detail}')
+
+    def _poll_parking_navigation(self, now_s):
+        if self.state == MissionState.PARKED and self._parked_settled_ns is not None:
+            now_ns = self.get_clock().now().nanoseconds
+            if (now_ns - self._parked_settled_ns) * 1e-9 >= self.parking_wait_s:
+                self._start_return('parking wait completed')
+            return
+        if self.state == MissionState.PARKED and self.motion.ready(
+                self.get_clock().now().nanoseconds, now_s):
+            self._parked_settled_ns = self.get_clock().now().nanoseconds
+            self._nav_deadline_s = None
+            self.get_logger().info(f'Parked and stopped; waiting {self.parking_wait_s:.1f} s')
+            self._publish_state('parked and stopped', event='parking_wait')
+            return
+        if self._nav_deadline_s is None or now_s < self._nav_deadline_s:
+            return
+        if self._nav_pending_tolerance is not None:
+            on_done, self._nav_pending_tolerance = self._nav_pending_tolerance, None
+            self._nav_generation += 1   # ignore a late parameter response
+            on_done(False)
+            return
+        detail = f'{self.state.name} deadline expired'
+        self._cancel_navigation_goal()
+        if self.state == MissionState.RETURNING_TO_START:
+            self._navigation_finished(False, detail)
+        else:
+            self._parking_navigation_failed(detail)
+
+    def _parking_navigation_failed(self, reason):
+        self.get_logger().error(f'Parking failed: {reason}; returning to start')
+        self._parking_failure = reason
+        self._start_return(reason)
+
+    def _start_return(self, reason):
+        self._transition(MissionState.RETURNING_TO_START, reason)
+        self._set_goal_tolerance(self._shared_goal_tolerance, self._send_return_goal)
+
+    def _send_return_goal(self, ok):
+        if not ok:
+            # Returning with the tighter parking tolerance is slower, not unsafe.
+            self.get_logger().warning('Shared goal tolerance not restored before return')
+        start = self.start_pose.pose
+        self._send_navigation_goal(
+            (start.position.x, start.position.y, _yaw(start.orientation)),
+            self.return_navigation_timeout_s)
+
+    def _cancel_navigation_goal(self):
+        self._nav_generation += 1
+        handle, self._nav_handle = self._nav_handle, None
+        self._nav_deadline_s = self._nav_pending_tolerance = None
+        if handle is not None:
+            try:
+                handle.cancel_goal_async()
+            except Exception as exc:
+                self.get_logger().error(f'Parking navigation cancel unresolved: {exc}')
+
+    def _stop_parking_navigation(self):
+        """Cancel the owned goal and restore the shared goal checker (cancel/reset/shutdown)."""
+        self._cancel_navigation_goal()
+        if self._goal_checker_set_client.service_is_ready():
+            self._set_goal_tolerance(self._shared_goal_tolerance, lambda ok: None)
+
+    def _final_pose_reason(self):
+        """Recheck the final footprint and G1 keep-out against the latest map before driving.
+
+        G1 is not re-observed while driving, so the localized target keeps its
+        planning timestamp; map and robot pose must still be fresh.
+        """
+        plan = self.parking_plan
+        sel = plan.selected
+        try:
+            grid = None if self.latest_map is None else GridSnapshot.from_msg(self.latest_map)
+        except ValueError as exc:
+            return f'map_invalid: {exc}'
+        reasons = validate_inputs(plan.target, grid, self._current_robot_pose(with_stamp=True),
+                                  now_ns=self.get_clock().now().nanoseconds,
+                                  map_frame=self.map_frame, max_target_age_s=math.inf,
+                                  max_map_age_s=self.parking_max_map_age_s,
+                                  max_pose_age_s=self.parking_max_pose_age_s,
+                                  clock_skew_s=0.1)
+        if reasons:
+            return ', '.join(reasons)
+        polygon = rotated_footprint_vertices(self.planner_config.footprint,
+                                             sel.base_x, sel.base_y, sel.yaw)
+        reason = footprint_rejection_reason(polygon, grid, self.planner_config.occupied_threshold)
+        if reason:
+            return f'footprint_{reason}'
+        if points_to_polygon_distance([plan.target.x], [plan.target.y], polygon)[0] \
+                < plan.keepout_radius_m:
+            return 'g1_keepout'
+        return None
+
+    def _record_arrival(self, label, goal):
+        robot = self._current_robot_pose()
+        if robot is None:
+            return
+        xy = math.hypot(robot[0] - goal[0], robot[1] - goal[1])
+        yaw = abs(math.atan2(math.sin(robot[2] - goal[2]), math.cos(robot[2] - goal[2])))
+        self._arrival_errors[label] = {'xy_m': round(xy, 3), 'yaw_rad': round(yaw, 3)}
+        self.get_logger().info(f'Arrived at {label}: error xy={xy:.3f} m, yaw={yaw:.3f} rad')
 
     def _plan_summary(self):
         plan = self.parking_plan
@@ -1668,6 +2012,10 @@ class MissionManagerNode(Node):
 
     def _on_guard_status(self, msg: String) -> None:
         self.process_guard_status(msg)
+
+
+def _yaw(q) -> float:
+    return math.atan2(2.0 * (q.w * q.z + q.x * q.y), 1.0 - 2.0 * (q.y * q.y + q.z * q.z))
 
 
 def load_nav2_footprint(nav2_params_path: str) -> list[tuple[float, float]]:

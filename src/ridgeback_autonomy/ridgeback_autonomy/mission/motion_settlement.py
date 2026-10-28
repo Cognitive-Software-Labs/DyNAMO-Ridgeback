@@ -10,6 +10,9 @@ class MotionSettlement:
     angular_limit: float = 0.005
     stable_s: float = 2.0
     max_age_s: float = 0.5
+    # A subscriber's sim-time clock can trail the odometry stamp by a clock
+    # message interval; only stamps further ahead than this are invalid.
+    clock_skew_s: float = 0.1
     reason: str = 'odometry_missing'
 
     def __post_init__(self):
@@ -27,7 +30,7 @@ class MotionSettlement:
             reason = 'odometry_frame'
         elif not all(math.isfinite(v) for v in velocities):
             reason = 'odometry_nonfinite'
-        elif stamp_ns <= 0 or stamp_ns > now_ns:
+        elif stamp_ns <= 0 or (stamp_ns - now_ns) * 1e-9 > self.clock_skew_s:
             reason = 'odometry_timestamp'
         elif (now_ns - stamp_ns) * 1e-9 > self.max_age_s:
             reason = 'odometry_stale'
@@ -48,7 +51,8 @@ class MotionSettlement:
     def ready(self, now_ns, wall_s):
         if not hasattr(self, 'last_ns') or self.last_ns is None:
             return False
-        if (now_ns < self.last_ns or (now_ns - self.last_ns) * 1e-9 > self.max_age_s
+        if ((self.last_ns - now_ns) * 1e-9 > self.clock_skew_s
+                or (now_ns - self.last_ns) * 1e-9 > self.max_age_s
                 or wall_s - self.last_wall > self.max_age_s):
             self.reset()
             self.reason = 'odometry_stale'

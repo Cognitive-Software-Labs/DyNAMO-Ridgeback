@@ -1,7 +1,7 @@
-"""Gazebo/Isaac integration launch for the parking mission prefix.
+"""Gazebo/Isaac integration launch for the parking mission.
 
 Frontier motion is off unless ``exploration_enabled`` is set; the mission
-manager itself never drives. The wrapper reuses the complete exploration
+manager drives only with ``parking_navigation_enabled``. The wrapper reuses the complete exploration
 bringup and adds exactly one Phase 2D mission manager when enabled.
 Exploration starts the production explorer and its MissionGuard, which own
 ``mission/pause`` and active-goal cancellation. The optional stationary
@@ -107,6 +107,12 @@ def generate_launch_description():
             description='Observed TF base frame; independent of ROS namespace'),
         DeclareLaunchArgument('handoff_timeout_s', default_value='10.0'),
         DeclareLaunchArgument('target_localization_timeout_s', default_value='5.0'),
+        DeclareLaunchArgument(
+            'parking_navigation_enabled', default_value='false',
+            choices=['true', 'false'],
+            description=(
+                'After a path-feasible parking pose: drive to pre-parking and the '
+                'final pose, wait, and return to the start pose')),
 
         # Evaluated before the include: its launch arguments are set in this
         # context, so afterwards exploration_rviz would always read 'false'.
@@ -162,6 +168,7 @@ def generate_launch_description():
                 'handoff_timeout_s': LaunchConfiguration('handoff_timeout_s'),
                 'target_localization_timeout_s': LaunchConfiguration(
                     'target_localization_timeout_s'),
+                'parking_navigation_enabled': LaunchConfiguration('parking_navigation_enabled'),
             }],
             remappings=[('/tf', 'tf'), ('/tf_static', 'tf_static')],
             output='screen',

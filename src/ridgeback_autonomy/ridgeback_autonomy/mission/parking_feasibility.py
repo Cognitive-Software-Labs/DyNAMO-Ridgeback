@@ -29,8 +29,9 @@ def candidate_groups(plan, approach, per_class=6):
     """At most six spatially diverse geometrically valid goals per priority.
 
     Use the existing reach/clearance tiers to order each class. Cover angular
-    sectors first, including outer-reach alternatives where full-footprint
-    turns can fit. Then fill spare slots in geometric order.
+    sectors first with each sector's best-ranked candidate (the route is checked
+    via the pre-parking pose and a straight approach, so outer-reach poses gain
+    no turning room). Then fill spare slots in geometric order.
     Exhaustion of this subset is not proof that the entire annulus is blocked.
     """
     groups = []
@@ -50,7 +51,7 @@ def candidate_groups(plan, approach, per_class=6):
         for c in ordered:
             angle = math.atan2(c.task_y - plan.target.y, c.task_x - plan.target.x)
             sectors.setdefault(math.floor(angle / (math.pi / 4)), []).append(c)
-        chosen = [max(bucket, key=lambda c: c.reach_m) for bucket in sectors.values()][:per_class]
+        chosen = [bucket[0] for bucket in sectors.values()][:per_class]
         chosen += [c for c in ordered if all(c is not a for a in chosen)][:per_class - len(chosen)]
         if chosen:
             groups.append(chosen)

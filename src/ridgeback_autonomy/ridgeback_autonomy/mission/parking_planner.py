@@ -220,9 +220,14 @@ def validate_inputs(
     max_target_age_s: float,
     max_map_age_s: float,
     max_pose_age_s: float,
+    clock_skew_s: float = 0.0,
 ) -> list[str]:
-    """Reasons the inputs are unusable; empty when planning may proceed."""
+    """Reasons the inputs are unusable; empty when planning may proceed.
 
+    ``clock_skew_s`` tolerates sources stamped slightly ahead of this node's clock.
+    """
+
+    future_ns = now_ns + int(clock_skew_s * 1e9)
     reasons = []
     if target is None:
         reasons.append('target_unavailable')
@@ -233,7 +238,7 @@ def validate_inputs(
             reasons.append('target_nonfinite')
         if (now_ns - target.stamp_ns) * 1e-9 > max_target_age_s:
             reasons.append('target_stale')
-        if target.stamp_ns > now_ns:
+        if target.stamp_ns > future_ns:
             reasons.append('target_from_future')
     if grid is None:
         reasons.append('map_unavailable')
@@ -244,7 +249,7 @@ def validate_inputs(
             reasons.append('map_empty')
         if (now_ns - grid.stamp_ns) * 1e-9 > max_map_age_s:
             reasons.append('map_stale')
-        if grid.stamp_ns > now_ns:
+        if grid.stamp_ns > future_ns:
             reasons.append('map_from_future')
     if robot_pose is None:
         reasons.append('robot_pose_unavailable')
@@ -253,7 +258,7 @@ def validate_inputs(
             reasons.append('robot_pose_nonfinite')
         if (now_ns - robot_pose[3]) * 1e-9 > max_pose_age_s:
             reasons.append('robot_pose_stale')
-        if robot_pose[3] > now_ns:
+        if robot_pose[3] > future_ns:
             reasons.append('robot_pose_from_future')
     return reasons
 

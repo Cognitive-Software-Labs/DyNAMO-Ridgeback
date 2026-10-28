@@ -56,7 +56,7 @@ def test_bad_odometry_resets_evidence(problem, reason):
     stamp = ns + 100_000_000
     now = stamp
     if problem == 'old': now += 600_000_000
-    if problem == 'future': now -= 1
+    if problem == 'future': now -= 100_000_001   # beyond the sim-clock skew allowance
     if problem == 'repeat': stamp = ns
     m.observe(v, stamp, now, wall + .1, frame_valid=problem != 'frame')
     assert not m.ready(now, wall + .1)
@@ -426,3 +426,25 @@ def test_safety_polling_uses_steady_clock_and_missing_server_times_out(manager_f
     m.tick()
     assert m.state == MissionState.PARKING_PLANNING_FAILED
     assert m.parking_plan.selected is None
+
+
+def test_groups_take_each_sectors_best_reach_not_the_outer_edge():
+    from ridgeback_autonomy.mission.parking_planner import plan_parking, preference
+    plan = plan_parking(grid(), target(), CONFIG, APPROACH_FROM_WEST)
+    t = plan.target
+    sector = lambda c: math.floor(math.atan2(c.task_y - t.y, c.task_x - t.x) / (math.pi / 4))
+    rank = lambda c: preference(c.task_x, c.task_y, t, APPROACH_FROM_WEST)[0]
+    valid = [c for c in plan.candidates if c.status in ('valid', 'selected')]
+    for group in candidate_groups(plan, APPROACH_FROM_WEST):
+        for key in {sector(c) for c in group}:
+            picked = min(c.reach_error_m for c in group if sector(c) == key)
+            best = min(c.reach_error_m for c in valid
+                       if sector(c) == key and rank(c) == rank(group[0]))
+            assert picked <= best + plan.resolution_m
+
+
+def test_sim_clock_lagging_odometry_by_a_few_ms_keeps_evidence():
+    m = MotionSettlement()
+    ns, wall = stopped(m)
+    m.observe((0.,) * 6, ns + 100_000_000, ns + 95_000_000, wall + .1)
+    assert m.ready(ns + 95_000_000, wall + .1)
