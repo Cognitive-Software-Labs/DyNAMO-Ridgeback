@@ -1,7 +1,11 @@
-"""RViz markers for a non-driving plan: occupancy and footprint validity layers.
+"""RViz markers for a non-driving plan: radial donut lines and candidate validity.
 
-Green rays/cells mean free occupancy; green candidate points also passed the
-footprint and keep-out checks. Neither layer certifies Nav2 path reachability.
+The donut is drawn as 360 radial lines at 1-degree steps, each split where the
+planner's classification of the cells it crosses changes: green where a parking
+pose with its task point there passed the footprint, keep-out and reach-budget
+checks, red where the line crosses an obstacle, orange where the map is unknown,
+grey on free floor where the parked footprint would fail. Green candidate points
+mean the same footprint validity. Neither layer certifies Nav2 path reachability.
 
 Every array starts with a DELETEALL marker so a new plan, a failed plan or a
 reset never leaves geometry from an earlier target on screen.
@@ -25,7 +29,9 @@ UNKNOWN_RED = (1.0, 0.35, 0.0, 0.8)   # original: unknown in an orange-red shade
 REJECTED = (1.0, 0.78, 0.05, 0.9)     # original "rejected" amber for non-collision reasons
 SELECTED = (0.0, 0.6, 1.0, 1.0)
 G1_COLOR = (0.8, 0.2, 0.9, 1.0)
-RAY_COLORS = {'free': GREEN, 'occupied': RED, 'unknown': UNKNOWN_RED, 'out_of_bounds': UNKNOWN_RED}
+POSE_INVALID = (0.55, 0.55, 0.55, 0.7)  # free floor, but no valid parking pose there
+# Marker id per radial class: one LINE_LIST each so RViz can toggle them.
+RAY_CLASSES = (('valid', GREEN), ('occupied', RED), ('unknown', UNKNOWN_RED), ('pose_invalid', POSE_INVALID))
 CIRCLE_SEGMENTS = 72  # the original donut outline resolution
 
 
@@ -64,7 +70,6 @@ def plan_markers(plan: ParkingPlan, config: PlannerConfig, stamp) -> MarkerArray
     t = plan.target
     array = clear_markers()
     add = array.markers.append
-    res = plan.resolution_m or 0.05
 
     g1 = _marker('parking/g1_position', 0, Marker.CYLINDER, frame, stamp, G1_COLOR, (0.08, 0.08, 0.6))
     g1.pose.position.x, g1.pose.position.y, g1.pose.position.z = t.x, t.y, 0.3
@@ -78,32 +83,28 @@ def plan_markers(plan: ParkingPlan, config: PlannerConfig, stamp) -> MarkerArray
         ring.points = _circle(t.x, t.y, radius, 0.04)
         add(ring)
 
-    rays = _marker('parking/radial_1deg', 0, Marker.LINE_LIST, frame, stamp, GREEN, (0.006, 0, 0))
-    for angle, status in plan.radial_rays:
-        c, s = math.cos(angle), math.sin(angle)
-        rays.points += [Point(x=t.x + config.reach_min_m * c, y=t.y + config.reach_min_m * s, z=0.05),
-                        Point(x=t.x + config.reach_max_m * c, y=t.y + config.reach_max_m * s, z=0.05)]
-        rays.colors += [_color(RAY_COLORS[status])] * 2
-    add(rays)
+    for marker_id, (status, rgba) in enumerate(RAY_CLASSES):
+        rays = _marker('parking/radial_1deg', marker_id, Marker.LINE_LIST, frame, stamp, rgba, (0.005, 0, 0))
+        for angle, runs in plan.radial_rays:
+            c, s = math.cos(angle), math.sin(angle)
+            rays.points += [Point(x=t.x + r * c, y=t.y + r * s, z=0.05)
+                            for r0, r1, run_status in runs if run_status == status for r in (r0, r1)]
+        add(rays)
 
-    for marker_id, (cells, rgba) in enumerate(
-            ((plan.free_cells, GREEN), (plan.occupied_cells, RED), (plan.unknown_cells, UNKNOWN_RED))):
-        cubes = _marker('parking/donut_cells', marker_id, Marker.CUBE_LIST, frame, stamp,
-                        (rgba[0], rgba[1], rgba[2], 0.45), (res, res, 0.01))
-        cubes.points = [Point(x=x, y=y, z=0.02) for x, y in cells]
-        add(cubes)
-
-    by_status = {'valid': GREEN, 'collision': RED, 'rejected': REJECTED}
-    for marker_id, (status, rgba) in enumerate(by_status.items()):
-        task_points = _marker('parking/candidate_task_points', marker_id, Marker.SPHERE_LIST, frame,
-                              stamp, rgba, (0.03, 0.03, 0.03))
+    # Valid candidates stay on top of the lines; the rejected ones repeat what the lines
+    # show, so they get their own namespace (hidden by default in the parking layout).
+    by_status = (('parking/candidate_task_points', 0, 'valid', GREEN),
+                 ('parking/rejected_task_points', 0, 'collision', RED),
+                 ('parking/rejected_task_points', 1, 'rejected', REJECTED))
+    for ns, marker_id, status, rgba in by_status:
+        task_points = _marker(ns, marker_id, Marker.SPHERE_LIST, frame, stamp, rgba, (0.018, 0.018, 0.018))
         task_points.points = [Point(x=c.task_x, y=c.task_y, z=0.08) for c in plan.candidates
                               if c.status == status]
         add(task_points)
 
     for marker_id, (status, rgba) in enumerate((('unchecked', REJECTED), ('rejected', RED), ('valid', GREEN))):
         points = _marker('parking/path_candidates', marker_id, Marker.SPHERE_LIST,
-                         frame, stamp, rgba, (0.04, 0.04, 0.04))
+                         frame, stamp, rgba, (0.025, 0.025, 0.025))
         points.points = [Point(x=c.task_x, y=c.task_y, z=0.13) for c in plan.candidates
                          if c.status in ('valid', 'selected') and c.path_status == status]
         add(points)
@@ -140,8 +141,10 @@ def plan_markers(plan: ParkingPlan, config: PlannerConfig, stamp) -> MarkerArray
               'geometric parking pose' if plan.ok else
               'path evaluation pending' if plan.failure_reason is None else
               'NO PARKING POSE: ' + str(plan.failure_reason))
+    passing = sum(any(run[2] == 'valid' for run in runs) for _, runs in plan.radial_rays)
     label.text = (f"{status}\n"
                   f"{t.reference} (keep-out {plan.keepout_radius_m:.2f} m), "
-                  f"valid {counts['valid']}/{counts['candidates']}")
+                  f"valid {counts['valid']}/{counts['candidates']}, "
+                  f"rays passing {passing}/{len(plan.radial_rays)}")
     add(label)
     return array

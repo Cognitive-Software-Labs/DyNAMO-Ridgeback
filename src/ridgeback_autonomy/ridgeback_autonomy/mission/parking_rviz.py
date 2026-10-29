@@ -13,11 +13,13 @@ import yaml
 PARKING_DISPLAY_NAME = 'Parking Plan'
 PARKING_NAMESPACES = (
     'parking/g1_position', 'parking/g1_keepout', 'parking/donut_boundaries',
-    'parking/radial_1deg', 'parking/donut_cells', 'parking/candidate_task_points',
+    'parking/radial_1deg', 'parking/candidate_task_points',
     'parking/selected_pose', 'parking/selected_footprint', 'parking/selected_task_point',
     'parking/status',
     'parking/path_candidates', 'parking/selected_path',
 )
+# Published but off by default: the radial lines already show where parking fails.
+PARKING_HIDDEN_NAMESPACES = ('parking/rejected_task_points',)
 
 
 def with_parking_display(layout: dict, topic: str) -> dict:
@@ -30,7 +32,8 @@ def with_parking_display(layout: dict, topic: str) -> dict:
         'Class': 'rviz_default_plugins/MarkerArray',
         'Enabled': True,
         'Name': PARKING_DISPLAY_NAME,
-        'Namespaces': {ns: True for ns in PARKING_NAMESPACES},
+        'Namespaces': {**{ns: True for ns in PARKING_NAMESPACES},
+                       **{ns: False for ns in PARKING_HIDDEN_NAMESPACES}},
         'Topic': {
             'Depth': 1,
             # The mission publishes each plan once, latched.

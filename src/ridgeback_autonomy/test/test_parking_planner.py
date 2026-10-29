@@ -345,21 +345,22 @@ def test_markers_clear_first_and_show_plan_semantics():
     assert markers[0].action == Marker.DELETEALL
     namespaces = {m.ns for m in markers[1:]}
     for ns in ('parking/g1_position', 'parking/g1_keepout', 'parking/donut_boundaries',
-               'parking/radial_1deg', 'parking/donut_cells', 'parking/candidate_task_points',
+               'parking/radial_1deg', 'parking/candidate_task_points',
                'parking/selected_pose', 'parking/selected_footprint', 'parking/status'):
         assert ns in namespaces
+    assert 'parking/donut_cells' not in namespaces   # the donut is drawn as lines, not dots
     assert all(m.header.frame_id == 'map' for m in markers[1:])
-    rays = next(m for m in markers if m.ns == 'parking/radial_1deg')
-    assert len(rays.points) == 720 and len(rays.colors) == 720
-    free_cells = next(m for m in markers if m.ns == 'parking/donut_cells' and m.id == 0)
-    assert free_cells.color.g > 0.8 and free_cells.color.r < 0.2   # green = safe
+    green = next(m for m in markers if m.ns == 'parking/radial_1deg' and m.id == 0)
+    assert green.type == Marker.LINE_LIST and green.points
+    assert green.color.g > 0.8 and green.color.r < 0.2   # green = valid parking position
 
     failed = plan_parking(grid(value=100), target(), CONFIG, APPROACH_FROM_WEST)
     failed_markers = plan_markers(failed, CONFIG, stamp).markers
     assert failed_markers[0].action == Marker.DELETEALL
     assert not any(m.ns.startswith('parking/selected') for m in failed_markers)
-    occupied = next(m for m in failed_markers if m.ns == 'parking/donut_cells' and m.id == 1)
-    assert occupied.points and occupied.color.r > 0.9 and occupied.color.g < 0.1   # red = unsafe
+    occupied = next(m for m in failed_markers if m.ns == 'parking/radial_1deg' and m.id == 1)
+    assert len(occupied.points) == 720   # every ray is one obstacle run
+    assert occupied.color.r > 0.9 and occupied.color.g < 0.1   # red = obstacle
     cleared = clear_markers().markers
     assert len(cleared) == 1 and cleared[0].action == Marker.DELETEALL
 
@@ -527,3 +528,175 @@ def test_ranking_prefers_mid_reach_and_stays_inside_the_budgeted_band():
         assert keepout_radius_m(plan.target, BUDGET) + REAR_OVERHANG <= plan.selected.reach_m <= 0.54
     foot_plan = plan_parking(grid(), target(foot=True), BUDGET, APPROACH_FROM_WEST)
     assert foot_plan.selected.reach_m < 0.54 - RES / 2
+
+
+# 1-degree radial donut lines: per-segment classes taken from the planner's own cells.
+from ridgeback_autonomy.mission.parking_planner import radial_profile
+
+RAY_IDS = {'valid': 0, 'occupied': 1, 'unknown': 2, 'pose_invalid': 3}
+
+
+def ray(plan, degrees):
+    return plan.radial_rays[degrees][1]
+
+
+SEVERITY = ('occupied', 'unknown', 'pose_invalid', 'valid')
+
+
+def expected_class(plan, g, x, y):
+    """Independent per-point lookup: the planner's occupancy and candidate status of the
+    cell, or the worse of the cells on both sides of an edge the point lies on."""
+    lx, ly = (float(v) / RES for v in g.map_to_local(x, y))
+    near = lambda v: (round(v) - 1, round(v)) if abs(v - round(v)) < 1e-6 else (math.floor(v),)
+    valid_cells = {(math.floor(float(g.map_to_local(c.task_x, c.task_y)[1]) / RES),
+                    math.floor(float(g.map_to_local(c.task_x, c.task_y)[0]) / RES))
+                   for c in plan.candidates if c.status in ('valid', 'selected')}
+    found = []
+    for row in near(ly):
+        for col in near(lx):
+            if not (0 <= col < g.width and 0 <= row < g.height) or g.data[row, col] == -1:
+                found.append('unknown')
+            elif g.data[row, col] >= CONFIG.occupied_threshold:
+                found.append('occupied')
+            else:
+                found.append('valid' if (row, col) in valid_cells else 'pose_invalid')
+    return min(found, key=SEVERITY.index)
+
+
+def assert_runs_match_the_map(plan, g):
+    t = plan.target
+    for angle, runs in plan.radial_rays:
+        assert runs[0][0] == pytest.approx(CONFIG.reach_min_m)
+        assert runs[-1][1] == pytest.approx(CONFIG.reach_max_m)
+        for (a0, a1, a), (b0, b1, b) in zip(runs, runs[1:]):
+            assert a1 == b0 and a != b     # contiguous, split only where the class changes
+        for r0, r1, status in runs:
+            assert r1 > r0
+            for r in np.linspace(r0, r1, max(3, int((r1 - r0) / 0.002)))[1:-1]:
+                x, y = t.x + r * math.cos(angle), t.y + r * math.sin(angle)
+                assert expected_class(plan, g, x, y) == status, (math.degrees(angle), r)
+
+
+def test_radial_profile_has_360_one_degree_rays_with_wraparound():
+    plan = plan_parking(grid(), target(), CONFIG, APPROACH_FROM_WEST)
+    angles = [a for a, _ in plan.radial_rays]
+    assert len(angles) == 360
+    assert angles == [math.radians(k) for k in range(360)]
+    assert angles[0] == 0.0 and math.degrees(2 * math.pi - angles[-1]) == pytest.approx(1.0)
+    # An obstacle straddling 0 deg shows on both sides of the wrap, symmetrically.
+    g = grid()
+    fill(g, 3.40, 2.95, 3.50, 3.05, 100)
+    occupied = {k for k, (_, runs) in enumerate(plan_parking(g, target(), CONFIG,
+                                                             APPROACH_FROM_WEST).radial_rays)
+                if any(s == 'occupied' for _, _, s in runs)}
+    assert {359, 0, 1} <= occupied
+    assert occupied == {(360 - k) % 360 for k in occupied}
+    assert all(k <= 10 or k >= 350 for k in occupied)
+
+
+def test_free_map_rays_span_the_reach_radii_and_pass_only_where_parking_is_valid():
+    g = grid()
+    plan = plan_parking(g, target(), CONFIG, APPROACH_FROM_WEST)
+    assert_runs_match_the_map(plan, g)
+    for _, runs in plan.radial_rays:
+        assert {s for _, _, s in runs} <= {'valid', 'pose_invalid'}   # nothing red or orange
+        # Inside the keep-out edge (0.29 + 0.217 m) no pose is valid: grey, never green.
+        assert runs[0][2] == 'pose_invalid' and runs[0][1] >= 0.29 + REAR_OVERHANG - RES
+    assert all(any(s == 'valid' for _, _, s in runs) for _, runs in plan.radial_rays)
+
+
+def test_table_across_part_of_the_donut_is_red_only_where_the_rays_cross_it():
+    free = plan_parking(grid(), target(), CONFIG, APPROACH_FROM_WEST)
+    g = grid()
+    fill(g, 3.40, 2.80, 3.50, 3.20, 100)    # table east of G1, 0.40-0.50 m out
+    plan = plan_parking(g, target(), CONFIG, APPROACH_FROM_WEST)
+    assert_runs_match_the_map(plan, g)
+
+    east = ray(plan, 0)
+    red = [(r0, r1) for r0, r1, s in east if s == 'occupied']
+    assert red == [(pytest.approx(0.40), pytest.approx(0.50))]
+    assert east[0][1] == pytest.approx(0.40) and east[-1][0] == pytest.approx(0.50)
+    # Parked poses near the table fail their footprint: grey, not red, not green.
+    assert all(s == 'pose_invalid' for _, _, s in east if s != 'occupied')
+    hit = [k for k, (_, runs) in enumerate(plan.radial_rays) if any(s == 'occupied' for *_, s in runs)]
+    assert hit and all(k <= 60 or k >= 300 for k in hit)
+    # Unrelated rays on the far side are unchanged and still pass.
+    for k in range(120, 241):
+        assert ray(plan, k) == ray(free, k)
+        assert any(s == 'valid' for _, _, s in ray(plan, k))
+
+
+def test_unknown_cells_are_orange_runs_and_never_green():
+    g = grid()
+    fill(g, 2.40, 2.95, 2.50, 3.05, -1)     # unexplored patch at the west edge of the donut
+    plan = plan_parking(g, target(), CONFIG, APPROACH_FROM_WEST)
+    assert_runs_match_the_map(plan, g)
+    assert ray(plan, 180)[-1] == (pytest.approx(0.50), pytest.approx(0.60), 'unknown')
+    assert not any(s == 'unknown' for k in range(90) for *_, s in ray(plan, k))
+
+
+@pytest.mark.parametrize('g1,map_yaw,approach', OFF_GRID)
+def test_rotated_map_origin_runs_follow_the_rotated_cells(g1, map_yaw, approach):
+    g = centred_grid(*g1, map_yaw)
+    mark(g, [(g1[0] + 0.45 * math.cos(a), g1[1] + 0.45 * math.sin(a)) for a in (0.4, 0.42, 0.44)], 100)
+    mark(g, [(g1[0] - 0.55, g1[1] + 0.05), (g1[0] - 0.52, g1[1] + 0.08)], -1)
+    plan = plan_parking(g, target(*g1), CONFIG, approach)
+    assert_runs_match_the_map(plan, g)
+    assert any(s == 'occupied' for _, runs in plan.radial_rays for *_, s in runs)
+    assert any(s == 'unknown' for _, runs in plan.radial_rays for *_, s in runs)
+
+
+def test_radial_line_markers_follow_the_runs_and_a_new_plan_replaces_them():
+    import rclpy.time
+    stamp = rclpy.time.Time(seconds=10).to_msg()
+    g = grid()
+    fill(g, 3.40, 2.80, 3.50, 3.20, 100)
+    fill(g, 2.40, 2.95, 2.50, 3.05, -1)
+    plan = plan_parking(g, target(), CONFIG, APPROACH_FROM_WEST)
+    markers = plan_markers(plan, CONFIG, stamp).markers
+    rays = {m.id: m for m in markers if m.ns == 'parking/radial_1deg'}
+    assert sorted(rays) == [0, 1, 2, 3] and all(m.type == Marker.LINE_LIST for m in rays.values())
+    for status, marker_id in RAY_IDS.items():
+        runs = [r for _, rs in plan.radial_rays for r in rs if r[2] == status]
+        assert len(rays[marker_id].points) == 2 * len(runs) > 0
+        for p in rays[marker_id].points:
+            assert 0.30 - 1e-9 <= math.hypot(p.x - 3.0, p.y - 3.0) <= 0.60 + 1e-9
+    assert rays[1].color.r > 0.9 and rays[1].color.g < 0.1          # red obstacle
+    assert rays[2].color.r > 0.9 and 0.2 < rays[2].color.g < 0.5    # orange unknown
+    label = next(m for m in markers if m.ns == 'parking/status')
+    passing = sum(any(s == 'valid' for *_, s in runs) for _, runs in plan.radial_rays)
+    assert f'rays passing {passing}/360' in label.text
+    # Candidates and the selection keep their own markers; rejected candidates are split
+    # off so the lines stay readable, and every candidate is still published exactly once.
+    assert {'parking/candidate_task_points', 'parking/rejected_task_points', 'parking/selected_pose',
+            'parking/selected_footprint'} <= {m.ns for m in markers}
+    dots = {(m.ns, m.id): len(m.points) for m in markers
+            if m.ns in ('parking/candidate_task_points', 'parking/rejected_task_points')}
+    assert dots == {('parking/candidate_task_points', 0): sum(c.status == 'valid' for c in plan.candidates),
+                    ('parking/rejected_task_points', 0): sum(c.status == 'collision' for c in plan.candidates),
+                    ('parking/rejected_task_points', 1): sum(c.status == 'rejected' for c in plan.candidates)}
+
+    # Replanning around a moved G1 clears everything first; no ray stays at the old centre.
+    moved = plan_markers(plan_parking(grid(), target(2.0, 4.0), CONFIG, APPROACH_FROM_WEST),
+                         CONFIG, stamp).markers
+    assert moved[0].action == Marker.DELETEALL
+    for m in moved:
+        if m.ns == 'parking/radial_1deg':
+            assert all(0.30 - 1e-9 <= math.hypot(p.x - 2.0, p.y - 4.0) <= 0.60 + 1e-9
+                       for p in m.points)
+
+
+def test_radial_profile_without_candidates_never_shows_green():
+    g = grid()
+    rays = radial_profile(g, target(), CONFIG)
+    assert len(rays) == 360
+    assert {s for _, runs in rays for *_, s in runs} == {'pose_invalid'}
+
+
+def test_a_ray_along_a_cell_edge_shows_the_worse_of_both_cells():
+    # G1 on a cell corner: the 0 deg ray runs exactly on the edge between two cell rows.
+    g = grid()
+    fill(g, 3.40, 3.00, 3.45, 3.05, 100)    # one cell just north of the edge
+    plan = plan_parking(g, target(3.0, 3.0), CONFIG, APPROACH_FROM_WEST)
+    assert [(round(a, 9), round(b, 9)) for a, b, s in ray(plan, 0) if s == 'occupied'] == [(0.40, 0.45)]
+    assert_runs_match_the_map(plan, g)

@@ -12,7 +12,8 @@ the integration needs around it:
   trusted to contain G1 (toes lie below the LiDAR plane and stationary SLAM
   drift smears the leg imprint);
 * freshness checks on target, map and robot pose, since the map frame drifts;
-* a 1-degree radial profile of the donut for visualization only.
+* a 1-degree radial profile of the donut, split where its class changes, for
+  visualization only.
 
 The original ranked by Nav2 path length as its fourth tier. Path planning is
 deliberately absent here, so that tier is skipped and the deterministic
@@ -183,7 +184,7 @@ class ParkingPlan:
     unknown_cells: list[tuple[float, float]] = field(default_factory=list)
     candidates: list[CandidateDecision] = field(default_factory=list)
     selected: CandidateDecision | None = None
-    radial_rays: list[tuple[float, str]] = field(default_factory=list)
+    radial_rays: list[tuple[float, list[tuple[float, float, str]]]] = field(default_factory=list)
     resolution_m: float = 0.0
     selected_path: object | None = None
     paths_checked: int = 0
@@ -378,27 +379,73 @@ def preference(
     return 2, 'approach_back'
 
 
+RADIAL_SEVERITY = ('occupied', 'unknown', 'pose_invalid', 'valid')
+
+
 def radial_profile(grid: GridSnapshot, target: TargetReference, config: PlannerConfig,
-                   step_deg: float = 1.0) -> list[tuple[float, str]]:
-    """Per ray from reach_min to reach_max: free, occupied, unknown or out_of_bounds (display only)."""
+                   candidates: Sequence[CandidateDecision] = (),
+                   step_deg: float = 1.0) -> list[tuple[float, list[tuple[float, float, str]]]]:
+    """Per ray from reach_min to reach_max: contiguous ``(r_start, r_end, class)`` runs (display only).
+
+    Runs end at the ray's exact map-cell boundary crossings, so an obstacle marks only
+    the part of a ray that lies in its cells. Each run takes the class of the cell it
+    crosses: ``occupied``, ``unknown`` (also outside the map), and for free cells
+    ``valid`` when that cell's parking candidate passed the footprint, keep-out and
+    reach-budget checks, otherwise ``pose_invalid``; a ray along a cell edge takes the
+    worse of both cells. This is not Nav2 path feasibility, and candidates are never
+    derived from the rays.
+    """
+
+    res = grid.resolution
+    valid_cells = set()
+    for c in candidates:
+        if c.status in ('valid', 'selected'):
+            lx, ly = grid.map_to_local(c.task_x, c.task_y)
+            valid_cells.add((math.floor(float(ly) / res), math.floor(float(lx) / res)))
+    px, py = (float(v) for v in grid.map_to_local(target.x, target.y))
+    r0, r1 = config.reach_min_m, config.reach_max_m
+
+    def indices(v):
+        # A ray running exactly along a cell edge touches both cells beside it.
+        k = round(v)
+        return (k - 1, k) if abs(v - k) < 1e-9 else (math.floor(v),)
+
+    def cell_class(r, dx, dy):
+        worst = 'valid'
+        for row in indices((py + r * dy) / res):
+            for col in indices((px + r * dx) / res):
+                if not (0 <= col < grid.width and 0 <= row < grid.height):
+                    status = 'unknown'
+                elif grid.data[row, col] >= config.occupied_threshold:
+                    status = 'occupied'
+                elif grid.data[row, col] < 0:
+                    status = 'unknown'
+                else:
+                    status = 'valid' if (row, col) in valid_cells else 'pose_invalid'
+                worst = min(worst, status, key=RADIAL_SEVERITY.index)
+        return worst
 
     rays = []
-    step = grid.resolution * 0.5
-    radii = np.arange(config.reach_min_m, config.reach_max_m + 1e-9, step)
     for k in range(int(round(360.0 / step_deg))):
         angle = math.radians(k * step_deg)
-        lx, ly = grid.map_to_local(target.x + radii * math.cos(angle), target.y + radii * math.sin(angle))
-        cols, rows = np.floor(lx / grid.resolution).astype(int), np.floor(ly / grid.resolution).astype(int)
-        if np.any((cols < 0) | (rows < 0) | (cols >= grid.width) | (rows >= grid.height)):
-            rays.append((angle, 'out_of_bounds'))
-            continue
-        values = grid.data[rows, cols]
-        if np.any(values >= config.occupied_threshold):
-            rays.append((angle, 'occupied'))
-        elif np.any(values == -1):
-            rays.append((angle, 'unknown'))
-        else:
-            rays.append((angle, 'free'))
+        # The ray's direction in grid-local axes; cell edges lie on multiples of res there.
+        dx, dy = math.cos(angle - grid.origin_yaw), math.sin(angle - grid.origin_yaw)
+        cuts = {r0, r1}
+        for p, d in ((px, dx), (py, dy)):
+            if abs(d) > 1e-12:
+                lo, hi = sorted(((p + r0 * d) / res, (p + r1 * d) / res))
+                cuts.update((i * res - p) / d for i in range(math.ceil(lo), math.floor(hi) + 1))
+        cuts = sorted(r for r in cuts if r0 <= r <= r1)
+        runs = []
+        for a, b in zip(cuts, cuts[1:]):
+            if b - a < 1e-9:
+                continue
+            status = cell_class((a + b) / 2.0, dx, dy)
+            if runs and runs[-1][2] == status:
+                runs[-1] = (runs[-1][0], b, status)
+            else:
+                runs.append((runs[-1][1] if runs else r0, b, status))
+        rays.append((angle, runs))
     return rays
 
 
@@ -413,7 +460,6 @@ def plan_parking(
     keepout = keepout_radius_m(target, config)
     plan = ParkingPlan(ok=False, failure_reason=None, target=target, keepout_radius_m=keepout,
                        resolution_m=grid.resolution)
-    plan.radial_rays = radial_profile(grid, target, config)
 
     # 1. Donut task cells, row-major like the original loop (this order is the final tie-break).
     rows, cols = np.mgrid[0:grid.height, 0:grid.width]
@@ -428,6 +474,7 @@ def plan_parking(
     ):
         bucket.extend(zip(cx[mask].tolist(), cy[mask].tolist()))
     if not plan.free_cells:
+        plan.radial_rays = radial_profile(grid, target, config)
         plan.failure_reason = 'no_free_donut_cells'
         return plan
 
@@ -462,6 +509,7 @@ def plan_parking(
         if decision.status == 'valid':
             decision.clearance_m = footprint_clearance_m(polygon, grid, unsafe_xy, config.clearance_cap_m)
         plan.candidates.append(decision)
+    plan.radial_rays = radial_profile(grid, target, config, plan.candidates)
 
     valid = [c for c in plan.candidates if c.status == 'valid']
     if not valid:

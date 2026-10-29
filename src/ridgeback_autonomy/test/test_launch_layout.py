@@ -1012,6 +1012,9 @@ def test_parking_rviz_layout_adds_one_latched_display_without_touching_the_share
     assert parking['Class'] == 'rviz_default_plugins/MarkerArray'
     assert parking['Topic']['Value'] == 'parking/visualization'
     assert parking['Topic']['Durability Policy'] == 'Transient Local'
+    # The radial donut lines are shown; rejected candidate dots are published but start hidden.
+    assert parking['Namespaces']['parking/radial_1deg'] is True
+    assert parking['Namespaces']['parking/rejected_task_points'] is False
 
 
 def test_mission_launch_owns_the_single_rviz_instance() -> None:
