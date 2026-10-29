@@ -231,11 +231,6 @@ evidence.
 - [`measure_feedback_ros_delivery.py`](../../tools/hardware/measure_feedback_ros_delivery.py)
   measures aggregate header-to-callback delay at an independent stationary
   observer; it does not see the driver's internal queue.
-- [`build_puma_queue_diagnostic.py`](../../tools/hardware/build_puma_queue_diagnostic.py)
-  builds a [queue-diagnostic patch](../../patches/clearpath_puma_queue_diagnostic.patch)
-  on the two-patch repair alone (callback-to-dequeue age and queue depth,
-  without field-age eligibility). It is not installed; the installed driver's
-  queue-timing layer provides the live buckets.
 
 Every capture tool needs an operator who confirms visible motion and stopping;
 a completed trace alone does not establish travel.

@@ -48,8 +48,8 @@ consumer path live in the [camera-stack reference](camera_stack.md).
 
 1. **RGB color image** - input to detection / segmentation. Gazebo and Isaac
    publish the selected shared nominal profile, `640x480` by default or
-   `1280x720`, at 30 Hz. The checked-out hardware default is 640x480 @ 30 Hz,
-   but the profile the driver actually activates must be recorded on the robot
+   `1280x720`, at 30 Hz. Hardware runs 640x480 @ 30 Hz only (1280x720 is
+   unsupported on the robot), but the profile the driver actually activates must be recorded on the robot
    rather than inferred from YAML.
 2. **Depth image** (made 1:1 with RGB) - input to projective ranging and euclidean reconstruction. Euclidean reconstruction deprojects its masked pixels into camera-frame points in code (`docs/target_localization/euclidean_reconstruction.md`) - the points are a derived, in-code representation, not a sensor product.
 3. **Camera IMU - present on the device, unused by this stack.** The D455 carries an IMU. Nothing here enables, subscribes to, or fuses those streams, and SLAM does not consume them. Capability is not configuration.

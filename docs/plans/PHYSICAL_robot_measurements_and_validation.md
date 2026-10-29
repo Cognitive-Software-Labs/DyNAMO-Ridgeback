@@ -179,7 +179,8 @@ device/profiles, independently of the later camera–LiDAR and joint tests.
 - Record effective parameters for colour/depth enablement, alignment, and
   synchronization. Inspect active driver profiles rather than inferring them
   from repository YAML.
-- Request `640x480@30` and `1280x720@30` as separate runs. Record the actual
+- Request `640x480@30` (1280x720 is unsupported on the robot; see the
+  [deferred gate](../BACKLOG.md#deferred-hardware-gates)). Record the actual
   colour and native-depth profiles and resulting aligned-depth grid. Unsupported
   requests or fallback profiles are unresolved findings, not successful tests
   of the requested profile.

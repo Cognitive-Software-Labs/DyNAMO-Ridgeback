@@ -125,7 +125,7 @@ troubleshooting, planning, and historical documentation.
 - [PHYSICAL — Intel–Thor deployment and transport qualification](plans/PHYSICAL_intel_thor_deployment.md) — robot-side installation, GPU offload, Ethernet measurements, and failure handling
   - [Intel–Thor sensor latency tools](physical/intel_thor_sensor_latency.md) — report components, clock bounds and interleaved qualification
 - [PHYSICAL — Robot measurements and stationary sensor validation](plans/PHYSICAL_robot_measurements_and_validation.md) — quick mount readings/photos, D455 and LiDAR checks, stationary alignment, and G1/person tests
-  - [PHYSICAL — Camera and alignment robot session](plans/PHYSICAL_camera_alignment_session.md) — ordered blocks, commands and pre-declared limits for the alignment overlay, off-centre and HD person checks, and estimator modes
+  - [PHYSICAL — Camera and alignment robot session](plans/PHYSICAL_camera_alignment_session.md) — ordered blocks, commands and pre-declared limits for the alignment overlay, off-centre person checks, and estimator modes
 - [PHYSICAL — Real-hardware LiDAR validation](plans/PHYSICAL_lidar_validation.md) — front/rear range and coverage, merged geometry, loaded continuity, recovery and conditional motion tests
 - [PHYSICAL — Remaining qualification and time estimates](plans/PHYSICAL_remaining_qualification.md) — canonical status of the S, P and D qualification items, remaining driving trials and estimates
 

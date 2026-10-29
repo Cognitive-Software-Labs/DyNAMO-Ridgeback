@@ -92,7 +92,7 @@ and the [librealsense per-stream intrinsics API](https://github.com/realsenseai/
 | Contract | Gazebo | Isaac Sim 6 | Physical D455 |
 |---|---|---|---|
 | Producer | Clearpath Gazebo `rgbd_camera` plus ROS-Gazebo bridges | generated USD colour camera plus Isaac ROS 2 helpers; `d455` mode adds a left-depth render and custom matched publisher | `dynamo-camera.service`: the apt `realsense2_camera` driver, colour and aligned depth only |
-| Profile | shared `640x480` default or `1280x720` | shared `640x480` default or `1280x720` | chosen at install (`camera_service apply --profile`), checked by `camera_contract_check` |
+| Profile | shared `640x480` default or `1280x720` | shared `640x480` default or `1280x720` | `640x480` only, installed by `camera_service apply --profile 640x480` and checked by `camera_contract_check`; 1280x720 is unsupported on the robot |
 | Authored rate | 30 Hz | 30 Hz | verify live rate |
 | Intrinsics | selected nominal profile, published as `CameraInfo` | selected nominal profile, published as `CameraInfo` | factory calibration in live `CameraInfo` |
 | Clip/range model | 0.3-100 m render clip | 0.1-100 m render clip; `d455` additionally rejects below 0.32 m at VGA or 0.52 m at HD | physical stereo validity; no application hard cutoff |

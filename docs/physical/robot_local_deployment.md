@@ -180,8 +180,10 @@ fewer frames while the link is saturated, so **local Intel readers also drop to
 about 22 Hz** whenever Thor pulls raw HD; the LiDAR scans were unaffected. Local
 HD is therefore a camera-and-host question that run A answers, while raw HD to
 Thor cannot meet 30 Hz on this link. **Decision (user, 2026-10-16): Thor stays at 640×480.** The deployment profile
-remains 640×480 at 30 Hz raw; 1280×720 is a local-only profile, selected only
-while Thor localization is stopped. Compressed or reduced-rate HD for Thor is not
+remains 640×480 at 30 Hz raw. **1280×720 is not supported on the robot (user
+decision, 2026-10-29):** the S2 checks below are its only hardware evidence, no
+further HD testing or development is planned, and anyone who needs HD must
+develop and qualify it first. Compressed or reduced-rate HD for Thor is not
 pursued.
 
 **S2 HD local reader matrix (2026-10-16, 10:22–10:33 UTC).** With 1280×720

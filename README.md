@@ -532,8 +532,8 @@ source /etc/clearpath/setup.bash && tools/camera_contract_check --backend hardwa
 sudo tools/intel_thor/camera_service rollback
 ```
 
-`apply` is idempotent: re-run it with `--profile 1280x720` to change resolution
-or after editing the driver configuration. On a replacement host, after
+`apply` is idempotent: re-run it after editing the driver configuration. The
+robot runs 640x480 only; 1280x720 is not supported on the robot: it is not tested or developed further, and anyone who needs it must develop and qualify it first. On a replacement host, after
 Clearpath and discovery-only DDS are set up, install the serial-pinned service
 with `sudo tools/intel_thor/camera_service apply --profile 640x480 --serial 338522302134`.
 Do not reapply just because the checkout revision differs while all status
