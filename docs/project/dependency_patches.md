@@ -5,6 +5,19 @@ defect, change, build and loading proof, and rollback. The import, refresh and
 verification procedure that applies to all of them is owned by
 [external dependency management](dependencies.md).
 
+## Patch inventory
+
+| Patch | Checkout | What it changes | Without it |
+|---|---|---|---|
+| `clearpath_gz_customizations.patch` | `src/clearpath_simulator/clearpath_gz` | Exposes the custom `SpawnG1` Gazebo GUI plugin; the Gazebo adapter owns this repository's world and model search path | — |
+| `slam_toolbox_tf_namespace.patch` | `src/slam_toolbox` | Makes `slam_toolbox` respect namespaced TF remappings | Required by this stack; failure signature in [troubleshooting](../troubleshooting.md) |
+| `clearpath_realsense_sim_frames.patch` | `src/clearpath_common` | `intel_realsense.urdf.xacro` forwards `is_sim` into every supported camera macro as `use_nominal_extrinsics`, and the Gazebo render sensor sits on the model's colour frame | Simulation has no `camera_0_color_optical_frame` TF and mask estimators report `TF_MISS_EXTRINSIC` |
+| `clearpath_ust10lx_sim_lidar.patch` | `src/clearpath_common`, on top of the RealSense patch | Gazebo simulates each `hokuyo_ust` as the UST-10LX: 1081 bins over ±135° at 0.25°, 0.06–10 m at 40 Hz, Gaussian range noise; hardware frames unchanged | Gazebo publishes Clearpath's generic 540 bins at 0.5° with returns out to 25 m |
+| `urg_node_reconnect_recovery.patch` | `src/urg_node` | Closes the failed socket and ignores SIGPIPE so the driver reconnects after a reset session | A Hokuyo stays locked out until the sensor service restarts; see [troubleshooting](../troubleshooting.md#hokuyo-drivers-stuck-reconnecting) |
+| `gz_sim_sensors_shutdown.patch` | `src/gz-sim` | [Below](#gazebo-sensors-shutdown-patch) | |
+| `ros_gz_bridge_shutdown.patch` | `src/ros_gz` | [Below](#ros_gz-shutdown-patch) | |
+| `rviz_shutdown.patch` | `src/rviz` | [Below](#rviz-shutdown-ownership-patch) | |
+
 ## Gazebo Sensors shutdown patch
 
 The Gazebo profile imports gz-sim **8.15.0**, upstream tag `gz-sim8_8.15.0`,

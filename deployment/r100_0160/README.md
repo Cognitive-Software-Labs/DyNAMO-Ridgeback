@@ -126,7 +126,7 @@ Reconstruction needs the `chrony` package, these root-owned 0644 files and an
 enabled `chrony.service`, followed by `tools/hardware/check_clock_ready.py`.
 The expanded profile and poll bound passed a local convergence check on
 2026-10-13; reboot and source-loss behavior remain unqualified;
-see [auxiliary checks](../../docs/physical/stationary_auxiliary_checks.md#intel-clock-source-expansion).
+see [auxiliary checks](../../docs/physical/stationary_auxiliary_checks.md#intel-clock-and-boot-policy).
 
 
 On 2026-10-13 the Intel pool profile was updated to `maxpoll 7` so its

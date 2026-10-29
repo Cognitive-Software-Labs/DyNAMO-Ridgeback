@@ -2,7 +2,7 @@
 
 This page owns what each driving check under `tools/hardware/` measures, which
 flags change its behaviour and what its result can and cannot establish. The
-root [README](../../README.md#stationary-driving-readiness-checks) owns operator
+[driving operator runbook](driving_operator_runbook.md) owns operator
 commands; the [qualification procedure](driving_qualification_procedure.md) owns
 how results become D-lane verdicts.
 

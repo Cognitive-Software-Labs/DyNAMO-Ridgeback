@@ -278,8 +278,9 @@ Platform, guard, camera, sensor and merger process IDs were unchanged.
 
 For reconstruction use the maintained stationary setup renderer and packaged
 noVNC from [the public recipe](ridgeback_public_recovery.md#independent-desktop-and-fresh-credentials),
-then recreate credentials locally with `vncpasswd` as `robot`. Public stage,
-installation and receipt-based rollback commands are in the root README.
+then recreate credentials locally with `vncpasswd` as `robot`. Stage,
+installation and receipt-based rollback commands are in the
+[stationary repairs runbook](stationary_repairs_runbook.md#desktop-and-controller-setup-repair).
 See [desktop troubleshooting](../troubleshooting.md#remote-desktop-startup-and-proxy-ownership)
 for listener/cgroup inspection. A read-only inspection of the 2026-10-13 boot (08:50:45 UTC) found all three
 desktop services active with zero reported restarts, correct listener cgroups
@@ -385,8 +386,9 @@ configuration and read-only chrony readiness gate before platform startup.
 Compiled Puma/controller libraries, camera, sensor and desktop services are
 preserved. The original Clearpath package and generated files are not edited.
 
-After reconstructing the capped platform and Puma repair, use the root README's
-stage/apply/verify workflow with fresh evidence and an engaged physical stop.
+After reconstructing the capped platform and Puma repair, use the
+[stage/apply/verify workflow](stationary_repairs_runbook.md#auxiliary-repairs)
+with fresh evidence and an engaged physical stop.
 The maintained installer regenerates its seven scoped files, rejects mismatched
 baseline inputs and records exact rollback ownership. The live receipt is
 `artifacts/hardware/20261013-auxiliary-repair-install/`; seven installed snapshots
@@ -419,7 +421,8 @@ builder, minimal plugin stager and guarded installer are
 `tools/hardware/install_puma_feedback_plugin.py`. The builder requires the
 pinned official Clearpath 2.9.4 archive; the installer additionally requires
 the installed commissioning test lock, pinned Puma driver and auxiliary launch.
-The root README owns stage/apply/restore commands. The deployment manifest
+The [Puma runbook](puma_feedback_runbook.md#plugin-installation-and-rollback)
+owns stage/apply/restore commands. The deployment manifest
 captures the installed platform 95 drop-in; its exact bytes identify the
 selected prefix, whose package manifest and loaded process path are preserved
 in `artifacts/hardware/20261013-puma-feedback-install-stage-5/result.json`.

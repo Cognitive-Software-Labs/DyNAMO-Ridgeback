@@ -200,9 +200,10 @@ in a longer HD capture.
 ## Clock synchronization and camera transport candidates
 
 Intel–Thor clock synchronization and latency qualification are owned by the
-[sensor timing reference](intel_thor_sensor_latency.md). The root README owns
-the public `tools/intel_thor/time_sync` and `tools/intel_thor/ptp_sync`
-installation and rollback commands. Use those maintained tools rather than
+[sensor timing reference](intel_thor_sensor_latency.md). The
+[clock installation commands](intel_thor_sensor_latency.md#clock-installation)
+own the public `tools/intel_thor/time_sync` and `tools/intel_thor/ptp_sync`
+installation and rollback. Use those maintained tools rather than
 temporary session scripts. The
 [transport reference](intel_thor_transport.md#sensor-timing-and-time-synchronization)
 describes PTP ownership; camera traffic and reader evidence are recorded above.

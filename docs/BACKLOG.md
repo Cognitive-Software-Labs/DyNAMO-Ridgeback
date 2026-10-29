@@ -123,6 +123,19 @@ qualified. Each needs a new scope decision; reopen it before the named use.
 it as an active item with its own criteria, or when its gate is qualified and
 the result is recorded in its reference.
 
+## Missing physical operator procedures
+
+**Gap.** The runbooks found three operator steps with no maintained procedure:
+releasing the physical e-stop and confirming that motor fault 8 clears (or
+recovering after a stop press in normal driving); writing the
+`boot-baseline.json` that `verify_auxiliary_boot.py` reads (only its `boot_id`
+field is documented); and pairing and trusting a replacement controller and
+recreating `controllers.txt`.
+
+**Completion criteria.** Each step has a verified procedure in the owning
+runbook under `docs/physical/`, tried once on the robot with the physical stop
+in reach, or a maintained tool that performs it.
+
 ## Optional physical organized-pointcloud qualification
 
 **Status.** Separate optional follow-up; not a blocker for core D455 colour and

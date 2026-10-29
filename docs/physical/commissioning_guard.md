@@ -127,16 +127,10 @@ the upgrade. Each application backs up the four owned files. Restore from the
 **new** install directory with
 `--restore --operator-confirmed --run-dir <new-install-directory>` to recover
 the preceding installation with the stop pressed. Restoring a first installation removes the caps and is not permission
-to drive. The root [README](../../README.md#stationary-driving-readiness-checks)
-owns the default, upgrade and test-lock commands. The original-manual
-selection uses the same pattern:
-
-```bash
-sudo python3 tools/hardware/install_commissioning_caps.py \
-  --apply --operator-confirmed --original-manual-speeds \
-  --upgrade-from-run-dir "$PWD/artifacts/hardware/<receipt-matching-installed-files>" \
-  --run-dir "$PWD/artifacts/hardware/original-manual-install-$(date -u +%Y%m%dT%H%M%SZ)"
-```
+to drive. The
+[driving operator runbook](driving_operator_runbook.md#guard-installation-and-rollback)
+owns the first-install, mode-change, upgrade and restore commands for all three
+modes.
 
 The installed receipt is listed in the
 [installed state](driving_readiness.md#installed-state); a test-lock

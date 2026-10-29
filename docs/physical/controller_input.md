@@ -112,9 +112,9 @@ and an ExecStart-only service drop-in. The helper:
 
 Unknown or untrusted controllers require local pairing. The helper's
 `connected-link-only` status is not proof of physical reports, live joystick
-input or return to neutral. The root
-[README](../../README.md#stationary-desktop-and-controller-setup-repair) owns
-installation and receipt-based rollback.
+input or return to neutral. The
+[stationary repairs runbook](stationary_repairs_runbook.md#desktop-and-controller-setup-repair)
+owns installation and receipt-based rollback.
 
 ## Connected-but-no-input failure
 
@@ -139,9 +139,9 @@ lock active where installed:
 Bluetooth connection or periodic zero ROS input alone is insufficient. A driver
 restart alone did not restore input. Do not release the stop to prove input
 delivery, automatically reset the robot stop, or restart the whole platform or
-desktop to repair controller input. The root
-[README](../../README.md#stationary-driving-readiness-checks) owns the exact
-commands.
+desktop to repair controller input. The
+[driving operator runbook](driving_operator_runbook.md#controller-checks-and-recovery)
+owns the exact commands.
 
 ## Archived evidence
 

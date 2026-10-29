@@ -55,7 +55,7 @@ invalid-batch path, not missing per-wheel CAN frames.
 
 Both checks run with the physical stop pressed, the controller centred and an
 operator beside the robot; neither sends movement. Commands and rollback live
-in the root [README](../../README.md).
+in the [Puma runbook](puma_feedback_runbook.md#stationary-feedback-interruption-checks).
 
 - [`check_live_feedback_outage.py`](../../tools/hardware/check_live_feedback_outage.py)
   pauses only the Puma driver for 0.8 seconds. An independent one-second

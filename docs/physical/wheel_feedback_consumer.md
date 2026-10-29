@@ -162,8 +162,9 @@ platform drop-in, `95-dynamo-puma-feedback.conf`, that selects only the pinned
 Puma library. It preserves the commissioned guard, the Puma motor driver, the
 auxiliary launch chain and the other plugin descriptors, checks rollback
 ownership and confirms the library mapped by the real controller manager after
-restart. Its commands, apply conditions and rollback are in the root
-[README](../../README.md); the installed receipt is
+restart. Its commands, apply conditions and rollback are in the
+[Puma runbook](puma_feedback_runbook.md#plugin-installation-and-rollback); the
+installed receipt is
 `artifacts/hardware/20261013-puma-feedback-install-stage-5/`, which reports
 `installed-verified-stationary`. Apply first runs the platform's clock startup
 gate and refuses, with no service changed, when the clock reference is too old;

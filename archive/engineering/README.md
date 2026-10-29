@@ -48,6 +48,7 @@ are excluded from ordinary repository search and the generated knowledge graph.
 - [D455 camera runs handoff](2026-09-18-d455-camera-runs-handoff.md) — agent 1's state snapshot: Fast DDS camera passes, CycloneDDS failures.
 
 - [Physical mecanum drive investigation](2026-09-18-mecanum-drive-investigation.md)
+- [r100_0160 Intel clock gate, sources and boot-step qualification](2026-10-13-r100-0160-intel-clock-qualification.md) — first reboot check, source expansion and poll bound, the October 14 startup delay and the S6 boots.
 - [r100_0160 commissioning guard installation and first low-speed trials](2026-10-06-driving-guard-and-deadman-trials.md) — guard install, capped direction pulses and deadman-release timing.
 - [Puma diagnostic build, first rate capture and startup-transient aborts](2026-10-06-puma-build-and-startup-transients.md) — repair build, first CAN rate capture and the mixed-wheel startup aborts.
 - [r100_0160 e-stop QoS repair and stationary disconnect trials](2026-10-09-estop-qos-and-disconnect-trials.md) — incompatible e-stop QoS, the reliable relay and controller power-off trials.

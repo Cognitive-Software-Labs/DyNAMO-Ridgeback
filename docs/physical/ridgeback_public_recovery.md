@@ -217,8 +217,9 @@ on 2026-10-12; all protected hardware process IDs were unchanged. Its exact
 receipt is under `artifacts/hardware/20261012-stationary-setup-install/`.
 The deployment manifest now includes 89 files with per-entry capture dates;
 maintained renderers remain authoritative. Cold boot and live reconnect
-qualification remain open. Public stage,
-apply and receipt-based rollback commands are in the root README.
+qualification remain open. Stage, apply
+and receipt-based rollback commands are in the
+[stationary repairs runbook](stationary_repairs_runbook.md#desktop-and-controller-setup-repair).
 
 A full recovery has not been demonstrated. On 2026-10-06 the user chose to
 preserve the instructions and commit the inputs without performing a spare-SSD
@@ -249,7 +250,7 @@ The commissioning guard additionally has an optional temporary test lock,
 selected by the caps installer’s `--test-interlock`. Do not enable it for normal
 manual operation: it blocks all motion without a fresh bounded test permit.
 Its source, installation and exact receipt-based rollback are maintained in the
-[root operator workflow](../../README.md) and
+[driving operator runbook](driving_operator_runbook.md#guard-installation-and-rollback) and
 [test-lock contract](commissioning_guard.md#test-permit-interlock).
 Recovery defaults to the normal capped guard. The temporary mode was installed
 and verified stationary on 2026-10-09; its receipt is under
@@ -259,7 +260,7 @@ state explicitly with `--test-interlock` only when resuming commissioning tests.
 The optional pinned Puma repair is reconstructed by the maintained
 `tools/hardware/build_puma_repair.py` and `install_puma_repair.py`, using the
 official 2.9.4 source archive and tracked fault/cache patches. Follow the
-[root build/install/rollback workflow](../../README.md). The installer recreates
+[build/install/rollback workflow](puma_feedback_runbook.md#repair-driver). The installer recreates
 a root-controlled package prefix plus DDS interface-readiness and scoped platform
 overlay drop-ins, preserving the exact normal/test-interlocked capped guard.
 The corrected repair was installed and verified stationary on 2026-10-12; its

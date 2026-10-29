@@ -21,7 +21,9 @@ Before editing any Markdown page:
 
 | Information | Canonical home |
 |---|---|
-| Installation, public commands, launch arguments, operator workflow | root `README.md` |
+| Installation, public commands and example invocations, operator workflow | root `README.md` (a router; long procedures live in the pages it links) |
+| Launch-argument reference for a public launch | its area page, e.g. `docs/exploration/launch_arguments.md` |
+| Physical-host operator procedures (commands, preconditions, rollback) | runbooks under `docs/physical/`, e.g. `driving_operator_runbook.md`; Intel–Thor transport and latency setup commands stay with their references, `intel_thor_transport.md` and `intel_thor_sensor_latency.md` |
 | Physical host reconstruction after reinstall or SSD failure | `docs/physical/ridgeback_recovery.md`, with small deployment inputs under `deployment/<robot>/` |
 | Short repository orientation | `docs/project/PROJECT_CONTEXT.md` |
 | Documentation policy and precedence | this page |
@@ -56,8 +58,9 @@ rule it routes to — the graphify rules, in particular, are owned by
 
 ## Update rules
 
-- Update the root README when setup, public commands, launch arguments, or an
-  operator workflow changes.
+- Update the root README when setup, public commands or an operator workflow
+  changes, and the area's launch-argument page when a public launch argument
+  changes.
 - Update a technical reference when implemented behavior or an interface
   changes.
 - Add troubleshooting only when a reader can act on the symptom today. Move a

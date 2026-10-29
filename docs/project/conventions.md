@@ -48,6 +48,16 @@ behavior stays in the relevant technical reference.
   runs and sweeps, `benchmark-jobs/` for jobs the configurator writes, and
   `configurator/runs/` for its run records.
 - Preserve explicit `output_dir`, `LOG_DIR`, and `ROS_LOG_DIR` overrides.
+  `colcon_defaults.yaml` sets the Colcon log base for commands run from the
+  workspace root (override with `colcon --log-base`; the build helper honors
+  `COLCON_LOG_PATH`). Each quick-start exploration run writes `console.log` and
+  `ros/` under `artifacts/exploration/<run>/`, and `LOG_DIR` moves that root.
+  Direct `ros2 launch` keeps ROS's default log destination unless `ROS_LOG_DIR`
+  is set first, e.g. `ROS_LOG_DIR="$PWD/artifacts/ros"`; logs already in
+  `~/.ros/log` or `/tmp` are not moved.
+- Benchmark results are not disposable logs: nothing prunes `artifacts/`
+  automatically. Relocated runs keep their original absolute paths in metadata;
+  reports and sweep resume use the relocated folders.
 - `benchmarking/paths.py` owns those roots and `anchored_path`, which anchors
   every operator-supplied benchmark path on the workspace root once, at job
   canonicalisation. Do not add a second anchor: the runner resolves a job's

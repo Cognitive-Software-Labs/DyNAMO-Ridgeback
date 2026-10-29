@@ -63,9 +63,9 @@ connected-but-no-input failure.
 
 The [check and recorder tools reference](driving_check_tools.md) owns what each
 auditor, isolated check, observer mode, pulse helper and controller tool
-measures, its flags and its limits. The root
-[README](../../README.md#stationary-driving-readiness-checks) owns their
-operator commands.
+measures, its flags and its limits. The
+[driving operator runbook](driving_operator_runbook.md) owns their operator
+commands.
 
 ## Remaining physical verification
 

@@ -4,7 +4,9 @@ This page routes a question to a profile, a profile to a way of starting it, and
 names the constraint that decides when more than one way exists. It routes; it
 does not explain. For what the benchmark is, what it compares, and what it may
 not claim, read [the overview](overview.md) first. The root README owns the
-commands.
+live commands; [launch arguments](launch_arguments.md), [sweeps](sweeps.md)
+and [profiles](profiles.md) own the arguments, the sweep format and the replay
+workflows.
 
 ## Execution-environment prerequisite
 
@@ -40,7 +42,7 @@ individual artifact narrows the offline set further — see
 | configurator **Start** | the three offline | nothing special | yes — re-attaches from disk |
 | `target_replay_benchmark <job>` | the three offline | nothing special | it is your terminal |
 | `target_offline_replay_benchmark <dataset> <sweep>` | `measurement` only | nothing special | it is your terminal |
-| `target_benchmark_sweep <yaml>` | `live-system` | GPU-backed X session, hours | terminal only |
+| [`target_benchmark_sweep <yaml>`](sweeps.md) | `live-system` | GPU-backed X session, hours | terminal only |
 
 Plus `target_distance_benchmark.launch.py` for a single live run — and for
 *every* capture. Both replay formats are written by a live benchmark run, not by
@@ -96,7 +98,7 @@ Use `target_replay_benchmark` when the job came from the configurator, when the
 run should be reproducible from a single committed file, or when an interrupted
 run must not leave a directory that looks like a result. Use
 `target_offline_replay_benchmark` for a quick sweep over a dataset you already
-have — it is the form the README's legacy smoke workflow uses.
+have — it is the form the [legacy smoke workflow](profiles.md#legacy-smoke-workflow) uses.
 
 ## After the run
 

@@ -3,7 +3,8 @@
 This page owns the DDS transport contract between the robot's Intel PC and the
 Jetson AGX Thor: the middleware, which interfaces carry ROS traffic, the
 receive-buffer requirement, the Intel service switch, and the pre-deploy check.
-Operator commands live in the
+One-time host setup commands are under [Setup commands](#setup-commands); the
+per-shell DDS environment and the pre-deploy check commands live in the
 [README](../../README.md#intel-thor-link-setup-and-pre-deploy-check); unfinished
 deployment work lives in the
 [Intel–Thor deployment plan](../plans/PHYSICAL_intel_thor_deployment.md).
@@ -235,6 +236,56 @@ Rules:
 - If `dds_env.sh` cannot select a host, or receives an invalid role, it returns
   nonzero and preserves the previous DDS environment. A chained
   `source .../dds_env.sh intel && ros2 ...` therefore stops on setup failure.
+
+## Setup commands
+
+Run each step once per host from that host's checkout; Thor uses its
+[latency worktree](intel_thor_sensor_latency.md#thor-worktree). Steps that
+restart services need the robot stationary with the e-stop in reach.
+
+Receive buffers, on both hosts (Thor first needs
+`sudo apt install ros-jazzy-rmw-cyclonedds-cpp`):
+
+```bash
+sudo cp src/ridgeback_autonomy_hardware/config/intel_thor/60-dynamo-dds-buffers.conf /etc/sysctl.d/
+sudo sysctl --system
+```
+
+Switch Intel's robot services from Fast DDS to CycloneDDS. The services restart;
+the [service switch](#intel-service-switch) describes each step and its rollback
+limits:
+
+```bash
+sudo tools/intel_thor/intel_services_rmw apply
+```
+
+`tools/intel_thor/intel_services_rmw status` shows the RMW each service actually
+runs, and `sudo tools/intel_thor/intel_services_rmw rollback` restores the saved
+middleware, DDS configuration and service drop-ins.
+
+Full CPU performance on both hosts and Thor's 120W power mode; `check_link`
+fails otherwise. Do not select MAXN (see [known limits](#known-limits)). A Thor
+power-mode change that needs a reboot is reported:
+
+```bash
+sudo tools/intel_thor/host_performance apply --host intel
+sudo tools/intel_thor/host_performance apply --host thor
+```
+
+`tools/intel_thor/host_performance status` reports drift; `sudo
+tools/intel_thor/host_performance rollback` restores the previous governors,
+energy preference and power mode.
+
+On Thor only, route Intel's Wi-Fi address over the robot Ethernet so
+transient-local data such as `tf_static` arrives (see
+[troubleshooting](../troubleshooting.md#thor-receives-sensor-streams-but-no-static-tf)):
+
+```bash
+sudo tools/intel_thor/thor_lan_route apply
+```
+
+`tools/intel_thor/thor_lan_route status` inspects the route and `sudo
+tools/intel_thor/thor_lan_route rollback` removes it.
 
 ## Intel service switch
 

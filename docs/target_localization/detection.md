@@ -19,7 +19,7 @@ The current defaults are:
 | Checkpoint (`detection_model`) | `google/owlv2-base-patch16-ensemble` |
 | Candidate label | `humanoid robot` |
 | Confidence threshold | `0.55` |
-| Maximum inference cadence | `10 Hz` |
+| Maximum inference cadence (`detector_fps`) | `10 Hz`; see [cadence defaults](#detector-cadence-defaults) |
 | Same-label NMS IoU threshold | `0.5` |
 | Same-label containment threshold | `0.95` intersection-over-smaller |
 
@@ -51,6 +51,22 @@ ros2 run ridgeback_localization target_detector_node --ros-args \
   -p target_labels:="humanoid robot" -p detection_threshold:=0.55 \
   -p detector_fps:=10.0
 ```
+
+## Detector cadence defaults
+
+`detector_fps` is an upper bound on detection step starts, not a guaranteed
+rate; every selected measurement row inherits the resulting cadence. Its
+default depends on where the value comes from:
+
+| Context | Default when unset | Source |
+|---|---|---|
+| `target_detector_node`, exploration, `localization.launch.py`, `target_distance_benchmark.launch.py`, and a sweep whose `defaults` omit it | `10.0` | `DETECTOR_FPS_DEFAULT` in `ridgeback_common.detector_config` |
+| A live sweep authored in the [configurator](../target_distance_benchmarking/configurator.md#detector-settings) | `5.0` | the live-system `detector_fps` field default in `benchmarking/replay_profiles.py` |
+
+The configurator writes its field value into the sweep it authors, so an
+authored sweep runs at 5 Hz unless the operator changes the field. A referenced
+sweep YAML and a direct launch keep `10.0` when they leave it unset. Offline
+replay profiles reuse frozen detections and select no cadence.
 
 ## Frame and scheduling behavior
 

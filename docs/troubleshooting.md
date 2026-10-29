@@ -161,14 +161,9 @@ Compare the source hash with `resume_signature.sweep_source_sha256` in
 ## Event-driven startup
 
 Bringup uses `ros2 run ridgeback_autonomy launch_wait` and launch events, not
-fixed delays. Exploration waits in this order:
-
-| Gate | Requires | Starts |
-|---|---|---|
-| `gate_slam` | scan and filtered odometry publishers | SLAM |
-| `gate_slam_configure` | `slam_toolbox/change_state` service | SLAM configure/activate |
-| `gate_nav2` | map publisher | Nav2 |
-| `gate_explorer` | global costmap publisher | frontier explorer |
+fixed delays; the [bringup sequence](exploration/architecture.md#bringup-sequence)
+owns the gate order, what each waits for and its timeout. When launch stalls,
+the last gate it logged names the missing topic, service or transform.
 
 Timeouts are bounded safety fallbacks: they report missing prerequisites and
 permit launch to continue. If a stage stalls, fix the named input or raise the
@@ -470,7 +465,7 @@ Listener ownership across repeated boots and automatic backend/proxy process
 recovery passed on 2026-10-16 (see the [recovery reference](physical/ridgeback_recovery.md)).
 Network loss, display corruption, browser-side session persistence and
 vendor-reload continuity remain [deferred](BACKLOG.md#deferred-hardware-gates). Use the
-[root stationary repair workflow](../README.md#stationary-desktop-and-controller-setup-repair)
+[stationary repair workflow](physical/stationary_repairs_runbook.md#desktop-and-controller-setup-repair)
 for exact receipt-based rollback; restarting it closes remote access temporarily.
 The legacy combined vendor-camera repair is not the current installation path.
 The vendor camera-readiness unit is disabled with the replaced vendor camera
@@ -514,7 +509,8 @@ coverage is low, distinguish `UNSET` (no mask result produced) from
 
 ## Required local patches
 
-The stack currently requires the patches listed in the root README. In
+The stack requires the patches in the
+[patch inventory](project/dependency_patches.md#patch-inventory). In
 particular, `patches/slam_toolbox_tf_namespace.patch` makes the TF listener use
 the namespaced node interface. Apply each patch only after `git apply --check`;
 the upstream dependency pins and patches are one compatibility unit.

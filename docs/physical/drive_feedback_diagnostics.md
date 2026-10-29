@@ -27,21 +27,15 @@ has its own receipt-based rollback.
 | Layer | Installed form | Content | Rollback |
 |---|---|---|---|
 | Running motor driver | `/opt/dynamo-puma-field/<manifest-hash>`, selected by `97-dynamo-puma-field-driver.conf` | Clearpath 2.9.4 with the fault-flag, cache-safety, completeness, field-age and queue-timing patches; motion fields 150 ms, auxiliary fields 500 ms | `install_puma_field_driver.py --restore`; returns to the repair driver below |
-| Repair driver (rollback target) | `/opt/dynamo-puma/76ff6b99a1e35cc56e27e07302aa98f94ebb85f809348e25eaab04a50ef49856/`, `80-dynamo-puma-repair.conf`, guard drop-in `20-dynamo-dds-readiness.conf`, helper `/usr/local/lib/dynamo-hardware/wait_dds_interfaces.py` | Clearpath 2.9.4 with the fault-flag and cache-safety patches | `install_puma_repair.py --restore`, documented in the [README](../../README.md) |
-| Hardware consumer | `/opt/dynamo-puma-feedback/<manifest-hash>`, selected by `95-dynamo-puma-feedback.conf` | Clearpath 2.9.4 Puma hardware plugin with the feedback-consumer patch | `install_puma_feedback_plugin.py --restore`, documented in the README |
+| Repair driver (rollback target) | `/opt/dynamo-puma/76ff6b99a1e35cc56e27e07302aa98f94ebb85f809348e25eaab04a50ef49856/`, `80-dynamo-puma-repair.conf`, guard drop-in `20-dynamo-dds-readiness.conf`, helper `/usr/local/lib/dynamo-hardware/wait_dds_interfaces.py` | Clearpath 2.9.4 with the fault-flag and cache-safety patches | `install_puma_repair.py --restore` ([runbook](puma_feedback_runbook.md#repair-driver)) |
+| Hardware consumer | `/opt/dynamo-puma-feedback/<manifest-hash>`, selected by `95-dynamo-puma-feedback.conf` | Clearpath 2.9.4 Puma hardware plugin with the feedback-consumer patch | `install_puma_feedback_plugin.py --restore` ([runbook](puma_feedback_runbook.md#plugin-installation-and-rollback)) |
 
 The field-driver drop-in copies the consumer drop-in's `ExecStart` and swaps
 only the driver prefix, so the running platform uses both. The plugin installer
 does not inspect that later drop-in: when both are to be removed, restore the
-field driver first. Restoring the field driver needs the physical stop pressed
-and the receipt directory used to install it:
-
-```bash
-cd /home/robot/DyNAMO-Ridgeback
-sudo python3 tools/hardware/install_puma_field_driver.py --restore \
-  --operator-confirmed \
-  --run-dir "$PWD/artifacts/hardware/d5-field-driver-install-20261022-2"
-```
+field driver first. Restoring it needs the physical stop pressed and its
+install receipt `d5-field-driver-install-20261022-2`; the command is in the
+[Puma runbook](puma_feedback_runbook.md#field-age-driver).
 
 Restore re-validates that stage: the commissioning cap mode (original-manual
 speeds when it was installed), the consumer drop-in, robot identity and

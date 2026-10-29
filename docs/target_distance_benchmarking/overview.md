@@ -35,7 +35,8 @@ estimators it may select depends on the profile and on the evidence named — se
 [profiles](profiles.md).
 
 The root README owns complete build/run instructions. Main launch:
-[`target_distance_benchmark.launch.py`](../../src/ridgeback_autonomy/launch/target_distance_benchmark.launch.py).
+[`target_distance_benchmark.launch.py`](../../src/ridgeback_autonomy/launch/target_distance_benchmark.launch.py);
+its layers and arguments are in [launch arguments](launch_arguments.md).
 
 ## Shutdown lifecycle
 
@@ -83,6 +84,10 @@ camera-less robot profile for measuring frontier exploration. It is a separate w
 - [open benchmarking work](BACKLOG.md) — remaining validation, tooling, and scenario work
 - [running benchmarks](running_benchmarks.md) — which question, which profile,
   and which of the four ways to start it
+- [launch arguments](launch_arguments.md) — launch layers, backends, and every
+  single-run argument
+- [sweeps](sweeps.md) — the persistent-environment supervisor, sweep file
+  format, resume, and shipped sweeps
 - [semantics](semantics.md) — scenarios, events, observations, instances, miss
   reasons, and what may be compared with what
 - [outputs](outputs.md) — `run.json`, `sweep.json`, `summary.md`, CSVs,

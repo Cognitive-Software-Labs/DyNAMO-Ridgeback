@@ -138,18 +138,8 @@ policy composition only.
 ## Installation and rollback
 
 [The field-driver installer](../../tools/hardware/install_puma_field_driver.py)
-owns deployment. Run it from the robot checkout with an operator present:
-
-```bash
-cd /home/robot/DyNAMO-Ridgeback
-python3 tools/hardware/install_puma_field_driver.py --stage \
-  --candidate "$PWD/artifacts/hardware/<field-candidate>" \
-  --run-dir "$PWD/artifacts/hardware/<fresh-install-dir>"
-sudo python3 tools/hardware/install_puma_field_driver.py --apply \
-  --operator-confirmed --run-dir "$PWD/artifacts/hardware/<fresh-install-dir>"
-sudo python3 tools/hardware/install_puma_field_driver.py --restore \
-  --operator-confirmed --run-dir "$PWD/artifacts/hardware/<fresh-install-dir>"
-```
+owns deployment. Its stage, apply, restore and live-acceptance commands are in
+the [Puma runbook](puma_feedback_runbook.md#field-age-driver).
 
 - **Stage** verifies the candidate's input hashes against the maintained
   patches and policy header, its dependency versions and its binary hash. The

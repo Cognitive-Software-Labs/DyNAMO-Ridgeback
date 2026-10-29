@@ -48,6 +48,13 @@ troubleshooting, planning, and historical documentation.
     policy, lifecycle and recovery
   - [Motor-link fault injection](physical/motor_link_fault_injection.md) — D6
     feedback and D7 command-link fault paths and verdicts
+- Operator runbooks (commands, preconditions, rollback):
+  - [Driving operator runbook](physical/driving_operator_runbook.md) — audits,
+    guard install and rollback, observer and pulse trials, controller checks
+  - [Puma feedback runbook](physical/puma_feedback_runbook.md) — repair driver,
+    feedback plugin and field-age driver install, rollback and checks
+  - [Stationary repairs runbook](physical/stationary_repairs_runbook.md) —
+    desktop and controller setup repair, auxiliary repairs, health batch, clock
 - [Ridgeback host setup and SSD recovery](physical/ridgeback_recovery.md) —
   reconstruction order, deployed scripts/configs, network and service ownership,
   credentials recreated locally, and unverified recovery steps
@@ -60,6 +67,8 @@ troubleshooting, planning, and historical documentation.
 ## Exploration
 
 - [Exploration architecture](exploration/architecture.md)
+  - [Exploration launch arguments](exploration/launch_arguments.md) — worlds and
+    every `ridgeback_exploration.launch.py` argument
 - [Exploration evaluation](exploration/evaluation.md)
 - [Ground-truth maps](../src/ridgeback_autonomy/sim/ground_truth_maps/README.md)
 
@@ -89,6 +98,10 @@ troubleshooting, planning, and historical documentation.
 - [Open benchmarking work](target_distance_benchmarking/BACKLOG.md) — validation gates, scenario recertification, and tooling gaps
 - [Target-distance benchmarking](target_distance_benchmarking/overview.md) — start here: what
   the benchmark is, the estimators and axes, and what it may not claim
+- [Benchmark launch arguments](target_distance_benchmarking/launch_arguments.md)
+  — launch layers, backends and every benchmark argument
+- [Benchmark sweeps](target_distance_benchmarking/sweeps.md) — sweep mechanism,
+  file format, resume and the shipped sweeps
 - [Running benchmarks](target_distance_benchmarking/running_benchmarks.md) — which question,
   which profile, which of the four ways to start it
 - [Benchmark semantics](target_distance_benchmarking/semantics.md) — scenarios, events,

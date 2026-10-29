@@ -20,7 +20,12 @@ The compatibility unit has four root-owned parts:
   Gazebo-only `clearpath_simulator`, `gz-sim`, and `ros_gz` pins.
 - [`dependencies/viz.repos`](../../dependencies/viz.repos) owns the optional
   `rviz` pin for hosts that run RViz.
-- [`patches/`](../../patches/) owns intentional changes to those pinned sources.
+- [`patches/`](../../patches/) owns intentional changes to those pinned sources;
+  [maintained dependency patches](dependency_patches.md) describes each one.
+  Because patches are recorded against exact upstream revisions, the manifests
+  pin every dependency to a commit. Never move a pin to a branch such as
+  `jazzy` or `main` to pick up a fix: a fresh import would clone commits the
+  patches were never rebased onto.
 - [`tools/check_dependencies`](../../tools/check_dependencies) verifies that
   every checkout is at its pin and contains either no changes or exactly its
   recorded patches.
