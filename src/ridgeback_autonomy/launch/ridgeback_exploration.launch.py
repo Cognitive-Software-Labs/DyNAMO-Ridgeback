@@ -500,6 +500,9 @@ def generate_launch_description():
             choices=['true', 'false'],
             description='Allow frontier goals to command motion; hardware '
                         'defaults false and requires explicit operator opt-in'),
+        DeclareLaunchArgument('exploration_startup_paused', default_value='false',
+                              choices=['true', 'false'],
+                              description='Start MissionGuard latched until mission/resume'),
         DeclareLaunchArgument(
             'start_hardware_platform', default_value='false',
             choices=['true', 'false'],
@@ -599,6 +602,7 @@ def generate_launch_description():
                         'namespace': namespace,
                         'use_sim_time': use_sim_time,
                         'localization_required': LaunchConfiguration('localization_required'),
+                        'startup_paused': LaunchConfiguration('exploration_startup_paused'),
                         'health_timeout': LaunchConfiguration('health_timeout'),
                         'localization_progress_timeout': LaunchConfiguration('progress_timeout'),
                         'cancellation_timeout': LaunchConfiguration('cancellation_timeout'),

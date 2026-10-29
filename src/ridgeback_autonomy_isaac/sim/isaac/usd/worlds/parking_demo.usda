@@ -1,0 +1,15 @@
+#usda 1.0
+(
+    defaultPrim = "initial_test_world"
+    metersPerUnit = 1
+    upAxis = "Z"
+    subLayers = [@./initial_test_world.usda@]
+)
+
+// Keep the existing environment, with exactly one G1 supplied by scene setup.
+over "initial_test_world"
+{
+    over "default_g1_far_right_room" (active = false)
+    {
+    }
+}

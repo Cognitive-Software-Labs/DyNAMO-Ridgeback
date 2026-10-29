@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections import OrderedDict
 
 import rclpy
+from ridgeback_common.ros_signals import init_owned, shielded, spin_until_interrupted
 from rclpy.executors import ExternalShutdownException
 from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
@@ -514,16 +515,16 @@ class TargetOverlayNode(Node):
         self.get_logger().warn(warning)
 
 def main() -> None:
-    rclpy.init()
+    init_owned()
     node = TargetOverlayNode()
     try:
-        rclpy.spin(node)
+        spin_until_interrupted(node)
     except (KeyboardInterrupt, ExternalShutdownException):
         pass
     finally:
-        node.destroy_node()
-        if rclpy.ok():
-            rclpy.shutdown()
+        with shielded(final=True):
+            node.destroy_node()
+            rclpy.try_shutdown()
 
 
 if __name__ == '__main__':

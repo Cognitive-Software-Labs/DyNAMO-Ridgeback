@@ -36,6 +36,7 @@ WORLD_FLOOR_Z = {
     "empty": 0.05,
     "g1_distance_calibration": 0.05,
     "initial_test_world": 0.05,
+    "parking_demo": 0.05,
     **{name: 0.0 for name in STOCK_WORLDS},
 }
 

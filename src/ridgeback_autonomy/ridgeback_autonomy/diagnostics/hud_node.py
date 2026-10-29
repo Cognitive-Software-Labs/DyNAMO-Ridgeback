@@ -21,6 +21,7 @@ to that mode: it joins with ``<br/>`` and sizes off ``<br/>``. Panels feeding a
 """
 
 import rclpy
+from ridgeback_common.ros_signals import init_owned, shielded, spin_until_interrupted
 from rclpy.node import Node
 from rclpy.qos import QoSProfile, ReliabilityPolicy, DurabilityPolicy, HistoryPolicy
 
@@ -160,16 +161,16 @@ class HudNode(Node):
 
 
 def main():
-    rclpy.init()
+    init_owned()
     node = HudNode()
     try:
-        rclpy.spin(node)
+        spin_until_interrupted(node)
     except KeyboardInterrupt:
         pass
     finally:
-        node.destroy_node()
-        if rclpy.ok():
-            rclpy.shutdown()
+        with shielded(final=True):
+            node.destroy_node()
+            rclpy.try_shutdown()
 
 
 if __name__ == '__main__':

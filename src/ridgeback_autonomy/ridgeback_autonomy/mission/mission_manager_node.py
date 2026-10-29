@@ -46,6 +46,7 @@ from rclpy.qos import DurabilityPolicy, QoSProfile, qos_profile_sensor_data
 from rclpy.time import Time
 from std_msgs.msg import String, Bool
 from rclpy.parameter import parameter_value_to_python
+from rclpy.signals import SignalHandlerOptions
 from std_srvs.srv import Trigger
 from tf2_ros import Buffer, TransformException, TransformListener
 from rviz_2d_overlay_msgs.msg import OverlayText
@@ -260,6 +261,8 @@ class MissionManagerNode(Node):
         self.declare_parameter('target_localization_timeout_s', 5.0)
         self.declare_parameter('association_history_size', 32)
         self.declare_parameter('control_period_s', 0.2)
+        self.declare_parameter('startup_paused', False)
+        self._startup_paused = bool(self.get_parameter('startup_paused').value)
         self.declare_parameter('parking_planning_enabled', True)
         self.declare_parameter('map_topic', 'map')
         self.declare_parameter('parking_visualization_topic', 'parking/visualization')
@@ -628,7 +631,24 @@ class MissionManagerNode(Node):
         # Safety deadlines must still be polled if /clock pauses or stops.
         self.control_timer = self.create_timer(
             control_period_s, self.tick, clock=Clock(clock_type=ClockType.STEADY_TIME))
+        self.start_service = self.create_service(Trigger, 'parking_mission/start', self._start_mission)
         self._publish_state('mission manager initialized', event='snapshot')
+
+    def _start_mission(self, request, response):
+        """Release demo startup admission after the launch has verified all prerequisites.
+
+        Start-pose capture is allowed while paused; detections are not. This
+        prevents a startup resume from racing the manager's G1 pause request.
+        Normal launches retain immediate admission (startup_paused defaults false).
+        """
+        with self._lock:
+            response.success = self.start_pose is not None
+            response.message = ('mission startup released' if response.success
+                                else 'waiting for the initial map-to-base pose')
+            if response.success:
+                self._startup_paused = False
+                self._publish_state(response.message, event='startup_release')
+            return response
 
     def tick(self, now_s: float | None = None) -> None:
         """Advance timeout/service polling without blocking ROS callbacks."""
@@ -737,6 +757,8 @@ class MissionManagerNode(Node):
 
     def process_detection(self, msg: TargetDetections) -> None:
         with self._lock:
+            if self._startup_paused:
+                return
             if self.state not in (
                 MissionState.SEARCH_G1,
                 MissionState.STOPPING_EXPLORATION,
@@ -1293,6 +1315,7 @@ class MissionManagerNode(Node):
             'reason': reason,
             'target_committed': self.target_committed,
             'start_pose_saved': self.start_pose is not None,
+            'startup_paused': self._startup_paused,
             'parking_navigation_enabled': self.execution.enabled or self.parking_navigation_enabled,
             'parking_execution': self.execution.summary(),
             'parking_safety': self.safety_monitor.summary(),
@@ -1358,7 +1381,12 @@ class MissionManagerNode(Node):
             except ValueError as exc:
                 self._fail_planning('parking_inputs_invalid', f'map_invalid: {exc}')
                 return
-            robot = self._current_robot_pose(with_stamp=True)
+            # TF arrives on its own thread; its newest sample can be ahead of
+            # this callback's /clock sample. Request our actual snapshot time
+            # first. The fallback still passes the unchanged future/age checks.
+            robot = self._frame_pose(self.base_frame, Time(nanoseconds=now_ns))
+            if robot is None:
+                robot = self._current_robot_pose(with_stamp=True)
             reasons = validate_inputs(
                 target, grid, robot, now_ns=now_ns, map_frame=self.map_frame,
                 max_target_age_s=self.parking_max_target_age_s,
@@ -1929,6 +1957,13 @@ class MissionManagerNode(Node):
         self.stage_paths.cancel('manager_shutdown')
         if self.execution.busy:
             self.execution.cancel('manager_shutdown')
+        if self.tf_listener is not None:
+            # Join the dedicated TF executor before destroying the ROS context.
+            self.tf_listener.executor.shutdown()
+            self.tf_listener.dedicated_listener_thread.join()
+            self.tf_listener.unregister()
+            self.tf_listener.node.destroy_node()
+            self.tf_listener = None
         return super().destroy_node()
 
     # Original mission tail: pre-parking -> final -> stop and wait -> return to start.
@@ -2473,7 +2508,9 @@ def load_nav2_footprint(nav2_params_path: str) -> list[tuple[float, float]]:
 
 
 def main(args=None) -> None:
-    rclpy.init(args=args)
+    # Python's SIGINT exception reaches finally before ROS context destruction,
+    # allowing the independent TF executor to stop without racing shutdown.
+    rclpy.init(args=args, signal_handler_options=SignalHandlerOptions.NO)
     node = MissionManagerNode()
     try:
         rclpy.spin(node)

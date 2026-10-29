@@ -78,6 +78,12 @@ install(PROGRAMS
 )
 
 install(PROGRAMS
+  ridgeback_autonomy/mission/simulation_startup.py
+  DESTINATION lib/${PROJECT_NAME}
+  RENAME parking_simulation_startup
+)
+
+install(PROGRAMS
   ridgeback_autonomy/diagnostics/velocity_overlay_node.py
   DESTINATION lib/${PROJECT_NAME}
   RENAME velocity_overlay_node
@@ -141,6 +147,7 @@ if(BUILD_TESTING)
   ament_add_pytest_test(test_isaac_collider_validation test/test_isaac_collider_validation.py)
   ament_add_pytest_test(test_nav2_footprint test/test_nav2_footprint.py)
   ament_add_pytest_test(test_parking_geometry test/test_parking_geometry.py)
+  ament_add_pytest_test(test_parking_simulation_startup test/test_parking_simulation_startup.py)
   ament_add_pytest_test(test_parking_planner test/test_parking_planner.py)
   ament_add_pytest_test(test_parking_feasibility test/test_parking_feasibility.py)
   ament_add_pytest_test(test_parking_execution test/test_parking_execution.py)

@@ -34,10 +34,11 @@ def guard_factory():
     rclpy.init()
     nodes = []
 
-    def create(required=False):
+    def create(required=False, startup_paused=False):
         node = Node(
             f'mission_handoff_test_{len(nodes)}',
-            parameter_overrides=[Parameter('localization_required', value=required)],
+            parameter_overrides=[Parameter('localization_required', value=required),
+                                 Parameter('startup_paused', value=startup_paused)],
         )
         nodes.append(node)
         return MissionGuard(node)
@@ -87,6 +88,15 @@ def test_pause_while_idle_is_immediately_acknowledged_and_idempotent(guard_facto
     assert status['pause_requested'] is True
     assert status['handoff_safe'] is True
     assert status['goal_active'] is False
+
+
+def test_startup_latch_does_not_turn_optional_localization_into_a_requirement(guard_factory):
+    guard = guard_factory(startup_paused=True)
+    assert guard.paused and not guard.required and not guard.allowed()
+    response = guard.resume(Trigger.Request(), Trigger.Response())
+    assert response.success and guard.allowed()
+    guard.tick()
+    assert guard.allowed()  # missing optional health cannot relatch startup
 
 
 def test_pause_during_active_goal_waits_for_terminal_result(guard_factory):

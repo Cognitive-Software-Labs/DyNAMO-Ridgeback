@@ -28,6 +28,10 @@ ENTRY_POINTS = {
     'velocity_overlay': 'ridgeback_autonomy.diagnostics.velocity_overlay_node',
     'coverage_overlay': 'ridgeback_autonomy.diagnostics.coverage_overlay_node',
     'localization_overlay': 'ridgeback_autonomy.diagnostics.localization_overlay_node',
+    'hud': 'ridgeback_autonomy.diagnostics.hud_node',
+    'localization_health': 'ridgeback_localization.health_node',
+    'target_overlay': 'ridgeback_localization.overlay_node',
+    'target_visualization': 'ridgeback_localization.visualization_node',
     'frontier_explorer': 'ridgeback_autonomy.frontier_explorer.frontier_explorer_node',
 }
 

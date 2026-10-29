@@ -11,6 +11,7 @@ install(DIRECTORY launch sim DESTINATION share/${PROJECT_NAME}
 if(BUILD_TESTING)
   find_package(ament_cmake_pytest REQUIRED)
   ament_add_pytest_test(test_benchmark_assets test/test_benchmark_assets.py)
+  ament_add_pytest_test(test_parking_demo_world test/test_parking_demo_world.py)
   # Skips without pxr; the Isaac interpreter verifies generated USD content.
   ament_add_pytest_test(test_generated_benchmark_assets
     test/test_generated_benchmark_assets.py)

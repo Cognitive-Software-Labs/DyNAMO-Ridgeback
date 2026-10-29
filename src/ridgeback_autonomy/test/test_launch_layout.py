@@ -115,7 +115,7 @@ def test_stationary_mock_condition_excludes_exploration() -> None:
         _package_root() / 'launch' / 'ridgeback_mission.launch.py'
     ).read_text(encoding='utf-8')
     mock_node = mission_text[mission_text.index("executable='stationary_mission_guard'"):]
-    mock_node = mock_node[:mock_node.index('Node(')]
+    mock_node = mock_node[:mock_node.index('OpaqueFunction(function=_startup_nodes)')]
     assert "exploration_enabled, \"' != 'true'\"" in mock_node
 
 

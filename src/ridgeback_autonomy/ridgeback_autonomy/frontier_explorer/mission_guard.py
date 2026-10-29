@@ -15,7 +15,7 @@ class MissionGuard:
     def __init__(self, node):
         self.node = node
         self.lock = threading.RLock()
-        for name, value in dict(localization_required=False, health_timeout=3.0,
+        for name, value in dict(localization_required=False, startup_paused=False, health_timeout=3.0,
                                 localization_progress_timeout=15.0, cancellation_timeout=5.0).items():
             node.declare_parameter(name, value)
         self.required = bool(node.get_parameter('localization_required').value)
@@ -24,12 +24,15 @@ class MissionGuard:
         self.cancel_timeout = float(node.get_parameter('cancellation_timeout').value)
         if any(not math.isfinite(v) or v <= 0 for v in (self.health_timeout, self.progress_timeout, self.cancel_timeout)):
             raise ValueError('Supervision timeouts must be finite and positive')
-        self.paused = self.required
+        startup_paused = bool(node.get_parameter('startup_paused').value)
+        self.paused = self.required or startup_paused
         self.last_health = None
         self.session = None
         self.progress = {}
         self.health_state = 'startup'
         self.reason = 'Awaiting health and explicit resume' if self.required else 'Localization optional'
+        if startup_paused:
+            self.reason = 'Awaiting explicit startup release'
         self.handle = None
         self.goal_pending = False
         self.cancel_state = 'none'

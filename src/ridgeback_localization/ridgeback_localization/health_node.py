@@ -4,6 +4,7 @@ import json
 import time
 import uuid
 import rclpy
+from ridgeback_common.ros_signals import init_owned, shielded, spin_until_interrupted
 from rclpy.node import Node
 from rclpy.clock import Clock, ClockType
 from rclpy.qos import qos_profile_sensor_data, QoSProfile, DurabilityPolicy
@@ -119,12 +120,13 @@ class LocalizationHealthNode(Node):
 
 
 def main():
-    rclpy.init()
+    init_owned()
     node = LocalizationHealthNode()
-    try: rclpy.spin(node)
+    try: spin_until_interrupted(node)
     except KeyboardInterrupt: pass
     finally:
-        node.destroy_node()
-        if rclpy.ok(): rclpy.shutdown()
+        with shielded(final=True):
+            node.destroy_node()
+            rclpy.try_shutdown()
 
 if __name__ == '__main__': main()

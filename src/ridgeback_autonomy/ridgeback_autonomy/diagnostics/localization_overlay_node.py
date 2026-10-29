@@ -17,6 +17,7 @@ the kind of thing worth eyeballing in RViz.
 import math
 
 import rclpy
+from ridgeback_common.ros_signals import init_owned, shielded, spin_until_interrupted
 from rclpy.executors import ExternalShutdownException
 from rclpy.node import Node
 from rclpy.qos import QoSProfile, ReliabilityPolicy, DurabilityPolicy, HistoryPolicy
@@ -131,15 +132,16 @@ class LocalizationOverlayNode(Node):
 
 
 def main():
-    rclpy.init()
+    init_owned()
     node = LocalizationOverlayNode()
     try:
-        rclpy.spin(node)
+        spin_until_interrupted(node)
     except (KeyboardInterrupt, ExternalShutdownException):
         pass
     finally:
-        node.destroy_node()
-        rclpy.try_shutdown()
+        with shielded(final=True):
+            node.destroy_node()
+            rclpy.try_shutdown()
 
 
 if __name__ == '__main__':

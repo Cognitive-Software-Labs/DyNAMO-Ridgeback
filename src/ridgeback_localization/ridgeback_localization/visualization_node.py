@@ -14,6 +14,7 @@ import math
 import threading
 
 import rclpy
+from ridgeback_common.ros_signals import init_owned, shielded, spin_until_interrupted
 from geometry_msgs.msg import PointStamped
 from rclpy.executors import ExternalShutdownException
 from rclpy.node import Node
@@ -284,16 +285,16 @@ class TargetVisualizationNode(Node):
 
 
 def main() -> None:
-    rclpy.init()
+    init_owned()
     node = TargetVisualizationNode()
     try:
-        rclpy.spin(node)
+        spin_until_interrupted(node)
     except (KeyboardInterrupt, ExternalShutdownException):
         pass
     finally:
-        node.destroy_node()
-        if rclpy.ok():
-            rclpy.shutdown()
+        with shielded(final=True):
+            node.destroy_node()
+            rclpy.try_shutdown()
 
 
 if __name__ == '__main__':
