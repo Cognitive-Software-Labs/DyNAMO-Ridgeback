@@ -1,8 +1,8 @@
 """RViz layout for the parking mission, derived from the shared exploration layout.
 
 The shared ``exploration.rviz`` stays untouched; the mission launch writes a
-temporary copy with a MarkerArray display for the parking plan and a screen
-overlay for its colour legend.
+temporary copy with a MarkerArray display for the parking plan and screen
+overlays for its colour legend and the live mission state machine.
 """
 
 from __future__ import annotations
@@ -14,6 +14,8 @@ import yaml
 PARKING_DISPLAY_NAME = 'Parking Plan'
 LEGEND_DISPLAY_NAME = 'Parking Legend'
 LEGEND_TOPIC = 'parking/legend'
+STATE_DIAGRAM_DISPLAY_NAME = 'Mission State Machine'
+STATE_DIAGRAM_TOPIC = 'parking_mission/state_diagram'
 PARKING_NAMESPACES = (
     'parking/g1_position', 'parking/g1_keepout', 'parking/donut_boundaries',
     'parking/radial_1deg', 'parking/candidate_task_points',
@@ -25,8 +27,9 @@ PARKING_NAMESPACES = (
 PARKING_HIDDEN_NAMESPACES = ('parking/rejected_task_points',)
 
 
-def with_parking_display(layout: dict, topic: str, legend_topic: str = LEGEND_TOPIC) -> dict:
-    """The layout with transient-local parking marker and legend displays appended."""
+def with_parking_display(layout: dict, topic: str, legend_topic: str = LEGEND_TOPIC,
+                         state_diagram_topic: str = STATE_DIAGRAM_TOPIC) -> dict:
+    """The layout with transient-local parking marker, legend and state-machine displays."""
 
     displays = layout['Visualization Manager']['Displays']
     if any(d.get('Name') == PARKING_DISPLAY_NAME for d in displays):
@@ -47,20 +50,22 @@ def with_parking_display(layout: dict, topic: str, legend_topic: str = LEGEND_TO
         },
         'Value': True,
     })
-    displays.append({
-        'Class': 'rviz_2d_overlay_plugins/TextOverlay',
-        'Enabled': True,
-        'Name': LEGEND_DISPLAY_NAME,
-        'Topic': {
-            'Depth': 1,
-            # Published once by the mission manager, latched.
-            'Durability Policy': 'Transient Local',
-            'History Policy': 'Keep Last',
-            'Reliability Policy': 'Reliable',
-            'Value': legend_topic,
-        },
-        'Value': True,
-    })
+    for name, overlay_topic in ((LEGEND_DISPLAY_NAME, legend_topic),
+                                (STATE_DIAGRAM_DISPLAY_NAME, state_diagram_topic)):
+        displays.append({
+            'Class': 'rviz_2d_overlay_plugins/TextOverlay',
+            'Enabled': True,
+            'Name': name,
+            'Topic': {
+                'Depth': 1,
+                # Latched by the mission manager, so a late RViz still gets it.
+                'Durability Policy': 'Transient Local',
+                'History Policy': 'Keep Last',
+                'Reliability Policy': 'Reliable',
+                'Value': overlay_topic,
+            },
+            'Value': True,
+        })
     return layout
 
 

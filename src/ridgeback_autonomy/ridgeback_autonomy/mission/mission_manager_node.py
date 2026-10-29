@@ -80,6 +80,7 @@ from ridgeback_autonomy.mission.parking_geometry import preparking_pose, rotated
 from ridgeback_autonomy.mission.parking_visualization import (
     clear_markers, legend_overlay, plan_markers,
 )
+from ridgeback_autonomy.mission.mission_state_diagram import state_diagram_overlay
 from ridgeback_autonomy.mission.motion_settlement import MotionSettlement
 from ridgeback_autonomy.mission.parking_clearance import (
     ClearanceLimits, ClearanceResult, clearance_reason, scan_points,
@@ -222,6 +223,9 @@ _ALLOWED_TRANSITIONS = {
     MissionState.MISSION_CANCELED: set(),
 }
 
+_ALLOWED_STATE_NAMES = {state.name: frozenset(target.name for target in targets)
+                        for state, targets in _ALLOWED_TRANSITIONS.items()}
+
 
 class MissionManagerNode(Node):
     """Coordinate the safe exploration-to-localization mission prefix."""
@@ -260,6 +264,7 @@ class MissionManagerNode(Node):
         self.declare_parameter('map_topic', 'map')
         self.declare_parameter('parking_visualization_topic', 'parking/visualization')
         self.declare_parameter('parking_legend_topic', 'parking/legend')
+        self.declare_parameter('state_diagram_topic', 'parking_mission/state_diagram')
         self.declare_parameter(
             'nav2_params_path',
             os.path.join(get_package_share_directory('ridgeback_autonomy'),
@@ -430,6 +435,10 @@ class MissionManagerNode(Node):
             self.state_topic,
             status_qos,
         )
+        # Read-only RViz view of the state machine, redrawn when the state changes.
+        self.state_diagram_publisher = self.create_publisher(
+            OverlayText, str(self.get_parameter('state_diagram_topic').value), status_qos)
+        self._state_diagram = self._state_diagram_key = None
         self.detection_subscription = self.create_subscription(
             TargetDetections,
             self.detection_topic,
@@ -629,6 +638,8 @@ class MissionManagerNode(Node):
             if now_s >= self._legend_next_s:
                 self._legend_next_s = now_s + 1.0
                 self.parking_legend_publisher.publish(self._legend)
+                if self._state_diagram is not None:
+                    self.state_diagram_publisher.publish(self._state_diagram)
             self._poll_safety_evidence(now_s)
             self._publish_keepout_mask()
             stage_was_busy = self.stage_paths.busy
@@ -1260,7 +1271,19 @@ class MissionManagerNode(Node):
         self._guard_failure_signature = None
         self._guard_failure_count = 0
 
+    def _publish_state_diagram(self) -> None:
+        key = (self.state, len(self.transition_history))
+        if key == self._state_diagram_key:
+            return
+        self._state_diagram_key = key
+        self._state_diagram = state_diagram_overlay(
+            self.state.name,
+            [(t.previous.name, t.current.name, t.reason) for t in self.transition_history],
+            _ALLOWED_STATE_NAMES)
+        self.state_diagram_publisher.publish(self._state_diagram)
+
     def _publish_state(self, reason: str, *, event: str = 'transition') -> None:
+        self._publish_state_diagram()
         issue = self.last_issue
         position = self.target_position
         payload = {
