@@ -47,6 +47,14 @@ if [ -z "${RIDGEBACK_PERCEPTION_VENV:-}" ] || [ ! -x "$RIDGEBACK_PERCEPTION_VENV
 fi
 cd "$PARKING_ROOT"
 export RIDGEBACK_WORKSPACE="$PARKING_ROOT"
+# One non-clobbering run directory, as in start_exploration.sh. LOG_DIR moves
+# the root; an explicit ROS_LOG_DIR stays authoritative.
+LOG_DIR="${LOG_DIR:-$PARKING_ROOT/artifacts/exploration}"
+mkdir -p "$LOG_DIR"
+PARKING_RUN_DIR="$(mktemp -d "$LOG_DIR/parking_$(date +%Y-%m-%d_%H-%M-%S)_${PARKING_BACKEND}.XXXXXX")"
+export ROS_LOG_DIR="${ROS_LOG_DIR:-$PARKING_RUN_DIR/ros}"
+mkdir -p "$ROS_LOG_DIR"
+echo "ROS logs: $ROS_LOG_DIR"
 exec ros2 launch ridgeback_autonomy ridgeback_mission.launch.py \
     backend:="$PARKING_BACKEND" demo_scene_enabled:=true \
     mission_management_enabled:=true exploration_enabled:="$PARKING_EXPLORE" \

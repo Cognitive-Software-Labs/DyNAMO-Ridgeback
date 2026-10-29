@@ -73,3 +73,9 @@ startup resumes exploration and admits detections. `startup_timeout_s:=300.0`
 bounds each startup gate; failure shuts down the launch's processes. Ctrl-C
 stops the owned stack. Additional `name:=value` arguments are forwarded, for
 example `headless:=true` for Isaac without its viewport; RViz remains enabled.
+
+Each run writes its ROS logs to a new
+`artifacts/exploration/parking_<date>_<backend>.<suffix>/ros/` directory, which
+the wrapper prints at startup. `LOG_DIR` moves that root and an explicit
+`ROS_LOG_DIR` replaces the `ros/` directory; console output stays on the
+terminal.
