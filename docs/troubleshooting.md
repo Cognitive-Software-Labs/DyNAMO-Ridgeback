@@ -227,6 +227,30 @@ The camera stream is best-effort, so a default reliable `ros2 topic hz`
 subscription may not match. Use a sensor-data QoS subscriber or the mask node's
 depth-match receive counters.
 
+## Simulation slows on a shared workstation
+
+On a multi-user machine, check GPU access before blaming the stack's
+configuration. systemd-logind grants `/dev/dri/*` only to the user holding the
+active seat; without that ACL every sensor falls back to `llvmpipe` and RTF
+collapses (about 0.9 measured with access, 0.02–0.08 without):
+
+```bash
+getfacl /dev/dri/renderD128
+```
+
+If your user is missing, an administrator can grant access immediately with
+`setfacl -m u:<user>:rw /dev/dri/renderD128 /dev/dri/card*`, or durably with
+`usermod -aG render,video <user>` followed by a re-login. Agent sandboxes can
+also block `/dev/dri`, so launch simulators outside them.
+
+Then check other users' CPU load, which degrades the simulation independently
+of this stack:
+
+```bash
+ps -eo user,pid,%cpu,comm --sort=-%cpu | head
+cat /proc/loadavg
+```
+
 ## SLAM TF lag aborts valid Nav2 plans
 
 If MPPI reports `Unable to transform goal pose into costmap frame` with a small
