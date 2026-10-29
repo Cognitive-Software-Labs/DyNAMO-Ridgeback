@@ -332,3 +332,39 @@ was not tested: the boot step's 60-second give-up path is covered only by
 offline tests, and the platform clock gate is then expected to hold the base
 until time returns. Retest that path before relying on the robot where internet
 time can be missing at boot. Evidence: `artifacts/hardware/20261014-s6-boot-clock/`.
+
+## Passive stationary health commands
+
+The robot stays stationary with its physical e-stop pressed; no controller
+input, motion publisher, test permit or autonomy startup is involved. Run from
+the repository root with ROS Jazzy sourced. Each command is separate so a
+failed camera screen cannot obscure a health report. Use fresh output names for
+repeats and retain failed runs.
+
+```bash
+cd /home/robot/DyNAMO-Ridgeback
+source /opt/ros/jazzy/setup.bash
+python3 tools/hardware/fast_stationary_check.py
+python3 tools/camera_contract_check --backend hardware --guard \
+  --warmup 3 --duration 12 \
+  --output "artifacts/hardware/camera-screen-$(date -u +%Y%m%dT%H%M%SZ).json"
+python3 tools/hardware/hokuyo_recovery_watch.py --dry-run --duration 35 \
+  --report "artifacts/hardware/hokuyo-passive-$(date -u +%Y%m%dT%H%M%SZ).json"
+```
+
+The camera command creates local image subscribers; the scan guard ends the
+reader trial on individual gaps above 250 ms, merged gaps above 500 ms, driver
+errors or service changes. It does not restart services. The Hokuyo command
+does not create a fault or restart anything. If journal access is unavailable,
+that is a failed observation rather than evidence of healthy reconnect handling.
+The October 13 batch passed all 22 checks, and the passive Hokuyo watch held
+39.91/39.92 Hz front/rear with maximum receive gaps of 43.8/37.7 ms
+(`artifacts/hardware/stationary-batch-20261013T132501Z-78c5ac/` and
+`artifacts/hardware/20261013-hokuyo-passive-audit.json`). That confirms
+short-window healthy scans, not timeout recovery.
+
+Do not bundle a service restart into these passive commands. LiDAR
+interruption, desktop backend restart, reboot and external-time-source loss
+need dedicated rollback and evidence plans. Do not interrupt the MCU/CAN link as
+part of a LiDAR check, and do not disable networking broadly to test time
+sources: that also removes the operator's desktop path.

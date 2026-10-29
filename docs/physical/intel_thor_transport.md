@@ -19,7 +19,12 @@ that configuration. Two focused discovery-only multicast captures subsequently
 passed native image, scan and traffic gates with two independent reader pairs.
 Use the [guarded procedure](intel_dds_testing.md) to repeat and explicitly retain
 the candidate; check its recorded deployment state before routine camera runs.
-Alignment, soak, distributed localization and motion acceptance remain open.
+On 2026-10-14 a quiet local-reader screen and a 30-minute two-reader-pair soak
+passed under the installed configuration, and on 2026-10-21 `check_link
+--camera-reader` passed on `r100_0160` (S1 and S4 in the
+[qualification plan](../plans/PHYSICAL_remaining_qualification.md)). The
+initiating mechanism of the September lockouts and a loaded multi-hour soak
+remain [deferred](../BACKLOG.md#deferred-hardware-gates).
 
 The October 5 repeat-and-keep run passed its native capture and final verification
 and retained discovery-only multicast in `/etc/clearpath/cyclonedds.xml` on Intel.
@@ -47,7 +52,7 @@ running services or establish that the installed XML matches it.
 
 Discovery-only multicast has passed the focused local workload. Broader
 qualification still requires repeated captures, aligned-stream testing, and the
-[backlog's longer soak](../BACKLOG.md#hokuyo-driver-recovery-after-read-timeouts).
+[backlog's longer soak](../BACKLOG.md#deferred-hardware-gates).
 The timeout/reconnect cause remains unverified; no captured Hokuyo timeout in
 these tests established the historical recovery bug's mechanism.
 The synthetic `check_link` traffic test does not exercise this failure: it
@@ -379,8 +384,8 @@ colour/depth pairing, round-trip time and CPU. It writes its results under
   of the Hokuyo stalls remain hypotheses. Restarting drivers clears the
   reconnect lockout but does not resolve the initiating problem. Recovery is in
   [troubleshooting](../troubleshooting.md#hokuyo-drivers-stuck-reconnecting),
-  and the open fix is in the
-  [backlog](../BACKLOG.md#hokuyo-driver-recovery-after-read-timeouts).
+  and the unexplained recurrence is a
+  [deferred gate](../BACKLOG.md#deferred-hardware-gates).
 - The check and the benchmark use synthetic frames from a Python probe. They
   do not prove camera-driver health, the real driver's timing, or the rate of
   the real perception pipeline.

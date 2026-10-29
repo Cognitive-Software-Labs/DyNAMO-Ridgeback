@@ -8,7 +8,7 @@ package split from origin.
 section 2 "Transport, time, and readiness"
 **Related:** [Intel–Thor DDS transport](../../physical/intel_thor_transport.md),
 [D455 camera runs handoff (agent 1)](PHYSICAL_d455_camera_runs_agent1.md),
-and the [Hokuyo recovery backlog item](../../BACKLOG.md#hokuyo-driver-recovery-after-read-timeouts)
+and the [Hokuyo recovery backlog item](../../BACKLOG.md#deferred-hardware-gates)
 
 The evidence folders below are under `artifacts/hardware/` on the robot host
 and are not tracked by git.

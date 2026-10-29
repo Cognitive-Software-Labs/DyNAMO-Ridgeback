@@ -169,9 +169,47 @@ goals, not arbitrary Nav2 clients, teleoperation, or a physical emergency stop.
 Hardware autonomous motion remains off by default; do not enable it for the
 stationary milestone.
 
+## Thor inference environment
+
+Thor (JetPack 7, CUDA 13.0, `sm_110`) uses a `venv` over the system Python 3.12
+with `--system-site-packages`, as on the workstation, so compute nodes import
+ROS Jazzy's `rclpy`, `cv_bridge` and NumPy directly. Conda was rejected because
+its Python cannot reliably load the system ROS build; Thor's existing
+`~/miniforge3` environment belongs to another project. The venv lives at
+`~/venvs/dynamo-perception`, outside every checkout, and launches select it with
+`RIDGEBACK_PERCEPTION_VENV`. `requirements-perception-thor.txt` holds the setup
+commands and pins the workstation's `torch 2.11.0`/`torchvision 0.26.0` in
+their PyTorch CUDA 13.0 builds; NVIDIA's Jetson AI Lab index is the fallback
+only if `tools/intel_thor/check_perception_env` fails, and its different
+versions would need a new decision. Creating the venv needs Ubuntu's
+`python3.12-venv`. On the 2026-10-09 install, `pip check` reported two
+accepted items outside the model stack: Ubuntu's `python3-nacl` without
+`python3-cffi`, and a platform-tag warning for `nvidia-cusparselt-cu13`, which
+PyTorch loads.
+
 ## Qualification and paired rollback
 
-The package plan retains the [remaining handoff gates](../plans/PHYSICAL_package_split.md).
+Both hosts run the same installed revision since 2026-10-16 (P1 in the
+[qualification plan](../plans/PHYSICAL_remaining_qualification.md)); the
+workstation runtime evidence is under [Archived evidence](#archived-evidence).
+The workstation handoff candidate was `eaacd24b`, with build, import, replay and
+installed-smoke evidence under `artifacts/package-split/integration-eaacd24b/`.
+Recorded-input parity establishes schema and scoring preservation, not runtime
+timing equivalence; rerun live performance before quoting results for this
+process layout or non-default label queries.
+
+On `r100_0160` (2026-10-16, P1 and P2) both hosts ran `dev` `a31e770` and
+`check_link --no-traffic` passed 30 checks with matching revisions and a
+−0.02 ms clock offset. Killing the detector reported health `failure` and
+returned to `processing` 8 s after relaunch; since 2026-10-21 workers respawn
+automatically (`processing` within 13 s, no service restart), and Thor runs
+`dynamo-localization.service` from boot. A Thor cable pull recovered PTP in
+about 5 s after the PHC step fix. All four localization modes started and
+reached `processing` on the Thor GPU, with box-stereo delays of 367/383 ms,
+box-mono 575/592 ms, Thor at no more than 68 °C, a person tracked at two marks,
+and no false detections in a 28 s empty segment. Distance accuracy at taped
+marks, silhouette timing and G1 target cases were not measured; see the
+[deferred gates](../BACKLOG.md#deferred-hardware-gates).
 The current workstation checks include clean headless builds/imports, generated
 serialization, unchanged recorded-input estimator/scoring results, launch-role
 construction, fake Nav2 action cancellation, and bounded headless Gazebo/Isaac

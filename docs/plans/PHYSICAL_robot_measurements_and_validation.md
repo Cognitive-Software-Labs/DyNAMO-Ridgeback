@@ -4,7 +4,7 @@ Status: **mount readings and LiDAR box checks recorded (2026-09-18), rear-offset
 service qualified at both profiles (2026-10-06); alignment and target acceptance
 still open.** Owner:
 people at the robot, assisted by an agent. The
-[project backlog](../BACKLOG.md#physical-stationary-integration) owns the overall
+[qualification plan](PHYSICAL_remaining_qualification.md) owns the overall
 stationary milestone; its individual geometry, camera, calibration, and motion
 gates retain their own completion criteria.
 
@@ -17,9 +17,7 @@ worksheet for people.
 
 The visit covers quick mount measurements, both LiDARs, stationary camera–LiDAR
 alignment, and G1/person integration.
-Measurements and sensor inspection can proceed alongside deployment. The
-[workstation package split](PHYSICAL_package_split.md) supplies an available
-handoff candidate; final distributed tests use its accepted installed revision and the
+Measurements and sensor inspection can proceed alongside deployment. Final distributed tests use the revision installed on both hosts and the
 [Intel–Thor deployment](PHYSICAL_intel_thor_deployment.md). Physical driving,
 braking, dynamic calibration, and autonomous missions remain outside this plan.
 
@@ -50,13 +48,13 @@ The [geometry reference](../robot/geometry.md#deployed-hardware-mounts) separate
 physical readings, robot-local configuration, and nominal simulator geometry.
 The rear offset correction changed the robot YAML and vendor merger, not the
 repository's already symmetric declaration. Its independent stationary
-side-target recheck and stationary merged-output comparison are complete;
-driver recovery is not.
+side-target recheck and stationary merged-output comparison are complete, and
+in-driver reconnect after a session reset passed on both LiDARs (S3).
 
-Continue in this order: resolve and validate the services transport fault;
-confirm stable individual and merged scans;
-then run camera–LiDAR overlays, the localization smoke once a perception
-environment is installed, and G1/person integration. The camera service and its
+The services transport screens (S1, S4) and the first Thor localization smoke
+are done. Remaining here: the camera–LiDAR overlays in the
+[alignment session](PHYSICAL_camera_alignment_session.md) and G1/person
+integration. The camera service and its
 camera-to-base TF are in place and pass the contract check.
 
 ## Who does what

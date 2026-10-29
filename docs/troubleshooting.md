@@ -359,12 +359,15 @@ UST serves one client at a time, so the stock driver never recovers on its own.
 LiDAR's driver reconnects by itself in about 2.25 s (rear 2026-10-13, front
 2026-10-14). If this symptom returns, first check that `robot.yaml` still lists
 the overlay and that `pgrep -af urg_node_driver` shows its path; a reinstall or
-Clearpath regeneration that drops the overlay brings the lockout back. Repeated local-camera-subscriber-associated failures
+Clearpath regeneration that drops the overlay brings the lockout back. The
+pre-overlay configuration is kept as `/etc/clearpath/robot.yaml.bak-urg-node-fix`
+for rollback. Repeated local-camera-subscriber-associated failures
 and Ethernet traffic spikes are recorded in the
 [transport blocker](physical/intel_thor_transport.md#camera-subscriber-blocker);
 the initiating mechanism remains unproven.
-The [backlog](BACKLOG.md#hokuyo-driver-recovery-after-read-timeouts) tracks the
-recovery fix, and the incident timeline is in the archived evidence below.
+The in-driver reconnect fix is deployed and verified on both LiDARs; the
+unexplained simultaneous timeout is a [deferred gate](BACKLOG.md#deferred-hardware-gates),
+and the incident timeline is in the archived evidence below.
 
 **Recovery.** Stop the offending test subscribers and record the time and active
 configuration before restarting `clearpath-sensors`. This restarts only sensor
@@ -439,8 +442,10 @@ replace the failed dependency arrangement. Mesa selection applies to the
 virtual X server; applications retain their own GPU selection. The desktop uses
 the real user runtime and an isolated session bus.
 
-Current listener ownership and stationary hardware preservation passed. Cold
-boot, backend failure/recovery and vendor-reload continuity remain open. Use the
+Listener ownership across repeated boots and automatic backend/proxy process
+recovery passed on 2026-10-16 (see the [recovery reference](physical/ridgeback_recovery.md)).
+Network loss, display corruption, browser-side session persistence and
+vendor-reload continuity remain [deferred](BACKLOG.md#deferred-hardware-gates). Use the
 [root stationary repair workflow](../README.md#stationary-desktop-and-controller-setup-repair)
 for exact receipt-based rollback; restarting it closes remote access temporarily.
 The legacy combined vendor-camera repair is not the current installation path.
