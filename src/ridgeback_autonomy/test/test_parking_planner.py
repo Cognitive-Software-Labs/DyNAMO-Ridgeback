@@ -372,3 +372,158 @@ def test_reach_budget_rejects_candidates_beyond_the_allowed_planned_reach():
     assert all(c.reach_m <= 0.54 for c in plan.candidates if c.status in ('valid', 'selected'))
     assert any(c.reason == 'reach_budget' for c in plan.candidates)
     assert plan.selected.reach_m <= 0.54
+
+
+# Candidate-geometry audit: every candidate, at off-grid G1 positions and on a rotated map.
+from ridgeback_autonomy.mission.parking_geometry import normalize_angle, task_point_from_base_pose
+from ridgeback_autonomy.mission.parking_planner import G1_LOWER_BODY_RADIUS_M
+
+REAR_OVERHANG = 0.497107 - 0.280     # footprint rear edge behind the rear-bin task point
+BUDGET = replace(CONFIG, reach_allowance_m=0.06)   # the node's 0.03 final + 0.03 reference
+OFF_GRID = [
+    # (G1 x, y), map yaw, approach pose
+    ((2.93, 3.17), 0.0, (4.6, 1.4, 2.3)),
+    ((3.11, 2.87), math.radians(70), (1.2, 4.9, -0.9)),
+]
+
+
+def centred_grid(tx, ty, yaw, size_m=8.0):
+    """A free grid of the given yaw whose local centre is the target."""
+    c, s = math.cos(yaw), math.sin(yaw)
+    h = size_m / 2.0
+    return grid(size_m=size_m, origin=(tx - c * h + s * h, ty - s * h - c * h), yaw=yaw)
+
+
+def touching(polygon, g, mask):
+    """Brute force over the whole grid: does any masked cell touch the polygon?"""
+    rows, cols = np.nonzero(mask)
+    cx, cy = g.cell_centers(cols, rows)
+    return bool(np.any(points_to_polygon_distance(cx, cy, polygon) <= math.sqrt(2.0) * RES * 0.5))
+
+
+def mark(g, points_xy, value):
+    for x, y in points_xy:
+        lx, ly = g.map_to_local(x, y)
+        g.data[int(ly // RES), int(lx // RES)] = value
+
+
+@pytest.mark.parametrize('g1,map_yaw,approach', OFF_GRID)
+def test_every_candidate_puts_the_rear_task_point_in_the_donut_with_g1_behind(g1, map_yaw, approach):
+    g = centred_grid(*g1, map_yaw)
+    plan = plan_parking(g, target(*g1), CONFIG, approach)
+
+    rows, cols = np.mgrid[0:g.height, 0:g.width]
+    cx, cy = g.cell_centers(cols, rows)
+    d = np.hypot(cx - g1[0], cy - g1[1])
+    assert len(plan.candidates) == len(plan.free_cells) == int(np.sum((d >= 0.30) & (d <= 0.60)))
+    for c in plan.candidates:
+        # The (-0.28, 0) base_link task point is the candidate's donut cell...
+        assert task_point_from_base_pose(c.base_x, c.base_y, c.yaw, -0.28, 0.0) == pytest.approx(
+            (c.task_x, c.task_y), abs=1e-9)
+        # ...and reach is measured from it to the G1 reference, never from base_link.
+        assert c.reach_m == pytest.approx(math.hypot(c.task_x - g1[0], c.task_y - g1[1]))
+        assert 0.30 <= c.reach_m <= 0.60
+        assert math.hypot(c.base_x - g1[0], c.base_y - g1[1]) == pytest.approx(c.reach_m + 0.28)
+        # G1 lies exactly behind the base (yaw + pi), with yaw normalized to (-pi, pi].
+        assert -math.pi < c.yaw <= math.pi
+        to_g1 = math.atan2(g1[1] - c.base_y, g1[0] - c.base_x)
+        assert normalize_angle(to_g1 - c.yaw - math.pi) == pytest.approx(0.0, abs=1e-9)
+    assert any(abs(c.yaw) > 3.0 for c in plan.candidates)   # the +-pi wrap is exercised
+
+
+def test_g1_reference_is_used_as_given_without_hidden_offsets():
+    shift = (0.73, -1.18)
+    plain = plan_parking(grid(), target(), CONFIG, APPROACH_FROM_WEST)
+    moved = plan_parking(grid(origin=shift), target(3.0 + shift[0], 3.0 + shift[1]), CONFIG,
+                         (APPROACH_FROM_WEST[0] + shift[0], APPROACH_FROM_WEST[1] + shift[1], 0.0))
+
+    assert len(plain.candidates) == len(moved.candidates)
+    for a, b in zip(plain.candidates, moved.candidates):
+        assert (b.base_x - a.base_x, b.base_y - a.base_y) == pytest.approx(shift)
+        assert (b.yaw, b.status, b.reason) == (pytest.approx(a.yaw), a.status, a.reason)
+    assert moved.selected.task_x - plain.selected.task_x == pytest.approx(shift[0])
+
+
+@pytest.mark.parametrize('foot', [False, True])
+def test_keepout_covers_the_feet_at_any_g1_heading(foot):
+    # The planner takes no G1 heading: the 0.19 m envelope must cover the static SDF
+    # feet (+-0.104 m along G1 x, +-0.156 m lateral) about the foot midpoint at any yaw.
+    corners = [(sx * 0.104, sy * 0.156) for sx in (-1, 1) for sy in (-1, 1)]
+    plan = plan_parking(grid(), target(foot=foot), CONFIG, APPROACH_FROM_WEST)
+    for c in [c for c in plan.candidates if c.status in ('valid', 'selected')]:
+        polygon = rotated_footprint_vertices(FOOTPRINT, c.base_x, c.base_y, c.yaw)
+        for heading in np.radians(np.arange(0, 360, 15)):
+            feet = rotated_footprint_vertices(corners, 3.0, 3.0, heading)
+            assert max(math.hypot(x - 3.0, y - 3.0) for x, y in feet) <= G1_LOWER_BODY_RADIUS_M
+            gap = points_to_polygon_distance([p[0] for p in feet], [p[1] for p in feet], polygon)
+            assert gap.min() >= plan.keepout_radius_m - G1_LOWER_BODY_RADIUS_M - 1e-9
+
+
+@pytest.mark.parametrize('g1,map_yaw,approach', OFF_GRID)
+def test_rotated_table_legs_reject_exactly_the_footprints_they_touch(g1, map_yaw, approach):
+    g = centred_grid(*g1, map_yaw)
+    # A 0.9 x 0.6 m table rotated 30 deg beside G1: only its legs are in the LiDAR plane.
+    legs = rotated_footprint_vertices([(0.45, 0.3), (0.45, -0.3), (-0.45, -0.3), (-0.45, 0.3)],
+                                      g1[0] + 0.85, g1[1] + 0.55, math.radians(30))
+    mark(g, legs, 100)
+    plan = plan_parking(g, target(*g1), CONFIG, approach)
+
+    occupied = g.data >= CONFIG.occupied_threshold
+    hit = 0
+    for c in plan.candidates:
+        polygon = rotated_footprint_vertices(FOOTPRINT, c.base_x, c.base_y, c.yaw)
+        touches = touching(polygon, g, occupied)
+        hit += touches
+        assert touches == (c.reason == 'footprint_occupied')
+        assert not touches or c.status == 'collision'
+    assert hit and plan.ok
+    sel = plan.selected
+    assert not touching(rotated_footprint_vertices(FOOTPRINT, sel.base_x, sel.base_y, sel.yaw),
+                        g, occupied)
+
+
+@pytest.mark.parametrize('g1,map_yaw,approach', OFF_GRID)
+def test_unknown_cells_touching_a_rotated_footprint_reject_it(g1, map_yaw, approach):
+    g = centred_grid(*g1, map_yaw)
+    # A diagonal unexplored streak outside the donut, as left behind by a LiDAR shadow.
+    streak = [(g1[0] - 0.9 + 0.03 * k, g1[1] + 0.4 + 0.03 * k) for k in range(30)]
+    mark(g, streak, -1)
+    plan = plan_parking(g, target(*g1), CONFIG, approach)
+
+    assert not plan.unknown_cells   # nothing unknown inside the donut itself
+    unknown = g.data == -1
+    rejected = [c for c in plan.candidates if c.reason == 'footprint_unknown']
+    assert rejected and all(c.status == 'rejected' for c in rejected)
+    for c in plan.candidates:
+        polygon = rotated_footprint_vertices(FOOTPRINT, c.base_x, c.base_y, c.yaw)
+        assert touching(polygon, g, unknown) == (c.reason == 'footprint_unknown')
+
+
+@pytest.mark.parametrize('foot', [False, True])
+@pytest.mark.parametrize('g1,map_yaw,approach', OFF_GRID)
+def test_keepout_and_reach_budget_bound_the_valid_band(g1, map_yaw, approach, foot):
+    plan = plan_parking(centred_grid(*g1, map_yaw), target(*g1, foot=foot), BUDGET, approach)
+
+    keepout = plan.keepout_radius_m
+    for c in plan.candidates:
+        polygon = rotated_footprint_vertices(FOOTPRINT, c.base_x, c.base_y, c.yaw)
+        gap = points_to_polygon_distance([g1[0]], [g1[1]], polygon)[0]
+        # G1 sits on the base axis, so its distance to the footprint is reach - rear overhang.
+        assert gap == pytest.approx(c.reach_m - REAR_OVERHANG)
+        assert (c.reason == 'g1_keepout') == (gap < keepout)
+        assert (c.reason == 'reach_budget') == (gap >= keepout and c.reach_m > 0.54)
+    valid = [c.reach_m for c in plan.candidates if c.status in ('valid', 'selected')]
+    assert valid and min(valid) >= keepout + REAR_OVERHANG and max(valid) <= 0.54
+
+
+def test_ranking_prefers_mid_reach_and_stays_inside_the_budgeted_band():
+    for foot in (True, False):
+        plan = plan_parking(grid(), target(foot=foot), BUDGET, APPROACH_FROM_WEST)
+        valid = [c.reach_m for c in plan.candidates if c.status in ('valid', 'selected')
+                 and c.preference_label == plan.selected.preference_label]
+        # The 0.45 m preferred reach lies below the keep-out edge, so the tier keeps the
+        # innermost reachable cells (within one cell) rather than the 0.54 m outer cap.
+        assert plan.selected.reach_m <= min(valid) + RES
+        assert keepout_radius_m(plan.target, BUDGET) + REAR_OVERHANG <= plan.selected.reach_m <= 0.54
+    foot_plan = plan_parking(grid(), target(foot=True), BUDGET, APPROACH_FROM_WEST)
+    assert foot_plan.selected.reach_m < 0.54 - RES / 2

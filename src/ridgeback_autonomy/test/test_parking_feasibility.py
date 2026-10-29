@@ -533,3 +533,37 @@ def test_floor_under_the_mission_start_footprint_is_not_unknown_to_the_robot():
     c = CandidateDecision(3.5, 4.4, 3., 4.4, 0., 'valid', 'footprint_free', .5)
     assert path_rejection(p, c, start, g, target(), CONFIG, .29,
                           occupied=(mission_start,)) == 'path_footprint_unknown'
+
+
+def test_selected_candidate_is_driven_straight_in_from_its_preparking_pose():
+    from builtin_interfaces.msg import Time as TimeMsg
+    from ridgeback_autonomy.mission.mission_manager_node import MissionManagerNode
+    from ridgeback_autonomy.mission.parking_feasibility import pose_xyyaw
+    from ridgeback_autonomy.mission.parking_geometry import (
+        normalize_angle, preparking_pose, rotated_footprint_vertices)
+    from ridgeback_autonomy.mission.parking_planner import footprint_rejection_reason, plan_parking
+    g = grid(size_m=8., origin=(-1., -1.))
+    plan = plan_parking(g, target(), CONFIG, APPROACH_FROM_WEST)
+    sel = plan.selected
+    pre = preparking_pose(sel.base_x, sel.base_y, sel.yaw, .5)
+    # Pre-parking lies 0.5 m further out on the same axis: the final leg backs toward G1.
+    assert math.hypot(pre[0] - 3., pre[1] - 3.) == pytest.approx(
+        math.hypot(sel.base_x - 3., sel.base_y - 3.) + .5)
+    # The goals Nav2 receives carry exactly the candidate yaw, including near +-pi.
+    node = SimpleNamespace(map_frame='map', get_clock=lambda: SimpleNamespace(
+        now=lambda: SimpleNamespace(to_msg=TimeMsg)))
+    for yaw in (sel.yaw, math.pi, -math.pi + 1e-6, 3.1, -3.1):
+        msg = MissionManagerNode._pose_stamped(node, sel.base_x, sel.base_y, yaw)
+        assert normalize_angle(pose_xyyaw(msg.pose)[2] - yaw) == pytest.approx(0., abs=1e-9)
+    # As the node does: the Nav2 path to pre-parking plus the appended final pose.
+    start = preparking_pose(*pre, 1.)
+    route = path([start, pre, (sel.base_x, sel.base_y, sel.yaw)])
+    assert path_rejection(route, sel, start, g, target(), CONFIG, plan.keepout_radius_m) is None
+    # A table leg inside the pre-parking footprint only: the parking pose stays
+    # geometrically valid, but its route is not feasible.
+    lx, ly = g.map_to_local(*preparking_pose(*pre, .3)[:2])
+    g.data[int(ly // g.resolution), int(lx // g.resolution)] = 100
+    final = rotated_footprint_vertices(CONFIG.footprint, sel.base_x, sel.base_y, sel.yaw)
+    assert footprint_rejection_reason(final, g, CONFIG.occupied_threshold) is None
+    assert path_rejection(route, sel, start, g, target(), CONFIG,
+                          plan.keepout_radius_m) == 'path_footprint_occupied'
