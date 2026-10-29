@@ -99,20 +99,7 @@ def path_rejection(path, candidate, start, grid, target, config, keepout, *, occ
         return 'path_goal_yaw_mismatch'
     for stood in (start,) + tuple(occupied):
         grid = _start_footprint_known(grid, stood, config)
-    # The planner's first pose is the robot's start cell (NavFn: the grid-snapped
-    # cell point, a few cm off), not a place the robot drives to, so the swept route
-    # starts at the robot's actual pose. Keep the goal connector rather than
-    # trusting the endpoint tolerance.
-    poses = ([tuple(start[:3])] + poses[1 if len(poses) > 1 else 0:]
-             + [(candidate.base_x, candidate.base_y, candidate.yaw)])
-    # NavFn leaves intermediate orientations as the identity quaternion and the
-    # Omni MPPI controller does not follow path orientations, so those are not
-    # headings: the robot translates holonomically keeping its current yaw. Any
-    # real yaw (the goal pose, the final approach) is still swept below.
-    for i in range(1, len(path.poses) - 1):
-        q = path.poses[i].pose.orientation
-        if (q.x, q.y, q.z, q.w) == (0.0, 0.0, 0.0, 1.0):
-            poses[i] = poses[i][:2] + (poses[i - 1][2],)
+    poses = driven_poses(path, candidate, start, poses)
     budget = 2000
     for a, b in zip(poses, poses[1:]):
         dyaw = normalize_angle(b[2] - a[2])
@@ -131,6 +118,27 @@ def path_rejection(path, candidate, start, grid, target, config, keepout, *, occ
             if points_to_polygon_distance([target.x], [target.y], polygon)[0] < keepout:
                 return 'path_g1_keepout'
     return None
+
+
+def driven_poses(path, candidate, start, poses=None):
+    """The (x, y, yaw) sequence the robot drives along ``path`` from ``start`` to the candidate."""
+    if poses is None:
+        poses = [pose_xyyaw(p.pose) for p in path.poses]
+    # The planner's first pose is the robot's start cell (NavFn: the grid-snapped
+    # cell point, a few cm off), not a place the robot drives to, so the swept route
+    # starts at the robot's actual pose. Keep the goal connector rather than
+    # trusting the endpoint tolerance.
+    poses = ([tuple(start[:3])] + poses[1 if len(poses) > 1 else 0:]
+             + [(candidate.base_x, candidate.base_y, candidate.yaw)])
+    # NavFn leaves intermediate orientations as the identity quaternion and the
+    # Omni MPPI controller does not follow path orientations, so those are not
+    # headings: the robot translates holonomically keeping its current yaw. Any
+    # real yaw (the goal pose, the final approach) is still swept.
+    for i in range(1, len(path.poses) - 1):
+        q = path.poses[i].pose.orientation
+        if (q.x, q.y, q.z, q.w) == (0.0, 0.0, 0.0, 1.0):
+            poses[i] = poses[i][:2] + (poses[i - 1][2],)
+    return poses
 
 
 def _start_footprint_known(grid, start, config):
