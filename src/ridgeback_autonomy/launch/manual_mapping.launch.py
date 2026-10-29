@@ -5,7 +5,7 @@ Manual SLAM mapping launch for ground-truth map generation.
 This brings up:
 - Gazebo simulation
 - SLAM (slam_toolbox)
-- Keyboard teleop
+- Interactive-marker teleop (RViz drag widget) through twist_mux
 
 Excludes Nav2 and frontier exploration so the operator can manually teleoperate
 through the entire reachable space to collect ground-truth maps.

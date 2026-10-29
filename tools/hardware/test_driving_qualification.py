@@ -91,6 +91,18 @@ class QualificationTests(unittest.TestCase):
         self.assertEqual(matrix['summary']['D4']['passed'], 1)
         self.assertEqual(matrix['summary']['D6']['passed'], 0)
 
+    def test_cli_conditions_parse_booleans_numbers_and_text(self):
+        self.assertEqual(qualification.key_values(
+            ['final_configuration=true', 'retry=False', 'speed=0.05', 'floor=dry concrete']),
+            {'final_configuration': True, 'retry': False, 'speed': .05, 'floor': 'dry concrete'})
+
+    def test_d4_completes_from_cli_final_configuration_condition(self):
+        path = self.make_run('passed', True)
+        qualification.finalize(path, 'D4', 'handover', 'passed', 'clean handover',
+                               conditions=qualification.key_values(['final_configuration=true']))
+        matrix = qualification.build_matrix(self.root)
+        self.assertTrue(matrix['acceptance']['D4']['complete'])
+
 
 if __name__ == '__main__':
     unittest.main()

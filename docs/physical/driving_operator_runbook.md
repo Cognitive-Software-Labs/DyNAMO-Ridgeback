@@ -454,8 +454,10 @@ python3 tools/hardware/driving_qualification.py matrix \
 
 `finalize` also takes `--video <file>`, `--recovery <text>`,
 `--final-mode <text>` and repeated `--condition NAME=VALUE` and
-`--measurement NAME=VALUE`. The verdict is one of `passed`, `failed`,
-`inconclusive` or `aborted`. The matrix counts these mechanism names:
+`--measurement NAME=VALUE`. Values `true` and `false` become booleans and
+numbers become floats; a D4 run counts toward the matrix only with
+`--condition final_configuration=true`. The verdict is one of `passed`,
+`failed`, `inconclusive` or `aborted`. The matrix counts these mechanism names:
 
 | Lane | `--mechanism` values |
 |---|---|
