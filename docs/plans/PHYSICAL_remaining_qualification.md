@@ -1,13 +1,14 @@
 # PHYSICAL — Qualification status and remaining work
 
-Status update (2026-10-22): **S1–S10 and P1–P5 are finished for the agreed
-scope.** The other agent completed its work on the sensor, host, perception and
-navigation items. They are not part of the remaining-work list or estimates.
+Status update (2026-10-22): **S1–S10 and P1–P3 are finished for the agreed
+scope.** The other agent completed its work on the sensor, host and perception
+items. They are not part of the remaining-work list or estimates.
 The specific test results and limits below remain the record of what was
-measured; reopening an item requires a new scope decision. Autonomous motion
-remains disabled until P4/P5 are tested and approved. Active driving
-qualification work is D2, D3, D4 regression, and D6–D8. D5 is the installed
-freshness baseline that those trials must preserve.
+measured; reopening an item requires a new scope decision. P4 and P5 have not
+been run and stay open; autonomous motion remains disabled until they are
+tested and approved. Active driving qualification work is D2, D3, D4
+regression, and D6–D8, then P4 and P5. D5 is the installed freshness baseline
+that those trials must preserve.
 
 Planning checkpoint: **2026-10-14**, after the passing bounded-forward trial
 `forward-permit-20261014T090919Z`. Estimates below are hands-on test/setup time,
@@ -93,8 +94,8 @@ calibration session. Battery values remain explicitly unknown until measured.
 | P1 | **Passed 2026-10-16.** Both hosts run `dev` `a31e770` (`check_link --no-traffic`: 30 PASS, revision match, Thor −0.02 ms); Intel camera service reinstalled from `dev`. F1 detector kill: health `failure`, `processing` 8 s after relaunch; since 2026-10-21 workers respawn automatically (killed detector replaced in 6 s, `processing` in 13 s, service not restarted). F2 cable pull: PHC step fix verified, recovery ~5 s. 2026-10-21: Thor localization runs as `dynamo-localization.service` from `dev` `25ebd2a` (after PTP; verified across a Thor reboot: `processing` with no manual launch, 382 Mbit/s, −0.02 ms). Perception now loads models offline by default (Thor Wi-Fi recovered by 2026-10-21; its new NetworkManager profile had lost the Thor LAN route, restored with `thor_lan_route apply`; `check_link --no-traffic` 0 failures at `070b284`). Known divergence: Intel chrony profile differs from `time_sync`'s record (pool/maxpoll edits) | — | Fix Thor Wi-Fi (antennas/router) |
 | P2 | **Finished.** Evidence kept: GPU environment, all four modes start and reach `processing`, delays (box-stereo 367/383 ms, box-mono 575/592 ms), Thor thermal ≤68 °C, person tracked at two marks, 0 false detections in a 28 s empty segment, silhouette buffer fix deployed. Not done: distance accuracy at taped marks, silhouette re-measurement, G1 target cases | — | Reopen before quoting localization accuracy |
 | P3 | **Finished.** Evidence kept: overlay captures show camera depth at projected LiDAR pixels reading long by +1 cm (<1.5 m) to +23 cm (2.5–4 m), cause not separated (`ANALYSIS.md`). Not done: flat-target test, calibration with uncertainty, motion check. **Polar profiling stays unqualified and must not be relied on** | — | Reopen before using camera–LiDAR projection |
-| P4 | **Finished.** Not run: navigation TF chain, collision-monitor suppression and stale-source handling, command-chain integration with Nav2 | — | Required before autonomous motion |
-| P5 | **Finished.** Not run: no bounded autonomous clear-space smoke. **Autonomous motion remains unqualified; keep `autonomous_motion_enabled:=false` (the hardware default)** until P4/P5 are actually performed | — | Explicit session approval and P4 first |
+| P4 | **Open, not run.** Remaining: navigation TF chain, collision-monitor suppression and stale-source handling, command-chain integration with Nav2 | — | Required before autonomous motion |
+| P5 | **Open, not run.** Remaining: bounded autonomous clear-space smoke. **Autonomous motion remains unqualified; keep `autonomous_motion_enabled:=false` (the hardware default)** until P4/P5 are actually performed | — | Explicit session approval and P4 first |
 
 Optional organized-pointcloud qualification adds approximately 30–60 min if
 that input is selected. It remains disabled/unqualified otherwise. Simulator
