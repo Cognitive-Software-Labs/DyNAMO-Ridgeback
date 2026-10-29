@@ -26,7 +26,7 @@ braking, dynamic calibration, and autonomous missions remain outside this plan.
 The September 18 field record names checkout
 `a01a4532a170fcb85df1a5aaffb8c28bf1601f96`, with partial provenance: it tested
 robot-local services with ad-hoc probes, and raw captures remain on the robot.
-The later [camera handoff](handoffs/PHYSICAL_d455_camera_runs_agent1.md) reports
+The later camera handoff (under [Archived evidence](#archived-evidence)) reports
 VGA and HD aligned-depth tests on Fast DDS, followed by failures on CycloneDDS.
 Those camera passes apply to the recorded configurations; final deployment
 acceptance requires reruns after the
@@ -409,6 +409,7 @@ or physical motion safety.
 ## Archived evidence
 
 - [r100_0160 field readings and LiDAR box checks](../../archive/engineering/2026-09-18-r100-0160-field-measurements.md)
+- [D455 camera runs handoff, 2026-09-18](../../archive/engineering/2026-09-18-d455-camera-runs-handoff.md)
 - [r100_0160 D455 camera service qualification](../../archive/engineering/2026-10-06-r100-0160-camera-service.md)
 - [r100_0160 D455 factory calibration against the nominal simulator profiles](../../archive/engineering/2026-10-13-r100-0160-d455-calibration-vs-nominal.md)
 - [r100_0160 rear LiDAR side-target recheck](../../archive/engineering/2026-09-24-r100-0160-rear-lidar-recheck.md)

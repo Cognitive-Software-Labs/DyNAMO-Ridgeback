@@ -1,14 +1,20 @@
 # PHYSICAL — Intel–Thor transport handoff (agent 2)
 
+Recorded dates: 2026-09-18
+Tested revisions: `b9395843fad6c43d1f271c482b372ebdefd6fbcc`
+Provenance: partial
+
+This is a dated handoff snapshot moved from `docs/plans/handoffs/` after its findings were resolved or carried into current references. Its links to repository documents point at the handoff revision. The live robot state it describes was not preserved, so provenance is partial.
+
 **Author:** agent 2 (Claude Code session on the robot host `cpr-r100-0160`)
 **Written:** 2026-09-18, 18:50 UTC · **Repository HEAD:** `b939584` on
 `feat/real-hardware-exploration`. This is agent 2's work merged with the
 package split from origin.
-**Governing plan:** [PHYSICAL — Intel–Thor deployment and transport qualification](../PHYSICAL_intel_thor_deployment.md),
+**Governing plan:** [PHYSICAL — Intel–Thor deployment and transport qualification](https://github.com/Cognitive-Software-Labs/DyNAMO-Ridgeback/blob/b9395843fad6c43d1f271c482b372ebdefd6fbcc/docs/plans/PHYSICAL_intel_thor_deployment.md),
 section 2 "Transport, time, and readiness"
-**Related:** [Intel–Thor DDS transport](../../physical/intel_thor_transport.md),
-[D455 camera runs handoff (agent 1)](PHYSICAL_d455_camera_runs_agent1.md),
-and the [Hokuyo recovery backlog item](../../BACKLOG.md#deferred-hardware-gates)
+**Related:** [Intel–Thor DDS transport](https://github.com/Cognitive-Software-Labs/DyNAMO-Ridgeback/blob/b9395843fad6c43d1f271c482b372ebdefd6fbcc/docs/physical/intel_thor_transport.md),
+[D455 camera runs handoff (agent 1)](2026-09-18-d455-camera-runs-handoff.md),
+and the [Hokuyo recovery backlog item](https://github.com/Cognitive-Software-Labs/DyNAMO-Ridgeback/blob/b9395843fad6c43d1f271c482b372ebdefd6fbcc/docs/BACKLOG.md#hokuyo-driver-recovery-after-read-timeouts)
 
 The evidence folders below are under `artifacts/hardware/` on the robot host
 and are not tracked by git.
@@ -78,7 +84,7 @@ This is the most likely cause of the LiDAR lockouts, and it is not fixed.
   a new local subscriber started under the services configuration. In the
   18:30:40 case the subscriber was camera-only. There were none in 2.5 h on
   Fast DDS. Once a driver times out, the
-  [`urg_node` reconnect bug](../../troubleshooting.md#hokuyo-drivers-stuck-reconnecting)
+  [`urg_node` reconnect bug](https://github.com/Cognitive-Software-Labs/DyNAMO-Ridgeback/blob/b9395843fad6c43d1f271c482b372ebdefd6fbcc/docs/troubleshooting.md#hokuyo-drivers-stuck-reconnecting)
   makes the lockout permanent until `clearpath-sensors` restarts.
 - **Why `check_link` missed it.** The check runs both probe ends on the
   Ethernet-only configurations, in an isolated domain, with one reader per
@@ -106,7 +112,7 @@ This is the most likely cause of the LiDAR lockouts, and it is not fixed.
      manual recovery. **Correction, 2026-09-21:** do not restore the old YAML
      wholesale or delete the only backup. The later rear-offset correction must
      remain consistent in robot TF and the separately configured scan merger.
-     Use the maintained [recovery procedure for later configuration changes](../../physical/intel_thor_transport.md#recovery-with-later-robot-configuration-changes):
+     Use the maintained [recovery procedure for later configuration changes](https://github.com/Cognitive-Software-Labs/DyNAMO-Ridgeback/blob/b9395843fad6c43d1f271c482b372ebdefd6fbcc/docs/physical/intel_thor_transport.md#recovery-with-later-robot-configuration-changes):
      preserve current and original snapshots, reverse only the middleware/DDS
      changes, and verify both rear offsets and effective services afterward.
 
@@ -129,7 +135,7 @@ This is the most likely cause of the LiDAR lockouts, and it is not fixed.
 6. Continue the governing plan. Harden time sync (offsets of 0.6–4.2 ms on
    internet NTP), then install the Thor perception environment against the
    package split's localization install (`tools/check_localization_install`).
-7. Update the [transport reference](../../physical/intel_thor_transport.md)
+7. Update the [transport reference](https://github.com/Cognitive-Software-Labs/DyNAMO-Ridgeback/blob/b9395843fad6c43d1f271c482b372ebdefd6fbcc/docs/physical/intel_thor_transport.md)
    (rules, known limits, the `check_link` table) and the archive incident entry
    with the flood mechanism and the third lockout, once step 1 is verified.
 
@@ -145,6 +151,6 @@ This is the most likely cause of the LiDAR lockouts, and it is not fixed.
 
 ## Archived evidence
 
-- [Intel–Thor DDS transport diagnosis](../../../archive/engineering/2026-09-18-intel-thor-dds-transport.md)
-- [Intel–Thor middleware benchmark](../../../archive/engineering/2026-09-18-intel-thor-rmw-benchmark.md)
-- [Hokuyo reconnect lockout](../../../archive/engineering/operational_incidents.md#hokuyo-reconnect-lockout--2026-09-18)
+- [Intel–Thor DDS transport diagnosis](2026-09-18-intel-thor-dds-transport.md)
+- [Intel–Thor middleware benchmark](2026-09-18-intel-thor-rmw-benchmark.md)
+- [Hokuyo reconnect lockout](operational_incidents.md#hokuyo-reconnect-lockout--2026-09-18)

@@ -20,6 +20,7 @@ Other pages summarize it only when useful and link back to that owner.
 | Robot, exploration, deployment and cross-cutting gaps | `docs/BACKLOG.md` |
 | Target-distance benchmarking and controlled estimator-evaluation gaps | `docs/target_distance_benchmarking/BACKLOG.md` |
 | Approved work not yet complete | `docs/plans/` |
+| Unabsorbed handoff snapshots between owners of a plan | `docs/plans/handoffs/` |
 | Rejected, deferred, or unselected approaches | `docs/do_not_try_again/` |
 | Dated experiments, migrations, and validation evidence | `archive/engineering/` |
 

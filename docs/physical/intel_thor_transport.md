@@ -10,9 +10,8 @@ deployment work lives in the
 
 ## Camera subscriber blocker
 
-The September 18 [camera](../plans/handoffs/PHYSICAL_d455_camera_runs_agent1.md)
-and [transport](../plans/handoffs/PHYSICAL_intel_thor_transport_agent2.md)
-handoffs report repeated LiDAR lockouts associated with new local camera
+The September 18 camera and transport handoffs (under
+[Archived evidence](#archived-evidence)) report repeated LiDAR lockouts associated with new local camera
 subscribers under the unrestricted services configuration. October 5 controlled
 tests observed a scan interruption when one local color reader started under
 that configuration. Two focused discovery-only multicast captures subsequently
@@ -416,5 +415,7 @@ frames.
 
 - [Intel local DDS screening, timing and retained configuration](../../archive/engineering/2026-10-05-intel-dds-screening.md)
 - [Intel–Thor DDS transport diagnosis](../../archive/engineering/2026-09-18-intel-thor-dds-transport.md)
+- [D455 camera runs handoff, 2026-09-18](../../archive/engineering/2026-09-18-d455-camera-runs-handoff.md)
+- [Intel–Thor transport handoff, 2026-09-18](../../archive/engineering/2026-09-18-intel-thor-transport-handoff.md)
 - [Intel–Thor middleware benchmark](../../archive/engineering/2026-09-18-intel-thor-rmw-benchmark.md)
 - [r100_0160 Intel–Thor camera transport candidates](../../archive/engineering/2026-10-06-r100-0160-thor-transport-candidates.md)

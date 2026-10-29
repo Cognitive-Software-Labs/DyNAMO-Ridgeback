@@ -43,6 +43,8 @@ are excluded from ordinary repository search and the generated knowledge graph.
 
 - [Intel–Thor DDS transport diagnosis](2026-09-18-intel-thor-dds-transport.md) — Wi-Fi duplication, receive-buffer drops, and Ethernet-only profile measurements.
 - [Intel–Thor middleware benchmark](2026-09-18-intel-thor-rmw-benchmark.md) — Fast DDS vs CycloneDDS vs mixed across the link, and the reader-side interface rule.
+- [Intel–Thor transport handoff](2026-09-18-intel-thor-transport-handoff.md) — agent 2's state snapshot: CycloneDDS switch, LiDAR lockouts under the services configuration, manual rollback.
+- [D455 camera runs handoff](2026-09-18-d455-camera-runs-handoff.md) — agent 1's state snapshot: Fast DDS camera passes, CycloneDDS failures.
 
 - [Physical mecanum drive investigation](2026-09-18-mecanum-drive-investigation.md)
 - [r100_0160 field readings and LiDAR box checks](2026-09-18-r100-0160-field-measurements.md) — tape mount readings, LiDAR range/side checks, and the rear-offset finding.

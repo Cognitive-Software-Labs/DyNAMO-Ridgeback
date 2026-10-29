@@ -8,3 +8,8 @@ source of truth for what the work is, and resolved findings move to their
 technical reference.
 
 Filenames follow the plan convention, `<SCOPE>_<topic>_<author>.md`.
+
+When the receiving owner has absorbed a handoff (its open steps are scheduled
+in a plan or backlog, its results are in references), move it to
+`archive/engineering/<date>-<topic>-handoff.md` with the standard archive
+header and immutable links. A handoff never stays here as permanent history.

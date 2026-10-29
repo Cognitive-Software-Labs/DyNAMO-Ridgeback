@@ -28,7 +28,7 @@ files, with partial provenance. They do not establish acceptance of the newer
 package-split handoff. Do not carry their performance numbers forward as a
 measurement of the deployed localization pipeline.
 
-The later [transport handoff](handoffs/PHYSICAL_intel_thor_transport_agent2.md)
+The later transport handoff (under [Archived evidence](#archived-evidence))
 records robot state at 18:46 UTC on September 18, not current live state.
 Read the maintained [blocker and recovery procedure](../physical/intel_thor_transport.md#camera-subscriber-blocker)
 before starting camera consumers. A passing synthetic check cannot clear it.
@@ -225,4 +225,5 @@ dynamic calibration, and autonomous missions are separate work.
 
 ## Archived evidence
 
+- [Intel–Thor transport handoff, 2026-09-18](../../archive/engineering/2026-09-18-intel-thor-transport-handoff.md)
 - [r100_0160 first Thor localization smoke](../../archive/engineering/2026-10-12-r100-0160-thor-localization-smoke.md)

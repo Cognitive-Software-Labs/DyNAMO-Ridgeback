@@ -83,14 +83,13 @@ troubleshooting, planning, and historical documentation.
 
 - [BENCHMARKING — Execution-environment qualification](plans/BENCHMARKING_environment_qualification.md) — prerequisite for tuning and benchmark claims
 - [BENCHMARKING — Combined-model throughput](plans/BENCHMARKING_model_throughput.md) — run the existing sweep and determine whether concurrency is needed
+- [BENCHMARKING — Stationary hardware scene recording](plans/BENCHMARKING_hardware_recording.md) — raw sensor bags and measured G1 positions for later estimator comparison; recording not started
 - [BENCHMARKING — Live configurator sweeps](plans/BENCHMARKING_live_configurator_sweeps.md) — blocked on live process ownership and cleanup; follows environment qualification
 - [Distributed localization contract](target_localization/distributed_deployment.md) — packages, host roles, health, and mission pause/resume
 - [PHYSICAL — Intel–Thor deployment and transport qualification](plans/PHYSICAL_intel_thor_deployment.md) — robot-side installation, GPU offload, Ethernet measurements, and failure handling
-  - Handoff: [Intel–Thor transport (agent 2)](plans/handoffs/PHYSICAL_intel_thor_transport_agent2.md) — CycloneDDS switch state, services-configuration flood behind the LiDAR lockouts, manual rollback, next steps
   - [Intel–Thor sensor latency tools](physical/intel_thor_sensor_latency.md) — report components, clock bounds and interleaved qualification
 - [PHYSICAL — Robot measurements and stationary sensor validation](plans/PHYSICAL_robot_measurements_and_validation.md) — quick mount readings/photos, D455 and LiDAR checks, stationary alignment, and G1/person tests
   - [PHYSICAL — Camera and alignment robot session](plans/PHYSICAL_camera_alignment_session.md) — ordered blocks, commands and pre-declared limits for the alignment overlay, off-centre and HD person checks, and estimator modes
-  - Handoff: [D455 camera runs (agent 1)](plans/handoffs/PHYSICAL_d455_camera_runs_agent1.md) — P1/P2 results, CycloneDDS camera-transport and LiDAR-lockout findings, next steps
 - [PHYSICAL — Real-hardware LiDAR validation](plans/PHYSICAL_lidar_validation.md) — front/rear range and coverage, merged geometry, loaded continuity, recovery and conditional motion tests
 - [PHYSICAL — Remaining qualification and time estimates](plans/PHYSICAL_remaining_qualification.md) — canonical status of the S, P and D qualification items, remaining driving trials and estimates
 
