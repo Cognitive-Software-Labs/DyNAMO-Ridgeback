@@ -32,6 +32,7 @@ rotated process-level replications each:
 | Start | 14:02:48 +0200 | 14:41:40 +0200 |
 | GL renderer (`sweep.json`) | NVIDIA RTX PRO 6000, not software | NVIDIA RTX PRO 6000, not software |
 | ROS domain | 43 | 43 |
+| Gazebo GUI and RViz | running (`gz sim ... -r -v`, `rviz2`) | running |
 | Video recording | off | off |
 | 1-min load during the run | 0.4–13.0 | 0.2–14.3 |
 
@@ -67,8 +68,8 @@ evidence has these limits, which the owner accepted rather than rerun:
 - No equivalence margins were declared before the runs, and the display
   order was not alternated (seat first). Agreement was exact, so no margin
   would decide it.
-- Isaac, headless EGL, 1280x720, video recording and GUI or RViz load were
-  not tested. Software rendering is a known failure mode, not a qualified
+- Both displays ran the Gazebo GUI and RViz. Isaac, headless EGL, 1280x720,
+  video recording and runs without the GUI or RViz were not tested. Software rendering is a known failure mode, not a qualified
   environment.
 
 Supporting files: the

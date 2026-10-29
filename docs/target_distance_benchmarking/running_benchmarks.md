@@ -10,8 +10,8 @@ workflows.
 
 ## Qualified execution environments
 
-Gazebo rendering through `tools/gpu-run` is qualified on the physical seat
-(`:0`) and in an xrdp session: matched light (box, stereo) and heavy
+Gazebo rendering through `tools/gpu-run`, with the Gazebo GUI and RViz open,
+is qualified on the physical seat (`:0`) and in an xrdp session: matched light (box, stereo) and heavy
 (silhouette, monocular) runs gave identical error and scored counts on both,
 and observation coverage varied as much between replications on one display
 as between displays. Results from either display may be compared, tuned on and
@@ -19,8 +19,8 @@ reported, and replay tuning may use captures from either. The evidence predates
 the current camera model and covers the example scenes; the owner accepted it
 as sufficient.
 
-Not qualified: Isaac, headless EGL, `1280x720`, video recording, and runs with
-the Gazebo GUI or RViz adding display load. Qualify those before quoting them.
+Not qualified: Isaac, headless EGL, `1280x720`, video recording, and runs
+without the Gazebo GUI or RViz. Qualify those before quoting them.
 Confirm the GL path with `tools/gpu-run glxinfo -B` from the run's own
 session. Software rendering is a failure, not an environment; see
 [troubleshooting](../troubleshooting.md#camera-rate-collapses-under-software-rendering).
