@@ -97,6 +97,9 @@ The repository graph lives in `graphify-out/`.
   analysis.
 - After modifying code, run
   `bash "$(git rev-parse --show-toplevel)/tools/rebuild_graphify"`.
+- `tools/install_hooks` installs the tracked hooks: pre-commit rebuilds and
+  stages the graph when code is staged; post-checkout leaves a revision's
+  committed graph alone, so switching branches never dirties `graphify-out/`.
 - Do not use the obsolete direct Python `graphify.watch` one-liner; the helper
   owns the correct environment and output path.
 

@@ -7,6 +7,7 @@ retiring a plan or handoff, splitting a page or rewriting a backlog item:
     tools/check_removed_facts.py              # working tree against HEAD
     tools/check_removed_facts.py --cached     # staged changes
     tools/check_removed_facts.py HEAD~1 HEAD  # a commit (searches the working tree)
+    tools/check_removed_facts.py --path docs/project/dependencies.md
 
 Each reported token (code names, quantities with units, dates, paths, hashes) was
 on a deleted line and is not found in any tracked or new text file. Decide for
@@ -38,10 +39,11 @@ def git(root: Path, *args: str) -> str:
                           capture_output=True, text=True).stdout
 
 
-def removed_lines(root: Path, diff_args: list[str]) -> dict[str, list[str]]:
+def removed_lines(root: Path, diff_args: list[str], paths: list[str]) -> dict[str, list[str]]:
     removed: dict[str, list[str]] = {}
     source = None
-    for line in git(root, 'diff', '-U0', '--no-color', *diff_args, '--', '*.md').splitlines():
+    diff = git(root, 'diff', '-U0', '--no-color', *diff_args, '--', *(paths or ['*.md']))
+    for line in diff.splitlines():
         if line.startswith('--- '):
             source = line[6:] if line.startswith('--- a/') else None
         elif line.startswith('-') and not line.startswith('---') and source:
@@ -76,13 +78,15 @@ def main() -> int:
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('diff_args', nargs='*', help='arguments passed to git diff')
     parser.add_argument('--cached', action='store_true', help='check staged changes')
+    parser.add_argument('--path', action='append', default=[],
+                        help='limit the diff to this Markdown path (repeatable)')
     parser.add_argument('--root', type=Path, default=Path(__file__).resolve().parents[1])
     args = parser.parse_args()
     diff_args = (['--cached'] if args.cached else []) + (args.diff_args or
                                                            ([] if args.cached else ['HEAD']))
     text = corpus(args.root)
     missing = 0
-    for source, lines in sorted(removed_lines(args.root, diff_args).items()):
+    for source, lines in sorted(removed_lines(args.root, diff_args, args.path).items()):
         lost = sorted(t for t in tokens(lines) if t not in text)
         if lost:
             print(f'{source}:')

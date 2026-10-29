@@ -21,7 +21,7 @@ scenes; the [gallery](benchmark_scenarios_v2_gallery.html) is a visual reference
   0.25°, 0.06–10 m, 40 Hz. Neither simulator lets `polar_profiling` reach a
   surface beyond 10 m; such a ray is `+inf`, and the row reports `no_value`
   instead of latching a far wall. A Gazebo run from before the
-  [UST-10LX patch](../project/dependencies.md#ust-10lx-gazebo-lidar-patch),
+  [UST-10LX patch](../project/dependency_patches.md#ust-10lx-gazebo-lidar-patch),
   with 540 bins out to 25 m, is a different population and cannot serve as a
   polar baseline.
 - Both simulators add LiDAR range noise, and neither is bit-reproducible on

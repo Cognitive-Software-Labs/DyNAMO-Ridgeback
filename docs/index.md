@@ -14,6 +14,8 @@ troubleshooting, planning, and historical documentation.
   tooling, dependencies, and entrypoint conventions
 - [External dependency management](project/dependencies.md) — import, patch,
   refresh, verification, live migration, and rollback procedure
+  - [Maintained dependency patches](project/dependency_patches.md) — defect,
+    change, build and loading proof, and rollback for each local patch
 - [Project engineering gaps](BACKLOG.md)
 - [Troubleshooting](troubleshooting.md)
 

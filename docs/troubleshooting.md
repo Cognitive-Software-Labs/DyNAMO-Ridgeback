@@ -77,7 +77,7 @@ and coalesces further cleanup signals. A saved result does not establish a clean
 exit: inspect the child failure and lifecycle fields before resuming.
 
 For an RViz unsubscribe abort or a late process-exit SIGSEGV, verify that the
-[RViz shutdown overlay](project/dependencies.md#rviz-shutdown-ownership-patch)
+[RViz shutdown overlay](project/dependency_patches.md#rviz-shutdown-ownership-patch)
 is applied and that the exact RViz PID loaded both patched libraries. The Image
 subscription and view-controller ownership defects are separate mechanisms.
 
