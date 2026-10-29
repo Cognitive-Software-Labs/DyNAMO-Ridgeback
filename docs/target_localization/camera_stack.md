@@ -73,6 +73,13 @@ so pixel geometry such as which targets touch the image edge or lose their
 feet is profile-specific. Benchmark scene certifications use `640x480`, the
 profile the Thor perception host runs.
 
+Both simulators render pixel centres, so pixel index `i` sees the ray through
+image coordinate `i + 0.5` while `CameraInfo` publishes `cx = W / 2`. In the
+integer-centre convention that `deproject_pixel` uses, the simulated principal
+point therefore sits half a pixel from the published one: about 0.075 degrees
+of bearing at `640x480`, negligible for ranging. Hardware runs use the
+driver's factory calibration instead.
+
 The estimators read only `K` from `CameraInfo` (`intrinsics_from_camera_info`).
 They ignore the distortion coefficients `D` and treat the unrectified D455
 colour image as an ideal pinhole. On `r100_0160` this costs a fraction of a

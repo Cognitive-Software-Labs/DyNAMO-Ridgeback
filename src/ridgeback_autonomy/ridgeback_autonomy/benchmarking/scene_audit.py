@@ -17,16 +17,16 @@ yaw about +z. Camera points are expressed in the optical frame (+Z forward,
 Pixel convention
 ----------------
 Pixel column ``i`` / row ``j`` samples the single ray through the continuous
-image coordinate ``(u, v) = (i, j)``, where ``u = fx * X / Z + cx`` and
-``v = fy * Y / Z + cy``. That is the convention of
-``ridgeback_localization.core.intrinsics`` (``deproject_pixel`` takes a pixel
-index as ``u``; ``project_points`` rounds to the nearest index). A pixel is
-covered by a triangle when its sample point lies inside the projected triangle,
-edges inclusive; the nearest covering triangle (smallest optical Z, interpolated
-perspective-correctly) owns the pixel. ``pixel_center_offset`` shifts every
-sample by a constant (0.5 models a renderer whose principal point is the exact
-image centre while ``cx = W / 2``); the effect is at most half a pixel on any
-boundary.
+image coordinate ``(u, v) = (i + offset, j + offset)``, where
+``u = fx * X / Z + cx`` and ``v = fy * Y / Z + cy``. Gazebo and Isaac both
+publish ``cx = W / 2`` and render pixel centres, so they sample at offset 0.5;
+a rendered comparison of both backends matched the audit at 0.5 and missed by
+a one-pixel band at 0. The CLI therefore defaults to 0.5. Offset 0 is the
+integer-centre convention of ``ridgeback_localization.core.intrinsics``
+(``deproject_pixel`` takes a pixel index as ``u``). A pixel is covered by a
+triangle when its sample point lies inside the projected triangle, edges
+inclusive; the nearest covering triangle (smallest optical Z, interpolated
+perspective-correctly) owns the pixel.
 
 Near plane
 ----------

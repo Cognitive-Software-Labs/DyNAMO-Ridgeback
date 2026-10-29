@@ -306,7 +306,8 @@ def _parser() -> argparse.ArgumentParser:
                         help='Historical geometry preset instead of the description')
     parser.add_argument('--base-link-z', type=float, default=sa.GAZEBO_BASE_LINK_WORLD_Z,
                         help='World z of the sensor base_link (default: Gazebo settled height)')
-    parser.add_argument('--pixel-center-offset', type=float, default=0.0)
+    parser.add_argument('--pixel-center-offset', type=float, default=0.5,
+                        help='Sample offset in px; 0.5 matches Gazebo and Isaac renders')
     parser.add_argument('--cylinder-segments', type=int, default=sa.DEFAULT_CYLINDER_SEGMENTS)
     parser.add_argument('--asset-catalog', help='Asset catalog (default: Gazebo catalog)')
     parser.add_argument('--world', default=DEFAULT_WORLD)

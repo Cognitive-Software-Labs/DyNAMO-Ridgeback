@@ -72,21 +72,20 @@ with demonstrated facts and remove this item only when the listed gates pass.
 
 ## Camera-geometry benchmark recertification
 
-**Status.** The scenario comments, the gallery and asset seating are current:
-`scene_audit` certifies every scene at 640x480 from the current description,
-and Gazebo and Isaac agree statically on camera pose, intrinsics, LiDAR pose
-and object geometry. [Scene certification](semantics.md#scene-certification)
-owns the method.
+**Status.** Certification is complete: `scene_audit` certifies every scene at
+640x480 from the current description, Gazebo and Isaac agree statically on
+camera pose, intrinsics, LiDAR pose and object geometry, and rendered depth
+captures in both backends match the audit's masks.
+[Scene certification](semantics.md#scene-certification) owns the method.
 
-**Gap.** No rendered comparison yet checks the audit's raster against
-simulator depth captures. Every benchmark result recorded before the
-2026-10-29 scene recertification predates the floor-standing assets and the replaced `edge640_*` scenes.
+**Gap.** Every benchmark result recorded before the 2026-10-29 scene
+recertification predates the floor-standing assets and the replaced
+`edge640_*` scenes, and none has been rerun on the current geometry.
 
-**Completion criteria.** Predeclare a pixel tolerance, then compare depth-
-derived target masks with the audit on scenes spanning occlusion, edge and
-clutter families in Gazebo, and on object and camera geometry in Isaac. Rerun
-every benchmark whose inputs or measured behavior depend on camera or LiDAR
-geometry or asset seating before quoting its numbers.
+**Completion criteria.** Rerun every benchmark whose inputs or measured
+behavior depend on camera or LiDAR geometry or asset seating, under the
+[execution-environment gate](#benchmark-execution-environment-qualification),
+before quoting its numbers.
 
 **Context.** [Camera stack](../target_localization/camera_stack.md) and
 [shared robot geometry](../robot/geometry.md).

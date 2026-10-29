@@ -217,7 +217,7 @@ scenes:
     objects:
       - { model: cabinet_tall, x: 3.41, y: 1.78, yaw: 1.32 }
 
-  # privacy_curtain heavy occlusion; vis 0.09 (band 0.02-0.20)
+  # privacy_curtain heavy occlusion; vis 0.11 (band 0.02-0.20)
   - id: objocc_heavy_01
     robots: [{ x: 3.34, y: 0.95, yaw: 3.13 }]
     objects:
@@ -229,13 +229,13 @@ scenes:
     objects:
       - { model: cabinet, x: 2.76, y: -0.84, yaw: 1.08 }
 
-  # cabinet_tall heavy occlusion; vis 0.06 (band 0.02-0.20)
+  # cabinet_tall heavy occlusion; vis 0.04 (band 0.02-0.20)
   - id: objocc_heavy_03
     robots: [{ x: 4.17, y: 0.92, yaw: 3.24 }]
     objects:
       - { model: cabinet_tall, x: 2.23, y: 0.76, yaw: 2.05 }
 
-  # privacy_curtain heavy occlusion; vis 0.09 (band 0.02-0.20)
+  # privacy_curtain heavy occlusion; vis 0.11 (band 0.02-0.20)
   - id: objocc_heavy_04
     robots: [{ x: 4.12, y: -0.48, yaw: 3.17 }]
     objects:
@@ -254,7 +254,7 @@ scenes:
     objects:
       - { model: hospital_bed_high, x: 2.37, y: 0.44, yaw: 0.06 }
 
-  # privacy_curtain partial; vis 0.54 (band 0.35-0.65)
+  # privacy_curtain partial; vis 0.53 (band 0.35-0.65)
   - id: objpartial_03
     robots: [{ x: 3.11, y: -0.34, yaw: 3.35 }]
     objects:
@@ -272,7 +272,7 @@ scenes:
     objects:
       - { model: hospital_bed_high, x: 2.48, y: -0.03, yaw: 2.19 }
 
-  # table partial; vis 0.63 (band 0.35-0.65)
+  # table partial; vis 0.64 (band 0.35-0.65)
   - id: objpartial_06
     robots: [{ x: 4.12, y: -1.27, yaw: 3.32 }]
     objects:
@@ -311,7 +311,7 @@ scenes:
   - id: far_beyond_01
     robots: [{ x: 10.73, y: 0.64, yaw: 3.41 }]
 
-  # 640x480 edge, touching the right edge; in-frame 0.99, center ratio 0.91
+  # 640x480 edge, touching the right edge; in-frame 1.00, center ratio 0.91
   - id: edge640_mostly_in_01
     robots: [{ x: 4.18, y: -2.98, yaw: 2.67 }]
 
@@ -319,11 +319,11 @@ scenes:
   - id: edge640_mostly_in_02
     robots: [{ x: 3.89, y: 2.53, yaw: 2.84 }]
 
-  # 640x480 edge, cut by the left edge; in-frame 0.28, center ratio 1.03
+  # 640x480 edge, cut by the left edge; in-frame 0.27, center ratio 1.03
   - id: edge640_half_out_01
     robots: [{ x: 4.11, y: 3.28, yaw: 3.54 }]
 
-  # 640x480 edge, cut by the right edge; in-frame 0.29, center ratio 1.03
+  # 640x480 edge, cut by the right edge; in-frame 0.31, center ratio 1.03
   - id: edge640_half_out_02
     robots: [{ x: 4.17, y: -3.34, yaw: 2.73 }]
 
@@ -331,13 +331,13 @@ scenes:
   - id: edge640_sliver_01
     robots: [{ x: 2.61, y: 2.12, yaw: 3.47 }]
 
-  # edge-on curtain bisects mask (verified); vis 0.32
+  # edge-on curtain bisects mask (verified); vis 0.33
   - id: trap_split_curtain
     robots: [{ x: 3.86, y: 0.17, yaw: 3.04 }]
     objects:
       - { model: privacy_curtain, x: 2.35, y: 0.11, yaw: 1.57 }
 
-  # IV pole bisects mask (verified); vis 0.77
+  # IV pole bisects mask (verified); vis 0.79
   - id: trap_split_pole
     robots: [{ x: 3.86, y: -0.48, yaw: 3.07 }]
     objects:
@@ -349,7 +349,7 @@ scenes:
     objects:
       - { model: hospital_bed, x: 1.47, y: -0.43, yaw: 0.0 }
 
-  # table on same bearing: scan passes between legs; camera vis 0.71
+  # table on same bearing: scan passes between legs; camera vis 0.70
   - id: trap_lidar_table
     robots: [{ x: 4.27, y: 0.8, yaw: 3.08 }]
     objects:
@@ -393,7 +393,7 @@ scenes:
       - { model: table, x: 2.49, y: 0.52, yaw: 0.0 }
       - { model: cabinet, x: 5.22, y: 0.67, yaw: 2.35 }
 
-  # R0 vis 0.61, R1 vis 0.81, R2 vis 0.74 | table+hospital_bed_high
+  # R0 vis 0.61, R1 vis 0.80, R2 vis 0.74 | table+hospital_bed_high
   - id: chaos_01
     robots:
       - { x: 4.17, y: -1.34, yaw: 1.18 }
@@ -403,7 +403,7 @@ scenes:
       - { model: table, x: 2.0, y: 1.16, yaw: 0.91 }
       - { model: hospital_bed_high, x: 2.04, y: -0.97, yaw: 1.21 }
 
-  # R0 vis 0.87, R1 vis 0.82, R2 vis 0.71 | table+cabinet_tall
+  # R0 vis 0.86, R1 vis 0.83, R2 vis 0.70 | table+cabinet_tall
   - id: chaos_02
     robots:
       - { x: 3.71, y: -1.24, yaw: 0.36 }
@@ -413,7 +413,7 @@ scenes:
       - { model: table, x: 2.59, y: -0.35, yaw: 1.97 }
       - { model: cabinet_tall, x: 3.0, y: 1.98, yaw: 1.01 }
 
-  # R0 vis 0.70, R1 vis 0.60, R2 vis 0.78 | table+cabinet_tall
+  # R0 vis 0.71, R1 vis 0.60, R2 vis 0.78 | table+cabinet_tall
   - id: chaos_03
     robots:
       - { x: 2.22, y: -0.18, yaw: 3.57 }
@@ -423,7 +423,7 @@ scenes:
       - { model: table, x: 1.67, y: 2.07, yaw: 2.64 }
       - { model: cabinet_tall, x: 1.88, y: -0.65, yaw: 2.26 }
 
-  # R0 vis 0.82, R1 vis 0.55, R2 vis 0.84 | table+table_low+iv_pole
+  # R0 vis 0.82, R1 vis 0.54, R2 vis 0.84 | table+table_low+iv_pole
   - id: chaos_04
     robots:
       - { x: 3.33, y: 0.01, yaw: 3.13 }
@@ -478,7 +478,7 @@ scenes:
     objects:
       - { model: iv_pole, x: 1.70, y: 0.07 }
 
-  # 1 pole: at 1.92 m, 6 beams, +20 px inside the box; legs unshadowed
+  # 1 pole: at 1.92 m, 6 beams, +21 px inside the box; legs unshadowed
   - id: interfere_infront_02
     robots: [{ x: 2.90, y: -0.25, yaw: 3.28 }]
     objects:
@@ -490,7 +490,7 @@ scenes:
     objects:
       - { model: iv_pole, x: 2.11, y: -0.34 }
 
-  # 1 pole: at 1.99 m, 6 beams, +11 px inside the box; legs keep >= 83% width
+  # 1 pole: at 1.99 m, 6 beams, +10 px inside the box; legs keep >= 83% width
   - id: interfere_infront_04
     robots: [{ x: 2.95, y: 0.40, yaw: 3.00 }]
     objects:
@@ -514,13 +514,13 @@ scenes:
     objects:
       - { model: iv_pole, x: 4.10, y: 0.37 }
 
-  # 1 pole: at 1.98 m, 5 beams, +25 px inside the box; legs unshadowed
+  # 1 pole: at 1.98 m, 5 beams, +26 px inside the box; legs unshadowed
   - id: interfere_samerange_01
     robots: [{ x: 2.70, y: 0.15, yaw: 3.22 }]
     objects:
       - { model: iv_pole, x: 2.37, y: 0.13 }
 
-  # 1 pole: at 2.38 m, 5 beams, +20 px inside the box; legs unshadowed
+  # 1 pole: at 2.38 m, 5 beams, +21 px inside the box; legs unshadowed
   - id: interfere_samerange_02
     robots: [{ x: 3.10, y: -0.20, yaw: 3.28 }]
     objects:
@@ -532,21 +532,21 @@ scenes:
     objects:
       - { model: iv_pole, x: 2.55, y: 0.45 }
 
-  # 2 poles: p0 at 3.31 m, 3 beams, +23 px inside the box; p1 at 2.01 m, 5 beams, 3 px outside the box; legs keep >= 91% width
+  # 2 poles: p0 at 3.31 m, 3 beams, +24 px inside the box; p1 at 2.01 m, 5 beams, 3 px outside the box; legs keep >= 91% width
   - id: interfere_pair_01
     robots: [{ x: 3.00, y: 0.00, yaw: 3.14 }]
     objects:
       - { model: iv_pole, x: 3.70, y: 0.00 }
       - { model: iv_pole, x: 2.40, y: 0.14 }
 
-  # 2 poles: p0 at 1.82 m, 7 beams, +25 px inside the box; p1 at 2.75 m, 4 beams, 1 px outside the box; legs unshadowed
+  # 2 poles: p0 at 1.82 m, 7 beams, +24 px inside the box; p1 at 2.75 m, 4 beams, 2 px outside the box; legs unshadowed
   - id: interfere_pair_02
     robots: [{ x: 2.80, y: 0.25, yaw: 3.25 }]
     objects:
       - { model: iv_pole, x: 2.20, y: 0.19 }
       - { model: iv_pole, x: 3.14, y: 0.08 }
 
-  # 2 poles: p0 at 1.91 m, 6 beams, 4 px outside the box; p1 at 2.84 m, 5 beams, 3 px outside the box; legs keep >= 93% width
+  # 2 poles: p0 at 1.91 m, 6 beams, 3 px outside the box; p1 at 2.84 m, 5 beams, 3 px outside the box; legs keep >= 93% width
   - id: interfere_pair_03
     robots: [{ x: 2.90, y: 0.00, yaw: 3.14 }]
     objects:
@@ -560,7 +560,7 @@ scenes:
       - { model: iv_pole, x: 2.52, y: -0.22 }
       - { model: iv_pole, x: 2.04, y: -0.29 }
 
-  # 2 poles: p0 at 3.27 m, 4 beams, +23 px inside the box; p1 at 2.23 m, 5 beams, 1 px outside the box, intersects the G1 by >= 2.5 cm; legs keep >= 93% width
+  # 2 poles: p0 at 3.27 m, 4 beams, +22 px inside the box; p1 at 2.23 m, 5 beams, 1 px outside the box, intersects the G1 by >= 2.5 cm; legs keep >= 93% width
   - id: interfere_pair_05
     robots: [{ x: 2.95, y: 0.20, yaw: 3.18 }]
     objects:
@@ -575,7 +575,7 @@ scenes:
     objects:
       - { model: iv_pole, x: 2.13, y: 0.60 }
 
-  # 2 poles: p0 at 1.95 m, 6 beams, +22 px inside the box; p1 at 3.25 m, 4 beams, 3 px outside the box; legs unshadowed
+  # 2 poles: p0 at 1.95 m, 6 beams, +22 px inside the box; p1 at 3.25 m, 4 beams, 4 px outside the box; legs unshadowed
   - id: interfere_multi_02
     robots:
       - { x: 2.80, y: 0.85, yaw: 3.28 }

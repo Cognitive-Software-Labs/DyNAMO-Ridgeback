@@ -112,7 +112,10 @@ comment outside its family band says so. `edge640_*` scenes are edge cases only
 at 640x480: the frame edge sits at ±39.8° there and at ±45° at 1280x720.
 
 The Isaac stage matches the geometry the audit models: camera pose, intrinsics,
-LiDAR pose and every object agree exactly. The G1 is the exception: Gazebo
+LiDAR pose and every object agree exactly. Rendered depth captures in both
+backends reproduce the audit's target and object masks (IoU at least 0.94,
+visible fractions within 0.011) when pixels are sampled at their centres,
+`i + 0.5` with `cx = W / 2`, which is the audit's default. The G1 is the exception: Gazebo
 renders the STL G1 under `ridgeback_autonomy_gz/sim/models/g1`, Isaac the
 Unitree 29-DoF Dex1 USD under `ridgeback_autonomy_isaac/sim/isaac/usd/models/g1`
 (provenance in its `NOTICE.md`).

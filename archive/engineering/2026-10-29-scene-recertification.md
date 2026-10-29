@@ -1,10 +1,10 @@
 # Benchmark scene recertification for the current camera
 
 Recorded dates: 2026-10-29
-Tested revisions: `c23a0fb3ca58dd07a04c881c00bcbbfac872e711`
+Tested revisions: `c23a0fb3ca58dd07a04c881c00bcbbfac872e711`, `9649353971cb7b48fd1b58335b21b674597c319b`
 Provenance: partial
 
-The audits ran from a working tree based on the tested revision, with the
+The audits ran from a working tree based on the first tested revision, with the
 `scene_audit` tool, asset seating and scenario edits uncommitted; those changes
 were committed together with this record. The full audit outputs stayed under
 `artifacts/benchmarks/scene_audit/20261029_*`; the two claim comparisons and
@@ -109,9 +109,52 @@ to `v = fy·0.686/Z + cy`, with the plane leaving the 480-row frame below about
 1.10 m. With the current 0.808 m drop that floor is about 1.29 m; the reference
 was updated in the same change.
 
+## Rendered comparison
+
+The geometric audits above sampled pixels at integer image coordinates. A
+rendered spot-check then compared the audit with real depth renders at the
+second tested revision (`src/` clean). Both backends ran headless on ROS domain
+57 with the environment launch only (simulator, robot, camera, no measurement
+layer); entities were spawned and deleted through the runner's scene-control
+client, and each capture repeated bit-identically (Gazebo) or within 1 mm
+(Isaac). Masks came from depth differences with a 2 cm threshold: a target's
+visible mask is where the full scene is nearer than the scene without it.
+
+Thresholds were fixed before capture: target masks IoU >= 0.85, pixel count
+within 10 %, bbox edges within 3 px and visible fraction within 0.05 in
+Gazebo; Isaac object masks IoU >= 0.85 and count within 10 %, `CameraInfo` K
+equal to the profile, Isaac G1 reported but not judged.
+
+| Backend, entities | Offset 0 | Offset 0.5 |
+|---|---|---|
+| Gazebo, 8 targets in 7 scenes | 6 pass, IoU 0.79-0.98 | 8 pass, IoU 0.992-1.000 |
+| Isaac, 4 objects | 3 pass, IoU 0.78-0.98 | 4 pass, IoU 0.945-0.999 |
+
+Visible fractions matched within 0.011 at either offset, and every bbox edge
+within 2 px at 0.5. Both backends publish `fx = fy = 384, cx = 320, cy = 240`.
+The offset-0 failures were a uniform one-pixel band (simulator-only on left and
+top edges, audit-only on right and bottom): both renderers sample pixel centres
+at `i + 0.5` while publishing `cx = W / 2`. The audit default became 0.5 and
+the scenario comments were refreshed from a 0.5 audit; values moved by at most
+0.025 and no band verdict changed, so the values in the tables above are the
+offset-0 audit. Remaining count deficits sit where an object is within the
+2 cm threshold of what lies behind it (bed underside, pole bases, feet on the
+floor); in Isaac, part of one pole base near the floor is missing from the
+render (likely base-disc tessellation, not checked). The Isaac G1 masks read
+IoU 0.918-0.991 against the Gazebo-mesh audit, with visible fractions within
+0.011.
+
+![Gazebo trap_split_curtain overlays at offset 0 (one-pixel band) and 0.5 (agreement). White agrees, magenta audit-only, green simulator-only.](assets/2026-10-29-scene-recertification/rendered_spotcheck_gz_offset0.png)
+
+![The same scene at offset 0.5.](assets/2026-10-29-scene-recertification/rendered_spotcheck_gz_offset05.png)
+
+Per-entity results for both offsets are in
+[`rendered_spotcheck_results.csv`](assets/2026-10-29-scene-recertification/rendered_spotcheck_results.csv);
+an Isaac object overlay is
+[`rendered_spotcheck_isaac_objects_offset05.png`](assets/2026-10-29-scene-recertification/rendered_spotcheck_isaac_objects_offset05.png).
+
 ## Limits
 
 The audit models the Gazebo G1. Visual and collision meshes differ for 11 of
-its 36 parts; cameras and `gpu_lidar` render visuals. Pixel centres follow the
-intrinsics convention used by `project_points`; a renderer sampling half-pixel
-centres differs by at most 0.5 px at any boundary.
+its 36 parts; cameras and `gpu_lidar` render visuals. The rendered comparison
+covered seven scenes; the remaining families rest on the geometric audit.
