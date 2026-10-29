@@ -1,14 +1,21 @@
-# v2 benchmark set: randomized poses under family constraints. Its historical
-# pixel certifications used fx=443.53 at 640x480 and camera (0.25, 0, 0.85).
-# They predate the current mounts and shared camera profiles, so the fractions
-# below must not be quoted until the camera-geometry recertification backlog is
-# complete. Sampler seed 20260725; generated 2026-07-26 by a one-shot scratchpad
-# script. This YAML remains the durable fixed scene input.
+# v2 benchmark set: randomized poses under family constraints. Sampler seed
+# 20260725. This YAML remains the durable fixed scene input.
+#
+# Certifications: every number in a scene comment comes from `scene_audit`
+# (ridgeback_autonomy.benchmarking.scene_audit, definitions in its docstring)
+# against the current robot description, the 640x480 camera profile and the
+# Gazebo assets standing on the floor. Recheck them with
+#   scene_audit --scenario <this file> --profile 640x480
+# whose certification CSV compares each comment with the audited value.
+# Family names record the intended condition; where the current geometry
+# leaves a scene outside its family band, the comment says so. Interocc
+# scenes read higher than their bands because the far G1 shows through the
+# near G1's limb gaps. edge640_* scenes are edge cases at 640x480 only.
 #
 # Design: repeats:=1 at the runner; 3 probe scenes carry repeats_override 8
 # to measure the within-pose noise floor (single_facing_01, objpartial_01,
 # far_mid_01). Yaw and occluder shape are stratified factors; occlusion and
-# FOV families are certified into named bands.
+# FOV families are placed into named bands.
 #
 # EXTENDED 2026-08-23 with 18 in-box clutter scenes at the end of the file:
 # interfere_infront_*, interfere_behind_03..05, interfere_samerange_*,
@@ -76,14 +83,14 @@ scenes:
       - { x: 1.82, y: 0.2, yaw: 3.28 }
       - { x: 3.67, y: -1.18, yaw: 6.05 }
 
-  # 3 robots all visible: 1.00, 1.00, 0.98
+  # 3 robots all visible: 1.00, 1.00, 1.00
   - id: multi_02
     robots:
       - { x: 3.45, y: -1.05, yaw: 3.44 }
       - { x: 2.44, y: 0.87, yaw: 2.77 }
       - { x: 4.36, y: 0.88, yaw: 3.16 }
 
-  # 2 robots all visible: 0.98, 1.00
+  # 2 robots all visible: 1.00, 1.00
   - id: multi_03
     robots:
       - { x: 4.11, y: 0.1, yaw: 3.08 }
@@ -120,37 +127,37 @@ scenes:
       - { x: 2.66, y: 0.75, yaw: 2.87 }
       - { x: 4.45, y: 0.21, yaw: 3.48 }
 
-  # far robot vis 0.15 (band 0.15-0.45)
+  # far robot vis 0.52, above the 0.15-0.45 band: the far G1 shows through the near G1's limb gaps
   - id: interocc_moderate_01
     robots:
       - { x: 3.07, y: -0.75, yaw: 3.18 }
       - { x: 4.69, y: -0.97, yaw: 2.86 }
 
-  # far robot vis 0.23 (band 0.15-0.45)
+  # far robot vis 0.66, above the 0.15-0.45 band: the far G1 shows through the near G1's limb gaps
   - id: interocc_moderate_02
     robots:
       - { x: 1.87, y: 0.11, yaw: 2.76 }
       - { x: 3.91, y: 0.69, yaw: 2.99 }
 
-  # far robot vis 0.09 (band 0.03-0.15)
+  # far robot vis 0.45, above the 0.03-0.15 band: the far G1 shows through the near G1's limb gaps
   - id: interocc_sliver_01
     robots:
       - { x: 3.21, y: -0.66, yaw: 2.72 }
       - { x: 4.76, y: -1.14, yaw: 3.61 }
 
-  # far robot vis 0.10 (band 0.03-0.15)
+  # far robot vis 0.36, above the 0.03-0.15 band: the far G1 shows through the near G1's limb gaps
   - id: interocc_sliver_02
     robots:
       - { x: 3.04, y: -0.94, yaw: 2.7 }
       - { x: 4.09, y: -1.18, yaw: 3.49 }
 
-  # far robot vis 0.00 (band 0.0-0.03)
+  # far robot vis 0.27, above the 0.0-0.03 band: the far G1 shows through the near G1's limb gaps
   - id: interocc_neartotal_01
     robots:
       - { x: 3.02, y: -0.12, yaw: 3.0 }
       - { x: 5.1, y: -0.31, yaw: 3.43 }
 
-  # far robot vis 0.00 (band 0.0-0.03)
+  # far robot vis 0.30, above the 0.0-0.03 band: the far G1 shows through the near G1's limb gaps
   - id: interocc_neartotal_02
     robots:
       - { x: 2.49, y: 0.11, yaw: 3.56 }
@@ -210,13 +217,13 @@ scenes:
     objects:
       - { model: cabinet_tall, x: 3.41, y: 1.78, yaw: 1.32 }
 
-  # privacy_curtain heavy occlusion; vis 0.16 (band 0.02-0.20)
+  # privacy_curtain heavy occlusion; vis 0.09 (band 0.02-0.20)
   - id: objocc_heavy_01
     robots: [{ x: 3.34, y: 0.95, yaw: 3.13 }]
     objects:
       - { model: privacy_curtain, x: 2.17, y: 0.04, yaw: 2.67 }
 
-  # cabinet heavy occlusion; vis 0.05 (band 0.02-0.20)
+  # cabinet heavy occlusion; vis 0.03 (band 0.02-0.20)
   - id: objocc_heavy_02
     robots: [{ x: 4.02, y: -1.49, yaw: 3.33 }]
     objects:
@@ -228,44 +235,44 @@ scenes:
     objects:
       - { model: cabinet_tall, x: 2.23, y: 0.76, yaw: 2.05 }
 
-  # privacy_curtain heavy occlusion; vis 0.14 (band 0.02-0.20)
+  # privacy_curtain heavy occlusion; vis 0.09 (band 0.02-0.20)
   - id: objocc_heavy_04
     robots: [{ x: 4.12, y: -0.48, yaw: 3.17 }]
     objects:
       - { model: privacy_curtain, x: 2.27, y: 0.4, yaw: 0.44 }
 
-  # hospital_bed partial; vis 0.65 (band 0.35-0.65)
+  # hospital_bed partial; vis 0.71, above the 0.35-0.65 band
   - id: objpartial_01
     robots: [{ x: 4.41, y: 0.31, yaw: 3.62 }]
     objects:
       - { model: hospital_bed, x: 3.3, y: -0.12, yaw: 0.61 }
     repeats_override: 8
 
-  # hospital_bed_high partial; vis 0.50 (band 0.35-0.65)
+  # hospital_bed_high partial; vis 0.67, above the 0.35-0.65 band
   - id: objpartial_02
     robots: [{ x: 3.69, y: 1.61, yaw: 3.21 }]
     objects:
       - { model: hospital_bed_high, x: 2.37, y: 0.44, yaw: 0.06 }
 
-  # privacy_curtain partial; vis 0.51 (band 0.35-0.65)
+  # privacy_curtain partial; vis 0.54 (band 0.35-0.65)
   - id: objpartial_03
     robots: [{ x: 3.11, y: -0.34, yaw: 3.35 }]
     objects:
       - { model: privacy_curtain, x: 2.22, y: -1.08, yaw: 0.16 }
 
-  # table partial; vis 0.60 (band 0.35-0.65)
+  # table partial; vis 0.62 (band 0.35-0.65)
   - id: objpartial_04
     robots: [{ x: 3.72, y: -0.92, yaw: 3.1 }]
     objects:
       - { model: table, x: 2.17, y: -0.56, yaw: 0.09 }
 
-  # hospital_bed_high partial; vis 0.49 (band 0.35-0.65)
+  # hospital_bed_high partial; vis 0.59 (band 0.35-0.65)
   - id: objpartial_05
     robots: [{ x: 3.32, y: 1.34, yaw: 3.15 }]
     objects:
       - { model: hospital_bed_high, x: 2.48, y: -0.03, yaw: 2.19 }
 
-  # table partial; vis 0.64 (band 0.35-0.65)
+  # table partial; vis 0.63 (band 0.35-0.65)
   - id: objpartial_06
     robots: [{ x: 4.12, y: -1.27, yaw: 3.32 }]
     objects:
@@ -304,75 +311,75 @@ scenes:
   - id: far_beyond_01
     robots: [{ x: 10.73, y: 0.64, yaw: 3.41 }]
 
-  # center ratio 0.89; in-frame 1.00
-  - id: edge_mostly_in_01
-    robots: [{ x: 4.39, y: -2.67, yaw: 2.74 }]
+  # 640x480 edge, touching the right edge; in-frame 0.99, center ratio 0.91
+  - id: edge640_mostly_in_01
+    robots: [{ x: 4.18, y: -2.98, yaw: 2.67 }]
 
-  # center ratio 0.88; in-frame 1.00
-  - id: edge_mostly_in_02
-    robots: [{ x: 3.98, y: 2.38, yaw: 2.8 }]
+  # 640x480 edge, touching the left edge; in-frame 1.00, center ratio 0.84
+  - id: edge640_mostly_in_02
+    robots: [{ x: 3.89, y: 2.53, yaw: 2.84 }]
 
-  # center ratio 1.04; in-frame 0.26
-  - id: edge_half_out_01
-    robots: [{ x: 4.3, y: 3.03, yaw: 3.48 }]
+  # 640x480 edge, cut by the left edge; in-frame 0.28, center ratio 1.03
+  - id: edge640_half_out_01
+    robots: [{ x: 4.11, y: 3.28, yaw: 3.54 }]
 
-  # center ratio 1.03; in-frame 0.27
-  - id: edge_half_out_02
-    robots: [{ x: 4.37, y: -3.08, yaw: 2.79 }]
+  # 640x480 edge, cut by the right edge; in-frame 0.29, center ratio 1.03
+  - id: edge640_half_out_02
+    robots: [{ x: 4.17, y: -3.34, yaw: 2.73 }]
 
-  # center ratio 1.18; in-frame 0.01
-  - id: edge_sliver_01
-    robots: [{ x: 2.67, y: 2.05, yaw: 3.44 }]
+  # 640x480 edge, sliver at the left edge; in-frame 0.03, center ratio 1.10
+  - id: edge640_sliver_01
+    robots: [{ x: 2.61, y: 2.12, yaw: 3.47 }]
 
-  # edge-on curtain bisects mask (verified); vis 0.30
+  # edge-on curtain bisects mask (verified); vis 0.32
   - id: trap_split_curtain
     robots: [{ x: 3.86, y: 0.17, yaw: 3.04 }]
     objects:
       - { model: privacy_curtain, x: 2.35, y: 0.11, yaw: 1.57 }
 
-  # IV pole bisects mask (verified); vis 0.70
+  # IV pole bisects mask (verified); vis 0.77
   - id: trap_split_pole
     robots: [{ x: 3.86, y: -0.48, yaw: 3.07 }]
     objects:
       - { model: iv_pole, x: 2.25, y: -0.24, yaw: 0.0 }
 
-  # bed blocks scan plane fully; camera vis 0.84
+  # bed blocks scan plane fully; camera vis 0.97
   - id: trap_lidar_bed
     robots: [{ x: 4.19, y: -1.39, yaw: 3.21 }]
     objects:
       - { model: hospital_bed, x: 1.47, y: -0.43, yaw: 0.0 }
 
-  # table on same bearing: scan passes between legs; camera vis 0.67
+  # table on same bearing: scan passes between legs; camera vis 0.71
   - id: trap_lidar_table
     robots: [{ x: 4.27, y: 0.8, yaw: 3.08 }]
     objects:
       - { model: table, x: 1.83, y: 0.31, yaw: 0.0 }
 
-  # hospital_bed hides legs, bbox bottom lifted; vis 0.66
+  # hospital_bed hides legs, bbox bottom lifted; vis 0.74
   - id: trap_rgb_01
     robots: [{ x: 3.85, y: 0.98, yaw: 3.46 }]
     objects:
       - { model: hospital_bed, x: 2.62, y: 0.64, yaw: 0.0 }
 
-  # hospital_bed hides legs, bbox bottom lifted; vis 0.66
+  # hospital_bed hides legs, bbox bottom lifted; vis 0.74
   - id: trap_rgb_02
     robots: [{ x: 3.7, y: 0.94, yaw: 3.37 }]
     objects:
       - { model: hospital_bed, x: 2.49, y: 0.61, yaw: 0.0 }
 
-  # hospital_bed_high contact, gap 0.22 m; vis 0.45
+  # hospital_bed_high contact, gap 0.22 m; vis 0.52
   - id: trap_contact_01
     robots: [{ x: 3.58, y: -0.69, yaw: 2.97 }]
     objects:
       - { model: hospital_bed_high, x: 2.61, y: -0.69, yaw: 1.57 }
 
-  # table contact, gap 0.19 m; vis 0.89
+  # table contact, gap 0.19 m; vis 0.82
   - id: trap_contact_02
     robots: [{ x: 3.36, y: -0.93, yaw: 3.33 }]
     objects:
       - { model: table, x: 2.57, y: -0.93, yaw: 1.57 }
 
-  # table in front + cabinet behind: depth band attacked both sides; vis 0.62
+  # table in front + cabinet behind: depth band attacked both sides; vis 0.61
   - id: trap_layered_01
     robots: [{ x: 3.71, y: -1.27, yaw: 2.76 }]
     objects:
@@ -386,7 +393,7 @@ scenes:
       - { model: table, x: 2.49, y: 0.52, yaw: 0.0 }
       - { model: cabinet, x: 5.22, y: 0.67, yaw: 2.35 }
 
-  # R0 vis 0.47, R1 vis 0.75, R2 vis 0.52 | table+hospital_bed_high
+  # R0 vis 0.61, R1 vis 0.81, R2 vis 0.74 | table+hospital_bed_high
   - id: chaos_01
     robots:
       - { x: 4.17, y: -1.34, yaw: 1.18 }
@@ -396,7 +403,7 @@ scenes:
       - { model: table, x: 2.0, y: 1.16, yaw: 0.91 }
       - { model: hospital_bed_high, x: 2.04, y: -0.97, yaw: 1.21 }
 
-  # R0 vis 0.85, R1 vis 0.84, R2 vis 0.57 | table+cabinet_tall
+  # R0 vis 0.87, R1 vis 0.82, R2 vis 0.71 | table+cabinet_tall
   - id: chaos_02
     robots:
       - { x: 3.71, y: -1.24, yaw: 0.36 }
@@ -406,7 +413,7 @@ scenes:
       - { model: table, x: 2.59, y: -0.35, yaw: 1.97 }
       - { model: cabinet_tall, x: 3.0, y: 1.98, yaw: 1.01 }
 
-  # R0 vis 0.68, R1 vis 0.33, R2 vis 0.54 | table+cabinet_tall
+  # R0 vis 0.70, R1 vis 0.60, R2 vis 0.78 | table+cabinet_tall
   - id: chaos_03
     robots:
       - { x: 2.22, y: -0.18, yaw: 3.57 }
@@ -416,7 +423,7 @@ scenes:
       - { model: table, x: 1.67, y: 2.07, yaw: 2.64 }
       - { model: cabinet_tall, x: 1.88, y: -0.65, yaw: 2.26 }
 
-  # R0 vis 0.79, R1 vis 0.35, R2 vis 0.84 | table+table_low+iv_pole
+  # R0 vis 0.82, R1 vis 0.55, R2 vis 0.84 | table+table_low+iv_pole
   - id: chaos_04
     robots:
       - { x: 3.33, y: 0.01, yaw: 3.13 }
@@ -433,22 +440,22 @@ scenes:
   # ignored. These place one inside it, where the mask admits its beams and the
   # range segmentation is what has to reject them -- the other half of the axis.
   #
-  # Historical certification from the then-live URDF (~/clearpath, camera mount
-  # 0.0/0.72) and world SDF: camera base_link + (0.011, 0.018, 1.028),
-  # fx 443.53 at 640x480. It is not current profile/mount evidence;
-  # LiDAR base_link + (0.392, 0, 0.342), 270 deg at 0.25 deg per beam, so the
-  # scan plane cuts the G1 mid-thigh. IV pole = 0.025 m shaft, z 0.05..1.80;
-  # its 0.225 m base disc sits below the scan plane and the LiDAR never sees it.
+  # Certified by scene_audit: colour optical frame base_link + (0.280, -0.012,
+  # 1.035), fx 384 at 640x480; LiDAR base_link + (0.392, 0, 0.226), 270 deg at
+  # 0.25 deg per beam, so the scan plane cuts the G1 just below the knee.
+  # IV pole = 0.025 m shaft, z 0.10..1.85 standing on the floor; its 0.225 m
+  # base disc sits below the scan plane and the LiDAR never sees it.
   #
-  # Each pole satisfies: both shins keep at least 60% of their angular width
-  # (so the legs always return), it projects inside the detection box, its
-  # shaft clears the robot and the other poles, and no pole stands in another's
-  # shadow. Camera and LiDAR are only 0.38 m apart on one centre line, so "in
-  # the box" and "in the leg shadow" are nearly the same cone: a pole fits
-  # either BETWEEN the legs (25-35 px inside the box edge) or on a FLANK just
-  # outside one shin (5-7 px inside the edge, the geometric maximum). Two poles
-  # per robot is the ceiling; a third would have to share a bearing and would
-  # sit in another pole's shadow.
+  # Design rule for each pole: both shins keep at least 60% of their angular
+  # width (so the legs always return), it projects inside the detection box,
+  # its shaft clears the robot and the other poles, and no pole stands in
+  # another's shadow. Camera and LiDAR share one centre line, so "in the box"
+  # and "in the leg shadow" are nearly the same cone: a pole fits either
+  # BETWEEN the legs (about 10-28 px inside the box edge) or on a FLANK just
+  # outside one shin, at the box edge. Against the G1 mesh several flank poles
+  # now sit 1-4 px outside the box, and interfere_pair_05's second pole touches
+  # the G1's hand; their comments say so. Two poles per robot is the ceiling; a
+  # third would have to share a bearing and would sit in another pole's shadow.
   #
   # Baseline for subtracting the pole's effect: the object-free poses already
   # in this file. All but one of these scenes is facing at 2.7-3.4 m, within
@@ -465,102 +472,102 @@ scenes:
   # samerange = pole merges and pulls the estimate; control = no effect at all.
   # ---------------------------------------------------------------------------
 
-  # pole between the legs at 1.31 m (-0.59 m vs the legs, ~9 beams), nearest shin 100% visible, +37 px inside the box -> steals the near band
+  # pole between the legs at 1.31 m (-0.58 m vs the legs, ~9 beams), nearest shin 100% visible, +28 px inside the box -> steals the near band
   - id: interfere_infront_01
     robots: [{ x: 2.30, y: 0.10, yaw: 3.05 }]
     objects:
       - { model: iv_pole, x: 1.70, y: 0.07 }
 
-  # control twin of interfere_infront_01: identical robot pose, no poles
+  # 1 pole: at 1.92 m, 6 beams, +20 px inside the box; legs unshadowed
   - id: interfere_infront_02
     robots: [{ x: 2.90, y: -0.25, yaw: 3.28 }]
     objects:
       - { model: iv_pole, x: 2.30, y: -0.19 }
 
-  # control twin of interfere_infront_02: identical robot pose, no poles
+  # 1 pole: at 1.75 m, 7 beams, +24 px inside the box; legs unshadowed
   - id: interfere_infront_03
     robots: [{ x: 2.70, y: -0.45, yaw: 0.10 }]
     objects:
       - { model: iv_pole, x: 2.11, y: -0.34 }
 
-  # control twin of interfere_infront_03: identical robot pose, no poles
+  # 1 pole: at 1.99 m, 6 beams, +11 px inside the box; legs keep >= 83% width
   - id: interfere_infront_04
     robots: [{ x: 2.95, y: 0.40, yaw: 3.00 }]
     objects:
       - { model: iv_pole, x: 2.33, y: 0.44 }
 
-  # control twin of interfere_infront_04: identical robot pose, no poles
+  # 1 pole: at 3.11 m, 4 beams, +25 px inside the box; legs unshadowed
   - id: interfere_behind_03
     robots: [{ x: 2.80, y: 0.05, yaw: 3.14 }]
     objects:
       - { model: iv_pole, x: 3.50, y: 0.06 }
 
-  # control twin of interfere_behind_03: identical robot pose, no poles
+  # 1 pole: at 3.63 m, 3 beams, +21 px inside the box; legs unshadowed
   - id: interfere_behind_04
     robots: [{ x: 3.30, y: -0.40, yaw: 3.35 }]
     objects:
       - { model: iv_pole, x: 3.99, y: -0.50 }
 
-  # control twin of interfere_behind_04: identical robot pose, no poles
+  # 1 pole: at 3.73 m, 3 beams, +19 px inside the box; legs unshadowed
   - id: interfere_behind_05
     robots: [{ x: 3.40, y: 0.30, yaw: 2.98 }]
     objects:
       - { model: iv_pole, x: 4.10, y: 0.37 }
 
-  # control twin of interfere_behind_05: identical robot pose, no poles
+  # 1 pole: at 1.98 m, 5 beams, +25 px inside the box; legs unshadowed
   - id: interfere_samerange_01
     robots: [{ x: 2.70, y: 0.15, yaw: 3.22 }]
     objects:
       - { model: iv_pole, x: 2.37, y: 0.13 }
 
-  # control twin of interfere_samerange_01: identical robot pose, no poles
+  # 1 pole: at 2.38 m, 5 beams, +20 px inside the box; legs unshadowed
   - id: interfere_samerange_02
     robots: [{ x: 3.10, y: -0.20, yaw: 3.28 }]
     objects:
       - { model: iv_pole, x: 2.77, y: -0.18 }
 
-  # control twin of interfere_samerange_02: identical robot pose, no poles
+  # 1 pole: at 2.20 m, 5 beams, +9 px inside the box; legs keep >= 79% width
   - id: interfere_samerange_03
     robots: [{ x: 2.90, y: 0.35, yaw: 3.05 }]
     objects:
       - { model: iv_pole, x: 2.55, y: 0.45 }
 
-  # control twin of interfere_samerange_03: identical robot pose, no poles
+  # 2 poles: p0 at 3.31 m, 3 beams, +23 px inside the box; p1 at 2.01 m, 5 beams, 3 px outside the box; legs keep >= 91% width
   - id: interfere_pair_01
     robots: [{ x: 3.00, y: 0.00, yaw: 3.14 }]
     objects:
       - { model: iv_pole, x: 3.70, y: 0.00 }
       - { model: iv_pole, x: 2.40, y: 0.14 }
 
-  # control twin of interfere_pair_01: identical robot pose, no poles
+  # 2 poles: p0 at 1.82 m, 7 beams, +25 px inside the box; p1 at 2.75 m, 4 beams, 1 px outside the box; legs unshadowed
   - id: interfere_pair_02
     robots: [{ x: 2.80, y: 0.25, yaw: 3.25 }]
     objects:
       - { model: iv_pole, x: 2.20, y: 0.19 }
       - { model: iv_pole, x: 3.14, y: 0.08 }
 
-  # control twin of interfere_pair_02: identical robot pose, no poles
+  # 2 poles: p0 at 1.91 m, 6 beams, 4 px outside the box; p1 at 2.84 m, 5 beams, 3 px outside the box; legs keep >= 93% width
   - id: interfere_pair_03
     robots: [{ x: 2.90, y: 0.00, yaw: 3.14 }]
     objects:
       - { model: iv_pole, x: 2.30, y: 0.14 }
       - { model: iv_pole, x: 3.22, y: -0.21 }
 
-  # control twin of interfere_pair_03: identical robot pose, no poles
+  # 2 poles: p0 at 2.14 m, 6 beams, +22 px inside the box; p1 at 1.67 m, 7 beams, +9 px inside the box; legs keep >= 82% width
   - id: interfere_pair_04
     robots: [{ x: 2.85, y: -0.25, yaw: 3.30 }]
     objects:
       - { model: iv_pole, x: 2.52, y: -0.22 }
       - { model: iv_pole, x: 2.04, y: -0.29 }
 
-  # control twin of interfere_pair_04: identical robot pose, no poles
+  # 2 poles: p0 at 3.27 m, 4 beams, +23 px inside the box; p1 at 2.23 m, 5 beams, 1 px outside the box, intersects the G1 by >= 2.5 cm; legs keep >= 93% width
   - id: interfere_pair_05
     robots: [{ x: 2.95, y: 0.20, yaw: 3.18 }]
     objects:
       - { model: iv_pole, x: 3.65, y: 0.25 }
       - { model: iv_pole, x: 2.60, y: 0.33 }
 
-  # control twin of interfere_pair_05: identical robot pose, no poles
+  # 1 pole: at 1.84 m, 6 beams, +22 px inside the box; legs unshadowed
   - id: interfere_multi_01
     robots:
       - { x: 2.70, y: 0.80, yaw: 3.30 }
@@ -568,7 +575,7 @@ scenes:
     objects:
       - { model: iv_pole, x: 2.13, y: 0.60 }
 
-  # control twin of interfere_multi_01: identical robot pose, no poles
+  # 2 poles: p0 at 1.95 m, 6 beams, +22 px inside the box; p1 at 3.25 m, 4 beams, 3 px outside the box; legs unshadowed
   - id: interfere_multi_02
     robots:
       - { x: 2.80, y: 0.85, yaw: 3.28 }
@@ -577,10 +584,8 @@ scenes:
       - { model: iv_pole, x: 2.23, y: 0.65 }
       - { model: iv_pole, x: 3.53, y: 0.86 }
 
-  # control twin of interfere_multi_02: identical robot pose, no poles
+  # control: 1 pole at 1.81 m, 7 beams, 55 px outside the box by design; legs unshadowed
   - id: interfere_control_04
     robots: [{ x: 2.80, y: 0.10, yaw: 3.15 }]
     objects:
       - { model: iv_pole, x: 2.14, y: 0.46 }
-
-  # control twin of interfere_control_04: identical robot pose, no poles

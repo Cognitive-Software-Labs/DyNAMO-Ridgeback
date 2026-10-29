@@ -79,8 +79,8 @@ and object geometry. [Scene certification](semantics.md#scene-certification)
 owns the method.
 
 **Gap.** No rendered comparison yet checks the audit's raster against
-simulator depth captures. Every benchmark result recorded before this change
-predates the floor-standing assets and the replaced `edge640_*` scenes.
+simulator depth captures. Every benchmark result recorded before the
+2026-10-29 scene recertification predates the floor-standing assets and the replaced `edge640_*` scenes.
 
 **Completion criteria.** Predeclare a pixel tolerance, then compare depth-
 derived target masks with the audit on scenes spanning occlusion, edge and
@@ -90,23 +90,6 @@ geometry or asset seating before quoting its numbers.
 
 **Context.** [Camera stack](../target_localization/camera_stack.md) and
 [shared robot geometry](../robot/geometry.md).
-
-## Shared G1 target geometry
-
-**Gap.** The backends render different G1 assets: Gazebo the STL G1 under
-`ridgeback_autonomy_gz/sim/models/g1`, Isaac the Unitree 29-DoF Dex1 USD under
-`ridgeback_autonomy_isaac/sim/isaac/usd/models/g1`. Both stand on the floor
-with their origin at ground contact, but silhouettes, limb gaps and LiDAR leg
-returns differ. Scene certifications describe the Gazebo G1, and a
-target-dependent result does not transfer between backends.
-
-**Completion criteria.** Render one shared G1 geometry in both backends, or
-audit the Isaac asset with `scene_audit` and record per scene how visible
-fraction, detection box and leg beams differ, and which cross-backend
-comparisons that invalidates.
-
-**Context.** [Scene certification](semantics.md#scene-certification) and the
-Isaac asset's `NOTICE.md`.
 
 ## Isolation validation
 

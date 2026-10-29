@@ -46,9 +46,8 @@ maps those names to its own world and spawnable resources:
 The runner places, reads and removes entities only through the standard ROS
 `simulation_interfaces` services the selected adapter serves, so it contains
 no simulator code. Ground truth comes from one state snapshot taken through
-those services. Both catalogs spawn at the literal scenario height, so a model
-stands identically in both simulators: its origin at z = 0, 5 cm into the
-0.05 m floor slab.
+those services. Both catalogs stand each model on the floor's top surface, so
+it stands identically in both simulators (see [scene certification](#scene-certification)).
 
 What a Gazebo-to-Isaac comparison may claim:
 - **Same-revision baseline.** Compare an Isaac run only with a Gazebo run of
@@ -113,9 +112,15 @@ comment outside its family band says so. `edge640_*` scenes are edge cases only
 at 640x480: the frame edge sits at ±39.8° there and at ±45° at 1280x720.
 
 The Isaac stage matches the geometry the audit models: camera pose, intrinsics,
-LiDAR pose and every object agree exactly. The G1 is the exception; Isaac
-renders a different G1 asset. Re-run the audit after any change to camera or
-LiDAR geometry, assets or the scenario file:
+LiDAR pose and every object agree exactly. The G1 is the exception: Gazebo
+renders the STL G1 under `ridgeback_autonomy_gz/sim/models/g1`, Isaac the
+Unitree 29-DoF Dex1 USD under `ridgeback_autonomy_isaac/sim/isaac/usd/models/g1`
+(provenance in its `NOTICE.md`).
+Both stand on the floor with their origin at ground contact, but silhouettes,
+limb gaps and LiDAR leg returns differ, so certifications describe the Gazebo
+G1 and a target-dependent result does not transfer between backends. Re-run
+the audit after any change to camera or LiDAR geometry, assets or the scenario
+file:
 
 ```bash
 ros2 run ridgeback_autonomy scene_audit \

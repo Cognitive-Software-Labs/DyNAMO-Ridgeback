@@ -1,0 +1,81 @@
+scene,claim,target,comment_value,band,audit_value,abs_diff,holds,note
+multi_01,vis,0,1.0,"[0.95, 1.0]",1.0,0.0,True,visible_fraction=1.0
+multi_01,vis,1,1.0,"[0.95, 1.0]",1.0,0.0,True,visible_fraction=1.0
+multi_02,vis,0,1.0,"[0.95, 1.0]",1.0,0.0,True,visible_fraction=1.0
+multi_02,vis,1,1.0,"[0.95, 1.0]",1.0,0.0,True,visible_fraction=1.0
+multi_02,vis,2,0.98,"[0.95, 1.0]",1.0,0.02,True,visible_fraction=1.0
+multi_03,vis,0,0.98,"[0.95, 1.0]",1.0,0.02,True,visible_fraction=1.0
+multi_03,vis,1,1.0,"[0.95, 1.0]",1.0,0.0,True,visible_fraction=1.0
+multi_04,vis,0,1.0,"[0.95, 1.0]",1.0,0.0,True,visible_fraction=1.0
+multi_04,vis,1,1.0,"[0.95, 1.0]",1.0,0.0,True,visible_fraction=1.0
+multi_04,vis,2,1.0,"[0.95, 1.0]",1.0,0.0,True,visible_fraction=1.0
+interocc_moderate_01,vis,1,0.15,"[0.15, 0.45]",0.5227,0.3727,False,visible_fraction=0.5227
+interocc_moderate_02,vis,1,0.23,"[0.15, 0.45]",0.6576,0.4276,False,visible_fraction=0.6576
+interocc_sliver_01,vis,1,0.09,"[0.03, 0.15]",0.4505,0.3605,False,visible_fraction=0.4505
+interocc_sliver_02,vis,1,0.1,"[0.03, 0.15]",0.3641,0.2641,False,visible_fraction=0.3641
+interocc_neartotal_01,vis,1,0.0,"[0.0, 0.03]",0.2748,0.2748,False,visible_fraction=0.2748
+interocc_neartotal_02,vis,1,0.0,"[0.0, 0.03]",0.3035,0.3035,False,visible_fraction=0.3035
+interfere_behind_01,vis,0,1.0,"[0.95, 1.0]",1.0,0.0,True,visible_fraction=1.0
+interfere_behind_02,vis,0,1.0,"[0.95, 1.0]",1.0,0.0,True,visible_fraction=1.0
+interfere_beside_01,vis,0,1.0,"[0.95, 1.0]",1.0,0.0,True,visible_fraction=1.0
+interfere_beside_02,vis,0,1.0,"[0.95, 1.0]",1.0,0.0,True,visible_fraction=1.0
+interfere_bearing_01,vis,0,1.0,"[0.95, 1.0]",1.0,0.0,True,visible_fraction=1.0
+interfere_bearing_02,vis,0,1.0,"[0.95, 1.0]",1.0,0.0,True,visible_fraction=1.0
+interfere_control_01,vis,0,1.0,"[0.95, 1.0]",1.0,0.0,True,visible_fraction=1.0
+interfere_control_02,vis,0,1.0,"[0.95, 1.0]",1.0,0.0,True,visible_fraction=1.0
+interfere_control_03,vis,0,1.0,"[0.95, 1.0]",1.0,0.0,True,visible_fraction=1.0
+objocc_heavy_01,vis,0,0.16,"[0.02, 0.2]",0.0943,0.0657,True,visible_fraction=0.0943
+objocc_heavy_02,vis,0,0.05,"[0.02, 0.2]",0.033,0.017,True,visible_fraction=0.033
+objocc_heavy_03,vis,0,0.06,"[0.02, 0.2]",0.0574,0.0026,True,visible_fraction=0.0574
+objocc_heavy_04,vis,0,0.14,"[0.02, 0.2]",0.0915,0.0485,True,visible_fraction=0.0915
+objpartial_01,vis,0,0.65,"[0.35, 0.65]",0.7068,0.0568,False,visible_fraction=0.7068
+objpartial_02,vis,0,0.5,"[0.35, 0.65]",0.6665,0.1665,False,visible_fraction=0.6665
+objpartial_03,vis,0,0.51,"[0.35, 0.65]",0.5354,0.0254,True,visible_fraction=0.5354
+objpartial_04,vis,0,0.6,"[0.35, 0.65]",0.6212,0.0212,True,visible_fraction=0.6212
+objpartial_05,vis,0,0.49,"[0.35, 0.65]",0.5896,0.0996,True,visible_fraction=0.5896
+objpartial_06,vis,0,0.64,"[0.35, 0.65]",0.6255,0.0145,True,visible_fraction=0.6255
+near_clip_01,feet_clipped,0,,,,,True,clipped_edges=['bottom']
+far_clamp_01,inside_depth_clamp,0,,,8.8996,,True,optical Z of the torso centre
+far_clamp_02,inside_depth_clamp,0,,,9.0396,,True,optical Z of the torso centre
+far_beyond_01,beyond_depth_clamp,0,,,10.4497,,True,optical Z of the torso centre
+edge_mostly_in_01,center_ratio,0,0.89,"[0.88, 0.96]",0.7763,0.1137,False,
+edge_mostly_in_01,in_frame_fraction,0,1.0,,1.0,0.0,,
+edge_mostly_in_02,center_ratio,0,0.88,"[0.88, 0.96]",0.7757,0.1043,False,
+edge_mostly_in_02,in_frame_fraction,0,1.0,,1.0,0.0,,
+edge_half_out_01,center_ratio,0,1.04,"[0.99, 1.04]",0.908,0.132,False,
+edge_half_out_01,in_frame_fraction,0,0.26,,0.9914,0.7314,,
+edge_half_out_02,center_ratio,0,1.03,"[0.99, 1.04]",0.9004,0.1296,False,
+edge_half_out_02,in_frame_fraction,0,0.27,,1.0,0.73,,
+edge_sliver_01,center_ratio,0,1.18,"[1.1, 1.18]",1.0352,0.1448,False,
+edge_sliver_01,in_frame_fraction,0,0.01,,0.327,0.317,,
+trap_split_curtain,vis,0,0.3,,0.3192,0.0192,,visible_fraction=0.3192
+trap_split_pole,vis,0,0.7,,0.7664,0.0664,,visible_fraction=0.7664
+trap_lidar_bed,vis,0,0.84,,0.967,0.127,,visible_fraction=0.967
+trap_lidar_bed,scan_plane_blocked,0,,,0,,True,
+trap_lidar_table,vis,0,0.67,,0.7058,0.0358,,visible_fraction=0.7058
+trap_lidar_table,scan_reaches_target,0,,,10,,True,
+trap_rgb_01,vis,0,0.66,,0.7409,0.0809,,visible_fraction=0.7409
+trap_rgb_01,bbox_bottom_lifted,0,,,,,True,"bbox=[193, 212, 235, 306] bbox_alone=[193, 212, 235, 359]"
+trap_rgb_02,vis,0,0.66,,0.7389,0.0789,,visible_fraction=0.7389
+trap_rgb_02,bbox_bottom_lifted,0,,,,,True,"bbox=[190, 211, 234, 309] bbox_alone=[190, 211, 234, 365]"
+trap_contact_01,vis,0,0.45,,0.5227,0.0727,,visible_fraction=0.5227
+trap_contact_02,vis,0,0.89,,0.8227,0.0673,,visible_fraction=0.8227
+trap_layered_01,vis,0,0.62,,0.607,0.013,,visible_fraction=0.607
+trap_layered_02,vis,0,0.63,,0.6267,0.0033,,visible_fraction=0.6267
+chaos_01,vis,0,0.47,,0.6126,0.1426,,visible_fraction=0.6126
+chaos_01,vis,1,0.75,,0.8061,0.0561,,visible_fraction=0.8061
+chaos_01,vis,2,0.52,,0.7393,0.2193,,visible_fraction=0.7393
+chaos_02,vis,0,0.85,,0.8675,0.0175,,visible_fraction=0.8675
+chaos_02,vis,1,0.84,,0.82,0.02,,visible_fraction=0.82
+chaos_02,vis,2,0.57,,0.707,0.137,,visible_fraction=0.707
+chaos_03,vis,0,0.68,,0.6992,0.0192,,visible_fraction=0.6992
+chaos_03,vis,1,0.33,,0.5993,0.2693,,visible_fraction=0.5993
+chaos_03,vis,2,0.54,,0.7763,0.2363,,visible_fraction=0.7763
+chaos_04,vis,0,0.79,,0.822,0.032,,visible_fraction=0.822
+chaos_04,vis,1,0.35,,0.547,0.197,,visible_fraction=0.547
+chaos_04,vis,2,0.84,,0.8381,0.0019,,visible_fraction=0.8381
+interfere_infront_01,pole_range_m,,1.31,,1.3097,0.0003,,
+interfere_infront_01,pole_minus_leg_range_m,,-0.59,,-0.584,0.006,,
+interfere_infront_01,pole_beams,,9.0,,9,0.0,,
+interfere_infront_01,nearest_leg_width_ratio,0,1.0,"[0.6, 1.0]",1.0,0.0,True,
+interfere_infront_01,pole_inset_px,,37.0,"[0.0, inf]",28.28,8.72,True,

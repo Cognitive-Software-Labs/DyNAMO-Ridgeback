@@ -60,6 +60,19 @@ for the physical unit. The `r100_0160` unit's factory calibration lies within
 about 1 % in focal length and a few pixels in principal point of both profiles.
 The profiles are therefore kept as they are; hardware runs read the live `K`.
 
+![The 1280x720 profile keeps the sensor's full width; the 640x480 profile keeps its full height and trims the sides.](assets/d455-profile-crops.svg)
+
+Resolution alone does not set the field of view; the aspect ratio does. A 4:3
+grid cut from the 16:10 sensor at full height keeps only the central 1067 of
+1280 columns, so `640x480` sees 2·atan(533/640) = 79.6 degrees horizontally,
+and scaling that crop by 0.6 gives `fx = 384`. A plain downscale of the whole
+sensor would instead give a 640 x 400 image with `fx = 320`; the factory
+calibration rules that out. `640x480` is therefore narrower than `1280x720`
+horizontally (frame edge at ±39.8 versus ±45 degrees) but 5.3 degrees taller,
+so pixel geometry such as which targets touch the image edge or lose their
+feet is profile-specific. Benchmark scene certifications use `640x480`, the
+profile the Thor perception host runs.
+
 The estimators read only `K` from `CameraInfo` (`intrinsics_from_camera_info`).
 They ignore the distortion coefficients `D` and treat the unrectified D455
 colour image as an ideal pinhole. On `r100_0160` this costs a fraction of a
@@ -202,10 +215,10 @@ contains a Gazebo-, Isaac-, or RealSense-specific projection constant.
   optional gate.
 - Physical camera-to-LiDAR extrinsic and clock validation remains a deployment
   gate for polar profiling.
-- The committed benchmark scenarios carry visibility certifications generated
-  against older camera and LiDAR geometry. They remain useful fixed A/B scenes,
-  but their certified fractions must be regenerated before being quoted for the
-  current measured mounts.
+- Benchmark scene certifications are generated from this geometry by
+  [`scene_audit`](../target_distance_benchmarking/semantics.md#scene-certification);
+  a rendered comparison and the benchmark reruns remain in the
+  [benchmarking backlog](../target_distance_benchmarking/BACKLOG.md#camera-geometry-benchmark-recertification).
 
 ## Source map
 

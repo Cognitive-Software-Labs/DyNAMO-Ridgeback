@@ -6,8 +6,12 @@ Provenance: partial
 
 The audits ran from a working tree based on the tested revision, with the
 `scene_audit` tool, asset seating and scenario edits uncommitted; those changes
-were committed together with this record. Audit outputs stayed under
-`artifacts/benchmarks/scene_audit/20261029_*` and are not preserved in git.
+were committed together with this record. The full audit outputs stayed under
+`artifacts/benchmarks/scene_audit/20261029_*`; the two claim comparisons and
+the figures below are preserved in
+[`assets/2026-10-29-scene-recertification/`](assets/2026-10-29-scene-recertification/).
+
+![Cross-check scatter: recomputed versus July comment values with the old and the current geometry.](assets/2026-10-29-scene-recertification/crosscheck_scatter.png)
 
 ## Scope and decisions
 
@@ -19,7 +23,7 @@ D455 profile (fx = 384 at 640x480, within about 1 % of the `r100_0160` factory
 calibration) with its colour optical frame at base_link + (0.280, -0.012,
 1.035), and the front LiDAR plane moved from z 0.342 to 0.226.
 
-The user decided:
+Decisions (deivid, 2026-10-29):
 
 - Certify at 640x480 only. Raw HD exceeds the Intel-Thor link, so hardware
   perception stays at 640x480; the audit still reports 1280x720.
@@ -33,8 +37,8 @@ The user decided:
   re-place the edge scenes, which no longer tested the image edge at all.
   The five `edge_*` ids were retired and replaced by `edge640_*` ids with the
   same range, side and relative yaw, so no id refers to two poses.
-- Record the Isaac/Gazebo G1 asset difference as a backlog item rather than
-  unifying the assets here.
+- Keep the Isaac/Gazebo G1 asset difference as a documented limitation; no
+  asset unification is planned.
 
 ## Method
 
@@ -65,9 +69,16 @@ comparison against simulator depth captures was not run.
 | interocc sliver (band 0.03-0.15) | 0.09, 0.10 | 0.45, 0.36 | relabelled, above band |
 | interocc neartotal (band 0.00-0.03) | 0.00, 0.00 | 0.27, 0.30 | relabelled, above band |
 | objpartial_01, _02 (band 0.35-0.65) | 0.65, 0.50 | 0.71, 0.67 | relabelled, above band |
-| edge mostly-in (centre 0.88-0.96) | 0.89, 0.88 | 0.78 | re-placed |
-| edge half-out (in-frame ~0.26) | 0.26, 0.27 | 0.99, 1.00 | re-placed: 0.28, 0.29 |
-| edge sliver (in-frame ~0.01) | 0.01 | 0.33 | re-placed: 0.03 |
+| edge mostly-in (centre 0.88-0.96) | 0.89, 0.88 | centre 0.78, 0.78 | re-placed: in-frame 0.99, 1.00 |
+| edge half-out (in-frame ~0.26) | 0.26, 0.27 | in-frame 0.99, 1.00 | re-placed: 0.28, 0.29 |
+| edge sliver (in-frame ~0.01) | 0.01 | in-frame 0.33 | re-placed: 0.03 |
+
+The re-placed edge families are banded on in-frame fraction instead of centre
+ratio, because the G1's arms reach the frame edge before its torso centre
+does: mostly-in 0.99-1.00 (touching the edge), half-out 0.20-0.35, sliver
+0.005-0.05. The mostly-in replacements read centre ratio 0.91 and 0.84.
+
+![Retired edge poses (left) and their replacements (right) at 640x480.](assets/2026-10-29-scene-recertification/edge_scenes_before_after.png)
 
 Retired edge ids and their replacements, as `(x, y, yaw)`:
 
@@ -88,8 +99,15 @@ In the in-box clutter block every shin keeps at least 79 % of its angular
 width. Six flank poles project 1-4 px outside the G1's detection box, and the
 second pole of `interfere_pair_05` intersects the G1's hand by 2.5 cm; their
 comments say so. The "control twin" comments in that block never described
-their scenes (no pole-free twins exist since the block was added on
-2026-08-23) and were replaced with each scene's own pole numbers.
+their scenes (no pole-free twins existed even in `e1bdc171`, which added the
+block on 2026-08-23) and were replaced with each scene's own pole numbers.
+
+The same geometry drift had left the polar-profiling reference stale: it
+derived the near-range floor from a camera optical origin at 1.028 m and
+`lidar2d_0_laser` at 0.342 m, a scan plane 0.686 m below the camera projecting
+to `v = fy·0.686/Z + cy`, with the plane leaving the 480-row frame below about
+1.10 m. With the current 0.808 m drop that floor is about 1.29 m; the reference
+was updated in the same change.
 
 ## Limits
 
