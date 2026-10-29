@@ -54,6 +54,8 @@ captures in both backends match the audit's masks.
 **Gap.** Every benchmark result recorded before the 2026-10-29 scene
 recertification predates the floor-standing assets and the replaced
 `edge640_*` scenes, and none has been rerun on the current geometry.
+[BENCHMARKING — Geometry reruns](../plans/BENCHMARKING_geometry_reruns.md)
+owns the order and preconditions.
 
 **Completion criteria.** Rerun every benchmark whose inputs or measured
 behavior depend on camera or LiDAR geometry or asset seating, in a

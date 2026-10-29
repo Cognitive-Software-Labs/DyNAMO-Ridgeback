@@ -116,6 +116,7 @@ troubleshooting, planning, and historical documentation.
 
 ## Active plans
 
+- [BENCHMARKING — Geometry reruns](plans/BENCHMARKING_geometry_reruns.md) — baseline, concurrency and isolation sweeps on the current scene geometry; blocked on dependencies
 - [BENCHMARKING — Combined-model throughput](plans/BENCHMARKING_model_throughput.md) — run the existing sweep and determine whether concurrency is needed
 - [BENCHMARKING — Stationary hardware scene recording](plans/BENCHMARKING_hardware_recording.md) — raw sensor bags and measured G1 positions for later estimator comparison; recording not started
 - [BENCHMARKING — Shutdown lifecycle and crash qualification](plans/BENCHMARKING_shutdown_lifecycle.md) — remaining shutdown qualification and dependency investigations
