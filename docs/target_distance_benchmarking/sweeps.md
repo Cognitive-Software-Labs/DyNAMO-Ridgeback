@@ -133,9 +133,8 @@ pair, then runs three rotated replications of the box/silhouette by
 stereoscopic/monocular matrix. Run it only from a clean, committed checkout; its
 `sweep.json` records the exact sweep and scenario file hashes.
 [BENCHMARKING — Combined-model throughput](../plans/BENCHMARKING_model_throughput.md)
-owns its decision gates and interpretation, and the
-[seat-validation plan](../plans/BENCHMARKING_environment_qualification.md) owns
-the seat sweep.
+owns its decision gates and interpretation; the seat sweep qualified the
+[execution environments](running_benchmarks.md#qualified-execution-environments).
 
 ## Archived evidence
 

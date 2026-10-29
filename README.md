@@ -269,10 +269,9 @@ canonical maps come from world geometry, with manual capture as the fallback.
 
 ## Benchmarks
 
-Before parameter tuning or reporting new comparisons, complete the
-[execution-environment qualification gate](docs/target_distance_benchmarking/BACKLOG.md#benchmark-execution-environment-qualification);
-the CLI does not block unqualified runs, and replay tuning also needs qualified
-capture provenance. [Running benchmarks](docs/target_distance_benchmarking/running_benchmarks.md) picks configurator or CLI.
+Tune on and report results only from a
+[qualified execution environment](docs/target_distance_benchmarking/running_benchmarks.md#qualified-execution-environments);
+the CLI does not block other environments. [Running benchmarks](docs/target_distance_benchmarking/running_benchmarks.md) picks configurator or CLI.
 
 ### Single run
 

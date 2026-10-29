@@ -121,7 +121,7 @@ through the normal review/publish workflow to survive loss of this checkout.
 
 Plan filenames start with an uppercase scope followed by a descriptive topic:
 `<SCOPE>_<topic>.md`. Titles and navigation labels use the same scope prefix,
-for example `BENCHMARKING — Execution-environment qualification`.
+for example `BENCHMARKING — Combined-model throughput`.
 
 Choose the scope by the work's primary owner:
 

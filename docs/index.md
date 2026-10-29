@@ -116,7 +116,6 @@ troubleshooting, planning, and historical documentation.
 
 ## Active plans
 
-- [BENCHMARKING — Execution-environment qualification](plans/BENCHMARKING_environment_qualification.md) — prerequisite for tuning and benchmark claims
 - [BENCHMARKING — Combined-model throughput](plans/BENCHMARKING_model_throughput.md) — run the existing sweep and determine whether concurrency is needed
 - [BENCHMARKING — Stationary hardware scene recording](plans/BENCHMARKING_hardware_recording.md) — raw sensor bags and measured G1 positions for later estimator comparison; recording not started
 - [BENCHMARKING — Shutdown lifecycle and crash qualification](plans/BENCHMARKING_shutdown_lifecycle.md) — remaining shutdown qualification and dependency investigations

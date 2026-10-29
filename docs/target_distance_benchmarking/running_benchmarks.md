@@ -8,14 +8,23 @@ live commands; [launch arguments](launch_arguments.md), [sweeps](sweeps.md)
 and [profiles](profiles.md) own the arguments, the sweep format and the replay
 workflows.
 
-## Execution-environment prerequisite
+## Qualified execution environments
 
-Before parameter tuning or using new benchmark comparisons as reportable results,
-complete the [execution-environment qualification gate](BACKLOG.md#benchmark-execution-environment-qualification).
-Qualification/diagnostic runs establish that evidence; their outputs are not yet
-qualified tuning results. Replay tuning also requires qualified capture provenance.
-Use only the recorded environment, workload, camera profile, and display/capture
-conditions covered by qualification. The CLI does not enforce this workflow gate.
+Gazebo rendering through `tools/gpu-run` is qualified on the physical seat
+(`:0`) and in an xrdp session: matched light (box, stereo) and heavy
+(silhouette, monocular) runs gave identical error and scored counts on both,
+and observation coverage varied as much between replications on one display
+as between displays. Results from either display may be compared, tuned on and
+reported, and replay tuning may use captures from either. The evidence predates
+the current camera model and covers the example scenes; the owner accepted it
+as sufficient.
+
+Not qualified: Isaac, headless EGL, `1280x720`, video recording, and runs with
+the Gazebo GUI or RViz adding display load. Qualify those before quoting them.
+Confirm the GL path with `tools/gpu-run glxinfo -B` from the run's own
+session. Software rendering is a failure, not an environment; see
+[troubleshooting](../troubleshooting.md#camera-rate-collapses-under-software-rendering).
+The CLI does not enforce any of this.
 
 ## Which question, which profile
 
@@ -105,3 +114,7 @@ have — it is the form the [legacy smoke workflow](profiles.md#legacy-smoke-wor
 [semantics](semantics.md) defines what a scored row is and why an estimator
 missed; [outputs](outputs.md) describes what landed on disk.
 [The overview](overview.md) maps the rest.
+
+## Archived evidence
+
+- [Remote versus physical-seat validation](../../archive/engineering/2026-09-07-seat-validation.md)

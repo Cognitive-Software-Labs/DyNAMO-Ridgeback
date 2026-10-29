@@ -11,33 +11,6 @@ procedures may live in linked plans. Completed evidence goes in the engineering
 archive, and the closed item is removed. A deferred item or a linked proposal
 is not approval to implement it.
 
-## Benchmark execution-environment qualification
-
-**Priority and dependency.** Complete this gate before parameter-tuning campaigns
-or treating new benchmark comparisons as reportable results. Qualification and
-bounded diagnostic runs are allowed to establish the gate; their outputs remain
-qualification evidence. This applies to live runs and the provenance of captures
-used for replay tuning. It is a documented workflow gate, not a CLI-enforced lock.
-
-**Gap.** Remote-versus-physical-seat equivalence has not been established for the
-current Gazebo GLX workflow. Rendering load may affect sensor delivery, processing,
-and which events are scored. Neither session is automatically a valid baseline.
-
-**Remaining work.** Execute the [BENCHMARKING — Execution-environment qualification](../plans/BENCHMARKING_environment_qualification.md):
-verify actual rendering paths; freeze conditions and practical acceptance margins;
-compare matched light/heavy workloads with at least three independent replications
-per condition; assess sensor delivery, processing, scored outcomes, and uncertainty.
-
-**Completion criteria.** Preserve reproducible evidence showing that an identified
-execution environment meets declared stream/application requirements and is
-repeatable enough for the intended claims. Interchangeable remote/seat results
-additionally require practical equivalence within predeclared margins. If only
-one environment is qualified, restrict tuning and claims to it and record the
-unresolved comparison separately. Display-only limitations must be scoped;
-measurement differences or inconclusive evidence keep the affected use blocked.
-Gazebo GLX qualification does not establish Isaac, EGL, hardware, or untested
-workload/profile equivalence. Record the qualified conditions in run guidance.
-
 ## Layered replay validation
 
 **Gap.** Layered replay is implemented; fresh live parity, real segmentation
@@ -83,8 +56,8 @@ recertification predates the floor-standing assets and the replaced
 `edge640_*` scenes, and none has been rerun on the current geometry.
 
 **Completion criteria.** Rerun every benchmark whose inputs or measured
-behavior depend on camera or LiDAR geometry or asset seating, under the
-[execution-environment gate](#benchmark-execution-environment-qualification),
+behavior depend on camera or LiDAR geometry or asset seating, in a
+[qualified execution environment](running_benchmarks.md#qualified-execution-environments),
 before quoting its numbers.
 
 **Context.** [Camera stack](../target_localization/camera_stack.md) and
@@ -146,9 +119,7 @@ no production architecture change is included here.
 ## Live sweeps from the configurator
 
 **Status and priority.** Cleanup ownership is fixed; live start, conflict
-detection and supervision remain. Prioritize
-[execution-environment qualification](#benchmark-execution-environment-qualification)
-before this convenience feature. Qualification can use the terminal workflow.
+detection and supervision remain.
 
 **Gap.** The configurator authors live sweeps but cannot start them. Live
 conflict handling, progress and cancellation are not implemented or qualified.
