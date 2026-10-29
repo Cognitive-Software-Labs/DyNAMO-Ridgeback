@@ -69,8 +69,15 @@ def select_path_candidate(candidates, resolution):
     return next(c for c in tier if c.path_length_m <= best_length + resolution)
 
 
-def path_rejection(path, candidate, start, grid, target, config, keepout):
-    """Check endpoints and swept footprints at <=half-cell / 0.05 rad steps."""
+def path_rejection(path, candidate, start, grid, target, config, keepout, *, occupied=()):
+    """Check endpoints and swept footprints at <=half-cell / 0.05 rad steps.
+
+    The swept route starts at the robot's actual pose and yaw in place of the
+    planner's start cell (which must lie within 0.10 m). Identity orientations on
+    intermediate poses are planner placeholders and inherit the previous heading;
+    every other yaw change is swept with the rotated footprint. ``occupied`` are
+    further poses the robot physically stood at (the mission start).
+    """
     if path is None or not path.poses:
         return 'empty_path'
     if len(path.poses) > 2000:
@@ -90,9 +97,22 @@ def path_rejection(path, candidate, start, grid, target, config, keepout):
         return 'path_goal_mismatch'
     if abs(normalize_angle(end[2] - candidate.yaw)) > 0.12:
         return 'path_goal_yaw_mismatch'
-    grid = _start_footprint_known(grid, start, config)
-    # Include the short start/goal connectors, rather than trusting endpoint tolerance.
-    poses = [tuple(start[:3])] + poses + [(candidate.base_x, candidate.base_y, candidate.yaw)]
+    for stood in (start,) + tuple(occupied):
+        grid = _start_footprint_known(grid, stood, config)
+    # The planner's first pose is the robot's start cell (NavFn: the grid-snapped
+    # cell point, a few cm off), not a place the robot drives to, so the swept route
+    # starts at the robot's actual pose. Keep the goal connector rather than
+    # trusting the endpoint tolerance.
+    poses = ([tuple(start[:3])] + poses[1 if len(poses) > 1 else 0:]
+             + [(candidate.base_x, candidate.base_y, candidate.yaw)])
+    # NavFn leaves intermediate orientations as the identity quaternion and the
+    # Omni MPPI controller does not follow path orientations, so those are not
+    # headings: the robot translates holonomically keeping its current yaw. Any
+    # real yaw (the goal pose, the final approach) is still swept below.
+    for i in range(1, len(path.poses) - 1):
+        q = path.poses[i].pose.orientation
+        if (q.x, q.y, q.z, q.w) == (0.0, 0.0, 0.0, 1.0):
+            poses[i] = poses[i][:2] + (poses[i - 1][2],)
     budget = 2000
     for a, b in zip(poses, poses[1:]):
         dyaw = normalize_angle(b[2] - a[2])

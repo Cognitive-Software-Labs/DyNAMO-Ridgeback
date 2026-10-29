@@ -78,7 +78,7 @@ from ridgeback_autonomy.mission.parking_geometry import preparking_pose, rotated
 from ridgeback_autonomy.mission.parking_visualization import clear_markers, plan_markers
 from ridgeback_autonomy.mission.motion_settlement import MotionSettlement
 from ridgeback_autonomy.mission.parking_feasibility import (
-    PlanningSnapshot, candidate_groups, path_rejection, path_length,
+    PlanningSnapshot, candidate_groups, path_rejection, path_length, pose_xyyaw,
     select_path_candidate,
 )
 from ridgeback_autonomy.mission.parking_execution import (
@@ -394,7 +394,9 @@ class MissionManagerNode(Node):
         self.tf_listener = (
             None
             if tf_buffer is not None
-            else TransformListener(self.tf_buffer, self)
+            # Own node and thread: TF stays current while this node's callbacks
+            # run synchronous path checks (process-wide /tf remaps still apply).
+            else TransformListener(self.tf_buffer, None, spin_thread=True)
         )
         self.detection_adapter = TargetDetectionAdapter()
         self.localization_adapter = TargetLocalizationAdapter(
@@ -1642,10 +1644,13 @@ class MissionManagerNode(Node):
         except ValueError as exc:
             return f'map_invalid: {exc}'
         robot = self._current_robot_pose(with_stamp=True)
+        # TF keeps updating on its own thread while this node's clock callback can
+        # wait behind a path check; stamps that far ahead are not future data.
         reasons = validate_inputs(plan.target, grid, robot, now_ns=now_ns,
                                   map_frame=self.map_frame, max_target_age_s=self.parking_max_target_age_s,
                                   max_map_age_s=self.parking_max_map_age_s,
-                                  max_pose_age_s=self.parking_max_pose_age_s)
+                                  max_pose_age_s=self.parking_max_pose_age_s,
+                                  clock_skew_s=self.parking_max_pose_age_s)
         if reasons:
             return ', '.join(reasons)
         reason = self._planning_snapshot.changed(
@@ -1656,7 +1661,8 @@ class MissionManagerNode(Node):
         # Revalidate the selected route against the latest map, including same-stamp changes.
         if plan.selected is not None and plan.selected_path is not None:
             return path_rejection(plan.selected_path, plan.selected, robot, grid, plan.target,
-                                  self.planner_config, plan.keepout_radius_m)
+                                  self.planner_config, plan.keepout_radius_m,
+                                  occupied=self._start_footprint_poses())
         return None
 
     def _publish_parking_markers(self):
@@ -1722,6 +1728,10 @@ class MissionManagerNode(Node):
             self._fail_planning('planner_transport', str(exc))
             return
         future.add_done_callback(lambda f: self._path_goal_response(f, generation, candidate, robot))
+
+    def _start_footprint_poses(self):
+        """The saved mission start: the robot stood there, so its footprint held no obstacle."""
+        return () if self.start_pose is None else (pose_xyyaw(self.start_pose.pose),)
 
     def _pose_stamped(self, x, y, yaw):
         msg = PoseStamped()
@@ -1803,7 +1813,8 @@ class MissionManagerNode(Node):
                     reason = 'path_timestamp'
                 else:
                     reason = path_rejection(route, candidate, robot, grid, self.parking_plan.target,
-                                            self.planner_config, self.parking_plan.keepout_radius_m)
+                                            self.planner_config, self.parking_plan.keepout_radius_m,
+                                            occupied=self._start_footprint_poses())
             candidate.path_status = 'rejected' if reason else 'valid'
             candidate.path_reason = reason
             if reason:
@@ -2077,7 +2088,7 @@ class MissionManagerNode(Node):
                                   map_frame=self.map_frame, max_target_age_s=math.inf,
                                   max_map_age_s=self.parking_max_map_age_s,
                                   max_pose_age_s=self.parking_max_pose_age_s,
-                                  clock_skew_s=0.1)
+                                  clock_skew_s=self.parking_max_pose_age_s)
         if reasons:
             return ', '.join(reasons)
         polygon = rotated_footprint_vertices(self.planner_config.footprint,

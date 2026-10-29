@@ -17,7 +17,7 @@ from ridgeback_autonomy.mission.parking_feasibility import (
 )
 from ridgeback_autonomy.mission.parking_planner import CandidateDecision, GridSnapshot, PlannerConfig
 from ridgeback_autonomy.mission.mission_manager_node import MissionState
-from test_parking_planner import target, grid, CONFIG, APPROACH_FROM_WEST
+from test_parking_planner import target, grid, fill, CONFIG, APPROACH_FROM_WEST
 from test_mission_manager import (
     manager_factory, planning_manager, PLAN_NOW_NS, occupancy_map, FakePauseClient,
     trigger_response, start_search, confirm_target, WallClock,
@@ -207,7 +207,7 @@ def running(manager_factory, monkeypatch):
     manager, published = planning_manager(manager_factory, map_msg=occupancy_map())
     manager.compute_path_client = client
     # Pure swept-path checks are tested above; isolate asynchronous orchestration here.
-    monkeypatch.setattr('ridgeback_autonomy.mission.mission_manager_node.path_rejection', lambda *a: None)
+    monkeypatch.setattr('ridgeback_autonomy.mission.mission_manager_node.path_rejection', lambda *a, **k: None)
     manager._next_path(now_ns=PLAN_NOW_NS)
     return manager, client, published
 
@@ -460,3 +460,76 @@ def test_unknown_cells_under_the_robot_itself_do_not_block_its_route():
     g.data[84, 20] = -1
     g.data[84, 40] = -1                 # unknown beyond the robot still rejects
     assert path_rejection(p, c, start, g, target(), CONFIG, .29) == 'path_footprint_unknown'
+
+
+# NavFn returns intermediate poses with the identity orientation (yaw 0) and the
+# Omni MPPI controller ignores path orientations (use_path_orientations: false).
+def test_placeholder_headings_keep_the_robot_yaw_past_unknown_space_behind_it():
+    g = grid(size_m=8.)
+    g.data[:, :15] = -1                       # never observed behind the robot (x < 0.75)
+    c = CandidateDecision(3.5, 4.2, 3., 4.2, .31, 'valid', 'footprint_free', .5)
+    start = (1., 4.2, .31)                    # robot not aligned with the placeholder yaw 0
+    p = path([start[:2], (2., 4.2), (3., 4.2, .31)])
+    assert path_rejection(p, c, start, g, target(), CONFIG, .29) is None
+    # A meaningful intermediate heading is still a rotation, swept into the unknown space.
+    p.poses[1] = pose(2., 4.2, -.3)
+    p.poses.insert(1, pose(1., 4.2, -.3))
+    assert path_rejection(p, c, start, g, target(), CONFIG, .29) == 'path_footprint_unknown'
+
+
+@pytest.mark.parametrize('yaw,expected', [(math.pi / 2, None), (0., 'path_footprint_occupied')])
+def test_holonomic_translation_checks_the_actual_heading_not_the_travel_direction(yaw, expected):
+    g = grid(size_m=8.)
+    fill(g, 0., 0., 3.48, 8., 100)            # 1.0 m corridor along +y: narrower than the
+    fill(g, 4.52, 0., 8., 8., 100)            # robot's length, wider than its width
+    c = CandidateDecision(4., 5.5, 4., 5., yaw, 'valid', 'footprint_free', .5)
+    start = (4., 2., yaw)
+    p = path([start[:2], (4., 3.), (4., 4.), (4., 5., yaw)])
+    assert path_rejection(p, c, start, g, target(7., 7.), CONFIG, .29) == expected
+
+
+def test_genuine_rotation_to_the_goal_yaw_is_swept():
+    g = grid(size_m=8.)
+    c = CandidateDecision(2.5, 5., 2.5, 4.7, math.pi / 2, 'valid', 'footprint_free', .3)
+    start = (1., 4.2, 0.)
+    # Placeholder, then the planner's goal pose (pre-parking) and the final approach.
+    p = path([start, (1.75, 4.2), (2.5, 4.2, math.pi / 2), (2.5, 4.7, math.pi / 2)])
+    assert path_rejection(p, c, start, g, target(7., 7.), CONFIG, .29) is None
+    g.data[72, 49] = 100                      # (2.475, 3.625): touched only mid-rotation
+    assert path_rejection(p, c, start, g, target(7., 7.), CONFIG, .29) == 'path_footprint_occupied'
+    g.data[72, 49] = 0
+    p.poses[-1] = pose(2.5, 4.7, math.pi / 2 - .3)   # final parking orientation still enforced
+    assert path_rejection(p, c, start, g, target(7., 7.), CONFIG, .29) == 'path_goal_yaw_mismatch'
+
+
+def test_route_starts_at_the_robot_not_the_planners_grid_snapped_start_cell():
+    g = grid(size_m=8.)
+    g.data[:, :10] = -1                       # unseen right behind the robot (x < 0.5)
+    c = CandidateDecision(3.5, 4.2, 3., 4.2, 0., 'valid', 'footprint_free', .5)
+    start = (1.02, 4.2, 0.)                   # rear edge 4.8 cm from the unknown cells
+    # NavFn's first pose is the start cell's point, 4.5 cm behind the robot.
+    p = path([(.98, 4.18), (2., 4.2), (3., 4.2)])
+    assert path_rejection(p, c, start, g, target(), CONFIG, .29) is None
+    p.poses.insert(1, pose(.7, 4.2))          # a route that really backs into it
+    assert path_rejection(p, c, start, g, target(), CONFIG, .29) == 'path_footprint_unknown'
+    p = path([(1.15, 4.2), (2., 4.2), (3., 4.2)])
+    assert path_rejection(p, c, start, g, target(), CONFIG, .29) == 'path_start_mismatch'
+
+
+def test_floor_under_the_mission_start_footprint_is_not_unknown_to_the_robot():
+    g = grid(size_m=8.)
+    g.data[:, :29] = -1                       # never observed: behind the sensor at spawn (x < 1.45)
+    c = CandidateDecision(3.5, 4.2, 3., 4.2, 0., 'valid', 'footprint_free', .5)
+    mission_start = (1., 4.2, 0.)             # the robot stood here; the floor under it is unseen
+    start = (1.3, 4.05, 0.)                   # returned near it, not exactly onto it
+    p = path([start[:2], (1.3, 4.2), (3., 4.2)])
+    assert path_rejection(p, c, start, g, target(), CONFIG, .29) == 'path_footprint_unknown'
+    assert path_rejection(p, c, start, g, target(), CONFIG, .29, occupied=(mission_start,)) is None
+    g.data[90, 23] = 100                      # an obstacle there is still an obstacle
+    assert path_rejection(p, c, start, g, target(), CONFIG, .29,
+                          occupied=(mission_start,)) == 'path_footprint_occupied'
+    g.data[90, 23] = -1
+    p = path([start[:2], (1.3, 4.4), (3., 4.4)])   # beyond that footprint it stays unknown
+    c = CandidateDecision(3.5, 4.4, 3., 4.4, 0., 'valid', 'footprint_free', .5)
+    assert path_rejection(p, c, start, g, target(), CONFIG, .29,
+                          occupied=(mission_start,)) == 'path_footprint_unknown'

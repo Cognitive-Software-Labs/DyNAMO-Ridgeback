@@ -244,3 +244,26 @@ def test_restarted_evidence_must_complete_within_the_settlement_timeout(manager_
     m.tick()
     assert m.state == MissionState.PARKING_PLANNING_FAILED
     assert m.last_issue.reason.startswith('motion_evidence_lost')
+
+
+def test_revalidation_tolerates_a_lagging_node_clock_but_not_stale_poses(manager_factory, monkeypatch):
+    m, _ = feasible(manager_factory, monkeypatch, enabled=False)
+    m.tf_buffer.stamp_ns = m.test_ros_ns + 600_000_000   # TF ahead of a delayed clock callback
+    assert m._plan_invalid_reason() is None
+    m.tf_buffer.stamp_ns = m.test_ros_ns + 1_500_000_000  # beyond any plausible lag
+    assert 'robot_pose_from_future' in m._plan_invalid_reason()
+    m.tf_buffer.stamp_ns = m.test_ros_ns - 1_500_000_000  # stale still rejects
+    assert 'robot_pose_stale' in m._plan_invalid_reason()
+
+
+def test_path_checks_include_the_saved_mission_start_footprint(manager_factory, monkeypatch):
+    m, _ = feasible(manager_factory, monkeypatch, enabled=False)
+    start = m.start_pose.pose
+    (stood,) = m._start_footprint_poses()
+    assert stood == pytest.approx(
+        (start.position.x, start.position.y, 2 * math.atan2(start.orientation.z, start.orientation.w)))
+    seen = []
+    monkeypatch.setattr('ridgeback_autonomy.mission.mission_manager_node.path_rejection',
+                        lambda *a, **k: seen.append(k) or None)
+    assert m._plan_invalid_reason() is None
+    assert seen == [{'occupied': m._start_footprint_poses()}]
