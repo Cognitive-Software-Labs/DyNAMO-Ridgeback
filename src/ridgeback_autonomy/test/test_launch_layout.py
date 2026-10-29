@@ -1006,8 +1006,8 @@ def test_parking_rviz_layout_adds_one_latched_display_without_touching_the_share
     assert source.read_text(encoding='utf-8') == before
     original_displays = yaml.safe_load(before)['Visualization Manager']['Displays']
     displays = derived['Visualization Manager']['Displays']
-    assert displays[:-1] == original_displays
-    parking = displays[-1]
+    assert displays[:-2] == original_displays
+    parking, legend = displays[-2:]
     assert parking['Name'] == PARKING_DISPLAY_NAME
     assert parking['Class'] == 'rviz_default_plugins/MarkerArray'
     assert parking['Topic']['Value'] == 'parking/visualization'
@@ -1015,6 +1015,10 @@ def test_parking_rviz_layout_adds_one_latched_display_without_touching_the_share
     # The radial donut lines are shown; rejected candidate dots are published but start hidden.
     assert parking['Namespaces']['parking/radial_1deg'] is True
     assert parking['Namespaces']['parking/rejected_task_points'] is False
+    # The colour legend is a latched screen overlay, outside the marker clears.
+    assert legend['Class'] == 'rviz_2d_overlay_plugins/TextOverlay' and legend['Enabled'] is True
+    assert legend['Topic']['Value'] == 'parking/legend'
+    assert legend['Topic']['Durability Policy'] == 'Transient Local'
 
 
 def test_mission_launch_owns_the_single_rviz_instance() -> None:

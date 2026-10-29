@@ -48,6 +48,7 @@ from std_msgs.msg import String, Bool
 from rclpy.parameter import parameter_value_to_python
 from std_srvs.srv import Trigger
 from tf2_ros import Buffer, TransformException, TransformListener
+from rviz_2d_overlay_msgs.msg import OverlayText
 from visualization_msgs.msg import MarkerArray
 
 from ridgeback_interfaces.msg import TargetDetections, TargetMeasurements
@@ -76,7 +77,9 @@ from ridgeback_autonomy.mission.parking_planner import (
     validate_inputs,
 )
 from ridgeback_autonomy.mission.parking_geometry import preparking_pose, rotated_footprint_vertices
-from ridgeback_autonomy.mission.parking_visualization import clear_markers, plan_markers
+from ridgeback_autonomy.mission.parking_visualization import (
+    clear_markers, legend_overlay, plan_markers,
+)
 from ridgeback_autonomy.mission.motion_settlement import MotionSettlement
 from ridgeback_autonomy.mission.parking_clearance import (
     ClearanceLimits, ClearanceResult, clearance_reason, scan_points,
@@ -256,6 +259,7 @@ class MissionManagerNode(Node):
         self.declare_parameter('parking_planning_enabled', True)
         self.declare_parameter('map_topic', 'map')
         self.declare_parameter('parking_visualization_topic', 'parking/visualization')
+        self.declare_parameter('parking_legend_topic', 'parking/legend')
         self.declare_parameter(
             'nav2_params_path',
             os.path.join(get_package_share_directory('ridgeback_autonomy'),
@@ -457,6 +461,14 @@ class MissionManagerNode(Node):
             str(self.get_parameter('parking_visualization_topic').value),
             status_qos,
         )
+        # The colour legend never changes and lives outside the marker clears. It is
+        # latched and resent each second: the overlay places a right/bottom-aligned panel
+        # from its size, which is unknown when the first message arrives.
+        self.parking_legend_publisher = self.create_publisher(
+            OverlayText, str(self.get_parameter('parking_legend_topic').value), status_qos)
+        self._legend = legend_overlay(self.planner_config)
+        self._legend_next_s = 0.0
+        self.parking_legend_publisher.publish(self._legend)
         self.pause_client = (
             pause_client
             if pause_client is not None
@@ -614,6 +626,9 @@ class MissionManagerNode(Node):
 
         with self._lock:
             now_s = self._monotonic() if now_s is None else float(now_s)
+            if now_s >= self._legend_next_s:
+                self._legend_next_s = now_s + 1.0
+                self.parking_legend_publisher.publish(self._legend)
             self._poll_safety_evidence(now_s)
             self._publish_keepout_mask()
             stage_was_busy = self.stage_paths.busy

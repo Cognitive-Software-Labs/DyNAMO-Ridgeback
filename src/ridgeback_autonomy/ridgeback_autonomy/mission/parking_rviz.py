@@ -1,7 +1,8 @@
 """RViz layout for the parking mission, derived from the shared exploration layout.
 
 The shared ``exploration.rviz`` stays untouched; the mission launch writes a
-temporary copy with one extra MarkerArray display for the parking plan.
+temporary copy with a MarkerArray display for the parking plan and a screen
+overlay for its colour legend.
 """
 
 from __future__ import annotations
@@ -11,6 +12,8 @@ import tempfile
 import yaml
 
 PARKING_DISPLAY_NAME = 'Parking Plan'
+LEGEND_DISPLAY_NAME = 'Parking Legend'
+LEGEND_TOPIC = 'parking/legend'
 PARKING_NAMESPACES = (
     'parking/g1_position', 'parking/g1_keepout', 'parking/donut_boundaries',
     'parking/radial_1deg', 'parking/candidate_task_points',
@@ -22,8 +25,8 @@ PARKING_NAMESPACES = (
 PARKING_HIDDEN_NAMESPACES = ('parking/rejected_task_points',)
 
 
-def with_parking_display(layout: dict, topic: str) -> dict:
-    """The layout with a transient-local parking MarkerArray display appended."""
+def with_parking_display(layout: dict, topic: str, legend_topic: str = LEGEND_TOPIC) -> dict:
+    """The layout with transient-local parking marker and legend displays appended."""
 
     displays = layout['Visualization Manager']['Displays']
     if any(d.get('Name') == PARKING_DISPLAY_NAME for d in displays):
@@ -41,6 +44,20 @@ def with_parking_display(layout: dict, topic: str) -> dict:
             'History Policy': 'Keep Last',
             'Reliability Policy': 'Reliable',
             'Value': topic,
+        },
+        'Value': True,
+    })
+    displays.append({
+        'Class': 'rviz_2d_overlay_plugins/TextOverlay',
+        'Enabled': True,
+        'Name': LEGEND_DISPLAY_NAME,
+        'Topic': {
+            'Depth': 1,
+            # Published once by the mission manager, latched.
+            'Durability Policy': 'Transient Local',
+            'History Policy': 'Keep Last',
+            'Reliability Policy': 'Reliable',
+            'Value': legend_topic,
         },
         'Value': True,
     })
