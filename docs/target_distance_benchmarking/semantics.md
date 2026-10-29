@@ -7,9 +7,10 @@ mean, and which runs may be compared with which. Start at
 ## Scenario and comparison discipline
 
 The packaged full set is `config/benchmark_scenarios_full.yaml` (88 scenes,
-20 multi-robot in the recorded 2026-08-24 transition; verify current source
-before reporting counts). It includes occlusion, clutter, traps, and probe
-scenes; the [gallery](benchmark_scenarios_v2_gallery.html) is a visual reference.
+20 multi-robot; verify current source before reporting counts). It includes
+occlusion, clutter, image-edge, trap, and probe scenes; the
+[gallery](benchmark_scenarios_v2_gallery.html) renders every scene from its
+[certification](#scene-certification) audit.
 
 - Compare runs against the exact same scenario YAML and revision. Regenerating
   with a new seed expands coverage; it is not an A/B baseline.
@@ -21,7 +22,7 @@ scenes; the [gallery](benchmark_scenarios_v2_gallery.html) is a visual reference
   0.25°, 0.06–10 m, 40 Hz. Neither simulator lets `polar_profiling` reach a
   surface beyond 10 m; such a ray is `+inf`, and the row reports `no_value`
   instead of latching a far wall. A Gazebo run from before the
-  [UST-10LX patch](../project/dependencies.md#ust-10lx-gazebo-lidar-patch),
+  [UST-10LX patch](../project/dependency_patches.md#ust-10lx-gazebo-lidar-patch),
   with 540 bins out to 25 m, is a different population and cannot serve as a
   polar baseline.
 - Both simulators add LiDAR range noise, and neither is bit-reproducible on
@@ -45,9 +46,8 @@ maps those names to its own world and spawnable resources:
 The runner places, reads and removes entities only through the standard ROS
 `simulation_interfaces` services the selected adapter serves, so it contains
 no simulator code. Ground truth comes from one state snapshot taken through
-those services. Both catalogs spawn at the literal scenario height, so a model
-stands identically in both simulators: its origin at z = 0, 5 cm into the
-0.05 m floor slab.
+those services. Both catalogs stand each model on the floor's top surface, so
+it stands identically in both simulators (see [scene certification](#scene-certification)).
 
 What a Gazebo-to-Isaac comparison may claim:
 - **Same-revision baseline.** Compare an Isaac run only with a Gazebo run of
@@ -84,10 +84,55 @@ scenes:
 
 Coordinates are world-frame planar poses: `x` is forward, `y` is lateral
 (positive left), and `yaw` is radians about +Z. Scenarios carry no height. The
-runner spawns each model at its catalog `spawn_z_m`, which is 0 for every
-packaged model. `benchmarking/scenarios.py` is the authoritative parser and
-validation contract; scenario-file comments record generation-specific design
-and certification details.
+runner spawns each model at its catalog `spawn_z_m`: every packaged model's
+origin is its ground contact, and both catalogs stand it on the calibration
+floor's top surface at z = 0.05. Ground truth is planar, so the height changes
+only what the sensors see. `benchmarking/scenarios.py` is the authoritative
+parser and validation contract; scenario-file comments record each scene's
+intended condition and its certified values.
+
+## Scene certification
+
+`scene_audit` certifies scenes geometrically, without a simulator. It ray-casts
+a depth-ordered id buffer of the Gazebo visual geometry standing on the floor
+through the sensor geometry expanded from `clearpath/robot.yaml`, and casts the
+front LiDAR in its scan plane. The `benchmarking/scene_audit.py` docstring owns
+the exact definitions:
+
+| Quantity | Meaning |
+|---|---|
+| visible fraction | target pixels visible in the scene ÷ its pixels with all other geometry removed |
+| in-frame fraction | target pixels inside the image ÷ its pixels on an unbounded image plane |
+| centre ratio | `abs(u - cx) / cx` of the projected torso centre; above 1 the centre is outside the frame |
+| LiDAR | beams on each target and pole, each shin's visible angular width, pole inset in the detection box |
+
+Comments are certified at 640x480, the profile both simulators default to and
+the Thor perception host uses. Family names record the intended condition; a
+comment outside its family band says so. `edge640_*` scenes are edge cases only
+at 640x480: the frame edge sits at ±39.8° there and at ±45° at 1280x720.
+
+The Isaac stage matches the geometry the audit models: camera pose, intrinsics,
+LiDAR pose and every object agree exactly. Rendered depth captures in both
+backends reproduce the audit's target and object masks (IoU at least 0.94,
+visible fractions within 0.011) when pixels are sampled at their centres,
+`i + 0.5` with `cx = W / 2`, which is the audit's default. The G1 is the exception: Gazebo
+renders the STL G1 under `ridgeback_autonomy_gz/sim/models/g1`, Isaac the
+Unitree 29-DoF Dex1 USD under `ridgeback_autonomy_isaac/sim/isaac/usd/models/g1`
+(provenance in its `NOTICE.md`).
+Both stand on the floor with their origin at ground contact, but silhouettes,
+limb gaps and LiDAR leg returns differ, so certifications describe the Gazebo
+G1 and a target-dependent result does not transfer between backends. Re-run
+the audit after any change to camera or LiDAR geometry, assets or the scenario
+file:
+
+```bash
+ros2 run ridgeback_autonomy scene_audit \
+  --scenario src/ridgeback_autonomy/config/benchmark_scenarios_full.yaml \
+  --profile 640x480 \
+  --gallery docs/target_distance_benchmarking/benchmark_scenarios_v2_gallery.html
+```
+
+Its `certifications_640x480.csv` compares every comment with the audited value.
 
 ## Event, observation, and instance semantics
 
@@ -144,3 +189,4 @@ Historical scenario/status transitions are retained in the Archived evidence sec
 
 - [benchmark history](../../archive/engineering/benchmark_evolution.md)
 - [Gazebo and Isaac backend qualification](../../archive/engineering/2026-10-26-benchmark-gazebo-isaac-qualification.md)
+- [scene recertification for the current camera](../../archive/engineering/2026-10-29-scene-recertification.md)

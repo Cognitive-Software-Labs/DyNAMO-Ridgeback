@@ -1371,7 +1371,7 @@ def main():
     args = parse_args()
     if not args.recover and vendor_camera_retired():
         print('dynamo-camera.service owns the camera; this runner only drives the retired vendor '
-              'realsense-camera unit. Use tools/camera_contract_check (see the S2/S4 reader runs in '
+              'realsense-camera unit. Use tools/camera_contract_check (see "Local reader checks" in '
               'docs/physical/robot_local_deployment.md). --recover still restores old runs.', file=sys.stderr)
         return 2
     if os.geteuid() != 0:

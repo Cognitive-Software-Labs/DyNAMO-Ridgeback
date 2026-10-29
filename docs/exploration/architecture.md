@@ -2,8 +2,9 @@
 
 The exploration workflow composes one I/O backend with the same state
 estimation, SLAM, Nav2, target-localization, and diagnostic application stack.
-The root [README](../../README.md) owns commands and launch arguments; this page
-owns the high-level component and dependency boundary.
+The root [README](../../README.md) owns commands, and
+[launch arguments](launch_arguments.md) lists every argument and world; this
+page owns the component and dependency boundary and the bringup sequence.
 
 ```text
  ridgeback_autonomy_gz     ridgeback_autonomy_isaac     ridgeback_autonomy_hardware
@@ -42,16 +43,49 @@ requires otherwise. Current intentional differences are simulation time,
 camera topic/profile selection, hardware-safe estimator selection, truth-map
 overlays, and motion/platform opt-ins.
 
-Bringup follows actual readiness rather than elapsed time:
+## Bringup sequence
 
-1. scan and filtered odometry publishers permit SLAM startup;
-2. the SLAM lifecycle service permits configuration and activation;
-3. the map publisher permits Nav2 startup;
-4. the global costmap publisher permits the frontier explorer to start.
+`ridgeback_exploration.launch.py` starts each stage when its prerequisite
+exists, not after a fixed delay. Each `launch_wait` gate exits when its topics
+or service appear, and that exit starts the next stage.
+
+```mermaid
+flowchart TD
+    START["ridgeback_exploration.launch.py"] --> RVIZ["Exploration RViz<br/>(exploration_rviz)"]
+    START --> BACKEND["Backend adapter<br/>Gazebo, Isaac, or hardware attach"]
+    START --> HUD["HUD panels and aggregator<br/>velocity, coverage, localization"]
+    START --> GSLAM{"gate_slam<br/>scan + platform/odom/filtered"}
+    GSLAM --> SLAM["slam_toolbox"]
+    SLAM --> GCONF{"gate_slam_configure<br/>slam_toolbox/change_state"}
+    GCONF --> ACTIVE["Configure, then activate"]
+    GSLAM --> GNAV{"gate_nav2<br/>map"}
+    GNAV --> NAV2["Nav2"]
+    GNAV --> GEXP{"gate_explorer<br/>global_costmap/costmap"}
+    GEXP -->|"autonomous_motion_enabled"| EXPLORER["frontier_explorer_node"]
+    START -->|"target_localization_enabled"| MODE{"localization_mode"}
+    MODE -->|local| GCAM{"gate_camera<br/>colour + CameraInfo + aligned depth"}
+    GCAM --> LOCAL["Detector, selected measurement nodes,<br/>health, rings, distance HUD, overlay"]
+    MODE -->|external| REMOTE["Status consumer, rings,<br/>distance HUD, overlay"]
+```
+
+*Diamonds are readiness gates. Edges from a gate fire on its exit; labelled
+edges are launch conditions.*
+
+| Gate | Waits for | Timeout |
+|---|---|---|
+| `gate_slam` | `sensors/lidar2d_0/scan` and `platform/odom/filtered` publishers | `sim_ready_timeout`: 45 s, 300 s on Isaac |
+| `gate_slam_configure` | `slam_toolbox/change_state` service | 30 s |
+| `gate_nav2` | `map` publisher | 60 s |
+| `gate_explorer` | `global_costmap/costmap` publisher | 60 s |
+| `gate_camera` (local mode only) | colour image, colour `CameraInfo` and aligned-depth publishers | `sim_ready_timeout` |
 
 Gate timeouts are bounded safety fallbacks. A timeout reports the missing
 topic, service, or transform and then permits launch to continue; it is not a
-replacement for the readiness condition.
+replacement for the readiness condition. A `map` publisher implies the full
+`map -> odom -> base_link` chain is alive, so Nav2 activates only once TF is
+ready. External localization mode has no camera gate, because this host
+consumes no camera for inference. [Troubleshooting](../troubleshooting.md#event-driven-startup) covers what to do
+when a gate stalls.
 
 ## Hardware safety boundary
 
@@ -75,7 +109,8 @@ validation gates before motion is enabled.
 ## Exploration and diagnostics
 
 `frontier_explorer_node` reads the Nav2 global costmap, chooses frontiers, and
-sends `NavigateToPose` goals. It is the only supported explorer.
+sends `NavigateToPose` goals. It is the only supported explorer; its sources
+live under `src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer/`.
 
 ### Navigation ownership handoff
 
@@ -125,7 +160,30 @@ generation and interpretation are documented beside the
 Target localization is an optional consumer of the same sensor stack. Its
 detector, measurement paths, visualization, and benchmark semantics are owned
 by the [target-localization pipeline](../target_localization/target_localization_pipeline.md),
-not duplicated here.
+not duplicated here. Exploration runs the same estimator rows the benchmark
+compares: all four in simulation, the aligned-depth pair on hardware. Each row
+draws its own RViz ring with its own bearing, and a wide distance HUD at the
+top right (`hud_target_overlay`) lists the rows side by side with the age of
+each reading. Exploration has no ground truth, so that panel has no truth line
+and no error column. Each row has its own RViz Displays checkbox under
+`Target Estimates`. The camera overlay publishes on `debug/target/overlay`,
+shown by the configured RViz Image display.
+
+## Tuning parameters
+
+These are the first parameters to adjust; each file holds the rest.
+
+| File | Parameter | Effect |
+|---|---|---|
+| `config/frontier_explorer_params.yaml` | `min_frontier_size` / `near_frontier_radius` / `goal_advance_cells` | Frontier clustering, near-tier preference, and goal placement past the centroid |
+| `config/frontier_explorer_params.yaml` | `progress_timeout` / `abort_blacklist_threshold` | Stall timeout (cancels only when no progress) and failures required before a frontier is blacklisted |
+| `config/frontier_explorer_params.yaml` | `distance_weight` / `size_weight` | Scoring trade-off between how close and how large a far-tier frontier is |
+| `config/frontier_explorer_params.yaml` | `goal_cost_threshold` / `goal_safety_margin` / `lethal_cost_threshold` | Goal-safety filtering against the costmap |
+| `config/nav2_params.yaml` | `vx_max` / `vy_max` / `wz_max` | Robot linear and turn-rate limits |
+| `config/nav2_params.yaml` | `max_accel` / `max_decel` | Velocity smoother acceleration and braking limits |
+| `config/slam_toolbox_params.yaml` | `resolution` | Map resolution (m/pixel) |
+
+Paths are relative to `src/ridgeback_autonomy/`.
 
 ## Robot geometry
 

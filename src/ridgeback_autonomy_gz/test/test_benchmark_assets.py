@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 import xml.etree.ElementTree as ET
 
+import pytest
 from ridgeback_autonomy.benchmarking.asset_catalog import (
     CATALOG_SCHEMA,
     DEFAULT_TARGET,
@@ -12,6 +13,7 @@ from ridgeback_autonomy.benchmarking.asset_catalog import (
     scene_object_models,
 )
 from ridgeback_autonomy.benchmarking.scenarios import load_scenarios
+from ridgeback_autonomy.benchmarking.scene_audit import load_sdf_model
 
 
 PACKAGE_ROOT = Path(__file__).resolve().parents[1]
@@ -60,12 +62,24 @@ def test_public_world_maps_to_the_packaged_world_of_the_same_name() -> None:
     assert root.find('world').get('name') == world.native_name
 
 
-def test_spawnable_resources_are_static_models_at_the_established_height() -> None:
+def _floor_top(world_uri: str) -> float:
+    model = next(
+        m for m in ET.parse(world_uri).getroot().iter('model')
+        if m.get('name') == 'calibration_floor')
+    z = float(model.findtext('pose').split()[2])
+    height = float(model.find('.//collision/geometry/box/size').text.split()[2])
+    return z + height / 2.0
+
+
+def test_spawnable_resources_are_static_models_standing_on_the_floor() -> None:
     catalog = load_asset_catalog(str(CATALOG))
+    floor_top = _floor_top(catalog.worlds[PUBLIC_WORLD].resource.uri)
 
     for resource in (*catalog.targets.values(), *catalog.objects.values()):
         model = ET.parse(resource.uri).getroot().find('model')
         assert Path(resource.uri).parent.name == resource.logical_name
         assert model.findtext('static') == 'true', resource.logical_name
-        # The benchmark has always spawned Gazebo models at z = 0.
-        assert resource.spawn_z_m == 0.0
+        # Origin at ground contact, spawned onto the floor's top surface.
+        lowest = min(part.z_range[0] for part in load_sdf_model(resource.uri).parts)
+        assert lowest == pytest.approx(0.0, abs=1e-4), resource.logical_name
+        assert resource.spawn_z_m == pytest.approx(floor_top), resource.logical_name

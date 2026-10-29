@@ -459,26 +459,27 @@ smoke check even though the data contract is current.
 
 ### 7.1 A near-range floor the geometry imposes
 
-The scan plane sits **0.686 m below the camera** (camera optical origin 1.028 m
-above `base_link`, `lidar2d_0_laser` 0.342 m), so it projects to
-`v = fy·0.686/Z + cy`. At the shared default's `fy = 384`, `cy = 240` on a
+The scan plane sits **0.808 m below the camera** (colour optical origin 1.0345 m
+above `base_link`, `lidar2d_0_laser` 0.2264 m; see
+[shared robot geometry](../robot/geometry.md)), so it projects to
+`v = fy·0.808/Z + cy`. At the shared default's `fy = 384`, `cy = 240` on a
 480-row frame:
 
 | target range | scan-plane row |
 |---|---|
-| 0.84 m | 554 — off-frame |
-| 1.09 m | 482 — off-frame |
-| **1.10 m** | **480 — approximately the floor** |
-| 2.45 m | 348 |
-| 10.0 m | 266 |
+| 0.84 m | 609 — off-frame |
+| 1.09 m | 525 — off-frame |
+| **1.29 m** | **480 — approximately the floor** |
+| 2.45 m | 367 |
+| 10.0 m | 271 |
 
-**Below ≈1.10 m the scan plane projects off the bottom of the image**, so the
+**Below ≈1.29 m the scan plane projects off the bottom of the image**, so the
 in-FoV clip (§2.3) removes every beam that could have hit the target and the mask
 can only ever select background. This is structural, not a tuning failure: no
 value of any parameter in §6 recovers it. It is a stronger condition than "the
 scan plane intersects the object", and it is the one that binds up close.
 
-### 7.2 Measured, 2026-09-09
+### 7.2 Measured validation run
 
 `artifacts/benchmarks/20260909_210559_polar_validation`, polar alone, box gate,
 full scenario set, 109 trials:

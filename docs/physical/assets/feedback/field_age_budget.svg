@@ -1,0 +1,96 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 820 340" width="820" height="340" role="img" aria-labelledby="title desc">
+  <title id="title">Wheel feedback age budget</title>
+  <desc id="desc">Ages measured from the host CAN receive callback, on a 0 to 500 ms axis. Queue wait is about one 50 ms drain cycle, with a 75 ms acceptance limit and a counter for receipts over 100 ms. The driver publishes every 50 ms. Position and speed must be new since the previous publication and at most 150 ms old; the stationary acceptance measured at most 51.2 ms. Duty, current and setpoint must be valid and at most 500 ms old; the stationary acceptance measured at most 160.6 ms. The hardware consumer separately rejects aggregates older than 250 ms.</desc>
+  <style>
+    text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; font-size: 13px; fill: #6e7781; }
+    .head { font-weight: 600; }
+    .small { font-size: 11.5px; }
+    .axis { stroke: #8b949e; stroke-width: 1; fill: none; }
+    .grid { stroke: #8b949e; stroke-width: 0.6; stroke-dasharray: 2 4; opacity: 0.55; }
+    .queue { fill: #2f81f7; opacity: 0.85; }
+    .motion { fill: #3fb950; opacity: 0.45; }
+    .aux { fill: #d29922; opacity: 0.45; }
+    .consumer { fill: #a371f7; opacity: 0.45; }
+    .measured { stroke: #6e7781; stroke-width: 2.5; }
+    .limit { stroke: #f85149; stroke-width: 1.6; stroke-dasharray: 5 3; }
+    .tick { stroke: #8b949e; stroke-width: 1.4; }
+    .limit-text { fill: #f85149; }
+    @media (prefers-color-scheme: dark) {
+      text { fill: #b1bac4; }
+      .measured { stroke: #c9d1d9; }
+    }
+  </style>
+
+  <!-- x = 270 + 1 px per ms; 0..500 ms -->
+  <line class="grid" x1="370" y1="26" x2="370" y2="292"/>
+  <line class="grid" x1="470" y1="26" x2="470" y2="292"/>
+  <line class="grid" x1="570" y1="26" x2="570" y2="292"/>
+  <line class="grid" x1="670" y1="26" x2="670" y2="292"/>
+  <line class="grid" x1="770" y1="26" x2="770" y2="292"/>
+
+  <!-- row 1: queue -->
+  <text class="head" x="12" y="46">Receive callback to dequeue</text>
+  <text class="small" x="12" y="62">five-second DYNAMO_PUMA_QUEUE_TIME buckets</text>
+  <rect class="queue" x="270" y="34" width="50" height="18" rx="2"/>
+  <line class="limit" x1="345" y1="28" x2="345" y2="60"/>
+  <line class="tick" x1="370" y1="28" x2="370" y2="60"/>
+  <text class="small limit-text" x="350" y="74">75 ms acceptance limit</text>
+  <text class="small" x="376" y="46">over-100 ms counter</text>
+  <text class="small" x="276" y="74">one drain</text>
+
+  <!-- row 2: publication ticks -->
+  <text class="head" x="12" y="106">Driver publication tick</text>
+  <text class="small" x="12" y="122">20 Hz node timer</text>
+  <line class="tick" x1="270" y1="94" x2="270" y2="112"/>
+  <line class="tick" x1="320" y1="94" x2="320" y2="112"/>
+  <line class="tick" x1="370" y1="94" x2="370" y2="112"/>
+  <line class="tick" x1="420" y1="94" x2="420" y2="112"/>
+  <line class="tick" x1="470" y1="94" x2="470" y2="112"/>
+  <line class="tick" x1="520" y1="94" x2="520" y2="112"/>
+  <line class="tick" x1="570" y1="94" x2="570" y2="112"/>
+  <line class="tick" x1="620" y1="94" x2="620" y2="112"/>
+  <line class="tick" x1="670" y1="94" x2="670" y2="112"/>
+  <line class="tick" x1="720" y1="94" x2="720" y2="112"/>
+  <line class="tick" x1="770" y1="94" x2="770" y2="112"/>
+
+  <!-- row 3: motion -->
+  <text class="head" x="12" y="156">Motion fields: position, speed</text>
+  <text class="small" x="12" y="172">new since previous publication</text>
+  <rect class="motion" x="270" y="144" width="150" height="18" rx="2"/>
+  <line class="limit" x1="420" y1="138" x2="420" y2="170"/>
+  <text class="small limit-text" x="426" y="157">150 ms bound</text>
+  <line class="measured" x1="321.2" y1="140" x2="321.2" y2="166"/>
+  <text class="small" x="276" y="184">51.2 ms measured</text>
+
+  <!-- row 4: auxiliary -->
+  <text class="head" x="12" y="214">Auxiliary fields: duty, current,</text>
+  <text class="head" x="12" y="230">setpoint (reused while valid)</text>
+  <rect class="aux" x="270" y="204" width="500" height="18" rx="2"/>
+  <line class="limit" x1="770" y1="198" x2="770" y2="230"/>
+  <text class="small limit-text" x="706" y="244">500 ms bound</text>
+  <line class="measured" x1="430.6" y1="200" x2="430.6" y2="226"/>
+  <text class="small" x="436" y="244">160.6 ms measured</text>
+
+  <!-- row 5: consumer -->
+  <text class="head" x="12" y="272">Hardware consumer</text>
+  <text class="small" x="12" y="288">aggregate age at read and write</text>
+  <rect class="consumer" x="270" y="262" width="250" height="18" rx="2"/>
+  <line class="limit" x1="520" y1="256" x2="520" y2="288"/>
+  <text class="small limit-text" x="526" y="275">250 ms timeout: zero command, latch</text>
+
+  <!-- axis -->
+  <line class="axis" x1="270" y1="300" x2="780" y2="300"/>
+  <line class="axis" x1="270" y1="300" x2="270" y2="305"/>
+  <line class="axis" x1="370" y1="300" x2="370" y2="305"/>
+  <line class="axis" x1="470" y1="300" x2="470" y2="305"/>
+  <line class="axis" x1="570" y1="300" x2="570" y2="305"/>
+  <line class="axis" x1="670" y1="300" x2="670" y2="305"/>
+  <line class="axis" x1="770" y1="300" x2="770" y2="305"/>
+  <text x="266" y="320">0</text>
+  <text x="358" y="320">100</text>
+  <text x="458" y="320">200</text>
+  <text x="558" y="320">300</text>
+  <text x="658" y="320">400</text>
+  <text x="758" y="320">500 ms</text>
+  <text class="small" x="12" y="334">Ages run from the host CAN receive callback, not the MCU or wire sample time. Measured values: stationary acceptance run.</text>
+</svg>

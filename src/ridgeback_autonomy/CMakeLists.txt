@@ -54,6 +54,12 @@ install(PROGRAMS
 )
 
 install(PROGRAMS
+  ridgeback_autonomy/benchmarking/scene_audit_cli.py
+  DESTINATION lib/${PROJECT_NAME}
+  RENAME scene_audit
+)
+
+install(PROGRAMS
   ridgeback_autonomy/benchmarking/configurator.py
   DESTINATION lib/${PROJECT_NAME}
   RENAME target_benchmark_configurator
@@ -226,6 +232,7 @@ if(BUILD_TESTING)
   ament_add_pytest_test(test_asset_catalog test/test_asset_catalog.py)
   ament_add_pytest_test(test_sdf2usd_parse test/test_sdf2usd_parse.py)
   ament_add_pytest_test(test_scenarios test/test_scenarios.py)
+  ament_add_pytest_test(test_scene_audit test/test_scene_audit.py)
   ament_add_pytest_test(test_association test/test_association.py)
   ament_add_pytest_test(test_scoring test/test_scoring.py)
   ament_add_pytest_test(test_report test/test_report.py)

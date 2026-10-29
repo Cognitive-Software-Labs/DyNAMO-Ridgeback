@@ -39,279 +39,102 @@ default decision addresses these tradeoffs and the exploration/P5 results.
 [Isaac lidar pipeline](isaac/lidar-pipeline.md), and the resolved orphan-lidar
 investigation in the archived evidence below.
 
-## Physical stationary integration
-
-**Gap.** The package split and workstation checks are complete, and Intel–Thor
-transport tooling and preliminary network experiments are recorded. Matching
-robot installations, live GPU localization, the physical sensor suite, and joint
-stationary target tests have not been qualified. The three plans own their
-current progress and remaining acceptance gates:
-
-| Plan | Owner | Completion boundary |
-|---|---|---|
-| [PHYSICAL — Package split for distributed deployment](plans/PHYSICAL_package_split.md) | Workstation | Independently installable localization, preserved Gazebo/Isaac and benchmark workflows, tested interfaces and handoff. |
-| [PHYSICAL — Intel–Thor deployment and transport qualification](plans/PHYSICAL_intel_thor_deployment.md) | Robot deployment team | Matching installed revision, GPU offload, measured transport/performance, stationary failure and recovery evidence. |
-| [PHYSICAL — Robot measurements and stationary sensor validation](plans/PHYSICAL_robot_measurements_and_validation.md) | People at the robot with agent assistance | Quick sensor-mount readings/photos, agent-run sensor/alignment checks, and distributed G1/person tests. |
-
-**Coordination.** The workstation handoff is available in the package-split plan;
-both robot hosts must acknowledge the same installed revision before final
-distributed tests. Mount measurements and sensor inspection can proceed in
-parallel. Shared-code defects return to the workstation; robot teams own machine
-configuration and physical evidence. Start with the D455 on Intel and explicit
-per-host commands; camera relocation is an evidence-led alternative. One-command
-remote startup and boot services are optional later stages.
-
-**Auxiliary findings.** The [October 13 at-rest check](physical/stationary_auxiliary_checks.md)
-observed healthy short-window sensor delivery, but IMU covariance/calibration,
-battery field accuracy and startup timing remain unqualified. Source diagnosis
-found an IMU parameter-selector mismatch and synthesized cell-voltage fields;
-the rollback-capable platform-only repair was installed and independently
-verified stationary on October 13. Zero IMU covariance
-and NaN temperature are valid unknown/unmeasured semantics, not calibration
-values to fabricate. The clock converged and the bounded platform startup gate is installed;
-one supervised post-install reboot now verifies about 38 seconds of clock-gate
-waiting before successful platform startup and preserved sensor/desktop/data
-contracts. Repeated cold boots and external-source loss remain unqualified.
-
-**Completion criteria.** All three plans pass their stationary boundaries on
-the recorded configuration. Apply the existing camera, geometry, calibration,
-and command-chain criteria independently: stationary success does not close
-moving-robot calibration, physical stop/clearance, simulator contact, or
-autonomous-mission work. Pointcloud qualification remains optional.
-
 ## Physical command-chain validation
 
 **Deployment gate.** The hardware adapter is attach-only and autonomous motion
-defaults off. Stationary live inspection confirmed a compatible stamped
-mux/controller interface and an active four-wheel mecanum controller. Legacy
-generated `use_stamped_vel: false` is not the installed controller's interface
-selector. A commissioning guard is installed with 0.05 m/s planar and 0.1 rad/s
-yaw command caps; stationary routing verification passed. Physical stopping
-remains partially qualified: bounded command loss and gently ramped motion in
-all six directions recorded clean stops with operator confirmation. A low-speed
-deadman release also stopped with operator confirmation, with trial deviations
-preserved in the driving reference. Physical e-stop stopping was observed with
-forward still held, and neutral e-stop release produced no movement; the e-stop
-trial exceeded its requested one-second exposure. A deliberate controller disconnect during motion now recorded automatic
-stopping before the bounded-permit backstop, with operator confirmation.
-Silent radio loss/reconnection, takeover and cold boot remain open. Reconnection
-is now a reproduced failed gate: Bluetooth reconnects but the driver reports
-zero physical reports and ROS input stays neutral despite operator input.
-A verified device-specific disconnect and manual reconnect restored live input
-while the stop remained pressed. The root cause, neutral-return evidence and
-automatic reconnect reliability remain open; manual recovery is not a gate pass.
-On 2026-10-12 the platform-restarting autoconnect handler was replaced by a
-root-pinned paired/trusted-device helper that makes no ROS/base service calls.
-Its installation preserved platform/guard/sensor/camera process IDs and verified
-asserted-stop stationary state. A subsequent cached-state recording observed changing physical and virtual
-input and return to neutral, with asserted-stop/stationary probes before and
-after. A subsequent stationary ROS capture also verified changing joystick/combiner
-input and neutral return, with asserted-stop suppression and zero limited/wheel
-commands and raw odometry. One post-repair neutral reconnect plus companion live ROS input/neutral-return
-recording now passes with stop suppression and no platform restart. Repeated
-reconnect reliability and silent radio loss remain open; link-connected status
-alone is insufficient.
-Abrupt direction tests encountered repeatable startup-transient
-aborts; resolve physical versus feedback-timing causes before qualifying those
-profiles. The diagnostic fault-mask and cache-memory repair is installed and verified
-stationary from a root-pinned package, preserving the test lock. The old
-unpatched build was withdrawn;
-the CAN-rate/freshness investigation remains
-open. A stationary paired capture separates steady status-speed reception on
-all wheels from rear setpoint-response count asymmetry; loss location and
-per-field freshness are unqualified. An offline completeness/diagnostic-read
-patch passes extracted-routine checks and full compilation, but timing replay
-predicts about 16.5 Hz and 200 ms publication gaps. Consumer inspection/offline reproduction shows stale states retained and
-commands continuing without an age check. An offline consumer candidate adds age/batch validation, latched command
-inhibition and stationary lifecycle activation; extracted-body checks pass and
-the package compiles and a direct compiled-plugin fixture passes loopback
-ROS messaging checks. The corrected candidate also passes controller-manager initialization,
-feedback-loss inhibition and explicit neutral recovery with fake wheels. The
-plugin-only deployment now passes stationary install and reboot checks. A
-supervised interruption of the real ROS feedback stream with the physical stop
-engaged produced zero wheel commands at about 290 ms and deactivated the
-controller; a stationary platform restart restored active, zero-command
-operation. Qualify braking under movement, electrical CAN loss and repeated
-fault recovery before deploying the driver-completeness candidate. Details are in the [wheel-feedback reference](physical/drive_feedback_diagnostics.md).
-An incoming-only motor-CAN/UDP interruption with the physical stop pressed
-also removed aggregate feedback and faulted the controller about 290 ms later.
-The corrected stationary repeat observed feedback return after the exact rule
-was removed, but control remained inactive until a supervised platform restart;
-stationary recovery passed. This is not a passed moving gate.
-The separate bounded invalid-feedback trial is prepared for securely raised
-wheels; full bidirectional electrical-link loss and per-wheel field freshness
-remain open.
-The native e-stop publisher/mux subscription had incompatible QoS. A reliable
-guard stop relay and mux-only remap passed isolated mock checks and were
-installed and verified stationary on 2026-10-09. A deliberate wireless
-controller power-off and a device-specific automatic disconnect both reset held
-input to neutral while the physical stop was held; the automatic trial retained
-twenty seconds of neutral input and zero commands/wheel motion.
-Silent radio-loss/reconnection qualification remains open. The [stop-delivery reference](physical/driving_readiness.md#e-stop-delivery-to-the-mux)
-owns its deployment state.
-Automatic moving-disconnect testing is disabled after a preflight-unarmed
-trial contained prolonged commands without triggering disconnection. A bounded test-permit interlock is now installed and verified stationary;
-Neutral release and held-command suppression with the physical stop released
-are now verified, including operator confirmation of no movement. The bounded-permit workflow now cut commands despite ongoing source input and
-permits, and the operator confirmed stopping while forward remained held.
-A repeat interlocked deliberate moving-disconnect trial now passed its recorded
-command-stop gate and operator physical stopping observation. Sustained/silent
-radio loss and reconnection remain unqualified.
-Manual mux inputs bypass the Nav2 collision monitor; optional software stop
-locks had no publishers during inspection. The maintained
-[driving reference](physical/driving_readiness.md) owns findings and the
-remaining test sequence.
+defaults off (`autonomous_motion_enabled:=false`). Keep it off until every open
+gate below passes on the approved robot configuration.
+
+**Qualified so far.** Every hop from Nav2 to the base carries `TwistStamped`
+and delivers on the live graph (stationary, no goal sent). The
+[commissioning guard](physical/commissioning_guard.md) bounds every source.
+D1 (six bounded floor directions), D4 (live handover) and D5 (stationary
+field-age acceptance) passed. The [driving](physical/driving_readiness.md) and
+[feedback](physical/drive_feedback_diagnostics.md) references own installed
+state; the [qualification plan](plans/PHYSICAL_remaining_qualification.md#driving-and-feedback)
+schedules the trials and their acceptance counts.
+
+**Open gates.**
+
+- **D2.** Re-confirm deadman release, command loss and physical e-stop stops on
+  the current build. Earlier observations remain historical evidence only.
+- **D3.** Repeated abrupt and silent wireless input loss, neutral reconnect and
+  restored input. One post-repair reconnect passed; repeated reliability and
+  genuine silent report loss are untested. Manual recovery or link-connected
+  status alone is not a pass.
+- **D6.** Feedback fault while the wheels turn (raised), fault latch and
+  supervised recovery.
+- **D7.** Actual motor-link loss, including outgoing zeros that cannot be
+  delivered, and recovery. It drops bridge packets; electrical CAN loss is a
+  separate, untested case.
+- **D8.** Measured stopping distance and clearance at the approved limits.
+- **Abrupt starts.** Abrupt direction changes hit repeatable startup-transient
+  aborts. Resolve physical versus feedback-timing causes before qualifying
+  those profiles.
+- **Collision-monitor bypass.** Manual mux inputs bypass the Nav2 collision
+  monitor; optional software stop locks had no publishers during inspection.
+- **P4, then P5.** Not yet run: the navigation TF chain, collision-monitor
+  suppression and stale-source handling, Nav2 command-chain integration with
+  the base, and then a bounded autonomous clear-space smoke. Both need explicit
+  session approval.
 
 **Completion criteria.** On the exact approved robot configuration, trace the
 message type, topic, QoS, frame/timeout semantics, mux ownership, collision
 monitor, controller input, e-stop, and deadman behavior from Nav2 to the base.
 Reconcile drive feedback frequency targets and direct/aggregated fault
-reporting. Resolve any mismatch at the narrowest owning layer; then perform stationary,
+reporting, including complete controller-manager and EKF parameter reads.
+Resolve any mismatch at the narrowest owning layer; then perform stationary,
 lifted/blocked-wheel where approved, low-speed clear-space, stop, timeout, and
 e-stop tests before enabling `autonomous_motion_enabled:=true`.
 
-**Progress.** On 2026-10-13 the Nav2 portion was observed on the live graph for
-the first time, stationary and with no goal sent. Every hop from Nav2 to the
-controller carries `TwistStamped`, and every publisher/subscriber pair delivers.
-It also found that `controller_server` subscribed `odom`, which has no publisher
-on the robot. The platform publishes `platform/odom` and
-`platform/odom/filtered`, so the controller received no velocity feedback
-(record under [Archived evidence](#archived-evidence)).
-`nav2_params.yaml` now sets the controller's `odom_topic` to
-`platform/odom/filtered`, the topic `bt_navigator` and the velocity smoother
-already use in every backend. Earlier simulator benchmarks ran the controller
-without that feedback, so rerun any benchmark before comparing it with results
-from after this change.
+**Benchmark rerun.** The 2026-10-13 live trace found `controller_server`
+subscribed to `odom`, which has no publisher on the robot (record under
+[Archived evidence](#archived-evidence)). `nav2_params.yaml` now sets its
+`odom_topic` to `platform/odom/filtered`, the topic `bt_navigator` and the
+velocity smoother already use in every backend. Earlier simulator benchmarks
+ran the controller without velocity feedback, so rerun any benchmark before
+comparing it with results from after this change.
 
 **Context.** [Exploration architecture](exploration/architecture.md#hardware-safety-boundary)
-and the public hardware workflow in the [README](../README.md). The
-[stationary measurement plan](plans/PHYSICAL_robot_measurements_and_validation.md#both-lidars-and-stationary-auxiliary-sensors)
-owns inspection only; its completion does not close this actuation gate.
+and the public hardware workflow in the [README](../README.md).
 
-## Hokuyo driver recovery after read timeouts
+## Deferred hardware gates
 
-**Gap.** `urg_node` (`ros-jazzy-urg-node` 1.1.2) cannot recover from a burst
-of read timeouts. It reconnects without closing its old TCP session, and a
-Hokuyo UST serves one client at a time, so the new connection is refused
-indefinitely. The robot then has no scans until someone restarts
-`clearpath-sensors`, whatever the middleware. September 18 handoffs report three
-subscriber-associated lockouts under the CycloneDDS services configuration and
-measured camera traffic leaving the bridge onto the sensor/MCU ports. The
-initiating mechanism remains unproven; the maintained
-[transport blocker](physical/intel_thor_transport.md#camera-subscriber-blocker)
-distinguishes observations from the multicast hypothesis.
+The stationary sensor, host and perception work (S1–S10, P1–P3 in the
+[qualification plan](plans/PHYSICAL_remaining_qualification.md)) closed on
+2026-10-22 for the agreed scope. The gates below were deliberately not
+qualified. Each needs a new scope decision; reopen it before the named use.
 
-**Progress.** The lockout mechanism was found and fixed on 2026-10-13: when
-`urg_open` fails after the TCP connect, `urg_node` 1.1.2 throws without closing
-the socket, and `urg_c` writes without `MSG_NOSIGNAL`, so a reset session killed
-the driver with SIGPIPE. One recorded patch,
-`patches/urg_node_reconnect_recovery.patch` on `src/urg_node` 1.1.2 (pinned in
-`dependencies/core.repos` on `origin/dev`), closes the failed socket and ignores
-SIGPIPE. It runs on `r100_0160` as the overlay
-`/home/robot/ros_overlays/urg_node_fix`, listed under `system.ros2.workspaces`
-in `/etc/clearpath/robot.yaml` (rollback copy `robot.yaml.bak-urg-node-fix`).
-A rear-LiDAR session reset on 2026-10-13 reconnected the same driver process
-after a 2.25 s scan gap. On 2026-10-14 (S3) `tools/hardware/observe_lidar_interruption.py`
-reset the **front** session with the base e-stopped: the same driver process
-reconnected after 2.25 s with no service or merger restart, the rear scan never
-gapped more than 42 ms, and over the 30 s after recovery front, rear and merged
-scans each held 39.93 Hz with gaps up to 43 ms (`artifacts/hardware/20261014T114600Z-s3-front-lidar-interruption/`). An earlier attempt
-the same day is kept as `…-INVALID-settle-window`: its recovery was identical
-but the tool's settle window overlapped the outage. The half-answering-sensor
-case is shown only offline.
+| Gate | Not qualified | Reopen before |
+|---|---|---|
+| LiDAR timeout recurrence | The 2026-09-18 simultaneous front/rear timeout is unexplained, and no loaded multi-hour soak ran (`tools/hardware/run_loaded_soak.sh` is ready). In-driver reconnect after a session reset is fixed and verified on both LiDARs ([troubleshooting](troubleshooting.md#hokuyo-drivers-stuck-reconnecting)). | Long unattended operation |
+| Boot without internet time | The boot clock step passed three boots with internet time; the no-source path is untested. | Field use without internet time |
+| Remote desktop continuity | Repeated-boot ownership and automatic VNC/proxy process recovery passed ([recovery reference](physical/ridgeback_recovery.md)). Network loss, display corruption, browser-side session persistence and vendor webserver reloads are untested. | Relying on the desktop across those events |
+| D455 at 1280x720 | Not supported on the robot (user decision, 2026-10-29): no HD testing or development is planned. Raw HD to Thor exceeds the 1 Gb/s link, so Thor stays at 640x480; the one local HD check failed one of nine captures with a 166.8 ms source dropout. | Any hardware use of 1280x720, which first needs its own development and qualification |
+| Hardware localization accuracy | Distance accuracy at taped marks (including off-centre), silhouette re-measurement and G1 target cases. Person detection scores sit near 0.3, leaving little threshold margin. | Quoting localization accuracy |
+| IMU calibration | Factory calibration is accepted without a reference calibration; covariance stays reported as unknown. | Heading drift or SLAM smearing that points to the IMU |
+| Battery health | Only pack voltage, total current and MCU/PCB temperatures exist; the battery model is unidentified. | Long or unattended missions that depend on battery health |
+| Driving-stack cold boot | The guard unit's `After=network.target` does not wait for `wlp3s0` ([boot ordering](physical/commissioning_guard.md#boot-ordering-limitation)). The consumer plugin has one supervised post-install reboot check; the 2026-10-22 field driver and the repair's DDS-readiness helper have no reboot or cold-boot evidence. | Unattended power-up |
+| Feedback timing under load | Field age and live queue timing are measured stationary and in short moving captures only; no sustained motion or CPU load. Ages exclude MCU, wire and kernel delay. | Long missions, or quoting feedback latency |
+| Consumer CAN-ID check | The consumer learns CAN IDs from feedback without checking them against the robot declaration. | Changing wheel IDs or the controller configuration |
+| Electrical motor-link loss | D7 drops CAN-over-UDP bridge packets; a physical CAN or power loss on the motor link is untested ([fault paths](physical/motor_link_fault_injection.md#electrical-link-loss)). | Relying on stopping after a motor-link hardware failure |
 
-**Context.** Recovery steps are in
-[troubleshooting](troubleshooting.md#hokuyo-drivers-stuck-reconnecting). The
-incident timeline is in the archived evidence below. The CycloneDDS deployment is described in the
-[transport reference](physical/intel_thor_transport.md).
+**Completion criteria.** A row leaves this table when a scope decision reopens
+it as an active item with its own criteria, or when its gate is qualified and
+the result is recorded in its reference.
 
-**Completion criteria.**
+## Missing physical operator procedures
 
-- Resolve the services-configuration camera fault and extend `check_link` to
-  cover an extra local camera reader under the installed services configuration,
-  observing physical-port traffic, image delivery and LiDAR errors. A synthetic
-  Ethernet-only probe pass does not satisfy this gate.
-- A driver that loses its Hokuyo connection resumes publishing scans without
-  manual intervention. Achieve this with a maintained `urg_node` patch under
-  `patches/` that closes the old session before reconnecting, or with a
-  documented supervisor that restarts only the sensor drivers. Demonstrate it
-  by interrupting a LiDAR's TCP session on the robot. **Met** for a reset
-  session on both LiDARs (see Progress); no supervisor is needed for that case.
-- Either explain the 2026-09-18 simultaneous timeout, or bound its recurrence
-  with a recorded multi-hour soak under CycloneDDS with the Intel services,
-  SLAM, and Nav2 running.
+**Gap.** The runbooks found three operator steps with no maintained procedure:
+releasing the physical e-stop and confirming that motor fault 8 clears (or
+recovering after a stop press in normal driving); writing the
+`boot-baseline.json` that `verify_auxiliary_boot.py` reads (only its `boot_id`
+field is documented); and pairing and trusting a replacement controller and
+recreating `controllers.txt`.
 
-## Remote desktop startup recovery
-
-**Gap.** The October 5 independent VNC installation survived vendor webserver
-reloads, but the October 6 cold boot recorded 37 VNC restarts, an NVIDIA EGL/GLX
-crash and repeated display conflicts. The independent browser proxy did not
-recover after its dependency failed; port 9005 reverted to a vendor-owned
-listener. Desktop user-session/runtime failures were also recorded. The retained
-DDS profile survived the boot, and a scan-only check passed; this is a desktop
-startup gap, separate from camera transport.
-
-**Context.** Read-only checks and ownership interpretation are in
-[desktop startup troubleshooting](troubleshooting.md#remote-desktop-startup-and-proxy-ownership).
-The camera-independent stationary setup repair was installed and independently
-verified on 2026-10-12. The foreground VNC service owns display :1/5901;
-independent units own 9005 and 9100, and the remote-screen override removes its
-competing display launcher. All six root-owned file hashes/modes match maintained
-sources; platform, guard, camera, sensors and merger kept their process IDs.
-The vendor webserver remained inactive. Public installation and exact-file
-rollback commands are in the [README](../README.md#stationary-desktop-and-controller-setup-repair).
-The 2026-10-13 boot inspection now shows correct desktop listener ownership,
-matching repaired files and zero reported desktop/guard restarts. One observed
-boot does not establish repeated cold boots or browser continuity; backend-failure
-recovery and vendor-reload continuity remain unqualified.
-
-**Completion criteria.** Demonstrate clean cold boots with one owner for display
-:1 and port 9005, a valid robot user session/runtime directory, automatic proxy
-recovery after VNC failure, and browser/desktop continuity across vendor webserver
-reloads. Preserve DDS, camera startup, robot YAML and merger settings throughout.
-Resolve the graphics startup fault from captured evidence rather than accepting
-repeated retries as successful boot qualification.
-
-## Physical camera validation
-
-**Gap.** The D455 input contract is implemented, but device identity, effective
-profiles, colour/aligned-depth delivery, exact timestamps, TF ownership, and
-application behavior still need proof on the deployed robot.
-
-**Completion criteria.** Execute the D455 section of
-[PHYSICAL — Robot measurements and stationary sensor validation](plans/PHYSICAL_robot_measurements_and_validation.md#d455-camera-validation):
-verify the intended device and driver, inspect effective configuration, validate
-image/depth/calibration contracts and timing, confirm the actual camera-to-base
-TF chain, and run a stationary projective/Euclidean application smoke. Test
-640x480@30 and 1280x720@30 separately; record unsupported/fallback profiles as
-unresolved rather than silently accepting them. Freeze acceptance criteria
-before measurement. Preserve evidence and compare live calibration with the
-nominal simulation model without treating nominal values as hardware guarantees.
-
-Close only after both required profiles and the core checks pass, or after an
-explicit deployment-scope decision revises the required profile set. Pointcloud,
-camera–LiDAR calibration, calibrated accuracy, and motion validation are separate.
-
-**Progress.** `dynamo-camera.service` owns the D455 on `r100_0160` from boot
-and publishes the simulators' topic names, frames and TF. It passes
-`tools/camera_contract_check` at 640x480@30 and 1280x720@30, after a cold boot,
-and after a rollback and reinstall: device identity, effective profiles,
-encodings, exact colour/depth stamps and the camera-to-base TF chain are
-established. A first stationary projective/Euclidean smoke ran on Thor on
-2026-10-12 at 640x480@30: both estimators measured a person within 4–10% of
-taped distances at three marks (`person` at threshold 0.22), and a redo with
-`full body person` at 0.26 passed the empty scene and a 600 s scan guard
-(record under [Archived evidence](#archived-evidence)).
-Person scores stay near 0.3 in that room, so the setting has little margin.
-The live factory calibration was compared with the nominal simulation model on
-2026-10-13: the model was kept, and the pipeline ignoring distortion was
-recorded (record under [Archived evidence](#archived-evidence)).
-That record's HD values come from the earlier vendor service. Remaining: an
-off-centre check against a taped mark, and the 1280x720 smoke.
-
-**Context.** [Camera stack](target_localization/camera_stack.md),
-[aligned depth](target_localization/aligned_depth.md), and
-[robot-local deployment](physical/robot_local_deployment.md#camera-service).
+**Completion criteria.** Each step has a verified procedure in the owning
+runbook under `docs/physical/`, tried once on the robot with the physical stop
+in reach, or a maintained tool that performs it.
 
 ## Optional physical organized-pointcloud qualification
 
@@ -354,6 +177,13 @@ That field check can expose a calibration problem without requiring a workshop
 survey. It does not establish formal extrinsic uncertainty or moving-robot
 validity; those parts of this gate remain open after an integration pass.
 
+**Progress.** Stationary overlay captures on `r100_0160` show camera depth at
+projected LiDAR pixels reading long, from about +1 cm below 1.5 m to +23 cm at
+2.5–4 m; the cause is not separated. No flat-target test, calibration with
+uncertainty or motion check has run, so polar profiling remains unqualified on
+hardware. The [alignment session plan](plans/PHYSICAL_camera_alignment_session.md)
+holds the prepared next session.
+
 ## Shared camera mast and bracket geometry
 
 **Implemented.** One shared Xacro now supplies both simulators' mast and bracket.
@@ -395,9 +225,14 @@ and stop/reverse recovery passed at 0.05/0.10/0.20 m/s across three cold boots
 per backend. The [collision reference](robot/collision_model.md) owns the policy,
 limits and reproduction path.
 
-**Remaining gap.** Agreement with the deployed hardware, including attachments,
-is unproven. The field visit supplied selected tape readings rather than a
-surveyed planar outline, uncertainty model, or physical stopping/clearance test.
+**Hardware footprint.** The `r100_0160` outline survey corrected the Nav2
+footprint to 99.4 × 82.7 cm, enclosing the measured outline by at least 12 mm.
+The equal 2 cm front/rear split of the 4 cm length excess is an assumption.
+
+**Remaining gap.** The corrected footprint has no static simulator comparison
+or Gazebo/Isaac contact matrices yet, and the affected benchmarks have not been
+rerun with it. Height-dependent attachment limits, an uncertainty model and a
+physical stopping/clearance test are still missing.
 
 **Completion criteria.** Add the measured physical envelope to the existing
 same-frame overlay, including height-dependent attachment limits and explicit
@@ -416,7 +251,9 @@ stopping proof. Those are separate tasks under this gate.
 ## MyBotShop follow-ups
 
 Open questions for the next call with MyBotShop, the robot's integrator.
-Resolve each one here or move it to the item that owns it.
+
+**Completion criteria.** Each question is answered, and the answer is recorded
+in the reference that owns the fact or moved to the item that owns the work.
 
 - **Rear LiDAR offset.** Where did x = −0.4278 come from in
   `/etc/clearpath/robot.yaml` (first seen 2026-08-06) and the scan-merger
@@ -429,9 +266,9 @@ Resolve each one here or move it to the item that owns it.
   reboot took 10 s. A `proton_ros2_node` segmentation fault in `librcl.so` was
   logged once during a stop. Which process ignores the stop request, and is the
   fault known? Every Clearpath restart costs that minute of motor power.
-- **Camera web readiness.** Earlier boot waits failed despite subsequently
-  healthy camera topics. The direct discovery replacement and its deployment
-  verification belong to [desktop startup recovery](#remote-desktop-startup-recovery).
+- **Battery model.** Which battery is installed? Only pack voltage, total
+  current and MCU/PCB temperatures are exposed; battery temperature and
+  per-cell voltages need its BMS or added sensors.
 - **Unit files changed on disk.** On 2026-09-18 systemd reported that the
   `realsense-camera`, `camera-web-ready`, `clearpath-platform` and
   `clearpath-sensors` units had changed since they were loaded. Which edits are

@@ -148,7 +148,7 @@ def test_run_report_has_every_section_and_survives_null_metrics() -> None:
                     '## Run configuration'):
         assert heading in report
     # Configuration precedes the per-scene table: that table is the only one
-    # that grows without bound (~92 rows for the 68-scene v2 set), so anything
+    # that grows without bound (~114 rows for the 88-scene full set), so anything
     # placed after it is unreachable without scrolling past all of it.
     assert report.index('## Run configuration') < report.index('## Per scene')
     # Provenance: enough to identify the run later.

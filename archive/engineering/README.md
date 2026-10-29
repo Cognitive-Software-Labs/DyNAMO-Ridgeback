@@ -22,6 +22,8 @@ are excluded from ordinary repository search and the generated knowledge graph.
 
 ## Benchmarking and execution
 
+- [Remote versus physical-seat validation](2026-09-07-seat-validation.md) — identical error on both displays; accepted as the execution-environment qualification.
+- [Scene recertification for the current camera](2026-10-29-scene-recertification.md) — scene_audit method, legacy cross-check, relabel/re-place decisions and asset seating.
 - [Gazebo and Isaac backend qualification](2026-10-26-benchmark-gazebo-isaac-qualification.md) — the first and accepted matched full runs, cross-simulator detector and ranking differences, reproducibility of each simulator, interrupted-stop cycles and installed-launch smokes.
 - [Benchmark shutdown ordering and RViz node ownership](2026-10-23-benchmark-shutdown-ownership.md) — client-before-provider rollback, retained view-controller services, native DDS unload evidence, and distinct qualification populations.
 - [Benchmark population and scoring transitions](benchmark_evolution.md)
@@ -43,14 +45,36 @@ are excluded from ordinary repository search and the generated knowledge graph.
 
 - [Intel–Thor DDS transport diagnosis](2026-09-18-intel-thor-dds-transport.md) — Wi-Fi duplication, receive-buffer drops, and Ethernet-only profile measurements.
 - [Intel–Thor middleware benchmark](2026-09-18-intel-thor-rmw-benchmark.md) — Fast DDS vs CycloneDDS vs mixed across the link, and the reader-side interface rule.
+- [Intel–Thor transport handoff](2026-09-18-intel-thor-transport-handoff.md) — agent 2's state snapshot: CycloneDDS switch, LiDAR lockouts under the services configuration, manual rollback.
+- [D455 camera runs handoff](2026-09-18-d455-camera-runs-handoff.md) — agent 1's state snapshot: Fast DDS camera passes, CycloneDDS failures.
 
 - [Physical mecanum drive investigation](2026-09-18-mecanum-drive-investigation.md)
+- [r100_0160 Intel clock gate, sources and boot-step qualification](2026-10-13-r100-0160-intel-clock-qualification.md) — first reboot check, source expansion and poll bound, the October 14 startup delay and the S6 boots.
+- [r100_0160 commissioning guard installation and first low-speed trials](2026-10-06-driving-guard-and-deadman-trials.md) — guard install, capped direction pulses and deadman-release timing.
+- [Puma diagnostic build, first rate capture and startup-transient aborts](2026-10-06-puma-build-and-startup-transients.md) — repair build, first CAN rate capture and the mixed-wheel startup aborts.
+- [r100_0160 e-stop QoS repair and stationary disconnect trials](2026-10-09-estop-qos-and-disconnect-trials.md) — incompatible e-stop QoS, the reliable relay and controller power-off trials.
+- [r100_0160 test-permit interlock, bounded-permit and moving-disconnect trials](2026-10-12-interlock-and-moving-disconnect-trials.md) — permit timeline, interlock installation and the interlocked moving disconnect.
+- [r100_0160 controller input loss, recovery and reconnect cycles](2026-10-12-controller-input-loss-and-reconnect-cycles.md) — connected-but-no-input failures, manual recovery and the autoconnect helper.
+- [Puma repair driver, CAN rates and offline freshness models](2026-10-12-puma-repair-rates-and-freshness-replays.md) — installed repair rates, superseded 16.5 Hz/200 ms models and replays.
+- [Puma feedback-consumer repair, installation and stationary interruptions](2026-10-13-consumer-plugin-and-feedback-outage.md) — consumer candidates, plugin install, feedback and CAN-ingress interruptions.
+- [r100_0160 bounded direction trials and D2 deadman and command-loss runs](2026-10-14-direction-and-deadman-trials.md) — D1 six-direction floor trials and the first D2 runs.
+- [r100_0160 D2 physical-stop capture attempts](2026-10-16-physical-stop-captures.md) — physical e-stop capture attempts and their deviations.
+- [Single-bound field-age candidate and stationary field captures](2026-10-16-field-age-captures.md) — the superseded 200 ms bound and stationary field captures.
+- [r100_0160 original-manual guard profile and D4 handover trials](2026-10-21-original-manual-and-d4-trials.md) — original-manual install and the live handover pass.
+- [Field-age evidence from short moving captures, replays and queue-timing builds](2026-10-21-d5-motion-captures-and-queue.md) — moving captures, replays and the queue-timing layer.
+- [Split field-age bounds, field-driver installation and stationary acceptance](2026-10-22-d5-acceptance.md) — 150/500 ms bounds, install and the revised 75 ms queue criterion.
+- [r100_0160 D-lane baseline, D2 preparation and the reconnected deadman run](2026-10-22-d2-preparation-and-run.md) — baseline snapshot, finalize workflow and the deadman run.
 - [r100_0160 field readings and LiDAR box checks](2026-09-18-r100-0160-field-measurements.md) — tape mount readings, LiDAR range/side checks, and the rear-offset finding.
 - [r100_0160 Thor perception environment and first live localization](2026-10-12-r100-0160-thor-localization-smoke.md) — Thor GPU environment, model timings at 120W and MAXN, the person-threshold and static-TF findings, and the stationary distance smoke.
 - [r100_0160 Intel RViz view of Thor localization](2026-10-13-r100-0160-intel-rviz-observer.md) — SLAM map, scans and Thor's results drawn on Intel in RViz; no image crosses with the box gate; overlay draws on the newest colour frame; CLI probe pitfalls.
 - [r100_0160 D455 factory calibration against the nominal simulator profiles](2026-10-13-r100-0160-d455-calibration-vs-nominal.md) — live VGA and recorded HD intrinsics against the nominal profiles, factory extrinsics, and the cost of the pipeline ignoring distortion; nominal profiles kept.
 - [r100_0160 Nav2 command chain observed live](2026-10-13-r100-0160-nav2-command-chain.md) — first live Nav2-to-controller trace: TwistStamped throughout, mux remap in force; controller_server reads an unpublished `odom` topic.
 - [urg_node reconnect lockout: leaked socket on a failed open](2026-10-13-urg-node-reconnect-leak.md) — source-level cause of the Hokuyo lockout, offline single-client reproduction, and the one-line close patch; not deployed.
+- [r100_0160 IGMP querier discovery stall](2026-10-13-r100-0160-igmp-querier-discovery-stall.md) — the 313–381 s discovery outage, causes ruled out, and the 0.2 s result with the querier on.
+- [r100_0160 remote desktop boot and recovery](2026-10-06-r100-0160-remote-desktop-boot-and-recovery.md) — the October 6 cold-boot failures, the six-file repair, the boot inspection, the update incident and the S7 recovery check.
+- [r100_0160 front LiDAR session reset (S3)](2026-10-14-r100-0160-front-lidar-session-reset.md) — same-process reconnect after 2.25 s with the patched driver.
+- [r100_0160 local camera-reader screens](2026-10-13-r100-0160-local-camera-reader-screens.md) — contract screen, port comparisons, S1 quiet repeat, S2 VGA matrix, S4 soak and the `check_link --camera-reader` pass.
+- [r100_0160 Thor image copies and HD trials](2026-10-16-r100-0160-thor-image-copies-and-hd-trials.md) — the health image-copy reduction, the HD trial and diagnosis, and the decision to keep Thor at VGA.
 - [r100_0160 Intel–Thor camera transport candidates](2026-10-06-r100-0160-thor-transport-candidates.md) — raw baseline against the larger send buffer (O1) and compression (O4), with the decoder findings.
 - [r100_0160 D455 camera service qualification](2026-10-06-r100-0160-camera-service.md) — contract checks at both profiles, after a cold boot and after a rollback and reinstall, with the platform-restart and serial findings.
 - [r100_0160 rear LiDAR side-target recheck](2026-09-24-r100-0160-rear-lidar-recheck.md) — independent placements after the correction, with a before/after corner overlay.

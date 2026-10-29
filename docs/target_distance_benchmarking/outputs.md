@@ -13,6 +13,9 @@ Default root: `<repo>/artifacts/benchmarks`. Each timestamped run contains:
 - `images/<trial_id>.png` collages;
 - `video/run.mp4`, best-effort RViz capture when recording succeeds.
 
+Start with `summary.md`; `run.json` carries the same run-level numbers for
+machines.
+
 The `run` object records label/start, commit/branch, numeric
 `uncommitted_files`, absolute scenario path, and included/skipped counts.
 `parameters` records node parameters. Each `estimators` entry records stable key
@@ -44,6 +47,38 @@ An estimator dropped from a variant is named with its reason in `run.json` and i
 the summary, rather than being silently absent — a table that simply lacks a row
 reads as one that scored nothing.
 
+### Run folder and file names
+
+A run folder is named
+`<timestamp>_<scenario>[_<gate>][_<depth_source>]` under `output_dir`, for
+example `20260822_202851_full_silhouette_stereoscopic`. The timestamp leads so
+folders sort chronologically. The packaged `benchmark_scenarios_full.yaml`
+shortens to `full`; any other scenario keeps its file stem. The gate appears
+only when a mask estimator ran, and the depth source only when a depth-path
+estimator ran. `run_dir_name` replaces the whole name; a sweep uses the
+configuration name. `benchmarking/naming.py` owns these rules.
+
+Mask-row CSV names fold in the config axes that executed: the mask gate, the
+aligned-depth source, the path, and on the box gate the foreground recipe
+(`isolation_2d` for projective ranging, `isolation_3d` for Euclidean
+reconstruction):
+
+| Row | Example CSV |
+|---|---|
+| Box gate, stereoscopic depth, projective ranging | `box_gated_stereoscopic_projective_ranging_nearest_mode_histogram.csv` |
+| Box gate, stereoscopic depth, Euclidean reconstruction | `box_gated_stereoscopic_euclidean_reconstruction_height_crop_nearest_mode_band.csv` |
+| Silhouette gate, no recipe token (the tight branches run none) | `silhouette_gated_stereoscopic_projective_ranging.csv` |
+| Polar profiling, gate only | `box_gated_polar_profiling.csv` |
+| Point cloud | `pointcloud.csv` |
+
+### Child ROS logs
+
+Benchmark entrypoints point each child's `ROS_LOG_DIR` at its own output:
+`<run>/logs/ros/` for a standalone runner, `<sweep>/environment/logs/ros/` for a
+sweep's environment, and `<sweep>/<config>/logs/ros/` for each configuration.
+An explicit `ROS_LOG_DIR` always wins. `output_dir:=...`, or a sweep's
+`defaults.output_dir`, moves the run or sweep root.
+
 ## Representative images and video
 
 One shared representative event supplies every panel in a trial collage.
@@ -68,6 +103,26 @@ record as each run. Its resume signature includes the backend, the normalized
 backend settings, the native world, and the catalog bytes, so a sweep never
 resumes onto a different simulator or catalog. Do not replace process restarts with runtime
 estimator mutation: selected rows determine node existence.
+
+One timestamped sweep folder holds the manifest, the comparison report, and one
+ordinary run folder per configuration:
+
+```text
+artifacts/benchmarks/20260828_141530_baseline/
+  sweep.json
+  summary.md
+  pointcloud/
+    run.json  summary.md  pointcloud.csv  images/  video/run.mp4
+  mask_projective_ranging/
+    ...
+```
+
+The sweep `summary.md` has one row per `(config, estimator)`, sorted by mean
+absolute error. It also records each configuration's wall time and a real-time
+factor sampled just before that configuration started. RTF is diagnostic only,
+but it helps separate configuration effects from observation-coverage drift as a
+long-lived simulator slows down. The [sweep mechanism](sweeps.md) owns how the
+folder is produced and resumed.
 
 Each configuration records `output_valid`, `launch_returncode`, and `shutdown`.
 A valid `run.json` remains available after a process or shutdown failure, but
@@ -102,8 +157,9 @@ directory appears only after the entire job succeeded; an interrupted staging
 directory is never accepted as a result. It contains `results/` and `job.json`.
 `target_offline_replay_benchmark` writes its results at the output root instead.
 Both record `replay.json` with dataset and sweep hashes, evaluator Git
-provenance, worker count, and evaluation wall time, and a root `summary.md`
-comparing variants over the same frozen trials.
+provenance, worker count, and evaluation wall time, plus a root `summary.md` and
+`sweep.json` comparing variants over the same frozen trials. Each variant gets
+the normal CSV, `run.json` and `summary.md` set.
 
 ## Renaming a result
 

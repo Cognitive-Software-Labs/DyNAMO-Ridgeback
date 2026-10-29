@@ -51,20 +51,35 @@ produce a command at all, rather than emitting one that names nothing.
 The three offline profiles — legacy `measurement` replay, frozen `mask-output`
 comparison, and `mask-model` materialization — start, cancel, and tail their log
 from the page. They route through one command and import no ROS runtime, so they
-cannot orphan a simulator. Run records live under
-`artifacts/configurator/runs/<run_id>/`; runs outlive the GUI and the tab
-re-attaches from disk. Concurrent runs are refused server-side, because two
+cannot orphan a simulator. Run records, with each run's log and exit code, live
+under `artifacts/configurator/runs/<run_id>/`; runs outlive the GUI and the tab
+re-attaches from disk. *Save a copy* still downloads the job for archiving or
+hand-editing. Concurrent runs are refused server-side, because two
 replays contend for the worker counts the operator chose. Cancellation signals
 the process group and escalates SIGINT → SIGTERM → SIGKILL. It monitors the
 group, because the wrapper shell can exit before a child that ignores SIGINT.
 Reattachment instead verifies the recorded PID's command line: existence alone
 is insufficient because the kernel reuses PIDs after a GUI restart.
 
-`live-system` sweeps stay terminal-only: `target_benchmark_sweep` runs
-`run_preflight_cleanup`, whose catch-all would `kill -9` the page. The UI shows
-a disabled Start with that reason. See
-[troubleshooting](../troubleshooting.md). Remaining implementation is tracked
-in the [benchmarking backlog](BACKLOG.md#live-sweeps-from-the-configurator).
+`live-system` sweeps stay terminal-only: they need a GPU-backed X session, and
+the page cannot yet supervise a live run's conflicts, progress or cancellation.
+The UI shows a disabled Start with that reason and renders the command to copy.
+Preflight cleanup no longer kills the page or a replay it started
+([troubleshooting](../troubleshooting.md#what-cleanupsh-leaves-alone)).
+Remaining implementation is tracked in the
+[benchmarking backlog](BACKLOG.md#live-sweeps-from-the-configurator).
+
+## Detector settings
+
+The live-system form shows the detector settings once, above the config cards:
+the `owlv2` choice, checkpoint, labels, threshold, rate and diagnostics. They
+are sweep-wide `defaults`, because the detector belongs to the persistent
+environment. A referenced sweep owns these settings: the page shows its resolved
+values and rejects per-variant overrides. Saving the job and copying its command
+preserve the same settings. The form's `detector_fps` field starts at `5.0`,
+unlike the `10.0` launch default; [detection](../target_localization/detection.md#detector-cadence-defaults)
+owns both defaults. Offline profiles reuse frozen detections and cannot select
+a new detector.
 
 The Results panel lists typed artifacts and run outputs and can rename them;
 [outputs](outputs.md) owns the rename rules and their refusals.

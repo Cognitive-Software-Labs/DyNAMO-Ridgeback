@@ -18,7 +18,7 @@ camera pages, browser robot controls or webserver packages.
 |---|---|---|
 | Clearpath base and sensor services | Official Jazzy packages and captured robot declaration | Existing deployment observed; fresh host generation and commissioning still required |
 | Scan merger | Public Git pin, byte-matched deployed source, captured launch/config | Isolated Colcon build passed on this host; no recovered service was launched |
-| D455 native streams | Apt ROS driver and captured wrapper adapted to source Clearpath setup | Candidate preserves native stream flags; serial/alignment migration and runtime checks remain separate |
+| D455 camera service | Apt ROS driver; `camera.json` and the maintained camera-service renderer | Rendered unit and parameters only; install with the camera installer, then run the contract check |
 | Controller and power helpers | Curated local scripts/configs and packaged dependencies | Input integrity/syntax verified; controller re-pairing and commissioning still required |
 | Desktop | Maintained foreground/Mesa/private D-Bus renderer; packaged TigerVNC, websockify, noVNC | Prepared candidates only; fresh boot/browser qualification still required |
 | Vendor dashboard | Private vendor source and credential-bearing config | Optional; not reconstructed by this procedure |
@@ -107,7 +107,7 @@ The historical `/opt/mybotshop/scripts/joy_x_combiner.py` path is retained for
 compatibility; this is a standalone preserved script, not a vendor workspace.
 
 Four additional candidates implement the maintained
-[commissioning caps](driving_readiness.md#commissioning-caps): a pinned Python
+[commissioning caps](commissioning_guard.md#speed-modes): a pinned Python
 guard, a launch wrapper, its unit and a platform drop-in. Their source is
 `tools/hardware/install_commissioning_caps.py`, not the captured baseline.
 Install them before qualifying the recovered base. The wrapper includes the
@@ -116,15 +116,16 @@ generated Clearpath files. Keep the physical stop engaged until command routing
 and the guarded motion checks pass; these candidates do not certify recovery.
 The maintained candidate includes a reliable e-stop relay and a mux-only remap
 for the native firmware/mux QoS mismatch. The
-[stop-delivery reference](driving_readiness.md#e-stop-delivery-to-the-mux) owns
+[stop-delivery reference](estop_stop_semantics.md#e-stop-delivery-to-the-mux) owns
 deployment status and verification. Keep the original firmware stop topic
 for the guard and other consumers; do not apply a global e-stop-topic remap.
 
 The official Puma 2.9.4 package has a confirmed diagnostic fault-decoding
 defect. The [wheel-feedback reference](drive_feedback_diagnostics.md) owns its
-maintained source patch and verification. That patch is prepared, not included
-in the installed/candidate base package here; fresh-host qualification must
-check raw fault masks and must not trust the affected human-readable flags.
+maintained source patch and verification. The apt package and the candidates
+prepared here do not carry the patch; the robot's installed repair and
+field-age drivers do. Until those layers are rebuilt on a fresh host, check raw
+fault masks and do not trust the affected human-readable flags.
 
 ## Install selected host candidates on the replacement host
 
@@ -146,16 +147,21 @@ sudo install -D -o root -g root -m 0644 \
 No blanket restore or automatic service enablement is provided: the inspected
 baseline has known boot faults and differing motion/service boundaries. Retain
 sensor/desktop commissioning separately from base/controller commissioning.
-In particular, `controller-autoconnect` can restart platform services when a
-controller connects. Keep it stopped until deliberately checking that path.
+In particular, the captured `controller-autoconnect.sh` restarts platform
+services when a controller connects. The candidates'
+`controller-autoconnect.service.d/30-dynamo-no-platform-restart.conf` drop-in
+replaces that command with the maintained helper, which does not; install it
+with the unit, and keep the unit stopped until deliberately checking that path.
 `battery-guard` remains `ACTION=warn`; no shutdown action is added.
 
-The camera wrapper sources `/etc/clearpath/setup.bash` instead of the optional
-vendor overlay. It preserves the captured 640×480×30 native streams, infrared
-flags and point cloud. That is a reconstruction of the captured baseline, not
-approval of those flags for the planned camera migration. If the new camera
-owner has landed, refresh the recovery inputs first and install that owner;
-do not start both implementations.
+`camera.json` selects the D455 serial and profile. The preparer adds the
+description-only `camera_0` entry to `robot.yaml`, renders
+`dynamo-camera.service` and its parameters from the maintained camera-service
+source, and leaves out the vendor `realsense-camera` unit. Review those
+candidates, then install the camera on the replacement host with the maintained
+camera installer, which records fresh installation metadata
+([robot-local deployment](robot_local_deployment.md#reconstruction-and-verification)).
+Do not start the vendor camera unit and the camera service together.
 
 ## Independent desktop and fresh credentials
 
@@ -189,36 +195,30 @@ this procedure does not introduce a new access policy.
 After installation, reload systemd and commission the reviewed units with an
 operator. Check display 5901, proxy 9005 and remote-screen 9100 belong to their
 intended unit cgroups, reconnect through the browser, then qualify a cold boot.
-Do not infer reliability just because a candidate parses or a port listens.
-The existing VNC faults remain open until that test passes.
+Do not infer reliability just because a candidate parses or a port listens;
+the desktop is unqualified on the new host until that test passes.
 
 ## What was verified, and what remains
 
-On 2026-10-06 the source preparation and 27 offline tests passed, and the pinned
-public merger built successfully with ROS Jazzy in an isolated prefix. Installed
+On 2026-10-06 the source preparation and its offline tests passed, and the
+pinned public merger built with ROS Jazzy in an isolated prefix. Installed
 launch/config bytes matched the prepared copies; launch-description construction
 was inspected without executing nodes. No ROS subscribers, base commands,
 service restarts, desktop transitions or host-file installations were performed
 for this reconstruction check.
 
-The 2026-10-12 stationary audit rechecked the original captured-input manifest.
-The missing camera tools/templates were recovered from the installed camera's
-recorded Git revision and verified against installed state. The manifest now
-contains labelled camera and stationary-setup snapshots;
-`camera.json` selects serial/profile and the preparer regenerates the direct
-camera service instead of the vendor camera wrapper. Camera setup ownership and
-remaining application-topic reconciliation live in
-[robot-local deployment](robot_local_deployment.md).
-
-The preparer also uses the maintained stationary desktop/Bluetooth renderer.
-Its autoconnect helper no longer restarts platform services. The six-file
-desktop/Bluetooth repair was installed and independently verified stationary
-on 2026-10-12; all protected hardware process IDs were unchanged. Its exact
-receipt is under `artifacts/hardware/20261012-stationary-setup-install/`.
-The deployment manifest now includes 89 files with per-entry capture dates;
-maintained renderers remain authoritative. Cold boot and live reconnect
-qualification remain open. Public stage,
-apply and receipt-based rollback commands are in the root README.
+The deployment manifest also holds labelled camera and stationary-setup
+snapshots, each with its capture date; maintained renderers remain
+authoritative. `camera.json` selects serial and profile, and the preparer
+regenerates the direct camera service instead of the vendor camera wrapper.
+[Robot-local deployment](robot_local_deployment.md) owns camera setup and the
+remaining application-topic reconciliation. The preparer also uses the
+maintained stationary desktop/Bluetooth renderer, whose autoconnect helper
+does not restart platform services. The robot's installed desktop repair and
+its receipt are recorded in the
+[host recovery runbook](ridgeback_recovery.md#6-camera-and-desktop-service-ownership).
+Stage, apply and receipt-based rollback commands are in the
+[stationary repairs runbook](stationary_repairs_runbook.md#desktop-and-controller-setup-repair).
 
 A full recovery has not been demonstrated. On 2026-10-06 the user chose to
 preserve the instructions and commit the inputs without performing a spare-SSD
@@ -235,11 +235,12 @@ to use it. The [vendor source inventory](../../deployment/r100_0160/reconstructi
 records package identities, selected build-file hashes, handover artifact hashes
 and external inputs without copying full proprietary sources or credentials.
 The local bundle needs base commit
-`ffa4d2457057e0ca0cb44cc2ddb1271258b34879`; it is not self-contained. Current
-GitHub access returns 404, which does not distinguish missing repository from
-missing permissions. If the optional dashboard is rebuilt, add the preserved
-whitelist helper to `robot_webserver/launch/` and reconcile the captured installed
-webserver overrides into source before rebuilding and verifying its imports.
+`ffa4d2457057e0ca0cb44cc2ddb1271258b34879`; it is not self-contained. When
+inspected on 2026-10-06, GitHub access returned 404, which does not distinguish
+missing repository from missing permissions. If the optional dashboard is
+rebuilt, add the preserved whitelist helper to `robot_webserver/launch/` and
+reconcile the captured installed webserver overrides into source before
+rebuilding and verifying its imports.
 
 These repository changes still require normal review/commit/publication to
 survive loss of this checkout. The project remote is public: do not publish
@@ -249,22 +250,26 @@ The commissioning guard additionally has an optional temporary test lock,
 selected by the caps installer’s `--test-interlock`. Do not enable it for normal
 manual operation: it blocks all motion without a fresh bounded test permit.
 Its source, installation and exact receipt-based rollback are maintained in the
-[root operator workflow](../../README.md) and
-[test-lock contract](driving_readiness.md#temporary-commissioning-test-interlock).
-Recovery defaults to the normal capped guard. The temporary mode was installed
-and verified stationary on 2026-10-09; its receipt is under
-`artifacts/hardware/20261009-test-interlock-install/`. Recreate that temporary
-state explicitly with `--test-interlock` only when resuming commissioning tests.
+[driving operator runbook](driving_operator_runbook.md#guard-installation-and-rollback) and
+[test-lock contract](commissioning_guard.md#test-permit-interlock).
+Recovery installs the default commissioning caps, the fresh-SSD baseline. The
+robot's current guard mode and its receipts are listed in the
+[driving installed state](driving_readiness.md#installed-state). Recreate
+another mode explicitly with the installer only when it is needed, such as the
+temporary test lock with `--test-interlock` for commissioning tests.
 
 The optional pinned Puma repair is reconstructed by the maintained
 `tools/hardware/build_puma_repair.py` and `install_puma_repair.py`, using the
 official 2.9.4 source archive and tracked fault/cache patches. Follow the
-[root build/install/rollback workflow](../../README.md). The installer recreates
+[build/install/rollback workflow](puma_feedback_runbook.md#repair-driver). The installer recreates
 a root-controlled package prefix plus DDS interface-readiness and scoped platform
 overlay drop-ins, preserving the exact normal/test-interlocked capped guard.
-The corrected repair was installed and verified stationary on 2026-10-12; its
-receipt is under `artifacts/hardware/20261012-puma-repair-install/`. The older
-October 9 compiled candidate was unpatched and is withdrawn. Do not reuse artifacts as the recovery
-configuration authority: rebuild, verify actual applied patches and dependencies,
-and create a fresh deployment receipt. Cold boot and per-wheel freshness remain
-unqualified even after a successful stationary installation.
+On the robot the repair driver sits beneath the field-age driver as its
+rollback target; the
+[wheel-feedback installed state](drive_feedback_diagnostics.md#installed-state)
+lists every layer, its receipt and the removal order. Do not reuse artifacts as
+the recovery configuration authority: rebuild, verify actual applied patches and
+dependencies, and create a fresh deployment receipt. The repair driver alone
+does not bound per-wheel feedback age; the field-age driver does. Cold boot
+remains unqualified for every layer, even after a successful stationary
+installation.

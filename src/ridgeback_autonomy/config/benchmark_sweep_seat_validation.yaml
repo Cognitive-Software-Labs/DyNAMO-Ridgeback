@@ -9,8 +9,8 @@
 #   gpu-run ros2 run ridgeback_autonomy target_benchmark_sweep \
 #       <share>/config/benchmark_sweep_seat_validation.yaml
 #
-# `gpu-run` is a no-op on the physical seat. See
-# docs/plans/BENCHMARKING_environment_qualification.md for the decision rules.
+# `gpu-run` is a no-op on the physical seat. Its result and the qualified
+# conditions live in docs/target_distance_benchmarking/running_benchmarks.md.
 #
 # Two cells of the mask matrix, three process-level replicates each, rotated so
 # startup and thermal drift do not land on one cell. A -- box gate, stereoscopic

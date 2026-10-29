@@ -12,6 +12,18 @@ if [ -z "$CHANGED" ]; then
     exit 0
 fi
 
+# Documentation links, provenance and page shape (docs/project/documentation.md).
+if grep -qE '\.md$' <<<"$CHANGED"; then
+    if python3 -c 'import markdown_it' 2>/dev/null; then
+        python3 "$REPO_ROOT/tools/check_doc_links.py" --root "$REPO_ROOT" >&2 || {
+            echo "[docs hook] fix the documentation failures above before committing" >&2
+            exit 1
+        }
+    else
+        echo "[docs hook] python3-markdown-it missing; documentation checks skipped" >&2
+    fi
+fi
+
 CODE_EXTS="\.py$|\.ts$|\.js$|\.go$|\.rs$|\.java$|\.cpp$|\.c$|\.rb$|\.swift$|\.kt$|\.cs$|\.scala$|\.php$|\.cc$|\.cxx$|\.hpp$|\.h$|\.kts$"
 CODE_CHANGED=$(echo "$CHANGED" | grep -E "$CODE_EXTS" || true)
 

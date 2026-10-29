@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 370" role="img" aria-labelledby="title desc">
+  <title id="title">The two camera profiles are different crops of the D455 sensor</title>
+  <desc id="desc">The 1280 by 800 RGB sensor. The 1280x720 profile keeps the full width and trims top and bottom, giving 90 by 58.7 degrees. The 640x480 profile keeps the full height, trims the sides to 4:3 and scales by 0.6, giving 79.6 by 64 degrees.</desc>
+  <rect width="780" height="370" rx="16" fill="#101d30"/>
+  <g font-family="sans-serif" fill="#e9f1fb">
+    <text x="30" y="37" font-size="20" font-weight="bold">Profiles are crops, not rescaled copies</text>
+    <text x="30" y="64" font-size="14" fill="#aebed3">Nominal D455 RGB sensor, 90° horizontal · to scale · centred principal point</text>
+    <rect x="60" y="100" width="384" height="240" rx="3" fill="#1d3150" stroke="#9bacc4" stroke-width="1.5"/>
+    <rect x="60" y="112" width="384" height="216" rx="2" fill="none" stroke="#59d4c3" stroke-width="3" stroke-dasharray="10 5"/>
+    <rect x="92" y="100" width="320" height="240" rx="2" fill="none" stroke="#e3b769" stroke-width="3" stroke-dasharray="4 4"/>
+    <rect x="490" y="110" width="18" height="12" rx="2" fill="#1d3150" stroke="#9bacc4" stroke-width="1.5"/>
+    <text x="518" y="121" font-size="15">Sensor 1280 × 800</text>
+    <text x="518" y="142" font-size="13" fill="#aebed3">90° × 64° · fx 640</text>
+    <line x1="490" y1="186" x2="508" y2="186" stroke="#59d4c3" stroke-width="3" stroke-dasharray="10 5"/>
+    <text x="518" y="191" font-size="15" fill="#59d4c3">1280 × 720 (16:9)</text>
+    <text x="518" y="212" font-size="13" fill="#aebed3">full width, rows trimmed</text>
+    <text x="518" y="230" font-size="13" fill="#aebed3">90° × 58.7° · fx 640</text>
+    <line x1="490" y1="270" x2="508" y2="270" stroke="#e3b769" stroke-width="3" stroke-dasharray="4 4"/>
+    <text x="518" y="275" font-size="15" fill="#e3b769">640 × 480 (4:3)</text>
+    <text x="518" y="296" font-size="13" fill="#aebed3">full height, sides trimmed,</text>
+    <text x="518" y="314" font-size="13" fill="#aebed3">scaled 0.6 · 79.6° × 64° · fx 384</text>
+  </g>
+</svg>

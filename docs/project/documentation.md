@@ -3,11 +3,27 @@
 The documentation system has one rule: a durable fact has one canonical owner.
 Other pages summarize it only when useful and link back to that owner.
 
+## Writing checklist
+
+<!-- writing-checklist:start -->
+Before editing any Markdown page:
+
+1. Find the fact's owner in the canonical-owners table of `docs/project/documentation.md` and edit that page, not the one you happen to have open.
+2. Current pages state the current system. A run, trial or session narrative goes in a new dated archive record; the current page keeps only its result and links the record under `## Archived evidence`.
+3. When plan or backlog work completes, write its result into the owning reference in the same commit and remove it from the active list. A plan's status table may summarize, never hold the only copy.
+4. Documentation rides the code commit that changes the behavior it describes.
+5. No dates in the headings of current pages.
+6. Page near its budget: split out a self-contained section. Raise a `doc-budget` only for a page that cannot be split, with the reason.
+7. Before committing a removal or condensation, run `tools/check_removed_facts.py` and `python3 tools/check_doc_links.py`.
+<!-- writing-checklist:end -->
+
 ## Canonical owners
 
 | Information | Canonical home |
 |---|---|
-| Installation, public commands, launch arguments, operator workflow | root `README.md` |
+| Installation, public commands and example invocations, operator workflow | root `README.md` (a router; long procedures live in the pages it links) |
+| Launch-argument reference for a public launch | its area page, e.g. `docs/exploration/launch_arguments.md` |
+| Physical-host operator procedures (commands, preconditions, rollback) | runbooks under `docs/physical/`, e.g. `driving_operator_runbook.md`; Intel–Thor transport and latency setup commands stay with their references, `intel_thor_transport.md` and `intel_thor_sensor_latency.md` |
 | Physical host reconstruction after reinstall or SSD failure | `docs/physical/ridgeback_recovery.md`, with small deployment inputs under `deployment/<robot>/` |
 | Short repository orientation | `docs/project/PROJECT_CONTEXT.md` |
 | Documentation policy and precedence | this page |
@@ -20,6 +36,7 @@ Other pages summarize it only when useful and link back to that owner.
 | Robot, exploration, deployment and cross-cutting gaps | `docs/BACKLOG.md` |
 | Target-distance benchmarking and controlled estimator-evaluation gaps | `docs/target_distance_benchmarking/BACKLOG.md` |
 | Approved work not yet complete | `docs/plans/` |
+| Unabsorbed handoff snapshots between owners of a plan | `docs/plans/handoffs/` |
 | Rejected, deferred, or unselected approaches | `docs/do_not_try_again/` |
 | Dated experiments, migrations, and validation evidence | `archive/engineering/` |
 
@@ -41,8 +58,9 @@ rule it routes to — the graphify rules, in particular, are owned by
 
 ## Update rules
 
-- Update the root README when setup, public commands, launch arguments, or an
-  operator workflow changes.
+- Update the root README when setup, public commands or an operator workflow
+  changes, and the area's launch-argument page when a public launch argument
+  changes.
 - Update a technical reference when implemented behavior or an interface
   changes.
 - Add troubleshooting only when a reader can act on the symptom today. Move a
@@ -58,6 +76,9 @@ rule it routes to — the graphify rules, in particular, are owned by
   one- or two-sentence summary and link to the topic owner.
 - Prefer relative Markdown links within current documentation or within the
   archive. Historical implementation sources use immutable commit links.
+- A plan that tracks status across items links each completed item's result in
+  its reference. Retiring a plan, handoff or section first moves any fact found
+  only there; `tools/check_removed_facts.py` lists candidates.
 
 ## Host setup and reconstruction
 
@@ -100,7 +121,7 @@ through the normal review/publish workflow to survive loss of this checkout.
 
 Plan filenames start with an uppercase scope followed by a descriptive topic:
 `<SCOPE>_<topic>.md`. Titles and navigation labels use the same scope prefix,
-for example `BENCHMARKING — Execution-environment qualification`.
+for example `BENCHMARKING — Combined-model throughput`.
 
 Choose the scope by the work's primary owner:
 
@@ -184,6 +205,25 @@ to verify than prose alone.
   what to notice. Preserve the command, revision, or evidence path needed to
   regenerate them when that provenance matters.
 
+## Page size and splitting
+
+Current pages have line budgets: 600 for references, the README, backlogs and
+other current pages; 500 for plans; 60 for one backlog item. Archive records and
+handoffs have none, since evidence stays whole and handoffs are temporary.
+
+A page that needs more space is split, not stretched. Extract a section a reader
+can understand on its own into `docs/<same family>/<topic>.md` and leave a short
+summary and link where it was. A backlog item that outgrows 60 lines moves its
+procedure into a plan and links it.
+
+Only a page that cannot be split, such as one indivisible table or state
+machine, may raise its own budget with one HTML comment near its top:
+`<!-- doc-budget: 900 lines; reason: one indivisible launch-argument table -->`.
+The reason must say why splitting does not work; raising a budget shows in the
+diff and is reviewed like any other change. A page waiting for a scheduled split
+may carry its current size with the reason `split pending`, so it can shrink
+but not grow.
+
 Aggregate documents must remain compact routers rather than grow into permanent
 catch-alls. This applies especially to indexes, overview pages, archive indexes
 or changelog pages, backlogs, and long-lived plans.
@@ -229,5 +269,18 @@ not interpreted. Diagnostics identify the
 source block's first line and target; failures exit nonzero. The check needs
 neither network access nor simulator/build output. Raw HTML links are outside
 this Markdown-link gate; explicit HTML anchors in Markdown are recognized.
+The same run enforces page shape on current documentation: the
+[page budgets](#page-size-and-splitting) and `doc-budget` markers, no dated
+headings in current pages, no duplicated level-one or level-two headings, a
+`Status:` line in each plan and a link to it from `docs/index.md`, a
+`**Completion criteria.**` paragraph in each backlog item, and flowchart node
+IDs that are not reused for different nodes. Each failure message names the fix.
+
 The checker validates structure and declared provenance, not the truth of prose
 or the completeness of an experiment's preserved state. Those require review.
+`tools/check_removed_facts.py` supports that review: it lists distinctive names,
+quantities, dates, paths and hashes from deleted Markdown lines that no longer
+appear anywhere in the tree. The tracked pre-commit hook, installed by
+`tools/install_hooks`, runs the link and shape checker whenever Markdown is
+staged. The `doc-steward` Claude agent reviews a documentation diff against
+this page.

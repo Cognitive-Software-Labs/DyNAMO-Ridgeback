@@ -14,6 +14,8 @@ troubleshooting, planning, and historical documentation.
   tooling, dependencies, and entrypoint conventions
 - [External dependency management](project/dependencies.md) — import, patch,
   refresh, verification, live migration, and rollback procedure
+  - [Maintained dependency patches](project/dependency_patches.md) — defect,
+    change, build and loading proof, and rollback for each local patch
 - [Project engineering gaps](BACKLOG.md)
 - [Troubleshooting](troubleshooting.md)
 
@@ -24,8 +26,35 @@ troubleshooting, planning, and historical documentation.
 
 ## Physical deployment
 
-- [Driving readiness](physical/driving_readiness.md) — command ownership,
-  stop/stamp/speed semantics, stationary diagnostics and physical qualification
+- [Driving readiness](physical/driving_readiness.md) — router for the driving
+  stack: installed state and links to its mechanism pages
+  - [Driving command path](physical/driving_command_path.md) — topology, mux
+    priorities, stamps, frames and speed scales from Nav2 and teleop to the base
+  - [E-stop and stop semantics](physical/estop_stop_semantics.md) — QoS relay,
+    deadman release, source loss and disconnection
+  - [Commissioning guard](physical/commissioning_guard.md) — speed modes,
+    admission and watchdog, test-permit interlock, install and rollback
+  - [Controller input](physical/controller_input.md) — joystick chain, neutral
+    input, autoconnect helper and connected-but-no-input recovery
+  - [Driving check tools](physical/driving_check_tools.md) — what each stationary
+    check, observer and recorder measures
+  - [Driving qualification procedure](physical/driving_qualification_procedure.md)
+    — supervised procedure, verdicts and the stopping-distance method
+- [Wheel feedback and diagnostics](physical/drive_feedback_diagnostics.md) —
+  installed feedback stack, fault flags and the three-rate model
+  - [Per-wheel field age](physical/wheel_feedback_field_age.md) — field
+    eligibility, age and queue bounds, installation and acceptance
+  - [Feedback consumer](physical/wheel_feedback_consumer.md) — missing-feedback
+    policy, lifecycle and recovery
+  - [Motor-link fault injection](physical/motor_link_fault_injection.md) — D6
+    feedback and D7 command-link fault paths and verdicts
+- Operator runbooks (commands, preconditions, rollback):
+  - [Driving operator runbook](physical/driving_operator_runbook.md) — audits,
+    guard install and rollback, observer and pulse trials, controller checks
+  - [Puma feedback runbook](physical/puma_feedback_runbook.md) — repair driver,
+    feedback plugin and field-age driver install, rollback and checks
+  - [Stationary repairs runbook](physical/stationary_repairs_runbook.md) —
+    desktop and controller setup repair, auxiliary repairs, health batch, clock
 - [Ridgeback host setup and SSD recovery](physical/ridgeback_recovery.md) —
   reconstruction order, deployed scripts/configs, network and service ownership,
   credentials recreated locally, and unverified recovery steps
@@ -38,7 +67,11 @@ troubleshooting, planning, and historical documentation.
 ## Exploration
 
 - [Exploration architecture](exploration/architecture.md)
+  - [Exploration launch arguments](exploration/launch_arguments.md) — worlds and
+    every `ridgeback_exploration.launch.py` argument
 - [Exploration evaluation](exploration/evaluation.md)
+- [Simulation parking demonstration](exploration/parking_demo.md) — `start_parking_demo.sh`
+  modes, spawned G1 scene and startup gates
 - [Ground-truth maps](../src/ridgeback_autonomy/sim/ground_truth_maps/README.md)
 
 ## Isaac Sim
@@ -67,6 +100,10 @@ troubleshooting, planning, and historical documentation.
 - [Open benchmarking work](target_distance_benchmarking/BACKLOG.md) — validation gates, scenario recertification, and tooling gaps
 - [Target-distance benchmarking](target_distance_benchmarking/overview.md) — start here: what
   the benchmark is, the estimators and axes, and what it may not claim
+- [Benchmark launch arguments](target_distance_benchmarking/launch_arguments.md)
+  — launch layers, backends and every benchmark argument
+- [Benchmark sweeps](target_distance_benchmarking/sweeps.md) — sweep mechanism,
+  file format, resume and the shipped sweeps
 - [Running benchmarks](target_distance_benchmarking/running_benchmarks.md) — which question,
   which profile, which of the four ways to start it
 - [Benchmark semantics](target_distance_benchmarking/semantics.md) — scenarios, events,
@@ -81,21 +118,19 @@ troubleshooting, planning, and historical documentation.
 
 ## Active plans
 
-- [BENCHMARKING — Execution-environment qualification](plans/BENCHMARKING_environment_qualification.md) — prerequisite for tuning and benchmark claims
+- [BENCHMARKING — Geometry reruns](plans/BENCHMARKING_geometry_reruns.md) — baseline, concurrency and isolation sweeps on the current scene geometry; blocked on dependencies
 - [BENCHMARKING — Combined-model throughput](plans/BENCHMARKING_model_throughput.md) — run the existing sweep and determine whether concurrency is needed
+- [BENCHMARKING — Stationary hardware scene recording](plans/BENCHMARKING_hardware_recording.md) — raw sensor bags and measured G1 positions for later estimator comparison; recording not started
+- [BENCHMARKING — Shutdown lifecycle and crash qualification](plans/BENCHMARKING_shutdown_lifecycle.md) — remaining shutdown qualification and dependency investigations
 - [BENCHMARKING — Live configurator sweeps](plans/BENCHMARKING_live_configurator_sweeps.md) — blocked on live process ownership and cleanup; follows environment qualification
 - [Distributed localization contract](target_localization/distributed_deployment.md) — packages, host roles, health, and mission pause/resume
-- [PHYSICAL — Package split for distributed deployment](plans/PHYSICAL_package_split.md) — workstation code restructuring, simulator compatibility, and tested handoff
+- [EXPLORATION — Parking mission migration](plans/EXPLORATION_parking_mission_migration.md) — Ridgeback parking beside the G1 on the package-split architecture; driving execution not yet qualified
 - [PHYSICAL — Intel–Thor deployment and transport qualification](plans/PHYSICAL_intel_thor_deployment.md) — robot-side installation, GPU offload, Ethernet measurements, and failure handling
-  - Handoff: [Intel–Thor transport (agent 2)](plans/handoffs/PHYSICAL_intel_thor_transport_agent2.md) — CycloneDDS switch state, services-configuration flood behind the LiDAR lockouts, manual rollback, next steps
   - [Intel–Thor sensor latency tools](physical/intel_thor_sensor_latency.md) — report components, clock bounds and interleaved qualification
-  - [PHYSICAL — Thor perception environment and first live localization](plans/PHYSICAL_thor_perception_environment.md) — verified GPU inference environment on Thor, the localization build there, and one stationary live run
 - [PHYSICAL — Robot measurements and stationary sensor validation](plans/PHYSICAL_robot_measurements_and_validation.md) — quick mount readings/photos, D455 and LiDAR checks, stationary alignment, and G1/person tests
-  - [PHYSICAL — Camera and alignment robot session](plans/PHYSICAL_camera_alignment_session.md) — ordered blocks, commands and pre-declared limits for the alignment overlay, off-centre and HD person checks, and estimator modes
-  - Handoff: [D455 camera runs (agent 1)](plans/handoffs/PHYSICAL_d455_camera_runs_agent1.md) — P1/P2 results, CycloneDDS camera-transport and LiDAR-lockout findings, next steps
-- [PHYSICAL — Checks without movement or a controller](plans/PHYSICAL_stationary_checks.md) — evidence audit, passive commands, and separately controlled stationary disruptions
+  - [PHYSICAL — Camera and alignment robot session](plans/PHYSICAL_camera_alignment_session.md) — ordered blocks, commands and pre-declared limits for the alignment overlay, off-centre person checks, and estimator modes
 - [PHYSICAL — Real-hardware LiDAR validation](plans/PHYSICAL_lidar_validation.md) — front/rear range and coverage, merged geometry, loaded continuity, recovery and conditional motion tests
-- [PHYSICAL — Remaining qualification and time estimates](plans/PHYSICAL_remaining_qualification.md) — October 14 checkpoint, prerequisites, test durations and preparation allowances
+- [PHYSICAL — Remaining qualification and time estimates](plans/PHYSICAL_remaining_qualification.md) — canonical status of the S, P and D qualification items, remaining driving trials and estimates
 
 Dated handoff snapshots live in [plans/handoffs/](plans/handoffs/README.md).
 

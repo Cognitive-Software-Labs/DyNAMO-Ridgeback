@@ -14,6 +14,7 @@ from pathlib import Path
 
 import pytest
 
+from ridgeback_autonomy import robot_description
 from ridgeback_common.camera_profiles import (
     DEFAULT_CAMERA_PROFILE,
     resolve_camera_profile,
@@ -42,31 +43,17 @@ def _expand(
     is_sim: bool,
     profile_name: str = DEFAULT_CAMERA_PROFILE,
 ) -> ET.Element:
-    xacro = pytest.importorskip('xacro')
-    profile = resolve_camera_profile(profile_name)
-    document = xacro.process_file(
-        str(setup_path / 'robot.urdf.xacro'),
-        mappings={
-            'is_sim': 'true' if is_sim else 'false',
-            'namespace': 'r100_0001',
-            'gazebo_controllers': '/dev/null',
-            'sim_camera_width': str(profile.width),
-            'sim_camera_height': str(profile.height),
-            'sim_camera_horizontal_fov': str(profile.horizontal_fov_rad),
-        },
-    )
-    return ET.fromstring(document.toxml())
+    pytest.importorskip('xacro')
+    return robot_description.expand_description(
+        setup_path, is_sim=is_sim, profile_name=profile_name)
 
 
 @pytest.fixture(scope='module')
 def setup_path(tmp_path_factory) -> Path:
     """A generated setup directory of our own, never the user's."""
-    generator_module = pytest.importorskip('clearpath_generator_common.description.generator')
-
-    path = tmp_path_factory.mktemp('clearpath_setup')
-    shutil.copyfile(ROBOT_YAML, path / 'robot.yaml')
-    generator_module.DescriptionGenerator(str(path)).generate()
-    return path
+    pytest.importorskip('clearpath_generator_common.description.generator')
+    return robot_description.generate_setup(
+        ROBOT_YAML, tmp_path_factory.mktemp('clearpath_setup'))
 
 
 @pytest.fixture(scope='module')
@@ -86,20 +73,10 @@ def gazebo_sdf(setup_path: Path) -> ET.Element:
         pytest.skip('gz is required to convert the description to SDF')
 
     urdf_path = setup_path / 'robot_sim.urdf'
-    xacro_module = pytest.importorskip('xacro')
-    profile = resolve_camera_profile(DEFAULT_CAMERA_PROFILE)
+    pytest.importorskip('xacro')
     urdf_path.write_text(
-        xacro_module.process_file(
-            str(setup_path / 'robot.urdf.xacro'),
-            mappings={
-                'is_sim': 'true',
-                'namespace': 'r100_0001',
-                'gazebo_controllers': '/dev/null',
-                'sim_camera_width': str(profile.width),
-                'sim_camera_height': str(profile.height),
-                'sim_camera_horizontal_fov': str(profile.horizontal_fov_rad),
-            },
-        ).toxml(),
+        robot_description.expand_description_xml(
+            setup_path, is_sim=True, profile_name=DEFAULT_CAMERA_PROFILE),
         encoding='utf-8',
     )
     converted = subprocess.run(
@@ -116,38 +93,13 @@ def gazebo_sdf(setup_path: Path) -> ET.Element:
     )
 
 
-def _joint(urdf: ET.Element, name: str) -> ET.Element:
-    joints = [joint for joint in urdf.findall('joint') if joint.get('name') == name]
-    assert len(joints) == 1, f'expected exactly one joint named {name}, found {len(joints)}'
-    return joints[0]
-
-
-def _origin(joint: ET.Element) -> tuple[tuple[float, ...], tuple[float, ...]]:
-    origin = joint.find('origin')
-    xyz = tuple(float(value) for value in (origin.get('xyz') or '0 0 0').split())
-    rpy = tuple(float(value) for value in (origin.get('rpy') or '0 0 0').split())
-    return xyz, rpy
+_joint = robot_description.joint
+_origin = robot_description.origin
 
 
 def _translation_to(urdf: ET.Element, child: str) -> tuple[float, float, float]:
-    """Sum the chain up to ``child``. Every joint involved is fixed and unrotated
-    except the optical hop, so a plain sum is the whole transform."""
-    parents = {
-        joint.find('child').get('link'): joint
-        for joint in urdf.findall('joint')
-    }
-    total = [0.0, 0.0, 0.0]
-    link = child
-    while link in parents:
-        joint = parents[link]
-        xyz, rpy = _origin(joint)
-        assert all(abs(angle) < TOLERANCE for angle in rpy), (
-            f'joint {joint.get("name")} rotates; the plain sum below is invalid'
-        )
-        total = [component + offset for component, offset in zip(total, xyz)]
-        link = joint.find('parent').get('link')
-    assert link == 'base_link', f'chain ended at {link}, not base_link'
-    return tuple(total)
+    """Position of ``child`` in ``base_link``, every joint's rotation composed."""
+    return robot_description.translation_to(urdf, child)
 
 
 def test_simulation_expansion_supplies_the_models_nominal_camera_frames(

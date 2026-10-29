@@ -1,15 +1,11 @@
 # PHYSICAL — Intel–Thor deployment and transport qualification
 
-Status: **network inventory and service switch reported; live camera transport
-blocked by subscriber-associated failures; distributed acceptance pending.**
-Owner: people and agents working at the robot. The
-[project backlog](../BACKLOG.md#physical-stationary-integration) owns the
-stationary milestone. The [package split](PHYSICAL_package_split.md) supplies
-shared code and interfaces; the
-[measurement plan](PHYSICAL_robot_measurements_and_validation.md) supplies
-sensor-mount checks and stationary alignment evidence. The tested workstation
-handoff is available; deployment acceptance requires its matching installation
-on both hosts.
+Status: **matching revisions installed and the local camera-reader screens
+passed (P1, S1, S4 in the [qualification plan](PHYSICAL_remaining_qualification.md));
+full host inventory, live model-mode timing, the cross-host failure matrix and
+joint G1/person acceptance remain.** Owner: people and agents working at the
+robot. The [measurement plan](PHYSICAL_robot_measurements_and_validation.md)
+supplies sensor-mount checks and stationary alignment evidence.
 
 ## Progress and next evidence
 
@@ -22,7 +18,7 @@ topology, selected configuration, known limits, and dated evidence links.
 |---|---|---|
 | Host and network inventory | Intel/Thor identities, Ethernet interfaces and 1 Gb/s link, ROS Jazzy middleware versions, and existing service ownership are partly recorded. | Complete OS, USB, GPU software, model and installed-package inventory on both hosts. |
 | DDS transport | Intel switched to CycloneDDS and both hosts' receive limits were reported persisted. Synthetic link checks passed, but local camera subscribers exposed the services-configuration blocker. | Resolve and validate that blocker, extend the check to cover it, then qualify live sensor/TF delivery. |
-| Shared application deployment | Workstation handoff is ready. At the September 18 transport handoff, Thor was still at `950aacb` with no perception environment. | Confirm fresh installed revisions on both hosts and demonstrate stationary startup/shutdown. Thor's GPU environment is installed and verified, and a first live localization run passed on 2026-10-12 with listed gaps; see [Thor perception environment](PHYSICAL_thor_perception_environment.md). |
+| Shared application deployment | Workstation handoff is ready. At the September 18 transport handoff, Thor was still at `950aacb` with no perception environment. | Confirm fresh installed revisions on both hosts and demonstrate stationary startup/shutdown. Thor's GPU environment is installed and verified, and a first live localization run passed on 2026-10-12 with listed gaps; see [Archived evidence](#archived-evidence). |
 | Timing and performance | PTP holds the clocks within tens of microseconds, and the real camera and LiDAR streams to Thor meet the working targets with raw VGA at 30 Hz and both hosts in performance mode (2026-10-09; see the [transport reference](../physical/intel_thor_transport.md#sensor-timing-and-time-synchronization)). | All four live model-mode measurements, including resource/thermal behavior and matched replay. Colour before aligned depth in the driver would let the detector start about 4.6 ms sooner, but on 2026-10-12 a result took about 365 ms from the source stamp, mostly detector inference, so the patch is not worth its maintenance unless inference becomes much faster. |
 | Failure and joint acceptance | Supervision is tested locally with a fake navigation server. | Cross-host interruption/stall/recovery evidence and shared G1/person runs with the measurement team. |
 
@@ -32,7 +28,7 @@ files, with partial provenance. They do not establish acceptance of the newer
 package-split handoff. Do not carry their performance numbers forward as a
 measurement of the deployed localization pipeline.
 
-The later [transport handoff](handoffs/PHYSICAL_intel_thor_transport_agent2.md)
+The later transport handoff (under [Archived evidence](#archived-evidence))
 records robot state at 18:46 UTC on September 18, not current live state.
 Read the maintained [blocker and recovery procedure](../physical/intel_thor_transport.md#camera-subscriber-blocker)
 before starting camera consumers. A passing synthetic check cannot clear it.
@@ -226,3 +222,8 @@ startup/shutdown and log collection from Intel, then persistent boot services
 with ordering, restart policy, and reboot tests. Neither stage blocks this
 stationary milestone. Intel perception fallback, physical driving, braking,
 dynamic calibration, and autonomous missions are separate work.
+
+## Archived evidence
+
+- [Intel–Thor transport handoff, 2026-09-18](../../archive/engineering/2026-09-18-intel-thor-transport-handoff.md)
+- [r100_0160 first Thor localization smoke](../../archive/engineering/2026-10-12-r100-0160-thor-localization-smoke.md)

@@ -7,10 +7,10 @@ claim. Start at [running benchmarks](running_benchmarks.md) to pick a profile;
 ## Legacy measurement replay
 
 The legacy measurement profile is the measurement-accuracy path for box-gated stereoscopic
-`projective_ranging` parameter sweeps. The live runner counts an exact number
-of raw detector batches per trial, then performs a bounded exact-stamp drain.
-It stores raw depth ROIs and camera context, including invalid values and
-explicit missing matches; it never stores isolated foreground pixels or final
+`projective_ranging` parameter sweeps: use it when only that recipe or its
+numeric parameters change. The live runner captures a [quota](#capture-quota)
+of raw detector batches per trial. It stores raw depth ROIs and camera context,
+including invalid values and explicit missing matches; it never stores isolated foreground pixels or final
 measurements.
 
 The offline executor loads one trial per worker task and applies every variant
@@ -28,10 +28,54 @@ manifest reports zero skipped trials. A bounded drain may legitimately retain
 `NO_DEPTH_FRAME` evidence, but an infrastructure failure that skips the trial
 marks the complete capture `incomplete`.
 
-The root README owns the capture and replay commands. Replay is
-not authoritative for detector behavior, ROS delivery, timing, throughput, or
-final integration. Batch counts and worker scaling require evidence for the
-actual workload; a result on one host is not a universal throughput guarantee.
+Replay is not authoritative for detector behavior, ROS delivery, timing,
+throughput, models, or final integration; those questions need live runs, and
+the offline loader refuses an `incomplete` dataset rather than compare a
+reduced scenario set. Batch counts and worker scaling
+require evidence for the actual workload; a result on one host is not a
+universal throughput guarantee.
+
+### Capture quota
+
+Replay capture counts raw detector batches rather than elapsed seconds:
+`capture_batches` per trial, default five, with empty batches counted. Once
+the quota arrives, the runner drains only until every selected stamp has
+matching depth, camera context and a live measurement, or `capture_drain_sec`
+expires. Missing matches remain explicit replay evidence. Five batches is the
+validated legacy default for the scenario and detector cadence it was measured
+on, not a universal sensor statistic.
+[Launch arguments](launch_arguments.md#replay-capture) lists the capture
+settings.
+
+### Legacy smoke workflow
+
+One live run freezes the dataset; the offline command then evaluates every
+configuration of the projective sweep over those same inputs. The dataset
+directory and the offline output directory must both be new. This five-scene
+example is a smoke workflow at the default five batches:
+
+```bash
+SCENARIO="$(ros2 pkg prefix ridgeback_autonomy)/share/ridgeback_autonomy/config/benchmark_scenarios_examples.yaml"
+SWEEP="$(ros2 pkg prefix ridgeback_autonomy)/share/ridgeback_autonomy/config/benchmark_sweep_projective_parameters.yaml"
+DATASET="$PWD/artifacts/benchmarks/replay_projective_smoke_dataset"
+LIVE_OUTPUT="$PWD/artifacts/benchmarks/replay_projective_smoke_live"
+OFFLINE_OUTPUT="$PWD/artifacts/benchmarks/replay_projective_smoke_offline"
+
+ros2 launch ridgeback_autonomy target_distance_benchmark.launch.py \
+  scenario:="$SCENARIO" repeats:=1 estimators:=projective_ranging \
+  mask_gate:=box depth_source:=stereoscopic record_video:=false gz_gui:=false \
+  output_dir:="$LIVE_OUTPUT" run_dir_name:=matching_live \
+  replay_dataset_dir:="$DATASET" \
+  capture_drain_sec:=2.0 capture_timeout_sec:=30.0 \
+  shutdown_on_complete:=true
+
+ros2 run ridgeback_autonomy target_offline_replay_benchmark \
+  "$DATASET" "$SWEEP" --output-dir "$OFFLINE_OUTPUT" --workers 4
+```
+
+Choose `--workers` for the machine rather than every logical CPU: past the
+host's knee, more workers add overhead without reducing wall time. The
+[outputs](outputs.md#sweep-outputs) page owns the offline root's layout.
 
 ## Layered replay profiles
 
@@ -91,7 +135,9 @@ explicit producer miss and differs from a valid empty `MaskRegion`. Regions
 retain origin, full-grid size, `rect|tight` precision, shape, and bit-packed
 boolean pixels. Tight regions use their actual nonzero extent, which may extend
 outside the padded prompt box. Changing any producer parameter or provenance
-creates a separately identified immutable cache.
+creates a separately identified immutable cache: a different checkpoint,
+revision, prompt padding, IoU floor, device or dtype, dependency version, or
+code provenance yields a different producer signature and artifact identity.
 
 `target_replay_materialize_masks` loads one model once and streams all parent
 trials through it; the box producer needs no model. A canonical `mask-model` job
@@ -134,8 +180,87 @@ Offline reports carry the profile boundary. `measurement` and `mask-output`
 cannot support model/runtime claims. `mask-model` may retain isolated producer
 duration as diagnostics, but only `live-system` can establish ROS delivery,
 end-to-end latency, throughput, GPU contention, simulator real-time factor, or
-integration behavior. Remaining live-parity, real-model, storage and scaling
-gates are owned by the [benchmarking backlog](BACKLOG.md#layered-replay-validation).
+integration behavior. Each offline report states its profile, supported
+claims, artifact hashes, cache lineage, worker count and limitations. Remaining
+live-parity, real-model, storage and scaling gates are owned by the
+[benchmarking backlog](BACKLOG.md#layered-replay-validation).
+
+### Layered workflow
+
+Print the four profiles and their legal axes, without importing ROS or a model:
+
+```bash
+ros2 run ridgeback_autonomy target_replay_describe --json
+```
+
+Capture one full sensor parent with the live benchmark launch. The capture
+follows the same [quota](#capture-quota) as the legacy format:
+
+```bash
+SCENARIO="$(ros2 pkg prefix ridgeback_autonomy)/share/ridgeback_autonomy/config/benchmark_scenarios_examples.yaml"
+SENSOR="$PWD/artifacts/benchmarks/sensor_capture"
+LIVE_OUTPUT="$PWD/artifacts/benchmarks/sensor_capture_live"
+
+ros2 launch ridgeback_autonomy target_distance_benchmark.launch.py \
+  scenario:="$SCENARIO" repeats:=1 estimators:=projective_ranging \
+  mask_gate:=box depth_source:=stereoscopic record_video:=false gz_gui:=false \
+  output_dir:="$LIVE_OUTPUT" run_dir_name:=sensor_capture_live \
+  sensor_capture_dir:="$SENSOR" capture_batches:=5 \
+  capture_drain_sec:=2.0 capture_timeout_sec:=30.0 \
+  shutdown_on_complete:=true
+```
+
+Derive immutable mask caches from it independently:
+
+```bash
+ros2 run ridgeback_autonomy target_replay_materialize_masks \
+  "$SENSOR" --producer box \
+  --output-dir "$PWD/artifacts/benchmarks/masks_box"
+
+ros2 run ridgeback_autonomy target_replay_materialize_masks \
+  "$SENSOR" --producer slimsam \
+  --model Zigeng/SlimSAM-uniform-50 \
+  --output-dir "$PWD/artifacts/benchmarks/masks_slimsam"
+```
+
+`target_replay_benchmark` runs one canonical job YAML or JSON. `mask-output`
+requires the sensor parent plus one or more caches; `mask-model` requires the
+sensor parent plus `materializations`, and creates its caches once before
+running every measurement variant:
+
+```yaml
+job_version: 1
+question: compare-mask-outputs
+profile: mask-output
+inputs:
+  sensor_capture: ./artifacts/benchmarks/sensor_capture
+  mask_caches:
+    - ./artifacts/benchmarks/masks_box
+    - ./artifacts/benchmarks/masks_slimsam
+sweep:
+  sweep:
+    name: paired_mask_measurements
+    description: Compare two measurement bands over every frozen mask cache.
+  configs:
+    - name: baseline
+      estimators: projective_ranging,euclidean_reconstruction
+      isolation_2d_band_m: 0.35
+    - name: wider_2d_band
+      estimators: projective_ranging,euclidean_reconstruction
+      isolation_2d_band_m: 0.50
+resources:
+  measurement_workers: 4
+comparison_baseline: masks_box:baseline
+output_dir: ./artifacts/benchmarks/paired_masks
+```
+
+```bash
+ros2 run ridgeback_autonomy target_replay_benchmark replay-job.yaml
+```
+
+Relative job paths resolve against the job file's own directory
+([conventions](../project/conventions.md#generated-state)). Outputs appear only
+after the whole job succeeds ([outputs](outputs.md#sweep-outputs)).
 
 ## Archived evidence
 
