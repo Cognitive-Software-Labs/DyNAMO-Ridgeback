@@ -119,10 +119,10 @@ copy of `benchmarking/configurator.py`.
 
 The failure is confusing rather than loud, because the two halves disagree: the
 running executable is the stale copy, while everything it imports is live. A
-configurator started this way served a current capability contract and current
-artifact summaries from the symlinked modules, but ran request handlers from
-whenever the package was last built — so a validation rule added that morning
-silently did not fire, with no error anywhere.
+configurator started this way serves a current capability contract and current
+artifact summaries from the symlinked modules, but runs request handlers from
+the last build, so a validation rule added to `configurator.py` since then
+silently does not fire, with no error anywhere.
 
 ```bash
 # The tell: the executable's mtime is older than the module it was copied from.
@@ -296,10 +296,9 @@ replies to that address over Thor's own Wi-Fi, and the lab access point does
 not deliver traffic between its clients (Thor and Intel cannot ping each other
 over Wi-Fi). Intel never sees Thor's readers or acknowledgements, so it never
 sends stored samples; data it streams continuously still arrives over the
-cable. Reproduced on 2026-10-12: a once-published transient-local message from
-the services profile never reached Thor in domain 0, and arrived within 3 s
-with Wi-Fi removed from the publisher's profile, with the Ethernet-only
-profile, or with the route below.
+cable. Removing Wi-Fi from the publisher's profile, using the Ethernet-only
+profile, or adding the route below each restores delivery; the reproduction is
+under [Archived evidence](#archived-evidence).
 
 **Fix.** On Thor, `sudo tools/intel_thor/thor_lan_route apply` routes
 192.168.123.14 over the robot Ethernet, persistently; `check_link` fails
@@ -316,18 +315,17 @@ the detector) appear on Intel while others never do.
 
 **Cause.** DDS discovery announcements are multicast. With no IGMP querier on
 the robot Ethernet, IGMP snooping stops forwarding the restarted processes'
-multicast to Intel until the membership entry ages out. Measured on
-2026-10-13: Intel heard Thor's own announcements stop within seconds of a
-restart and resume 313–381 s later, and delivery resumed at the same moment.
-Firewalls, ports and socket buffers were ruled out. Unicast DDS peers did not
-help Intel's already-running consumers.
+multicast to Intel until the membership entry ages out; delivery resumes when
+Thor's announcements reach Intel again. Firewalls, ports and socket buffers
+were ruled out, and unicast DDS peers do not help Intel's already-running
+consumers. The measurement is under [Archived evidence](#archived-evidence).
 
 **Fix.** Make `br0` the querier. Live:
 `echo 1 | sudo tee /sys/class/net/br0/bridge/multicast_querier`. Persistently,
 install `src/ridgeback_autonomy_hardware/config/intel_thor/90-dynamo-multicast-querier.conf`
 as `/etc/systemd/network/10-netplan-br0.netdev.d/90-dynamo-multicast-querier.conf`.
-With it on, a restarted Thor's results reached Intel in 0.2 s.
-`tools/intel_thor/check_link` checks both.
+With the querier on, a restarted Thor's results reach Intel without the
+minutes-long wait. `tools/intel_thor/check_link` checks both.
 
 ## Camera frame gaps while RViz runs on Intel
 
@@ -336,15 +334,14 @@ With it on, a restarted Thor's results reached Intel in 0.2 s.
 on Intel's VNC desktop, and passes with RViz closed.
 
 **Cause.** The VNC display has no GPU, so RViz renders in software. At 30 fps
-Mesa's renderer took a full core in per-frame bursts across every core. On
-2026-10-13 that gave 567 and 467 ms depth gaps and 98.6 % pairing. With RViz
-closed: 133 ms and 99.45 %.
+Mesa's renderer takes a full core in per-frame bursts spread across every
+core.
 
 **Fix.** `backend:=hardware` already applies it: a 10 fps hardware layout,
-`nice -n 19` on the last two cores, and `LP_NUM_THREADS=2`. On 2026-10-14 that
-measured a 100 ms maximum depth gap and 99.26 % pairing with RViz open, with
-RViz at ~25 % of one core. If the check still fails, close RViz on Intel and
-view it from another computer.
+`nice -n 19` on the last two cores (`rviz_layouts.hardware_rviz_process`), and
+`LP_NUM_THREADS=2`. With these settings the guard check passed with RViz open;
+the before-and-after runs are under [Archived evidence](#archived-evidence). If
+the check still fails, close RViz on Intel and view it from another computer.
 
 ## CLI probes show no data although consumers are healthy
 
@@ -375,10 +372,10 @@ after the TCP connect, and a reset session can kill it with SIGPIPE. A Hokuyo
 UST serves one client at a time, so the stock driver never recovers on its own.
 `r100_0160` runs the patched driver from `/home/robot/ros_overlays/urg_node_fix`
 (`patches/urg_node_reconnect_recovery.patch`): after a reset session each
-LiDAR's driver reconnects by itself in about 2.25 s (rear 2026-10-13, front
-2026-10-14). If this symptom returns, first check that `robot.yaml` still lists
-the overlay and that `pgrep -af urg_node_driver` shows its path; a reinstall or
-Clearpath regeneration that drops the overlay brings the lockout back. The
+LiDAR's driver reconnects by itself in about 2.25 s. If this symptom returns,
+first check that `robot.yaml` still lists the overlay and that
+`pgrep -af urg_node_driver` shows its path; a reinstall or Clearpath
+regeneration that drops the overlay brings the lockout back. The
 pre-overlay configuration is kept as `/etc/clearpath/robot.yaml.bak-urg-node-fix`
 for rollback. Repeated local-camera-subscriber-associated failures
 and Ethernet traffic spikes are recorded in the
@@ -391,9 +388,12 @@ and the incident timeline is in the archived evidence below.
 **Recovery.** Stop the offending test subscribers and record the time and active
 configuration before restarting `clearpath-sensors`. This restarts only sensor
 drivers and clears the reconnect lockout; it does not fix the initiating fault.
-Resolve and validate the transport configuration before routine camera tests
-resume. The reported rear-offset service restart later restored scans, but no
-camera-load retest is recorded. Do not treat restored idle scans as acceptance.
+Before camera tests resume, confirm that the transport is still the qualified
+configuration, for example with `tools/intel_thor/check_link --camera-reader`
+on Intel with the robot stationary; restored idle scans alone are not
+acceptance. The installed configuration has passed local camera-reader screens
+and a 30-minute two-reader-pair soak without LiDAR errors, but no loaded multi-hour
+soak has run.
 
 `tools/hardware/observe_lidar_interruption.py` reproduces the reset-session
 check read-only, with an operator running one `ss -K`. A candidate
@@ -410,32 +410,22 @@ Offline tests do not prove interrupted-TCP recovery on the physical LiDAR.
 
 ## Remote desktop startup and proxy ownership
 
+Each desktop listener has its own unit: VNC on 5901, its browser proxy on 9005
+and the remote-screen proxy on 9100. The
+[host recovery runbook](physical/ridgeback_recovery.md#6-camera-and-desktop-service-ownership)
+owns the installed design.
+
 For repeated disconnects during an otherwise running session, inspect
 `/var/log/unattended-upgrades/unattended-upgrades.log`, its `-dpkg.log`, and the
 desktop/platform journals before attributing the problem to VNC graphics or DDS.
-On 2026-10-14 unattended package updates ran from about 09:25 to 09:32 UTC.
-The installer logged repeated service-restart passes; the system journal
-recorded requested stops/restarts of VNC, proxies, networking and robot
-services. The boot ID remained unchanged, while VNC was replaced repeatedly,
-most recently at 09:31:34. Updates completed at 09:32:31; a subsequent passive
-health batch passed all 22 checks. This explains that incident's lost desktop
-sessions; it does not qualify future update-time continuity. `NRestarts=0`
-alone is insufficient: explicitly requested service restarts reset lifecycle
-state and need not appear as automatic failure retries.
-
-Evidence is under `artifacts/hardware/20261014-desktop-disconnect-diagnosis/`
-and `stationary-batch-20261014T093333Z-18bc1d/`. No maintenance-policy change or
-reboot was performed during diagnosis. The update installed a newer kernel and
-left a reboot-required marker; the running robot had not rebooted into it.
-Do not test motion during package installation or its service-restart phase.
-
-The independent VNC service protects the desktop from vendor webserver reloads,
-but its October 6 cold boot showed 37 restarts. Logs included an Xtigervnc
-segmentation fault in NVIDIA EGL/GLX and repeated already-running-display errors.
-The independent port-9005 proxy failed its VNC dependency and remained inactive;
-the vendor webserver subsequently started the listener itself. A browser
-connection through that listener can therefore close on a webserver reload,
-even while the desktop remains in the independent VNC control group.
+If `needrestart` restarts services automatically (check
+`/etc/needrestart/conf.d/`), an unattended upgrade restarts VNC, the proxies,
+networking and robot services repeatedly without a reboot: the boot ID stays
+the same while VNC is replaced. `NRestarts=0` alone is insufficient: explicitly
+requested service restarts reset lifecycle state and need not appear as
+automatic failure retries. A kernel update also leaves
+`/var/run/reboot-required`. Do not test motion during package installation or
+its service-restart phase.
 
 Check ownership without restarting the desktop:
 
@@ -448,23 +438,20 @@ journalctl -b -u ridgeback-vnc.service -u ridgeback-vnc-websockify.service
 
 For each listener PID, read `/proc/PID/cgroup`: port 5901 should belong to
 `ridgeback-vnc.service`, and port 9005 to `ridgeback-vnc-websockify.service`.
-An active VNC unit alone does not establish proxy independence. Use an independent
-SSH session to investigate startup; restarting VNC closes the desktop. Preserve
-the journal before recovery. The graphics initialization failure, competing
-display ownership and proxy recovery need separate boot verification; they
-are not evidence that the retained DDS configuration failed.
+An active VNC unit alone does not establish proxy independence. If the vendor
+webserver owns 9005, a browser connection through it closes on a webserver
+reload even while the desktop stays up; this happened before the current
+repair, when the independent proxy failed its VNC dependency. Use an
+independent SSH session to investigate startup; restarting VNC closes the
+desktop. Preserve the journal before recovery. A VNC graphics-initialization
+failure or a competing display owner is a desktop fault, not evidence that the
+retained DDS configuration failed.
 
-The six-file stationary setup repair was installed and independently verified
-on 2026-10-12. Its remote-screen drop-in bypasses the old launcher and runs
-only the port-9100 proxy. Foreground VNC supervision and independent proxy units
-replace the failed dependency arrangement. Mesa selection applies to the
-virtual X server; applications retain their own GPU selection. The desktop uses
-the real user runtime and an isolated session bus.
-
-Listener ownership across repeated boots and automatic backend/proxy process
-recovery passed on 2026-10-16 (see the [recovery reference](physical/ridgeback_recovery.md)).
-Network loss, display corruption, browser-side session persistence and
-vendor-reload continuity remain [deferred](BACKLOG.md#deferred-hardware-gates). Use the
+Listener ownership across repeated boots and automatic recovery of each desktop
+unit's main process have passed. Network loss, display corruption, browser-side
+session persistence and vendor-reload continuity remain
+[deferred](BACKLOG.md#deferred-hardware-gates). The boot faults, update restarts
+and recovery check are under [Archived evidence](#archived-evidence). Use the
 [stationary repair workflow](physical/stationary_repairs_runbook.md#desktop-and-controller-setup-repair)
 for exact receipt-based rollback; restarting it closes remote access temporarily.
 The legacy combined vendor-camera repair is not the current installation path.
@@ -517,6 +504,14 @@ the upstream dependency pins and patches are one compatibility unit.
 
 ## Archived evidence
 
-- [operational incidents](../archive/engineering/operational_incidents.md)
-- [operational incidents](../archive/engineering/operational_incidents.md#slam-tf-lag--2026-09-10)
-- [operational incidents](../archive/engineering/operational_incidents.md#hokuyo-reconnect-lockout--2026-09-18)
+- [Operational incident history](../archive/engineering/operational_incidents.md):
+  camera software-rendering collapse, long Gazebo GUI sweep failure and other
+  early simulator incidents
+- [SLAM TF lag](../archive/engineering/operational_incidents.md#slam-tf-lag--2026-09-10)
+- [Hokuyo reconnect lockout](../archive/engineering/operational_incidents.md#hokuyo-reconnect-lockout--2026-09-18)
+  and its [urg_node socket-leak mechanism and patched-driver interruption](../archive/engineering/2026-10-13-urg-node-reconnect-leak.md)
+  and the [front LiDAR session reset (S3)](../archive/engineering/2026-10-14-r100-0160-front-lidar-session-reset.md)
+- [Thor missing transient-local data over Wi-Fi](../archive/engineering/2026-10-12-r100-0160-thor-localization-smoke.md)
+- [Restarted Thor processes hidden by IGMP snooping](../archive/engineering/2026-10-13-r100-0160-igmp-querier-discovery-stall.md)
+- [RViz on Intel and camera frame gaps](../archive/engineering/2026-10-13-r100-0160-intel-rviz-observer.md)
+- [Remote desktop boot faults, update restarts and recovery check](../archive/engineering/2026-10-06-r100-0160-remote-desktop-boot-and-recovery.md)

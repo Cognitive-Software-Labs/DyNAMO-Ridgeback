@@ -256,20 +256,21 @@ also `Conflicts=` with `realsense-camera`. Do not re-enable them while the
 service is installed. `tools/intel_thor/camera_service status` reports drift,
 and `rollback` restores the vendor state it snapshotted. After a
 reconstruction, re-apply the DDS services configuration first and the camera
-service second. `docs/physical/robot_local_deployment.md` (added with the camera
-service) owns its files, re-apply order and the contract diagnostics should
-target. The deployment manifest includes labelled camera snapshots, and `camera.json`
+service second. [Robot-local deployment](robot_local_deployment.md) owns its
+files, re-apply order and the contract diagnostics should target. The
+deployment manifest includes labelled camera snapshots, and `camera.json`
 regenerates the `camera_0` declaration, unit and parameters. Apply the camera
 installer on a replacement host to create fresh actual installation metadata.
 
-`run_local_dds_test.py` still requires the old vendor units and topics: adapt it
-to the contract above before using it. Its `d455_serial()` reads the USB
-descriptor serial, which would not select the camera in its aligned stage. The
-combined hardware repair runner is staged for the vendor stack and must not be
-run while the camera service is installed.
+`tools/intel_thor/run_local_dds_test.py` drives only the retired vendor camera
+unit and refuses to start while `dynamo-camera.service` owns the camera, except
+with `--recover` for old runs. Use `tools/camera_contract_check` reader runs
+instead. The combined hardware repair runner is staged for the vendor stack and
+must not be run while the camera service is installed.
 
 The current desktop repair was installed and independently verified stationary
-on 2026-10-12. `ridgeback-vnc.service` exclusively owns display :1/5901;
+on 2026-10-12; its receipt is `artifacts/hardware/20261012-stationary-setup-install/`
+on the robot host. `ridgeback-vnc.service` exclusively owns display :1/5901;
 `ridgeback-vnc-websockify.service` owns 9005; the remote-screen override owns
 9100 and runs only a proxy. Foreground VNC supervision, Mesa selection for the
 virtual X server, a valid user runtime and a private session bus replace the
@@ -282,33 +283,27 @@ then recreate credentials locally with `vncpasswd` as `robot`. Stage,
 installation and receipt-based rollback commands are in the
 [stationary repairs runbook](stationary_repairs_runbook.md#desktop-and-controller-setup-repair).
 See [desktop troubleshooting](../troubleshooting.md#remote-desktop-startup-and-proxy-ownership)
-for listener/cgroup inspection. A read-only inspection of the 2026-10-13 boot (08:50:45 UTC) found all three
-desktop services active with zero reported restarts, correct listener cgroups
-and all six repaired files matching maintained sources. The selected boot
-journals show no repeated VNC/guard startup failure. The guard DDS readiness
-helper completed and the platform started without reported restarts. This is
-one observed boot; power-cycle conditions and operator browser continuity were
-not recorded at that checkpoint. Tailscale remains the network transport.
+for listener/cgroup inspection. Tailscale remains the network transport.
 
-On 2026-10-16 a detached recovery check deliberately killed the main process
-of each desktop unit in turn. `ridgeback-vnc.service`,
-`ridgeback-vnc-websockify.service` and `ridgeback-remote-screen.service` each
-restarted with a new PID and restored its RFB or WebSocket listener on
-5901, 9005 and 9100 respectively. The operator reconnected to the desktop;
-SSH socket activation stayed available on port 22. The independent fallback
-restart timer was cancelled after all three listeners recovered. The report is
-`artifacts/hardware/20261016-s7-desktop-recovery/result.json`. This qualifies
-supervised backend and proxy process-failure recovery for the installed
-services; it does not test network loss, display corruption or browser-side
-session persistence.
+Last verified 2026-10-16 (S7 recovery check); the six repaired files were
+inspected against their maintained sources on 2026-10-13. On the installed
+services, boots after the repair kept the intended listener ownership with no
+reported desktop restarts, and a supervised check that
+killed each desktop unit's main process saw the unit restart with a new PID
+and restore its listener on 5901, 9005 or 9100. That qualifies backend and
+proxy process-failure recovery only. Network loss, display corruption,
+browser-side session persistence and vendor-reload continuity are untested,
+and a replacement host needs its own cold-boot check. The boot inspections and
+the recovery check are under [Archived evidence](#archived-evidence).
 
 ## 7. Start and verify, without driving
 
 Finish package maintenance before a physical test session and verify that no
-upgrade job is active. October 14 unattended updates repeatedly restarted the
-desktop, networking and Clearpath services during testing. The
+upgrade job is active. An unattended upgrade with automatic `needrestart` can
+restart the desktop, networking and Clearpath services repeatedly during a
+test. The
 [desktop troubleshooting reference](../troubleshooting.md#remote-desktop-startup-and-proxy-ownership)
-owns that incident and diagnostic commands. Record package changes, recheck
+owns that symptom and its diagnostic commands. Record package changes, recheck
 installed overlays and stationary health, and qualify a requested kernel reboot
 with the operator and physical stop engaged. An update-time restart policy and
 planned maintenance window still need selection; this runbook does not silently
@@ -344,12 +339,10 @@ ros2 topic info /r100_0160/sensors/lidar2d_1/scan --verbose
 ros2 topic info /r100_0160/sensors/scan --verbose
 ```
 
-Use the [stationary DDS measurement workflow](intel_dds_testing.md) for guarded
-camera subscribers, exact image timestamps, scan continuity and port traffic.
-Its current-profile mode avoids DDS reloads, but still expects the captured
-vendor camera contract, so it needs adapting to `dynamo-camera.service` first
-(section 6). For the installed camera itself, `source /etc/clearpath/setup.bash`
-and run `tools/camera_contract_check --backend hardware`, which checks images,
+The older [stationary DDS measurement workflow](intel_dds_testing.md) is
+retired with the vendor camera unit (section 6). For the installed camera,
+`source /etc/clearpath/setup.bash` and run
+`tools/camera_contract_check --backend hardware`, which checks images,
 CameraInfo, aligned-depth pairing, the optical TF path and scan continuity
 together. A healthy UST-20LX publishes about 40 Hz; the merger's `scan_time`
 metadata is not a substitute for measuring received rate. Check calibrated
@@ -363,17 +356,6 @@ hashes and results under `artifacts/hardware/`. A recreated desktop or a passing
 sensor test alone does not qualify motion, TF/localization, aligned depth,
 LiDAR timeout recovery or Thor deployment.
 
-## Keeping the reconstruction record current
-
-Every host setup change must update this runbook and its simple deployment
-inputs in the same repository change. Capture installed bytes, origin, mode,
-owner and SHA after deployment; label templates and pending work explicitly.
-Document what generated the files, how services are enabled, how to verify and
-how to undo the change. Keep secrets local and name the fresh-entry step.
-The [documentation policy](../project/documentation.md#host-setup-and-reconstruction)
-owns this requirement. This task added no backup job and changed no live services.
-
-
 ## Installed auxiliary repair
 
 `tools/hardware/install_auxiliary_repairs.py` was installed and independently
@@ -385,34 +367,39 @@ and changes only its unknown-cell semantics. It adds a selector-corrected IMU
 configuration and read-only chrony readiness gate before platform startup.
 Compiled Puma/controller libraries, camera, sensor and desktop services are
 preserved. The original Clearpath package and generated files are not edited.
+[Stationary auxiliary checks](stationary_auxiliary_checks.md#source-diagnosis-and-installed-repairs)
+owns what the repair changes and how its installation was verified.
 
 After reconstructing the capped platform and Puma repair, use the
 [stage/apply/verify workflow](stationary_repairs_runbook.md#auxiliary-repairs)
 with fresh evidence and an engaged physical stop.
 The maintained installer regenerates its seven scoped files, rejects mismatched
 baseline inputs and records exact rollback ownership. The live receipt is
-`artifacts/hardware/20261013-auxiliary-repair-install/`; seven installed snapshots
-are labelled in the deployment manifest, which now contains 96 entries. A fresh
-host installation needs its own receipt; historical receipts are not deployable
+`artifacts/hardware/20261013-auxiliary-repair-install/`; the seven installed
+files are labelled snapshots in the deployment manifest. A fresh host
+installation needs its own receipt; historical receipts are not deployable
 state. Rollback removes only these additions and returns to the prior integration.
 
-Final verification confirmed intended filter settings, unknown individual battery
-voltages, finite pack voltage, local clock convergence, asserted stop, stationary
-raw odometry and guarded routing. No battery-temperature/per-cell hardware or
-full IMU calibration is claimed. The new clock gate passed one supervised reboot on 2026-10-13: it waited
-about 38 seconds, exited successfully, and then allowed platform startup.
-Post-boot file/service/listener/data checks all passed. This does not qualify
-repeated cold power cycles or time-source loss; offline operation without an
-external time source will keep the platform
-from starting until its readiness policy is deliberately revised and qualified.
+The installed verification confirmed intended filter settings, unknown
+individual battery voltages, finite pack voltage, local clock convergence,
+asserted stop, stationary raw odometry and guarded routing. No
+battery-temperature/per-cell hardware or full IMU calibration is claimed.
 
+The clock gate depends on Intel's clock policy, which is host setup too: the
+chrony pool source and poll bound, and `dynamo-boot-clock.service`, installed
+with `tools/intel_thor/time_sync boot-step-install --host intel`. The
+[clock and boot policy](stationary_auxiliary_checks.md#intel-clock-and-boot-policy)
+owns them and the [stationary repairs runbook](stationary_repairs_runbook.md#intel-clock-sources)
+their commands; reinstall them with the gate. With internet time, boots step or
+slew the clock before any consumer starts and the gate passes almost at once.
+Repeated cold power cycles and time-source loss are not qualified; offline
+operation without an external time source will keep the platform from
+starting until its readiness policy is deliberately revised and qualified.
 
 ## Puma feedback plugin
 
 The feedback-consumer repair was installed and verified stationary on
-2026-10-13. An initial live attempt failed package executable resolution and
-rolled back; its original-service recovery has a separate stationary audit.
-The corrected stage-5 package then passed the local clock gate, restarted the
+2026-10-13: its stage-5 package passed the local clock gate, restarted the
 platform and mapped its exact pinned library in the running controller manager.
 Its maintained
 builder, minimal plugin stager and guarded installer are
@@ -430,10 +417,35 @@ The 6 MB plugin library and companion symlinks are generated by the maintained
 builder and stager from the pinned Clearpath archive and repository patch, then
 installed by the guarded installer. Rebuild and verify that package when
 reconstructing an SSD; copying the 95 drop-in alone would reference a missing
-prefix. The post-install reboot check under
-`artifacts/hardware/20261013-feedback-clock-postboot-2/` passed the clock gate,
-service and stationary probes and exact plugin-path check. A separate
-e-stop-held real ROS feedback interruption deactivated the controller with
-zero wheel commands around 290 ms, followed by a successful stationary
-platform restart and recovery check. These observations do not qualify
-physical braking under movement or electrical CAN loss.
+prefix.
+
+The plugin is one of three platform layers. The running motor driver is the
+field-age driver selected by `97-dynamo-puma-field-driver.conf`, with the repair
+driver beneath it as its rollback target. The
+[wheel-feedback installed state](drive_feedback_diagnostics.md#installed-state)
+lists every layer, its receipt and the removal order, and the
+[Puma runbook](puma_feedback_runbook.md#before-you-start) gives the install
+order: repair driver, auxiliary repair, consumer plugin, field-age driver.
+
+The plugin's acceptance is stationary: a post-install reboot passed the clock
+gate, service and stationary probes and the exact plugin-path check, and an
+e-stop-held feedback interruption deactivated the controller with zero wheel
+commands. Physical braking under movement and electrical CAN loss are not
+qualified. The installation attempts and interruption trials are under
+[Archived evidence](#archived-evidence).
+
+## Keeping the reconstruction record current
+
+Every host setup change must update this runbook and its simple deployment
+inputs in the same repository change. Capture installed bytes, origin, mode,
+owner and SHA after deployment; label templates and pending work explicitly.
+Document what generated the files, how services are enabled, how to verify and
+how to undo the change. Keep secrets local and name the fresh-entry step.
+The [documentation policy](../project/documentation.md#host-setup-and-reconstruction)
+owns this requirement. This runbook adds no backup job.
+
+## Archived evidence
+
+- [Remote desktop boot faults, update restarts and recovery check](../../archive/engineering/2026-10-06-r100-0160-remote-desktop-boot-and-recovery.md)
+- [Intel clock gate, sources and boot-step qualification](../../archive/engineering/2026-10-13-r100-0160-intel-clock-qualification.md)
+- [Puma feedback-consumer installation and stationary interruptions](../../archive/engineering/2026-10-13-consumer-plugin-and-feedback-outage.md)

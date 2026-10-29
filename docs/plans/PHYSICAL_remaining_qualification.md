@@ -19,8 +19,8 @@ evidence rather than defining weaker replacements.
 Checkpoint update: S1 (quiet local-reader camera/traffic screen) passed on
 October 14 in `camera-port-screen-20261014T093624119430Z`. Thor perception was
 temporarily stopped and its launch restored after capture. The
-[camera deployment reference](../physical/robot_local_deployment.md) owns the
-measurements. Do not schedule another S1 merely to repeat a passing unchanged
+[camera deployment reference](../physical/robot_local_deployment.md#local-reader-checks)
+owns the conclusions; the run measurements are in its archived records. Do not schedule another S1 merely to repeat a passing unchanged
 configuration.
 
 ## Integrated D-lane execution — 2026-10-22
@@ -70,7 +70,7 @@ permit stop must not mask the fault-specific stop mechanism being measured.
 | S2 | VGA passed 2026-10-14 (the deployment profile). HD 2026-10-16: raw HD to Thor cannot fit the 1 Gb/s link (diagnosis `20261016T095428Z-s2-hd-diagnosis`); Thor stays at VGA (user decision). HD local matrix 8/9: one 5-frame source dropout (166.8 ms > 150 ms) in `20261016T101433Z-s2-hd-reader-matrix`, so HD local is not qualified | — | 1280x720 is unsupported on the robot (user decision, 2026-10-29); no further HD testing |
 | S3 | Passed 2026-10-14 (`20261014T114600Z-s3-front-lidar-interruption`): front session reset, same driver reconnected in 2.25 s, three scans settled at 39.93 Hz; rear passed 2026-10-13 | — | In-driver reconnect patch deployed as an overlay; no watchdog needed for a reset session |
 | S4 | Passed 2026-10-14 (`20261014T114755Z-s4-reader-pair-soak`): two reader pairs for 30 min, full contract, 39.9 Hz scans, +1.9 Mbit/s TX, no LiDAR errors | — | VGA only; loaded soak is S5 |
-| S5 | **Finished.** No loaded multi-hour soak was run. Evidence kept: 30-min two-reader soak (S4) and both LiDAR interruption recoveries (S3). The 2026-09-18 simultaneous LiDAR timeout remains unexplained and unbounded; the runner `tools/hardware/run_loaded_soak.sh` (stack `~/DyNAMO-Ridgeback-intel`) is ready | — | Reopen before long unattended operation |
+| S5 | **Finished.** No loaded multi-hour soak was run. Evidence kept: 30-min two-reader-pair soak (S4) and both LiDAR interruption recoveries (S3). The 2026-09-18 simultaneous LiDAR timeout remains unexplained and unbounded; the runner `tools/hardware/run_loaded_soak.sh` (stack `~/DyNAMO-Ridgeback-intel`) is ready | — | Reopen before long unattended operation |
 | S6 | Passed with internet time 2026-10-16: boot clock step installed, 3 of 3 boots stepped before any consumer and the platform gate took 0.1 s. Boot without the internet source not tested (user decision) | — | Retest the no-source path before field use without internet time |
 | S7 | Passed 2026-10-16: repeated-boot ownership plus deliberate main-process failure and automatic listener recovery for VNC and both proxies; operator reconnected (`20261016-s7-desktop-recovery`) | — | Does not qualify network loss, display corruption or browser session persistence |
 | S8 | **Finished.** Survey done and footprint corrected on `dev` (99.4 × 82.7 cm, measured outline enclosed by ≥12 mm). Not done: static simulator comparison, Gazebo/Isaac contact matrices and affected benchmark reruns with the new footprint; the 2 cm/2 cm front/rear split of the 4 cm length excess is an assumption | — | Rerun before quoting simulator or benchmark results |

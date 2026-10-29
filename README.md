@@ -477,9 +477,10 @@ ros2 service call /r100_0001/mission/resume std_srvs/srv/Trigger '{}'
 
 The Intel PC and the Jetson Thor both run ROS 2 on CycloneDDS over the robot
 Ethernet only. The [transport reference](docs/physical/intel_thor_transport.md)
-owns the mechanism and its [blocker procedure](docs/physical/intel_thor_transport.md#camera-subscriber-blocker)
-the deployment state; the [guarded hardware workflow](docs/physical/intel_dds_testing.md)
-repairs Intel desktop/camera readiness and verifies the retained DDS profile.
+owns the mechanism, the installed profile and the
+[camera-subscriber blocker](docs/physical/intel_thor_transport.md#camera-subscriber-blocker)
+state. Local camera readers are checked with `tools/camera_contract_check`
+([reader checks](docs/physical/robot_local_deployment.md#local-reader-checks)).
 
 ### Intel-Thor link setup and pre-deploy check
 

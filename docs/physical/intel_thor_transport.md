@@ -11,28 +11,24 @@ deployment work lives in the
 
 ## Camera subscriber blocker
 
-The September 18 camera and transport handoffs (under
-[Archived evidence](#archived-evidence)) report repeated LiDAR lockouts associated with new local camera
-subscribers under the unrestricted services configuration. October 5 controlled
-tests observed a scan interruption when one local color reader started under
-that configuration. Two focused discovery-only multicast captures subsequently
-passed native image, scan and traffic gates with two independent reader pairs.
-Use the [guarded procedure](intel_dds_testing.md) to repeat and explicitly retain
-the candidate; check its recorded deployment state before routine camera runs.
-On 2026-10-14 a quiet local-reader screen and a 30-minute two-reader-pair soak
-passed under the installed configuration, and on 2026-10-21 `check_link
---camera-reader` passed on `r100_0160` (S1 and S4 in the
-[qualification plan](../plans/PHYSICAL_remaining_qualification.md)). The
-initiating mechanism of the September lockouts and a loaded multi-hour soak
-remain [deferred](../BACKLOG.md#deferred-hardware-gates).
+Under the earlier unrestricted services configuration, repeated LiDAR lockouts
+followed new local camera subscribers, and a controlled test saw a scan
+interruption when one local colour reader started. Intel's installed
+`/etc/clearpath/cyclonedds.xml` now carries discovery-only multicast
+(`AllowMulticast=spdp`). A guarded repeat-and-keep run retained it on Intel
+after its native capture and final verification passed, with deployment state
+`candidate-retained`. Camera startup, robot YAML and the merger override were
+preserved, and the saved recovery command under
+`artifacts/hardware/20261005-intel-dds-retain/` restores the exact
+pre-experiment XML. Thor's profile does not set `AllowMulticast`.
 
-The October 5 repeat-and-keep run passed its native capture and final verification
-and retained discovery-only multicast in `/etc/clearpath/cyclonedds.xml` on Intel.
-Its deployment state is `candidate-retained` under local evidence directory
-`artifacts/hardware/20261005-intel-dds-retain/`. Camera startup, robot YAML and the
-merger override were preserved. The saved recovery command restores the exact
-pre-experiment XML. Thor was not updated. Dated measurements and limitations
-are indexed under [archived evidence](#archived-evidence).
+Under the installed configuration, a quiet local-reader screen, one and two
+independent reader pairs and a 30-minute two-pair soak (S1, S2 and S4 in the
+[qualification plan](../plans/PHYSICAL_remaining_qualification.md)) and
+`check_link --camera-reader` all pass at 640×480; the
+[camera deployment reference](robot_local_deployment.md#local-reader-checks)
+owns those conclusions. The initiating mechanism of the earlier lockouts and a
+loaded multi-hour soak remain [deferred](../BACKLOG.md#deferred-hardware-gates).
 
 ```mermaid
 flowchart LR
@@ -42,35 +38,30 @@ flowchart LR
     E -. "Suspected causal link; not established" .-> L["Hokuyo timeout and reconnect lockout"]
 ```
 
-The camera-only probe measured about 92 Mbit/s on `br0` and both physical
-ports. Three lockouts were reported after subscriber starts; the later two
-followed within 1–2 seconds. Data multicast is a working hypothesis, and the
-cause of the Hokuyo TCP stalls remains unproven. Do not generalize this result
-to all CycloneDDS configurations. The repository's Intel services and application
-profiles now set `AllowMulticast=spdp`. Updating a checkout does not reload
-running services or establish that the installed XML matches it.
+Under the unrestricted configuration, one extra local camera reader made
+`br0` and both physical ports each transmit about 92 Mbit/s, and lockouts were
+reported within seconds of new subscriber starts. Data multicast is a working
+hypothesis, and the cause of the Hokuyo TCP stalls remains unproven. Do not
+generalize this result to all CycloneDDS configurations. The repository's Intel
+services and application profiles also set `AllowMulticast=spdp`; updating a
+checkout does not reload running services or establish that the installed XML
+matches it. The local-reader tests captured no Hokuyo timeout, so they do not
+establish the historical recovery bug's mechanism.
 
-Discovery-only multicast has passed the focused local workload. Broader
-qualification still requires repeated captures, aligned-stream testing, and the
-[backlog's longer soak](../BACKLOG.md#deferred-hardware-gates).
-The timeout/reconnect cause remains unverified; no captured Hokuyo timeout in
-these tests established the historical recovery bug's mechanism.
 The synthetic `check_link` traffic test does not exercise this failure: it
 uses Ethernet-only profiles, a separate domain, and one reader per probe topic.
 `check_link --camera-reader` adds the local-reader case on the robot graph under
 the installed services configuration: one guarded `camera_contract_check` reader
 for 20 s after a 10 s quiet baseline, failing on a contract failure, a wired TX
 rise above 5 Mbit/s or a new LiDAR grab/reconnect error. It passed on
-2026-10-21 (29.95 Hz, +0.64 Mbit/s on `eno1`, no LiDAR errors); it is one short
-reader, not the multi-hour soak.
+`r100_0160` on 2026-10-21; it is one short reader, not the multi-hour soak.
 
-The [guarded local DDS comparison](intel_dds_testing.md) provides an explicit
-current-versus-candidate test on the Intel robot graph. It keeps the scan-merger
-middleware override fixed, records packet destinations and scan continuity,
-and reports the observed result separately from the historical hypothesis.
-Its focused retention option keeps a passing candidate after final verification,
-while preserving evidence and an exact-original recovery command. A focused
-pass does not clear broader hardware qualification gates.
+The [guarded local DDS comparison](intel_dds_testing.md) that compared the
+unrestricted configuration with discovery-only multicast, and retained the
+candidate, is retired with the vendor camera unit. It refuses to start while
+`dynamo-camera.service` owns the D455, except `--recover` for old runs.
+Current-profile reader checks use `tools/camera_contract_check` as described in
+the [camera deployment reference](robot_local_deployment.md#local-reader-checks).
 
 ## Topology
 
@@ -79,8 +70,8 @@ pass does not clear broader hardware qualification gates.
 | Intel (`cpr-r100-0160`) | `br0` 192.168.131.1, bridging `eno1` (1 Gb/s, to the switch with Thor and both Hokuyo LiDARs) and `enp2s0` (100 Mb/s, to the MCU at 192.168.131.2) | Lab Wi-Fi `wlp3s0` 192.168.123.14 (static), Tailscale; `br0` also carries 192.168.123.8/32 |
 | Thor (`nvidia-thor-r100-0160`) | `enP2p1s0` 192.168.131.51 (1 Gb/s, static), plus a route for 192.168.123.14 via 192.168.131.1 (`thor_lan_route`) | Lab Wi-Fi `wlP1p1s0` 192.168.123.152 (default route, internet only) |
 
-The lab access point (`ASUS_20`) does not pass traffic between its clients:
-Intel and Thor cannot reach each other over Wi-Fi (checked 2026-10-12).
+The lab access point (`ASUS_20`, checked 2026-10-12) does not pass traffic between its clients:
+Intel and Thor cannot reach each other over Wi-Fi (100% ping loss both ways).
 
 ```mermaid
 flowchart LR
@@ -136,18 +127,12 @@ are wired; dotted edges use Wi-Fi or, for PTP, raw Ethernet outside DDS.*
 
 CycloneDDS sends each subscribing **process** its own unicast copy, so the image
 load is set by how many Thor processes take each image: the detector takes
-colour and the mask node takes depth. Until 2026-10-16 `localization_health`
-also subscribed to both images just to read their stamps. 2026-10-13 packet
-captures showed the camera socket sending to three Thor participants (unicast
-ports 7411, 7413 and 7415, carrying colour + depth, colour, and depth), about
-754 Mbit/s in total. Health now watches each stream's `camera_info` instead,
-which carries the same stamps. Measured on 2026-10-16 under the same Thor launch:
-763 Mbit/s Intel→Thor before, 382.6 Mbit/s steady after (Thor receiving 377),
-with a header capture showing one copy each of colour (226 Mbit/s) and depth
-(151 Mbit/s). Readings near 860 Mbit/s taken between those two were made while
-the camera was temporarily at 1280×720 for a separate HD check, so they are not
-VGA evidence. Adding an image subscriber in another Thor process adds another
-full copy.
+colour and the mask node takes depth. `localization_health` watches each
+stream's `camera_info`, which carries the same stamps, instead of the images.
+Intel→Thor camera traffic is therefore about 383 Mbit/s steady: one copy each
+of colour (about 226 Mbit/s) and depth (about 151 Mbit/s). While health also
+subscribed to both images, three Thor participants pulled about 760 Mbit/s.
+Adding an image subscriber in another Thor process adds another full copy.
 
 | Link | Carries | Contract |
 |---|---|---|
@@ -184,9 +169,9 @@ receive socket and the stream stalls, even though ping stays below 1 ms.
 
 The restriction must be on the **receiving** side. A writer sends to every
 address its reader advertises, whatever the writer's own configuration.
-In one test Thor was pinned to Ethernet and the Intel reader also advertised
-Wi-Fi: Thor then sent the stream through its own Wi-Fi (466 Mbit/s across both
-hosts).
+With Thor pinned to Ethernet and an Intel reader that also advertises Wi-Fi,
+Thor sends the stream through its own Wi-Fi (466 Mbit/s across both hosts in
+a middleware-benchmark check).
 
 ## Configuration contract
 
@@ -407,10 +392,10 @@ colour/depth pairing, round-trip time and CPU. It writes its results under
   robot Ethernet; the lab access point does not pass traffic between Wi-Fi
   clients. See [troubleshooting](../troubleshooting.md#thor-receives-sensor-streams-but-no-static-tf).
 - Thor is powered from the Ridgeback's USER POWER panel (three ports, each
-  behind a 5 A fuse with a green indicator, beside a 20 A fuse). On 2026-10-09
-  Thor stopped responding during a heavy GPU load in MAXN, and afterwards all
-  three ports read 0 V at the pins with their indicators still green. Thor's
-  logs kept nothing from that day, so the cause is unconfirmed. Thor therefore
+  behind a 5 A fuse with a green indicator, beside a 20 A fuse). Thor once
+  stopped responding during a heavy GPU load in MAXN, and afterwards all three
+  ports read 0 V at the pins with their indicators still green. Thor's logs
+  kept nothing from the event, so the cause is unconfirmed. Thor therefore
   runs in 120W, not MAXN, until the panel's supply capacity is known; Thor's
   dev kit can draw more than a 5 A port supplies at the lower port voltages.
 - The raw 1280×720 colour + depth stream is about 1.1 Gbit/s, which does not
@@ -466,7 +451,10 @@ frames.
 
 - [Intel local DDS screening, timing and retained configuration](../../archive/engineering/2026-10-05-intel-dds-screening.md)
 - [Intel–Thor DDS transport diagnosis](../../archive/engineering/2026-09-18-intel-thor-dds-transport.md)
-- [D455 camera runs handoff, 2026-09-18](../../archive/engineering/2026-09-18-d455-camera-runs-handoff.md)
-- [Intel–Thor transport handoff, 2026-09-18](../../archive/engineering/2026-09-18-intel-thor-transport-handoff.md)
+- [D455 camera runs handoff](../../archive/engineering/2026-09-18-d455-camera-runs-handoff.md)
+- [Intel–Thor transport handoff](../../archive/engineering/2026-09-18-intel-thor-transport-handoff.md)
 - [Intel–Thor middleware benchmark](../../archive/engineering/2026-09-18-intel-thor-rmw-benchmark.md)
 - [r100_0160 Intel–Thor camera transport candidates](../../archive/engineering/2026-10-06-r100-0160-thor-transport-candidates.md)
+- [r100_0160 Thor perception environment and first live localization](../../archive/engineering/2026-10-12-r100-0160-thor-localization-smoke.md)
+- [r100_0160 local camera-reader and port-traffic screens](../../archive/engineering/2026-10-13-r100-0160-local-camera-reader-screens.md)
+- [r100_0160 Thor image copies and 1280×720 camera trials](../../archive/engineering/2026-10-16-r100-0160-thor-image-copies-and-hd-trials.md)
