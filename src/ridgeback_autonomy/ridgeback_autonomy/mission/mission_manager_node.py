@@ -29,6 +29,7 @@ import rclpy
 import yaml
 from geometry_msgs.msg import PointStamped, PoseStamped, TwistStamped
 from nav_msgs.msg import OccupancyGrid, Odometry
+from sensor_msgs.msg import LaserScan
 from nav2_msgs.action import ComputePathToPose, NavigateToPose
 from nav2_msgs.msg import CollisionMonitorState, CostmapFilterInfo
 from action_msgs.msg import GoalStatus, GoalStatusArray
@@ -77,8 +78,11 @@ from ridgeback_autonomy.mission.parking_planner import (
 from ridgeback_autonomy.mission.parking_geometry import preparking_pose, rotated_footprint_vertices
 from ridgeback_autonomy.mission.parking_visualization import clear_markers, plan_markers
 from ridgeback_autonomy.mission.motion_settlement import MotionSettlement
+from ridgeback_autonomy.mission.parking_clearance import (
+    ClearanceLimits, ClearanceResult, clearance_reason, scan_points,
+)
 from ridgeback_autonomy.mission.parking_feasibility import (
-    PlanningSnapshot, candidate_groups, path_rejection, path_length, pose_xyyaw,
+    PlanningSnapshot, candidate_groups, driven_poses, path_rejection, path_length, pose_xyyaw,
     select_path_candidate,
 )
 from ridgeback_autonomy.mission.parking_execution import (
@@ -117,6 +121,9 @@ class MissionState(Enum):
     MISSION_FAILED = 'mission_failed'
     MISSION_CANCELED = 'mission_canceled'
 
+
+# The two parking legs, monitored live against both LiDARs.
+_PARKING_LEGS = (MissionState.NAVIGATING_TO_PREPARKING, MissionState.NAVIGATING_TO_PARKING)
 
 # States in which the manager owns a NavigateToPose goal or a parked stop.
 _PARKING_DRIVE_STATES = (
@@ -292,6 +299,11 @@ class MissionManagerNode(Node):
         self.declare_parameter('goal_checker_plugin', 'general_goal_checker')
         self.declare_parameter('parking_final_xy_tolerance_m', 0.03)
         self.declare_parameter('parking_target_reach_allowance_m', 0.03)
+        # Live LiDAR clearance during the two parking legs (the collision monitor's sources).
+        self.declare_parameter('parking_lidar_topics',
+                               ['sensors/lidar2d_0/scan', 'sensors/lidar2d_1/scan'])
+        self.declare_parameter('parking_lidar_margin_m', 0.05)
+        self.declare_parameter('parking_lidar_max_age_s', 0.5)
 
         self.map_frame = str(self.get_parameter('map_frame').value).strip()
         self.base_frame = str(self.get_parameter('robot_base_frame').value).strip()
@@ -577,6 +589,18 @@ class MissionManagerNode(Node):
         self._parked_settled_ns = None
         self._parking_failure = None
         self._arrival_errors = {}
+        self._return_after_stop = False
+        self.clearance_limits = ClearanceLimits(
+            margin_m=float(self.get_parameter('parking_lidar_margin_m').value),
+            scan_max_age_s=float(self.get_parameter('parking_lidar_max_age_s').value))
+        self._scans = {}
+        self._laser_in_base = {}
+        self._clearance = None
+        self._clearance_legs = {}
+        self.parking_lidar_topics = [str(t) for t in self.get_parameter('parking_lidar_topics').value]
+        for topic in self.parking_lidar_topics:
+            self.create_subscription(LaserScan, topic, lambda msg, topic=topic: self._on_scan(topic, msg),
+                                     qos_profile_sensor_data)
         self._motion_fault_mark = 0
         self._motion_restart_s = None
 
@@ -864,6 +888,9 @@ class MissionManagerNode(Node):
             self.g1_exploration_result = None
             self._parking_failure = None
             self._arrival_errors = {}
+            self._return_after_stop = False
+            self._clearance = None
+            self._clearance_legs = {}
             self.stage_paths.reset()
             self.execution_safety = None
             self._execution_odometry = self._execution_odom_received_s = None
@@ -1249,6 +1276,13 @@ class MissionManagerNode(Node):
                 'arrival_errors': self._arrival_errors,
             },
             'motion_status': self.motion.reason,
+            'parking_clearance': None if self._clearance is None else {
+                'reason': self._clearance.reason, 'points': self._clearance.points,
+                'nearest_m': None if self._clearance.nearest_m is None
+                else round(self._clearance.nearest_m, 3),
+                'g1_gap_m': None if self._clearance.g1_gap_m is None
+                else round(self._clearance.g1_gap_m, 3),
+                'legs': self._clearance_legs},
             'path_request_unresolved': self._path_busy,
         }
         self.state_publisher.publish(String(data=json.dumps(payload, sort_keys=True)))
@@ -1968,6 +2002,9 @@ class MissionManagerNode(Node):
 
     def _navigation_finished(self, ok, detail):
         sel = self.parking_plan.selected if self.parking_plan is not None else None
+        if self.state in _PARKING_LEGS:
+            self.get_logger().info(f'LiDAR clearance in {self.state.name}: '
+                                   f'{self._clearance_legs.get(self.state.value)}')
         if self.state == MissionState.RETURNING_TO_OBSERVATION:
             if not ok:
                 self.last_issue = MissionIssue(FailureClass.TERMINAL,
@@ -2022,6 +2059,21 @@ class MissionManagerNode(Node):
                 self._transition(MissionState.MISSION_FAILED, f'return to start failed: {detail}')
 
     def _poll_parking_navigation(self, now_s):
+        if self.state in _PARKING_LEGS and self._check_parking_clearance():
+            return
+        if self.state == MissionState.RETURNING_TO_START and self._return_after_stop:
+            if self.motion.ready(self.get_clock().now().nanoseconds, now_s):
+                self._return_after_stop = False
+                self._nav_deadline_s = None
+                self._set_goal_tolerance(self._shared_goal_tolerance, self._send_return_goal)
+            elif now_s >= self._nav_deadline_s:
+                self._return_after_stop = False
+                self._nav_deadline_s = None
+                self.last_issue = MissionIssue(FailureClass.TERMINAL, 'stop_not_confirmed',
+                                               self.motion.reason)
+                self._transition(MissionState.MISSION_FAILED,
+                                 f'no confirmed stop after the parking veto: {self.motion.reason}')
+            return
         if self.state == MissionState.PARKED and self._parked_settled_ns is not None:
             now_ns = self.get_clock().now().nanoseconds
             if (now_ns - self._parked_settled_ns) * 1e-9 >= self.parking_wait_s:
@@ -2048,14 +2100,95 @@ class MissionManagerNode(Node):
         else:
             self._parking_navigation_failed(detail)
 
-    def _parking_navigation_failed(self, reason):
+    def _parking_navigation_failed(self, reason, *, stop_first=False):
         self.get_logger().error(f'Parking failed: {reason}; returning to start')
         self._parking_failure = reason
-        self._start_return(reason)
+        self._start_return(reason, stop_first=stop_first)
 
-    def _start_return(self, reason):
+    def _start_return(self, reason, *, stop_first=False):
+        if stop_first:
+            # A cancelled leg is not resumed: the return starts only from a confirmed stop.
+            self._transition(MissionState.RETURNING_TO_START, f'{reason}; stopping before the return')
+            self._return_after_stop = True
+            self.motion.reset()
+            self._nav_deadline_s = self._monotonic() + self.motion_settlement_timeout_s
+            return
         self._transition(MissionState.RETURNING_TO_START, reason)
         self._set_goal_tolerance(self._shared_goal_tolerance, self._send_return_goal)
+
+    # Live LiDAR clearance during the two parking legs.
+
+    def _on_scan(self, topic, msg):
+        with self._lock:
+            self._scans[topic] = (msg, self._monotonic())
+            if self.state in _PARKING_LEGS:
+                self._check_parking_clearance()
+
+    def _laser_pose(self, frame):
+        if frame not in self._laser_in_base:
+            try:
+                t = self.tf_buffer.lookup_transform(self.base_frame, frame, Time()).transform
+            except TransformException:
+                return None
+            self._laser_in_base[frame] = (t.translation.x, t.translation.y, _yaw(t.rotation))
+        return self._laser_in_base[frame]
+
+    def _check_parking_clearance(self):
+        """Cancel the leg when the next movement is unsafe; True when it was cancelled."""
+        reason, result = self._parking_clearance(), None
+        if isinstance(reason, ClearanceResult):
+            result, reason = reason, reason.reason
+            self._clearance = result
+            # Per-leg evidence that the check ran: count and closest distances seen.
+            leg = self._clearance_legs.setdefault(self.state.value, {
+                'checks': 0, 'min_nearest_m': None, 'min_g1_gap_m': None})
+            leg['checks'] += 1
+            for key, value in (('min_nearest_m', result.nearest_m), ('min_g1_gap_m', result.g1_gap_m)):
+                if value is not None and (leg[key] is None or value < leg[key]):
+                    leg[key] = round(value, 3)
+        if reason is None:
+            return False
+        detail = '' if result is None else (
+            f' (nearest return {result.nearest_m if result.nearest_m is None else round(result.nearest_m, 3)} m,'
+            f' G1 gap {result.g1_gap_m if result.g1_gap_m is None else round(result.g1_gap_m, 3)} m)')
+        self.get_logger().error(f'Parking LiDAR veto in {self.state.name}: {reason}{detail}')
+        self._cancel_navigation_goal()
+        self._parking_navigation_failed(f'lidar_clearance: {reason}', stop_first=True)
+        return True
+
+    def _parking_clearance(self):
+        now_ns, now_s = self.get_clock().now().nanoseconds, self._monotonic()
+        limit = self.clearance_limits.scan_max_age_s
+        xs, ys, age = [], [], 0.0
+        for topic in self.parking_lidar_topics:
+            entry = self._scans.get(topic)
+            if entry is None:
+                return f'lidar_unavailable: {topic}'
+            scan, received_s = entry
+            stamp_age = (now_ns - Time.from_msg(scan.header.stamp).nanoseconds) * 1e-9
+            if not -limit <= stamp_age <= limit or now_s - received_s > 2.0 * limit:
+                return f'lidar_stale: {topic}'
+            laser = self._laser_pose(scan.header.frame_id)
+            if laser is None:
+                return f'lidar_frame_unavailable: {scan.header.frame_id}'
+            px, py = scan_points(scan, laser)
+            xs.append(px)
+            ys.append(py)
+            age = max(age, stamp_age)
+        robot = self._current_robot_pose()
+        odometry = self._execution_odometry
+        if robot is None:
+            return 'robot_pose_unavailable'
+        if odometry is None or now_s - self._execution_odom_received_s > 2.0 * limit:
+            return 'odometry_stale'
+        t = odometry.twist.twist
+        plan, sel = self.parking_plan, self.parking_plan.selected
+        route = driven_poses(plan.selected_path, sel, robot)
+        return clearance_reason(
+            (np.concatenate(xs), np.concatenate(ys)), self.planner_config.footprint,
+            (t.linear.x, t.linear.y, t.angular.z), age, robot, route,
+            (plan.target.x, plan.target.y), plan.keepout_radius_m - self.final_xy_tolerance_m,
+            self.safety_monitor.limits, self.clearance_limits)
 
     def _send_return_goal(self, ok):
         if not ok:

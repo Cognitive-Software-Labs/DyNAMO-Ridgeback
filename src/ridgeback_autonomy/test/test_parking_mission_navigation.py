@@ -167,6 +167,7 @@ def test_leg_deadline_cancels_and_returns(manager_factory, monkeypatch):
     answer(m._goal_checker_set_client)
     _, accepted, handle = m.navigation_client.calls[-1]
     accepted.set_result(handle)
+    m._parking_clearance = lambda: None   # LiDAR clear; the deadline is under test
     m._monotonic.value += 91.0
     m.tick()
     assert handle.cancels == 1
