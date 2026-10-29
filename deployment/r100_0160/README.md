@@ -26,7 +26,7 @@ The selected recovery scope excludes the vendor dashboard. The
 owns source preparation, selected host candidates and fresh-host build commands.
 
 The captured joystick/base files describe the original uncapped baseline.
-The current [commissioning caps](../../docs/physical/driving_readiness.md#commissioning-caps)
+The current [commissioning caps](../../docs/physical/commissioning_guard.md#speed-modes)
 are maintained in `tools/hardware/commissioning_speed_guard.py` and rendered by
 `tools/hardware/install_commissioning_caps.py`. Recovery preparation includes
 these newer candidates with explicit provenance rather than rewriting the

@@ -46,16 +46,13 @@ defaults off (`autonomous_motion_enabled:=false`). Keep it off until every open
 gate below passes on the approved robot configuration.
 
 **Qualified so far.** Every hop from Nav2 to the base carries `TwistStamped`
-and delivers on the live graph (stationary, no goal sent). The commissioning
-guard caps commands at 0.05 m/s planar and 0.1 rad/s yaw. One bounded floor
-trial passed in each of the six directions (D1); live mux handover, timeout
-return and self-stop passed (D4); and the per-wheel field-age feedback driver
-passed stationary acceptance (D5). The
-[driving reference](physical/driving_readiness.md) and the
-[feedback reference](physical/drive_feedback_diagnostics.md) own the installed
-state, evidence and exact test conditions. The
-[qualification plan](plans/PHYSICAL_remaining_qualification.md#driving-and-feedback)
-schedules the remaining trials.
+and delivers on the live graph (stationary, no goal sent). The
+[commissioning guard](physical/commissioning_guard.md) bounds every source.
+D1 (six bounded floor directions), D4 (live handover) and D5 (stationary
+field-age acceptance) passed. The [driving](physical/driving_readiness.md) and
+[feedback](physical/drive_feedback_diagnostics.md) references own installed
+state; the [qualification plan](plans/PHYSICAL_remaining_qualification.md#driving-and-feedback)
+schedules the trials and their acceptance counts.
 
 **Open gates.**
 
@@ -68,8 +65,8 @@ schedules the remaining trials.
 - **D6.** Feedback fault while the wheels turn (raised), fault latch and
   supervised recovery.
 - **D7.** Actual motor-link loss, including outgoing zeros that cannot be
-  delivered, and recovery. Electrical CAN loss and per-wheel field freshness
-  belong to this trial.
+  delivered, and recovery. It drops bridge packets; electrical CAN loss is a
+  separate, untested case.
 - **D8.** Measured stopping distance and clearance at the approved limits.
 - **Abrupt starts.** Abrupt direction changes hit repeatable startup-transient
   aborts. Resolve physical versus feedback-timing causes before qualifying
@@ -85,7 +82,8 @@ schedules the remaining trials.
 message type, topic, QoS, frame/timeout semantics, mux ownership, collision
 monitor, controller input, e-stop, and deadman behavior from Nav2 to the base.
 Reconcile drive feedback frequency targets and direct/aggregated fault
-reporting. Resolve any mismatch at the narrowest owning layer; then perform stationary,
+reporting, including complete controller-manager and EKF parameter reads.
+Resolve any mismatch at the narrowest owning layer; then perform stationary,
 lifted/blocked-wheel where approved, low-speed clear-space, stop, timeout, and
 e-stop tests before enabling `autonomous_motion_enabled:=true`.
 
@@ -116,6 +114,10 @@ qualified. Each needs a new scope decision; reopen it before the named use.
 | Hardware localization accuracy | Distance accuracy at taped marks (including off-centre), silhouette re-measurement and G1 target cases. Person detection scores sit near 0.3, leaving little threshold margin. | Quoting localization accuracy |
 | IMU calibration | Factory calibration is accepted without a reference calibration; covariance stays reported as unknown. | Heading drift or SLAM smearing that points to the IMU |
 | Battery health | Only pack voltage, total current and MCU/PCB temperatures exist; the battery model is unidentified. | Long or unattended missions that depend on battery health |
+| Driving-stack cold boot | The guard unit's `After=network.target` does not wait for `wlp3s0` ([boot ordering](physical/commissioning_guard.md#boot-ordering-limitation)). The consumer plugin has one supervised post-install reboot check; the 2026-10-22 field driver and the repair's DDS-readiness helper have no reboot or cold-boot evidence. | Unattended power-up |
+| Feedback timing under load | Field age and live queue timing are measured stationary and in short moving captures only; no sustained motion or CPU load. Ages exclude MCU, wire and kernel delay. | Long missions, or quoting feedback latency |
+| Consumer CAN-ID check | The consumer learns CAN IDs from feedback without checking them against the robot declaration. | Changing wheel IDs or the controller configuration |
+| Electrical motor-link loss | D7 drops CAN-over-UDP bridge packets; a physical CAN or power loss on the motor link is untested ([fault paths](physical/motor_link_fault_injection.md#electrical-link-loss)). | Relying on stopping after a motor-link hardware failure |
 
 **Completion criteria.** A row leaves this table when a scope decision reopens
 it as an active item with its own criteria, or when its gate is qualified and

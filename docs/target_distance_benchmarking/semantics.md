@@ -7,9 +7,10 @@ mean, and which runs may be compared with which. Start at
 ## Scenario and comparison discipline
 
 The packaged full set is `config/benchmark_scenarios_full.yaml` (88 scenes,
-20 multi-robot in the recorded 2026-08-24 transition; verify current source
-before reporting counts). It includes occlusion, clutter, traps, and probe
-scenes; the [gallery](benchmark_scenarios_v2_gallery.html) is a visual reference.
+20 multi-robot; verify current source before reporting counts). It includes
+occlusion, clutter, image-edge, trap, and probe scenes; the
+[gallery](benchmark_scenarios_v2_gallery.html) renders every scene from its
+[certification](#scene-certification) audit.
 
 - Compare runs against the exact same scenario YAML and revision. Regenerating
   with a new seed expands coverage; it is not an A/B baseline.
@@ -84,10 +85,46 @@ scenes:
 
 Coordinates are world-frame planar poses: `x` is forward, `y` is lateral
 (positive left), and `yaw` is radians about +Z. Scenarios carry no height. The
-runner spawns each model at its catalog `spawn_z_m`, which is 0 for every
-packaged model. `benchmarking/scenarios.py` is the authoritative parser and
-validation contract; scenario-file comments record generation-specific design
-and certification details.
+runner spawns each model at its catalog `spawn_z_m`: every packaged model's
+origin is its ground contact, and both catalogs stand it on the calibration
+floor's top surface at z = 0.05. Ground truth is planar, so the height changes
+only what the sensors see. `benchmarking/scenarios.py` is the authoritative
+parser and validation contract; scenario-file comments record each scene's
+intended condition and its certified values.
+
+## Scene certification
+
+`scene_audit` certifies scenes geometrically, without a simulator. It ray-casts
+a depth-ordered id buffer of the Gazebo visual geometry standing on the floor
+through the sensor geometry expanded from `clearpath/robot.yaml`, and casts the
+front LiDAR in its scan plane. The `benchmarking/scene_audit.py` docstring owns
+the exact definitions:
+
+| Quantity | Meaning |
+|---|---|
+| visible fraction | target pixels visible in the scene ÷ its pixels with all other geometry removed |
+| in-frame fraction | target pixels inside the image ÷ its pixels on an unbounded image plane |
+| centre ratio | `abs(u - cx) / cx` of the projected torso centre; above 1 the centre is outside the frame |
+| LiDAR | beams on each target and pole, each shin's visible angular width, pole inset in the detection box |
+
+Comments are certified at 640x480, the profile both simulators default to and
+the Thor perception host uses. Family names record the intended condition; a
+comment outside its family band says so. `edge640_*` scenes are edge cases only
+at 640x480: the frame edge sits at ±39.8° there and at ±45° at 1280x720.
+
+The Isaac stage matches the geometry the audit models: camera pose, intrinsics,
+LiDAR pose and every object agree exactly. The G1 is the exception; Isaac
+renders a different G1 asset. Re-run the audit after any change to camera or
+LiDAR geometry, assets or the scenario file:
+
+```bash
+ros2 run ridgeback_autonomy scene_audit \
+  --scenario src/ridgeback_autonomy/config/benchmark_scenarios_full.yaml \
+  --profile 640x480 \
+  --gallery docs/target_distance_benchmarking/benchmark_scenarios_v2_gallery.html
+```
+
+Its `certifications_640x480.csv` compares every comment with the audited value.
 
 ## Event, observation, and instance semantics
 
@@ -144,3 +181,4 @@ Historical scenario/status transitions are retained in the Archived evidence sec
 
 - [benchmark history](../../archive/engineering/benchmark_evolution.md)
 - [Gazebo and Isaac backend qualification](../../archive/engineering/2026-10-26-benchmark-gazebo-isaac-qualification.md)
+- [scene recertification for the current camera](../../archive/engineering/2026-10-29-scene-recertification.md)

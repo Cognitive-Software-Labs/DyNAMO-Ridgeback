@@ -107,7 +107,7 @@ The historical `/opt/mybotshop/scripts/joy_x_combiner.py` path is retained for
 compatibility; this is a standalone preserved script, not a vendor workspace.
 
 Four additional candidates implement the maintained
-[commissioning caps](driving_readiness.md#commissioning-caps): a pinned Python
+[commissioning caps](commissioning_guard.md#speed-modes): a pinned Python
 guard, a launch wrapper, its unit and a platform drop-in. Their source is
 `tools/hardware/install_commissioning_caps.py`, not the captured baseline.
 Install them before qualifying the recovered base. The wrapper includes the
@@ -116,7 +116,7 @@ generated Clearpath files. Keep the physical stop engaged until command routing
 and the guarded motion checks pass; these candidates do not certify recovery.
 The maintained candidate includes a reliable e-stop relay and a mux-only remap
 for the native firmware/mux QoS mismatch. The
-[stop-delivery reference](driving_readiness.md#e-stop-delivery-to-the-mux) owns
+[stop-delivery reference](estop_stop_semantics.md#e-stop-delivery-to-the-mux) owns
 deployment status and verification. Keep the original firmware stop topic
 for the guard and other consumers; do not apply a global e-stop-topic remap.
 
@@ -250,7 +250,7 @@ selected by the caps installer’s `--test-interlock`. Do not enable it for norm
 manual operation: it blocks all motion without a fresh bounded test permit.
 Its source, installation and exact receipt-based rollback are maintained in the
 [root operator workflow](../../README.md) and
-[test-lock contract](driving_readiness.md#temporary-commissioning-test-interlock).
+[test-lock contract](commissioning_guard.md#test-permit-interlock).
 Recovery defaults to the normal capped guard. The temporary mode was installed
 and verified stationary on 2026-10-09; its receipt is under
 `artifacts/hardware/20261009-test-interlock-install/`. Recreate that temporary

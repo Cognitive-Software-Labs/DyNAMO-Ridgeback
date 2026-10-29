@@ -599,7 +599,7 @@ python3 tools/hardware/check_driving_mux.py
 The auditor deliberately selects deployed domain 0 and
 `/etc/clearpath/cyclonedds.xml`; its output labels missing evidence. Physical
 e-stop, low-speed, timeout and deadman checks require the supervised procedure
-in the [driving reference](docs/physical/driving_readiness.md#remaining-physical-verification).
+in the [driving reference](docs/physical/driving_qualification_procedure.md#supervised-physical-procedure).
 
 To apply the fixed commissioning caps, keep the robot stationary with the
 physical stop engaged and an operator beside it. The installer observes that
@@ -614,7 +614,7 @@ sudo python3 tools/hardware/install_commissioning_caps.py \
 ```
 
 It limits all mux inputs to a planar magnitude of 0.05 m/s and yaw of 0.1 rad/s.
-See the [guard contract](docs/physical/driving_readiness.md#commissioning-caps).
+See the [guard contract](docs/physical/commissioning_guard.md#speed-modes).
 An unsuccessful install leaves the platform stopped. An explicitly requested
 rollback restores only the saved files; with the physical stop still engaged,
 use the same evidence directory with `--restore --operator-confirmed` instead
@@ -638,7 +638,7 @@ capped controller. It restarts only the platform and guard. Use the new evidence
 directory for an explicitly requested `--restore --operator-confirmed`; an
 upgrade rollback restores the previous capped installation. An original first
 installation rollback removes caps. The
-[stop-delivery reference](docs/physical/driving_readiness.md#e-stop-delivery-to-the-mux)
+[stop-delivery reference](docs/physical/estop_stop_semantics.md#e-stop-delivery-to-the-mux)
 records deployment state. The repair was installed and verified stationary on
 `r100_0160` on 2026-10-09; physical disconnection qualification remains open.
 For another upgrade, choose a fresh output directory and the record matching
@@ -662,7 +662,7 @@ Restore the previous capped installation using the new installation receipt:
 `sudo python3 tools/hardware/install_commissioning_caps.py --restore
 --operator-confirmed --run-dir <new-install-directory>`, keeping the physical
 stop pressed. Moving interlock trials are not yet enabled. See the
-[test-lock contract](docs/physical/driving_readiness.md#temporary-commissioning-test-interlock).
+[test-lock contract](docs/physical/commissioning_guard.md#test-permit-interlock).
 
 To observe a held joystick command against the installed software test lock,
 start with the physical stop pressed, controller neutral, clear floor and an
@@ -1840,7 +1840,7 @@ Both outputs must be fresh. The replay is a flag/scheduling model, not a live
 patched-driver test. It predicts lower output rates and longer publication gaps
 when every wheel must provide fresh fields. Do not add the candidate to the
 installed repair without qualifying stale-feedback handling in the hardware
-consumer. See the [freshness deployment boundary](docs/physical/drive_feedback_diagnostics.md#offline-freshness-candidate-and-deployment-boundary).
+consumer. See the [freshness deployment boundary](docs/physical/wheel_feedback_field_age.md#field-eligibility).
 
 To reproduce the Puma hardware consumer’s current behavior offline, with no ROS
 or hardware access:
@@ -1853,7 +1853,7 @@ python3 tools/hardware/verify_puma_feedback_consumer.py \
 
 Use a fresh output directory. It exercises actual extracted method bodies with
 inert input/output; it does not interrupt live feedback or establish physical
-stopping. The [consumer reference](docs/physical/drive_feedback_diagnostics.md#hardware-consumer-missing-feedback-behavior)
+stopping. The [consumer reference](docs/physical/wheel_feedback_consumer.md#stock-behavior)
 owns findings and the pending age/batch-validation deployment gate.
 
 
@@ -1869,7 +1869,7 @@ Use a fresh output directory. The builder accepts only the pinned archive,
 checks the policy and actual adapter/lifecycle bodies, compiles the package and
 saves provenance. It does not install or access the live robot. The candidate
 is not qualified for deployment; see the
-[consumer safety boundary](docs/physical/drive_feedback_diagnostics.md#offline-feedback-consumer-safety-candidate).
+[consumer safety boundary](docs/physical/wheel_feedback_consumer.md#installed-policy).
 
 
 Check that compiled candidate using fake wheel publishers and a command sink:
@@ -2009,7 +2009,7 @@ Use a fresh run directory. Leave the stop pressed while reviewing its
 `result.json`; if the controller faults, use the stationary recovery command
 above and a new recovery directory. This incoming-only software interruption
 does not prove physical braking or the motor controllers' response to a full
-electrical link failure. The [feedback reference](docs/physical/drive_feedback_diagnostics.md#remaining-moving-and-motor-link-qualification)
+electrical link failure. The [feedback reference](docs/physical/motor_link_fault_injection.md#electrical-link-loss)
 owns those boundaries.
 
 ## Stationary desktop and controller setup repair

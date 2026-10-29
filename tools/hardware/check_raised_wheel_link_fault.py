@@ -8,7 +8,7 @@
 
 All four wheels must be clear of the floor on rated stands, with a qualified
 operator at the physical stop. The unchanged guarded pulse tool is the only
-motion source (one ramped 1 s request at the installed 0.05 m/s cap); this tool
+motion source (one ramped 1 s request at 0.05 m/s); this tool
 never publishes. Once commanded forward motion is seen on the motor command
 and every wheel's feedback, it inserts ONE firewall rule on the MCU CAN-over-UDP
 bridge (port 11412) for at most --block-s seconds:

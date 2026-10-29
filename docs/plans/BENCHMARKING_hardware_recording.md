@@ -475,11 +475,11 @@ be documented before cross-environment accuracy claims.
 | **P04-01 PLACE** | Near G1; verify camera clipping | (1.30, +0.00); yaw=3.30; r=1.30 | none | `near_clip_01` | (1.34, -0.03, 3.45) | none | Verify actual clipping; hardware field of view differs. |
 | **P05-01 PLACE** | Near G1; verify camera clipping | (1.30, -0.65); yaw=0.65; r=1.45 | none | `near_clip_02` | (1.36, -0.67, 0.65) | none | Verify actual clipping; hardware field of view differs. |
 | **P06-01 PLACE** | Near G1; verify camera clipping | (1.10, +0.00); yaw=3.30; r=1.10 | none | `near_clip_03` | (1.09, +0.03, 3.28) | none | Verify actual clipping; hardware field of view differs. |
-| **P07-01 PLACE** | G1 near image edge but mostly visible | (2.00, -1.25); yaw=2.80; r=2.36 | none | `edge_mostly_in_01` | (4.39, -2.67, 2.74) | none | Adjust lateral position to actual clipping; verify usable width. |
-| **P08-01 PLACE** | G1 partially outside image | (2.00, -1.55); yaw=2.80; r=2.53 | none | `edge_half_out_02` | (4.37, -3.08, 2.79) | none | Adjust lateral position to actual clipping; verify usable width. |
-| **P09-01 PLACE** | G1 near image edge but mostly visible | (2.00, +1.25); yaw=2.80; r=2.36 | none | `edge_mostly_in_02` | (3.98, +2.38, 2.80) | none | Adjust lateral position to actual clipping; verify usable width. |
-| **P10-01 PLACE** | G1 partially outside image | (2.00, +1.55); yaw=3.40; r=2.53 | none | `edge_half_out_01` | (4.30, +3.03, 3.48) | none | Adjust lateral position to actual clipping; verify usable width. |
-| **P11-01 PLACE** | Only a sliver of G1 visible | (2.00, +1.80); yaw=3.40; r=2.69 | none | `edge_sliver_01` | (2.67, +2.05, 3.44) | none | Adjust lateral position to actual clipping; verify usable width. |
+| **P07-01 PLACE** | G1 near image edge but mostly visible | (2.00, -1.25); yaw=2.80; r=2.36 | none | `edge640_mostly_in_01` | (4.18, -2.98, 2.67) | none | Adjust lateral position to actual clipping; verify usable width. |
+| **P08-01 PLACE** | G1 partially outside image | (2.00, -1.55); yaw=2.80; r=2.53 | none | `edge640_half_out_02` | (4.17, -3.34, 2.73) | none | Adjust lateral position to actual clipping; verify usable width. |
+| **P09-01 PLACE** | G1 near image edge but mostly visible | (2.00, +1.25); yaw=2.80; r=2.36 | none | `edge640_mostly_in_02` | (3.89, +2.53, 2.84) | none | Adjust lateral position to actual clipping; verify usable width. |
+| **P10-01 PLACE** | G1 partially outside image | (2.00, +1.55); yaw=3.40; r=2.53 | none | `edge640_half_out_01` | (4.11, +3.28, 3.54) | none | Adjust lateral position to actual clipping; verify usable width. |
+| **P11-01 PLACE** | Only a sliver of G1 visible | (2.00, +1.80); yaw=3.40; r=2.69 | none | `edge640_sliver_01` | (2.61, +2.12, 3.47) | none | Adjust lateral position to actual clipping; verify usable width. |
 
 ### Excluded source scenes
 

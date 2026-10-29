@@ -26,8 +26,28 @@ troubleshooting, planning, and historical documentation.
 
 ## Physical deployment
 
-- [Driving readiness](physical/driving_readiness.md) — command ownership,
-  stop/stamp/speed semantics, stationary diagnostics and physical qualification
+- [Driving readiness](physical/driving_readiness.md) — router for the driving
+  stack: installed state and links to its mechanism pages
+  - [Driving command path](physical/driving_command_path.md) — topology, mux
+    priorities, stamps, frames and speed scales from Nav2 and teleop to the base
+  - [E-stop and stop semantics](physical/estop_stop_semantics.md) — QoS relay,
+    deadman release, source loss and disconnection
+  - [Commissioning guard](physical/commissioning_guard.md) — speed modes,
+    admission and watchdog, test-permit interlock, install and rollback
+  - [Controller input](physical/controller_input.md) — joystick chain, neutral
+    input, autoconnect helper and connected-but-no-input recovery
+  - [Driving check tools](physical/driving_check_tools.md) — what each stationary
+    check, observer and recorder measures
+  - [Driving qualification procedure](physical/driving_qualification_procedure.md)
+    — supervised procedure, verdicts and the stopping-distance method
+- [Wheel feedback and diagnostics](physical/drive_feedback_diagnostics.md) —
+  installed feedback stack, fault flags and the three-rate model
+  - [Per-wheel field age](physical/wheel_feedback_field_age.md) — field
+    eligibility, age and queue bounds, installation and acceptance
+  - [Feedback consumer](physical/wheel_feedback_consumer.md) — missing-feedback
+    policy, lifecycle and recovery
+  - [Motor-link fault injection](physical/motor_link_fault_injection.md) — D6
+    feedback and D7 command-link fault paths and verdicts
 - [Ridgeback host setup and SSD recovery](physical/ridgeback_recovery.md) —
   reconstruction order, deployed scripts/configs, network and service ownership,
   credentials recreated locally, and unverified recovery steps

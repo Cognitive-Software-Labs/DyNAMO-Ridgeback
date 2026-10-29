@@ -22,6 +22,7 @@ are excluded from ordinary repository search and the generated knowledge graph.
 
 ## Benchmarking and execution
 
+- [Scene recertification for the current camera](2026-10-29-scene-recertification.md) — scene_audit method, legacy cross-check, relabel/re-place decisions and asset seating
 - [Gazebo and Isaac backend qualification](2026-10-26-benchmark-gazebo-isaac-qualification.md) — the first and accepted matched full runs, cross-simulator detector and ranking differences, reproducibility of each simulator, interrupted-stop cycles and installed-launch smokes.
 - [Benchmark shutdown ordering and RViz node ownership](2026-10-23-benchmark-shutdown-ownership.md) — client-before-provider rollback, retained view-controller services, native DDS unload evidence, and distinct qualification populations.
 - [Benchmark population and scoring transitions](benchmark_evolution.md)
@@ -47,6 +48,20 @@ are excluded from ordinary repository search and the generated knowledge graph.
 - [D455 camera runs handoff](2026-09-18-d455-camera-runs-handoff.md) — agent 1's state snapshot: Fast DDS camera passes, CycloneDDS failures.
 
 - [Physical mecanum drive investigation](2026-09-18-mecanum-drive-investigation.md)
+- [r100_0160 commissioning guard installation and first low-speed trials](2026-10-06-driving-guard-and-deadman-trials.md) — guard install, capped direction pulses and deadman-release timing.
+- [Puma diagnostic build, first rate capture and startup-transient aborts](2026-10-06-puma-build-and-startup-transients.md) — repair build, first CAN rate capture and the mixed-wheel startup aborts.
+- [r100_0160 e-stop QoS repair and stationary disconnect trials](2026-10-09-estop-qos-and-disconnect-trials.md) — incompatible e-stop QoS, the reliable relay and controller power-off trials.
+- [r100_0160 test-permit interlock, bounded-permit and moving-disconnect trials](2026-10-12-interlock-and-moving-disconnect-trials.md) — permit timeline, interlock installation and the interlocked moving disconnect.
+- [r100_0160 controller input loss, recovery and reconnect cycles](2026-10-12-controller-input-loss-and-reconnect-cycles.md) — connected-but-no-input failures, manual recovery and the autoconnect helper.
+- [Puma repair driver, CAN rates and offline freshness models](2026-10-12-puma-repair-rates-and-freshness-replays.md) — installed repair rates, superseded 16.5 Hz/200 ms models and replays.
+- [Puma feedback-consumer repair, installation and stationary interruptions](2026-10-13-consumer-plugin-and-feedback-outage.md) — consumer candidates, plugin install, feedback and CAN-ingress interruptions.
+- [r100_0160 bounded direction trials and D2 deadman and command-loss runs](2026-10-14-direction-and-deadman-trials.md) — D1 six-direction floor trials and the first D2 runs.
+- [r100_0160 D2 physical-stop capture attempts](2026-10-16-physical-stop-captures.md) — physical e-stop capture attempts and their deviations.
+- [Single-bound field-age candidate and stationary field captures](2026-10-16-field-age-captures.md) — the superseded 200 ms bound and stationary field captures.
+- [r100_0160 original-manual guard profile and D4 handover trials](2026-10-21-original-manual-and-d4-trials.md) — original-manual install and the live handover pass.
+- [Field-age evidence from short moving captures, replays and queue-timing builds](2026-10-21-d5-motion-captures-and-queue.md) — moving captures, replays and the queue-timing layer.
+- [Split field-age bounds, field-driver installation and stationary acceptance](2026-10-22-d5-acceptance.md) — 150/500 ms bounds, install and the revised 75 ms queue criterion.
+- [r100_0160 D-lane baseline, D2 preparation and the reconnected deadman run](2026-10-22-d2-preparation-and-run.md) — baseline snapshot, finalize workflow and the deadman run.
 - [r100_0160 field readings and LiDAR box checks](2026-09-18-r100-0160-field-measurements.md) — tape mount readings, LiDAR range/side checks, and the rear-offset finding.
 - [r100_0160 Thor perception environment and first live localization](2026-10-12-r100-0160-thor-localization-smoke.md) — Thor GPU environment, model timings at 120W and MAXN, the person-threshold and static-TF findings, and the stationary distance smoke.
 - [r100_0160 Intel RViz view of Thor localization](2026-10-13-r100-0160-intel-rviz-observer.md) — SLAM map, scans and Thor's results drawn on Intel in RViz; no image crosses with the box gate; overlay draws on the newest colour frame; CLI probe pitfalls.

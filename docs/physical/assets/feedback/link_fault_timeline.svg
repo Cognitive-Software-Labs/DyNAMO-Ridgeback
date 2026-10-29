@@ -1,0 +1,88 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 930 420" width="930" height="420" role="img" aria-labelledby="title desc">
+  <title id="title">Raised-wheel link-fault trial timeline</title>
+  <desc id="desc">Time relative to drop-rule insertion. The rule is inserted only after the motor command has been forward for 350 ms and every wheel reports at least 0.3 rad/s. The rule stays for the block length, 1.0 s by default and 0.3 to 1.5 s allowed; the cleanup unit removes it 0.25 s after the block at the latest. Samples in the first 0.1 s are in-flight allowance. D6 requires zero motor commands within 0.5 s and none later, no feedback during the block, and a sustained 0.25 s stop after the rule clears. D7 requires feedback to keep arriving with gaps of at most 0.15 s, all wheels at or below 0.05 rad/s for 0.25 s starting within 0.5 s while the upstream source is still nonzero, and no motion after the rule clears.</desc>
+  <style>
+    text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; font-size: 13px; fill: #6e7781; }
+    .head { font-weight: 600; }
+    .small { font-size: 11.5px; }
+    .axis { stroke: #8b949e; stroke-width: 1; fill: none; }
+    .grid { stroke: #8b949e; stroke-width: 0.6; stroke-dasharray: 2 4; opacity: 0.55; }
+    .arm { fill: #8b949e; opacity: 0.45; }
+    .rule { fill: #f85149; opacity: 0.35; }
+    .rule-max { fill: none; stroke: #f85149; stroke-width: 1.2; stroke-dasharray: 4 3; }
+    .inflight { fill: #8b949e; opacity: 0.7; }
+    .d6 { fill: #2f81f7; opacity: 0.45; }
+    .d7 { fill: #d29922; opacity: 0.45; }
+    .ok { fill: #3fb950; opacity: 0.5; }
+    .ok-outline { fill: #3fb950; fill-opacity: 0.2; stroke: #3fb950; stroke-width: 1.2; stroke-dasharray: 4 3; }
+    .limit { stroke: #f85149; stroke-width: 1.6; stroke-dasharray: 5 3; }
+    .zero { stroke: #8b949e; stroke-width: 2; }
+    .limit-text { fill: #f85149; }
+    @media (prefers-color-scheme: dark) { text { fill: #b1bac4; } }
+  </style>
+
+  <!-- x = 260 + (t + 0.5) * 300 ; t in seconds after rule insertion -->
+  <line class="zero" x1="410" y1="22" x2="410" y2="372"/>
+  <text class="small head" x="372" y="16">rule inserted</text>
+  <line class="grid" x1="560" y1="22" x2="560" y2="372"/>
+  <line class="grid" x1="710" y1="22" x2="710" y2="372"/>
+  <line class="grid" x1="860" y1="22" x2="860" y2="372"/>
+
+  <!-- arming -->
+  <text class="head" x="12" y="46">Arming (both faults)</text>
+  <text class="small" x="12" y="62">pulse source at the 0.05 m/s cap</text>
+  <rect class="arm" x="305" y="34" width="105" height="18" rx="2"/>
+  <text class="small" x="262" y="72">forward command for at least 350 ms,</text>
+  <text class="small" x="262" y="86">every wheel at least 0.3 rad/s</text>
+
+  <!-- rule -->
+  <text class="head" x="12" y="114">Drop rule on UDP 11412</text>
+  <text class="small" x="12" y="130">--block-s 0.3–1.5 s, default 1.0 s</text>
+  <rect class="rule" x="410" y="102" width="300" height="18" rx="2"/>
+  <rect class="rule-max" x="710" y="102" width="150" height="18" rx="2"/>
+  <rect class="inflight" x="410" y="124" width="30" height="8"/>
+  <text class="small" x="446" y="140">0.1 s in-flight allowance</text>
+  <text class="small" x="716" y="140">cleanup unit: block + 0.25 s,</text>
+  <text class="small" x="716" y="154">owner exit, or 600 s cap</text>
+
+  <!-- D6 -->
+  <text class="head" x="12" y="190">D6 feedback fault</text>
+  <text class="small" x="12" y="206">MCU to PC dropped</text>
+  <rect class="d6" x="410" y="178" width="150" height="16" rx="2"/>
+  <line class="limit" x1="560" y1="172" x2="560" y2="198"/>
+  <text class="small" x="566" y="190">zero motor command by 0.5 s, none later</text>
+  <rect class="d6" x="440" y="204" width="270" height="16" rx="2"/>
+  <text class="small" x="446" y="216">no feedback sample during the block</text>
+  <rect class="ok" x="710" y="226" width="75" height="16" rx="2"/>
+  <text class="small" x="704" y="238" text-anchor="end">after clear: stopped for 0.25 s</text>
+  <text class="small" x="12" y="236">controller leaves active,</text>
+  <text class="small" x="12" y="250">no restart; source still nonzero</text>
+
+  <!-- D7 -->
+  <text class="head" x="12" y="288">D7 command-link fault</text>
+  <text class="small" x="12" y="304">PC to MCU dropped</text>
+  <rect class="d7" x="440" y="276" width="270" height="16" rx="2"/>
+  <text class="small" x="446" y="288">feedback keeps arriving, gaps at most 0.15 s</text>
+  <rect class="ok-outline" x="560" y="300" width="75" height="16" rx="2"/>
+  <line class="limit" x1="560" y1="294" x2="560" y2="320"/>
+  <text class="small" x="641" y="312">latest pass: all wheels at most</text>
+  <text class="small" x="641" y="326">0.05 rad/s from 0.5 s for 0.25 s</text>
+  <rect class="ok" x="710" y="334" width="150" height="16" rx="2"/>
+  <text class="small" x="704" y="346" text-anchor="end">after clear: no wheel above 0.05 rad/s</text>
+  <text class="small" x="12" y="334">source still nonzero 0.1 s</text>
+  <text class="small" x="12" y="348">after the stop</text>
+
+  <!-- axis -->
+  <line class="axis" x1="260" y1="380" x2="890" y2="380"/>
+  <line class="axis" x1="260" y1="380" x2="260" y2="385"/>
+  <line class="axis" x1="410" y1="380" x2="410" y2="385"/>
+  <line class="axis" x1="560" y1="380" x2="560" y2="385"/>
+  <line class="axis" x1="710" y1="380" x2="710" y2="385"/>
+  <line class="axis" x1="860" y1="380" x2="860" y2="385"/>
+  <text x="248" y="400">-0.5</text>
+  <text x="406" y="400">0</text>
+  <text x="550" y="400">0.5</text>
+  <text x="700" y="400">1.0</text>
+  <text x="850" y="400">1.5 s</text>
+  <text class="small" x="12" y="414">Both trials need a pressed stop at the end, positive drop-rule packets, video and a supervised recovery before a pass.</text>
+</svg>

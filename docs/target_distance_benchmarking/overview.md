@@ -91,7 +91,7 @@ camera-less robot profile for measuring frontier exploration. It is a separate w
   layered replay contract
 - [configurator](configurator.md) — the local browser UI, including its run
   substrate
-- [scenario gallery](benchmark_scenarios_v2_gallery.html) — visual reference for
+- [scenario gallery](benchmark_scenarios_v2_gallery.html) — generated visual reference for
   the packaged scene set
 
 ## Archived evidence

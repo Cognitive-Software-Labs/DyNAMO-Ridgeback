@@ -72,19 +72,41 @@ with demonstrated facts and remove this item only when the listed gates pass.
 
 ## Camera-geometry benchmark recertification
 
-**Gap.** The current measured camera and LiDAR mounts supersede the geometry
-used to generate the visibility fractions and pixel-grid certifications in
-`benchmark_scenarios_full.yaml`. The scenes remain a stable A/B input set, but
-their old certified fractions are not current evidence.
+**Status.** The scenario comments, the gallery and asset seating are current:
+`scene_audit` certifies every scene at 640x480 from the current description,
+and Gazebo and Isaac agree statically on camera pose, intrinsics, LiDAR pose
+and object geometry. [Scene certification](semantics.md#scene-certification)
+owns the method.
 
-**Completion criteria.** Regenerate the pixel/visibility audit from the current
-robot description for both shared camera profiles and verify Gazebo/Isaac
-agreement; update scenario certifications and the gallery; rerun every
-benchmark whose inputs or measured behavior depend on camera or LiDAR geometry
-before quoting its numbers.
+**Gap.** No rendered comparison yet checks the audit's raster against
+simulator depth captures. Every benchmark result recorded before this change
+predates the floor-standing assets and the replaced `edge640_*` scenes.
+
+**Completion criteria.** Predeclare a pixel tolerance, then compare depth-
+derived target masks with the audit on scenes spanning occlusion, edge and
+clutter families in Gazebo, and on object and camera geometry in Isaac. Rerun
+every benchmark whose inputs or measured behavior depend on camera or LiDAR
+geometry or asset seating before quoting its numbers.
 
 **Context.** [Camera stack](../target_localization/camera_stack.md) and
 [shared robot geometry](../robot/geometry.md).
+
+## Shared G1 target geometry
+
+**Gap.** The backends render different G1 assets: Gazebo the STL G1 under
+`ridgeback_autonomy_gz/sim/models/g1`, Isaac the Unitree 29-DoF Dex1 USD under
+`ridgeback_autonomy_isaac/sim/isaac/usd/models/g1`. Both stand on the floor
+with their origin at ground contact, but silhouettes, limb gaps and LiDAR leg
+returns differ. Scene certifications describe the Gazebo G1, and a
+target-dependent result does not transfer between backends.
+
+**Completion criteria.** Render one shared G1 geometry in both backends, or
+audit the Isaac asset with `scene_audit` and record per scene how visible
+fraction, detection box and leg beams differ, and which cross-backend
+comparisons that invalidates.
+
+**Context.** [Scene certification](semantics.md#scene-certification) and the
+Isaac asset's `NOTICE.md`.
 
 ## Isolation validation
 
@@ -186,4 +208,5 @@ owned leftovers separately from saved measurements.
 ## Archived evidence
 
 - [Gazebo and Isaac backend qualification](../../archive/engineering/2026-10-26-benchmark-gazebo-isaac-qualification.md)
+- [Scene recertification for the current camera](../../archive/engineering/2026-10-29-scene-recertification.md)
 - [Layered replay implementation and preliminary storage evidence](../../archive/engineering/layered_replay_implementation_validation.md)
