@@ -260,11 +260,13 @@ class MissionManagerNode(Node):
         self.declare_parameter('parking_input_timeout_s', 10.0)
         # G1-centred mapping with the shared explorer before parking planning.
         self.declare_parameter('g1_exploration_enabled', True)
+        # Exploration ends when every donut cell (the planner's task-point cells) is
+        # known on the SLAM map; the wider footprint area out to this radius is reported.
         self.declare_parameter('g1_coverage_radius_m', 1.4)
-        self.declare_parameter('g1_coverage_max_unknown_fraction', 0.02)
         self.declare_parameter('g1_exploration_timeout_s', 240.0)
         self.declare_parameter('g1_exploration_protected_margin_m', 0.15)
         self.declare_parameter('exploration_resume_service', 'mission/resume')
+        self.declare_parameter('explorer_status_topic', 'explore/status')
         self.declare_parameter('odom_frame', 'odom')
         self.declare_parameter('odometry_topic', 'platform/odom/filtered')
         self.declare_parameter('motion_linear_limit_mps', 0.005)
@@ -454,14 +456,19 @@ class MissionManagerNode(Node):
         self.focus_publisher = self.create_publisher(PointStamped, 'explore/focus', status_qos)
         self.g1_exploration_enabled = bool(self.get_parameter('g1_exploration_enabled').value)
         self.g1_coverage_radius_m = float(self.get_parameter('g1_coverage_radius_m').value)
-        self.g1_coverage_max_unknown = float(
-            self.get_parameter('g1_coverage_max_unknown_fraction').value)
         self.g1_exploration_timeout_s = float(self.get_parameter('g1_exploration_timeout_s').value)
         self.g1_protected_margin_m = float(
             self.get_parameter('g1_exploration_protected_margin_m').value)
         self._g1_explored = False
         self._observation_pose = None
         self._g1_exploration_deadline_s = None
+        self._g1_explorer_resumed = False
+        self._g1_frontiers_exhausted = False
+        self._g1_exploration_started_s = None
+        self.g1_exploration_result = None
+        self.exploration_status_subscription = self.create_subscription(
+            String, str(self.get_parameter('explorer_status_topic').value),
+            self._on_exploration_status, 10)
         self.compute_path_client = (compute_path_client if compute_path_client is not None else
                                     ActionClient(self, ComputePathToPose, 'compute_path_to_pose'))
         self.odom_subscription = self.create_subscription(
@@ -852,6 +859,9 @@ class MissionManagerNode(Node):
             self._g1_explored = False
             self._observation_pose = None
             self._g1_exploration_deadline_s = None
+            self._g1_explorer_resumed = self._g1_frontiers_exhausted = False
+            self._g1_exploration_started_s = None
+            self.g1_exploration_result = None
             self._parking_failure = None
             self._arrival_errors = {}
             self.stage_paths.reset()
@@ -1232,6 +1242,7 @@ class MissionManagerNode(Node):
             'target_source': None if position is None else position.source,
             'is_foot_midpoint': None if position is None else position.is_foot_midpoint,
             'parking_plan': self._plan_summary(),
+            'g1_exploration': self.g1_exploration_result,
             'parking_mission_navigation': {
                 'enabled': self.parking_navigation_enabled,
                 'failure': self._parking_failure,
@@ -2112,8 +2123,12 @@ class MissionManagerNode(Node):
 
     # G1-centred mapping: the shared explorer, focused on G1 through explore/focus.
 
-    def _g1_unknown_fraction(self):
-        """Unknown share of the cells a parking footprint can occupy around G1."""
+    def _g1_coverage(self):
+        """Unknown cells of the donut and unknown share of the footprint area, on the SLAM map.
+
+        The donut uses the planner's own cell rule (cell centre within the reach
+        band), so it matches the plan's ``donut_unknown`` and the orange P2 rays.
+        """
         position = self.target_position
         if position is None or self.latest_map is None:
             return None
@@ -2124,33 +2139,49 @@ class MissionManagerNode(Node):
         rows, cols = np.mgrid[0:grid.height, 0:grid.width]
         x, y = grid.cell_centers(cols, rows)
         d = np.hypot(x - position.map_x_m, y - position.map_y_m)
-        region = (d >= self.planner_config.reach_min_m) & (d <= self.g1_coverage_radius_m)
-        if not region.any():
+        donut = (d >= self.planner_config.reach_min_m) & (d <= self.planner_config.reach_max_m)
+        area = (d > self.planner_config.reach_max_m) & (d <= self.g1_coverage_radius_m)
+        if not donut.any():
             return None
-        return float(np.count_nonzero(grid.data[region] < 0)) / float(np.count_nonzero(region))
+        unknown = grid.data < 0
+        return {
+            'donut_cells': int(np.count_nonzero(donut)),
+            'donut_unknown_cells': int(np.count_nonzero(unknown & donut)),
+            'footprint_area_unknown_fraction': round(
+                float(np.count_nonzero(unknown & area)) / max(1, int(np.count_nonzero(area))), 4),
+        }
 
     def _maybe_explore_around_g1(self):
-        """Resume the explorer around G1 when the parking area is not yet mapped."""
+        """Resume the explorer around G1 unless every donut cell is already known."""
         if not self.g1_exploration_enabled or self._g1_explored:
             return False
-        unknown = self._g1_unknown_fraction()
-        if unknown is None or unknown <= self.g1_coverage_max_unknown:
+        coverage = self._g1_coverage()
+        if coverage is None:
+            return False
+        if coverage['donut_unknown_cells'] == 0:
+            self.g1_exploration_result = {'outcome': 'not_needed', 'reason': 'donut_already_mapped',
+                                          'duration_s': 0.0, 'before': coverage, 'after': coverage}
+            self.get_logger().info(f'Donut already mapped; no G1 exploration: {coverage}')
             return False
         if not self.resume_client.service_is_ready():
             self.get_logger().warning(
-                f'Parking area {unknown:.0%} unknown, but no explorer resume service; '
-                'planning with the current map')
+                f'Donut has {coverage["donut_unknown_cells"]} unknown cells, but no explorer '
+                'resume service; planning with the current map')
             return False
         self._g1_explored = True
+        self._g1_explorer_resumed = self._g1_frontiers_exhausted = False
         self._observation_pose = self._current_robot_pose()
-        self._g1_exploration_deadline_s = self._monotonic() + self.g1_exploration_timeout_s
+        self._g1_exploration_started_s = self._monotonic()
+        self._g1_exploration_deadline_s = self._g1_exploration_started_s + self.g1_exploration_timeout_s
+        self.g1_exploration_result = {'outcome': 'running', 'reason': None, 'before': coverage}
         focus = PointStamped()
         focus.header.frame_id = self.map_frame
         focus.header.stamp = self.get_clock().now().to_msg()
         focus.point.x, focus.point.y = self.target_position.map_x_m, self.target_position.map_y_m
         self.focus_publisher.publish(focus)
         self._transition(MissionState.EXPLORING_AROUND_G1,
-                         f'parking area {unknown:.0%} unknown; exploring around G1')
+                         f'{coverage["donut_unknown_cells"]}/{coverage["donut_cells"]} donut cells '
+                         'unknown; exploring around G1')
         self.resume_client.call_async(Trigger.Request()).add_done_callback(self._on_resume_response)
         return True
 
@@ -2164,10 +2195,19 @@ class MissionManagerNode(Node):
             except Exception as exc:
                 ok, message = False, str(exc)
             if not ok:
-                self._finish_g1_exploration(f'explorer did not resume: {message}')
+                self._finish_g1_exploration('partial', 'explorer_not_resumed', message)
+                return
+            self._g1_explorer_resumed = True
+
+    def _on_exploration_status(self, msg: String) -> None:
+        """The explorer has no reachable frontier left in the focus region around G1."""
+        with self._lock:
+            if (msg.data == 'focus_exploration_complete' and self._g1_explorer_resumed
+                    and self.state == MissionState.EXPLORING_AROUND_G1):
+                self._g1_frontiers_exhausted = True
 
     def _poll_g1_exploration(self, now_s):
-        unknown = self._g1_unknown_fraction()
+        coverage = self._g1_coverage()
         robot = self._current_robot_pose()
         if robot is not None and self.target_position is not None:
             polygon = rotated_footprint_vertices(self.planner_config.footprint, *robot)
@@ -2178,19 +2218,33 @@ class MissionManagerNode(Node):
             gap = points_to_polygon_distance([target.x], [target.y], polygon)[0]
             if gap < protected:
                 self._finish_g1_exploration(
+                    'partial', 'protected_region',
                     f'footprint {gap:.2f} m from G1 inside the protected {protected:.2f} m')
                 return
-        if unknown is not None and unknown <= self.g1_coverage_max_unknown:
-            self._finish_g1_exploration(f'parking area mapped ({unknown:.1%} unknown)')
+        if coverage is not None and coverage['donut_unknown_cells'] == 0:
+            self._finish_g1_exploration('complete', 'donut_mapped', 'every donut cell is known')
+        elif self._g1_frontiers_exhausted:
+            # Remaining unknown donut cells are not reachable by the explorer (occluded or
+            # outside its goal annulus): plan with them; candidates there stay rejected.
+            self._finish_g1_exploration('partial', 'no_reachable_frontiers',
+                                        'explorer found no frontier left around G1')
         elif now_s >= self._g1_exploration_deadline_s:
-            self._finish_g1_exploration(
-                f'G1 exploration timeout with {unknown if unknown is not None else 1:.0%} unknown')
+            self._finish_g1_exploration('partial', 'timeout',
+                                        f'{self.g1_exploration_timeout_s:.0f} s elapsed')
 
-    def _finish_g1_exploration(self, reason):
+    def _finish_g1_exploration(self, outcome, reason, detail):
         self.focus_publisher.publish(PointStamped())   # empty frame clears the focus
         self._g1_exploration_deadline_s = None
-        self.get_logger().info(f'G1 exploration finished: {reason}')
-        if self._transition(MissionState.STOPPING_EXPLORATION, f'{reason}; pausing explorer'):
+        coverage = self._g1_coverage()
+        result = dict(self.g1_exploration_result or {})
+        result.update(outcome=outcome, reason=reason, after=coverage, duration_s=round(
+            self._monotonic() - (self._g1_exploration_started_s or self._monotonic()), 2))
+        self.g1_exploration_result = result
+        summary = (f'{outcome} ({reason}): {detail}; donut unknown '
+                   f'{"?" if coverage is None else coverage["donut_unknown_cells"]}'
+                   f'/{"?" if coverage is None else coverage["donut_cells"]}')
+        self.get_logger().info(f'G1 exploration finished: {summary}')
+        if self._transition(MissionState.STOPPING_EXPLORATION, f'{summary}; pausing explorer'):
             self._begin_exploration_handoff()
 
     def _stop_g1_exploration(self):
