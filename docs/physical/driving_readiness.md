@@ -1,5 +1,7 @@
 # Ridgeback driving command path and qualification
 
+<!-- doc-budget: 1630 lines; reason: split pending into current-state pages and archive records -->
+
 Driving readiness requires both a compatible software command path and observed
 physical stopping. Graph discovery, stationary odometry, DDS throughput and
 camera readiness do not establish the latter. The remaining gate lives in the
@@ -1211,7 +1213,7 @@ Repeated cycles and silent-radio-loss qualification remain open. Driving-enable
 was held about 6.45 seconds rather than the requested one second; this was an
 engaged-stop observation, not a motion exposure or braking test.
 
-## October 14 controller input under the physical stop
+## Controller input under the physical stop
 
 After the local clock gate eventually passed and the platform reached
 active/running, `controller-input-20261014T090714Z` recorded 991 joystick
@@ -1533,7 +1535,7 @@ was not enlarged to make a human-timed test pass. A future e-stop qualification
 must actually capture the stop action while nonzero motor commands are still
 present, with the operator able to act within that window.
 
-## October 22 D2/D3/D8 preparation
+## D2, D3 and D8 preparation
 
 The current guard service uses `--original-manual-speeds`. A read-only
 stationary batch on 2026-10-22 passed with the physical stop pressed; both

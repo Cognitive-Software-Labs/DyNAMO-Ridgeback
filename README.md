@@ -1,5 +1,7 @@
 # Ridgeback Exploration, Target Localization, and Benchmarking
 
+<!-- doc-budget: 2253 lines; reason: split pending into a router plus operator runbooks -->
+
 Autonomous exploration, reusable target localization, and distance benchmarking
 for a [Clearpath Ridgeback](https://clearpathrobotics.com/ridgeback-indoor-robot-platform/)
 robot on physical hardware, in Gazebo Harmonic, or in NVIDIA Isaac Sim 6.1 with
@@ -2053,7 +2055,7 @@ sudo python3 tools/hardware/install_stationary_setup.py --restore --detach \
 Rollback refuses changed managed files. The stage must use a fresh directory;
 application also refuses files or service state changed since staging.
 
-## Hardware camera service
+## Hardware camera service status and source restore
 
 The maintained boot-service sources are restored from the installed camera's
 recorded Git revision; its current contract and recovery inputs live in

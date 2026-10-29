@@ -1,5 +1,7 @@
 # External dependency management
 
+<!-- doc-budget: 646 lines; reason: split pending; overlay and patch procedures are separable -->
+
 This page owns the repository's procedure for importing, patching, verifying,
 refreshing, and rolling back external ROS source repositories. The root README
 keeps the public installation commands; dated refresh results belong in

@@ -1,5 +1,7 @@
 # Ridgeback wheel feedback and diagnostic qualification
 
+<!-- doc-budget: 908 lines; reason: split pending into current-state pages and archive records -->
+
 The [driving qualification](driving_readiness.md) remains open. Command caps
 bound requested velocities; they do not establish synchronized wheel response,
 physical stopping distance or truthful diagnostic decoding.

@@ -117,6 +117,10 @@ qualified. Each needs a new scope decision; reopen it before the named use.
 | IMU calibration | Factory calibration is accepted without a reference calibration; covariance stays reported as unknown. | Heading drift or SLAM smearing that points to the IMU |
 | Battery health | Only pack voltage, total current and MCU/PCB temperatures exist; the battery model is unidentified. | Long or unattended missions that depend on battery health |
 
+**Completion criteria.** A row leaves this table when a scope decision reopens
+it as an active item with its own criteria, or when its gate is qualified and
+the result is recorded in its reference.
+
 ## Optional physical organized-pointcloud qualification
 
 **Status.** Separate optional follow-up; not a blocker for core D455 colour and
@@ -232,7 +236,9 @@ stopping proof. Those are separate tasks under this gate.
 ## MyBotShop follow-ups
 
 Open questions for the next call with MyBotShop, the robot's integrator.
-Resolve each one here or move it to the item that owns it.
+
+**Completion criteria.** Each question is answered, and the answer is recorded
+in the reference that owns the fact or moved to the item that owns the work.
 
 - **Rear LiDAR offset.** Where did x = −0.4278 come from in
   `/etc/clearpath/robot.yaml` (first seen 2026-08-06) and the scan-merger

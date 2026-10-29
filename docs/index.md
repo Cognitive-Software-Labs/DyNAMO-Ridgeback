@@ -84,6 +84,7 @@ troubleshooting, planning, and historical documentation.
 - [BENCHMARKING — Execution-environment qualification](plans/BENCHMARKING_environment_qualification.md) — prerequisite for tuning and benchmark claims
 - [BENCHMARKING — Combined-model throughput](plans/BENCHMARKING_model_throughput.md) — run the existing sweep and determine whether concurrency is needed
 - [BENCHMARKING — Stationary hardware scene recording](plans/BENCHMARKING_hardware_recording.md) — raw sensor bags and measured G1 positions for later estimator comparison; recording not started
+- [BENCHMARKING — Shutdown lifecycle and crash qualification](plans/BENCHMARKING_shutdown_lifecycle.md) — remaining shutdown qualification and dependency investigations
 - [BENCHMARKING — Live configurator sweeps](plans/BENCHMARKING_live_configurator_sweeps.md) — blocked on live process ownership and cleanup; follows environment qualification
 - [Distributed localization contract](target_localization/distributed_deployment.md) — packages, host roles, health, and mission pause/resume
 - [PHYSICAL — Intel–Thor deployment and transport qualification](plans/PHYSICAL_intel_thor_deployment.md) — robot-side installation, GPU offload, Ethernet measurements, and failure handling

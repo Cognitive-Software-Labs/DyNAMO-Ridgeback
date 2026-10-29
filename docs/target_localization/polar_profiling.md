@@ -478,7 +478,7 @@ can only ever select background. This is structural, not a tuning failure: no
 value of any parameter in §6 recovers it. It is a stronger condition than "the
 scan plane intersects the object", and it is the one that binds up close.
 
-### 7.2 Measured, 2026-09-09
+### 7.2 Measured validation run
 
 `artifacts/benchmarks/20260909_210559_polar_validation`, polar alone, box gate,
 full scenario set, 109 trials:

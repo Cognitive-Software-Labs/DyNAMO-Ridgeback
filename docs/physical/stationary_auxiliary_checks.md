@@ -281,7 +281,7 @@ guarded routing, active services and a passing local clock gate. The report is
 under `artifacts/hardware/stationary-batch-20261013T130511Z-ca5147/`.
 This is stationary health, not driving or Intel–Thor time qualification.
 
-## October 14 startup blocked by remaining clock correction
+## Startup blocked by remaining clock correction
 
 The camera traffic screen at `camera-port-screen-20261014T084637335854Z`
 stopped before any readers or packet capture. Its probe received no firmware
