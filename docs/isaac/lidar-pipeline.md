@@ -2,7 +2,9 @@
 
 The two UST-10LX scans remain independent navigation inputs. `slam_source`
 selects SLAM input only: `front_only` (the public default) uses the front scan;
-`merged` explicitly enables a front/rear scan in `base_link`.
+`merged` explicitly enables a front/rear scan in `base_link`. The Gazebo
+[parking demonstration](../exploration/parking_demo.md#scene-configuration-and-startup-gates)
+selects `merged` by default.
 
 ```text
 front RTX cloud ── 270° assembler ── front scan ──┬── navigation

@@ -57,6 +57,16 @@ Creation failures or existing G1 entities abort startup rather than renaming
 or deleting an existing target. Manual `gz service` calls and the removed
 `benchmarking.simulation.spawn_model_command` helper are not needed.
 
+On Gazebo the demonstration maps both LiDARs: `ridgeback_mission.launch.py`
+defaults `slam_source` to `merged` for `backend:=gz` and to `front_only` for
+Isaac, and an explicit `slam_source:=...` still wins. Front-only SLAM never
+observes the floor behind the spawn pose, which left the start of every
+parking route unknown, so path feasibility rejected all of them
+(`path_footprint_unknown`). The merge, its frames and its range limits are
+owned by the [LiDAR pipeline](../isaac/lidar-pipeline.md#merger-and-range-limits);
+navigation, the collision monitor and the mission's LiDAR clearance keep the
+two raw scans, and the shared exploration default stays `front_only`.
+
 The mission explicitly selects this checkout's `clearpath/robot.yaml`; an
 explicit `setup_path:=...` remains supported, but Isaac rejects a sensor rig
 different from its committed USD. Manager odometry defaults to

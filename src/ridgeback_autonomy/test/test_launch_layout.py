@@ -97,6 +97,28 @@ def _launch_context(**configurations):
     return context
 
 
+def test_parking_demo_maps_both_lidars_only_on_gazebo() -> None:
+    from launch.actions import DeclareLaunchArgument
+
+    description = _mission_launch_module().generate_launch_description()
+    (argument,) = [entity for entity in description.entities
+                   if isinstance(entity, DeclareLaunchArgument) and entity.name == 'slam_source']
+    assert argument.choices == ['front_only', 'merged']
+    for backend, expected in (('gz', 'merged'), ('isaac', 'front_only')):
+        context = _launch_context(backend=backend)
+        assert ''.join(s.perform(context) for s in argument.default_value) == expected
+    mission_text = (
+        _package_root() / 'launch' / 'ridgeback_mission.launch.py'
+    ).read_text(encoding='utf-8')
+    assert "'slam_source': LaunchConfiguration('slam_source')" in mission_text
+    # The shared exploration default is unchanged.
+    exploration_text = (
+        _package_root() / 'launch' / 'ridgeback_exploration.launch.py'
+    ).read_text(encoding='utf-8')
+    slam_argument = exploration_text[exploration_text.index("'slam_source',"):]
+    assert "default_value='front_only'" in slam_argument[:120]
+
+
 def test_exploration_and_stationary_mock_cannot_run_together() -> None:
     import pytest
 

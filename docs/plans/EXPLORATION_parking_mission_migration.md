@@ -377,12 +377,17 @@ TF or changing estimator validation.
    and Isaac driving validation. The occupied start cell that rejected every
    Gazebo route came from Gazebo's corrupted first LiDAR ray, now invalidated
    at the source ([Gazebo first ray](../isaac/lidar-pipeline.md#gazebo-first-ray));
-   path feasibility still rejects any occupied cell under the robot. Gazebo
-   planning now stops at `path_footprint_unknown`: front-only SLAM never
-   observes the floor behind the spawn pose, and routes that rotate near the
-   start sweep into that unknown wedge. Clearing it needs that floor observed,
-   for example by the existing `slam_source=merged`, which is a shared SLAM
-   change not yet made.
+   path feasibility still rejects any occupied cell under the robot. The
+   unknown floor behind the spawn pose that then rejected every route is
+   observed by merged SLAM, which the Gazebo parking demonstration now
+   selects ([parking demonstration](../exploration/parking_demo.md#scene-configuration-and-startup-gates));
+   with it Gazebo reaches `PARKING_PATH_FEASIBLE`. The complete mission is
+   next blocked intermittently at the second localization: after the
+   observation return the robot stops about 18° off its observation yaw,
+   within the shared 0.40 rad goal tolerance, with the G1 about 20° off the
+   camera axis. In two of five runs the detector then reported no G1 for the
+   whole 5 s window (`target_localization_timeout`). Detection and the
+   observation-return tolerance are unchanged pending a decision.
 8. **Port markers and launch integration.** Add relative marker topics and
    clean RViz displays, then integrate the manager into the current readiness
    chain without changing backend packages or Nav2 safety parameters.
