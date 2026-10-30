@@ -438,3 +438,5 @@ TF or changing estimator validation.
   — live validation of the ray colours and the final-approach veto on G1's leg.
 - [Parking whole-ray display](../../archive/engineering/2026-10-30-parking-whole-ray-display.md)
   — one colour per complete ray, and a repeat of the final-approach veto.
+- [G1 exploration footprint coverage](../../archive/engineering/2026-10-30-g1-exploration-footprint-coverage.md)
+  — exploration continues until no allowed parking pose is undecided by unknown space.
