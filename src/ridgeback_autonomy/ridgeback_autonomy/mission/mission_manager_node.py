@@ -2409,7 +2409,9 @@ class MissionManagerNode(Node):
             return 'odometry_stale'
         t = odometry.twist.twist
         plan, sel = self.parking_plan, self.parking_plan.selected
-        route = driven_poses(plan.selected_path, sel, robot)
+        # Without the robot pose driven_poses prepends, so remaining_route locates the
+        # robot on the checked route instead of sweeping back to its start.
+        route = driven_poses(plan.selected_path, sel, robot)[1:]
         return clearance_reason(
             (np.concatenate(xs), np.concatenate(ys)), self.planner_config.footprint,
             (t.linear.x, t.linear.y, t.angular.z), age, robot, route,

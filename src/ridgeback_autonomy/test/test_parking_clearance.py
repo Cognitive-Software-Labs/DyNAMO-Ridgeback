@@ -12,7 +12,9 @@ from ridgeback_autonomy.mission.parking_clearance import (
     clearance_reason, remaining_route, scan_points, stopping_poses,
 )
 from ridgeback_autonomy.mission.parking_feasibility import driven_poses
-from ridgeback_autonomy.mission.parking_geometry import normalize_angle, preparking_pose
+from ridgeback_autonomy.mission.parking_geometry import (
+    normalize_angle, preparking_pose, rotated_footprint_vertices,
+)
 from ridgeback_autonomy.mission.parking_planner import plan_parking
 from ridgeback_autonomy.mission.parking_safety import ProtectionLimits
 from test_mission_manager import manager_factory  # noqa: F401 (fixture)
@@ -236,3 +238,41 @@ def test_clearance_is_published_with_the_mission_state(manager_factory, monkeypa
     assert payload['parking_clearance']['reason'] == 'lidar_obstacle_on_route'
     leg = payload['parking_clearance']['legs']['navigating_to_preparking']
     assert leg['checks'] >= 2 and leg['min_nearest_m'] is not None   # it ran on every scan
+
+
+def dense_selected_route(m, step=0.05):
+    """The selected path with NavFn's dense placeholder poses, as Nav2 returns it."""
+    from geometry_msgs.msg import PoseStamped
+    poses = m.parking_plan.selected_path.poses
+    (x0, y0), goal = (poses[0].pose.position.x, poses[0].pose.position.y), poses[-1]
+    n = int(math.hypot(goal.pose.position.x - x0, goal.pose.position.y - y0) / step)
+    dense = []
+    for k in range(n):
+        p = PoseStamped()
+        p.header = goal.header
+        p.pose.position.x = x0 + (goal.pose.position.x - x0) * k / n
+        p.pose.position.y = y0 + (goal.pose.position.y - y0) * k / n
+        p.pose.orientation.w = 1.0
+        dense.append(p)
+    m.parking_plan.selected_path.poses = dense + list(poses[1:])
+    return driven_poses(m.parking_plan.selected_path, m.parking_plan.selected, (1.0, 2.0, 0.25))
+
+
+# Recorded 2026-10-30: 2 m into the leg the monitor swept the robot back to the route's
+# start, across a real person the route had cleared, because the route it was given
+# began with the robot's own pose and so was "nearest" there.
+def test_only_the_route_ahead_of_the_robot_is_checked(manager_factory, monkeypatch):
+    m, handle, _ = driving(manager_factory, monkeypatch)
+    route = dense_selected_route(m)
+    ahead = route[len(route) // 2]
+    m.tf_buffer.x, m.tf_buffer.y = ahead[:2]               # the robot followed the route
+    robot = (m.tf_buffer.x, m.tf_buffer.y, m.tf_buffer.yaw)
+    from ridgeback_autonomy.mission.parking_planner import points_to_polygon_distance
+    here = rotated_footprint_vertices(m.planner_config.footprint, *robot)
+    left_behind, final = route[0][:2], route[-1][:2]    # where it started; where it will park
+    for point in (left_behind, final):                  # neither is in the stopping path
+        assert points_to_polygon_distance([point[0]], [point[1]], here)[0] > 0.2
+    feed(m, [tuple(zip(*base_points(robot, [left_behind])))[0]])
+    assert handle.cancels == 0 and m.state == MissionState.NAVIGATING_TO_PREPARKING
+    feed(m, [tuple(zip(*base_points(robot, [final])))[0]])
+    assert handle.cancels == 1 and 'lidar_obstacle_on_route' in m._parking_failure

@@ -181,14 +181,13 @@ def generate_launch_description():
         DeclareLaunchArgument('estimators', default_value='all'),
         DeclareLaunchArgument('detector_debug', default_value='false'),
         DeclareLaunchArgument(
-            'slam_source', default_value=PythonExpression([
-                "'merged' if '", backend, "' == 'gz' else 'front_only'"]),
+            'slam_source', default_value='merged',
             choices=['front_only', 'merged'],
             description=(
-                'SLAM input for this demo. Gazebo maps both LiDARs: front-only SLAM '
+                'SLAM input for this demo. Both LiDARs are mapped: front-only SLAM '
                 'never observes the floor behind the spawn pose, so every parking '
-                'route stayed unknown there. Isaac and the shared exploration '
-                'default keep front_only')),
+                'route stayed unknown there. The shared exploration default keeps '
+                'front_only')),
         DeclareLaunchArgument('gz_gui', default_value='true'),
         DeclareLaunchArgument('headless_rendering', default_value='false'),
         DeclareLaunchArgument(

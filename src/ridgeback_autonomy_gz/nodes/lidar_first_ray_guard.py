@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
-"""Republish Gazebo 2D LiDAR scans with their corrupted first ray marked invalid.
+"""Republish Gazebo 2D LiDAR scans with their corrupted rays marked invalid.
 
-The installed gz-rendering GPU rays do not measure the first sample of a
-270-degree scan along its labelled -135 degree bearing: it carries a range from
-about 90 degrees away, next to the -45 degree cube-map face seam. Every other
-ray, including the last, agrees with its neighbours. SLAM integrated those
-endpoints as isolated phantom obstacles, one of them inside the robot's start
-footprint. NaN marks the sample erroneous (REP 117); SLAM, Nav2 and this
-repository's scan consumers already skip non-finite ranges. Nothing else in
-the scan changes.
+The installed gz-rendering GPU rays do not measure two bins of the 1081-bin,
+270-degree scan correctly. The first ray (-135 degrees) carries a range from
+about 90 degrees away, next to the -45 degree cube-map face seam; SLAM
+integrated those endpoints as phantom obstacles, one inside the robot's start
+footprint. Bin 360, on that -45 degree seam, returns phantom short ranges in
+roughly 10-26% of scans, which vetoed parking legs. NaN marks a sample
+erroneous (REP 117); SLAM, Nav2 and this repository's scan consumers already
+skip non-finite ranges. Nothing else in the scan changes.
 """
 
 import math
@@ -19,10 +19,15 @@ from rclpy.qos import qos_profile_sensor_data
 from sensor_msgs.msg import LaserScan
 
 
+# Bin indices of the 1081-bin scan that gz-rendering corrupts: -135 and -45 degrees.
+CORRUPTED_BINS = (0, 360)
+
+
 def invalidate_first_ray(msg):
-    """Mark ``ranges[0]`` erroneous in place and return ``msg``."""
-    if len(msg.ranges):
-        msg.ranges[0] = math.nan
+    """Mark the corrupted bins erroneous in place and return ``msg``."""
+    for index in CORRUPTED_BINS:
+        if index < len(msg.ranges):
+            msg.ranges[index] = math.nan
     return msg
 
 

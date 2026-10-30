@@ -41,8 +41,9 @@ bash start_parking_demo.sh isaac
 
 Cancelled or vetoed legs hold Nav2 goal ownership until a terminal result, as
 described in [mission navigation goal ownership](architecture.md#mission-navigation-goal-ownership).
-Full driving remains subject to the separately identified checked-route
-execution issue; startup validation does not qualify it. The return to the G1
+During both parking legs the live LiDAR clearance monitor checks the stopping
+path and the validated route still ahead of the robot; the route it has already
+driven is not re-checked. The return to the G1
 observation pose uses a temporary tight goal checker and a verified view before
 relocalizing ([observation return](architecture.md#observation-return)); it can
 still fail explicitly, including in `--planning-only` mode. No execution
@@ -59,9 +60,9 @@ Creation failures or existing G1 entities abort startup rather than renaming
 or deleting an existing target. Manual `gz service` calls and the removed
 `benchmarking.simulation.spawn_model_command` helper are not needed.
 
-On Gazebo the demonstration maps both LiDARs: `ridgeback_mission.launch.py`
-defaults `slam_source` to `merged` for `backend:=gz` and to `front_only` for
-Isaac, and an explicit `slam_source:=...` still wins. Front-only SLAM never
+The demonstration maps both LiDARs: `ridgeback_mission.launch.py` defaults
+`slam_source` to `merged` on Gazebo and Isaac, and an explicit
+`slam_source:=...` still wins. Front-only SLAM never
 observes the floor behind the spawn pose, which left the start of every
 parking route unknown, so path feasibility rejected all of them
 (`path_footprint_unknown`). The merge, its frames and its range limits are

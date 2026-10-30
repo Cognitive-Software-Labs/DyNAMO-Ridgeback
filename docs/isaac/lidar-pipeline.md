@@ -2,9 +2,9 @@
 
 The two UST-10LX scans remain independent navigation inputs. `slam_source`
 selects SLAM input only: `front_only` (the public default) uses the front scan;
-`merged` explicitly enables a front/rear scan in `base_link`. The Gazebo
+`merged` explicitly enables a front/rear scan in `base_link`. The
 [parking demonstration](../exploration/parking_demo.md#scene-configuration-and-startup-gates)
-selects `merged` by default.
+selects `merged` by default on both simulators.
 
 ```text
 front RTX cloud ── 270° assembler ── front scan ──┬── navigation
@@ -56,8 +56,8 @@ Gazebo produces the same two raw scans from `gpu_lidar` sensors in the
 Clearpath description. Its geometry, range, rate and frames match the table
 above. The generated bridges publish them on `sensors/lidar2d_N/scan_gz`, and
 `lidar_first_ray_guard` (Gazebo adapter) republishes each on
-`sensors/lidar2d_N/scan` with `ranges[0]` set to NaN and every other field
-unchanged; see [first ray](#gazebo-first-ray). `patches/clearpath_ust10lx_sim_lidar.patch` supplies the
+`sensors/lidar2d_N/scan` with `ranges[0]` and `ranges[360]` set to NaN and
+every other field unchanged; see [first ray](#gazebo-first-ray). `patches/clearpath_ust10lx_sim_lidar.patch` supplies the
 UST-10LX values; the [dependency runbook](../project/dependency_patches.md#ust-10lx-gazebo-lidar-patch)
 owns that patch. The two simulators still differ in three ways:
 
@@ -86,8 +86,8 @@ rays near -45° (bins 359–361) instead. The other edge pairs checked (bins 1�
 and 1078–1080, so the last ray too) agree in about 99% of scans. SLAM integrated those endpoints
 as isolated occupied cells that no other ray supported. One such cell inside
 the robot's start footprint rejected every parking route. The guard marks that
-one bin erroneous (NaN,
-REP 117); SLAM, Nav2 and the repository's consumers skip non-finite ranges.
+bin erroneous (NaN, REP 117); SLAM, Nav2 and the repository's consumers skip
+non-finite ranges.
 Clearpath's generated bridge launch files stay unchanged: `gazebo.launch.py`
 adds one node-targeted remap per `lidar2d` in `robot.yaml`
 (`<lidar>_gz_bridge:<ns>/sensors/<lidar>/scan`), so no other node is renamed.
@@ -96,9 +96,9 @@ Isaac and hardware scans are not affected.
 The bins at the ±45° cube-map face seams (360 and 720) also read `+inf` far
 more often than their neighbours. Bin 360 (-45°) also returns phantom short
 ranges on both LiDARs, more than 0.3 m short of two agreeing neighbours, in
-roughly 10–26% of scans. The parking clearance monitor treats those as real
-returns, so they can veto a parking leg. Both seam bins are currently left
-unchanged.
+roughly 10–26% of scans. The parking clearance monitor treats every return as
+real, so these vetoed parking legs; the guard sets bin 360 to NaN as well.
+Bin 720 (+45°) shows no short phantoms and is left unchanged.
 
 Gazebo scans before and after the guard are different populations: do not
 pair LiDAR-dependent Gazebo results across that change.

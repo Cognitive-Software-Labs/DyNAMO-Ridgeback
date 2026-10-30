@@ -2,8 +2,8 @@
 
 Status: **Phase 1 geometry foundation and Phase 2 detection, localization,
 explorer handoff, mission coordination, candidate and path feasibility, and the
-simulation execution tail are implemented; driving is not yet qualified
-end to end.** This plan covers adapting the existing
+simulation execution tail are implemented; the complete mission has reached
+`MISSION_COMPLETE` on Gazebo and Isaac.** This plan covers adapting the existing
 Ridgeback-G1 parking mission to the current package-split architecture without
 duplicating localization or changing Nav2 safety configuration.
 
@@ -372,27 +372,27 @@ TF or changing estimator validation.
    `NavigateToPose` goal is released only by its terminal result, including
    through cancellation, deadlines, LiDAR vetoes and reset; the contract is in
    [mission navigation goal ownership](../exploration/architecture.md#mission-navigation-goal-ownership).
-   Remaining before qualification: one complete Gazebo mission to
-   `MISSION_COMPLETE`, the separate checked-route-versus-executed-route issue,
-   and Isaac driving validation. The occupied start cell that rejected every
+   The complete mission now reaches `MISSION_COMPLETE` on Gazebo and Isaac
+   with the one-command demonstration; the fixes along the way follow. The
+   occupied start cell that rejected every
    Gazebo route came from Gazebo's corrupted first LiDAR ray, now invalidated
    at the source ([Gazebo first ray](../isaac/lidar-pipeline.md#gazebo-first-ray));
    path feasibility still rejects any occupied cell under the robot. The
    unknown floor behind the spawn pose that then rejected every route is
-   observed by merged SLAM, which the Gazebo parking demonstration now
-   selects ([parking demonstration](../exploration/parking_demo.md#scene-configuration-and-startup-gates));
+   observed by merged SLAM, which the parking demonstration now selects on
+   both simulators ([parking demonstration](../exploration/parking_demo.md#scene-configuration-and-startup-gates));
    with it Gazebo reaches `PARKING_PATH_FEASIBLE`. The second localization
    failed when the shared 0.40 m / 0.40 rad checker left the robot about 18°
    from the observation view, where the detector's score falls just below its
    threshold. The precise, verified
    [observation return](../exploration/architecture.md#observation-return)
-   now restores that view, and Gazebo relocalizes and plans. The complete
-   mission is next stopped on the pre-parking leg by the live LiDAR clearance
-   monitor. The checked route cleared every real obstacle and Nav2 followed it
-   within 3 cm, but Gazebo's -45° seam bin returns phantom short ranges
-   ([Gazebo first ray](../isaac/lidar-pipeline.md#gazebo-first-ray)), and one
-   fell inside the remaining route. Invalidating that bin in the Gazebo guard
-   is the identified correction and has not been made.
+   now restores that view, and Gazebo relocalizes and plans. Pre-parking
+   vetoes on routes Nav2 followed within 3 cm had two causes: Gazebo's -45°
+   seam bin returned phantom short ranges, now invalidated by the Gazebo guard
+   ([Gazebo first ray](../isaac/lidar-pipeline.md#gazebo-first-ray)). And the
+   live monitor was given a route starting with the robot's own pose, so it
+   re-checked the whole route back to its start, now limited to the route
+   ahead ([parking demonstration](../exploration/parking_demo.md)).
 8. **Port markers and launch integration.** Add relative marker topics and
    clean RViz displays, then integrate the manager into the current readiness
    chain without changing backend packages or Nav2 safety parameters.

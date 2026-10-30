@@ -97,16 +97,16 @@ def _launch_context(**configurations):
     return context
 
 
-def test_parking_demo_maps_both_lidars_only_on_gazebo() -> None:
+def test_parking_demo_maps_both_lidars_on_both_simulators() -> None:
     from launch.actions import DeclareLaunchArgument
 
     description = _mission_launch_module().generate_launch_description()
     (argument,) = [entity for entity in description.entities
                    if isinstance(entity, DeclareLaunchArgument) and entity.name == 'slam_source']
     assert argument.choices == ['front_only', 'merged']
-    for backend, expected in (('gz', 'merged'), ('isaac', 'front_only')):
+    for backend in ('gz', 'isaac'):
         context = _launch_context(backend=backend)
-        assert ''.join(s.perform(context) for s in argument.default_value) == expected
+        assert ''.join(s.perform(context) for s in argument.default_value) == 'merged'
     mission_text = (
         _package_root() / 'launch' / 'ridgeback_mission.launch.py'
     ).read_text(encoding='utf-8')

@@ -46,16 +46,35 @@ def gazebo_scan(ranges):
     return msg
 
 
-def test_only_the_first_ray_is_invalidated_and_everything_else_is_kept():
+def test_only_the_corrupted_bins_are_invalidated_and_everything_else_is_kept():
     ranges = np.linspace(1.0, 5.0, 1081)
     msg = guard.invalidate_first_ray(gazebo_scan(ranges))
-    assert math.isnan(msg.ranges[0])
-    assert list(msg.ranges[1:]) == pytest.approx(list(ranges[1:]))
+    assert math.isnan(msg.ranges[0]) and math.isnan(msg.ranges[360])
+    kept = [i for i in range(1081) if i not in (0, 360)]
+    assert [msg.ranges[i] for i in kept] == pytest.approx([ranges[i] for i in kept])
     assert (msg.header.frame_id, msg.header.stamp.sec, msg.header.stamp.nanosec) == (
         'lidar2d_0_laser', 64, 780_000_000)
     assert len(msg.ranges) == 1081 and len(msg.intensities) == 1081
     assert msg.angle_min == pytest.approx(-2.35619449)
     assert guard.invalidate_first_ray(LaserScan()).ranges.tolist() == []
+
+
+def test_recorded_seam_phantom_is_removed_and_its_real_neighbours_kept():
+    # Recorded 2026-10-30, front scan vetoing the pre-parking leg: bin 360 read
+    # 1.389 m while its neighbours saw the far wall at about 6.2 m.
+    ranges = np.full(1081, 6.2)
+    ranges[360] = 1.389
+    ranges[361] = 1.0                       # a real object one bin away stays
+    msg = guard.invalidate_first_ray(gazebo_scan(ranges))
+    assert math.isnan(msg.ranges[360])
+    assert msg.ranges[359] == pytest.approx(6.2) and msg.ranges[361] == pytest.approx(1.0)
+    bx, _ = scan_points(msg, (0.3922, 0.0, 0.0))
+    assert len(bx) == 1079                  # bins 0 and 360 only
+
+
+def test_short_scans_are_left_intact_beyond_their_length():
+    msg = guard.invalidate_first_ray(gazebo_scan([2.0] * 10))
+    assert math.isnan(msg.ranges[0]) and list(msg.ranges[1:]) == [2.0] * 9
 
 
 def test_reproduced_phantom_start_cell_is_removed_and_real_edge_returns_kept():
@@ -132,8 +151,9 @@ def test_relay_republishes_the_bridged_scan_with_only_the_first_ray_invalid():
             for spun in (node, probe, node):
                 rclpy.spin_once(spun, timeout_sec=0.05)
         assert received, 'no relayed scan'
-        assert math.isnan(received[0].ranges[0])
-        assert list(received[0].ranges[1:]) == pytest.approx(list(ranges[1:]))
+        assert math.isnan(received[0].ranges[0]) and math.isnan(received[0].ranges[360])
+        kept = [i for i in range(1081) if i not in (0, 360)]
+        assert [received[0].ranges[i] for i in kept] == pytest.approx([ranges[i] for i in kept])
         probe.destroy_node()
         node.destroy_node()
     finally:
