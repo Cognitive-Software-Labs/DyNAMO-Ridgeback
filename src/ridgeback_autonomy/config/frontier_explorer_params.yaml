@@ -8,24 +8,23 @@
       costmap_topic: global_costmap/costmap
       
       # Frontier detection parameters
-      min_frontier_size: 4              # Minimum cells in a frontier cluster
+      min_frontier_size: 5              # Minimum cells in a frontier cluster
       distance_weight: 0.7              # Weight for distance in frontier scoring (0-1)
       size_weight: 0.3                  # Weight for cluster size in frontier scoring (0-1)
       
       # Tier-based selection: frontiers within near_frontier_radius cells are always
       # preferred over distant ones (sorted by distance, nearest first).
-      # At 0.06 m/cell: 90 cells = 5.4 m — wide enough to include room doorways
-      # at startup (~58 cells from origin at x=4, y=1.6).
-      near_frontier_radius: 120
+      # Cell-count parameters assume the 0.05 m global costmap; 144 cells = 7.2 m.
+      near_frontier_radius: 144
 
       # Goal placement: advance N cells PAST the frontier centroid (away from robot)
       # so the goal lands inside the unexplored room.  Unknown cells have cost -1,
       # which always passes is_goal_safe(), and Nav2 plans through them with
       # allow_unknown=true.
-      goal_advance_cells: 10
+      goal_advance_cells: 12
 
       # Distance scoring for far-tier frontiers
-      max_effective_frontier_size: 80
+      max_effective_frontier_size: 96
 
       # Goal safety: reject goals where any cell within margin has cost >= goal_cost_threshold.
       # 50 with margin 2 allows goals near wall corners while still rejecting lethal zones.
@@ -35,7 +34,7 @@
       # Oscillation prevention: blacklist a goal after this many consecutive aborts
       abort_blacklist_threshold: 3
       # Cells radius around a visited goal that counts as "already explored"
-      visited_goal_radius: 25
+      visited_goal_radius: 30
 
       # Costmap threshold for obstacle detection in the awareness map
       lethal_cost_threshold: 90

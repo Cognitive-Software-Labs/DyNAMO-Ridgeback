@@ -152,7 +152,7 @@ local_costmap:
       rolling_window: true
       width: 5
       height: 5
-      resolution: 0.06
+      resolution: 0.05
       # Symmetric 16-point outline fitted to the aligned Gazebo/Isaac collision
       # envelope in base_link, with 2 mm of nominal model clearance. Backend
       # origin-equivalence offsets are absorbed by the separate runtime padding.
@@ -219,7 +219,10 @@ global_costmap:
       # Keep this identical to the local-costmap nominal body outline.
       footprint: "[ [0.497107, 0.263718], [0.477026, 0.338663], [0.422163, 0.393526], [0.347218, 0.413607], [-0.347218, 0.413607], [-0.422163, 0.393526], [-0.477026, 0.338663], [-0.497107, 0.263718], [-0.497107, -0.263718], [-0.477026, -0.338663], [-0.422163, -0.393526], [-0.347218, -0.413607], [0.347218, -0.413607], [0.422163, -0.393526], [0.477026, -0.338663], [0.497107, -0.263718] ]"
       footprint_padding: 0.01
-      resolution: 0.06
+      # Matches the 0.05 m SLAM map. With 0.06 m cells and one cell of map
+      # noise, a 1.05 m doorway was blocked at some grid alignments; the
+      # frontier explorer's cell-count parameters assume 0.05 m.
+      resolution: 0.05
       track_unknown_space: true
       always_send_full_costmap: true
       plugins: ["static_layer", "obstacle_layer", "inflation_layer"]
