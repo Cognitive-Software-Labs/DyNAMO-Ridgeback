@@ -42,6 +42,7 @@ are excluded from ordinary repository search and the generated knowledge graph.
 - [Intel DDS local-reader screening](2026-10-05-intel-dds-screening.md) — scan interruption after a local color reader under the original profile, brief discovery-only multicast comparison, and verified restoration.
 - [Static collision-envelope audit](2026-09-18-collision-envelope-audit.md) — description/USD/Nav2 comparison with top-down and side views.
 - [Navigation footprint and simulator-contact qualification](2026-09-22-navigation-footprint-qualification.md) — effective Nav2 containment plus three-boot Gazebo and Isaac wall-contact matrices.
+- [HCC arena doorway runs and the mesh-shaped robot outline](2026-10-30-hcc-arena-doorway-runs.md) — four Gazebo runs through 1.05 m doorways, collision-monitor and Smac Lattice failure modes, and the outline the mesh shape replaced.
 
 - [Intel–Thor DDS transport diagnosis](2026-09-18-intel-thor-dds-transport.md) — Wi-Fi duplication, receive-buffer drops, and Ethernet-only profile measurements.
 - [Intel–Thor middleware benchmark](2026-09-18-intel-thor-rmw-benchmark.md) — Fast DDS vs CycloneDDS vs mixed across the link, and the reader-side interface rule.

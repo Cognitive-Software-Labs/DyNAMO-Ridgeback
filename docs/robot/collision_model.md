@@ -15,74 +15,53 @@ An image of one does not establish the others.
 
 ## Configured navigation footprint
 
-**Measured hardware outline (2026-10-16).** A tape survey of `r100_0160`
-(`artifacts/hardware/20261016T125020Z-s8-outline-direct/` on Intel) gave 96.0 × 79.3 cm overall, 5.5 cm diagonal gaps at all four
-corners (a 13.3 cm corner rounding) and symmetric hubs 26.0 cm from each end, so
-`base_link` sits at the outline's centre. The former outline below failed that
-survey: the ends stuck out 2 mm past the padded polygon and the rounded corners
-42 mm past its chamfers. The configured polygon is now built from the survey:
-straight edges 12 mm (the tape uncertainty) outside each face and corner
-vertices on the rounding offset by 12 mm, with the 30° chord sag compensated.
-It is 99.4 × 82.7 cm, and every measured and rounding point lies at least
-12 mm inside it before padding (22 mm with the 10 mm padding).
-`test_nav2_footprint.py` pins both. The figures and simulator numbers in the
-rest of this section describe the **former** fitted outline; the new polygon is
-larger in every direction, so it still encloses both simulator envelopes, but
-the static comparison, the simulator contact matrices and any affected
-benchmarks must be rerun before their results are quoted with it. Physical
-clearance and stopping remain under the command-chain gate.
+Both costmaps and the collision monitor use one outline, the robot body. It
+takes the Clearpath r100 collision meshes (`body-collision.stl` and `top.stl`),
+widens them by the 4.408 mm longitudinal and 0.201 mm lateral Isaac origin
+offset, mirrors them front to rear and left to right, and encloses the result
+along 24 support directions with 5.1 mm margin: 95.2 × 80.1 cm, angled ends
+included. The margin is built in, so both costmaps set `footprint_padding` to
+0. The collision monitor's `FootprintApproach` polygon follows
+`local_costmap/published_footprint`. `test_nav2_footprint.py` pins the outline
+and checks that it encloses both simulator placements of the meshes by at
+least 5 mm.
 
-![Configured 16-point Nav2 body outline in the base_link plane, with forward and left axes.](assets/navigation-footprint.png)
+![Configured 24-point outline over the Gazebo, Isaac and Clearpath-mesh robot bodies, with front-left corner zooms and the direct tape survey dotted.](assets/navigation-footprint.png)
 
 The figure plots the identical local/global costmap `footprint` entries from
-[`nav2_params.yaml`](../../src/ridgeback_autonomy/config/nav2_params.yaml).
-It shows the nominal polygon before runtime padding or costmap inflation. Both
-costmaps explicitly apply 10 mm of `footprint_padding`; this pins the former
-Nav2 default as part of the project configuration.
+[`nav2_params.yaml`](../../src/ridgeback_autonomy/config/nav2_params.yaml)
+against each backend's collision hull. The outline clears the Gazebo hull by at
+least 5.3 mm and the Isaac hull by at least 5.1 mm. In a 1.05 m doorway it
+leaves 12.5 cm per side when aligned, and its widest swept width while turning
+is 105.1 cm. The survey-based outline it replaced, 101.4 × 84.7 cm with
+padding, needed 119.8 cm to turn, and the collision monitor's 1.2 s approach
+check stopped MPPI's sideways and turning commands inside doorways.
 
-![Gazebo and recentered Isaac collision projections with the fitted 16-point body outline.](assets/navigation-footprint-aligned-envelope.png)
+The containment policy is: the outline must enclose every raw simulator
+collision projection with at least 5 mm clearance. Inflation remains an
+obstacle-cost policy and does not count toward that margin.
 
-The nominal outline treats the 4.408 mm longitudinal and 0.201 mm lateral Isaac
-chassis translation as a backend origin-equivalence offset. After recentering
-Isaac onto Gazebo, their union is symmetrized and enclosed with 16 evenly spaced
-support directions plus 2 mm of model margin. Compared with the former octagon,
-the outline removes falsely occupied corners and reduces nominal area by 1.5%.
+**Open hardware basis.** The outline treats `r100_0160` as having the Clearpath
+mesh shape, a decision made on 2026-10-30. Two tape surveys of 2026-10-16 bear
+on it, and neither traced the end profile:
 
-![Gazebo and Isaac collision projections inside the effective 10 mm padded Nav2 footprint.](assets/navigation-footprint-envelope.png)
+- The direct survey (`artifacts/hardware/20261016T125020Z-s8-outline-direct/`
+  on Intel) gave 96.0 × 79.3 cm overall, 5.5 cm diagonal gaps at all four
+  corners and symmetric hubs 26.0 cm from each end, so `base_link` sits at the
+  outline's centre. Clearpath publishes the same 960 × 793 mm. Read as a
+  rounded rectangle with 13.3 cm corners, its corners lie up to 58 mm outside
+  the outline; the mesh's own diagonal corner gap is 10.0 cm.
+- The operator's preliminary survey measured the widest body at about
+  0.92 × 0.80 m (±0.01 m) with about 0.06 m corner rounding, closer to the
+  mesh. No attachments outside that outline were reported; the physical
+  `base_link` centre and the mast and bracket dimensions were not surveyed.
 
-In the raw backend frames, Isaac's accepted origin offset leaves its rear edge
-2.409 mm outside the nominal outline. The effective padded polygon encloses both
-raw simulator projections with at least 7.591 mm clearance. The green union is
-diagnostic; it is not a replacement robot outline.
-
-The containment policy is: the nominal polygon encloses the aligned shared body
-envelope with at least 2 mm model margin, while the effective polygon must
-enclose every raw simulator collision projection with at least 5 mm clearance.
-Inflation remains an obstacle-cost policy and does not count toward either
-geometric margin. Physical hardware requires a separately measured outline and
-clearance qualification.
-
-An operator's preliminary stationary tape survey on 2026-10-16 measured the
-widest body at approximately 0.92 m long and 0.80 m wide, with ±0.01 m
-measurement uncertainty. The operator reported no attachments outside that
-outline and approximately 0.06 m rounding at all four corners. The
-read-only comparison under
-`artifacts/hardware/20261016-s8-outline/analysis.json` found 7 mm side-face
-clearance inside the padded footprint, less than the 12.2 mm combined
-uncertainty. If each corner is approximated as a 60 mm quarter-circle, its
-derived 45-degree point lies about 55.5 mm outside the padded footprint.
-Those 45-degree points were calculated from an approximate radius, not taped
-individually; the physical `base_link` centre and mast/bracket dimensions were
-also not surveyed. This is a failed preliminary containment screen, not a
-calibrated final outline. Verify the corner points and frame origin, then
-review the footprint before using it for physical navigation clearance.
-
-Live Gazebo and Isaac launches of the initial outline both reported the expected
-10 mm padding. After the refinement, a fresh Gazebo launch loaded the exact
-16-point polygon in both costmaps and published all 16 padded points. Nav2's
-collision monitor consumed `local_costmap/published_footprint` and republished
-the same padded outline in `base_link` during command flow. The archived runtime
-capture records the configured and observed points.
+Until the centreline length and the end-face setback at the corners are taped,
+the footprint does not guarantee physical contact coverage. Against a hull of
+the Isaac model's bounds with 4 mm tape uncertainty,
+`tools/hardware/compare_measured_outline.py` leaves 3.7 mm at the side faces
+where it requires 6.7 mm. Physical clearance and stopping remain under the
+command-chain gate.
 
 ## Backend contact representations
 
@@ -158,7 +137,7 @@ MPLCONFIGDIR=/tmp/ridgeback-mpl isaac_venv/bin/python \
   tools/isaac/compare_collision_envelopes.py \
   --urdf artifacts/collision-envelope-validation/robot.urdf \
   --output artifacts/collision-envelope-validation/review-new \
-  --footprint-padding 0.01
+  --footprint-padding 0.0
 ```
 
 The review directory must be fresh. Outputs include top-down and side figures,
@@ -174,3 +153,4 @@ static extraction does not qualify hardware.
 - [September 18 static envelope audit](../../archive/engineering/2026-09-18-collision-envelope-audit.md)
 - [September 22 simulator footprint qualification](../../archive/engineering/2026-09-22-navigation-footprint-qualification.md)
 - [September 22 refined-footprint runtime capture](../../archive/engineering/assets/2026-09-22-footprint-qualification/runtime-16-point.json)
+- [October 30 arena doorway runs and outline change](../../archive/engineering/2026-10-30-hcc-arena-doorway-runs.md)

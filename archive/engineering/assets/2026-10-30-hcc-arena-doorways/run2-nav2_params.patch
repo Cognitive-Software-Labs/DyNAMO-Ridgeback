@@ -1,0 +1,16 @@
+--- a/src/ridgeback_autonomy/config/nav2_params.yaml
++++ b/src/ridgeback_autonomy/config/nav2_params.yaml
+@@ -342,7 +342,12 @@
+     FootprintApproach:
+       type: "polygon"
+       action_type: "approach"
+-      footprint_topic: "local_costmap/published_footprint"
++      # Fixed body zone, deliberately tighter than the padded Nav2 footprint:
++      # the Clearpath r100 collision meshes (body-collision.stl + top.stl),
++      # widened by the Isaac origin offset and mirrored, enclosed by 24 support
++      # directions 5.1 mm out (95.2 x 80.1 cm). Applies to every backend; see
++      # docs/robot/collision_model.md for the basis and its open hardware check.
++      points: "[[0.475762, 0.073265], [0.409768, 0.319557], [0.393065, 0.348488], [0.367198, 0.374355], [0.339166, 0.390539], [0.302752, 0.400297], [-0.302752, 0.400297], [-0.339166, 0.390539], [-0.367198, 0.374355], [-0.393065, 0.348488], [-0.409768, 0.319557], [-0.475762, 0.073265], [-0.475762, -0.073265], [-0.409768, -0.319557], [-0.393065, -0.348488], [-0.367198, -0.374355], [-0.339166, -0.390539], [-0.302752, -0.400297], [0.302752, -0.400297], [0.339166, -0.390539], [0.367198, -0.374355], [0.393065, -0.348488], [0.409768, -0.319557], [0.475762, -0.073265]]"
+       time_before_collision: 1.2
+       simulation_time_step: 0.1
+       min_points: 6

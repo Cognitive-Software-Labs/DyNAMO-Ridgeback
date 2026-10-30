@@ -48,6 +48,7 @@
   <test_depend>ament_cmake_pytest</test_depend>
   <test_depend>python3-pytest</test_depend>
   <test_depend>python3-markdown-it</test_depend>
+  <test_depend>clearpath_platform_description</test_depend>
 
   <export>
     <build_type>ament_cmake</build_type>

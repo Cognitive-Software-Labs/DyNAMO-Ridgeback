@@ -17,7 +17,7 @@ def rows(points=()):
 
 
 def test_reads_the_configured_polygon_and_padding():
-    assert len(POLYGON) == 16 and PADDING == 0.01
+    assert len(POLYGON) == 24 and PADDING == 0.0
 
 
 def test_margin_sign_inside_and_outside():
@@ -25,8 +25,12 @@ def test_margin_sign_inside_and_outside():
     assert tool.signed_margin(POLYGON, 0.6, 0.0) < 0
 
 
-def test_a_model_sized_hull_passes_its_face_midpoints():
-    assert all(row['passed'] for row in rows().values())
+def test_a_hull_inside_the_footprint_passes_its_face_midpoints():
+    # Size the hull 10 mm inside each face of the configured outline instead of
+    # assuming a particular deployed footprint, which can change after a survey.
+    hull = {'length_m': 2 * (max(x for x, _ in POLYGON) + PADDING - 0.01),
+            'width_m': 2 * (max(y for _, y in POLYGON) + PADDING - 0.01), 'uncertainty_m': 0.004}
+    assert all(row['passed'] for row in tool.evaluate({'hull': hull, 'points': []}, POLYGON, PADDING))
 
 
 def test_converts_tape_distances_to_base_link():

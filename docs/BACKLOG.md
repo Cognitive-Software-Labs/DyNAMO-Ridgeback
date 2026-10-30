@@ -216,20 +216,23 @@ until a traction, terrain, traversal, or wheel-control requirement justifies it.
 Geometry and footprint validation can proceed independently; shared outlines do
 not establish wheel-contact parity.
 
-**Qualified simulator state.** The nominal local/global 16-point outlines remain
-equal, enclose the aligned shared simulator envelope with 2 mm model margin, and
-both costmaps pin the audited 10 mm runtime padding explicitly. The effective
-footprint encloses the raw Gazebo and Isaac collision projections with at least
-7.591 mm clearance. Front, side and 45° contact, held contact,
-and stop/reverse recovery passed at 0.05/0.10/0.20 m/s across three cold boots
-per backend. The [collision reference](robot/collision_model.md) owns the policy,
+**Qualified simulator state.** The local and global footprints are one 24-point
+outline with no padding, enclosing the raw Gazebo and Isaac collision projections
+with at least 5.1 mm clearance. On the September 22 16-point outline, front, side
+and 45° contact, held contact, and stop/reverse recovery passed at
+0.05/0.10/0.20 m/s across three cold boots per backend. The [collision reference](robot/collision_model.md) owns the policy,
 limits and reproduction path.
 
-**Hardware footprint.** The `r100_0160` outline survey corrected the Nav2
-footprint to 99.4 × 82.7 cm, enclosing the measured outline by at least 12 mm.
-The equal 2 cm front/rear split of the 4 cm length excess is an assumption.
+**Hardware footprint.** Since 2026-10-30 both costmaps and the collision
+monitor use the Clearpath mesh shape plus 5.1 mm (95.2 × 80.1 cm, no padding),
+on the premise that `r100_0160` has that shape. Under the 2026-10-16 direct
+survey (96.0 × 79.3 cm, 5.5 cm corner gaps) the robot's corners would sit up to
+58 mm outside it; the preliminary survey (about 0.92 × 0.80 m) agrees better.
+Tape the centreline tip-to-tip length and the end-face setback at the corners,
+then confirm or replace the outline. The change, with the 0.05 m costmaps, also
+invalidates any earlier exploration baseline.
 
-**Remaining gap.** The corrected footprint has no static simulator comparison
+**Remaining gap.** The current footprint has no static simulator comparison
 or Gazebo/Isaac contact matrices yet, and the affected benchmarks have not been
 rerun with it. Height-dependent attachment limits, an uncertainty model and a
 physical stopping/clearance test are still missing.

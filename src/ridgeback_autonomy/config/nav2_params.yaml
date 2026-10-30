@@ -153,13 +153,14 @@ local_costmap:
       width: 5
       height: 5
       resolution: 0.05
-      # Symmetric 16-point outline fitted to the aligned Gazebo/Isaac collision
-      # envelope in base_link, with 2 mm of nominal model clearance. Backend
-      # origin-equivalence offsets are absorbed by the separate runtime padding.
-      footprint: "[ [0.497107, 0.263718], [0.477026, 0.338663], [0.422163, 0.393526], [0.347218, 0.413607], [-0.347218, 0.413607], [-0.422163, 0.393526], [-0.477026, 0.338663], [-0.497107, 0.263718], [-0.497107, -0.263718], [-0.477026, -0.338663], [-0.422163, -0.393526], [-0.347218, -0.413607], [0.347218, -0.413607], [0.422163, -0.393526], [0.477026, -0.338663], [0.497107, -0.263718] ]"
-      # Explicit runtime clearance around the nominal body polygon. This was
-      # previously Nav2's implicit default; keep it pinned and audited.
-      footprint_padding: 0.01
+      # Robot body: the Clearpath r100 collision meshes (body-collision.stl +
+      # top.stl), widened by the Isaac origin offset and mirrored, enclosed
+      # along 24 support directions 5.1 mm out: 95.2 x 80.1 cm with the
+      # angled ends. The margin is built in, so no runtime padding. The
+      # collision monitor follows this outline; see
+      # docs/robot/collision_model.md for the open hardware check.
+      footprint: "[[0.475762, 0.073265], [0.409768, 0.319557], [0.393065, 0.348488], [0.367198, 0.374355], [0.339166, 0.390539], [0.302752, 0.400297], [-0.302752, 0.400297], [-0.339166, 0.390539], [-0.367198, 0.374355], [-0.393065, 0.348488], [-0.409768, 0.319557], [-0.475762, 0.073265], [-0.475762, -0.073265], [-0.409768, -0.319557], [-0.393065, -0.348488], [-0.367198, -0.374355], [-0.339166, -0.390539], [-0.302752, -0.400297], [0.302752, -0.400297], [0.339166, -0.390539], [0.367198, -0.374355], [0.393065, -0.348488], [0.409768, -0.319557], [0.475762, -0.073265]]"
+      footprint_padding: 0.0
       always_send_full_costmap: true
       plugins: ["voxel_layer", "inflation_layer"]
       inflation_layer:
@@ -216,9 +217,9 @@ global_costmap:
       rolling_window: true
       width: 60
       height: 60
-      # Keep this identical to the local-costmap nominal body outline.
-      footprint: "[ [0.497107, 0.263718], [0.477026, 0.338663], [0.422163, 0.393526], [0.347218, 0.413607], [-0.347218, 0.413607], [-0.422163, 0.393526], [-0.477026, 0.338663], [-0.497107, 0.263718], [-0.497107, -0.263718], [-0.477026, -0.338663], [-0.422163, -0.393526], [-0.347218, -0.413607], [0.347218, -0.413607], [0.422163, -0.393526], [0.477026, -0.338663], [0.497107, -0.263718] ]"
-      footprint_padding: 0.01
+      # Keep this identical to the local-costmap body outline.
+      footprint: "[[0.475762, 0.073265], [0.409768, 0.319557], [0.393065, 0.348488], [0.367198, 0.374355], [0.339166, 0.390539], [0.302752, 0.400297], [-0.302752, 0.400297], [-0.339166, 0.390539], [-0.367198, 0.374355], [-0.393065, 0.348488], [-0.409768, 0.319557], [-0.475762, 0.073265], [-0.475762, -0.073265], [-0.409768, -0.319557], [-0.393065, -0.348488], [-0.367198, -0.374355], [-0.339166, -0.390539], [-0.302752, -0.400297], [0.302752, -0.400297], [0.339166, -0.390539], [0.367198, -0.374355], [0.393065, -0.348488], [0.409768, -0.319557], [0.475762, -0.073265]]"
+      footprint_padding: 0.0
       # Matches the 0.05 m SLAM map. With 0.06 m cells and one cell of map
       # noise, a 1.05 m doorway was blocked at some grid alignments; the
       # frontier explorer's cell-count parameters assume 0.05 m.
