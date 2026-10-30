@@ -39,9 +39,10 @@ bash start_parking_demo.sh gz
 bash start_parking_demo.sh isaac
 ```
 
-Full driving remains subject to the separately identified cancellation and
-checked-route execution issues; startup validation does not qualify those
-behaviors. The existing navigation back to the G1 observation pose can also
+Cancelled or vetoed legs hold Nav2 goal ownership until a terminal result, as
+described in [mission navigation goal ownership](architecture.md#mission-navigation-goal-ownership).
+Full driving remains subject to the separately identified checked-route
+execution issue; startup validation does not qualify it. The existing navigation back to the G1 observation pose can also
 time out before planning, including in `--planning-only` mode. No execution
 safeguard or motion-settlement threshold is relaxed by this launch change.
 

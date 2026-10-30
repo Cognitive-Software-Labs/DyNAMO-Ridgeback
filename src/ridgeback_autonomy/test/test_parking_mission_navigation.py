@@ -5,7 +5,8 @@ import math
 from types import SimpleNamespace
 
 import pytest
-from action_msgs.msg import GoalStatus
+from action_msgs.msg import GoalInfo, GoalStatus
+from action_msgs.srv import CancelGoal
 from nav2_msgs.action import NavigateToPose
 from rcl_interfaces.msg import SetParametersResult
 from rcl_interfaces.srv import SetParameters
@@ -47,6 +48,19 @@ def navigation_result(nav, status=GoalStatus.STATUS_SUCCEEDED, error=0):
     handle.future.set_result(SimpleNamespace(status=status, result=result))
     p = request.pose.pose
     return p.position.x, p.position.y, 2 * math.atan2(p.orientation.z, p.orientation.w)
+
+
+def release(handle, status=GoalStatus.STATUS_CANCELED):
+    """Nav2's terminal result: the only proof that the goal no longer executes."""
+    handle.future.set_result(SimpleNamespace(status=status, result=NavigateToPose.Result()))
+
+
+def reply_to_cancel(handle, accepted=True):
+    response = CancelGoal.Response()
+    response.return_code = (CancelGoal.Response.ERROR_NONE if accepted
+                            else CancelGoal.Response.ERROR_GOAL_TERMINATED)
+    response.goals_canceling = [GoalInfo()] if accepted else []
+    handle.cancel_futures[-1].set_result(response)
 
 
 def feasible(manager_factory, monkeypatch, *, enabled=True):
@@ -159,7 +173,8 @@ def test_cancel_cancels_owned_goal_and_restores_goal_checker(manager_factory, mo
     assert answer(params)['general_goal_checker.xy_goal_tolerance'] == 0.40
     handle.future.set_result(SimpleNamespace(status=GoalStatus.STATUS_CANCELED,
                                              result=NavigateToPose.Result()))
-    assert m.state == MissionState.MISSION_CANCELED   # late result ignored
+    assert m.state == MissionState.MISSION_CANCELED   # the result releases the goal only
+    assert not m._nav_canceling and m._nav_goal_generation is None
 
 
 def test_leg_deadline_cancels_and_returns(manager_factory, monkeypatch):
@@ -268,3 +283,120 @@ def test_path_checks_include_the_saved_mission_start_footprint(manager_factory, 
                         lambda *a, **k: seen.append(k) or None)
     assert m._plan_invalid_reason() is None
     assert seen == [{'occupied': m._start_footprint_poses()}]
+
+
+# Goal ownership: a cancel request never releases a goal; only its terminal result does.
+
+def owned_leg(manager_factory, monkeypatch):
+    m, published = feasible(manager_factory, monkeypatch)
+    answer(m._goal_checker_set_client)
+    _, accepted, handle = m.navigation_client.calls[-1]
+    accepted.set_result(handle)
+    m._parking_clearance = lambda: None   # LiDAR clear; ownership is under test
+    return m, handle, published
+
+
+def expire_leg(m):
+    m._monotonic.value += 91.0
+    m.tick()
+    assert m.state == MissionState.RETURNING_TO_START and m._return_after_stop
+
+
+def navigation_payload(published):
+    return json.loads(published['state'][-1].data)['parking_mission_navigation']
+
+
+@pytest.mark.parametrize('reply', ['accepted', 'rejected', 'delayed'])
+@pytest.mark.parametrize('status', [GoalStatus.STATUS_CANCELED, GoalStatus.STATUS_SUCCEEDED,
+                                    GoalStatus.STATUS_ABORTED])
+def test_cancelled_leg_returns_only_after_terminal_result_and_a_fresh_stop(
+        manager_factory, monkeypatch, reply, status):
+    m, handle, published = owned_leg(manager_factory, monkeypatch)
+    nav, params = m.navigation_client, m._goal_checker_set_client
+    expire_leg(m)
+    assert handle.cancels == 1
+    if reply != 'delayed':
+        reply_to_cancel(handle, accepted=reply == 'accepted')
+    hold_still(m)   # zero velocity while the result is delayed proves nothing about ownership
+    m.tick()
+    assert len(nav.calls) == 1 and len(params.calls) == 1
+    assert navigation_payload(published)['goal_owned'] is True
+    release(handle, status)   # including a goal that finished while the cancel was in flight
+    assert m.state == MissionState.RETURNING_TO_START
+    assert 'preparking' not in m._arrival_errors   # an abandoned leg never counts as reached
+    assert navigation_payload(published)['goal_owned'] is False
+    m.tick()
+    assert len(params.calls) == 1   # the stop must be observed after the release
+    hold_still(m)
+    m.tick()
+    answer(params)
+    assert navigation_result(nav) == pytest.approx((1.0, 2.0, 0.25))   # then a new goal
+    assert m.state == MissionState.MISSION_FAILED and m.last_issue.code == 'parking_failed'
+
+
+def test_cancel_without_terminal_result_fails_explicitly_and_keeps_ownership(
+        manager_factory, monkeypatch):
+    m, handle, published = owned_leg(manager_factory, monkeypatch)
+    expire_leg(m)
+    reply_to_cancel(handle)
+    hold_still(m)
+    m._monotonic.value += m.execution.limits.cancellation_timeout_s
+    m.tick()
+    assert m.state == MissionState.MISSION_FAILED
+    assert m.last_issue.code == 'navigation_cancel_unresolved'
+    assert handle.cancels == 2   # one final request; the goal is not discarded
+    assert len(m.navigation_client.calls) == 1 and len(m._goal_checker_set_client.calls) == 1
+    assert navigation_payload(published)['goal_owned'] is True
+    m.reset_mission()
+    assert m.state == MissionState.MISSION_FAILED   # reset refused while ownership is unknown
+    release(handle)   # a late terminal result still releases the goal
+    assert m.state == MissionState.MISSION_FAILED
+    m.reset_mission()
+    assert m.state == MissionState.WAITING_FOR_START_POSE
+
+
+def test_no_second_goal_is_sent_before_the_previous_one_terminates(manager_factory, monkeypatch):
+    m, handle, _ = owned_leg(manager_factory, monkeypatch)
+    expire_leg(m)
+    m._send_return_goal(True)   # a premature return attempt
+    assert len(m.navigation_client.calls) == 1
+    assert m.state == MissionState.MISSION_FAILED
+    assert 'previous navigation goal not released' in m.last_issue.reason
+
+
+def test_reset_during_an_active_goal_waits_for_its_terminal_result(manager_factory, monkeypatch):
+    m, handle, _ = owned_leg(manager_factory, monkeypatch)
+    m.reset_mission()
+    assert m.state == MissionState.MISSION_CANCELED and handle.cancels == 1
+    m.reset_mission()
+    assert m.state == MissionState.MISSION_CANCELED and handle.cancels == 1
+    release(handle)
+    m.reset_mission()
+    assert m.state == MissionState.WAITING_FOR_START_POSE
+
+
+def test_cancel_before_acceptance_cancels_the_accepted_goal_and_tracks_it(
+        manager_factory, monkeypatch):
+    m, _ = feasible(manager_factory, monkeypatch)
+    answer(m._goal_checker_set_client)
+    _, accepted, handle = m.navigation_client.calls[-1]
+    m.cancel_mission('operator stop')
+    accepted.set_result(handle)
+    assert handle.cancels == 1
+    m._monotonic.value += m.execution.limits.cancellation_timeout_s + 0.1
+    m.tick()
+    assert m.state == MissionState.MISSION_CANCELED
+    assert m.last_issue.code == 'navigation_cancel_unresolved'
+
+
+def test_unknown_acceptance_never_starts_the_return(manager_factory, monkeypatch):
+    m, _ = feasible(manager_factory, monkeypatch)
+    answer(m._goal_checker_set_client)
+    m.navigation_client.calls[-1][1].set_exception(RuntimeError('transport lost'))
+    assert m.state == MissionState.RETURNING_TO_START
+    hold_still(m)
+    m._monotonic.value += m.execution.limits.cancellation_timeout_s
+    m.tick()
+    assert m.state == MissionState.MISSION_FAILED
+    assert m.last_issue.code == 'navigation_cancel_unresolved'
+    assert len(m.navigation_client.calls) == 1

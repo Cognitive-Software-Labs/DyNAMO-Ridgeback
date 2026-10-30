@@ -138,6 +138,10 @@ _PARKING_DRIVE_STATES = (
     MissionState.RETURNING_TO_START,
 )
 
+# Only these prove that Nav2 has stopped executing a goal and released it.
+_TERMINAL_GOAL_STATUSES = (
+    GoalStatus.STATUS_SUCCEEDED, GoalStatus.STATUS_ABORTED, GoalStatus.STATUS_CANCELED)
+
 
 class FailureClass(Enum):
     RECOVERABLE = 'recoverable'
@@ -607,7 +611,11 @@ class MissionManagerNode(Node):
             goal_checker_client if goal_checker_client is not None
             else self.create_client(SetParameters, 'controller_server/set_parameters'))
         self._nav_generation = 0
+        # A sent goal stays owned until its terminal result; a cancel request never releases it.
+        self._nav_goal_generation = None
         self._nav_handle = None
+        self._nav_canceling = False
+        self._nav_cancel_deadline_s = None
         self._nav_deadline_s = None
         self._nav_pending_tolerance = None
         self._parked_settled_ns = None
@@ -673,6 +681,13 @@ class MissionManagerNode(Node):
             if self.execution.state not in (ExecutionState.IDLE, ExecutionState.FAILED):
                 self.execution.poll()
                 # Robot movement is expected during navigation, not frame drift.
+                return
+            if self._nav_cancel_deadline_s is not None:
+                # Nothing drives or times out while Nav2 may still own a cancelled goal.
+                if now_s >= self._nav_cancel_deadline_s:
+                    self._navigation_ownership_unresolved(
+                        'NavigateToPose cancellation produced no terminal result within '
+                        f'{self.execution.limits.cancellation_timeout_s:.1f} s')
                 return
             if self.state in _PARKING_DRIVE_STATES:
                 self._poll_parking_navigation(now_s)
@@ -920,6 +935,11 @@ class MissionManagerNode(Node):
             if self.execution.busy or self.execution.state == ExecutionState.SETTLING:
                 self.execution.cancel('operator_reset_requested')
                 self._guard_failed('mission reset', 'navigation termination/physical settlement pending')
+                return
+            if self._nav_goal_generation is not None:
+                # Nav2 may still execute the goal; a retry succeeds after its terminal result.
+                self.cancel_mission('reset requested while Nav2 owns a goal')
+                self._guard_failed('mission reset', 'navigation goal termination pending')
                 return
             if not self.execution.reset():
                 self._guard_failed('mission reset', 'fresh physical stop evidence required')
@@ -1335,6 +1355,8 @@ class MissionManagerNode(Node):
                 'enabled': self.parking_navigation_enabled,
                 'failure': self._parking_failure,
                 'arrival_errors': self._arrival_errors,
+                'goal_owned': self._nav_goal_generation is not None,
+                'cancel_pending': self._nav_canceling,
             },
             'motion_status': self.motion.reason,
             'parking_clearance': None if self._clearance is None else {
@@ -1952,8 +1974,11 @@ class MissionManagerNode(Node):
 
     def destroy_node(self):
         self._invalidate_path_requests()
-        if self.state in _PARKING_DRIVE_STATES:
+        if self.state in _PARKING_DRIVE_STATES or self._nav_goal_generation is not None:
             self._stop_parking_navigation()
+        if self._nav_goal_generation is not None:
+            self.get_logger().error('Shutting down before Nav2 confirmed a terminal NavigateToPose '
+                                    'result; cancellation was requested but not confirmed')
         self.stage_paths.cancel('manager_shutdown')
         if self.execution.busy:
             self.execution.cancel('manager_shutdown')
@@ -2023,6 +2048,11 @@ class MissionManagerNode(Node):
         self._goal_checker_set_client.call_async(request).add_done_callback(done)
 
     def _send_navigation_goal(self, pose, timeout_s):
+        if self._nav_goal_generation is not None:
+            # Never compete with a goal Nav2 may still be executing.
+            self.get_logger().error(f'{self.state.name}: previous NavigateToPose goal not released')
+            self._navigation_finished(False, 'previous navigation goal not released')
+            return
         if not self.navigation_client.server_is_ready():
             self._navigation_finished(False, 'navigate_to_pose server unavailable')
             return
@@ -2030,48 +2060,78 @@ class MissionManagerNode(Node):
         goal.pose = self._pose_stamped(*pose)
         self._nav_generation += 1
         generation = self._nav_generation
-        self._nav_handle = None
+        self._nav_goal_generation, self._nav_handle = generation, None
+        self._nav_canceling, self._nav_cancel_deadline_s = False, None
         self._nav_deadline_s = self._monotonic() + timeout_s
         self.get_logger().info(f'{self.state.name}: NavigateToPose x={pose[0]:.3f}, '
                                f'y={pose[1]:.3f}, yaw={pose[2]:.3f}')
         try:
             future = self.navigation_client.send_goal_async(goal)
         except Exception as exc:
-            self._navigation_finished(False, f'goal transport failed: {exc}')
+            # The request may have reached Nav2: the goal stays owned until the cancel deadline.
+            self._abandon_navigation(f'goal transport failed: {exc}')
             return
         future.add_done_callback(lambda f: self._navigation_accepted(f, generation))
 
     def _navigation_accepted(self, future, generation):
         with self._lock:
+            if generation != self._nav_goal_generation:
+                return
             try:
                 handle = future.result()
-            except Exception:
-                handle = None
-            if generation != self._nav_generation:
-                if handle is not None and handle.accepted:
-                    handle.cancel_goal_async()   # superseded while acceptance was pending
+            except Exception as exc:
+                self._abandon_navigation(f'goal acceptance unknown: {exc}')
                 return
             if handle is None or not handle.accepted:
-                self._navigation_finished(False, 'goal rejected')
+                self._release_navigation_goal('goal rejected', ok=False)
                 return
             self._nav_handle = handle
             handle.get_result_async().add_done_callback(
                 lambda f: self._navigation_result(f, generation))
+            if self._nav_canceling:
+                self._request_navigation_cancel()   # cancelled while acceptance was pending
 
     def _navigation_result(self, future, generation):
         with self._lock:
-            if generation != self._nav_generation:
+            if generation != self._nav_goal_generation:
                 return
-            self._nav_handle = self._nav_deadline_s = None
             try:
                 wrapped = future.result()
-                ok = (wrapped.status == GoalStatus.STATUS_SUCCEEDED
-                      and wrapped.result.error_code == 0)
-                detail = (f'status={wrapped.status}, error_code={wrapped.result.error_code}, '
-                          f'{wrapped.result.error_msg}')
+                status, code = wrapped.status, wrapped.result.error_code
+                detail = f'status={status}, error_code={code}, {wrapped.result.error_msg}'
             except Exception as exc:
-                ok, detail = False, f'result unavailable: {exc}'
+                status, code, detail = None, None, f'result unavailable: {exc}'
+            if status not in _TERMINAL_GOAL_STATUSES:
+                # Without a terminal status Nav2 may still be executing the goal.
+                self._abandon_navigation(f'navigation result not terminal: {detail}')
+                return
+            self._release_navigation_goal(
+                detail, ok=status == GoalStatus.STATUS_SUCCEEDED and code == 0)
+
+    def _release_navigation_goal(self, detail, *, ok):
+        """Nav2 no longer owns the goal; a cancelled goal's outcome is never reported as the leg's."""
+        canceling = self._nav_canceling
+        self._nav_goal_generation = self._nav_handle = self._nav_cancel_deadline_s = None
+        self._nav_canceling = False
+        if not canceling:
+            self._nav_deadline_s = None
             self._navigation_finished(ok, detail)
+            return
+        self.get_logger().info(f'Cancelled NavigateToPose released by Nav2: {detail}')
+        self._publish_state(f'cancelled navigation goal released: {detail}',
+                            event='navigation_released')
+        if self.state == MissionState.RETURNING_TO_START and self._return_after_stop:
+            self._settle_before_return()
+
+    def _abandon_navigation(self, detail):
+        """Fail the current goal while Nav2 may still own it; nothing new drives before release."""
+        if self._nav_canceling:
+            return   # the pending cancellation's deadline decides
+        if self.state in _PARKING_LEGS:
+            self._parking_navigation_failed(detail, stop_first=True)
+        else:
+            self._cancel_navigation_goal()
+            self._navigation_finished(False, detail)
 
     def _navigation_finished(self, ok, detail):
         sel = self.parking_plan.selected if self.parking_plan is not None else None
@@ -2135,6 +2195,8 @@ class MissionManagerNode(Node):
         if self.state in _PARKING_LEGS and self._check_parking_clearance():
             return
         if self.state == MissionState.RETURNING_TO_START and self._return_after_stop:
+            if self._nav_goal_generation is not None:
+                return   # the cancelled leg has not been released by Nav2 yet
             if self.motion.ready(self.get_clock().now().nanoseconds, now_s):
                 self._return_after_stop = False
                 self._nav_deadline_s = None
@@ -2167,6 +2229,9 @@ class MissionManagerNode(Node):
             on_done(False)
             return
         detail = f'{self.state.name} deadline expired'
+        if self.state in _PARKING_LEGS:
+            self._abandon_navigation(detail)
+            return
         self._cancel_navigation_goal()
         if self.state == MissionState.RETURNING_TO_START:
             self._navigation_finished(False, detail)
@@ -2180,14 +2245,20 @@ class MissionManagerNode(Node):
 
     def _start_return(self, reason, *, stop_first=False):
         if stop_first:
-            # A cancelled leg is not resumed: the return starts only from a confirmed stop.
+            # A cancelled leg is not resumed: the return starts only after Nav2 releases
+            # the goal and fresh odometry then confirms the stop.
             self._transition(MissionState.RETURNING_TO_START, f'{reason}; stopping before the return')
             self._return_after_stop = True
-            self.motion.reset()
-            self._nav_deadline_s = self._monotonic() + self.motion_settlement_timeout_s
+            self._cancel_navigation_goal()
+            if self._nav_goal_generation is None:
+                self._settle_before_return()
             return
         self._transition(MissionState.RETURNING_TO_START, reason)
         self._set_goal_tolerance(self._shared_goal_tolerance, self._send_return_goal)
+
+    def _settle_before_return(self):
+        self.motion.reset()
+        self._nav_deadline_s = self._monotonic() + self.motion_settlement_timeout_s
 
     # Live LiDAR clearance during the two parking legs.
 
@@ -2225,7 +2296,6 @@ class MissionManagerNode(Node):
             f' (nearest return {result.nearest_m if result.nearest_m is None else round(result.nearest_m, 3)} m,'
             f' G1 gap {result.g1_gap_m if result.g1_gap_m is None else round(result.g1_gap_m, 3)} m)')
         self.get_logger().error(f'Parking LiDAR veto in {self.state.name}: {reason}{detail}')
-        self._cancel_navigation_goal()
         self._parking_navigation_failed(f'lidar_clearance: {reason}', stop_first=True)
         return True
 
@@ -2273,14 +2343,52 @@ class MissionManagerNode(Node):
             self.return_navigation_timeout_s)
 
     def _cancel_navigation_goal(self):
-        self._nav_generation += 1
-        handle, self._nav_handle = self._nav_handle, None
+        """Request cancellation; only the goal's terminal result releases it, within a bounded wait."""
+        self._nav_generation += 1   # ignore a late goal-checker response
         self._nav_deadline_s = self._nav_pending_tolerance = None
-        if handle is not None:
+        if self._nav_goal_generation is None or self._nav_canceling:
+            return
+        self._nav_canceling = True
+        self._nav_cancel_deadline_s = self._monotonic() + self.execution.limits.cancellation_timeout_s
+        self._request_navigation_cancel()   # deferred to acceptance when no handle exists yet
+
+    def _request_navigation_cancel(self):
+        handle, generation = self._nav_handle, self._nav_goal_generation
+        if handle is None:
+            return
+        try:
+            handle.cancel_goal_async().add_done_callback(
+                lambda f: self._navigation_cancel_response(f, generation))
+        except Exception as exc:
+            self.get_logger().error(f'NavigateToPose cancel request failed: {exc}; '
+                                    'awaiting the terminal result')
+
+    def _navigation_cancel_response(self, future, generation):
+        with self._lock:
+            if generation != self._nav_goal_generation:
+                return
             try:
-                handle.cancel_goal_async()
+                accepted = bool(future.result().goals_canceling)
             except Exception as exc:
-                self.get_logger().error(f'Parking navigation cancel unresolved: {exc}')
+                accepted, note = False, f'cancel response unavailable: {exc}'
+            else:
+                # A rejection usually means the goal is already finishing.
+                note = 'cancel accepted' if accepted else 'cancel rejected'
+            # Neither answer releases ownership: only the goal's terminal result does.
+            log = self.get_logger().info if accepted else self.get_logger().warning
+            log(f'NavigateToPose {note}; awaiting the terminal result')
+
+    def _navigation_ownership_unresolved(self, detail):
+        """Fail explicitly while keeping the handle, so a late result is still recognised."""
+        self._nav_cancel_deadline_s = self._nav_deadline_s = None
+        self._return_after_stop = False
+        self._request_navigation_cancel()   # one final request; the first may have been lost
+        self.get_logger().error(f'Navigation goal ownership unresolved: {detail}')
+        self.last_issue = MissionIssue(FailureClass.TERMINAL, 'navigation_cancel_unresolved', detail)
+        if self.state == MissionState.RETURNING_TO_START:
+            self._transition(MissionState.MISSION_FAILED, detail)
+        else:
+            self._publish_state(detail, event='navigation_ownership')
 
     def _stop_parking_navigation(self):
         """Cancel the owned goal and restore the shared goal checker (cancel/reset/shutdown)."""

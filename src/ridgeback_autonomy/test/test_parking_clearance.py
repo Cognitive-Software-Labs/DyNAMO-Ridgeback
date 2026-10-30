@@ -17,7 +17,8 @@ from ridgeback_autonomy.mission.parking_planner import plan_parking
 from ridgeback_autonomy.mission.parking_safety import ProtectionLimits
 from test_mission_manager import manager_factory  # noqa: F401 (fixture)
 from test_parking_feasibility import path
-from test_parking_mission_navigation import answer, feasible, hold_still, navigation_result
+from test_parking_mission_navigation import (
+    answer, feasible, hold_still, navigation_result, release)
 from test_parking_planner import APPROACH_FROM_WEST, CONFIG, grid, target
 
 G1 = (3.0, 3.0)
@@ -186,6 +187,11 @@ def test_obstacle_on_route_cancels_the_leg_and_returns_only_after_a_confirmed_st
     assert m.state == MissionState.RETURNING_TO_START
     assert 'lidar_obstacle_on_route' in m._parking_failure
     calls = len(m.navigation_client.calls)
+    hold_still(m)
+    m.tick()
+    # A stop is no proof Nav2 released the goal: no return, not even its goal-checker change.
+    assert len(m.navigation_client.calls) == calls and len(m._goal_checker_set_client.calls) == 1
+    release(handle)
     m.tick()
     assert len(m.navigation_client.calls) == calls    # not resumed, no return before the stop
     hold_still(m)
@@ -212,6 +218,7 @@ def test_unconfirmed_stop_after_a_veto_fails_without_driving(manager_factory, mo
     m, handle, _ = driving(manager_factory, monkeypatch)
     m._scans.clear()
     m.tick()
+    release(handle)
     calls = len(m.navigation_client.calls)
     m._monotonic.value += m.motion_settlement_timeout_s + 1.0
     m.tick()

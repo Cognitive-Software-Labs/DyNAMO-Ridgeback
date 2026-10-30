@@ -131,13 +131,17 @@ be used as the handoff acknowledgment.
 
 ### Parking mission coordination
 
-The Phase 2D `mission_manager_node.py` is a non-driving coordinator. It captures
-one start pose from the configured TF frames, consumes the shared target
-detection/localization interfaces, pauses the frontier owner through the
-terminal handoff above, and publishes transient-local JSON state on
-`parking_mission/state`. It owns no Nav2 action client. Its successful terminal
-state is `G1_LOCALIZED`, explicitly meaning that a generic target estimate has
-stabilized while parking execution remains deferred.
+`mission_manager_node.py` captures one start pose from the configured TF
+frames, consumes the shared target detection/localization interfaces, pauses
+the frontier owner through the terminal handoff above, and publishes
+transient-local JSON state on `parking_mission/state`. After a stabilized
+target estimate it plans parking candidates and checks their paths with
+`ComputePathToPose`. With `parking_navigation_enabled` off it stops in
+`PARKING_PATH_FEASIBLE`; with it on (simulation launch only) it drives the
+original mission tail through its own `NavigateToPose` client: pre-parking pose,
+final parking pose, the parking wait, then return to the saved start pose and
+`MISSION_COMPLETE`. A failed parking leg returns to the start pose and ends in
+`MISSION_FAILED`.
 
 The estimate retains its `generic_target_position` reference and false
 `is_foot_midpoint` flag. It is not yet qualified as the G1 ground center needed
@@ -149,6 +153,36 @@ unsettled explorer goal are reported as distinct failures. The detailed
 migration state flow and future insertion
 point for G1-region exploration are maintained in the
 [parking mission migration plan](../plans/EXPLORATION_parking_mission_migration.md#phase-2d-non-driving-mission-coordinator).
+
+### Mission navigation goal ownership
+
+The manager owns at most one `NavigateToPose` goal and tracks it from the send
+until the action reports `SUCCEEDED`, `ABORTED` or `CANCELED`. Only that
+terminal result releases the goal. Cancellation follows the explorer's rule:
+a cancel request or its answer, accepted or rejected, does not release
+ownership, and neither does measured zero velocity. A goal cancelled before
+acceptance is cancelled when its handle arrives. A goal that succeeds or aborts
+while its cancellation is in flight is released, but never counts as the
+abandoned leg's arrival.
+
+During a parking leg, a LiDAR veto, the leg deadline or an unknown
+acceptance/result moves the mission to `RETURNING_TO_START` without sending a
+goal. The return waits for the terminal result, then for fresh odometry that
+confirms the robot stopped after the release, and only then restores the
+shared goal checker and sends the return goal. A deadline on the observation or return goal fails the mission at once
+while the cancellation is still tracked. A send attempted while a goal is still
+owned is refused and fails the mission. A reset while a goal is owned cancels
+the mission and is refused until the terminal result arrives. Shutdown can only
+request cancellation and logs that termination was not confirmed.
+
+The wait is bounded by the executor's `cancellation_timeout_s` (5 s). Nothing
+drives or times out during it. On expiry the manager keeps the handle, sends
+one final cancel request and reports terminal `navigation_cancel_unresolved`
+(`MISSION_FAILED`, or the issue on an already cancelled mission). It never
+starts the return, and a reset stays refused until a late terminal result
+releases the goal. Stopping meanwhile relies on Nav2's own cancellation and
+collision monitor; the manager publishes no velocity commands. The state
+JSON's `parking_mission_navigation` reports `goal_owned` and `cancel_pending`.
 
 The HUD is an aggregator. Independent producers publish text panels such as
 velocity and coverage, and `hud_node` combines them for one RViz overlay.

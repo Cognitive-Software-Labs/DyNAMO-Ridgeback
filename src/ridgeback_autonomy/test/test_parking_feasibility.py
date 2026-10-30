@@ -184,12 +184,14 @@ class Handle:
     def __init__(self):
         self.future = Future()
         self.cancels = 0
+        self.cancel_futures = []
 
     def get_result_async(self): return self.future
 
     def cancel_goal_async(self):
         self.cancels += 1
-        return Future()
+        self.cancel_futures.append(Future())
+        return self.cancel_futures[-1]
 
 
 class Client:

@@ -1,8 +1,9 @@
 # EXPLORATION - Parking mission migration
 
 Status: **Phase 1 geometry foundation and Phase 2 detection, localization,
-explorer handoff, and non-driving mission coordination are implemented; parking
-execution remains pending.** This plan covers adapting the existing
+explorer handoff, mission coordination, candidate and path feasibility, and the
+simulation execution tail are implemented; driving is not yet qualified
+end to end.** This plan covers adapting the existing
 Ridgeback-G1 parking mission to the current package-split architecture without
 duplicating localization or changing Nav2 safety configuration.
 
@@ -365,8 +366,15 @@ TF or changing estimator validation.
 6. **Port Nav2 feasibility and ranking.** Preserve all-candidate evaluation,
    action result/error checks, path length, and deterministic ordering. Do not
    introduce the supervisor's proposed donut changes in this migration.
-7. **Port execution.** Add pre-parking, final parking, the existing wait, and
-   return-to-start actions only after explorer ownership is proven settled.
+7. **Implemented in simulation, not yet qualified: port execution.**
+   Pre-parking, final parking, the existing wait, and return-to-start run only
+   after explorer ownership is proven settled. The manager's own
+   `NavigateToPose` goal is released only by its terminal result, including
+   through cancellation, deadlines, LiDAR vetoes and reset; the contract is in
+   [mission navigation goal ownership](../exploration/architecture.md#mission-navigation-goal-ownership).
+   Remaining before qualification: one complete Gazebo mission to
+   `MISSION_COMPLETE`, the separate checked-route-versus-executed-route issue,
+   and Isaac driving validation.
 8. **Port markers and launch integration.** Add relative marker topics and
    clean RViz displays, then integrate the manager into the current readiness
    chain without changing backend packages or Nav2 safety parameters.
