@@ -387,10 +387,12 @@ TF or changing estimator validation.
    threshold. The precise, verified
    [observation return](../exploration/architecture.md#observation-return)
    now restores that view, and Gazebo relocalizes and plans. The complete
-   mission is next stopped on the pre-parking leg. The live LiDAR clearance
-   vetoes a real obstacle about 0.45 m from the robot's footprint near the
-   start, which lies inside the remaining route that the map-based path check
-   accepted. That is the separate checked-route-versus-executed-route issue.
+   mission is next stopped on the pre-parking leg by the live LiDAR clearance
+   monitor. The checked route cleared every real obstacle and Nav2 followed it
+   within 3 cm, but Gazebo's -45° seam bin returns phantom short ranges
+   ([Gazebo first ray](../isaac/lidar-pipeline.md#gazebo-first-ray)), and one
+   fell inside the remaining route. Invalidating that bin in the Gazebo guard
+   is the identified correction and has not been made.
 8. **Port markers and launch integration.** Add relative marker topics and
    clean RViz displays, then integrate the manager into the current readiness
    chain without changing backend packages or Nav2 safety parameters.
@@ -424,3 +426,5 @@ TF or changing estimator validation.
   — front-only versus merged mapping, path feasibility, and the relocalization blocker.
 - [Gazebo G1 reacquisition](../../archive/engineering/2026-10-30-gazebo-g1-reacquisition.md)
   — why the second localization failed off the observation view, and the precise return's validation run.
+- [Gazebo pre-parking veto](../../archive/engineering/2026-10-30-gazebo-parking-route-veto.md)
+  — checked versus executed route, and the LiDAR seam phantom that caused the veto.

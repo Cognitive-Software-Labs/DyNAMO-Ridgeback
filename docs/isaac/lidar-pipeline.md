@@ -94,7 +94,11 @@ adds one node-targeted remap per `lidar2d` in `robot.yaml`
 Isaac and hardware scans are not affected.
 
 The bins at the ±45° cube-map face seams (360 and 720) also read `+inf` far
-more often than their neighbours. They are single rays and are left unchanged.
+more often than their neighbours. Bin 360 (-45°) also returns phantom short
+ranges on both LiDARs, more than 0.3 m short of two agreeing neighbours, in
+roughly 10–26% of scans. The parking clearance monitor treats those as real
+returns, so they can veto a parking leg. Both seam bins are currently left
+unchanged.
 
 Gazebo scans before and after the guard are different populations: do not
 pair LiDAR-dependent Gazebo results across that change.

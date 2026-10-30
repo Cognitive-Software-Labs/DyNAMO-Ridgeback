@@ -90,3 +90,9 @@ the clearance monitor sweeps it. That route had passed the map-based path
 check, so the two checks disagree near the start (the separate
 checked-route-versus-executed-route issue), which this change does not
 address.
+
+Correction, 2026-10-30: the paragraph above inferred a real obstacle from the
+returns within 1.2 m of the robot only. A recorded reproduction found that
+the route cleared real obstacles, and that the offending return was a Gazebo
+LiDAR seam phantom (bin 360), which also appeared in this run's scans just
+before its veto; see the [route-veto record](2026-10-30-gazebo-parking-route-veto.md).
