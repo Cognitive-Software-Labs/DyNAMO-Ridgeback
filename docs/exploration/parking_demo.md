@@ -49,6 +49,22 @@ relocalizing ([observation return](architecture.md#observation-return)); it can
 still fail explicitly, including in `--planning-only` mode. No execution
 safeguard or motion-settlement threshold is relaxed by this launch change.
 
+## Parking display
+
+RViz shows the plan on `parking/visualization`, with a colour legend overlay on
+`parking/legend`. The donut is 360 radial lines, one per degree between the
+reach limits (white rings), split where the class changes. Each part takes the
+class of the map cell it crosses and of the parking pose whose task point lies
+there:
+
+- green: a geometrically valid parking pose, not a Nav2 path check;
+- red: an occupied cell, or a pose whose parked footprint hits an obstacle;
+- orange: an unmapped cell, or a footprint that reaches unmapped space;
+- grey: free floor, but the pose fails the G1 keep-out or the reach limit.
+
+Candidates are not drawn as dots. The Nav2-checked choice is the blue selected
+pose (arrow, footprint, rear-bin task point) and its validated route.
+
 ## Scene, configuration and startup gates
 
 The wrapper calls `ridgeback_mission.launch.py` with `demo_scene_enabled:=true`.

@@ -392,7 +392,11 @@ TF or changing estimator validation.
    ([Gazebo first ray](../isaac/lidar-pipeline.md#gazebo-first-ray)). And the
    live monitor was given a route starting with the robot's own pose, so it
    re-checked the whole route back to its start, now limited to the route
-   ahead ([parking demonstration](../exploration/parking_demo.md)).
+   ahead ([parking demonstration](../exploration/parking_demo.md)). Open: when
+   the robot reverses toward G1, the live stopping-path margin can veto the
+   final approach on G1's real leg, about 0.1 m from the footprint. The
+   planner's keep-out is measured from the generic G1 estimate, not G1's body
+   extent.
 8. **Port markers and launch integration.** Add relative marker topics and
    clean RViz displays, then integrate the manager into the current readiness
    chain without changing backend packages or Nav2 safety parameters.

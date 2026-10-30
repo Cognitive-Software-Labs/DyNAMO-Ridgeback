@@ -18,13 +18,11 @@ STATE_DIAGRAM_DISPLAY_NAME = 'Mission State Machine'
 STATE_DIAGRAM_TOPIC = 'parking_mission/state_diagram'
 PARKING_NAMESPACES = (
     'parking/g1_position', 'parking/g1_keepout', 'parking/donut_boundaries',
-    'parking/radial_1deg', 'parking/candidate_task_points',
+    'parking/radial_1deg',
     'parking/selected_pose', 'parking/selected_footprint', 'parking/selected_task_point',
-    'parking/status',
-    'parking/path_candidates', 'parking/selected_path',
+    'parking/status', 'parking/selected_path',
 )
-# Published but off by default: the radial lines already show where parking fails.
-PARKING_HIDDEN_NAMESPACES = ('parking/rejected_task_points',)
+PARKING_HIDDEN_NAMESPACES = ()
 
 
 def with_parking_display(layout: dict, topic: str, legend_topic: str = LEGEND_TOPIC,

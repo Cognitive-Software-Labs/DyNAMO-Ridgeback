@@ -28,11 +28,17 @@ def test_donut_legend_matches_the_four_ray_classes():
     rows = dict(viz.legend_sections(CONFIG))['Donut rays (1°, 0.30-0.60 m)']
     assert [(label, rgb(rgba)) for _, rgba, label in rows] == [
         ('Valid parking pose (no path check)', rgb(viz.GREEN)),
-        ('Obstacle on the ray', rgb(viz.RED)),
-        ('Unknown or unmapped', rgb(viz.UNKNOWN_RED)),
-        ('Free, parking pose invalid', rgb(viz.POSE_INVALID))]
-    # Green on the donut is geometric validity; the path check has its own section.
-    assert 'Nav2 path check (large dots)' in dict(viz.legend_sections(CONFIG))
+        ('Blocked by an obstacle (cell or footprint)', rgb(viz.RED)),
+        ('Unknown or unmapped (cell or footprint)', rgb(viz.UNKNOWN_ORANGE)),
+        ('Free, but keep-out / reach fails', rgb(viz.POSE_INVALID))]
+    # Four clearly different, opaque colours: neighbouring 1-degree rays never blend.
+    colours = [rgb(rgba) for _, rgba, _ in rows]
+    assert len(set(colours)) == 4 and all(rgba[3] == 1.0 for _, rgba, _ in rows)
+    assert min(sum(abs(a - b) for a, b in zip(p, q))
+               for i, p in enumerate(colours) for q in colours[i + 1:]) >= 100
+    # No candidate or path-check dots are explained any more: the display has none.
+    titles = [title for title, _ in viz.legend_sections(CONFIG)]
+    assert not any('dots' in title or 'Candidates' in title for title in titles)
 
 
 def test_every_coloured_parking_marker_has_its_legend_entry():
@@ -46,9 +52,6 @@ def test_every_coloured_parking_marker_has_its_legend_entry():
     markers = viz.plan_markers(plan, CONFIG, rclpy.time.Time(seconds=1).to_msg()).markers
     legend = entries()
     expected = {('parking/radial_1deg', i): viz.RAY_LABELS[s] for i, (s, _) in enumerate(viz.RAY_CLASSES)}
-    expected.update({(ns, i): viz.CANDIDATE_LABELS[s] for ns, i, s, _ in viz.CANDIDATE_CLASSES})
-    expected.update({('parking/path_candidates', i): viz.PATH_CHECK_LABELS[s]
-                     for i, (s, _) in enumerate(viz.PATH_CHECK_CLASSES)})
     expected.update({('parking/selected_pose', 0): 'Parking pose and heading',
                      ('parking/selected_footprint', 0): 'Robot footprint at the pose',
                      ('parking/selected_task_point', 0): 'Rear-bin task point',
@@ -72,10 +75,7 @@ def test_selected_pose_route_and_feasibility_are_explained_with_their_colours():
     for label in ('Parking pose and heading', 'Robot footprint at the pose', 'Rear-bin task point',
                   'Validated route to the pose'):
         assert rgb(legend[label][1]) == rgb(viz.SELECTED)
-    assert rgb(legend['Path feasible (Nav2 + swept footprint)'][1]) == rgb(viz.GREEN)
-    assert rgb(legend['No safe path'][1]) == rgb(viz.RED)
-    assert rgb(legend['Path not checked yet'][1]) == rgb(viz.REJECTED)
-    assert rgb(legend['Rejected: collision / G1 keep-out *'][1]) == rgb(viz.RED)
+    assert 'Selected parking (Nav2-checked)' in dict(viz.legend_sections(CONFIG))
 
 
 def test_legend_overlay_is_a_bottom_right_rich_text_panel_sized_for_its_rows():

@@ -382,26 +382,37 @@ def preference(
 RADIAL_SEVERITY = ('occupied', 'unknown', 'pose_invalid', 'valid')
 
 
+def candidate_ray_class(candidate: CandidateDecision) -> str:
+    """Display class of a free donut cell from its parking candidate's existing decision."""
+    if candidate.status in ('valid', 'selected'):
+        return 'valid'
+    if candidate.reason == 'footprint_occupied':
+        return 'occupied'          # the parked footprint is blocked by an obstacle
+    if candidate.reason in ('footprint_unknown', 'footprint_out_of_bounds'):
+        return 'unknown'           # the parked footprint reaches unmapped space
+    return 'pose_invalid'          # free, but G1 keep-out, reach budget or geometry fails
+
+
 def radial_profile(grid: GridSnapshot, target: TargetReference, config: PlannerConfig,
                    candidates: Sequence[CandidateDecision] = (),
                    step_deg: float = 1.0) -> list[tuple[float, list[tuple[float, float, str]]]]:
     """Per ray from reach_min to reach_max: contiguous ``(r_start, r_end, class)`` runs (display only).
 
     Runs end at the ray's exact map-cell boundary crossings, so an obstacle marks only
-    the part of a ray that lies in its cells. Each run takes the class of the cell it
-    crosses: ``occupied``, ``unknown`` (also outside the map), and for free cells
-    ``valid`` when that cell's parking candidate passed the footprint, keep-out and
-    reach-budget checks, otherwise ``pose_invalid``; a ray along a cell edge takes the
-    worse of both cells. This is not Nav2 path feasibility, and candidates are never
-    derived from the rays.
+    the part of a ray it affects. Each run takes the class of the cell it crosses:
+    ``occupied``, ``unknown`` (also outside the map), and for a free cell the class of
+    its parking candidate's decision (``candidate_ray_class``): ``valid``, ``occupied``
+    where the parked footprint hits an obstacle, ``unknown`` where it reaches unmapped
+    space, otherwise ``pose_invalid``. A ray along a cell edge takes the worse of both
+    cells. This is not Nav2 path feasibility, and candidates are never derived from
+    the rays.
     """
 
     res = grid.resolution
-    valid_cells = set()
+    cell_class_of = {}
     for c in candidates:
-        if c.status in ('valid', 'selected'):
-            lx, ly = grid.map_to_local(c.task_x, c.task_y)
-            valid_cells.add((math.floor(float(ly) / res), math.floor(float(lx) / res)))
+        lx, ly = grid.map_to_local(c.task_x, c.task_y)
+        cell_class_of[(math.floor(float(ly) / res), math.floor(float(lx) / res))] = candidate_ray_class(c)
     px, py = (float(v) for v in grid.map_to_local(target.x, target.y))
     r0, r1 = config.reach_min_m, config.reach_max_m
 
@@ -421,7 +432,7 @@ def radial_profile(grid: GridSnapshot, target: TargetReference, config: PlannerC
                 elif grid.data[row, col] < 0:
                     status = 'unknown'
                 else:
-                    status = 'valid' if (row, col) in valid_cells else 'pose_invalid'
+                    status = cell_class_of.get((row, col), 'pose_invalid')
                 worst = min(worst, status, key=RADIAL_SEVERITY.index)
         return worst
 

@@ -1,11 +1,12 @@
-"""RViz markers for a non-driving plan: radial donut lines and candidate validity.
+"""RViz markers for a parking plan: radial donut lines and the selected pose.
 
 The donut is drawn as 360 radial lines at 1-degree steps, each split where the
 planner's classification of the cells it crosses changes: green where a parking
 pose with its task point there passed the footprint, keep-out and reach-budget
-checks, red where the line crosses an obstacle, orange where the map is unknown,
-grey on free floor where the parked footprint would fail. Green candidate points
-mean the same footprint validity. Neither layer certifies Nav2 path reachability.
+checks, red where the cell or that pose's footprint is blocked by an obstacle,
+orange where either is unmapped, grey on free floor where the pose fails another
+check. Green is geometric validity only; Nav2 path feasibility is shown by the
+selected pose and its route.
 
 Every array starts with a DELETEALL marker so a new plan, a failed plan or a
 reset never leaves geometry from an earlier target on screen. The colour legend
@@ -27,24 +28,17 @@ from ridgeback_autonomy.mission.parking_geometry import rotated_footprint_vertic
 from ridgeback_autonomy.mission.parking_planner import ParkingPlan, PlannerConfig
 
 
-GREEN = (0.1, 0.9, 0.2, 0.85)
-RED = (1.0, 0.0, 0.0, 0.9)
-UNKNOWN_RED = (1.0, 0.35, 0.0, 0.8)   # original: unknown in an orange-red shade of red
-REJECTED = (1.0, 0.78, 0.05, 0.9)     # original "rejected" amber for non-collision reasons
+GREEN = (0.1, 0.9, 0.2, 1.0)
+RED = (1.0, 0.0, 0.0, 1.0)
+UNKNOWN_ORANGE = (1.0, 0.55, 0.0, 1.0)
 SELECTED = (0.0, 0.6, 1.0, 1.0)
 G1_COLOR = (0.8, 0.2, 0.9, 1.0)
 RING = (1.0, 1.0, 1.0, 0.9)           # donut reach boundaries
-POSE_INVALID = (0.55, 0.55, 0.55, 0.7)  # free floor, but no valid parking pose there
-# Marker id per radial class: one LINE_LIST each so RViz can toggle them.
-RAY_CLASSES = (('valid', GREEN), ('occupied', RED), ('unknown', UNKNOWN_RED), ('pose_invalid', POSE_INVALID))
-# (namespace, id, candidate status, colour): geometric validity of each candidate task point.
-# Valid candidates stay on top of the lines; the rejected ones repeat what the lines
-# show, so they get their own namespace (hidden by default in the parking layout).
-CANDIDATE_CLASSES = (('parking/candidate_task_points', 0, 'valid', GREEN),
-                     ('parking/rejected_task_points', 0, 'collision', RED),
-                     ('parking/rejected_task_points', 1, 'rejected', REJECTED))
-# Marker id per Nav2 path-check result of a geometrically valid candidate.
-PATH_CHECK_CLASSES = (('unchecked', REJECTED), ('rejected', RED), ('valid', GREEN))
+POSE_INVALID = (0.6, 0.6, 0.6, 1.0)  # free floor, but no valid parking pose there
+# Marker id per radial class: one LINE_LIST each so RViz can toggle them. Opaque, so
+# neighbouring 1-degree rays do not blend into one shade.
+RAY_CLASSES = (('valid', GREEN), ('occupied', RED), ('unknown', UNKNOWN_ORANGE),
+               ('pose_invalid', POSE_INVALID))
 # Colours of the shared layout's Nav2 displays (sim/rviz/exploration.rviz), shown in the legend.
 NAV2_PLAN = (0.0, 1.0, 0.0, 1.0)
 MPPI_TRAJECTORY = (1.0, 170 / 255, 0.0, 1.0)
@@ -108,19 +102,6 @@ def plan_markers(plan: ParkingPlan, config: PlannerConfig, stamp) -> MarkerArray
                             for r0, r1, run_status in runs if run_status == status for r in (r0, r1)]
         add(rays)
 
-    for ns, marker_id, status, rgba in CANDIDATE_CLASSES:
-        task_points = _marker(ns, marker_id, Marker.SPHERE_LIST, frame, stamp, rgba, (0.018, 0.018, 0.018))
-        task_points.points = [Point(x=c.task_x, y=c.task_y, z=0.08) for c in plan.candidates
-                              if c.status == status]
-        add(task_points)
-
-    for marker_id, (status, rgba) in enumerate(PATH_CHECK_CLASSES):
-        points = _marker('parking/path_candidates', marker_id, Marker.SPHERE_LIST,
-                         frame, stamp, rgba, (0.025, 0.025, 0.025))
-        points.points = [Point(x=c.task_x, y=c.task_y, z=0.13) for c in plan.candidates
-                         if c.status in ('valid', 'selected') and c.path_status == status]
-        add(points)
-
     if plan.selected_path is not None:
         path = _marker('parking/selected_path', 0, Marker.LINE_STRIP, frame, stamp,
                        SELECTED, (0.025, 0, 0))
@@ -164,12 +145,10 @@ def plan_markers(plan: ParkingPlan, config: PlannerConfig, stamp) -> MarkerArray
 
 # Screen legend: one latched overlay, generated from the colour tables above.
 
-RAY_LABELS = {'valid': 'Valid parking pose (no path check)', 'occupied': 'Obstacle on the ray',
-              'unknown': 'Unknown or unmapped', 'pose_invalid': 'Free, parking pose invalid'}
-CANDIDATE_LABELS = {'valid': 'Valid candidate', 'collision': 'Rejected: collision / G1 keep-out *',
-                    'rejected': 'Rejected: unknown / reach *'}
-PATH_CHECK_LABELS = {'unchecked': 'Path not checked yet', 'rejected': 'No safe path',
-                     'valid': 'Path feasible (Nav2 + swept footprint)'}
+RAY_LABELS = {'valid': 'Valid parking pose (no path check)',
+              'occupied': 'Blocked by an obstacle (cell or footprint)',
+              'unknown': 'Unknown or unmapped (cell or footprint)',
+              'pose_invalid': 'Free, but keep-out / reach fails'}
 LINE, DOT, ARROW, OUTLINE, RING_GLYPH = '\u2501\u2501', '\u25cf', '\u279c', '\u25ad', '\u25ef'
 LEGEND_TEXT_SIZE = 9
 LEGEND_LINE_PX = 15   # one 9 pt row, with slack for font differences
@@ -180,11 +159,7 @@ def legend_sections(config: PlannerConfig):
     return (
         (f'Donut rays (1\u00b0, {config.reach_min_m:.2f}-{config.reach_max_m:.2f} m)',
          [(LINE, rgba, RAY_LABELS[status]) for status, rgba in RAY_CLASSES]),
-        ('Candidates (small dots)',
-         [(DOT, rgba, CANDIDATE_LABELS[status]) for _, _, status, rgba in CANDIDATE_CLASSES]),
-        ('Nav2 path check (large dots)',
-         [(DOT, rgba, PATH_CHECK_LABELS[status]) for status, rgba in PATH_CHECK_CLASSES]),
-        ('Selected parking', [(ARROW, SELECTED, 'Parking pose and heading'),
+        ('Selected parking (Nav2-checked)', [(ARROW, SELECTED, 'Parking pose and heading'),
                               (OUTLINE, SELECTED, 'Robot footprint at the pose'),
                               (DOT, SELECTED, 'Rear-bin task point'),
                               (LINE, SELECTED, 'Validated route to the pose')]),
@@ -210,7 +185,6 @@ def legend_overlay(config: PlannerConfig) -> OverlayText:
         rows.append(f'<span style="color: rgb(150, 200, 255);">{html.escape(title)}</span>')
         rows += [f'&nbsp;&nbsp;{_swatch(glyph, rgba)}&nbsp;&nbsp;{html.escape(label)}'
                  for glyph, rgba, label in entries]
-    rows.append('* hidden by default (Parking Plan namespaces)')
     msg = OverlayText()
     msg.action = OverlayText.ADD
     msg.width, msg.height = 330, LEGEND_LINE_PX * len(rows) + 10

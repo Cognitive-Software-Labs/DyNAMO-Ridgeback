@@ -1034,9 +1034,9 @@ def test_parking_rviz_layout_adds_one_latched_display_without_touching_the_share
     assert parking['Class'] == 'rviz_default_plugins/MarkerArray'
     assert parking['Topic']['Value'] == 'parking/visualization'
     assert parking['Topic']['Durability Policy'] == 'Transient Local'
-    # The radial donut lines are shown; rejected candidate dots are published but start hidden.
+    # The radial donut lines are shown; candidate dots no longer exist.
     assert parking['Namespaces']['parking/radial_1deg'] is True
-    assert parking['Namespaces']['parking/rejected_task_points'] is False
+    assert not any('task_points' in ns or ns == 'parking/path_candidates' for ns in parking['Namespaces'])
     # The colour legend is a latched screen overlay, outside the marker clears.
     assert legend['Class'] == 'rviz_2d_overlay_plugins/TextOverlay' and legend['Enabled'] is True
     assert legend['Topic']['Value'] == 'parking/legend'
