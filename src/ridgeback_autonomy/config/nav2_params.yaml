@@ -41,7 +41,9 @@ controller_server:
       stateful: true
       plugin: "nav2_controller::SimpleGoalChecker"
       xy_goal_tolerance: 0.40
-      yaw_goal_tolerance: 0.40
+      # Any heading counts: exploration goals carry no meaningful heading, and
+      # turning on the spot at a goal beside a wall is what the base cannot do.
+      yaw_goal_tolerance: 3.15
     FollowPath:
       plugin: "nav2_mppi_controller::MPPIController"
       time_steps: 56

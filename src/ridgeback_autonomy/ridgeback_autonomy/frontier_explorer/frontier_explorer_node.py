@@ -20,7 +20,7 @@ from visualization_msgs.msg import Marker, MarkerArray
 from std_msgs.msg import ColorRGBA
 from rclpy.qos import QoSProfile, QoSDurabilityPolicy
 from std_msgs.msg import String
-from ridgeback_autonomy.frontier_explorer.navigator import get_frontier_clusters
+from ridgeback_autonomy.frontier_explorer.navigator import facing_quaternion, get_frontier_clusters
 from ridgeback_autonomy.frontier_explorer.params import UNKNOWN, OBSTACLE, FREE
 
 
@@ -347,7 +347,7 @@ class FrontierExplorerNode(Node):
             f'world ({best_frontier_world[0]:.2f}, {best_frontier_world[1]:.2f})'
         )
 
-        if not self.send_goal_to_nav2(best_frontier_world):
+        if not self.send_goal_to_nav2(best_frontier_world, self.grid_to_world(robot_pos)):
             # Nothing was sent — leaving current_goal unset lets the next
             # tick retry instead of idling until the progress timeout
             # blacklists a goal nav2 never saw
@@ -556,13 +556,13 @@ class FrontierExplorerNode(Node):
         
         return (world_x, world_y)
     
-    def send_goal_to_nav2(self, target_position):
+    def send_goal_to_nav2(self, target_position, start_position=None):
         with self.mission_guard.lock:
             if not self.mission_guard.allowed() or (self.mission_guard.required and self.mission_guard.handle is not None):
                 return False
             self.mission_guard.goal_pending = True
             try:
-                sent = self._send_goal_to_nav2(target_position)
+                sent = self._send_goal_to_nav2(target_position, start_position)
             except Exception:
                 self.mission_guard.goal_pending = False
                 raise
@@ -570,7 +570,7 @@ class FrontierExplorerNode(Node):
                 self.mission_guard.goal_pending = False
             return sent
 
-    def _send_goal_to_nav2(self, target_position):
+    def _send_goal_to_nav2(self, target_position, start_position=None):
         """Send goal to Nav2 NavigateToPose action. Returns True if sent."""
         goal_msg = NavigateToPose.Goal()
         goal_msg.pose = PoseStamped()
@@ -581,8 +581,15 @@ class FrontierExplorerNode(Node):
         goal_msg.pose.pose.position.y = target_position[1]
         goal_msg.pose.pose.position.z = 0.0
 
-        # Set orientation to face the goal
-        goal_msg.pose.pose.orientation.w = 1.0
+        # Face along the approach, from the robot towards the goal. With a
+        # fixed yaw the base arrived and then had to turn on the spot, which
+        # walls beside a doorway block.
+        if start_position is None:
+            goal_msg.pose.pose.orientation.w = 1.0
+        else:
+            qz, qw = facing_quaternion(start_position, target_position)
+            goal_msg.pose.pose.orientation.z = qz
+            goal_msg.pose.pose.orientation.w = qw
 
         if not self.nav_client.wait_for_server(timeout_sec=1.0):
             self.get_logger().warn('NavigateToPose action server not available')

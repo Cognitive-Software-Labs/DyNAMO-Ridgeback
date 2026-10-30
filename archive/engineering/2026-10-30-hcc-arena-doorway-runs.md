@@ -1,14 +1,14 @@
 # HCC arena doorway runs and the mesh-shaped robot outline
 
 Recorded dates: 2026-10-30
-Tested revisions: `f88c46fd50ce713bd32108fa54c3fc3d39e3833f`, `64695c7f9961958526b7d5ffd6bc5a1ede6ca2aa`
+Tested revisions: `f88c46fd50ce713bd32108fa54c3fc3d39e3833f`, `64695c7f9961958526b7d5ffd6bc5a1ede6ca2aa`, `d4f419cbc34b0cd7e37a40246eff7cbe4b31df7f`
 Provenance: partial
 
-All four runs used the `robocup_hcc_arena` world as committed in `f88c46fd` and
+All six runs used the `robocup_hcc_arena` world as committed in `f88c46fd` and
 the 0.05 m costmaps and rescaled explorer cell parameters of `64695c7f`. Run 1
 used `64695c7f` unchanged. Runs 2–4 ran on uncommitted `nav2_params.yaml`
-changes; each run's full difference from `64695c7f` is preserved as a patch
-beside this record. Launch and console logs stayed in the session scratch
+changes; each run's full difference from `64695c7f` (runs 5 and 6: from
+`d4f419cb`) is preserved as a patch beside this record. Launch and console logs stayed in the session scratch
 space and were not retained, so provenance is partial.
 
 ## Conditions
@@ -64,6 +64,33 @@ footprint's rear edge. The explorer blacklisted 18 goals.
 
 ![Run 4 Start-occupied spots with the padded footprint at the recorded pose.](assets/2026-10-30-hcc-arena-doorways/run4-start-occupied.png)
 
+## Runs 5 and 6
+
+Both ran Smac Lattice with reverse expansion as in run 4, on the mesh-shaped
+Nav2 footprint without padding from `d4f419cb`
+([patch](assets/2026-10-30-hcc-arena-doorways/run5-6-nav2_params.patch)).
+Run 6 also sent explorer goals facing from the robot towards the goal instead
+of a fixed yaw of 0.
+
+| Run | Minutes | Goals reached | 60 s stalls | `Start occupied` | Blacklisted |
+|---|---|---|---|---|---|
+| 5 | 2.1 | 0 | 1 | 7 | 2 |
+| 6 | 4.9 | 2 | 0 | 51 | 16 |
+
+**Run 5.** The robot reached its first goal beside the OR sliding door facing
+96°. The goal carried yaw 0 and the goal checker allowed 0.40 rad, so MPPI
+commanded an on-the-spot turn of about 0.14 rad/s beside the wall, which the
+collision monitor held at zero.
+
+**Run 6.** Facing goals removed that turn: the robot reached the OR doorway
+goal and a goal inside Storage. Heading for CT, it backed into the Storage
+doorway and stopped at (−1.41, 0.35) turned 139°, about 41° off the doorway
+axis. The footprint's centre cell was clear, but its edges touched door-frame
+cells, so every later plan failed with `Start occupied` for 4.5 minutes. Smac
+checks its lattice at 16 headings, 22.5° apart, against 5 cm cells, and the
+unpadded outline needs 105.1 cm at its widest turning angle, so a pose that
+passed planning can fail once MPPI ends a few degrees off it.
+
 ## Decisions
 
 On 2026-10-30 the user decided that `r100_0160` has the Clearpath mesh shape.
@@ -72,6 +99,12 @@ Nav2 footprint took the same outline with no padding, so one body model serves
 both costmaps and the monitor. That contradicts the 2026-10-16 direct tape
 survey at the corners; the open check is in the backlog. Smac Lattice remained
 under evaluation and was not part of that change.
+
+After run 6 the user paused planner tuning. Smac Lattice and the MPPI heading
+settings were reverted to NavFn and mode 1 and survive only as the patch above.
+The explorer's facing goals and a goal checker that accepts any heading were
+committed with this update. Not built: a recovery that retraces the robot's
+recorded path backwards when Smac reports `Start occupied`.
 
 ## Outline replaced
 

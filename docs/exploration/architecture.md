@@ -111,6 +111,9 @@ validation gates before motion is enabled.
 `frontier_explorer_node` reads the Nav2 global costmap, chooses frontiers, and
 sends `NavigateToPose` goals. It is the only supported explorer; its sources
 live under `src/ridgeback_autonomy/ridgeback_autonomy/frontier_explorer/`.
+Each goal faces from the robot towards the goal, and Nav2's goal checker
+accepts any heading (`yaw_goal_tolerance: 3.15`), so the base never has to turn
+on the spot to finish a goal beside a wall.
 
 The HUD is an aggregator. Independent producers publish text panels such as
 velocity and coverage, and `hud_node` combines them for one RViz overlay.
