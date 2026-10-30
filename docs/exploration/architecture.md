@@ -156,41 +156,65 @@ point for G1-region exploration are maintained in the
 
 ### G1-centred exploration
 
-After the first G1 localization, the manager resumes the shared explorer,
-focused on G1, unless no parking position is undecided. A position is
+After each G1 localization, the manager plans parking from the map at hand
+first. It explores only when that planning finds no geometrically valid pose,
+or no pose with a safe route (`bounded_search_exhausted`), and parking
+positions are still undecided. A position is
 undecided when the G1 keep-out and reach budget allow it, but its task cell is
 unknown, or its parked footprint touches unknown cells or leaves the map
 (`undecided_parking_positions`, using the planner's own checks). Positions
 blocked by obstacles are decided, and unknown floor that no parked footprint
-reaches is not required. Exploration completes when no position is undecided.
-It ends with a partial result when the explorer has no reachable frontier
-left around G1, after `g1_exploration_timeout_s`, or when the footprint enters
-G1's protected region. Planning then rejects any candidate whose footprint
+reaches is not required. A verified pose elsewhere therefore skips exploration,
+even if some directions stay orange.
+
+Exploration resumes the shared explorer, focused on G1, for a round. While it
+runs, every new map (at most every `g1_exploration_refresh_s`, 2 s) redraws
+the donut from the last G1 estimate; that preview never selects a pose. A round
+ends:
+
+- as a checkpoint, once poses become valid that no planning attempt has
+  considered (none within a cell of one), after at least
+  `g1_exploration_min_round_s` (5 s);
+- complete, when no position is undecided;
+- partial, when the explorer has no reachable frontier left around G1, after
+  `g1_exploration_timeout_s` (240 s, shared by all rounds), or when the
+  footprint enters G1's protected region.
+
+Every round end pauses the explorer through MissionGuard and relocalizes G1
+before the unchanged planning and path checks. If that planning fails again,
+only a checkpoint round may lead to another, up to
+`g1_exploration_max_rounds` (3). Planning rejects any candidate whose footprint
 still touches unknown space, as before.
 
 ### Observation return
 
-When G1-centred exploration has moved the robot, it returns to the
-observation pose: the pose at which G1 was localized, so a pose where the
-detector has already found G1. The detector's score near its threshold depends
-on the exact view: a lateral shift of 0.1 m or an 18° turn can put the same,
-fully visible G1 just below it. The return therefore applies a temporary goal
-checker of 0.03 m and 0.10 rad (`observation_xy_tolerance_m`,
+After exploring, G1 is relocalized from where the robot stopped when possible.
+If the camera is `g1_reacquire_min_range_m`–`g1_reacquire_max_range_m`
+(1.7–3.5 m) from the G1 estimate, the robot turns in place to point the camera
+at it. Closer, G1's feet leave the image: the camera is 1.03 m up with a 32°
+vertical half view. Otherwise, and once if the turn, its view check or the localization
+fails, it returns to the observation pose: the pose at which G1 was first
+localized, where the detector has already found it. The detector's score near
+its threshold depends on the exact view: a lateral shift of 0.1 m or an 18°
+turn can put the same, fully visible G1 just below it. Both goals apply a
+temporary goal checker of 0.03 m and 0.10 rad (`observation_xy_tolerance_m`,
 `observation_yaw_tolerance_rad`) through the same parameter call the parking
-legs use, and sends the goal only after the change is confirmed. If it is not
-confirmed, the mission fails rather than return loosely. When Nav2 releases
-the goal, by success, failure or deadline, the shared checker is restored.
+legs use, and are sent only after the change is confirmed. If it is not
+confirmed, the turn falls back to the observation pose, and the observation
+return fails rather than return loosely. When Nav2 releases a goal, by
+success, failure or deadline, the shared checker is restored.
 
-Nav2 success alone does not start the second localization. After fresh odometry
+Nav2 success alone does not start the localization. After fresh odometry
 confirms the stop, the manager reads the robot pose from TF. It accepts the
 pose only within the checker plus a 0.01 m / 0.02 rad stop allowance, and only
 if the camera's optical axis
 (`observation_camera_frame`, from TF, so the mount is included) points within
 `observation_camera_half_view_rad` (0.60 rad, inside the 0.70 rad half field of
-view of both simulators' colour camera) of the latest G1 estimate. Otherwise it
-fails with `observation_pose_not_reached`, `g1_outside_camera_view` or
-`observation_view_unverified`. There is one observation goal and no retry; a
-G1 that still is not detected ends at the existing localization timeout.
+view of both simulators' colour camera) of the latest G1 estimate. Otherwise
+the observation return fails with `observation_pose_not_reached`,
+`g1_outside_camera_view` or `observation_view_unverified`. There is one
+observation-pose goal and no retry. A G1 that still is not detected there ends
+at the existing localization timeout.
 
 ### Mission navigation goal ownership
 

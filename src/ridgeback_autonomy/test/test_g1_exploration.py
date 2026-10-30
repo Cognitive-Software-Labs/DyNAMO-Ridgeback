@@ -170,14 +170,12 @@ def test_mapped_donut_with_unknown_parked_footprints_still_explores(manager_fact
     assert before['donut_unknown_cells'] == 0 and before['undecided_positions'] > 0
 
 
-def test_unknown_space_no_parked_footprint_reaches_skips_exploration(manager_factory):
+def test_unknown_space_no_parked_footprint_reaches_plans_without_exploring(manager_factory):
     # Unknown floor beyond every parked footprint, and under G1 inside the donut.
     m = localized_on(manager_factory, lambda d, a: (d > 1.6) | (d < 0.25))
     assert m.resume_client.calls == []
-    result = m.g1_exploration_result
-    assert (result['outcome'], result['reason']) == ('not_needed', 'positions_already_decided')
-    assert result['before']['undecided_positions'] == 0
-    assert m.state != MissionState.EXPLORING_AROUND_G1
+    assert m.g1_exploration_result is None
+    assert m.state in (MissionState.PARKING_CANDIDATES_READY, MissionState.EVALUATING_PARKING_PATHS)
 
 
 def test_undecided_positions_follow_the_planners_own_decisions(manager_factory):
@@ -312,6 +310,8 @@ def test_handoff_state_reports_the_exploration_result(manager_factory):
 
 def test_failed_fresh_localization_after_exploration_never_plans(manager_factory):
     m = exploring_manager(manager_factory)
+    first = m.parking_plan          # the failed plan-first attempt that started exploring
+    assert first.failure_reason == 'no_free_donut_cells'
     m._on_map(occupancy_map())
     m.tick()
     back_at_observation(m)
@@ -321,7 +321,7 @@ def test_failed_fresh_localization_after_exploration_never_plans(manager_factory
     m.tick()
     assert m.state == MissionState.MISSION_FAILED
     assert m.last_issue.code == 'target_localization_timeout'
-    assert m.parking_plan is None
+    assert m.parking_plan is first
     assert len(m.navigation_client.calls) == 1   # bounded: no second observation goal
 
 
@@ -432,3 +432,160 @@ def test_observation_goal_is_never_sent_with_the_loose_checker(manager_factory):
     assert m.state == MissionState.MISSION_FAILED
     assert 'observation goal tolerance not applied' in m.last_issue.reason
     assert m.navigation_client.calls == []
+
+
+# Progressive planning: plan first, explore only while poses are undecided, check newly
+# valid poses at bounded checkpoints, and relocalize G1 by turning toward it in place.
+
+def stand(m, x, y, yaw):
+    """The robot stands at (x, y, yaw), with the camera looking along the base heading."""
+    m.tf_buffer.x, m.tf_buffer.y, m.tf_buffer.yaw = x, y, yaw
+    m._camera_view = lambda: (m.tf_buffer.x, m.tf_buffer.y, m.tf_buffer.yaw)
+
+
+def markers(m):
+    published = []
+    m.parking_marker_publisher.publish = published.append
+    return published
+
+
+def test_valid_poses_skip_exploration_even_with_undecided_sectors(manager_factory):
+    # North of G1 is unmapped, but the mapped south already has valid parking poses.
+    m = localized_on(manager_factory, lambda d, a: (d < 1.4) & (a > 0))
+    assert m._g1_coverage()['undecided_positions'] > 0
+    assert m.resume_client.calls == [] and m.g1_exploration_result is None
+    assert m.state in (MissionState.PARKING_CANDIDATES_READY, MissionState.EVALUATING_PARKING_PATHS)
+
+
+def test_newly_valid_poses_end_a_round_after_its_minimum_time_without_selecting_one(
+        manager_factory):
+    m = exploring_manager(manager_factory)
+    published = markers(m)
+    m._on_map(ring_map(m, lambda d, a: (d < 1.4) & (a > 0)))   # the south is mapped now
+    m.tick()
+    assert m.state == MissionState.EXPLORING_AROUND_G1          # round younger than its minimum
+    donut = [mk for array in published for mk in array.markers if mk.ns == 'parking/radial_1deg']
+    assert any(mk.id == 0 and mk.points for mk in donut)        # green rays drawn while exploring
+    assert not any(mk.ns.startswith('parking/selected')
+                   for array in published for mk in array.markers)
+    m._monotonic.value += m.g1_exploration_min_round_s
+    m.tick()                                                     # same map: the count is kept
+    assert 'checkpoint (parking_candidates_available)' in finished(m)
+    assert m.g1_exploration_result['rounds'] == 1
+
+
+def test_poses_an_earlier_attempt_considered_trigger_no_checkpoint(manager_factory):
+    m = exploring_manager(manager_factory)
+    msg = ring_map(m, lambda d, a: (d < 1.4) & (a > 0))
+    m._on_map(msg)
+    assert m._refresh_g1_preview(m._monotonic()) > 0
+    t = m.target_position
+    plan = plan_parking(GridSnapshot.from_msg(msg), TargetReference(
+        t.map_x_m, t.map_y_m, 'map', 0, GENERIC_TARGET_REFERENCE, False, ''), m.planner_config, None)
+    m._g1_planned_cells = {(round(c.task_x / 0.05), round(c.task_y / 0.05))
+                           for c in plan.candidates if c.status in ('valid', 'selected')}
+    m._on_map(ring_map(m, lambda d, a: (d < 1.4) & (a > 0)))
+    m._g1_preview_next_s = 0.0
+    assert m._refresh_g1_preview(m._monotonic()) == 0
+
+
+def finish_round_away_from_the_observation_pose(manager_factory):
+    m = exploring_manager(manager_factory)
+    t = m.target_position
+    stand(m, t.map_x_m - 1.9, t.map_y_m - 0.6, -1.0)           # G1 2 m away, off to the side
+    m._on_map(occupancy_map())                                  # every pose decided
+    m.tick()
+    assert m.state == MissionState.RETURNING_TO_OBSERVATION
+    return m
+
+
+def test_after_exploring_g1_is_relocalized_by_turning_toward_it_in_place(manager_factory):
+    m = finish_round_away_from_the_observation_pose(manager_factory)
+    t = m.target_position
+    assert 'turning toward G1 in place' in m.transition_history[-1].reason
+    goal = back_at_observation(m)
+    assert goal[:2] == pytest.approx((t.map_x_m - 1.9, t.map_y_m - 0.6))
+    assert goal[2] == pytest.approx(math.atan2(0.6, 1.9))
+    m.tf_buffer.yaw = goal[2]                                    # stopped facing G1
+    settle_motion(m)
+    assert m.state == MissionState.LOCALIZE_G1
+    assert len(m.navigation_client.calls) == 1                   # no drive back
+    second = PLAN_NOW_NS + 10
+    m.test_ros_ns = m.tf_buffer.stamp_ns = second + 4
+    m._on_map(occupancy_map(stamp_ns=second + 4))
+    localize(m, first_stamp_ns=second)
+    assert m.state in (MissionState.PARKING_CANDIDATES_READY, MissionState.EVALUATING_PARKING_PATHS)
+
+
+def test_failed_in_place_relocalization_falls_back_once_to_the_observation_pose(manager_factory):
+    m = finish_round_away_from_the_observation_pose(manager_factory)
+    m.tf_buffer.yaw = back_at_observation(m)[2]
+    settle_motion(m)
+    assert m.state == MissionState.LOCALIZE_G1
+    m._monotonic.value += m.localization_timeout_s + 1.0
+    m.tick()
+    assert m.state == MissionState.RETURNING_TO_OBSERVATION
+    assert back_at_observation(m) == pytest.approx((1.0, 2.0, 0.25))
+    stand(m, 1.0, 2.0, 0.25)
+    settle_motion(m)
+    assert m.state == MissionState.LOCALIZE_G1
+    m._monotonic.value += m.localization_timeout_s + 1.0
+    m.tick()
+    assert m.state == MissionState.MISSION_FAILED                # bounded: one fallback
+    assert m.last_issue.code == 'target_localization_timeout'
+    assert len(m.navigation_client.calls) == 2
+
+
+def test_failed_turn_toward_g1_falls_back_to_the_observation_pose(manager_factory):
+    m = finish_round_away_from_the_observation_pose(manager_factory)
+    back_at_observation(m, status=GoalStatus.STATUS_ABORTED)
+    assert m.state == MissionState.RETURNING_TO_OBSERVATION
+    assert back_at_observation(m) == pytest.approx((1.0, 2.0, 0.25))
+    assert m.state == MissionState.SETTLING_MOTION
+
+
+def test_g1_too_close_for_the_camera_returns_to_the_observation_pose(manager_factory):
+    m = exploring_manager(manager_factory)
+    t = m.target_position
+    stand(m, t.map_x_m - 1.5, t.map_y_m - 0.5, -1.0)           # 1.58 m: G1's feet out of view
+    m._on_map(occupancy_map())
+    m.tick()
+    assert 'outside 1.7-3.5 m' in m.transition_history[-1].reason
+    assert back_at_observation(m) == pytest.approx((1.0, 2.0, 0.25))
+
+
+def checkpoint_and_relocalize(m, unknown):
+    m._on_map(ring_map(m, lambda d, a: (d < 1.4) & (a > 0)))
+    m._monotonic.value += m.g1_exploration_min_round_s
+    m.tick()
+    back_at_observation(m)                                       # the robot did not move
+    settle_motion(m)
+    second = PLAN_NOW_NS + 10 * (m._g1_rounds + 1)
+    m.test_ros_ns = m.tf_buffer.stamp_ns = second + 4
+    m._on_map(ring_map(m, unknown, stamp_ns=second + 4))
+    localize(m, first_stamp_ns=second)
+
+
+def test_checkpoint_without_a_valid_pose_resumes_exploring_in_bounded_rounds(manager_factory):
+    m = exploring_manager(manager_factory)
+    m.g1_exploration_max_rounds = 2
+    checkpoint_and_relocalize(m, lambda d, a: d < 1.4)          # the new map shows nothing yet
+    assert m.state == MissionState.EXPLORING_AROUND_G1
+    assert len(m.resume_client.calls) == 2 and m.g1_exploration_result['rounds'] == 2
+    checkpoint_and_relocalize(m, lambda d, a: d < 1.4)
+    assert m.state == MissionState.PARKING_PLANNING_FAILED       # no third round
+    assert len(m.resume_client.calls) == 2
+
+
+def test_a_closed_exploration_is_not_resumed(manager_factory):
+    m = exploring_manager(manager_factory)
+    m._monotonic.value += 241.0
+    m.tick()                                                     # timeout ends exploring for good
+    back_at_observation(m)
+    settle_motion(m)
+    second = PLAN_NOW_NS + 10
+    m.test_ros_ns = m.tf_buffer.stamp_ns = second + 4
+    m._on_map(occupancy_map(value=-1, stamp_ns=second + 4))
+    localize(m, first_stamp_ns=second)
+    assert m.state == MissionState.PARKING_PLANNING_FAILED
+    assert len(m.resume_client.calls) == 1

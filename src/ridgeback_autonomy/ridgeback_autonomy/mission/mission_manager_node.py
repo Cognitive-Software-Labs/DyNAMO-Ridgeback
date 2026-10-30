@@ -144,6 +144,10 @@ _PARKING_DRIVE_STATES = (
 # Drift allowed after Nav2 stops inside the observation goal checker (m, rad).
 _OBSERVATION_STOP_ALLOWANCE = (0.01, 0.02)
 
+# Planning failures that more mapping around G1 can resolve.
+_EXPLORABLE_PLANNING_FAILURES = ('no_free_donut_cells', 'no_valid_candidate',
+                                 'bounded_search_exhausted')
+
 # Only these prove that Nav2 has stopped executing a goal and released it.
 _TERMINAL_GOAL_STATUSES = (
     GoalStatus.STATUS_SUCCEEDED, GoalStatus.STATUS_ABORTED, GoalStatus.STATUS_CANCELED)
@@ -189,6 +193,7 @@ _ALLOWED_TRANSITIONS = {
     },
     MissionState.SETTLING_MOTION: {
         MissionState.LOCALIZE_G1,
+        MissionState.RETURNING_TO_OBSERVATION,
         MissionState.MOTION_SETTLEMENT_FAILED,
         MissionState.MISSION_FAILED,
         MissionState.MISSION_CANCELED,
@@ -196,6 +201,7 @@ _ALLOWED_TRANSITIONS = {
     MissionState.MOTION_SETTLEMENT_FAILED: set(),
     MissionState.LOCALIZE_G1: {
         MissionState.G1_LOCALIZED,
+        MissionState.RETURNING_TO_OBSERVATION,
         MissionState.MISSION_FAILED,
         MissionState.MISSION_CANCELED,
     },
@@ -214,7 +220,7 @@ _ALLOWED_TRANSITIONS = {
         MissionState.MISSION_CANCELED},
     MissionState.EVALUATING_PARKING_PATHS: {
         MissionState.PARKING_PATH_FEASIBLE, MissionState.PARKING_PLANNING_FAILED,
-        MissionState.MISSION_CANCELED},
+        MissionState.EXPLORING_AROUND_G1, MissionState.MISSION_CANCELED},
     MissionState.PARKING_PATH_FEASIBLE: {
         MissionState.PARKING_PLANNING_FAILED, MissionState.PARKING_EXECUTION_FAILED,
         MissionState.NAVIGATING_TO_PREPARKING, MissionState.MISSION_CANCELED},
@@ -294,6 +300,19 @@ class MissionManagerNode(Node):
         # known. The unknown share of the area out to this radius is only reported.
         self.declare_parameter('g1_coverage_radius_m', 1.4)
         self.declare_parameter('g1_exploration_timeout_s', 240.0)
+        # Parking is planned first from the map at hand; exploration resumes only when
+        # unknown space leaves poses undecided. While exploring, the donut is refreshed
+        # from new maps, and newly valid poses end a round to check their paths, at
+        # most this many rounds, each at least the minimum time.
+        self.declare_parameter('g1_exploration_max_rounds', 3)
+        self.declare_parameter('g1_exploration_min_round_s', 5.0)
+        self.declare_parameter('g1_exploration_refresh_s', 2.0)
+        # After exploring, G1 is relocalized by turning toward it in place when it is
+        # within this camera range; otherwise, or if that fails, from the observation pose.
+        # The colour camera is 1.03 m up with a 32 degree vertical half view, so G1's feet
+        # leave the image below about 1.65 m; at 1.01 m it was not detected (2026-10-30).
+        self.declare_parameter('g1_reacquire_min_range_m', 1.7)
+        self.declare_parameter('g1_reacquire_max_range_m', 3.5)
         self.declare_parameter('g1_exploration_protected_margin_m', 0.15)
         # Return to the observation pose: G1 was detected from exactly there, and the
         # detector's score varies with the view. A temporary goal checker brings the
@@ -513,9 +532,25 @@ class MissionManagerNode(Node):
         self.g1_exploration_timeout_s = float(self.get_parameter('g1_exploration_timeout_s').value)
         self.g1_protected_margin_m = float(
             self.get_parameter('g1_exploration_protected_margin_m').value)
+        self.g1_exploration_max_rounds = int(self.get_parameter('g1_exploration_max_rounds').value)
+        self.g1_exploration_min_round_s = float(
+            self.get_parameter('g1_exploration_min_round_s').value)
+        self.g1_exploration_refresh_s = float(self.get_parameter('g1_exploration_refresh_s').value)
+        self.g1_reacquire_range_m = (
+            float(self.get_parameter('g1_reacquire_min_range_m').value),
+            float(self.get_parameter('g1_reacquire_max_range_m').value))
         self._g1_explored = False
         self._g1_coverage_cache = (None, None, None)
+        self._g1_rounds = 0
+        self._g1_exploration_closed = False
+        self._g1_exploration_elapsed_s = 0.0
+        self._g1_preview_map = None
+        self._g1_preview_next_s = 0.0
+        self._g1_preview_new = 0
+        self._g1_planned_cells = set()
         self._observation_pose = None
+        self._observation_goal = None
+        self._observation_fallback = False
         self._observation_check_pending = False
         self.observation_tolerance = (
             float(self.get_parameter('observation_xy_tolerance_m').value),
@@ -728,6 +763,9 @@ class MissionManagerNode(Node):
                     if self._observation_check_pending:
                         self._observation_check_pending = False
                         failure = self._observation_view_failure()
+                        if failure is not None and self._observation_fallback:
+                            self._fall_back_to_observation_pose(failure[1])
+                            return
                         if failure is not None:
                             self._fail_terminal(*failure)
                             return
@@ -790,6 +828,11 @@ class MissionManagerNode(Node):
                 and self._localization_deadline_s is not None
                 and now_s >= self._localization_deadline_s
             ):
+                if self._observation_fallback:
+                    self._localization_deadline_s = None
+                    self._fall_back_to_observation_pose(
+                        'target localization did not stabilize in place')
+                    return
                 self._fail_terminal(
                     'target_localization_timeout',
                     'Target localization did not stabilize before the timeout',
@@ -949,7 +992,9 @@ class MissionManagerNode(Node):
                     'planning uses the larger keep-out margin'
                 )
                 self._planning_deadline_s = self._monotonic() + self.parking_input_timeout_s
-                if not self._maybe_explore_around_g1():
+                # Plan from the map at hand first; a planning failure that more mapping
+                # could resolve resumes the explorer instead (_fail_planning).
+                if self.parking_planning_enabled or not self._maybe_explore_around_g1():
                     self.try_plan_parking(self._monotonic(), now_ns=now_ns)
 
     def reset_mission(self, *, clear_start_pose: bool = True) -> None:
@@ -977,7 +1022,11 @@ class MissionManagerNode(Node):
             if self.state == MissionState.EXPLORING_AROUND_G1:
                 self._stop_g1_exploration()
             self._g1_explored = False
-            self._observation_pose = None
+            self._g1_rounds, self._g1_exploration_closed = 0, False
+            self._g1_exploration_elapsed_s = 0.0
+            self._g1_preview_map, self._g1_planned_cells = None, set()
+            self._observation_pose = self._observation_goal = None
+            self._observation_fallback = False
             self._observation_check_pending = False
             self._g1_exploration_deadline_s = None
             self._g1_explorer_resumed = self._g1_frontiers_exhausted = False
@@ -1235,15 +1284,48 @@ class MissionManagerNode(Node):
             return
         self._clear_handoff_state()
         if self._g1_explored and self._observation_pose is not None:
-            # G1 must be in view again for the fresh localization.
-            if self._transition(MissionState.RETURNING_TO_OBSERVATION,
-                                f'{reason}; returning to the G1 observation pose'):
+            # G1 must be in view again for the fresh localization: turn toward it where
+            # the robot stands, falling back once to the pose it was first localized from.
+            goal, how = self._reacquisition_goal()
+            self._observation_goal = goal
+            self._observation_fallback = goal is not self._observation_pose
+            if self._transition(MissionState.RETURNING_TO_OBSERVATION, f'{reason}; {how}'):
                 self._set_goal_tolerance(self.observation_tolerance, self._send_observation_goal)
             return
         self.motion.reset()
         self._motion_deadline_s = self._monotonic() + self.motion_settlement_timeout_s
         self._transition(MissionState.SETTLING_MOTION,
                          f'{reason}; waiting for physical motion settlement')
+
+    def _reacquisition_goal(self):
+        """(goal, description): the current position facing G1, when the camera range allows
+        it and the robot is not already at the observation pose; else the observation pose."""
+        robot, view, target = self._current_robot_pose(), self._camera_view(), self.target_position
+        origin = self._observation_pose
+        if robot is None or view is None or target is None:
+            return origin, 'returning to the G1 observation pose (current view unavailable)'
+        if (math.hypot(robot[0] - origin[0], robot[1] - origin[1]) <= self.observation_tolerance[0]
+                and abs(normalize_angle(robot[2] - origin[2])) <= self.observation_tolerance[1]):
+            return origin, 'returning to the G1 observation pose'
+        distance = math.hypot(target.map_x_m - view[0], target.map_y_m - view[1])
+        low, high = self.g1_reacquire_range_m
+        if not low <= distance <= high:
+            return origin, (f'returning to the G1 observation pose (G1 {distance:.2f} m from the '
+                            f'camera, outside {low:.1f}-{high:.1f} m)')
+        # Turn the camera's optical axis, not the base, toward the G1 estimate.
+        bearing = math.atan2(target.map_y_m - view[1], target.map_x_m - view[0])
+        yaw = normalize_angle(bearing - normalize_angle(view[2] - robot[2]))
+        return (robot[0], robot[1], yaw), f'turning toward G1 in place ({distance:.2f} m away)'
+
+    def _fall_back_to_observation_pose(self, reason):
+        """After a failed in-place relocalization: the single return to the observation pose."""
+        self._observation_goal, self._observation_fallback = self._observation_pose, False
+        self.get_logger().warning(f'G1 not reacquired in place ({reason}); '
+                                  'returning to the observation pose')
+        if (self.state == MissionState.RETURNING_TO_OBSERVATION or self._transition(
+                MissionState.RETURNING_TO_OBSERVATION,
+                f'{reason}; returning to the G1 observation pose')):
+            self._set_goal_tolerance(self.observation_tolerance, self._send_observation_goal)
 
     def _start_localization(self, reason: str) -> None:
         if self.state != MissionState.SETTLING_MOTION:
@@ -1461,6 +1543,10 @@ class MissionManagerNode(Node):
             plan = plan_parking(grid, target, self.planner_config, approach)
             self.parking_plan = plan
             self._planning_deadline_s = None
+            # A later exploration checkpoint needs poses no attempt has considered yet.
+            self._g1_planned_cells |= {
+                (round(c.task_x / grid.resolution), round(c.task_y / grid.resolution))
+                for c in plan.candidates if c.status in ('valid', 'selected')}
             counts = plan.counts()
             if not plan.ok:
                 self._fail_planning(plan.failure_reason, f'no feasible parking pose: {counts}')
@@ -1497,6 +1583,9 @@ class MissionManagerNode(Node):
             self._next_path(now_ns=now_ns)
 
     def _fail_planning(self, code: str, reason: str) -> None:
+        if code in _EXPLORABLE_PLANNING_FAILURES and self._maybe_explore_around_g1(
+                f'{code}: {reason}'):
+            return
         self.last_issue = MissionIssue(FailureClass.TERMINAL, code, reason)
         self._invalidate_path_requests()
         self._planning_deadline_s = None
@@ -2053,7 +2142,7 @@ class MissionManagerNode(Node):
             # Never return loosely: the view, not just the place, must be restored.
             self._navigation_finished(False, 'observation goal tolerance not applied')
             return
-        self._send_navigation_goal(self._observation_pose, self.parking_navigation_timeout_s)
+        self._send_navigation_goal(self._observation_goal, self.parking_navigation_timeout_s)
 
     def _restore_shared_tolerance(self, context):
         def done(ok):
@@ -2077,7 +2166,7 @@ class MissionManagerNode(Node):
 
     def _observation_view_failure(self):
         """(code, reason) unless the stopped robot is back at the observation view of G1."""
-        robot, goal = self._current_robot_pose(), self._observation_pose
+        robot, goal = self._current_robot_pose(), self._observation_goal
         if robot is None:
             return 'observation_pose_unverified', 'robot pose unavailable after the observation return'
         xy = math.hypot(robot[0] - goal[0], robot[1] - goal[1])
@@ -2222,6 +2311,9 @@ class MissionManagerNode(Node):
             self.get_logger().info(f'LiDAR clearance in {self.state.name}: '
                                    f'{self._clearance_legs.get(self.state.value)}')
         if self.state == MissionState.RETURNING_TO_OBSERVATION:
+            if not ok and self._observation_fallback:
+                self._fall_back_to_observation_pose(f'turn toward G1 failed: {detail}')
+                return
             if not ok:
                 self.last_issue = MissionIssue(FailureClass.TERMINAL,
                                                'observation_return_failed', detail)
@@ -2564,38 +2656,53 @@ class MissionManagerNode(Node):
         self._g1_coverage_cache = (self.latest_map, key, coverage)
         return coverage
 
-    def _maybe_explore_around_g1(self):
-        """Resume the explorer around G1 unless no parking position is left undecided."""
-        if not self.g1_exploration_enabled or self._g1_explored:
+    def _maybe_explore_around_g1(self, why='no parking plan yet'):
+        """Resume the explorer around G1 for another bounded round, when unknown space
+        leaves parking positions undecided and the earlier rounds allow one."""
+        if (not self.g1_exploration_enabled or self._g1_exploration_closed
+                or self._g1_rounds >= self.g1_exploration_max_rounds
+                or self.state not in (MissionState.G1_LOCALIZED,
+                                      MissionState.EVALUATING_PARKING_PATHS)):
+            return False
+        now_s = self._monotonic()
+        if self._g1_exploration_deadline_s is not None and now_s >= self._g1_exploration_deadline_s:
             return False
         coverage = self._g1_coverage()
         if coverage is None:
             return False
         if coverage['undecided_positions'] == 0:
-            self.g1_exploration_result = {'outcome': 'not_needed', 'reason': 'positions_already_decided',
-                                          'duration_s': 0.0, 'before': coverage, 'after': coverage}
+            if self._g1_rounds == 0:
+                self.g1_exploration_result = {
+                    'outcome': 'not_needed', 'reason': 'positions_already_decided',
+                    'duration_s': 0.0, 'before': coverage, 'after': coverage}
             self.get_logger().info(f'No parking position undecided; no G1 exploration: {coverage}')
             return False
         if not self.resume_client.service_is_ready():
             self.get_logger().warning(
                 f'{coverage["undecided_positions"]} parking positions undecided, but no explorer '
-                'resume service; planning with the current map')
+                'resume service')
             return False
-        self._g1_explored = True
+        self._invalidate_path_requests()
+        self._g1_rounds += 1
         self._g1_explorer_resumed = self._g1_frontiers_exhausted = False
-        self._observation_pose = self._current_robot_pose()
-        self._g1_exploration_started_s = self._monotonic()
-        self._g1_exploration_deadline_s = self._g1_exploration_started_s + self.g1_exploration_timeout_s
-        self.g1_exploration_result = {'outcome': 'running', 'reason': None, 'before': coverage}
+        self._g1_exploration_started_s = now_s
+        self._g1_preview_map, self._g1_preview_next_s, self._g1_preview_new = None, now_s, 0
+        if not self._g1_explored:
+            # The view G1 was first localized from: the fallback for relocalization.
+            self._g1_explored = True
+            self._observation_pose = self._current_robot_pose()
+            self._g1_exploration_deadline_s = now_s + self.g1_exploration_timeout_s
+            self.g1_exploration_result = {'before': coverage}
+        self.g1_exploration_result.update(outcome='running', reason=None, rounds=self._g1_rounds)
         focus = PointStamped()
         focus.header.frame_id = self.map_frame
         focus.header.stamp = self.get_clock().now().to_msg()
         focus.point.x, focus.point.y = self.target_position.map_x_m, self.target_position.map_y_m
         self.focus_publisher.publish(focus)
         self._transition(MissionState.EXPLORING_AROUND_G1,
-                         f'{coverage["undecided_positions"]} parking positions undecided, '
+                         f'{why}; {coverage["undecided_positions"]} parking positions undecided, '
                          f'{coverage["donut_unknown_cells"]}/{coverage["donut_cells"]} donut cells '
-                         'unknown; exploring around G1')
+                         f'unknown; exploring around G1 (round {self._g1_rounds})')
         self.resume_client.call_async(Trigger.Request()).add_done_callback(self._on_resume_response)
         return True
 
@@ -2646,14 +2753,60 @@ class MissionManagerNode(Node):
         elif now_s >= self._g1_exploration_deadline_s:
             self._finish_g1_exploration('partial', 'timeout',
                                         f'{self.g1_exploration_timeout_s:.0f} s elapsed')
+        else:
+            new = self._refresh_g1_preview(now_s)
+            if new and now_s - self._g1_exploration_started_s >= self.g1_exploration_min_round_s:
+                self._finish_g1_exploration(
+                    'checkpoint', 'parking_candidates_available',
+                    f'{new} newly valid parking poses; relocalizing G1 to check their paths')
+
+    def _refresh_g1_preview(self, now_s):
+        """Redraw the donut from a new map (at most every refresh interval); return how many
+        geometrically valid poses on the latest preview no planning attempt has considered.
+
+        The preview uses the last G1 estimate for display and as a trigger only: a parking
+        pose is selected solely by try_plan_parking after a fresh localization.
+        """
+        if (not self.parking_planning_enabled or self.latest_map is self._g1_preview_map
+                or now_s < self._g1_preview_next_s or self.target_position is None):
+            return self._g1_preview_new
+        self._g1_preview_map, self._g1_preview_next_s = (
+            self.latest_map, now_s + self.g1_exploration_refresh_s)
+        try:
+            grid = GridSnapshot.from_msg(self.latest_map)
+        except ValueError:
+            return self._g1_preview_new
+        position = self.target_position
+        target = TargetReference(position.map_x_m, position.map_y_m, self.map_frame,
+                                 position.last_stamp_ns, position.reference,
+                                 position.is_foot_midpoint, position.source)
+        preview = plan_parking(grid, target, self.planner_config,
+                               self.approach_pose or self._current_robot_pose())
+        if preview.selected is not None:
+            # Not path-checked: never drawn as the selected pose.
+            preview.selected.status, preview.selected, preview.ok = 'valid', None, False
+        self.parking_marker_publisher.publish(plan_markers(
+            preview, self.planner_config, self.get_clock().now().to_msg()))
+        self._g1_preview_new = sum(1 for c in preview.candidates if c.status == 'valid'
+                                   and not self._near_planned_cell(c, grid.resolution))
+        return self._g1_preview_new
+
+    def _near_planned_cell(self, candidate, resolution):
+        """Whether an earlier planning attempt considered this pose, or one a cell away."""
+        col, row = round(candidate.task_x / resolution), round(candidate.task_y / resolution)
+        return any((col + dc, row + dr) in self._g1_planned_cells
+                   for dc in (-1, 0, 1) for dr in (-1, 0, 1))
 
     def _finish_g1_exploration(self, outcome, reason, detail):
         self.focus_publisher.publish(PointStamped())   # empty frame clears the focus
-        self._g1_exploration_deadline_s = None
+        if outcome != 'checkpoint':
+            self._g1_exploration_closed = True   # no further round would find more
         coverage = self._g1_coverage()
+        self._g1_exploration_elapsed_s += (
+            self._monotonic() - (self._g1_exploration_started_s or self._monotonic()))
         result = dict(self.g1_exploration_result or {})
-        result.update(outcome=outcome, reason=reason, after=coverage, duration_s=round(
-            self._monotonic() - (self._g1_exploration_started_s or self._monotonic()), 2))
+        result.update(outcome=outcome, reason=reason, after=coverage,
+                      duration_s=round(self._g1_exploration_elapsed_s, 2))
         self.g1_exploration_result = result
         summary = (f'{outcome} ({reason}): {detail}; undecided positions '
                    f'{"?" if coverage is None else coverage["undecided_positions"]}, donut unknown '
