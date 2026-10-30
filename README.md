@@ -257,7 +257,8 @@ every physical gate's status.
 Clearpath's interactive-marker teleop with `twist_mux`, without Nav2 or frontier
 goals, so an operator drives the robot through the space. It activates the
 inactive `platform_velocity_controller` once the controller manager is ready.
-Arguments: `world` (`initial_test_world`, `depot` or `coworking_space`),
+Arguments: `world` (`initial_test_world`, `robocup_hcc_arena`, `depot` or
+`coworking_space`),
 `mapping_rviz` (default `true`), `namespace`, `use_sim_time`, `setup_path`.
 
 ```bash
