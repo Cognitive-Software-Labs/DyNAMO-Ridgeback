@@ -50,9 +50,12 @@ contain full-circle renderer output and are not navigation scan inputs.
 
 ## Gazebo parity
 
-Gazebo publishes the same two raw scans directly from `gpu_lidar` sensors in
-the Clearpath description. Its geometry, range, rate and frames match the
-table above. `patches/clearpath_ust10lx_sim_lidar.patch` supplies the
+Gazebo produces the same two raw scans from `gpu_lidar` sensors in the
+Clearpath description. Its geometry, range, rate and frames match the table
+above. The generated bridges publish them on `sensors/lidar2d_N/scan_gz`, and
+`lidar_first_ray_guard` (Gazebo adapter) republishes each on
+`sensors/lidar2d_N/scan` with `ranges[0]` set to NaN and every other field
+unchanged; see [first ray](#gazebo-first-ray). `patches/clearpath_ust10lx_sim_lidar.patch` supplies the
 UST-10LX values; the [dependency runbook](../project/dependency_patches.md#ust-10lx-gazebo-lidar-patch)
 owns that patch. The two simulators still differ in three ways:
 
@@ -71,6 +74,28 @@ owns that patch. The two simulators still differ in three ways:
   bin reads `+inf`. Gazebo clamps a noisy finite return into
   `[range_min, range_max]`, so a surface just inside 10 m can read exactly
   10.0 m. Beams with no return stay `+inf` on both.
+
+### Gazebo first ray
+
+The installed gz-rendering GPU rays do not measure Gazebo's first ray along
+its labelled -135° bearing. Where it and its neighbour are both finite, they
+differ by more than 0.3 m in 90–100% of scans, and the first ray tracks the
+rays near -45° (bins 359–361) instead. The other edge pairs checked (bins 1–3
+and 1078–1080, so the last ray too) agree in about 99% of scans. SLAM integrated those endpoints
+as isolated occupied cells that no other ray supported. One such cell inside
+the robot's start footprint rejected every parking route. The guard marks that
+one bin erroneous (NaN,
+REP 117); SLAM, Nav2 and the repository's consumers skip non-finite ranges.
+Clearpath's generated bridge launch files stay unchanged: `gazebo.launch.py`
+adds one node-targeted remap per `lidar2d` in `robot.yaml`
+(`<lidar>_gz_bridge:<ns>/sensors/<lidar>/scan`), so no other node is renamed.
+Isaac and hardware scans are not affected.
+
+The bins at the ±45° cube-map face seams (360 and 720) also read `+inf` far
+more often than their neighbours. They are single rays and are left unchanged.
+
+Gazebo scans before and after the guard are different populations: do not
+pair LiDAR-dependent Gazebo results across that change.
 
 Neither simulator quantises published ranges to `rangeResolutionM`. Gazebo's
 bridge leaves `scan_time` at 0, while the Isaac assembler sets it to 0.025 s.
@@ -160,6 +185,7 @@ hardware. Public invocation details are owned by the [README](../../README.md).
 
 ## Archived evidence
 
+- [October 30, 2026 Gazebo first-ray artifact and start-cell diagnosis](../../archive/engineering/2026-10-30-gazebo-lidar-first-ray-artifact.md)
 - [October 25, 2026 UST-10LX noise measurement and Gazebo parity](../../archive/engineering/2026-10-25-gazebo-ust10lx-lidar.md)
 - [September 17–18, 2026 lidar and SLAM qualification](../../archive/engineering/2026-09-17-isaac-lidar-qualification.md)
 - [Invalidated July 2026 investigation](../../archive/engineering/2026-07-12-isaac-slam-investigation.md)

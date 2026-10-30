@@ -374,12 +374,15 @@ TF or changing estimator validation.
    [mission navigation goal ownership](../exploration/architecture.md#mission-navigation-goal-ownership).
    Remaining before qualification: one complete Gazebo mission to
    `MISSION_COMPLETE`, the separate checked-route-versus-executed-route issue,
-   and Isaac driving validation. The first full Gazebo run after the ownership
-   fix stopped in `PARKING_PLANNING_FAILED`: a single occupied SLAM cell at the
-   map origin lay inside the robot's own start and current footprint, so every
-   swept route was rejected as `path_footprint_occupied` at its first sample.
-   Its source, and whether occupied cells under the robot's own footprint should
-   be treated differently, is unresolved.
+   and Isaac driving validation. The occupied start cell that rejected every
+   Gazebo route came from Gazebo's corrupted first LiDAR ray, now invalidated
+   at the source ([Gazebo first ray](../isaac/lidar-pipeline.md#gazebo-first-ray));
+   path feasibility still rejects any occupied cell under the robot. Gazebo
+   planning now stops at `path_footprint_unknown`: front-only SLAM never
+   observes the floor behind the spawn pose, and routes that rotate near the
+   start sweep into that unknown wedge. Clearing it needs that floor observed,
+   for example by the existing `slam_source=merged`, which is a shared SLAM
+   change not yet made.
 8. **Port markers and launch integration.** Add relative marker topics and
    clean RViz displays, then integrate the manager into the current readiness
    chain without changing backend packages or Nav2 safety parameters.
@@ -407,3 +410,5 @@ TF or changing estimator validation.
 
 - [Gazebo parking mission after the goal-ownership fix](../../archive/engineering/2026-10-30-gazebo-parking-start-cell-blocker.md)
   — the run, the occupied start cell and its effect on path feasibility.
+- [Gazebo LiDAR first-ray artifact](../../archive/engineering/2026-10-30-gazebo-lidar-first-ray-artifact.md)
+  — the start cell's source, the correction, and the unknown wedge behind the spawn pose.

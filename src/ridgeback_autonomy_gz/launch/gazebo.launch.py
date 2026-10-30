@@ -4,7 +4,9 @@ The server runs as the ``ros_gz_sim`` ``gzserver`` node rather than through
 the ``gz sim`` command line, because that node is what serves the standard
 ``simulation_interfaces`` scene-control services, under ``/gzserver``. The GUI
 is a separate client of the same server. The Clearpath generators, robot
-spawn, and platform/sensor bridges are included unchanged.
+spawn, and platform/sensor bridges are included unchanged, except that each 2D
+LiDAR bridge publishes to ``scan_gz`` for ``lidar_first_ray_guard``, which
+republishes the scan on its normal topic with the corrupted first ray invalid.
 
 Internal to this adapter: ``backend.launch.py`` owns the public arguments and
 passes the Clearpath world name and the resolved rendering mode here.
@@ -24,7 +26,7 @@ from launch.actions import (
 from launch.event_handlers import OnShutdown
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
-from launch_ros.actions import Node
+from launch_ros.actions import Node, SetRemap
 from ros_gz_sim.actions import GzServer
 
 
@@ -79,6 +81,49 @@ def _remove_gui_config(_context, *, path):
     except FileNotFoundError:
         pass
     return []
+
+
+def _lidar_names(setup_path):
+    """(namespace, 2D LiDAR names) from the robot declaration, or None without one."""
+
+    robot_yaml = os.path.join(setup_path, 'robot.yaml')
+    if not os.path.isfile(robot_yaml):
+        return None
+    config = ClearpathConfig(robot_yaml)
+    return config.system.namespace, [lidar.name for lidar in config.sensors.get_all_lidar_2d()]
+
+
+def _launch_robot(context):
+    """Clearpath robot spawn, with each 2D LiDAR scan relayed through the first-ray guard."""
+
+    setup_path = LaunchConfiguration('setup_path').perform(context)
+    spawn = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(os.path.join(
+            get_package_share_directory('clearpath_gz'), 'launch', 'robot_spawn.launch.py')),
+        launch_arguments={
+            name: LaunchConfiguration(name)
+            for name in ('setup_path', 'world', 'rviz', 'use_sim_time', 'x', 'y', 'z', 'yaw')
+        }.items(),
+    )
+    lidars = _lidar_names(setup_path)
+    if not lidars or not lidars[1]:
+        return [spawn]
+    namespace, names = lidars
+    sensors = f'/{namespace}/sensors' if namespace not in ('', '/') else '/sensors'
+    # The spawn starts the generated bridges from event handlers after this
+    # function returns, so a scoped group would be gone by then. Each rule names
+    # the generated bridge node (``<lidar>_gz_bridge``) and renames only its
+    # publisher; every other node keeps the normal scan topic.
+    remaps = [SetRemap(f'{name}_gz_bridge:{sensors}/{name}/scan', f'{sensors}/{name}/scan_gz')
+              for name in names]
+    guard = Node(
+        package='ridgeback_autonomy_gz',
+        executable='lidar_first_ray_guard',
+        namespace=sensors.lstrip('/'),
+        output='screen',
+        parameters=[{'scans': names, 'use_sim_time': LaunchConfiguration('use_sim_time')}],
+    )
+    return [*remaps, spawn, guard]
 
 
 def _launch_gazebo(context):
@@ -163,18 +208,5 @@ def generate_launch_description():
             output='screen',
             arguments=['/clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock'],
         ),
-        IncludeLaunchDescription(
-            PythonLaunchDescriptionSource(
-                os.path.join(pkg_clearpath_gz, 'launch', 'robot_spawn.launch.py')),
-            launch_arguments={
-                'setup_path': LaunchConfiguration('setup_path'),
-                'world': LaunchConfiguration('world'),
-                'rviz': LaunchConfiguration('rviz'),
-                'use_sim_time': LaunchConfiguration('use_sim_time'),
-                'x': LaunchConfiguration('x'),
-                'y': LaunchConfiguration('y'),
-                'z': LaunchConfiguration('z'),
-                'yaw': LaunchConfiguration('yaw'),
-            }.items(),
-        ),
+        OpaqueFunction(function=_launch_robot),
     ])

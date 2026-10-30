@@ -569,3 +569,33 @@ def test_selected_candidate_is_driven_straight_in_from_its_preparking_pose():
     assert footprint_rejection_reason(final, g, CONFIG.occupied_threshold) is None
     assert path_rejection(route, sel, start, g, target(), CONFIG,
                           plan.keepout_radius_m) == 'path_footprint_occupied'
+
+
+# Gazebo spawn: an isolated occupied cell at (0.017, -0.001), under the robot's
+# start footprint, rejected every route. Its source was the simulator's corrupted
+# first LiDAR ray (fixed in the Gazebo adapter); the map check itself must still
+# treat any occupied cell under the robot as an obstacle.
+def _set(g, x, y, value):
+    lx, ly = g.map_to_local([x], [y])
+    g.data[int(ly[0] // g.resolution), int(lx[0] // g.resolution)] = value
+
+
+@pytest.mark.parametrize('case,cells,expected', [
+    ('free start footprint', [], None),
+    ('reproduced phantom start cell', [(0.017, -0.001, 100)], 'path_footprint_occupied'),
+    ('real obstacle inside the footprint', [(0.30, 0.20, 100)], 'path_footprint_occupied'),
+    ('obstacle just outside the rear edge', [(-0.575, 0.0, 100)], None),
+    ('obstacle touching the rear edge', [(-0.525, 0.0, 100)], 'path_footprint_occupied'),
+    ('route crosses an obstacle', [(1.25, 0.0, 100)], 'path_footprint_occupied'),
+    ('unseen floor under the robot', [(x, y, -1) for x in (-0.3, 0.0, 0.3) for y in (-0.2, 0.2)], None),
+    ('unknown on the route', [(1.25, 0.0, -1)], 'path_footprint_unknown'),
+])
+def test_start_footprint_occupancy_is_never_waived(case, cells, expected):
+    g = grid(size_m=8., origin=(-2., -2.))
+    c = CandidateDecision(2.5, 0., 2.5, 0., 0., 'valid', 'footprint_free', .5)
+    start = (0., 0., 0.)
+    for x, y, value in cells:
+        _set(g, x, y, value)
+    p = path([start, (1.25, 0.), (2.5, 0., 0.)])
+    assert path_rejection(p, c, start, g, target(5., 5.), CONFIG, .29,
+                          occupied=(start,)) == expected, case

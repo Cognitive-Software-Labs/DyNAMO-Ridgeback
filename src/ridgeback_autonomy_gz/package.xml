@@ -23,13 +23,16 @@
   <exec_depend>launch</exec_depend>
   <exec_depend>launch_ros</exec_depend>
   <exec_depend>ridgeback_autonomy</exec_depend>
+  <exec_depend>rclpy</exec_depend>
   <exec_depend>rosgraph_msgs</exec_depend>
+  <exec_depend>sensor_msgs</exec_depend>
   <!-- gzserver serves the standard simulation_interfaces scene-control services. -->
   <exec_depend>ros_gz_bridge</exec_depend>
   <exec_depend>ros_gz_sim</exec_depend>
   <exec_depend>simulation_interfaces</exec_depend>
 
   <test_depend>ament_cmake_pytest</test_depend>
+  <test_depend>python3-numpy</test_depend>
   <test_depend>python3-pytest</test_depend>
   <test_depend>rclpy</test_depend>
 
