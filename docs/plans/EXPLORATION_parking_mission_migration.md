@@ -434,3 +434,5 @@ TF or changing estimator validation.
   — checked versus executed route, and the LiDAR seam phantom that caused the veto.
 - [Parking demonstration complete](../../archive/engineering/2026-10-30-parking-demo-complete.md)
   — the remaining-route fix and the completed Gazebo and Isaac missions.
+- [Parking donut display](../../archive/engineering/2026-10-30-parking-donut-display.md)
+  — live validation of the ray colours and the final-approach veto on G1's leg.
