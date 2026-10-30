@@ -52,15 +52,23 @@ safeguard or motion-settlement threshold is relaxed by this launch change.
 ## Parking display
 
 RViz shows the plan on `parking/visualization`, with a colour legend overlay on
-`parking/legend`. The donut is 360 radial lines, one per degree between the
-reach limits (white rings), split where the class changes. Each part takes the
-class of the map cell it crosses and of the parking pose whose task point lies
-there:
+`parking/legend`. The donut is 360 radial lines, one per degree, each drawn in
+one colour from the inner to the outer reach limit (grey rings). A ray's
+parking positions are the donut cells it crosses; each is judged by the
+planner's own candidate decision, and the ray takes the first class that any
+position has:
 
-- green: a geometrically valid parking pose, not a Nav2 path check;
-- red: an occupied cell, or a pose whose parked footprint hits an obstacle;
-- orange: an unmapped cell, or a footprint that reaches unmapped space;
-- grey: free floor, but the pose fails the G1 keep-out or the reach limit.
+- green: at least one geometrically valid parking pose, not a Nav2 path check;
+- orange: no valid pose, and unmapped space blocks a pose that keep-out and
+  reach allow, so the direction is undecided;
+- red: no valid pose, and obstacles block every pose that keep-out and reach
+  allow;
+- grey: keep-out or the reach limit rules out every pose on the ray.
+
+Unmapped space wins over obstacles, so an undecided direction is never shown
+as definitively blocked. With the live 0.06 m reach allowance, the allowed task
+points lie only about 0.51–0.54 m from the generic G1 estimate, less than one
+map cell, so some directions cross no allowed cell and stay grey.
 
 Candidates are not drawn as dots. The Nav2-checked choice is the blue selected
 pose (arrow, footprint, rear-bin task point) and its validated route.

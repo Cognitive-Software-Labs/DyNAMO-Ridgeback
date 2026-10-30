@@ -25,12 +25,13 @@ def marker_rgb(m):
 
 
 def test_donut_legend_matches_the_four_ray_classes():
-    rows = dict(viz.legend_sections(CONFIG))['Donut rays (1°, 0.30-0.60 m)']
+    # Each label describes a whole ray, not a segment of it.
+    rows = dict(viz.legend_sections(CONFIG))['Donut rays: one colour per 1° ray (0.30-0.60 m)']
     assert [(label, rgb(rgba)) for _, rgba, label in rows] == [
-        ('Valid parking pose (no path check)', rgb(viz.GREEN)),
-        ('Blocked by an obstacle (cell or footprint)', rgb(viz.RED)),
-        ('Unknown or unmapped (cell or footprint)', rgb(viz.UNKNOWN_ORANGE)),
-        ('Free, but keep-out / reach fails', rgb(viz.POSE_INVALID))]
+        ('A valid parking pose exists (no path check)', rgb(viz.GREEN)),
+        ('No valid pose: obstacles block it', rgb(viz.RED)),
+        ('No valid pose: unmapped space, undecided', rgb(viz.UNKNOWN_ORANGE)),
+        ('No valid pose: keep-out / reach', rgb(viz.POSE_INVALID))]
     # Four clearly different, opaque colours: neighbouring 1-degree rays never blend.
     colours = [rgb(rgba) for _, rgba, _ in rows]
     assert len(set(colours)) == 4 and all(rgba[3] == 1.0 for _, rgba, _ in rows)

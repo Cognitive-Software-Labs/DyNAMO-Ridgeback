@@ -184,7 +184,7 @@ class ParkingPlan:
     unknown_cells: list[tuple[float, float]] = field(default_factory=list)
     candidates: list[CandidateDecision] = field(default_factory=list)
     selected: CandidateDecision | None = None
-    radial_rays: list[tuple[float, list[tuple[float, float, str]]]] = field(default_factory=list)
+    radial_rays: list[tuple[float, str]] = field(default_factory=list)
     resolution_m: float = 0.0
     selected_path: object | None = None
     paths_checked: int = 0
@@ -379,62 +379,71 @@ def preference(
     return 2, 'approach_back'
 
 
-RADIAL_SEVERITY = ('occupied', 'unknown', 'pose_invalid', 'valid')
+# A ray takes the first class any of its positions has. Uncertainty wins over a
+# definite "blocked" or "invalid": an unmapped position might still be valid.
+RAY_PRIORITY = ('valid', 'unknown', 'occupied', 'pose_invalid')
 
 
-def candidate_ray_class(candidate: CandidateDecision) -> str:
-    """Display class of a free donut cell from its parking candidate's existing decision."""
-    if candidate.status in ('valid', 'selected'):
-        return 'valid'
-    if candidate.reason == 'footprint_occupied':
-        return 'occupied'          # the parked footprint is blocked by an obstacle
-    if candidate.reason in ('footprint_unknown', 'footprint_out_of_bounds'):
-        return 'unknown'           # the parked footprint reaches unmapped space
-    return 'pose_invalid'          # free, but G1 keep-out, reach budget or geometry fails
+def pose_geometry_passes(task_x: float, task_y: float, target: TargetReference,
+                         config: PlannerConfig, keepout_m: float) -> bool:
+    """Whether a pose with its task point here passes plan_parking's G1 keep-out and reach budget."""
+    base_x, base_y, yaw = base_pose_from_task_point(
+        task_x, task_y, target.x, target.y, config.task_point_x_base_m, config.task_point_y_base_m)
+    polygon = rotated_footprint_vertices(config.footprint, base_x, base_y, yaw)
+    return (float(points_to_polygon_distance([target.x], [target.y], polygon)[0]) >= keepout_m
+            and math.hypot(task_x - target.x, task_y - target.y)
+            <= config.reach_max_m - config.reach_allowance_m)
 
 
 def radial_profile(grid: GridSnapshot, target: TargetReference, config: PlannerConfig,
                    candidates: Sequence[CandidateDecision] = (),
-                   step_deg: float = 1.0) -> list[tuple[float, list[tuple[float, float, str]]]]:
-    """Per ray from reach_min to reach_max: contiguous ``(r_start, r_end, class)`` runs (display only).
+                   step_deg: float = 1.0) -> list[tuple[float, str]]:
+    """One ``(angle, class)`` per ray, from reach_min to reach_max (display only).
 
-    Runs end at the ray's exact map-cell boundary crossings, so an obstacle marks only
-    the part of a ray it affects. Each run takes the class of the cell it crosses:
-    ``occupied``, ``unknown`` (also outside the map), and for a free cell the class of
-    its parking candidate's decision (``candidate_ray_class``): ``valid``, ``occupied``
-    where the parked footprint hits an obstacle, ``unknown`` where it reaches unmapped
-    space, otherwise ``pose_invalid``. A ray along a cell edge takes the worse of both
-    cells. This is not Nav2 path feasibility, and candidates are never derived from
-    the rays.
+    A ray's parking positions are the donut cells it crosses (both cells where it runs
+    along a cell edge) whose centre lies in the donut, as in plan_parking. Each position
+    is judged as the planner judged it. A free cell takes its candidate's decision:
+    ``valid``; ``occupied`` or ``unknown`` where the parked footprint is blocked or
+    reaches unmapped space; ``pose_invalid`` for keep-out, reach budget or geometry. An
+    occupied or unknown cell, or one outside the map, is never a candidate; it counts as
+    ``occupied`` or ``unknown`` only where a pose there would pass keep-out and reach
+    budget, else ``pose_invalid``. The ray takes the first class in ``RAY_PRIORITY`` that
+    any of its positions has, and ``pose_invalid`` without positions or candidates. This
+    is not Nav2 path feasibility, and candidates are never derived from the rays.
     """
 
     res = grid.resolution
-    cell_class_of = {}
+    keepout = keepout_radius_m(target, config)
+    decision_of = {}
     for c in candidates:
         lx, ly = grid.map_to_local(c.task_x, c.task_y)
-        cell_class_of[(math.floor(float(ly) / res), math.floor(float(lx) / res))] = candidate_ray_class(c)
+        decision_of[(math.floor(float(ly) / res), math.floor(float(lx) / res))] = c
     px, py = (float(v) for v in grid.map_to_local(target.x, target.y))
     r0, r1 = config.reach_min_m, config.reach_max_m
+    position_class = {}
+
+    def judge(row, col):
+        x, y = (float(v) for v in grid.cell_centers(col, row))
+        if not r0 <= math.hypot(x - target.x, y - target.y) <= r1:
+            return None                       # not a parking position
+        inside = 0 <= col < grid.width and 0 <= row < grid.height
+        if inside and 0 <= grid.data[row, col] < config.occupied_threshold:
+            c = decision_of.get((row, col))
+            if c is None:
+                return 'pose_invalid'         # no decision: never green
+            if c.status in ('valid', 'selected'):
+                return 'valid'
+            blocked = {'footprint_occupied': 'occupied', 'footprint_unknown': 'unknown',
+                       'footprint_out_of_bounds': 'unknown'}.get(c.reason)
+        else:
+            blocked = 'occupied' if inside and grid.data[row, col] >= config.occupied_threshold else 'unknown'
+        # The footprint check runs first, so a blocked pose may fail keep-out or reach too.
+        return blocked if blocked and pose_geometry_passes(x, y, target, config, keepout) else 'pose_invalid'
 
     def indices(v):
         # A ray running exactly along a cell edge touches both cells beside it.
         k = round(v)
         return (k - 1, k) if abs(v - k) < 1e-9 else (math.floor(v),)
-
-    def cell_class(r, dx, dy):
-        worst = 'valid'
-        for row in indices((py + r * dy) / res):
-            for col in indices((px + r * dx) / res):
-                if not (0 <= col < grid.width and 0 <= row < grid.height):
-                    status = 'unknown'
-                elif grid.data[row, col] >= config.occupied_threshold:
-                    status = 'occupied'
-                elif grid.data[row, col] < 0:
-                    status = 'unknown'
-                else:
-                    status = cell_class_of.get((row, col), 'pose_invalid')
-                worst = min(worst, status, key=RADIAL_SEVERITY.index)
-        return worst
 
     rays = []
     for k in range(int(round(360.0 / step_deg))):
@@ -447,16 +456,17 @@ def radial_profile(grid: GridSnapshot, target: TargetReference, config: PlannerC
                 lo, hi = sorted(((p + r0 * d) / res, (p + r1 * d) / res))
                 cuts.update((i * res - p) / d for i in range(math.ceil(lo), math.floor(hi) + 1))
         cuts = sorted(r for r in cuts if r0 <= r <= r1)
-        runs = []
+        found = set()
         for a, b in zip(cuts, cuts[1:]):
             if b - a < 1e-9:
                 continue
-            status = cell_class((a + b) / 2.0, dx, dy)
-            if runs and runs[-1][2] == status:
-                runs[-1] = (runs[-1][0], b, status)
-            else:
-                runs.append((runs[-1][1] if runs else r0, b, status))
-        rays.append((angle, runs))
+            r = (a + b) / 2.0
+            for row in indices((py + r * dy) / res):
+                for col in indices((px + r * dx) / res):
+                    if (row, col) not in position_class:
+                        position_class[(row, col)] = judge(row, col)
+                    found.add(position_class[(row, col)])
+        rays.append((angle, next((s for s in RAY_PRIORITY if s in found), 'pose_invalid')))
     return rays
 
 

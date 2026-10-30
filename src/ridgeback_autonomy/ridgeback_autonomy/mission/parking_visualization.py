@@ -1,12 +1,12 @@
 """RViz markers for a parking plan: radial donut lines and the selected pose.
 
-The donut is drawn as 360 radial lines at 1-degree steps, each split where the
-planner's classification of the cells it crosses changes: green where a parking
-pose with its task point there passed the footprint, keep-out and reach-budget
-checks, red where the cell or that pose's footprint is blocked by an obstacle,
-orange where either is unmapped, grey on free floor where the pose fails another
-check. Green is geometric validity only; Nav2 path feasibility is shown by the
-selected pose and its route.
+The donut is drawn as 360 radial lines at 1-degree steps, each one solid colour
+from the inner to the outer reach limit (``radial_profile``): green where the
+direction has at least one parking pose that passed the footprint, keep-out and
+reach-budget checks; otherwise orange where unmapped space leaves it undecided,
+red where obstacles block every otherwise valid pose, grey where keep-out or reach
+rules out every pose. Green is geometric validity only; Nav2 path feasibility is
+shown by the selected pose and its route.
 
 Every array starts with a DELETEALL marker so a new plan, a failed plan or a
 reset never leaves geometry from an earlier target on screen. The colour legend
@@ -33,8 +33,8 @@ RED = (1.0, 0.0, 0.0, 1.0)
 UNKNOWN_ORANGE = (1.0, 0.55, 0.0, 1.0)
 SELECTED = (0.0, 0.6, 1.0, 1.0)
 G1_COLOR = (0.8, 0.2, 0.9, 1.0)
-RING = (1.0, 1.0, 1.0, 0.9)           # donut reach boundaries
-POSE_INVALID = (0.6, 0.6, 0.6, 1.0)  # free floor, but no valid parking pose there
+RING = (0.85, 0.85, 0.85, 0.5)        # donut reach boundaries, secondary to the rays
+POSE_INVALID = (0.6, 0.6, 0.6, 1.0)  # keep-out or reach rules out every pose on the ray
 # Marker id per radial class: one LINE_LIST each so RViz can toggle them. Opaque, so
 # neighbouring 1-degree rays do not blend into one shade.
 RAY_CLASSES = (('valid', GREEN), ('occupied', RED), ('unknown', UNKNOWN_ORANGE),
@@ -90,16 +90,18 @@ def plan_markers(plan: ParkingPlan, config: PlannerConfig, stamp) -> MarkerArray
     add(keepout)
     for marker_id, radius in enumerate((config.reach_min_m, config.reach_max_m)):
         ring = _marker('parking/donut_boundaries', marker_id, Marker.LINE_STRIP, frame, stamp,
-                       RING, (0.015, 0, 0))
+                       RING, (0.006, 0, 0))
         ring.points = _circle(t.x, t.y, radius, 0.04)
         add(ring)
 
     for marker_id, (status, rgba) in enumerate(RAY_CLASSES):
-        rays = _marker('parking/radial_1deg', marker_id, Marker.LINE_LIST, frame, stamp, rgba, (0.005, 0, 0))
-        for angle, runs in plan.radial_rays:
-            c, s = math.cos(angle), math.sin(angle)
-            rays.points += [Point(x=t.x + r * c, y=t.y + r * s, z=0.05)
-                            for r0, r1, run_status in runs if run_status == status for r in (r0, r1)]
+        # 4 mm wide: rays 1 degree apart are 5.2 mm apart at the inner limit.
+        rays = _marker('parking/radial_1deg', marker_id, Marker.LINE_LIST, frame, stamp, rgba, (0.004, 0, 0))
+        for angle, ray_status in plan.radial_rays:
+            if ray_status == status:
+                c, s = math.cos(angle), math.sin(angle)
+                rays.points += [Point(x=t.x + r * c, y=t.y + r * s, z=0.05)
+                                for r in (config.reach_min_m, config.reach_max_m)]
         add(rays)
 
     if plan.selected_path is not None:
@@ -134,7 +136,7 @@ def plan_markers(plan: ParkingPlan, config: PlannerConfig, stamp) -> MarkerArray
               'geometric parking pose' if plan.ok else
               'path evaluation pending' if plan.failure_reason is None else
               'NO PARKING POSE: ' + str(plan.failure_reason))
-    passing = sum(any(run[2] == 'valid' for run in runs) for _, runs in plan.radial_rays)
+    passing = sum(status == 'valid' for _, status in plan.radial_rays)
     label.text = (f"{status}\n"
                   f"{t.reference} (keep-out {plan.keepout_radius_m:.2f} m), "
                   f"valid {counts['valid']}/{counts['candidates']}, "
@@ -145,10 +147,10 @@ def plan_markers(plan: ParkingPlan, config: PlannerConfig, stamp) -> MarkerArray
 
 # Screen legend: one latched overlay, generated from the colour tables above.
 
-RAY_LABELS = {'valid': 'Valid parking pose (no path check)',
-              'occupied': 'Blocked by an obstacle (cell or footprint)',
-              'unknown': 'Unknown or unmapped (cell or footprint)',
-              'pose_invalid': 'Free, but keep-out / reach fails'}
+RAY_LABELS = {'valid': 'A valid parking pose exists (no path check)',
+              'occupied': 'No valid pose: obstacles block it',
+              'unknown': 'No valid pose: unmapped space, undecided',
+              'pose_invalid': 'No valid pose: keep-out / reach'}
 LINE, DOT, ARROW, OUTLINE, RING_GLYPH = '\u2501\u2501', '\u25cf', '\u279c', '\u25ad', '\u25ef'
 LEGEND_TEXT_SIZE = 9
 LEGEND_LINE_PX = 15   # one 9 pt row, with slack for font differences
@@ -157,7 +159,7 @@ LEGEND_LINE_PX = 15   # one 9 pt row, with slack for font differences
 def legend_sections(config: PlannerConfig):
     """(title, [(glyph, rgba, label)]) for every coloured parking marker and shared Nav2 display."""
     return (
-        (f'Donut rays (1\u00b0, {config.reach_min_m:.2f}-{config.reach_max_m:.2f} m)',
+        (f'Donut rays: one colour per 1\u00b0 ray ({config.reach_min_m:.2f}-{config.reach_max_m:.2f} m)',
          [(LINE, rgba, RAY_LABELS[status]) for status, rgba in RAY_CLASSES]),
         ('Selected parking (Nav2-checked)', [(ARROW, SELECTED, 'Parking pose and heading'),
                               (OUTLINE, SELECTED, 'Robot footprint at the pose'),
