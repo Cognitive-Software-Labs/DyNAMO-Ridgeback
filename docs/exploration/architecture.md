@@ -154,6 +154,20 @@ migration state flow and future insertion
 point for G1-region exploration are maintained in the
 [parking mission migration plan](../plans/EXPLORATION_parking_mission_migration.md#phase-2d-non-driving-mission-coordinator).
 
+### G1-centred exploration
+
+After the first G1 localization, the manager resumes the shared explorer,
+focused on G1, unless no parking position is undecided. A position is
+undecided when the G1 keep-out and reach budget allow it, but its task cell is
+unknown, or its parked footprint touches unknown cells or leaves the map
+(`undecided_parking_positions`, using the planner's own checks). Positions
+blocked by obstacles are decided, and unknown floor that no parked footprint
+reaches is not required. Exploration completes when no position is undecided.
+It ends with a partial result when the explorer has no reachable frontier
+left around G1, after `g1_exploration_timeout_s`, or when the footprint enters
+G1's protected region. Planning then rejects any candidate whose footprint
+still touches unknown space, as before.
+
 ### Observation return
 
 When G1-centred exploration has moved the robot, it returns to the

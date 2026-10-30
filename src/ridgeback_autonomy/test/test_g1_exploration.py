@@ -114,7 +114,8 @@ def test_explorer_focus_keeps_goals_in_the_annulus_around_g1():
     assert not FrontierExplorerNode._in_focus(owner, (3.5, 0.0), outer=False)
 
 
-# Explicit, donut-based termination: complete only when every donut cell is known.
+# Explicit termination: complete only when unknown space leaves no parking position
+# undecided that keep-out and reach allow (its task cell and whole parked footprint).
 import json
 import math
 
@@ -122,7 +123,7 @@ import numpy as np
 from std_msgs.msg import String
 
 from ridgeback_autonomy.mission.parking_planner import (
-    GENERIC_TARGET_REFERENCE, GridSnapshot, TargetReference, plan_parking)
+    GENERIC_TARGET_REFERENCE, GridSnapshot, TargetReference, plan_parking, pose_geometry_passes)
 
 
 def ring_map(m, unknown, *, stamp_ns=PLAN_NOW_NS, centre=None):
@@ -143,7 +144,8 @@ def finished(m):
                 MissionState.EXPLORING_AROUND_G1)
 
 
-def test_already_mapped_donut_skips_exploration_even_with_unknown_footprint_area(manager_factory):
+def localized_on(manager_factory, unknown):
+    """A manager that localizes G1 on a map with ``unknown(distance, angle)`` cells around it."""
     def manager():
         m = manager_factory(tf_buffer=FakeTfBuffer(stamp_ns=PLAN_NOW_NS),
                             pause_client=FakePauseClient(trigger_response(True, 'safe')))
@@ -152,26 +154,50 @@ def test_already_mapped_donut_skips_exploration_even_with_unknown_footprint_area
     probe = exploring_manager(manager_factory)   # where the fixtures localize G1
     centre = (probe.target_position.map_x_m, probe.target_position.map_y_m)
     m = manager()
-    m._on_map(ring_map(m, lambda d, a: (d > 0.65) & (d < 1.4), centre=centre))
+    m._on_map(ring_map(m, unknown, centre=centre))
     enter_localization(m)
     localize(m)
     assert (m.target_position.map_x_m, m.target_position.map_y_m) == pytest.approx(centre)
+    return m
+
+
+def test_mapped_donut_with_unknown_parked_footprints_still_explores(manager_factory):
+    # The donut is mapped, but every parked footprint reaches the unknown ring beyond it.
+    m = localized_on(manager_factory, lambda d, a: (d > 0.65) & (d < 1.4))
+    assert m.state == MissionState.EXPLORING_AROUND_G1
+    assert len(m.resume_client.calls) == 1
+    before = m.g1_exploration_result['before']
+    assert before['donut_unknown_cells'] == 0 and before['undecided_positions'] > 0
+
+
+def test_unknown_space_no_parked_footprint_reaches_skips_exploration(manager_factory):
+    # Unknown floor beyond every parked footprint, and under G1 inside the donut.
+    m = localized_on(manager_factory, lambda d, a: (d > 1.6) | (d < 0.25))
     assert m.resume_client.calls == []
     result = m.g1_exploration_result
-    assert (result['outcome'], result['reason']) == ('not_needed', 'donut_already_mapped')
-    assert result['before']['footprint_area_unknown_fraction'] > 0.9
+    assert (result['outcome'], result['reason']) == ('not_needed', 'positions_already_decided')
+    assert result['before']['undecided_positions'] == 0
     assert m.state != MissionState.EXPLORING_AROUND_G1
 
 
-def test_skip_decision_counts_only_the_donut(manager_factory):
+def test_undecided_positions_follow_the_planners_own_decisions(manager_factory):
     m = exploring_manager(manager_factory)
-    # Unknown only beyond the donut (0.6-1.4 m): the donut itself is fully mapped.
-    m._on_map(ring_map(m, lambda d, a: (d > 0.65) & (d < 1.4)))
-    cov = m._g1_coverage()
-    assert cov['donut_unknown_cells'] == 0 and cov['footprint_area_unknown_fraction'] > 0.9
-    # Unknown only inside the 0.30 m inner radius (under G1) does not count either.
-    m._on_map(ring_map(m, lambda d, a: d < 0.25))
-    assert m._g1_coverage()['donut_unknown_cells'] == 0
+    t = m.target_position
+    target = TargetReference(t.map_x_m, t.map_y_m, 'map', 0, GENERIC_TARGET_REFERENCE, False, '')
+    for unknown in (lambda d, a: (d > 0.65) & (d < 1.4),                 # beyond the donut
+                    lambda d, a: (d >= 0.3) & (d <= 0.6) & (a > 0),      # northern donut half
+                    lambda d, a: (d > 0.9) & (np.abs(a - 2.0) < 0.4),    # one patch
+                    lambda d, a: d < 0.25):                              # under G1 only
+        msg = ring_map(m, unknown)
+        m._on_map(msg)
+        plan = plan_parking(GridSnapshot.from_msg(msg), target, m.planner_config, None)
+        allowed = lambda x, y: bool(pose_geometry_passes(
+            math.hypot(x - target.x, y - target.y), m.planner_config, plan.keepout_radius_m))
+        expected = (sum(c.reason in ('footprint_unknown', 'footprint_out_of_bounds')
+                        and allowed(c.task_x, c.task_y) for c in plan.candidates)
+                    + sum(allowed(x, y) for x, y in plan.unknown_cells))
+        assert m._g1_coverage()['undecided_positions'] == expected
+    assert expected == 0     # nothing under G1 can block a parked footprint
 
 
 def test_coverage_uses_the_planners_donut_cells(manager_factory):
@@ -195,19 +221,24 @@ def test_exploration_continues_while_coverage_improves_and_completes_at_zero(man
         m.tick()
         assert m.state == MissionState.EXPLORING_AROUND_G1
         assert 0 < m._g1_coverage()['donut_unknown_cells'] < before
-    # Only the footprint area beyond the donut is still unknown: the donut is complete.
+    # The donut is mapped, but parked footprints still reach unknown floor beyond it.
     m._on_map(ring_map(m, lambda d, a: (d > 0.7) & (d < 1.2)))
     m.tick()
-    assert 'complete (donut_mapped)' in finished(m)
+    assert m.state == MissionState.EXPLORING_AROUND_G1
+    assert m._g1_coverage()['donut_unknown_cells'] == 0
+    # Only floor no parked footprint reaches is still unknown: every position is decided.
+    m._on_map(ring_map(m, lambda d, a: d > 1.6))
+    m.tick()
+    assert 'complete (positions_decided)' in finished(m)
     result = m.g1_exploration_result
-    assert result['outcome'] == 'complete' and result['after']['donut_unknown_cells'] == 0
-    assert result['after']['footprint_area_unknown_fraction'] > 0
+    assert result['outcome'] == 'complete' and result['after']['undecided_positions'] == 0
+    assert result['after']['footprint_area_unknown_fraction'] == 0   # the far floor is not required
 
 
-def test_one_unknown_donut_cell_keeps_exploring(manager_factory):
+def test_one_unknown_cell_under_parked_footprints_keeps_exploring(manager_factory):
     m = exploring_manager(manager_factory)
     m._on_map(ring_map(m, lambda d, a: (np.abs(d - 0.45) < 0.03) & (np.abs(a - 1.0) < 0.06)))
-    assert m._g1_coverage()['donut_unknown_cells'] >= 1
+    assert m._g1_coverage()['undecided_positions'] >= 1
     m.tick()
     assert m.state == MissionState.EXPLORING_AROUND_G1   # no percentage tolerance
 
@@ -275,7 +306,7 @@ def test_handoff_state_reports_the_exploration_result(manager_factory):
     m.tick()
     payload = json.loads(states[-1].data)
     assert payload['g1_exploration']['outcome'] == 'complete'
-    assert payload['g1_exploration']['reason'] == 'donut_mapped'
+    assert payload['g1_exploration']['reason'] == 'positions_decided'
     assert payload['g1_exploration']['before']['donut_unknown_cells'] > 0
 
 

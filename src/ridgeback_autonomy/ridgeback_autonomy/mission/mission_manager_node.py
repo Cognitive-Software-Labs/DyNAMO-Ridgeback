@@ -75,6 +75,7 @@ from ridgeback_autonomy.mission.parking_planner import (
     keepout_radius_m,
     plan_parking,
     points_to_polygon_distance,
+    undecided_parking_positions,
     validate_inputs,
 )
 from ridgeback_autonomy.mission.parking_geometry import (
@@ -288,8 +289,9 @@ class MissionManagerNode(Node):
         self.declare_parameter('parking_input_timeout_s', 10.0)
         # G1-centred mapping with the shared explorer before parking planning.
         self.declare_parameter('g1_exploration_enabled', True)
-        # Exploration ends when every donut cell (the planner's task-point cells) is
-        # known on the SLAM map; the wider footprint area out to this radius is reported.
+        # Exploration ends when unknown space leaves no parking position undecided that
+        # keep-out and reach allow: its task cell and its whole parked footprint are
+        # known. The unknown share of the area out to this radius is only reported.
         self.declare_parameter('g1_coverage_radius_m', 1.4)
         self.declare_parameter('g1_exploration_timeout_s', 240.0)
         self.declare_parameter('g1_exploration_protected_margin_m', 0.15)
@@ -512,6 +514,7 @@ class MissionManagerNode(Node):
         self.g1_protected_margin_m = float(
             self.get_parameter('g1_exploration_protected_margin_m').value)
         self._g1_explored = False
+        self._g1_coverage_cache = (None, None, None)
         self._observation_pose = None
         self._observation_check_pending = False
         self.observation_tolerance = (
@@ -2523,14 +2526,20 @@ class MissionManagerNode(Node):
     # G1-centred mapping: the shared explorer, focused on G1 through explore/focus.
 
     def _g1_coverage(self):
-        """Unknown cells of the donut and unknown share of the footprint area, on the SLAM map.
+        """Parking positions left undecided by unknown space, the donut's unknown cells and
+        the unknown share of the footprint area, on the SLAM map.
 
         The donut uses the planner's own cell rule (cell centre within the reach
-        band), so it matches the plan's ``donut_unknown`` and the orange P2 rays.
+        band), so it matches the plan's ``donut_unknown``. Computed once per map and G1
+        estimate.
         """
         position = self.target_position
         if position is None or self.latest_map is None:
             return None
+        key = (position.map_x_m, position.map_y_m)
+        cached_map, cached_key, cached = self._g1_coverage_cache
+        if cached_map is self.latest_map and cached_key == key:
+            return cached
         try:
             grid = GridSnapshot.from_msg(self.latest_map)
         except ValueError:
@@ -2543,28 +2552,33 @@ class MissionManagerNode(Node):
         if not donut.any():
             return None
         unknown = grid.data < 0
-        return {
+        target = TargetReference(position.map_x_m, position.map_y_m, self.map_frame, 0,
+                                 position.reference, position.is_foot_midpoint, '')
+        coverage = {
+            'undecided_positions': undecided_parking_positions(grid, target, self.planner_config),
             'donut_cells': int(np.count_nonzero(donut)),
             'donut_unknown_cells': int(np.count_nonzero(unknown & donut)),
             'footprint_area_unknown_fraction': round(
                 float(np.count_nonzero(unknown & area)) / max(1, int(np.count_nonzero(area))), 4),
         }
+        self._g1_coverage_cache = (self.latest_map, key, coverage)
+        return coverage
 
     def _maybe_explore_around_g1(self):
-        """Resume the explorer around G1 unless every donut cell is already known."""
+        """Resume the explorer around G1 unless no parking position is left undecided."""
         if not self.g1_exploration_enabled or self._g1_explored:
             return False
         coverage = self._g1_coverage()
         if coverage is None:
             return False
-        if coverage['donut_unknown_cells'] == 0:
-            self.g1_exploration_result = {'outcome': 'not_needed', 'reason': 'donut_already_mapped',
+        if coverage['undecided_positions'] == 0:
+            self.g1_exploration_result = {'outcome': 'not_needed', 'reason': 'positions_already_decided',
                                           'duration_s': 0.0, 'before': coverage, 'after': coverage}
-            self.get_logger().info(f'Donut already mapped; no G1 exploration: {coverage}')
+            self.get_logger().info(f'No parking position undecided; no G1 exploration: {coverage}')
             return False
         if not self.resume_client.service_is_ready():
             self.get_logger().warning(
-                f'Donut has {coverage["donut_unknown_cells"]} unknown cells, but no explorer '
+                f'{coverage["undecided_positions"]} parking positions undecided, but no explorer '
                 'resume service; planning with the current map')
             return False
         self._g1_explored = True
@@ -2579,6 +2593,7 @@ class MissionManagerNode(Node):
         focus.point.x, focus.point.y = self.target_position.map_x_m, self.target_position.map_y_m
         self.focus_publisher.publish(focus)
         self._transition(MissionState.EXPLORING_AROUND_G1,
+                         f'{coverage["undecided_positions"]} parking positions undecided, '
                          f'{coverage["donut_unknown_cells"]}/{coverage["donut_cells"]} donut cells '
                          'unknown; exploring around G1')
         self.resume_client.call_async(Trigger.Request()).add_done_callback(self._on_resume_response)
@@ -2620,10 +2635,11 @@ class MissionManagerNode(Node):
                     'partial', 'protected_region',
                     f'footprint {gap:.2f} m from G1 inside the protected {protected:.2f} m')
                 return
-        if coverage is not None and coverage['donut_unknown_cells'] == 0:
-            self._finish_g1_exploration('complete', 'donut_mapped', 'every donut cell is known')
+        if coverage is not None and coverage['undecided_positions'] == 0:
+            self._finish_g1_exploration('complete', 'positions_decided',
+                                        'no parking position is left undecided by unknown space')
         elif self._g1_frontiers_exhausted:
-            # Remaining unknown donut cells are not reachable by the explorer (occluded or
+            # The remaining unknown cells are not reachable by the explorer (occluded or
             # outside its goal annulus): plan with them; candidates there stay rejected.
             self._finish_g1_exploration('partial', 'no_reachable_frontiers',
                                         'explorer found no frontier left around G1')
@@ -2639,7 +2655,8 @@ class MissionManagerNode(Node):
         result.update(outcome=outcome, reason=reason, after=coverage, duration_s=round(
             self._monotonic() - (self._g1_exploration_started_s or self._monotonic()), 2))
         self.g1_exploration_result = result
-        summary = (f'{outcome} ({reason}): {detail}; donut unknown '
+        summary = (f'{outcome} ({reason}): {detail}; undecided positions '
+                   f'{"?" if coverage is None else coverage["undecided_positions"]}, donut unknown '
                    f'{"?" if coverage is None else coverage["donut_unknown_cells"]}'
                    f'/{"?" if coverage is None else coverage["donut_cells"]}')
         self.get_logger().info(f'G1 exploration finished: {summary}')

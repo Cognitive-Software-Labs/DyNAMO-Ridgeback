@@ -384,15 +384,48 @@ def preference(
 RAY_PRIORITY = ('valid', 'unknown', 'occupied', 'pose_invalid')
 
 
-def pose_geometry_passes(task_x: float, task_y: float, target: TargetReference,
-                         config: PlannerConfig, keepout_m: float) -> bool:
-    """Whether a pose with its task point here passes plan_parking's G1 keep-out and reach budget."""
-    base_x, base_y, yaw = base_pose_from_task_point(
-        task_x, task_y, target.x, target.y, config.task_point_x_base_m, config.task_point_y_base_m)
-    polygon = rotated_footprint_vertices(config.footprint, base_x, base_y, yaw)
-    return (float(points_to_polygon_distance([target.x], [target.y], polygon)[0]) >= keepout_m
-            and math.hypot(task_x - target.x, task_y - target.y)
-            <= config.reach_max_m - config.reach_allowance_m)
+def pose_geometry_passes(reach_m, config: PlannerConfig, keepout_m: float):
+    """Whether poses with their task point ``reach_m`` from G1 pass plan_parking's G1
+    keep-out and reach budget (element-wise for arrays).
+
+    The base +x axis points from G1 through the task point, so G1 always lies at
+    ``(task_point_x_base_m - reach, task_point_y_base_m)`` in the base frame: both
+    checks depend only on the reach.
+    """
+    reach = np.asarray(reach_m, dtype=float)
+    gap = points_to_polygon_distance(config.task_point_x_base_m - reach,
+                                     np.full(reach.shape, config.task_point_y_base_m),
+                                     config.footprint)
+    return (gap >= keepout_m) & (reach <= config.reach_max_m - config.reach_allowance_m)
+
+
+def undecided_parking_positions(grid: GridSnapshot, target: TargetReference,
+                                config: PlannerConfig) -> int:
+    """Donut positions that keep-out and reach allow, but unknown space leaves undecided.
+
+    Uses plan_parking's cell rule and checks: an unknown task cell, or a free one whose
+    parked footprint it would reject as unknown or outside the map. Occupied task cells
+    and footprints that touch an obstacle are decided, so they do not count.
+    """
+
+    keepout = keepout_radius_m(target, config)
+    rows, cols = np.mgrid[0:grid.height, 0:grid.width]
+    cx, cy = grid.cell_centers(cols, rows)
+    distance = np.hypot(cx - target.x, cy - target.y)
+    values = grid.data
+    # Unknown (-1) or free task cells; occupied and other negative values are not candidates.
+    cells = ((distance >= config.reach_min_m) & (distance <= config.reach_max_m)
+             & ((values == -1) | ((values >= 0) & (values < config.occupied_threshold))))
+    cells[cells] = pose_geometry_passes(distance[cells], config, keepout)
+    count = int(np.count_nonzero(cells & (values == -1)))
+    free = cells & (values >= 0)
+    for task_x, task_y in zip(cx[free].tolist(), cy[free].tolist()):
+        base_x, base_y, yaw = base_pose_from_task_point(
+            task_x, task_y, target.x, target.y, config.task_point_x_base_m, config.task_point_y_base_m)
+        polygon = rotated_footprint_vertices(config.footprint, base_x, base_y, yaw)
+        count += footprint_rejection_reason(polygon, grid, config.occupied_threshold) in (
+            'unknown', 'out_of_bounds')
+    return count
 
 
 def radial_profile(grid: GridSnapshot, target: TargetReference, config: PlannerConfig,
@@ -438,7 +471,9 @@ def radial_profile(grid: GridSnapshot, target: TargetReference, config: PlannerC
         else:
             blocked = 'occupied' if inside and grid.data[row, col] >= config.occupied_threshold else 'unknown'
         # The footprint check runs first, so a blocked pose may fail keep-out or reach too.
-        return blocked if blocked and pose_geometry_passes(x, y, target, config, keepout) else 'pose_invalid'
+        if blocked and pose_geometry_passes(math.hypot(x - target.x, y - target.y), config, keepout):
+            return blocked
+        return 'pose_invalid'
 
     def indices(v):
         # A ray running exactly along a cell edge touches both cells beside it.

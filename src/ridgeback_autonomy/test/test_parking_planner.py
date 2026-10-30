@@ -752,3 +752,19 @@ def test_ray_colour_follows_the_parked_footprint_not_only_the_cells():
     assert len(plan.occupied_cells) == len(plan.unknown_cells) == 0 and donut
     assert_rays_match_the_planner(plan, g)
     assert {'occupied', 'unknown', 'valid'} <= {s for _, s in plan.radial_rays}
+
+
+@pytest.mark.parametrize('foot', (False, True))
+@pytest.mark.parametrize('g1,map_yaw,approach', OFF_GRID)
+def test_reach_only_geometry_check_agrees_with_every_planner_decision(g1, map_yaw, approach, foot):
+    from ridgeback_autonomy.mission.parking_planner import pose_geometry_passes
+    g = centred_grid(*g1, map_yaw)
+    for config in (CONFIG, BUDGET):
+        plan = plan_parking(g, target(*g1, foot=foot), config, approach)
+        passes = pose_geometry_passes([c.reach_m for c in plan.candidates], config, plan.keepout_radius_m)
+        for c, ok in zip(plan.candidates, passes):
+            if c.status in ('valid', 'selected'):
+                assert ok
+            elif c.reason in ('g1_keepout', 'reach_budget'):
+                assert not ok
+        assert passes.any() and not passes.all()
