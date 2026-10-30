@@ -131,7 +131,7 @@ OMNI_KIT_ACCEPT_EULA=YES isaac_venv/bin/python3 tools/isaac/smoke_test.py
 ```
 
 The first install is roughly 30–50 GB. Stock Isaac worlds need NVIDIA's asset
-root; the repo-local `initial_test_world` does not. Canonical `isaac_venv` points
+root; the repo-local `initial_test_world` and `robocup_hcc_arena` do not. Canonical `isaac_venv` points
 to 6.1; [Isaac rollback](docs/isaac/rollback.md) covers the retained 6.0.1 environment.
 
 ### 5. (Optional) Install the repository Git hooks

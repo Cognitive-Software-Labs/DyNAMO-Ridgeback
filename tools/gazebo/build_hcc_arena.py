@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build the RoboCup HCC arena Gazebo world from the arena CAD export (GLB).
+"""Build the RoboCup HCC arena Gazebo and Isaac worlds from the arena CAD export (GLB).
 
 The CAD doorways are narrower than the Ridgeback stack accepts, so this edits
 the export instead of hand-modelling a copy:
@@ -22,11 +22,27 @@ Outputs, all in the Gazebo world frame (robot spawn at the origin):
 Gazebo's glTF loader keeps the file Y-up, so the SDF rolls the visual by
 +90 deg; the collision STL is written Z-up directly.
 
+With ``--isaac-out`` it writes the Isaac Sim stage from the same edited
+geometry, in the same frame:
+
+    <isaac-out>/robocup_hcc_arena.usda              stage: physics, lights
+    <isaac-out>/robocup_hcc_arena/arena.usdc        render meshes, collider
+    <isaac-out>/robocup_hcc_arena/textures/         embedded CAD textures
+
+The render meshes are what the RTX lidar and cameras see; the Gazebo
+collision set becomes one invisible static triangle-mesh collider.
+
     python3 tools/gazebo/build_hcc_arena.py \\
         ~/Downloads/2026_09_01_RoboCup_HCC_Arena_V1.glb \\
         src/ridgeback_autonomy_gz/sim/worlds
+    isaac_venv/bin/python3 tools/gazebo/build_hcc_arena.py \\
+        ~/Downloads/2026_09_01_RoboCup_HCC_Arena_V1.glb \\
+        --isaac-out src/ridgeback_autonomy_isaac/sim/isaac/usd/worlds
 
-Pure python + numpy. The script is deterministic for a given input file.
+The Gazebo outputs need only numpy; the Isaac stage needs pxr (isaac_venv).
+Each output is deterministic for a given input file and numpy version; the
+committed Gazebo files come from the system numpy, and isaac_venv's numpy
+differs from it only in the last float bit.
 """
 from __future__ import annotations
 
@@ -103,6 +119,8 @@ class Glb:
 
     def read(self, acc_i: int) -> np.ndarray:
         acc, dt, n, stride, base = self._view(acc_i)
+        if stride == dt.itemsize * n:
+            return np.frombuffer(self.bin, dt, n * acc['count'], base).reshape(-1, n).astype(float)
         return np.stack([np.frombuffer(self.bin, dt, n, base + k * stride)
                          for k in range(acc['count'])]).astype(float)
 
@@ -323,6 +341,180 @@ def write_stl(path: Path, tris: np.ndarray) -> None:
                      + struct.pack('<I', len(tris)) + rec.tobytes())
 
 
+def _usd_name(name: str, taken: set) -> str:
+    base = ''.join(c if c.isalnum() else '_' for c in name) or 'prim'
+    base = base if base[0].isalpha() else f'n_{base}'
+    name, k = base, 1
+    while name in taken:
+        name, k = f'{base}_{k}', k + 1
+    taken.add(name)
+    return name
+
+
+def write_usd(glb: Glb, frame: np.ndarray, stage_path: Path, collision: np.ndarray,
+              closures: list[tuple[np.ndarray, np.ndarray]], source_sha256: str) -> None:
+    """Isaac Sim stage in the Gazebo world frame: the edited CAD as render
+    meshes, the Gazebo collision set as one invisible static triangle-mesh
+    collider, a floor collider whose top is z = 0, and the closure walls."""
+    from pxr import Gf, Sdf, Usd, UsdGeom, UsdLux, UsdPhysics, UsdShade, Vt
+
+    assets = stage_path.with_suffix('')
+    (assets / 'textures').mkdir(parents=True, exist_ok=True)
+    arena_path = assets / 'arena.usdc'
+    arena_path.unlink(missing_ok=True)
+    stage = Usd.Stage.CreateNew(str(arena_path))
+    UsdGeom.SetStageUpAxis(stage, UsdGeom.Tokens.z)
+    UsdGeom.SetStageMetersPerUnit(stage, 1.0)
+    root = UsdGeom.Xform.Define(stage, '/Arena')
+    stage.SetDefaultPrim(root.GetPrim())
+    looks = UsdGeom.Scope.Define(stage, '/Arena/Looks').GetPath()
+    F, C3 = Sdf.ValueTypeNames.Float, Sdf.ValueTypeNames.Color3f
+
+    textures = {}
+
+    def texture(index):
+        if index not in textures:
+            image = glb.json['images'][glb.json['textures'][index]['source']]
+            view = glb.json['bufferViews'][image['bufferView']]
+            ext = {'image/png': 'png', 'image/jpeg': 'jpg'}[image['mimeType']]
+            textures[index] = f'textures/texture_{index}.{ext}'
+            start = view.get('byteOffset', 0)
+            (assets / textures[index]).write_bytes(bytes(glb.bin[start:start + view['byteLength']]))
+        return textures[index]
+
+    materials = {}
+
+    def material(i):
+        if i in materials:
+            return materials[i]
+        gm = glb.json['materials'][i]
+        pbr = gm.get('pbrMetallicRoughness', {})
+        path = looks.AppendChild(f'mat_{i:03d}')
+        mat = UsdShade.Material.Define(stage, path)
+        shader = UsdShade.Shader.Define(stage, path.AppendChild('shader'))
+        shader.CreateIdAttr('UsdPreviewSurface')
+        r, g, b, a = pbr.get('baseColorFactor', [1.0, 1.0, 1.0, 1.0])
+        diffuse = shader.CreateInput('diffuseColor', C3)
+        if 'baseColorTexture' in pbr:
+            reader = UsdShade.Shader.Define(stage, path.AppendChild('st'))
+            reader.CreateIdAttr('UsdPrimvarReader_float2')
+            reader.CreateInput('varname', Sdf.ValueTypeNames.Token).Set('st')
+            tex = UsdShade.Shader.Define(stage, path.AppendChild('base_color'))
+            tex.CreateIdAttr('UsdUVTexture')
+            tex.CreateInput('file', Sdf.ValueTypeNames.Asset).Set(texture(pbr['baseColorTexture']['index']))
+            tex.CreateInput('st', Sdf.ValueTypeNames.Float2).ConnectToSource(
+                reader.CreateOutput('result', Sdf.ValueTypeNames.Float2))
+            tex.CreateInput('scale', Sdf.ValueTypeNames.Float4).Set(Gf.Vec4f(r, g, b, a))
+            tex.CreateInput('wrapS', Sdf.ValueTypeNames.Token).Set('repeat')
+            tex.CreateInput('wrapT', Sdf.ValueTypeNames.Token).Set('repeat')
+            diffuse.ConnectToSource(tex.CreateOutput('rgb', Sdf.ValueTypeNames.Float3))
+        else:
+            diffuse.Set(Gf.Vec3f(r, g, b))
+        shader.CreateInput('metallic', F).Set(float(pbr.get('metallicFactor', 1.0)))
+        shader.CreateInput('roughness', F).Set(float(pbr.get('roughnessFactor', 1.0)))
+        strength = gm.get('extensions', {}).get('KHR_materials_emissive_strength', {}).get('emissiveStrength', 1.0)
+        shader.CreateInput('emissiveColor', C3).Set(Gf.Vec3f(*(np.array(gm.get('emissiveFactor', [0, 0, 0])) * strength)))
+        if gm.get('alphaMode') == 'BLEND' and a < 1.0:
+            shader.CreateInput('opacity', F).Set(float(a))
+        mat.CreateSurfaceOutput().ConnectToSource(shader.CreateOutput('surface', Sdf.ValueTypeNames.Token))
+        materials[i] = mat
+        return mat
+
+    def mesh_prim(path, points, indices):
+        mesh = UsdGeom.Mesh.Define(stage, path)
+        mesh.CreatePointsAttr(Vt.Vec3fArray.FromNumpy(points.astype(np.float32)))
+        mesh.CreateFaceVertexCountsAttr(Vt.IntArray.FromNumpy(np.full(len(indices) // 3, 3, np.int32)))
+        mesh.CreateFaceVertexIndicesAttr(Vt.IntArray.FromNumpy(indices.astype(np.int32)))
+        mesh.CreateSubdivisionSchemeAttr(UsdGeom.Tokens.none)
+        mesh.CreateExtentAttr(Vt.Vec3fArray([Gf.Vec3f(*points.min(0)), Gf.Vec3f(*points.max(0))]))
+        return mesh
+
+    visual = UsdGeom.Xform.Define(stage, '/Arena/Visual').GetPath()
+    taken = set()
+    for i in sorted(glb.mesh_nodes()):
+        m = frame @ glb.world(i)
+        normal_m = np.linalg.inv(m[:3, :3]).T
+        for k, prim in enumerate(glb.primitives(i)):
+            attrs = prim['attributes']
+            local = glb.read(attrs['POSITION'])
+            points = (m @ np.c_[local, np.ones(len(local))].T).T[:, :3]
+            indices = (glb.read(prim['indices']).ravel().astype(int) if 'indices' in prim
+                       else np.arange(len(local)))
+            name = _usd_name(f"{glb.json['nodes'][i].get('name', 'node')}_{k}", taken)
+            mesh = mesh_prim(visual.AppendChild(name), points, indices)
+            if 'NORMAL' in attrs:
+                normals = glb.read(attrs['NORMAL']) @ normal_m.T
+                normals /= np.maximum(np.linalg.norm(normals, axis=1, keepdims=True), 1e-12)
+                mesh.CreateNormalsAttr(Vt.Vec3fArray.FromNumpy(normals.astype(np.float32)))
+                mesh.SetNormalsInterpolation(UsdGeom.Tokens.vertex)
+            if 'TEXCOORD_0' in attrs:
+                uv = glb.read(attrs['TEXCOORD_0'])
+                uv[:, 1] = 1.0 - uv[:, 1]  # glTF v runs down the image, USD st up
+                UsdGeom.PrimvarsAPI(mesh).CreatePrimvar(
+                    'st', Sdf.ValueTypeNames.TexCoord2fArray, UsdGeom.Tokens.vertex).Set(
+                    Vt.Vec2fArray.FromNumpy(uv.astype(np.float32)))
+            if 'material' in prim:
+                if glb.json['materials'][prim['material']].get('doubleSided'):
+                    mesh.CreateDoubleSidedAttr(True)
+                UsdShade.MaterialBindingAPI.Apply(mesh.GetPrim()).Bind(material(prim['material']))
+
+    def collider(prim):
+        UsdPhysics.CollisionAPI.Apply(prim)
+        UsdGeom.Imageable(prim).CreateVisibilityAttr(UsdGeom.Tokens.invisible)
+        UsdGeom.Imageable(prim).CreatePurposeAttr(UsdGeom.Tokens.guide)
+
+    points, inverse = np.unique(collision.reshape(-1, 3).round(6), axis=0, return_inverse=True)
+    col = mesh_prim(Sdf.Path('/Arena/Collision'), points, inverse.ravel())
+    collider(col.GetPrim())
+    UsdPhysics.MeshCollisionAPI.Apply(col.GetPrim()).CreateApproximationAttr(UsdPhysics.Tokens.none)
+    floor = UsdGeom.Cube.Define(stage, '/Arena/FloorCollider')
+    floor.CreateSizeAttr(1.0)
+    floor.AddTranslateOp().Set(Gf.Vec3d(0.0, 0.0, -0.05))
+    floor.AddScaleOp().Set(Gf.Vec3f(40.0, 40.0, 0.1))
+    collider(floor.GetPrim())
+
+    grey = UsdShade.Material.Define(stage, looks.AppendChild('closure'))
+    shader = UsdShade.Shader.Define(stage, grey.GetPath().AppendChild('shader'))
+    shader.CreateIdAttr('UsdPreviewSurface')
+    shader.CreateInput('diffuseColor', C3).Set(Gf.Vec3f(0.62, 0.64, 0.68))
+    shader.CreateInput('roughness', F).Set(1.0)
+    grey.CreateSurfaceOutput().ConnectToSource(shader.CreateOutput('surface', Sdf.ValueTypeNames.Token))
+    for k, (centre, size) in enumerate(closures):
+        # A mesh, not a Cube prim: ground-truth slicing reads meshes only.
+        corners = np.array([[centre[d] + size[d] * (((m >> (2 - d)) & 1) - 0.5) for d in range(3)]
+                            for m in range(8)])
+        points, inverse = np.unique(box_triangles(corners).reshape(-1, 3), axis=0, return_inverse=True)
+        box = mesh_prim(Sdf.Path(f'/Arena/closed_exit_{k}'), points, inverse.ravel())
+        UsdShade.MaterialBindingAPI.Apply(box.GetPrim()).Bind(grey)
+    stage.GetRootLayer().Save()
+
+    stage_path.unlink(missing_ok=True)
+    stage = Usd.Stage.CreateNew(str(stage_path))
+    UsdGeom.SetStageUpAxis(stage, UsdGeom.Tokens.z)
+    UsdGeom.SetStageMetersPerUnit(stage, 1.0)
+    stage.GetRootLayer().documentation = (
+        f'Generated by tools/gazebo/build_hcc_arena.py from the RoboCup HCC arena CAD export '
+        f'(sha256 {source_sha256}). Do not edit by hand; rerun the script.')
+    root = UsdGeom.Xform.Define(stage, f'/{WORLD}')
+    stage.SetDefaultPrim(root.GetPrim())
+    scene = UsdPhysics.Scene.Define(stage, root.GetPath().AppendChild('physicsScene'))
+    scene.CreateGravityDirectionAttr(Gf.Vec3f(0, 0, -1))
+    scene.CreateGravityMagnitudeAttr(9.81)
+    # Reference on a child prim so the root keeps its own (empty) transform.
+    stage.DefinePrim(root.GetPath().AppendChild('arena'), 'Xform').GetReferences().AddReference(
+        f'{assets.name}/arena.usdc')
+    sun = UsdLux.DistantLight.Define(stage, root.GetPath().AppendChild('sun'))
+    sun.CreateIntensityAttr(1000.0)
+    sun.CreateColorAttr(Gf.Vec3f(0.95, 0.95, 0.95))
+    q = Gf.Rotation(Gf.Vec3d(0, 0, -1), Gf.Vec3d(-0.25, 0.15, -1).GetNormalized()).GetQuat()
+    sun.AddOrientOp().Set(Gf.Quatf(q.GetReal(), *(float(v) for v in q.GetImaginary())))
+    dome = UsdLux.DomeLight.Define(stage, root.GetPath().AppendChild('ambient_dome'))
+    dome.CreateIntensityAttr(300.0)
+    dome.CreateColorAttr(Gf.Vec3f(0.72, 0.72, 0.72))
+    stage.GetRootLayer().Save()
+    stage_path.write_text(stage_path.read_text(encoding='utf-8').rstrip() + '\n', encoding='utf-8')
+
+
 SDF = """<?xml version="1.0"?>
 <!-- Generated by tools/gazebo/build_hcc_arena.py from the RoboCup HCC arena
      CAD export (sha256 {sha}). Do not edit by hand; rerun the script.
@@ -424,12 +616,16 @@ CLOSURE = """
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__.split('\n\n')[0])
     ap.add_argument('source', type=Path, help='arena CAD export (.glb)')
-    ap.add_argument('out', type=Path, help='worlds directory to write into')
+    ap.add_argument('out', type=Path, nargs='?', help='Gazebo worlds directory to write into')
     ap.add_argument('--door-width', type=float, default=1.05,
                     help='minimum clear doorway width at every height [m]')
     ap.add_argument('--spawn', type=float, nargs=2, default=(9.05, 6.5), metavar=('X', 'Y'),
                     help='robot spawn, metres from the floor slab corner (corridor centre)')
+    ap.add_argument('--isaac-out', type=Path,
+                    help='Isaac USD worlds directory; also writes the Isaac stage (needs pxr)')
     args = ap.parse_args()
+    if not args.out and not args.isaac_out:
+        ap.error('give a Gazebo worlds directory, --isaac-out, or both')
 
     glb = Glb(args.source)
     floor = glb.triangles(glb.by_name['Floor'], np.eye(4)).reshape(-1, 3)
@@ -445,15 +641,16 @@ def main() -> None:
     ceiling = glb.json['nodes'][glb.by_name['Ceiling']]
     ceiling.pop('mesh', None)
 
-    (args.out / 'meshes').mkdir(parents=True, exist_ok=True)
-    glb.save(args.out / 'meshes' / f'{WORLD}.glb')
+    if args.out:
+        (args.out / 'meshes').mkdir(parents=True, exist_ok=True)
+        glb.save(args.out / 'meshes' / f'{WORLD}.glb')
 
     tris = [glb.triangles(glb.by_name[n], frame) for n in STRUCTURE if n != 'WallsTop']
     tris += [glb.triangles(i, frame, lambda prim: _solid(glb, prim)) for n, i in glb.by_name.items()
              if n and n.startswith(('Door_', 'SlidingDoor_'))]
     boxes = furniture_boxes(glb, frame)
     tris += [box_triangles(c) for _, c in boxes]
-    closures = []
+    closures, closure_boxes = [], []
     for k, ex in enumerate(exterior):
         a = 1 if ex['axis'] == 'x' else 0
         lo, hi = np.zeros(3), np.zeros(3)
@@ -465,12 +662,17 @@ def main() -> None:
         tris.append(box_triangles(corners))
         c, size = (lo + hi) / 2, hi - lo
         closures.append(CLOSURE.format(k=k, x=c[0], y=c[1], z=c[2], sx=size[0], sy=size[1], sz=size[2]))
-    write_stl(args.out / 'meshes' / f'{WORLD}_collision.stl', np.concatenate(tris))
+        closure_boxes.append((c, size))
+    if args.out:
+        write_stl(args.out / 'meshes' / f'{WORLD}_collision.stl', np.concatenate(tris))
+        visual = frame @ YUP2ZUP  # visual pose = frame translation, roll +90 deg
+        (args.out / f'{WORLD}.sdf').write_text(SDF.format(
+            sha=glb.source_sha256, width=args.door_width, world=WORLD,
+            vx=visual[0, 3], vy=visual[1, 3], closures=''.join(closures)))
 
-    visual = frame @ YUP2ZUP  # visual pose = frame translation, roll +90 deg
-    (args.out / f'{WORLD}.sdf').write_text(SDF.format(
-        sha=glb.source_sha256, width=args.door_width, world=WORLD,
-        vx=visual[0, 3], vy=visual[1, 3], closures=''.join(closures)))
+    if args.isaac_out:
+        write_usd(glb, frame, args.isaac_out / f'{WORLD}.usda', np.concatenate(tris), closure_boxes,
+                  glb.source_sha256)
 
     for r in report:
         print(f"{r['name']:15s} {r['kind']:7s} wall {r['axis']}-axis  clear {r['clear_before']:.3f} -> "
