@@ -1,6 +1,9 @@
 """G1-centred mapping with the shared explorer before parking planning."""
 
+import math
+
 import pytest
+from action_msgs.msg import GoalStatus
 
 from ridgeback_autonomy.mission.mission_manager_node import MissionState
 from test_mission_manager import (  # noqa: F401 (fixture)
@@ -8,7 +11,7 @@ from test_mission_manager import (  # noqa: F401 (fixture)
     manager_factory, occupancy_map, settle_motion, trigger_response,
 )
 from test_parking_feasibility import Client
-from test_parking_mission_navigation import navigation_result
+from test_parking_mission_navigation import ParamClient, answer, navigation_result, release
 
 
 def exploring_manager(manager_factory, *, resume_ready=True):
@@ -16,12 +19,30 @@ def exploring_manager(manager_factory, *, resume_ready=True):
                         pause_client=FakePauseClient(trigger_response(True, 'safe')))
     m.resume_client = FakePauseClient(trigger_response(True, 'resumed'), ready=resume_ready)
     m.navigation_client = Client()
+    m._goal_checker_set_client = ParamClient()
+    aim_camera(m)
     m.focus = []
     m.focus_publisher.publish = m.focus.append
     m._on_map(occupancy_map(value=-1))   # nothing around G1 mapped yet
     enter_localization(m)
     localize(m)
     return m
+
+
+def aim_camera(m, offset=0.0):
+    """The optical axis at the robot, ``offset`` rad from the bearing to the G1 estimate."""
+    def view():
+        t, x, y = m.target_position, m.tf_buffer.x, m.tf_buffer.y
+        return x, y, math.atan2(t.map_y_m - y, t.map_x_m - x) + offset
+    m._camera_view = view
+
+
+def back_at_observation(m, status=GoalStatus.STATUS_SUCCEEDED):
+    """Apply the observation goal checker, then finish the one observation goal."""
+    assert answer(m._goal_checker_set_client) == {
+        'general_goal_checker.xy_goal_tolerance': 0.03,
+        'general_goal_checker.yaw_goal_tolerance': 0.10}
+    return navigation_result(m.navigation_client, status=status)
 
 
 def test_unmapped_parking_area_resumes_the_explorer_focused_on_g1(manager_factory):
@@ -42,7 +63,7 @@ def test_mapped_area_pauses_returns_to_observation_and_plans_from_fresh_localiza
     m.tick()
     assert m.focus[-1].header.frame_id == ''   # focus cleared
     assert m.state == MissionState.RETURNING_TO_OBSERVATION
-    assert navigation_result(m.navigation_client) == pytest.approx((1.0, 2.0, 0.25))
+    assert back_at_observation(m) == pytest.approx((1.0, 2.0, 0.25))
     assert m.state == MissionState.SETTLING_MOTION
     settle_motion(m)
     assert m.state == MissionState.LOCALIZE_G1
@@ -241,6 +262,8 @@ def test_finishing_cancels_through_missionguard_before_any_navigation(manager_fa
     m.process_guard_status(guard_status(handoff_safe=True, goal_active=False, cancellation='none'))
     m.pause_client.calls[-1][1].set_result(trigger_response(True, 'safe'))   # fresh verification
     assert m.state == MissionState.RETURNING_TO_OBSERVATION
+    assert m.navigation_client.calls == []             # the goal waits for its goal checker
+    answer(m._goal_checker_set_client)
     assert len(m.navigation_client.calls) == 1
 
 
@@ -260,7 +283,7 @@ def test_failed_fresh_localization_after_exploration_never_plans(manager_factory
     m = exploring_manager(manager_factory)
     m._on_map(occupancy_map())
     m.tick()
-    navigation_result(m.navigation_client)
+    back_at_observation(m)
     settle_motion(m)
     assert m.state == MissionState.LOCALIZE_G1
     m._monotonic.value += m.localization_timeout_s + 1.0
@@ -268,3 +291,113 @@ def test_failed_fresh_localization_after_exploration_never_plans(manager_factory
     assert m.state == MissionState.MISSION_FAILED
     assert m.last_issue.code == 'target_localization_timeout'
     assert m.parking_plan is None
+    assert len(m.navigation_client.calls) == 1   # bounded: no second observation goal
+
+
+# Observation return: G1 was detected from exactly the observation pose, and the
+# detector's score varies with the view (recorded 2026-10-30), so the return must
+# restore that view and verify it before relocalizing.
+
+def returning(manager_factory):
+    m = exploring_manager(manager_factory)
+    m._on_map(occupancy_map())
+    m.tick()
+    assert m.state == MissionState.RETURNING_TO_OBSERVATION
+    return m
+
+
+def restored(m):
+    request, _ = m._goal_checker_set_client.calls[-1]
+    return {p.name: p.value.double_value for p in request.parameters} == {
+        'general_goal_checker.xy_goal_tolerance': 0.40,
+        'general_goal_checker.yaw_goal_tolerance': 0.40}
+
+
+def test_precise_return_restores_the_shared_checker_and_relocalizes_after_a_verified_stop(
+        manager_factory):
+    m = returning(manager_factory)
+    assert m.navigation_client.calls == []             # no goal before the tighter checker
+    back_at_observation(m)
+    assert len(m.navigation_client.calls) == 1
+    assert restored(m)                                 # restored as soon as Nav2 released it
+    assert m.state == MissionState.SETTLING_MOTION
+    m.tick()
+    assert m.state == MissionState.SETTLING_MOTION     # no stop evidence yet: no check, no localization
+    settle_motion(m)
+    assert m.state == MissionState.LOCALIZE_G1
+    assert len(m.navigation_client.calls) == 1
+
+
+@pytest.mark.parametrize('dx,dyaw', [(0.0, 0.30), (0.10, 0.0)])
+def test_nav2_success_outside_the_observation_view_is_not_trusted(manager_factory, dx, dyaw):
+    m = returning(manager_factory)
+    back_at_observation(m)
+    m.tf_buffer.x += dx                                # where the robot actually stopped
+    m.tf_buffer.yaw += dyaw
+    settle_motion(m)
+    assert m.state == MissionState.MISSION_FAILED
+    assert m.last_issue.code == 'observation_pose_not_reached'
+    assert restored(m) and len(m.navigation_client.calls) == 1
+
+
+def test_stop_within_the_checker_plus_drift_allowance_is_accepted(manager_factory):
+    m = returning(manager_factory)
+    back_at_observation(m)
+    m.tf_buffer.x += 0.035                             # 0.03 m checker + 0.01 m stop drift
+    m.tf_buffer.yaw += 0.11                            # 0.10 rad checker + 0.02 rad stop drift
+    settle_motion(m)
+    assert m.state == MissionState.LOCALIZE_G1
+
+
+def test_g1_outside_the_usable_camera_view_fails_before_relocalizing(manager_factory):
+    m = returning(manager_factory)
+    aim_camera(m, offset=0.8)                          # G1 0.8 rad off the optical axis
+    back_at_observation(m)
+    settle_motion(m)
+    assert m.state == MissionState.MISSION_FAILED
+    assert m.last_issue.code == 'g1_outside_camera_view'
+
+
+def test_missing_camera_transform_is_not_treated_as_a_view_of_g1(manager_factory):
+    m = returning(manager_factory)
+    m._camera_view = lambda: None
+    back_at_observation(m)
+    settle_motion(m)
+    assert m.state == MissionState.MISSION_FAILED
+    assert m.last_issue.code == 'observation_view_unverified'
+
+
+def test_obstructed_observation_pose_fails_once_and_restores_the_checker(manager_factory):
+    m = returning(manager_factory)
+    back_at_observation(m, status=GoalStatus.STATUS_ABORTED)
+    assert m.state == MissionState.MISSION_FAILED
+    assert m.last_issue.code == 'observation_return_failed'
+    assert restored(m) and len(m.navigation_client.calls) == 1
+    m.tick()
+    assert len(m.navigation_client.calls) == 1        # no retry
+
+
+def test_unreached_heading_times_out_cancels_and_restores_the_checker(manager_factory):
+    m = returning(manager_factory)
+    answer(m._goal_checker_set_client)
+    _, accepted, handle = m.navigation_client.calls[-1]
+    accepted.set_result(handle)
+    m._monotonic.value += m.parking_navigation_timeout_s + 1.0
+    m.tick()
+    assert handle.cancels == 1
+    assert m.state == MissionState.MISSION_FAILED
+    assert m.last_issue.code == 'observation_return_failed'
+    assert restored(m)
+    release(handle)                                    # the cancelled goal is still owned until here
+    m.tick()
+    assert len(m.navigation_client.calls) == 1
+
+
+def test_observation_goal_is_never_sent_with_the_loose_checker(manager_factory):
+    m = exploring_manager(manager_factory)
+    m._goal_checker_set_client.ready = False
+    m._on_map(occupancy_map())
+    m.tick()
+    assert m.state == MissionState.MISSION_FAILED
+    assert 'observation goal tolerance not applied' in m.last_issue.reason
+    assert m.navigation_client.calls == []

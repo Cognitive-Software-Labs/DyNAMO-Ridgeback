@@ -42,8 +42,10 @@ bash start_parking_demo.sh isaac
 Cancelled or vetoed legs hold Nav2 goal ownership until a terminal result, as
 described in [mission navigation goal ownership](architecture.md#mission-navigation-goal-ownership).
 Full driving remains subject to the separately identified checked-route
-execution issue; startup validation does not qualify it. The existing navigation back to the G1 observation pose can also
-time out before planning, including in `--planning-only` mode. No execution
+execution issue; startup validation does not qualify it. The return to the G1
+observation pose uses a temporary tight goal checker and a verified view before
+relocalizing ([observation return](architecture.md#observation-return)); it can
+still fail explicitly, including in `--planning-only` mode. No execution
 safeguard or motion-settlement threshold is relaxed by this launch change.
 
 ## Scene, configuration and startup gates

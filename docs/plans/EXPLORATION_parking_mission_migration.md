@@ -381,13 +381,16 @@ TF or changing estimator validation.
    unknown floor behind the spawn pose that then rejected every route is
    observed by merged SLAM, which the Gazebo parking demonstration now
    selects ([parking demonstration](../exploration/parking_demo.md#scene-configuration-and-startup-gates));
-   with it Gazebo reaches `PARKING_PATH_FEASIBLE`. The complete mission is
-   next blocked intermittently at the second localization: after the
-   observation return the robot stops about 18° off its observation yaw,
-   within the shared 0.40 rad goal tolerance, with the G1 about 20° off the
-   camera axis. In two of five runs the detector then reported no G1 for the
-   whole 5 s window (`target_localization_timeout`). Detection and the
-   observation-return tolerance are unchanged pending a decision.
+   with it Gazebo reaches `PARKING_PATH_FEASIBLE`. The second localization
+   failed when the shared 0.40 m / 0.40 rad checker left the robot about 18°
+   from the observation view, where the detector's score falls just below its
+   threshold. The precise, verified
+   [observation return](../exploration/architecture.md#observation-return)
+   now restores that view, and Gazebo relocalizes and plans. The complete
+   mission is next stopped on the pre-parking leg. The live LiDAR clearance
+   vetoes a real obstacle about 0.45 m from the robot's footprint near the
+   start, which lies inside the remaining route that the map-based path check
+   accepted. That is the separate checked-route-versus-executed-route issue.
 8. **Port markers and launch integration.** Add relative marker topics and
    clean RViz displays, then integrate the manager into the current readiness
    chain without changing backend packages or Nav2 safety parameters.

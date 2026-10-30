@@ -154,6 +154,30 @@ migration state flow and future insertion
 point for G1-region exploration are maintained in the
 [parking mission migration plan](../plans/EXPLORATION_parking_mission_migration.md#phase-2d-non-driving-mission-coordinator).
 
+### Observation return
+
+When G1-centred exploration has moved the robot, it returns to the
+observation pose: the pose at which G1 was localized, so a pose where the
+detector has already found G1. The detector's score near its threshold depends
+on the exact view: a lateral shift of 0.1 m or an 18° turn can put the same,
+fully visible G1 just below it. The return therefore applies a temporary goal
+checker of 0.03 m and 0.10 rad (`observation_xy_tolerance_m`,
+`observation_yaw_tolerance_rad`) through the same parameter call the parking
+legs use, and sends the goal only after the change is confirmed. If it is not
+confirmed, the mission fails rather than return loosely. When Nav2 releases
+the goal, by success, failure or deadline, the shared checker is restored.
+
+Nav2 success alone does not start the second localization. After fresh odometry
+confirms the stop, the manager reads the robot pose from TF. It accepts the
+pose only within the checker plus a 0.01 m / 0.02 rad stop allowance, and only
+if the camera's optical axis
+(`observation_camera_frame`, from TF, so the mount is included) points within
+`observation_camera_half_view_rad` (0.60 rad, inside the 0.70 rad half field of
+view of both simulators' colour camera) of the latest G1 estimate. Otherwise it
+fails with `observation_pose_not_reached`, `g1_outside_camera_view` or
+`observation_view_unverified`. There is one observation goal and no retry; a
+G1 that still is not detected ends at the existing localization timeout.
+
 ### Mission navigation goal ownership
 
 The manager owns at most one `NavigateToPose` goal and tracks it from the send

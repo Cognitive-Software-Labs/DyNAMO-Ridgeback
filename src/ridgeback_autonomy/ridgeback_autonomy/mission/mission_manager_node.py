@@ -77,7 +77,9 @@ from ridgeback_autonomy.mission.parking_planner import (
     points_to_polygon_distance,
     validate_inputs,
 )
-from ridgeback_autonomy.mission.parking_geometry import preparking_pose, rotated_footprint_vertices
+from ridgeback_autonomy.mission.parking_geometry import (
+    normalize_angle, preparking_pose, rotated_footprint_vertices,
+)
 from ridgeback_autonomy.mission.parking_visualization import (
     clear_markers, legend_overlay, plan_markers,
 )
@@ -137,6 +139,9 @@ _PARKING_DRIVE_STATES = (
     MissionState.PARKED,
     MissionState.RETURNING_TO_START,
 )
+
+# Drift allowed after Nav2 stops inside the observation goal checker (m, rad).
+_OBSERVATION_STOP_ALLOWANCE = (0.01, 0.02)
 
 # Only these prove that Nav2 has stopped executing a goal and released it.
 _TERMINAL_GOAL_STATUSES = (
@@ -288,6 +293,13 @@ class MissionManagerNode(Node):
         self.declare_parameter('g1_coverage_radius_m', 1.4)
         self.declare_parameter('g1_exploration_timeout_s', 240.0)
         self.declare_parameter('g1_exploration_protected_margin_m', 0.15)
+        # Return to the observation pose: G1 was detected from exactly there, and the
+        # detector's score varies with the view. A temporary goal checker brings the
+        # robot back to that view; the stop is verified before relocalization.
+        self.declare_parameter('observation_xy_tolerance_m', 0.03)
+        self.declare_parameter('observation_yaw_tolerance_rad', 0.10)
+        self.declare_parameter('observation_camera_frame', 'camera_0_color_optical_frame')
+        self.declare_parameter('observation_camera_half_view_rad', 0.60)
         self.declare_parameter('exploration_resume_service', 'mission/resume')
         self.declare_parameter('explorer_status_topic', 'explore/status')
         self.declare_parameter('odom_frame', 'odom')
@@ -501,6 +513,13 @@ class MissionManagerNode(Node):
             self.get_parameter('g1_exploration_protected_margin_m').value)
         self._g1_explored = False
         self._observation_pose = None
+        self._observation_check_pending = False
+        self.observation_tolerance = (
+            float(self.get_parameter('observation_xy_tolerance_m').value),
+            float(self.get_parameter('observation_yaw_tolerance_rad').value))
+        self.observation_camera_frame = str(self.get_parameter('observation_camera_frame').value)
+        self.observation_camera_half_view_rad = float(
+            self.get_parameter('observation_camera_half_view_rad').value)
         self._g1_exploration_deadline_s = None
         self._g1_explorer_resumed = False
         self._g1_frontiers_exhausted = False
@@ -703,6 +722,12 @@ class MissionManagerNode(Node):
             if self.state == MissionState.SETTLING_MOTION:
                 now_ns = self.get_clock().now().nanoseconds
                 if self.motion.ready(now_ns, now_s):
+                    if self._observation_check_pending:
+                        self._observation_check_pending = False
+                        failure = self._observation_view_failure()
+                        if failure is not None:
+                            self._fail_terminal(*failure)
+                            return
                     self.get_logger().info('Physical motion settled; starting fresh target localization')
                     self._start_localization('fresh odometry confirms physical motion settled')
                 elif now_s >= self._motion_deadline_s:
@@ -950,6 +975,7 @@ class MissionManagerNode(Node):
                 self._stop_g1_exploration()
             self._g1_explored = False
             self._observation_pose = None
+            self._observation_check_pending = False
             self._g1_exploration_deadline_s = None
             self._g1_explorer_resumed = self._g1_frontiers_exhausted = False
             self._g1_exploration_started_s = None
@@ -1209,7 +1235,7 @@ class MissionManagerNode(Node):
             # G1 must be in view again for the fresh localization.
             if self._transition(MissionState.RETURNING_TO_OBSERVATION,
                                 f'{reason}; returning to the G1 observation pose'):
-                self._send_navigation_goal(self._observation_pose, self.parking_navigation_timeout_s)
+                self._set_goal_tolerance(self.observation_tolerance, self._send_observation_goal)
             return
         self.motion.reset()
         self._motion_deadline_s = self._monotonic() + self.motion_settlement_timeout_s
@@ -2019,6 +2045,60 @@ class MissionManagerNode(Node):
         self._send_navigation_goal((sel.base_x, sel.base_y, sel.yaw),
                                    self.parking_navigation_timeout_s)
 
+    def _send_observation_goal(self, ok):
+        if not ok:
+            # Never return loosely: the view, not just the place, must be restored.
+            self._navigation_finished(False, 'observation goal tolerance not applied')
+            return
+        self._send_navigation_goal(self._observation_pose, self.parking_navigation_timeout_s)
+
+    def _restore_shared_tolerance(self, context):
+        def done(ok):
+            log = self.get_logger().info if ok else self.get_logger().error
+            log(f'Shared goal checker {"restored" if ok else "NOT restored"} after {context}')
+        self._set_goal_tolerance(self._shared_goal_tolerance, done)
+
+    def _camera_view(self):
+        """(x, y, heading) in the map of the camera's optical axis (+z), or None."""
+        try:
+            transform = self.tf_buffer.lookup_transform(
+                self.map_frame, self.observation_camera_frame, Time())
+        except TransformException:
+            return None
+        t, q = transform.transform.translation, transform.transform.rotation
+        forward_x = 2.0 * (q.x * q.z + q.w * q.y)
+        forward_y = 2.0 * (q.y * q.z - q.w * q.x)
+        if math.hypot(forward_x, forward_y) < 0.5:   # not looking horizontally
+            return None
+        return float(t.x), float(t.y), math.atan2(forward_y, forward_x)
+
+    def _observation_view_failure(self):
+        """(code, reason) unless the stopped robot is back at the observation view of G1."""
+        robot, goal = self._current_robot_pose(), self._observation_pose
+        if robot is None:
+            return 'observation_pose_unverified', 'robot pose unavailable after the observation return'
+        xy = math.hypot(robot[0] - goal[0], robot[1] - goal[1])
+        yaw = abs(normalize_angle(robot[2] - goal[2]))
+        xy_limit, yaw_limit = (limit + allowance for limit, allowance in
+                               zip(self.observation_tolerance, _OBSERVATION_STOP_ALLOWANCE))
+        if xy > xy_limit or yaw > yaw_limit:
+            return ('observation_pose_not_reached',
+                    f'stopped {xy:.3f} m / {yaw:.3f} rad from the observation pose '
+                    f'(limits {xy_limit:.3f} m / {yaw_limit:.3f} rad)')
+        view = self._camera_view()
+        if view is None:
+            return 'observation_view_unverified', f'{self.observation_camera_frame} transform unavailable'
+        target = self.target_position
+        bearing = normalize_angle(math.atan2(target.map_y_m - view[1], target.map_x_m - view[0])
+                                  - view[2])
+        if abs(bearing) > self.observation_camera_half_view_rad:
+            return ('g1_outside_camera_view',
+                    f'G1 estimate {bearing:.2f} rad off the camera axis '
+                    f'(usable {self.observation_camera_half_view_rad:.2f} rad)')
+        self.get_logger().info(f'Observation view verified: {xy:.3f} m / {yaw:.3f} rad from the pose, '
+                               f'G1 {bearing:.2f} rad off the camera axis')
+        return None
+
     def _set_goal_tolerance(self, tolerance, on_done):
         """Set the controller's goal checker; ``on_done(ok)`` runs for the current request only."""
         self._nav_generation += 1
@@ -2144,11 +2224,14 @@ class MissionManagerNode(Node):
                                                'observation_return_failed', detail)
                 self._transition(MissionState.MISSION_FAILED,
                                  f'could not return to the G1 observation pose: {detail}')
-                return
-            self.motion.reset()
-            self._motion_deadline_s = self._monotonic() + self.motion_settlement_timeout_s
-            self._transition(MissionState.SETTLING_MOTION,
-                             'observation pose reached; waiting for physical motion settlement')
+            else:
+                self.motion.reset()
+                self._motion_deadline_s = self._monotonic() + self.motion_settlement_timeout_s
+                self._observation_check_pending = True
+                self._transition(MissionState.SETTLING_MOTION,
+                                 'observation pose reached; waiting for physical motion settlement')
+            # Nav2 released the goal: the tighter checker was for this goal only.
+            self._restore_shared_tolerance('the observation return')
             return
         if self.state == MissionState.NAVIGATING_TO_PREPARKING:
             if not ok:
