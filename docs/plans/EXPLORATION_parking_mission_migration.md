@@ -417,3 +417,5 @@ TF or changing estimator validation.
   — the run, the occupied start cell and its effect on path feasibility.
 - [Gazebo LiDAR first-ray artifact](../../archive/engineering/2026-10-30-gazebo-lidar-first-ray-artifact.md)
   — the start cell's source, the correction, and the unknown wedge behind the spawn pose.
+- [Gazebo parking with merged SLAM](../../archive/engineering/2026-10-30-gazebo-parking-merged-slam.md)
+  — front-only versus merged mapping, path feasibility, and the relocalization blocker.
