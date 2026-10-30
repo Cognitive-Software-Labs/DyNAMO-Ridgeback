@@ -374,7 +374,12 @@ TF or changing estimator validation.
    [mission navigation goal ownership](../exploration/architecture.md#mission-navigation-goal-ownership).
    Remaining before qualification: one complete Gazebo mission to
    `MISSION_COMPLETE`, the separate checked-route-versus-executed-route issue,
-   and Isaac driving validation.
+   and Isaac driving validation. The first full Gazebo run after the ownership
+   fix stopped in `PARKING_PLANNING_FAILED`: a single occupied SLAM cell at the
+   map origin lay inside the robot's own start and current footprint, so every
+   swept route was rejected as `path_footprint_occupied` at its first sample.
+   Its source, and whether occupied cells under the robot's own footprint should
+   be treated differently, is unresolved.
 8. **Port markers and launch integration.** Add relative marker topics and
    clean RViz displays, then integrate the manager into the current readiness
    chain without changing backend packages or Nav2 safety parameters.
@@ -397,3 +402,8 @@ TF or changing estimator validation.
   selection, or Nav2 safety parameters.
 - Geometry and migrated manager tests pass before the mission manager is added
   to a public launch.
+
+## Archived evidence
+
+- [Gazebo parking mission after the goal-ownership fix](../../archive/engineering/2026-10-30-gazebo-parking-start-cell-blocker.md)
+  — the run, the occupied start cell and its effect on path feasibility.
