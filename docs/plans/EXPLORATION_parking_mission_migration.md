@@ -440,3 +440,5 @@ TF or changing estimator validation.
   — one colour per complete ray, and a repeat of the final-approach veto.
 - [G1 exploration footprint coverage](../../archive/engineering/2026-10-30-g1-exploration-footprint-coverage.md)
   — exploration continues until no allowed parking pose is undecided by unknown space.
+- [Progressive parking planning](../../archive/engineering/2026-10-30-progressive-parking-planning.md)
+  — planning first and at exploration checkpoints, in-place relocalization, and the measured savings.
