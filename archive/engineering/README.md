@@ -36,6 +36,7 @@ are excluded from ordinary repository search and the generated knowledge graph.
 - [Gazebo Sensors shutdown races](2026-10-18-gazebo-sensors-shutdown.md) — waiter wakeup, observed same-instance concurrent joins, and separate diagnostic/qualification populations.
 - [ros_gz bridge ownership cycles and image_bridge teardown](2026-10-22-ros-gz-bridge-shutdown.md) — two bridge-node ownership cycles, the image_bridge in-flight callback race, and stock/partial/final crash populations.
 - [RViz Image display teardown abort](2026-10-22-rviz-image-display-teardown.md) — stale message-filter connection after unsubscribe, stock/patched signal populations, and the separate process-exit SIGSEGV still open.
+- [Parking demonstration complete](2026-10-30-parking-demo-complete.md) — the remaining-route fix, merged SLAM on Isaac, and complete Gazebo and Isaac missions with Gazebo ground-truth reach and error.
 - [Gazebo pre-parking veto](2026-10-30-gazebo-parking-route-veto.md) — the checked route, Nav2's executed plans and the driven trajectory agree; the veto came from the -45° LiDAR seam bin's phantom returns.
 - [Gazebo G1 reacquisition](2026-10-30-gazebo-g1-reacquisition.md) — OWLv2 scores of the visible G1 around the observation pose, the precise observation return, and the run that relocalized and then met a LiDAR veto on a real obstacle.
 - [Gazebo parking with merged SLAM](2026-10-30-gazebo-parking-merged-slam.md) — front-only versus merged mapping of the start area against ground truth, path feasibility, and the intermittent second-localization blocker.

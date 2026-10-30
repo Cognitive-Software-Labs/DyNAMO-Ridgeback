@@ -428,3 +428,5 @@ TF or changing estimator validation.
   — why the second localization failed off the observation view, and the precise return's validation run.
 - [Gazebo pre-parking veto](../../archive/engineering/2026-10-30-gazebo-parking-route-veto.md)
   — checked versus executed route, and the LiDAR seam phantom that caused the veto.
+- [Parking demonstration complete](../../archive/engineering/2026-10-30-parking-demo-complete.md)
+  — the remaining-route fix and the completed Gazebo and Isaac missions.
