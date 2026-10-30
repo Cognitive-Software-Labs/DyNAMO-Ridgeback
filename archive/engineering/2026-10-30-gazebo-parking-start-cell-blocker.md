@@ -68,7 +68,10 @@ candidate. The fast, uniform rejections match this.
 
 This run does not establish where the occupied cell comes from: it could be a
 SLAM artifact at the origin or a return the map attributes to the spawn
-position. The run deliberately did not change mapping, footprint, geometry or
+position. (Later the same day, recorded runs attributed such cells to
+Gazebo's corrupted first LiDAR ray; see
+[the first-ray record](2026-10-30-gazebo-lidar-first-ray-artifact.md). This
+run's own cell remains inferred, not observed.) The run deliberately did not change mapping, footprint, geometry or
 feasibility rules to obtain a pass.
 
 ## Limits
