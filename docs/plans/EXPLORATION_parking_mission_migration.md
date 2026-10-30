@@ -422,3 +422,5 @@ TF or changing estimator validation.
   — the start cell's source, the correction, and the unknown wedge behind the spawn pose.
 - [Gazebo parking with merged SLAM](../../archive/engineering/2026-10-30-gazebo-parking-merged-slam.md)
   — front-only versus merged mapping, path feasibility, and the relocalization blocker.
+- [Gazebo G1 reacquisition](../../archive/engineering/2026-10-30-gazebo-g1-reacquisition.md)
+  — why the second localization failed off the observation view, and the precise return's validation run.
