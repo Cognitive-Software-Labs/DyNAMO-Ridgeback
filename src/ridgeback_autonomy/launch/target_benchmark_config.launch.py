@@ -220,6 +220,7 @@ def build_benchmark_nodes(context, *args, environment: BenchmarkEnvironment, **k
             'scene_control_service_namespace': (
                 environment.backend.scene_control_service_namespace),
             'scenario': LaunchConfiguration('scenario'),
+            'background': LaunchConfiguration('background'),
             'repeats': repeats,
             'output_dir': output_dir,
             'run_dir_name': LaunchConfiguration('run_dir_name'),
@@ -400,6 +401,13 @@ def generate_launch_description():
             'scenario',
             default_value='',
             description='Scenario YAML; empty uses benchmark_scenarios_full.yaml',
+        ),
+        DeclareLaunchArgument(
+            'background',
+            default_value='',
+            description=(
+                'Packaged background layout to furnish the room with (lab); '
+                'empty runs the bare room'),
         ),
         DeclareLaunchArgument('repeats', default_value='5'),
         DeclareLaunchArgument('output_dir', default_value=benchmark_output_dir),

@@ -71,6 +71,7 @@ def benchmark_run_folder_name(
     mask_gate: str,
     depth_source: str,
     selected_estimators: tuple[str, ...],
+    background: str = '',
 ) -> str:
     """Run folder name: timestamp first, then the axes that change the results.
 
@@ -78,7 +79,8 @@ def benchmark_run_folder_name(
     usual question is "what did I run last". After it come only axes that
     actually applied: the mask gate is omitted when no mask estimator ran, and
     the depth source when no depth-path estimator ran, so a pointcloud-only run
-    is not labelled with a segmentation gate it never used.
+    is not labelled with a segmentation gate it never used. A furnished room
+    adds ``bg-<name>``; the bare room adds nothing, so its names are unchanged.
     """
 
     parts = [run_label, scenario_slug(scenario_path)]
@@ -86,6 +88,8 @@ def benchmark_run_folder_name(
         parts.append(mask_gate)
     if any(estimator in DEPTH_PATH_ESTIMATORS for estimator in selected_estimators):
         parts.append(depth_source)
+    if background:
+        parts.append(f'bg-{background}')
     return '_'.join(part for part in parts if part)
 
 

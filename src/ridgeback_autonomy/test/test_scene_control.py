@@ -48,7 +48,8 @@ REQUIRED_FEATURES = (
     SimulatorFeatures.ENTITY_STATE_GETTING,
 )
 PENDING = object()
-COMMON_MODULES = ('asset_catalog.py', 'scene_control.py')
+COMMON_MODULES = (
+    'asset_catalog.py', 'scene_control.py', 'background.py', 'background_session.py')
 BENCHMARK_ROOT = Path(__file__).parents[1] / 'ridgeback_autonomy' / 'benchmarking'
 SIMULATOR_PACKAGES = (
     'ridgeback_autonomy_gz',
@@ -903,6 +904,8 @@ class BlockSimulators(importlib.abc.MetaPathFinder):
             raise ImportError('simulator package requested: ' + fullname)
 sys.meta_path.insert(0, BlockSimulators())
 import ridgeback_autonomy.benchmarking.asset_catalog
+import ridgeback_autonomy.benchmarking.background
+import ridgeback_autonomy.benchmarking.background_session
 import ridgeback_autonomy.benchmarking.scene_control
 import ridgeback_autonomy.benchmarking.simulation
 loaded = sorted(name for name in sys.modules if name.split('.')[0] in BLOCKED)

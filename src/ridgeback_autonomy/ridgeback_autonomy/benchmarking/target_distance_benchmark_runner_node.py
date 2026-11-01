@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections import OrderedDict
+import contextlib
 import os
 import time
 from typing import Any
@@ -88,6 +89,8 @@ from ridgeback_autonomy.benchmarking.process_utils import (
 )
 from ridgeback_autonomy.benchmarking.report import render_run_report
 from ridgeback_autonomy.benchmarking.scenarios import Scene, load_scenarios
+from ridgeback_autonomy.benchmarking.background import resolve_scene_background
+from ridgeback_autonomy.benchmarking.background_session import background_scene
 from ridgeback_autonomy.benchmarking.asset_catalog import (
     DEFAULT_TARGET,
     load_asset_catalog,
@@ -240,6 +243,9 @@ class TargetDistanceBenchmarkRunner(Node):
         self.declare_parameter('asset_catalog', '')
         self.declare_parameter('scene_control_service_namespace', '')
         self.declare_parameter('scenario', '')
+        # A packaged background layout to furnish the room with; empty runs
+        # the bare room, the control the background is compared against.
+        self.declare_parameter('background', '')
         self.declare_parameter('repeats', 5)
         self.declare_parameter('output_dir', default_output_dir)
         self.declare_parameter('run_dir_name', '')
@@ -326,13 +332,30 @@ class TargetDistanceBenchmarkRunner(Node):
             if scenario_param else default_scenario
         )
         self.scenes = load_scenarios(self.scenario_path)
+        self.background_name = str(self.get_parameter('background').value).strip()
+        self.scene_background = None
+        if self.background_name:
+            self.scene_background = resolve_scene_background(
+                self.background_name,
+                os.path.join(pkg_share, 'config'),
+                self.scenario_path,
+                [scene.id for scene in self.scenes],
+            )
+            if self.scene_background.layout.world != self.world:
+                raise ValueError(
+                    f'Background "{self.background_name}" furnishes world '
+                    f'"{self.scene_background.layout.world}", not "{self.world}".')
+        self.background_session = None
+        self.background_spawn_sec: float | None = None
+        self.background_adjustments: list[dict[str, Any]] = []
         self.asset_catalog_path = os.path.abspath(os.path.expanduser(
             str(self.get_parameter('asset_catalog').value).strip()))
         self.scene_control_service_namespace = str(
             self.get_parameter('scene_control_service_namespace').value).strip()
         catalog = load_asset_catalog(self.asset_catalog_path)
         self.asset_selection = catalog.select(
-            self.world, DEFAULT_TARGET, scene_object_models(self.scenes))
+            self.world, DEFAULT_TARGET, scene_object_models(self.scenes),
+            self.scene_background.layout.models if self.scene_background else ())
         self.scene_control = create_scene_control_client(
             self, self.scene_control_service_namespace)
         self.repeats = int(self.get_parameter('repeats').value)
@@ -384,6 +407,7 @@ class TargetDistanceBenchmarkRunner(Node):
             self.mask_gate,
             self.depth_source,
             self.selected_estimators,
+            self.background_name,
         )
         self.run_output_dir = os.path.join(self.output_dir, run_folder)
         self.images_dir = os.path.join(self.run_output_dir, 'images')
@@ -405,6 +429,7 @@ class TargetDistanceBenchmarkRunner(Node):
                 'dataset_id': self.run_label,
                 'scenario_path': self.scenario_path,
                 'scenario_sha256': sha256_file(self.scenario_path),
+                'background': self.background_identity(),
                 'capture_parameters': self.declared_parameters(),
                 'source': git_provenance(self.workspace_root),
             })
@@ -437,6 +462,7 @@ class TargetDistanceBenchmarkRunner(Node):
                     'dataset_id': self.run_label,
                     'scenario_path': self.scenario_path,
                     'scenario_sha256': sha256_file(self.scenario_path),
+                    'background': self.background_identity(),
                 },
             )
 
@@ -984,7 +1010,8 @@ class TargetDistanceBenchmarkRunner(Node):
             f'for {", ".join(self.estimator_display_names[est] for est in self.selected_estimators)} '
             f'in world "{self.world}" for robot "{self.robot_model_name}" '
             f'on backend {self.backend.name} '
-            f'(native world "{self.asset_selection.world.native_name}").'
+            f'(native world "{self.asset_selection.world.native_name}"), '
+            f'background {self.background_label()}.'
         )
         self.scene_control.wait_for_services(STREAM_WAIT_TIMEOUT_SEC)
         self.scene_control.require_capabilities(self.asset_selection.spawn_formats)
@@ -998,17 +1025,99 @@ class TargetDistanceBenchmarkRunner(Node):
             f'{timeline["clock_advance_after_services_sec"]:.3f} s after the '
             'scene-control services appeared.')
         self.scene_control.wait_until_present([self.robot_model_name])
+        self.refuse_leftover_entities()
         self.wait_for_required_streams()
 
-        # Started once the streams are up, so RViz is certain to exist by now,
-        # and stopped in the finally below so an exception or a Ctrl-C still
-        # leaves a playable file covering everything up to the interruption.
-        self.start_recording()
-        try:
-            self.run_trials()
-        finally:
-            self.stop_recording()
+        with self.background_context():
+            # Started once the streams are up, so RViz is certain to exist by
+            # now, and stopped in the finally below so an exception or a Ctrl-C
+            # still leaves a playable file covering everything up to the
+            # interruption.
+            self.start_recording()
+            try:
+                self.run_trials()
+            finally:
+                self.stop_recording()
         self.log_readiness_timeline()
+
+    def refuse_leftover_entities(self) -> None:
+        """Refuse to start on top of another run's benchmark entities.
+
+        A sweep reaps them between configurations, but a single run has no
+        reaper, and leftover props or targets would stand in every scene.
+        """
+
+        leftovers = self.scene_control.find_benchmark_entities()
+        if leftovers:
+            shown = ', '.join(leftovers[:5]) + (', ...' if len(leftovers) > 5 else '')
+            raise RuntimeError(
+                f'{len(leftovers)} benchmark entities are already in the simulation '
+                f'({shown}): an earlier run left them behind. Restart the simulator, '
+                'or let a sweep reap them, before starting a run.')
+
+    def background_label(self) -> str:
+        if self.scene_background is None:
+            return 'none (bare room)'
+        return f'"{self.background_name}" ({len(self.scene_background.layout.props)} props)'
+
+    def background_identity(self) -> dict[str, Any] | None:
+        """The background a capture was taken in; None for the bare room."""
+
+        if self.scene_background is None:
+            return None
+        return {
+            'name': self.background_name,
+            'layout_sha256': self.scene_background.layout.sha256,
+            'drops_sha256': self.scene_background.drops.sha256,
+        }
+
+    @contextlib.contextmanager
+    def background_context(self):
+        """Spawn the background for the run's trials and remove it afterwards."""
+
+        if self.scene_background is None:
+            yield
+            return
+        self.get_logger().info(f'Spawning background {self.background_label()}.')
+        with background_scene(
+            self.scene_control,
+            self.scene_background,
+            self.asset_selection.background,
+            self.run_label,
+        ) as session:
+            self.background_session = session
+            self.background_spawn_sec = session.spawn_sec
+            self.get_logger().info(f'Background spawned in {session.spawn_sec:.1f} s.')
+            try:
+                yield
+            finally:
+                self.background_session = None
+        self.get_logger().info('Background removed.')
+
+    def adjust_background(self, trial: dict[str, Any]) -> None:
+        """Fit the room to this trial's scene before its objects and targets."""
+
+        session = getattr(self, 'background_session', None)
+        if session is None:
+            return
+        adjustment = session.adjust(trial['scene'].id)
+        self.background_adjustments.append(
+            {'trial_id': trial['trial_id'], **adjustment.as_record()})
+        if adjustment.removed or adjustment.restored:
+            self.get_logger().info(
+                f'{trial["trial_id"]} background: removed '
+                f'{", ".join(adjustment.removed) or "none"}, restored '
+                f'{", ".join(adjustment.restored) or "none"} '
+                f'in {adjustment.duration_sec:.2f} s.')
+
+    def background_provenance(self) -> dict[str, Any] | None:
+        if self.scene_background is None:
+            return None
+        return {
+            **self.scene_background.provenance(),
+            'spawn_sec': self.background_spawn_sec,
+            'trials': list(self.background_adjustments),
+        }
 
     def log_readiness_timeline(self) -> None:
         """One line separating simulator start-up delay from provider readiness."""
@@ -1192,6 +1301,7 @@ class TargetDistanceBenchmarkRunner(Node):
             'Asset catalog': (
                 f'{simulation["asset_catalog"]["schema"]} '
                 f'sha256 {simulation["asset_catalog"]["sha256"]}'),
+            'Background': self.background_label(),
         }
         # Named while the recorder is still running (it is stopped after the
         # report is written), so this is the path, not a claim the file is ready.
@@ -1235,6 +1345,7 @@ class TargetDistanceBenchmarkRunner(Node):
                 'world': self.world,
                 'native_world': simulation['native_world'],
                 'simulation': simulation,
+                'background': self.background_provenance(),
                 'scenes': scenes,
                 'instances': instances,
                 'trials_included': included_trials,
@@ -1273,6 +1384,7 @@ class TargetDistanceBenchmarkRunner(Node):
 
         specs, robot_models = self.scene_spawn_specs(scene, entity_prefix)
         try:
+            self.adjust_background(trial)
             with self.scene_control.scene(specs):
                 self.spin_for(self.settle_sec)
 
@@ -1454,10 +1566,13 @@ class TargetDistanceBenchmarkRunner(Node):
             return
         scene: Scene = trial['scene']
         writer = self.replay_writer or self.sensor_writer
+        background = getattr(self, 'scene_background', None)
         writer.write_trial({
             'trial_id': trial['trial_id'],
             'repeat_index': trial['repeat_index'],
             'scene_id': scene.id,
+            **({'background_dropped': list(background.scene_drops[scene.id])}
+               if background is not None else {}),
             'ground_truth': [
                 {
                     'index': instance.index,
@@ -1559,16 +1674,13 @@ class TargetDistanceBenchmarkRunner(Node):
         scene: Scene,
         entity_prefix: str,
     ) -> tuple[list[SpawnSpec], list[tuple[int, str, Any]]]:
-        """Resolve targets first, then objects, preserving deterministic order."""
+        """Resolve objects first, then targets, preserving deterministic order.
+
+        The scene is complete before any target appears in it; rollback
+        removes the targets first.
+        """
 
         specs = []
-        robot_models: list[tuple[int, str, Any]] = []
-        for index, robot in enumerate(scene.robots):
-            model_name = f'{entity_prefix}_target_{index}'
-            specs.append(SpawnSpec.for_resource(
-                self.asset_selection.target, model_name, robot.x, robot.y, robot.yaw))
-            robot_models.append((index, model_name, robot))
-
         for index, obj in enumerate(scene.objects):
             model_name = f'{entity_prefix}_obj_{index}'
             specs.append(SpawnSpec.for_resource(
@@ -1578,6 +1690,13 @@ class TargetDistanceBenchmarkRunner(Node):
                 obj.y,
                 obj.yaw,
             ))
+
+        robot_models: list[tuple[int, str, Any]] = []
+        for index, robot in enumerate(scene.robots):
+            model_name = f'{entity_prefix}_target_{index}'
+            specs.append(SpawnSpec.for_resource(
+                self.asset_selection.target, model_name, robot.x, robot.y, robot.yaw))
+            robot_models.append((index, model_name, robot))
 
         return specs, robot_models
 

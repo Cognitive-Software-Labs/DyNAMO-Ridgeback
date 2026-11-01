@@ -77,6 +77,7 @@ CONFIG_LAUNCH_ARGUMENT_NAMES = frozenset({
     'overlay',
     'estimators',
     'scenario',
+    'background',
     'repeats',
     'output_dir',
     'settle_sec',

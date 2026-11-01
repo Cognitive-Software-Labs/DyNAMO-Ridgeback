@@ -400,6 +400,11 @@ AXES: dict[str, AxisSpec] = {
         'overlay', 'boolean', True, STAGE_SYSTEM, 'Camera overlay'),
     'scenario': _axis(
         'scenario', 'string', '', STAGE_SYSTEM, 'Scenario YAML'),
+    # The furnished room is spawned live; frozen evidence was captured in
+    # whichever room it was, so only the live profile can vary it.
+    'background': _axis(
+        'background', 'choice', '', STAGE_SYSTEM, 'Background props',
+        choices=('', 'lab')),
     'repeats': _axis(
         'repeats', 'integer', 5, STAGE_SYSTEM, 'Repeats', minimum=1),
     'run_dir_name': _axis(
@@ -477,7 +482,7 @@ MASK_AXES = frozenset(
 # page would have shown. Every other live argument is an installation constant
 # (topics, namespace, world, the viz toggles) that no shipped sweep varies.
 LIVE_SWEEP_DEFAULT_AXES = (
-    'scenario', 'repeats', 'detector', 'detection_model', 'target_labels',
+    'scenario', 'background', 'repeats', 'detector', 'detection_model', 'target_labels',
     'detection_threshold', 'detector_fps', 'detector_debug',
 )
 

@@ -560,6 +560,13 @@ def test_run_folder_name_leads_with_the_timestamp_then_applied_axes() -> None:
         ('pointcloud',),
     ) == '20260822_202851_verify_gate'
 
+    # A furnished room is an axis that changes results; the bare room adds
+    # nothing, so names from before backgrounds existed are unchanged.
+    assert benchmark_run_folder_name(
+        '20260822_202851', '/x/benchmark_scenarios_full.yaml', 'box',
+        'stereoscopic', ('projective_ranging',), 'lab',
+    ) == '20260822_202851_full_box_stereoscopic_bg-lab'
+
     assert scenario_slug('/x/benchmark_scenarios_full.yaml') == 'full'
     assert scenario_slug('/x/My Scenes!.yaml') == 'my_scenes'
 
