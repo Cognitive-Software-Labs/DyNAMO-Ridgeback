@@ -17,6 +17,7 @@ and searches instead of following an unconfirmed person.
 |---|---|
 | Leader choice | Lock onto the nearest person in front at start; a language prompt is not required |
 | First system | Modular baseline: lidar and RGB-D people tracking, appearance re-identification, the existing Nav2 stack for motion |
+| Crowd setting | A lab corridor with a few people first; a dense public space later |
 | Development order | Simulation first, across both simulators (Gazebo, Isaac) as a sim-to-sim check; real-robot tests after the simulated loop is stable |
 | OmTrackVLA | Stays in its own repository as a model server; a client node here sends RGB frames with the leader's box (server `planner` mode) and publishes its waypoints as `nav_msgs/Path` |
 | Branch | `leader-following`, additive to `dev`: new packages, new docs, new simulator scenario files |
@@ -73,7 +74,7 @@ recordings once F5 starts. **Results:** one table per category in
 | Category | Candidates | Scored by |
 |---|---|---|
 | Camera person detection | YOLO11, YOLO26, RT-DETRv2, D-FINE, DEIM, RF-DETR, OWLv2 (already used for target localization) | Recall and precision by distance band (0–2, 2–4, 4–8 m) and visible fraction |
-| Lidar person detection | DR-SPAAM, a leg detector, plain scan clustering | Same recall and precision, plus coverage outside the camera view |
+| Lidar person detection (scans at leg height: both lidars about 0.23 m up, see the [geometry reference](../robot/geometry.md)) | DR-SPAAM, a leg detector, plain scan clustering | Same recall and precision, plus coverage outside the camera view |
 | Multi-person tracking | ByteTrack, BoT-SORT, OC-SORT, Deep OC-SORT, StrongSORT | HOTA, IDF1 and ID switches against simulator ground truth |
 | Single target from one click | SAM 2, SAMURAI | Leader-track coverage and recovery after occlusion |
 | Re-identification | OSNet-AIN, CLIP-ReID, TransReID, SOLIDER, DINOv2 features | Correct leader pick among people within 3 m, look-alike scenario separately |
@@ -117,10 +118,3 @@ Metrics per scenario, median and spread over at least 10 repetitions: follow
 success rate, correct-lock time, ID switches, wrong-follow time (target 0),
 recovery time after occlusion, distance-keeping error, minimum clearance to
 bystanders, and safety stops.
-
-## Open questions
-
-- Target crowd density: a lab corridor with a few people, or a dense public space.
-- Which simulator is the development default and which validates.
-- Lidar person detector: depends on the lidar mount height in the
-  [geometry reference](../robot/geometry.md).

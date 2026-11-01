@@ -154,9 +154,6 @@ p { margin: 0; max-width: 65ch; }
 .rule-card { border: 1px solid var(--line); background: var(--panel); border-radius: 12px; padding: 16px 18px; display: grid; gap: 6px; transition: border-color .2s; }
 .rule-card:hover { border-color: var(--leader); }
 .rule-card p { font-size: .93rem; color: var(--muted); }
-.questions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-top: 30px; }
-.q { border-left: 3px solid var(--leader); padding: 4px 0 4px 14px; display: grid; gap: 4px; }
-.q p { font-size: .92rem; color: var(--muted); }
 footer { color: var(--muted); font-size: .85rem; border-top: 1px solid var(--line); padding-top: 18px; }
 
 /* svg tokens */
@@ -180,7 +177,7 @@ footer { color: var(--muted); font-size: .85rem; border-top: 1px solid var(--lin
 }
 @media (max-width: 620px) {
   main { gap: 64px; padding-block: 24px 56px; }
-  .tiles3, .scen, .questions { grid-template-columns: 1fr; }
+  .tiles3, .scen { grid-template-columns: 1fr; }
   .pipe { grid-template-columns: 1fr; }
   .tasks, .rules { grid-template-columns: 1fr; }
 }
@@ -300,7 +297,7 @@ footer { color: var(--muted); font-size: .85rem; border-top: 1px solid var(--lin
       <span class="eyebrow">What the robot has</span>
       <h2>Lidar sees everyone. The camera sees who they are.</h2>
       <div class="sense-list">
-        <div class="sense"><i style="background:var(--scan)"></i><div><h3>Two lidars, 270° each</h3><p>One at the front, one at the rear: together a full circle. They measure where every person is, many times a second, in the dark too. They only see outlines, so they cannot tell people apart.</p></div></div>
+        <div class="sense"><i style="background:var(--scan)"></i><div><h3>Two lidars, 270° each</h3><p>One at the front, one at the rear: together a full circle, about 25 cm above the floor, so they cut through legs. They measure where every person is, many times a second, in the dark too. They only see outlines, so they cannot tell people apart.</p></div></div>
         <div class="sense"><i style="background:var(--robot)"></i><div><h3>One front depth camera</h3><p>A RealSense D455 at about 1 m height. Its colour image shows clothing and appearance, which is what identifies the leader; its depth image says how far away each person is. It only looks forward, and people block it.</p></div></div>
         <div class="sense"><i style="background:var(--leader)"></i><div><h3>A base that moves sideways</h3><p>The Ridgeback drives in any direction and turns on the spot, so it can keep the camera on the leader while it side-steps around people.</p></div></div>
       </div>
@@ -379,7 +376,7 @@ footer { color: var(--muted); font-size: .85rem; border-top: 1px solid var(--lin
   <div class="section-head">
     <span class="eyebrow">How we will know</span>
     <h2>Same scenarios, same scores, for every approach</h2>
-    <p class="lede">In simulation the simulator knows where everyone really is. On the robot the leader wears a marker the robot never uses. Either way every mistake can be counted.</p>
+    <p class="lede">The scenes start in a lab corridor with a few people; a busy public hall comes later. In simulation the simulator knows where everyone really is. On the robot the leader wears a marker the robot never uses. Either way every mistake can be counted.</p>
   </div>
   <div class="scen">
     <article class="tile"><h3>Alone</h3><p>Straight lines and turns. Tunes distance keeping.</p></article>
@@ -420,7 +417,7 @@ footer { color: var(--muted); font-size: .85rem; border-top: 1px solid var(--lin
       <h3>Find and track people</h3>
       <p>First build one benchmark that runs any candidate on the same scenes and scores it the same way. Then try every candidate below once with default settings, tune only the best two, and build the people tracker from the winners: it combines lidar and the depth camera, gives each person a stable number and publishes everyone it sees.</p>
       <div class="try"><span class="try-label">Camera detectors</span><span class="chip">YOLO11</span><span class="chip">YOLO26</span><span class="chip">RT-DETRv2</span><span class="chip">D-FINE</span><span class="chip">DEIM</span><span class="chip">RF-DETR</span><span class="chip">OWLv2</span></div>
-      <div class="try"><span class="try-label">Lidar people</span><span class="chip">DR-SPAAM</span><span class="chip">leg detector</span><span class="chip">scan clustering</span></div>
+      <div class="try"><span class="try-label">Lidar people (legs, about 25 cm up)</span><span class="chip">DR-SPAAM</span><span class="chip">leg detector</span><span class="chip">scan clustering</span></div>
       <div class="try"><span class="try-label">Trackers</span><span class="chip">ByteTrack</span><span class="chip">BoT-SORT</span><span class="chip">OC-SORT</span><span class="chip">Deep OC-SORT</span><span class="chip">StrongSORT</span></div>
       <div class="try"><span class="try-label">One target from a click</span><span class="chip">SAM 2</span><span class="chip">SAMURAI</span></div>
       <p class="done"><b>Done when</b> every candidate has a row in one results table (people found by distance and occlusion, track losses and swaps, time per frame on the robot's GPU), the chosen combination is written down with the reason, and every scene has a report of how often the leader's track was lost or swapped.</p>
@@ -466,11 +463,6 @@ footer { color: var(--muted); font-size: .85rem; border-top: 1px solid var(--lin
     <div class="rule-card"><h3>Leave the robot as you found it</h3><p>Use your own copy of the code on the robot instead of switching the shared one to another branch. Stop only the programs you started, and leave others' processes, services and recordings alone.</p></div>
     <div class="rule-card"><h3>Robot-wide settings are not yours to change</h3><p>The robot's identity, sensor drivers, network and camera services serve everyone. Changing them needs agreement first, and the change then goes into the repository like any other.</p></div>
     <div class="rule-card"><h3>Docs travel with the code</h3><p>When behaviour changes, the page that describes it changes in the same commit. Results and recordings go in the generated-output folder, and the numbers that matter go into the docs.</p></div>
-  </div>
-  <div class="questions">
-    <div class="q"><h3>How crowded?</h3><p>A lab corridor with a few people, or a busy public hall? This sets the test densities and speed limits.</p></div>
-    <div class="q"><h3>Which simulator first?</h3><p>Both simulators run the same robot software. One is the everyday test bed, the other the cross-check.</p></div>
-    <div class="q"><h3>Lidar height?</h3><p>Lidars at shin height see legs; higher ones see bodies. That decides which people detector fits.</p></div>
   </div>
 </section>
 
