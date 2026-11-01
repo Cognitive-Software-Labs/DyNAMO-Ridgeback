@@ -34,3 +34,8 @@ recorded, so provenance is partial.
   0.131 m from the footprint, and the G1 gap was 0.365 m. The robot returned
   to the start, and the mission ended `MISSION_FAILED`. This matches the
   earlier veto on G1's leg, but without a bag the return was not attributed.
+
+Correction, 2026-11-01: the finding above called the grey sectors real planner
+results. They were an artifact of classifying rays from map cells: most of those
+directions have a pose exactly on the ray that passes every planner check; see
+the [ray record](2026-11-01-parking-rays-and-g1-heading.md).

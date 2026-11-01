@@ -442,3 +442,5 @@ TF or changing estimator validation.
   — exploration continues until no allowed parking pose is undecided by unknown space.
 - [Progressive parking planning](../../archive/engineering/2026-10-30-progressive-parking-planning.md)
   — planning first and at exploration checkpoints, in-place relocalization, and the measured savings.
+- [Parking rays and G1 heading](../../archive/engineering/2026-11-01-parking-rays-and-g1-heading.md)
+  — rays judged at their own poses, heading accuracy, and front and rear parking missions.
