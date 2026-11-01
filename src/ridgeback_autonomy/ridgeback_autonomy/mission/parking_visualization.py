@@ -137,7 +137,10 @@ def plan_markers(plan: ParkingPlan, config: PlannerConfig, stamp) -> MarkerArray
               'path evaluation pending' if plan.failure_reason is None else
               'NO PARKING POSE: ' + str(plan.failure_reason))
     passing = sum(status == 'valid' for _, status in plan.radial_rays)
-    label.text = (f"{status}\n"
+    side = '' if plan.selected is None else f', {plan.selected.preference_label}'
+    facing = ('G1 heading unknown' if t.facing_yaw_rad is None
+              else f'G1 facing {math.degrees(t.facing_yaw_rad):.0f} deg{side}')
+    label.text = (f"{status}\n{facing}\n"
                   f"{t.reference} (keep-out {plan.keepout_radius_m:.2f} m), "
                   f"valid {counts['valid']}/{counts['candidates']}, "
                   f"rays passing {passing}/{len(plan.radial_rays)}")

@@ -53,25 +53,29 @@ safeguard or motion-settlement threshold is relaxed by this launch change.
 
 RViz shows the plan on `parking/visualization`, with a colour legend overlay on
 `parking/legend`. The donut is 360 radial lines, one per degree, each drawn in
-one colour from the inner to the outer reach limit (grey rings). A ray's
-parking positions are the donut cells it crosses; each is judged by the
-planner's own candidate decision, and the ray takes the first class that any
-position has:
+one colour from the inner to the outer reach limit (grey rings). A ray is judged
+at its own poses: the task point on the ray, at both ends of the reach band
+that the G1 keep-out and the reach budget allow, using the planner's own
+checks. Planner candidates cannot judge a direction, because they sit at map-cell
+centres, each with its own bearing, and that band (about 0.51–0.54 m from the
+generic G1 estimate with the live 0.06 m allowance) is narrower than one cell.
+The ray takes the first class that applies:
 
-- green: at least one geometrically valid parking pose, not a Nav2 path check;
-- orange: no valid pose, and unmapped space blocks a pose that keep-out and
-  reach allow, so the direction is undecided;
-- red: no valid pose, and obstacles block every pose that keep-out and reach
-  allow;
-- grey: keep-out or the reach limit rules out every pose on the ray.
+- green: one of its poses passes, or a valid planner candidate has that bearing,
+  so a selected pose always lies on a green ray; this is not a Nav2 path check;
+- orange: no valid pose, and unmapped space or the map edge leaves one undecided;
+- red: no valid pose, and obstacles block its poses;
+- grey: keep-out and reach allow no pose at all. Both depend only on the reach,
+  so this applies to every ray or to none.
 
 Unmapped space wins over obstacles, so an undecided direction is never shown
-as definitively blocked. With the live 0.06 m reach allowance, the allowed task
-points lie only about 0.51–0.54 m from the generic G1 estimate, less than one
-map cell, so some directions cross no allowed cell and stay grey.
+as definitively blocked. A green ray may have no cell-centred candidate exactly
+on it, because candidate generation is unchanged.
 
 Candidates are not drawn as dots. The Nav2-checked choice is the blue selected
 pose (arrow, footprint, rear-bin task point) and its validated route.
+The status text above the donut gives G1's estimated heading and the selected
+pose's side ([G1 heading](architecture.md#g1-heading)).
 
 ## Scene, configuration and startup gates
 

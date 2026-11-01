@@ -111,6 +111,7 @@ def test_legend_is_latched_once_and_survives_plan_updates_and_clears(manager_fac
     legends = []
     m.parking_legend_publisher.publish = legends.append
     assert m.parking_legend_publisher.qos_profile.durability.name == 'TRANSIENT_LOCAL'
+    m._draw_plan_rays()
     # Plans and clears go to the marker topic only; the legend topic is never cleared.
     assert published['markers'] and published['markers'][-1].markers[0].action == Marker.DELETEALL
     m._fail_planning('test_failure', 'cleared by a failed plan')

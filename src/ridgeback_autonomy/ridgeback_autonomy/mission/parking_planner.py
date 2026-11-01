@@ -138,6 +138,7 @@ class TargetReference:
     reference: str
     is_foot_midpoint: bool
     source: str
+    facing_yaw_rad: float | None = None   # the direction G1 faces, when reliably observed
 
 
 @dataclass(frozen=True)
@@ -324,10 +325,15 @@ def footprint_rejection_reason(
     c1 = min(grid.width - 1, int(math.ceil(lx.max() / res)) + 1)
     r0 = max(0, int(math.floor(ly.min() / res)) - 1)
     r1 = min(grid.height - 1, int(math.ceil(ly.max() / res)) + 1)
-    cols, rows = np.meshgrid(np.arange(c0, c1 + 1), np.arange(r0, r1 + 1))
-    cx, cy = grid.cell_centers(cols, rows)
+    window = grid.data[r0:r1 + 1, c0:c1 + 1]
+    # Only non-free cells can reject a pose; most windows have few, which keeps planning
+    # short of the odometry age that would restart motion settlement.
+    rows, cols = np.nonzero((window >= occupied_threshold) | (window < 0))
+    if not rows.size:
+        return None
+    cx, cy = grid.cell_centers(cols + c0, rows + r0)
     touching = points_to_polygon_distance(cx, cy, polygon) <= math.sqrt(2.0) * res * 0.5
-    values = grid.data[r0:r1 + 1, c0:c1 + 1][touching]
+    values = window[rows[touching], cols[touching]]
     if np.any(values >= occupied_threshold):
         return 'occupied'
     if np.any(values == -1):
@@ -355,18 +361,34 @@ def footprint_clearance_m(
     return clearance
 
 
+# Half-width of G1's front and rear sectors: far wider than the heading estimate's error.
+FACING_SECTOR_HALF_RAD = math.pi / 4.0
+
+
 def preference(
     task_x: float,
     task_y: float,
     target: TargetReference,
     approach_pose: tuple[float, float, float] | None,
 ) -> tuple[int, str]:
-    """Original ``_parking_candidate_preference`` without a G1 heading: side, front, back."""
+    """Preference class of a pose: only an order of checking, never a validity decision.
 
+    With a reliable G1 heading: its front (the hands), then behind it, then its sides,
+    by the task point's bearing from G1. Otherwise the original
+    ``_parking_candidate_preference`` without a heading: side, front, back of the approach.
+    """
+
+    task_angle = math.atan2(task_y - target.y, task_x - target.x)
+    if target.facing_yaw_rad is not None:
+        relative = abs(normalize_angle(task_angle - target.facing_yaw_rad))
+        if relative <= FACING_SECTOR_HALF_RAD:
+            return 0, 'g1_front'
+        if relative >= math.pi - FACING_SECTOR_HALF_RAD:
+            return 1, 'g1_rear'
+        return 2, 'g1_side'
     if approach_pose is None or math.hypot(approach_pose[0] - target.x,
                                            approach_pose[1] - target.y) < 0.10:
         return 1, 'front'
-    task_angle = math.atan2(task_y - target.y, task_x - target.x)
     reference_yaw = math.atan2(approach_pose[1] - target.y, approach_pose[0] - target.x)
     relative = normalize_angle(task_angle - reference_yaw)
     side_error = abs(abs(relative) - math.pi / 2.0)
@@ -405,7 +427,8 @@ def undecided_parking_positions(grid: GridSnapshot, target: TargetReference,
 
     Uses plan_parking's cell rule and checks: an unknown task cell, or a free one whose
     parked footprint it would reject as unknown or outside the map. Occupied task cells
-    and footprints that touch an obstacle are decided, so they do not count.
+    and footprints that touch an obstacle are decided, so they do not count. With a
+    known G1 heading only its front counts: the positions worth mapping to reach.
     """
 
     keepout = keepout_radius_m(target, config)
@@ -416,6 +439,9 @@ def undecided_parking_positions(grid: GridSnapshot, target: TargetReference,
     # Unknown (-1) or free task cells; occupied and other negative values are not candidates.
     cells = ((distance >= config.reach_min_m) & (distance <= config.reach_max_m)
              & ((values == -1) | ((values >= 0) & (values < config.occupied_threshold))))
+    if target.facing_yaw_rad is not None:
+        bearing = np.arctan2(cy - target.y, cx - target.x) - target.facing_yaw_rad
+        cells &= np.abs(np.arctan2(np.sin(bearing), np.cos(bearing))) <= FACING_SECTOR_HALF_RAD
     cells[cells] = pose_geometry_passes(distance[cells], config, keepout)
     count = int(np.count_nonzero(cells & (values == -1)))
     free = cells & (values >= 0)
@@ -433,75 +459,55 @@ def radial_profile(grid: GridSnapshot, target: TargetReference, config: PlannerC
                    step_deg: float = 1.0) -> list[tuple[float, str]]:
     """One ``(angle, class)`` per ray, from reach_min to reach_max (display only).
 
-    A ray's parking positions are the donut cells it crosses (both cells where it runs
-    along a cell edge) whose centre lies in the donut, as in plan_parking. Each position
-    is judged as the planner judged it. A free cell takes its candidate's decision:
-    ``valid``; ``occupied`` or ``unknown`` where the parked footprint is blocked or
-    reaches unmapped space; ``pose_invalid`` for keep-out, reach budget or geometry. An
-    occupied or unknown cell, or one outside the map, is never a candidate; it counts as
-    ``occupied`` or ``unknown`` only where a pose there would pass keep-out and reach
-    budget, else ``pose_invalid``. The ray takes the first class in ``RAY_PRIORITY`` that
-    any of its positions has, and ``pose_invalid`` without positions or candidates. This
-    is not Nav2 path feasibility, and candidates are never derived from the rays.
+    Planner candidates sit at map-cell centres, each with its own bearing, and the reach
+    band that keep-out and the budget allow is narrower than a cell. So cells cannot
+    judge a direction: a ray is judged at its own poses instead, with the task point on
+    the ray, at both ends of that band (and at most one cell apart between them), by
+    plan_parking's own checks. A ray is ``valid`` if one of those poses passes, or if a
+    valid planner candidate has that bearing, so a selected pose always lies on a green
+    ray. Otherwise it takes the first class in ``RAY_PRIORITY`` that its poses have:
+    ``unknown`` where the task cell or footprint is unmapped or off the map, ``occupied``
+    where an obstacle blocks them, and ``pose_invalid`` when keep-out and reach allow no
+    pose at all. This is not Nav2 path feasibility, and candidates are never derived from
+    the rays: a green ray may have no cell-centred candidate exactly on it.
     """
 
-    res = grid.resolution
     keepout = keepout_radius_m(target, config)
-    decision_of = {}
-    for c in candidates:
-        lx, ly = grid.map_to_local(c.task_x, c.task_y)
-        decision_of[(math.floor(float(ly) / res), math.floor(float(lx) / res))] = c
-    px, py = (float(v) for v in grid.map_to_local(target.x, target.y))
-    r0, r1 = config.reach_min_m, config.reach_max_m
-    position_class = {}
+    fine = np.linspace(config.reach_min_m, config.reach_max_m, 301)
+    allowed = fine[pose_geometry_passes(fine, config, keepout)]
+    count = int(round(360.0 / step_deg))
+    angles = [math.radians(k * step_deg) for k in range(count)]
+    if not allowed.size:
+        return [(angle, 'pose_invalid') for angle in angles]
+    reaches = np.linspace(allowed[0], allowed[-1],
+                          max(2, math.ceil((allowed[-1] - allowed[0]) / grid.resolution) + 1))
+    valid_rays = {round(math.degrees(math.atan2(c.task_y - target.y, c.task_x - target.x))
+                        / step_deg) % count
+                  for c in candidates if c.status in ('valid', 'selected')}
 
-    def judge(row, col):
-        x, y = (float(v) for v in grid.cell_centers(col, row))
-        if not r0 <= math.hypot(x - target.x, y - target.y) <= r1:
-            return None                       # not a parking position
-        inside = 0 <= col < grid.width and 0 <= row < grid.height
-        if inside and 0 <= grid.data[row, col] < config.occupied_threshold:
-            c = decision_of.get((row, col))
-            if c is None:
-                return 'pose_invalid'         # no decision: never green
-            if c.status in ('valid', 'selected'):
-                return 'valid'
-            blocked = {'footprint_occupied': 'occupied', 'footprint_unknown': 'unknown',
-                       'footprint_out_of_bounds': 'unknown'}.get(c.reason)
-        else:
-            blocked = 'occupied' if inside and grid.data[row, col] >= config.occupied_threshold else 'unknown'
-        # The footprint check runs first, so a blocked pose may fail keep-out or reach too.
-        if blocked and pose_geometry_passes(math.hypot(x - target.x, y - target.y), config, keepout):
-            return blocked
-        return 'pose_invalid'
-
-    def indices(v):
-        # A ray running exactly along a cell edge touches both cells beside it.
-        k = round(v)
-        return (k - 1, k) if abs(v - k) < 1e-9 else (math.floor(v),)
+    def pose_class(task_x, task_y):
+        lx, ly = (float(v) for v in grid.map_to_local(task_x, task_y))
+        col, row = math.floor(lx / grid.resolution), math.floor(ly / grid.resolution)
+        if not (0 <= col < grid.width and 0 <= row < grid.height) or grid.data[row, col] < 0:
+            return 'unknown'
+        if grid.data[row, col] >= config.occupied_threshold:
+            return 'occupied'
+        base_x, base_y, yaw = base_pose_from_task_point(
+            task_x, task_y, target.x, target.y, config.task_point_x_base_m, config.task_point_y_base_m)
+        polygon = rotated_footprint_vertices(config.footprint, base_x, base_y, yaw)
+        rejection = footprint_rejection_reason(polygon, grid, config.occupied_threshold)
+        return {None: 'valid', 'occupied': 'occupied', 'unknown': 'unknown',
+                'out_of_bounds': 'unknown'}.get(rejection, 'pose_invalid')
 
     rays = []
-    for k in range(int(round(360.0 / step_deg))):
-        angle = math.radians(k * step_deg)
-        # The ray's direction in grid-local axes; cell edges lie on multiples of res there.
-        dx, dy = math.cos(angle - grid.origin_yaw), math.sin(angle - grid.origin_yaw)
-        cuts = {r0, r1}
-        for p, d in ((px, dx), (py, dy)):
-            if abs(d) > 1e-12:
-                lo, hi = sorted(((p + r0 * d) / res, (p + r1 * d) / res))
-                cuts.update((i * res - p) / d for i in range(math.ceil(lo), math.floor(hi) + 1))
-        cuts = sorted(r for r in cuts if r0 <= r <= r1)
-        found = set()
-        for a, b in zip(cuts, cuts[1:]):
-            if b - a < 1e-9:
-                continue
-            r = (a + b) / 2.0
-            for row in indices((py + r * dy) / res):
-                for col in indices((px + r * dx) / res):
-                    if (row, col) not in position_class:
-                        position_class[(row, col)] = judge(row, col)
-                    found.add(position_class[(row, col)])
-        rays.append((angle, next((s for s in RAY_PRIORITY if s in found), 'pose_invalid')))
+    for k, angle in enumerate(angles):
+        found = {'valid'} if k in valid_rays else set()
+        for reach in reaches.tolist():
+            if 'valid' in found:
+                break
+            found.add(pose_class(target.x + reach * math.cos(angle),
+                                 target.y + reach * math.sin(angle)))
+        rays.append((angle, next(s for s in RAY_PRIORITY if s in found)))
     return rays
 
 
@@ -510,8 +516,13 @@ def plan_parking(
     target: TargetReference,
     config: PlannerConfig,
     approach_pose: tuple[float, float, float] | None,
+    *,
+    rays: bool = True,
 ) -> ParkingPlan:
-    """Generate, check and rank parking candidates exactly in the original order."""
+    """Generate, check and rank parking candidates exactly in the original order.
+
+    ``rays=False`` leaves the display-only ``radial_rays`` for the caller to compute.
+    """
 
     keepout = keepout_radius_m(target, config)
     plan = ParkingPlan(ok=False, failure_reason=None, target=target, keepout_radius_m=keepout,
@@ -530,7 +541,8 @@ def plan_parking(
     ):
         bucket.extend(zip(cx[mask].tolist(), cy[mask].tolist()))
     if not plan.free_cells:
-        plan.radial_rays = radial_profile(grid, target, config)
+        if rays:
+            plan.radial_rays = radial_profile(grid, target, config)
         plan.failure_reason = 'no_free_donut_cells'
         return plan
 
@@ -565,7 +577,8 @@ def plan_parking(
         if decision.status == 'valid':
             decision.clearance_m = footprint_clearance_m(polygon, grid, unsafe_xy, config.clearance_cap_m)
         plan.candidates.append(decision)
-    plan.radial_rays = radial_profile(grid, target, config, plan.candidates)
+    if rays:
+        plan.radial_rays = radial_profile(grid, target, config, plan.candidates)
 
     valid = [c for c in plan.candidates if c.status == 'valid']
     if not valid:

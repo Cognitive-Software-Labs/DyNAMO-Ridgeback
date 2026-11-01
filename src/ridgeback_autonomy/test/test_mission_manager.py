@@ -653,6 +653,10 @@ def test_localization_with_fresh_map_generates_parking_candidates(manager_factor
     assert plan.counts()['valid'] > 0
     assert plan.target.reference == 'generic_target_position'
     assert plan.keepout_radius_m == pytest.approx(0.29)
+    # Planning stays short of the odometry age: the rays follow on the next tick.
+    assert plan.radial_rays == [] and not published['markers']
+    manager.tick()
+    assert len(plan.radial_rays) == 360
     assert published['markers'][-1].markers[0].action == 3   # DELETEALL first
     payload = json.loads(published['state'][-1].data)
     assert payload['state'] == 'EVALUATING_PARKING_PATHS'

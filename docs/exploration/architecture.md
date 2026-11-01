@@ -154,6 +154,37 @@ migration state flow and future insertion
 point for G1-region exploration are maintained in the
 [parking mission migration plan](../plans/EXPLORATION_parking_mission_migration.md#phase-2d-non-driving-mission-coordinator).
 
+### G1 heading
+
+Each G1 localization also estimates which way G1 faces, from the depth frames of
+that stationary view (`target_orientation.py`, `target_orientation_enabled`).
+The G1 holds both forearms forward, and from every side they are the only part
+of it more than 0.18 m from its vertical axis: two parallel bars at chest height.
+Depth pixels are transformed to the map through TF and matched against those bars
+around the localized position, then refined along the bars' own direction. A
+heading needs at least 3 of the last 5 frames to agree within 20°. It needs
+enough bar points, reaching the fingertips, with at least 80% of the protruding
+points on the bars. Otherwise the heading is unknown; it is never inferred from
+missing forearms, so a G1 with its arms down gets no heading. The simulators'
+poses are not an input. In Gazebo, over 72 views at 24 headings and three robot
+positions, the mean error against ground truth was 6.7° (maximum 12.9°), and it
+also held with a table next to or across G1's front. The cue is specific to this
+forearms-forward posture, and it is unqualified on Isaac and on hardware.
+
+The heading only orders candidates, and only when planning runs; it never
+changes a footprint, keep-out, reach, route or LiDAR check, and a goal is never
+changed while driving. Without a heading, the ranking is the original undirected
+one. With one, by the task point's bearing from G1:
+
+1. `g1_front`, within 45° of the heading: the poses at G1's hands;
+2. `g1_rear`, within 45° of the opposite direction;
+3. `g1_side`, the rest.
+
+Path checks run in that order, and the first class with a safe route is selected,
+so an unsafe preferred pose always loses to a safe alternative. A rear pose is
+within the reach band but behind G1's hands, and nothing here verifies that the
+task can be done from there; the manager logs this when it selects one.
+
 ### G1-centred exploration
 
 After each G1 localization, the manager plans parking from the map at hand
@@ -165,7 +196,9 @@ unknown, or its parked footprint touches unknown cells or leaves the map
 (`undecided_parking_positions`, using the planner's own checks). Positions
 blocked by obstacles are decided, and unknown floor that no parked footprint
 reaches is not required. A verified pose elsewhere therefore skips exploration,
-even if some directions stay orange.
+even if some directions stay orange. With a known G1 heading only G1's front
+counts: a valid rear pose does not stop the mapping of a front that is still
+unknown, while a front that is known to be blocked needs no more mapping.
 
 Exploration resumes the shared explorer, focused on G1, for a round. While it
 runs, every new map (at most every `g1_exploration_refresh_s`, 2 s) redraws
@@ -173,8 +206,8 @@ the donut from the last G1 estimate; that preview never selects a pose. A round
 ends:
 
 - as a checkpoint, once poses become valid that no planning attempt has
-  considered (none within a cell of one), after at least
-  `g1_exploration_min_round_s` (5 s);
+  considered (none within a cell of one), at G1's front when its heading is
+  known, after at least `g1_exploration_min_round_s` (5 s);
 - complete, when no position is undecided;
 - partial, when the explorer has no reachable frontier left around G1, after
   `g1_exploration_timeout_s` (240 s, shared by all rounds), or when the

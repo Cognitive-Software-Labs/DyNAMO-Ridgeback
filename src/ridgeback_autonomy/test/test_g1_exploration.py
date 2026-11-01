@@ -126,15 +126,18 @@ from ridgeback_autonomy.mission.parking_planner import (
     GENERIC_TARGET_REFERENCE, GridSnapshot, TargetReference, plan_parking, pose_geometry_passes)
 
 
-def ring_map(m, unknown, *, stamp_ns=PLAN_NOW_NS, centre=None):
-    """A free 6 m map with unknown cells where ``unknown(distance_from_G1, angle)`` holds."""
+def ring_map(m, unknown, *, stamp_ns=PLAN_NOW_NS, centre=None, occupied=None):
+    """A free 6 m map with unknown (and occupied) cells where ``f(distance_from_G1, angle)`` holds."""
     msg = occupancy_map(stamp_ns=stamp_ns)
     cx, cy = centre or (m.target_position.map_x_m, m.target_position.map_y_m)
     g = GridSnapshot.from_msg(msg)
     rows, cols = np.mgrid[0:g.height, 0:g.width]
     x, y = g.cell_centers(cols, rows)
-    mask = unknown(np.hypot(x - cx, y - cy), np.arctan2(y - cy, x - cx))
-    msg.data = np.where(mask, -1, 0).astype(int).ravel().tolist()
+    d, a = np.hypot(x - cx, y - cy), np.arctan2(y - cy, x - cx)
+    data = np.where(unknown(d, a), -1, 0)
+    if occupied is not None:
+        data = np.where(occupied(d, a), 100, data)
+    msg.data = data.astype(int).ravel().tolist()
     return msg
 
 
@@ -144,7 +147,7 @@ def finished(m):
                 MissionState.EXPLORING_AROUND_G1)
 
 
-def localized_on(manager_factory, unknown):
+def localized_on(manager_factory, unknown, *, occupied=None, prepare=lambda m: None):
     """A manager that localizes G1 on a map with ``unknown(distance, angle)`` cells around it."""
     def manager():
         m = manager_factory(tf_buffer=FakeTfBuffer(stamp_ns=PLAN_NOW_NS),
@@ -154,8 +157,9 @@ def localized_on(manager_factory, unknown):
     probe = exploring_manager(manager_factory)   # where the fixtures localize G1
     centre = (probe.target_position.map_x_m, probe.target_position.map_y_m)
     m = manager()
-    m._on_map(ring_map(m, unknown, centre=centre))
+    m._on_map(ring_map(m, unknown, centre=centre, occupied=occupied))
     enter_localization(m)
+    prepare(m)
     localize(m)
     assert (m.target_position.map_x_m, m.target_position.map_y_m) == pytest.approx(centre)
     return m
@@ -589,3 +593,107 @@ def test_a_closed_exploration_is_not_resumed(manager_factory):
     localize(m, first_stamp_ns=second)
     assert m.state == MissionState.PARKING_PLANNING_FAILED
     assert len(m.resume_client.calls) == 1
+
+
+# G1's heading, from the stationary depth frames of a localization, orders the candidates.
+from sensor_msgs.msg import Image
+
+from ridgeback_autonomy.mission import mission_manager_node as manager_module
+from ridgeback_autonomy.mission.target_orientation import OrientationEstimate
+
+WEST = math.pi
+NOTHING = lambda d, a: np.zeros_like(d, dtype=bool)
+
+
+def depth_frame():
+    return Image(height=2, width=2, encoding='32FC1', data=np.ones((2, 2), np.float32).tobytes())
+
+
+def seeing(monkeypatch, yaws):
+    """Localization frames whose per-frame estimates are ``yaws`` (None: no heading in it)."""
+    estimates = iter(yaws)
+    monkeypatch.setattr(manager_module, 'estimate_target_yaw', lambda points, center: (
+        lambda yaw: None if yaw is None else OrientationEstimate(yaw, 200, 0.95))(next(estimates)))
+
+    def prepare(m):
+        m._camera_to_map = lambda: (np.eye(3), np.zeros(3))
+        m._camera_intrinsics = (100.0, 100.0, 1.0, 1.0)
+        for _ in yaws:
+            m._on_depth(depth_frame())
+    return prepare
+
+
+def in_sector(a, centre, half=0.7):
+    return np.abs(np.arctan2(np.sin(a - centre), np.cos(a - centre))) <= half
+
+
+def labels(m):
+    return {c.preference_label for c in m.parking_plan.candidates if c.status == 'valid'}
+
+
+def test_a_free_front_goes_straight_to_its_path_checks(manager_factory, monkeypatch):
+    m = localized_on(manager_factory, NOTHING, prepare=seeing(monkeypatch, [WEST] * 5))
+    assert m.target_heading.yaw_rad == pytest.approx(WEST)
+    assert m.resume_client.calls == []
+    assert m.parking_plan.target.facing_yaw_rad == pytest.approx(WEST)
+    assert m.state in (MissionState.PARKING_CANDIDATES_READY, MissionState.EVALUATING_PARKING_PATHS)
+    assert 'g1_front' in labels(m)
+
+
+def test_an_unmapped_front_is_explored_even_with_a_valid_rear(manager_factory, monkeypatch):
+    m = localized_on(manager_factory, lambda d, a: (d < 1.4) & in_sector(a, WEST, 1.0),
+                     prepare=seeing(monkeypatch, [WEST] * 5))
+    assert m.state == MissionState.EXPLORING_AROUND_G1
+    assert any('no valid pose at the front of G1' in t.reason for t in m.transition_history)
+    assert 'g1_rear' in labels(m) and 'g1_front' not in labels(m)
+    assert m._g1_coverage()['undecided_positions'] > 0
+
+
+def test_only_the_front_ends_a_round_once_the_heading_is_known(manager_factory, monkeypatch):
+    m = localized_on(manager_factory, lambda d, a: (d < 1.4) & in_sector(a, WEST, 1.0),
+                     prepare=seeing(monkeypatch, [WEST] * 5))
+    m.focus_publisher.publish = lambda msg: None
+    m._monotonic.value += m.g1_exploration_min_round_s
+    m._on_map(ring_map(m, lambda d, a: (d < 1.4) & in_sector(a, WEST, 1.0)))
+    m.tick()
+    assert m.state == MissionState.EXPLORING_AROUND_G1            # rear poses never stop it
+    m._monotonic.value += m.g1_exploration_refresh_s
+    # One side of the front mapped: parked footprints are wide, so only off its axis.
+    m._on_map(ring_map(m, lambda d, a: (d < 1.4) & in_sector(a, WEST + 0.8, 0.3)))
+    m.tick()
+    assert 'checkpoint (parking_candidates_available)' in finished(m)
+
+
+def test_a_blocked_front_is_decided_and_the_rear_is_planned_without_exploring(
+        manager_factory, monkeypatch):
+    # A table across G1's front: its parked footprints hit it, so nothing there is unknown.
+    table = lambda d, a: (d > 0.75) & (d < 1.0) & in_sector(a, WEST, 1.0)
+    m = localized_on(manager_factory, NOTHING, occupied=table,
+                     prepare=seeing(monkeypatch, [WEST] * 5))
+    assert m.resume_client.calls == []
+    assert 'g1_front' not in labels(m) and 'g1_rear' in labels(m)
+    assert m.state in (MissionState.PARKING_CANDIDATES_READY, MissionState.EVALUATING_PARKING_PATHS)
+    assert m._path_groups or m._path_queue
+
+
+@pytest.mark.parametrize('yaws', [[None] * 5, [WEST, None, None, None, None],
+                                  [0.2, 0.2, 2.0, 2.0, 2.0]],
+                         ids=['not_visible', 'too_few_frames', 'frames_disagree'])
+def test_an_unreliable_heading_keeps_the_undirected_ranking(manager_factory, monkeypatch, yaws):
+    m = localized_on(manager_factory, NOTHING, prepare=seeing(monkeypatch, yaws))
+    assert m.target_heading is None and m.parking_plan.target.facing_yaw_rad is None
+    assert labels(m) and all(label.startswith('approach') for label in labels(m))
+    assert m.state in (MissionState.PARKING_CANDIDATES_READY, MissionState.EVALUATING_PARKING_PATHS)
+
+
+def test_without_camera_data_the_mission_plans_as_before(manager_factory):
+    m = localized_on(manager_factory, NOTHING)
+    assert m.target_heading is None
+    assert m.state in (MissionState.PARKING_CANDIDATES_READY, MissionState.EVALUATING_PARKING_PATHS)
+
+
+def test_depth_outside_a_localization_is_never_used(manager_factory, monkeypatch):
+    m = localized_on(manager_factory, NOTHING, prepare=seeing(monkeypatch, [WEST] * 5))
+    heading = m.target_heading
+    m._on_depth(depth_frame())
+    assert not m._depth_frames and m.target_heading is heading     # no replanning while driving

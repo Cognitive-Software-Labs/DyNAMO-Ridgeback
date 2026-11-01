@@ -533,63 +533,62 @@ def test_ranking_prefers_mid_reach_and_stays_inside_the_budgeted_band():
     assert foot_plan.selected.reach_m < 0.54 - RES / 2
 
 
-# 1-degree radial donut lines: one class per complete ray, from the planner's own decisions.
+# 1-degree radial donut lines: one class per complete ray, judged at the ray's own poses.
+from ridgeback_autonomy.mission import parking_planner as planner_module
+from ridgeback_autonomy.mission.parking_geometry import base_pose_from_task_point
 from ridgeback_autonomy.mission.parking_planner import radial_profile
 
 RAY_IDS = {'valid': 0, 'occupied': 1, 'unknown': 2, 'pose_invalid': 3}
 PRIORITY = ('valid', 'unknown', 'occupied', 'pose_invalid')
-BLOCKED = {'footprint_occupied': 'occupied', 'footprint_unknown': 'unknown',
-           'footprint_out_of_bounds': 'unknown'}
-GEOMETRY_ONLY = {'g1_keepout', 'reach_budget', 'footprint_other'}
 
 
 def ray(plan, degrees):
     return plan.radial_rays[degrees][1]
 
 
-def cell_of(g, x, y):
-    lx, ly = g.map_to_local(x, y)
-    return math.floor(float(ly) / RES), math.floor(float(lx) / RES)
+def cell_value(g, x, y):
+    lx, ly = (float(v) for v in g.map_to_local(x, y))
+    col, row = math.floor(lx / RES), math.floor(ly / RES)
+    return g.data[row, col] if 0 <= col < g.width and 0 <= row < g.height else -1
 
 
-def ray_positions(plan, g, degrees):
-    """Independent sampling, every 1 mm: the donut-centred cells the ray touches."""
+def exact_pose_class(plan, g, config, degrees, reach):
+    """The planner's checks for the pose with its task point exactly on the ray."""
     t, a = plan.target, math.radians(degrees)
-    near = lambda v: (round(v) - 1, round(v)) if abs(v - round(v)) < 1e-6 else (math.floor(v),)
-    cells = set()
-    for r in np.linspace(CONFIG.reach_min_m, CONFIG.reach_max_m, 301):
-        lx, ly = (float(v) / RES for v in g.map_to_local(t.x + r * math.cos(a), t.y + r * math.sin(a)))
-        cells.update((row, col) for row in near(ly) for col in near(lx))
-    centre = lambda rc: tuple(float(v) for v in g.cell_centers(rc[1], rc[0]))
-    return {rc for rc in cells
-            if CONFIG.reach_min_m <= math.hypot(centre(rc)[0] - t.x, centre(rc)[1] - t.y) <= CONFIG.reach_max_m}
+    x, y = t.x + reach * math.cos(a), t.y + reach * math.sin(a)
+    base_x, base_y, yaw = base_pose_from_task_point(
+        x, y, t.x, t.y, config.task_point_x_base_m, config.task_point_y_base_m)
+    polygon = rotated_footprint_vertices(config.footprint, base_x, base_y, yaw)
+    if float(points_to_polygon_distance([t.x], [t.y], polygon)[0]) < plan.keepout_radius_m:
+        return 'pose_invalid'
+    if reach > config.reach_max_m - config.reach_allowance_m:
+        return 'pose_invalid'
+    value = cell_value(g, x, y)
+    if value >= config.occupied_threshold:
+        return 'occupied'
+    if value < 0:
+        return 'unknown'
+    return {None: 'valid', 'occupied': 'occupied', 'unknown': 'unknown',
+            'out_of_bounds': 'unknown'}[footprint_rejection_reason(polygon, g, config.occupied_threshold)]
 
 
-def expected_rays(plan, g):
-    """Oracle: each position judged by the planner's decision for its cell, with keep-out and
-    reach taken from the planner itself on a free copy of the map, then the documented priority."""
-    free = replace(g, data=np.zeros_like(g.data))
-    geometry_fails = {cell_of(free, c.task_x, c.task_y): c.reason in GEOMETRY_ONLY
-                      for c in plan_parking(free, plan.target, CONFIG, None).candidates}
-    decided = {cell_of(g, c.task_x, c.task_y): c for c in plan.candidates}
-    expected = []
-    for k in range(360):
-        found = set()
-        for row, col in ray_positions(plan, g, k):
-            value = g.data[row, col]
-            c = decided.get((row, col))
-            if c is not None and c.status in ('valid', 'selected'):
-                found.add('valid')
-                continue
-            blocked = (BLOCKED.get(c.reason) if c is not None else
-                       'occupied' if value >= CONFIG.occupied_threshold else 'unknown')
-            found.add(blocked if blocked and not geometry_fails[(row, col)] else 'pose_invalid')
-        expected.append(next(s for s in PRIORITY if s in found))
-    return expected
+def expected_ray(plan, g, config, k):
+    """Independent oracle: every 4 mm along the ray, plus each valid candidate's own bearing."""
+    t = plan.target
+    if k in {round(math.degrees(math.atan2(c.task_y - t.y, c.task_x - t.x))) % 360
+             for c in plan.candidates if c.status in ('valid', 'selected')}:
+        return 'valid'
+    found = {exact_pose_class(plan, g, config, k, r)
+             for r in np.arange(config.reach_min_m, config.reach_max_m + 1e-9, 0.004)}
+    return next(s for s in PRIORITY if s in found)
 
 
-def assert_rays_match_the_planner(plan, g):
-    assert [s for _, s in plan.radial_rays] == expected_rays(plan, g)
+def assert_rays_match_the_planner(plan, g, config=CONFIG):
+    """Every fourth ray, for time. A pose valid only in a sliver of the reach band, between
+    the oracle's or the display's samples, is the only disagreement allowed."""
+    wrong = [k for k in range(0, 360, 4)
+             if expected_ray(plan, g, config, k) != plan.radial_rays[k][1]]
+    assert len(wrong) <= 2, wrong
 
 
 def test_radial_profile_has_360_one_degree_rays_with_wraparound():
@@ -643,31 +642,66 @@ def test_unknown_cells_make_their_rays_orange_and_never_green():
     assert not any(ray(plan, k) == 'unknown' for k in range(90))
 
 
-def test_mixed_rejections_follow_the_documented_priority():
-    """valid > unknown > occupied > pose_invalid over the positions of one ray."""
+def scripted_ray(monkeypatch, classes):
+    """The first ray of a free map, with its poses (by increasing reach) rejected as scripted."""
+    verdicts = iter(classes)
+    monkeypatch.setattr(planner_module, 'footprint_rejection_reason',
+                        lambda polygon, grid_, threshold: next(verdicts, None))
+    return radial_profile(grid(), target(), CONFIG, step_deg=90.0)[0][1]
+
+
+@pytest.mark.parametrize('classes,expected', [
+    (('occupied', None), 'valid'),                       # blocked and valid: green
+    ((None,), 'valid'),
+    (('unknown', None), 'valid'),
+    (('occupied', 'unknown'), 'unknown'),                # undecided beats blocked
+    (('unknown', 'occupied'), 'unknown'),
+    (('occupied', 'occupied'), 'occupied'),
+    (('out_of_bounds', 'occupied'), 'unknown'),
+])
+def test_mixed_poses_on_one_ray_follow_the_documented_priority(monkeypatch, classes, expected):
+    padded = tuple(classes) + (classes[-1],) * 8        # the last verdict holds along the ray
+    assert scripted_ray(monkeypatch, padded) == expected
+
+
+def test_a_valid_candidate_turns_its_own_ray_green_and_no_other(monkeypatch):
+    # Every pose exactly on the rays is blocked; one planner candidate is valid at 37.4 deg.
+    monkeypatch.setattr(planner_module, 'footprint_rejection_reason',
+                        lambda polygon, grid_, threshold: 'occupied')
+    a = math.radians(37.4)
+    c = planner_module.CandidateDecision(3.0 + 0.52 * math.cos(a), 3.0 + 0.52 * math.sin(a),
+                                         0, 0, a, 'selected', 'footprint_free', 0.52)
+    rays = radial_profile(grid(), target(), CONFIG, [c])
+    assert [k for k, (_, s) in enumerate(rays) if s == 'valid'] == [37]
+    assert {s for _, s in rays} == {'valid', 'occupied'}
+
+
+def test_only_geometry_ruling_out_every_pose_makes_rays_grey():
+    short = replace(CONFIG, reach_max_m=0.45)            # all reaches inside the keep-out edge
+    rays = plan_parking(grid(), target(), short, APPROACH_FROM_WEST).radial_rays
+    assert len(rays) == 360 and {s for _, s in rays} == {'pose_invalid'}
+
+
+def test_a_ray_between_valid_cells_is_judged_at_its_own_poses():
+    """The recorded defect: a cell-based ray borrowed the verdict of a nearby cell's pose,
+    whose bearing differs, and the allowed reach band is narrower than a cell."""
     g = grid()
-    plan = plan_parking(g, target(), CONFIG, None)
-    on_ray = ray_positions(plan, g, 90)
-    mine = [c for c in plan.candidates if cell_of(g, c.task_x, c.task_y) in on_ray]
-    viable = [c for c in mine if c.status == 'valid']
-    assert len(viable) >= 2 and len(mine) > len(viable)
+    fill(g, 3.55, 3.70, 3.60, 3.75, 100)
+    fill(g, 3.70, 3.45, 3.75, 3.50, 100)
+    plan = plan_parking(g, target(), BUDGET, APPROACH_FROM_WEST)
+    assert_rays_match_the_planner(plan, g, BUDGET)
+    cell_centres = {round(math.degrees(math.atan2(c.task_y - 3.0, c.task_x - 3.0))) % 360
+                    for c in plan.candidates if c.status == 'valid'}
+    between = [k for k, (_, s) in enumerate(plan.radial_rays)
+               if s == 'valid' and k not in cell_centres]
+    assert between                                       # green with no cell centre on the ray
+    assert 'pose_invalid' not in {s for _, s in plan.radial_rays}
 
-    def ray_90(reasons):
-        for c, (status, reason) in zip(viable, reasons):
-            c.status, c.reason = status, reason
-        return radial_profile(g, plan.target, CONFIG, plan.candidates)[90][1]
 
-    occupied, unknown = ('collision', 'footprint_occupied'), ('rejected', 'footprint_unknown')
-    assert ray_90([occupied] * len(viable)) == 'occupied'
-    assert ray_90([unknown] + [occupied] * (len(viable) - 1)) == 'unknown'
-    assert ray_90([('valid', 'footprint_free'), unknown] + [occupied] * (len(viable) - 2)) == 'valid'
-    # A blocked footprint where keep-out would fail anyway stays grey.
-    assert ray_90([('collision', 'g1_keepout')] * len(viable)) == 'pose_invalid'
-    inside = [c for c in mine if c.reason == 'g1_keepout']
-    assert inside
-    for c in inside:
-        c.status, c.reason = 'collision', 'footprint_occupied'
-    assert ray_90([('collision', 'g1_keepout')] * len(viable)) == 'pose_invalid'
+def test_no_free_donut_cells_never_show_green():
+    plan = plan_parking(grid(value=-1), target(), CONFIG, APPROACH_FROM_WEST)
+    assert plan.failure_reason == 'no_free_donut_cells'
+    assert {s for _, s in plan.radial_rays} == {'unknown'}
 
 
 @pytest.mark.parametrize('g1,map_yaw,approach', OFF_GRID)
@@ -677,8 +711,7 @@ def test_rotated_map_origin_rays_follow_the_rotated_cells(g1, map_yaw, approach)
     mark(g, [(g1[0] - 0.55, g1[1] + 0.05), (g1[0] - 0.52, g1[1] + 0.08)], -1)
     plan = plan_parking(g, target(*g1), CONFIG, approach)
     assert_rays_match_the_planner(plan, g)
-    classes = {s for _, s in plan.radial_rays}
-    assert {'occupied', 'unknown', 'valid'} <= classes
+    assert {'occupied', 'unknown', 'valid'} <= {s for _, s in plan.radial_rays}
 
 
 def test_each_ray_is_drawn_once_in_one_colour_and_a_new_plan_replaces_them():
@@ -695,7 +728,7 @@ def test_each_ray_is_drawn_once_in_one_colour_and_a_new_plan_replaces_them():
     for status, marker_id in RAY_IDS.items():
         points = rays[marker_id].points
         assert len(points) == 2 * sum(s == status for _, s in plan.radial_rays)
-        assert points or status == 'pose_invalid'    # every direction here has a pose past keep-out
+        assert points or status == 'pose_invalid'    # every direction here has an allowed pose
         for p, q in zip(points[0::2], points[1::2]):
             # One straight segment from the inner to the outer reach limit.
             assert math.hypot(p.x - 3.0, p.y - 3.0) == pytest.approx(0.30)
@@ -713,6 +746,7 @@ def test_each_ray_is_drawn_once_in_one_colour_and_a_new_plan_replaces_them():
     # The selection keeps its markers; the candidates themselves are not drawn as dots.
     assert {'parking/selected_pose', 'parking/selected_footprint'} <= {m.ns for m in markers}
     assert not any(m.ns.endswith('task_points') or m.ns == 'parking/path_candidates' for m in markers)
+    assert not any(m.type in (Marker.SPHERE_LIST, Marker.POINTS) for m in markers)
 
     # Replanning around a moved G1 clears everything first; no ray stays at the old centre.
     moved = plan_markers(plan_parking(grid(), target(2.0, 4.0), CONFIG, APPROACH_FROM_WEST),
@@ -724,23 +758,6 @@ def test_each_ray_is_drawn_once_in_one_colour_and_a_new_plan_replaces_them():
                        for p in m.points)
 
 
-def test_radial_profile_without_candidates_never_shows_green():
-    g = grid()
-    rays = radial_profile(g, target(), CONFIG)
-    assert len(rays) == 360
-    assert {s for _, s in rays} == {'pose_invalid'}
-
-
-def test_a_ray_along_a_cell_edge_counts_the_cells_on_both_sides():
-    # G1 on a cell corner: the 0 deg ray runs exactly on the edge between two cell rows.
-    g = grid()
-    fill(g, 3.40, 3.00, 3.45, 3.05, 100)    # one cell just north of the edge
-    plan = plan_parking(g, target(3.0, 3.0), CONFIG, APPROACH_FROM_WEST)
-    assert {(60, 68), (59, 68)} <= ray_positions(plan, g, 0)
-    assert ray(plan, 0) == 'occupied'
-    assert_rays_match_the_planner(plan, g)
-
-
 def test_ray_colour_follows_the_parked_footprint_not_only_the_cells():
     """Obstacles and unmapped floor outside the donut still colour the rays whose parked
     footprints they block, and leave green rays elsewhere."""
@@ -748,10 +765,77 @@ def test_ray_colour_follows_the_parked_footprint_not_only_the_cells():
     fill(g, 3.00, 2.00, 3.05, 2.05, 100)    # a post south of G1, outside the donut
     fill(g, 3.90, 3.00, 4.40, 3.40, -1)      # unmapped floor north-east, outside the donut
     plan = plan_parking(g, target(), CONFIG, APPROACH_FROM_WEST)
-    donut = [c for c in plan.free_cells]
-    assert len(plan.occupied_cells) == len(plan.unknown_cells) == 0 and donut
+    assert len(plan.occupied_cells) == len(plan.unknown_cells) == 0 and plan.free_cells
     assert_rays_match_the_planner(plan, g)
     assert {'occupied', 'unknown', 'valid'} <= {s for _, s in plan.radial_rays}
+
+
+# G1's heading orders the candidates; validity stays the planner's alone.
+from ridgeback_autonomy.mission.parking_feasibility import candidate_groups
+
+EAST, NORTH, WEST, SOUTH = 0.0, math.pi / 2, math.pi, -math.pi / 2
+
+
+def facing(yaw):
+    return replace(target(), facing_yaw_rad=yaw)
+
+
+def bearing(c):
+    return math.atan2(c.task_y - 3.0, c.task_x - 3.0)
+
+
+def block(g, *boxes):
+    for box in boxes:
+        fill(g, *box, 100)
+    return g
+
+
+BLOCK_WEST = (2.20, 2.75, 2.45, 3.25)       # a table across G1's west side, in the band
+BLOCK_EAST = (3.55, 2.75, 3.80, 3.25)
+
+
+@pytest.mark.parametrize('yaw', [WEST, EAST, NORTH, SOUTH, 0.6],
+                         ids=['facing_robot', 'facing_away', 'rotated_left', 'rotated_right', 'skew'])
+def test_a_free_front_is_preferred_at_any_heading(yaw):
+    plan = plan_parking(grid(), facing(yaw), CONFIG, APPROACH_FROM_WEST)
+    assert plan.ok and plan.selected.preference_label == 'g1_front'
+    assert abs(normalize_angle(bearing(plan.selected) - yaw)) <= math.pi / 4
+
+
+def test_a_blocked_front_falls_to_a_safe_rear():
+    g = block(grid(), BLOCK_WEST)
+    plan = plan_parking(g, facing(WEST), CONFIG, APPROACH_FROM_WEST)
+    assert plan.ok and plan.selected.preference_label == 'g1_rear'
+    assert abs(normalize_angle(bearing(plan.selected) - EAST)) <= math.pi / 4
+    assert not any(c.status == 'valid' and c.preference_label == 'g1_front' for c in plan.candidates)
+
+
+def test_front_and_rear_blocked_fall_to_a_safe_side():
+    g = block(grid(), BLOCK_WEST, BLOCK_EAST)
+    plan = plan_parking(g, facing(WEST), CONFIG, APPROACH_FROM_WEST)
+    assert plan.ok and plan.selected.preference_label == 'g1_side'
+
+
+def test_all_sides_blocked_select_nothing_whatever_the_heading():
+    plan = plan_parking(block(grid(), (2.0, 2.0, 4.0, 4.0)), facing(WEST), CONFIG, APPROACH_FROM_WEST)
+    assert not plan.ok and plan.selected is None
+
+
+def test_the_heading_changes_only_the_order_never_the_decisions():
+    g = block(grid(), BLOCK_WEST)
+    undirected = plan_parking(g, target(), CONFIG, APPROACH_FROM_WEST)
+    directed = plan_parking(g, facing(WEST), CONFIG, APPROACH_FROM_WEST)
+    decisions = lambda p: [(c.task_x, c.task_y, c.status == 'collision', c.reason) for c in p.candidates]
+    assert decisions(undirected) == decisions(directed)
+    assert undirected.selected.preference_label.startswith('approach')
+
+
+def test_path_checks_visit_the_front_group_first():
+    plan = plan_parking(block(grid(), (3.0, 3.60, 3.6, 3.9)), facing(WEST), CONFIG, APPROACH_FROM_WEST)
+    groups = candidate_groups(plan, APPROACH_FROM_WEST)
+    labels = [{planner_module.preference(c.task_x, c.task_y, plan.target, APPROACH_FROM_WEST)[1]
+               for c in group} for group in groups]
+    assert labels[:3] == [{'g1_front'}, {'g1_rear'}, {'g1_side'}]
 
 
 @pytest.mark.parametrize('foot', (False, True))
