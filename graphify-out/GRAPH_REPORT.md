@@ -1,7 +1,7 @@
-# Graph Report - /home/stefi/DyNAMO/DyNAMO-Ridgeback  (2026-10-26)
+# Graph Report - /home/stefi/DyNAMO/DyNAMO-Ridgeback  (2026-11-01)
 
 ## Corpus Check
-- Large corpus: 736 files · ~710,554 words. Semantic extraction will be expensive (many Claude tokens). Consider running on a subfolder.
+- Large corpus: 739 files · ~719,011 words. Semantic extraction will be expensive (many Claude tokens). Consider running on a subfolder.
 
 ## Summary
 - 6889 nodes · 14378 edges · 412 communities (344 shown, 68 thin omitted)

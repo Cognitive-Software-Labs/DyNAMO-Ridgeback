@@ -81,6 +81,7 @@ troubleshooting, planning, and historical documentation.
 
 ## Active plans
 
+- [BENCHMARKING — Humanoid detector comparison](plans/BENCHMARKING_detector_comparison.md) — paused; private tooling snapshot and resumption instructions
 - [BENCHMARKING — Execution-environment qualification](plans/BENCHMARKING_environment_qualification.md) — prerequisite for tuning and benchmark claims
 - [BENCHMARKING — Combined-model throughput](plans/BENCHMARKING_model_throughput.md) — run the existing sweep and determine whether concurrency is needed
 - [BENCHMARKING — Live configurator sweeps](plans/BENCHMARKING_live_configurator_sweeps.md) — blocked on live process ownership and cleanup; follows environment qualification
