@@ -7,6 +7,8 @@ are excluded from ordinary repository search and the generated knowledge graph.
 
 ## Localization and perception
 
+- [OWLv2 threshold selection and live exploration observation](2026-11-01-owlv2-threshold-selection.md) — offline frame sampling, robot/person trade-off, remaining occlusion failures and qualitative live evidence behind the 0.30 default.
+
 - [Intel–Thor perception frame timing and depth-one deployment](2026-10-22-perception-frame-timing.md) — warm detector cost, matched-frame delivery, population limits, and queue-change verification.
 - [Package split simulator runtime qualification](2026-09-18-package-split-runtime.md)
 

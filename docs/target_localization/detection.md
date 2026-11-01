@@ -18,10 +18,14 @@ The current defaults are:
 | Detector implementation (`detector`) | `owlv2` |
 | Checkpoint (`detection_model`) | `google/owlv2-base-patch16-ensemble` |
 | Candidate label | `humanoid robot` |
-| Confidence threshold | `0.55` |
+| Confidence threshold | `0.30` |
 | Maximum inference cadence | `10 Hz` |
 | Same-label NMS IoU threshold | `0.5` |
 | Same-label containment threshold | `0.95` intersection-over-smaller |
+
+The threshold favors recovery under occlusion while retaining the generic
+`humanoid robot` prompt. Lower thresholds also admit more false detections; this
+is a confidence filter, not a guarantee of person rejection or precise boxes.
 
 OWLv2 is an implementation choice, not a downstream dependency. Consumers use
 only the published image grid, boxes, labels, scores, and original image header.
@@ -48,7 +52,7 @@ source perception_venv/bin/activate
 ros2 run ridgeback_localization target_detector_node --ros-args \
   -p detector:=owlv2 \
   -p detection_model:=google/owlv2-base-patch16-ensemble \
-  -p target_labels:="humanoid robot" -p detection_threshold:=0.55 \
+  -p target_labels:="humanoid robot" -p detection_threshold:=0.30 \
   -p detector_fps:=10.0
 ```
 
@@ -183,3 +187,4 @@ need separate measurements.
 ## Archived evidence
 
 - [October 22 Intel–Thor frame timing and depth-one deployment](../../archive/engineering/2026-10-22-perception-frame-timing.md)
+- [OWLv2 threshold comparison and operator-reported exploration observation](../../archive/engineering/2026-11-01-owlv2-threshold-selection.md) — evidence and limitations behind the change from 0.55 to 0.30.

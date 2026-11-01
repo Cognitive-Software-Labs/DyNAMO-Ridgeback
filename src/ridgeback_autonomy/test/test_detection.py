@@ -149,7 +149,7 @@ def test_detector_settings_are_ros_free_and_validate_effective_values() -> None:
     baseline = resolve_detector_settings({})
     assert baseline == {
         'detector': 'owlv2', 'detection_model': DETECTION_MODEL_DEFAULT,
-        'target_labels': 'humanoid robot', 'detection_threshold': 0.55,
+        'target_labels': 'humanoid robot', 'detection_threshold': 0.30,
         'detector_fps': 10.0, 'detector_debug': False,
     }
     explicit = resolve_detector_settings({

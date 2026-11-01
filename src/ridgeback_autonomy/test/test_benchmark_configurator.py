@@ -289,7 +289,7 @@ def test_an_authored_live_sweep_carries_the_polar_settings(tmp_path):
         'detector': 'owlv2',
         'detection_model': 'google/owlv2-base-patch16-ensemble',
         'target_labels': 'humanoid robot',
-        'detection_threshold': 0.55,
+        'detection_threshold': 0.30,
         'detector_fps': 5.0,
         'detector_debug': False,
     }

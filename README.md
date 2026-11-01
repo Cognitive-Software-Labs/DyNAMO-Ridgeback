@@ -305,9 +305,11 @@ unit with the template; `remove` uninstalls it and keeps the settings unless
 `--purge` is given. Stop any launch started by hand first; `apply` refuses
 while one runs.
 `tools/intel_thor/thor_lan_route` must be applied first, or Thor never receives
-static TF. For a person target, OWLv2 scores below the default
-`detection_threshold` of 0.55 on `r100_0160`; set `detection_threshold:=` explicitly
-and record it. Preserve observed sensor topics and the observed TF base frame:
+static TF. The shared humanoid-robot confidence default is `0.30`. For a
+different target or experiment, set `target_labels:=` and
+`detection_threshold:=` explicitly and record both. Existing
+`/etc/default/dynamo-localization` values override repository defaults. Preserve
+observed sensor topics and the observed TF base frame:
 
 ```bash
 : "${ROS_DOMAIN_ID:?Set the deployment domain shared with Intel}"
@@ -321,7 +323,7 @@ ros2 launch ridgeback_localization localization.launch.py \
   color_topic:="$COLOR_TOPIC" depth_topic:="$DEPTH_TOPIC" camera_info_topic:="$CAMERA_INFO_TOPIC" \
   estimators:=projective_ranging,euclidean_reconstruction \
   detector:=owlv2 detection_model:=google/owlv2-base-patch16-ensemble \
-  target_labels:="humanoid robot" detection_threshold:=0.55 detector_fps:=10.0 \
+  target_labels:="humanoid robot" detection_threshold:=0.30 detector_fps:=10.0 \
   displays:=false
 ```
 
@@ -470,9 +472,9 @@ For an explicit baseline selection, the quick-start wrappers forward the same
 launch arguments untouched (the build wrapper forwards to the start wrapper):
 
 ```bash
-bash start_exploration.sh initial_test_world detector:=owlv2 \
+bash start_exploration.sh initial_test_world target_localization_enabled:=true detector:=owlv2 \
   detection_model:=google/owlv2-base-patch16-ensemble \
-  target_labels:="humanoid robot" detection_threshold:=0.55 detector_fps:=10.0
+  target_labels:="humanoid robot" detection_threshold:=0.30 detector_fps:=10.0
 ```
 
 `localization_mode:=external` consumes an already-running detector and rejects
@@ -517,7 +519,7 @@ Arguments:
 | `detector` | `owlv2` | Startup-only implementation selector; only `owlv2` is supported |
 | `detection_model` | `google/owlv2-base-patch16-ensemble` | Checkpoint identifier for the selected detector |
 | `target_labels` | `humanoid robot` | Comma-separated detection queries |
-| `detection_threshold` | `0.55` | Confidence floor in `(0, 1]` |
+| `detection_threshold` | `0.30` | Confidence floor in `(0, 1]` |
 | `detector_fps` | `10.0` | Upper bound on detection step starts; every selected measurement row inherits this cadence |
 | `detector_debug` | `false` | Log detector cadence, superseded frames, and bounded stage timings |
 | `depth_source` | `stereoscopic` | Aligned depth source for the mask rows — `stereoscopic` or `monocular` (Depth-Anything V2; its checkpoint must be cached or downloads enabled) |
@@ -1207,7 +1209,7 @@ ros2 launch ridgeback_autonomy target_distance_benchmark.launch.py backend:=isaa
 # The same production baseline, with the detector settings explicit
 ros2 launch ridgeback_autonomy target_distance_benchmark.launch.py \
   detector:=owlv2 detection_model:=google/owlv2-base-patch16-ensemble \
-  target_labels:="humanoid robot" detection_threshold:=0.55 detector_fps:=10.0
+  target_labels:="humanoid robot" detection_threshold:=0.30 detector_fps:=10.0
 
 # Point cloud only
 ros2 launch ridgeback_autonomy target_distance_benchmark.launch.py estimators:=pointcloud
@@ -1271,7 +1273,7 @@ Arguments:
 | `detector` | `owlv2` | Startup-only detector implementation; only `owlv2` is registered. Persistent environment `defaults` in a sweep |
 | `detection_model` | `google/owlv2-base-patch16-ensemble` | Checkpoint identifier, distinct from `detector`; persistent environment `defaults` in a sweep |
 | `target_labels` | `humanoid robot` | Comma-separated detection queries; persistent environment `defaults` in a sweep |
-| `detection_threshold` | `0.55` | Finite confidence floor in `(0, 1]`; persistent environment `defaults` in a sweep |
+| `detection_threshold` | `0.30` | Finite confidence floor in `(0, 1]`; persistent environment `defaults` in a sweep |
 | `detector_fps` | `10.0` | Upper bound on the detection rate every measurement row inherits. Belongs to the persistent environment layer, so in a sweep it is a `defaults` key and cannot vary per configuration |
 | `detector_debug` | `false` | Default-off detector evidence logging: achieved cadence, superseded frames, and bounded cold/warm percentiles for the throttle wait, decode, inference, parse, publish and CUDA synchronization. Environment-layer, like `detector_fps` |
 | `headless_rendering` | `false` | Gazebo only: optional default-off server-only EGL sensor rendering. In sweeps this is a persistent-environment `defaults` key and cannot vary per configuration; `tools/gpu-run` remains the GUI-capable NVIDIA GLX path |
@@ -1437,7 +1439,7 @@ defaults:
   detector: owlv2
   detection_model: google/owlv2-base-patch16-ensemble
   target_labels: humanoid robot
-  detection_threshold: 0.55
+  detection_threshold: 0.30
   detector_fps: 10.0
 
 configs:
