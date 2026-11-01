@@ -48,14 +48,37 @@ flowchart LR
 
 ## Phases
 
+All phases are assigned to the student assistant, in order. A phase is done
+when its check passes, not when its code exists.
+
 | Phase | Work | Done when |
 |---|---|---|
-| F1 Crowd scenes | Several moving pedestrians, including look-alikes, in the Gazebo and Isaac backends; ground-truth positions from the simulator | Every scenario below spawns in both backends |
-| F2 People tracking | `people_tracker` on simulated data | Leader-track coverage and ID switches measured per scenario |
-| F3 Re-identification | OSNet-AIN embeddings in `People` | Leader-pick accuracy among nearby people measured |
-| F4 Closed loop in sim | `follow_controller`; same scenarios in both simulators | Every metric below reported for both simulators |
-| F5 Real robot | Stationary recordings replayed offline first, then driving once the [driving readiness](../physical/driving_readiness.md) gates allow it; the leader wears a ground-truth tag the system never reads | Real-robot numbers for the scenario set |
-| F6 Comparison | OmTrackVLA through `vla_client`, other methods | Methods compared on identical scenarios |
+| F1 Crowd scenes | Moving pedestrians, including two dressed alike, in the Gazebo and Isaac backends; one scene per scenario below | Every scenario plays in both backends and the simulator logs every person's ground-truth position |
+| F2 People tracking | `people_tracker` node: merged scan plus D455 colour and depth, constant-velocity fusion, stable ids; publishes `People` | Every scenario has a report, scored against simulator ground truth, of leader-track losses and ID switches |
+| F3 Re-identification | Pretrained OSNet-AIN embeddings in `Person.appearance` | `leader_identity` reaches `LOCKED` on the leader in every scenario; leader-pick accuracy among nearby people reported per scenario, look-alike scenario included |
+| F4 Closed loop in sim | `follow_controller` through Nav2; moves only while `LOCKED` | Every scenario runs start to finish in both simulators with zero wrong-follow time, and every metric below is reported for both |
+| F5 Real robot | Recorded people replayed offline through the tracker first, then driving under the [driving readiness](../physical/driving_readiness.md) gates; the leader wears a ground-truth tag the system never reads | The scenario set and every metric exist for the real robot |
+| F6 Comparison | OmTrackVLA through `vla_client` (server `planner` mode) on the same scenarios | OmTrackVLA's metrics sit beside the baseline's for every scenario, in simulation and on the robot |
+
+## Working rules
+
+The branch and the robot are shared with the exploration work.
+
+- Work only on `leader-following`, inside `leader_follow_interfaces`,
+  `ridgeback_leader_follow`, the leader-following docs and new simulator
+  scenario files. Exploration code, launches and configuration stay unchanged;
+  a needed shared change is agreed first.
+- Nothing lives only on the robot: every robot-side change is committed and
+  pushed before leaving it. Robot services and settings are installed from the
+  repository (see [robot-local deployment](../physical/robot_local_deployment.md));
+  change their sources here and reinstall, never hand-edit installed copies.
+- Use a separate checkout or worktree on the robot rather than switching the
+  shared one; stop only processes you started.
+- Robot-wide settings (robot identity in `/etc/clearpath/robot.yaml`, drivers,
+  DDS and network, camera services) change only by agreement, through the
+  repository.
+- Documentation rides the code commit that changes the behavior; run outputs go
+  under `artifacts/`, and the numbers that matter go into the docs.
 
 ## Evaluation
 

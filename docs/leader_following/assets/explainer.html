@@ -141,15 +141,22 @@ p { margin: 0; max-width: 65ch; }
 .metric:hover { border-color: var(--scan); background: color-mix(in srgb, var(--scan) 8%, var(--panel)); }
 .metric b { color: var(--scan); font-weight: 600; }
 
-/* ---------- progress ---------- */
-.track { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 0; position: relative; }
-.track::before { content: ""; position: absolute; left: 7%; right: 7%; top: 13px; height: 2px; background: var(--line); }
-.step { display: grid; justify-items: center; text-align: center; gap: 8px; padding: 0 6px; position: relative; }
-.step .ball { width: 28px; height: 28px; border-radius: 50%; border: 2px solid var(--line); background: var(--panel); display: grid; place-items: center; font: 600 .75rem var(--mono); }
-.step.done .ball { background: var(--ok); border-color: var(--ok); color: var(--panel); }
-.step.now .ball { border-color: var(--robot); color: var(--robot); box-shadow: 0 0 0 6px var(--glow); }
-.step b { font-size: .92rem; }
-.step span { font-size: .82rem; color: var(--muted); }
+/* ---------- tasks and rules ---------- */
+.tasks { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.task { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; display: grid; gap: 10px; align-content: start;
+  transition: transform .2s, box-shadow .2s, border-color .2s; }
+.task:hover { transform: translateY(-3px); border-color: var(--robot); box-shadow: 0 10px 30px var(--glow); }
+.task.now { border-color: var(--robot); box-shadow: 0 0 0 3px var(--glow); }
+.task-top { display: flex; justify-content: space-between; align-items: center; }
+.task .num { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font: 600 .85rem var(--mono); border: 2px solid var(--line); color: var(--muted); }
+.task.now .num { border-color: var(--robot); color: var(--robot); }
+.task p { font-size: .93rem; color: var(--muted); }
+.task .done { color: var(--ink); background: color-mix(in srgb, var(--ok) 9%, var(--panel)); border-left: 3px solid var(--ok); padding: 8px 10px; border-radius: 0 8px 8px 0; }
+.task .done b { color: var(--ok); }
+.rules { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.rule-card { border: 1px solid var(--line); background: var(--panel); border-radius: 12px; padding: 16px 18px; display: grid; gap: 6px; transition: border-color .2s; }
+.rule-card:hover { border-color: var(--leader); }
+.rule-card p { font-size: .93rem; color: var(--muted); }
 .questions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-top: 30px; }
 .q { border-left: 3px solid var(--leader); padding: 4px 0 4px 14px; display: grid; gap: 4px; }
 .q p { font-size: .92rem; color: var(--muted); }
@@ -172,16 +179,13 @@ footer { color: var(--muted); font-size: .85rem; border-top: 1px solid var(--lin
   .pipe { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
   .stage::after { display: none; }
   .split, .idgrid, .compare { grid-template-columns: 1fr; }
-  .scen { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .scen, .tasks { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 620px) {
   main { gap: 64px; padding-block: 24px 56px; }
   .tiles3, .scen, .questions { grid-template-columns: 1fr; }
   .pipe { grid-template-columns: 1fr; }
-  .track { grid-template-columns: 1fr; gap: 14px; }
-  .track::before { left: 13px; right: auto; top: 6px; bottom: 6px; width: 2px; height: auto; }
-  .step { grid-template-columns: 28px 1fr; justify-items: start; text-align: left; column-gap: 12px; }
-  .step .ball { grid-row: span 2; }
+  .tasks, .rules { grid-template-columns: 1fr; }
   .row { grid-template-columns: 1fr; gap: 2px; }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -378,7 +382,7 @@ footer { color: var(--muted); font-size: .85rem; border-top: 1px solid var(--lin
   <div class="section-head">
     <span class="eyebrow">Why build this first</span>
     <h2>A baseline before the big model</h2>
-    <p class="lede">The repository started as a deployment of OmTrackVLA, a vision-language-action model that turns camera images and a sentence into a path. It stays as a candidate. A simple, measurable system comes first, so the model has something to beat.</p>
+    <p class="lede">The project started as a deployment of OmTrackVLA, a vision-language-action model that turns camera images and a sentence into a path. It stays as a candidate. A simple, measurable system comes first, so the model has something to beat.</p>
   </div>
   <div class="compare">
     <div class="col">
@@ -427,19 +431,66 @@ footer { color: var(--muted); font-size: .85rem; border-top: 1px solid var(--lin
   </div>
 </section>
 
-<!-- ============ PROGRESS ============ -->
+<!-- ============ TASKS ============ -->
 <section>
   <div class="section-head">
-    <span class="eyebrow">Where we are</span>
-    <h2>Groundwork done, crowds in simulation next</h2>
+    <span class="eyebrow">The work</span>
+    <h2>Six tasks, in this order</h2>
+    <p class="lede">Each task ends with a check anyone can repeat. A task is done when its check passes, not when its code exists. The groundwork is already in place: the leader lock runs as a robot program, and the message formats for people and the leader are defined.</p>
   </div>
-  <div class="track">
-    <div class="step done"><i class="ball">✓</i><b>Groundwork</b><span>Lock logic running as a robot node; message types for people and the leader</span></div>
-    <div class="step now"><i class="ball">1</i><b>Crowds in sim</b><span>Walking people and look-alikes in both simulators</span></div>
-    <div class="step"><i class="ball">2</i><b>Track people</b><span>Find and follow everyone with lidar and the depth camera</span></div>
-    <div class="step"><i class="ball">3</i><b>Check identity</b><span>Can appearance pick the leader out of the people nearby?</span></div>
-    <div class="step"><i class="ball">4</i><b>Drive in sim</b><span>Close the loop; the same scenes must work in both simulators</span></div>
-    <div class="step"><i class="ball">5</i><b>Real robot</b><span>Recordings first, then driving; then compare other approaches</span></div>
+  <div class="tasks">
+    <article class="task now">
+      <div class="task-top"><span class="num">1</span><span class="pill next">start here</span></div>
+      <h3>Crowds in simulation</h3>
+      <p>Add walking people to the Gazebo and Isaac worlds the robot already uses, including two dressed alike. Build the six test scenes from the list above.</p>
+      <p class="done"><b>Done when</b> each of the six scenes plays in both simulators, and the simulator records where every person really was.</p>
+    </article>
+    <article class="task">
+      <div class="task-top"><span class="num">2</span><span class="pill later">then</span></div>
+      <h3>Find and track people</h3>
+      <p>A people tracker that combines the merged lidar scan and the depth camera, gives each person a stable number and publishes everyone it sees.</p>
+      <p class="done"><b>Done when</b> every scene has a report, checked against the simulator's record, of how often the leader's track was lost or swapped with someone else.</p>
+    </article>
+    <article class="task">
+      <div class="task-top"><span class="num">3</span><span class="pill later">then</span></div>
+      <h3>Recognise the leader</h3>
+      <p>Add appearance fingerprints (a pretrained re-identification network) to each tracked person, so the lock can tell the leader from the others.</p>
+      <p class="done"><b>Done when</b> the robot locks onto the leader in every scene, and the share of correct picks among nearby people is reported, look-alike scene included.</p>
+    </article>
+    <article class="task">
+      <div class="task-top"><span class="num">4</span><span class="pill later">then</span></div>
+      <h3>Follow in simulation</h3>
+      <p>A follow controller that keeps the set distance through the existing navigation stack and moves only while the leader is confirmed.</p>
+      <p class="done"><b>Done when</b> all six scenes run start to finish in both simulators, the robot never moves behind the wrong person, and all eight scores are reported for both simulators.</p>
+    </article>
+    <article class="task">
+      <div class="task-top"><span class="num">5</span><span class="pill later">then</span></div>
+      <h3>Real robot</h3>
+      <p>First replay robot recordings of people walking past through the tracker, then drive. The leader wears a reference marker the robot never uses.</p>
+      <p class="done"><b>Done when</b> the same scenes and the same eight scores exist for the real robot.</p>
+    </article>
+    <article class="task">
+      <div class="task-top"><span class="num">6</span><span class="pill later">then</span></div>
+      <h3>Compare with OmTrackVLA</h3>
+      <p>Connect the OmTrackVLA model server as an alternative way to choose the path, and run it through the same scenes.</p>
+      <p class="done"><b>Done when</b> OmTrackVLA's scores sit next to the baseline's for every scene, in simulation and on the robot.</p>
+    </article>
+  </div>
+</section>
+
+<!-- ============ RULES ============ -->
+<section>
+  <div class="section-head">
+    <span class="eyebrow">Working on a shared robot</span>
+    <h2>Everything lands in the repository, nothing breaks for others</h2>
+    <p class="lede">The robot and the code base are shared with the exploration project. These rules keep both working for everyone.</p>
+  </div>
+  <div class="rules">
+    <div class="rule-card"><h3>Stay on the leader-following branch</h3><p>All work goes on the <span class="mono">leader-following</span> branch, in the leader-following packages and pages. Exploration code, its launch files and its settings stay untouched; if something shared really has to change, ask first.</p></div>
+    <div class="rule-card"><h3>Nothing lives only on the robot</h3><p>Every change made on the robot, code or settings, is committed and pushed before you leave it. Robot settings and services are installed from the repository: change the source there and reinstall, never hand-edit files on the robot.</p></div>
+    <div class="rule-card"><h3>Leave the robot as you found it</h3><p>Use your own copy of the code on the robot instead of switching the shared one to another branch. Stop only the programs you started, and leave others' processes, services and recordings alone.</p></div>
+    <div class="rule-card"><h3>Robot-wide settings are not yours to change</h3><p>The robot's identity, sensor drivers, network and camera services serve everyone. Changing them needs agreement first, and the change then goes into the repository like any other.</p></div>
+    <div class="rule-card"><h3>Docs travel with the code</h3><p>When behaviour changes, the page that describes it changes in the same commit. Results and recordings go in the generated-output folder, and the numbers that matter go into the docs.</p></div>
   </div>
   <div class="questions">
     <div class="q"><h3>How crowded?</h3><p>A lab corridor with a few people, or a busy public hall? This sets the test densities and speed limits.</p></div>
