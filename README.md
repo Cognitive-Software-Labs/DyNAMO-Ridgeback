@@ -15,6 +15,10 @@ not recorded robot data). Interactive version and plain-language overview:
 [visual explainer](docs/exploration/assets/explainer.html); open it in a
 browser from a clone.*
 
+[![Animated top-down hall: the robot follows one person, stops when passers-by block its view, and re-locks only after re-confirming the leader](docs/leader_following/assets/leader_following.gif)](docs/leader_following/assets/explainer.html)
+
+*Leader following in a crowd, work in progress (illustration): [visual explainer and open tasks](docs/leader_following/assets/explainer.html).*
+
 This README owns installation, public commands and operator workflows. It is a
 router: detailed references and physical runbooks live in the pages it links.
 
