@@ -1267,6 +1267,7 @@ Arguments:
 | `overlay` | `true` | Publish the camera overlay with selected estimator panels |
 | `estimators` | `all` | Comma-separated estimator subset to compare in one run: `pointcloud`, `projective_ranging`, `euclidean_reconstruction`, `polar_profiling`. Any subset works, rows individually — `estimators:=polar_profiling` runs that row alone |
 | `scenario` | empty | Scenario YAML; empty uses the packaged full scenario set |
+| `background` | empty | Packaged background layout that furnishes the room, spawned once per run and adjusted per scene: `lab`. Empty runs the bare room, the control. Refused for a scenario file the layout's generated drop lists do not cover; see [benchmark semantics](docs/target_distance_benchmarking/semantics.md#background-props) |
 | `depth_source` | `stereoscopic` | Aligned-depth producer for the `projective_ranging`/`euclidean_reconstruction` rows: `stereoscopic` or `monocular`; comparing sources = two runs |
 | `mask_gate` | `box` | Mask front-end for the mask-based rows: `box` (rasterized detection box, no model) or `silhouette` (segmentation model prompted with the boxes; needs `perception_venv`); comparing gates = two runs |
 | `depth_match_debug` | `false` | Default-off mask-worker evidence logging: exact-depth delivery, pending replacements, batch completion/publication age, and bounded cold/warm percentiles for RGB, SlimSAM, depth production, mask preparation, estimator reduction, worker, lock, and CUDA-synchronization timing |

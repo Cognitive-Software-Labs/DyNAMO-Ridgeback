@@ -64,6 +64,42 @@ What a Gazebo-to-Isaac comparison may claim:
   run to run on any estimator path: same-code runs differ in detector outcomes
   and camera-path estimates.
 
+### Background props
+
+`background:=lab` furnishes the room with one fixed layout of static props,
+`config/benchmark_background_lab.yaml`; an empty `background` runs the bare
+room and is the control. Props are never moved or randomized. For each scene a
+deterministic rule removes every prop that would conflict with it: within
+0.70 m of a target centre, within 0.30 m of an object footprint, within 0.45 m
+of a camera-to-target or camera-to-object sight line, or inside a target's
+bearing cone (its width plus the margin) closer than 2.3 m behind it. The
+2.3 m sits 0.5 m beyond the farthest designed behind-target object, so
+near-background interference stays the job of the `interfere_*` and
+`trap_layered_*` scenes.
+
+The rule runs offline. `tools/benchmark/build_background.py` writes each
+packaged scene's removals to `config/benchmark_backgrounds/lab.yaml`, which
+pins the layout and every scenario file by SHA-256. The runner refuses a
+layout or scenario file that changed since then, a scenario file the drop
+lists do not cover, and any scene without a list; regenerate after editing
+either. Footprints come from the Gazebo models, the geometry's source of
+truth; the Isaac models are generated from them (see the
+[asset notes](#simulator-assets-and-cross-simulator-comparison)).
+
+The runner spawns the whole layout once, after the readiness gates and before
+the first trial, as `bench_<run>_bg_<prop>`. Before each trial it removes the
+props that scene drops and restores any an earlier scene removed, starting
+from what is actually present, so the room at capture time depends only on the
+scene. The trial's own rollback still covers only its objects and targets. At
+the end of the run every prop is deleted; an interrupted run leaves the rest
+under the `bench_` prefix, which the sweep reaps and which makes the next
+single run refuse to start.
+
+Props use Gazebo Fuel meshes (CC BY 4.0, attribution beside each model) and
+in-repo primitives, one mesh set for both simulators. Expect them to move
+coverage and extra-detection numbers: compare a background run with the bare
+room of the same revision, never with older bare-room evidence alone.
+
 ### Scenario schema
 
 Scenario YAML is declarative. A file contains optional defaults and a non-empty
@@ -85,7 +121,9 @@ scenes:
 Coordinates are world-frame planar poses: `x` is forward, `y` is lateral
 (positive left), and `yaw` is radians about +Z. Scenarios carry no height. The
 runner spawns each model at its catalog `spawn_z_m`, which is 0 for every
-packaged model. `benchmarking/scenarios.py` is the authoritative parser and
+packaged scene model (background props stand on the floor top, 0.05).
+Within a trial the runner spawns the scene's objects first, then its targets,
+so the scene is complete before a target appears. `benchmarking/scenarios.py` is the authoritative parser and
 validation contract; scenario-file comments record generation-specific design
 and certification details.
 

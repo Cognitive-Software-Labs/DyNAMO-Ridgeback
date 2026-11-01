@@ -34,7 +34,15 @@ The run also names its simulator:
     and first spawn.
 - `parameters` repeats `backend` and `backend_settings`.
 - `summary.md` names the backend, the world (with its native name when it
-  differs) and the catalog.
+  differs), the catalog and the background.
+
+`run.background` is null for the bare room. With a background it records the
+name, the layout and drop-file paths and SHA-256, the prop count, every scene's
+drop list, the one-off spawn time, and for each trial the props it dropped,
+removed and restored with the adjustment time. The catalog provenance then
+lists the background resources too. Capture artifacts carry the background's
+name and hashes, and each trial its dropped props. The run folder gains a
+`bg-<name>` suffix; bare-room names are unchanged.
 
 CSV rows include trial/scene/instance and spawn truth; estimator/outcome/reason;
 estimate and absolute/relative error; usable events and captured frames; and
@@ -138,6 +146,9 @@ old name is reported.
 - `asset_catalog.py`: logical-name-to-resource catalogs and native worlds;
 - `scene_control.py`: the simulator-neutral `simulation_interfaces` client
   (bounded calls, ownership of `bench_*` names, readiness, rollback);
+- `background.py`: background layouts, the per-scene drop rule, and the
+  generated drop lists' run-time checks; `background_session.py`: the
+  run-scoped prop spawn, per-scene adjustment and removal;
 - `simulation.py`: pose normalization and ground-truth instances;
 - `target_distance_benchmark_runner_node.py`: ROS orchestration and lifecycle;
 - `sweep.py`, `target_benchmark_sweep.py`, `sweep_report.py`: sweep domain,
