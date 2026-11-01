@@ -93,6 +93,13 @@ troubleshooting, planning, and historical documentation.
 - [Euclidean reconstruction](target_localization/euclidean_reconstruction.md)
 - [Polar profiling](target_localization/polar_profiling.md)
 
+## Leader following
+
+- [Leader following](leader_following/architecture.md) — messages, the
+  `leader_identity` node and the leader lock
+- [Visual explainer](leader_following/assets/explainer.html) — plain-language
+  overview for people outside the project
+
 ## Target-distance benchmarking
 
 - [Open benchmarking work](target_distance_benchmarking/BACKLOG.md) — validation gates, scenario recertification, and tooling gaps
@@ -116,6 +123,7 @@ troubleshooting, planning, and historical documentation.
 
 ## Active plans
 
+- [FOLLOWING — Leader following in crowds](plans/FOLLOWING_leader_in_crowds.md) — crowd scenes in both simulators, people tracking, closed loop, then the real robot
 - [BENCHMARKING — Geometry reruns](plans/BENCHMARKING_geometry_reruns.md) — baseline, concurrency and isolation sweeps on the current scene geometry; blocked on dependencies
 - [BENCHMARKING — Combined-model throughput](plans/BENCHMARKING_model_throughput.md) — run the existing sweep and determine whether concurrency is needed
 - [BENCHMARKING — Stationary hardware scene recording](plans/BENCHMARKING_hardware_recording.md) — raw sensor bags and measured G1 positions for later estimator comparison; recording not started

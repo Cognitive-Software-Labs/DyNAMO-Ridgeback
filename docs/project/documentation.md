@@ -130,6 +130,7 @@ Choose the scope by the work's primary owner:
 - `ISAAC` — Isaac-specific implementation or qualification.
 - `GAZEBO` — Gazebo-specific implementation or qualification.
 - `EXPLORATION` — exploration behavior, navigation, and exploration evaluation.
+- `FOLLOWING` — crowd leader following: people tracking, leader identity, following behavior and its evaluation.
 
 A benchmarking experiment comparing remote and physical-seat execution stays
 `BENCHMARKING`; physical-seat access does not make it physical-robot validation.

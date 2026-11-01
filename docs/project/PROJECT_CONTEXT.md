@@ -35,6 +35,8 @@ building blocks unless a technical reference says otherwise.
 - `src/ridgeback_common/` — shared sensor contracts and utilities
 - `src/ridgeback_localization/` — inference, estimators, and optional result displays
 - `src/ridgeback_interfaces/` — shared ROS detection, measurement, and beam messages
+- `src/leader_follow_interfaces/` — people tracks and leader state messages
+- `src/ridgeback_leader_follow/` — crowd leader following: leader lock and its nodes
 - `src/ridgeback_autonomy/` — backend-neutral nodes, configuration,
   tests, readiness gates, and public launch workflows
 - `src/ridgeback_autonomy_gz/` — Gazebo adapter, worlds, models, and GUI plugin
@@ -69,6 +71,7 @@ building blocks unless a technical reference says otherwise.
 - [Project engineering gaps](../BACKLOG.md)
 - [Target-distance benchmarking gaps](../target_distance_benchmarking/BACKLOG.md)
 - [Isaac Sim port](../isaac/overview.md)
+- [Leader following](../leader_following/architecture.md)
 
 The graph report required by the imported graphify conventions identifies
 high-connectivity nodes and module communities. It does not replace the
