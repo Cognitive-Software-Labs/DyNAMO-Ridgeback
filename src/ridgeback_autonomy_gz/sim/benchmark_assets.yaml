@@ -44,3 +44,60 @@ objects:
   table_low:
     resource: models/table_low/model.sdf
     format: sdf
+
+# Background props (benchmark_background_lab.yaml). Unlike scene objects they
+# stand on the calibration floor's top surface, z = 0.05: they are new, so
+# there is no earlier camera view to keep.
+background:
+  bookshelf:
+    resource: models/bg_bookshelf/model.sdf
+    format: sdf
+    spawn_z_m: 0.05
+  clinic_cart:
+    resource: models/bg_clinic_cart/model.sdf
+    format: sdf
+    spawn_z_m: 0.05
+  door:
+    resource: models/bg_door/model.sdf
+    format: sdf
+    spawn_z_m: 0.05
+  low_cabinet:
+    resource: models/bg_low_cabinet/model.sdf
+    format: sdf
+    spawn_z_m: 0.05
+  metal_cabinet:
+    resource: models/bg_metal_cabinet/model.sdf
+    format: sdf
+    spawn_z_m: 0.05
+  mobile_whiteboard:
+    resource: models/bg_mobile_whiteboard/model.sdf
+    format: sdf
+    spawn_z_m: 0.05
+  office_chair:
+    resource: models/bg_office_chair/model.sdf
+    format: sdf
+    spawn_z_m: 0.05
+  plant:
+    resource: models/bg_plant/model.sdf
+    format: sdf
+    spawn_z_m: 0.05
+  trash_bin:
+    resource: models/bg_trash_bin/model.sdf
+    format: sdf
+    spawn_z_m: 0.05
+  utility_cart:
+    resource: models/bg_utility_cart/model.sdf
+    format: sdf
+    spawn_z_m: 0.05
+  visitor_chair:
+    resource: models/bg_visitor_chair/model.sdf
+    format: sdf
+    spawn_z_m: 0.05
+  wall_whiteboard:
+    resource: models/bg_wall_whiteboard/model.sdf
+    format: sdf
+    spawn_z_m: 0.05
+  workstation:
+    resource: models/bg_workstation/model.sdf
+    format: sdf
+    spawn_z_m: 0.05

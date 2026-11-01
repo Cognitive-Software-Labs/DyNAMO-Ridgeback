@@ -18,10 +18,16 @@ Catalog layout::
       <logical target>: {resource: ..., format: ..., spawn_z_m: 0.0}
     objects:
       <logical object>: {resource: ..., format: ..., spawn_z_m: 0.0}
+    background:
+      <logical prop model>: {resource: ..., format: ..., spawn_z_m: 0.05}
+
+``background`` is optional: only a run with a background layout selects from
+it, and its props stay apart from scene ``objects`` in validation and
+provenance.
 
 A resource is an explicit URI (``scheme://...``), kept verbatim, or a path
-relative to the catalog file, resolved and required to exist. A target or
-object ``format`` must be one of the spawn formats the simulator advertises.
+relative to the catalog file, resolved and required to exist. A target,
+object or background ``format`` must be one of the spawn formats the simulator advertises.
 ``spawn_z_m`` is the optional world-frame height of the resource origin when
 placed on the floor.
 """
@@ -29,7 +35,7 @@ placed on the floor.
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import hashlib
 import math
 import os
@@ -45,7 +51,7 @@ DEFAULT_TARGET = 'g1'
 _URI_PATTERN = re.compile(r'^[A-Za-z][A-Za-z0-9+.-]*://')
 _SPAWNABLE_FIELDS = frozenset({'resource', 'format', 'spawn_z_m'})
 _WORLD_FIELDS = frozenset({'native_name', 'resource', 'format'})
-_TOP_LEVEL_FIELDS = frozenset({'schema', 'worlds', 'targets', 'objects'})
+_TOP_LEVEL_FIELDS = frozenset({'schema', 'worlds', 'targets', 'objects', 'background'})
 
 
 class AssetCatalogError(ValueError):
@@ -99,12 +105,13 @@ class AssetSelection:
     world: CatalogWorld
     target: CatalogResource
     objects: Mapping[str, CatalogResource]
+    background: Mapping[str, CatalogResource] = field(default_factory=dict)
 
     @property
     def spawn_formats(self) -> frozenset[str]:
         return frozenset(
             resource.resource_format
-            for resource in (self.target, *self.objects.values())
+            for resource in (self.target, *self.objects.values(), *self.background.values())
         )
 
     def provenance(self) -> dict[str, Any]:
@@ -118,6 +125,12 @@ class AssetSelection:
                 name: resource.identity()
                 for name, resource in sorted(self.objects.items())
             },
+            # Only a run with a background selects any, so runs without one
+            # keep the provenance they always had.
+            **({'background': {
+                name: resource.identity()
+                for name, resource in sorted(self.background.items())
+            }} if self.background else {}),
         }
 
 
@@ -129,22 +142,27 @@ class AssetCatalog:
     worlds: Mapping[str, CatalogWorld]
     targets: Mapping[str, CatalogResource]
     objects: Mapping[str, CatalogResource]
+    background: Mapping[str, CatalogResource] = field(default_factory=dict)
 
     def select(
         self,
         world: str,
         target: str,
         object_models: Iterable[str],
+        background_models: Iterable[str] = (),
     ) -> AssetSelection:
         """Resolve one run's assets, reporting every missing name at once."""
 
         models = sorted(set(object_models))
+        props = sorted(set(background_models))
         missing = []
         if world not in self.worlds:
             missing.append(f'world "{world}"')
         if target not in self.targets:
             missing.append(f'target "{target}"')
         missing.extend(f'object "{model}"' for model in models if model not in self.objects)
+        missing.extend(
+            f'background prop "{model}"' for model in props if model not in self.background)
         if missing:
             raise AssetCatalogError(
                 f'Asset catalog {self.path} has no entry for {", ".join(missing)}.')
@@ -153,6 +171,7 @@ class AssetCatalog:
             world=self.worlds[world],
             target=self.targets[target],
             objects={model: self.objects[model] for model in models},
+            background={model: self.background[model] for model in props},
         )
 
 
@@ -276,6 +295,7 @@ def parse_asset_catalog(
         worlds=worlds,
         targets=_parse_spawnables(document, 'targets', catalog_dir),
         objects=_parse_spawnables(document, 'objects', catalog_dir),
+        background=_parse_spawnables(document, 'background', catalog_dir),
     )
 
 

@@ -43,14 +43,13 @@ def test_catalog_resolves_every_packaged_scenario() -> None:
 
 def test_catalog_lists_exactly_the_scenario_objects_and_their_models() -> None:
     catalog = load_asset_catalog(str(CATALOG))
-    # Background props are not scenario assets and have no catalog entry yet.
     model_dirs = {
         path.parent.name for path in (PACKAGE_ROOT / 'sim' / 'models').glob('*/model.sdf')
-        if not path.parent.name.startswith('bg_')
     }
 
     assert set(catalog.objects) == set(_packaged_object_models())
-    assert set(catalog.objects) | set(catalog.targets) == model_dirs
+    background_dirs = {Path(resource.uri).parent.name for resource in catalog.background.values()}
+    assert set(catalog.objects) | set(catalog.targets) | background_dirs == model_dirs
 
 
 def test_public_world_maps_to_the_packaged_world_of_the_same_name() -> None:
@@ -71,3 +70,16 @@ def test_spawnable_resources_are_static_models_at_the_established_height() -> No
         assert model.findtext('static') == 'true', resource.logical_name
         # The benchmark has always spawned Gazebo models at z = 0.
         assert resource.spawn_z_m == 0.0
+
+
+def test_background_props_are_static_models_standing_on_the_floor_top() -> None:
+    catalog = load_asset_catalog(str(CATALOG))
+
+    assert catalog.background
+    for resource in catalog.background.values():
+        model = ET.parse(resource.uri).getroot().find('model')
+        assert Path(resource.uri).parent.name == f'bg_{resource.logical_name}'
+        assert model.findtext('static') == 'true', resource.logical_name
+        # The calibration floor's top surface, unlike the scene objects.
+        assert resource.spawn_z_m == 0.05
+        assert resource.resource_format in GAZEBO_SPAWN_FORMATS
