@@ -417,7 +417,7 @@ footer { color: var(--muted); font-size: .85rem; border-top: 1px solid var(--lin
       <h3>Find and track people</h3>
       <p>First build one benchmark that runs any candidate on the same scenes and scores it the same way. Then try every candidate below once with default settings, tune only the best two, and build the people tracker from the winners: it combines lidar and the depth camera, gives each person a stable number and publishes everyone it sees.</p>
       <div class="try"><span class="try-label">Camera detectors</span><span class="chip">YOLO11</span><span class="chip">YOLO26</span><span class="chip">RT-DETRv2</span><span class="chip">D-FINE</span><span class="chip">DEIM</span><span class="chip">RF-DETR</span><span class="chip">OWLv2</span></div>
-      <div class="try"><span class="try-label">Lidar people (legs, about 25 cm up)</span><span class="chip">DR-SPAAM</span><span class="chip">leg detector</span><span class="chip">scan clustering</span></div>
+      <div class="try"><span class="try-label">Lidar people (legs, about 25 cm up)</span><span class="chip">DR-SPAAM</span><span class="chip">DROW3</span><span class="chip">LFE-PPN</span><span class="chip">PeTra</span><span class="chip">ROS leg detector</span><span class="chip">scan clustering</span></div>
       <div class="try"><span class="try-label">Trackers</span><span class="chip">ByteTrack</span><span class="chip">BoT-SORT</span><span class="chip">OC-SORT</span><span class="chip">Deep OC-SORT</span><span class="chip">StrongSORT</span></div>
       <div class="try"><span class="try-label">One target from a click</span><span class="chip">SAM 2</span><span class="chip">SAMURAI</span></div>
       <p class="done"><b>Done when</b> every candidate has a row in one results table (people found by distance and occlusion, track losses and swaps, time per frame on the robot's GPU), the chosen combination is written down with the reason, and every scene has a report of how often the leader's track was lost or swapped.</p>
@@ -438,7 +438,7 @@ footer { color: var(--muted); font-size: .85rem; border-top: 1px solid var(--lin
     <article class="task">
       <div class="task-top"><span class="num">5</span><span class="pill later">then</span></div>
       <h3>Real robot</h3>
-      <p>First replay robot recordings of people walking past through the tracker, then drive. The leader wears a reference marker the robot never uses.</p>
+      <p>First replay robot recordings of people walking past through the tracker, and retrain the lidar detector on the robot's own scans, using the camera's detections as automatic labels. Then drive. The leader wears a reference marker the robot never uses.</p>
       <p class="done"><b>Done when</b> the same scenes and the same eight scores exist for the real robot.</p>
     </article>
     <article class="task">

@@ -58,7 +58,7 @@ when its check passes, not when its code exists.
 | F2 People tracking | Candidate benchmark for detection and tracking (below), then a `people_tracker` node built from the chosen combination: merged scan plus D455 colour and depth, constant-velocity fusion, stable ids; publishes `People` | Every F2 candidate has a row in the results table, the chosen combination and its reason are recorded, and every scenario has a report, scored against simulator ground truth, of leader-track losses and ID switches |
 | F3 Leader recognition | Re-identification candidate benchmark (below), the chosen embeddings in `Person.appearance`, plus track continuity as a second identity cue in `lock_on.py`, so the lock holds while the leader is out of camera view | Every F3 candidate has a row in the results table; `leader_identity` reaches `LOCKED` on the leader in every scenario and holds it while the leader is out of camera view; leader-pick accuracy among nearby people reported per scenario, look-alike scenario included |
 | F4 Closed loop in sim | `follow_controller` through Nav2; moves only while `LOCKED` | Every scenario runs start to finish in both simulators with zero wrong-follow time, and every metric below is reported for both |
-| F5 Real robot | Recorded people replayed offline through the tracker first, then driving under the [driving readiness](../physical/driving_readiness.md) gates; the leader wears a ground-truth tag the system never reads | The scenario set and every metric exist for the real robot |
+| F5 Real robot | Recorded people replayed offline through the tracker first, with the lidar detector fine-tuned on robot scans using camera-detection pseudo-labels; then driving under the [driving readiness](../physical/driving_readiness.md) gates; the leader wears a ground-truth tag the system never reads | The scenario set and every metric exist for the real robot |
 | F6 Comparison | OmTrackVLA through `vla_client` (server `planner` mode) on the same scenarios | OmTrackVLA's metrics sit beside the baseline's for every scenario, in simulation and on the robot |
 
 ## Candidate benchmark (F2, F3)
@@ -74,10 +74,27 @@ recordings once F5 starts. **Results:** one table per category in
 | Category | Candidates | Scored by |
 |---|---|---|
 | Camera person detection | YOLO11, YOLO26, RT-DETRv2, D-FINE, DEIM, RF-DETR, OWLv2 (already used for target localization) | Recall and precision by distance band (0–2, 2–4, 4–8 m) and visible fraction |
-| Lidar person detection (scans at leg height: both lidars about 0.23 m up, see the [geometry reference](../robot/geometry.md)) | DR-SPAAM, a leg detector, plain scan clustering | Same recall and precision, plus coverage outside the camera view |
+| Lidar person detection (scans at leg height: both lidars about 0.23 m up, see the [geometry reference](../robot/geometry.md)) | DR-SPAAM, DROW3, LFE-PPN, PeTra, ROS leg detector, plain scan clustering (details below) | Same recall and precision, plus coverage outside the camera view |
 | Multi-person tracking | ByteTrack, BoT-SORT, OC-SORT, Deep OC-SORT, StrongSORT | HOTA, IDF1 and ID switches against simulator ground truth |
 | Single target from one click | SAM 2, SAMURAI | Leader-track coverage and recovery after occlusion |
 | Re-identification | OSNet-AIN, CLIP-ReID, TransReID, SOLIDER, DINOv2 features | Correct leader pick among people within 3 m, look-alike scenario separately |
+
+Lidar candidate notes, checked 2026-11-01:
+
+| Candidate | Source | Known result | Notes |
+|---|---|---|---|
+| DR-SPAAM, DROW3 | [2D_lidar_person_detection](https://github.com/VisualComputingInstitute/2D_lidar_person_detection) (IROS 2020, ICRA 2021) | Best on the FROG benchmark: DR-SPAAM 75.3 AP (5-scan), DROW3 73.6 AP, about 14 ms per scan | GPL-3.0; ROS 1 node, community ROS 2 port linked from the repository; supports fine-tuning from camera pseudo-labels |
+| LFE-PPN, LFE-Peaks | [FROG](https://www.frontiersin.org/journals/robotics-and-ai/articles/10.3389/frobt.2025.1671673/full) (2025), ROS package [upo_laser_people_detector](https://github.com/robotics-upo/upo_laser_people_detector) | 66.5 / 64.9 AP at about 1.5 ms per scan | Fastest; license and ROS version not checked |
+| PeTra | benchmarked in FROG | 58.3 AP retrained | Older baseline |
+| ROS leg detector | ROS 2 Foxy port [ros2_leg_detector](https://github.com/mowito/ros2_leg_detector) of Leigh's detector | 15.8 AP on FROG | Classic baseline; trained for 0.33° scans, the UST-10LX is 0.25° |
+| Scan clustering | in-repo | — | Floor every candidate must beat |
+
+The published models were trained with sensors at about 33–37 cm; ours are
+about 23 cm, so expect a gap until they are fine-tuned on simulated scans and,
+in F5, on robot scans labelled from camera detections. The FROG
+[benchmark code](https://github.com/robotics-upo/2DLaserPeopleBenchmark) and
+[dataset](https://robotics.upo.es/datasets/frog/laser2d_people/) are a ready
+starting point for the lidar part of the harness.
 
 Every row also records time per frame (median and p95) and GPU memory on the
 robot GPU and on Thor, and the license; Ultralytics models are AGPL-3.0.
