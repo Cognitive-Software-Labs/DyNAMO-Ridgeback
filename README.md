@@ -8,6 +8,13 @@ environments; thin backend packages own simulator- or hardware-specific
 bringup. The shipped simulation benchmark uses a Unitree G1 as its target model;
 the ROS interfaces and localization package are target-generic.
 
+[![Animated top-down map: the robot reveals rooms with its lidar, drives to the edges of unknown space and spots the target](docs/exploration/assets/exploration.gif)](docs/exploration/assets/explainer.html)
+
+*Frontier exploration, simulated with the explorer's goal rules (an illustration,
+not recorded robot data). Interactive version and plain-language overview:
+[visual explainer](docs/exploration/assets/explainer.html); open it in a
+browser from a clone.*
+
 This README owns installation, public commands and operator workflows. It is a
 router: detailed references and physical runbooks live in the pages it links.
 
