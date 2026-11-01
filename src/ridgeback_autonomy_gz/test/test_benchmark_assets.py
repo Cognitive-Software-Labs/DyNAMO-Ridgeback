@@ -43,8 +43,10 @@ def test_catalog_resolves_every_packaged_scenario() -> None:
 
 def test_catalog_lists_exactly_the_scenario_objects_and_their_models() -> None:
     catalog = load_asset_catalog(str(CATALOG))
+    # Background props are not scenario assets and have no catalog entry yet.
     model_dirs = {
         path.parent.name for path in (PACKAGE_ROOT / 'sim' / 'models').glob('*/model.sdf')
+        if not path.parent.name.startswith('bg_')
     }
 
     assert set(catalog.objects) == set(_packaged_object_models())

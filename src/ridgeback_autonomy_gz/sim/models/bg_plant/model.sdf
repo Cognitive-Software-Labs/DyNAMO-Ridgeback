@@ -1,0 +1,48 @@
+<?xml version="1.0"?>
+<!-- Background prop: potted plant, in-repo primitives. -->
+<sdf version="1.9">
+  <model name="bg_plant">
+    <static>true</static>
+    <link name="link">
+      <visual name="pot">
+        <pose>0 0 0.16 0 0 0</pose>
+        <geometry><cylinder><radius>0.16</radius><length>0.32</length></cylinder></geometry>
+        <material><ambient>0.6 0.32 0.2 1</ambient><diffuse>0.6 0.32 0.2 1</diffuse></material>
+      </visual>
+      <visual name="soil">
+        <pose>0 0 0.33 0 0 0</pose>
+        <geometry><cylinder><radius>0.15</radius><length>0.02</length></cylinder></geometry>
+        <material><ambient>0.2 0.14 0.1 1</ambient><diffuse>0.2 0.14 0.1 1</diffuse></material>
+      </visual>
+      <visual name="stem">
+        <pose>0 0 0.59 0 0 0</pose>
+        <geometry><cylinder><radius>0.02</radius><length>0.5</length></cylinder></geometry>
+        <material><ambient>0.55 0.42 0.3 1</ambient><diffuse>0.55 0.42 0.3 1</diffuse></material>
+      </visual>
+      <visual name="foliage_0">
+        <pose>0 0 0.9 0 0 0</pose>
+        <geometry><sphere><radius>0.22</radius></sphere></geometry>
+        <material><ambient>0.2 0.42 0.18 1</ambient><diffuse>0.2 0.42 0.18 1</diffuse></material>
+      </visual>
+      <visual name="foliage_1">
+        <pose>0.07 0.05 1.03 0 0 0</pose>
+        <geometry><sphere><radius>0.15</radius></sphere></geometry>
+        <material><ambient>0.16 0.36 0.14 1</ambient><diffuse>0.16 0.36 0.14 1</diffuse></material>
+      </visual>
+      <visual name="foliage_2">
+        <pose>-0.08 -0.06 0.99 0 0 0</pose>
+        <geometry><sphere><radius>0.14</radius></sphere></geometry>
+        <material><ambient>0.16 0.36 0.14 1</ambient><diffuse>0.16 0.36 0.14 1</diffuse></material>
+      </visual>
+      <visual name="foliage_3">
+        <pose>0.06 -0.1 0.74 0 0 0</pose>
+        <geometry><sphere><radius>0.12</radius></sphere></geometry>
+        <material><ambient>0.2 0.42 0.18 1</ambient><diffuse>0.2 0.42 0.18 1</diffuse></material>
+      </visual>
+      <collision name="collision_body">
+        <pose>0 0 0.59 0 0 0</pose>
+        <geometry><box><size>0.45 0.45 1.18</size></box></geometry>
+      </collision>
+    </link>
+  </model>
+</sdf>
