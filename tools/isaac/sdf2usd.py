@@ -8,6 +8,14 @@ directional/point lights, ``model://`` includes) and refuses anything else,
 so a silent partial conversion can never masquerade as a ported world.
 The SDF files remain the source of truth; regenerate after editing them.
 
+Visual meshes are Wavefront OBJ files referenced relative to the model
+directory, with an optional per-axis ``<scale>``. Each material group
+becomes one ``UsdGeom.Mesh`` carrying the OBJ's own faces, texture
+coordinates and normals, so both simulators render the same polygons. An
+MTL diffuse colour or ``map_Kd`` texture becomes a PreviewSurface; the
+texture is copied next to the USD file so the converted asset stays
+self-contained. Meshes are never colliders: collide with primitives.
+
 Parse layer is dependency-free (unit-tested via colcon); the emit/check
 layers need pxr and run under isaac_venv:
 
@@ -26,11 +34,17 @@ lidar and cameras see them), collisions become invisible PhysX colliders.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import math
+import shutil
 import sys
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
 from pathlib import Path
+
+
+# Textures are copied into this directory next to the converted USD file.
+TEXTURE_DIR = "textures"
 
 
 # --------------------------------------------------------------------------
@@ -45,14 +59,55 @@ class Material:
 
 
 @dataclass
+class ObjMaterial:
+    """One MTL material: diffuse colour, specular colour, diffuse texture."""
+    name: str
+    diffuse: tuple = (0.8, 0.8, 0.8)
+    specular: tuple = (0.0, 0.0, 0.0)
+    texture: Path | None = None
+
+
+@dataclass
+class ObjGroup:
+    """The faces of one OBJ that share a material.
+
+    ``points``, ``uvs`` and ``normals`` hold one zero-based index per face
+    vertex into the mesh's arrays; ``uvs`` and ``normals`` are None when the
+    group's faces carry none.
+    """
+    material: str
+    face_counts: list[int] = field(default_factory=list)
+    points: list[int] = field(default_factory=list)
+    uvs: list[int] | None = field(default_factory=list)
+    normals: list[int] | None = field(default_factory=list)
+
+
+@dataclass
+class ObjMesh:
+    path: Path
+    points: list[tuple]
+    uvs: list[tuple]
+    normals: list[tuple]
+    groups: list[ObjGroup]
+    materials: dict[str, ObjMaterial]
+
+    def used_points(self) -> list[tuple]:
+        """Every vertex some face references, in first-use order."""
+        used = dict.fromkeys(i for group in self.groups for i in group.points)
+        return [self.points[i] for i in used]
+
+
+@dataclass
 class Geom:
     """One <visual> or <collision> entry."""
     name: str
-    kind: str                    # "box" | "sphere" | "cylinder"
-    size: tuple                  # box: (sx,sy,sz); sphere: (r,); cylinder: (r,l)
+    kind: str                    # "box" | "sphere" | "cylinder" | "mesh"
+    size: tuple                  # box: (sx,sy,sz); sphere: (r,); cylinder: (r,l);
+                                 # mesh: per-axis scale (sx,sy,sz)
     pose: tuple                  # (x,y,z,roll,pitch,yaw) relative to link
     is_collision: bool
     material: Material | None
+    mesh: ObjMesh | None = None
 
 
 @dataclass
@@ -122,11 +177,165 @@ def _material(el) -> Material | None:
     )
 
 
-def _geom(el, is_collision: bool) -> Geom:
+# MTL statements that carry nothing this converter or Gazebo's PBR path
+# renders differently: ambient/emissive colours, shininess, index of
+# refraction and the illumination model.
+_IGNORED_MTL_STATEMENTS = frozenset({"Ka", "Ke", "Ns", "Ni", "illum"})
+
+
+def parse_mtl(path: Path) -> dict[str, ObjMaterial]:
+    """Diffuse and specular colours and diffuse textures of one MTL file."""
+
+    path = Path(path)
+    materials: dict[str, ObjMaterial] = {}
+    current = None
+    for lineno, raw in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+        line = raw.split("#", 1)[0].strip()
+        if not line:
+            continue
+        key, *rest = line.split()
+        where = f"{path}:{lineno}"
+        if key == "newmtl":
+            current = ObjMaterial(name=" ".join(rest))
+            materials[current.name] = current
+            continue
+        if current is None:
+            raise ValueError(f"{where}: {key!r} before any newmtl")
+        if key == "Kd":
+            current.diffuse = _floats(" ".join(rest), expect=3)
+        elif key == "Ks":
+            current.specular = _floats(" ".join(rest), expect=3)
+        elif key == "map_Kd":
+            if not rest or rest[0].startswith("-"):
+                raise ValueError(f"{where}: map_Kd options are unsupported")
+            texture = path.parent / " ".join(rest)
+            if not texture.is_file():
+                raise ValueError(f"{where}: texture {texture} not found")
+            current.texture = texture
+        elif key == "d":
+            if float(rest[0]) < 1.0:
+                raise ValueError(f"{where}: transparent materials are unsupported")
+        elif key == "Tr":
+            if float(rest[0]) > 0.0:
+                raise ValueError(f"{where}: transparent materials are unsupported")
+        elif key not in _IGNORED_MTL_STATEMENTS:
+            raise ValueError(f"{where}: unsupported MTL statement {key!r}")
+    return materials
+
+
+def _obj_index(token: str, count: int, where: str) -> int:
+    index = int(token)
+    resolved = index - 1 if index > 0 else count + index
+    if index == 0 or not 0 <= resolved < count:
+        raise ValueError(f"{where}: index {index} out of range 1..{count}")
+    return resolved
+
+
+def parse_obj(path: Path) -> ObjMesh:
+    """Vertices, texture coordinates, normals and per-material faces of an OBJ.
+
+    Faces may have any number of vertices and are kept as polygons. Every face
+    must follow a ``usemtl`` naming a material from its ``mtllib``; within one
+    material, faces either all carry texture coordinates (normals) or none do.
+    """
+
+    path = Path(path)
+    points, uvs, normals = [], [], []
+    groups: dict[str, ObjGroup] = {}
+    materials: dict[str, ObjMaterial] = {}
+    current = None
+    for lineno, raw in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+        line = raw.split("#", 1)[0].strip()
+        if not line:
+            continue
+        key, *rest = line.split()
+        where = f"{path}:{lineno}"
+        if key == "v":
+            if len(rest) == 4 and float(rest[3]) == 1.0:
+                rest = rest[:3]
+            points.append(_floats(" ".join(rest), expect=3))
+        elif key == "vt":
+            if len(rest) not in (2, 3):
+                raise ValueError(f"{where}: expected 2 or 3 texture coordinates")
+            uvs.append((float(rest[0]), float(rest[1])))
+        elif key == "vn":
+            normals.append(_floats(" ".join(rest), expect=3))
+        elif key == "f":
+            if current is None:
+                raise ValueError(f"{where}: face before any usemtl")
+            if len(rest) < 3:
+                raise ValueError(f"{where}: a face needs at least three vertices")
+            group = groups.setdefault(current, ObjGroup(material=current))
+            group.face_counts.append(len(rest))
+            for vertex in rest:
+                parts = vertex.split("/")
+                if len(parts) > 3:
+                    raise ValueError(f"{where}: malformed face vertex {vertex!r}")
+                parts += [""] * (3 - len(parts))
+                group.points.append(_obj_index(parts[0], len(points), where))
+                group.uvs.append(
+                    _obj_index(parts[1], len(uvs), where) if parts[1] else -1)
+                group.normals.append(
+                    _obj_index(parts[2], len(normals), where) if parts[2] else -1)
+        elif key == "usemtl":
+            current = " ".join(rest)
+        elif key == "mtllib":
+            materials.update(parse_mtl(path.parent / " ".join(rest)))
+        elif key in ("o", "g", "s"):
+            continue
+        else:
+            raise ValueError(f"{where}: unsupported OBJ statement {key!r}")
+
+    for group in groups.values():
+        if group.material not in materials:
+            raise ValueError(f"{path}: usemtl {group.material!r} has no MTL definition")
+        for attribute in ("uvs", "normals"):
+            indices = getattr(group, attribute)
+            missing = sum(index < 0 for index in indices)
+            if missing == len(indices):
+                setattr(group, attribute, None)
+            elif missing:
+                raise ValueError(
+                    f"{path}: material {group.material!r} mixes faces with and "
+                    f"without {'texture coordinates' if attribute == 'uvs' else 'normals'}")
+    if not groups:
+        raise ValueError(f"{path}: no faces")
+    return ObjMesh(
+        path=path,
+        points=points,
+        uvs=uvs,
+        normals=normals,
+        groups=list(groups.values()),
+        materials=materials,
+    )
+
+
+def _mesh_geom(el, mesh_el, is_collision: bool, base_dir: Path):
+    name = el.get("name")
+    if is_collision:
+        raise ValueError(f"mesh collision {name!r} unsupported; collide with primitives")
+    uri = mesh_el.findtext("uri", "").strip()
+    if not uri or "://" in uri or Path(uri).is_absolute():
+        raise ValueError(
+            f"mesh visual {name!r}: uri {uri!r} must be relative to the model directory")
+    if Path(uri).suffix.lower() != ".obj":
+        raise ValueError(f"mesh visual {name!r}: only OBJ meshes are supported")
+    unsupported = sorted({child.tag for child in mesh_el} - {"uri", "scale"})
+    if unsupported:
+        raise ValueError(f"mesh visual {name!r}: unsupported {unsupported}")
+    if el.find("material") is not None:
+        raise ValueError(f"mesh visual {name!r}: the MTL file is its material")
+    scale = _floats(mesh_el.findtext("scale", "1 1 1"), expect=3)
+    return "mesh", scale, parse_obj(base_dir / uri)
+
+
+def _geom(el, is_collision: bool, base_dir: Path) -> Geom:
     g = el.find("geometry")
     if g is None:
         raise ValueError(f"missing geometry in {el.get('name')!r}")
     box, sphere, cylinder = g.find("box"), g.find("sphere"), g.find("cylinder")
+    mesh_el = g.find("mesh")
+    mesh = None
     if box is not None:
         kind, size = "box", _floats(box.find("size").text, expect=3)
     elif sphere is not None:
@@ -136,6 +345,8 @@ def _geom(el, is_collision: bool) -> Geom:
             float(cylinder.find("radius").text),
             float(cylinder.find("length").text),
         )
+    elif mesh_el is not None:
+        kind, size, mesh = _mesh_geom(el, mesh_el, is_collision, base_dir)
     else:
         unsupported = [c.tag for c in g]
         raise ValueError(f"unsupported geometry {unsupported} in {el.get('name')!r}")
@@ -145,11 +356,12 @@ def _geom(el, is_collision: bool) -> Geom:
         size=size,
         pose=_pose(el),
         is_collision=is_collision,
-        material=None if is_collision else _material(el),
+        material=None if is_collision or mesh is not None else _material(el),
+        mesh=mesh,
     )
 
 
-def _parse_model(model_el) -> Model:
+def _parse_model(model_el, base_dir: Path) -> Model:
     model = Model(
         name=model_el.get("name"),
         static=(model_el.findtext("static", "false").strip().lower() == "true"),
@@ -158,11 +370,11 @@ def _parse_model(model_el) -> Model:
     for link in model_el.findall("link"):
         link_pose = _pose(link)
         for visual in link.findall("visual"):
-            geom = _geom(visual, is_collision=False)
+            geom = _geom(visual, is_collision=False, base_dir=base_dir)
             geom.pose = compose_pose(link_pose, geom.pose)
             model.geoms.append(geom)
         for collision in link.findall("collision"):
-            geom = _geom(collision, is_collision=True)
+            geom = _geom(collision, is_collision=True, base_dir=base_dir)
             geom.pose = compose_pose(link_pose, geom.pose)
             model.geoms.append(geom)
     return model
@@ -177,7 +389,7 @@ def parse_model(sdf_path) -> Model:
     models = [root] if root.tag == "model" else root.findall("model")
     if len(models) != 1:
         raise ValueError(f"{sdf_path}: expected exactly one standalone <model>")
-    return _parse_model(models[0])
+    return _parse_model(models[0], Path(sdf_path).parent)
 
 
 def parse_world(sdf_path) -> World:
@@ -186,7 +398,7 @@ def parse_world(sdf_path) -> World:
     if world is None:
         raise ValueError(f"{sdf_path}: no <world>")
 
-    models = [_parse_model(model) for model in world.findall("model")]
+    models = [_parse_model(model, Path(sdf_path).parent) for model in world.findall("model")]
     includes, lights = [], []
 
     for inc in world.findall("include"):
@@ -320,6 +532,10 @@ def model_world_aabb(model: Model, include_visual=True, include_collision=True):
             r = g.size[0]
             bounds = [tuple(pose[i] - r for i in range(3)),
                       tuple(pose[i] + r for i in range(3))]
+        elif g.kind == "mesh":
+            sx, sy, sz = g.size
+            bounds = [_apply(pose, (x * sx, y * sy, z * sz))
+                      for x, y, z in g.mesh.used_points()]
         else:
             radius, length = g.size
             rotation = _rot_mat(rpy_to_quat(*pose[3:]))
@@ -376,8 +592,38 @@ def _freeze_include_dynamics(prim) -> None:
           flush=True)
 
 
+def world_textures(world: World) -> dict[str, Path]:
+    """Every mesh texture by the file name it gets next to the USD output.
+
+    Two different source files may not share a name, since they would land
+    on the same copy.
+    """
+
+    textures: dict[str, Path] = {}
+    for model in world.models:
+        for geom in model.geoms:
+            if geom.mesh is None:
+                continue
+            for material in geom.mesh.materials.values():
+                texture = material.texture
+                if texture is None:
+                    continue
+                known = textures.setdefault(texture.name, texture)
+                if known.resolve() != texture.resolve():
+                    raise ValueError(
+                        f"textures {known} and {texture} share the name {texture.name!r}")
+    return textures
+
+
 def emit_usd(world: World, out_path: Path, model_refs: dict[str, str]):
-    from pxr import Gf, Sdf, Usd, UsdGeom, UsdLux, UsdPhysics, UsdShade
+    from pxr import Gf, Sdf, Usd, UsdGeom, UsdLux, UsdPhysics, UsdShade, Vt
+
+    textures = world_textures(world)
+    if textures:
+        texture_dir = out_path.parent / TEXTURE_DIR
+        texture_dir.mkdir(parents=True, exist_ok=True)
+        for name, source in sorted(textures.items()):
+            shutil.copyfile(source, texture_dir / name)
 
     stage = Usd.Stage.CreateNew(str(out_path))
     UsdGeom.SetStageUpAxis(stage, UsdGeom.Tokens.z)
@@ -419,6 +665,80 @@ def emit_usd(world: World, out_path: Path, model_refs: dict[str, str]):
         material_cache[key] = m
         return m
 
+    def obj_material_for(mat: ObjMaterial):
+        """A PreviewSurface for one MTL material.
+
+        Gazebo multiplies a diffuse texture by the MTL diffuse colour, so the
+        texture's scale input carries that colour here.
+        """
+        texture = None if mat.texture is None else mat.texture.name
+        key = ("obj", mat.diffuse, mat.specular, texture)
+        if key in material_cache:
+            return material_cache[key]
+        name = f"mat_{len(material_cache):03d}"
+        m = UsdShade.Material.Define(stage, looks.GetPath().AppendChild(name))
+        shader = UsdShade.Shader.Define(stage, m.GetPath().AppendChild("shader"))
+        shader.CreateIdAttr("UsdPreviewSurface")
+        shader.CreateInput("roughness", Sdf.ValueTypeNames.Float).Set(
+            1.0 - max(mat.specular))
+        diffuse = shader.CreateInput("diffuseColor", Sdf.ValueTypeNames.Color3f)
+        if texture is None:
+            diffuse.Set(Gf.Vec3f(*mat.diffuse))
+        else:
+            reader = UsdShade.Shader.Define(stage, m.GetPath().AppendChild("st_reader"))
+            reader.CreateIdAttr("UsdPrimvarReader_float2")
+            reader.CreateInput("varname", Sdf.ValueTypeNames.String).Set("st")
+            reader.CreateOutput("result", Sdf.ValueTypeNames.Float2)
+            sampler = UsdShade.Shader.Define(
+                stage, m.GetPath().AppendChild("diffuse_texture"))
+            sampler.CreateIdAttr("UsdUVTexture")
+            sampler.CreateInput("file", Sdf.ValueTypeNames.Asset).Set(
+                f"./{TEXTURE_DIR}/{texture}")
+            sampler.CreateInput("sourceColorSpace", Sdf.ValueTypeNames.Token).Set("sRGB")
+            sampler.CreateInput("wrapS", Sdf.ValueTypeNames.Token).Set("repeat")
+            sampler.CreateInput("wrapT", Sdf.ValueTypeNames.Token).Set("repeat")
+            sampler.CreateInput("scale", Sdf.ValueTypeNames.Float4).Set(
+                Gf.Vec4f(*mat.diffuse, 1.0))
+            sampler.CreateInput("st", Sdf.ValueTypeNames.Float2).ConnectToSource(
+                reader.ConnectableAPI(), "result")
+            sampler.CreateOutput("rgb", Sdf.ValueTypeNames.Float3)
+            diffuse.ConnectToSource(sampler.ConnectableAPI(), "rgb")
+        m.CreateSurfaceOutput().ConnectToSource(
+            shader.ConnectableAPI(), "surface")
+        material_cache[key] = m
+        return m
+
+    def indexed_primvar(mesh_prim, name, type_name, values, indices):
+        """A face-varying primvar storing each distinct value once."""
+        used = list(dict.fromkeys(indices))
+        position = {index: i for i, index in enumerate(used)}
+        primvar = UsdGeom.PrimvarsAPI(mesh_prim).CreatePrimvar(
+            name, type_name, UsdGeom.Tokens.faceVarying)
+        primvar.Set([values[index] for index in used])
+        primvar.SetIndices(Vt.IntArray([position[index] for index in indices]))
+
+    def define_mesh_group(parent_path, mesh: ObjMesh, group: ObjGroup):
+        prim = UsdGeom.Mesh.Define(
+            stage, parent_path.AppendChild(_sanitize(group.material)))
+        used = list(dict.fromkeys(group.points))
+        position = {index: i for i, index in enumerate(used)}
+        points = Vt.Vec3fArray([Gf.Vec3f(*mesh.points[index]) for index in used])
+        prim.CreatePointsAttr(points)
+        prim.CreateExtentAttr(UsdGeom.PointBased.ComputeExtent(points))
+        prim.CreateFaceVertexCountsAttr(Vt.IntArray(group.face_counts))
+        prim.CreateFaceVertexIndicesAttr(
+            Vt.IntArray([position[index] for index in group.points]))
+        # OBJ faces are polygons to render as authored, never a subdivision cage.
+        prim.CreateSubdivisionSchemeAttr(UsdGeom.Tokens.none)
+        if group.uvs is not None:
+            indexed_primvar(prim, "st", Sdf.ValueTypeNames.TexCoord2fArray,
+                            [Gf.Vec2f(*uv) for uv in mesh.uvs], group.uvs)
+        if group.normals is not None:
+            indexed_primvar(prim, "normals", Sdf.ValueTypeNames.Normal3fArray,
+                            [Gf.Vec3f(*n) for n in mesh.normals], group.normals)
+        UsdShade.MaterialBindingAPI.Apply(prim.GetPrim()).Bind(
+            obj_material_for(mesh.materials[group.material]))
+
     def set_pose(xformable, pose):
         xformable.AddTranslateOp().Set(Gf.Vec3d(*pose[:3]))
         w, x, y, z = rpy_to_quat(*pose[3:])
@@ -426,6 +746,10 @@ def emit_usd(world: World, out_path: Path, model_refs: dict[str, str]):
 
     def define_geom(parent_path, geom: Geom):
         gpath = parent_path.AppendChild(_sanitize(geom.name))
+        if stage.GetPrimAtPath(gpath):
+            # SDF lets a visual and a collision share a name; USD prim paths
+            # cannot, and redefining one would merge the two geometries.
+            raise ValueError(f"geometry name {geom.name!r} is used twice in one model")
         if geom.kind == "box":
             prim = UsdGeom.Cube.Define(stage, gpath)
             prim.CreateSizeAttr(1.0)
@@ -435,6 +759,13 @@ def emit_usd(world: World, out_path: Path, model_refs: dict[str, str]):
             prim = UsdGeom.Sphere.Define(stage, gpath)
             prim.CreateRadiusAttr(float(geom.size[0]))
             set_pose(prim, geom.pose)
+        elif geom.kind == "mesh":
+            prim = UsdGeom.Xform.Define(stage, gpath)
+            set_pose(prim, geom.pose)
+            prim.AddScaleOp().Set(Gf.Vec3f(*geom.size))
+            for group in geom.mesh.groups:
+                define_mesh_group(gpath, geom.mesh, group)
+            return prim
         else:
             prim = UsdGeom.Cylinder.Define(stage, gpath)
             prim.CreateAxisAttr(UsdGeom.Tokens.z)
@@ -582,7 +913,19 @@ def check_usd(world: World, usd_path: Path, tol=1e-5) -> list[str]:
         missing = expected_children - got_children
         if missing:
             errors.append(f"missing prims: {sorted(missing)}")
+
+    # Mesh textures: the copy next to the USD must be the SDF's texture.
+    for name, source in sorted(world_textures(world).items()):
+        copy = Path(usd_path).parent / TEXTURE_DIR / name
+        if not copy.is_file():
+            errors.append(f"texture {name}: missing at {copy}")
+        elif _sha256(copy) != _sha256(source):
+            errors.append(f"texture {name}: {copy} differs from {source}")
     return errors
+
+
+def _sha256(path: Path) -> str:
+    return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
 
 # --------------------------------------------------------------------------

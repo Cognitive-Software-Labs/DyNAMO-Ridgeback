@@ -184,5 +184,143 @@ def test_unsupported_geometry_is_refused(tmp_path):
         encoding="utf-8",
     )
 
-    with pytest.raises(ValueError, match="unsupported geometry.*mesh"):
+    with pytest.raises(ValueError, match="uri 'model://mesh/file.dae' must be relative"):
         sdf2usd.parse_model(sdf)
+
+
+_MTL = """# exporter comment
+newmtl wood
+Ka 1 1 1
+Kd 0.8 0.7 0.6
+Ks 0.5 0.5 0.5
+Ns 96
+illum 2
+map_Kd wood.png
+newmtl paint
+Kd 0.2 0.3 0.4
+d 1.0
+"""
+
+# A unit quad in two materials: one textured quad, one triangle and one
+# pentagon, with relative (negative) indices on the last face.
+_OBJ = """mtllib part.mtl
+o part
+v 0 0 0
+v 1 0 0
+v 1 1 0
+v 0 1 0
+v 0.5 1.5 0
+v 2 0 0
+vt 0 0
+vt 1 0
+vt 1 1
+vt 0 1
+vn 0 0 1
+usemtl wood
+s off
+f 1/1/1 2/2/1 3/3/1 4/4/1
+usemtl paint
+f 2//1 6//1 3//1
+f -6//-1 -5//-1 -4//-1 -2//-1 -3//-1
+"""
+
+
+def _mesh_model(tmp_path, obj=_OBJ, mtl=_MTL, geometry_extra="", pose="1 2 0 0 0 1.5707963267948966",
+                collision=False):
+    (tmp_path / "meshes").mkdir(exist_ok=True)
+    (tmp_path / "meshes" / "part.obj").write_text(obj, encoding="utf-8")
+    (tmp_path / "meshes" / "part.mtl").write_text(mtl, encoding="utf-8")
+    (tmp_path / "meshes" / "wood.png").write_bytes(b"png")
+    tag = "collision" if collision else "visual"
+    sdf = tmp_path / "model.sdf"
+    sdf.write_text(
+        f"""<sdf version="1.9"><model name="m"><static>true</static><link name="link">
+        <{tag} name="part"><pose>{pose}</pose><geometry><mesh>
+        <uri>meshes/part.obj</uri><scale>2 3 4</scale>{geometry_extra}
+        </mesh></geometry></{tag}></link></model></sdf>""",
+        encoding="utf-8",
+    )
+    return sdf
+
+
+def test_an_obj_mesh_keeps_its_polygons_uvs_normals_and_materials(tmp_path):
+    model = sdf2usd.parse_model(_mesh_model(tmp_path))
+    (geom,) = model.geoms
+    mesh = geom.mesh
+
+    assert geom.kind == "mesh" and geom.size == (2.0, 3.0, 4.0)
+    assert geom.material is None
+    assert [group.material for group in mesh.groups] == ["wood", "paint"]
+    wood, paint = mesh.groups
+    assert wood.face_counts == [4] and wood.points == [0, 1, 2, 3]
+    assert wood.uvs == [0, 1, 2, 3] and wood.normals == [0, 0, 0, 0]
+    assert paint.face_counts == [3, 5]
+    assert paint.points == [1, 5, 2, 0, 1, 2, 4, 3]
+    assert paint.uvs is None and paint.normals == [0] * 8
+    assert mesh.materials["wood"].diffuse == (0.8, 0.7, 0.6)
+    assert mesh.materials["wood"].specular == (0.5, 0.5, 0.5)
+    assert mesh.materials["wood"].texture == tmp_path / "meshes" / "wood.png"
+    assert mesh.materials["paint"].texture is None
+
+
+def test_mesh_bounds_apply_scale_then_the_visual_pose(tmp_path):
+    lo, hi = sdf2usd.model_world_aabb(sdf2usd.parse_model(_mesh_model(tmp_path)))
+
+    # Scaled x 0..4, y 0..4.5; yawed +90 deg about (1, 2): x' = 1 - y, y' = 2 + x.
+    assert lo == pytest.approx((-3.5, 2.0, 0.0))
+    assert hi == pytest.approx((1.0, 6.0, 0.0))
+
+
+def test_texture_names_must_not_collide(tmp_path):
+    model = sdf2usd.parse_model(_mesh_model(tmp_path))
+    other = tmp_path / "other"
+    other.mkdir()
+    (other / "wood.png").write_bytes(b"different")
+    second = sdf2usd.parse_model(_mesh_model(other))
+    world = sdf2usd.World("w", (0, 0, -9.81), (0.4,) * 4, [model, second], [], [])
+
+    with pytest.raises(ValueError, match="share the name 'wood.png'"):
+        sdf2usd.world_textures(world)
+
+
+@pytest.mark.parametrize("obj, mtl, message", [
+    (_OBJ.replace("usemtl wood\n", ""), _MTL, "face before any usemtl"),
+    (_OBJ.replace("usemtl paint", "usemtl missing"), _MTL, "no MTL definition"),
+    (_OBJ.replace("f 2//1", "f 2/1/1"), _MTL, "mixes faces with and without texture"),
+    (_OBJ.replace("f 2//1 6//1 3//1", "f 2 6 3 9"), _MTL, "index 9 out of range"),
+    (_OBJ + "l 1 2\n", _MTL, "unsupported OBJ statement 'l'"),
+    (_OBJ, _MTL + "map_Bump normal.tga\n", "unsupported MTL statement 'map_Bump'"),
+    (_OBJ, _MTL.replace("d 1.0", "d 0.5"), "transparent materials"),
+    (_OBJ, _MTL.replace("map_Kd wood.png", "map_Kd -s 2 2 wood.png"), "options are unsupported"),
+    (_OBJ, _MTL.replace("wood.png", "absent.png"), "absent.png not found"),
+])
+def test_obj_and_mtl_features_outside_the_subset_are_refused(tmp_path, obj, mtl, message):
+    with pytest.raises(ValueError, match=message):
+        sdf2usd.parse_model(_mesh_model(tmp_path, obj=obj, mtl=mtl))
+
+
+def test_mesh_collisions_and_non_obj_meshes_are_refused(tmp_path):
+    with pytest.raises(ValueError, match="mesh collision 'part' unsupported"):
+        sdf2usd.parse_model(_mesh_model(tmp_path, collision=True))
+    sdf = _mesh_model(tmp_path)
+    sdf.write_text(sdf.read_text().replace("part.obj", "part.stl"))
+    with pytest.raises(ValueError, match="only OBJ meshes"):
+        sdf2usd.parse_model(sdf)
+    with pytest.raises(ValueError, match=r"unsupported \['submesh'\]"):
+        sdf2usd.parse_model(_mesh_model(
+            tmp_path, geometry_extra="<submesh><name>a</name></submesh>"))
+
+
+def test_packaged_background_props_parse_with_their_fuel_meshes():
+    workstation = sdf2usd.parse_model(_MODELS / "bg_workstation" / "model.sdf")
+    meshes = [g for g in workstation.geoms if g.kind == "mesh"]
+
+    assert [g.name for g in meshes] == ["desk", "monitor", "keyboard"]
+    assert all(not g.is_collision for g in meshes)
+    assert meshes[0].mesh.materials["wood"].texture.name == "Desk_Diffuse.png"
+    lo, hi = sdf2usd.model_world_aabb(workstation)
+    # A 0.75 m desk top and the monitor above it, centred on the footprint.
+    assert lo[2] == pytest.approx(0.0, abs=1e-6)
+    assert hi[2] == pytest.approx(1.192, abs=1e-3)
+    assert lo[0] == pytest.approx(-hi[0], abs=1e-3)
+    assert lo[1] == pytest.approx(-hi[1], abs=1e-3)
