@@ -54,11 +54,33 @@ when its check passes, not when its code exists.
 | Phase | Work | Done when |
 |---|---|---|
 | F1 Crowd scenes | Moving pedestrians, including two dressed alike, in the Gazebo and Isaac backends; one scene per scenario below | Every scenario plays in both backends and the simulator logs every person's ground-truth position |
-| F2 People tracking | `people_tracker` node: merged scan plus D455 colour and depth, constant-velocity fusion, stable ids; publishes `People` | Every scenario has a report, scored against simulator ground truth, of leader-track losses and ID switches |
-| F3 Leader recognition | Pretrained re-identification embeddings in `Person.appearance`, plus track continuity as a second identity cue in `lock_on.py`, so the lock holds while the leader is out of camera view | `leader_identity` reaches `LOCKED` on the leader in every scenario and holds it while the leader is out of camera view; leader-pick accuracy among nearby people reported per scenario, look-alike scenario included |
+| F2 People tracking | Candidate benchmark for detection and tracking (below), then a `people_tracker` node built from the chosen combination: merged scan plus D455 colour and depth, constant-velocity fusion, stable ids; publishes `People` | Every F2 candidate has a row in the results table, the chosen combination and its reason are recorded, and every scenario has a report, scored against simulator ground truth, of leader-track losses and ID switches |
+| F3 Leader recognition | Re-identification candidate benchmark (below), the chosen embeddings in `Person.appearance`, plus track continuity as a second identity cue in `lock_on.py`, so the lock holds while the leader is out of camera view | Every F3 candidate has a row in the results table; `leader_identity` reaches `LOCKED` on the leader in every scenario and holds it while the leader is out of camera view; leader-pick accuracy among nearby people reported per scenario, look-alike scenario included |
 | F4 Closed loop in sim | `follow_controller` through Nav2; moves only while `LOCKED` | Every scenario runs start to finish in both simulators with zero wrong-follow time, and every metric below is reported for both |
 | F5 Real robot | Recorded people replayed offline through the tracker first, then driving under the [driving readiness](../physical/driving_readiness.md) gates; the leader wears a ground-truth tag the system never reads | The scenario set and every metric exist for the real robot |
 | F6 Comparison | OmTrackVLA through `vla_client` (server `planner` mode) on the same scenarios | OmTrackVLA's metrics sit beside the baseline's for every scenario, in simulation and on the robot |
+
+## Candidate benchmark (F2, F3)
+
+Methods are chosen by measurement, not up front. One harness first; then each
+candidate gets one adapter and one run with default settings on the same data.
+Only the best two per category are tuned.
+
+**Data:** every F1 scenario in both simulators, plus one or two real
+recordings once F5 starts. **Results:** one table per category in
+`docs/leader_following/benchmarks.md`; raw runs under `artifacts/`.
+
+| Category | Candidates | Scored by |
+|---|---|---|
+| Camera person detection | YOLO11, YOLO26, RT-DETRv2, D-FINE, DEIM, RF-DETR, OWLv2 (already used for target localization) | Recall and precision by distance band (0–2, 2–4, 4–8 m) and visible fraction |
+| Lidar person detection | DR-SPAAM, a leg detector, plain scan clustering | Same recall and precision, plus coverage outside the camera view |
+| Multi-person tracking | ByteTrack, BoT-SORT, OC-SORT, Deep OC-SORT, StrongSORT | HOTA, IDF1 and ID switches against simulator ground truth |
+| Single target from one click | SAM 2, SAMURAI | Leader-track coverage and recovery after occlusion |
+| Re-identification | OSNet-AIN, CLIP-ReID, TransReID, SOLIDER, DINOv2 features | Correct leader pick among people within 3 m, look-alike scenario separately |
+
+Every row also records time per frame (median and p95) and GPU memory on the
+robot GPU and on Thor, and the license; Ultralytics models are AGPL-3.0.
+The ported `camera_people.py` (YOLO + BoT-SORT) is one candidate, not the choice.
 
 ## Working rules
 

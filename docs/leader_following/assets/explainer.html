@@ -146,6 +146,10 @@ p { margin: 0; max-width: 65ch; }
 .task p { font-size: .93rem; color: var(--muted); }
 .task .done { color: var(--ink); background: color-mix(in srgb, var(--ok) 9%, var(--panel)); border-left: 3px solid var(--ok); padding: 8px 10px; border-radius: 0 8px 8px 0; }
 .task .done b { color: var(--ok); }
+.try { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.try-label { font: 500 .7rem var(--mono); text-transform: uppercase; letter-spacing: .08em; color: var(--muted); width: 100%; }
+.chip { font: 500 .78rem var(--mono); padding: 3px 8px; border-radius: 6px; border: 1px solid var(--line); background: color-mix(in srgb, var(--scan) 6%, var(--panel)); transition: border-color .2s; }
+.chip:hover { border-color: var(--scan); }
 .rules { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
 .rule-card { border: 1px solid var(--line); background: var(--panel); border-radius: 12px; padding: 16px 18px; display: grid; gap: 6px; transition: border-color .2s; }
 .rule-card:hover { border-color: var(--leader); }
@@ -314,9 +318,9 @@ footer { color: var(--muted); font-size: .85rem; border-top: 1px solid var(--lin
   </div>
   <div class="pipe">
     <article class="stage" tabindex="0"><span class="n">SENSE</span><h3>Merge the scans</h3><p>Join the front and rear lidar into one 360° picture. The DyNAMO-Ridgeback setup already does this; we reuse it.</p><span class="pill built">already exists</span></article>
-    <article class="stage" tabindex="0"><span class="n">SEE</span><h3>Find people</h3><p>Camera: boxes around every person. Lidar: legs and bodies.</p><span class="pill built">camera part works</span></article>
+    <article class="stage" tabindex="0"><span class="n">SEE</span><h3>Find people</h3><p>Camera: boxes around every person. Lidar: legs and bodies.</p><span class="pill next">one candidate ported</span></article>
     <article class="stage" tabindex="0"><span class="n">TRACK</span><h3>Follow everyone</h3><p>Keep a position and heading for each person, even while hidden from the camera.</p><span class="pill next">next</span></article>
-    <article class="stage" tabindex="0"><span class="n">IDENTIFY</span><h3>Which one is the leader?</h3><p>Lock on at the start, then keep checking appearance and track history.</p><span class="pill built">lock logic works</span></article>
+    <article class="stage" tabindex="0"><span class="n">IDENTIFY</span><h3>Which one is the leader?</h3><p>Lock on at the start, then keep checking appearance and track history.</p><span class="pill built">built, tested offline</span></article>
     <article class="stage" tabindex="0"><span class="n">FOLLOW</span><h3>Keep the distance</h3><p>Stay about a metre behind, keep the leader in front of the camera.</p><span class="pill later">later</span></article>
     <article class="stage" tabindex="0"><span class="n">SAFETY</span><h3>Never bump anyone</h3><p>Cap speed, keep a gap to every person, stop when the leader is not confirmed.</p><span class="pill later">later</span></article>
   </div>
@@ -414,14 +418,19 @@ footer { color: var(--muted); font-size: .85rem; border-top: 1px solid var(--lin
     <article class="task">
       <div class="task-top"><span class="num">2</span><span class="pill later">then</span></div>
       <h3>Find and track people</h3>
-      <p>A people tracker that combines the merged lidar scan and the depth camera, gives each person a stable number and publishes everyone it sees.</p>
-      <p class="done"><b>Done when</b> every scene has a report, checked against the simulator's record, of how often the leader's track was lost or swapped with someone else.</p>
+      <p>First build one benchmark that runs any candidate on the same scenes and scores it the same way. Then try every candidate below once with default settings, tune only the best two, and build the people tracker from the winners: it combines lidar and the depth camera, gives each person a stable number and publishes everyone it sees.</p>
+      <div class="try"><span class="try-label">Camera detectors</span><span class="chip">YOLO11</span><span class="chip">YOLO26</span><span class="chip">RT-DETRv2</span><span class="chip">D-FINE</span><span class="chip">DEIM</span><span class="chip">RF-DETR</span><span class="chip">OWLv2</span></div>
+      <div class="try"><span class="try-label">Lidar people</span><span class="chip">DR-SPAAM</span><span class="chip">leg detector</span><span class="chip">scan clustering</span></div>
+      <div class="try"><span class="try-label">Trackers</span><span class="chip">ByteTrack</span><span class="chip">BoT-SORT</span><span class="chip">OC-SORT</span><span class="chip">Deep OC-SORT</span><span class="chip">StrongSORT</span></div>
+      <div class="try"><span class="try-label">One target from a click</span><span class="chip">SAM 2</span><span class="chip">SAMURAI</span></div>
+      <p class="done"><b>Done when</b> every candidate has a row in one results table (people found by distance and occlusion, track losses and swaps, time per frame on the robot's GPU), the chosen combination is written down with the reason, and every scene has a report of how often the leader's track was lost or swapped.</p>
     </article>
     <article class="task">
       <div class="task-top"><span class="num">3</span><span class="pill later">then</span></div>
       <h3>Recognise the leader</h3>
-      <p>Give the lock two ways to tell the leader from the others: appearance fingerprints from a pretrained re-identification network, and the person's track history, so the lock holds while the leader is out of camera view.</p>
-      <p class="done"><b>Done when</b> the robot locks onto the leader in every scene, keeps the lock while the leader walks out of camera view, and the share of correct picks among nearby people is reported, look-alike scene included.</p>
+      <p>Give the lock two ways to tell the leader from the others: appearance fingerprints from a pretrained re-identification network, and the person's track history, so the lock holds while the leader is out of camera view. Try every fingerprint network below on the same benchmark.</p>
+      <div class="try"><span class="try-label">Re-identification</span><span class="chip">OSNet-AIN</span><span class="chip">CLIP-ReID</span><span class="chip">TransReID</span><span class="chip">SOLIDER</span><span class="chip">DINOv2 features</span></div>
+      <p class="done"><b>Done when</b> every network has a row in the results table (correct picks among nearby people, look-alike scene included, and time per frame), the robot locks onto the leader in every scene with the chosen one, and keeps the lock while the leader walks out of camera view.</p>
     </article>
     <article class="task">
       <div class="task-top"><span class="num">4</span><span class="pill later">then</span></div>

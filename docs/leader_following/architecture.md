@@ -80,8 +80,8 @@ stateDiagram-v2
 `ridgeback_leader_follow/camera_people.py` detects every person with YOLO and
 associates them over frames with BoT-SORT; the appearance embedding function is
 injected so a learned re-identification model plugs in unchanged. It is a
-library only until the planned `people_tracker` node uses it, and needs
-`ultralytics` in the compute environment.
+library only and one candidate in the F2 detector and tracker benchmark, not a
+chosen method; it needs `ultralytics` in the compute environment.
 
 ## Provenance
 
