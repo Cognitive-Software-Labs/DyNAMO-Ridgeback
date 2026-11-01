@@ -8,6 +8,13 @@ environments; thin backend packages own simulator- or hardware-specific
 bringup. The shipped simulation benchmark uses a Unitree G1 as its target model;
 the ROS interfaces and localization package are target-generic.
 
+[![Animated top-down map: the robot reveals rooms with its lidar, drives to the edges of unknown space and spots the target](docs/exploration/assets/exploration.gif)](docs/exploration/assets/explainer.html)
+
+*Frontier exploration, simulated with the explorer's goal rules (an illustration,
+not recorded robot data). Interactive version and plain-language overview:
+[visual explainer](docs/exploration/assets/explainer.html); open it in a
+browser from a clone.*
+
 This README owns installation, public commands and operator workflows. It is a
 router: detailed references and physical runbooks live in the pages it links.
 
@@ -16,7 +23,7 @@ router: detailed references and physical runbooks live in the pages it links.
 | Area | Pages |
 |------|-------|
 | Start here | [Documentation index](docs/index.md) · [project context](docs/project/PROJECT_CONTEXT.md) · [documentation ownership](docs/project/documentation.md) · [conventions](docs/project/conventions.md) · `AGENTS.md` / `CLAUDE.md` (thin agent entrypoints) |
-| Exploration | [Architecture](docs/exploration/architecture.md) · [launch arguments](docs/exploration/launch_arguments.md) · [evaluation](docs/exploration/evaluation.md) (coverage and navigation outcomes) |
+| Exploration | [Architecture](docs/exploration/architecture.md) · [launch arguments](docs/exploration/launch_arguments.md) · [evaluation](docs/exploration/evaluation.md) (coverage and navigation outcomes) · [visual explainer](docs/exploration/assets/explainer.html) |
 | Leader following | [Architecture](docs/leader_following/architecture.md) · [plan](docs/plans/FOLLOWING_leader_in_crowds.md) · [visual explainer](docs/leader_following/assets/explainer.html) |
 | Target localization | [Pipeline](docs/target_localization/target_localization_pipeline.md) · [camera stack](docs/target_localization/camera_stack.md) · [distributed deployment](docs/target_localization/distributed_deployment.md) |
 | Benchmarking | [Overview](docs/target_distance_benchmarking/overview.md) · [running benchmarks](docs/target_distance_benchmarking/running_benchmarks.md) · [launch arguments](docs/target_distance_benchmarking/launch_arguments.md) · [sweeps](docs/target_distance_benchmarking/sweeps.md) · [outputs](docs/target_distance_benchmarking/outputs.md) · [replay profiles](docs/target_distance_benchmarking/profiles.md) · [configurator](docs/target_distance_benchmarking/configurator.md) |
