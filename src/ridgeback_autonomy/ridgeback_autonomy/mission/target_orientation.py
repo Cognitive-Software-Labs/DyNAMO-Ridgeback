@@ -1,4 +1,4 @@
-"""G1 heading in the map frame from one depth image, with no simulator input.
+"""G1 heading and body axis in the map frame from one depth image, with no simulator input.
 
 The G1 holds both forearms forward: from every side, the only part of it more
 than 0.18 m from its vertical axis is two parallel bars at chest height, on
@@ -8,6 +8,10 @@ at every heading, and the best heading is reported only when enough points
 support it and few contradict it. A heading is never inferred from their absence:
 without visible forearms (hidden behind G1, or a posture with the arms down) the
 estimate is None and parking keeps its undirected ranking.
+
+The body axis is a separate estimate from the same points: the middle of the legs,
+which the detector's surface centroid is not (the forearms pull it toward a camera
+G1 faces). It needs no forearms and does not feed the heading.
 """
 
 from __future__ import annotations
@@ -23,6 +27,9 @@ SEARCH_RADIUS_M = 0.60
 BODY_HEIGHT_M = (0.05, 1.50)
 LEG_HEIGHT_M = (0.10, 0.55)
 LEG_SEARCH_RADIUS_M = 0.30   # G1's own legs: a nearby table's legs must not move the axis
+MIN_LEG_POINTS = 50
+LEG_SURFACE_OFFSET_M = 0.03  # only the near surfaces show: measured short by this along the view
+MAX_AXIS_SPREAD_M = 0.03
 # The forearm bars, in G1's frame (x forward, y left), with a margin for depth
 # noise and for the centre error of a surface-based G1 estimate.
 FOREARM_HEIGHT_M = (0.80, 0.97)
@@ -82,14 +89,10 @@ def estimate_target_yaw(points_map, center_xy, floor_z=0.0):
     dx, dy, height = points[:, 0] - center_xy[0], points[:, 1] - center_xy[1], points[:, 2] - floor_z
     around = ((np.hypot(dx, dy) <= SEARCH_RADIUS_M)
               & (height >= BODY_HEIGHT_M[0]) & (height <= BODY_HEIGHT_M[1]))
-    legs = (around & (np.hypot(dx, dy) <= LEG_SEARCH_RADIUS_M)
-            & (height >= LEG_HEIGHT_M[0]) & (height <= LEG_HEIGHT_M[1]))
+    legs = _leg_points(dx, dy, height)
     if not legs.any():
         return None
-    # The middle of the legs' extent marks G1's axis better than a surface-based position
-    # estimate, and unlike a mean or median it ignores which leg shows more pixels.
-    dx = dx - np.mean(np.percentile(dx[legs], (2, 98)))
-    dy = dy - np.mean(np.percentile(dy[legs], (2, 98)))
+    dx, dy = dx - _middle(dx[legs]), dy - _middle(dy[legs])
     radius = np.hypot(dx, dy)
     band = around & (height >= FOREARM_HEIGHT_M[0]) & (height <= FOREARM_HEIGHT_M[1])
     bars = band & (radius >= FOREARM_MIN_RADIUS_M) & (radius <= FOREARM_MAX_RADIUS_M)
@@ -115,6 +118,41 @@ def estimate_target_yaw(points_map, center_xy, floor_z=0.0):
         return None
     return OrientationEstimate(_along_forearms(px[inliers], py[inliers], yaw), int(best),
                                round(fraction, 3))
+
+
+def _leg_points(dx, dy, height):
+    return ((np.hypot(dx, dy) <= LEG_SEARCH_RADIUS_M)
+            & (height >= LEG_HEIGHT_M[0]) & (height <= LEG_HEIGHT_M[1]))
+
+
+def _middle(values):
+    """The middle of an extent: unlike a mean or median, it ignores which leg shows more pixels."""
+    return float(np.mean(np.percentile(values, (2, 98))))
+
+
+def estimate_body_axis(points_map, seed_xy, camera_xy, floor_z=0.0):
+    """G1's vertical axis (x, y) from its legs near ``seed_xy``, or None without enough of them."""
+    points = np.asarray(points_map, dtype=float)
+    if points.size == 0:
+        return None
+    dx, dy = points[:, 0] - seed_xy[0], points[:, 1] - seed_xy[1]
+    legs = _leg_points(dx, dy, points[:, 2] - floor_z)
+    if np.count_nonzero(legs) < MIN_LEG_POINTS:
+        return None
+    x, y = seed_xy[0] + _middle(dx[legs]), seed_xy[1] + _middle(dy[legs])
+    view = math.atan2(y - camera_xy[1], x - camera_xy[0])
+    return (x + LEG_SURFACE_OFFSET_M * math.cos(view), y + LEG_SURFACE_OFFSET_M * math.sin(view))
+
+
+def combined_axis(axes):
+    """One axis from a stationary view's per-frame axes, or None unless enough frames agree."""
+    seen = [a for a in axes if a is not None]
+    if len(seen) < MIN_AGREEING_FRAMES:
+        return None
+    x, y = float(np.median([a[0] for a in seen])), float(np.median([a[1] for a in seen]))
+    if max(math.hypot(a[0] - x, a[1] - y) for a in seen) > MAX_AXIS_SPREAD_M:
+        return None
+    return x, y
 
 
 def _along_forearms(px, py, yaw):

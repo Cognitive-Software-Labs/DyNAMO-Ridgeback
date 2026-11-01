@@ -92,6 +92,7 @@ class ClearanceResult:
     nearest_m: float | None = None     # closest return to the current footprint
     g1_gap_m: float | None = None      # current footprint to the G1 reference
     points: int = 0
+    vetoed_by: tuple | None = None     # base-frame return and map pose it fell inside (diagnostic)
 
 
 def clearance_reason(points, footprint, velocity, age_s, robot, route, g1, g1_min_gap_m,
@@ -117,12 +118,16 @@ def clearance_reason(points, footprint, velocity, age_s, robot, route, g1, g1_mi
         return result
     for pose in stopping_poses(velocity, age_s, protection):
         polygon = rotated_footprint_vertices(footprint, *pose)
-        if points_to_polygon_distance(px, py, polygon).min() < limits.margin_m:
+        distance = points_to_polygon_distance(px, py, polygon)
+        if distance.min() < limits.margin_m:
             result.reason = 'lidar_obstacle_in_stopping_path'
+            result.vetoed_by = (float(px[distance.argmin()]), float(py[distance.argmin()]), None)
             return result
     for pose in remaining_route(route, robot, limits):
         polygon = rotated_footprint_vertices(footprint, *to_base(pose, robot))
-        if points_to_polygon_distance(px, py, polygon).min() <= 0.0:
+        distance = points_to_polygon_distance(px, py, polygon)
+        if distance.min() <= 0.0:
             result.reason = 'lidar_obstacle_on_route'
+            result.vetoed_by = (float(px[distance.argmin()]), float(py[distance.argmin()]), pose)
             return result
     return result

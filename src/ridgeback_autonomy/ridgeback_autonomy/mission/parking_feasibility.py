@@ -13,7 +13,7 @@ from ridgeback_autonomy.mission.parking_geometry import (
     normalize_angle, planar_path_length, rotated_footprint_vertices,
 )
 from ridgeback_autonomy.mission.parking_planner import (
-    footprint_rejection_reason, points_to_polygon_distance, preference,
+    PREFERENCE_RANKS, footprint_rejection_reason, points_to_polygon_distance, preference,
 )
 
 
@@ -37,7 +37,7 @@ def candidate_groups(plan, approach, per_class=6):
     Exhaustion of this subset is not proof that the entire annulus is blocked.
     """
     groups = []
-    for rank in range(3):
+    for rank in range(PREFERENCE_RANKS):
         pool = [c for c in plan.candidates if c.status in ('valid', 'selected')
                 and preference(c.task_x, c.task_y, plan.target, approach)[0] == rank]
         ordered = []

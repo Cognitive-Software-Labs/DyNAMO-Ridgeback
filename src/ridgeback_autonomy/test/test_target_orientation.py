@@ -7,8 +7,8 @@ import pytest
 from sensor_msgs.msg import Image
 
 from ridgeback_autonomy.mission.target_orientation import (
-    OrientationEstimate, combined_estimate, depth_metres, depth_to_map_points,
-    estimate_target_yaw,
+    LEG_SURFACE_OFFSET_M, OrientationEstimate, combined_axis, combined_estimate, depth_metres,
+    depth_to_map_points, estimate_body_axis, estimate_target_yaw,
 )
 
 
@@ -117,3 +117,37 @@ def test_depth_pixels_become_map_points_through_the_camera_pose():
     rotation = np.array([[0, 0, 1], [-1, 0, 0], [0, -1, 0]], dtype=float)
     points = depth_to_map_points(depth, (100.0, 100.0, 1.0, 1.0), rotation, [1.0, 0.0, 1.0])
     assert points == pytest.approx(np.array([[3.0, 0.0, 1.0], [3.0, -0.02, 1.0]]))
+
+
+def test_the_body_axis_is_the_middle_of_the_legs_plus_the_surface_correction():
+    points = cloud(0.0)
+    x, y = estimate_body_axis(points, (2.9, 0.0), (0.3, 0.0))
+    # The legs span the axis; the near-surface correction points away from the camera.
+    assert x == pytest.approx(G1[0] + 0.01 + LEG_SURFACE_OFFSET_M, abs=0.02)
+    assert y == pytest.approx(G1[1], abs=0.02)
+
+
+def test_the_body_axis_needs_no_forearms_and_ignores_them():
+    with_arms = estimate_body_axis(cloud(1.2), (3.0, 0.0), (0.3, 0.0))
+    without = estimate_body_axis(cloud(1.2, bars=()), (3.0, 0.0), (0.3, 0.0))
+    assert with_arms == pytest.approx(without, abs=0.02)
+
+
+def test_the_body_axis_ignores_which_leg_shows_more_pixels():
+    points = cloud(0.0)
+    near_leg = (points[:, 2] < 0.6) & (points[:, 1] > G1[1])
+    uneven = np.vstack((points, points[near_leg], points[near_leg], points[near_leg]))
+    assert estimate_body_axis(uneven, G1, (0.3, 0.0)) == pytest.approx(
+        estimate_body_axis(points, G1, (0.3, 0.0)), abs=0.015)
+
+
+def test_a_body_axis_needs_legs_near_the_estimate():
+    assert estimate_body_axis(np.empty((0, 3)), G1, (0.3, 0.0)) is None
+    assert estimate_body_axis(cloud(0.0, legs=False), G1, (0.3, 0.0)) is None
+    assert estimate_body_axis(cloud(0.0), (5.0, 0.0), (0.3, 0.0)) is None
+
+
+def test_frames_must_agree_on_the_body_axis():
+    assert combined_axis([(3.0, 0.0), (3.01, 0.0), None, (3.0, 0.01)]) == pytest.approx((3.0, 0.0))
+    assert combined_axis([(3.0, 0.0), None, (3.0, 0.0)]) is None
+    assert combined_axis([(3.0, 0.0), (3.0, 0.0), (3.2, 0.0)]) is None

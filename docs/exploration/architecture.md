@@ -171,19 +171,49 @@ positions, the mean error against ground truth was 6.7° (maximum 12.9°), and i
 also held with a table next to or across G1's front. The cue is specific to this
 forearms-forward posture, and it is unqualified on Isaac and on hardware.
 
+The same frames give G1's body axis (`estimate_body_axis`): the middle of the
+legs' extent, plus 0.03 m along the view for the legs' hidden far side. It
+replaces the position estimate when at least 3 frames agree within 0.03 m and it
+lies within `target_axis_max_shift_m` (0.25 m); otherwise the estimate is kept.
+That estimate is a centroid of visible surface points, so it depends on G1's
+heading: the forearms pulled it up to 0.13 m toward a camera G1 faced. The axis
+was 0.025 m from ground truth on average (maximum 0.049 m) over the same 72
+views, from any seed. It uses no forearms and does not feed the heading. The
+keep-out reference stays `generic_target_position`.
+
 The heading only orders candidates, and only when planning runs; it never
-changes a footprint, keep-out, reach, route or LiDAR check, and a goal is never
-changed while driving. Without a heading, the ranking is the original undirected
-one. With one, by the task point's bearing from G1:
+changes a footprint, keep-out, reach, route or LiDAR check, or a ray's colour,
+and a goal is never changed while driving. Without a heading, the ranking is the
+original undirected one. With one, by the task point's bearing from G1, relative
+to G1's heading and never to the robot's:
 
-1. `g1_front`, within 45° of the heading: the poses at G1's hands;
-2. `g1_rear`, within 45° of the opposite direction;
-3. `g1_side`, the rest.
+1. `g1_left` and `g1_right`, equally, within `parking_side_sector_half_deg` (45°)
+   of G1's own left and right. Left is counter-clockwise from the heading, seen
+   from above;
+2. `g1_rear`, within `parking_rear_sector_half_deg` (30°) of the opposite direction;
+3. `g1_front`, within `parking_front_sector_half_deg` (30°) of the heading;
+4. `g1_other`, what lies between those sectors.
 
-Path checks run in that order, and the first class with a safe route is selected,
-so an unsafe preferred pose always loses to a safe alternative. A rear pose is
-within the reach band but behind G1's hands, and nothing here verifies that the
-task can be done from there; the manager logs this when it selects one.
+Path checks run in that order, and the first class with a safe route is
+selected. Inside a class the existing reach, clearance and path-length tiers
+choose, so neither side is favoured and an unsafe preferred pose always loses to
+a safe alternative. With a heading, the clearance score also counts G1's legs,
+0.21 m to each side of its axis (`G1_LEG_LATERAL_M`). This affects quality only:
+the keep-out is a circle while G1 is wider than deep, and its mapped leg cells
+are too coarse to separate poses whose real leg clearance differs by centimetres.
+The LiDAR monitor treats those legs as obstacles, so a pose with little real
+clearance is stopped on the final approach.
+Nothing verifies that G1's hands can reach the rear bin. With the held forearms,
+the nearest hand is about 0.53 m from the task point straight beside G1, 0.23 m at
+the front edge of the side sector, and 0.9 m behind G1; the manager logs this
+limit when it selects a pose.
+
+If no safe pose exists and exploration can add nothing, a driving mission returns
+to the saved start pose through the normal return leg and ends `MISSION_FAILED`
+(`parking_failed`, with the planning reason). It first requires that Nav2 owns no
+goal: otherwise, or with driving off, it stops in `PARKING_PLANNING_FAILED`
+without sending a goal. A failed return ends `MISSION_FAILED`
+(`return_navigation_failed`) without a retry.
 
 ### G1-centred exploration
 
@@ -196,9 +226,10 @@ unknown, or its parked footprint touches unknown cells or leaves the map
 (`undecided_parking_positions`, using the planner's own checks). Positions
 blocked by obstacles are decided, and unknown floor that no parked footprint
 reaches is not required. A verified pose elsewhere therefore skips exploration,
-even if some directions stay orange. With a known G1 heading only G1's front
-counts: a valid rear pose does not stop the mapping of a front that is still
-unknown, while a front that is known to be blocked needs no more mapping.
+even if some directions stay orange. With a known G1 heading only positions
+ranked at least as high as the best valid one count: both sides are evaluated,
+a valid rear pose does not stop the mapping of G1's sides while they are
+unknown, and a side known to be blocked needs no more mapping.
 
 Exploration resumes the shared explorer, focused on G1, for a round. While it
 runs, every new map (at most every `g1_exploration_refresh_s`, 2 s) redraws
@@ -206,8 +237,9 @@ the donut from the last G1 estimate; that preview never selects a pose. A round
 ends:
 
 - as a checkpoint, once poses become valid that no planning attempt has
-  considered (none within a cell of one), at G1's front when its heading is
-  known, after at least `g1_exploration_min_round_s` (5 s);
+  considered (none within a cell of one), in a better class than any planned so
+  far when G1's heading is known, after at least `g1_exploration_min_round_s`
+  (5 s);
 - complete, when no position is undecided;
 - partial, when the explorer has no reachable frontier left around G1, after
   `g1_exploration_timeout_s` (240 s, shared by all rounds), or when the

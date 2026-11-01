@@ -127,6 +127,14 @@ class GridSnapshot:
         return self.origin_x + c * local_x - s * local_y, self.origin_y + s * local_x + c * local_y
 
 
+# Outer surface of G1's shins beside its axis, seen by the LiDARs (measured, 2026-11-02). With
+# a heading the map's coarser leg cells are replaced by these for the clearance quality score.
+G1_LEG_LATERAL_M = 0.21
+# Half-widths around G1's left and right, rear and front: wider than the heading's error.
+DEFAULT_FACING_SECTORS_RAD = (math.radians(45.0), math.radians(30.0), math.radians(30.0))
+PREFERENCE_RANKS = 4
+
+
 @dataclass(frozen=True)
 class TargetReference:
     """A localized target and what kind of point it is."""
@@ -139,6 +147,7 @@ class TargetReference:
     is_foot_midpoint: bool
     source: str
     facing_yaw_rad: float | None = None   # the direction G1 faces, when reliably observed
+    facing_sectors_rad: tuple[float, float, float] = DEFAULT_FACING_SECTORS_RAD
 
 
 @dataclass(frozen=True)
@@ -361,10 +370,6 @@ def footprint_clearance_m(
     return clearance
 
 
-# Half-width of G1's front and rear sectors: far wider than the heading estimate's error.
-FACING_SECTOR_HALF_RAD = math.pi / 4.0
-
-
 def preference(
     task_x: float,
     task_y: float,
@@ -373,19 +378,24 @@ def preference(
 ) -> tuple[int, str]:
     """Preference class of a pose: only an order of checking, never a validity decision.
 
-    With a reliable G1 heading: its front (the hands), then behind it, then its sides,
-    by the task point's bearing from G1. Otherwise the original
-    ``_parking_candidate_preference`` without a heading: side, front, back of the approach.
+    With a reliable G1 heading, by the task point's bearing from G1 relative to that
+    heading (positive to G1's left, as seen standing at G1 facing that way): beside G1,
+    left and right equally, then behind it, then in front of it, then what lies between
+    those sectors. Otherwise the original ``_parking_candidate_preference`` without a
+    heading: side, front, back of the approach.
     """
 
     task_angle = math.atan2(task_y - target.y, task_x - target.x)
     if target.facing_yaw_rad is not None:
-        relative = abs(normalize_angle(task_angle - target.facing_yaw_rad))
-        if relative <= FACING_SECTOR_HALF_RAD:
-            return 0, 'g1_front'
-        if relative >= math.pi - FACING_SECTOR_HALF_RAD:
+        relative = normalize_angle(task_angle - target.facing_yaw_rad)
+        side_half, rear_half, front_half = target.facing_sectors_rad
+        if abs(abs(relative) - math.pi / 2.0) <= side_half:
+            return 0, 'g1_left' if relative > 0.0 else 'g1_right'
+        if abs(relative) >= math.pi - rear_half:
             return 1, 'g1_rear'
-        return 2, 'g1_side'
+        if abs(relative) <= front_half:
+            return 2, 'g1_front'
+        return 3, 'g1_other'
     if approach_pose is None or math.hypot(approach_pose[0] - target.x,
                                            approach_pose[1] - target.y) < 0.10:
         return 1, 'front'
@@ -428,7 +438,8 @@ def undecided_parking_positions(grid: GridSnapshot, target: TargetReference,
     Uses plan_parking's cell rule and checks: an unknown task cell, or a free one whose
     parked footprint it would reject as unknown or outside the map. Occupied task cells
     and footprints that touch an obstacle are decided, so they do not count. With a
-    known G1 heading only its front counts: the positions worth mapping to reach.
+    known G1 heading, only positions ranked at least as high as the best valid one
+    count: both sides are evaluated, and nothing worse is worth mapping.
     """
 
     keepout = keepout_radius_m(target, config)
@@ -439,19 +450,25 @@ def undecided_parking_positions(grid: GridSnapshot, target: TargetReference,
     # Unknown (-1) or free task cells; occupied and other negative values are not candidates.
     cells = ((distance >= config.reach_min_m) & (distance <= config.reach_max_m)
              & ((values == -1) | ((values >= 0) & (values < config.occupied_threshold))))
-    if target.facing_yaw_rad is not None:
-        bearing = np.arctan2(cy - target.y, cx - target.x) - target.facing_yaw_rad
-        cells &= np.abs(np.arctan2(np.sin(bearing), np.cos(bearing))) <= FACING_SECTOR_HALF_RAD
     cells[cells] = pose_geometry_passes(distance[cells], config, keepout)
-    count = int(np.count_nonzero(cells & (values == -1)))
+    unknown = cells & (values == -1)
+    undecided = list(zip(cx[unknown].tolist(), cy[unknown].tolist()))
+    valid = []
     free = cells & (values >= 0)
     for task_x, task_y in zip(cx[free].tolist(), cy[free].tolist()):
         base_x, base_y, yaw = base_pose_from_task_point(
             task_x, task_y, target.x, target.y, config.task_point_x_base_m, config.task_point_y_base_m)
         polygon = rotated_footprint_vertices(config.footprint, base_x, base_y, yaw)
-        count += footprint_rejection_reason(polygon, grid, config.occupied_threshold) in (
-            'unknown', 'out_of_bounds')
-    return count
+        rejection = footprint_rejection_reason(polygon, grid, config.occupied_threshold)
+        if rejection in ('unknown', 'out_of_bounds'):
+            undecided.append((task_x, task_y))
+        elif rejection is None:
+            valid.append((task_x, task_y))
+    if target.facing_yaw_rad is None:
+        return len(undecided)
+    rank = lambda point: preference(point[0], point[1], target, None)[0]
+    best_valid = min(map(rank, valid), default=PREFERENCE_RANKS)
+    return sum(rank(point) <= best_valid for point in undecided)
 
 
 def radial_profile(grid: GridSnapshot, target: TargetReference, config: PlannerConfig,
@@ -552,6 +569,12 @@ def plan_parking(
         + config.clearance_cap_m)
     unsafe = near & ((values == -1) | (values >= config.occupied_threshold))
     unsafe_xy = (cx[unsafe], cy[unsafe])
+    if target.facing_yaw_rad is not None:
+        # Quality only, never validity: the keep-out is a circle, but G1 is wider than deep.
+        left_x = -math.sin(target.facing_yaw_rad) * G1_LEG_LATERAL_M
+        left_y = math.cos(target.facing_yaw_rad) * G1_LEG_LATERAL_M
+        unsafe_xy = (np.append(unsafe_xy[0], (target.x + left_x, target.x - left_x)),
+                     np.append(unsafe_xy[1], (target.y + left_y, target.y - left_y)))
 
     # 2-4. Base pose per free task cell, footprint occupancy, then G1 keep-out.
     for task_x, task_y in plan.free_cells:

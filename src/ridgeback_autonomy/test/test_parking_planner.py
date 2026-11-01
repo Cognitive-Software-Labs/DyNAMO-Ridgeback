@@ -772,8 +772,11 @@ def test_ray_colour_follows_the_parked_footprint_not_only_the_cells():
 
 # G1's heading orders the candidates; validity stays the planner's alone.
 from ridgeback_autonomy.mission.parking_feasibility import candidate_groups
+from ridgeback_autonomy.mission.parking_planner import preference
 
 EAST, NORTH, WEST, SOUTH = 0.0, math.pi / 2, math.pi, -math.pi / 2
+# G1 at (3, 3), facing west: its left is south, its right north, its rear east.
+OUTER = 0.75          # obstacles beyond the donut, inside the parked footprints
 
 
 def facing(yaw):
@@ -784,58 +787,143 @@ def bearing(c):
     return math.atan2(c.task_y - 3.0, c.task_x - 3.0)
 
 
-def block(g, *boxes):
-    for box in boxes:
-        fill(g, *box, 100)
+def blocked(*directions):
+    """A map with a wall across the parked footprints of the given bearings."""
+    g = grid()
+    rows, cols = np.mgrid[0:g.height, 0:g.width]
+    x, y = g.cell_centers(cols, rows)
+    d, a = np.hypot(x - 3.0, y - 3.0), np.arctan2(y - 3.0, x - 3.0)
+    for direction in directions:
+        off = np.abs(np.arctan2(np.sin(a - direction), np.cos(a - direction)))
+        g.data[(d >= OUTER) & (d <= 1.0) & (off <= math.radians(50))] = 100
     return g
 
 
-BLOCK_WEST = (2.20, 2.75, 2.45, 3.25)       # a table across G1's west side, in the band
-BLOCK_EAST = (3.55, 2.75, 3.80, 3.25)
+def selected_label(g, heading=WEST, config=CONFIG):
+    plan = plan_parking(g, facing(heading), config, APPROACH_FROM_WEST)
+    assert plan.ok
+    return plan.selected.preference_label
 
 
-@pytest.mark.parametrize('yaw', [WEST, EAST, NORTH, SOUTH, 0.6],
-                         ids=['facing_robot', 'facing_away', 'rotated_left', 'rotated_right', 'skew'])
-def test_a_free_front_is_preferred_at_any_heading(yaw):
-    plan = plan_parking(grid(), facing(yaw), CONFIG, APPROACH_FROM_WEST)
-    assert plan.ok and plan.selected.preference_label == 'g1_front'
-    assert abs(normalize_angle(bearing(plan.selected) - yaw)) <= math.pi / 4
+def test_right_side_is_selected_when_the_left_is_blocked():
+    assert selected_label(blocked(SOUTH)) == 'g1_right'
 
 
-def test_a_blocked_front_falls_to_a_safe_rear():
-    g = block(grid(), BLOCK_WEST)
-    plan = plan_parking(g, facing(WEST), CONFIG, APPROACH_FROM_WEST)
-    assert plan.ok and plan.selected.preference_label == 'g1_rear'
-    assert abs(normalize_angle(bearing(plan.selected) - EAST)) <= math.pi / 4
-    assert not any(c.status == 'valid' and c.preference_label == 'g1_front' for c in plan.candidates)
+def test_left_side_is_selected_when_the_right_is_blocked():
+    assert selected_label(blocked(NORTH)) == 'g1_left'
 
 
-def test_front_and_rear_blocked_fall_to_a_safe_side():
-    g = block(grid(), BLOCK_WEST, BLOCK_EAST)
-    plan = plan_parking(g, facing(WEST), CONFIG, APPROACH_FROM_WEST)
-    assert plan.ok and plan.selected.preference_label == 'g1_side'
+def test_both_sides_are_equal_and_the_existing_criteria_choose():
+    # Turning G1 by 180 degrees swaps its left and right but not the poses beside it:
+    # the same pose must win, so neither side is favoured.
+    g = grid()
+    looking_west = plan_parking(g, facing(WEST), CONFIG, APPROACH_FROM_WEST)
+    looking_east = plan_parking(g, facing(EAST), CONFIG, APPROACH_FROM_WEST)
+    assert looking_west.selected.preference_label in ('g1_left', 'g1_right')
+    assert (looking_west.selected.task_x, looking_west.selected.task_y) == (
+        looking_east.selected.task_x, looking_east.selected.task_y)
+    assert looking_west.selected.preference_label != looking_east.selected.preference_label
+    # A map obstacle moves the choice to the side with the better clearance, not by name.
+    g = grid()
+    fill(g, 2.4, 3.95, 3.6, 4.05, 100)
+    assert selected_label(g, WEST) == selected_label(g, EAST).replace('right', 'x').replace(
+        'left', 'right').replace('x', 'left')
 
 
-def test_all_sides_blocked_select_nothing_whatever_the_heading():
-    plan = plan_parking(block(grid(), (2.0, 2.0, 4.0, 4.0)), facing(WEST), CONFIG, APPROACH_FROM_WEST)
-    assert not plan.ok and plan.selected is None
+def test_both_sides_blocked_consider_behind_g1():
+    assert selected_label(blocked(NORTH, SOUTH)) == 'g1_rear'
+
+
+def test_sides_and_rear_blocked_consider_the_front():
+    assert selected_label(blocked(NORTH, SOUTH, EAST)) == 'g1_front'
+
+
+def test_preferred_sectors_blocked_leave_the_remaining_directions():
+    narrow = tuple(math.radians(15.0) for _ in range(3))
+    g = grid()
+    for box in ((2.85, 3.8, 3.15, 4.4), (2.85, 1.6, 3.15, 2.2),
+                (1.6, 2.85, 2.2, 3.15), (3.8, 2.85, 4.4, 3.15)):
+        fill(g, *box, 100)                     # a cross: north, south, west and east arms
+    plan = plan_parking(g, replace(facing(WEST), facing_sectors_rad=narrow), CONFIG, APPROACH_FROM_WEST)
+    assert plan.ok and plan.selected.preference_label == 'g1_other'
+
+
+def test_no_feasible_pose_selects_nothing_whatever_the_heading():
+    plan = plan_parking(blocked(NORTH, SOUTH, EAST, WEST), facing(WEST), CONFIG, APPROACH_FROM_WEST)
+    assert not plan.ok and plan.selected is None and plan.failure_reason == 'no_valid_candidate'
+
+
+@pytest.mark.parametrize('heading_deg', [0, 90, 180, 270, 37])
+def test_sectors_rotate_with_g1_and_ignore_the_approach(heading_deg):
+    heading = math.radians(heading_deg)
+    t = facing(heading)
+    def label(offset_deg, approach=APPROACH_FROM_WEST):
+        a = heading + math.radians(offset_deg)
+        return preference(3.0 + 0.5 * math.cos(a), 3.0 + 0.5 * math.sin(a), t, approach)
+    # Left is counter-clockwise from the heading: G1's own left, seen from above.
+    assert label(90) == (0, 'g1_left') and label(-90) == (0, 'g1_right')
+    assert label(180) == (1, 'g1_rear') and label(0) == (2, 'g1_front')
+    assert label(37) == (3, 'g1_other') and label(-143) == (3, 'g1_other')
+    assert label(90, (9.0, -7.0, 1.0)) == (0, 'g1_left')
+
+
+def test_sector_widths_are_configurable():
+    t = replace(facing(EAST), facing_sectors_rad=(math.radians(20), math.radians(70), math.radians(70)))
+    at = lambda deg: preference(3 + 0.5 * math.cos(math.radians(deg)),
+                                3 + 0.5 * math.sin(math.radians(deg)), t, None)[1]
+    assert at(60) == 'g1_front' and at(75) == 'g1_left' and at(120) == 'g1_rear'
+
+
+def test_unknown_heading_keeps_the_original_undirected_ranking():
+    plan = plan_parking(blocked(NORTH), target(), CONFIG, APPROACH_FROM_WEST)
+    assert plan.ok and plan.selected.preference_label.startswith('approach')
 
 
 def test_the_heading_changes_only_the_order_never_the_decisions():
-    g = block(grid(), BLOCK_WEST)
+    g = blocked(SOUTH)
     undirected = plan_parking(g, target(), CONFIG, APPROACH_FROM_WEST)
     directed = plan_parking(g, facing(WEST), CONFIG, APPROACH_FROM_WEST)
     decisions = lambda p: [(c.task_x, c.task_y, c.status == 'collision', c.reason) for c in p.candidates]
     assert decisions(undirected) == decisions(directed)
-    assert undirected.selected.preference_label.startswith('approach')
+    assert [s for _, s in undirected.radial_rays] == [s for _, s in directed.radial_rays]
 
 
-def test_path_checks_visit_the_front_group_first():
-    plan = plan_parking(block(grid(), (3.0, 3.60, 3.6, 3.9)), facing(WEST), CONFIG, APPROACH_FROM_WEST)
+def test_g1_legs_lower_the_clearance_score_of_poses_beside_them_without_rejecting_any():
+    undirected = plan_parking(grid(), target(), CONFIG, APPROACH_FROM_WEST)
+    directed = plan_parking(grid(), facing(WEST), CONFIG, APPROACH_FROM_WEST)
+    score = lambda plan: {(c.task_x, c.task_y): c.clearance_m for c in plan.candidates
+                          if c.status in ('valid', 'selected')}
+    before, after = score(undirected), score(directed)
+    assert before.keys() == after.keys()            # the same poses stay valid
+    assert all(after[k] <= before[k] for k in before)
+    beside = [k for k in before if abs(k[0] - 3.0) < 0.1]     # south and north of G1, facing west
+    assert beside and all(after[k] < before[k] for k in beside)
+
+
+def test_path_checks_visit_the_sides_then_rear_then_front_then_the_rest():
+    plan = plan_parking(grid(), facing(WEST), CONFIG, APPROACH_FROM_WEST)
     groups = candidate_groups(plan, APPROACH_FROM_WEST)
-    labels = [{planner_module.preference(c.task_x, c.task_y, plan.target, APPROACH_FROM_WEST)[1]
-               for c in group} for group in groups]
-    assert labels[:3] == [{'g1_front'}, {'g1_rear'}, {'g1_side'}]
+    labels = [{preference(c.task_x, c.task_y, plan.target, None)[1] for c in group} for group in groups]
+    assert labels == [{'g1_left', 'g1_right'}, {'g1_rear'}, {'g1_front'}, {'g1_other'}]
+
+
+def test_positions_at_least_as_good_as_the_best_valid_one_are_worth_exploring():
+    from ridgeback_autonomy.mission.parking_planner import undecided_parking_positions
+    undecided = lambda g: undecided_parking_positions(g, facing(WEST), CONFIG)
+    rows, cols = np.mgrid[0:grid().height, 0:grid().width]
+    x, y = grid().cell_centers(cols, rows)
+    d, a = np.hypot(x - 3.0, y - 3.0), np.arctan2(y - 3.0, x - 3.0)
+    beside = (d >= OUTER) & (d <= 1.4) & (np.abs(np.abs(a) - math.pi / 2) <= math.radians(40))
+    assert undecided(grid()) == 0                         # everything decided
+    right_unknown = grid()
+    right_unknown.data[beside & (y > 3.0)] = -1
+    assert undecided(right_unknown) > 0                   # one valid side: still evaluate the other
+    both_unknown = grid()
+    both_unknown.data[beside] = -1
+    assert undecided(both_unknown) > 0                    # a valid rear: the sides still rank above
+    rear_unknown = grid()
+    rear_unknown.data[(d >= 1.0) & (d <= 1.4) & (np.abs(a) <= math.radians(8))] = -1
+    assert undecided(rear_unknown) == 0                   # a valid side: the rear is not needed
 
 
 @pytest.mark.parametrize('foot', (False, True))

@@ -67,7 +67,8 @@ from ridgeback_autonomy.mission.target_localization import (
     TargetLocalizationAdapter,
 )
 from ridgeback_autonomy.mission.target_orientation import (
-    combined_estimate, depth_metres, depth_to_map_points, estimate_target_yaw,
+    combined_axis, combined_estimate, depth_metres, depth_to_map_points, estimate_body_axis,
+    estimate_target_yaw,
 )
 from ridgeback_autonomy.mission.parking_planner import (
     GridSnapshot,
@@ -76,6 +77,7 @@ from ridgeback_autonomy.mission.parking_planner import (
     TargetReference,
     footprint_rejection_reason,
     keepout_radius_m,
+    PREFERENCE_RANKS,
     plan_parking,
     points_to_polygon_distance,
     preference,
@@ -221,6 +223,7 @@ _ALLOWED_TRANSITIONS = {
         MissionState.EXPLORING_AROUND_G1,
         MissionState.PARKING_CANDIDATES_READY,
         MissionState.PARKING_PLANNING_FAILED,
+        MissionState.RETURNING_TO_START,
         MissionState.MISSION_CANCELED,
     },
     MissionState.PARKING_CANDIDATES_READY: {
@@ -228,7 +231,8 @@ _ALLOWED_TRANSITIONS = {
         MissionState.MISSION_CANCELED},
     MissionState.EVALUATING_PARKING_PATHS: {
         MissionState.PARKING_PATH_FEASIBLE, MissionState.PARKING_PLANNING_FAILED,
-        MissionState.EXPLORING_AROUND_G1, MissionState.MISSION_CANCELED},
+        MissionState.EXPLORING_AROUND_G1, MissionState.RETURNING_TO_START,
+        MissionState.MISSION_CANCELED},
     MissionState.PARKING_PATH_FEASIBLE: {
         MissionState.PARKING_PLANNING_FAILED, MissionState.PARKING_EXECUTION_FAILED,
         MissionState.NAVIGATING_TO_PREPARKING, MissionState.MISSION_CANCELED},
@@ -328,6 +332,12 @@ class MissionManagerNode(Node):
         self.declare_parameter('target_depth_topic', 'sensors/camera_0/depth/image')
         self.declare_parameter('target_camera_info_topic', 'sensors/camera_0/color/camera_info')
         self.declare_parameter('target_orientation_frames', 5)
+        # Half-widths around G1's left and right, rear and front, relative to its heading.
+        self.declare_parameter('parking_side_sector_half_deg', 45.0)
+        self.declare_parameter('parking_rear_sector_half_deg', 30.0)
+        self.declare_parameter('parking_front_sector_half_deg', 30.0)
+        # The legs' axis replaces the surface-based G1 position, unless it is this far off.
+        self.declare_parameter('target_axis_max_shift_m', 0.25)
         # Return to the observation pose: G1 was detected from exactly there, and the
         # detector's score varies with the view. A temporary goal checker brings the
         # robot back to that view; the stop is verified before relocalization.
@@ -553,6 +563,11 @@ class MissionManagerNode(Node):
         self.g1_reacquire_range_m = (
             float(self.get_parameter('g1_reacquire_min_range_m').value),
             float(self.get_parameter('g1_reacquire_max_range_m').value))
+        self.facing_sectors_rad = tuple(math.radians(float(self.get_parameter(name).value)) for name in (
+            'parking_side_sector_half_deg', 'parking_rear_sector_half_deg',
+            'parking_front_sector_half_deg'))
+        self.target_axis_max_shift_m = float(self.get_parameter('target_axis_max_shift_m').value)
+        self._g1_best_planned_rank = PREFERENCE_RANKS
         self._plan_rays_grid = None
         self.target_heading = None
         self._depth_frames = deque(
@@ -999,7 +1014,7 @@ class MissionManagerNode(Node):
                 return
 
             self.target_position = result.stabilized
-            self._observe_target_heading()
+            self._observe_target_body()
             self._target_map_odom = self._map_odom(Time.from_msg(msg.header.stamp))
             self._localization_deadline_s = None
             self._clear_recoverable_issue()
@@ -1054,6 +1069,7 @@ class MissionManagerNode(Node):
             self._g1_exploration_elapsed_s = 0.0
             self._g1_preview_map, self._g1_planned_cells = None, set()
             self.target_heading = None
+            self._g1_best_planned_rank = PREFERENCE_RANKS
             self._plan_rays_grid = None
             self._depth_frames.clear()
             self._observation_pose = self._observation_goal = None
@@ -1545,7 +1561,7 @@ class MissionManagerNode(Node):
                 x=position.map_x_m, y=position.map_y_m, frame_id=self.map_frame,
                 stamp_ns=position.last_stamp_ns, reference=position.reference,
                 is_foot_midpoint=position.is_foot_midpoint, source=position.source,
-                facing_yaw_rad=self._facing_yaw_rad())
+                facing_yaw_rad=self._facing_yaw_rad(), facing_sectors_rad=self.facing_sectors_rad)
             try:
                 grid = None if self.latest_map is None else GridSnapshot.from_msg(self.latest_map)
             except ValueError as exc:
@@ -1595,10 +1611,12 @@ class MissionManagerNode(Node):
             plan.selected.status = 'valid'
             plan.selected = None
             plan.ok = False
-            if (target.facing_yaw_rad is not None and not any(
-                    c.preference_label == 'g1_front' for c in plan.candidates)
-                    and self._maybe_explore_around_g1('no valid pose at the front of G1 yet')):
-                return
+            if target.facing_yaw_rad is not None:
+                self._g1_best_planned_rank = min(self._g1_best_planned_rank, min(
+                    preference(c.task_x, c.task_y, target, None)[0]
+                    for c in plan.candidates if c.status == 'valid'))
+                if self._maybe_explore_around_g1('better-ranked parking poses are still unmapped'):
+                    return
             self._planning_snapshot = PlanningSnapshot(robot, self._target_map_odom)
             if self._target_map_odom is None:
                 self._fail_planning('parking_tf_unavailable', 'source-time map-to-odom unavailable')
@@ -1629,6 +1647,8 @@ class MissionManagerNode(Node):
         if code in _EXPLORABLE_PLANNING_FAILURES and self._maybe_explore_around_g1(
                 f'{code}: {reason}'):
             return
+        if code in _EXPLORABLE_PLANNING_FAILURES and self._return_without_parking(code, reason):
+            return
         self.last_issue = MissionIssue(FailureClass.TERMINAL, code, reason)
         self._invalidate_path_requests()
         self._planning_deadline_s = None
@@ -1643,6 +1663,23 @@ class MissionManagerNode(Node):
             self.parking_marker_publisher.publish(clear_markers())
         self.get_logger().error(f'Parking planning failed [{code}]: {reason}')
         self._transition(MissionState.PARKING_PLANNING_FAILED, reason)
+
+    def _return_without_parking(self, code, reason):
+        """No safe pose exists: go back to the saved start and report it. False, for a plain
+        planning failure, when driving is off or Nav2 may still own a goal."""
+        if (not self.parking_navigation_enabled or self.start_pose is None
+                or self._nav_goal_generation is not None):
+            return False
+        self._invalidate_path_requests()
+        self._planning_deadline_s = None
+        if self.parking_plan is not None:
+            plan = self.parking_plan
+            plan.ok, plan.selected, plan.selected_path, plan.failure_reason = False, None, None, code
+            self._publish_parking_markers()
+        self._parking_failure = f'{code}: {reason}'
+        self.get_logger().error(f'No feasible parking pose [{code}]: {reason}; returning to start')
+        self._start_return(f'no feasible parking pose: {code}')
+        return True
 
     def _current_robot_pose(self, *, with_stamp: bool = False):
         pose = self._frame_pose(self.base_frame, Time())
@@ -1992,10 +2029,10 @@ class MissionManagerNode(Node):
                     f'Path-feasible parking pose selected: x={selected.base_x:.3f}, '
                     f'y={selected.base_y:.3f}, yaw={selected.yaw:.3f}, '
                     f'path_length={selected.path_length_m:.3f} m, {selected.preference_label}')
-                if selected.preference_label == 'g1_rear':
-                    self.get_logger().warning(
-                        'Parking behind G1: within its reach band, but its hands face away; '
-                        'nothing here verifies that the task can be done from this side')
+                if selected.preference_label.startswith('g1_'):
+                    self.get_logger().info(
+                        f'Parking at {selected.preference_label}: within the reach band; nothing '
+                        "here verifies that G1's hands can reach the rear bin from this side")
                 self._transition(MissionState.PARKING_PATH_FEASIBLE,
                                  'path-feasible snapshot selected')
                 if not self.parking_navigation_enabled:
@@ -2528,6 +2565,14 @@ class MissionManagerNode(Node):
             f' (nearest return {result.nearest_m if result.nearest_m is None else round(result.nearest_m, 3)} m,'
             f' G1 gap {result.g1_gap_m if result.g1_gap_m is None else round(result.g1_gap_m, 3)} m)')
         self.get_logger().error(f'Parking LiDAR veto in {self.state.name}: {reason}{detail}')
+        robot = self._current_robot_pose()
+        if result is not None and result.vetoed_by is not None and robot is not None:
+            x, y, pose = result.vetoed_by
+            c, s = math.cos(robot[2]), math.sin(robot[2])
+            self.get_logger().error(
+                f'Vetoing return at map ({robot[0] + c * x - s * y:.3f}, '
+                f'{robot[1] + s * x + c * y:.3f}), robot {tuple(round(v, 3) for v in robot[:3])}, '
+                f'inside the route pose {None if pose is None else tuple(round(v, 3) for v in pose)}')
         self._parking_navigation_failed(f'lidar_clearance: {reason}', stop_first=True)
         return True
 
@@ -2700,7 +2745,7 @@ class MissionManagerNode(Node):
         unknown = grid.data < 0
         target = TargetReference(position.map_x_m, position.map_y_m, self.map_frame, 0,
                                  position.reference, position.is_foot_midpoint, '',
-                                 self._facing_yaw_rad())
+                                 self._facing_yaw_rad(), self.facing_sectors_rad)
         coverage = {
             'undecided_positions': undecided_parking_positions(grid, target, self.planner_config),
             'donut_cells': int(np.count_nonzero(donut)),
@@ -2835,7 +2880,7 @@ class MissionManagerNode(Node):
         target = TargetReference(position.map_x_m, position.map_y_m, self.map_frame,
                                  position.last_stamp_ns, position.reference,
                                  position.is_foot_midpoint, position.source,
-                                 self._facing_yaw_rad())
+                                 self._facing_yaw_rad(), self.facing_sectors_rad)
         preview = plan_parking(grid, target, self.planner_config,
                                self.approach_pose or self._current_robot_pose())
         if preview.selected is not None:
@@ -2843,13 +2888,13 @@ class MissionManagerNode(Node):
             preview.selected.status, preview.selected, preview.ok = 'valid', None, False
         self.parking_marker_publisher.publish(plan_markers(
             preview, self.planner_config, self.get_clock().now().to_msg()))
-        # With a known heading, only G1's front is worth stopping for: the plan first
-        # asks for it, and other poses stay available when the round ends.
+        # With a known heading, only a better class than any planned so far is worth
+        # stopping for: the poses already considered stay available when the round ends.
         self._g1_preview_new = sum(
             1 for c in preview.candidates if c.status == 'valid'
             and not self._near_planned_cell(c, grid.resolution)
             and (target.facing_yaw_rad is None
-                 or preference(c.task_x, c.task_y, target, None)[1] == 'g1_front'))
+                 or preference(c.task_x, c.task_y, target, None)[0] < self._g1_best_planned_rank))
         return self._g1_preview_new
 
     def _near_planned_cell(self, candidate, resolution):
@@ -2904,21 +2949,32 @@ class MissionManagerNode(Node):
     def _facing_yaw_rad(self):
         return None if self.target_heading is None else self.target_heading.yaw_rad
 
-    def _observe_target_heading(self):
-        """G1's heading from this localization's stationary depth frames, used only for
-        ranking at the next planning; None when they do not show it reliably."""
+    def _observe_target_body(self):
+        """G1's heading and body axis from this localization's stationary depth frames. The
+        heading only ranks poses at the next planning, and is None when the frames do not
+        show it reliably. The axis replaces the surface-based position, which the forearms
+        pull toward a camera G1 faces; the keep-out reference stays generic."""
         frames = list(self._depth_frames)
         self._depth_frames.clear()
         center = (self.target_position.map_x_m, self.target_position.map_y_m)
         rotation_translation = self._camera_to_map()
-        estimates = []
+        estimates, axes = [], []
         if rotation_translation is not None and self._camera_intrinsics is not None:
             for msg in frames:
                 depth = depth_metres(msg)
                 if depth is not None:
-                    estimates.append(estimate_target_yaw(depth_to_map_points(
-                        depth, self._camera_intrinsics, *rotation_translation), center))
+                    points = depth_to_map_points(depth, self._camera_intrinsics, *rotation_translation)
+                    estimates.append(estimate_target_yaw(points, center))
+                    axes.append(estimate_body_axis(points, center, rotation_translation[1][:2]))
         self.target_heading = combined_estimate(estimates)
+        axis = combined_axis(axes)
+        if axis is None or math.hypot(axis[0] - center[0], axis[1] - center[1]) > self.target_axis_max_shift_m:
+            self.get_logger().info(f'G1 position kept at ({center[0]:.3f}, {center[1]:.3f}): '
+                                   f'body axis {axis} not usable')
+        else:
+            self.target_position = replace(self.target_position, map_x_m=axis[0], map_y_m=axis[1])
+            self.get_logger().info(f'G1 position from its body axis: ({axis[0]:.3f}, {axis[1]:.3f}), '
+                                   f'surface estimate ({center[0]:.3f}, {center[1]:.3f})')
         if self.target_heading is None:
             self.get_logger().info(f'G1 heading unknown: no reliable forearm view in {len(frames)} '
                                    'depth frames; parking ranking stays undirected')
