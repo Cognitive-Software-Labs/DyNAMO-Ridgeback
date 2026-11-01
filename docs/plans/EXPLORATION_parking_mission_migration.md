@@ -444,3 +444,5 @@ TF or changing estimator validation.
   — planning first and at exploration checkpoints, in-place relocalization, and the measured savings.
 - [Parking rays and G1 heading](../../archive/engineering/2026-11-01-parking-rays-and-g1-heading.md)
   — rays judged at their own poses, heading accuracy, and front and rear parking missions.
+- [Parking beside G1](../../archive/engineering/2026-11-02-parking-beside-g1.md)
+  — side-first priorities, the body-axis reach correction, and the open leg-clearance limit.
