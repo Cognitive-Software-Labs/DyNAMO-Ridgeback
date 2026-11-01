@@ -71,6 +71,8 @@ troubleshooting, planning, and historical documentation.
     every `ridgeback_exploration.launch.py` argument
 - [Exploration evaluation](exploration/evaluation.md)
 - [Ground-truth maps](../src/ridgeback_autonomy/sim/ground_truth_maps/README.md)
+- [Visual explainer](exploration/assets/explainer.html) — plain-language
+  overview of exploration and target localization for people outside the project
 
 ## Isaac Sim
 
