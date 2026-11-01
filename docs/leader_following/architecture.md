@@ -62,7 +62,8 @@ Behaviour:
   stored gallery to match, so the lock never jumps to a different person.
 - **Fails closed without appearance.** A person whose `appearance` is empty
   cannot be confirmed, so the lock never reaches `LOCKED` until the tracker
-  supplies embeddings. Track continuity as a second identity cue is planned.
+  supplies embeddings. Track continuity as a second identity cue is planned
+  (FOLLOWING plan, F3).
 
 ```mermaid
 stateDiagram-v2

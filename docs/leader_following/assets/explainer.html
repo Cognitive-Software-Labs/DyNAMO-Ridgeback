@@ -126,13 +126,6 @@ p { margin: 0; max-width: 65ch; }
 .state-note { min-height: 6.4em; padding: 16px 18px; border-top: 1px solid var(--line); display: grid; gap: 6px; }
 .rule { font-family: var(--display); font-size: 1.35rem; font-weight: 700; line-height: 1.25; }
 
-/* ---------- compare ---------- */
-.compare { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; }
-.col { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 20px; display: grid; gap: 12px; align-content: start; }
-.col.base { border-color: var(--robot); box-shadow: 0 0 0 3px var(--glow); }
-.row { display: grid; grid-template-columns: 112px 1fr; gap: 12px; font-size: .93rem; padding-top: 10px; border-top: 1px solid var(--line); }
-.row span:first-child { font: 500 .74rem var(--mono); text-transform: uppercase; letter-spacing: .08em; color: var(--muted); padding-top: 3px; }
-
 /* ---------- evaluation ---------- */
 .scen { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
 .scen .tile { padding: 14px; }
@@ -178,7 +171,7 @@ footer { color: var(--muted); font-size: .85rem; border-top: 1px solid var(--lin
   .readout { border-left: 0; border-top: 1px solid var(--line); }
   .pipe { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
   .stage::after { display: none; }
-  .split, .idgrid, .compare { grid-template-columns: 1fr; }
+  .split, .idgrid { grid-template-columns: 1fr; }
   .scen, .tasks { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 620px) {
@@ -186,7 +179,6 @@ footer { color: var(--muted); font-size: .85rem; border-top: 1px solid var(--lin
   .tiles3, .scen, .questions { grid-template-columns: 1fr; }
   .pipe { grid-template-columns: 1fr; }
   .tasks, .rules { grid-template-columns: 1fr; }
-  .row { grid-template-columns: 1fr; gap: 2px; }
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition: none !important; }
@@ -365,6 +357,7 @@ footer { color: var(--muted); font-size: .85rem; border-top: 1px solid var(--lin
     </div>
     <div class="stack">
       <p class="rule">If the robot is not sure it sees the leader, it stops and looks. It never follows a best guess.</p>
+      <p class="callout">This lock is already built and tested offline. It cannot lock onto anyone yet: it needs appearance fingerprints from the tracker, and track history so it can hold the leader while they are out of camera view. Both are task 3.</p>
       <p>Following the wrong person quietly is the worst failure, worse than stopping. So the lock only moves the robot when the leader is confirmed, and a new person has to pass two independent checks before the lock accepts them as the leader again.</p>
       <div class="fig">
         <svg viewBox="0 0 420 220" role="img" aria-labelledby="embT">
@@ -373,33 +366,6 @@ footer { color: var(--muted); font-size: .85rem; border-top: 1px solid var(--lin
         </svg>
       </div>
       <p class="caption">Each person crop becomes an appearance fingerprint. A network trained once on thousands of other people puts photos of the same person close together. At lock-on the robot stores a few snapshots of the leader; nobody is trained per person.</p>
-    </div>
-  </div>
-</section>
-
-<!-- ============ COMPARE ============ -->
-<section>
-  <div class="section-head">
-    <span class="eyebrow">Why build this first</span>
-    <h2>A baseline before the big model</h2>
-    <p class="lede">The project started as a deployment of OmTrackVLA, a vision-language-action model that turns camera images and a sentence into a path. It stays as a candidate. A simple, measurable system comes first, so the model has something to beat.</p>
-  </div>
-  <div class="compare">
-    <div class="col">
-      <h3>OmTrackVLA (one big model)</h3>
-      <div class="row"><span>Sees</span><span>Front camera only</span></div>
-      <div class="row"><span>Speed</span><span>About 6 decisions a second on the robot (168 ms each, measured)</span></div>
-      <div class="row"><span>Identity</span><span>Implicit inside the model; cannot be inspected or corrected</span></div>
-      <div class="row"><span>Learned from</span><span>Simulated people in a virtual building</span></div>
-      <div class="row"><span>Moves robot?</span><span>It has driven the robot before, but that driving code is not in this project yet; here its paths are only displayed</span></div>
-    </div>
-    <div class="col base">
-      <h3>Modular baseline (this project)</h3>
-      <div class="row"><span>Sees</span><span>360° lidar plus the depth camera</span></div>
-      <div class="row"><span>Speed</span><span>Aim: ten or more updates a second</span></div>
-      <div class="row"><span>Identity</span><span>An explicit lock with states you can watch and test</span></div>
-      <div class="row"><span>Learned from</span><span>Public pretrained detectors and re-identification; no new training to start</span></div>
-      <div class="row"><span>Crowd results</span><span>None yet, for either approach</span></div>
     </div>
   </div>
 </section>
@@ -454,8 +420,8 @@ footer { color: var(--muted); font-size: .85rem; border-top: 1px solid var(--lin
     <article class="task">
       <div class="task-top"><span class="num">3</span><span class="pill later">then</span></div>
       <h3>Recognise the leader</h3>
-      <p>Add appearance fingerprints (a pretrained re-identification network) to each tracked person, so the lock can tell the leader from the others.</p>
-      <p class="done"><b>Done when</b> the robot locks onto the leader in every scene, and the share of correct picks among nearby people is reported, look-alike scene included.</p>
+      <p>Give the lock two ways to tell the leader from the others: appearance fingerprints from a pretrained re-identification network, and the person's track history, so the lock holds while the leader is out of camera view.</p>
+      <p class="done"><b>Done when</b> the robot locks onto the leader in every scene, keeps the lock while the leader walks out of camera view, and the share of correct picks among nearby people is reported, look-alike scene included.</p>
     </article>
     <article class="task">
       <div class="task-top"><span class="num">4</span><span class="pill later">then</span></div>
@@ -472,7 +438,7 @@ footer { color: var(--muted); font-size: .85rem; border-top: 1px solid var(--lin
     <article class="task">
       <div class="task-top"><span class="num">6</span><span class="pill later">then</span></div>
       <h3>Compare with OmTrackVLA</h3>
-      <p>Connect the OmTrackVLA model server as an alternative way to choose the path, and run it through the same scenes.</p>
+      <p>OmTrackVLA is a single large model that plans a path straight from camera images and an instruction. Connect its model server as an alternative way to choose the path; this task checks whether it beats the modular system on the same scenes.</p>
       <p class="done"><b>Done when</b> OmTrackVLA's scores sit next to the baseline's for every scene, in simulation and on the robot.</p>
     </article>
   </div>
