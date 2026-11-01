@@ -3,6 +3,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Ridgeback Exploration</title>
 <meta name="claude:viewport-fit-sides" content="cover">
+<!-- Explainer page: every claim comes from the sources below; update this page when they change (docs/project/documentation.md#explainer-pages). -->
+<meta name="explainer-sources" content="docs/exploration/architecture.md, docs/exploration/launch_arguments.md, src/ridgeback_autonomy/config/frontier_explorer_params.yaml, src/ridgeback_autonomy/config/nav2_params.yaml, src/ridgeback_autonomy/config/slam_toolbox_params.yaml, docs/target_localization/target_localization_pipeline.md, docs/target_localization/polar_profiling.md, docs/target_localization/distributed_deployment.md, docs/target_distance_benchmarking/overview.md, docs/robot/geometry.md, docs/BACKLOG.md">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
@@ -405,6 +407,7 @@ footer { color: var(--muted); font-size: .85rem; border-top: 1px solid var(--lin
   })();
 
   /* ---------- live exploration ---------- */
+  // sim:start (tools/explainer_gifs/exploration.py renders the README GIF from this block)
   const W = 64, H = 36, CELL = 14;
   const cv = document.getElementById('map'), ctx = cv.getContext('2d');
   const UNK = 0, FREE = 1, OCC = 2;
@@ -521,6 +524,7 @@ footer { color: var(--muted); font-size: .85rem; border-top: 1px solid var(--lin
     }
   };
 
+  // sim:end
   const col = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
   const draw = () => {
     const c = { unk: col('--unknown'), free: col('--free'), wall: col('--wall'), fr: col('--frontier'), robot: col('--robot'), scan: col('--scan'), target: col('--target'), panel: col('--panel') };
