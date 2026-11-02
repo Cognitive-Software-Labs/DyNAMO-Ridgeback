@@ -89,6 +89,7 @@ def _trial_runner(scene_control, *, truth=None, capture=None):
             RuntimeError('capture failed')))),
         capture_sec=0.0,
         adjust_background=lambda _trial: None,
+        verify_scene_state=lambda _trial, _specs: None,
         capture_artifact_enabled=lambda: False,
         selected_estimators=('pointcloud',),
         estimator_display_names={'pointcloud': 'Pointcloud'},
@@ -125,6 +126,7 @@ def test_runner_waits_for_an_advancing_clock_before_its_first_scene_operation() 
         asset_selection=SimpleNamespace(
             spawn_formats=frozenset({'usd'}),
             world=SimpleNamespace(native_name='g1_distance_calibration')),
+        bring_robot_home=lambda: events.append(('home',)),
         wait_for_required_streams=lambda: events.append(('streams',)),
         background_label=lambda: 'none (bare room)',
         background_context=contextlib.nullcontext,
@@ -141,7 +143,7 @@ def test_runner_waits_for_an_advancing_clock_before_its_first_scene_operation() 
 
     assert [event[0] for event in events] == [
         'provenance', 'services', 'capabilities', 'clock', 'robot', 'leftovers',
-        'streams', 'recording', 'trials', 'stopped', 'timeline',
+        'home', 'streams', 'recording', 'trials', 'stopped', 'timeline',
     ]
     assert any('native world "g1_distance_calibration"' in message for message in messages)
     assert any('Simulation clock advancing at 1.500 s' in message for message in messages)

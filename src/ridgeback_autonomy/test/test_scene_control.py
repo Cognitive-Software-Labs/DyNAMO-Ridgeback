@@ -51,7 +51,8 @@ REQUIRED_FEATURES = (
 )
 PENDING = object()
 COMMON_MODULES = (
-    'asset_catalog.py', 'scene_control.py', 'background.py', 'background_session.py')
+    'asset_catalog.py', 'scene_control.py', 'background.py', 'background_session.py',
+    'scene_state.py')
 BENCHMARK_ROOT = Path(__file__).parents[1] / 'ridgeback_autonomy' / 'benchmarking'
 SIMULATOR_PACKAGES = (
     'ridgeback_autonomy_gz',

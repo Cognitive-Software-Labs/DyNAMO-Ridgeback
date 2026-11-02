@@ -285,7 +285,7 @@ def test_an_authored_live_sweep_carries_the_polar_settings(tmp_path):
 
     document = yaml.safe_load(written.read_text())
     assert document['defaults'] == {
-        'scenario': '', 'background': '', 'repeats': 1,
+        'scenario': '', 'background': '', 'background_props': True, 'repeats': 1,
         'detector': 'owlv2',
         'detection_model': 'google/owlv2-base-patch16-ensemble',
         'target_labels': 'humanoid robot',

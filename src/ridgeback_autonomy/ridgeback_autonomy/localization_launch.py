@@ -78,6 +78,8 @@ CONFIG_LAUNCH_ARGUMENT_NAMES = frozenset({
     'estimators',
     'scenario',
     'background',
+    'background_props',
+    'scene_ids',
     'repeats',
     'output_dir',
     'settle_sec',

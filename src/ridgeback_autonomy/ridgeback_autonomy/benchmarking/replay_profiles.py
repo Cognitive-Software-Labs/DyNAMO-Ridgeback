@@ -405,6 +405,11 @@ AXES: dict[str, AxisSpec] = {
     'background': _axis(
         'background', 'choice', '', STAGE_SYSTEM, 'Background props',
         choices=('', 'lab')),
+    'background_props': _axis(
+        'background_props', 'boolean', True, STAGE_SYSTEM,
+        'Spawn background props (off: control arm)'),
+    'scene_ids': _axis(
+        'scene_ids', 'string', '', STAGE_SYSTEM, 'Scene ids (comma-separated)'),
     'repeats': _axis(
         'repeats', 'integer', 5, STAGE_SYSTEM, 'Repeats', minimum=1),
     'run_dir_name': _axis(
@@ -482,8 +487,9 @@ MASK_AXES = frozenset(
 # page would have shown. Every other live argument is an installation constant
 # (topics, namespace, world, the viz toggles) that no shipped sweep varies.
 LIVE_SWEEP_DEFAULT_AXES = (
-    'scenario', 'background', 'repeats', 'detector', 'detection_model', 'target_labels',
-    'detection_threshold', 'detector_fps', 'detector_debug',
+    'scenario', 'background', 'background_props', 'repeats', 'detector',
+    'detection_model', 'target_labels', 'detection_threshold', 'detector_fps',
+    'detector_debug',
 )
 
 _OFFLINE_LIMITS = (

@@ -221,6 +221,8 @@ def build_benchmark_nodes(context, *args, environment: BenchmarkEnvironment, **k
                 environment.backend.scene_control_service_namespace),
             'scenario': LaunchConfiguration('scenario'),
             'background': LaunchConfiguration('background'),
+            'background_props': LaunchConfiguration('background_props'),
+            'scene_ids': LaunchConfiguration('scene_ids'),
             'repeats': repeats,
             'output_dir': output_dir,
             'run_dir_name': LaunchConfiguration('run_dir_name'),
@@ -406,8 +408,22 @@ def generate_launch_description():
             'background',
             default_value='',
             description=(
-                'Packaged background layout to furnish the room with (lab); '
-                'empty runs the bare room'),
+                'Packaged background layout (lab): each scene is placed by its dx '
+                'and furnished; empty keeps the robot at the origin in the bare room'),
+        ),
+        DeclareLaunchArgument(
+            'background_props',
+            default_value='true',
+            description=(
+                'Spawn the background props; false is the control arm, placed '
+                'identically in the bare room'),
+        ),
+        DeclareLaunchArgument(
+            'scene_ids',
+            default_value='',
+            description=(
+                'Comma-separated scene ids to run, in that order; empty runs '
+                'every scene in file order'),
         ),
         DeclareLaunchArgument('repeats', default_value='5'),
         DeclareLaunchArgument('output_dir', default_value=benchmark_output_dir),

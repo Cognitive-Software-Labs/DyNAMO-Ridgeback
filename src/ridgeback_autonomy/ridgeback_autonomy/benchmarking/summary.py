@@ -22,6 +22,9 @@ TRIAL_CSV_COLUMNS = [
     'instance_index',
     'spawn_world_x',
     'spawn_world_y',
+    # How far along world x the scene was placed; the spawn coordinates above
+    # include it, the truth below is relative to the robot and does not.
+    'placement_dx_m',
     'spawn_yaw_rad',
     # Ground truth in the robot's planar frame, all three off the robot front
     # (the reference every estimator publishes against).

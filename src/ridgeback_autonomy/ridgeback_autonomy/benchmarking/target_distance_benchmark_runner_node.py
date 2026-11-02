@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections import OrderedDict
 import contextlib
+import math
 import os
 import time
 from typing import Any
@@ -88,9 +89,14 @@ from ridgeback_autonomy.benchmarking.process_utils import (
     git_provenance,
 )
 from ridgeback_autonomy.benchmarking.report import render_run_report
-from ridgeback_autonomy.benchmarking.scenarios import Scene, load_scenarios
+from ridgeback_autonomy.benchmarking.scenarios import (
+    Scene, load_scenarios, parse_scene_ids, select_scenes,
+)
 from ridgeback_autonomy.benchmarking.background import resolve_scene_background
 from ridgeback_autonomy.benchmarking.background_session import background_scene
+from ridgeback_autonomy.benchmarking.scene_state import (
+    ExpectedPose, SceneStateMismatch, check_scene_state,
+)
 from ridgeback_autonomy.benchmarking.asset_catalog import (
     DEFAULT_TARGET,
     load_asset_catalog,
@@ -103,8 +109,13 @@ from ridgeback_autonomy.benchmarking.backends import (
     simulator_provenance,
 )
 from ridgeback_autonomy.benchmarking.scene_control import (
+    BENCHMARK_ENTITY_PREFIX,
+    POSE_TOLERANCE_M,
+    YAW_TOLERANCE_RAD,
     SpawnSpec,
     create_scene_control_client,
+    planar_pose,
+    yaw_difference,
 )
 from ridgeback_autonomy.benchmarking.scoring import (
     MISS_OUTCOMES,
@@ -192,6 +203,12 @@ RECORD_WINDOW_WAIT_SEC = 20.0
 RCLPY_INTERNAL_PARAMETERS = frozenset({'start_type_description_service'})
 
 
+def placement_dx(background: Any, scene: Scene) -> float:
+    """How far along world x a scene is placed; 0 without a background."""
+
+    return 0.0 if background is None else background.dx_m(scene.id)
+
+
 def format_summary_log_row(row: dict[str, Any]) -> str:
     """Format one aggregate row without assuming it has accuracy metrics."""
 
@@ -243,9 +260,15 @@ class TargetDistanceBenchmarkRunner(Node):
         self.declare_parameter('asset_catalog', '')
         self.declare_parameter('scene_control_service_namespace', '')
         self.declare_parameter('scenario', '')
-        # A packaged background layout to furnish the room with; empty runs
-        # the bare room, the control the background is compared against.
+        # A packaged background layout: each scene is placed by its dx and,
+        # with background_props, captured among the layout's props; false is
+        # the control arm, placed identically in the bare room. An empty
+        # background keeps every scene at the origin in the bare room.
         self.declare_parameter('background', '')
+        self.declare_parameter('background_props', True)
+        # Comma-separated scene ids to run, in that order; empty runs every
+        # scene of the scenario file in file order.
+        self.declare_parameter('scene_ids', '')
         self.declare_parameter('repeats', 5)
         self.declare_parameter('output_dir', default_output_dir)
         self.declare_parameter('run_dir_name', '')
@@ -331,8 +354,14 @@ class TargetDistanceBenchmarkRunner(Node):
             os.path.abspath(os.path.expanduser(scenario_param))
             if scenario_param else default_scenario
         )
-        self.scenes = load_scenarios(self.scenario_path)
+        self.scene_ids = parse_scene_ids(str(self.get_parameter('scene_ids').value))
+        self.scenes = select_scenes(load_scenarios(self.scenario_path), self.scene_ids)
         self.background_name = str(self.get_parameter('background').value).strip()
+        self.background_props = bool(self.get_parameter('background_props').value)
+        if not self.background_name and not self.background_props:
+            raise ValueError(
+                'background_props:=false is the control arm of a background; '
+                'name the background it is placed by.')
         self.scene_background = None
         if self.background_name:
             self.scene_background = resolve_scene_background(
@@ -348,6 +377,7 @@ class TargetDistanceBenchmarkRunner(Node):
         self.background_session = None
         self.background_spawn_sec: float | None = None
         self.background_adjustments: list[dict[str, Any]] = []
+        self.robot_home_record: dict[str, Any] = {}
         self.asset_catalog_path = os.path.abspath(os.path.expanduser(
             str(self.get_parameter('asset_catalog').value).strip()))
         self.scene_control_service_namespace = str(
@@ -355,9 +385,17 @@ class TargetDistanceBenchmarkRunner(Node):
         catalog = load_asset_catalog(self.asset_catalog_path)
         self.asset_selection = catalog.select(
             self.world, DEFAULT_TARGET, scene_object_models(self.scenes),
-            self.scene_background.layout.models if self.scene_background else ())
+            self.scene_background.layout.models
+            if self.scene_background and self.background_props else ())
+        self.namespace_name = self.get_namespace().strip('/')
+        self.robot_model_name = (
+            f'{self.namespace_name}/robot' if self.namespace_name else 'robot'
+        )
+        # Only a placed run may move the robot; every other run leaves it
+        # where the simulator put it.
         self.scene_control = create_scene_control_client(
-            self, self.scene_control_service_namespace)
+            self, self.scene_control_service_namespace,
+            robot_entity=self.robot_model_name if self.scene_background else None)
         self.repeats = int(self.get_parameter('repeats').value)
         self.output_dir = os.path.abspath(os.path.expanduser(str(self.get_parameter('output_dir').value)))
         self.run_dir_name = str(self.get_parameter('run_dir_name').value).strip()
@@ -392,10 +430,6 @@ class TargetDistanceBenchmarkRunner(Node):
             log=self.get_logger().warning,
         )
 
-        self.namespace_name = self.get_namespace().strip('/')
-        self.robot_model_name = (
-            f'{self.namespace_name}/robot' if self.namespace_name else 'robot'
-        )
         self.run_started_at = time.localtime()
         self.run_started_monotonic = time.monotonic()
         self.run_label = time.strftime('%Y%m%d_%H%M%S', self.run_started_at)
@@ -408,6 +442,7 @@ class TargetDistanceBenchmarkRunner(Node):
             self.depth_source,
             self.selected_estimators,
             self.background_name,
+            self.background_props,
         )
         self.run_output_dir = os.path.join(self.output_dir, run_folder)
         self.images_dir = os.path.join(self.run_output_dir, 'images')
@@ -1026,6 +1061,7 @@ class TargetDistanceBenchmarkRunner(Node):
             'scene-control services appeared.')
         self.scene_control.wait_until_present([self.robot_model_name])
         self.refuse_leftover_entities()
+        self.bring_robot_home()
         self.wait_for_required_streams()
 
         with self.background_context():
@@ -1055,10 +1091,62 @@ class TargetDistanceBenchmarkRunner(Node):
                 f'({shown}): an earlier run left them behind. Restart the simulator, '
                 'or let a sweep reap them, before starting a run.')
 
+    def bring_robot_home(self) -> None:
+        """Start a placed run with the robot at home; report it elsewhere otherwise.
+
+        An interrupted placed run can leave the robot at its last scene's
+        placement. A placed run moves it back -- safe now, since no benchmark
+        entity exists -- and any other run, which never moves the robot,
+        warns that its scenes are not where the scenario file puts them.
+        """
+
+        snapshot = self.scene_control.get_scene_snapshot([self.robot_model_name])
+        x, y, z, yaw = planar_pose(snapshot.poses[self.robot_model_name])
+        at_home = (math.hypot(x, y) <= POSE_TOLERANCE_M
+                   and yaw_difference(yaw, 0.0) <= YAW_TOLERANCE_RAD)
+        record: dict[str, Any] = {
+            'measured': {'x': x, 'y': y, 'z': z, 'yaw': yaw}, 'moved': False}
+        if not at_home:
+            where = f'({x:.3f}, {y:.3f}, yaw {yaw:.3f})'
+            if self.scene_background is None:
+                self.get_logger().warning(
+                    f'The robot stands at {where}, not at home; this run does not '
+                    'move it, so its scenes are offset by as much.')
+            else:
+                self.get_logger().warning(
+                    f'The robot stands at {where}, not at home (an earlier run was '
+                    'interrupted); moving it home.')
+                record['move'] = self.scene_control.move_robot(0.0, 0.0, 0.0).as_record()
+                record['moved'] = True
+        self.robot_home_record = {'start': record}
+
+    def return_robot_home(self, deadline: float | None) -> None:
+        """End a placed run with the robot at home, after its props are gone.
+
+        Under an interrupt only the budget left after the props' removal is
+        spent; what it cannot finish, the next placed run's start repairs.
+        """
+
+        timeout = None if deadline is None else deadline - time.monotonic()
+        if timeout is not None and timeout <= 0.0:
+            self.get_logger().warning(
+                'Robot left at its last placement: the interrupt budget is spent; '
+                'the next placed run moves it home.')
+            return
+        try:
+            move = self.scene_control.move_robot(0.0, 0.0, 0.0, timeout_sec=timeout)
+        except Exception as exc:
+            self.get_logger().warning(
+                f'Robot not returned home ({exc}); the next placed run moves it home.')
+            raise
+        self.robot_home_record['end'] = move.as_record()
+
     def background_label(self) -> str:
         if self.scene_background is None:
-            return 'none (bare room)'
-        return f'"{self.background_name}" ({len(self.scene_background.layout.props)} props)'
+            return 'none (bare room, robot at the origin)'
+        if not self.background_props:
+            return f'"{self.background_name}" control arm (no props, scenes placed)'
+        return f'"{self.background_name}" ({len(self.scene_background.layout.props)} props, scenes placed)'
 
     def background_identity(self) -> dict[str, Any] | None:
         """The background a capture was taken in; None for the bare room."""
@@ -1067,23 +1155,27 @@ class TargetDistanceBenchmarkRunner(Node):
             return None
         return {
             'name': self.background_name,
+            'props_spawned': self.background_props,
+            'backdrop_gap_m': self.scene_background.layout.placement.backdrop_gap_m,
             'layout_sha256': self.scene_background.layout.sha256,
             'drops_sha256': self.scene_background.drops.sha256,
         }
 
     @contextlib.contextmanager
     def background_context(self):
-        """Spawn the background for the run's trials and remove it afterwards."""
+        """Spawn the background for the run's trials, then remove it and return home."""
 
         if self.scene_background is None:
             yield
             return
-        self.get_logger().info(f'Spawning background {self.background_label()}.')
+        self.get_logger().info(f'Setting up background {self.background_label()}.')
         with background_scene(
             self.scene_control,
             self.scene_background,
             self.asset_selection.background,
             self.run_label,
+            props=self.background_props,
+            after_removal=self.return_robot_home,
         ) as session:
             self.background_session = session
             self.background_spawn_sec = session.spawn_sec
@@ -1092,30 +1184,82 @@ class TargetDistanceBenchmarkRunner(Node):
                 yield
             finally:
                 self.background_session = None
-        self.get_logger().info('Background removed.')
+        self.get_logger().info('Background removed and robot returned home.')
 
     def adjust_background(self, trial: dict[str, Any]) -> None:
-        """Fit the room to this trial's scene before its objects and targets."""
+        """Remove this scene's drops, place the robot, restore the rest.
 
+        Runs before the scene's objects and targets spawn. The robot is moved
+        in every trial, even to the placement it already has, so every trial
+        takes the same steps.
+        """
+
+        background = getattr(self, 'scene_background', None)
         session = getattr(self, 'background_session', None)
-        if session is None:
+        if background is None or session is None:
             return
-        adjustment = session.adjust(trial['scene'].id)
-        self.background_adjustments.append(
-            {'trial_id': trial['trial_id'], **adjustment.as_record()})
-        if adjustment.removed or adjustment.restored:
-            self.get_logger().info(
-                f'{trial["trial_id"]} background: removed '
-                f'{", ".join(adjustment.removed) or "none"}, restored '
-                f'{", ".join(adjustment.restored) or "none"} '
-                f'in {adjustment.duration_sec:.2f} s.')
+        scene_id = trial['scene'].id
+        dx = background.dx_m(scene_id)
+        adjustment = session.adjust(
+            scene_id, move_robot=lambda: self.scene_control.move_robot(dx, 0.0, 0.0))
+        record = {
+            'trial_id': trial['trial_id'],
+            'dx_m': dx,
+            'anchor': background.anchor(scene_id).as_record(),
+            **adjustment.as_record(),
+        }
+        self.background_adjustments.append(record)
+        self.get_logger().info(
+            f'{trial["trial_id"]} placed at dx {dx:.2f} m in {adjustment.move_sec:.2f} s; '
+            f'background removed {", ".join(adjustment.removed) or "none"}, restored '
+            f'{", ".join(adjustment.restored) or "none"} '
+            f'in {adjustment.duration_sec:.2f} s.')
+
+    def verify_scene_state(self, trial: dict[str, Any], specs: list[SpawnSpec]) -> None:
+        """Refuse to capture a placed scene unless the simulation holds exactly it.
+
+        One snapshot after settling: the benchmark entities present must be
+        this scene's kept props, objects and targets, each at its commanded
+        pose, with the robot at its placement. The result and the state's
+        fingerprint join the trial's background record.
+        """
+
+        background = getattr(self, 'scene_background', None)
+        if background is None:
+            return
+        scene: Scene = trial['scene']
+        dx = background.dx_m(scene.id)
+        entity_prefix = f'bench_{self.run_label}_{trial["trial_id"]}_'
+        expected = {self.robot_model_name: ExpectedPose('robot', dx, 0.0, 0.0)}
+        session = getattr(self, 'background_session', None)
+        if self.background_props and session is not None:
+            for prop in background.kept(scene.id):
+                expected[f'{session.prefix}{prop.id}'] = ExpectedPose(
+                    f'bg_{prop.id}', prop.x, prop.y, prop.yaw)
+        for spec in specs:
+            expected[spec.name] = ExpectedPose(
+                spec.name.removeprefix(entity_prefix), spec.x, spec.y, spec.yaw)
+        snapshot = self.scene_control.get_scene_snapshot(
+            [self.robot_model_name], include_prefix=BENCHMARK_ENTITY_PREFIX)
+        check = check_scene_state(
+            snapshot.poses, expected, entity_prefix=BENCHMARK_ENTITY_PREFIX,
+            position_tolerance_m=POSE_TOLERANCE_M, yaw_tolerance_rad=YAW_TOLERANCE_RAD)
+        record = next(
+            (record for record in reversed(self.background_adjustments)
+             if record['trial_id'] == trial['trial_id']), None)
+        if record is not None:
+            record['state_check'] = check.as_record()
+        if not check.ok:
+            raise SceneStateMismatch(check)
 
     def background_provenance(self) -> dict[str, Any] | None:
         if self.scene_background is None:
             return None
         return {
             **self.scene_background.provenance(),
+            'props_spawned': self.background_props,
             'spawn_sec': self.background_spawn_sec,
+            'robot_home': dict(self.robot_home_record),
             'trials': list(self.background_adjustments),
         }
 
@@ -1381,12 +1525,16 @@ class TargetDistanceBenchmarkRunner(Node):
         trial_id = trial['trial_id']
         scene: Scene = trial['scene']
         entity_prefix = f'bench_{self.run_label}_{trial_id}'
+        trial['placement_dx_m'] = placement_dx(getattr(self, 'scene_background', None), scene)
 
         specs, robot_models = self.scene_spawn_specs(scene, entity_prefix)
         try:
+            # Remove this scene's drops, place the robot, restore the rest;
+            # then objects before targets, settle, and check the room.
             self.adjust_background(trial)
             with self.scene_control.scene(specs):
                 self.spin_for(self.settle_sec)
+                self.verify_scene_state(trial, specs)
 
                 gt_instances = self.compute_scene_ground_truth(robot_models)
                 # Overlay truth line is a single reference: republish the nearest
@@ -1567,12 +1715,15 @@ class TargetDistanceBenchmarkRunner(Node):
         scene: Scene = trial['scene']
         writer = self.replay_writer or self.sensor_writer
         background = getattr(self, 'scene_background', None)
+        props = getattr(self, 'background_props', True)
         writer.write_trial({
             'trial_id': trial['trial_id'],
             'repeat_index': trial['repeat_index'],
             'scene_id': scene.id,
-            **({'background_dropped': list(background.scene_drops[scene.id])}
-               if background is not None else {}),
+            **({
+                'placement_dx_m': background.dx_m(scene.id),
+                'background_dropped': list(background.scene_drops[scene.id]) if props else [],
+            } if background is not None else {}),
             'ground_truth': [
                 {
                     'index': instance.index,
@@ -1677,16 +1828,19 @@ class TargetDistanceBenchmarkRunner(Node):
         """Resolve objects first, then targets, preserving deterministic order.
 
         The scene is complete before any target appears in it; rollback
-        removes the targets first.
+        removes the targets first. A placed scene shifts every entity by its
+        dx along world x, as the robot was shifted, so nothing moves relative
+        to the robot.
         """
 
+        dx = placement_dx(getattr(self, 'scene_background', None), scene)
         specs = []
         for index, obj in enumerate(scene.objects):
             model_name = f'{entity_prefix}_obj_{index}'
             specs.append(SpawnSpec.for_resource(
                 self.asset_selection.objects[obj.model],
                 model_name,
-                obj.x,
+                obj.x + dx,
                 obj.y,
                 obj.yaw,
             ))
@@ -1695,7 +1849,7 @@ class TargetDistanceBenchmarkRunner(Node):
         for index, robot in enumerate(scene.robots):
             model_name = f'{entity_prefix}_target_{index}'
             specs.append(SpawnSpec.for_resource(
-                self.asset_selection.target, model_name, robot.x, robot.y, robot.yaw))
+                self.asset_selection.target, model_name, robot.x + dx, robot.y, robot.yaw))
             robot_models.append((index, model_name, robot))
 
         return specs, robot_models

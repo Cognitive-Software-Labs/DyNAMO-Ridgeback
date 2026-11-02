@@ -153,6 +153,28 @@ def parse_scenarios(document, *, source: str = '<memory>') -> tuple[Scene, ...]:
     return scenes
 
 
+def parse_scene_ids(text: str) -> tuple[str, ...]:
+    """Scene ids from a comma-separated list; empty means every scene."""
+
+    return tuple(part.strip() for part in text.split(',') if part.strip())
+
+
+def select_scenes(scenes: tuple[Scene, ...], scene_ids: tuple[str, ...]) -> tuple[Scene, ...]:
+    """The named scenes in the given order, or every scene when none are named."""
+
+    if not scene_ids:
+        return tuple(scenes)
+    by_id = {scene.id: scene for scene in scenes}
+    unknown = [scene_id for scene_id in scene_ids if scene_id not in by_id]
+    if unknown:
+        raise ValueError(f'scene_ids names scenes the scenario file lacks: {", ".join(unknown)}.')
+    repeated = sorted({scene_id for scene_id in scene_ids if scene_ids.count(scene_id) > 1})
+    if repeated:
+        raise ValueError(
+            f'scene_ids names {", ".join(repeated)} more than once; use repeats instead.')
+    return tuple(by_id[scene_id] for scene_id in scene_ids)
+
+
 def load_scenarios(path: str) -> tuple[Scene, ...]:
     """Load and validate a scenario YAML file into a tuple of :class:`Scene`."""
 
