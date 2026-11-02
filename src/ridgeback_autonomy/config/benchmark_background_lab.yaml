@@ -1,18 +1,24 @@
 # Background "lab": a clinical research lab furnishing target_distance_calibration.
 #
 # The master layout, spawned once per run when the runner gets background:=lab.
-# Props are only ever removed for a scene, never moved; which ones each scene
-# removes is generated into benchmark_backgrounds/lab.yaml by
+# Props are only ever removed for a scene, never moved. Each scene is captured
+# shifted along world x, robot included, so its farthest target stands
+# placement.backdrop_gap_m in front of the prop behind it; that shift and the
+# props each scene removes are generated into benchmark_backgrounds/lab.yaml by
 # tools/benchmark/build_background.py. Regenerate after any edit here.
 #
-# World frame: robot at the origin facing +x, camera at (0.2692, 0). Room
-# interior x -5.9..11.9, y -4.9..4.9. Each model's footprint is read from its
-# Gazebo model.sdf. Convention: wall furniture has its back (local +y) to the
-# wall, 2 cm off it (wall-mounted door and whiteboard flush); seating faces
+# World frame: the robot's home is the origin facing +x, camera at
+# (0.2692, 0); a scene placed at dx has them at (dx, 0) and (dx + 0.2692, 0).
+# Room interior x -5.9..11.9, y -4.9..4.9. Each model's footprint is read from
+# its Gazebo model.sdf. Convention: wall furniture has its back (local +y) to
+# the wall, 2 cm off it (wall-mounted door and whiteboard flush); seating faces
 # local +y. yaw rotates local x onto the world.
-schema: ridgeback_benchmark_background_layout/1
+schema: ridgeback_benchmark_background_layout/2
 world: target_distance_calibration
 room: {x_min: -5.9, x_max: 11.9, y_min: -4.9, y_max: 4.9}
+# backdrop_gap_m: the gap each scene's farthest target aims for in front of
+# its backdrop prop. dx_step_m: the grid every placement lies on.
+placement: {backdrop_gap_m: 1.0, dx_step_m: 0.05}
 
 props:
   # East (far) wall, fronts face -x

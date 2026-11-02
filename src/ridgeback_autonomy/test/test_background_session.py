@@ -2,15 +2,23 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+import random
 from types import SimpleNamespace
 
 import pytest
+import yaml
 
 from ridgeback_autonomy.benchmarking.background import (
+    WALL,
+    Anchor,
     BackgroundLayout,
     BackgroundProp,
+    Placement,
     Room,
     SceneBackground,
+    ScenePlacement,
+    resolve_scene_background,
 )
 from ridgeback_autonomy.benchmarking.background_session import (
     background_entity_prefix,
@@ -28,6 +36,7 @@ from test_scene_control import (
 )
 
 
+CONFIG_DIR = Path(__file__).resolve().parents[1] / 'config'
 PROPS = ('desk', 'chair', 'cart', 'plant')
 PREFIX = background_entity_prefix('run')
 
@@ -36,13 +45,16 @@ def _background(scene_drops) -> SceneBackground:
     layout = BackgroundLayout(
         path='lab.yaml', sha256='l', world='target_distance_calibration',
         room=Room(-5.0, 5.0, -5.0, 5.0),
+        placement=Placement(backdrop_gap_m=1.0, dx_step_m=0.05),
         props=tuple(BackgroundProp(prop_id, 'thing', float(i), 3.0, 0.0)
                     for i, prop_id in enumerate(PROPS)),
     )
     return SceneBackground(
         name='lab', layout=layout,
-        drops=SimpleNamespace(path='drops.yaml', sha256='d'),
-        scene_drops=scene_drops,
+        drops=SimpleNamespace(path='drops.yaml', sha256='d', rules={}),
+        placements={
+            scene_id: ScenePlacement(0.0, Anchor(0, WALL, 1.0), tuple(dropped))
+            for scene_id, dropped in scene_drops.items()},
     )
 
 
@@ -110,6 +122,30 @@ def test_an_adjustment_starts_from_what_is_present_not_what_was_intended(simulat
 
         assert adjustment.restored == ('desk',)
         assert _props(simulator) == set(PROPS)
+
+
+def test_any_scene_order_shows_each_scene_the_layout_minus_only_its_own_drops(
+        simulator) -> None:
+    # The packaged lab background over the full scenario file, visited in
+    # random orders with repeats: nothing an earlier scene dropped may stay
+    # missing from a scene that keeps it.
+    scenario = CONFIG_DIR / 'benchmark_scenarios_full.yaml'
+    scene_ids = [scene['id'] for scene in yaml.safe_load(scenario.read_text())['scenes']]
+    background = resolve_scene_background('lab', str(CONFIG_DIR), str(scenario), scene_ids)
+    resources = {model: RESOURCES['thing'] for model in background.layout.models}
+    every_prop = {prop.id for prop in background.layout.props}
+    present = lambda: {name.removeprefix(PREFIX) for name in simulator.entities  # noqa: E731
+                       if name.startswith(PREFIX)}
+    order = random.Random(20261101)
+
+    client, _ = make_client(simulator)
+    with background_scene(client, background, resources, 'run',
+                          clock=simulator.clock) as session:
+        for _ in range(6):
+            sequence = order.choices(scene_ids, k=len(scene_ids))
+            for scene_id in sequence:
+                session.adjust(scene_id)
+                assert present() == every_prop - set(background.scene_drops[scene_id]), scene_id
 
 
 def test_a_failed_layout_spawn_removes_what_it_spawned_and_propagates(simulator) -> None:
