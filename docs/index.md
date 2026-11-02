@@ -78,6 +78,9 @@ troubleshooting, planning, and historical documentation.
 - [Benchmark configurator](target_distance_benchmarking/configurator.md) — the local browser UI
   and its run substrate
 - [Scenario gallery](target_distance_benchmarking/benchmark_scenarios_v2_gallery.html)
+- [Gazebo placed-scene gallery](target_distance_benchmarking/benchmark_background_gallery_gazebo.html)
+  and [Isaac placed-scene gallery](target_distance_benchmarking/benchmark_background_gallery_isaac.html)
+  — every scene at its placement with the `lab` background, robot camera beside a room overview
 
 ## Active plans
 

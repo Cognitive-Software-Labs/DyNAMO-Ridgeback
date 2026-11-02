@@ -162,6 +162,12 @@ them, walls included. Props use Gazebo Fuel meshes (CC BY 4.0, attribution
 beside each model) and in-repo primitives, one mesh set for both simulators.
 Expect them to move coverage and extra-detection numbers.
 
+**Galleries.** The [Gazebo](benchmark_background_gallery_gazebo.html) and
+[Isaac](benchmark_background_gallery_isaac.html) placed-scene galleries show
+every scene of the full set at its placement with the `lab` background: the
+robot camera beside a fixed room overview, with each scene's backdrop and
+drops. They are a visual reference, not estimator evidence.
+
 ### Scenario schema
 
 Scenario YAML is declarative. A file contains optional defaults and a non-empty

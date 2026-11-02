@@ -93,6 +93,9 @@ camera-less robot profile for measuring frontier exploration. It is a separate w
   substrate
 - [scenario gallery](benchmark_scenarios_v2_gallery.html) — visual reference for
   the packaged scene set
+- [Gazebo](benchmark_background_gallery_gazebo.html) and
+  [Isaac](benchmark_background_gallery_isaac.html) placed-scene galleries — every
+  scene at its placement with the `lab` background, as each simulator renders it
 
 ## Archived evidence
 
