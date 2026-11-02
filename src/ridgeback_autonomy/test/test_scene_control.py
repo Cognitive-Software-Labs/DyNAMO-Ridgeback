@@ -16,6 +16,7 @@ from simulation_interfaces.srv import (
     GetEntities,
     GetEntitiesStates,
     GetSimulatorFeatures,
+    SetEntityState,
     SpawnEntity,
 )
 
@@ -23,6 +24,7 @@ from ridgeback_autonomy.benchmarking.scene_control import (
     BENCHMARK_ENTITY_PREFIX,
     CLOCK_TOPIC,
     ROLLBACK_INTERRUPT_BUDGET_SEC,
+    POSE_TOLERANCE_M,
     ROLLBACK_INTERRUPT_CALL_SEC,
     SCENE_OPERATION_SERVICES,
     SERVICE_TYPES,
@@ -138,7 +140,7 @@ def _failed(response, code: int, message: str):
 
 
 class FakeSimulator:
-    """Serves the five standard services from a name -> pose dictionary.
+    """Serves the six standard services from a name -> pose dictionary.
 
     Behaves like the qualified Gazebo server where the standard leaves room:
     deleting an absent entity is a generic failure, not NOT_FOUND, and a name
@@ -159,6 +161,9 @@ class FakeSimulator:
         self.hidden_states = {}
         self.lingering = {}
         self.filter_match = re.Pattern.fullmatch
+        # Snapshots that still show an entity where it was before a state set.
+        self.move_lag = 0
+        self.pending_moves = {}
 
     def handle(self, suffix: str, request):
         self.calls.append((suffix, request))
@@ -208,8 +213,30 @@ class FakeSimulator:
         ]
         return _ok(response)
 
+    def set_entity_state(self, request):
+        response = SetEntityState.Response()
+        if request.entity not in self.entities:
+            return _failed(response, Result.RESULT_NOT_FOUND, 'no such entity')
+        twist = request.state.twist
+        if any((twist.linear.x, twist.linear.y, twist.linear.z,
+                twist.angular.x, twist.angular.y, twist.angular.z)):
+            return _failed(response, Result.RESULT_OPERATION_FAILED, 'non-zero twist')
+        pose = request.state.pose
+        yaw = 2.0 * math.atan2(pose.orientation.z, pose.orientation.w)
+        self.pending_moves[request.entity] = [
+            self.move_lag, (pose.position.x, pose.position.y, pose.position.z, yaw)]
+        return _ok(response)
+
     def get_entities_states(self, request):
         response = GetEntitiesStates.Response()
+        # A move lands after its lag; each snapshot leaves the simulation one
+        # step further on.
+        for name, move in list(self.pending_moves.items()):
+            if move[0] <= 0:
+                self.entities[name] = move[1]
+                del self.pending_moves[name]
+            else:
+                move[0] -= 1
         for name, (x, y, z, yaw) in self.entities.items():
             if self.hidden_states.get(name, 0) > 0:
                 self.hidden_states[name] -= 1
@@ -222,6 +249,8 @@ class FakeSimulator:
             state.pose.orientation.w = math.cos(0.5 * yaw)
             response.entities.append(name)
             response.states.append(state)
+        sec, nanosec = self.stamp
+        self.stamp = (sec, nanosec + 1_000_000)
         return _ok(response)
 
 
@@ -254,6 +283,7 @@ def test_service_names_compose_the_standard_suffixes_under_the_provider_namespac
         'delete_entity': '/gzserver/delete_entity',
         'get_entities': '/gzserver/get_entities',
         'get_entities_states': '/gzserver/get_entities_states',
+        'set_entity_state': '/gzserver/set_entity_state',
     }
     assert scene_control_service_names('/')['spawn_entity'] == '/spawn_entity'
     # A relative name would resolve under the runner's robot namespace.
@@ -1135,3 +1165,75 @@ def test_a_provider_exercised_without_simulation_time_can_opt_out_of_the_gate() 
 
     assert node.subscriptions == []
     assert client.readiness_timeline()['clock_observed'] is False
+
+
+# --- moving the robot -----------------------------------------------------------
+
+def test_only_the_configured_robot_may_be_moved(simulator) -> None:
+    client, _ = make_client(simulator, robot_entity=ROBOT)
+    unconfigured, _ = make_client(simulator)
+    simulator.entities['bench_run_t_target_0'] = (2.0, 0.0, 0.0, 0.0)
+
+    for name in ('wall_north', 'bench_run_t_target_0', 'r100_0002/robot'):
+        with pytest.raises(SceneControlError) as error:
+            client.set_robot_pose(name, 1.0, 0.0, 0.0, 0.0)
+        assert error.value.failure is SceneControlFailure.UNOWNED_ENTITY
+    with pytest.raises(SceneControlError, match='has none') as error:
+        unconfigured.set_robot_pose(ROBOT, 1.0, 0.0, 0.0, 0.0)
+    assert error.value.failure is SceneControlFailure.UNOWNED_ENTITY
+    assert simulator.calls_to('set_entity_state') == []
+
+
+def test_a_robot_move_commands_a_pose_at_rest_and_waits_for_it(simulator) -> None:
+    simulator.entities[ROBOT] = (0.0, 0.0, 0.0759, 0.0)
+    simulator.move_lag = 3
+    client, _ = make_client(simulator, robot_entity=ROBOT)
+
+    move = client.move_robot(2.35, 0.0, 0.0)
+
+    [request] = simulator.calls_to('set_entity_state')
+    assert request.entity == ROBOT
+    assert request.state.header.frame_id == 'world'
+    assert request.state.pose.position.z == pytest.approx(0.0759)
+    for vector in (request.state.twist.linear, request.state.twist.angular,
+                   request.state.acceleration.linear, request.state.acceleration.angular):
+        assert (vector.x, vector.y, vector.z) == (0.0, 0.0, 0.0)
+    assert move.measured[:2] == pytest.approx((2.35, 0.0))
+    assert move.position_error_m <= POSE_TOLERANCE_M
+    assert move.as_record()['commanded'] == {'x': 2.35, 'y': 0.0, 'yaw': 0.0}
+    # The lagging steps were polled through before the pose counted.
+    assert len(simulator.calls_to('get_entities_states')) == 1 + 4
+
+
+def test_a_robot_that_does_not_arrive_fails_the_move(simulator) -> None:
+    simulator.move_lag = 10 ** 6
+    client, _ = make_client(simulator, robot_entity=ROBOT, ready_timeout_sec=2.0)
+
+    with pytest.raises(SceneControlError, match='not at') as error:
+        client.move_robot(1.0, 0.0, 0.0)
+
+    assert error.value.failure is SceneControlFailure.INCORRECT_STATE
+
+
+def test_a_snapshot_from_before_the_command_never_counts(simulator) -> None:
+    client, _ = make_client(simulator, robot_entity=ROBOT, ready_timeout_sec=1.0)
+
+    # The robot already stands at the commanded pose, but every snapshot is
+    # stamped before the command, so none can show the command's effect.
+    with pytest.raises(SceneControlError, match='no snapshot after the command'):
+        client.wait_for_robot_pose(0.0, 0.0, 0.0, after_stamp_ns=10 ** 12)
+
+
+def test_state_setting_is_needed_only_by_a_client_that_moves_the_robot(simulator) -> None:
+    simulator.available = set(SERVICE_TYPES) - {'set_entity_state'}
+    bare, _ = make_client(simulator)
+    bare.wait_for_services(1.0)
+    bare.require_capabilities()
+
+    placing, _ = make_client(simulator, robot_entity=ROBOT)
+    with pytest.raises(SceneControlError, match='/sim/set_entity_state'):
+        placing.wait_for_services(1.0)
+    with pytest.raises(SceneControlError, match='ENTITY_STATE_SETTING'):
+        placing.require_capabilities()
+    simulator.features = [*REQUIRED_FEATURES, SimulatorFeatures.ENTITY_STATE_SETTING]
+    placing.require_capabilities()

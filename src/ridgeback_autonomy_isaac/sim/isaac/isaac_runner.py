@@ -339,10 +339,12 @@ def run(app, args) -> int:
         print(f"animating {len(g1_anim)} g1 figure(s)", flush=True)
 
     # standard simulation_interfaces scene control (benchmark targets and
-    # occluders): requests queue on their own executor thread and run below,
-    # once per update, so no ROS callback ever edits the stage
+    # occluders, and placing the robot): requests queue on their own executor
+    # thread and run below, once per update, so no ROS callback ever edits the
+    # stage. A placement goes through the same rig reset as sim/reset.
     scene_control = SceneControlService(SceneEntities(
-        UsdScene(stage), robot_name=robot_entity_name(args.namespace)))
+        UsdScene(stage), robot_name=robot_entity_name(args.namespace),
+        move_robot=rig.set_planar_pose))
     print(f"scene control services under {scene_control.service_namespace}",
           flush=True)
 
