@@ -245,3 +245,23 @@ def test_a_patch_must_be_the_diff_git_generates(stacked) -> None:
     assert ('patches/plain_first.patch is not the diff Git generates for its change; '
             're-record it') in result.stderr
     assert (plain / 'pkg_plain/source.txt').read_text() == 'upstream\n'
+
+
+def test_adding_a_package_to_partial_overlay_requires_explicit_marker_removal(workspace):
+    """A kept-set migration must preserve all other upstream exclusions."""
+    assert _check(workspace, '--apply', '--profile', 'all').returncode == 0
+    checker = workspace / 'tools/check_dependencies'
+    checker.write_text(checker.read_text().replace(
+        '[src/overlay]="pkg_kept"', '[src/overlay]="pkg_kept pkg_other"'))
+    marker = workspace / 'src/overlay/pkg_other/COLCON_IGNORE'
+    assert marker.read_bytes() == b''
+    refused = _check(workspace, '--apply', '--profile', 'all')
+    assert refused.returncode == 1
+    assert 'pkg_other must be built but contains COLCON_IGNORE' in refused.stderr
+    assert marker.exists()
+    marker.unlink()
+    accepted = _check(workspace, '--apply', '--profile', 'all')
+    assert accepted.returncode == 0, accepted.stderr
+    assert not marker.exists()
+    assert (workspace / 'src/overlay/pkg_upstream_ignored/COLCON_IGNORE').exists()
+    assert _check(workspace, '--profile', 'all').returncode == 0
