@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+from collections import OrderedDict
 import json
 import os
 from pathlib import Path
 import subprocess
 import sys
+import time
 from types import SimpleNamespace
 
 import numpy as np
@@ -636,6 +638,263 @@ def test_runner_keeps_the_closest_scan_and_refuses_one_outside_the_tolerance(mon
     assert stale['scan'] is None
     assert not runner_module.TargetDistanceBenchmarkRunner.replay_scan_capture_is_complete(
         runner)
+
+
+def _ros_stamp(stamp_ns):
+    from builtin_interfaces.msg import Time as TimeMsg
+
+    return TimeMsg(sec=stamp_ns // 1_000_000_000, nanosec=stamp_ns % 1_000_000_000)
+
+
+def _color_msg(stamp_ns, fill):
+    from sensor_msgs.msg import Image
+
+    msg = Image(height=HEIGHT, width=WIDTH, encoding='rgb8', step=WIDTH * 3)
+    msg.header.stamp = _ros_stamp(stamp_ns)
+    msg.data = bytes([fill]) * (HEIGHT * WIDTH * 3)
+    return msg
+
+
+def _camera_info_msg(stamp_ns):
+    from sensor_msgs.msg import CameraInfo
+
+    msg = CameraInfo(
+        width=WIDTH, height=HEIGHT,
+        k=[100.0, 0.0, 40.0, 0.0, 100.0, 30.0, 0.0, 0.0, 1.0])
+    msg.header.stamp = _ros_stamp(stamp_ns)
+    return msg
+
+
+def _laser_scan_msg(stamp_ns):
+    from sensor_msgs.msg import LaserScan
+
+    msg = LaserScan(
+        angle_min=-0.8, angle_max=0.8, angle_increment=0.2,
+        range_min=0.15, range_max=12.0, ranges=[2.0] * 9)
+    msg.header.stamp = _ros_stamp(stamp_ns)
+    msg.header.frame_id = 'lidar2d_0'
+    return msg
+
+
+def _raw_detections_msg(stamp_ns):
+    from ridgeback_interfaces.msg import TargetDetections
+
+    msg = TargetDetections(
+        detected=True, count=1, bbox_xyxy=[30.0, 20.0, 50.0, 40.0],
+        labels=['target'], scores=[0.9], image_width=WIDTH, image_height=HEIGHT)
+    msg.header.stamp = _ros_stamp(stamp_ns)
+    msg.header.frame_id = 'camera'
+    return msg
+
+
+def _aligned_depth_msg(stamp_ns):
+    from sensor_msgs.msg import Image
+
+    msg = Image(height=HEIGHT, width=WIDTH, encoding='32FC1', step=WIDTH * 4)
+    msg.header.stamp = _ros_stamp(stamp_ns)
+    msg.data = np.full((HEIGHT, WIDTH), 2.0, dtype=np.float32).tobytes()
+    return msg
+
+
+def _mask_measurement_msg(stamp_ns):
+    from ridgeback_interfaces.msg import TargetMeasurements
+
+    msg = TargetMeasurements(
+        detected=True, count=1, bbox_xyxy=[30.0, 20.0, 50.0, 40.0],
+        labels=['target'], scores=[0.9], image_width=WIDTH, image_height=HEIGHT,
+        projective_ranging_lateral_m=[0.0], projective_ranging_forward_m=[2.0],
+        projective_ranging_distance_m=[2.0],
+        projective_ranging_status=[int(MissReason.OK)])
+    msg.header.stamp = _ros_stamp(stamp_ns)
+    msg.header.frame_id = 'camera'
+    return msg
+
+
+def _sensor_capture_runner(monkeypatch, scripted_spins):
+    """A runner whose executor delivers ``scripted_spins`` one per spin.
+
+    Everything from the window reset to the drain is the runner's own code;
+    only ROS delivery is scripted, so callback order is the test's to choose.
+    """
+
+    from ridgeback_autonomy.benchmarking import (
+        target_distance_benchmark_runner_node as runner_module,
+    )
+    from ridgeback_autonomy.benchmarking.rendering import BenchmarkCollageRenderer
+    from ridgeback_localization.synchronization import (
+        SCAN_MATCH_BUFFER_DEPTH,
+        StampedMessageBuffer,
+    )
+
+    warnings = []
+    logger = SimpleNamespace(
+        info=lambda _m: None, warn=warnings.append, warning=warnings.append)
+    runner = object.__new__(runner_module.TargetDistanceBenchmarkRunner)
+    runner.__dict__.update(
+        get_logger=lambda: logger,
+        warnings=warnings,
+        sensor_writer=object(),
+        replay_writer=None,
+        capture_active=False,
+        capture_events={},
+        color_preview_buffer=OrderedDict(),
+        replay_capture_events=OrderedDict(),
+        replay_depth_buffer=OrderedDict(),
+        sensor_color_buffer=OrderedDict(),
+        replay_camera_info_buffer=OrderedDict(),
+        static_replay_camera_info=None,
+        sensor_scan_buffer=StampedMessageBuffer(SCAN_MATCH_BUFFER_DEPTH),
+        replay_tf_buffer=object(),
+        replay_last_fallback_frame=None,
+        replay_last_scan_fallback_frame=None,
+        scan_match_tolerance_s=0.05,
+        base_frame='base_link',
+        capture_batches=1,
+        capture_timeout_sec=5.0,
+        capture_drain_sec=0.3,
+        color_stream_seen=False,
+        mask_measurement_seen=False,
+        selected_mask_estimators={'projective_ranging'},
+        selected_estimators=('projective_ranging',),
+        collage_renderer=BenchmarkCollageRenderer(),
+        last_color_decode_warning=None,
+        namespace_name='',
+        color_topic='color',
+        active_truth=None,
+        active_trial_id='',
+    )
+
+    def spin(_node, *, timeout_sec=0.1):
+        if scripted_spins:
+            scripted_spins.pop(0)()
+        else:
+            time.sleep(min(timeout_sec, 0.005))
+
+    monkeypatch.setattr(runner_module, 'spin_step', spin)
+    monkeypatch.setattr(runner_module.rclpy, 'ok', lambda: True)
+    monkeypatch.setattr(
+        runner_module,
+        'lookup_transform_components',
+        lambda *_args: (np.eye(3), np.array([0.0, 0.0, 0.0]), None),
+    )
+    return runner
+
+
+def _deliver_batch(runner, stamp_ns):
+    runner.on_replay_raw_detections(_raw_detections_msg(stamp_ns))
+    runner.on_replay_aligned_depth(_aligned_depth_msg(stamp_ns))
+    runner.on_mask_measurement(_mask_measurement_msg(stamp_ns))
+
+
+def test_capture_keeps_first_batch_inputs_received_before_the_window_opened(monkeypatch):
+    """The detector's latency puts a window's first batch on a pre-window frame.
+
+    Its RGB, camera info and scan all arrived before ``capture_active``; a
+    window that drops or clears them records that batch without them although
+    every one was published and the live measurement used them.
+    """
+
+    stamp = 120_450_000_000
+    runner = _sensor_capture_runner(
+        monkeypatch, [lambda: _deliver_batch(runner, stamp)])
+    runner.on_color_image(_color_msg(stamp, fill=7))
+    runner.on_replay_camera_info(_camera_info_msg(stamp))
+    runner.on_replay_scan(_laser_scan_msg(stamp))
+
+    summary = runner.capture_measurement_window(10.0)
+
+    [event] = summary['replay_events']
+    assert event['stamp_ns'] == stamp
+    assert event['rgb'] is not None and int(event['rgb'][0, 0, 0]) == 7
+    assert event['intrinsics_stamp_ns'] == stamp
+    assert event['depth_m'] is not None
+    assert event['scan']['stamp_ns'] == stamp
+    assert event['scan_rotation'] is not None
+    assert runner.replay_capture_is_complete()
+    assert not any('drain ended' in warning for warning in runner.warnings)
+
+
+def test_capture_prefers_the_nearest_scan_even_when_it_preceded_the_window(monkeypatch):
+    """A farther in-tolerance scan must not stand in for the dropped nearest one."""
+
+    stamp = 1_000_000_000
+
+    def batch_then_farther_scan():
+        _deliver_batch(runner, stamp)
+        runner.on_replay_scan(_laser_scan_msg(stamp + 25_000_000))
+
+    runner = _sensor_capture_runner(monkeypatch, [batch_then_farther_scan])
+    runner.on_color_image(_color_msg(stamp, fill=1))
+    runner.on_replay_camera_info(_camera_info_msg(stamp))
+    runner.on_replay_scan(_laser_scan_msg(stamp))
+
+    summary = runner.capture_measurement_window(10.0)
+
+    assert summary['replay_events'][0]['scan']['stamp_ns'] == stamp
+
+
+def test_capture_keeps_genuinely_missing_inputs_explicit(monkeypatch):
+    """Persistent buffers must not turn an absent input into a neighbour's."""
+
+    stamp = 2_000_000_000
+    neighbour = stamp - 33_333_333
+    runner = _sensor_capture_runner(
+        monkeypatch, [lambda: _deliver_batch(runner, stamp)])
+    runner.on_color_image(_color_msg(neighbour, fill=3))
+    runner.on_replay_camera_info(_camera_info_msg(neighbour))
+    runner.on_replay_scan(_laser_scan_msg(stamp - 80_000_000))
+
+    summary = runner.capture_measurement_window(10.0)
+
+    [event] = summary['replay_events']
+    assert event['rgb'] is None
+    assert event['intrinsics'] is None
+    assert event['scan'] is None
+    assert event['scan_rotation'] is None
+    assert event['depth_m'] is not None
+    assert not runner.replay_capture_is_complete()
+    assert any(
+        '1 missing exact RGB and 1 missing camera context' in warning
+        for warning in runner.warnings)
+
+
+def test_capture_color_buffer_is_bounded_and_evicts_rather_than_substitutes(monkeypatch):
+    from ridgeback_localization.synchronization import COLOR_BUFFER_DEPTH_DEFAULT
+
+    first = 3_000_000_000
+    runner = _sensor_capture_runner(
+        monkeypatch, [lambda: _deliver_batch(runner, first)])
+    for index in range(COLOR_BUFFER_DEPTH_DEFAULT + 5):
+        runner.on_color_image(_color_msg(first + index * 33_333_333, fill=index))
+    assert len(runner.sensor_color_buffer) == COLOR_BUFFER_DEPTH_DEFAULT
+
+    summary = runner.capture_measurement_window(10.0)
+
+    assert summary['replay_events'][0]['rgb'] is None
+
+
+def test_consecutive_windows_only_freeze_their_own_batches_and_inputs(monkeypatch):
+    """Buffers now outlive a window; events and live measurements must not."""
+
+    first, second = 4_000_000_000, 9_000_000_000
+    scripted = [lambda: _deliver_batch(runner, first)]
+    runner = _sensor_capture_runner(monkeypatch, scripted)
+    for stamp, fill in ((first, 11), (second, 22)):
+        runner.on_color_image(_color_msg(stamp, fill=fill))
+        runner.on_replay_camera_info(_camera_info_msg(stamp))
+        runner.on_replay_scan(_laser_scan_msg(stamp))
+
+    first_summary = runner.capture_measurement_window(10.0)
+    scripted.append(lambda: _deliver_batch(runner, second))
+    second_summary = runner.capture_measurement_window(10.0)
+
+    assert [event['stamp_ns'] for event in first_summary['replay_events']] == [first]
+    assert [event['stamp_ns'] for event in second_summary['replay_events']] == [second]
+    [event] = second_summary['replay_events']
+    assert int(event['rgb'][0, 0, 0]) == 22
+    assert event['intrinsics_stamp_ns'] == second
+    assert event['scan']['stamp_ns'] == second
+    assert {e.stamp_ns for e in runner.capture_events.values()} == {second}
 
 
 def test_mask_region_cache_round_trip_preserves_none_empty_holes_and_extent(tmp_path):

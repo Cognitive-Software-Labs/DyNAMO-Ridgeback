@@ -158,6 +158,7 @@ from ridgeback_localization.contracts import (
     RAW_DETECTIONS_TOPIC,
 )
 from ridgeback_localization.synchronization import (
+    COLOR_BUFFER_DEPTH_DEFAULT,
     SCAN_MATCH_BUFFER_DEPTH,
     SCAN_MATCH_TOLERANCE_S_DEFAULT,
     StampedMessageBuffer,
@@ -544,7 +545,10 @@ class TargetDistanceBenchmarkRunner(Node):
         self.color_preview_buffer: OrderedDict[int, Any] = OrderedDict()
         self.replay_capture_events: OrderedDict[int, dict[str, Any]] = OrderedDict()
         self.replay_depth_buffer: OrderedDict[int, np.ndarray] = OrderedDict()
-        self.sensor_rgb_buffer: OrderedDict[int, np.ndarray] = OrderedDict()
+        # Undecoded color frames, held outside capture windows too and decoded
+        # only for the stamps a frozen batch claims. Same depth as the mask
+        # node's color buffer, so a frame outlives the detector latency.
+        self.sensor_color_buffer: OrderedDict[int, Image] = OrderedDict()
         self.replay_camera_info_buffer: OrderedDict[int, CameraInfo] = OrderedDict()
         self.static_replay_camera_info: CameraInfo | None = None
         # The scan free-runs on its own clock, so unlike RGB and depth it never
@@ -640,6 +644,17 @@ class TargetDistanceBenchmarkRunner(Node):
 
     def on_color_image(self, msg: Image) -> None:
         self.color_stream_seen = True
+        stamp_ns = stamp_to_nanoseconds(msg.header.stamp)
+        if getattr(self, 'sensor_writer', None) is not None:
+            # Buffered outside capture windows too: a window's first raw batch
+            # is usually for a frame that arrived before the window opened,
+            # its detection landing only after the detector's latency.
+            store_buffered_preview(
+                self.sensor_color_buffer, stamp_ns, msg, limit=COLOR_BUFFER_DEPTH_DEFAULT)
+            if self.capture_active:
+                event = self.replay_capture_events.get(stamp_ns)
+                if event is not None:
+                    self.attach_replay_rgb(event, msg)
         if not self.capture_active:
             return
 
@@ -653,23 +668,22 @@ class TargetDistanceBenchmarkRunner(Node):
             return
 
         preview = self.collage_renderer.make_color_preview(frame)
-        stamp_ns = stamp_to_nanoseconds(msg.header.stamp)
         store_buffered_preview(self.color_preview_buffer, stamp_ns, preview)
-        if getattr(self, 'sensor_writer', None) is not None:
-            try:
-                rgb = np.ascontiguousarray(decode_color_to_rgb(msg))
-            except ValueError as exc:
-                self.log_warning_once(
-                    'last_color_decode_warning',
-                    f'Failed to decode exact replay RGB from '
-                    f'"{self.resolved_topic(self.color_topic)}": {exc}',
-                )
-            else:
-                store_buffered_preview(self.sensor_rgb_buffer, stamp_ns, rgb)
-                event = self.replay_capture_events.get(stamp_ns)
-                if event is not None:
-                    self.store_replay_rgb(event, rgb)
         self.backfill_previews_from_buffers()
+
+    def attach_replay_rgb(self, event: dict[str, Any], msg: Image) -> None:
+        """Decode one exact-stamp color frame into its frozen sensor event."""
+
+        try:
+            rgb = np.ascontiguousarray(decode_color_to_rgb(msg))
+        except ValueError as exc:
+            self.log_warning_once(
+                'last_color_decode_warning',
+                f'Failed to decode exact replay RGB from '
+                f'"{self.resolved_topic(self.color_topic)}": {exc}',
+            )
+            return
+        self.store_replay_rgb(event, rgb)
 
     def on_replay_camera_info(self, msg: CameraInfo) -> None:
         stamp_ns = stamp_to_nanoseconds(msg.header.stamp)
@@ -685,16 +699,19 @@ class TargetDistanceBenchmarkRunner(Node):
             self.store_replay_intrinsics(event, msg, stamp_ns=stamp_ns)
 
     def on_replay_scan(self, msg: LaserScan) -> None:
-        """Buffer scans for the nearest-stamp match, capture windows only.
+        """Buffer every scan; attach to frozen batches only inside a window.
 
-        Outside a window there is no event to attach one to, and the buffer is
-        rebuilt per trial, so storing then would only age out the scans that
-        matter.
+        Buffered outside windows too, as the mask node does: the scan nearest a
+        window's first raw batch usually arrived before the window opened, and
+        without it that batch keeps no scan, or a farther one than the live
+        polar row measured.
         """
 
-        if not self.capture_active or self.sensor_scan_buffer is None:
+        if self.sensor_scan_buffer is None:
             return
         self.sensor_scan_buffer.store(msg)
+        if not self.capture_active:
+            return
         for event in self.replay_capture_events.values():
             self.attach_replay_scan(event)
 
@@ -744,9 +761,9 @@ class TargetDistanceBenchmarkRunner(Node):
                 }
                 for detection in batch.detections
             ]
-            rgb = self.sensor_rgb_buffer.get(stamp_ns)
-            if rgb is not None:
-                self.store_replay_rgb(event, rgb)
+            color_msg = self.sensor_color_buffer.get(stamp_ns)
+            if color_msg is not None:
+                self.attach_replay_rgb(event, color_msg)
         else:
             event['detections'] = [
                 {
@@ -1623,10 +1640,10 @@ class TargetDistanceBenchmarkRunner(Node):
         self.clear_preview_buffers()
         self.replay_capture_events.clear()
         self.replay_depth_buffer.clear()
-        self.sensor_rgb_buffer.clear()
-        self.replay_camera_info_buffer.clear()
-        if self.sensor_scan_buffer is not None:
-            self.sensor_scan_buffer = StampedMessageBuffer(SCAN_MATCH_BUFFER_DEPTH)
+        # The color, camera-info and scan buffers are kept: the first raw batch
+        # is usually for a frame received before this point. Matching stays
+        # exact-stamp (the scan nearest within tolerance), so a batch only ever
+        # receives the inputs of its own instant.
         self.capture_active = True
         try:
             if not self.capture_artifact_enabled():
