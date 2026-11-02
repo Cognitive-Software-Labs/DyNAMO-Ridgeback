@@ -23,6 +23,7 @@ benchmarks — legal because the whole stack runs on sim time.
 """
 import argparse
 import math
+import os
 import signal
 import sys
 import time
@@ -36,6 +37,29 @@ from ridgeback_common.camera_profiles import (
 )
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+
+def release_cpu0_pins() -> list[int]:
+    """Let this process's threads pinned to CPU 0 alone run on any allowed CPU.
+
+    Kit's perfmonitor plugin pins its sampling thread to CPU 0. On a shared
+    host where another process saturates CPU 0, that thread barely runs, and
+    the process cannot finish exiting until it does: shutdown then outlasts
+    the launch's SIGINT and SIGTERM windows and ends in SIGKILL. Returns the
+    thread ids released.
+    """
+    allowed = os.sched_getaffinity(0)
+    if allowed == {0}:
+        return []
+    released = []
+    for tid in sorted(int(name) for name in os.listdir("/proc/self/task")):
+        try:
+            if os.sched_getaffinity(tid) == {0}:
+                os.sched_setaffinity(tid, allowed)
+                released.append(tid)
+        except OSError:  # the thread exited meanwhile
+            pass
+    return released
 
 
 def parse_args():
@@ -348,6 +372,9 @@ def run(app, args) -> int:
     print(f"scene control services under {scene_control.service_namespace}",
           flush=True)
 
+    released = release_cpu0_pins()
+    if released:
+        print(f"released {len(released)} thread(s) pinned to CPU 0", flush=True)
     print("RUNNER READY", flush=True)
 
     stop = {"flag": False}
