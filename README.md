@@ -1398,6 +1398,12 @@ ros2 run ridgeback_autonomy target_benchmark_sweep \
   --report-only artifacts/benchmarks/20260828_141530_baseline
 ```
 
+The [unattended qualification helper](docs/target_distance_benchmarking/unattended_qualification.md)
+prepares the fixed 16-run Gazebo/Isaac campaign and can supervise it as a local
+user service, with capture-readiness checks, strict result checks, deadlines and
+automatic reports. Preparation does not launch a simulation; recorder integration
+and its short readiness checks must pass before full qualification runs begin.
+
 The shipped `benchmark_sweep_model_concurrency.yaml` is the controlled
 sequential evidence run for the SlimSAM/Depth-Anything question. It starts with
 a diagnostics-off/on A/A pair and then runs three rotated replications of the

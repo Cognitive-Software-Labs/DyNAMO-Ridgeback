@@ -1,0 +1,4 @@
+# Apply only recorder launch arguments established by the capture fix.
+# The current quota-only stereo recorder MUST fail the automatic capture checks.
+# These overrides affect sensor-recording configurations, not ordinary live runs.
+{}

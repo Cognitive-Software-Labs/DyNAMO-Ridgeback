@@ -1,0 +1,39 @@
+sweep:
+  name: qualification_gz_r2
+  description: Full furnished benchmark; independent session 2; four fixed mask/depth
+    conditions.
+defaults:
+  backend: gz
+  scenario: ''
+  background: lab
+  background_props: true
+  camera_profile: 640x480
+  estimators: projective_ranging,euclidean_reconstruction,polar_profiling
+  repeats: 1
+  settle_sec: 2.0
+  capture_sec: 10.0
+  record_video: true
+  overlay: true
+  estimate_viz: true
+  detector: owlv2
+  detection_model: google/owlv2-base-patch16-ensemble
+  target_labels: humanoid robot
+  detection_threshold: 0.3
+  detector_fps: 10.0
+  detector_debug: true
+  depth_match_debug: true
+  gz_gui: true
+  headless_rendering: false
+configs:
+- name: box_stereo
+  mask_gate: box
+  depth_source: stereoscopic
+- name: silhouette_stereo
+  mask_gate: silhouette
+  depth_source: stereoscopic
+- name: box_monocular
+  mask_gate: box
+  depth_source: monocular
+- name: silhouette_monocular
+  mask_gate: silhouette
+  depth_source: monocular
