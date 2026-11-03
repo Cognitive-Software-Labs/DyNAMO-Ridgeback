@@ -136,9 +136,10 @@ rerunning them. The earlier stage must have recorded the condition as successful
 and validated; it is revalidated with the current evidence checks, its
 experimental settings must equal this bundle's apart from output paths, and its
 run, CSV, sampled-reference and capture hashes are recorded. Inventory refuses
-the campaign's evidence if any of them later changes. The stage keeps at least
-one condition, and its remaining conditions run in their own fresh simulator
-session, so an imported condition does not share a session with them. Workstation
+the campaign's evidence if any of them later changes. A stage's remaining
+conditions run in their own fresh simulator session, so an imported condition
+does not share a session with them; a stage with every condition imported is
+skipped and its input is kept under `inputs_imported/`. Workstation
 time of the earlier run is charged through the carried phase accounting, not
 again.
 

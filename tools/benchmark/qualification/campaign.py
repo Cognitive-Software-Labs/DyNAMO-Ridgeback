@@ -201,6 +201,9 @@ def validate_matrix(bundle):
         if not check and any(c.arguments['capture_sec'] != '10.0' for c in spec.configs):
             raise ValueError('Full runs must keep the 10-second live window')
         counts[path.stem] = trials
+    for stage in (*CHECK_STAGES, *ORDER):
+        if stage_conditions(state, stage) and stage not in counts:
+            raise ValueError(f'{stage} has conditions to run but no sweep input')
     for key in state.get('imported', {}):
         counts[key] = [109]
     return counts
@@ -241,8 +244,9 @@ def import_conditions(bundle, source, stage, conditions):
     """Adopt completed full-run conditions of an earlier session instead of rerunning them.
 
     Allowed only before launch, with identical experimental settings and the same
-    evidence a condition run here must produce. The stage keeps at least one
-    condition, which then runs in its own fresh simulator session.
+    evidence a condition run here must produce. The stage's remaining conditions
+    run in their own fresh simulator session; a stage with none left is skipped,
+    its input kept under inputs_imported/.
     """
     bundle, source = Path(bundle).resolve(), Path(source).resolve()
     state = read_json(bundle/'campaign.json')
@@ -253,8 +257,6 @@ def import_conditions(bundle, source, stage, conditions):
     imports = state.setdefault('imported', {})
     if any(c not in CONDITIONS or f'{stage}/{c}' in imports for c in conditions):
         raise ValueError(f'Cannot import {conditions} into {stage}')
-    if not set(stage_conditions(state, stage)) - set(conditions):
-        raise ValueError(f'{stage} must keep at least one condition to run')
     target = yaml.safe_load((bundle/'inputs'/f'{stage}.yaml').read_text())
     original = yaml.safe_load((source/'inputs'/f'{stage}.yaml').read_text())
     guard = read_json(source/f'{stage}_guard.json')
@@ -285,6 +287,9 @@ def import_conditions(bundle, source, stage, conditions):
             'processing_stages': stages, **_imported_hashes(run_dir, sensor)}
     target['configs'] = [c for c in target['configs'] if f'{stage}/{c["name"]}' not in imports]
     (bundle/'inputs'/f'{stage}.yaml').write_text(yaml.safe_dump(target, sort_keys=False))
+    if not target['configs']:
+        (bundle/'inputs_imported').mkdir(exist_ok=True)
+        (bundle/'inputs'/f'{stage}.yaml').replace(bundle/'inputs_imported'/f'{stage}.yaml')
     atomic_json(bundle/'campaign.json', state)
     report(bundle)
     return {key: imports[key]['run_dir'] for key in imports}
@@ -557,6 +562,8 @@ def run_stages(bundle, state, stages, end):
     live_end = None
     for stage in stages:
         check_frozen(bundle)
+        if not stage_conditions(state, stage):
+            continue
         state.setdefault('host_checks', {})[stage] = host_available(
             state.get('external_gpu_policy', 'stop'))
         proof = stage.startswith('check_')

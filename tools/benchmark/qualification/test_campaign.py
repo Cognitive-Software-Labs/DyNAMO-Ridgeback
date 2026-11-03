@@ -527,7 +527,7 @@ def completed_source(tmp_path, monkeypatch, conditions=('box_stereo', 'silhouett
                   'measurement_sec': [10.0, 10.0], 'drain_sec_max': 0.0}
     monkeypatch.setattr(campaign, 'validate_run', lambda *_args: validation)
     monkeypatch.setattr(campaign, 'processing_diagnostics',
-                        lambda *_args: {'slimsam': {'warm_n': 100}})
+                        lambda *_args: {'slimsam': {'warm_n': 100}, 'depth_anything': {'warm_n': 100}})
     monkeypatch.setattr(artifacts, 'load_artifact',
                         lambda *_args, **_kwargs: SimpleNamespace(id='artifact', manifest_sha256='manifest'))
     return source, sweep
@@ -554,15 +554,13 @@ def test_import_adopts_validated_conditions_and_the_stage_runs_only_the_rest(tmp
         campaign.inventory(bundle, state)
 
 
-def test_import_refuses_changed_settings_unvalidated_runs_whole_stages_and_launched_bundles(
+def test_import_refuses_changed_settings_unvalidated_runs_and_launched_bundles(
         tmp_path, monkeypatch):
     import yaml
     bundle = campaign.prepare(tmp_path/'bundle')
     source, _sweep = completed_source(tmp_path, monkeypatch, conditions=('box_stereo',))
     with pytest.raises(ValueError, match='did not complete'):
         campaign.import_conditions(bundle, source, 'gz_r1', ['silhouette_stereo'])
-    with pytest.raises(ValueError, match='keep at least one'):
-        campaign.import_conditions(bundle, source, 'gz_r1', list(evidence.CONDITIONS))
     with pytest.raises(ValueError, match='Only full-run stages'):
         campaign.import_conditions(bundle, source, 'check_gz', ['box_stereo'])
     path = source/'inputs/gz_r1.yaml'
@@ -613,3 +611,22 @@ def test_host_load_is_attributed_to_the_stage_that_was_running(tmp_path):
     assert campaign.stage_host_load(tmp_path, state) == {
         'check_gz': {'samples': 1, 'external_busy': 1, 'min_mem_available_gib': 40.0},
         'gz_r1': {'samples': 2, 'external_busy': 1, 'min_mem_available_gib': 20.0}}
+
+
+def test_fully_imported_stage_is_skipped_and_its_input_kept_aside(tmp_path, monkeypatch):
+    bundle = campaign.prepare(tmp_path/'bundle')
+    source, _sweep = completed_source(tmp_path, monkeypatch, conditions=evidence.CONDITIONS)
+    campaign.import_conditions(bundle, source, 'gz_r1', list(evidence.CONDITIONS))
+    state = campaign.read_json(bundle/'campaign.json')
+    assert campaign.stage_conditions(state, 'gz_r1') == ()
+    assert not (bundle/'inputs/gz_r1.yaml').exists() and (bundle/'inputs_imported/gz_r1.yaml').exists()
+    monkeypatch.setattr(campaign, 'check_frozen', lambda _bundle: None)
+    monkeypatch.setattr(campaign, 'host_available', lambda *_args: {})
+    ran = []
+    def owned(command, *_args):
+        ran.append(command)
+        raise RuntimeError('stop after the first stage that runs')
+    monkeypatch.setattr(campaign, 'owned_command', owned)
+    with pytest.raises(RuntimeError, match='first stage that runs'):
+        campaign.run_stages(bundle, state, ('gz_r1', 'isaac_r1'), time.monotonic()+3600)
+    assert len(ran) == 1 and ran[0][2].endswith('isaac_r1.yaml')
