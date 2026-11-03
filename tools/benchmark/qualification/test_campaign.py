@@ -225,7 +225,8 @@ def test_prepare_has_separate_repetitions_with_equal_capture_workloads(tmp_path)
 def test_stage_failure_prevents_all_full_benchmarks(tmp_path, monkeypatch):
     bundle = campaign.prepare(tmp_path/'bundle')
     monkeypatch.setattr(campaign, 'ROOT', tmp_path)
-    monkeypatch.setattr(campaign, 'host_available', lambda: None)
+    monkeypatch.setattr(campaign, 'host_available', lambda *_args: None)
+    monkeypatch.setattr(campaign, 'sample_host', lambda *_args: None)
     monkeypatch.setattr(campaign, 'check_installed', lambda: None)
     monkeypatch.setattr(campaign, 'acquire_idle_inhibitor', lambda: None)
     monkeypatch.setattr(campaign, 'validate_matrix', lambda _: {})
@@ -503,3 +504,112 @@ def test_event_parity_compares_each_live_measured_batch_with_its_own_record(tmp_
     first['live_measurement'] = None
     sensor, cache = build(tmp_path/'none', [first])
     assert evidence.event_parity(sensor.root, cache.root, replay_dir)['verdict'] == 'inconclusive'
+
+
+def completed_source(tmp_path, monkeypatch, conditions=('box_stereo', 'silhouette_stereo')):
+    """An earlier bundle whose gz_r1 completed and validated the given conditions."""
+    import ridgeback_autonomy.benchmarking.replay_artifacts as artifacts
+    source = campaign.prepare(tmp_path/'source')
+    sweep = source/'gz_r1'/'20261103_000000_qualification_gz_r1'
+    configs = []
+    for condition in conditions:
+        run_dir = sweep/condition
+        (run_dir/'sampled_reference').mkdir(parents=True)
+        (run_dir/'sampled_reference/sampled_windows.json').write_text('{}')
+        (run_dir/'projective.csv').write_text('trial_id\n')
+        campaign.atomic_json(run_dir/'run.json', {
+            'run': {'commit': '4e22a20'},
+            'parameters': {'sensor_capture_dir': str(source/'captures/gz_r1'/condition)}})
+        configs.append({'name': condition, 'status': 'success'})
+    campaign.atomic_json(sweep/'sweep.json', {'configs': configs})
+    campaign.atomic_json(source/'gz_r1_guard.json', {'checked': {c: {} for c in conditions}})
+    validation = {'window_events': 10898, 'live_raw_batches': 10898, 'sampled_batches': 545,
+                  'measurement_sec': [10.0, 10.0], 'drain_sec_max': 0.0}
+    monkeypatch.setattr(campaign, 'validate_run', lambda *_args: validation)
+    monkeypatch.setattr(campaign, 'processing_diagnostics',
+                        lambda *_args: {'slimsam': {'warm_n': 100}})
+    monkeypatch.setattr(artifacts, 'load_artifact',
+                        lambda *_args, **_kwargs: SimpleNamespace(id='artifact', manifest_sha256='manifest'))
+    return source, sweep
+
+
+def test_import_adopts_validated_conditions_and_the_stage_runs_only_the_rest(tmp_path, monkeypatch):
+    import yaml
+    bundle = campaign.prepare(tmp_path/'bundle')
+    source, sweep = completed_source(tmp_path, monkeypatch)
+    campaign.import_conditions(bundle, source, 'gz_r1', ['box_stereo', 'silhouette_stereo'])
+    state = campaign.read_json(bundle/'campaign.json')
+    spec = yaml.safe_load((bundle/'inputs/gz_r1.yaml').read_text())
+    assert [c['name'] for c in spec['configs']] == ['box_monocular', 'silhouette_monocular']
+    assert campaign.stage_conditions(state, 'gz_r1') == ('box_monocular', 'silhouette_monocular')
+    assert campaign.stage_conditions(state, 'gz_r2') == evidence.CONDITIONS
+    record = state['imported']['gz_r1/box_stereo']
+    assert record['source_revision'] == '4e22a20' and record['validation']['sampled_batches'] == 545
+    assert campaign.condition_paths(bundle, state, 'gz_r1', 'box_stereo') == (
+        sweep/'box_stereo', source/'captures/gz_r1/box_stereo')
+    assert '| gz_r1/box_stereo | imported | 10898 | 545 |' in (bundle/'REPORT.md').read_text()
+    # Imported evidence stays frozen: any later edit stops inventory before offline use.
+    (sweep/'box_stereo/projective.csv').write_text('trial_id\nchanged\n')
+    with pytest.raises(RuntimeError, match='Imported evidence changed'):
+        campaign.inventory(bundle, state)
+
+
+def test_import_refuses_changed_settings_unvalidated_runs_whole_stages_and_launched_bundles(
+        tmp_path, monkeypatch):
+    import yaml
+    bundle = campaign.prepare(tmp_path/'bundle')
+    source, _sweep = completed_source(tmp_path, monkeypatch, conditions=('box_stereo',))
+    with pytest.raises(ValueError, match='did not complete'):
+        campaign.import_conditions(bundle, source, 'gz_r1', ['silhouette_stereo'])
+    with pytest.raises(ValueError, match='keep at least one'):
+        campaign.import_conditions(bundle, source, 'gz_r1', list(evidence.CONDITIONS))
+    with pytest.raises(ValueError, match='Only full-run stages'):
+        campaign.import_conditions(bundle, source, 'check_gz', ['box_stereo'])
+    path = source/'inputs/gz_r1.yaml'
+    original = yaml.safe_load(path.read_text())
+    original['defaults']['capture_sec'] = 9.0
+    path.write_text(yaml.safe_dump(original, sort_keys=False))
+    with pytest.raises(ValueError, match='settings differ'):
+        campaign.import_conditions(bundle, source, 'gz_r1', ['box_stereo'])
+    state = campaign.read_json(bundle/'campaign.json')
+    assert 'imported' not in state or not state['imported']
+    state['status'] = 'running-live'
+    campaign.atomic_json(bundle/'campaign.json', state)
+    with pytest.raises(RuntimeError, match='before launch'):
+        campaign.import_conditions(bundle, source, 'gz_r1', ['box_stereo'])
+
+
+def test_external_cuda_work_is_recorded_only_under_the_record_policy(tmp_path, monkeypatch):
+    pmon = ('# gpu pid type sm mem enc dec jpg ofa fb ccpm command\n'
+            '    0  4242  C  37  1  -  -  -  -  8000  0  python\n')
+    monkeypatch.setattr(campaign.psutil, 'process_iter', lambda *_args: [])
+    monkeypatch.setattr(campaign.subprocess, 'run', lambda *_args, **_kwargs: SimpleNamespace(stdout=pmon))
+    free = {'bytes': 100 * 1024**3}
+    monkeypatch.setattr(campaign.shutil, 'disk_usage', lambda _path: SimpleNamespace(free=free['bytes']))
+    with pytest.raises(RuntimeError, match='Another CUDA process is active: PID 4242'):
+        campaign.host_available('stop')
+    assert campaign.host_available('record')['active_cuda'] == [{'pid': 4242, 'sm_percent': 37}]
+    free['bytes'] = 1024**3
+    with pytest.raises(RuntimeError, match='Less than 10 GiB'):
+        campaign.host_available('record')
+    bundle = campaign.prepare(tmp_path/'bundle')
+    campaign.allow_external_gpu(bundle)
+    assert campaign.read_json(bundle/'campaign.json')['external_gpu_policy'] == 'record'
+    assert '**record**' in (bundle/'REPORT.md').read_text()
+    state = campaign.read_json(bundle/'campaign.json')
+    state['status'] = 'running-live'
+    campaign.atomic_json(bundle/'campaign.json', state)
+    with pytest.raises(RuntimeError, match='before launch'):
+        campaign.allow_external_gpu(bundle)
+
+
+def test_host_load_is_attributed_to_the_stage_that_was_running(tmp_path):
+    rows = [{'t': 5, 'external_busy': True, 'meminfo_kib': {'MemAvailable': 40 * 1024**2}},
+            {'t': 15, 'external_busy': False, 'meminfo_kib': {'MemAvailable': 30 * 1024**2}},
+            {'t': 25, 'external_busy': True, 'meminfo_kib': {'MemAvailable': 20 * 1024**2}}]
+    (tmp_path/'host_samples.jsonl').write_text('\n'.join(json.dumps(r) for r in rows))
+    state = {'operations': [{'stage': 'check_gz', 'epoch': [0, 10]},
+                            {'stage': 'gz_r1', 'epoch': [10, 30]}]}
+    assert campaign.stage_host_load(tmp_path, state) == {
+        'check_gz': {'samples': 1, 'external_busy': 1, 'min_mem_available_gib': 40.0},
+        'gz_r1': {'samples': 2, 'external_busy': 1, 'min_mem_available_gib': 20.0}}

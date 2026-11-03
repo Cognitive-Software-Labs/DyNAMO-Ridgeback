@@ -120,6 +120,36 @@ or stop it, use `systemctl --user status UNIT.service` or
 reach the campaign owner first, allowing ordered shutdown. The script never
 invokes broad `cleanup.sh` or signals unrelated processes by name.
 
+### Imported conditions and shared-GPU operation
+
+Two optional, pre-launch changes to a prepared bundle are recorded in
+`campaign.json` and `REPORT.md`:
+
+```bash
+python3 tools/benchmark/qualification/campaign.py import BUNDLE \
+  --from EARLIER_BUNDLE --stage gz_r1 --conditions box_stereo,silhouette_stereo
+python3 tools/benchmark/qualification/campaign.py allow-external-gpu BUNDLE
+```
+
+`import` adopts completed full-run conditions of an earlier bundle instead of
+rerunning them. The earlier stage must have recorded the condition as successful
+and validated; it is revalidated with the current evidence checks, its
+experimental settings must equal this bundle's apart from output paths, and its
+run, CSV, sampled-reference and capture hashes are recorded. Inventory refuses
+the campaign's evidence if any of them later changes. The stage keeps at least
+one condition, and its remaining conditions run in their own fresh simulator
+session, so an imported condition does not share a session with them. Workstation
+time of the earlier run is charged through the carried phase accounting, not
+again.
+
+`allow-external-gpu` changes only the external CUDA rule: another user's CUDA
+process above 5% SM is recorded at every stage boundary rather than stopping the
+campaign. Another simulator/perception job and low disk still stop it. Whatever
+the policy, the live phase samples GPU users and memory every 10 seconds into
+`host_samples.jsonl`, and the report states for each stage how many samples saw
+external GPU work and the lowest available memory. The sampler records memory;
+it does not stop the campaign under memory pressure.
+
 ## Deadlines, ownership and failure behavior
 
 The job budget is 12 hours minus the timing study's rounded 428 seconds. The full
@@ -136,8 +166,8 @@ If observed costs do not fit, the campaign stops with the incomplete matrix
 reported instead of changing capture settings between repetitions.
 
 The helper holds a local campaign lock, checks for existing simulator/perception
-jobs and active external CUDA work, uses a separate ROS domain/Gazebo partition,
-and tracks only its descendants. Linux child-subreaper ownership retains SDK
+jobs and active external CUDA work (stopping or recording, as above), uses a
+separate ROS domain/Gazebo partition, and tracks only its descendants. Linux child-subreaper ownership retains SDK
 helpers that create new sessions or outlive a launch leader. The original sweep
 owner performs normal teardown; the outer deadline guard cleans up owned leftovers
 and retains any escalation as a failure.

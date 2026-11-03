@@ -12,6 +12,7 @@ import shutil
 import signal
 import subprocess
 import sys
+import threading
 import time
 
 import psutil
@@ -19,7 +20,7 @@ import yaml
 
 from evidence import (
     CHECK_CONDITIONS, CONDITIONS, ESTIMATORS, SAMPLE_BATCHES, compare_rows, csv_rows, event_parity,
-    read_json, repeatability, sampled_identity, without_trials,
+    processing_diagnostics, read_json, repeatability, sampled_identity, validate_run, without_trials,
 )
 
 HERE = Path(__file__).resolve().parent
@@ -36,6 +37,10 @@ PROBE_COMPLETE = 'probe-complete-not-a-campaign'
 CHECK_STAGES = ('check_gz', 'check_isaac')
 # A readiness probe runs only the short checks and their offline replay.
 PROBE_SEC = 3600
+# External CUDA work either stops the campaign ('stop') or is only recorded
+# ('record'); simulator/perception conflicts and low disk always stop it.
+EXTERNAL_GPU_POLICIES = ('stop', 'record')
+HOST_SAMPLE_SEC = 10
 
 
 def atomic_json(path, value):
@@ -156,6 +161,7 @@ def validate_matrix(bundle):
     from ridgeback_autonomy.benchmarking.trial_results import build_trials
     from ridgeback_autonomy.benchmarking.backends import resolve_benchmark_environment
     counts = {}
+    state = read_json(Path(bundle)/'campaign.json')
     for path, checksum in read_json(Path(bundle)/'plan_inputs.json').items():
         if sha(path) != checksum:
             raise ValueError('Scenario/background changed since preparation: '+path)
@@ -186,18 +192,117 @@ def validate_matrix(bundle):
                 raise ValueError('Detector diagnostics must remain enabled')
             trials.append(count)
         check = path.stem.startswith('check_')
-        expected = [1] * len(CHECK_CONDITIONS) if check else [109] * 4
+        names = stage_conditions(state, path.stem)
+        expected = [1 if check else 109] * len(names)
         if trials != expected:
             raise ValueError(f'{path.name}: expected {expected}, got {trials}')
-        if tuple(c.name for c in spec.configs) != (CHECK_CONDITIONS if check else CONDITIONS):
+        if tuple(c.name for c in spec.configs) != names:
             raise ValueError('The condition matrix changed')
         if not check and any(c.arguments['capture_sec'] != '10.0' for c in spec.configs):
             raise ValueError('Full runs must keep the 10-second live window')
         counts[path.stem] = trials
+    for key in state.get('imported', {}):
+        counts[key] = [109]
     return counts
 
 
-def host_available():
+def stage_conditions(state, stage):
+    """The conditions a stage runs itself: its full set minus any imported ones."""
+    imported = state.get('imported', {})
+    return tuple(c for c in (CHECK_CONDITIONS if stage.startswith('check_') else CONDITIONS)
+                 if f'{stage}/{c}' not in imported)
+
+
+def condition_paths(bundle, state, stage, condition):
+    """Run directory and sensor capture of one condition, whether run here or imported."""
+    record = state.get('imported', {}).get(f'{stage}/{condition}')
+    if record:
+        return Path(record['run_dir']), Path(record['sensor_capture'])
+    return find_sweep(bundle, stage).parent/condition, Path(bundle)/'captures'/stage/condition
+
+
+def _settings(document, condition):
+    """A condition's experimental settings, without the bundle-specific output paths."""
+    config = next(c for c in document['configs'] if c['name'] == condition)
+    return ({k: v for k, v in document['defaults'].items() if k != 'output_dir'},
+            {k: v for k, v in config.items() if k != 'sensor_capture_dir'})
+
+
+def _imported_hashes(run_dir, sensor):
+    from ridgeback_autonomy.benchmarking.replay_artifacts import load_artifact
+    artifact = load_artifact(sensor, require_parent=False)
+    return {'artifact_id': artifact.id, 'manifest_sha256': artifact.manifest_sha256,
+            'sampled_windows_sha256': sha(run_dir/'sampled_reference/sampled_windows.json'),
+            'run_json_sha256': sha(run_dir/'run.json'),
+            'csv_sha256': {p.name: sha(p) for p in sorted(run_dir.glob('*.csv'))}}
+
+
+def import_conditions(bundle, source, stage, conditions):
+    """Adopt completed full-run conditions of an earlier session instead of rerunning them.
+
+    Allowed only before launch, with identical experimental settings and the same
+    evidence a condition run here must produce. The stage keeps at least one
+    condition, which then runs in its own fresh simulator session.
+    """
+    bundle, source = Path(bundle).resolve(), Path(source).resolve()
+    state = read_json(bundle/'campaign.json')
+    if state['status'] != 'prepared-not-launched':
+        raise RuntimeError('Conditions can only be imported before launch')
+    if stage not in ORDER:
+        raise ValueError(f'Only full-run stages can import conditions, not {stage}')
+    imports = state.setdefault('imported', {})
+    if any(c not in CONDITIONS or f'{stage}/{c}' in imports for c in conditions):
+        raise ValueError(f'Cannot import {conditions} into {stage}')
+    if not set(stage_conditions(state, stage)) - set(conditions):
+        raise ValueError(f'{stage} must keep at least one condition to run')
+    target = yaml.safe_load((bundle/'inputs'/f'{stage}.yaml').read_text())
+    original = yaml.safe_load((source/'inputs'/f'{stage}.yaml').read_text())
+    guard = read_json(source/f'{stage}_guard.json')
+    sweep = find_sweep(source, stage)
+    entries = {c['name']: c for c in read_json(sweep)['configs']}
+    for condition in conditions:
+        if _settings(original, condition) != _settings(target, condition):
+            raise ValueError(f'{stage}/{condition}: experimental settings differ from this campaign')
+        entry = entries.get(condition) or {}
+        if entry.get('status') != 'success' or condition not in guard.get('checked', {}):
+            raise ValueError(f'{stage}/{condition} did not complete and pass validation in {source}')
+        run_dir = sweep.parent/condition
+        # Revalidated with the current checks rather than trusted from the source guard.
+        result = validate_run(run_dir, entry, 109, source/'capture_windows.jsonl')
+        stages = processing_diagnostics(source/f'{stage}.log', condition)
+        required = ['slimsam'] if 'silhouette' in condition else []
+        required += ['depth_anything'] if 'monocular' in condition else []
+        if any(stages.get(key, {}).get('warm_n', 0) < 3 for key in required):
+            raise ValueError('Requested models did not produce enough warm inference samples')
+        run = read_json(run_dir/'run.json')
+        sensor = Path(run['parameters']['sensor_capture_dir'])
+        imports[f'{stage}/{condition}'] = {
+            'source_bundle': str(source), 'source_revision': run['run']['commit'],
+            'run_dir': str(run_dir), 'sensor_capture': str(sensor),
+            'imported_utc': datetime.now(timezone.utc).isoformat(),
+            'validation': {k: result[k] for k in ('window_events', 'live_raw_batches', 'sampled_batches',
+                                                  'measurement_sec', 'drain_sec_max')},
+            'processing_stages': stages, **_imported_hashes(run_dir, sensor)}
+    target['configs'] = [c for c in target['configs'] if f'{stage}/{c["name"]}' not in imports]
+    (bundle/'inputs'/f'{stage}.yaml').write_text(yaml.safe_dump(target, sort_keys=False))
+    atomic_json(bundle/'campaign.json', state)
+    report(bundle)
+    return {key: imports[key]['run_dir'] for key in imports}
+
+
+def allow_external_gpu(bundle):
+    """Record, rather than stop for, other users' CUDA work during this campaign."""
+    bundle = Path(bundle).resolve()
+    state = read_json(bundle/'campaign.json')
+    if state['status'] != 'prepared-not-launched':
+        raise RuntimeError('The external GPU policy can only change before launch')
+    state.update(external_gpu_policy='record', external_gpu_policy_utc=datetime.now(timezone.utc).isoformat())
+    atomic_json(bundle/'campaign.json', state)
+    report(bundle)
+
+
+def host_available(external_gpu='stop'):
+    """Stop for conflicting simulator/perception jobs or low disk; stop for or record external CUDA work."""
     own = {os.getpid(), *[p.pid for p in psutil.Process().parents()]}
     heavy = {'gzserver', 'isaac_runner.py', 'target_distance_benchmark_runner',
              'target_benchmark_sweep', 'target_mask_measurement_node', 'target_detector_node'}
@@ -206,15 +311,53 @@ def host_available():
             continue
         if any(Path(token).name in heavy for token in (process.info['cmdline'] or [])):
             raise RuntimeError(f'Another simulator/perception job owns the workstation: PID {process.pid}')
+    if external_gpu not in EXTERNAL_GPU_POLICIES:
+        raise ValueError(f'Unknown external GPU policy {external_gpu}')
+    if shutil.disk_usage(ROOT).free < 10 * 1024**3:
+        raise RuntimeError('Less than 10 GiB free; stop before exhausting evidence storage')
     sampled = subprocess.run(['nvidia-smi', 'pmon', '-c', '1', '-s', 'um'],
                              capture_output=True, text=True, timeout=8, check=True)
+    active = []
     for line in sampled.stdout.splitlines():
         fields = line.split()
         if len(fields) > 4 and not line.startswith('#') and fields[2] == 'C':
             if fields[3].isdigit() and int(fields[3]) > 5:
-                raise RuntimeError(f'Another CUDA process is active: PID {fields[1]}')
-    if shutil.disk_usage(ROOT).free < 10 * 1024**3:
-        raise RuntimeError('Less than 10 GiB free; stop before exhausting evidence storage')
+                if external_gpu == 'stop':
+                    raise RuntimeError(f'Another CUDA process is active: PID {fields[1]}')
+                active.append({'pid': int(fields[1]), 'sm_percent': int(fields[3])})
+    return {'utc': datetime.now(timezone.utc).isoformat(), 'external_gpu_policy': external_gpu,
+            'active_cuda': active}
+
+
+def sample_host(stop, path):
+    """Background GPU/memory record of the whole live phase; never stops the campaign."""
+    user = psutil.Process().username()
+    with Path(path).open('a') as out:
+        while not stop.is_set():
+            row = {'t': time.time()}
+            try:
+                owners = {}
+                for process in psutil.process_iter(['pid', 'username']):
+                    owners[process.info['pid']] = process.info['username']
+                # NVML through nvidia-smi: one 1 s utilization sample per process.
+                pmon = subprocess.run(['nvidia-smi', 'pmon', '-c', '1', '-s', 'um'],
+                                      capture_output=True, text=True, timeout=8).stdout
+                row['cuda'] = [{'pid': int(f[1]), 'user': owners.get(int(f[1])),
+                                'sm_percent': int(f[3]) if f[3].isdigit() else None,
+                                'fb_mib': int(f[9]) if len(f) > 9 and f[9].isdigit() else None}
+                               for f in (line.split() for line in pmon.splitlines())
+                               if len(f) > 4 and not f[0].startswith('#') and f[2] == 'C']
+                row['external_busy'] = any(p['user'] != user and (p['sm_percent'] or 0) > 5
+                                           for p in row['cuda'])
+            except Exception as error:  # the record must never stop the measurement
+                row['error'] = repr(error)
+            row['meminfo_kib'] = {
+                line.split(':')[0]: int(line.split()[1]) for line in open('/proc/meminfo')
+                if line.split(':')[0] in ('MemAvailable', 'SwapFree', 'SwapTotal')}
+            row['psi_memory'] = Path('/proc/pressure/memory').read_text().splitlines()
+            out.write(json.dumps(row) + '\n')
+            out.flush()
+            stop.wait(HOST_SAMPLE_SEC)
 
 
 def _alive(tracked):
@@ -374,17 +517,21 @@ def run(bundle):
         state.update(status='running-preflight', started_utc=started_utc)
         atomic_json(bundle / 'campaign.json', state)
         idle_fd = None
+        stop_sampling = threading.Event()
+        threading.Thread(target=sample_host, args=(stop_sampling, bundle/'host_samples.jsonl'),
+                         daemon=True).start()
         try:
             idle_fd = acquire_idle_inhibitor()
             preflight(bundle, state)
             run_stages(bundle, state, (*CHECK_STAGES, *ORDER), end)
-            state['offline_inputs'] = inventory(bundle)
+            state['offline_inputs'] = inventory(bundle, state)
             check_frozen(bundle)
             state['status'] = LIVE_COMPLETE
         except BaseException as error:
             state['status'] = 'stopped' if STOP_REQUESTED else 'failed'
             state['errors'].append(f'{type(error).__name__}: {error}')
         finally:
+            stop_sampling.set()
             finish_phase(bundle, state, 'live', started, started_utc)
             if idle_fd is not None:
                 os.close(idle_fd)
@@ -395,7 +542,8 @@ def run(bundle):
 
 def preflight(bundle, state):
     """Host, installation and matrix checks, then freeze implementation and inputs."""
-    host_available()
+    state.setdefault('host_checks', {})['preflight'] = host_available(
+        state.get('external_gpu_policy', 'stop'))
     check_installed()
     state['matrix'] = validate_matrix(bundle)
     atomic_json(bundle / 'frozen.json', {
@@ -409,7 +557,8 @@ def run_stages(bundle, state, stages, end):
     live_end = None
     for stage in stages:
         check_frozen(bundle)
-        host_available()
+        state.setdefault('host_checks', {})[stage] = host_available(
+            state.get('external_gpu_policy', 'stop'))
         proof = stage.startswith('check_')
         if not proof and live_end is None:
             live_end = min(time.monotonic()+LIVE_SEC, end-CLEANUP_SEC)
@@ -421,9 +570,10 @@ def run_stages(bundle, state, stages, end):
                    QUALIFICATION_ADMISSION_SEC=str(30 if proof else ADMISSION_SEC))
         state.update(status='checking-capture' if proof else 'running-live', current_stage=stage)
         atomic_json(bundle / 'campaign.json', state)
+        started_epoch = time.time()
         operation = owned_command([sys.executable, str(HERE/'sweep_entry.py'), str(bundle/'inputs'/f'{stage}.yaml'),
                                    '--skip-preflight-cleanup'], bundle/f'{stage}.log', env, stage_end)
-        operation['stage'] = stage
+        operation.update(stage=stage, epoch=[started_epoch, time.time()])
         state['operations'].append(operation)
         atomic_json(bundle/'campaign.json', state)
         if (operation['returncode'] or operation['deadline_or_stop']
@@ -433,7 +583,7 @@ def run_stages(bundle, state, stages, end):
         if manifest['sweep']['status'] != 'complete' or not manifest['lifecycle']['clean']:
             raise RuntimeError(f'{stage} has incomplete or unclean results')
         guard = read_json(bundle/f'{stage}_guard.json')
-        expected = set(CHECK_CONDITIONS) if proof else set(CONDITIONS)
+        expected = set(stage_conditions(state, stage))
         if guard.get('error') or set(guard.get('checked', {})) != expected:
             raise RuntimeError(f'{stage} is missing condition-level validation evidence')
 
@@ -483,21 +633,25 @@ def probe(bundle):
     return 0 if state['status'] == PROBE_COMPLETE else 1
 
 
-def inventory(bundle):
+def inventory(bundle, state):
     """The immutable live outputs a later offline phase may consume, by hash."""
     from ridgeback_autonomy.benchmarking.replay_artifacts import load_artifact
     datasets = {}
     for stage in ORDER:
-        sweep_dir = find_sweep(bundle, stage).parent
         for condition in CONDITIONS:
-            sensor = bundle/'captures'/stage/condition
+            key = f'{stage}/{condition}'
+            run_dir, sensor = condition_paths(bundle, state, stage, condition)
+            record = state.get('imported', {}).get(key)
+            if record and any(record[k] != v for k, v in _imported_hashes(run_dir, sensor).items()):
+                raise RuntimeError(f'Imported evidence changed since import: {key}')
             artifact = load_artifact(sensor, require_parent=False)
-            windows = sweep_dir/condition/'sampled_reference/sampled_windows.json'
-            datasets[f'{stage}/{condition}'] = {
+            windows = run_dir/'sampled_reference/sampled_windows.json'
+            datasets[key] = {
                 'sensor_capture': str(sensor), 'artifact_id': artifact.id,
-                'manifest_sha256': artifact.manifest_sha256, 'run_dir': str(sweep_dir/condition),
+                'manifest_sha256': artifact.manifest_sha256, 'run_dir': str(run_dir),
                 'sampled_windows_sha256': sha(windows),
                 'capture_bytes': sum(f.stat().st_size for f in sensor.rglob('*') if f.is_file()),
+                'imported_from': record['source_bundle'] if record else None,
                 # Repetition 2 is retained evidence; only repetition 1 is replayed.
                 'offline': stage.endswith('_r1')}
     atomic_json(bundle/'offline_inputs.json', datasets)
@@ -539,7 +693,7 @@ def run_offline(bundle):
         try:
             idle_fd = acquire_idle_inhibitor()
             check_frozen(bundle)
-            host_available()
+            host_available(state.get('external_gpu_policy', 'stop'))
             verify_inventory(bundle)
             offline(bundle, state, started + remaining - CLEANUP_SEC)
             check_frozen(bundle)
@@ -636,6 +790,23 @@ def process_dataset(bundle, state, stage, condition, sensor, run_dir, deadline):
         raise RuntimeError('Identical frozen numeric evaluations differed')
 
 
+def stage_host_load(bundle, state):
+    """Per completed stage: host samples taken while it ran and how many saw external CUDA work."""
+    path = Path(bundle)/'host_samples.jsonl'
+    rows = [json.loads(line) for line in path.read_text().splitlines() if line.strip()] if path.exists() else []
+    result = {}
+    for operation in state.get('operations', []):
+        if 'epoch' not in operation:
+            continue
+        start, end = operation['epoch']
+        inside = [r for r in rows if start <= r['t'] <= end]
+        memory = [r['meminfo_kib']['MemAvailable'] for r in inside if 'meminfo_kib' in r]
+        result[operation['stage']] = {
+            'samples': len(inside), 'external_busy': sum(bool(r.get('external_busy')) for r in inside),
+            'min_mem_available_gib': round(min(memory) / 1024**2, 1) if memory else None}
+    return result
+
+
 def report(bundle):
     bundle = Path(bundle)
     state = read_json(bundle/'campaign.json')
@@ -646,18 +817,18 @@ def report(bundle):
         atomic_json(bundle/'campaign.json', state)
     comparisons = {}
     for backend in ('gz', 'isaac'):
-        try:
-            first = find_sweep(bundle, backend+'_r1').parent
-            second = find_sweep(bundle, backend+'_r2').parent
-            for condition in CONDITIONS:
-                for estimator in ESTIMATORS:
-                    try:
-                        comparisons[f'{backend}/{condition}/{estimator}'] = repeatability(
-                            csv_rows(first/condition, estimator), csv_rows(second/condition, estimator))
-                    except (OSError, ValueError, KeyError) as error:
-                        comparisons[f'{backend}/{condition}/{estimator}'] = {'error': str(error)}
-        except ValueError:
-            continue
+        for condition in CONDITIONS:
+            try:
+                first, _sensor = condition_paths(bundle, state, backend+'_r1', condition)
+                second, _sensor = condition_paths(bundle, state, backend+'_r2', condition)
+            except ValueError:
+                continue
+            for estimator in ESTIMATORS:
+                try:
+                    comparisons[f'{backend}/{condition}/{estimator}'] = repeatability(
+                        csv_rows(first, estimator), csv_rows(second, estimator))
+                except (OSError, ValueError, KeyError) as error:
+                    comparisons[f'{backend}/{condition}/{estimator}'] = {'error': str(error)}
     atomic_json(bundle/'comparisons.json', comparisons)
     lines = ['# Overnight benchmark campaign', '', f"Execution status: **{state['status']}**", '',
              '16 full condition runs: Gazebo/Isaac × four conditions × two independent sessions.', '',
@@ -665,6 +836,15 @@ def report(bundle):
     for operation in state['operations']:
         lines.append(f"| {operation['stage']} | {operation['returncode']} | {operation['wall_sec']:.1f} | {operation['leftover_pids']} |")
     lines += ['', '## Problems', ''] + (['- '+e for e in state['errors']] or ['No execution error recorded.'])
+    lines += ['', '## Sessions and host load', '',
+              f"External CUDA work: **{state.get('external_gpu_policy', 'stop')}** "
+              '(another simulator/perception job or low disk always stops the campaign).']
+    for key, record in state.get('imported', {}).items():
+        lines.append(f"- `{key}` is imported from `{record['source_bundle']}` (revision "
+                     f"{record['source_revision']}); the stage's other conditions run in their own session.")
+    for stage, load in stage_host_load(bundle, state).items():
+        lines.append(f"- {stage}: another user's CUDA process above 5% SM in {load['external_busy']}/"
+                     f"{load['samples']} host samples; minimum MemAvailable {load['min_mem_available_gib']} GiB.")
     if state['status'] == LIVE_COMPLETE:
         lines += ['', '## Next step', '',
                   'Live collection is complete; offline processing has not run. It consumes the '
@@ -684,8 +864,10 @@ def report(bundle):
         path = bundle/f'{stage}_guard.json'
         checked = read_json(path).get('checked', {}) if path.exists() else {}
         for condition in CONDITIONS:
-            result = checked.get(condition)
-            lines.append(f"| {stage}/{condition} | {'yes' if result else 'pending'} | "
+            imported = state.get('imported', {}).get(f'{stage}/{condition}')
+            result = imported['validation'] if imported else checked.get(condition)
+            status = 'imported' if imported else 'yes' if result else 'pending'
+            lines.append(f"| {stage}/{condition} | {status} | "
                          f"{result['window_events'] if result else '—'} | "
                          f"{result.get('sampled_batches', '—') if result else '—'} |")
     lines += ['', '## Repeatability', '',
@@ -737,7 +919,7 @@ def start(bundle, action='run'):
         verify_inventory(bundle)
         suffix, runtime = '-offline', remaining_budget(state)
     check_installed()
-    host_available()
+    host_available(state.get('external_gpu_policy', 'stop'))
     unit = 'ridgeback-qualification-'+bundle.name.replace('_','-')+suffix
     launch = bundle/('launch.sh' if action == 'run' else 'launch_offline.sh')
     import shlex
@@ -763,11 +945,22 @@ def start(bundle, action='run'):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('action', choices=(
-        'prepare', 'check', 'probe', 'start', 'run', 'start-offline', 'offline', 'report'))
+        'prepare', 'import', 'allow-external-gpu', 'check', 'probe', 'start', 'run', 'start-offline',
+        'offline', 'report'))
     parser.add_argument('bundle', type=Path)
+    parser.add_argument('--from', dest='source', type=Path, help='import: earlier campaign bundle')
+    parser.add_argument('--stage', help='import: full-run stage, e.g. gz_r1')
+    parser.add_argument('--conditions', help='import: comma-separated completed conditions')
     args = parser.parse_args()
     if args.action == 'prepare':
         print(prepare(args.bundle))
+    elif args.action == 'import':
+        if not (args.source and args.stage and args.conditions):
+            parser.error('import needs --from, --stage and --conditions')
+        print(json.dumps(import_conditions(args.bundle, args.source, args.stage,
+                                           args.conditions.split(',')), indent=2))
+    elif args.action == 'allow-external-gpu':
+        allow_external_gpu(args.bundle)
     elif args.action == 'check':
         print(json.dumps({'matrix': validate_matrix(args.bundle),
                           'launch_status': 'prepared; sampled stereo/monocular capture checks have NOT run'}, indent=2))
