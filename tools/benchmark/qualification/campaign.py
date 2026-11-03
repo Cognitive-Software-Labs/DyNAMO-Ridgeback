@@ -87,6 +87,7 @@ def check_installed():
         ('ridgeback_autonomy', 'benchmarking/target_benchmark_sweep.py', 'target_benchmark_sweep'),
         ('ridgeback_localization', 'mask_measurement_node.py', 'target_mask_measurement_node'),
         ('ridgeback_localization', 'detector_node.py', 'target_detector_node'),
+        ('ridgeback_localization', 'overlay_node.py', 'target_overlay_node'),
     )
     for package, source, executable in pairs:
         a = ROOT / 'src' / package / package / source

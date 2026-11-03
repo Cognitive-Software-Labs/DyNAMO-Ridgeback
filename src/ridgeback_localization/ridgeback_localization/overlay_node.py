@@ -25,6 +25,7 @@ from ridgeback_common.messages import (
     polar_beam_booleans,
 )
 from ridgeback_common.stamps import stamp_key
+from ridgeback_common.ros_signals import init_owned, shielded, spin_until_interrupted
 from ridgeback_common.tf_utils import lookup_transform_components
 from ridgeback_interfaces.msg import PolarBeams, TargetMeasurements
 from ridgeback_localization.core.image_utils import (
@@ -514,16 +515,16 @@ class TargetOverlayNode(Node):
         self.get_logger().warn(warning)
 
 def main() -> None:
-    rclpy.init()
+    init_owned()
     node = TargetOverlayNode()
     try:
-        rclpy.spin(node)
+        spin_until_interrupted(node)
     except (KeyboardInterrupt, ExternalShutdownException):
         pass
     finally:
-        node.destroy_node()
-        if rclpy.ok():
-            rclpy.shutdown()
+        with shielded(final=True):
+            node.destroy_node()
+            rclpy.try_shutdown()
 
 
 if __name__ == '__main__':
