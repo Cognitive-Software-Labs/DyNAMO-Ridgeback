@@ -246,3 +246,4 @@ receive another allocation on launch.
 ## Archived evidence
 
 - [Sampled capture and live-scan parity, 2026-11-03](../../archive/engineering/sampled_capture_live_scan_parity_20261103.md)
+- [Qualification campaign stopped by systemd-oomd, 2026-11-03](../../archive/engineering/2026-11-03-qualification-oom.md)
