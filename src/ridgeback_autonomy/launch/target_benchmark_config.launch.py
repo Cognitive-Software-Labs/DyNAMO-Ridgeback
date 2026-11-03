@@ -36,6 +36,10 @@ from ridgeback_autonomy.benchmarking.backends import (
 )
 from ridgeback_autonomy.benchmarking.paths import default_output_directory
 from ridgeback_autonomy.benchmarking.replay import REPLAY_CAPTURE_BATCHES_DEFAULT
+from ridgeback_autonomy.benchmarking.sampled_capture import (
+    SENSOR_CAPTURE_MODE_QUOTA,
+    SENSOR_CAPTURE_MODES,
+)
 from ridgeback_localization.estimator_registry import (
     parse_estimators,
     selected_mask_estimators,
@@ -45,6 +49,7 @@ from ridgeback_localization.estimator_registry import (
 )
 from ridgeback_autonomy.localization_launch import (
     ALIGNED_DEPTH_DEBUG_TOPIC,
+    ALIGNED_DEPTH_SOURCE_DEBUG_TOPIC,
     CONFIG_LAUNCH_ARGUMENT_NAMES,
     MASK_MEASUREMENTS_TOPIC,
     POINTCLOUD_MEASUREMENTS_TOPIC,
@@ -233,8 +238,10 @@ def build_benchmark_nodes(context, *args, environment: BenchmarkEnvironment, **k
             'capture_batches': LaunchConfiguration('capture_batches'),
             'capture_drain_sec': LaunchConfiguration('capture_drain_sec'),
             'capture_timeout_sec': LaunchConfiguration('capture_timeout_sec'),
+            'sensor_capture_mode': LaunchConfiguration('sensor_capture_mode'),
             'raw_detections_topic': RAW_DETECTIONS_TOPIC,
             'aligned_depth_debug_topic': ALIGNED_DEPTH_DEBUG_TOPIC,
+            'aligned_depth_source_topic': ALIGNED_DEPTH_SOURCE_DEBUG_TOPIC,
             'camera_info_topic': camera_inputs.color_camera_info_topic,
             'camera_profile': LaunchConfiguration('camera_profile'),
             # The same scan the mask node measures from, so a sensor capture
@@ -449,6 +456,13 @@ def generate_launch_description():
         DeclareLaunchArgument(
             'capture_timeout_sec', default_value='30.0',
             description='Hard stall bound for one replay-capture trial',
+        ),
+        DeclareLaunchArgument(
+            'sensor_capture_mode', default_value=SENSOR_CAPTURE_MODE_QUOTA,
+            choices=list(SENSOR_CAPTURE_MODES),
+            description=(
+                'quota ends the window at capture_batches; sampled_window keeps '
+                'capture_sec and stores only its first capture_batches batches'),
         ),
         DeclareLaunchArgument(
             'depth_topic', default_value=SIMULATION_CAMERA_INPUTS.aligned_depth_topic),

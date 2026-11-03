@@ -21,40 +21,55 @@ model/estimator defaults, 2-second settling and 10-second wall-clock captures ar
 fixed. Projective ranging, Euclidean reconstruction and polar profiling run together;
 pointcloud is excluded. GUI, RViz/overlays, video and diagnostics stay enabled.
 
-Both repetitions record typed sensor parents so capture overhead and input
-handling are matched between repetitions. Automatic replay uses the first
-repetition's eight parents; the second set is retained as evidence. Every
-simulator/condition receives its own capture directory. Repetition 2 never resumes
-or reuses repetition 1. Automatic retries or replacement runs are disabled.
+Every condition of both repetitions stores a bounded sample of its live
+windows, so capture overhead and input handling are matched between
+repetitions. The later offline phase replays the first repetition's eight
+samples; the second set is retained as evidence. Every simulator/condition
+receives its own capture directory. Repetition 2 never resumes or reuses
+repetition 1. Automatic retries or replacement runs are disabled.
 
-## Capture readiness is mandatory
+## Sampled-window capture
 
-The existing quota-based, stereoscopic-only typed recorder is insufficient for
-this campaign. Both first-event context retention and timed monocular capture
-must be established before a full run begins. The helper does not implement
-those recorder changes.
-
-Before the full matrix, two short capture-check configurations run in each
-simulator: box/stereo for 4 seconds and box/monocular for 6 seconds, on `multi_04`.
-The actual capture-window durations must follow those settings within 0.5 seconds.
-Each must provide live measurement batches, correct depth-source identity,
-640×480 dimensions and complete RGB/depth/calibration/transforms/scan for every
-nonempty detection batch. Empty detections remain legitimate events; explicit
-unused missing channels in those batches are counted rather than hidden.
-
-The unequal durations distinguish timed capture from the old five-batch quota.
-These checks are functional readiness checks, not additional full repetitions or
-a replacement timing study. They run before spending time on the 16 full runs.
-
-If the recorder fix introduces launch arguments, put only those established
-arguments in
 [`capture_arguments.yaml`](../../tools/benchmark/qualification/capture_arguments.yaml)
-**before preparing the final bundle**. They are applied to capture-enabled
-configurations. A pending bundle generated before that change must be regenerated;
-do not alter a running campaign. With current recorder behavior the readiness
-checks should fail; successful execution has not yet been demonstrated.
+applies `sensor_capture_mode: sampled_window` and `capture_batches: 5` to every
+configuration, checks included. Each trial keeps its 10-second wall-clock live
+window and scores it exactly as an uncaptured run would. The runner stores only
+the first five raw batches delivered inside that window, empty ones included,
+with their exact RGB, float32 depth, calibration, transforms and scan; a bounded
+drain after the deadline may complete only those batches. The
+[replay profile reference](profiles.md#sampled-window-capture) owns the recorder
+contract, including the sampled live reference written beside each run's
+full-window CSVs and the depth-source record that freezes monocular depth with
+the usable ceiling the live node declared.
 
-## Preparation and launch
+A batch the live mask node never measured has no live record and keeps its
+depth explicitly absent. The node keeps only its newest pending batch, so this
+happens while Depth Anything loads on a configuration's first non-empty batch,
+which can overlap the start of the first trial's window. Such a trial is
+reported as inconclusive for replay parity; it is not a capture failure and is
+never counted as a pass.
+
+## Readiness checks
+
+Before the full matrix, three short configurations run in each simulator on
+`multi_04`: box/stereo for 4 seconds, box/monocular and silhouette/monocular for
+6 seconds. Each check must show:
+
+- a measurement window within 0.5 seconds of its setting, timed apart from the
+  sample drain, and more live raw batches than the five it stored;
+- the full five-batch sample, the expected depth source, and 640×480 grids;
+- complete RGB, calibration, transforms and scan for every non-empty sampled
+  batch, and depth wherever the live node produced it, each frame carrying the
+  live source's record (a finite ceiling for monocular, none for stereo);
+- a hashed sampled live reference whose stamps equal the stored events and
+  whose live records measured the stored boxes.
+
+Empty detections remain legitimate events; unused missing channels in them are
+counted rather than hidden. The full runs apply the same guards except the
+beyond-the-sample comparison. These are functional readiness checks, not
+additional full repetitions or a replacement timing study.
+
+## Preparation, probe and launch
 
 From the workspace root, with ROS and the installed workspace sourced:
 
@@ -71,7 +86,18 @@ historical fixed time estimate. The generated `inputs/` contains the four full
 sweeps and two short capture-check sweeps. The prepared `REPORT.md` is an explicit
 pending report.
 
-After capture integration is verified and the workstation is available:
+A readiness probe runs on its own separately prepared bundle. It executes only
+the two check sweeps and then replays their samples offline exactly as the later
+offline phase would, so it starts simulators but never a full block. The probe
+bundle ends as `probe-complete-not-a-campaign` and can never be launched:
+
+```bash
+tools/gpu-run /usr/bin/python3 tools/benchmark/qualification/campaign.py probe \
+  artifacts/benchmarks/qualification_probe
+```
+
+After a successful probe and with the workstation available, launch the live
+phase from a freshly prepared bundle:
 
 ```bash
 python3 tools/benchmark/qualification/campaign.py start \
@@ -125,20 +151,55 @@ missing warm model work, unplayable video or unclean shutdown stop the campaign.
 Expected detector misses and estimator no-value outcomes are not infrastructure
 failures.
 
+## Live and offline phases
+
+The live phase (`start`, or `run` in the foreground) runs the checks and the
+four blocks and stops. On success its status is `live-complete-offline-pending`;
+`offline_inputs.json` inventories every sample by artifact ID, manifest hash,
+sampled-reference hash and size, and `REPORT.md` names the next command:
+
+```bash
+python3 tools/benchmark/qualification/campaign.py start-offline \
+  artifacts/benchmarks/qualification_prepared
+```
+
+`start-offline` (or `offline` in the foreground) accepts only that status. It
+verifies that the implementation, inputs and inventoried evidence are unchanged
+and then runs only mask materialization and numeric replay; it never starts a
+simulator or repeats a live condition. Each phase's elapsed workstation time is
+persisted, and the offline phase receives only what remains of the same
+allocation, never a fresh one. Neither phase can be run twice on a bundle.
+
 ## Automatic results
 
 `REPORT.md` is regenerated on normal completion and failure, including a service
 post-stop hook. `campaign.json` retains operation commands, exit status, elapsed
-time, ownership and errors. Per-stage guard files contain run checks, captured
-event counts and final model-stage diagnostic summaries. Original sweep manifests,
-CSV rows, images, videos and ROS/console logs remain intact.
+time per phase, remaining budget, ownership and errors. Per-stage guard files
+contain run checks, window and sample counts, measurement and drain durations
+and final model-stage diagnostic summaries. Original sweep manifests, full-window
+CSV rows, sampled references, images, videos and ROS/console logs remain intact.
 
-After all live blocks, eight first-repetition sensor parents are processed using
-the corresponding box or real SlimSAM mask producer, then all three estimators
-are evaluated with one numeric worker. Trial/instance CSV keys, outcomes, reasons,
-counts, truth and estimates are compared with live results. The technical numeric
-parity tolerance is 0.0001 absolute (0.1 mm for metre-valued columns), with zero
-relative tolerance. This is separate from scientific repeatability margins.
+The offline phase processes the eight first-repetition samples using the
+corresponding box or real SlimSAM mask producer, then evaluates all three
+estimators with one numeric worker over the frozen depth. Event identity is
+checked first: stored stamps against the sampled stamps, payload hashes, and
+each live record against its raw boxes. Two numeric comparisons follow:
+
+- **Per event:** every sampled batch the live node measured is replayed with the
+  exact variant arguments of the numeric replay and compared, box by box, with
+  its own live record: every estimator's status, distance, forward and lateral.
+  Batches without a live record are counted, not compared. Polar differences on
+  an event whose live row used another scan than the frozen one are counted
+  separately as attribution; they still fail.
+- **Per trial:** trial/instance CSV keys, outcomes, reasons, counts, truth and
+  estimates are compared with the **sampled live reference**, over trials whose
+  every sampled batch has a live record; the others are listed. The full-window
+  CSVs are kept for repeatability and never used for parity.
+
+A dataset with nothing compared is reported inconclusive, never passed. The
+technical numeric parity tolerance is 0.0001 absolute (0.1 mm for metre-valued
+columns), with zero relative tolerance. This is separate from scientific
+repeatability margins. Any mismatch stops the offline phase.
 
 Numeric evaluation is repeated against the same immutable parent/cache, requiring
 exact CSV equality for the compared numeric/outcome columns. No second model
@@ -146,14 +207,42 @@ materialization is done merely for that determinism check. `comparisons.json`
 summarizes the two independent live repetitions without inventing scientific
 acceptance thresholds.
 
-Trial-level parity is narrower than full per-event parity: the current saved live
-reports do not prove every event's numeric output and association identical. Full
-per-event comparison, declared repeatability margins, camera/LiDAR visibility and
-occlusion auditing, and deliberate cancellation/pending-request qualification
-remain explicit pending items. The helper never upgrades those claims to passed.
+Parity covers the stored sample only, not every batch of the live window.
+Declared repeatability margins, camera/LiDAR visibility and occlusion auditing,
+and deliberate cancellation/pending-request qualification remain explicit
+pending items. The
+helper never upgrades those claims to passed. Frozen-depth replay qualifies the
+estimators over predicted monocular depth; it does not evaluate another
+monocular model or show that a second inference would be identical.
 Three-replication remote/physical-seat equivalence is outside this two-repetition
 campaign.
 
-No full overnight campaign has yet been demonstrated. Preparation and software
-tests establish the orchestration and rejection paths; capture readiness and
-actual overnight outcomes must supply the remaining runtime evidence.
+## Readiness status
+
+The 2026-11-03 probe at
+`artifacts/benchmarks/sampled_capture_probe_20261103_live_scan_fix/` passed with
+status `probe-complete-not-a-campaign` and no errors. Sampled capture now
+retains the exact scan selected live, including when a closer scan arrives later.
+
+- **Gazebo: ready for live collection.** All three short-condition guards,
+  per-event replay comparisons and fixed-input numeric checks passed. Twelve of
+  fifteen stored batches had live results; the three unmeasured box/monocular
+  batches remain explicit, and that trial's aggregate parity is inconclusive.
+- **Isaac: ready for live collection.** All three short-condition guards,
+  per-event replay comparisons and fixed-input numeric checks passed. All
+  fifteen stored batches had live results, including matching polar profiling.
+
+Across both simulators, the largest compared coordinate difference was below
+5×10⁻⁷ m; the existing 0.0001 tolerance was unchanged. Measurement windows were
+within 0.6 ms of their settings. Both simulator sessions shut down cleanly,
+without outer escalation or owned leftovers. The complete probe took 176.6 s.
+
+These checks establish capture mechanics and replay on one scene per condition.
+The full live runs and deferred offline phase must supply the remaining evidence;
+readiness is not a completed scientific qualification verdict. Charge measured
+preparation probes to the launch bundle's prior-phase budget so they do not
+receive another allocation on launch.
+
+## Archived evidence
+
+- [Sampled capture and live-scan parity, 2026-11-03](../../archive/engineering/sampled_capture_live_scan_parity_20261103.md)

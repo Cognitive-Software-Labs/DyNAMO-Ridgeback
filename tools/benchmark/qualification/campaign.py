@@ -17,7 +17,10 @@ import time
 import psutil
 import yaml
 
-from evidence import CONDITIONS, ESTIMATORS, csv_rows, compare_rows, read_json, repeatability
+from evidence import (
+    CHECK_CONDITIONS, CONDITIONS, ESTIMATORS, SAMPLE_BATCHES, compare_rows, csv_rows, event_parity,
+    read_json, repeatability, sampled_identity, without_trials,
+)
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[2]
@@ -28,6 +31,11 @@ LIVE_SEC = 9 * 3600
 CLEANUP_SEC = 180
 ADMISSION_SEC = 35 * 60
 STOP_REQUESTED = False
+LIVE_COMPLETE = 'live-complete-offline-pending'
+PROBE_COMPLETE = 'probe-complete-not-a-campaign'
+CHECK_STAGES = ('check_gz', 'check_isaac')
+# A readiness probe runs only the short checks and their offline replay.
+PROBE_SEC = 3600
 
 
 def atomic_json(path, value):
@@ -116,20 +124,21 @@ def prepare(bundle):
             config.update(overrides)
             config['sensor_capture_dir'] = str(bundle / 'captures' / name / config['name'])
         (bundle / 'inputs' / f'{name}.yaml').write_text(yaml.safe_dump(document, sort_keys=False))
-    # Four short capture checks precede all full runs. Their unequal durations
-    # check that capture follows time, rather than the old fixed batch quota.
+    # Short capture checks precede all full runs, both monocular mask paths
+    # included. Their unequal durations check that the live window follows
+    # time while the stored sample stays at the batch bound.
     for backend in ('gz', 'isaac'):
         document = yaml.safe_load((bundle / 'inputs' / f'{backend}_r1.yaml').read_text())
         document['sweep']['name'] = f'capture_check_{backend}'
         document['defaults'].update(scene_ids='multi_04', output_dir=str(bundle / f'check_{backend}'))
-        document['configs'] = [dict(document['configs'][index]) for index in (0, 2)]
-        for config, duration in zip(document['configs'], (4.0, 6.0)):
+        document['configs'] = [dict(c) for c in document['configs'] if c['name'] in CHECK_CONDITIONS]
+        for config, duration in zip(document['configs'], (4.0, 6.0, 6.0)):
             config['capture_sec'] = duration
             config['sensor_capture_dir'] = str(bundle / 'check_captures' / backend / config['name'])
         (bundle / 'inputs' / f'check_{backend}.yaml').write_text(yaml.safe_dump(document, sort_keys=False))
     atomic_json(bundle / 'campaign.json', {
         'schema': 'ridgeback-qualification-campaign/1', 'status': 'prepared-not-launched',
-        'order': list(ORDER), 'operations': [], 'validated': {}, 'errors': [],
+        'order': list(ORDER), 'operations': [], 'validated': {}, 'errors': [], 'phases': {},
         'budget_sec': TOTAL_SEC, 'live_budget_sec': LIVE_SEC, 'timing_already_spent_sec': TIMING_SPENT_SEC,
         'qualification_verdict': 'pending; capture checks, scene audit and acceptance margins are unresolved',
     })
@@ -162,6 +171,9 @@ def validate_matrix(bundle):
                 raise ValueError('Mask/depth settings differ from the named condition')
             if args['repeats'] != '1':
                 raise ValueError('Run replications must not change within-scene repeats')
+            if (args.get('sensor_capture_mode') != 'sampled_window'
+                    or args.get('capture_batches') != str(SAMPLE_BATCHES)):
+                raise ValueError('Every condition must store the same bounded sampled-window capture')
             scenes = select_scenes(load_scenarios(args['scenario']), parse_scene_ids(args.get('scene_ids', '')))
             count = len(build_trials(scenes, int(args['repeats'])))
             if args['estimators'] != ','.join(ESTIMATORS):
@@ -172,11 +184,14 @@ def validate_matrix(bundle):
             if spec.defaults['detector_debug'] != 'true':
                 raise ValueError('Detector diagnostics must remain enabled')
             trials.append(count)
-        expected = [1, 1] if path.stem.startswith('check_') else [109] * 4
+        check = path.stem.startswith('check_')
+        expected = [1] * len(CHECK_CONDITIONS) if check else [109] * 4
         if trials != expected:
             raise ValueError(f'{path.name}: expected {expected}, got {trials}')
-        if not path.stem.startswith('check_') and tuple(c.name for c in spec.configs) != CONDITIONS:
-            raise ValueError('The four-condition matrix changed')
+        if tuple(c.name for c in spec.configs) != (CHECK_CONDITIONS if check else CONDITIONS):
+            raise ValueError('The condition matrix changed')
+        if not check and any(c.arguments['capture_sec'] != '10.0' for c in spec.configs):
+            raise ValueError('Full runs must keep the 10-second live window')
         counts[path.stem] = trials
     return counts
 
@@ -310,78 +325,229 @@ def find_sweep(bundle, stage):
     return paths[0]
 
 
+def spent(state):
+    """Workstation seconds already used by this campaign's phases."""
+    return sum(phase['elapsed_sec'] for phase in state.get('phases', {}).values())
+
+
+def remaining_budget(state):
+    return TOTAL_SEC - spent(state)
+
+
+def finish_phase(bundle, state, name, started, started_utc):
+    state.setdefault('phases', {})[name] = {
+        'started_utc': started_utc, 'finished_utc': datetime.now(timezone.utc).isoformat(),
+        'elapsed_sec': time.monotonic() - started}
+    state.update(elapsed_sec=spent(state), budget_remaining_sec=remaining_budget(state),
+                 finished_utc=state['phases'][name]['finished_utc'])
+    atomic_json(bundle/'campaign.json', state)
+    report(bundle)
+
+
+def workstation_lock():
+    lock_path = ROOT / 'artifacts/benchmarks/.qualification-workstation.lock'
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    lock = lock_path.open('w')
+    fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    return lock
+
+
+def install_stop_handlers():
+    def stop(_signal, _frame):
+        global STOP_REQUESTED
+        STOP_REQUESTED = True
+    return {sig: signal.signal(sig, stop) for sig in (signal.SIGINT, signal.SIGTERM)}
+
+
 def run(bundle):
-    global STOP_REQUESTED
+    """The live phase only: checks and the four blocks, never offline processing."""
     bundle = Path(bundle).resolve()
     state = read_json(bundle / 'campaign.json')
     if state['status'] != 'prepared-not-launched':
         raise RuntimeError('Campaign already launched. Preserve it; resume needs review, not automatic retry.')
-    def stop(_signal, _frame):
-        global STOP_REQUESTED
-        STOP_REQUESTED = True
-    previous = {sig: signal.signal(sig, stop) for sig in (signal.SIGINT, signal.SIGTERM)}
-    lock_path = ROOT / 'artifacts/benchmarks/.qualification-workstation.lock'
-    lock_path.parent.mkdir(parents=True, exist_ok=True)
-    with lock_path.open('w') as lock:
-        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    previous = install_stop_handlers()
+    with workstation_lock():
         started = time.monotonic()
-        end = started + TOTAL_SEC
-        state.update(status='running-preflight', started_utc=datetime.now(timezone.utc).isoformat())
+        started_utc = datetime.now(timezone.utc).isoformat()
+        end = started + remaining_budget(state)
+        state.update(status='running-preflight', started_utc=started_utc)
         atomic_json(bundle / 'campaign.json', state)
         idle_fd = None
         try:
             idle_fd = acquire_idle_inhibitor()
-            host_available()
-            check_installed()
-            state['matrix'] = validate_matrix(bundle)
-            atomic_json(bundle / 'frozen.json', {
-                'files': frozen_files(bundle),
-                'revision': subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip(),
-                'dirty_patch': subprocess.check_output(['git', 'diff', '--binary', '--', 'src', 'tools/benchmark/qualification'], cwd=ROOT, text=True),
-            })
-            live_end = None
-            for stage in ('check_gz', 'check_isaac', *ORDER):
-                check_frozen(bundle)
-                host_available()
-                proof = stage.startswith('check_')
-                if not proof and live_end is None:
-                    live_end = min(time.monotonic()+LIVE_SEC, end-CLEANUP_SEC)
-                stage_end = min(time.monotonic()+(240 if proof else 8100),
-                                end-CLEANUP_SEC, end if proof else live_end)
-                env = environment(bundle, 'isaac' if 'isaac' in stage else 'gz')
-                env.update(QUALIFICATION_BUNDLE=str(bundle), QUALIFICATION_STAGE=stage,
-                           QUALIFICATION_STOP_AT=str(stage_end-90),
-                           QUALIFICATION_ADMISSION_SEC=str(30 if proof else ADMISSION_SEC))
-                state.update(status='checking-capture' if proof else 'running-live', current_stage=stage)
-                atomic_json(bundle / 'campaign.json', state)
-                operation = owned_command([sys.executable, str(HERE/'sweep_entry.py'), str(bundle/'inputs'/f'{stage}.yaml'),
-                                           '--skip-preflight-cleanup'], bundle/f'{stage}.log', env, stage_end)
-                operation['stage'] = stage
-                state['operations'].append(operation)
-                atomic_json(bundle/'campaign.json', state)
-                if (operation['returncode'] or operation['deadline_or_stop']
-                        or operation['leftover_pids'] or operation['outer_escalated']):
-                    raise RuntimeError(f'{stage} stopped; inspect {stage}.log and guard.json')
-                manifest = read_json(find_sweep(bundle, stage))
-                if manifest['sweep']['status'] != 'complete' or not manifest['lifecycle']['clean']:
-                    raise RuntimeError(f'{stage} has incomplete or unclean results')
-                guard = read_json(bundle/f'{stage}_guard.json')
-                expected = {'box_stereo', 'box_monocular'} if proof else set(CONDITIONS)
-                if guard.get('error') or set(guard.get('checked', {})) != expected:
-                    raise RuntimeError(f'{stage} is missing condition-level validation evidence')
-            state['status'] = 'processing-offline'
-            atomic_json(bundle/'campaign.json', state)
-            offline(bundle, state, end-CLEANUP_SEC)
+            preflight(bundle, state)
+            run_stages(bundle, state, (*CHECK_STAGES, *ORDER), end)
+            state['offline_inputs'] = inventory(bundle)
             check_frozen(bundle)
-            state['status'] = 'execution-complete-review-required'
+            state['status'] = LIVE_COMPLETE
         except BaseException as error:
             state['status'] = 'stopped' if STOP_REQUESTED else 'failed'
             state['errors'].append(f'{type(error).__name__}: {error}')
         finally:
-            state.update(elapsed_sec=time.monotonic()-started,
-                         finished_utc=datetime.now(timezone.utc).isoformat())
-            atomic_json(bundle/'campaign.json', state)
-            report(bundle)
+            finish_phase(bundle, state, 'live', started, started_utc)
+            if idle_fd is not None:
+                os.close(idle_fd)
+            for sig, handler in previous.items():
+                signal.signal(sig, handler)
+    return 0 if state['status'] == LIVE_COMPLETE else 1
+
+
+def preflight(bundle, state):
+    """Host, installation and matrix checks, then freeze implementation and inputs."""
+    host_available()
+    check_installed()
+    state['matrix'] = validate_matrix(bundle)
+    atomic_json(bundle / 'frozen.json', {
+        'files': frozen_files(bundle),
+        'revision': subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip(),
+        'dirty_patch': subprocess.check_output(['git', 'diff', '--binary', '--', 'src', 'tools/benchmark/qualification'], cwd=ROOT, text=True),
+    })
+
+
+def run_stages(bundle, state, stages, end):
+    live_end = None
+    for stage in stages:
+        check_frozen(bundle)
+        host_available()
+        proof = stage.startswith('check_')
+        if not proof and live_end is None:
+            live_end = min(time.monotonic()+LIVE_SEC, end-CLEANUP_SEC)
+        stage_end = min(time.monotonic()+(240 if proof else 8100),
+                        end-CLEANUP_SEC, end if proof else live_end)
+        env = environment(bundle, 'isaac' if 'isaac' in stage else 'gz')
+        env.update(QUALIFICATION_BUNDLE=str(bundle), QUALIFICATION_STAGE=stage,
+                   QUALIFICATION_STOP_AT=str(stage_end-90),
+                   QUALIFICATION_ADMISSION_SEC=str(30 if proof else ADMISSION_SEC))
+        state.update(status='checking-capture' if proof else 'running-live', current_stage=stage)
+        atomic_json(bundle / 'campaign.json', state)
+        operation = owned_command([sys.executable, str(HERE/'sweep_entry.py'), str(bundle/'inputs'/f'{stage}.yaml'),
+                                   '--skip-preflight-cleanup'], bundle/f'{stage}.log', env, stage_end)
+        operation['stage'] = stage
+        state['operations'].append(operation)
+        atomic_json(bundle/'campaign.json', state)
+        if (operation['returncode'] or operation['deadline_or_stop']
+                or operation['leftover_pids'] or operation['outer_escalated']):
+            raise RuntimeError(f'{stage} stopped; inspect {stage}.log and guard.json')
+        manifest = read_json(find_sweep(bundle, stage))
+        if manifest['sweep']['status'] != 'complete' or not manifest['lifecycle']['clean']:
+            raise RuntimeError(f'{stage} has incomplete or unclean results')
+        guard = read_json(bundle/f'{stage}_guard.json')
+        expected = set(CHECK_CONDITIONS) if proof else set(CONDITIONS)
+        if guard.get('error') or set(guard.get('checked', {})) != expected:
+            raise RuntimeError(f'{stage} is missing condition-level validation evidence')
+
+
+def probe(bundle):
+    """Readiness probe on its own bundle: the short checks and their offline replay.
+
+    Never a full block. The bundle ends as a probe and cannot be launched as a
+    campaign, so a launch always starts from a freshly prepared bundle.
+    """
+    bundle = Path(bundle).resolve()
+    state = read_json(bundle / 'campaign.json')
+    if state['status'] != 'prepared-not-launched':
+        raise RuntimeError('Probe needs a freshly prepared bundle')
+    previous = install_stop_handlers()
+    with workstation_lock():
+        started = time.monotonic()
+        started_utc = datetime.now(timezone.utc).isoformat()
+        deadline = started + PROBE_SEC
+        state.update(status='probing', started_utc=started_utc)
+        atomic_json(bundle / 'campaign.json', state)
+        idle_fd = None
+        try:
+            idle_fd = acquire_idle_inhibitor()
+            preflight(bundle, state)
+            for stage in CHECK_STAGES:
+                stage_started = time.monotonic()
+                run_stages(bundle, state, (stage,), deadline)
+                sweep_dir = find_sweep(bundle, stage).parent
+                for condition in CHECK_CONDITIONS:
+                    sensor = bundle/'check_captures'/stage.removeprefix('check_')/condition
+                    state.setdefault('probe', {})[f'{stage}/{condition}'] = {
+                        'capture_bytes': sum(f.stat().st_size for f in sensor.rglob('*') if f.is_file())}
+                    process_dataset(bundle, state, stage, condition, sensor, sweep_dir/condition, deadline)
+                state['probe'][stage] = {'wall_sec': time.monotonic()-stage_started}
+            check_frozen(bundle)
+            state['status'] = PROBE_COMPLETE
+        except BaseException as error:
+            state['status'] = 'probe-stopped' if STOP_REQUESTED else 'probe-failed'
+            state['errors'].append(f'{type(error).__name__}: {error}')
+        finally:
+            finish_phase(bundle, state, 'probe', started, started_utc)
+            if idle_fd is not None:
+                os.close(idle_fd)
+            for sig, handler in previous.items():
+                signal.signal(sig, handler)
+    return 0 if state['status'] == PROBE_COMPLETE else 1
+
+
+def inventory(bundle):
+    """The immutable live outputs a later offline phase may consume, by hash."""
+    from ridgeback_autonomy.benchmarking.replay_artifacts import load_artifact
+    datasets = {}
+    for stage in ORDER:
+        sweep_dir = find_sweep(bundle, stage).parent
+        for condition in CONDITIONS:
+            sensor = bundle/'captures'/stage/condition
+            artifact = load_artifact(sensor, require_parent=False)
+            windows = sweep_dir/condition/'sampled_reference/sampled_windows.json'
+            datasets[f'{stage}/{condition}'] = {
+                'sensor_capture': str(sensor), 'artifact_id': artifact.id,
+                'manifest_sha256': artifact.manifest_sha256, 'run_dir': str(sweep_dir/condition),
+                'sampled_windows_sha256': sha(windows),
+                'capture_bytes': sum(f.stat().st_size for f in sensor.rglob('*') if f.is_file()),
+                # Repetition 2 is retained evidence; only repetition 1 is replayed.
+                'offline': stage.endswith('_r1')}
+    atomic_json(bundle/'offline_inputs.json', datasets)
+    return datasets
+
+
+def verify_inventory(bundle):
+    from ridgeback_autonomy.benchmarking.replay_artifacts import load_artifact
+    inputs = read_json(bundle/'offline_inputs.json')
+    for key, dataset in inputs.items():
+        artifact = load_artifact(dataset['sensor_capture'], require_parent=False)
+        windows = Path(dataset['run_dir'])/'sampled_reference/sampled_windows.json'
+        if (artifact.id, artifact.manifest_sha256, sha(windows)) != (
+                dataset['artifact_id'], dataset['manifest_sha256'], dataset['sampled_windows_sha256']):
+            raise RuntimeError(f'Live evidence changed since the live phase: {key}')
+    return inputs
+
+
+def run_offline(bundle):
+    """The deferred offline phase: frozen live evidence only, within the remaining budget.
+
+    It starts no simulator and no live condition. It refuses unless the live
+    phase completed, and it never receives a fresh allocation.
+    """
+    bundle = Path(bundle).resolve()
+    state = read_json(bundle / 'campaign.json')
+    if state['status'] != LIVE_COMPLETE:
+        raise RuntimeError(f"Offline processing needs status {LIVE_COMPLETE}, not {state['status']}")
+    remaining = remaining_budget(state)
+    if remaining <= CLEANUP_SEC + 120:
+        raise RuntimeError('No workstation budget remains for offline processing')
+    previous = install_stop_handlers()
+    with workstation_lock():
+        started = time.monotonic()
+        started_utc = datetime.now(timezone.utc).isoformat()
+        state.update(status='processing-offline')
+        atomic_json(bundle / 'campaign.json', state)
+        idle_fd = None
+        try:
+            idle_fd = acquire_idle_inhibitor()
+            check_frozen(bundle)
+            host_available()
+            verify_inventory(bundle)
+            offline(bundle, state, started + remaining - CLEANUP_SEC)
+            check_frozen(bundle)
+            state['status'] = 'execution-complete-review-required'
+        except BaseException as error:
+            state['status'] = 'offline-stopped' if STOP_REQUESTED else 'offline-failed'
+            state['errors'].append(f'{type(error).__name__}: {error}')
+        finally:
+            finish_phase(bundle, state, 'offline', started, started_utc)
             if idle_fd is not None:
                 os.close(idle_fd)
             for sig, handler in previous.items():
@@ -390,59 +556,83 @@ def run(bundle):
 
 
 def offline(bundle, state, deadline):
+    inputs = read_json(bundle/'offline_inputs.json')
     for stage in ('gz_r1', 'isaac_r1'):
-        sweep_dir = find_sweep(bundle, stage).parent
         for condition in CONDITIONS:
-            check_frozen(bundle)
-            if STOP_REQUESTED or time.monotonic()+120 >= deadline:
-                raise RuntimeError('No remaining budget for another offline condition')
-            sensor = bundle/'captures'/stage/condition
-            cache = bundle/'masks'/stage/condition
-            cache.parent.mkdir(parents=True, exist_ok=True)
-            producer = 'slimsam' if condition.startswith('silhouette') else 'box'
-            commands = [([str(ROOT/'perception_venv/bin/python3'), '-m',
-                'ridgeback_autonomy.benchmarking.target_replay_materialize_masks', str(sensor),
-                '--producer', producer, '--output-dir', str(cache)], 'masks')]
-            job = {'job_version': 1, 'question': 'validate-live-replay', 'profile': 'mask-output',
-                   'inputs': {'sensor_capture': str(sensor), 'mask_caches': [str(cache)]},
-                   'sweep': {'sweep': {'name': f'{stage}_{condition}'}, 'configs': [
-                       {'name': 'matching_defaults', 'estimators': ','.join(ESTIMATORS)}]},
-                   'resources': {'measurement_workers': 1},
-                   'output_dir': str(bundle/'replay'/stage/condition)}
-            # Generated outputs are not part of the frozen live input set.
-            job_path = bundle / f'offline_{stage}_{condition}.yaml'
-            job_path.write_text(yaml.safe_dump(job, sort_keys=False))
-            commands.append(([sys.executable, '-m', 'ridgeback_autonomy.benchmarking.target_replay_benchmark',
-                              str(job_path)], 'numeric'))
-            for command, suffix in commands:
-                op = owned_command(command, bundle/f'{stage}_{condition}_{suffix}.log', environment(bundle), deadline)
-                state['operations'].append(dict(op, stage=f'{stage}_{condition}_{suffix}'))
-                atomic_json(bundle/'campaign.json', state)
-                if op['returncode'] or op['deadline_or_stop'] or op['leftover_pids'] or op['outer_escalated']:
-                    raise RuntimeError('Offline execution failed; retain inputs and diagnostics')
-            replay = bundle/'replay'/stage/condition/'results/matching_defaults'
-            parity = {key: compare_rows(csv_rows(sweep_dir/condition, key), csv_rows(replay, key))
-                      for key in ESTIMATORS}
-            state.setdefault('parity', {})[f'{stage}/{condition}'] = parity
-            atomic_json(bundle/'campaign.json', state)
-            if not all(result['passed'] for result in parity.values()):
-                raise RuntimeError(f'Trial-level replay mismatch: {stage}/{condition}')
-            repeat_output = bundle/'replay_repeat'/stage/condition
-            job['output_dir'] = str(repeat_output)
-            job_path = bundle/f'offline_repeat_{stage}_{condition}.yaml'
-            job_path.write_text(yaml.safe_dump(job, sort_keys=False))
-            op = owned_command([sys.executable, '-m', 'ridgeback_autonomy.benchmarking.target_replay_benchmark',
-                                str(job_path)], bundle/f'{stage}_{condition}_determinism.log',
-                               environment(bundle), deadline)
-            state['operations'].append(dict(op, stage=f'{stage}_{condition}_determinism'))
-            if op['returncode'] or op['deadline_or_stop'] or op['leftover_pids'] or op['outer_escalated']:
-                raise RuntimeError('Repeated fixed-input evaluation failed')
-            deterministic = {key: compare_rows(csv_rows(replay, key),
-                csv_rows(repeat_output/'results/matching_defaults', key), tolerance=0) for key in ESTIMATORS}
-            state.setdefault('fixed_input_checks', {})[f'{stage}/{condition}'] = deterministic
-            atomic_json(bundle/'campaign.json', state)
-            if not all(result['passed'] for result in deterministic.values()):
-                raise RuntimeError('Identical frozen numeric evaluations differed')
+            dataset = inputs[f'{stage}/{condition}']
+            process_dataset(bundle, state, stage, condition, Path(dataset['sensor_capture']),
+                            Path(dataset['run_dir']), deadline)
+
+
+def process_dataset(bundle, state, stage, condition, sensor, run_dir, deadline):
+    """Materialize, replay and compare one frozen sample with its sampled live reference."""
+    check_frozen(bundle)
+    if STOP_REQUESTED or time.monotonic()+120 >= deadline:
+        raise RuntimeError('No remaining budget for another offline condition')
+    key = f'{stage}/{condition}'
+    cache = bundle/'masks'/stage/condition
+    cache.parent.mkdir(parents=True, exist_ok=True)
+    producer = 'slimsam' if condition.startswith('silhouette') else 'box'
+    commands = [([str(ROOT/'perception_venv/bin/python3'), '-m',
+        'ridgeback_autonomy.benchmarking.target_replay_materialize_masks', str(sensor),
+        '--producer', producer, '--output-dir', str(cache)], 'masks')]
+    job = {'job_version': 1, 'question': 'validate-live-replay', 'profile': 'mask-output',
+           'inputs': {'sensor_capture': str(sensor), 'mask_caches': [str(cache)]},
+           'sweep': {'sweep': {'name': f'{stage}_{condition}'}, 'configs': [
+               {'name': 'matching_defaults', 'estimators': ','.join(ESTIMATORS)}]},
+           'resources': {'measurement_workers': 1},
+           'output_dir': str(bundle/'replay'/stage/condition)}
+    # Generated outputs are not part of the frozen live input set.
+    job_path = bundle / f'offline_{stage}_{condition}.yaml'
+    job_path.write_text(yaml.safe_dump(job, sort_keys=False))
+    commands.append(([sys.executable, '-m', 'ridgeback_autonomy.benchmarking.target_replay_benchmark',
+                      str(job_path)], 'numeric'))
+    for command, suffix in commands:
+        op = owned_command(command, bundle/f'{stage}_{condition}_{suffix}.log', environment(bundle), deadline)
+        state['operations'].append(dict(op, stage=f'{stage}_{condition}_{suffix}'))
+        atomic_json(bundle/'campaign.json', state)
+        if op['returncode'] or op['deadline_or_stop'] or op['leftover_pids'] or op['outer_escalated']:
+            raise RuntimeError('Offline execution failed; retain inputs and diagnostics')
+    replay = bundle/'replay'/stage/condition/'results/matching_defaults'
+    # Identity first: numbers are compared only for the stored stamps,
+    # against the sampled live reference, never the full-window CSV.
+    identity = sampled_identity(sensor, run_dir)
+    result = {'identity': identity, 'estimators': {}}
+    state.setdefault('parity', {})[key] = result
+    atomic_json(bundle/'campaign.json', state)
+    if not identity['passed']:
+        raise RuntimeError(f'Sampled event identity differs: {key}')
+    # Every batch the live node measured, compared with its own live record.
+    result['events'] = event_parity(sensor, cache, replay)
+    excluded = set(identity['inconclusive_trials'])
+    reference = run_dir/'sampled_reference'
+    result['excluded_trials'] = sorted(excluded)
+    # Nothing compared is not a pass: every trial had a batch live never measured.
+    result['compared_trials'] = identity['trials'] - len(excluded)
+    result['estimators'] = {name: compare_rows(without_trials(csv_rows(reference, name), excluded),
+                                               without_trials(csv_rows(replay, name), excluded))
+                            for name in ESTIMATORS}
+    atomic_json(bundle/'campaign.json', state)
+    if result['events']['verdict'] == 'failed':
+        raise RuntimeError(f'Per-event replay mismatch: {key}')
+    if not all(item['passed'] for item in result['estimators'].values()):
+        raise RuntimeError(f'Trial-level replay mismatch: {key}')
+    repeat_output = bundle/'replay_repeat'/stage/condition
+    job['output_dir'] = str(repeat_output)
+    job_path = bundle/f'offline_repeat_{stage}_{condition}.yaml'
+    job_path.write_text(yaml.safe_dump(job, sort_keys=False))
+    op = owned_command([sys.executable, '-m', 'ridgeback_autonomy.benchmarking.target_replay_benchmark',
+                        str(job_path)], bundle/f'{stage}_{condition}_determinism.log',
+                       environment(bundle), deadline)
+    state['operations'].append(dict(op, stage=f'{stage}_{condition}_determinism'))
+    if op['returncode'] or op['deadline_or_stop'] or op['leftover_pids'] or op['outer_escalated']:
+        raise RuntimeError('Repeated fixed-input evaluation failed')
+    deterministic = {name: compare_rows(csv_rows(replay, name),
+        csv_rows(repeat_output/'results/matching_defaults', name), tolerance=0) for name in ESTIMATORS}
+    state.setdefault('fixed_input_checks', {})[key] = deterministic
+    atomic_json(bundle/'campaign.json', state)
+    if not all(item['passed'] for item in deterministic.values()):
+        raise RuntimeError('Identical frozen numeric evaluations differed')
 
 
 def report(bundle):
@@ -474,24 +664,50 @@ def report(bundle):
     for operation in state['operations']:
         lines.append(f"| {operation['stage']} | {operation['returncode']} | {operation['wall_sec']:.1f} | {operation['leftover_pids']} |")
     lines += ['', '## Problems', ''] + (['- '+e for e in state['errors']] or ['No execution error recorded.'])
+    if state['status'] == LIVE_COMPLETE:
+        lines += ['', '## Next step', '',
+                  'Live collection is complete; offline processing has not run. It consumes the '
+                  'inventoried evidence in `offline_inputs.json` and starts no simulator:', '',
+                  f'    python3 tools/benchmark/qualification/campaign.py start-offline {bundle}', '',
+                  f"Remaining workstation budget: {remaining_budget(state):.0f} s of {TOTAL_SEC} s."]
+    if state.get('probe'):
+        lines += ['', '## Readiness probe', '', 'Short checks only; this bundle is not a campaign.', '',
+                  '| Stage or dataset | Capture bytes | Wall seconds |', '| --- | ---: | ---: |']
+        for key, value in state['probe'].items():
+            lines.append(f"| {key} | {value.get('capture_bytes', '—')} | "
+                         f"{format(value['wall_sec'], '.1f') if 'wall_sec' in value else '—'} |")
     lines += ['', '## Full live configurations', '',
-              '| Session / condition | Checked | Captured events |', '| --- | --- | ---: |']
+              '| Session / condition | Checked | Live window events | Stored sample batches |',
+              '| --- | --- | ---: | ---: |']
     for stage in ORDER:
         path = bundle/f'{stage}_guard.json'
         checked = read_json(path).get('checked', {}) if path.exists() else {}
         for condition in CONDITIONS:
             result = checked.get(condition)
-            lines.append(f"| {stage}/{condition} | {'yes' if result else 'pending'} | {result['window_events'] if result else '—'} |")
+            lines.append(f"| {stage}/{condition} | {'yes' if result else 'pending'} | "
+                         f"{result['window_events'] if result else '—'} | "
+                         f"{result.get('sampled_batches', '—') if result else '—'} |")
     lines += ['', '## Repeatability', '',
               '| Backend / condition / estimator | Changed outcome/reason rows | Median paired estimate delta (m) |',
               '| --- | ---: | ---: |']
     for key, result in comparisons.items():
         lines.append(f"| {key} | {result.get('outcome_or_reason_changes', 'unavailable')} | {result.get('median_abs_estimate_delta_m', 'unavailable')} |")
-    lines += ['', '## Frozen-input replay', '',
-              '| Dataset | Trial/instance parity | Repeated numeric evaluation |', '| --- | --- | --- |']
+    lines += ['', '## Frozen-input replay against the sampled live reference', '',
+              '| Dataset | Event identity | Per-event parity (events) | Unmeasured live batches | '
+              'Trial/instance parity (trials) | Repeated numeric evaluation |',
+              '| --- | --- | --- | ---: | --- | --- |']
     for key, values in state.get('parity', {}).items():
         repeated = state.get('fixed_input_checks', {}).get(key)
-        lines.append(f"| {key} | {all(r['passed'] for r in values.values())} | {all(r['passed'] for r in repeated.values()) if repeated else 'pending'} |")
+        events = values.get('events') or {}
+        estimators = values.get('estimators') or {}
+        trials = ('not compared' if not estimators
+                  else 'inconclusive' if not values.get('compared_trials')
+                  else all(r['passed'] for r in estimators.values()))
+        lines.append(f"| {key} | {values['identity']['passed']} | "
+                     f"{events.get('verdict', 'not compared')} ({events.get('compared_events', 0)}) | "
+                     f"{events.get('events_without_live_record', '—')} | "
+                     f"{trials} ({values.get('compared_trials', 0)}) | "
+                     f"{all(r['passed'] for r in repeated.values()) if repeated else 'pending'} |")
     for path in bundle.glob('*_guard.json'):
         guard = read_json(path)
         if guard.get('error'):
@@ -499,30 +715,38 @@ def report(bundle):
     lines += ['', '## Qualification scope', '',
               'Execution success is not a scientific qualification verdict. See comparisons.json for descriptive repeatability and campaign.json for trial/instance replay parity.',
               'Scientific repeatability margins, full per-event live-output parity, camera/LiDAR scene audit and deliberate cancellation/pending-request qualification still require explicit evidence. They are never silently marked passed.',
-              'Missing required sensor inputs or a capture window that follows a batch quota stops the batch before full runs.',
-              'Current capture integration is pending: correct RGB/intrinsics/scan retention AND timed monocular capture must pass the four short capture checks.', '',
+              'Missing required sensor inputs, an unannounced depth range or a capture window that follows a batch quota stops the batch before full runs.',
+              'Each 10-second live window stores its first five raw batches. Replay is compared with the live results of exactly those batches; full-window CSVs serve repeatability only.', '',
               'No automatic experiment retry or replacement is performed. Failures retain their output. No hardware is operated.', '',
-              'The timing study already consumed 428 seconds; the job budget is the remaining part of the 12-hour allocation, with nine hours maximum for the full live blocks and a final cleanup reserve.', '']
+              'The timing study already consumed 428 seconds; the job budget is the remaining part of the 12-hour allocation, with nine hours maximum for the full live blocks and a final cleanup reserve. The deferred offline phase receives only what the live phase left.', '']
     (bundle/'REPORT.md').write_text('\n'.join(lines))
 
 
-def start(bundle):
+def start(bundle, action='run'):
     bundle = Path(bundle).resolve()
-    if read_json(bundle/'campaign.json')['status'] != 'prepared-not-launched':
-        raise RuntimeError('Bundle has already been launched')
-    validate_matrix(bundle)
+    state = read_json(bundle/'campaign.json')
+    if action == 'run':
+        if state['status'] != 'prepared-not-launched':
+            raise RuntimeError('Bundle has already been launched')
+        validate_matrix(bundle)
+        suffix, runtime = '', remaining_budget(state)
+    else:
+        if state['status'] != LIVE_COMPLETE:
+            raise RuntimeError(f"Offline processing needs status {LIVE_COMPLETE}, not {state['status']}")
+        verify_inventory(bundle)
+        suffix, runtime = '-offline', remaining_budget(state)
     check_installed()
     host_available()
-    unit = 'ridgeback-qualification-'+bundle.name.replace('_','-')
-    launch = bundle/'launch.sh'
+    unit = 'ridgeback-qualification-'+bundle.name.replace('_','-')+suffix
+    launch = bundle/('launch.sh' if action == 'run' else 'launch_offline.sh')
     import shlex
     launch.write_text('#!/bin/bash\nset -e\ncd '+shlex.quote(str(ROOT))+'\n'
                       'source /opt/ros/jazzy/setup.bash\nsource install/setup.bash\n'
                       'exec tools/gpu-run /usr/bin/python3 '+shlex.quote(str(HERE/'campaign.py'))+
-                      ' run '+shlex.quote(str(bundle))+'\n')
+                      ' '+action+' '+shlex.quote(str(bundle))+'\n')
     command = ['systemd-run', '--user', '--unit='+unit, '--property=Restart=no',
                '--property=KillMode=mixed', '--property=KillSignal=SIGINT',
-               '--property=TimeoutStopSec=150', '--property=RuntimeMaxSec='+str(TOTAL_SEC),
+               '--property=TimeoutStopSec=150', '--property=RuntimeMaxSec='+str(int(runtime)),
                '--property=WorkingDirectory='+str(ROOT),
                '--property=ExecStopPost='+shlex.join(['/usr/bin/python3', str(HERE/'campaign.py'), 'report', str(bundle)])]
     for key in ('DISPLAY', 'XAUTHORITY', 'XDG_RUNTIME_DIR', 'DBUS_SESSION_BUS_ADDRESS'):
@@ -530,24 +754,32 @@ def start(bundle):
             command.append('--setenv='+key+'='+os.environ[key])
     command += ['/bin/bash', str(launch)]
     subprocess.run(command, check=True)
-    atomic_json(bundle/'service.json', {'unit': unit, 'command': command})
+    atomic_json(bundle/('service.json' if action == 'run' else 'service_offline.json'),
+                {'unit': unit, 'command': command})
     print(f'Started {unit}.service; automatic report: {bundle}/REPORT.md')
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('action', choices=('prepare', 'check', 'start', 'run', 'report'))
+    parser.add_argument('action', choices=(
+        'prepare', 'check', 'probe', 'start', 'run', 'start-offline', 'offline', 'report'))
     parser.add_argument('bundle', type=Path)
     args = parser.parse_args()
     if args.action == 'prepare':
         print(prepare(args.bundle))
     elif args.action == 'check':
         print(json.dumps({'matrix': validate_matrix(args.bundle),
-                          'launch_status': 'prepared; timed stereo/monocular capture checks have NOT run'}, indent=2))
+                          'launch_status': 'prepared; sampled stereo/monocular capture checks have NOT run'}, indent=2))
     elif args.action == 'run':
         return run(args.bundle)
+    elif args.action == 'offline':
+        return run_offline(args.bundle)
+    elif args.action == 'probe':
+        return probe(args.bundle)
     elif args.action == 'start':
         start(args.bundle)
+    elif args.action == 'start-offline':
+        start(args.bundle, 'offline')
     else:
         report(args.bundle)
     return 0

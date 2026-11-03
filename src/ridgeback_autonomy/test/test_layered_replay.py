@@ -696,21 +696,55 @@ def _aligned_depth_msg(stamp_ns):
     return msg
 
 
-def _mask_measurement_msg(stamp_ns):
+def _mask_measurement_msg(stamp_ns, distance=2.0):
     from ridgeback_interfaces.msg import TargetMeasurements
 
     msg = TargetMeasurements(
         detected=True, count=1, bbox_xyxy=[30.0, 20.0, 50.0, 40.0],
         labels=['target'], scores=[0.9], image_width=WIDTH, image_height=HEIGHT,
-        projective_ranging_lateral_m=[0.0], projective_ranging_forward_m=[2.0],
-        projective_ranging_distance_m=[2.0],
+        projective_ranging_lateral_m=[0.0], projective_ranging_forward_m=[distance],
+        projective_ranging_distance_m=[distance],
         projective_ranging_status=[int(MissReason.OK)])
     msg.header.stamp = _ros_stamp(stamp_ns)
     msg.header.frame_id = 'camera'
     return msg
 
 
-def _sensor_capture_runner(monkeypatch, scripted_spins):
+def _empty_raw_detections_msg(stamp_ns):
+    from ridgeback_interfaces.msg import TargetDetections
+
+    msg = TargetDetections(
+        detected=False, count=0, image_width=WIDTH, image_height=HEIGHT)
+    msg.header.stamp = _ros_stamp(stamp_ns)
+    msg.header.frame_id = 'camera'
+    return msg
+
+
+def _empty_mask_measurement_msg(stamp_ns):
+    from ridgeback_interfaces.msg import TargetMeasurements
+
+    msg = TargetMeasurements(
+        detected=False, count=0, image_width=WIDTH, image_height=HEIGHT)
+    msg.header.stamp = _ros_stamp(stamp_ns)
+    msg.header.frame_id = 'camera'
+    return msg
+
+
+def _depth_source_msg(stamp_ns, source='stereoscopic', ceiling=None):
+    from std_msgs.msg import String
+
+    record = {
+        'stamp_ns': stamp_ns, 'frame_id': 'camera', 'depth_source': source,
+        'usable_max_m': ceiling, 'working_gate_m': None,
+    }
+    if source == 'monocular':
+        record.update(
+            model_id='depth/model', model_revision='rev',
+            declared_max_depth_m=20.0, usable_range_fraction=0.9)
+    return String(data=json.dumps(record))
+
+
+def _sensor_capture_runner(monkeypatch, scripted_spins, *, mode='quota'):
     """A runner whose executor delivers ``scripted_spins`` one per spin.
 
     Everything from the window reset to the drain is the runner's own code;
@@ -743,6 +777,14 @@ def _sensor_capture_runner(monkeypatch, scripted_spins):
         sensor_color_buffer=OrderedDict(),
         replay_camera_info_buffer=OrderedDict(),
         static_replay_camera_info=None,
+        replay_depth_source_buffer=OrderedDict(),
+        sensor_capture_mode=mode,
+        depth_source='stereoscopic',
+        live_window_open=False,
+        window_raw_batch_stamps=set(),
+        sampled_live_events={},
+        live_scan_stamp_buffer=OrderedDict(),
+        last_depth_source_warning=None,
         sensor_scan_buffer=StampedMessageBuffer(SCAN_MATCH_BUFFER_DEPTH),
         replay_tf_buffer=object(),
         replay_last_fallback_frame=None,
@@ -895,6 +937,349 @@ def test_consecutive_windows_only_freeze_their_own_batches_and_inputs(monkeypatc
     assert event['intrinsics_stamp_ns'] == second
     assert event['scan']['stamp_ns'] == second
     assert {e.stamp_ns for e in runner.capture_events.values()} == {second}
+
+
+def _deliver_context(runner, stamp_ns):
+    runner.on_color_image(_color_msg(stamp_ns, fill=stamp_ns % 251))
+    runner.on_replay_camera_info(_camera_info_msg(stamp_ns))
+    runner.on_replay_scan(_laser_scan_msg(stamp_ns))
+
+
+def _deliver_sampled_batch(runner, stamp_ns, distance=2.0, source=None):
+    _deliver_context(runner, stamp_ns)
+    runner.on_replay_raw_detections(_raw_detections_msg(stamp_ns))
+    runner.on_replay_depth_source(source or _depth_source_msg(stamp_ns))
+    runner.on_replay_aligned_depth(_aligned_depth_msg(stamp_ns))
+    runner.on_mask_measurement(_mask_measurement_msg(stamp_ns, distance))
+
+
+def _sampled_runner(monkeypatch, scripted, *, batches):
+    runner = _sensor_capture_runner(monkeypatch, scripted, mode='sampled_window')
+    runner.capture_batches = batches
+    return runner
+
+
+def test_sampled_window_keeps_measuring_after_the_sample_is_full(monkeypatch):
+    """Reaching the quota stops storage, never the live window or its scores."""
+
+    stamps = [5_000_000_000 + index * 100_000_000 for index in range(4)]
+    scripted = [
+        (lambda stamp=stamp, distance=distance:
+            _deliver_sampled_batch(runner, stamp, distance))
+        for stamp, distance in zip(stamps, (2.0, 2.0, 2.4, 2.4))
+    ]
+    runner = _sampled_runner(monkeypatch, scripted, batches=2)
+
+    started = time.monotonic()
+    summary = runner.capture_measurement_window(0.2)
+
+    assert time.monotonic() - started >= 0.2
+    window = summary['sampled_window']
+    assert [event['stamp_ns'] for event in summary['replay_events']] == stamps[:2]
+    assert window['sampled_stamps_ns'] == stamps[:2]
+    assert window['actual_samples'] == 2
+    assert window['sample_coverage'] == 'complete'
+    assert window['live_raw_batches'] == 4
+    # The full window scores every batch it measured, sample or not.
+    assert summary['total_events'] == 4
+    assert window['live_measurement_events'] == 4
+    assert {event.stamp_ns for event in summary['sampled_live_events'].values()} == set(
+        stamps[:2])
+    assert window['measurement_sec'] >= 0.2
+    assert window['drain_sec'] < window['measurement_sec']
+    assert window['complete']
+    for event in summary['replay_events']:
+        assert event['live_measurement']['stamp_ns'] == event['stamp_ns']
+        assert event['depth_source']['depth_source'] == 'stereoscopic'
+        assert event['depth_usable_max_m'] is None
+    # Nothing outside the sample is held once the sample is full.
+    assert not runner.replay_depth_buffer
+    assert not runner.replay_depth_source_buffer
+
+
+def test_sampled_reference_scores_only_the_stored_stamps(monkeypatch):
+    """Same scorer as the full window, over the sampled live records alone."""
+
+    from ridgeback_autonomy.benchmarking.reduction import summarize_capture_events
+    from ridgeback_autonomy.benchmarking.scoring import score_scene
+    from ridgeback_autonomy.benchmarking.simulation import GroundTruthInstance
+    from ridgeback_autonomy.benchmarking.trial_results import build_trial_result
+
+    stamps = [6_000_000_000 + index * 100_000_000 for index in range(4)]
+    scripted = [
+        (lambda stamp=stamp, distance=distance:
+            _deliver_sampled_batch(runner, stamp, distance))
+        for stamp, distance in zip(stamps, (2.0, 2.0, 2.4, 2.4))
+    ]
+    runner = _sampled_runner(monkeypatch, scripted, batches=2)
+    runner.estimator_display_names = {'projective_ranging': 'projective'}
+    runner.sampled_reference_rows = {'projective_ranging': []}
+    runner.sampled_window_records = []
+    trial = {'trial_id': 'single_rep1', 'repeat_index': 1}
+    scene = SimpleNamespace(id='single', robots=(SimpleNamespace(yaw=0.0),))
+    truth = [GroundTruthInstance(0, 'target', 2.25, 0.0, 2.0, 0.0, 2.0)]
+
+    summary = runner.capture_measurement_window(0.2)
+    runner.score_sampled_reference(trial, scene, truth, summary)
+
+    [sampled] = runner.sampled_reference_rows['projective_ranging']
+    assert sampled['frames_captured'] == 2
+    assert sampled['trial_estimate_m'] == pytest.approx(2.0)
+    assert runner.sampled_window_records == [summary['sampled_window']]
+    full_score = score_scene(
+        summary['usable_by_estimator'], truth, ('projective_ranging',),
+        detector_fired=summary['any_detected'])
+    [full] = build_trial_result(
+        trial, scene, truth, full_score, ('projective_ranging',),
+        runner.estimator_display_names, summary['usable_by_estimator'], '',
+        summary['total_events'])['rows']['projective_ranging']
+    # The deliberately larger full window answers differently, as it should.
+    assert full['frames_captured'] == 4
+    assert full['trial_estimate_m'] == pytest.approx(2.2)
+    assert summarize_capture_events(
+        summary['sampled_live_events'], ('projective_ranging',))['total_events'] == 2
+
+
+def test_sampled_window_drain_completes_the_sample_but_admits_nothing(monkeypatch):
+    """After the deadline neither population grows; the sample may complete."""
+
+    first, late = 7_000_000_000, 7_100_000_000
+
+    def raw_only():
+        _deliver_context(runner, first)
+        runner.on_replay_raw_detections(_raw_detections_msg(first))
+
+    def past_deadline():
+        time.sleep(0.15)
+
+    def live_result_and_a_new_batch():
+        runner.on_mask_measurement(_mask_measurement_msg(first))
+        _deliver_sampled_batch(runner, late)
+
+    def first_depth():
+        runner.on_replay_depth_source(_depth_source_msg(first))
+        runner.on_replay_aligned_depth(_aligned_depth_msg(first))
+
+    runner = _sampled_runner(
+        monkeypatch, [raw_only, past_deadline, live_result_and_a_new_batch, first_depth],
+        batches=2)
+
+    summary = runner.capture_measurement_window(0.1)
+
+    window = summary['sampled_window']
+    assert window['sampled_stamps_ns'] == [first]
+    assert [event['stamp_ns'] for event in summary['replay_events']] == [first]
+    assert window['live_raw_batches'] == 1
+    # Neither the late result of the sampled batch nor the drain's new batch
+    # joined the full window: it closed at its deadline.
+    assert summary['total_events'] == 0
+    assert {event.stamp_ns for event in summary['sampled_live_events'].values()} == {first}
+    [event] = summary['replay_events']
+    assert event['live_measurement']['stamp_ns'] == first
+    assert event['depth_m'] is not None
+    assert window['complete']
+    assert window['actual_samples'] == 1
+    assert window['sample_coverage'] == 'insufficient'
+    assert any('insufficient sample coverage, 1/2' in warning for warning in runner.warnings)
+
+
+def test_sampled_window_keeps_empty_batches_without_waiting_for_depth(monkeypatch):
+    stamp = 8_000_000_000
+
+    def empty_batch():
+        _deliver_context(runner, stamp)
+        runner.on_replay_raw_detections(_empty_raw_detections_msg(stamp))
+        runner.on_mask_measurement(_empty_mask_measurement_msg(stamp))
+
+    runner = _sampled_runner(monkeypatch, [empty_batch], batches=1)
+    runner.capture_drain_sec = 2.0
+
+    summary = runner.capture_measurement_window(0.05)
+
+    [event] = summary['replay_events']
+    window = summary['sampled_window']
+    assert event['detections'] == [] and event['depth_m'] is None
+    assert event['live_measurement']['detected'] is False
+    assert window['complete']
+    assert window['missing']['depth'] == 0
+    assert window['drain_sec'] < 1.0
+    assert summary['total_events'] == 1
+
+
+def test_sampled_window_freezes_monocular_depth_only_with_its_declared_ceiling(monkeypatch):
+    """No ceiling is guessed: depth without the live source's own is not frozen."""
+
+    proper, unannounced, mislabelled = 9_000_000_000, 9_100_000_000, 9_200_000_000
+
+    def deliver():
+        _deliver_sampled_batch(
+            runner, proper, source=_depth_source_msg(proper, 'monocular', 18.0))
+        _deliver_context(runner, unannounced)
+        runner.on_replay_raw_detections(_raw_detections_msg(unannounced))
+        runner.on_replay_aligned_depth(_aligned_depth_msg(unannounced))
+        runner.on_mask_measurement(_mask_measurement_msg(unannounced))
+        _deliver_sampled_batch(
+            runner, mislabelled, source=_depth_source_msg(mislabelled, 'stereoscopic'))
+
+    runner = _sampled_runner(monkeypatch, [deliver], batches=3)
+    runner.depth_source = 'monocular'
+
+    summary = runner.capture_measurement_window(0.05)
+
+    events = {event['stamp_ns']: event for event in summary['replay_events']}
+    assert events[proper]['depth_usable_max_m'] == 18.0
+    assert events[proper]['depth_source']['model_revision'] == 'rev'
+    assert events[proper]['depth_source']['declared_max_depth_m'] == 20.0
+    assert events[proper]['depth_m'].dtype == np.float32
+    for stamp in (unannounced, mislabelled):
+        assert events[stamp]['depth_m'] is None
+        assert events[stamp]['depth_source'] is None
+        assert events[stamp]['depth_usable_max_m'] is None
+    window = summary['sampled_window']
+    assert window['missing']['depth_source'] == 2
+    assert not window['complete']
+
+
+def test_sampled_window_records_the_scan_the_live_polar_row_used(monkeypatch):
+    """Both callback orders freeze the actual live scan, not a later closer one."""
+
+    from ridgeback_interfaces.msg import PolarBeams
+
+    early, late = 11_000_000_000, 11_100_000_000
+
+    def beams(stamp_ns, scan_stamp_ns):
+        msg = PolarBeams()
+        msg.header.stamp = _ros_stamp(stamp_ns)
+        msg.scan_stamp = _ros_stamp(scan_stamp_ns)
+        return msg
+
+    def deliver():
+        # The live result can name its scan before the raw batch is admitted.
+        runner.on_replay_scan(_laser_scan_msg(early - 16_666_667))
+        runner.on_live_polar_beams(beams(early, early - 16_666_667))
+        _deliver_sampled_batch(runner, early)
+        _deliver_sampled_batch(runner, late)
+        runner.on_replay_scan(_laser_scan_msg(late - 16_666_667))
+        runner.on_live_polar_beams(beams(late, late - 16_666_667))
+        # This arrives after processing and is closer, but was not used live.
+        runner.on_replay_scan(_laser_scan_msg(late + 8_333_333))
+
+    runner = _sampled_runner(monkeypatch, [deliver], batches=2)
+
+    summary = runner.capture_measurement_window(0.05)
+
+    events = {event['stamp_ns']: event for event in summary['replay_events']}
+    assert events[early]['live_scan_stamp_ns'] == early - 16_666_667
+    assert events[early]['scan']['stamp_ns'] == early - 16_666_667
+    assert events[late]['live_scan_stamp_ns'] == late - 16_666_667
+    assert events[late]['scan']['stamp_ns'] == late - 16_666_667
+
+
+def test_sampled_scan_choice_never_substitutes_a_missing_live_scan(monkeypatch):
+    from ridgeback_interfaces.msg import PolarBeams
+
+    stamp = 11_000_000_000
+    chosen = stamp - 16_666_667
+
+    def deliver():
+        _deliver_sampled_batch(runner, stamp)
+        msg = PolarBeams()
+        msg.header.stamp = _ros_stamp(stamp)
+        msg.scan_stamp = _ros_stamp(chosen)
+        runner.on_live_polar_beams(msg)
+        event = runner.replay_capture_events[stamp]
+        assert event['scan'] is None
+        assert event['scan_rotation'] is None
+        assert event['scan_translation'] is None
+        runner.on_replay_scan(_laser_scan_msg(chosen))
+
+    runner = _sampled_runner(monkeypatch, [deliver], batches=1)
+    summary = runner.capture_measurement_window(0.05)
+    assert summary['replay_events'][0]['scan']['stamp_ns'] == chosen
+
+
+def test_quota_mode_still_ends_the_window_at_the_batch_quota(monkeypatch):
+    first, second = 10_000_000_000, 10_100_000_000
+
+    def two_batches():
+        _deliver_sampled_batch(runner, first)
+        _deliver_sampled_batch(runner, second)
+
+    runner = _sensor_capture_runner(monkeypatch, [two_batches])
+
+    started = time.monotonic()
+    summary = runner.capture_measurement_window(10.0)
+
+    assert time.monotonic() - started < 5.0
+    assert 'sampled_window' not in summary
+    assert [event['stamp_ns'] for event in summary['replay_events']] == [first]
+    assert {event.stamp_ns for event in runner.capture_events.values()} == {first}
+
+
+def test_sampled_events_round_trip_their_live_record_and_depth_contract(tmp_path):
+    from ridgeback_autonomy.benchmarking.sampled_capture import (
+        live_record_matches_raw_batch,
+    )
+
+    event = _event()
+    event['depth_usable_max_m'] = 18.0
+    event['depth_source'] = {'depth_source': 'monocular', 'usable_max_m': 18.0}
+    event['live_measurement'] = {
+        'stamp_ns': 123, 'frame_id': 'camera', 'detected': True, 'count': 1,
+        'image_width': WIDTH, 'image_height': HEIGHT,
+        'detections': [{
+            'bbox_xyxy': [30, 20, 50, 40], 'label': 'target', 'score': 0.9,
+            'estimators': {'projective_ranging': {
+                'distance_m': 2.0, 'forward_m': 2.0, 'lateral_m': 0.0, 'status': 0}},
+        }],
+    }
+    sensor = _sensor(tmp_path, events=[event])
+
+    _trial_data, [loaded] = load_sensor_trial(sensor, sensor.trial_entries[0])
+
+    assert loaded['depth_usable_max_m'] == 18.0
+    assert loaded['depth_source'] == event['depth_source']
+    assert loaded['live_measurement'] == event['live_measurement']
+    assert np.array_equal(loaded['depth_m'], event['depth_m'])
+    assert live_record_matches_raw_batch(loaded['live_measurement'], loaded)
+    loaded['live_measurement']['detections'][0]['bbox_xyxy'] = [31, 20, 50, 40]
+    assert not live_record_matches_raw_batch(loaded['live_measurement'], loaded)
+
+
+@pytest.mark.parametrize('producer', ['box', 'slimsam'])
+@pytest.mark.parametrize(('ceiling', 'scored'), [(18.0, False), (20.0, True), (None, True)])
+def test_frozen_depth_ceiling_filters_replay_as_the_live_node_does(
+        tmp_path, producer, ceiling, scored):
+    """The saved ceiling, not a loaded model, bounds frozen monocular depth.
+
+    The target stands at 19 m: past an 18 m ceiling every masked pixel is a
+    no-return, as it was for the live node that declared it; a 20 m ceiling and
+    stereo's undeclared one both admit it.
+    """
+
+    event = _event()
+    event['depth_m'][:, :] = 19.0
+    event['depth_usable_max_m'] = ceiling
+    sensor = _sensor(tmp_path, events=[event])
+    if producer == 'box':
+        cache = _box_cache(sensor, tmp_path / 'cache')
+    else:
+        cache = materialize_masks(
+            sensor, tmp_path / 'cache', producer='slimsam', model='fake/model',
+            code_provenance={'commit': 'abc', 'dirty_count': 0},
+            segmenter_factory=_FakeSegmenter)
+
+    _expanded, result = evaluate_sensor_capture(
+        sensor, (cache,), (_variant('frozen', 'projective_ranging'),))
+
+    row = result['frozen']['rows']['projective_ranging'][0]
+    histogram = result['frozen']['status_histogram']['projective_ranging']
+    if scored:
+        assert row['outcome'] == 'scored'
+        assert row['trial_estimate_m'] == pytest.approx(19.0 - 0.25, abs=0.05)
+    else:
+        assert row['outcome'] != 'scored'
+        assert histogram.get(int(MissReason.OK), 0) == 0
 
 
 def test_mask_region_cache_round_trip_preserves_none_empty_holes_and_extent(tmp_path):

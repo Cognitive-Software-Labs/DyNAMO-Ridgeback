@@ -27,6 +27,7 @@ from ridgeback_common.detector_config import (
 )
 from ridgeback_localization.contracts import (
     ALIGNED_DEPTH_DEBUG_TOPIC,
+    ALIGNED_DEPTH_SOURCE_DEBUG_TOPIC,
     HUD_DISTANCES_PANEL_TOPIC,
     MASK_MEASUREMENTS_TOPIC,
     POINTCLOUD_MEASUREMENTS_TOPIC,
@@ -89,6 +90,7 @@ CONFIG_LAUNCH_ARGUMENT_NAMES = frozenset({
     'capture_batches',
     'capture_drain_sec',
     'capture_timeout_sec',
+    'sensor_capture_mode',
     'depth_topic',
     'camera_info_topic',
     'depth_source',

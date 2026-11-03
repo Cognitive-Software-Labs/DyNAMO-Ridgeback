@@ -36,7 +36,8 @@ def main():
                 if renderer.get('software') is not False or not renderer.get('renderer'):
                     raise RuntimeError('Missing hardware-renderer evidence or software rendering')
                 result = validate_run(Path(sweep_dir)/name, entry, expected_trials,
-                                      bundle/'capture_windows.jsonl')
+                                      bundle/'capture_windows.jsonl',
+                                      beyond_sample=stage.startswith('check_'))
                 result['processing_stages'] = processing_diagnostics(bundle/f'{stage}.log', name)
                 required = []
                 if 'silhouette' in name:

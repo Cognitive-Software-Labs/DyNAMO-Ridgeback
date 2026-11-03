@@ -1309,6 +1309,7 @@ Arguments:
 | `capture_batches` | `5` | Raw detector batches captured per trial when either replay output is set; empty batches count. Five was selected by the 2026-09-09 convergence run |
 | `capture_drain_sec` | `2.0` | Maximum post-quota drain for matching exact depth, camera context, and live measurement messages. Capture ends early when every selected stamp is complete and preserves missing matches when the bound expires |
 | `capture_timeout_sec` | `30.0` | Hard wall-time bound for obtaining the raw detector-batch quota; it is a stall guard, not the normal capture duration |
+| `sensor_capture_mode` | `quota` | `quota` ends a sensor-capture window at `capture_batches`. `sampled_window` keeps the live window at `capture_sec`, stores only its first `capture_batches` raw batches, drains them for at most `capture_drain_sec` afterwards, and writes their live results to `sampled_reference/`. Only `sampled_window` accepts `depth_source:=monocular`; requires `sensor_capture_dir` |
 | `record_video` | `true` | Best-effort RViz recording to `video/run.mp4`; disable for timing runs where screen capture would be unwanted load |
 | `color_topic` | `sensors/camera_0/color/image` | Compatibility override for the shared camera contract's color image; feeds detector, measurements, overlay, runner, and readiness gate |
 | `depth_topic` | `sensors/camera_0/depth/image` | Colour-aligned depth of the shared camera contract; the hardware camera service publishes the same name |
@@ -1571,6 +1572,15 @@ ros2 launch ridgeback_autonomy target_distance_benchmark.launch.py \
   capture_drain_sec:=2.0 capture_timeout_sec:=30.0 \
   shutdown_on_complete:=true
 ```
+
+To keep the full live window instead, add `sensor_capture_mode:=sampled_window`:
+the run scores all `capture_sec` seconds as an uncaptured run would, stores the
+first `capture_batches` raw batches of each window, and also scores the live
+results of exactly those batches into `sampled_reference/` beside the run's CSVs.
+That reference, not the full-window CSV, is what a replay of the capture must
+reproduce. It is the only mode that records `depth_source:=monocular`, freezing
+the predicted depth with the usable ceiling the live node declared, so replay
+never loads Depth Anything.
 
 Derive immutable caches independently. A changed checkpoint, revision, prompt
 padding, IoU floor, device/dtype, dependency version, or code provenance yields

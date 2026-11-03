@@ -10,6 +10,10 @@ MASK_MEASUREMENTS_TOPIC = 'measurements/target/mask'
 
 MASK_DEBUG_TOPIC = 'debug/target/mask'
 ALIGNED_DEPTH_DEBUG_TOPIC = 'debug/target/mask/aligned_depth'
+# Which source produced each aligned depth frame, and the usable ceiling it
+# declared when it did: JSON on std_msgs/String, keyed by the frame's stamp. A
+# depth grid alone cannot say whether it may be read to 18 m or to infinity.
+ALIGNED_DEPTH_SOURCE_DEBUG_TOPIC = 'debug/target/mask/aligned_depth_source'
 OVERLAY_IMAGE_TOPIC = 'debug/target/overlay'
 # The beam indices polar profiling selected and reduced. A machine-readable
 # artifact for the overlay node, sibling of MASK_DEBUG_TOPIC -- not

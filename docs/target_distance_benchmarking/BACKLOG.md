@@ -44,6 +44,10 @@ workload/profile equivalence. Record the qualified conditions in run guidance.
 model, representative storage, and scaling evidence remain incomplete. The
 [profile reference](profiles.md) owns the implemented contract.
 
+The [sampled monocular capture plan](../plans/BENCHMARKING_sampled_monocular_capture.md)
+defines the current handoff for collecting bounded stereo/monocular samples
+during the 16 live qualification runs, with matching live references for later replay.
+
 **Remaining work.**
 
 - Capture a fresh live sensor dataset with exact RGB, depth, detections,

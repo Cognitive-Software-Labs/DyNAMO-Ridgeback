@@ -376,6 +376,9 @@ AXES: dict[str, AxisSpec] = {
     'capture_timeout_sec': _axis(
         'capture_timeout_sec', 'number', 30.0, STAGE_SENSOR, 'Capture stall timeout',
         minimum=0.0),
+    'sensor_capture_mode': _axis(
+        'sensor_capture_mode', 'choice', 'quota', STAGE_SENSOR,
+        'Sensor capture window', choices=('quota', 'sampled_window')),
     'capture_sec': _axis(
         'capture_sec', 'number', 10.0, STAGE_SYSTEM, 'Live capture window',
         minimum=0.0),

@@ -1449,6 +1449,50 @@ def test_aligned_depth_debug_carries_the_detection_stamp(ros_context) -> None:
         node.destroy_node()
 
 
+def test_aligned_depth_source_precedes_its_frame_with_the_same_stamp(ros_context) -> None:
+    import json
+
+    from ridgeback_localization.core.depth_sources import StereoDepthSource
+
+    order: list = []
+    node = _mask_node(StereoDepthSource(None, usable_max_m=6.0))
+    node.aligned_depth_debug_pub.publish = lambda msg: order.append(('depth', msg))
+    node.aligned_depth_debug_pub.get_subscription_count = lambda: 1
+    node.aligned_depth_source_pub.publish = lambda msg: order.append(('source', msg))
+    node.aligned_depth_source_pub.get_subscription_count = lambda: 1
+    try:
+        header = Header()
+        header.frame_id = 'camera_0_color_optical'
+        header.stamp.sec, header.stamp.nanosec = 7, 42
+
+        node.publish_aligned_depth_debug(build_fill_depth(), header)
+
+        assert [kind for kind, _msg in order] == ['source', 'depth']
+        record = json.loads(order[0][1].data)
+        assert record['stamp_ns'] == 7_000_000_042
+        assert record['frame_id'] == 'camera_0_color_optical'
+        assert record['depth_source'] == 'stereoscopic'
+        assert record['usable_max_m'] == 6.0
+        assert record['working_gate_m'] is None
+    finally:
+        node.destroy_node()
+
+
+def test_aligned_depth_source_is_not_invented_for_a_source_without_one(
+        ros_context) -> None:
+    node = _mask_node(_StubDepthSource('depth'))
+    published: list = []
+    node.aligned_depth_source_pub.publish = published.append
+    node.aligned_depth_source_pub.get_subscription_count = lambda: 1
+    node.aligned_depth_debug_pub.get_subscription_count = lambda: 0
+    try:
+        node.publish_aligned_depth_debug(build_fill_depth(), Header())
+
+        assert published == []
+    finally:
+        node.destroy_node()
+
+
 def test_aligned_depth_debug_skips_the_encode_with_no_subscriber(ros_context) -> None:
     node = _mask_node(_StubDepthSource('depth'))
     published: list = []

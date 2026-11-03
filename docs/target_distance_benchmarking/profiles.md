@@ -77,6 +77,60 @@ does. Layered replay projects that scan through the same `scan_points_optical`
 the live row uses, so `polar_profiling` is measurable offline on a version-2
 capture.
 
+### Sampled-window capture
+
+`sensor_capture_mode:=quota` (the default) ends a trial's window at
+`capture_batches` raw batches, so its live result is scored on the sample.
+`sensor_capture_mode:=sampled_window` keeps the live window at `capture_sec`:
+
+1. The window is the uncaptured run's own loop. The first `capture_batches`
+   unique raw batches delivered inside it are sampled, empty ones included;
+   reaching that bound stops storage and the buffering of context for other
+   stamps, not measurement.
+2. The deadline freezes both the full live population and the sampled stamps.
+   A bounded drain of at most `capture_drain_sec` may then complete sampled
+   batches only: their depth, depth-source record, camera context, scan and
+   live result. It admits no batch and adds nothing to the full window.
+3. Fewer sampled batches than requested is reported as insufficient coverage;
+   the window is never extended and no batch is substituted.
+
+Each sampled event carries `live_measurement`: the live node's own result for
+that batch, box by box in detector order, with every selected estimator's
+distance, forward, lateral and status. A batch the live node never measured
+(it keeps only the newest pending batch, for example while Depth Anything
+loads) keeps `null` there, and its depth stays explicitly absent, which is what
+live produced. The runner scores the sampled live records alone with the normal
+reduction, association and row builder into
+`<run>/sampled_reference/<estimator output>.csv`, beside the unchanged
+full-window CSVs. `sampled_windows.json` there lists per trial the measurement
+and drain durations, live raw-batch and measurement counts, requested and
+actual samples, the exact sampled stamps, what never arrived, and the trial
+payload's SHA-256; the sensor manifest's metadata holds the reference files'
+hashes. A replay of the capture is compared with that reference, never with the
+full-window CSV.
+
+Each sampled event also records `live_scan_stamp_ns`, the scan the live polar
+row actually used, read from the node's `PolarBeams` debug message. Once that
+selection arrives, the recorder freezes that exact scan and its transform;
+a closer scan arriving later cannot replace it. If the selected scan is not
+available, its input remains explicitly missing instead of substituting another
+scan. Before a live selection, the recorder holds a provisional nearest scan
+within tolerance, also used for batches the live node did not measure. Quota
+capture retains its existing nearest-scan policy. The sample guard requires
+the saved scan to match the live selection wherever the polar outcome proves
+that the worker used a scan.
+
+Monocular depth is recorded only in this mode. Each event stores
+`depth_source`, the live node's description of the frame from
+[`aligned_depth_source`](../target_localization/aligned_depth.md#4-the-strategy-pattern),
+and `depth_usable_max_m`, the finite ceiling the loaded checkpoint declared
+(`null` for stereo, unchanged). Depth whose record never arrived, or that names
+another source, is dropped rather than frozen with a guessed range. Layered
+replay cleans the frozen grid against that ceiling together with the job's
+`mask_depth_max_meters`, exactly as the live node combines them, and never loads
+Depth Anything. This qualifies replay over frozen predicted depth; it says
+nothing about another monocular model or a second inference.
+
 Legacy schema version 2 adds the same scan to that format, stored the same way:
 float32 `ranges` as its own payload array beside the depth ROIs, beam geometry
 and source frame in the JSON, and the scan→camera-optical rotation and

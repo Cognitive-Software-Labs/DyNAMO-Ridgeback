@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 import sys
 import time
+from types import SimpleNamespace
 
 import pytest
 
@@ -13,9 +14,13 @@ import campaign
 import evidence
 
 
-def write_windows(path, seconds=10, events=4, count=1):
+def write_windows(path, seconds=10, events=4, count=1, **sampled):
+    window = {'measurement_sec': seconds, 'drain_sec': .2, 'live_raw_batches': 90,
+              'requested_samples': 5, 'actual_samples': 5, 'sample_coverage': 'complete',
+              'complete': True}
+    window.update(sampled)
     path.write_text('\n'.join(json.dumps({'run_label': 'r', 'trial_id': f't{i}',
-        'wall_sec': seconds, 'total_events': events}) for i in range(count)))
+        'wall_sec': seconds + window['drain_sec'], 'total_events': events, **window}) for i in range(count)))
 
 
 def test_capture_quota_and_missing_heartbeat_rejected(tmp_path):
@@ -28,6 +33,30 @@ def test_capture_quota_and_missing_heartbeat_rejected(tmp_path):
         evidence.capture_windows(path, 'r', 1, 10)
     write_windows(path)
     assert len(evidence.capture_windows(path, 'r', 1, 10)) == 1
+
+
+def test_measurement_window_is_timed_apart_from_the_sample_drain(tmp_path):
+    path = tmp_path/'windows.jsonl'
+    write_windows(path, drain_sec=2.0)
+    assert evidence.capture_windows(path, 'r', 1, 10)[0]['wall_sec'] > 10.5
+    write_windows(path, actual_samples=3, sample_coverage='insufficient')
+    with pytest.raises(ValueError, match='insufficient sample coverage'):
+        evidence.capture_windows(path, 'r', 1, 10)
+    write_windows(path, requested_samples=8)
+    with pytest.raises(ValueError, match='bounded'):
+        evidence.capture_windows(path, 'r', 1, 10)
+    write_windows(path, live_raw_batches=5)
+    assert evidence.capture_windows(path, 'r', 1, 10)
+    with pytest.raises(ValueError, match='beyond the sample'):
+        evidence.capture_windows(path, 'r', 1, 10, beyond_sample=True)
+    path.write_text(json.dumps({'run_label': 'r', 'trial_id': 't', 'wall_sec': 10,
+                                'total_events': 4}))
+    with pytest.raises(ValueError, match='sampled-window'):
+        evidence.capture_windows(path, 'r', 1, 10)
+    path.write_text(json.dumps({'run_label': 'r', 'trial_id': '', 'wall_sec': 10,
+                                'total_events': 4}))
+    with pytest.raises(ValueError, match='trial identity'):
+        evidence.capture_windows(path, 'r', 1, 10)
 
 
 def test_duplicate_or_missing_trial_window_rejected(tmp_path):
@@ -47,7 +76,9 @@ def test_capture_missing_context_is_not_silently_dropped(monkeypatch, tmp_path):
         manifest={'producer': {'parameters': {'depth_source': 'stereoscopic'}}}, id='id', manifest_sha256='hash')
     event = dict.fromkeys(('rgb','depth_m','intrinsics','camera_rotation','camera_translation',
                           'scan','scan_rotation','scan_translation'), object())
-    event.update(stamp_ns=1, image_width=640, image_height=480, detections=[{}])
+    event.update(stamp_ns=1, image_width=640, image_height=480, detections=[{}],
+                 depth_source={'depth_source': 'stereoscopic', 'usable_max_m': None},
+                 depth_usable_max_m=None)
     monkeypatch.setattr(artifacts, 'load_artifact', lambda *a, **k: artifact)
     monkeypatch.setattr(artifacts, 'load_sensor_trial', lambda *a: ({}, [event]))
     assert evidence.sensor_completeness(tmp_path, 'stereoscopic', 1)['events'] == 1
@@ -59,6 +90,73 @@ def test_capture_missing_context_is_not_silently_dropped(monkeypatch, tmp_path):
     assert result['empty_detection_batches'] == 1 and result['explicit_missing_inputs']['rgb'] == 1
     with pytest.raises(ValueError, match='depth source'):
         evidence.sensor_completeness(tmp_path, 'monocular', 1)
+
+
+def test_depth_absent_where_live_never_produced_it_is_kept_explicit(monkeypatch, tmp_path):
+    from types import SimpleNamespace
+    import ridgeback_autonomy.benchmarking.replay_artifacts as artifacts
+    artifact = SimpleNamespace(kind='sensor-capture', trial_entries=[{'trial_id': 't', 'sha256': 'p'}],
+        manifest={'producer': {'parameters': {'depth_source': 'monocular'}}}, id='id', manifest_sha256='hash')
+    detection = {'bbox_xyxy': [1, 1, 3, 3]}
+    event = dict.fromkeys(('rgb', 'intrinsics', 'camera_rotation', 'camera_translation',
+                           'scan', 'scan_rotation', 'scan_translation'), object())
+    event.update(stamp_ns=1, image_width=640, image_height=480, detections=[detection],
+                 depth_m=None, depth_source=None, depth_usable_max_m=None, live_measurement=None)
+    windows = {'t': {'sampled_stamps_ns': [1], 'payload_sha256': 'p'}}
+    monkeypatch.setattr(artifacts, 'load_artifact', lambda *a, **k: artifact)
+    monkeypatch.setattr(artifacts, 'load_sensor_trial', lambda *a: ({}, [event]))
+    # Never measured live (the node was loading its model): explicit, not a failure.
+    result = evidence.sensor_completeness(tmp_path, 'monocular', 1, windows)
+    assert result['events_without_live_record'] == 1
+    assert result['explicit_missing_inputs']['depth_m'] == 1
+    # Measured live without depth: the live result says why, and it matches.
+    status = {'status': 20}
+    event['live_measurement'] = {'stamp_ns': 1, 'detections': [dict(detection, estimators={
+        'projective_ranging': status, 'euclidean_reconstruction': status})]}
+    assert evidence.sensor_completeness(tmp_path, 'monocular', 1, windows)['events_without_live_record'] == 0
+    # Measured live WITH depth, yet none stored: the capture lost it.
+    status['status'] = 0
+    with pytest.raises(ValueError, match='depth_m'):
+        evidence.sensor_completeness(tmp_path, 'monocular', 1, windows)
+
+
+def test_sampled_capture_rejects_a_different_or_unknown_live_polar_scan(monkeypatch, tmp_path):
+    from types import SimpleNamespace
+    import ridgeback_autonomy.benchmarking.replay_artifacts as artifacts
+    artifact = SimpleNamespace(kind='sensor-capture', trial_entries=[{'trial_id': 't', 'sha256': 'p'}],
+        manifest={'producer': {'parameters': {'depth_source': 'stereoscopic'}}}, id='id', manifest_sha256='hash')
+    detection = {'bbox_xyxy': [1, 1, 3, 3]}
+    event = dict.fromkeys(('rgb', 'intrinsics', 'camera_rotation', 'camera_translation',
+                          'scan_rotation', 'scan_translation'), object())
+    event.update(stamp_ns=1, image_width=640, image_height=480, detections=[detection],
+        depth_m=None, depth_source=None, depth_usable_max_m=None, scan={'stamp_ns': 10},
+        live_scan_stamp_ns=9, live_measurement={'stamp_ns': 1, 'detections': [
+            dict(detection, estimators={'polar_profiling': {'status': 0}})]})
+    windows = {'t': {'sampled_stamps_ns': [1], 'payload_sha256': 'p'}}
+    monkeypatch.setattr(artifacts, 'load_artifact', lambda *a, **k: artifact)
+    monkeypatch.setattr(artifacts, 'load_sensor_trial', lambda *a: ({}, [event]))
+    for chosen in (9, None):
+        event['live_scan_stamp_ns'] = chosen
+        with pytest.raises(ValueError, match='live polar selection'):
+            evidence.sensor_completeness(tmp_path, 'stereoscopic', 1, windows)
+    event['live_scan_stamp_ns'] = 10
+    assert evidence.sensor_completeness(tmp_path, 'stereoscopic', 1, windows)['events'] == 1
+
+
+def test_frozen_depth_must_carry_its_live_source_range():
+    stereo = {'depth_m': object(), 'depth_usable_max_m': None,
+              'depth_source': {'depth_source': 'stereoscopic', 'usable_max_m': None}}
+    assert evidence.depth_contract_error(stereo, 'stereoscopic') is None
+    assert 'never declared' in evidence.depth_contract_error(
+        dict(stereo, depth_usable_max_m=6.0), 'stereoscopic')
+    assert 'metadata' in evidence.depth_contract_error(dict(stereo, depth_source=None), 'stereoscopic')
+    mono = {'depth_m': object(), 'depth_usable_max_m': 18.0, 'depth_source': {
+        'depth_source': 'monocular', 'usable_max_m': 18.0, 'model_id': 'm',
+        'declared_max_depth_m': 20.0}}
+    assert evidence.depth_contract_error(mono, 'monocular') is None
+    assert 'finite' in evidence.depth_contract_error(dict(mono, depth_usable_max_m=None), 'monocular')
+    assert 'metadata' in evidence.depth_contract_error(mono, 'stereoscopic')
+    assert evidence.depth_contract_error(dict(mono, depth_m=None, depth_source=None), 'monocular') is None
 
 
 def row(estimate='1.0', outcome='scored'):
@@ -76,6 +174,14 @@ def test_replay_identity_outcomes_and_values_are_checked():
     assert not evidence.compare_rows(original, {('t','0'): row('1.01')})['passed']
     assert evidence.compare_rows(original, {('t','0'): row('1.00001')})['passed']
     assert not evidence.compare_rows(original, {('t','0'): row('1.00001')}, tolerance=0)['passed']
+
+
+def test_altered_status_and_association_are_detected():
+    original = {('t', '0'): row('1.0'), ('t', '1'): row('2.0')}
+    assert not evidence.compare_rows(original, {
+        ('t', '0'): dict(row('1.0'), miss_reason='NO_DEPTH_FRAME'), ('t', '1'): row('2.0')})['passed']
+    # The same two estimates associated with the other targets.
+    assert not evidence.compare_rows(original, {('t', '0'): row('2.0'), ('t', '1'): row('1.0')})['passed']
 
 
 def test_expected_misses_are_descriptive_not_execution_failures():
@@ -102,8 +208,16 @@ def test_prepare_has_separate_repetitions_with_equal_capture_workloads(tmp_path)
         spec = yaml.safe_load((bundle/'inputs'/f'{name}.yaml').read_text())
         assert [c['name'] for c in spec['configs']] == list(evidence.CONDITIONS)
         assert spec['defaults']['repeats'] == 1
+        assert spec['defaults']['capture_sec'] == 10.0
         assert spec['defaults']['output_dir'].endswith(name)
         assert all(c['sensor_capture_dir'].endswith(name+'/'+c['name']) for c in spec['configs'])
+        assert all(c['sensor_capture_mode'] == 'sampled_window' and c['capture_batches'] == 5
+                   for c in spec['configs'])
+    for backend in ('gz', 'isaac'):
+        spec = yaml.safe_load((bundle/'inputs'/f'check_{backend}.yaml').read_text())
+        assert [(c['name'], c['capture_sec']) for c in spec['configs']] == [
+            ('box_stereo', 4.0), ('box_monocular', 6.0), ('silhouette_monocular', 6.0)]
+        assert all(c['sensor_capture_mode'] == 'sampled_window' for c in spec['configs'])
     assert campaign.read_json(bundle/'campaign.json')['status'] == 'prepared-not-launched'
     assert 'pending' in (bundle/'REPORT.md').read_text()
 
@@ -177,13 +291,215 @@ def test_orphan_in_new_session_remains_owned(tmp_path):
 
 def test_observer_does_not_change_capture_result(tmp_path):
     path = Path(__file__).parent/'observer/sitecustomize.py'
+    # Like the runner, the window clears the trial identity when it closes.
     code = '''class TargetDistanceBenchmarkRunner:
  def __init__(self): self.run_label='r'; self.active_trial_id='t'
- def capture_measurement_window(self, seconds): return {'total_events':2,'usable_events':[]}
+ def capture_measurement_window(self, seconds):
+  self.active_trial_id=''
+  return {'total_events':2,'usable_events':[],'sampled_window':{'measurement_sec':4.01,
+   'drain_sec':.3,'live_raw_batches':40,'requested_samples':5,'actual_samples':5,
+   'sample_coverage':'complete','complete':True}}
 result=TargetDistanceBenchmarkRunner().capture_measurement_window(4)
-assert result=={'total_events':2,'usable_events':[]}
+assert result['total_events']==2 and result['usable_events']==[]
 '''
     import subprocess
     env = dict(os.environ, PYTHONPATH=str(path.parent), QUALIFICATION_CAPTURE_TIMINGS=str(tmp_path/'timings'))
     subprocess.run([sys.executable, '-c', code], env=env, check=True)
-    assert json.loads((tmp_path/'timings').read_text())['requested_sec'] == 4
+    record = json.loads((tmp_path/'timings').read_text())
+    assert record['requested_sec'] == 4 and record['trial_id'] == 't'
+    assert record['measurement_sec'] == 4.01 and record['drain_sec'] == .3
+    assert record['actual_samples'] == 5 and record['live_raw_batches'] == 40
+
+
+def sampled_dataset(tmp_path, *, live=True, stamps=(11, 12)):
+    """A sensor capture and its sampled reference, written by the runner's own code."""
+    from ridgeback_autonomy.benchmarking import target_distance_benchmark_runner_node as module
+    from ridgeback_autonomy.benchmarking.replay_artifacts import SensorCaptureWriter
+    writer = SensorCaptureWriter(tmp_path/'sensor', producer={'parameters': {'depth_source': 'monocular'}})
+    events = []
+    for stamp in stamps:
+        detection = {'bbox_xyxy': [1, 1, 3, 3], 'label': 'target', 'score': .9}
+        events.append({'stamp_ns': stamp, 'frame_id': 'camera', 'detected': True, 'count': 1,
+                       'image_width': 4, 'image_height': 3, 'detections': [detection],
+                       'live_measurement': None if not live else {
+                           'stamp_ns': stamp, 'detections': [dict(detection, estimators={})]}})
+    writer.write_trial({'trial_id': 't'}, events)
+    run_dir = tmp_path/'run'
+    run_dir.mkdir()
+    runner = object.__new__(module.TargetDistanceBenchmarkRunner)
+    rows = {key: [dict(row(), trial_id='t', instance_index='0')] for key in evidence.ESTIMATORS}
+    runner.__dict__.update(
+        sensor_capture_mode='sampled_window', sensor_writer=writer, run_output_dir=str(run_dir),
+        selected_estimators=evidence.ESTIMATORS, sampled_reference_rows=rows,
+        estimator_output_names={key: f'{key}_box_monocular' for key in evidence.ESTIMATORS},
+        sampled_window_records=[{'trial_id': 't', 'sampled_stamps_ns': list(stamps),
+            'measurement_sec': 10.0, 'drain_sec': .1, 'actual_samples': len(stamps),
+            'sample_coverage': 'complete', 'complete': True, 'missing': {'live_record': 0}}],
+        sensor_capture_dir=str(tmp_path/'sensor'), capture_batches=5, run_label='r')
+    summary = runner.write_sampled_reference()
+    writer.finalize(sampled_reference=summary)
+    return tmp_path/'sensor', run_dir
+
+
+def test_sampled_identity_checks_stamps_before_numbers(tmp_path):
+    sensor, run_dir = sampled_dataset(tmp_path)
+    identity = evidence.sampled_identity(sensor, run_dir)
+    assert identity['passed'] and identity['events'] == 2 and not identity['inconclusive_trials']
+    windows = run_dir/'sampled_reference/sampled_windows.json'
+    document = json.loads(windows.read_text())
+    document['windows'][0]['sampled_stamps_ns'] = [11, 13]
+    windows.write_text(json.dumps(document))
+    assert not evidence.sampled_identity(sensor, run_dir)['passed']
+    reference = run_dir/'sampled_reference'
+    next(reference.glob('projective_ranging*.csv')).write_text('trial_id\n')
+    with pytest.raises(ValueError, match='CSV changed'):
+        evidence.sampled_reference(run_dir, ['t'])
+
+
+def test_sampled_batch_without_a_live_record_is_named_inconclusive(tmp_path):
+    sensor, run_dir = sampled_dataset(tmp_path, live=False)
+    identity = evidence.sampled_identity(sensor, run_dir)
+    assert identity['passed'] and identity['inconclusive_trials'] == {'t': [11, 12]}
+    rows = {('t', '0'): row(), ('u', '0'): row()}
+    assert set(evidence.without_trials(rows, {'t'})) == {('u', '0')}
+
+
+def live_complete_bundle(tmp_path, monkeypatch, live_elapsed=3600.0):
+    bundle = campaign.prepare(tmp_path/'bundle')
+    state = campaign.read_json(bundle/'campaign.json')
+    state.update(status=campaign.LIVE_COMPLETE, phases={'live': {'elapsed_sec': live_elapsed}})
+    campaign.atomic_json(bundle/'campaign.json', state)
+    monkeypatch.setattr(campaign, 'ROOT', tmp_path)
+    for name in ('host_available', 'check_frozen', 'verify_inventory'):
+        monkeypatch.setattr(campaign, name, lambda *_args: None)
+    monkeypatch.setattr(campaign, 'acquire_idle_inhibitor', lambda: None)
+    return bundle
+
+
+def test_deferred_offline_uses_only_the_remaining_budget(tmp_path, monkeypatch):
+    bundle = live_complete_bundle(tmp_path, monkeypatch)
+    seen = {}
+    def offline(path, state, deadline):
+        seen.update(deadline=deadline-time.monotonic(), status=state['status'])
+    monkeypatch.setattr(campaign, 'offline', offline)
+    assert campaign.run_offline(bundle) == 0
+    expected = campaign.TOTAL_SEC - 3600 - campaign.CLEANUP_SEC
+    assert expected - 5 < seen['deadline'] <= expected
+    state = campaign.read_json(bundle/'campaign.json')
+    assert state['status'] == 'execution-complete-review-required'
+    assert set(state['phases']) == {'live', 'offline'}
+    assert state['budget_remaining_sec'] <= campaign.TOTAL_SEC - 3600
+    # Neither phase can run again: no repeated live condition, no second offline.
+    with pytest.raises(RuntimeError, match='already launched'):
+        campaign.run(bundle)
+    with pytest.raises(RuntimeError, match='Offline processing needs'):
+        campaign.run_offline(bundle)
+
+
+def test_offline_refuses_without_a_completed_live_phase_or_budget(tmp_path, monkeypatch):
+    bundle = campaign.prepare(tmp_path/'bundle')
+    with pytest.raises(RuntimeError, match='Offline processing needs'):
+        campaign.run_offline(bundle)
+    bundle = live_complete_bundle(tmp_path/'spent', monkeypatch, live_elapsed=campaign.TOTAL_SEC-60)
+    with pytest.raises(RuntimeError, match='No workstation budget'):
+        campaign.run_offline(bundle)
+
+
+def test_offline_phase_consumes_inventoried_evidence_and_spawns_no_live_stage(tmp_path, monkeypatch):
+    bundle = live_complete_bundle(tmp_path, monkeypatch)
+    inputs = {f'{stage}/{condition}': {'sensor_capture': str(tmp_path/stage/condition/'sensor'),
+                                        'run_dir': str(tmp_path/stage/condition/'run')}
+              for stage in campaign.ORDER for condition in evidence.CONDITIONS}
+    campaign.atomic_json(bundle/'offline_inputs.json', inputs)
+    commands = []
+    def owned(command, log, env, deadline):
+        commands.append(command)
+        return {'returncode': 0, 'deadline_or_stop': False, 'outer_escalated': False,
+                'leftover_pids': [], 'wall_sec': .1}
+    monkeypatch.setattr(campaign, 'owned_command', owned)
+    identities = []
+    def identity(sensor, run_dir):
+        identities.append((str(sensor), str(run_dir)))
+        return {'passed': True, 'inconclusive_trials': {}, 'trials': 1}
+    monkeypatch.setattr(campaign, 'sampled_identity', identity)
+    monkeypatch.setattr(campaign, 'event_parity', lambda *_args: {'verdict': 'passed'})
+    compared = []
+    def rows(directory, _estimator):
+        compared.append(Path(directory))
+        return {('t', '0'): row()}
+    monkeypatch.setattr(campaign, 'csv_rows', rows)
+    state = campaign.read_json(bundle/'campaign.json')
+    campaign.offline(bundle, state, time.monotonic()+3600)
+    flat = [' '.join(command) for command in commands]
+    assert not any('sweep_entry' in command or 'launch' in command for command in flat)
+    assert len(identities) == 8 and all('_r1/' in sensor for sensor, _run in identities)
+    # Parity reads the sampled reference, never the full-window CSV directory.
+    references = [p for p in compared if p.name == 'sampled_reference']
+    assert len(references) == 8 * len(evidence.ESTIMATORS)
+    assert not any(p.name == 'run' for p in compared)
+    assert all(result['identity']['passed'] for result in state['parity'].values())
+
+
+def test_event_parity_compares_each_live_measured_batch_with_its_own_record(tmp_path):
+    import numpy as np
+    from ridgeback_autonomy.benchmarking.layered_replay import replay_sensor_event
+    from ridgeback_autonomy.benchmarking.replay_artifacts import SensorCaptureWriter
+    from ridgeback_autonomy.benchmarking.replay_materialization import materialize_masks
+    from ridgeback_autonomy.benchmarking.sampled_capture import live_measurement_record
+    height, width = 60, 80
+    depth = np.full((height, width), 4.0, dtype=np.float32)
+    depth[20:40, 30:50] = 2.0
+    arguments = {'estimators': 'projective_ranging,euclidean_reconstruction',
+                 'isolation_2d': 'nearest_mode_histogram',
+                 'isolation_3d': 'height_crop_nearest_mode_band'}
+    def event(stamp, live=True):
+        return {'stamp_ns': stamp, 'frame_id': 'camera', 'detected': True, 'count': 1,
+                'image_width': width, 'image_height': height,
+                'intrinsics': {'fx': 100.0, 'fy': 100.0, 'cx': 40.0, 'cy': 30.0,
+                               'width': width, 'height': height},
+                'camera_rotation': [[0.0, 0.0, 1.0], [-1.0, 0.0, 0.0], [0.0, -1.0, 0.0]],
+                'camera_translation': [0.0, 0.0, 0.0], 'front_offset_m': 0.25,
+                'base_above_floor_m': 0.026, 'depth_usable_max_m': None,
+                'rgb': np.zeros((height, width, 3), dtype=np.uint8), 'depth_m': depth,
+                'detections': [{'bbox_xyxy': [30, 20, 50, 40], 'label': 'target', 'score': .9}],
+                'live_measurement': None}
+    def build(root, events):
+        writer = SensorCaptureWriter(root/'sensor', producer={'parameters': {}})
+        writer.write_trial({'trial_id': 't'}, events)
+        sensor = writer.finalize()
+        cache = materialize_masks(sensor, root/'masks', producer='box',
+                                  code_provenance={'commit': 'abc', 'dirty_count': 0})
+        return sensor, cache
+    # The live record is what the live kernel produced; replay must reproduce it.
+    first, second = event(1), event(2)
+    sensor, cache = build(tmp_path/'probe', [first, second])
+    from ridgeback_autonomy.benchmarking.replay_artifacts import load_mask_trial
+    outcomes = load_mask_trial(cache, cache.trial_entries[0])[0]
+    live = replay_sensor_event(first, outcomes, arguments, tuple(arguments['estimators'].split(',')))
+    record = live_measurement_record(
+        SimpleNamespace(**vars(live), key=('camera',)), arguments['estimators'].split(','))
+    replay_dir = tmp_path/'replay'
+    replay_dir.mkdir()
+    campaign.atomic_json(replay_dir/'run.json', {'parameters': arguments})
+
+    first['live_measurement'] = record
+    sensor, cache = build(tmp_path/'match', [first, second])
+    result = evidence.event_parity(sensor.root, cache.root, replay_dir)
+    assert result['verdict'] == 'passed'
+    assert (result['compared_events'], result['events_without_live_record']) == (1, 1)
+
+    altered = json.loads(json.dumps(record))
+    altered['detections'][0]['estimators']['projective_ranging']['status'] = 20
+    first['live_measurement'] = altered
+    sensor, cache = build(tmp_path/'status', [first])
+    assert evidence.event_parity(sensor.root, cache.root, replay_dir)['verdict'] == 'failed'
+
+    altered = json.loads(json.dumps(record))
+    altered['detections'][0]['estimators']['euclidean_reconstruction']['distance_m'] += .001
+    first['live_measurement'] = altered
+    sensor, cache = build(tmp_path/'value', [first])
+    assert evidence.event_parity(sensor.root, cache.root, replay_dir)['mismatch_count'] == 1
+
+    first['live_measurement'] = None
+    sensor, cache = build(tmp_path/'none', [first])
+    assert evidence.event_parity(sensor.root, cache.root, replay_dir)['verdict'] == 'inconclusive'
