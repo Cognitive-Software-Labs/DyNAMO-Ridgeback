@@ -53,7 +53,7 @@ def test_drawn_edges_are_exactly_the_allowed_transitions():
     # and the rendered numbers say the same
     text, _ = rows(diagram.diagram_text('SEARCH_G1', [], ALLOWED))
     assert text['G1_LOCALIZED'][2].split()[3:] == ['↓', '→9', '→15', '✗18']
-    assert text['NAVIGATING_TO_PARKING'][2].split()[3:] == ['↓', '→15']
+    assert text['NAVIGATING_TO_PARKING'][2].split()[3:] == ['↓', '→8', '→15']
     assert text['EXPLORING_AROUND_G1'][2].split()[3:] == ['→3', 'optional']
 
 

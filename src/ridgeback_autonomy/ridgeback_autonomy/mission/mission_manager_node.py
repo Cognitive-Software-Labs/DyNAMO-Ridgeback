@@ -68,7 +68,7 @@ from ridgeback_autonomy.mission.target_localization import (
 )
 from ridgeback_autonomy.mission.target_orientation import (
     combined_axis, combined_estimate, depth_metres, depth_to_map_points, estimate_body_axis,
-    estimate_target_yaw,
+    estimate_target_yaw, occupied_cells, overhead_obstacle_points,
 )
 from ridgeback_autonomy.mission.parking_planner import (
     GridSnapshot,
@@ -158,6 +158,15 @@ _EXPLORABLE_PLANNING_FAILURES = ('no_free_donut_cells', 'no_valid_candidate',
 # Planning failures that leave the rejected plan on screen.
 _DRAWN_PLANNING_FAILURES = _EXPLORABLE_PLANNING_FAILURES
 
+# Parking leg failures worth another attempt in a different direction: what blocked
+# this one is specific to it. Sensor, ownership, deadline and setup failures are not.
+_RETRYABLE_PARKING_FAILURES = (
+    'lidar_clearance: lidar_obstacle_on_route', 'lidar_clearance: lidar_obstacle_in_stopping_path',
+    'lidar_clearance: g1_protected_region', 'final_pose_invalid: footprint_',
+    'final_pose_invalid: g1_keepout',
+    f'preparking_navigation_failed: status={GoalStatus.STATUS_ABORTED},',
+    f'parking_navigation_failed: status={GoalStatus.STATUS_ABORTED},')
+
 # Only these prove that Nav2 has stopped executing a goal and released it.
 _TERMINAL_GOAL_STATUSES = (
     GoalStatus.STATUS_SUCCEEDED, GoalStatus.STATUS_ABORTED, GoalStatus.STATUS_CANCELED)
@@ -204,6 +213,7 @@ _ALLOWED_TRANSITIONS = {
     MissionState.SETTLING_MOTION: {
         MissionState.LOCALIZE_G1,
         MissionState.RETURNING_TO_OBSERVATION,
+        MissionState.RETURNING_TO_START,
         MissionState.MOTION_SETTLEMENT_FAILED,
         MissionState.MISSION_FAILED,
         MissionState.MISSION_CANCELED,
@@ -212,13 +222,15 @@ _ALLOWED_TRANSITIONS = {
     MissionState.LOCALIZE_G1: {
         MissionState.G1_LOCALIZED,
         MissionState.RETURNING_TO_OBSERVATION,
+        MissionState.RETURNING_TO_START,
         MissionState.MISSION_FAILED,
         MissionState.MISSION_CANCELED,
     },
     MissionState.EXPLORING_AROUND_G1: {
         MissionState.STOPPING_EXPLORATION, MissionState.MISSION_CANCELED},
     MissionState.RETURNING_TO_OBSERVATION: {
-        MissionState.SETTLING_MOTION, MissionState.MISSION_FAILED, MissionState.MISSION_CANCELED},
+        MissionState.SETTLING_MOTION, MissionState.RETURNING_TO_START, MissionState.MISSION_FAILED,
+        MissionState.MISSION_CANCELED},
     MissionState.G1_LOCALIZED: {
         MissionState.EXPLORING_AROUND_G1,
         MissionState.PARKING_CANDIDATES_READY,
@@ -239,10 +251,11 @@ _ALLOWED_TRANSITIONS = {
     MissionState.PARKING_PLANNING_FAILED: set(),
     MissionState.PARKING_EXECUTION_FAILED: {MissionState.MISSION_CANCELED},
     MissionState.NAVIGATING_TO_PREPARKING: {
-        MissionState.NAVIGATING_TO_PARKING, MissionState.RETURNING_TO_START,
-        MissionState.MISSION_CANCELED},
+        MissionState.NAVIGATING_TO_PARKING, MissionState.RETURNING_TO_OBSERVATION,
+        MissionState.RETURNING_TO_START, MissionState.MISSION_CANCELED},
     MissionState.NAVIGATING_TO_PARKING: {
-        MissionState.PARKED, MissionState.RETURNING_TO_START, MissionState.MISSION_CANCELED},
+        MissionState.PARKED, MissionState.RETURNING_TO_OBSERVATION,
+        MissionState.RETURNING_TO_START, MissionState.MISSION_CANCELED},
     MissionState.PARKED: {MissionState.RETURNING_TO_START, MissionState.MISSION_CANCELED},
     MissionState.RETURNING_TO_START: {
         MissionState.MISSION_COMPLETE, MissionState.MISSION_FAILED,
@@ -338,6 +351,9 @@ class MissionManagerNode(Node):
         self.declare_parameter('parking_front_sector_half_deg', 30.0)
         # The legs' axis replaces the surface-based G1 position, unless it is this far off.
         self.declare_parameter('target_axis_max_shift_m', 0.25)
+        # Parking executions in total; a retry excludes the directions that failed.
+        self.declare_parameter('parking_max_attempts', 3)
+        self.declare_parameter('parking_retry_exclusion_deg', 20.0)
         # Return to the observation pose: G1 was detected from exactly there, and the
         # detector's score varies with the view. A temporary goal checker brings the
         # robot back to that view; the stop is verified before relocalization.
@@ -567,9 +583,16 @@ class MissionManagerNode(Node):
             'parking_side_sector_half_deg', 'parking_rear_sector_half_deg',
             'parking_front_sector_half_deg'))
         self.target_axis_max_shift_m = float(self.get_parameter('target_axis_max_shift_m').value)
+        self.parking_max_attempts = int(self.get_parameter('parking_max_attempts').value)
+        self.parking_retry_exclusion_rad = math.radians(
+            float(self.get_parameter('parking_retry_exclusion_deg').value))
+        self._parking_attempts = 0
+        self._failed_bearings = []
+        self._retry_after_stop = False
         self._g1_best_planned_rank = PREFERENCE_RANKS
         self._plan_rays_grid = None
         self.target_heading = None
+        self._overhead_points = None
         self._depth_frames = deque(
             maxlen=int(self.get_parameter('target_orientation_frames').value))
         self._camera_intrinsics = None
@@ -794,6 +817,9 @@ class MissionManagerNode(Node):
             if self.state == MissionState.EXPLORING_AROUND_G1:
                 self._poll_g1_exploration(now_s)
                 return
+            if self.state == MissionState.RETURNING_TO_OBSERVATION and self._retry_after_stop:
+                self._poll_retry_stop(now_s)
+                return
             if self.state == MissionState.RETURNING_TO_OBSERVATION:
                 if self._nav_deadline_s is not None and now_s >= self._nav_deadline_s:
                     self._cancel_navigation_goal()
@@ -807,6 +833,8 @@ class MissionManagerNode(Node):
                         failure = self._observation_view_failure()
                         if failure is not None and self._observation_fallback:
                             self._fall_back_to_observation_pose(failure[1])
+                            return
+                        if failure is not None and self._give_up_parking(*failure):
                             return
                         if failure is not None:
                             self._fail_terminal(*failure)
@@ -874,6 +902,10 @@ class MissionManagerNode(Node):
                     self._localization_deadline_s = None
                     self._fall_back_to_observation_pose(
                         'target localization did not stabilize in place')
+                    return
+                if self._give_up_parking('target_localization_timeout',
+                                         'G1 not relocalized for the next parking attempt'):
+                    self._localization_deadline_s = None
                     return
                 self._fail_terminal(
                     'target_localization_timeout',
@@ -1035,6 +1067,9 @@ class MissionManagerNode(Node):
                     'planning uses the larger keep-out margin'
                 )
                 self._planning_deadline_s = self._monotonic() + self.parking_input_timeout_s
+                if self._observation_pose is None:
+                    # A later parking retry relocalizes G1 from here if needed.
+                    self._observation_pose = self._current_robot_pose()
                 # Plan from the map at hand first; a planning failure that more mapping
                 # could resolve resumes the explorer instead (_fail_planning).
                 if self.parking_planning_enabled or not self._maybe_explore_around_g1():
@@ -1069,7 +1104,10 @@ class MissionManagerNode(Node):
             self._g1_exploration_elapsed_s = 0.0
             self._g1_preview_map, self._g1_planned_cells = None, set()
             self.target_heading = None
+            self._overhead_points = None
             self._g1_best_planned_rank = PREFERENCE_RANKS
+            self._parking_attempts, self._failed_bearings = 0, []
+            self._retry_after_stop = False
             self._plan_rays_grid = None
             self._depth_frames.clear()
             self._observation_pose = self._observation_goal = None
@@ -1510,6 +1548,8 @@ class MissionManagerNode(Node):
             'is_foot_midpoint': None if position is None else position.is_foot_midpoint,
             'parking_plan': self._plan_summary(),
             'g1_exploration': self.g1_exploration_result,
+            'parking_attempts': self._parking_attempts,
+            'failed_parking_bearings_deg': [round(math.degrees(b), 1) for b in self._failed_bearings],
             'g1_heading': None if self.target_heading is None else {
                 'yaw_rad': round(self.target_heading.yaw_rad, 3),
                 'support_points': self.target_heading.support_points,
@@ -1563,7 +1603,7 @@ class MissionManagerNode(Node):
                 is_foot_midpoint=position.is_foot_midpoint, source=position.source,
                 facing_yaw_rad=self._facing_yaw_rad(), facing_sectors_rad=self.facing_sectors_rad)
             try:
-                grid = None if self.latest_map is None else GridSnapshot.from_msg(self.latest_map)
+                grid = None if self.latest_map is None else self._planning_grid(self.latest_map)
             except ValueError as exc:
                 self._fail_planning('parking_inputs_invalid', f'map_invalid: {exc}')
                 return
@@ -1596,6 +1636,7 @@ class MissionManagerNode(Node):
             # The rays follow on the next tick: planning must stay short of the odometry
             # age that restarts motion settlement, or the target expires before driving.
             plan = plan_parking(grid, target, self.planner_config, approach, rays=False)
+            self._exclude_failed_directions(plan)
             self.parking_plan = plan
             self._plan_rays_grid = grid
             self._planning_deadline_s = None
@@ -1677,6 +1718,9 @@ class MissionManagerNode(Node):
             plan.ok, plan.selected, plan.selected_path, plan.failure_reason = False, None, None, code
             self._publish_parking_markers()
         self._parking_failure = f'{code}: {reason}'
+        if self._parking_attempts:
+            self._parking_failure = (f'no alternative after {self._parking_attempts} parking attempts, '
+                                     f'directions that failed excluded: {self._parking_failure}')
         self.get_logger().error(f'No feasible parking pose [{code}]: {reason}; returning to start')
         self._start_return(f'no feasible parking pose: {code}')
         return True
@@ -1724,6 +1768,7 @@ class MissionManagerNode(Node):
             self._execution_odom_received_s = self._monotonic()
             if self.execution.state == ExecutionState.IDLE and self.state not in (
                                   MissionState.SETTLING_MOTION, MissionState.LOCALIZE_G1,
+                                  MissionState.RETURNING_TO_OBSERVATION,
                                   MissionState.G1_LOCALIZED, MissionState.PARKING_CANDIDATES_READY,
                                   MissionState.EVALUATING_PARKING_PATHS,
                                   MissionState.PARKING_PATH_FEASIBLE) + _PARKING_DRIVE_STATES:
@@ -1971,7 +2016,7 @@ class MissionManagerNode(Node):
         if plan is None:
             return 'plan_unavailable'
         try:
-            grid = None if self.latest_map is None else GridSnapshot.from_msg(self.latest_map)
+            grid = None if self.latest_map is None else self._planning_grid(self.latest_map)
         except ValueError as exc:
             return f'map_invalid: {exc}'
         robot = self._current_robot_pose(with_stamp=True)
@@ -2148,7 +2193,7 @@ class MissionManagerNode(Node):
                 route = deepcopy(result.path)
                 route.poses.append(self._pose_stamped(candidate.base_x, candidate.base_y,
                                                       candidate.yaw))
-                grid = GridSnapshot.from_msg(self.latest_map)
+                grid = self._planning_grid(self.latest_map)
                 path_stamp = Time.from_msg(result.path.header.stamp).nanoseconds
                 now = self.get_clock().now().nanoseconds
                 if path_stamp > now or now - path_stamp > int(self.parking_max_pose_age_s * 1e9):
@@ -2203,8 +2248,10 @@ class MissionManagerNode(Node):
     # Original mission tail: pre-parking -> final -> stop and wait -> return to start.
 
     def _begin_parking_navigation(self):
+        self._parking_attempts += 1
         self._transition(MissionState.NAVIGATING_TO_PREPARKING,
-                         'path-feasible parking pose selected; parking navigation enabled')
+                         f'path-feasible parking pose selected; parking attempt '
+                         f'{self._parking_attempts}/{self.parking_max_attempts}')
         # The original parked with a 0.08 m / 0.12 rad goal checker; the shared
         # profile is far looser, so tighten it for the two parking legs only.
         limits = self.execution.limits
@@ -2385,6 +2432,8 @@ class MissionManagerNode(Node):
                             event='navigation_released')
         if self.state == MissionState.RETURNING_TO_START and self._return_after_stop:
             self._settle_before_return()
+        if self.state == MissionState.RETURNING_TO_OBSERVATION and self._retry_after_stop:
+            self._settle_before_return()
 
     def _abandon_navigation(self, detail):
         """Fail the current goal while Nav2 may still own it; nothing new drives before release."""
@@ -2404,6 +2453,9 @@ class MissionManagerNode(Node):
         if self.state == MissionState.RETURNING_TO_OBSERVATION:
             if not ok and self._observation_fallback:
                 self._fall_back_to_observation_pose(f'turn toward G1 failed: {detail}')
+                return
+            if not ok and self._give_up_parking('observation_return_failed', detail):
+                self._restore_shared_tolerance('the observation return')
                 return
             if not ok:
                 self.last_issue = MissionIssue(FailureClass.TERMINAL,
@@ -2508,9 +2560,83 @@ class MissionManagerNode(Node):
             self._parking_navigation_failed(detail)
 
     def _parking_navigation_failed(self, reason, *, stop_first=False):
+        if self._retry_parking(reason, stop_first=stop_first):
+            return
+        if self._parking_attempts > 1:
+            reason = f'parking attempt {self._parking_attempts}/{self.parking_max_attempts}: {reason}'
         self.get_logger().error(f'Parking failed: {reason}; returning to start')
         self._parking_failure = reason
         self._start_return(reason, stop_first=stop_first)
+
+    def _retry_parking(self, reason, *, stop_first):
+        """Stop, then relocalize G1 for another attempt that avoids this direction. False for a
+        failure that is not specific to the attempt, or when no attempt is left."""
+        plan = self.parking_plan
+        if (not reason.startswith(_RETRYABLE_PARKING_FAILURES)
+                or self._parking_attempts >= self.parking_max_attempts
+                or self.state not in _PARKING_LEGS or self._observation_pose is None
+                or plan is None or plan.selected is None):
+            return False
+        sel = plan.selected
+        self._failed_bearings.append(math.atan2(sel.task_y - plan.target.y, sel.task_x - plan.target.x))
+        self.get_logger().warning(
+            f'Parking attempt {self._parking_attempts}/{self.parking_max_attempts} failed: {reason}; '
+            'stopping, then relocalizing G1 for another direction')
+        if not self._transition(
+                MissionState.RETURNING_TO_OBSERVATION,
+                f'parking attempt {self._parking_attempts} failed: {reason}; stopping before a retry'):
+            return False
+        self._retry_after_stop = True
+        if stop_first:
+            self._cancel_navigation_goal()
+        if self._nav_goal_generation is None:
+            self._settle_before_return()
+        return True
+
+    def _poll_retry_stop(self, now_s):
+        """After a failed attempt: once Nav2 released the goal and the robot stopped, relocalize."""
+        if self._nav_goal_generation is not None:
+            return   # the cancelled leg has not been released by Nav2 yet
+        if self.motion.ready(self.get_clock().now().nanoseconds, now_s):
+            self._retry_after_stop = False
+            self._nav_deadline_s = None
+            goal, how = self._reacquisition_goal()
+            self._observation_goal = goal
+            self._observation_fallback = goal is not self._observation_pose
+            self._publish_state(f'stopped after the failed attempt; {how}', event='parking_retry')
+            self._set_goal_tolerance(self.observation_tolerance, self._send_observation_goal)
+        elif self._nav_deadline_s is not None and now_s >= self._nav_deadline_s:
+            self._retry_after_stop = False
+            self._nav_deadline_s = None
+            self.last_issue = MissionIssue(FailureClass.TERMINAL, 'stop_not_confirmed', self.motion.reason)
+            self._transition(MissionState.MISSION_FAILED,
+                             f'no confirmed stop after the failed parking attempt: {self.motion.reason}')
+
+    def _give_up_parking(self, code, reason):
+        """A retry cannot proceed: go home and report it, as after the last attempt. False before
+        any attempt, with driving off, or while Nav2 may still own a goal."""
+        if (self._parking_attempts == 0 or not self.parking_navigation_enabled
+                or self.start_pose is None or self._nav_goal_generation is not None):
+            return False
+        self._parking_failure = (f'parking attempt {self._parking_attempts}/{self.parking_max_attempts} '
+                                 f'not retried: {code}: {reason}')
+        self.get_logger().error(f'{self._parking_failure}; returning to start')
+        self._start_return(f'retry not possible: {code}')
+        return True
+
+    def _exclude_failed_directions(self, plan):
+        """Reject valid candidates near a direction whose parking attempt failed."""
+        if not self._failed_bearings:
+            return
+        for c in plan.candidates:
+            bearing = math.atan2(c.task_y - plan.target.y, c.task_x - plan.target.x)
+            if c.status in ('valid', 'selected') and any(
+                    abs(normalize_angle(bearing - failed)) <= self.parking_retry_exclusion_rad
+                    for failed in self._failed_bearings):
+                c.status, c.reason = 'rejected', 'failed_attempt_direction'
+        if not any(c.status in ('valid', 'selected') for c in plan.candidates):
+            plan.ok, plan.selected = False, None
+            plan.failure_reason = plan.failure_reason or 'no_valid_candidate'
 
     def _start_return(self, reason, *, stop_first=False):
         if stop_first:
@@ -2664,7 +2790,8 @@ class MissionManagerNode(Node):
         self._request_navigation_cancel()   # one final request; the first may have been lost
         self.get_logger().error(f'Navigation goal ownership unresolved: {detail}')
         self.last_issue = MissionIssue(FailureClass.TERMINAL, 'navigation_cancel_unresolved', detail)
-        if self.state == MissionState.RETURNING_TO_START:
+        if self.state in (MissionState.RETURNING_TO_START, MissionState.RETURNING_TO_OBSERVATION):
+            self._retry_after_stop = False
             self._transition(MissionState.MISSION_FAILED, detail)
         else:
             self._publish_state(detail, event='navigation_ownership')
@@ -2684,7 +2811,7 @@ class MissionManagerNode(Node):
         plan = self.parking_plan
         sel = plan.selected
         try:
-            grid = None if self.latest_map is None else GridSnapshot.from_msg(self.latest_map)
+            grid = None if self.latest_map is None else self._planning_grid(self.latest_map)
         except ValueError as exc:
             return f'map_invalid: {exc}'
         reasons = validate_inputs(plan.target, grid, self._current_robot_pose(with_stamp=True),
@@ -2732,7 +2859,7 @@ class MissionManagerNode(Node):
         if cached_map is self.latest_map and cached_key == key:
             return cached
         try:
-            grid = GridSnapshot.from_msg(self.latest_map)
+            grid = self._planning_grid(self.latest_map)
         except ValueError:
             return None
         rows, cols = np.mgrid[0:grid.height, 0:grid.width]
@@ -2873,7 +3000,7 @@ class MissionManagerNode(Node):
         self._g1_preview_map, self._g1_preview_next_s = (
             self.latest_map, now_s + self.g1_exploration_refresh_s)
         try:
-            grid = GridSnapshot.from_msg(self.latest_map)
+            grid = self._planning_grid(self.latest_map)
         except ValueError:
             return self._g1_preview_new
         position = self.target_position
@@ -2946,6 +3073,21 @@ class MissionManagerNode(Node):
                 'preference': sel.preference_label, 'path_length_m': sel.path_length_m}
         return summary
 
+    def _planning_grid(self, msg):
+        """The SLAM map plus obstacles the camera saw at robot height near G1, which the 2D
+        LiDARs pass under (a tabletop over the floor between its legs). Planning only: the
+        map, Nav2 and the LiDAR monitor are unchanged."""
+        grid = GridSnapshot.from_msg(msg)
+        if self._overhead_points is None or not len(self._overhead_points):
+            return grid
+        rows, cols = occupied_cells(self._overhead_points, grid)
+        free = grid.data[rows, cols] < self.planner_config.occupied_threshold
+        if not free.any():
+            return grid
+        data = grid.data.copy()
+        data[rows[free], cols[free]] = 100
+        return replace(grid, data=data)
+
     def _facing_yaw_rad(self):
         return None if self.target_heading is None else self.target_heading.yaw_rad
 
@@ -2966,6 +3108,8 @@ class MissionManagerNode(Node):
                     points = depth_to_map_points(depth, self._camera_intrinsics, *rotation_translation)
                     estimates.append(estimate_target_yaw(points, center))
                     axes.append(estimate_body_axis(points, center, rotation_translation[1][:2]))
+                    # The latest view also shows what the 2D LiDARs pass under.
+                    self._overhead_points = overhead_obstacle_points(points, center)
         self.target_heading = combined_estimate(estimates)
         axis = combined_axis(axes)
         if axis is None or math.hypot(axis[0] - center[0], axis[1] - center[1]) > self.target_axis_max_shift_m:

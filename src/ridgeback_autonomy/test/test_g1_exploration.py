@@ -825,3 +825,22 @@ def test_a_goal_still_owned_by_nav2_blocks_the_return(manager_factory):
     on_a_blocked_map(m, centre)
     assert m.state == MissionState.PARKING_PLANNING_FAILED
     assert m.navigation_client.calls == []           # no competing goal
+
+
+
+def test_a_tabletop_the_lidars_pass_under_blocks_parking_beneath_it(manager_factory, monkeypatch):
+    """Planning only: the camera's view of a tabletop marks its floor occupied for the planner,
+    while the SLAM map itself is left unchanged."""
+    probe = exploring_manager(manager_factory)
+    t = probe.target_position
+    monkeypatch.setattr(manager_module, 'estimate_body_axis', lambda points, seed, camera: None)
+    above = lambda points, centre: np.array(
+        [[x, y] for x in np.arange(t.map_x_m - 0.6, t.map_x_m + 0.6, 0.02)
+         for y in np.arange(t.map_y_m + 0.7, t.map_y_m + 1.4, 0.02)] * 3)
+    monkeypatch.setattr(manager_module, 'overhead_obstacle_points', above)
+    m = localized_on(manager_factory, NOTHING, prepare=seeing(monkeypatch, [WEST] * 5))
+    beneath = [c for c in m.parking_plan.candidates
+               if abs(c.base_x - t.map_x_m) < 0.4 and c.base_y > t.map_y_m + 0.5]
+    assert beneath and all(c.status != 'valid' for c in beneath)
+    assert any(c.status == 'valid' for c in m.parking_plan.candidates)
+    assert (np.array(m.latest_map.data) < 50).all()      # the SLAM map itself is untouched

@@ -63,9 +63,11 @@ def reply_to_cancel(handle, accepted=True):
     handle.cancel_futures[-1].set_result(response)
 
 
-def feasible(manager_factory, monkeypatch, *, enabled=True):
+def feasible(manager_factory, monkeypatch, *, enabled=True, attempts=1):
+    """A path-feasible plan; one attempt by default, so a failed leg is the last one."""
     m, paths, published = running(manager_factory, monkeypatch)
     m.parking_navigation_enabled = enabled
+    m.parking_max_attempts = attempts
     m.navigation_client = Client()
     m._goal_checker_set_client = ParamClient()
     while m.state == MissionState.EVALUATING_PARKING_PATHS:
@@ -400,3 +402,135 @@ def test_unknown_acceptance_never_starts_the_return(manager_factory, monkeypatch
     assert m.state == MissionState.MISSION_FAILED
     assert m.last_issue.code == 'navigation_cancel_unresolved'
     assert len(m.navigation_client.calls) == 1
+
+
+
+# Up to three parking attempts: a failed direction is excluded, and only failures that
+# are specific to the attempt are retried.
+from test_mission_manager import localize
+
+
+def aim_camera(m):
+    from test_g1_exploration import aim_camera as aim   # local: that module imports this one
+    aim(m)
+
+
+def back_at_observation(m):
+    from test_g1_exploration import back_at_observation as back
+    return back(m)
+
+
+def vetoed(manager_factory, monkeypatch, reason='lidar_clearance: lidar_obstacle_on_route'):
+    m, published = feasible(manager_factory, monkeypatch, attempts=3)
+    aim_camera(m)
+    answer(m._goal_checker_set_client)
+    _, accepted, handle = m.navigation_client.calls[-1]
+    accepted.set_result(handle)
+    failed = m.parking_plan.selected
+    m._parking_navigation_failed(reason, stop_first=True)
+    return m, handle, failed, published
+
+
+def stopped(m, handle):
+    release(handle)
+    hold_still(m)
+    m.tick()
+
+
+def bearing(m, c):
+    return math.atan2(c.task_y - m.parking_plan.target.y, c.task_x - m.parking_plan.target.x)
+
+
+def test_a_vetoed_attempt_stops_relocalizes_and_tries_another_direction(manager_factory, monkeypatch):
+    m, handle, failed, _ = vetoed(manager_factory, monkeypatch)
+    assert m.state == MissionState.RETURNING_TO_OBSERVATION and handle.cancels == 1
+    m.tick()
+    assert len(m.navigation_client.calls) == 1                 # nothing before Nav2 releases the leg
+    release(handle)
+    m.tick()
+    assert len(m.navigation_client.calls) == 1                 # nor before a confirmed stop
+    hold_still(m)
+    m.tick()
+    assert back_at_observation(m) == pytest.approx((1.0, 2.0, 0.25))   # the robot never moved here
+    hold_still(m)
+    m.tick()
+    assert m.state == MissionState.LOCALIZE_G1
+    m.test_ros_ns = m.tf_buffer.stamp_ns = m.test_ros_ns + 10
+    localize(m, first_stamp_ns=m.test_ros_ns - 4)
+    assert m.state in (MissionState.PARKING_CANDIDATES_READY, MissionState.EVALUATING_PARKING_PATHS)
+    near = [c for c in m.parking_plan.candidates
+            if abs(math.remainder(bearing(m, c) - bearing(m, failed), 2 * math.pi)) <= math.radians(20)]
+    assert near and all(c.reason == 'failed_attempt_direction' for c in near
+                        if c.status != 'collision' and c.reason in ('footprint_free', 'failed_attempt_direction'))
+    assert any(c.status == 'valid' for c in m.parking_plan.candidates)
+    assert m._parking_attempts == 1 and len(m._failed_bearings) == 1
+
+
+@pytest.mark.parametrize('reason', [
+    'lidar_clearance: lidar_stale: sensors/lidar2d_0/scan', 'lidar_clearance: odometry_stale',
+    'NAVIGATING_TO_PREPARKING deadline expired', 'goal transport failed: x',
+    'preparking_navigation_failed: status=5, error_code=0, '])
+def test_failures_not_specific_to_the_attempt_are_never_retried(manager_factory, monkeypatch, reason):
+    m, handle, _, _ = vetoed(manager_factory, monkeypatch, reason)
+    assert m.state == MissionState.RETURNING_TO_START
+    assert m._failed_bearings == []
+
+
+def test_the_third_failed_attempt_returns_home_and_reports_all_attempts(manager_factory, monkeypatch):
+    m, handle, _, _ = vetoed(manager_factory, monkeypatch)
+    m._parking_attempts = 3                                    # this was the last allowed attempt
+    m.state = MissionState.NAVIGATING_TO_PARKING
+    m._parking_navigation_failed('lidar_clearance: lidar_obstacle_in_stopping_path', stop_first=True)
+    assert m.state == MissionState.RETURNING_TO_START
+    stopped(m, handle)
+    answer(m._goal_checker_set_client)
+    navigation_result(m.navigation_client)
+    assert m.state == MissionState.MISSION_FAILED
+    assert m.last_issue.code == 'parking_failed' and 'parking attempt 3/3' in m.last_issue.reason
+
+
+def test_an_unconfirmed_stop_after_a_failed_attempt_never_drives(manager_factory, monkeypatch):
+    m, handle, _, _ = vetoed(manager_factory, monkeypatch)
+    release(handle)
+    m._monotonic.value += m.motion_settlement_timeout_s + 1.0
+    m.tick()
+    assert m.state == MissionState.MISSION_FAILED and m.last_issue.code == 'stop_not_confirmed'
+    assert len(m.navigation_client.calls) == 1
+
+
+def test_an_unresolved_cancellation_fails_without_a_competing_goal(manager_factory, monkeypatch):
+    m, handle, _, _ = vetoed(manager_factory, monkeypatch)
+    m._monotonic.value += m.execution.limits.cancellation_timeout_s + 1.0
+    m.tick()
+    assert m.state == MissionState.MISSION_FAILED
+    assert m.last_issue.code == 'navigation_cancel_unresolved'
+    assert len(m.navigation_client.calls) == 1
+
+
+def test_no_alternative_direction_returns_home_and_reports_it(manager_factory, monkeypatch):
+    m, handle, failed, _ = vetoed(manager_factory, monkeypatch)
+    m.parking_retry_exclusion_rad = math.pi                    # every direction counts as failed
+    stopped(m, handle)
+    back_at_observation(m)
+    hold_still(m)
+    m.tick()
+    m.test_ros_ns = m.tf_buffer.stamp_ns = m.test_ros_ns + 10
+    localize(m, first_stamp_ns=m.test_ros_ns - 4)
+    assert m.state == MissionState.RETURNING_TO_START
+    answer(m._goal_checker_set_client)
+    navigation_result(m.navigation_client)
+    assert m.state == MissionState.MISSION_FAILED
+    assert 'no alternative after 1 parking attempts' in m.last_issue.reason
+
+
+def test_relocalization_failing_during_a_retry_returns_home(manager_factory, monkeypatch):
+    m, handle, _, _ = vetoed(manager_factory, monkeypatch)
+    stopped(m, handle)
+    back_at_observation(m)
+    hold_still(m)
+    m.tick()
+    assert m.state == MissionState.LOCALIZE_G1
+    m._monotonic.value += m.localization_timeout_s + 1.0
+    m.tick()
+    assert m.state == MissionState.RETURNING_TO_START
+    assert 'target_localization_timeout' in m._parking_failure

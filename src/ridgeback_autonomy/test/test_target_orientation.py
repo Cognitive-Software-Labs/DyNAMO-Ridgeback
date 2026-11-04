@@ -151,3 +151,30 @@ def test_frames_must_agree_on_the_body_axis():
     assert combined_axis([(3.0, 0.0), (3.01, 0.0), None, (3.0, 0.01)]) == pytest.approx((3.0, 0.0))
     assert combined_axis([(3.0, 0.0), None, (3.0, 0.0)]) is None
     assert combined_axis([(3.0, 0.0), (3.0, 0.0), (3.2, 0.0)]) is None
+
+
+# What the 2D LiDARs pass under: a tabletop over free floor, seen by the depth camera.
+from ridgeback_autonomy.mission.parking_planner import GridSnapshot
+from ridgeback_autonomy.mission.target_orientation import occupied_cells, overhead_obstacle_points
+
+
+def tabletop(x0=2.4, x1=3.6, y0=0.7, y1=1.4, z=0.75, n=4000):
+    return np.stack((RNG.uniform(x0, x1, n), RNG.uniform(y0, y1, n), np.full(n, z)), axis=1)
+
+
+def test_a_tabletop_at_robot_height_is_an_obstacle_but_g1_floor_and_ceiling_are_not():
+    floor = np.stack((RNG.uniform(1, 5, 2000), RNG.uniform(-2, 2, 2000), np.zeros(2000)), axis=1)
+    ceiling = tabletop(z=2.5)
+    points = np.vstack((cloud(math.pi), tabletop(), floor, ceiling))
+    kept = overhead_obstacle_points(points, G1)
+    assert len(kept) >= 3000                                       # the tabletop
+    assert np.all(np.hypot(kept[:, 0] - G1[0], kept[:, 1] - G1[1]) > 0.45)   # never G1's own body
+    assert np.all((kept[:, 1] >= 0.69) & (kept[:, 1] <= 1.41))
+
+
+def test_only_cells_with_enough_points_are_marked():
+    g = GridSnapshot('map', 0, 0.05, 120, 120, 0.0, -3.0, 0.0, np.zeros((120, 120), np.int16))
+    rows, cols = occupied_cells(np.array([[3.01, 1.01]] * 2 + [[3.21, 1.21]] * 3), g)
+    assert list(zip(rows.tolist(), cols.tolist())) == [(84, 64)]
+    assert occupied_cells(np.empty((0, 2)), g)[0].size == 0
+    assert occupied_cells(np.array([[50.0, 50.0]] * 5), g)[0].size == 0   # off the map

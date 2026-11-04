@@ -186,3 +186,38 @@ def combined_estimate(estimates):
         return None
     return OrientationEstimate(yaw, min(e.support_points for e in seen),
                                min(e.inlier_fraction for e in seen))
+
+
+# Obstacles the 2D LiDARs pass under (a tabletop): depth points between just above
+# the scan plane and the robot's top, near G1 but outside its own body. The robot is
+# 1.03 m tall at its camera; G1's forearms reach 0.40 m from its axis, over the bin.
+OVERHEAD_HEIGHT_M = (0.25, 1.15)
+OVERHEAD_RADIUS_M = 1.6
+G1_BODY_RADIUS_M = 0.45
+MIN_OVERHEAD_POINTS_PER_CELL = 3
+
+
+def overhead_obstacle_points(points_map, center_xy, floor_z=0.0):
+    """(N, 2) map points of obstacles at robot height near G1, outside its own body."""
+    points = np.asarray(points_map, dtype=float)
+    if points.size == 0:
+        return np.empty((0, 2))
+    radius = np.hypot(points[:, 0] - center_xy[0], points[:, 1] - center_xy[1])
+    height = points[:, 2] - floor_z
+    keep = ((height >= OVERHEAD_HEIGHT_M[0]) & (height <= OVERHEAD_HEIGHT_M[1])
+            & (radius > G1_BODY_RADIUS_M) & (radius <= OVERHEAD_RADIUS_M))
+    return points[keep, :2]
+
+
+def occupied_cells(points_xy, grid):
+    """(rows, cols) of grid cells holding at least MIN_OVERHEAD_POINTS_PER_CELL of the points."""
+    points = np.asarray(points_xy, dtype=float).reshape(-1, 2)
+    lx, ly = grid.map_to_local(points[:, 0], points[:, 1])
+    cols = np.floor(np.asarray(lx) / grid.resolution).astype(int)
+    rows = np.floor(np.asarray(ly) / grid.resolution).astype(int)
+    inside = (cols >= 0) & (cols < grid.width) & (rows >= 0) & (rows < grid.height)
+    if not inside.any():
+        return np.empty(0, int), np.empty(0, int)
+    cells, counts = np.unique(np.stack((rows[inside], cols[inside])), axis=1, return_counts=True)
+    cells = cells[:, counts >= MIN_OVERHEAD_POINTS_PER_CELL]
+    return cells[0], cells[1]

@@ -215,6 +215,20 @@ goal: otherwise, or with driving off, it stops in `PARKING_PLANNING_FAILED`
 without sending a goal. A failed return ends `MISSION_FAILED`
 (`return_navigation_failed`) without a retry.
 
+### Obstacles above the LiDAR plane
+
+The LiDARs scan 0.18 m above the floor, so the SLAM map has a tabletop's legs
+but not its top. Beside the demo table, poses between its legs looked free, and
+their rays were green: in Gazebo, the parked footprint fitted between the legs
+with the 1.03 m camera mast under the 0.70 m tabletop. The depth frames of each
+stationary localization therefore also give the obstacles at robot height
+(0.25-1.15 m) within 1.6 m of G1, excluding G1's own body within 0.45 m, whose
+forearms are meant to reach over the bin (`overhead_obstacle_points`). Cells with
+at least 3 such points are occupied for planning, its revalidation and the
+exploration coverage, so the planner and the rays reject those poses. The SLAM
+map, Nav2 and the LiDAR monitor are unchanged, and anything outside the camera's
+view stays unknown to it.
+
 ### G1-centred exploration
 
 After each G1 localization, the manager plans parking from the map at hand
@@ -292,9 +306,23 @@ acceptance is cancelled when its handle arrives. A goal that succeeds or aborts
 while its cancellation is in flight is released, but never counts as the
 abandoned leg's arrival.
 
-During a parking leg, a LiDAR veto, the leg deadline or an unknown
-acceptance/result moves the mission to `RETURNING_TO_START` without sending a
-goal. The return waits for the terminal result, then for fresh odometry that
+A parking leg gets `parking_max_attempts` (3) executions in total. A failure
+specific to the attempt is retried: a LiDAR veto for an obstacle on the route,
+in the stopping path or in G1's protected region, a Nav2 abort, or a final pose
+the latest map rejects. The mission moves to `RETURNING_TO_OBSERVATION`. Like
+the return below, it sends nothing until Nav2 has released the goal and fresh
+odometry confirms the stop. It then relocalizes G1 as after exploring, and plans
+again with every valid candidate within `parking_retry_exclusion_deg` (20°) of a
+failed attempt's bearing rejected (`failed_attempt_direction`). The ranking is
+otherwise unchanged, so the next attempt takes the best remaining class and
+direction, and the rays keep their geometric colours. Without an untried
+direction, or if G1 is not relocalized, the robot returns to the start and the
+mission ends `MISSION_FAILED` (`parking_failed`, naming the attempts). An
+unconfirmed stop or an unresolved cancellation fails at once, without a goal.
+
+Any other parking-leg failure moves the mission to `RETURNING_TO_START`: stale
+LiDAR or odometry, the leg deadline, an unknown acceptance or result, or the
+last attempt. It sends no goal at first. The return waits for the terminal result, then for fresh odometry that
 confirms the robot stopped after the release, and only then restores the
 shared goal checker and sends the return goal. A deadline on the observation or return goal fails the mission at once
 while the cancellation is still tracked. A send attempted while a goal is still
