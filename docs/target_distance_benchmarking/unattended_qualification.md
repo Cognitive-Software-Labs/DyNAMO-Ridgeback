@@ -53,7 +53,9 @@ never counted as a pass.
 
 Before the full matrix, three short configurations run in each simulator on
 `multi_04`: box/stereo for 4 seconds, box/monocular and silhouette/monocular for
-6 seconds. Each check must show:
+6 seconds. A simulator whose full-run conditions are all imported has nothing
+left for its check to guard, so that check is skipped and recorded in
+`skipped_checks`. Each check must show:
 
 - a measurement window within 0.5 seconds of its setting, timed apart from the
   sample drain, and more live raw batches than the five it stored;

@@ -630,3 +630,21 @@ def test_fully_imported_stage_is_skipped_and_its_input_kept_aside(tmp_path, monk
     with pytest.raises(RuntimeError, match='first stage that runs'):
         campaign.run_stages(bundle, state, ('gz_r1', 'isaac_r1'), time.monotonic()+3600)
     assert len(ran) == 1 and ran[0][2].endswith('isaac_r1.yaml')
+
+
+def test_readiness_check_is_skipped_for_a_simulator_with_every_full_run_imported(tmp_path, monkeypatch):
+    state = {'imported': {f'{stage}/{c}': {} for stage in ('gz_r1', 'gz_r2') for c in evidence.CONDITIONS}}
+    assert not campaign.check_needed(state, 'check_gz')
+    assert campaign.check_needed(state, 'check_isaac') and campaign.check_needed({}, 'check_gz')
+    monkeypatch.setattr(campaign, 'check_frozen', lambda _bundle: None)
+    monkeypatch.setattr(campaign, 'host_available', lambda *_args: {})
+    monkeypatch.setattr(campaign, 'atomic_json', lambda *_args: None)
+    ran = []
+    def owned(command, *_args):
+        ran.append(command)
+        raise RuntimeError('stop after the first stage that runs')
+    monkeypatch.setattr(campaign, 'owned_command', owned)
+    with pytest.raises(RuntimeError, match='first stage that runs'):
+        campaign.run_stages(tmp_path, state, (*campaign.CHECK_STAGES, *campaign.ORDER), time.monotonic()+3600)
+    assert len(ran) == 1 and ran[0][2].endswith('check_isaac.yaml')
+    assert state['skipped_checks'] == ['check_gz']

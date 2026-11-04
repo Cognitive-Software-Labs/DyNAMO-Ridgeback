@@ -216,6 +216,12 @@ def stage_conditions(state, stage):
                  if f'{stage}/{c}' not in imported)
 
 
+def check_needed(state, stage):
+    """A simulator's readiness check guards its own full runs; none left, nothing to guard."""
+    backend = stage.removeprefix('check_') + '_'
+    return any(stage_conditions(state, s) for s in ORDER if s.startswith(backend))
+
+
 def condition_paths(bundle, state, stage, condition):
     """Run directory and sensor capture of one condition, whether run here or imported."""
     record = state.get('imported', {}).get(f'{stage}/{condition}')
@@ -564,6 +570,9 @@ def run_stages(bundle, state, stages, end):
         check_frozen(bundle)
         if not stage_conditions(state, stage):
             continue
+        if stage.startswith('check_') and not check_needed(state, stage):
+            state.setdefault('skipped_checks', []).append(stage)
+            continue
         state.setdefault('host_checks', {})[stage] = host_available(
             state.get('external_gpu_policy', 'stop'))
         proof = stage.startswith('check_')
@@ -849,6 +858,8 @@ def report(bundle):
     for key, record in state.get('imported', {}).items():
         lines.append(f"- `{key}` is imported from `{record['source_bundle']}` (revision "
                      f"{record['source_revision']}); the stage's other conditions run in their own session.")
+    for stage in state.get('skipped_checks', []):
+        lines.append(f'- {stage} skipped: every full-run condition of that simulator is imported.')
     for stage, load in stage_host_load(bundle, state).items():
         lines.append(f"- {stage}: another user's CUDA process above 5% SM in {load['external_busy']}/"
                      f"{load['samples']} host samples; minimum MemAvailable {load['min_mem_available_gib']} GiB.")
