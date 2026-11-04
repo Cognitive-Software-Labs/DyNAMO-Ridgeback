@@ -48,6 +48,9 @@ from ridgeback_autonomy.localization_launch import (
     SIMULATION_CAMERA_INPUTS,
 )
 from ridgeback_autonomy.namespace_resolution import resolve_namespace
+from ridgeback_localization.core.vehicle_frame import (
+    HARDWARE_FRONT_OFFSET_M, ROBOT_FRONT_OFFSET_M,
+)
 
 
 # The distance HUD is a second overlay from the velocity/coverage one, and needs
@@ -127,6 +130,7 @@ def build_target_localization_nodes(context, *args, **kwargs):
     use_sim_time = LaunchConfiguration('use_sim_time')
     depth_source = LaunchConfiguration('depth_source')
     mask_gate = LaunchConfiguration('mask_gate')
+    front_offset = float(LaunchConfiguration('front_offset_m').perform(context))
     estimate_viz = LaunchConfiguration('estimate_viz')
     camera_inputs = _camera_inputs(context)
 
@@ -183,6 +187,7 @@ def build_target_localization_nodes(context, *args, **kwargs):
                 base_frame=base_frame,
                 color_topic=camera_inputs.color_image_topic,
                 pointcloud_topic=camera_inputs.organized_points_topic,
+                front_offset_m=front_offset,
             ))
 
         if uses_mask_estimators(selected_estimators):
@@ -198,6 +203,7 @@ def build_target_localization_nodes(context, *args, **kwargs):
                 camera_info_topic=camera_inputs.color_camera_info_topic,
                 depth_topic=camera_inputs.aligned_depth_topic,
                 scan_topic=LaunchConfiguration('scan_topic'),
+                front_offset_m=front_offset,
             ))
 
     if mode == 'external':
@@ -233,6 +239,7 @@ def build_target_localization_nodes(context, *args, **kwargs):
         hud_layout='wide',
         base_frame=base_frame,
         condition=launch.conditions.IfCondition(estimate_viz),
+        front_offset_m=front_offset,
     ))
 
     # Four cells of HUD_WIDE_CELL_COLUMNS each, so ~40 columns; 40 x 14.4 px =
@@ -444,6 +451,11 @@ def generate_launch_description():
                 SIMULATION_CAMERA_INPUTS.organized_points_topic or '',
                 REALSENSE_CAMERA_INPUTS.organized_points_topic or ''),
         ),
+        DeclareLaunchArgument(
+            'front_offset_m', default_value=_backend_default(
+                str(ROBOT_FRONT_OFFSET_M), str(HARDWARE_FRONT_OFFSET_M)),
+            description='Reporting origin ahead of base_link; measured r100_0160 '
+                        'front datum on hardware. Match remote compute in external mode.'),
         DeclareLaunchArgument('exploration_rviz', default_value='true',
                               description='Launch the exploration RViz2 config'),
         DeclareLaunchArgument('target_localization_enabled', default_value='true',

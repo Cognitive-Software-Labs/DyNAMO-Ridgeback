@@ -71,6 +71,61 @@ offset worsened the informative placements to about 29–33 mm. The small
 best-fit extra shift in those checks is not a basis for retuning the mount;
 formal extrinsic uncertainty and moving-robot validity remain separate.
 
+## Hardware distance-reporting front datum
+
+For physical Ridgeback **`r100_0160`**, use **`front_offset_m = 0.465` m**.
+This is the nominal longitudinal distance from `base_link` to **F**, the floor
+projection of the centreline, foremost point of the pointed front body shell.
+It is a reporting-origin translation, not a sensor mount or TF correction.
+
+On **2026-11-04**, the operator identified the factory deck fasteners **A and B**
+shown below and reported **A-to-front = 46.5 cm** and **B-to-front = 46.5 cm**,
+following instructions to measure horizontally along the robot's forward axis,
+perpendicular to the A–B line. These are left/right checks of the same front
+distance, not front/rear measurements. No rear distance was supplied.
+
+![Top-view CAD guide identifying the two small deck fasteners immediately outside the large cable openings and the longitudinal measurement from their joining line to the front tip F.](assets/r100-0160-front-datum.svg)
+
+*Measurement endpoint guide from the manufacturer CAD. The operator matched
+this fastener pair on the robot; the drawn shell is nominal CAD geometry,
+not the measured hardware outline.*
+
+The [manufacturer STEP assembly](https://docs.clearpathrobotics.com/docs_robots/indoor_robots/ridgeback/integration_ridgeback/)
+places the pair at `x = 0`, `y = ±0.330 m`. Their transverse joining line is
+the CAD wheel-axis midpoint. Clearpath's R100 description places `base_link`
+longitudinally halfway between its front/rear wheel axes at `x = ±0.319 m`;
+matching the factory deck pattern supplies the nominal mechanical datum
+correspondence. The accepted offset is the operator's **0.465 m**, rather than
+half an overall-length survey or the newer STEP shell's approximately 0.480 m.
+The unchanged vendor `end-cover.stl` in the pinned Clearpath dependency reaches
+approximately `x = +0.46623 m`, a consistency check rather than a substitute
+for the operator's readings.
+
+The [measurement record](assets/r100-0160-front-datum-20261104.json) retains the
+readings, reference-source identities and limits. Treat this as a **measured
+nominal value**: tape accuracy, squareness, endpoint projection, datum
+registration and total uncertainty have not been independently quantified.
+Matching readings do not establish millimetre accuracy or prove that the rear
+shell is centred. The earlier navigation-outline survey owns its separate
+clearance assumptions; it does not override this reporting datum.
+
+Hardware exploration, standalone compute and the stationary observer select
+this default and pass the same `front_offset_m` to producers and RViz marker
+conversion. Set the same explicit value on both hosts when overriding it.
+Direct node invocations must pass the hardware value themselves. The Thor
+service exposes `FRONT_OFFSET_M`; changing repository defaults does not update
+an installed executable or restart an existing service.
+
+The conversion is `forward_F = x_base - front_offset_m`, `lateral_F = y_base`,
+then `distance_F = hypot(forward_F, lateral_F)`. An off-centre radial distance
+cannot be corrected by subtracting a scalar offset. New hardware-bag derivatives
+must explicitly retain `front_offset_m: 0.465` with their point estimates and
+reference provenance; the MCAP import path is separate work. Preserve old raw
+bags, ground-truth records and replay artifacts. Historical replay continues to
+use its saved offset/truth; simulator defaults remain **0.25 m**. This hardware
+measurement does not change Gazebo/Isaac geometry, TF, Nav2 footprint or sensor
+calibration.
+
 ## Physical field readings
 
 Robot `r100_0160`, September 18 visit: tape precision approximately **±1 cm**.

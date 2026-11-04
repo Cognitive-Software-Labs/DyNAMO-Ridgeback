@@ -20,6 +20,14 @@ def _flat_cloud(points: list[tuple[float, float, float]]):
     return point_cloud2.create_cloud_xyz32(Header(), points)
 
 
+def test_explicit_front_offset_keeps_the_pointcloud_in_the_same_reference():
+    points = np.zeros((4, 4, 3), dtype=np.float32)
+    points[:, :, 0] = 2.0
+    measurement = compute_pointcloud_measurement(
+        points, (0, 0, 4, 4), None, None, front_offset_m=.465)
+    assert measurement == pytest.approx((0.0, 1.535, 1.535), abs=1e-6)
+
+
 def test_extract_organized_xyz_recovers_isaac_row_major_camera_cloud(
 ) -> None:
     points = [(float(i), float(i + 1), float(i + 2)) for i in range(6)]

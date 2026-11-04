@@ -13,6 +13,9 @@ import numpy as np
 
 
 ROBOT_FRONT_OFFSET_M = 0.25
+# r100_0160: operator's two deck-datum-to-front readings, 2026-11-04.
+# See docs/robot/geometry.md. Keep simulator and historical replay defaults above.
+HARDWARE_FRONT_OFFSET_M = 0.465
 
 
 def optical_to_base_planar(
@@ -33,22 +36,27 @@ def optical_to_base_planar(
     return lateral_m, forward_m, math.hypot(lateral_m, forward_m)
 
 
-def apply_vehicle_front_offset(lateral_m, forward_m):
-    return lateral_m, forward_m - ROBOT_FRONT_OFFSET_M
+def apply_vehicle_front_offset(
+    lateral_m, forward_m, *, front_offset_m=ROBOT_FRONT_OFFSET_M,
+):
+    return lateral_m, forward_m - front_offset_m
 
 
-def remove_vehicle_front_offset(lateral_m, forward_m):
+def remove_vehicle_front_offset(
+    lateral_m, forward_m, *, front_offset_m=ROBOT_FRONT_OFFSET_M,
+):
     """Inverse of ``apply_vehicle_front_offset``: front-referenced -> base origin.
 
     Needed by anything that has to put a published measurement back on a map,
-    since every estimator reports against the robot front rather than the base
-    origin TF gives. It lives beside the forward conversion so the two cannot
+    since estimates report against the configured front rather than the base
+    origin TF gives. Producer and consumer must use the same offset. This lives
+    beside the forward conversion so the two cannot
     drift: a one-sided change to the offset would otherwise leave the round trip
     silently lossy, and the error is a constant shift that looks like a
     calibration problem.
     """
 
-    return lateral_m, forward_m + ROBOT_FRONT_OFFSET_M
+    return lateral_m, forward_m + front_offset_m
 
 
 def yaw_from_quaternion(x: float, y: float, z: float, w: float) -> float:

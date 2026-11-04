@@ -34,3 +34,12 @@ def test_segments_split_at_marks_after_settling_and_shift_to_camera_face():
     assert first['detection_delay_ms']['median'] == 600
     assert first['measurement_delay_ms']['median'] == 700
     assert second['euclidean_reconstruction']['forward_from_camera_m'] is None  # 12 s is before the 13 s settle
+
+
+def test_record_cli_keeps_the_selected_front_reference(monkeypatch, tmp_path):
+    captured = []
+    monkeypatch.setattr(TOOL, 'record', lambda *args: captured.append(args))
+    arguments = ['record', '--namespace', 'r100_0160', '--duration', '1', '--output', str(tmp_path)]
+    TOOL.main(arguments)
+    TOOL.main([*arguments, '--front-offset-m', '0.25'])
+    assert [args[-1] for args in captured] == [.465, .25]

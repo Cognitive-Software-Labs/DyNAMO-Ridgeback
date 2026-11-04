@@ -17,8 +17,11 @@ An image of one does not establish the others.
 
 **Measured hardware outline (2026-10-16).** A tape survey of `r100_0160`
 (`artifacts/hardware/20261016T125020Z-s8-outline-direct/` on Intel) gave 96.0 × 79.3 cm overall, 5.5 cm diagonal gaps at all four
-corners (a 13.3 cm corner rounding) and symmetric hubs 26.0 cm from each end, so
-`base_link` sits at the outline's centre. The former outline below failed that
+corners (a 13.3 cm corner rounding). Its summary also reported symmetric hub
+setbacks of 26.0 cm; those endpoints do not reconcile with the standard 63.8 cm
+wheelbase and are not used to calibrate the localization reporting origin.
+The [hardware front datum](geometry.md#hardware-distance-reporting-front-datum)
+owns the independently reported deck-datum-to-front measurement. The former outline below failed that
 survey: the ends stuck out 2 mm past the padded polygon and the rounded corners
 42 mm past its chamfers. The configured polygon is now built from the survey:
 straight edges 12 mm (the tape uncertainty) outside each face and corner

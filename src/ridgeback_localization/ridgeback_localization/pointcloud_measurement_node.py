@@ -20,6 +20,7 @@ from ridgeback_common.messages import (
 from ridgeback_common.ros_signals import init_owned, shielded, spin_until_interrupted
 from ridgeback_common.tf_utils import lookup_transform_components
 from ridgeback_localization.worker_state import WorkerState, join_workers
+from ridgeback_localization.core.vehicle_frame import ROBOT_FRONT_OFFSET_M
 from ridgeback_interfaces.msg import TargetDetections, TargetMeasurements
 from ridgeback_localization.contracts import (
     POINTCLOUD_MEASUREMENTS_TOPIC,
@@ -47,6 +48,7 @@ class TargetPointcloudMeasurementNode(Node):
         self.declare_parameter('color_topic', 'sensors/camera_0/color/image')
         self.declare_parameter('pointcloud_topic', 'sensors/camera_0/points')
         self.declare_parameter('base_frame', default_base_frame)
+        self.declare_parameter('front_offset_m', ROBOT_FRONT_OFFSET_M)
         self.declare_parameter('enabled_estimators', 'all')
 
         self.detections_topic = self.get_parameter('detections_topic').value
@@ -54,6 +56,7 @@ class TargetPointcloudMeasurementNode(Node):
         self.color_topic = self.get_parameter('color_topic').value
         self.pointcloud_topic = self.get_parameter('pointcloud_topic').value
         self.base_frame = self.get_parameter('base_frame').value or default_base_frame
+        self.front_offset_m = float(self.get_parameter('front_offset_m').value)
         self.enabled_estimators = parse_estimators(self.get_parameter('enabled_estimators').value)
 
         self.last_pointcloud_warning = None
@@ -235,6 +238,7 @@ class TargetPointcloudMeasurementNode(Node):
                     pointcloud_xyz,
                     pointcloud_rotation,
                     pointcloud_translation,
+                    front_offset_m=self.front_offset_m,
                 )
             elif pointcloud_xyz is not None and pointcloud_xyz.shape[:2] != (batch.image_height, batch.image_width):
                 self.log_warning_once(

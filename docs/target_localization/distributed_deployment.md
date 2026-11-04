@@ -54,6 +54,12 @@ to relative names. Standalone/observer default to wall time; simulation uses
 `use_sim_time:=true`. These settings must agree across hosts, with synchronized
 host clocks for wall-time acquisition-age checks.
 
+Compute and marker consumers must also share `front_offset_m`. The hardware
+launches use the [measured r100_0160 front datum](../robot/geometry.md#hardware-distance-reporting-front-datum);
+pass the same override on Thor and Intel when choosing another reporting origin.
+The visualization adds this offset back before placing a point through TF, so
+using different offsets shifts the map marker even when the estimate is correct.
+
 `RIDGEBACK_PERCEPTION_VENV` selects the compute Python environment. Without it,
 a discovered checkout's `perception_venv` is used if present; otherwise the
 current Python environment is used. Only compute process environments change.

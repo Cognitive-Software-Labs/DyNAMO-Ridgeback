@@ -10,6 +10,7 @@ from std_msgs.msg import ColorRGBA
 from visualization_msgs.msg import Marker
 
 from ridgeback_localization.core.vehicle_frame import (
+    ROBOT_FRONT_OFFSET_M,
     remove_vehicle_front_offset,
 )
 from ridgeback_localization.visualization_style import (
@@ -81,13 +82,16 @@ def append_estimator_markers(
     stamp,
     frame_id: str,
     marker_lifetime_s: float,
+    *,
+    front_offset_m: float = ROBOT_FRONT_OFFSET_M,
 ) -> bool:
     """Append one estimator's ring and dot; return whether it placed anything."""
 
     if forward_m is None or lateral_m is None:
         return False
 
-    lateral_m, forward_m = remove_vehicle_front_offset(lateral_m, forward_m)
+    lateral_m, forward_m = remove_vehicle_front_offset(
+        lateral_m, forward_m, front_offset_m=front_offset_m)
     world_x, world_y = world_marker_point(
         forward_m, lateral_m, robot_x, robot_y, robot_yaw)
 

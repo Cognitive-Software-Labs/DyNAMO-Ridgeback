@@ -298,7 +298,7 @@ checkout that holds the build; it starts after Thor's PTP clock services:
 sudo tools/intel_thor/localization_service apply
 ```
 
-Settings (checkout, labels, threshold, mask and depth modes) live in
+Settings (checkout, labels, threshold, mask and depth modes, `FRONT_OFFSET_M`) live in
 `/etc/default/dynamo-localization`; edit them and run
 `sudo systemctl restart dynamo-localization`. `status` compares the installed
 unit with the template; `remove` uninstalls it and keeps the settings unless
@@ -320,6 +320,7 @@ observed sensor topics and the observed TF base frame:
 : "${CAMERA_INFO_TOPIC:?Set the observed color CameraInfo topic}"
 ros2 launch ridgeback_localization localization.launch.py \
   namespace:="$ROBOT_NAMESPACE" use_sim_time:=false base_frame:="$BASE_FRAME" \
+  front_offset_m:=0.465 \
   color_topic:="$COLOR_TOPIC" depth_topic:="$DEPTH_TOPIC" camera_info_topic:="$CAMERA_INFO_TOPIC" \
   estimators:=projective_ranging,euclidean_reconstruction \
   detector:=owlv2 detection_model:=google/owlv2-base-patch16-ensemble \
@@ -343,8 +344,20 @@ source artifacts/colcon/intel-install/local_setup.bash
 : "${COLOR_TOPIC:?Set the observed color image topic}"
 ros2 launch ridgeback_autonomy localization_observer.launch.py \
   namespace:="$ROBOT_NAMESPACE" use_sim_time:=false base_frame:="$BASE_FRAME" \
+  front_offset_m:=0.465 \
   color_topic:="$COLOR_TOPIC" estimators:=projective_ranging,euclidean_reconstruction
 ```
+
+Standalone compute and observer default `front_offset_m` to the
+[measured hardware front datum](docs/robot/geometry.md#hardware-distance-reporting-front-datum).
+Use the same value on both hosts. The service unit supplies the hardware default
+when an older `/etc/default/dynamo-localization` has no `FRONT_OFFSET_M`; an
+explicit environment-file setting overrides it. Deploy the rebuilt packages and
+re-apply the service template before expecting an installed service to use these
+changes. Existing running processes and recorded artifacts are not updated.
+`tools/intel_thor/record_localization_run record` uses the same hardware default;
+pass `--front-offset-m` when recording a producer with another value. Its
+summarizer reads the offset saved with each recording.
 
 The observer attaches to existing topics and starts no navigation or compute.
 View health with `ros2 topic echo "/${ROBOT_NAMESPACE}/localization/health"` and
@@ -508,6 +521,7 @@ Arguments:
 | `namespace` | backend-derived | `r100_0001` in simulation; on hardware, read from `<setup_path>/robot.yaml`; an explicit value overrides either default |
 | `use_sim_time` | backend-derived | `true` in simulation; `false` on hardware |
 | `setup_path` | backend-derived | `~/clearpath/` in simulation; `/etc/clearpath/` on hardware |
+| `front_offset_m` | backend-derived | Reporting origin ahead of `base_link`: `0.465` m for hardware, `0.25` m for Gazebo/Isaac. Match remote compute in external mode; see the [hardware datum](docs/robot/geometry.md#hardware-distance-reporting-front-datum) |
 | `color_topic` | `sensors/camera_0/color/image` | Shared camera contract's colour image; the hardware camera service publishes the same name |
 | `camera_info_topic` | `sensors/camera_0/color/camera_info` | Compatibility override for color-grid camera intrinsics |
 | `depth_topic` | `sensors/camera_0/depth/image` | Colour-aligned depth; the same name on every backend |
@@ -1643,10 +1657,10 @@ or integration claims.
 | Node | Output topic | Key params |
 |------|--------------|------------|
 | `target_detector_node` | `detections/target/raw` | `color_topic`, `detector` (`owlv2` only), `detection_model` (checkpoint), `target_labels`, `detection_threshold`, `detector_fps` (default `10.0`; an upper bound on *step starts*), `detector_debug` |
-| `target_pointcloud_measurement_node` | `measurements/target/pointcloud` | `color_topic`, `pointcloud_topic`, `base_frame`, `enabled_estimators` |
+| `target_pointcloud_measurement_node` | `measurements/target/pointcloud` | `color_topic`, `pointcloud_topic`, `base_frame`, `front_offset_m`, `enabled_estimators` |
 | `target_mask_measurement_node` | `measurements/target/mask` (+ subscriber-gated mask/aligned-depth debug images, `visualization/target/polar_rays`, and `debug/target/polar_beams` as selected) | `enabled_estimators`, `depth_source`, `depth_topic`, `camera_info_topic`, `scan_topic`, `base_frame` (**must be passed** — its own default is the bare `base_link`, unlike the other nodes', which are namespace-derived), `pitch_deg`, `front_offset_m`, `isolation_2d` and its three numeric settings, `min_valid_pixels`, `isolation_3d` and its six numeric settings, polar-isolation settings, `mask_gate`, `segmentation_model`, `color_topic`, `ray_marker_topic` |
 | `target_overlay_node` | `debug/target/overlay` | `measurement_topic`, `mask_measurement_topic`, `color_topic`, `aligned_depth_topic`, `estimators`, `max_cols`, `rgb_panel_labels` |
-| `target_visualization_node` | `visualization/target/estimates` + `hud/target_distances` | `base_frame`, `world_frame`, `marker_lifetime_sec`, `ground_truth_topic`, `estimators` (gates both the HUD rows and the rings; defaults to `all`), `hud_layout` (`rows` — the benchmark's, with truth and error columns — or `wide`, exploration's estimator columns with an age under each) |
+| `target_visualization_node` | `visualization/target/estimates` + `hud/target_distances` | `base_frame`, `front_offset_m` (match producers), `world_frame`, `marker_lifetime_sec`, `ground_truth_topic`, `estimators` (gates both the HUD rows and the rings; defaults to `all`), `hud_layout` (`rows` — the benchmark's, with truth and error columns — or `wide`, exploration's estimator columns with an age under each) |
 | `target_distance_benchmark_runner` | per-estimator CSVs + `run.json` + `summary.md` + trial collage images + optional `video/run.mp4` | `estimators`, `output_dir`, `pointcloud_measurement_topic`, `mask_measurement_topic`, `color_topic`, `record_video`, `record_fps` |
 
 Perception gets camera intrinsics exclusively from the colour camera's live
