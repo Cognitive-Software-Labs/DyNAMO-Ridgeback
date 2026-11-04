@@ -26,6 +26,8 @@ from rclpy.qos import QoSProfile, ReliabilityPolicy, DurabilityPolicy, HistoryPo
 
 from rviz_2d_overlay_msgs.msg import OverlayText
 
+from ridgeback_common.ros_signals import init_owned, shielded, spin_until_interrupted
+
 
 LINE_BREAK = '<br/>'
 
@@ -160,16 +162,16 @@ class HudNode(Node):
 
 
 def main():
-    rclpy.init()
+    init_owned()
     node = HudNode()
     try:
-        rclpy.spin(node)
+        spin_until_interrupted(node)
     except KeyboardInterrupt:
         pass
     finally:
-        node.destroy_node()
-        if rclpy.ok():
-            rclpy.shutdown()
+        with shielded(final=True):
+            node.destroy_node()
+            rclpy.try_shutdown()
 
 
 if __name__ == '__main__':

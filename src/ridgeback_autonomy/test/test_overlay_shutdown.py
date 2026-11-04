@@ -1,4 +1,4 @@
-"""Exercise the overlay entry point with real ROS delivery and shutdown signals."""
+"""Exercise benchmark display entry points with real ROS delivery and shutdown signals."""
 
 import os
 import select
@@ -13,9 +13,11 @@ import pytest
 CHILD = r'''
 import time
 from sensor_msgs.msg import Image
-from ridgeback_localization import overlay_node as module
+import importlib
+module = importlib.import_module(MODULE)
+base = getattr(module, CLASS)
 
-class ProbeOverlay(module.TargetOverlayNode):
+class ProbeNode(base):
     def __init__(self):
         super().__init__()
         self.seen = False
@@ -34,16 +36,28 @@ class ProbeOverlay(module.TargetOverlayNode):
         time.sleep(.2)
         return super().destroy_node()
 
-module.TargetOverlayNode = ProbeOverlay
+setattr(module, CLASS, ProbeNode)
 module.main()
 print('DONE', flush=True)
 '''
 
 
+# Every display node a benchmark configuration launches: a signal landing inside
+# message deserialization must not surface as an exit-1 traceback.
+ENTRY_POINTS = [
+    ('ridgeback_localization.overlay_node', 'TargetOverlayNode'),
+    ('ridgeback_localization.visualization_node', 'TargetVisualizationNode'),
+    ('ridgeback_autonomy.diagnostics.hud_node', 'HudNode'),
+]
+
+
+@pytest.mark.parametrize('module,cls', ENTRY_POINTS, ids=[c for _m, c in ENTRY_POINTS])
 @pytest.mark.parametrize('first_signal', [signal.SIGINT, signal.SIGTERM])
-def test_overlay_keeps_context_alive_until_signal_shielded_cleanup(tmp_path, first_signal):
+def test_display_node_keeps_context_alive_until_signal_shielded_cleanup(tmp_path, first_signal,
+                                                                       module, cls):
     env = dict(os.environ, ROS_DOMAIN_ID='189', ROS_LOG_DIR=str(tmp_path))
-    child = subprocess.Popen([sys.executable, '-u', '-c', CHILD],
+    code = f'MODULE = {module!r}\nCLASS = {cls!r}\n' + CHILD
+    child = subprocess.Popen([sys.executable, '-u', '-c', code],
                              stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=env)
     output = []
 

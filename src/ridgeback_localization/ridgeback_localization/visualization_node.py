@@ -21,6 +21,7 @@ from rviz_2d_overlay_msgs.msg import OverlayText
 from tf2_ros import Buffer, TransformException, TransformListener
 from visualization_msgs.msg import MarkerArray
 
+from ridgeback_common.ros_signals import init_owned, shielded, spin_until_interrupted
 from ridgeback_interfaces.msg import TargetMeasurements
 from ridgeback_localization.contracts import (
     ESTIMATE_MARKERS_TOPIC,
@@ -284,16 +285,16 @@ class TargetVisualizationNode(Node):
 
 
 def main() -> None:
-    rclpy.init()
+    init_owned()
     node = TargetVisualizationNode()
     try:
-        rclpy.spin(node)
+        spin_until_interrupted(node)
     except (KeyboardInterrupt, ExternalShutdownException):
         pass
     finally:
-        node.destroy_node()
-        if rclpy.ok():
-            rclpy.shutdown()
+        with shielded(final=True):
+            node.destroy_node()
+            rclpy.try_shutdown()
 
 
 if __name__ == '__main__':
