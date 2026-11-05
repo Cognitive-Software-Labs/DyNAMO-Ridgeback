@@ -1,5 +1,8 @@
 {
   "source": "modern_arm_chair_01.gltf",
+  "max_export_pose_deviation_m": 0.0,
+  "source_polygon_count": 8916,
+  "triangle_budget": null,
   "blender": "4.2.9 LTS",
   "floor_center_translation": [
     0.003363475203514099,
@@ -15,7 +18,7 @@
   "triangles": 8916,
   "sha256": {
     "mesh.npz": "7e971ee7626e43a91358f9a07c2243db90a4198e4d0ddbf80200c8e20d93b351",
-    "model.dae": "3d3ee44c8ca88d9ebbdf41632cb692694053d8cf314c0a7cac31586f5318a908",
-    "materials.json": "7dadafe71fa70e33270df1f420aac741cbbe52d0a0d8721e539754a8c747ba20"
+    "model.dae": "a6c56f27cce24d3896e618604ae532d47a9de3ba9bc6d0dc7bfb8e60485409a9",
+    "materials.json": "3489e5e6c2adb3c981c6bf86b58fc0619c0d0ea0591bb27e2e673429d28866a5"
   }
 }

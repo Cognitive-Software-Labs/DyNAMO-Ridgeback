@@ -1,7 +1,8 @@
 # Realistic simulation environments
 
 The `realistic` scene profile adds furnished worlds and a varied pedestrian
-cast to the crowd runner. It is under visual development. The existing F1/F2/F3
+cast to the crowd runner, with enclosed interiors, wayfinding signs and
+textured architectural surfaces. The existing F1/F2/F3
 benchmark results apply to their recorded profiles; they do not qualify these
 new worlds or characters. The observation robot remains stationary.
 
@@ -9,13 +10,14 @@ new worlds or characters. The observation robot remains stationary.
 
 | `--environment` | Contents |
 |---|---|
-| `office` | Wood floor, glazed frontage, reception counter, desks, monitors, lounge furniture, plants and doors |
-| `warehouse` | Concrete floor, storage racks, crates, barrels, aisle markings and loading door |
-| `courtyard` | Paved walkways, planted beds, trees, benches, street lamps and surrounding building facades |
+| `office` | Wood floor, ceiling lights, glazed frontage, reception counter, desks, monitors, books, notebooks, lounge furniture, plants, bins and room signs |
+| `warehouse` | Concrete floor, roof/skylight, storage racks, crates, barrels, aisle markings, loading door and pedestrian signs |
+| `courtyard` | Paved walkways, planted beds, trees, benches, street lamps, bins, wayfinding and windowed building facades |
 
 Four source characters are available: Sam and Maya in casual clothing, Harper
 and Jordan in business clothing. Clothing colours and uniform stature scaling
-provide additional variants. The cast reuses these four models; it is not a
+provide additional variants. Casual trousers keep neutral colours when shirt
+colours change. The cast reuses these four models; it is not a
 population of independently modelled people. Look-alike scenarios deliberately
 assign the leader and look-alike the same model, scale and clothing settings.
 Appearance assignments are rendering/evaluation metadata, never a recognition
@@ -23,7 +25,14 @@ input. All routes are scripted rather than reactive pedestrian navigation.
 
 Both simulators consume the shared layout and cast. Isaac uses evaluated mesh
 animation and textured PreviewSurface materials; Gazebo uses native Collada
-actors with per-person gait speed. Rendering and material support differ.
+actors with per-person gait speed. Fixture UVs keep wall textures horizontal
+and tile floor materials in metres. Rendering and material support differ.
+
+Trees use a 180,000-triangle visual mesh derived from the source and simple
+cylindrical trunk collisions in both backends. The proxy is approximate and
+does not model foliage collision. Lidar rendering still uses the visible tree.
+The Gazebo launch bridges `/world/leader_follow_scene/clock` to ROS `/clock`,
+so startup does not depend on Gazebo also creating the short `/clock` topic.
 
 ## Run a scenario
 
@@ -83,6 +92,11 @@ artifacts/leader-following/tools/blender-4.2.9-linux-x64/blender -b \
 Repeat conversion for each directory under `props/`. For each directory under
 `humans/`, append `human` after the directory argument. Blender evaluates the
 walk and exports the Gazebo skin; existing Maya assets are reused. Compare
+Static conversion verifies the exported world-space pose against the vertex
+cache, and reduces source meshes above 250,000 polygons to a 180,000-triangle
+budget. Material names are normalized during import to disambiguate duplicate
+source names. Original wayfinding textures are regenerated with
+`python3 src/ridgeback_leader_follow/sim/prepare_scene_signs.py`. Compare
 regenerated files against the source/conversion receipts before replacing a
 recorded population. Publisher content may change despite retaining its URL.
 
@@ -96,9 +110,23 @@ OMNI_KIT_ACCEPT_EULA=YES isaac_venv/bin/python \
   --output artifacts/leader-following/realistic-previews
 ```
 
-The renderer closes after writing overview and human-height PNGs and USD
+The renderer closes after writing overview, human-height and cast PNGs and USD
 snapshots. Current checks cover static obstacle clearance across all six
 scenario families in all three layouts, cast assignment, turn geometry,
 Collada texture paths, actor scales and preservation of commanded paths.
-Lighting and texture orientation still need visual refinement. Full runtime
-sensor smoke checks and new recognition qualification remain pending.
+Rendered previews are provided below. Short runtime checks cover sensor and
+ground-truth startup in both simulators. They do not measure recognition
+accuracy or establish successful full-length scenario execution; new
+recognition qualification remains pending.
+
+![Furnished office lobby with textured floor, reception furniture and varied walking pedestrians](assets/environments/office.png)
+
+![Warehouse aisle with racks, crates, barrels and pedestrians](assets/environments/warehouse.png)
+
+![Courtyard with trees, benches and windowed buildings](assets/environments/courtyard.png)
+
+![Casual and business-clothed pedestrian character variants](assets/environments/humans.png)
+
+## Archived evidence
+
+- [Realistic worlds, asset conversion and startup validation](../../archive/engineering/2026-11-05-realistic-worlds.md) — tested population, tree/clock startup failures and verification limits.

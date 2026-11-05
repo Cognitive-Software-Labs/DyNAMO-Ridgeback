@@ -1,5 +1,8 @@
 {
   "source": "potted_plant_02.gltf",
+  "max_export_pose_deviation_m": 5.960464477539063e-08,
+  "source_polygon_count": 69806,
+  "triangle_budget": null,
   "blender": "4.2.9 LTS",
   "floor_center_translation": [
     -0.04608151316642761,
@@ -15,7 +18,7 @@
   "triangles": 69806,
   "sha256": {
     "mesh.npz": "05ee0ef977bcab20f880ed85a070e84e8c212d82a40244c4f4cf966d9eef08ff",
-    "model.dae": "6301d663c842b52443ef7d81c3583d9638e1608ec9e0290bcc5ebc8ebece0cee",
-    "materials.json": "6ed4429f06b7fdf1b485a699ddcfd964744b6ce6b31d14eaf778c97b16e3da14"
+    "model.dae": "85cca59f23ec946f7e7010d5ae3e246dccb8791b0199043d8822dde1bf7ed431",
+    "materials.json": "ab4eae203aec75cb1a7faea8a991d57d80fe817a2b31011f3e6c0b4b024dfe7b"
   }
 }

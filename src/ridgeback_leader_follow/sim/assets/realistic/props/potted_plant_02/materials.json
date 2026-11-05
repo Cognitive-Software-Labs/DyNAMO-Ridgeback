@@ -1,7 +1,7 @@
 [
   {
     "doubleSided": true,
-    "name": "potted_plant_02_pot",
+    "name": "potted_plant_02_pot_material_0",
     "normalTexture": {
       "index": 0
     },
@@ -21,7 +21,7 @@
     "alphaCutoff": 0.5,
     "alphaMode": "MASK",
     "doubleSided": true,
-    "name": "potted_plant_02_leaves",
+    "name": "potted_plant_02_leaves_material_1",
     "normalTexture": {
       "index": 3
     },

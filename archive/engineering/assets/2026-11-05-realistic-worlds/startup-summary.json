@@ -1,0 +1,127 @@
+{
+  "status": "passed",
+  "scope": "one-second sensor and observed-ground-truth startup; no recognition benchmark or closed-loop following",
+  "cases": {
+    "gz-office": {
+      "status": "complete",
+      "backend": "gz",
+      "environment": "office",
+      "scenario": "crossing",
+      "duration_seconds": 1.0,
+      "people": 2,
+      "ros_domain": 200,
+      "sensor_counts": {
+        "tf_static": 4,
+        "camera_info": 38,
+        "depth": 38,
+        "rgb": 38,
+        "front_scan": 51,
+        "rear_scan": 51,
+        "tf": 76,
+        "odom": 55
+      },
+      "evidence": "artifacts/leader-following/realistic-development/runtime-clock-gz-office"
+    },
+    "gz-warehouse": {
+      "status": "complete",
+      "backend": "gz",
+      "environment": "warehouse",
+      "scenario": "leader_stop",
+      "duration_seconds": 1.0,
+      "people": 4,
+      "ros_domain": 201,
+      "sensor_counts": {
+        "tf_static": 4,
+        "camera_info": 38,
+        "depth": 38,
+        "rgb": 38,
+        "front_scan": 51,
+        "rear_scan": 50,
+        "tf": 55,
+        "odom": 55
+      },
+      "evidence": "artifacts/leader-following/realistic-development/runtime-clock-gz-warehouse"
+    },
+    "gz-courtyard": {
+      "status": "complete",
+      "backend": "gz",
+      "environment": "courtyard",
+      "scenario": "crowd",
+      "duration_seconds": 1.0,
+      "people": 9,
+      "ros_domain": 202,
+      "sensor_counts": {
+        "tf_static": 4,
+        "camera_info": 39,
+        "depth": 38,
+        "rgb": 38,
+        "front_scan": 51,
+        "rear_scan": 51,
+        "tf": 79,
+        "odom": 55
+      },
+      "evidence": "artifacts/leader-following/realistic-development/runtime-clock-gz-courtyard"
+    },
+    "isaac-office": {
+      "status": "complete",
+      "backend": "isaac",
+      "environment": "office",
+      "scenario": "lookalike_parallel",
+      "duration_seconds": 1.0,
+      "people": 2,
+      "ros_domain": 193,
+      "sensor_counts": {
+        "odom": 48,
+        "tf": 71,
+        "tf_static": 2,
+        "rgb": 33,
+        "depth": 33,
+        "camera_info": 33,
+        "front_scan": 44,
+        "rear_scan": 44
+      },
+      "evidence": "artifacts/leader-following/realistic-development/runtime-verified-isaac-office"
+    },
+    "isaac-warehouse": {
+      "status": "complete",
+      "backend": "isaac",
+      "environment": "warehouse",
+      "scenario": "lookalike_crossing",
+      "duration_seconds": 1.0,
+      "people": 2,
+      "ros_domain": 194,
+      "sensor_counts": {
+        "odom": 48,
+        "tf": 71,
+        "tf_static": 2,
+        "rgb": 33,
+        "depth": 33,
+        "camera_info": 33,
+        "front_scan": 44,
+        "rear_scan": 44
+      },
+      "evidence": "artifacts/leader-following/realistic-development/runtime-verified-isaac-warehouse"
+    },
+    "isaac-courtyard": {
+      "status": "complete",
+      "backend": "isaac",
+      "environment": "courtyard",
+      "scenario": "leader_alone",
+      "duration_seconds": 1.0,
+      "people": 1,
+      "ros_domain": 195,
+      "sensor_counts": {
+        "odom": 48,
+        "tf": 71,
+        "tf_static": 2,
+        "rgb": 33,
+        "depth": 33,
+        "camera_info": 33,
+        "front_scan": 44,
+        "rear_scan": 44
+      },
+      "evidence": "artifacts/leader-following/realistic-development/runtime-verified-isaac-courtyard"
+    }
+  },
+  "source_base": "566fbd8cd58dbd61a5d90adc4eb1f4ac4a06cd49"
+}

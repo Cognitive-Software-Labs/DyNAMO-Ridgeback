@@ -1,5 +1,8 @@
 {
   "source": "painted_wooden_bench.gltf",
+  "max_export_pose_deviation_m": 0.0,
+  "source_polygon_count": 630,
+  "triangle_budget": null,
   "blender": "4.2.9 LTS",
   "floor_center_translation": [
     0.006410717964172363,
@@ -15,7 +18,7 @@
   "triangles": 630,
   "sha256": {
     "mesh.npz": "1d25ba12a317d8533eb55c609c8df800b891435b6f67ac8daaac38f2e1334336",
-    "model.dae": "82632f4b7f96149b4ee926d6db113276869dd3686b9d130169a7ceb4432b5d90",
-    "materials.json": "9db3f98af9668aba182b98e3bb096157d42cb0ab34d7fb0e32634ff7fa957998"
+    "model.dae": "88088006acf92927a01256369d7d47cabe14a8d92a4c3278ff3499c0f13047c6",
+    "materials.json": "b84f1426f8d0b1cb4924cc145ae336e9a2bb4913f58680ab1524e093352f9fd4"
   }
 }

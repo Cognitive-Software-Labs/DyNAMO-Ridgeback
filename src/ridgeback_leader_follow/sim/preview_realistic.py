@@ -26,9 +26,9 @@ try:
         adapter=Path(get_package_share_directory('ridgeback_autonomy_isaac'))/'sim/isaac'
         robot=stage.DefinePrim('/ridgeback','Xform');robot.GetReferences().AddReference((adapter/'usd/robots/ridgeback_r100/ridgeback_r100.usda').as_uri())
         UsdGeom.XformCommonAPI(robot).SetTranslate(Gf.Vec3d(0,0,.06))
-        views=[('overview',(11.,-4.7,3.3),(4,0,1.)),('human_view',(-1.8,-2.3,1.65),(4.5,0,1.))]
+        views=[('overview',(-3.5,-2.6,3.1),(7,0,1.)),('human_view',(-1.8,-1.9,1.65),(5.5,0,1.)),('cast',(8.,-2.5,1.9),(3.5,0,1.))]
         for name,eye,target in views:
-            camera=rep.create.camera(position=eye,look_at=target,focal_length=22.)
+            camera=rep.create.camera(position=eye,look_at=target,focal_length=18.)
             product=rep.create.render_product(camera,(1280,800))
             annotator=rep.AnnotatorRegistry.get_annotator('rgb');annotator.attach(product)
             for _ in range(32):app.update()

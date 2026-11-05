@@ -1,7 +1,7 @@
 [
   {
     "doubleSided": true,
-    "name": "sofa_03",
+    "name": "sofa_03_material_0",
     "normalTexture": {
       "index": 0
     },
@@ -20,7 +20,7 @@
   {
     "alphaMode": "BLEND",
     "doubleSided": true,
-    "name": "sofa_03_fringe",
+    "name": "sofa_03_fringe_material_1",
     "normalTexture": {
       "index": 3
     },

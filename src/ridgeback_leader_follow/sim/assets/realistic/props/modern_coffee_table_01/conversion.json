@@ -1,5 +1,8 @@
 {
   "source": "modern_coffee_table_01.gltf",
+  "max_export_pose_deviation_m": 0.0,
+  "source_polygon_count": 4504,
+  "triangle_budget": null,
   "blender": "4.2.9 LTS",
   "floor_center_translation": [
     1.1920928955078125e-07,
@@ -15,7 +18,7 @@
   "triangles": 4504,
   "sha256": {
     "mesh.npz": "135768d613ca3558606eee67e54443eb8d657340b91700016f821a41fd6b9e8b",
-    "model.dae": "357226ef7fc2e3f361374f0a719a6ce2d0e69f2ecd9725de139bf7731004a199",
-    "materials.json": "fb927c875ca89c8a964d035cd7be0ed53d12247bd8c4c8bab61e7c394fbc3c13"
+    "model.dae": "4f6ad9b872a19ad34a45530f366582f1d0a90626b4010b9333f11c2ab283c7d9",
+    "materials.json": "7c61939d54ef8676e16d7a599a0dc267284810eb9ab2b847eb568e343cbce657"
   }
 }

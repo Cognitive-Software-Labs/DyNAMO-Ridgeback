@@ -1,7 +1,7 @@
 [
   {
     "doubleSided": true,
-    "name": "street_lamp_01",
+    "name": "street_lamp_01_material_0",
     "normalTexture": {
       "index": 0
     },
@@ -19,7 +19,7 @@
   {
     "alphaMode": "BLEND",
     "doubleSided": true,
-    "name": "street_lamp_01_glass",
+    "name": "street_lamp_01_glass_material_1",
     "normalTexture": {
       "index": 3
     },
@@ -36,7 +36,7 @@
   },
   {
     "doubleSided": true,
-    "name": "street_lamp_01_bulb",
+    "name": "street_lamp_01_bulb_material_2",
     "normalTexture": {
       "index": 6
     },

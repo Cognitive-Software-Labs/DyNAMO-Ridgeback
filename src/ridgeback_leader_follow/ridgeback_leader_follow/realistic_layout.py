@@ -33,7 +33,8 @@ PALETTE={
  'steel':((.24,.29,.32),.32,.8),'blue':((.05,.16,.24),.55,.15),
  'orange':((.75,.22,.025),.45,.25),'yellow':((.9,.58,.025),.6,0.),
  'glass':((.24,.46,.56),.08,.35),'white':((.9,.91,.89),.65,0.),
- 'brick':((.4,.19,.1),.85,0.),'wood_floor':((.5,.35,.18),.6,0.),
+ 'brick':((.4,.19,.1),.85,0.),
+ **{name:((1.,1.,1.),.65,0.) for name in ('sign_reception','sign_office','sign_exit','sign_loading','sign_safety','sign_courtyard')},'wood_floor':((.5,.35,.18),.6,0.),
  'concrete_floor_02':((.5,.5,.48),.85,0.),'brick_pavement_02':((.5,.38,.3),.9,0.),
  'brick_wall_001':((.5,.35,.25),.85,0.),'grass_ground':((.18,.28,.07),.95,0.),
 }
@@ -50,6 +51,7 @@ def layout(environment):
     box('Ground',(6,0,-.12),(26,18,.24),floor)
     if environment=='office':
         box('NorthWall',(6,6.5,2.1),(24,.22,4.2),'plaster')
+        box('Ceiling',(6,0,4.2),(24,13,.16),'ivory')
         box('EndBrickWall',(17,0,2.1),(.25,13,4.2),'brick_wall_001')
         box('WestWall',(-5,0,2.1),(.22,13,4.2),'plaster')
         box('EntranceLintel',(6,-6.5,3.8),(24,.22,.8),'plaster')
@@ -72,10 +74,17 @@ def layout(environment):
             prop(f'DeskChair{i}','modern_arm_chair_01',x,-3.65,yaw=180)
             box(f'Monitor{i}',(x,-4.8,1.12),(.65,.07,.4),'charcoal',False)
             box(f'MonitorStand{i}',(x,-4.8,.86),(.08,.15,.16),'steel',False)
+            prop(f'DeskNotebook{i}','binder_notebook',x+.42,-4.75,.78,scale=.8)
+            prop(f'DeskBooks{i}','book_encyclopedia_set_01',x-.5,-4.8,.78,scale=.5)
         box('ReceptionDesk',(11,-4.65,.6),(4,1.1,1.2),'oak')
         box('ReceptionCounter',(11,-4.65,1.24),(4.2,1.25,.08),'white')
         for i in range(24):box(f'ReceptionSlat{i}',(9.1+i*.165,-4.06,.6),(.07,.06,1.1),'charcoal',False)
         box('ReceptionBackdrop',(11,-6.32,2.1),(4.2,.1,2.8),'blue')
+        box('ReceptionSign',(11,-6.22,2.5),(3.,.025,.95),'sign_reception',False)
+        box('OfficeSign',(7,6.18,2.95),(2.5,.025,.78),'sign_office',False)
+        box('ExitSign',(-4.8,0,2.6),(.025,1.7,.53),'sign_exit',False)
+        prop('ReceptionNotebook','binder_notebook',11,-4.65,1.29,scale=.9)
+        prop('ReceptionBin','metal_trash_can',13.5,-5.3,scale=.65)
         for i,x in enumerate((8,14)):
             prop(f'ReceptionPlant{i}','potted_plant_02',x,-4.6,scale=1.25)
         for i,x in enumerate((1,7,13)):
@@ -86,6 +95,8 @@ def layout(environment):
     elif environment=='warehouse':
         for y in (-7,7):box('Wall'+str(y).replace('-','n'),(6,y,2.7),(24,.25,5.4),'brick_wall_001')
         box('LoadingEndWall',(17,0,2.7),(.25,14,5.4),'plaster')
+        for side in (-1,1):box('Roof'+str(side).replace('-','n'),(6,side*4.65,5.5),(24,4.7,.16),'plaster')
+        box('WarehouseSkylight',(6,0,5.5),(24,4.6,.08),'glass',False)
         box('LoadingDoor',(16.83,0,2.1),(.05,5,4.2),'steel')
         for i in range(22):box(f'DoorRib{i}',(16.75,0,.12+i*.185),(.04,5,.025),'charcoal',False)
         for side in (-1,1):
@@ -105,6 +116,9 @@ def layout(environment):
             box(f'CrossBeam{i}',(x,0,5.1),(.2,14,.2),'steel',False)
             box(f'LightHousing{i}',(x,0,4.9),(2,.25,.08),'white',False)
         prop('MaintenanceDesk','metal_office_desk',-3,5.5)
+        box('LoadingSign',(16.7,0,4.6),(.025,3.3,1.),'sign_loading',False)
+        box('PedestrianSign',(6,6.8,3.4),(3.,.025,.95),'sign_safety',False)
+        prop('WarehouseBin','metal_trash_can',-3,3.8,scale=.85)
     else:
         for side in (-1,1):
             for i,x in enumerate((0,7,14)):
@@ -115,7 +129,12 @@ def layout(environment):
             for i,x in enumerate((2.5,10.5)):
                 prop(f'StreetLamp{side}_{i}'.replace('-','n'),'street_lamp_01',x,side*3.9,scale=.8)
         box('NorthBuilding',(6,9,3.4),(26,.4,6.8),'brick_wall_001')
-        box('EastBuilding',(19,0,3.4),(.4,18,6.8),'plaster')
+        box('EastBuilding',(19,0,3.4),(.4,18,6.8),'brick_wall_001')
+        for row,z in enumerate((1.8,4.8)):
+            for col,y in enumerate((-6,-3,0,3,6)):
+                box(f'EastWindowFrame{row}_{col}',(18.75,y,z),(.1,1.5,1.9),'charcoal')
+                box(f'EastWindow{row}_{col}',(18.68,y,z),(.03,1.3,1.7),'glass',False)
+        box('EastCornice',(18.65,0,6.65),(.3,18,.25),'ivory')
         for row,z in enumerate((1.8,4.8)):
             for col,x in enumerate(range(-4,19,3)):
                 box(f'WindowFrame{row}_{col}',(x,8.75,z),(1.5,.1,1.9),'charcoal')
@@ -123,4 +142,7 @@ def layout(environment):
                 box(f'WindowSplit{row}_{col}',(x,8.62,z),(.04,.03,1.7),'white',False)
         box('CourtyardEntrance',(6,8.66,1.3),(2.5,.1,2.6),'charcoal')
         box('EntranceGlass',(6,8.58,1.3),(2.2,.04,2.4),'glass',False)
+        box('CourtyardSign',(6,8.5,3.2),(3.5,.025,1.1),'sign_courtyard',False)
+        for i,x in enumerate((3.2,10.2)):
+            prop(f'CourtyardBin{i}','metal_trash_can',x,-3.7,scale=.7)
     return boxes,props

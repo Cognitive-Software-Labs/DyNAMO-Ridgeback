@@ -1,7 +1,7 @@
 [
   {
     "doubleSided": true,
-    "name": "tree_small_02_branches",
+    "name": "tree_small_02_branches_material_0",
     "normalTexture": {
       "extensions": {
         "KHR_texture_transform": {
@@ -59,7 +59,7 @@
   {
     "alphaMode": "BLEND",
     "doubleSided": true,
-    "name": "tree_small_02_leaves",
+    "name": "tree_small_02_leaves_material_1",
     "normalTexture": {
       "index": 3
     },
@@ -77,7 +77,7 @@
   },
   {
     "doubleSided": true,
-    "name": "tree_small_02_trunk",
+    "name": "tree_small_02_trunk_material_2",
     "normalTexture": {
       "index": 6
     },

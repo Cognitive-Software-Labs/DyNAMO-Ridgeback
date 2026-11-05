@@ -50,6 +50,11 @@ def test_cast_diversity_and_deliberate_twins(name):
 def test_gazebo_preserves_scenario_paths_and_actor_scales(environment,tmp_path):
     scenario=load_scenario('lookalike_crossing');world=ET.fromstring(gazebo_world(scenario,tmp_path,environment)).find('world')
     assert len(world.findall('actor'))==len(scenario.people)
+    if environment=='courtyard':
+        trees=[model for model in world.findall('model') if model.get('name','').startswith('Tree')]
+        assert len(trees)==6
+        assert all(tree.find('link/collision/geometry/cylinder') is not None for tree in trees)
+        assert all(tree.find('link/visual/geometry/mesh') is not None for tree in trees)
     for actor in world.findall('actor'):
         assert float(actor.findtext('skin/scale'))>0
         skin=Path(actor.findtext('skin/filename'));assert skin.is_file()
@@ -59,3 +64,16 @@ def test_gazebo_preserves_scenario_paths_and_actor_scales(environment,tmp_path):
     plugin=next(p for p in world.findall('plugin') if p.get('name')=='leader_follow::CrowdMotion')
     for person,config in zip(scenario.people,plugin.findall('person'),strict=True):
         assert [w.text for w in config.findall('waypoint')]==[f'{w.time} {w.x} {w.y}' for w in person.waypoints]
+
+
+def test_wall_texture_u_axis_is_horizontal_and_signs_are_not_tiled():
+    from ridgeback_leader_follow.realistic_scene import box_mesh_data
+    for size in ((12,.2,4),(.2,12,4)):
+        data,points=box_mesh_data(size)
+        for face in (2,3,4,5):
+            offset=face*6
+            # On each side wall U follows its horizontal edge, V rises vertically.
+            assert points[offset+1,2]==pytest.approx(points[offset,2])
+            assert points[offset+2,2]>points[offset+1,2]
+        sign,_=box_mesh_data(size,repeat=False)
+        assert sign['uv'].min()==0 and sign['uv'].max()==1

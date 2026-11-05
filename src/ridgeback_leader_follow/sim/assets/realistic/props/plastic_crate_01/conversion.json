@@ -1,5 +1,8 @@
 {
   "source": "plastic_crate_01.gltf",
+  "max_export_pose_deviation_m": 0.0,
+  "source_polygon_count": 18320,
+  "triangle_budget": null,
   "blender": "4.2.9 LTS",
   "floor_center_translation": [
     0.0,
@@ -15,7 +18,7 @@
   "triangles": 18320,
   "sha256": {
     "mesh.npz": "e05ffbb58a22286696d952e5841f92d8c8da01c8c4c74f59b3bd465a89572dfe",
-    "model.dae": "7abc93b557696fe1361d5b9800de98cf837e3b67368ce4e071cf5dc2a80c4bb5",
-    "materials.json": "9ec4ef3396a6f906940e542179c8f9b5c97f28ca8aa3ddac9fc7432795c11780"
+    "model.dae": "6b771716af74cb7f7f6ca98e8c99d66ad4e086c4f9c7458078b0d8de8b15c395",
+    "materials.json": "80fc8dbe18616571252601a625b4795a361ed9803c3d47131d79a48b9437ab90"
   }
 }

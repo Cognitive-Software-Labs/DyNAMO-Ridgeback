@@ -4,7 +4,7 @@
 <title>Crowd Leader Following</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <!-- Explainer page: every claim comes from the sources below; update this page when they change (docs/project/documentation.md#explainer-pages). -->
-<meta name="explainer-sources" content="docs/leader_following/architecture.md, docs/leader_following/benchmarks.md, docs/leader_following/simulation.md, docs/leader_following/people_tracker.md, docs/leader_following/recognition.md, docs/plans/FOLLOWING_leader_in_crowds.md, docs/robot/geometry.md, src/ridgeback_leader_follow/ridgeback_leader_follow/lock_on.py, src/leader_follow_interfaces/msg/LeaderState.msg">
+<meta name="explainer-sources" content="docs/leader_following/architecture.md, docs/leader_following/benchmarks.md, docs/leader_following/simulation.md, docs/leader_following/environments.md, docs/leader_following/people_tracker.md, docs/leader_following/recognition.md, docs/plans/FOLLOWING_leader_in_crowds.md, docs/robot/geometry.md, src/ridgeback_leader_follow/ridgeback_leader_follow/lock_on.py, src/leader_follow_interfaces/msg/LeaderState.msg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
@@ -413,7 +413,7 @@ footer { color: var(--muted); font-size: .85rem; border-top: 1px solid var(--lin
       <h3>Crowds in simulation</h3>
       <p>Add walking people to the Gazebo and Isaac worlds the robot already uses, including two dressed alike. Build the six test scenes from the list above.</p>
       <p>All six scene families now use animated, textured people and a stationary Ridgeback with its camera and lidars. All six families passed in both simulators, including three crowd densities, with a separate record of every person’s true position.</p>
-      <p>The separate F3 profile assigns distinct outfits in both simulators and keeps matching outfits for the two look-alike scenarios. A furnished Isaac lab demo also uses a casually dressed walking character. The F2 detector/tracker benchmark uses the original controlled scene; F3 recognition uses the distinct-outfit recordings. Richer office, warehouse and courtyard worlds with four source character models are under visual development.</p>
+      <p>The separate F3 profile assigns distinct outfits in both simulators and keeps matching outfits for the two look-alike scenarios. A furnished Isaac lab demo also uses a casually dressed walking character. The F2 detector/tracker benchmark uses the original controlled scene; F3 recognition uses the distinct-outfit recordings. The realistic profile adds furnished office, warehouse and courtyard worlds, textured materials, wayfinding and four source character models. Startup checks are separate from the recorded recognition benchmark.</p>
       <p class="done"><b>Done when</b> each of the six scenes plays in both simulators, and the simulator records where every person really was.</p>
     </article>
     <article class="task">

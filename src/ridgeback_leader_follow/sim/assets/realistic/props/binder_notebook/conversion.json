@@ -1,0 +1,24 @@
+{
+  "source": "binder_notebook.gltf",
+  "max_export_pose_deviation_m": 1.4901161193847656e-08,
+  "source_polygon_count": 18077,
+  "triangle_budget": null,
+  "blender": "4.2.9 LTS",
+  "floor_center_translation": [
+    0.13520270586013794,
+    -0.00036513060331344604,
+    -0.0020946459844708443
+  ],
+  "dimensions_m": [
+    0.5840288400650024,
+    0.19995832443237305,
+    0.025289427489042282
+  ],
+  "vertices": 13032,
+  "triangles": 18077,
+  "sha256": {
+    "mesh.npz": "111f0a4fd621e211d71c3c3062a8a682b39c75c4933223183b5d7ec376ee1af1",
+    "model.dae": "829e66f1bd03d71442f12b21615888f8160087f5c489a34eb0070156671959a5",
+    "materials.json": "e7443277b06cb87d0ad67af34e3b316590716396f94e320ac7d44f6af91d048a"
+  }
+}

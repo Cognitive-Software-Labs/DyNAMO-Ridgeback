@@ -20,10 +20,20 @@ def main():
         export.ALPHA_MASKED=tuple(sorted({export.CANONICAL[m['name']] for m in specs if m.get('alphaMode')=='MASK' and m['name'] in export.CANONICAL}))
         sys.argv=[sys.argv[0],'--',str(directory),str(directory)];export.main()
         return
-    source=next(directory.glob('*.gltf'));gltf=json.loads(source.read_text())
+    source=next(p for p in directory.glob('*.gltf') if not p.name.startswith('.'));gltf=json.loads(source.read_text())
+    for i,spec in enumerate(gltf['materials']):spec['name']=spec.get('name','Material')+'_material_'+str(i)
+    temporary=directory/'.conversion-source.gltf';temporary.write_text(json.dumps(gltf))
     bpy.ops.object.select_all(action='SELECT');bpy.ops.object.delete(use_global=False)
-    bpy.ops.import_scene.gltf(filepath=str(source))
+    try:bpy.ops.import_scene.gltf(filepath=str(temporary))
+    finally:temporary.unlink(missing_ok=True)
     meshes=[o for o in bpy.context.scene.objects if o.type=='MESH']
+    source_triangles=sum(len(obj.data.polygons) for obj in meshes)
+    if source_triangles>250000:
+        for obj in meshes:
+            bpy.context.view_layer.objects.active=obj
+            modifier=obj.modifiers.new('SimulationLOD','DECIMATE');modifier.ratio=180000/source_triangles
+            modifier.use_collapse_triangulate=True
+            bpy.ops.object.modifier_apply(modifier=modifier.name)
     specs=gltf['materials']
     for i,spec in enumerate(specs):
         spec.setdefault('name',f'Material_{i}')
@@ -48,11 +58,17 @@ def main():
     minimum,maximum=points.min(axis=0),points.max(axis=0)
     center=np.array([(minimum[0]+maximum[0])/2,(minimum[1]+maximum[1])/2,minimum[2]])
     points-=center
-    for obj in meshes:obj.location-=__import__('mathutils').Vector(center)
+    for obj in meshes:
+        matrix=obj.matrix_world.copy();matrix.translation-=__import__('mathutils').Vector(center)
+        obj.matrix_world=matrix
+    bpy.context.view_layer.update()
+    exported=np.asarray([obj.matrix_world@v.co for obj in meshes for v in obj.data.vertices],np.float32)
+    deviation=float(np.max(np.abs(exported-points)))
+    if deviation>1e-4:raise RuntimeError(f'Static Collada pose differs from the mesh cache by {deviation} m')
     np.savez_compressed(directory/'mesh.npz',points=points,normals=np.asarray(normals,np.float32),faces=np.asarray(faces,np.int32),uv=np.asarray(uvs,np.float32),materials=np.asarray(groups,np.int32))
     (directory/'materials.json').write_text(json.dumps(specs,indent=2)+'\n')
     bpy.ops.wm.collada_export(filepath=str(directory/'model.dae'),include_animations=False,triangulate=True,use_texture_copies=True,export_global_up_selection='Z',apply_global_orientation=False)
-    receipt={'source':source.name,'blender':bpy.app.version_string,'floor_center_translation':center.tolist(),'dimensions_m':(maximum-minimum).tolist(),'vertices':len(points),'triangles':len(faces),'sha256':{p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in [directory/'mesh.npz',directory/'model.dae',directory/'materials.json']}}
+    receipt={'source':source.name,'max_export_pose_deviation_m':deviation,'source_polygon_count':source_triangles,'triangle_budget':180000 if source_triangles>250000 else None,'blender':bpy.app.version_string,'floor_center_translation':center.tolist(),'dimensions_m':(maximum-minimum).tolist(),'vertices':len(points),'triangles':len(faces),'sha256':{p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in [directory/'mesh.npz',directory/'model.dae',directory/'materials.json']}}
     (directory/'conversion.json').write_text(json.dumps(receipt,indent=2)+'\n')
     print('Prepared static asset',directory.name,receipt,flush=True)
 

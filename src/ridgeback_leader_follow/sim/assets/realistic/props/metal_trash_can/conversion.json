@@ -1,0 +1,24 @@
+{
+  "source": "metal_trash_can.gltf",
+  "max_export_pose_deviation_m": 5.960464477539063e-08,
+  "source_polygon_count": 13960,
+  "triangle_budget": null,
+  "blender": "4.2.9 LTS",
+  "floor_center_translation": [
+    -0.0636829137802124,
+    8.940696716308594e-08,
+    6.173570000100881e-05
+  ],
+  "dimensions_m": [
+    1.7780095338821411,
+    0.556289792060852,
+    0.9061697125434875
+  ],
+  "vertices": 9282,
+  "triangles": 13960,
+  "sha256": {
+    "mesh.npz": "0ca11632a2d3ea7bac3ddd4418f4cfab1a2a7a7b031f3fb9b2603b674db685c8",
+    "model.dae": "62d59bf35974a6e6e61911c2ffcb0e7eacf8d206cd8e74a7d00110ecf3d5e376",
+    "materials.json": "3a16d7235e0a7a37be27c27fdf3f1564b79c13f36c52d81a87c63e2c9af10074"
+  }
+}

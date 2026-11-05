@@ -1,21 +1,24 @@
 {
   "source": "tree_small_02.gltf",
+  "max_export_pose_deviation_m": 0.0,
+  "source_polygon_count": 2062487,
+  "triangle_budget": 180000,
   "blender": "4.2.9 LTS",
   "floor_center_translation": [
-    0.14935654401779175,
-    -0.7636117935180664,
-    -0.02410384640097618
+    0.1477453112602234,
+    -0.7640848755836487,
+    -0.0249857809394598
   ],
   "dimensions_m": [
-    2.9166998863220215,
-    4.292477130889893,
-    4.556740760803223
+    2.9163732528686523,
+    4.2956061363220215,
+    4.564810276031494
   ],
-  "vertices": 1777278,
-  "triangles": 2062487,
+  "vertices": 402004,
+  "triangles": 180000,
   "sha256": {
-    "mesh.npz": "ca82f35ef1b79257f94c07d9d8ab11e138f749ec78eb98d27bd1697987f028e2",
-    "model.dae": "1b4828ecf15e813c02a0dc5ed97c23289effabba930b848db476e3ed94fd6f53",
-    "materials.json": "016bfee196d1e3207f28b3ee0c7accf6f34e4ac00b5386ca4d144df24d1b27bc"
+    "mesh.npz": "038ad01a92d84c381a3a1a7fec5f94fcac008c5f6fd307848f063d54c4aacd76",
+    "model.dae": "b45faa900fb2e54833d6586d5dd31db07ca4ec3a0aae7849400798cc8a72e470",
+    "materials.json": "31ba67376764334c850bb9614896c70616478055ca745aec5803e0a048b3ce77"
   }
 }

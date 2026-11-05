@@ -1,5 +1,8 @@
 {
   "source": "street_lamp_01.gltf",
+  "max_export_pose_deviation_m": 0.0,
+  "source_polygon_count": 30610,
+  "triangle_budget": null,
   "blender": "4.2.9 LTS",
   "floor_center_translation": [
     0.0,
@@ -15,7 +18,7 @@
   "triangles": 30610,
   "sha256": {
     "mesh.npz": "af2b012b8773bd158dea7b07d7fbfcb316a6333e7f3ecad6a9b51834227bb1ef",
-    "model.dae": "6eabdb0c182e45ca94442a76b0454b70a7905fdb1058b2cfd89ec92cbd57d969",
-    "materials.json": "9667560ec91321648f308153ec19418d1e292a513b350f61ac6d392d75b82f41"
+    "model.dae": "5dc641c26427f68cce5387f5bd2f41d86c64cd9f7b40e1eb00e8e8731e8c8691",
+    "materials.json": "a7be3c7f7a6f79f2e2d01574740cf8637165aed6fec0c39dba0904f500b0b6f0"
   }
 }

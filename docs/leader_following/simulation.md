@@ -110,9 +110,10 @@ unthrottled by the F1 runner; GUI mode is paced at no more than real time.
 ## Richer environments
 
 The optional `realistic` profile adds office, warehouse and courtyard worlds,
-plus four source human characters and clothing/stature variants. Visual
-refinement and runtime validation are in progress. Commands, asset setup and
-limitations live in the [environment reference](environments.md).
+plus four source human characters and clothing/stature variants. The worlds
+include practical lighting, wayfinding and detailed props.
+Commands, asset setup, preview images and validation limits live in
+the [environment reference](environments.md).
 
 ## Furnished lab demonstration
 

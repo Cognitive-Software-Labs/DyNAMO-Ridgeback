@@ -22,6 +22,8 @@ are excluded from ordinary repository search and the generated knowledge graph.
 
 ## Leader following
 
+- [Realistic worlds and pedestrian profile validation](2026-11-05-realistic-worlds.md) — assets, visual/collision refinements, clock startup correction and bounded sensor checks.
+
 - [F3 recognition and ROS qualification investigation](2026-11-03-f3-recognition.md) — model populations, evaluation frames, identity failures and startup/TF corrections.
 
 - [F2 simulation candidate comparison](2026-11-02-f2-simulation.md) — twenty methods, selected sensor fusion and per-scenario tracking errors in both simulators.

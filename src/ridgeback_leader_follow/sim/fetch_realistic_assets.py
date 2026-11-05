@@ -12,7 +12,8 @@ import requests
 
 MODELS = ('modern_arm_chair_01','sofa_03','modern_coffee_table_01','potted_plant_02',
           'metal_office_desk','wooden_crate_01','barrel_03','plastic_crate_01',
-          'painted_wooden_bench','street_lamp_01','tree_small_02')
+          'painted_wooden_bench','street_lamp_01','tree_small_02',
+          'binder_notebook','book_encyclopedia_set_01','metal_trash_can')
 SURFACES = ('wood_floor','concrete_floor_02','brick_pavement_02','brick_wall_001','grass_ground')
 HUMANS = {
     'sam':'relaxed-walk-sam-3d-person-animated-732f1206',

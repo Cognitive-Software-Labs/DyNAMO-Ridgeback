@@ -1,0 +1,19 @@
+[
+  {
+    "doubleSided": true,
+    "name": "binder_notebook_material_0",
+    "normalTexture": {
+      "index": 0
+    },
+    "pbrMetallicRoughness": {
+      "baseColorTexture": {
+        "index": 1
+      },
+      "metallicRoughnessTexture": {
+        "index": 2
+      }
+    },
+    "image": "textures/binder_notebook_diff_1k.jpg",
+    "normal_image": "textures/binder_notebook_nor_gl_1k.jpg"
+  }
+]

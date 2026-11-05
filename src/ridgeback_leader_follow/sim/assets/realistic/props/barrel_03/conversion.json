@@ -1,5 +1,8 @@
 {
   "source": "barrel_03.gltf",
+  "max_export_pose_deviation_m": 0.0,
+  "source_polygon_count": 1473,
+  "triangle_budget": null,
   "blender": "4.2.9 LTS",
   "floor_center_translation": [
     2.9802322387695312e-08,
@@ -15,7 +18,7 @@
   "triangles": 1473,
   "sha256": {
     "mesh.npz": "c50a88ba0cc7f2058b3a8e8a88f1290aed3a2dd7af722d9ce4deb661baf1f939",
-    "model.dae": "59eda5721f448f26f146a5c96e7b7393e3115455dbe2c06c75e7a1e835ea6120",
-    "materials.json": "c43b9c264a92475a38f9ad94f5303dd5650ddfd98cff97b1f94badd79da807dd"
+    "model.dae": "526bf34420334533e99ac6a9052fbb59815ccc70ea32b5a979beac328d0e2525",
+    "materials.json": "37453790dc30ccb11c8e34603af2f7c0336989ac4fc2a7755289608a06c0bc42"
   }
 }

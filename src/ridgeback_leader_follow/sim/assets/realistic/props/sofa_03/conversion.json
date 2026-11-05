@@ -1,5 +1,8 @@
 {
   "source": "sofa_03.gltf",
+  "max_export_pose_deviation_m": 0.0,
+  "source_polygon_count": 8003,
+  "triangle_budget": null,
   "blender": "4.2.9 LTS",
   "floor_center_translation": [
     0.0,
@@ -15,7 +18,7 @@
   "triangles": 8003,
   "sha256": {
     "mesh.npz": "318397f26333fc23f5eaa74e5a28d9154316a1a49b1572382afd8d5a4cc76216",
-    "model.dae": "4dc308606365558bd19c4d5b4f29d7ef69c7720ab2c0c3053fcd6df0f2b89c43",
-    "materials.json": "ce958c9ac2c9c16356d9098b9f36030e225b48a1f89381c24cd6e4c74cd6f4fc"
+    "model.dae": "dbe067a9f44f18a4a8ea8e1679049a18c055d84789da0ccd84c3afee22683c8e",
+    "materials.json": "a010d34d63be8554a502b3fd8275c37614042763b02a6daeea8f1b16c32aad0c"
   }
 }

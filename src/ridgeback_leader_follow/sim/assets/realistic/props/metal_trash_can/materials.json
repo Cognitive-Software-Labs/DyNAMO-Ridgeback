@@ -1,0 +1,53 @@
+[
+  {
+    "doubleSided": true,
+    "name": "metal_trash_can_material_0",
+    "normalTexture": {
+      "index": 0
+    },
+    "pbrMetallicRoughness": {
+      "baseColorTexture": {
+        "index": 1
+      },
+      "metallicRoughnessTexture": {
+        "index": 2
+      }
+    },
+    "image": "textures/metal_trash_can_diff_1k.jpg",
+    "normal_image": "textures/metal_trash_can_nor_gl_1k.jpg"
+  },
+  {
+    "doubleSided": true,
+    "name": "metal_trash_can_rust_material_1",
+    "normalTexture": {
+      "index": 3
+    },
+    "pbrMetallicRoughness": {
+      "baseColorTexture": {
+        "index": 4
+      },
+      "metallicRoughnessTexture": {
+        "index": 5
+      }
+    },
+    "image": "textures/metal_trash_can_rust_diff_1k.jpg",
+    "normal_image": "textures/metal_trash_can_rust_nor_gl_1k.jpg"
+  },
+  {
+    "doubleSided": true,
+    "name": "metal_trash_can_rust_material_2",
+    "normalTexture": {
+      "index": 6
+    },
+    "pbrMetallicRoughness": {
+      "baseColorTexture": {
+        "index": 7
+      },
+      "metallicRoughnessTexture": {
+        "index": 8
+      }
+    },
+    "image": "textures/metal_trash_can_rust_diff_1k.jpg",
+    "normal_image": "textures/metal_trash_can_rust_nor_gl_1k.jpg"
+  }
+]

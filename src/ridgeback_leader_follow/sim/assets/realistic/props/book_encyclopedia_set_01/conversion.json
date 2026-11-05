@@ -1,0 +1,24 @@
+{
+  "source": "book_encyclopedia_set_01.gltf",
+  "max_export_pose_deviation_m": 2.9802322387695312e-08,
+  "source_polygon_count": 67306,
+  "triangle_budget": null,
+  "blender": "4.2.9 LTS",
+  "floor_center_translation": [
+    0.2563322186470032,
+    -0.01946128159761429,
+    -1.1795664001112982e-08
+  ],
+  "dimensions_m": [
+    0.5512974262237549,
+    0.16306233406066895,
+    0.23741818964481354
+  ],
+  "vertices": 67003,
+  "triangles": 67306,
+  "sha256": {
+    "mesh.npz": "9b80545a140c3b56e13419130860140240acc92edb2746782addc91fb2197911",
+    "model.dae": "a47f30db36db3de1614d955d3a7f0406e5d57c8b18e135ba6068a8b1b67b01d5",
+    "materials.json": "0bf224f83a1aa60b9d8cf793931a91be2c5c11b994607c89be1c190c1e340b2b"
+  }
+}

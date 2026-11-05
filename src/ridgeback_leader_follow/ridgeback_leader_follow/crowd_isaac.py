@@ -103,7 +103,7 @@ def run(scenario, duration, output, writer, gui, finish, record=False, scene_pro
         rig.set_planar_pose(0., 0., 0.)
         if gui and scene_profile in ('lab','realistic'):
             from isaacsim.core.utils.viewports import set_camera_view
-            set_camera_view(eye=[-3., -5., 3.5] if scene_profile=='realistic' else [-2.5,-2.3,2.4], target=[5.,0.,.9])
+            set_camera_view(eye=[-3., -2.6, 2.8] if scene_profile=='realistic' else [-2.5,-2.3,2.4], target=[5.,0.,.9])
 
         def publish_robot():
             stamp = timeline.get_current_time()

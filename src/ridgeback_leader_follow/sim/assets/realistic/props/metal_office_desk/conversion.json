@@ -1,5 +1,8 @@
 {
   "source": "metal_office_desk.gltf",
+  "max_export_pose_deviation_m": 0.0,
+  "source_polygon_count": 6898,
+  "triangle_budget": null,
   "blender": "4.2.9 LTS",
   "floor_center_translation": [
     -6.556510925292969e-07,
@@ -15,7 +18,7 @@
   "triangles": 6898,
   "sha256": {
     "mesh.npz": "771c409018093c91180655e944119139ecf508f64eb2a6349d7e452db2cefa64",
-    "model.dae": "0ddc381e9288ae4c3122b3cd056f125d32392dc3cac59b1973a64ccab1b539ea",
-    "materials.json": "339eda2b3debe954d1f450f18d6a08ce26b0b3f92a59542d129ea2b5b5291046"
+    "model.dae": "dc8508cef202347f7755322c0927322967a75f66bd30a7f447f0bd4c205b17b8",
+    "materials.json": "cf205e6b4e319b8b0402be103459bd05a615ba941dc2329e69e41e8837475962"
   }
 }

@@ -1,7 +1,7 @@
 [
   {
     "doubleSided": true,
-    "name": "modern_arm_chair_01_legs",
+    "name": "modern_arm_chair_01_legs_material_0",
     "normalTexture": {
       "index": 0
     },
@@ -18,7 +18,7 @@
   },
   {
     "doubleSided": true,
-    "name": "modern_arm_chair_01_pillow",
+    "name": "modern_arm_chair_01_pillow_material_1",
     "normalTexture": {
       "index": 3
     },

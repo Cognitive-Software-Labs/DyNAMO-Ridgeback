@@ -4,8 +4,11 @@ Furniture, plants, trees, surface maps and the daylight HDRI are from
 [Poly Haven](https://polyhaven.com), released under
 [CC0 1.0](https://polyhaven.com/license). Powered by Poly Haven.
 `sources.json` records publisher download URLs, byte counts and SHA-256 hashes.
-Per-prop `conversion.json` files record the Blender version, geometry bounds
-and derived geometry hashes. Original glTF files retain their material data.
+Original wayfinding panels are drawn by `prepare_scene_signs.py` for this
+project and are dedicated to CC0. Per-prop `conversion.json` files record the Blender version, geometry bounds
+and derived geometry hashes. Original glTF files retain their material data. Large meshes use a
+180,000-triangle simulation LOD; exported static poses are checked against the
+vertex cache. Runtime tree collision uses an approximate trunk cylinder.
 
 The walking Sam, Harper and Jordan models are from Innerscene, adapted from
 MakeHuman CC0 assets and released under CC0:
