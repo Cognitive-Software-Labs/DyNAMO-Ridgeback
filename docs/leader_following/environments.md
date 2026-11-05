@@ -48,12 +48,16 @@ look-alikes, from walking or breathing in step. Isaac selects cached frames;
 Gazebo's `CrowdMotion` plugin switches each actor between its `walk` and
 `idle` animations using the same rule and offsets.
 
-In the modern office all six scenario families walk at 1.0-1.2 m/s with
-rounded corners: the alone route jogs left, turns around and returns towards
-the robot; the passer crosses between robot and leader; look-alikes walk side
-by side or swap sides about 1.3 s apart; the leader joins a standing group of
-three; and the crowd mixes oncoming, crossing and same-direction walkers.
-Everyone stays at least 0.8 m apart at crowd sizes 2, 4 and 8. The earlier
+In the modern office all six scenario families walk at about 1.1 m/s (one
+brisk crosser at 1.35 m/s) with rounded corners, between 1.6 m and about 13 m
+in front of the stationary robot, so its camera sees people large and from the
+front as well as from behind: the alone route jogs left, turns around and
+returns towards the robot; the passer crosses about 3.5 m ahead, between robot
+and leader; look-alikes walk side by side or swap sides; the leader joins a
+standing group of three; and the crowd is a busy hall with a fast crosser
+between robot and leader, a slow pair crossing the view, walkers passing the
+robot on both sides and a standing trio. Everyone stays at least 0.8 m apart at
+crowd sizes 2, 4 and 8. The earlier
 realistic worlds keep their recorded routes, which walk at 0.2-0.5 m/s.
 All routes are scripted rather than reactive pedestrian navigation.
 

@@ -93,34 +93,37 @@ def natural_scenario(name,crowd_size,baseline):
     from .crowd_scenarios import CrowdScenario,PersonPath
     colour=baseline.people[0].color
     def person(key,role,points,start=0.,pace=PACE):return PersonPath(key,role,colour if role=='leader' or key=='lf_lookalike' else (.5,.5,.5),route(points,start,pace))
+    # Routes keep people 2-9 m in front of the stationary robot, where its camera
+    # sees them large, and include oncoming faces and close crossings.
     if name=='leader_alone':
         # Away from the robot, a left jog, a turn-around and the walk back.
-        people=(person('lf_leader','leader',((1.6,-.3),(7.5,-.3),(10.,1.4),(14.,1.4),(15.4,.4),(14.4,-.7),(8.5,-1.))),)
+        people=(person('lf_leader','leader',((1.6,-.3),(5.5,-.3),(7.,1.2),(8.6,1.2),(9.3,.2),(8.4,-.8),(3.,-1.))),)
     elif name=='crossing':
-        # The passer crosses x~5.8 while the leader is ahead at x~8-9.
-        people=(person('lf_leader','leader',((1.6,.2),(10.5,.2),(13.5,1.2))),
-                person('lf_passer','bystander',((5.6,-4.1),(5.9,0.),(6.1,3.9),(11.,3.9)),start=2.9))
+        # The passer crosses about 3.5 m ahead, between the robot and the leader.
+        people=(person('lf_leader','leader',((1.6,.2),(6.,.2),(7.2,1.))),
+                person('lf_passer','bystander',((3.4,-3.8),(3.5,0.),(3.6,3.8),(6.,4.)),start=1.5))
     elif name=='lookalike_parallel':
-        people=(person('lf_leader','leader',((1.6,.45),(17.,.45))),
-                person('lf_lookalike','bystander',((1.6,-.45),(17.,-.45))))
+        people=(person('lf_leader','leader',((1.6,.45),(8.5,.45),(9.5,1.))),
+                person('lf_lookalike','bystander',((1.6,-.45),(8.5,-.45),(9.7,-.1))))
     elif name=='lookalike_crossing':
-        # The pair swap sides; they never come closer than 1.5 m.
-        people=(person('lf_leader','leader',((1.7,-1.),(13.,1.6),(15.,1.6))),
-                person('lf_lookalike','bystander',((3.3,1.5),(13.5,-1.5),(15.5,-1.5))))
+        # The pair swap sides a few metres ahead and never come closer than 1.5 m.
+        people=(person('lf_leader','leader',((1.7,-1.),(8.,1.4),(9.5,1.4))),
+                person('lf_lookalike','bystander',((3.,1.4),(8.5,-1.2),(10.,-1.2))))
     elif name=='leader_stop':
         # The leader joins a standing group; a short step sets each member's facing.
-        group=(((11.,1.3),(10.6,.95)),((11.2,-1.1),(10.85,-.75)),((12.,-.1),(11.55,-.05)))
-        people=(person('lf_leader','leader',((1.6,0.),(9.7,.1))),
+        group=(((6.9,1.3),(6.5,.95)),((7.1,-1.1),(6.75,-.75)),((7.9,-.1),(7.45,-.05)))
+        people=(person('lf_leader','leader',((1.6,0.),(5.6,.1))),
                 *(person(f'lf_standing_{i}','bystander',(a,b),pace=.6) for i,(a,b) in enumerate(group)))
     elif name=='crowd':
-        # Oncoming, crossing and same-direction walkers; start times and paces
-        # were chosen so everyone keeps at least 0.85 m apart at every crowd size.
-        lanes=(((20.,1.6),(3.,2.),(1.2,3.6)),((8.,-4.1),(8.6,3.)),((19.5,-2.3),(3.,-3.1)),
-               ((4.5,-1.6),(19.,-1.1)),((15.5,3.9),(15.2,-4.1)),((21.,-.6),(18.8,-2.)),
-               ((2.2,-3.7),(11.,-3.7),(17.,-2.6)),((18.,4.),(6.5,4.)))
-        starts=(2.,1.4,1.1,3.6,.9,2.6,5.,1.5)
-        paces=(1.16,1.19,1.02,1.03,1.17,1.02,1.1,1.15)
-        people=(person('lf_leader','leader',((1.6,0.),(14.,.3))),
+        # A busy hall: a fast crosser between robot and leader, a slow pair
+        # crossing the view, walkers passing the robot on both sides and a
+        # standing trio. Start times keep everyone at least 0.8 m apart.
+        lanes=(((3.6,-4.),(3.8,4.)),((13.,-1.1),(2.4,-1.),(1.2,-2.6)),
+               ((6.9,4.),(6.6,-4.)),((7.75,4.1),(7.45,-3.9)),((13.5,2.7),(2.4,2.2),(1.,3.6)),
+               ((9.7,-3.),(9.4,-2.65)),((10.5,-3.4),(10.3,-3.)),((10.75,-1.8),(10.5,-2.1)))
+        starts=(2.4,2.5,7.5,7.5,1.5,0.,0.,0.)
+        paces=(1.35,1.15,.8,.8,1.1,.5,.5,.5)
+        people=(person('lf_leader','leader',((1.6,0.),(6.,0.),(8.5,1.2),(11.,1.)),pace=1.05),
                 *(person(f'lf_crowd_{i}','bystander',lanes[i],start=starts[i],pace=paces[i]) for i in range(crowd_size)))
     else:
         raise ValueError('Unknown scenario '+name)

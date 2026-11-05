@@ -120,7 +120,7 @@ def test_modern_office_routes_walk_at_a_natural_pace_without_contact():
         assert [p.name for p in scenario.people]==[p.name for p in load_scenario(name,8,'office').people]
         for person in scenario.people:
             speeds=[np.hypot(b.x-a.x,b.y-a.y)/(b.time-a.time) for a,b in zip(person.waypoints,person.waypoints[1:])]
-            assert max(speeds)<=1.25
+            assert max(speeds)<=1.4
             if person.role=='leader':assert max(speeds)>=1.
         tracks={p.name:np.array([p.sample(t)[:2] for t in times]) for p in scenario.people}
         for a,b in itertools.combinations(tracks,2):
@@ -195,3 +195,12 @@ def test_modern_office_starts_with_a_person_in_the_front_lidar_gate(name):
         offset=np.array(person.sample(0.)[:2])-lidar
         if .8<np.linalg.norm(offset)<1.85 and abs(np.arctan2(offset[1],offset[0]))<.7:return
     pytest.fail('no pedestrian inside the front-lidar start gate')
+
+
+def test_modern_office_people_pass_close_to_but_clear_of_the_robot():
+    times=np.linspace(0,20,401)
+    for name in SCENARIOS:
+        scenario=load_scenario(name,8,'modern_office')
+        distances=[np.hypot(*p.sample(t)[:2]) for p in scenario.people for t in times]
+        assert min(distances)>1.4 and min(distances)<2.5,name
+        assert max(np.hypot(*p.sample(t)[:2]) for p in scenario.people for t in times)<15.,name
