@@ -1,0 +1,30 @@
+{
+  "source_avatar": "Adults/Female_Adult_05",
+  "description": "pink jacket and jeans",
+  "animation_set": "f",
+  "walk_clip": "all_animations_max_motextr_xy/f_walk_neutral_01",
+  "idle_clip": "all_animations_max_motextr_static/f_idle_neutral_01",
+  "blender": "4.2.9 LTS",
+  "fps": 30,
+  "walk_frames": 36,
+  "cycle_seconds": 1.2,
+  "stride_m": 1.4565209847345093,
+  "gait_speed_mps": 1.2137674872787578,
+  "height_m": 1.744179129600525,
+  "idle_seconds": 8,
+  "idle_blend_seconds": 1,
+  "idle_cache_fps": 15,
+  "vertices": 4570,
+  "triangles": 8288,
+  "max_rekey_deviation_m": 1.339779305040182e-06,
+  "leg_length_ratio": 1.0000001297011112,
+  "rebound_unweighted_vertices": 0,
+  "idle_loop_gap_m": 0.0,
+  "sha256": {
+    "walk.npz": "4a58e51d3ae3fc15c083c2549dd552f8a4341cbe5e97ff07dc68082054641a7d",
+    "idle.npz": "b680f2157b60e2bdc2c23f4ccfdb6dd1dbf3ce14dc76b1a1f57e420b946b7098",
+    "walk.dae": "71127299b6108bc66e2697d681a5d6e2dfe31598899df31d1a9f6933c8f0fa7e",
+    "idle.dae": "c761ba1075daf86bb7f796e1d56f53bfa175669520fc6bb67d9bdc0994dbfb94",
+    "materials.json": "fde037c50f088c6f2a7c7182f84a41bd4b0724fad29ead08e54561dec8d5e948"
+  }
+}

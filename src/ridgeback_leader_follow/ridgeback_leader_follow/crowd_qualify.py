@@ -25,7 +25,7 @@ def validate_run(output, scene_profile='baseline'):
         scenario = load_recognition_scenario(manifest['scenario']['name'])
     elif scene_profile == 'realistic':
         from ridgeback_leader_follow.realistic_scene import load_scenario as realistic_scenario,manifest_entry
-        scenario=realistic_scenario(manifest['scenario']['name'],manifest['crowd_size'])
+        scenario=realistic_scenario(manifest['scenario']['name'],manifest['crowd_size'],manifest.get('environment','office'))
         expected=json.loads(json.dumps(manifest_entry(scenario,manifest['environment'])))
         if manifest.get('appearance')!=expected['appearance']:
             raise ValueError('Recorded realistic cast differs from its rendering contract')
@@ -90,7 +90,7 @@ def qualification_cases(backends,scene_profile,environments=None,scenarios=SCENA
     """World names are part of realistic case keys so evidence cannot collide."""
     from ridgeback_leader_follow.realistic_layout import ENVIRONMENTS
     if scene_profile=='realistic':
-        worlds=environments or ('office',)
+        worlds=environments or ('modern_office',)
         if any(world not in ENVIRONMENTS for world in worlds):raise ValueError('Unknown realistic environment')
     else:
         if environments:raise ValueError('Environment selection requires realistic profile')
@@ -107,7 +107,7 @@ def main():
     parser.add_argument('--record', action='store_true')
     parser.add_argument('--scene-profile', choices=('baseline', 'f3', 'realistic'), default='baseline',
                         help='Scene/sensor gates only; recognition needs separate evaluation')
-    parser.add_argument('--environments',nargs='+',choices=('office','warehouse','courtyard'))
+    parser.add_argument('--environments',nargs='+',choices=('modern_office','office','warehouse','courtyard'))
     parser.add_argument('--scenarios',nargs='+',choices=SCENARIOS,default=SCENARIOS)
     parser.add_argument('--crowd-sizes',nargs='+',type=int,choices=CROWD_SIZES,default=CROWD_SIZES)
     args = parser.parse_args()
@@ -150,7 +150,7 @@ def main():
              f'{label}: playback, sensors and simulator truth; no recognition claims')
     (root / 'qualification.json').write_text(json.dumps({
         'status': 'passed', 'scene_profile': args.scene_profile, 'scope': scope,
-        'environments':args.environments or (['office'] if args.scene_profile=='realistic' else []),
+        'environments':args.environments or (['modern_office'] if args.scene_profile=='realistic' else []),
         'results': results},indent=2)+'\n')
     print(f'{label} qualification passed; evidence: {root}',flush=True)
 

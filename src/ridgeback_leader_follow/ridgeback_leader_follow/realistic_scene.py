@@ -7,21 +7,25 @@ import shutil
 from xml.etree import ElementTree as ET
 
 import numpy as np
-from .realistic_layout import ENVIRONMENTS,PALETTE,layout
+from .realistic_layout import EMISSIVE,ENVIRONMENTS,PALETTE,layout
 
 
 @dataclass(frozen=True)
 class Pedestrian:
     model: str
     scale: float
-    clothing: tuple
+    clothing: tuple|None
 
 
-CAST=(Pedestrian('sam',1.05,(.06,.18,.48)),Pedestrian('harper',.96,(.42,.09,.08)),
-      Pedestrian('maya',1.,(.6,.7,1.)),Pedestrian('jordan',1.03,(.15,.18,.2)),
-      Pedestrian('sam',.98,(.18,.36,.14)),Pedestrian('harper',1.02,(.42,.3,.1)),
-      Pedestrian('jordan',.97,(.12,.24,.34)),Pedestrian('maya',1.04,(.7,1.,.65)),
-      Pedestrian('sam',1.,(.6,.22,.08)),Pedestrian('harper',1.,(.25,.13,.3)))
+# Microsoft Rocketbox (MIT) pedestrians at natural statures: the scale maps
+# each publisher skeleton (about 1.74 m women, 1.81 m men including hair) onto
+# 1.63-1.85 m people. Clothing is the publisher's own; no tint is applied.
+CAST=tuple(Pedestrian(model,scale,None) for model,scale in (
+    ('business_female_01',.97),('business_male_02',.97),('female_adult_05',.95),
+    ('male_adult_12',1.),('business_female_02',.94),('male_adult_17',.96),
+    ('female_adult_11',.96),('male_adult_03',.99),('business_male_05',.97),
+    ('female_party_02',.93),('male_adult_08',1.02),('business_female_03',.99),
+    ('business_male_04',.95),('male_adult_14',.98)))
 
 
 def asset_directory():
@@ -30,6 +34,8 @@ def asset_directory():
 
 
 def human_directory(model):
+    from .rocketbox_cast import ROSTER
+    if model in ROSTER:return asset_directory()/'rocketbox'/model
     return asset_directory().parent/'maya' if model=='maya' else asset_directory()/'humans'/model
 
 
@@ -43,22 +49,103 @@ def assign_people(scenario):
     return assigned
 
 
-def load_scenario(name,crowd_size=4):
-    """Keep six scenario families; the realistic alone route also includes turns."""
+def load_scenario(name,crowd_size=4,environment='office'):
+    """Six scenario families. The modern office walks them at a natural pace;
+    the earlier realistic worlds keep their recorded routes (alone adds turns)."""
     from dataclasses import replace
     from .crowd_scenarios import load_scenario as baseline,Waypoint
     scenario=baseline(name,crowd_size)
+    if environment=='modern_office':
+        return natural_scenario(name,crowd_size,scenario)
     if name=='leader_alone':
         leader=replace(scenario.people[0],waypoints=tuple(Waypoint(*p) for p in ((0,2,0),(6,4,0),(12,6,1.5),(16,8,1.5),(20,9,0))))
         scenario=replace(scenario,people=(leader,))
     return scenario
 
 
+# Walking pace for scripted routes. The baked gaits cover 0.95-1.2 m/s at the
+# cast's statures; gait phase follows distance, so stance feet stay planted.
+PACE=1.1
+
+
+def route(points,start=0.,pace=PACE,duration=20.,radius=.7):
+    """Waypoints along a polyline at `pace`, standing (idle) before and after.
+
+    Interior corners are rounded with short arcs so heading changes gradually.
+    """
+    from .crowd_scenarios import Waypoint
+    points=[np.asarray(p,float) for p in points];path=[points[0]]
+    for a,b,c in zip(points,points[1:],points[2:]):
+        r=min(radius,np.linalg.norm(b-a)/2,np.linalg.norm(c-b)/2)
+        p0=b+(a-b)/np.linalg.norm(a-b)*r;p2=b+(c-b)/np.linalg.norm(c-b)*r
+        for t in np.linspace(0,1,6):path.append((1-t)**2*p0+2*(1-t)*t*b+t**2*p2)
+    path.append(points[-1])
+    times=[start]
+    for a,b in zip(path,path[1:]):times.append(times[-1]+max(np.linalg.norm(b-a),1e-3)/pace)
+    if times[-1]>duration-.05:raise ValueError('Route does not finish inside the scenario')
+    waypoints=([Waypoint(0.,*map(float,path[0]))] if start>0 else [])
+    waypoints+=[Waypoint(round(t,4),float(x),float(y)) for t,(x,y) in zip(times,path)]
+    return tuple(waypoints)+(Waypoint(duration,*map(float,path[-1])),)
+
+
+def natural_scenario(name,crowd_size,baseline):
+    """Modern-office routes: same families and roles, natural walking speed."""
+    from .crowd_scenarios import CrowdScenario,PersonPath
+    colour=baseline.people[0].color
+    def person(key,role,points,start=0.,pace=PACE):return PersonPath(key,role,colour if role=='leader' or key=='lf_lookalike' else (.5,.5,.5),route(points,start,pace))
+    if name=='leader_alone':
+        # Away from the robot, a left jog, a turn-around and the walk back.
+        people=(person('lf_leader','leader',((1.6,-.3),(7.5,-.3),(10.,1.4),(14.,1.4),(15.4,.4),(14.4,-.7),(8.5,-1.))),)
+    elif name=='crossing':
+        # The passer crosses x~5.8 while the leader is ahead at x~8-9.
+        people=(person('lf_leader','leader',((1.6,.2),(10.5,.2),(13.5,1.2))),
+                person('lf_passer','bystander',((5.6,-4.1),(5.9,0.),(6.1,3.9),(11.,3.9)),start=2.9))
+    elif name=='lookalike_parallel':
+        people=(person('lf_leader','leader',((1.6,.45),(17.,.45))),
+                person('lf_lookalike','bystander',((1.6,-.45),(17.,-.45))))
+    elif name=='lookalike_crossing':
+        # Paths cross near x=8.3 about 1.3 s apart, so the pair swap sides.
+        people=(person('lf_leader','leader',((2.,-1.6),(13.,1.6),(15.,1.6))),
+                person('lf_lookalike','bystander',((3.5,1.8),(13.5,-1.5),(15.5,-1.5))))
+    elif name=='leader_stop':
+        # The leader joins a standing group; a short step sets each member's facing.
+        group=(((11.,1.3),(10.6,.95)),((11.2,-1.1),(10.85,-.75)),((12.,-.1),(11.55,-.05)))
+        people=(person('lf_leader','leader',((1.6,0.),(9.7,.1))),
+                *(person(f'lf_standing_{i}','bystander',(a,b),pace=.6) for i,(a,b) in enumerate(group)))
+    elif name=='crowd':
+        # Oncoming, crossing and same-direction walkers; start times and paces
+        # were chosen so everyone keeps at least 0.85 m apart at every crowd size.
+        lanes=(((20.,1.6),(3.,2.),(1.2,3.6)),((8.,-4.1),(8.6,3.)),((19.5,-2.3),(3.,-3.1)),
+               ((4.5,-1.6),(19.,-1.1)),((15.5,3.9),(15.2,-4.1)),((21.,-.6),(18.8,-2.)),
+               ((2.2,-3.7),(11.,-3.7),(17.,-2.6)),((18.,4.),(6.5,4.)))
+        starts=(2.,1.4,1.1,3.6,.9,2.6,5.,1.5)
+        paces=(1.16,1.19,1.02,1.03,1.17,1.02,1.1,1.15)
+        people=(person('lf_leader','leader',((1.6,0.),(14.,.3))),
+                *(person(f'lf_crowd_{i}','bystander',lanes[i],start=starts[i],pace=paces[i]) for i in range(crowd_size)))
+    else:
+        raise ValueError('Unknown scenario '+name)
+    return CrowdScenario(name,20.,people)
+
+
 def manifest_entry(scenario,environment):
     from dataclasses import asdict
-    return {'environment':environment,'geometry':'Textured architectural scene, CC0 Poly Haven props and Innerscene pedestrians',
+    return {'environment':environment,'geometry':'Textured architectural scene, CC0 Poly Haven props and MIT Microsoft Rocketbox pedestrians',
             'appearance':{name:asdict(spec) for name,spec in assign_people(scenario).items()},
             'qualification':'new visual profile; original F1/F2/F3 results do not qualify this population'}
+
+
+def load_motion(directory):
+    """Walk cache plus, when baked, the idle loop played while a person stands."""
+    with np.load(directory/'walk.npz') as source:data={k:source[k] for k in source.files}
+    if (directory/'idle.npz').exists():
+        with np.load(directory/'idle.npz') as source:data['idle']={k:source[k] for k in source.files}
+    return data
+
+
+def scaled_motion(data,scale):
+    result=dict(data);result['points']=data['points']*scale;result['gait_speed_mps']=float(data['gait_speed_mps'])*scale
+    if 'idle' in data:result['idle']=dict(data['idle'],points=data['idle']['points']*scale)
+    return result
 
 
 def _clothing(name):
@@ -228,6 +315,9 @@ def create_scene(stage,scenario,environment='office'):
         if box.name.startswith(('LightHousing','CoveLED')):
             mat=material('luminaire',(.95,.92,.84),.4)
             UsdShade.Shader.Get(stage,str(mat.GetPath())+'/Surface').CreateInput('emissiveColor',Sdf.ValueTypeNames.Color3f).Set(Gf.Vec3f(3.,2.85,2.55))
+        elif box.material in EMISSIVE:
+            mat=material('emissive_'+box.material,PALETTE[box.material][0],PALETTE[box.material][1])
+            UsdShade.Shader.Get(stage,str(mat.GetPath())+'/Surface').CreateInput('emissiveColor',Sdf.ValueTypeNames.Color3f).Set(Gf.Vec3f(*EMISSIVE[box.material]))
         UsdShade.MaterialBindingAPI.Apply(obj.GetPrim()).Bind(mat)
         if box.collision:UsdPhysics.CollisionAPI.Apply(obj.GetPrim())
     for prop in props:
@@ -245,6 +335,8 @@ def create_scene(stage,scenario,environment='office'):
             collider.AddTranslateOp().Set(Gf.Vec3d(-center[0],-center[1],1.))
             collider.MakeInvisible();UsdPhysics.CollisionAPI.Apply(collider.GetPrim())
         else:UsdPhysics.CollisionAPI.Apply(obj.GetPrim())
+    if environment=='modern_office':
+        _modern_office_lights(stage);return _people(stage,scenario,meshes,mesh,bind_asset)
     dome=UsdLux.DomeLight.Define(stage,'/Realistic/Lighting/Daylight');dome.CreateIntensityAttr(750. if environment!='courtyard' else 900.)
     dome.CreateTextureFileAttr(Sdf.AssetPath(str(root/'daylight.hdr')))
     dome.CreateTextureFormatAttr('latlong')
@@ -267,17 +359,48 @@ def create_scene(stage,scenario,environment='office'):
                 light.AddTranslateOp().Set(Gf.Vec3d(x,side*5.5,4.02));light.AddRotateXOp().Set(180.)
                 light.CreateWidthAttr(4.8);light.CreateHeightAttr(.08);light.CreateIntensityAttr(1800.)
                 light.CreateColorAttr(Gf.Vec3f(1.,.93,.82))
+    return _people(stage,scenario,meshes,mesh,bind_asset)
+
+
+def _people(stage,scenario,meshes,mesh,bind_asset):
+    from pxr import UsdGeom
     roots={}
     for person in scenario.people:
         spec=assign_people(scenario)[person.name];directory=human_directory(spec.model)
         if spec.model not in meshes:
-            with np.load(directory/'walk.npz') as source:meshes[spec.model]={k:source[k] for k in source.files}
-        data=dict(meshes[spec.model]);data['points']=data['points']*spec.scale;data['gait_speed_mps']=float(data['gait_speed_mps'])*spec.scale
+            meshes[spec.model]=load_motion(directory)
+        data=scaled_motion(meshes[spec.model],spec.scale)
         node=UsdGeom.Xform.Define(stage,'/People/'+person.name);translate=node.AddTranslateOp();rotate=node.AddRotateZOp()
         obj=mesh(str(node.GetPath())+'/human',data,data['points'][0]);bind_asset(obj,data,directory,spec.clothing if spec.model!="maya" else None)
         roots[person.name]=(node,translate,rotate,obj,data)
     return roots
 
+
+def _modern_office_lights(stage):
+    """Daylight through the south glazing plus soft linear ceiling light."""
+    from pxr import Gf,Sdf,UsdLux
+    from .realistic_layout import CEILING,layout
+    root=asset_directory()
+    dome=UsdLux.DomeLight.Define(stage,'/Realistic/Lighting/Daylight');dome.CreateIntensityAttr(1600.)
+    dome.CreateTextureFileAttr(Sdf.AssetPath(str(root/'daylight.hdr')));dome.CreateTextureFormatAttr('latlong')
+    dome.GetPrim().CreateAttribute('visibleInPrimaryRay',Sdf.ValueTypeNames.Bool).Set(True)
+    # Low sun from the south-west casting window light across the floor.
+    sun=UsdLux.DistantLight.Define(stage,'/Realistic/Lighting/Sun');sun.AddRotateXYZOp().Set(Gf.Vec3f(52,0,-25))
+    sun.CreateIntensityAttr(4500.);sun.CreateAngleAttr(.6);sun.CreateColorAttr(Gf.Vec3f(1.,.95,.88))
+    # Sky fill just inside the glazing, angled into the room.
+    for i,x in enumerate(range(-1,24,5)):
+        fill=UsdLux.RectLight.Define(stage,f'/Realistic/Lighting/WindowFill{i}')
+        fill.AddTranslateOp().Set(Gf.Vec3d(x,-7.2,1.6));fill.AddRotateXYZOp().Set(Gf.Vec3f(80,0,0))
+        fill.CreateWidthAttr(4.8);fill.CreateHeightAttr(2.6);fill.CreateIntensityAttr(2500.)
+        fill.CreateColorAttr(Gf.Vec3f(.9,.95,1.))
+        fill.GetPrim().CreateAttribute('visibleInPrimaryRay',Sdf.ValueTypeNames.Bool).Set(False)
+    boxes,_=layout('modern_office')
+    for box in boxes:
+        if box.material!='led':continue
+        light=UsdLux.RectLight.Define(stage,'/Realistic/Lighting/'+box.name);light.AddTranslateOp().Set(Gf.Vec3d(box.position[0],box.position[1],CEILING-.04))
+        light.CreateWidthAttr(box.size[0]);light.CreateHeightAttr(.3);light.CreateIntensityAttr(22000.)
+        light.CreateColorAttr(Gf.Vec3f(1.,.97,.92))
+        light.GetPrim().CreateAttribute('visibleInPrimaryRay',Sdf.ValueTypeNames.Bool).Set(False)
 
 def gazebo_world(scenario,output,environment):
     """Same layout and cast, native Gazebo actor animation and textured meshes."""
@@ -293,6 +416,14 @@ def gazebo_world(scenario,output,environment):
             for name,image in SOURCE_IMAGES.items():
                 path=human_directory("maya")/image
                 text=text.replace(f'<init_from>{name}.png</init_from>',f'<init_from>{path.as_uri()}</init_from>')
+        elif (directory/'idle.dae').exists():
+            # Rocketbox: publisher outfit, unique texture names, separate idle clip.
+            for clip in ('walk','idle'):
+                text=(directory/(clip+'.dae')).read_text()
+                for file in [*directory.glob('*.jpg'),*directory.glob('*.png')]:
+                    text=text.replace(f'<init_from>{file.name}</init_from>',f'<init_from>{file.as_uri()}</init_from>')
+                target=output/(person.name+('' if clip=='walk' else '_idle')+'.dae');target.parent.mkdir(parents=True,exist_ok=True);target.write_text(text)
+            skins[person.name]=output/(person.name+'.dae');continue
         else:
             text=(directory/'walk.dae').read_text()
             for file in directory.glob('image_*.png'):text=text.replace(f'<init_from>{file.name}</init_from>',f'<init_from>{file.as_uri()}</init_from>')
@@ -313,7 +444,19 @@ def gazebo_world(scenario,output,environment):
     for light in list(world.findall('light')):world.remove(light)
     sun=ET.SubElement(world,'light',name='daylight',type='directional');ET.SubElement(sun,'direction').text='-0.3 0.4 -1';ET.SubElement(sun,'diffuse').text='0.95 0.94 0.9 1'
     scene=ET.SubElement(world,'scene');ET.SubElement(scene,'ambient').text='.45 .45 .45 1';ET.SubElement(scene,'background').text='.58 .72 .87 1';ET.SubElement(scene,'shadows').text='true'
-    if environment!='courtyard':
+    if environment=='modern_office':
+        # Daylight enters through the south glazing; ceiling runs add soft fill.
+        sun.find('direction').text='0.35 0.75 -0.55'
+        scene.find('ambient').text='.5 .5 .5 1';scene.find('background').text='.7 .8 .92 1'
+        for i,(x,y) in enumerate((x,y) for x in (1.,7.,13.,19.) for y in (-3.5,2.)):
+            light=ET.SubElement(world,'light',name=f'ceiling_run_{i}',type='point')
+            ET.SubElement(light,'pose').text=f'{x} {y} 2.85 0 0 0'
+            ET.SubElement(light,'diffuse').text='0.75 0.72 0.66 1';ET.SubElement(light,'specular').text='0.15 0.15 0.15 1'
+            ET.SubElement(light,'cast_shadows').text='false'
+            attenuation=ET.SubElement(light,'attenuation')
+            for key,value in [('range',12),('constant',.7),('linear',.06),('quadratic',.03)]:
+                ET.SubElement(attenuation,key).text=str(value)
+    elif environment!='courtyard':
         for i,x in enumerate((0,5,10,15)):
             light=ET.SubElement(world,'light',name=f'ceiling_panel_{i}',type='point')
             ET.SubElement(light,'pose').text=f'{x} 0 {3.65 if environment=="office" else 4.65} 0 0 0'
@@ -323,13 +466,23 @@ def gazebo_world(scenario,output,environment):
             for key,value in [('range',16),('constant',.6),('linear',.03),('quadratic',.02)]:
                 ET.SubElement(attenuation,key).text=str(value)
     for actor in world.findall('actor'):
-        spec=cast[actor.get('name')]
-        for element in (actor.find('skin'),actor.find('animation')):ET.SubElement(element,'scale').text=str(spec.scale)
+        spec=cast[actor.get('name')];idle=output/(actor.get('name')+'_idle.dae')
+        if idle.exists():
+            animation=ET.SubElement(actor,'animation',name='idle');ET.SubElement(animation,'filename').text=str(idle)
+            ET.SubElement(animation,'interpolate_x').text='false'
+        for element in (actor.find('skin'),*actor.findall('animation')):ET.SubElement(element,'scale').text=str(spec.scale)
     controller=next(p for p in world.findall('plugin') if p.get('name')=='leader_follow::CrowdMotion')
     for config in controller.findall('person'):
         spec=cast[config.findtext('name')]
-        with np.load(human_directory(spec.model)/'walk.npz') as data:speed=float(data['gait_speed_mps'])*spec.scale
-        ET.SubElement(config,'gait_speed').text=str(speed)
+        directory=human_directory(spec.model)
+        with np.load(directory/'walk.npz') as data:
+            ET.SubElement(config,'gait_speed').text=str(float(data['gait_speed_mps'])*spec.scale)
+            ET.SubElement(config,'cycle').text=str(float(data['cycle_seconds']))
+        if (directory/'idle.npz').exists():
+            from .crowd_geometry import idle_offset
+            with np.load(directory/'idle.npz') as data:cycle=float(data['cycle_seconds'])
+            ET.SubElement(config,'idle_cycle').text=str(cycle)
+            ET.SubElement(config,'idle_offset').text=str(idle_offset(config.findtext('name'),cycle))
     def model(name,position,yaw=0.):
         obj=ET.SubElement(world,'model',name=name);ET.SubElement(obj,'static').text='true'
         ET.SubElement(obj,'pose').text=' '.join(map(str,(*position,0,0,np.deg2rad(yaw))))
@@ -348,6 +501,8 @@ def gazebo_world(scenario,output,environment):
                 color,rough,metal=PALETTE[box.material];mat=ET.SubElement(item,'material');ET.SubElement(mat,'diffuse').text=' '.join(map(str,(*color,1.)))
                 if box.name.startswith(('LightHousing','CoveLED')):
                     ET.SubElement(mat,'emissive').text='1 0.94 0.82 1'
+                elif box.material in EMISSIVE:
+                    ET.SubElement(mat,'emissive').text=' '.join(f'{min(v/3.,1.):.3f}' for v in EMISSIVE[box.material])+' 1'
                 texture=root/'surfaces'/box.material
                 if texture.exists():
                     pbr=ET.SubElement(ET.SubElement(mat,'pbr'),'metal')

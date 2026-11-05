@@ -1,0 +1,30 @@
+{
+  "source_avatar": "Adults/Male_Adult_17",
+  "description": "cap, blue track jacket",
+  "animation_set": "m",
+  "walk_clip": "all_animations_max_motextr_xy/m_walk_neutral_01",
+  "idle_clip": "all_animations_max_motextr_static/m_idle_neutral_01",
+  "blender": "4.2.9 LTS",
+  "fps": 30,
+  "walk_frames": 36,
+  "cycle_seconds": 1.2,
+  "stride_m": 1.2140405818470055,
+  "gait_speed_mps": 1.0117004848725046,
+  "height_m": 1.815627932548523,
+  "idle_seconds": 8,
+  "idle_blend_seconds": 1,
+  "idle_cache_fps": 15,
+  "vertices": 3564,
+  "triangles": 7084,
+  "max_rekey_deviation_m": 8.23348151656467e-07,
+  "leg_length_ratio": 1.0000001509416716,
+  "rebound_unweighted_vertices": 0,
+  "idle_loop_gap_m": 0.0,
+  "sha256": {
+    "walk.npz": "5040a2a539cb699d23508d954b14cf5c1157c550f28f63f3acb2298c345d3c5e",
+    "idle.npz": "71f1f46a6a438a64036e01466987dfce7f0c486ac7c54f24e53e6bb63c20315a",
+    "walk.dae": "4c9043ce1424f8a356042e2302f0f8dd7bc6bfa654c7a4313929530ca389eb3e",
+    "idle.dae": "bd59ba43ac4cda69f162a2548531e7b8775549161ce30838e5759f37c4d306f8",
+    "materials.json": "5767a953cd5914bae554578ba545235eaf8eb6810b51c8a06e8b4d7d7b5c7406"
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "source": "potted_plant_04.gltf",
+  "max_export_pose_deviation_m": 0.0,
+  "source_polygon_count": 8929,
+  "triangle_budget": null,
+  "blender": "4.2.9 LTS",
+  "floor_center_translation": [
+    3.725290298461914e-09,
+    -0.008432555943727493,
+    0.0003753884811885655
+  ],
+  "dimensions_m": [
+    0.16788631677627563,
+    0.18475142121315002,
+    0.26745766401290894
+  ],
+  "vertices": 5882,
+  "triangles": 8929,
+  "removed_loose_edges": 0,
+  "sha256": {
+    "mesh.npz": "f47ac578d596e8d604f9348775030602830205f4b82413b9ff5755b45d533399",
+    "model.dae": "dca8ee1a31978992c6d1b0d2892ceb7b7494c4f4e92dd17ae18ae7e9c5d063bb",
+    "materials.json": "5453a7d68e6665c6f36e9efadf2e288ad26a2cdd8365edc9661ffcadf9a56532"
+  }
+}

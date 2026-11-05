@@ -1,0 +1,30 @@
+{
+  "source_avatar": "Adults/Female_Party_02",
+  "description": "curly hair, patterned top",
+  "animation_set": "f",
+  "walk_clip": "all_animations_max_motextr_xy/f_walk_neutral_01",
+  "idle_clip": "all_animations_max_motextr_static/f_idle_neutral_01",
+  "blender": "4.2.9 LTS",
+  "fps": 30,
+  "walk_frames": 36,
+  "cycle_seconds": 1.2,
+  "stride_m": 1.4565207273974046,
+  "gait_speed_mps": 1.2137672728311706,
+  "height_m": 1.798707365989685,
+  "idle_seconds": 8,
+  "idle_blend_seconds": 1,
+  "idle_cache_fps": 15,
+  "vertices": 5961,
+  "triangles": 9874,
+  "max_rekey_deviation_m": 9.685754776000977e-07,
+  "leg_length_ratio": 0.9999999530217906,
+  "rebound_unweighted_vertices": 4,
+  "idle_loop_gap_m": 0.0,
+  "sha256": {
+    "walk.npz": "a960ff775e696d52b29524d6edc7746359fffc0ac28ca9bb1170ad3a73c47c6b",
+    "idle.npz": "ffe9dde239658e64ee808e7731234b7949556b3269af97e777f14c3241c9e3a8",
+    "walk.dae": "6acc0ecf39b491339f41ef07d975966a64b93fc8e974f46b37a4ee37e619346b",
+    "idle.dae": "ddda26b9aacb9127ed82ad12868aa90f58b70b62efcf6e47f5d488bc263a6e58",
+    "materials.json": "6917c5e912b4f7a9a8e10978e0fc2f7b9b5338cc2ce1970ba659a985183a0ec8"
+  }
+}

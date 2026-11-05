@@ -13,8 +13,14 @@ import requests
 MODELS = ('modern_arm_chair_01','sofa_03','modern_coffee_table_01','potted_plant_02',
           'metal_office_desk','wooden_crate_01','barrel_03','plastic_crate_01',
           'painted_wooden_bench','street_lamp_01','tree_small_02',
-          'binder_notebook','book_encyclopedia_set_01','metal_trash_can','grass_medium_01','shrub_01')
-SURFACES = ('wood_floor','concrete_floor_02','brick_pavement_02','brick_wall_001','grass_ground','wood_table_001')
+          'binder_notebook','book_encyclopedia_set_01','metal_trash_can','grass_medium_01','shrub_01',
+          # Modern office furnishing.
+          'mid_century_lounge_chair','coffee_table_round_01','modern_ceiling_lamp_01','potted_plant_04',
+          'wooden_display_shelves_01','side_table_01','modern_wooden_cabinet')
+SURFACES = ('wood_floor','concrete_floor_02','brick_pavement_02','brick_wall_001','grass_ground','wood_table_001',
+            'laminate_floor_02','painted_plaster_wall','white_oak_veneer','marble_01','denim_fabric_04')
+# Large modern-office surfaces fill much of the camera view; fetch them at 2K.
+SURFACE_RESOLUTION = {'laminate_floor_02':'2k','painted_plaster_wall':'2k','white_oak_veneer':'2k'}
 HUMANS = {
     'sam':'relaxed-walk-sam-3d-person-animated-732f1206',
     'jordan':'relaxed-walk-jordan-3d-person-animated-7ab9479d',
@@ -53,7 +59,7 @@ def main():
     for key in SURFACES:
         response=requests.get('https://api.polyhaven.com/files/'+key,headers=HEADERS,timeout=45);response.raise_for_status();spec=response.json()
         for channel in ('Diffuse','Rough','nor_gl'):
-            item=spec[channel]['1k']['jpg'];path=output/'surfaces'/key/(channel+'.jpg')
+            item=spec[channel][SURFACE_RESOLUTION.get(key,'1k')]['jpg'];path=output/'surfaces'/key/(channel+'.jpg')
             receipt['files'][str(path.relative_to(output))]=fetch(item['url'],path)
     key='kloofendal_48d_partly_cloudy_puresky'
     response=requests.get('https://api.polyhaven.com/files/'+key,headers=HEADERS,timeout=45);response.raise_for_status()

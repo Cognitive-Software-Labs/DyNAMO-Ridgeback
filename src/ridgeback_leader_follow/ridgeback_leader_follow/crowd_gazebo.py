@@ -18,7 +18,7 @@ def run(scenario, duration, output, writer, gui, record=False, scene_profile='ba
 
     if scene_profile == 'realistic':
         from ridgeback_leader_follow.realistic_scene import gazebo_world as realistic_world
-        world = realistic_world(scenario, output / 'actors', environment or 'office')
+        world = realistic_world(scenario, output / 'actors', environment or 'modern_office')
     elif scene_profile == 'f3':
         from ridgeback_leader_follow.f3_scene import gait_speed, gazebo_actor_skins
         world = gazebo_world(scenario, gazebo_actor_skins(scenario, output / 'actors'), gait_speed())

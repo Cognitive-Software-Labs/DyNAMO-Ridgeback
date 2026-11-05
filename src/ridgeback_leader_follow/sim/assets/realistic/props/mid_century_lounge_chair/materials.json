@@ -1,0 +1,19 @@
+[
+  {
+    "doubleSided": true,
+    "name": "mid_century_lounge_chair_material_0",
+    "normalTexture": {
+      "index": 0
+    },
+    "pbrMetallicRoughness": {
+      "baseColorTexture": {
+        "index": 1
+      },
+      "metallicRoughnessTexture": {
+        "index": 2
+      }
+    },
+    "image": "textures/mid_century_lounge_chair_diff_1k.jpg",
+    "normal_image": "textures/mid_century_lounge_chair_nor_gl_1k.jpg"
+  }
+]

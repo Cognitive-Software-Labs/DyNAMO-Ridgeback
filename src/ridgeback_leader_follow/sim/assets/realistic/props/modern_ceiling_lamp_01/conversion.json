@@ -1,0 +1,25 @@
+{
+  "source": "modern_ceiling_lamp_01.gltf",
+  "max_export_pose_deviation_m": 0.0,
+  "source_polygon_count": 5602,
+  "triangle_budget": null,
+  "blender": "4.2.9 LTS",
+  "floor_center_translation": [
+    2.8252601623535156e-05,
+    -0.0015027299523353577,
+    0.22109216451644897
+  ],
+  "dimensions_m": [
+    0.4316493272781372,
+    0.4316607713699341,
+    0.9515514969825745
+  ],
+  "vertices": 3538,
+  "triangles": 5602,
+  "removed_loose_edges": 0,
+  "sha256": {
+    "mesh.npz": "09dfb97186729f58c58ad97c42a81ba9f95f6c5e4082cdbb1c5f3ccbd29bd15e",
+    "model.dae": "070f78db1c3fc22e093f3ae434ef74d3db14af59841e2cb0b7e78721740690c2",
+    "materials.json": "78a186b96c0f86104629998eff4101a872ade92731cfb9e8b708d81a5dab1a37"
+  }
+}

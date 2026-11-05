@@ -1,0 +1,19 @@
+[
+  {
+    "doubleSided": true,
+    "name": "coffee_table_round_01_material_0",
+    "normalTexture": {
+      "index": 0
+    },
+    "pbrMetallicRoughness": {
+      "baseColorTexture": {
+        "index": 1
+      },
+      "metallicRoughnessTexture": {
+        "index": 2
+      }
+    },
+    "image": "textures/coffee_table_round_01_diff_1k.jpg",
+    "normal_image": "textures/coffee_table_round_01_nor_gl_1k.jpg"
+  }
+]

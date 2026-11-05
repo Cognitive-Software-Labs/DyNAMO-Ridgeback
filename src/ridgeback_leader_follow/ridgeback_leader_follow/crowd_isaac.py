@@ -57,7 +57,7 @@ def run(scenario, duration, output, writer, gui, finish, record=False, scene_pro
         stage = context.get_stage()
         if scene_profile == 'realistic':
             from ridgeback_leader_follow.realistic_scene import create_scene
-            people = create_scene(stage, scenario, environment or 'office')
+            people = create_scene(stage, scenario, environment or 'modern_office')
         elif scene_profile == 'lab':
             from ridgeback_leader_follow.lab_scene import create_scene
             people = create_scene(stage, scenario)

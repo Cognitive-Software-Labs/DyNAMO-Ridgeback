@@ -58,6 +58,13 @@ class PersonPath:
             total += fraction * math.hypot(b.x - a.x, b.y - a.y)
         return total
 
+    def moving(self, time: float) -> bool:
+        """True while a segment with displacement is being walked; False when standing."""
+        for a, b in zip(self.waypoints, self.waypoints[1:]):
+            if a.time <= time < b.time:
+                return (b.x, b.y) != (a.x, a.y)
+        return False
+
     def animation_time(self, time: float) -> float:
         return self.distance(time) / 0.5
 

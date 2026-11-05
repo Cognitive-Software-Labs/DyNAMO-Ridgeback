@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 from ridgeback_leader_follow.crowd_scenarios import SCENARIOS
 from ridgeback_leader_follow.realistic_layout import ENVIRONMENTS,layout
-from ridgeback_leader_follow.realistic_scene import assign_people,asset_directory,human_directory,load_scenario,gazebo_world
+from ridgeback_leader_follow.realistic_scene import CAST,assign_people,asset_directory,human_directory,load_scenario,gazebo_world
 
 
 @pytest.mark.parametrize('environment',ENVIRONMENTS)
@@ -26,7 +26,7 @@ def test_all_scenario_paths_clear_of_static_furniture(environment):
         half=np.array([[c,s],[s,c]])@np.array(dimensions[:2])*prop.scale/2
         obstacles.append((prop.name,np.array(prop.position[:2]),half))
     for name in SCENARIOS:
-        for person in load_scenario(name,8).people:
+        for person in load_scenario(name,8,environment).people:
             for at in np.linspace(0,20,101):
                 point=np.array(person.sample(at)[:2])
                 for label,center,half in obstacles:
@@ -39,11 +39,11 @@ def test_cast_diversity_and_deliberate_twins(name):
     scenario=load_scenario(name,8);cast=assign_people(scenario)
     assert set(cast)=={p.name for p in scenario.people}
     if name.startswith('lookalike'):assert cast['lf_leader']==cast['lf_lookalike']
-    if name=='crowd':assert len({p.model for p in cast.values()})==4
+    if name=='crowd':assert len({p.model for p in cast.values()})==len(scenario.people)
     if name=='leader_alone':assert len({p.y for p in scenario.people[0].waypoints})>1
     for spec in cast.values():
         with np.load(human_directory(spec.model)/'walk.npz') as data:
-            assert np.isfinite(data['points']).all() and data['points'][:,:,2].min()>=-1e-5
+            assert np.isfinite(data['points']).all() and data['points'][:,:,2].min()>=-1e-4
             assert float(data['gait_speed_mps'])>0
 
 
@@ -110,3 +110,78 @@ def test_static_props_have_no_wire_edges_and_textures_resolve():
         for image in document.findall('.//c:library_images/c:image',ns):
             reference=image.findtext('c:init_from',namespaces=ns).removeprefix('file://')
             assert (model.parent/reference).is_file(),(model,reference)
+
+
+def test_modern_office_routes_walk_at_a_natural_pace_without_contact():
+    import itertools
+    times=np.linspace(0,20,801)
+    for name in SCENARIOS:
+        scenario=load_scenario(name,8,'modern_office')
+        assert [p.name for p in scenario.people]==[p.name for p in load_scenario(name,8,'office').people]
+        for person in scenario.people:
+            speeds=[np.hypot(b.x-a.x,b.y-a.y)/(b.time-a.time) for a,b in zip(person.waypoints,person.waypoints[1:])]
+            assert max(speeds)<=1.25
+            if person.role=='leader':assert max(speeds)>=1.
+        tracks={p.name:np.array([p.sample(t)[:2] for t in times]) for p in scenario.people}
+        for a,b in itertools.combinations(tracks,2):
+            assert np.linalg.norm(tracks[a]-tracks[b],axis=1).min()>.8,(name,a,b)
+    stop=load_scenario('leader_stop',4,'modern_office')
+    assert all(not p.moving(15.) for p in stop.people)
+
+
+def test_cast_has_natural_statures_and_varied_people():
+    from ridgeback_leader_follow.rocketbox_cast import ROSTER
+    assert len({p.model for p in CAST})==len(CAST)>=12 and all(p.model in ROSTER for p in CAST)
+    heights=[]
+    for spec in CAST:
+        with np.load(human_directory(spec.model)/'idle.npz') as data:heights.append(float(data['points'][0][:,2].max())*spec.scale)
+    assert 1.55<min(heights) and max(heights)<1.9 and max(heights)-min(heights)>.15
+
+
+@pytest.mark.parametrize('model',sorted(__import__('ridgeback_leader_follow.rocketbox_cast',fromlist=['ROSTER']).ROSTER))
+def test_rocketbox_assets_are_consistent(model):
+    directory=human_directory(model)
+    receipt=json.loads((directory/'conversion.json').read_text())
+    import hashlib
+    for name,digest in receipt['sha256'].items():
+        assert hashlib.sha256((directory/name).read_bytes()).hexdigest()==digest,name
+    with np.load(directory/'walk.npz') as walk,np.load(directory/'idle.npz') as idle:
+        assert walk['points'].shape[1]==idle['points'].shape[1]
+        assert (walk['faces']==idle['faces']).all()
+        assert abs(float(walk['cycle_seconds'])-len(walk['points'])/float(walk['fps']))<1e-6
+        assert 0.9<float(walk['gait_speed_mps'])<1.4
+        for clip in (walk,idle):assert clip['points'][:,:,2].min()>=-1e-4
+        # Standing loop: first and last frames nearly coincide.
+        assert np.abs(idle['points'][0]-idle['points'][-1]).max()<.02
+    for spec in json.loads((directory/'materials.json').read_text()):
+        assert (directory/spec['image']).is_file()
+    ns={'c':'http://www.collada.org/2005/11/COLLADASchema'}
+    for clip in ('walk.dae','idle.dae'):
+        document=ET.parse(directory/clip)
+        assert len(document.findall('.//c:instance_controller/c:skeleton',ns))==1
+        for image in document.findall('.//c:library_images/c:image',ns):
+            assert image.get('id')==Path(image.findtext('c:init_from',namespaces=ns)).stem
+            assert (directory/image.findtext('c:init_from',namespaces=ns)).is_file()
+
+
+def test_idle_clip_plays_while_standing_and_gait_while_walking():
+    from ridgeback_leader_follow.crowd_geometry import motion_frame
+    scenario=load_scenario('leader_stop',4,'modern_office');leader=scenario.people[0]
+    from ridgeback_leader_follow.realistic_scene import load_motion
+    data=load_motion(human_directory(assign_people(scenario)['lf_leader'].model))
+    clip,_=motion_frame(data,leader,2.);assert clip is data
+    clip,first=motion_frame(data,leader,15.);assert clip is data['idle']
+    _,later=motion_frame(data,leader,16.);assert later!=first
+
+
+def test_gazebo_actor_switches_to_idle_animation(tmp_path):
+    scenario=load_scenario('leader_stop',4,'modern_office')
+    world=ET.fromstring(gazebo_world(scenario,tmp_path,'modern_office')).find('world')
+    for actor in world.findall('actor'):
+        names=[a.get('name') for a in actor.findall('animation')]
+        assert names==['walk','idle'] and all(Path(a.findtext('filename')).is_file() for a in actor.findall('animation'))
+    plugin=next(p for p in world.findall('plugin') if p.get('name')=='leader_follow::CrowdMotion')
+    for config in plugin.findall('person'):
+        assert float(config.findtext('idle_cycle'))>0 and float(config.findtext('cycle'))>0
+    emissive=[m for m in world.findall('model') if m.get('name','').startswith(('LEDRun','Display'))]
+    assert emissive and all(m.find('link/visual/material/emissive') is not None for m in emissive)

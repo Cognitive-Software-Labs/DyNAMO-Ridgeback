@@ -1,0 +1,22 @@
+[
+  {
+    "name": "m012_body",
+    "doubleSided": true,
+    "pbrMetallicRoughness": {
+      "metallicFactor": 0.0,
+      "roughnessFactor": 0.72
+    },
+    "image": "m012_body_color.jpg",
+    "normal_image": "m012_body_normal.jpg"
+  },
+  {
+    "name": "m012_head",
+    "doubleSided": true,
+    "pbrMetallicRoughness": {
+      "metallicFactor": 0.0,
+      "roughnessFactor": 0.72
+    },
+    "image": "m012_head_color.jpg",
+    "normal_image": "m012_head_normal.jpg"
+  }
+]

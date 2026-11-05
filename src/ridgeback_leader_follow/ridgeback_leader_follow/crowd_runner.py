@@ -65,8 +65,8 @@ def main(argv=None):
                         help='Repeat a continuous 30-second lab walk (1..120 cycles)')
     parser.add_argument('--scene-profile', choices=SCENE_PROFILES, default='baseline',
                         help='Lab uses a CC0 casual pedestrian and furnished corridor (Isaac only); '
-                             'f3 uses distinct outfits; realistic adds textured worlds and four character models')
-    parser.add_argument('--environment',choices=('office','warehouse','courtyard'),help='Realistic-profile world; defaults to office')
+                             'f3 uses distinct outfits; realistic adds textured worlds and Rocketbox pedestrians')
+    parser.add_argument('--environment',choices=('modern_office','office','warehouse','courtyard'),help='Realistic-profile world; defaults to modern_office')
     parser.add_argument('--gui', action='store_true', help='Open a simulator window')
     parser.add_argument('--crowd-size', type=int, choices=CROWD_SIZES, default=4)
     parser.add_argument('--record', action='store_true', help='Record sensor topics to a ROS bag')
@@ -74,7 +74,7 @@ def main(argv=None):
     args = parser.parse_args(argv)
     if args.environment is not None and args.scene_profile != "realistic":
         parser.error("--environment requires --scene-profile realistic")
-    if args.scene_profile == "realistic":args.environment=args.environment or "office"
+    if args.scene_profile == "realistic":args.environment=args.environment or "modern_office"
     if args.scene_profile == 'lab' and args.backend != 'isaac':
         parser.error('The lab profile currently requires --backend isaac')
     if args.ros_domain is None:
@@ -90,7 +90,7 @@ def main(argv=None):
         scenario = load_scenario(args.scenario, args.crowd_size)
     if args.scene_profile == 'realistic':
         from ridgeback_leader_follow.realistic_scene import load_scenario as realistic_scenario
-        scenario=realistic_scenario(args.scenario,args.crowd_size)
+        scenario=realistic_scenario(args.scenario,args.crowd_size,args.environment)
     if args.demo_cycles:
         if args.scene_profile != 'lab' or args.duration is not None or not 1 <= args.demo_cycles <= 120:
             parser.error('demo-cycles requires lab, 1..120 cycles, and no duration override')

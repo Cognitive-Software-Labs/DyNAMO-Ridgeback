@@ -1,0 +1,30 @@
+{
+  "source_avatar": "Professions/Business_Male_04",
+  "description": "older, waistcoat",
+  "animation_set": "m",
+  "walk_clip": "all_animations_max_motextr_xy/m_walk_neutral_01",
+  "idle_clip": "all_animations_max_motextr_static/m_idle_neutral_01",
+  "blender": "4.2.9 LTS",
+  "fps": 30,
+  "walk_frames": 36,
+  "cycle_seconds": 1.2,
+  "stride_m": 1.214040536377464,
+  "gait_speed_mps": 1.01170044698122,
+  "height_m": 1.8044748306274414,
+  "idle_seconds": 8,
+  "idle_blend_seconds": 1,
+  "idle_cache_fps": 15,
+  "vertices": 3685,
+  "triangles": 7326,
+  "max_rekey_deviation_m": 8.537094249819384e-07,
+  "leg_length_ratio": 1.0000001134886003,
+  "rebound_unweighted_vertices": 0,
+  "idle_loop_gap_m": 0.0,
+  "sha256": {
+    "walk.npz": "f81880748914b752c64282d2716cc0b4e48f19706cb94018835c76816eb1a8b6",
+    "idle.npz": "433ddfb369c3531d8ef336c1d3a47726f6949ae2e361853be4688ff5cc292df6",
+    "walk.dae": "a0683e70e8f2d7928e68ad7eaeb2ca9da207efa2b6827ed72f75b1516bd67598",
+    "idle.dae": "c5c83959bf255e209e544a96a4e9420d3e12abd2463799932e44a2fbe3d33fe2",
+    "materials.json": "038736bc59434a85a87510ec75a78d5df08af982977384b0a06045f0e4fb2f0e"
+  }
+}

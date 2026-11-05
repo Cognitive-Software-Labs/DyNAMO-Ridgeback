@@ -1,0 +1,30 @@
+{
+  "source_avatar": "Adults/Male_Adult_03",
+  "description": "older, grey hair, tweed jacket",
+  "animation_set": "m",
+  "walk_clip": "all_animations_max_motextr_xy/m_walk_neutral_01",
+  "idle_clip": "all_animations_max_motextr_static/m_idle_neutral_01",
+  "blender": "4.2.9 LTS",
+  "fps": 30,
+  "walk_frames": 36,
+  "cycle_seconds": 1.2,
+  "stride_m": 1.214040536377464,
+  "gait_speed_mps": 1.01170044698122,
+  "height_m": 1.8090392351150513,
+  "idle_seconds": 8,
+  "idle_blend_seconds": 1,
+  "idle_cache_fps": 15,
+  "vertices": 3749,
+  "triangles": 7200,
+  "max_rekey_deviation_m": 9.904789627801387e-07,
+  "leg_length_ratio": 1.0000001134886003,
+  "rebound_unweighted_vertices": 0,
+  "idle_loop_gap_m": 0.0,
+  "sha256": {
+    "walk.npz": "8edebafef3a0e16f65aef075c6d6194759555fbe0fd2ad8bfa0f00b982cb9fc0",
+    "idle.npz": "b2d228408aa9d045fd3b174b5e0aeac40f56ffea27a735a52a646abc526a84d8",
+    "walk.dae": "df51e29fdb6066cbdbb9bb0271bddc06daf14930e1f43cdf9de6de419741135d",
+    "idle.dae": "f8ea2ca9bfb0bfca3061e62c799c21992838b2afa542eea94b1a057993c3b90a",
+    "materials.json": "c889c1633184c39bb7d0ecf6942ba640480915a99da53c2c6f0488765a7e745b"
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "source": "modern_wooden_cabinet.gltf",
+  "max_export_pose_deviation_m": 1.1920928955078125e-07,
+  "source_polygon_count": 24976,
+  "triangle_budget": null,
+  "blender": "4.2.9 LTS",
+  "floor_center_translation": [
+    5.960464477539063e-08,
+    0.01000000536441803,
+    1.6823410987854004e-05
+  ],
+  "dimensions_m": [
+    2.440000534057617,
+    0.5199999809265137,
+    0.6801425218582153
+  ],
+  "vertices": 31535,
+  "triangles": 24976,
+  "removed_loose_edges": 0,
+  "sha256": {
+    "mesh.npz": "33ba9e9ad5e50bb545dc2163352308b41c5962f65681d061a2bfc0e209c5bdcb",
+    "model.dae": "59862968e339f57dbfe3f0aab0d86a0dbd8d808e88895af0923ee2f158498b64",
+    "materials.json": "5c16b0919976f4881986d1dec5de42aa39cee29b4d2a64b489505e90260e9219"
+  }
+}

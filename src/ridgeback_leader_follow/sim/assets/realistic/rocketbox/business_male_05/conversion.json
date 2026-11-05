@@ -1,0 +1,30 @@
+{
+  "source_avatar": "Professions/Business_Male_05",
+  "description": "charcoal suit, violet shirt",
+  "animation_set": "m",
+  "walk_clip": "all_animations_max_motextr_xy/m_walk_neutral_01",
+  "idle_clip": "all_animations_max_motextr_static/m_idle_neutral_01",
+  "blender": "4.2.9 LTS",
+  "fps": 30,
+  "walk_frames": 36,
+  "cycle_seconds": 1.2,
+  "stride_m": 1.214040536377464,
+  "gait_speed_mps": 1.01170044698122,
+  "height_m": 1.8028576374053955,
+  "idle_seconds": 8,
+  "idle_blend_seconds": 1,
+  "idle_cache_fps": 15,
+  "vertices": 3606,
+  "triangles": 7164,
+  "max_rekey_deviation_m": 1.1581759185685542e-06,
+  "leg_length_ratio": 1.0000001134886003,
+  "rebound_unweighted_vertices": 0,
+  "idle_loop_gap_m": 0.0,
+  "sha256": {
+    "walk.npz": "0afcd3ef31e4aca5c42f4f90b29cd0552ad28df7ab2f0784f08b03c3f2c2ce25",
+    "idle.npz": "3fa46f0a352004055a3da276820354f6b56e25b8fd4528d02e8f3a02904ef742",
+    "walk.dae": "9cd44bca95848ca37623e4133f3fea92499bf577cf6c64107b481efafdf9afb4",
+    "idle.dae": "9c79566b99d89687e7d63933fe9cd7edfc60728f9b64f2bb926fa8cc74726abc",
+    "materials.json": "387a3284112256201648283d94fd6870e5222db3fbcc4e57ad41cd5c4a14fa9d"
+  }
+}

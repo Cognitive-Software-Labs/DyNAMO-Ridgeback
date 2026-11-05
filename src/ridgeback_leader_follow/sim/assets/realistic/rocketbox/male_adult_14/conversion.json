@@ -1,0 +1,30 @@
+{
+  "source_avatar": "Adults/Male_Adult_14",
+  "description": "older, grey shirt and chinos",
+  "animation_set": "m",
+  "walk_clip": "all_animations_max_motextr_xy/m_walk_neutral_01",
+  "idle_clip": "all_animations_max_motextr_static/m_idle_neutral_01",
+  "blender": "4.2.9 LTS",
+  "fps": 30,
+  "walk_frames": 36,
+  "cycle_seconds": 1.2,
+  "stride_m": 1.214040536377464,
+  "gait_speed_mps": 1.01170044698122,
+  "height_m": 1.7970103025436401,
+  "idle_seconds": 8,
+  "idle_blend_seconds": 1,
+  "idle_cache_fps": 15,
+  "vertices": 3443,
+  "triangles": 6842,
+  "max_rekey_deviation_m": 1.2880672684296554e-06,
+  "leg_length_ratio": 1.0000001134886003,
+  "rebound_unweighted_vertices": 0,
+  "idle_loop_gap_m": 0.0,
+  "sha256": {
+    "walk.npz": "c69bdc583bff79c2110a9ad0552674c6b1569c18cc19c2990ff9f5e37fbf6454",
+    "idle.npz": "ba126aebd71f4947d62fc0b8f653e8863850d6e68350e82293d0ab624771611c",
+    "walk.dae": "f77aecac141785ef886298a5d1106e90d709739450b653ecd62bab49e7c23f4c",
+    "idle.dae": "0ce7f1e6460550f134191941d47eb03d6b14d70b13d70291485e3b1f9c771ab5",
+    "materials.json": "438b99440e087663cf6dc0821e65acb8c3f9249e04df90dd7b13aa4a10faec48"
+  }
+}

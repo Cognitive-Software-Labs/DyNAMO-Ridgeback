@@ -22,7 +22,8 @@ namespace leader_follow {
 struct Waypoint { double t, x, y; };
 struct Person {
   std::string name;
-  double gaitSpeed{.5};
+  double gaitSpeed{.5}, cycle{2.}, idleCycle{0.}, idleOffset{0.};
+  std::string clip;
   std::vector<Waypoint> path;
   gz::sim::Entity entity{gz::sim::kNullEntity};
   gz::math::Pose3d Sample(double t, double &distance) const {
@@ -38,6 +39,13 @@ struct Person {
       if (t < b.t) return {a.x+f*dx,a.y+f*dy,0.,0.,0.,yaw};
     }
     return {end.x,end.y,0.,0.,0.,yaw};
+  }
+  // Matches PersonPath.moving(): standing segments and the path end are idle.
+  bool Moving(double t) const {
+    for (size_t i = 1; i < path.size(); ++i)
+      if (path[i-1].t <= t && t < path[i].t)
+        return path[i].x != path[i-1].x || path[i].y != path[i-1].y;
+    return false;
   }
 };
 
@@ -72,6 +80,9 @@ class CrowdMotion : public gz::sim::System,
       Person person;
       person.name = p->Get<std::string>("name");
       person.gaitSpeed = p->HasElement("gait_speed") ? p->Get<double>("gait_speed") : gaitSpeed;
+      if (p->HasElement("cycle")) person.cycle = p->Get<double>("cycle");
+      if (p->HasElement("idle_cycle")) person.idleCycle = p->Get<double>("idle_cycle");
+      if (p->HasElement("idle_offset")) person.idleOffset = p->Get<double>("idle_offset");
       for (auto w = p->GetElement("waypoint"); w;
            w = w->GetNextElement("waypoint")) {
         auto v = w->Get<gz::math::Vector3d>();
@@ -95,9 +106,19 @@ class CrowdMotion : public gz::sim::System,
       double distance;
       auto pose = person.Sample(elapsed,distance);
       ecm.SetComponentData<gz::sim::components::TrajectoryPose>(person.entity,pose);
-      ecm.SetComponentData<gz::sim::components::AnimationName>(person.entity,"walk");
+      // Idle loop while standing (when the actor has one); gait follows distance.
+      bool idle = person.idleCycle > 0. && !person.Moving(elapsed);
+      std::string clip = idle ? "idle" : "walk";
+      ecm.SetComponentData<gz::sim::components::AnimationName>(person.entity,clip);
+      if (clip != person.clip) {
+        person.clip = clip;
+        ecm.SetChanged(person.entity,gz::sim::components::AnimationName::typeId,
+                       gz::sim::ComponentState::OneTimeChange);
+      }
+      double seconds = idle ? std::fmod(elapsed+person.idleOffset,person.idleCycle)
+                            : std::fmod(distance/person.gaitSpeed,person.cycle);
       auto phase = std::chrono::duration_cast<std::chrono::steady_clock::duration>(
-          std::chrono::duration<double>(std::fmod(distance/person.gaitSpeed,2.)));
+          std::chrono::duration<double>(seconds));
       auto animation = ecm.Component<gz::sim::components::AnimationTime>(person.entity);
       if (animation) *animation = gz::sim::components::AnimationTime(phase);
       else ecm.CreateComponent(person.entity,gz::sim::components::AnimationTime(phase));

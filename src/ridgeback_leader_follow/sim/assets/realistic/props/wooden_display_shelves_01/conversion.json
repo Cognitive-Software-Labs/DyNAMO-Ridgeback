@@ -1,0 +1,25 @@
+{
+  "source": "wooden_display_shelves_01.gltf",
+  "max_export_pose_deviation_m": 0.0,
+  "source_polygon_count": 3174,
+  "triangle_budget": null,
+  "blender": "4.2.9 LTS",
+  "floor_center_translation": [
+    0.0,
+    0.0,
+    0.0004363059997558594
+  ],
+  "dimensions_m": [
+    0.3715096414089203,
+    1.077760934829712,
+    1.5561838150024414
+  ],
+  "vertices": 2717,
+  "triangles": 3174,
+  "removed_loose_edges": 0,
+  "sha256": {
+    "mesh.npz": "c22216cf0223f815561f55dd2400eb1d25eea1e6bade0a6d6aa2c757448f8e19",
+    "model.dae": "16b0e3d2c5847e890d59b9d26392344f026ba33ae670a3da799cefeb0a45c4e6",
+    "materials.json": "ff8af95f117595afd2222c399f285220a070a595bf8035f61cf28f1aa9de8820"
+  }
+}

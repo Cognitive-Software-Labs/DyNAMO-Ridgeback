@@ -6,6 +6,25 @@ textured architectural surfaces. The existing F1/F2/F3
 benchmark results apply to their recorded profiles; they do not qualify these
 new worlds or characters. The observation robot remains stationary.
 
+## Work-in-progress modern office
+
+The realistic profile now defaults to `modern_office`, a new clean office
+layout with glazed rooms and contemporary furnishings. The cast uses fourteen
+Microsoft Rocketbox models with publisher clothing, natural stature variation,
+and walk/idle animation assets. Sources are pinned in `rocketbox_cast.py`;
+asset download receipts and the Microsoft MIT licence are stored under
+`sim/assets/realistic/rocketbox/`. The earlier Sam/Maya/Harper/Jordan assets
+remain available, but are no longer the default realistic cast.
+
+This is a work-in-progress snapshot. Automated checks currently fail, including
+character foot-height assertions; new renders and full playback qualification
+are required before treating this population as validated. The earlier figures
+and playback evidence below describe the preceding four-model population,
+not the new Rocketbox cast or modern office.
+
+Run the new layout with `--scene-profile realistic --environment modern_office`.
+The baseline and F3 profiles remain separate.
+
 ## Worlds and people
 
 | `--environment` | Contents |
@@ -14,7 +33,7 @@ new worlds or characters. The observation robot remains stationary.
 | `warehouse` | Concrete floor, roof/skylight and clerestory windows, storage racks, crates, barrels, aisle markings, loading door and pedestrian signs |
 | `courtyard` | Paved walkways, planted grass/shrub beds, trees, benches, street lamps, bins, wayfinding and windowed building facades |
 
-Four source characters are available: Sam and Maya in casual clothing, Harper
+The preceding realistic population used four source characters: Sam and Maya in casual clothing, Harper
 and Jordan in business clothing. Clothing colours and uniform stature scaling
 provide additional variants. Casual trousers keep neutral colours when shirt
 colours change. The cast reuses these four models; it is not a
@@ -76,7 +95,7 @@ isaac_venv/bin/python -m ridgeback_leader_follow.crowd_runner \
 | Stop in a group | `leader_stop` | Leader stops among standing pedestrians |
 | Crowd | `crowd` | Combined paths with `--crowd-size 2`, `4` or `8` bystanders |
 
-`--environment` requires `--scene-profile realistic`; its default is `office`.
+`--environment` requires `--scene-profile realistic`; its default is `modern_office`.
 The other five routes reuse the original fixture paths. Only the realistic
 alone route adds turns; original baseline and F3 routes are unchanged.
 All normal recording, private-domain and owned-process cleanup options apply.

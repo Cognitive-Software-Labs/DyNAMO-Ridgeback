@@ -1,0 +1,30 @@
+{
+  "source_avatar": "Adults/Female_Adult_11",
+  "description": "brown knit dress and boots",
+  "animation_set": "f",
+  "walk_clip": "all_animations_max_motextr_xy/f_walk_neutral_01",
+  "idle_clip": "all_animations_max_motextr_static/f_idle_neutral_01",
+  "blender": "4.2.9 LTS",
+  "fps": 30,
+  "walk_frames": 36,
+  "cycle_seconds": 1.2,
+  "stride_m": 1.4565205929487623,
+  "gait_speed_mps": 1.2137671607906353,
+  "height_m": 1.7370952367782593,
+  "idle_seconds": 8,
+  "idle_blend_seconds": 1,
+  "idle_cache_fps": 15,
+  "vertices": 4758,
+  "triangles": 8896,
+  "max_rekey_deviation_m": 5.189724017021808e-07,
+  "leg_length_ratio": 0.9999998607137077,
+  "rebound_unweighted_vertices": 0,
+  "idle_loop_gap_m": 0.0,
+  "sha256": {
+    "walk.npz": "61b9fab9be6cf79c3a733e3074639d7840c71335b2fa7cc2c4a24cba2e2b9ec6",
+    "idle.npz": "5844ad4accccde4cad52f894b071fb61770a44714b01e62666090703191b8db1",
+    "walk.dae": "2c6cd8f0d9e49bd2f5c304db39ae3538e4faf705a98f74661c9bb6ff1554be21",
+    "idle.dae": "230ca82a47912a5de48de8c050d8616602112d2eb7cac85f30f2d686893f59d3",
+    "materials.json": "c0be08d3ca3af34e2ed76b43c8321013f0f607e5186e5832eeda2bc3f39aff0f"
+  }
+}

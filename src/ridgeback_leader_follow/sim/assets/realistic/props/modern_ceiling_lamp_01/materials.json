@@ -1,0 +1,58 @@
+[
+  {
+    "doubleSided": true,
+    "name": "modern_ceiling_lamp_01_glass_material_0",
+    "normalTexture": {
+      "index": 0
+    },
+    "pbrMetallicRoughness": {
+      "baseColorTexture": {
+        "index": 1
+      },
+      "metallicRoughnessTexture": {
+        "index": 2
+      }
+    },
+    "image": "textures/modern_ceiling_lamp_01_diff_1k.jpg",
+    "normal_image": "textures/modern_ceiling_lamp_01_nor_gl_1k.jpg"
+  },
+  {
+    "doubleSided": true,
+    "name": "modern_ceiling_lamp_01_material_1",
+    "normalTexture": {
+      "index": 3
+    },
+    "pbrMetallicRoughness": {
+      "baseColorTexture": {
+        "index": 4
+      },
+      "metallicRoughnessTexture": {
+        "index": 5
+      }
+    },
+    "image": "textures/modern_ceiling_lamp_01_diff_1k.jpg",
+    "normal_image": "textures/modern_ceiling_lamp_01_nor_gl_1k.jpg"
+  },
+  {
+    "doubleSided": true,
+    "emissiveFactor": [
+      0.6229580640792847,
+      0.5416215658187866,
+      0.4745504856109619
+    ],
+    "name": "modern_ceiling_globe_material_2",
+    "normalTexture": {
+      "index": 6
+    },
+    "pbrMetallicRoughness": {
+      "baseColorTexture": {
+        "index": 7
+      },
+      "metallicRoughnessTexture": {
+        "index": 8
+      }
+    },
+    "image": "textures/modern_ceiling_lamp_01_diff_1k.jpg",
+    "normal_image": "textures/modern_ceiling_lamp_01_nor_gl_1k.jpg"
+  }
+]

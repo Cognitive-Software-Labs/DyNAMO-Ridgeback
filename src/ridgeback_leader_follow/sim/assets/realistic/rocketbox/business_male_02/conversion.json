@@ -1,0 +1,30 @@
+{
+  "source_avatar": "Professions/Business_Male_02",
+  "description": "navy suit and tie",
+  "animation_set": "m",
+  "walk_clip": "all_animations_max_motextr_xy/m_walk_neutral_01",
+  "idle_clip": "all_animations_max_motextr_static/m_idle_neutral_01",
+  "blender": "4.2.9 LTS",
+  "fps": 30,
+  "walk_frames": 36,
+  "cycle_seconds": 1.2,
+  "stride_m": 1.214040536377464,
+  "gait_speed_mps": 1.01170044698122,
+  "height_m": 1.826408863067627,
+  "idle_seconds": 8,
+  "idle_blend_seconds": 1,
+  "idle_cache_fps": 15,
+  "vertices": 3863,
+  "triangles": 7448,
+  "max_rekey_deviation_m": 9.651593800050527e-07,
+  "leg_length_ratio": 1.0000001134886003,
+  "rebound_unweighted_vertices": 0,
+  "idle_loop_gap_m": 0.0,
+  "sha256": {
+    "walk.npz": "70f6e3eed92d1c5a62d1ce9fc5a005c3ec3271186e5443cb0f1f299a4ab11af5",
+    "idle.npz": "20bb2630a26c3bcc3573eb6a97665d9eed07cad5625b26469785c4e099f24340",
+    "walk.dae": "1684789aff8ebadbcca8b5c820297f67b2fc20fc876bfb15ba72f9a54ad33c2c",
+    "idle.dae": "1d8fb839428a6a10069ce3cf9e64d26564975a7f1a4d0e1e2c8078ded3eba90f",
+    "materials.json": "62723b600f8c72447eb3b8137ea0ee15bea78647e39bf3d55f535c603c651027"
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "source_avatar": "Professions/Business_Female_02",
+  "description": "older, glasses, burgundy blazer",
+  "animation_set": "f",
+  "walk_clip": "all_animations_max_motextr_xy/f_walk_neutral_01",
+  "idle_clip": "all_animations_max_motextr_static/f_idle_neutral_01",
+  "blender": "4.2.9 LTS",
+  "fps": 30,
+  "walk_frames": 36,
+  "cycle_seconds": 1.2,
+  "stride_m": 1.4565206601730833,
+  "gait_speed_mps": 1.2137672168109028,
+  "height_m": 1.7287975549697876,
+  "idle_seconds": 8,
+  "idle_blend_seconds": 1,
+  "idle_cache_fps": 15,
+  "vertices": 4732,
+  "triangles": 8640,
+  "max_rekey_deviation_m": 6.343065695104826e-07,
+  "leg_length_ratio": 0.9999999068677491,
+  "rebound_unweighted_vertices": 0,
+  "idle_loop_gap_m": 0.0,
+  "sha256": {
+    "walk.npz": "5f20982120c480371d9f806b2844957f07150313d6e5ec5468cb98a3d6a3fe04",
+    "idle.npz": "f4a1f7cc397024d813c755566b912ec23185582a707ba0992a5262f8eeaf2cd7",
+    "walk.dae": "f49db1cd2603c3aabb96e61ee593b06843ef5b396ba2177193fcc2ae4ea274d2",
+    "idle.dae": "ec3b6234535655e0ca6dc1f40d261ba8fc058b91d8f1694fd173334b3ebf3f71",
+    "materials.json": "7ba9ae2110db86b6b3d65088213b94bae00ea184aebcd3476a9dfea9d2a4f941"
+  }
+}

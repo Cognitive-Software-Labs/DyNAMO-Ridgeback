@@ -142,6 +142,29 @@ def create_isaac_scene(stage, scenario):
     return roots
 
 
+def idle_offset(name, cycle):
+    """Deterministic per-person phase so standing people do not breathe in unison."""
+    import zlib
+    return (zlib.crc32(name.encode()) % 1000) / 1000. * cycle
+
+
+def motion_frame(data, person, scenario_time):
+    """Clip and frame for a person: idle loop while standing (when baked), else gait.
+
+    Gait phase follows travelled distance, so foot motion matches path speed.
+    Shared by the Isaac animation and offline mesh annotations; the Gazebo
+    plugin implements the same rule from the per-person values it is given.
+    """
+    idle = data['idle'] if 'idle' in data else None
+    if idle is not None and not person.moving(scenario_time):
+        cycle = float(idle['cycle_seconds'])
+        phase = (scenario_time + idle_offset(person.name, cycle)) % cycle
+        return idle, int(phase * float(idle['fps'])) % len(idle['points'])
+    speed = float(data['gait_speed_mps']) if 'gait_speed_mps' in data else .5
+    phase = (person.distance(scenario_time) / speed) % float(data['cycle_seconds'])
+    return data, int(phase * float(data['fps'])) % len(data['points'])
+
+
 def animate_isaac_person(handle, person, scenario_time):
     import math
     from pxr import Gf
@@ -149,9 +172,7 @@ def animate_isaac_person(handle, person, scenario_time):
     x, y, yaw = person.sample(scenario_time)
     translate.Set(Gf.Vec3d(x, y, 0.))
     rotate.Set(math.degrees(yaw))
-    speed = float(data['gait_speed_mps']) if 'gait_speed_mps' in data else .5
-    phase = (person.distance(scenario_time) / speed) % float(data['cycle_seconds'])
-    frame = int(phase * float(data['fps'])) % len(data['points'])
-    mesh.GetPointsAttr().Set(data['points'][frame])
-    if 'normals' in data:
-        mesh.GetNormalsAttr().Set(data['normals'][frame])
+    clip, frame = motion_frame(data, person, scenario_time)
+    mesh.GetPointsAttr().Set(clip['points'][frame])
+    if 'normals' in clip:
+        mesh.GetNormalsAttr().Set(clip['normals'][frame])

@@ -31,9 +31,11 @@ def projection_meshes(run,manifest,scenario):
             spec=manifest.get('appearance',{}).get(person.name)
             if spec is None:raise ValueError('Missing recorded character for '+person.name)
             model=spec['model'];scale=float(spec['scale'])
-            if model not in ('maya','sam','harper','jordan') or not np.isfinite(scale) or scale<=0:
+            from ridgeback_leader_follow.rocketbox_cast import ROSTER
+            if model not in ('maya','sam','harper','jordan',*ROSTER) or not np.isfinite(scale) or scale<=0:
                 raise ValueError('Invalid recorded character or scale')
-            relative=Path('maya') if model=='maya' else Path('realistic/humans')/model
+            relative=(Path('maya') if model=='maya' else Path('realistic/rocketbox')/model if model in ROSTER
+                      else Path('realistic/humans')/model)
         else:
             relative=Path('maya' if profile in ('f3','lab') else 'cesium_man')
         if relative not in cache:
@@ -47,6 +49,14 @@ def projection_meshes(run,manifest,scenario):
                 raise ValueError('Recorded mesh hash mismatch: '+str(path))
             with np.load(path) as source:
                 cache[relative]={k:source[k] for k in ('points','faces','fps','cycle_seconds','gait_speed_mps') if k in source}
+            idle=path.parent/'idle.npz'
+            if idle.exists():
+                # The standing loop must be the recorded one, like the walk.
+                expected=manifest.get('input_sha256',{}).get(str(Path('simulation_inputs/assets')/relative/'idle.npz'))
+                if expected is None or hashlib.sha256(idle.read_bytes()).hexdigest()!=expected:
+                    raise ValueError('Recorded idle mesh hash absent or mismatched: '+str(idle))
+                with np.load(idle) as source:
+                    cache[relative]['idle']={k:source[k] for k in ('points','fps','cycle_seconds')}
         assigned[person.name]=(cache[relative],scale)
     return assigned
 

@@ -1,0 +1,25 @@
+{
+  "source": "coffee_table_round_01.gltf",
+  "max_export_pose_deviation_m": 0.0,
+  "source_polygon_count": 4044,
+  "triangle_budget": null,
+  "blender": "4.2.9 LTS",
+  "floor_center_translation": [
+    -8.940696716308594e-08,
+    0.0,
+    -0.0013774335384368896
+  ],
+  "dimensions_m": [
+    1.3013010025024414,
+    1.3013015985488892,
+    0.4910094439983368
+  ],
+  "vertices": 3339,
+  "triangles": 4044,
+  "removed_loose_edges": 0,
+  "sha256": {
+    "mesh.npz": "980982420e127f49d73d28e5e671954ce285a9d8ef27bebfc4343ce1744663a3",
+    "model.dae": "3388cb250a55281fb691d41f27258b8c3b5f31d3fe4acbf0cac4b78dbc1124df",
+    "materials.json": "d8bdb124cbeff1d02cbeb459b51e075bc2b7c138e8391002620b77cd2b88bc28"
+  }
+}

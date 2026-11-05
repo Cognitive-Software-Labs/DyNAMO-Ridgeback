@@ -1,0 +1,25 @@
+{
+  "source": "mid_century_lounge_chair.gltf",
+  "max_export_pose_deviation_m": 0.0,
+  "source_polygon_count": 6148,
+  "triangle_budget": null,
+  "blender": "4.2.9 LTS",
+  "floor_center_translation": [
+    2.9802322387695312e-08,
+    0.06620714068412781,
+    -5.651812884366336e-08
+  ],
+  "dimensions_m": [
+    1.0086143016815186,
+    1.1903107166290283,
+    1.1690846681594849
+  ],
+  "vertices": 4203,
+  "triangles": 6148,
+  "removed_loose_edges": 0,
+  "sha256": {
+    "mesh.npz": "2b01973df6b5603cfc4a40782b05f3051a27ffa695a7211d1b899a4adc4d4cf9",
+    "model.dae": "a314e3a802219e949706300195fea48bc20c4409bf9593956919f95be7946530",
+    "materials.json": "7cef8784ee1ae155070aa699ad0b0c1c59b04ec50d0ece056d1ce87128477b04"
+  }
+}
